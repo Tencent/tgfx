@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProxyProvider.h"
-#include "core/ShapeBezierTriangulator.h"
+#include "core/HairlineTriangulator.h"
 #include "core/ShapeRasterizer.h"
 #include "core/utils/HardwareBufferUtil.h"
 #include "core/utils/MathExtra.h"
@@ -249,13 +249,15 @@ std::shared_ptr<GPUHairlineProxy> ProxyProvider::createGPUHairlineProxy(
   auto lineIndexProxy = findOrWrapGPUBufferProxy(lineIndexKey);
   auto quadVertexProxy = findOrWrapGPUBufferProxy(quadVertexKey);
   auto quadIndexProxy = findOrWrapGPUBufferProxy(quadIndexKey);
-  if (lineVertexProxy != nullptr && lineIndexProxy != nullptr && quadVertexProxy != nullptr &&
-      quadIndexProxy != nullptr) {
+  bool lineBuffersValid = (lineVertexProxy != nullptr) == (lineIndexProxy != nullptr);
+  bool quadBuffersValid = (quadVertexProxy != nullptr) == (quadIndexProxy != nullptr);
+  bool hasAnyBuffer = lineVertexProxy != nullptr || quadVertexProxy != nullptr;
+  if (lineBuffersValid && quadBuffersValid && hasAnyBuffer) {
     return std::make_shared<GPUHairlineProxy>(drawingMatrix, std::move(lineVertexProxy),
                                               std::move(lineIndexProxy), std::move(quadVertexProxy),
                                               std::move(quadIndexProxy));
   }
-  auto rasterizer = std::make_unique<ShapeBezierTriangulator>(shape, hasCap);
+  auto rasterizer = std::make_unique<HairlineTriangulator>(shape, hasCap);
   std::unique_ptr<DataSource<HairlineBuffer>> dataSource = nullptr;
 #ifdef TGFX_USE_THREADS
   if (!(renderFlags & RenderFlags::DisableAsyncTask)) {

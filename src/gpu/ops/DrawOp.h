@@ -31,8 +31,8 @@ class DrawOp {
     ShapeDrawOp,
     AtlasTextOp,
     Quads3DDrawOp,
-    HairlineLineDrawOp,
-    HairlineQuadDrawOp,
+    HairlineLineOp,
+    HairlineQuadOp,
   };
 
   virtual ~DrawOp() = default;

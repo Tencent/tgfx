@@ -20,7 +20,7 @@
 
 #include "ResourceTask.h"
 #include "core/DataSource.h"
-#include "core/ShapeBezierTriangulator.h"
+#include "core/HairlineTriangulator.h"
 
 namespace tgfx {
 

@@ -29,8 +29,8 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
-#include "gpu/ops/HairlineLineDrawOp.h"
-#include "gpu/ops/HairlineQuadDrawOp.h"
+#include "gpu/ops/HairlineLineOp.h"
+#include "gpu/ops/HairlineQuadOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -241,9 +241,9 @@ void OpsCompositor::drawHairlineShape(std::shared_ptr<Shape> shape, const MCStat
     return;
   }
   auto coverage = GetHairlineAlphaFactor(*stroke, state.matrix);
-  auto lineDrawOp = HairlineLineDrawOp::Make(hairlineProxy, dstColor, uvMatrix, coverage, aaType);
+  auto lineDrawOp = HairlineLineOp::Make(hairlineProxy, dstColor, uvMatrix, coverage, aaType);
   addDrawOp(std::move(lineDrawOp), clip, brush, localBounds, deviceBounds, drawScale);
-  auto quadDrawOp = HairlineQuadDrawOp::Make(hairlineProxy, dstColor, uvMatrix, coverage, aaType);
+  auto quadDrawOp = HairlineQuadOp::Make(hairlineProxy, dstColor, uvMatrix, coverage, aaType);
   addDrawOp(std::move(quadDrawOp), clip, brush, localBounds, deviceBounds, drawScale);
 }
 

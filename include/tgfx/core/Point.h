@@ -185,6 +185,9 @@ struct Point {
     return (a.x * b.x) + (a.y * b.y);
   }
 
+  /**
+   * Returns the cross product of a and b (the z-component of the 3D cross product).
+   */
   static float CrossProduct(const Point& a, const Point& b) {
     return (a.x * b.y) - (a.y * b.x);
   }

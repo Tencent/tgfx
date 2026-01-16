@@ -1,5 +1,5 @@
 #include <vector>
-#include "core/ShapeBezierTriangulator.h"
+#include "core/HairlineTriangulator.h"
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/PathUtils.h"
 #include "core/utils/StrokeUtils.h"

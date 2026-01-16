@@ -36,9 +36,9 @@ struct HairlineBuffer {
   std::shared_ptr<Data> quadIndices = nullptr;
 };
 
-class ShapeBezierTriangulator : public DataSource<HairlineBuffer> {
+class HairlineTriangulator : public DataSource<HairlineBuffer> {
  public:
-  ShapeBezierTriangulator(std::shared_ptr<Shape> shape, bool hasCap);
+  HairlineTriangulator(std::shared_ptr<Shape> shape, bool hasCap);
 
   std::shared_ptr<HairlineBuffer> getData() const override;
 

@@ -61,7 +61,9 @@ class GPUHairlineProxy {
   }
 
   Context* getContext() const {
-    return lineVertexProxy ? lineVertexProxy->context : nullptr;
+    if (lineVertexProxy) return lineVertexProxy->context;
+    if (quadVertexProxy) return quadVertexProxy->context;
+    return nullptr;
   }
 
  private:

@@ -16,14 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ShapeBezierTriangulator.h"
+#include "HairlineTriangulator.h"
 #include <cstddef>
 #include "core/utils/PathUtils.h"
 #include "core/utils/PointUtils.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Point.h"
-#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 
@@ -40,7 +39,7 @@ struct LineVertex {
 };
 
 struct ConicData {
-  float KML[3];
+  float KML[3] = {};
 };
 
 struct PaddingData {
@@ -75,7 +74,6 @@ constexpr uint16_t QUAD_INDEX_BUFFER_PATTERN[] = {0, 1, 2, 2, 4, 3, 1, 4, 2};
 
 constexpr int QUAD_NUM_INDICES = std::size(QUAD_INDEX_BUFFER_PATTERN);
 constexpr int QUAD_NUM_VERTICES = 5;
-// constexpr int kQuadsNumInIdxBuffer = 256;
 
 std::vector<uint32_t> GetQuadsIndexBuffer(size_t numQuads) {
   std::vector<uint32_t> indices;
@@ -114,7 +112,6 @@ constexpr uint16_t LINE_INDEX_BUFFER_PATTERN[] = {0, 1, 3, 0, 3, 2, 0, 4, 5,
 
 constexpr int LINE_NUM_INDICES = std::size(LINE_INDEX_BUFFER_PATTERN);
 constexpr int LINE_NUM_VERTICES = 6;
-// constexpr int kLineSegsNumInIdxBuffer = 256;
 
 std::vector<uint32_t> GetLinesIndexBuffer(size_t numLines) {
   std::vector<uint32_t> indices;
@@ -132,10 +129,9 @@ std::vector<uint32_t> GetLinesIndexBuffer(size_t numLines) {
 
 // Takes 178th time of logf on Z600 / VC2010
 int GetFloatExp(float x) {
-  static_assert(sizeof(int) == sizeof(float));
-  int bits;
-  std::memcpy(&bits, &x, sizeof(float));
-  return ((bits & 0x7f800000) >> 23) - 127;
+  int exponent = 0;
+  std::frexp(x, &exponent);
+  return exponent - 1;
 }
 
 // Returns true if quad/conic is degenerate or close to it (should be approximated with lines).
@@ -202,6 +198,11 @@ struct PathDecomposerContext {
   Point& zeroVerbPt;
 };
 
+bool IsZeroLengthLine(const Point& p0, const Point& p1) {
+  constexpr float POINT_EPSILON_SQD = 1e-12f;
+  return PointUtils::DistanceSquared(p0, p1) < POINT_EPSILON_SQD;
+}
+
 void AddChoppedQuad(PathDecomposerContext& ctx, const Point devPts[3], bool isContourStart) {
   int subdiv = NumQuadSubdivs(devPts);
   DEBUG_ASSERT(subdiv >= -1);
@@ -211,10 +212,10 @@ void AddChoppedQuad(PathDecomposerContext& ctx, const Point devPts[3], bool isCo
     ctx.lines.push_back(devPts[1]);
     ctx.lines.push_back(devPts[1]);
     ctx.lines.push_back(devPts[2]);
-    if (isContourStart && ctx.lines[index] == ctx.lines[index + 1] &&
-        ctx.lines[index + 2] == ctx.lines[index + 3]) {
+    if (isContourStart && IsZeroLengthLine(ctx.lines[index], ctx.lines[index + 1]) &&
+        IsZeroLengthLine(ctx.lines[index + 2], ctx.lines[index + 3])) {
       ctx.seenZeroLengthVerb = true;
-      ctx.zeroVerbPt = ctx.lines[0];
+      ctx.zeroVerbPt = ctx.lines[index];
     }
   } else {
     ctx.quads.push_back(devPts[0]);
@@ -249,7 +250,7 @@ void ProcessPathVerb(PathVerb verb, const Point points[4], void* userData) {
       ctx->matrix.mapPoints(devPoints, points, 2);
       ctx->lines.push_back(devPoints[0]);
       ctx->lines.push_back(devPoints[1]);
-      if (ctx->verbsInContour == 0 && devPoints[0] == devPoints[1]) {
+      if (ctx->verbsInContour == 0 && IsZeroLengthLine(devPoints[0], devPoints[1])) {
         ctx->seenZeroLengthVerb = true;
         ctx->zeroVerbPt = devPoints[0];
       }
@@ -331,32 +332,25 @@ void AddLine(const Point p[2], LineVertex** vert) {
   auto vec = b - a;
   float lengthSqd = PointUtils::LengthSquared(vec);
   if (PointUtils::SetLength(vec, HALF_PIXEL_LENGTH)) {
-    // Create a vector orthogonal to 'vec' and of unit length
+    // Create a vector orthogonal to 'vec'. The factor of 2.0 compensates for the fact that
+    // 'vec' has been normalized to HALF_PIXEL_LENGTH, so we need to scale by 2 to get a
+    // full pixel perpendicular offset.
     ortho.x = 2.0f * vec.y;
     ortho.y = -2.0f * vec.x;
 
-    if (lengthSqd >= 1.0f) {
-      // Relative to points a and b:
-      // The inner vertices are inset half a pixel along the line a,b
-      (*vert)[0].pos = a + vec;
-      (*vert)[0].coverage = 1.0f;
-      (*vert)[1].pos = b - vec;
-      (*vert)[1].coverage = 1.0f;
-    } else {
-      // The inner vertices are inset a distance of length(a,b) from the outer edge of
-      // geometry. For the "a" inset this is the same as insetting from b by half a pixel.
-      // The coverage is then modulated by the length. This gives us the correct
-      // coverage for rects shorter than a pixel as they get translated subpixel amounts
-      // inside of a pixel.
-      float length = std::sqrt(lengthSqd);
-      (*vert)[0].pos = b - vec;
-      (*vert)[0].coverage = length;
-      (*vert)[1].pos = a + vec;
-      (*vert)[1].coverage = length;
-    }
-    // Relative to points a and b:
-    // The outer vertices are outset half a pixel along the line a,b and then a whole pixel
-    // orthogonally.
+    // For lines shorter than a pixel, modulate coverage by the actual length to ensure
+    // correct antialiasing for subpixel movements. For normal lines, use full coverage.
+    float coverage = (lengthSqd < 1.0f) ? std::sqrt(lengthSqd) : 1.0f;
+    Point innerOffset = vec;
+
+    // The inner vertices are inset half a pixel along the line direction.
+    // For short lines, both inner vertices converge toward the center.
+    (*vert)[0].pos = (lengthSqd < 1.0f) ? (b - innerOffset) : (a + innerOffset);
+    (*vert)[0].coverage = coverage;
+    (*vert)[1].pos = (lengthSqd < 1.0f) ? (a + innerOffset) : (b - innerOffset);
+    (*vert)[1].coverage = coverage;
+
+    // The outer vertices are outset half a pixel along the line and a full pixel orthogonally.
     (*vert)[2].pos = a - vec + ortho;
     (*vert)[2].coverage = 0;
     (*vert)[3].pos = b + vec + ortho;
@@ -468,9 +462,8 @@ void AddQuad(const Point points[3], int subdiv, BezierVertex** vert) {
 
   // storage for the chopped quad
   // pts 0,1,2 are the first quad, and 2,3,4 the second quad
-  Point choppedQuadPoints[5];
   // start off with our original curve in the second quad slot
-  memcpy(&choppedQuadPoints[2], points, 3 * sizeof(Point));
+  Point choppedQuadPoints[5] = {Point::Zero(), Point::Zero(), points[0], points[1], points[2]};
 
   int stepCount = 1 << subdiv;
   while (stepCount > 1) {
@@ -499,14 +492,17 @@ void AddQuad(const Point points[3], int subdiv, BezierVertex** vert) {
 
 }  // namespace
 
-ShapeBezierTriangulator::ShapeBezierTriangulator(std::shared_ptr<Shape> shape, bool hasCap)
+HairlineTriangulator::HairlineTriangulator(std::shared_ptr<Shape> shape, bool hasCap)
     : shape(std::move(shape)), hasCap(hasCap) {
 }
 
-std::shared_ptr<HairlineBuffer> ShapeBezierTriangulator::getData() const {
+std::shared_ptr<HairlineBuffer> HairlineTriangulator::getData() const {
   auto path = shape->getPath();
 
-  // reserve space for performance
+  // Reserve space based on empirical testing. For typical paths, 128 points provide a good
+  // balance between avoiding frequent reallocations and not over-allocating memory. This is
+  // a reasonable starting point since most common UI shapes (rounded rects, icons, etc.)
+  // generate fewer than 64 line segments and 32 quads.
   std::vector<Point> lines;
   lines.reserve(128);
   std::vector<Point> quads;
@@ -526,12 +522,13 @@ std::shared_ptr<HairlineBuffer> ShapeBezierTriangulator::getData() const {
   std::shared_ptr<Data> lineIndicesData = nullptr;
   if (lineCount > 0) {
     std::vector<uint32_t> lineIndices = GetLinesIndexBuffer(lineCount);
-    std::vector<LineVertex> lineVerts(lineCount * LINE_NUM_VERTICES);
-    LineVertex* vertPtr = lineVerts.data();
+    auto lineVertexTotalSize = lineCount * LINE_NUM_VERTICES * sizeof(LineVertex);
+    auto lineVertexBuffer = std::unique_ptr<uint8_t[]>(new uint8_t[lineVertexTotalSize]);
+    auto vertPtr = reinterpret_cast<LineVertex*>(lineVertexBuffer.get());
     for (size_t i = 0; i < lineCount; ++i) {
       AddLine(&lines[2 * i], &vertPtr);
     }
-    lineVerticesData = Data::MakeWithCopy(lineVerts.data(), lineVerts.size() * sizeof(LineVertex));
+    lineVerticesData = Data::MakeAdopted(lineVertexBuffer.release(), lineVertexTotalSize);
     lineIndicesData = Data::MakeWithCopy(lineIndices.data(), lineIndices.size() * sizeof(uint32_t));
   }
 
@@ -539,12 +536,13 @@ std::shared_ptr<HairlineBuffer> ShapeBezierTriangulator::getData() const {
   std::shared_ptr<Data> quadIndicesData = nullptr;
   if (quadCount > 0) {
     std::vector<uint32_t> quadIndices = GetQuadsIndexBuffer(quadCount);
-    std::vector<BezierVertex> quadVerts(static_cast<size_t>(quadCount) * QUAD_NUM_VERTICES);
-    BezierVertex* vertPointer = quadVerts.data();
+    auto quadVertexTotalSize = static_cast<size_t>(quadCount) * QUAD_NUM_VERTICES * sizeof(BezierVertex);
+    auto quadVertexBuffer = std::unique_ptr<uint8_t[]>(new uint8_t[quadVertexTotalSize]);
+    auto vertPointer = reinterpret_cast<BezierVertex*>(quadVertexBuffer.get());
     for (size_t i = 0; i < quads.size() / 3; ++i) {
       AddQuad(&quads[3 * i], quadSubdivs[i], &vertPointer);
     }
-    quadVerticesData = Data::MakeWithCopy(quadVerts.data(), quadVerts.size() * sizeof(BezierVertex));
+    quadVerticesData = Data::MakeAdopted(quadVertexBuffer.release(), quadVertexTotalSize);
     quadIndicesData = Data::MakeWithCopy(quadIndices.data(), quadIndices.size() * sizeof(uint32_t));
   }
   return std::make_shared<HairlineBuffer>(std::move(lineVerticesData), std::move(lineIndicesData),

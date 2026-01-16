@@ -16,33 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "HairlineLineDrawOp.h"
+#include "HairlineLineOp.h"
 #include "gpu/processors/HairlineLineGeometryProcessor.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 
-PlacementPtr<HairlineLineDrawOp> HairlineLineDrawOp::Make(
-    std::shared_ptr<GPUHairlineProxy> hairlineProxy, PMColor color, const Matrix& uvMatrix,
-    float coverage, AAType aaType) {
+PlacementPtr<HairlineLineOp> HairlineLineOp::Make(std::shared_ptr<GPUHairlineProxy> hairlineProxy,
+                                                  PMColor color, const Matrix& uvMatrix,
+                                                  float coverage, AAType aaType) {
   if (hairlineProxy == nullptr) {
     return nullptr;
   }
 
   auto allocator = hairlineProxy->getContext()->drawingAllocator();
-  return allocator->make<HairlineLineDrawOp>(allocator, std::move(hairlineProxy), color, uvMatrix,
-                                             coverage, aaType);
+  return allocator->make<HairlineLineOp>(allocator, std::move(hairlineProxy), color, uvMatrix,
+                                         coverage, aaType);
 }
 
-HairlineLineDrawOp::HairlineLineDrawOp(BlockAllocator* allocator,
-                                       std::shared_ptr<GPUHairlineProxy> hairlineProxy,
-                                       PMColor color, const Matrix& uvMatrix, float coverage,
-                                       AAType aaType)
+HairlineLineOp::HairlineLineOp(BlockAllocator* allocator,
+                               std::shared_ptr<GPUHairlineProxy> hairlineProxy, PMColor color,
+                               const Matrix& uvMatrix, float coverage, AAType aaType)
     : DrawOp(allocator, aaType), hairlineProxy(std::move(hairlineProxy)), color(color),
       uvMatrix(uvMatrix), coverage(coverage) {
 }
 
-PlacementPtr<GeometryProcessor> HairlineLineDrawOp::onMakeGeometryProcessor(
+PlacementPtr<GeometryProcessor> HairlineLineOp::onMakeGeometryProcessor(
     RenderTarget* /*renderTarget*/) {
   auto viewMatrix = hairlineProxy->getDrawingMatrix();
   auto realUVMatrix = uvMatrix;
@@ -51,7 +50,7 @@ PlacementPtr<GeometryProcessor> HairlineLineDrawOp::onMakeGeometryProcessor(
                                              aaType);
 }
 
-void HairlineLineDrawOp::onDraw(RenderPass* renderPass) {
+void HairlineLineOp::onDraw(RenderPass* renderPass) {
   auto lineVertexBuffer = hairlineProxy->getLineVertexBufferProxy();
   auto lineIndexBuffer = hairlineProxy->getLineIndexBufferProxy();
 

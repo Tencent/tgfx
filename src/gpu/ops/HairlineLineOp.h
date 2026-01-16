@@ -25,11 +25,11 @@
 
 namespace tgfx {
 
-class HairlineLineDrawOp final : public DrawOp {
+class HairlineLineOp final : public DrawOp {
  public:
-  static PlacementPtr<HairlineLineDrawOp> Make(std::shared_ptr<GPUHairlineProxy> hairlineProxy,
-                                               PMColor color, const Matrix& uvMatrix, float coverage,
-                                               AAType aaType);
+  static PlacementPtr<HairlineLineOp> Make(std::shared_ptr<GPUHairlineProxy> hairlineProxy,
+                                           PMColor color, const Matrix& uvMatrix, float coverage,
+                                           AAType aaType);
 
  protected:
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
@@ -37,12 +37,12 @@ class HairlineLineDrawOp final : public DrawOp {
   void onDraw(RenderPass* renderPass) override;
 
   Type type() override {
-    return Type::HairlineLineDrawOp;
+    return Type::HairlineLineOp;
   }
 
  private:
-  HairlineLineDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUHairlineProxy> hairlineProxy,
-                     PMColor color, const Matrix& uvMatrix, float coverage, AAType aaType);
+  HairlineLineOp(BlockAllocator* allocator, std::shared_ptr<GPUHairlineProxy> hairlineProxy,
+                 PMColor color, const Matrix& uvMatrix, float coverage, AAType aaType);
 
   std::shared_ptr<GPUHairlineProxy> hairlineProxy;
   PMColor color;
