@@ -269,11 +269,11 @@ std::shared_ptr<RenderPipeline> GLGPU::createRenderPipeline(
     LOGE("GLGPU::createRenderPipeline() invalid shader module!");
     return nullptr;
   }
-  if (descriptor.vertex.attributes.empty()) {
-    LOGE("GLGPU::createRenderPipeline() invalid vertex attributes, no attributes set!");
+  if (descriptor.vertex.bufferLayouts.empty()) {
+    LOGE("GLGPU::createRenderPipeline() invalid vertex attributes, no buffer layouts set!");
     return nullptr;
   }
-  if (descriptor.vertex.vertexStride == 0) {
+  if (descriptor.vertex.bufferLayouts[0].stride == 0) {
     LOGE("GLGPU::createRenderPipeline() invalid vertex attributes, vertex stride is 0!");
     return nullptr;
   }

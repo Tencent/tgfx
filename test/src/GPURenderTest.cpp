@@ -18,6 +18,7 @@
 
 #include <memory>
 #include <vector>
+#include "InstancedGridRenderPass.h"
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLUtil.h"
 #include "tgfx/gpu/GPU.h"
@@ -49,6 +50,48 @@ TGFX_TEST(GPURenderTest, DepthRenderPassTest) {
   ASSERT_TRUE(commandEncoder != nullptr);
   auto renderPass = commandEncoder->beginRenderPass(renderPassDescriptor);
   ASSERT_TRUE(renderPass != nullptr);
+}
+
+TGFX_TEST(GPURenderTest, InstancedGridRender) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto gpu = context->gpu();
+
+  // Create render texture
+  constexpr uint32_t rows = 100;
+  constexpr uint32_t columns = 100;
+  const int width =
+      static_cast<int>(InstancedGridRenderPass::GRID_SIZE * static_cast<float>(columns) +
+                       InstancedGridRenderPass::GRID_SPACING * static_cast<float>(columns - 1));
+  const int height =
+      static_cast<int>(InstancedGridRenderPass::GRID_SIZE * static_cast<float>(rows) +
+                       InstancedGridRenderPass::GRID_SPACING * static_cast<float>(rows - 1));
+
+  TextureDescriptor renderTextureDesc(
+      width, height, PixelFormat::RGBA_8888, false, 1,
+      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
+  auto renderTexture = gpu->createTexture(renderTextureDesc);
+  ASSERT_TRUE(renderTexture != nullptr);
+
+  // Create render pass
+  auto commandEncoder = gpu->createCommandEncoder();
+  ASSERT_TRUE(commandEncoder != nullptr);
+  auto renderPass = InstancedGridRenderPass::Make(rows, columns);
+  ASSERT_TRUE(renderPass->onDraw(commandEncoder.get(), renderTexture));
+
+  // Submit and wait for completion
+  auto commandBuffer = commandEncoder->finish();
+  ASSERT_TRUE(commandBuffer != nullptr);
+  gpu->queue()->submit(commandBuffer);
+  gpu->queue()->waitUntilCompleted();
+
+  auto surface =
+      Surface::MakeFrom(context, renderTexture->getBackendTexture(), ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+
+  // Also compare with baseline
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/InstancedGridRender"));
 }
 
 // ==================== GL Utility Tests ====================

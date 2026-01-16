@@ -57,6 +57,8 @@
   M(glDisable)                        \
   M(glDrawArrays)                     \
   M(glDrawElements)                   \
+  M(glDrawArraysInstanced)            \
+  M(glDrawElementsInstanced)          \
   M(glEnable)                         \
   M(glEnableVertexAttribArray)        \
   M(glFenceSync)                      \
@@ -104,5 +106,6 @@
   M(glUniform1i)                      \
   M(glUseProgram)                     \
   M(glVertexAttribPointer)            \
+  M(glVertexAttribDivisor)            \
   M(glViewport)                       \
   M(glWaitSync)

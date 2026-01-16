@@ -286,9 +286,15 @@ class RenderPass {
                           std::shared_ptr<Sampler> sampler) = 0;
 
   /**
-   * Sets or unsets the current vertex buffer with an optional offset.
+   * Sets a vertex buffer at the specified slot with an optional offset. Slot indices correspond to
+   * the VertexBufferLayout array in the VertexDescriptor. Slot 0 is typically used for per-vertex
+   * data, and slot 1 for per-instance data.
+   * @param slot The slot index to bind the buffer to.
+   * @param buffer The vertex buffer to bind. If nullptr, the call is ignored.
+   * @param offset The byte offset into the buffer where data begins.
    */
-  virtual void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset = 0) = 0;
+  virtual void setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer,
+                               size_t offset = 0) = 0;
 
   /**
    * Sets the current index buffer with its format.
@@ -304,15 +310,32 @@ class RenderPass {
   virtual void setStencilReference(uint32_t reference) = 0;
 
   /**
-   * Draws primitives based on the vertex buffer provided by setVertexBuffer().
+   * Draws primitives based on the vertex buffers provided by setVertexBuffer().
+   * @param primitiveType The type of primitive to draw.
+   * @param vertexCount The number of vertices to draw.
+   * @param instanceCount The number of instances to draw. Defaults to 1.
+   * @param firstVertex The index of the first vertex to draw. Defaults to 0.
+   * @param firstInstance The first instance to draw. Defaults to 0. Note: Not supported on
+   * OpenGL/OpenGL ES backend, must be 0.
    */
-  virtual void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) = 0;
+  virtual void draw(PrimitiveType primitiveType, uint32_t vertexCount, uint32_t instanceCount = 1,
+                    uint32_t firstVertex = 0, uint32_t firstInstance = 0) = 0;
 
   /**
    * Draws indexed primitives based on the index buffer provided by setIndexBuffer() and the vertex
-   * buffer provided by setVertexBuffer().
+   * buffers provided by setVertexBuffer().
+   * @param primitiveType The type of primitive to draw.
+   * @param indexCount The number of indices to draw.
+   * @param instanceCount The number of instances to draw. Defaults to 1.
+   * @param firstIndex The index of the first index to use. Defaults to 0.
+   * @param baseVertex A value added to each index before reading from the vertex buffer. Defaults
+   * to 0. Note: Not supported on OpenGL/OpenGL ES backend, must be 0.
+   * @param firstInstance The first instance to draw. Defaults to 0. Note: Not supported on
+   * OpenGL/OpenGL ES backend, must be 0.
    */
-  virtual void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) = 0;
+  virtual void drawIndexed(PrimitiveType primitiveType, uint32_t indexCount,
+                           uint32_t instanceCount = 1, uint32_t firstIndex = 0,
+                           int32_t baseVertex = 0, uint32_t firstInstance = 0) = 0;
 
   /**
    * Completes the current render pass. After calling this method, no further commands can be added

@@ -99,16 +99,22 @@ void GLRenderPipeline::setTexture(GLGPU* gpu, unsigned binding, GLTexture* textu
   }
 }
 
-void GLRenderPipeline::setVertexBuffer(GLGPU* gpu, GLBuffer* vertexBuffer, size_t vertexOffset) {
-  DEBUG_ASSERT(vertexBuffer != nullptr);
-  DEBUG_ASSERT(vertexBuffer->usage() & GPUBufferUsage::VERTEX);
+void GLRenderPipeline::setVertexBuffer(GLGPU* gpu, unsigned slot, GLBuffer* buffer, size_t offset) {
+  DEBUG_ASSERT(slot < bufferLayouts.size());
+  if (slot >= bufferLayouts.size()) {
+    LOGE("GLRenderPipeline::setVertexBuffer: slot %u out of range (max %zu)", slot,
+         bufferLayouts.size());
+    return;
+  }
+  DEBUG_ASSERT(buffer != nullptr);
+  DEBUG_ASSERT(buffer->usage() & GPUBufferUsage::VERTEX);
   auto gl = gpu->functions();
-  gl->bindBuffer(GL_ARRAY_BUFFER, vertexBuffer->bufferID());
-  for (auto& attribute : attributes) {
+  gl->bindBuffer(GL_ARRAY_BUFFER, buffer->bufferID());
+  const auto& layout = bufferLayouts[slot];
+  for (auto& attribute : layout.attributes) {
     gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), attribute.count,
-                            attribute.type, attribute.normalized, static_cast<int>(vertexStride),
-                            reinterpret_cast<void*>(attribute.offset + vertexOffset));
-    gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
+                            attribute.type, attribute.normalized, static_cast<int>(layout.stride),
+                            reinterpret_cast<void*>(attribute.offset + offset));
   }
 }
 
@@ -240,18 +246,28 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   auto state = gpu->state();
   state->bindPipeline(this);
 
-  DEBUG_ASSERT(!descriptor.vertex.attributes.empty());
-  DEBUG_ASSERT(descriptor.vertex.vertexStride > 0);
-  size_t vertexOffset = 0;
-  attributes.reserve(descriptor.vertex.attributes.size());
-  for (const auto& attribute : descriptor.vertex.attributes) {
-    auto location = gl->getAttribLocation(programID, attribute.name().c_str());
-    if (location != -1) {
-      attributes.push_back(MakeGLAttribute(attribute.format(), location, vertexOffset));
+  DEBUG_ASSERT(!descriptor.vertex.bufferLayouts.empty());
+  bufferLayouts.reserve(descriptor.vertex.bufferLayouts.size());
+  for (const auto& layout : descriptor.vertex.bufferLayouts) {
+    DEBUG_ASSERT(layout.stride > 0);
+    GLBufferLayout glLayout = {};
+    glLayout.stride = layout.stride;
+    glLayout.stepMode = layout.stepMode;
+    size_t attributeOffset = 0;
+    glLayout.attributes.reserve(layout.attributes.size());
+    int divisor = (layout.stepMode == VertexStepMode::Instance) ? 1 : 0;
+    for (const auto& attribute : layout.attributes) {
+      auto location = gl->getAttribLocation(programID, attribute.name().c_str());
+      if (location != -1) {
+        glLayout.attributes.push_back(
+            MakeGLAttribute(attribute.format(), location, attributeOffset));
+        gl->enableVertexAttribArray(static_cast<unsigned>(location));
+        gl->vertexAttribDivisor(static_cast<unsigned>(location), divisor);
+      }
+      attributeOffset += attribute.size();
     }
-    vertexOffset += attribute.size();
+    bufferLayouts.push_back(std::move(glLayout));
   }
-  vertexStride = descriptor.vertex.vertexStride;
 
   DEBUG_ASSERT(descriptor.fragment.colorAttachments.size() == 1);
   auto& attachment = descriptor.fragment.colorAttachments[0];
