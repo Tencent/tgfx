@@ -4077,9 +4077,9 @@ TGFX_TEST(VectorLayerTest, StrokeAlign) {
 }
 
 /**
- * Test DrawPosition: FillStyle and StrokeStyle can be drawn above or below children.
+ * Test LayerPlacement: FillStyle and StrokeStyle can be placed in front of or behind children.
  */
-TGFX_TEST(VectorLayerTest, DrawPosition) {
+TGFX_TEST(VectorLayerTest, LayerPlacement) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -4087,13 +4087,13 @@ TGFX_TEST(VectorLayerTest, DrawPosition) {
   auto displayList = std::make_unique<DisplayList>();
   auto container = Layer::Make();
 
-  // Test 1: Fill with BelowChildren (default) - child layer should be on top
+  // Test 1: Fill with Background (default) - child layer should be on top
   auto vectorLayer1 = VectorLayer::Make();
   auto rect1 = std::make_shared<Rectangle>();
   rect1->setSize({80, 80});
   rect1->setCenter({40, 40});
   auto fill1 = MakeFillStyle(Color::Red());
-  // fill1->drawPosition() is BelowChildren by default
+  // fill1->placement() is Background by default
   vectorLayer1->setContents({rect1, fill1});
 
   // Add a child layer on top
@@ -4104,14 +4104,14 @@ TGFX_TEST(VectorLayerTest, DrawPosition) {
   childLayer1->setPosition({20, 20});
   vectorLayer1->addChild(childLayer1);
 
-  // Test 2: Fill with AboveChildren - fill should be on top of child layer
+  // Test 2: Fill with Foreground - fill should be on top of child layer
   auto vectorLayer2 = VectorLayer::Make();
   vectorLayer2->setPosition({120, 0});
   auto rect2 = std::make_shared<Rectangle>();
   rect2->setSize({80, 80});
   rect2->setCenter({40, 40});
   auto fill2 = MakeFillStyle(Color::Red());
-  fill2->setDrawPosition(DrawPosition::AboveChildren);
+  fill2->setPlacement(LayerPlacement::Foreground);
   vectorLayer2->setContents({rect2, fill2});
 
   auto childLayer2 = SolidLayer::Make();
@@ -4121,14 +4121,14 @@ TGFX_TEST(VectorLayerTest, DrawPosition) {
   childLayer2->setPosition({20, 20});
   vectorLayer2->addChild(childLayer2);
 
-  // Test 3: Stroke with BelowChildren (default)
+  // Test 3: Stroke with Background (default)
   auto vectorLayer3 = VectorLayer::Make();
   vectorLayer3->setPosition({240, 0});
   auto rect3 = std::make_shared<Rectangle>();
   rect3->setSize({60, 60});
   rect3->setCenter({40, 40});
   auto stroke3 = MakeStrokeStyle(Color::Green(), 20);
-  // stroke3->drawPosition() is BelowChildren by default
+  // stroke3->placement() is Background by default
   vectorLayer3->setContents({rect3, stroke3});
 
   auto childLayer3 = SolidLayer::Make();
@@ -4138,14 +4138,14 @@ TGFX_TEST(VectorLayerTest, DrawPosition) {
   childLayer3->setPosition({15, 15});
   vectorLayer3->addChild(childLayer3);
 
-  // Test 4: Stroke with AboveChildren - stroke should be on top of child layer
+  // Test 4: Stroke with Foreground - stroke should be on top of child layer
   auto vectorLayer4 = VectorLayer::Make();
   vectorLayer4->setPosition({360, 0});
   auto rect4 = std::make_shared<Rectangle>();
   rect4->setSize({60, 60});
   rect4->setCenter({40, 40});
   auto stroke4 = MakeStrokeStyle(Color::Green(), 20);
-  stroke4->setDrawPosition(DrawPosition::AboveChildren);
+  stroke4->setPlacement(LayerPlacement::Foreground);
   vectorLayer4->setContents({rect4, stroke4});
 
   auto childLayer4 = SolidLayer::Make();
@@ -4169,7 +4169,7 @@ TGFX_TEST(VectorLayerTest, DrawPosition) {
   canvas->clear(Color::White());
   displayList->render(surface.get());
 
-  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/DrawPosition"));
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/LayerPlacement"));
 }
 
 }  // namespace tgfx
