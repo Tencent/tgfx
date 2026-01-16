@@ -18,45 +18,22 @@
 
 #pragma once
 
-#include <vector>
-#include "Geometry.h"
-#include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Shader.h"
-#include "tgfx/layers/LayerPaint.h"
-
 namespace tgfx {
-
-class LayerRecorder;
-
 /**
- * Painter is the base class for objects that perform draw operations.
+ * The alignment of the stroke relative to the boundaries of the shape.
  */
-class Painter {
- public:
-  virtual ~Painter() = default;
-
+enum class StrokeAlign {
   /**
-   * Applies an alpha multiplier to this painter.
+   * Draw a stroke centered along the shape boundary.
    */
-  void applyAlpha(float groupAlpha) {
-    alpha *= groupAlpha;
-  }
-
+  Center,
   /**
-   * Draws the geometries to the given recorder.
+   * Draw a stroke inside the shape boundary.
    */
-  virtual void draw(LayerRecorder* recorder) = 0;
-
+  Inside,
   /**
-   * Creates a copy of this painter.
+   * Draw a stroke outside the shape boundary.
    */
-  virtual std::unique_ptr<Painter> clone() const = 0;
-
-  std::shared_ptr<Shader> shader = nullptr;
-  BlendMode blendMode = BlendMode::SrcOver;
-  float alpha = 1.0f;
-  DrawPosition drawPosition = DrawPosition::BelowChildren;
-  std::vector<Geometry*> geometries = {};
+  Outside
 };
-
 }  // namespace tgfx

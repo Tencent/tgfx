@@ -22,6 +22,8 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Stroke.h"
+#include "tgfx/layers/LayerPaint.h"
+#include "tgfx/layers/StrokeAlign.h"
 #include "tgfx/layers/vectors/ColorSource.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
@@ -143,6 +145,32 @@ class StrokeStyle : public VectorElement {
    */
   void setDashOffset(float value);
 
+  /**
+   * Returns the stroke alignment relative to the shape boundary. The default value is
+   * StrokeAlign::Center.
+   */
+  StrokeAlign strokeAlign() const {
+    return _strokeAlign;
+  }
+
+  /**
+   * Sets the stroke alignment relative to the shape boundary.
+   */
+  void setStrokeAlign(StrokeAlign value);
+
+  /**
+   * Returns the draw position of the stroke relative to the layer's children. The default value is
+   * DrawPosition::BelowChildren.
+   */
+  DrawPosition drawPosition() const {
+    return _drawPosition;
+  }
+
+  /**
+   * Sets the draw position of the stroke relative to the layer's children.
+   */
+  void setDrawPosition(DrawPosition value);
+
  protected:
   Type type() const override {
     return Type::StrokeStyle;
@@ -161,6 +189,8 @@ class StrokeStyle : public VectorElement {
   Stroke _stroke = Stroke(1.0f);
   std::vector<float> _dashes = {};
   float _dashOffset = 0.0f;
+  StrokeAlign _strokeAlign = StrokeAlign::Center;
+  DrawPosition _drawPosition = DrawPosition::BelowChildren;
   std::shared_ptr<PathEffect> _cachedDashEffect = nullptr;
 };
 

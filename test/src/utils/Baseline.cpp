@@ -35,6 +35,7 @@ static const std::string BASELINE_VERSION_PATH = BASELINE_ROOT + "/version.json"
 static const std::string CACHE_MD5_PATH = BASELINE_ROOT + "/.cache/md5.json";
 static const std::string CACHE_VERSION_PATH = BASELINE_ROOT + "/.cache/version.json";
 static const std::string GIT_HEAD_PATH = BASELINE_ROOT + "/.cache/HEAD";
+static const std::string EXISTING_OUT_ROOT = ProjectPath::Absolute("test/out/");
 #ifdef GENERATE_BASELINE_IMAGES
 static const std::string OUT_ROOT = ProjectPath::Absolute("test/baseline-out/");
 #else
@@ -42,6 +43,7 @@ static const std::string OUT_ROOT = ProjectPath::Absolute("test/out/");
 #endif
 static const std::string OUT_MD5_PATH = OUT_ROOT + "/md5.json";
 static const std::string OUT_VERSION_PATH = OUT_ROOT + "/version.json";
+static const std::string WEBP_FILE_EXT = ".webp";
 
 static nlohmann::json BaselineVersion = {};
 static nlohmann::json CacheVersion = {};
@@ -154,6 +156,28 @@ static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
   return true;
 }
 
+#ifdef GENERATE_BASELINE_IMAGES
+static bool TryCopyExistingBaseline(const std::string& key, const std::string& md5) {
+  auto existingPath = EXISTING_OUT_ROOT + "/" + key + "_base" + WEBP_FILE_EXT;
+  if (!std::filesystem::exists(existingPath)) {
+    return false;
+  }
+  auto baselineVersion = GetJSONValue(BaselineVersion, key);
+  auto cacheVersion = GetJSONValue(CacheVersion, key);
+  if (baselineVersion.empty() || baselineVersion != cacheVersion) {
+    return false;
+  }
+  if (GetJSONValue(CacheMD5, key) != md5) {
+    return false;
+  }
+  auto destPath = OUT_ROOT + "/" + key + "_base" + WEBP_FILE_EXT;
+  std::filesystem::path destFilePath = destPath;
+  std::filesystem::create_directories(destFilePath.parent_path());
+  std::filesystem::copy(existingPath, destPath, std::filesystem::copy_options::overwrite_existing);
+  return true;
+}
+#endif
+
 bool Baseline::Compare(const Pixmap& pixmap, const std::string& key) {
   if (pixmap.isEmpty()) {
     return false;
@@ -172,7 +196,9 @@ bool Baseline::Compare(const Pixmap& pixmap, const std::string& key) {
     md5 = DumpMD5(newPixmap.pixels(), newPixmap.byteSize());
   }
 #ifdef GENERATE_BASELINE_IMAGES
-  SaveImage(pixmap, key + "_base");
+  if (!TryCopyExistingBaseline(key, md5)) {
+    SaveImage(pixmap, key + "_base");
+  }
 #endif
   return CompareVersionAndMd5(md5, key, [key, pixmap](bool result) {
     if (result) {
