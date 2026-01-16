@@ -343,7 +343,7 @@ TGFX_TEST(VectorLayerTest, MergePath) {
   rect2b->setSize({160, 160});
 
   auto merge = std::make_shared<MergePath>();
-  merge->setPathOp(PathOp::XOR);
+  merge->setMode(MergePathOp::XOR);
 
   auto fill2 = MakeFillStyle(Color::FromRGBA(0, 0, 255, 128));
   group2->setElements({rect2a, rect2b, merge, fill2});
@@ -379,7 +379,7 @@ TGFX_TEST(VectorLayerTest, MergePathClearsPainters) {
   auto redFill = MakeFillStyle(Color::Red());
 
   auto merge = std::make_shared<MergePath>();
-  merge->setPathOp(PathOp::Append);
+  merge->setMode(MergePathOp::Append);
 
   // Only this fill should render
   auto blueFill = MakeFillStyle(Color::Blue());
@@ -734,7 +734,7 @@ TGFX_TEST(VectorLayerTest, FillRule) {
 
   auto fill1 = std::make_shared<FillStyle>();
   fill1->setColorSource(SolidColor::Make(Color::Red()));
-  fill1->setFillRule(PathFillType::Winding);
+  fill1->setFillRule(FillRule::Winding);
 
   group1->setElements({shape1, fill1});
 
@@ -747,7 +747,7 @@ TGFX_TEST(VectorLayerTest, FillRule) {
 
   auto fill2 = std::make_shared<FillStyle>();
   fill2->setColorSource(SolidColor::Make(Color::Blue()));
-  fill2->setFillRule(PathFillType::EvenOdd);
+  fill2->setFillRule(FillRule::EvenOdd);
 
   group2->setElements({shape2, fill2});
 
@@ -1051,7 +1051,7 @@ TGFX_TEST(VectorLayerTest, RoundCornerWithScale) {
   innerGroup2->setElements({rect2});
 
   auto merge2 = std::make_shared<MergePath>();
-  merge2->setPathOp(PathOp::Append);
+  merge2->setMode(MergePathOp::Append);
 
   auto roundCorner2 = std::make_shared<RoundCorner>();
   roundCorner2->setRadius(30.0f);
@@ -1206,7 +1206,7 @@ TGFX_TEST(VectorLayerTest, TrimPathWithScale) {
   innerGroup2->setElements({rect2});
 
   auto merge2 = std::make_shared<MergePath>();
-  merge2->setPathOp(PathOp::Append);
+  merge2->setMode(MergePathOp::Append);
 
   auto trim2 = std::make_shared<TrimPath>();
   trim2->setStart(0.0f);
@@ -1330,28 +1330,28 @@ TGFX_TEST(VectorLayerTest, MergePathOps) {
   // Group 1: Union (combines both shapes)
   auto [group1, rect1, ellipse1] = createOverlappingShapes(90);
   auto merge1 = std::make_shared<MergePath>();
-  merge1->setPathOp(PathOp::Union);
+  merge1->setMode(MergePathOp::Union);
   auto fill1 = MakeFillStyle(Color::Red());
   group1->setElements({rect1, ellipse1, merge1, fill1});
 
   // Group 2: Intersect (only overlapping area)
   auto [group2, rect2, ellipse2] = createOverlappingShapes(260);
   auto merge2 = std::make_shared<MergePath>();
-  merge2->setPathOp(PathOp::Intersect);
+  merge2->setMode(MergePathOp::Intersect);
   auto fill2 = MakeFillStyle(Color::Green());
   group2->setElements({rect2, ellipse2, merge2, fill2});
 
   // Group 3: Difference (first minus second)
   auto [group3, rect3, ellipse3] = createOverlappingShapes(430);
   auto merge3 = std::make_shared<MergePath>();
-  merge3->setPathOp(PathOp::Difference);
+  merge3->setMode(MergePathOp::Difference);
   auto fill3 = MakeFillStyle(Color::Blue());
   group3->setElements({rect3, ellipse3, merge3, fill3});
 
   // Group 4: XOR (non-overlapping areas)
   auto [group4, rect4, ellipse4] = createOverlappingShapes(600);
   auto merge4 = std::make_shared<MergePath>();
-  merge4->setPathOp(PathOp::XOR);
+  merge4->setMode(MergePathOp::XOR);
   auto fill4 = MakeFillStyle(Color::FromRGBA(255, 128, 0, 255));
   group4->setElements({rect4, ellipse4, merge4, fill4});
 
@@ -2006,7 +2006,7 @@ TGFX_TEST(VectorLayerTest, TextSpanWithPathModifiers) {
   textSpan2b->setPosition({100, 0});
 
   auto mergePath = std::make_shared<MergePath>();
-  mergePath->setPathOp(PathOp::Union);
+  mergePath->setMode(MergePathOp::Union);
 
   auto fill2 = MakeFillStyle(Color::Red());
   group2->setElements({textSpan2a, textSpan2b, mergePath, fill2});
