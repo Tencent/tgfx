@@ -33,27 +33,34 @@ Path ShapeUtils::GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resol
 }
 
 float ShapeUtils::CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape) {
-  if (!shape) {
+  auto [strokeShape, matrix] = DecomposeStrokeShape(shape);
+  if (!strokeShape || strokeShape->stroke.width <= 0.f) {
     return 1.f;
   }
+  float scale = matrix.getMaxScale();
+  return std::min(strokeShape->stroke.width * scale, 1.f);
+}
 
+std::tuple<std::shared_ptr<StrokeShape>, Matrix> ShapeUtils::DecomposeStrokeShape(
+    std::shared_ptr<Shape> shape) {
   std::shared_ptr<StrokeShape> strokeShape = nullptr;
-  float scale = 1.f;
+  Matrix matrix = Matrix::I();
+
+  if (!shape) {
+    return {strokeShape, matrix};
+  }
 
   if (shape->type() == Shape::Type::Matrix) {
     auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
     if (matrixShape->shape->type() == Shape::Type::Stroke) {
       strokeShape = std::static_pointer_cast<StrokeShape>(matrixShape->shape);
-      scale = matrixShape->matrix.getMaxScale();
+      matrix = matrixShape->matrix;
     }
   } else if (shape->type() == Shape::Type::Stroke) {
     strokeShape = std::static_pointer_cast<StrokeShape>(shape);
   }
 
-  if (!strokeShape || strokeShape->stroke.width <= 0.f) {
-    return 1.f;
-  }
-  return std::min(strokeShape->stroke.width * scale, 1.f);
+  return {strokeShape, matrix};
 }
 
 }  // namespace tgfx

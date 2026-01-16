@@ -22,6 +22,7 @@
 #include "core/AtlasStrikeCache.h"
 #include "core/GlyphRasterizer.h"
 #include "core/GlyphRunList.h"
+#include "core/MCState.h"
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
@@ -29,8 +30,10 @@
 #include "core/UserTypeface.h"
 #include "core/images/SubsetImage.h"
 #include "core/shapes/GlyphShape.h"
+#include "core/shapes/StrokeShape.h"
 #include "core/utils/FauxBoldScale.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 #include "tgfx/core/Surface.h"
@@ -281,6 +284,14 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
     if (stroke != nullptr && TreatStrokeAsHairline(*stroke, state.matrix)) {
       compositor->drawHairlineShape(std::move(shape), state, brush, stroke);
       return;
+    } else if (stroke == nullptr) {
+      auto [strokeShape, matrix] = ShapeUtils::DecomposeStrokeShape(shape);
+      if (strokeShape && TreatStrokeAsHairline(strokeShape->stroke, state.matrix * matrix)) {
+        MCState newState = state;
+        newState.matrix.preConcat(matrix);
+        compositor->drawHairlineShape(strokeShape->shape, newState, brush, &strokeShape->stroke);
+        return;
+      }
     }
     shape = Shape::ApplyStroke(std::move(shape), stroke);
     compositor->drawShape(std::move(shape), state, brush);

@@ -19,9 +19,14 @@
 #pragma once
 
 #include <memory>
+#include <tuple>
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Shape.h"
+
 namespace tgfx {
+
+class StrokeShape;
 
 class ShapeUtils {
  public:
@@ -33,5 +38,8 @@ class ShapeUtils {
   static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
 
   static float CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape);
+
+  static std::tuple<std::shared_ptr<StrokeShape>, Matrix> DecomposeStrokeShape(
+      std::shared_ptr<Shape> shape);
 };
 }  // namespace tgfx

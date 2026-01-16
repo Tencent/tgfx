@@ -62,7 +62,7 @@ Path StrokeShape::onGetPath(float resolutionScale) const {
     return {};
   }
   auto path = shape->onGetPath(resolutionScale);
-  if (TreatStrokeAsHairline(stroke, Matrix::MakeScale(resolutionScale, resolutionScale))) {
+  if (IsHairlineStroke(stroke)) {
     Stroke hairlineStroke = stroke;
     // When zoomed in by a matrix shape, reduce the stroke width ahead of time
     hairlineStroke.width = 1.f / resolutionScale;
