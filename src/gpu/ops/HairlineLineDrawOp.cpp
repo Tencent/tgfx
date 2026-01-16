@@ -72,9 +72,10 @@ void HairlineLineDrawOp::onDraw(RenderPass* renderPass) {
   auto gpuVertexBuffer = vertexBuffer->gpuBuffer();
   auto gpuIndexBuffer = indexBuffer->gpuBuffer();
   DEBUG_ASSERT(gpuVertexBuffer != nullptr && gpuIndexBuffer != nullptr);
-  renderPass->setVertexBuffer(gpuVertexBuffer);
+  renderPass->setVertexBuffer(gpuVertexBuffer, 0);
   renderPass->setIndexBuffer(gpuIndexBuffer, IndexFormat::UInt32);
-  renderPass->drawIndexed(PrimitiveType::Triangles, 0, indexBuffer->size() / sizeof(uint32_t));
+  auto indexCount = static_cast<uint32_t>(indexBuffer->size() / sizeof(uint32_t));
+  renderPass->drawIndexed(PrimitiveType::Triangles, 0, indexCount);
 }
 
 }  // namespace tgfx
