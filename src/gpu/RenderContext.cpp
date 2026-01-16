@@ -286,7 +286,7 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
       return;
     } else if (stroke == nullptr) {
       auto [strokeShape, matrix] = ShapeUtils::DecomposeStrokeShape(shape);
-      if (strokeShape && TreatStrokeAsHairline(strokeShape->stroke, state.matrix * matrix)) {
+      if (strokeShape && TreatStrokeAsHairline(strokeShape->stroke, matrix * state.matrix)) {
         MCState newState = state;
         newState.matrix.preConcat(matrix);
         compositor->drawHairlineShape(strokeShape->shape, newState, brush, &strokeShape->stroke);
