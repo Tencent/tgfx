@@ -29,7 +29,7 @@ HairlineQuadGeometryProcessor::HairlineQuadGeometryProcessor(const PMColor& colo
       coverage(coverage), aaType(aaType) {
   position = {"aPosition", VertexFormat::Float2};
   hairQuadEdge = {"hairQuadEdge", VertexFormat::Float4};
-  setVertexAttributes(&position, 3);
+  setVertexAttributes(&position, 2);
 }
 
 void HairlineQuadGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {

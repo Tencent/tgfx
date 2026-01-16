@@ -423,15 +423,20 @@
         "widegamut": "cd158924"
     },
     "StrokeTest": {
+        "ConvertCubicToQuads": "779da4bd",
         "DashStrokeAsSolidStroke": "eefb7a46",
         "DrawPathByHairlinePaint": "543054b5",
         "DrawShapeByHairlinePaint": "543054b5",
         "ExtremelyThinStrokeLayer": "543054b5",
         "ExtremelyThinStrokePath": "543054b5",
+        "HairlineBasicRendering": "779da4bd",
+        "HairlineCanvasTransformations": "779da4bd",
+        "HairlineClipping": "779da4bd",
+        "HairlineComplexPathRendering": "779da4bd",
         "HairlineLayer": "eefb7a46",
         "HairlineStrokeText": "9a10662a",
         "HairlineWithDropShadow": "61b44005",
-        "LineRenderAsHairline": "cd6a8dff",
+        "LineRenderAsHairline": "779da4bd",
         "ZoomUpTinyStrokeShape": "cd6a8dff"
     },
     "SurfaceRenderTest": {

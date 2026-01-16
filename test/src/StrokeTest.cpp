@@ -746,7 +746,7 @@ TGFX_TEST(StrokeTest, HairlineComplexPathRendering) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 800, 600);
+  auto surface = Surface::Make(context, 600, 200);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
@@ -782,24 +782,13 @@ TGFX_TEST(StrokeTest, HairlineComplexPathRendering) {
   paint.setStyle(PaintStyle::Stroke);
   paint.setColor(Color::Red());
 
-  float startX = 100.0f;
-  float startY = 80.0f;
-  float offsetX = 200.0f;
-  float offsetY = 150.0f;
-
-  for (size_t i = 0; i < testCases.size(); ++i) {
-    auto& testCase = testCases[i];
-    float x = startX + ((i % 2) * offsetX);
-    float y = startY + ((static_cast<float>(i) / 2.0f) * offsetY);
-
-    canvas->save();
-    canvas->translate(x, y);
-
+  canvas->translate(50, 50);
+  for (auto& testCase : testCases) {
     paint.setAntiAlias(testCase.antiAlias);
     paint.setStrokeWidth(testCase.strokeWidth);
     canvas->drawPath(*path, paint);
 
-    canvas->restore();
+    canvas->translate(100, 0);
   }
 
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineComplexPathRendering"));
@@ -857,19 +846,14 @@ TGFX_TEST(StrokeTest, HairlineCanvasTransformations) {
 
   for (const auto& testCase : transformCases) {
     canvas->save();
-
     canvas->translate(testCase.translateX, testCase.translateY);
-
     if (testCase.rotation != 0.0f) {
       canvas->rotate(testCase.rotation);
     }
-
     if (testCase.scaleX != 1.0f || testCase.scaleY != 1.0f) {
       canvas->scale(testCase.scaleX, testCase.scaleY);
     }
-
     canvas->drawPath(*path, paint);
-
     canvas->restore();
   }
 
