@@ -11,6 +11,7 @@ description: 提交 PR - 自动识别新建或追加提交
 ## 前置检查
 
 ```bash
+git fetch origin main
 CURRENT_BRANCH=$(git branch --show-current)
 gh pr list --head "$CURRENT_BRANCH" --state open --json number,url
 ```
@@ -59,11 +60,11 @@ gh pr list --head "$CURRENT_BRANCH" --state open --json number,url
 
 ## 第三步：生成 Commit 信息
 
-若暂存区无内容，跳过此步骤。
-
 ```bash
 git diff --cached
 ```
+
+若暂存区无内容，跳过此步骤。
 
 根据暂存区变更生成 **Commit 信息**：英语，120 字符内，以句号结尾，侧重描述用户可感知的变化。
 
@@ -93,9 +94,8 @@ git push
 #### 1. 分析完整变更
 
 ```bash
-git fetch origin main
 git log origin/main..HEAD --oneline   # 已有未推送的 commit
-git diff --cached                      # 本次暂存区变更
+git diff --cached                      # 本次暂存区变更（复用第三步结果）
 ```
 
 若已有 commit 为空且暂存区无内容，提示无变更，终止流程。
@@ -105,7 +105,7 @@ git diff --cached                      # 本次暂存区变更
 根据完整变更生成：
 
 - **分支名称**：`feature/{username}_模块名` 或 `bugfix/{username}_模块名`（`{username}` 为 GitHub 用户 ID 全小写，模块名用下划线连接，最多两个单词）
-- **PR 标题**：英语，120 字符内，以句号结尾，概括所有变更
+- **PR 标题**：英语，120 字符内，以句号结尾，侧重描述用户可感知的变化
 - **PR 描述**：中文，简要说明变更内容和目的
 
 #### 3. 处理分支
