@@ -27,8 +27,19 @@ bool TreatStrokeAsHairline(const Stroke& stroke, const Matrix& matrix) {
   if (IsHairlineStroke(stroke)) {
     return true;
   }
+  if (!FloatNearlyEqual(matrix.getScaleX(), matrix.getScaleY())) {
+    return false;
+  }
   auto maxWidth = stroke.width * matrix.getMaxScale();
   return maxWidth < 1.f;
+}
+
+float GetHairlineAlphaFactor(const Stroke& stroke, const Matrix& matrix) {
+  if (IsHairlineStroke(stroke)) {
+    return 1.0f;
+  }
+  auto scaledStrokeWidth = stroke.width * matrix.getMaxScale();
+  return std::clamp(scaledStrokeWidth, 0.f, 1.f);
 }
 
 std::vector<float> SimplifyLineDashPattern(const std::vector<float>& pattern,

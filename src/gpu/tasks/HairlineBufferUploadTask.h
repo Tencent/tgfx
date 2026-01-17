@@ -18,28 +18,28 @@
 
 #pragma once
 
-#include <memory>
-#include <tuple>
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Path.h"
-#include "tgfx/core/Shape.h"
+#include "ResourceTask.h"
+#include "core/DataSource.h"
+#include "core/HairlineTriangulator.h"
 
 namespace tgfx {
 
-class StrokeShape;
-
-class ShapeUtils {
+class HairlineBufferUploadTask : public ResourceTask {
  public:
-  /**
-   * Returns the Shape adjusted for the current resolution scale.
-   * Used during rendering to decide whether to simplify the Path or apply hairline stroking,
-   * depending on the resolution scale.
-   */
-  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
+  HairlineBufferUploadTask(std::shared_ptr<ResourceProxy> lineVertexProxy,
+                           std::shared_ptr<ResourceProxy> lineIndexProxy,
+                           std::shared_ptr<ResourceProxy> quadVertexProxy,
+                           std::shared_ptr<ResourceProxy> quadIndexProxy,
+                           std::unique_ptr<DataSource<HairlineBuffer>> source);
 
-  static float CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape);
+ protected:
+  std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
-  static std::tuple<std::shared_ptr<StrokeShape>, Matrix> DecomposeStrokeShape(
-      std::shared_ptr<Shape> shape);
+ private:
+  std::shared_ptr<ResourceProxy> lineIndexProxy = nullptr;
+  std::shared_ptr<ResourceProxy> quadVertexProxy = nullptr;
+  std::shared_ptr<ResourceProxy> quadIndexProxy = nullptr;
+  std::unique_ptr<DataSource<HairlineBuffer>> source = nullptr;
 };
+
 }  // namespace tgfx

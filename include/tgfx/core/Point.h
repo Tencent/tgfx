@@ -101,6 +101,8 @@ struct Point {
     return Point::Length(x, y);
   }
 
+  bool normalize();
+
   /**
    * Returns true if a is equivalent to b.
    */
@@ -174,6 +176,20 @@ struct Point {
    */
   static float Distance(const Point& a, const Point& b) {
     return Length(a.x - b.x, a.y - b.y);
+  }
+
+  /**
+   * Returns the dot product of a and b.
+   */
+  static float DotProduct(const Point& a, const Point& b) {
+    return (a.x * b.x) + (a.y * b.y);
+  }
+
+  /**
+   * Returns the cross product of a and b (the z-component of the 3D cross product).
+   */
+  static float CrossProduct(const Point& a, const Point& b) {
+    return (a.x * b.y) - (a.y * b.x);
   }
 };
 }  // namespace tgfx

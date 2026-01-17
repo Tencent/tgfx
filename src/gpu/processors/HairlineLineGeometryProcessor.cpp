@@ -16,30 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <memory>
-#include <tuple>
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Path.h"
-#include "tgfx/core/Shape.h"
+#include "HairlineLineGeometryProcessor.h"
+#include "tgfx/core/Color.h"
 
 namespace tgfx {
 
-class StrokeShape;
+HairlineLineGeometryProcessor::HairlineLineGeometryProcessor(const PMColor& color,
+                                                             const Matrix& viewMatrix,
+                                                             std::optional<Matrix> uvMatrix,
+                                                             float coverage, AAType aaType)
+    : GeometryProcessor(ClassID()), color(color), viewMatrix(viewMatrix), uvMatrix(uvMatrix),
+      coverage(coverage), aaType(aaType) {
+  position = {"aPosition", VertexFormat::Float2};
+  edgeDistance = {"aEdgeDistance", VertexFormat::Float};
+  setVertexAttributes(&position, 2);
+}
 
-class ShapeUtils {
- public:
-  /**
-   * Returns the Shape adjusted for the current resolution scale.
-   * Used during rendering to decide whether to simplify the Path or apply hairline stroking,
-   * depending on the resolution scale.
-   */
-  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
+void HairlineLineGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  uint32_t flags = aaType == AAType::Coverage ? 1 : 0;
+  bytesKey->write(flags);
+}
 
-  static float CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape);
-
-  static std::tuple<std::shared_ptr<StrokeShape>, Matrix> DecomposeStrokeShape(
-      std::shared_ptr<Shape> shape);
-};
 }  // namespace tgfx
