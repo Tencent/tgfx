@@ -5,9 +5,17 @@ alwaysApply: true
 
 ## **!! IMPORTANT - 操作限制**
 
-- **NEVER** 自动执行 `git stash`、`git reset`、`git checkout` 等改变暂存区或工作区状态的命令，除非用户明确要求提交代码
-- 必须 stash 时需用户确认，完成后用 `git stash pop --index` 完全还原原始的暂存区和工作区状态
+- **NEVER** 自动执行 `git stash`、`git reset`、`git checkout` 等改变暂存区或工作区状态的命令，除非**暂存区为空**或**用户明确要求**
 - **NEVER** 在 main 分支直接提交推送代码，必须通过 PR 流程
+
+## 自动提交
+
+每次编辑文件后，立即提交变更（仅 commit，不自动推送）：
+
+1. 若当前在 main 分支，先创建新分支：`git checkout -b {分支名称}`
+2. 使用 `git commit --only {修改的文件} -m "{Commit 信息}"` 提交
+
+> 注：`git commit --only` 只提交指定文件，不影响现有暂存区和工作区状态。
 
 ## 分支命名
 
