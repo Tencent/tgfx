@@ -59,9 +59,30 @@ gh pr list --head "$CURRENT_BRANCH" --state open --json number,url
 
 ---
 
-## 第三步：提交本次变更
+## 第三步：处理分支并提交
 
 若暂存区无内容，跳过此步骤。
+
+### 处理分支（仅新建模式）
+
+获取完整变更范围用于分支命名：
+
+```bash
+git fetch origin main
+git log origin/main..HEAD --oneline   # 已有未推送的 commit
+git diff --cached                      # 本次暂存区变更
+```
+
+**分支命名**：根据完整变更内容分析，按规范生成：
+- `feature/{username}_模块名` 或 `bugfix/{username}_模块名`（`{username}` 为 GitHub 用户 ID 全小写，模块名用下划线连接，最多两个单词）
+
+| 当前分支 | 分支名是否符合规范 | 操作 |
+|----------|-------------------|------|
+| main | - | `git checkout -b {分支名称}` |
+| 非 main | 是（`feature/xxx` 或 `bugfix/xxx`） | 无需操作 |
+| 非 main | 否 | `git branch -m {分支名称}` |
+
+### 提交变更
 
 查看暂存区变更：
 
@@ -101,64 +122,21 @@ git push
 
 ### 新建模式
 
-#### 判断 commit 数量
-
 ```bash
-# 拉取最新的 main 分支
-git fetch origin main
-
-# 查看当前分支相对 origin/main 的 commit 数量
 git rev-list --count origin/main..HEAD
 ```
 
 若 commit 数量为 0，提示无变更，终止流程。
 
-#### 生成 PR 信息
+**生成 PR 信息**：
 
-**若只有 1 个 commit**：
-
-- **PR 标题**：若第三步有新 commit，使用该 Commit 信息；否则使用已有 commit 的信息（`git log -1 --format=%s`）
-- **PR 描述**：中文，简要说明变更内容和目的
-
-**若有多个 commit**：
-
-先获取完整变更：
+| commit 数量 | PR 标题 | PR 描述 |
+|-------------|---------|--------|
+| 1 个 | 使用该 commit 信息（`git log -1 --format=%s`） | 中文，简要说明变更内容和目的 |
+| 多个 | 根据 `git diff origin/main` 概括所有变更 | 中文，简要说明整体变更内容和目的 |
 
 ```bash
-git diff origin/main
-```
-
-根据完整变更生成：
-
-- **PR 标题**：概括所有变更，格式同 Commit 信息
-- **PR 描述**：中文，简要说明整体变更内容和目的
-
-**分支名称**（两种情况通用）：
-
-- `feature/{username}_模块名` 或 `bugfix/{username}_模块名`（`{username}` 为 GitHub 用户 ID 全小写，模块名用下划线连接，最多两个单词）
-
-#### 处理分支并推送
-
-**若当前在 main 分支**：
-
-```bash
-git checkout -b {分支名称}
 git push -u origin {分支名称}
-gh pr create --title "{PR 标题}" --body "{PR 描述}"
-```
-
-**若当前在非 main 分支**：
-
-判断当前分支名是否已符合命名规范（`feature/xxx` 或 `bugfix/xxx` 格式）：
-
-- 若已符合规范：直接使用当前分支名
-- 若不符合规范：重命名分支 `git branch -m {新分支名称}`
-
-```bash
-# 若需要重命名
-git branch -m {新分支名称}
-
-git push -u origin {最终分支名称}
 gh pr create --title "{PR 标题}" --body "{PR 描述}"
 ```
 
