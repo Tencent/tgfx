@@ -110,11 +110,10 @@ git diff --cached                      # 本次暂存区变更
 
 #### 3. 处理分支
 
-| 当前分支 | 分支名是否符合规范 | 操作 |
-|----------|-------------------|------|
-| main | - | `git checkout -b {分支名称}` |
-| 非 main | 是（`feature/xxx` 或 `bugfix/xxx`） | 无需操作 |
-| 非 main | 否 | `git branch -m {分支名称}` |
+| 当前分支 | 操作 |
+|----------|------|
+| main | `git checkout -b {分支名称}` |
+| 非 main | `git branch -m {分支名称}` |
 
 #### 4. 提交并推送
 
