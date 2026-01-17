@@ -8,7 +8,7 @@ alwaysApply: true
 - **NEVER** 自动执行 `git stash`、`git reset`、`git checkout` 等改变暂存区或工作区状态的命令，除非**暂存区为空**或**用户明确要求**
 - **NEVER** 在 main 分支直接提交推送代码，必须通过 PR 流程
 
-## 自动提交
+## **!! IMPORTANT - 自动提交**
 
 每次编辑文件后，立即提交变更（仅 commit，不自动推送）：
 
