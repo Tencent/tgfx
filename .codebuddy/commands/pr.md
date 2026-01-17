@@ -57,41 +57,7 @@ gh pr list --head "$CURRENT_BRANCH" --state open --json number,url
 
 ---
 
-## 第三步：生成 PR 信息（仅新建模式）
-
-若为追加模式，跳过此步骤。
-
-获取完整变更范围：
-
-```bash
-git fetch origin main
-git log origin/main..HEAD --oneline   # 已有未推送的 commit
-git diff --cached                      # 本次暂存区变更
-```
-
-若已有 commit 为空且暂存区无内容，提示无变更，终止流程。
-
-根据完整变更生成：
-
-- **分支名称**：`feature/{username}_模块名` 或 `bugfix/{username}_模块名`（`{username}` 为 GitHub 用户 ID 全小写，模块名用下划线连接，最多两个单词）
-- **PR 标题**：英语，120 字符内，以句号结尾，概括所有变更
-- **PR 描述**：中文，简要说明变更内容和目的
-
----
-
-## 第四步：处理分支（仅新建模式）
-
-若为追加模式，跳过此步骤。
-
-| 当前分支 | 分支名是否符合规范 | 操作 |
-|----------|-------------------|------|
-| main | - | `git checkout -b {分支名称}` |
-| 非 main | 是（`feature/xxx` 或 `bugfix/xxx`） | 无需操作 |
-| 非 main | 否 | `git branch -m {分支名称}` |
-
----
-
-## 第五步：提交变更
+## 第三步：生成 Commit 信息
 
 若暂存区无内容，跳过此步骤。
 
@@ -101,19 +67,16 @@ git diff --cached
 
 根据暂存区变更生成 **Commit 信息**：英语，120 字符内，以句号结尾，侧重描述用户可感知的变化。
 
-```bash
-git commit -m "{Commit 信息}"
-```
-
 ---
 
-## 第六步：推送
+## 第四步：提交并推送
 
 ### 追加模式
 
-若第五步有新 commit：
+若暂存区无内容，提示"无新变更需要提交"，流程结束。
 
 ```bash
+git commit -m "{Commit 信息}"
 git push
 ```
 
@@ -125,11 +88,40 @@ git push
 **PR 链接**（已追加提交）：{PR 链接}
 ```
 
-若第五步无新 commit（暂存区无内容），提示"无新变更需要提交"，流程结束。
-
 ### 新建模式
 
+#### 1. 分析完整变更
+
 ```bash
+git fetch origin main
+git log origin/main..HEAD --oneline   # 已有未推送的 commit
+git diff --cached                      # 本次暂存区变更
+```
+
+若已有 commit 为空且暂存区无内容，提示无变更，终止流程。
+
+#### 2. 生成 PR 信息
+
+根据完整变更生成：
+
+- **分支名称**：`feature/{username}_模块名` 或 `bugfix/{username}_模块名`（`{username}` 为 GitHub 用户 ID 全小写，模块名用下划线连接，最多两个单词）
+- **PR 标题**：英语，120 字符内，以句号结尾，概括所有变更
+- **PR 描述**：中文，简要说明变更内容和目的
+
+#### 3. 处理分支
+
+| 当前分支 | 分支名是否符合规范 | 操作 |
+|----------|-------------------|------|
+| main | - | `git checkout -b {分支名称}` |
+| 非 main | 是（`feature/xxx` 或 `bugfix/xxx`） | 无需操作 |
+| 非 main | 否 | `git branch -m {分支名称}` |
+
+#### 4. 提交并推送
+
+```bash
+# 若暂存区有内容
+git commit -m "{Commit 信息}"
+
 git push -u origin {分支名称}
 gh pr create --title "{PR 标题}" --body "{PR 描述}"
 ```
