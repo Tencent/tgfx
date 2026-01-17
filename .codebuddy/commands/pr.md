@@ -57,11 +57,11 @@ gh pr list --head "$CURRENT_BRANCH" --state open --json number,url
 
 ---
 
-## 第三步：处理分支（仅新建模式）
+## 第三步：生成 PR 信息（仅新建模式）
 
 若为追加模式，跳过此步骤。
 
-获取完整变更范围用于分支命名：
+获取完整变更范围：
 
 ```bash
 git fetch origin main
@@ -69,8 +69,19 @@ git log origin/main..HEAD --oneline   # 已有未推送的 commit
 git diff --cached                      # 本次暂存区变更
 ```
 
-**分支命名**：根据完整变更内容分析，按规范生成：
-- `feature/{username}_模块名` 或 `bugfix/{username}_模块名`（`{username}` 为 GitHub 用户 ID 全小写，模块名用下划线连接，最多两个单词）
+若已有 commit 为空且暂存区无内容，提示无变更，终止流程。
+
+根据完整变更生成：
+
+- **分支名称**：`feature/{username}_模块名` 或 `bugfix/{username}_模块名`（`{username}` 为 GitHub 用户 ID 全小写，模块名用下划线连接，最多两个单词）
+- **PR 标题**：英语，120 字符内，以句号结尾，概括所有变更
+- **PR 描述**：中文，简要说明变更内容和目的
+
+---
+
+## 第四步：处理分支（仅新建模式）
+
+若为追加模式，跳过此步骤。
 
 | 当前分支 | 分支名是否符合规范 | 操作 |
 |----------|-------------------|------|
@@ -80,7 +91,7 @@ git diff --cached                      # 本次暂存区变更
 
 ---
 
-## 第四步：提交变更
+## 第五步：提交变更
 
 若暂存区无内容，跳过此步骤。
 
@@ -96,11 +107,11 @@ git commit -m "{Commit 信息}"
 
 ---
 
-## 第五步：推送
+## 第六步：推送
 
 ### 追加模式
 
-若第四步有新 commit，推送并输出：
+若第五步有新 commit：
 
 ```bash
 git push
@@ -114,22 +125,9 @@ git push
 **PR 链接**（已追加提交）：{PR 链接}
 ```
 
-若第四步无新 commit（暂存区无内容），提示"无新变更需要提交"，流程结束。
+若第五步无新 commit（暂存区无内容），提示"无新变更需要提交"，流程结束。
 
 ### 新建模式
-
-```bash
-git rev-list --count origin/main..HEAD
-```
-
-若 commit 数量为 0，提示无变更，终止流程。
-
-**生成 PR 信息**：
-
-| commit 数量 | PR 标题 | PR 描述 |
-|-------------|---------|--------|
-| 1 个 | 使用该 commit 信息（`git log -1 --format=%s`） | 中文，简要说明变更内容和目的 |
-| 多个 | 根据 `git diff origin/main` 概括所有变更 | 中文，简要说明整体变更内容和目的 |
 
 ```bash
 git push -u origin {分支名称}
