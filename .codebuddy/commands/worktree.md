@@ -122,5 +122,4 @@ git worktree remove "{worktree 路径}" --force
 ## 重要限制
 
 - **NEVER** 删除主仓库
-- **NEVER** 在主仓库路径上执行 worktree remove
 - 创建 worktree 时始终基于 `origin/main`
