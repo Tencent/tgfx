@@ -5,9 +5,9 @@
   "includeCoAuthoredBy": false,
   "model": "claude-opus-4.5",
   "hooks": {
-    "PostToolUse": [
+    "Stop": [
       {
-        "matcher": "Write|Edit|MultiEdit",
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
