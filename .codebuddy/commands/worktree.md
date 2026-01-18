@@ -15,7 +15,7 @@ description: 管理 Git Worktree - 创建、切换或清理 worktree，自动同
 | 空 | 列出现有 worktree，询问用户进入或删除 |
 | `{name}` | 进入该 worktree（不存在则创建） |
 
-名称规范化：纯数字如 `1` 自动转为 `wt1`。
+Worktree 路径命名规范：`{项目名称}-{name}`，与主仓库同级目录。
 
 ---
 
