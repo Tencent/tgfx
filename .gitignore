@@ -45,9 +45,6 @@ local.properties
 # CodeBuddy
 CODEBUDDY.md
 .design/
-.codebuddy/settings.local.json
-.codebuddy/hooks/
-.codebuddy/.modified/
 
 /third_party
 /vendor_tools
