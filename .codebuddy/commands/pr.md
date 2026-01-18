@@ -142,39 +142,29 @@ git ls-remote --heads origin {分支名称} | grep -q . && echo "远程已存在
 
 若分支名冲突，调整分支名称（如添加数字后缀）后继续。
 
-根据当前分支选择操作（使用 heredoc 避免特殊字符问题）：
+切换到新分支：
 
-**若当前在 main 分支：**
+| 当前分支 | 操作 |
+|----------|------|
+| main | `git checkout -b {分支名称}` |
+| 非 main | `git branch -m {分支名称}` |
+
+提交并推送（使用 heredoc 避免特殊字符问题）：
 
 ```bash
-git checkout -b {分支名称} && \
+# 若暂存区有内容，先提交
 git commit -m "$(cat <<'EOF'
 {Commit 信息}
 EOF
-)" && \
+)"
+
+# 推送并创建 PR
 git push -u origin {分支名称} && \
 gh pr create --title "{PR 标题}" --body "$(cat <<'EOF'
 {PR 描述}
 EOF
 )"
 ```
-
-**若当前在非 main 分支：**
-
-```bash
-git branch -m {分支名称} && \
-git commit -m "$(cat <<'EOF'
-{Commit 信息}
-EOF
-)" && \
-git push -u origin {分支名称} && \
-gh pr create --title "{PR 标题}" --body "$(cat <<'EOF'
-{PR 描述}
-EOF
-)"
-```
-
-> 注：若暂存区无内容，省略 `git commit` 命令。
 
 输出：
 
