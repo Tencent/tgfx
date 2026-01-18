@@ -18,8 +18,6 @@ gh pr list --head "$CURRENT_BRANCH" --state open --json number,url && \
 gh api user --jq '.login'
 ```
 
-若 `CURRENT_BRANCH` 为空，说明处于 detached HEAD 状态，提示用户先切换到分支，终止流程。
-
 记录：当前分支、是否有开启的 PR、GitHub username（供新建模式使用）。
 
 根据结果选择模式：
@@ -129,15 +127,6 @@ git diff --cached                      # 本次暂存区变更（若第三步已
 - **PR 描述**：中文，简要说明变更内容和目的
 
 #### 3. 处理分支并提交推送
-
-检查分支名是否已存在：
-
-```bash
-git show-ref --verify --quiet refs/heads/{分支名称} && echo "本地已存在"
-git ls-remote --heads origin {分支名称} | grep -q . && echo "远程已存在"
-```
-
-若分支名冲突，调整分支名称（如添加数字后缀）后继续。
 
 切换到新分支：
 
