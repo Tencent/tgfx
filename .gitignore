@@ -43,7 +43,6 @@ local.properties
 !**/.idea/misc.xml
 
 # CodeBuddy
-CODEBUDDY.md
 .codebuddy/designs/
 
 /third_party
