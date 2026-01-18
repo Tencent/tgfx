@@ -34,8 +34,10 @@ Worktree 路径命名规范：`{项目名称}-{name}`，与主仓库同级目录
 git worktree list
 ```
 
-展示 worktree 列表给用户，询问用户要执行的操作：
-- 进入某个已存在的 worktree（执行「进入 worktree」流程）
+若只有主仓库，提示用户使用 `/worktree {name}` 创建新的 worktree，**终止流程**。
+
+若有其他 worktree，展示列表并询问用户要执行的操作：
+- 进入某个 worktree（执行「同步缓存并切换」，`WT_PATH` 为用户选择的路径）
 - 删除某个 worktree（执行「删除 worktree」流程）
 
 ---
@@ -56,7 +58,7 @@ git fetch origin main
 git worktree add "$WT_PATH" origin/main
 ```
 
-### 3. 同步缓存目录
+### 3. 同步缓存并切换
 
 从主仓库拷贝测试缓存（若存在）：
 
@@ -74,7 +76,7 @@ if [ -d "$MAIN_REPO/test/out" ]; then
 fi
 ```
 
-### 4. 切换到 worktree
+切换到 worktree：
 
 ```bash
 cd "$WT_PATH"
@@ -99,13 +101,23 @@ cd "$WT_PATH"
 
 ## 删除 worktree
 
+### 1. 检查未提交变更
+
+```bash
+git -C "{worktree 路径}" status --porcelain
+```
+
+若有未提交变更，提示用户并询问是否继续删除。用户取消则**终止流程**。
+
+### 2. 切换工作目录（如需要）
+
 若当前工作目录在待删除的 worktree 内，先切换到主仓库：
 
 ```bash
 cd "$MAIN_REPO"
 ```
 
-移除 worktree：
+### 3. 移除 worktree
 
 ```bash
 git worktree remove "{worktree 路径}" --force
