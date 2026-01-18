@@ -10,29 +10,50 @@ description: 管理 Git Worktree - 创建、切换或清理 worktree，自动同
 
 ## 参数解析
 
-根据 `$ARGUMENTS` 解析操作和名称：
-
 | $ARGUMENTS | 操作 |
 |------------|------|
-| 空 | list |
-| `1` 或 `wt1` | 进入 wt1（不存在则创建） |
-| `rm 1` 或 `rm wt1` | remove wt1 |
+| 空 | 列出现有 worktree，询问用户进入或删除 |
+| `{name}` | 进入该 worktree（不存在则创建） |
 
-名称规范化：纯数字 `1` 自动转为 `wt1`。
+名称规范化：纯数字如 `1` 自动转为 `wt1`。
 
 ---
 
-## 操作：list
+## 无参数模式
+
+### 1. 列出现有 worktree
 
 ```bash
+MAIN_REPO=$(git worktree list --porcelain | head -1 | sed 's/worktree //')
+REPO_NAME=$(basename "$MAIN_REPO")
 git worktree list
 ```
 
-列出所有 worktree 并展示给用户。
+展示 worktree 列表给用户，询问用户要执行的操作：
+- 进入某个已存在的 worktree
+- 删除某个 worktree
+
+### 2. 进入 worktree
+
+直接切换到用户选择的 worktree 目录。
+
+### 3. 删除 worktree
+
+若当前工作目录在待删除的 worktree 内，先切换到主仓库：
+
+```bash
+cd "$MAIN_REPO"
+```
+
+移除 worktree：
+
+```bash
+git worktree remove "{用户选择的 worktree 路径}" --force
+```
 
 ---
 
-## 操作：进入（或创建）worktree
+## 有参数模式：进入或创建 worktree
 
 ### 1. 获取主仓库信息
 
@@ -40,8 +61,6 @@ git worktree list
 MAIN_REPO=$(git worktree list --porcelain | head -1 | sed 's/worktree //')
 REPO_NAME=$(basename "$MAIN_REPO")
 WT_PATH="$MAIN_REPO/../$REPO_NAME-{名称}"
-echo "MAIN_REPO: $MAIN_REPO"
-echo "WT_PATH: $WT_PATH"
 ```
 
 ### 2. 检查 worktree 是否存在
@@ -99,47 +118,6 @@ pwd
 
 ```
 已切换到 worktree：{WT_PATH}
-```
-
----
-
-## 操作：remove
-
-### 1. 获取路径
-
-```bash
-MAIN_REPO=$(git worktree list --porcelain | head -1 | sed 's/worktree //')
-REPO_NAME=$(basename "$MAIN_REPO")
-WT_PATH="$MAIN_REPO/../$REPO_NAME-{名称}"
-```
-
-### 2. 检查是否存在
-
-```bash
-test -d "$WT_PATH" && echo "exists" || echo "not found"
-```
-
-若不存在，提示 worktree 不存在，**终止流程**。
-
-### 3. 检查当前位置
-
-若当前工作目录在该 worktree 内，先切换到主仓库：
-
-```bash
-cd "$MAIN_REPO"
-```
-
-### 4. 移除 worktree
-
-```bash
-git worktree remove "$WT_PATH" --force
-```
-
-输出：
-
-```
-**已移除 Worktree**：{WT_PATH}
-**当前目录**：{当前工作目录}
 ```
 
 ---
