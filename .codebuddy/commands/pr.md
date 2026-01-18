@@ -92,11 +92,8 @@ git log origin/{当前分支}..HEAD --oneline
 | 无内容 | 无 | 提示"无新变更需要提交"，流程结束 |
 
 ```bash
-# 若暂存区有内容，提交并推送（使用 heredoc 避免特殊字符问题）
-git commit -m "$(cat <<'EOF'
-{Commit 信息}
-EOF
-)" && git push
+# 若暂存区有内容，提交并推送
+git commit -m "{Commit 信息}" && git push
 
 # 若暂存区无内容但有未推送 commit，仅推送
 git push
@@ -149,21 +146,15 @@ git ls-remote --heads origin {分支名称} | grep -q . && echo "远程已存在
 | main | `git checkout -b {分支名称}` |
 | 非 main | `git branch -m {分支名称}` |
 
-提交并推送（使用 heredoc 避免特殊字符问题）：
+提交并推送：
 
 ```bash
 # 若暂存区有内容，先提交
-git commit -m "$(cat <<'EOF'
-{Commit 信息}
-EOF
-)"
+git commit -m "{Commit 信息}"
 
 # 推送并创建 PR
-git push -u origin {分支名称} && \
-gh pr create --title "{PR 标题}" --body "$(cat <<'EOF'
-{PR 描述}
-EOF
-)"
+git push -u origin {分支名称}
+gh pr create --title "{PR 标题}" --body "{PR 描述}"
 ```
 
 输出：
