@@ -13,7 +13,7 @@ git commit --only {文件1} {文件2} ... -m "{Commit 信息}"
 
 若当前在 main 分支，先创建新分支再提交。
 
-> 注：`git commit --only` 只提交指定文件，不影响现有暂存区和工作区状态。
+> 注：`git commit --only` 提交指定文件的工作区内容。若文件在暂存区有用户的部分修改（`git status` 显示同一文件同时在 staged 和 unstaged），需询问用户如何处理，避免覆盖用户的暂存内容。
 
 ## **!! IMPORTANT - 操作限制**
 
