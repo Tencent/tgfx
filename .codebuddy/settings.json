@@ -3,29 +3,5 @@
     "defaultMode": "bypassPermissions"
   },
   "includeCoAuthoredBy": false,
-  "model": "claude-opus-4.5",
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CODEBUDDY_PROJECT_DIR\"/.codebuddy/hooks/track-modified.sh"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CODEBUDDY_PROJECT_DIR\"/.codebuddy/hooks/check-uncommitted.sh"
-          }
-        ]
-      }
-    ]
-  }
+  "model": "claude-opus-4.5"
 }
