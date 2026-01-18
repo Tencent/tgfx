@@ -10,10 +10,10 @@ alwaysApply: true
 
 ## **!! CRITICAL - 自动提交**
 
-每次使用 Write/Edit 工具修改文件后，立即执行：
+完成用户请求后，若有文件被修改，执行提交：
 
 ```bash
-git commit --only {修改的文件} -m "{Commit 信息}"
+git commit --only {文件1} {文件2} ... -m "{Commit 信息}"
 ```
 
 若当前在 main 分支，先创建新分支再提交。
