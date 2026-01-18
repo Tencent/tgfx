@@ -40,7 +40,7 @@ git worktree list
 
 ---
 
-## 进入或创建 worktree
+## 进入 worktree
 
 ### 1. 计算路径并检查是否存在
 
@@ -49,43 +49,24 @@ WT_PATH="$MAIN_REPO/../$REPO_NAME-{name}"
 test -d "$WT_PATH" && echo "exists" || echo "not found"
 ```
 
-- **若不存在**：执行步骤 2 创建
-- **若存在**：跳到步骤 3
-
-### 2. 创建 worktree
+### 2. 若不存在则创建
 
 ```bash
 git fetch origin main
 git worktree add "$WT_PATH" origin/main
 ```
 
-### 3. 同步缓存并切换
-
-从主仓库拷贝测试缓存后切换（执行「进入 worktree」流程）。
-
-输出：
-
-```
-**Worktree 已创建**：{WT_PATH}
-**基于分支**：origin/main
-**已同步缓存**：{同步的目录列表}
-```
-
----
-
-## 进入 worktree
+### 3. 同步缓存目录
 
 从主仓库拷贝测试缓存（若存在）：
 
 ```bash
-# 拷贝 baseline 缓存
 if [ -d "$MAIN_REPO/test/baseline/.cache" ]; then
     mkdir -p "$WT_PATH/test/baseline"
     cp -r "$MAIN_REPO/test/baseline/.cache" "$WT_PATH/test/baseline/"
     echo "已同步 test/baseline/.cache"
 fi
 
-# 拷贝 test/out
 if [ -d "$MAIN_REPO/test/out" ]; then
     mkdir -p "$WT_PATH/test"
     cp -r "$MAIN_REPO/test/out" "$WT_PATH/test/"
@@ -93,13 +74,21 @@ if [ -d "$MAIN_REPO/test/out" ]; then
 fi
 ```
 
-切换到 worktree：
+### 4. 切换到 worktree
 
 ```bash
 cd "$WT_PATH"
 ```
 
-输出：
+输出（新建时）：
+
+```
+**Worktree 已创建**：{WT_PATH}
+**基于分支**：origin/main
+**已同步缓存**：{同步的目录列表}
+```
+
+输出（已存在时）：
 
 ```
 **已切换到 worktree**：{WT_PATH}
