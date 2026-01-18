@@ -35,7 +35,7 @@ git worktree list
 
 ### 2. 进入 worktree
 
-直接切换到用户选择的 worktree 目录。
+切换到用户选择的 worktree 目录，并同步测试缓存（见「同步缓存目录」）。
 
 ### 3. 删除 worktree
 
@@ -69,7 +69,7 @@ WT_PATH="$MAIN_REPO/../$REPO_NAME-{名称}"
 test -d "$WT_PATH" && echo "exists" || echo "not found"
 ```
 
-- **若存在**：直接切换到该 worktree（跳到步骤 5）
+- **若存在**：同步缓存目录后切换到该 worktree（跳到步骤 4）
 - **若不存在**：创建新 worktree（继续步骤 3）
 
 ### 3. 创建 worktree
@@ -117,7 +117,8 @@ pwd
 输出（已存在时）：
 
 ```
-已切换到 worktree：{WT_PATH}
+**已切换到 worktree**：{WT_PATH}
+**已同步缓存**：{同步的目录列表}
 ```
 
 ---
