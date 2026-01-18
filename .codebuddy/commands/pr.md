@@ -18,6 +18,8 @@ gh pr list --head "$CURRENT_BRANCH" --state open --json number,url && \
 gh api user --jq '.login'
 ```
 
+若 `CURRENT_BRANCH` 为空，说明处于 detached HEAD 状态，提示用户先切换到分支，终止流程。
+
 记录：当前分支、是否有开启的 PR、GitHub username（供新建模式使用）。
 
 根据结果选择模式：
@@ -40,11 +42,13 @@ gh api user --jq '.login'
 
 **判断方法**：第一列非空格为暂存区有内容；第二列非空格或以 `??` 开头为工作区有内容。
 
-若为**局部提交**，记录**暂存区文件列表**供后续步骤使用。
+若为**局部提交**，使用 `git diff --cached --name-only` 记录**暂存区文件列表**供后续步骤使用。
 
 ---
 
 ## 第二步：格式化代码
+
+若 `./codeformat.sh` 存在，执行：
 
 ```bash
 ./codeformat.sh
@@ -88,8 +92,11 @@ git log origin/{当前分支}..HEAD --oneline
 | 无内容 | 无 | 提示"无新变更需要提交"，流程结束 |
 
 ```bash
-# 若暂存区有内容，提交并推送
-git commit -m "{Commit 信息}" && git push
+# 若暂存区有内容，提交并推送（使用 heredoc 避免特殊字符问题）
+git commit -m "$(cat <<'EOF'
+{Commit 信息}
+EOF
+)" && git push
 
 # 若暂存区无内容但有未推送 commit，仅推送
 git push
@@ -107,17 +114,18 @@ git push
 
 #### 1. 分析完整变更
 
-```bash
-git log origin/main..HEAD --oneline
-```
+分析 PR 包含的所有变更：
 
-结合第三步的暂存区变更（已获取，无需重复执行）进行分析。
+```bash
+git log origin/main..HEAD --oneline   # 已有 commit
+git diff --cached                      # 本次暂存区变更（若第三步已获取则复用）
+```
 
 若已有 commit 为空且暂存区无内容，提示无变更，终止流程。
 
 #### 2. 生成 PR 信息
 
-根据完整变更生成：
+根据上述完整变更（已有 commit + 暂存区变更）生成：
 
 - **分支名称**：`feature/{username}_模块名` 或 `bugfix/{username}_模块名`（`{username}` 为前置检查获取的 GitHub 用户 ID 全小写，模块名用下划线连接，最多两个单词）
 - **PR 标题**：英语，120 字符内，以句号结尾，侧重描述用户可感知的变化
@@ -125,24 +133,45 @@ git log origin/main..HEAD --oneline
 
 #### 3. 处理分支并提交推送
 
-根据当前分支选择操作：
+检查分支名是否已存在：
+
+```bash
+git show-ref --verify --quiet refs/heads/{分支名称} && echo "本地已存在"
+git ls-remote --heads origin {分支名称} | grep -q . && echo "远程已存在"
+```
+
+若分支名冲突，调整分支名称（如添加数字后缀）后继续。
+
+根据当前分支选择操作（使用 heredoc 避免特殊字符问题）：
 
 **若当前在 main 分支：**
 
 ```bash
 git checkout -b {分支名称} && \
-git commit -m "{Commit 信息}" && \
+git commit -m "$(cat <<'EOF'
+{Commit 信息}
+EOF
+)" && \
 git push -u origin {分支名称} && \
-gh pr create --title "{PR 标题}" --body "{PR 描述}"
+gh pr create --title "{PR 标题}" --body "$(cat <<'EOF'
+{PR 描述}
+EOF
+)"
 ```
 
 **若当前在非 main 分支：**
 
 ```bash
 git branch -m {分支名称} && \
-git commit -m "{Commit 信息}" && \
+git commit -m "$(cat <<'EOF'
+{Commit 信息}
+EOF
+)" && \
 git push -u origin {分支名称} && \
-gh pr create --title "{PR 标题}" --body "{PR 描述}"
+gh pr create --title "{PR 标题}" --body "$(cat <<'EOF'
+{PR 描述}
+EOF
+)"
 ```
 
 > 注：若暂存区无内容，省略 `git commit` 命令。
