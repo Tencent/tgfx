@@ -55,7 +55,7 @@ test -d "$WT_PATH" && echo "exists" || echo "not found"
 
 ```bash
 git fetch origin main
-git worktree add "$WT_PATH" origin/main
+git worktree add -b {name} "$WT_PATH" origin/main
 ```
 
 ### 3. 同步缓存并切换
@@ -86,7 +86,7 @@ cd "$WT_PATH"
 
 ```
 **Worktree 已创建**：{WT_PATH}
-**基于分支**：origin/main
+**分支**：{name}
 **已同步缓存**：{同步的目录列表}
 ```
 
