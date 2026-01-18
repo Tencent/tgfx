@@ -8,6 +8,15 @@ description: 管理 Git Worktree - 创建、切换或清理 worktree，自动同
 
 ---
 
+## 公共步骤：获取主仓库信息
+
+```bash
+MAIN_REPO=$(git worktree list --porcelain | head -1 | sed 's/worktree //')
+REPO_NAME=$(basename "$MAIN_REPO")
+```
+
+---
+
 ## 参数解析
 
 | $ARGUMENTS | 操作 |
@@ -22,44 +31,49 @@ Worktree 路径命名规范：`{项目名称}-{name}`，与主仓库同级目录
 ## 无参数模式
 
 ```bash
-MAIN_REPO=$(git worktree list --porcelain | head -1 | sed 's/worktree //')
-REPO_NAME=$(basename "$MAIN_REPO")
 git worktree list
 ```
 
 展示 worktree 列表给用户，询问用户要执行的操作：
-- 进入某个已存在的 worktree（执行「进入或创建 worktree」流程）
+- 进入某个已存在的 worktree（执行「进入 worktree」流程）
 - 删除某个 worktree（执行「删除 worktree」流程）
 
 ---
 
 ## 进入或创建 worktree
 
-### 1. 获取主仓库信息
+### 1. 计算路径并检查是否存在
 
 ```bash
-MAIN_REPO=$(git worktree list --porcelain | head -1 | sed 's/worktree //')
-REPO_NAME=$(basename "$MAIN_REPO")
 WT_PATH="$MAIN_REPO/../$REPO_NAME-{name}"
-```
-
-### 2. 检查 worktree 是否存在
-
-```bash
 test -d "$WT_PATH" && echo "exists" || echo "not found"
 ```
 
-- **若不存在**：创建新 worktree（执行步骤 3）
-- **若存在**：跳到步骤 4
+- **若不存在**：执行步骤 2 创建
+- **若存在**：跳到步骤 3
 
-### 3. 创建 worktree
+### 2. 创建 worktree
 
 ```bash
 git fetch origin main
 git worktree add "$WT_PATH" origin/main
 ```
 
-### 4. 同步缓存目录
+### 3. 同步缓存并切换
+
+从主仓库拷贝测试缓存后切换（执行「进入 worktree」流程）。
+
+输出：
+
+```
+**Worktree 已创建**：{WT_PATH}
+**基于分支**：origin/main
+**已同步缓存**：{同步的目录列表}
+```
+
+---
+
+## 进入 worktree
 
 从主仓库拷贝测试缓存（若存在）：
 
@@ -79,22 +93,13 @@ if [ -d "$MAIN_REPO/test/out" ]; then
 fi
 ```
 
-### 5. 切换到 worktree
+切换到 worktree：
 
 ```bash
 cd "$WT_PATH"
-pwd
 ```
 
-输出（新建时）：
-
-```
-**Worktree 已创建**：{WT_PATH}
-**基于分支**：origin/main
-**已同步缓存**：{同步的目录列表}
-```
-
-输出（已存在时）：
+输出：
 
 ```
 **已切换到 worktree**：{WT_PATH}
@@ -115,6 +120,12 @@ cd "$MAIN_REPO"
 
 ```bash
 git worktree remove "{worktree 路径}" --force
+```
+
+输出：
+
+```
+**已删除 worktree**：{worktree 路径}
 ```
 
 ---
