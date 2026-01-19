@@ -37,6 +37,7 @@ class SlidingWindowTracker;
 class AtlasManager;
 class CommandBuffer;
 class ShaderCaps;
+class AtlasStrikeCache;
 
 /**
  * Context is responsible for creating and managing GPU resources, as well as issuing drawing
@@ -192,6 +193,10 @@ class Context {
     return _atlasManager;
   }
 
+  AtlasStrikeCache* atlasStrikeCache() const {
+    return _atlasStrikeCache;
+  }
+
  private:
   std::shared_ptr<DrawingBuffer> getDrawingBuffer(const Recording* recording) const;
 
@@ -203,6 +208,7 @@ class Context {
   DrawingManager* _drawingManager = nullptr;
   ProxyProvider* _proxyProvider = nullptr;
   AtlasManager* _atlasManager = nullptr;
+  AtlasStrikeCache* _atlasStrikeCache = nullptr;
   std::deque<std::shared_ptr<DrawingBuffer>> pendingDrawingBuffers = {};
 };
 

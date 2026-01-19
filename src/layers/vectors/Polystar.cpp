@@ -19,6 +19,7 @@
 #include "tgfx/layers/vectors/Polystar.h"
 #include <cmath>
 #include "VectorContext.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
@@ -256,6 +257,7 @@ void Polystar::setReversed(bool value) {
 }
 
 void Polystar::apply(VectorContext* context) {
+  DEBUG_ASSERT(context != nullptr);
   if (_cachedShape == nullptr) {
     auto pathProvider = std::make_shared<PolystarPathProvider>(
         _center, _polystarType, _pointCount, _rotation, _outerRadius, _outerRoundness, _innerRadius,

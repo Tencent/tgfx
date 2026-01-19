@@ -44,12 +44,13 @@ class Matrix2D {
   }
 
   /**
-  * Creates a Matrix2D with the given elements. The created Matrix2D is:
-  *
-  *       | m00  m01  m02 |
-  *       | m10  m11  m12 |
-  *       | m20  m21  m22 |
-  */
+   * Creates a Matrix2D with the given elements. The parameters are specified in column-major order.
+   * The created Matrix2D is:
+   *
+   *       | m00  m10  m20 |
+   *       | m01  m11  m21 |
+   *       | m02  m12  m22 |
+   */
   static Matrix2D MakeAll(float m00, float m01, float m02, float m10, float m11, float m12,
                           float m20, float m21, float m22) {
     return {m00, m01, m02, m10, m11, m12, m20, m21, m22};
@@ -66,10 +67,10 @@ class Matrix2D {
   bool invert(Matrix2D* inverse = nullptr) const;
 
   /**
-   * Maps a rectangle using this matrix.
-   * If the matrix contains a perspective transformation, each corner of the rectangle is mapped as a
-   * 4D point (x, y, 0, 1), and the resulting rectangle is computed from the projected points
-   * (after perspective division).
+   * Maps a rectangle using this matrix. If the matrix contains a perspective transformation, each
+   * corner of the rectangle is mapped with w=0 plane clipping. When a corner has w < 0 (behind the
+   * camera), the edge connecting it to an adjacent corner with w > 0 is clipped against the w=0
+   * plane. This produces a conservative bounding box that may extend to infinity in some directions.
    */
   Rect mapRect(const Rect& src) const;
 
@@ -83,6 +84,13 @@ class Matrix2D {
   constexpr Matrix2D(float m00, float m01, float m02, float m10, float m11, float m12, float m20,
                      float m21, float m22)
       : values{m00, m01, m02, m10, m11, m12, m20, m21, m22} {
+  }
+
+  Rect mapRectAffine(const Rect& src) const;
+  Rect mapRectPerspective(const Rect& src) const;
+
+  bool hasPerspective() const {
+    return values[2] != 0 || values[5] != 0 || values[8] != 1;
   }
 
   /**

@@ -66,10 +66,9 @@ void LayerUnrollContext::drawImageRect(std::shared_ptr<Image> image, const Rect&
   unrolled = true;
 }
 
-void LayerUnrollContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                          const MCState& state, const Brush& brush,
-                                          const Stroke* stroke) {
-  drawContext->drawGlyphRunList(std::move(glyphRunList), state, mergeBrush(brush), stroke);
+void LayerUnrollContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
+                                      const Brush& brush, const Stroke* stroke) {
+  drawContext->drawTextBlob(std::move(textBlob), state, mergeBrush(brush), stroke);
   unrolled = true;
 }
 

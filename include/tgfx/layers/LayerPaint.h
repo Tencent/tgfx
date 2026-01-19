@@ -23,17 +23,17 @@
 namespace tgfx {
 
 /**
- * Defines the draw order of layer content relative to its children.
+ * Defines the placement of layer content relative to its children.
  */
-enum class DrawOrder {
+enum class LayerPlacement {
   /**
-   * Draw the content below the layer's children (default).
+   * Place the content behind the layer's children (default).
    */
-  BelowChildren,
+  Background,
   /**
-   * Draw the content above the layer's children.
+   * Place the content in front of the layer's children.
    */
-  AboveChildren
+  Foreground
 };
 
 /**
@@ -96,10 +96,10 @@ class LayerPaint {
   Stroke stroke = {};
 
   /**
-   * The draw order of the content relative to the layer's children. Default is
-   * DrawOrder::BelowChildren.
+   * The placement of the content relative to the layer's children. Default is
+   * LayerPlacement::Background.
    */
-  DrawOrder drawOrder = DrawOrder::BelowChildren;
+  LayerPlacement placement = LayerPlacement::Background;
 };
 
 }  // namespace tgfx

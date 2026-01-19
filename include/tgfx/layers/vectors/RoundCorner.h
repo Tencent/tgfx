@@ -52,7 +52,7 @@ class RoundCorner : public VectorElement {
   void apply(VectorContext* context) override;
 
  private:
-  float _radius = 0.0f;
+  float _radius = 10.0f;
   std::shared_ptr<PathEffect> _cachedEffect = nullptr;
 };
 

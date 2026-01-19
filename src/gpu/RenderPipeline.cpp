@@ -19,11 +19,12 @@
 #include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
-VertexDescriptor::VertexDescriptor(std::vector<Attribute> attribs, size_t stride)
-    : attributes(std::move(attribs)), vertexStride(stride) {
-  if (vertexStride == 0) {
+VertexBufferLayout::VertexBufferLayout(std::vector<Attribute> attribs, VertexStepMode mode,
+                                       size_t strideValue)
+    : stride(strideValue), stepMode(mode), attributes(std::move(attribs)) {
+  if (stride == 0) {
     for (auto& attribute : attributes) {
-      vertexStride += attribute.size();
+      stride += attribute.size();
     }
   }
 }

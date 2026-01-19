@@ -1,5 +1,8 @@
 #include "core/utils/StrokeUtils.h"
 #include "gtest/gtest.h"
+#include "tgfx/core/Paint.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/layers/DisplayList.h"
@@ -7,7 +10,6 @@
 #include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "utils/TestUtils.h"
-#include "utils/TextShaper.h"
 
 namespace tgfx {
 TGFX_TEST(StrokeTest, DrawPathByHairlinePaint) {
@@ -174,6 +176,29 @@ TGFX_TEST(StrokeTest, ExtremelyThinStrokePath) {
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/ExtremelyThinStrokePath"));
 }
 
+TGFX_TEST(StrokeTest, ExtremelyThinStrokePathIdentityMatrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 800, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::Black());
+
+  Path path;
+  path.addOval(Rect::MakeXYWH(50, 50, 300, 300));
+
+  Paint paint;
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(0.5f);
+  paint.setColor(Color::FromRGBA(255, 255, 0, 255));
+
+  canvas->drawPath(path, paint);
+  canvas->translate(400, 0);
+  canvas->drawPath(path, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/ExtremelyThinStrokePathIdentityMatrix"));
+}
+
 TGFX_TEST(StrokeTest, ExtremelyThinStrokeLayer) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -323,6 +348,59 @@ TGFX_TEST(StrokeTest, HairlineWithDropShadow) {
   canvas->drawLine(50, 50, 350, 350, paint);  // diagonal line
 
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineWithDropShadow"));
+}
+
+TGFX_TEST(StrokeTest, HairlineStrokeText) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Create surface
+  auto surface = Surface::Make(context, 150, 300);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+
+  // Clear background
+  canvas->clear(Color::White());
+
+  // Create font
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 12);
+
+  // Create stroke paint only
+  Paint strokePaint;
+  strokePaint.setStyle(PaintStyle::Stroke);
+  strokePaint.setColor(Color::Red());
+
+  Paint fillPaint;
+  fillPaint.setStyle(PaintStyle::Fill);
+  fillPaint.setColor(Color::Blue());
+
+  // Draw text with stroke only
+  strokePaint.setStrokeWidth(2.0f);
+  canvas->drawSimpleText("Width 2.0", 50, 100, font, fillPaint);
+  canvas->drawSimpleText("Width 2.0", 50, 100, font, strokePaint);
+
+  // Test with different stroke widths
+  strokePaint.setStrokeWidth(1.0f);
+  canvas->drawSimpleText("Width 1.0", 50, 150, font, fillPaint);
+  canvas->drawSimpleText("Width 1.0", 50, 150, font, strokePaint);
+
+  strokePaint.setStrokeWidth(0.5f);
+  canvas->drawSimpleText("Width 0.5", 50, 200, font, fillPaint);
+  canvas->drawSimpleText("Width 0.5", 50, 200, font, strokePaint);
+
+  // Test with very small stroke width
+  strokePaint.setStrokeWidth(0.2f);
+  canvas->drawSimpleText("Width 0.2", 50, 250, font, fillPaint);
+  canvas->drawSimpleText("Width 0.2", 50, 250, font, strokePaint);
+
+  context->flush();
+  // Compare with baseline
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineStrokeText"));
+  device->unlock();
 }
 
 }  // namespace tgfx

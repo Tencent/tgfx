@@ -20,6 +20,7 @@
 
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Shape.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
@@ -46,14 +47,14 @@ class Ellipse : public VectorElement {
   /**
    * Returns the size of the ellipse (width and height of the bounding box).
    */
-  const Point& size() const {
+  const Size& size() const {
     return _size;
   }
 
   /**
    * Sets the size of the ellipse.
    */
-  void setSize(const Point& value);
+  void setSize(const Size& value);
 
   /**
    * Returns whether the path direction is reversed (counter-clockwise).
@@ -76,7 +77,7 @@ class Ellipse : public VectorElement {
 
  private:
   Point _center = Point::Zero();
-  Point _size = Point::Zero();
+  Size _size = {100.0f, 100.0f};
   bool _reversed = false;
   std::shared_ptr<Shape> _cachedShape = nullptr;
 };

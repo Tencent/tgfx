@@ -55,13 +55,8 @@ std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
   attrs.minorVersion = 0;
   auto context = emscripten_webgl_create_context(canvasID.c_str(), &attrs);
   if (context == 0) {
-    // fallback to WebGL 1.0
-    attrs.majorVersion = 1;
-    context = emscripten_webgl_create_context(canvasID.c_str(), &attrs);
-    if (context == 0) {
-      LOGE("WebGLDevice::MakeFrom emscripten_webgl_create_context error");
-      return nullptr;
-    }
+    LOGE("WebGLDevice::MakeFrom emscripten_webgl_create_context 2.0 error");
+    return nullptr;
   }
   auto result = emscripten_webgl_make_context_current(context);
   if (result != EMSCRIPTEN_RESULT_SUCCESS) {

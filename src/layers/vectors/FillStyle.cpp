@@ -19,11 +19,21 @@
 #include "tgfx/layers/vectors/FillStyle.h"
 #include "Painter.h"
 #include "VectorContext.h"
-#include "tgfx/core/Shape.h"
-#include "tgfx/layers/LayerPaint.h"
+#include "core/utils/Log.h"
+#include "tgfx/core/PathTypes.h"
 #include "tgfx/layers/LayerRecorder.h"
 
 namespace tgfx {
+
+static PathFillType ToPathFillType(FillRule fillRule) {
+  switch (fillRule) {
+    case FillRule::Winding:
+      return PathFillType::Winding;
+    case FillRule::EvenOdd:
+      return PathFillType::EvenOdd;
+  }
+  return PathFillType::Winding;
+}
 
 class FillPainter : public Painter {
  public:
@@ -33,16 +43,50 @@ class FillPainter : public Painter {
     return std::make_unique<FillPainter>(*this);
   }
 
- protected:
-  void onDraw(LayerRecorder* recorder, std::shared_ptr<Shape> shape) override {
-    // Only apply fillRule if the shape's current fillType is the default (Winding).
-    // This preserves fillType set by PathOp (e.g., MergePath with XOR produces EvenOdd).
-    if (shape->fillType() == PathFillType::Winding) {
-      shape = Shape::ApplyFillType(shape, fillRule);
+  void draw(LayerRecorder* recorder) override {
+    for (auto* geometry : geometries) {
+      if (geometry->hasText()) {
+        for (const auto& run : geometry->getGlyphRuns()) {
+          auto runMatrix = run.matrix;
+          runMatrix.postConcat(geometry->matrix);
+          drawGlyphRun(recorder, runMatrix, run);
+        }
+        continue;
+      }
+
+      auto shape = geometry->getShape();
+      if (shape == nullptr) {
+        continue;
+      }
+      if (shape->fillType() == PathFillType::Winding) {
+        shape = Shape::ApplyFillType(shape, fillRule);
+      }
+      shape = Shape::ApplyMatrix(shape, geometry->matrix);
+      LayerPaint paint(shader, alpha, blendMode);
+      paint.placement = placement;
+      recorder->addShape(std::move(shape), paint);
     }
-    shape = Shape::ApplyMatrix(shape, matrix);
-    LayerPaint paint(shader, alpha, blendMode);
-    recorder->addShape(shape, paint);
+  }
+
+ private:
+  void drawGlyphRun(LayerRecorder* recorder, const Matrix& geometryMatrix,
+                    const StyledGlyphRun& run) {
+    float blendFactor = run.style.fillColor.alpha;
+
+    if (blendFactor < 1.0f) {
+      LayerPaint paint(shader, alpha * run.style.alpha, blendMode);
+      paint.placement = placement;
+      recorder->addTextBlob(run.textBlob, paint, geometryMatrix);
+    }
+
+    if (blendFactor > 0.0f) {
+      const auto& fillColor = run.style.fillColor;
+      auto overlayColor = Color{fillColor.red, fillColor.green, fillColor.blue, blendFactor};
+      auto colorShader = Shader::MakeColorShader(overlayColor);
+      LayerPaint paint(colorShader, alpha * run.style.alpha, BlendMode::SrcOver);
+      paint.placement = placement;
+      recorder->addTextBlob(run.textBlob, paint, geometryMatrix);
+    }
   }
 };
 
@@ -71,11 +115,19 @@ void FillStyle::setBlendMode(BlendMode value) {
   invalidateContent();
 }
 
-void FillStyle::setFillRule(PathFillType value) {
+void FillStyle::setFillRule(FillRule value) {
   if (_fillRule == value) {
     return;
   }
   _fillRule = value;
+  invalidateContent();
+}
+
+void FillStyle::setPlacement(LayerPlacement value) {
+  if (_placement == value) {
+    return;
+  }
+  _placement = value;
   invalidateContent();
 }
 
@@ -94,7 +146,8 @@ void FillStyle::detachFromLayer(Layer* layer) {
 }
 
 void FillStyle::apply(VectorContext* context) {
-  if (_colorSource == nullptr || context->shapes.empty()) {
+  DEBUG_ASSERT(context != nullptr);
+  if (_colorSource == nullptr || context->geometries.empty()) {
     return;
   }
   auto shader = _colorSource->getShader();
@@ -106,9 +159,12 @@ void FillStyle::apply(VectorContext* context) {
   painter->shader = std::move(shader);
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
-  painter->fillRule = _fillRule;
-  painter->startIndex = 0;
-  painter->matrices = context->matrices;
+  painter->fillRule = ToPathFillType(_fillRule);
+  painter->placement = _placement;
+  painter->geometries.reserve(context->geometries.size());
+  for (auto& geometry : context->geometries) {
+    painter->geometries.push_back(geometry.get());
+  }
   context->painters.push_back(std::move(painter));
 }
 

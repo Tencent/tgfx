@@ -17,13 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerFilterSerialization.h"
-#include <tgfx/layers/filters/BlendFilter.h>
-#include <tgfx/layers/filters/BlurFilter.h>
-#include <tgfx/layers/filters/ColorMatrixFilter.h>
-#include <tgfx/layers/filters/DropShadowFilter.h>
-#include <tgfx/layers/filters/InnerShadowFilter.h>
 #include "core/utils/Log.h"
-#include "layers/filters/Transform3DFilter.h"
+#include "tgfx/layers/filters/BlendFilter.h"
+#include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/filters/ColorMatrixFilter.h"
+#include "tgfx/layers/filters/DropShadowFilter.h"
+#include "tgfx/layers/filters/InnerShadowFilter.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 
 namespace tgfx {
@@ -129,10 +128,6 @@ std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* lay
       break;
     case Types::LayerFilterType::InnerShadowFilter:
       SerializeInnerShadowFilterImpl(fbb, layerFilter, map);
-      break;
-    case Types::LayerFilterType::Transform3DFilter:
-      // Filters stored within the Layer itself need to be serialized. Transform3DFilter type
-      // filters are not stored inside the Layer and do not require processing.
       break;
   }
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);

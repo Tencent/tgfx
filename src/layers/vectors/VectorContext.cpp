@@ -24,8 +24,45 @@ void VectorContext::addShape(std::shared_ptr<Shape> shape) {
   if (shape == nullptr) {
     return;
   }
-  shapes.push_back(std::move(shape));
-  matrices.push_back(Matrix::I());
+  auto geometry = std::make_unique<Geometry>();
+  geometry->shape = std::move(shape);
+  geometries.push_back(std::move(geometry));
+}
+
+void VectorContext::addTextBlob(std::shared_ptr<TextBlob> blob, const Point& position) {
+  if (blob == nullptr) {
+    return;
+  }
+  auto geometry = std::make_unique<Geometry>();
+  geometry->textBlob = std::move(blob);
+  geometry->matrix = Matrix::MakeTrans(position.x, position.y);
+  geometries.push_back(std::move(geometry));
+}
+
+std::vector<Geometry*> VectorContext::getShapeGeometries() {
+  std::vector<Geometry*> result = {};
+  result.reserve(geometries.size());
+  for (auto& geometry : geometries) {
+    if (geometry->hasText()) {
+      geometry->convertToShape();
+    }
+    result.push_back(geometry.get());
+  }
+  return result;
+}
+
+std::vector<Geometry*> VectorContext::getGlyphGeometries() {
+  std::vector<Geometry*> result = {};
+  for (auto& geometry : geometries) {
+    if (!geometry->hasText()) {
+      continue;
+    }
+    if (geometry->textBlob != nullptr) {
+      geometry->expandToGlyphs();
+    }
+    result.push_back(geometry.get());
+  }
+  return result;
 }
 
 }  // namespace tgfx

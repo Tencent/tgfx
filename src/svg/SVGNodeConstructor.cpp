@@ -433,7 +433,7 @@ std::shared_ptr<SVGNode> SVGNodeConstructor::ConstructSVGNode(const Construction
                      const std::string& elementName) -> std::shared_ptr<SVGNode> {
     if (elementName == "svg") {
       // Outermost SVG element must be tagged as such.
-      return SVGRoot::Make(context.parentNode ? SVGRoot::Type::kInner : SVGRoot::Type::kRoot);
+      return SVGRoot::Make(context.parentNode ? SVGRoot::Type::Inner : SVGRoot::Type::Root);
     }
 
     static const auto elementFactories = InitElementFactories();

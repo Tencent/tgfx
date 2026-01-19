@@ -19,10 +19,10 @@
 #pragma once
 
 #include <vector>
+#include "Geometry.h"
 #include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shader.h"
-#include "tgfx/core/Shape.h"
+#include "tgfx/layers/LayerPaint.h"
 
 namespace tgfx {
 
@@ -36,19 +36,16 @@ class Painter {
   virtual ~Painter() = default;
 
   /**
-   * Applies a transformation matrix and alpha multiplier to this painter.
+   * Applies an alpha multiplier to this painter.
    */
-  void applyTransform(const Matrix& groupMatrix, float groupAlpha);
+  void applyAlpha(float groupAlpha) {
+    alpha *= groupAlpha;
+  }
 
   /**
-   * Offsets the shape indices by the given amount.
+   * Draws the geometries to the given recorder.
    */
-  void offsetShapeIndex(size_t offset);
-
-  /**
-   * Draws the content of this painter to the given recorder.
-   */
-  void draw(LayerRecorder* recorder, const std::vector<std::shared_ptr<Shape>>& shapes);
+  virtual void draw(LayerRecorder* recorder) = 0;
 
   /**
    * Creates a copy of this painter.
@@ -58,16 +55,8 @@ class Painter {
   std::shared_ptr<Shader> shader = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   float alpha = 1.0f;
-  Matrix matrix = Matrix::I();
-  size_t startIndex = 0;
-  std::vector<Matrix> matrices = {};
-
- protected:
-  /**
-   * Called for each shape during draw. Subclasses should apply their specific styles
-   * and return the final shape and paint to be drawn.
-   */
-  virtual void onDraw(LayerRecorder* recorder, std::shared_ptr<Shape> shape) = 0;
+  LayerPlacement placement = LayerPlacement::Background;
+  std::vector<Geometry*> geometries = {};
 };
 
 }  // namespace tgfx

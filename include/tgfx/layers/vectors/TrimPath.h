@@ -29,13 +29,13 @@ namespace tgfx {
  */
 enum class TrimPathType {
   /**
+   * Trim each path separately with the same trim parameters.
+   */
+  Separate,
+  /**
    * Trim all paths as one continuous path.
    */
-  Simultaneously,
-  /**
-   * Trim each path individually.
-   */
-  Individually
+  Continuous
 };
 
 /**
@@ -70,14 +70,15 @@ class TrimPath : public VectorElement {
   void setEnd(float value);
 
   /**
-   * Returns the offset of the trim range in degrees.
+   * Returns the offset of the trim range. The value is in degrees, where 360 degrees equals a full
+   * cycle of the path length. For example, 180 degrees shifts the trim range by half the path.
    */
   float offset() const {
     return _offset;
   }
 
   /**
-   * Sets the offset of the trim range in degrees.
+   * Sets the offset of the trim range. The value is in degrees.
    */
   void setOffset(float value);
 
@@ -104,7 +105,7 @@ class TrimPath : public VectorElement {
   float _start = 0.0f;
   float _end = 1.0f;
   float _offset = 0.0f;
-  TrimPathType _trimType = TrimPathType::Simultaneously;
+  TrimPathType _trimType = TrimPathType::Separate;
 };
 
 }  // namespace tgfx

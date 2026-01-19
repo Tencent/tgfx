@@ -104,19 +104,24 @@ void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& pai
 
 void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
                                 float x, float y) {
+  addTextBlob(std::move(textBlob), paint, Matrix::MakeTrans(x, y));
+}
+
+void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
+                                const Matrix& matrix) {
   if (textBlob == nullptr) {
     return;
   }
   flushPending();
-  auto& list = paint.drawOrder == DrawOrder::AboveChildren ? foregrounds : contents;
-  list.push_back(std::make_unique<TextContent>(std::move(textBlob), x, y, paint));
+  auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
+  list.push_back(std::make_unique<TextContent>(std::move(textBlob), matrix, paint));
 }
 
 bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint) const {
   if (pendingType != type) {
     return false;
   }
-  if (pendingPaint.drawOrder != paint.drawOrder || pendingPaint.style != paint.style ||
+  if (pendingPaint.placement != paint.placement || pendingPaint.style != paint.style ||
       pendingPaint.blendMode != paint.blendMode) {
     return false;
   }
@@ -139,7 +144,7 @@ bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint) const {
 
 void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint) {
   if (pendingType != PendingType::None) {
-    auto& list = pendingPaint.drawOrder == DrawOrder::AboveChildren ? foregrounds : contents;
+    auto& list = pendingPaint.placement == LayerPlacement::Foreground ? foregrounds : contents;
     switch (pendingType) {
       case PendingType::Rect:
         if (pendingRects.size() == 1) {

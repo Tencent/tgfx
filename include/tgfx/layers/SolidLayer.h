@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Tencent is pleased to support the open source community by making libpag available.
+//  Tencent is pleased to support the open source community by making tgfx available.
 //
 //  Copyright (C) 2024 Tencent. All rights reserved.
 //
@@ -18,9 +18,8 @@
 
 #pragma once
 
-#include "SolidColor.h"
-#include "tgfx/layers/ColorSource.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/vectors/SolidColor.h"
 
 namespace tgfx {
 /**

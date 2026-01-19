@@ -29,11 +29,11 @@ namespace tgfx {
  */
 enum class RepeaterOrder {
   /**
-   * Copies are drawn from bottom to top.
+   * Copies are stacked below the original. The original (index 0) appears on top.
    */
   BelowOriginal,
   /**
-   * Copies are drawn from top to bottom.
+   * Copies are stacked above the original. The last copy (index N-1) appears on top.
    */
   AboveOriginal
 };
@@ -163,11 +163,11 @@ class Repeater : public VectorElement {
  private:
   Matrix getMatrix(float progress) const;
 
-  float _copies = 1.0f;
+  float _copies = 3.0f;
   float _offset = 0.0f;
   RepeaterOrder _order = RepeaterOrder::BelowOriginal;
   Point _anchorPoint = Point::Zero();
-  Point _position = Point::Zero();
+  Point _position = {100.0f, 100.0f};
   float _rotation = 0.0f;
   Point _scale = {1.0f, 1.0f};
   float _startAlpha = 1.0f;

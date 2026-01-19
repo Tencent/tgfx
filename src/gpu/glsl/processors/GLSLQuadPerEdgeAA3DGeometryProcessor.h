@@ -18,28 +18,26 @@
 
 #pragma once
 
-#include "gpu/processors/Transform3DGeometryProcessor.h"
+#include "gpu/processors/QuadPerEdgeAA3DGeometryProcessor.h"
 
 namespace tgfx {
 
 /**
  * The implementation of QuadPerEdgeAA3DGeometryProcessor using GLSL.
  */
-class GLSLQuadPerEdgeAA3DGeometryProcessor final : public Transform3DGeometryProcessor {
+class GLSLQuadPerEdgeAA3DGeometryProcessor final : public QuadPerEdgeAA3DGeometryProcessor {
  public:
   /**
    * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
    */
   explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& matrix,
-                                                const Vec2& ndcScale, const Vec2& ndcOffset);
+                                                const Vec2& ndcScale, const Vec2& ndcOffset,
+                                                std::optional<PMColor> commonColor);
 
   void emitCode(EmitArgs& args) const override;
 
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                FPCoordTransformIter* transformIter) const override;
-
- private:
-  Color defaultColor = Color::White();
 };
 
 }  // namespace tgfx

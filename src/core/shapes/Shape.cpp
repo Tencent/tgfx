@@ -17,14 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Shape.h"
+#include "core/utils/AtomicCache.h"
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
 Shape::~Shape() {
-  auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
-  delete oldBounds;
-  auto oldPath = path.exchange(nullptr, std::memory_order_acq_rel);
-  delete oldPath;
+  AtomicCacheReset(bounds);
+  AtomicCacheReset(path);
 }
 
 bool Shape::isInverseFillType() const {
@@ -33,28 +32,20 @@ bool Shape::isInverseFillType() const {
 }
 
 Rect Shape::getBounds() const {
-  if (auto cachedBounds = bounds.load(std::memory_order_acquire)) {
+  if (auto cachedBounds = AtomicCacheGet(bounds)) {
     return *cachedBounds;
   }
   auto totalBounds = onGetBounds();
-  auto newBounds = new Rect(totalBounds);
-  Rect* oldBounds = nullptr;
-  if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
-    delete newBounds;
-  }
+  AtomicCacheSet(bounds, &totalBounds);
   return totalBounds;
 }
 
 Path Shape::getPath() const {
-  if (auto cachePath = path.load(std::memory_order_acquire)) {
-    return *cachePath;
+  if (auto cachedPath = AtomicCacheGet(path)) {
+    return *cachedPath;
   }
-  auto computePath = onGetPath(1.0f);
-  auto newPath = new Path(computePath);
-  Path* oldPath = nullptr;
-  if (!path.compare_exchange_strong(oldPath, newPath, std::memory_order_acq_rel)) {
-    delete newPath;
-  }
-  return computePath;
+  auto totalPath = onGetPath(1.0f);
+  AtomicCacheSet(path, &totalPath);
+  return totalPath;
 }
 }  // namespace tgfx

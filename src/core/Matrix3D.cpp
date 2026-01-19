@@ -206,6 +206,14 @@ Vec4 Matrix3D::getRow(int i) const {
   return {values[i], values[i + 4], values[i + 8], values[i + 12]};
 }
 
+void Matrix3D::setRow(int i, const Vec4& v) {
+  DEBUG_ASSERT(i >= 0 && i < 4);
+  values[i] = v.x;
+  values[i + 4] = v.y;
+  values[i + 8] = v.z;
+  values[i + 12] = v.w;
+}
+
 float Matrix3D::getTranslateX() const {
   return values[TRANS_X];
 }
@@ -217,6 +225,20 @@ float Matrix3D::getTranslateY() const {
 const Matrix3D& Matrix3D::I() {
   static constexpr Matrix3D identity;
   return identity;
+}
+
+void Matrix3D::preScale(float sx, float sy, float sz) {
+  if (sx == 1 && sy == 1 && sz == 1) {
+    return;
+  }
+
+  auto c0 = getCol(0);
+  auto c1 = getCol(1);
+  auto c2 = getCol(2);
+
+  setColumn(0, c0 * sx);
+  setColumn(1, c1 * sy);
+  setColumn(2, c2 * sz);
 }
 
 void Matrix3D::postScale(float sx, float sy, float sz) {
@@ -247,15 +269,21 @@ void Matrix3D::preTranslate(float tx, float ty, float tz) {
 }
 
 void Matrix3D::postTranslate(float tx, float ty, float tz) {
-  values[12] += tx;
-  values[13] += ty;
-  values[14] += tz;
+  Vec4 t = {tx, ty, tz, 0};
+  setColumn(0, getCol(0) + t * values[3]);
+  setColumn(1, getCol(1) + t * values[7]);
+  setColumn(2, getCol(2) + t * values[11]);
+  setColumn(3, getCol(3) + t * values[15]);
 }
 
 void Matrix3D::postSkew(float kxy, float kxz, float kyx, float kyz, float kzx, float kzy) {
   Matrix3D m;
   m.setSkew(kxy, kxz, kyx, kyz, kzx, kzy);
   postConcat(m);
+}
+
+void Matrix3D::preConcat(const Matrix3D& m) {
+  setConcat(*this, m);
 }
 
 void Matrix3D::postConcat(const Matrix3D& m) {
@@ -293,7 +321,9 @@ Matrix3D Matrix3D::Perspective(float fovyDegress, float aspect, float nearZ, flo
 }
 
 Rect Matrix3D::mapRect(const Rect& src) const {
-  if (hasPerspective()) {
+  if (isIdentity()) {
+    return src;
+  } else if (hasPerspective()) {
     return MapRectPerspective(src, values);
   } else {
     return MapRectAffine(src, values);
@@ -307,9 +337,24 @@ void Matrix3D::mapRect(Rect* rect) const {
   *rect = mapRect(*rect);
 }
 
-Vec3 Matrix3D::mapVec3(const Vec3& v) const {
-  auto r = this->mapPoint(v.x, v.y, v.z, 1.f);
+Vec3 Matrix3D::mapPoint(const Vec3& point) const {
+  auto r = mapHomogeneous(point.x, point.y, point.z, 1.f);
   return {IEEEFloatDivide(r.x, r.w), IEEEFloatDivide(r.y, r.w), IEEEFloatDivide(r.z, r.w)};
+}
+
+Vec3 Matrix3D::mapVector(const Vec3& vector) const {
+  auto r = mapHomogeneous(vector.x, vector.y, vector.z, 0.f);
+  return {r.x, r.y, r.z};
+}
+
+Vec4 Matrix3D::mapHomogeneous(float x, float y, float z, float w) const {
+  auto c0 = getCol(0);
+  auto c1 = getCol(1);
+  auto c2 = getCol(2);
+  auto c3 = getCol(3);
+
+  const Vec4 result = (c0 * x + c1 * y + c2 * z + c3 * w);
+  return result;
 }
 
 bool Matrix3D::operator==(const Matrix3D& other) const {
@@ -353,38 +398,10 @@ void Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {
   setColumn(3, m3);
 }
 
-void Matrix3D::preConcat(const Matrix3D& m) {
-  setConcat(*this, m);
-}
-
-void Matrix3D::preScale(float sx, float sy, float sz) {
-  if (sx == 1 && sy == 1 && sz == 1) {
-    return;
-  }
-
-  auto c0 = getCol(0);
-  auto c1 = getCol(1);
-  auto c2 = getCol(2);
-
-  setColumn(0, c0 * sx);
-  setColumn(1, c1 * sy);
-  setColumn(2, c2 * sz);
-}
-
 Matrix3D Matrix3D::transpose() const {
   Matrix3D m;
   TransposeArrays(values, m.values);
   return m;
-}
-
-Vec4 Matrix3D::mapPoint(float x, float y, float z, float w) const {
-  auto c0 = getCol(0);
-  auto c1 = getCol(1);
-  auto c2 = getCol(2);
-  auto c3 = getCol(3);
-
-  const Vec4 result = (c0 * x + c1 * y + c2 * z + c3 * w);
-  return result;
 }
 
 void Matrix3D::setAll(float m00, float m01, float m02, float m03, float m10, float m11, float m12,

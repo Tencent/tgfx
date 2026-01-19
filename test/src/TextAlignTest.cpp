@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <tgfx/layers/DisplayList.h>
-#include <tgfx/layers/Layer.h>
-#include <tgfx/layers/TextLayer.h>
+#include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/Layer.h"
+#include "tgfx/layers/TextLayer.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -697,6 +697,7 @@ TGFX_TEST(TextAlignTest, FontFallbackTest) {
   canvas->drawRect(textLayerBounds4, paint);
   canvas->drawRect(textLayerBounds5, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/FontFallbackTest"));
+  TextLayer::SetFallbackTypefaces({});
 }
 
 TGFX_TEST(TextAlignTest, TextAlignBlankLineTest) {

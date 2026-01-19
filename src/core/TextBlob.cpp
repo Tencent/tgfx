@@ -17,38 +17,56 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/TextBlob.h"
+#include <cstdlib>
+#include "core/GlyphRun.h"
 #include "core/GlyphRunList.h"
+#include "core/RunRecord.h"
+#include "core/ScalerContext.h"
+#include "core/utils/AtomicCache.h"
+#include "core/utils/FauxBoldScale.h"
+#include "core/utils/MathExtra.h"
+#include "core/utils/StrokeUtils.h"
+#include "tgfx/core/TextBlobBuilder.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
+
 std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font& font) {
   if (font.getTypeface() == nullptr) {
     return nullptr;
   }
-
   const char* textStart = text.data();
   const char* textStop = textStart + text.size();
-  GlyphRun glyphRun = GlyphRun(font, {}, {});
-  // Use half the font size as width for spaces
+  size_t glyphCount = 0;
+  const char* ptr = textStart;
+  while (ptr < textStop) {
+    auto unichar = UTF::NextUTF8(&ptr, textStop);
+    if (font.getGlyphID(unichar) > 0) {
+      glyphCount++;
+    }
+  }
+  if (glyphCount == 0) {
+    return nullptr;
+  }
+  TextBlobBuilder builder;
+  const auto& buffer = builder.allocRunPosH(font, glyphCount, 0.0f);
   auto emptyAdvance = font.getSize() / 2.0f;
   float xOffset = 0;
-  while (textStart < textStop) {
-    auto unichar = UTF::NextUTF8(&textStart, textStop);
+  size_t index = 0;
+  ptr = textStart;
+  while (ptr < textStop) {
+    auto unichar = UTF::NextUTF8(&ptr, textStop);
     auto glyphID = font.getGlyphID(unichar);
     if (glyphID > 0) {
-      glyphRun.glyphs.push_back(glyphID);
-      glyphRun.positions.push_back(Point::Make(xOffset, 0.0f));
-      auto advance = font.getAdvance(glyphID);
-      xOffset += advance;
+      buffer.glyphs[index] = glyphID;
+      buffer.positions[index] = xOffset;
+      xOffset += font.getAdvance(glyphID);
+      index++;
     } else {
       xOffset += emptyAdvance;
     }
   }
-  if (glyphRun.glyphs.empty()) {
-    return nullptr;
-  }
-  auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
-  return std::shared_ptr<TextBlob>(new TextBlob({glyphRunList}));
+  return builder.build();
 }
 
 std::shared_ptr<TextBlob> TextBlob::MakeFrom(const GlyphID glyphIDs[], const Point positions[],
@@ -56,94 +74,191 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const GlyphID glyphIDs[], const Poi
   if (glyphCount == 0 || font.getTypeface() == nullptr) {
     return nullptr;
   }
-  GlyphRun glyphRun(font, {glyphIDs, glyphIDs + glyphCount}, {positions, positions + glyphCount});
-  auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
-  return std::shared_ptr<TextBlob>(new TextBlob({glyphRunList}));
+  TextBlobBuilder builder;
+  const auto& buffer = builder.allocRunPos(font, glyphCount);
+  memcpy(buffer.glyphs, glyphIDs, glyphCount * sizeof(GlyphID));
+  memcpy(buffer.positions, positions, glyphCount * 2 * sizeof(float));
+  return builder.build();
 }
 
-std::shared_ptr<TextBlob> TextBlob::MakeFrom(GlyphRun glyphRun) {
-  if (glyphRun.glyphs.size() != glyphRun.positions.size()) {
+std::shared_ptr<TextBlob> TextBlob::MakeFromPosH(const GlyphID glyphIDs[], const float xPositions[],
+                                                 size_t glyphCount, float y, const Font& font) {
+  if (glyphCount == 0 || font.getTypeface() == nullptr) {
     return nullptr;
   }
-  if (glyphRun.glyphs.empty()) {
-    return nullptr;
-  }
-  auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
-  return std::shared_ptr<TextBlob>(new TextBlob({glyphRunList}));
+  TextBlobBuilder builder;
+  const auto& buffer = builder.allocRunPosH(font, glyphCount, y);
+  memcpy(buffer.glyphs, glyphIDs, glyphCount * sizeof(GlyphID));
+  memcpy(buffer.positions, xPositions, glyphCount * sizeof(float));
+  return builder.build();
 }
 
-enum class FontType { Path, Color, Other };
-
-static FontType GetFontType(const Font& font) {
-  if (font.getTypeface() == nullptr) {
-    return FontType::Other;
-  }
-
-  if (font.hasColor()) {
-    return FontType::Color;
-  }
-  if (font.hasOutlines()) {
-    return FontType::Path;
-  }
-
-  return FontType::Other;
-}
-
-std::shared_ptr<TextBlob> TextBlob::MakeFrom(std::vector<GlyphRun> glyphRuns) {
-  if (glyphRuns.empty()) {
+std::shared_ptr<TextBlob> TextBlob::MakeFromRSXform(const GlyphID glyphIDs[],
+                                                    const RSXform xforms[], size_t glyphCount,
+                                                    const Font& font) {
+  if (glyphCount == 0 || font.getTypeface() == nullptr) {
     return nullptr;
   }
-  if (glyphRuns.size() == 1) {
-    return MakeFrom(std::move(glyphRuns[0]));
+  TextBlobBuilder builder;
+  const auto& buffer = builder.allocRunRSXform(font, glyphCount);
+  memcpy(buffer.glyphs, glyphIDs, glyphCount * sizeof(GlyphID));
+  memcpy(buffer.positions, xforms, glyphCount * sizeof(RSXform));
+  return builder.build();
+}
+
+TextBlob::TextBlob(size_t runCount) : runCount(runCount) {
+}
+
+TextBlob::TextBlob(size_t runCount, const Rect& bounds)
+    : runCount(runCount), bounds(new Rect(bounds)) {
+}
+
+TextBlob::~TextBlob() {
+  AtomicCacheReset(bounds);
+  // Explicitly destruct RunRecords since they contain Font objects
+  const RunRecord* run = firstRun();
+  for (size_t i = 0; i < runCount; i++) {
+    const RunRecord* nextRun = run->next();
+    run->~RunRecord();
+    run = nextRun;
   }
-  std::vector<std::shared_ptr<GlyphRunList>> runLists;
-  std::vector<GlyphRun> currentRuns;
-  FontType fontType = GetFontType(glyphRuns[0].font);
-  for (auto& run : glyphRuns) {
-    if (run.glyphs.size() != run.positions.size()) {
-      return nullptr;
-    }
-    if (run.glyphs.empty()) {
-      continue;
-    }
-    auto currentFontType = GetFontType(run.font);
-    if (currentFontType != fontType) {
-      if (!currentRuns.empty()) {
-        runLists.push_back(std::make_shared<GlyphRunList>(std::move(currentRuns)));
-        currentRuns = {};
-      }
-      fontType = currentFontType;
-    }
-    currentRuns.push_back(std::move(run));
+}
+
+void TextBlob::operator delete(void* p) {
+  free(p);
+}
+
+void* TextBlob::operator new(size_t, void* p) {
+  return p;
+}
+
+const RunRecord* TextBlob::firstRun() const {
+  if (runCount == 0) {
+    return nullptr;
   }
-  if (!currentRuns.empty()) {
-    runLists.push_back(std::make_shared<GlyphRunList>(std::move(currentRuns)));
-  }
-  return std::shared_ptr<TextBlob>(new TextBlob(std::move(runLists)));
+  // Run data immediately follows the TextBlob object, aligned for RunRecord.
+  // This matches AlignedBlobHeaderSize() in TextBlobBuilder.
+  size_t headerSize = sizeof(TextBlob);
+  size_t alignment = alignof(RunRecord);
+  size_t alignedOffset = (headerSize + alignment - 1) & ~(alignment - 1);
+  return reinterpret_cast<const RunRecord*>(reinterpret_cast<const uint8_t*>(this) + alignedOffset);
 }
 
 Rect TextBlob::getBounds() const {
-  Rect bounds = {};
-  for (auto& runList : glyphRunLists) {
-    bounds.join(runList->getBounds());
+  if (auto cachedBounds = AtomicCacheGet(bounds)) {
+    return *cachedBounds;
   }
-  return bounds;
+  auto totalBounds = computeBounds();
+  AtomicCacheSet(bounds, &totalBounds);
+  return totalBounds;
+}
+
+Rect TextBlob::computeBounds() const {
+  Rect finalBounds = {};
+  Matrix transformMat = {};
+  for (const auto& run : GlyphRunList(this)) {
+    auto& font = run.font;
+    transformMat.reset();
+    transformMat.setScale(font.getSize(), font.getSize());
+    if (font.isFauxItalic()) {
+      transformMat.postSkew(ITALIC_SKEW, 0.0f);
+    }
+    auto typeface = font.getTypeface();
+    if (typeface == nullptr || typeface->getBounds().isEmpty()) {
+      finalBounds.setEmpty();
+      break;
+    }
+    auto fontBounds = typeface->getBounds();
+    if (font.isFauxBold()) {
+      auto fauxBoldScale = FauxBoldScale(font.getSize());
+      fontBounds.outset(fauxBoldScale, fauxBoldScale);
+    }
+    transformMat.mapRect(&fontBounds);
+    Rect runBounds = {};
+    for (size_t i = 0; i < run.runSize(); i++) {
+      auto glyphMatrix = run.getMatrix(i);
+      auto glyphBounds = glyphMatrix.mapRect(fontBounds);
+      if (i == 0) {
+        runBounds = glyphBounds;
+      } else {
+        runBounds.join(glyphBounds);
+      }
+    }
+    if (run.runSize() == 0) {
+      continue;
+    }
+    finalBounds.join(runBounds);
+  }
+  if (!finalBounds.isEmpty()) {
+    return finalBounds;
+  }
+  return getTightBounds();
 }
 
 Rect TextBlob::getTightBounds(const Matrix* matrix) const {
-  Rect bounds = {};
-  for (auto& runList : glyphRunLists) {
-    bounds.join(runList->getTightBounds(matrix));
+  auto resolutionScale = matrix ? matrix->getMaxScale() : 1.0f;
+  if (FloatNearlyZero(resolutionScale)) {
+    return {};
   }
-  return bounds;
+  auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
+  auto inverseScale = 1.0f / resolutionScale;
+  Rect totalBounds = {};
+  for (const auto& run : GlyphRunList(this)) {
+    auto font = run.font;
+    if (hasScale) {
+      font = font.makeWithSize(resolutionScale * font.getSize());
+    }
+    for (size_t i = 0; i < run.runSize(); i++) {
+      auto glyphBounds = font.getBounds(run.glyphs[i]);
+      auto glyphMatrix = run.getMatrix(i);
+      if (hasScale) {
+        // Pre-scale to counteract the enlarged glyphBounds from the scaled font.
+        glyphMatrix.preScale(inverseScale, inverseScale);
+      }
+      glyphBounds = glyphMatrix.mapRect(glyphBounds);
+      totalBounds.join(glyphBounds);
+    }
+  }
+  if (matrix) {
+    totalBounds = matrix->mapRect(totalBounds);
+  }
+  return totalBounds;
 }
 
 bool TextBlob::hitTestPoint(float localX, float localY, const Stroke* stroke) const {
-  for (auto& runList : glyphRunLists) {
-    if (runList->hitTestPoint(localX, localY, stroke)) {
-      return true;
+  for (const auto& run : GlyphRunList(this)) {
+    auto& font = run.font;
+    auto usePathHitTest = font.hasOutlines();
+    for (size_t i = 0; i < run.runSize(); i++) {
+      auto glyphMatrix = run.getMatrix(i);
+      Matrix inverseMatrix = {};
+      if (!glyphMatrix.invert(&inverseMatrix)) {
+        continue;
+      }
+      Point localPoint = {};
+      inverseMatrix.mapXY(localX, localY, &localPoint);
+      if (usePathHitTest) {
+        Path glyphPath = {};
+        if (font.getPath(run.glyphs[i], &glyphPath)) {
+          if (stroke) {
+            stroke->applyToPath(&glyphPath);
+          }
+          if (glyphPath.contains(localPoint.x, localPoint.y)) {
+            return true;
+          }
+        }
+      } else {
+        auto glyphBounds = font.getBounds(run.glyphs[i]);
+        if (stroke) {
+          ApplyStrokeToBounds(*stroke, &glyphBounds);
+        }
+        if (glyphBounds.contains(localPoint.x, localPoint.y)) {
+          return true;
+        }
+      }
     }
   }
   return false;
 }
+
 }  // namespace tgfx
