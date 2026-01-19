@@ -156,6 +156,8 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
   functions->genVertexArrays =
       reinterpret_cast<GLGenVertexArrays*>(getter->getProcAddress("glGenVertexArrays"));
   functions->getError = reinterpret_cast<GLGetError*>(getter->getProcAddress("glGetError"));
+  functions->getBooleanv =
+      reinterpret_cast<GLGetBooleanv*>(getter->getProcAddress("glGetBooleanv"));
   functions->getIntegerv =
       reinterpret_cast<GLGetIntegerv*>(getter->getProcAddress("glGetIntegerv"));
   functions->getInternalformativ =

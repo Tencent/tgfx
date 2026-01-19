@@ -312,6 +312,7 @@ std::shared_ptr<RenderPipeline> GLGPU::createRenderPipeline(
 
 std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() {
   processUnreferencedResources();
+  save();
   return std::make_shared<GLCommandEncoder>(this);
 }
 
@@ -339,6 +340,92 @@ std::shared_ptr<GLResource> GLGPU::addResource(GLResource* resource) {
   resources.push_back(resource);
   resource->cachedPosition = --resources.end();
   return std::static_pointer_cast<GLResource>(returnQueue->makeShared(resource));
+}
+
+void GLGPU::save() {
+  auto gl = functions();
+  // Clear external GL errors to prevent incorrect CheckGLError results.
+  ClearGLError(gl);
+
+  gl->getIntegerv(GL_VIEWPORT, savedState.viewport);
+  unsigned char scissorEnabled = GL_FALSE;
+  gl->getBooleanv(GL_SCISSOR_TEST, &scissorEnabled);
+  savedState.scissorEnabled = scissorEnabled != GL_FALSE;
+  if (savedState.scissorEnabled) {
+    gl->getIntegerv(GL_SCISSOR_BOX, savedState.scissorBox);
+  }
+  gl->getIntegerv(GL_CURRENT_PROGRAM, &savedState.program);
+  gl->getIntegerv(GL_FRAMEBUFFER_BINDING, &savedState.frameBuffer);
+  gl->getIntegerv(GL_ACTIVE_TEXTURE, &savedState.activeTexture);
+  gl->getIntegerv(GL_TEXTURE_BINDING_2D, &savedState.textureID);
+  gl->getIntegerv(GL_ARRAY_BUFFER_BINDING, &savedState.arrayBuffer);
+  gl->getIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &savedState.elementArrayBuffer);
+  if (gl->bindVertexArray) {
+    gl->getIntegerv(GL_VERTEX_ARRAY_BINDING, &savedState.vertexArray);
+  }
+  unsigned char blendEnabled = GL_FALSE;
+  gl->getBooleanv(GL_BLEND, &blendEnabled);
+  savedState.blendEnabled = blendEnabled != GL_FALSE;
+  if (savedState.blendEnabled) {
+    gl->getIntegerv(GL_BLEND_EQUATION_RGB, &savedState.equationRGB);
+    gl->getIntegerv(GL_BLEND_EQUATION_ALPHA, &savedState.equationAlpha);
+    gl->getIntegerv(GL_BLEND_SRC_RGB, &savedState.blendSrcRGB);
+    gl->getIntegerv(GL_BLEND_DST_RGB, &savedState.blendDstRGB);
+    gl->getIntegerv(GL_BLEND_SRC_ALPHA, &savedState.blendSrcAlpha);
+    gl->getIntegerv(GL_BLEND_DST_ALPHA, &savedState.blendDstAlpha);
+  }
+
+  // Unbind external buffers to avoid accidental modification.
+  gl->bindBuffer(GL_ARRAY_BUFFER, 0);
+  gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+  if (gl->bindVertexArray && savedState.vertexArray > 0) {
+    gl->bindVertexArray(0);
+  }
+
+  stateSaved = true;
+}
+
+void GLGPU::restore() {
+  _state->reset();
+  if (!stateSaved) {
+    return;
+  }
+  auto gl = functions();
+
+  gl->viewport(savedState.viewport[0], savedState.viewport[1], savedState.viewport[2],
+               savedState.viewport[3]);
+  if (savedState.scissorEnabled) {
+    gl->enable(GL_SCISSOR_TEST);
+    gl->scissor(savedState.scissorBox[0], savedState.scissorBox[1], savedState.scissorBox[2],
+                savedState.scissorBox[3]);
+  } else {
+    gl->disable(GL_SCISSOR_TEST);
+  }
+  gl->useProgram(static_cast<unsigned>(savedState.program));
+  gl->bindFramebuffer(GL_FRAMEBUFFER, static_cast<unsigned>(savedState.frameBuffer));
+  gl->activeTexture(static_cast<unsigned>(savedState.activeTexture));
+  gl->bindTexture(GL_TEXTURE_2D, static_cast<unsigned>(savedState.textureID));
+  gl->bindBuffer(GL_ARRAY_BUFFER, static_cast<unsigned>(savedState.arrayBuffer));
+  gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<unsigned>(savedState.elementArrayBuffer));
+  if (gl->bindVertexArray) {
+    gl->bindVertexArray(static_cast<unsigned>(savedState.vertexArray));
+  }
+  if (savedState.blendEnabled) {
+    gl->enable(GL_BLEND);
+    gl->blendEquationSeparate(static_cast<unsigned>(savedState.equationRGB),
+                              static_cast<unsigned>(savedState.equationAlpha));
+    gl->blendFuncSeparate(static_cast<unsigned>(savedState.blendSrcRGB),
+                          static_cast<unsigned>(savedState.blendDstRGB),
+                          static_cast<unsigned>(savedState.blendSrcAlpha),
+                          static_cast<unsigned>(savedState.blendDstAlpha));
+  } else {
+    gl->disable(GL_BLEND);
+  }
+
+  // Clear internal GL errors to prevent them from affecting external rendering.
+  ClearGLError(gl);
+
+  stateSaved = false;
 }
 
 }  // namespace tgfx

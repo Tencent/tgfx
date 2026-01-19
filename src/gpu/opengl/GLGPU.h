@@ -65,9 +65,9 @@ class GLGPU : public GPU {
     return interface->caps()->getSampleCount(requestedCount, pixelFormat);
   }
 
-  void resetGLState() {
-    _state->reset();
-  }
+  void save();
+
+  void restore();
 
   std::shared_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) override;
 
@@ -108,11 +108,33 @@ class GLGPU : public GPU {
   explicit GLGPU(std::shared_ptr<GLInterface> glInterface);
 
  private:
+  struct SavedGLState {
+    int viewport[4] = {0};
+    int scissorBox[4] = {0};
+    int program = 0;
+    int frameBuffer = 0;
+    int activeTexture = 0;
+    int textureID = 0;
+    int arrayBuffer = 0;
+    int elementArrayBuffer = 0;
+    int vertexArray = 0;
+    bool scissorEnabled = false;
+    bool blendEnabled = false;
+    int equationRGB = 0;
+    int equationAlpha = 0;
+    int blendSrcRGB = 0;
+    int blendDstRGB = 0;
+    int blendSrcAlpha = 0;
+    int blendDstAlpha = 0;
+  };
+
   std::shared_ptr<GLState> _state = nullptr;
   std::shared_ptr<GLInterface> interface = nullptr;
   std::unique_ptr<GLCommandQueue> commandQueue = nullptr;
   std::list<GLResource*> resources = {};
   std::shared_ptr<ReturnQueue> returnQueue = ReturnQueue::Make();
+  SavedGLState savedState = {};
+  bool stateSaved = false;
 
   std::shared_ptr<GLResource> addResource(GLResource* resource);
 };

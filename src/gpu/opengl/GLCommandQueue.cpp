@@ -77,7 +77,7 @@ void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
   auto gl = gpu->functions();
   gl->flush();
   // Reset GL state every frame to avoid interference from external GL calls.
-  gpu->resetGLState();
+  gpu->restore();
 }
 
 std::shared_ptr<Semaphore> GLCommandQueue::insertSemaphore() {

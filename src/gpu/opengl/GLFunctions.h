@@ -102,6 +102,7 @@ using GLGenerateMipmap = void GL_FUNCTION_TYPE(unsigned target);
 using GLGenRenderbuffers = void GL_FUNCTION_TYPE(int n, unsigned* renderbuffers);
 using GLGenTextures = void GL_FUNCTION_TYPE(int n, unsigned* textures);
 using GLGetError = unsigned GL_FUNCTION_TYPE();
+using GLGetBooleanv = void GL_FUNCTION_TYPE(unsigned pname, unsigned char* params);
 using GLGetIntegerv = void GL_FUNCTION_TYPE(unsigned pname, int* params);
 using GLGetInternalformativ = void GL_FUNCTION_TYPE(unsigned target, unsigned internalformat,
                                                     unsigned pname, int bufSize, int* params);
@@ -237,6 +238,7 @@ class GLFunctions {
   GLGenTextures* genTextures = nullptr;
   GLGenVertexArrays* genVertexArrays = nullptr;
   GLGetError* getError = nullptr;
+  GLGetBooleanv* getBooleanv = nullptr;
   GLGetIntegerv* getIntegerv = nullptr;
   GLGetInternalformativ* getInternalformativ = nullptr;
   GLGetProgramInfoLog* getProgramInfoLog = nullptr;
