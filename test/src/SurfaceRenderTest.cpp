@@ -156,8 +156,8 @@ TGFX_TEST(SurfaceRenderTest, OutOfRenderTarget) {
   EXPECT_TRUE(Baseline::Compare(surface, "SurfaceRenderTest/OutOfRenderTarget"));
 }
 
-// Simple vertex shader for external rendering test.
-static const char* ExternalVertexShader = R"(#version 150
+// Simple vertex shader for external rendering test (GLSL 3.00 ES).
+static const char* ExternalVertexShaderES = R"(#version 300 es
   in vec2 aPosition;
   in vec3 aColor;
   out vec3 vColor;
@@ -167,8 +167,29 @@ static const char* ExternalVertexShader = R"(#version 150
   }
 )";
 
-// Simple fragment shader for external rendering test.
-static const char* ExternalFragmentShader = R"(#version 150
+// Simple fragment shader for external rendering test (GLSL 3.00 ES).
+static const char* ExternalFragmentShaderES = R"(#version 300 es
+  precision mediump float;
+  in vec3 vColor;
+  out vec4 fragColor;
+  void main() {
+    fragColor = vec4(vColor, 1.0);
+  }
+)";
+
+// Simple vertex shader for external rendering test (GLSL 1.50 for desktop OpenGL).
+static const char* ExternalVertexShaderGL = R"(#version 150
+  in vec2 aPosition;
+  in vec3 aColor;
+  out vec3 vColor;
+  void main() {
+    gl_Position = vec4(aPosition, 0.0, 1.0);
+    vColor = aColor;
+  }
+)";
+
+// Simple fragment shader for external rendering test (GLSL 1.50 for desktop OpenGL).
+static const char* ExternalFragmentShaderGL = R"(#version 150
   in vec3 vColor;
   out vec4 fragColor;
   void main() {
@@ -194,12 +215,14 @@ static unsigned CompileShader(const GLFunctions* gl, unsigned type, const char* 
 }
 
 // Create a shader program from vertex and fragment shaders.
-static unsigned CreateExternalProgram(const GLFunctions* gl) {
-  auto vertexShader = CompileShader(gl, GL_VERTEX_SHADER, ExternalVertexShader);
+static unsigned CreateExternalProgram(const GLFunctions* gl, bool isOpenGLES) {
+  const char* vertexSource = isOpenGLES ? ExternalVertexShaderES : ExternalVertexShaderGL;
+  const char* fragmentSource = isOpenGLES ? ExternalFragmentShaderES : ExternalFragmentShaderGL;
+  auto vertexShader = CompileShader(gl, GL_VERTEX_SHADER, vertexSource);
   if (vertexShader == 0) {
     return 0;
   }
-  auto fragmentShader = CompileShader(gl, GL_FRAGMENT_SHADER, ExternalFragmentShader);
+  auto fragmentShader = CompileShader(gl, GL_FRAGMENT_SHADER, fragmentSource);
   if (fragmentShader == 0) {
     gl->deleteShader(vertexShader);
     return 0;
@@ -262,6 +285,10 @@ TGFX_TEST(SurfaceRenderTest, GLStateRestore) {
   auto gl = gpu->functions();
   ASSERT_TRUE(gl->genVertexArrays != nullptr);
 
+  // Determine if we're using OpenGL ES based on version string.
+  auto gpuInfo = gpu->info();
+  bool isOpenGLES = gpuInfo->version.find("OpenGL ES") != std::string::npos;
+
   // Step 1: Create external GL resources.
   constexpr int textureWidth = 200;
   constexpr int textureHeight = 200;
@@ -274,7 +301,7 @@ TGFX_TEST(SurfaceRenderTest, GLStateRestore) {
   gl->bindFramebuffer(GL_FRAMEBUFFER, externalFBO);
   gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, glInfo.id, 0);
 
-  auto externalProgram = CreateExternalProgram(gl);
+  auto externalProgram = CreateExternalProgram(gl, isOpenGLES);
   ASSERT_TRUE(externalProgram > 0);
 
   // clang-format off
