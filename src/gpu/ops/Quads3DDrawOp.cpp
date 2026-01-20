@@ -106,8 +106,7 @@ void Quads3DDrawOp::onDraw(RenderPass* renderPass) {
   renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
     auto numIndicesPerQuad = aaType == AAType::Coverage ? IndicesPerAAQuad : IndicesPerNonAAQuad;
-    renderPass->drawIndexed(PrimitiveType::Triangles,
-                            static_cast<uint32_t>(quadCount * numIndicesPerQuad));
+    renderPass->drawIndexed(PrimitiveType::Triangles, quadCount * numIndicesPerQuad);
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 4);
   }

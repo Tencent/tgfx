@@ -91,7 +91,7 @@ void ShapeDrawOp::onDraw(RenderPass* renderPass) {
     auto vertexCount = aaType == AAType::Coverage
                            ? PathTriangulator::GetAATriangleCount(vertexBuffer->size())
                            : PathTriangulator::GetTriangleCount(vertexBuffer->size());
-    renderPass->draw(PrimitiveType::Triangles, static_cast<uint32_t>(vertexCount));
+    renderPass->draw(PrimitiveType::Triangles, vertexCount);
   } else {
     auto maskBuffer = maskBufferProxy->getBuffer();
     renderPass->setVertexBuffer(0, maskBuffer->gpuBuffer(), maskBufferProxy->offset());
