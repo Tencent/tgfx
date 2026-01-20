@@ -182,8 +182,8 @@ void GLRenderPass::onEnd() {
 
 static constexpr unsigned PrimitiveTypes[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
 
-void GLRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount, uint32_t instanceCount,
-                        uint32_t firstVertex, uint32_t firstInstance) {
+void GLRenderPass::draw(PrimitiveType primitiveType, size_t vertexCount, size_t instanceCount,
+                        size_t firstVertex, size_t firstInstance) {
   if (!flushPendingBindings()) {
     return;
   }
@@ -201,9 +201,9 @@ void GLRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount, uint3
   }
 }
 
-void GLRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCount,
-                               uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
-                               uint32_t firstInstance) {
+void GLRenderPass::drawIndexed(PrimitiveType primitiveType, size_t indexCount,
+                               size_t instanceCount, size_t firstIndex, int32_t baseVertex,
+                               size_t firstInstance) {
   if (!flushPendingBindings()) {
     return;
   }

@@ -318,8 +318,8 @@ class RenderPass {
    * @param firstInstance The first instance to draw. Defaults to 0. Note: Not supported on
    * OpenGL/OpenGL ES backend, must be 0.
    */
-  virtual void draw(PrimitiveType primitiveType, uint32_t vertexCount, uint32_t instanceCount = 1,
-                    uint32_t firstVertex = 0, uint32_t firstInstance = 0) = 0;
+  virtual void draw(PrimitiveType primitiveType, size_t vertexCount, size_t instanceCount = 1,
+                    size_t firstVertex = 0, size_t firstInstance = 0) = 0;
 
   /**
    * Draws indexed primitives based on the index buffer provided by setIndexBuffer() and the vertex
@@ -333,9 +333,9 @@ class RenderPass {
    * @param firstInstance The first instance to draw. Defaults to 0. Note: Not supported on
    * OpenGL/OpenGL ES backend, must be 0.
    */
-  virtual void drawIndexed(PrimitiveType primitiveType, uint32_t indexCount,
-                           uint32_t instanceCount = 1, uint32_t firstIndex = 0,
-                           int32_t baseVertex = 0, uint32_t firstInstance = 0) = 0;
+  virtual void drawIndexed(PrimitiveType primitiveType, size_t indexCount, size_t instanceCount = 1,
+                           size_t firstIndex = 0, int32_t baseVertex = 0,
+                           size_t firstInstance = 0) = 0;
 
   /**
    * Completes the current render pass. After calling this method, no further commands can be added
