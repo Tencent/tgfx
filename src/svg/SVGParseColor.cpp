@@ -48,8 +48,8 @@ const char* colorNames[] = {
     "darkcyan",
     "darkgoldenrod",
     "darkgray",
-    "darkgrey",
     "darkgreen",
+    "darkgrey",
     "darkkhaki",
     "darkmagenta",
     "darkolivegreen",
@@ -77,8 +77,8 @@ const char* colorNames[] = {
     "gold",
     "goldenrod",
     "gray",
-    "grey",
     "green",
+    "grey",
     "greenyellow",
     "honeydew",
     "hotpink",
@@ -203,8 +203,8 @@ constexpr ColorRec colors[] = {
     {0x00, 0x8b, 0x8b},  // darkcyan
     {0xb8, 0x86, 0x0b},  // darkgoldenrod
     {0xa9, 0xa9, 0xa9},  // darkgray
-    {0xa9, 0xa9, 0xa9},  // darkgrey
     {0x00, 0x64, 0x00},  // darkgreen
+    {0xa9, 0xa9, 0xa9},  // darkgrey
     {0xbd, 0xb7, 0x6b},  // darkkhaki
     {0x8b, 0x00, 0x8b},  // darkmagenta
     {0x55, 0x6b, 0x2f},  // darkolivegreen
@@ -232,8 +232,8 @@ constexpr ColorRec colors[] = {
     {0xff, 0xd7, 0x00},  // gold
     {0xda, 0xa5, 0x20},  // goldenrod
     {0x80, 0x80, 0x80},  // gray
-    {0x80, 0x80, 0x80},  // grey
     {0x00, 0x80, 0x00},  // green
+    {0x80, 0x80, 0x80},  // grey
     {0xad, 0xff, 0x2f},  // greenyellow
     {0xf0, 0xff, 0xf0},  // honeydew
     {0xff, 0x69, 0xb4},  // hotpink
