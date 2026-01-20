@@ -49,6 +49,7 @@ const char* colorNames[] = {
     "darkgoldenrod",
     "darkgray",
     "darkgreen",
+    "darkgrey",
     "darkkhaki",
     "darkmagenta",
     "darkolivegreen",
@@ -59,11 +60,13 @@ const char* colorNames[] = {
     "darkseagreen",
     "darkslateblue",
     "darkslategray",
+    "darkslategrey",
     "darkturquoise",
     "darkviolet",
     "deeppink",
     "deepskyblue",
     "dimgray",
+    "dimgrey",
     "dodgerblue",
     "firebrick",
     "floralwhite",
@@ -75,6 +78,7 @@ const char* colorNames[] = {
     "goldenrod",
     "gray",
     "green",
+    "grey",
     "greenyellow",
     "honeydew",
     "hotpink",
@@ -90,6 +94,7 @@ const char* colorNames[] = {
     "lightcoral",
     "lightcyan",
     "lightgoldenrodyellow",
+    "lightgray",
     "lightgreen",
     "lightgrey",
     "lightpink",
@@ -97,6 +102,7 @@ const char* colorNames[] = {
     "lightseagreen",
     "lightskyblue",
     "lightslategray",
+    "lightslategrey",
     "lightsteelblue",
     "lightyellow",
     "lime",
@@ -136,6 +142,7 @@ const char* colorNames[] = {
     "plum",
     "powderblue",
     "purple",
+    "rebeccapurple",
     "red",
     "rosybrown",
     "royalblue",
@@ -149,6 +156,7 @@ const char* colorNames[] = {
     "skyblue",
     "slateblue",
     "slategray",
+    "slategrey",
     "snow",
     "springgreen",
     "steelblue",
@@ -196,6 +204,7 @@ constexpr ColorRec colors[] = {
     {0xb8, 0x86, 0x0b},  // darkgoldenrod
     {0xa9, 0xa9, 0xa9},  // darkgray
     {0x00, 0x64, 0x00},  // darkgreen
+    {0xa9, 0xa9, 0xa9},  // darkgrey
     {0xbd, 0xb7, 0x6b},  // darkkhaki
     {0x8b, 0x00, 0x8b},  // darkmagenta
     {0x55, 0x6b, 0x2f},  // darkolivegreen
@@ -206,11 +215,13 @@ constexpr ColorRec colors[] = {
     {0x8f, 0xbc, 0x8f},  // darkseagreen
     {0x48, 0x3d, 0x8b},  // darkslateblue
     {0x2f, 0x4f, 0x4f},  // darkslategray
+    {0x2f, 0x4f, 0x4f},  // darkslategrey
     {0x00, 0xce, 0xd1},  // darkturquoise
     {0x94, 0x00, 0xd3},  // darkviolet
     {0xff, 0x14, 0x93},  // deeppink
     {0x00, 0xbf, 0xff},  // deepskyblue
     {0x69, 0x69, 0x69},  // dimgray
+    {0x69, 0x69, 0x69},  // dimgrey
     {0x1e, 0x90, 0xff},  // dodgerblue
     {0xb2, 0x22, 0x22},  // firebrick
     {0xff, 0xfa, 0xf0},  // floralwhite
@@ -222,6 +233,7 @@ constexpr ColorRec colors[] = {
     {0xda, 0xa5, 0x20},  // goldenrod
     {0x80, 0x80, 0x80},  // gray
     {0x00, 0x80, 0x00},  // green
+    {0x80, 0x80, 0x80},  // grey
     {0xad, 0xff, 0x2f},  // greenyellow
     {0xf0, 0xff, 0xf0},  // honeydew
     {0xff, 0x69, 0xb4},  // hotpink
@@ -237,6 +249,7 @@ constexpr ColorRec colors[] = {
     {0xf0, 0x80, 0x80},  // lightcoral
     {0xe0, 0xff, 0xff},  // lightcyan
     {0xfa, 0xfa, 0xd2},  // lightgoldenrodyellow
+    {0xd3, 0xd3, 0xd3},  // lightgray
     {0x90, 0xee, 0x90},  // lightgreen
     {0xd3, 0xd3, 0xd3},  // lightgrey
     {0xff, 0xb6, 0xc1},  // lightpink
@@ -244,6 +257,7 @@ constexpr ColorRec colors[] = {
     {0x20, 0xb2, 0xaa},  // lightseagreen
     {0x87, 0xce, 0xfa},  // lightskyblue
     {0x77, 0x88, 0x99},  // lightslategray
+    {0x77, 0x88, 0x99},  // lightslategrey
     {0xb0, 0xc4, 0xde},  // lightsteelblue
     {0xff, 0xff, 0xe0},  // lightyellow
     {0x00, 0xff, 0x00},  // lime
@@ -283,6 +297,7 @@ constexpr ColorRec colors[] = {
     {0xdd, 0xa0, 0xdd},  // plum
     {0xb0, 0xe0, 0xe6},  // powderblue
     {0x80, 0x00, 0x80},  // purple
+    {0x66, 0x33, 0x99},  // rebeccapurple
     {0xff, 0x00, 0x00},  // red
     {0xbc, 0x8f, 0x8f},  // rosybrown
     {0x41, 0x69, 0xe1},  // royalblue
@@ -296,6 +311,7 @@ constexpr ColorRec colors[] = {
     {0x87, 0xce, 0xeb},  // skyblue
     {0x6a, 0x5a, 0xcd},  // slateblue
     {0x70, 0x80, 0x90},  // slategray
+    {0x70, 0x80, 0x90},  // slategrey
     {0xff, 0xfa, 0xfa},  // snow
     {0x00, 0xff, 0x7f},  // springgreen
     {0x46, 0x82, 0xb4},  // steelblue
