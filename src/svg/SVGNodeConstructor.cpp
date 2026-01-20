@@ -440,8 +440,7 @@ std::shared_ptr<SVGNode> SVGNodeConstructor::ConstructSVGNode(const Construction
     if (auto iter = elementFactories.find(elementName); iter != elementFactories.end()) {
       return iter->second();
     }
-    //can't find the element factory
-    DEBUG_ASSERT(false);
+    LOGE("Unknown SVG element: '%s'\n", elementName.c_str());
     return nullptr;
   };
 
