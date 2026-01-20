@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLRenderPass.h"
+#include <climits>
 #include "GLSampler.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/opengl/GLDepthStencilTexture.h"
@@ -187,6 +188,10 @@ void GLRenderPass::draw(PrimitiveType primitiveType, size_t vertexCount, size_t 
   if (!flushPendingBindings()) {
     return;
   }
+  // OpenGL uses GLsizei (int) for count parameters, so we need to check the range.
+  DEBUG_ASSERT(vertexCount <= static_cast<size_t>(INT_MAX));
+  DEBUG_ASSERT(instanceCount <= static_cast<size_t>(INT_MAX));
+  DEBUG_ASSERT(firstVertex <= static_cast<size_t>(INT_MAX));
   // Requires OpenGL 4.2+ or ES 3.2+, not implemented in the OpenGL backend.
   DEBUG_ASSERT(firstInstance == 0);
   (void)firstInstance;
@@ -207,6 +212,9 @@ void GLRenderPass::drawIndexed(PrimitiveType primitiveType, size_t indexCount,
   if (!flushPendingBindings()) {
     return;
   }
+  // OpenGL uses GLsizei (int) for count parameters, so we need to check the range.
+  DEBUG_ASSERT(indexCount <= static_cast<size_t>(INT_MAX));
+  DEBUG_ASSERT(instanceCount <= static_cast<size_t>(INT_MAX));
   // Requires OpenGL 4.2+ or ES 3.2+, not implemented in the OpenGL backend.
   DEBUG_ASSERT(baseVertex == 0);
   DEBUG_ASSERT(firstInstance == 0);
