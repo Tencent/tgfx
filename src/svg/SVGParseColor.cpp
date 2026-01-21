@@ -18,11 +18,12 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include "svg/SVGUtils.h"
 #include "tgfx/core/Color.h"
 
 namespace {
-const char* colorNames[] = {
+constexpr const char* colorNames[] = {
     "aliceblue",
     "antiquewhite",
     "aqua",
@@ -78,8 +79,8 @@ const char* colorNames[] = {
     "goldenrod",
     "gray",
     "green",
-    "grey",
     "greenyellow",
+    "grey",
     "honeydew",
     "hotpink",
     "indianred",
@@ -173,6 +174,18 @@ const char* colorNames[] = {
     "yellowgreen",
 };
 
+// Compile-time check to ensure colorNames is sorted for binary search (std::lower_bound).
+constexpr bool ColorNamesSorted() {
+  for (size_t i = 1; i < std::size(colorNames); ++i) {
+    if (std::string_view(colorNames[i - 1]) >= std::string_view(colorNames[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static_assert(ColorNamesSorted(), "colorNames must be sorted alphabetically");
+
 struct ColorRec {
   uint8_t r, g, b;
 };
@@ -233,8 +246,8 @@ constexpr ColorRec colors[] = {
     {0xda, 0xa5, 0x20},  // goldenrod
     {0x80, 0x80, 0x80},  // gray
     {0x00, 0x80, 0x00},  // green
-    {0x80, 0x80, 0x80},  // grey
     {0xad, 0xff, 0x2f},  // greenyellow
+    {0x80, 0x80, 0x80},  // grey
     {0xf0, 0xff, 0xf0},  // honeydew
     {0xff, 0x69, 0xb4},  // hotpink
     {0xcd, 0x5c, 0x5c},  // indianred
