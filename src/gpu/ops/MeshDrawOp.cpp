@@ -36,7 +36,7 @@ MeshDrawOp::MeshDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUMeshProxy> 
       viewMatrix(viewMatrix) {
 }
 
-PlacementPtr<GeometryProcessor> MeshDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+PlacementPtr<GeometryProcessor> MeshDrawOp::onMakeGeometryProcessor(RenderTarget*) {
   const auto& impl = meshProxy->impl();
   return MeshGeometryProcessor::Make(allocator, impl.hasTexCoords(), impl.hasColors(), color,
                                      viewMatrix);
