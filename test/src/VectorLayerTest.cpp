@@ -3763,7 +3763,6 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     shapePath->setPath(linePath);
     auto stroke = std::make_shared<StrokeStyle>();
     stroke->setColorSource(SolidColor::Make(Color{0.8f, 0.8f, 0.8f}));
-    stroke->setStrokeWidth(1);
     group->setElements({shapePath, stroke});
     return group;
   };
@@ -3918,7 +3917,6 @@ TGFX_TEST(VectorLayerTest, StrokeAlign) {
   // Reference stroke for comparison (1px black center stroke)
   auto refStroke = std::make_shared<StrokeStyle>();
   refStroke->setColorSource(SolidColor::Make(Color::Black()));
-  refStroke->setStrokeWidth(1);
 
   // Row 1: Rectangle with Center/Inside/Outside stroke
   auto rectGroup1 = std::make_shared<VectorGroup>();
