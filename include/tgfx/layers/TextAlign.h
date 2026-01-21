@@ -24,14 +24,14 @@ namespace tgfx {
  */
 enum class TextAlign {
   /**
-   * Text is visually left aligned.
+   * Text is aligned to the start of the available region.
    */
-  Left,
+  Start,
 
   /**
-   * Text is visually right aligned.
+   * Text is aligned to the end of the available region.
    */
-  Right,
+  End,
 
   /**
    * Text is visually center aligned.

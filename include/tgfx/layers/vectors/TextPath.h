@@ -44,8 +44,8 @@ class TextPath : public VectorElement {
 
   /**
    * Returns the text alignment within the available path region (path length minus margins).
-   * TextAlign::Left means text starts from the beginning, TextAlign::Center means text is centered,
-   * TextAlign::Right means text ends at the end, and TextAlign::Justify means letter spacing is
+   * TextAlign::Start means text starts from the beginning, TextAlign::Center means text is centered,
+   * TextAlign::End means text ends at the end, and TextAlign::Justify means letter spacing is
    * adjusted to fit text within the available region.
    */
   TextAlign textAlign() const {
@@ -117,7 +117,7 @@ class TextPath : public VectorElement {
 
  private:
   Path _path = {};
-  TextAlign _textAlign = TextAlign::Left;
+  TextAlign _textAlign = TextAlign::Start;
   float _firstMargin = 0.0f;
   float _lastMargin = 0.0f;
   bool _perpendicularToPath = true;

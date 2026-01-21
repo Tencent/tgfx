@@ -147,7 +147,7 @@ void TextPath::apply(VectorContext* context) {
       case TextAlign::Center:
         startOffset = (pathLength - totalWidth) * 0.5f + _firstMargin + _lastMargin;
         break;
-      case TextAlign::Right:
+      case TextAlign::End:
         startOffset = pathLength + _lastMargin - totalWidth;
         break;
       default:
