@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Context3DCompositor.h"
+#include <algorithm>
 #include <cmath>
 #include "BspTree.h"
 #include "core/images/TextureImage.h"
@@ -136,10 +137,11 @@ Context3DCompositor::Context3DCompositor(const Context& context, int width, int 
   DEBUG_ASSERT(_targetColorProxy != nullptr);
 }
 
-void Context3DCompositor::addImage(std::shared_ptr<Image> image, const Matrix3D& matrix,
+void Context3DCompositor::addImage(std::shared_ptr<Image> image, const Matrix3D& matrix, int depth,
                                    float alpha, bool antiAlias) {
-  auto polygon = std::make_unique<DrawPolygon3D>(std::move(image), matrix, _nextOrderIndex++, alpha,
-                                                 antiAlias);
+  int sequenceIndex = _depthSequenceCounters[depth]++;
+  auto polygon = std::make_unique<DrawPolygon3D>(std::move(image), matrix, depth, sequenceIndex,
+                                                 alpha, antiAlias);
   _polygons.push_back(std::move(polygon));
 }
 
@@ -214,6 +216,9 @@ std::shared_ptr<Image> Context3DCompositor::finish() {
   DEBUG_ASSERT(context != nullptr);
 
   if (!_polygons.empty()) {
+    // Sort polygons by (depth, sequenceIndex) to ensure correct paint order in BSP tree.
+    // TODO: Support pre-order traversal of layers to avoid the performance cost of sorting.
+    std::sort(_polygons.begin(), _polygons.end(), DrawPolygon3DOrder);
     BspTree bspTree(std::move(_polygons));
     _polygons.clear();
     bspTree.traverseBackToFront([this](const DrawPolygon3D* polygon) { drawPolygon(polygon); });

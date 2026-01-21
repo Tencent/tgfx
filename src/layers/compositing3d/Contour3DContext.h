@@ -47,7 +47,7 @@ class Contour3DContext : public Layer3DContext {
   Canvas* onBeginRecording() override;
   std::shared_ptr<Picture> onFinishRecording() override;
   void onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                    const Point& pictureOffset, bool antialiasing) override;
+                    const Point& pictureOffset, int depth, bool antialiasing) override;
 
  private:
   std::stack<ContourContext> _contourStack = {};

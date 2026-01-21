@@ -47,11 +47,11 @@ std::shared_ptr<Picture> Render3DContext::onFinishRecording() {
 }
 
 void Render3DContext::onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                                   const Point& pictureOffset, bool antialiasing) {
+                                   const Point& pictureOffset, int depth, bool antialiasing) {
   auto finalTransform = imageTransform;
   finalTransform.postTranslate(pictureOffset.x - _renderRect.left,
                                pictureOffset.y - _renderRect.top, 0);
-  _compositor->addImage(std::move(image), finalTransform, 1.0f, antialiasing);
+  _compositor->addImage(std::move(image), finalTransform, depth, 1.0f, antialiasing);
 }
 
 void Render3DContext::finishAndDrawTo(Canvas* canvas, bool antialiasing) {

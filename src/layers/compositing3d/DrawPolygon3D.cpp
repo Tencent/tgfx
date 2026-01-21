@@ -58,10 +58,10 @@ static void CollectSplitPoints(const std::vector<Vec3>& points, const Vec3& star
   }
 }
 
-DrawPolygon3D::DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matrix, int orderIndex,
-                             float alpha, bool antiAlias)
-    : _orderIndex(orderIndex), _alpha(alpha), _antiAlias(antiAlias), _image(std::move(image)),
-      _matrix(matrix) {
+DrawPolygon3D::DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matrix, int depth,
+                             int sequenceIndex, float alpha, bool antiAlias)
+    : _depth(depth), _sequenceIndex(sequenceIndex), _alpha(alpha), _antiAlias(antiAlias),
+      _image(std::move(image)), _matrix(matrix) {
   auto srcW = static_cast<float>(_image->width());
   auto srcH = static_cast<float>(_image->height());
 
@@ -82,10 +82,11 @@ DrawPolygon3D::DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matri
 }
 
 DrawPolygon3D::DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matrix,
-                             std::vector<Vec3> points, const Vec3& normal, int orderIndex,
-                             float alpha, bool antiAlias)
-    : _points(std::move(points)), _normal(normal), _orderIndex(orderIndex), _isSplit(true),
-      _alpha(alpha), _antiAlias(antiAlias), _image(std::move(image)), _matrix(matrix) {
+                             std::vector<Vec3> points, const Vec3& normal, int depth,
+                             int sequenceIndex, float alpha, bool antiAlias)
+    : _points(std::move(points)), _normal(normal), _depth(depth), _sequenceIndex(sequenceIndex),
+      _isSplit(true), _alpha(alpha), _antiAlias(antiAlias), _image(std::move(image)),
+      _matrix(matrix) {
 }
 
 // Computes the normal by averaging cross products of opposite vertex pairs from the first vertex.
@@ -135,8 +136,11 @@ void DrawPolygon3D::splitAnother(std::unique_ptr<DrawPolygon3D> polygon,
   // The polygon is coplanar with this polygon.
   if (posCount == 0 && negCount == 0) {
     *isCoplanar = true;
-    // TGFX uses post-order traversal: smaller orderIndex (child) should be in front (drawn later).
-    if (polygon->_orderIndex <= _orderIndex) {
+    // Compare by (depth, sequenceIndex) to determine paint order.
+    // Larger values should be drawn later (on top), so they go to front.
+    bool polygonIsLater = (polygon->_depth > _depth) ||
+                          (polygon->_depth == _depth && polygon->_sequenceIndex >= _sequenceIndex);
+    if (polygonIsLater) {
       *front = std::move(polygon);
     } else {
       *back = std::move(polygon);
@@ -195,12 +199,12 @@ void DrawPolygon3D::splitAnother(std::unique_ptr<DrawPolygon3D> polygon,
   CollectSplitPoints(polygon->_points, preNegIntersection, prePosIntersection, backBegin,
                      frontBegin, &backPoints);
 
-  *front = std::unique_ptr<DrawPolygon3D>(
-      new DrawPolygon3D(polygon->_image, polygon->_matrix, std::move(frontPoints), polygon->_normal,
-                        polygon->_orderIndex, polygon->_alpha, polygon->_antiAlias));
-  *back = std::unique_ptr<DrawPolygon3D>(
-      new DrawPolygon3D(polygon->_image, polygon->_matrix, std::move(backPoints), polygon->_normal,
-                        polygon->_orderIndex, polygon->_alpha, polygon->_antiAlias));
+  *front = std::unique_ptr<DrawPolygon3D>(new DrawPolygon3D(
+      polygon->_image, polygon->_matrix, std::move(frontPoints), polygon->_normal, polygon->_depth,
+      polygon->_sequenceIndex, polygon->_alpha, polygon->_antiAlias));
+  *back = std::unique_ptr<DrawPolygon3D>(new DrawPolygon3D(
+      polygon->_image, polygon->_matrix, std::move(backPoints), polygon->_normal, polygon->_depth,
+      polygon->_sequenceIndex, polygon->_alpha, polygon->_antiAlias));
 
   DEBUG_ASSERT((*front)->_points.size() >= 3);
   DEBUG_ASSERT((*back)->_points.size() >= 3);

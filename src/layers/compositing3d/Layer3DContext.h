@@ -100,7 +100,7 @@ class Layer3DContext {
   virtual Canvas* onBeginRecording() = 0;
   virtual std::shared_ptr<Picture> onFinishRecording() = 0;
   virtual void onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                            const Point& pictureOffset, bool antialiasing) = 0;
+                            const Point& pictureOffset, int depth, bool antialiasing) = 0;
 
   Rect _renderRect = {};
   float _contentScale = 1.0f;

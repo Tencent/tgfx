@@ -46,7 +46,7 @@ std::shared_ptr<Picture> Contour3DContext::onFinishRecording() {
 }
 
 void Contour3DContext::onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                                    const Point&, bool) {
+                                    const Point&, int, bool) {
   _contourImages.push_back({std::move(image), imageTransform});
 }
 
