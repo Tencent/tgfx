@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,38 +18,29 @@
 
 #pragma once
 
+#include "layers/contents/GeometryContent.h"
+#include "tgfx/core/Mesh.h"
+
 namespace tgfx {
-/**
- * Defines the types of a layer.
- */
-enum class LayerType {
-  /**
-   * The type for a generic layer. May be used as a container for other child layers.
-   */
-  Layer,
-  /**
-   * A layer displaying a simple image.
-   */
-  Image,
-  /**
-   * A layer displaying a simple shape.
-   */
-  Shape,
-  /**
-   * A layer displaying a simple text.
-   */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid,
-  /**
-   * A layer displaying vector elements (shapes, text, images) with fill/stroke styles and modifiers.
-   */
-  Vector,
-  /**
-   * A layer displaying a mesh with vertex colors or textures.
-   */
-  Mesh
+
+class MeshContent : public GeometryContent {
+ public:
+  MeshContent(std::shared_ptr<Mesh> mesh, const LayerPaint& paint);
+
+  Rect getBounds() const override;
+  Rect getTightBounds(const Matrix& matrix) const override;
+  bool hitTestPoint(float localX, float localY) const override;
+
+  std::shared_ptr<Mesh> mesh = nullptr;
+
+ protected:
+  Type type() const override {
+    return Type::Mesh;
+  }
+
+  Rect onGetBounds() const override;
+  void onDraw(Canvas* canvas, const Paint& paint) const override;
+  bool onHasSameGeometry(const GeometryContent* other) const override;
 };
+
 }  // namespace tgfx

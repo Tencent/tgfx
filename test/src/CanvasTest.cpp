@@ -32,6 +32,7 @@
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
+#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PictureRecorder.h"
@@ -1397,6 +1398,114 @@ TGFX_TEST(CanvasTest, PictureMaskPath) {
   // Check that pixel at (100, 100) is transparent (outside the stroke bounds)
   auto colorOutside = bitmap.getColor(100, 100);
   EXPECT_EQ(colorOutside, Color::Transparent());
+}
+
+TGFX_TEST(CanvasTest, DrawMesh_ColorsOnly) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Create a simple triangle with vertex colors (no texture)
+  Point positions[] = {{100, 50}, {50, 150}, {150, 150}};
+  Color colors[] = {Color::Red(), Color::Green(), Color::Blue()};
+
+  auto mesh = Mesh::MakeCopy(MeshTopology::Triangles, 3, positions, colors);
+  ASSERT_TRUE(mesh != nullptr);
+
+  Paint paint = {};
+  canvas->drawMesh(mesh, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_ColorsOnly"));
+}
+
+TGFX_TEST(CanvasTest, DrawMesh_TextureOnly) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+
+  // Create a quad with texture coordinates (no vertex colors)
+  Point positions[] = {{50, 50}, {150, 50}, {150, 150}, {50, 50}, {150, 150}, {50, 150}};
+  Point texCoords[] = {{0, 0}, {imageWidth, 0},           {imageWidth, imageHeight},
+                       {0, 0}, {imageWidth, imageHeight}, {0, imageHeight}};
+
+  auto mesh = Mesh::MakeCopy(MeshTopology::Triangles, 6, positions, nullptr, texCoords);
+  ASSERT_TRUE(mesh != nullptr);
+
+  Paint paint = {};
+  paint.setShader(Shader::MakeImageShader(image));
+  canvas->drawMesh(mesh, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_TextureOnly"));
+}
+
+TGFX_TEST(CanvasTest, DrawMesh_TextureAndColors) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+
+  // Create a quad with both texture coordinates and vertex colors
+  // The result should be texture * vertexColor (Modulate blend)
+  Point positions[] = {{50, 50}, {150, 50}, {150, 150}, {50, 50}, {150, 150}, {50, 150}};
+  Point texCoords[] = {{0, 0}, {imageWidth, 0},           {imageWidth, imageHeight},
+                       {0, 0}, {imageWidth, imageHeight}, {0, imageHeight}};
+  // Use semi-transparent colors to modulate the texture
+  Color colors[] = {Color::FromRGBA(255, 0, 0, 128), Color::FromRGBA(0, 255, 0, 128),
+                    Color::FromRGBA(0, 0, 255, 128), Color::FromRGBA(255, 0, 0, 128),
+                    Color::FromRGBA(0, 0, 255, 128), Color::FromRGBA(255, 255, 0, 128)};
+
+  auto mesh = Mesh::MakeCopy(MeshTopology::Triangles, 6, positions, colors, texCoords);
+  ASSERT_TRUE(mesh != nullptr);
+
+  Paint paint = {};
+  paint.setShader(Shader::MakeImageShader(image));
+  canvas->drawMesh(mesh, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_TextureAndColors"));
+}
+
+TGFX_TEST(CanvasTest, DrawMesh_PaintColorOnly) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Create a simple triangle with no colors and no texture
+  // The paint color should be used as fallback
+  Point positions[] = {{100, 50}, {50, 150}, {150, 150}};
+
+  auto mesh = Mesh::MakeCopy(MeshTopology::Triangles, 3, positions);
+  ASSERT_TRUE(mesh != nullptr);
+
+  Paint paint = {};
+  paint.setColor(Color::Red());
+  canvas->drawMesh(mesh, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_PaintColorOnly"));
 }
 
 }  // namespace tgfx

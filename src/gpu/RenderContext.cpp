@@ -283,6 +283,12 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   }
 }
 
+void RenderContext::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush) {
+  if (auto compositor = getOpsCompositor()) {
+    compositor->drawMesh(std::move(mesh), state, brush);
+  }
+}
+
 void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                   const Rect& dstRect, const SamplingOptions& sampling,
                                   const MCState& state, const Brush& brush,

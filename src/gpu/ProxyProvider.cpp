@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProxyProvider.h"
+#include "core/MeshImpl.h"
 #include "core/ShapeRasterizer.h"
 #include "core/utils/HardwareBufferUtil.h"
 #include "core/utils/MathExtra.h"
@@ -28,6 +29,7 @@
 #include "gpu/proxies/HardwareRenderTargetProxy.h"
 #include "gpu/proxies/TextureRenderTargetProxy.h"
 #include "gpu/tasks/GPUBufferUploadTask.h"
+#include "gpu/tasks/MeshBufferUploadTask.h"
 #include "gpu/tasks/ReadbackBufferCreateTask.h"
 #include "gpu/tasks/ShapeBufferUploadTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
@@ -218,6 +220,60 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
   }
   context->drawingManager()->addResourceTask(std::move(task));
   return std::make_shared<GPUShapeProxy>(drawingMatrix, triangleProxy, textureProxy);
+}
+
+std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(std::shared_ptr<Mesh> mesh,
+                                                                uint32_t renderFlags) {
+  if (mesh == nullptr) {
+    return nullptr;
+  }
+
+  auto meshProxy = std::make_shared<GPUMeshProxy>(context, std::move(mesh));
+  const auto& impl = meshProxy->impl();
+  auto baseKey = meshProxy->impl().getUniqueKey();
+  bool disableCache = (renderFlags & RenderFlags::DisableCache) != 0;
+
+  // Create vertex buffer proxy
+  static const auto VertexBufferType = UniqueID::Next();
+  auto vertexKey = UniqueKey::Append(baseKey, &VertexBufferType, 1);
+
+  auto vertexBufferProxy = findOrWrapGPUBufferProxy(vertexKey);
+  if (vertexBufferProxy == nullptr) {
+    vertexBufferProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+    addResourceProxy(vertexBufferProxy, vertexKey);
+
+    if (!disableCache) {
+      vertexBufferProxy->uniqueKey = vertexKey;
+    }
+
+    auto task =
+        context->drawingAllocator()->make<MeshVertexBufferUploadTask>(vertexBufferProxy, meshProxy);
+    context->drawingManager()->addResourceTask(std::move(task));
+  }
+  meshProxy->setVertexBufferProxy(std::move(vertexBufferProxy));
+
+  // Create index buffer proxy (if needed)
+  if (impl.hasIndices()) {
+    static const auto IndexBufferType = UniqueID::Next();
+    auto indexKey = UniqueKey::Append(baseKey, &IndexBufferType, 1);
+
+    auto indexBufferProxy = findOrWrapGPUBufferProxy(indexKey);
+    if (indexBufferProxy == nullptr) {
+      indexBufferProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+      addResourceProxy(indexBufferProxy, indexKey);
+
+      if (!disableCache) {
+        indexBufferProxy->uniqueKey = indexKey;
+      }
+
+      auto task =
+          context->drawingAllocator()->make<MeshIndexBufferUploadTask>(indexBufferProxy, meshProxy);
+      context->drawingManager()->addResourceTask(std::move(task));
+    }
+    meshProxy->setIndexBufferProxy(std::move(indexBufferProxy));
+  }
+
+  return meshProxy;
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(

@@ -86,6 +86,17 @@ void ContourContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
   drawContour(Contour(std::move(shape), stroke), state, brush);
 }
 
+void ContourContext::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state,
+                              const Brush& brush) {
+  auto bounds = mesh->bounds();
+  bounds = state.matrix.mapRect(bounds);
+  if (containContourBound(bounds)) {
+    return;
+  }
+  flushPendingContour();
+  pictureContext.drawMesh(std::move(mesh), state, brush);
+}
+
 void ContourContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                const MCState& state, const Brush& brush) {
   auto newBrush = brush;

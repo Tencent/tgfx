@@ -24,11 +24,13 @@
 #include "gpu/BackingFit.h"
 #include "gpu/VertexProvider.h"
 #include "gpu/proxies/GPUBufferProxy.h"
+#include "gpu/proxies/GPUMeshProxy.h"
 #include "gpu/proxies/GPUShapeProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/proxies/VertexBufferView.h"
 #include "tgfx/core/ImageGenerator.h"
+#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -77,6 +79,13 @@ class ProxyProvider {
   std::shared_ptr<GPUShapeProxy> createGPUShapeProxy(std::shared_ptr<Shape> shape, AAType aaType,
                                                      const Rect& clipBounds,
                                                      uint32_t renderFlags = 0);
+
+  /**
+   * Creates a GPUMeshProxy for the given Mesh. The vertex and index buffers will be uploaded
+   * asynchronously.
+   */
+  std::shared_ptr<GPUMeshProxy> createGPUMeshProxy(std::shared_ptr<Mesh> mesh,
+                                                   uint32_t renderFlags = 0);
 
   /*
    * Creates a TextureProxy for the given ImageBuffer. The image buffer will be released after being

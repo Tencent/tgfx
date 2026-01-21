@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Shape.h"
@@ -84,6 +85,13 @@ class LayerRecorder {
    */
   void addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
                    const Matrix& matrix);
+
+  /**
+   * Adds a mesh with the specified paint.
+   * @param mesh The mesh object.
+   * @param paint The paint style for the mesh.
+   */
+  void addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint& paint);
 
  private:
   enum class PendingType {

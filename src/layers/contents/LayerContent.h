@@ -85,6 +85,7 @@ class LayerContent {
     Compose,
     Rects,
     RRects,
+    Mesh,
   };
 
   /**

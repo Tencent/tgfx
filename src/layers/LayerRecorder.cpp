@@ -20,6 +20,7 @@
 #include "core/utils/StrokeUtils.h"
 #include "layers/contents/ComposeContent.h"
 #include "layers/contents/GeometryContent.h"
+#include "layers/contents/MeshContent.h"
 #include "layers/contents/PathContent.h"
 #include "layers/contents/RRectContent.h"
 #include "layers/contents/RRectsContent.h"
@@ -115,6 +116,15 @@ void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerP
   flushPending();
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
   list.push_back(std::make_unique<TextContent>(std::move(textBlob), matrix, paint));
+}
+
+void LayerRecorder::addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint& paint) {
+  if (mesh == nullptr) {
+    return;
+  }
+  flushPending();
+  auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
+  list.push_back(std::make_unique<MeshContent>(std::move(mesh), paint));
 }
 
 bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint) const {
