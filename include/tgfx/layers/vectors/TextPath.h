@@ -19,27 +19,10 @@
 #pragma once
 
 #include "tgfx/core/Path.h"
+#include "tgfx/layers/TextAlign.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
-
-/**
- * Defines text alignment on a path.
- */
-enum class TextPathAlign {
-  /**
-   * Text starts from the beginning of the available path region.
-   */
-  Start,
-  /**
-   * Text is centered within the available path region.
-   */
-  Center,
-  /**
-   * Text ends at the end of the available path region.
-   */
-  End
-};
 
 /**
  * TextPath applies path-based layout to accumulated glyphs in the VectorContext. When applied, it
@@ -61,15 +44,18 @@ class TextPath : public VectorElement {
 
   /**
    * Returns the text alignment within the available path region (path length minus margins).
+   * TextAlign::Left means text starts from the beginning, TextAlign::Center means text is centered,
+   * TextAlign::Right means text ends at the end, and TextAlign::Justify means letter spacing is
+   * adjusted to fit text within the available region.
    */
-  TextPathAlign align() const {
-    return _align;
+  TextAlign textAlign() const {
+    return _textAlign;
   }
 
   /**
    * Sets the text alignment within the available path region.
    */
-  void setAlign(TextPathAlign value);
+  void setTextAlign(TextAlign value);
 
   /**
    * Returns the margin from the path start in pixels. Positive values offset text forward along
@@ -122,19 +108,6 @@ class TextPath : public VectorElement {
    */
   void setReversed(bool value);
 
-  /**
-   * Returns whether to force text to fit within the available path region. When enabled, letter
-   * spacing is adjusted to fit text within the bounds defined by firstMargin and lastMargin.
-   */
-  bool forceAlignment() const {
-    return _forceAlignment;
-  }
-
-  /**
-   * Sets whether to force text to fit within the available path region.
-   */
-  void setForceAlignment(bool value);
-
  protected:
   Type type() const override {
     return Type::TextPath;
@@ -144,12 +117,11 @@ class TextPath : public VectorElement {
 
  private:
   Path _path = {};
-  TextPathAlign _align = TextPathAlign::Start;
+  TextAlign _textAlign = TextAlign::Left;
   float _firstMargin = 0.0f;
   float _lastMargin = 0.0f;
   bool _perpendicularToPath = true;
   bool _reversed = false;
-  bool _forceAlignment = false;
 };
 
 }  // namespace tgfx

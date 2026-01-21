@@ -33,11 +33,11 @@ void TextPath::setPath(Path value) {
   invalidateContent();
 }
 
-void TextPath::setAlign(TextPathAlign value) {
-  if (_align == value) {
+void TextPath::setTextAlign(TextAlign value) {
+  if (_textAlign == value) {
     return;
   }
-  _align = value;
+  _textAlign = value;
   invalidateContent();
 }
 
@@ -70,14 +70,6 @@ void TextPath::setReversed(bool value) {
     return;
   }
   _reversed = value;
-  invalidateContent();
-}
-
-void TextPath::setForceAlignment(bool value) {
-  if (_forceAlignment == value) {
-    return;
-  }
-  _forceAlignment = value;
   invalidateContent();
 }
 
@@ -138,7 +130,7 @@ void TextPath::apply(VectorContext* context) {
   // lastMargin is negative to shrink from end
   auto availableLength = std::abs(pathLength + _lastMargin - _firstMargin);
   float letterSpacing = 0.0f;
-  if (_forceAlignment && totalGlyphCount > 1) {
+  if (_textAlign == TextAlign::Justify && totalGlyphCount > 1) {
     auto glyphIntervals = static_cast<float>(totalGlyphCount - 1);
     if (_firstMargin <= pathLength + _lastMargin) {
       letterSpacing = (availableLength - totalWidth) / glyphIntervals;
@@ -148,14 +140,14 @@ void TextPath::apply(VectorContext* context) {
     }
   }
 
-  // When forceAlignment is enabled, always start from firstMargin
+  // When textAlign is Justify, always start from firstMargin
   float startOffset = _firstMargin;
-  if (!_forceAlignment) {
-    switch (_align) {
-      case TextPathAlign::Center:
+  if (_textAlign != TextAlign::Justify) {
+    switch (_textAlign) {
+      case TextAlign::Center:
         startOffset = (pathLength - totalWidth) * 0.5f + _firstMargin + _lastMargin;
         break;
-      case TextPathAlign::End:
+      case TextAlign::Right:
         startOffset = pathLength + _lastMargin - totalWidth;
         break;
       default:
