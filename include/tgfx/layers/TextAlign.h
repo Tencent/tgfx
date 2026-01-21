@@ -24,22 +24,23 @@ namespace tgfx {
  */
 enum class TextAlign {
   /**
-   * Text is aligned to the start of the available region.
+   * The same as left if direction is left-to-right and right if direction is right-to-left.
    */
   Start,
 
   /**
-   * Text is aligned to the end of the available region.
+   * The same as right if direction is left-to-right and left if direction is right-to-left.
    */
   End,
 
   /**
-   * Text is visually center aligned.
+   * Text is centered within the available region.
    */
   Center,
 
   /**
-   * Text is justified.
+   * Text is justified. Text is spaced to line up its left and right edges to the left and right
+   * edges of the available region.
    */
   Justify
 };
