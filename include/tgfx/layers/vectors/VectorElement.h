@@ -55,9 +55,7 @@ class VectorElement : public LayerProperty {
     MergePath,
     Repeater,
     VectorGroup,
-    TextSpan,
-    TextPath,
-    TextModifier
+    TextSpan
   };
 
   VectorElement() = default;

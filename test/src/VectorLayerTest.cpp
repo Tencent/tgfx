@@ -18,6 +18,9 @@
 
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/SolidLayer.h"
+#include "tgfx/layers/TextModifier.h"
+#include "tgfx/layers/TextPath.h"
+#include "tgfx/layers/TextSelector.h"
 #include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/vectors/Ellipse.h"
 #include "tgfx/layers/vectors/FillStyle.h"
@@ -31,9 +34,6 @@
 #include "tgfx/layers/vectors/ShapePath.h"
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/StrokeStyle.h"
-#include "tgfx/layers/vectors/TextModifier.h"
-#include "tgfx/layers/vectors/TextPath.h"
-#include "tgfx/layers/vectors/TextSelector.h"
 #include "tgfx/layers/vectors/TextSpan.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
@@ -2837,7 +2837,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   canvas->clear(Color::White());
 
   auto displayList = std::make_unique<DisplayList>();
-  auto vectorLayer = VectorLayer::Make();
+  auto rootLayer = Layer::Make();
 
   auto typeface = GetTestTypeface();
   if (typeface == nullptr) {
@@ -2850,131 +2850,89 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   curvePath.moveTo(40, 80);
   curvePath.cubicTo(140, -40, 340, 200, 440, 80);
 
+  // Helper lambda to create a VectorLayer with TextPath
+  auto makeTextPathLayer = [&](const std::string& text, std::shared_ptr<TextPath> textPath,
+                               Color fillColor, Point position) {
+    auto layer = VectorLayer::Make();
+    layer->setPosition(position);
+
+    auto textSpan = std::make_shared<TextSpan>();
+    textSpan->setTextBlob(TextBlob::MakeFrom(text, font));
+
+    auto fill = MakeFillStyle(fillColor);
+    layer->setContents({textSpan, fill});
+    layer->setTextPath(textPath);
+
+    return layer;
+  };
+
   // ==================== Column 1: Basic TextPath options ====================
 
-  // Group 1: Start alignment, perpendicular to path
-  auto group1 = std::make_shared<VectorGroup>();
-  group1->setPosition({58, 63});
-
-  auto textSpan1 = std::make_shared<TextSpan>();
-  textSpan1->setTextBlob(TextBlob::MakeFrom("Start Aligned", font));
-
+  // Layer 1: Start alignment, perpendicular to path
   auto textPath1 = std::make_shared<TextPath>();
   textPath1->setPath(curvePath);
   textPath1->setTextAlign(TextAlign::Start);
   textPath1->setPerpendicularToPath(true);
+  auto layer1 = makeTextPathLayer("Start Aligned", textPath1, Color::Blue(), {58, 63});
 
-  auto fill1 = MakeFillStyle(Color::Blue());
-  group1->setElements({textSpan1, textPath1, fill1});
-
-  // Group 2: Center alignment, perpendicular to path
-  auto group2 = std::make_shared<VectorGroup>();
-  group2->setPosition({58, 163});
-
-  auto textSpan2 = std::make_shared<TextSpan>();
-  textSpan2->setTextBlob(TextBlob::MakeFrom("Center Aligned", font));
-
+  // Layer 2: Center alignment, perpendicular to path
   auto textPath2 = std::make_shared<TextPath>();
   textPath2->setPath(curvePath);
   textPath2->setTextAlign(TextAlign::Center);
   textPath2->setPerpendicularToPath(true);
+  auto layer2 = makeTextPathLayer("Center Aligned", textPath2, Color::Red(), {58, 163});
 
-  auto fill2 = MakeFillStyle(Color::Red());
-  group2->setElements({textSpan2, textPath2, fill2});
-
-  // Group 3: End alignment, perpendicular to path
-  auto group3 = std::make_shared<VectorGroup>();
-  group3->setPosition({58, 263});
-
-  auto textSpan3 = std::make_shared<TextSpan>();
-  textSpan3->setTextBlob(TextBlob::MakeFrom("End Aligned", font));
-
+  // Layer 3: End alignment, perpendicular to path
   auto textPath3 = std::make_shared<TextPath>();
   textPath3->setPath(curvePath);
   textPath3->setTextAlign(TextAlign::End);
   textPath3->setPerpendicularToPath(true);
+  auto layer3 = makeTextPathLayer("End Aligned", textPath3, Color::Green(), {58, 263});
 
-  auto fill3 = MakeFillStyle(Color::Green());
-  group3->setElements({textSpan3, textPath3, fill3});
-
-  // Group 4: Not perpendicular to path (text stays upright)
-  auto group4 = std::make_shared<VectorGroup>();
-  group4->setPosition({58, 363});
-
-  auto textSpan4 = std::make_shared<TextSpan>();
-  textSpan4->setTextBlob(TextBlob::MakeFrom("Not Perpendicular", font));
-
+  // Layer 4: Not perpendicular to path (text stays upright)
   auto textPath4 = std::make_shared<TextPath>();
   textPath4->setPath(curvePath);
   textPath4->setTextAlign(TextAlign::Center);
   textPath4->setPerpendicularToPath(false);
+  auto layer4 =
+      makeTextPathLayer("Not Perpendicular", textPath4, Color{1.0f, 0.5f, 0.0f, 1.0f}, {58, 363});
 
-  auto fill4 = MakeFillStyle(Color{1.0f, 0.5f, 0.0f, 1.0f});  // Orange
-  group4->setElements({textSpan4, textPath4, fill4});
-
-  // Group 5: Reversed path direction
-  auto group5 = std::make_shared<VectorGroup>();
-  group5->setPosition({58, 463});
-
-  auto textSpan5 = std::make_shared<TextSpan>();
-  textSpan5->setTextBlob(TextBlob::MakeFrom("Reversed Path", font));
-
+  // Layer 5: Reversed path direction
   auto textPath5 = std::make_shared<TextPath>();
   textPath5->setPath(curvePath);
   textPath5->setTextAlign(TextAlign::Start);
   textPath5->setPerpendicularToPath(true);
   textPath5->setReversed(true);
+  auto layer5 =
+      makeTextPathLayer("Reversed Path", textPath5, Color{0.5f, 0.0f, 0.5f, 1.0f}, {58, 463});
 
-  auto fill5 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
-  group5->setElements({textSpan5, textPath5, fill5});
-
-  // Group 6: With margins and Justify alignment
-  auto group6 = std::make_shared<VectorGroup>();
-  group6->setPosition({58, 563});
-
-  auto textSpan6 = std::make_shared<TextSpan>();
-  textSpan6->setTextBlob(TextBlob::MakeFrom("Force Alignment", font));
-
+  // Layer 6: With margins and Justify alignment
   auto textPath6 = std::make_shared<TextPath>();
   textPath6->setPath(curvePath);
   textPath6->setFirstMargin(50);
-  textPath6->setLastMargin(-50);  // Negative value shrinks from path end
+  textPath6->setLastMargin(-50);
   textPath6->setTextAlign(TextAlign::Justify);
   textPath6->setPerpendicularToPath(true);
-
-  auto fill6 = MakeFillStyle(Color{0.0f, 0.5f, 0.5f, 1.0f});  // Teal
-  group6->setElements({textSpan6, textPath6, fill6});
+  auto layer6 =
+      makeTextPathLayer("Force Alignment", textPath6, Color{0.0f, 0.5f, 0.5f, 1.0f}, {58, 563});
 
   // ==================== Column 2: TextPath advanced tests ====================
 
   // Create a larger curved path for testing TextPath override
   Path largerCurvePath = {};
   largerCurvePath.moveTo(40, 80);
-  largerCurvePath.cubicTo(140, -120, 340, 280, 440, 80);  // More extreme curve
+  largerCurvePath.cubicTo(140, -120, 340, 280, 440, 80);
 
-  // Group 7: Two consecutive TextPaths - second should override first
-  auto group7 = std::make_shared<VectorGroup>();
-  group7->setPosition({548, 63});
+  // Layer 7: Only uses second TextPath (API now only allows one TextPath per layer)
+  auto textPath7 = std::make_shared<TextPath>();
+  textPath7->setPath(largerCurvePath);
+  textPath7->setTextAlign(TextAlign::Start);
+  textPath7->setPerpendicularToPath(true);
+  auto layer7 = makeTextPathLayer("Second Override", textPath7, Color::Blue(), {548, 63});
 
-  auto textSpan7 = std::make_shared<TextSpan>();
-  textSpan7->setTextBlob(TextBlob::MakeFrom("Second Override", font));
-
-  auto textPathFirst = std::make_shared<TextPath>();
-  textPathFirst->setPath(curvePath);
-  textPathFirst->setTextAlign(TextAlign::Start);
-  textPathFirst->setPerpendicularToPath(true);
-
-  auto textPathSecond = std::make_shared<TextPath>();
-  textPathSecond->setPath(largerCurvePath);
-  textPathSecond->setTextAlign(TextAlign::Start);
-  textPathSecond->setPerpendicularToPath(true);
-
-  auto fill7 = MakeFillStyle(Color::Blue());
-  group7->setElements({textSpan7, textPathFirst, textPathSecond, fill7});
-
-  // Group 8: Inner group transform overridden by TextPath
-  auto group8 = std::make_shared<VectorGroup>();
-  group8->setPosition({548, 163});
+  // Layer 8: Inner group transform with TextPath
+  auto layer8 = VectorLayer::Make();
+  layer8->setPosition({548, 163});
 
   auto innerGroup8 = std::make_shared<VectorGroup>();
   innerGroup8->setPosition({20, 60});
@@ -2982,7 +2940,6 @@ TGFX_TEST(VectorLayerTest, TextPath) {
 
   auto textSpan8 = std::make_shared<TextSpan>();
   textSpan8->setTextBlob(TextBlob::MakeFrom("Group Override", font));
-
   innerGroup8->setElements({textSpan8});
 
   auto textPath8 = std::make_shared<TextPath>();
@@ -2991,53 +2948,38 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   textPath8->setPerpendicularToPath(true);
 
   auto fill8 = MakeFillStyle(Color::Red());
-  group8->setElements({innerGroup8, textPath8, fill8});
+  layer8->setContents({innerGroup8, fill8});
+  layer8->setTextPath(textPath8);
 
-  // Group 9: Path extension - text extends beyond path boundaries
-  // Uses short path with long text to test path extension at both ends
+  // Layer 9: Path extension - text extends beyond path boundaries
   Path shortPath = {};
   shortPath.moveTo(180, 80);
   shortPath.cubicTo(220, 20, 280, 140, 320, 80);
-
-  auto group9 = std::make_shared<VectorGroup>();
-  group9->setPosition({548, 263});
-
-  auto textSpan9 = std::make_shared<TextSpan>();
-  textSpan9->setTextBlob(TextBlob::MakeFrom("Path Extension Test", font));
 
   auto textPath9 = std::make_shared<TextPath>();
   textPath9->setPath(shortPath);
   textPath9->setTextAlign(TextAlign::Center);
   textPath9->setPerpendicularToPath(true);
+  auto layer9 = makeTextPathLayer("Path Extension Test", textPath9, Color::Green(), {548, 263});
 
-  auto fill9 = MakeFillStyle(Color::Green());
-  group9->setElements({textSpan9, textPath9, fill9});
-
-  // Group 10: Closed path with text wrapping around
+  // Layer 10: Closed path with text wrapping around
   Path closedPath = {};
   closedPath.moveTo(240, 40);
   closedPath.cubicTo(340, 40, 340, 120, 240, 120);
   closedPath.cubicTo(140, 120, 140, 40, 240, 40);
   closedPath.close();
 
-  auto group10 = std::make_shared<VectorGroup>();
-  group10->setPosition({548, 363});
-
-  auto textSpan10 = std::make_shared<TextSpan>();
-  textSpan10->setTextBlob(TextBlob::MakeFrom("Closed Path Text Wrap", font));
-
   auto textPath10 = std::make_shared<TextPath>();
   textPath10->setPath(closedPath);
   textPath10->setTextAlign(TextAlign::Start);
-  textPath10->setFirstMargin(-80.0f);  // Negative margin to wrap around the closed path
+  textPath10->setFirstMargin(-80.0f);
   textPath10->setPerpendicularToPath(true);
+  auto layer10 = makeTextPathLayer("Closed Path Text Wrap", textPath10,
+                                   Color{0.5f, 0.0f, 0.5f, 1.0f}, {548, 363});
 
-  auto fill10 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
-  group10->setElements({textSpan10, textPath10, fill10});
-
-  // Group 11: Multiple TextSpans with nested transforms
-  auto group11 = std::make_shared<VectorGroup>();
-  group11->setPosition({448, 513});
+  // Layer 11: Multiple TextSpans with nested transforms
+  auto layer11 = VectorLayer::Make();
+  layer11->setPosition({448, 513});
 
   auto middleGroup11 = std::make_shared<VectorGroup>();
   middleGroup11->setScale({1.3f, 1.3f});
@@ -3052,96 +2994,83 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textSpan11b = std::make_shared<TextSpan>();
   textSpan11b->setTextBlob(TextBlob::MakeFrom("Spans", font));
 
-  auto textPath11 = std::make_shared<TextPath>();
-  textPath11->setPath(curvePath);
-  textPath11->setTextAlign(TextAlign::Center);
-  textPath11->setPerpendicularToPath(true);
-
-  auto fill11 = MakeFillStyle(Color{0.0f, 0.5f, 0.5f, 1.0f});  // Teal
-  innerGroup11->setElements({textSpan11a, textSpan11b, textPath11, fill11});
+  auto fill11 = MakeFillStyle(Color{0.0f, 0.5f, 0.5f, 1.0f});
+  innerGroup11->setElements({textSpan11a, textSpan11b, fill11});
   middleGroup11->setElements({innerGroup11});
 
   auto rotationGroup11 = std::make_shared<VectorGroup>();
   rotationGroup11->setAnchorPoint({350, 104});
   rotationGroup11->setPosition({350, 104});
   rotationGroup11->setRotation(15.0f);
-
   rotationGroup11->setElements({middleGroup11});
-  group11->setElements({rotationGroup11});
+
+  auto textPath11 = std::make_shared<TextPath>();
+  textPath11->setPath(curvePath);
+  textPath11->setTextAlign(TextAlign::Center);
+  textPath11->setPerpendicularToPath(true);
+
+  layer11->setContents({rotationGroup11});
+  layer11->setTextPath(textPath11);
 
   // ==================== Row 7: Edge cases for margin and alignment ====================
 
-  // Group 12: Justify alignment - letter spacing is adjusted to fit available region
-  auto group12 = std::make_shared<VectorGroup>();
-  group12->setPosition({58, 663});
-
-  auto textSpan12 = std::make_shared<TextSpan>();
-  textSpan12->setTextBlob(TextBlob::MakeFrom("Force+Center", font));
-
+  // Layer 12: Justify alignment
   auto textPath12 = std::make_shared<TextPath>();
   textPath12->setPath(curvePath);
   textPath12->setFirstMargin(30);
   textPath12->setLastMargin(-30);
   textPath12->setTextAlign(TextAlign::Justify);
   textPath12->setPerpendicularToPath(true);
+  auto layer12 =
+      makeTextPathLayer("Force+Center", textPath12, Color{0.8f, 0.2f, 0.2f, 1.0f}, {58, 663});
 
-  auto fill12 = MakeFillStyle(Color{0.8f, 0.2f, 0.2f, 1.0f});  // Dark red
-  group12->setElements({textSpan12, textPath12, fill12});
-
-  // Group 13: Negative spacing - firstMargin exceeds pathLength + lastMargin
-  auto group13 = std::make_shared<VectorGroup>();
-  group13->setPosition({58, 763});
-
-  auto textSpan13 = std::make_shared<TextSpan>();
-  textSpan13->setTextBlob(TextBlob::MakeFrom("Negative Spacing", font));
-
+  // Layer 13: Negative spacing
   auto textPath13 = std::make_shared<TextPath>();
   textPath13->setPath(curvePath);
-  textPath13->setFirstMargin(400);  // Exceeds path end
-  textPath13->setLastMargin(-350);  // Path length ~380, so 400 > 380 + (-350) = 30
+  textPath13->setFirstMargin(400);
+  textPath13->setLastMargin(-350);
   textPath13->setTextAlign(TextAlign::Justify);
   textPath13->setPerpendicularToPath(true);
+  auto layer13 =
+      makeTextPathLayer("Negative Spacing", textPath13, Color{0.2f, 0.2f, 0.8f, 1.0f}, {58, 763});
 
-  auto fill13 = MakeFillStyle(Color{0.2f, 0.2f, 0.8f, 1.0f});  // Dark blue
-  group13->setElements({textSpan13, textPath13, fill13});
-
-  // Group 14: Center align with both margins
-  auto group14 = std::make_shared<VectorGroup>();
-  group14->setPosition({548, 663});
-
-  auto textSpan14 = std::make_shared<TextSpan>();
-  textSpan14->setTextBlob(TextBlob::MakeFrom("Center+Margins", font));
-
+  // Layer 14: Center align with both margins
   auto textPath14 = std::make_shared<TextPath>();
   textPath14->setPath(curvePath);
   textPath14->setFirstMargin(40);
   textPath14->setLastMargin(-60);
   textPath14->setTextAlign(TextAlign::Center);
   textPath14->setPerpendicularToPath(true);
+  auto layer14 =
+      makeTextPathLayer("Center+Margins", textPath14, Color{0.2f, 0.6f, 0.2f, 1.0f}, {548, 663});
 
-  auto fill14 = MakeFillStyle(Color{0.2f, 0.6f, 0.2f, 1.0f});  // Dark green
-  group14->setElements({textSpan14, textPath14, fill14});
-
-  // Group 15: End align with lastMargin
-  auto group15 = std::make_shared<VectorGroup>();
-  group15->setPosition({548, 763});
-
-  auto textSpan15 = std::make_shared<TextSpan>();
-  textSpan15->setTextBlob(TextBlob::MakeFrom("End+LastMargin", font));
-
+  // Layer 15: End align with lastMargin
   auto textPath15 = std::make_shared<TextPath>();
   textPath15->setPath(curvePath);
   textPath15->setLastMargin(-80);
   textPath15->setTextAlign(TextAlign::End);
   textPath15->setPerpendicularToPath(true);
+  auto layer15 =
+      makeTextPathLayer("End+LastMargin", textPath15, Color{0.6f, 0.4f, 0.0f, 1.0f}, {548, 763});
 
-  auto fill15 = MakeFillStyle(Color{0.6f, 0.4f, 0.0f, 1.0f});  // Brown
-  group15->setElements({textSpan15, textPath15, fill15});
+  // Add all layers to root
+  rootLayer->addChild(layer1);
+  rootLayer->addChild(layer2);
+  rootLayer->addChild(layer3);
+  rootLayer->addChild(layer4);
+  rootLayer->addChild(layer5);
+  rootLayer->addChild(layer6);
+  rootLayer->addChild(layer7);
+  rootLayer->addChild(layer8);
+  rootLayer->addChild(layer9);
+  rootLayer->addChild(layer10);
+  rootLayer->addChild(layer11);
+  rootLayer->addChild(layer12);
+  rootLayer->addChild(layer13);
+  rootLayer->addChild(layer14);
+  rootLayer->addChild(layer15);
 
-  vectorLayer->setContents({group1, group2, group3, group4, group5, group6, group7, group8, group9,
-                            group10, group11, group12, group13, group14, group15});
-
-  displayList->root()->addChild(vectorLayer);
+  displayList->root()->addChild(rootLayer);
   displayList->render(surface.get());
 
   // Draw helper paths after rendering
@@ -3171,7 +3100,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   }
 
   // Column 2 helper paths
-  // Row 1 (group7): Second Override
+  // Row 1 (layer7): Second Override
   canvas->save();
   canvas->translate(548, 63);
   pathPaint.setColor(Color::Blue());
@@ -3184,28 +3113,28 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   canvas->drawPath(largerCurvePath, pathPaint);
   canvas->restore();
 
-  // Row 2 (group8): Group Transform
+  // Row 2 (layer8): Group Transform
   canvas->save();
   canvas->translate(548, 163);
   pathPaint.setColor(Color::Red());
   canvas->drawPath(curvePath, pathPaint);
   canvas->restore();
 
-  // Row 3 (group9): Path Extension
+  // Row 3 (layer9): Path Extension
   canvas->save();
   canvas->translate(548, 263);
   pathPaint.setColor(Color::Green());
   canvas->drawPath(shortPath, pathPaint);
   canvas->restore();
 
-  // Row 4 (group10): Closed Path
+  // Row 4 (layer10): Closed Path
   canvas->save();
   canvas->translate(548, 363);
   pathPaint.setColor(Color{0.5f, 0.0f, 0.5f, 1.0f});
   canvas->drawPath(closedPath, pathPaint);
   canvas->restore();
 
-  // Row 5 (group11): Deep Nested
+  // Row 5 (layer11): Deep Nested
   canvas->save();
   canvas->translate(548, 533);
   pathPaint.setColor(Color{0.0f, 0.5f, 0.5f, 1.0f});
@@ -3213,14 +3142,14 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   canvas->restore();
 
   // Row 7 Column 2 helper paths
-  // Group 14: Center+Margins
+  // Layer 14: Center+Margins
   canvas->save();
   canvas->translate(548, 663);
   pathPaint.setColor(Color{0.2f, 0.6f, 0.2f, 1.0f});
   canvas->drawPath(curvePath, pathPaint);
   canvas->restore();
 
-  // Group 15: End+LastMargin
+  // Layer 15: End+LastMargin
   canvas->save();
   canvas->translate(548, 763);
   pathPaint.setColor(Color{0.6f, 0.4f, 0.0f, 1.0f});
@@ -3228,105 +3157,6 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   canvas->restore();
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextPath"));
-}
-
-/**
- * Test combinations of TextPath (text modifier) and TrimPath (path modifier):
- * - Row 1: TextPath then TrimPath - text is laid out along path first, then trimmed as shapes
- * - Row 2: TrimPath then TextPath - TrimPath converts text to shapes and trims them,
- *          TextPath finds no text to layout (already converted)
- */
-TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 518, 460);
-  auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-
-  auto displayList = std::make_unique<DisplayList>();
-  auto vectorLayer = VectorLayer::Make();
-
-  auto typeface = GetTestTypeface();
-  if (typeface == nullptr) {
-    return;
-  }
-  Font font(typeface, 32);
-  font.setFauxBold(true);
-
-  Path curvePath = {};
-  curvePath.moveTo(40, 60);
-  curvePath.cubicTo(140, -60, 340, 180, 440, 60);
-
-  // Group 1: TextPath then TrimPath
-  // Text is first laid out along the path (glyphs positioned on curve),
-  // then TrimPath trims each glyph shape (Separate mode)
-  auto group1 = std::make_shared<VectorGroup>();
-  group1->setPosition({28, 110});
-
-  auto textSpan1 = std::make_shared<TextSpan>();
-  textSpan1->setTextBlob(TextBlob::MakeFrom("TextPath+TrimPath", font));
-
-  auto textPath1 = std::make_shared<TextPath>();
-  textPath1->setPath(curvePath);
-  textPath1->setTextAlign(TextAlign::Start);
-  textPath1->setPerpendicularToPath(true);
-
-  auto trim1 = std::make_shared<TrimPath>();
-  trim1->setStart(0.0f);
-  trim1->setEnd(0.95f);
-  trim1->setTrimType(TrimPathType::Separate);
-
-  auto fill1 = MakeFillStyle(Color::Blue());
-  group1->setElements({textSpan1, textPath1, trim1, fill1});
-
-  // Group 2: TrimPath then TextPath
-  // TrimPath runs first, converts text to shapes (at original position) and trims from 5% to 100%.
-  // TextPath then runs but finds no text to layout (already converted to shapes by TrimPath).
-  // Result: text is trimmed at original position, not laid out along path.
-  auto group2 = std::make_shared<VectorGroup>();
-  group2->setPosition({28, 230});
-
-  auto textSpan2 = std::make_shared<TextSpan>();
-  textSpan2->setTextBlob(TextBlob::MakeFrom("TrimPath+TextPath", font));
-  textSpan2->setPosition({150, 40});
-
-  auto trim2 = std::make_shared<TrimPath>();
-  trim2->setStart(0.05f);
-  trim2->setEnd(1.0f);
-  trim2->setTrimType(TrimPathType::Separate);
-
-  auto textPath2 = std::make_shared<TextPath>();
-  textPath2->setPath(curvePath);
-  textPath2->setTextAlign(TextAlign::Start);
-  textPath2->setPerpendicularToPath(true);
-
-  auto fill2 = MakeFillStyle(Color::Red());
-  group2->setElements({textSpan2, trim2, textPath2, fill2});
-
-  vectorLayer->setContents({group1, group2});
-
-  displayList->root()->addChild(vectorLayer);
-  displayList->render(surface.get());
-
-  // Draw helper paths
-  Paint pathPaint = {};
-  pathPaint.setStyle(PaintStyle::Stroke);
-  pathPaint.setStrokeWidth(1.0f);
-
-  canvas->save();
-  canvas->translate(28, 110);
-  pathPaint.setColor(Color{0.7f, 0.7f, 1.0f, 1.0f});
-  canvas->drawPath(curvePath, pathPaint);
-  canvas->restore();
-
-  canvas->save();
-  canvas->translate(28, 230);
-  pathPaint.setColor(Color{1.0f, 0.7f, 0.7f, 1.0f});
-  canvas->drawPath(curvePath, pathPaint);
-  canvas->restore();
-
-  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextPathWithTrimPath"));
 }
 
 // ==================== TextModifier and TextSelector Tests ====================
@@ -3348,7 +3178,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   canvas->clear(Color::White());
 
   auto displayList = std::make_unique<DisplayList>();
-  auto vectorLayer = VectorLayer::Make();
+  auto rootLayer = Layer::Make();
 
   auto typeface = GetTestTypeface();
   if (typeface == nullptr) {
@@ -3358,152 +3188,135 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   Font boldFont(typeface, 28);
   boldFont.setFauxBold(true);
 
-  std::vector<std::shared_ptr<VectorGroup>> groups = {};
+  // Helper to create a VectorLayer with TextModifier
+  auto makeModifierLayer =
+      [](const std::string& text, const Font& f, std::shared_ptr<TextModifier> modifier,
+         std::shared_ptr<VectorElement> style, Point position) -> std::shared_ptr<VectorLayer> {
+    auto layer = VectorLayer::Make();
+    layer->setPosition(position);
+    auto textSpan = std::make_shared<TextSpan>();
+    textSpan->setTextBlob(TextBlob::MakeFrom(text, f));
+    layer->setContents({textSpan, style});
+    layer->setTextModifiers({modifier});
+    return layer;
+  };
 
   // ==================== Column 1: Transform properties ====================
   float col1X = 50;
   float rowHeight = 75;
 
   // Row 1: Position
-  auto group1 = std::make_shared<VectorGroup>();
-  group1->setPosition({col1X, 86});
-  auto textSpan1 = std::make_shared<TextSpan>();
-  textSpan1->setTextBlob(TextBlob::MakeFrom("Position", font));
   auto selector1 = std::make_shared<RangeSelector>();
   selector1->setShape(SelectorShape::RampUp);
   auto modifier1 = std::make_shared<TextModifier>();
   modifier1->setSelectors({selector1});
   modifier1->setPosition({0, -20});
-  group1->setElements({textSpan1, modifier1, MakeFillStyle(Color::Blue())});
-  groups.push_back(group1);
+  auto layer1 =
+      makeModifierLayer("Position", font, modifier1, MakeFillStyle(Color::Blue()), {col1X, 86});
 
   // Row 2: Scale (non-uniform)
-  auto group2 = std::make_shared<VectorGroup>();
-  group2->setPosition({col1X, 86 + rowHeight});
-  auto textSpan2 = std::make_shared<TextSpan>();
-  textSpan2->setTextBlob(TextBlob::MakeFrom("Scale", font));
   auto selector2 = std::make_shared<RangeSelector>();
   selector2->setShape(SelectorShape::Triangle);
   auto modifier2 = std::make_shared<TextModifier>();
   modifier2->setSelectors({selector2});
   modifier2->setScale({2.0f, 0.5f});
-  group2->setElements({textSpan2, modifier2, MakeFillStyle(Color::Red())});
-  groups.push_back(group2);
+  auto layer2 = makeModifierLayer("Scale", font, modifier2, MakeFillStyle(Color::Red()),
+                                  {col1X, 86 + rowHeight});
 
   // Row 3: Rotation
-  auto group3 = std::make_shared<VectorGroup>();
-  group3->setPosition({col1X, 86 + rowHeight * 2});
-  auto textSpan3 = std::make_shared<TextSpan>();
-  textSpan3->setTextBlob(TextBlob::MakeFrom("Rotation", font));
   auto selector3 = std::make_shared<RangeSelector>();
   selector3->setShape(SelectorShape::Square);
   auto modifier3 = std::make_shared<TextModifier>();
   modifier3->setSelectors({selector3});
   modifier3->setRotation(45);
-  group3->setElements({textSpan3, modifier3, MakeFillStyle(Color::Green())});
-  groups.push_back(group3);
+  auto layer3 = makeModifierLayer("Rotation", font, modifier3, MakeFillStyle(Color::Green()),
+                                  {col1X, 86 + rowHeight * 2});
 
   // Row 4: Alpha (intermediate value 0.5)
-  auto group4 = std::make_shared<VectorGroup>();
-  group4->setPosition({col1X, 86 + rowHeight * 3});
-  auto textSpan4 = std::make_shared<TextSpan>();
-  textSpan4->setTextBlob(TextBlob::MakeFrom("Alpha", font));
   auto selector4 = std::make_shared<RangeSelector>();
   selector4->setShape(SelectorShape::RampDown);
   auto modifier4 = std::make_shared<TextModifier>();
   modifier4->setSelectors({selector4});
   modifier4->setAlpha(0.5f);
-  group4->setElements({textSpan4, modifier4, MakeFillStyle(Color::Black())});
-  groups.push_back(group4);
+  auto layer4 = makeModifierLayer("Alpha", font, modifier4, MakeFillStyle(Color::Black()),
+                                  {col1X, 86 + rowHeight * 3});
 
   // Row 5: Skew
-  auto group5 = std::make_shared<VectorGroup>();
-  group5->setPosition({col1X, 86 + rowHeight * 4});
-  auto textSpan5 = std::make_shared<TextSpan>();
-  textSpan5->setTextBlob(TextBlob::MakeFrom("Skew", font));
   auto selector5 = std::make_shared<RangeSelector>();
   selector5->setShape(SelectorShape::Triangle);
   auto modifier5 = std::make_shared<TextModifier>();
   modifier5->setSelectors({selector5});
   modifier5->setSkew(30);
   modifier5->setSkewAxis(45);
-  group5->setElements({textSpan5, modifier5, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
-  groups.push_back(group5);
+  auto layer5 =
+      makeModifierLayer("Skew", font, modifier5, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255)),
+                        {col1X, 86 + rowHeight * 4});
 
   // Row 6: AnchorPoint
-  auto group6 = std::make_shared<VectorGroup>();
-  group6->setPosition({col1X, 86 + rowHeight * 5});
-  auto textSpan6 = std::make_shared<TextSpan>();
-  textSpan6->setTextBlob(TextBlob::MakeFrom("AnchorPoint", font));
   auto selector6 = std::make_shared<RangeSelector>();
   selector6->setShape(SelectorShape::RampUp);
   auto modifier6 = std::make_shared<TextModifier>();
   modifier6->setSelectors({selector6});
   modifier6->setAnchorPoint({0, 15});
   modifier6->setRotation(30);
-  group6->setElements({textSpan6, modifier6, MakeFillStyle(Color::FromRGBA(255, 128, 0, 255))});
-  groups.push_back(group6);
+  auto layer6 = makeModifierLayer("AnchorPoint", font, modifier6,
+                                  MakeFillStyle(Color::FromRGBA(255, 128, 0, 255)),
+                                  {col1X, 86 + rowHeight * 5});
 
   // ==================== Column 2: Style overrides ====================
   float col2X = 244;
 
   // Row 1: FillColor
-  auto group7 = std::make_shared<VectorGroup>();
-  group7->setPosition({col2X, 86});
-  auto textSpan7 = std::make_shared<TextSpan>();
-  textSpan7->setTextBlob(TextBlob::MakeFrom("FillColor", boldFont));
   auto selector7 = std::make_shared<RangeSelector>();
   selector7->setShape(SelectorShape::RampDown);
   auto modifier7 = std::make_shared<TextModifier>();
   modifier7->setSelectors({selector7});
   modifier7->setFillColor(Color::Red());
-  group7->setElements({textSpan7, modifier7, MakeFillStyle(Color::Blue())});
-  groups.push_back(group7);
+  auto layer7 = makeModifierLayer("FillColor", boldFont, modifier7, MakeFillStyle(Color::Blue()),
+                                  {col2X, 86});
 
   // Row 2: StrokeColor
-  auto group8 = std::make_shared<VectorGroup>();
-  group8->setPosition({col2X, 86 + rowHeight});
-  auto textSpan8 = std::make_shared<TextSpan>();
-  textSpan8->setTextBlob(TextBlob::MakeFrom("StrokeColor", boldFont));
   auto selector8 = std::make_shared<RangeSelector>();
   selector8->setShape(SelectorShape::Triangle);
   auto modifier8 = std::make_shared<TextModifier>();
   modifier8->setSelectors({selector8});
   modifier8->setStrokeColor(Color::Red());
-  group8->setElements({textSpan8, modifier8, MakeStrokeStyle(Color::Blue(), 2)});
-  groups.push_back(group8);
+  auto layer8 = makeModifierLayer("StrokeColor", boldFont, modifier8,
+                                  MakeStrokeStyle(Color::Blue(), 2), {col2X, 86 + rowHeight});
 
   // Row 3: StrokeWidth
-  auto group9 = std::make_shared<VectorGroup>();
-  group9->setPosition({col2X, 86 + rowHeight * 2});
-  auto textSpan9 = std::make_shared<TextSpan>();
-  textSpan9->setTextBlob(TextBlob::MakeFrom("StrokeWidth", boldFont));
   auto selector9 = std::make_shared<RangeSelector>();
   selector9->setShape(SelectorShape::RampUp);
   auto modifier9 = std::make_shared<TextModifier>();
   modifier9->setSelectors({selector9});
   modifier9->setStrokeWidth(6);
-  group9->setElements({textSpan9, modifier9, MakeStrokeStyle(Color::Green(), 1)});
-  groups.push_back(group9);
+  auto layer9 = makeModifierLayer("StrokeWidth", boldFont, modifier9,
+                                  MakeStrokeStyle(Color::Green(), 1), {col2X, 86 + rowHeight * 2});
 
   // Row 4: Fill+Stroke
-  auto group10 = std::make_shared<VectorGroup>();
-  group10->setPosition({col2X, 86 + rowHeight * 3});
-  auto textSpan10 = std::make_shared<TextSpan>();
-  textSpan10->setTextBlob(TextBlob::MakeFrom("Fill+Stroke", boldFont));
   auto selector10 = std::make_shared<RangeSelector>();
   selector10->setShape(SelectorShape::RampUp);
   auto modifier10 = std::make_shared<TextModifier>();
   modifier10->setSelectors({selector10});
   modifier10->setFillColor(Color::Red());
   modifier10->setStrokeColor(Color::Green());
-  group10->setElements({textSpan10, modifier10, MakeFillStyle(Color::Blue()),
-                        MakeStrokeStyle(Color(0.5f, 0.5f, 0.5f), 2)});
-  groups.push_back(group10);
+  auto layer10 = VectorLayer::Make();
+  layer10->setPosition({col2X, 86 + rowHeight * 3});
+  auto textSpan10 = std::make_shared<TextSpan>();
+  textSpan10->setTextBlob(TextBlob::MakeFrom("Fill+Stroke", boldFont));
+  layer10->setContents(
+      {textSpan10, MakeFillStyle(Color::Blue()), MakeStrokeStyle(Color(0.5f, 0.5f, 0.5f), 2)});
+  layer10->setTextModifiers({modifier10});
 
   // Row 5: MultiSpan
-  auto group11 = std::make_shared<VectorGroup>();
-  group11->setPosition({col2X, 86 + rowHeight * 4});
+  auto selector11 = std::make_shared<RangeSelector>();
+  selector11->setShape(SelectorShape::RampUp);
+  auto modifier11 = std::make_shared<TextModifier>();
+  modifier11->setSelectors({selector11});
+  modifier11->setPosition({0, -20});
+  modifier11->setFillColor(Color::Red());
+  auto layer11 = VectorLayer::Make();
+  layer11->setPosition({col2X, 86 + rowHeight * 4});
   auto textSpanA = std::make_shared<TextSpan>();
   textSpanA->setTextBlob(TextBlob::MakeFrom("AB", font));
   auto textSpanB = std::make_shared<TextSpan>();
@@ -3512,20 +3325,10 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   auto textSpanC = std::make_shared<TextSpan>();
   textSpanC->setTextBlob(TextBlob::MakeFrom("EF", font));
   textSpanC->setPosition({110, 0});
-  auto selector11 = std::make_shared<RangeSelector>();
-  selector11->setShape(SelectorShape::RampUp);
-  auto modifier11 = std::make_shared<TextModifier>();
-  modifier11->setSelectors({selector11});
-  modifier11->setPosition({0, -20});
-  modifier11->setFillColor(Color::Red());
-  group11->setElements({textSpanA, textSpanB, textSpanC, modifier11, MakeFillStyle(Color::Blue())});
-  groups.push_back(group11);
+  layer11->setContents({textSpanA, textSpanB, textSpanC, MakeFillStyle(Color::Blue())});
+  layer11->setTextModifiers({modifier11});
 
   // Row 6: Multiple Modifiers stacking
-  auto group12 = std::make_shared<VectorGroup>();
-  group12->setPosition({col2X, 86 + rowHeight * 5});
-  auto textSpan12 = std::make_shared<TextSpan>();
-  textSpan12->setTextBlob(TextBlob::MakeFrom("MultiMod", font));
   auto selectorA = std::make_shared<RangeSelector>();
   selectorA->setStart(0.0f);
   selectorA->setEnd(0.5f);
@@ -3538,9 +3341,12 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   auto modifierB = std::make_shared<TextModifier>();
   modifierB->setSelectors({selectorB});
   modifierB->setRotation(15);
-  group12->setElements(
-      {textSpan12, modifierA, modifierB, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
-  groups.push_back(group12);
+  auto layer12 = VectorLayer::Make();
+  layer12->setPosition({col2X, 86 + rowHeight * 5});
+  auto textSpan12 = std::make_shared<TextSpan>();
+  textSpan12->setTextBlob(TextBlob::MakeFrom("MultiMod", font));
+  layer12->setContents({textSpan12, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
+  layer12->setTextModifiers({modifierA, modifierB});
 
   // ==================== Column 3: Shape comparison ====================
   float col3X = 470;
@@ -3549,56 +3355,42 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
       {SelectorShape::RampDown, "RampDown"}, {SelectorShape::Triangle, "Triangle"},
       {SelectorShape::Round, "Round"},       {SelectorShape::Smooth, "Smooth"}};
 
+  std::vector<std::shared_ptr<VectorLayer>> shapeLayers = {};
   for (size_t i = 0; i < shapes.size(); i++) {
-    auto group = std::make_shared<VectorGroup>();
-    group->setPosition({col3X, 86 + rowHeight * static_cast<float>(i)});
-    auto textSpan = std::make_shared<TextSpan>();
-    textSpan->setTextBlob(TextBlob::MakeFrom(shapes[i].second, font));
     auto selector = std::make_shared<RangeSelector>();
     selector->setShape(shapes[i].first);
     auto modifier = std::make_shared<TextModifier>();
     modifier->setSelectors({selector});
     modifier->setPosition({0, -15});
-    group->setElements({textSpan, modifier, MakeFillStyle(Color::Blue())});
-    groups.push_back(group);
+    auto layer = makeModifierLayer(shapes[i].second, font, modifier, MakeFillStyle(Color::Blue()),
+                                   {col3X, 86 + rowHeight * static_cast<float>(i)});
+    shapeLayers.push_back(layer);
   }
 
   // ==================== Column 4: RangeSelector properties ====================
   float col4X = 680;
 
   // Row 1: EaseIn (Triangle + EaseIn)
-  auto groupEL = std::make_shared<VectorGroup>();
-  groupEL->setPosition({col4X, 86});
-  auto textSpanEL = std::make_shared<TextSpan>();
-  textSpanEL->setTextBlob(TextBlob::MakeFrom("EaseIn", font));
   auto selectorEL = std::make_shared<RangeSelector>();
   selectorEL->setShape(SelectorShape::Triangle);
   selectorEL->setEaseIn(0.8f);
   auto modifierEL = std::make_shared<TextModifier>();
   modifierEL->setSelectors({selectorEL});
   modifierEL->setPosition({0, -15});
-  groupEL->setElements({textSpanEL, modifierEL, MakeFillStyle(Color::Blue())});
-  groups.push_back(groupEL);
+  auto layerEL =
+      makeModifierLayer("EaseIn", font, modifierEL, MakeFillStyle(Color::Blue()), {col4X, 86});
 
   // Row 2: EaseOut (Triangle + EaseOut)
-  auto groupEH = std::make_shared<VectorGroup>();
-  groupEH->setPosition({col4X, 86 + rowHeight});
-  auto textSpanEH = std::make_shared<TextSpan>();
-  textSpanEH->setTextBlob(TextBlob::MakeFrom("EaseOut", font));
   auto selectorEH = std::make_shared<RangeSelector>();
   selectorEH->setShape(SelectorShape::Triangle);
   selectorEH->setEaseOut(0.8f);
   auto modifierEH = std::make_shared<TextModifier>();
   modifierEH->setSelectors({selectorEH});
   modifierEH->setPosition({0, -15});
-  groupEH->setElements({textSpanEH, modifierEH, MakeFillStyle(Color::Red())});
-  groups.push_back(groupEH);
+  auto layerEH = makeModifierLayer("EaseOut", font, modifierEH, MakeFillStyle(Color::Red()),
+                                   {col4X, 86 + rowHeight});
 
   // Row 3: EaseBoth (Triangle + EaseOut + EaseIn)
-  auto groupEB = std::make_shared<VectorGroup>();
-  groupEB->setPosition({col4X, 86 + rowHeight * 2});
-  auto textSpanEB = std::make_shared<TextSpan>();
-  textSpanEB->setTextBlob(TextBlob::MakeFrom("EaseBoth", font));
   auto selectorEB = std::make_shared<RangeSelector>();
   selectorEB->setShape(SelectorShape::Triangle);
   selectorEB->setEaseOut(0.6f);
@@ -3606,14 +3398,10 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   auto modifierEB = std::make_shared<TextModifier>();
   modifierEB->setSelectors({selectorEB});
   modifierEB->setPosition({0, -15});
-  groupEB->setElements({textSpanEB, modifierEB, MakeFillStyle(Color::Green())});
-  groups.push_back(groupEB);
+  auto layerEB = makeModifierLayer("EaseBoth", font, modifierEB, MakeFillStyle(Color::Green()),
+                                   {col4X, 86 + rowHeight * 2});
 
   // Row 4: Unit (Index)
-  auto groupUnit = std::make_shared<VectorGroup>();
-  groupUnit->setPosition({col4X, 86 + rowHeight * 3});
-  auto textSpanUnit = std::make_shared<TextSpan>();
-  textSpanUnit->setTextBlob(TextBlob::MakeFrom("ABCDEFGH", font));
   auto selectorUnit = std::make_shared<RangeSelector>();
   selectorUnit->setUnit(SelectorUnit::Index);
   selectorUnit->setStart(2);
@@ -3621,14 +3409,10 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   auto modifierUnit = std::make_shared<TextModifier>();
   modifierUnit->setSelectors({selectorUnit});
   modifierUnit->setFillColor(Color::Red());
-  groupUnit->setElements({textSpanUnit, modifierUnit, MakeFillStyle(Color::Blue())});
-  groups.push_back(groupUnit);
+  auto layerUnit = makeModifierLayer("ABCDEFGH", font, modifierUnit, MakeFillStyle(Color::Blue()),
+                                     {col4X, 86 + rowHeight * 3});
 
   // Row 5: Negative Offset
-  auto groupOff = std::make_shared<VectorGroup>();
-  groupOff->setPosition({col4X, 86 + rowHeight * 4});
-  auto textSpanOff = std::make_shared<TextSpan>();
-  textSpanOff->setTextBlob(TextBlob::MakeFrom("NegOffset", font));
   auto selectorOff = std::make_shared<RangeSelector>();
   selectorOff->setStart(0.5f);
   selectorOff->setEnd(1.0f);
@@ -3636,31 +3420,23 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   auto modifierOff = std::make_shared<TextModifier>();
   modifierOff->setSelectors({selectorOff});
   modifierOff->setFillColor(Color::Green());
-  groupOff->setElements({textSpanOff, modifierOff, MakeFillStyle(Color::Blue())});
-  groups.push_back(groupOff);
+  auto layerOff = makeModifierLayer("NegOffset", font, modifierOff, MakeFillStyle(Color::Blue()),
+                                    {col4X, 86 + rowHeight * 4});
 
   // Row 6: Reversed (Start > End)
-  auto groupRev = std::make_shared<VectorGroup>();
-  groupRev->setPosition({col4X, 86 + rowHeight * 5});
-  auto textSpanRev = std::make_shared<TextSpan>();
-  textSpanRev->setTextBlob(TextBlob::MakeFrom("Reversed", font));
   auto selectorRev = std::make_shared<RangeSelector>();
   selectorRev->setStart(0.7f);
   selectorRev->setEnd(0.3f);
   auto modifierRev = std::make_shared<TextModifier>();
   modifierRev->setSelectors({selectorRev});
   modifierRev->setFillColor(Color::FromRGBA(255, 128, 0, 255));
-  groupRev->setElements({textSpanRev, modifierRev, MakeFillStyle(Color::Blue())});
-  groups.push_back(groupRev);
+  auto layerRev = makeModifierLayer("Reversed", font, modifierRev, MakeFillStyle(Color::Blue()),
+                                    {col4X, 86 + rowHeight * 5});
 
   // ==================== Column 5: Edge cases ====================
   float col5X = 910;
 
   // Row 1: Random
-  auto groupRnd = std::make_shared<VectorGroup>();
-  groupRnd->setPosition({col5X, 86});
-  auto textSpanRnd = std::make_shared<TextSpan>();
-  textSpanRnd->setTextBlob(TextBlob::MakeFrom("Random", font));
   auto selectorRnd = std::make_shared<RangeSelector>();
   selectorRnd->setShape(SelectorShape::RampUp);
   selectorRnd->setRandomizeOrder(true);
@@ -3668,56 +3444,64 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   auto modifierRnd = std::make_shared<TextModifier>();
   modifierRnd->setSelectors({selectorRnd});
   modifierRnd->setPosition({0, -12});
-  groupRnd->setElements(
-      {textSpanRnd, modifierRnd, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
-  groups.push_back(groupRnd);
+  auto layerRnd = makeModifierLayer("Random", font, modifierRnd,
+                                    MakeFillStyle(Color::FromRGBA(128, 0, 128, 255)), {col5X, 86});
 
   // Row 2: Empty selector
-  auto groupEmpty = std::make_shared<VectorGroup>();
-  groupEmpty->setPosition({col5X, 86 + rowHeight});
-  auto textSpanEmpty = std::make_shared<TextSpan>();
-  textSpanEmpty->setTextBlob(TextBlob::MakeFrom("Empty", font));
   auto modifierEmpty = std::make_shared<TextModifier>();
   modifierEmpty->setPosition({0, -10});
-  groupEmpty->setElements({textSpanEmpty, modifierEmpty, MakeFillStyle(Color::Black())});
-  groups.push_back(groupEmpty);
+  auto layerEmpty = makeModifierLayer("Empty", font, modifierEmpty, MakeFillStyle(Color::Black()),
+                                      {col5X, 86 + rowHeight});
 
   // Row 3: Start == End boundary
-  auto groupSE = std::make_shared<VectorGroup>();
-  groupSE->setPosition({col5X, 86 + rowHeight * 2});
-  auto textSpanSE = std::make_shared<TextSpan>();
-  textSpanSE->setTextBlob(TextBlob::MakeFrom("StartEnd", font));
   auto selectorSE = std::make_shared<RangeSelector>();
   selectorSE->setStart(0.5f);
   selectorSE->setEnd(0.5f);
   auto modifierSE = std::make_shared<TextModifier>();
   modifierSE->setSelectors({selectorSE});
   modifierSE->setFillColor(Color::Red());
-  groupSE->setElements({textSpanSE, modifierSE, MakeFillStyle(Color::Black())});
-  groups.push_back(groupSE);
+  auto layerSE = makeModifierLayer("StartEnd", font, modifierSE, MakeFillStyle(Color::Black()),
+                                   {col5X, 86 + rowHeight * 2});
 
   // Row 4: First selector uses Subtract mode
-  auto groupSub = std::make_shared<VectorGroup>();
-  groupSub->setPosition({col5X, 86 + rowHeight * 3});
-  auto textSpanSub = std::make_shared<TextSpan>();
-  textSpanSub->setTextBlob(TextBlob::MakeFrom("SubFirst", font));
   auto selectorSub = std::make_shared<RangeSelector>();
   selectorSub->setMode(SelectorMode::Subtract);
   selectorSub->setShape(SelectorShape::Triangle);
   auto modifierSub = std::make_shared<TextModifier>();
   modifierSub->setSelectors({selectorSub});
   modifierSub->setPosition({0, -15});
-  groupSub->setElements(
-      {textSpanSub, modifierSub, MakeFillStyle(Color::FromRGBA(255, 128, 0, 255))});
-  groups.push_back(groupSub);
+  auto layerSub = makeModifierLayer("SubFirst", font, modifierSub,
+                                    MakeFillStyle(Color::FromRGBA(255, 128, 0, 255)),
+                                    {col5X, 86 + rowHeight * 3});
 
-  std::vector<std::shared_ptr<VectorElement>> contents = {};
-  for (const auto& group : groups) {
-    contents.push_back(group);
+  // Add all layers to root
+  rootLayer->addChild(layer1);
+  rootLayer->addChild(layer2);
+  rootLayer->addChild(layer3);
+  rootLayer->addChild(layer4);
+  rootLayer->addChild(layer5);
+  rootLayer->addChild(layer6);
+  rootLayer->addChild(layer7);
+  rootLayer->addChild(layer8);
+  rootLayer->addChild(layer9);
+  rootLayer->addChild(layer10);
+  rootLayer->addChild(layer11);
+  rootLayer->addChild(layer12);
+  for (const auto& layer : shapeLayers) {
+    rootLayer->addChild(layer);
   }
-  vectorLayer->setContents(contents);
+  rootLayer->addChild(layerEL);
+  rootLayer->addChild(layerEH);
+  rootLayer->addChild(layerEB);
+  rootLayer->addChild(layerUnit);
+  rootLayer->addChild(layerOff);
+  rootLayer->addChild(layerRev);
+  rootLayer->addChild(layerRnd);
+  rootLayer->addChild(layerEmpty);
+  rootLayer->addChild(layerSE);
+  rootLayer->addChild(layerSub);
 
-  displayList->root()->addChild(vectorLayer);
+  displayList->root()->addChild(rootLayer);
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextModifier"));
@@ -3737,7 +3521,7 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
   canvas->clear(Color::White());
 
   auto displayList = std::make_unique<DisplayList>();
-  auto vectorLayer = VectorLayer::Make();
+  auto rootLayer = Layer::Make();
 
   auto typeface = GetTestTypeface();
   if (typeface == nullptr) {
@@ -3745,14 +3529,14 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
   }
   Font font(typeface, 22);
 
-  std::vector<std::shared_ptr<VectorGroup>> groups = {};
   float rowHeight = 65;
   float col1X = 50;
   float col2X = 270;
 
-  // Helper to create a baseline reference line
-  auto makeBaseline = [](float width) {
-    auto group = std::make_shared<VectorGroup>();
+  // Helper to create a baseline VectorLayer with a reference line
+  auto makeBaselineLayer = [](float width, Point position) {
+    auto layer = VectorLayer::Make();
+    layer->setPosition(position);
     Path linePath = {};
     linePath.moveTo(0, 0);
     linePath.lineTo(width, 0);
@@ -3760,8 +3544,8 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     shapePath->setPath(linePath);
     auto stroke = std::make_shared<StrokeStyle>();
     stroke->setColorSource(SolidColor::Make(Color{0.8f, 0.8f, 0.8f}));
-    group->setElements({shapePath, stroke});
-    return group;
+    layer->setContents({shapePath, stroke});
+    return layer;
   };
 
   // ==================== Column 1: Modes with two overlapping selectors ====================
@@ -3774,16 +3558,13 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     float y = 84 + rowHeight * static_cast<float>(i);
 
     // Baseline reference line
-    auto baseline = makeBaseline(105);
-    baseline->setPosition({col1X, y});
-    groups.push_back(baseline);
+    rootLayer->addChild(makeBaselineLayer(105, {col1X, y}));
 
-    auto group = std::make_shared<VectorGroup>();
-    group->setPosition({col1X, y});
+    auto layer = VectorLayer::Make();
+    layer->setPosition({col1X, y});
     auto textSpan = std::make_shared<TextSpan>();
     textSpan->setTextBlob(TextBlob::MakeFrom(modes[i].second, font));
 
-    // Each string has 8-10 chars
     // Selector1: first 60% with Square shape, weight=0.6
     auto selector1 = std::make_shared<RangeSelector>();
     selector1->setShape(SelectorShape::Square);
@@ -3803,8 +3584,9 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     modifier->setSelectors({selector1, selector2});
     modifier->setPosition({0, -20});
 
-    group->setElements({textSpan, modifier, MakeFillStyle(Color::Blue())});
-    groups.push_back(group);
+    layer->setContents({textSpan, MakeFillStyle(Color::Blue())});
+    layer->setTextModifiers({modifier});
+    rootLayer->addChild(layer);
   }
 
   // ==================== Column 2: Weight variations ====================
@@ -3818,12 +3600,10 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     float y = 84 + rowHeight * static_cast<float>(i);
 
     // Baseline reference line
-    auto baseline = makeBaseline(130);
-    baseline->setPosition({col2X, y});
-    groups.push_back(baseline);
+    rootLayer->addChild(makeBaselineLayer(130, {col2X, y}));
 
-    auto group = std::make_shared<VectorGroup>();
-    group->setPosition({col2X, y});
+    auto layer = VectorLayer::Make();
+    layer->setPosition({col2X, y});
     auto textSpan = std::make_shared<TextSpan>();
     textSpan->setTextBlob(TextBlob::MakeFrom(weights[i].second, font));
 
@@ -3835,20 +3615,19 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     modifier->setSelectors({selector});
     modifier->setPosition({0, -20});
 
-    group->setElements({textSpan, modifier, MakeFillStyle(Color::Red())});
-    groups.push_back(group);
+    layer->setContents({textSpan, MakeFillStyle(Color::Red())});
+    layer->setTextModifiers({modifier});
+    rootLayer->addChild(layer);
   }
 
   // ==================== Column 2 Row 6: Edge cases ====================
   // Row 6: Three selectors combination
   {
     float y = 84 + rowHeight * 5;
-    auto baseline = makeBaseline(130);
-    baseline->setPosition({col2X, y});
-    groups.push_back(baseline);
+    rootLayer->addChild(makeBaselineLayer(130, {col2X, y}));
 
-    auto group = std::make_shared<VectorGroup>();
-    group->setPosition({col2X, y});
+    auto layer = VectorLayer::Make();
+    layer->setPosition({col2X, y});
     auto textSpan = std::make_shared<TextSpan>();
     textSpan->setTextBlob(TextBlob::MakeFrom("ThreeSels", font));
 
@@ -3879,17 +3658,12 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     modifier->setSelectors({selector1, selector2, selector3});
     modifier->setPosition({0, -20});
 
-    group->setElements({textSpan, modifier, MakeFillStyle(Color::Green())});
-    groups.push_back(group);
+    layer->setContents({textSpan, MakeFillStyle(Color::Green())});
+    layer->setTextModifiers({modifier});
+    rootLayer->addChild(layer);
   }
 
-  std::vector<std::shared_ptr<VectorElement>> contents = {};
-  for (const auto& group : groups) {
-    contents.push_back(group);
-  }
-  vectorLayer->setContents(contents);
-
-  displayList->root()->addChild(vectorLayer);
+  displayList->root()->addChild(rootLayer);
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextSelector"));
