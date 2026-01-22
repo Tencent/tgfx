@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeshImpl.h"
+#include <new>
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
@@ -53,7 +54,7 @@ std::shared_ptr<Mesh> MeshImpl::Make(MeshTopology topology, int vertexCount, con
   const auto numIndices = static_cast<size_t>(indexCount);
 
   auto memorySize = CalculateMemorySize(numVertices, numIndices, hasTexCoords, hasColors);
-  auto memory = ::operator new(memorySize);
+  auto memory = ::operator new(memorySize, std::nothrow);
   if (memory == nullptr) {
     return nullptr;
   }
