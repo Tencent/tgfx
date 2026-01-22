@@ -40,7 +40,6 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
 
   varyingHandler->emitAttributes(*this);
 
-  // Add view matrix uniform
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
 
@@ -50,7 +49,7 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
                            matrixName.c_str(), position.name().c_str());
 
   // Handle texture coordinates
-  if (_hasTexCoords) {
+  if (hasTexCoords) {
     auto texCoordVar = varyingHandler->addVarying("TexCoord", SLType::Float2);
     vertBuilder->codeAppendf("%s = %s;", texCoordVar.vsOut().c_str(), texCoord.name().c_str());
 
@@ -58,15 +57,13 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
     emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(texCoord));
   }
 
-  // Handle vertex colors
-  if (_hasColors) {
+  if (hasColors) {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
     vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
 
     // Output vertex color (will be modulated by FragmentProcessor if texCoords present)
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
   } else {
-    // Use uniform color
     auto colorName =
         uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
@@ -75,7 +72,6 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
   // No coverage for mesh (no anti-aliasing)
   fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
 
-  // Emit the vertex position to the hardware
   vertBuilder->emitNormalizedPosition(positionName);
 }
 
@@ -84,13 +80,13 @@ void GLSLMeshGeometryProcessor::setData(UniformData* vertexUniformData,
                                         FPCoordTransformIter* transformIter) const {
   vertexUniformData->setData("Matrix", viewMatrix);
 
-  if (_hasTexCoords) {
+  if (hasTexCoords) {
     // Use identity matrix since texCoords are in pixel space, CoordTransform handles normalization
     setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
   }
 
-  if (!_hasColors) {
-    fragmentUniformData->setData("Color", _color);
+  if (!hasColors) {
+    fragmentUniformData->setData("Color", commonColor);
   }
 }
 

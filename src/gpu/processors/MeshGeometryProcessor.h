@@ -43,13 +43,13 @@ class MeshGeometryProcessor : public GeometryProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  Attribute position;
-  Attribute texCoord;
-  Attribute color;
+  Attribute position = {};
+  Attribute texCoord = {};
+  Attribute color = {};
 
-  bool _hasTexCoords = false;
-  bool _hasColors = false;
-  PMColor _color = PMColor::Transparent();
+  bool hasTexCoords = false;
+  bool hasColors = false;
+  PMColor commonColor = {};
   Matrix viewMatrix = {};
 };
 

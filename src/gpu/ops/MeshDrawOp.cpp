@@ -60,7 +60,7 @@ void MeshDrawOp::onDraw(RenderPass* renderPass) {
       return;
     }
     renderPass->setIndexBuffer(indexBuffer, IndexFormat::UInt16);
-    renderPass->drawIndexed(primitiveType, static_cast<uint32_t>(impl.indexCount()), 1, 0);
+    renderPass->drawIndexed(primitiveType, static_cast<uint32_t>(impl.indexCount()));
   } else {
     renderPass->draw(primitiveType, static_cast<uint32_t>(impl.vertexCount()));
   }
