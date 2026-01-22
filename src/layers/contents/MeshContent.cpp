@@ -38,9 +38,6 @@ Rect MeshContent::getTightBounds(const Matrix& matrix) const {
 }
 
 bool MeshContent::hitTestPoint(float localX, float localY) const {
-  if (color.alpha <= 0) {
-    return false;
-  }
   return mesh->bounds().contains(localX, localY);
 }
 

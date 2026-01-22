@@ -24,8 +24,7 @@
 namespace tgfx {
 
 /**
- * Uploads mesh vertex data to GPU.
- * Buffer layout: [interleaved vertex data (position + texCoord + color)]
+ * Uploads mesh vertex data to GPU with interleaved layout (position + texCoord + color).
  */
 class MeshVertexBufferUploadTask : public ResourceTask {
  public:
@@ -39,9 +38,6 @@ class MeshVertexBufferUploadTask : public ResourceTask {
   std::shared_ptr<GPUMeshProxy> meshProxy = nullptr;
 };
 
-/**
- * Uploads mesh index data to GPU.
- */
 class MeshIndexBufferUploadTask : public ResourceTask {
  public:
   MeshIndexBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,

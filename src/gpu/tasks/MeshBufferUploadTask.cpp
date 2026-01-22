@@ -35,16 +35,11 @@ std::shared_ptr<Resource> MeshVertexBufferUploadTask::onMakeResource(Context* co
   }
 
   const auto& impl = MeshImpl::ReadAccess(*meshProxy->mesh());
+  size_t vertexDataSize = impl.getVertexStride() * static_cast<size_t>(impl.vertexCount());
 
-  // Calculate vertex buffer size
-  size_t vertexStride = impl.getVertexStride();
-  size_t vertexDataSize = vertexStride * static_cast<size_t>(impl.vertexCount());
-
-  // Allocate temporary buffer
+  // Allocate temporary buffer and write interleaved vertex data
   auto buffer = std::make_unique<uint8_t[]>(vertexDataSize);
   uint8_t* ptr = buffer.get();
-
-  // Write interleaved vertex data
   for (auto i = 0; i < impl.vertexCount(); ++i) {
     // Position (float2)
     memcpy(ptr, &impl.positions()[i], sizeof(Point));
@@ -64,7 +59,6 @@ std::shared_ptr<Resource> MeshVertexBufferUploadTask::onMakeResource(Context* co
     }
   }
 
-  // Create GPU vertex buffer
   auto gpu = context->gpu();
   auto gpuBuffer = gpu->createBuffer(vertexDataSize, GPUBufferUsage::VERTEX);
   if (!gpuBuffer) {
@@ -93,10 +87,7 @@ std::shared_ptr<Resource> MeshIndexBufferUploadTask::onMakeResource(Context* con
     return nullptr;
   }
 
-  // Calculate index buffer size
   size_t indexDataSize = sizeof(uint16_t) * static_cast<size_t>(impl.indexCount());
-
-  // Create GPU index buffer
   auto gpu = context->gpu();
   auto gpuBuffer = gpu->createBuffer(indexDataSize, GPUBufferUsage::INDEX);
   if (!gpuBuffer) {

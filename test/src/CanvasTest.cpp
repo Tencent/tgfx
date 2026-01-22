@@ -1436,12 +1436,11 @@ TGFX_TEST(CanvasTest, DrawMesh_TextureOnly) {
   auto imageWidth = static_cast<float>(image->width());
   auto imageHeight = static_cast<float>(image->height());
 
-  // Create a quad with texture coordinates (no vertex colors)
-  Point positions[] = {{50, 50}, {150, 50}, {150, 150}, {50, 50}, {150, 150}, {50, 150}};
-  Point texCoords[] = {{0, 0}, {imageWidth, 0},           {imageWidth, imageHeight},
-                       {0, 0}, {imageWidth, imageHeight}, {0, imageHeight}};
+  // Create a quad with TriangleStrip topology (no vertex colors)
+  Point positions[] = {{50, 50}, {150, 50}, {50, 150}, {150, 150}};
+  Point texCoords[] = {{0, 0}, {imageWidth, 0}, {0, imageHeight}, {imageWidth, imageHeight}};
 
-  auto mesh = Mesh::MakeCopy(MeshTopology::Triangles, 6, positions, nullptr, texCoords);
+  auto mesh = Mesh::MakeCopy(MeshTopology::TriangleStrip, 4, positions, nullptr, texCoords);
   ASSERT_TRUE(mesh != nullptr);
 
   Paint paint = {};
@@ -1465,17 +1464,16 @@ TGFX_TEST(CanvasTest, DrawMesh_TextureAndColors) {
   auto imageWidth = static_cast<float>(image->width());
   auto imageHeight = static_cast<float>(image->height());
 
-  // Create a quad with both texture coordinates and vertex colors
+  // Create a quad with indices, texture coordinates and vertex colors
   // The result should be texture * vertexColor (Modulate blend)
-  Point positions[] = {{50, 50}, {150, 50}, {150, 150}, {50, 50}, {150, 150}, {50, 150}};
-  Point texCoords[] = {{0, 0}, {imageWidth, 0},           {imageWidth, imageHeight},
-                       {0, 0}, {imageWidth, imageHeight}, {0, imageHeight}};
+  Point positions[] = {{50, 50}, {150, 50}, {150, 150}, {50, 150}};
+  Point texCoords[] = {{0, 0}, {imageWidth, 0}, {imageWidth, imageHeight}, {0, imageHeight}};
   // Use semi-transparent colors to modulate the texture
   Color colors[] = {Color::FromRGBA(255, 0, 0, 128), Color::FromRGBA(0, 255, 0, 128),
-                    Color::FromRGBA(0, 0, 255, 128), Color::FromRGBA(255, 0, 0, 128),
                     Color::FromRGBA(0, 0, 255, 128), Color::FromRGBA(255, 255, 0, 128)};
+  uint16_t indices[] = {0, 1, 2, 0, 2, 3};
 
-  auto mesh = Mesh::MakeCopy(MeshTopology::Triangles, 6, positions, colors, texCoords);
+  auto mesh = Mesh::MakeCopy(MeshTopology::Triangles, 4, positions, colors, texCoords, 6, indices);
   ASSERT_TRUE(mesh != nullptr);
 
   Paint paint = {};
