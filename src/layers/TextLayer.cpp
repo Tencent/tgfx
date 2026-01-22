@@ -392,13 +392,13 @@ void TextLayer::resolveTextAlignment(const std::vector<std::shared_ptr<GlyphLine
 
     if (_width != 0.0f) {
       switch (_textAlign) {
-        case TextAlign::Left:
+        case TextAlign::Start:
           // do nothing
           break;
         case TextAlign::Center:
           xOffset = (_width - lineWidth) / 2.0f;
           break;
-        case TextAlign::Right:
+        case TextAlign::End:
           xOffset = _width - lineWidth;
           break;
         case TextAlign::Justify: {

@@ -21,26 +21,26 @@
 #include <stack>
 #include <vector>
 #include "Layer3DContext.h"
-#include "layers/ContourContext.h"
+#include "layers/OpaqueContext.h"
 
 namespace tgfx {
 
-struct ContourImageEntry {
+struct OpaqueImageEntry {
   std::shared_ptr<Image> image = nullptr;
   Matrix3D transform = {};
 };
 
 /**
- * Simplified 3D context for contour rendering. Unlike Render3DContext, this class does not
- * perform complex depth sorting or clipping. It simply applies 3D transforms to each layer
- * and draws them in order.
+ * Simplified 3D context for opaque content/contour rendering. Unlike Render3DContext, this class
+ * does not perform complex depth sorting or clipping. It simply applies 3D transforms to each
+ * layer and draws them in order.
  */
-class Contour3DContext : public Layer3DContext {
+class Opaque3DContext : public Layer3DContext {
  public:
-  Contour3DContext(const Rect& renderRect, float contentScale,
-                   std::shared_ptr<ColorSpace> colorSpace);
+  Opaque3DContext(const Rect& renderRect, float contentScale,
+                  std::shared_ptr<ColorSpace> colorSpace);
 
-  ContourContext* currentContourContext() override;
+  OpaqueContext* currentOpaqueContext() override;
   void finishAndDrawTo(Canvas* canvas, bool antialiasing) override;
 
  protected:
@@ -50,8 +50,8 @@ class Contour3DContext : public Layer3DContext {
                     const Point& pictureOffset, bool antialiasing) override;
 
  private:
-  std::stack<ContourContext> _contourStack = {};
-  std::vector<ContourImageEntry> _contourImages = {};
+  std::stack<OpaqueContext> _opaqueStack = {};
+  std::vector<OpaqueImageEntry> _opaqueImages = {};
 };
 
 }  // namespace tgfx

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ContourContext.h"
+#include "OpaqueContext.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/StrokeUtils.h"
 #include "layers/OpaqueThreshold.h"
@@ -24,31 +24,31 @@
 
 namespace tgfx {
 
-class PendingContourAutoReset {
+class PendingOpaqueAutoReset {
  public:
-  PendingContourAutoReset(ContourContext* context, const ContourContext::Contour& contour,
-                          MCState state, Brush brush)
+  PendingOpaqueAutoReset(OpaqueContext* context, const OpaqueContext::Contour& contour,
+                         MCState state, Brush brush)
       : context(context), contour(contour), state(std::move(state)), brush(std::move(brush)) {
   }
 
-  ~PendingContourAutoReset() {
+  ~PendingOpaqueAutoReset() {
     context->resetPendingContour(contour, state, brush);
   }
 
  private:
-  ContourContext* context = nullptr;
-  ContourContext::Contour contour;
+  OpaqueContext* context = nullptr;
+  OpaqueContext::Contour contour;
   MCState state;
   Brush brush;
 };
 
-ContourContext::ContourContext() {
+OpaqueContext::OpaqueContext() {
   contourBounds.reserve(3);
 }
 
-ContourContext::~ContourContext() = default;
+OpaqueContext::~OpaqueContext() = default;
 
-Canvas* ContourContext::beginRecording() {
+Canvas* OpaqueContext::beginRecording() {
   if (canvas == nullptr) {
     canvas = std::unique_ptr<Canvas>(new Canvas(this));
   } else {
@@ -62,34 +62,32 @@ Canvas* ContourContext::beginRecording() {
   return canvas.get();
 }
 
-void ContourContext::drawFill(const Brush& brush) {
+void OpaqueContext::drawFill(const Brush& brush) {
   static Contour FillContour = Contour(Contour::Type::Fill);
   drawContour(FillContour, {}, brush);
 }
 
-void ContourContext::drawRect(const Rect& rect, const MCState& state, const Brush& brush,
-                              const Stroke* stroke) {
+void OpaqueContext::drawRect(const Rect& rect, const MCState& state, const Brush& brush,
+                             const Stroke* stroke) {
   drawContour(Contour(rect, stroke), state, brush);
 }
 
-void ContourContext::drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
-                               const Stroke* stroke) {
+void OpaqueContext::drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
+                              const Stroke* stroke) {
   drawContour(Contour(rRect, stroke), state, brush);
 }
 
-void ContourContext::drawPath(const Path& path, const MCState& state, const Brush& brush) {
+void OpaqueContext::drawPath(const Path& path, const MCState& state, const Brush& brush) {
   drawContour(Contour(path), state, brush);
 }
 
-void ContourContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                               const Brush& brush, const Stroke* stroke) {
+void OpaqueContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                              const Brush& brush, const Stroke* stroke) {
   drawContour(Contour(std::move(shape), stroke), state, brush);
 }
 
-void ContourContext::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state,
-                              const Brush& brush) {
-  auto bounds = mesh->bounds();
-  bounds = state.matrix.mapRect(bounds);
+void OpaqueContext::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush) {
+  auto bounds = state.matrix.mapRect(mesh->bounds());
   if (containContourBound(bounds)) {
     return;
   }
@@ -97,17 +95,17 @@ void ContourContext::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state,
   pictureContext.drawMesh(std::move(mesh), state, brush);
 }
 
-void ContourContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                               const MCState& state, const Brush& brush) {
+void OpaqueContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                              const MCState& state, const Brush& brush) {
   auto newBrush = brush;
   newBrush.shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, sampling);
   drawRect(Rect::MakeWH(image->width(), image->height()), state, newBrush, nullptr);
 }
 
-void ContourContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
-                                   const Rect& dstRect, const SamplingOptions& sampling,
-                                   const MCState& state, const Brush& brush,
-                                   SrcRectConstraint constraint) {
+void OpaqueContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
+                                  const Rect& dstRect, const SamplingOptions& sampling,
+                                  const MCState& state, const Brush& brush,
+                                  SrcRectConstraint constraint) {
   if (constraint != SrcRectConstraint::Strict) {
     auto newState = state;
     newState.matrix.preConcat(MakeRectToRectMatrix(srcRect, dstRect));
@@ -127,8 +125,8 @@ void ContourContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src
   pictureContext.drawImageRect(image, srcRect, dstRect, sampling, state, brush, constraint);
 }
 
-void ContourContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
-                                  const Brush& brush, const Stroke* stroke) {
+void OpaqueContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
+                                 const Brush& brush, const Stroke* stroke) {
   auto bounds = textBlob->getBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &bounds, state.matrix);
@@ -140,13 +138,12 @@ void ContourContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCSt
   pictureContext.drawTextBlob(textBlob, state, brush, stroke);
 }
 
-void ContourContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
+void OpaqueContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
   picture->playback(this, state);
 }
 
-void ContourContext::drawLayer(std::shared_ptr<Picture> picture,
-                               std::shared_ptr<ImageFilter> filter, const MCState& state,
-                               const Brush& brush) {
+void OpaqueContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
+                              const MCState& state, const Brush& brush) {
   if (brush.nothingToDraw()) {
     return;
   }
@@ -168,7 +165,7 @@ void ContourContext::drawLayer(std::shared_ptr<Picture> picture,
   pictureContext.drawLayer(picture, filter, state, brush);
 }
 
-void ContourContext::drawContour(const Contour& contour, const MCState& state, const Brush& brush) {
+void OpaqueContext::drawContour(const Contour& contour, const MCState& state, const Brush& brush) {
   if (canAppend(contour, state, brush)) {
     appendFill(brush);
     return;
@@ -176,7 +173,7 @@ void ContourContext::drawContour(const Contour& contour, const MCState& state, c
   flushPendingContour(contour, state, brush);
 }
 
-bool ContourContext::containContourBound(const Rect& bounds) const {
+bool OpaqueContext::containContourBound(const Rect& bounds) const {
   return bounds.isEmpty() || std::any_of(contourBounds.begin(), contourBounds.end(),
                                          [&](const Rect& rect) { return rect.contains(bounds); });
 }
@@ -195,7 +192,7 @@ Rect GetMaxOverlapRect(const Rect& rect1, const Rect& rect2) {
   return Rect::MakeEmpty();
 }
 
-void ContourContext::mergeContourBound(const Rect& bounds) {
+void OpaqueContext::mergeContourBound(const Rect& bounds) {
   if (contourBounds.size() < 3) {
     contourBounds.emplace_back(bounds);
     if (contourBounds.size() == 3) {
@@ -231,16 +228,16 @@ void ContourContext::mergeContourBound(const Rect& bounds) {
             [](const Rect& a, const Rect& b) { return a.area() > b.area(); });
 }
 
-std::shared_ptr<Picture> ContourContext::finishRecordingAsPicture() {
+std::shared_ptr<Picture> OpaqueContext::finishRecordingAsPicture() {
   flushPendingContour();
   return pictureContext.finishRecordingAsPicture();
 }
 
-bool ContourContext::containsOpaqueBounds(const Rect& bounds) const {
+bool OpaqueContext::containsOpaqueBounds(const Rect& bounds) const {
   return containContourBound(bounds);
 }
 
-bool ContourContext::canAppend(const Contour& contour, const MCState& state, const Brush& brush) {
+bool OpaqueContext::canAppend(const Contour& contour, const MCState& state, const Brush& brush) {
   if (state.clip != pendingState.clip || state.matrix != pendingState.matrix) {
     return false;
   }
@@ -260,9 +257,9 @@ Rect GetGlobalBounds(const MCState& state, const Rect& localBounds) {
   return globalBounds;
 }
 
-void ContourContext::flushPendingContour(const Contour& contour, const MCState& state,
-                                         const Brush& brush) {
-  PendingContourAutoReset autoReset(this, contour, state, brush);
+void OpaqueContext::flushPendingContour(const Contour& contour, const MCState& state,
+                                        const Brush& brush) {
+  PendingOpaqueAutoReset autoReset(this, contour, state, brush);
   if (pendingContour.type == Contour::Type::None) {
     return;
   }
@@ -296,35 +293,39 @@ void ContourContext::flushPendingContour(const Contour& contour, const MCState& 
   }
 }
 
-Brush GetContourBrush(const Brush& brush) {
+/**
+ * Converts a brush to "opaque mode" by applying AlphaThreshold filter.
+ * Semi-transparent pixels become fully opaque, while fully transparent pixels remain transparent.
+ */
+Brush GetOpaqueBrush(const Brush& brush) {
   Color color;
   if (brush.shader && !brush.shader->asColor(&color)) {
-    auto contourBrush = brush;
-    contourBrush.colorFilter = ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD);
-    return contourBrush;
+    auto opaqueBrush = brush;
+    opaqueBrush.colorFilter = ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD);
+    return opaqueBrush;
   }
   // Src + coverage AA may cause edge artifacts, use SrcOver instead.
-  auto contourBrush = Brush(Color::White(), BlendMode::SrcOver, brush.antiAlias);
-  contourBrush.maskFilter = brush.maskFilter;
-  return contourBrush;
+  auto opaqueBrush = Brush(Color::White(), BlendMode::SrcOver, brush.antiAlias);
+  opaqueBrush.maskFilter = brush.maskFilter;
+  return opaqueBrush;
 }
 
-void ContourContext::appendFill(const Brush& brush) {
+void OpaqueContext::appendFill(const Brush& brush) {
   auto& pendingShader = pendingBrushes.back().shader;
   if (pendingShader == nullptr) {
     return;
   }
-  pendingBrushes.emplace_back(GetContourBrush(brush));
+  pendingBrushes.emplace_back(GetOpaqueBrush(brush));
 }
 
-void ContourContext::resetPendingContour(const Contour& contour, const MCState& state,
-                                         const Brush& brush) {
+void OpaqueContext::resetPendingContour(const Contour& contour, const MCState& state,
+                                        const Brush& brush) {
   pendingContour = contour;
   pendingState = state;
-  pendingBrushes = {GetContourBrush(brush)};
+  pendingBrushes = {GetOpaqueBrush(brush)};
 }
 
-bool ContourContext::Contour::isInverseFillType() const {
+bool OpaqueContext::Contour::isInverseFillType() const {
   if (type < Type::Path) {
     return false;
   }
@@ -334,7 +335,7 @@ bool ContourContext::Contour::isInverseFillType() const {
   return shape->isInverseFillType();
 }
 
-Rect ContourContext::Contour::getBounds() const {
+Rect OpaqueContext::Contour::getBounds() const {
   switch (type) {
     case Type::Fill: {
       return Rect::MakeLTRB(-FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MAX);
@@ -357,8 +358,8 @@ Rect ContourContext::Contour::getBounds() const {
   return Rect::MakeEmpty();
 }
 
-void ContourContext::Contour::draw(PictureContext& context, const MCState& state,
-                                   const Brush& brush) const {
+void OpaqueContext::Contour::draw(PictureContext& context, const MCState& state,
+                                  const Brush& brush) const {
   const Stroke* strokePtr = hasStroke ? &stroke : nullptr;
   switch (type) {
     case Type::Fill: {
@@ -386,7 +387,7 @@ void ContourContext::Contour::draw(PictureContext& context, const MCState& state
   }
 }
 
-bool ContourContext::Contour::operator==(const Contour& other) const {
+bool OpaqueContext::Contour::operator==(const Contour& other) const {
   if (type != other.type || hasStroke != other.hasStroke) {
     return false;
   }
@@ -408,7 +409,7 @@ bool ContourContext::Contour::operator==(const Contour& other) const {
   return true;
 }
 
-ContourContext::Contour& ContourContext::Contour::operator=(const Contour& other) {
+OpaqueContext::Contour& OpaqueContext::Contour::operator=(const Contour& other) {
   if (this == &other) return *this;
   switch (type) {
     case Type::Path:

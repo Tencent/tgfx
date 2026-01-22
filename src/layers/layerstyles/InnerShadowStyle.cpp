@@ -82,18 +82,17 @@ Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   return filter->filterBounds(srcRect);
 }
 
-void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> contour, float contentScale,
+void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                               float alpha, BlendMode blendMode) {
-  // create opaque image
   auto filter = getShadowFilter(contentScale);
   if (!filter) {
     return;
   }
-  contour = contour->makeWithFilter(filter);
+  content = content->makeWithFilter(filter);
   Paint paint = {};
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
-  canvas->drawImage(contour, &paint);
+  canvas->drawImage(content, &paint);
 }
 
 std::shared_ptr<ImageFilter> InnerShadowStyle::getShadowFilter(float scale) {
