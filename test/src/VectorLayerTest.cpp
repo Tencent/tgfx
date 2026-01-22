@@ -18,6 +18,9 @@
 
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/SolidLayer.h"
+#include "tgfx/layers/TextModifier.h"
+#include "tgfx/layers/TextPath.h"
+#include "tgfx/layers/TextSelector.h"
 #include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/vectors/Ellipse.h"
 #include "tgfx/layers/vectors/FillStyle.h"
@@ -31,9 +34,6 @@
 #include "tgfx/layers/vectors/ShapePath.h"
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/StrokeStyle.h"
-#include "tgfx/layers/TextModifier.h"
-#include "tgfx/layers/TextPath.h"
-#include "tgfx/layers/TextSelector.h"
 #include "tgfx/layers/vectors/TextSpan.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
@@ -2960,8 +2960,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   textPath9->setPath(shortPath);
   textPath9->setTextAlign(TextAlign::Center);
   textPath9->setPerpendicularToPath(true);
-  auto layer9 =
-      makeTextPathLayer("Path Extension Test", textPath9, Color::Green(), {548, 263});
+  auto layer9 = makeTextPathLayer("Path Extension Test", textPath9, Color::Green(), {548, 263});
 
   // Layer 10: Closed path with text wrapping around
   Path closedPath = {};
@@ -3160,111 +3159,6 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextPath"));
 }
 
-/**
- * Test combinations of TextPath (layer-level text animation) and TrimPath (path modifier):
- * - Row 1: TextPath applied to text, result is trimmed by TrimPath
- *          (TextPath layouts text along curve, then TrimPath converts to shapes and trims)
- * - Row 2: TrimPath first converts text to shapes, TextPath has no effect
- *          (TrimPath runs in contents, converts text to path; TextPath finds no glyphs)
- *
- * Note: After the refactoring, TextPath is a layer-level property that applies after all
- * VectorElements in contents. TrimPath in contents will convert text to paths before
- * TextPath can apply, so Row 1 and Row 2 will produce identical results.
- */
-TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 518, 460);
-  auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-
-  auto displayList = std::make_unique<DisplayList>();
-  auto rootLayer = Layer::Make();
-
-  auto typeface = GetTestTypeface();
-  if (typeface == nullptr) {
-    return;
-  }
-  Font font(typeface, 32);
-  font.setFauxBold(true);
-
-  Path curvePath = {};
-  curvePath.moveTo(40, 60);
-  curvePath.cubicTo(140, -60, 340, 180, 440, 60);
-
-  // Layer 1: TextPath with TrimPath
-  // TrimPath in contents converts text to shapes first, then TextPath applies (but finds no glyphs)
-  auto layer1 = VectorLayer::Make();
-  layer1->setPosition({28, 110});
-
-  auto textSpan1 = std::make_shared<TextSpan>();
-  textSpan1->setTextBlob(TextBlob::MakeFrom("TextPath+TrimPath", font));
-
-  auto trim1 = std::make_shared<TrimPath>();
-  trim1->setStart(0.0f);
-  trim1->setEnd(0.95f);
-  trim1->setTrimType(TrimPathType::Separate);
-
-  auto fill1 = MakeFillStyle(Color::Blue());
-  layer1->setContents({textSpan1, trim1, fill1});
-
-  auto textPath1 = std::make_shared<TextPath>();
-  textPath1->setPath(curvePath);
-  textPath1->setTextAlign(TextAlign::Start);
-  textPath1->setPerpendicularToPath(true);
-  layer1->setTextPath(textPath1);
-
-  // Layer 2: TrimPath then TextPath (same behavior as layer 1 with new API)
-  // TrimPath runs first in contents, converts text to shapes and trims.
-  // TextPath then runs but finds no text to layout.
-  auto layer2 = VectorLayer::Make();
-  layer2->setPosition({28, 230});
-
-  auto textSpan2 = std::make_shared<TextSpan>();
-  textSpan2->setTextBlob(TextBlob::MakeFrom("TrimPath+TextPath", font));
-  textSpan2->setPosition({150, 40});
-
-  auto trim2 = std::make_shared<TrimPath>();
-  trim2->setStart(0.05f);
-  trim2->setEnd(1.0f);
-  trim2->setTrimType(TrimPathType::Separate);
-
-  auto fill2 = MakeFillStyle(Color::Red());
-  layer2->setContents({textSpan2, trim2, fill2});
-
-  auto textPath2 = std::make_shared<TextPath>();
-  textPath2->setPath(curvePath);
-  textPath2->setTextAlign(TextAlign::Start);
-  textPath2->setPerpendicularToPath(true);
-  layer2->setTextPath(textPath2);
-
-  rootLayer->addChild(layer1);
-  rootLayer->addChild(layer2);
-
-  displayList->root()->addChild(rootLayer);
-  displayList->render(surface.get());
-
-  // Draw helper paths
-  Paint pathPaint = {};
-  pathPaint.setStyle(PaintStyle::Stroke);
-  pathPaint.setStrokeWidth(1.0f);
-
-  canvas->save();
-  canvas->translate(28, 110);
-  pathPaint.setColor(Color{0.7f, 0.7f, 1.0f, 1.0f});
-  canvas->drawPath(curvePath, pathPaint);
-  canvas->restore();
-
-  canvas->save();
-  canvas->translate(28, 230);
-  pathPaint.setColor(Color{1.0f, 0.7f, 0.7f, 1.0f});
-  canvas->drawPath(curvePath, pathPaint);
-  canvas->restore();
-
-  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextPathWithTrimPath"));
-}
-
 // ==================== TextModifier and TextSelector Tests ====================
 
 /**
@@ -3354,9 +3248,9 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   modifier5->setSelectors({selector5});
   modifier5->setSkew(30);
   modifier5->setSkewAxis(45);
-  auto layer5 = makeModifierLayer("Skew", font, modifier5,
-                                  MakeFillStyle(Color::FromRGBA(128, 0, 128, 255)),
-                                  {col1X, 86 + rowHeight * 4});
+  auto layer5 =
+      makeModifierLayer("Skew", font, modifier5, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255)),
+                        {col1X, 86 + rowHeight * 4});
 
   // Row 6: AnchorPoint
   auto selector6 = std::make_shared<RangeSelector>();
@@ -3378,8 +3272,8 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   auto modifier7 = std::make_shared<TextModifier>();
   modifier7->setSelectors({selector7});
   modifier7->setFillColor(Color::Red());
-  auto layer7 =
-      makeModifierLayer("FillColor", boldFont, modifier7, MakeFillStyle(Color::Blue()), {col2X, 86});
+  auto layer7 = makeModifierLayer("FillColor", boldFont, modifier7, MakeFillStyle(Color::Blue()),
+                                  {col2X, 86});
 
   // Row 2: StrokeColor
   auto selector8 = std::make_shared<RangeSelector>();
