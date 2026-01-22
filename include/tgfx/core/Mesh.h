@@ -50,7 +50,8 @@ class Mesh {
   /**
    * Creates a Mesh by copying the provided vertex data.
    * @param topology How vertices are organized into triangles.
-   * @param vertexCount Number of vertices (must be > 0).
+   * @param vertexCount Number of vertices (must be > 0, and must not exceed 65536 when using
+   *                    indices since indices are 16-bit).
    * @param positions Vertex positions (required).
    * @param colors Per-vertex colors (optional).
    * @param texCoords Texture coordinates in pixel space (e.g., [0, imageWidth] x [0, imageHeight]),
