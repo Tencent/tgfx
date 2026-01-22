@@ -119,7 +119,7 @@ class TextSelector : public LayerProperty {
    * @param totalCount The total number of characters.
    * @return The selection factor for this character.
    */
-  virtual float calculateFactor(size_t index, size_t totalCount) const = 0;
+  virtual float calculateFactor(size_t index, size_t totalCount) = 0;
 
   /**
    * Returns how this selector combines with previous selectors.
@@ -162,7 +162,7 @@ class RangeSelector : public TextSelector {
  public:
   RangeSelector() = default;
 
-  float calculateFactor(size_t index, size_t totalCount) const override;
+  float calculateFactor(size_t index, size_t totalCount) override;
 
   /**
    * Returns the start of the selection range.
@@ -282,6 +282,8 @@ class RangeSelector : public TextSelector {
   float _easeIn = 0.0f;
   bool _randomizeOrder = false;
   uint16_t _randomSeed = 0;
+
+  std::vector<size_t> _randomIndicesCache = {};
 };
 
 }  // namespace tgfx
