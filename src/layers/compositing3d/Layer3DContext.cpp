@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Layer3DContext.h"
-#include "Contour3DContext.h"
+#include "Opaque3DContext.h"
 #include "Render3DContext.h"
 #include "core/Matrix3DUtils.h"
 #include "core/utils/Log.h"
@@ -27,11 +27,11 @@
 namespace tgfx {
 
 std::shared_ptr<Layer3DContext> Layer3DContext::Make(
-    bool contourMode, Context* context, const Rect& renderRect, float contentScale,
+    bool opaqueMode, Context* context, const Rect& renderRect, float contentScale,
     std::shared_ptr<ColorSpace> colorSpace, std::shared_ptr<BackgroundContext> backgroundContext) {
-  if (contourMode) {
+  if (opaqueMode) {
     DEBUG_ASSERT(backgroundContext == nullptr);
-    return std::make_shared<Contour3DContext>(renderRect, contentScale, std::move(colorSpace));
+    return std::make_shared<Opaque3DContext>(renderRect, contentScale, std::move(colorSpace));
   }
   auto compositor = std::make_shared<Context3DCompositor>(
       *context, static_cast<int>(renderRect.width()), static_cast<int>(renderRect.height()));
