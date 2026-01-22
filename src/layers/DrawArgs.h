@@ -25,7 +25,7 @@
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
-class ContourContext;
+class OpaqueContext;
 
 enum class DrawMode { Normal, Background };
 
@@ -77,7 +77,7 @@ class DrawArgs {
   // through the Compositor and do not need to be drawn to the Canvas.
   std::shared_ptr<Layer3DContext> render3DContext = nullptr;
 
-  // The contour context to be used during contour drawing. Note: this could be nullptr.
-  ContourContext* contourContext = nullptr;
+  // The opaque context to be used during opaque content/contour recording. Note: this could be nullptr.
+  OpaqueContext* opaqueContext = nullptr;
 };
 }  // namespace tgfx
