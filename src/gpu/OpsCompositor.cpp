@@ -240,7 +240,7 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
   }
 
   auto meshProxy = proxyProvider()->createGPUMeshProxy(mesh, renderFlags);
-  auto drawOp = MeshDrawOp::Make(std::move(meshProxy), gpColor, state.matrix, getAAType(brush));
+  auto drawOp = MeshDrawOp::Make(std::move(meshProxy), gpColor, state.matrix);
   if (drawOp == nullptr) {
     return;
   }

@@ -22,17 +22,17 @@
 namespace tgfx {
 
 PlacementPtr<MeshDrawOp> MeshDrawOp::Make(std::shared_ptr<GPUMeshProxy> meshProxy, PMColor color,
-                                          const Matrix& viewMatrix, AAType aaType) {
+                                          const Matrix& viewMatrix) {
   if (meshProxy == nullptr) {
     return nullptr;
   }
   auto allocator = meshProxy->getContext()->drawingAllocator();
-  return allocator->make<MeshDrawOp>(allocator, std::move(meshProxy), color, viewMatrix, aaType);
+  return allocator->make<MeshDrawOp>(allocator, std::move(meshProxy), color, viewMatrix);
 }
 
 MeshDrawOp::MeshDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUMeshProxy> meshProxy,
-                       PMColor color, const Matrix& viewMatrix, AAType aaType)
-    : DrawOp(allocator, aaType), meshProxy(std::move(meshProxy)), color(color),
+                       PMColor color, const Matrix& viewMatrix)
+    : DrawOp(allocator, AAType::None), meshProxy(std::move(meshProxy)), color(color),
       viewMatrix(viewMatrix) {
 }
 

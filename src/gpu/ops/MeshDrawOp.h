@@ -26,7 +26,7 @@ namespace tgfx {
 class MeshDrawOp : public DrawOp {
  public:
   static PlacementPtr<MeshDrawOp> Make(std::shared_ptr<GPUMeshProxy> meshProxy, PMColor color,
-                                       const Matrix& viewMatrix, AAType aaType);
+                                       const Matrix& viewMatrix);
 
   bool hasCoverage() const override {
     return false;
@@ -43,7 +43,7 @@ class MeshDrawOp : public DrawOp {
 
  private:
   MeshDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUMeshProxy> meshProxy, PMColor color,
-             const Matrix& viewMatrix, AAType aaType);
+             const Matrix& viewMatrix);
 
   std::shared_ptr<GPUMeshProxy> meshProxy = nullptr;
   PMColor color = PMColor::Transparent();
