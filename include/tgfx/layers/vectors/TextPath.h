@@ -24,16 +24,12 @@
 
 namespace tgfx {
 
-class VectorContext;
-class VectorLayer;
-
 /**
- * TextPath applies path-based layout to text content in a VectorLayer. When set on a VectorLayer,
- * it repositions glyphs along the specified path curve.
+ * TextPath applies path-based layout to accumulated glyphs in the VectorContext. When applied, it
+ * repositions glyphs along the specified path curve.
  */
 class TextPath : public VectorElement {
  public:
-  TextPath() = default;
   /**
    * Returns the path that text follows.
    */
@@ -120,15 +116,12 @@ class TextPath : public VectorElement {
   void apply(VectorContext* context) override;
 
  private:
-
   Path _path = {};
   TextAlign _textAlign = TextAlign::Start;
   float _firstMargin = 0.0f;
   float _lastMargin = 0.0f;
   bool _perpendicularToPath = true;
   bool _reversed = false;
-
-  friend class VectorLayer;
 };
 
 }  // namespace tgfx

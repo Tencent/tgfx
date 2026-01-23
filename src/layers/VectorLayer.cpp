@@ -61,6 +61,7 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
       element->apply(&context);
     }
   }
+  // Render all painters
   for (const auto& painter : context.painters) {
     painter->draw(recorder);
   }

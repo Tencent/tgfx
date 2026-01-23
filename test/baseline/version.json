@@ -109,9 +109,6 @@
         "innerShadow": "0cfb8996",
         "shaderMaskFilter": "6b4e5ce0"
     },
-    "GPURenderTest": {
-        "InstancedGridRender": "62f124a1"
-    },
     "Hello2DTest": {
         "ConicGradient": "4e98c910",
         "ImageWithMipmap": "4e98c910",
@@ -520,5 +517,8 @@
         "TrimPathReversedWrapAround": "4a74f6aa",
         "TrimPathWithScale": "4a74f6aa",
         "VectorGroupTransform": "4a74f6aa"
+    },
+    "GPURenderTest": {
+        "InstancedGridRender": "62f124a1"
     }
 }

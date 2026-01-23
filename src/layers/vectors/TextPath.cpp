@@ -18,10 +18,10 @@
 
 #include "tgfx/layers/vectors/TextPath.h"
 #include <cmath>
-#include "core/utils/MathExtra.h"
-#include "tgfx/core/PathMeasure.h"
 #include "Geometry.h"
 #include "VectorContext.h"
+#include "core/utils/MathExtra.h"
+#include "tgfx/core/PathMeasure.h"
 
 namespace tgfx {
 

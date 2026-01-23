@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <memory>
+#include <optional>
 #include <vector>
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Point.h"
@@ -26,17 +28,12 @@
 
 namespace tgfx {
 
-class VectorContext;
-class VectorLayer;
-
 /**
- * TextModifier applies per-character transform and paint properties to text content in a
- * VectorLayer. It uses selectors to determine which characters are affected and by how much.
+ * TextModifier applies per-character transform and paint properties to accumulated glyphs in the
+ * VectorContext. It uses selectors to determine which characters are affected and by how much.
  */
 class TextModifier : public VectorElement {
  public:
-  TextModifier() = default;
-
   /**
    * Returns the selectors that define which characters this modifier applies to.
    */
@@ -182,11 +179,11 @@ class TextModifier : public VectorElement {
     return Type::TextModifier;
   }
 
-  void apply(VectorContext* context) override;
-
   void attachToLayer(Layer* layer) override;
 
   void detachFromLayer(Layer* layer) override;
+
+  void apply(VectorContext* context) override;
 
  private:
   std::vector<std::shared_ptr<TextSelector>> _selectors = {};
@@ -204,8 +201,6 @@ class TextModifier : public VectorElement {
   std::optional<Color> _fillColor = {};
   std::optional<Color> _strokeColor = {};
   std::optional<float> _strokeWidth = {};
-
-  friend class VectorLayer;
 };
 
 }  // namespace tgfx
