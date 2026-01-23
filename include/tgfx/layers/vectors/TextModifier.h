@@ -18,13 +18,11 @@
 
 #pragma once
 
-#include <memory>
-#include <optional>
 #include <vector>
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Point.h"
-#include "tgfx/layers/LayerProperty.h"
-#include "tgfx/layers/TextSelector.h"
+#include "tgfx/layers/vectors/TextSelector.h"
+#include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
 
@@ -35,8 +33,10 @@ class VectorLayer;
  * TextModifier applies per-character transform and paint properties to text content in a
  * VectorLayer. It uses selectors to determine which characters are affected and by how much.
  */
-class TextModifier : public LayerProperty {
+class TextModifier : public VectorElement {
  public:
+  TextModifier() = default;
+
   /**
    * Returns the selectors that define which characters this modifier applies to.
    */
@@ -178,13 +178,17 @@ class TextModifier : public LayerProperty {
   void setStrokeWidth(std::optional<float> value);
 
  protected:
+  Type type() const override {
+    return Type::TextModifier;
+  }
+
+  void apply(VectorContext* context) override;
+
   void attachToLayer(Layer* layer) override;
 
   void detachFromLayer(Layer* layer) override;
 
  private:
-  void apply(VectorContext* context);
-
   std::vector<std::shared_ptr<TextSelector>> _selectors = {};
 
   // Transform properties

@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/TextModifier.h"
+#include "tgfx/layers/vectors/TextModifier.h"
 #include <cmath>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/layers/Layer.h"
-#include "vectors/VectorContext.h"
+#include "VectorContext.h"
 
 namespace tgfx {
 

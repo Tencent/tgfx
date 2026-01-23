@@ -19,8 +19,8 @@
 #pragma once
 
 #include "tgfx/core/Path.h"
-#include "tgfx/layers/LayerProperty.h"
 #include "tgfx/layers/TextAlign.h"
+#include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
 
@@ -31,8 +31,9 @@ class VectorLayer;
  * TextPath applies path-based layout to text content in a VectorLayer. When set on a VectorLayer,
  * it repositions glyphs along the specified path curve.
  */
-class TextPath : public LayerProperty {
+class TextPath : public VectorElement {
  public:
+  TextPath() = default;
   /**
    * Returns the path that text follows.
    */
@@ -111,8 +112,14 @@ class TextPath : public LayerProperty {
    */
   void setReversed(bool value);
 
+ protected:
+  Type type() const override {
+    return Type::TextPath;
+  }
+
+  void apply(VectorContext* context) override;
+
  private:
-  void apply(VectorContext* context);
 
   Path _path = {};
   TextAlign _textAlign = TextAlign::Start;

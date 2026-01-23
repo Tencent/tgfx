@@ -20,8 +20,6 @@
 
 #include <vector>
 #include "tgfx/layers/Layer.h"
-#include "tgfx/layers/TextModifier.h"
-#include "tgfx/layers/TextPath.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
@@ -60,32 +58,6 @@ class VectorLayer : public Layer {
    */
   void setContents(std::vector<std::shared_ptr<VectorElement>> value);
 
-  /**
-   * Returns the text path that applies to all text content in this layer. When set, glyphs from
-   * TextSpan elements will be positioned along this path.
-   */
-  std::shared_ptr<TextPath> textPath() const {
-    return _textPath;
-  }
-
-  /**
-   * Sets the text path for this layer. Pass nullptr to remove path-based layout.
-   */
-  void setTextPath(std::shared_ptr<TextPath> value);
-
-  /**
-   * Returns the list of text modifiers that apply to all text content in this layer. Modifiers are
-   * applied in order after TextPath (if present).
-   */
-  const std::vector<std::shared_ptr<TextModifier>>& textModifiers() const {
-    return _textModifiers;
-  }
-
-  /**
-   * Sets the list of text modifiers for this layer.
-   */
-  void setTextModifiers(std::vector<std::shared_ptr<TextModifier>> value);
-
  protected:
   VectorLayer() = default;
 
@@ -93,8 +65,6 @@ class VectorLayer : public Layer {
 
  private:
   std::vector<std::shared_ptr<VectorElement>> _contents = {};
-  std::shared_ptr<TextPath> _textPath = nullptr;
-  std::vector<std::shared_ptr<TextModifier>> _textModifiers = {};
 };
 
 }  // namespace tgfx
