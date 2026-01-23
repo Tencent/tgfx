@@ -109,6 +109,9 @@
         "innerShadow": "0cfb8996",
         "shaderMaskFilter": "6b4e5ce0"
     },
+    "GPURenderTest": {
+        "InstancedGridRender": "62f124a1"
+    },
     "Hello2DTest": {
         "ConicGradient": "4e98c910",
         "ImageWithMipmap": "4e98c910",
@@ -500,25 +503,22 @@
         "StrokeDashWithTrim": "4a74f6aa",
         "StrokeJoinCap": "4a74f6aa",
         "StrokeNestedScale": "4a74f6aa",
+        "TextBasic": "48b78e36",
+        "TextEdgeCases": "48b78e36",
+        "TextEmoji": "48b78e36",
         "TextModifier": "ec49a65b",
         "TextPath": "ec49a65b",
         "TextPathWithTrimPath": "9020d7e2",
         "TextSelector": "ec49a65b",
-        "TextSpanBasic": "48b78e36",
-        "TextSpanEdgeCases": "48b78e36",
-        "TextSpanEmoji": "48b78e36",
-        "TextSpanStyles": "48b78e36",
-        "TextSpanWithGroup": "48b78e36",
-        "TextSpanWithPathModifiers": "48b78e36",
-        "TextSpanWithRepeater": "48b78e36",
+        "TextStyles": "48b78e36",
+        "TextWithGroup": "48b78e36",
+        "TextWithPathModifiers": "48b78e36",
+        "TextWithRepeater": "48b78e36",
         "TrimPath": "4a74f6aa",
         "TrimPathOffset": "4a74f6aa",
         "TrimPathReversed": "4a74f6aa",
         "TrimPathReversedWrapAround": "4a74f6aa",
         "TrimPathWithScale": "4a74f6aa",
         "VectorGroupTransform": "4a74f6aa"
-    },
-    "GPURenderTest": {
-        "InstancedGridRender": "62f124a1"
     }
 }
