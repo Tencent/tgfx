@@ -87,6 +87,14 @@ inline float sdot(float a, float b, float c, float d) {
 
 void Matrix::preTranslate(float tx, float ty) {
   const unsigned mask = this->getType();
+  // Check perspective first, as it requires full matrix multiplication
+  if (mask & PerspectiveMask) {
+    Matrix m;
+    m.setTranslate(tx, ty);
+    this->preConcat(m);
+    return;
+  }
+
   if (mask <= TranslateMask) {
     values[TRANS_X] += tx;
     values[TRANS_Y] += ty;
@@ -98,9 +106,15 @@ void Matrix::preTranslate(float tx, float ty) {
 }
 
 void Matrix::postTranslate(float tx, float ty) {
-  values[TRANS_X] += tx;
-  values[TRANS_Y] += ty;
-  this->updateTranslateMask();
+  if (this->getType() & PerspectiveMask) {
+    Matrix m;
+    m.setTranslate(tx, ty);
+    this->postConcat(m);
+  } else {
+    values[TRANS_X] += tx;
+    values[TRANS_Y] += ty;
+    this->updateTranslateMask();
+  }
 }
 
 void Matrix::setScale(float sx, float sy, float px, float py) {
@@ -140,9 +154,13 @@ void Matrix::preScale(float sx, float sy) {
   }
   values[SCALE_X] *= sx;
   values[SKEW_Y] *= sx;
+  values[PERSP_0] *= sx;
+
   values[SKEW_X] *= sy;
   values[SCALE_Y] *= sy;
-  if (values[SCALE_X] == 1 && values[SCALE_Y] == 1 && !(typeMask & AffineMask)) {
+  values[PERSP_1] *= sy;
+  if (values[SCALE_X] == 1 && values[SCALE_Y] == 1 &&
+      !(typeMask & (PerspectiveMask | AffineMask))) {
     this->clearTypeMask(ScaleMask);
   } else {
     this->orTypeMask(ScaleMask);
@@ -281,10 +299,6 @@ static bool OnlyScaleAndTranslate(unsigned mask) {
   return 0 == (mask & (Matrix::AffineMask | Matrix::PerspectiveMask));
 }
 
-static bool HasPerspective(unsigned mask) {
-  return (mask & Matrix::PerspectiveMask) != 0;
-}
-
 void Matrix::setConcat(const Matrix& first, const Matrix& second) {
   if (first.isTriviallyIdentity()) {
     *this = second;
@@ -295,16 +309,16 @@ void Matrix::setConcat(const Matrix& first, const Matrix& second) {
     return;
   }
 
-  auto& matrixA = first.values;
-  auto& matrixB = second.values;
-  TypeMask aType = first.getType();
-  TypeMask bType = second.getType();
   // If either matrix has perspective, do full 3x3 multiply
-  if (HasPerspective(aType) || HasPerspective(bType)) {
+  if (first.hasPerspective() || second.hasPerspective()) {
     ConcatMatrix(first, second, *this);
     return;
   }
 
+  auto& matrixA = first.values;
+  auto& matrixB = second.values;
+  TypeMask aType = first.getType();
+  TypeMask bType = second.getType();
   // No perspective, use optimized affine path
   auto sx = matrixB[SCALE_X] * matrixA[SCALE_X];
   auto kx = 0.0f;

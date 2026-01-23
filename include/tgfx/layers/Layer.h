@@ -658,20 +658,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getBackgroundImage(const DrawArgs& args, float contentScale,
                                             Point* offset);
 
-  /**
-   * Gets the background image of the minimum axis-aligned bounding box after drawing the layer
-   * subtree with the current layer as the root node
-   */
-  std::shared_ptr<Image> getBoundsBackgroundImage(const DrawArgs& args, float contentScale,
-                                                  Point* offset);
-
   void drawBackgroundImage(const DrawArgs& args, Canvas& canvas);
 
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position);
-
-  void drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                                 const Matrix3D& transform3D);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 

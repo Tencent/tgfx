@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Matrix.h"
 #include <limits>
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Vec.h"
 // First undef to prevent error when re-included.
 #undef HWY_TARGET_INCLUDE
@@ -205,7 +205,8 @@ Vec3 MapHomogeneousHWYImpl(const Matrix& m, float x, float y, float w) {
   auto col0 = hn::Dup128VecFromValues(d, m.getScaleX(), m.getSkewY(), m.getPerspX(), 0.0f);
   auto col1 = hn::Dup128VecFromValues(d, m.getSkewX(), m.getScaleY(), m.getPerspY(), 0.0f);
   auto col2 = hn::Dup128VecFromValues(d, m.getTranslateX(), m.getTranslateY(), m.get(8), 0.0f);
-  auto res = hn::MulAdd(col0, hn::Set(d, x), hn::MulAdd(col1, hn::Set(d, y), hn::Mul(col2, hn::Set(d, w))));
+  auto res = hn::MulAdd(col0, hn::Set(d, x),
+                        hn::MulAdd(col1, hn::Set(d, y), hn::Mul(col2, hn::Set(d, w))));
   float result[4];
   hn::StoreU(res, d, result);
   return {result[0], result[1], result[2]};

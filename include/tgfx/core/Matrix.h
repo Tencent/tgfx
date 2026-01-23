@@ -208,7 +208,7 @@ class Matrix {
       typeMask = this->computeTypeMask();
     }
     // only return the public masks
-    return (TypeMask)(typeMask & 0xF);
+    return static_cast<TypeMask>(typeMask & 0xF);
   }
 
   /**
@@ -247,6 +247,14 @@ class Matrix {
    */
   bool isTranslate() const {
     return !(this->getType() & ~(TranslateMask));
+  }
+
+  /**
+   * Returns true if the matrix contains perspective elements (the last row is not [0, 0, 1]).
+   * @return  true if Matrix has perspective.
+   */
+  bool hasPerspective() const {
+    return (this->getType() & PerspectiveMask) != 0;
   }
 
   /**

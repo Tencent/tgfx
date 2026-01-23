@@ -40,6 +40,10 @@ class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
                                    std::optional<Matrix> uvMatrix);
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  bool hasUVPerspective() const override {
+    return uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
+  }
+
   Attribute inPosition;
   Attribute inCoverage;
   Attribute inEllipseOffset;
