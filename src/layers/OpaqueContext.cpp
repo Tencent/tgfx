@@ -27,7 +27,7 @@ namespace tgfx {
 class PendingOpaqueAutoReset {
  public:
   PendingOpaqueAutoReset(OpaqueContext* context, const OpaqueContext::Contour& contour,
-                         MCState state, Brush brush)
+                          MCState state, Brush brush)
       : context(context), contour(contour), state(std::move(state)), brush(std::move(brush)) {
   }
 
@@ -68,12 +68,12 @@ void OpaqueContext::drawFill(const Brush& brush) {
 }
 
 void OpaqueContext::drawRect(const Rect& rect, const MCState& state, const Brush& brush,
-                             const Stroke* stroke) {
+                              const Stroke* stroke) {
   drawContour(Contour(rect, stroke), state, brush);
 }
 
 void OpaqueContext::drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
-                              const Stroke* stroke) {
+                               const Stroke* stroke) {
   drawContour(Contour(rRect, stroke), state, brush);
 }
 
@@ -82,21 +82,21 @@ void OpaqueContext::drawPath(const Path& path, const MCState& state, const Brush
 }
 
 void OpaqueContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                              const Brush& brush, const Stroke* stroke) {
+                               const Brush& brush, const Stroke* stroke) {
   drawContour(Contour(std::move(shape), stroke), state, brush);
 }
 
 void OpaqueContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                              const MCState& state, const Brush& brush) {
+                               const MCState& state, const Brush& brush) {
   auto newBrush = brush;
   newBrush.shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, sampling);
   drawRect(Rect::MakeWH(image->width(), image->height()), state, newBrush, nullptr);
 }
 
 void OpaqueContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
-                                  const Rect& dstRect, const SamplingOptions& sampling,
-                                  const MCState& state, const Brush& brush,
-                                  SrcRectConstraint constraint) {
+                                   const Rect& dstRect, const SamplingOptions& sampling,
+                                   const MCState& state, const Brush& brush,
+                                   SrcRectConstraint constraint) {
   if (constraint != SrcRectConstraint::Strict) {
     auto newState = state;
     newState.matrix.preConcat(MakeRectToRectMatrix(srcRect, dstRect));
@@ -117,7 +117,7 @@ void OpaqueContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcR
 }
 
 void OpaqueContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
-                                 const Brush& brush, const Stroke* stroke) {
+                                  const Brush& brush, const Stroke* stroke) {
   auto bounds = textBlob->getBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &bounds, state.matrix);
@@ -133,8 +133,9 @@ void OpaqueContext::drawPicture(std::shared_ptr<Picture> picture, const MCState&
   picture->playback(this, state);
 }
 
-void OpaqueContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                              const MCState& state, const Brush& brush) {
+void OpaqueContext::drawLayer(std::shared_ptr<Picture> picture,
+                               std::shared_ptr<ImageFilter> filter, const MCState& state,
+                               const Brush& brush) {
   if (brush.nothingToDraw()) {
     return;
   }
@@ -249,7 +250,7 @@ Rect GetGlobalBounds(const MCState& state, const Rect& localBounds) {
 }
 
 void OpaqueContext::flushPendingContour(const Contour& contour, const MCState& state,
-                                        const Brush& brush) {
+                                         const Brush& brush) {
   PendingOpaqueAutoReset autoReset(this, contour, state, brush);
   if (pendingContour.type == Contour::Type::None) {
     return;
@@ -310,7 +311,7 @@ void OpaqueContext::appendFill(const Brush& brush) {
 }
 
 void OpaqueContext::resetPendingContour(const Contour& contour, const MCState& state,
-                                        const Brush& brush) {
+                                         const Brush& brush) {
   pendingContour = contour;
   pendingState = state;
   pendingBrushes = {GetOpaqueBrush(brush)};
@@ -350,7 +351,7 @@ Rect OpaqueContext::Contour::getBounds() const {
 }
 
 void OpaqueContext::Contour::draw(PictureContext& context, const MCState& state,
-                                  const Brush& brush) const {
+                                   const Brush& brush) const {
   const Stroke* strokePtr = hasStroke ? &stroke : nullptr;
   switch (type) {
     case Type::Fill: {

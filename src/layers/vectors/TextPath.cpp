@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/TextPath.h"
+#include "tgfx/layers/vectors/TextPath.h"
 #include <cmath>
+#include "Geometry.h"
+#include "VectorContext.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/PathMeasure.h"
-#include "vectors/Geometry.h"
-#include "vectors/VectorContext.h"
 
 namespace tgfx {
 

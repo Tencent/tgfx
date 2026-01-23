@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/TextModifier.h"
+#include "tgfx/layers/vectors/TextModifier.h"
 #include <cmath>
+#include "VectorContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/layers/Layer.h"
-#include "vectors/VectorContext.h"
 
 namespace tgfx {
 
@@ -75,7 +75,7 @@ void TextModifier::setSelectors(std::vector<std::shared_ptr<TextSelector>> value
 }
 
 void TextModifier::attachToLayer(Layer* layer) {
-  LayerProperty::attachToLayer(layer);
+  VectorElement::attachToLayer(layer);
   for (const auto& selector : _selectors) {
     DEBUG_ASSERT(selector != nullptr);
     selector->attachToLayer(layer);
@@ -87,7 +87,7 @@ void TextModifier::detachFromLayer(Layer* layer) {
     DEBUG_ASSERT(selector != nullptr);
     selector->detachFromLayer(layer);
   }
-  LayerProperty::detachFromLayer(layer);
+  VectorElement::detachFromLayer(layer);
 }
 
 void TextModifier::setAnchorPoint(Point value) {

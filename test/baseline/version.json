@@ -109,9 +109,6 @@
         "innerShadow": "0cfb8996",
         "shaderMaskFilter": "6b4e5ce0"
     },
-    "GPURenderTest": {
-        "InstancedGridRender": "62f124a1"
-    },
     "Hello2DTest": {
         "ConicGradient": "4e98c910",
         "ImageWithMipmap": "4e98c910",
@@ -504,7 +501,8 @@
         "StrokeJoinCap": "4a74f6aa",
         "StrokeNestedScale": "4a74f6aa",
         "TextModifier": "ec49a65b",
-        "TextPath": "a0365e41",
+        "TextPath": "ec49a65b",
+        "TextPathWithTrimPath": "9020d7e2",
         "TextSelector": "ec49a65b",
         "TextSpanBasic": "48b78e36",
         "TextSpanEdgeCases": "48b78e36",
@@ -519,5 +517,8 @@
         "TrimPathReversedWrapAround": "4a74f6aa",
         "TrimPathWithScale": "4a74f6aa",
         "VectorGroupTransform": "4a74f6aa"
+    },
+    "GPURenderTest": {
+        "InstancedGridRender": "62f124a1"
     }
 }

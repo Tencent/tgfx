@@ -23,19 +23,16 @@
 #include <vector>
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Point.h"
-#include "tgfx/layers/LayerProperty.h"
-#include "tgfx/layers/TextSelector.h"
+#include "tgfx/layers/vectors/TextSelector.h"
+#include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
 
-class VectorContext;
-class VectorLayer;
-
 /**
- * TextModifier applies per-character transform and paint properties to text content in a
- * VectorLayer. It uses selectors to determine which characters are affected and by how much.
+ * TextModifier applies per-character transform and paint properties to accumulated glyphs in the
+ * VectorContext. It uses selectors to determine which characters are affected and by how much.
  */
-class TextModifier : public LayerProperty {
+class TextModifier : public VectorElement {
  public:
   /**
    * Returns the selectors that define which characters this modifier applies to.
@@ -178,13 +175,17 @@ class TextModifier : public LayerProperty {
   void setStrokeWidth(std::optional<float> value);
 
  protected:
+  Type type() const override {
+    return Type::TextModifier;
+  }
+
   void attachToLayer(Layer* layer) override;
 
   void detachFromLayer(Layer* layer) override;
 
- private:
-  void apply(VectorContext* context);
+  void apply(VectorContext* context) override;
 
+ private:
   std::vector<std::shared_ptr<TextSelector>> _selectors = {};
 
   // Transform properties
@@ -200,8 +201,6 @@ class TextModifier : public LayerProperty {
   std::optional<Color> _fillColor = {};
   std::optional<Color> _strokeColor = {};
   std::optional<float> _strokeWidth = {};
-
-  friend class VectorLayer;
 };
 
 }  // namespace tgfx
