@@ -44,7 +44,7 @@ class CGScalerContext : public ScalerContext {
                          Matrix* matrix) const override;
 
   bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
-                  void* dstPixels) const override;
+                  void* dstPixels, const Point& glyphOffset) const override;
 
  private:
   float fauxBoldScale = 1.0f;
