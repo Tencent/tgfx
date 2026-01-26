@@ -58,11 +58,21 @@ struct GlyphRun {
    */
   Matrix getMatrix(size_t index) const;
 
+  /**
+   * Post-concatenates the glyph transformation matrix at the given index to the target matrix.
+   */
+  void postGlyphMatrix(size_t index, Matrix* matrix) const;
+
+  /**
+   * Checks if a glyph at the given index is visible within the clip bounds.
+   * @param scaledBounds The pre-computed scaled bounds (with stroke and scale applied).
+   */
+  bool isGlyphVisible(size_t index, const Rect& scaledBounds, const Rect& clipBounds) const;
+
  private:
   size_t _runSize = 0;
   float offsetY = 0.0f;  // Only used for Horizontal positioning
   friend struct RunRecord;
-  friend class RenderContext;
 };
 
 }  // namespace tgfx

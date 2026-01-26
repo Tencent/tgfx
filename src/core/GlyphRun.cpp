@@ -55,4 +55,37 @@ Matrix GlyphRun::getMatrix(size_t index) const {
   return Matrix::I();
 }
 
+void GlyphRun::postGlyphMatrix(size_t index, Matrix* matrix) const {
+  switch (positioning) {
+    case GlyphPositioning::Horizontal:
+      matrix->postTranslate(positions[index], offsetY);
+      return;
+    case GlyphPositioning::Point: {
+      auto point = reinterpret_cast<const Point*>(positions)[index];
+      matrix->postTranslate(point.x, point.y);
+      return;
+    }
+    default:
+      matrix->postConcat(getMatrix(index));
+  }
+}
+
+bool GlyphRun::isGlyphVisible(size_t index, const Rect& scaledBounds,
+                              const Rect& clipBounds) const {
+  auto bounds = scaledBounds;
+  switch (positioning) {
+    case GlyphPositioning::Horizontal:
+      bounds.offset(positions[index], offsetY);
+      break;
+    case GlyphPositioning::Point: {
+      auto point = reinterpret_cast<const Point*>(positions)[index];
+      bounds.offset(point.x, point.y);
+      break;
+    }
+    default:
+      bounds = getMatrix(index).mapRect(bounds);
+  }
+  return Rect::Intersects(bounds, clipBounds);
+}
+
 }  // namespace tgfx
