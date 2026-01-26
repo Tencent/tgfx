@@ -2305,13 +2305,10 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     if (canPreserve3D() || child->canPreserve3D()) {
       // Child is inside a 3D rendering context - allow combining matrices.
       childTransformer = RegionTransformer::MakeFromMatrix3D(childMatrix, transformer, true);
-    } else if (child->bitFields.matrix3DIsAffine) {
-      // Child is a 2D layer outside 3D context.
-      childTransformer = RegionTransformer::MakeFromMatrix(
-          Matrix3DUtils::GetMayLossyAffineMatrix(childMatrix), transformer);
     } else {
-      // Child has 3D transform but is outside 3D context - don't combine matrices.
-      childTransformer = RegionTransformer::MakeFromMatrix3D(childMatrix, transformer);
+      // Child is outside 3D context - project to 2D plane.
+      childTransformer = RegionTransformer::MakeFromMatrix(
+          Matrix3DUtils::GetMayLossyMatrix(childMatrix), transformer);
     }
     std::optional<Rect> clipRect = std::nullopt;
     if (child->_scrollRect) {
