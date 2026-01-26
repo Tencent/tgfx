@@ -62,6 +62,7 @@ struct GlyphRun {
   size_t _runSize = 0;
   float offsetY = 0.0f;  // Only used for Horizontal positioning
   friend struct RunRecord;
+  friend class RenderContext;
 };
 
 }  // namespace tgfx

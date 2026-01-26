@@ -27,7 +27,7 @@ namespace tgfx {
  * with translation, scaling, skewing, and rotation. Together these types of transformations are
  * known as affine transformations. Affine transformations preserve the straightness of lines while
  * transforming, so that parallel lines stay parallel. Matrix elements are in row major order.
- * Matrix does not have a constructor, so it must be explicitly initialized.
+ * Matrix has a default constructor that initializes to the identity matrix.
  */
 class Matrix {
  public:
