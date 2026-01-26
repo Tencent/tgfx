@@ -296,7 +296,7 @@ static int GetMipmapCacheLongEdge(int maxSize, float contentScale, const Rect& l
  */
 static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Canvas* canvas,
                                                        const Rect& bounds) {
-  if (args.renderRect == nullptr || args.context == nullptr) {
+  if (args.context == nullptr) {
     DEBUG_ASSERT(false);
     return nullptr;
   }
