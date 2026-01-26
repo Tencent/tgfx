@@ -20,7 +20,6 @@
 #include "core/images/TextureImage.h"
 #include "gpu/ProxyProvider.h"
 #include "tgfx/core/ColorSpace.h"
-#include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
 
@@ -56,8 +55,7 @@ bool SubtreeCache::hasCache(Context* context, int longEdge) const {
   return proxyProvider->findOrWrapTextureProxy(sizeUniqueKey) != nullptr;
 }
 
-void SubtreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint,
-                        const Matrix3D* transform3D) const {
+void SubtreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint) const {
   if (context == nullptr) {
     return;
   }
@@ -86,23 +84,7 @@ void SubtreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Pa
       drawPaint.setMaskFilter(maskFilter->makeWithMatrix(invertMatrix));
     }
   }
-  if (transform3D == nullptr) {
-    canvas->drawImage(image, &drawPaint);
-  } else {
-    auto adaptedMatrix = *transform3D;
-    auto offsetMatrix = Matrix3D::MakeTranslate(matrix.getTranslateX(), matrix.getTranslateY(), 0);
-    auto invOffsetMatrix =
-        Matrix3D::MakeTranslate(-matrix.getTranslateX(), -matrix.getTranslateY(), 0);
-    auto scaleMatrix = Matrix3D::MakeScale(matrix.getScaleX(), matrix.getScaleY(), 1.0f);
-    auto invScaleMatrix =
-        Matrix3D::MakeScale(1.0f / matrix.getScaleX(), 1.0f / matrix.getScaleY(), 1.0f);
-    adaptedMatrix = invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
-    auto imageFilter = ImageFilter::Transform3D(adaptedMatrix);
-    auto offset = Point();
-    auto filteredImage = image->makeWithFilter(imageFilter, &offset);
-    canvas->concat(Matrix::MakeTrans(offset.x, offset.y));
-    canvas->drawImage(filteredImage, &drawPaint);
-  }
+  canvas->drawImage(image, &drawPaint);
   canvas->setMatrix(oldMatrix);
 }
 }  // namespace tgfx
