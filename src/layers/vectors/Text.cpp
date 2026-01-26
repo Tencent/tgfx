@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/vectors/TextSpan.h"
+#include "tgfx/layers/vectors/Text.h"
 #include "VectorContext.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
 
-void TextSpan::setTextBlob(std::shared_ptr<TextBlob> value) {
+void Text::setTextBlob(std::shared_ptr<TextBlob> value) {
   if (_textBlob == value) {
     return;
   }
@@ -30,7 +30,7 @@ void TextSpan::setTextBlob(std::shared_ptr<TextBlob> value) {
   invalidateContent();
 }
 
-void TextSpan::setPosition(const Point& value) {
+void Text::setPosition(const Point& value) {
   if (_position == value) {
     return;
   }
@@ -38,7 +38,7 @@ void TextSpan::setPosition(const Point& value) {
   invalidateContent();
 }
 
-void TextSpan::apply(VectorContext* context) {
+void Text::apply(VectorContext* context) {
   DEBUG_ASSERT(context != nullptr);
   if (_textBlob == nullptr) {
     return;

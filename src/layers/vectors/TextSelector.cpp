@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/TextSelector.h"
+#include "tgfx/layers/vectors/TextSelector.h"
 #include <algorithm>
 #include <array>
 #include <cmath>

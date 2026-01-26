@@ -32,13 +32,6 @@ VectorLayer::~VectorLayer() {
     DEBUG_ASSERT(element != nullptr);
     detachProperty(element.get());
   }
-  if (_textPath != nullptr) {
-    detachProperty(_textPath.get());
-  }
-  for (const auto& modifier : _textModifiers) {
-    DEBUG_ASSERT(modifier != nullptr);
-    detachProperty(modifier.get());
-  }
 }
 
 void VectorLayer::setContents(std::vector<std::shared_ptr<VectorElement>> value) {
@@ -57,58 +50,18 @@ void VectorLayer::setContents(std::vector<std::shared_ptr<VectorElement>> value)
   invalidateContent();
 }
 
-void VectorLayer::setTextPath(std::shared_ptr<TextPath> value) {
-  if (_textPath == value) {
-    return;
-  }
-  if (_textPath != nullptr) {
-    detachProperty(_textPath.get());
-  }
-  _textPath = std::move(value);
-  if (_textPath != nullptr) {
-    attachProperty(_textPath.get());
-  }
-  invalidateContent();
-}
-
-void VectorLayer::setTextModifiers(std::vector<std::shared_ptr<TextModifier>> value) {
-  for (const auto& modifier : _textModifiers) {
-    DEBUG_ASSERT(modifier != nullptr);
-    detachProperty(modifier.get());
-  }
-  _textModifiers.clear();
-  for (auto& modifier : value) {
-    if (modifier == nullptr) {
-      continue;
-    }
-    attachProperty(modifier.get());
-    _textModifiers.push_back(std::move(modifier));
-  }
-  invalidateContent();
-}
-
 void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
   if (_contents.empty()) {
     return;
   }
   VectorContext context = {};
-  // 1. Apply all elements in contents (geometries, path modifiers, styles)
   for (const auto& element : _contents) {
     DEBUG_ASSERT(element != nullptr);
     if (element->enabled()) {
       element->apply(&context);
     }
   }
-  // 2. Apply layer-level TextModifiers in order (transforms like position, scale, rotation)
-  for (const auto& modifier : _textModifiers) {
-    DEBUG_ASSERT(modifier != nullptr);
-    modifier->apply(&context);
-  }
-  // 3. Apply layer-level TextPath (snaps transformed glyphs onto the curve)
-  if (_textPath != nullptr) {
-    _textPath->apply(&context);
-  }
-  // 4. Render all painters
+  // Render all painters
   for (const auto& painter : context.painters) {
     painter->draw(recorder);
   }
