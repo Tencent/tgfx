@@ -1018,7 +1018,8 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   // Check if the current layer needs to start a 3D context. Since Layer::draw is called directly
   // without going through a parent layer's drawChildren, 3D context handling must be done here.
   if (canPreserve3D()) {
-    drawByStarting3DContext(args, canvas, &Layer::drawLayer, alpha, blendMode);
+    drawByStarting3DContext(args, canvas, getMatrixWithScrollRect(), &Layer::drawLayer, alpha,
+                            blendMode);
   } else {
     drawLayer(args, canvas, alpha, blendMode);
   }
@@ -1254,31 +1255,35 @@ bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
 }
 
 std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isContourMode,
-                                               float scale, const Matrix& affineRelativeMatrix) {
+                                               float scale, const Matrix3D& relativeMatrix3D) {
   // Note: Does not use layerClipBounds here. Using clipBounds may cause PathOp errors when
   // extracting maskPath from the picture, resulting in incorrect clip regions.
   DrawArgs maskArgs = args;
   maskArgs.excludeEffects |= isContourMode;
   maskArgs.blurBackground = nullptr;
+  auto maskCanPreserve3D = _mask->canPreserve3D();
+  // When mask enables 3D context, the full 3D relative matrix is handled by the 3D context.
+  // Otherwise, use the 2D projection of the relative matrix on canvas.
+  auto canvasMatrix = Matrix3DUtils::GetMayLossyMatrix(relativeMatrix3D);
   if (isContourMode) {
     auto drawMask = [&](Canvas* canvas, ContourContext* contourContext) {
-      canvas->concat(affineRelativeMatrix);
       maskArgs.contourContext = contourContext;
-      if (_mask->canPreserve3D()) {
-        _mask->drawByStarting3DContext(maskArgs, canvas, &Layer::drawContour, _mask->_alpha,
-                                       BlendMode::SrcOver);
+      if (maskCanPreserve3D) {
+        _mask->drawByStarting3DContext(maskArgs, canvas, relativeMatrix3D, &Layer::drawContour,
+                                       _mask->_alpha, BlendMode::SrcOver);
       } else {
+        canvas->concat(canvasMatrix);
         _mask->drawContour(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
       }
     };
     return RecordContourPicture(scale, drawMask);
   }
   auto drawMask = [&](Canvas* canvas) {
-    canvas->concat(affineRelativeMatrix);
-    if (_mask->canPreserve3D()) {
-      _mask->drawByStarting3DContext(maskArgs, canvas, &Layer::drawLayer, _mask->_alpha,
-                                     BlendMode::SrcOver);
+    if (maskCanPreserve3D) {
+      _mask->drawByStarting3DContext(maskArgs, canvas, relativeMatrix3D, &Layer::drawLayer,
+                                     _mask->_alpha, BlendMode::SrcOver);
     } else {
+      canvas->concat(canvasMatrix);
       _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
     }
   };
@@ -1292,18 +1297,14 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   auto isContourMode = maskType == LayerMaskType::Contour;
 
-  auto relativeMatrix = _mask->getRelativeMatrix(this);
-  auto isMatrixAffine = Matrix3DUtils::IsMatrix3DAffine(relativeMatrix);
-  auto affineRelativeMatrix =
-      isMatrixAffine ? Matrix3DUtils::GetMayLossyAffineMatrix(relativeMatrix) : Matrix::I();
-
-  auto maskPicture = getMaskPicture(args, isContourMode, scale, affineRelativeMatrix);
+  auto relativeMatrix3D = _mask->getRelativeMatrix(this);
+  auto maskPicture = getMaskPicture(args, isContourMode, scale, relativeMatrix3D);
   if (maskPicture == nullptr) {
     return {};
   }
 
   bool needLuminance = maskType == LayerMaskType::Luminance;
-  if (isMatrixAffine && !needLuminance) {
+  if (!needLuminance) {
     Path maskPath = {};
     if (MaskContext::GetMaskPath(maskPicture, &maskPath)) {
       maskPath.transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
@@ -1328,9 +1329,6 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   if (needLuminance) {
     maskContentImage =
         maskContentImage->makeWithFilter(ImageFilter::ColorFilter(ColorFilter::Luma()));
-  }
-  if (!isMatrixAffine) {
-    maskContentImage = maskContentImage->makeWithFilter(ImageFilter::Transform3D(relativeMatrix));
   }
   auto maskMatrix = Matrix::MakeScale(1.0f / scale, 1.0f / scale);
   maskMatrix.preTranslate(maskImageOffset.x, maskImageOffset.y);
@@ -1897,12 +1895,13 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
   return true;
 }
 
-void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, LayerDrawFunc drawFunc,
-                                    float alpha, BlendMode blendMode) {
+void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const Matrix3D& matrix3D,
+                                    LayerDrawFunc drawFunc, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canPreserve3D());
   DEBUG_ASSERT(args.render3DContext == nullptr);
 
-  auto newContext = Create3DContext(args, canvas, getBounds(_parent));
+  const auto bounds = getBoundsInternal(matrix3D, false);
+  const auto newContext = Create3DContext(args, canvas, bounds);
   if (newContext == nullptr) {
     return;
   }
@@ -1914,8 +1913,8 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, LayerD
   // drawing each layer. Therefore, background styles are disabled.
   contextArgs.styleSourceTypes = StyleSourceTypesFor3DContext;
 
-  auto offscreenCanvas =
-      newContext->beginRecording(getMatrixWithScrollRect(), bitFields.allowsEdgeAntialiasing);
+  const auto offscreenCanvas =
+      newContext->beginRecording(matrix3D, bitFields.allowsEdgeAntialiasing);
   contextArgs.contourContext = newContext->currentContourContext();
   (this->*drawFunc)(contextArgs, offscreenCanvas, alpha, blendMode);
   newContext->endRecording();
