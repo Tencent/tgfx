@@ -20,9 +20,20 @@
 #include "Painter.h"
 #include "VectorContext.h"
 #include "core/utils/Log.h"
+#include "tgfx/core/PathTypes.h"
 #include "tgfx/layers/LayerRecorder.h"
 
 namespace tgfx {
+
+static PathFillType ToPathFillType(FillRule fillRule) {
+  switch (fillRule) {
+    case FillRule::Winding:
+      return PathFillType::Winding;
+    case FillRule::EvenOdd:
+      return PathFillType::EvenOdd;
+  }
+  return PathFillType::Winding;
+}
 
 class FillPainter : public Painter {
  public:
@@ -104,7 +115,7 @@ void FillStyle::setBlendMode(BlendMode value) {
   invalidateContent();
 }
 
-void FillStyle::setFillRule(PathFillType value) {
+void FillStyle::setFillRule(FillRule value) {
   if (_fillRule == value) {
     return;
   }
@@ -148,7 +159,7 @@ void FillStyle::apply(VectorContext* context) {
   painter->shader = std::move(shader);
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
-  painter->fillRule = _fillRule;
+  painter->fillRule = ToPathFillType(_fillRule);
   painter->placement = _placement;
   painter->geometries.reserve(context->geometries.size());
   for (auto& geometry : context->geometries) {

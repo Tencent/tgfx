@@ -121,10 +121,10 @@ class DropShadowStyle : public LayerStyle {
   }
 
  protected:
-  void onDraw(Canvas* canvas, std::shared_ptr<Image> contour, float contentScale, float alpha,
+  void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha,
               BlendMode blendMode) override;
 
-  void onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> contour, float contentScale,
+  void onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                              std::shared_ptr<Image> extraSource, const Point& extraSourceOffset,
                              float alpha, BlendMode blendMode) override;
 

@@ -19,12 +19,25 @@
 #pragma once
 
 #include "tgfx/core/BlendMode.h"
-#include "tgfx/core/PathTypes.h"
 #include "tgfx/layers/LayerPaint.h"
 #include "tgfx/layers/vectors/ColorSource.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
+
+/**
+ * Defines the rule used to determine the interior of a shape when filling.
+ */
+enum class FillRule {
+  /**
+   * Enclosed by a non-zero sum of contour directions.
+   */
+  Winding,
+  /**
+   * Enclosed by an odd number of contours.
+   */
+  EvenOdd
+};
 
 /**
  * FillStyle applies a fill to shapes in the same group using a ColorSource.
@@ -73,14 +86,14 @@ class FillStyle : public VectorElement {
   /**
    * Returns the fill rule used to determine the interior of the shape.
    */
-  PathFillType fillRule() const {
+  FillRule fillRule() const {
     return _fillRule;
   }
 
   /**
    * Sets the fill rule used to determine the interior of the shape.
    */
-  void setFillRule(PathFillType value);
+  void setFillRule(FillRule value);
 
   /**
    * Returns the placement of the fill relative to the layer's children. The default value is
@@ -110,7 +123,7 @@ class FillStyle : public VectorElement {
   std::shared_ptr<ColorSource> _colorSource = nullptr;
   float _alpha = 1.0f;
   BlendMode _blendMode = BlendMode::SrcOver;
-  PathFillType _fillRule = PathFillType::Winding;
+  FillRule _fillRule = FillRule::Winding;
   LayerPlacement _placement = LayerPlacement::Background;
 };
 

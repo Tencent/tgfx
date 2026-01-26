@@ -89,7 +89,7 @@ class Rectangle : public VectorElement {
 
  private:
   Point _center = Point::Zero();
-  Size _size = {};
+  Size _size = {100.0f, 100.0f};
   float _roundness = 0.0f;
   bool _reversed = false;
   std::shared_ptr<Shape> _cachedShape = nullptr;
