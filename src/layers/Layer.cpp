@@ -26,7 +26,6 @@
 #include "compositing3d/Layer3DContext.h"
 #include "core/MCState.h"
 #include "core/Matrix3DUtils.h"
-#include "core/filters/Transform3DImageFilter.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
