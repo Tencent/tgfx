@@ -32,7 +32,7 @@ namespace tgfx {
 
 class BackgroundContext;
 class Context;
-class ContourContext;
+class OpaqueContext;
 
 struct TransformState {
   TransformState(const Matrix3D& transform, bool antialiasing)
@@ -77,10 +77,10 @@ class Layer3DContext {
   bool isFinished() const;
 
   /**
-   * Returns the current ContourContext for contour rendering, or nullptr for normal rendering.
-   * Must be called after beginRecording.
+   * Returns the current OpaqueContext for opaque content/contour rendering, or nullptr for normal
+   * rendering. Must be called after beginRecording.
    */
-  virtual ContourContext* currentContourContext() {
+  virtual OpaqueContext* currentOpaqueContext() {
     return nullptr;
   }
 

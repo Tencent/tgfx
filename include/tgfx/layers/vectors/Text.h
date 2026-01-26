@@ -25,10 +25,10 @@
 namespace tgfx {
 
 /**
- * TextSpan represents a text blob with position. Multiple TextSpans can be combined with
+ * Text represents a text blob with position. Multiple Text elements can be combined with
  * VectorGroup to create rich text with different styles.
  */
-class TextSpan : public VectorElement {
+class Text : public VectorElement {
  public:
   /**
    * Returns the text blob to render.
@@ -56,7 +56,7 @@ class TextSpan : public VectorElement {
 
  protected:
   Type type() const override {
-    return Type::TextSpan;
+    return Type::Text;
   }
 
   void apply(VectorContext* context) override;
