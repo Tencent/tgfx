@@ -356,8 +356,8 @@ void Matrix::postConcat(const Matrix& matrix) {
 }
 
 bool Matrix::invertible() const {
-  float determinant = values[SCALE_X] * values[SCALE_Y] - values[SKEW_Y] * values[SKEW_X];
-  return !(FloatNearlyZero(determinant, FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO));
+  const auto determinant = CalcDeterminant(*this, hasPerspective());
+  return !FloatNearlyZero(determinant, FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO);
 }
 
 enum { TranslateShift, ScaleShift, AffineShift, RectStaysRectShift = 4 };
