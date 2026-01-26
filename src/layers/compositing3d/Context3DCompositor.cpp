@@ -139,7 +139,7 @@ Context3DCompositor::Context3DCompositor(const Context& context, int width, int 
 
 void Context3DCompositor::addImage(std::shared_ptr<Image> image, const Matrix3D& matrix, int depth,
                                    float alpha, bool antiAlias) {
-  int sequenceIndex = _depthSequenceCounters[depth]++;
+  const auto sequenceIndex = _depthSequenceCounters[depth]++;
   auto polygon = std::make_unique<DrawPolygon3D>(std::move(image), matrix, depth, sequenceIndex,
                                                  alpha, antiAlias);
   _polygons.push_back(std::move(polygon));
