@@ -35,7 +35,7 @@ std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
   }
   auto imageBuffer = source->getData();
   if (imageBuffer == nullptr) {
-    LOGE("TextureUploadTask::onMakeResource() Failed to decode the image!");
+    LOGE("TextureUploadTask::onMakeResource() Failed to read pixels from source!");
     return nullptr;
   }
   auto textureView = TextureView::MakeFrom(context, imageBuffer, mipmapped);
