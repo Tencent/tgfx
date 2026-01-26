@@ -16,11 +16,9 @@ description: 代码审查 - 支持在线 PR 审查和本地变更审查
 
 ```bash
 gh --version
-gh auth status
 ```
 
 - 未安装 gh：提示用户安装（macOS: `brew install gh`，其他系统参考 https://cli.github.com）
-- 未登录：提示用户运行 `gh auth login` 完成登录
 
 ### 清理遗留环境
 
@@ -63,15 +61,32 @@ done
 
 ### 本地模式
 
+获取当前分支相对 main 的完整变更：
+
 ```bash
-git status && git diff && git diff --cached
+# 拉取最新的 main 分支
+git fetch origin main
+
+# 当前分支相对 origin/main 的完整变更（已提交 + 暂存区 + 工作区的最终结果）
+git diff origin/main
+
+# 查看文件状态（用于识别未跟踪文件）
+git status
 ```
+
+对于未跟踪的新增文件（`git status` 中以 `??` 开头的文件），使用 Read 工具读取文件内容进行审查。
 
 ### Worktree 模式
 
-先判断当前分支是否为 PR 分支：
+先获取 PR 信息（一次调用获取所有需要的字段）：
 ```bash
-PR_BRANCH=$(gh pr view {pr_number} --json headRefName -q '.headRefName')
+PR_INFO=$(gh pr view {pr_number} --json headRefName,author)
+PR_BRANCH=$(echo "$PR_INFO" | jq -r '.headRefName')
+PR_AUTHOR=$(echo "$PR_INFO" | jq -r '.author.login')
+```
+
+判断当前分支是否为 PR 分支：
+```bash
 CURRENT_BRANCH=$(git branch --show-current)
 [ "$PR_BRANCH" = "$CURRENT_BRANCH" ]
 ```
@@ -85,16 +100,22 @@ git worktree add /tmp/pr-review-{pr_number} pr-{pr_number}
 cd /tmp/pr-review-{pr_number}
 ```
 
-获取变更内容：
+获取变更内容和评论（两种情况通用）：
 ```bash
-BASE_BRANCH=$(gh pr view {pr_number} --json baseRefName -q '.baseRefName')
-git diff origin/${BASE_BRANCH}...HEAD
+# 拉取最新的 main 分支
+git fetch origin main
+
+# 当前分支相对 origin/main 的完整变更
+git diff origin/main
+
 gh pr view {pr_number} --comments
 ```
 
 ### 在线模式
 
+**并行获取**以下信息（三个独立 API 调用，并行可显著减少等待时间）：
 ```bash
+PR_AUTHOR=$(gh pr view {pr_number} --json author -q '.author.login')
 gh pr diff {pr_number}
 gh pr view {pr_number} --comments
 ```
@@ -116,9 +137,9 @@ gh pr view {pr_number} --comments
 - 问题列表：按序号列出真正存在的问题，每个问题包含位置、描述、修复建议
 - 若无问题则输出"无问题"
 
-**输出禁令**（严格遵守）：
-- **禁止输出任何已排除的问题**，包括禁止以"排除"、"不是问题"、"二次验证后确认正确"等形式提及
-- **禁止输出分析推理过程**，只输出最终结论
+**!! IMPORTANT - 输出禁令**：
+- 禁止输出任何已排除的问题，包括禁止以"排除"、"不是问题"、"二次验证后确认正确"等形式提及
+- 禁止输出分析推理过程，只输出最终结论
 
 ---
 
@@ -126,17 +147,21 @@ gh pr view {pr_number} --comments
 
 **若无问题**：
 - 本地模式 / 在线模式：流程结束
-- Worktree 模式：执行清理后流程结束
+- Worktree 模式：跳至第四步清理
 
 **若有问题**：按以下流程处理。
 
-判断代码归属（Worktree / 在线模式）：`[ "$(gh pr view {pr_number} --json author -q '.author.login')" = "$(gh api user -q '.login')" ]`
+判断代码归属（Worktree / 在线模式）：比较 `$PR_AUTHOR` 与 `gh api user -q '.login'`
 
 | 模式 | 自己的代码 | 别人的代码 |
 |------|----------|----------|
 | 本地模式 | 询问修复 | - |
-| Worktree 模式 | 优化标题 + 询问修复 + 推送 + 清理 | 优化标题 + 询问评论 + 清理 |
+| Worktree 模式 | 优化标题 + 询问修复 + 推送 | 优化标题 + 询问评论 + 提交评论 |
 | 在线模式 | 优化标题 + 询问评论 | 优化标题 + 询问评论 |
+
+> **!! CRITICAL - 别人的代码处理规则**：
+> - **NEVER** 自动修复并推送，只能通过 PR 评论提建议
+> - 用户回复问题序号时默认提交评论，除非明确要求"修复并推送"
 
 ### 优化标题
 
@@ -144,7 +169,7 @@ gh pr view {pr_number} --comments
 
 格式：根据变更内容总结 120 字符内的英语概括，以英文句号结尾，中间无其他标点，侧重描述用户可感知的变化。
 
-### 询问修复
+### 询问修复（仅限自己的代码）
 
 询问用户需要修复哪些序号的问题，然后逐一修复。
 
@@ -153,12 +178,14 @@ gh pr view {pr_number} --comments
 **Worktree 模式**：修复完成后提交并推送到 PR 分支：
 ```bash
 git add . && git commit -m "{根据修复内容生成}"
-git push origin HEAD:$(gh pr view {pr_number} --json headRefName -q '.headRefName')
+git push origin HEAD:$PR_BRANCH
 ```
 
-### 询问评论
+> 注：`{PR_BRANCH}` 使用前面获取的 `headRefName`。
 
-询问用户是否需要将问题作为 PR 行级评论提交。
+### 询问评论（别人的代码必须走此流程）
+
+询问用户是否需要将问题作为 PR 行级评论提交，以及需要提交哪些序号的问题。用户确认后执行评论提交。
 
 - 使用简洁的中文描述问题和建议
 - **必须**使用 `gh api` + heredoc，**禁止**使用 `gh pr comment`、`gh pr review` 等或任何非行级评论命令
@@ -169,11 +196,13 @@ gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --input - <<'EOF'
 EOF
 ```
 
-### 清理（仅 Worktree 模式）
+---
 
-若当前分支就是 PR 分支（未创建 worktree），则跳过清理步骤。
+## 第四步：清理（仅 Worktree 模式）
 
-若创建了 worktree，自动清理临时环境并输出提示：
+若当前分支就是 PR 分支（未创建 worktree），则跳过此步骤。
+
+若创建了 worktree，在第三步所有操作完成后，**直接执行清理，无需确认**：
 
 ```bash
 cd - # 返回原目录

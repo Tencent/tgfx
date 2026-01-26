@@ -23,10 +23,21 @@
 #include "tgfx/core/Brush.h"
 
 namespace tgfx {
-class ContourContext : public DrawContext {
+/**
+ * OpaqueContext is a specialized DrawContext that records drawing operations in "opaque mode".
+ * In opaque mode, all semi-transparent pixels are converted to fully opaque (using AlphaThreshold),
+ * while fully transparent pixels (alpha=0) remain unaffected.
+ * 
+ * This context is used to collect layer content for layer styles (DropShadow, InnerShadow, etc.)
+ * where the style effects are calculated based on the opaque representation of the content.
+ * 
+ * Note: When recording layer contour (as opposed to content), the contour additionally includes
+ * shapes from alpha=0 painters, but the opaque conversion logic remains the same.
+ */
+class OpaqueContext : public DrawContext {
  public:
-  ContourContext();
-  ~ContourContext() override;
+  OpaqueContext();
+  ~OpaqueContext() override;
 
   Canvas* beginRecording();
 
@@ -148,6 +159,6 @@ class ContourContext : public DrawContext {
   PictureContext pictureContext = {};
   std::unique_ptr<Canvas> canvas = nullptr;
 
-  friend class PendingContourAutoReset;
+  friend class PendingOpaqueAutoReset;
 };
 }  // namespace tgfx

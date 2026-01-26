@@ -73,9 +73,10 @@ void RRectDrawOp::onDraw(RenderPass* renderPass) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->setIndexBuffer(indexBuffer->gpuBuffer());
   auto numIndicesPerRRect = hasStroke ? IndicesPerStrokeRRect : IndicesPerFillRRect;
-  renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerRRect);
+  renderPass->drawIndexed(PrimitiveType::Triangles,
+                          static_cast<uint32_t>(rectCount * numIndicesPerRRect));
 }
 }  // namespace tgfx

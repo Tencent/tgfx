@@ -20,9 +20,20 @@
 #include "Painter.h"
 #include "VectorContext.h"
 #include "core/utils/Log.h"
+#include "tgfx/core/PathTypes.h"
 #include "tgfx/layers/LayerRecorder.h"
 
 namespace tgfx {
+
+static PathFillType ToPathFillType(FillRule fillRule) {
+  switch (fillRule) {
+    case FillRule::Winding:
+      return PathFillType::Winding;
+    case FillRule::EvenOdd:
+      return PathFillType::EvenOdd;
+  }
+  return PathFillType::Winding;
+}
 
 class FillPainter : public Painter {
  public:
@@ -52,7 +63,7 @@ class FillPainter : public Painter {
       }
       shape = Shape::ApplyMatrix(shape, geometry->matrix);
       LayerPaint paint(shader, alpha, blendMode);
-      paint.drawPosition = drawPosition;
+      paint.placement = placement;
       recorder->addShape(std::move(shape), paint);
     }
   }
@@ -64,7 +75,7 @@ class FillPainter : public Painter {
 
     if (blendFactor < 1.0f) {
       LayerPaint paint(shader, alpha * run.style.alpha, blendMode);
-      paint.drawPosition = drawPosition;
+      paint.placement = placement;
       recorder->addTextBlob(run.textBlob, paint, geometryMatrix);
     }
 
@@ -73,7 +84,7 @@ class FillPainter : public Painter {
       auto overlayColor = Color{fillColor.red, fillColor.green, fillColor.blue, blendFactor};
       auto colorShader = Shader::MakeColorShader(overlayColor);
       LayerPaint paint(colorShader, alpha * run.style.alpha, BlendMode::SrcOver);
-      paint.drawPosition = drawPosition;
+      paint.placement = placement;
       recorder->addTextBlob(run.textBlob, paint, geometryMatrix);
     }
   }
@@ -104,7 +115,7 @@ void FillStyle::setBlendMode(BlendMode value) {
   invalidateContent();
 }
 
-void FillStyle::setFillRule(PathFillType value) {
+void FillStyle::setFillRule(FillRule value) {
   if (_fillRule == value) {
     return;
   }
@@ -112,11 +123,11 @@ void FillStyle::setFillRule(PathFillType value) {
   invalidateContent();
 }
 
-void FillStyle::setDrawPosition(DrawPosition value) {
-  if (_drawPosition == value) {
+void FillStyle::setPlacement(LayerPlacement value) {
+  if (_placement == value) {
     return;
   }
-  _drawPosition = value;
+  _placement = value;
   invalidateContent();
 }
 
@@ -148,8 +159,8 @@ void FillStyle::apply(VectorContext* context) {
   painter->shader = std::move(shader);
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
-  painter->fillRule = _fillRule;
-  painter->drawPosition = _drawPosition;
+  painter->fillRule = ToPathFillType(_fillRule);
+  painter->placement = _placement;
   painter->geometries.reserve(context->geometries.size());
   for (auto& geometry : context->geometries) {
     painter->geometries.push_back(geometry.get());

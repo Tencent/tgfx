@@ -37,7 +37,7 @@ class DisplayList;
 class DrawArgs;
 class RegionTransformer;
 class RootLayer;
-class ContourContext;
+class OpaqueContext;
 struct LayerStyleSource;
 struct MaskData;
 class BackgroundContext;

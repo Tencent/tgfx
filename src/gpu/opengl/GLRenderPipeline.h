@@ -35,6 +35,12 @@ struct GLAttribute {
   size_t offset = 0;
 };
 
+struct GLBufferLayout {
+  size_t stride = 0;
+  VertexStepMode stepMode = VertexStepMode::Vertex;
+  std::vector<GLAttribute> attributes = {};
+};
+
 /**
  * GLRenderPipeline is the OpenGL implementation of the RenderPipeline interface. It encapsulates
  * an OpenGL shader program along with its associated state, such as vertex attributes and blending
@@ -60,10 +66,10 @@ class GLRenderPipeline : public RenderPipeline, public GLResource {
   void setTexture(GLGPU* gpu, unsigned binding, GLTexture* texture, GLSampler* sampler);
 
   /**
-   * Binds the vertex buffer to be used in subsequent draw calls. The vertexOffset is the offset
-   * into the buffer where the vertex data begins.
+   * Binds a vertex buffer at the specified slot. The slot corresponds to the index in the
+   * bufferLayouts array of the VertexDescriptor.
    */
-  void setVertexBuffer(GLGPU* gpu, GLBuffer* vertexBuffer, size_t vertexOffset);
+  void setVertexBuffer(GLGPU* gpu, unsigned slot, GLBuffer* buffer, size_t offset);
 
   /**
    * Sets the stencil reference value for stencil testing.
@@ -77,8 +83,7 @@ class GLRenderPipeline : public RenderPipeline, public GLResource {
   uint32_t uniqueID = 0;
   unsigned programID = 0;
   unsigned vertexArray = 0;
-  std::vector<GLAttribute> attributes = {};
-  size_t vertexStride = 0;
+  std::vector<GLBufferLayout> bufferLayouts = {};
   std::unordered_map<unsigned, unsigned> textureUnits = {};
   uint32_t colorWriteMask = ColorWriteMask::All;
   std::unique_ptr<GLStencilState> stencilState = nullptr;

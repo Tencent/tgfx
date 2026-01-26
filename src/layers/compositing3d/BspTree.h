@@ -18,10 +18,12 @@
 
 #pragma once
 
+#include <algorithm>
 #include <deque>
 #include <memory>
 #include <vector>
 #include "DrawPolygon3D.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -78,10 +80,13 @@ class BspTree {
     if (firstChild) {
       traverseNode(action, firstChild);
     }
+    DEBUG_ASSERT(std::is_sorted(firstCoplanars.begin(), firstCoplanars.end(), DrawPolygon3DOrder));
     for (const auto& polygon : firstCoplanars) {
       action(polygon.get());
     }
     action(node->data.get());
+    DEBUG_ASSERT(
+        std::is_sorted(secondCoplanars.begin(), secondCoplanars.end(), DrawPolygon3DOrder));
     for (const auto& polygon : secondCoplanars) {
       action(polygon.get());
     }

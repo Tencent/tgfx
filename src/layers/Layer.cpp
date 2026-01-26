@@ -30,7 +30,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
-#include "layers/ContourContext.h"
+#include "layers/OpaqueContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/MaskContext.h"
 #include "layers/RegionTransformer.h"
@@ -170,16 +170,16 @@ static std::shared_ptr<Picture> RecordPicture(float contentScale,
   return recorder.finishRecordingAsPicture();
 }
 
-static std::shared_ptr<Picture> RecordContourPicture(
-    float contentScale, const std::function<void(Canvas*, ContourContext*)>& drawFunction) {
+static std::shared_ptr<Picture> RecordOpaquePicture(
+    float contentScale, const std::function<void(Canvas*, OpaqueContext*)>& drawFunction) {
   if (drawFunction == nullptr) {
     return nullptr;
   }
-  ContourContext contourContext;
-  auto canvas = contourContext.beginRecording();
+  OpaqueContext opaqueContext;
+  auto canvas = opaqueContext.beginRecording();
   canvas->scale(contentScale, contentScale);
-  drawFunction(canvas, &contourContext);
-  return contourContext.finishRecordingAsPicture();
+  drawFunction(canvas, &opaqueContext);
+  return opaqueContext.finishRecordingAsPicture();
 }
 
 static std::shared_ptr<Image> ToImageWithOffset(
@@ -259,7 +259,7 @@ static int GetMipmapCacheLongEdge(int maxSize, float contentScale, const Rect& l
  */
 static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Canvas* canvas,
                                                        const Rect& bounds) {
-  if (args.renderRect == nullptr || args.context == nullptr) {
+  if (args.context == nullptr) {
     DEBUG_ASSERT(false);
     return nullptr;
   }
@@ -286,8 +286,8 @@ static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Can
     return nullptr;
   }
 
-  bool contourMode = args.contourContext != nullptr;
-  return Layer3DContext::Make(contourMode, args.context, validRenderRect, contentScale,
+  bool opaqueMode = args.opaqueContext != nullptr;
+  return Layer3DContext::Make(opaqueMode, args.context, validRenderRect, contentScale,
                               args.dstColorSpace, args.blurBackground);
 }
 
@@ -1265,8 +1265,8 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   // Otherwise, use the 2D projection of the relative matrix on canvas.
   auto canvasMatrix = Matrix3DUtils::GetMayLossyMatrix(relativeMatrix3D);
   if (isContourMode) {
-    auto drawMask = [&](Canvas* canvas, ContourContext* contourContext) {
-      maskArgs.contourContext = contourContext;
+    auto drawMask = [&](Canvas* canvas, OpaqueContext* opaqueContext) {
+      maskArgs.opaqueContext = opaqueContext;
       if (maskCanPreserve3D) {
         _mask->drawByStarting3DContext(maskArgs, canvas, relativeMatrix3D, &Layer::drawContour,
                                        _mask->_alpha, BlendMode::SrcOver);
@@ -1275,7 +1275,7 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
         _mask->drawContour(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
       }
     };
-    return RecordContourPicture(scale, drawMask);
+    return RecordOpaquePicture(scale, drawMask);
   }
   auto drawMask = [&](Canvas* canvas) {
     if (maskCanPreserve3D) {
@@ -1345,9 +1345,9 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
     return nullptr;
   }
   bool allMatch = true;
-  auto picture = RecordContourPicture(contentScale, [&](Canvas* canvas, ContourContext* context) {
+  auto picture = RecordOpaquePicture(contentScale, [&](Canvas* canvas, OpaqueContext* context) {
     auto contourArgs = args;
-    contourArgs.contourContext = context;
+    contourArgs.opaqueContext = context;
     if (!drawContourInternal(contourArgs, canvas, true)) {
       allMatch = false;
     }
@@ -1764,11 +1764,11 @@ bool Layer::drawContour(const DrawArgs& args, Canvas* canvas, float, BlendMode) 
 }
 
 bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool contentOnly) {
-  auto* contourContext = args.contourContext;
+  auto* opaqueContext = args.opaqueContext;
   // Check if this layer is completely covered by opaque bounds
   auto bounds = getBounds();
   auto globalBounds = canvas->getMatrix().mapRect(bounds);
-  if (contourContext && contourContext->containsOpaqueBounds(globalBounds)) {
+  if (opaqueContext && opaqueContext->containsOpaqueBounds(globalBounds)) {
     return true;
   }
 
@@ -1914,7 +1914,7 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const 
 
   const auto offscreenCanvas =
       newContext->beginRecording(matrix3D, bitFields.allowsEdgeAntialiasing);
-  contextArgs.contourContext = newContext->currentContourContext();
+  contextArgs.opaqueContext = newContext->currentOpaqueContext();
   (this->*drawFunc)(contextArgs, offscreenCanvas, alpha, blendMode);
   newContext->endRecording();
   newContext->finishAndDrawTo(canvas, bitFields.allowsEdgeAntialiasing);
@@ -1978,7 +1978,7 @@ bool Layer::drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, f
   if (context3D) {
     targetCanvas =
         context3D->beginRecording(childTransform3D, child->bitFields.allowsEdgeAntialiasing);
-    drawArgs.contourContext = context3D->currentContourContext();
+    drawArgs.opaqueContext = context3D->currentOpaqueContext();
   }
   // If child cannot preserve 3D but has a 3D context, clear it so that child's internal rendering
   // (e.g., drawOffscreen) doesn't see it. The child is still recorded into the 3D context via
@@ -2059,7 +2059,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
   // Need to draw content separately when any drawn child's contour differs from content.
   if (!allContourMatch) {
-    auto picture = RecordContourPicture(contentScale, [&](Canvas* canvas, ContourContext*) {
+    auto picture = RecordOpaquePicture(contentScale, [&](Canvas* canvas, OpaqueContext*) {
       drawContents(drawArgs, canvas, 1.0f);
     });
     source->content =

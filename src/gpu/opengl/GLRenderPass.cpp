@@ -120,18 +120,16 @@ void GLRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> texture
                              std::static_pointer_cast<GLSampler>(sampler)});
 }
 
-void GLRenderPass::setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset) {
+void GLRenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer,
+                                   size_t offset) {
   if (buffer == nullptr) {
-    auto gl = _gpu->functions();
-    gl->bindBuffer(GL_ARRAY_BUFFER, 0);
     return;
   }
   if (!(buffer->usage() & GPUBufferUsage::VERTEX)) {
     LOGE("GLRenderPass::setVertexBuffer(), buffer usage is not VERTEX!");
     return;
   }
-  pendingVertexBuffer = std::static_pointer_cast<GLBuffer>(buffer);
-  pendingVertexOffset = offset;
+  pendingVertexBuffers.push_back({slot, std::static_pointer_cast<GLBuffer>(buffer), offset});
 }
 
 void GLRenderPass::setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat format) {
@@ -184,24 +182,47 @@ void GLRenderPass::onEnd() {
 
 static constexpr unsigned PrimitiveTypes[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
 
-void GLRenderPass::draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
+void GLRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount, uint32_t instanceCount,
+                        uint32_t firstVertex, uint32_t firstInstance) {
   if (!flushPendingBindings()) {
     return;
   }
+  // Requires OpenGL 4.2+ or ES 3.2+, not implemented in the OpenGL backend.
+  DEBUG_ASSERT(firstInstance == 0);
+  (void)firstInstance;
   auto gl = _gpu->functions();
-  gl->drawArrays(PrimitiveTypes[static_cast<int>(primitiveType)], static_cast<int>(baseVertex),
-                 static_cast<int>(vertexCount));
+  if (instanceCount <= 1) {
+    gl->drawArrays(PrimitiveTypes[static_cast<int>(primitiveType)], static_cast<int>(firstVertex),
+                   static_cast<int>(vertexCount));
+  } else {
+    gl->drawArraysInstanced(PrimitiveTypes[static_cast<int>(primitiveType)],
+                            static_cast<int>(firstVertex), static_cast<int>(vertexCount),
+                            static_cast<int>(instanceCount));
+  }
 }
 
-void GLRenderPass::drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) {
+void GLRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCount,
+                               uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
+                               uint32_t firstInstance) {
   if (!flushPendingBindings()) {
     return;
   }
+  // Requires OpenGL 4.2+ or ES 3.2+, not implemented in the OpenGL backend.
+  DEBUG_ASSERT(baseVertex == 0);
+  DEBUG_ASSERT(firstInstance == 0);
+  (void)baseVertex;
+  (void)firstInstance;
   auto gl = _gpu->functions();
   unsigned indexType = (indexFormat == IndexFormat::UInt16) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
   size_t indexSize = (indexFormat == IndexFormat::UInt16) ? sizeof(uint16_t) : sizeof(uint32_t);
-  gl->drawElements(PrimitiveTypes[static_cast<int>(primitiveType)], static_cast<int>(indexCount),
-                   indexType, reinterpret_cast<void*>(baseIndex * indexSize));
+  if (instanceCount <= 1) {
+    gl->drawElements(PrimitiveTypes[static_cast<int>(primitiveType)], static_cast<int>(indexCount),
+                     indexType, reinterpret_cast<void*>(firstIndex * indexSize));
+  } else {
+    gl->drawElementsInstanced(
+        PrimitiveTypes[static_cast<int>(primitiveType)], static_cast<int>(indexCount), indexType,
+        reinterpret_cast<void*>(firstIndex * indexSize), static_cast<int>(instanceCount));
+  }
 }
 
 void GLRenderPass::bindFramebuffer() {
@@ -244,9 +265,11 @@ bool GLRenderPass::flushPendingBindings() {
     pendingTextures.clear();
   }
 
-  if (pendingVertexBuffer) {
-    renderPipeline->setVertexBuffer(_gpu, pendingVertexBuffer.get(), pendingVertexOffset);
-    pendingVertexBuffer = nullptr;
+  if (!pendingVertexBuffers.empty()) {
+    for (auto& entry : pendingVertexBuffers) {
+      renderPipeline->setVertexBuffer(_gpu, entry.slot, entry.buffer.get(), entry.offset);
+    }
+    pendingVertexBuffers.clear();
   }
   if (pendingIndexBuffer) {
     gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, pendingIndexBuffer->bufferID());

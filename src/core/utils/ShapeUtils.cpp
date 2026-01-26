@@ -19,7 +19,6 @@
 #include "ShapeUtils.h"
 #include "core/shapes/MatrixShape.h"
 #include "core/shapes/StrokeShape.h"
-#include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -32,22 +31,27 @@ Path ShapeUtils::GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resol
 }
 
 float ShapeUtils::CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape) {
-  if (!shape || shape->type() != Shape::Type::Matrix) {
+  if (!shape) {
     return 1.f;
   }
 
-  auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
-  if (matrixShape->shape->type() == Shape::Type::Stroke) {
-    auto strokeShape = std::static_pointer_cast<StrokeShape>(matrixShape->shape);
-    if (IsHairlineStroke(strokeShape->stroke)) {
-      return 1.f;
+  std::shared_ptr<StrokeShape> strokeShape = nullptr;
+  float scale = 1.f;
+
+  if (shape->type() == Shape::Type::Matrix) {
+    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
+    if (matrixShape->shape->type() == Shape::Type::Stroke) {
+      strokeShape = std::static_pointer_cast<StrokeShape>(matrixShape->shape);
+      scale = matrixShape->matrix.getMaxScale();
     }
-    auto width = strokeShape->stroke.width * matrixShape->matrix.getMaxScale();
-    if (width < 1.f) {
-      return width;
-    }
+  } else if (shape->type() == Shape::Type::Stroke) {
+    strokeShape = std::static_pointer_cast<StrokeShape>(shape);
   }
-  return 1.f;
+
+  if (!strokeShape || strokeShape->stroke.width <= 0.f) {
+    return 1.f;
+  }
+  return std::min(strokeShape->stroke.width * scale, 1.f);
 }
 
 }  // namespace tgfx

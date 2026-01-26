@@ -119,6 +119,9 @@ bool RootLayer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   auto color = _backgroundColor;
   color.alpha = color.alpha * alpha;
   canvas->drawColor(color, blendMode);
+  if (args.blurBackground) {
+    args.blurBackground->getCanvas()->drawColor(color, blendMode);
+  }
   return Layer::drawLayer(args, canvas, alpha, blendMode);
 }
 

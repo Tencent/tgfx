@@ -104,8 +104,9 @@ std::shared_ptr<RenderPipeline> CornerPinEffect::createPipeline(GPU* gpu) const 
     return nullptr;
   }
   RenderPipelineDescriptor descriptor = {};
-  descriptor.vertex = VertexDescriptor(
+  VertexBufferLayout vertexLayout(
       {{"aPosition", VertexFormat::Float2}, {"aTextureCoord", VertexFormat::Float3}});
+  descriptor.vertex.bufferLayouts = {vertexLayout};
   descriptor.vertex.module = vertexShader;
   descriptor.fragment.module = fragmentShader;
   descriptor.fragment.colorAttachments.push_back({});
@@ -154,12 +155,12 @@ bool CornerPinEffect::onDraw(CommandEncoder* encoder,
   auto& inputTexture = inputTextures[0];
   collectVertices(inputTexture.get(), outputTexture.get(), offset, vertices);
   vertexBuffer->unmap();
-  renderPass->setVertexBuffer(vertexBuffer);
+  renderPass->setVertexBuffer(0, vertexBuffer);
   SamplerDescriptor samplerDesc(AddressMode::ClampToEdge, AddressMode::ClampToEdge,
                                 FilterMode::Linear, FilterMode::Linear, MipmapMode::None);
   auto sampler = gpu->createSampler(samplerDesc);
   renderPass->setTexture(0, inputTexture, sampler);
-  renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
+  renderPass->draw(PrimitiveType::TriangleStrip, 4);
   renderPass->end();
   return true;
 }

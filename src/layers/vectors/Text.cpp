@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,26 +16,34 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/layerstyles/LayerStyle.h"
-#include <utility>
+#include "tgfx/layers/vectors/Text.h"
+#include "VectorContext.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-void LayerStyle::setBlendMode(BlendMode blendMode) {
-  if (_blendMode == blendMode) {
+
+void Text::setTextBlob(std::shared_ptr<TextBlob> value) {
+  if (_textBlob == value) {
     return;
   }
-  _blendMode = blendMode;
-  invalidateTransform();
+  _textBlob = std::move(value);
+  invalidateContent();
 }
 
-Rect LayerStyle::filterBackground(const Rect& srcRect, float) {
-  return srcRect;
+void Text::setPosition(const Point& value) {
+  if (_position == value) {
+    return;
+  }
+  _position = value;
+  invalidateContent();
 }
 
-void LayerStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
-                                       float contentScale, std::shared_ptr<Image>, const Point&,
-                                       float alpha, BlendMode blendMode) {
-  onDraw(canvas, std::move(content), contentScale, alpha, blendMode);
+void Text::apply(VectorContext* context) {
+  DEBUG_ASSERT(context != nullptr);
+  if (_textBlob == nullptr) {
+    return;
+  }
+  context->addTextBlob(_textBlob, _position);
 }
 
 }  // namespace tgfx

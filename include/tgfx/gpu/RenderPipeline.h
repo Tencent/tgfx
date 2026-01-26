@@ -111,6 +111,59 @@ class FragmentDescriptor {
 };
 
 /**
+ * Defines how a vertex buffer steps through data for vertex shader invocations.
+ */
+enum class VertexStepMode {
+  /**
+   * The buffer data steps per vertex. Each vertex shader invocation reads the next element.
+   */
+  Vertex,
+
+  /**
+   * The buffer data steps per instance. Each instance reads the next element, shared by all
+   * vertices in that instance.
+   */
+  Instance
+};
+
+/**
+ * Describes the layout of a single vertex buffer, including its stride, step mode, and the
+ * attributes it contains.
+ */
+class VertexBufferLayout {
+ public:
+  /**
+   * Creates an empty vertex buffer layout.
+   */
+  VertexBufferLayout() = default;
+
+  /**
+   * Creates a vertex buffer layout with the specified attributes and step mode. If stride is 0, it
+   * will be calculated as the sum of the sizes of all attributes.
+   * @param attributes The attributes contained in this buffer.
+   * @param stepMode Whether the buffer steps per vertex or per instance.
+   * @param stride The number of bytes between consecutive elements. If 0, calculated automatically.
+   */
+  VertexBufferLayout(std::vector<Attribute> attributes,
+                     VertexStepMode stepMode = VertexStepMode::Vertex, size_t stride = 0);
+
+  /**
+   * The number of bytes between consecutive elements (vertices or instances) in the buffer.
+   */
+  size_t stride = 0;
+
+  /**
+   * Defines how the buffer steps through data: per vertex or per instance.
+   */
+  VertexStepMode stepMode = VertexStepMode::Vertex;
+
+  /**
+   * An array of attributes that describe the data layout within each element of the buffer.
+   */
+  std::vector<Attribute> attributes = {};
+};
+
+/**
  * VertexDescriptor describes the vertex shader entry point and the input buffer layouts for the
  * pipeline.
  */
@@ -120,12 +173,6 @@ class VertexDescriptor {
    * Creates an empty vertex descriptor.
    */
   VertexDescriptor() = default;
-
-  /**
-   * Creates a vertex descriptor with the specified attributes and vertex stride.
-   * If vertexStride is 0, it will be calculated as the sum of the sizes of all attributes.
-   */
-  VertexDescriptor(std::vector<Attribute> attributes, size_t vertexStride = 0);
 
   /**
    * A ShaderModule object containing the vertex shader code.
@@ -138,15 +185,11 @@ class VertexDescriptor {
   std::string entryPoint = "main";
 
   /**
-   * An array of state data that describes how vertex attribute data is stored in memory and is
-   * mapped to arguments for a vertex shader function.
+   * An array of VertexBufferLayout objects that describe the layout of vertex buffers. Each layout
+   * corresponds to a slot index used in setVertexBuffer(). Slot 0 is typically used for per-vertex
+   * data, and slot 1 for per-instance data.
    */
-  std::vector<Attribute> attributes = {};
-
-  /**
-   * The number of bytes between the first byte of two consecutive vertices in a buffer.
-   */
-  size_t vertexStride = 0;
+  std::vector<VertexBufferLayout> bufferLayouts = {};
 };
 
 /**

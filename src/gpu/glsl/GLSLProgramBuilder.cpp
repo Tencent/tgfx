@@ -183,7 +183,8 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     return nullptr;
   }
   RenderPipelineDescriptor descriptor = {};
-  descriptor.vertex = {programInfo->getVertexAttributes()};
+  VertexBufferLayout vertexLayout(programInfo->getVertexAttributes());
+  descriptor.vertex.bufferLayouts = {vertexLayout};
   descriptor.vertex.module = vertexShader;
   descriptor.fragment.module = fragmentShader;
   descriptor.fragment.colorAttachments.push_back(programInfo->getPipelineColorAttachment());

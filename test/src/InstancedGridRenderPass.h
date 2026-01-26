@@ -18,52 +18,28 @@
 
 #pragma once
 
-#include "tgfx/core/Point.h"
-#include "tgfx/core/TextBlob.h"
-#include "tgfx/layers/vectors/VectorElement.h"
+#include "tgfx/gpu/Attribute.h"
+#include "tgfx/gpu/CommandEncoder.h"
 
 namespace tgfx {
-
-/**
- * TextSpan represents a text blob with position. Multiple TextSpans can be combined with
- * VectorGroup to create rich text with different styles.
- */
-class TextSpan : public VectorElement {
+class InstancedGridRenderPass {
  public:
-  /**
-   * Returns the text blob to render.
-   */
-  std::shared_ptr<TextBlob> textBlob() const {
-    return _textBlob;
-  }
+  static constexpr float GRID_SIZE = 20.0f;
+  static constexpr float GRID_SPACING = 8.0f;
 
-  /**
-   * Sets the text blob to render.
-   */
-  void setTextBlob(std::shared_ptr<TextBlob> value);
+  static std::shared_ptr<InstancedGridRenderPass> Make(uint32_t rows, uint32_t columns);
 
-  /**
-   * Returns the position of the text blob.
-   */
-  Point position() const {
-    return _position;
-  }
-
-  /**
-   * Sets the position of the text blob.
-   */
-  void setPosition(const Point& value);
-
- protected:
-  Type type() const override {
-    return Type::TextSpan;
-  }
-
-  void apply(VectorContext* context) override;
+  bool onDraw(CommandEncoder* encoder, std::shared_ptr<Texture> renderTexture) const;
 
  private:
-  std::shared_ptr<TextBlob> _textBlob = nullptr;
-  Point _position = {};
-};
+  InstancedGridRenderPass(uint32_t rows, uint32_t columns);
 
+  uint32_t rows;
+  uint32_t columns;
+  Attribute position;
+  Attribute offset;
+  Attribute color;
+
+  std::shared_ptr<RenderPipeline> createPipeline(GPU* gpu) const;
+};
 }  // namespace tgfx

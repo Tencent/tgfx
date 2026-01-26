@@ -32,7 +32,7 @@ namespace tgfx {
 
 class BackgroundContext;
 class Context;
-class ContourContext;
+class OpaqueContext;
 
 struct TransformState {
   TransformState(const Matrix3D& transform, bool antialiasing)
@@ -77,10 +77,10 @@ class Layer3DContext {
   bool isFinished() const;
 
   /**
-   * Returns the current ContourContext for contour rendering, or nullptr for normal rendering.
-   * Must be called after beginRecording.
+   * Returns the current OpaqueContext for opaque content/contour rendering, or nullptr for normal
+   * rendering. Must be called after beginRecording.
    */
-  virtual ContourContext* currentContourContext() {
+  virtual OpaqueContext* currentOpaqueContext() {
     return nullptr;
   }
 
@@ -100,7 +100,7 @@ class Layer3DContext {
   virtual Canvas* onBeginRecording() = 0;
   virtual std::shared_ptr<Picture> onFinishRecording() = 0;
   virtual void onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                            const Point& pictureOffset, bool antialiasing) = 0;
+                            const Point& pictureOffset, int depth, bool antialiasing) = 0;
 
   Rect _renderRect = {};
   float _contentScale = 1.0f;

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Layer3DContext.h"
-#include "Contour3DContext.h"
+#include "Opaque3DContext.h"
 #include "Render3DContext.h"
 #include "core/Matrix3DUtils.h"
 #include "core/utils/Log.h"
@@ -27,11 +27,11 @@
 namespace tgfx {
 
 std::shared_ptr<Layer3DContext> Layer3DContext::Make(
-    bool contourMode, Context* context, const Rect& renderRect, float contentScale,
+    bool opaqueMode, Context* context, const Rect& renderRect, float contentScale,
     std::shared_ptr<ColorSpace> colorSpace, std::shared_ptr<BackgroundContext> backgroundContext) {
-  if (contourMode) {
+  if (opaqueMode) {
     DEBUG_ASSERT(backgroundContext == nullptr);
-    return std::make_shared<Contour3DContext>(renderRect, contentScale, std::move(colorSpace));
+    return std::make_shared<Opaque3DContext>(renderRect, contentScale, std::move(colorSpace));
   }
   auto compositor = std::make_shared<Context3DCompositor>(
       *context, static_cast<int>(renderRect.width()), static_cast<int>(renderRect.height()));
@@ -104,13 +104,15 @@ void Layer3DContext::endRecording() {
     return;
   }
 
+  // Get depth after pop: represents the number of ancestor layers (0 for root layer)
+  auto depth = static_cast<int>(_transformStack.size());
   DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
   auto invScale = 1.0f / _contentScale;
   auto imageOrigin = Point::Make(pictureOffset.x * invScale, pictureOffset.y * invScale);
   auto imageTransform = Matrix3DUtils::OriginAdaptedMatrix3D(state.transform, imageOrigin);
   imageTransform = Matrix3DUtils::ScaleAdaptedMatrix3D(imageTransform, _contentScale);
 
-  onImageReady(std::move(image), imageTransform, pictureOffset, state.antialiasing);
+  onImageReady(std::move(image), imageTransform, pictureOffset, depth, state.antialiasing);
 }
 
 }  // namespace tgfx
