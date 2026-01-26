@@ -17,7 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Contour3DContext.h"
-#include "tgfx/core/ImageFilter.h"
+#include "core/Matrix3DUtils.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Paint.h"
 
 namespace tgfx {
@@ -51,17 +52,13 @@ void Contour3DContext::onImageReady(std::shared_ptr<Image> image, const Matrix3D
 }
 
 void Contour3DContext::finishAndDrawTo(Canvas* canvas, bool antialiasing) {
-  auto invScale = 1.0f / _contentScale;
   Paint paint = {};
   paint.setAntiAlias(antialiasing);
   for (const auto& entry : _contourImages) {
-    auto imageFilter = ImageFilter::Transform3D(entry.transform);
-    auto offset = Point::Zero();
-    auto transformedImage = entry.image->makeWithFilter(imageFilter, &offset);
-    if (transformedImage == nullptr) {
-      continue;
-    }
-    canvas->drawImage(transformedImage, offset.x * invScale, offset.y * invScale, &paint);
+    AutoCanvasRestore autoRestore(canvas);
+    auto imageMatrix = Matrix3DUtils::GetMayLossyMatrix(entry.transform);
+    canvas->concat(imageMatrix);
+    canvas->drawImage(entry.image, &paint);
   }
 }
 
