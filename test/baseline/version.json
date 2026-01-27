@@ -251,7 +251,7 @@
         "draw_shape": "eefb7a46",
         "draw_solid": "b4a1231",
         "draw_text": "ba7ed034",
-        "getBounds": "543054b5",
+        "getBounds": "cad4b77f",
         "getLayersUnderPoint": "4d602959",
         "getTightBounds": "880d5a6c",
         "imageLayer": "e5103ae6"
@@ -310,7 +310,7 @@
         "path": "bf48e614",
         "roundRectRadii": "bf48e614",
         "roundRectRadiiStroke": "bf48e614",
-        "shape": "bf48e614"
+        "shape": "cad4b77f"
     },
     "PathTest": {
         "DrawInfiniteLoopPath": "898f84dd"
