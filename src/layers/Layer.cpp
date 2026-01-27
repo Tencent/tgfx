@@ -871,15 +871,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
 
 Point Layer::globalToLocal(const Point& globalPoint) const {
   auto globalMatrix = getGlobalMatrix();
-  // All vertices inside the rect have an initial z-coordinate of 0, so the third column of the 4x4
-  // matrix does not affect the final transformation result and can be ignored. Additionally, since
-  // we do not care about the final projected z-axis coordinate, the third row can also be ignored.
-  // Therefore, the 4x4 matrix can be simplified to a 3x3 matrix.
-  float values[16] = {};
-  globalMatrix.getColumnMajor(values);
-  // Convert from column-major (Matrix3D) to row-major (Matrix)
-  auto matrix = Matrix::MakeAll(values[0], values[4], values[12], values[1], values[5], values[13],
-                                values[3], values[7], values[15]);
+  auto matrix = Matrix3DUtils::GetMayLossyMatrix(globalMatrix);
   Matrix inversedMatrix;
   if (!matrix.invert(&inversedMatrix)) {
     DEBUG_ASSERT(false);
