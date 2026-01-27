@@ -41,16 +41,17 @@ static uint32_t GetTypefaceID(const Typeface* typeface, bool isCustom) {
   return isCustom ? static_cast<const UserTypeface*>(typeface)->builderID() : typeface->uniqueID();
 }
 
-static void ComputeStrikeKey(uint32_t typefaceID, float backingSize, bool isBold,
-                             const Stroke* stroke, BytesKey* key) {
-  key->write(typefaceID);
-  key->write(backingSize);
+static BytesKey GetStrikeKey(uint32_t typefaceID, float backingSize, bool isBold,
+                             const Stroke* stroke) {
+  BytesKey key;
+  key.write(typefaceID);
+  key.write(backingSize);
   if (!stroke) {
-    key->write(static_cast<uint32_t>(isBold));
-    return;
+    key.write(static_cast<uint32_t>(isBold));
+    return key;
   }
-  key->write(stroke->width);
-  key->write(stroke->miterLimit);
+  key.write(stroke->width);
+  key.write(stroke->miterLimit);
   uint32_t zipValue = 0;
   const auto cap = static_cast<uint32_t>(stroke->cap);
   const auto join = static_cast<uint32_t>(stroke->join);
@@ -58,7 +59,25 @@ static void ComputeStrikeKey(uint32_t typefaceID, float backingSize, bool isBold
   zipValue |= (cap & 0b11);          // cap: bit 0-1
   zipValue |= ((join & 0b11) << 2);  // join: bit 2-3
   zipValue |= ((bold & 0b1) << 4);   // bold: bit 4
-  key->write(zipValue);
+  key.write(zipValue);
+  return key;
+}
+
+static Font GetScaledFont(const Font& font, float scale) {
+  if (FloatNearlyEqual(scale, 1.0f)) {
+    return font;
+  }
+  return font.makeWithSize(font.getSize() * scale);
+}
+
+static std::unique_ptr<Stroke> GetScaledStroke(const Font& font, const Stroke* stroke,
+                                               float scale) {
+  if (font.hasColor() || stroke == nullptr) {
+    return nullptr;
+  }
+  auto scaledStroke = std::make_unique<Stroke>(*stroke);
+  scaledStroke->width *= scale;
+  return scaledStroke;
 }
 
 static MaskFormat GetMaskFormat(const Font& font) {
@@ -174,18 +193,22 @@ static void ApplyScaleAndStrokeToBounds(Rect* bounds, float scale, const Stroke*
   bounds->scale(scale, scale);
 }
 
+static Rect GetScaledTypefaceBounds(const std::shared_ptr<Typeface>& typeface, float fontSize,
+                                    float inverseScale, const Stroke* scaledStroke) {
+  auto bounds = typeface->getBounds();
+  bounds.scale(fontSize, fontSize);
+  ApplyScaleAndStrokeToBounds(&bounds, inverseScale, scaledStroke);
+  return bounds;
+}
+
 static const Rect* GetScaledGlyphBounds(const Font& font, GlyphID glyphID, float inverseScale,
-                                        const Stroke* scaledStroke, const Rect* sharedBounds,
-                                        Rect* perGlyphBounds) {
-  if (sharedBounds != nullptr) {
-    return sharedBounds;
-  }
-  *perGlyphBounds = font.getBounds(glyphID);
-  if (perGlyphBounds->isEmpty()) {
+                                        const Stroke* scaledStroke, Rect* outBounds) {
+  *outBounds = font.getBounds(glyphID);
+  if (outBounds->isEmpty()) {
     return nullptr;
   }
-  ApplyScaleAndStrokeToBounds(perGlyphBounds, inverseScale, scaledStroke);
-  return perGlyphBounds;
+  ApplyScaleAndStrokeToBounds(outBounds, inverseScale, scaledStroke);
+  return outBounds;
 }
 
 static void GetGlyphMatrix(float glyphRenderScale, const Point& glyphOffset, bool fauxItalic,
@@ -441,6 +464,7 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
   }
 }
 
+// rejectedIndices is guaranteed non-null by internal callers.
 void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
                                            const Brush& brush, const Stroke* stroke,
                                            const Rect& localClipBounds,
@@ -452,40 +476,31 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
   const auto maxScale = state.matrix.getMaxScale();
   const auto inverseScale = 1.0f / maxScale;
-  auto font = sourceGlyphRun.font;
-  if (!FloatNearlyEqual(maxScale, 1.0f)) {
-    font = font.makeWithSize(font.getSize() * maxScale);
-  }
 
+  auto font = GetScaledFont(sourceGlyphRun.font, maxScale);
   const auto maskFormat = GetMaskFormat(font);
   auto typeface = font.getTypeface();
-  std::unique_ptr<Stroke> scaledStroke = nullptr;
-  if (!font.hasColor() && stroke != nullptr) {
-    scaledStroke = std::make_unique<Stroke>(*stroke);
-    scaledStroke->width *= maxScale;
-  }
+  auto scaledStroke = GetScaledStroke(font, stroke, maxScale);
 
-  BytesKey strikeKey;
   const auto typefaceID = GetTypefaceID(typeface.get(), typeface->isCustom());
   const auto backingSize = font.scalerContext->getBackingSize();
   const auto isBold = !font.hasColor() && font.isFauxBold();
-  ComputeStrikeKey(typefaceID, backingSize, isBold, scaledStroke.get(), &strikeKey);
+  auto strikeKey = GetStrikeKey(typefaceID, backingSize, isBold, scaledStroke.get());
 
   AtlasCell atlasCell{maskFormat};
   PlotUseUpdater plotUseUpdater;
   auto atlasManager = getContext()->atlasManager();
-  auto drawingManager = getContext()->drawingManager();
   const auto nextFlushToken = atlasManager->nextFlushToken();
   auto strike = getContext()->atlasStrikeCache()->findOrCreateStrike(strikeKey);
   DEBUG_ASSERT(strike != nullptr);
+
+  auto drawingManager = getContext()->drawingManager();
   const auto atlasBrush = brush.makeWithMatrix(state.matrix);
-  const auto glyphRenderScale =
-      font.scalerContext->getSize() / font.scalerContext->getBackingSize();
+  const auto glyphRenderScale = font.scalerContext->getSize() / backingSize;
   const auto sampling = GetSamplingOptions(glyphRenderScale, font.isFauxItalic(), state.matrix);
 
-  auto typefaceBounds = typeface->getBounds();
-  typefaceBounds.scale(font.getSize(), font.getSize());
-  ApplyScaleAndStrokeToBounds(&typefaceBounds, inverseScale, scaledStroke.get());
+  auto typefaceBounds =
+      GetScaledTypefaceBounds(typeface, font.getSize(), inverseScale, scaledStroke.get());
   const auto* sharedBounds = typefaceBounds.isEmpty() ? nullptr : &typefaceBounds;
 
   auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
@@ -493,11 +508,10 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   Rect perGlyphBounds = {};
   for (size_t i = 0; i < sourceGlyphRun.runSize(); i++) {
     auto glyphID = sourceGlyphRun.glyphs[i];
-
-    auto glyphBounds = GetScaledGlyphBounds(font, glyphID, inverseScale, scaledStroke.get(),
-                                            sharedBounds, &perGlyphBounds);
-    if (glyphBounds == nullptr ||
-        !sourceGlyphRun.isGlyphVisible(i, *glyphBounds, localClipBounds)) {
+    auto glyphBounds = sharedBounds ? sharedBounds
+                                    : GetScaledGlyphBounds(font, glyphID, inverseScale,
+                                                           scaledStroke.get(), &perGlyphBounds);
+    if (!glyphBounds || !sourceGlyphRun.isGlyphVisible(i, *glyphBounds, localClipBounds)) {
       continue;
     }
 
@@ -519,7 +533,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
       if (glyphCodec == nullptr) {
         if (isEmptyGlyph) {
           strike->markEmptyGlyph(glyphID);
-        } else if (rejectedIndices) {
+        } else {
           // shouldRetry means glyph is too large, record for path rendering.
           rejectedIndices->push_back(i);
         }
@@ -531,16 +545,13 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
       atlasCell.height = static_cast<uint16_t>(glyphCodec->height());
 
       if (atlasManager->addCellToAtlas(atlasCell, nextFlushToken, &atlasLocator)) {
-        auto pageIndex = atlasLocator.pageIndex();
-        const auto& atlasRect = atlasLocator.getLocation();
-        drawingManager->addAtlasCellTask(textureProxies[pageIndex],
+        auto& atlasRect = atlasLocator.getLocation();
+        drawingManager->addAtlasCellTask(textureProxies[atlasLocator.pageIndex()],
                                          Point::Make(atlasRect.x(), atlasRect.y()),
                                          std::move(glyphCodec));
       } else {
         // Atlas full, record for path rendering.
-        if (rejectedIndices) {
-          rejectedIndices->push_back(i);
-        }
+        rejectedIndices->push_back(i);
         continue;
       }
     }
@@ -550,9 +561,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     auto textureProxy = textureProxies[atlasLocator.pageIndex()];
     if (textureProxy == nullptr) {
       // Texture proxy unavailable, record for path rendering.
-      if (rejectedIndices) {
-        rejectedIndices->push_back(i);
-      }
+      rejectedIndices->push_back(i);
       continue;
     }
 
@@ -593,15 +602,8 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   }
 
   const auto maxScale = state.matrix.getMaxScale();
-  auto font = sourceGlyphRun.font;
-  if (!FloatNearlyEqual(maxScale, 1.0f)) {
-    font = font.makeWithSize(font.getSize() * maxScale);
-  }
-  std::unique_ptr<Stroke> scaledStroke = nullptr;
-  if (!font.hasColor() && stroke) {
-    scaledStroke = std::make_unique<Stroke>(*stroke);
-    scaledStroke->width *= maxScale;
-  }
+  auto font = GetScaledFont(sourceGlyphRun.font, maxScale);
+  auto scaledStroke = GetScaledStroke(font, stroke, maxScale);
   static constexpr float MaxAtlasDimension = Atlas::MaxCellSize - 2.f;
   auto cellScale = 1.f;
   auto maxDimension =
@@ -619,11 +621,10 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
 
   auto maskFormat = GetMaskFormat(font);
   auto typeface = font.getTypeface();
-  BytesKey strikeKey;
   const auto typefaceID = GetTypefaceID(typeface.get(), typeface->isCustom());
   const auto backingSize = font.scalerContext->getBackingSize();
   const auto isBold = !font.hasColor() && font.isFauxBold();
-  ComputeStrikeKey(typefaceID, backingSize, isBold, scaledStroke.get(), &strikeKey);
+  auto strikeKey = GetStrikeKey(typefaceID, backingSize, isBold, scaledStroke.get());
 
   AtlasCell atlasCell{maskFormat};
   PlotUseUpdater plotUseUpdater;
@@ -633,8 +634,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   auto strike = getContext()->atlasStrikeCache()->findOrCreateStrike(strikeKey);
   auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
   const auto atlasBrush = brush.makeWithMatrix(state.matrix);
-  const auto glyphRenderScale =
-      font.scalerContext->getSize() / font.scalerContext->getBackingSize();
+  const auto glyphRenderScale = font.scalerContext->getSize() / backingSize;
 
   for (size_t i : glyphIndices) {
     auto glyphID = sourceGlyphRun.glyphs[i];
