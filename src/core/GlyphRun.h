@@ -59,9 +59,10 @@ struct GlyphRun {
   Matrix getMatrix(size_t index) const;
 
   /**
-   * Post-concatenates the glyph transformation matrix at the given index to the target matrix.
+   * Gets the transformation matrix for the glyph at the given index via out parameter.
+   * This version allows reusing the same Matrix object in a loop.
    */
-  void postGlyphMatrix(size_t index, Matrix* matrix) const;
+  void getMatrix(size_t index, Matrix* matrix) const;
 
   /**
    * Checks if a glyph at the given index is visible within the clip bounds.
