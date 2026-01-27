@@ -36,6 +36,7 @@
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
+#ifndef __EMSCRIPTEN__
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
                                                  const std::string& fontStyle) {
   return SystemFont::MakeFromName(fontFamily, fontStyle);
@@ -45,6 +46,7 @@ std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
                                                  const FontStyle& fontStyle) {
   return SystemFont::MakeFromName(fontFamily, fontStyle);
 }
+#endif
 
 std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string& fontPath, int ttcIndex) {
   return FTTypeface::Make(FTFontData(fontPath, ttcIndex));
