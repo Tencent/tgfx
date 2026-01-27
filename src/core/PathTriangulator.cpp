@@ -20,15 +20,9 @@
 #include "PathRef.h"
 #include "pathkit.h"
 #include "utils/MathExtra.h"
+#include "utils/PathUtils.h"
 
 namespace tgfx {
-/**
- * When tessellating curved paths into linear segments, this defines the maximum distance in
- * screen space which a segment may deviate from the mathematically correct value. Above this
- * value, the segment will be subdivided. This value was chosen to approximate the super sampling
- * accuracy of the raster path (16 samples, or one quarter pixel).
- */
-static constexpr float DefaultTolerance = 0.25f;
 
 // https://chromium-review.googlesource.com/c/chromium/src/+/1099564/
 static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
@@ -71,7 +65,7 @@ size_t PathTriangulator::ToTriangles(const Path& path, const Rect& clipBounds,
   const auto& skPath = PathRef::ReadAccess(path);
   bool linear = false;
   auto count = skPath.toTriangles(
-      DefaultTolerance, *reinterpret_cast<const pk::SkRect*>(&clipBounds), vertices, &linear);
+      PathUtils::DefaultTolerance, *reinterpret_cast<const pk::SkRect*>(&clipBounds), vertices, &linear);
   if (isLinear) {
     *isLinear = linear;
   }
@@ -85,7 +79,7 @@ size_t PathTriangulator::GetAATriangleCount(size_t bufferSize) {
 size_t PathTriangulator::ToAATriangles(const Path& path, const Rect& clipBounds,
                                        std::vector<float>* vertices) {
   const auto& skPath = PathRef::ReadAccess(path);
-  auto count = skPath.toAATriangles(DefaultTolerance,
+  auto count = skPath.toAATriangles(PathUtils::DefaultTolerance,
                                     *reinterpret_cast<const pk::SkRect*>(&clipBounds), vertices);
   return static_cast<size_t>(count);
 }

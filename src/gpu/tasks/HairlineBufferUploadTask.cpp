@@ -82,8 +82,7 @@ std::shared_ptr<Resource> HairlineBufferUploadTask::onMakeResource(Context* cont
         gpu->createBuffer(hairlineBuffer->quadVertices->size(), GPUBufferUsage::VERTEX);
     if (!gpuBuffer) {
       LOGE("HairlineBufferUploadTask: Failed to create quad vertex buffer!");
-      source = nullptr;
-      return lineVertexBuffer;
+      return nullptr;
     }
     gpu->queue()->writeBuffer(gpuBuffer, 0, hairlineBuffer->quadVertices->data(),
                               hairlineBuffer->quadVertices->size());
@@ -100,8 +99,7 @@ std::shared_ptr<Resource> HairlineBufferUploadTask::onMakeResource(Context* cont
         gpu->createBuffer(hairlineBuffer->quadIndices->size(), GPUBufferUsage::INDEX);
     if (!gpuBuffer) {
       LOGE("HairlineBufferUploadTask: Failed to create quad index buffer!");
-      source = nullptr;
-      return lineVertexBuffer;
+      return nullptr;
     }
     gpu->queue()->writeBuffer(gpuBuffer, 0, hairlineBuffer->quadIndices->data(),
                               hairlineBuffer->quadIndices->size());

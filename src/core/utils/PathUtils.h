@@ -70,6 +70,19 @@ class PathUtils {
   static int ChopQuadAtMaxCurvature(const Point src[3], Point dst[5]);
 };
 
+/**
+ * QuadUVMatrix computes a transformation matrix that maps vertex positions to UV coordinates
+ * for quadratic bezier curve rendering on GPU based on the Loop-Blinn algorithm.
+ * The UV coordinates are used in fragment shaders to determine pixel coverage for anti-aliased
+ * curve rendering.
+ *
+ * The matrix transforms control points [P0, P1, P2] to UV space:
+ *   P0 -> (0, 0)
+ *   P1 -> (0.5, 0)
+ *   P2 -> (1, 1)
+ *
+ * In fragment shader, pixels where u^2 < v are inside the curve.
+ */
 class QuadUVMatrix {
  public:
   QuadUVMatrix() = default;

@@ -128,7 +128,11 @@ std::vector<uint32_t> GetLinesIndexBuffer(size_t numLines) {
 }
 
 // Takes 178th time of logf on Z600 / VC2010
+// Note: Caller must ensure x is a positive finite number.
 int GetFloatExp(float x) {
+  if (x <= 0 || !std::isfinite(x)) {
+    return 0;
+  }
   int exponent = 0;
   std::frexp(x, &exponent);
   return exponent - 1;

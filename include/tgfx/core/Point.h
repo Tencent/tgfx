@@ -101,6 +101,10 @@ struct Point {
     return Point::Length(x, y);
   }
 
+  /**
+   * Scales the point so that its length becomes 1. If the original length is zero or nearly zero,
+   * the point is set to (0, 0) and returns false; otherwise returns true.
+   */
   bool normalize();
 
   /**

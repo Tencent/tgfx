@@ -35,6 +35,8 @@ class PointUtils {
     return (p.x * p.x) + (p.y * p.y);
   }
 
+  static bool SetLength(Point& point, float length);
+
   static float DistanceSquared(const Point& a, const Point& b) {
     float dx = a.x - b.x;
     float dy = a.y - b.y;
@@ -43,8 +45,6 @@ class PointUtils {
 
   static float DistanceToLineBetweenSquared(const Point& point, const Point& linePointA,
                                             const Point& linePointB, Side* side = nullptr);
-
-  static bool SetLength(Point& point, float length);
 
   static Point MakeOrthogonal(const Point& vec, Side side = Side::Left) {
     DEBUG_ASSERT((side == Side::Right || side == Side::Left));

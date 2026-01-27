@@ -249,10 +249,14 @@ std::shared_ptr<GPUHairlineProxy> ProxyProvider::createGPUHairlineProxy(
   auto lineIndexProxy = findOrWrapGPUBufferProxy(lineIndexKey);
   auto quadVertexProxy = findOrWrapGPUBufferProxy(quadVertexKey);
   auto quadIndexProxy = findOrWrapGPUBufferProxy(quadIndexKey);
-  bool lineBuffersValid = (lineVertexProxy != nullptr) == (lineIndexProxy != nullptr);
-  bool quadBuffersValid = (quadVertexProxy != nullptr) == (quadIndexProxy != nullptr);
+  // Check if we have valid cached buffers:
+  // - Line buffers must be both present or both absent (vertex and index come in pairs)
+  // - Quad buffers must be both present or both absent
+  // - At least one buffer pair must exist
+  bool lineBuffersPaired = (lineVertexProxy != nullptr) == (lineIndexProxy != nullptr);
+  bool quadBuffersPaired = (quadVertexProxy != nullptr) == (quadIndexProxy != nullptr);
   bool hasAnyBuffer = lineVertexProxy != nullptr || quadVertexProxy != nullptr;
-  if (lineBuffersValid && quadBuffersValid && hasAnyBuffer) {
+  if (lineBuffersPaired && quadBuffersPaired && hasAnyBuffer) {
     return std::make_shared<GPUHairlineProxy>(drawingMatrix, std::move(lineVertexProxy),
                                               std::move(lineIndexProxy), std::move(quadVertexProxy),
                                               std::move(quadIndexProxy));
