@@ -102,6 +102,28 @@ export const uploadToTexture = (
     }
 };
 
+export const uploadToTextureRegion = (
+    GL: EmscriptenGL,
+    source: TexImageSource | OffscreenCanvas,
+    textureID: number,
+    offsetX: number,
+    offsetY: number,
+    alphaOnly: boolean,
+) => {
+    if (!source) return;
+    const gl = GL.currentContext?.GLctx as WebGL2RenderingContext;
+    gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    if (alphaOnly) {
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, offsetX, offsetY, gl.RED, gl.UNSIGNED_BYTE, source);
+    } else {
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, offsetX, offsetY, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    }
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+};
+
 export const setColorSpace = (
     GL: EmscriptenGL,
     colorSpace: WindowColorSpace

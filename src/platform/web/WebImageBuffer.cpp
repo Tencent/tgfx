@@ -37,22 +37,43 @@ std::shared_ptr<WebImageBuffer> WebImageBuffer::MakeFrom(emscripten::val nativeI
   return std::shared_ptr<WebImageBuffer>(new WebImageBuffer(width, height, nativeImage));
 }
 
-std::shared_ptr<WebImageBuffer> WebImageBuffer::MakeAdopted(emscripten::val nativeImage) {
-  auto imageBuffer = MakeFrom(nativeImage);
-  if (imageBuffer != nullptr) {
-    imageBuffer->adopted = true;
+std::shared_ptr<WebImageBuffer> WebImageBuffer::MakeAdopted(emscripten::val nativeImage,
+                                                            bool alphaOnly) {
+  if (!nativeImage.as<bool>()) {
+    return nullptr;
   }
+  auto size = val::module_property("tgfx").call<val>("getSourceSize", nativeImage);
+  auto width = size["width"].as<int>();
+  auto height = size["height"].as<int>();
+  if (width < 1 || height < 1) {
+    return nullptr;
+  }
+  auto imageBuffer =
+      std::shared_ptr<WebImageBuffer>(new WebImageBuffer(width, height, nativeImage, alphaOnly));
+  imageBuffer->adopted = true;
   return imageBuffer;
 }
 
-WebImageBuffer::WebImageBuffer(int width, int height, emscripten::val nativeImage)
-    : _width(width), _height(height), nativeImage(nativeImage) {
+WebImageBuffer::WebImageBuffer(int width, int height, emscripten::val nativeImage, bool alphaOnly)
+    : _width(width), _height(height), _alphaOnly(alphaOnly), nativeImage(nativeImage) {
 }
 
 WebImageBuffer::~WebImageBuffer() {
   if (adopted) {
     val::module_property("tgfx").call<void>("releaseNativeImage", nativeImage);
   }
+}
+
+bool WebImageBuffer::uploadToTexture(std::shared_ptr<Texture> texture, int offsetX,
+                                     int offsetY) const {
+  if (texture == nullptr || !nativeImage.as<bool>()) {
+    return false;
+  }
+  auto glTexture = std::static_pointer_cast<GLTexture>(texture);
+  // Always upload as RGBA. The shader will handle alpha-only rendering via forceAsMask flag.
+  val::module_property("tgfx").call<void>("uploadToTextureRegion", val::module_property("GL"),
+                                          nativeImage, glTexture->textureID(), offsetX, offsetY, _alphaOnly);
+  return true;
 }
 
 std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, bool) const {
@@ -62,7 +83,7 @@ std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, boo
   }
   auto glTexture = std::static_pointer_cast<GLTexture>(textureView->getTexture());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          getImage(), glTexture->textureID(), false);
+                                          getImage(), glTexture->textureID(), _alphaOnly);
   return textureView;
 }
 
