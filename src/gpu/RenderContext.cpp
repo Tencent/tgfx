@@ -177,13 +177,31 @@ static void ComputeGlyphRenderMatrix(const GlyphRun& glyphRun, size_t index,
                                      float scale, const Point& glyphOffset, bool fauxItalic,
                                      bool needsPixelAlignment, Matrix* outMatrix) {
   float skewX = fauxItalic ? ITALIC_SKEW * scale : 0;
-  float tx = glyphOffset.x - atlasLocation.x();
-  float ty = glyphOffset.y - atlasLocation.y();
+  float tx = scale * glyphOffset.x + skewX * glyphOffset.y;
+  float ty = scale * glyphOffset.y;
+  // Equivalent to the old GetGlyphMatrix() + ComputeGlyphFinalMatrix().postScale():
+  //
+  //   void GetGlyphMatrix(float glyphRenderScale, const Point& glyphOffset, bool fauxItalic,
+  //                       Matrix* glyphMatrix) {
+  //     glyphMatrix->setTranslate(glyphOffset.x, glyphOffset.y);
+  //     glyphMatrix->postScale(glyphRenderScale, glyphRenderScale);
+  //     if (fauxItalic) {
+  //       glyphMatrix->postSkew(ITALIC_SKEW, 0);
+  //     }
+  //   }
+  //
+  //   void ComputeGlyphFinalMatrix(..., float inverseScale, ...) {
+  //     outMatrix->postScale(inverseScale, inverseScale);
+  //     ...
+  //   }
+  //
+  // Here scale = glyphRenderScale * inverseScale, combining both into a single matrix construction.
   outMatrix->setAll(scale, skewX, tx, 0, scale, ty);
   static Matrix PositionMatrix = {};
   glyphRun.getMatrix(index, &PositionMatrix);
   outMatrix->postConcat(PositionMatrix);
   outMatrix->postConcat(stateMatrix);
+  outMatrix->preTranslate(-atlasLocation.x(), -atlasLocation.y());
   if (needsPixelAlignment) {
     // Pixel alignment for nearest-neighbor sampling to prevent texture artifacts like pixel truncation
     (*outMatrix)[2] = std::round((*outMatrix)[2]);
