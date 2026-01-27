@@ -112,7 +112,7 @@ class Shader {
    * Returns a shader that generates a diamond gradient given the center and radius. The color
    * gradient is drawn from the center point to the vertices of the diamond.
    * @param center The center of the diamond for this gradient
-   * @param radius Must be positive. The distance from the center to the vertices of the diamond.
+   * @param radius Must be positive. The distance from the center to a vertex of the diamond.
    * @param colors The array of colors in sRGB gamut, may exceed 0-1, to be distributed between
    * the center and edge of the circle.
    * @param positions Maybe empty. The relative position of each corresponding color in the color

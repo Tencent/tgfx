@@ -87,7 +87,7 @@ class Gradient : public ColorSource {
    * Returns a color source that generates a diamond gradient given a center point and radius. The
    * color gradient is drawn from the center point to the vertices of the diamond.
    * @param center The center of the diamond
-   * @param radius Must be positive. The distance from the center to the vertices of the diamond.
+   * @param radius Must be positive. The distance from the center to a vertex of the diamond.
    * @param colors The array of colors, to be distributed around the center, within the gradient
    * angle range.
    * @param positions Maybe empty. The relative position of each corresponding color in the color
@@ -346,8 +346,8 @@ class DiamondGradient : public Gradient {
   void setCenter(const Point& center);
 
   /**
-   * Returns the radius of the diamond for this gradient. The distance from the center to the
-   * vertices of the diamond.
+   * Returns the radius of the diamond for this gradient. The distance from the center to a vertex
+   * of the diamond.
    */
   float radius() const {
     return _radius;
