@@ -33,6 +33,14 @@ class ScalerContext {
 
   virtual ~ScalerContext() = default;
 
+  /**
+   * Returns true if this ScalerContext supports asynchronous operations. If false, all methods
+   * must be called from the main thread only.
+   */
+  virtual bool asyncSupport() const {
+    return true;
+  }
+
   std::shared_ptr<Typeface> getTypeface() const {
     return typeface;
   }

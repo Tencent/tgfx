@@ -32,6 +32,10 @@ GlyphRasterizer::~GlyphRasterizer() {
   }
 }
 
+bool GlyphRasterizer::asyncSupport() const {
+  return scalerContext->asyncSupport();
+}
+
 bool GlyphRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
                                    std::shared_ptr<ColorSpace> dstColorSpace,
                                    void* dstPixels) const {
