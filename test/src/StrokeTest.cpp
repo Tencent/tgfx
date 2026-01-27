@@ -15,10 +15,12 @@
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/core/RSXform.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/RenderFlags.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
+#include "tgfx/core/TextBlob.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
@@ -937,6 +939,53 @@ TGFX_TEST(StrokeTest, HairlineClipping) {
   canvas->restore();
 
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineClipping"));
+}
+
+TGFX_TEST(StrokeTest, HairlineStrokeTextAsPath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 400);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 40);
+
+  auto glyphA = font.getGlyphID('A');
+  auto glyphB = font.getGlyphID('B');
+  auto glyphC = font.getGlyphID('C');
+  ASSERT_TRUE(glyphA > 0 && glyphB > 0 && glyphC > 0);
+
+  GlyphID glyphs[] = {glyphA, glyphB, glyphC};
+  RSXform xforms[] = {
+      RSXform::Make(1.0f, 0.0f, 0.0f, 0.0f),
+      RSXform::Make(0.866f, 0.5f, 50.0f, 0.0f),
+      RSXform::Make(0.5f, 0.866f, 100.0f, 30.0f),
+  };
+  auto textBlob = TextBlob::MakeFromRSXform(glyphs, xforms, 3, font);
+  ASSERT_TRUE(textBlob != nullptr);
+
+  Paint strokePaint;
+  strokePaint.setStyle(PaintStyle::Stroke);
+  strokePaint.setColor(Color::Red());
+  strokePaint.setAntiAlias(true);
+
+  canvas->translate(50, 80);
+  strokePaint.setStrokeWidth(0.0f);
+  canvas->drawTextBlob(textBlob, 0, 0, strokePaint);
+
+  canvas->translate(0, 100);
+  strokePaint.setStrokeWidth(0.5f);
+  canvas->drawTextBlob(textBlob, 0, 0, strokePaint);
+
+  canvas->translate(0, 100);
+  strokePaint.setStrokeWidth(0.2f);
+  canvas->drawTextBlob(textBlob, 0, 0, strokePaint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineStrokeTextAsPath"));
 }
 
 }  // namespace tgfx

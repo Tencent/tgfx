@@ -578,17 +578,36 @@ void RenderContext::drawGlyphAsPath(const Font& font, GlyphID glyphID, const Mat
                                     Rect& localClipBounds) {
   std::shared_ptr<Shape> shape = std::make_shared<GlyphShape>(font, glyphID);
   shape = Shape::ApplyMatrix(std::move(shape), glyphMatrix);
-  shape = Shape::ApplyStroke(std::move(shape), stroke);
 
   Path clipPath = {};
   if (brush.antiAlias) {
     localClipBounds.outset(1.0f, 1.0f);
   }
   clipPath.addRect(localClipBounds);
-  shape = Shape::Merge(std::move(shape), Shape::MakeFrom(std::move(clipPath)), PathOp::Intersect);
-  if (auto compositor = getOpsCompositor()) {
-    compositor->drawShape(std::move(shape), state, brush);
+
+  auto compositor = getOpsCompositor();
+  if (compositor == nullptr) {
+    return;
   }
+
+  if (stroke != nullptr && TreatStrokeAsHairline(*stroke, state.matrix)) {
+    shape = Shape::Merge(std::move(shape), Shape::MakeFrom(clipPath), PathOp::Intersect);
+    compositor->drawHairlineShape(std::move(shape), state, brush, stroke);
+    return;
+  } else if (stroke == nullptr) {
+    auto [strokeShape, matrix] = ShapeUtils::DecomposeStrokeShape(shape);
+    if (strokeShape && TreatStrokeAsHairline(strokeShape->stroke, matrix * state.matrix)) {
+      MCState newState = state;
+      newState.matrix.preConcat(matrix);
+      shape = Shape::Merge(std::move(shape), Shape::MakeFrom(clipPath), PathOp::Intersect);
+      compositor->drawHairlineShape(strokeShape->shape, newState, brush, &strokeShape->stroke);
+      return;
+    }
+  }
+
+  shape = Shape::ApplyStroke(std::move(shape), stroke);
+  shape = Shape::Merge(std::move(shape), Shape::MakeFrom(std::move(clipPath)), PathOp::Intersect);
+  compositor->drawShape(std::move(shape), state, brush);
 }
 
 void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
