@@ -24,7 +24,7 @@
 namespace tgfx {
 
 /**
- * GPUHairlineProxy 包含 hairline 渲染所需的顶点和索引缓冲 proxy
+ * GPUHairlineProxy contains vertex and index buffer proxies required for hairline rendering.
  */
 class GPUHairlineProxy {
  public:
