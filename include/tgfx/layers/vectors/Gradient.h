@@ -84,17 +84,16 @@ class Gradient : public ColorSource {
                                                   const std::vector<float>& positions = {});
 
   /**
-   * Returns a color source that generates a diamond gradient given a center point and half-diagonal
-   * length. The color gradient is drawn from the center point to the vertices of the diamond.
+   * Returns a color source that generates a diamond gradient given a center point and radius. The
+   * color gradient is drawn from the center point to the vertices of the diamond.
    * @param center The center of the diamond
-   * @param halfDiagonal Must be positive. The half-length between two opposite vertices of the
-   * diamond.
+   * @param radius Must be positive. The distance from the center to the vertices of the diamond.
    * @param colors The array of colors, to be distributed around the center, within the gradient
    * angle range.
    * @param positions Maybe empty. The relative position of each corresponding color in the color
    * array. If this is empty, the colors are distributed evenly between the start and end point.
    */
-  static std::shared_ptr<DiamondGradient> MakeDiamond(const Point& center, float halfDiagonal,
+  static std::shared_ptr<DiamondGradient> MakeDiamond(const Point& center, float radius,
                                                       const std::vector<Color>& colors,
                                                       const std::vector<float>& positions = {});
 
@@ -347,28 +346,28 @@ class DiamondGradient : public Gradient {
   void setCenter(const Point& center);
 
   /**
-   * Returns the halfDiagonal of the diamond for this gradient. The half-length between two opposite
+   * Returns the radius of the diamond for this gradient. The distance from the center to the
    * vertices of the diamond.
    */
-  float halfDiagonal() const {
-    return _halfDiagonal;
+  float radius() const {
+    return _radius;
   }
 
   /**
-   * Sets the half-Diagonal of the diamond for this gradient. The value must be positive.
+   * Sets the radius of the diamond for this gradient. The value must be positive.
    */
-  void setHalfDiagonal(float halfDiagonal);
+  void setRadius(float radius);
 
  protected:
   std::shared_ptr<Shader> onCreateShader() const override;
 
  private:
   Point _center = {};
-  float _halfDiagonal = 0;
+  float _radius = 0;
 
-  DiamondGradient(const Point& center, float halfDiagonal, const std::vector<Color>& colors,
+  DiamondGradient(const Point& center, float radius, const std::vector<Color>& colors,
                   const std::vector<float>& positions)
-      : Gradient(colors, positions), _center(center), _halfDiagonal(halfDiagonal) {
+      : Gradient(colors, positions), _center(center), _radius(radius) {
   }
 
   friend class Gradient;
