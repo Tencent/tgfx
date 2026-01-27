@@ -42,7 +42,7 @@ class DefaultGeometryProcessor : public GeometryProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   bool hasUVPerspective() const override {
-    return (uvMatrix.getType() & Matrix::PerspectiveMask) != 0;
+    return uvMatrix.hasPerspective();
   }
 
   Attribute position;

@@ -24,7 +24,7 @@
 namespace tgfx {
 
 Opaque3DContext::Opaque3DContext(const Rect& renderRect, float contentScale,
-                                   std::shared_ptr<ColorSpace> colorSpace)
+                                 std::shared_ptr<ColorSpace> colorSpace)
     : Layer3DContext(renderRect, contentScale, std::move(colorSpace)) {
 }
 
@@ -47,7 +47,7 @@ std::shared_ptr<Picture> Opaque3DContext::onFinishRecording() {
 }
 
 void Opaque3DContext::onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                                    const Point&, int, bool) {
+                                   const Point&, int, bool) {
   _opaqueImages.push_back({std::move(image), imageTransform});
 }
 

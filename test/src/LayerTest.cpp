@@ -23,10 +23,10 @@
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "layers/OpaqueContext.h"
-#include "layers/DrawArgs.h"
-#include "layers/RootLayer.h"
 #include "layers/BackgroundContext.h"
+#include "layers/DrawArgs.h"
+#include "layers/OpaqueContext.h"
+#include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
 #include "layers/TileCache.h"
 #include "layers/compositing3d/Layer3DContext.h"
@@ -3143,41 +3143,43 @@ TGFX_TEST(LayerTest, RootLayerBackgroundColorWithBlurBackground) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  
+
   auto surface = Surface::Make(context, 200, 200);
   auto displayList = std::make_unique<DisplayList>();
-  
+
   // Set background color on display list (which sets it on root layer)
-  auto backgroundColor = Color::FromRGBA(255, 0, 0, 128); // Semi-transparent red
+  auto backgroundColor = Color::FromRGBA(255, 0, 0, 128);  // Semi-transparent red
   displayList->setBackgroundColor(backgroundColor);
   EXPECT_EQ(displayList->backgroundColor(), backgroundColor);
-  
+
   // Add a bottom layer to provide content that will be blurred
   auto bottomLayer = ShapeLayer::Make();
   Path bottomPath = {};
   bottomPath.addRect(Rect::MakeXYWH(60.0f, 60.0f, 80.0f, 80.0f));
   bottomLayer->setPath(bottomPath);
-  bottomLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 255, 255))); // Blue background content
+  bottomLayer->setFillStyle(
+      ShapeStyle::Make(Color::FromRGBA(0, 0, 255, 255)));  // Blue background content
   displayList->root()->addChild(bottomLayer);
-  
+
   // Add a shape layer with background blur to trigger the blurBackground code path
   // Position it so part covers bottomLayer and part covers pure background
   auto shapeLayer = ShapeLayer::Make();
   Path path = {};
   path.addRect(Rect::MakeXYWH(40.0f, 40.0f, 80.0f, 80.0f));
   shapeLayer->setPath(path);
-  shapeLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 128))); // Semi-transparent white
-  
+  shapeLayer->setFillStyle(
+      ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 128)));  // Semi-transparent white
+
   // Add background blur style to trigger the blur background rendering
   auto backgroundBlur = BackgroundBlurStyle::Make(10.0f, 10.0f);
   shapeLayer->setLayerStyles({backgroundBlur});
-  
+
   displayList->root()->addChild(shapeLayer);
-  
+
   // Render the display list - this will internally create BackgroundContext and call
   // RootLayer::drawLayer with args.blurBackground set, testing our new code path
   displayList->render(surface.get());
-  
+
   // Compare with baseline to verify the background color is correctly drawn
   // to both the main canvas and blur background canvas
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RootLayerBackgroundColorWithBlurBackground"));
