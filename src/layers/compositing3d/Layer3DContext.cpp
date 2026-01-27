@@ -104,13 +104,15 @@ void Layer3DContext::endRecording() {
     return;
   }
 
+  // Get depth after pop: represents the number of ancestor layers (0 for root layer)
+  auto depth = static_cast<int>(_transformStack.size());
   DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
   auto invScale = 1.0f / _contentScale;
   auto imageOrigin = Point::Make(pictureOffset.x * invScale, pictureOffset.y * invScale);
   auto imageTransform = Matrix3DUtils::OriginAdaptedMatrix3D(state.transform, imageOrigin);
   imageTransform = Matrix3DUtils::ScaleAdaptedMatrix3D(imageTransform, _contentScale);
 
-  onImageReady(std::move(image), imageTransform, pictureOffset, state.antialiasing);
+  onImageReady(std::move(image), imageTransform, pictureOffset, depth, state.antialiasing);
 }
 
 }  // namespace tgfx
