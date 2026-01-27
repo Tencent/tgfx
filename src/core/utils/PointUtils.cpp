@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-constexpr int FloatSign(float x) {
+int FloatSign(float x) {
   return (0.0f < x) - (x < 0.0f);
 }
 

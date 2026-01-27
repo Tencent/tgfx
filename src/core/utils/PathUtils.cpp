@@ -17,11 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/utils/PathUtils.h"
-#include <algorithm>
-#include <cmath>
-#include <cstring>
-#include <utility>
-#include <vector>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/PointUtils.h"
@@ -30,6 +25,13 @@
 namespace tgfx {
 
 namespace {
+
+constexpr float CUBIC_TO_QUAD_LENGTH_SCALE = 1.5f;
+constexpr int CUBIC_TO_QUAD_MAX_SUBDIVS = 10;
+
+inline Point Interp(const Point& v0, const Point& v1, float t) {
+  return v0 + (v1 - v0) * t;
+}
 
 int ValidUnitDivide(float numer, float denom, float* ratio) {
   DEBUG_ASSERT(ratio);
@@ -99,6 +101,7 @@ int FindCubicInflections(const Point src[4], float tValues[2]) {
                            tValues);
 }
 
+// TODO(YGaurora): Consider SIMD optimization using Highway to vectorize interpolation.
 void ChopCubicAt(const Point source[4], Point destination[7], float t) {
   DEBUG_ASSERT((0 <= t && t <= 1));
 
@@ -112,21 +115,13 @@ void ChopCubicAt(const Point source[4], Point destination[7], float t) {
   auto p1 = source[1];
   auto p2 = source[2];
   auto p3 = source[3];
-  auto T = Point::Make(t, t);
 
-  auto unchecked_mix = [](const Point& a, const Point& b, const Point& t) -> Point {
-    Point ret;
-    ret.x = (b.x - a.x) * t.x + a.x;
-    ret.y = (b.y - a.y) * t.y + a.y;
-    return ret;
-  };
-
-  auto ab = unchecked_mix(p0, p1, T);
-  auto bc = unchecked_mix(p1, p2, T);
-  auto cd = unchecked_mix(p2, p3, T);
-  auto abc = unchecked_mix(ab, bc, T);
-  auto bcd = unchecked_mix(bc, cd, T);
-  auto abcd = unchecked_mix(abc, bcd, T);
+  auto ab = Interp(p0, p1, t);
+  auto bc = Interp(p1, p2, t);
+  auto cd = Interp(p2, p3, t);
+  auto abc = Interp(ab, bc, t);
+  auto bcd = Interp(bc, cd, t);
+  auto abcd = Interp(abc, bcd, t);
 
   destination[0] = p0;
   destination[1] = ab;
@@ -137,6 +132,7 @@ void ChopCubicAt(const Point source[4], Point destination[7], float t) {
   destination[6] = p3;
 }
 
+// TODO(YGaurora): Consider SIMD optimization using Highway to vectorize interpolation.
 void ChopCubicAt(const Point source[4], Point destination[10], float t0, float t1) {
   DEBUG_ASSERT((0 <= t0 && t0 <= t1 && t1 <= 1));
 
@@ -146,41 +142,43 @@ void ChopCubicAt(const Point source[4], Point destination[10], float t0, float t
     return;
   }
 
-  // Perform both chops in parallel using 4-lane SIMD.
-  auto p00 = std::make_pair(source[0], source[0]);
-  auto p11 = std::make_pair(source[1], source[1]);
-  auto p22 = std::make_pair(source[2], source[2]);
-  auto p33 = std::make_pair(source[3], source[3]);
-  std::pair<Point, Point> T = {Point::Make(t0, t0), Point::Make(t1, t1)};
+  // Perform two chops simultaneously. The data layout is optimized for potential
+  // compiler auto-vectorization: arrays store [t0_result, t1_result] pairs.
+  auto p0 = source[0];
+  auto p1 = source[1];
+  auto p2 = source[2];
+  auto p3 = source[3];
+  float t[2] = {t0, t1};
 
-  auto unchecked_mix = [](const std::pair<Point, Point>& a, const std::pair<Point, Point>& b,
-                          const std::pair<Point, Point>& t) -> std::pair<Point, Point> {
-    std::pair<Point, Point> ret;
-    ret.first.x = (b.first.x - a.first.x) * t.first.x + a.first.x;
-    ret.first.y = (b.first.y - a.first.y) * t.first.y + a.first.y;
-    ret.second.x = (b.second.x - a.second.x) * t.second.x + a.second.x;
-    ret.second.y = (b.second.y - a.second.y) * t.second.y + a.second.y;
-    return ret;
-  };
+  Point ab[2];
+  Point bc[2];
+  Point cd[2];
+  Point abc[2];
+  Point bcd[2];
+  Point abcd[2];
+  Point middle[2];
 
-  auto ab = unchecked_mix(p00, p11, T);
-  auto bc = unchecked_mix(p11, p22, T);
-  auto cd = unchecked_mix(p22, p33, T);
-  auto abc = unchecked_mix(ab, bc, T);
-  auto bcd = unchecked_mix(bc, cd, T);
-  auto abcd = unchecked_mix(abc, bcd, T);
-  auto middle = unchecked_mix(abc, bcd, {T.second, T.first});
+  for (int i = 0; i < 2; ++i) {
+    ab[i] = Interp(p0, p1, t[i]);
+    bc[i] = Interp(p1, p2, t[i]);
+    cd[i] = Interp(p2, p3, t[i]);
+    abc[i] = Interp(ab[i], bc[i], t[i]);
+    bcd[i] = Interp(bc[i], cd[i], t[i]);
+    abcd[i] = Interp(abc[i], bcd[i], t[i]);
+  }
+  middle[0] = Interp(abc[0], bcd[0], t[1]);
+  middle[1] = Interp(abc[1], bcd[1], t[0]);
 
-  destination[0] = p00.first;
-  destination[1] = ab.first;
-  destination[2] = abc.first;
-  destination[3] = abcd.first;
-  destination[4] = middle.first;
-  destination[5] = middle.second;
-  destination[6] = abcd.second;
-  destination[7] = bcd.second;
-  destination[8] = cd.second;
-  destination[9] = p33.second;
+  destination[0] = p0;
+  destination[1] = ab[0];
+  destination[2] = abc[0];
+  destination[3] = abcd[0];
+  destination[4] = middle[0];
+  destination[5] = middle[1];
+  destination[6] = abcd[1];
+  destination[7] = bcd[1];
+  destination[8] = cd[1];
+  destination[9] = p3;
 }
 
 void ChopCubicAt(const Point source[4], Point destination[], const float toleranceValues[],
@@ -193,27 +191,23 @@ void ChopCubicAt(const Point source[4], Point destination[], const float toleran
     if (toleranceCount == 0) {  // nothing to chop
       memcpy(destination, source, 4 * sizeof(Point));
     } else {
+      float lastTolerance = 0.f;
       int i = 0;
       for (; i < toleranceCount - 1; i += 2) {
         // Do two chops at once.
-        float tolerance1 = *(toleranceValues + i);
-        float tolerance2 = *(toleranceValues + i + 1);
-        if (i != 0) {
-          float lastTolerance = toleranceValues[i - 1];
-          tolerance1 = std::clamp((tolerance1 - lastTolerance) / (1 - lastTolerance), 0.f, 1.f);
-          tolerance2 = std::clamp((tolerance2 - lastTolerance) / (1 - lastTolerance), 0.f, 1.f);
-        }
+        float tolerance1 = toleranceValues[i];
+        float tolerance2 = toleranceValues[i + 1];
+        tolerance1 = std::clamp((tolerance1 - lastTolerance) / (1 - lastTolerance), 0.f, 1.f);
+        tolerance2 = std::clamp((tolerance2 - lastTolerance) / (1 - lastTolerance), 0.f, 1.f);
         ChopCubicAt(source, destination, tolerance1, tolerance2);
+        lastTolerance = toleranceValues[i + 1];
         source = destination = destination + 6;
       }
       if (i < toleranceCount) {
         // Chop the final cubic if there was an odd number of chops.
         DEBUG_ASSERT(i + 1 == toleranceCount);
         float tolerance = toleranceValues[i];
-        if (i != 0) {
-          float lastTolerance = toleranceValues[i - 1];
-          tolerance = std::clamp((tolerance - lastTolerance) / (1 - lastTolerance), 0.f, 1.f);
-        }
+        tolerance = std::clamp((tolerance - lastTolerance) / (1 - lastTolerance), 0.f, 1.f);
         ChopCubicAt(source, destination, tolerance);
       }
     }
@@ -259,11 +253,8 @@ void ConvertNoninflectCubicToQuads(const Point p[4], float toleranceSqd, std::ve
     dc = p[1] - p[3];
   }
 
-  constexpr float lengthScale = 3.f * 1.f / 2.f;
-  constexpr int maxSubdivs = 10;
-
-  ab *= lengthScale;
-  dc *= lengthScale;
+  ab *= CUBIC_TO_QUAD_LENGTH_SCALE;
+  dc *= CUBIC_TO_QUAD_LENGTH_SCALE;
 
   // c0 and c1 are extrapolations along vectors ab and dc.
   auto c0 = p[0] + ab;
@@ -271,8 +262,9 @@ void ConvertNoninflectCubicToQuads(const Point p[4], float toleranceSqd, std::ve
 
   // When recursion depth exceeds the limit, force distanceSqd to 0 to accept the approximation.
   // This prevents infinite recursion while maintaining acceptable visual quality, as curves
-  // requiring more than maxSubdivs levels are already extremely well-approximated.
-  float distanceSqd = sublevel > maxSubdivs ? 0 : PointUtils::DistanceSquared(c0, c1);
+  // requiring more than CUBIC_TO_QUAD_MAX_SUBDIVS levels are already extremely well-approximated.
+  float distanceSqd =
+      sublevel > CUBIC_TO_QUAD_MAX_SUBDIVS ? 0 : PointUtils::DistanceSquared(c0, c1);
   if (distanceSqd < toleranceSqd) {
     Point newC;
     if (preserveFirstTangent == preserveLastTangent) {
@@ -301,9 +293,6 @@ void ConvertNoninflectCubicToQuads(const Point p[4], float toleranceSqd, std::ve
                                 preserveLastTangent);
 }
 
-inline Point interp(const Point& v0, const Point& v1, float t) {
-  return v0 + (v1 - v0) * t;
-}
 }  // namespace
 
 std::vector<Point> PathUtils::ConvertCubicToQuads(const Point cubicPoints[4], float tolerance) {
@@ -330,12 +319,12 @@ void PathUtils::ChopQuadAt(const Point src[3], Point dst[5], float t) {
   auto p1 = src[1];
   auto p2 = src[2];
 
-  auto p01 = interp(p0, p1, t);
-  auto p12 = interp(p1, p2, t);
+  auto p01 = Interp(p0, p1, t);
+  auto p12 = Interp(p1, p2, t);
 
   dst[0] = p0;
   dst[1] = p01;
-  dst[2] = interp(p01, p12, t);
+  dst[2] = Interp(p01, p12, t);
   dst[3] = p12;
   dst[4] = p2;
 }
@@ -449,17 +438,12 @@ void QuadUVMatrix::set(const Point controlPoints[3]) {
     double scale = 1.0 / det;
 
     // compute adjugate matrix
-    double a3;
-    double a4;
-    double a6;
-    double a7;
-    a3 = y2 - y0;
-    a4 = x0 - x2;
+    double a3 = y2 - y0;
+    double a4 = x0 - x2;
+    double a6 = y0 - y1;
+    double a7 = x1 - x0;
 
-    a6 = y0 - y1;
-    a7 = x1 - x0;
-
-    // this performs the uv_pts*adjugate(control_pts) multiply,
+    // this performs the uv_pts * adjugate(control_pts) multiply,
     // then does the scale by 1/det afterwards to improve precision
     matrix[0] = static_cast<float>((0.5 * a3 + a6) * scale);
     matrix[1] = static_cast<float>((0.5 * a4 + a7) * scale);
