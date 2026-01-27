@@ -296,7 +296,7 @@ static int GetMipmapCacheLongEdge(int maxSize, float contentScale, const Rect& l
  */
 static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Canvas* canvas,
                                                        const Rect& bounds) {
-  if (args.renderRect == nullptr || args.context == nullptr) {
+  if (args.context == nullptr) {
     DEBUG_ASSERT(false);
     return nullptr;
   }
@@ -2062,11 +2062,12 @@ bool Layer::drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, f
   AutoCanvasRestore autoRestoreBg(backgroundCanvas);
 
   auto childTransform3D = child->getMatrixWithScrollRect();
-  // If the sublayer's Matrix contains 3D transformations or projection transformations, then
-  // treat its Matrix as an identity matrix here, and let the sublayer handle its actual position
-  // through 3D filter methods.
+  // Determine the matrix to apply to the canvas:
+  // - Inside 3D context: All child matrices are managed by Layer3DContext, use identity here.
+  // - Outside 3D context with 3D child: The 3D matrix is applied separately, use identity here.
+  // - Outside 3D context with 2D child: Apply the affine matrix directly to the canvas.
   const bool isChildMatrixAffine = Matrix3DUtils::IsMatrix3DAffine(childTransform3D);
-  auto childAffineMatrix = (isChildMatrixAffine && !canPreserve3D())
+  auto childAffineMatrix = (isChildMatrixAffine && !canPreserve3D() && !child->canPreserve3D())
                                ? Matrix3DUtils::GetMayLossyAffineMatrix(childTransform3D)
                                : Matrix::I();
   canvas->concat(childAffineMatrix);

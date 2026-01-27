@@ -19,6 +19,7 @@
 #pragma once
 
 #include <deque>
+#include <unordered_map>
 #include "DrawPolygon3D.h"
 #include "core/utils/PlacementPtr.h"
 #include "gpu/ops/DrawOp.h"
@@ -52,10 +53,12 @@ class Context3DCompositor {
    * Adds an image with 3D transformation for compositing.
    * @param image The source image to draw.
    * @param matrix The 3D transformation matrix applied to the image.
+   * @param depth The depth level in the layer tree (used for sorting coplanar polygons).
    * @param alpha The layer alpha for transparency.
    * @param antiAlias Whether to enable edge antialiasing when the render target does not support MSAA.
    */
-  void addImage(std::shared_ptr<Image> image, const Matrix3D& matrix, float alpha, bool antiAlias);
+  void addImage(std::shared_ptr<Image> image, const Matrix3D& matrix, int depth, float alpha,
+                bool antiAlias);
 
   /**
    * Draws all added images with correct depth ordering and blending.
@@ -72,7 +75,7 @@ class Context3DCompositor {
   std::shared_ptr<RenderTargetProxy> _targetColorProxy = nullptr;
   std::deque<std::unique_ptr<DrawPolygon3D>> _polygons = {};
   std::vector<PlacementPtr<DrawOp>> _drawOps = {};
-  int _nextOrderIndex = 0;
+  std::unordered_map<int, int> _depthSequenceCounters = {};
 };
 
 }  // namespace tgfx
