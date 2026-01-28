@@ -361,10 +361,8 @@ void RenderContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCSta
     // Glyphs with per-glyph rotation/scale (RSXform/Matrix) and outlines use path rendering
     // to avoid aliasing.
     if (run.hasComplexTransform() && run.font.hasOutlines()) {
-      Matrix glyphMatrix = {};
       for (size_t i = 0; i < run.runSize(); i++) {
-        run.getMatrix(i, &glyphMatrix);
-        drawGlyphAsPath(run.font, run.glyphs[i], glyphMatrix, state, brush, stroke,
+        drawGlyphAsPath(run.font, run.glyphs[i], run.getMatrix(i), state, brush, stroke,
                         localClipBounds);
       }
       continue;
@@ -374,10 +372,8 @@ void RenderContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCSta
     // Process rejected glyphs immediately to maintain correct draw order.
     if (!rejectedIndices.empty()) {
       if (!run.font.hasColor() && run.font.hasOutlines()) {
-        Matrix glyphMatrix = {};
         for (size_t i : rejectedIndices) {
-          run.getMatrix(i, &glyphMatrix);
-          drawGlyphAsPath(run.font, run.glyphs[i], glyphMatrix, state, brush, stroke,
+          drawGlyphAsPath(run.font, run.glyphs[i], run.getMatrix(i), state, brush, stroke,
                           localClipBounds);
         }
       } else {
