@@ -195,9 +195,15 @@ Rect TextBlob::computeBounds() const {
     }
     transformMat.mapRect(&fontBounds);
     Rect runBounds = {};
+    bool hasOnlyOffset = !HasComplexTransform(run);
     for (size_t i = 0; i < run.glyphCount; i++) {
-      auto glyphMatrix = GetGlyphMatrix(run, i);
-      auto glyphBounds = glyphMatrix.mapRect(fontBounds);
+      Rect glyphBounds = {};
+      if (hasOnlyOffset) {
+        auto position = GetGlyphPosition(run, i);
+        glyphBounds = fontBounds.makeOffset(position.x, position.y);
+      } else {
+        glyphBounds = GetGlyphMatrix(run, i).mapRect(fontBounds);
+      }
       if (i == 0) {
         runBounds = glyphBounds;
       } else {

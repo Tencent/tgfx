@@ -62,7 +62,7 @@ struct GlyphRun {
   /**
    * Pointer to the glyph ID array. The array contains glyphCount elements.
    */
-  const GlyphID* glyphs = nullptr; 
+  const GlyphID* glyphs = nullptr;
 
   /**
    * The positioning mode for this run.

@@ -54,5 +54,4 @@ Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
   return {};
 }
 
-
 }  // namespace tgfx
