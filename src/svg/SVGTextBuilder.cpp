@@ -19,6 +19,7 @@
 #include "SVGTextBuilder.h"
 #include <cstdint>
 #include <string>
+#include "core/GlyphRun.h"
 #include "core/utils/MathExtra.h"
 #include "svg/SVGUtils.h"
 #include "tgfx/core/Font.h"
@@ -29,8 +30,8 @@
 namespace tgfx {
 
 SVGTextBuilder::UnicharsInfo SVGTextBuilder::glyphToUnicharsInfo(const GlyphRun& glyphRun) {
-  std::vector<GlyphID> glyphIDs(glyphRun.glyphs, glyphRun.glyphs + glyphRun.runSize());
-  auto unicodeChars = converter.glyphsToUnichars(glyphRun.font, glyphIDs);
+  std::vector<GlyphID> glyphIDs(glyphRun.glyphs(), glyphRun.glyphs() + glyphRun.glyphCount());
+  auto unicodeChars = converter.glyphsToUnichars(glyphRun.font(), glyphIDs);
   if (unicodeChars.empty()) {
     return {};
   }
@@ -45,7 +46,7 @@ SVGTextBuilder::UnicharsInfo SVGTextBuilder::glyphToUnicharsInfo(const GlyphRun&
 
   for (uint32_t i = 0; i < unicodeChars.size(); i++) {
     auto c = unicodeChars[i];
-    auto matrix = glyphRun.getMatrix(i);
+    auto matrix = ComputeGlyphMatrix(glyphRun, i);
     auto position = Point::Make(matrix.getTranslateX(), matrix.getTranslateY());
     bool discardPos = false;
     bool isWhitespace = false;

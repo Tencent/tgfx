@@ -20,7 +20,7 @@
 #include <utility>
 #include "ElementWriter.h"
 #include "SVGUtils.h"
-#include "core/GlyphRunList.h"
+#include "core/GlyphRun.h"
 #include "core/RunRecord.h"
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
@@ -280,31 +280,30 @@ void SVGExportContext::exportPixmap(const Pixmap& pixmap, const MCState& state,
 void SVGExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
                                     const Brush& brush, const Stroke* stroke) {
   DEBUG_ASSERT(textBlob != nullptr);
-  GlyphRunList glyphRuns(textBlob.get());
-  if (glyphRuns.empty()) {
+  if (textBlob->empty()) {
     return;
   }
   auto deviceBounds = state.matrix.mapRect(textBlob->getBounds());
   if (!state.clip.contains(deviceBounds)) {
     applyClipPath(state.clip);
   }
-  for (const auto& glyphRun : glyphRuns) {
-    auto typeface = glyphRun.font.getTypeface();
+  for (auto glyphRun : *textBlob) {
+    auto typeface = glyphRun.font().getTypeface();
     if (typeface == nullptr) {
       continue;
     }
     // RSXform/Matrix positioning requires path export since SVG <text> cannot represent per-glyph
     // rotation/scale.
     if (!typeface->isCustom()) {
-      if (glyphRun.hasComplexTransform() ||
-          (glyphRun.font.hasOutlines() && !glyphRun.font.hasColor() &&
+      if (HasComplexTransform(glyphRun) ||
+          (glyphRun.font().hasOutlines() && !glyphRun.font().hasColor() &&
            exportFlags & SVGExportFlags::ConvertTextToPaths)) {
         exportGlyphRunAsPath(glyphRun, state, brush, stroke);
       } else {
         exportGlyphRunAsText(glyphRun, state, brush, stroke);
       }
     } else {
-      if (glyphRun.font.hasColor()) {
+      if (glyphRun.font().hasColor()) {
         exportGlyphRunAsImage(glyphRun, state, brush);
       } else {
         exportGlyphRunAsPath(glyphRun, state, brush, stroke);
@@ -316,13 +315,13 @@ void SVGExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MC
 void SVGExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCState& state,
                                             const Brush& brush, const Stroke* stroke) {
   Path path = {};
-  auto& font = glyphRun.font;
-  size_t glyphCount = glyphRun.runSize();
+  auto& font = glyphRun.font();
+  size_t glyphCount = glyphRun.glyphCount();
   for (size_t index = 0; index < glyphCount; ++index) {
-    auto glyphID = glyphRun.glyphs[index];
+    auto glyphID = glyphRun.glyphs()[index];
     Path glyphPath = {};
     if (font.getPath(glyphID, &glyphPath)) {
-      auto glyphMatrix = glyphRun.getMatrix(index);
+      auto glyphMatrix = ComputeGlyphMatrix(glyphRun, index);
       glyphPath.transform(glyphMatrix);
       path.addPath(glyphPath);
     }
@@ -345,7 +344,7 @@ void SVGExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
                             exportFlags & SVGExportFlags::DisableWarnings, state, brush, stroke,
                             _targetColorSpace, _assignColorSpace);
 
-  textElement.addFontAttributes(glyphRun.font);
+  textElement.addFontAttributes(glyphRun.font());
 
   auto unicharInfo = textBuilder.glyphToUnicharsInfo(glyphRun);
   textElement.addAttribute("x", unicharInfo.posX);
@@ -359,12 +358,12 @@ void SVGExportContext::exportGlyphRunAsImage(const GlyphRun& glyphRun, const MCS
   if (FloatNearlyZero(scale)) {
     return;
   }
-  auto font = glyphRun.font;
+  auto font = glyphRun.font();
   font = font.makeWithSize(scale * font.getSize());
-  size_t glyphCount = glyphRun.runSize();
+  size_t glyphCount = glyphRun.glyphCount();
   for (size_t i = 0; i < glyphCount; ++i) {
-    auto glyphID = glyphRun.glyphs[i];
-    auto glyphMatrix = glyphRun.getMatrix(i);
+    auto glyphID = glyphRun.glyphs()[i];
+    auto glyphMatrix = ComputeGlyphMatrix(glyphRun, i);
     auto glyphState = state;
     auto glyphCodec = font.getImage(glyphID, nullptr, &glyphState.matrix);
     auto glyphImage = Image::MakeFrom(glyphCodec);

@@ -19,7 +19,6 @@
 #include "tgfx/core/TextBlob.h"
 #include <cstdlib>
 #include "core/GlyphRun.h"
-#include "core/GlyphRunList.h"
 #include "core/RunRecord.h"
 #include "core/ScalerContext.h"
 #include "core/utils/AtomicCache.h"
@@ -144,6 +143,22 @@ const RunRecord* TextBlob::firstRun() const {
   return reinterpret_cast<const RunRecord*>(reinterpret_cast<const uint8_t*>(this) + alignedOffset);
 }
 
+TextBlob::Iterator TextBlob::begin() const {
+  return Iterator(firstRun(), runCount);
+}
+
+GlyphRun TextBlob::Iterator::operator*() const {
+  GlyphRun run;
+  run.record = current;
+  return run;
+}
+
+TextBlob::Iterator& TextBlob::Iterator::operator++() {
+  current = current->next();
+  --remaining;
+  return *this;
+}
+
 Rect TextBlob::getBounds() const {
   if (auto cachedBounds = AtomicCacheGet(bounds)) {
     return *cachedBounds;
@@ -156,8 +171,8 @@ Rect TextBlob::getBounds() const {
 Rect TextBlob::computeBounds() const {
   Rect finalBounds = {};
   Matrix transformMat = {};
-  for (const auto& run : GlyphRunList(this)) {
-    auto& font = run.font;
+  for (auto run : *this) {
+    auto& font = run.font();
     transformMat.reset();
     transformMat.setScale(font.getSize(), font.getSize());
     if (font.isFauxItalic()) {
@@ -175,8 +190,8 @@ Rect TextBlob::computeBounds() const {
     }
     transformMat.mapRect(&fontBounds);
     Rect runBounds = {};
-    for (size_t i = 0; i < run.runSize(); i++) {
-      auto glyphMatrix = run.getMatrix(i);
+    for (size_t i = 0; i < run.glyphCount(); i++) {
+      auto glyphMatrix = ComputeGlyphMatrix(run, i);
       auto glyphBounds = glyphMatrix.mapRect(fontBounds);
       if (i == 0) {
         runBounds = glyphBounds;
@@ -184,7 +199,7 @@ Rect TextBlob::computeBounds() const {
         runBounds.join(glyphBounds);
       }
     }
-    if (run.runSize() == 0) {
+    if (run.glyphCount() == 0) {
       continue;
     }
     finalBounds.join(runBounds);
@@ -203,14 +218,14 @@ Rect TextBlob::getTightBounds(const Matrix* matrix) const {
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
   auto inverseScale = 1.0f / resolutionScale;
   Rect totalBounds = {};
-  for (const auto& run : GlyphRunList(this)) {
-    auto font = run.font;
+  for (auto run : *this) {
+    auto font = run.font();
     if (hasScale) {
       font = font.makeWithSize(resolutionScale * font.getSize());
     }
-    for (size_t i = 0; i < run.runSize(); i++) {
-      auto glyphBounds = font.getBounds(run.glyphs[i]);
-      auto glyphMatrix = run.getMatrix(i);
+    for (size_t i = 0; i < run.glyphCount(); i++) {
+      auto glyphBounds = font.getBounds(run.glyphs()[i]);
+      auto glyphMatrix = ComputeGlyphMatrix(run, i);
       if (hasScale) {
         // Pre-scale to counteract the enlarged glyphBounds from the scaled font.
         glyphMatrix.preScale(inverseScale, inverseScale);
@@ -226,11 +241,11 @@ Rect TextBlob::getTightBounds(const Matrix* matrix) const {
 }
 
 bool TextBlob::hitTestPoint(float localX, float localY, const Stroke* stroke) const {
-  for (const auto& run : GlyphRunList(this)) {
-    auto& font = run.font;
+  for (auto run : *this) {
+    auto& font = run.font();
     auto usePathHitTest = font.hasOutlines();
-    for (size_t i = 0; i < run.runSize(); i++) {
-      auto glyphMatrix = run.getMatrix(i);
+    for (size_t i = 0; i < run.glyphCount(); i++) {
+      auto glyphMatrix = ComputeGlyphMatrix(run, i);
       Matrix inverseMatrix = {};
       if (!glyphMatrix.invert(&inverseMatrix)) {
         continue;
@@ -239,7 +254,7 @@ bool TextBlob::hitTestPoint(float localX, float localY, const Stroke* stroke) co
       inverseMatrix.mapXY(localX, localY, &localPoint);
       if (usePathHitTest) {
         Path glyphPath = {};
-        if (font.getPath(run.glyphs[i], &glyphPath)) {
+        if (font.getPath(run.glyphs()[i], &glyphPath)) {
           if (stroke) {
             stroke->applyToPath(&glyphPath);
           }
@@ -248,7 +263,7 @@ bool TextBlob::hitTestPoint(float localX, float localY, const Stroke* stroke) co
           }
         }
       } else {
-        auto glyphBounds = font.getBounds(run.glyphs[i]);
+        auto glyphBounds = font.getBounds(run.glyphs()[i]);
         if (stroke) {
           ApplyStrokeToBounds(*stroke, &glyphBounds);
         }

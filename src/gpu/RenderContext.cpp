@@ -21,7 +21,7 @@
 #include "core/AtlasManager.h"
 #include "core/AtlasStrikeCache.h"
 #include "core/GlyphRasterizer.h"
-#include "core/GlyphRunList.h"
+#include "core/GlyphRun.h"
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
@@ -353,17 +353,16 @@ void RenderContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCSta
   }
   inverseMatrix.mapRect(&localClipBounds);
 
-  GlyphRunList glyphRuns(textBlob.get());
-  for (const auto& run : glyphRuns) {
-    if (run.font.getTypeface() == nullptr) {
+  for (auto run : *textBlob) {
+    if (run.font().getTypeface() == nullptr) {
       continue;
     }
     // Glyphs with per-glyph rotation/scale (RSXform/Matrix) and outlines use path rendering
     // to avoid aliasing.
-    if (run.hasComplexTransform() && run.font.hasOutlines()) {
-      for (size_t i = 0; i < run.runSize(); i++) {
-        drawGlyphAsPath(run.font, run.glyphs[i], run.getMatrix(i), state, brush, stroke,
-                        localClipBounds);
+    if (HasComplexTransform(run) && run.font().hasOutlines()) {
+      for (size_t i = 0; i < run.glyphCount(); i++) {
+        drawGlyphAsPath(run.font(), run.glyphs()[i], ComputeGlyphMatrix(run, i), state, brush,
+                        stroke, localClipBounds);
       }
       continue;
     }
@@ -371,10 +370,10 @@ void RenderContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCSta
     drawGlyphsAsDirectMask(run, state, brush, stroke, localClipBounds, &rejectedIndices);
     // Process rejected glyphs immediately to maintain correct draw order.
     if (!rejectedIndices.empty()) {
-      if (!run.font.hasColor() && run.font.hasOutlines()) {
+      if (!run.font().hasColor() && run.font().hasOutlines()) {
         for (size_t i : rejectedIndices) {
-          drawGlyphAsPath(run.font, run.glyphs[i], run.getMatrix(i), state, brush, stroke,
-                          localClipBounds);
+          drawGlyphAsPath(run.font(), run.glyphs()[i], ComputeGlyphMatrix(run, i), state, brush,
+                          stroke, localClipBounds);
         }
       } else {
         drawGlyphsAsTransformedMask(run, rejectedIndices, state, brush, stroke);
@@ -481,7 +480,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   const auto maxScale = state.matrix.getMaxScale();
   const auto inverseScale = 1.0f / maxScale;
 
-  auto font = GetScaledFont(sourceGlyphRun.font, maxScale);
+  auto font = GetScaledFont(sourceGlyphRun.font(), maxScale);
   const auto maskFormat = GetMaskFormat(font);
   auto typeface = font.getTypeface();
   auto scaledStroke = GetScaledStroke(font, stroke, maxScale);
@@ -512,8 +511,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
   Rect perGlyphBounds = {};
   Matrix positionMatrix = {};
-  for (size_t i = 0; i < sourceGlyphRun.runSize(); i++) {
-    auto glyphID = sourceGlyphRun.glyphs[i];
+  for (size_t i = 0; i < sourceGlyphRun.glyphCount(); i++) {
+    auto glyphID = sourceGlyphRun.glyphs()[i];
     auto glyphBounds = sharedBounds ? sharedBounds
                                     : GetGlyphBounds(font, glyphID, inverseScale,
                                                      scaledStroke.get(), &perGlyphBounds);
@@ -521,7 +520,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
       continue;
     }
 
-    auto mappedBounds = sourceGlyphRun.mapBounds(i, *glyphBounds);
+    auto mappedBounds = MapGlyphBounds(sourceGlyphRun, i, *glyphBounds);
     if (!Rect::Intersects(mappedBounds, localClipBounds)) {
       continue;
     }
@@ -578,7 +577,9 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
     auto glyphState = state;
     auto& rect = atlasLocator.getLocation();
-    sourceGlyphRun.getMatrix(i, &positionMatrix);
+    sourceGlyphRun.positioning() == GlyphPositioning::Horizontal
+        ? (void)ComputeGlyphMatrix(sourceGlyphRun, i, &positionMatrix)
+        : (void)(positionMatrix = ComputeGlyphMatrix(sourceGlyphRun, i));
     ComputeGlyphRenderMatrix(rect, state.matrix, positionMatrix, combinedScale, glyphOffset,
                              font.isFauxItalic(), sampling.minFilterMode == FilterMode::Nearest,
                              &glyphState.matrix);
@@ -614,12 +615,12 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   }
 
   const auto maxScale = state.matrix.getMaxScale();
-  auto font = GetScaledFont(sourceGlyphRun.font, maxScale);
+  auto font = GetScaledFont(sourceGlyphRun.font(), maxScale);
   auto scaledStroke = GetScaledStroke(font, stroke, maxScale);
   static constexpr float MaxAtlasDimension = Atlas::MaxCellSize - 2.f;
   auto cellScale = 1.f;
   auto maxDimension =
-      FindMaxGlyphDimension(font, sourceGlyphRun.glyphs, glyphIndices, scaledStroke.get());
+      FindMaxGlyphDimension(font, sourceGlyphRun.glyphs(), glyphIndices, scaledStroke.get());
   while (maxDimension > MaxAtlasDimension) {
     auto reductionFactor = MaxAtlasDimension / maxDimension;
     font = font.makeWithSize(font.getSize() * reductionFactor);
@@ -627,7 +628,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
       scaledStroke->width *= reductionFactor;
     }
     maxDimension =
-        FindMaxGlyphDimension(font, sourceGlyphRun.glyphs, glyphIndices, scaledStroke.get());
+        FindMaxGlyphDimension(font, sourceGlyphRun.glyphs(), glyphIndices, scaledStroke.get());
     cellScale *= reductionFactor;
   }
 
@@ -651,7 +652,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
 
   Matrix positionMatrix = {};
   for (size_t i : glyphIndices) {
-    auto glyphID = sourceGlyphRun.glyphs[i];
+    auto glyphID = sourceGlyphRun.glyphs()[i];
     if (strike->isEmptyGlyph(glyphID)) {
       continue;
     }
@@ -695,7 +696,9 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
 
     auto glyphState = state;
     auto rect = atlasLocator.getLocation();
-    sourceGlyphRun.getMatrix(i, &positionMatrix);
+    sourceGlyphRun.positioning() == GlyphPositioning::Horizontal
+        ? (void)ComputeGlyphMatrix(sourceGlyphRun, i, &positionMatrix)
+        : (void)(positionMatrix = ComputeGlyphMatrix(sourceGlyphRun, i));
     ComputeGlyphRenderMatrix(rect, state.matrix, positionMatrix, combinedScale, glyphOffset,
                              font.isFauxItalic(), false, &glyphState.matrix);
     compositor->fillTextAtlas(std::move(textureProxy), rect,

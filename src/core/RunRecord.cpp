@@ -21,16 +21,6 @@
 
 namespace tgfx {
 
-unsigned ScalarsPerGlyph(GlyphPositioning positioning) {
-  static const unsigned scalarsPerPositioning[] = {
-      1,  // Horizontal
-      2,  // Point
-      4,  // RSXform
-      6,  // Matrix
-  };
-  return scalarsPerPositioning[static_cast<unsigned>(positioning)];
-}
-
 size_t RunRecord::StorageSize(size_t count, GlyphPositioning pos) {
   auto scalars = ScalarsPerGlyph(pos);
   size_t size = sizeof(RunRecord);

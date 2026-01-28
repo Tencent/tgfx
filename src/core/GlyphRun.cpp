@@ -21,30 +21,70 @@
 
 namespace tgfx {
 
-GlyphRun GlyphRun::From(const RunRecord* record) {
-  GlyphRun run;
-  run.font = record->font;
-  run.positioning = record->positioning;
-  run._runSize = record->glyphCount;
-  run.glyphs = record->glyphBuffer();
-  run.positions = record->posBuffer();
-  run.offsetY = record->y;
-  return run;
+unsigned ScalarsPerGlyph(GlyphPositioning positioning) {
+  switch (positioning) {
+    case GlyphPositioning::Horizontal:
+      return 1;
+    case GlyphPositioning::Point:
+      return 2;
+    case GlyphPositioning::RSXform:
+      return 4;
+    case GlyphPositioning::Matrix:
+      return 6;
+  }
+  return 0;
 }
 
-Matrix GlyphRun::getMatrix(size_t index) const {
+size_t GlyphRun::glyphCount() const {
+  return record->glyphCount;
+}
+
+const GlyphID* GlyphRun::glyphs() const {
+  return record->glyphBuffer();
+}
+
+const Font& GlyphRun::font() const {
+  return record->font;
+}
+
+GlyphPositioning GlyphRun::positioning() const {
+  return record->positioning;
+}
+
+const float* GlyphRun::positions() const {
+  return record->posBuffer();
+}
+
+float GlyphRun::offsetY() const {
+  return record->y;
+}
+
+const Point* GlyphRun::points() const {
+  return reinterpret_cast<const Point*>(record->posBuffer());
+}
+
+const RSXform* GlyphRun::xforms() const {
+  return reinterpret_cast<const RSXform*>(record->posBuffer());
+}
+
+const Matrix* GlyphRun::matrices() const {
+  return reinterpret_cast<const Matrix*>(record->posBuffer());
+}
+
+Matrix ComputeGlyphMatrix(const GlyphRun& run, size_t index) {
   Matrix matrix = {};
-  getMatrix(index, &matrix);
+  ComputeGlyphMatrix(run, index, &matrix);
   return matrix;
 }
 
-void GlyphRun::getMatrix(size_t index, Matrix* matrix) const {
-  switch (positioning) {
+void ComputeGlyphMatrix(const GlyphRun& run, size_t index, Matrix* matrix) {
+  const float* positions = run.positions();
+  switch (run.positioning()) {
     case GlyphPositioning::Horizontal:
-      matrix->setTranslate(positions[index], offsetY);
+      matrix->setTranslate(positions[index], run.offsetY());
       break;
     case GlyphPositioning::Point: {
-      auto point = reinterpret_cast<const Point*>(positions)[index];
+      auto point = run.points()[index];
       matrix->setTranslate(point.x, point.y);
       break;
     }
@@ -63,17 +103,22 @@ void GlyphRun::getMatrix(size_t index, Matrix* matrix) const {
   }
 }
 
-Rect GlyphRun::mapBounds(size_t index, const Rect& glyphBounds) const {
-  switch (positioning) {
+Rect MapGlyphBounds(const GlyphRun& run, size_t index, const Rect& bounds) {
+  switch (run.positioning()) {
     case GlyphPositioning::Horizontal:
-      return glyphBounds.makeOffset(positions[index], offsetY);
+      return bounds.makeOffset(run.positions()[index], run.offsetY());
     case GlyphPositioning::Point: {
-      auto point = reinterpret_cast<const Point*>(positions)[index];
-      return glyphBounds.makeOffset(point.x, point.y);
+      auto point = run.points()[index];
+      return bounds.makeOffset(point.x, point.y);
     }
     default:
-      return getMatrix(index).mapRect(glyphBounds);
+      return ComputeGlyphMatrix(run, index).mapRect(bounds);
   }
+}
+
+bool HasComplexTransform(const GlyphRun& run) {
+  return run.positioning() == GlyphPositioning::RSXform ||
+         run.positioning() == GlyphPositioning::Matrix;
 }
 
 }  // namespace tgfx

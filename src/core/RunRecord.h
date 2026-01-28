@@ -18,11 +18,9 @@
 
 #pragma once
 
-#include "core/GlyphRun.h"
+#include "tgfx/core/GlyphRun.h"
 
 namespace tgfx {
-
-unsigned ScalarsPerGlyph(GlyphPositioning positioning);
 
 // RunRecord stores metadata for a single run in the TextBlob's contiguous memory.
 // Memory layout after RunRecord:

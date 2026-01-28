@@ -18,61 +18,29 @@
 
 #pragma once
 
-#include <memory>
-#include "tgfx/core/Font.h"
+#include "tgfx/core/GlyphRun.h"
 
 namespace tgfx {
 
-struct RunRecord;
-class TextBlob;
+/**
+ * Computes the transformation matrix for a glyph at the given index within a GlyphRun.
+ */
+Matrix ComputeGlyphMatrix(const GlyphRun& run, size_t index);
 
-enum class GlyphPositioning {
-  Horizontal = 0,
-  Point = 1,
-  RSXform = 2,
-  Matrix = 3,
-};
+/**
+ * Computes the transformation matrix for a glyph at the given index within a GlyphRun.
+ * This version reuses an existing Matrix object for better performance in loops.
+ */
+void ComputeGlyphMatrix(const GlyphRun& run, size_t index, Matrix* matrix);
 
-struct GlyphRun {
-  Font font = {};
-  GlyphPositioning positioning = GlyphPositioning::Horizontal;
-  const GlyphID* glyphs = nullptr;
-  const float* positions = nullptr;
+/**
+ * Maps a glyph's bounds by applying the positioning transformation at the given index.
+ */
+Rect MapGlyphBounds(const GlyphRun& run, size_t index, const Rect& bounds);
 
-  static GlyphRun From(const RunRecord* record);
-
-  size_t runSize() const {
-    return _runSize;
-  }
-
-  /**
-   * Returns true if the glyph run has complex per-glyph transforms (RSXform or Matrix positioning),
-   * not just simple translations.
-   */
-  bool hasComplexTransform() const {
-    return positioning == GlyphPositioning::RSXform || positioning == GlyphPositioning::Matrix;
-  }
-
-  /**
-   * Returns the transformation matrix for the glyph at the given index.
-   */
-  Matrix getMatrix(size_t index) const;
-
-  /**
-   * Gets the transformation matrix for the glyph at the given index via out parameter.
-   * This version allows reusing the same Matrix object in a loop.
-   */
-  void getMatrix(size_t index, Matrix* matrix) const;
-
-  /**
-   * Returns the glyph bounds transformed by the glyph's positioning at the given index.
-   */
-  Rect mapBounds(size_t index, const Rect& glyphBounds) const;
-
- private:
-  size_t _runSize = 0;
-  float offsetY = 0.0f;  // Only used for Horizontal positioning
-  friend struct RunRecord;
-};
+/**
+ * Returns true if the GlyphRun has complex per-glyph transforms (RSXform or Matrix positioning).
+ */
+bool HasComplexTransform(const GlyphRun& run);
 
 }  // namespace tgfx
