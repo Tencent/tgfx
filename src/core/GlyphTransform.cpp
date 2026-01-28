@@ -20,6 +20,20 @@
 
 namespace tgfx {
 
+unsigned ScalarsPerGlyph(GlyphPositioning positioning) {
+  switch (positioning) {
+    case GlyphPositioning::Horizontal:
+      return 1;
+    case GlyphPositioning::Point:
+      return 2;
+    case GlyphPositioning::RSXform:
+      return 4;
+    case GlyphPositioning::Matrix:
+      return 6;
+  }
+  return 0;
+}
+
 Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
   switch (run.positioning) {
     case GlyphPositioning::Horizontal:

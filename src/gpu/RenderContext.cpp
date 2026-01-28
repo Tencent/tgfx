@@ -529,7 +529,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
 
   Rect perGlyphBounds = {};
-  const bool isSimplePositioning = !HasComplexTransform(sourceGlyphRun);
+  const bool hasOnlyOffset = !HasComplexTransform(sourceGlyphRun);
   for (size_t i = 0; i < sourceGlyphRun.glyphCount; i++) {
     auto glyphID = sourceGlyphRun.glyphs[i];
     auto glyphBounds = sharedBounds ? sharedBounds
@@ -540,7 +540,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     }
 
     Rect mappedBounds = {};
-    if (isSimplePositioning) {
+    if (hasOnlyOffset) {
       auto position = GetGlyphPosition(sourceGlyphRun, i);
       mappedBounds = glyphBounds->makeOffset(position.x, position.y);
     } else {
@@ -602,7 +602,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
     auto glyphState = state;
     auto& rect = atlasLocator.getLocation();
-    if (isSimplePositioning) {
+    if (hasOnlyOffset) {
       auto glyphPosition = GetGlyphPosition(sourceGlyphRun, i);
       ComputeGlyphRenderMatrixSimple(rect, state.matrix, glyphPosition, combinedScale, glyphOffset,
                                      font.isFauxItalic(),
@@ -681,7 +681,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   const auto glyphRenderScale = font.scalerContext->getSize() / backingSize;
   const auto combinedScale = glyphRenderScale / (maxScale * cellScale);
 
-  const bool isSimplePositioning = !HasComplexTransform(sourceGlyphRun);
+  const bool hasOnlyOffset = !HasComplexTransform(sourceGlyphRun);
   for (size_t i : glyphIndices) {
     auto glyphID = sourceGlyphRun.glyphs[i];
     if (strike->isEmptyGlyph(glyphID)) {
@@ -727,7 +727,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
 
     auto glyphState = state;
     auto rect = atlasLocator.getLocation();
-    if (isSimplePositioning) {
+    if (hasOnlyOffset) {
       auto glyphPosition = GetGlyphPosition(sourceGlyphRun, i);
       ComputeGlyphRenderMatrixSimple(rect, state.matrix, glyphPosition, combinedScale, glyphOffset,
                                      font.isFauxItalic(), false, &glyphState.matrix);
