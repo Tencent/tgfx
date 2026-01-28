@@ -22,8 +22,8 @@
 
 namespace tgfx {
 
-size_t RunRecord::StorageSize(size_t count, GlyphPositioning mode) {
-  auto scalars = ScalarsPerGlyph(mode);
+size_t RunRecord::StorageSize(size_t count, GlyphPositioning positioning) {
+  auto scalars = ScalarsPerGlyph(positioning);
   size_t size = sizeof(RunRecord);
   size_t glyphSize = count * sizeof(GlyphID);
   size += (glyphSize + 3) & ~static_cast<size_t>(3);

@@ -35,7 +35,7 @@ struct RunRecord {
 
   static constexpr uint8_t LAST_FLAG = 0x01;
 
-  static size_t StorageSize(size_t count, GlyphPositioning mode);
+  static size_t StorageSize(size_t count, GlyphPositioning positioning);
 
   GlyphID* glyphBuffer();
   const GlyphID* glyphBuffer() const;

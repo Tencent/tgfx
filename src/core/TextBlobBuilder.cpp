@@ -87,15 +87,16 @@ RunRecord* TextBlobBuilder::lastRun() {
   return reinterpret_cast<RunRecord*>(storage + lastRunOffset);
 }
 
-bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning mode, size_t count, float y) {
+bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning positioning, size_t count,
+                               float y) {
   if (runCount == 0) {
     return false;
   }
   auto* run = lastRun();
-  if (run->font != font || run->positionMode != mode) {
+  if (run->font != font || run->positionMode != positioning) {
     return false;
   }
-  if (mode == GlyphPositioning::Horizontal) {
+  if (positioning == GlyphPositioning::Horizontal) {
     if (run->y != y) {
       return false;
     }
@@ -104,33 +105,34 @@ bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning mode, size_t c
     return false;
   }
   size_t oldSize = run->storageSize();
-  size_t newSize = RunRecord::StorageSize(run->glyphCount + count, mode);
+  size_t newSize = RunRecord::StorageSize(run->glyphCount + count, positioning);
   size_t delta = newSize - oldSize;
   reserve(delta);
   run = lastRun();
   uint32_t preMergeCount = run->glyphCount;
   run->grow(static_cast<uint32_t>(count));
   currentBuffer.glyphs = run->glyphBuffer() + preMergeCount;
-  auto scalars = ScalarsPerGlyph(mode);
+  auto scalars = ScalarsPerGlyph(positioning);
   currentBuffer.positions = run->posBuffer() + preMergeCount * scalars;
   storageUsed += delta;
   return true;
 }
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRun(const Font& font, size_t glyphCount,
-                                                            GlyphPositioning mode, float y) {
+                                                            GlyphPositioning positioning,
+                                                            float y) {
   if (glyphCount == 0) {
     currentBuffer = {};
     return currentBuffer;
   }
-  if (tryMerge(font, mode, glyphCount, y)) {
+  if (tryMerge(font, positioning, glyphCount, y)) {
     return currentBuffer;
   }
-  size_t runSize = RunRecord::StorageSize(glyphCount, mode);
+  size_t runSize = RunRecord::StorageSize(glyphCount, positioning);
   reserve(runSize);
   lastRunOffset = storageUsed;
-  auto* run =
-      new (storage + storageUsed) RunRecord{font, mode, static_cast<uint32_t>(glyphCount), y, 0};
+  auto* run = new (storage + storageUsed)
+      RunRecord{font, positioning, static_cast<uint32_t>(glyphCount), y, 0};
   storageUsed += runSize;
   runCount++;
   currentBuffer.glyphs = run->glyphBuffer();

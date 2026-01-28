@@ -20,8 +20,8 @@
 
 namespace tgfx {
 
-unsigned ScalarsPerGlyph(GlyphPositioning mode) {
-  switch (mode) {
+unsigned ScalarsPerGlyph(GlyphPositioning positioning) {
+  switch (positioning) {
     case GlyphPositioning::Horizontal:
       return 1;
     case GlyphPositioning::Point:
