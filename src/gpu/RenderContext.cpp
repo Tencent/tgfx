@@ -173,44 +173,20 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
 }
 
 static void ComputeGlyphRenderMatrix(const Rect& atlasLocation, const Matrix& stateMatrix,
-                                     const Matrix& positionMatrix, float scale,
+                                     const GlyphRun& run, size_t index, float scale,
                                      const Point& glyphOffset, bool fauxItalic,
                                      bool needsPixelAlignment, Matrix* outMatrix) {
   auto skewX = fauxItalic ? ITALIC_SKEW * scale : 0.0f;
   auto tx =
       scale * (glyphOffset.x - atlasLocation.x()) + skewX * (glyphOffset.y - atlasLocation.y());
   auto ty = scale * (glyphOffset.y - atlasLocation.y());
-  // setAll Equivalent to :
-  //   outMatrix->setTranslate(- atlasLocation.x(), - atlasLocation.y()); → [1, 0, -ax; 0, 1, -ay]
-  //   outMatrix->postTranslate(glyphOffset.x, glyphOffset.y); → [1, 0, gx-ax; 0, 1, gy-ay]
-  //   outMatrix->postScale(glyphRenderScale, glyphRenderScale); → [s, 0, s*(gx-ax); 0, s, s*(gy-ay)]
-  //   if (fauxItalic) {
-  //       outMatrix->postSkew(ITALIC_SKEW, 0); → [s, skewX, s*(gx-ax)+skewX*(gy-ay); 0, s, s*(gy-ay)]
-  //   }
-  //   outMatrix->postScale(inverseScale, inverseScale); inverseScale is folded into s above
-  //
-  // Here scale = glyphRenderScale * inverseScale, combining both into a single matrix construction.
-  outMatrix->setAll(scale, skewX, tx, 0, scale, ty);
-  outMatrix->postConcat(positionMatrix);
-  outMatrix->postConcat(stateMatrix);
-  if (needsPixelAlignment) {
-    (*outMatrix)[2] = std::round((*outMatrix)[2]);
-    (*outMatrix)[5] = std::round((*outMatrix)[5]);
+  if (HasComplexTransform(run)) {
+    outMatrix->setAll(scale, skewX, tx, 0, scale, ty);
+    outMatrix->postConcat(GetGlyphMatrix(run, index));
+  } else {
+    auto position = GetGlyphPosition(run, index);
+    outMatrix->setAll(scale, skewX, tx + position.x, 0, scale, ty + position.y);
   }
-}
-
-// Optimized version for simple positioning (Horizontal/Point) that avoids full matrix multiply.
-static void ComputeGlyphRenderMatrixSimple(const Rect& atlasLocation, const Matrix& stateMatrix,
-                                           const Point& glyphPosition, float scale,
-                                           const Point& glyphOffset, bool fauxItalic,
-                                           bool needsPixelAlignment, Matrix* outMatrix) {
-  auto skewX = fauxItalic ? ITALIC_SKEW * scale : 0.0f;
-  auto tx =
-      scale * (glyphOffset.x - atlasLocation.x()) + skewX * (glyphOffset.y - atlasLocation.y());
-  auto ty = scale * (glyphOffset.y - atlasLocation.y());
-  // For simple positioning, positionMatrix is just a translation [1, 0, px; 0, 1, py].
-  // postConcat with translation: tx' = tx + px, ty' = ty + py (skipping full matrix multiply).
-  outMatrix->setAll(scale, skewX, tx + glyphPosition.x, 0, scale, ty + glyphPosition.y);
   outMatrix->postConcat(stateMatrix);
   if (needsPixelAlignment) {
     (*outMatrix)[2] = std::round((*outMatrix)[2]);
@@ -602,18 +578,9 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
     auto glyphState = state;
     auto& rect = atlasLocator.getLocation();
-    if (hasOnlyOffset) {
-      auto glyphPosition = GetGlyphPosition(sourceGlyphRun, i);
-      ComputeGlyphRenderMatrixSimple(rect, state.matrix, glyphPosition, combinedScale, glyphOffset,
-                                     font.isFauxItalic(),
-                                     sampling.minFilterMode == FilterMode::Nearest,
-                                     &glyphState.matrix);
-    } else {
-      auto positionMatrix = GetGlyphMatrix(sourceGlyphRun, i);
-      ComputeGlyphRenderMatrix(rect, state.matrix, positionMatrix, combinedScale, glyphOffset,
-                               font.isFauxItalic(), sampling.minFilterMode == FilterMode::Nearest,
-                               &glyphState.matrix);
-    }
+    ComputeGlyphRenderMatrix(rect, state.matrix, sourceGlyphRun, i, combinedScale, glyphOffset,
+                             font.isFauxItalic(), sampling.minFilterMode == FilterMode::Nearest,
+                             &glyphState.matrix);
     compositor->fillTextAtlas(std::move(textureProxy), rect, sampling, glyphState, atlasBrush);
   }
 }
@@ -681,7 +648,6 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   const auto glyphRenderScale = font.scalerContext->getSize() / backingSize;
   const auto combinedScale = glyphRenderScale / (maxScale * cellScale);
 
-  const bool hasOnlyOffset = !HasComplexTransform(sourceGlyphRun);
   for (size_t i : glyphIndices) {
     auto glyphID = sourceGlyphRun.glyphs[i];
     if (strike->isEmptyGlyph(glyphID)) {
@@ -727,15 +693,8 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
 
     auto glyphState = state;
     auto rect = atlasLocator.getLocation();
-    if (hasOnlyOffset) {
-      auto glyphPosition = GetGlyphPosition(sourceGlyphRun, i);
-      ComputeGlyphRenderMatrixSimple(rect, state.matrix, glyphPosition, combinedScale, glyphOffset,
-                                     font.isFauxItalic(), false, &glyphState.matrix);
-    } else {
-      auto positionMatrix = GetGlyphMatrix(sourceGlyphRun, i);
-      ComputeGlyphRenderMatrix(rect, state.matrix, positionMatrix, combinedScale, glyphOffset,
-                               font.isFauxItalic(), false, &glyphState.matrix);
-    }
+    ComputeGlyphRenderMatrix(rect, state.matrix, sourceGlyphRun, i, combinedScale, glyphOffset,
+                             font.isFauxItalic(), false, &glyphState.matrix);
     compositor->fillTextAtlas(std::move(textureProxy), rect,
                               SamplingOptions(FilterMode::Linear, MipmapMode::None), glyphState,
                               atlasBrush);
