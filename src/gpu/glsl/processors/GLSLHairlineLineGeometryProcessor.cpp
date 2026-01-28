@@ -45,6 +45,7 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   // Emit vertex attributes
   varyingHandler->emitAttributes(*this);
 
+  // Transform vertex position by view matrix
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
   std::string positionName = "transformedPosition";
@@ -65,6 +66,7 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
   }
 
+  // Output color and coverage
   auto colorName =
       uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
@@ -73,7 +75,7 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
                            coverageScale.c_str());
 
-  // Emit vertex position
+  // Emit final vertex position
   vertBuilder->emitNormalizedPosition(positionName);
 }
 

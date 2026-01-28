@@ -44,30 +44,30 @@ class PathUtils {
   /**
    * Subdivides a quadratic bezier curve at parameter t.
    *
-   * src is an array of 3 points defining the input quadratic curve.
-   * dst is an array of 5 points to receive the two resulting quadratic curves.
+   * source is an array of 3 points defining the input quadratic curve.
+   * destination is an array of 5 points to receive the two resulting quadratic curves.
    * t is the subdivision parameter in the range [0, 1].
    */
-  static void ChopQuadAt(const Point src[3], Point dst[5], float t);
+  static void ChopQuadAt(const Point source[3], Point destination[5], float t);
 
   /**
    * Finds the parameter t at the point of maximum curvature on a quadratic bezier curve.
    *
-   * src is an array of 3 points defining the quadratic curve.
+   * source is an array of 3 points defining the quadratic curve.
    * Returns the t value for the point of maximum curvature if it exists on the segment,
    * otherwise returns 0.
    */
-  static float FindQuadMaxCurvature(const Point src[3]);
+  static float FindQuadMaxCurvature(const Point source[3]);
 
   /**
    * Subdivides a quadratic bezier curve at the point of maximum curvature if it exists.
    *
-   * src is an array of 3 points defining the input quadratic curve.
-   * dst is an array of 5 points to receive the subdivided curves.
-   * Returns 1 if no subdivision occurred (dst[0..2] contains the original quad).
-   * Returns 2 if subdivision occurred (dst[0..2] and dst[2..4] contain the two new quads).
+   * source is an array of 3 points defining the input quadratic curve.
+   * destination is an array of 5 points to receive the subdivided curves.
+   * Returns 1 if no subdivision occurred (destination[0..2] contains the original quad).
+   * Returns 2 if subdivision occurred (destination[0..2] and destination[2..4] contain the two new quads).
    */
-  static int ChopQuadAtMaxCurvature(const Point src[3], Point dst[5]);
+  static int ChopQuadAtMaxCurvature(const Point source[3], Point destination[5]);
 };
 
 /**

@@ -24,6 +24,9 @@
 
 namespace tgfx {
 
+class BufferResource;
+class GPU;
+
 class HairlineBufferUploadTask : public ResourceTask {
  public:
   HairlineBufferUploadTask(std::shared_ptr<ResourceProxy> lineVertexProxy,
@@ -36,6 +39,14 @@ class HairlineBufferUploadTask : public ResourceTask {
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
+  static std::shared_ptr<BufferResource> createBuffer(Context* context, GPU* gpu,
+                                                      const std::shared_ptr<Data>& data,
+                                                      uint32_t usage, const char* bufferName,
+                                                      bool& creationFailed);
+
+  static void assignBufferToProxy(const std::shared_ptr<BufferResource>& buffer,
+                                  const std::shared_ptr<ResourceProxy>& proxy);
+
   std::shared_ptr<ResourceProxy> lineIndexProxy = nullptr;
   std::shared_ptr<ResourceProxy> quadVertexProxy = nullptr;
   std::shared_ptr<ResourceProxy> quadIndexProxy = nullptr;

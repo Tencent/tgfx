@@ -29,6 +29,9 @@
 
 namespace tgfx {
 
+/**
+ * HairlineQuadGeometryProcessor is used to render hairline quadratic curve segments.
+ */
 class HairlineQuadGeometryProcessor : public GeometryProcessor {
  public:
   static PlacementPtr<HairlineQuadGeometryProcessor> Make(BlockAllocator* allocator,

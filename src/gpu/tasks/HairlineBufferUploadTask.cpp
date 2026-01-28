@@ -44,74 +44,65 @@ std::shared_ptr<Resource> HairlineBufferUploadTask::onMakeResource(Context* cont
   }
 
   auto gpu = context->gpu();
-  std::shared_ptr<BufferResource> lineVertexBuffer = nullptr;
 
-  // Create line vertex buffer
-  if (hairlineBuffer->lineVertices && !hairlineBuffer->lineVertices->empty()) {
-    auto gpuBuffer =
-        gpu->createBuffer(hairlineBuffer->lineVertices->size(), GPUBufferUsage::VERTEX);
-    if (!gpuBuffer) {
-      LOGE("HairlineBufferUploadTask: Failed to create line vertex buffer!");
-      return nullptr;
-    }
-    gpu->queue()->writeBuffer(gpuBuffer, 0, hairlineBuffer->lineVertices->data(),
-                              hairlineBuffer->lineVertices->size());
-    lineVertexBuffer = BufferResource::Wrap(context, std::move(gpuBuffer));
+  // Create all buffers first, before assigning to proxies.
+  // This ensures atomic success/failure behavior.
+  bool failed = false;
+  auto lineVertexBuffer = createBuffer(context, gpu, hairlineBuffer->lineVertices,
+                                        GPUBufferUsage::VERTEX, "line vertex buffer", failed);
+  auto lineIndexBuffer = createBuffer(context, gpu, hairlineBuffer->lineIndices,
+                                       GPUBufferUsage::INDEX, "line index buffer", failed);
+  auto quadVertexBuffer = createBuffer(context, gpu, hairlineBuffer->quadVertices,
+                                        GPUBufferUsage::VERTEX, "quad vertex buffer", failed);
+  auto quadIndexBuffer = createBuffer(context, gpu, hairlineBuffer->quadIndices,
+                                       GPUBufferUsage::INDEX, "quad index buffer", failed);
+
+  if (failed) {
+    // Don't assign any buffers to proxies if any creation failed.
+    return nullptr;
   }
 
-  // Create line index buffer
-  if (hairlineBuffer->lineIndices && !hairlineBuffer->lineIndices->empty()) {
-    auto gpuBuffer =
-        gpu->createBuffer(hairlineBuffer->lineIndices->size(), GPUBufferUsage::INDEX);
-    if (!gpuBuffer) {
-      LOGE("HairlineBufferUploadTask: Failed to create line index buffer!");
-      return nullptr;
-    }
-    gpu->queue()->writeBuffer(gpuBuffer, 0, hairlineBuffer->lineIndices->data(),
-                              hairlineBuffer->lineIndices->size());
-    auto lineIndexBuffer = BufferResource::Wrap(context, std::move(gpuBuffer));
-    if (lineIndexProxy) {
-      lineIndexBuffer->assignUniqueKey(lineIndexProxy->uniqueKey);
-      lineIndexProxy->resource = lineIndexBuffer;
-    }
-  }
+  // All buffers created successfully (or were not needed). Assign to proxies.
+  assignBufferToProxy(lineIndexBuffer, lineIndexProxy);
+  assignBufferToProxy(quadVertexBuffer, quadVertexProxy);
+  assignBufferToProxy(quadIndexBuffer, quadIndexProxy);
 
-  // Create quad vertex buffer
-  if (hairlineBuffer->quadVertices && !hairlineBuffer->quadVertices->empty()) {
-    auto gpuBuffer =
-        gpu->createBuffer(hairlineBuffer->quadVertices->size(), GPUBufferUsage::VERTEX);
-    if (!gpuBuffer) {
-      LOGE("HairlineBufferUploadTask: Failed to create quad vertex buffer!");
-      return nullptr;
-    }
-    gpu->queue()->writeBuffer(gpuBuffer, 0, hairlineBuffer->quadVertices->data(),
-                              hairlineBuffer->quadVertices->size());
-    auto quadVertexBuffer = BufferResource::Wrap(context, std::move(gpuBuffer));
-    if (quadVertexProxy) {
-      quadVertexBuffer->assignUniqueKey(quadVertexProxy->uniqueKey);
-      quadVertexProxy->resource = quadVertexBuffer;
-    }
-  }
-
-  // Create quad index buffer
-  if (hairlineBuffer->quadIndices && !hairlineBuffer->quadIndices->empty()) {
-    auto gpuBuffer =
-        gpu->createBuffer(hairlineBuffer->quadIndices->size(), GPUBufferUsage::INDEX);
-    if (!gpuBuffer) {
-      LOGE("HairlineBufferUploadTask: Failed to create quad index buffer!");
-      return nullptr;
-    }
-    gpu->queue()->writeBuffer(gpuBuffer, 0, hairlineBuffer->quadIndices->data(),
-                              hairlineBuffer->quadIndices->size());
-    auto quadIndexBuffer = BufferResource::Wrap(context, std::move(gpuBuffer));
-    if (quadIndexProxy) {
-      quadIndexBuffer->assignUniqueKey(quadIndexProxy->uniqueKey);
-      quadIndexProxy->resource = quadIndexBuffer;
-    }
-  }
-
+  // Release the source data as it's no longer needed.
   source = nullptr;
-  return lineVertexBuffer;
+
+  // Return whichever buffer is available. The base class ResourceTask expects a non-null
+  // return value when the task succeeds. Prefer lineVertexBuffer, fall back to quadVertexBuffer.
+  if (lineVertexBuffer) {
+    return lineVertexBuffer;
+  }
+  return quadVertexBuffer;
+}
+
+std::shared_ptr<BufferResource> HairlineBufferUploadTask::createBuffer(
+    Context* context, GPU* gpu, const std::shared_ptr<Data>& data, uint32_t usage,
+    const char* bufferName, bool& creationFailed) {
+  if (!data || data->empty()) {
+    return nullptr;
+  }
+
+  auto gpuBuffer = gpu->createBuffer(data->size(), usage);
+  if (!gpuBuffer) {
+    LOGE("HairlineBufferUploadTask: Failed to create %s!", bufferName);
+    creationFailed = true;
+    return nullptr;
+  }
+
+  gpu->queue()->writeBuffer(gpuBuffer, 0, data->data(), data->size());
+  return BufferResource::Wrap(context, std::move(gpuBuffer));
+}
+
+void HairlineBufferUploadTask::assignBufferToProxy(
+    const std::shared_ptr<BufferResource>& buffer,
+    const std::shared_ptr<ResourceProxy>& proxy) {
+  if (buffer && proxy) {
+    buffer->assignUniqueKey(proxy->uniqueKey);
+    proxy->resource = buffer;
+  }
 }
 
 }  // namespace tgfx

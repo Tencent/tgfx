@@ -214,8 +214,8 @@ void ChopCubicAt(const Point source[4], Point destination[], const float toleran
   }
 }
 
-void ChopCubicAtHalf(const Point src[4], Point dst[7]) {
-  ChopCubicAt(src, dst, 0.5f);
+void ChopCubicAtHalf(const Point source[4], Point destination[7]) {
+  ChopCubicAt(source, destination, 0.5f);
 }
 
 int ChopCubicAtInflections(const Point source[4], Point destination[10]) {
@@ -312,28 +312,28 @@ std::vector<Point> PathUtils::ConvertCubicToQuads(const Point cubicPoints[4], fl
   return convertQuads;
 }
 
-void PathUtils::ChopQuadAt(const Point src[3], Point dst[5], float t) {
+void PathUtils::ChopQuadAt(const Point source[3], Point destination[5], float t) {
   DEBUG_ASSERT((t > 0.f && t < 1.f));
 
-  auto p0 = src[0];
-  auto p1 = src[1];
-  auto p2 = src[2];
+  auto p0 = source[0];
+  auto p1 = source[1];
+  auto p2 = source[2];
 
   auto p01 = Interp(p0, p1, t);
   auto p12 = Interp(p1, p2, t);
 
-  dst[0] = p0;
-  dst[1] = p01;
-  dst[2] = Interp(p01, p12, t);
-  dst[3] = p12;
-  dst[4] = p2;
+  destination[0] = p0;
+  destination[1] = p01;
+  destination[2] = Interp(p01, p12, t);
+  destination[3] = p12;
+  destination[4] = p2;
 }
 
-float PathUtils::FindQuadMaxCurvature(const Point src[3]) {
-  float Ax = src[1].x - src[0].x;
-  float Ay = src[1].y - src[0].y;
-  float Bx = src[0].x - src[1].x - src[1].x + src[2].x;
-  float By = src[0].y - src[1].y - src[1].y + src[2].y;
+float PathUtils::FindQuadMaxCurvature(const Point source[3]) {
+  float Ax = source[1].x - source[0].x;
+  float Ay = source[1].y - source[0].y;
+  float Bx = source[0].x - source[1].x - source[1].x + source[2].x;
+  float By = source[0].y - source[1].y - source[1].y + source[2].y;
 
   float numer = -((Ax * Bx) + (Ay * By));
   float denom = (Bx * Bx) + (By * By);
@@ -352,13 +352,13 @@ float PathUtils::FindQuadMaxCurvature(const Point src[3]) {
   return t;
 }
 
-int PathUtils::ChopQuadAtMaxCurvature(const Point src[3], Point dst[5]) {
-  float t = FindQuadMaxCurvature(src);
+int PathUtils::ChopQuadAtMaxCurvature(const Point source[3], Point destination[5]) {
+  float t = FindQuadMaxCurvature(source);
   if (t > 0 && t < 1) {
-    ChopQuadAt(src, dst, t);
+    ChopQuadAt(source, destination, t);
     return 2;
   } else {
-    memcpy(dst, src, 3 * sizeof(Point));
+    memcpy(destination, source, 3 * sizeof(Point));
     return 1;
   }
 }
@@ -455,6 +455,10 @@ void QuadUVMatrix::set(const Point controlPoints[3]) {
 }
 
 void QuadUVMatrix::apply(void* vertices, int vertexCount, size_t stride, size_t uvOffset) const {
+  DEBUG_ASSERT(vertices != nullptr);
+  if (vertexCount <= 0) {
+    return;
+  }
   auto* xyPtr = static_cast<char*>(vertices);
   auto* uvPtr = static_cast<char*>(vertices) + uvOffset;
   float sx = matrix[0];
