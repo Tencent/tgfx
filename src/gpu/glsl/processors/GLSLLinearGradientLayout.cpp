@@ -29,8 +29,8 @@ GLSLLinearGradientLayout::GLSLLinearGradientLayout(Matrix matrix) : LinearGradie
 
 void GLSLLinearGradientLayout::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
-  fragBuilder->codeAppendf("float t = %s.x + 1.0000000000000001e-05;",
-                           (*args.transformedCoords)[0].name().c_str());
+  const auto coordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
+  fragBuilder->codeAppendf("float t = %s.x + 1.0000000000000001e-05;", coordName.c_str());
   fragBuilder->codeAppendf("%s = vec4(t, 1.0, 0.0, 0.0);", args.outputColor.c_str());
 }
 }  // namespace tgfx

@@ -58,6 +58,17 @@ struct GlyphRun {
    */
   Matrix getMatrix(size_t index) const;
 
+  /**
+   * Gets the transformation matrix for the glyph at the given index via out parameter.
+   * This version allows reusing the same Matrix object in a loop.
+   */
+  void getMatrix(size_t index, Matrix* matrix) const;
+
+  /**
+   * Returns the glyph bounds transformed by the glyph's positioning at the given index.
+   */
+  Rect mapBounds(size_t index, const Rect& glyphBounds) const;
+
  private:
   size_t _runSize = 0;
   float offsetY = 0.0f;  // Only used for Horizontal positioning

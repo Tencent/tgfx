@@ -54,10 +54,37 @@ class Matrix3DUtils {
   static bool IsMatrix3DAffine(const Matrix3D& matrix);
 
   /**
-   * When a 4x4 matrix does not contain Z-axis related transformations and projection
-   * transformations, this function returns an equivalent 2D affine transformation. Otherwise, the
-   * return value will lose information about Z-axis related transformations and projection
-   * transformations.
+   * Converts a 4x4 matrix to a 3x3 matrix by extracting the 2D projection components. The z-axis
+   * related transformations are ignored.
+   *
+   * Given a 4x4 matrix:
+   *      | m00 m01 m02 m03 |
+   *      | m10 m11 m12 m13 |
+   *      | m20 m21 m22 m23 |
+   *      | m30 m31 m32 m33 |
+   *
+   * The resulting 3x3 matrix is:
+   *      | m00 m01 m03 |
+   *      | m10 m11 m13 |
+   *      | m30 m31 m33 |
+   */
+  static Matrix GetMayLossyMatrix(const Matrix3D& matrix);
+
+  /**
+   * Converts a 4x4 matrix to a 2D affine transformation matrix by extracting the X/Y translation
+   * and scale/skew components. The z-axis related transformations and projection transformations
+   * are ignored.
+   *
+   * Given a 4x4 matrix:
+   *      | m00 m01 m02 m03 |
+   *      | m10 m11 m12 m13 |
+   *      | m20 m21 m22 m23 |
+   *      | m30 m31 m32 m33 |
+   *
+   * The resulting 3x3 affine matrix is:
+   *      | m00 m01 m03 |
+   *      | m10 m11 m13 |
+   *      |  0   0   1  |
    */
   static Matrix GetMayLossyAffineMatrix(const Matrix3D& matrix);
 

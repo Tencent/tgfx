@@ -34,6 +34,8 @@ class DiamondGradientLayout : public FragmentProcessor {
 
   explicit DiamondGradientLayout(Matrix matrix);
 
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
+
   CoordTransform coordTransform;
 };
 }  // namespace tgfx
