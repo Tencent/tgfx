@@ -119,8 +119,7 @@ bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning positioning, s
 }
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRun(const Font& font, size_t glyphCount,
-                                                            GlyphPositioning positioning,
-                                                            float y) {
+                                                            GlyphPositioning positioning, float y) {
   if (glyphCount == 0) {
     currentBuffer = {};
     return currentBuffer;
