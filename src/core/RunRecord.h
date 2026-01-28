@@ -28,7 +28,7 @@ namespace tgfx {
 //   [positions: float[glyphCount * scalarsPerGlyph]] (if scalarsPerGlyph > 0)
 struct RunRecord {
   Font font;
-  GlyphPositioning positionMode = GlyphPositioning::Point;
+  GlyphPositioning positioning = GlyphPositioning::Point;
   uint32_t glyphCount = 0;
   float y = 0.0f;  // Only used for Horizontal positioning
   uint8_t flags = 0;

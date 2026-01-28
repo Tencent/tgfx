@@ -417,6 +417,7 @@ void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& s
 
 void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCState& state,
                                             const Brush& brush) {
+  DEBUG_ASSERT(!HasComplexTransform(glyphRun));
   if (glyphRun.glyphCount == 0) {
     return;
   }
@@ -467,8 +468,7 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
     pageXform.postConcat(document->currentPageTransform());
 
     const auto numGlyphs = typeface->glyphsCount();
-    auto offsetMatrix = GetGlyphMatrix(glyphRun, 0);
-    auto offset = Point::Make(offsetMatrix.getTranslateX(), offsetMatrix.getTranslateY());
+    auto offset = GetGlyphPosition(glyphRun, 0);
     GlyphPositioner glyphPositioner(out, glyphRunFont.getMetrics().leading, offset);
     PDFFont* font = nullptr;
 
@@ -485,8 +485,7 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
       if (numGlyphs <= glyphID) {
         continue;
       }
-      auto xyMatrix = GetGlyphMatrix(glyphRun, index);
-      auto xy = Point::Make(xyMatrix.getTranslateX(), xyMatrix.getTranslateY());
+      auto xy = GetGlyphPosition(glyphRun, index);
       // Do a glyph-by-glyph bounds-reject if positions are absolute.
       auto glyphBounds = glyphRunFont.getBounds(glyphID);
       glyphBounds = Matrix::MakeScale(textScaleX, textScaleY).mapRect(glyphBounds);

@@ -55,7 +55,7 @@ const float* RunRecord::posBuffer() const {
 }
 
 size_t RunRecord::storageSize() const {
-  return StorageSize(glyphCount, positionMode);
+  return StorageSize(glyphCount, positioning);
 }
 
 const RunRecord* RunRecord::next() const {
@@ -63,7 +63,7 @@ const RunRecord* RunRecord::next() const {
 }
 
 void RunRecord::grow(uint32_t count) {
-  auto scalars = ScalarsPerGlyph(positionMode);
+  auto scalars = ScalarsPerGlyph(positioning);
   float* oldPos = posBuffer();
   uint32_t oldCount = glyphCount;
   glyphCount += count;

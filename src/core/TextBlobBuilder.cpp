@@ -93,7 +93,7 @@ bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning positioning, s
     return false;
   }
   auto* run = lastRun();
-  if (run->font != font || run->positionMode != positioning) {
+  if (run->font != font || run->positioning != positioning) {
     return false;
   }
   if (positioning == GlyphPositioning::Horizontal) {

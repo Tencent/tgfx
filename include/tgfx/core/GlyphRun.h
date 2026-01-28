@@ -65,7 +65,7 @@ struct GlyphRun {
   const GlyphID* glyphs = nullptr; 
 
   /**
-   * The positioning mode for this run.的
+   * The positioning mode for this run.
    */
   GlyphPositioning positioning = GlyphPositioning::Point;
 

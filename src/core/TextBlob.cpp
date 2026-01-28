@@ -152,7 +152,7 @@ GlyphRun TextBlob::Iterator::operator*() const {
   run.font = current->font;
   run.glyphCount = current->glyphCount;
   run.glyphs = current->glyphBuffer();
-  run.positioning = current->positionMode;
+  run.positioning = current->positioning;
   run.positions = current->posBuffer();
   run.offsetY = current->y;
   return run;
