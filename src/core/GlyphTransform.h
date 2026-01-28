@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/utils/Log.h"
 #include "tgfx/core/GlyphRun.h"
 #include "tgfx/core/Matrix.h"
 
@@ -34,22 +35,23 @@ unsigned ScalarsPerGlyph(GlyphPositioning positioning);
 Matrix GetGlyphMatrix(const GlyphRun& run, size_t index);
 
 /**
- * Returns the position of a glyph at the given index within a GlyphRun. Only valid for Horizontal
- * and Point positioning modes.
- */
-inline Point GetGlyphPosition(const GlyphRun& run, size_t index) {
-  if (run.positioning == GlyphPositioning::Horizontal) {
-    return {run.positions[index], run.offsetY};
-  }
-  return reinterpret_cast<const Point*>(run.positions)[index];
-}
-
-/**
  * Returns true if the GlyphRun has complex per-glyph transforms (RSXform or Matrix positioning).
  */
 inline bool HasComplexTransform(const GlyphRun& run) {
   return run.positioning == GlyphPositioning::RSXform ||
          run.positioning == GlyphPositioning::Matrix;
+}
+
+/**
+ * Returns the position of a glyph at the given index within a GlyphRun. Only valid for Horizontal
+ * and Point positioning modes.
+ */
+inline Point GetGlyphPosition(const GlyphRun& run, size_t index) {
+  DEBUG_ASSERT(!HasComplexTransform(run));
+  if (run.positioning == GlyphPositioning::Horizontal) {
+    return {run.positions[index], run.offsetY};
+  }
+  return reinterpret_cast<const Point*>(run.positions)[index];
 }
 
 }  // namespace tgfx
