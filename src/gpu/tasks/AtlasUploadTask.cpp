@@ -33,6 +33,10 @@ class CellDecodeTask : public Task {
         offsetY(offsetY) {
   }
 
+  bool asyncSupport() const {
+    return imageCodec ? imageCodec->asyncSupport() : true;
+  }
+
   const ImageInfo& info() const {
     return dstInfo;
   }
@@ -129,7 +133,11 @@ void AtlasUploadTask::addCell(BlockAllocator* allocator, std::shared_ptr<ImageCo
   }
   auto task =
       std::make_shared<CellDecodeTask>(std::move(codec), dstPixels, dstInfo, offsetX, offsetY);
-  Task::Run(task);
+  if (task->asyncSupport()) {
+    Task::Run(task);
+  } else {
+    task->wait();
+  }
   tasks.emplace_back(std::move(task));
 }
 
