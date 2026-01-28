@@ -20,14 +20,25 @@
 
 #include <cstring>
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Vec.h"
 
 namespace tgfx {
-/***
- * Matrix holds a 3x2 matrix for transforming coordinates. This allows mapping Point and vectors
- * with translation, scaling, skewing, and rotation. Together these types of transformations are
- * known as affine transformations. Affine transformations preserve the straightness of lines while
- * transforming, so that parallel lines stay parallel. Matrix elements are in row major order.
- * Matrix has a default constructor that initializes to the identity matrix.
+
+/**
+ * Matrix holds a 3x3 matrix for transforming coordinates. This allows mapping Point and vectors
+ * with translation, scaling, skewing, rotation, and perspective.
+ *
+ * When the third row is (0, 0, 1), the matrix represents an affine transformation, which preserves
+ * parallelism (parallel lines remain parallel). Otherwise, the matrix represents a perspective
+ * transformation, which preserves straightness of lines but not parallelism.
+ *
+ * Matrix elements are in row major order. The default constructor initializes Matrix to identity.
+ *
+ * Matrix layout:
+ *
+ *       | scaleX  skewX  transX |   | values[0]  values[1]  values[2] |
+ *       | skewY   scaleY transY | = | values[3]  values[4]  values[5] |
+ *       | persp0  persp1 persp2 |   | values[6]  values[7]  values[8] |
  */
 class Matrix {
  public:
@@ -134,7 +145,30 @@ class Matrix {
    */
   static Matrix MakeAll(float scaleX, float skewX, float transX, float skewY, float scaleY,
                         float transY) {
-    return {scaleX, skewX, transX, skewY, scaleY, transY, UnknownMask};
+    return {scaleX, skewX, transX, skewY, scaleY, transY, 0, 0, 1, UnknownMask};
+  }
+
+  /**
+   * Sets Matrix to:
+   *
+   *      | scaleX  skewX  transX |
+   *      | skewY   scaleY transY |
+   *      | persp0  persp1 persp2 |
+   *
+   * @param scaleX  horizontal scale factor
+   * @param skewX   horizontal skew factor
+   * @param transX  horizontal translation
+   * @param skewY   vertical skew factor
+   * @param scaleY  vertical scale factor
+   * @param transY  vertical translation
+   * @param persp0  input x-axis perspective factor
+   * @param persp1  input y-axis perspective factor
+   * @param persp2  perspective scale factor
+   * @return        Matrix constructed from parameters
+   */
+  static Matrix MakeAll(float scaleX, float skewX, float transX, float skewY, float scaleY,
+                        float transY, float persp0, float persp1, float persp2) {
+    return {scaleX, skewX, transX, skewY, scaleY, transY, persp0, persp1, persp2, UnknownMask};
   }
 
   /**
@@ -154,21 +188,27 @@ class Matrix {
    *    | 0 1 0 |
    *    | 0 0 1 |
    */
-  constexpr Matrix() : Matrix(1, 0, 0, 0, 1, 0, IdentityMask | RectStayRectMask) {
+  constexpr Matrix() : Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1, IdentityMask | RectStayRectMask) {
   }
 
   /**
    * Enum of bit fields for mask returned by getType(). Used to identify the complexity of Matrix,
    * to optimize performance.
    */
-  enum TypeMask { IdentityMask = 0, TranslateMask = 0x01, ScaleMask = 0x02, AffineMask = 0x04 };
+  enum TypeMask {
+    IdentityMask = 0,
+    TranslateMask = 0x01,
+    ScaleMask = 0x02,
+    AffineMask = 0x04,
+    PerspectiveMask = 0x08
+  };
 
   TypeMask getType() const {
     if (typeMask & UnknownMask) {
       typeMask = this->computeTypeMask();
     }
     // only return the public masks
-    return (TypeMask)(typeMask & 0xF);
+    return static_cast<TypeMask>(typeMask & 0xF);
   }
 
   /**
@@ -207,6 +247,14 @@ class Matrix {
    */
   bool isTranslate() const {
     return !(this->getType() & ~(TranslateMask));
+  }
+
+  /**
+   * Returns true if the matrix contains perspective elements (the last row is not [0, 0, 1]).
+   * @return  true if Matrix has perspective.
+   */
+  bool hasPerspective() const {
+    return (this->getType() & PerspectiveMask) != 0;
   }
 
   /**
@@ -250,25 +298,47 @@ class Matrix {
 
   /**
    * Sets Matrix to six scalar values in buffer, in member value ascending order:
-   * ScaleX, SkewX, TransX, SkewY, ScaleY, TransY.
+   * ScaleX, SkewX, TransX, SkewY, ScaleY, TransY. The perspective values are set to (0, 0, 1).
    * Sets matrix to:
    *
    *     | buffer[0] buffer[1] buffer[2] |
    *     | buffer[3] buffer[4] buffer[5] |
+   *     |     0         0         1     |
    *
    * @param buffer storage for six scalar values.
    */
   void set6(const float buffer[6]) {
     memcpy(values, buffer, 6 * sizeof(float));
+    values[PERSP_0] = 0;
+    values[PERSP_1] = 0;
+    values[PERSP_2] = 1;
     this->setTypeMask(UnknownMask);
   }
 
   /**
    * Copies nine scalar values contained by Matrix into buffer, in member value ascending order:
-   * ScaleX, SkewX, TransX, SkewY, ScaleY, TransY, 0, 0, 1.
+   * ScaleX, SkewX, TransX, SkewY, ScaleY, TransY, Persp0, Persp1, Persp2.
    * @param buffer  storage for nine scalar values
    */
-  void get9(float buffer[9]) const;
+  void get9(float buffer[9]) const {
+    memcpy(buffer, values, 9 * sizeof(float));
+  }
+
+  /**
+   * Sets Matrix to nine scalar values in buffer, in member value ascending order:
+   * ScaleX, SkewX, TransX, SkewY, ScaleY, TransY, Persp0, Persp1, Persp2.
+   * Sets matrix to:
+   *
+   *     | buffer[0] buffer[1] buffer[2] |
+   *     | buffer[3] buffer[4] buffer[5] |
+   *     | buffer[6] buffer[7] buffer[8] |
+   *
+   * @param buffer storage for nine scalar values.
+   */
+  void set9(const float buffer[9]) {
+    memcpy(values, buffer, 9 * sizeof(float));
+    this->setTypeMask(UnknownMask);
+  }
 
   /**
    * Returns the horizontal scale factor.
@@ -310,6 +380,20 @@ class Matrix {
    */
   float getTranslateY() const {
     return values[TRANS_Y];
+  }
+
+  /**
+   * Returns the input x-axis perspective factor.
+   */
+  float getPerspX() const {
+    return values[PERSP_0];
+  }
+
+  /**
+   * Returns the input y-axis perspective factor.
+   */
+  float getPerspY() const {
+    return values[PERSP_1];
   }
 
   /**
@@ -369,6 +453,26 @@ class Matrix {
    * @param transY  vertical translation to store
    */
   void setAll(float scaleX, float skewX, float transX, float skewY, float scaleY, float transY);
+
+  /**
+   * Sets all values from parameters. Sets matrix to:
+   *
+   *      | scaleX  skewX  transX |
+   *      | skewY   scaleY transY |
+   *      | persp0  persp1 persp2 |
+   *
+   * @param scaleX  horizontal scale factor to store
+   * @param skewX   horizontal skew factor to store
+   * @param transX  horizontal translation to store
+   * @param skewY   vertical skew factor to store
+   * @param scaleY  vertical scale factor to store
+   * @param transY  vertical translation to store
+   * @param persp0  input x-axis perspective factor to store
+   * @param persp1  input y-axis perspective factor to store
+   * @param persp2  perspective scale factor to store
+   */
+  void setAll(float scaleX, float skewX, float transX, float skewY, float scaleY, float transY,
+              float persp0, float persp1, float persp2);
 
   /**
    * Sets Matrix to identity; which has no effect on mapped Point. Sets Matrix to:
@@ -438,6 +542,10 @@ class Matrix {
     values[SKEW_Y] = 0;
     values[SCALE_Y] = sy;
     values[TRANS_Y] = ty;
+
+    values[PERSP_0] = 0;
+    values[PERSP_1] = 0;
+    values[PERSP_2] = 1;
 
     int mask = 0;
     if (sx != 1 || sy != 1) {
@@ -813,8 +921,8 @@ class Matrix {
  private:
   static constexpr int RectStayRectMask = 0x10;
   static constexpr int UnknownMask = 0x80;
-  static constexpr int AllMasks = TranslateMask | ScaleMask | AffineMask;
-  float values[6];
+  static constexpr int AllMasks = TranslateMask | ScaleMask | AffineMask | PerspectiveMask;
+  float values[9];
   mutable int32_t typeMask;
   /**
    * Matrix organizes its values in row order. These members correspond to each value in Matrix.
@@ -825,10 +933,14 @@ class Matrix {
   static constexpr int SKEW_Y = 3;   //!< vertical skew factor
   static constexpr int SCALE_Y = 4;  //!< vertical scale factor
   static constexpr int TRANS_Y = 5;  //!< vertical translation
+  static constexpr int PERSP_0 = 6;  //!< input x-axis perspective factor
+  static constexpr int PERSP_1 = 7;  //!< input y-axis perspective factor
+  static constexpr int PERSP_2 = 8;  //!< perspective scale factor
 
   constexpr Matrix(float scaleX, float skewX, float transX, float skewY, float scaleY, float transY,
-                   int typeMask)
-      : values{scaleX, skewX, transX, skewY, scaleY, transY}, typeMask(typeMask) {
+                   float persp0, float persp1, float persp2, int typeMask)
+      : values{scaleX, skewX, transX, skewY, scaleY, transY, persp0, persp1, persp2},
+        typeMask(typeMask) {
   }
 
   uint8_t computeTypeMask() const;
@@ -884,9 +996,28 @@ class Matrix {
 
   static void AffinePoints(const Matrix& m, Point dst[], const Point src[], int count);
 
+  static void PerspPoints(const Matrix& m, Point dst[], const Point src[], int count);
+
+  static void ConcatMatrix(const Matrix& first, const Matrix& second, Matrix& dst);
+
+  static float CalcDeterminant(const Matrix& matrix, bool isPerspective);
+
+  static void ComputeInverse(Matrix& dst, const Matrix& src, float invDet, bool isPerspective);
+
   bool invertNonIdentity(Matrix* inverse) const;
 
   bool getMinMaxScaleFactors(float results[2]) const;
+
+  /**
+   * Maps a 2D homogeneous coordinate (x, y, w) using this matrix.
+   * The result is NOT perspective-divided; i.e., the w component may not be 1.
+   * To get the final 2D point, divide x' and y' by w'.
+   * @param x  x-coordinate of the input point
+   * @param y  y-coordinate of the input point
+   * @param w  w-coordinate of the input point (typically 1 for points, 0 for vectors)
+   * @return   the mapped homogeneous coordinate (x', y', w')
+   */
+  Vec3 mapHomogeneous(float x, float y, float w) const;
 
   friend class Matrix3D;
 };
