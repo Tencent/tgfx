@@ -79,13 +79,9 @@ void Geometry::convertToShape() {
 
 void Geometry::expandToGlyphs() {
   DEBUG_ASSERT(textBlob != nullptr);
-  size_t totalCount = 0;
-  for (auto run : *textBlob) {
-    totalCount += run.glyphCount;
-  }
   glyphs.clear();
-  glyphs.reserve(totalCount);
   for (auto run : *textBlob) {
+    glyphs.reserve(glyphs.size() + run.glyphCount);
     for (size_t i = 0; i < run.glyphCount; i++) {
       Glyph glyph = {};
       glyph.glyphID = run.glyphs[i];
