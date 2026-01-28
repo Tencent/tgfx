@@ -18,7 +18,7 @@
 
 #include "core/RunRecord.h"
 #include <cstring>
-#include "core/GlyphRun.h"
+#include "core/GlyphRunUtils.h"
 
 namespace tgfx {
 

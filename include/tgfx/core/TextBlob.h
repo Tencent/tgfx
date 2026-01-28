@@ -34,37 +34,15 @@ struct RunRecord;
  *
  * Example usage for iterating over glyph runs:
  *   for (auto run : *blob) {
- *       const Font& font = run.font();
- *       for (size_t i = 0; i < run.glyphCount(); ++i) {
- *           GlyphID glyph = run.glyphs()[i];
- *           // Access position data based on run.positioning()
+ *       const Font& font = run.font;
+ *       for (size_t i = 0; i < run.glyphCount; ++i) {
+ *           GlyphID glyph = run.glyphs[i];
+ *           // Access position data based on run.positioning
  *       }
  *   }
  */
 class TextBlob {
  public:
-  /**
-   * Iterator for traversing glyph runs within a TextBlob.
-   */
-  class Iterator {
-   public:
-    GlyphRun operator*() const;
-
-    Iterator& operator++();
-
-    bool operator!=(const Iterator& other) const {
-      return remaining != other.remaining;
-    }
-
-   private:
-    Iterator(const RunRecord* record, size_t remaining) : current(record), remaining(remaining) {
-    }
-
-    const RunRecord* current = nullptr;
-    size_t remaining = 0;
-    friend class TextBlob;
-  };
-
   /**
    * Creates a new TextBlob from the given text. The text must be in utf-8 encoding. This function
    * uses the default character-to-glyph mapping from the Typeface in font. It doesn't perform
@@ -107,25 +85,6 @@ class TextBlob {
   ~TextBlob();
 
   /**
-   * Returns an iterator to the first glyph run.
-   */
-  Iterator begin() const;
-
-  /**
-   * Returns an iterator past the last glyph run.
-   */
-  Iterator end() const {
-    return Iterator(nullptr, 0);
-  }
-
-  /**
-   * Returns true if this TextBlob contains no glyph runs.
-   */
-  bool empty() const {
-    return runCount == 0;
-  }
-
-  /**
    * Returns a conservative bounding box for the TextBlob that is guaranteed to contain all glyphs.
    * It may be larger than the actual bounds, but it is faster to compute.
    */
@@ -146,6 +105,40 @@ class TextBlob {
    * applied to the glyph path or bounds before testing.
    */
   bool hitTestPoint(float localX, float localY, const Stroke* stroke = nullptr) const;
+
+  /**
+   * Iterator for traversing glyph runs within a TextBlob.
+   */
+  class Iterator {
+   public:
+    GlyphRun operator*() const;
+
+    Iterator& operator++();
+
+    bool operator!=(const Iterator& other) const {
+      return remaining != other.remaining;
+    }
+
+   private:
+    Iterator(const RunRecord* record, size_t remaining) : current(record), remaining(remaining) {
+    }
+
+    const RunRecord* current = nullptr;
+    size_t remaining = 0;
+    friend class TextBlob;
+  };
+
+  /**
+   * Returns an iterator to the first glyph run.
+   */
+  Iterator begin() const;
+
+  /**
+   * Returns an iterator past the last glyph run.
+   */
+  Iterator end() const {
+    return Iterator(nullptr, 0);
+  }
 
  private:
   size_t runCount = 0;

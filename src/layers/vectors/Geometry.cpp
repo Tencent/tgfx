@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Geometry.h"
-#include "core/GlyphRun.h"
+#include "core/GlyphRunUtils.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/RSXform.h"
@@ -90,7 +90,7 @@ void Geometry::expandToGlyphs() {
       Glyph glyph = {};
       glyph.glyphID = run.glyphs[i];
       glyph.font = run.font;
-      glyph.matrix = ComputeGlyphMatrix(run, i);
+      glyph.matrix = GetGlyphMatrix(run, i);
       glyphs.push_back(glyph);
     }
   }

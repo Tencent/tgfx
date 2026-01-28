@@ -20,7 +20,7 @@
 #include <utility>
 #include "ElementWriter.h"
 #include "SVGUtils.h"
-#include "core/GlyphRun.h"
+#include "core/GlyphRunUtils.h"
 #include "core/RunRecord.h"
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
@@ -280,9 +280,6 @@ void SVGExportContext::exportPixmap(const Pixmap& pixmap, const MCState& state,
 void SVGExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
                                     const Brush& brush, const Stroke* stroke) {
   DEBUG_ASSERT(textBlob != nullptr);
-  if (textBlob->empty()) {
-    return;
-  }
   auto deviceBounds = state.matrix.mapRect(textBlob->getBounds());
   if (!state.clip.contains(deviceBounds)) {
     applyClipPath(state.clip);
@@ -321,7 +318,7 @@ void SVGExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCSt
     auto glyphID = glyphRun.glyphs[index];
     Path glyphPath = {};
     if (font.getPath(glyphID, &glyphPath)) {
-      auto glyphMatrix = ComputeGlyphMatrix(glyphRun, index);
+      auto glyphMatrix = GetGlyphMatrix(glyphRun, index);
       glyphPath.transform(glyphMatrix);
       path.addPath(glyphPath);
     }
@@ -362,7 +359,7 @@ void SVGExportContext::exportGlyphRunAsImage(const GlyphRun& glyphRun, const MCS
   size_t glyphCount = glyphRun.glyphCount;
   for (size_t i = 0; i < glyphCount; ++i) {
     auto glyphID = glyphRun.glyphs[i];
-    auto glyphMatrix = ComputeGlyphMatrix(glyphRun, i);
+    auto glyphMatrix = GetGlyphMatrix(glyphRun, i);
     auto glyphState = state;
     auto glyphCodec = font.getImage(glyphID, nullptr, &glyphState.matrix);
     auto glyphImage = Image::MakeFrom(glyphCodec);

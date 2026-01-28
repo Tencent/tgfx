@@ -19,7 +19,7 @@
 #include "SVGTextBuilder.h"
 #include <cstdint>
 #include <string>
-#include "core/GlyphRun.h"
+#include "core/GlyphRunUtils.h"
 #include "core/utils/MathExtra.h"
 #include "svg/SVGUtils.h"
 #include "tgfx/core/Font.h"
@@ -46,7 +46,7 @@ SVGTextBuilder::UnicharsInfo SVGTextBuilder::glyphToUnicharsInfo(const GlyphRun&
 
   for (uint32_t i = 0; i < unicodeChars.size(); i++) {
     auto c = unicodeChars[i];
-    auto matrix = ComputeGlyphMatrix(glyphRun, i);
+    auto matrix = GetGlyphMatrix(glyphRun, i);
     auto position = Point::Make(matrix.getTranslateX(), matrix.getTranslateY());
     bool discardPos = false;
     bool isWhitespace = false;

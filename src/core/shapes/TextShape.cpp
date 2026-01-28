@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextShape.h"
-#include "core/GlyphRun.h"
+#include "core/GlyphRunUtils.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/Matrix.h"
@@ -59,7 +59,7 @@ Path TextShape::onGetPath(float resolutionScale) const {
       auto glyphID = run.glyphs[index];
       Path glyphPath = {};
       if (font.getPath(glyphID, &glyphPath)) {
-        auto glyphMatrix = ComputeGlyphMatrix(run, index);
+        auto glyphMatrix = GetGlyphMatrix(run, index);
         glyphMatrix.preScale(1.0f / resolutionScale, 1.0f / resolutionScale);
         glyphMatrix.postConcat(matrix);
         glyphPath.transform(glyphMatrix);

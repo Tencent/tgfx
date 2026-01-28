@@ -29,15 +29,15 @@ namespace tgfx {
 unsigned ScalarsPerGlyph(GlyphPositioning mode);
 
 /**
- * Computes the transformation matrix for a glyph at the given index within a GlyphRun.
+ * Returns the transformation matrix for a glyph at the given index within a GlyphRun.
  */
-Matrix ComputeGlyphMatrix(const GlyphRun& run, size_t index);
+Matrix GetGlyphMatrix(const GlyphRun& run, size_t index);
 
 /**
- * Computes the transformation matrix for a glyph at the given index within a GlyphRun.
+ * Returns the transformation matrix for a glyph at the given index within a GlyphRun.
  * This version reuses an existing Matrix object for better performance in loops.
  */
-void ComputeGlyphMatrix(const GlyphRun& run, size_t index, Matrix* matrix);
+void GetGlyphMatrix(const GlyphRun& run, size_t index, Matrix* matrix);
 
 /**
  * Maps a glyph's bounds by applying the positioning transformation at the given index.

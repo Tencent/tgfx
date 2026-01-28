@@ -19,7 +19,7 @@
 #include "PDFExportContext.h"
 #include "core/AdvancedTypefaceInfo.h"
 #include "core/DrawContext.h"
-#include "core/GlyphRun.h"
+#include "core/GlyphRunUtils.h"
 #include "core/MCState.h"
 #include "core/MeasureContext.h"
 #include "core/PictureRecords.h"
@@ -467,7 +467,7 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
     pageXform.postConcat(document->currentPageTransform());
 
     const auto numGlyphs = typeface->glyphsCount();
-    auto offsetMatrix = ComputeGlyphMatrix(glyphRun, 0);
+    auto offsetMatrix = GetGlyphMatrix(glyphRun, 0);
     auto offset = Point::Make(offsetMatrix.getTranslateX(), offsetMatrix.getTranslateY());
     GlyphPositioner glyphPositioner(out, glyphRunFont.getMetrics().leading, offset);
     PDFFont* font = nullptr;
@@ -485,7 +485,7 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
       if (numGlyphs <= glyphID) {
         continue;
       }
-      auto xyMatrix = ComputeGlyphMatrix(glyphRun, index);
+      auto xyMatrix = GetGlyphMatrix(glyphRun, index);
       auto xy = Point::Make(xyMatrix.getTranslateX(), xyMatrix.getTranslateY());
       // Do a glyph-by-glyph bounds-reject if positions are absolute.
       auto glyphBounds = glyphRunFont.getBounds(glyphID);
@@ -534,7 +534,7 @@ void PDFExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCSt
 
   for (size_t i = 0; i < glyphRun.glyphCount; ++i) {
     auto glyphID = glyphRun.glyphs[i];
-    auto glyphMatrix = ComputeGlyphMatrix(glyphRun, i);
+    auto glyphMatrix = GetGlyphMatrix(glyphRun, i);
     Path glyphPath;
     if (!glyphFont.getPath(glyphID, &glyphPath)) {
       continue;
@@ -560,7 +560,7 @@ void PDFExportContext::exportGlyphRunAsImage(const GlyphRun& glyphRun, const MCS
   const auto& glyphFont = glyphRun.font;
   for (size_t i = 0; i < glyphRun.glyphCount; ++i) {
     auto glyphID = glyphRun.glyphs[i];
-    auto glyphMatrix = ComputeGlyphMatrix(glyphRun, i);
+    auto glyphMatrix = GetGlyphMatrix(glyphRun, i);
     auto tempState = state;
     Matrix matrix;
     auto glyphImageCodec = glyphFont.getImage(glyphID, nullptr, &matrix);

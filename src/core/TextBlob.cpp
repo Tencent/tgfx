@@ -18,7 +18,7 @@
 
 #include "tgfx/core/TextBlob.h"
 #include <cstdlib>
-#include "core/GlyphRun.h"
+#include "core/GlyphRunUtils.h"
 #include "core/RunRecord.h"
 #include "core/ScalerContext.h"
 #include "core/utils/AtomicCache.h"
@@ -196,7 +196,7 @@ Rect TextBlob::computeBounds() const {
     transformMat.mapRect(&fontBounds);
     Rect runBounds = {};
     for (size_t i = 0; i < run.glyphCount; i++) {
-      auto glyphMatrix = ComputeGlyphMatrix(run, i);
+      auto glyphMatrix = GetGlyphMatrix(run, i);
       auto glyphBounds = glyphMatrix.mapRect(fontBounds);
       if (i == 0) {
         runBounds = glyphBounds;
@@ -230,7 +230,7 @@ Rect TextBlob::getTightBounds(const Matrix* matrix) const {
     }
     for (size_t i = 0; i < run.glyphCount; i++) {
       auto glyphBounds = font.getBounds(run.glyphs[i]);
-      auto glyphMatrix = ComputeGlyphMatrix(run, i);
+      auto glyphMatrix = GetGlyphMatrix(run, i);
       if (hasScale) {
         // Pre-scale to counteract the enlarged glyphBounds from the scaled font.
         glyphMatrix.preScale(inverseScale, inverseScale);
@@ -250,7 +250,7 @@ bool TextBlob::hitTestPoint(float localX, float localY, const Stroke* stroke) co
     auto& font = run.font;
     auto usePathHitTest = font.hasOutlines();
     for (size_t i = 0; i < run.glyphCount; i++) {
-      auto glyphMatrix = ComputeGlyphMatrix(run, i);
+      auto glyphMatrix = GetGlyphMatrix(run, i);
       Matrix inverseMatrix = {};
       if (!glyphMatrix.invert(&inverseMatrix)) {
         continue;

@@ -20,7 +20,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include "core/GlyphRun.h"
+#include "core/GlyphRunUtils.h"
 #include "core/RunRecord.h"
 #include "tgfx/core/TextBlob.h"
 

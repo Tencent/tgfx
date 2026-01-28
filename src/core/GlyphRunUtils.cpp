@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/GlyphRun.h"
+#include "core/GlyphRunUtils.h"
 
 namespace tgfx {
 
@@ -34,13 +34,13 @@ unsigned ScalarsPerGlyph(GlyphPositioning mode) {
   return 0;
 }
 
-Matrix ComputeGlyphMatrix(const GlyphRun& run, size_t index) {
+Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
   Matrix matrix = {};
-  ComputeGlyphMatrix(run, index, &matrix);
+  GetGlyphMatrix(run, index, &matrix);
   return matrix;
 }
 
-void ComputeGlyphMatrix(const GlyphRun& run, size_t index, Matrix* matrix) {
+void GetGlyphMatrix(const GlyphRun& run, size_t index, Matrix* matrix) {
   switch (run.positioning) {
     case GlyphPositioning::Horizontal:
       matrix->setTranslate(run.positions[index], run.offsetY);
@@ -74,7 +74,7 @@ Rect MapGlyphBounds(const GlyphRun& run, size_t index, const Rect& bounds) {
       return bounds.makeOffset(points[index].x, points[index].y);
     }
     default:
-      return ComputeGlyphMatrix(run, index).mapRect(bounds);
+      return GetGlyphMatrix(run, index).mapRect(bounds);
   }
 }
 
