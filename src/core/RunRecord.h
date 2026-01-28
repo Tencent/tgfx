@@ -28,14 +28,14 @@ namespace tgfx {
 //   [positions: float[glyphCount * scalarsPerGlyph]] (if scalarsPerGlyph > 0)
 struct RunRecord {
   Font font;
-  GlyphPositioning positioning = GlyphPositioning::Point;
+  GlyphLayout glyphLayout = GlyphLayout::Point;
   uint32_t glyphCount = 0;
   float y = 0.0f;  // Only used for Horizontal positioning
   uint8_t flags = 0;
 
   static constexpr uint8_t LAST_FLAG = 0x01;
 
-  static size_t StorageSize(size_t count, GlyphPositioning pos);
+  static size_t StorageSize(size_t count, GlyphLayout layout);
 
   GlyphID* glyphBuffer();
   const GlyphID* glyphBuffer() const;

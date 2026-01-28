@@ -23,6 +23,11 @@
 namespace tgfx {
 
 /**
+ * Returns the number of float scalars per glyph for the given positioning mode.
+ */
+unsigned ScalarsPerGlyph(GlyphLayout layout);
+
+/**
  * Computes the transformation matrix for a glyph at the given index within a GlyphRun.
  */
 Matrix ComputeGlyphMatrix(const GlyphRun& run, size_t index);

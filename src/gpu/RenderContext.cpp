@@ -577,7 +577,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
     auto glyphState = state;
     auto& rect = atlasLocator.getLocation();
-    sourceGlyphRun.positioning() == GlyphPositioning::Horizontal
+    sourceGlyphRun.glyphLayout() == GlyphLayout::Horizontal
         ? (void)ComputeGlyphMatrix(sourceGlyphRun, i, &positionMatrix)
         : (void)(positionMatrix = ComputeGlyphMatrix(sourceGlyphRun, i));
     ComputeGlyphRenderMatrix(rect, state.matrix, positionMatrix, combinedScale, glyphOffset,
@@ -696,7 +696,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
 
     auto glyphState = state;
     auto rect = atlasLocator.getLocation();
-    sourceGlyphRun.positioning() == GlyphPositioning::Horizontal
+    sourceGlyphRun.glyphLayout() == GlyphLayout::Horizontal
         ? (void)ComputeGlyphMatrix(sourceGlyphRun, i, &positionMatrix)
         : (void)(positionMatrix = ComputeGlyphMatrix(sourceGlyphRun, i));
     ComputeGlyphRenderMatrix(rect, state.matrix, positionMatrix, combinedScale, glyphOffset,

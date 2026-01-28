@@ -29,7 +29,7 @@ struct RunRecord;
 /**
  * Describes the positioning mode of glyphs within a GlyphRun.
  */
-enum class GlyphPositioning {
+enum class GlyphLayout {
   /**
    * Horizontal positioning: each glyph has an x position, sharing a common y from offsetY().
    */
@@ -47,11 +47,6 @@ enum class GlyphPositioning {
    */
   Matrix = 3,
 };
-
-/**
- * Returns the number of float scalars per glyph for the given positioning mode.
- */
-unsigned ScalarsPerGlyph(GlyphPositioning positioning);
 
 /**
  * GlyphRun represents a sequence of glyphs sharing the same font and positioning mode. It provides
@@ -77,7 +72,7 @@ class GlyphRun {
   /**
    * Returns the positioning mode for this run.
    */
-  GlyphPositioning positioning() const;
+  GlyphLayout glyphLayout() const;
 
   /**
    * Returns a pointer to the raw position data array. The number of floats per glyph depends on
@@ -92,22 +87,23 @@ class GlyphRun {
   float offsetY() const;
 
   /**
-   * Returns the position data as Point array. Only valid when positioning() == Point.
+   * Returns the position data as Point array. Only valid when glyphLayout() == Point.
    */
   const Point* points() const;
 
   /**
-   * Returns the position data as RSXform array. Only valid when positioning() == RSXform.
+   * Returns the position data as RSXform array. Only valid when glyphLayout() == RSXform.
    */
   const RSXform* xforms() const;
 
   /**
-   * Returns the position data as Matrix array. Only valid when positioning() == Matrix.
+   * Returns the position data as Matrix array. Only valid when glyphLayout() == Matrix.
    */
   const Matrix* matrices() const;
 
  private:
   const RunRecord* record = nullptr;
+
   friend class TextBlob;
 };
 

@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include "core/GlyphRun.h"
 #include "core/RunRecord.h"
 #include "tgfx/core/TextBlob.h"
 
@@ -86,16 +87,15 @@ RunRecord* TextBlobBuilder::lastRun() {
   return reinterpret_cast<RunRecord*>(storage + lastRunOffset);
 }
 
-bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning positioning, size_t count,
-                               float y) {
+bool TextBlobBuilder::tryMerge(const Font& font, GlyphLayout layout, size_t count, float y) {
   if (runCount == 0) {
     return false;
   }
   auto* run = lastRun();
-  if (run->font != font || run->positioning != positioning) {
+  if (run->font != font || run->glyphLayout != layout) {
     return false;
   }
-  if (positioning == GlyphPositioning::Horizontal) {
+  if (layout == GlyphLayout::Horizontal) {
     if (run->y != y) {
       return false;
     }
@@ -104,33 +104,33 @@ bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning positioning, s
     return false;
   }
   size_t oldSize = run->storageSize();
-  size_t newSize = RunRecord::StorageSize(run->glyphCount + count, positioning);
+  size_t newSize = RunRecord::StorageSize(run->glyphCount + count, layout);
   size_t delta = newSize - oldSize;
   reserve(delta);
   run = lastRun();
   uint32_t preMergeCount = run->glyphCount;
   run->grow(static_cast<uint32_t>(count));
   currentBuffer.glyphs = run->glyphBuffer() + preMergeCount;
-  auto scalars = ScalarsPerGlyph(positioning);
+  auto scalars = ScalarsPerGlyph(layout);
   currentBuffer.positions = run->posBuffer() + preMergeCount * scalars;
   storageUsed += delta;
   return true;
 }
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRun(const Font& font, size_t glyphCount,
-                                                            GlyphPositioning positioning, float y) {
+                                                            GlyphLayout layout, float y) {
   if (glyphCount == 0) {
     currentBuffer = {};
     return currentBuffer;
   }
-  if (tryMerge(font, positioning, glyphCount, y)) {
+  if (tryMerge(font, layout, glyphCount, y)) {
     return currentBuffer;
   }
-  size_t runSize = RunRecord::StorageSize(glyphCount, positioning);
+  size_t runSize = RunRecord::StorageSize(glyphCount, layout);
   reserve(runSize);
   lastRunOffset = storageUsed;
-  auto* run = new (storage + storageUsed)
-      RunRecord{font, positioning, static_cast<uint32_t>(glyphCount), y, 0};
+  auto* run =
+      new (storage + storageUsed) RunRecord{font, layout, static_cast<uint32_t>(glyphCount), y, 0};
   storageUsed += runSize;
   runCount++;
   currentBuffer.glyphs = run->glyphBuffer();
@@ -140,22 +140,22 @@ const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRun(const Font& font, si
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRunPosH(const Font& font, size_t glyphCount,
                                                                 float y) {
-  return allocRun(font, glyphCount, GlyphPositioning::Horizontal, y);
+  return allocRun(font, glyphCount, GlyphLayout::Horizontal, y);
 }
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRunPos(const Font& font,
                                                                size_t glyphCount) {
-  return allocRun(font, glyphCount, GlyphPositioning::Point, 0.0f);
+  return allocRun(font, glyphCount, GlyphLayout::Point, 0.0f);
 }
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRunRSXform(const Font& font,
                                                                    size_t glyphCount) {
-  return allocRun(font, glyphCount, GlyphPositioning::RSXform, 0.0f);
+  return allocRun(font, glyphCount, GlyphLayout::RSXform, 0.0f);
 }
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRunMatrix(const Font& font,
                                                                   size_t glyphCount) {
-  return allocRun(font, glyphCount, GlyphPositioning::Matrix, 0.0f);
+  return allocRun(font, glyphCount, GlyphLayout::Matrix, 0.0f);
 }
 
 void TextBlobBuilder::setBounds(const Rect& bounds) {
