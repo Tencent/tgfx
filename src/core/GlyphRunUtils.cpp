@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/GlyphRunUtils.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -62,23 +63,12 @@ Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
 }
 
 Point GetGlyphPosition(const GlyphRun& run, size_t index) {
-  switch (run.positioning) {
-    case GlyphPositioning::Horizontal:
-      return {run.positions[index], run.offsetY};
-    case GlyphPositioning::Point: {
-      auto* points = reinterpret_cast<const Point*>(run.positions);
-      return points[index];
-    }
-    case GlyphPositioning::RSXform: {
-      const float* p = run.positions + index * 4;
-      return {p[2], p[3]};
-    }
-    case GlyphPositioning::Matrix: {
-      const float* p = run.positions + index * 6;
-      return {p[2], p[5]};
-    }
+  DEBUG_ASSERT(!HasComplexTransform(run));
+  if (run.positioning == GlyphPositioning::Horizontal) {
+    return {run.positions[index], run.offsetY};
   }
-  return {};
+  auto* points = reinterpret_cast<const Point*>(run.positions);
+  return points[index];
 }
 
 Rect MapGlyphBounds(const GlyphRun& run, size_t index, const Rect& bounds) {

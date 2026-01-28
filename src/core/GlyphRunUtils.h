@@ -35,7 +35,7 @@ Matrix GetGlyphMatrix(const GlyphRun& run, size_t index);
 
 /**
  * Returns the position of a glyph at the given index within a GlyphRun.
- * For RSXform and Matrix positioning, this returns the translation component.
+ * Only valid for Horizontal and Point positioning modes.
  */
 Point GetGlyphPosition(const GlyphRun& run, size_t index);
 
