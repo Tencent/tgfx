@@ -28,6 +28,10 @@ class RuntimeImageFilter : public ImageFilter {
 
   std::shared_ptr<RuntimeEffect> effect = nullptr;
 
+  bool skipCropRect() const override {
+    return effect ? effect->skipCropRect() : false;
+  }
+
  protected:
   Type type() const override {
     return Type::Runtime;

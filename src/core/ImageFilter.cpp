@@ -87,10 +87,18 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   if (uvMatrix) {
     clipBounds = uvMatrix->mapRect(clipBounds);
   }
+
   Rect dstBounds = {};
-  if (!applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
-    return nullptr;
+  // For filters that skip crop (e.g., 3D filters with shared depth buffer),
+  // ensure outputTexture size matches filterBounds exactly.
+  if (skipCropRect()) {
+    dstBounds = filterBounds(inputBounds);
+  } else {
+    if (!applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
+      return nullptr;
+    }
   }
+
   auto isAlphaOnly = source->isAlphaOnly();
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);

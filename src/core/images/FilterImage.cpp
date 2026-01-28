@@ -130,15 +130,25 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
   if (!clipBounds.intersect(drawBounds)) {
     return nullptr;
   }
+
   Rect dstBounds = {};
-  if (!filter->applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
-    return nullptr;
+  // For filters that skip crop (e.g., 3D filters with shared depth buffer),
+  // ensure outputTexture size matches filterBounds exactly.
+  if (filter->skipCropRect()) {
+    dstBounds = filter->filterBounds(inputBounds);
+    dstBounds.roundOut();
+  } else {
+    if (!filter->applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
+      return nullptr;
+    }
   }
+
   auto sampling = samplingArgs.sampling;
   if (dstBounds.contains(drawBounds)) {
     return filter->asFragmentProcessor(source, args, sampling, samplingArgs.constraint,
                                        AddressOf(fpMatrix));
   }
+
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
   auto textureProxy = filter->lockTextureProxy(source, dstBounds, tpArgs);

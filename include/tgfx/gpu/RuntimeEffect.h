@@ -54,6 +54,17 @@ class RuntimeEffect {
     return srcRect;
   }
 
+  /**
+   * Returns true to skip the applyCropRect optimization.
+   * When true, the output texture size will match filterBounds exactly instead of being
+   * cropped to the visible area. This is needed for effects that share resources
+   * (like depth buffers) across different layers, requiring consistent output sizes.
+   * Default is false.
+   */
+  virtual bool skipCropRect() const {
+    return false;
+  }
+
  protected:
   /**
    * Applies the effect to the input textures and draws the result to the specified output texture.
