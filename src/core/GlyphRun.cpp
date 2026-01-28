@@ -63,25 +63,17 @@ void GlyphRun::getMatrix(size_t index, Matrix* matrix) const {
   }
 }
 
-bool GlyphRun::isGlyphVisible(size_t index, const Rect& scaledBounds,
-                              const Rect& clipBounds) const {
-  auto bounds = scaledBounds;
+Rect GlyphRun::mapBounds(size_t index, const Rect& glyphBounds) const {
   switch (positioning) {
     case GlyphPositioning::Horizontal:
-      bounds.offset(positions[index], offsetY);
-      break;
+      return glyphBounds.makeOffset(positions[index], offsetY);
     case GlyphPositioning::Point: {
       auto point = reinterpret_cast<const Point*>(positions)[index];
-      bounds.offset(point.x, point.y);
-      break;
+      return glyphBounds.makeOffset(point.x, point.y);
     }
-    default: {
-      Matrix glyphMatrix = {};
-      getMatrix(index, &glyphMatrix);
-      bounds = glyphMatrix.mapRect(bounds);
-    }
+    default:
+      return getMatrix(index).mapRect(glyphBounds);
   }
-  return Rect::Intersects(bounds, clipBounds);
 }
 
 }  // namespace tgfx

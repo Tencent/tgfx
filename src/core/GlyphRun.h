@@ -65,10 +65,9 @@ struct GlyphRun {
   void getMatrix(size_t index, Matrix* matrix) const;
 
   /**
-   * Checks if a glyph at the given index is visible within the clip bounds.
-   * @param scaledBounds The pre-computed scaled bounds (with stroke and scale applied).
+   * Returns the glyph bounds transformed by the glyph's positioning at the given index.
    */
-  bool isGlyphVisible(size_t index, const Rect& scaledBounds, const Rect& clipBounds) const;
+  Rect mapBounds(size_t index, const Rect& glyphBounds) const;
 
  private:
   size_t _runSize = 0;
