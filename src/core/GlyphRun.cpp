@@ -17,58 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/GlyphRun.h"
-#include "core/RunRecord.h"
 
 namespace tgfx {
 
-unsigned ScalarsPerGlyph(GlyphPositionMode layout) {
-  switch (layout) {
-    case GlyphPositionMode::Horizontal:
+unsigned ScalarsPerGlyph(GlyphPositioning mode) {
+  switch (mode) {
+    case GlyphPositioning::Horizontal:
       return 1;
-    case GlyphPositionMode::Point:
+    case GlyphPositioning::Point:
       return 2;
-    case GlyphPositionMode::RSXform:
+    case GlyphPositioning::RSXform:
       return 4;
-    case GlyphPositionMode::Matrix:
+    case GlyphPositioning::Matrix:
       return 6;
   }
   return 0;
-}
-
-size_t GlyphRun::glyphCount() const {
-  return record->glyphCount;
-}
-
-const GlyphID* GlyphRun::glyphs() const {
-  return record->glyphBuffer();
-}
-
-const Font& GlyphRun::font() const {
-  return record->font;
-}
-
-GlyphPositionMode GlyphRun::positionMode() const {
-  return record->positionMode;
-}
-
-const float* GlyphRun::positions() const {
-  return record->posBuffer();
-}
-
-float GlyphRun::offsetY() const {
-  return record->y;
-}
-
-const Point* GlyphRun::points() const {
-  return reinterpret_cast<const Point*>(record->posBuffer());
-}
-
-const RSXform* GlyphRun::xforms() const {
-  return reinterpret_cast<const RSXform*>(record->posBuffer());
-}
-
-const Matrix* GlyphRun::matrices() const {
-  return reinterpret_cast<const Matrix*>(record->posBuffer());
 }
 
 Matrix ComputeGlyphMatrix(const GlyphRun& run, size_t index) {
@@ -78,25 +41,24 @@ Matrix ComputeGlyphMatrix(const GlyphRun& run, size_t index) {
 }
 
 void ComputeGlyphMatrix(const GlyphRun& run, size_t index, Matrix* matrix) {
-  const float* positions = run.positions();
-  switch (run.positionMode()) {
-    case GlyphPositionMode::Horizontal:
-      matrix->setTranslate(positions[index], run.offsetY());
+  switch (run.positionMode) {
+    case GlyphPositioning::Horizontal:
+      matrix->setTranslate(run.positions[index], run.offsetY);
       break;
-    case GlyphPositionMode::Point: {
-      auto point = run.points()[index];
-      matrix->setTranslate(point.x, point.y);
+    case GlyphPositioning::Point: {
+      auto* points = reinterpret_cast<const Point*>(run.positions);
+      matrix->setTranslate(points[index].x, points[index].y);
       break;
     }
-    case GlyphPositionMode::RSXform: {
-      const float* p = positions + index * 4;
+    case GlyphPositioning::RSXform: {
+      const float* p = run.positions + index * 4;
       float scos = p[0];
       float ssin = p[1];
       matrix->setAll(scos, -ssin, p[2], ssin, scos, p[3]);
       break;
     }
-    case GlyphPositionMode::Matrix: {
-      const float* p = positions + index * 6;
+    case GlyphPositioning::Matrix: {
+      const float* p = run.positions + index * 6;
       matrix->setAll(p[0], p[1], p[2], p[3], p[4], p[5]);
       break;
     }
@@ -104,12 +66,12 @@ void ComputeGlyphMatrix(const GlyphRun& run, size_t index, Matrix* matrix) {
 }
 
 Rect MapGlyphBounds(const GlyphRun& run, size_t index, const Rect& bounds) {
-  switch (run.positionMode()) {
-    case GlyphPositionMode::Horizontal:
-      return bounds.makeOffset(run.positions()[index], run.offsetY());
-    case GlyphPositionMode::Point: {
-      auto point = run.points()[index];
-      return bounds.makeOffset(point.x, point.y);
+  switch (run.positionMode) {
+    case GlyphPositioning::Horizontal:
+      return bounds.makeOffset(run.positions[index], run.offsetY);
+    case GlyphPositioning::Point: {
+      auto* points = reinterpret_cast<const Point*>(run.positions);
+      return bounds.makeOffset(points[index].x, points[index].y);
     }
     default:
       return ComputeGlyphMatrix(run, index).mapRect(bounds);
@@ -117,8 +79,8 @@ Rect MapGlyphBounds(const GlyphRun& run, size_t index, const Rect& bounds) {
 }
 
 bool HasComplexTransform(const GlyphRun& run) {
-  return run.positionMode() == GlyphPositionMode::RSXform ||
-         run.positionMode() == GlyphPositionMode::Matrix;
+  return run.positionMode == GlyphPositioning::RSXform ||
+         run.positionMode == GlyphPositioning::Matrix;
 }
 
 }  // namespace tgfx

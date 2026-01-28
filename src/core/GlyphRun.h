@@ -19,13 +19,14 @@
 #pragma once
 
 #include "tgfx/core/GlyphRun.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 
 /**
  * Returns the number of float scalars per glyph for the given positioning mode.
  */
-unsigned ScalarsPerGlyph(GlyphPositionMode mode);
+unsigned ScalarsPerGlyph(GlyphPositioning mode);
 
 /**
  * Computes the transformation matrix for a glyph at the given index within a GlyphRun.

@@ -81,15 +81,15 @@ void Geometry::expandToGlyphs() {
   DEBUG_ASSERT(textBlob != nullptr);
   size_t totalCount = 0;
   for (auto run : *textBlob) {
-    totalCount += run.glyphCount();
+    totalCount += run.glyphCount;
   }
   glyphs.clear();
   glyphs.reserve(totalCount);
   for (auto run : *textBlob) {
-    for (size_t i = 0; i < run.glyphCount(); i++) {
+    for (size_t i = 0; i < run.glyphCount; i++) {
       Glyph glyph = {};
-      glyph.glyphID = run.glyphs()[i];
-      glyph.font = run.font();
+      glyph.glyphID = run.glyphs[i];
+      glyph.font = *run.font;
       glyph.matrix = ComputeGlyphMatrix(run, i);
       glyphs.push_back(glyph);
     }

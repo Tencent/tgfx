@@ -87,7 +87,7 @@ RunRecord* TextBlobBuilder::lastRun() {
   return reinterpret_cast<RunRecord*>(storage + lastRunOffset);
 }
 
-bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositionMode mode, size_t count, float y) {
+bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning mode, size_t count, float y) {
   if (runCount == 0) {
     return false;
   }
@@ -95,7 +95,7 @@ bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositionMode mode, size_t 
   if (run->font != font || run->positionMode != mode) {
     return false;
   }
-  if (mode == GlyphPositionMode::Horizontal) {
+  if (mode == GlyphPositioning::Horizontal) {
     if (run->y != y) {
       return false;
     }
@@ -118,7 +118,7 @@ bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositionMode mode, size_t 
 }
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRun(const Font& font, size_t glyphCount,
-                                                            GlyphPositionMode mode, float y) {
+                                                            GlyphPositioning mode, float y) {
   if (glyphCount == 0) {
     currentBuffer = {};
     return currentBuffer;
@@ -140,22 +140,22 @@ const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRun(const Font& font, si
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRunPosH(const Font& font, size_t glyphCount,
                                                                 float y) {
-  return allocRun(font, glyphCount, GlyphPositionMode::Horizontal, y);
+  return allocRun(font, glyphCount, GlyphPositioning::Horizontal, y);
 }
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRunPos(const Font& font,
                                                                size_t glyphCount) {
-  return allocRun(font, glyphCount, GlyphPositionMode::Point, 0.0f);
+  return allocRun(font, glyphCount, GlyphPositioning::Point, 0.0f);
 }
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRunRSXform(const Font& font,
                                                                    size_t glyphCount) {
-  return allocRun(font, glyphCount, GlyphPositionMode::RSXform, 0.0f);
+  return allocRun(font, glyphCount, GlyphPositioning::RSXform, 0.0f);
 }
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRunMatrix(const Font& font,
                                                                   size_t glyphCount) {
-  return allocRun(font, glyphCount, GlyphPositionMode::Matrix, 0.0f);
+  return allocRun(font, glyphCount, GlyphPositioning::Matrix, 0.0f);
 }
 
 void TextBlobBuilder::setBounds(const Rect& bounds) {

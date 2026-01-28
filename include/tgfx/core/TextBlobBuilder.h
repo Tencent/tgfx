@@ -110,9 +110,9 @@ class TextBlobBuilder {
   std::shared_ptr<TextBlob> build();
 
  private:
-  const RunBuffer& allocRun(const Font& font, size_t glyphCount, GlyphPositionMode mode, float y);
+  const RunBuffer& allocRun(const Font& font, size_t glyphCount, GlyphPositioning mode, float y);
   void reserve(size_t size);
-  bool tryMerge(const Font& font, GlyphPositionMode mode, size_t count, float y);
+  bool tryMerge(const Font& font, GlyphPositioning mode, size_t count, float y);
   void reset();
   void freeStorage();
   RunRecord* lastRun();

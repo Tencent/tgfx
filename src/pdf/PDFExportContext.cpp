@@ -394,7 +394,7 @@ void PDFExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MC
 void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& state,
                                       const Brush& brush, const Stroke* stroke) {
 
-  auto font = glyphRun.font();
+  auto& font = *glyphRun.font;
   auto typeface = font.getTypeface();
   // RSXform/Matrix positioning requires path export since PDF text operators cannot represent
   // per-glyph rotation/scale.
@@ -417,11 +417,11 @@ void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& s
 
 void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCState& state,
                                             const Brush& brush) {
-  if (glyphRun.glyphCount() == 0) {
+  if (glyphRun.glyphCount == 0) {
     return;
   }
 
-  const auto& glyphRunFont = glyphRun.font();
+  const auto& glyphRunFont = *glyphRun.font;
   auto pdfStrike = PDFStrike::Make(document, glyphRunFont);
   if (!pdfStrike) {
     return;
@@ -472,8 +472,8 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
     GlyphPositioner glyphPositioner(out, glyphRunFont.getMetrics().leading, offset);
     PDFFont* font = nullptr;
 
-    for (size_t index = 0; index < glyphRun.glyphCount(); ++index) {
-      auto glyphID = glyphRun.glyphs()[index];
+    for (size_t index = 0; index < glyphRun.glyphCount; ++index) {
+      auto glyphID = glyphRun.glyphs[index];
 
       glyphPositioner.flush();
       out->writeText("/Span<</ActualText ");
@@ -529,11 +529,11 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
 
 void PDFExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCState& state,
                                             const Brush& brush, const Stroke* stroke) {
-  const auto& glyphFont = glyphRun.font();
+  const auto& glyphFont = *glyphRun.font;
   Path path;
 
-  for (size_t i = 0; i < glyphRun.glyphCount(); ++i) {
-    auto glyphID = glyphRun.glyphs()[i];
+  for (size_t i = 0; i < glyphRun.glyphCount; ++i) {
+    auto glyphID = glyphRun.glyphs[i];
     auto glyphMatrix = ComputeGlyphMatrix(glyphRun, i);
     Path glyphPath;
     if (!glyphFont.getPath(glyphID, &glyphPath)) {
@@ -557,9 +557,9 @@ void PDFExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCSt
 
 void PDFExportContext::exportGlyphRunAsImage(const GlyphRun& glyphRun, const MCState& state,
                                              const Brush& brush) {
-  const auto& glyphFont = glyphRun.font();
-  for (size_t i = 0; i < glyphRun.glyphCount(); ++i) {
-    auto glyphID = glyphRun.glyphs()[i];
+  const auto& glyphFont = *glyphRun.font;
+  for (size_t i = 0; i < glyphRun.glyphCount; ++i) {
+    auto glyphID = glyphRun.glyphs[i];
     auto glyphMatrix = ComputeGlyphMatrix(glyphRun, i);
     auto tempState = state;
     Matrix matrix;
