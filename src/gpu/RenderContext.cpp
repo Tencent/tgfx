@@ -505,7 +505,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
 
   Rect perGlyphBounds = {};
-  const bool hasOnlyOffset = !HasComplexTransform(sourceGlyphRun);
+  auto hasOnlyOffset = !HasComplexTransform(sourceGlyphRun);
   for (size_t i = 0; i < sourceGlyphRun.glyphCount; i++) {
     auto glyphID = sourceGlyphRun.glyphs[i];
     auto glyphBounds = sharedBounds ? sharedBounds
