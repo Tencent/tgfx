@@ -21,30 +21,23 @@
 namespace tgfx {
 
 Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
-  Matrix matrix = {};
   switch (run.positioning) {
     case GlyphPositioning::Horizontal:
-      matrix.setTranslate(run.positions[index], run.offsetY);
-      break;
+      return Matrix::MakeTrans(run.positions[index], run.offsetY);
     case GlyphPositioning::Point: {
-      auto* points = reinterpret_cast<const Point*>(run.positions);
-      matrix.setTranslate(points[index].x, points[index].y);
-      break;
+      auto position = reinterpret_cast<const Point*>(run.positions)[index];
+      return Matrix::MakeTrans(position.x, position.y);
     }
     case GlyphPositioning::RSXform: {
       const float* p = run.positions + index * 4;
-      float scos = p[0];
-      float ssin = p[1];
-      matrix.setAll(scos, -ssin, p[2], ssin, scos, p[3]);
-      break;
+      return Matrix::MakeAll(p[0], -p[1], p[2], p[1], p[0], p[3]);
     }
     case GlyphPositioning::Matrix: {
       const float* p = run.positions + index * 6;
-      matrix.setAll(p[0], p[1], p[2], p[3], p[4], p[5]);
-      break;
+      return Matrix::MakeAll(p[0], p[1], p[2], p[3], p[4], p[5]);
     }
   }
-  return matrix;
+  return {};
 }
 
 
