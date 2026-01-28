@@ -577,9 +577,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
     auto glyphState = state;
     auto& rect = atlasLocator.getLocation();
-    sourceGlyphRun.positioning == GlyphPositioning::Horizontal
-        ? (void)GetGlyphMatrix(sourceGlyphRun, i, &positionMatrix)
-        : (void)(positionMatrix = GetGlyphMatrix(sourceGlyphRun, i));
+    GetGlyphMatrix(sourceGlyphRun, i, &positionMatrix);
     ComputeGlyphRenderMatrix(rect, state.matrix, positionMatrix, combinedScale, glyphOffset,
                              font.isFauxItalic(), sampling.minFilterMode == FilterMode::Nearest,
                              &glyphState.matrix);
@@ -696,9 +694,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
 
     auto glyphState = state;
     auto rect = atlasLocator.getLocation();
-    sourceGlyphRun.positioning == GlyphPositioning::Horizontal
-        ? (void)GetGlyphMatrix(sourceGlyphRun, i, &positionMatrix)
-        : (void)(positionMatrix = GetGlyphMatrix(sourceGlyphRun, i));
+    GetGlyphMatrix(sourceGlyphRun, i, &positionMatrix);
     ComputeGlyphRenderMatrix(rect, state.matrix, positionMatrix, combinedScale, glyphOffset,
                              font.isFauxItalic(), false, &glyphState.matrix);
     compositor->fillTextAtlas(std::move(textureProxy), rect,
