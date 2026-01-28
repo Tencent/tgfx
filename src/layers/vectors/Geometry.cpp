@@ -89,7 +89,7 @@ void Geometry::expandToGlyphs() {
     for (size_t i = 0; i < run.glyphCount; i++) {
       Glyph glyph = {};
       glyph.glyphID = run.glyphs[i];
-      glyph.font = *run.font;
+      glyph.font = run.font;
       glyph.matrix = ComputeGlyphMatrix(run, i);
       glyphs.push_back(glyph);
     }

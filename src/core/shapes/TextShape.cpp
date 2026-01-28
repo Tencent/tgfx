@@ -29,7 +29,7 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
     return nullptr;
   }
   for (auto run : *textBlob) {
-    if (run.font->hasOutlines()) {
+    if (run.font.hasOutlines()) {
       return std::make_shared<TextShape>(std::move(textBlob));
     }
   }
@@ -48,10 +48,10 @@ Path TextShape::onGetPath(float resolutionScale) const {
   auto matrix = Matrix::MakeScale(resolutionScale, resolutionScale);
   Path totalPath = {};
   for (auto run : *textBlob) {
-    if (!run.font->hasOutlines()) {
+    if (!run.font.hasOutlines()) {
       continue;
     }
-    auto font = *run.font;
+    auto font = run.font;
     if (hasScale) {
       font = font.makeWithSize(resolutionScale * font.getSize());
     }

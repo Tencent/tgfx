@@ -31,7 +31,7 @@ namespace tgfx {
 
 SVGTextBuilder::UnicharsInfo SVGTextBuilder::glyphToUnicharsInfo(const GlyphRun& glyphRun) {
   std::vector<GlyphID> glyphIDs(glyphRun.glyphs, glyphRun.glyphs + glyphRun.glyphCount);
-  auto unicodeChars = converter.glyphsToUnichars(*glyphRun.font, glyphIDs);
+  auto unicodeChars = converter.glyphsToUnichars(glyphRun.font, glyphIDs);
   if (unicodeChars.empty()) {
     return {};
   }

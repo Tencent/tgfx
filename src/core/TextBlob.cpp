@@ -149,10 +149,10 @@ TextBlob::Iterator TextBlob::begin() const {
 
 GlyphRun TextBlob::Iterator::operator*() const {
   GlyphRun run;
-  run.font = &current->font;
+  run.font = current->font;
   run.glyphCount = current->glyphCount;
   run.glyphs = current->glyphBuffer();
-  run.positionMode = current->positionMode;
+  run.positioning = current->positionMode;
   run.positions = current->posBuffer();
   run.offsetY = current->y;
   return run;
@@ -177,7 +177,7 @@ Rect TextBlob::computeBounds() const {
   Rect finalBounds = {};
   Matrix transformMat = {};
   for (auto run : *this) {
-    auto& font = *run.font;
+    auto& font = run.font;
     transformMat.reset();
     transformMat.setScale(font.getSize(), font.getSize());
     if (font.isFauxItalic()) {
@@ -224,7 +224,7 @@ Rect TextBlob::getTightBounds(const Matrix* matrix) const {
   auto inverseScale = 1.0f / resolutionScale;
   Rect totalBounds = {};
   for (auto run : *this) {
-    auto font = *run.font;
+    auto font = run.font;
     if (hasScale) {
       font = font.makeWithSize(resolutionScale * font.getSize());
     }
@@ -247,7 +247,7 @@ Rect TextBlob::getTightBounds(const Matrix* matrix) const {
 
 bool TextBlob::hitTestPoint(float localX, float localY, const Stroke* stroke) const {
   for (auto run : *this) {
-    auto& font = *run.font;
+    auto& font = run.font;
     auto usePathHitTest = font.hasOutlines();
     for (size_t i = 0; i < run.glyphCount; i++) {
       auto glyphMatrix = ComputeGlyphMatrix(run, i);

@@ -41,7 +41,7 @@ Matrix ComputeGlyphMatrix(const GlyphRun& run, size_t index) {
 }
 
 void ComputeGlyphMatrix(const GlyphRun& run, size_t index, Matrix* matrix) {
-  switch (run.positionMode) {
+  switch (run.positioning) {
     case GlyphPositioning::Horizontal:
       matrix->setTranslate(run.positions[index], run.offsetY);
       break;
@@ -66,7 +66,7 @@ void ComputeGlyphMatrix(const GlyphRun& run, size_t index, Matrix* matrix) {
 }
 
 Rect MapGlyphBounds(const GlyphRun& run, size_t index, const Rect& bounds) {
-  switch (run.positionMode) {
+  switch (run.positioning) {
     case GlyphPositioning::Horizontal:
       return bounds.makeOffset(run.positions[index], run.offsetY);
     case GlyphPositioning::Point: {
@@ -79,8 +79,8 @@ Rect MapGlyphBounds(const GlyphRun& run, size_t index, const Rect& bounds) {
 }
 
 bool HasComplexTransform(const GlyphRun& run) {
-  return run.positionMode == GlyphPositioning::RSXform ||
-         run.positionMode == GlyphPositioning::Matrix;
+  return run.positioning == GlyphPositioning::RSXform ||
+         run.positioning == GlyphPositioning::Matrix;
 }
 
 }  // namespace tgfx

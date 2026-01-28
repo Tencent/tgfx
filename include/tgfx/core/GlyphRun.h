@@ -52,7 +52,7 @@ struct GlyphRun {
   /**
    * The font used for this run.
    */
-  const Font* font = nullptr;
+  Font font = {};
 
   /**
    * The number of glyphs in this run.
@@ -62,12 +62,12 @@ struct GlyphRun {
   /**
    * Pointer to the glyph ID array. The array contains glyphCount elements.
    */
-  const GlyphID* glyphs = nullptr;
+  const GlyphID* glyphs = nullptr; 
 
   /**
-   * The positioning mode for this run.
+   * The positioning mode for this run.的
    */
-  GlyphPositioning positionMode = GlyphPositioning::Point;
+  GlyphPositioning positioning = GlyphPositioning::Point;
 
   /**
    * Pointer to the raw position data array. The number of floats per glyph depends on
