@@ -29,7 +29,7 @@ struct RunRecord;
 /**
  * Describes the positioning mode of glyphs within a GlyphRun.
  */
-enum class GlyphPositioning : uint8_t {
+enum class GlyphPositioning {
   /**
    * Horizontal positioning: each glyph has an x position, sharing a common y from offsetY().
    */
