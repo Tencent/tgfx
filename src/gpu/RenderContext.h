@@ -20,7 +20,7 @@
 
 #include <optional>
 #include "core/DrawContext.h"
-#include "core/GlyphRunUtils.h"
+#include "core/GlyphTransform.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 

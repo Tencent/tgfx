@@ -19,7 +19,7 @@
 #include "PDFExportContext.h"
 #include "core/AdvancedTypefaceInfo.h"
 #include "core/DrawContext.h"
-#include "core/GlyphRunUtils.h"
+#include "core/GlyphTransform.h"
 #include "core/MCState.h"
 #include "core/MeasureContext.h"
 #include "core/PictureRecords.h"

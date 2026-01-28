@@ -20,7 +20,7 @@
 
 #include <unordered_set>
 #include "core/DrawContext.h"
-#include "core/GlyphRunUtils.h"
+#include "core/GlyphTransform.h"
 #include "core/MCState.h"
 #include "core/PictureRecords.h"
 #include "core/filters/DropShadowImageFilter.h"

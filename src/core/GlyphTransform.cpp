@@ -16,24 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/GlyphRunUtils.h"
-#include "core/utils/Log.h"
+#include "core/GlyphTransform.h"
 
 namespace tgfx {
-
-unsigned ScalarsPerGlyph(GlyphPositioning positioning) {
-  switch (positioning) {
-    case GlyphPositioning::Horizontal:
-      return 1;
-    case GlyphPositioning::Point:
-      return 2;
-    case GlyphPositioning::RSXform:
-      return 4;
-    case GlyphPositioning::Matrix:
-      return 6;
-  }
-  return 0;
-}
 
 Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
   Matrix matrix = {};
@@ -62,13 +47,5 @@ Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
   return matrix;
 }
 
-Point GetGlyphPosition(const GlyphRun& run, size_t index) {
-  DEBUG_ASSERT(!HasComplexTransform(run));
-  if (run.positioning == GlyphPositioning::Horizontal) {
-    return {run.positions[index], run.offsetY};
-  }
-  auto* points = reinterpret_cast<const Point*>(run.positions);
-  return points[index];
-}
 
 }  // namespace tgfx

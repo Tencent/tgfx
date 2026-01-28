@@ -21,7 +21,7 @@
 #include "core/AtlasManager.h"
 #include "core/AtlasStrikeCache.h"
 #include "core/GlyphRasterizer.h"
-#include "core/GlyphRunUtils.h"
+#include "core/GlyphTransform.h"
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"

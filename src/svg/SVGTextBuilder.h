@@ -19,7 +19,7 @@
 #pragma once
 
 #include <string>
-#include "core/GlyphRunUtils.h"
+#include "core/GlyphTransform.h"
 #include "core/utils/GlyphConverter.h"
 #include "tgfx/core/Typeface.h"
 

@@ -24,20 +24,20 @@
 namespace tgfx {
 
 /**
- * Returns the number of float scalars per glyph for the given positioning mode.
- */
-unsigned ScalarsPerGlyph(GlyphPositioning positioning);
-
-/**
  * Returns the transformation matrix for a glyph at the given index within a GlyphRun.
  */
 Matrix GetGlyphMatrix(const GlyphRun& run, size_t index);
 
 /**
- * Returns the position of a glyph at the given index within a GlyphRun.
- * Only valid for Horizontal and Point positioning modes.
+ * Returns the position of a glyph at the given index within a GlyphRun. Only valid for Horizontal
+ * and Point positioning modes.
  */
-Point GetGlyphPosition(const GlyphRun& run, size_t index);
+inline Point GetGlyphPosition(const GlyphRun& run, size_t index) {
+  if (run.positioning == GlyphPositioning::Horizontal) {
+    return {run.positions[index], run.offsetY};
+  }
+  return reinterpret_cast<const Point*>(run.positions)[index];
+}
 
 /**
  * Returns true if the GlyphRun has complex per-glyph transforms (RSXform or Matrix positioning).

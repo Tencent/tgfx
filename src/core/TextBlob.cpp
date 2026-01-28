@@ -18,7 +18,7 @@
 
 #include "tgfx/core/TextBlob.h"
 #include <cstdlib>
-#include "core/GlyphRunUtils.h"
+#include "core/GlyphTransform.h"
 #include "core/RunRecord.h"
 #include "core/ScalerContext.h"
 #include "core/utils/AtomicCache.h"

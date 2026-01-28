@@ -20,7 +20,7 @@
 #include <utility>
 #include "ElementWriter.h"
 #include "SVGUtils.h"
-#include "core/GlyphRunUtils.h"
+#include "core/GlyphTransform.h"
 #include "core/RunRecord.h"
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"

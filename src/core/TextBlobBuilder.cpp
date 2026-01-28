@@ -20,7 +20,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include "core/GlyphRunUtils.h"
 #include "core/RunRecord.h"
 #include "tgfx/core/TextBlob.h"
 
@@ -112,7 +111,7 @@ bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning positioning, s
   uint32_t preMergeCount = run->glyphCount;
   run->grow(static_cast<uint32_t>(count));
   currentBuffer.glyphs = run->glyphBuffer() + preMergeCount;
-  auto scalars = ScalarsPerGlyph(positioning);
+  auto scalars = RunRecord::ScalarsPerGlyph(positioning);
   currentBuffer.positions = run->posBuffer() + preMergeCount * scalars;
   storageUsed += delta;
   return true;
