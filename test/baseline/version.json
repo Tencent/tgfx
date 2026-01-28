@@ -36,6 +36,7 @@
         "LumaFilterToRec2020": "82494664",
         "LumaFilterToRec601": "82494664",
         "LumaFilterToSRGB": "82494664",
+        "Matrix3D": "af4b5a75",
         "Matrix3DShapeStroke": "49e449da",
         "MatrixShapeStroke": "eefb7a46",
         "MultiImageRect_NOSCALE_NEAREST_LINEAR": "4edccb64",
