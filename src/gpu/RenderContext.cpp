@@ -529,7 +529,6 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
 
   Rect perGlyphBounds = {};
-  Matrix positionMatrix = {};
   const bool isSimplePositioning = !HasComplexTransform(sourceGlyphRun);
   for (size_t i = 0; i < sourceGlyphRun.glyphCount; i++) {
     auto glyphID = sourceGlyphRun.glyphs[i];
@@ -604,7 +603,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
                                      sampling.minFilterMode == FilterMode::Nearest,
                                      &glyphState.matrix);
     } else {
-      GetGlyphMatrix(sourceGlyphRun, i, &positionMatrix);
+      auto positionMatrix = GetGlyphMatrix(sourceGlyphRun, i);
       ComputeGlyphRenderMatrix(rect, state.matrix, positionMatrix, combinedScale, glyphOffset,
                                font.isFauxItalic(), sampling.minFilterMode == FilterMode::Nearest,
                                &glyphState.matrix);
@@ -676,7 +675,6 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   const auto glyphRenderScale = font.scalerContext->getSize() / backingSize;
   const auto combinedScale = glyphRenderScale / (maxScale * cellScale);
 
-  Matrix positionMatrix = {};
   const bool isSimplePositioning = !HasComplexTransform(sourceGlyphRun);
   for (size_t i : glyphIndices) {
     auto glyphID = sourceGlyphRun.glyphs[i];
@@ -728,7 +726,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
       ComputeGlyphRenderMatrixSimple(rect, state.matrix, glyphPosition, combinedScale, glyphOffset,
                                      font.isFauxItalic(), false, &glyphState.matrix);
     } else {
-      GetGlyphMatrix(sourceGlyphRun, i, &positionMatrix);
+      auto positionMatrix = GetGlyphMatrix(sourceGlyphRun, i);
       ComputeGlyphRenderMatrix(rect, state.matrix, positionMatrix, combinedScale, glyphOffset,
                                font.isFauxItalic(), false, &glyphState.matrix);
     }

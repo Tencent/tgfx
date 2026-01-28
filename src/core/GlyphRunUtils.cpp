@@ -34,6 +34,53 @@ unsigned ScalarsPerGlyph(GlyphPositioning positioning) {
   return 0;
 }
 
+Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
+  Matrix matrix = {};
+  switch (run.positioning) {
+    case GlyphPositioning::Horizontal:
+      matrix.setTranslate(run.positions[index], run.offsetY);
+      break;
+    case GlyphPositioning::Point: {
+      auto* points = reinterpret_cast<const Point*>(run.positions);
+      matrix.setTranslate(points[index].x, points[index].y);
+      break;
+    }
+    case GlyphPositioning::RSXform: {
+      const float* p = run.positions + index * 4;
+      float scos = p[0];
+      float ssin = p[1];
+      matrix.setAll(scos, -ssin, p[2], ssin, scos, p[3]);
+      break;
+    }
+    case GlyphPositioning::Matrix: {
+      const float* p = run.positions + index * 6;
+      matrix.setAll(p[0], p[1], p[2], p[3], p[4], p[5]);
+      break;
+    }
+  }
+  return matrix;
+}
+
+Point GetGlyphPosition(const GlyphRun& run, size_t index) {
+  switch (run.positioning) {
+    case GlyphPositioning::Horizontal:
+      return {run.positions[index], run.offsetY};
+    case GlyphPositioning::Point: {
+      auto* points = reinterpret_cast<const Point*>(run.positions);
+      return points[index];
+    }
+    case GlyphPositioning::RSXform: {
+      const float* p = run.positions + index * 4;
+      return {p[2], p[3]};
+    }
+    case GlyphPositioning::Matrix: {
+      const float* p = run.positions + index * 6;
+      return {p[2], p[5]};
+    }
+  }
+  return {};
+}
+
 Rect MapGlyphBounds(const GlyphRun& run, size_t index, const Rect& bounds) {
   switch (run.positioning) {
     case GlyphPositioning::Horizontal:
