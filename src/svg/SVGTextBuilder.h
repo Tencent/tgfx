@@ -19,8 +19,8 @@
 #pragma once
 
 #include <string>
-#include "core/GlyphTransform.h"
 #include "core/utils/GlyphConverter.h"
+#include "tgfx/core/GlyphRun.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {

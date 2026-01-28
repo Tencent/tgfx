@@ -20,7 +20,6 @@
 
 #include <unordered_set>
 #include "core/DrawContext.h"
-#include "core/GlyphTransform.h"
 #include "core/MCState.h"
 #include "core/PictureRecords.h"
 #include "core/filters/DropShadowImageFilter.h"
@@ -30,6 +29,7 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Brush.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/GlyphRun.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
