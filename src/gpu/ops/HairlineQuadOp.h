@@ -18,28 +18,38 @@
 
 #pragma once
 
-#include <memory>
-#include <tuple>
+#include "gpu/ops/DrawOp.h"
+#include "gpu/proxies/GPUHairlineProxy.h"
+#include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Path.h"
-#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 
-class StrokeShape;
-
-class ShapeUtils {
+class HairlineQuadOp final : public DrawOp {
  public:
-  /**
-   * Returns the Shape adjusted for the current resolution scale.
-   * Used during rendering to decide whether to simplify the Path or apply hairline stroking,
-   * depending on the resolution scale.
-   */
-  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
+  static PlacementPtr<HairlineQuadOp> Make(std::shared_ptr<GPUHairlineProxy> hairlineProxy,
+                                           PMColor color, const Matrix& uvMatrix, float coverage,
+                                           AAType aaType);
 
-  static float CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape);
+ protected:
+  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
-  static std::tuple<std::shared_ptr<StrokeShape>, Matrix> DecomposeStrokeShape(
-      std::shared_ptr<Shape> shape);
+  void onDraw(RenderPass* renderPass) override;
+
+  Type type() override {
+    return Type::HairlineQuadOp;
+  }
+
+ private:
+  HairlineQuadOp(BlockAllocator* allocator, std::shared_ptr<GPUHairlineProxy> hairlineProxy,
+                 PMColor color, const Matrix& uvMatrix, float coverage, AAType aaType);
+
+  std::shared_ptr<GPUHairlineProxy> hairlineProxy;
+  PMColor color;
+  Matrix uvMatrix;
+  float coverage = 1.0f;
+
+  friend class BlockAllocator;
 };
+
 }  // namespace tgfx

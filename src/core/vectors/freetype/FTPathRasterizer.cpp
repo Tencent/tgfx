@@ -23,7 +23,6 @@
 #include "core/utils/ClearPixels.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
-#include "core/utils/ScalePixelsAlpha.h"
 #include "core/utils/ShapeUtils.h"
 #include "tgfx/core/Buffer.h"
 
@@ -88,7 +87,6 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   ftPath.setEvenOdd(fillType == PathFillType::EvenOdd || fillType == PathFillType::InverseEvenOdd);
   auto outlines = ftPath.getOutlines();
   auto ftLibrary = FTLibrary::Get();
-  auto alphaScale = ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
   if (!needsGammaCorrection) {
     FT_Bitmap bitmap;
     bitmap.width = static_cast<unsigned>(targetInfo.width());
@@ -100,7 +98,6 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
     for (auto& outline : outlines) {
       FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
     }
-    ScalePixelsAlpha(targetInfo, dstPixels, alphaScale);
     if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
       ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
                                dstColorSpace, dstPixels);
@@ -123,7 +120,6 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   for (const auto& outline : outlines) {
     FT_Outline_Render(ftLibrary, &(outline->outline), &params);
   }
-  ScalePixelsAlpha(targetInfo, dstPixels, alphaScale);
   if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
     ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
                              dstColorSpace, dstPixels);

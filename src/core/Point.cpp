@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/Point.h"
+#include "core/utils/PointUtils.h"
 
 namespace tgfx {
-/**
- * Scales the alpha value of each pixel by the given factor.
- */
-void ScalePixelsAlpha(const ImageInfo& info, void* pixels, float alphaScale);
+
+bool Point::normalize() {
+  return PointUtils::SetLength(*this, 1.f);
+}
+
 }  // namespace tgfx
