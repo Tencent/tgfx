@@ -35,19 +35,7 @@ struct RunRecord {
 
   static constexpr uint8_t LAST_FLAG = 0x01;
 
-  static unsigned ScalarsPerGlyph(GlyphPositioning positioning) {
-    switch (positioning) {
-      case GlyphPositioning::Horizontal:
-        return 1;
-      case GlyphPositioning::Point:
-        return 2;
-      case GlyphPositioning::RSXform:
-        return 4;
-      case GlyphPositioning::Matrix:
-        return 6;
-    }
-    return 0;
-  }
+  static unsigned ScalarsPerGlyph(GlyphPositioning positioning);
 
   static size_t StorageSize(size_t count, GlyphPositioning positioning);
 
