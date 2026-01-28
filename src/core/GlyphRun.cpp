@@ -33,26 +33,47 @@ GlyphRun GlyphRun::From(const RunRecord* record) {
 }
 
 Matrix GlyphRun::getMatrix(size_t index) const {
+  Matrix matrix = {};
+  getMatrix(index, &matrix);
+  return matrix;
+}
+
+void GlyphRun::getMatrix(size_t index, Matrix* matrix) const {
   switch (positioning) {
     case GlyphPositioning::Horizontal:
-      return Matrix::MakeTrans(positions[index], offsetY);
+      matrix->setTranslate(positions[index], offsetY);
+      break;
     case GlyphPositioning::Point: {
       auto point = reinterpret_cast<const Point*>(positions)[index];
-      return Matrix::MakeTrans(point.x, point.y);
+      matrix->setTranslate(point.x, point.y);
+      break;
     }
     case GlyphPositioning::RSXform: {
       const float* p = positions + index * 4;
       float scos = p[0];
       float ssin = p[1];
-      return Matrix::MakeAll(scos, -ssin, p[2], ssin, scos, p[3]);
+      matrix->setAll(scos, -ssin, p[2], ssin, scos, p[3]);
+      break;
     }
     case GlyphPositioning::Matrix: {
       const float* p = positions + index * 6;
-      return Matrix::MakeAll(p[0], p[1], p[2], p[3], p[4], p[5]);
+      matrix->setAll(p[0], p[1], p[2], p[3], p[4], p[5]);
+      break;
     }
   }
-  // All enum cases are handled above; this is unreachable but silences compiler warnings.
-  return Matrix::I();
+}
+
+Rect GlyphRun::mapBounds(size_t index, const Rect& glyphBounds) const {
+  switch (positioning) {
+    case GlyphPositioning::Horizontal:
+      return glyphBounds.makeOffset(positions[index], offsetY);
+    case GlyphPositioning::Point: {
+      auto point = reinterpret_cast<const Point*>(positions)[index];
+      return glyphBounds.makeOffset(point.x, point.y);
+    }
+    default:
+      return getMatrix(index).mapRect(glyphBounds);
+  }
 }
 
 }  // namespace tgfx

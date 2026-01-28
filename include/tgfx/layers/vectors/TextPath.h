@@ -87,14 +87,14 @@ class TextPath : public VectorElement {
    * Returns whether characters stand perpendicular to the path. When true, characters rotate to
    * follow the path direction. When false, characters remain upright regardless of path direction.
    */
-  bool perpendicularToPath() const {
-    return _perpendicularToPath;
+  bool perpendicular() const {
+    return _perpendicular;
   }
 
   /**
    * Sets whether characters stand perpendicular to the path.
    */
-  void setPerpendicularToPath(bool value);
+  void setPerpendicular(bool value);
 
   /**
    * Returns whether the path direction is reversed.
@@ -120,7 +120,7 @@ class TextPath : public VectorElement {
   TextAlign _textAlign = TextAlign::Start;
   float _firstMargin = 0.0f;
   float _lastMargin = 0.0f;
-  bool _perpendicularToPath = true;
+  bool _perpendicular = true;
   bool _reversed = false;
 };
 
