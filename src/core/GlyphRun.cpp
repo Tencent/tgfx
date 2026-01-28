@@ -21,15 +21,15 @@
 
 namespace tgfx {
 
-unsigned ScalarsPerGlyph(GlyphLayout layout) {
+unsigned ScalarsPerGlyph(GlyphPositionMode layout) {
   switch (layout) {
-    case GlyphLayout::Horizontal:
+    case GlyphPositionMode::Horizontal:
       return 1;
-    case GlyphLayout::Point:
+    case GlyphPositionMode::Point:
       return 2;
-    case GlyphLayout::RSXform:
+    case GlyphPositionMode::RSXform:
       return 4;
-    case GlyphLayout::Matrix:
+    case GlyphPositionMode::Matrix:
       return 6;
   }
   return 0;
@@ -47,8 +47,8 @@ const Font& GlyphRun::font() const {
   return record->font;
 }
 
-GlyphLayout GlyphRun::glyphLayout() const {
-  return record->glyphLayout;
+GlyphPositionMode GlyphRun::positionMode() const {
+  return record->positionMode;
 }
 
 const float* GlyphRun::positions() const {
@@ -79,23 +79,23 @@ Matrix ComputeGlyphMatrix(const GlyphRun& run, size_t index) {
 
 void ComputeGlyphMatrix(const GlyphRun& run, size_t index, Matrix* matrix) {
   const float* positions = run.positions();
-  switch (run.glyphLayout()) {
-    case GlyphLayout::Horizontal:
+  switch (run.positionMode()) {
+    case GlyphPositionMode::Horizontal:
       matrix->setTranslate(positions[index], run.offsetY());
       break;
-    case GlyphLayout::Point: {
+    case GlyphPositionMode::Point: {
       auto point = run.points()[index];
       matrix->setTranslate(point.x, point.y);
       break;
     }
-    case GlyphLayout::RSXform: {
+    case GlyphPositionMode::RSXform: {
       const float* p = positions + index * 4;
       float scos = p[0];
       float ssin = p[1];
       matrix->setAll(scos, -ssin, p[2], ssin, scos, p[3]);
       break;
     }
-    case GlyphLayout::Matrix: {
+    case GlyphPositionMode::Matrix: {
       const float* p = positions + index * 6;
       matrix->setAll(p[0], p[1], p[2], p[3], p[4], p[5]);
       break;
@@ -104,10 +104,10 @@ void ComputeGlyphMatrix(const GlyphRun& run, size_t index, Matrix* matrix) {
 }
 
 Rect MapGlyphBounds(const GlyphRun& run, size_t index, const Rect& bounds) {
-  switch (run.glyphLayout()) {
-    case GlyphLayout::Horizontal:
+  switch (run.positionMode()) {
+    case GlyphPositionMode::Horizontal:
       return bounds.makeOffset(run.positions()[index], run.offsetY());
-    case GlyphLayout::Point: {
+    case GlyphPositionMode::Point: {
       auto point = run.points()[index];
       return bounds.makeOffset(point.x, point.y);
     }
@@ -117,8 +117,8 @@ Rect MapGlyphBounds(const GlyphRun& run, size_t index, const Rect& bounds) {
 }
 
 bool HasComplexTransform(const GlyphRun& run) {
-  return run.glyphLayout() == GlyphLayout::RSXform ||
-         run.glyphLayout() == GlyphLayout::Matrix;
+  return run.positionMode() == GlyphPositionMode::RSXform ||
+         run.positionMode() == GlyphPositionMode::Matrix;
 }
 
 }  // namespace tgfx

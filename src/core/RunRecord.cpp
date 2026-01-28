@@ -22,8 +22,8 @@
 
 namespace tgfx {
 
-size_t RunRecord::StorageSize(size_t count, GlyphLayout layout) {
-  auto scalars = ScalarsPerGlyph(layout);
+size_t RunRecord::StorageSize(size_t count, GlyphPositionMode mode) {
+  auto scalars = ScalarsPerGlyph(mode);
   size_t size = sizeof(RunRecord);
   size_t glyphSize = count * sizeof(GlyphID);
   size += (glyphSize + 3) & ~static_cast<size_t>(3);
@@ -55,7 +55,7 @@ const float* RunRecord::posBuffer() const {
 }
 
 size_t RunRecord::storageSize() const {
-  return StorageSize(glyphCount, glyphLayout);
+  return StorageSize(glyphCount, positionMode);
 }
 
 const RunRecord* RunRecord::next() const {
@@ -63,7 +63,7 @@ const RunRecord* RunRecord::next() const {
 }
 
 void RunRecord::grow(uint32_t count) {
-  auto scalars = ScalarsPerGlyph(glyphLayout);
+  auto scalars = ScalarsPerGlyph(positionMode);
   float* oldPos = posBuffer();
   uint32_t oldCount = glyphCount;
   glyphCount += count;

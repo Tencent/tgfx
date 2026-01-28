@@ -29,7 +29,7 @@ struct RunRecord;
 /**
  * Describes the positioning mode of glyphs within a GlyphRun.
  */
-enum class GlyphLayout {
+enum class GlyphPositionMode {
   /**
    * Horizontal positioning: each glyph has an x position, sharing a common y from offsetY().
    */
@@ -55,6 +55,11 @@ enum class GlyphLayout {
 class GlyphRun {
  public:
   /**
+   * Returns the font for this run.
+   */
+  const Font& font() const;
+
+  /**
    * Returns the number of glyphs in this run.
    */
   size_t glyphCount() const;
@@ -65,14 +70,9 @@ class GlyphRun {
   const GlyphID* glyphs() const;
 
   /**
-   * Returns the font for this run.
-   */
-  const Font& font() const;
-
-  /**
    * Returns the positioning mode for this run.
    */
-  GlyphLayout glyphLayout() const;
+  GlyphPositionMode positionMode() const;
 
   /**
    * Returns a pointer to the raw position data array. The number of floats per glyph depends on
@@ -87,17 +87,17 @@ class GlyphRun {
   float offsetY() const;
 
   /**
-   * Returns the position data as Point array. Only valid when glyphLayout() == Point.
+   * Returns the position data as Point array. Only valid when positionMode() == Point.
    */
   const Point* points() const;
 
   /**
-   * Returns the position data as RSXform array. Only valid when glyphLayout() == RSXform.
+   * Returns the position data as RSXform array. Only valid when positionMode() == RSXform.
    */
   const RSXform* xforms() const;
 
   /**
-   * Returns the position data as Matrix array. Only valid when glyphLayout() == Matrix.
+   * Returns the position data as Matrix array. Only valid when positionMode() == Matrix.
    */
   const Matrix* matrices() const;
 
