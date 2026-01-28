@@ -539,7 +539,13 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
       continue;
     }
 
-    auto mappedBounds = MapGlyphBounds(sourceGlyphRun, i, *glyphBounds);
+    Rect mappedBounds = {};
+    if (isSimplePositioning) {
+      auto position = GetGlyphPosition(sourceGlyphRun, i);
+      mappedBounds = glyphBounds->makeOffset(position.x, position.y);
+    } else {
+      mappedBounds = GetGlyphMatrix(sourceGlyphRun, i).mapRect(*glyphBounds);
+    }
     if (!Rect::Intersects(mappedBounds, localClipBounds)) {
       continue;
     }

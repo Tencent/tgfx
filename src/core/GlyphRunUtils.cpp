@@ -71,17 +71,4 @@ Point GetGlyphPosition(const GlyphRun& run, size_t index) {
   return points[index];
 }
 
-Rect MapGlyphBounds(const GlyphRun& run, size_t index, const Rect& bounds) {
-  switch (run.positioning) {
-    case GlyphPositioning::Horizontal:
-      return bounds.makeOffset(run.positions[index], run.offsetY);
-    case GlyphPositioning::Point: {
-      auto* points = reinterpret_cast<const Point*>(run.positions);
-      return bounds.makeOffset(points[index].x, points[index].y);
-    }
-    default:
-      return GetGlyphMatrix(run, index).mapRect(bounds);
-  }
-}
-
 }  // namespace tgfx

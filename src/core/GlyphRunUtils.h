@@ -40,11 +40,6 @@ Matrix GetGlyphMatrix(const GlyphRun& run, size_t index);
 Point GetGlyphPosition(const GlyphRun& run, size_t index);
 
 /**
- * Maps a glyph's bounds by applying the positioning transformation at the given index.
- */
-Rect MapGlyphBounds(const GlyphRun& run, size_t index, const Rect& bounds);
-
-/**
  * Returns true if the GlyphRun has complex per-glyph transforms (RSXform or Matrix positioning).
  */
 inline bool HasComplexTransform(const GlyphRun& run) {
