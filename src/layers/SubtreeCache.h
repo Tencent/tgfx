@@ -23,7 +23,6 @@
 #include "gpu/resources/ResourceKey.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
-#include "tgfx/core/Matrix3D.h"
 
 namespace tgfx {
 class TextureProxy;
@@ -47,8 +46,7 @@ class SubtreeCache {
 
   bool hasCache(Context* context, int longEdge) const;
 
-  void draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint,
-            const Matrix3D* transform3D) const;
+  void draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint) const;
 
  private:
   struct CacheEntry {

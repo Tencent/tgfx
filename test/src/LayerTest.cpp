@@ -2175,6 +2175,7 @@ TGFX_TEST(LayerTest, Matrix) {
 
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setSubtreeCacheMaxSize(500);
 
   auto backLayer = ImageLayer::Make();
   auto backImage = MakeImage("resources/assets/HappyNewYear.png");

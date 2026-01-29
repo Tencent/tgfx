@@ -41,6 +41,10 @@ class DefaultGeometryProcessor : public GeometryProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  bool hasUVPerspective() const override {
+    return uvMatrix.hasPerspective();
+  }
+
   Attribute position;
   Attribute coverage;
 

@@ -16,43 +16,42 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/GlyphRun.h"
-#include "core/RunRecord.h"
+#include "core/GlyphTransform.h"
 
 namespace tgfx {
 
-GlyphRun GlyphRun::From(const RunRecord* record) {
-  GlyphRun run;
-  run.font = record->font;
-  run.positioning = record->positioning;
-  run._runSize = record->glyphCount;
-  run.glyphs = record->glyphBuffer();
-  run.positions = record->posBuffer();
-  run.offsetY = record->y;
-  return run;
-}
-
-Matrix GlyphRun::getMatrix(size_t index) const {
+unsigned ScalarsPerGlyph(GlyphPositioning positioning) {
   switch (positioning) {
     case GlyphPositioning::Horizontal:
-      return Matrix::MakeTrans(positions[index], offsetY);
+      return 1;
+    case GlyphPositioning::Point:
+      return 2;
+    case GlyphPositioning::RSXform:
+      return 4;
+    case GlyphPositioning::Matrix:
+      return 6;
+  }
+  return 0;
+}
+
+Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
+  switch (run.positioning) {
+    case GlyphPositioning::Horizontal:
+      return Matrix::MakeTrans(run.positions[index], run.offsetY);
     case GlyphPositioning::Point: {
-      auto point = reinterpret_cast<const Point*>(positions)[index];
-      return Matrix::MakeTrans(point.x, point.y);
+      auto position = reinterpret_cast<const Point*>(run.positions)[index];
+      return Matrix::MakeTrans(position.x, position.y);
     }
     case GlyphPositioning::RSXform: {
-      const float* p = positions + index * 4;
-      float scos = p[0];
-      float ssin = p[1];
-      return Matrix::MakeAll(scos, -ssin, p[2], ssin, scos, p[3]);
+      const float* p = run.positions + index * 4;
+      return Matrix::MakeAll(p[0], -p[1], p[2], p[1], p[0], p[3]);
     }
     case GlyphPositioning::Matrix: {
-      const float* p = positions + index * 6;
+      const float* p = run.positions + index * 6;
       return Matrix::MakeAll(p[0], p[1], p[2], p[3], p[4], p[5]);
     }
   }
-  // All enum cases are handled above; this is unreachable but silences compiler warnings.
-  return Matrix::I();
+  return {};
 }
 
 }  // namespace tgfx
