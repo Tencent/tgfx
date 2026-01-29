@@ -81,7 +81,8 @@ class OpsCompositor {
    * Fills the given rect with the given atlas textureProxy, sampling options, state and fill.
    */
   void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
-                     const SamplingOptions& sampling, const MCState& state, const Brush& brush);
+                     const SamplingOptions& sampling, const MCState& state, const Brush& brush,
+                     bool forceAsMask = false);
 
   /**
    * Discard all pending operations.
@@ -116,6 +117,7 @@ class OpsCompositor {
   SrcRectConstraint pendingConstraint = SrcRectConstraint::Fast;
   SamplingOptions pendingSampling = {};
   std::shared_ptr<TextureProxy> pendingAtlasTexture = nullptr;
+  bool pendingForceAsMask = false;
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
   std::vector<PlacementPtr<Rect>> pendingUVRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};

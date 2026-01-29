@@ -33,7 +33,7 @@ class AtlasTextOp final : public DrawOp {
                                         PlacementPtr<RectsVertexProvider> provider,
                                         uint32_t renderFlags,
                                         std::shared_ptr<TextureProxy> textureProxy,
-                                        const SamplingOptions& sampling);
+                                        const SamplingOptions& sampling, bool forceAsMask = false);
 
   bool hasCoverage() const override;
 
@@ -53,9 +53,11 @@ class AtlasTextOp final : public DrawOp {
   std::shared_ptr<VertexBufferView> vertexBufferProxyView = {};
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   SamplingOptions sampling{FilterMode::Nearest, MipmapMode::None};
+  bool forceAsMask = false;
 
   AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provider,
-              std::shared_ptr<TextureProxy> textureProxy, const SamplingOptions& sampling);
+              std::shared_ptr<TextureProxy> textureProxy, const SamplingOptions& sampling,
+              bool forceAsMask);
 
   friend class BlockAllocator;
 };

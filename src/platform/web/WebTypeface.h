@@ -65,6 +65,10 @@ class WebTypeface : public Typeface {
     return false;
   }
 
+  bool isWebTypeface() const override {
+    return true;
+  }
+
   std::string getText(GlyphID glyphID) const;
 
   GlyphID getGlyphID(Unichar unichar) const override;

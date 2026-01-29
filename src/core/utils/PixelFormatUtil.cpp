@@ -69,11 +69,10 @@ PixelFormat MaskFormatToPixelFormat(MaskFormat format) {
     case MaskFormat::A8:
       return PixelFormat::ALPHA_8;
     case MaskFormat::RGBA:
+    case MaskFormat::RGBA_MASK:
       return PixelFormat::RGBA_8888;
     case MaskFormat::BGRA:
       return PixelFormat::BGRA_8888;
-    default:
-      return PixelFormat::Unknown;
   }
 }
 

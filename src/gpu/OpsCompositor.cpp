@@ -224,6 +224,7 @@ void OpsCompositor::resetPendingOps(PendingOpType type, Path clip, Brush brush) 
   pendingRRects.clear();
   pendingStrokes.clear();
   pendingAtlasTexture = nullptr;
+  pendingForceAsMask = false;
 }
 
 bool OpsCompositor::CompareBrush(const Brush& a, const Brush& b) {
@@ -397,8 +398,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
       auto provider =
           RectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRects), {},
                                         AAType::None, true, UVSubsetMode::None, {}, dstColorSpace);
-      drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
-                                 std::move(pendingAtlasTexture), pendingSampling);
+      drawOp =
+          AtlasTextOp::Make(context, std::move(provider), renderFlags,
+                            std::move(pendingAtlasTexture), pendingSampling, pendingForceAsMask);
     } break;
     default:
       break;
@@ -718,14 +720,15 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const B
 
 void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
                                   const SamplingOptions& sampling, const MCState& state,
-                                  const Brush& brush) {
+                                  const Brush& brush, bool forceAsMask) {
   DEBUG_ASSERT(textureProxy != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
   if (!canAppend(PendingOpType::Atlas, state.clip, brush) || pendingAtlasTexture != textureProxy ||
-      pendingSampling != sampling) {
+      pendingSampling != sampling || pendingForceAsMask != forceAsMask) {
     flushPendingOps(PendingOpType::Atlas, state.clip, brush);
     pendingAtlasTexture = std::move(textureProxy);
     pendingSampling = sampling;
+    pendingForceAsMask = forceAsMask;
   }
   auto record = drawingAllocator()->make<RectRecord>(rect, state.matrix, brush.color);
   pendingRects.emplace_back(std::move(record));

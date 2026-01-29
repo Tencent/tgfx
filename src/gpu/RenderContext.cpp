@@ -62,6 +62,12 @@ static void ComputeStrikeKey(uint32_t typefaceID, float backingSize, bool isBold
 }
 
 static MaskFormat GetMaskFormat(const Font& font) {
+  auto typeface = font.getTypeface();
+  // WebTypeface always outputs RGBA data via Canvas 2D API.
+  // Use RGBA_MASK for ordinary text (forceAsMask=true) and RGBA for emoji.
+  if (typeface->isWebTypeface()) {
+    return font.hasColor() ? MaskFormat::RGBA : MaskFormat::RGBA_MASK;
+  }
   if (!font.hasColor()) {
     return MaskFormat::A8;
   }
@@ -70,6 +76,10 @@ static MaskFormat GetMaskFormat(const Font& font) {
 #else
   return MaskFormat::RGBA;
 #endif
+}
+
+static bool MaskFormatNeedsForceAsMask(MaskFormat format) {
+  return format == MaskFormat::A8 || format == MaskFormat::RGBA_MASK;
 }
 
 static float FindMaxGlyphDimension(const Font& font, const GlyphID* glyphs,
@@ -484,6 +494,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   const auto glyphRenderScale =
       font.scalerContext->getSize() / font.scalerContext->getBackingSize();
   const auto sampling = GetSamplingOptions(glyphRenderScale, font.isFauxItalic(), state.matrix);
+  const auto forceAsMask = MaskFormatNeedsForceAsMask(maskFormat);
 
   for (size_t i = 0; i < sourceGlyphRun.runSize(); i++) {
     auto glyphID = sourceGlyphRun.glyphs[i];
@@ -554,7 +565,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     auto& rect = atlasLocator.getLocation();
     ComputeGlyphFinalMatrix(rect, state.matrix, inverseScale, glyphMatrix, &glyphState.matrix,
                             sampling.minFilterMode == FilterMode::Nearest);
-    compositor->fillTextAtlas(std::move(textureProxy), rect, sampling, glyphState, atlasBrush);
+    compositor->fillTextAtlas(std::move(textureProxy), rect, sampling, glyphState, atlasBrush,
+                              forceAsMask);
   }
 }
 
@@ -627,6 +639,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   const auto atlasBrush = brush.makeWithMatrix(state.matrix);
   const auto glyphRenderScale =
       font.scalerContext->getSize() / font.scalerContext->getBackingSize();
+  const auto forceAsMask = MaskFormatNeedsForceAsMask(maskFormat);
 
   for (size_t i : glyphIndices) {
     auto glyphID = sourceGlyphRun.glyphs[i];
@@ -680,7 +693,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
                             &glyphState.matrix, false);
     compositor->fillTextAtlas(std::move(textureProxy), rect,
                               SamplingOptions(FilterMode::Linear, MipmapMode::None), glyphState,
-                              atlasBrush);
+                              atlasBrush, forceAsMask);
   }
 }
 }  // namespace tgfx

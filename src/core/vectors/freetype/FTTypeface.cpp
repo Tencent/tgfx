@@ -36,7 +36,7 @@
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
-#ifndef __EMSCRIPTEN__
+#ifndef TGFX_BUILD_FOR_WEB
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
                                                  const std::string& fontStyle) {
   return SystemFont::MakeFromName(fontFamily, fontStyle);

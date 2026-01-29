@@ -102,6 +102,24 @@ export const uploadToTexture = (
     }
 };
 
+export const uploadToTextureRegion = (
+    GL: EmscriptenGL,
+    source: TexImageSource | OffscreenCanvas,
+    textureID: number,
+    offsetX: number,
+    offsetY: number,
+) => {
+    if (!source) return;
+    const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
+    gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
+    // Always upload as RGBA with premultiplied alpha.
+    // The shader will handle alpha-only rendering via forceAsMask flag.
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, offsetX, offsetY, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+};
+
 export const setColorSpace = (
     GL: EmscriptenGL,
     colorSpace: WindowColorSpace

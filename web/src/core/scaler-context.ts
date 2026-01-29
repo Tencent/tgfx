@@ -196,6 +196,36 @@ export class ScalerContext {
         return new Uint8Array(data);
     }
 
+    public getGlyphCanvas(
+        text: string,
+        bounds: Rect,
+        fauxBold: boolean,
+        stroke ?: { width: number; cap: ctor; join: ctor; miterLimit: number },
+        padding: number = 0
+    ): HTMLCanvasElement | OffscreenCanvas | null {
+        const glyphWidth = bounds.right - bounds.left;
+        const glyphHeight = bounds.bottom - bounds.top;
+        if (glyphWidth <= 0 || glyphHeight <= 0) {
+            return null;
+        }
+        const width = glyphWidth + 2 * padding;
+        const height = glyphHeight + 2 * padding;
+        const canvas = getCanvas2D(width, height);
+        const context = canvas.getContext('2d') as CanvasRenderingContext2D;
+        context.clearRect(0, 0, width, height);
+        context.font = this.fontString(fauxBold, false);
+        if (stroke) {
+            context.lineJoin = ScalerContext.getLineJoin(stroke.join);
+            context.miterLimit = stroke.miterLimit;
+            context.lineCap = ScalerContext.getLineCap(stroke.cap);
+            context.lineWidth = stroke.width;
+            context.strokeText(text, -bounds.left + padding, -bounds.top + padding);
+        } else {
+            context.fillText(text, -bounds.left + padding, -bounds.top + padding);
+        }
+        return canvas;
+    }
+
     protected loadCanvas() {
         if (!ScalerContext.canvas) {
             ScalerContext.setCanvas(getCanvas2D(10, 10));

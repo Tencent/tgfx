@@ -22,9 +22,10 @@ namespace tgfx {
 AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
                                                        AAType aa,
                                                        std::optional<PMColor> commonColor,
-                                                       const SamplingOptions& sampling)
+                                                       const SamplingOptions& sampling,
+                                                       bool forceAsMask)
     : GeometryProcessor(ClassID()), textureProxy(std::move(textureProxy)), commonColor(commonColor),
-      samplerState(sampling) {
+      forceAsMask(forceAsMask), samplerState(sampling) {
   position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", VertexFormat::Float};
@@ -41,6 +42,7 @@ void AtlasTextGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const
   uint32_t flags = aa == AAType::Coverage ? 1 : 0;
   flags |= commonColor.has_value() ? 2 : 0;
   flags |= textureProxy->isAlphaOnly() ? 4 : 0;
+  flags |= forceAsMask ? 8 : 0;
   bytesKey->write(flags);
 }
 }  // namespace tgfx

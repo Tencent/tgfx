@@ -124,6 +124,14 @@ class Typeface {
   virtual bool hasOutlines() const = 0;
 
   /**
+   * Returns true if this typeface is a WebTypeface that renders glyphs via Canvas 2D API.
+   * WebTypeface always outputs RGBA data regardless of whether the font has color glyphs.
+   */
+  virtual bool isWebTypeface() const {
+    return false;
+  }
+
+  /**
    * Returns the glyph ID corresponds to the specified glyph name. The glyph name must be in utf-8
    * encoding. Returns 0 if the glyph name is not in this typeface.
    */

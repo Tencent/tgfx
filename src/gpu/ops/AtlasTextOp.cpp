@@ -31,14 +31,14 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
                                             PlacementPtr<RectsVertexProvider> provider,
                                             uint32_t renderFlags,
                                             std::shared_ptr<TextureProxy> textureProxy,
-                                            const SamplingOptions& sampling) {
+                                            const SamplingOptions& sampling, bool forceAsMask) {
   if (provider == nullptr || textureProxy == nullptr || textureProxy->width() <= 0 ||
       textureProxy->height() <= 0) {
     return nullptr;
   }
   auto allocator = context->drawingAllocator();
-  auto atlasTextOp =
-      allocator->make<AtlasTextOp>(allocator, provider.get(), std::move(textureProxy), sampling);
+  auto atlasTextOp = allocator->make<AtlasTextOp>(allocator, provider.get(),
+                                                  std::move(textureProxy), sampling, forceAsMask);
   CAPUTRE_RECT_MESH(atlasTextOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
     atlasTextOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
@@ -55,9 +55,9 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
 
 AtlasTextOp::AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provider,
                          std::shared_ptr<TextureProxy> textureProxy,
-                         const SamplingOptions& sampling)
+                         const SamplingOptions& sampling, bool forceAsMask)
     : DrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()),
-      textureProxy(std::move(textureProxy)), sampling(sampling) {
+      textureProxy(std::move(textureProxy)), sampling(sampling), forceAsMask(forceAsMask) {
   if (!provider->hasColor()) {
     commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
@@ -66,7 +66,8 @@ AtlasTextOp::AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provide
 PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarget*) {
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
-  return AtlasTextGeometryProcessor::Make(allocator, textureProxy, aaType, commonColor, sampling);
+  return AtlasTextGeometryProcessor::Make(allocator, textureProxy, aaType, commonColor, sampling,
+                                          forceAsMask);
 }
 
 void AtlasTextOp::onDraw(RenderPass* renderPass) {

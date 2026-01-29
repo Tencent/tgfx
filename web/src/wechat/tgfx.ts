@@ -69,4 +69,39 @@ export const uploadToTexture = (
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 };
 
+export const uploadToTextureRegion = (
+  GL: EmscriptenGL,
+  source: TexImageSource | WxOffscreenCanvas,
+  textureID: number,
+  offsetX: number,
+  offsetY: number,
+) => {
+  if (!source) return;
+  const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
+  gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
+
+  // Always upload as RGBA. The shader will handle alpha-only rendering via forceAsMask flag.
+  if (('isOffscreenCanvas' in source) && source.isOffscreenCanvas) {
+    const ctx = source.getContext('2d') as OffscreenCanvasRenderingContext2D;
+    const imgData = ctx.getImageData(0, 0, source.width, source.height);
+    gl.texSubImage2D(
+      gl.TEXTURE_2D,
+      0,
+      offsetX,
+      offsetY,
+      imgData.width,
+      imgData.height,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      new Uint8Array(imgData.data),
+    );
+    return;
+  }
+
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, offsetX, offsetY, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+};
+
 export { getSourceSize, isAndroidMiniprogram, getCanvas2D as createCanvas2D, releaseCanvas2D as releaseNativeImage };

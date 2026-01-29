@@ -118,14 +118,14 @@ std::vector<Unichar> WebTypeface::onCreateGlyphToUnicodeMap() const {
 }
 #endif
 
-#ifdef TGFX_USE_GLYPH_TO_UNICODE
-AdvancedTypefaceInfo WebTypeface::getAdvancedProperty() const {
-  return AdvancedTypefaceProperty{.postScriptName = webFontFamily,
-                                  .type = AdvancedTypefaceProperty::FontType::Other,
-                                  .flags = static_cast<AdvancedTypefaceProperty::FontFlags>(
-                                      AdvancedTypefaceProperty::FontFlags::NotEmbeddable |
-                                      AdvancedTypefaceProperty::FontFlags::NotSubsettable),
-                                  .style = static_cast<AdvancedTypefaceProperty::StyleFlags>(0)};
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
+AdvancedTypefaceInfo WebTypeface::getAdvancedInfo() const {
+  return AdvancedTypefaceInfo{.postScriptName = webFontFamily,
+                              .type = AdvancedTypefaceInfo::FontType::Other,
+                              .flags = static_cast<AdvancedTypefaceInfo::FontFlags>(
+                                  AdvancedTypefaceInfo::FontFlags::NotEmbeddable |
+                                  AdvancedTypefaceInfo::FontFlags::NotSubsettable),
+                              .style = static_cast<AdvancedTypefaceInfo::StyleFlags>(0)};
 }
 #endif
 

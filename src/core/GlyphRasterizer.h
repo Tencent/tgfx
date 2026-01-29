@@ -40,6 +40,8 @@ class GlyphRasterizer : public ImageCodec {
   bool asyncSupport() const override;
 
  protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+
   bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
                     std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const override;
 
