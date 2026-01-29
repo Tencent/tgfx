@@ -85,7 +85,8 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
    * coordinate space in which the glyph paths and font metrics are designed. The default value is
    * 1, meaning all data is expected to be in normalized coordinates. When rendering, all values
    * will be scaled by (fontSize / unitsPerEm). For example, if your glyphs are designed in a
-   * 1000x1000 coordinate space, set unitsPerEm to 1000.
+   * 1000x1000 coordinate space, set unitsPerEm to 1000. If your glyph paths are extracted from
+   * another font at a specific font size (e.g., 48px), set unitsPerEm to that font size (48).
    */
   explicit PathTypefaceBuilder(int unitsPerEm = 1);
 
@@ -129,8 +130,8 @@ class ImageTypefaceBuilder : public CustomTypefaceBuilder {
    * Creates an ImageTypefaceBuilder with the specified units-per-em value. This value defines the
    * coordinate space in which the glyph images and font metrics are designed. The default value is
    * 1, meaning all data is expected to be in normalized coordinates. When rendering, all values
-   * will be scaled by (fontSize / unitsPerEm). For example, if your glyphs are designed in a
-   * 1000x1000 coordinate space, set unitsPerEm to 1000.
+   * will be scaled by (fontSize / unitsPerEm). For example, if your glyph images are rasterized
+   * from another font at a specific font size (e.g., 48px), set unitsPerEm to that font size (48).
    */
   explicit ImageTypefaceBuilder(int unitsPerEm = 1);
 
