@@ -32,10 +32,7 @@ void CustomTypefaceBuilder::setMetrics(const FontMetrics& metrics) {
   _fontMetrics = metrics;
 }
 
-void CustomTypefaceBuilder::setUnitsPerEm(int unitsPerEm) {
-  if (unitsPerEm > 0) {
-    _unitsPerEm = unitsPerEm;
-  }
+PathTypefaceBuilder::PathTypefaceBuilder(int unitsPerEm) : CustomTypefaceBuilder(unitsPerEm) {
 }
 
 GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
@@ -70,6 +67,9 @@ std::shared_ptr<Typeface> PathTypefaceBuilder::detach() const {
   }
   return PathUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, fontBounds,
                                 _unitsPerEm, glyphRecords);
+}
+
+ImageTypefaceBuilder::ImageTypefaceBuilder(int unitsPerEm) : CustomTypefaceBuilder(unitsPerEm) {
 }
 
 GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset) {
