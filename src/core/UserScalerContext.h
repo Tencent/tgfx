@@ -22,22 +22,6 @@
 
 namespace tgfx {
 
-static FontMetrics ScaleFontMetrics(const FontMetrics& metrics, float scale) {
-  FontMetrics result = {};
-  result.top = metrics.top * scale;
-  result.ascent = metrics.ascent * scale;
-  result.descent = metrics.descent * scale;
-  result.bottom = metrics.bottom * scale;
-  result.leading = metrics.leading * scale;
-  result.xMin = metrics.xMin * scale;
-  result.xMax = metrics.xMax * scale;
-  result.xHeight = metrics.xHeight * scale;
-  result.capHeight = metrics.capHeight * scale;
-  result.underlineThickness = metrics.underlineThickness * scale;
-  result.underlinePosition = metrics.underlinePosition * scale;
-  return result;
-}
-
 class UserScalerContext : public ScalerContext {
  public:
   UserScalerContext(std::shared_ptr<Typeface> typeface, float size)
@@ -47,7 +31,20 @@ class UserScalerContext : public ScalerContext {
   FontMetrics getFontMetrics() const override {
     auto userTypeface = static_cast<UserTypeface*>(typeface.get());
     float scale = textSize / static_cast<float>(userTypeface->unitsPerEm());
-    return ScaleFontMetrics(userTypeface->fontMetrics(), scale);
+    const auto& metrics = userTypeface->fontMetrics();
+    FontMetrics result = {};
+    result.top = metrics.top * scale;
+    result.ascent = metrics.ascent * scale;
+    result.descent = metrics.descent * scale;
+    result.bottom = metrics.bottom * scale;
+    result.leading = metrics.leading * scale;
+    result.xMin = metrics.xMin * scale;
+    result.xMax = metrics.xMax * scale;
+    result.xHeight = metrics.xHeight * scale;
+    result.capHeight = metrics.capHeight * scale;
+    result.underlineThickness = metrics.underlineThickness * scale;
+    result.underlinePosition = metrics.underlinePosition * scale;
+    return result;
   }
 
   float getAdvance(GlyphID, bool) const override {
