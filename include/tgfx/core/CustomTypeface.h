@@ -125,14 +125,6 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
  */
 class ImageTypefaceBuilder : public CustomTypefaceBuilder {
  public:
-  struct GlyphRecord {
-    std::shared_ptr<ImageCodec> image = nullptr;
-    Point offset = {};
-    GlyphRecord(std::shared_ptr<ImageCodec> image, const Point& offset)
-        : image(std::move(image)), offset(offset) {
-    }
-  };
-
   /**
    * Creates an ImageTypefaceBuilder with the specified units-per-em value. This value defines the
    * coordinate space in which the glyph images and font metrics are designed. The default value is
@@ -154,6 +146,16 @@ class ImageTypefaceBuilder : public CustomTypefaceBuilder {
   std::shared_ptr<Typeface> detach() const override;
 
  private:
+  friend class ImageUserTypeface;
+
+  struct GlyphRecord {
+    std::shared_ptr<ImageCodec> image = nullptr;
+    Point offset = {};
+    GlyphRecord(std::shared_ptr<ImageCodec> image, const Point& offset)
+        : image(std::move(image)), offset(offset) {
+    }
+  };
+
   std::vector<std::shared_ptr<GlyphRecord>> glyphRecords = {};
 };
 }  // namespace tgfx
