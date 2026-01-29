@@ -46,6 +46,13 @@ class CustomTypefaceBuilder {
   void setMetrics(const FontMetrics& metrics);
 
   /**
+   * Returns the units-per-em value for the typeface.
+   */
+  int unitsPerEm() const {
+    return _unitsPerEm;
+  }
+
+  /**
    * Detaches the typeface being built. After this call, the builder remains valid and can be used
    * to add more glyphs, but the returned typeface is no longer linked to this builder. Any later
    * detached typeface will include glyphs from previous detachments. You can safely release the
