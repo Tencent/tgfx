@@ -91,6 +91,10 @@ enum class PathVerb {
    */
   Quad,
   /**
+   * PathIterator returns 3 points and a weight.
+   */
+  Conic,
+  /**
    * PathIterator returns 4 points.
    */
   Cubic,
@@ -115,8 +119,13 @@ enum class PathArcSize {
 };
 
 /**
- * Zero to four Point are stored in points, depending on the returned PathVerb
+ * Callback function for iterating over path verbs and points.
+ * @param verb   the path verb type
+ * @param points zero to four points depending on the verb
+ * @param weight the conic weight (only valid when verb is Conic, otherwise 0)
+ * @param info   user-defined context pointer
  */
-using PathIterator = std::function<void(PathVerb verb, const Point points[4], void* info)>;
+using PathIterator =
+    std::function<void(PathVerb verb, const Point points[4], float weight, void* info)>;
 
 }  // namespace tgfx

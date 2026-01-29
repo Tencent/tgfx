@@ -25,10 +25,11 @@
 #include "core/utils/ScalePixelsAlpha.h"
 #include "core/utils/ShapeUtils.h"
 #include "platform/apple/BitmapContextUtil.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 
 namespace tgfx {
-static void Iterator(PathVerb verb, const Point points[4], void* info) {
+static void Iterator(PathVerb verb, const Point points[4], float weight, void* info) {
   auto cgPath = reinterpret_cast<CGMutablePathRef>(info);
   switch (verb) {
     case PathVerb::Move:
@@ -41,6 +42,15 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
       CGPathAddQuadCurveToPoint(cgPath, nullptr, points[1].x, points[1].y, points[2].x,
                                 points[2].y);
       break;
+    case PathVerb::Conic: {
+      Point quads[5] = {};
+      int numQuads = Path::ConvertConicToQuads(points[0], points[1], points[2], weight, quads, 1);
+      for (int i = 0; i < numQuads; ++i) {
+        CGPathAddQuadCurveToPoint(cgPath, nullptr, quads[1 + (i * 2)].x, quads[1 + (i * 2)].y,
+                                  quads[2 + (i * 2)].x, quads[2 + (i * 2)].y);
+      }
+      break;
+    }
     case PathVerb::Cubic:
       CGPathAddCurveToPoint(cgPath, nullptr, points[1].x, points[1].y, points[2].x, points[2].y,
                             points[3].x, points[3].y);

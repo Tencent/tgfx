@@ -228,6 +228,14 @@ void Path::cubicTo(const Point& control1, const Point& control2, const Point& po
   cubicTo(control1.x, control1.y, control2.x, control2.y, point.x, point.y);
 }
 
+void Path::conicTo(float controlX, float controlY, float x, float y, float weight) {
+  writableRef()->path.conicTo(controlX, controlY, x, y, weight);
+}
+
+void Path::conicTo(const Point& control, const Point& point, float weight) {
+  conicTo(control.x, control.y, point.x, point.y, weight);
+}
+
 void Path::arcTo(float x1, float y1, float x2, float y2, float radius) {
   writableRef()->path.arcTo(x1, y1, x2, y2, radius);
 }
@@ -561,35 +569,39 @@ void Path::decompose(const PathIterator& iterator, void* info) const {
   const auto& skPath = pathRef->path;
   SkPath::Iter iter(skPath, false);
   SkPoint points[4];
-  SkPoint quads[5];
   SkPath::Verb verb;
   while ((verb = iter.next(points)) != SkPath::kDone_Verb) {
     switch (verb) {
       case SkPath::kMove_Verb:
-        iterator(PathVerb::Move, reinterpret_cast<Point*>(points), info);
+        iterator(PathVerb::Move, reinterpret_cast<Point*>(points), 0, info);
         break;
       case SkPath::kLine_Verb:
-        iterator(PathVerb::Line, reinterpret_cast<Point*>(points), info);
+        iterator(PathVerb::Line, reinterpret_cast<Point*>(points), 0, info);
         break;
       case SkPath::kQuad_Verb:
-        iterator(PathVerb::Quad, reinterpret_cast<Point*>(points), info);
+        iterator(PathVerb::Quad, reinterpret_cast<Point*>(points), 0, info);
         break;
       case SkPath::kConic_Verb:
-        // approximate with 2^1=2 quads.
-        SkPath::ConvertConicToQuads(points[0], points[1], points[2], iter.conicWeight(), quads, 1);
-        iterator(PathVerb::Quad, reinterpret_cast<Point*>(quads), info);
-        iterator(PathVerb::Quad, reinterpret_cast<Point*>(quads) + 2, info);
+        iterator(PathVerb::Conic, reinterpret_cast<Point*>(points), iter.conicWeight(), info);
         break;
       case SkPath::kCubic_Verb:
-        iterator(PathVerb::Cubic, reinterpret_cast<Point*>(points), info);
+        iterator(PathVerb::Cubic, reinterpret_cast<Point*>(points), 0, info);
         break;
       case SkPath::kClose_Verb:
-        iterator(PathVerb::Close, reinterpret_cast<Point*>(points), info);
+        iterator(PathVerb::Close, reinterpret_cast<Point*>(points), 0, info);
         break;
       default:
         break;
     }
   }
+}
+
+int Path::ConvertConicToQuads(const Point& p0, const Point& p1, const Point& p2, float weight,
+                              Point quads[], int pow2) {
+  return SkPath::ConvertConicToQuads(*reinterpret_cast<const SkPoint*>(&p0),
+                                     *reinterpret_cast<const SkPoint*>(&p1),
+                                     *reinterpret_cast<const SkPoint*>(&p2), weight,
+                                     reinterpret_cast<SkPoint*>(quads), pow2);
 }
 
 PathRef* Path::writableRef() {

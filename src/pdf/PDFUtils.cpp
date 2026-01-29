@@ -25,6 +25,7 @@
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/UTF.h"
@@ -306,7 +307,7 @@ void PDFUtils::EmitPath(const Path& path, bool doConsumeDegerates,
   auto lastMovePt = Point::Make(0, 0);
   auto currentSegment = MemoryWriteStream::Make();
 
-  auto pathIterator = [&](PathVerb verb, const Point points[4], void* /*info*/) -> void {
+  auto pathIterator = [&](PathVerb verb, const Point points[4], float weight, void* /*info*/) -> void {
     switch (verb) {
       case PathVerb::Move:
         MoveTo(points[0].x, points[0].y, currentSegment);
@@ -329,6 +330,15 @@ void PDFUtils::EmitPath(const Path& path, bool doConsumeDegerates,
           fillState = SkipFillState::NonSingleLine;
         }
         break;
+      case PathVerb::Conic: {
+        Point quads[5] = {};
+        int numQuads = Path::ConvertConicToQuads(points[0], points[1], points[2], weight, quads, 1);
+        for (int i = 0; i < numQuads; ++i) {
+          AppendQuad(&quads[i * 2], currentSegment);
+        }
+        fillState = SkipFillState::NonSingleLine;
+        break;
+      }
       case PathVerb::Cubic:
         if (!doConsumeDegerates || !AllPointsEqual(points, 4)) {
           AppendCubic(points[1].x, points[1].y, points[2].x, points[2].y, points[3].x, points[3].y,

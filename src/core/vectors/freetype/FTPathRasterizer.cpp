@@ -26,9 +26,10 @@
 #include "core/utils/ScalePixelsAlpha.h"
 #include "core/utils/ShapeUtils.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-static void Iterator(PathVerb verb, const Point points[4], void* info) {
+static void Iterator(PathVerb verb, const Point points[4], float weight, void* info) {
   auto path = reinterpret_cast<FTPath*>(info);
   switch (verb) {
     case PathVerb::Move:
@@ -40,6 +41,14 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
     case PathVerb::Quad:
       path->quadTo(points[1], points[2]);
       break;
+    case PathVerb::Conic: {
+      Point quads[5] = {};
+      int numQuads = Path::ConvertConicToQuads(points[0], points[1], points[2], weight, quads, 1);
+      for (int i = 0; i < numQuads; ++i) {
+        path->quadTo(quads[1 + i * 2], quads[2 + i * 2]);
+      }
+      break;
+    }
     case PathVerb::Cubic:
       path->cubicTo(points[1], points[2], points[3]);
       break;

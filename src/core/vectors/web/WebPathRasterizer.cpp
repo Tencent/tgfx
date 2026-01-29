@@ -23,6 +23,7 @@
 #include "core/utils/ScalePixelsAlpha.h"
 #include "core/utils/ShapeUtils.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/Path.h"
 
 using namespace emscripten;
 
@@ -38,7 +39,7 @@ std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
                                              needsGammaCorrection);
 }
 
-static void Iterator(PathVerb verb, const Point points[4], void* info) {
+static void Iterator(PathVerb verb, const Point points[4], float weight, void* info) {
   auto path2D = reinterpret_cast<val*>(info);
   switch (verb) {
     case PathVerb::Move:
@@ -50,6 +51,15 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
     case PathVerb::Quad:
       path2D->call<void>("quadraticCurveTo", points[1].x, points[1].y, points[2].x, points[2].y);
       break;
+    case PathVerb::Conic: {
+      Point quads[5] = {};
+      int numQuads = Path::ConvertConicToQuads(points[0], points[1], points[2], weight, quads, 1);
+      for (int i = 0; i < numQuads; ++i) {
+        path2D->call<void>("quadraticCurveTo", quads[1 + i * 2].x, quads[1 + i * 2].y,
+                           quads[2 + i * 2].x, quads[2 + i * 2].y);
+      }
+      break;
+    }
     case PathVerb::Cubic:
       path2D->call<void>("bezierCurveTo", points[1].x, points[1].y, points[2].x, points[2].y,
                          points[3].x, points[3].y);

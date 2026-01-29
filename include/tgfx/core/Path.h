@@ -173,6 +173,36 @@ class Path {
   void cubicTo(const Point& control1, const Point& control2, const Point& point);
 
   /**
+   * Adds a conic curve from last point towards (controlX, controlY), ending at (x, y), weighted by
+   * weight. Conics can represent circular, elliptical, parabolic, or hyperbolic arcs depending on
+   * the weight value:
+   * - weight < 1: elliptical arc
+   * - weight == 1: equivalent to quadTo (parabolic arc)
+   * - weight > 1: hyperbolic arc
+   * - weight == sqrt(2)/2 ≈ 0.707: exact 90-degree circular arc
+   * @param controlX  x-coordinate of the control point
+   * @param controlY  y-coordinate of the control point
+   * @param x         x-coordinate of the end point
+   * @param y         y-coordinate of the end point
+   * @param weight    conic weight determining the curve type
+   */
+  void conicTo(float controlX, float controlY, float x, float y, float weight);
+
+  /**
+   * Adds a conic curve from last point towards control, ending at point, weighted by weight. Conics
+   * can represent circular, elliptical, parabolic, or hyperbolic arcs depending on the weight
+   * value:
+   * - weight < 1: elliptical arc
+   * - weight == 1: equivalent to quadTo (parabolic arc)
+   * - weight > 1: hyperbolic arc
+   * - weight == sqrt(2)/2 ≈ 0.707: exact 90-degree circular arc
+   * @param control  the control point
+   * @param point    the end point
+   * @param weight   conic weight determining the curve type
+   */
+  void conicTo(const Point& control, const Point& point, float weight);
+
+  /**
    * Append a line and arc to the current path. This is the same as the PostScript call "arct".
    */
   void arcTo(float x1, float y1, float x2, float y2, float radius);
@@ -337,9 +367,24 @@ class Path {
   void reverse();
 
   /**
-   * Iterates through verb array and associated Point array.
+   * Iterates through verb array and associated Point array. The iterator callback receives the verb
+   * type, points array, and conic weight (only valid for PathVerb::Conic, otherwise 0).
    */
   void decompose(const PathIterator& iterator, void* info = nullptr) const;
+
+  /**
+   * Converts a conic curve to a series of quadratic Bezier curves. This is useful when the target
+   * platform does not support conic curves natively (e.g., SVG, PDF, CoreGraphics, Canvas 2D).
+   * @param p0     conic start point
+   * @param p1     conic control point
+   * @param p2     conic end point
+   * @param weight conic weight
+   * @param quads  storage for quad points, must have space for at least 1 + 2 * (1 << pow2) points
+   * @param pow2   quad count as power of two (0 to 5), e.g., pow2=1 generates 2 quads (5 points)
+   * @return       number of quad curves written to quads
+   */
+  static int ConvertConicToQuads(const Point& p0, const Point& p1, const Point& p2, float weight,
+                                 Point quads[], int pow2);
 
   /**
    * Returns the number of points in Path.

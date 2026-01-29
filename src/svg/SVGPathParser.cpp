@@ -19,6 +19,7 @@
 #include "tgfx/svg/SVGPathParser.h"
 #include "core/utils/Log.h"
 #include "svg/SVGUtils.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
 
@@ -126,7 +127,7 @@ std::string SVGPathParser::ToSVGString(const Path& path, PathEncoding encoding) 
                     points[offset + count - 1].y * static_cast<float>(relSelector)};
   };
 
-  auto pathIter = [&](PathVerb verb, const Point points[4], void* info) -> void {
+  auto pathIter = [&](PathVerb verb, const Point points[4], float weight, void* info) -> void {
     auto castedString = reinterpret_cast<std::string*>(info);
     switch (verb) {
       case PathVerb::Move:
@@ -138,6 +139,14 @@ std::string SVGPathParser::ToSVGString(const Path& path, PathEncoding encoding) 
       case PathVerb::Quad:
         appendCommand(*castedString, 'Q', points, 1, 2);
         break;
+      case PathVerb::Conic: {
+        Point quads[5] = {};
+        int numQuads = Path::ConvertConicToQuads(points[0], points[1], points[2], weight, quads, 1);
+        for (int i = 0; i < numQuads; ++i) {
+          appendCommand(*castedString, 'Q', quads, static_cast<size_t>(1 + i * 2), 2);
+        }
+        break;
+      }
       case PathVerb::Cubic:
         appendCommand(*castedString, 'C', points, 1, 3);
         break;
