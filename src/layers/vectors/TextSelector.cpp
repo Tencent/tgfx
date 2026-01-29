@@ -415,11 +415,11 @@ void RangeSelector::setEaseIn(float value) {
   invalidateContent();
 }
 
-void RangeSelector::setRandomizeOrder(bool value) {
-  if (_randomizeOrder == value) {
+void RangeSelector::setRandomOrder(bool value) {
+  if (_randomOrder == value) {
     return;
   }
-  _randomizeOrder = value;
+  _randomOrder = value;
   _randomIndicesCache.clear();
   invalidateContent();
 }
@@ -439,7 +439,7 @@ float RangeSelector::calculateFactor(size_t index, size_t totalCount) {
   }
 
   size_t effectiveIndex = index;
-  if (_randomizeOrder) {
+  if (_randomOrder) {
     if (_randomIndicesCache.size() != totalCount) {
       _randomIndicesCache = BuildRandomIndices(totalCount, _randomSeed);
     }

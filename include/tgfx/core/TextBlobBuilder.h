@@ -19,13 +19,13 @@
 #pragma once
 
 #include "tgfx/core/Font.h"
+#include "tgfx/core/GlyphRun.h"
 #include "tgfx/core/RSXform.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
 class TextBlob;
 struct RunRecord;
-enum class GlyphPositioning;
 
 /**
  * TextBlobBuilder is used to construct TextBlob objects with efficient memory layout.

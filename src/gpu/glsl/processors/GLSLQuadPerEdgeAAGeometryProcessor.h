@@ -38,7 +38,8 @@ class GLSLQuadPerEdgeAAGeometryProcessor : public QuadPerEdgeAAGeometryProcessor
 
   void onEmitTransform(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
                        VaryingHandler* varyingHandler, UniformHandler* uniformHandler,
-                       const std::string& transformUniformName, int index) const override;
+                       const std::string& transformUniformName, bool hasPerspective,
+                       int index) const override;
 
  private:
   std::optional<std::string> subsetVaryingName = std::nullopt;

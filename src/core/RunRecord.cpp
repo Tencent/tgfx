@@ -18,21 +18,12 @@
 
 #include "core/RunRecord.h"
 #include <cstring>
+#include "core/GlyphTransform.h"
 
 namespace tgfx {
 
-unsigned ScalarsPerGlyph(GlyphPositioning positioning) {
-  static const unsigned scalarsPerPositioning[] = {
-      1,  // Horizontal
-      2,  // Point
-      4,  // RSXform
-      6,  // Matrix
-  };
-  return scalarsPerPositioning[static_cast<unsigned>(positioning)];
-}
-
-size_t RunRecord::StorageSize(size_t count, GlyphPositioning pos) {
-  auto scalars = ScalarsPerGlyph(pos);
+size_t RunRecord::StorageSize(size_t count, GlyphPositioning positioning) {
+  auto scalars = ScalarsPerGlyph(positioning);
   size_t size = sizeof(RunRecord);
   size_t glyphSize = count * sizeof(GlyphID);
   size += (glyphSize + 3) & ~static_cast<size_t>(3);

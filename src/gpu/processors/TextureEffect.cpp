@@ -61,6 +61,7 @@ void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   }
   flags |= needSubset() ? 16 : 0;
   flags |= constraint == SrcRectConstraint::Strict ? 32 : 0;
+  flags |= coordTransform.matrix.hasPerspective() ? 64 : 0;
   bytesKey->write(flags);
 }
 

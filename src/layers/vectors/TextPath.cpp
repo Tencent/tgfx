@@ -57,11 +57,11 @@ void TextPath::setLastMargin(float value) {
   invalidateContent();
 }
 
-void TextPath::setPerpendicularToPath(bool value) {
-  if (_perpendicularToPath == value) {
+void TextPath::setPerpendicular(bool value) {
+  if (_perpendicular == value) {
     return;
   }
-  _perpendicularToPath = value;
+  _perpendicular = value;
   invalidateContent();
 }
 
@@ -187,7 +187,7 @@ void TextPath::apply(VectorContext* context) {
       }
 
       Matrix curveMatrix = Matrix::I();
-      if (_perpendicularToPath) {
+      if (_perpendicular) {
         auto angle = RadiansToDegrees(std::atan2(tangent.y, tangent.x));
         if (_reversed) {
           angle += 180.0f;

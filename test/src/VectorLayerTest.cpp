@@ -31,10 +31,10 @@
 #include "tgfx/layers/vectors/ShapePath.h"
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/StrokeStyle.h"
+#include "tgfx/layers/vectors/Text.h"
 #include "tgfx/layers/vectors/TextModifier.h"
 #include "tgfx/layers/vectors/TextPath.h"
 #include "tgfx/layers/vectors/TextSelector.h"
-#include "tgfx/layers/vectors/Text.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
 #include "utils/TestUtils.h"
@@ -2559,9 +2559,9 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   auto diamond = Gradient::MakeDiamond({560, 110}, 85, colors);
   EXPECT_EQ(diamond->type(), GradientType::Diamond);
   EXPECT_EQ(diamond->center(), Point::Make(560, 110));
-  EXPECT_EQ(diamond->halfDiagonal(), 85.0f);
+  EXPECT_EQ(diamond->radius(), 85.0f);
   diamond->setCenter({560, 110});
-  diamond->setHalfDiagonal(85.0f);
+  diamond->setRadius(85.0f);
   fill4->setColorSource(diamond);
   group4->setElements({rect4, fill4});
 
@@ -2819,7 +2819,7 @@ TGFX_TEST(VectorLayerTest, ImagePatternText) {
  * Test TextPath with various configurations:
  * Column 1 (left): Basic TextPath options
  * - Alignment: Left, Center, Right
- * - perpendicularToPath: true and false
+ * - perpendicular: true and false
  * - reversed: true
  * - firstMargin/lastMargin with Justify
  *
@@ -2862,7 +2862,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textPath1 = std::make_shared<TextPath>();
   textPath1->setPath(curvePath);
   textPath1->setTextAlign(TextAlign::Start);
-  textPath1->setPerpendicularToPath(true);
+  textPath1->setPerpendicular(true);
 
   auto fill1 = MakeFillStyle(Color::Blue());
   group1->setElements({textSpan1, textPath1, fill1});
@@ -2877,7 +2877,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textPath2 = std::make_shared<TextPath>();
   textPath2->setPath(curvePath);
   textPath2->setTextAlign(TextAlign::Center);
-  textPath2->setPerpendicularToPath(true);
+  textPath2->setPerpendicular(true);
 
   auto fill2 = MakeFillStyle(Color::Red());
   group2->setElements({textSpan2, textPath2, fill2});
@@ -2892,7 +2892,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textPath3 = std::make_shared<TextPath>();
   textPath3->setPath(curvePath);
   textPath3->setTextAlign(TextAlign::End);
-  textPath3->setPerpendicularToPath(true);
+  textPath3->setPerpendicular(true);
 
   auto fill3 = MakeFillStyle(Color::Green());
   group3->setElements({textSpan3, textPath3, fill3});
@@ -2907,7 +2907,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textPath4 = std::make_shared<TextPath>();
   textPath4->setPath(curvePath);
   textPath4->setTextAlign(TextAlign::Center);
-  textPath4->setPerpendicularToPath(false);
+  textPath4->setPerpendicular(false);
 
   auto fill4 = MakeFillStyle(Color{1.0f, 0.5f, 0.0f, 1.0f});  // Orange
   group4->setElements({textSpan4, textPath4, fill4});
@@ -2922,7 +2922,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textPath5 = std::make_shared<TextPath>();
   textPath5->setPath(curvePath);
   textPath5->setTextAlign(TextAlign::Start);
-  textPath5->setPerpendicularToPath(true);
+  textPath5->setPerpendicular(true);
   textPath5->setReversed(true);
 
   auto fill5 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
@@ -2940,7 +2940,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   textPath6->setFirstMargin(50);
   textPath6->setLastMargin(-50);  // Negative value shrinks from path end
   textPath6->setTextAlign(TextAlign::Justify);
-  textPath6->setPerpendicularToPath(true);
+  textPath6->setPerpendicular(true);
 
   auto fill6 = MakeFillStyle(Color{0.0f, 0.5f, 0.5f, 1.0f});  // Teal
   group6->setElements({textSpan6, textPath6, fill6});
@@ -2962,12 +2962,12 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textPathFirst = std::make_shared<TextPath>();
   textPathFirst->setPath(curvePath);
   textPathFirst->setTextAlign(TextAlign::Start);
-  textPathFirst->setPerpendicularToPath(true);
+  textPathFirst->setPerpendicular(true);
 
   auto textPathSecond = std::make_shared<TextPath>();
   textPathSecond->setPath(largerCurvePath);
   textPathSecond->setTextAlign(TextAlign::Start);
-  textPathSecond->setPerpendicularToPath(true);
+  textPathSecond->setPerpendicular(true);
 
   auto fill7 = MakeFillStyle(Color::Blue());
   group7->setElements({textSpan7, textPathFirst, textPathSecond, fill7});
@@ -2988,7 +2988,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textPath8 = std::make_shared<TextPath>();
   textPath8->setPath(curvePath);
   textPath8->setTextAlign(TextAlign::Start);
-  textPath8->setPerpendicularToPath(true);
+  textPath8->setPerpendicular(true);
 
   auto fill8 = MakeFillStyle(Color::Red());
   group8->setElements({innerGroup8, textPath8, fill8});
@@ -3008,7 +3008,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textPath9 = std::make_shared<TextPath>();
   textPath9->setPath(shortPath);
   textPath9->setTextAlign(TextAlign::Center);
-  textPath9->setPerpendicularToPath(true);
+  textPath9->setPerpendicular(true);
 
   auto fill9 = MakeFillStyle(Color::Green());
   group9->setElements({textSpan9, textPath9, fill9});
@@ -3030,7 +3030,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   textPath10->setPath(closedPath);
   textPath10->setTextAlign(TextAlign::Start);
   textPath10->setFirstMargin(-80.0f);  // Negative margin to wrap around the closed path
-  textPath10->setPerpendicularToPath(true);
+  textPath10->setPerpendicular(true);
 
   auto fill10 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
   group10->setElements({textSpan10, textPath10, fill10});
@@ -3055,7 +3055,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textPath11 = std::make_shared<TextPath>();
   textPath11->setPath(curvePath);
   textPath11->setTextAlign(TextAlign::Center);
-  textPath11->setPerpendicularToPath(true);
+  textPath11->setPerpendicular(true);
 
   auto fill11 = MakeFillStyle(Color{0.0f, 0.5f, 0.5f, 1.0f});  // Teal
   innerGroup11->setElements({textSpan11a, textSpan11b, textPath11, fill11});
@@ -3083,7 +3083,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   textPath12->setFirstMargin(30);
   textPath12->setLastMargin(-30);
   textPath12->setTextAlign(TextAlign::Justify);
-  textPath12->setPerpendicularToPath(true);
+  textPath12->setPerpendicular(true);
 
   auto fill12 = MakeFillStyle(Color{0.8f, 0.2f, 0.2f, 1.0f});  // Dark red
   group12->setElements({textSpan12, textPath12, fill12});
@@ -3100,7 +3100,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   textPath13->setFirstMargin(400);  // Exceeds path end
   textPath13->setLastMargin(-350);  // Path length ~380, so 400 > 380 + (-350) = 30
   textPath13->setTextAlign(TextAlign::Justify);
-  textPath13->setPerpendicularToPath(true);
+  textPath13->setPerpendicular(true);
 
   auto fill13 = MakeFillStyle(Color{0.2f, 0.2f, 0.8f, 1.0f});  // Dark blue
   group13->setElements({textSpan13, textPath13, fill13});
@@ -3117,7 +3117,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   textPath14->setFirstMargin(40);
   textPath14->setLastMargin(-60);
   textPath14->setTextAlign(TextAlign::Center);
-  textPath14->setPerpendicularToPath(true);
+  textPath14->setPerpendicular(true);
 
   auto fill14 = MakeFillStyle(Color{0.2f, 0.6f, 0.2f, 1.0f});  // Dark green
   group14->setElements({textSpan14, textPath14, fill14});
@@ -3133,7 +3133,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   textPath15->setPath(curvePath);
   textPath15->setLastMargin(-80);
   textPath15->setTextAlign(TextAlign::End);
-  textPath15->setPerpendicularToPath(true);
+  textPath15->setPerpendicular(true);
 
   auto fill15 = MakeFillStyle(Color{0.6f, 0.4f, 0.0f, 1.0f});  // Brown
   group15->setElements({textSpan15, textPath15, fill15});
@@ -3270,7 +3270,7 @@ TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
   auto textPath1 = std::make_shared<TextPath>();
   textPath1->setPath(curvePath);
   textPath1->setTextAlign(TextAlign::Start);
-  textPath1->setPerpendicularToPath(true);
+  textPath1->setPerpendicular(true);
 
   auto trim1 = std::make_shared<TrimPath>();
   trim1->setStart(0.0f);
@@ -3299,7 +3299,7 @@ TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
   auto textPath2 = std::make_shared<TextPath>();
   textPath2->setPath(curvePath);
   textPath2->setTextAlign(TextAlign::Start);
-  textPath2->setPerpendicularToPath(true);
+  textPath2->setPerpendicular(true);
 
   auto fill2 = MakeFillStyle(Color::Red());
   group2->setElements({textSpan2, trim2, textPath2, fill2});
@@ -3663,7 +3663,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   textSpanRnd->setTextBlob(TextBlob::MakeFrom("Random", font));
   auto selectorRnd = std::make_shared<RangeSelector>();
   selectorRnd->setShape(SelectorShape::RampUp);
-  selectorRnd->setRandomizeOrder(true);
+  selectorRnd->setRandomOrder(true);
   selectorRnd->setRandomSeed(12345);
   auto modifierRnd = std::make_shared<TextModifier>();
   modifierRnd->setSelectors({selectorRnd});

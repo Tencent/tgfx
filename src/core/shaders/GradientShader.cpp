@@ -289,29 +289,29 @@ GradientType ConicGradientShader::asGradient(GradientInfo* info) const {
   return GradientType::Conic;
 }
 
-static Matrix DiamondHalfDiagonalToUnitMatrix(const Point& center, float halfDiagonal) {
-  // sqrt(2) / half-diagonal to calculate the side length of the diamond
-  float inv = 1.4142135624f / halfDiagonal;
+static Matrix DiamondRadiusToUnitMatrix(const Point& center, float radius) {
+  // sqrt(2) / radius to calculate the side length of the diamond
+  float inv = 1.4142135624f / radius;
   auto matrix = Matrix::MakeTrans(-center.x, -center.y);
   matrix.postScale(inv, inv);
   matrix.postRotate(45);
   return matrix;
 }
 
-static std::tuple<Point, float> UnitMatrixToDiamondHalfDiagonal(const Matrix& matrix) {
+static std::tuple<Point, float> UnitMatrixToDiamondRadius(const Matrix& matrix) {
   auto invertMatrix = matrix;
   invertMatrix.postRotate(-45);
   invertMatrix.invert(&invertMatrix);
   std::array<Point, 2> points{Point::Make(0, 0), Point::Make(2, 0)};
   invertMatrix.mapPoints(points.data(), 2);
-  // half diagonal =  side length / sqrt(2)
+  // radius = side length / sqrt(2)
   return {points[0], Point::Distance(points[0], points[1]) / 1.4142135624f};
 }
 
-DiamondGradientShader::DiamondGradientShader(const Point& center, float halfDiagonal,
+DiamondGradientShader::DiamondGradientShader(const Point& center, float radius,
                                              const std::vector<Color>& colors,
                                              const std::vector<float>& positions)
-    : GradientShader(colors, positions, DiamondHalfDiagonalToUnitMatrix(center, halfDiagonal)) {
+    : GradientShader(colors, positions, DiamondRadiusToUnitMatrix(center, radius)) {
 }
 
 PlacementPtr<FragmentProcessor> DiamondGradientShader::asFragmentProcessor(
@@ -329,7 +329,7 @@ GradientType DiamondGradientShader::asGradient(GradientInfo* info) const {
   if (info) {
     info->colors = originalColors;
     info->positions = originalPositions;
-    std::tie(info->points[0], info->radiuses[0]) = UnitMatrixToDiamondHalfDiagonal(pointsToUnit);
+    std::tie(info->points[0], info->radiuses[0]) = UnitMatrixToDiamondRadius(pointsToUnit);
   }
   return GradientType::Diamond;
 }
@@ -389,21 +389,21 @@ std::shared_ptr<Shader> Shader::MakeConicGradient(const Point& center, float sta
   return shader;
 }
 
-std::shared_ptr<Shader> Shader::MakeDiamondGradient(const Point& center, float halfDiagonal,
+std::shared_ptr<Shader> Shader::MakeDiamondGradient(const Point& center, float radius,
                                                     const std::vector<Color>& colors,
                                                     const std::vector<float>& positions) {
-  if (halfDiagonal < 0 || colors.empty()) {
+  if (radius < 0 || colors.empty()) {
     return nullptr;
   }
   if (1 == colors.size()) {
     return Shader::MakeColorShader(colors[0]);
   }
 
-  if (FloatNearlyZero(halfDiagonal, DegenerateThreshold)) {
+  if (FloatNearlyZero(radius, DegenerateThreshold)) {
     // Degenerate gradient optimization, and no special logic needed for clamped diamond gradient
     return Shader::MakeColorShader(colors[colors.size() - 1]);
   }
-  auto shader = std::make_shared<DiamondGradientShader>(center, halfDiagonal, colors, positions);
+  auto shader = std::make_shared<DiamondGradientShader>(center, radius, colors, positions);
   shader->weakThis = shader;
   return shader;
 }

@@ -221,18 +221,18 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
     return;
   }
-  auto vertexColor = (*args.transformedCoords)[0].name();
+  auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
   if (args.coordFunc) {
-    vertexColor = args.coordFunc(vertexColor);
+    texCoordName = args.coordFunc(texCoordName);
   }
   Sampling sampling(textureView, samplerState, subset);
   if (sampling.shaderModeX == TiledTextureEffect::ShaderMode::None &&
       sampling.shaderModeY == TiledTextureEffect::ShaderMode::None) {
     fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
-    fragBuilder->appendTextureLookup((*args.textureSamplers)[0], vertexColor);
+    fragBuilder->appendTextureLookup((*args.textureSamplers)[0], texCoordName);
     fragBuilder->codeAppend(";");
   } else {
-    fragBuilder->codeAppendf("vec2 inCoord = %s;", vertexColor.c_str());
+    fragBuilder->codeAppendf("vec2 inCoord = %s;", texCoordName.c_str());
     bool useClamp[2] = {ShaderModeUsesClamp(sampling.shaderModeX),
                         ShaderModeUsesClamp(sampling.shaderModeY)};
     auto names = initUniform(args, textureView, sampling, useClamp);

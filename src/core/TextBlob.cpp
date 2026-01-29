@@ -18,8 +18,7 @@
 
 #include "tgfx/core/TextBlob.h"
 #include <cstdlib>
-#include "core/GlyphRun.h"
-#include "core/GlyphRunList.h"
+#include "core/GlyphTransform.h"
 #include "core/RunRecord.h"
 #include "core/ScalerContext.h"
 #include "core/utils/AtomicCache.h"
@@ -144,6 +143,27 @@ const RunRecord* TextBlob::firstRun() const {
   return reinterpret_cast<const RunRecord*>(reinterpret_cast<const uint8_t*>(this) + alignedOffset);
 }
 
+TextBlob::Iterator TextBlob::begin() const {
+  return Iterator(firstRun(), runCount);
+}
+
+GlyphRun TextBlob::Iterator::operator*() const {
+  GlyphRun run;
+  run.font = current->font;
+  run.glyphCount = current->glyphCount;
+  run.glyphs = current->glyphBuffer();
+  run.positioning = current->positioning;
+  run.positions = current->posBuffer();
+  run.offsetY = current->y;
+  return run;
+}
+
+TextBlob::Iterator& TextBlob::Iterator::operator++() {
+  current = current->next();
+  --remaining;
+  return *this;
+}
+
 Rect TextBlob::getBounds() const {
   if (auto cachedBounds = AtomicCacheGet(bounds)) {
     return *cachedBounds;
@@ -156,7 +176,7 @@ Rect TextBlob::getBounds() const {
 Rect TextBlob::computeBounds() const {
   Rect finalBounds = {};
   Matrix transformMat = {};
-  for (const auto& run : GlyphRunList(this)) {
+  for (auto run : *this) {
     auto& font = run.font;
     transformMat.reset();
     transformMat.setScale(font.getSize(), font.getSize());
@@ -175,16 +195,22 @@ Rect TextBlob::computeBounds() const {
     }
     transformMat.mapRect(&fontBounds);
     Rect runBounds = {};
-    for (size_t i = 0; i < run.runSize(); i++) {
-      auto glyphMatrix = run.getMatrix(i);
-      auto glyphBounds = glyphMatrix.mapRect(fontBounds);
+    bool hasOnlyOffset = !HasComplexTransform(run);
+    for (size_t i = 0; i < run.glyphCount; i++) {
+      Rect glyphBounds = {};
+      if (hasOnlyOffset) {
+        auto position = GetGlyphPosition(run, i);
+        glyphBounds = fontBounds.makeOffset(position.x, position.y);
+      } else {
+        glyphBounds = GetGlyphMatrix(run, i).mapRect(fontBounds);
+      }
       if (i == 0) {
         runBounds = glyphBounds;
       } else {
         runBounds.join(glyphBounds);
       }
     }
-    if (run.runSize() == 0) {
+    if (run.glyphCount == 0) {
       continue;
     }
     finalBounds.join(runBounds);
@@ -203,14 +229,14 @@ Rect TextBlob::getTightBounds(const Matrix* matrix) const {
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
   auto inverseScale = 1.0f / resolutionScale;
   Rect totalBounds = {};
-  for (const auto& run : GlyphRunList(this)) {
+  for (auto run : *this) {
     auto font = run.font;
     if (hasScale) {
       font = font.makeWithSize(resolutionScale * font.getSize());
     }
-    for (size_t i = 0; i < run.runSize(); i++) {
+    for (size_t i = 0; i < run.glyphCount; i++) {
       auto glyphBounds = font.getBounds(run.glyphs[i]);
-      auto glyphMatrix = run.getMatrix(i);
+      auto glyphMatrix = GetGlyphMatrix(run, i);
       if (hasScale) {
         // Pre-scale to counteract the enlarged glyphBounds from the scaled font.
         glyphMatrix.preScale(inverseScale, inverseScale);
@@ -226,11 +252,11 @@ Rect TextBlob::getTightBounds(const Matrix* matrix) const {
 }
 
 bool TextBlob::hitTestPoint(float localX, float localY, const Stroke* stroke) const {
-  for (const auto& run : GlyphRunList(this)) {
+  for (auto run : *this) {
     auto& font = run.font;
     auto usePathHitTest = font.hasOutlines();
-    for (size_t i = 0; i < run.runSize(); i++) {
-      auto glyphMatrix = run.getMatrix(i);
+    for (size_t i = 0; i < run.glyphCount; i++) {
+      auto glyphMatrix = GetGlyphMatrix(run, i);
       Matrix inverseMatrix = {};
       if (!glyphMatrix.invert(&inverseMatrix)) {
         continue;

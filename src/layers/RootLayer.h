@@ -78,8 +78,7 @@ class RootLayer : public Layer {
   bool setBackgroundColor(const Color& color);
 
  protected:
-  bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                 const Matrix3D* transform3D = nullptr) override;
+  bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) override;
 
  private:
   std::vector<Rect> dirtyRects = {};

@@ -17,8 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextShape.h"
-#include "core/GlyphRun.h"
-#include "core/GlyphRunList.h"
+#include "core/GlyphTransform.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/Matrix.h"
@@ -29,7 +28,7 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
   if (textBlob == nullptr) {
     return nullptr;
   }
-  for (const auto& run : GlyphRunList(textBlob.get())) {
+  for (auto run : *textBlob) {
     if (run.font.hasOutlines()) {
       return std::make_shared<TextShape>(std::move(textBlob));
     }
@@ -48,7 +47,7 @@ Path TextShape::onGetPath(float resolutionScale) const {
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
   auto matrix = Matrix::MakeScale(resolutionScale, resolutionScale);
   Path totalPath = {};
-  for (const auto& run : GlyphRunList(textBlob.get())) {
+  for (auto run : *textBlob) {
     if (!run.font.hasOutlines()) {
       continue;
     }
@@ -56,11 +55,11 @@ Path TextShape::onGetPath(float resolutionScale) const {
     if (hasScale) {
       font = font.makeWithSize(resolutionScale * font.getSize());
     }
-    for (size_t index = 0; index < run.runSize(); index++) {
+    for (size_t index = 0; index < run.glyphCount; index++) {
       auto glyphID = run.glyphs[index];
       Path glyphPath = {};
       if (font.getPath(glyphID, &glyphPath)) {
-        auto glyphMatrix = run.getMatrix(index);
+        auto glyphMatrix = GetGlyphMatrix(run, index);
         glyphMatrix.preScale(1.0f / resolutionScale, 1.0f / resolutionScale);
         glyphMatrix.postConcat(matrix);
         glyphPath.transform(glyphMatrix);

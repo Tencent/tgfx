@@ -18,11 +18,9 @@
 
 #pragma once
 
-#include "core/GlyphRun.h"
+#include "tgfx/core/GlyphRun.h"
 
 namespace tgfx {
-
-unsigned ScalarsPerGlyph(GlyphPositioning positioning);
 
 // RunRecord stores metadata for a single run in the TextBlob's contiguous memory.
 // Memory layout after RunRecord:
@@ -37,7 +35,7 @@ struct RunRecord {
 
   static constexpr uint8_t LAST_FLAG = 0x01;
 
-  static size_t StorageSize(size_t count, GlyphPositioning pos);
+  static size_t StorageSize(size_t count, GlyphPositioning positioning);
 
   GlyphID* glyphBuffer();
   const GlyphID* glyphBuffer() const;

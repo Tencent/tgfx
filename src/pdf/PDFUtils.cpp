@@ -20,6 +20,7 @@
 #include <array>
 #include <cfloat>
 #include <string>
+#include "core/utils/Log.h"
 #include "pdf/PDFResourceDictionary.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/BlendMode.h"
@@ -54,6 +55,7 @@ constexpr int IntPow(int base, unsigned exp, int acc = 1) {
 }
 
 std::array<float, 6> MatrixToPDFAffine(const Matrix& matrix) {
+  DEBUG_ASSERT(!matrix.hasPerspective());
   std::array<float, 6> origin = {};
   matrix.get6(origin.data());
 

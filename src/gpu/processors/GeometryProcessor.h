@@ -110,6 +110,13 @@ class GeometryProcessor : public Processor {
   explicit GeometryProcessor(uint32_t classID) : Processor(classID) {
   }
 
+  /**
+   * Returns whether the uvMatrix has perspective. Subclass should override this if needed.
+   */
+  virtual bool hasUVPerspective() const {
+    return false;
+  }
+
   void setVertexAttributes(const Attribute* attrs, int attrCount);
 
   /**
@@ -139,7 +146,7 @@ class GeometryProcessor : public Processor {
   }
 
   virtual void onEmitTransform(EmitArgs&, VertexShaderBuilder*, VaryingHandler*, UniformHandler*,
-                               const std::string&, int) const {
+                               const std::string&, bool, int) const {
   }
 
   virtual void onSetTransformData(UniformData*, const CoordTransform*, int) const {

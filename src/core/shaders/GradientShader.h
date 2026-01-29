@@ -113,7 +113,7 @@ class ConicGradientShader : public GradientShader {
 
 class DiamondGradientShader : public GradientShader {
  public:
-  DiamondGradientShader(const Point& center, float halfDiagonal, const std::vector<Color>& colors,
+  DiamondGradientShader(const Point& center, float radius, const std::vector<Color>& colors,
                         const std::vector<float>& positions);
 
   GradientType asGradient(GradientInfo* info) const override;

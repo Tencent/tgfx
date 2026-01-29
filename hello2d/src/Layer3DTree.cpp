@@ -108,6 +108,68 @@ static inline std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host,
   return imageLayer;
 }
 
+/**
+ * Creates a background layer for the cube with a linear gradient fill and 3D transformation.
+ * @param origin The origin point for positioning the layer.
+ * @return A shared pointer to the created layer.
+ */
+static inline std::shared_ptr<tgfx::Layer> CreateCubeBackLayer(const tgfx::Point& origin) {
+  auto layer = tgfx::ShapeLayer::Make();
+  auto rect = tgfx::Rect::MakeWH(600, 400);
+  tgfx::Path path = {};
+  path.addRect(rect);
+  layer->setPath(path);
+  std::shared_ptr<tgfx::Shader> shader = tgfx::Shader::MakeLinearGradient(
+      {rect.left, 0}, {rect.right, 0}, {tgfx::Color::Red(), tgfx::Color::Green()});
+  layer->addFillStyle(tgfx::ShapeStyle::Make(shader, 1.f));
+
+  auto layerSize = tgfx::Size::Make(600, 400);
+  auto anchor = tgfx::Point::Make(0.5f, 0.5f);
+  auto offsetToAnchorMatrix =
+      tgfx::Matrix3D::MakeTranslate(-anchor.x * layerSize.width, -anchor.y * layerSize.height, 0.f);
+  auto invOffsetToAnchorMatrix =
+      tgfx::Matrix3D::MakeTranslate(anchor.x * layerSize.width, anchor.y * layerSize.height, 0.f);
+  auto modelMatrix = tgfx::Matrix3D::MakeScale(0.5, 0.5, 1);
+  modelMatrix.postRotate({0, 1, 0}, 10);
+  auto perspectiveMatrix = MakePerspectiveMatrix();
+  auto originTranslateMatrix = tgfx::Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+  auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                         modelMatrix * offsetToAnchorMatrix;
+  layer->setMatrix3D(transformMatrix);
+  return layer;
+}
+
+/**
+ * Creates a face layer for the cube with specified rotation and color.
+ * @param anchor The anchor point for rotation (normalized coordinates).
+ * @param rotateAxis The axis around which to rotate the face.
+ * @param rotateAngles The rotation angle in degrees.
+ * @param color The fill color of the face.
+ * @return A shared pointer to the created solid layer.
+ */
+static inline std::shared_ptr<tgfx::SolidLayer> CreateCubeFaceLayer(const tgfx::Point& anchor,
+                                                                    const tgfx::Vec3& rotateAxis,
+                                                                    float rotateAngles,
+                                                                    const tgfx::Color& color) {
+  auto layer = tgfx::SolidLayer::Make();
+  auto layerSize = tgfx::Size::Make(200, 200);
+  layer->setWidth(layerSize.width);
+  layer->setHeight(layerSize.height);
+  layer->setColor(color);
+
+  tgfx::Point origin = {200, 100};
+  auto offsetToAnchorMatrix =
+      tgfx::Matrix3D::MakeTranslate(-anchor.x * layerSize.width, -anchor.y * layerSize.height, 0.f);
+  auto invOffsetToAnchorMatrix =
+      tgfx::Matrix3D::MakeTranslate(anchor.x * layerSize.width, anchor.y * layerSize.height, 0.f);
+  auto modelMatrix = tgfx::Matrix3D::MakeRotate(rotateAxis, rotateAngles);
+  auto originTranslateMatrix = tgfx::Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+  auto transformMatrix =
+      originTranslateMatrix * invOffsetToAnchorMatrix * modelMatrix * offsetToAnchorMatrix;
+  layer->setMatrix3D(transformMatrix);
+  return layer;
+}
+
 std::shared_ptr<tgfx::Layer> Layer3DTree::onBuildLayerTree(const AppHost* host) {
   auto root = tgfx::Layer::Make();
 
@@ -128,6 +190,23 @@ std::shared_ptr<tgfx::Layer> Layer3DTree::onBuildLayerTree(const AppHost* host) 
   preserve3DBackLayer->addChild(preserve3DContainerLayer);
   root->addChild(preserve3DBackLayer);
 
+  // Cube
+  auto cubeBackLayer = CreateCubeBackLayer({200, 0});
+  cubeBackLayer->setPreserve3D(true);
+  root->addChild(cubeBackLayer);
+  auto cubeFloor = CreateCubeFaceLayer({0.5, 0.5}, {1, 0, 0}, 0, tgfx::Color::White());
+  cubeBackLayer->addChild(cubeFloor);
+  auto cubeLeft = CreateCubeFaceLayer({0.0, 0.5}, {0, 1, 0}, -90, tgfx::Color::Red());
+  cubeBackLayer->addChild(cubeLeft);
+  auto cubeTop =
+      CreateCubeFaceLayer({0.5, 0.0}, {1, 0, 0}, 90, tgfx::Color::FromRGBA(0, 153, 46, 255));
+  cubeBackLayer->addChild(cubeTop);
+  auto cubeRight =
+      CreateCubeFaceLayer({1.0, 0.5}, {0, 1, 0}, 90, tgfx::Color::FromRGBA(90, 153, 146, 255));
+  cubeBackLayer->addChild(cubeRight);
+  auto cubeBottom =
+      CreateCubeFaceLayer({0.5, 1.0}, {1, 0, 0}, -90, tgfx::Color::FromRGBA(190, 53, 146, 255));
+  cubeBackLayer->addChild(cubeBottom);
   return root;
 }
 }  // namespace hello2d

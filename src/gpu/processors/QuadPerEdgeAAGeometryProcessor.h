@@ -43,6 +43,10 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  bool hasUVPerspective() const override {
+    return uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
+  }
+
   Attribute position;  // May contain coverage as last channel
   Attribute coverage;
   Attribute uvCoord;

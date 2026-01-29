@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Geometry.h"
-#include "core/GlyphRunList.h"
+#include "core/GlyphTransform.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/RSXform.h"
@@ -79,18 +79,14 @@ void Geometry::convertToShape() {
 
 void Geometry::expandToGlyphs() {
   DEBUG_ASSERT(textBlob != nullptr);
-  size_t totalCount = 0;
-  for (const auto& run : GlyphRunList(textBlob.get())) {
-    totalCount += run.runSize();
-  }
   glyphs.clear();
-  glyphs.reserve(totalCount);
-  for (const auto& run : GlyphRunList(textBlob.get())) {
-    for (size_t i = 0; i < run.runSize(); i++) {
+  for (auto run : *textBlob) {
+    glyphs.reserve(glyphs.size() + run.glyphCount);
+    for (size_t i = 0; i < run.glyphCount; i++) {
       Glyph glyph = {};
       glyph.glyphID = run.glyphs[i];
       glyph.font = run.font;
-      glyph.matrix = run.getMatrix(i);
+      glyph.matrix = GetGlyphMatrix(run, i);
       glyphs.push_back(glyph);
     }
   }

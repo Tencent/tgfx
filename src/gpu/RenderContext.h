@@ -20,9 +20,9 @@
 
 #include <optional>
 #include "core/DrawContext.h"
-#include "core/GlyphRun.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/core/GlyphRun.h"
 
 namespace tgfx {
 

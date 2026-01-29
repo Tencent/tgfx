@@ -38,7 +38,7 @@ struct OpaqueImageEntry {
 class Opaque3DContext : public Layer3DContext {
  public:
   Opaque3DContext(const Rect& renderRect, float contentScale,
-                   std::shared_ptr<ColorSpace> colorSpace);
+                  std::shared_ptr<ColorSpace> colorSpace);
 
   OpaqueContext* currentOpaqueContext() override;
   void finishAndDrawTo(Canvas* canvas, bool antialiasing) override;
@@ -47,7 +47,7 @@ class Opaque3DContext : public Layer3DContext {
   Canvas* onBeginRecording() override;
   std::shared_ptr<Picture> onFinishRecording() override;
   void onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                    const Point& pictureOffset, bool antialiasing) override;
+                    const Point& pictureOffset, int depth, bool antialiasing) override;
 
  private:
   std::stack<OpaqueContext> _opaqueStack = {};

@@ -35,15 +35,15 @@ class DrawPolygon3D {
   /**
    * Constructs a polygon from an image's 2D bounds and a 3D transformation matrix.
    * The transform is applied immediately to convert vertices to screen space.
-   * @param orderIndex Used for sorting coplanar polygons. Smaller values are placed in front
-   *        (along the polygon's normal direction).
+   * @param depth The depth level in the layer tree (used for sorting coplanar polygons).
+   * @param sequenceIndex The sequence index within the same depth level.
    */
-  DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matrix, int orderIndex, float alpha,
-                bool antiAlias);
+  DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matrix, int depth, int sequenceIndex,
+                float alpha, bool antiAlias);
 
   /**
    * Splits the given polygon by this polygon's plane.
-   * For coplanar polygons, smaller orderIndex goes to front (drawn later in TGFX's post-order).
+   * For coplanar polygons, larger sequenceIndex goes to front (drawn later, appears on top).
    * @param polygon The polygon to split (ownership will be transferred).
    * @param front Output: portion in front of this plane, entire polygon if not split, or nullptr.
    * @param back Output: portion behind this plane, entire polygon if not split, or nullptr.
@@ -84,6 +84,14 @@ class DrawPolygon3D {
 
   bool isFacingPositiveZ() const;
 
+  int sequenceIndex() const {
+    return _sequenceIndex;
+  }
+
+  int depth() const {
+    return _depth;
+  }
+
   /**
    * Converts this polygon to a list of quads for rendering.
    * Each quad contains 4 vertices in local space (clockwise order).
@@ -95,13 +103,14 @@ class DrawPolygon3D {
  private:
   // Constructs a polygon from already-transformed 3D points (used for split polygons).
   DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matrix, std::vector<Vec3> points,
-                const Vec3& normal, int orderIndex, float alpha, bool antiAlias);
+                const Vec3& normal, int depth, int sequenceIndex, float alpha, bool antiAlias);
 
   void constructNormal();
 
   std::vector<Vec3> _points = {};
   Vec3 _normal = {0.0f, 0.0f, 1.0f};
-  int _orderIndex = 0;
+  int _depth = 0;
+  int _sequenceIndex = 0;
   // Whether this polygon was split from another polygon.
   bool _isSplit = false;
   float _alpha = 1.0f;
@@ -109,5 +118,18 @@ class DrawPolygon3D {
   std::shared_ptr<Image> _image = nullptr;
   Matrix3D _matrix = {};
 };
+
+/**
+ * Comparator for sorting DrawPolygon3D by paint order.
+ * Smaller depth (parent layers) should be drawn first (at bottom).
+ * Within the same depth, smaller sequenceIndex should be drawn first.
+ */
+static inline bool DrawPolygon3DOrder(const std::unique_ptr<DrawPolygon3D>& x,
+                                      const std::unique_ptr<DrawPolygon3D>& y) {
+  if (x->depth() != y->depth()) {
+    return x->depth() < y->depth();
+  }
+  return x->sequenceIndex() < y->sequenceIndex();
+}
 
 }  // namespace tgfx

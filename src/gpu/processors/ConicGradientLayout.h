@@ -35,6 +35,8 @@ class ConicGradientLayout : public FragmentProcessor {
 
   ConicGradientLayout(Matrix matrix, float bias, float scale);
 
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
+
   CoordTransform coordTransform;
   float bias;
   float scale;
