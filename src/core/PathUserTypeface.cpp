@@ -35,7 +35,7 @@ static Matrix GetTransform(bool fauxItalic, float textScale) {
 class PathUserScalerContext final : public UserScalerContext {
  public:
   PathUserScalerContext(std::shared_ptr<Typeface> typeface, float size)
-      : UserScalerContext(std::move(typeface), size), fauxBoldScale(FauxBoldScale(size)) {
+      : UserScalerContext(std::move(typeface), size), fauxBoldSize(size * FauxBoldScale(size)) {
   }
 
   Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override {
@@ -50,7 +50,6 @@ class PathUserScalerContext final : public UserScalerContext {
     auto matrix = GetTransform(fauxItalic, textScale);
     bounds = matrix.mapRect(bounds);
     if (fauxBold) {
-      auto fauxBoldSize = textScale * fauxBoldScale;
       bounds.outset(fauxBoldSize, fauxBoldSize);
     }
     bounds.roundOut();
@@ -72,7 +71,7 @@ class PathUserScalerContext final : public UserScalerContext {
       path->transform(transform);
       if (fauxBold) {
         auto strokePath = *path;
-        Stroke stroke(textScale * fauxBoldScale);
+        Stroke stroke(fauxBoldSize);
         stroke.applyToPath(&strokePath);
         path->addPath(strokePath, PathOp::Union);
       }
@@ -117,6 +116,11 @@ class PathUserScalerContext final : public UserScalerContext {
     auto matrix = Matrix::MakeScale(textScale);
     matrix.postTranslate(-bounds.x(), -bounds.y());
     auto shape = Shape::MakeFrom(pathProvider);
+    if (fauxBold) {
+      auto boldStroke = std::make_unique<Stroke>(fauxBoldSize / textScale);
+      shape = Shape::ApplyStroke(shape, boldStroke.get());
+      shape = Shape::Merge(Shape::MakeFrom(pathProvider), std::move(shape));
+    }
     shape = Shape::ApplyStroke(std::move(shape), stroke);
     shape = Shape::ApplyMatrix(std::move(shape), matrix);
     auto rasterizer = PathRasterizer::MakeFrom(width, height, std::move(shape), true,
@@ -138,7 +142,7 @@ class PathUserScalerContext final : public UserScalerContext {
     return static_cast<PathUserTypeface*>(userTypeface());
   }
 
-  float fauxBoldScale = 1.0f;
+  float fauxBoldSize = 0.0f;
 };
 
 std::shared_ptr<UserTypeface> PathUserTypeface::Make(uint32_t builderID,
