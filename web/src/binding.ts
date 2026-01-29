@@ -27,7 +27,7 @@ export const TGFXBind = (module: TGFX) => {
     setTGFXModule(module)
     module.module = module
     module.ScalerContext = ScalerContext
-    module.WebMask = PathRasterizer
+    module.PathRasterizer = PathRasterizer
     module.Matrix = Matrix
     module.tgfx = {...tgfx};
 }
