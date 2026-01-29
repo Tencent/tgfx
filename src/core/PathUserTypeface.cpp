@@ -24,8 +24,8 @@
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
-static Matrix GetTransform(bool fauxItalic, float textSize) {
-  auto matrix = Matrix::MakeScale(textSize);
+static Matrix GetTransform(bool fauxItalic, float textScale) {
+  auto matrix = Matrix::MakeScale(textScale);
   if (fauxItalic) {
     matrix.postSkew(ITALIC_SKEW, 0.f);
   }
@@ -36,6 +36,7 @@ class PathUserScalerContext final : public UserScalerContext {
  public:
   PathUserScalerContext(std::shared_ptr<Typeface> typeface, float size)
       : UserScalerContext(std::move(typeface), size) {
+    textScale = textSize / pathTypeFace()->unitsPerEmF();
     fauxBoldScale = FauxBoldScale(textSize);
   }
 
@@ -48,10 +49,10 @@ class PathUserScalerContext final : public UserScalerContext {
     if (bounds.isEmpty()) {
       return {};
     }
-    auto matrix = GetTransform(fauxItalic, textSize);
+    auto matrix = GetTransform(fauxItalic, textScale);
     bounds = matrix.mapRect(bounds);
     if (fauxBold) {
-      auto fauxBoldSize = textSize * fauxBoldScale;
+      auto fauxBoldSize = textScale * fauxBoldScale;
       bounds.outset(fauxBoldSize, fauxBoldSize);
     }
     bounds.roundOut();
@@ -69,11 +70,11 @@ class PathUserScalerContext final : public UserScalerContext {
     }
     *path = pathProvider->getPath();
     if (!path->isEmpty()) {
-      auto transform = GetTransform(fauxItalic, textSize);
+      auto transform = GetTransform(fauxItalic, textScale);
       path->transform(transform);
       if (fauxBold) {
         auto strokePath = *path;
-        Stroke stroke(textSize * fauxBoldScale);
+        Stroke stroke(textScale * fauxBoldScale);
         stroke.applyToPath(&strokePath);
         path->addPath(strokePath, PathOp::Union);
       }
@@ -115,7 +116,7 @@ class PathUserScalerContext final : public UserScalerContext {
     if (width <= 0 || height <= 0) {
       return false;
     }
-    auto matrix = Matrix::MakeScale(textSize);
+    auto matrix = Matrix::MakeScale(textScale);
     matrix.postTranslate(-bounds.x(), -bounds.y());
     auto shape = Shape::MakeFrom(pathProvider);
     shape = Shape::ApplyStroke(std::move(shape), stroke);
@@ -139,6 +140,7 @@ class PathUserScalerContext final : public UserScalerContext {
     return static_cast<PathUserTypeface*>(typeface.get());
   }
 
+  float textScale = 1.0f;
   float fauxBoldScale = 1.0f;
 };
 
@@ -146,19 +148,19 @@ std::shared_ptr<UserTypeface> PathUserTypeface::Make(uint32_t builderID,
                                                      const std::string& fontFamily,
                                                      const std::string& fontStyle,
                                                      const FontMetrics& fontMetrics,
-                                                     const Rect& fontBounds,
+                                                     const Rect& fontBounds, float unitsPerEm,
                                                      const VectorProviderType& glyphPathProviders) {
   auto typeface = std::shared_ptr<PathUserTypeface>(new PathUserTypeface(
-      builderID, fontFamily, fontStyle, fontMetrics, fontBounds, glyphPathProviders));
+      builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm, glyphPathProviders));
   typeface->weakThis = typeface;
   return typeface;
 }
 
 PathUserTypeface::PathUserTypeface(uint32_t builderID, const std::string& fontFamily,
                                    const std::string& fontStyle, const FontMetrics& fontMetrics,
-                                   const Rect& fontBounds,
+                                   const Rect& fontBounds, float unitsPerEm,
                                    const VectorProviderType& glyphPathProviders)
-    : UserTypeface(builderID, fontFamily, fontStyle, fontMetrics, fontBounds),
+    : UserTypeface(builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm),
       glyphPathProviders(glyphPathProviders) {
 }
 

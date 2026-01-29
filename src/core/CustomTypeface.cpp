@@ -32,6 +32,12 @@ void CustomTypefaceBuilder::setMetrics(const FontMetrics& metrics) {
   _fontMetrics = metrics;
 }
 
+void CustomTypefaceBuilder::setUnitsPerEm(float unitsPerEm) {
+  if (unitsPerEm > 0) {
+    _unitsPerEm = unitsPerEm;
+  }
+}
+
 GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
     // Reached the maximum number of glyphs. Return an invalid GlyphID
@@ -63,7 +69,7 @@ std::shared_ptr<Typeface> PathTypefaceBuilder::detach() const {
     return nullptr;
   }
   return PathUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, fontBounds,
-                                glyphRecords);
+                                _unitsPerEm, glyphRecords);
 }
 
 GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset) {
@@ -84,7 +90,7 @@ std::shared_ptr<Typeface> ImageTypefaceBuilder::detach() const {
     return nullptr;
   }
   return ImageUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, fontBounds,
-                                 glyphRecords);
+                                 _unitsPerEm, glyphRecords);
 }
 
 }  // namespace tgfx

@@ -39,9 +39,22 @@ class CustomTypefaceBuilder {
   void setFontName(const std::string& fontFamily, const std::string& fontStyle);
 
   /**
-   * Sets the font metrics for the typeface.
+   * Sets the font metrics for the typeface. The metrics should be specified in design space
+   * coordinates (the same coordinate system as the glyph paths or images). When rendering, metrics
+   * will be scaled by (fontSize / unitsPerEm) to convert to pixel values.
    */
   void setMetrics(const FontMetrics& metrics);
+
+  /**
+   * Sets the units-per-em value for the typeface. This value defines the coordinate space in which
+   * the glyph paths, images, and font metrics are designed. The default value is 1, meaning all
+   * data is expected to be in normalized coordinates. When rendering, all values will be scaled by
+   * (fontSize / unitsPerEm). For example, if your glyphs are designed in a 1000x1000 coordinate
+   * space with ascender=800, set unitsPerEm to 1000, then using fontSize=24 will render glyphs at
+   * 24 pixels height and ascent will be 800 * 24 / 1000 = 19.2 pixels.
+   * @param unitsPerEm The design space units per em. Must be greater than 0.
+   */
+  void setUnitsPerEm(float unitsPerEm);
 
   /**
    * Detaches the typeface being built. After this call, the builder remains valid and can be used
@@ -56,6 +69,7 @@ class CustomTypefaceBuilder {
   std::string _fontFamily;
   std::string _fontStyle;
   FontMetrics _fontMetrics = {};
+  float _unitsPerEm = 1.0f;
   uint32_t uniqueID = 0;
   Rect fontBounds = {};
 };

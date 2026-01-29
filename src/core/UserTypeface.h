@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cmath>
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/Stream.h"
@@ -43,7 +44,11 @@ class UserTypeface : public Typeface {
   }
 
   int unitsPerEm() const override {
-    return 1;
+    return static_cast<int>(std::ceil(_unitsPerEm));
+  }
+
+  float unitsPerEmF() const {
+    return _unitsPerEm;
   }
 
   const FontMetrics& fontMetrics() const {
@@ -69,16 +74,18 @@ class UserTypeface : public Typeface {
   }
 
   bool onComputeBounds(Rect* bounds) const override {
-    *bounds = fontBounds;
+    float invUpem = 1.0f / _unitsPerEm;
+    bounds->setLTRB(fontBounds.left * invUpem, fontBounds.top * invUpem,
+                    fontBounds.right * invUpem, fontBounds.bottom * invUpem);
     return true;
   }
 
  protected:
   explicit UserTypeface(uint32_t builderID, const std::string& fontFamily,
                         const std::string& fontStyle, const FontMetrics& fontMetrics,
-                        const Rect& fontBounds)
+                        const Rect& fontBounds, float unitsPerEm)
       : _builderID(builderID), _fontFamily(fontFamily), _fontStyle(fontStyle),
-        _fontMetrics(fontMetrics), fontBounds(fontBounds) {
+        _fontMetrics(fontMetrics), fontBounds(fontBounds), _unitsPerEm(unitsPerEm) {
   }
 
  private:
@@ -88,5 +95,6 @@ class UserTypeface : public Typeface {
   std::string _fontStyle;
   FontMetrics _fontMetrics = {};
   Rect fontBounds = {};
+  float _unitsPerEm = 1.0f;
 };
 }  // namespace tgfx

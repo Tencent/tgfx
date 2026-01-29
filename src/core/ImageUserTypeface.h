@@ -29,7 +29,7 @@ class ImageUserTypeface final : public UserTypeface {
   static std::shared_ptr<UserTypeface> Make(uint32_t builderID, const std::string& fontFamily,
                                             const std::string& fontStyle,
                                             const FontMetrics& fontMetrics, const Rect& fontBounds,
-                                            const ImageRecordType& glyphRecords);
+                                            float unitsPerEm, const ImageRecordType& glyphRecords);
 
   size_t glyphsCount() const override;
 
@@ -44,7 +44,8 @@ class ImageUserTypeface final : public UserTypeface {
  private:
   explicit ImageUserTypeface(uint32_t builderID, const std::string& fontFamily,
                              const std::string& fontStyle, const FontMetrics& fontMetrics,
-                             const Rect& fontBounds, const ImageRecordType& glyphRecords);
+                             const Rect& fontBounds, float unitsPerEm,
+                             const ImageRecordType& glyphRecords);
 
   ImageRecordType glyphRecords = {};
 };
