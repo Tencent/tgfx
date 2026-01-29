@@ -26,7 +26,7 @@ class ImageUserScalerContext final : public UserScalerContext {
  public:
   ImageUserScalerContext(std::shared_ptr<Typeface> typeface, float size)
       : UserScalerContext(std::move(typeface), size) {
-    textScale = textSize / imageTypeface()->unitsPerEmF();
+    textScale = textSize / static_cast<float>(imageTypeface()->unitsPerEm());
   }
 
   Rect getBounds(GlyphID glyphID, bool, bool fauxItalic) const override {
@@ -91,7 +91,7 @@ class ImageUserScalerContext final : public UserScalerContext {
 
 std::shared_ptr<UserTypeface> ImageUserTypeface::Make(
     uint32_t builderID, const std::string& fontFamily, const std::string& fontStyle,
-    const FontMetrics& fontMetrics, const Rect& fontBounds, float unitsPerEm,
+    const FontMetrics& fontMetrics, const Rect& fontBounds, int unitsPerEm,
     const ImageRecordType& glyphRecords) {
   auto typeface = std::shared_ptr<ImageUserTypeface>(new ImageUserTypeface(
       builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm, glyphRecords));
@@ -101,7 +101,7 @@ std::shared_ptr<UserTypeface> ImageUserTypeface::Make(
 
 ImageUserTypeface::ImageUserTypeface(uint32_t builderID, const std::string& fontFamily,
                                      const std::string& fontStyle, const FontMetrics& fontMetrics,
-                                     const Rect& fontBounds, float unitsPerEm,
+                                     const Rect& fontBounds, int unitsPerEm,
                                      const ImageRecordType& glyphRecords)
     : UserTypeface(builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm),
       glyphRecords(glyphRecords) {

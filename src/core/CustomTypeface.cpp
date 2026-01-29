@@ -32,7 +32,7 @@ void CustomTypefaceBuilder::setMetrics(const FontMetrics& metrics) {
   _fontMetrics = metrics;
 }
 
-void CustomTypefaceBuilder::setUnitsPerEm(float unitsPerEm) {
+void CustomTypefaceBuilder::setUnitsPerEm(int unitsPerEm) {
   if (unitsPerEm > 0) {
     _unitsPerEm = unitsPerEm;
   }

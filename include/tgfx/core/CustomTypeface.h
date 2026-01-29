@@ -54,7 +54,7 @@ class CustomTypefaceBuilder {
    * 24 pixels height and ascent will be 800 * 24 / 1000 = 19.2 pixels.
    * @param unitsPerEm The design space units per em. Must be greater than 0.
    */
-  void setUnitsPerEm(float unitsPerEm);
+  void setUnitsPerEm(int unitsPerEm);
 
   /**
    * Detaches the typeface being built. After this call, the builder remains valid and can be used
@@ -69,7 +69,7 @@ class CustomTypefaceBuilder {
   std::string _fontFamily;
   std::string _fontStyle;
   FontMetrics _fontMetrics = {};
-  float _unitsPerEm = 1.0f;
+  int _unitsPerEm = 1;
   uint32_t uniqueID = 0;
   Rect fontBounds = {};
 };

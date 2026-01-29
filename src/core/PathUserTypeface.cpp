@@ -36,7 +36,7 @@ class PathUserScalerContext final : public UserScalerContext {
  public:
   PathUserScalerContext(std::shared_ptr<Typeface> typeface, float size)
       : UserScalerContext(std::move(typeface), size) {
-    textScale = textSize / pathTypeFace()->unitsPerEmF();
+    textScale = textSize / static_cast<float>(pathTypeFace()->unitsPerEm());
     fauxBoldScale = FauxBoldScale(textSize);
   }
 
@@ -148,7 +148,7 @@ std::shared_ptr<UserTypeface> PathUserTypeface::Make(uint32_t builderID,
                                                      const std::string& fontFamily,
                                                      const std::string& fontStyle,
                                                      const FontMetrics& fontMetrics,
-                                                     const Rect& fontBounds, float unitsPerEm,
+                                                     const Rect& fontBounds, int unitsPerEm,
                                                      const VectorProviderType& glyphPathProviders) {
   auto typeface = std::shared_ptr<PathUserTypeface>(new PathUserTypeface(
       builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm, glyphPathProviders));
@@ -158,7 +158,7 @@ std::shared_ptr<UserTypeface> PathUserTypeface::Make(uint32_t builderID,
 
 PathUserTypeface::PathUserTypeface(uint32_t builderID, const std::string& fontFamily,
                                    const std::string& fontStyle, const FontMetrics& fontMetrics,
-                                   const Rect& fontBounds, float unitsPerEm,
+                                   const Rect& fontBounds, int unitsPerEm,
                                    const VectorProviderType& glyphPathProviders)
     : UserTypeface(builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm),
       glyphPathProviders(glyphPathProviders) {

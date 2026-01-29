@@ -46,7 +46,7 @@ class UserScalerContext : public ScalerContext {
 
   FontMetrics getFontMetrics() const override {
     auto userTypeface = static_cast<UserTypeface*>(typeface.get());
-    float scale = textSize / userTypeface->unitsPerEmF();
+    float scale = textSize / static_cast<float>(userTypeface->unitsPerEm());
     return ScaleFontMetrics(userTypeface->fontMetrics(), scale);
   }
 
