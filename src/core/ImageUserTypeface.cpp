@@ -75,7 +75,7 @@ class ImageUserScalerContext final : public UserScalerContext {
   }
 
   float getBackingSize() const override {
-    return 1.f;
+    return static_cast<float>(userTypeface()->unitsPerEm());
   }
 
  private:
