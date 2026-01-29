@@ -35,13 +35,11 @@ static Matrix GetTransform(bool fauxItalic, float textScale) {
 class PathUserScalerContext final : public UserScalerContext {
  public:
   PathUserScalerContext(std::shared_ptr<Typeface> typeface, float size)
-      : UserScalerContext(std::move(typeface), size) {
-    textScale = textSize / static_cast<float>(pathTypeFace()->unitsPerEm());
-    fauxBoldScale = FauxBoldScale(textSize);
+      : UserScalerContext(std::move(typeface), size), fauxBoldScale(FauxBoldScale(size)) {
   }
 
   Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override {
-    auto pathProvider = pathTypeFace()->getPathProvider(glyphID);
+    auto pathProvider = pathTypeface()->getPathProvider(glyphID);
     if (pathProvider == nullptr) {
       return {};
     }
@@ -63,7 +61,7 @@ class PathUserScalerContext final : public UserScalerContext {
     if (path == nullptr) {
       return false;
     }
-    auto pathProvider = pathTypeFace()->getPathProvider(glyphID);
+    auto pathProvider = pathTypeface()->getPathProvider(glyphID);
     if (pathProvider == nullptr) {
       path->reset();
       return false;
@@ -84,7 +82,7 @@ class PathUserScalerContext final : public UserScalerContext {
 
   Rect getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
                          Matrix* matrix) const override {
-    if (pathTypeFace()->getPathProvider(glyphID) == nullptr) {
+    if (pathTypeface()->getPathProvider(glyphID) == nullptr) {
       return {};
     }
     auto bounds = getBounds(glyphID, fauxBold, false);
@@ -105,7 +103,7 @@ class PathUserScalerContext final : public UserScalerContext {
     if (dstInfo.isEmpty() || dstPixels == nullptr || dstInfo.colorType() != ColorType::ALPHA_8) {
       return false;
     }
-    auto pathProvider = pathTypeFace()->getPathProvider(glyphID);
+    auto pathProvider = pathTypeface()->getPathProvider(glyphID);
     if (pathProvider == nullptr) {
       return false;
     }
@@ -136,11 +134,10 @@ class PathUserScalerContext final : public UserScalerContext {
   }
 
  private:
-  PathUserTypeface* pathTypeFace() const {
-    return static_cast<PathUserTypeface*>(typeface.get());
+  PathUserTypeface* pathTypeface() const {
+    return static_cast<PathUserTypeface*>(userTypeface());
   }
 
-  float textScale = 1.0f;
   float fauxBoldScale = 1.0f;
 };
 

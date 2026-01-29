@@ -25,25 +25,24 @@ namespace tgfx {
 class UserScalerContext : public ScalerContext {
  public:
   UserScalerContext(std::shared_ptr<Typeface> typeface, float size)
-      : ScalerContext(std::move(typeface), size) {
+      : ScalerContext(std::move(typeface), size),
+        textScale(size / static_cast<float>(userTypeface()->unitsPerEm())) {
   }
 
   FontMetrics getFontMetrics() const override {
-    auto userTypeface = static_cast<UserTypeface*>(typeface.get());
-    float scale = textSize / static_cast<float>(userTypeface->unitsPerEm());
-    const auto& metrics = userTypeface->fontMetrics();
+    const auto& metrics = userTypeface()->fontMetrics();
     FontMetrics result = {};
-    result.top = metrics.top * scale;
-    result.ascent = metrics.ascent * scale;
-    result.descent = metrics.descent * scale;
-    result.bottom = metrics.bottom * scale;
-    result.leading = metrics.leading * scale;
-    result.xMin = metrics.xMin * scale;
-    result.xMax = metrics.xMax * scale;
-    result.xHeight = metrics.xHeight * scale;
-    result.capHeight = metrics.capHeight * scale;
-    result.underlineThickness = metrics.underlineThickness * scale;
-    result.underlinePosition = metrics.underlinePosition * scale;
+    result.top = metrics.top * textScale;
+    result.ascent = metrics.ascent * textScale;
+    result.descent = metrics.descent * textScale;
+    result.bottom = metrics.bottom * textScale;
+    result.leading = metrics.leading * textScale;
+    result.xMin = metrics.xMin * textScale;
+    result.xMax = metrics.xMax * textScale;
+    result.xHeight = metrics.xHeight * textScale;
+    result.capHeight = metrics.capHeight * textScale;
+    result.underlineThickness = metrics.underlineThickness * textScale;
+    result.underlinePosition = metrics.underlinePosition * textScale;
     return result;
   }
 
@@ -54,5 +53,12 @@ class UserScalerContext : public ScalerContext {
   Point getVerticalOffset(GlyphID) const override {
     return {};
   }
+
+ protected:
+  UserTypeface* userTypeface() const {
+    return static_cast<UserTypeface*>(typeface.get());
+  }
+
+  float textScale = 1.0f;
 };
 }  // namespace tgfx

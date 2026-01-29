@@ -26,7 +26,6 @@ class ImageUserScalerContext final : public UserScalerContext {
  public:
   ImageUserScalerContext(std::shared_ptr<Typeface> typeface, float size)
       : UserScalerContext(std::move(typeface), size) {
-    textScale = textSize / static_cast<float>(imageTypeface()->unitsPerEm());
   }
 
   Rect getBounds(GlyphID glyphID, bool, bool fauxItalic) const override {
@@ -81,10 +80,8 @@ class ImageUserScalerContext final : public UserScalerContext {
 
  private:
   ImageUserTypeface* imageTypeface() const {
-    return static_cast<ImageUserTypeface*>(typeface.get());
+    return static_cast<ImageUserTypeface*>(userTypeface());
   }
-
-  float textScale = 1.0f;
 };
 
 //////////////
