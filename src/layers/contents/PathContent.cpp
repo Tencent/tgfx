@@ -22,7 +22,7 @@
 namespace tgfx {
 
 PathContent::PathContent(Path path, const LayerPaint& paint)
-    : GeometryContent(paint), path(std::move(path)) {
+    : DrawContent(paint), path(std::move(path)) {
 }
 
 Rect PathContent::onGetBounds() const {

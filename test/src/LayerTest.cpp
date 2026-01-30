@@ -23,14 +23,15 @@
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "layers/OpaqueContext.h"
-#include "layers/DrawArgs.h"
-#include "layers/RootLayer.h"
 #include "layers/BackgroundContext.h"
+#include "layers/DrawArgs.h"
+#include "layers/OpaqueContext.h"
+#include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
 #include "layers/TileCache.h"
 #include "layers/compositing3d/Layer3DContext.h"
 #include "layers/contents/ComposeContent.h"
+#include "layers/contents/MatrixContent.h"
 #include "layers/contents/RRectsContent.h"
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/TextContent.h"
@@ -2599,6 +2600,75 @@ TGFX_TEST(LayerTest, LayerRecorder) {
   }
 }
 
+TGFX_TEST(LayerTest, LayerRecorderMatrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  LayerPaint redPaint = {};
+  redPaint.color = Color::Red();
+
+  // Test 1: Same matrix should merge, different matrices should not merge
+  {
+    auto surface = Surface::Make(context, 300, 150);
+    auto canvas = surface->getCanvas();
+
+    // Same matrix merges into MatrixContent wrapping Rects
+    LayerRecorder recorder1 = {};
+    auto rotate30 = Matrix::MakeRotate(30, 75, 75);
+    recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint, rotate30);
+    recorder1.addRect(Rect::MakeXYWH(90, 90, 50, 50), redPaint, rotate30);
+    auto content1 = recorder1.finishRecording();
+    ASSERT_TRUE(content1 != nullptr);
+    EXPECT_EQ(content1->type(), LayerContent::Type::Matrix);
+    auto matrixContent = static_cast<MatrixContent*>(content1.get());
+    EXPECT_EQ(matrixContent->content->type(), LayerContent::Type::Rects);
+    content1->drawDefault(canvas, 1.0f, true);
+
+    // Different matrices create Compose
+    LayerRecorder recorder2 = {};
+    auto rotate45 = Matrix::MakeRotate(45, 225, 75);
+    recorder2.addRect(Rect::MakeXYWH(160, 10, 50, 50), redPaint, rotate30);
+    recorder2.addRect(Rect::MakeXYWH(240, 90, 50, 50), redPaint, rotate45);
+    auto content2 = recorder2.finishRecording();
+    ASSERT_TRUE(content2 != nullptr);
+    EXPECT_EQ(content2->type(), LayerContent::Type::Compose);
+    content2->drawDefault(canvas, 1.0f, true);
+
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorderMatrix_MergeAndCompose"));
+  }
+
+  // Test 2: nullopt or identity matrix should not create MatrixContent
+  {
+    LayerRecorder recorder1 = {};
+    recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint, std::nullopt);
+    auto content1 = recorder1.finishRecording();
+    EXPECT_EQ(content1->type(), LayerContent::Type::Rect);
+
+    LayerRecorder recorder2 = {};
+    recorder2.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint, Matrix::I());
+    auto content2 = recorder2.finishRecording();
+    EXPECT_EQ(content2->type(), LayerContent::Type::Rect);
+  }
+
+  // Test 3: getTightBounds and hitTestPoint with matrix transformation
+  {
+    LayerRecorder recorder = {};
+    auto rotateMatrix = Matrix::MakeRotate(45, 50, 50);
+    recorder.addRect(Rect::MakeXYWH(0, 0, 100, 100), redPaint, rotateMatrix);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+
+    auto bounds = content->getTightBounds(Matrix::I());
+    EXPECT_GT(bounds.width(), 100.0f);
+    EXPECT_GT(bounds.height(), 100.0f);
+
+    EXPECT_TRUE(content->hitTestPoint(50, 50));
+    EXPECT_FALSE(content->hitTestPoint(0, 0));
+    EXPECT_TRUE(content->hitTestPoint(50, -15));
+  }
+}
+
 TGFX_TEST(LayerTest, GetRotateBounds) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -3142,41 +3212,43 @@ TGFX_TEST(LayerTest, RootLayerBackgroundColorWithBlurBackground) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  
+
   auto surface = Surface::Make(context, 200, 200);
   auto displayList = std::make_unique<DisplayList>();
-  
+
   // Set background color on display list (which sets it on root layer)
-  auto backgroundColor = Color::FromRGBA(255, 0, 0, 128); // Semi-transparent red
+  auto backgroundColor = Color::FromRGBA(255, 0, 0, 128);  // Semi-transparent red
   displayList->setBackgroundColor(backgroundColor);
   EXPECT_EQ(displayList->backgroundColor(), backgroundColor);
-  
+
   // Add a bottom layer to provide content that will be blurred
   auto bottomLayer = ShapeLayer::Make();
   Path bottomPath = {};
   bottomPath.addRect(Rect::MakeXYWH(60.0f, 60.0f, 80.0f, 80.0f));
   bottomLayer->setPath(bottomPath);
-  bottomLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 255, 255))); // Blue background content
+  bottomLayer->setFillStyle(
+      ShapeStyle::Make(Color::FromRGBA(0, 0, 255, 255)));  // Blue background content
   displayList->root()->addChild(bottomLayer);
-  
+
   // Add a shape layer with background blur to trigger the blurBackground code path
   // Position it so part covers bottomLayer and part covers pure background
   auto shapeLayer = ShapeLayer::Make();
   Path path = {};
   path.addRect(Rect::MakeXYWH(40.0f, 40.0f, 80.0f, 80.0f));
   shapeLayer->setPath(path);
-  shapeLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 128))); // Semi-transparent white
-  
+  shapeLayer->setFillStyle(
+      ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 128)));  // Semi-transparent white
+
   // Add background blur style to trigger the blur background rendering
   auto backgroundBlur = BackgroundBlurStyle::Make(10.0f, 10.0f);
   shapeLayer->setLayerStyles({backgroundBlur});
-  
+
   displayList->root()->addChild(shapeLayer);
-  
+
   // Render the display list - this will internally create BackgroundContext and call
   // RootLayer::drawLayer with args.blurBackground set, testing our new code path
   displayList->render(surface.get());
-  
+
   // Compare with baseline to verify the background color is correctly drawn
   // to both the main canvas and blur background canvas
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RootLayerBackgroundColorWithBlurBackground"));

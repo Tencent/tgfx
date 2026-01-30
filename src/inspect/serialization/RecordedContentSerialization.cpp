@@ -19,9 +19,12 @@
 #include "RecordedContentSerialization.h"
 #include "core/utils/Types.h"
 #include "layers/contents/ComposeContent.h"
+#include "layers/contents/MatrixContent.h"
 #include "layers/contents/PathContent.h"
 #include "layers/contents/RRectContent.h"
+#include "layers/contents/RRectsContent.h"
 #include "layers/contents/RectContent.h"
+#include "layers/contents/RectsContent.h"
 #include "layers/contents/ShapeContent.h"
 #include "layers/contents/TextContent.h"
 
@@ -43,6 +46,12 @@ static std::string ContentTypeToString(ContentType type) {
       return "Text";
     case ContentType::Compose:
       return "Compose";
+    case ContentType::Rects:
+      return "Rects";
+    case ContentType::RRects:
+      return "RRects";
+    case ContentType::Matrix:
+      return "Matrix";
     default:
       return "Unknown";
   }
@@ -82,7 +91,7 @@ static void SerializeStroke(flexbuffers::Builder& fbb, const Stroke& stroke) {
   fbb.EndMap(strokeStart);
 }
 
-static void SerializeGeometryContent(flexbuffers::Builder& fbb, const GeometryContent* content) {
+static void SerializeDrawContent(flexbuffers::Builder& fbb, const DrawContent* content) {
   SerializeColor(fbb, content->color);
   SerializeUtils::SetFlexBufferMap(fbb, "hasShader", content->shader != nullptr);
   SerializeUtils::SetFlexBufferMap(fbb, "blendMode",
@@ -93,28 +102,31 @@ static void SerializeGeometryContent(flexbuffers::Builder& fbb, const GeometryCo
   }
 }
 
-static void SerializeRectContent(flexbuffers::Builder& fbb, const RectContent* content) {
-  SerializeGeometryContent(fbb, content);
-  fbb.Key("rect");
+static void SerializeRect(flexbuffers::Builder& fbb, const char* key, const Rect& rect) {
+  fbb.Key(key);
   auto rectStart = fbb.StartMap();
-  SerializeUtils::SetFlexBufferMap(fbb, "left", content->rect.left);
-  SerializeUtils::SetFlexBufferMap(fbb, "top", content->rect.top);
-  SerializeUtils::SetFlexBufferMap(fbb, "right", content->rect.right);
-  SerializeUtils::SetFlexBufferMap(fbb, "bottom", content->rect.bottom);
+  SerializeUtils::SetFlexBufferMap(fbb, "left", rect.left);
+  SerializeUtils::SetFlexBufferMap(fbb, "top", rect.top);
+  SerializeUtils::SetFlexBufferMap(fbb, "right", rect.right);
+  SerializeUtils::SetFlexBufferMap(fbb, "bottom", rect.bottom);
   fbb.EndMap(rectStart);
 }
 
+static void SerializeRectContent(flexbuffers::Builder& fbb, const RectContent* content) {
+  SerializeDrawContent(fbb, content);
+  SerializeRect(fbb, "rect", content->rect);
+}
+
+static void SerializeRectsContent(flexbuffers::Builder& fbb, const RectsContent* content) {
+  SerializeDrawContent(fbb, content);
+  SerializeUtils::SetFlexBufferMap(fbb, "rectsCount", static_cast<int>(content->rects.size()));
+}
+
 static void SerializeRRectContent(flexbuffers::Builder& fbb, const RRectContent* content) {
-  SerializeGeometryContent(fbb, content);
+  SerializeDrawContent(fbb, content);
   fbb.Key("rRect");
   auto rRectStart = fbb.StartMap();
-  fbb.Key("rect");
-  auto rectStart = fbb.StartMap();
-  SerializeUtils::SetFlexBufferMap(fbb, "left", content->rRect.rect.left);
-  SerializeUtils::SetFlexBufferMap(fbb, "top", content->rRect.rect.top);
-  SerializeUtils::SetFlexBufferMap(fbb, "right", content->rRect.rect.right);
-  SerializeUtils::SetFlexBufferMap(fbb, "bottom", content->rRect.rect.bottom);
-  fbb.EndMap(rectStart);
+  SerializeRect(fbb, "rect", content->rRect.rect);
   fbb.Key("radii");
   auto radiiStart = fbb.StartMap();
   SerializeUtils::SetFlexBufferMap(fbb, "x", content->rRect.radii.x);
@@ -123,44 +135,40 @@ static void SerializeRRectContent(flexbuffers::Builder& fbb, const RRectContent*
   fbb.EndMap(rRectStart);
 }
 
+static void SerializeRRectsContent(flexbuffers::Builder& fbb, const RRectsContent* content) {
+  SerializeDrawContent(fbb, content);
+  SerializeUtils::SetFlexBufferMap(fbb, "rRectsCount", static_cast<int>(content->rRects.size()));
+}
+
 static void SerializePathContent(flexbuffers::Builder& fbb, const PathContent* content) {
-  SerializeGeometryContent(fbb, content);
-  auto bounds = content->path.getBounds();
-  fbb.Key("pathBounds");
-  auto pathBoundsStart = fbb.StartMap();
-  SerializeUtils::SetFlexBufferMap(fbb, "left", bounds.left);
-  SerializeUtils::SetFlexBufferMap(fbb, "top", bounds.top);
-  SerializeUtils::SetFlexBufferMap(fbb, "right", bounds.right);
-  SerializeUtils::SetFlexBufferMap(fbb, "bottom", bounds.bottom);
-  fbb.EndMap(pathBoundsStart);
+  SerializeDrawContent(fbb, content);
+  SerializeRect(fbb, "pathBounds", content->path.getBounds());
 }
 
 static void SerializeShapeContent(flexbuffers::Builder& fbb, const ShapeContent* content) {
-  SerializeGeometryContent(fbb, content);
+  SerializeDrawContent(fbb, content);
   if (content->shape) {
-    auto bounds = content->shape->getBounds();
-    fbb.Key("shapeBounds");
-    auto shapeBoundsStart = fbb.StartMap();
-    SerializeUtils::SetFlexBufferMap(fbb, "left", bounds.left);
-    SerializeUtils::SetFlexBufferMap(fbb, "top", bounds.top);
-    SerializeUtils::SetFlexBufferMap(fbb, "right", bounds.right);
-    SerializeUtils::SetFlexBufferMap(fbb, "bottom", bounds.bottom);
-    fbb.EndMap(shapeBoundsStart);
+    SerializeRect(fbb, "shapeBounds", content->shape->getBounds());
   }
 }
 
 static void SerializeTextContent(flexbuffers::Builder& fbb, const TextContent* content) {
-  SerializeGeometryContent(fbb, content);
+  SerializeDrawContent(fbb, content);
   if (content->textBlob) {
-    auto bounds = content->textBlob->getBounds();
-    fbb.Key("textBounds");
-    auto textBoundsStart = fbb.StartMap();
-    SerializeUtils::SetFlexBufferMap(fbb, "left", bounds.left);
-    SerializeUtils::SetFlexBufferMap(fbb, "top", bounds.top);
-    SerializeUtils::SetFlexBufferMap(fbb, "right", bounds.right);
-    SerializeUtils::SetFlexBufferMap(fbb, "bottom", bounds.bottom);
-    fbb.EndMap(textBoundsStart);
+    SerializeRect(fbb, "textBounds", content->textBlob->getBounds());
   }
+}
+
+static void SerializeMatrixContent(flexbuffers::Builder& fbb, const MatrixContent* content) {
+  fbb.Key("matrix");
+  auto matrixStart = fbb.StartMap();
+  SerializeUtils::SetFlexBufferMap(fbb, "scaleX", content->matrix.getScaleX());
+  SerializeUtils::SetFlexBufferMap(fbb, "skewX", content->matrix.getSkewX());
+  SerializeUtils::SetFlexBufferMap(fbb, "transX", content->matrix.getTranslateX());
+  SerializeUtils::SetFlexBufferMap(fbb, "skewY", content->matrix.getSkewY());
+  SerializeUtils::SetFlexBufferMap(fbb, "scaleY", content->matrix.getScaleY());
+  SerializeUtils::SetFlexBufferMap(fbb, "transY", content->matrix.getTranslateY());
+  fbb.EndMap(matrixStart);
 }
 
 std::shared_ptr<Data> RecordedContentSerialization::Serialize(
@@ -181,8 +189,14 @@ std::shared_ptr<Data> RecordedContentSerialization::Serialize(
     case ContentType::Rect:
       SerializeRectContent(fbb, static_cast<const RectContent*>(content));
       break;
+    case ContentType::Rects:
+      SerializeRectsContent(fbb, static_cast<const RectsContent*>(content));
+      break;
     case ContentType::RRect:
       SerializeRRectContent(fbb, static_cast<const RRectContent*>(content));
+      break;
+    case ContentType::RRects:
+      SerializeRRectsContent(fbb, static_cast<const RRectsContent*>(content));
       break;
     case ContentType::Path:
       SerializePathContent(fbb, static_cast<const PathContent*>(content));
@@ -192,6 +206,9 @@ std::shared_ptr<Data> RecordedContentSerialization::Serialize(
       break;
     case ContentType::Text:
       SerializeTextContent(fbb, static_cast<const TextContent*>(content));
+      break;
+    case ContentType::Matrix:
+      SerializeMatrixContent(fbb, static_cast<const MatrixContent*>(content));
       break;
     case ContentType::Compose:
       // ComposeContent contains multiple contents, just show count.

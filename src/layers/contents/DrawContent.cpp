@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GeometryContent.h"
+#include "DrawContent.h"
 #include "core/utils/StrokeUtils.h"
 #include "core/utils/Types.h"
 
@@ -32,7 +32,7 @@ static bool StrokeEquals(const Stroke* a, const Stroke* b) {
   return *a == *b;
 }
 
-GeometryContent::GeometryContent(const LayerPaint& paint) : blendMode(paint.blendMode) {
+DrawContent::DrawContent(const LayerPaint& paint) : blendMode(paint.blendMode) {
   auto paintShader = paint.shader;
   if (paintShader) {
     Color shaderColor = {};
@@ -51,7 +51,7 @@ GeometryContent::GeometryContent(const LayerPaint& paint) : blendMode(paint.blen
   }
 }
 
-Rect GeometryContent::getBounds() const {
+Rect DrawContent::getBounds() const {
   auto bounds = onGetBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &bounds);
@@ -59,27 +59,7 @@ Rect GeometryContent::getBounds() const {
   return bounds;
 }
 
-bool GeometryContent::drawDefault(Canvas* canvas, float contentAlpha, bool antiAlias) const {
-  if (color.alpha <= 0) {
-    return false;
-  }
-  Paint paint = {};
-  paint.setAntiAlias(antiAlias);
-  paint.setColor(color);
-  paint.setAlpha(color.alpha * contentAlpha);
-  if (shader) {
-    paint.setShader(shader);
-  }
-  paint.setBlendMode(blendMode);
-  if (stroke) {
-    paint.setStyle(PaintStyle::Stroke);
-    paint.setStroke(*stroke);
-  }
-  onDraw(canvas, paint);
-  return false;
-}
-
-void GeometryContent::drawContour(Canvas* canvas, bool antiAlias) const {
+void DrawContent::drawContour(Canvas* canvas, bool antiAlias) const {
   Paint paint = {};
   paint.setAntiAlias(antiAlias);
   if (stroke) {
@@ -92,7 +72,7 @@ void GeometryContent::drawContour(Canvas* canvas, bool antiAlias) const {
   onDraw(canvas, paint);
 }
 
-bool GeometryContent::contourEqualsOpaqueContent() const {
+bool DrawContent::contourEqualsOpaqueContent() const {
   if (color.alpha <= 0) {
     return false;
   }
@@ -102,12 +82,39 @@ bool GeometryContent::contourEqualsOpaqueContent() const {
   return true;
 }
 
-void GeometryContent::drawForeground(Canvas*, float, bool) const {
+bool DrawContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
+  if (color.alpha <= 0) {
+    return false;
+  }
+  Paint paint = {};
+  paint.setAntiAlias(antiAlias);
+  paint.setColor(color);
+  paint.setAlpha(color.alpha * alpha);
+  if (shader) {
+    paint.setShader(shader);
+  }
+  paint.setBlendMode(blendMode);
+  if (stroke) {
+    paint.setStyle(PaintStyle::Stroke);
+    paint.setStroke(*stroke);
+  }
+  onDraw(canvas, paint);
+  return false;
 }
 
-bool GeometryContent::hasSameGeometry(const GeometryContent* other) const {
-  if (other == nullptr || Types::Get(this) != Types::Get(other) ||
-      !StrokeEquals(stroke.get(), other->stroke.get())) {
+void DrawContent::drawForeground(Canvas*, float, bool) const {
+}
+
+const std::shared_ptr<Shader>& DrawContent::getShader() const {
+  return shader;
+}
+
+bool DrawContent::hasSameGeometry(const GeometryContent* other) const {
+  if (other == nullptr || Types::Get(this) != Types::Get(other)) {
+    return false;
+  }
+  auto otherContent = static_cast<const DrawContent*>(other);
+  if (!StrokeEquals(stroke.get(), otherContent->stroke.get())) {
     return false;
   }
   return onHasSameGeometry(other);

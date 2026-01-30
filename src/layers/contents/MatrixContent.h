@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,32 +18,35 @@
 
 #pragma once
 
-#include <vector>
 #include "layers/contents/DrawContent.h"
-#include "tgfx/core/RRect.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 
-class RRectsContent : public DrawContent {
+/**
+ * MatrixContent wraps a DrawContent and applies a transformation matrix during drawing.
+ */
+class MatrixContent : public GeometryContent {
  public:
-  RRectsContent(std::vector<RRect> rRects, const LayerPaint& paint);
+  MatrixContent(std::unique_ptr<DrawContent> content, const Matrix& matrix);
 
+  Rect getBounds() const override;
   Rect getTightBounds(const Matrix& matrix) const override;
   bool hitTestPoint(float localX, float localY) const override;
+  void drawContour(Canvas* canvas, bool antiAlias) const override;
+  bool contourEqualsOpaqueContent() const override;
+  bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
+  void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
+  const std::shared_ptr<Shader>& getShader() const override;
+  bool hasSameGeometry(const GeometryContent* other) const override;
 
-  std::vector<RRect> rRects = {};
+  std::unique_ptr<DrawContent> content = nullptr;
+  Matrix matrix = Matrix::I();
 
  protected:
   Type type() const override {
-    return Type::RRects;
+    return Type::Matrix;
   }
-
-  Rect onGetBounds() const override;
-  void onDraw(Canvas* canvas, const Paint& paint) const override;
-  bool onHasSameGeometry(const GeometryContent* other) const override;
-
- private:
-  Path getFilledPath() const;
 };
 
 }  // namespace tgfx

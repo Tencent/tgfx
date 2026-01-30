@@ -18,12 +18,12 @@
 
 #pragma once
 
-#include "layers/contents/GeometryContent.h"
+#include "layers/contents/DrawContent.h"
 #include "tgfx/core/RRect.h"
 
 namespace tgfx {
 
-class RRectContent : public GeometryContent {
+class RRectContent : public DrawContent {
  public:
   RRectContent(const RRect& rRect, const LayerPaint& paint);
 
