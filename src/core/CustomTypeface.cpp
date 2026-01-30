@@ -19,9 +19,15 @@
 #include "tgfx/core/CustomTypeface.h"
 #include "ImageUserTypeface.h"
 #include "PathUserTypeface.h"
+#include "core/utils/UniqueID.h"
 #include "tgfx/core/PathProvider.h"
 
 namespace tgfx {
+
+CustomTypefaceBuilder::CustomTypefaceBuilder(int unitsPerEm)
+    : _unitsPerEm(unitsPerEm > 0 ? unitsPerEm : 1), uniqueID(UniqueID::Next()) {
+}
+
 void CustomTypefaceBuilder::setFontName(const std::string& fontFamily,
                                         const std::string& fontStyle) {
   _fontFamily = fontFamily;
