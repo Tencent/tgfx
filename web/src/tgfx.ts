@@ -136,7 +136,6 @@ export const releaseNativeImage = (source: TexImageSource | OffscreenCanvas) => 
     } else if (isCanvas(source)) {
         releaseCanvas2D(source as OffscreenCanvas | HTMLCanvasElement);
     }
-    // OffscreenCanvas and HTMLCanvasElement will be garbage collected automatically.
 };
 
 export const getBytesFromPath = async (module: TGFX, path: string) => {

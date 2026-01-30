@@ -29,13 +29,13 @@ class AtlasManager : public AtlasGenerationCounter {
 
   // This function must be called first, before other functions which use the atlas.
   // if it returns empty, the client must not try to use other functions.
-  const std::vector<std::shared_ptr<TextureProxy>>& getTextureProxies(MaskFormat maskFormat);
+  const std::vector<std::shared_ptr<TextureProxy>>& getTextureProxies(AtlasFormat atlasFormat);
 
-  bool hasGlyph(MaskFormat, const AtlasGlyph* glyph) const;
+  bool hasGlyph(AtlasFormat, const AtlasGlyph* glyph) const;
 
   bool addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken, AtlasLocator*) const;
 
-  void setPlotUseToken(PlotUseUpdater&, const PlotLocator&, MaskFormat, AtlasToken) const;
+  void setPlotUseToken(PlotUseUpdater&, const PlotLocator&, AtlasFormat, AtlasToken) const;
 
   void preFlush() {
   }
@@ -49,12 +49,12 @@ class AtlasManager : public AtlasGenerationCounter {
   void releaseAll();
 
  private:
-  bool initAtlas(MaskFormat format);
+  bool initAtlas(AtlasFormat format);
 
-  Atlas* getAtlas(MaskFormat format) const;
+  Atlas* getAtlas(AtlasFormat format) const;
 
   Context* context = nullptr;
-  std::unique_ptr<Atlas> atlases[MaskFormatCount];
+  std::unique_ptr<Atlas> atlases[AtlasFormatCount];
   AtlasTokenTracker atlasTokenTracker = {};
 };
 }  // namespace tgfx
