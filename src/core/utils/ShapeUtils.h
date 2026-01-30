@@ -21,7 +21,10 @@
 #include <memory>
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Shape.h"
+
 namespace tgfx {
+
+class MatrixShape;
 
 class ShapeUtils {
  public:
@@ -33,5 +36,11 @@ class ShapeUtils {
   static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
 
   static float CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape);
+
+  /**
+   * Returns the shape as a MatrixShape pointer, or nullptr if it is not a MatrixShape.
+   */
+  static const MatrixShape* AsMatrixShape(const Shape* shape);
 };
+
 }  // namespace tgfx

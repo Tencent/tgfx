@@ -22,7 +22,7 @@
 namespace tgfx {
 
 ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, const LayerPaint& paint)
-    : GeometryContent(paint), shape(std::move(shape)) {
+    : DrawContent(paint), shape(std::move(shape)) {
 }
 
 Rect ShapeContent::onGetBounds() const {

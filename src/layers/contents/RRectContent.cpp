@@ -17,13 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectContent.h"
-#include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
 
 RRectContent::RRectContent(const RRect& rRect, const LayerPaint& paint)
-    : GeometryContent(paint), rRect(rRect) {
+    : DrawContent(paint), rRect(rRect) {
 }
 
 Rect RRectContent::onGetBounds() const {

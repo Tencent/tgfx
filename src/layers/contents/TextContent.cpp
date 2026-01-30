@@ -22,7 +22,7 @@ namespace tgfx {
 
 TextContent::TextContent(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
                          const LayerPaint& paint)
-    : GeometryContent(paint), textBlob(std::move(textBlob)), textMatrix(matrix) {
+    : DrawContent(paint), textBlob(std::move(textBlob)), textMatrix(matrix) {
 }
 
 Rect TextContent::onGetBounds() const {

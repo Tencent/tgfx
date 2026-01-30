@@ -54,4 +54,11 @@ float ShapeUtils::CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> sh
   return std::min(strokeShape->stroke.width * scale, 1.f);
 }
 
+const MatrixShape* ShapeUtils::AsMatrixShape(const Shape* shape) {
+  if (shape != nullptr && shape->type() == Shape::Type::Matrix) {
+    return static_cast<const MatrixShape*>(shape);
+  }
+  return nullptr;
+}
+
 }  // namespace tgfx

@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "layers/contents/GeometryContent.h"
+#include "layers/contents/DrawContent.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
 
-class TextContent : public GeometryContent {
+class TextContent : public DrawContent {
  public:
   TextContent(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix, const LayerPaint& paint);
 
