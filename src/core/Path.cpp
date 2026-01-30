@@ -596,14 +596,6 @@ void Path::decompose(const PathIterator& iterator, void* info) const {
   }
 }
 
-int Path::ConvertConicToQuads(const Point& p0, const Point& p1, const Point& p2, float weight,
-                              Point quads[], int pow2) {
-  return SkPath::ConvertConicToQuads(*reinterpret_cast<const SkPoint*>(&p0),
-                                     *reinterpret_cast<const SkPoint*>(&p1),
-                                     *reinterpret_cast<const SkPoint*>(&p2), weight,
-                                     reinterpret_cast<SkPoint*>(quads), pow2);
-}
-
 PathRef* Path::writableRef() {
   if (pathRef.use_count() != 1) {
     pathRef = std::make_shared<PathRef>(pathRef->path);

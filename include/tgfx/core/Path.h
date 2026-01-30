@@ -373,20 +373,6 @@ class Path {
   void decompose(const PathIterator& iterator, void* info = nullptr) const;
 
   /**
-   * Converts a conic curve to a series of quadratic Bezier curves. This is useful when the target
-   * platform does not support conic curves natively (e.g., SVG, PDF, CoreGraphics, Canvas 2D).
-   * @param p0     conic start point
-   * @param p1     conic control point
-   * @param p2     conic end point
-   * @param weight conic weight
-   * @param quads  storage for quad points, must have space for at least 1 + 2 * (1 << pow2) points
-   * @param pow2   quad count as power of two (0 to 5), e.g., pow2=1 generates 2 quads (5 points)
-   * @return       number of quad curves written to quads
-   */
-  static int ConvertConicToQuads(const Point& p0, const Point& p1, const Point& p2, float weight,
-                                 Point quads[], int pow2);
-
-  /**
    * Returns the number of points in Path.
    */
   int countPoints() const;

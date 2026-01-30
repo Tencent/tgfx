@@ -19,6 +19,7 @@
 #include "tgfx/svg/SVGPathParser.h"
 #include "core/utils/Log.h"
 #include "svg/SVGUtils.h"
+#include "tgfx/core/CurveConverter.h"
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
@@ -140,10 +141,10 @@ std::string SVGPathParser::ToSVGString(const Path& path, PathEncoding encoding) 
         appendCommand(*castedString, 'Q', points, 1, 2);
         break;
       case PathVerb::Conic: {
-        Point quads[5] = {};
-        int numQuads = Path::ConvertConicToQuads(points[0], points[1], points[2], weight, quads, 1);
-        for (int i = 0; i < numQuads; ++i) {
-          appendCommand(*castedString, 'Q', quads, static_cast<size_t>(1 + i * 2), 2);
+        auto quads = CurveConverter::ConicToQuads(points[0], points[1], points[2], weight);
+        size_t numQuads = (quads.size() - 1) / 2;
+        for (size_t i = 0; i < numQuads; ++i) {
+          appendCommand(*castedString, 'Q', quads.data(), 1 + i * 2, 2);
         }
         break;
       }

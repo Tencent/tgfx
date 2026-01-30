@@ -25,6 +25,7 @@
 #include "core/utils/ScalePixelsAlpha.h"
 #include "core/utils/ShapeUtils.h"
 #include "platform/apple/BitmapContextUtil.h"
+#include "tgfx/core/CurveConverter.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 
@@ -43,11 +44,11 @@ static void Iterator(PathVerb verb, const Point points[4], float weight, void* i
                                 points[2].y);
       break;
     case PathVerb::Conic: {
-      Point quads[5] = {};
-      int numQuads = Path::ConvertConicToQuads(points[0], points[1], points[2], weight, quads, 1);
-      for (int i = 0; i < numQuads; ++i) {
-        CGPathAddQuadCurveToPoint(cgPath, nullptr, quads[1 + (i * 2)].x, quads[1 + (i * 2)].y,
-                                  quads[2 + (i * 2)].x, quads[2 + (i * 2)].y);
+      auto quads = CurveConverter::ConicToQuads(points[0], points[1], points[2], weight);
+      size_t numQuads = (quads.size() - 1) / 2;
+      for (size_t i = 0; i < numQuads; ++i) {
+        CGPathAddQuadCurveToPoint(cgPath, nullptr, quads[1 + i * 2].x, quads[1 + i * 2].y,
+                                  quads[2 + i * 2].x, quads[2 + i * 2].y);
       }
       break;
     }

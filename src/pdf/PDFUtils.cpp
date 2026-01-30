@@ -24,6 +24,7 @@
 #include "pdf/PDFResourceDictionary.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/BlendMode.h"
+#include "tgfx/core/CurveConverter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Point.h"
@@ -331,9 +332,9 @@ void PDFUtils::EmitPath(const Path& path, bool doConsumeDegerates,
         }
         break;
       case PathVerb::Conic: {
-        Point quads[5] = {};
-        int numQuads = Path::ConvertConicToQuads(points[0], points[1], points[2], weight, quads, 1);
-        for (int i = 0; i < numQuads; ++i) {
+        auto quads = CurveConverter::ConicToQuads(points[0], points[1], points[2], weight);
+        size_t numQuads = (quads.size() - 1) / 2;
+        for (size_t i = 0; i < numQuads; ++i) {
           AppendQuad(&quads[i * 2], currentSegment);
         }
         fillState = SkipFillState::NonSingleLine;

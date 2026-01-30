@@ -23,6 +23,7 @@
 #include "core/PathTriangulator.h"
 #include "core/ShapeRasterizer.h"
 #include "gtest/gtest.h"
+#include "tgfx/core/CurveConverter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -187,16 +188,16 @@ TGFX_TEST(PathTest, ConicTo) {
   ASSERT_EQ(points[2].y, 100.0f);
 }
 
-TGFX_TEST(PathTest, ConvertConicToQuads) {
+TGFX_TEST(PathTest, ConicToQuads) {
   Point p0 = {0, 100};
   Point p1 = {100, 0};
   Point p2 = {200, 100};
   float weight = 0.707107f;
 
-  Point quads[5] = {};
-  int numQuads = Path::ConvertConicToQuads(p0, p1, p2, weight, quads, 1);
+  auto quads = CurveConverter::ConicToQuads(p0, p1, p2, weight);
+  size_t numQuads = (quads.size() - 1) / 2;
 
-  ASSERT_EQ(numQuads, 2);
+  ASSERT_EQ(numQuads, 2u);
   ASSERT_EQ(quads[0].x, p0.x);
   ASSERT_EQ(quads[0].y, p0.y);
   ASSERT_EQ(quads[4].x, p2.x);
@@ -208,6 +209,69 @@ TGFX_TEST(PathTest, ConvertConicToQuads) {
   ASSERT_NEAR(quads[2].y, 58.5786f, 0.001f);
   ASSERT_NEAR(quads[3].x, 158.5786f, 0.001f);
   ASSERT_NEAR(quads[3].y, 58.5786f, 0.001f);
+}
+
+TGFX_TEST(PathTest, ConicToCubics) {
+  // Test 1: Normal conic (non-90-degree arc)
+  {
+    Point p0 = {0, 100};
+    Point p1 = {100, 0};
+    Point p2 = {200, 100};
+    float weight = 0.5f;
+
+    auto cubics = CurveConverter::ConicToCubics(p0, p1, p2, weight);
+    size_t numCubics = (cubics.size() - 1) / 3;
+
+    ASSERT_EQ(numCubics, 2u);
+    ASSERT_EQ(cubics[0].x, p0.x);
+    ASSERT_EQ(cubics[0].y, p0.y);
+    ASSERT_EQ(cubics[6].x, p2.x);
+    ASSERT_EQ(cubics[6].y, p2.y);
+  }
+
+  // Test 2: 90-degree circular arc (uses optimal kappa approximation)
+  {
+    // A 90-degree arc from a RoundRect corner: center at (100, 100), radius 100
+    // Arc from (0, 100) to (100, 0) with control point at (0, 0)
+    Point p0 = {0, 100};
+    Point p1 = {0, 0};
+    Point p2 = {100, 0};
+    float weight = 0.707106781186548f;
+
+    auto cubics = CurveConverter::ConicToCubics(p0, p1, p2, weight, 0);
+    size_t numCubics = (cubics.size() - 1) / 3;
+
+    ASSERT_EQ(numCubics, 1u);
+    ASSERT_EQ(cubics[0].x, p0.x);
+    ASSERT_EQ(cubics[0].y, p0.y);
+    ASSERT_EQ(cubics[3].x, p2.x);
+    ASSERT_EQ(cubics[3].y, p2.y);
+
+    // Verify control points use kappa = 0.552284749830794
+    // cubic[1] = p0 + kappa * (p1 - p0) = (0, 100) + 0.5523 * (0-0, 0-100) = (0, 44.77)
+    // cubic[2] = p2 + kappa * (p1 - p2) = (100, 0) + 0.5523 * (0-100, 0-0) = (44.77, 0)
+    ASSERT_NEAR(cubics[1].x, 0.0f, 0.001f);
+    ASSERT_NEAR(cubics[1].y, 44.7715f, 0.001f);
+    ASSERT_NEAR(cubics[2].x, 44.7715f, 0.001f);
+    ASSERT_NEAR(cubics[2].y, 0.0f, 0.001f);
+  }
+
+  // Test 3: 90-degree arc with pow2 > 0 (still uses optimal kappa, pow2 is ignored)
+  {
+    Point p0 = {0, 100};
+    Point p1 = {0, 0};
+    Point p2 = {100, 0};
+    float weight = 0.707106781186548f;
+
+    auto cubics = CurveConverter::ConicToCubics(p0, p1, p2, weight, 1);
+    size_t numCubics = (cubics.size() - 1) / 3;
+
+    ASSERT_EQ(numCubics, 1u);
+    ASSERT_NEAR(cubics[1].x, 0.0f, 0.001f);
+    ASSERT_NEAR(cubics[1].y, 44.7715f, 0.001f);
+    ASSERT_NEAR(cubics[2].x, 44.7715f, 0.001f);
+    ASSERT_NEAR(cubics[2].y, 0.0f, 0.001f);
+  }
 }
 
 }  // namespace tgfx
