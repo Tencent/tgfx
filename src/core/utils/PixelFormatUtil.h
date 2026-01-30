@@ -30,6 +30,6 @@ ColorType PixelFormatToColorType(PixelFormat format);
 
 size_t PixelFormatBytesPerPixel(PixelFormat format);
 
-PixelFormat MaskFormatToPixelFormat(MaskFormat format);
+PixelFormat AtlasFormatToPixelFormat(AtlasFormat format);
 
 }  // namespace tgfx

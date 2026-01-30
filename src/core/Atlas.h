@@ -83,7 +83,7 @@ class AtlasConfig {
  public:
   explicit AtlasConfig(int maxTextureSize);
 
-  ISize atlasDimensions(MaskFormat maskFormat) const;
+  ISize atlasDimensions(AtlasFormat atlasFormat) const;
 
   static ISize PlotDimensions();
 

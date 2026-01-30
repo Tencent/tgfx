@@ -17,6 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlyphRasterizer.h"
+#ifdef TGFX_BUILD_FOR_WEB
+#include "platform/web/WebImageBuffer.h"
+#include "platform/web/WebScalerContext.h"
+#endif
 
 namespace tgfx {
 GlyphRasterizer::GlyphRasterizer(int width, int height,
@@ -30,6 +34,25 @@ GlyphRasterizer::~GlyphRasterizer() {
   if (stroke) {
     delete stroke;
   }
+}
+
+bool GlyphRasterizer::asyncSupport() const {
+  return scalerContext->asyncSupport();
+}
+
+std::shared_ptr<ImageBuffer> GlyphRasterizer::onMakeBuffer(bool tryHardware) const {
+#ifdef TGFX_BUILD_FOR_WEB
+  if (!scalerContext->asyncSupport()) {
+    auto webScalerContext = static_cast<WebScalerContext*>(scalerContext.get());
+    auto canvas = webScalerContext->getGlyphCanvas(glyphID, fauxBold, stroke);
+    if (!canvas.isNull()) {
+      // WebTypeface: always use RGBA to avoid getImageData extracting alpha channel.
+      // The forceAsMask flag in shader will handle alpha-only rendering.
+      return WebImageBuffer::MakeAdopted(canvas, false);
+    }
+  }
+#endif
+  return ImageCodec::onMakeBuffer(tryHardware);
 }
 
 bool GlyphRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,

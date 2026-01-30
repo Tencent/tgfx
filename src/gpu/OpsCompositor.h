@@ -59,7 +59,7 @@ class OpsCompositor {
    */
   void fillImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                      const SamplingOptions& sampling, const MCState& state, const Brush& brush,
-                     SrcRectConstraint constraint);
+                     SrcRectConstraint constraint, bool forceAsMask = false);
 
   /**
    * Fills the given rect with the given state, fill and optional stroke.
@@ -115,6 +115,7 @@ class OpsCompositor {
   std::shared_ptr<Image> pendingImage = nullptr;
   SrcRectConstraint pendingConstraint = SrcRectConstraint::Fast;
   SamplingOptions pendingSampling = {};
+  bool pendingForceAsMask = false;
   std::shared_ptr<TextureProxy> pendingAtlasTexture = nullptr;
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
   std::vector<PlacementPtr<Rect>> pendingUVRects = {};

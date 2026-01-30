@@ -248,8 +248,8 @@ AtlasConfig::AtlasConfig(int maxTextureSize) {
   A8Dimensions.set(std::min(MaxAtlasSize, maxTextureSize), std::min(MaxAtlasSize, maxTextureSize));
 }
 
-ISize AtlasConfig::atlasDimensions(MaskFormat maskFormat) const {
-  if (maskFormat == MaskFormat::A8) {
+ISize AtlasConfig::atlasDimensions(AtlasFormat atlasFormat) const {
+  if (atlasFormat == AtlasFormat::A8) {
     return A8Dimensions;
   }
   return {A8Dimensions.width, A8Dimensions.height / 2};

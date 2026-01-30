@@ -84,17 +84,19 @@ void OpsCompositor::fillImage(std::shared_ptr<Image> image, const SamplingOption
 void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                   const Rect& dstRect, const SamplingOptions& sampling,
                                   const MCState& state, const Brush& brush,
-                                  SrcRectConstraint constraint) {
+                                  SrcRectConstraint constraint, bool forceAsMask) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!srcRect.isEmpty());
   DEBUG_ASSERT(!dstRect.isEmpty());
   auto brushInLocal = brush.makeWithMatrix(MakeRectToRectMatrix(dstRect, srcRect));
   if (!canAppend(PendingOpType::Image, state.clip, brushInLocal) || pendingImage != image ||
-      pendingSampling != sampling || pendingConstraint != constraint) {
+      pendingSampling != sampling || pendingConstraint != constraint ||
+      pendingForceAsMask != forceAsMask) {
     flushPendingOps(PendingOpType::Image, state.clip, brushInLocal);
     pendingImage = std::move(image);
     pendingSampling = sampling;
     pendingConstraint = constraint;
+    pendingForceAsMask = forceAsMask;
   }
   auto record = drawingAllocator()->make<RectRecord>(dstRect, state.matrix, brushInLocal.color);
   pendingRects.emplace_back(std::move(record));
@@ -219,6 +221,7 @@ void OpsCompositor::resetPendingOps(PendingOpType type, Path clip, Brush brush) 
   pendingImage = nullptr;
   pendingSampling = {};
   pendingConstraint = SrcRectConstraint::Fast;
+  pendingForceAsMask = false;
   pendingRects.clear();
   pendingUVRects.clear();
   pendingRRects.clear();
@@ -411,13 +414,18 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
     if (processor == nullptr) {
       return;
     }
-    drawOp->addColorFP(std::move(processor));
-    if (!pendingImage->isAlphaOnly() &&
-        NeedConvertColorSpace(pendingImage->colorSpace(), dstColorSpace)) {
-      auto xformEffect = ColorSpaceXformEffect::Make(
-          context->drawingAllocator(), pendingImage->colorSpace().get(), AlphaType::Premultiplied,
-          dstColorSpace.get(), AlphaType::Premultiplied);
-      drawOp->addColorFP(std::move(xformEffect));
+    if (pendingForceAsMask) {
+      // forceAsMask: use texture alpha as coverage, color comes from brush
+      drawOp->addCoverageFP(std::move(processor));
+    } else {
+      drawOp->addColorFP(std::move(processor));
+      if (!pendingImage->isAlphaOnly() &&
+          NeedConvertColorSpace(pendingImage->colorSpace(), dstColorSpace)) {
+        auto xformEffect = ColorSpaceXformEffect::Make(
+            context->drawingAllocator(), pendingImage->colorSpace().get(), AlphaType::Premultiplied,
+            dstColorSpace.get(), AlphaType::Premultiplied);
+        drawOp->addColorFP(std::move(xformEffect));
+      }
     }
   }
   addDrawOp(std::move(drawOp), pendingClip, pendingBrush, localBounds, deviceBounds,

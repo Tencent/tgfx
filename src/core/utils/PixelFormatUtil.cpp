@@ -64,13 +64,13 @@ size_t PixelFormatBytesPerPixel(PixelFormat format) {
   }
 }
 
-PixelFormat MaskFormatToPixelFormat(MaskFormat format) {
+PixelFormat AtlasFormatToPixelFormat(AtlasFormat format) {
   switch (format) {
-    case MaskFormat::A8:
+    case AtlasFormat::A8:
       return PixelFormat::ALPHA_8;
-    case MaskFormat::RGBA:
+    case AtlasFormat::RGBA:
       return PixelFormat::RGBA_8888;
-    case MaskFormat::BGRA:
+    case AtlasFormat::BGRA:
       return PixelFormat::BGRA_8888;
     default:
       return PixelFormat::Unknown;

@@ -24,9 +24,9 @@
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
-enum class MaskFormat : int { A8, RGBA, BGRA, Last = BGRA };
+enum class AtlasFormat : int { A8, RGBA, BGRA, Last = BGRA };
 
-static constexpr int MaskFormatCount = static_cast<int>(MaskFormat::Last) + 1;
+static constexpr int AtlasFormatCount = static_cast<int>(AtlasFormat::Last) + 1;
 
 /**
  * Keep track of generation number for atlases and Plots.
@@ -203,7 +203,7 @@ class PlotUseUpdater {
 };
 
 struct AtlasCell {
-  MaskFormat maskFormat = MaskFormat::A8;
+  AtlasFormat atlasFormat = AtlasFormat::A8;
   uint16_t width = 0;
   uint16_t height = 0;
 };

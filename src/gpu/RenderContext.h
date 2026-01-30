@@ -91,6 +91,13 @@ class RenderContext : public DrawContext {
                                    const std::vector<size_t>& glyphIndices, const MCState& state,
                                    const Brush& brush, const Stroke* stroke);
 
+  /**
+   * Draws glyphs as individual images. Used for WebTypeface to avoid getImageData calls
+   * in atlas texture upload.
+   */
+  void drawGlyphsAsImages(const GlyphRun& run, const MCState& state, const Brush& brush,
+                          const Stroke* stroke, const Rect& localClipBounds);
+
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
   uint32_t renderFlags = 0;
   Surface* surface = nullptr;
