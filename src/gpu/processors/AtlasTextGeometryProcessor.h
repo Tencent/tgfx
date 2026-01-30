@@ -29,8 +29,7 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
                                                        std::shared_ptr<TextureProxy> textureProxy,
                                                        AAType aa,
                                                        std::optional<PMColor> commonColor,
-                                                       const SamplingOptions& sampling,
-                                                       bool forceAsMask = false);
+                                                       const SamplingOptions& sampling);
   std::string name() const override {
     return "AtlasTextGeometryProcessor";
   }
@@ -43,8 +42,7 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy, AAType aa,
-                             std::optional<PMColor> commonColor, const SamplingOptions& sampling,
-                             bool forceAsMask);
+                             std::optional<PMColor> commonColor, const SamplingOptions& sampling);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -61,7 +59,6 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   AAType aa = AAType::None;
   std::optional<PMColor> commonColor = std::nullopt;
-  bool forceAsMask = false;
   std::vector<std::shared_ptr<Texture>> textures;
   SamplerState samplerState = {};
 };

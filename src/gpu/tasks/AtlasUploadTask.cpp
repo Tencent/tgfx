@@ -23,9 +23,6 @@
 #include "core/utils/HardwareBufferUtil.h"
 #include "tgfx/core/Task.h"
 #include "tgfx/gpu/GPU.h"
-#ifdef TGFX_BUILD_FOR_WEB
-#include "platform/web/WebImageBuffer.h"
-#endif
 
 namespace tgfx {
 class CellDecodeTask : public Task {
@@ -112,28 +109,11 @@ void AtlasUploadTask::addCell(BlockAllocator* allocator, std::shared_ptr<ImageCo
                               const Point& atlasOffset) {
   DEBUG_ASSERT(codec != nullptr);
   auto padding = Plot::CellPadding;
-  auto offsetX = static_cast<int>(atlasOffset.x) - padding;
-  auto offsetY = static_cast<int>(atlasOffset.y) - padding;
-  // Check async support before creating task or moving codec.
-  auto asyncSupport = codec->asyncSupport();
-
-#ifdef TGFX_BUILD_FOR_WEB
-  if (!asyncSupport && hardwarePixels == nullptr) {
-    auto imageBuffer = codec->makeBuffer(false);
-    if (imageBuffer != nullptr) {
-      DirectUploadCell cell;
-      cell.imageBuffer = std::move(imageBuffer);
-      cell.offsetX = offsetX;
-      cell.offsetY = offsetY;
-      directUploadCells.push_back(std::move(cell));
-      return;
-    }
-  }
-#endif
-
   void* dstPixels = nullptr;
   auto dstWidth = codec->width() + 2 * padding;
   auto dstHeight = codec->height() + 2 * padding;
+  auto offsetX = static_cast<int>(atlasOffset.x) - padding;
+  auto offsetY = static_cast<int>(atlasOffset.y) - padding;
   ImageInfo dstInfo = {};
   if (hardwarePixels != nullptr) {
     dstInfo = hardwareInfo.makeIntersect(offsetX, offsetY, dstWidth, dstHeight);
@@ -147,24 +127,10 @@ void AtlasUploadTask::addCell(BlockAllocator* allocator, std::shared_ptr<ImageCo
       return;
     }
   }
-  if (asyncSupport) {
-    auto task =
-        std::make_shared<CellDecodeTask>(std::move(codec), dstPixels, dstInfo, offsetX, offsetY);
-    Task::Run(task);
-    tasks.emplace_back(std::move(task));
-  } else {
-    // For codecs that don't support async, execute synchronously without Task overhead.
-    ClearPixels(dstInfo, dstPixels);
-    auto targetInfo = dstInfo.makeIntersect(0, 0, codec->width(), codec->height());
-    auto targetPixels = dstInfo.computeOffset(dstPixels, Plot::CellPadding, Plot::CellPadding);
-    codec->readPixels(targetInfo, targetPixels);
-    SyncDecodedCell cell;
-    cell.pixels = dstPixels;
-    cell.info = dstInfo;
-    cell.offsetX = offsetX;
-    cell.offsetY = offsetY;
-    syncDecodedCells.push_back(cell);
-  }
+  auto task =
+      std::make_shared<CellDecodeTask>(std::move(codec), dstPixels, dstInfo, offsetX, offsetY);
+  Task::Run(task);
+  tasks.emplace_back(std::move(task));
 }
 
 void AtlasUploadTask::upload(Context* context) {
@@ -172,32 +138,15 @@ void AtlasUploadTask::upload(Context* context) {
   if (textureView == nullptr) {
     return;
   }
-  auto texture = textureView->getTexture();
   auto queue = context->gpu()->queue();
-
-#ifdef TGFX_BUILD_FOR_WEB
-  for (auto& cell : directUploadCells) {
-    auto webBuffer = std::static_pointer_cast<WebImageBuffer>(cell.imageBuffer);
-    webBuffer->uploadToTexture(texture, cell.offsetX, cell.offsetY);
-  }
-  directUploadCells.clear();
-#endif
-
   for (auto& task : tasks) {
     task->wait();
     if (!hardwarePixels) {
-      queue->writeTexture(texture, task->atlasRect(), task->pixels(), task->info().rowBytes());
+      queue->writeTexture(textureView->getTexture(), task->atlasRect(), task->pixels(),
+                          task->info().rowBytes());
     }
   }
   tasks.clear();
-
-  for (auto& cell : syncDecodedCells) {
-    if (!hardwarePixels) {
-      auto rect = Rect::MakeXYWH(cell.offsetX, cell.offsetY, cell.info.width(), cell.info.height());
-      queue->writeTexture(texture, rect, cell.pixels, cell.info.rowBytes());
-    }
-  }
-  syncDecodedCells.clear();
 }
 
 }  // namespace tgfx

@@ -24,20 +24,6 @@
 
 namespace tgfx {
 class CellDecodeTask;
-class ImageBuffer;
-
-struct DirectUploadCell {
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
-  int offsetX = 0;
-  int offsetY = 0;
-};
-
-struct SyncDecodedCell {
-  void* pixels = nullptr;
-  ImageInfo info = {};
-  int offsetX = 0;
-  int offsetY = 0;
-};
 
 class AtlasUploadTask {
  public:
@@ -55,7 +41,5 @@ class AtlasUploadTask {
   ImageInfo hardwareInfo = {};
   void* hardwarePixels = nullptr;
   std::vector<std::shared_ptr<CellDecodeTask>> tasks = {};
-  std::vector<DirectUploadCell> directUploadCells = {};
-  std::vector<SyncDecodedCell> syncDecodedCells = {};
 };
 }  // namespace tgfx

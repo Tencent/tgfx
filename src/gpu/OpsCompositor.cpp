@@ -84,17 +84,19 @@ void OpsCompositor::fillImage(std::shared_ptr<Image> image, const SamplingOption
 void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                   const Rect& dstRect, const SamplingOptions& sampling,
                                   const MCState& state, const Brush& brush,
-                                  SrcRectConstraint constraint) {
+                                  SrcRectConstraint constraint, bool forceAsMask) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!srcRect.isEmpty());
   DEBUG_ASSERT(!dstRect.isEmpty());
   auto brushInLocal = brush.makeWithMatrix(MakeRectToRectMatrix(dstRect, srcRect));
   if (!canAppend(PendingOpType::Image, state.clip, brushInLocal) || pendingImage != image ||
-      pendingSampling != sampling || pendingConstraint != constraint) {
+      pendingSampling != sampling || pendingConstraint != constraint ||
+      pendingForceAsMask != forceAsMask) {
     flushPendingOps(PendingOpType::Image, state.clip, brushInLocal);
     pendingImage = std::move(image);
     pendingSampling = sampling;
     pendingConstraint = constraint;
+    pendingForceAsMask = forceAsMask;
   }
   auto record = drawingAllocator()->make<RectRecord>(dstRect, state.matrix, brushInLocal.color);
   pendingRects.emplace_back(std::move(record));
@@ -219,12 +221,12 @@ void OpsCompositor::resetPendingOps(PendingOpType type, Path clip, Brush brush) 
   pendingImage = nullptr;
   pendingSampling = {};
   pendingConstraint = SrcRectConstraint::Fast;
+  pendingForceAsMask = false;
   pendingRects.clear();
   pendingUVRects.clear();
   pendingRRects.clear();
   pendingStrokes.clear();
   pendingAtlasTexture = nullptr;
-  pendingForceAsMask = false;
 }
 
 bool OpsCompositor::CompareBrush(const Brush& a, const Brush& b) {
@@ -398,9 +400,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
       auto provider =
           RectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRects), {},
                                         AAType::None, true, UVSubsetMode::None, {}, dstColorSpace);
-      drawOp =
-          AtlasTextOp::Make(context, std::move(provider), renderFlags,
-                            std::move(pendingAtlasTexture), pendingSampling, pendingForceAsMask);
+      drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
+                                 std::move(pendingAtlasTexture), pendingSampling);
     } break;
     default:
       break;
@@ -408,18 +409,24 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
   if (drawOp != nullptr && pendingType == PendingOpType::Image) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
                    drawScale.value_or(1.0f)};
-    auto processor =
-        FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint);
+    SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, pendingSampling,
+                                 pendingConstraint};
+    auto processor = FragmentProcessor::Make(pendingImage, args, samplingArgs, nullptr);
     if (processor == nullptr) {
       return;
     }
-    drawOp->addColorFP(std::move(processor));
-    if (!pendingImage->isAlphaOnly() &&
-        NeedConvertColorSpace(pendingImage->colorSpace(), dstColorSpace)) {
-      auto xformEffect = ColorSpaceXformEffect::Make(
-          context->drawingAllocator(), pendingImage->colorSpace().get(), AlphaType::Premultiplied,
-          dstColorSpace.get(), AlphaType::Premultiplied);
-      drawOp->addColorFP(std::move(xformEffect));
+    if (pendingForceAsMask) {
+      // forceAsMask: use texture alpha as coverage, color comes from brush
+      drawOp->addCoverageFP(std::move(processor));
+    } else {
+      drawOp->addColorFP(std::move(processor));
+      if (!pendingImage->isAlphaOnly() &&
+          NeedConvertColorSpace(pendingImage->colorSpace(), dstColorSpace)) {
+        auto xformEffect = ColorSpaceXformEffect::Make(
+            context->drawingAllocator(), pendingImage->colorSpace().get(), AlphaType::Premultiplied,
+            dstColorSpace.get(), AlphaType::Premultiplied);
+        drawOp->addColorFP(std::move(xformEffect));
+      }
     }
   }
   addDrawOp(std::move(drawOp), pendingClip, pendingBrush, localBounds, deviceBounds,
@@ -720,15 +727,14 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const B
 
 void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
                                   const SamplingOptions& sampling, const MCState& state,
-                                  const Brush& brush, bool forceAsMask) {
+                                  const Brush& brush) {
   DEBUG_ASSERT(textureProxy != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
   if (!canAppend(PendingOpType::Atlas, state.clip, brush) || pendingAtlasTexture != textureProxy ||
-      pendingSampling != sampling || pendingForceAsMask != forceAsMask) {
+      pendingSampling != sampling) {
     flushPendingOps(PendingOpType::Atlas, state.clip, brush);
     pendingAtlasTexture = std::move(textureProxy);
     pendingSampling = sampling;
-    pendingForceAsMask = forceAsMask;
   }
   auto record = drawingAllocator()->make<RectRecord>(rect, state.matrix, brush.color);
   pendingRects.emplace_back(std::move(record));

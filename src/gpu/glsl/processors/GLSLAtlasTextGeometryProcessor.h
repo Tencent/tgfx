@@ -26,7 +26,7 @@ class GLSLAtlasTextGeometryProcessor : public AtlasTextGeometryProcessor {
  public:
   GLSLAtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy, AAType aa,
                                  std::optional<PMColor> commonColor,
-                                 const SamplingOptions& sampling, bool forceAsMask);
+                                 const SamplingOptions& sampling);
   void emitCode(EmitArgs&) const override;
 
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,

@@ -81,12 +81,6 @@ static std::unique_ptr<Stroke> GetScaledStroke(const Font& font, const Stroke* s
 }
 
 static MaskFormat GetMaskFormat(const Font& font) {
-  auto typeface = font.getTypeface();
-  // WebTypeface always outputs RGBA data via Canvas 2D API.
-  // Use RGBA_MASK for ordinary text (forceAsMask=true) and RGBA for emoji.
-  if (typeface->isWebTypeface()) {
-    return font.hasColor() ? MaskFormat::RGBA : MaskFormat::RGBA_MASK;
-  }
   if (!font.hasColor()) {
     return MaskFormat::A8;
   }
@@ -95,10 +89,6 @@ static MaskFormat GetMaskFormat(const Font& font) {
 #else
   return MaskFormat::RGBA;
 #endif
-}
-
-static bool MaskFormatNeedsForceAsMask(MaskFormat format) {
-  return format == MaskFormat::A8 || format == MaskFormat::RGBA_MASK;
 }
 
 static float FindMaxGlyphDimension(const Font& font, const GlyphID* glyphs,
@@ -362,6 +352,11 @@ void RenderContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCSta
     if (run.font.getTypeface() == nullptr) {
       continue;
     }
+    // Typefaces requiring RGBA mask: use direct Image rendering to avoid getImageData in atlas.
+    if (run.font.getTypeface()->requiresRGBAMask()) {
+      drawGlyphsAsImages(run, state, brush, stroke, localClipBounds);
+      continue;
+    }
     // Glyphs with per-glyph rotation/scale (RSXform/Matrix) and outlines use path rendering
     // to avoid aliasing.
     if (HasComplexTransform(run) && run.font.hasOutlines()) {
@@ -507,7 +502,6 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   const auto glyphRenderScale = font.scalerContext->getSize() / backingSize;
   const auto combinedScale = glyphRenderScale * inverseScale;
   const auto sampling = GetSamplingOptions(glyphRenderScale, font.isFauxItalic(), state.matrix);
-  const auto forceAsMask = MaskFormatNeedsForceAsMask(maskFormat);
 
   auto typefaceBounds =
       GetTypefaceBounds(typeface, font.getSize(), inverseScale, scaledStroke.get());
@@ -592,8 +586,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     ComputeGlyphRenderMatrix(rect, state.matrix, sourceGlyphRun, i, combinedScale, glyphOffset,
                              font.isFauxItalic(), sampling.minFilterMode == FilterMode::Nearest,
                              &glyphState.matrix);
-    compositor->fillTextAtlas(std::move(textureProxy), rect, sampling, glyphState, atlasBrush,
-                              forceAsMask);
+    compositor->fillTextAtlas(std::move(textureProxy), rect, sampling, glyphState, atlasBrush);
   }
 }
 
@@ -659,7 +652,6 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   const auto atlasBrush = brush.makeWithMatrix(state.matrix);
   const auto glyphRenderScale = font.scalerContext->getSize() / backingSize;
   const auto combinedScale = glyphRenderScale / (maxScale * cellScale);
-  const auto forceAsMask = MaskFormatNeedsForceAsMask(maskFormat);
 
   for (size_t i : glyphIndices) {
     auto glyphID = sourceGlyphRun.glyphs[i];
@@ -710,7 +702,66 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
                              font.isFauxItalic(), false, &glyphState.matrix);
     compositor->fillTextAtlas(std::move(textureProxy), rect,
                               SamplingOptions(FilterMode::Linear, MipmapMode::None), glyphState,
-                              atlasBrush, forceAsMask);
+                              atlasBrush);
+  }
+}
+
+void RenderContext::drawGlyphsAsImages(const GlyphRun& run, const MCState& state,
+                                       const Brush& brush, const Stroke* stroke,
+                                       const Rect& localClipBounds) {
+  auto compositor = getOpsCompositor();
+  if (compositor == nullptr) {
+    return;
+  }
+
+  auto typeface = run.font.getTypeface();
+  bool forceAsMask = !typeface->hasColor();
+  bool hasFauxBold = !run.font.hasColor() && run.font.isFauxBold();
+
+  // Scale font by matrix scale to ensure crisp rendering at high DPI.
+  const auto maxScale = state.matrix.getMaxScale();
+  const auto inverseScale = 1.0f / maxScale;
+  auto scaledFont = GetScaledFont(run.font, maxScale);
+  auto scalerContext = scaledFont.scalerContext;
+  auto scaledStroke = GetScaledStroke(scaledFont, stroke, maxScale);
+
+  for (size_t i = 0; i < run.glyphCount; i++) {
+    auto glyphID = run.glyphs[i];
+    if (glyphID == 0) {
+      continue;
+    }
+
+    auto imageRect =
+        scalerContext->getImageTransform(glyphID, hasFauxBold, scaledStroke.get(), nullptr);
+    if (imageRect.isEmpty()) {
+      continue;
+    }
+
+    auto position = GetGlyphPosition(run, i);
+    // dstRect is in unscaled local coordinates.
+    Rect dstRect = Rect::MakeXYWH(
+        position.x + imageRect.left * inverseScale, position.y + imageRect.top * inverseScale,
+        imageRect.width() * inverseScale, imageRect.height() * inverseScale);
+
+    if (!Rect::Intersects(dstRect, localClipBounds)) {
+      continue;
+    }
+
+    auto width = FloatCeilToInt(imageRect.width());
+    auto height = FloatCeilToInt(imageRect.height());
+    Point offset = {-imageRect.left, -imageRect.top};
+
+    auto rasterizer = std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID,
+                                                        hasFauxBold, scaledStroke.get(), offset);
+    auto image = Image::MakeFrom(rasterizer);
+    if (image == nullptr) {
+      continue;
+    }
+
+    Rect srcRect = Rect::MakeWH(static_cast<float>(width), static_cast<float>(height));
+    compositor->fillImageRect(std::move(image), srcRect, dstRect,
+                              SamplingOptions(FilterMode::Linear, MipmapMode::None), state, brush,
+                              SrcRectConstraint::Fast, forceAsMask);
   }
 }
 }  // namespace tgfx

@@ -65,7 +65,7 @@ class WebTypeface : public Typeface {
     return false;
   }
 
-  bool isWebTypeface() const override {
+  bool requiresRGBAMask() const override {
     return true;
   }
 

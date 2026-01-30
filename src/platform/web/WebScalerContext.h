@@ -49,8 +49,7 @@ class WebScalerContext : public ScalerContext {
    * Returns a Canvas containing the rendered glyph. The returned Canvas can be directly uploaded to
    * a texture without reading pixels. Returns null if the glyph cannot be rendered.
    */
-  emscripten::val getGlyphCanvas(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
-                                 int padding) const;
+  emscripten::val getGlyphCanvas(GlyphID glyphID, bool fauxBold, const Stroke* stroke) const;
 
  private:
   emscripten::val scalerContext = emscripten::val::null();

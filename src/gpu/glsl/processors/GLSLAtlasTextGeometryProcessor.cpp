@@ -21,15 +21,15 @@
 namespace tgfx {
 PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
     BlockAllocator* allocator, std::shared_ptr<TextureProxy> textureProxy, AAType aa,
-    std::optional<PMColor> commonColor, const SamplingOptions& sampling, bool forceAsMask) {
+    std::optional<PMColor> commonColor, const SamplingOptions& sampling) {
   return allocator->make<GLSLAtlasTextGeometryProcessor>(std::move(textureProxy), aa, commonColor,
-                                                         sampling, forceAsMask);
+                                                         sampling);
 }
 
 GLSLAtlasTextGeometryProcessor::GLSLAtlasTextGeometryProcessor(
     std::shared_ptr<TextureProxy> textureProxy, AAType aa, std::optional<PMColor> commonColor,
-    const SamplingOptions& sampling, bool forceAsMask)
-    : AtlasTextGeometryProcessor(std::move(textureProxy), aa, commonColor, sampling, forceAsMask) {
+    const SamplingOptions& sampling)
+    : AtlasTextGeometryProcessor(std::move(textureProxy), aa, commonColor, sampling) {
 }
 
 void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -74,11 +74,9 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("vec4 color = ");
   fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.vsOut());
   fragBuilder->codeAppend(";");
-  if (textureView->isAlphaOnly() || forceAsMask) {
-    // A8 texture or RGBA_MASK: use alpha channel as coverage only
+  if (textureView->isAlphaOnly()) {
     fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
   } else {
-    // RGBA texture (emoji): restore premultiplied color
     fragBuilder->codeAppendf("%s = clamp(vec4(color.rgb/color.a, 1.0), 0.0, 1.0);",
                              args.outputColor.c_str());
     fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());

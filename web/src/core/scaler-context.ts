@@ -200,28 +200,25 @@ export class ScalerContext {
         text: string,
         bounds: Rect,
         fauxBold: boolean,
-        stroke ?: { width: number; cap: ctor; join: ctor; miterLimit: number },
-        padding: number = 0
+        stroke ?: { width: number; cap: ctor; join: ctor; miterLimit: number }
     ): HTMLCanvasElement | OffscreenCanvas | null {
         const glyphWidth = bounds.right - bounds.left;
         const glyphHeight = bounds.bottom - bounds.top;
         if (glyphWidth <= 0 || glyphHeight <= 0) {
             return null;
         }
-        const width = glyphWidth + 2 * padding;
-        const height = glyphHeight + 2 * padding;
-        const canvas = getCanvas2D(width, height);
-        const context = canvas.getContext('2d') as CanvasRenderingContext2D;
-        context.clearRect(0, 0, width, height);
+        const canvas = new OffscreenCanvas(glyphWidth, glyphHeight);
+        const context = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
+        context.clearRect(0, 0, glyphWidth, glyphHeight);
         context.font = this.fontString(fauxBold, false);
         if (stroke) {
             context.lineJoin = ScalerContext.getLineJoin(stroke.join);
             context.miterLimit = stroke.miterLimit;
             context.lineCap = ScalerContext.getLineCap(stroke.cap);
             context.lineWidth = stroke.width;
-            context.strokeText(text, -bounds.left + padding, -bounds.top + padding);
+            context.strokeText(text, -bounds.left, -bounds.top);
         } else {
-            context.fillText(text, -bounds.left + padding, -bounds.top + padding);
+            context.fillText(text, -bounds.left, -bounds.top);
         }
         return canvas;
     }

@@ -94,7 +94,7 @@ bool WebScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* 
 }
 
 emscripten::val WebScalerContext::getGlyphCanvas(GlyphID glyphID, bool fauxBold,
-                                                 const Stroke* stroke, int padding) const {
+                                                 const Stroke* stroke) const {
   auto properFauxBold = !hasColor() && fauxBold;
   auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphID), properFauxBold, false);
   if (bounds.isEmpty()) {
@@ -103,10 +103,10 @@ emscripten::val WebScalerContext::getGlyphCanvas(GlyphID glyphID, bool fauxBold,
   if (!hasColor() && stroke != nullptr) {
     ApplyStrokeToBounds(*stroke, &bounds);
     return scalerContext.call<val>("getGlyphCanvas", getText(glyphID), bounds, properFauxBold,
-                                   *stroke, padding);
+                                   *stroke);
   }
   return scalerContext.call<val>("getGlyphCanvas", getText(glyphID), bounds, properFauxBold,
-                                 emscripten::val::undefined(), padding);
+                                 emscripten::val::undefined());
 }
 
 std::string WebScalerContext::getText(GlyphID glyphID) const {

@@ -124,10 +124,11 @@ class Typeface {
   virtual bool hasOutlines() const = 0;
 
   /**
-   * Returns true if this typeface is a WebTypeface that renders glyphs via Canvas 2D API.
-   * WebTypeface always outputs RGBA data regardless of whether the font has color glyphs.
+   * Returns true if this typeface requires RGBA mask for glyph rendering. Such typefaces always
+   * output RGBA data regardless of whether the font has color glyphs, and require direct image
+   * rendering instead of atlas-based rendering.
    */
-  virtual bool isWebTypeface() const {
+  virtual bool requiresRGBAMask() const {
     return false;
   }
 

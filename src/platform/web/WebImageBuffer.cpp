@@ -64,18 +64,6 @@ WebImageBuffer::~WebImageBuffer() {
   }
 }
 
-bool WebImageBuffer::uploadToTexture(std::shared_ptr<Texture> texture, int offsetX,
-                                     int offsetY) const {
-  if (texture == nullptr || !nativeImage.as<bool>()) {
-    return false;
-  }
-  auto glTexture = std::static_pointer_cast<GLTexture>(texture);
-  // Always upload as RGBA. The shader will handle alpha-only rendering via forceAsMask flag.
-  val::module_property("tgfx").call<void>("uploadToTextureRegion", val::module_property("GL"),
-                                          nativeImage, glTexture->textureID(), offsetX, offsetY);
-  return true;
-}
-
 std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, bool) const {
   auto textureView = TextureView::MakeRGBA(context, width(), height(), nullptr, 0);
   if (textureView == nullptr) {
