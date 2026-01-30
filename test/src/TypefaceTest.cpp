@@ -22,6 +22,10 @@
 
 namespace tgfx {
 
+// A PathProvider that creates paths in 25x25 coordinate space for testing unitsPerEm scaling.
+// With unitsPerEm=25 and fontSize=50, textScale=2.0, so paths scale to 50x50 pixels.
+// This also tests fauxBold scaling: if fauxBold incorrectly uses textScale * fauxBoldScale
+// instead of fontSize * fauxBoldScale, the bold effect would be wrong.
 class GlyphPathProvider final : public PathProvider {
  public:
   explicit GlyphPathProvider(int pathIndex) : pathIndex(pathIndex) {
@@ -31,43 +35,32 @@ class GlyphPathProvider final : public PathProvider {
     Path path;
     switch (pathIndex) {
       case 0:
-        path.moveTo(Point::Make(25.0f, 5.0f));
-        path.lineTo(Point::Make(45.0f, 45.0f));
-        path.lineTo(Point::Make(5.0f, 45.0f));
+        path.moveTo(Point::Make(12.5f, 2.5f));
+        path.lineTo(Point::Make(22.5f, 22.5f));
+        path.lineTo(Point::Make(2.5f, 22.5f));
         path.close();
         break;
       case 1:
-        path.moveTo(Point::Make(5.0f, 5.0f));
-        path.lineTo(Point::Make(45.0f, 5.0f));
-        path.lineTo(Point::Make(45.0f, 45.0f));
-        path.lineTo(Point::Make(5.0f, 45.0f));
+        path.moveTo(Point::Make(2.5f, 2.5f));
+        path.lineTo(Point::Make(22.5f, 2.5f));
+        path.lineTo(Point::Make(22.5f, 22.5f));
+        path.lineTo(Point::Make(2.5f, 22.5f));
         path.close();
         break;
       case 2: {
-        Rect rect = Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f);
+        Rect rect = Rect::MakeXYWH(2.5f, 2.5f, 20.0f, 20.0f);
         path.addOval(rect);
         path.close();
         break;
       }
-      default: {
-        Rect rect = Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
-        path.addOval(rect);
-        path.close();
+      default:
         break;
-      }
     }
     return path;
   }
 
   Rect getBounds() const override {
-    switch (pathIndex) {
-      case 0:
-      case 1:
-      case 2:
-        return Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f);
-      default:
-        return Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
-    }
+    return Rect::MakeXYWH(2.5f, 2.5f, 20.0f, 20.0f);
   }
 
  private:
@@ -77,7 +70,9 @@ class GlyphPathProvider final : public PathProvider {
 TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   const std::string fontFamily = "customPath";
   const std::string fontStyle = "customStyle";
-  PathTypefaceBuilder builder;
+  // Paths are designed in 25x25 coordinate space. Set unitsPerEm=25 so that with fontSize=50,
+  // textScale=2.0 scales them to 50x50 pixels.
+  PathTypefaceBuilder builder(25);
   builder.setFontName(fontFamily, fontStyle);
 
   builder.addGlyph(std::make_shared<GlyphPathProvider>(0));
@@ -93,32 +88,27 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   ASSERT_EQ(typeface->fontFamily(), fontFamily);
   ASSERT_EQ(typeface->fontStyle(), fontStyle);
   ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(3));
-
-  builder.addGlyph(std::make_shared<GlyphPathProvider>(4));
-
-  typeface = builder.detach();
-  ASSERT_TRUE(typeface != nullptr);
-  ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(4));
+  ASSERT_EQ(typeface->unitsPerEm(), 25);
 
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 200, 100);
+  auto surface = Surface::Make(context, 250, 150);
   auto canvas = surface->getCanvas();
 
   auto paint = Paint();
   paint.setColor(Color::Red());
 
-  float scaleFactor = 1.0f;
-  canvas->scale(scaleFactor, scaleFactor);
-
-  Font font(std::move(typeface), 1.f);
-  std::vector<GlyphID> glyphIDs1 = {1, 2, 3};
-  std::vector<Point> positions1 = {};
-  positions1.push_back(Point::Make(10.0f, 0.0f));
-  positions1.push_back(Point::Make(60.0f, 0.0f));
-  positions1.push_back(Point::Make(120.0f, 0.0f));
-  canvas->drawGlyphs(glyphIDs1.data(), positions1.data(), glyphIDs1.size(), font, paint);
+  // fontSize=50, unitsPerEm=25 => textScale=2.0
+  // Glyphs will be scaled 2x from 25x25 design space to 50x50 pixels.
+  // FauxBold uses fontSize(50) for calculation.
+  // fauxBoldSize = 50 * FauxBoldScale(50) ≈ 1.5625 pixels.
+  Font font(typeface, 50.0f);
+  font.setFauxBold(true);
+  std::vector<GlyphID> glyphIDs = {1, 2, 3};
+  std::vector<Point> positions = {Point::Make(45, 50), Point::Make(105, 50),
+                                  Point::Make(165, 50)};
+  canvas->drawGlyphs(glyphIDs.data(), positions.data(), glyphIDs.size(), font, paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "TypefaceTest/CustomPathTypeface"));
 }
@@ -126,7 +116,8 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
 TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   const std::string fontFamily = "customImage";
   const std::string fontStyle = "customStyle";
-  ImageTypefaceBuilder builder;
+  // Glyph images are 200x200 pixels. Set unitsPerEm=200 to match the image size.
+  ImageTypefaceBuilder builder(200);
   builder.setFontName(fontFamily, fontStyle);
   std::string imagePath = "resources/assets/glyph1.png";
   auto imageCodec = ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
@@ -134,7 +125,7 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
 
   imagePath = "resources/assets/glyph2.png";
   imageCodec = ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
-  builder.addGlyph(std::move(imageCodec), Point::Make(5.0f, 5.0f));
+  builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 0.0f));
 
   auto typeface = builder.detach();
 
@@ -146,10 +137,11 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   ASSERT_EQ(typeface->fontFamily(), fontFamily);
   ASSERT_EQ(typeface->fontStyle(), fontStyle);
   ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(2));
+  ASSERT_EQ(typeface->unitsPerEm(), 200);
 
   imagePath = "resources/assets/glyph3.png";
   imageCodec = ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
-  builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 5.0f));
+  builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 0.0f));
 
   typeface = builder.detach();
   ASSERT_TRUE(typeface != nullptr);
@@ -158,15 +150,15 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 200);
+  auto surface = Surface::Make(context, 250, 150);
   auto canvas = surface->getCanvas();
 
-  Font font(std::move(typeface), 0.25);
+  // With fontSize=50 and unitsPerEm=200, textScale = 0.25
+  // 200x200 images will render as 50x50 pixels
+  Font font(std::move(typeface), 50.0f);
   std::vector<GlyphID> glyphIDs2 = {1, 2, 3};
-  std::vector<Point> positions2 = {};
-  positions2.push_back(Point::Make(150.0f, 0.0f));
-  positions2.push_back(Point::Make(215.0f, 0.0f));
-  positions2.push_back(Point::Make(280.0f, 0.0f));
+  std::vector<Point> positions2 = {Point::Make(45, 50), Point::Make(105, 50),
+                                   Point::Make(165, 50)};
   canvas->drawGlyphs(glyphIDs2.data(), positions2.data(), glyphIDs2.size(), font, {});
 
   EXPECT_TRUE(Baseline::Compare(surface, "TypefaceTest/CustomImageTypeface"));

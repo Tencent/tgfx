@@ -36,7 +36,7 @@ class ImageUserScalerContext final : public UserScalerContext {
     auto bounds = Rect::MakeXYWH(record->offset.x, record->offset.y,
                                  static_cast<float>(record->image->width()),
                                  static_cast<float>(record->image->height()));
-    auto matrix = Matrix::MakeScale(textSize, textSize);
+    auto matrix = Matrix::MakeScale(textScale, textScale);
     if (fauxItalic) {
       matrix.postSkew(ITALIC_SKEW, 0.f);
     }
@@ -54,8 +54,8 @@ class ImageUserScalerContext final : public UserScalerContext {
       return {};
     }
     if (matrix) {
-      matrix->setTranslate(record->offset.x, record->offset.y);
-      matrix->postScale(textSize, textSize);
+      matrix->setScale(textScale, textScale);
+      matrix->preTranslate(record->offset.x, record->offset.y);
     }
     return Rect::MakeXYWH(record->offset.x, record->offset.y,
                           static_cast<float>(record->image->width()),
@@ -75,12 +75,12 @@ class ImageUserScalerContext final : public UserScalerContext {
   }
 
   float getBackingSize() const override {
-    return 1.f;
+    return static_cast<float>(userTypeface()->unitsPerEm());
   }
 
  private:
   ImageUserTypeface* imageTypeface() const {
-    return static_cast<ImageUserTypeface*>(typeface.get());
+    return static_cast<ImageUserTypeface*>(userTypeface());
   }
 };
 
@@ -88,17 +88,19 @@ class ImageUserScalerContext final : public UserScalerContext {
 
 std::shared_ptr<UserTypeface> ImageUserTypeface::Make(
     uint32_t builderID, const std::string& fontFamily, const std::string& fontStyle,
-    const FontMetrics& fontMetrics, const Rect& fontBounds, const ImageRecordType& glyphRecords) {
+    const FontMetrics& fontMetrics, const Rect& fontBounds, int unitsPerEm,
+    const ImageRecordType& glyphRecords) {
   auto typeface = std::shared_ptr<ImageUserTypeface>(new ImageUserTypeface(
-      builderID, fontFamily, fontStyle, fontMetrics, fontBounds, glyphRecords));
+      builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm, glyphRecords));
   typeface->weakThis = typeface;
   return typeface;
 }
 
 ImageUserTypeface::ImageUserTypeface(uint32_t builderID, const std::string& fontFamily,
                                      const std::string& fontStyle, const FontMetrics& fontMetrics,
-                                     const Rect& fontBounds, const ImageRecordType& glyphRecords)
-    : UserTypeface(builderID, fontFamily, fontStyle, fontMetrics, fontBounds),
+                                     const Rect& fontBounds, int unitsPerEm,
+                                     const ImageRecordType& glyphRecords)
+    : UserTypeface(builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm),
       glyphRecords(glyphRecords) {
 }
 

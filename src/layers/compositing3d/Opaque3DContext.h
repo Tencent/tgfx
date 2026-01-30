@@ -38,7 +38,7 @@ struct OpaqueImageEntry {
 class Opaque3DContext : public Layer3DContext {
  public:
   Opaque3DContext(const Rect& renderRect, float contentScale,
-                   std::shared_ptr<ColorSpace> colorSpace);
+                  std::shared_ptr<ColorSpace> colorSpace);
 
   OpaqueContext* currentOpaqueContext() override;
   void finishAndDrawTo(Canvas* canvas, bool antialiasing) override;

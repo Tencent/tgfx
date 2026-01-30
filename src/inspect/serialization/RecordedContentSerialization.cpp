@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RecordedContentSerialization.h"
+#include <string>
 #include "core/utils/Types.h"
 #include "layers/contents/ComposeContent.h"
 #include "layers/contents/MatrixContent.h"
@@ -162,12 +163,12 @@ static void SerializeTextContent(flexbuffers::Builder& fbb, const TextContent* c
 static void SerializeMatrixContent(flexbuffers::Builder& fbb, const MatrixContent* content) {
   fbb.Key("matrix");
   auto matrixStart = fbb.StartMap();
-  SerializeUtils::SetFlexBufferMap(fbb, "scaleX", content->matrix.getScaleX());
-  SerializeUtils::SetFlexBufferMap(fbb, "skewX", content->matrix.getSkewX());
-  SerializeUtils::SetFlexBufferMap(fbb, "transX", content->matrix.getTranslateX());
-  SerializeUtils::SetFlexBufferMap(fbb, "skewY", content->matrix.getSkewY());
-  SerializeUtils::SetFlexBufferMap(fbb, "scaleY", content->matrix.getScaleY());
-  SerializeUtils::SetFlexBufferMap(fbb, "transY", content->matrix.getTranslateY());
+  float buffer[9] = {};
+  content->matrix.get9(buffer);
+  for (int i = 0; i < 9; i++) {
+    auto key = "[" + std::to_string(i) + "]";
+    SerializeUtils::SetFlexBufferMap(fbb, key.c_str(), buffer[i]);
+  }
   fbb.EndMap(matrixStart);
 }
 

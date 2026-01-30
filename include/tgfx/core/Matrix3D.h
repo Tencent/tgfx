@@ -48,17 +48,18 @@ class Matrix3D {
   }
 
   /**
-   * Creates a Matrix3D with the given matrix. The created Matrix3D is:
+   * Creates a Matrix3D with the given 3x3 matrix. The created Matrix3D is:
    *
    *       | m.scaleX  m.skewX   0  m.transX |
    *       | m.skewY   m.scaleY  0  m.transY |
    *       | 0         0         1  0        |
-   *       | 0         0         0  1        |
+   *       | m.persp0  m.persp1  0  m.persp2 |
    */
   explicit Matrix3D(const Matrix& m)
-      : Matrix3D(m.values[Matrix::SCALE_X], m.values[Matrix::SKEW_Y], 0, 0,
-                 m.values[Matrix::SKEW_X], m.values[Matrix::SCALE_Y], 0, 0, 0, 0, 1, 0,
-                 m.values[Matrix::TRANS_X], m.values[Matrix::TRANS_Y], 0, 1) {
+      : Matrix3D(m.values[Matrix::SCALE_X], m.values[Matrix::SKEW_Y], 0, m.values[Matrix::PERSP_0],
+                 m.values[Matrix::SKEW_X], m.values[Matrix::SCALE_Y], 0, m.values[Matrix::PERSP_1],
+                 0, 0, 1, 0, m.values[Matrix::TRANS_X], m.values[Matrix::TRANS_Y], 0,
+                 m.values[Matrix::PERSP_2]) {
   }
 
   /**
