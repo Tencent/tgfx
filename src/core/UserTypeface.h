@@ -70,8 +70,8 @@ class UserTypeface : public Typeface {
 
   bool onComputeBounds(Rect* bounds) const override {
     float invUpem = 1.0f / static_cast<float>(_unitsPerEm);
-    bounds->setLTRB(fontBounds.left * invUpem, fontBounds.top * invUpem,
-                    fontBounds.right * invUpem, fontBounds.bottom * invUpem);
+    bounds->setLTRB(fontBounds.left * invUpem, fontBounds.top * invUpem, fontBounds.right * invUpem,
+                    fontBounds.bottom * invUpem);
     return true;
   }
 

@@ -106,8 +106,7 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   Font font(typeface, 50.0f);
   font.setFauxBold(true);
   std::vector<GlyphID> glyphIDs = {1, 2, 3};
-  std::vector<Point> positions = {Point::Make(45, 50), Point::Make(105, 50),
-                                  Point::Make(165, 50)};
+  std::vector<Point> positions = {Point::Make(45, 50), Point::Make(105, 50), Point::Make(165, 50)};
   canvas->drawGlyphs(glyphIDs.data(), positions.data(), glyphIDs.size(), font, paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "TypefaceTest/CustomPathTypeface"));
@@ -157,8 +156,7 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   // 200x200 images will render as 50x50 pixels
   Font font(std::move(typeface), 50.0f);
   std::vector<GlyphID> glyphIDs2 = {1, 2, 3};
-  std::vector<Point> positions2 = {Point::Make(45, 50), Point::Make(105, 50),
-                                   Point::Make(165, 50)};
+  std::vector<Point> positions2 = {Point::Make(45, 50), Point::Make(105, 50), Point::Make(165, 50)};
   canvas->drawGlyphs(glyphIDs2.data(), positions2.data(), glyphIDs2.size(), font, {});
 
   EXPECT_TRUE(Baseline::Compare(surface, "TypefaceTest/CustomImageTypeface"));
