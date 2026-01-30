@@ -207,7 +207,7 @@ export class ScalerContext {
         if (glyphWidth <= 0 || glyphHeight <= 0) {
             return null;
         }
-        const canvas = new OffscreenCanvas(glyphWidth, glyphHeight);
+        const canvas = getCanvas2D(glyphWidth, glyphHeight);
         const context = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
         context.clearRect(0, 0, glyphWidth, glyphHeight);
         context.font = this.fontString(fauxBold, false);

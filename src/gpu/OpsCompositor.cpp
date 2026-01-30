@@ -409,9 +409,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
   if (drawOp != nullptr && pendingType == PendingOpType::Image) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
                    drawScale.value_or(1.0f)};
-    SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, pendingSampling,
-                                 pendingConstraint};
-    auto processor = FragmentProcessor::Make(pendingImage, args, samplingArgs, nullptr);
+    auto processor =
+        FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint);
     if (processor == nullptr) {
       return;
     }

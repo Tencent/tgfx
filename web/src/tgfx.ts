@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import {getCanvas2D, releaseCanvas2D} from './utils/canvas';
+import {getCanvas2D, isCanvas, releaseCanvas2D} from './utils/canvas';
 import {BitmapImage} from './core/bitmap-image';
 import {isInstanceOf} from './utils/type-utils';
 
@@ -133,6 +133,8 @@ export const isAndroidMiniprogram = () => {
 export const releaseNativeImage = (source: TexImageSource | OffscreenCanvas) => {
     if (isInstanceOf(source, globalThis.ImageBitmap)) {
         (source as ImageBitmap).close();
+    } else if (isCanvas(source)) {
+        releaseCanvas2D(source as OffscreenCanvas | HTMLCanvasElement);
     }
     // OffscreenCanvas and HTMLCanvasElement will be garbage collected automatically.
 };

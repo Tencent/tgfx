@@ -48,8 +48,7 @@ std::shared_ptr<ImageBuffer> GlyphRasterizer::onMakeBuffer(bool tryHardware) con
     if (!canvas.isNull()) {
       // WebTypeface: always use RGBA to avoid getImageData extracting alpha channel.
       // The forceAsMask flag in shader will handle alpha-only rendering.
-      bool alphaOnly = false;
-      return WebImageBuffer::MakeAdopted(canvas, alphaOnly);
+      return WebImageBuffer::MakeAdopted(canvas, false);
     }
   }
 #endif

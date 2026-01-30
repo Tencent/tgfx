@@ -72,8 +72,9 @@ PixelFormat MaskFormatToPixelFormat(MaskFormat format) {
       return PixelFormat::RGBA_8888;
     case MaskFormat::BGRA:
       return PixelFormat::BGRA_8888;
+    default:
+      return PixelFormat::Unknown;
   }
-  return PixelFormat::RGBA_8888;
 }
 
 }  // namespace tgfx
