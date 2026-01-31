@@ -154,6 +154,7 @@
         "tile_mode_subset": "bf48e614"
     },
     "LayerCacheTest": {
+        "ContentBlendModeDisablesCache": "a0e8d4f3",
         "DirtyRegionTest1": "bf48e614",
         "DirtyRegionTest10": "bf48e614",
         "DirtyRegionTest11": "bf48e614",
