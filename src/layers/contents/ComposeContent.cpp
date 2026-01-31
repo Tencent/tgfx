@@ -84,6 +84,15 @@ bool ComposeContent::contourEqualsOpaqueContent() const {
   return true;
 }
 
+bool ComposeContent::hasBlendMode() const {
+  for (const auto& content : contents) {
+    if (content->hasBlendMode()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool ComposeContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
   for (size_t i = 0; i < foregroundStartIndex; ++i) {
     contents[i]->drawDefault(canvas, alpha, antiAlias);

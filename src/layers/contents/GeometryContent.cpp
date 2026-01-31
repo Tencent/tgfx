@@ -102,6 +102,10 @@ bool GeometryContent::contourEqualsOpaqueContent() const {
   return true;
 }
 
+bool GeometryContent::hasBlendMode() const {
+  return blendMode != BlendMode::SrcOver;
+}
+
 void GeometryContent::drawForeground(Canvas*, float, bool) const {
 }
 

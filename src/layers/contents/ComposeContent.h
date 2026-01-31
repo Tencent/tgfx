@@ -39,6 +39,7 @@ class ComposeContent : public LayerContent {
   bool hitTestPoint(float localX, float localY) const override;
   void drawContour(Canvas* canvas, bool antiAlias) const override;
   bool contourEqualsOpaqueContent() const override;
+  bool hasBlendMode() const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
 
