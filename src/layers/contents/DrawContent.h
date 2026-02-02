@@ -46,6 +46,7 @@ class DrawContent : public GeometryContent {
                       const Stroke* stroke) const override;
   void drawContour(Canvas* canvas, bool antiAlias, const Stroke* stroke) const override;
   bool contourEqualsOpaqueContent() const override;
+  bool hasBlendMode() const override;
 
  protected:
   virtual Rect onGetBounds() const = 0;

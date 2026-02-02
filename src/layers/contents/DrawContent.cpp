@@ -108,4 +108,8 @@ bool DrawContent::contourEqualsOpaqueContent() const {
   return true;
 }
 
+bool DrawContent::hasBlendMode() const {
+  return blendMode != BlendMode::SrcOver;
+}
+
 }  // namespace tgfx

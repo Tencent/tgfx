@@ -92,4 +92,8 @@ bool StrokeContent::contourEqualsOpaqueContent() const {
   return content->contourEqualsOpaqueContent();
 }
 
+bool StrokeContent::hasBlendMode() const {
+  return content->hasBlendMode();
+}
+
 }  // namespace tgfx

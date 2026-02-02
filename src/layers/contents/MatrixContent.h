@@ -46,6 +46,7 @@ class MatrixContent : public GeometryContent {
                       const Stroke* stroke) const override;
   void drawContour(Canvas* canvas, bool antiAlias, const Stroke* stroke) const override;
   bool contourEqualsOpaqueContent() const override;
+  bool hasBlendMode() const override;
 
   std::unique_ptr<GeometryContent> content = nullptr;
   Matrix _matrix = Matrix::I();

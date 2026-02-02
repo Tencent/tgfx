@@ -90,4 +90,8 @@ bool MatrixContent::contourEqualsOpaqueContent() const {
   return content->contourEqualsOpaqueContent();
 }
 
+bool MatrixContent::hasBlendMode() const {
+  return content->hasBlendMode();
+}
+
 }  // namespace tgfx
