@@ -134,7 +134,12 @@ void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerP
   }
   flushPending();
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
-  list.push_back(std::make_unique<TextContent>(std::move(textBlob), matrix, paint));
+  std::unique_ptr<GeometryContent> content =
+      std::make_unique<TextContent>(std::move(textBlob), matrix, paint);
+  if (paint.style == PaintStyle::Stroke) {
+    content = std::make_unique<StrokeContent>(std::move(content), paint.stroke);
+  }
+  list.push_back(std::move(content));
 }
 
 bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint,
