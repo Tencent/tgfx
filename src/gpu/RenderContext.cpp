@@ -209,6 +209,9 @@ static void ApplyScaleAndStrokeToBounds(Rect* bounds, float scale, const Stroke*
 static Rect GetTypefaceBounds(const std::shared_ptr<Typeface>& typeface, float fontSize,
                               float inverseScale, const Stroke* scaledStroke) {
   auto bounds = typeface->getBounds();
+  if (bounds.isEmpty()) {
+    return bounds;
+  }
   bounds.scale(fontSize, fontSize);
   ApplyScaleAndStrokeToBounds(&bounds, inverseScale, scaledStroke);
   return bounds;
