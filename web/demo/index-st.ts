@@ -41,9 +41,9 @@ if (typeof window !== 'undefined') {
             let tgfxView = shareData.Hello2DModule.TGFXView.MakeFrom('#hello2d');
             shareData.tgfxBaseView = tgfxView;
             var image = await loadImage("http://localhost:8081/../../resources/assets/bridge.jpg");
-            tgfxView.setImage("bridge",image);
+            tgfxView.setImagePath("bridge",image);
             image = await loadImage("http://localhost:8081/../../resources/assets/tgfx.png");
-            tgfxView.setImage("TGFX",image);
+            tgfxView.setImagePath("TGFX",image);
 
             var font = new FontFace('default', "url(../../resources/font/NotoSansSC-Regular.otf)");
             font.load().then((loadedFont) => {
@@ -56,6 +56,8 @@ if (typeof window !== 'undefined') {
             tgfxView.registerFonts();
 
             updateSize(shareData);
+            tgfxView.updateLayerTree(shareData.drawIndex);
+            tgfxView.updateZoomScaleAndOffset(1.0, 0, 0);
             const canvas = document.getElementById('hello2d');
             bindCanvasZoomAndPanEvents(canvas, shareData);
             animationLoop(shareData);
