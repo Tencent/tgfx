@@ -56,8 +56,8 @@ PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(
     auto xformEffect = ColorSpaceXformEffect::Make(
         args.context->drawingAllocator(), image->colorSpace().get(), AlphaType::Premultiplied,
         dstColorSpace.get(), AlphaType::Premultiplied);
-    fp = FragmentProcessor::Compose(args.context->drawingAllocator(), std::move(xformEffect),
-                                    std::move(fp));
+    fp = FragmentProcessor::Compose(args.context->drawingAllocator(), std::move(fp),
+      std::move(xformEffect));
   }
   return fp;
 }
