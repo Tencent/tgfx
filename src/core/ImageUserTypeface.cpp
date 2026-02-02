@@ -86,10 +86,12 @@ class ImageUserScalerContext final : public UserScalerContext {
 
 //////////////
 
-std::shared_ptr<UserTypeface> ImageUserTypeface::Make(
-    uint32_t builderID, const std::string& fontFamily, const std::string& fontStyle,
-    const FontMetrics& fontMetrics, const Rect& fontBounds, int unitsPerEm,
-    const ImageRecordType& glyphRecords) {
+std::shared_ptr<UserTypeface> ImageUserTypeface::Make(uint32_t builderID,
+                                                      const std::string& fontFamily,
+                                                      const std::string& fontStyle,
+                                                      const FontMetrics& fontMetrics,
+                                                      const Rect& fontBounds, int unitsPerEm,
+                                                      const ImageRecordType& glyphRecords) {
   auto typeface = std::shared_ptr<ImageUserTypeface>(new ImageUserTypeface(
       builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm, glyphRecords));
   typeface->weakThis = typeface;

@@ -62,8 +62,7 @@ class CustomTypefaceBuilder {
   virtual std::shared_ptr<Typeface> detach() const = 0;
 
  protected:
-  explicit CustomTypefaceBuilder(int unitsPerEm) : _unitsPerEm(unitsPerEm > 0 ? unitsPerEm : 1) {
-  }
+  explicit CustomTypefaceBuilder(int unitsPerEm);
 
   std::string _fontFamily;
   std::string _fontStyle;
