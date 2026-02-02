@@ -19,16 +19,16 @@
 #pragma once
 
 #include "layers/contents/GeometryContent.h"
-#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 
 /**
- * MatrixContent wraps a GeometryContent and applies a transformation matrix during drawing.
+ * StrokeContent wraps a GeometryContent and applies stroke style during drawing.
  */
-class MatrixContent : public GeometryContent {
+class StrokeContent : public GeometryContent {
  public:
-  MatrixContent(std::unique_ptr<GeometryContent> content, const Matrix& matrix);
+  StrokeContent(std::unique_ptr<GeometryContent> content, const Stroke& stroke);
 
   Rect getBounds() const override;
   bool hasSameGeometry(const GeometryContent* other) const override;
@@ -48,11 +48,11 @@ class MatrixContent : public GeometryContent {
   bool contourEqualsOpaqueContent() const override;
 
   std::unique_ptr<GeometryContent> content = nullptr;
-  Matrix _matrix = Matrix::I();
+  Stroke _stroke = {};
 
  protected:
   Type type() const override {
-    return Type::Matrix;
+    return Type::Stroke;
   }
 };
 

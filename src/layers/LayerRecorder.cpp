@@ -22,6 +22,7 @@
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "layers/contents/ComposeContent.h"
+#include "layers/contents/GeometryContent.h"
 #include "layers/contents/MatrixContent.h"
 #include "layers/contents/PathContent.h"
 #include "layers/contents/RRectContent.h"
@@ -29,6 +30,7 @@
 #include "layers/contents/RectContent.h"
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/ShapeContent.h"
+#include "layers/contents/StrokeContent.h"
 #include "layers/contents/TextContent.h"
 
 namespace tgfx {
@@ -167,30 +169,30 @@ bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint,
 void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint,
                                  const std::optional<Matrix>& newMatrix) {
   if (pendingType != PendingType::None) {
-    std::unique_ptr<DrawContent> drawContent = nullptr;
+    std::unique_ptr<GeometryContent> content = nullptr;
     auto& list = pendingPaint.placement == LayerPlacement::Foreground ? foregrounds : contents;
     switch (pendingType) {
       case PendingType::Rect:
         if (pendingRects.size() == 1) {
-          drawContent = std::make_unique<RectContent>(pendingRects[0], pendingPaint);
+          content = std::make_unique<RectContent>(pendingRects[0], pendingPaint);
         } else {
-          drawContent = std::make_unique<RectsContent>(std::move(pendingRects), pendingPaint);
+          content = std::make_unique<RectsContent>(std::move(pendingRects), pendingPaint);
         }
         pendingRects = {};
         break;
       case PendingType::RRect:
         if (pendingRRects.size() == 1) {
-          drawContent = std::make_unique<RRectContent>(pendingRRects[0], pendingPaint);
+          content = std::make_unique<RRectContent>(pendingRRects[0], pendingPaint);
         } else {
-          drawContent = std::make_unique<RRectsContent>(std::move(pendingRRects), pendingPaint);
+          content = std::make_unique<RRectsContent>(std::move(pendingRRects), pendingPaint);
         }
         pendingRRects = {};
         break;
       case PendingType::Shape:
         if (pendingShape->isSimplePath()) {
-          drawContent = std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint);
+          content = std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint);
         } else {
-          drawContent = std::make_unique<ShapeContent>(std::move(pendingShape), pendingPaint);
+          content = std::make_unique<ShapeContent>(std::move(pendingShape), pendingPaint);
         }
         pendingShape = nullptr;
         break;
@@ -198,15 +200,18 @@ void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint
         break;
     }
 
+    // Wrap with StrokeContent if paint has stroke style.
+    if (content != nullptr && pendingPaint.style == PaintStyle::Stroke) {
+      content = std::make_unique<StrokeContent>(std::move(content), pendingPaint.stroke);
+    }
     // Wrap with MatrixContent if matrix has value and is not identity.
-    DEBUG_ASSERT(drawContent != nullptr);
-    if (drawContent != nullptr) {
-      if (pendingMatrix.has_value() && !pendingMatrix->isIdentity()) {
-        DEBUG_ASSERT(pendingType != PendingType::Shape);
-        list.push_back(std::make_unique<MatrixContent>(std::move(drawContent), *pendingMatrix));
-      } else {
-        list.push_back(std::move(drawContent));
-      }
+    if (content != nullptr && pendingMatrix.has_value() && !pendingMatrix->isIdentity()) {
+      DEBUG_ASSERT(pendingType != PendingType::Shape);
+      content = std::make_unique<MatrixContent>(std::move(content), *pendingMatrix);
+    }
+    DEBUG_ASSERT(content != nullptr);
+    if (content != nullptr) {
+      list.push_back(std::move(content));
     }
   }
   pendingType = newType;

@@ -27,6 +27,7 @@
 #include "layers/contents/RectContent.h"
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/ShapeContent.h"
+#include "layers/contents/StrokeContent.h"
 #include "layers/contents/TextContent.h"
 
 namespace tgfx {
@@ -53,13 +54,11 @@ static std::string ContentTypeToString(ContentType type) {
       return "RRects";
     case ContentType::Matrix:
       return "Matrix";
+    case ContentType::Stroke:
+      return "Stroke";
     default:
       return "Unknown";
   }
-}
-
-static std::string PaintStyleToString(bool hasStroke) {
-  return hasStroke ? "Stroke" : "Fill";
 }
 
 static void SerializeBounds(flexbuffers::Builder& fbb, const Rect& bounds) {
@@ -93,14 +92,10 @@ static void SerializeStroke(flexbuffers::Builder& fbb, const Stroke& stroke) {
 }
 
 static void SerializeDrawContent(flexbuffers::Builder& fbb, const DrawContent* content) {
-  SerializeColor(fbb, content->color);
-  SerializeUtils::SetFlexBufferMap(fbb, "hasShader", content->shader != nullptr);
+  SerializeColor(fbb, content->getColor());
+  SerializeUtils::SetFlexBufferMap(fbb, "hasShader", content->getShader() != nullptr);
   SerializeUtils::SetFlexBufferMap(fbb, "blendMode",
-                                   SerializeUtils::BlendModeToString(content->blendMode));
-  SerializeUtils::SetFlexBufferMap(fbb, "style", PaintStyleToString(content->stroke != nullptr));
-  if (content->stroke) {
-    SerializeStroke(fbb, *content->stroke);
-  }
+                                   SerializeUtils::BlendModeToString(content->getBlendMode()));
 }
 
 static void SerializeRect(flexbuffers::Builder& fbb, const char* key, const Rect& rect) {
@@ -164,13 +159,17 @@ static void SerializeMatrixContent(flexbuffers::Builder& fbb, const MatrixConten
   fbb.Key("matrix");
   auto matrixStart = fbb.StartMap();
   float buffer[9] = {};
-  content->matrix.get9(buffer);
+  content->_matrix.get9(buffer);
   for (int i = 0; i < 9; i++) {
     auto key = "[" + std::to_string(i) + "]";
     SerializeUtils::SetFlexBufferMap(fbb, key.c_str(), buffer[i]);
   }
   fbb.EndMap(matrixStart);
 }
+
+  static void SerializeStrokeContent(flexbuffers::Builder& fbb, const StrokeContent* content) {
+    SerializeStroke(fbb, content->_stroke);
+  }
 
 std::shared_ptr<Data> RecordedContentSerialization::Serialize(
     const LayerContent* content, SerializeUtils::ComplexObjSerMap*,
@@ -208,12 +207,15 @@ std::shared_ptr<Data> RecordedContentSerialization::Serialize(
     case ContentType::Text:
       SerializeTextContent(fbb, static_cast<const TextContent*>(content));
       break;
-    case ContentType::Matrix:
-      SerializeMatrixContent(fbb, static_cast<const MatrixContent*>(content));
-      break;
     case ContentType::Compose:
       // ComposeContent contains multiple contents, just show count.
       SerializeUtils::SetFlexBufferMap(fbb, "isComposed", true);
+      break;
+    case ContentType::Matrix:
+      SerializeMatrixContent(fbb, static_cast<const MatrixContent*>(content));
+      break;
+    case ContentType::Stroke:
+      SerializeStrokeContent(fbb, static_cast<const StrokeContent*>(content));
       break;
     default:
       break;

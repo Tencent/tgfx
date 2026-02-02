@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PathContent.h"
-#include "core/utils/StrokeUtils.h"
 
 namespace tgfx {
 
@@ -29,16 +28,7 @@ Rect PathContent::onGetBounds() const {
   return path.getBounds();
 }
 
-Rect PathContent::getBounds() const {
-  auto bounds = onGetBounds();
-  if (stroke) {
-    // Path may contain sharp corners, so we need to apply miter limit to the bounds.
-    ApplyStrokeToBounds(*stroke, &bounds, Matrix::I(), true);
-  }
-  return bounds;
-}
-
-Path PathContent::getFilledPath() const {
+Path PathContent::getFilledPath(const Stroke* stroke) const {
   Path result = path;
   if (stroke) {
     stroke->applyToPath(&result);
@@ -46,17 +36,17 @@ Path PathContent::getFilledPath() const {
   return result;
 }
 
-Rect PathContent::getTightBounds(const Matrix& matrix) const {
-  auto strokedPath = getFilledPath();
+Rect PathContent::getTightBounds(const Matrix& matrix, const Stroke* stroke) const {
+  auto strokedPath = getFilledPath(stroke);
   strokedPath.transform(matrix);
   return strokedPath.getBounds();
 }
 
-bool PathContent::hitTestPoint(float localX, float localY) const {
+bool PathContent::hitTestPoint(float localX, float localY, const Stroke* stroke) const {
   if (color.alpha <= 0) {
     return false;
   }
-  return getFilledPath().contains(localX, localY);
+  return getFilledPath(stroke).contains(localX, localY);
 }
 
 void PathContent::onDraw(Canvas* canvas, const Paint& paint) const {

@@ -29,29 +29,20 @@ Rect RRectContent::onGetBounds() const {
   return rRect.rect;
 }
 
-Path RRectContent::getFilledPath() const {
-  Path path = {};
-  path.addRRect(rRect);
+Rect RRectContent::getTightBounds(const Matrix& matrix, const Stroke* stroke) const {
   if (stroke) {
-    stroke->applyToPath(&path);
-  }
-  return path;
-}
-
-Rect RRectContent::getTightBounds(const Matrix& matrix) const {
-  if (stroke) {
-    auto strokedPath = getFilledPath();
+    auto strokedPath = getFilledPath(stroke);
     strokedPath.transform(matrix);
     return strokedPath.getBounds();
   }
   return matrix.mapRect(rRect.rect);
 }
 
-bool RRectContent::hitTestPoint(float localX, float localY) const {
+bool RRectContent::hitTestPoint(float localX, float localY, const Stroke* stroke) const {
   if (color.alpha <= 0) {
     return false;
   }
-  return getFilledPath().contains(localX, localY);
+  return getFilledPath(stroke).contains(localX, localY);
 }
 
 void RRectContent::onDraw(Canvas* canvas, const Paint& paint) const {
@@ -61,6 +52,15 @@ void RRectContent::onDraw(Canvas* canvas, const Paint& paint) const {
 bool RRectContent::onHasSameGeometry(const GeometryContent* other) const {
   auto otherRRect = static_cast<const RRectContent*>(other)->rRect;
   return rRect.rect == otherRRect.rect && rRect.radii == otherRRect.radii;
+}
+
+Path RRectContent::getFilledPath(const Stroke* stroke) const {
+  Path path = {};
+  path.addRRect(rRect);
+  if (stroke) {
+    stroke->applyToPath(&path);
+  }
+  return path;
 }
 
 }  // namespace tgfx

@@ -27,8 +27,8 @@ class RectContent : public DrawContent {
  public:
   RectContent(const Rect& rect, const LayerPaint& paint);
 
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
+  Rect getTightBounds(const Matrix& matrix, const Stroke* stroke) const override;
+  bool hitTestPoint(float localX, float localY, const Stroke* stroke) const override;
 
   Rect rect = {};
 
@@ -42,7 +42,7 @@ class RectContent : public DrawContent {
   bool onHasSameGeometry(const GeometryContent* other) const override;
 
  private:
-  Path getFilledPath() const;
+  Path getFilledPath(const Stroke* stroke) const;
 };
 
 }  // namespace tgfx

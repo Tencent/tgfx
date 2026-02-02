@@ -25,31 +25,36 @@
 namespace tgfx {
 
 /**
- * DrawContent is the base class for geometry contents that store their own draw attributes.
- * Each DrawContent represents a single draw operation with its own color, shader, stroke and blend
- * mode.
+ * DrawContent is the base class for geometry contents that store their own fill attributes.
+ * Each DrawContent represents a single draw operation with its own color, shader, and blend mode.
  */
 class DrawContent : public GeometryContent {
  public:
   explicit DrawContent(const LayerPaint& paint);
 
   Rect getBounds() const override;
-  void drawContour(Canvas* canvas, bool antiAlias) const override;
-  bool contourEqualsOpaqueContent() const override;
-  bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
-  void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
-  const std::shared_ptr<Shader>& getShader() const override;
   bool hasSameGeometry(const GeometryContent* other) const override;
-
-  Color color = Color::White();
-  std::shared_ptr<Shader> shader = nullptr;
-  BlendMode blendMode = BlendMode::SrcOver;
-  std::unique_ptr<Stroke> stroke = nullptr;
+  bool mayHaveSharpCorners() const override {
+    return false;
+  }
+  const Color& getColor() const override;
+  const std::shared_ptr<Shader>& getShader() const override;
+  const BlendMode& getBlendMode() const override;
+  bool drawDefault(Canvas* canvas, float alpha, bool antiAlias,
+                   const Stroke* stroke) const override;
+  void drawForeground(Canvas* canvas, float alpha, bool antiAlias,
+                      const Stroke* stroke) const override;
+  void drawContour(Canvas* canvas, bool antiAlias, const Stroke* stroke) const override;
+  bool contourEqualsOpaqueContent() const override;
 
  protected:
   virtual Rect onGetBounds() const = 0;
   virtual void onDraw(Canvas* canvas, const Paint& paint) const = 0;
   virtual bool onHasSameGeometry(const GeometryContent* other) const = 0;
+
+  Color color = Color::White();
+  std::shared_ptr<Shader> shader = nullptr;
+  BlendMode blendMode = BlendMode::SrcOver;
 };
 
 }  // namespace tgfx

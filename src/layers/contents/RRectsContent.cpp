@@ -33,9 +33,9 @@ Rect RRectsContent::onGetBounds() const {
   return bounds;
 }
 
-Rect RRectsContent::getTightBounds(const Matrix& matrix) const {
+Rect RRectsContent::getTightBounds(const Matrix& matrix, const Stroke* stroke) const {
   if (stroke) {
-    auto strokedPath = getFilledPath();
+    auto strokedPath = getFilledPath(stroke);
     strokedPath.transform(matrix);
     return strokedPath.getBounds();
   }
@@ -46,7 +46,7 @@ Rect RRectsContent::getTightBounds(const Matrix& matrix) const {
   return bounds;
 }
 
-bool RRectsContent::hitTestPoint(float localX, float localY) const {
+bool RRectsContent::hitTestPoint(float localX, float localY, const Stroke* stroke) const {
   if (color.alpha <= 0) {
     return false;
   }
@@ -64,7 +64,7 @@ bool RRectsContent::hitTestPoint(float localX, float localY) const {
   return false;
 }
 
-Path RRectsContent::getFilledPath() const {
+Path RRectsContent::getFilledPath(const Stroke* stroke) const {
   Path path = {};
   for (const auto& rRect : rRects) {
     path.addRRect(rRect);

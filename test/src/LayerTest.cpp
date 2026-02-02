@@ -18,12 +18,10 @@
 
 #include <math.h>
 #include <vector>
-#include "core/filters/ComposeImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "layers/BackgroundContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/OpaqueContext.h"
 #include "layers/RootLayer.h"
@@ -32,6 +30,7 @@
 #include "layers/compositing3d/Layer3DContext.h"
 #include "layers/contents/ComposeContent.h"
 #include "layers/contents/MatrixContent.h"
+#include "layers/contents/StrokeContent.h"
 #include "layers/contents/RRectsContent.h"
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/TextContent.h"
@@ -44,16 +43,12 @@
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/TextLayer.h"
-#include "tgfx/layers/filters/BlendFilter.h"
 #include "tgfx/layers/filters/BlurFilter.h"
-#include "tgfx/layers/filters/ColorMatrixFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
-#include "tgfx/layers/filters/InnerShadowFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "utils/TestUtils.h"
-#include "utils/common.h"
 
 namespace tgfx {
 TGFX_TEST(LayerTest, LayerTree) {
@@ -2606,67 +2601,122 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  LayerPaint redPaint = {};
-  redPaint.color = Color::Red();
-
-  // Test 1: Same matrix should merge, different matrices should not merge
+  // Test 1: MatrixContent
   {
-    auto surface = Surface::Make(context, 300, 150);
-    auto canvas = surface->getCanvas();
+    LayerPaint fillPaint = {};
+    fillPaint.color = Color::Red();
 
     // Same matrix merges into MatrixContent wrapping Rects
+    auto rotateMatrix = Matrix::MakeRotate(30, 50, 50);
     LayerRecorder recorder1 = {};
-    auto rotate30 = Matrix::MakeRotate(30, 75, 75);
-    recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint, rotate30);
-    recorder1.addRect(Rect::MakeXYWH(90, 90, 50, 50), redPaint, rotate30);
+    recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint, rotateMatrix);
+    recorder1.addRect(Rect::MakeXYWH(80, 10, 50, 50), fillPaint, rotateMatrix);
     auto content1 = recorder1.finishRecording();
-    ASSERT_TRUE(content1 != nullptr);
     EXPECT_EQ(content1->type(), LayerContent::Type::Matrix);
     auto matrixContent = static_cast<MatrixContent*>(content1.get());
     EXPECT_EQ(matrixContent->content->type(), LayerContent::Type::Rects);
-    content1->drawDefault(canvas, 1.0f, true);
 
     // Different matrices create Compose
+    auto rotateMatrix2 = Matrix::MakeRotate(60, 50, 50);
     LayerRecorder recorder2 = {};
-    auto rotate45 = Matrix::MakeRotate(45, 225, 75);
-    recorder2.addRect(Rect::MakeXYWH(160, 10, 50, 50), redPaint, rotate30);
-    recorder2.addRect(Rect::MakeXYWH(240, 90, 50, 50), redPaint, rotate45);
+    recorder2.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint, rotateMatrix);
+    recorder2.addRect(Rect::MakeXYWH(80, 10, 50, 50), fillPaint, rotateMatrix2);
     auto content2 = recorder2.finishRecording();
-    ASSERT_TRUE(content2 != nullptr);
     EXPECT_EQ(content2->type(), LayerContent::Type::Compose);
-    content2->drawDefault(canvas, 1.0f, true);
 
-    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorderMatrix_MergeAndCompose"));
+    // Identity or nullopt matrix should not create MatrixContent
+    LayerRecorder recorder3 = {};
+    recorder3.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint, std::nullopt);
+    EXPECT_EQ(recorder3.finishRecording()->type(), LayerContent::Type::Rect);
+    LayerRecorder recorder4 = {};
+    recorder4.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint, Matrix::I());
+    EXPECT_EQ(recorder4.finishRecording()->type(), LayerContent::Type::Rect);
+
+    // getTightBounds: rotated rect bounds should be larger than original
+    auto bounds = content1->getTightBounds(Matrix::I());
+    bounds.roundOut();
+    EXPECT_EQ(bounds, Rect::MakeLTRB(10, -5, 140, 99));
+
+    // hitTestPoint: center point should hit, corner should not (due to rotation)
+    LayerRecorder recorder5 = {};
+    recorder5.addRect(Rect::MakeXYWH(0, 0, 100, 100), fillPaint,
+                      Matrix::MakeRotate(45, 50, 50));
+    auto content5 = recorder5.finishRecording();
+    EXPECT_TRUE(content5->hitTestPoint(50, 50));
+    EXPECT_FALSE(content5->hitTestPoint(0, 0));
+    EXPECT_TRUE(content5->hitTestPoint(50, -15));
   }
 
-  // Test 2: nullopt or identity matrix should not create MatrixContent
+  // Test 2: StrokeContent
   {
+    LayerPaint strokePaint = {};
+    strokePaint.color = Color::Blue();
+    strokePaint.style = PaintStyle::Stroke;
+    strokePaint.stroke = Stroke(10.0f);
+
+    // Fill style should not create StrokeContent
+    LayerPaint fillPaint = {};
+    fillPaint.color = Color::Blue();
+    LayerRecorder recorder0 = {};
+    recorder0.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint);
+    recorder0.addRect(Rect::MakeXYWH(80, 10, 50, 50), fillPaint);
+    EXPECT_EQ(recorder0.finishRecording()->type(), LayerContent::Type::Rects);
+
+    // Same stroke merges into StrokeContent wrapping Rects
     LayerRecorder recorder1 = {};
-    recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint, std::nullopt);
+    recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), strokePaint);
+    recorder1.addRect(Rect::MakeXYWH(80, 10, 50, 50), strokePaint);
     auto content1 = recorder1.finishRecording();
-    EXPECT_EQ(content1->type(), LayerContent::Type::Rect);
+    EXPECT_EQ(content1->type(), LayerContent::Type::Stroke);
+    auto strokeContent = static_cast<StrokeContent*>(content1.get());
+    EXPECT_EQ(strokeContent->content->type(), LayerContent::Type::Rects);
 
+    // Different stroke widths create Compose
+    LayerPaint strokePaint2 = strokePaint;
+    strokePaint2.stroke = Stroke(20.0f);
     LayerRecorder recorder2 = {};
-    recorder2.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint, Matrix::I());
+    recorder2.addRect(Rect::MakeXYWH(10, 10, 50, 50), strokePaint);
+    recorder2.addRect(Rect::MakeXYWH(80, 10, 50, 50), strokePaint2);
     auto content2 = recorder2.finishRecording();
-    EXPECT_EQ(content2->type(), LayerContent::Type::Rect);
+    EXPECT_EQ(content2->type(), LayerContent::Type::Compose);
+
+    // getTightBounds: bounds should be expanded by half stroke width (5)
+    LayerRecorder recorder3 = {};
+    recorder3.addRect(Rect::MakeXYWH(0, 0, 100, 100), strokePaint);
+    auto content3 = recorder3.finishRecording();
+    auto bounds = content3->getTightBounds(Matrix::I());
+    bounds.roundOut();
+    EXPECT_EQ(bounds, Rect::MakeLTRB(-5, -5, 105, 105));
+
+    // hitTestPoint: stroke edge should hit, inside rect should not (stroke is hollow)
+    EXPECT_TRUE(content3->hitTestPoint(0, 50));
+    EXPECT_TRUE(content3->hitTestPoint(-4, 50));
+    EXPECT_FALSE(content3->hitTestPoint(-10, 50));
+    EXPECT_FALSE(content3->hitTestPoint(50, 50));
   }
 
-  // Test 3: getTightBounds and hitTestPoint with matrix transformation
+  // Test 3: MatrixContent + StrokeContent combination
   {
+    auto surface = Surface::Make(context, 200, 200);
+    auto canvas = surface->getCanvas();
+
+    LayerPaint strokePaint = {};
+    strokePaint.color = Color::Green();
+    strokePaint.style = PaintStyle::Stroke;
+    strokePaint.stroke = Stroke(4.0f);
+
+    auto rotateMatrix = Matrix::MakeRotate(30, 100, 100);
+    // Same matrix + same stroke: MatrixContent -> StrokeContent
     LayerRecorder recorder = {};
-    auto rotateMatrix = Matrix::MakeRotate(45, 50, 50);
-    recorder.addRect(Rect::MakeXYWH(0, 0, 100, 100), redPaint, rotateMatrix);
+    recorder.addRect(Rect::MakeXYWH(50, 50, 50, 50), strokePaint, rotateMatrix);
+    recorder.addRect(Rect::MakeXYWH(100, 50, 50, 50), strokePaint, rotateMatrix);
     auto content = recorder.finishRecording();
-    ASSERT_TRUE(content != nullptr);
+    EXPECT_EQ(content->type(), LayerContent::Type::Matrix);
+    EXPECT_EQ(static_cast<MatrixContent*>(content.get())->content->type(),
+              LayerContent::Type::Stroke);
+    content->drawDefault(canvas, 1.0f, true);
 
-    auto bounds = content->getTightBounds(Matrix::I());
-    EXPECT_GT(bounds.width(), 100.0f);
-    EXPECT_GT(bounds.height(), 100.0f);
-
-    EXPECT_TRUE(content->hitTestPoint(50, 50));
-    EXPECT_FALSE(content->hitTestPoint(0, 0));
-    EXPECT_TRUE(content->hitTestPoint(50, -15));
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorderMatrix_Combination"));
   }
 }
 

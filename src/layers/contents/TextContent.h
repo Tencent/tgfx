@@ -28,8 +28,8 @@ class TextContent : public DrawContent {
  public:
   TextContent(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix, const LayerPaint& paint);
 
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
+  Rect getTightBounds(const Matrix& matrix, const Stroke* stroke) const override;
+  bool hitTestPoint(float localX, float localY, const Stroke* stroke) const override;
 
   std::shared_ptr<TextBlob> textBlob = nullptr;
   Matrix textMatrix = Matrix::I();

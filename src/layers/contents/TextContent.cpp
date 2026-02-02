@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextContent.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 
@@ -29,13 +30,13 @@ Rect TextContent::onGetBounds() const {
   return textMatrix.mapRect(textBlob->getBounds());
 }
 
-Rect TextContent::getTightBounds(const Matrix& matrix) const {
+Rect TextContent::getTightBounds(const Matrix& matrix, const Stroke*) const {
   auto combinedMatrix = textMatrix;
   combinedMatrix.postConcat(matrix);
   return textBlob->getTightBounds(&combinedMatrix);
 }
 
-bool TextContent::hitTestPoint(float localX, float localY) const {
+bool TextContent::hitTestPoint(float localX, float localY, const Stroke* stroke) const {
   if (color.alpha <= 0) {
     return false;
   }
@@ -44,7 +45,7 @@ bool TextContent::hitTestPoint(float localX, float localY) const {
     return false;
   }
   auto localPoint = inverse.mapXY(localX, localY);
-  return textBlob->hitTestPoint(localPoint.x, localPoint.y, stroke.get());
+  return textBlob->hitTestPoint(localPoint.x, localPoint.y, stroke);
 }
 
 void TextContent::onDraw(Canvas* canvas, const Paint& paint) const {
