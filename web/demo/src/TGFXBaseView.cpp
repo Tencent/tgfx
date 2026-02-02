@@ -123,8 +123,8 @@ void TGFXBaseView::draw() {
 
   auto canvas = surface->getCanvas();
   canvas->clear();
-  double cssWidth = 0;
-  double cssHeight = 0;
+  auto cssWidth = static_cast<double>(surface->width());
+  auto cssHeight = static_cast<double>(surface->height());
   emscripten_get_element_css_size(canvasID.c_str(), &cssWidth, &cssHeight);
   auto density = static_cast<float>(surface->width()) / static_cast<float>(cssWidth);
   DrawBackground(canvas, surface->width(), surface->height(), density);
