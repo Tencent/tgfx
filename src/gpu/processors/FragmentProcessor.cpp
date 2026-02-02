@@ -77,9 +77,9 @@ PlacementPtr<FragmentProcessor> FragmentProcessor::MulInputByChildAlpha(
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::Compose(BlockAllocator* allocator,
-                                                           PlacementPtr<FragmentProcessor> f,
-                                                           PlacementPtr<FragmentProcessor> g) {
-  return ComposeFragmentProcessor::Make(allocator, std::move(f), std::move(g));
+                                                           PlacementPtr<FragmentProcessor> first,
+                                                           PlacementPtr<FragmentProcessor> second) {
+  return ComposeFragmentProcessor::Make(allocator, std::move(first), std::move(second));
 }
 
 void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey) const {
