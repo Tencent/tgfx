@@ -104,13 +104,13 @@ class FragmentProcessor : public Processor {
                                                               bool inverted = false);
 
   /**
-   * Returns a fragment processor that composes two fragment processors `f` and `g` into f(g(x)).
-   * This is equivalent to running them in series (`g`, then `f`). This is not the same as
+   * Returns a fragment processor that composes two fragment processors into second(first(x)).
+   * This is equivalent to running them in series (first, then second). This is not the same as
    * transfer-mode composition; there is no blending step.
    */
   static PlacementPtr<FragmentProcessor> Compose(BlockAllocator* allocator,
-                                                 PlacementPtr<FragmentProcessor> f,
-                                                 PlacementPtr<FragmentProcessor> g);
+                                                 PlacementPtr<FragmentProcessor> first,
+                                                 PlacementPtr<FragmentProcessor> second);
 
   size_t numTextureSamplers() const {
     return onCountTextureSamplers();
