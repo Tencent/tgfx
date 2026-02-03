@@ -11,6 +11,7 @@ app.use((req, res, next) => {
 
 app.use('', express.static(path.join('../')));
 app.use('', express.static(path.join('demo/')));
+app.use('/resources', express.static(path.join('../resources')));
 
 app.get('/', (req, res) => {
   res.send('Hello, tgfx!');
