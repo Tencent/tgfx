@@ -109,6 +109,16 @@ emscripten::val WebScalerContext::getGlyphCanvas(GlyphID glyphID, bool fauxBold,
                                  emscripten::val::undefined(), padding);
 }
 
+std::shared_ptr<ImageBuffer> WebScalerContext::makeGlyphBuffer(GlyphID glyphID, bool fauxBold,
+                                                               const Stroke* stroke, int padding,
+                                                               bool alphaOnly) const {
+  auto canvas = getGlyphCanvas(glyphID, fauxBold, stroke, padding);
+  if (canvas.as<bool>()) {
+    return WebImageBuffer::MakeAdopted(canvas, alphaOnly);
+  }
+  return nullptr;
+}
+
 std::string WebScalerContext::getText(GlyphID glyphID) const {
   return static_cast<WebTypeface*>(typeface.get())->getText(glyphID);
 }

@@ -78,6 +78,15 @@ class ScalerContext {
     return textSize;
   }
 
+  /**
+   * Creates an ImageBuffer containing the rendered glyph that supports direct texture upload.
+   * Returns nullptr if direct upload is not supported. Default implementation returns nullptr.
+   */
+  virtual std::shared_ptr<ImageBuffer> makeGlyphBuffer(GlyphID, bool, const Stroke*, int,
+                                                       bool) const {
+    return nullptr;
+  }
+
  protected:
   // Note: This could be nullptr.
   std::shared_ptr<Typeface> typeface = nullptr;

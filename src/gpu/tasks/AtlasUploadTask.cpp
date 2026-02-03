@@ -23,9 +23,6 @@
 #include "core/utils/HardwareBufferUtil.h"
 #include "tgfx/core/Task.h"
 #include "tgfx/gpu/GPU.h"
-#ifdef TGFX_BUILD_FOR_WEB
-#include "platform/web/WebImageBuffer.h"
-#endif
 
 namespace tgfx {
 class CellDecodeTask : public Task {
@@ -115,7 +112,6 @@ void AtlasUploadTask::addCell(BlockAllocator* allocator, std::shared_ptr<ImageCo
   auto offsetX = static_cast<int>(atlasOffset.x) - padding;
   auto offsetY = static_cast<int>(atlasOffset.y) - padding;
 
-#ifdef TGFX_BUILD_FOR_WEB
   if (!codec->asyncSupport() && hardwarePixels == nullptr) {
     auto imageBuffer = codec->makeBuffer(false);
     if (imageBuffer != nullptr) {
@@ -127,7 +123,6 @@ void AtlasUploadTask::addCell(BlockAllocator* allocator, std::shared_ptr<ImageCo
       return;
     }
   }
-#endif
 
   void* dstPixels = nullptr;
   auto dstWidth = codec->width() + 2 * padding;
@@ -156,19 +151,16 @@ void AtlasUploadTask::upload(Context* context) {
   if (textureView == nullptr) {
     return;
   }
-#ifdef TGFX_BUILD_FOR_WEB
+  auto texture = textureView->getTexture();
   for (auto& cell : directUploadCells) {
-    auto webBuffer = std::static_pointer_cast<WebImageBuffer>(cell.imageBuffer);
-    webBuffer->uploadToTexture(textureView->getTexture(), cell.offsetX, cell.offsetY);
+    cell.imageBuffer->onUploadToTexture(context, texture, cell.offsetX, cell.offsetY);
   }
   directUploadCells.clear();
-#endif
   auto queue = context->gpu()->queue();
   for (auto& task : tasks) {
     task->wait();
     if (!hardwarePixels) {
-      queue->writeTexture(textureView->getTexture(), task->atlasRect(), task->pixels(),
-                          task->info().rowBytes());
+      queue->writeTexture(texture, task->atlasRect(), task->pixels(), task->info().rowBytes());
     }
   }
   tasks.clear();

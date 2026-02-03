@@ -17,11 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlyphRasterizer.h"
-#ifdef TGFX_BUILD_FOR_WEB
 #include "core/AtlasTypes.h"
-#include "platform/web/WebImageBuffer.h"
-#include "platform/web/WebScalerContext.h"
-#endif
 
 namespace tgfx {
 GlyphRasterizer::GlyphRasterizer(int width, int height,
@@ -42,15 +38,13 @@ bool GlyphRasterizer::asyncSupport() const {
 }
 
 std::shared_ptr<ImageBuffer> GlyphRasterizer::onMakeBuffer(bool tryHardware) const {
-#ifdef TGFX_BUILD_FOR_WEB
   if (!scalerContext->asyncSupport()) {
-    auto webScalerContext = static_cast<WebScalerContext*>(scalerContext.get());
-    auto canvas = webScalerContext->getGlyphCanvas(glyphID, fauxBold, stroke, Plot::CellPadding);
-    if (canvas.as<bool>()) {
-      return WebImageBuffer::MakeAdopted(canvas, isAlphaOnly());
+    auto buffer =
+        scalerContext->makeGlyphBuffer(glyphID, fauxBold, stroke, Plot::CellPadding, isAlphaOnly());
+    if (buffer != nullptr) {
+      return buffer;
     }
   }
-#endif
   return ImageCodec::onMakeBuffer(tryHardware);
 }
 

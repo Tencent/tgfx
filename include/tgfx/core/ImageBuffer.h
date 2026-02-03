@@ -28,8 +28,10 @@
 
 namespace tgfx {
 class Context;
+class Texture;
 class TextureView;
 class BufferImage;
+class AtlasUploadTask;
 
 /**
  * ImageBuffer describes a two-dimensional array of pixels and is optimized for creating textures.
@@ -123,7 +125,17 @@ class ImageBuffer {
    */
   virtual std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const = 0;
 
+  /**
+   * Uploads the image content directly to the specified texture at the given offset.
+   * Returns true if the upload was successful. Default implementation returns false.
+   * Subclasses can override this to support platform-specific direct upload optimizations.
+   */
+  virtual bool onUploadToTexture(Context*, std::shared_ptr<Texture>, int, int) const {
+    return false;
+  }
+
   friend class TextureView;
   friend class BufferImage;
+  friend class AtlasUploadTask;
 };
 }  // namespace tgfx

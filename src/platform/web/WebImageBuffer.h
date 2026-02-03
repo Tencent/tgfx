@@ -55,17 +55,15 @@ class WebImageBuffer : public ImageBuffer {
     return _alphaOnly;
   }
 
-  /**
-   * Uploads the image to a region of the target texture. Returns true if successful.
-   */
-  bool uploadToTexture(std::shared_ptr<Texture> texture, int offsetX, int offsetY) const;
-
   const std::shared_ptr<ColorSpace>& colorSpace() const override {
     return ColorSpace::SRGB();
   }
 
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
+
+  bool onUploadToTexture(Context* context, std::shared_ptr<Texture> texture, int offsetX,
+                         int offsetY) const override;
 
  private:
   int _width = 0;

@@ -64,8 +64,8 @@ WebImageBuffer::~WebImageBuffer() {
   }
 }
 
-bool WebImageBuffer::uploadToTexture(std::shared_ptr<Texture> texture, int offsetX,
-                                     int offsetY) const {
+bool WebImageBuffer::onUploadToTexture(Context*, std::shared_ptr<Texture> texture, int offsetX,
+                                       int offsetY) const {
   if (texture == nullptr || !nativeImage.as<bool>()) {
     return false;
   }

@@ -52,6 +52,9 @@ class WebScalerContext : public ScalerContext {
   emscripten::val getGlyphCanvas(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
                                  int padding) const;
 
+  std::shared_ptr<ImageBuffer> makeGlyphBuffer(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                                               int padding, bool alphaOnly) const override;
+
  private:
   emscripten::val scalerContext = emscripten::val::null();
 
