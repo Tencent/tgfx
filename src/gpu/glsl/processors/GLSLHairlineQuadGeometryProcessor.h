@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2026 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,23 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ScalePixelsAlpha.h"
-#include <cmath>
+#pragma once
+
+#include "gpu/processors/HairlineQuadGeometryProcessor.h"
+#include "tgfx/core/Color.h"
 
 namespace tgfx {
-void ScalePixelsAlpha(const ImageInfo& info, void* pixels, float alphaScale) {
-  if (alphaScale >= 1.f) {
-    return;
-  }
-  auto buffer = static_cast<unsigned char*>(pixels);
-  auto width = static_cast<size_t>(info.width());
-  auto height = static_cast<size_t>(info.height());
-  auto rowBytes = info.rowBytes();
-  for (size_t y = 0; y < height; ++y) {
-    auto* row = buffer + y * rowBytes;
-    for (size_t x = 0; x < width; ++x) {
-      row[x] = static_cast<unsigned char>(std::lroundf(row[x] * alphaScale));
-    }
-  }
-}
+
+class GLSLHairlineQuadGeometryProcessor : public HairlineQuadGeometryProcessor {
+ public:
+  GLSLHairlineQuadGeometryProcessor(const PMColor& color, const Matrix& viewMatrix,
+                                    std::optional<Matrix> uvMatrix, float coverage, AAType aaType);
+
+  void emitCode(EmitArgs& args) const override;
+
+ private:
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
+               FPCoordTransformIter* coordTransformIter) const override;
+};
+
 }  // namespace tgfx

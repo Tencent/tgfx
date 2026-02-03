@@ -18,28 +18,33 @@
 
 #pragma once
 
-#include <memory>
-#include <tuple>
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Path.h"
+#include "core/DataSource.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
 
-class StrokeShape;
+struct HairlineBuffer {
+  HairlineBuffer(std::shared_ptr<Data> lineVertices, std::shared_ptr<Data> lineIndices,
+                 std::shared_ptr<Data> quadVertices, std::shared_ptr<Data> quadIndices)
+      : lineVertices(std::move(lineVertices)), lineIndices(std::move(lineIndices)),
+        quadVertices(std::move(quadVertices)), quadIndices(std::move(quadIndices)) {
+  }
 
-class ShapeUtils {
- public:
-  /**
-   * Returns the Shape adjusted for the current resolution scale.
-   * Used during rendering to decide whether to simplify the Path or apply hairline stroking,
-   * depending on the resolution scale.
-   */
-  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
-
-  static float CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape);
-
-  static std::tuple<std::shared_ptr<StrokeShape>, Matrix> DecomposeStrokeShape(
-      std::shared_ptr<Shape> shape);
+  std::shared_ptr<Data> lineVertices = nullptr;
+  std::shared_ptr<Data> lineIndices = nullptr;
+  std::shared_ptr<Data> quadVertices = nullptr;
+  std::shared_ptr<Data> quadIndices = nullptr;
 };
+
+class HairlineTriangulator : public DataSource<HairlineBuffer> {
+ public:
+  HairlineTriangulator(std::shared_ptr<Shape> shape, bool hasCap);
+
+  std::shared_ptr<HairlineBuffer> getData() const override;
+
+ private:
+  std::shared_ptr<Shape> shape = nullptr;
+  bool hasCap = false;
+};
+
 }  // namespace tgfx
