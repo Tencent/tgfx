@@ -114,10 +114,9 @@ void AtlasUploadTask::addCell(BlockAllocator* allocator, std::shared_ptr<ImageCo
   auto padding = Plot::CellPadding;
   auto offsetX = static_cast<int>(atlasOffset.x) - padding;
   auto offsetY = static_cast<int>(atlasOffset.y) - padding;
-  auto asyncSupport = codec->asyncSupport();
 
 #ifdef TGFX_BUILD_FOR_WEB
-  if (!asyncSupport && hardwarePixels == nullptr) {
+  if (!codec->asyncSupport() && hardwarePixels == nullptr) {
     auto imageBuffer = codec->makeBuffer(false);
     if (imageBuffer != nullptr) {
       DirectUploadCell cell;
