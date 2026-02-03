@@ -42,20 +42,20 @@ TGFXThreadsView::TGFXThreadsView(const std::string& canvasID) : TGFXBaseView(can
 }
 
 void TGFXThreadsView::registerFonts(const val& fontVal, const val& emojiFontVal) {
-  //auto fontData = GetDataFromEmscripten(fontVal);
-  //if (fontData) {
-  auto typeface = tgfx::Typeface::MakeFromName("default", "");
-  if (typeface) {
-    appHost->addTypeface("default", std::move(typeface));
+  auto fontData = GetDataFromEmscripten(fontVal);
+  if (fontData) {
+    auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
+    if (typeface) {
+      appHost->addTypeface("default", std::move(typeface));
+    }
   }
-  //}
-  //auto emojiFontData = GetDataFromEmscripten(emojiFontVal);
-  //if (emojiFontData) {
-  auto typeface1 = tgfx::Typeface::MakeFromName("emoji", "");
-  if (typeface1) {
-    appHost->addTypeface("emoji", std::move(typeface1));
+  auto emojiFontData = GetDataFromEmscripten(emojiFontVal);
+  if (emojiFontData) {
+    auto typeface = tgfx::Typeface::MakeFromData(emojiFontData, 0);
+    if (typeface) {
+      appHost->addTypeface("emoji", std::move(typeface));
+    }
   }
-  //}
 }
 
 }  // namespace hello2d

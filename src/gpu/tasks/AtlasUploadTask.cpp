@@ -36,10 +36,6 @@ class CellDecodeTask : public Task {
         offsetY(offsetY) {
   }
 
-  bool asyncSupport() const {
-    return imageCodec ? imageCodec->asyncSupport() : true;
-  }
-
   const ImageInfo& info() const {
     return dstInfo;
   }
@@ -118,7 +114,6 @@ void AtlasUploadTask::addCell(BlockAllocator* allocator, std::shared_ptr<ImageCo
   auto padding = Plot::CellPadding;
   auto offsetX = static_cast<int>(atlasOffset.x) - padding;
   auto offsetY = static_cast<int>(atlasOffset.y) - padding;
-  // Check async support before creating task or moving codec.
   auto asyncSupport = codec->asyncSupport();
 
 #ifdef TGFX_BUILD_FOR_WEB
@@ -153,11 +148,7 @@ void AtlasUploadTask::addCell(BlockAllocator* allocator, std::shared_ptr<ImageCo
   }
   auto task =
       std::make_shared<CellDecodeTask>(std::move(codec), dstPixels, dstInfo, offsetX, offsetY);
-  if (task->asyncSupport()) {
-    Task::Run(task);
-  } else {
-    task->wait();
-  }
+  Task::Run(task);
   tasks.emplace_back(std::move(task));
 }
 
