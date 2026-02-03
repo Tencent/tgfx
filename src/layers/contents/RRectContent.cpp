@@ -25,24 +25,24 @@ RRectContent::RRectContent(const RRect& rRect, const LayerPaint& paint)
     : DrawContent(paint), rRect(rRect) {
 }
 
-Rect RRectContent::onGetBounds() const {
-  return rRect.rect;
-}
-
-Rect RRectContent::getTightBounds(const Matrix& matrix, const Stroke* stroke) const {
+Rect RRectContent::getTightBounds(const Matrix& matrix) const {
   if (stroke) {
-    auto strokedPath = getFilledPath(stroke);
+    auto strokedPath = getFilledPath();
     strokedPath.transform(matrix);
     return strokedPath.getBounds();
   }
   return matrix.mapRect(rRect.rect);
 }
 
-bool RRectContent::hitTestPoint(float localX, float localY, const Stroke* stroke) const {
+bool RRectContent::hitTestPoint(float localX, float localY) const {
   if (color.alpha <= 0) {
     return false;
   }
-  return getFilledPath(stroke).contains(localX, localY);
+  return getFilledPath().contains(localX, localY);
+}
+
+Rect RRectContent::onGetBounds() const {
+  return rRect.rect;
 }
 
 void RRectContent::onDraw(Canvas* canvas, const Paint& paint) const {
@@ -54,7 +54,7 @@ bool RRectContent::onHasSameGeometry(const GeometryContent* other) const {
   return rRect.rect == otherRRect.rect && rRect.radii == otherRRect.radii;
 }
 
-Path RRectContent::getFilledPath(const Stroke* stroke) const {
+Path RRectContent::getFilledPath() const {
   Path path = {};
   path.addRRect(rRect);
   if (stroke) {

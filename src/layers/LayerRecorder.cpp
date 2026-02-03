@@ -31,7 +31,6 @@
 #include "layers/contents/RectContent.h"
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/ShapeContent.h"
-#include "layers/contents/StrokeContent.h"
 #include "layers/contents/TextContent.h"
 
 namespace tgfx {
@@ -74,9 +73,6 @@ void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerP
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
   std::unique_ptr<GeometryContent> content =
       std::make_unique<TextContent>(std::move(textBlob), textMatrix, paint);
-  if (paint.style == PaintStyle::Stroke) {
-    content = std::make_unique<StrokeContent>(std::move(content), paint.stroke);
-  }
   list.push_back(std::move(content));
 }
 
@@ -252,10 +248,6 @@ void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint
         break;
     }
 
-    // Wrap with StrokeContent if paint has stroke style.
-    if (content != nullptr && pendingPaint.style == PaintStyle::Stroke) {
-      content = std::make_unique<StrokeContent>(std::move(content), pendingPaint.stroke);
-    }
     // Wrap with MatrixContent if matrix has value and is not identity.
     if (content != nullptr && pendingMatrix.has_value() && !pendingMatrix->isIdentity()) {
       content = std::make_unique<MatrixContent>(std::move(content), *pendingMatrix);

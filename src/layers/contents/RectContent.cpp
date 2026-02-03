@@ -24,36 +24,27 @@ RectContent::RectContent(const Rect& rect, const LayerPaint& paint)
     : DrawContent(paint), rect(rect) {
 }
 
-Rect RectContent::onGetBounds() const {
-  return rect;
-}
-
-Rect RectContent::getTightBounds(const Matrix& matrix, const Stroke* stroke) const {
+Rect RectContent::getTightBounds(const Matrix& matrix) const {
   if (stroke) {
-    auto strokedPath = getFilledPath(stroke);
+    auto strokedPath = getFilledPath();
     strokedPath.transform(matrix);
     return strokedPath.getBounds();
   }
   return matrix.mapRect(rect);
 }
 
-bool RectContent::hitTestPoint(float localX, float localY, const Stroke* stroke) const {
+bool RectContent::hitTestPoint(float localX, float localY) const {
   if (color.alpha <= 0) {
     return false;
   }
   if (stroke) {
-    return getFilledPath(stroke).contains(localX, localY);
+    return getFilledPath().contains(localX, localY);
   }
   return rect.contains(localX, localY);
 }
 
-Path RectContent::getFilledPath(const Stroke* stroke) const {
-  Path path = {};
-  path.addRect(rect);
-  if (stroke) {
-    stroke->applyToPath(&path);
-  }
-  return path;
+Rect RectContent::onGetBounds() const {
+  return rect;
 }
 
 void RectContent::onDraw(Canvas* canvas, const Paint& paint) const {
@@ -62,6 +53,15 @@ void RectContent::onDraw(Canvas* canvas, const Paint& paint) const {
 
 bool RectContent::onHasSameGeometry(const GeometryContent* other) const {
   return rect == static_cast<const RectContent*>(other)->rect;
+}
+
+Path RectContent::getFilledPath() const {
+  Path path = {};
+  path.addRect(rect);
+  if (stroke) {
+    stroke->applyToPath(&path);
+  }
+  return path;
 }
 
 }  // namespace tgfx

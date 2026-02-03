@@ -31,22 +31,15 @@ class MatrixContent : public GeometryContent {
   MatrixContent(std::unique_ptr<GeometryContent> content, const Matrix& matrix);
 
   Rect getBounds() const override;
-  bool hasSameGeometry(const GeometryContent* other) const override;
-  bool mayHaveSharpCorners() const override {
-    return content->mayHaveSharpCorners();
-  }
-  const Color& getColor() const override;
-  const std::shared_ptr<Shader>& getShader() const override;
-  const BlendMode& getBlendMode() const override;
-  Rect getTightBounds(const Matrix& matrix, const Stroke* stroke) const override;
-  bool hitTestPoint(float localX, float localY, const Stroke* stroke) const override;
-  bool drawDefault(Canvas* canvas, float alpha, bool antiAlias,
-                   const Stroke* stroke) const override;
-  void drawForeground(Canvas* canvas, float alpha, bool antiAlias,
-                      const Stroke* stroke) const override;
-  void drawContour(Canvas* canvas, bool antiAlias, const Stroke* stroke) const override;
+  Rect getTightBounds(const Matrix& matrix) const override;
+  bool hitTestPoint(float localX, float localY) const override;
+  bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
+  void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
+  void drawContour(Canvas* canvas, bool antiAlias) const override;
   bool contourEqualsOpaqueContent() const override;
   bool hasBlendMode() const override;
+  bool hasSameGeometry(const GeometryContent* other) const override;
+  const std::shared_ptr<Shader>& getShader() const override;
 
   std::unique_ptr<GeometryContent> content = nullptr;
   Matrix _matrix = Matrix::I();

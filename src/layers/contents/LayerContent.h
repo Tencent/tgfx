@@ -93,7 +93,6 @@ class LayerContent {
     Rects,
     RRects,
     Matrix,
-    Stroke,
   };
 
   /**

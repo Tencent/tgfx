@@ -30,13 +30,13 @@ Rect TextContent::onGetBounds() const {
   return textMatrix.mapRect(textBlob->getBounds());
 }
 
-Rect TextContent::getTightBounds(const Matrix& matrix, const Stroke*) const {
+Rect TextContent::getTightBounds(const Matrix& matrix) const {
   auto combinedMatrix = textMatrix;
   combinedMatrix.postConcat(matrix);
   return textBlob->getTightBounds(&combinedMatrix);
 }
 
-bool TextContent::hitTestPoint(float localX, float localY, const Stroke* stroke) const {
+bool TextContent::hitTestPoint(float localX, float localY) const {
   if (color.alpha <= 0) {
     return false;
   }
@@ -45,7 +45,7 @@ bool TextContent::hitTestPoint(float localX, float localY, const Stroke* stroke)
     return false;
   }
   auto localPoint = inverse.mapXY(localX, localY);
-  return textBlob->hitTestPoint(localPoint.x, localPoint.y, stroke);
+  return textBlob->hitTestPoint(localPoint.x, localPoint.y, stroke.get());
 }
 
 void TextContent::onDraw(Canvas* canvas, const Paint& paint) const {

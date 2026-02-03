@@ -32,7 +32,6 @@
 #include "layers/contents/MatrixContent.h"
 #include "layers/contents/RRectsContent.h"
 #include "layers/contents/RectsContent.h"
-#include "layers/contents/StrokeContent.h"
 #include "layers/contents/TextContent.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
@@ -2651,14 +2650,14 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
     EXPECT_TRUE(content5->hitTestPoint(50, -15));
   }
 
-  // Test 2: StrokeContent
+  // Test 2: Stroke style with DrawContent
   {
     LayerPaint strokePaint = {};
     strokePaint.color = Color::Blue();
     strokePaint.style = PaintStyle::Stroke;
     strokePaint.stroke = Stroke(10.0f);
 
-    // Fill style should not create StrokeContent
+    // Fill style should not create stroke
     LayerPaint fillPaint = {};
     fillPaint.color = Color::Blue();
     LayerRecorder recorder0 = {};
@@ -2666,14 +2665,12 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
     recorder0.addRect(Rect::MakeXYWH(80, 10, 50, 50), fillPaint);
     EXPECT_EQ(recorder0.finishRecording()->type(), LayerContent::Type::Rects);
 
-    // Same stroke merges into StrokeContent wrapping Rects
+    // Same stroke merges into Rects with stroke attribute
     LayerRecorder recorder1 = {};
     recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), strokePaint);
     recorder1.addRect(Rect::MakeXYWH(80, 10, 50, 50), strokePaint);
     auto content1 = recorder1.finishRecording();
-    EXPECT_EQ(content1->type(), LayerContent::Type::Stroke);
-    auto strokeContent = static_cast<StrokeContent*>(content1.get());
-    EXPECT_EQ(strokeContent->content->type(), LayerContent::Type::Rects);
+    EXPECT_EQ(content1->type(), LayerContent::Type::Rects);
 
     // Different stroke widths create Compose
     LayerPaint strokePaint2 = strokePaint;
@@ -2699,7 +2696,7 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
     EXPECT_FALSE(content3->hitTestPoint(50, 50));
   }
 
-  // Test 3: MatrixContent + StrokeContent combination
+  // Test 3: MatrixContent + stroke combination
   {
     auto surface = Surface::Make(context, 200, 200);
     auto canvas = surface->getCanvas();
@@ -2710,7 +2707,7 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
     strokePaint.stroke = Stroke(4.0f);
 
     auto rotateMatrix = Matrix::MakeRotate(30, 100, 100);
-    // Same matrix + same stroke: MatrixContent -> StrokeContent
+    // Same matrix + same stroke: MatrixContent wrapping Rects with stroke
     LayerRecorder recorder = {};
     recorder.setMatrix(rotateMatrix);
     recorder.addRect(Rect::MakeXYWH(50, 50, 50, 50), strokePaint);
@@ -2718,7 +2715,7 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
     auto content = recorder.finishRecording();
     EXPECT_EQ(content->type(), LayerContent::Type::Matrix);
     EXPECT_EQ(static_cast<MatrixContent*>(content.get())->content->type(),
-              LayerContent::Type::Stroke);
+              LayerContent::Type::Rects);
     content->drawDefault(canvas, 1.0f, true);
 
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorderMatrix_Combination"));

@@ -30,6 +30,47 @@ Rect MatrixContent::getBounds() const {
   return _matrix.mapRect(content->getBounds());
 }
 
+Rect MatrixContent::getTightBounds(const Matrix& matrix) const {
+  auto combinedMatrix = _matrix;
+  combinedMatrix.postConcat(matrix);
+  return content->getTightBounds(combinedMatrix);
+}
+
+bool MatrixContent::hitTestPoint(float localX, float localY) const {
+  Matrix inverse = Matrix::I();
+  if (!_matrix.invert(&inverse)) {
+    return false;
+  }
+  auto localPoint = inverse.mapXY(localX, localY);
+  return content->hitTestPoint(localPoint.x, localPoint.y);
+}
+
+bool MatrixContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
+  AutoCanvasRestore autoRestore(canvas);
+  canvas->concat(_matrix);
+  return content->drawDefault(canvas, alpha, antiAlias);
+}
+
+void MatrixContent::drawForeground(Canvas* canvas, float alpha, bool antiAlias) const {
+  AutoCanvasRestore autoRestore(canvas);
+  canvas->concat(_matrix);
+  content->drawForeground(canvas, alpha, antiAlias);
+}
+
+void MatrixContent::drawContour(Canvas* canvas, bool antiAlias) const {
+  AutoCanvasRestore autoRestore(canvas);
+  canvas->concat(_matrix);
+  content->drawContour(canvas, antiAlias);
+}
+
+bool MatrixContent::contourEqualsOpaqueContent() const {
+  return content->contourEqualsOpaqueContent();
+}
+
+bool MatrixContent::hasBlendMode() const {
+  return content->hasBlendMode();
+}
+
 bool MatrixContent::hasSameGeometry(const GeometryContent* other) const {
   if (other == nullptr || Types::Get(this) != Types::Get(other)) {
     return false;
@@ -39,59 +80,8 @@ bool MatrixContent::hasSameGeometry(const GeometryContent* other) const {
          content->hasSameGeometry(otherMatrix->content.get());
 }
 
-const Color& MatrixContent::getColor() const {
-  return content->getColor();
-}
-
 const std::shared_ptr<Shader>& MatrixContent::getShader() const {
   return content->getShader();
-}
-
-const BlendMode& MatrixContent::getBlendMode() const {
-  return content->getBlendMode();
-}
-
-Rect MatrixContent::getTightBounds(const Matrix& matrix, const Stroke* stroke) const {
-  auto combinedMatrix = _matrix;
-  combinedMatrix.postConcat(matrix);
-  return content->getTightBounds(combinedMatrix, stroke);
-}
-
-bool MatrixContent::hitTestPoint(float localX, float localY, const Stroke* stroke) const {
-  Matrix inverse = Matrix::I();
-  if (!_matrix.invert(&inverse)) {
-    return false;
-  }
-  auto localPoint = inverse.mapXY(localX, localY);
-  return content->hitTestPoint(localPoint.x, localPoint.y, stroke);
-}
-
-bool MatrixContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias,
-                                const Stroke* stroke) const {
-  AutoCanvasRestore autoRestore(canvas);
-  canvas->concat(_matrix);
-  return content->drawDefault(canvas, alpha, antiAlias, stroke);
-}
-
-void MatrixContent::drawForeground(Canvas* canvas, float alpha, bool antiAlias,
-                                   const Stroke* stroke) const {
-  AutoCanvasRestore autoRestore(canvas);
-  canvas->concat(_matrix);
-  content->drawForeground(canvas, alpha, antiAlias, stroke);
-}
-
-void MatrixContent::drawContour(Canvas* canvas, bool antiAlias, const Stroke* stroke) const {
-  AutoCanvasRestore autoRestore(canvas);
-  canvas->concat(_matrix);
-  content->drawContour(canvas, antiAlias, stroke);
-}
-
-bool MatrixContent::contourEqualsOpaqueContent() const {
-  return content->contourEqualsOpaqueContent();
-}
-
-bool MatrixContent::hasBlendMode() const {
-  return content->hasBlendMode();
 }
 
 }  // namespace tgfx

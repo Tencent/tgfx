@@ -27,7 +27,6 @@
 #include "layers/contents/RectContent.h"
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/ShapeContent.h"
-#include "layers/contents/StrokeContent.h"
 #include "layers/contents/TextContent.h"
 
 namespace tgfx {
@@ -54,11 +53,13 @@ static std::string ContentTypeToString(ContentType type) {
       return "RRects";
     case ContentType::Matrix:
       return "Matrix";
-    case ContentType::Stroke:
-      return "Stroke";
     default:
       return "Unknown";
   }
+}
+
+static std::string PaintStyleToString(bool hasStroke) {
+  return hasStroke ? "Stroke" : "Fill";
 }
 
 static void SerializeBounds(flexbuffers::Builder& fbb, const Rect& bounds) {
@@ -96,6 +97,10 @@ static void SerializeDrawContent(flexbuffers::Builder& fbb, const DrawContent* c
   SerializeUtils::SetFlexBufferMap(fbb, "hasShader", content->getShader() != nullptr);
   SerializeUtils::SetFlexBufferMap(fbb, "blendMode",
                                    SerializeUtils::BlendModeToString(content->getBlendMode()));
+  SerializeUtils::SetFlexBufferMap(fbb, "style", PaintStyleToString(content->getStroke() != nullptr));
+  if (content->getStroke()) {
+    SerializeStroke(fbb, *content->getStroke());
+  }
 }
 
 static void SerializeRect(flexbuffers::Builder& fbb, const char* key, const Rect& rect) {
@@ -167,10 +172,6 @@ static void SerializeMatrixContent(flexbuffers::Builder& fbb, const MatrixConten
   fbb.EndMap(matrixStart);
 }
 
-  static void SerializeStrokeContent(flexbuffers::Builder& fbb, const StrokeContent* content) {
-    SerializeStroke(fbb, content->_stroke);
-  }
-
 std::shared_ptr<Data> RecordedContentSerialization::Serialize(
     const LayerContent* content, SerializeUtils::ComplexObjSerMap*,
     SerializeUtils::RenderableObjSerMap*) {
@@ -213,9 +214,6 @@ std::shared_ptr<Data> RecordedContentSerialization::Serialize(
       break;
     case ContentType::Matrix:
       SerializeMatrixContent(fbb, static_cast<const MatrixContent*>(content));
-      break;
-    case ContentType::Stroke:
-      SerializeStrokeContent(fbb, static_cast<const StrokeContent*>(content));
       break;
     default:
       break;

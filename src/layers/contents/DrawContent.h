@@ -25,28 +25,36 @@
 namespace tgfx {
 
 /**
- * DrawContent is the base class for geometry contents that store their own fill attributes.
- * Each DrawContent represents a single draw operation with its own color, shader, and blend mode.
+ * DrawContent is the base class for geometry contents that store their own draw attributes.
+ * Each DrawContent represents a single draw operation with its own color, shader, stroke and blend
+ * mode.
  */
 class DrawContent : public GeometryContent {
  public:
   explicit DrawContent(const LayerPaint& paint);
 
   Rect getBounds() const override;
-  bool hasSameGeometry(const GeometryContent* other) const override;
-  bool mayHaveSharpCorners() const override {
-    return false;
-  }
-  const Color& getColor() const override;
-  const std::shared_ptr<Shader>& getShader() const override;
-  const BlendMode& getBlendMode() const override;
-  bool drawDefault(Canvas* canvas, float alpha, bool antiAlias,
-                   const Stroke* stroke) const override;
-  void drawForeground(Canvas* canvas, float alpha, bool antiAlias,
-                      const Stroke* stroke) const override;
-  void drawContour(Canvas* canvas, bool antiAlias, const Stroke* stroke) const override;
+  Rect getTightBounds(const Matrix& matrix) const override = 0;
+  bool hitTestPoint(float localX, float localY) const override = 0;
+  void drawContour(Canvas* canvas, bool antiAlias) const override;
   bool contourEqualsOpaqueContent() const override;
+  bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
+  void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
+  const std::shared_ptr<Shader>& getShader() const override;
+  bool hasSameGeometry(const GeometryContent* other) const override;
   bool hasBlendMode() const override;
+
+  const Color& getColor() const {
+    return color;
+  }
+
+  const BlendMode& getBlendMode() const {
+    return blendMode;
+  }
+
+  const Stroke* getStroke() const {
+    return stroke.get();
+  }
 
  protected:
   virtual Rect onGetBounds() const = 0;
@@ -56,6 +64,7 @@ class DrawContent : public GeometryContent {
   Color color = Color::White();
   std::shared_ptr<Shader> shader = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
+  std::unique_ptr<Stroke> stroke = nullptr;
 };
 
 }  // namespace tgfx

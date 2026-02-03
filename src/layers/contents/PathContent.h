@@ -27,12 +27,9 @@ class PathContent : public DrawContent {
  public:
   PathContent(Path path, const LayerPaint& paint);
 
-  Rect getTightBounds(const Matrix& matrix, const Stroke* stroke) const override;
-  bool hitTestPoint(float localX, float localY, const Stroke* stroke) const override;
-  // Path may contain sharp corners that require miter limit consideration.
-  bool mayHaveSharpCorners() const override {
-    return true;
-  }
+  Rect getBounds() const override;
+  Rect getTightBounds(const Matrix& matrix) const override;
+  bool hitTestPoint(float localX, float localY) const override;
 
   Path path = {};
 
@@ -46,7 +43,7 @@ class PathContent : public DrawContent {
   bool onHasSameGeometry(const GeometryContent* other) const override;
 
  private:
-  Path getFilledPath(const Stroke* stroke) const;
+  Path getFilledPath() const;
 };
 
 }  // namespace tgfx
