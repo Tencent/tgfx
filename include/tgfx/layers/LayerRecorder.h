@@ -32,7 +32,7 @@ class LayerContent;
 class GeometryContent;
 
 /**
- * LayerRecorder records geometries and their paints as layer content.  Geometries with invisible
+ * LayerRecorder records geometries and their paints as layer content. Geometries with invisible
  * paints are still included as part of the layer's contour, but they will not be rendered.
  */
 class LayerRecorder {
@@ -41,22 +41,18 @@ class LayerRecorder {
   ~LayerRecorder();
 
   /**
-   * Adds a rectangle with the specified paint and an optional transformation matrix.
+   * Adds a rectangle with the specified paint.
    * @param rect The rectangle shape.
    * @param paint The paint style for the rectangle.
-   * @param matrix Optional transformation matrix. If nullopt, no transformation is applied.
    */
-  void addRect(const Rect& rect, const LayerPaint& paint,
-               const std::optional<Matrix>& matrix = std::nullopt);
+  void addRect(const Rect& rect, const LayerPaint& paint);
 
   /**
-   * Adds a rounded rectangle with the specified paint and an optional transformation matrix.
+   * Adds a rounded rectangle with the specified paint.
    * @param rRect The rounded rectangle shape.
    * @param paint The paint style for the rounded rectangle.
-   * @param matrix Optional transformation matrix. If nullopt, no transformation is applied.
    */
-  void addRRect(const RRect& rRect, const LayerPaint& paint,
-                const std::optional<Matrix>& matrix = std::nullopt);
+  void addRRect(const RRect& rRect, const LayerPaint& paint);
 
   /**
    * Adds a path with the specified paint.
@@ -91,6 +87,22 @@ class LayerRecorder {
   void addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
                    const Matrix& matrix);
 
+  /**
+   * Returns the current transformation matrix, or nullptr if no matrix is set.
+   */
+  const Matrix* getMatrix() const;
+
+  /**
+   * Sets the transformation matrix for subsequent drawing operations.
+   * @param matrix The transformation matrix to apply.
+   */
+  void setMatrix(const Matrix& matrix);
+
+  /**
+   * Resets the transformation matrix to none.
+   */
+  void resetMatrix();
+
  private:
   enum class PendingType {
     None,
@@ -99,18 +111,28 @@ class LayerRecorder {
     Shape,
   };
 
+  // Current transformation matrix applied to all subsequent drawing operations.
+  std::optional<Matrix> _matrix = std::nullopt;
+
   std::vector<std::unique_ptr<GeometryContent>> contents;
   std::vector<std::unique_ptr<GeometryContent>> foregrounds;
 
   PendingType pendingType = PendingType::None;
   LayerPaint pendingPaint = {};
+  // Transformation matrix for the pending geometries.
   std::optional<Matrix> pendingMatrix = std::nullopt;
   std::vector<Rect> pendingRects = {};
   std::vector<RRect> pendingRRects = {};
   std::shared_ptr<Shape> pendingShape = nullptr;
 
+  void addRect(const Rect& rect, const LayerPaint& paint, const std::optional<Matrix>& matrix);
+  void addRRect(const RRect& rRect, const LayerPaint& paint, const std::optional<Matrix>& matrix);
+  void addPath(const Path& path, const LayerPaint& paint, const std::optional<Matrix>& matrix);
+  void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint,
+                const std::optional<Matrix>& matrix);
+
   bool handlePathAsRect(const Path& path, const LayerPaint& paint,
-                        const std::optional<Matrix>& matrix = std::nullopt);
+                        const std::optional<Matrix>& matrix);
   bool canAppend(PendingType type, const LayerPaint& paint,
                  const std::optional<Matrix>& matrix) const;
   void flushPending(PendingType newType = PendingType::None, const LayerPaint& newPaint = {},

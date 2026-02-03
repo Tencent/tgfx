@@ -30,9 +30,9 @@
 #include "layers/compositing3d/Layer3DContext.h"
 #include "layers/contents/ComposeContent.h"
 #include "layers/contents/MatrixContent.h"
-#include "layers/contents/StrokeContent.h"
 #include "layers/contents/RRectsContent.h"
 #include "layers/contents/RectsContent.h"
+#include "layers/contents/StrokeContent.h"
 #include "layers/contents/TextContent.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
@@ -2609,8 +2609,9 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
     // Same matrix merges into MatrixContent wrapping Rects
     auto rotateMatrix = Matrix::MakeRotate(30, 50, 50);
     LayerRecorder recorder1 = {};
-    recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint, rotateMatrix);
-    recorder1.addRect(Rect::MakeXYWH(80, 10, 50, 50), fillPaint, rotateMatrix);
+    recorder1.setMatrix(rotateMatrix);
+    recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint);
+    recorder1.addRect(Rect::MakeXYWH(80, 10, 50, 50), fillPaint);
     auto content1 = recorder1.finishRecording();
     EXPECT_EQ(content1->type(), LayerContent::Type::Matrix);
     auto matrixContent = static_cast<MatrixContent*>(content1.get());
@@ -2619,17 +2620,20 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
     // Different matrices create Compose
     auto rotateMatrix2 = Matrix::MakeRotate(60, 50, 50);
     LayerRecorder recorder2 = {};
-    recorder2.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint, rotateMatrix);
-    recorder2.addRect(Rect::MakeXYWH(80, 10, 50, 50), fillPaint, rotateMatrix2);
+    recorder2.setMatrix(rotateMatrix);
+    recorder2.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint);
+    recorder2.setMatrix(rotateMatrix2);
+    recorder2.addRect(Rect::MakeXYWH(80, 10, 50, 50), fillPaint);
     auto content2 = recorder2.finishRecording();
     EXPECT_EQ(content2->type(), LayerContent::Type::Compose);
 
     // Identity or nullopt matrix should not create MatrixContent
     LayerRecorder recorder3 = {};
-    recorder3.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint, std::nullopt);
+    recorder3.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint);
     EXPECT_EQ(recorder3.finishRecording()->type(), LayerContent::Type::Rect);
     LayerRecorder recorder4 = {};
-    recorder4.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint, Matrix::I());
+    recorder4.setMatrix(Matrix::I());
+    recorder4.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint);
     EXPECT_EQ(recorder4.finishRecording()->type(), LayerContent::Type::Rect);
 
     // getTightBounds: rotated rect bounds should be larger than original
@@ -2639,8 +2643,8 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
 
     // hitTestPoint: center point should hit, corner should not (due to rotation)
     LayerRecorder recorder5 = {};
-    recorder5.addRect(Rect::MakeXYWH(0, 0, 100, 100), fillPaint,
-                      Matrix::MakeRotate(45, 50, 50));
+    recorder5.setMatrix(Matrix::MakeRotate(45, 50, 50));
+    recorder5.addRect(Rect::MakeXYWH(0, 0, 100, 100), fillPaint);
     auto content5 = recorder5.finishRecording();
     EXPECT_TRUE(content5->hitTestPoint(50, 50));
     EXPECT_FALSE(content5->hitTestPoint(0, 0));
@@ -2708,8 +2712,9 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
     auto rotateMatrix = Matrix::MakeRotate(30, 100, 100);
     // Same matrix + same stroke: MatrixContent -> StrokeContent
     LayerRecorder recorder = {};
-    recorder.addRect(Rect::MakeXYWH(50, 50, 50, 50), strokePaint, rotateMatrix);
-    recorder.addRect(Rect::MakeXYWH(100, 50, 50, 50), strokePaint, rotateMatrix);
+    recorder.setMatrix(rotateMatrix);
+    recorder.addRect(Rect::MakeXYWH(50, 50, 50, 50), strokePaint);
+    recorder.addRect(Rect::MakeXYWH(100, 50, 50, 50), strokePaint);
     auto content = recorder.finishRecording();
     EXPECT_EQ(content->type(), LayerContent::Type::Matrix);
     EXPECT_EQ(static_cast<MatrixContent*>(content.get())->content->type(),

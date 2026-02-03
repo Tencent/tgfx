@@ -40,6 +40,58 @@ LayerRecorder::LayerRecorder() = default;
 
 LayerRecorder::~LayerRecorder() = default;
 
+void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint) {
+  addRect(rect, paint, _matrix);
+}
+
+void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint) {
+  addRRect(rRect, paint, _matrix);
+}
+
+void LayerRecorder::addPath(const Path& path, const LayerPaint& paint) {
+  addPath(path, paint, _matrix);
+}
+
+void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint) {
+  addShape(std::move(shape), paint, _matrix);
+}
+
+void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
+                                float x, float y) {
+  addTextBlob(std::move(textBlob), paint, Matrix::MakeTrans(x, y));
+}
+
+void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
+                                const Matrix& matrix) {
+  if (textBlob == nullptr) {
+    return;
+  }
+  flushPending();
+  auto textMatrix = matrix;
+  if (_matrix.has_value()) {
+    textMatrix.postConcat(*_matrix);
+  }
+  auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
+  std::unique_ptr<GeometryContent> content =
+      std::make_unique<TextContent>(std::move(textBlob), textMatrix, paint);
+  if (paint.style == PaintStyle::Stroke) {
+    content = std::make_unique<StrokeContent>(std::move(content), paint.stroke);
+  }
+  list.push_back(std::move(content));
+}
+
+const Matrix* LayerRecorder::getMatrix() const {
+  return _matrix.has_value() ? &_matrix.value() : nullptr;
+}
+
+void LayerRecorder::setMatrix(const Matrix& matrix) {
+  _matrix = matrix;
+}
+
+void LayerRecorder::resetMatrix() {
+  _matrix = std::nullopt;
+}
+
 void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint,
                             const std::optional<Matrix>& matrix) {
   if (rect.isEmpty()) {
@@ -66,36 +118,47 @@ void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint,
   pendingRRects.push_back(rRect);
 }
 
-void LayerRecorder::addPath(const Path& path, const LayerPaint& paint) {
+void LayerRecorder::addPath(const Path& path, const LayerPaint& paint,
+                            const std::optional<Matrix>& matrix) {
   if (path.isEmpty()) {
     return;
   }
-  if (handlePathAsRect(path, paint)) {
+  if (handlePathAsRect(path, paint, matrix)) {
     return;
   }
-  flushPending(PendingType::Shape, paint, std::nullopt);
+  flushPending(PendingType::Shape, paint, matrix);
   pendingShape = Shape::MakeFrom(path);
 }
 
-void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint) {
+void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint,
+                             const std::optional<Matrix>& matrix) {
   if (shape == nullptr) {
     return;
   }
   if (shape->isSimplePath()) {
-    addPath(shape->getPath(), paint);
+    addPath(shape->getPath(), paint, matrix);
     return;
   }
-  if (auto matrixShape = ShapeUtils::AsMatrixShape(shape.get());
-      matrixShape != nullptr && matrixShape->shape->isSimplePath()) {
-    // Skip handlePathAsRect for stroke with non-uniform scale, as this optimization would cause
-    // the stroke to be scaled non-uniformly. Let Shape::ApplyStroke handle it correctly instead.
+  do {
+    auto matrixShape = ShapeUtils::AsMatrixShape(shape.get());
+    if (matrixShape == nullptr || !matrixShape->shape->isSimplePath()) {
+      break;
+    }
+    // Skip handlePathAsRect for stroke with non-uniform scale in shape's matrix, as this
+    // optimization would cause the stroke to be scaled non-uniformly.
     auto scales = matrixShape->matrix.getAxisScales();
-    auto uniformScale = paint.style != PaintStyle::Stroke || FloatNearlyEqual(scales.x, scales.y);
-    if (uniformScale && handlePathAsRect(matrixShape->shape->getPath(), paint, matrixShape->matrix)) {
+    if (paint.style == PaintStyle::Stroke && !FloatNearlyEqual(scales.x, scales.y)) {
+      break;
+    }
+    auto combinedMatrix = matrixShape->matrix;
+    if (matrix.has_value()) {
+      combinedMatrix.postConcat(*matrix);
+    }
+    if (handlePathAsRect(matrixShape->shape->getPath(), paint, combinedMatrix)) {
       return;
     }
-  }
-  flushPending(PendingType::Shape, paint, std::nullopt);
+  } while (false);
+  flushPending(PendingType::Shape, paint, matrix);
   pendingShape = std::move(shape);
 }
 
@@ -115,37 +178,15 @@ bool LayerRecorder::handlePathAsRect(const Path& path, const LayerPaint& paint,
       return true;
     }
   }
-  Rect rect = {};
-  if (path.isRect(&rect)) {
+  if (Rect rect = {}; path.isRect(&rect)) {
     addRect(rect, paint, matrix);
     return true;
   }
-  RRect rRect = {};
-  if (path.isRRect(&rRect)) {
+  if (RRect rRect = {}; path.isRRect(&rRect)) {
     addRRect(rRect, paint, matrix);
     return true;
   }
   return false;
-}
-
-void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
-                                float x, float y) {
-  addTextBlob(std::move(textBlob), paint, Matrix::MakeTrans(x, y));
-}
-
-void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
-                                const Matrix& matrix) {
-  if (textBlob == nullptr) {
-    return;
-  }
-  flushPending();
-  auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
-  std::unique_ptr<GeometryContent> content =
-      std::make_unique<TextContent>(std::move(textBlob), matrix, paint);
-  if (paint.style == PaintStyle::Stroke) {
-    content = std::make_unique<StrokeContent>(std::move(content), paint.stroke);
-  }
-  list.push_back(std::move(content));
 }
 
 bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint,
@@ -217,7 +258,6 @@ void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint
     }
     // Wrap with MatrixContent if matrix has value and is not identity.
     if (content != nullptr && pendingMatrix.has_value() && !pendingMatrix->isIdentity()) {
-      DEBUG_ASSERT(pendingType != PendingType::Shape);
       content = std::make_unique<MatrixContent>(std::move(content), *pendingMatrix);
     }
     DEBUG_ASSERT(content != nullptr);
