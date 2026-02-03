@@ -19,6 +19,7 @@
 #include "tgfx/layers/LayerRecorder.h"
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "layers/contents/ComposeContent.h"
@@ -85,9 +86,14 @@ void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& pai
     return;
   }
   if (auto matrixShape = ShapeUtils::AsMatrixShape(shape.get());
-      matrixShape != nullptr && matrixShape->shape->isSimplePath() &&
-      handlePathAsRect(matrixShape->shape->getPath(), paint, matrixShape->matrix)) {
-    return;
+      matrixShape != nullptr && matrixShape->shape->isSimplePath()) {
+    // Skip handlePathAsRect for stroke with non-uniform scale, as this optimization would cause
+    // the stroke to be scaled non-uniformly. Let Shape::ApplyStroke handle it correctly instead.
+    auto scales = matrixShape->matrix.getAxisScales();
+    auto uniformScale = paint.style != PaintStyle::Stroke || FloatNearlyEqual(scales.x, scales.y);
+    if (uniformScale && handlePathAsRect(matrixShape->shape->getPath(), paint, matrixShape->matrix)) {
+      return;
+    }
   }
   flushPending(PendingType::Shape, paint, std::nullopt);
   pendingShape = std::move(shape);
