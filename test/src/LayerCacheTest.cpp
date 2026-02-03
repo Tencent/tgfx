@@ -818,6 +818,54 @@ TGFX_TEST(LayerCacheTest, TileClearWhenAllLayersRemoved) {
 }
 
 /**
+ * Test that content with non-SrcOver blend mode disables subtree caching.
+ * When a shape layer uses a blend mode other than SrcOver, the layer needs pass-through background
+ * mode to composite correctly, which is incompatible with subtree caching.
+ */
+TGFX_TEST(LayerCacheTest, ContentBlendModeDisablesCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setSubtreeCacheMaxSize(2048);
+
+  auto root = displayList->root();
+  root->setPassThroughBackground(false);
+
+  // Create a background layer
+  auto background = ShapeLayer::Make();
+  Path bgPath = {};
+  bgPath.addRect(Rect::MakeWH(200, 200));
+  background->setPath(bgPath);
+  background->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  root->addChild(background);
+
+  // Create a layer with content that uses Multiply blend mode
+  auto blendLayer = ShapeLayer::Make();
+  Path blendPath = {};
+  blendPath.addRect(Rect::MakeXYWH(25, 25, 150, 150));
+  blendLayer->setPath(blendPath);
+  blendLayer->setFillStyle(ShapeStyle::Make(Color::Red(), BlendMode::Multiply));
+  blendLayer->setMatrix(Matrix::MakeTrans(0, 0));
+  root->addChild(blendLayer);
+
+  // First render
+  displayList->render(surface.get());
+  EXPECT_TRUE(blendLayer->subtreeCache == nullptr);
+  EXPECT_TRUE(blendLayer->bitFields.hasBlendMode);
+
+  // Second render - should still not create cache due to content blend mode
+  displayList->render(surface.get());
+  EXPECT_TRUE(blendLayer->subtreeCache == nullptr);
+  EXPECT_TRUE(blendLayer->bitFields.hasBlendMode);
+
+  // Compare the rendering result to ensure blend mode works correctly
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerCacheTest/ContentBlendModeDisablesCache"));
+}
+
+/**
  * Test that overlapping layers with intersecting dirty regions don't cause duplicate tile recycling.
  * When two layers overlap and both are modified, their dirty regions may cover the same tiles.
  * The tile should only be recycled once, not multiple times.

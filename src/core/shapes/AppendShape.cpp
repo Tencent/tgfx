@@ -37,6 +37,9 @@ std::shared_ptr<Shape> Shape::Merge(const std::vector<std::shared_ptr<Shape>>& s
   }
   std::vector<std::shared_ptr<Shape>> list = {};
   for (auto& shape : shapes) {
+    if (shape == nullptr) {
+      continue;
+    }
     AppendShape::Append(&list, shape);
   }
   if (list.size() == 1) {
