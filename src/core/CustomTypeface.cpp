@@ -19,9 +19,15 @@
 #include "tgfx/core/CustomTypeface.h"
 #include "ImageUserTypeface.h"
 #include "PathUserTypeface.h"
+#include "core/utils/UniqueID.h"
 #include "tgfx/core/PathProvider.h"
 
 namespace tgfx {
+
+CustomTypefaceBuilder::CustomTypefaceBuilder(int unitsPerEm)
+    : _unitsPerEm(unitsPerEm > 0 ? unitsPerEm : 1), uniqueID(UniqueID::Next()) {
+}
+
 void CustomTypefaceBuilder::setFontName(const std::string& fontFamily,
                                         const std::string& fontStyle) {
   _fontFamily = fontFamily;
@@ -30,6 +36,9 @@ void CustomTypefaceBuilder::setFontName(const std::string& fontFamily,
 
 void CustomTypefaceBuilder::setMetrics(const FontMetrics& metrics) {
   _fontMetrics = metrics;
+}
+
+PathTypefaceBuilder::PathTypefaceBuilder(int unitsPerEm) : CustomTypefaceBuilder(unitsPerEm) {
 }
 
 GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
@@ -63,7 +72,10 @@ std::shared_ptr<Typeface> PathTypefaceBuilder::detach() const {
     return nullptr;
   }
   return PathUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, fontBounds,
-                                glyphRecords);
+                                _unitsPerEm, glyphRecords);
+}
+
+ImageTypefaceBuilder::ImageTypefaceBuilder(int unitsPerEm) : CustomTypefaceBuilder(unitsPerEm) {
 }
 
 GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset) {
@@ -84,7 +96,7 @@ std::shared_ptr<Typeface> ImageTypefaceBuilder::detach() const {
     return nullptr;
   }
   return ImageUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, fontBounds,
-                                 glyphRecords);
+                                 _unitsPerEm, glyphRecords);
 }
 
 }  // namespace tgfx

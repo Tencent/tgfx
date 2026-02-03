@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include "core/GlyphTransform.h"
 #include "core/RunRecord.h"
 #include "tgfx/core/TextBlob.h"
 

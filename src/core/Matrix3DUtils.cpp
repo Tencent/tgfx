@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/Matrix3DUtils.h"
-#include "core/Matrix2D.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
@@ -40,20 +39,22 @@ bool Matrix3DUtils::IsMatrix3DAffine(const Matrix3D& matrix) {
          matrix.getRow(2) == Vec4(0, 0, 1, 0) && matrix.getRow(3) == Vec4(0, 0, 0, 1);
 }
 
+Matrix Matrix3DUtils::GetMayLossyMatrix(const Matrix3D& matrix) {
+  return Matrix::MakeAll(
+      matrix.getRowColumn(0, 0), matrix.getRowColumn(0, 1), matrix.getRowColumn(0, 3),
+      matrix.getRowColumn(1, 0), matrix.getRowColumn(1, 1), matrix.getRowColumn(1, 3),
+      matrix.getRowColumn(3, 0), matrix.getRowColumn(3, 1), matrix.getRowColumn(3, 3));
+}
+
 Matrix Matrix3DUtils::GetMayLossyAffineMatrix(const Matrix3D& matrix) {
-  auto affineMatrix = Matrix::I();
-  affineMatrix.setAll(matrix.getRowColumn(0, 0), matrix.getRowColumn(0, 1),
-                      matrix.getRowColumn(0, 3), matrix.getRowColumn(1, 0),
-                      matrix.getRowColumn(1, 1), matrix.getRowColumn(1, 3));
-  return affineMatrix;
+  return Matrix::MakeAll(matrix.getRowColumn(0, 0), matrix.getRowColumn(0, 1),
+                         matrix.getRowColumn(0, 3), matrix.getRowColumn(1, 0),
+                         matrix.getRowColumn(1, 1), matrix.getRowColumn(1, 3));
 }
 
 Rect Matrix3DUtils::InverseMapRect(const Rect& rect, const Matrix3D& matrix) {
-  float values[16] = {};
-  matrix.getColumnMajor(values);
-  auto matrix2D = Matrix2D::MakeAll(values[0], values[1], values[3], values[4], values[5],
-                                    values[7], values[12], values[13], values[15]);
-  Matrix2D inversedMatrix;
+  auto matrix2D = GetMayLossyMatrix(matrix);
+  Matrix inversedMatrix;
   if (!matrix2D.invert(&inversedMatrix)) {
     return Rect::MakeEmpty();
   }

@@ -37,9 +37,9 @@ void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
                     backgroundPaint);
 
   tgfx::LayerPaint tilePaint(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
-  int tileSize = 8 * static_cast<int>(_density);
+  int tileSize = 16 * static_cast<int>(_density);
   if (tileSize <= 0) {
-    tileSize = 8;
+    tileSize = 16;
   }
   for (int y = 0; y < _height; y += tileSize) {
     bool draw = (y / tileSize) % 2 == 1;
