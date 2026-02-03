@@ -180,13 +180,35 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
 }
 
 Color Surface::getColor(int x, int y) {
-  uint8_t color[4];
-  auto info =
-      ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied, 0, ColorSpace::SRGB());
-  if (!readPixels(info, color, x, y)) {
+  // 使用 RGBA_F16 格式，不会截断超出 [0,1] 范围的值
+  auto dstInfo = ImageInfo::Make(1, 1, ColorType::RGBA_F16, AlphaType::Premultiplied, 8,
+                                 ColorSpace::SRGB());
+  uint16_t color[4];  // F16 每通道 2 字节
+  if (!readPixels(dstInfo, color, x, y)) {
     return Color::Transparent();
   }
-  return Color::FromRGBA(color[0], color[1], color[2], color[3]);
+  // Convert IEEE 754-2008 half-precision float to single-precision float
+  auto halfToFloat = [](uint16_t h) -> float {
+    uint32_t sign = static_cast<uint32_t>(h & 0x8000) << 16;
+    uint32_t exponent = static_cast<uint32_t>((h >> 10) & 0x1F);
+    uint32_t mantissa = static_cast<uint32_t>(h & 0x3FF);
+    uint32_t f = 0;
+    if (exponent == 0) {
+      // Zero or denormalized number, flush to zero
+      f = sign;
+    } else if (exponent == 31) {
+      // Infinity or NaN
+      f = sign | 0x7F800000u | (mantissa << 13);
+    } else {
+      // Normalized number: convert exponent bias from 15 to 127
+      f = sign | ((exponent + 112) << 23) | (mantissa << 13);
+    }
+    float result = 0.0f;
+    memcpy(&result, &f, sizeof(float));
+    return result;
+  };
+  return Color(halfToFloat(color[0]), halfToFloat(color[1]),
+               halfToFloat(color[2]), halfToFloat(color[3]));
 }
 
 std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {

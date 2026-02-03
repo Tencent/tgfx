@@ -1401,4 +1401,17 @@ TGFX_TEST(CanvasTest, PictureMaskPath) {
   EXPECT_EQ(colorOutside, Color::Transparent());
 }
 
+TGFX_TEST(CanvasTest, test) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1024, 1024, false, 1, false, 0, ColorSpace::DisplayP3());
+  auto canvas = surface->getCanvas();
+  canvas->drawColor(Color::FromRGBA(0, 177, 156, 255, ColorSpace::DisplayP3()), BlendMode::SrcOver);
+  auto color = surface->getColor(500, 500);
+  ColorSpaceXformSteps steps{ColorSpace::SRGB().get(), AlphaType::Premultiplied, ColorSpace::DisplayP3().get(), AlphaType::Premultiplied};
+  steps.apply(color.array());
+  std::cout << static_cast<uint32_t>(color.red * 255.0) << " " << static_cast<uint32_t>(color.green * 255.0) << " " << static_cast<uint32_t>(color.blue * 255.0) << " " << static_cast<uint32_t>(color.alpha * 255.0) << std::endl;
+}
+
 }  // namespace tgfx
