@@ -38,7 +38,8 @@ class WebImageBuffer : public ImageBuffer {
    * tgfx.releaseNativeImage() when it goes out of scope. Returns nullptr if the nativeImage is
    * nullptr or has a size of zero.
    */
-  static std::shared_ptr<WebImageBuffer> MakeAdopted(emscripten::val nativeImage, bool alphaOnly = false);
+  static std::shared_ptr<WebImageBuffer> MakeAdopted(emscripten::val nativeImage,
+                                                     bool alphaOnly = false);
 
   ~WebImageBuffer() override;
 
@@ -55,9 +56,8 @@ class WebImageBuffer : public ImageBuffer {
   }
 
   /**
- * Uploads the image to a region of the target texture.
- * Returns true if successful.
- */
+   * Uploads the image to a region of the target texture. Returns true if successful.
+   */
   bool uploadToTexture(std::shared_ptr<Texture> texture, int offsetX, int offsetY) const;
 
   const std::shared_ptr<ColorSpace>& colorSpace() const override {
