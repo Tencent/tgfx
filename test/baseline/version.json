@@ -22,7 +22,7 @@
         "Clip": "d010fb8",
         "ConvertColorSpace": "eefb7a46",
         "DiscardContent": "4c590832",
-        "DrawImageShaderToP3": "2931d737",
+        "DrawImageShaderToP3": "bfe5bf84",
         "DrawP3ColorToP3": "82494664",
         "DrawRecordSRGBColorToP3UseDrawImage": "68928515",
         "DrawRecordSRGBColorToP3UseDrawPicture": "82494664",
@@ -109,12 +109,12 @@
         "InstancedGridRender": "62f124a1"
     },
     "Hello2DTest": {
-        "ConicGradient": "4e98c910",
-        "ImageWithMipmap": "4e98c910",
-        "ImageWithShadow": "4e98c910",
-        "Layer3DTree": "f726231d",
-        "RichText": "d8e4b387",
-        "SimpleLayerTree": "4e98c910"
+        "ConicGradient": "1ea63c49",
+        "ImageWithMipmap": "1ea63c49",
+        "ImageWithShadow": "1ea63c49",
+        "Layer3DTree": "1ea63c49",
+        "RichText": "1ea63c49",
+        "SimpleLayerTree": "1ea63c49"
     },
     "ImageRenderTest": {
         "RotateImageRect": "bf48e614",

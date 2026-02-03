@@ -40,22 +40,24 @@ if (typeof window !== 'undefined') {
 
             let tgfxView = shareData.Hello2DModule.TGFXView.MakeFrom('#hello2d');
             shareData.tgfxBaseView = tgfxView;
-            var image = await loadImage("http://localhost:8081/../../resources/assets/bridge.jpg");
-            tgfxView.setImage("bridge",image);
-            image = await loadImage("http://localhost:8081/../../resources/assets/tgfx.png");
-            tgfxView.setImage("TGFX",image);
+            var image = await loadImage("resources/assets/bridge.jpg");
+            tgfxView.setImagePath("bridge",image);
+            image = await loadImage("resources/assets/tgfx.png");
+            tgfxView.setImagePath("TGFX",image);
 
-            var font = new FontFace('default', "url(../../resources/font/NotoSansSC-Regular.otf)");
+            var font = new FontFace('default', "url(resources/font/NotoSansSC-Regular.otf)");
             font.load().then((loadedFont) => {
                 document.fonts.add(loadedFont);
             })
-            var emojiFont = new FontFace('emoji', "url(../../resources/font/NotoColorEmoji.ttf)");
+            var emojiFont = new FontFace('emoji', "url(resources/font/NotoColorEmoji.ttf)");
             emojiFont.load().then((loadedFont) => {
                 document.fonts.add(loadedFont);
             })
             tgfxView.registerFonts();
 
             updateSize(shareData);
+            tgfxView.updateLayerTree(shareData.drawIndex);
+            tgfxView.updateZoomScaleAndOffset(1.0, 0, 0);
             const canvas = document.getElementById('hello2d');
             bindCanvasZoomAndPanEvents(canvas, shareData);
             animationLoop(shareData);
