@@ -57,21 +57,19 @@ void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& pai
 
 void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
                                 float x, float y) {
-  addTextBlob(std::move(textBlob), paint, Matrix::MakeTrans(x, y));
-}
-
-void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
-                                const Matrix& matrix) {
   if (textBlob == nullptr) {
     return;
   }
   flushPending();
-  auto textMatrix = matrix;
-  if (_matrix.has_value()) {
-    textMatrix.postConcat(*_matrix);
-  }
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
-  auto content = std::make_unique<TextContent>(std::move(textBlob), textMatrix, paint);
+  // The translation matrix only affects the text position, while _matrix affects both
+  // the text position and the paint (shader/maskFilter coordinates).
+  auto textMatrix = Matrix::MakeTrans(x, y);
+  std::unique_ptr<GeometryContent> content =
+      std::make_unique<TextContent>(std::move(textBlob), textMatrix, paint);
+  if (_matrix.has_value() && !_matrix->isIdentity()) {
+    content = std::make_unique<MatrixContent>(std::move(content), *_matrix);
+  }
   list.push_back(std::move(content));
 }
 
