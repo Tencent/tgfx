@@ -71,8 +71,7 @@ void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerP
     textMatrix.postConcat(*_matrix);
   }
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
-  std::unique_ptr<GeometryContent> content =
-      std::make_unique<TextContent>(std::move(textBlob), textMatrix, paint);
+  auto content = std::make_unique<TextContent>(std::move(textBlob), textMatrix, paint);
   list.push_back(std::move(content));
 }
 
