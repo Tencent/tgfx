@@ -84,7 +84,8 @@ class LayerRecorder {
   const Matrix& getMatrix() const;
 
   /**
-   * Sets the transformation matrix for subsequent drawing operations.
+   * Sets the transformation matrix for subsequent drawing operations. The matrix is applied to both
+   * the geometry (Rect, RRect, Path, Shape, TextBlob) and the paint.
    * @param matrix The transformation matrix to apply.
    */
   void setMatrix(const Matrix& matrix);
