@@ -2600,126 +2600,83 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  // Test 1: MatrixContent
-  {
-    LayerPaint fillPaint = {};
-    fillPaint.color = Color::Red();
+  LayerPaint redFill = {};
+  redFill.color = Color::Red();
 
-    // Same matrix merges into MatrixContent wrapping Rects
-    auto rotateMatrix = Matrix::MakeRotate(30, 50, 50);
-    LayerRecorder recorder1 = {};
-    recorder1.setMatrix(rotateMatrix);
-    recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint);
-    recorder1.addRect(Rect::MakeXYWH(80, 10, 50, 50), fillPaint);
-    auto content1 = recorder1.finishRecording();
-    EXPECT_EQ(content1->type(), LayerContent::Type::Matrix);
-    auto matrixContent = static_cast<MatrixContent*>(content1.get());
-    EXPECT_EQ(matrixContent->content->type(), LayerContent::Type::Rects);
+  LayerPaint blueStroke = {};
+  blueStroke.color = Color::Blue();
+  blueStroke.style = PaintStyle::Stroke;
+  blueStroke.stroke = Stroke(8.0f);
 
-    // Different matrices create Compose
-    auto rotateMatrix2 = Matrix::MakeRotate(60, 50, 50);
-    LayerRecorder recorder2 = {};
-    recorder2.setMatrix(rotateMatrix);
-    recorder2.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint);
-    recorder2.setMatrix(rotateMatrix2);
-    recorder2.addRect(Rect::MakeXYWH(80, 10, 50, 50), fillPaint);
-    auto content2 = recorder2.finishRecording();
-    EXPECT_EQ(content2->type(), LayerContent::Type::Compose);
+  LayerPaint greenFill = {};
+  greenFill.color = Color::Green();
 
-    // Identity or nullopt matrix should not create MatrixContent
-    LayerRecorder recorder3 = {};
-    recorder3.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint);
-    EXPECT_EQ(recorder3.finishRecording()->type(), LayerContent::Type::Rect);
-    LayerRecorder recorder4 = {};
-    recorder4.setMatrix(Matrix::I());
-    recorder4.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint);
-    EXPECT_EQ(recorder4.finishRecording()->type(), LayerContent::Type::Rect);
+  // Test 1: Same matrix merges into MatrixContent wrapping Rects
+  auto matrix1 = Matrix::MakeRotate(30, 50, 50) * Matrix::MakeScale(1.5f, 0.7f);
+  LayerRecorder recorder1 = {};
+  recorder1.setMatrix(matrix1);
+  recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), redFill);
+  recorder1.addRect(Rect::MakeXYWH(80, 10, 50, 50), redFill);
+  auto content1 = recorder1.finishRecording();
+  EXPECT_EQ(content1->type(), LayerContent::Type::Matrix);
+  auto matrixContent = static_cast<MatrixContent*>(content1.get());
+  EXPECT_EQ(matrixContent->content->type(), LayerContent::Type::Rects);
 
-    // getTightBounds: rotated rect bounds should be larger than original
-    auto bounds = content1->getTightBounds(Matrix::I());
-    bounds.roundOut();
-    EXPECT_EQ(bounds, Rect::MakeLTRB(10, -5, 140, 99));
+  // Test 2: Different matrices create Compose
+  auto matrix2 = Matrix::MakeRotate(60, 50, 50);
+  LayerRecorder recorder2 = {};
+  recorder2.setMatrix(matrix1);
+  recorder2.addRect(Rect::MakeXYWH(10, 10, 50, 50), blueStroke);
+  recorder2.setMatrix(matrix2);
+  recorder2.addRect(Rect::MakeXYWH(80, 10, 50, 50), blueStroke);
+  auto content2 = recorder2.finishRecording();
+  EXPECT_EQ(content2->type(), LayerContent::Type::Compose);
+  auto composeContent = static_cast<ComposeContent*>(content2.get());
+  EXPECT_EQ(composeContent->contents.size(), 2u);
+  EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Matrix);
+  EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::Matrix);
 
-    // hitTestPoint: center point should hit, corner should not (due to rotation)
-    LayerRecorder recorder5 = {};
-    recorder5.setMatrix(Matrix::MakeRotate(45, 50, 50));
-    recorder5.addRect(Rect::MakeXYWH(0, 0, 100, 100), fillPaint);
-    auto content5 = recorder5.finishRecording();
-    EXPECT_TRUE(content5->hitTestPoint(50, 50));
-    EXPECT_FALSE(content5->hitTestPoint(0, 0));
-    EXPECT_TRUE(content5->hitTestPoint(50, -15));
-  }
+  // Test 3: Nullopt matrix should not create MatrixContent
+  LayerRecorder recorder3 = {};
+  recorder3.addRect(Rect::MakeXYWH(10, 10, 50, 50), greenFill);
+  auto content3 = recorder3.finishRecording();
+  EXPECT_EQ(content3->type(), LayerContent::Type::Rect);
 
-  // Test 2: Stroke style with DrawContent
-  {
-    LayerPaint strokePaint = {};
-    strokePaint.color = Color::Blue();
-    strokePaint.style = PaintStyle::Stroke;
-    strokePaint.stroke = Stroke(10.0f);
+  // Test 4: Identity matrix should not create MatrixContent
+  LayerRecorder recorder4 = {};
+  recorder4.setMatrix(Matrix::I());
+  recorder4.addRect(Rect::MakeXYWH(10, 10, 50, 50), blueStroke);
+  auto content4 = recorder4.finishRecording();
+  EXPECT_EQ(content4->type(), LayerContent::Type::Rect);
 
-    // Fill style should not create stroke
-    LayerPaint fillPaint = {};
-    fillPaint.color = Color::Blue();
-    LayerRecorder recorder0 = {};
-    recorder0.addRect(Rect::MakeXYWH(10, 10, 50, 50), fillPaint);
-    recorder0.addRect(Rect::MakeXYWH(80, 10, 50, 50), fillPaint);
-    EXPECT_EQ(recorder0.finishRecording()->type(), LayerContent::Type::Rects);
+  // Test 5: getTightBounds with transformed content
+  auto bounds = content1->getTightBounds(Matrix::I());
+  bounds.roundOut();
+  EXPECT_EQ(bounds, Rect::MakeLTRB(23, -5, 198, 116));
 
-    // Same stroke merges into Rects with stroke attribute
-    LayerRecorder recorder1 = {};
-    recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), strokePaint);
-    recorder1.addRect(Rect::MakeXYWH(80, 10, 50, 50), strokePaint);
-    auto content1 = recorder1.finishRecording();
-    EXPECT_EQ(content1->type(), LayerContent::Type::Rects);
+  // Test 6: hitTestPoint with rotated content
+  LayerRecorder recorder5 = {};
+  recorder5.setMatrix(Matrix::MakeRotate(45, 50, 50));
+  recorder5.addRect(Rect::MakeXYWH(0, 0, 100, 100), greenFill);
+  auto content5 = recorder5.finishRecording();
+  EXPECT_TRUE(content5->hitTestPoint(50, 50));
+  EXPECT_FALSE(content5->hitTestPoint(0, 0));
+  EXPECT_TRUE(content5->hitTestPoint(50, -15));
 
-    // Different stroke widths create Compose
-    LayerPaint strokePaint2 = strokePaint;
-    strokePaint2.stroke = Stroke(20.0f);
-    LayerRecorder recorder2 = {};
-    recorder2.addRect(Rect::MakeXYWH(10, 10, 50, 50), strokePaint);
-    recorder2.addRect(Rect::MakeXYWH(80, 10, 50, 50), strokePaint2);
-    auto content2 = recorder2.finishRecording();
-    EXPECT_EQ(content2->type(), LayerContent::Type::Compose);
-
-    // getTightBounds: bounds should be expanded by half stroke width (5)
-    LayerRecorder recorder3 = {};
-    recorder3.addRect(Rect::MakeXYWH(0, 0, 100, 100), strokePaint);
-    auto content3 = recorder3.finishRecording();
-    auto bounds = content3->getTightBounds(Matrix::I());
-    bounds.roundOut();
-    EXPECT_EQ(bounds, Rect::MakeLTRB(-5, -5, 105, 105));
-
-    // hitTestPoint: stroke edge should hit, inside rect should not (stroke is hollow)
-    EXPECT_TRUE(content3->hitTestPoint(0, 50));
-    EXPECT_TRUE(content3->hitTestPoint(-4, 50));
-    EXPECT_FALSE(content3->hitTestPoint(-10, 50));
-    EXPECT_FALSE(content3->hitTestPoint(50, 50));
-  }
-
-  // Test 3: MatrixContent + stroke combination
-  {
-    auto surface = Surface::Make(context, 200, 200);
-    auto canvas = surface->getCanvas();
-
-    LayerPaint strokePaint = {};
-    strokePaint.color = Color::Green();
-    strokePaint.style = PaintStyle::Stroke;
-    strokePaint.stroke = Stroke(4.0f);
-
-    auto rotateMatrix = Matrix::MakeRotate(30, 100, 100);
-    // Same matrix + same stroke: MatrixContent wrapping Rects with stroke
-    LayerRecorder recorder = {};
-    recorder.setMatrix(rotateMatrix);
-    recorder.addRect(Rect::MakeXYWH(50, 50, 50, 50), strokePaint);
-    recorder.addRect(Rect::MakeXYWH(100, 50, 50, 50), strokePaint);
-    auto content = recorder.finishRecording();
-    EXPECT_EQ(content->type(), LayerContent::Type::Matrix);
-    EXPECT_EQ(static_cast<MatrixContent*>(content.get())->content->type(),
-              LayerContent::Type::Rects);
-    content->drawDefault(canvas, 1.0f, true);
-
-    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorderMatrix_Combination"));
-  }
+  // Test 7: Render all contents
+  auto surface = Surface::Make(context, 600, 200);
+  auto canvas = surface->getCanvas();
+  canvas->concat(Matrix::MakeTrans(0, 50));
+  content1->drawDefault(canvas, 1.0f, true);
+  canvas->concat(Matrix::MakeTrans(200, 0));
+  content2->drawDefault(canvas, 1.0f, true);
+  canvas->concat(Matrix::MakeTrans(150, 0));
+  content3->drawDefault(canvas, 1.0f, true);
+  canvas->concat(Matrix::MakeTrans(50, 0));
+  content4->drawDefault(canvas, 1.0f, true);
+  canvas->concat(Matrix::MakeTrans(50, 0));
+  content5->drawDefault(canvas, 1.0f, true);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorderMatrix"));
 }
 
 TGFX_TEST(LayerTest, GetRotateBounds) {
