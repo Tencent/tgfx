@@ -518,5 +518,9 @@
         "TrimPathReversedWrapAround": "4a74f6aa",
         "TrimPathWithScale": "4a74f6aa",
         "VectorGroupTransform": "4a74f6aa"
+    },
+    "VerticalOffsetTest": {
+        "OffsetVerification": "29dde9e0",
+        "VerticalAlignment": "29dde9e0"
     }
 }

@@ -697,10 +697,31 @@ Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
   if (glyphID == 0 || setupSize(false)) {
     return {};
   }
-  FontMetrics metrics = {};
-  getFontMetricsInternal(&metrics);
-  auto advanceX = getAdvanceInternal(glyphID);
-  return {-advanceX * 0.5f, metrics.capHeight};
+
+  auto face = ftTypeface()->face;
+  auto err =
+      FT_Load_Glyph(face, glyphID, loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY));
+  if (err != FT_Err_Ok) {
+    return {};
+  }
+
+  const auto& metrics = face->glyph->metrics;
+
+  // Check if the font contains vertical metrics information.
+  if (!FT_HAS_VERTICAL(face)) {
+    // Fallback to estimated values (consistent with original behavior).
+    auto advanceX = FDot6ToFloat(metrics.horiAdvance);
+    FontMetrics fontMetrics = {};
+    getFontMetricsInternal(&fontMetrics);
+    return {-advanceX * 0.5f, fontMetrics.capHeight};
+  }
+
+  // Calculate the offset from vertical origin (V) to horizontal origin (H), satisfying H = V + offset.
+  // See: https://freetype.org/freetype2/docs/glyphs/glyphs-3.html and freetype.h line 400.
+  // Both bearings point to the same bbox top-left corner. horiBearingY is Y-up, vertBearingY is Y-down.
+  float offsetX = FDot6ToFloat(metrics.vertBearingX) - FDot6ToFloat(metrics.horiBearingX);
+  float offsetY = FDot6ToFloat(metrics.vertBearingY) + FDot6ToFloat(metrics.horiBearingY);
+  return {offsetX, offsetY};
 }
 
 Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
