@@ -22,6 +22,7 @@
 #include <sstream>
 #include <vector>
 #include "Checksum.h"
+#include "core/ColorSpaceXformSteps.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 #include "utils/Log.h"
@@ -832,5 +833,37 @@ void ColorSpace::computeLazyDstFields() const {
     // Spin wait
   }
 }
+
+template <AlphaType SRCAT, AlphaType DSTAT>
+RGBA4f<DSTAT> ColorSpace::ConvertColorSpace(const RGBA4f<SRCAT>& color,
+                                            std::shared_ptr<ColorSpace> srcColorSpace,
+                                            std::shared_ptr<ColorSpace> dstColorSpace) {
+  RGBA4f<DSTAT> dstColor = {color.red, color.green, color.blue, color.alpha};
+  if (NeedConvertColorSpace(srcColorSpace, dstColorSpace) || SRCAT != DSTAT) {
+    ColorSpaceXformSteps steps{srcColorSpace.get(), SRCAT, dstColorSpace.get(), DSTAT};
+    steps.apply(dstColor.array());
+  }
+  return dstColor;
+}
+
+template RGBA4f<AlphaType::Unpremultiplied>
+ColorSpace::ConvertColorSpace<AlphaType::Unpremultiplied, AlphaType::Unpremultiplied>(
+    const RGBA4f<AlphaType::Unpremultiplied>&, std::shared_ptr<ColorSpace>,
+    std::shared_ptr<ColorSpace>);
+
+template RGBA4f<AlphaType::Premultiplied>
+ColorSpace::ConvertColorSpace<AlphaType::Premultiplied, AlphaType::Premultiplied>(
+    const RGBA4f<AlphaType::Premultiplied>&, std::shared_ptr<ColorSpace>,
+    std::shared_ptr<ColorSpace>);
+
+template RGBA4f<AlphaType::Premultiplied>
+ColorSpace::ConvertColorSpace<AlphaType::Unpremultiplied, AlphaType::Premultiplied>(
+    const RGBA4f<AlphaType::Unpremultiplied>&, std::shared_ptr<ColorSpace>,
+    std::shared_ptr<ColorSpace>);
+
+template RGBA4f<AlphaType::Unpremultiplied>
+ColorSpace::ConvertColorSpace<AlphaType::Premultiplied, AlphaType::Unpremultiplied>(
+    const RGBA4f<AlphaType::Premultiplied>&, std::shared_ptr<ColorSpace>,
+    std::shared_ptr<ColorSpace>);
 
 }  // namespace tgfx

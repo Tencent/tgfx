@@ -20,9 +20,13 @@
 
 #include <atomic>
 #include <memory>
+#include "tgfx/core/AlphaType.h"
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
+
+template <AlphaType AT>
+struct RGBA4f;
 /**
  * Simplified color matrix, without processing the alpha channel and offset.
  */
@@ -369,6 +373,18 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
    * Create an ColorSpace from a ICC data.
    */
   static std::shared_ptr<ColorSpace> MakeFromICC(const void* data, size_t size);
+
+  /**
+   * Converts a color from one color space to another, with optional alpha type conversion.
+   * @param color The source color to convert.
+   * @param srcColorSpace The color space of the source color. Pass nullptr for sRGB.
+   * @param dstColorSpace The target color space. Pass nullptr to skip color space conversion.
+   * @return The converted color in the destination color space and alpha type.
+   */
+  template <AlphaType SRCAT, AlphaType DSTAT>
+  static RGBA4f<DSTAT> ConvertColorSpace(const RGBA4f<SRCAT>& color,
+                                         std::shared_ptr<ColorSpace> srcColorSpace,
+                                         std::shared_ptr<ColorSpace> dstColorSpace);
 
   /**
    * Returns true if the color space gamma is near enough to be approximated as sRGB.
