@@ -75,8 +75,8 @@ void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerP
   list.push_back(std::move(content));
 }
 
-const Matrix* LayerRecorder::getMatrix() const {
-  return _matrix.has_value() ? &_matrix.value() : nullptr;
+const Matrix& LayerRecorder::getMatrix() const {
+  return _matrix.has_value() ? _matrix.value() : Matrix::I();
 }
 
 void LayerRecorder::setMatrix(const Matrix& matrix) {

@@ -88,9 +88,9 @@ class LayerRecorder {
                    const Matrix& matrix);
 
   /**
-   * Returns the current transformation matrix, or nullptr if no matrix is set.
+   * Returns the current transformation matrix. If no matrix is set, returns the identity matrix.
    */
-  const Matrix* getMatrix() const;
+  const Matrix& getMatrix() const;
 
   /**
    * Sets the transformation matrix for subsequent drawing operations.
