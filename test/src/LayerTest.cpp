@@ -2525,7 +2525,7 @@ TGFX_TEST(LayerTest, LayerRecorder) {
     // Should be single TextContent
     EXPECT_EQ(content->type(), LayerContent::Type::Text);
     auto textContent = static_cast<TextContent*>(content.get());
-    EXPECT_EQ(textContent->textMatrix, Matrix::MakeTrans(50, 100));
+    EXPECT_EQ(textContent->offset, Point::Make(50, 100));
     content->drawDefault(surface->getCanvas(), 1.0f, true);
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_TextBlobWithOffset"));
   }

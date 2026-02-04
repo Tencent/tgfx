@@ -62,19 +62,19 @@ void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerP
   }
   flushPending();
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
-  // The translation matrix only affects the text position, while _matrix affects both
+  // The offset only affects the text position, while _matrix affects both
   // the text position and the paint (shader/maskFilter coordinates).
-  auto textMatrix = Matrix::MakeTrans(x, y);
+  auto offset = Point::Make(x, y);
   std::unique_ptr<GeometryContent> content =
-      std::make_unique<TextContent>(std::move(textBlob), textMatrix, paint);
-  if (_matrix.has_value() && !_matrix->isIdentity()) {
-    content = std::make_unique<MatrixContent>(std::move(content), *_matrix);
+      std::make_unique<TextContent>(std::move(textBlob), offset, paint);
+  if (!_matrix.isIdentity()) {
+    content = std::make_unique<MatrixContent>(std::move(content), _matrix);
   }
   list.push_back(std::move(content));
 }
 
 const Matrix& LayerRecorder::getMatrix() const {
-  return _matrix.has_value() ? _matrix.value() : Matrix::I();
+  return _matrix;
 }
 
 void LayerRecorder::setMatrix(const Matrix& matrix) {
@@ -82,11 +82,10 @@ void LayerRecorder::setMatrix(const Matrix& matrix) {
 }
 
 void LayerRecorder::resetMatrix() {
-  _matrix = std::nullopt;
+  _matrix = Matrix::I();
 }
 
-void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint,
-                            const std::optional<Matrix>& matrix) {
+void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint, const Matrix& matrix) {
   if (rect.isEmpty()) {
     return;
   }
@@ -96,8 +95,7 @@ void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint,
   pendingRects.push_back(rect);
 }
 
-void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint,
-                             const std::optional<Matrix>& matrix) {
+void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint, const Matrix& matrix) {
   if (rRect.rect.isEmpty()) {
     return;
   }
@@ -111,8 +109,7 @@ void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint,
   pendingRRects.push_back(rRect);
 }
 
-void LayerRecorder::addPath(const Path& path, const LayerPaint& paint,
-                            const std::optional<Matrix>& matrix) {
+void LayerRecorder::addPath(const Path& path, const LayerPaint& paint, const Matrix& matrix) {
   if (path.isEmpty()) {
     return;
   }
@@ -124,7 +121,7 @@ void LayerRecorder::addPath(const Path& path, const LayerPaint& paint,
 }
 
 void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint,
-                             const std::optional<Matrix>& matrix) {
+                             const Matrix& matrix) {
   if (shape == nullptr) {
     return;
   }
@@ -144,9 +141,7 @@ void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& pai
       break;
     }
     auto combinedMatrix = matrixShape->matrix;
-    if (matrix.has_value()) {
-      combinedMatrix.postConcat(*matrix);
-    }
+    combinedMatrix.postConcat(matrix);
     if (handlePathAsRect(matrixShape->shape->getPath(), paint, combinedMatrix)) {
       return;
     }
@@ -156,7 +151,7 @@ void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& pai
 }
 
 bool LayerRecorder::handlePathAsRect(const Path& path, const LayerPaint& paint,
-                                     const std::optional<Matrix>& matrix) {
+                                     const Matrix& matrix) {
   Point line[2] = {};
   if (path.isLine(line)) {
     if (paint.style != PaintStyle::Stroke) {
@@ -183,7 +178,7 @@ bool LayerRecorder::handlePathAsRect(const Path& path, const LayerPaint& paint,
 }
 
 bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint,
-                              const std::optional<Matrix>& matrix) const {
+                              const Matrix& matrix) const {
   if (pendingType != type) {
     return false;
   }
@@ -212,7 +207,7 @@ bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint,
 }
 
 void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint,
-                                 const std::optional<Matrix>& newMatrix) {
+                                 const Matrix& newMatrix) {
   if (pendingType != PendingType::None) {
     std::unique_ptr<GeometryContent> content = nullptr;
     auto& list = pendingPaint.placement == LayerPlacement::Foreground ? foregrounds : contents;
@@ -245,9 +240,9 @@ void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint
         break;
     }
 
-    // Wrap with MatrixContent if matrix has value and is not identity.
-    if (content != nullptr && pendingMatrix.has_value() && !pendingMatrix->isIdentity()) {
-      content = std::make_unique<MatrixContent>(std::move(content), *pendingMatrix);
+    // Wrap with MatrixContent if matrix is not identity.
+    if (content != nullptr && !pendingMatrix.isIdentity()) {
+      content = std::make_unique<MatrixContent>(std::move(content), pendingMatrix);
     }
     DEBUG_ASSERT(content != nullptr);
     if (content != nullptr) {

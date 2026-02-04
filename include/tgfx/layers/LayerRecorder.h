@@ -19,7 +19,6 @@
 #pragma once
 
 #include <memory>
-#include <optional>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
@@ -104,7 +103,7 @@ class LayerRecorder {
   };
 
   // Current transformation matrix applied to all subsequent drawing operations.
-  std::optional<Matrix> _matrix = std::nullopt;
+  Matrix _matrix = Matrix::I();
 
   std::vector<std::unique_ptr<GeometryContent>> contents;
   std::vector<std::unique_ptr<GeometryContent>> foregrounds;
@@ -112,23 +111,20 @@ class LayerRecorder {
   PendingType pendingType = PendingType::None;
   LayerPaint pendingPaint = {};
   // Transformation matrix for the pending geometries.
-  std::optional<Matrix> pendingMatrix = std::nullopt;
+  Matrix pendingMatrix = Matrix::I();
   std::vector<Rect> pendingRects = {};
   std::vector<RRect> pendingRRects = {};
   std::shared_ptr<Shape> pendingShape = nullptr;
 
-  void addRect(const Rect& rect, const LayerPaint& paint, const std::optional<Matrix>& matrix);
-  void addRRect(const RRect& rRect, const LayerPaint& paint, const std::optional<Matrix>& matrix);
-  void addPath(const Path& path, const LayerPaint& paint, const std::optional<Matrix>& matrix);
-  void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint,
-                const std::optional<Matrix>& matrix);
+  void addRect(const Rect& rect, const LayerPaint& paint, const Matrix& matrix);
+  void addRRect(const RRect& rRect, const LayerPaint& paint, const Matrix& matrix);
+  void addPath(const Path& path, const LayerPaint& paint, const Matrix& matrix);
+  void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint, const Matrix& matrix);
 
-  bool handlePathAsRect(const Path& path, const LayerPaint& paint,
-                        const std::optional<Matrix>& matrix);
-  bool canAppend(PendingType type, const LayerPaint& paint,
-                 const std::optional<Matrix>& matrix) const;
+  bool handlePathAsRect(const Path& path, const LayerPaint& paint, const Matrix& matrix);
+  bool canAppend(PendingType type, const LayerPaint& paint, const Matrix& matrix) const;
   void flushPending(PendingType newType = PendingType::None, const LayerPaint& newPaint = {},
-                    const std::optional<Matrix>& newMatrix = std::nullopt);
+                    const Matrix& newMatrix = Matrix::I());
 
   std::unique_ptr<LayerContent> finishRecording();
 

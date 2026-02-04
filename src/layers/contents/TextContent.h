@@ -19,20 +19,19 @@
 #pragma once
 
 #include "layers/contents/DrawContent.h"
-#include "tgfx/core/Matrix.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
 
 class TextContent : public DrawContent {
  public:
-  TextContent(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix, const LayerPaint& paint);
+  TextContent(std::shared_ptr<TextBlob> textBlob, const Point& offset, const LayerPaint& paint);
 
   Rect getTightBounds(const Matrix& matrix) const override;
   bool hitTestPoint(float localX, float localY) const override;
 
   std::shared_ptr<TextBlob> textBlob = nullptr;
-  Matrix textMatrix = Matrix::I();
+  Point offset = Point::Zero();
 
  protected:
   Type type() const override {
