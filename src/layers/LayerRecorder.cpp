@@ -113,7 +113,7 @@ void LayerRecorder::addPath(const Path& path, const LayerPaint& paint, const Mat
   if (path.isEmpty()) {
     return;
   }
-  if (handlePathAsRect(path, paint, matrix)) {
+  if (tryAddSimplifiedPath(path, paint, matrix)) {
     return;
   }
   flushPending(PendingType::Shape, paint, matrix);
@@ -129,29 +129,32 @@ void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& pai
     addPath(shape->getPath(), paint, matrix);
     return;
   }
-  do {
-    auto matrixShape = ShapeUtils::AsMatrixShape(shape.get());
-    if (matrixShape == nullptr || !matrixShape->shape->isSimplePath()) {
-      break;
-    }
-    // Skip handlePathAsRect for stroke with non-uniform scale in shape's matrix, as this
-    // optimization would cause the stroke to be scaled non-uniformly.
-    auto scales = matrixShape->matrix.getAxisScales();
-    if (paint.style == PaintStyle::Stroke && !FloatNearlyEqual(scales.x, scales.y)) {
-      break;
-    }
-    auto combinedMatrix = matrixShape->matrix;
-    combinedMatrix.postConcat(matrix);
-    if (handlePathAsRect(matrixShape->shape->getPath(), paint, combinedMatrix)) {
-      return;
-    }
-  } while (false);
+  if (tryAddSimplifiedMatrixShape(shape, paint, matrix)) {
+    return;
+  }
   flushPending(PendingType::Shape, paint, matrix);
   pendingShape = std::move(shape);
 }
 
-bool LayerRecorder::handlePathAsRect(const Path& path, const LayerPaint& paint,
-                                     const Matrix& matrix) {
+bool LayerRecorder::tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& shape,
+                                                const LayerPaint& paint, const Matrix& matrix) {
+  auto matrixShape = ShapeUtils::AsMatrixShape(shape.get());
+  if (matrixShape == nullptr || !matrixShape->shape->isSimplePath()) {
+    return false;
+  }
+  // Skip tryAddSimplifiedPath for stroke with non-uniform scale in shape's matrix, as this
+  // optimization would cause the stroke to be scaled non-uniformly.
+  auto scales = matrixShape->matrix.getAxisScales();
+  if (paint.style == PaintStyle::Stroke && !FloatNearlyEqual(scales.x, scales.y)) {
+    return false;
+  }
+  auto combinedMatrix = matrixShape->matrix;
+  combinedMatrix.postConcat(matrix);
+  return tryAddSimplifiedPath(matrixShape->shape->getPath(), paint, combinedMatrix);
+}
+
+bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& paint,
+                                         const Matrix& matrix) {
   Point line[2] = {};
   if (path.isLine(line)) {
     if (paint.style != PaintStyle::Stroke) {

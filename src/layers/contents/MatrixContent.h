@@ -42,7 +42,7 @@ class MatrixContent : public GeometryContent {
   const std::shared_ptr<Shader>& getShader() const override;
 
   std::unique_ptr<GeometryContent> content = nullptr;
-  Matrix _matrix = Matrix::I();
+  Matrix matrix = Matrix::I();
 
  protected:
   Type type() const override {

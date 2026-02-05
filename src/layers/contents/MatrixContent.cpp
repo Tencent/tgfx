@@ -23,22 +23,22 @@
 namespace tgfx {
 
 MatrixContent::MatrixContent(std::unique_ptr<GeometryContent> content, const Matrix& matrix)
-    : content(std::move(content)), _matrix(matrix) {
+    : content(std::move(content)), matrix(matrix) {
 }
 
 Rect MatrixContent::getBounds() const {
-  return _matrix.mapRect(content->getBounds());
+  return matrix.mapRect(content->getBounds());
 }
 
-Rect MatrixContent::getTightBounds(const Matrix& matrix) const {
-  auto combinedMatrix = _matrix;
-  combinedMatrix.postConcat(matrix);
+Rect MatrixContent::getTightBounds(const Matrix& parentMatrix) const {
+  auto combinedMatrix = matrix;
+  combinedMatrix.postConcat(parentMatrix);
   return content->getTightBounds(combinedMatrix);
 }
 
 bool MatrixContent::hitTestPoint(float localX, float localY) const {
   Matrix inverse = Matrix::I();
-  if (!_matrix.invert(&inverse)) {
+  if (!matrix.invert(&inverse)) {
     return false;
   }
   auto localPoint = inverse.mapXY(localX, localY);
@@ -47,19 +47,19 @@ bool MatrixContent::hitTestPoint(float localX, float localY) const {
 
 bool MatrixContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
   AutoCanvasRestore autoRestore(canvas);
-  canvas->concat(_matrix);
+  canvas->concat(matrix);
   return content->drawDefault(canvas, alpha, antiAlias);
 }
 
 void MatrixContent::drawForeground(Canvas* canvas, float alpha, bool antiAlias) const {
   AutoCanvasRestore autoRestore(canvas);
-  canvas->concat(_matrix);
+  canvas->concat(matrix);
   content->drawForeground(canvas, alpha, antiAlias);
 }
 
 void MatrixContent::drawContour(Canvas* canvas, bool antiAlias) const {
   AutoCanvasRestore autoRestore(canvas);
-  canvas->concat(_matrix);
+  canvas->concat(matrix);
   content->drawContour(canvas, antiAlias);
 }
 
@@ -76,8 +76,7 @@ bool MatrixContent::hasSameGeometry(const GeometryContent* other) const {
     return false;
   }
   auto otherMatrix = static_cast<const MatrixContent*>(other);
-  return _matrix == otherMatrix->_matrix &&
-         content->hasSameGeometry(otherMatrix->content.get());
+  return matrix == otherMatrix->matrix && content->hasSameGeometry(otherMatrix->content.get());
 }
 
 const std::shared_ptr<Shader>& MatrixContent::getShader() const {

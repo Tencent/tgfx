@@ -97,7 +97,8 @@ static void SerializeDrawContent(flexbuffers::Builder& fbb, const DrawContent* c
   SerializeUtils::SetFlexBufferMap(fbb, "hasShader", content->getShader() != nullptr);
   SerializeUtils::SetFlexBufferMap(fbb, "blendMode",
                                    SerializeUtils::BlendModeToString(content->getBlendMode()));
-  SerializeUtils::SetFlexBufferMap(fbb, "style", PaintStyleToString(content->getStroke() != nullptr));
+  SerializeUtils::SetFlexBufferMap(fbb, "style",
+                                   PaintStyleToString(content->getStroke() != nullptr));
   if (content->getStroke()) {
     SerializeStroke(fbb, *content->getStroke());
   }
@@ -164,7 +165,7 @@ static void SerializeMatrixContent(flexbuffers::Builder& fbb, const MatrixConten
   fbb.Key("matrix");
   auto matrixStart = fbb.StartMap();
   float buffer[9] = {};
-  content->_matrix.get9(buffer);
+  content->matrix.get9(buffer);
   for (int i = 0; i < 9; i++) {
     auto key = "[" + std::to_string(i) + "]";
     SerializeUtils::SetFlexBufferMap(fbb, key.c_str(), buffer[i]);

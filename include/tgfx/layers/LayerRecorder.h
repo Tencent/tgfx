@@ -121,7 +121,9 @@ class LayerRecorder {
   void addPath(const Path& path, const LayerPaint& paint, const Matrix& matrix);
   void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint, const Matrix& matrix);
 
-  bool handlePathAsRect(const Path& path, const LayerPaint& paint, const Matrix& matrix);
+  bool tryAddSimplifiedPath(const Path& path, const LayerPaint& paint, const Matrix& matrix);
+  bool tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& shape, const LayerPaint& paint,
+                                   const Matrix& matrix);
   bool canAppend(PendingType type, const LayerPaint& paint, const Matrix& matrix) const;
   void flushPending(PendingType newType = PendingType::None, const LayerPaint& newPaint = {},
                     const Matrix& newMatrix = Matrix::I());
