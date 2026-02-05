@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <mutex>
 #include "CGTypeface.h"
 #include "core/PixelBuffer.h"
 #include "core/ScalerContext.h"
@@ -48,8 +49,12 @@ class CGScalerContext : public ScalerContext {
   float getBackingSize() const override;
 
  private:
+  FontMetrics computeFontMetrics() const;
+
   float fauxBoldScale = 1.0f;
   CTFontRef ctFont = nullptr;
   CTFontRef backingFont = nullptr;
+  mutable std::once_flag fontMetricsOnce = {};
+  mutable FontMetrics fontMetrics = {};
 };
 }  // namespace tgfx
