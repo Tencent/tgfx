@@ -275,6 +275,13 @@ int FTScalerContext::setupSize(bool fauxItalic) const {
 }
 
 FontMetrics FTScalerContext::getFontMetrics() const {
+  std::call_once(fontMetricsOnce, [this]() {
+    fontMetrics = computeFontMetrics();
+  });
+  return fontMetrics;
+}
+
+FontMetrics FTScalerContext::computeFontMetrics() const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   FontMetrics metrics = {};
   if (setupSize(false)) {

@@ -147,6 +147,13 @@ CGScalerContext::~CGScalerContext() {
 }
 
 FontMetrics CGScalerContext::getFontMetrics() const {
+  std::call_once(fontMetricsOnce, [this]() {
+    fontMetrics = computeFontMetrics();
+  });
+  return fontMetrics;
+}
+
+FontMetrics CGScalerContext::computeFontMetrics() const {
   FontMetrics metrics;
   auto theBounds = CTFontGetBoundingBox(ctFont);
   metrics.top = static_cast<float>(-CGRectGetMaxY(theBounds));

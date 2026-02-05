@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include "ft2build.h"
 #include FT_COLOR_H
@@ -55,6 +56,8 @@ class FTScalerContext : public ScalerContext {
   }
 
  private:
+  FontMetrics computeFontMetrics() const;
+
   int setupSize(bool fauxItalic) const;
 
   void getFontMetricsInternal(FontMetrics* metrics) const;
@@ -86,5 +89,7 @@ class FTScalerContext : public ScalerContext {
   FT_Int strikeIndex = -1;  // The bitmap strike for the face (or -1 if none).
   FT_Int32 loadGlyphFlags = 0;
   float backingSize = 1.0f;
+  mutable std::once_flag fontMetricsOnce = {};
+  mutable FontMetrics fontMetrics = {};
 };
 }  // namespace tgfx
