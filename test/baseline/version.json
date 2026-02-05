@@ -19,6 +19,7 @@
     },
     "CanvasTest": {
         "BlendFormula": "543054b5",
+        "CMYKWithoutICCProfile": "d8f64384",
         "Clip": "d010fb8",
         "ConvertColorSpace": "eefb7a46",
         "DiscardContent": "4c590832",
