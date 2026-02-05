@@ -170,10 +170,14 @@ void TextPath::apply(VectorContext* context) {
       invertedMatrix = Matrix::I();
     }
 
+    const auto& anchors = geometry->anchors;
+    bool hasAnchors = !anchors.empty();
+    size_t glyphIndex = 0;
     for (auto& glyph : geometry->glyphs) {
       auto advance = glyph.font.getAdvance(glyph.glyphID);
       auto halfAdvance = advance * 0.5f;
-      auto centerPosition = currentPosition + halfAdvance + glyph.anchor.x;
+      Point anchor = hasAnchors && glyphIndex < anchors.size() ? anchors[glyphIndex] : Point::Zero();
+      auto centerPosition = currentPosition + halfAdvance + anchor.x;
 
       if (_reversed) {
         centerPosition = pathLength - centerPosition;
@@ -187,6 +191,7 @@ void TextPath::apply(VectorContext* context) {
       Point tangent = {};
       if (!GetPosTanExtended(pathMeasure.get(), centerPosition, pathLength, &position, &tangent)) {
         currentPosition += advance + letterSpacing;
+        glyphIndex++;
         continue;
       }
 
@@ -200,11 +205,12 @@ void TextPath::apply(VectorContext* context) {
       }
       curveMatrix.postTranslate(position.x, position.y);
 
-      glyph.matrix.setTranslate(-halfAdvance - glyph.anchor.x, -glyph.anchor.y);
+      glyph.matrix.setTranslate(-halfAdvance - anchor.x, -anchor.y);
       glyph.matrix.postConcat(curveMatrix);
       glyph.matrix.postConcat(invertedMatrix);
 
       currentPosition += advance + letterSpacing;
+      glyphIndex++;
     }
   }
 }

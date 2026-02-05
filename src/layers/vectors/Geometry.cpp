@@ -81,9 +81,6 @@ void Geometry::convertToShape() {
 void Geometry::expandToGlyphs() {
   DEBUG_ASSERT(textBlob != nullptr);
   glyphs.clear();
-  size_t globalIndex = 0;
-  bool hasAnchors = !anchors.empty();
-  size_t anchorsSize = anchors.size();
   for (auto run : *textBlob) {
     glyphs.reserve(glyphs.size() + run.glyphCount);
     for (size_t i = 0; i < run.glyphCount; i++) {
@@ -91,11 +88,7 @@ void Geometry::expandToGlyphs() {
       glyph.glyphID = run.glyphs[i];
       glyph.font = run.font;
       glyph.matrix = GetGlyphMatrix(run, i);
-      if (hasAnchors && globalIndex < anchorsSize) {
-        glyph.anchor = anchors[globalIndex];
-      }
       glyphs.push_back(glyph);
-      globalIndex++;
     }
   }
   textBlob = nullptr;

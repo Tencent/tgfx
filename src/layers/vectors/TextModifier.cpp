@@ -190,10 +190,14 @@ void TextModifier::apply(VectorContext* context) {
 
   size_t globalIndex = 0;
   for (auto* geometry : glyphGeometries) {
+    const auto& anchors = geometry->anchors;
+    bool hasAnchors = !anchors.empty();
+    size_t glyphIndex = 0;
     for (auto& glyph : geometry->glyphs) {
       float factor = TextSelector::CalculateCombinedFactor(_selectors, globalIndex, totalCount);
       if (factor == 0.0f) {
         globalIndex++;
+        glyphIndex++;
         continue;
       }
 
@@ -202,9 +206,12 @@ void TextModifier::apply(VectorContext* context) {
       // Calculate the default anchor point: half of advance width
       float defaultAnchorX = glyph.font.getAdvance(glyph.glyphID) * 0.5f;
 
+      // Get glyph anchor from geometry's anchors array
+      Point glyphAnchor = hasAnchors && glyphIndex < anchors.size() ? anchors[glyphIndex] : Point::Zero();
+
       // Total anchor point = default anchor + glyph anchor + user-specified anchor offset (scaled by factor)
-      float totalAnchorX = defaultAnchorX + glyph.anchor.x + _anchor.x * factor;
-      float totalAnchorY = glyph.anchor.y + _anchor.y * factor;
+      float totalAnchorX = defaultAnchorX + glyphAnchor.x + _anchor.x * factor;
+      float totalAnchorY = glyphAnchor.y + _anchor.y * factor;
 
       // Apply transform: anchor -> scale -> skew -> rotation -> anchor restore -> position
       Matrix transform = Matrix::I();
@@ -251,6 +258,7 @@ void TextModifier::apply(VectorContext* context) {
       }
 
       globalIndex++;
+      glyphIndex++;
     }
   }
 }
