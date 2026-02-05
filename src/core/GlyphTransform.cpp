@@ -36,20 +36,11 @@ unsigned ScalarsPerGlyph(GlyphPositioning positioning) {
   return 0;
 }
 
-static float ComputeDefaultPositionX(const GlyphRun& run, size_t index) {
-  float x = run.offset.x;
-  for (size_t i = 0; i < index; i++) {
-    x += run.font.getAdvance(run.glyphs[i]);
-  }
-  return x;
-}
-
 Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
   switch (run.positioning) {
     case GlyphPositioning::Default:
-      return Matrix::MakeTrans(ComputeDefaultPositionX(run, index), run.offset.y);
     case GlyphPositioning::Horizontal:
-      return Matrix::MakeTrans(run.positions[index], run.offset.y);
+      return Matrix::MakeTrans(run.positions[index], run.offsetY);
     case GlyphPositioning::Point: {
       auto position = reinterpret_cast<const Point*>(run.positions)[index];
       return Matrix::MakeTrans(position.x, position.y);
@@ -69,9 +60,8 @@ Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
 Point GetGlyphPosition(const GlyphRun& run, size_t index) {
   switch (run.positioning) {
     case GlyphPositioning::Default:
-      return {ComputeDefaultPositionX(run, index), run.offset.y};
     case GlyphPositioning::Horizontal:
-      return {run.positions[index], run.offset.y};
+      return {run.positions[index], run.offsetY};
     case GlyphPositioning::Point:
       return reinterpret_cast<const Point*>(run.positions)[index];
     default:

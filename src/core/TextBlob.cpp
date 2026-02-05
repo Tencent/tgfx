@@ -178,11 +178,11 @@ GlyphRun TextBlob::Iterator::operator*() {
     }
     run.positioning = GlyphPositioning::Horizontal;
     run.positions = positionBuffer.data();
-    run.offset = Point{0, current->offset.y};
+    run.offsetY = current->offset.y;
   } else {
     run.positioning = current->positioning;
     run.positions = current->posBuffer();
-    run.offset = current->offset;
+    run.offsetY = current->offset.y;
   }
   return run;
 }

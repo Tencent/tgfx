@@ -19,7 +19,6 @@
 #pragma once
 
 #include "tgfx/core/Font.h"
-#include "tgfx/core/Point.h"
 
 namespace tgfx {
 
@@ -83,12 +82,9 @@ struct GlyphRun {
   const float* positions = nullptr;
 
   /**
-   * The shared offset for all glyphs in this run.
-   * - Default positioning: (x, y) is the starting point, glyphs advance horizontally from there.
-   * - Horizontal positioning: y is the shared baseline, x is always zero.
-   * - Other modes: always zero, as positions already contain full coordinates.
+   * The shared y offset for Horizontal positioning mode. For other modes, this value is 0.
    */
-  Point offset = {};
+  float offsetY = 0;
 };
 
 }  // namespace tgfx
