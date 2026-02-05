@@ -50,9 +50,9 @@ struct GlyphStyle {
 struct Glyph {
   GlyphID glyphID = 0;
   Font font = {};
+  Point anchor = Point::Zero();  // offset relative to default anchor (advance*0.5, 0)
   Matrix matrix = Matrix::I();
   GlyphStyle style = {};
-  Point anchor = Point::Zero();  // offset relative to default anchor (advance*0.5, 0)
 };
 
 /**
