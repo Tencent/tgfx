@@ -38,7 +38,8 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
                           return std::shared_ptr<TGFXView>(nullptr);
                         }
                         return std::make_shared<TGFXView>(canvasID);
-                      }));
+                      }))
+      .function("registerFonts", &TGFXView::registerFonts);
 
   class_<TGFXThreadsView, base<TGFXBaseView>>("TGFXThreadsView")
       .smart_ptr<std::shared_ptr<TGFXThreadsView>>("TGFXThreadsView")

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,40 +18,53 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
 #include "layers/contents/GeometryContent.h"
+#include "tgfx/core/Stroke.h"
+#include "tgfx/layers/LayerPaint.h"
 
 namespace tgfx {
 
 /**
- * ComposeContent combines multiple GeometryContent objects into a single unit. It manages a list of
- * contents and supports separating them into default content (drawn below children) and foreground
- * content (drawn above children).
+ * DrawContent is the base class for geometry contents that store their own draw attributes.
+ * Each DrawContent represents a single draw operation with its own color, shader, stroke and blend
+ * mode.
  */
-class ComposeContent : public LayerContent {
+class DrawContent : public GeometryContent {
  public:
-  ComposeContent(std::vector<std::unique_ptr<GeometryContent>> contents,
-                 size_t foregroundStartIndex, std::vector<GeometryContent*> contours);
+  explicit DrawContent(const LayerPaint& paint);
 
   Rect getBounds() const override;
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
+  Rect getTightBounds(const Matrix& matrix) const override = 0;
+  bool hitTestPoint(float localX, float localY) const override = 0;
   void drawContour(Canvas* canvas, bool antiAlias) const override;
   bool contourEqualsOpaqueContent() const override;
-  bool hasBlendMode() const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
+  const std::shared_ptr<Shader>& getShader() const override;
+  bool hasSameGeometry(const GeometryContent* other) const override;
+  bool hasBlendMode() const override;
 
- protected:
-  Type type() const override {
-    return Type::Compose;
+  const Color& getColor() const {
+    return color;
   }
 
- private:
-  std::vector<std::unique_ptr<GeometryContent>> contents = {};
-  size_t foregroundStartIndex = 0;
-  std::vector<GeometryContent*> contours = {};
+  const BlendMode& getBlendMode() const {
+    return blendMode;
+  }
+
+  const Stroke* getStroke() const {
+    return stroke.get();
+  }
+
+ protected:
+  virtual Rect onGetBounds() const = 0;
+  virtual void onDraw(Canvas* canvas, const Paint& paint) const = 0;
+  virtual bool onHasSameGeometry(const GeometryContent* other) const = 0;
+
+  Color color = Color::White();
+  std::shared_ptr<Shader> shader = nullptr;
+  BlendMode blendMode = BlendMode::SrcOver;
+  std::unique_ptr<Stroke> stroke = nullptr;
 };
 
 }  // namespace tgfx

@@ -42,14 +42,14 @@ if (typeof window !== 'undefined') {
 
             let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d');
             shareData.tgfxBaseView = tgfxView;
-            var image = await loadImage("http://localhost:8081/../../resources/assets/bridge.jpg");
+            var image = await loadImage("resources/assets/bridge.jpg");
             tgfxView.setImagePath("bridge",image);
-            image = await loadImage("http://localhost:8081/../../resources/assets/tgfx.png");
+            image = await loadImage("resources/assets/tgfx.png");
             tgfxView.setImagePath("TGFX",image);
-            var fontPath = "../../resources/font/NotoSansSC-Regular.otf";
+            var fontPath = "resources/font/NotoSansSC-Regular.otf";
             const fontBuffer = await fetch(fontPath).then((response) => response.arrayBuffer());
             const fontUIntArray = new Uint8Array(fontBuffer);
-            var emojiFontPath = "../../resources/font/NotoColorEmoji.ttf";
+            var emojiFontPath = "resources/font/NotoColorEmoji.ttf";
             const emojiFontBuffer = await fetch(emojiFontPath).then((response) => response.arrayBuffer());
             const emojiFontUIntArray = new Uint8Array(emojiFontBuffer);
             tgfxView.registerFonts(fontUIntArray, emojiFontUIntArray);

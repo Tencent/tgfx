@@ -175,14 +175,16 @@ class Pixmap {
   }
 
   /**
-   * Returns pixel at (x, y) as unpremultiplied color. Some color precision may be lost in the
-   * conversion to unpremultiplied color; original pixel data may have additional precision. Returns
-   * a transparent color if the point (x, y) is not contained by bounds.
+   * Returns pixel at (x, y) as unpremultiplied color. Returns a transparent color if the point
+   * (x, y) is not contained by bounds.
    * @param x  column index, zero or greater, and less than width()
    * @param y  row index, zero or greater, and less than height()
-   * @return   pixel converted to unpremultiplied color in SRGB gamut.
+   * @param dstColorSpace  the destination color space for the returned color. If nullptr, no color
+   *                       space conversion is performed.
+   * @return   pixel converted to unpremultiplied color.
    */
-  Color getColor(int x, int y) const;
+  RGBA4f<AlphaType::Unpremultiplied> getColor(
+      int x, int y, std::shared_ptr<ColorSpace> dstColorSpace = nullptr) const;
 
   /**
    * Returns subset of the Pixmap. subset must be fully contained by Pixmap dimensions. Returns

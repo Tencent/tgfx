@@ -130,7 +130,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
                                                    AlphaType::Premultiplied, dstColorSpace.get(),
                                                    AlphaType::Premultiplied);
     colorProcessor =
-        FragmentProcessor::Compose(allocator, std::move(xformEffect), std::move(colorProcessor));
+        FragmentProcessor::Compose(allocator, std::move(colorProcessor), std::move(xformEffect));
   }
   auto geometryProcessor = DefaultGeometryProcessor::Make(
       allocator, {}, renderTarget->width(), renderTarget->height(), AAType::None, {}, {});
