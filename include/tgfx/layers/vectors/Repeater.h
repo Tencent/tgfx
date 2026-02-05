@@ -87,14 +87,14 @@ class Repeater : public VectorElement {
   /**
    * Returns the anchor point for transformation.
    */
-  const Point& anchorPoint() const {
-    return _anchorPoint;
+  const Point& anchor() const {
+    return _anchor;
   }
 
   /**
    * Sets the anchor point for transformation.
    */
-  void setAnchorPoint(const Point& value);
+  void setAnchor(const Point& value);
 
   /**
    * Returns the position offset applied to each copy.
@@ -172,7 +172,7 @@ class Repeater : public VectorElement {
   float _copies = 3.0f;
   float _offset = 0.0f;
   RepeaterOrder _order = RepeaterOrder::BelowOriginal;
-  Point _anchorPoint = Point::Zero();
+  Point _anchor = Point::Zero();
   Point _position = {100.0f, 100.0f};
   float _rotation = 0.0f;
   Point _scale = {1.0f, 1.0f};

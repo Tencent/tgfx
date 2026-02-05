@@ -94,11 +94,11 @@ void TextModifier::detachFromLayer(Layer* layer) {
   VectorElement::detachFromLayer(layer);
 }
 
-void TextModifier::setAnchorPoint(Point value) {
-  if (_anchorPoint == value) {
+void TextModifier::setAnchor(Point value) {
+  if (_anchor == value) {
     return;
   }
-  _anchorPoint = value;
+  _anchor = value;
   invalidateContent();
 }
 
@@ -203,8 +203,8 @@ void TextModifier::apply(VectorContext* context) {
       float defaultAnchorX = glyph.font.getAdvance(glyph.glyphID) * 0.5f;
 
       // Total anchor point = default anchor + glyph anchor + user-specified anchor offset (scaled by factor)
-      float totalAnchorX = defaultAnchorX + glyph.anchor.x + _anchorPoint.x * factor;
-      float totalAnchorY = glyph.anchor.y + _anchorPoint.y * factor;
+      float totalAnchorX = defaultAnchorX + glyph.anchor.x + _anchor.x * factor;
+      float totalAnchorY = glyph.anchor.y + _anchor.y * factor;
 
       // Apply transform: anchor -> scale -> skew -> rotation -> anchor restore -> position
       Matrix transform = Matrix::I();

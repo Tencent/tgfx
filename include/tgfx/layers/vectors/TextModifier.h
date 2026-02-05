@@ -58,14 +58,14 @@ class TextModifier : public VectorElement {
    * which is the horizontal center of the character at the baseline. This offset is relative to
    * that default position. Default is (0, 0).
    */
-  Point anchorPoint() const {
-    return _anchorPoint;
+  Point anchor() const {
+    return _anchor;
   }
 
   /**
    * Sets the anchor point offset for the selected characters.
    */
-  void setAnchorPoint(Point value);
+  void setAnchor(Point value);
 
   /**
    * Returns the position offset for the selected characters. Default is (0, 0).
@@ -198,7 +198,7 @@ class TextModifier : public VectorElement {
   std::vector<std::shared_ptr<TextSelector>> _selectors = {};
 
   // Transform properties
-  Point _anchorPoint = Point::Zero();
+  Point _anchor = Point::Zero();
   Point _position = Point::Zero();
   Point _scale = Point::Make(1.0f, 1.0f);
   float _skew = 0.0f;

@@ -481,7 +481,7 @@ TGFX_TEST(VectorLayerTest, RepeaterTransform) {
   repeater->setCopies(8);
   repeater->setPosition(Point::Zero());
   repeater->setRotation(45.0f);
-  repeater->setAnchorPoint({0, 0});
+  repeater->setAnchor({0, 0});
   repeater->setStartAlpha(1.0f);
   repeater->setEndAlpha(1.0f);
 
@@ -566,7 +566,7 @@ TGFX_TEST(VectorLayerTest, VectorGroupTransform) {
   auto group1 = std::make_shared<VectorGroup>();
   group1->setPosition({189, 269});
   group1->setRotation(30.0f);
-  group1->setAnchorPoint({80, 80});
+  group1->setAnchor({80, 80});
 
   auto rect1 = std::make_shared<Rectangle>();
   rect1->setSize({160, 160});
@@ -989,7 +989,7 @@ TGFX_TEST(VectorLayerTest, ComplexComposition) {
   repeater->setCopies(12);
   repeater->setPosition(Point::Zero());
   repeater->setRotation(30.0f);
-  repeater->setAnchorPoint({0, 0});
+  repeater->setAnchor({0, 0});
 
   auto trim = std::make_shared<TrimPath>();
   trim->setStart(0.48f);
@@ -1257,7 +1257,7 @@ TGFX_TEST(VectorLayerTest, RepeaterWithScale) {
   repeater1->setCopies(4);
   repeater1->setPosition({100, 0});
   repeater1->setScale({1.3f, 1.0f});  // Non-uniform scale per copy
-  repeater1->setAnchorPoint({20, 20});
+  repeater1->setAnchor({20, 20});
 
   auto stroke1 = MakeStrokeStyle(Color::Red(), 3.0f);
   auto fill1 = MakeFillStyle(Color::FromRGBA(255, 0, 0, 80));
@@ -1274,7 +1274,7 @@ TGFX_TEST(VectorLayerTest, RepeaterWithScale) {
   auto repeater2 = std::make_shared<Repeater>();
   repeater2->setCopies(5);
   repeater2->setPosition({50, 0});
-  repeater2->setAnchorPoint({20, 20});
+  repeater2->setAnchor({20, 20});
 
   auto stroke2 = MakeStrokeStyle(Color::Blue(), 3.0f);
   auto fill2 = MakeFillStyle(Color::FromRGBA(0, 0, 255, 80));
@@ -3062,7 +3062,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   middleGroup11->setElements({innerGroup11});
 
   auto rotationGroup11 = std::make_shared<VectorGroup>();
-  rotationGroup11->setAnchorPoint({350, 104});
+  rotationGroup11->setAnchor({350, 104});
   rotationGroup11->setPosition({350, 104});
   rotationGroup11->setRotation(15.0f);
 
@@ -3439,7 +3439,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   selector6->setShape(SelectorShape::RampUp);
   auto modifier6 = std::make_shared<TextModifier>();
   modifier6->setSelectors({selector6});
-  modifier6->setAnchorPoint({0, 15});
+  modifier6->setAnchor({0, 15});
   modifier6->setRotation(30);
   group6->setElements({textSpan6, modifier6, MakeFillStyle(Color::FromRGBA(255, 128, 0, 255))});
   groups.push_back(group6);
