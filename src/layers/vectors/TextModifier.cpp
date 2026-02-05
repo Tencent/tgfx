@@ -207,7 +207,7 @@ void TextModifier::apply(VectorContext* context) {
       float defaultAnchorX = glyph.font.getAdvance(glyph.glyphID) * 0.5f;
 
       // Get glyph anchor from geometry's anchors array
-      Point glyphAnchor = hasAnchors && glyphIndex < anchors.size() ? anchors[glyphIndex] : Point::Zero();
+      Point glyphAnchor = hasAnchors ? anchors[glyphIndex] : Point::Zero();
 
       // Total anchor point = default anchor + glyph anchor + user-specified anchor offset (scaled by factor)
       float totalAnchorX = defaultAnchorX + glyphAnchor.x + _anchor.x * factor;

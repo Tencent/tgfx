@@ -75,7 +75,6 @@ class Text : public VectorElement {
 
   void apply(VectorContext* context) override;
 
- protected:
   Text(std::shared_ptr<TextBlob> textBlob, std::vector<Point> anchors)
       : _textBlob(std::move(textBlob)), _anchors(std::move(anchors)) {
   }

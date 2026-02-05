@@ -176,7 +176,7 @@ void TextPath::apply(VectorContext* context) {
     for (auto& glyph : geometry->glyphs) {
       auto advance = glyph.font.getAdvance(glyph.glyphID);
       auto halfAdvance = advance * 0.5f;
-      Point anchor = hasAnchors && glyphIndex < anchors.size() ? anchors[glyphIndex] : Point::Zero();
+      Point anchor = hasAnchors ? anchors[glyphIndex] : Point::Zero();
       auto centerPosition = currentPosition + halfAdvance + anchor.x;
 
       if (_reversed) {
