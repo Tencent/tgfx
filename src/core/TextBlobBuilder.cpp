@@ -87,9 +87,8 @@ RunRecord* TextBlobBuilder::lastRun() {
   return reinterpret_cast<RunRecord*>(storage + lastRunOffset);
 }
 
-bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning positioning, size_t count,
-                               float x, float y) {
-  (void)x;  // x is only used for Default positioning which cannot be merged
+bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning positioning, size_t count, float,
+                               float y) {
   if (runCount == 0) {
     return false;
   }

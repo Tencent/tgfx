@@ -133,7 +133,7 @@ class TextBlobBuilder {
   const RunBuffer& allocRunInternal(const Font& font, size_t glyphCount,
                                     GlyphPositioning positioning, float x, float y);
   void reserve(size_t size);
-  bool tryMerge(const Font& font, GlyphPositioning positioning, size_t count, float x, float y);
+  bool tryMerge(const Font& font, GlyphPositioning positioning, size_t count, float, float y);
   void reset();
   void freeStorage();
   RunRecord* lastRun();

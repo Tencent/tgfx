@@ -79,10 +79,12 @@ void RunRecord::shrink(uint32_t newCount) {
     glyphCount = newCount;
     return;
   }
+  // Move positions to new location before updating glyphCount
   float* oldPos = posBuffer();
+  uint32_t oldCount = glyphCount;
   glyphCount = newCount;
   float* newPos = posBuffer();
-  if (newPos != oldPos) {
+  if (newPos != oldPos && oldCount > 0) {
     memmove(newPos, oldPos, newCount * scalars * sizeof(float));
   }
 }
