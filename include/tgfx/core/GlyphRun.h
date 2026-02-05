@@ -29,11 +29,11 @@ namespace tgfx {
 enum class GlyphPositioning {
   /**
    * Default positioning: no position data, glyphs are positioned by their advances.
-   * Position is computed as (x + accumulated_advances, y) where x and y come from offsetY storage.
+   * Position is computed as (offset.x + accumulated_advances, offset.y).
    */
   Default = 0,
   /**
-   * Horizontal positioning: each glyph has an x position, sharing a common y from offsetY.
+   * Horizontal positioning: each glyph has an x position, sharing a common y from offset.y.
    */
   Horizontal = 1,
   /**
