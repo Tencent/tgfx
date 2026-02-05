@@ -56,8 +56,6 @@ struct RunRecord {
   const RunRecord* next() const;
 
   void grow(uint32_t count);
-
-  void shrink(uint32_t newCount);
 };
 
 }  // namespace tgfx

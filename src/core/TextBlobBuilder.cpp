@@ -196,7 +196,17 @@ void TextBlobBuilder::trimLastRun(size_t glyphCount) {
     return;
   }
   size_t oldSize = run->storageSize();
-  run->shrink(static_cast<uint32_t>(glyphCount));
+  auto scalars = ScalarsPerGlyph(run->positioning);
+  if (scalars > 0) {
+    float* oldPos = run->posBuffer();
+    run->glyphCount = static_cast<uint32_t>(glyphCount);
+    float* newPos = run->posBuffer();
+    if (newPos != oldPos) {
+      memmove(newPos, oldPos, glyphCount * scalars * sizeof(float));
+    }
+  } else {
+    run->glyphCount = static_cast<uint32_t>(glyphCount);
+  }
   size_t newSize = run->storageSize();
   storageUsed -= (oldSize - newSize);
 }
