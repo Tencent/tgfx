@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <vector>
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Point.h"
 
@@ -89,6 +90,11 @@ struct GlyphRun {
    * - Other modes: always zero, as positions already contain full coordinates.
    */
   Point offset = {};
+
+  /**
+   * Storage for expanded position data when converting from Default positioning.
+   */
+  std::vector<float> expandedPositions = {};
 };
 
 }  // namespace tgfx

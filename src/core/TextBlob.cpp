@@ -156,46 +156,11 @@ const RunRecord* TextBlob::firstRun() const {
 }
 
 TextBlob::Iterator TextBlob::begin() const {
-  size_t totalDefaultGlyphs = 0;
-  const RunRecord* run = firstRun();
-  for (size_t i = 0; i < runCount; i++) {
-    if (run->positioning == GlyphPositioning::Default) {
-      totalDefaultGlyphs += run->glyphCount;
-    }
-    run = run->next();
-  }
-
-  float* positions = nullptr;
-  if (totalDefaultGlyphs > 0) {
-    positions = new float[totalDefaultGlyphs * 2];
-    float* cursor = positions;
-    run = firstRun();
-    for (size_t i = 0; i < runCount; i++) {
-      if (run->positioning == GlyphPositioning::Default) {
-        const auto& font = run->font;
-        const GlyphID* glyphs = run->glyphBuffer();
-        float x = run->offset.x;
-        float y = run->offset.y;
-        for (uint32_t j = 0; j < run->glyphCount; j++) {
-          cursor[j * 2] = x;
-          cursor[j * 2 + 1] = y;
-          x += font.getAdvance(glyphs[j]);
-        }
-        cursor += run->glyphCount * 2;
-      }
-      run = run->next();
-    }
-  }
-
-  return Iterator(firstRun(), runCount, positions);
+  return Iterator(firstRun(), runCount);
 }
 
-TextBlob::Iterator::Iterator(const RunRecord* record, size_t remaining, float* positions)
-    : current(record), remaining(remaining), expandedPositions(positions), currentPositions(positions) {
-}
-
-TextBlob::Iterator::~Iterator() {
-  delete[] expandedPositions;
+TextBlob::Iterator::Iterator(const RunRecord* record, size_t remaining)
+    : current(record), remaining(remaining) {
 }
 
 GlyphRun TextBlob::Iterator::operator*() const {
@@ -204,8 +169,17 @@ GlyphRun TextBlob::Iterator::operator*() const {
   run.glyphCount = current->glyphCount;
   run.glyphs = current->glyphBuffer();
   if (current->positioning == GlyphPositioning::Default) {
+    run.expandedPositions.resize(current->glyphCount * 2);
+    const GlyphID* glyphs = current->glyphBuffer();
+    float x = current->offset.x;
+    float y = current->offset.y;
+    for (uint32_t i = 0; i < current->glyphCount; i++) {
+      run.expandedPositions[i * 2] = x;
+      run.expandedPositions[i * 2 + 1] = y;
+      x += current->font.getAdvance(glyphs[i]);
+    }
     run.positioning = GlyphPositioning::Point;
-    run.positions = currentPositions;
+    run.positions = run.expandedPositions.data();
     run.offset = Point::Zero();
   } else {
     run.positioning = current->positioning;
@@ -216,9 +190,6 @@ GlyphRun TextBlob::Iterator::operator*() const {
 }
 
 TextBlob::Iterator& TextBlob::Iterator::operator++() {
-  if (current->positioning == GlyphPositioning::Default) {
-    currentPositions += current->glyphCount * 2;
-  }
   current = current->next();
   --remaining;
   return *this;

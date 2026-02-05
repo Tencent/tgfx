@@ -108,8 +108,6 @@ class TextBlob {
 
   class Iterator {
    public:
-    ~Iterator();
-
     GlyphRun operator*() const;
 
     Iterator& operator++();
@@ -119,19 +117,17 @@ class TextBlob {
     }
 
    private:
-    Iterator(const RunRecord* record, size_t remaining, float* positions);
+    Iterator(const RunRecord* record, size_t remaining);
 
     const RunRecord* current = nullptr;
     size_t remaining = 0;
-    float* expandedPositions = nullptr;
-    float* currentPositions = nullptr;
     friend class TextBlob;
   };
 
   Iterator begin() const;
 
   Iterator end() const {
-    return Iterator(nullptr, 0, nullptr);
+    return Iterator(nullptr, 0);
   }
 
  private:
