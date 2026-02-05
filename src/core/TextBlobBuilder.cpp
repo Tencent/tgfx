@@ -188,6 +188,20 @@ void TextBlobBuilder::setBounds(const Rect& bounds) {
   }
 }
 
+void TextBlobBuilder::trimLastRun(size_t glyphCount) {
+  if (runCount == 0) {
+    return;
+  }
+  auto* run = lastRun();
+  if (glyphCount >= run->glyphCount) {
+    return;
+  }
+  size_t oldSize = run->storageSize();
+  run->shrink(static_cast<uint32_t>(glyphCount));
+  size_t newSize = run->storageSize();
+  storageUsed -= (oldSize - newSize);
+}
+
 std::shared_ptr<TextBlob> TextBlobBuilder::build() {
   if (runCount == 0 || storageUsed == 0) {
     freeStorage();

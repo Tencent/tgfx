@@ -115,6 +115,14 @@ class TextBlobBuilder {
   void setBounds(const Rect& bounds);
 
   /**
+   * Trims the last run to the specified glyph count. This is useful when the actual number of
+   * glyphs is less than initially allocated. Must be called before build() and only affects the
+   * most recently allocated run.
+   * @param glyphCount The new glyph count for the last run.
+   */
+  void trimLastRun(size_t glyphCount);
+
+  /**
    * Builds and returns the TextBlob. After calling this method, the builder is reset and can be
    * reused to build another TextBlob.
    * @return The constructed TextBlob, or nullptr if no runs were added or all runs were empty.

@@ -73,4 +73,18 @@ void RunRecord::grow(uint32_t count) {
   }
 }
 
+void RunRecord::shrink(uint32_t newCount) {
+  auto scalars = ScalarsPerGlyph(positioning);
+  if (scalars == 0 || newCount >= glyphCount) {
+    glyphCount = newCount;
+    return;
+  }
+  float* oldPos = posBuffer();
+  glyphCount = newCount;
+  float* newPos = posBuffer();
+  if (newPos != oldPos) {
+    memmove(newPos, oldPos, newCount * scalars * sizeof(float));
+  }
+}
+
 }  // namespace tgfx
