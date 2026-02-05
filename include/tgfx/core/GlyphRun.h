@@ -84,9 +84,9 @@ struct GlyphRun {
 
   /**
    * The shared offset for all glyphs in this run.
-   * - Default positioning: (x, y) is the starting point, glyphs advance from there
-   * - Horizontal positioning: y is the baseline, x is ignored (positions contain x values)
-   * - Other modes: ignored (positions contain full coordinates)
+   * - Default positioning: (x, y) is the starting point, glyphs advance from there.
+   * - Horizontal positioning: y is the shared baseline, x is zero (each glyph's x is in positions).
+   * - Other modes: always zero, as positions already contain full coordinates.
    */
   Point offset = {};
 };
