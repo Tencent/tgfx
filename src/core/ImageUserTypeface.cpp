@@ -107,11 +107,11 @@ ImageUserTypeface::ImageUserTypeface(uint32_t builderID, const std::string& font
                                      const Rect& fontBounds, int unitsPerEm,
                                      const GlyphRecords& glyphRecords)
     : UserTypeface(builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm),
-      _glyphRecords(glyphRecords) {
+      glyphRecords(glyphRecords) {
 }
 
 size_t ImageUserTypeface::glyphsCount() const {
-  return _glyphRecords.size();
+  return glyphRecords.size();
 }
 
 bool ImageUserTypeface::hasColor() const {
@@ -128,10 +128,10 @@ std::shared_ptr<ScalerContext> ImageUserTypeface::onCreateScalerContext(float si
 
 std::shared_ptr<ImageTypefaceBuilder::ImageGlyphRecord> ImageUserTypeface::getGlyphRecord(
     GlyphID glyphID) const {
-  if (glyphID == 0 || static_cast<size_t>(glyphID) > _glyphRecords.size()) {
+  if (glyphID == 0 || static_cast<size_t>(glyphID) > glyphRecords.size()) {
     return nullptr;  // Invalid GlyphID
   }
-  return _glyphRecords[glyphID - 1];  // GlyphID starts from 1
+  return glyphRecords[glyphID - 1];  // GlyphID starts from 1
 }
 
 float ImageUserTypeface::getGlyphAdvance(GlyphID glyphID) const {

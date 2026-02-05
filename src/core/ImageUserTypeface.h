@@ -49,6 +49,6 @@ class ImageUserTypeface final : public UserTypeface {
                              const Rect& fontBounds, int unitsPerEm,
                              const GlyphRecords& glyphRecords);
 
-  GlyphRecords _glyphRecords = {};
+  GlyphRecords glyphRecords = {};
 };
 }  // namespace tgfx
