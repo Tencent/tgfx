@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 #include "tgfx/core/Font.h"
 #include "tgfx/core/GlyphRun.h"
 #include "tgfx/core/RSXform.h"
@@ -120,11 +121,11 @@ class TextBlob {
     }
 
    private:
-    Iterator(const RunRecord* record, size_t remaining) : current(record), remaining(remaining) {
-    }
+    Iterator(const RunRecord* record, size_t remaining);
 
     const RunRecord* current = nullptr;
     size_t remaining = 0;
+    mutable std::vector<float> positionBuffer = {};
     friend class TextBlob;
   };
 

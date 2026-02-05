@@ -41,7 +41,7 @@ void CustomTypefaceBuilder::setMetrics(const FontMetrics& metrics) {
 PathTypefaceBuilder::PathTypefaceBuilder(int unitsPerEm) : CustomTypefaceBuilder(unitsPerEm) {
 }
 
-GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
+GlyphID PathTypefaceBuilder::addGlyph(const Path& path, float advance) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
     // Reached the maximum number of glyphs. Return an invalid GlyphID
     return 0;
@@ -50,11 +50,11 @@ GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
   auto bounds = path.getBounds();
   fontBounds.join(bounds);
-  glyphRecords.emplace_back(PathProvider::Wrap(path));
+  glyphRecords.push_back({PathProvider::Wrap(path), advance});
   return glyphID;
 }
 
-GlyphID PathTypefaceBuilder::addGlyph(std::shared_ptr<PathProvider> provider) {
+GlyphID PathTypefaceBuilder::addGlyph(std::shared_ptr<PathProvider> provider, float advance) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
     // Reached the maximum number of glyphs. Return an invalid GlyphID
     return 0;
@@ -63,7 +63,7 @@ GlyphID PathTypefaceBuilder::addGlyph(std::shared_ptr<PathProvider> provider) {
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
   auto bounds = provider->getBounds();
   fontBounds.join(bounds);
-  glyphRecords.emplace_back(std::move(provider));
+  glyphRecords.push_back({std::move(provider), advance});
   return glyphID;
 }
 
@@ -78,7 +78,8 @@ std::shared_ptr<Typeface> PathTypefaceBuilder::detach() const {
 ImageTypefaceBuilder::ImageTypefaceBuilder(int unitsPerEm) : CustomTypefaceBuilder(unitsPerEm) {
 }
 
-GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset) {
+GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset,
+                                       float advance) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
     // Reached the maximum number of glyphs.Return an invalid GlyphID
     return 0;
@@ -87,7 +88,8 @@ GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const 
   auto bounds = Rect::MakeWH(image->width(), image->height());
   bounds.offset(offset);
   fontBounds.join(bounds);
-  glyphRecords.emplace_back(std::make_shared<GlyphRecord>(std::move(image), offset));
+  glyphRecords.push_back(std::make_shared<ImageGlyphRecord>(
+      ImageGlyphRecord{std::move(image), offset, advance}));
   return glyphID;
 }
 

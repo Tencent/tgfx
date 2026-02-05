@@ -22,6 +22,8 @@ namespace tgfx {
 
 unsigned ScalarsPerGlyph(GlyphPositioning positioning) {
   switch (positioning) {
+    case GlyphPositioning::Default:
+      return 0;
     case GlyphPositioning::Horizontal:
       return 1;
     case GlyphPositioning::Point:
@@ -36,6 +38,7 @@ unsigned ScalarsPerGlyph(GlyphPositioning positioning) {
 
 Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
   switch (run.positioning) {
+    case GlyphPositioning::Default:
     case GlyphPositioning::Horizontal:
       return Matrix::MakeTrans(run.positions[index], run.offsetY);
     case GlyphPositioning::Point: {
@@ -52,6 +55,18 @@ Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
     }
   }
   return {};
+}
+
+Point GetGlyphPosition(const GlyphRun& run, size_t index) {
+  switch (run.positioning) {
+    case GlyphPositioning::Default:
+    case GlyphPositioning::Horizontal:
+      return {run.positions[index], run.offsetY};
+    case GlyphPositioning::Point:
+      return reinterpret_cast<const Point*>(run.positions)[index];
+    default:
+      return {};
+  }
 }
 
 }  // namespace tgfx

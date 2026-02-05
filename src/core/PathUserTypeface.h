@@ -24,13 +24,12 @@
 namespace tgfx {
 class PathUserTypeface final : public UserTypeface {
  public:
-  using VectorProviderType = std::vector<std::shared_ptr<PathProvider>>;
+  using GlyphRecords = std::vector<PathTypefaceBuilder::PathGlyphRecord>;
 
   static std::shared_ptr<UserTypeface> Make(uint32_t builderID, const std::string& fontFamily,
                                             const std::string& fontStyle,
                                             const FontMetrics& fontMetrics, const Rect& fontBounds,
-                                            int unitsPerEm,
-                                            const VectorProviderType& glyphPathProviders);
+                                            int unitsPerEm, const GlyphRecords& glyphRecords);
   size_t glyphsCount() const override;
 
   bool hasColor() const override;
@@ -39,14 +38,16 @@ class PathUserTypeface final : public UserTypeface {
 
   std::shared_ptr<PathProvider> getPathProvider(GlyphID glyphID) const;
 
+  float getGlyphAdvance(GlyphID glyphID) const;
+
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
  private:
   explicit PathUserTypeface(uint32_t builderID, const std::string& fontFamily,
                             const std::string& fontStyle, const FontMetrics& fontMetrics,
                             const Rect& fontBounds, int unitsPerEm,
-                            const VectorProviderType& glyphPathProviders);
+                            const GlyphRecords& glyphRecords);
 
-  VectorProviderType glyphPathProviders = {};
+  GlyphRecords glyphRecords = {};
 };
 }  // namespace tgfx

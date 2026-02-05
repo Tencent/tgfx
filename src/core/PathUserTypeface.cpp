@@ -38,6 +38,10 @@ class PathUserScalerContext final : public UserScalerContext {
       : UserScalerContext(std::move(typeface), size), fauxBoldSize(size * FauxBoldScale(size)) {
   }
 
+  float getAdvance(GlyphID glyphID, bool) const override {
+    return pathTypeface()->getGlyphAdvance(glyphID) * textScale;
+  }
+
   Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override {
     auto pathProvider = pathTypeface()->getPathProvider(glyphID);
     if (pathProvider == nullptr) {
@@ -150,9 +154,9 @@ std::shared_ptr<UserTypeface> PathUserTypeface::Make(uint32_t builderID,
                                                      const std::string& fontStyle,
                                                      const FontMetrics& fontMetrics,
                                                      const Rect& fontBounds, int unitsPerEm,
-                                                     const VectorProviderType& glyphPathProviders) {
+                                                     const GlyphRecords& glyphRecords) {
   auto typeface = std::shared_ptr<PathUserTypeface>(new PathUserTypeface(
-      builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm, glyphPathProviders));
+      builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm, glyphRecords));
   typeface->weakThis = typeface;
   return typeface;
 }
@@ -160,13 +164,13 @@ std::shared_ptr<UserTypeface> PathUserTypeface::Make(uint32_t builderID,
 PathUserTypeface::PathUserTypeface(uint32_t builderID, const std::string& fontFamily,
                                    const std::string& fontStyle, const FontMetrics& fontMetrics,
                                    const Rect& fontBounds, int unitsPerEm,
-                                   const VectorProviderType& glyphPathProviders)
+                                   const GlyphRecords& glyphRecords)
     : UserTypeface(builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm),
-      glyphPathProviders(glyphPathProviders) {
+      glyphRecords(glyphRecords) {
 }
 
 size_t PathUserTypeface::glyphsCount() const {
-  return glyphPathProviders.size();
+  return glyphRecords.size();
 }
 
 bool PathUserTypeface::hasColor() const {
@@ -182,9 +186,16 @@ std::shared_ptr<ScalerContext> PathUserTypeface::onCreateScalerContext(float siz
 }
 
 std::shared_ptr<PathProvider> PathUserTypeface::getPathProvider(GlyphID glyphID) const {
-  if (glyphID == 0 || static_cast<size_t>(glyphID) > glyphPathProviders.size()) {
+  if (glyphID == 0 || static_cast<size_t>(glyphID) > glyphRecords.size()) {
     return nullptr;
   }
-  return glyphPathProviders[glyphID - 1];
+  return glyphRecords[glyphID - 1].pathProvider;
+}
+
+float PathUserTypeface::getGlyphAdvance(GlyphID glyphID) const {
+  if (glyphID == 0 || static_cast<size_t>(glyphID) > glyphRecords.size()) {
+    return 0.0f;
+  }
+  return glyphRecords[glyphID - 1].advance;
 }
 }  // namespace tgfx
