@@ -155,6 +155,7 @@ GlyphRun TextBlob::Iterator::operator*() const {
   run.positioning = current->positioning;
   run.positions = current->posBuffer();
   run.offsetY = current->y;
+  run.offsetX = current->x;
   return run;
 }
 

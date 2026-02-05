@@ -27,21 +27,26 @@ namespace tgfx {
  */
 enum class GlyphPositioning {
   /**
+   * Default positioning: no position data, glyphs are positioned by their advances.
+   * Position is computed as (x + accumulated_advances, y) where x and y come from offsetY storage.
+   */
+  Default = 0,
+  /**
    * Horizontal positioning: each glyph has an x position, sharing a common y from offsetY.
    */
-  Horizontal = 0,
+  Horizontal = 1,
   /**
    * Point positioning: each glyph has an independent (x, y) position.
    */
-  Point = 1,
+  Point = 2,
   /**
    * RSXform positioning: each glyph has rotation, scale, and translation (scos, ssin, tx, ty).
    */
-  RSXform = 2,
+  RSXform = 3,
   /**
    * Matrix positioning: each glyph has a full 2x3 affine matrix.
    */
-  Matrix = 3,
+  Matrix = 4,
 };
 
 /**
@@ -71,14 +76,23 @@ struct GlyphRun {
 
   /**
    * Pointer to the raw position data array. The number of floats per glyph depends on
-   * the positioning mode: Horizontal=1, Point=2, RSXform=4, Matrix=6.
+   * the positioning mode: Default=0, Horizontal=1, Point=2, RSXform=4, Matrix=6.
+   * For Default positioning, this pointer is not used.
    */
   const float* positions = nullptr;
 
   /**
-   * The shared y offset for Horizontal positioning mode. For other modes, this value is 0.
+   * For Default positioning: the shared (x, y) offset for all glyphs.
+   * For Horizontal positioning: the shared y offset for all glyphs (x stored in positions).
+   * For other modes, this value is 0.
    */
   float offsetY = 0;
+
+  /**
+   * For Default positioning: the shared x offset for all glyphs.
+   * Only used when positioning is Default.
+   */
+  float offsetX = 0;
 };
 
 }  // namespace tgfx

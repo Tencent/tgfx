@@ -45,6 +45,7 @@ class TextBlobBuilder {
 
     /**
      * Storage for position data. The number of floats to fill depends on the positioning mode:
+     * - Default: nullptr (no position data)
      * - Horizontal: glyphCount floats (one x per glyph)
      * - Point: glyphCount * 2 floats (x, y per glyph)
      * - RSXform: glyphCount * 4 floats (scos, ssin, tx, ty per glyph)
@@ -59,6 +60,17 @@ class TextBlobBuilder {
 
   TextBlobBuilder(const TextBlobBuilder&) = delete;
   TextBlobBuilder& operator=(const TextBlobBuilder&) = delete;
+
+  /**
+   * Allocates a run with default positioning. Glyphs are positioned based on their default
+   * advances starting from the specified (x, y) position.
+   * @param font The font for this run.
+   * @param glyphCount Number of glyphs in this run.
+   * @param x The x position for the first glyph.
+   * @param y The y position for all glyphs.
+   * @return RunBuffer with pointer to glyph storage (positions is nullptr).
+   */
+  const RunBuffer& allocRun(const Font& font, size_t glyphCount, float x, float y);
 
   /**
    * Allocates a run with horizontal positioning. Each glyph has an x position, and all glyphs
@@ -110,10 +122,10 @@ class TextBlobBuilder {
   std::shared_ptr<TextBlob> build();
 
  private:
-  const RunBuffer& allocRun(const Font& font, size_t glyphCount, GlyphPositioning positioning,
-                            float y);
+  const RunBuffer& allocRunInternal(const Font& font, size_t glyphCount,
+                                    GlyphPositioning positioning, float x, float y);
   void reserve(size_t size);
-  bool tryMerge(const Font& font, GlyphPositioning positioning, size_t count, float y);
+  bool tryMerge(const Font& font, GlyphPositioning positioning, size_t count, float x, float y);
   void reset();
   void freeStorage();
   RunRecord* lastRun();

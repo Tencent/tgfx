@@ -28,6 +28,10 @@ class ImageUserScalerContext final : public UserScalerContext {
       : UserScalerContext(std::move(typeface), size) {
   }
 
+  float getAdvance(GlyphID glyphID, bool) const override {
+    return imageTypeface()->getGlyphAdvance(glyphID) * textScale;
+  }
+
   Rect getBounds(GlyphID glyphID, bool, bool fauxItalic) const override {
     auto record = imageTypeface()->getGlyphRecord(glyphID);
     if (record == nullptr || record->image == nullptr) {
@@ -128,5 +132,13 @@ std::shared_ptr<ImageTypefaceBuilder::GlyphRecord> ImageUserTypeface::getGlyphRe
     return nullptr;  // Invalid GlyphID
   }
   return glyphRecords[glyphID - 1];  // GlyphID starts from 1
+}
+
+float ImageUserTypeface::getGlyphAdvance(GlyphID glyphID) const {
+  auto record = getGlyphRecord(glyphID);
+  if (record == nullptr) {
+    return 0.0f;
+  }
+  return record->advance;
 }
 }  // namespace tgfx

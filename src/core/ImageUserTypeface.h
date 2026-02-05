@@ -39,6 +39,8 @@ class ImageUserTypeface final : public UserTypeface {
 
   std::shared_ptr<ImageTypefaceBuilder::GlyphRecord> getGlyphRecord(GlyphID glyphID) const;
 
+  float getGlyphAdvance(GlyphID glyphID) const;
+
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
  private:
