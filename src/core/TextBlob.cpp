@@ -39,6 +39,7 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font
 
   // First pass: collect glyphs and detect empty glyphs
   std::vector<GlyphID> glyphs;
+  glyphs.reserve(text.size());  // Reserve upper bound (ASCII case)
   bool hasEmptyGlyph = false;
   const char* ptr = textStart;
   while (ptr < textStop) {
