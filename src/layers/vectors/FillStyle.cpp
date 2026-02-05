@@ -72,11 +72,11 @@ class FillPainter : public Painter {
   void drawGlyphRun(LayerRecorder* recorder, const Matrix& geometryMatrix,
                     const StyledGlyphRun& run) {
     float blendFactor = run.style.fillColor.alpha;
-
+    recorder->setMatrix(geometryMatrix);
     if (blendFactor < 1.0f) {
       LayerPaint paint(shader, alpha * run.style.alpha, blendMode);
       paint.placement = placement;
-      recorder->addTextBlob(run.textBlob, paint, geometryMatrix);
+      recorder->addTextBlob(run.textBlob, paint);
     }
 
     if (blendFactor > 0.0f) {
@@ -85,8 +85,9 @@ class FillPainter : public Painter {
       auto colorShader = Shader::MakeColorShader(overlayColor);
       LayerPaint paint(colorShader, alpha * run.style.alpha, BlendMode::SrcOver);
       paint.placement = placement;
-      recorder->addTextBlob(run.textBlob, paint, geometryMatrix);
+      recorder->addTextBlob(run.textBlob, paint);
     }
+    recorder->resetMatrix();
   }
 };
 

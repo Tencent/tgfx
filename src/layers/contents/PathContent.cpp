@@ -22,11 +22,7 @@
 namespace tgfx {
 
 PathContent::PathContent(Path path, const LayerPaint& paint)
-    : GeometryContent(paint), path(std::move(path)) {
-}
-
-Rect PathContent::onGetBounds() const {
-  return path.getBounds();
+    : DrawContent(paint), path(std::move(path)) {
 }
 
 Rect PathContent::getBounds() const {
@@ -36,14 +32,6 @@ Rect PathContent::getBounds() const {
     ApplyStrokeToBounds(*stroke, &bounds, Matrix::I(), true);
   }
   return bounds;
-}
-
-Path PathContent::getFilledPath() const {
-  Path result = path;
-  if (stroke) {
-    stroke->applyToPath(&result);
-  }
-  return result;
 }
 
 Rect PathContent::getTightBounds(const Matrix& matrix) const {
@@ -59,12 +47,24 @@ bool PathContent::hitTestPoint(float localX, float localY) const {
   return getFilledPath().contains(localX, localY);
 }
 
+Rect PathContent::onGetBounds() const {
+  return path.getBounds();
+}
+
 void PathContent::onDraw(Canvas* canvas, const Paint& paint) const {
   canvas->drawPath(path, paint);
 }
 
 bool PathContent::onHasSameGeometry(const GeometryContent* other) const {
   return path == static_cast<const PathContent*>(other)->path;
+}
+
+Path PathContent::getFilledPath() const {
+  Path result = path;
+  if (stroke) {
+    stroke->applyToPath(&result);
+  }
+  return result;
 }
 
 }  // namespace tgfx

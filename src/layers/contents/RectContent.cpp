@@ -17,16 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectContent.h"
-#include "core/utils/StrokeUtils.h"
 
 namespace tgfx {
 
 RectContent::RectContent(const Rect& rect, const LayerPaint& paint)
-    : GeometryContent(paint), rect(rect) {
-}
-
-Rect RectContent::onGetBounds() const {
-  return rect;
+    : DrawContent(paint), rect(rect) {
 }
 
 Rect RectContent::getTightBounds(const Matrix& matrix) const {
@@ -48,13 +43,8 @@ bool RectContent::hitTestPoint(float localX, float localY) const {
   return rect.contains(localX, localY);
 }
 
-Path RectContent::getFilledPath() const {
-  Path path = {};
-  path.addRect(rect);
-  if (stroke) {
-    stroke->applyToPath(&path);
-  }
-  return path;
+Rect RectContent::onGetBounds() const {
+  return rect;
 }
 
 void RectContent::onDraw(Canvas* canvas, const Paint& paint) const {
@@ -63,6 +53,15 @@ void RectContent::onDraw(Canvas* canvas, const Paint& paint) const {
 
 bool RectContent::onHasSameGeometry(const GeometryContent* other) const {
   return rect == static_cast<const RectContent*>(other)->rect;
+}
+
+Path RectContent::getFilledPath() const {
+  Path path = {};
+  path.addRect(rect);
+  if (stroke) {
+    stroke->applyToPath(&path);
+  }
+  return path;
 }
 
 }  // namespace tgfx
