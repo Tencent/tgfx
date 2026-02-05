@@ -41,7 +41,7 @@ void CustomTypefaceBuilder::setMetrics(const FontMetrics& metrics) {
 PathTypefaceBuilder::PathTypefaceBuilder(int unitsPerEm) : CustomTypefaceBuilder(unitsPerEm) {
 }
 
-GlyphID PathTypefaceBuilder::addGlyph(float advance, const Path& path) {
+GlyphID PathTypefaceBuilder::addGlyph(const Path& path, float advance) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
     // Reached the maximum number of glyphs. Return an invalid GlyphID
     return 0;
@@ -54,7 +54,7 @@ GlyphID PathTypefaceBuilder::addGlyph(float advance, const Path& path) {
   return glyphID;
 }
 
-GlyphID PathTypefaceBuilder::addGlyph(float advance, std::shared_ptr<PathProvider> provider) {
+GlyphID PathTypefaceBuilder::addGlyph(std::shared_ptr<PathProvider> provider, float advance) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
     // Reached the maximum number of glyphs. Return an invalid GlyphID
     return 0;
@@ -78,8 +78,8 @@ std::shared_ptr<Typeface> PathTypefaceBuilder::detach() const {
 ImageTypefaceBuilder::ImageTypefaceBuilder(int unitsPerEm) : CustomTypefaceBuilder(unitsPerEm) {
 }
 
-GlyphID ImageTypefaceBuilder::addGlyph(float advance, std::shared_ptr<ImageCodec> image,
-                                       const Point& offset) {
+GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset,
+                                       float advance) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
     // Reached the maximum number of glyphs.Return an invalid GlyphID
     return 0;
