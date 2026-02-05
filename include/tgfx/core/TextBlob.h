@@ -106,11 +106,10 @@ class TextBlob {
    */
   bool hitTestPoint(float localX, float localY, const Stroke* stroke = nullptr) const;
 
-  /**
-   * Iterator for traversing glyph runs within a TextBlob.
-   */
   class Iterator {
    public:
+    ~Iterator();
+
     GlyphRun operator*() const;
 
     Iterator& operator++();
@@ -120,24 +119,19 @@ class TextBlob {
     }
 
    private:
-    Iterator(const RunRecord* record, size_t remaining) : current(record), remaining(remaining) {
-    }
+    Iterator(const RunRecord* record, size_t remaining, float* positions);
 
     const RunRecord* current = nullptr;
     size_t remaining = 0;
+    float* expandedPositions = nullptr;
+    float* currentPositions = nullptr;
     friend class TextBlob;
   };
 
-  /**
-   * Returns an iterator to the first glyph run.
-   */
   Iterator begin() const;
 
-  /**
-   * Returns an iterator past the last glyph run.
-   */
   Iterator end() const {
-    return Iterator(nullptr, 0);
+    return Iterator(nullptr, 0, nullptr);
   }
 
  private:

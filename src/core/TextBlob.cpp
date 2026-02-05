@@ -37,9 +37,10 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font
   const char* textStart = text.data();
   const char* textStop = textStart + text.size();
 
-  // First pass: collect glyphs and detect empty glyphs
   std::vector<GlyphID> glyphs;
-  glyphs.reserve(text.size());  // Reserve upper bound (ASCII case)
+  std::vector<float> advances;
+  glyphs.reserve(text.size());
+  advances.reserve(text.size());
   bool hasEmptyGlyph = false;
   const char* ptr = textStart;
   while (ptr < textStop) {
@@ -47,8 +48,10 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font
     auto glyphID = font.getGlyphID(unichar);
     if (glyphID > 0) {
       glyphs.push_back(glyphID);
+      advances.push_back(font.getAdvance(glyphID));
     } else {
       hasEmptyGlyph = true;
+      advances.push_back(font.getSize() / 2.0f);
     }
   }
   if (glyphs.empty()) {
@@ -57,26 +60,23 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font
 
   TextBlobBuilder builder;
   if (hasEmptyGlyph) {
-    // Has empty glyphs, use Horizontal positioning for precise spacing control
     const auto& buffer = builder.allocRunPosH(font, glyphs.size(), 0.0f);
     memcpy(buffer.glyphs, glyphs.data(), glyphs.size() * sizeof(GlyphID));
-    auto emptyAdvance = font.getSize() / 2.0f;
     float xOffset = 0;
-    size_t index = 0;
+    size_t glyphIndex = 0;
+    size_t advanceIndex = 0;
     ptr = textStart;
     while (ptr < textStop) {
       auto unichar = UTF::NextUTF8(&ptr, textStop);
       auto glyphID = font.getGlyphID(unichar);
       if (glyphID > 0) {
-        buffer.positions[index] = xOffset;
-        xOffset += font.getAdvance(glyphID);
-        index++;
-      } else {
-        xOffset += emptyAdvance;
+        buffer.positions[glyphIndex] = xOffset;
+        glyphIndex++;
       }
+      xOffset += advances[advanceIndex];
+      advanceIndex++;
     }
   } else {
-    // No empty glyphs, use Default positioning to save storage
     const auto& buffer = builder.allocRun(font, glyphs.size(), 0.0f, 0.0f);
     memcpy(buffer.glyphs, glyphs.data(), glyphs.size() * sizeof(GlyphID));
   }
@@ -129,7 +129,6 @@ TextBlob::TextBlob(size_t runCount, const Rect& bounds)
 
 TextBlob::~TextBlob() {
   AtomicCacheReset(bounds);
-  // Explicitly destruct RunRecords since they contain Font objects
   const RunRecord* run = firstRun();
   for (size_t i = 0; i < runCount; i++) {
     const RunRecord* nextRun = run->next();
@@ -150,8 +149,6 @@ const RunRecord* TextBlob::firstRun() const {
   if (runCount == 0) {
     return nullptr;
   }
-  // Run data immediately follows the TextBlob object, aligned for RunRecord.
-  // This matches AlignedBlobHeaderSize() in TextBlobBuilder.
   size_t headerSize = sizeof(TextBlob);
   size_t alignment = alignof(RunRecord);
   size_t alignedOffset = (headerSize + alignment - 1) & ~(alignment - 1);
@@ -159,7 +156,46 @@ const RunRecord* TextBlob::firstRun() const {
 }
 
 TextBlob::Iterator TextBlob::begin() const {
-  return Iterator(firstRun(), runCount);
+  size_t totalDefaultGlyphs = 0;
+  const RunRecord* run = firstRun();
+  for (size_t i = 0; i < runCount; i++) {
+    if (run->positioning == GlyphPositioning::Default) {
+      totalDefaultGlyphs += run->glyphCount;
+    }
+    run = run->next();
+  }
+
+  float* positions = nullptr;
+  if (totalDefaultGlyphs > 0) {
+    positions = new float[totalDefaultGlyphs * 2];
+    float* cursor = positions;
+    run = firstRun();
+    for (size_t i = 0; i < runCount; i++) {
+      if (run->positioning == GlyphPositioning::Default) {
+        const auto& font = run->font;
+        const GlyphID* glyphs = run->glyphBuffer();
+        float x = run->offset.x;
+        float y = run->offset.y;
+        for (uint32_t j = 0; j < run->glyphCount; j++) {
+          cursor[j * 2] = x;
+          cursor[j * 2 + 1] = y;
+          x += font.getAdvance(glyphs[j]);
+        }
+        cursor += run->glyphCount * 2;
+      }
+      run = run->next();
+    }
+  }
+
+  return Iterator(firstRun(), runCount, positions);
+}
+
+TextBlob::Iterator::Iterator(const RunRecord* record, size_t remaining, float* positions)
+    : current(record), remaining(remaining), expandedPositions(positions), currentPositions(positions) {
+}
+
+TextBlob::Iterator::~Iterator() {
+  delete[] expandedPositions;
 }
 
 GlyphRun TextBlob::Iterator::operator*() const {
@@ -167,13 +203,22 @@ GlyphRun TextBlob::Iterator::operator*() const {
   run.font = current->font;
   run.glyphCount = current->glyphCount;
   run.glyphs = current->glyphBuffer();
-  run.positioning = current->positioning;
-  run.positions = current->posBuffer();
-  run.offset = current->offset;
+  if (current->positioning == GlyphPositioning::Default) {
+    run.positioning = GlyphPositioning::Point;
+    run.positions = currentPositions;
+    run.offset = Point::Zero();
+  } else {
+    run.positioning = current->positioning;
+    run.positions = current->posBuffer();
+    run.offset = current->offset;
+  }
   return run;
 }
 
 TextBlob::Iterator& TextBlob::Iterator::operator++() {
+  if (current->positioning == GlyphPositioning::Default) {
+    currentPositions += current->glyphCount * 2;
+  }
   current = current->next();
   --remaining;
   return *this;
@@ -253,7 +298,6 @@ Rect TextBlob::getTightBounds(const Matrix* matrix) const {
       auto glyphBounds = font.getBounds(run.glyphs[i]);
       auto glyphMatrix = GetGlyphMatrix(run, i);
       if (hasScale) {
-        // Pre-scale to counteract the enlarged glyphBounds from the scaled font.
         glyphMatrix.preScale(inverseScale, inverseScale);
       }
       glyphBounds = glyphMatrix.mapRect(glyphBounds);
