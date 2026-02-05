@@ -112,7 +112,7 @@ class TextBlob {
    */
   class Iterator {
    public:
-    GlyphRun operator*();
+    GlyphRun operator*() const;
 
     Iterator& operator++();
 
@@ -125,7 +125,7 @@ class TextBlob {
 
     const RunRecord* current = nullptr;
     size_t remaining = 0;
-    std::vector<float> positionBuffer = {};
+    mutable std::vector<float> positionBuffer = {};
     friend class TextBlob;
   };
 

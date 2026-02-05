@@ -166,7 +166,7 @@ TextBlob::Iterator::Iterator(const RunRecord* record, size_t remaining)
     : current(record), remaining(remaining) {
 }
 
-GlyphRun TextBlob::Iterator::operator*() {
+GlyphRun TextBlob::Iterator::operator*() const {
   GlyphRun run;
   run.font = current->font;
   run.glyphCount = current->glyphCount;
