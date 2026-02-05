@@ -187,30 +187,6 @@ void TextBlobBuilder::setBounds(const Rect& bounds) {
   }
 }
 
-void TextBlobBuilder::trimLastRun(size_t glyphCount) {
-  if (runCount == 0) {
-    return;
-  }
-  auto* run = lastRun();
-  if (glyphCount >= run->glyphCount) {
-    return;
-  }
-  size_t oldSize = run->storageSize();
-  auto scalars = ScalarsPerGlyph(run->positioning);
-  if (scalars > 0) {
-    float* oldPos = run->posBuffer();
-    run->glyphCount = static_cast<uint32_t>(glyphCount);
-    float* newPos = run->posBuffer();
-    if (newPos != oldPos) {
-      memmove(newPos, oldPos, glyphCount * scalars * sizeof(float));
-    }
-  } else {
-    run->glyphCount = static_cast<uint32_t>(glyphCount);
-  }
-  size_t newSize = run->storageSize();
-  storageUsed -= (oldSize - newSize);
-}
-
 std::shared_ptr<TextBlob> TextBlobBuilder::build() {
   if (runCount == 0 || storageUsed == 0) {
     freeStorage();
