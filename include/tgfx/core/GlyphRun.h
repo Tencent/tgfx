@@ -76,8 +76,9 @@ struct GlyphRun {
   GlyphPositioning positioning = GlyphPositioning::Point;
 
   /**
-   * Pointer to the raw position data array. The number of floats per glyph depends on
-   * the positioning mode: Horizontal=1, Point=2, RSXform=4, Matrix=6.
+   * Pointer to the raw position data array. The number of floats per glyph depends on the
+   * positioning mode: Default=1, Horizontal=1, Point=2, RSXform=4, Matrix=6. Note that Default
+   * positioning is automatically expanded to Horizontal when iterating a TextBlob.
    */
   const float* positions = nullptr;
 
