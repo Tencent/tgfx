@@ -30,8 +30,7 @@ struct RunRecord {
   Font font;
   GlyphPositioning positioning = GlyphPositioning::Point;
   uint32_t glyphCount = 0;
-  float y = 0.0f;  // For Default and Horizontal: shared y offset
-  float x = 0.0f;  // For Default: shared x offset
+  Point offset = {};  // For Default: (x, y) starting point; For Horizontal: y is baseline
   uint8_t flags = 0;
 
   static constexpr uint8_t LAST_FLAG = 0x01;

@@ -36,33 +36,57 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font
   }
   const char* textStart = text.data();
   const char* textStop = textStart + text.size();
+  
+  // First pass: count valid glyphs and detect empty glyphs
   size_t glyphCount = 0;
+  bool hasEmptyGlyph = false;
   const char* ptr = textStart;
   while (ptr < textStop) {
     auto unichar = UTF::NextUTF8(&ptr, textStop);
-    if (font.getGlyphID(unichar) > 0) {
+    auto glyphID = font.getGlyphID(unichar);
+    if (glyphID > 0) {
       glyphCount++;
+    } else {
+      hasEmptyGlyph = true;
     }
   }
   if (glyphCount == 0) {
     return nullptr;
   }
+  
   TextBlobBuilder builder;
-  const auto& buffer = builder.allocRunPosH(font, glyphCount, 0.0f);
   auto emptyAdvance = font.getSize() / 2.0f;
-  float xOffset = 0;
-  size_t index = 0;
-  ptr = textStart;
-  while (ptr < textStop) {
-    auto unichar = UTF::NextUTF8(&ptr, textStop);
-    auto glyphID = font.getGlyphID(unichar);
-    if (glyphID > 0) {
-      buffer.glyphs[index] = glyphID;
-      buffer.positions[index] = xOffset;
-      xOffset += font.getAdvance(glyphID);
-      index++;
-    } else {
-      xOffset += emptyAdvance;
+  
+  if (hasEmptyGlyph) {
+    // Has empty glyphs, use Horizontal positioning for precise spacing control
+    const auto& buffer = builder.allocRunPosH(font, glyphCount, 0.0f);
+    float xOffset = 0;
+    size_t index = 0;
+    ptr = textStart;
+    while (ptr < textStop) {
+      auto unichar = UTF::NextUTF8(&ptr, textStop);
+      auto glyphID = font.getGlyphID(unichar);
+      if (glyphID > 0) {
+        buffer.glyphs[index] = glyphID;
+        buffer.positions[index] = xOffset;
+        xOffset += font.getAdvance(glyphID);
+        index++;
+      } else {
+        xOffset += emptyAdvance;
+      }
+    }
+  } else {
+    // No empty glyphs, use Default positioning to save storage
+    const auto& buffer = builder.allocRun(font, glyphCount, 0.0f, 0.0f);
+    size_t index = 0;
+    ptr = textStart;
+    while (ptr < textStop) {
+      auto unichar = UTF::NextUTF8(&ptr, textStop);
+      auto glyphID = font.getGlyphID(unichar);
+      if (glyphID > 0) {
+        buffer.glyphs[index] = glyphID;
+        index++;
+      }
     }
   }
   return builder.build();
@@ -154,8 +178,7 @@ GlyphRun TextBlob::Iterator::operator*() const {
   run.glyphs = current->glyphBuffer();
   run.positioning = current->positioning;
   run.positions = current->posBuffer();
-  run.offsetY = current->y;
-  run.offsetX = current->x;
+  run.offset = current->offset;
   return run;
 }
 

@@ -122,12 +122,12 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
  private:
   friend class PathUserTypeface;
 
-  struct GlyphRecord {
+  struct PathGlyphRecord {
     std::shared_ptr<PathProvider> pathProvider = nullptr;
     float advance = 0.0f;
   };
 
-  std::vector<GlyphRecord> glyphRecords = {};
+  std::vector<PathGlyphRecord> glyphRecords = {};
 };
 
 /**
@@ -163,15 +163,15 @@ class ImageTypefaceBuilder : public CustomTypefaceBuilder {
  private:
   friend class ImageUserTypeface;
 
-  struct GlyphRecord {
+  struct ImageGlyphRecord {
     std::shared_ptr<ImageCodec> image = nullptr;
     Point offset = {};
     float advance = 0.0f;
-    GlyphRecord(float advance, std::shared_ptr<ImageCodec> image, const Point& offset)
+    ImageGlyphRecord(float advance, std::shared_ptr<ImageCodec> image, const Point& offset)
         : image(std::move(image)), offset(offset), advance(advance) {
     }
   };
 
-  std::vector<std::shared_ptr<GlyphRecord>> glyphRecords = {};
+  std::vector<std::shared_ptr<ImageGlyphRecord>> glyphRecords = {};
 };
 }  // namespace tgfx

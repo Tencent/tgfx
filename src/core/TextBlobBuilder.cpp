@@ -102,7 +102,7 @@ bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning positioning, s
     return false;
   }
   if (positioning == GlyphPositioning::Horizontal) {
-    if (run->y != y) {
+    if (run->offset.y != y) {
       return false;
     }
   }
@@ -142,7 +142,7 @@ const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRunInternal(const Font& 
   reserve(runSize);
   lastRunOffset = storageUsed;
   auto* run = new (storage + storageUsed)
-      RunRecord{font, positioning, static_cast<uint32_t>(glyphCount), y, x};
+      RunRecord{font, positioning, static_cast<uint32_t>(glyphCount), Point::Make(x, y)};
   storageUsed += runSize;
   runCount++;
   currentBuffer.glyphs = run->glyphBuffer();
