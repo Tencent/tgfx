@@ -163,24 +163,22 @@ TextBlob::Iterator::Iterator(const RunRecord* record, size_t remaining)
     : current(record), remaining(remaining) {
 }
 
-GlyphRun TextBlob::Iterator::operator*() const {
+GlyphRun TextBlob::Iterator::operator*() {
   GlyphRun run;
   run.font = current->font;
   run.glyphCount = current->glyphCount;
   run.glyphs = current->glyphBuffer();
   if (current->positioning == GlyphPositioning::Default) {
-    run.expandedPositions.resize(current->glyphCount * 2);
+    positionBuffer.resize(current->glyphCount);
     const GlyphID* glyphs = current->glyphBuffer();
     float x = current->offset.x;
-    float y = current->offset.y;
     for (uint32_t i = 0; i < current->glyphCount; i++) {
-      run.expandedPositions[i * 2] = x;
-      run.expandedPositions[i * 2 + 1] = y;
+      positionBuffer[i] = x;
       x += current->font.getAdvance(glyphs[i]);
     }
-    run.positioning = GlyphPositioning::Point;
-    run.positions = run.expandedPositions.data();
-    run.offset = Point::Zero();
+    run.positioning = GlyphPositioning::Horizontal;
+    run.positions = positionBuffer.data();
+    run.offset = Point{0, current->offset.y};
   } else {
     run.positioning = current->positioning;
     run.positions = current->posBuffer();

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <vector>
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Point.h"
 
@@ -72,29 +71,23 @@ struct GlyphRun {
   const GlyphID* glyphs = nullptr;
 
   /**
-   * The positioning mode for this run.
+   * The positioning mode for this run. When iterating a TextBlob, Default positioning is
+   * automatically expanded to Horizontal, with position data stored in the iterator.
    */
   GlyphPositioning positioning = GlyphPositioning::Point;
 
   /**
    * Pointer to the raw position data array. The number of floats per glyph depends on
-   * the positioning mode: Default=0, Horizontal=1, Point=2, RSXform=4, Matrix=6.
-   * For Default positioning, this pointer is not used.
+   * the positioning mode: Horizontal=1, Point=2, RSXform=4, Matrix=6.
    */
   const float* positions = nullptr;
 
   /**
    * The shared offset for all glyphs in this run.
-   * - Default positioning: (x, y) is the starting point, glyphs advance from there.
    * - Horizontal positioning: y is the shared baseline, x is zero (each glyph's x is in positions).
    * - Other modes: always zero, as positions already contain full coordinates.
    */
   Point offset = {};
-
-  /**
-   * Storage for expanded position data when converting from Default positioning.
-   */
-  std::vector<float> expandedPositions = {};
 };
 
 }  // namespace tgfx

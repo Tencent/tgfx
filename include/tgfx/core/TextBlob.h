@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 #include "tgfx/core/Font.h"
 #include "tgfx/core/GlyphRun.h"
 #include "tgfx/core/RSXform.h"
@@ -106,9 +107,12 @@ class TextBlob {
    */
   bool hitTestPoint(float localX, float localY, const Stroke* stroke = nullptr) const;
 
+  /**
+   * Iterator for traversing glyph runs within a TextBlob.
+   */
   class Iterator {
    public:
-    GlyphRun operator*() const;
+    GlyphRun operator*();
 
     Iterator& operator++();
 
@@ -121,11 +125,18 @@ class TextBlob {
 
     const RunRecord* current = nullptr;
     size_t remaining = 0;
+    std::vector<float> positionBuffer = {};
     friend class TextBlob;
   };
 
+  /**
+   * Returns an iterator to the first glyph run.
+   */
   Iterator begin() const;
 
+  /**
+   * Returns an iterator past the last glyph run.
+   */
   Iterator end() const {
     return Iterator(nullptr, 0);
   }
