@@ -24,6 +24,10 @@
 
 namespace tgfx {
 
+std::shared_ptr<Repeater> Repeater::Make() {
+  return std::shared_ptr<Repeater>(new Repeater());
+}
+
 void Repeater::setCopies(float value) {
   if (_copies == value) {
     return;

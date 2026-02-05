@@ -43,7 +43,10 @@ enum class TrimPathType {
  */
 class TrimPath : public VectorElement {
  public:
-  TrimPath() = default;
+  /**
+   * Creates a new TrimPath instance.
+   */
+  static std::shared_ptr<TrimPath> Make();
 
   /**
    * Returns the start of the trim range (0.0 to 1.0).
@@ -100,6 +103,9 @@ class TrimPath : public VectorElement {
   }
 
   void apply(VectorContext* context) override;
+
+ protected:
+  TrimPath() = default;
 
  private:
   float _start = 0.0f;

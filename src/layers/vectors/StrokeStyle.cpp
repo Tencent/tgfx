@@ -259,6 +259,10 @@ class StrokePainter : public Painter {
   }
 };
 
+std::shared_ptr<StrokeStyle> StrokeStyle::Make() {
+  return std::shared_ptr<StrokeStyle>(new StrokeStyle());
+}
+
 void StrokeStyle::setColorSource(std::shared_ptr<ColorSource> value) {
   if (_colorSource == value) {
     return;

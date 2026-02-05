@@ -42,6 +42,10 @@ static void ApplySkew(Matrix* matrix, float skew, float skewAxis) {
   matrix->postConcat(temp);
 }
 
+std::shared_ptr<VectorGroup> VectorGroup::Make() {
+  return std::shared_ptr<VectorGroup>(new VectorGroup());
+}
+
 void VectorGroup::setElements(std::vector<std::shared_ptr<VectorElement>> value) {
   for (const auto& owner : owners) {
     for (const auto& element : _elements) {

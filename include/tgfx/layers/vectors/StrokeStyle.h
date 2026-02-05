@@ -34,7 +34,10 @@ namespace tgfx {
  */
 class StrokeStyle : public VectorElement {
  public:
-  StrokeStyle() = default;
+  /**
+   * Creates a new StrokeStyle instance.
+   */
+  static std::shared_ptr<StrokeStyle> Make();
 
   /**
    * Returns the color source used for the stroke.
@@ -181,6 +184,9 @@ class StrokeStyle : public VectorElement {
   void detachFromLayer(Layer* layer) override;
 
   void apply(VectorContext* context) override;
+
+ protected:
+  StrokeStyle() = default;
 
  private:
   std::shared_ptr<ColorSource> _colorSource = nullptr;

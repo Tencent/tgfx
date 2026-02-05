@@ -30,7 +30,10 @@ namespace tgfx {
  */
 class Rectangle : public VectorElement {
  public:
-  Rectangle() = default;
+  /**
+   * Creates a new Rectangle instance.
+   */
+  static std::shared_ptr<Rectangle> Make();
 
   /**
    * Returns the center point of the rectangle.
@@ -86,6 +89,9 @@ class Rectangle : public VectorElement {
   }
 
   void apply(VectorContext* context) override;
+
+ protected:
+  Rectangle() = default;
 
  private:
   Point _center = Point::Zero();

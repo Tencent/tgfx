@@ -43,7 +43,10 @@ enum class RepeaterOrder {
  */
 class Repeater : public VectorElement {
  public:
-  Repeater() = default;
+  /**
+   * Creates a new Repeater instance.
+   */
+  static std::shared_ptr<Repeater> Make();
 
   /**
    * Returns the number of copies to create.
@@ -159,6 +162,9 @@ class Repeater : public VectorElement {
   }
 
   void apply(VectorContext* context) override;
+
+ protected:
+  Repeater() = default;
 
  private:
   Matrix getMatrix(float progress) const;

@@ -44,7 +44,10 @@ enum class FillRule {
  */
 class FillStyle : public VectorElement {
  public:
-  FillStyle() = default;
+  /**
+   * Creates a new FillStyle instance.
+   */
+  static std::shared_ptr<FillStyle> Make();
 
   /**
    * Returns the color source used for the fill.
@@ -118,6 +121,9 @@ class FillStyle : public VectorElement {
   void detachFromLayer(Layer* layer) override;
 
   void apply(VectorContext* context) override;
+
+ protected:
+  FillStyle() = default;
 
  private:
   std::shared_ptr<ColorSource> _colorSource = nullptr;

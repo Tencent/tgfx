@@ -59,6 +59,10 @@ static Color BlendColor(const Color& base, const Color& overlay, float factor) {
                (base.blue * baseWeight + overlay.blue * blendFactor) / newAlpha, newAlpha};
 }
 
+std::shared_ptr<TextModifier> TextModifier::Make() {
+  return std::shared_ptr<TextModifier>(new TextModifier());
+}
+
 void TextModifier::setSelectors(std::vector<std::shared_ptr<TextSelector>> value) {
   for (const auto& owner : owners) {
     for (const auto& selector : _selectors) {
@@ -198,9 +202,9 @@ void TextModifier::apply(VectorContext* context) {
       // Calculate the default anchor point: half of advance width
       float defaultAnchorX = glyph.font.getAdvance(glyph.glyphID) * 0.5f;
 
-      // Total anchor point = default anchor + user-specified anchor offset (scaled by factor)
-      float totalAnchorX = defaultAnchorX + _anchorPoint.x * factor;
-      float totalAnchorY = _anchorPoint.y * factor;
+      // Total anchor point = default anchor + glyph anchor + user-specified anchor offset (scaled by factor)
+      float totalAnchorX = defaultAnchorX + glyph.anchor.x + _anchorPoint.x * factor;
+      float totalAnchorY = glyph.anchor.y + _anchorPoint.y * factor;
 
       // Apply transform: anchor -> scale -> skew -> rotation -> anchor restore -> position
       Matrix transform = Matrix::I();

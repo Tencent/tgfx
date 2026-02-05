@@ -25,6 +25,10 @@
 
 namespace tgfx {
 
+std::shared_ptr<TextPath> TextPath::Make() {
+  return std::shared_ptr<TextPath>(new TextPath());
+}
+
 void TextPath::setPath(Path value) {
   if (_path == value) {
     return;
@@ -169,7 +173,7 @@ void TextPath::apply(VectorContext* context) {
     for (auto& glyph : geometry->glyphs) {
       auto advance = glyph.font.getAdvance(glyph.glyphID);
       auto halfAdvance = advance * 0.5f;
-      auto centerPosition = currentPosition + halfAdvance;
+      auto centerPosition = currentPosition + halfAdvance + glyph.anchor.x;
 
       if (_reversed) {
         centerPosition = pathLength - centerPosition;
@@ -196,7 +200,7 @@ void TextPath::apply(VectorContext* context) {
       }
       curveMatrix.postTranslate(position.x, position.y);
 
-      glyph.matrix.setTranslate(-halfAdvance, 0.0f);
+      glyph.matrix.setTranslate(-halfAdvance - glyph.anchor.x, -glyph.anchor.y);
       glyph.matrix.postConcat(curveMatrix);
       glyph.matrix.postConcat(invertedMatrix);
 

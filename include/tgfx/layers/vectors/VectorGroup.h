@@ -32,7 +32,10 @@ namespace tgfx {
  */
 class VectorGroup : public VectorElement {
  public:
-  VectorGroup() = default;
+  /**
+   * Creates a new VectorGroup instance.
+   */
+  static std::shared_ptr<VectorGroup> Make();
 
   /**
    * Returns the list of child vector elements in this group.
@@ -148,6 +151,9 @@ class VectorGroup : public VectorElement {
   void detachFromLayer(Layer* layer) override;
 
   void apply(VectorContext* context) override;
+
+ protected:
+  VectorGroup() = default;
 
  private:
   std::vector<std::shared_ptr<VectorElement>> _elements = {};

@@ -35,6 +35,10 @@ namespace tgfx {
 class TextModifier : public VectorElement {
  public:
   /**
+   * Creates a new TextModifier instance.
+   */
+  static std::shared_ptr<TextModifier> Make();
+  /**
    * Returns the selectors that define which characters this modifier applies to.
    */
   const std::vector<std::shared_ptr<TextSelector>>& selectors() const {
@@ -186,6 +190,9 @@ class TextModifier : public VectorElement {
   void detachFromLayer(Layer* layer) override;
 
   void apply(VectorContext* context) override;
+
+ protected:
+  TextModifier() = default;
 
  private:
   std::vector<std::shared_ptr<TextSelector>> _selectors = {};

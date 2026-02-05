@@ -91,6 +91,10 @@ class FillPainter : public Painter {
   }
 };
 
+std::shared_ptr<FillStyle> FillStyle::Make() {
+  return std::shared_ptr<FillStyle>(new FillStyle());
+}
+
 void FillStyle::setColorSource(std::shared_ptr<ColorSource> value) {
   if (_colorSource == value) {
     return;

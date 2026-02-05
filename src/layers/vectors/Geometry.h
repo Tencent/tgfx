@@ -52,6 +52,7 @@ struct Glyph {
   Font font = {};
   Matrix matrix = Matrix::I();
   GlyphStyle style = {};
+  Point anchor = Point::Zero();  // offset relative to default anchor (advance*0.5, 0)
 };
 
 /**
@@ -120,6 +121,11 @@ class Geometry {
    * Individual glyphs with per-glyph transformations, expanded from textBlob for modification.
    */
   std::vector<Glyph> glyphs = {};
+
+  /**
+   * Anchor offsets for each glyph, applied when expanding to glyphs.
+   */
+  std::vector<Point> anchors = {};
 
  private:
   friend class VectorContext;
