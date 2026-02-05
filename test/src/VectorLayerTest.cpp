@@ -42,14 +42,11 @@
 namespace tgfx {
 
 static std::shared_ptr<FillStyle> MakeFillStyle(const Color& color) {
-  auto fill = std::make_shared<FillStyle>();
-  fill->setColorSource(SolidColor::Make(color));
-  return fill;
+  return FillStyle::Make(SolidColor::Make(color));
 }
 
 static std::shared_ptr<StrokeStyle> MakeStrokeStyle(const Color& color, float width) {
-  auto stroke = std::make_shared<StrokeStyle>();
-  stroke->setColorSource(SolidColor::Make(color));
+  auto stroke = StrokeStyle::Make(SolidColor::Make(color));
   stroke->setStrokeWidth(width);
   return stroke;
 }
@@ -732,8 +729,7 @@ TGFX_TEST(VectorLayerTest, FillRule) {
   auto shape1 = std::make_shared<ShapePath>();
   shape1->setPath(concentricPath);
 
-  auto fill1 = std::make_shared<FillStyle>();
-  fill1->setColorSource(SolidColor::Make(Color::Red()));
+  auto fill1 = FillStyle::Make(SolidColor::Make(Color::Red()));
   fill1->setFillRule(FillRule::Winding);
 
   group1->setElements({shape1, fill1});
@@ -745,8 +741,7 @@ TGFX_TEST(VectorLayerTest, FillRule) {
   auto shape2 = std::make_shared<ShapePath>();
   shape2->setPath(concentricPath);
 
-  auto fill2 = std::make_shared<FillStyle>();
-  fill2->setColorSource(SolidColor::Make(Color::Blue()));
+  auto fill2 = FillStyle::Make(SolidColor::Make(Color::Blue()));
   fill2->setFillRule(FillRule::EvenOdd);
 
   group2->setElements({shape2, fill2});
@@ -1385,8 +1380,7 @@ TGFX_TEST(VectorLayerTest, StrokeDashWithTrim) {
   auto rect1 = std::make_shared<Rectangle>();
   rect1->setSize({160, 100});
 
-  auto stroke1 = std::make_shared<StrokeStyle>();
-  stroke1->setColorSource(SolidColor::Make(Color::Red()));
+  auto stroke1 = StrokeStyle::Make(SolidColor::Make(Color::Red()));
   stroke1->setStrokeWidth(6.0f);
   stroke1->setDashes({20.0f, 10.0f});
 
@@ -1403,8 +1397,7 @@ TGFX_TEST(VectorLayerTest, StrokeDashWithTrim) {
   trim2->setStart(0.0f);
   trim2->setEnd(0.6f);
 
-  auto stroke2 = std::make_shared<StrokeStyle>();
-  stroke2->setColorSource(SolidColor::Make(Color::Blue()));
+  auto stroke2 = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
   stroke2->setStrokeWidth(6.0f);
   stroke2->setDashes({20.0f, 10.0f});
 
@@ -1648,8 +1641,7 @@ TGFX_TEST(VectorLayerTest, StrokeJoinCap) {
   auto shape1 = std::make_shared<ShapePath>();
   shape1->setPath(openPath);
 
-  auto stroke1 = std::make_shared<StrokeStyle>();
-  stroke1->setColorSource(SolidColor::Make(Color::Red()));
+  auto stroke1 = StrokeStyle::Make(SolidColor::Make(Color::Red()));
   stroke1->setStrokeWidth(16.0f);
   stroke1->setLineCap(LineCap::Butt);
   stroke1->setLineJoin(LineJoin::Miter);
@@ -1663,8 +1655,7 @@ TGFX_TEST(VectorLayerTest, StrokeJoinCap) {
   auto shape2 = std::make_shared<ShapePath>();
   shape2->setPath(openPath);
 
-  auto stroke2 = std::make_shared<StrokeStyle>();
-  stroke2->setColorSource(SolidColor::Make(Color::Green()));
+  auto stroke2 = StrokeStyle::Make(SolidColor::Make(Color::Green()));
   stroke2->setStrokeWidth(16.0f);
   stroke2->setLineCap(LineCap::Round);
   stroke2->setLineJoin(LineJoin::Round);
@@ -1678,8 +1669,7 @@ TGFX_TEST(VectorLayerTest, StrokeJoinCap) {
   auto shape3 = std::make_shared<ShapePath>();
   shape3->setPath(openPath);
 
-  auto stroke3 = std::make_shared<StrokeStyle>();
-  stroke3->setColorSource(SolidColor::Make(Color::Blue()));
+  auto stroke3 = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
   stroke3->setStrokeWidth(16.0f);
   stroke3->setLineCap(LineCap::Square);
   stroke3->setLineJoin(LineJoin::Bevel);
@@ -1694,8 +1684,7 @@ TGFX_TEST(VectorLayerTest, StrokeJoinCap) {
   auto rect4 = std::make_shared<Rectangle>();
   rect4->setSize({80, 80});
 
-  auto stroke4 = std::make_shared<StrokeStyle>();
-  stroke4->setColorSource(SolidColor::Make(Color::Red()));
+  auto stroke4 = StrokeStyle::Make(SolidColor::Make(Color::Red()));
   stroke4->setStrokeWidth(12.0f);
   stroke4->setLineJoin(LineJoin::Miter);
   stroke4->setMiterLimit(10.0f);
@@ -1709,8 +1698,7 @@ TGFX_TEST(VectorLayerTest, StrokeJoinCap) {
   auto rect5 = std::make_shared<Rectangle>();
   rect5->setSize({80, 80});
 
-  auto stroke5 = std::make_shared<StrokeStyle>();
-  stroke5->setColorSource(SolidColor::Make(Color::Green()));
+  auto stroke5 = StrokeStyle::Make(SolidColor::Make(Color::Green()));
   stroke5->setStrokeWidth(12.0f);
   stroke5->setLineJoin(LineJoin::Round);
 
@@ -1723,8 +1711,7 @@ TGFX_TEST(VectorLayerTest, StrokeJoinCap) {
   auto rect6 = std::make_shared<Rectangle>();
   rect6->setSize({80, 80});
 
-  auto stroke6 = std::make_shared<StrokeStyle>();
-  stroke6->setColorSource(SolidColor::Make(Color::Blue()));
+  auto stroke6 = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
   stroke6->setStrokeWidth(12.0f);
   stroke6->setLineJoin(LineJoin::Bevel);
 
@@ -1742,8 +1729,7 @@ TGFX_TEST(VectorLayerTest, StrokeJoinCap) {
   auto shape7 = std::make_shared<ShapePath>();
   shape7->setPath(sharpPath);
 
-  auto stroke7 = std::make_shared<StrokeStyle>();
-  stroke7->setColorSource(SolidColor::Make(Color::FromRGBA(255, 128, 0, 255)));
+  auto stroke7 = StrokeStyle::Make(SolidColor::Make(Color::FromRGBA(255, 128, 0, 255)));
   stroke7->setStrokeWidth(12.0f);
   stroke7->setLineJoin(LineJoin::Miter);
   stroke7->setMiterLimit(2.0f);  // Low miter limit forces bevel on sharp angles
@@ -1789,22 +1775,19 @@ TGFX_TEST(VectorLayerTest, TextBasic) {
   Font font(typeface, 36.0f);
 
   // Text 1: Basic text at origin
-  auto textSpan1 = std::make_shared<Text>();
   auto blob1 = TextBlob::MakeFrom("Hello TGFX", font);
-  textSpan1->setTextBlob(blob1);
+  auto textSpan1 = Text::Make(blob1);
   textSpan1->setPosition({50, 80});
 
   // Text 2: Text at different position
-  auto textSpan2 = std::make_shared<Text>();
   auto blob2 = TextBlob::MakeFrom("Vector Text", font);
-  textSpan2->setTextBlob(blob2);
+  auto textSpan2 = Text::Make(blob2);
   textSpan2->setPosition({50, 140});
 
   // Text 3: Smaller font
   Font smallFont(typeface, 24.0f);
-  auto textSpan3 = std::make_shared<Text>();
   auto blob3 = TextBlob::MakeFrom("Small Text", smallFont);
-  textSpan3->setTextBlob(blob3);
+  auto textSpan3 = Text::Make(blob3);
   textSpan3->setPosition({50, 190});
 
   auto fill = MakeFillStyle(Color::Black());
@@ -1841,9 +1824,8 @@ TGFX_TEST(VectorLayerTest, TextWithGroup) {
   group1->setPosition({50, 76});
   group1->setRotation(15.0f);
 
-  auto textSpan1 = std::make_shared<Text>();
   auto blob1 = TextBlob::MakeFrom("Rotated", font);
-  textSpan1->setTextBlob(blob1);
+  auto textSpan1 = Text::Make(blob1);
 
   auto fill1 = MakeFillStyle(Color::Red());
   group1->setElements({textSpan1, fill1});
@@ -1853,9 +1835,8 @@ TGFX_TEST(VectorLayerTest, TextWithGroup) {
   group2->setPosition({250, 76});
   group2->setScale({2.0f, 1.0f});
 
-  auto textSpan2 = std::make_shared<Text>();
   auto blob2 = TextBlob::MakeFrom("Scaled", font);
-  textSpan2->setTextBlob(blob2);
+  auto textSpan2 = Text::Make(blob2);
 
   auto fill2 = MakeFillStyle(Color::Blue());
   group2->setElements({textSpan2, fill2});
@@ -1866,9 +1847,8 @@ TGFX_TEST(VectorLayerTest, TextWithGroup) {
   group3->setSkew(20.0f);
   group3->setAlpha(0.6f);
 
-  auto textSpan3 = std::make_shared<Text>();
   auto blob3 = TextBlob::MakeFrom("Skewed", font);
-  textSpan3->setTextBlob(blob3);
+  auto textSpan3 = Text::Make(blob3);
 
   auto fill3 = MakeFillStyle(Color::Green());
   group3->setElements({textSpan3, fill3});
@@ -1906,9 +1886,8 @@ TGFX_TEST(VectorLayerTest, TextStyles) {
   auto group1 = std::make_shared<VectorGroup>();
   group1->setPosition({46, 60});
 
-  auto textSpan1 = std::make_shared<Text>();
   auto blob1 = TextBlob::MakeFrom("Fill", font);
-  textSpan1->setTextBlob(blob1);
+  auto textSpan1 = Text::Make(blob1);
 
   auto fill1 = MakeFillStyle(Color::Red());
   group1->setElements({textSpan1, fill1});
@@ -1917,9 +1896,8 @@ TGFX_TEST(VectorLayerTest, TextStyles) {
   auto group2 = std::make_shared<VectorGroup>();
   group2->setPosition({141, 60});
 
-  auto textSpan2 = std::make_shared<Text>();
   auto blob2 = TextBlob::MakeFrom("Stroke", font);
-  textSpan2->setTextBlob(blob2);
+  auto textSpan2 = Text::Make(blob2);
 
   auto stroke2 = MakeStrokeStyle(Color::Blue(), 2.0f);
   group2->setElements({textSpan2, stroke2});
@@ -1928,9 +1906,8 @@ TGFX_TEST(VectorLayerTest, TextStyles) {
   auto group3 = std::make_shared<VectorGroup>();
   group3->setPosition({46, 120});
 
-  auto textSpan3 = std::make_shared<Text>();
   auto blob3 = TextBlob::MakeFrom("Fill+Stroke", font);
-  textSpan3->setTextBlob(blob3);
+  auto textSpan3 = Text::Make(blob3);
 
   auto fill3 = MakeFillStyle(Color::FromRGBA(255, 200, 0, 255));
   auto stroke3 = MakeStrokeStyle(Color::FromRGBA(200, 100, 0, 255), 2.0f);
@@ -1940,9 +1917,8 @@ TGFX_TEST(VectorLayerTest, TextStyles) {
   auto group4 = std::make_shared<VectorGroup>();
   group4->setPosition({46, 180});
 
-  auto textSpan4 = std::make_shared<Text>();
   auto blob4 = TextBlob::MakeFrom("Dash", font);
-  textSpan4->setTextBlob(blob4);
+  auto textSpan4 = Text::Make(blob4);
 
   auto stroke4 = MakeStrokeStyle(Color::Green(), 2.0f);
   stroke4->setDashes({8.0f, 4.0f});
@@ -1982,9 +1958,8 @@ TGFX_TEST(VectorLayerTest, TextWithPathModifiers) {
   auto group1 = std::make_shared<VectorGroup>();
   group1->setPosition({50, 91});
 
-  auto textSpan1 = std::make_shared<Text>();
   auto blob1 = TextBlob::MakeFrom("Round", font);
-  textSpan1->setTextBlob(blob1);
+  auto textSpan1 = Text::Make(blob1);
 
   auto roundCorner = std::make_shared<RoundCorner>();
   roundCorner->setRadius(5.0f);
@@ -1996,13 +1971,11 @@ TGFX_TEST(VectorLayerTest, TextWithPathModifiers) {
   auto group2 = std::make_shared<VectorGroup>();
   group2->setPosition({50, 171});
 
-  auto textSpan2a = std::make_shared<Text>();
   auto blob2a = TextBlob::MakeFrom("AB🐼", font);
-  textSpan2a->setTextBlob(blob2a);
+  auto textSpan2a = Text::Make(blob2a);
 
-  auto textSpan2b = std::make_shared<Text>();
   auto blob2b = TextBlob::MakeFrom("CD🎉", font);
-  textSpan2b->setTextBlob(blob2b);
+  auto textSpan2b = Text::Make(blob2b);
   textSpan2b->setPosition({100, 0});
 
   auto mergePath = std::make_shared<MergePath>();
@@ -2015,9 +1988,8 @@ TGFX_TEST(VectorLayerTest, TextWithPathModifiers) {
   auto group3 = std::make_shared<VectorGroup>();
   group3->setPosition({250, 171});
 
-  auto textSpan3 = std::make_shared<Text>();
   auto blob3 = TextBlob::MakeFrom("Trim", font);
-  textSpan3->setTextBlob(blob3);
+  auto textSpan3 = Text::Make(blob3);
 
   auto trimPath = std::make_shared<TrimPath>();
   trimPath->setStart(0.2f);
@@ -2054,29 +2026,27 @@ TGFX_TEST(VectorLayerTest, TextEdgeCases) {
   }
   Font font(typeface, 32.0f);
 
-  // Group 1: Empty TextBlob (should render nothing)
+  // Group 1: Null Text::Make (should return nullptr for null textBlob)
   auto group1 = std::make_shared<VectorGroup>();
   group1->setPosition({47, 26});
 
-  auto emptySpan = std::make_shared<Text>();
-  // textBlob is nullptr by default
+  auto emptySpan = Text::Make(nullptr);  // Should return nullptr
+  EXPECT_EQ(emptySpan, nullptr);
 
   auto fill1 = MakeFillStyle(Color::Red());
-  group1->setElements({emptySpan, fill1});
+  group1->setElements({fill1});  // emptySpan is nullptr, don't add it
 
   // Group 2: Disabled Text (should not render)
   auto group2 = std::make_shared<VectorGroup>();
   group2->setPosition({47, 76});
 
-  auto disabledSpan = std::make_shared<Text>();
   auto blob2 = TextBlob::MakeFrom("Disabled", font);
-  disabledSpan->setTextBlob(blob2);
+  auto disabledSpan = Text::Make(blob2);
   disabledSpan->setEnabled(false);
 
   // This text should render (enabled by default)
-  auto enabledSpan = std::make_shared<Text>();
   auto blob2b = TextBlob::MakeFrom("Enabled", font);
-  enabledSpan->setTextBlob(blob2b);
+  auto enabledSpan = Text::Make(blob2b);
   enabledSpan->setPosition({150, 0});
 
   auto fill2 = MakeFillStyle(Color::Blue());
@@ -2090,9 +2060,8 @@ TGFX_TEST(VectorLayerTest, TextEdgeCases) {
   auto innerGroup = std::make_shared<VectorGroup>();
   innerGroup->setRotation(10.0f);
 
-  auto nestedSpan = std::make_shared<Text>();
   auto blob3 = TextBlob::MakeFrom("Nested", font);
-  nestedSpan->setTextBlob(blob3);
+  auto nestedSpan = Text::Make(blob3);
 
   auto fill3 = MakeFillStyle(Color::Green());
   innerGroup->setElements({nestedSpan, fill3});
@@ -2130,9 +2099,8 @@ TGFX_TEST(VectorLayerTest, TextWithRepeater) {
   auto group = std::make_shared<VectorGroup>();
   group->setPosition({50, 68});
 
-  auto textSpan = std::make_shared<Text>();
   auto blob = TextBlob::MakeFrom("ABC", font);
-  textSpan->setTextBlob(blob);
+  auto textSpan = Text::Make(blob);
 
   auto repeater = std::make_shared<Repeater>();
   repeater->setCopies(5);
@@ -2181,18 +2149,15 @@ TGFX_TEST(VectorLayerTest, TextEmoji) {
   auto group1 = std::make_shared<VectorGroup>();
   group1->setPosition({50, 80});
 
-  auto textSpan1 = std::make_shared<Text>();
   auto blob1 = TextBlob::MakeFrom("Hello ", textFont);
-  textSpan1->setTextBlob(blob1);
+  auto textSpan1 = Text::Make(blob1);
 
-  auto emojiSpan1 = std::make_shared<Text>();
   auto emojiBlob1 = TextBlob::MakeFrom("🎨🌈", emojiFont);
-  emojiSpan1->setTextBlob(emojiBlob1);
+  auto emojiSpan1 = Text::Make(emojiBlob1);
   emojiSpan1->setPosition({85, 0});
 
-  auto textSpan1b = std::make_shared<Text>();
   auto blob1b = TextBlob::MakeFrom(" World", textFont);
-  textSpan1b->setTextBlob(blob1b);
+  auto textSpan1b = Text::Make(blob1b);
   textSpan1b->setPosition({165, 0});
 
   auto fill1 = MakeFillStyle(Color::Black());
@@ -2202,13 +2167,11 @@ TGFX_TEST(VectorLayerTest, TextEmoji) {
   auto group2 = std::make_shared<VectorGroup>();
   group2->setPosition({50, 150});
 
-  auto textSpan2 = std::make_shared<Text>();
   auto blob2 = TextBlob::MakeFrom("Stroke: ", textFont);
-  textSpan2->setTextBlob(blob2);
+  auto textSpan2 = Text::Make(blob2);
 
-  auto emojiSpan2 = std::make_shared<Text>();
   auto emojiBlob2 = TextBlob::MakeFrom("🚀🎭", emojiFont);
-  emojiSpan2->setTextBlob(emojiBlob2);
+  auto emojiSpan2 = Text::Make(emojiBlob2);
   emojiSpan2->setPosition({114, 0});
 
   auto stroke2 = MakeStrokeStyle(Color::Blue(), 1.0f);
@@ -2219,13 +2182,11 @@ TGFX_TEST(VectorLayerTest, TextEmoji) {
   auto group3 = std::make_shared<VectorGroup>();
   group3->setPosition({50, 200});
 
-  auto textSpan3 = std::make_shared<Text>();
   auto blob3 = TextBlob::MakeFrom("Trim: ", textFont);
-  textSpan3->setTextBlob(blob3);
+  auto textSpan3 = Text::Make(blob3);
 
-  auto emojiSpan3 = std::make_shared<Text>();
   auto emojiBlob3 = TextBlob::MakeFrom("🎪🎉", emojiFont);
-  emojiSpan3->setTextBlob(emojiBlob3);
+  auto emojiSpan3 = Text::Make(emojiBlob3);
   emojiSpan3->setPosition({86, 0});
 
   auto trim3 = std::make_shared<TrimPath>();
@@ -2239,9 +2200,8 @@ TGFX_TEST(VectorLayerTest, TextEmoji) {
   auto group4 = std::make_shared<VectorGroup>();
   group4->setPosition({50, 260});
 
-  auto emojiSpan4 = std::make_shared<Text>();
   auto emojiBlob4 = TextBlob::MakeFrom("😀🤩🥳🎊🎁", emojiFont);
-  emojiSpan4->setTextBlob(emojiBlob4);
+  auto emojiSpan4 = Text::Make(emojiBlob4);
 
   auto fill4 = MakeFillStyle(Color::Black());
   group4->setElements({emojiSpan4, fill4});
@@ -2293,14 +2253,13 @@ TGFX_TEST(VectorLayerTest, RichText) {
   imageRect->setCenter({82, 82});
   imageRect->setSize({64, 64});
 
-  auto imageFill = std::make_shared<FillStyle>();
   SamplingOptions nearestSampling(FilterMode::Nearest, MipmapMode::None);
   auto imagePattern =
       ImagePattern::Make(inlineImage, TileMode::Clamp, TileMode::Clamp, nearestSampling);
   Matrix imageMatrix = Matrix::MakeScale(0.125f);
   imageMatrix.postTranslate(50, 50);
   imagePattern->setMatrix(imageMatrix);
-  imageFill->setColorSource(imagePattern);
+  auto imageFill = FillStyle::Make(imagePattern);
 
   auto imageGroup = std::make_shared<VectorGroup>();
   imageGroup->setElements({imageRect, imageFill});
@@ -2308,18 +2267,15 @@ TGFX_TEST(VectorLayerTest, RichText) {
   auto row1 = std::make_shared<VectorGroup>();
   row1->setPosition({127, 107});
 
-  auto tgfxSpan = std::make_shared<Text>();
-  tgfxSpan->setTextBlob(TextBlob::MakeFrom("TGFX", titleFont));
+  auto tgfxSpan = Text::Make(TextBlob::MakeFrom("TGFX", titleFont));
 
   auto titleGradient = Gradient::MakeLinear(
       {0, 0}, {155, 0}, {Color::FromRGBA(255, 0, 0, 255), Color::FromRGBA(0, 0, 255, 255)});
-  auto tgfxFill = std::make_shared<FillStyle>();
-  tgfxFill->setColorSource(titleGradient);
+  auto tgfxFill = FillStyle::Make(titleGradient);
   auto tgfxGroup = std::make_shared<VectorGroup>();
   tgfxGroup->setElements({tgfxSpan, tgfxFill});
 
-  auto demoSpan = std::make_shared<Text>();
-  demoSpan->setTextBlob(TextBlob::MakeFrom(" Rich Text Demo", titleFont));
+  auto demoSpan = Text::Make(TextBlob::MakeFrom(" Rich Text Demo", titleFont));
   demoSpan->setPosition({155, 0});
   auto blackFill = MakeFillStyle(Color::Black());
   auto demoGroup = std::make_shared<VectorGroup>();
@@ -2332,12 +2288,10 @@ TGFX_TEST(VectorLayerTest, RichText) {
   row2->setPosition({50, 183});
 
   // "Supports " - black
-  auto supportsSpan = std::make_shared<Text>();
-  supportsSpan->setTextBlob(TextBlob::MakeFrom("Supports ", normalFont));
+  auto supportsSpan = Text::Make(TextBlob::MakeFrom("Supports ", normalFont));
 
   // "bold" - blue
-  auto boldSpan = std::make_shared<Text>();
-  boldSpan->setTextBlob(TextBlob::MakeFrom("bold", boldFont));
+  auto boldSpan = Text::Make(TextBlob::MakeFrom("bold", boldFont));
   boldSpan->setPosition({199, 0});
 
   auto blueFill = MakeFillStyle(Color::Blue());
@@ -2345,8 +2299,7 @@ TGFX_TEST(VectorLayerTest, RichText) {
   boldGroup->setElements({boldSpan, blueFill});
 
   // "italic" - red
-  auto italicSpan = std::make_shared<Text>();
-  italicSpan->setTextBlob(TextBlob::MakeFrom("italic", italicFont));
+  auto italicSpan = Text::Make(TextBlob::MakeFrom("italic", italicFont));
   italicSpan->setPosition({303, 0});
 
   auto redFill = MakeFillStyle(Color::Red());
@@ -2354,8 +2307,7 @@ TGFX_TEST(VectorLayerTest, RichText) {
   italicGroup->setElements({italicSpan, redFill});
 
   // "描边" - black fill + green stroke
-  auto strokeSpan = std::make_shared<Text>();
-  strokeSpan->setTextBlob(TextBlob::MakeFrom("描边", normalFont));
+  auto strokeSpan = Text::Make(TextBlob::MakeFrom("描边", normalFont));
   strokeSpan->setPosition({414, 0});
 
   auto greenStroke = MakeStrokeStyle(Color::Green(), 2.0f);
@@ -2363,13 +2315,11 @@ TGFX_TEST(VectorLayerTest, RichText) {
   strokeGroup->setElements({strokeSpan, blackFill, greenStroke});
 
   // " and E=mc" - black
-  auto andSpan = std::make_shared<Text>();
-  andSpan->setTextBlob(TextBlob::MakeFrom(" and E=mc", normalFont));
+  auto andSpan = Text::Make(TextBlob::MakeFrom(" and E=mc", normalFont));
   andSpan->setPosition({502, 0});
 
   // "2" superscript - black
-  auto superscriptSpan = std::make_shared<Text>();
-  superscriptSpan->setTextBlob(TextBlob::MakeFrom("2", subscriptFont));
+  auto superscriptSpan = Text::Make(TextBlob::MakeFrom("2", subscriptFont));
   superscriptSpan->setPosition({714, -16});
 
   row2->setElements(
@@ -2380,12 +2330,10 @@ TGFX_TEST(VectorLayerTest, RichText) {
   row3->setPosition({50, 250});
 
   // "Visit " - black
-  auto visitSpan = std::make_shared<Text>();
-  visitSpan->setTextBlob(TextBlob::MakeFrom("Visit ", normalFont));
+  auto visitSpan = Text::Make(TextBlob::MakeFrom("Visit ", normalFont));
 
   // "tgfx.org" - blue link with underline
-  auto linkSpan = std::make_shared<Text>();
-  linkSpan->setTextBlob(TextBlob::MakeFrom("tgfx.org", normalFont));
+  auto linkSpan = Text::Make(TextBlob::MakeFrom("tgfx.org", normalFont));
   linkSpan->setPosition({97, 0});
 
   auto underline = std::make_shared<Rectangle>();
@@ -2396,16 +2344,14 @@ TGFX_TEST(VectorLayerTest, RichText) {
   linkGroup->setElements({linkSpan, underline, blueFill});
 
   // " for more information " - black
-  auto infoSpan = std::make_shared<Text>();
-  infoSpan->setTextBlob(TextBlob::MakeFrom(" for more information ", normalFont));
+  auto infoSpan = Text::Make(TextBlob::MakeFrom(" for more information ", normalFont));
   infoSpan->setPosition({256, 0});
 
   // emoji
   std::shared_ptr<Text> emojiSpan = nullptr;
   if (emojiTypeface != nullptr) {
     Font emojiFont(emojiTypeface, 32);
-    emojiSpan = std::make_shared<Text>();
-    emojiSpan->setTextBlob(TextBlob::MakeFrom("\u2139", emojiFont));
+    emojiSpan = Text::Make(TextBlob::MakeFrom("\u2139", emojiFont));
     emojiSpan->setPosition({702, -3});
   }
 
@@ -2457,8 +2403,7 @@ TGFX_TEST(VectorLayerTest, SolidColor) {
   auto rect1 = std::make_shared<Rectangle>();
   rect1->setCenter({100, 100});
   rect1->setSize({100, 100});
-  auto fill1 = std::make_shared<FillStyle>();
-  fill1->setColorSource(solidDefault);
+  auto fill1 = FillStyle::Make(solidDefault);
   group1->setElements({rect1, fill1});
 
   // Group 2: SolidColor with specific color
@@ -2466,8 +2411,7 @@ TGFX_TEST(VectorLayerTest, SolidColor) {
   auto rect2 = std::make_shared<Rectangle>();
   rect2->setCenter({240, 100});
   rect2->setSize({100, 100});
-  auto fill2 = std::make_shared<FillStyle>();
-  fill2->setColorSource(solidRed);
+  auto fill2 = FillStyle::Make(solidRed);
   group2->setElements({rect2, fill2});
 
   // Group 3: SolidColor with alpha
@@ -2475,8 +2419,7 @@ TGFX_TEST(VectorLayerTest, SolidColor) {
   auto rect3 = std::make_shared<Rectangle>();
   rect3->setCenter({380, 100});
   rect3->setSize({100, 100});
-  auto fill3 = std::make_shared<FillStyle>();
-  fill3->setColorSource(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
+  auto fill3 = FillStyle::Make(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
   group3->setElements({rect3, fill3});
 
   vectorLayer->setContents({group1, group2, group3});
@@ -2508,14 +2451,13 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   auto rect1 = std::make_shared<Rectangle>();
   rect1->setCenter({110, 110});
   rect1->setSize({120, 120});
-  auto fill1 = std::make_shared<FillStyle>();
   auto linear = Gradient::MakeLinear({50, 110}, {170, 110}, colors);
   EXPECT_EQ(linear->type(), GradientType::Linear);
   EXPECT_EQ(linear->startPoint(), Point::Make(50, 110));
   EXPECT_EQ(linear->endPoint(), Point::Make(170, 110));
   linear->setStartPoint({50, 110});
   linear->setEndPoint({170, 110});
-  fill1->setColorSource(linear);
+  auto fill1 = FillStyle::Make(linear);
   group1->setElements({rect1, fill1});
 
   // Radial gradient
@@ -2523,14 +2465,13 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   auto rect2 = std::make_shared<Rectangle>();
   rect2->setCenter({260, 110});
   rect2->setSize({120, 120});
-  auto fill2 = std::make_shared<FillStyle>();
   auto radial = Gradient::MakeRadial({260, 110}, 85, colors);
   EXPECT_EQ(radial->type(), GradientType::Radial);
   EXPECT_EQ(radial->center(), Point::Make(260, 110));
   EXPECT_EQ(radial->radius(), 85.0f);
   radial->setCenter({260, 110});
   radial->setRadius(85.0f);
-  fill2->setColorSource(radial);
+  auto fill2 = FillStyle::Make(radial);
   group2->setElements({rect2, fill2});
 
   // Conic gradient
@@ -2538,7 +2479,6 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   auto rect3 = std::make_shared<Rectangle>();
   rect3->setCenter({410, 110});
   rect3->setSize({120, 120});
-  auto fill3 = std::make_shared<FillStyle>();
   auto conic = Gradient::MakeConic({410, 110}, 0, 360, colors);
   EXPECT_EQ(conic->type(), GradientType::Conic);
   EXPECT_EQ(conic->center(), Point::Make(410, 110));
@@ -2547,7 +2487,7 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   conic->setCenter({410, 110});
   conic->setStartAngle(0.0f);
   conic->setEndAngle(360.0f);
-  fill3->setColorSource(conic);
+  auto fill3 = FillStyle::Make(conic);
   group3->setElements({rect3, fill3});
 
   // Diamond gradient
@@ -2555,14 +2495,13 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   auto rect4 = std::make_shared<Rectangle>();
   rect4->setCenter({560, 110});
   rect4->setSize({120, 120});
-  auto fill4 = std::make_shared<FillStyle>();
   auto diamond = Gradient::MakeDiamond({560, 110}, 85, colors);
   EXPECT_EQ(diamond->type(), GradientType::Diamond);
   EXPECT_EQ(diamond->center(), Point::Make(560, 110));
   EXPECT_EQ(diamond->radius(), 85.0f);
   diamond->setCenter({560, 110});
   diamond->setRadius(85.0f);
-  fill4->setColorSource(diamond);
+  auto fill4 = FillStyle::Make(diamond);
   group4->setElements({rect4, fill4});
 
   // Test colors and positions
@@ -2597,10 +2536,9 @@ TGFX_TEST(VectorLayerTest, GradientEdgeCases) {
   auto rect1 = std::make_shared<Rectangle>();
   rect1->setCenter({101, 101});
   rect1->setSize({100, 100});
-  auto fill1 = std::make_shared<FillStyle>();
   auto emptyGradient = Gradient::MakeLinear({51, 101}, {151, 101}, {});
   EXPECT_TRUE(emptyGradient->colors().empty());
-  fill1->setColorSource(emptyGradient);
+  auto fill1 = FillStyle::Make(emptyGradient);
   auto stroke1 = MakeStrokeStyle(Color::FromRGBA(128, 128, 128, 255), 2.0f);
   group1->setElements({rect1, fill1, stroke1});
 
@@ -2609,10 +2547,9 @@ TGFX_TEST(VectorLayerTest, GradientEdgeCases) {
   auto rect2 = std::make_shared<Rectangle>();
   rect2->setCenter({241, 101});
   rect2->setSize({100, 100});
-  auto fill2 = std::make_shared<FillStyle>();
   auto singleGradient = Gradient::MakeLinear({191, 101}, {291, 101}, {Color::Red()});
   EXPECT_EQ(singleGradient->colors().size(), 1u);
-  fill2->setColorSource(singleGradient);
+  auto fill2 = FillStyle::Make(singleGradient);
   group2->setElements({rect2, fill2});
 
   // Group 3: With rotation matrix (gradient rotated 45 degrees around center)
@@ -2620,10 +2557,9 @@ TGFX_TEST(VectorLayerTest, GradientEdgeCases) {
   auto rect3 = std::make_shared<Rectangle>();
   rect3->setCenter({381, 101});
   rect3->setSize({100, 100});
-  auto fill3 = std::make_shared<FillStyle>();
   // Create a gradient from top-left to bottom-right of the rect
   auto matrixGradient = Gradient::MakeLinear({331, 51}, {431, 151}, {Color::Red(), Color::Blue()});
-  fill3->setColorSource(matrixGradient);
+  auto fill3 = FillStyle::Make(matrixGradient);
   group3->setElements({rect3, fill3});
 
   vectorLayer->setContents({group1, group2, group3});
@@ -2661,7 +2597,6 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   auto rect1 = std::make_shared<Rectangle>();
   rect1->setCenter({100, 100});
   rect1->setSize({100, 100});  // Rect is 100x100, larger than 50x50 image
-  auto fill1 = std::make_shared<FillStyle>();
   auto pattern1 = ImagePattern::Make(image, TileMode::Clamp, TileMode::Clamp);
   ASSERT_TRUE(pattern1 != nullptr);
   EXPECT_EQ(pattern1->image(), image);
@@ -2674,7 +2609,7 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   Matrix matrix1 = Matrix::MakeScale(scale1);
   matrix1.postTranslate(75, 75);
   pattern1->setMatrix(matrix1);
-  fill1->setColorSource(pattern1);
+  auto fill1 = FillStyle::Make(pattern1);
   group1->setElements({rect1, fill1});
 
   // Group 2: Repeat tile mode - small scale to show tiling
@@ -2682,13 +2617,12 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   auto rect2 = std::make_shared<Rectangle>();
   rect2->setCenter({240, 100});
   rect2->setSize({100, 100});
-  auto fill2 = std::make_shared<FillStyle>();
   auto pattern2 = ImagePattern::Make(image2, TileMode::Repeat, TileMode::Repeat);
   // Scale image to ~25x25 pixels to show tiling, position at rect's top-left (190, 50)
   Matrix matrix2 = Matrix::MakeScale(0.05f);
   matrix2.postTranslate(190, 50);
   pattern2->setMatrix(matrix2);
-  fill2->setColorSource(pattern2);
+  auto fill2 = FillStyle::Make(pattern2);
   group2->setElements({rect2, fill2});
 
   // Group 3: Mirror tile mode with rotation
@@ -2696,7 +2630,6 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   auto rect3 = std::make_shared<Rectangle>();
   rect3->setCenter({380, 100});
   rect3->setSize({100, 100});
-  auto fill3 = std::make_shared<FillStyle>();
   auto pattern3 = ImagePattern::Make(image2, TileMode::Mirror, TileMode::Mirror);
   // Scale image to ~25x25 pixels, rotate, and position at rect's top-left (330, 50)
   Matrix matrix3 = Matrix::MakeScale(0.05f);
@@ -2704,7 +2637,7 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   matrix3.postTranslate(330, 50);
   pattern3->setMatrix(matrix3);
   EXPECT_EQ(pattern3->matrix(), matrix3);
-  fill3->setColorSource(pattern3);
+  auto fill3 = FillStyle::Make(pattern3);
   group3->setElements({rect3, fill3});
 
   vectorLayer->setContents({group1, group2, group3});
@@ -2733,8 +2666,7 @@ TGFX_TEST(VectorLayerTest, ColorSourceAdvanced) {
   auto rect1 = std::make_shared<Rectangle>();
   rect1->setCenter({104, 104});
   rect1->setSize({100, 100});
-  auto stroke1 = std::make_shared<StrokeStyle>();
-  stroke1->setColorSource(SolidColor::Make(Color::Red()));
+  auto stroke1 = StrokeStyle::Make(SolidColor::Make(Color::Red()));
   stroke1->setStrokeWidth(8.0f);
   group1->setElements({rect1, stroke1});
 
@@ -2743,8 +2675,7 @@ TGFX_TEST(VectorLayerTest, ColorSourceAdvanced) {
   auto rect2 = std::make_shared<Rectangle>();
   rect2->setCenter({244, 104});
   rect2->setSize({100, 100});
-  auto stroke2 = std::make_shared<StrokeStyle>();
-  stroke2->setColorSource(
+  auto stroke2 = StrokeStyle::Make(
       Gradient::MakeLinear({194, 54}, {294, 154}, {Color::Blue(), Color::Green()}));
   stroke2->setStrokeWidth(8.0f);
   group2->setElements({rect2, stroke2});
@@ -2756,8 +2687,7 @@ TGFX_TEST(VectorLayerTest, ColorSourceAdvanced) {
   auto rect3 = std::make_shared<Rectangle>();
   rect3->setCenter({384, 104});
   rect3->setSize({100, 100});
-  auto fill3 = std::make_shared<FillStyle>();
-  fill3->setColorSource(sharedGradient);
+  auto fill3 = FillStyle::Make(sharedGradient);
   group3->setElements({rect3, fill3});
 
   vectorLayer->setContents({group1, group2, group3});
@@ -2797,16 +2727,14 @@ TGFX_TEST(VectorLayerTest, ImagePatternText) {
   // Create bold text filled with image pattern
   Font font(typeface, 96.0f);
   font.setFauxBold(true);
-  auto textSpan = std::make_shared<Text>();
-  textSpan->setTextBlob(TextBlob::MakeFrom("TGFX", font));
+  auto textSpan = Text::Make(TextBlob::MakeFrom("TGFX", font));
   textSpan->setPosition({50, 126});
 
-  auto fill = std::make_shared<FillStyle>();
   auto pattern = ImagePattern::Make(image, TileMode::Clamp, TileMode::Clamp);
   Matrix matrix = Matrix::MakeScale(0.5f);
   matrix.postTranslate(-180, -80);
   pattern->setMatrix(matrix);
-  fill->setColorSource(pattern);
+  auto fill = FillStyle::Make(pattern);
 
   vectorLayer->setContents({textSpan, fill});
   displayList->root()->addChild(vectorLayer);
@@ -2856,8 +2784,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto group1 = std::make_shared<VectorGroup>();
   group1->setPosition({58, 63});
 
-  auto textSpan1 = std::make_shared<Text>();
-  textSpan1->setTextBlob(TextBlob::MakeFrom("Start Aligned", font));
+  auto textSpan1 = Text::Make(TextBlob::MakeFrom("Start Aligned", font));
 
   auto textPath1 = std::make_shared<TextPath>();
   textPath1->setPath(curvePath);
@@ -2871,8 +2798,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto group2 = std::make_shared<VectorGroup>();
   group2->setPosition({58, 163});
 
-  auto textSpan2 = std::make_shared<Text>();
-  textSpan2->setTextBlob(TextBlob::MakeFrom("Center Aligned", font));
+  auto textSpan2 = Text::Make(TextBlob::MakeFrom("Center Aligned", font));
 
   auto textPath2 = std::make_shared<TextPath>();
   textPath2->setPath(curvePath);
@@ -2886,8 +2812,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto group3 = std::make_shared<VectorGroup>();
   group3->setPosition({58, 263});
 
-  auto textSpan3 = std::make_shared<Text>();
-  textSpan3->setTextBlob(TextBlob::MakeFrom("End Aligned", font));
+  auto textSpan3 = Text::Make(TextBlob::MakeFrom("End Aligned", font));
 
   auto textPath3 = std::make_shared<TextPath>();
   textPath3->setPath(curvePath);
@@ -2901,8 +2826,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto group4 = std::make_shared<VectorGroup>();
   group4->setPosition({58, 363});
 
-  auto textSpan4 = std::make_shared<Text>();
-  textSpan4->setTextBlob(TextBlob::MakeFrom("Not Perpendicular", font));
+  auto textSpan4 = Text::Make(TextBlob::MakeFrom("Not Perpendicular", font));
 
   auto textPath4 = std::make_shared<TextPath>();
   textPath4->setPath(curvePath);
@@ -2916,8 +2840,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto group5 = std::make_shared<VectorGroup>();
   group5->setPosition({58, 463});
 
-  auto textSpan5 = std::make_shared<Text>();
-  textSpan5->setTextBlob(TextBlob::MakeFrom("Reversed Path", font));
+  auto textSpan5 = Text::Make(TextBlob::MakeFrom("Reversed Path", font));
 
   auto textPath5 = std::make_shared<TextPath>();
   textPath5->setPath(curvePath);
@@ -2932,8 +2855,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto group6 = std::make_shared<VectorGroup>();
   group6->setPosition({58, 563});
 
-  auto textSpan6 = std::make_shared<Text>();
-  textSpan6->setTextBlob(TextBlob::MakeFrom("Force Alignment", font));
+  auto textSpan6 = Text::Make(TextBlob::MakeFrom("Force Alignment", font));
 
   auto textPath6 = std::make_shared<TextPath>();
   textPath6->setPath(curvePath);
@@ -2956,8 +2878,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto group7 = std::make_shared<VectorGroup>();
   group7->setPosition({548, 63});
 
-  auto textSpan7 = std::make_shared<Text>();
-  textSpan7->setTextBlob(TextBlob::MakeFrom("Second Override", font));
+  auto textSpan7 = Text::Make(TextBlob::MakeFrom("Second Override", font));
 
   auto textPathFirst = std::make_shared<TextPath>();
   textPathFirst->setPath(curvePath);
@@ -2980,8 +2901,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   innerGroup8->setPosition({20, 60});
   innerGroup8->setScale({1.5f, 0.8f});
 
-  auto textSpan8 = std::make_shared<Text>();
-  textSpan8->setTextBlob(TextBlob::MakeFrom("Group Override", font));
+  auto textSpan8 = Text::Make(TextBlob::MakeFrom("Group Override", font));
 
   innerGroup8->setElements({textSpan8});
 
@@ -3002,8 +2922,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto group9 = std::make_shared<VectorGroup>();
   group9->setPosition({548, 263});
 
-  auto textSpan9 = std::make_shared<Text>();
-  textSpan9->setTextBlob(TextBlob::MakeFrom("Path Extension Test", font));
+  auto textSpan9 = Text::Make(TextBlob::MakeFrom("Path Extension Test", font));
 
   auto textPath9 = std::make_shared<TextPath>();
   textPath9->setPath(shortPath);
@@ -3023,8 +2942,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto group10 = std::make_shared<VectorGroup>();
   group10->setPosition({548, 363});
 
-  auto textSpan10 = std::make_shared<Text>();
-  textSpan10->setTextBlob(TextBlob::MakeFrom("Closed Path Text Wrap", font));
+  auto textSpan10 = Text::Make(TextBlob::MakeFrom("Closed Path Text Wrap", font));
 
   auto textPath10 = std::make_shared<TextPath>();
   textPath10->setPath(closedPath);
@@ -3046,11 +2964,9 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   innerGroup11->setPosition({0, 8});
   innerGroup11->setSkew(-20.0f);
 
-  auto textSpan11a = std::make_shared<Text>();
-  textSpan11a->setTextBlob(TextBlob::MakeFrom("Multi ", font));
+  auto textSpan11a = Text::Make(TextBlob::MakeFrom("Multi ", font));
 
-  auto textSpan11b = std::make_shared<Text>();
-  textSpan11b->setTextBlob(TextBlob::MakeFrom("Spans", font));
+  auto textSpan11b = Text::Make(TextBlob::MakeFrom("Spans", font));
 
   auto textPath11 = std::make_shared<TextPath>();
   textPath11->setPath(curvePath);
@@ -3075,8 +2991,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto group12 = std::make_shared<VectorGroup>();
   group12->setPosition({58, 663});
 
-  auto textSpan12 = std::make_shared<Text>();
-  textSpan12->setTextBlob(TextBlob::MakeFrom("Force+Center", font));
+  auto textSpan12 = Text::Make(TextBlob::MakeFrom("Force+Center", font));
 
   auto textPath12 = std::make_shared<TextPath>();
   textPath12->setPath(curvePath);
@@ -3092,8 +3007,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto group13 = std::make_shared<VectorGroup>();
   group13->setPosition({58, 763});
 
-  auto textSpan13 = std::make_shared<Text>();
-  textSpan13->setTextBlob(TextBlob::MakeFrom("Negative Spacing", font));
+  auto textSpan13 = Text::Make(TextBlob::MakeFrom("Negative Spacing", font));
 
   auto textPath13 = std::make_shared<TextPath>();
   textPath13->setPath(curvePath);
@@ -3109,8 +3023,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto group14 = std::make_shared<VectorGroup>();
   group14->setPosition({548, 663});
 
-  auto textSpan14 = std::make_shared<Text>();
-  textSpan14->setTextBlob(TextBlob::MakeFrom("Center+Margins", font));
+  auto textSpan14 = Text::Make(TextBlob::MakeFrom("Center+Margins", font));
 
   auto textPath14 = std::make_shared<TextPath>();
   textPath14->setPath(curvePath);
@@ -3126,8 +3039,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto group15 = std::make_shared<VectorGroup>();
   group15->setPosition({548, 763});
 
-  auto textSpan15 = std::make_shared<Text>();
-  textSpan15->setTextBlob(TextBlob::MakeFrom("End+LastMargin", font));
+  auto textSpan15 = Text::Make(TextBlob::MakeFrom("End+LastMargin", font));
 
   auto textPath15 = std::make_shared<TextPath>();
   textPath15->setPath(curvePath);
@@ -3264,8 +3176,7 @@ TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
   auto group1 = std::make_shared<VectorGroup>();
   group1->setPosition({28, 110});
 
-  auto textSpan1 = std::make_shared<Text>();
-  textSpan1->setTextBlob(TextBlob::MakeFrom("TextPath+TrimPath", font));
+  auto textSpan1 = Text::Make(TextBlob::MakeFrom("TextPath+TrimPath", font));
 
   auto textPath1 = std::make_shared<TextPath>();
   textPath1->setPath(curvePath);
@@ -3287,8 +3198,7 @@ TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
   auto group2 = std::make_shared<VectorGroup>();
   group2->setPosition({28, 230});
 
-  auto textSpan2 = std::make_shared<Text>();
-  textSpan2->setTextBlob(TextBlob::MakeFrom("TrimPath+TextPath", font));
+  auto textSpan2 = Text::Make(TextBlob::MakeFrom("TrimPath+TextPath", font));
   textSpan2->setPosition({150, 40});
 
   auto trim2 = std::make_shared<TrimPath>();
@@ -3367,8 +3277,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 1: Position
   auto group1 = std::make_shared<VectorGroup>();
   group1->setPosition({col1X, 86});
-  auto textSpan1 = std::make_shared<Text>();
-  textSpan1->setTextBlob(TextBlob::MakeFrom("Position", font));
+  auto textSpan1 = Text::Make(TextBlob::MakeFrom("Position", font));
   auto selector1 = std::make_shared<RangeSelector>();
   selector1->setShape(SelectorShape::RampUp);
   auto modifier1 = std::make_shared<TextModifier>();
@@ -3380,8 +3289,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 2: Scale (non-uniform)
   auto group2 = std::make_shared<VectorGroup>();
   group2->setPosition({col1X, 86 + rowHeight});
-  auto textSpan2 = std::make_shared<Text>();
-  textSpan2->setTextBlob(TextBlob::MakeFrom("Scale", font));
+  auto textSpan2 = Text::Make(TextBlob::MakeFrom("Scale", font));
   auto selector2 = std::make_shared<RangeSelector>();
   selector2->setShape(SelectorShape::Triangle);
   auto modifier2 = std::make_shared<TextModifier>();
@@ -3393,8 +3301,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 3: Rotation
   auto group3 = std::make_shared<VectorGroup>();
   group3->setPosition({col1X, 86 + rowHeight * 2});
-  auto textSpan3 = std::make_shared<Text>();
-  textSpan3->setTextBlob(TextBlob::MakeFrom("Rotation", font));
+  auto textSpan3 = Text::Make(TextBlob::MakeFrom("Rotation", font));
   auto selector3 = std::make_shared<RangeSelector>();
   selector3->setShape(SelectorShape::Square);
   auto modifier3 = std::make_shared<TextModifier>();
@@ -3406,8 +3313,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 4: Alpha (intermediate value 0.5)
   auto group4 = std::make_shared<VectorGroup>();
   group4->setPosition({col1X, 86 + rowHeight * 3});
-  auto textSpan4 = std::make_shared<Text>();
-  textSpan4->setTextBlob(TextBlob::MakeFrom("Alpha", font));
+  auto textSpan4 = Text::Make(TextBlob::MakeFrom("Alpha", font));
   auto selector4 = std::make_shared<RangeSelector>();
   selector4->setShape(SelectorShape::RampDown);
   auto modifier4 = std::make_shared<TextModifier>();
@@ -3419,8 +3325,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 5: Skew
   auto group5 = std::make_shared<VectorGroup>();
   group5->setPosition({col1X, 86 + rowHeight * 4});
-  auto textSpan5 = std::make_shared<Text>();
-  textSpan5->setTextBlob(TextBlob::MakeFrom("Skew", font));
+  auto textSpan5 = Text::Make(TextBlob::MakeFrom("Skew", font));
   auto selector5 = std::make_shared<RangeSelector>();
   selector5->setShape(SelectorShape::Triangle);
   auto modifier5 = std::make_shared<TextModifier>();
@@ -3433,8 +3338,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 6: AnchorPoint
   auto group6 = std::make_shared<VectorGroup>();
   group6->setPosition({col1X, 86 + rowHeight * 5});
-  auto textSpan6 = std::make_shared<Text>();
-  textSpan6->setTextBlob(TextBlob::MakeFrom("AnchorPoint", font));
+  auto textSpan6 = Text::Make(TextBlob::MakeFrom("AnchorPoint", font));
   auto selector6 = std::make_shared<RangeSelector>();
   selector6->setShape(SelectorShape::RampUp);
   auto modifier6 = std::make_shared<TextModifier>();
@@ -3450,8 +3354,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 1: FillColor
   auto group7 = std::make_shared<VectorGroup>();
   group7->setPosition({col2X, 86});
-  auto textSpan7 = std::make_shared<Text>();
-  textSpan7->setTextBlob(TextBlob::MakeFrom("FillColor", boldFont));
+  auto textSpan7 = Text::Make(TextBlob::MakeFrom("FillColor", boldFont));
   auto selector7 = std::make_shared<RangeSelector>();
   selector7->setShape(SelectorShape::RampDown);
   auto modifier7 = std::make_shared<TextModifier>();
@@ -3463,8 +3366,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 2: StrokeColor
   auto group8 = std::make_shared<VectorGroup>();
   group8->setPosition({col2X, 86 + rowHeight});
-  auto textSpan8 = std::make_shared<Text>();
-  textSpan8->setTextBlob(TextBlob::MakeFrom("StrokeColor", boldFont));
+  auto textSpan8 = Text::Make(TextBlob::MakeFrom("StrokeColor", boldFont));
   auto selector8 = std::make_shared<RangeSelector>();
   selector8->setShape(SelectorShape::Triangle);
   auto modifier8 = std::make_shared<TextModifier>();
@@ -3476,8 +3378,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 3: StrokeWidth
   auto group9 = std::make_shared<VectorGroup>();
   group9->setPosition({col2X, 86 + rowHeight * 2});
-  auto textSpan9 = std::make_shared<Text>();
-  textSpan9->setTextBlob(TextBlob::MakeFrom("StrokeWidth", boldFont));
+  auto textSpan9 = Text::Make(TextBlob::MakeFrom("StrokeWidth", boldFont));
   auto selector9 = std::make_shared<RangeSelector>();
   selector9->setShape(SelectorShape::RampUp);
   auto modifier9 = std::make_shared<TextModifier>();
@@ -3489,8 +3390,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 4: Fill+Stroke
   auto group10 = std::make_shared<VectorGroup>();
   group10->setPosition({col2X, 86 + rowHeight * 3});
-  auto textSpan10 = std::make_shared<Text>();
-  textSpan10->setTextBlob(TextBlob::MakeFrom("Fill+Stroke", boldFont));
+  auto textSpan10 = Text::Make(TextBlob::MakeFrom("Fill+Stroke", boldFont));
   auto selector10 = std::make_shared<RangeSelector>();
   selector10->setShape(SelectorShape::RampUp);
   auto modifier10 = std::make_shared<TextModifier>();
@@ -3504,13 +3404,10 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 5: MultiSpan
   auto group11 = std::make_shared<VectorGroup>();
   group11->setPosition({col2X, 86 + rowHeight * 4});
-  auto textSpanA = std::make_shared<Text>();
-  textSpanA->setTextBlob(TextBlob::MakeFrom("AB", font));
-  auto textSpanB = std::make_shared<Text>();
-  textSpanB->setTextBlob(TextBlob::MakeFrom("CD", font));
+  auto textSpanA = Text::Make(TextBlob::MakeFrom("AB", font));
+  auto textSpanB = Text::Make(TextBlob::MakeFrom("CD", font));
   textSpanB->setPosition({55, 0});
-  auto textSpanC = std::make_shared<Text>();
-  textSpanC->setTextBlob(TextBlob::MakeFrom("EF", font));
+  auto textSpanC = Text::Make(TextBlob::MakeFrom("EF", font));
   textSpanC->setPosition({110, 0});
   auto selector11 = std::make_shared<RangeSelector>();
   selector11->setShape(SelectorShape::RampUp);
@@ -3524,8 +3421,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 6: Multiple Modifiers stacking
   auto group12 = std::make_shared<VectorGroup>();
   group12->setPosition({col2X, 86 + rowHeight * 5});
-  auto textSpan12 = std::make_shared<Text>();
-  textSpan12->setTextBlob(TextBlob::MakeFrom("MultiMod", font));
+  auto textSpan12 = Text::Make(TextBlob::MakeFrom("MultiMod", font));
   auto selectorA = std::make_shared<RangeSelector>();
   selectorA->setStart(0.0f);
   selectorA->setEnd(0.5f);
@@ -3552,8 +3448,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   for (size_t i = 0; i < shapes.size(); i++) {
     auto group = std::make_shared<VectorGroup>();
     group->setPosition({col3X, 86 + rowHeight * static_cast<float>(i)});
-    auto textSpan = std::make_shared<Text>();
-    textSpan->setTextBlob(TextBlob::MakeFrom(shapes[i].second, font));
+    auto textSpan = Text::Make(TextBlob::MakeFrom(shapes[i].second, font));
     auto selector = std::make_shared<RangeSelector>();
     selector->setShape(shapes[i].first);
     auto modifier = std::make_shared<TextModifier>();
@@ -3569,8 +3464,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 1: EaseIn (Triangle + EaseIn)
   auto groupEL = std::make_shared<VectorGroup>();
   groupEL->setPosition({col4X, 86});
-  auto textSpanEL = std::make_shared<Text>();
-  textSpanEL->setTextBlob(TextBlob::MakeFrom("EaseIn", font));
+  auto textSpanEL = Text::Make(TextBlob::MakeFrom("EaseIn", font));
   auto selectorEL = std::make_shared<RangeSelector>();
   selectorEL->setShape(SelectorShape::Triangle);
   selectorEL->setEaseIn(0.8f);
@@ -3583,8 +3477,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 2: EaseOut (Triangle + EaseOut)
   auto groupEH = std::make_shared<VectorGroup>();
   groupEH->setPosition({col4X, 86 + rowHeight});
-  auto textSpanEH = std::make_shared<Text>();
-  textSpanEH->setTextBlob(TextBlob::MakeFrom("EaseOut", font));
+  auto textSpanEH = Text::Make(TextBlob::MakeFrom("EaseOut", font));
   auto selectorEH = std::make_shared<RangeSelector>();
   selectorEH->setShape(SelectorShape::Triangle);
   selectorEH->setEaseOut(0.8f);
@@ -3597,8 +3490,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 3: EaseBoth (Triangle + EaseOut + EaseIn)
   auto groupEB = std::make_shared<VectorGroup>();
   groupEB->setPosition({col4X, 86 + rowHeight * 2});
-  auto textSpanEB = std::make_shared<Text>();
-  textSpanEB->setTextBlob(TextBlob::MakeFrom("EaseBoth", font));
+  auto textSpanEB = Text::Make(TextBlob::MakeFrom("EaseBoth", font));
   auto selectorEB = std::make_shared<RangeSelector>();
   selectorEB->setShape(SelectorShape::Triangle);
   selectorEB->setEaseOut(0.6f);
@@ -3612,8 +3504,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 4: Unit (Index)
   auto groupUnit = std::make_shared<VectorGroup>();
   groupUnit->setPosition({col4X, 86 + rowHeight * 3});
-  auto textSpanUnit = std::make_shared<Text>();
-  textSpanUnit->setTextBlob(TextBlob::MakeFrom("ABCDEFGH", font));
+  auto textSpanUnit = Text::Make(TextBlob::MakeFrom("ABCDEFGH", font));
   auto selectorUnit = std::make_shared<RangeSelector>();
   selectorUnit->setUnit(SelectorUnit::Index);
   selectorUnit->setStart(2);
@@ -3627,8 +3518,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 5: Negative Offset
   auto groupOff = std::make_shared<VectorGroup>();
   groupOff->setPosition({col4X, 86 + rowHeight * 4});
-  auto textSpanOff = std::make_shared<Text>();
-  textSpanOff->setTextBlob(TextBlob::MakeFrom("NegOffset", font));
+  auto textSpanOff = Text::Make(TextBlob::MakeFrom("NegOffset", font));
   auto selectorOff = std::make_shared<RangeSelector>();
   selectorOff->setStart(0.5f);
   selectorOff->setEnd(1.0f);
@@ -3642,8 +3532,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 6: Reversed (Start > End)
   auto groupRev = std::make_shared<VectorGroup>();
   groupRev->setPosition({col4X, 86 + rowHeight * 5});
-  auto textSpanRev = std::make_shared<Text>();
-  textSpanRev->setTextBlob(TextBlob::MakeFrom("Reversed", font));
+  auto textSpanRev = Text::Make(TextBlob::MakeFrom("Reversed", font));
   auto selectorRev = std::make_shared<RangeSelector>();
   selectorRev->setStart(0.7f);
   selectorRev->setEnd(0.3f);
@@ -3659,8 +3548,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 1: Random
   auto groupRnd = std::make_shared<VectorGroup>();
   groupRnd->setPosition({col5X, 86});
-  auto textSpanRnd = std::make_shared<Text>();
-  textSpanRnd->setTextBlob(TextBlob::MakeFrom("Random", font));
+  auto textSpanRnd = Text::Make(TextBlob::MakeFrom("Random", font));
   auto selectorRnd = std::make_shared<RangeSelector>();
   selectorRnd->setShape(SelectorShape::RampUp);
   selectorRnd->setRandomOrder(true);
@@ -3675,8 +3563,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 2: Empty selector
   auto groupEmpty = std::make_shared<VectorGroup>();
   groupEmpty->setPosition({col5X, 86 + rowHeight});
-  auto textSpanEmpty = std::make_shared<Text>();
-  textSpanEmpty->setTextBlob(TextBlob::MakeFrom("Empty", font));
+  auto textSpanEmpty = Text::Make(TextBlob::MakeFrom("Empty", font));
   auto modifierEmpty = std::make_shared<TextModifier>();
   modifierEmpty->setPosition({0, -10});
   groupEmpty->setElements({textSpanEmpty, modifierEmpty, MakeFillStyle(Color::Black())});
@@ -3685,8 +3572,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 3: Start == End boundary
   auto groupSE = std::make_shared<VectorGroup>();
   groupSE->setPosition({col5X, 86 + rowHeight * 2});
-  auto textSpanSE = std::make_shared<Text>();
-  textSpanSE->setTextBlob(TextBlob::MakeFrom("StartEnd", font));
+  auto textSpanSE = Text::Make(TextBlob::MakeFrom("StartEnd", font));
   auto selectorSE = std::make_shared<RangeSelector>();
   selectorSE->setStart(0.5f);
   selectorSE->setEnd(0.5f);
@@ -3699,8 +3585,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // Row 4: First selector uses Subtract mode
   auto groupSub = std::make_shared<VectorGroup>();
   groupSub->setPosition({col5X, 86 + rowHeight * 3});
-  auto textSpanSub = std::make_shared<Text>();
-  textSpanSub->setTextBlob(TextBlob::MakeFrom("SubFirst", font));
+  auto textSpanSub = Text::Make(TextBlob::MakeFrom("SubFirst", font));
   auto selectorSub = std::make_shared<RangeSelector>();
   selectorSub->setMode(SelectorMode::Subtract);
   selectorSub->setShape(SelectorShape::Triangle);
@@ -3758,8 +3643,7 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     linePath.lineTo(width, 0);
     auto shapePath = std::make_shared<ShapePath>();
     shapePath->setPath(linePath);
-    auto stroke = std::make_shared<StrokeStyle>();
-    stroke->setColorSource(SolidColor::Make(Color{0.8f, 0.8f, 0.8f}));
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color{0.8f, 0.8f, 0.8f}));
     group->setElements({shapePath, stroke});
     return group;
   };
@@ -3780,8 +3664,7 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
 
     auto group = std::make_shared<VectorGroup>();
     group->setPosition({col1X, y});
-    auto textSpan = std::make_shared<Text>();
-    textSpan->setTextBlob(TextBlob::MakeFrom(modes[i].second, font));
+    auto textSpan = Text::Make(TextBlob::MakeFrom(modes[i].second, font));
 
     // Each string has 8-10 chars
     // Selector1: first 60% with Square shape, weight=0.6
@@ -3824,8 +3707,7 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
 
     auto group = std::make_shared<VectorGroup>();
     group->setPosition({col2X, y});
-    auto textSpan = std::make_shared<Text>();
-    textSpan->setTextBlob(TextBlob::MakeFrom(weights[i].second, font));
+    auto textSpan = Text::Make(TextBlob::MakeFrom(weights[i].second, font));
 
     auto selector = std::make_shared<RangeSelector>();
     selector->setShape(SelectorShape::Triangle);
@@ -3849,8 +3731,7 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
 
     auto group = std::make_shared<VectorGroup>();
     group->setPosition({col2X, y});
-    auto textSpan = std::make_shared<Text>();
-    textSpan->setTextBlob(TextBlob::MakeFrom("ThreeSels", font));
+    auto textSpan = Text::Make(TextBlob::MakeFrom("ThreeSels", font));
 
     // Selector1: [0, 0.4], weight=0.5
     auto selector1 = std::make_shared<RangeSelector>();
@@ -3912,16 +3793,14 @@ TGFX_TEST(VectorLayerTest, StrokeAlign) {
   Font font(typeface, 60);
 
   // Reference stroke for comparison (1px black center stroke)
-  auto refStroke = std::make_shared<StrokeStyle>();
-  refStroke->setColorSource(SolidColor::Make(Color::Black()));
+  auto refStroke = StrokeStyle::Make(SolidColor::Make(Color::Black()));
 
   // Row 1: Rectangle with Center/Inside/Outside stroke
   auto rectGroup1 = std::make_shared<VectorGroup>();
   auto rect1 = std::make_shared<Rectangle>();
   rect1->setSize({100, 100});
   auto rectFill1 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
-  auto rectStroke1 = std::make_shared<StrokeStyle>();
-  rectStroke1->setColorSource(SolidColor::Make(Color::Red()));
+  auto rectStroke1 = StrokeStyle::Make(SolidColor::Make(Color::Red()));
   rectStroke1->setStrokeWidth(16);
   rectStroke1->setStrokeAlign(StrokeAlign::Center);
   rectGroup1->setElements({rect1, rectFill1, rectStroke1, refStroke});
@@ -3931,8 +3810,7 @@ TGFX_TEST(VectorLayerTest, StrokeAlign) {
   auto rect2 = std::make_shared<Rectangle>();
   rect2->setSize({100, 100});
   auto rectFill2 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
-  auto rectStroke2 = std::make_shared<StrokeStyle>();
-  rectStroke2->setColorSource(SolidColor::Make(Color::Green()));
+  auto rectStroke2 = StrokeStyle::Make(SolidColor::Make(Color::Green()));
   rectStroke2->setStrokeWidth(16);
   rectStroke2->setStrokeAlign(StrokeAlign::Inside);
   rectGroup2->setElements({rect2, rectFill2, rectStroke2, refStroke});
@@ -3942,8 +3820,7 @@ TGFX_TEST(VectorLayerTest, StrokeAlign) {
   auto rect3 = std::make_shared<Rectangle>();
   rect3->setSize({100, 100});
   auto rectFill3 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
-  auto rectStroke3 = std::make_shared<StrokeStyle>();
-  rectStroke3->setColorSource(SolidColor::Make(Color::Blue()));
+  auto rectStroke3 = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
   rectStroke3->setStrokeWidth(16);
   rectStroke3->setStrokeAlign(StrokeAlign::Outside);
   rectGroup3->setElements({rect3, rectFill3, rectStroke3, refStroke});
@@ -3954,8 +3831,7 @@ TGFX_TEST(VectorLayerTest, StrokeAlign) {
   auto ellipse1 = std::make_shared<Ellipse>();
   ellipse1->setSize({100, 70});
   auto ellipseFill1 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
-  auto ellipseStroke1 = std::make_shared<StrokeStyle>();
-  ellipseStroke1->setColorSource(SolidColor::Make(Color::Red()));
+  auto ellipseStroke1 = StrokeStyle::Make(SolidColor::Make(Color::Red()));
   ellipseStroke1->setStrokeWidth(12);
   ellipseStroke1->setStrokeAlign(StrokeAlign::Center);
   ellipseGroup1->setElements({ellipse1, ellipseFill1, ellipseStroke1, refStroke});
@@ -3965,8 +3841,7 @@ TGFX_TEST(VectorLayerTest, StrokeAlign) {
   auto ellipse2 = std::make_shared<Ellipse>();
   ellipse2->setSize({100, 70});
   auto ellipseFill2 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
-  auto ellipseStroke2 = std::make_shared<StrokeStyle>();
-  ellipseStroke2->setColorSource(SolidColor::Make(Color::Green()));
+  auto ellipseStroke2 = StrokeStyle::Make(SolidColor::Make(Color::Green()));
   ellipseStroke2->setStrokeWidth(12);
   ellipseStroke2->setStrokeAlign(StrokeAlign::Inside);
   ellipseGroup2->setElements({ellipse2, ellipseFill2, ellipseStroke2, refStroke});
@@ -3976,8 +3851,7 @@ TGFX_TEST(VectorLayerTest, StrokeAlign) {
   auto ellipse3 = std::make_shared<Ellipse>();
   ellipse3->setSize({100, 70});
   auto ellipseFill3 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
-  auto ellipseStroke3 = std::make_shared<StrokeStyle>();
-  ellipseStroke3->setColorSource(SolidColor::Make(Color::Blue()));
+  auto ellipseStroke3 = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
   ellipseStroke3->setStrokeWidth(12);
   ellipseStroke3->setStrokeAlign(StrokeAlign::Outside);
   ellipseGroup3->setElements({ellipse3, ellipseFill3, ellipseStroke3, refStroke});
@@ -3985,33 +3859,27 @@ TGFX_TEST(VectorLayerTest, StrokeAlign) {
   // Row 3: Text with Center/Inside/Outside stroke
   auto textGroup1 = std::make_shared<VectorGroup>();
   textGroup1->setPosition({-20, 230});
-  auto textSpan1 = std::make_shared<Text>();
-  textSpan1->setTextBlob(TextBlob::MakeFrom("Aa", font));
+  auto textSpan1 = Text::Make(TextBlob::MakeFrom("Aa", font));
   auto textFill1 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
-  auto textStroke1 = std::make_shared<StrokeStyle>();
-  textStroke1->setColorSource(SolidColor::Make(Color::Red()));
+  auto textStroke1 = StrokeStyle::Make(SolidColor::Make(Color::Red()));
   textStroke1->setStrokeWidth(4);
   textStroke1->setStrokeAlign(StrokeAlign::Center);
   textGroup1->setElements({textSpan1, textFill1, textStroke1, refStroke});
 
   auto textGroup2 = std::make_shared<VectorGroup>();
   textGroup2->setPosition({130, 230});
-  auto textSpan2 = std::make_shared<Text>();
-  textSpan2->setTextBlob(TextBlob::MakeFrom("Aa", font));
+  auto textSpan2 = Text::Make(TextBlob::MakeFrom("Aa", font));
   auto textFill2 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
-  auto textStroke2 = std::make_shared<StrokeStyle>();
-  textStroke2->setColorSource(SolidColor::Make(Color::Green()));
+  auto textStroke2 = StrokeStyle::Make(SolidColor::Make(Color::Green()));
   textStroke2->setStrokeWidth(4);
   textStroke2->setStrokeAlign(StrokeAlign::Inside);
   textGroup2->setElements({textSpan2, textFill2, textStroke2, refStroke});
 
   auto textGroup3 = std::make_shared<VectorGroup>();
   textGroup3->setPosition({280, 230});
-  auto textSpan3 = std::make_shared<Text>();
-  textSpan3->setTextBlob(TextBlob::MakeFrom("Aa", font));
+  auto textSpan3 = Text::Make(TextBlob::MakeFrom("Aa", font));
   auto textFill3 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
-  auto textStroke3 = std::make_shared<StrokeStyle>();
-  textStroke3->setColorSource(SolidColor::Make(Color::Blue()));
+  auto textStroke3 = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
   textStroke3->setStrokeWidth(4);
   textStroke3->setStrokeAlign(StrokeAlign::Outside);
   textGroup3->setElements({textSpan3, textFill3, textStroke3, refStroke});
@@ -4022,8 +3890,7 @@ TGFX_TEST(VectorLayerTest, StrokeAlign) {
   auto dashRect1 = std::make_shared<Rectangle>();
   dashRect1->setSize({100, 100});
   auto dashFill1 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
-  auto dashStroke1 = std::make_shared<StrokeStyle>();
-  dashStroke1->setColorSource(SolidColor::Make(Color::Red()));
+  auto dashStroke1 = StrokeStyle::Make(SolidColor::Make(Color::Red()));
   dashStroke1->setStrokeWidth(12);
   dashStroke1->setDashes({16, 8});
   dashStroke1->setStrokeAlign(StrokeAlign::Center);
@@ -4034,8 +3901,7 @@ TGFX_TEST(VectorLayerTest, StrokeAlign) {
   auto dashRect2 = std::make_shared<Rectangle>();
   dashRect2->setSize({100, 100});
   auto dashFill2 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
-  auto dashStroke2 = std::make_shared<StrokeStyle>();
-  dashStroke2->setColorSource(SolidColor::Make(Color::Green()));
+  auto dashStroke2 = StrokeStyle::Make(SolidColor::Make(Color::Green()));
   dashStroke2->setStrokeWidth(12);
   dashStroke2->setDashes({16, 8});
   dashStroke2->setStrokeAlign(StrokeAlign::Inside);
@@ -4046,8 +3912,7 @@ TGFX_TEST(VectorLayerTest, StrokeAlign) {
   auto dashRect3 = std::make_shared<Rectangle>();
   dashRect3->setSize({100, 100});
   auto dashFill3 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
-  auto dashStroke3 = std::make_shared<StrokeStyle>();
-  dashStroke3->setColorSource(SolidColor::Make(Color::Blue()));
+  auto dashStroke3 = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
   dashStroke3->setStrokeWidth(12);
   dashStroke3->setDashes({16, 8});
   dashStroke3->setStrokeAlign(StrokeAlign::Outside);

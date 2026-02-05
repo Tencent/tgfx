@@ -35,9 +35,11 @@ namespace tgfx {
 class StrokeStyle : public VectorElement {
  public:
   /**
-   * Creates a new StrokeStyle instance.
+   * Creates a new StrokeStyle instance with the specified color source.
+   * @param colorSource The color source used for the stroke. If null, returns nullptr.
+   * @return A new StrokeStyle instance, or nullptr if colorSource is null.
    */
-  static std::shared_ptr<StrokeStyle> Make();
+  static std::shared_ptr<StrokeStyle> Make(std::shared_ptr<ColorSource> colorSource);
 
   /**
    * Returns the color source used for the stroke.
@@ -45,11 +47,6 @@ class StrokeStyle : public VectorElement {
   std::shared_ptr<ColorSource> colorSource() const {
     return _colorSource;
   }
-
-  /**
-   * Sets the color source used for the stroke.
-   */
-  void setColorSource(std::shared_ptr<ColorSource> value);
 
   /**
    * Returns the alpha value applied to the stroke. Ranges from 0.0 (fully transparent) to 1.0
@@ -186,7 +183,9 @@ class StrokeStyle : public VectorElement {
   void apply(VectorContext* context) override;
 
  protected:
-  StrokeStyle() = default;
+  explicit StrokeStyle(std::shared_ptr<ColorSource> colorSource)
+      : _colorSource(std::move(colorSource)) {
+  }
 
  private:
   std::shared_ptr<ColorSource> _colorSource = nullptr;

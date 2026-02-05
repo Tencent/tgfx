@@ -31,20 +31,22 @@ namespace tgfx {
 class Text : public VectorElement {
  public:
   /**
-   * Creates a new Text instance.
+   * Creates a new Text instance with the specified text blob and optional anchor offsets.
+   * @param textBlob The text blob to render. If null, returns nullptr.
+   * @param anchors Optional anchor offsets for each glyph. These offsets are relative to each
+   * glyph's default anchor point at (advance * 0.5, 0). If the array length does not match the
+   * glyph count, it will be resized (padded with zeros or truncated) and a warning is logged.
+   * @return A new Text instance, or nullptr if textBlob is null.
    */
-  static std::shared_ptr<Text> Make();
+  static std::shared_ptr<Text> Make(std::shared_ptr<TextBlob> textBlob,
+                                    std::vector<Point> anchors = {});
+
   /**
    * Returns the text blob to render.
    */
   std::shared_ptr<TextBlob> textBlob() const {
     return _textBlob;
   }
-
-  /**
-   * Sets the text blob to render.
-   */
-  void setTextBlob(std::shared_ptr<TextBlob> value);
 
   /**
    * Returns the position of the text blob.
@@ -66,13 +68,6 @@ class Text : public VectorElement {
     return _anchors;
   }
 
-  /**
-   * Sets the anchor offsets for each glyph. The array length should match the total glyph count
-   * of the text blob. If shorter, missing entries default to (0, 0). If longer, extra entries are
-   * ignored. A warning is logged if the length does not match.
-   */
-  void setAnchors(std::vector<Point> value);
-
  protected:
   Type type() const override {
     return Type::Text;
@@ -81,7 +76,9 @@ class Text : public VectorElement {
   void apply(VectorContext* context) override;
 
  protected:
-  Text() = default;
+  Text(std::shared_ptr<TextBlob> textBlob, std::vector<Point> anchors)
+      : _textBlob(std::move(textBlob)), _anchors(std::move(anchors)) {
+  }
 
  private:
   std::shared_ptr<TextBlob> _textBlob = nullptr;

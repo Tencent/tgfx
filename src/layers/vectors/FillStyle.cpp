@@ -91,17 +91,11 @@ class FillPainter : public Painter {
   }
 };
 
-std::shared_ptr<FillStyle> FillStyle::Make() {
-  return std::shared_ptr<FillStyle>(new FillStyle());
-}
-
-void FillStyle::setColorSource(std::shared_ptr<ColorSource> value) {
-  if (_colorSource == value) {
-    return;
+std::shared_ptr<FillStyle> FillStyle::Make(std::shared_ptr<ColorSource> colorSource) {
+  if (colorSource == nullptr) {
+    return nullptr;
   }
-  replaceChildProperty(_colorSource.get(), value.get());
-  _colorSource = std::move(value);
-  invalidateContent();
+  return std::shared_ptr<FillStyle>(new FillStyle(std::move(colorSource)));
 }
 
 void FillStyle::setAlpha(float value) {

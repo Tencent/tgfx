@@ -22,16 +22,23 @@
 
 namespace tgfx {
 
-std::shared_ptr<Text> Text::Make() {
-  return std::shared_ptr<Text>(new Text());
-}
-
-void Text::setTextBlob(std::shared_ptr<TextBlob> value) {
-  if (_textBlob == value) {
-    return;
+std::shared_ptr<Text> Text::Make(std::shared_ptr<TextBlob> textBlob,
+                                 std::vector<Point> anchors) {
+  if (textBlob == nullptr) {
+    return nullptr;
   }
-  _textBlob = std::move(value);
-  invalidateContent();
+  // Calculate glyph count for anchors validation
+  size_t glyphCount = 0;
+  for (auto run : *textBlob) {
+    glyphCount += run.glyphCount;
+  }
+  // Validate and adjust anchors size
+  if (!anchors.empty() && anchors.size() != glyphCount) {
+    LOGE("Text::Make: anchors size (%zu) does not match glyph count (%zu)", anchors.size(),
+         glyphCount);
+    anchors.resize(glyphCount, Point::Zero());
+  }
+  return std::shared_ptr<Text>(new Text(std::move(textBlob), std::move(anchors)));
 }
 
 void Text::setPosition(const Point& value) {
@@ -42,28 +49,10 @@ void Text::setPosition(const Point& value) {
   invalidateContent();
 }
 
-void Text::setAnchors(std::vector<Point> value) {
-  if (_anchors == value) {
-    return;
-  }
-  _anchors = std::move(value);
-  invalidateContent();
-}
-
 void Text::apply(VectorContext* context) {
   DEBUG_ASSERT(context != nullptr);
   if (_textBlob == nullptr) {
     return;
-  }
-  if (!_anchors.empty()) {
-    size_t glyphCount = 0;
-    for (auto run : *_textBlob) {
-      glyphCount += run.glyphCount;
-    }
-    if (_anchors.size() != glyphCount) {
-      LOGE("Text::apply: anchors size (%zu) does not match glyph count (%zu)", _anchors.size(),
-           glyphCount);
-    }
   }
   context->addTextBlob(_textBlob, _position, _anchors);
 }

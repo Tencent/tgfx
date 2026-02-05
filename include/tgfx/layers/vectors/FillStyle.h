@@ -45,9 +45,11 @@ enum class FillRule {
 class FillStyle : public VectorElement {
  public:
   /**
-   * Creates a new FillStyle instance.
+   * Creates a new FillStyle instance with the specified color source.
+   * @param colorSource The color source used for the fill. If null, returns nullptr.
+   * @return A new FillStyle instance, or nullptr if colorSource is null.
    */
-  static std::shared_ptr<FillStyle> Make();
+  static std::shared_ptr<FillStyle> Make(std::shared_ptr<ColorSource> colorSource);
 
   /**
    * Returns the color source used for the fill.
@@ -55,11 +57,6 @@ class FillStyle : public VectorElement {
   std::shared_ptr<ColorSource> colorSource() const {
     return _colorSource;
   }
-
-  /**
-   * Sets the color source used for the fill.
-   */
-  void setColorSource(std::shared_ptr<ColorSource> value);
 
   /**
    * Returns the alpha value applied to the fill. Ranges from 0.0 (fully transparent) to 1.0 (fully
@@ -123,7 +120,9 @@ class FillStyle : public VectorElement {
   void apply(VectorContext* context) override;
 
  protected:
-  FillStyle() = default;
+  explicit FillStyle(std::shared_ptr<ColorSource> colorSource)
+      : _colorSource(std::move(colorSource)) {
+  }
 
  private:
   std::shared_ptr<ColorSource> _colorSource = nullptr;
