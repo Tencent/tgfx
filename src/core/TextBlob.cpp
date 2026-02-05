@@ -129,6 +129,7 @@ TextBlob::TextBlob(size_t runCount, const Rect& bounds)
 
 TextBlob::~TextBlob() {
   AtomicCacheReset(bounds);
+  // Explicitly destruct RunRecords since they contain Font objects
   const RunRecord* run = firstRun();
   for (size_t i = 0; i < runCount; i++) {
     const RunRecord* nextRun = run->next();
@@ -149,6 +150,8 @@ const RunRecord* TextBlob::firstRun() const {
   if (runCount == 0) {
     return nullptr;
   }
+  // Run data immediately follows the TextBlob object, aligned for RunRecord.
+  // This matches AlignedBlobHeaderSize() in TextBlobBuilder.
   size_t headerSize = sizeof(TextBlob);
   size_t alignment = alignof(RunRecord);
   size_t alignedOffset = (headerSize + alignment - 1) & ~(alignment - 1);
@@ -267,6 +270,7 @@ Rect TextBlob::getTightBounds(const Matrix* matrix) const {
       auto glyphBounds = font.getBounds(run.glyphs[i]);
       auto glyphMatrix = GetGlyphMatrix(run, i);
       if (hasScale) {
+        // Pre-scale to counteract the enlarged glyphBounds from the scaled font.
         glyphMatrix.preScale(inverseScale, inverseScale);
       }
       glyphBounds = glyphMatrix.mapRect(glyphBounds);
