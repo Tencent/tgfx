@@ -37,27 +37,28 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font
   const char* textStart = text.data();
   const char* textStop = textStart + text.size();
 
-  // First pass: count glyphs and detect empty glyphs
-  size_t glyphCount = 0;
+  // First pass: collect glyphs and detect empty glyphs
+  std::vector<GlyphID> glyphs;
   bool hasEmptyGlyph = false;
   const char* ptr = textStart;
   while (ptr < textStop) {
     auto unichar = UTF::NextUTF8(&ptr, textStop);
     auto glyphID = font.getGlyphID(unichar);
     if (glyphID > 0) {
-      glyphCount++;
+      glyphs.push_back(glyphID);
     } else {
       hasEmptyGlyph = true;
     }
   }
-  if (glyphCount == 0) {
+  if (glyphs.empty()) {
     return nullptr;
   }
 
   TextBlobBuilder builder;
   if (hasEmptyGlyph) {
     // Has empty glyphs, use Horizontal positioning for precise spacing control
-    const auto& buffer = builder.allocRunPosH(font, glyphCount, 0.0f);
+    const auto& buffer = builder.allocRunPosH(font, glyphs.size(), 0.0f);
+    memcpy(buffer.glyphs, glyphs.data(), glyphs.size() * sizeof(GlyphID));
     auto emptyAdvance = font.getSize() / 2.0f;
     float xOffset = 0;
     size_t index = 0;
@@ -66,7 +67,6 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font
       auto unichar = UTF::NextUTF8(&ptr, textStop);
       auto glyphID = font.getGlyphID(unichar);
       if (glyphID > 0) {
-        buffer.glyphs[index] = glyphID;
         buffer.positions[index] = xOffset;
         xOffset += font.getAdvance(glyphID);
         index++;
@@ -76,15 +76,8 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font
     }
   } else {
     // No empty glyphs, use Default positioning to save storage
-    const auto& buffer = builder.allocRun(font, glyphCount, 0.0f, 0.0f);
-    size_t index = 0;
-    ptr = textStart;
-    while (ptr < textStop) {
-      auto unichar = UTF::NextUTF8(&ptr, textStop);
-      auto glyphID = font.getGlyphID(unichar);
-      buffer.glyphs[index] = glyphID;
-      index++;
-    }
+    const auto& buffer = builder.allocRun(font, glyphs.size(), 0.0f, 0.0f);
+    memcpy(buffer.glyphs, glyphs.data(), glyphs.size() * sizeof(GlyphID));
   }
   return builder.build();
 }
