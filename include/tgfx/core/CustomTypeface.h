@@ -167,9 +167,6 @@ class ImageTypefaceBuilder : public CustomTypefaceBuilder {
     std::shared_ptr<ImageCodec> image = nullptr;
     Point offset = {};
     float advance = 0.0f;
-    ImageGlyphRecord(float advance, std::shared_ptr<ImageCodec> image, const Point& offset)
-        : image(std::move(image)), offset(offset), advance(advance) {
-    }
   };
 
   std::vector<std::shared_ptr<ImageGlyphRecord>> glyphRecords = {};

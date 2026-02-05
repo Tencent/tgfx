@@ -88,7 +88,8 @@ GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const 
   auto bounds = Rect::MakeWH(image->width(), image->height());
   bounds.offset(offset);
   fontBounds.join(bounds);
-  glyphRecords.emplace_back(std::make_shared<ImageGlyphRecord>(advance, std::move(image), offset));
+  glyphRecords.push_back(std::make_shared<ImageGlyphRecord>(
+      ImageGlyphRecord{std::move(image), offset, advance}));
   return glyphID;
 }
 
