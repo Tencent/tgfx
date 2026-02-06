@@ -51,7 +51,7 @@ class BackgroundContext {
   BackgroundContext(Context* context, const Matrix& matrix, const Rect& rect,
                     std::shared_ptr<ColorSpace> colorSpace)
       : context(context), imageMatrix(matrix), backgroundRect(rect),
-        colorSpace(std::move(colorSpace)){};
+        colorSpace(std::move(colorSpace)) {};
   Context* context = nullptr;
   Matrix imageMatrix = Matrix::I();
   Rect backgroundRect = Rect::MakeEmpty();

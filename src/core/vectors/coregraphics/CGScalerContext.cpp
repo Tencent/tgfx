@@ -150,6 +150,7 @@ CGScalerContext::~CGScalerContext() {
 }
 
 FontMetrics CGScalerContext::getFontMetrics() const {
+  std::call_once(fontMetricsOnce, [this]() { fontMetrics = computeFontMetrics(); });
   return fontMetrics;
 }
 
