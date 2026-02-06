@@ -1464,7 +1464,7 @@ TGFX_TEST(CanvasTest, DrawTextBlob) {
   paint.setShader(gradientShader);
 
   // Top: use offset parameter, shader should stay in canvas coordinate
-  canvas->drawTextBlob(textBlob, offsetX, -textBounds.top + padding, paint);
+  canvas->drawTextBlob(textBlob, offsetX, padding - textBounds.top, paint);
   // Bottom: use canvas matrix, shader moves with the text
   canvas->save();
   canvas->translate(offsetX, padding + textHeight + padding - textBounds.top);
