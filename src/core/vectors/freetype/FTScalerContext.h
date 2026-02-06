@@ -19,7 +19,9 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 #include "ft2build.h"
 #include FT_COLOR_H
 #include FT_FREETYPE_H
@@ -55,6 +57,8 @@ class FTScalerContext : public ScalerContext {
   }
 
  private:
+  FontMetrics computeFontMetrics() const;
+
   int setupSize(bool fauxItalic) const;
 
   void getFontMetricsInternal(FontMetrics* metrics) const;
@@ -86,5 +90,32 @@ class FTScalerContext : public ScalerContext {
   FT_Int strikeIndex = -1;  // The bitmap strike for the face (or -1 if none).
   FT_Int32 loadGlyphFlags = 0;
   float backingSize = 1.0f;
+  mutable std::once_flag fontMetricsOnce = {};
+  mutable FontMetrics fontMetrics = {};
+
+  // Caching for performance optimization
+  mutable std::mutex advanceCacheMutex = {};
+  mutable std::unordered_map<GlyphID, float> advanceCacheH = {};
+  mutable std::unordered_map<GlyphID, float> advanceCacheV = {};
+
+  struct FTBoundsKey {
+    GlyphID glyphID;
+    bool fauxBold;
+    bool fauxItalic;
+
+    bool operator==(const FTBoundsKey& other) const {
+      return glyphID == other.glyphID && fauxBold == other.fauxBold && fauxItalic == other.fauxItalic;
+    }
+  };
+
+  struct FTBoundsKeyHash {
+    size_t operator()(const FTBoundsKey& key) const {
+      return std::hash<GlyphID>()(key.glyphID) ^ (std::hash<bool>()(key.fauxBold) << 1) ^
+             (std::hash<bool>()(key.fauxItalic) << 2);
+    }
+  };
+
+  mutable std::mutex boundsCacheMutex = {};
+  mutable std::unordered_map<FTBoundsKey, Rect, FTBoundsKeyHash> boundsCache = {};
 };
 }  // namespace tgfx

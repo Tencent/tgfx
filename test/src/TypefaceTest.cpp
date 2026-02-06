@@ -16,7 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <chrono>
 #include "tgfx/core/CustomTypeface.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Typeface.h"
 #include "utils/TestUtils.h"
 
@@ -160,5 +162,29 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   canvas->drawGlyphs(glyphIDs2.data(), positions2.data(), glyphIDs2.size(), font, {});
 
   EXPECT_TRUE(Baseline::Compare(surface, "TypefaceTest/CustomImageTypeface"));
+}
+
+TGFX_TEST(TypefaceTest, FontMetricsCachePerformance) {
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+
+  Font font(typeface, 24.0f);
+  const int iterations = 100000;
+
+  auto start = std::chrono::high_resolution_clock::now();
+  float sum = 0;
+  for (int i = 0; i < iterations; i++) {
+    auto metrics = font.getMetrics();
+    sum += metrics.ascent;
+  }
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+  printf("getFontMetrics() x %d: %lld us (avg: %.4f us/call)\n", iterations,
+         static_cast<long long>(duration.count()),
+         static_cast<double>(duration.count()) / iterations);
+
+  EXPECT_NE(sum, 0);
+  EXPECT_LT(duration.count(), 1000000);
 }
 }  // namespace tgfx

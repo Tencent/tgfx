@@ -275,6 +275,13 @@ int FTScalerContext::setupSize(bool fauxItalic) const {
 }
 
 FontMetrics FTScalerContext::getFontMetrics() const {
+  std::call_once(fontMetricsOnce, [this]() {
+    fontMetrics = computeFontMetrics();
+  });
+  return fontMetrics;
+}
+
+FontMetrics FTScalerContext::computeFontMetrics() const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   FontMetrics metrics = {};
   if (setupSize(false)) {
@@ -672,11 +679,32 @@ Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxI
 }
 
 float FTScalerContext::getAdvance(GlyphID glyphID, bool verticalText) const {
+  // Select cache based on text direction
+  auto& cache = verticalText ? advanceCacheV : advanceCacheH;
+
+  // Check cache first
+  {
+    std::lock_guard<std::mutex> cacheLock(advanceCacheMutex);
+    auto it = cache.find(glyphID);
+    if (it != cache.end()) {
+      return it->second;
+    }
+  }
+
+  // Cache miss: compute advance
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   if (setupSize(false)) {
     return 0;
   }
-  return getAdvanceInternal(glyphID, verticalText);
+  float advance = getAdvanceInternal(glyphID, verticalText);
+
+  // Store in cache
+  {
+    std::lock_guard<std::mutex> cacheLock(advanceCacheMutex);
+    cache[glyphID] = advance;
+  }
+
+  return advance;
 }
 
 float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) const {
