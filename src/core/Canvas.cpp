@@ -507,12 +507,14 @@ void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
   }
   SaveLayerForImageFilter(paint.getImageFilter());
   auto state = *mcState;
-  auto brush = paint.getBrush();
-  if (x != 0.0f || y != 0.0f) {
+  if (!FloatNearlyZero(x) || !FloatNearlyZero(y)) {
     state.matrix.preTranslate(x, y);
-    brush = brush.makeWithMatrix(Matrix::MakeTrans(-x, -y));
+    drawContext->drawTextBlob(std::move(textBlob), state,
+                              paint.getBrush().makeWithMatrix(Matrix::MakeTrans(-x, -y)),
+                              paint.getStroke());
+  } else {
+    drawContext->drawTextBlob(std::move(textBlob), state, paint.getBrush(), paint.getStroke());
   }
-  drawContext->drawTextBlob(std::move(textBlob), state, brush, paint.getStroke());
 }
 
 void Canvas::drawPicture(std::shared_ptr<Picture> picture) {
