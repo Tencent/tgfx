@@ -26,6 +26,13 @@
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
+/**
+ * WebTypeface provides access to browser's default fonts through Canvas 2D API.
+ *
+ * WARNING: This class is NOT thread-safe. All methods must be called from the main thread only,
+ * as it relies on JavaScript Canvas 2D API which is not available in Web Workers.
+ * For multi-threaded rendering, use FTTypeface with font files loaded via MakeFromPath/Bytes/Data.
+ */
 class WebTypeface : public Typeface {
  public:
   static std::shared_ptr<WebTypeface> Make(const std::string& name, const std::string& style = "");

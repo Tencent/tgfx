@@ -22,6 +22,7 @@
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
+class Texture;
 class WebImageBuffer : public ImageBuffer {
  public:
   /**
@@ -37,7 +38,8 @@ class WebImageBuffer : public ImageBuffer {
    * tgfx.releaseNativeImage() when it goes out of scope. Returns nullptr if the nativeImage is
    * nullptr or has a size of zero.
    */
-  static std::shared_ptr<WebImageBuffer> MakeAdopted(emscripten::val nativeImage);
+  static std::shared_ptr<WebImageBuffer> MakeAdopted(emscripten::val nativeImage,
+                                                     bool alphaOnly = false);
 
   ~WebImageBuffer() override;
 
@@ -50,7 +52,7 @@ class WebImageBuffer : public ImageBuffer {
   }
 
   bool isAlphaOnly() const override {
-    return false;
+    return _alphaOnly;
   }
 
   const std::shared_ptr<ColorSpace>& colorSpace() const override {
@@ -60,13 +62,17 @@ class WebImageBuffer : public ImageBuffer {
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
 
+  bool onUploadToTexture(Context* context, std::shared_ptr<Texture> texture, int offsetX,
+                         int offsetY) const override;
+
  private:
   int _width = 0;
   int _height = 0;
+  bool _alphaOnly = false;
   emscripten::val nativeImage = emscripten::val::null();
   bool adopted = false;
 
-  WebImageBuffer(int width, int height, emscripten::val nativeImage);
+  WebImageBuffer(int width, int height, emscripten::val nativeImage, bool alphaOnly = false);
 
   emscripten::val getImage() const;
 

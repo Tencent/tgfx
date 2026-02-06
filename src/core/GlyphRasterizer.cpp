@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlyphRasterizer.h"
+#include "core/AtlasTypes.h"
 
 namespace tgfx {
 GlyphRasterizer::GlyphRasterizer(int width, int height,
@@ -30,6 +31,21 @@ GlyphRasterizer::~GlyphRasterizer() {
   if (stroke) {
     delete stroke;
   }
+}
+
+bool GlyphRasterizer::asyncSupport() const {
+  return scalerContext->asyncSupport();
+}
+
+std::shared_ptr<ImageBuffer> GlyphRasterizer::onMakeBuffer(bool tryHardware) const {
+  if (!scalerContext->asyncSupport()) {
+    auto buffer =
+        scalerContext->makeGlyphBuffer(glyphID, fauxBold, stroke, Plot::CellPadding, isAlphaOnly());
+    if (buffer != nullptr) {
+      return buffer;
+    }
+  }
+  return ImageCodec::onMakeBuffer(tryHardware);
 }
 
 bool GlyphRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,

@@ -33,6 +33,14 @@ class ScalerContext {
 
   virtual ~ScalerContext() = default;
 
+  /**
+   * Returns true if this ScalerContext supports asynchronous operations. If false, all methods
+   * must be called from the main thread only.
+   */
+  virtual bool asyncSupport() const {
+    return true;
+  }
+
   std::shared_ptr<Typeface> getTypeface() const {
     return typeface;
   }
@@ -68,6 +76,15 @@ class ScalerContext {
 
   virtual float getBackingSize() const {
     return textSize;
+  }
+
+  /**
+   * Creates an ImageBuffer containing the rendered glyph that supports direct texture upload.
+   * Returns nullptr if direct upload is not supported. Default implementation returns nullptr.
+   */
+  virtual std::shared_ptr<ImageBuffer> makeGlyphBuffer(GlyphID, bool, const Stroke*, int,
+                                                       bool) const {
+    return nullptr;
   }
 
  protected:

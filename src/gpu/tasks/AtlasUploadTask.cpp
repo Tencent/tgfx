@@ -109,11 +109,24 @@ void AtlasUploadTask::addCell(BlockAllocator* allocator, std::shared_ptr<ImageCo
                               const Point& atlasOffset) {
   DEBUG_ASSERT(codec != nullptr);
   auto padding = Plot::CellPadding;
+  auto offsetX = static_cast<int>(atlasOffset.x) - padding;
+  auto offsetY = static_cast<int>(atlasOffset.y) - padding;
+
+  if (!codec->asyncSupport() && hardwarePixels == nullptr) {
+    auto imageBuffer = codec->makeBuffer(false);
+    if (imageBuffer != nullptr) {
+      DirectUploadCell cell;
+      cell.imageBuffer = std::move(imageBuffer);
+      cell.offsetX = offsetX;
+      cell.offsetY = offsetY;
+      directUploadCells.push_back(std::move(cell));
+      return;
+    }
+  }
+
   void* dstPixels = nullptr;
   auto dstWidth = codec->width() + 2 * padding;
   auto dstHeight = codec->height() + 2 * padding;
-  auto offsetX = static_cast<int>(atlasOffset.x) - padding;
-  auto offsetY = static_cast<int>(atlasOffset.y) - padding;
   ImageInfo dstInfo = {};
   if (hardwarePixels != nullptr) {
     dstInfo = hardwareInfo.makeIntersect(offsetX, offsetY, dstWidth, dstHeight);
@@ -138,12 +151,16 @@ void AtlasUploadTask::upload(Context* context) {
   if (textureView == nullptr) {
     return;
   }
+  auto texture = textureView->getTexture();
+  for (auto& cell : directUploadCells) {
+    cell.imageBuffer->onUploadToTexture(context, texture, cell.offsetX, cell.offsetY);
+  }
+  directUploadCells.clear();
   auto queue = context->gpu()->queue();
   for (auto& task : tasks) {
     task->wait();
     if (!hardwarePixels) {
-      queue->writeTexture(textureView->getTexture(), task->atlasRect(), task->pixels(),
-                          task->info().rowBytes());
+      queue->writeTexture(texture, task->atlasRect(), task->pixels(), task->info().rowBytes());
     }
   }
   tasks.clear();
