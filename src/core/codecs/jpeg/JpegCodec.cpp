@@ -18,7 +18,6 @@
 
 #include "core/codecs/jpeg/JpegCodec.h"
 #include <csetjmp>
-#include "core/codecs/jpeg/GenericCMYKProfile.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/OrientationHelper.h"
@@ -208,22 +207,6 @@ static void ConvertCMYKToRGBWithFormula(void* pixels, const ImageInfo& dstInfo) 
   }
 }
 
-// Returns the cached Generic CMYK ICC Profile.
-static const gfx::skcms_ICCProfile* GetGenericCMYKProfile() {
-  static gfx::skcms_ICCProfile profile = MakeGenericCMYKProfile();
-  return &profile;
-}
-
-// Fallback CMYK to RGB conversion when no ICC profile is available.
-// First tries to use the built-in Generic CMYK Profile, falls back to formula if that fails.
-static void ConvertCMYKToRGBFallback(void* pixels, const ImageInfo& dstInfo) {
-  auto genericCMYKProfile = GetGenericCMYKProfile();
-  if (ConvertCMYKWithProfile(pixels, *genericCMYKProfile, dstInfo)) {
-    return;
-  }
-  ConvertCMYKToRGBWithFormula(pixels, dstInfo);
-}
-
 uint32_t JpegCodec::getScaledDimensions(int newWidth, int newHeight) const {
   auto scaledX = static_cast<float>(newWidth) / static_cast<float>(width());
   auto scaledY = static_cast<float>(newHeight) / static_cast<float>(height());
@@ -359,7 +342,7 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
       }
       if (!converted) {
         // Fallback to basic CMYK to RGB conversion when no ICC profile is available.
-        ConvertCMYKToRGBFallback(outPixels, dstInfo);
+        ConvertCMYKToRGBWithFormula(outPixels, dstInfo);
       }
     }
     result = jpeg_finish_decompress(&cinfo);
