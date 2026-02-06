@@ -22,6 +22,7 @@
 #include "core/images/SubsetImage.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/RenderContext.h"
+#include "gpu/ops/FillRRectOp.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "gtest/gtest.h"
@@ -1483,6 +1484,112 @@ TGFX_TEST(CanvasTest, CMYKWithoutICCProfile) {
   auto canvas = surface->getCanvas();
   canvas->drawImage(image);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CMYKWithoutICCProfile"));
+}
+
+TGFX_TEST(CanvasTest, FillRRectOp) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 500);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // FillRRectOp is used when antiAlias is false and no stroke.
+  Paint paint;
+  paint.setAntiAlias(false);
+
+  // Single filled RRect with uniform radii.
+  paint.setColor(Color::Red());
+  RRect rrect1 = {};
+  rrect1.setRectXY(Rect::MakeXYWH(50, 50, 120, 80), 15, 15);
+  canvas->drawRRect(rrect1, paint);
+
+  // Different colors and radii.
+  paint.setColor(Color::Green());
+  RRect rrect2 = {};
+  rrect2.setRectXY(Rect::MakeXYWH(200, 50, 150, 100), 30, 20);
+  canvas->drawRRect(rrect2, paint);
+
+  // Ellipse-like (large corner radii).
+  paint.setColor(Color::Blue());
+  RRect rrect3 = {};
+  rrect3.setRectXY(Rect::MakeXYWH(50, 160, 100, 80), 50, 40);
+  canvas->drawRRect(rrect3, paint);
+
+  // Small corner radii.
+  paint.setColor(Color::FromRGBA(255, 165, 0, 255));
+  RRect rrect4 = {};
+  rrect4.setRectXY(Rect::MakeXYWH(200, 160, 150, 100), 5, 5);
+  canvas->drawRRect(rrect4, paint);
+
+  // With transformation - rotation.
+  canvas->save();
+  canvas->translate(100, 350);
+  canvas->rotate(15);
+  paint.setColor(Color::FromRGBA(128, 0, 128, 255));
+  RRect rrect5 = {};
+  rrect5.setRectXY(Rect::MakeXYWH(-50, -30, 100, 60), 10, 10);
+  canvas->drawRRect(rrect5, paint);
+  canvas->restore();
+
+  // With transformation - scale.
+  canvas->save();
+  canvas->translate(280, 350);
+  canvas->scale(1.5f, 0.8f);
+  paint.setColor(Color::FromRGBA(0, 128, 128, 255));
+  RRect rrect6 = {};
+  rrect6.setRectXY(Rect::MakeXYWH(-40, -25, 80, 50), 12, 12);
+  canvas->drawRRect(rrect6, paint);
+  canvas->restore();
+
+  // Verify FillRRectOp is used by checking the Op type.
+  surface->renderContext->flush();
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  ASSERT_TRUE(drawingBuffer->renderTasks.size() >= 1);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
+  ASSERT_TRUE(task->drawOps.size() >= 1);
+  // All non-AA filled RRects should be batched into FillRRectOp.
+  EXPECT_EQ(task->drawOps.back().get()->type(), DrawOp::Type::FillRRectOp);
+  EXPECT_EQ(static_cast<FillRRectOp*>(task->drawOps.back().get())->rectCount, 6u);
+
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/FillRRectOp"));
+}
+
+TGFX_TEST(CanvasTest, FillRRectOpWithShader) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 350);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Test FillRRectOp with image shader to verify UV coordinates are correct.
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+
+  // Draw two RRects with different AA modes to verify shader works with both paths.
+  // Top: FillRRectOp (antiAlias=false), Bottom: RRectDrawOp (antiAlias=true)
+  // Both use device coordinates for UV, so textures should tile continuously.
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setShader(shader);
+  RRect rrect = {};
+  rrect.setRectXY(Rect::MakeXYWH(50, 50, 200, 120), 30, 30);
+  canvas->drawRRect(rrect, paint);
+
+  // Bottom: RRectDrawOp (antiAlias=true)
+  Paint paint2;
+  paint2.setAntiAlias(true);
+  paint2.setShader(shader);
+  RRect rrect2 = {};
+  rrect2.setRectXY(Rect::MakeXYWH(50, 180, 200, 120), 30, 30);
+  canvas->drawRRect(rrect2, paint2);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/FillRRectOpWithShader"));
 }
 
 }  // namespace tgfx

@@ -84,6 +84,12 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> getRRectIndexBuffer(bool stroke);
 
   /**
+   * Returns a GPU buffer containing indices for rendering filled round rectangles using
+   * FillRRectOp.
+   */
+  std::shared_ptr<GPUBufferProxy> getFillRRectIndexBuffer();
+
+  /**
    * Finds a static resource in the cache by its unique key. Returns nullptr if no resource is found.
    * The resource will be kept alive for the lifetime of the GlobalCache.
    */
@@ -126,6 +132,7 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> nonAAQuadIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> rRectFillIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> rRectStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> fillRRectIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> aaRectMiterStrokeIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> aaRectRoundStrokeIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> aaRectBevelStrokeIndexBuffer = nullptr;
