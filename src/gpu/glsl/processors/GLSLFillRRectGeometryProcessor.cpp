@@ -169,9 +169,10 @@ void GLSLFillRRectGeometryProcessor::emitCode(EmitArgs& args) const {
   vertBuilder->codeAppend("  vec2 arccoord = 1.0 - abs(radius_outset) + aa_outset / radii * corner;");
   // We are a corner piece: Interpolate the arc coordinates for coverage.
   // Emit x+1 to ensure no pixel in the arc has a x value of 0.
+  // The gradient is order-1: Interpolate it across arccoord.zw.
   vertBuilder->codeAppend("  mat2 derivatives = inverse(skewmatrix);");
   vertBuilder->codeAppendf("  %s = vec4(arccoord.x + 1.0, arccoord.y, "
-                           "derivatives[0] * arccoord / radii * 2.0);",
+                           "derivatives * (arccoord / radii * 2.0));",
                            arcCoordVarying.vsOut().c_str());
   vertBuilder->codeAppend("}");
 

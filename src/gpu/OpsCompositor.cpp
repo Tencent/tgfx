@@ -130,20 +130,24 @@ void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Brush
   }
 }
 
+// FillRRectOp has more vertices (40 vs 16) but avoids per-pixel ellipse equation for inner pixels.
+// Use FillRRectOp only when the RRect is large enough that the fragment shader savings outweigh
+// the extra vertex processing overhead. Threshold is approximately 256x256 pixels.
+static constexpr float FillRRectAreaThreshold = 65536.0f;
+
 void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
                               const Stroke* stroke) {
   DEBUG_ASSERT(!rRect.rect.isEmpty());
   auto rectBrush = brush.makeWithMatrix(state.matrix);
   auto aaType = getAAType(rectBrush);
-  if (aaType == AAType::None) {
-    // Non-AA stroked RRect is not supported, fall back to drawShape.
-    if (stroke != nullptr) {
-      Path path = {};
-      path.addRRect(rRect);
-      drawShape(Shape::MakeFrom(std::move(path)), state, brush);
-      return;
-    }
-    // Use FillRRectOp for non-AA filled RRect.
+  // Calculate the transformed area to determine which Op to use.
+  auto scales = state.matrix.getAxisScales();
+  auto transformedArea = rRect.rect.width() * scales.x * rRect.rect.height() * scales.y;
+  auto useFillRRectOp =
+      stroke == nullptr && !state.matrix.hasPerspective() && transformedArea >= FillRRectAreaThreshold;
+  if (useFillRRectOp) {
+    // Use FillRRectOp for large filled RRect, which avoids computing the ellipse equation for
+    // inner pixels.
     if (!canAppend(PendingOpType::FillRRect, state.clip, rectBrush)) {
       flushPendingOps(PendingOpType::FillRRect, state.clip, rectBrush);
     }
@@ -151,7 +155,15 @@ void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Br
     pendingRRects.emplace_back(std::move(record));
     return;
   }
-  // Use RRectDrawOp (EllipseGeometryProcessor) for AA filled or stroked RRect.
+  // Use RRectDrawOp (EllipseGeometryProcessor) for stroked RRect, perspective transformation,
+  // or small filled RRect where vertex count matters more than fragment shader computation.
+  if (aaType == AAType::None) {
+    // Non-AA stroked/perspective RRect is not supported, fall back to drawShape.
+    Path path = {};
+    path.addRRect(rRect);
+    drawShape(Shape::MakeFrom(std::move(path)), state, brush);
+    return;
+  }
   if (!canAppend(PendingOpType::RRect, state.clip, rectBrush) ||
       (pendingStrokes.empty() != (stroke == nullptr))) {
     flushPendingOps(PendingOpType::RRect, state.clip, rectBrush);
