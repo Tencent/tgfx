@@ -22,6 +22,7 @@
 #include <cmath>
 #include <numeric>
 #include <random>
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -326,9 +327,7 @@ float TextSelector::CalculateCombinedFactor(
   bool isFirst = true;
 
   for (const auto& selector : selectors) {
-    if (selector == nullptr) {
-      continue;
-    }
+    DEBUG_ASSERT(selector != nullptr);
     float factor = selector->calculateFactor(index, totalCount);
 
     if (isFirst && selector->mode() != SelectorMode::Subtract) {
@@ -416,11 +415,12 @@ void RangeSelector::setEaseIn(float value) {
   invalidateContent();
 }
 
-void RangeSelector::setRandomizeOrder(bool value) {
-  if (_randomizeOrder == value) {
+void RangeSelector::setRandomOrder(bool value) {
+  if (_randomOrder == value) {
     return;
   }
-  _randomizeOrder = value;
+  _randomOrder = value;
+  _randomIndicesCache.clear();
   invalidateContent();
 }
 
@@ -429,18 +429,21 @@ void RangeSelector::setRandomSeed(uint16_t value) {
     return;
   }
   _randomSeed = value;
+  _randomIndicesCache.clear();
   invalidateContent();
 }
 
-float RangeSelector::calculateFactor(size_t index, size_t totalCount) const {
+float RangeSelector::calculateFactor(size_t index, size_t totalCount) {
   if (totalCount == 0) {
     return 0.0f;
   }
 
   size_t effectiveIndex = index;
-  if (_randomizeOrder) {
-    auto randomIndices = BuildRandomIndices(totalCount, _randomSeed);
-    effectiveIndex = randomIndices[index];
+  if (_randomOrder) {
+    if (_randomIndicesCache.size() != totalCount) {
+      _randomIndicesCache = BuildRandomIndices(totalCount, _randomSeed);
+    }
+    effectiveIndex = _randomIndicesCache[index];
   }
 
   auto textStart = static_cast<float>(effectiveIndex) / static_cast<float>(totalCount);

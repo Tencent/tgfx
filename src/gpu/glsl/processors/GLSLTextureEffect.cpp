@@ -103,9 +103,9 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   auto uniformHandler = args.uniformHandler;
   auto& textureSampler = (*args.textureSamplers)[0];
-  auto vertexColor = (*args.transformedCoords)[0].name();
+  auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
   if (args.coordFunc) {
-    vertexColor = args.coordFunc(vertexColor);
+    texCoordName = args.coordFunc(texCoordName);
   }
   std::string subsetName = "";
   if (needSubset()) {
@@ -117,7 +117,7 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   if (SrcRectConstraint::Strict == constraint) {
     extraSubsetName = args.inputSubset;
   }
-  appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, extraSubsetName);
+  appendClamp(fragBuilder, texCoordName, finalCoordName, subsetName, extraSubsetName);
   fragBuilder->codeAppend("vec4 color = ");
   fragBuilder->appendTextureLookup(textureSampler, finalCoordName);
   fragBuilder->codeAppend(";");
@@ -142,7 +142,7 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
   auto uniformHandler = args.uniformHandler;
   auto yuvTexture = getYUVTexture();
   auto& textureSamplers = *args.textureSamplers;
-  auto vertexColor = (*args.transformedCoords)[0].name();
+  const auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
   std::string subsetName = "";
   if (needSubset()) {
     subsetName = uniformHandler->addUniform("Subset", UniformFormat::Float4, ShaderStage::Fragment);
@@ -153,22 +153,22 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
   }
   std::string finalCoordName = "finalCoord";
   fragBuilder->codeAppendf("highp vec2 %s;", finalCoordName.c_str());
-  appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, extraSubsetName);
+  appendClamp(fragBuilder, texCoordName, finalCoordName, subsetName, extraSubsetName);
   fragBuilder->codeAppend("vec3 yuv;");
   fragBuilder->codeAppend("yuv.x = ");
   fragBuilder->appendTextureLookup(textureSamplers[0], finalCoordName);
   fragBuilder->codeAppend(".r;");
   if (yuvTexture->yuvFormat() == YUVFormat::I420) {
-    appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, extraSubsetName);
+    appendClamp(fragBuilder, texCoordName, finalCoordName, subsetName, extraSubsetName);
     fragBuilder->codeAppend("yuv.y = ");
     fragBuilder->appendTextureLookup(textureSamplers[1], finalCoordName);
     fragBuilder->codeAppend(".r;");
-    appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, extraSubsetName);
+    appendClamp(fragBuilder, texCoordName, finalCoordName, subsetName, extraSubsetName);
     fragBuilder->codeAppend("yuv.z = ");
     fragBuilder->appendTextureLookup(textureSamplers[2], finalCoordName);
     fragBuilder->codeAppend(".r;");
   } else if (yuvTexture->yuvFormat() == YUVFormat::NV12) {
-    appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, extraSubsetName);
+    appendClamp(fragBuilder, texCoordName, finalCoordName, subsetName, extraSubsetName);
     fragBuilder->codeAppend("yuv.yz = ");
     fragBuilder->appendTextureLookup(textureSamplers[1], finalCoordName);
     fragBuilder->codeAppend(".ra;");

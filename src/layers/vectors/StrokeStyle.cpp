@@ -195,6 +195,7 @@ class StrokePainter : public Painter {
     runStroke.width = BlendStrokeWidth(stroke.width, run.style) * scale;
     auto paints = MakeBlendPaints(shader, alpha, blendMode, run.style);
 
+    recorder->setMatrix(matrix);
     for (const auto& info : paints) {
       if (info.shader == nullptr) {
         continue;
@@ -203,8 +204,9 @@ class StrokePainter : public Painter {
       paint.style = PaintStyle::Stroke;
       paint.stroke = runStroke;
       paint.placement = placement;
-      recorder->addTextBlob(run.textBlob, paint, matrix);
+      recorder->addTextBlob(run.textBlob, paint);
     }
+    recorder->resetMatrix();
   }
 
   void drawGlyphRunAsShape(LayerRecorder* recorder, const StyledGlyphRun& run,

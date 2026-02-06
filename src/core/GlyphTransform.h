@@ -18,47 +18,34 @@
 
 #pragma once
 
-#include "core/GlyphRun.h"
+#include "core/utils/Log.h"
+#include "tgfx/core/GlyphRun.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 
-class TextBlob;
-struct RunRecord;
+/**
+ * Returns the number of float scalars per glyph for the given positioning mode.
+ */
+unsigned ScalarsPerGlyph(GlyphPositioning positioning);
 
-// A lightweight list class for iterating over GlyphRuns without allocating a vector.
-class GlyphRunList {
- public:
-  class Iterator {
-   public:
-    Iterator(const RunRecord* record, size_t remaining) : current(record), remaining(remaining) {
-    }
+/**
+ * Returns the transformation matrix for a glyph at the given index within a GlyphRun.
+ */
+Matrix GetGlyphMatrix(const GlyphRun& run, size_t index);
 
-    GlyphRun operator*() const;
+/**
+ * Returns true if the GlyphRun has complex per-glyph transforms (RSXform or Matrix positioning).
+ */
+inline bool HasComplexTransform(const GlyphRun& run) {
+  return run.positioning == GlyphPositioning::RSXform ||
+         run.positioning == GlyphPositioning::Matrix;
+}
 
-    Iterator& operator++();
-
-    bool operator!=(const Iterator& other) const {
-      return remaining != other.remaining;
-    }
-
-   private:
-    const RunRecord* current = nullptr;
-    size_t remaining = 0;
-  };
-
-  explicit GlyphRunList(const TextBlob* blob) : blob(blob) {
-  }
-
-  Iterator begin() const;
-
-  Iterator end() const {
-    return Iterator(nullptr, 0);
-  }
-
-  bool empty() const;
-
- private:
-  const TextBlob* blob = nullptr;
-};
+/**
+ * Returns the position of a glyph at the given index within a GlyphRun.
+ * Valid for Default, Horizontal, and Point positioning modes.
+ */
+Point GetGlyphPosition(const GlyphRun& run, size_t index);
 
 }  // namespace tgfx

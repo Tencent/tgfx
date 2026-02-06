@@ -17,21 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectsContent.h"
-#include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
 
 RRectsContent::RRectsContent(std::vector<RRect> rRects, const LayerPaint& paint)
-    : GeometryContent(paint), rRects(std::move(rRects)) {
-}
-
-Rect RRectsContent::onGetBounds() const {
-  auto bounds = rRects[0].rect;
-  for (size_t i = 1; i < rRects.size(); ++i) {
-    bounds.join(rRects[i].rect);
-  }
-  return bounds;
+    : DrawContent(paint), rRects(std::move(rRects)) {
 }
 
 Rect RRectsContent::getTightBounds(const Matrix& matrix) const {
@@ -65,15 +56,12 @@ bool RRectsContent::hitTestPoint(float localX, float localY) const {
   return false;
 }
 
-Path RRectsContent::getFilledPath() const {
-  Path path = {};
-  for (const auto& rRect : rRects) {
-    path.addRRect(rRect);
+Rect RRectsContent::onGetBounds() const {
+  auto bounds = rRects[0].rect;
+  for (size_t i = 1; i < rRects.size(); ++i) {
+    bounds.join(rRects[i].rect);
   }
-  if (stroke) {
-    stroke->applyToPath(&path);
-  }
-  return path;
+  return bounds;
 }
 
 void RRectsContent::onDraw(Canvas* canvas, const Paint& paint) const {
@@ -93,6 +81,17 @@ bool RRectsContent::onHasSameGeometry(const GeometryContent* other) const {
     }
   }
   return true;
+}
+
+Path RRectsContent::getFilledPath() const {
+  Path path = {};
+  for (const auto& rRect : rRects) {
+    path.addRRect(rRect);
+  }
+  if (stroke) {
+    stroke->applyToPath(&path);
+  }
+  return path;
 }
 
 }  // namespace tgfx

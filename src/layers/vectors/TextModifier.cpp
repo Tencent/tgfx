@@ -195,9 +195,16 @@ void TextModifier::apply(VectorContext* context) {
 
       float absFactor = std::abs(factor);
 
-      // Apply transform: anchor -> scale -> skew -> rotation -> position
+      // Calculate the default anchor point: half of advance width
+      float defaultAnchorX = glyph.font.getAdvance(glyph.glyphID) * 0.5f;
+
+      // Total anchor point = default anchor + user-specified anchor offset (scaled by factor)
+      float totalAnchorX = defaultAnchorX + _anchorPoint.x * factor;
+      float totalAnchorY = _anchorPoint.y * factor;
+
+      // Apply transform: anchor -> scale -> skew -> rotation -> anchor restore -> position
       Matrix transform = Matrix::I();
-      transform.postTranslate(-_anchorPoint.x * factor, -_anchorPoint.y * factor);
+      transform.postTranslate(-totalAnchorX, -totalAnchorY);
 
       float scaleX = (_scale.x - 1.0f) * factor + 1.0f;
       float scaleY = (_scale.y - 1.0f) * factor + 1.0f;
@@ -208,7 +215,7 @@ void TextModifier::apply(VectorContext* context) {
       }
 
       transform.postRotate(_rotation * factor);
-      transform.postTranslate(_anchorPoint.x * factor, _anchorPoint.y * factor);
+      transform.postTranslate(totalAnchorX, totalAnchorY);
       transform.postTranslate(_position.x * factor, _position.y * factor);
 
       glyph.matrix.preConcat(transform);

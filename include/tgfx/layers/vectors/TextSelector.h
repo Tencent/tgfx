@@ -119,7 +119,7 @@ class TextSelector : public LayerProperty {
    * @param totalCount The total number of characters.
    * @return The selection factor for this character.
    */
-  virtual float calculateFactor(size_t index, size_t totalCount) const = 0;
+  virtual float calculateFactor(size_t index, size_t totalCount) = 0;
 
   /**
    * Returns how this selector combines with previous selectors.
@@ -162,7 +162,7 @@ class RangeSelector : public TextSelector {
  public:
   RangeSelector() = default;
 
-  float calculateFactor(size_t index, size_t totalCount) const override;
+  float calculateFactor(size_t index, size_t totalCount) override;
 
   /**
    * Returns the start of the selection range.
@@ -251,24 +251,24 @@ class RangeSelector : public TextSelector {
   /**
    * Returns whether to randomize the order of character selection.
    */
-  bool randomizeOrder() const {
-    return _randomizeOrder;
+  bool randomOrder() const {
+    return _randomOrder;
   }
 
   /**
    * Sets whether to randomize the order of character selection.
    */
-  void setRandomizeOrder(bool value);
+  void setRandomOrder(bool value);
 
   /**
-   * Returns the random seed used when randomizeOrder is true.
+   * Returns the random seed used when randomOrder is true.
    */
   uint16_t randomSeed() const {
     return _randomSeed;
   }
 
   /**
-   * Sets the random seed used when randomizeOrder is true.
+   * Sets the random seed used when randomOrder is true.
    */
   void setRandomSeed(uint16_t value);
 
@@ -280,8 +280,10 @@ class RangeSelector : public TextSelector {
   SelectorShape _shape = SelectorShape::Square;
   float _easeOut = 0.0f;
   float _easeIn = 0.0f;
-  bool _randomizeOrder = false;
+  bool _randomOrder = false;
   uint16_t _randomSeed = 0;
+
+  std::vector<size_t> _randomIndicesCache = {};
 };
 
 }  // namespace tgfx

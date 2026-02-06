@@ -79,21 +79,6 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
   if (imageFilter == nullptr) {
     return nullptr;
   }
-  // When merging with previous filters, the anchor point of 3D transform would change,
-  // so we're temporarily skipping the merge
-  if (imageFilter->type() == ImageFilter::Type::Transform3D) {
-    return FilterImage::MakeFrom(weakThis.lock(), std::move(imageFilter), offset, clipRect);
-  }
-  if (imageFilter->type() == ImageFilter::Type::Compose) {
-    auto composeFilter = static_cast<ComposeImageFilter*>(imageFilter.get());
-    auto it = std::find_if(composeFilter->filters.begin(), composeFilter->filters.end(),
-                           [](const std::shared_ptr<ImageFilter>& filter) {
-                             return filter->type() == ImageFilter::Type::Transform3D;
-                           });
-    if (it != composeFilter->filters.end()) {
-      return FilterImage::MakeFrom(weakThis.lock(), std::move(imageFilter), offset, clipRect);
-    }
-  }
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   if (filter->filterBounds(inputBounds) != bounds) {
     return FilterImage::MakeFrom(weakThis.lock(), std::move(imageFilter), offset, clipRect);

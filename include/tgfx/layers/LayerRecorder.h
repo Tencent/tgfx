@@ -20,6 +20,7 @@
 
 #include <memory>
 #include "tgfx/core/Mesh.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Shape.h"
@@ -31,7 +32,7 @@ class LayerContent;
 class GeometryContent;
 
 /**
- * LayerRecorder records geometries and their paints as layer content.  Geometries with invisible
+ * LayerRecorder records geometries and their paints as layer content. Geometries with invisible
  * paints are still included as part of the layer's contour, but they will not be rendered.
  */
 class LayerRecorder {
@@ -78,13 +79,21 @@ class LayerRecorder {
                    float y = 0);
 
   /**
-   * Adds a text blob with the specified paint and transformation matrix.
-   * @param textBlob The text blob.
-   * @param paint The paint style for the text.
-   * @param matrix The transformation matrix to apply to the text.
+   * Returns the current transformation matrix. If no matrix is set, returns the identity matrix.
    */
-  void addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
-                   const Matrix& matrix);
+  const Matrix& getMatrix() const;
+
+  /**
+   * Sets the transformation matrix for subsequent drawing operations. The matrix is applied to both
+   * the geometry (Rect, RRect, Path, Shape, TextBlob) and the paint.
+   * @param matrix The transformation matrix to apply.
+   */
+  void setMatrix(const Matrix& matrix);
+
+  /**
+   * Resets the transformation matrix to none.
+   */
+  void resetMatrix();
 
   /**
    * Adds a mesh with the specified paint.
@@ -101,17 +110,31 @@ class LayerRecorder {
     Shape,
   };
 
+  // Current transformation matrix applied to all subsequent drawing operations.
+  Matrix _matrix = Matrix::I();
+
   std::vector<std::unique_ptr<GeometryContent>> contents;
   std::vector<std::unique_ptr<GeometryContent>> foregrounds;
 
   PendingType pendingType = PendingType::None;
   LayerPaint pendingPaint = {};
+  // Transformation matrix for the pending geometries.
+  Matrix pendingMatrix = Matrix::I();
   std::vector<Rect> pendingRects = {};
   std::vector<RRect> pendingRRects = {};
   std::shared_ptr<Shape> pendingShape = nullptr;
 
-  bool canAppend(PendingType type, const LayerPaint& paint) const;
-  void flushPending(PendingType newType = PendingType::None, const LayerPaint& newPaint = {});
+  void addRect(const Rect& rect, const LayerPaint& paint, const Matrix& matrix);
+  void addRRect(const RRect& rRect, const LayerPaint& paint, const Matrix& matrix);
+  void addPath(const Path& path, const LayerPaint& paint, const Matrix& matrix);
+  void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint, const Matrix& matrix);
+
+  bool tryAddSimplifiedPath(const Path& path, const LayerPaint& paint, const Matrix& matrix);
+  bool tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& shape, const LayerPaint& paint,
+                                   const Matrix& matrix);
+  bool canAppend(PendingType type, const LayerPaint& paint, const Matrix& matrix) const;
+  void flushPending(PendingType newType = PendingType::None, const LayerPaint& newPaint = {},
+                    const Matrix& newMatrix = Matrix::I());
 
   std::unique_ptr<LayerContent> finishRecording();
 

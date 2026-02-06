@@ -16,34 +16,54 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/vectors/TextSpan.h"
-#include "VectorContext.h"
-#include "core/utils/Log.h"
+#pragma once
+
+#include "tgfx/core/Point.h"
+#include "tgfx/core/TextBlob.h"
+#include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
 
-void TextSpan::setTextBlob(std::shared_ptr<TextBlob> value) {
-  if (_textBlob == value) {
-    return;
+/**
+ * Text represents a text blob with position. Multiple Text elements can be combined with
+ * VectorGroup to create rich text with different styles.
+ */
+class Text : public VectorElement {
+ public:
+  /**
+   * Returns the text blob to render.
+   */
+  std::shared_ptr<TextBlob> textBlob() const {
+    return _textBlob;
   }
-  _textBlob = std::move(value);
-  invalidateContent();
-}
 
-void TextSpan::setPosition(const Point& value) {
-  if (_position == value) {
-    return;
-  }
-  _position = value;
-  invalidateContent();
-}
+  /**
+   * Sets the text blob to render.
+   */
+  void setTextBlob(std::shared_ptr<TextBlob> value);
 
-void TextSpan::apply(VectorContext* context) {
-  DEBUG_ASSERT(context != nullptr);
-  if (_textBlob == nullptr) {
-    return;
+  /**
+   * Returns the position of the text blob.
+   */
+  Point position() const {
+    return _position;
   }
-  context->addTextBlob(_textBlob, _position);
-}
+
+  /**
+   * Sets the position of the text blob.
+   */
+  void setPosition(const Point& value);
+
+ protected:
+  Type type() const override {
+    return Type::Text;
+  }
+
+  void apply(VectorContext* context) override;
+
+ private:
+  std::shared_ptr<TextBlob> _textBlob = nullptr;
+  Point _position = {};
+};
 
 }  // namespace tgfx

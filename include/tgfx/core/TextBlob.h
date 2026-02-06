@@ -21,17 +21,26 @@
 #include <memory>
 #include <vector>
 #include "tgfx/core/Font.h"
+#include "tgfx/core/GlyphRun.h"
 #include "tgfx/core/RSXform.h"
 
 namespace tgfx {
 class TextBlobBuilder;
-class GlyphRunList;
 struct RunRecord;
 
 /**
  * TextBlob combines multiple text runs into an immutable container. Each text run consists of
  * glyphs, positions, and font. The object and run data are stored in a single contiguous memory
  * block for efficiency.
+ *
+ * Example usage for iterating over glyph runs:
+ *   for (auto run : *blob) {
+ *       const Font& font = run.font;
+ *       for (size_t i = 0; i < run.glyphCount; ++i) {
+ *           GlyphID glyph = run.glyphs[i];
+ *           // Access position data based on run.positioning
+ *       }
+ *   }
  */
 class TextBlob {
  public:
@@ -98,6 +107,40 @@ class TextBlob {
    */
   bool hitTestPoint(float localX, float localY, const Stroke* stroke = nullptr) const;
 
+  /**
+   * Iterator for traversing glyph runs within a TextBlob.
+   */
+  class Iterator {
+   public:
+    GlyphRun operator*() const;
+
+    Iterator& operator++();
+
+    bool operator!=(const Iterator& other) const {
+      return remaining != other.remaining;
+    }
+
+   private:
+    Iterator(const RunRecord* record, size_t remaining);
+
+    const RunRecord* current = nullptr;
+    size_t remaining = 0;
+    mutable std::vector<float> positionBuffer = {};
+    friend class TextBlob;
+  };
+
+  /**
+   * Returns an iterator to the first glyph run.
+   */
+  Iterator begin() const;
+
+  /**
+   * Returns an iterator past the last glyph run.
+   */
+  Iterator end() const {
+    return Iterator(nullptr, 0);
+  }
+
  private:
   size_t runCount = 0;
   mutable std::atomic<Rect*> bounds = {nullptr};
@@ -112,6 +155,5 @@ class TextBlob {
   Rect computeBounds() const;
 
   friend class TextBlobBuilder;
-  friend class GlyphRunList;
 };
 }  // namespace tgfx

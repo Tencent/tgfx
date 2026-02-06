@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/MCState.h"
+#include "core/Matrix3DUtils.h"
 #include "core/PictureRecords.h"
 #include "core/images/SubsetImage.h"
 #include "gpu/DrawingManager.h"
@@ -1022,9 +1023,10 @@ TGFX_TEST(CanvasTest, Matrix3DShapeStroke) {
   paint1.setAntiAlias(true);
   paint1.setColor(Color::FromRGBA(0, 255, 0, 255));
   paint1.setStyle(PaintStyle::Fill);
-  auto transform3DFilter = ImageFilter::Transform3D(transform);
-  paint1.setImageFilter(transform3DFilter);
+  canvas->save();
+  canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
   canvas->drawShape(rawShape, paint1);
+  canvas->restore();
 
   auto mappedShape = Shape::ApplyMatrix3D(rawShape, transform);
   Paint paint2;

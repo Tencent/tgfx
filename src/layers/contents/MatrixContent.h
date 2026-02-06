@@ -18,52 +18,36 @@
 
 #pragma once
 
-#include "tgfx/core/Point.h"
-#include "tgfx/core/TextBlob.h"
-#include "tgfx/layers/vectors/VectorElement.h"
+#include "layers/contents/GeometryContent.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 
 /**
- * TextSpan represents a text blob with position. Multiple TextSpans can be combined with
- * VectorGroup to create rich text with different styles.
+ * MatrixContent wraps a GeometryContent and applies a transformation matrix during drawing.
  */
-class TextSpan : public VectorElement {
+class MatrixContent : public GeometryContent {
  public:
-  /**
-   * Returns the text blob to render.
-   */
-  std::shared_ptr<TextBlob> textBlob() const {
-    return _textBlob;
-  }
+  MatrixContent(std::unique_ptr<GeometryContent> content, const Matrix& matrix);
 
-  /**
-   * Sets the text blob to render.
-   */
-  void setTextBlob(std::shared_ptr<TextBlob> value);
+  Rect getBounds() const override;
+  Rect getTightBounds(const Matrix& matrix) const override;
+  bool hitTestPoint(float localX, float localY) const override;
+  bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
+  void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
+  void drawContour(Canvas* canvas, bool antiAlias) const override;
+  bool contourEqualsOpaqueContent() const override;
+  bool hasBlendMode() const override;
+  bool hasSameGeometry(const GeometryContent* other) const override;
+  const std::shared_ptr<Shader>& getShader() const override;
 
-  /**
-   * Returns the position of the text blob.
-   */
-  Point position() const {
-    return _position;
-  }
-
-  /**
-   * Sets the position of the text blob.
-   */
-  void setPosition(const Point& value);
+  std::unique_ptr<GeometryContent> content = nullptr;
+  Matrix matrix = Matrix::I();
 
  protected:
   Type type() const override {
-    return Type::TextSpan;
+    return Type::Matrix;
   }
-
-  void apply(VectorContext* context) override;
-
- private:
-  std::shared_ptr<TextBlob> _textBlob = nullptr;
-  Point _position = {};
 };
 
 }  // namespace tgfx

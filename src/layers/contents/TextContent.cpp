@@ -17,20 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextContent.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 
-TextContent::TextContent(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
+TextContent::TextContent(std::shared_ptr<TextBlob> textBlob, const Point& offset,
                          const LayerPaint& paint)
-    : GeometryContent(paint), textBlob(std::move(textBlob)), textMatrix(matrix) {
+    : DrawContent(paint), textBlob(std::move(textBlob)), offset(offset) {
 }
 
 Rect TextContent::onGetBounds() const {
-  return textMatrix.mapRect(textBlob->getBounds());
+  return textBlob->getBounds().makeOffset(offset.x, offset.y);
 }
 
 Rect TextContent::getTightBounds(const Matrix& matrix) const {
-  auto combinedMatrix = textMatrix;
+  auto combinedMatrix = Matrix::MakeTrans(offset.x, offset.y);
   combinedMatrix.postConcat(matrix);
   return textBlob->getTightBounds(&combinedMatrix);
 }
@@ -39,24 +40,17 @@ bool TextContent::hitTestPoint(float localX, float localY) const {
   if (color.alpha <= 0) {
     return false;
   }
-  Matrix inverse = Matrix::I();
-  if (!textMatrix.invert(&inverse)) {
-    return false;
-  }
-  auto localPoint = inverse.mapXY(localX, localY);
+  auto localPoint = Point::Make(localX - offset.x, localY - offset.y);
   return textBlob->hitTestPoint(localPoint.x, localPoint.y, stroke.get());
 }
 
 void TextContent::onDraw(Canvas* canvas, const Paint& paint) const {
-  auto oldMatrix = canvas->getMatrix();
-  canvas->concat(textMatrix);
-  canvas->drawTextBlob(textBlob, 0, 0, paint);
-  canvas->setMatrix(oldMatrix);
+  canvas->drawTextBlob(textBlob, offset.x, offset.y, paint);
 }
 
 bool TextContent::onHasSameGeometry(const GeometryContent* other) const {
   auto* otherText = static_cast<const TextContent*>(other);
-  return textBlob == otherText->textBlob && textMatrix == otherText->textMatrix;
+  return textBlob == otherText->textBlob && offset == otherText->offset;
 }
 
 }  // namespace tgfx

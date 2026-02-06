@@ -16,28 +16,34 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/GlyphRunList.h"
-#include "core/RunRecord.h"
-#include "tgfx/core/TextBlob.h"
+#include "tgfx/layers/vectors/Text.h"
+#include "VectorContext.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
-GlyphRunList::Iterator GlyphRunList::begin() const {
-  return Iterator(blob->firstRun(), blob->runCount);
+void Text::setTextBlob(std::shared_ptr<TextBlob> value) {
+  if (_textBlob == value) {
+    return;
+  }
+  _textBlob = std::move(value);
+  invalidateContent();
 }
 
-bool GlyphRunList::empty() const {
-  return blob->runCount == 0;
+void Text::setPosition(const Point& value) {
+  if (_position == value) {
+    return;
+  }
+  _position = value;
+  invalidateContent();
 }
 
-GlyphRun GlyphRunList::Iterator::operator*() const {
-  return GlyphRun::From(current);
-}
-
-GlyphRunList::Iterator& GlyphRunList::Iterator::operator++() {
-  current = current->next();
-  --remaining;
-  return *this;
+void Text::apply(VectorContext* context) {
+  DEBUG_ASSERT(context != nullptr);
+  if (_textBlob == nullptr) {
+    return;
+  }
+  context->addTextBlob(_textBlob, _position);
 }
 
 }  // namespace tgfx

@@ -17,7 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Opaque3DContext.h"
-#include "tgfx/core/ImageFilter.h"
+#include "core/Matrix3DUtils.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Paint.h"
 
 namespace tgfx {
@@ -46,22 +47,18 @@ std::shared_ptr<Picture> Opaque3DContext::onFinishRecording() {
 }
 
 void Opaque3DContext::onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                                   const Point&, bool) {
+                                   const Point&, int, bool) {
   _opaqueImages.push_back({std::move(image), imageTransform});
 }
 
 void Opaque3DContext::finishAndDrawTo(Canvas* canvas, bool antialiasing) {
-  auto invScale = 1.0f / _contentScale;
   Paint paint = {};
   paint.setAntiAlias(antialiasing);
   for (const auto& entry : _opaqueImages) {
-    auto imageFilter = ImageFilter::Transform3D(entry.transform);
-    auto offset = Point::Zero();
-    auto transformedImage = entry.image->makeWithFilter(imageFilter, &offset);
-    if (transformedImage == nullptr) {
-      continue;
-    }
-    canvas->drawImage(transformedImage, offset.x * invScale, offset.y * invScale, &paint);
+    AutoCanvasRestore autoRestore(canvas);
+    auto imageMatrix = Matrix3DUtils::GetMayLossyMatrix(entry.transform);
+    canvas->concat(imageMatrix);
+    canvas->drawImage(entry.image, &paint);
   }
 }
 

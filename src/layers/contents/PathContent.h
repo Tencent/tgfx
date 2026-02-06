@@ -18,12 +18,12 @@
 
 #pragma once
 
-#include "layers/contents/GeometryContent.h"
+#include "layers/contents/DrawContent.h"
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
 
-class PathContent : public GeometryContent {
+class PathContent : public DrawContent {
  public:
   PathContent(Path path, const LayerPaint& paint);
 
