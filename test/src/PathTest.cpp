@@ -19,8 +19,13 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfloat-conversion"
+#pragma clang diagnostic ignored "-Wimplicit-int-conversion"
+#include <include/core/SkPath.h>
+#pragma clang diagnostic pop
 #include "base/TGFXTest.h"
-#include "core/PathIteratorNoConics.h"
+#include "core/NoConicsPathIterator.h"
 #include "core/PathRef.h"
 #include "core/PathRasterizer.h"
 #include "core/PathTriangulator.h"
@@ -314,7 +319,7 @@ TGFX_TEST(PathTest, IteratorCopy) {
 }
 
 TGFX_TEST(PathTest, IteratorNoConics) {
-  // Test PathIteratorNoConics with conic conversion
+  // Test NoConicsPathIterator with conic conversion
   Path path;
   path.moveTo(0, 100);
   path.conicTo(100, 0, 200, 100, 0.707107f);
@@ -322,7 +327,7 @@ TGFX_TEST(PathTest, IteratorNoConics) {
   std::vector<PathVerb> verbs;
   std::vector<Point> points;
 
-  PathIteratorNoConics iterator(path);
+  NoConicsPathIterator iterator(path);
   for (auto segment : iterator) {
     verbs.push_back(segment.verb);
     switch (segment.verb) {
@@ -354,6 +359,69 @@ TGFX_TEST(PathTest, IteratorNoConics) {
   // Last point should be the conic end point
   ASSERT_EQ(points[4].x, 200.0f);
   ASSERT_EQ(points[4].y, 100.0f);
+}
+
+TGFX_TEST(PathTest, IteratorPerformance) {
+  // Build a path with many conics for performance testing
+  auto buildTestPath = [](int numConics) {
+    Path path;
+    path.moveTo(0, 0);
+    for (int i = 0; i < numConics; i++) {
+      float x = static_cast<float>(i * 10);
+      path.conicTo(x + 5, 10, x + 10, 0, 0.707107f);
+    }
+    return path;
+  };
+
+  const int iterations = 1000;
+  std::vector<int> testSizes = {10, 50, 100, 500, 1000, 5000};
+
+  printf("\n=== Path::Iterator vs SkPath::Iter Performance ===\n");
+  printf("%-8s %-8s %-15s %-15s %-12s %-12s %-8s\n", "Conics", "Verbs", "Iterator(us)",
+         "SkPath::Iter(us)", "ns/verb(I)", "ns/verb(S)", "Ratio");
+  printf("-------------------------------------------------------------------------\n");
+
+  for (int numConics : testSizes) {
+    Path path = buildTestPath(numConics);
+    auto& skPath = PathRef::ReadAccess(path);
+    int verbCount = skPath.countVerbs();
+
+    // Benchmark Path::Iterator (range-for)
+    auto startIterator = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; i++) {
+      volatile int count = 0;
+      for (const auto& segment : path) {
+        if (segment.verb != PathVerb::Done) {
+          count++;
+        }
+      }
+    }
+    auto endIterator = std::chrono::high_resolution_clock::now();
+    double iteratorUs =
+        std::chrono::duration<double, std::micro>(endIterator - startIterator).count() / iterations;
+
+    // Benchmark SkPath::Iter directly
+    auto startSkPath = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; i++) {
+      volatile int count = 0;
+      pk::SkPath::Iter iter(skPath, false);
+      pk::SkPoint pts[4];
+      while (iter.next(pts) != pk::SkPath::kDone_Verb) {
+        count++;
+      }
+    }
+    auto endSkPath = std::chrono::high_resolution_clock::now();
+    double skPathUs =
+        std::chrono::duration<double, std::micro>(endSkPath - startSkPath).count() / iterations;
+
+    double nsPerVerbIterator = (iteratorUs * 1000.0) / verbCount;
+    double nsPerVerbSkPath = (skPathUs * 1000.0) / verbCount;
+    double ratio = iteratorUs / skPathUs;
+
+    printf("%-8d %-8d %-15.2f %-15.2f %-12.2f %-12.2f %-8.1fx\n", numConics, verbCount, iteratorUs,
+           skPathUs, nsPerVerbIterator, nsPerVerbSkPath, ratio);
+  }
+  printf("\n");
 }
 
 }  // namespace tgfx

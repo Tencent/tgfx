@@ -23,13 +23,13 @@
 namespace tgfx {
 
 /**
- * PathIteratorNoConics converts conic curves to quadratic curves during iteration.
+ * NoConicsPathIterator converts conic curves to quadratic curves during iteration.
  * Each conic is approximated by quadratic Bezier curves (pow2=1, up to 2 quads).
  * This is for internal use where Conic curves need to be converted to Quad curves
  * (e.g., rasterization backends that don't support conics).
  *
  * Supports range-based for loops:
- *   PathIteratorNoConics iterNoConics(path);
+ *   NoConicsPathIterator iterNoConics(path);
  *   for (auto segment : iterNoConics) {
  *       switch (segment.verb) {
  *           case PathVerb::Move: // segment.points[0]
@@ -40,12 +40,11 @@ namespace tgfx {
  *       }
  *   }
  */
-class PathIteratorNoConics {
+class NoConicsPathIterator {
  public:
-  struct Segment {
-    PathVerb verb = PathVerb::Done;
-    Point points[4] = {};
-  };
+  explicit NoConicsPathIterator(const Path& path);
+
+  using Segment = Path::Segment;
 
   class Iterator {
    public:
@@ -53,7 +52,7 @@ class PathIteratorNoConics {
     Iterator(const Iterator& other);
     Iterator& operator=(const Iterator& other);
 
-    Segment operator*() const {
+    const Segment& operator*() const {
       return current;
     }
 
@@ -69,17 +68,15 @@ class PathIteratorNoConics {
 
     void advance();
 
-    friend class PathIteratorNoConics;
+    friend class NoConicsPathIterator;
 
-    static constexpr size_t kStorageSize = 64;
-    alignas(8) uint8_t storage[kStorageSize] = {};
+    static constexpr size_t STORAGE_SIZE = 64;
+    alignas(8) uint8_t storage[STORAGE_SIZE] = {};
     Segment current = {};
     Point pendingQuad[3] = {};
     bool hasPendingQuad = false;
     bool isDone = true;
   };
-
-  explicit PathIteratorNoConics(const Path& path);
 
   Iterator begin() const;
 
@@ -88,7 +85,7 @@ class PathIteratorNoConics {
   }
 
  private:
-  const Path* path = nullptr;
+  Path path = {};
 };
 
 }  // namespace tgfx

@@ -397,7 +397,7 @@ class Path {
     Iterator(const Iterator& other);
     Iterator& operator=(const Iterator& other);
 
-    Segment operator*() const {
+    const Segment& operator*() const {
       return current;
     }
 
@@ -415,8 +415,8 @@ class Path {
 
     friend class Path;
 
-    static constexpr size_t kStorageSize = 64;
-    alignas(8) uint8_t storage[kStorageSize] = {};
+    static constexpr size_t STORAGE_SIZE = 64;
+    alignas(8) uint8_t storage[STORAGE_SIZE] = {};
     Segment current = {};
     bool isDone = true;
   };

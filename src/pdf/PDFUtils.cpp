@@ -20,7 +20,7 @@
 #include <array>
 #include <cfloat>
 #include <string>
-#include "core/PathIteratorNoConics.h"
+#include "core/NoConicsPathIterator.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFResourceDictionary.h"
 #include "pdf/PDFTypes.h"
@@ -308,7 +308,7 @@ void PDFUtils::EmitPath(const Path& path, bool doConsumeDegerates,
   auto lastMovePt = Point::Make(0, 0);
   auto currentSegment = MemoryWriteStream::Make();
 
-  PathIteratorNoConics iterator(path);
+  NoConicsPathIterator iterator(path);
   for (auto segment : iterator) {
     switch (segment.verb) {
       case PathVerb::Move:

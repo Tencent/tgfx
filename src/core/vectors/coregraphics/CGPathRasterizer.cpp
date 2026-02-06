@@ -18,7 +18,7 @@
 
 #include "CGPathRasterizer.h"
 #include <CoreGraphics/CGBitmapContext.h>
-#include "core/PathIteratorNoConics.h"
+#include "core/NoConicsPathIterator.h"
 #include "core/PixelBuffer.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
@@ -31,7 +31,7 @@
 
 namespace tgfx {
 static void AddPathToCGPath(const Path& path, CGMutablePathRef cgPath) {
-  PathIteratorNoConics iterator(path);
+  NoConicsPathIterator iterator(path);
   for (auto segment : iterator) {
     switch (segment.verb) {
       case PathVerb::Move:

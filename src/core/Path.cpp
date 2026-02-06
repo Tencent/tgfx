@@ -609,7 +609,8 @@ static_assert(alignof(pk::SkPath::Iter) <= 8,
 
 Path::Iterator::Iterator(const Path* path) : isDone(false) {
   new (storage) pk::SkPath::Iter(PathRef::ReadAccess(*path), false);
-  advance();
+  // Advance to the first segment.
+  ++(*this);
 }
 
 Path::Iterator::Iterator() = default;
@@ -648,7 +649,9 @@ Path::Iterator& Path::Iterator::operator++() {
 
 void Path::Iterator::advance() {
   auto* iter = reinterpret_cast<pk::SkPath::Iter*>(storage);
-  pk::SkPoint pts[4];
+  // Point and SkPoint have identical memory layout (two consecutive floats),
+  // so we can directly pass current.points as SkPoint* to avoid memcpy.
+  auto* pts = reinterpret_cast<pk::SkPoint*>(current.points);
   auto verb = iter->next(pts);
   if (verb == pk::SkPath::kDone_Verb) {
     isDone = true;
@@ -656,7 +659,6 @@ void Path::Iterator::advance() {
     current = {};
   } else {
     current.verb = static_cast<PathVerb>(verb);
-    std::memcpy(current.points, pts, sizeof(pts));
     if (verb == pk::SkPath::kConic_Verb) {
       current.conicWeight = iter->conicWeight();
     } else {

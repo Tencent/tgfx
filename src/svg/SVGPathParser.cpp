@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/SVGPathParser.h"
-#include "core/PathIteratorNoConics.h"
+#include "core/NoConicsPathIterator.h"
 #include "core/utils/Log.h"
 #include "svg/SVGUtils.h"
 #include "tgfx/core/Path.h"
@@ -129,7 +129,7 @@ std::string SVGPathParser::ToSVGString(const Path& path, PathEncoding encoding) 
   };
 
   std::string svgString;
-  PathIteratorNoConics iterator(path);
+  NoConicsPathIterator iterator(path);
   for (auto segment : iterator) {
     switch (segment.verb) {
       case PathVerb::Move:

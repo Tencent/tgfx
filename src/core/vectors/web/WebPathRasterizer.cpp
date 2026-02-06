@@ -19,7 +19,7 @@
 #include "WebPathRasterizer.h"
 #include <emscripten/val.h>
 #include "ReadPixelsFromCanvasImage.h"
-#include "core/PathIteratorNoConics.h"
+#include "core/NoConicsPathIterator.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/ScalePixelsAlpha.h"
 #include "core/utils/ShapeUtils.h"
@@ -41,7 +41,7 @@ std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
 }
 
 static void AddPathToPath2D(const Path& path, val* path2D) {
-  PathIteratorNoConics iterator(path);
+  NoConicsPathIterator iterator(path);
   for (auto segment : iterator) {
     switch (segment.verb) {
       case PathVerb::Move:

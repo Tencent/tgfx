@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PathIteratorNoConics.h"
+#include "NoConicsPathIterator.h"
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-conversion"
 #pragma clang diagnostic ignored "-Wimplicit-int-conversion"
@@ -27,43 +27,42 @@
 namespace tgfx {
 
 static_assert(sizeof(pk::SkPath::Iter) <= 64,
-              "PathIteratorNoConics storage size is too small for SkPath::Iter");
+              "NoConicsPathIterator storage size is too small for SkPath::Iter");
 static_assert(alignof(pk::SkPath::Iter) <= 8,
-              "PathIteratorNoConics storage alignment is insufficient for SkPath::Iter");
+              "NoConicsPathIterator storage alignment is insufficient for SkPath::Iter");
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
-// PathIteratorNoConics implementation
+// NoConicsPathIterator implementation
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-PathIteratorNoConics::PathIteratorNoConics(const Path& path) : path(&path) {
+NoConicsPathIterator::NoConicsPathIterator(const Path& path) : path(path) {
 }
 
-PathIteratorNoConics::Iterator PathIteratorNoConics::begin() const {
-  if (path == nullptr || path->isEmpty()) {
+NoConicsPathIterator::Iterator NoConicsPathIterator::begin() const {
+  if (path.isEmpty()) {
     return Iterator();
   }
-  return Iterator(path);
+  return Iterator(&path);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
-// PathIteratorNoConics::Iterator implementation
+// NoConicsPathIterator::Iterator implementation
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-PathIteratorNoConics::Iterator::Iterator(const Path* path) : isDone(false) {
+NoConicsPathIterator::Iterator::Iterator(const Path* path) : isDone(false) {
   new (storage) pk::SkPath::Iter(PathRef::ReadAccess(*path), false);
   advance();
 }
 
-PathIteratorNoConics::Iterator::Iterator() : isDone(true) {
-}
+NoConicsPathIterator::Iterator::Iterator() = default;
 
-PathIteratorNoConics::Iterator::~Iterator() {
+NoConicsPathIterator::Iterator::~Iterator() {
   if (!isDone) {
     reinterpret_cast<pk::SkPath::Iter*>(storage)->~Iter();
   }
 }
 
-PathIteratorNoConics::Iterator::Iterator(const Iterator& other)
+NoConicsPathIterator::Iterator::Iterator(const Iterator& other)
     : current(other.current), hasPendingQuad(other.hasPendingQuad), isDone(other.isDone) {
   if (!isDone) {
     new (storage) pk::SkPath::Iter(*reinterpret_cast<const pk::SkPath::Iter*>(other.storage));
@@ -75,7 +74,7 @@ PathIteratorNoConics::Iterator::Iterator(const Iterator& other)
   }
 }
 
-PathIteratorNoConics::Iterator& PathIteratorNoConics::Iterator::operator=(const Iterator& other) {
+NoConicsPathIterator::Iterator& NoConicsPathIterator::Iterator::operator=(const Iterator& other) {
   if (this == &other) {
     return *this;
   }
@@ -96,12 +95,12 @@ PathIteratorNoConics::Iterator& PathIteratorNoConics::Iterator::operator=(const 
   return *this;
 }
 
-PathIteratorNoConics::Iterator& PathIteratorNoConics::Iterator::operator++() {
+NoConicsPathIterator::Iterator& NoConicsPathIterator::Iterator::operator++() {
   advance();
   return *this;
 }
 
-void PathIteratorNoConics::Iterator::advance() {
+void NoConicsPathIterator::Iterator::advance() {
   // First, check if there's a pending quad from conic conversion
   if (hasPendingQuad) {
     hasPendingQuad = false;
@@ -113,7 +112,9 @@ void PathIteratorNoConics::Iterator::advance() {
   }
 
   auto* iter = reinterpret_cast<pk::SkPath::Iter*>(storage);
-  pk::SkPoint pts[4];
+  // Point and SkPoint have identical memory layout (two consecutive floats),
+  // so we can directly pass current.points as SkPoint* to avoid memcpy.
+  auto* pts = reinterpret_cast<pk::SkPoint*>(current.points);
   pk::SkPath::Verb verb = iter->next(pts);
 
   if (verb == pk::SkPath::kDone_Verb) {
@@ -125,13 +126,11 @@ void PathIteratorNoConics::Iterator::advance() {
 
   if (verb != pk::SkPath::kConic_Verb) {
     current.verb = static_cast<PathVerb>(verb);
-    std::memcpy(current.points, pts, sizeof(pts));
     return;
   }
 
   // Convert conic to quads
-  Point points[3];
-  std::memcpy(points, pts, sizeof(Point) * 3);
+  Point points[3] = {current.points[0], current.points[1], current.points[2]};
   float weight = iter->conicWeight();
   auto quads = Path::ConvertConicToQuads(points[0], points[1], points[2], weight);
   size_t quadCount = (quads.size() - 1) / 2;

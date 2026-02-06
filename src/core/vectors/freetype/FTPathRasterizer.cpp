@@ -20,7 +20,7 @@
 #include "FTLibrary.h"
 #include "FTPath.h"
 #include "FTRasterTarget.h"
-#include "core/PathIteratorNoConics.h"
+#include "core/NoConicsPathIterator.h"
 #include "core/utils/ClearPixels.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
@@ -31,7 +31,7 @@
 
 namespace tgfx {
 static void AddPathToFTPath(const Path& path, FTPath* ftPath) {
-  PathIteratorNoConics iterator(path);
+  NoConicsPathIterator iterator(path);
   for (auto segment : iterator) {
     switch (segment.verb) {
       case PathVerb::Move:
