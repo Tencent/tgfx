@@ -138,8 +138,8 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
                     orientation, filePath, std::move(byteData), std::move(cs)));
 }
 
-bool ConvertCMYKPixels(void* dst, const gfx::skcms_ICCProfile cmykProfile,
-                       const ImageInfo& dstInfo) {
+static bool ConvertCMYKWithProfile(void* dst, const gfx::skcms_ICCProfile& cmykProfile,
+                                   const ImageInfo& dstInfo) {
   gfx::skcms_PixelFormat dstPixelFormat;
   switch (dstInfo.colorType()) {
     case ColorType::BGRA_8888:
@@ -170,6 +170,41 @@ bool ConvertCMYKPixels(void* dst, const gfx::skcms_ICCProfile cmykProfile,
     src = reinterpret_cast<uint8_t*>(src) + dstInfo.rowBytes();
   }
   return true;
+}
+
+// Fallback formula CMYK to RGB conversion.
+// libjpeg outputs inverted CMYK (like Photoshop): 255=no ink, 0=full ink
+// Formula: R = C * K / 255 (both C and K are already inverted)
+static void ConvertCMYKToRGBWithFormula(void* pixels, const ImageInfo& dstInfo) {
+  auto width = dstInfo.width();
+  auto height = dstInfo.height();
+  auto rowBytes = dstInfo.rowBytes();
+  auto colorType = dstInfo.colorType();
+  auto data = static_cast<uint8_t*>(pixels);
+  for (int y = 0; y < height; y++) {
+    auto row = data + static_cast<size_t>(y) * rowBytes;
+    for (int x = 0; x < width; x++) {
+      auto pixel = row + x * 4;
+      uint8_t c = pixel[0];
+      uint8_t m = pixel[1];
+      uint8_t yVal = pixel[2];
+      uint8_t k = pixel[3];
+      // Inverted CMYK to RGB: R = C * K / 255
+      uint8_t r = static_cast<uint8_t>((c * k + 127) / 255);
+      uint8_t g = static_cast<uint8_t>((m * k + 127) / 255);
+      uint8_t b = static_cast<uint8_t>((yVal * k + 127) / 255);
+      if (colorType == ColorType::BGRA_8888) {
+        pixel[0] = b;
+        pixel[1] = g;
+        pixel[2] = r;
+      } else {
+        pixel[0] = r;
+        pixel[1] = g;
+        pixel[2] = b;
+      }
+      pixel[3] = 255;
+    }
+  }
 }
 
 uint32_t JpegCodec::getScaledDimensions(int newWidth, int newHeight) const {
@@ -297,16 +332,17 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
       line++;
     }
     if (cinfo.out_color_space == JCS_CMYK) {
+      bool converted = false;
       std::vector<uint8_t> iccProfileData;
       if (ExtractICCProfile(&cinfo, iccProfileData)) {
         gfx::skcms_ICCProfile cmykProfile;
         if (ParseICCProfile(iccProfileData, &cmykProfile)) {
-          if (!ConvertCMYKPixels(outPixels, cmykProfile, dstInfo)) {
-            result = false;
-            jpeg_finish_decompress(&cinfo);
-            break;
-          }
+          converted = ConvertCMYKWithProfile(outPixels, cmykProfile, dstInfo);
         }
+      }
+      if (!converted) {
+        // Fallback to basic CMYK to RGB conversion when no ICC profile is available.
+        ConvertCMYKToRGBWithFormula(outPixels, dstInfo);
       }
     }
     result = jpeg_finish_decompress(&cinfo);
