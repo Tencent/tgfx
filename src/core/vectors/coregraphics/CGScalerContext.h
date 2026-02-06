@@ -19,6 +19,7 @@
 #pragma once
 
 #include <mutex>
+#include <unordered_map>
 #include "CGTypeface.h"
 #include "core/PixelBuffer.h"
 #include "core/ScalerContext.h"
@@ -55,5 +56,30 @@ class CGScalerContext : public ScalerContext {
   CTFontRef ctFont = nullptr;
   CTFontRef backingFont = nullptr;
   FontMetrics fontMetrics = {};
+
+  // Caching for performance optimization
+  mutable std::mutex advanceCacheMutex = {};
+  mutable std::unordered_map<GlyphID, float> advanceCacheH = {};
+  mutable std::unordered_map<GlyphID, float> advanceCacheV = {};
+
+  struct CGBoundsKey {
+    GlyphID glyphID;
+    bool fauxBold;
+    bool fauxItalic;
+
+    bool operator==(const CGBoundsKey& other) const {
+      return glyphID == other.glyphID && fauxBold == other.fauxBold && fauxItalic == other.fauxItalic;
+    }
+  };
+
+  struct CGBoundsKeyHash {
+    size_t operator()(const CGBoundsKey& key) const {
+      return std::hash<GlyphID>()(key.glyphID) ^ (std::hash<bool>()(key.fauxBold) << 1) ^
+             (std::hash<bool>()(key.fauxItalic) << 2);
+    }
+  };
+
+  mutable std::mutex boundsCacheMutex = {};
+  mutable std::unordered_map<CGBoundsKey, Rect, CGBoundsKeyHash> boundsCache = {};
 };
 }  // namespace tgfx

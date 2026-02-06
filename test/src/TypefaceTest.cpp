@@ -442,4 +442,106 @@ TGFX_TEST(TypefaceTest, CacheMemoryOverheadLowHitRate) {
   EXPECT_LT(totalBytes, static_cast<size_t>(1024 * 1024));
   EXPECT_EQ(uniqueGlyphCount, static_cast<size_t>(3000));
 }
+
+#ifdef __APPLE__
+// Test CoreGraphics advance cache performance with high hit rate.
+TGFX_TEST(TypefaceTest, CGAdvanceCacheHighHitRate) {
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  
+  Font font(typeface, 24.0f);
+  std::vector<GlyphID> glyphs = GenerateRandomCommonGlyphs(typeface, 100000);
+  
+  auto start = std::chrono::high_resolution_clock::now();
+  float sum = 0;
+  for (auto glyphID : glyphs) {
+    sum += font.getAdvance(glyphID, false);
+  }
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+  
+  printf("CG getAdvance() high hit rate x100,000: %lld us (avg: %.4f us/call)\n", 
+         duration.count(), duration.count() / 100000.0);
+  
+  EXPECT_GT(sum, 0);
+  EXPECT_LT(duration.count(), 1000000);
+}
+
+// Test CoreGraphics advance cache performance with low hit rate.
+TGFX_TEST(TypefaceTest, CGAdvanceCacheLowHitRate) {
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  
+  Font font(typeface, 24.0f);
+  std::vector<GlyphID> glyphs;
+  for (GlyphID i = 1; i <= 3000; i++) {
+    glyphs.push_back(i);
+  }
+  
+  auto start = std::chrono::high_resolution_clock::now();
+  float sum = 0;
+  for (auto glyphID : glyphs) {
+    sum += font.getAdvance(glyphID, false);
+  }
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+  
+  printf("CG getAdvance() low hit rate x3000: %lld us (avg: %.4f us/call)\n", 
+         duration.count(), duration.count() / 3000.0);
+  
+  EXPECT_GT(sum, 0);
+  EXPECT_LT(duration.count(), 50000);
+}
+
+// Test CoreGraphics bounds cache performance with high hit rate.
+TGFX_TEST(TypefaceTest, CGBoundsCacheHighHitRate) {
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  
+  Font font(typeface, 24.0f);
+  std::vector<GlyphID> glyphs = GenerateRandomCommonGlyphs(typeface, 100000);
+  
+  auto start = std::chrono::high_resolution_clock::now();
+  float sum = 0;
+  for (auto glyphID : glyphs) {
+    auto bounds = font.getBounds(glyphID);
+    sum += bounds.width() + bounds.height();
+  }
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+  
+  printf("CG getBounds() high hit rate x100,000: %lld us (avg: %.4f us/call)\n", 
+         duration.count(), duration.count() / 100000.0);
+  
+  EXPECT_GT(sum, 0);
+  EXPECT_LT(duration.count(), 1000000);
+}
+
+// Test CoreGraphics bounds cache performance with low hit rate.
+TGFX_TEST(TypefaceTest, CGBoundsCacheLowHitRate) {
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  
+  Font font(typeface, 24.0f);
+  std::vector<GlyphID> glyphs;
+  for (GlyphID i = 1; i <= 3000; i++) {
+    glyphs.push_back(i);
+  }
+  
+  auto start = std::chrono::high_resolution_clock::now();
+  float sum = 0;
+  for (auto glyphID : glyphs) {
+    auto bounds = font.getBounds(glyphID);
+    sum += bounds.width() + bounds.height();
+  }
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+  
+  printf("CG getBounds() low hit rate x3000: %lld us (avg: %.4f us/call)\n", 
+         duration.count(), duration.count() / 3000.0);
+  
+  EXPECT_GT(sum, 0);
+  EXPECT_LT(duration.count(), 50000);
+}
+#endif
 }  // namespace tgfx

@@ -171,6 +171,18 @@ FontMetrics CGScalerContext::computeFontMetrics() const {
 }
 
 Rect CGScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
+  CGBoundsKey key = {glyphID, fauxBold, fauxItalic};
+
+  // Check cache first
+  {
+    std::lock_guard<std::mutex> cacheLock(boundsCacheMutex);
+    auto it = boundsCache.find(key);
+    if (it != boundsCache.end()) {
+      return it->second;
+    }
+  }
+
+  // Cache miss: compute bounds
   const auto cgGlyph = static_cast<CGGlyph>(glyphID);
   // Glyphs are always drawn from the horizontal origin. The caller must manually use the result
   // of CTFontGetVerticalTranslationsForGlyphs to calculate where to draw the glyph for vertical
@@ -183,6 +195,9 @@ Rect CGScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic)
   auto transform = GetTransform(fauxItalic);
   cgBounds = CGRectApplyAffineTransform(cgBounds, transform);
   if (CGRectIsEmpty(cgBounds)) {
+    // Store empty bounds in cache
+    std::lock_guard<std::mutex> cacheLock(boundsCacheMutex);
+    boundsCache[key] = {};
     return {};
   }
   // Convert cgBounds to Glyph units (pixels, y down).
@@ -201,10 +216,30 @@ Rect CGScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic)
   // is not currently known, as CG dilates the outlines by some percentage.
   // Note that if this context is A8 and not back-forming from LCD, there is no need to outset.
   bounds.outset(1.f, 1.f);
+
+  // Store in cache
+  {
+    std::lock_guard<std::mutex> cacheLock(boundsCacheMutex);
+    boundsCache[key] = bounds;
+  }
+
   return bounds;
 }
 
 float CGScalerContext::getAdvance(GlyphID glyphID, bool verticalText) const {
+  // Select cache based on text direction
+  auto& cache = verticalText ? advanceCacheV : advanceCacheH;
+
+  // Check cache first
+  {
+    std::lock_guard<std::mutex> cacheLock(advanceCacheMutex);
+    auto it = cache.find(glyphID);
+    if (it != cache.end()) {
+      return it->second;
+    }
+  }
+
+  // Cache miss: compute advance
   CGSize cgAdvance;
   if (verticalText) {
     CTFontGetAdvancesForGlyphs(ctFont, kCTFontOrientationVertical, &glyphID, &cgAdvance, 1);
@@ -213,7 +248,15 @@ float CGScalerContext::getAdvance(GlyphID glyphID, bool verticalText) const {
   } else {
     CTFontGetAdvancesForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphID, &cgAdvance, 1);
   }
-  return verticalText ? static_cast<float>(cgAdvance.height) : static_cast<float>(cgAdvance.width);
+  float advance = verticalText ? static_cast<float>(cgAdvance.height) : static_cast<float>(cgAdvance.width);
+
+  // Store in cache
+  {
+    std::lock_guard<std::mutex> cacheLock(advanceCacheMutex);
+    cache[glyphID] = advance;
+  }
+
+  return advance;
 }
 
 Point CGScalerContext::getVerticalOffset(GlyphID glyphID) const {
