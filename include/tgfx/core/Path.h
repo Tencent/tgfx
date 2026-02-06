@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/PathTypes.h"

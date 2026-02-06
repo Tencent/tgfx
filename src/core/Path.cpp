@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Path.h"
-#include <cstring>
 #include <functional>
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-conversion"
@@ -26,8 +25,6 @@
 #pragma clang diagnostic pop
 #include <include/core/SkPathTypes.h>
 #include <include/core/SkRect.h>
-#include <memory>
-#include <new>
 #include "core/PathRef.h"
 #include "core/utils/AtomicCache.h"
 #include "core/utils/MathExtra.h"
