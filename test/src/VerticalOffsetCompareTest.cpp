@@ -360,7 +360,7 @@ TGFX_TEST(VerticalOffsetCompare, DiffVisualization) {
 
   int panelWidth = kMarginLeft + kCharSpacing * 3 + 60;
   int panelHeight = kMarginTop + kRowSpacing * 3 + kTitleHeight;
-  int totalWidth = panelWidth * 2;  // FT | Overlay
+  int totalWidth = panelWidth * 3;  // FT | CT | Overlay
 
   auto surface = Surface::Make(context, totalWidth, panelHeight);
   ASSERT_TRUE(surface != nullptr);
@@ -368,15 +368,18 @@ TGFX_TEST(VerticalOffsetCompare, DiffVisualization) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
-  // Panel separator
+  // Panel separators
   Paint sepPaint;
   sepPaint.setStyle(PaintStyle::Stroke);
   sepPaint.setStrokeWidth(2.0f);
   sepPaint.setColor(Color::FromRGBA(100, 100, 100, 255));
   canvas->drawLine(static_cast<float>(panelWidth), 0, static_cast<float>(panelWidth),
                    static_cast<float>(panelHeight), sepPaint);
+  canvas->drawLine(static_cast<float>(panelWidth * 2), 0, static_cast<float>(panelWidth * 2),
+                   static_cast<float>(panelHeight), sepPaint);
 
-  // Panel 1: FreeType implementation
+  // Panel 1: FreeType implementation (blue)
+  Color ftPanelColor = Color::FromRGBA(0, 0, 255, 255);
   for (size_t i = 0; i < kTestChars.size(); ++i) {
     int row = static_cast<int>(i / 3);
     int col = static_cast<int>(i % 3);
@@ -385,17 +388,68 @@ TGFX_TEST(VerticalOffsetCompare, DiffVisualization) {
 
     auto glyphID = typeface->getGlyphID(static_cast<Unichar>(kTestChars[i]));
     Point offset = font.getVerticalOffset(glyphID);
-    DrawGlyphCell(canvas, font, glyphID, x, y, offset);
+
+    // Draw baselines
+    Paint linePaint;
+    linePaint.setStyle(PaintStyle::Stroke);
+    linePaint.setStrokeWidth(1.0f);
+    linePaint.setColor(kBaselineColor);
+    canvas->drawLine(x - 60.0f, y, x + 80.0f, y, linePaint);
+    canvas->drawLine(x, y - 80.0f, x, y + 80.0f, linePaint);
+
+    // Draw glyph in blue
+    Paint glyphPaint;
+    glyphPaint.setColor(ftPanelColor);
+    Point pos = {x + offset.x, y + offset.y};
+    canvas->drawGlyphs(&glyphID, &pos, 1, font, glyphPaint);
+
+    // Origin dot
+    Paint dotPaint;
+    dotPaint.setStyle(PaintStyle::Fill);
+    dotPaint.setColor(ftPanelColor);
+    canvas->drawCircle(x + offset.x, y + offset.y, 4.0f, dotPaint);
   }
 
-  // Panel 2: Overlay (FT red, CT blue)
-  Color ftColor = Color::FromRGBA(255, 0, 0, 180);
-  Color ctColor = Color::FromRGBA(0, 0, 255, 180);
-
+  // Panel 2: CoreText implementation (red)
+  Color ctPanelColor = Color::FromRGBA(255, 0, 0, 255);
   for (size_t i = 0; i < kTestChars.size(); ++i) {
     int row = static_cast<int>(i / 3);
     int col = static_cast<int>(i % 3);
     float x = static_cast<float>(panelWidth + kMarginLeft + col * kCharSpacing);
+    float y = static_cast<float>(kMarginTop + row * kRowSpacing);
+
+    auto glyphID = typeface->getGlyphID(static_cast<Unichar>(kTestChars[i]));
+    Point offset = ctFontCache.getVerticalOffset(glyphID);
+
+    // Draw baselines
+    Paint linePaint;
+    linePaint.setStyle(PaintStyle::Stroke);
+    linePaint.setStrokeWidth(1.0f);
+    linePaint.setColor(kBaselineColor);
+    canvas->drawLine(x - 60.0f, y, x + 80.0f, y, linePaint);
+    canvas->drawLine(x, y - 80.0f, x, y + 80.0f, linePaint);
+
+    // Draw glyph in red
+    Paint glyphPaint;
+    glyphPaint.setColor(ctPanelColor);
+    Point pos = {x + offset.x, y + offset.y};
+    canvas->drawGlyphs(&glyphID, &pos, 1, font, glyphPaint);
+
+    // Origin dot
+    Paint dotPaint;
+    dotPaint.setStyle(PaintStyle::Fill);
+    dotPaint.setColor(ctPanelColor);
+    canvas->drawCircle(x + offset.x, y + offset.y, 4.0f, dotPaint);
+  }
+
+  // Panel 3: Overlay (FT blue, CT red)
+  Color ftColor = Color::FromRGBA(0, 0, 255, 180);
+  Color ctColor = Color::FromRGBA(255, 0, 0, 180);
+
+  for (size_t i = 0; i < kTestChars.size(); ++i) {
+    int row = static_cast<int>(i / 3);
+    int col = static_cast<int>(i % 3);
+    float x = static_cast<float>(panelWidth * 2 + kMarginLeft + col * kCharSpacing);
     float y = static_cast<float>(kMarginTop + row * kRowSpacing);
 
     auto glyphID = typeface->getGlyphID(static_cast<Unichar>(kTestChars[i]));
@@ -410,13 +464,13 @@ TGFX_TEST(VerticalOffsetCompare, DiffVisualization) {
     canvas->drawLine(x - 60.0f, y, x + 80.0f, y, linePaint);
     canvas->drawLine(x, y - 80.0f, x, y + 80.0f, linePaint);
 
-    // CT glyph (blue)
+    // CT glyph (red)
     Paint ctPaint;
     ctPaint.setColor(ctColor);
     Point ctPos = {x + ctOffset.x, y + ctOffset.y};
     canvas->drawGlyphs(&glyphID, &ctPos, 1, font, ctPaint);
 
-    // FT glyph (red)
+    // FT glyph (blue)
     Paint ftPaint;
     ftPaint.setColor(ftColor);
     Point ftPos = {x + ftOffset.x, y + ftOffset.y};
@@ -431,14 +485,16 @@ TGFX_TEST(VerticalOffsetCompare, DiffVisualization) {
     canvas->drawCircle(x + ftOffset.x, y + ftOffset.y, 4.0f, dotPaint);
   }
 
-  // Title
+  // Titles
   Font titleFont(typeface, 18.0f);
   Paint titlePaint;
   titlePaint.setColor(Color::Black());
-  canvas->drawSimpleText("FreeType", static_cast<float>(panelWidth / 2 - 40),
+  canvas->drawSimpleText("FreeType (Blue)", static_cast<float>(panelWidth / 2 - 60),
                          static_cast<float>(panelHeight - 15), titleFont, titlePaint);
-  canvas->drawSimpleText("FT(Red) vs CT(Blue)",
-                         static_cast<float>(panelWidth + panelWidth / 2 - 80),
+  canvas->drawSimpleText("CoreText (Red)", static_cast<float>(panelWidth + panelWidth / 2 - 60),
+                         static_cast<float>(panelHeight - 15), titleFont, titlePaint);
+  canvas->drawSimpleText("FT(Blue) vs CT(Red)",
+                         static_cast<float>(panelWidth * 2 + panelWidth / 2 - 80),
                          static_cast<float>(panelHeight - 15), titleFont, titlePaint);
 
   // Save output
