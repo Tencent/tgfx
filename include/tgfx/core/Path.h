@@ -368,6 +368,15 @@ class Path {
 
   /**
    * Represents a single segment during path iteration.
+   * - verb: The type of path command (Move, Line, Quad, Conic, Cubic, Close, or Done).
+   * - points: Control points for the segment. The number of valid points depends on verb:
+   *     - Move: points[0]
+   *     - Line: points[0-1]
+   *     - Quad: points[0-2]
+   *     - Conic: points[0-2]
+   *     - Cubic: points[0-3]
+   *     - Close/Done: no valid points
+   * - conicWeight: The weight for conic curves. Only valid when verb is Conic.
    */
   struct Segment {
     PathVerb verb = PathVerb::Done;
@@ -380,7 +389,7 @@ class Path {
    * The iterator provides high-performance traversal without virtual function overhead.
    *
    * Usage example:
-   *   for (auto segment : path) {
+   *   for (auto& segment : path) {
    *       switch (segment.verb) {
    *           case PathVerb::Move: // segment.points[0] is the move-to point
    *           case PathVerb::Line: // segment.points[0-1] are line endpoints

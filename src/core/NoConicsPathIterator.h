@@ -30,7 +30,7 @@ namespace tgfx {
  *
  * Supports range-based for loops:
  *   NoConicsPathIterator iterNoConics(path);
- *   for (auto segment : iterNoConics) {
+ *   for (auto& segment : iterNoConics) {
  *       switch (segment.verb) {
  *           case PathVerb::Move: // segment.points[0]
  *           case PathVerb::Line: // segment.points[0-1]
