@@ -697,10 +697,35 @@ Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
   if (glyphID == 0 || setupSize(false)) {
     return {};
   }
-  FontMetrics metrics = {};
-  getFontMetricsInternal(&metrics);
-  auto advanceX = getAdvanceInternal(glyphID);
-  return {-advanceX * 0.5f, metrics.capHeight};
+
+  auto face = ftTypeface()->face;
+  auto err =
+      FT_Load_Glyph(face, glyphID, loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY));
+  if (err != FT_Err_Ok) {
+    return {};
+  }
+
+  const auto& metrics = face->glyph->metrics;
+
+  if (!FT_HAS_VERTICAL(face)) {
+    // Fallback for fonts without vertical metrics: estimate vertical origin at glyph center.
+    auto advanceX = FDot6ToFloat(metrics.horiAdvance);
+    FontMetrics fontMetrics = {};
+    getFontMetricsInternal(&fontMetrics);
+    return {-advanceX * 0.5f, fontMetrics.capHeight};
+  }
+
+  // Calculate the offset from horizontal origin (H) to vertical origin (V).
+  // Reference: Skia's SkFontHost_FreeType.cpp (lines 1539-1542):
+  //   vector.x = vertBearingX - horiBearingX
+  //   vector.y = -vertBearingY - horiBearingY
+  //   builder.offset(SkFDot6ToScalar(vector.x), -SkFDot6ToScalar(vector.y));
+  // After the negation in offset(), the effective Y offset becomes: vertBearingY + horiBearingY.
+  // Skia also applies FT_Vector_Transform for matrix transformations, which we omit here since
+  // getVerticalOffset returns the base offset without additional transforms.
+  float offsetX = FDot6ToFloat(metrics.vertBearingX) - FDot6ToFloat(metrics.horiBearingX);
+  float offsetY = FDot6ToFloat(metrics.horiBearingY) + FDot6ToFloat(metrics.vertBearingY);
+  return {offsetX, offsetY};
 }
 
 Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
