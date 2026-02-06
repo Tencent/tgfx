@@ -50,6 +50,7 @@ struct GlyphStyle {
 struct Glyph {
   GlyphID glyphID = 0;
   Font font = {};
+  Point anchor = Point::Zero();
   Matrix matrix = Matrix::I();
   GlyphStyle style = {};
 };
@@ -117,14 +118,14 @@ class Geometry {
   std::shared_ptr<TextBlob> textBlob = nullptr;
 
   /**
+   * Anchor offsets for each glyph, used when expanding textBlob to glyphs.
+   */
+  std::vector<Point> textAnchors = {};
+
+  /**
    * Individual glyphs with per-glyph transformations, expanded from textBlob for modification.
    */
   std::vector<Glyph> glyphs = {};
-
-  /**
-   * Anchor offsets for each glyph, applied when expanding to glyphs.
-   */
-  std::vector<Point> anchors = {};
 
  private:
   friend class VectorContext;

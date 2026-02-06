@@ -4034,4 +4034,132 @@ TGFX_TEST(VectorLayerTest, LayerPlacement) {
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/LayerPlacement"));
 }
 
+/**
+ * Test Text anchors property which allows custom anchor offset for each glyph.
+ * Anchors affect the pivot point for rotation/scale and path alignment position.
+ *
+ * Row 1: TextModifier - rotate one character in the middle
+ *   - Left (blue): No anchor - rotation around default center (advance*0.5, 0)
+ *   - Right (red): Initial anchor (0, -20) + TextModifier anchor (0, 6) = pivot (0, -14)
+ *                  Tests that TextModifier anchor adds to glyph anchor
+ *
+ * Row 2: TextPath - curved path alignment
+ *   - Left (green): No anchor - align to path at default position
+ *   - Right (purple): With anchor (0, -14) - characters shift perpendicular to path
+ */
+TGFX_TEST(VectorLayerTest, TextAnchors) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 280);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto typeface = GetTestTypeface();
+  if (typeface == nullptr) {
+    return;
+  }
+  Font font(typeface, 36);
+
+  std::vector<std::shared_ptr<VectorGroup>> groups = {};
+
+  // ==================== Row 1: TextModifier - rotate one character ====================
+  auto textBlob = TextBlob::MakeFrom("TGFX", font);
+  size_t glyphCount = 0;
+  for (auto run : *textBlob) {
+    glyphCount += run.glyphCount;
+  }
+
+  // Left: No anchor - rotate 2nd character around default center
+  auto group1 = std::make_shared<VectorGroup>();
+  group1->setPosition({50, 80});
+  auto textSpan1 = Text::Make(textBlob);
+  auto selector1 = std::make_shared<RangeSelector>();
+  selector1->setStart(0.25f);  // Select only 2nd character (G)
+  selector1->setEnd(0.5f);
+  auto modifier1 = TextModifier::Make();
+  modifier1->setSelectors({selector1});
+  modifier1->setRotation(45);
+  group1->setElements({textSpan1, modifier1, MakeFillStyle(Color::Blue())});
+  groups.push_back(group1);
+
+  // Right: Initial anchor y=-20, TextModifier anchor y=6, total pivot offset = -20+6 = -14
+  // This tests that TextModifier anchor adds to glyph anchor
+  std::vector<Point> modifierAnchorOffsets(glyphCount, Point::Zero());
+  modifierAnchorOffsets[1] = {0, -20};  // Initial anchor offset on 'G'
+  auto group2 = std::make_shared<VectorGroup>();
+  group2->setPosition({220, 80});
+  auto textSpan2 = Text::Make(textBlob, modifierAnchorOffsets);
+  auto selector2 = std::make_shared<RangeSelector>();
+  selector2->setStart(0.25f);
+  selector2->setEnd(0.5f);
+  auto modifier2 = TextModifier::Make();
+  modifier2->setSelectors({selector2});
+  modifier2->setAnchor({0, 6});  // This adds to glyph.anchor, so pivot.y = -20 + 6 = -14
+  modifier2->setRotation(45);
+  group2->setElements({textSpan2, modifier2, MakeFillStyle(Color::Red())});
+  groups.push_back(group2);
+
+  // ==================== Row 2: TextPath - curved path ====================
+  Path curvePath = {};
+  curvePath.moveTo(0, 30);
+  curvePath.quadTo(75, -30, 150, 30);
+
+  // Reuse textBlob ("TGFX") for TextPath, shift all characters -14px perpendicular to path
+  std::vector<Point> pathAnchorOffsets(glyphCount, {0, -14});
+
+  // Left: No anchor offset
+  auto group3 = std::make_shared<VectorGroup>();
+  group3->setPosition({50, 200});
+  auto textSpan3 = Text::Make(textBlob);
+  auto textPath3 = std::make_shared<TextPath>();
+  textPath3->setPath(curvePath);
+  textPath3->setPerpendicular(true);
+  textPath3->setTextAlign(TextAlign::Center);
+  group3->setElements({textSpan3, textPath3, MakeFillStyle(Color::FromRGBA(0, 128, 0, 255))});
+  groups.push_back(group3);
+
+  // Right: With anchor offset - characters shift perpendicular to path
+  auto group4 = std::make_shared<VectorGroup>();
+  group4->setPosition({220, 200});
+  auto textSpan4 = Text::Make(textBlob, pathAnchorOffsets);
+  auto textPath4 = std::make_shared<TextPath>();
+  textPath4->setPath(curvePath);
+  textPath4->setPerpendicular(true);
+  textPath4->setTextAlign(TextAlign::Center);
+  group4->setElements({textSpan4, textPath4, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
+  groups.push_back(group4);
+
+  vectorLayer->setContents(
+      std::vector<std::shared_ptr<VectorElement>>(groups.begin(), groups.end()));
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  // Draw reference lines
+  Paint linePaint = {};
+  linePaint.setStyle(PaintStyle::Stroke);
+  linePaint.setStrokeWidth(1.0f);
+  linePaint.setColor(Color{0.7f, 0.7f, 0.7f, 1.0f});
+
+  // Row 1: baseline
+  canvas->drawLine(50, 80, 180, 80, linePaint);
+  canvas->drawLine(220, 80, 350, 80, linePaint);
+
+  // Row 2: draw curve path
+  canvas->save();
+  canvas->translate(50, 200);
+  canvas->drawPath(curvePath, linePaint);
+  canvas->restore();
+
+  canvas->save();
+  canvas->translate(220, 200);
+  canvas->drawPath(curvePath, linePaint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextAnchors"));
+}
+
 }  // namespace tgfx

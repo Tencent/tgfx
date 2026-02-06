@@ -37,10 +37,10 @@ class VectorContext {
   void addShape(std::shared_ptr<Shape> shape);
 
   /**
-   * Adds a text geometry with the given position and optional anchor offsets to the list.
+   * Adds a text geometry with the given position and optional text anchors to the list.
    */
   void addTextBlob(std::shared_ptr<TextBlob> blob, const Point& position,
-                   const std::vector<Point>& anchors = {});
+                   const std::vector<Point>& textAnchors = {});
 
   /**
    * Converts all geometries to shape mode and returns the geometry list.

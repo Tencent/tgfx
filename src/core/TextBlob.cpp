@@ -159,7 +159,7 @@ const RunRecord* TextBlob::firstRun() const {
 }
 
 TextBlob::Iterator TextBlob::begin() const {
-  return Iterator(firstRun(), runCount);
+  return {firstRun(), runCount};
 }
 
 TextBlob::Iterator::Iterator(const RunRecord* record, size_t remaining)

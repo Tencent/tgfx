@@ -190,32 +190,23 @@ void TextModifier::apply(VectorContext* context) {
 
   size_t globalIndex = 0;
   for (auto* geometry : glyphGeometries) {
-    const auto& anchors = geometry->anchors;
-    bool hasAnchors = !anchors.empty();
-    size_t glyphIndex = 0;
     for (auto& glyph : geometry->glyphs) {
       float factor = TextSelector::CalculateCombinedFactor(_selectors, globalIndex, totalCount);
       if (factor == 0.0f) {
         globalIndex++;
-        glyphIndex++;
         continue;
       }
 
       float absFactor = std::abs(factor);
 
-      // Calculate the default anchor point: half of advance width
-      float defaultAnchorX = glyph.font.getAdvance(glyph.glyphID) * 0.5f;
+      // Pivot point for rotation/scale = glyph anchor + user anchor offset
+      float pivotX = glyph.anchor.x + _anchor.x * factor;
+      float pivotY = glyph.anchor.y + _anchor.y * factor;
 
-      // Get glyph anchor from geometry's anchors array
-      Point glyphAnchor = hasAnchors ? anchors[glyphIndex] : Point::Zero();
-
-      // Total anchor point = default anchor + glyph anchor + user-specified anchor offset (scaled by factor)
-      float totalAnchorX = defaultAnchorX + glyphAnchor.x + _anchor.x * factor;
-      float totalAnchorY = glyphAnchor.y + _anchor.y * factor;
-
-      // Apply transform: anchor -> scale -> skew -> rotation -> anchor restore -> position
+      // Apply transform: pivot -> scale -> skew -> rotation -> pivot restore -> position
+      // The glyph rotates around the pivot point without changing its final position
       Matrix transform = Matrix::I();
-      transform.postTranslate(-totalAnchorX, -totalAnchorY);
+      transform.postTranslate(-pivotX, -pivotY);
 
       float scaleX = (_scale.x - 1.0f) * factor + 1.0f;
       float scaleY = (_scale.y - 1.0f) * factor + 1.0f;
@@ -226,7 +217,7 @@ void TextModifier::apply(VectorContext* context) {
       }
 
       transform.postRotate(_rotation * factor);
-      transform.postTranslate(totalAnchorX, totalAnchorY);
+      transform.postTranslate(pivotX, pivotY);
       transform.postTranslate(_position.x * factor, _position.y * factor);
 
       glyph.matrix.preConcat(transform);
@@ -258,7 +249,6 @@ void TextModifier::apply(VectorContext* context) {
       }
 
       globalIndex++;
-      glyphIndex++;
     }
   }
 }
