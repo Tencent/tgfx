@@ -59,6 +59,10 @@ static Color BlendColor(const Color& base, const Color& overlay, float factor) {
                (base.blue * baseWeight + overlay.blue * blendFactor) / newAlpha, newAlpha};
 }
 
+std::shared_ptr<TextModifier> TextModifier::Make() {
+  return std::shared_ptr<TextModifier>(new TextModifier());
+}
+
 void TextModifier::setSelectors(std::vector<std::shared_ptr<TextSelector>> value) {
   for (const auto& owner : owners) {
     for (const auto& selector : _selectors) {
@@ -90,11 +94,11 @@ void TextModifier::detachFromLayer(Layer* layer) {
   VectorElement::detachFromLayer(layer);
 }
 
-void TextModifier::setAnchorPoint(Point value) {
-  if (_anchorPoint == value) {
+void TextModifier::setAnchor(Point value) {
+  if (_anchor == value) {
     return;
   }
-  _anchorPoint = value;
+  _anchor = value;
   invalidateContent();
 }
 
@@ -195,16 +199,14 @@ void TextModifier::apply(VectorContext* context) {
 
       float absFactor = std::abs(factor);
 
-      // Calculate the default anchor point: half of advance width
-      float defaultAnchorX = glyph.font.getAdvance(glyph.glyphID) * 0.5f;
+      // Pivot point for rotation/scale = glyph anchor + user anchor offset
+      float pivotX = glyph.anchor.x + _anchor.x * factor;
+      float pivotY = glyph.anchor.y + _anchor.y * factor;
 
-      // Total anchor point = default anchor + user-specified anchor offset (scaled by factor)
-      float totalAnchorX = defaultAnchorX + _anchorPoint.x * factor;
-      float totalAnchorY = _anchorPoint.y * factor;
-
-      // Apply transform: anchor -> scale -> skew -> rotation -> anchor restore -> position
+      // Apply transform: pivot -> scale -> skew -> rotation -> pivot restore -> position
+      // The glyph rotates around the pivot point without changing its final position
       Matrix transform = Matrix::I();
-      transform.postTranslate(-totalAnchorX, -totalAnchorY);
+      transform.postTranslate(-pivotX, -pivotY);
 
       float scaleX = (_scale.x - 1.0f) * factor + 1.0f;
       float scaleY = (_scale.y - 1.0f) * factor + 1.0f;
@@ -215,7 +217,7 @@ void TextModifier::apply(VectorContext* context) {
       }
 
       transform.postRotate(_rotation * factor);
-      transform.postTranslate(totalAnchorX, totalAnchorY);
+      transform.postTranslate(pivotX, pivotY);
       transform.postTranslate(_position.x * factor, _position.y * factor);
 
       glyph.matrix.preConcat(transform);

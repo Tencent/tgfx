@@ -22,6 +22,10 @@
 
 namespace tgfx {
 
+std::shared_ptr<Ellipse> Ellipse::Make() {
+  return std::shared_ptr<Ellipse>(new Ellipse());
+}
+
 void Ellipse::setCenter(const Point& value) {
   if (_center == value) {
     return;

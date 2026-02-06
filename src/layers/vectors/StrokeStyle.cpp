@@ -259,13 +259,11 @@ class StrokePainter : public Painter {
   }
 };
 
-void StrokeStyle::setColorSource(std::shared_ptr<ColorSource> value) {
-  if (_colorSource == value) {
-    return;
+std::shared_ptr<StrokeStyle> StrokeStyle::Make(std::shared_ptr<ColorSource> colorSource) {
+  if (colorSource == nullptr) {
+    return nullptr;
   }
-  replaceChildProperty(_colorSource.get(), value.get());
-  _colorSource = std::move(value);
-  invalidateContent();
+  return std::shared_ptr<StrokeStyle>(new StrokeStyle(std::move(colorSource)));
 }
 
 void StrokeStyle::setAlpha(float value) {

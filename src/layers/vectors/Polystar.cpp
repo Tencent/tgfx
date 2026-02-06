@@ -175,6 +175,10 @@ class PolystarPathProvider final : public PathProvider {
   bool _reversed = false;
 };
 
+std::shared_ptr<Polystar> Polystar::Make() {
+  return std::shared_ptr<Polystar>(new Polystar());
+}
+
 void Polystar::setCenter(const Point& value) {
   if (_center == value) {
     return;

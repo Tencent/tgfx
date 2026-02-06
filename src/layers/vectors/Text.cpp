@@ -22,12 +22,23 @@
 
 namespace tgfx {
 
-void Text::setTextBlob(std::shared_ptr<TextBlob> value) {
-  if (_textBlob == value) {
-    return;
+std::shared_ptr<Text> Text::Make(std::shared_ptr<TextBlob> textBlob,
+                                 std::vector<Point> anchors) {
+  if (textBlob == nullptr) {
+    return nullptr;
   }
-  _textBlob = std::move(value);
-  invalidateContent();
+  // Calculate glyph count for anchors validation
+  size_t glyphCount = 0;
+  for (auto run : *textBlob) {
+    glyphCount += run.glyphCount;
+  }
+  // Validate and adjust anchors size
+  if (!anchors.empty() && anchors.size() != glyphCount) {
+    LOGE("Text::Make: anchors size (%zu) does not match glyph count (%zu)", anchors.size(),
+         glyphCount);
+    anchors.resize(glyphCount, Point::Zero());
+  }
+  return std::shared_ptr<Text>(new Text(std::move(textBlob), std::move(anchors)));
 }
 
 void Text::setPosition(const Point& value) {
@@ -43,7 +54,7 @@ void Text::apply(VectorContext* context) {
   if (_textBlob == nullptr) {
     return;
   }
-  context->addTextBlob(_textBlob, _position);
+  context->addTextBlob(_textBlob, _position, _anchors);
 }
 
 }  // namespace tgfx
