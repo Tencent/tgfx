@@ -250,8 +250,7 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, float size)
     backingSize = FDot6ToFloat(face->available_sizes[strikeIndex].y_ppem);
   }
   
-  // Initialize FontMetrics in constructor to avoid runtime locking
-  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  // Initialize FontMetrics in constructor (already holding ftTypeface()->locker)
   fontMetrics = computeFontMetrics();
 }
 
