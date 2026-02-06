@@ -18,6 +18,7 @@
 
 #include "OpsCompositor.h"
 #include "core/PathRasterizer.h"
+#include "gpu/ops/FillRRectOp.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/utils/ColorHelper.h"
@@ -26,6 +27,7 @@
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/ShapeUtils.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/FillRRectsVertexProvider.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
@@ -128,10 +130,40 @@ void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Brush
   }
 }
 
+// FillRRectOp has more vertices (40 vs 16) but avoids per-pixel ellipse equation for inner pixels.
+// Use FillRRectOp only when the RRect is large enough that the fragment shader savings outweigh
+// the extra vertex processing overhead. Threshold is approximately 256x256 pixels.
+static constexpr float FillRRectAreaThreshold = 65536.0f;
+
 void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
                               const Stroke* stroke) {
   DEBUG_ASSERT(!rRect.rect.isEmpty());
   auto rectBrush = brush.makeWithMatrix(state.matrix);
+  auto aaType = getAAType(rectBrush);
+  // Calculate the transformed area to determine which Op to use.
+  auto scales = state.matrix.getAxisScales();
+  auto transformedArea = rRect.rect.width() * scales.x * rRect.rect.height() * scales.y;
+  auto useFillRRectOp =
+      stroke == nullptr && !state.matrix.hasPerspective() && transformedArea >= FillRRectAreaThreshold;
+  if (useFillRRectOp) {
+    // Use FillRRectOp for large filled RRect, which avoids computing the ellipse equation for
+    // inner pixels.
+    if (!canAppend(PendingOpType::FillRRect, state.clip, rectBrush)) {
+      flushPendingOps(PendingOpType::FillRRect, state.clip, rectBrush);
+    }
+    auto record = drawingAllocator()->make<RRectRecord>(rRect, state.matrix, rectBrush.color);
+    pendingRRects.emplace_back(std::move(record));
+    return;
+  }
+  // Use RRectDrawOp (EllipseGeometryProcessor) for stroked RRect, perspective transformation,
+  // or small filled RRect where vertex count matters more than fragment shader computation.
+  if (aaType == AAType::None) {
+    // Non-AA stroked/perspective RRect is not supported, fall back to drawShape.
+    Path path = {};
+    path.addRRect(rRect);
+    drawShape(Shape::MakeFrom(std::move(path)), state, brush);
+    return;
+  }
   if (!canAppend(PendingOpType::RRect, state.clip, rectBrush) ||
       (pendingStrokes.empty() != (stroke == nullptr))) {
     flushPendingOps(PendingOpType::RRect, state.clip, rectBrush);
@@ -260,6 +292,8 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Brush&
       return pendingRects.size() < RectDrawOp::MaxNumRects;
     case PendingOpType::RRect:
       return pendingRRects.size() < RRectDrawOp::MaxNumRRects;
+    case PendingOpType::FillRRect:
+      return pendingRRects.size() < FillRRectOp::MaxNumRRects;
     default:
       break;
   }
@@ -321,7 +355,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
   }
 
   if (needLocalBounds || needDeviceBounds) {
-    if (pendingType == PendingOpType::RRect) {
+    if (pendingType == PendingOpType::RRect || pendingType == PendingOpType::FillRRect) {
       deviceBounds = Rect::MakeEmpty();
       for (auto& record : pendingRRects) {
         auto rect = record->viewMatrix.mapRect(record->rRect.rect);
@@ -392,6 +426,12 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
           RRectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRRects), aaType,
                                          std::move(pendingStrokes), dstColorSpace);
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
+    } break;
+    case PendingOpType::FillRRect: {
+      auto provider = FillRRectsVertexProvider::MakeFrom(drawingAllocator(),
+                                                         std::move(pendingRRects), aaType,
+                                                         dstColorSpace);
+      drawOp = FillRRectOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::Atlas: {
       auto provider =
@@ -502,7 +542,8 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
       needDeviceBounds = true;
     }
   }
-  if (pendingType == PendingOpType::RRect && (needDeviceBounds || needLocalBounds)) {
+  if ((pendingType == PendingOpType::RRect || pendingType == PendingOpType::FillRRect) &&
+      (needDeviceBounds || needLocalBounds)) {
     // When either localBounds or deviceBounds needs to be computed for RRect, both should be set to
     // true, since localBounds and deviceBounds are computed together in that case.
     needLocalBounds = true;
