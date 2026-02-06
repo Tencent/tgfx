@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <functional>
 #include "tgfx/core/Point.h"
 
 namespace tgfx {
@@ -101,7 +100,11 @@ enum class PathVerb {
   /**
    * PathIterator returns 0 points.
    */
-  Close
+  Close,
+  /**
+   * Iteration is complete, no more verbs to return.
+   */
+  Done
 };
 
 /**
@@ -117,15 +120,5 @@ enum class PathArcSize {
    */
   Large,
 };
-
-/**
- * Callback function for iterating over path verbs and points.
- * @param verb   the path verb type
- * @param points zero to four points depending on the verb
- * @param weight the conic weight (only valid when verb is Conic, otherwise 0)
- * @param info   user-defined context pointer
- */
-using PathIterator =
-    std::function<void(PathVerb verb, const Point points[4], float weight, void* info)>;
 
 }  // namespace tgfx

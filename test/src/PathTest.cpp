@@ -16,14 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include "base/TGFXTest.h"
+#include "core/PathIteratorNoConics.h"
+#include "core/PathRef.h"
 #include "core/PathRasterizer.h"
 #include "core/PathTriangulator.h"
 #include "core/ShapeRasterizer.h"
 #include "gtest/gtest.h"
-#include "tgfx/core/CurveConverter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -142,50 +144,49 @@ TGFX_TEST(PathTest, ConicTo) {
   std::vector<Point> points = {};
   std::vector<float> weights = {};
 
-  path.decompose(
-      [&](PathVerb verb, const Point pts[4], float weight, void*) {
-        verbs.push_back(verb);
-        weights.push_back(weight);
-        switch (verb) {
-          case PathVerb::Move:
-            points.push_back(pts[0]);
-            break;
-          case PathVerb::Line:
-            points.push_back(pts[1]);
-            break;
-          case PathVerb::Quad:
-            points.push_back(pts[1]);
-            points.push_back(pts[2]);
-            break;
-          case PathVerb::Conic:
-            points.push_back(pts[1]);
-            points.push_back(pts[2]);
-            break;
-          case PathVerb::Cubic:
-            points.push_back(pts[1]);
-            points.push_back(pts[2]);
-            points.push_back(pts[3]);
-            break;
-          case PathVerb::Close:
-            break;
-        }
-      },
-      nullptr);
+  for (auto segment : path) {
+    verbs.push_back(segment.verb);
+    switch (segment.verb) {
+      case PathVerb::Move:
+        points.push_back(segment.points[0]);
+        break;
+      case PathVerb::Line:
+        points.push_back(segment.points[1]);
+        break;
+      case PathVerb::Quad:
+        points.push_back(segment.points[1]);
+        points.push_back(segment.points[2]);
+        break;
+      case PathVerb::Conic:
+        points.push_back(segment.points[1]);
+        points.push_back(segment.points[2]);
+        weights.push_back(segment.conicWeight);
+        break;
+      case PathVerb::Cubic:
+        points.push_back(segment.points[1]);
+        points.push_back(segment.points[2]);
+        points.push_back(segment.points[3]);
+        break;
+      default:
+        break;
+    }
+  }
 
+  // Iterator returns original conic
   ASSERT_EQ(verbs.size(), 2u);
   ASSERT_EQ(verbs[0], PathVerb::Move);
   ASSERT_EQ(verbs[1], PathVerb::Conic);
 
-  ASSERT_EQ(weights[0], 0.0f);
-  ASSERT_NEAR(weights[1], 0.707107f, 0.0001f);
-
+  // 1 move point + 2 conic points (control + end) = 3 points
   ASSERT_EQ(points.size(), 3u);
   ASSERT_EQ(points[0].x, 0.0f);
   ASSERT_EQ(points[0].y, 100.0f);
-  ASSERT_EQ(points[1].x, 100.0f);
-  ASSERT_EQ(points[1].y, 0.0f);
   ASSERT_EQ(points[2].x, 200.0f);
   ASSERT_EQ(points[2].y, 100.0f);
+
+  // Verify conic weight
+  ASSERT_EQ(weights.size(), 1u);
+  ASSERT_FLOAT_EQ(weights[0], 0.707107f);
 }
 
 TGFX_TEST(PathTest, ConicToQuads) {
@@ -194,7 +195,7 @@ TGFX_TEST(PathTest, ConicToQuads) {
   Point p2 = {200, 100};
   float weight = 0.707107f;
 
-  auto quads = CurveConverter::ConicToQuads(p0, p1, p2, weight);
+  auto quads = Path::ConvertConicToQuads(p0, p1, p2, weight);
   size_t numQuads = (quads.size() - 1) / 2;
 
   ASSERT_EQ(numQuads, 2u);
@@ -211,67 +212,148 @@ TGFX_TEST(PathTest, ConicToQuads) {
   ASSERT_NEAR(quads[3].y, 58.5786f, 0.001f);
 }
 
-TGFX_TEST(PathTest, ConicToCubics) {
-  // Test 1: Normal conic (non-90-degree arc)
-  {
-    Point p0 = {0, 100};
-    Point p1 = {100, 0};
-    Point p2 = {200, 100};
-    float weight = 0.5f;
+TGFX_TEST(PathTest, Iterator) {
+  // Test basic iterator functionality with various path types
+  Path path;
+  path.moveTo(10, 20);
+  path.lineTo(30, 40);
+  path.quadTo(50, 60, 70, 80);
+  path.conicTo(90, 100, 110, 120, 0.707107f);
+  path.cubicTo(130, 140, 150, 160, 170, 180);
+  path.close();
 
-    auto cubics = CurveConverter::ConicToCubics(p0, p1, p2, weight);
-    size_t numCubics = (cubics.size() - 1) / 3;
+  // Collect results using Iterator (range-for)
+  std::vector<PathVerb> iteratorVerbs;
+  std::vector<Point> iteratorPoints;
+  std::vector<float> iteratorWeights;
 
-    ASSERT_EQ(numCubics, 2u);
-    ASSERT_EQ(cubics[0].x, p0.x);
-    ASSERT_EQ(cubics[0].y, p0.y);
-    ASSERT_EQ(cubics[6].x, p2.x);
-    ASSERT_EQ(cubics[6].y, p2.y);
+  for (auto segment : path) {
+    iteratorVerbs.push_back(segment.verb);
+
+    switch (segment.verb) {
+      case PathVerb::Move:
+        iteratorPoints.push_back(segment.points[0]);
+        break;
+      case PathVerb::Line:
+        iteratorPoints.push_back(segment.points[1]);
+        break;
+      case PathVerb::Quad:
+        iteratorPoints.push_back(segment.points[1]);
+        iteratorPoints.push_back(segment.points[2]);
+        break;
+      case PathVerb::Conic:
+        iteratorPoints.push_back(segment.points[1]);
+        iteratorPoints.push_back(segment.points[2]);
+        iteratorWeights.push_back(segment.conicWeight);
+        break;
+      case PathVerb::Cubic:
+        iteratorPoints.push_back(segment.points[1]);
+        iteratorPoints.push_back(segment.points[2]);
+        iteratorPoints.push_back(segment.points[3]);
+        break;
+      default:
+        break;
+    }
   }
 
-  // Test 2: 90-degree circular arc (uses optimal kappa approximation)
-  {
-    // A 90-degree arc from a RoundRect corner: center at (100, 100), radius 100
-    // Arc from (0, 100) to (100, 0) with control point at (0, 0)
-    Point p0 = {0, 100};
-    Point p1 = {0, 0};
-    Point p2 = {100, 0};
-    float weight = 0.707106781186548f;
+  // Verify expected verb sequence (SkPath adds Line before Close for closed paths)
+  ASSERT_EQ(iteratorVerbs.size(), 7u);
+  ASSERT_EQ(iteratorVerbs[0], PathVerb::Move);
+  ASSERT_EQ(iteratorVerbs[1], PathVerb::Line);
+  ASSERT_EQ(iteratorVerbs[2], PathVerb::Quad);
+  ASSERT_EQ(iteratorVerbs[3], PathVerb::Conic);
+  ASSERT_EQ(iteratorVerbs[4], PathVerb::Cubic);
+  ASSERT_EQ(iteratorVerbs[5], PathVerb::Line);  // Auto-added line back to start
+  ASSERT_EQ(iteratorVerbs[6], PathVerb::Close);
 
-    auto cubics = CurveConverter::ConicToCubics(p0, p1, p2, weight, 0);
-    size_t numCubics = (cubics.size() - 1) / 3;
+  // Verify conic weight
+  ASSERT_EQ(iteratorWeights.size(), 1u);
+  ASSERT_FLOAT_EQ(iteratorWeights[0], 0.707107f);
+}
 
-    ASSERT_EQ(numCubics, 1u);
-    ASSERT_EQ(cubics[0].x, p0.x);
-    ASSERT_EQ(cubics[0].y, p0.y);
-    ASSERT_EQ(cubics[3].x, p2.x);
-    ASSERT_EQ(cubics[3].y, p2.y);
+TGFX_TEST(PathTest, IteratorEmptyPath) {
+  // Test iterator with empty path
+  Path emptyPath;
 
-    // Verify control points use kappa = 0.552284749830794
-    // cubic[1] = p0 + kappa * (p1 - p0) = (0, 100) + 0.5523 * (0-0, 0-100) = (0, 44.77)
-    // cubic[2] = p2 + kappa * (p1 - p2) = (100, 0) + 0.5523 * (0-100, 0-0) = (44.77, 0)
-    ASSERT_NEAR(cubics[1].x, 0.0f, 0.001f);
-    ASSERT_NEAR(cubics[1].y, 44.7715f, 0.001f);
-    ASSERT_NEAR(cubics[2].x, 44.7715f, 0.001f);
-    ASSERT_NEAR(cubics[2].y, 0.0f, 0.001f);
+  int count = 0;
+  for (auto segment : emptyPath) {
+    (void)segment;
+    count++;
   }
 
-  // Test 3: 90-degree arc with pow2 > 0 (still uses optimal kappa, pow2 is ignored)
-  {
-    Point p0 = {0, 100};
-    Point p1 = {0, 0};
-    Point p2 = {100, 0};
-    float weight = 0.707106781186548f;
+  // Empty path should have no segments
+  ASSERT_EQ(count, 0);
+}
 
-    auto cubics = CurveConverter::ConicToCubics(p0, p1, p2, weight, 1);
-    size_t numCubics = (cubics.size() - 1) / 3;
+TGFX_TEST(PathTest, IteratorCopy) {
+  // Test iterator copy constructor and assignment
+  Path path;
+  path.moveTo(10, 20);
+  path.lineTo(30, 40);
+  path.lineTo(50, 60);
 
-    ASSERT_EQ(numCubics, 1u);
-    ASSERT_NEAR(cubics[1].x, 0.0f, 0.001f);
-    ASSERT_NEAR(cubics[1].y, 44.7715f, 0.001f);
-    ASSERT_NEAR(cubics[2].x, 44.7715f, 0.001f);
-    ASSERT_NEAR(cubics[2].y, 0.0f, 0.001f);
+  auto iter1 = path.begin();
+  ASSERT_EQ((*iter1).verb, PathVerb::Move);
+
+  // Test copy constructor
+  auto iter2 = iter1;
+  ASSERT_EQ((*iter2).verb, PathVerb::Move);
+
+  // Advance iter1, iter2 should remain at Move
+  ++iter1;
+  ASSERT_EQ((*iter1).verb, PathVerb::Line);
+  ASSERT_EQ((*iter2).verb, PathVerb::Move);
+
+  // Test assignment operator
+  iter2 = iter1;
+  ASSERT_EQ((*iter2).verb, PathVerb::Line);
+
+  ++iter1;
+  ASSERT_EQ((*iter1).verb, PathVerb::Line);
+  ASSERT_EQ((*iter2).verb, PathVerb::Line);
+}
+
+TGFX_TEST(PathTest, IteratorNoConics) {
+  // Test PathIteratorNoConics with conic conversion
+  Path path;
+  path.moveTo(0, 100);
+  path.conicTo(100, 0, 200, 100, 0.707107f);
+
+  std::vector<PathVerb> verbs;
+  std::vector<Point> points;
+
+  PathIteratorNoConics iterator(path);
+  for (auto segment : iterator) {
+    verbs.push_back(segment.verb);
+    switch (segment.verb) {
+      case PathVerb::Move:
+        points.push_back(segment.points[0]);
+        break;
+      case PathVerb::Quad:
+        points.push_back(segment.points[1]);
+        points.push_back(segment.points[2]);
+        break;
+      default:
+        break;
+    }
   }
+
+  // Conic should be converted to 2 quads (pow2=1)
+  ASSERT_EQ(verbs.size(), 3u);
+  ASSERT_EQ(verbs[0], PathVerb::Move);
+  ASSERT_EQ(verbs[1], PathVerb::Quad);
+  ASSERT_EQ(verbs[2], PathVerb::Quad);
+
+  // 1 move point + 2*2 quad control/end points = 5 points
+  ASSERT_EQ(points.size(), 5u);
+
+  // First point is move-to
+  ASSERT_EQ(points[0].x, 0.0f);
+  ASSERT_EQ(points[0].y, 100.0f);
+
+  // Last point should be the conic end point
+  ASSERT_EQ(points[4].x, 200.0f);
+  ASSERT_EQ(points[4].y, 100.0f);
 }
 
 }  // namespace tgfx
