@@ -628,6 +628,18 @@ Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxI
     }
   }
 #endif
+
+  // Check cache first
+  FTBoundsKey key = {glyphID, fauxBold, fauxItalic};
+  {
+    std::lock_guard<std::mutex> cacheLock(boundsCacheMutex);
+    auto it = boundsCache.find(key);
+    if (it != boundsCache.end()) {
+      return it->second;
+    }
+  }
+
+  // Cache miss: compute bounds
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   Rect bounds = {};
   if (setupSize(fauxItalic)) {
@@ -675,6 +687,13 @@ Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxI
   } else {
     LOGE("FTScalerContext::getBounds() unknown glyph format!");
   }
+
+  // Store in cache
+  {
+    std::lock_guard<std::mutex> cacheLock(boundsCacheMutex);
+    boundsCache[key] = bounds;
+  }
+
   return bounds;
 }
 
