@@ -54,7 +54,6 @@ class CGScalerContext : public ScalerContext {
   float fauxBoldScale = 1.0f;
   CTFontRef ctFont = nullptr;
   CTFontRef backingFont = nullptr;
-  mutable std::once_flag fontMetricsOnce = {};
-  mutable FontMetrics fontMetrics = {};
+  FontMetrics fontMetrics = {};
 };
 }  // namespace tgfx

@@ -90,8 +90,7 @@ class FTScalerContext : public ScalerContext {
   FT_Int strikeIndex = -1;  // The bitmap strike for the face (or -1 if none).
   FT_Int32 loadGlyphFlags = 0;
   float backingSize = 1.0f;
-  mutable std::once_flag fontMetricsOnce = {};
-  mutable FontMetrics fontMetrics = {};
+  FontMetrics fontMetrics = {};
 
   // Caching for performance optimization
   mutable std::mutex advanceCacheMutex = {};

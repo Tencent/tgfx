@@ -249,6 +249,10 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, float size)
 
     backingSize = FDot6ToFloat(face->available_sizes[strikeIndex].y_ppem);
   }
+  
+  // Initialize FontMetrics in constructor to avoid runtime locking
+  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  fontMetrics = computeFontMetrics();
 }
 
 FTScalerContext::~FTScalerContext() {
@@ -275,14 +279,10 @@ int FTScalerContext::setupSize(bool fauxItalic) const {
 }
 
 FontMetrics FTScalerContext::getFontMetrics() const {
-  std::call_once(fontMetricsOnce, [this]() {
-    fontMetrics = computeFontMetrics();
-  });
   return fontMetrics;
 }
 
 FontMetrics FTScalerContext::computeFontMetrics() const {
-  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   FontMetrics metrics = {};
   if (setupSize(false)) {
     return metrics;

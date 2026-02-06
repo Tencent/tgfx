@@ -135,6 +135,9 @@ CGScalerContext::CGScalerContext(std::shared_ptr<Typeface> tf, float size)
   if (typeface->hasColor() || !typeface->hasOutlines()) {
     backingFont = CreateBackingFont(ctFont, textSize);
   }
+  
+  // Initialize FontMetrics in constructor to avoid runtime locking
+  fontMetrics = computeFontMetrics();
 }
 
 CGScalerContext::~CGScalerContext() {
@@ -147,9 +150,6 @@ CGScalerContext::~CGScalerContext() {
 }
 
 FontMetrics CGScalerContext::getFontMetrics() const {
-  std::call_once(fontMetricsOnce, [this]() {
-    fontMetrics = computeFontMetrics();
-  });
   return fontMetrics;
 }
 
