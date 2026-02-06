@@ -509,9 +509,8 @@ void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
   auto state = *mcState;
   if (!FloatNearlyZero(x) || !FloatNearlyZero(y)) {
     state.matrix.preTranslate(x, y);
-    drawContext->drawTextBlob(std::move(textBlob), state,
-                              paint.getBrush().makeWithMatrix(Matrix::MakeTrans(-x, -y)),
-                              paint.getStroke());
+    auto brush = paint.getBrush().makeWithMatrix(Matrix::MakeTrans(-x, -y));
+    drawContext->drawTextBlob(std::move(textBlob), state, brush, paint.getStroke());
   } else {
     drawContext->drawTextBlob(std::move(textBlob), state, paint.getBrush(), paint.getStroke());
   }
