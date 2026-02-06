@@ -189,6 +189,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
   auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() == 1);
+  // Small RRects (8x8=64 pixels < 65536 threshold) use RRectDrawOp for fewer vertices.
   EXPECT_EQ(static_cast<RRectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount);
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
@@ -1490,56 +1491,57 @@ TGFX_TEST(CanvasTest, FillRRectOp) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 500);
+  auto surface = Surface::Make(context, 800, 900);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
-  // FillRRectOp is used when antiAlias is false and no stroke.
+  // FillRRectOp is used when RRect area >= 65536 pixels (approximately 256x256).
+  // All RRects below are large enough to trigger FillRRectOp.
   Paint paint;
   paint.setAntiAlias(false);
 
-  // Single filled RRect with uniform radii.
+  // Single filled RRect with uniform radii (300x260 = 78000 pixels).
   paint.setColor(Color::Red());
   RRect rrect1 = {};
-  rrect1.setRectXY(Rect::MakeXYWH(50, 50, 120, 80), 15, 15);
+  rrect1.setRectXY(Rect::MakeXYWH(50, 50, 300, 260), 30, 30);
   canvas->drawRRect(rrect1, paint);
 
-  // Different colors and radii.
+  // Different colors and radii (350x280 = 98000 pixels).
   paint.setColor(Color::Green());
   RRect rrect2 = {};
-  rrect2.setRectXY(Rect::MakeXYWH(200, 50, 150, 100), 30, 20);
+  rrect2.setRectXY(Rect::MakeXYWH(400, 50, 350, 280), 50, 40);
   canvas->drawRRect(rrect2, paint);
 
-  // Ellipse-like (large corner radii).
+  // Ellipse-like large corner radii (300x260 = 78000 pixels).
   paint.setColor(Color::Blue());
   RRect rrect3 = {};
-  rrect3.setRectXY(Rect::MakeXYWH(50, 160, 100, 80), 50, 40);
+  rrect3.setRectXY(Rect::MakeXYWH(50, 350, 300, 260), 150, 130);
   canvas->drawRRect(rrect3, paint);
 
-  // Small corner radii.
+  // Small corner radii (350x280 = 98000 pixels).
   paint.setColor(Color::FromRGBA(255, 165, 0, 255));
   RRect rrect4 = {};
-  rrect4.setRectXY(Rect::MakeXYWH(200, 160, 150, 100), 5, 5);
+  rrect4.setRectXY(Rect::MakeXYWH(400, 350, 350, 280), 10, 10);
   canvas->drawRRect(rrect4, paint);
 
-  // With transformation - rotation.
+  // With transformation - rotation (300x260 = 78000 pixels).
   canvas->save();
-  canvas->translate(100, 350);
+  canvas->translate(200, 750);
   canvas->rotate(15);
   paint.setColor(Color::FromRGBA(128, 0, 128, 255));
   RRect rrect5 = {};
-  rrect5.setRectXY(Rect::MakeXYWH(-50, -30, 100, 60), 10, 10);
+  rrect5.setRectXY(Rect::MakeXYWH(-150, -130, 300, 260), 20, 20);
   canvas->drawRRect(rrect5, paint);
   canvas->restore();
 
-  // With transformation - scale.
+  // With transformation - scale (300*1.5 x 260*0.8 = 450x208 = 93600 pixels).
   canvas->save();
-  canvas->translate(280, 350);
+  canvas->translate(600, 750);
   canvas->scale(1.5f, 0.8f);
   paint.setColor(Color::FromRGBA(0, 128, 128, 255));
   RRect rrect6 = {};
-  rrect6.setRectXY(Rect::MakeXYWH(-40, -25, 80, 50), 12, 12);
+  rrect6.setRectXY(Rect::MakeXYWH(-150, -130, 300, 260), 25, 25);
   canvas->drawRRect(rrect6, paint);
   canvas->restore();
 
@@ -1549,7 +1551,7 @@ TGFX_TEST(CanvasTest, FillRRectOp) {
   ASSERT_TRUE(drawingBuffer->renderTasks.size() >= 1);
   auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() >= 1);
-  // All non-AA filled RRects should be batched into FillRRectOp.
+  // All large filled RRects should be batched into FillRRectOp.
   EXPECT_EQ(task->drawOps.back().get()->type(), DrawOp::Type::FillRRectOp);
   EXPECT_EQ(static_cast<FillRRectOp*>(task->drawOps.back().get())->rectCount, 6u);
 
@@ -1561,7 +1563,7 @@ TGFX_TEST(CanvasTest, FillRRectOpWithShader) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 300, 350);
+  auto surface = Surface::Make(context, 450, 550);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
@@ -1571,22 +1573,21 @@ TGFX_TEST(CanvasTest, FillRRectOpWithShader) {
   ASSERT_TRUE(image != nullptr);
   auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
 
-  // Draw two RRects with different AA modes to verify shader works with both paths.
-  // Top: FillRRectOp (antiAlias=false), Bottom: RRectDrawOp (antiAlias=true)
+  // Draw two large RRects (350x220 = 77000 pixels > 65536 threshold) to trigger FillRRectOp.
   // Both use device coordinates for UV, so textures should tile continuously.
   Paint paint;
   paint.setAntiAlias(false);
   paint.setShader(shader);
   RRect rrect = {};
-  rrect.setRectXY(Rect::MakeXYWH(50, 50, 200, 120), 30, 30);
+  rrect.setRectXY(Rect::MakeXYWH(50, 50, 350, 220), 40, 40);
   canvas->drawRRect(rrect, paint);
 
-  // Bottom: RRectDrawOp (antiAlias=true)
+  // Bottom: FillRRectOp (antiAlias=true)
   Paint paint2;
   paint2.setAntiAlias(true);
   paint2.setShader(shader);
   RRect rrect2 = {};
-  rrect2.setRectXY(Rect::MakeXYWH(50, 180, 200, 120), 30, 30);
+  rrect2.setRectXY(Rect::MakeXYWH(50, 280, 350, 220), 40, 40);
   canvas->drawRRect(rrect2, paint2);
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/FillRRectOpWithShader"));
