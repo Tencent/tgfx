@@ -699,10 +699,17 @@ Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
   }
 
   auto face = ftTypeface()->face;
-  auto err =
-      FT_Load_Glyph(face, glyphID, loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY));
-  if (err != FT_Err_Ok) {
-    return {};
+  // Check if the glyph is already loaded to avoid redundant FT_Load_Glyph calls.
+  if (face->glyph->glyph_index != glyphID) {
+    // Use FT_LOAD_NO_HINTING to get higher precision metrics (sub-pixel accuracy).
+    // Without this flag, FreeType rounds metrics to integer pixel boundaries during hinting,
+    // which results in less precision compared to CoreGraphics.
+    auto err = FT_Load_Glyph(
+        face, glyphID,
+        loadGlyphFlags | FT_LOAD_NO_HINTING | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY));
+    if (err != FT_Err_Ok) {
+      return {};
+    }
   }
 
   const auto& metrics = face->glyph->metrics;
