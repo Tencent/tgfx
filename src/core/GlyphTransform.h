@@ -43,15 +43,9 @@ inline bool HasComplexTransform(const GlyphRun& run) {
 }
 
 /**
- * Returns the position of a glyph at the given index within a GlyphRun. Only valid for Horizontal
- * and Point positioning modes.
+ * Returns the position of a glyph at the given index within a GlyphRun.
+ * Valid for Default, Horizontal, and Point positioning modes.
  */
-inline Point GetGlyphPosition(const GlyphRun& run, size_t index) {
-  DEBUG_ASSERT(!HasComplexTransform(run));
-  if (run.positioning == GlyphPositioning::Horizontal) {
-    return {run.positions[index], run.offsetY};
-  }
-  return reinterpret_cast<const Point*>(run.positions)[index];
-}
+Point GetGlyphPosition(const GlyphRun& run, size_t index);
 
 }  // namespace tgfx

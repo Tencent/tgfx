@@ -50,7 +50,9 @@ class TextModifier : public VectorElement {
 
   /**
    * Returns the anchor point offset for the selected characters. This affects the center of
-   * rotation and scale. Default is (0, 0).
+   * rotation and scale. The default anchor point for each character is at (advance * 0.5, 0),
+   * which is the horizontal center of the character at the baseline. This offset is relative to
+   * that default position. Default is (0, 0).
    */
   Point anchorPoint() const {
     return _anchorPoint;
