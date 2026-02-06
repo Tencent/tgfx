@@ -68,9 +68,11 @@ PathIteratorNoConics::Iterator::Iterator(const Iterator& other)
   if (!isDone) {
     new (storage) pk::SkPath::Iter(*reinterpret_cast<const pk::SkPath::Iter*>(other.storage));
   }
-  pendingQuad[0] = other.pendingQuad[0];
-  pendingQuad[1] = other.pendingQuad[1];
-  pendingQuad[2] = other.pendingQuad[2];
+  if (hasPendingQuad) {
+    pendingQuad[0] = other.pendingQuad[0];
+    pendingQuad[1] = other.pendingQuad[1];
+    pendingQuad[2] = other.pendingQuad[2];
+  }
 }
 
 PathIteratorNoConics::Iterator& PathIteratorNoConics::Iterator::operator=(const Iterator& other) {
@@ -86,9 +88,11 @@ PathIteratorNoConics::Iterator& PathIteratorNoConics::Iterator::operator=(const 
   if (!isDone) {
     new (storage) pk::SkPath::Iter(*reinterpret_cast<const pk::SkPath::Iter*>(other.storage));
   }
-  pendingQuad[0] = other.pendingQuad[0];
-  pendingQuad[1] = other.pendingQuad[1];
-  pendingQuad[2] = other.pendingQuad[2];
+  if (hasPendingQuad) {
+    pendingQuad[0] = other.pendingQuad[0];
+    pendingQuad[1] = other.pendingQuad[1];
+    pendingQuad[2] = other.pendingQuad[2];
+  }
   return *this;
 }
 
