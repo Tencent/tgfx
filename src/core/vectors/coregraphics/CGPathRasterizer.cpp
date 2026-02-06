@@ -18,6 +18,7 @@
 
 #include "CGPathRasterizer.h"
 #include <CoreGraphics/CGBitmapContext.h>
+#include "core/NoConicsPathIterator.h"
 #include "core/PixelBuffer.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
@@ -25,36 +26,42 @@
 #include "core/utils/ScalePixelsAlpha.h"
 #include "core/utils/ShapeUtils.h"
 #include "platform/apple/BitmapContextUtil.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 
 namespace tgfx {
-static void Iterator(PathVerb verb, const Point points[4], void* info) {
-  auto cgPath = reinterpret_cast<CGMutablePathRef>(info);
-  switch (verb) {
-    case PathVerb::Move:
-      CGPathMoveToPoint(cgPath, nullptr, points[0].x, points[0].y);
-      break;
-    case PathVerb::Line:
-      CGPathAddLineToPoint(cgPath, nullptr, points[1].x, points[1].y);
-      break;
-    case PathVerb::Quad:
-      CGPathAddQuadCurveToPoint(cgPath, nullptr, points[1].x, points[1].y, points[2].x,
-                                points[2].y);
-      break;
-    case PathVerb::Cubic:
-      CGPathAddCurveToPoint(cgPath, nullptr, points[1].x, points[1].y, points[2].x, points[2].y,
-                            points[3].x, points[3].y);
-      break;
-    case PathVerb::Close:
-      CGPathCloseSubpath(cgPath);
-      break;
+static void AddPathToCGPath(const Path& path, CGMutablePathRef cgPath) {
+  NoConicsPathIterator iterator(path);
+  for (auto segment : iterator) {
+    switch (segment.verb) {
+      case PathVerb::Move:
+        CGPathMoveToPoint(cgPath, nullptr, segment.points[0].x, segment.points[0].y);
+        break;
+      case PathVerb::Line:
+        CGPathAddLineToPoint(cgPath, nullptr, segment.points[1].x, segment.points[1].y);
+        break;
+      case PathVerb::Quad:
+        CGPathAddQuadCurveToPoint(cgPath, nullptr, segment.points[1].x, segment.points[1].y,
+                                  segment.points[2].x, segment.points[2].y);
+        break;
+      case PathVerb::Cubic:
+        CGPathAddCurveToPoint(cgPath, nullptr, segment.points[1].x, segment.points[1].y,
+                              segment.points[2].x, segment.points[2].y, segment.points[3].x,
+                              segment.points[3].y);
+        break;
+      case PathVerb::Close:
+        CGPathCloseSubpath(cgPath);
+        break;
+      default:
+        break;
+    }
   }
 }
 
 static void DrawPath(const Path& path, CGContextRef cgContext, const ImageInfo& info,
                      bool antiAlias) {
   auto cgPath = CGPathCreateMutable();
-  path.decompose(Iterator, cgPath);
+  AddPathToCGPath(path, cgPath);
 
   CGContextSetShouldAntialias(cgContext, antiAlias);
   static const CGFloat white[] = {1.f, 1.f, 1.f, 1.f};
