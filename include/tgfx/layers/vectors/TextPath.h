@@ -48,17 +48,17 @@ class TextPath : public VectorElement {
   void setPath(Path value);
 
   /**
-   * Returns the text origin offset. The text origin is the baseline reference point for path
-   * layout, calculated as the first glyph's origin position plus this offset. Each glyph's
-   * position on the path is determined by projecting the distance between its anchor and the text
-   * origin onto the baseline direction. Default is (0, 0).
+   * Returns the text origin, which is the baseline reference point for path layout. Each glyph's
+   * position on the path is determined by projecting the distance between its anchor and this
+   * origin onto the baseline direction. When set to (0, 0), the first glyph's position is used as
+   * the origin. Non-zero values shift the origin relative to the first glyph. Default is (0, 0).
    */
   Point textOrigin() const {
     return _textOrigin;
   }
 
   /**
-   * Sets the text origin offset.
+   * Sets the text origin.
    */
   void setTextOrigin(Point value);
 
