@@ -2797,7 +2797,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto fill1 = MakeFillStyle(Color::Blue());
   group1->setElements({textSpan1, textPath1, fill1});
 
-  // Group 2: Center alignment using textOrigin
+  // Group 2: Center alignment using textOriginOffset
   auto group2 = std::make_shared<VectorGroup>();
   group2->setPosition({58, 163});
 
@@ -2807,16 +2807,16 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textPath2 = std::make_shared<TextPath>();
   textPath2->setPath(curvePath);
   textPath2->setPerpendicular(true);
-  // Calculate center alignment: textOrigin.x = -(pathLength - textWidth) / 2
+  // Calculate center alignment: textOriginOffset.x = -(pathLength - textWidth) / 2
   // For center alignment, shift origin to negative so text moves right
   auto textWidth2 = textBlob2->getTightBounds().width();
   auto pathLength2 = PathMeasure::MakeFrom(curvePath)->getLength();
-  textPath2->setTextOrigin({-(pathLength2 - textWidth2) / 2, 0});
+  textPath2->setTextOriginOffset({-(pathLength2 - textWidth2) / 2, 0});
 
   auto fill2 = MakeFillStyle(Color::Red());
   group2->setElements({textSpan2, textPath2, fill2});
 
-  // Group 3: End alignment using textOrigin
+  // Group 3: End alignment using textOriginOffset
   auto group3 = std::make_shared<VectorGroup>();
   group3->setPosition({58, 263});
 
@@ -2826,10 +2826,10 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textPath3 = std::make_shared<TextPath>();
   textPath3->setPath(curvePath);
   textPath3->setPerpendicular(true);
-  // For end alignment: textOrigin.x = -(pathLength - textWidth) so text is at path end
+  // For end alignment: textOriginOffset.x = -(pathLength - textWidth) so text is at path end
   auto textWidth3 = textBlob3->getTightBounds().width();
   auto pathLength3 = PathMeasure::MakeFrom(curvePath)->getLength();
-  textPath3->setTextOrigin({-(pathLength3 - textWidth3), 0});
+  textPath3->setTextOriginOffset({-(pathLength3 - textWidth3), 0});
 
   auto fill3 = MakeFillStyle(Color::Green());
   group3->setElements({textSpan3, textPath3, fill3});
@@ -4165,9 +4165,9 @@ TGFX_TEST(VectorLayerTest, TextAnchors) {
 }
 
 /**
- * Tests TextPath with textOrigin and baselineRotation:
- * - Row 1: Default mode (textOrigin at 0,0) - text from path start
- * - Row 2: Centered using negative textOrigin.x
+ * Tests TextPath with textOriginOffset and baselineRotation:
+ * - Row 1: Default mode (textOriginOffset at 0,0) - text from path start
+ * - Row 2: Centered using negative textOriginOffset.x
  * - Row 3: Multi-line text preserving relative positions
  * - Row 4: ForceAlignment mode - all glyphs distributed evenly
  * - Row 5: Vertical text with 90° rotation
@@ -4195,7 +4195,7 @@ TGFX_TEST(VectorLayerTest, TextPathGlyphBaseline) {
 
   // ==================== Row 1: Default mode ====================
 
-  // Group 1: Default mode (textOrigin at 0,0) - text positioned from path start
+  // Group 1: Default mode (textOriginOffset at 0,0) - text positioned from path start
   auto group1 = std::make_shared<VectorGroup>();
   group1->setPosition({22, 23});
 
@@ -4204,14 +4204,14 @@ TGFX_TEST(VectorLayerTest, TextPathGlyphBaseline) {
   auto textPath1 = TextPath::Make();
   textPath1->setPath(curvePath);
   textPath1->setPerpendicular(true);
-  // Default textOrigin=(0,0), baselineRotation=0
+  // Default textOriginOffset=(0,0), baselineRotation=0
 
   auto fill1 = MakeFillStyle(Color::Blue());
   group1->setElements({textSpan1, textPath1, fill1});
 
   // ==================== Row 2: Centered ====================
 
-  // Group 2: With origin offset - single line, centered using negative textOrigin.x
+  // Group 2: With origin offset - single line, centered using negative textOriginOffset.x
   auto group2 = std::make_shared<VectorGroup>();
   group2->setPosition({22, 123});
 
@@ -4221,10 +4221,10 @@ TGFX_TEST(VectorLayerTest, TextPathGlyphBaseline) {
   auto textPath2 = TextPath::Make();
   textPath2->setPath(curvePath);
   textPath2->setPerpendicular(true);
-  // Use negative textOrigin.x to shift text right, centering it on the path
+  // Use negative textOriginOffset.x to shift text right, centering it on the path
   auto textWidth2 = textBlob2->getTightBounds().width();
   auto pathLength2 = PathMeasure::MakeFrom(curvePath)->getLength();
-  textPath2->setTextOrigin({-(pathLength2 - textWidth2) / 2, 0});
+  textPath2->setTextOriginOffset({-(pathLength2 - textWidth2) / 2, 0});
 
   auto fill2 = MakeFillStyle(Color::Red());
   group2->setElements({textSpan2, textPath2, fill2});
@@ -4248,10 +4248,10 @@ TGFX_TEST(VectorLayerTest, TextPathGlyphBaseline) {
   auto textPath3 = TextPath::Make();
   textPath3->setPath(curvePath);
   textPath3->setPerpendicular(true);
-  // Use negative textOrigin.x to center text on the path
+  // Use negative textOriginOffset.x to center text on the path
   auto textWidth3 = std::max(textBlob3a->getTightBounds().width(), textBlob3b->getTightBounds().width());
   auto pathLength3 = PathMeasure::MakeFrom(curvePath)->getLength();
-  textPath3->setTextOrigin({-(pathLength3 - textWidth3) / 2, 0});
+  textPath3->setTextOriginOffset({-(pathLength3 - textWidth3) / 2, 0});
 
   auto fill3 = MakeFillStyle(Color::Green());
   group3->setElements({innerGroup3, textPath3, fill3});
@@ -4345,7 +4345,7 @@ TGFX_TEST(VectorLayerTest, TextPathGlyphBaseline) {
   textPath5->setPerpendicular(true);
   // 90° baselineRotation: Y coordinate maps to path direction (vertical text layout)
   textPath5->setBaselineRotation(90.0f);
-  textPath5->setTextOrigin({firstHorizontalAdvance * 0.5f, -capHeight});
+  textPath5->setTextOriginOffset({firstHorizontalAdvance * 0.5f, -capHeight});
 
   auto fill5 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
   group5->setElements({innerGroup5, textPath5, fill5});

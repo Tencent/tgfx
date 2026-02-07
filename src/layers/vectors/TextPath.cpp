@@ -37,11 +37,11 @@ void TextPath::setPath(Path value) {
   invalidateContent();
 }
 
-void TextPath::setTextOrigin(Point value) {
-  if (_textOrigin == value) {
+void TextPath::setTextOriginOffset(Point value) {
+  if (_textOriginOffset == value) {
     return;
   }
-  _textOrigin = value;
+  _textOriginOffset = value;
   invalidateContent();
 }
 
@@ -180,8 +180,8 @@ void TextPath::apply(VectorContext* context) {
 
   // textOrigin = first glyph's origin + offset
   auto origin = GetGlyphOrigin(*allGlyphs[0].glyph, allGlyphs[0].geometryMatrix);
-  origin.x += _textOrigin.x;
-  origin.y += _textOrigin.y;
+  origin.x += _textOriginOffset.x;
+  origin.y += _textOriginOffset.y;
 
   if (_forceAlignment) {
     // ForceAlignment mode: lay out glyphs using advance, then adjust spacing
