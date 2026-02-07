@@ -2764,7 +2764,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 1105, 861);
+  auto surface = Surface::Make(context, 1105, 961);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -2816,48 +2816,64 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto fill2 = MakeFillStyle(Color::Red());
   group2->setElements({textSpan2, textPath2, fill2});
 
-  // Group 3: Not perpendicular to path (text stays upright)
+  // Group 3: End alignment using textOriginOffset
   auto group3 = std::make_shared<VectorGroup>();
   group3->setPosition({58, 263});
 
-  auto textSpan3 = Text::Make(TextBlob::MakeFrom("Not Perpendicular", font));
+  auto textBlob3 = TextBlob::MakeFrom("End Aligned", font);
+  auto textSpan3 = Text::Make(textBlob3);
 
   auto textPath3 = std::make_shared<TextPath>();
   textPath3->setPath(curvePath);
-  textPath3->setPerpendicular(false);
+  textPath3->setPerpendicular(true);
+  // For end alignment: textOriginOffset.x = -(pathLength - textWidth) so text is at path end
+  auto textWidth3 = textBlob3->getTightBounds().width();
+  auto pathLength3 = PathMeasure::MakeFrom(curvePath)->getLength();
+  textPath3->setTextOriginOffset({-(pathLength3 - textWidth3), 0});
 
-  auto fill3 = MakeFillStyle(Color{1.0f, 0.5f, 0.0f, 1.0f});  // Orange
+  auto fill3 = MakeFillStyle(Color::Green());
   group3->setElements({textSpan3, textPath3, fill3});
 
-  // Group 4: Reversed path direction
+  // Group 4: Not perpendicular to path (text stays upright)
   auto group4 = std::make_shared<VectorGroup>();
   group4->setPosition({58, 363});
 
-  auto textSpan4 = Text::Make(TextBlob::MakeFrom("Reversed Path", font));
+  auto textSpan4 = Text::Make(TextBlob::MakeFrom("Not Perpendicular", font));
 
   auto textPath4 = std::make_shared<TextPath>();
   textPath4->setPath(curvePath);
-  textPath4->setPerpendicular(true);
-  textPath4->setReversed(true);
+  textPath4->setPerpendicular(false);
 
-  auto fill4 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
+  auto fill4 = MakeFillStyle(Color{1.0f, 0.5f, 0.0f, 1.0f});  // Orange
   group4->setElements({textSpan4, textPath4, fill4});
 
-  // Group 5: With margins and force alignment
+  // Group 5: Reversed path direction
   auto group5 = std::make_shared<VectorGroup>();
   group5->setPosition({58, 463});
 
-  auto textSpan5 = Text::Make(TextBlob::MakeFrom("Force Alignment", font));
+  auto textSpan5 = Text::Make(TextBlob::MakeFrom("Reversed Path", font));
 
   auto textPath5 = std::make_shared<TextPath>();
   textPath5->setPath(curvePath);
-  textPath5->setFirstMargin(50);
-  textPath5->setLastMargin(-50);  // Negative value shrinks from path end
-  textPath5->setForceAlignment(true);
   textPath5->setPerpendicular(true);
+  textPath5->setReversed(true);
 
-  auto fill5 = MakeFillStyle(Color{0.0f, 0.5f, 0.5f, 1.0f});  // Teal
+  auto fill5 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
   group5->setElements({textSpan5, textPath5, fill5});
+
+  // Group 6: Force alignment without margins
+  auto group6 = std::make_shared<VectorGroup>();
+  group6->setPosition({58, 563});
+
+  auto textSpan6 = Text::Make(TextBlob::MakeFrom("Force Alignment", font));
+
+  auto textPath6 = std::make_shared<TextPath>();
+  textPath6->setPath(curvePath);
+  textPath6->setForceAlignment(true);
+  textPath6->setPerpendicular(true);
+
+  auto fill6 = MakeFillStyle(Color{0.0f, 0.5f, 0.5f, 1.0f});  // Teal
+  group6->setElements({textSpan6, textPath6, fill6});
 
   // ==================== Column 2: TextPath advanced tests ====================
 
@@ -2866,11 +2882,11 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   largerCurvePath.moveTo(40, 80);
   largerCurvePath.cubicTo(140, -120, 340, 280, 440, 80);  // More extreme curve
 
-  // Group 6: Two consecutive TextPaths - second should override first
-  auto group6 = std::make_shared<VectorGroup>();
-  group6->setPosition({548, 63});
+  // Group 7: Two consecutive TextPaths - second should override first
+  auto group7 = std::make_shared<VectorGroup>();
+  group7->setPosition({548, 63});
 
-  auto textSpan6 = Text::Make(TextBlob::MakeFrom("Second Override", font));
+  auto textSpan7 = Text::Make(TextBlob::MakeFrom("Second Override", font));
 
   auto textPathFirst = std::make_shared<TextPath>();
   textPathFirst->setPath(curvePath);
@@ -2880,211 +2896,166 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   textPathSecond->setPath(largerCurvePath);
   textPathSecond->setPerpendicular(true);
 
-  auto fill6 = MakeFillStyle(Color::Blue());
-  group6->setElements({textSpan6, textPathFirst, textPathSecond, fill6});
+  auto fill7 = MakeFillStyle(Color::Blue());
+  group7->setElements({textSpan7, textPathFirst, textPathSecond, fill7});
 
-  // Group 7: Inner group transform overridden by TextPath
-  auto group7 = std::make_shared<VectorGroup>();
-  group7->setPosition({548, 163});
+  // Group 8: Inner group transform overridden by TextPath
+  auto group8 = std::make_shared<VectorGroup>();
+  group8->setPosition({548, 163});
 
-  auto innerGroup7 = std::make_shared<VectorGroup>();
-  innerGroup7->setPosition({20, 60});
-  innerGroup7->setScale({1.5f, 0.8f});
+  auto innerGroup8 = std::make_shared<VectorGroup>();
+  innerGroup8->setPosition({20, 60});
+  innerGroup8->setScale({1.5f, 0.8f});
 
-  auto textSpan7 = Text::Make(TextBlob::MakeFrom("Group Override", font));
+  auto textSpan8 = Text::Make(TextBlob::MakeFrom("Group Override", font));
 
-  innerGroup7->setElements({textSpan7});
+  innerGroup8->setElements({textSpan8});
 
-  auto textPath7 = std::make_shared<TextPath>();
-  textPath7->setPath(curvePath);
-  textPath7->setPerpendicular(true);
+  auto textPath8 = std::make_shared<TextPath>();
+  textPath8->setPath(curvePath);
+  textPath8->setPerpendicular(true);
 
-  auto fill7 = MakeFillStyle(Color::Red());
-  group7->setElements({innerGroup7, textPath7, fill7});
+  auto fill8 = MakeFillStyle(Color::Red());
+  group8->setElements({innerGroup8, textPath8, fill8});
 
-  // Group 8: Path extension - text extends beyond path boundaries
+  // Group 9: Path extension - text extends beyond path boundaries
   // Uses short path with long text to test path extension at both ends
   Path shortPath = {};
   shortPath.moveTo(180, 80);
   shortPath.cubicTo(220, 20, 280, 140, 320, 80);
 
-  auto group8 = std::make_shared<VectorGroup>();
-  group8->setPosition({548, 263});
+  auto group9 = std::make_shared<VectorGroup>();
+  group9->setPosition({548, 263});
 
-  auto textSpan8 = Text::Make(TextBlob::MakeFrom("Path Extension Test", font));
+  auto textSpan9 = Text::Make(TextBlob::MakeFrom("Path Extension Test", font));
 
-  auto textPath8 = std::make_shared<TextPath>();
-  textPath8->setPath(shortPath);
-  textPath8->setPerpendicular(true);
+  auto textPath9 = std::make_shared<TextPath>();
+  textPath9->setPath(shortPath);
+  textPath9->setPerpendicular(true);
 
-  auto fill8 = MakeFillStyle(Color::Green());
-  group8->setElements({textSpan8, textPath8, fill8});
+  auto fill9 = MakeFillStyle(Color::Green());
+  group9->setElements({textSpan9, textPath9, fill9});
 
-  // Group 9: Closed path with text wrapping around
+  // Group 10: Closed path with text wrapping around
   Path closedPath = {};
   closedPath.moveTo(240, 40);
   closedPath.cubicTo(340, 40, 340, 120, 240, 120);
   closedPath.cubicTo(140, 120, 140, 40, 240, 40);
   closedPath.close();
 
-  auto group9 = std::make_shared<VectorGroup>();
-  group9->setPosition({548, 363});
-
-  auto textSpan9 = Text::Make(TextBlob::MakeFrom("Closed Path Text Wrap", font));
-
-  auto textPath9 = std::make_shared<TextPath>();
-  textPath9->setPath(closedPath);
-  textPath9->setFirstMargin(-80.0f);  // Negative margin to wrap around the closed path
-  textPath9->setPerpendicular(true);
-
-  auto fill9 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
-  group9->setElements({textSpan9, textPath9, fill9});
-
-  // Group 10: Multiple Text elements with nested transforms
   auto group10 = std::make_shared<VectorGroup>();
-  group10->setPosition({448, 513});
+  group10->setPosition({548, 363});
 
-  auto middleGroup10 = std::make_shared<VectorGroup>();
-  middleGroup10->setScale({1.3f, 1.3f});
-
-  auto innerGroup10 = std::make_shared<VectorGroup>();
-  innerGroup10->setPosition({0, 8});
-  innerGroup10->setSkew(-20.0f);
-
-  // Multiple Text elements - should maintain relative positions along path
-  auto textBlob10a = TextBlob::MakeFrom("Multi", font);
-  auto textSpan10a = Text::Make(textBlob10a);
-
-  auto textSpan10b = Text::Make(TextBlob::MakeFrom("Spans", font));
-  // Position Spans after Multi using tight bounds
-  textSpan10b->setPosition({textBlob10a->getTightBounds().right, 0});
+  auto textSpan10 = Text::Make(TextBlob::MakeFrom("Closed Path Text Wrap", font));
 
   auto textPath10 = std::make_shared<TextPath>();
-  textPath10->setPath(curvePath);
+  textPath10->setPath(closedPath);
+  textPath10->setFirstMargin(-80.0f);  // Negative margin to wrap around the closed path
   textPath10->setPerpendicular(true);
 
-  auto fill10 = MakeFillStyle(Color{0.0f, 0.5f, 0.5f, 1.0f});  // Teal
-  innerGroup10->setElements({textSpan10a, textSpan10b, textPath10, fill10});
-  middleGroup10->setElements({innerGroup10});
+  auto fill10 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
+  group10->setElements({textSpan10, textPath10, fill10});
 
-  auto rotationGroup10 = std::make_shared<VectorGroup>();
-  rotationGroup10->setAnchor({350, 104});
-  rotationGroup10->setPosition({350, 104});
-  rotationGroup10->setRotation(15.0f);
-
-  rotationGroup10->setElements({middleGroup10});
-  group10->setElements({rotationGroup10});
-
-  // ==================== Row 6: Edge cases and special text layout ====================
-
-  // Group 11: Negative spacing - firstMargin exceeds pathLength + lastMargin
+  // Group 11: Multiple Text elements with nested transforms
   auto group11 = std::make_shared<VectorGroup>();
-  group11->setPosition({58, 563});
+  group11->setPosition({448, 513});
 
-  auto textSpan11 = Text::Make(TextBlob::MakeFrom("Negative Spacing", font));
+  auto middleGroup11 = std::make_shared<VectorGroup>();
+  middleGroup11->setScale({1.3f, 1.3f});
+
+  auto innerGroup11 = std::make_shared<VectorGroup>();
+  innerGroup11->setPosition({0, 8});
+  innerGroup11->setSkew(-20.0f);
+
+  // Multiple Text elements - should maintain relative positions along path
+  auto textBlob11a = TextBlob::MakeFrom("Multi", font);
+  auto textSpan11a = Text::Make(textBlob11a);
+
+  auto textSpan11b = Text::Make(TextBlob::MakeFrom("Spans", font));
+  // Position Spans after Multi using tight bounds
+  textSpan11b->setPosition({textBlob11a->getTightBounds().right, 0});
 
   auto textPath11 = std::make_shared<TextPath>();
   textPath11->setPath(curvePath);
-  textPath11->setFirstMargin(400);  // Exceeds path end
-  textPath11->setLastMargin(-350);  // Path length ~380, so 400 > 380 + (-350) = 30
-  textPath11->setForceAlignment(true);
   textPath11->setPerpendicular(true);
 
-  auto fill11 = MakeFillStyle(Color{0.2f, 0.2f, 0.8f, 1.0f});  // Dark blue
-  group11->setElements({textSpan11, textPath11, fill11});
+  auto fill11 = MakeFillStyle(Color{0.0f, 0.5f, 0.5f, 1.0f});  // Teal
+  innerGroup11->setElements({textSpan11a, textSpan11b, textPath11, fill11});
+  middleGroup11->setElements({innerGroup11});
 
-  // Group 12: Multi-line text with line spacing preserved, centered on path
+  auto rotationGroup11 = std::make_shared<VectorGroup>();
+  rotationGroup11->setAnchor({350, 104});
+  rotationGroup11->setPosition({350, 104});
+  rotationGroup11->setRotation(15.0f);
+
+  rotationGroup11->setElements({middleGroup11});
+  group11->setElements({rotationGroup11});
+
+  // ==================== Row 7: Edge cases for margin and alignment ====================
+
+  // Group 12: Force alignment with margins
   auto group12 = std::make_shared<VectorGroup>();
   group12->setPosition({58, 663});
 
-  auto textSpan12a = Text::Make(TextBlob::MakeFrom("Hello", font));
-  auto textSpan12b = Text::Make(TextBlob::MakeFrom("World", font));
-  textSpan12b->setPosition({0, 20});
+  auto textSpan12 = Text::Make(TextBlob::MakeFrom("Force+Margin", font));
 
-  auto innerGroup12 = std::make_shared<VectorGroup>();
-  innerGroup12->setElements({textSpan12a, textSpan12b});
-
-  auto textPath12 = TextPath::Make();
+  auto textPath12 = std::make_shared<TextPath>();
   textPath12->setPath(curvePath);
+  textPath12->setFirstMargin(30);
+  textPath12->setLastMargin(-30);
+  textPath12->setForceAlignment(true);
   textPath12->setPerpendicular(true);
-  // Hardcoded: -(431.97 - 65.00) / 2 ≈ -183.48
-  textPath12->setTextOriginOffset({-183.48f, 0});
 
-  auto fill12 = MakeFillStyle(Color::Green());
-  group12->setElements({innerGroup12, textPath12, fill12});
+  auto fill12 = MakeFillStyle(Color{0.8f, 0.2f, 0.2f, 1.0f});  // Dark red
+  group12->setElements({textSpan12, textPath12, fill12});
 
-  // Group 13: Vertical text with 90° rotation (Latin rotated, CJK upright)
+  // Group 13: Negative spacing - firstMargin exceeds pathLength + lastMargin
   auto group13 = std::make_shared<VectorGroup>();
-  group13->setPosition({548, 663});
+  group13->setPosition({58, 763});
 
-  std::string verticalText = "Vertical 文本";
-  std::vector<std::shared_ptr<Text>> textSpans13 = {};
-  float currentY = 0.0f;
-  // capHeight = 17.59
-  float capHeight = 17.59f;
-  bool prevRotated = false;
+  auto textSpan13 = Text::Make(TextBlob::MakeFrom("Negative Spacing", font));
 
-  const char* textPtr = verticalText.c_str();
-  const char* textEnd = textPtr + verticalText.size();
-  while (textPtr < textEnd) {
-    auto unichar = UTF::NextUTF8(&textPtr, textEnd);
-    if (unichar < 0) {
-      break;
-    }
-    auto glyphID = font.getGlyphID(unichar);
-    bool isCJK = unichar >= 0x4E00 && unichar <= 0x9FFF;
-    if (isCJK) {
-      // boundsTop = -21, hAdv = 24, vAdv = 24, posX = capHeight/2 - 24/2 = -3.20
-      if (prevRotated) {
-        currentY += 21;
-      }
-      TextBlobBuilder builder;
-      auto buffer = builder.allocRun(font, 1, 0, 0);
-      buffer.glyphs[0] = glyphID;
-      auto textBlob = builder.build();
-      if (textBlob != nullptr) {
-        auto span = Text::Make(textBlob, {{12, -capHeight * 0.5f}});
-        span->setPosition({-3.20f, currentY});
-        textSpans13.push_back(span);
-      }
-      currentY += 24;
-      prevRotated = false;
-    } else {
-      float horizontalAdvance = font.getAdvance(glyphID, false);
-      TextBlobBuilder builder;
-      auto buffer = builder.allocRunRSXform(font, 1);
-      buffer.glyphs[0] = glyphID;
-      auto* xform = reinterpret_cast<RSXform*>(buffer.positions);
-      xform[0] = RSXform::Make(0, 1, 0, 0);
-      auto textBlob = builder.build();
-      if (textBlob != nullptr) {
-        auto span = Text::Make(textBlob, {{0, -capHeight * 0.5f}});
-        span->setPosition({0, currentY});
-        textSpans13.push_back(span);
-      }
-      currentY += horizontalAdvance;
-      prevRotated = true;
-    }
-  }
-
-  std::vector<std::shared_ptr<VectorElement>> elements13 = {};
-  for (const auto& span : textSpans13) {
-    elements13.push_back(span);
-  }
-  auto innerGroup13 = std::make_shared<VectorGroup>();
-  innerGroup13->setElements(elements13);
-
-  auto textPath13 = TextPath::Make();
+  auto textPath13 = std::make_shared<TextPath>();
   textPath13->setPath(curvePath);
+  textPath13->setFirstMargin(400);  // Exceeds path end
+  textPath13->setLastMargin(-350);  // Path length ~380, so 400 > 380 + (-350) = 30
+  textPath13->setForceAlignment(true);
   textPath13->setPerpendicular(true);
-  textPath13->setBaselineRotation(90.0f);
-  textPath13->setTextOriginOffset({capHeight * 0.5f, 0});
 
-  auto fill13 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
-  group13->setElements({innerGroup13, textPath13, fill13});
+  auto fill13 = MakeFillStyle(Color{0.2f, 0.2f, 0.8f, 1.0f});  // Dark blue
+  group13->setElements({textSpan13, textPath13, fill13});
+
+  // Group 14: Center align with both margins
+  auto group14 = std::make_shared<VectorGroup>();
+  group14->setPosition({548, 663});
+
+  auto textSpan14 = Text::Make(TextBlob::MakeFrom("Center+Margins", font));
+
+  auto textPath14 = std::make_shared<TextPath>();
+  textPath14->setPath(curvePath);
+  textPath14->setFirstMargin(40);
+  textPath14->setLastMargin(-60);
+  textPath14->setPerpendicular(true);
+
+  auto fill14 = MakeFillStyle(Color{0.2f, 0.6f, 0.2f, 1.0f});  // Dark green
+  group14->setElements({textSpan14, textPath14, fill14});
+
+  // Group 15: End align with lastMargin
+  auto group15 = std::make_shared<VectorGroup>();
+  group15->setPosition({548, 763});
+
+  auto textSpan15 = Text::Make(TextBlob::MakeFrom("End+LastMargin", font));
+
+  auto textPath15 = std::make_shared<TextPath>();
+  textPath15->setPath(curvePath);
+  textPath15->setLastMargin(-80);
+  textPath15->setPerpendicular(true);
+
+  auto fill15 = MakeFillStyle(Color{0.6f, 0.4f, 0.0f, 1.0f});  // Brown
+  group15->setElements({textSpan15, textPath15, fill15});
 
   vectorLayer->setContents({group1, group2, group3, group4, group5, group6, group7, group8, group9,
-                            group10, group11, group12, group13});
+                            group10, group11, group12, group13, group14, group15});
 
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
@@ -3099,11 +3070,12 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   std::vector<std::pair<float, Color>> pathPositions1 = {
       {63, Color::Blue()},
       {163, Color::Red()},
-      {263, Color{1.0f, 0.5f, 0.0f, 1.0f}},   // Orange
-      {363, Color{0.5f, 0.0f, 0.5f, 1.0f}},   // Purple
-      {463, Color{0.0f, 0.5f, 0.5f, 1.0f}},   // Teal
-      {563, Color{0.2f, 0.2f, 0.8f, 1.0f}},   // Dark blue (Negative Spacing)
-      {663, Color::Green()},                    // Multi-line centered
+      {263, Color::Green()},
+      {363, Color{1.0f, 0.5f, 0.0f, 1.0f}},  // Orange
+      {463, Color{0.5f, 0.0f, 0.5f, 1.0f}},  // Purple
+      {563, Color{0.0f, 0.5f, 0.5f, 1.0f}},  // Teal
+      {663, Color{0.8f, 0.2f, 0.2f, 1.0f}},  // Dark red (Force+Center)
+      {763, Color{0.2f, 0.2f, 0.8f, 1.0f}},  // Dark blue (Negative Spacing)
   };
 
   for (const auto& [y, color] : pathPositions1) {
@@ -3115,7 +3087,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   }
 
   // Column 2 helper paths
-  // Row 1 (group6): Second Override
+  // Row 1 (group7): Second Override
   canvas->save();
   canvas->translate(548, 63);
   pathPaint.setColor(Color::Blue());
@@ -3128,38 +3100,46 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   canvas->drawPath(largerCurvePath, pathPaint);
   canvas->restore();
 
-  // Row 2 (group7): Group Transform
+  // Row 2 (group8): Group Transform
   canvas->save();
   canvas->translate(548, 163);
   pathPaint.setColor(Color::Red());
   canvas->drawPath(curvePath, pathPaint);
   canvas->restore();
 
-  // Row 3 (group8): Path Extension
+  // Row 3 (group9): Path Extension
   canvas->save();
   canvas->translate(548, 263);
   pathPaint.setColor(Color::Green());
   canvas->drawPath(shortPath, pathPaint);
   canvas->restore();
 
-  // Row 4 (group9): Closed Path
+  // Row 4 (group10): Closed Path
   canvas->save();
   canvas->translate(548, 363);
   pathPaint.setColor(Color{0.5f, 0.0f, 0.5f, 1.0f});
   canvas->drawPath(closedPath, pathPaint);
   canvas->restore();
 
-  // Row 5 (group10): Deep Nested
+  // Row 5 (group11): Deep Nested
   canvas->save();
   canvas->translate(548, 533);
   pathPaint.setColor(Color{0.0f, 0.5f, 0.5f, 1.0f});
   canvas->drawPath(curvePath, pathPaint);
   canvas->restore();
 
-  // Row 6 (group13): Vertical text
+  // Row 7 Column 2 helper paths
+  // Group 14: Center+Margins
   canvas->save();
   canvas->translate(548, 663);
-  pathPaint.setColor(Color{0.5f, 0.0f, 0.5f, 1.0f});
+  pathPaint.setColor(Color{0.2f, 0.6f, 0.2f, 1.0f});
+  canvas->drawPath(curvePath, pathPaint);
+  canvas->restore();
+
+  // Group 15: End+LastMargin
+  canvas->save();
+  canvas->translate(548, 763);
+  pathPaint.setColor(Color{0.6f, 0.4f, 0.0f, 1.0f});
   canvas->drawPath(curvePath, pathPaint);
   canvas->restore();
 
@@ -4180,6 +4160,248 @@ TGFX_TEST(VectorLayerTest, TextAnchors) {
   canvas->restore();
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextAnchors"));
+}
+
+/**
+ * Tests TextPath with textOriginOffset and baselineRotation:
+ * - Row 1: Default mode (textOriginOffset at 0,0) - text from path start
+ * - Row 2: Centered using negative textOriginOffset.x
+ * - Row 3: Multi-line text preserving relative positions
+ * - Row 4: ForceAlignment mode - all glyphs distributed evenly
+ * - Row 5: Vertical text with 90° rotation
+ */
+TGFX_TEST(VectorLayerTest, TextPathGlyphBaseline) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 511, 588);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto typeface = GetTestTypeface();
+  if (typeface == nullptr) {
+    return;
+  }
+  Font font(typeface, 24);
+
+  Path curvePath = {};
+  curvePath.moveTo(40, 80);
+  curvePath.cubicTo(140, -40, 340, 200, 440, 80);
+
+  // ==================== Row 1: Default mode ====================
+
+  // Group 1: Default mode (textOriginOffset at 0,0) - text positioned from path start
+  auto group1 = std::make_shared<VectorGroup>();
+  group1->setPosition({22, 23});
+
+  auto textSpan1 = Text::Make(TextBlob::MakeFrom("Hello World", font));
+
+  auto textPath1 = TextPath::Make();
+  textPath1->setPath(curvePath);
+  textPath1->setPerpendicular(true);
+  // Default textOriginOffset=(0,0), baselineRotation=0
+
+  auto fill1 = MakeFillStyle(Color::Blue());
+  group1->setElements({textSpan1, textPath1, fill1});
+
+  // ==================== Row 2: Centered ====================
+
+  // Group 2: With origin offset - single line, centered using negative textOriginOffset.x
+  auto group2 = std::make_shared<VectorGroup>();
+  group2->setPosition({22, 123});
+
+  auto textBlob2 = TextBlob::MakeFrom("Hello World", font);
+  auto textSpan2 = Text::Make(textBlob2);
+
+  auto textPath2 = TextPath::Make();
+  textPath2->setPath(curvePath);
+  textPath2->setPerpendicular(true);
+  // Use negative textOriginOffset.x to shift text right, centering it on the path
+  auto textWidth2 = textBlob2->getTightBounds().width();
+  auto pathLength2 = PathMeasure::MakeFrom(curvePath)->getLength();
+  textPath2->setTextOriginOffset({-(pathLength2 - textWidth2) / 2, 0});
+
+  auto fill2 = MakeFillStyle(Color::Red());
+  group2->setElements({textSpan2, textPath2, fill2});
+
+  // ==================== Row 3: Multi-line text ====================
+
+  // Group 3: Multi-line text with line spacing preserved, centered
+  auto group3 = std::make_shared<VectorGroup>();
+  group3->setPosition({22, 223});
+
+  // Create multi-line text - positions are preserved relative to first glyph
+  auto textBlob3a = TextBlob::MakeFrom("Hello", font);
+  auto textBlob3b = TextBlob::MakeFrom("World", font);
+  auto textSpan3a = Text::Make(textBlob3a);
+  auto textSpan3b = Text::Make(textBlob3b);
+  textSpan3b->setPosition({0, 20});
+
+  auto innerGroup3 = std::make_shared<VectorGroup>();
+  innerGroup3->setElements({textSpan3a, textSpan3b});
+
+  auto textPath3 = TextPath::Make();
+  textPath3->setPath(curvePath);
+  textPath3->setPerpendicular(true);
+  // Use negative textOriginOffset.x to center text on the path
+  auto textWidth3 = std::max(textBlob3a->getTightBounds().width(), textBlob3b->getTightBounds().width());
+  auto pathLength3 = PathMeasure::MakeFrom(curvePath)->getLength();
+  textPath3->setTextOriginOffset({-(pathLength3 - textWidth3) / 2, 0});
+
+  auto fill3 = MakeFillStyle(Color::Green());
+  group3->setElements({innerGroup3, textPath3, fill3});
+
+  // ==================== Row 4: ForceAlignment ====================
+
+  // Group 4: ForceAlignment - all glyphs distributed evenly along path
+  auto group4 = std::make_shared<VectorGroup>();
+  group4->setPosition({22, 353});
+
+  auto textSpan4a = Text::Make(TextBlob::MakeFrom("Hello", font));
+  auto textSpan4b = Text::Make(TextBlob::MakeFrom("World", font));
+  textSpan4b->setPosition({0, 20});
+
+  auto innerGroup4 = std::make_shared<VectorGroup>();
+  innerGroup4->setElements({textSpan4a, textSpan4b});
+
+  auto textPath4 = TextPath::Make();
+  textPath4->setPath(curvePath);
+  textPath4->setPerpendicular(true);
+  textPath4->setForceAlignment(true);
+  // ForceAlignment ignores original positions and distributes glyphs evenly
+
+  auto fill4 = MakeFillStyle(Color{1.0f, 0.5f, 0.0f, 1.0f});  // Orange
+  group4->setElements({innerGroup4, textPath4, fill4});
+
+  // ==================== Row 5: Vertical text with 90° rotation ====================
+
+  // Group 5: Vertical text using baselineRotation
+  auto group5 = std::make_shared<VectorGroup>();
+  group5->setPosition({22, 453});
+
+  // Create vertical text by stacking characters vertically
+  // Each character is rotated 90° around its anchor point
+  std::string verticalText = "Vertical 文本";
+  std::vector<std::shared_ptr<Text>> textSpans5 = {};
+  float currentY = 0.0f;
+  auto capHeight = font.getMetrics().capHeight;
+
+  const char* textPtr = verticalText.c_str();
+  const char* textEnd = textPtr + verticalText.size();
+  float firstHorizontalAdvance = -1.0f;
+  while (textPtr < textEnd) {
+    auto unichar = UTF::NextUTF8(&textPtr, textEnd);
+    if (unichar < 0) {
+      break;
+    }
+
+    auto glyphID = font.getGlyphID(unichar);
+    // Characters are rotated 90°, so horizontal advance becomes the vertical spacing
+    float horizontalAdvance = font.getAdvance(glyphID, false);
+    if (firstHorizontalAdvance < 0) {
+      firstHorizontalAdvance = horizontalAdvance;
+    }
+
+    if (glyphID == 0) {
+      currentY += horizontalAdvance;
+      continue;
+    }
+
+    // Create TextBlob with 90° rotation around anchor using RSXform
+    // Anchor in glyph local space: (advance/2, -capHeight/2)
+    float anchorX = horizontalAdvance * 0.5f;
+    float anchorY = -capHeight * 0.5f;
+    // RSXform for 90° rotation around (anchorX, anchorY):
+    // scos=0, ssin=1, tx = anchorX + anchorY, ty = anchorY - anchorX
+    TextBlobBuilder builder;
+    auto buffer = builder.allocRunRSXform(font, 1);
+    buffer.glyphs[0] = glyphID;
+    auto* xform = reinterpret_cast<RSXform*>(buffer.positions);
+    xform[0] = RSXform::Make(0, 1, anchorX + anchorY, anchorY - anchorX);
+    auto textBlob = builder.build();
+
+    if (textBlob != nullptr) {
+      // For baselineRotation=90, anchor y should be at visual center
+      Point anchorOffset5 = {0, -capHeight * 0.5f};
+      auto span = Text::Make(textBlob, {anchorOffset5});
+      // Center align all characters to first character's center
+      float posX = (firstHorizontalAdvance - horizontalAdvance) * 0.5f;
+      span->setPosition({posX, currentY});
+      textSpans5.push_back(span);
+    }
+    currentY += horizontalAdvance;
+  }
+
+  std::vector<std::shared_ptr<VectorElement>> elements5 = {};
+  for (const auto& span : textSpans5) {
+    elements5.push_back(span);
+  }
+  auto innerGroup5 = std::make_shared<VectorGroup>();
+  innerGroup5->setElements(elements5);
+
+  auto textPath5 = TextPath::Make();
+  textPath5->setPath(curvePath);
+  textPath5->setPerpendicular(true);
+  // 90° baselineRotation: Y coordinate maps to path direction (vertical text layout)
+  textPath5->setBaselineRotation(90.0f);
+  // textOriginOffset compensates for the RSXform shifting the first glyph's origin.
+  // Before rotation: first glyph origin = (0, 0), desired textOrigin = (advance/2, -capHeight).
+  // After rotation: first glyph origin = (anchorX + anchorY, anchorY - anchorX).
+  // offset = desired textOrigin - new first glyph origin
+  float firstAnchorX = firstHorizontalAdvance * 0.5f;
+  float firstAnchorY = -capHeight * 0.5f;
+  float firstOriginX = firstAnchorX + firstAnchorY;
+  float firstOriginY = firstAnchorY - firstAnchorX;
+  textPath5->setTextOriginOffset(
+      {firstHorizontalAdvance * 0.5f - firstOriginX, -capHeight - firstOriginY});
+
+  auto fill5 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
+  group5->setElements({innerGroup5, textPath5, fill5});
+
+  vectorLayer->setContents({group1, group2, group3, group4, group5});
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  // Draw helper paths for visualization
+  Paint pathPaint = {};
+  pathPaint.setStyle(PaintStyle::Stroke);
+  pathPaint.setStrokeWidth(1.0f);
+  pathPaint.setColor(Color{0.7f, 0.7f, 0.7f, 1.0f});
+
+  // Row 1 helper paths
+  canvas->save();
+  canvas->translate(22, 23);
+  canvas->drawPath(curvePath, pathPaint);
+  canvas->restore();
+
+  canvas->save();
+  canvas->translate(22, 123);
+  canvas->drawPath(curvePath, pathPaint);
+  canvas->restore();
+
+  // Row 2 helper path
+  canvas->save();
+  canvas->translate(22, 223);
+  canvas->drawPath(curvePath, pathPaint);
+  canvas->restore();
+
+  // Row 3 helper path
+  canvas->save();
+  canvas->translate(22, 353);
+  canvas->drawPath(curvePath, pathPaint);
+  canvas->restore();
+
+  // Row 4 helper path
+  canvas->save();
+  canvas->translate(22, 453);
+  canvas->drawPath(curvePath, pathPaint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextPathGlyphBaseline"));
 }
 
 }  // namespace tgfx
