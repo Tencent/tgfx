@@ -3097,8 +3097,23 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto fill14 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
   group14->setElements({innerGroup14, textPath14, fill14});
 
+  // Group 15: Reversed path with force alignment
+  auto group15 = std::make_shared<VectorGroup>();
+  group15->setPosition({548, 663});
+
+  auto textSpan15 = Text::Make(TextBlob::MakeFrom("Reversed+Force", font));
+
+  auto textPath15 = std::make_shared<TextPath>();
+  textPath15->setPath(curvePath);
+  textPath15->setReversed(true);
+  textPath15->setForceAlignment(true);
+  textPath15->setPerpendicular(true);
+
+  auto fill15 = MakeFillStyle(Color{0.6f, 0.4f, 0.0f, 1.0f});  // Brown
+  group15->setElements({textSpan15, textPath15, fill15});
+
   vectorLayer->setContents({group1, group2, group3, group4, group5, group6, group7, group8, group9,
-                            group10, group11, group12, group13, group14});
+                            group10, group11, group12, group13, group14, group15});
 
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
@@ -3168,6 +3183,13 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   canvas->save();
   canvas->translate(548, 533);
   pathPaint.setColor(Color{0.0f, 0.5f, 0.5f, 1.0f});
+  canvas->drawPath(curvePath, pathPaint);
+  canvas->restore();
+
+  // Row 6 (group15): Reversed+Force
+  canvas->save();
+  canvas->translate(548, 663);
+  pathPaint.setColor(Color{0.6f, 0.4f, 0.0f, 1.0f});
   canvas->drawPath(curvePath, pathPaint);
   canvas->restore();
 
