@@ -4328,7 +4328,9 @@ TGFX_TEST(VectorLayerTest, TextPathGlyphBaseline) {
       // For baselineRotation=90, anchor y should be at visual center
       Point anchorOffset5 = {0, -capHeight * 0.5f};
       auto span = Text::Make(textBlob, {anchorOffset5});
-      span->setPosition({0, currentY});
+      // Center align all characters to first character's center
+      float posX = (firstHorizontalAdvance - horizontalAdvance) * 0.5f;
+      span->setPosition({posX, currentY});
       textSpans5.push_back(span);
     }
     currentY += horizontalAdvance;
