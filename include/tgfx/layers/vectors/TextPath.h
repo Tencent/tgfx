@@ -63,6 +63,19 @@ class TextPath : public VectorElement {
   void setTextOriginOffset(Point value);
 
   /**
+   * Returns the rotation angle in degrees for the baseline coordinate system. 0 means horizontal
+   * text (baseline along X axis), 90 means vertical text (baseline along Y axis).
+   */
+  float baselineRotation() const {
+    return _baselineRotation;
+  }
+
+  /**
+   * Sets the rotation angle for the baseline coordinate system.
+   */
+  void setBaselineRotation(float value);
+
+  /**
    * Returns the margin from the path start in pixels. Positive values offset glyphs forward along
    * the path.
    */
@@ -112,19 +125,6 @@ class TextPath : public VectorElement {
    * Sets whether the path direction is reversed.
    */
   void setReversed(bool value);
-
-  /**
-   * Returns the rotation angle in degrees for the baseline coordinate system. 0 means horizontal
-   * text (baseline along X axis), 90 means vertical text (baseline along Y axis).
-   */
-  float baselineRotation() const {
-    return _baselineRotation;
-  }
-
-  /**
-   * Sets the rotation angle for the baseline coordinate system.
-   */
-  void setBaselineRotation(float value);
 
   /**
    * Returns whether text is stretched to fit the available path length. When enabled, glyphs are
