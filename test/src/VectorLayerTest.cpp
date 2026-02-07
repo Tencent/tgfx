@@ -4305,9 +4305,7 @@ TGFX_TEST(VectorLayerTest, TextPathGlyphBaseline) {
       continue;
     }
 
-    // Use vertical advance for vertical text layout spacing
-    float verticalAdvance = font.getAdvance(glyphID, true);
-    // Use horizontal advance for centering
+    // Characters are rotated 90°, so horizontal advance becomes the vertical spacing
     float horizontalAdvance = font.getAdvance(glyphID, false);
     if (firstHorizontalAdvance < 0) {
       firstHorizontalAdvance = horizontalAdvance;
@@ -4330,14 +4328,10 @@ TGFX_TEST(VectorLayerTest, TextPathGlyphBaseline) {
       // For baselineRotation=90, anchor y should be at visual center
       Point anchorOffset5 = {0, -capHeight * 0.5f};
       auto span = Text::Make(textBlob, {anchorOffset5});
-      // Position x: center align all characters to first character's center
-      // First char center at x = firstAdvance/2, current char center at x = horizontalAdvance/2
-      // To align centers: position.x = (firstAdvance - horizontalAdvance) / 2
-      float posX = (firstHorizontalAdvance - horizontalAdvance) * 0.5f;
-      span->setPosition({posX, currentY});
+      span->setPosition({0, currentY});
       textSpans5.push_back(span);
     }
-    currentY += verticalAdvance;
+    currentY += horizontalAdvance;
   }
 
   std::vector<std::shared_ptr<VectorElement>> elements5 = {};
