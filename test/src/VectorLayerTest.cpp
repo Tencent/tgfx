@@ -3011,8 +3011,10 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto group13 = std::make_shared<VectorGroup>();
   group13->setPosition({58, 763});
 
-  auto textSpan13a = Text::Make(TextBlob::MakeFrom("Hello", font));
-  auto textSpan13b = Text::Make(TextBlob::MakeFrom("World", font));
+  auto textBlob13a = TextBlob::MakeFrom("Multiple", font);
+  auto textSpan13a = Text::Make(textBlob13a);
+  auto textBlob13b = TextBlob::MakeFrom("Lines", font);
+  auto textSpan13b = Text::Make(textBlob13b);
   textSpan13b->setPosition({0, 20});
 
   auto innerGroup13 = std::make_shared<VectorGroup>();
@@ -3021,8 +3023,10 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textPath13 = TextPath::Make();
   textPath13->setPath(curvePath);
   textPath13->setPerpendicular(true);
-  // Hardcoded: -(431.97 - 65.00) / 2 ≈ -183.48
-  textPath13->setTextOriginOffset({-183.48f, 0});
+  auto textWidth13 =
+      std::max(textBlob13a->getTightBounds().width(), textBlob13b->getTightBounds().width());
+  auto pathLength13 = PathMeasure::MakeFrom(curvePath)->getLength();
+  textPath13->setTextOriginOffset({-(pathLength13 - textWidth13) / 2, 0});
 
   auto fill13 = MakeFillStyle(Color::Green());
   group13->setElements({innerGroup13, textPath13, fill13});
