@@ -4352,7 +4352,16 @@ TGFX_TEST(VectorLayerTest, TextPathGlyphBaseline) {
   textPath5->setPerpendicular(true);
   // 90° baselineRotation: Y coordinate maps to path direction (vertical text layout)
   textPath5->setBaselineRotation(90.0f);
-  textPath5->setTextOriginOffset({firstHorizontalAdvance * 0.5f, -capHeight});
+  // textOriginOffset compensates for the RSXform shifting the first glyph's origin.
+  // Before rotation: first glyph origin = (0, 0), desired textOrigin = (advance/2, -capHeight).
+  // After rotation: first glyph origin = (anchorX + anchorY, anchorY - anchorX).
+  // offset = desired textOrigin - new first glyph origin
+  float firstAnchorX = firstHorizontalAdvance * 0.5f;
+  float firstAnchorY = -capHeight * 0.5f;
+  float firstOriginX = firstAnchorX + firstAnchorY;
+  float firstOriginY = firstAnchorY - firstAnchorX;
+  textPath5->setTextOriginOffset(
+      {firstHorizontalAdvance * 0.5f - firstOriginX, -capHeight - firstOriginY});
 
   auto fill5 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
   group5->setElements({innerGroup5, textPath5, fill5});
