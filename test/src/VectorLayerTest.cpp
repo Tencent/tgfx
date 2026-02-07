@@ -4285,7 +4285,7 @@ TGFX_TEST(VectorLayerTest, TextPathGlyphBaseline) {
   group5->setPosition({22, 453});
 
   // Create vertical text by stacking characters vertically
-  // Characters are NOT rotated 90° - to inspect vertical spacing
+  // Each character is rotated 90° around its anchor point
   std::string verticalText = "Vertical 文本";
   std::vector<std::shared_ptr<Text>> textSpans5 = {};
   float currentY = 0.0f;
@@ -4313,10 +4313,17 @@ TGFX_TEST(VectorLayerTest, TextPathGlyphBaseline) {
       firstHorizontalAdvance = horizontalAdvance;
     }
 
-    // Create TextBlob without rotation - just use allocRun
+    // Create TextBlob with 90° rotation around anchor using RSXform
+    // Anchor in glyph local space: (advance/2, -capHeight/2)
+    float anchorX = horizontalAdvance * 0.5f;
+    float anchorY = -capHeight * 0.5f;
+    // RSXform for 90° rotation around (anchorX, anchorY):
+    // scos=0, ssin=1, tx = anchorX + anchorY, ty = anchorY - anchorX
     TextBlobBuilder builder;
-    auto buffer = builder.allocRun(font, 1, 0, 0);
+    auto buffer = builder.allocRunRSXform(font, 1);
     buffer.glyphs[0] = glyphID;
+    auto* xform = reinterpret_cast<RSXform*>(buffer.positions);
+    xform[0] = RSXform::Make(0, 1, anchorX + anchorY, anchorY - anchorX);
     auto textBlob = builder.build();
 
     if (textBlob != nullptr) {
