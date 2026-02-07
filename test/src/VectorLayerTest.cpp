@@ -4301,14 +4301,15 @@ TGFX_TEST(VectorLayerTest, TextPathGlyphBaseline) {
     }
 
     auto glyphID = font.getGlyphID(unichar);
-    if (glyphID == 0) {
-      continue;
-    }
-
     // Characters are rotated 90°, so horizontal advance becomes the vertical spacing
     float horizontalAdvance = font.getAdvance(glyphID, false);
     if (firstHorizontalAdvance < 0) {
       firstHorizontalAdvance = horizontalAdvance;
+    }
+
+    if (glyphID == 0) {
+      currentY += horizontalAdvance;
+      continue;
     }
 
     // Create TextBlob with 90° rotation around anchor using RSXform
