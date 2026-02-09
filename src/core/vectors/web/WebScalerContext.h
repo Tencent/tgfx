@@ -41,6 +41,9 @@ class WebScalerContext : public ScalerContext {
   bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
                   void* dstPixels, const Point& glyphOffset) const override;
 
+ protected:
+  FontMetrics onComputeFontMetrics() const override;
+
  private:
   emscripten::val scalerContext = emscripten::val::null();
 

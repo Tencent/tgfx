@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <mutex>
 #include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
@@ -49,7 +50,7 @@ class ScalerContext {
     return textSize;
   }
 
-  virtual FontMetrics getFontMetrics() const = 0;
+  FontMetrics getFontMetrics() const;
 
   virtual Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const = 0;
 
@@ -77,7 +78,12 @@ class ScalerContext {
 
   ScalerContext(std::shared_ptr<Typeface> typeface, float size);
 
+  virtual FontMetrics onComputeFontMetrics() const = 0;
+
  private:
+  mutable FontMetrics fontMetricsCache = {};
+  mutable std::once_flag fontMetricsOnceFlag = {};
+
   friend class Font;
 };
 }  // namespace tgfx

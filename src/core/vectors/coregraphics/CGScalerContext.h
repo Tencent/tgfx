@@ -30,8 +30,6 @@ class CGScalerContext : public ScalerContext {
 
   ~CGScalerContext() override;
 
-  FontMetrics getFontMetrics() const override;
-
   Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override;
 
   float getAdvance(GlyphID glyphID, bool verticalText) const override;
@@ -46,6 +44,9 @@ class CGScalerContext : public ScalerContext {
   bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
                   void* dstPixels, const Point& glyphOffset) const override;
   float getBackingSize() const override;
+
+ protected:
+  FontMetrics onComputeFontMetrics() const override;
 
  private:
   float fauxBoldScale = 1.0f;

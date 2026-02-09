@@ -29,7 +29,16 @@ class UserScalerContext : public ScalerContext {
         textScale(size / static_cast<float>(userTypeface()->unitsPerEm())) {
   }
 
-  FontMetrics getFontMetrics() const override {
+  float getAdvance(GlyphID, bool) const override {
+    return 0.0f;
+  }
+
+  Point getVerticalOffset(GlyphID) const override {
+    return {};
+  }
+
+ protected:
+  FontMetrics onComputeFontMetrics() const override {
     const auto& metrics = userTypeface()->fontMetrics();
     FontMetrics result = {};
     result.top = metrics.top * textScale;
@@ -46,15 +55,6 @@ class UserScalerContext : public ScalerContext {
     return result;
   }
 
-  float getAdvance(GlyphID, bool) const override {
-    return 0.0f;
-  }
-
-  Point getVerticalOffset(GlyphID) const override {
-    return {};
-  }
-
- protected:
   UserTypeface* userTypeface() const {
     return static_cast<UserTypeface*>(typeface.get());
   }

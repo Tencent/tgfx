@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include "ft2build.h"
 #include FT_COLOR_H
 #include FT_FREETYPE_H
@@ -33,8 +34,6 @@ class FTScalerContext : public ScalerContext {
   FTScalerContext(std::shared_ptr<Typeface> typeFace, float textSize);
 
   ~FTScalerContext() override;
-
-  FontMetrics getFontMetrics() const override;
 
   Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override;
 
@@ -53,6 +52,9 @@ class FTScalerContext : public ScalerContext {
   float getBackingSize() const override {
     return backingSize;
   }
+
+ protected:
+  FontMetrics onComputeFontMetrics() const override;
 
  private:
   int setupSize(bool fauxItalic) const;
@@ -86,5 +88,7 @@ class FTScalerContext : public ScalerContext {
   FT_Int strikeIndex = -1;  // The bitmap strike for the face (or -1 if none).
   FT_Int32 loadGlyphFlags = 0;
   float backingSize = 1.0f;
+  mutable std::mutex advanceCacheLocker = {};
+  mutable std::unordered_map<uint32_t, float> advanceCache = {};
 };
 }  // namespace tgfx

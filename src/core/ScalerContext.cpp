@@ -24,10 +24,6 @@ class EmptyScalerContext : public ScalerContext {
   explicit EmptyScalerContext(float size) : ScalerContext(nullptr, size) {
   }
 
-  FontMetrics getFontMetrics() const override {
-    return {};
-  }
-
   Rect getBounds(GlyphID, bool, bool) const override {
     return {};
   }
@@ -52,6 +48,11 @@ class EmptyScalerContext : public ScalerContext {
                   const Point&) const override {
     return false;
   }
+
+ protected:
+  FontMetrics onComputeFontMetrics() const override {
+    return {};
+  }
 };
 
 std::shared_ptr<ScalerContext> ScalerContext::MakeEmpty(float size) {
@@ -67,5 +68,10 @@ std::shared_ptr<ScalerContext> ScalerContext::MakeEmpty(float size) {
 
 ScalerContext::ScalerContext(std::shared_ptr<Typeface> typeface, float size)
     : typeface(std::move(typeface)), textSize(size) {
+}
+
+FontMetrics ScalerContext::getFontMetrics() const {
+  std::call_once(fontMetricsOnceFlag, [this] { fontMetricsCache = onComputeFontMetrics(); });
+  return fontMetricsCache;
 }
 }  // namespace tgfx
