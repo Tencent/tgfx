@@ -122,7 +122,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
 }
 
 void RRectsVertexProvider::getAAVertices(float* vertices) const {
-  auto index = 0;
+  size_t index = 0;
   auto currentAAType = aaType();
   size_t currentIndex = 0;
   std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
