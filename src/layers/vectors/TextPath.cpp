@@ -267,15 +267,13 @@ void TextPath::apply(VectorContext* context) {
       accumulatedAdvance += advance;
     }
   } else {
-    // Normal mode: projects glyphs onto the path based on their original positions.
+    // Normal mode: projects each glyph's anchor onto the path, then places the glyph by
+    // preserving its origin's relative offset to the anchor.
     //
-    // Each glyph's anchor determines its tangent distance (position along the curve), while
-    // the glyph origin determines the normal offset (perpendicular distance from the curve).
-    // This separation ensures anchor Y offset moves the glyph relative to the curve via
-    // relativeToAnchor, without being cancelled by normalOffset.
-    //
-    // After finding the anchor's target position on the curve, the glyph origin is computed
-    // by preserving its relative offset to the anchor and rotating it to follow the curve.
+    // 1. Project anchor position onto the baseline to get tangentDistance (along curve) and
+    //    normalOffset (perpendicular to curve).
+    // 2. Find the curve point at tangentDistance, then shift by normalOffset to get anchorTarget.
+    // 3. Compute glyphOriginNew = anchorTarget + rotated(origin - anchor).
 
     // baselineOrigin is the reference origin for the glyph coordinate system, independent of the
     // path geometry. Each glyph's anchor position relative to this origin determines its distance
@@ -293,14 +291,11 @@ void TextPath::apply(VectorContext* context) {
       auto anchorPos = GetGlyphAnchor(glyph, entry.geometryMatrix);
       auto glyphOriginOld = GetGlyphOrigin(glyph, entry.geometryMatrix);
 
-      // Project anchor-to-origin offset onto baseline direction
+      // Project anchor position onto baseline direction
       float anchorDx = anchorPos.x - origin.x;
       float anchorDy = anchorPos.y - origin.y;
       float tangentDistance = anchorDx * cosR + anchorDy * sinR;
-
-      float originDx = glyphOriginOld.x - origin.x;
-      float originDy = glyphOriginOld.y - origin.y;
-      float normalOffset = originDy * cosR - originDx * sinR;
+      float normalOffset = anchorDy * cosR - anchorDx * sinR;
 
       float pathOffset = _firstMargin + tangentDistance;
       pathOffset = AdjustPathOffset(pathOffset, pathLength, _reversed, isClosed);
