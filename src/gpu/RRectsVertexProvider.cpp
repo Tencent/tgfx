@@ -133,8 +133,10 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
     float innerXRadius = 0;
     float innerYRadius = 0;
     auto rectBounds = rRect.rect;
-    if (stroke && stroke->width > 0.0f) {
-      Point halfStrokeWidth = {0.5f * scales.x * stroke->width, 0.5f * scales.y * stroke->width};
+    if (stroke) {
+      // For hairline stroke (width == 0), use 1 pixel width in device space.
+      auto strokeWidth = stroke->width > 0.0f ? stroke->width : 1.0f / std::max(scales.x, scales.y);
+      Point halfStrokeWidth = {0.5f * scales.x * strokeWidth, 0.5f * scales.y * strokeWidth};
       if (viewMatrix.getScaleX() == 0.f) {
         // The matrix may have a rotation by an odd multiple of 90 degrees.
         std::swap(xRadius, yRadius);

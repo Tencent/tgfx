@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { getSourceSize, isAndroidMiniprogram } from '../tgfx';
+import { getSourceSize, isAndroidMiniprogram, setColorSpace, hasWebpSupport } from '../tgfx';
 import { ArrayBufferImage } from './array-buffer-image';
 import { getCanvas2D, releaseCanvas2D } from './canvas';
 
-import type { EmscriptenGL } from '../types';
+import { EmscriptenGL, TGFX } from '../types';
 
 type WxOffscreenCanvas = OffscreenCanvas & { isOffscreenCanvas: boolean };
 
@@ -30,6 +30,9 @@ export const uploadToTexture = (
   textureID: number,
   alphaOnly: boolean,
 ) => {
+  if (!source) {
+    return;
+  }
   const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
   gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
   if (!alphaOnly && ('isOffscreenCanvas' in source) && source.isOffscreenCanvas) {
@@ -69,4 +72,23 @@ export const uploadToTexture = (
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 };
 
-export { getSourceSize, isAndroidMiniprogram, getCanvas2D as createCanvas2D, releaseCanvas2D as releaseNativeImage };
+export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: number, height: number): Uint8Array | null => {
+  if (!image) {
+    return null;
+  }
+  const canvas = getCanvas2D(width, height);
+  const ctx = canvas?.getContext('2d', {willReadFrequently: true}) as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+  if (!ctx) {
+    return null;
+  }
+  ctx.drawImage(image, 0, 0, width, height);
+  const {data} = ctx.getImageData(0, 0, width, height);
+  releaseCanvas2D(canvas);
+  if (data.length === 0) {
+    return null;
+  }
+  return new Uint8Array(data);
+};
+
+export { getSourceSize, isAndroidMiniprogram, getCanvas2D as createCanvas2D, releaseCanvas2D as releaseNativeImage, setColorSpace, hasWebpSupport };
+

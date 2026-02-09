@@ -31,6 +31,10 @@ namespace tgfx {
 class TextPath : public VectorElement {
  public:
   /**
+   * Creates a new TextPath instance.
+   */
+  static std::shared_ptr<TextPath> Make();
+  /**
    * Returns the path that text follows.
    */
   const Path& path() const {
@@ -114,6 +118,9 @@ class TextPath : public VectorElement {
   }
 
   void apply(VectorContext* context) override;
+
+ protected:
+  TextPath() = default;
 
  private:
   Path _path = {};

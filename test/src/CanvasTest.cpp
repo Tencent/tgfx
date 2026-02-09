@@ -1401,4 +1401,88 @@ TGFX_TEST(CanvasTest, PictureMaskPath) {
   EXPECT_EQ(colorOutside, Color::Transparent());
 }
 
+TGFX_TEST(CanvasTest, DrawImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/apitest/imageReplacement.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+  auto offsetX = 50.0f;
+  auto padding = 25.0f;
+
+  auto surfaceWidth = static_cast<int>(offsetX + imageWidth + padding);
+  auto surfaceHeight = static_cast<int>(padding + imageHeight + padding + imageHeight + padding);
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto maskShader = Shader::MakeLinearGradient(Point{0, 0}, Point{imageWidth, 0},
+                                               {Color::White(), Color::Transparent()}, {});
+  Paint paint;
+  paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+
+  // Top: use offset parameter, mask should stay in canvas coordinate
+  canvas->drawImage(image, offsetX, padding, &paint);
+  // Bottom: use canvas matrix, mask moves with the image
+  canvas->save();
+  canvas->translate(offsetX, padding + imageHeight + padding);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawImage"));
+}
+
+TGFX_TEST(CanvasTest, DrawTextBlob) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto font = Font(typeface, 50);
+  auto textBlob = TextBlob::MakeFrom("TGFX", font);
+  ASSERT_TRUE(textBlob != nullptr);
+  auto textBounds = textBlob->getTightBounds();
+  auto textWidth = textBounds.width();
+  auto textHeight = textBounds.height();
+  auto offsetX = 50.0f;
+  auto padding = 25.0f;
+
+  auto surfaceWidth = static_cast<int>(offsetX + textWidth + padding);
+  auto surfaceHeight = static_cast<int>(padding + textHeight + padding + textHeight + padding);
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto gradientShader = Shader::MakeLinearGradient(Point{0, 0}, Point{textWidth, 0},
+                                                   {Color::Red(), Color::Blue()}, {});
+  Paint paint;
+  paint.setShader(gradientShader);
+
+  // Top: use offset parameter, shader should stay in canvas coordinate
+  canvas->drawTextBlob(textBlob, offsetX, padding - textBounds.top, paint);
+  // Bottom: use canvas matrix, shader moves with the text
+  canvas->save();
+  canvas->translate(offsetX, padding + textHeight + padding - textBounds.top);
+  canvas->drawTextBlob(textBlob, 0, 0, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawTextBlob"));
+}
+
+TGFX_TEST(CanvasTest, CMYKWithoutICCProfile) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/mandrill_128.jpg");
+  auto surface = Surface::Make(context, image->width(), image->height());
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CMYKWithoutICCProfile"));
+}
+
 }  // namespace tgfx

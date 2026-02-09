@@ -42,6 +42,10 @@ static void ApplySkew(Matrix* matrix, float skew, float skewAxis) {
   matrix->postConcat(temp);
 }
 
+std::shared_ptr<VectorGroup> VectorGroup::Make() {
+  return std::shared_ptr<VectorGroup>(new VectorGroup());
+}
+
 void VectorGroup::setElements(std::vector<std::shared_ptr<VectorElement>> value) {
   for (const auto& owner : owners) {
     for (const auto& element : _elements) {
@@ -78,11 +82,11 @@ void VectorGroup::detachFromLayer(Layer* layer) {
   LayerProperty::detachFromLayer(layer);
 }
 
-void VectorGroup::setAnchorPoint(const Point& value) {
-  if (_anchorPoint == value) {
+void VectorGroup::setAnchor(const Point& value) {
+  if (_anchor == value) {
     return;
   }
-  _anchorPoint = value;
+  _anchor = value;
   _matrixDirty = true;
   invalidateContent();
 }
@@ -143,7 +147,7 @@ void VectorGroup::setSkewAxis(float value) {
 Matrix VectorGroup::getMatrix() {
   if (_matrixDirty) {
     _cachedMatrix = Matrix::I();
-    _cachedMatrix.postTranslate(-_anchorPoint.x, -_anchorPoint.y);
+    _cachedMatrix.postTranslate(-_anchor.x, -_anchor.y);
     _cachedMatrix.postScale(_scale.x, _scale.y);
     if (_skew != 0.0f) {
       ApplySkew(&_cachedMatrix, DegreesToRadians(-_skew), DegreesToRadians(_skewAxis));

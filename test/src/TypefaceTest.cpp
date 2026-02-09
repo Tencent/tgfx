@@ -75,9 +75,9 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   PathTypefaceBuilder builder(25);
   builder.setFontName(fontFamily, fontStyle);
 
-  builder.addGlyph(std::make_shared<GlyphPathProvider>(0));
-  builder.addGlyph(std::make_shared<GlyphPathProvider>(1));
-  builder.addGlyph(std::make_shared<GlyphPathProvider>(2));
+  builder.addGlyph(std::make_shared<GlyphPathProvider>(0), 25.0f);
+  builder.addGlyph(std::make_shared<GlyphPathProvider>(1), 25.0f);
+  builder.addGlyph(std::make_shared<GlyphPathProvider>(2), 25.0f);
   auto typeface = builder.detach();
 
   ASSERT_TRUE(typeface != nullptr);
@@ -120,11 +120,11 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   builder.setFontName(fontFamily, fontStyle);
   std::string imagePath = "resources/assets/glyph1.png";
   auto imageCodec = ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
-  builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 0.0f));
+  builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 0.0f), 200.0f);
 
   imagePath = "resources/assets/glyph2.png";
   imageCodec = ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
-  builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 0.0f));
+  builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 0.0f), 200.0f);
 
   auto typeface = builder.detach();
 
@@ -140,7 +140,7 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
 
   imagePath = "resources/assets/glyph3.png";
   imageCodec = ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
-  builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 0.0f));
+  builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 0.0f), 200.0f);
 
   typeface = builder.detach();
   ASSERT_TRUE(typeface != nullptr);
