@@ -3063,7 +3063,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
       buffer.glyphs[0] = glyphID;
       auto textBlob = builder.build();
       if (textBlob != nullptr) {
-        auto span = Text::Make(textBlob, {{12, -capHeight * 0.5f}});
+        auto span = Text::Make(textBlob, {{0, -capHeight * 0.5f}});
         span->setPosition({-3.20f, currentY});
         textSpans14.push_back(span);
       }
@@ -3098,6 +3098,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   textPath14->setPath(curvePath);
   textPath14->setPerpendicular(true);
   textPath14->setBaselineAngle(90.0f);
+  textPath14->setBaselineOrigin({capHeight * 0.5f, 0});
 
   auto fill14 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
   group14->setElements({innerGroup14, textPath14, fill14});
