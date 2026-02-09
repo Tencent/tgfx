@@ -37,11 +37,11 @@ void TextPath::setPath(Path value) {
   invalidateContent();
 }
 
-void TextPath::setTextOrigin(Point value) {
-  if (_textOrigin == value) {
+void TextPath::setBaselineOrigin(Point value) {
+  if (_baselineOrigin == value) {
     return;
   }
-  _textOrigin = value;
+  _baselineOrigin = value;
   invalidateContent();
 }
 
@@ -77,11 +77,11 @@ void TextPath::setReversed(bool value) {
   invalidateContent();
 }
 
-void TextPath::setBaselineRotation(float value) {
-  if (_baselineRotation == value) {
+void TextPath::setBaselineAngle(float value) {
+  if (_baselineAngle == value) {
     return;
   }
-  _baselineRotation = value;
+  _baselineAngle = value;
   invalidateContent();
 }
 
@@ -174,12 +174,15 @@ void TextPath::apply(VectorContext* context) {
   auto availableLength = pathLength + _lastMargin - _firstMargin;
 
   // Precompute rotation values
-  float rotationRadians = _baselineRotation * static_cast<float>(M_PI) / 180.0f;
+  float rotationRadians = _baselineAngle * static_cast<float>(M_PI) / 180.0f;
   float cosR = std::cos(rotationRadians);
   float sinR = std::sin(rotationRadians);
 
-  // textOrigin is the fixed baseline reference point in local coordinate space.
-  auto origin = _textOrigin;
+  // baselineOrigin is an offset relative to the path start point. Convert it to a local
+  // coordinate by adding the path start position, so it serves as the baseline reference point.
+  Point pathStart = {};
+  pathMeasure->getPosTan(0.0f, &pathStart, nullptr);
+  auto origin = pathStart + _baselineOrigin;
 
   if (_forceAlignment) {
     // ForceAlignment mode: lay out glyphs using advance, then adjust spacing
@@ -236,7 +239,7 @@ void TextPath::apply(VectorContext* context) {
         if (_reversed) {
           angle += 180.0f;
         }
-        angle -= _baselineRotation;
+        angle -= _baselineAngle;
         curveRotation.setRotate(angle);
       }
 
@@ -253,7 +256,7 @@ void TextPath::apply(VectorContext* context) {
       accumulatedAdvance += advance;
     }
   } else {
-    // Normal mode: project glyphs onto path using anchor positions relative to textOrigin.
+    // Normal mode: project glyphs onto path using anchor positions relative to baselineOrigin.
     // Curve rotation is applied around each anchor point.
     for (size_t idx = 0; idx < allGlyphs.size(); idx++) {
       auto& entry = allGlyphs[idx];
@@ -299,7 +302,7 @@ void TextPath::apply(VectorContext* context) {
         if (_reversed) {
           angle += 180.0f;
         }
-        angle -= _baselineRotation;
+        angle -= _baselineAngle;
         curveRotation.setRotate(angle);
       }
 

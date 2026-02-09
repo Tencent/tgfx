@@ -48,32 +48,34 @@ class TextPath : public VectorElement {
   void setPath(Path value);
 
   /**
-   * Returns the baseline reference origin in the TextPath's local coordinate space. Each glyph's
-   * position on the path is determined by projecting the distance between its anchor point and this
-   * origin onto the baseline direction. Default is (0, 0), which means the coordinate origin serves
-   * as the baseline reference.
+   * Returns the baseline reference origin as an offset relative to the path start point. Together
+   * with baselineAngle, it defines the baseline reference line used for glyph projection. Each
+   * glyph's position on the path is determined by projecting the distance between its anchor point
+   * and this origin onto the baseline direction. Default is (0, 0), which means the path start
+   * point serves as the baseline reference.
    */
-  Point textOrigin() const {
-    return _textOrigin;
+  Point baselineOrigin() const {
+    return _baselineOrigin;
   }
 
   /**
    * Sets the baseline reference origin.
    */
-  void setTextOrigin(Point value);
+  void setBaselineOrigin(Point value);
 
   /**
-   * Returns the rotation angle in degrees for the baseline coordinate system. 0 means horizontal
+   * Returns the angle in degrees of the baseline reference line. Together with baselineOrigin, it
+   * defines the baseline reference line in the TextPath's local coordinate space. 0 means horizontal
    * text (baseline along X axis), 90 means vertical text (baseline along Y axis).
    */
-  float baselineRotation() const {
-    return _baselineRotation;
+  float baselineAngle() const {
+    return _baselineAngle;
   }
 
   /**
-   * Sets the rotation angle for the baseline coordinate system.
+   * Sets the angle of the baseline reference line.
    */
-  void setBaselineRotation(float value);
+  void setBaselineAngle(float value);
 
   /**
    * Returns the margin from the path start in pixels. Positive values offset glyphs forward along
@@ -151,12 +153,12 @@ class TextPath : public VectorElement {
 
  private:
   Path _path = {};
-  Point _textOrigin = Point::Zero();
+  Point _baselineOrigin = Point::Zero();
   float _firstMargin = 0.0f;
   float _lastMargin = 0.0f;
   bool _perpendicular = true;
   bool _reversed = false;
-  float _baselineRotation = 0.0f;
+  float _baselineAngle = 0.0f;
   bool _forceAlignment = false;
 };
 
