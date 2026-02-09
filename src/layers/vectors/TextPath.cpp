@@ -270,10 +270,13 @@ void TextPath::apply(VectorContext* context) {
     // Normal mode: projects each glyph's anchor onto the path, then places the glyph by
     // preserving its origin's relative offset to the anchor.
     //
-    // 1. Project anchor position onto the baseline to get tangentDistance (along curve) and
-    //    normalOffset (perpendicular to curve).
-    // 2. Find the curve point at tangentDistance, then shift by normalOffset to get anchorTarget.
-    // 3. Compute glyphOriginNew = anchorTarget + rotated(origin - anchor).
+    // tangentDistance (from anchor): determines position along the curve.
+    // normalOffset (from origin): determines perpendicular distance from the curve.
+    //
+    // Using origin for normalOffset ensures that glyph.anchor offsets don't affect the
+    // perpendicular placement — anchor offsets are preserved through relativeToAnchor instead.
+    // This way the anchor always lands on the curve, while the glyph body shifts according to
+    // relativeToAnchor.
 
     // baselineOrigin is the reference origin for the glyph coordinate system, independent of the
     // path geometry. Each glyph's anchor position relative to this origin determines its distance
@@ -291,11 +294,15 @@ void TextPath::apply(VectorContext* context) {
       auto anchorPos = GetGlyphAnchor(glyph, entry.geometryMatrix);
       auto glyphOriginOld = GetGlyphOrigin(glyph, entry.geometryMatrix);
 
-      // Project anchor position onto baseline direction
+      // tangentDistance from anchor: determines where along the curve
       float anchorDx = anchorPos.x - origin.x;
       float anchorDy = anchorPos.y - origin.y;
       float tangentDistance = anchorDx * cosR + anchorDy * sinR;
-      float normalOffset = anchorDy * cosR - anchorDx * sinR;
+
+      // normalOffset from origin: determines perpendicular distance from curve
+      float originDx = glyphOriginOld.x - origin.x;
+      float originDy = glyphOriginOld.y - origin.y;
+      float normalOffset = originDy * cosR - originDx * sinR;
 
       float pathOffset = _firstMargin + tangentDistance;
       pathOffset = AdjustPathOffset(pathOffset, pathLength, _reversed, isClosed);

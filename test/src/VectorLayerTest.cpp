@@ -3098,7 +3098,6 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   textPath14->setPath(curvePath);
   textPath14->setPerpendicular(true);
   textPath14->setBaselineAngle(90.0f);
-  textPath14->setBaselineOrigin({capHeight * 0.5f, 0});
 
   auto fill14 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
   group14->setElements({innerGroup14, textPath14, fill14});
