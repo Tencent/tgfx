@@ -50,7 +50,7 @@ class NonAARRectGeometryProcessor : public GeometryProcessor {
   Attribute inLocalCoord;   // local coordinates (2 floats)
   Attribute inRadii;        // corner radii (2 floats)
   Attribute inRectBounds;   // rect bounds: left, top, right, bottom (4 floats)
-  Attribute inColor;        // optional color (1 float as UByte4Normalized)
+  Attribute inColor;        // optional color (4 bytes as UByte4Normalized)
   Attribute inStrokeWidth;  // half stroke width (2 floats, stroke only)
 
   int width = 1;

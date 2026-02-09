@@ -80,6 +80,28 @@ static float FloatInvert(float value) {
   return value == 0.0f ? 1e6f : 1 / value;
 }
 
+struct StrokeParams {
+  float halfStrokeX = 0.0f;
+  float halfStrokeY = 0.0f;
+};
+
+static StrokeParams ApplyScales(RRect* rRect, Matrix* viewMatrix, const Point& scales,
+                                const Stroke* stroke) {
+  rRect->scale(scales.x, scales.y);
+  viewMatrix->preScale(1 / scales.x, 1 / scales.y);
+  StrokeParams params;
+  if (stroke) {
+    auto strokeWidth = stroke->width > 0.0f ? stroke->width : 1.0f / std::max(scales.x, scales.y);
+    params.halfStrokeX = 0.5f * scales.x * strokeWidth;
+    params.halfStrokeY = 0.5f * scales.y * strokeWidth;
+    if (viewMatrix->getScaleX() == 0.f) {
+      std::swap(rRect->radii.x, rRect->radii.y);
+      std::swap(params.halfStrokeX, params.halfStrokeY);
+    }
+  }
+  return params;
+}
+
 RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
                                            bool hasColor, PlacementArray<Stroke>&& strokes,
                                            std::shared_ptr<BlockAllocator> reference,
@@ -140,31 +162,23 @@ void RRectsVertexProvider::getAAVertices(float* vertices) const {
       uint32_t uintColor = ToUintPMColor(record->color, steps.get());
       compressedColor = *reinterpret_cast<float*>(&uintColor);
     }
-    rRect.scale(scales.x, scales.y);
-    viewMatrix.preScale(1 / scales.x, 1 / scales.y);
+
+    auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
+    auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
 
     bool stroked = false;
-    auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
     float xRadius = rRect.radii.x;
     float yRadius = rRect.radii.y;
     float innerXRadius = 0;
     float innerYRadius = 0;
     auto rectBounds = rRect.rect;
     if (stroke) {
-      // For hairline stroke (width == 0), use 1 pixel width in device space.
-      auto strokeWidth = stroke->width > 0.0f ? stroke->width : 1.0f / std::max(scales.x, scales.y);
-      Point halfStrokeWidth = {0.5f * scales.x * strokeWidth, 0.5f * scales.y * strokeWidth};
-      if (viewMatrix.getScaleX() == 0.f) {
-        // The matrix may have a rotation by an odd multiple of 90 degrees.
-        std::swap(xRadius, yRadius);
-        std::swap(halfStrokeWidth.x, halfStrokeWidth.y);
-      }
-      innerXRadius = xRadius - halfStrokeWidth.x;
-      innerYRadius = yRadius - halfStrokeWidth.y;
+      innerXRadius = xRadius - strokeParams.halfStrokeX;
+      innerYRadius = yRadius - strokeParams.halfStrokeY;
       stroked = innerXRadius > 0.0f && innerYRadius > 0.0f;
-      xRadius += halfStrokeWidth.x;
-      yRadius += halfStrokeWidth.y;
-      rectBounds.outset(halfStrokeWidth.x, halfStrokeWidth.y);
+      xRadius += strokeParams.halfStrokeX;
+      yRadius += strokeParams.halfStrokeY;
+      rectBounds.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
     }
 
     float reciprocalRadii[4] = {FloatInvert(xRadius), FloatInvert(yRadius),
@@ -265,10 +279,6 @@ void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
                                                _dstColorSpace.get(), AlphaType::Premultiplied);
   }
 
-  // Corner positions for a quad: TL, TR, BR, BL
-  static constexpr float cornerX[] = {0.0f, 1.0f, 1.0f, 0.0f};
-  static constexpr float cornerY[] = {0.0f, 0.0f, 1.0f, 1.0f};
-
   size_t currentIndex = 0;
   for (auto& record : rects) {
     auto viewMatrix = record->viewMatrix;
@@ -280,47 +290,32 @@ void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
     }
 
     auto scales = viewMatrix.getAxisScales();
-    rRect.scale(scales.x, scales.y);
-    viewMatrix.preScale(1 / scales.x, 1 / scales.y);
+    auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
+    auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
 
     auto rect = rRect.rect;
-    auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
-
     float xRadii = rRect.radii.x;
     float yRadii = rRect.radii.y;
-    float halfStrokeX = 0.0f;
-    float halfStrokeY = 0.0f;
 
     if (stroke) {
-      // For hairline stroke (width == 0), use 1 pixel width in device space.
-      auto strokeWidth = stroke->width > 0.0f ? stroke->width : 1.0f / std::max(scales.x, scales.y);
-      halfStrokeX = 0.5f * scales.x * strokeWidth;
-      halfStrokeY = 0.5f * scales.y * strokeWidth;
-      if (viewMatrix.getScaleX() == 0.f) {
-        std::swap(xRadii, yRadii);
-        std::swap(halfStrokeX, halfStrokeY);
-      }
-      rect.outset(halfStrokeX, halfStrokeY);
-      xRadii += halfStrokeX;
-      yRadii += halfStrokeY;
+      rect.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
+      xRadii += strokeParams.halfStrokeX;
+      yRadii += strokeParams.halfStrokeY;
     }
 
-    auto left = rect.left;
-    auto top = rect.top;
-    auto right = rect.right;
-    auto bottom = rect.bottom;
+    // Corner positions for a quad: TL, TR, BR, BL
+    const Point corners[] = {
+        {rect.left, rect.top},
+        {rect.right, rect.top},
+        {rect.right, rect.bottom},
+        {rect.left, rect.bottom},
+    };
 
     // Write 4 vertices for the quad
     for (int v = 0; v < 4; ++v) {
-      // Local position within rect [0, 1]
-      float lx = cornerX[v];
-      float ly = cornerY[v];
+      float localX = corners[v].x;
+      float localY = corners[v].y;
 
-      // Position in local space
-      float localX = left + lx * (right - left);
-      float localY = top + ly * (bottom - top);
-
-      // Transform to device space
       auto point = Point::Make(localX, localY);
       viewMatrix.mapPoints(&point, 1);
 
@@ -337,10 +332,10 @@ void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
       vertices[index++] = yRadii;
 
       // rectBounds (4 floats) - outer bounds
-      vertices[index++] = left;
-      vertices[index++] = top;
-      vertices[index++] = right;
-      vertices[index++] = bottom;
+      vertices[index++] = rect.left;
+      vertices[index++] = rect.top;
+      vertices[index++] = rect.right;
+      vertices[index++] = rect.bottom;
 
       // Optional color
       if (bitFields.hasColor) {
@@ -349,8 +344,8 @@ void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
 
       // strokeWidth (2 floats) - only for stroke mode
       if (bitFields.hasStroke) {
-        vertices[index++] = halfStrokeX;
-        vertices[index++] = halfStrokeY;
+        vertices[index++] = strokeParams.halfStrokeX;
+        vertices[index++] = strokeParams.halfStrokeY;
       }
     }
     currentIndex++;

@@ -78,12 +78,12 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
                  ShaderVar(inPosition.name(), SLType::Float2));
 
-  // Fragment shader - evaluate round rect shape using branchless SDF
+  // Fragment shader - evaluate round rect shape using SDF
   fragBuilder->codeAppendf("vec2 localCoord = %s;", localCoordVarying.fsIn().c_str());
   fragBuilder->codeAppendf("vec2 radii = %s;", radiiVarying.fsIn().c_str());
   fragBuilder->codeAppendf("vec4 bounds = %s;", boundsVarying.fsIn().c_str());
 
-  // Calculate outer round rect coverage using branchless SDF
+  // Calculate outer round rect coverage using SDF
   fragBuilder->codeAppend("vec2 center = (bounds.xy + bounds.zw) * 0.5;");
   fragBuilder->codeAppend("vec2 halfSize = (bounds.zw - bounds.xy) * 0.5;");
   fragBuilder->codeAppend("vec2 q = abs(localCoord - center) - halfSize + radii;");
@@ -92,7 +92,7 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("float outerCoverage = step(d, 0.0);");
 
   if (stroke) {
-    // Stroke mode: also check inner round rect using branchless SDF
+    // Stroke mode: also check inner round rect using SDF
     fragBuilder->codeAppendf("vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
     fragBuilder->codeAppend("vec2 innerHalfSize = halfSize - 2.0 * sw;");
     fragBuilder->codeAppend("vec2 innerRadii = max(radii - 2.0 * sw, vec2(0.0));");
