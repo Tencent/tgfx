@@ -17,13 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlyphRasterizer.h"
-#ifdef TGFX_BUILD_FOR_WEB
-#include "core/AtlasTypes.h"
-#include "platform/web/WebImageBuffer.h"
-#include "platform/web/WebScalerContext.h"
-#endif
 
 namespace tgfx {
+#ifndef TGFX_BUILD_FOR_WEB
+std::shared_ptr<GlyphRasterizer> GlyphRasterizer::MakeFrom(
+    int width, int height, std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
+    bool fauxBold, const Stroke* stroke, const Point& glyphOffset) {
+  if (scalerContext == nullptr || width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  return std::make_shared<GlyphRasterizer>(width, height, std::move(scalerContext), glyphID,
+                                           fauxBold, stroke, glyphOffset);
+}
+#endif
+
 GlyphRasterizer::GlyphRasterizer(int width, int height,
                                  std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
                                  bool fauxBold, const Stroke* stroke, const Point& glyphOffset)
@@ -39,19 +46,6 @@ GlyphRasterizer::~GlyphRasterizer() {
 
 bool GlyphRasterizer::asyncSupport() const {
   return scalerContext->asyncSupport();
-}
-
-std::shared_ptr<ImageBuffer> GlyphRasterizer::onMakeBuffer(bool tryHardware) const {
-#ifdef TGFX_BUILD_FOR_WEB
-  if (!scalerContext->asyncSupport()) {
-    auto webScalerContext = static_cast<WebScalerContext*>(scalerContext.get());
-    auto canvas = webScalerContext->getGlyphCanvas(glyphID, fauxBold, stroke, Plot::CellPadding);
-    if (canvas.as<bool>()) {
-      return WebImageBuffer::MakeAdopted(canvas, isAlphaOnly());
-    }
-  }
-#endif
-  return ImageCodec::onMakeBuffer(tryHardware);
 }
 
 bool GlyphRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,

@@ -28,6 +28,15 @@ namespace tgfx {
  */
 class GlyphRasterizer : public ImageCodec {
  public:
+  /**
+   * Creates a new GlyphRasterizer instance. Returns nullptr if scalerContext is null or dimensions
+   * are invalid.
+   */
+  static std::shared_ptr<GlyphRasterizer> MakeFrom(int width, int height,
+                                                   std::shared_ptr<ScalerContext> scalerContext,
+                                                   GlyphID glyphID, bool fauxBold,
+                                                   const Stroke* stroke, const Point& glyphOffset);
+
   GlyphRasterizer(int width, int height, std::shared_ptr<ScalerContext> scalerContext,
                   GlyphID glyphID, bool fauxBold, const Stroke* stroke, const Point& glyphOffset);
 
@@ -40,12 +49,9 @@ class GlyphRasterizer : public ImageCodec {
   bool asyncSupport() const override;
 
  protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
-
   bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
                     std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const override;
 
- private:
   std::shared_ptr<ScalerContext> scalerContext = nullptr;
   GlyphID glyphID = 0;
   bool fauxBold = false;

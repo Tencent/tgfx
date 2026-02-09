@@ -18,36 +18,37 @@
 
 #pragma once
 
+#include "core/utils/PlacementPtr.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+class BlockAllocator;
 class CellDecodeTask;
-class ImageBuffer;
-
-struct DirectUploadCell {
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
-  int offsetX = 0;
-  int offsetY = 0;
-};
 
 class AtlasUploadTask {
  public:
+  /**
+   * Creates a new AtlasUploadTask instance. On the Web platform, returns a WebAtlasUploadTask that
+   * supports direct texture uploading from canvas elements.
+   */
+  static PlacementPtr<AtlasUploadTask> Make(BlockAllocator* allocator,
+                                            std::shared_ptr<TextureProxy> proxy);
+
   explicit AtlasUploadTask(std::shared_ptr<TextureProxy> proxy);
 
-  ~AtlasUploadTask();
+  virtual ~AtlasUploadTask();
 
-  void addCell(BlockAllocator* allocator, std::shared_ptr<ImageCodec> codec,
-               const Point& atlasOffset);
+  virtual void addCell(BlockAllocator* allocator, std::shared_ptr<ImageCodec> codec,
+                       const Point& atlasOffset);
 
-  void upload(Context* context);
+  virtual void upload(Context* context);
 
- private:
+ protected:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   ImageInfo hardwareInfo = {};
   void* hardwarePixels = nullptr;
   std::vector<std::shared_ptr<CellDecodeTask>> tasks = {};
-  std::vector<DirectUploadCell> directUploadCells = {};
 };
 }  // namespace tgfx
