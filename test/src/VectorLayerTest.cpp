@@ -2954,7 +2954,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
 
   // Group 11: Multiple Text elements with nested transforms
   auto group11 = std::make_shared<VectorGroup>();
-  group11->setPosition({488, 633});
+  group11->setPosition({448, 633});
 
   auto middleGroup11 = std::make_shared<VectorGroup>();
   middleGroup11->setScale({1.3f, 1.3f});
@@ -2964,12 +2964,11 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   innerGroup11->setSkew(-20.0f);
 
   // Multiple Text elements - should maintain relative positions along path
-  auto textBlob11a = TextBlob::MakeFrom("Multi", font);
+  auto textBlob11a = TextBlob::MakeFrom("Multi ", font);
   auto textSpan11a = Text::Make(textBlob11a);
 
-  auto textSpan11b = Text::Make(TextBlob::MakeFrom("Spans", font));
-  // Position Spans after Multi using tight bounds
-  textSpan11b->setPosition({std::round(textBlob11a->getTightBounds().right), 0});
+  auto textBlob11b = TextBlob::MakeFrom("Spans", font);
+  auto textSpan11b = Text::Make(textBlob11b);
 
   auto textPath11 = std::make_shared<TextPath>();
   textPath11->setPath(curvePath);
@@ -2980,8 +2979,8 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   middleGroup11->setElements({innerGroup11});
 
   auto rotationGroup11 = std::make_shared<VectorGroup>();
-  rotationGroup11->setAnchor({310, 24});
-  rotationGroup11->setPosition({310, 24});
+  rotationGroup11->setAnchor({350, 104});
+  rotationGroup11->setPosition({350, 104});
   rotationGroup11->setRotation(15.0f);
 
   rotationGroup11->setElements({middleGroup11});
