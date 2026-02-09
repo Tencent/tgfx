@@ -16,45 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/vectors/ShapePath.h"
-#include "VectorContext.h"
-#include "core/utils/Log.h"
+#pragma once
+
+#include "gpu/processors/NonAARRectGeometryProcessor.h"
 
 namespace tgfx {
+class GLSLNonAARRectGeometryProcessor : public NonAARRectGeometryProcessor {
+ public:
+  GLSLNonAARRectGeometryProcessor(int width, int height, bool stroke,
+                                  std::optional<PMColor> commonColor);
 
-std::shared_ptr<ShapePath> ShapePath::Make() {
-  return std::shared_ptr<ShapePath>(new ShapePath());
-}
+  void emitCode(EmitArgs& args) const override;
 
-void ShapePath::setPath(Path value) {
-  if (_path == value) {
-    return;
-  }
-  _path = std::move(value);
-  _cachedShape = nullptr;
-  invalidateContent();
-}
-
-void ShapePath::setReversed(bool value) {
-  if (_reversed == value) {
-    return;
-  }
-  _reversed = value;
-  _cachedShape = nullptr;
-  invalidateContent();
-}
-
-void ShapePath::apply(VectorContext* context) {
-  DEBUG_ASSERT(context != nullptr);
-  if (_cachedShape == nullptr) {
-    _cachedShape = Shape::MakeFrom(_path);
-    if (_reversed) {
-      _cachedShape = Shape::ApplyReverse(_cachedShape);
-    }
-  }
-  if (_cachedShape) {
-    context->addShape(_cachedShape);
-  }
-}
-
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
+               FPCoordTransformIter* transformIter) const override;
+};
 }  // namespace tgfx

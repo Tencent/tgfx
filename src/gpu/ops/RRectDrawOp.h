@@ -33,18 +33,27 @@ class RRectDrawOp : public DrawOp {
   static constexpr uint16_t MaxNumRRects = 1024;
 
   /**
-   * The maximum number of vertices per fill round rect.
+   * The number of indices per AA fill round rect.
    */
-  static constexpr uint16_t IndicesPerFillRRect = 54;
+  static constexpr uint16_t IndicesPerAAFillRRect = 54;
 
   /**
-   * The maximum number of vertices per stroke round rect.
+   * The number of indices per AA stroke round rect.
    */
-  static constexpr uint16_t IndicesPerStrokeRRect = 48;
+  static constexpr uint16_t IndicesPerAAStrokeRRect = 48;
 
   /**
-   * Create a new RRectDrawOp for a list of RRect records. Note that the returned RRectDrawOp is in
-   * the device space.
+   * The number of indices per non-AA round rect (6 indices for 2 triangles).
+   */
+  static constexpr uint16_t IndicesPerNonAARRect = 6;
+
+  /**
+   * The number of vertices per non-AA round rect (4 corner vertices).
+   */
+  static constexpr uint16_t VerticesPerNonAARRect = 4;
+
+  /**
+   * Create a new RRectDrawOp for a list of RRect records.
    */
   static PlacementPtr<RRectDrawOp> Make(Context* context,
                                         PlacementPtr<RRectsVertexProvider> provider,
@@ -60,12 +69,13 @@ class RRectDrawOp : public DrawOp {
   }
 
   bool hasCoverage() const override {
-    return true;
+    return aaType != AAType::None;
   }
 
  private:
   size_t rectCount = 0;
   bool hasStroke = false;
+  size_t indicesPerRRect = 0;
   std::optional<PMColor> commonColor = std::nullopt;
   std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<VertexBufferView> vertexBufferProxyView = nullptr;

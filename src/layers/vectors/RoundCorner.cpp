@@ -23,6 +23,10 @@
 
 namespace tgfx {
 
+std::shared_ptr<RoundCorner> RoundCorner::Make() {
+  return std::shared_ptr<RoundCorner>(new RoundCorner());
+}
+
 void RoundCorner::setRadius(float value) {
   if (_radius == value) {
     return;

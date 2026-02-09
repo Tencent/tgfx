@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <vector>
 #include "tgfx/core/Path.h"

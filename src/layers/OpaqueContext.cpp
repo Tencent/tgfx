@@ -305,7 +305,7 @@ Brush GetOpaqueBrush(const Brush& brush) {
     return opaqueBrush;
   }
   // Src + coverage AA may cause edge artifacts, use SrcOver instead.
-  auto opaqueBrush = Brush(Color::White(), BlendMode::SrcOver, brush.antiAlias);
+  auto opaqueBrush = Brush(Color::White(), BlendMode::SrcOver, false);
   opaqueBrush.maskFilter = brush.maskFilter;
   return opaqueBrush;
 }

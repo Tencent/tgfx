@@ -159,18 +159,20 @@ const RunRecord* TextBlob::firstRun() const {
 }
 
 TextBlob::Iterator TextBlob::begin() const {
-  return Iterator(firstRun(), runCount);
+  return {firstRun(), runCount};
 }
 
 TextBlob::Iterator::Iterator(const RunRecord* record, size_t remaining)
     : current(record), remaining(remaining) {
+  if (current != nullptr) {
+    updateGlyphRun();
+  }
 }
 
-GlyphRun TextBlob::Iterator::operator*() const {
-  GlyphRun run;
-  run.font = current->font;
-  run.glyphCount = current->glyphCount;
-  run.glyphs = current->glyphBuffer();
+void TextBlob::Iterator::updateGlyphRun() {
+  glyphRun.font = current->font;
+  glyphRun.glyphCount = current->glyphCount;
+  glyphRun.glyphs = current->glyphBuffer();
   if (current->positioning == GlyphPositioning::Default) {
     positionBuffer.resize(current->glyphCount);
     const GlyphID* glyphs = current->glyphBuffer();
@@ -179,20 +181,26 @@ GlyphRun TextBlob::Iterator::operator*() const {
       positionBuffer[i] = x;
       x += current->font.getAdvance(glyphs[i]);
     }
-    run.positioning = GlyphPositioning::Horizontal;
-    run.positions = positionBuffer.data();
-    run.offsetY = current->offset.y;
+    glyphRun.positioning = GlyphPositioning::Horizontal;
+    glyphRun.positions = positionBuffer.data();
+    glyphRun.offsetY = current->offset.y;
   } else {
-    run.positioning = current->positioning;
-    run.positions = current->posBuffer();
-    run.offsetY = current->offset.y;
+    glyphRun.positioning = current->positioning;
+    glyphRun.positions = current->posBuffer();
+    glyphRun.offsetY = current->offset.y;
   }
-  return run;
+}
+
+const GlyphRun& TextBlob::Iterator::operator*() const {
+  return glyphRun;
 }
 
 TextBlob::Iterator& TextBlob::Iterator::operator++() {
   current = current->next();
   --remaining;
+  if (remaining > 0) {
+    updateGlyphRun();
+  }
   return *this;
 }
 
