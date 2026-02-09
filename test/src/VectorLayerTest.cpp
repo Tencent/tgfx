@@ -2764,7 +2764,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 1105, 1041);
+  auto surface = Surface::Make(context, 1105, 961);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -2881,7 +2881,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
 
   // Group 7: Two consecutive TextPaths - second applies on top of first
   auto group7 = std::make_shared<VectorGroup>();
-  group7->setPosition({588, 143});
+  group7->setPosition({588, 173});
 
   auto textSpan7 = Text::Make(TextBlob::MakeFrom("Second Override", font));
 
@@ -2898,7 +2898,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
 
   // Group 8: Inner group transform overridden by TextPath
   auto group8 = std::make_shared<VectorGroup>();
-  group8->setPosition({588, 243});
+  group8->setPosition({588, 273});
 
   auto innerGroup8 = std::make_shared<VectorGroup>();
   innerGroup8->setScale({1.5f, 0.8f});
@@ -2921,7 +2921,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   shortPath.cubicTo(180, -60, 240, 60, 280, 0);
 
   auto group9 = std::make_shared<VectorGroup>();
-  group9->setPosition({588, 343});
+  group9->setPosition({588, 373});
 
   auto textSpan9 = Text::Make(TextBlob::MakeFrom("Path Extension Test", font));
 
@@ -2940,7 +2940,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   closedPath.close();
 
   auto group10 = std::make_shared<VectorGroup>();
-  group10->setPosition({588, 443});
+  group10->setPosition({588, 473});
 
   auto textSpan10 = Text::Make(TextBlob::MakeFrom("Closed Path Text Wrap", font));
 
@@ -3150,34 +3150,34 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   // Column 2 helper paths
   // Row 1 (group7): Two TextPaths
   canvas->save();
-  canvas->translate(588, 143);
+  canvas->translate(588, 173);
   pathPaint.setColor(Color{0.8f, 0.8f, 0.8f, 1.0f});  // Gray for first path
   canvas->drawPath(curvePath, pathPaint);
   canvas->restore();
 
   canvas->save();
-  canvas->translate(588, 143);
+  canvas->translate(588, 173);
   pathPaint.setColor(Color::Blue());
   canvas->drawPath(largerCurvePath, pathPaint);
   canvas->restore();
 
   // Row 2 (group8): Group Transform
   canvas->save();
-  canvas->translate(588, 243);
+  canvas->translate(588, 273);
   pathPaint.setColor(Color::Red());
   canvas->drawPath(curvePath, pathPaint);
   canvas->restore();
 
   // Row 3 (group9): Path Extension
   canvas->save();
-  canvas->translate(588, 343);
+  canvas->translate(588, 373);
   pathPaint.setColor(Color::Green());
   canvas->drawPath(shortPath, pathPaint);
   canvas->restore();
 
   // Row 4 (group10): Closed Path
   canvas->save();
-  canvas->translate(588, 443);
+  canvas->translate(588, 473);
   pathPaint.setColor(Color{0.5f, 0.0f, 0.5f, 1.0f});
   canvas->drawPath(closedPath, pathPaint);
   canvas->restore();
