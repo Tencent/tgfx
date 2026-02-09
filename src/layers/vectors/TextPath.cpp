@@ -268,16 +268,13 @@ void TextPath::apply(VectorContext* context) {
     }
   } else {
     // Normal mode: projects each glyph's anchor onto the curve, then translates the entire glyph
-    // so its anchor lands on the curve. The glyph rotates around its anchor to follow the curve
-    // tangent.
+    // so its anchor lands directly on the curve. The glyph rotates around its anchor to follow
+    // the curve tangent.
     //
-    // To avoid mathematical cancellation between normalOffset and (glyphOrigin - anchor):
-    // - tangentDistance uses anchor: determines position along the curve
-    // - normalOffset uses glyphOrigin: determines perpendicular distance from the curve
-    //
-    // This way, anchor offsets only affect curve position (not perpendicular placement), so the
-    // anchor always lands on the curve. Multi-line text spacing (encoded in glyphOrigin.y) is
-    // correctly preserved as perpendicular offset.
+    // 1. tangentDistance = anchor's displacement from baselineOrigin projected along the baseline
+    //    direction, determines the position along the curve.
+    // 2. anchorNew is the curve point at that position (anchor always lands on the curve).
+    // 3. The glyph is rotated around anchorOld, then translated so anchorOld moves to anchorNew.
     auto origin = _baselineOrigin;
 
     float rotationRadians = _baselineAngle * static_cast<float>(M_PI) / 180.0f;
@@ -292,14 +289,9 @@ void TextPath::apply(VectorContext* context) {
       auto glyphOriginOld = GetGlyphOrigin(glyph, entry.geometryMatrix);
 
       // tangentDistance from anchor: determines where along the curve
-      float anchorDx = anchorOld.x - origin.x;
-      float anchorDy = anchorOld.y - origin.y;
-      float tangentDistance = anchorDx * cosR + anchorDy * sinR;
-
-      // normalOffset from glyphOrigin: determines perpendicular distance from the curve
-      float originDx = glyphOriginOld.x - origin.x;
-      float originDy = glyphOriginOld.y - origin.y;
-      float normalOffset = originDy * cosR - originDx * sinR;
+      float dx = anchorOld.x - origin.x;
+      float dy = anchorOld.y - origin.y;
+      float tangentDistance = dx * cosR + dy * sinR;
 
       float pathOffset = _firstMargin + tangentDistance;
       pathOffset = AdjustPathOffset(pathOffset, pathLength, _reversed, isClosed);
@@ -310,9 +302,8 @@ void TextPath::apply(VectorContext* context) {
         continue;
       }
 
-      // anchorNew: curve point shifted by normalOffset perpendicular to the path
-      Point anchorNew = {position.x - tangent.y * normalOffset,
-                         position.y + tangent.x * normalOffset};
+      // anchorNew is directly on the curve
+      Point anchorNew = position;
 
       auto rotationAngle = ComputeRotationAngle(tangent, _perpendicular, _reversed, _baselineAngle);
       auto rotationScale = ExtractRotationScale(glyph.matrix);
