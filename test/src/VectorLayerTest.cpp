@@ -2921,7 +2921,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   shortPath.cubicTo(180, -60, 240, 60, 280, 0);
 
   auto group9 = std::make_shared<VectorGroup>();
-  group9->setPosition({588, 393});
+  group9->setPosition({588, 413});
 
   auto textSpan9 = Text::Make(TextBlob::MakeFrom("Path Extension Test", font));
 
@@ -2940,7 +2940,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   closedPath.close();
 
   auto group10 = std::make_shared<VectorGroup>();
-  group10->setPosition({588, 493});
+  group10->setPosition({588, 513});
 
   auto textSpan10 = Text::Make(TextBlob::MakeFrom("Closed Path Text Wrap", font));
 
@@ -2954,7 +2954,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
 
   // Group 11: Multiple Text elements with nested transforms
   auto group11 = std::make_shared<VectorGroup>();
-  group11->setPosition({488, 613});
+  group11->setPosition({488, 633});
 
   auto middleGroup11 = std::make_shared<VectorGroup>();
   middleGroup11->setScale({1.3f, 1.3f});
@@ -3170,21 +3170,21 @@ TGFX_TEST(VectorLayerTest, TextPath) {
 
   // Row 3 (group9): Path Extension
   canvas->save();
-  canvas->translate(588, 393);
+  canvas->translate(588, 413);
   pathPaint.setColor(Color::Green());
   canvas->drawPath(shortPath, pathPaint);
   canvas->restore();
 
   // Row 4 (group10): Closed Path
   canvas->save();
-  canvas->translate(588, 493);
+  canvas->translate(588, 513);
   pathPaint.setColor(Color{0.5f, 0.0f, 0.5f, 1.0f});
   canvas->drawPath(closedPath, pathPaint);
   canvas->restore();
 
   // Row 5 (group11): Deep Nested
   canvas->save();
-  canvas->translate(588, 633);
+  canvas->translate(588, 653);
   pathPaint.setColor(Color{0.0f, 0.5f, 0.5f, 1.0f});
   canvas->drawPath(curvePath, pathPaint);
   canvas->restore();
