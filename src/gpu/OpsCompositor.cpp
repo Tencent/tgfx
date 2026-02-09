@@ -135,12 +135,11 @@ void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Br
   DEBUG_ASSERT(!rRect.rect.isEmpty());
   auto rectBrush = brush.makeWithMatrix(state.matrix);
   auto aaType = getAAType(rectBrush);
-  if (aaType == AAType::None) {
-    // Use NonAARRectOp for non-AA RRect (both fill and stroke).
-    // Fill and stroke don't batch together due to different vertex layouts.
-    if (!canAppend(PendingOpType::NonAARRect, state.clip, rectBrush) ||
+  // Try AA mode first (RRectDrawOp with EllipseGeometryProcessor).
+  if (aaType != AAType::None) {
+    if (!canAppend(PendingOpType::RRect, state.clip, rectBrush) ||
         (pendingStrokes.empty() != (stroke == nullptr))) {
-      flushPendingOps(PendingOpType::NonAARRect, state.clip, rectBrush);
+      flushPendingOps(PendingOpType::RRect, state.clip, rectBrush);
     }
     auto record = drawingAllocator()->make<RRectRecord>(rRect, state.matrix, rectBrush.color);
     pendingRRects.emplace_back(std::move(record));
@@ -150,10 +149,11 @@ void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Br
     }
     return;
   }
-  // Use RRectDrawOp (EllipseGeometryProcessor) for AA filled or stroked RRect.
-  if (!canAppend(PendingOpType::RRect, state.clip, rectBrush) ||
+  // Fall back to NonAARRectOp for non-AA RRect (both fill and stroke).
+  // Fill and stroke don't batch together due to different vertex layouts.
+  if (!canAppend(PendingOpType::NonAARRect, state.clip, rectBrush) ||
       (pendingStrokes.empty() != (stroke == nullptr))) {
-    flushPendingOps(PendingOpType::RRect, state.clip, rectBrush);
+    flushPendingOps(PendingOpType::NonAARRect, state.clip, rectBrush);
   }
   auto record = drawingAllocator()->make<RRectRecord>(rRect, state.matrix, rectBrush.color);
   pendingRRects.emplace_back(std::move(record));
