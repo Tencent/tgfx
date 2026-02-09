@@ -3219,7 +3219,7 @@ TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 558, 520);
+  auto surface = Surface::Make(context, 518, 460);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -3265,7 +3265,7 @@ TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
   group2->setPosition({68, 290});
 
   auto textSpan2 = Text::Make(TextBlob::MakeFrom("TrimPath+TextPath", font));
-  textSpan2->setPosition({150, 40});
+  textSpan2->setPosition({110, -20});
 
   auto trim2 = std::make_shared<TrimPath>();
   trim2->setStart(0.05f);
@@ -4176,13 +4176,19 @@ TGFX_TEST(VectorLayerTest, TextAnchors) {
   // Reuse textBlob ("TGFX") for TextPath, shift all characters -14px perpendicular to path
   std::vector<Point> pathAnchorOffsets(glyphCount, {0, -14});
 
-  // Left: No anchor offset
+  // Center text on path
+  auto textWidth = textBlob->getTightBounds().width();
+  auto curvePathLength = PathMeasure::MakeFrom(curvePath)->getLength();
+  Point centerOrigin = {-(curvePathLength - textWidth) / 2, 0};
+
+  // Left: No anchor offset - text sits on the path curve
   auto group3 = std::make_shared<VectorGroup>();
   group3->setPosition({50, 230});
   auto textSpan3 = Text::Make(textBlob);
   auto textPath3 = std::make_shared<TextPath>();
   textPath3->setPath(curvePath);
   textPath3->setPerpendicular(true);
+  textPath3->setBaselineOrigin(centerOrigin);
   group3->setElements({textSpan3, textPath3, MakeFillStyle(Color::FromRGBA(0, 128, 0, 255))});
   groups.push_back(group3);
 
@@ -4193,6 +4199,7 @@ TGFX_TEST(VectorLayerTest, TextAnchors) {
   auto textPath4 = std::make_shared<TextPath>();
   textPath4->setPath(curvePath);
   textPath4->setPerpendicular(true);
+  textPath4->setBaselineOrigin(centerOrigin);
   group4->setElements({textSpan4, textPath4, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
   groups.push_back(group4);
 
