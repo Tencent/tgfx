@@ -211,10 +211,12 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
   DEBUG_ASSERT(mesh != nullptr);
   flushPendingOps();
 
+  auto& meshImpl = MeshImpl::ReadAccess(*mesh);
+
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
   auto& clip = state.clip;
-  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, false);
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, meshImpl.hasCoverage());
   auto clipBounds = getClipBounds(clip);
 
   float drawScale = 1.0f;
@@ -231,8 +233,6 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
     deviceBounds = state.matrix.mapRect(meshBounds);
   }
 
-  auto& meshImpl = MeshImpl::ReadAccess(*mesh);
-
   // Determine if mesh has colors and texCoords (only VertexMesh can have these)
   bool hasColors = false;
   bool hasTexCoords = false;
@@ -242,11 +242,11 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
     hasTexCoords = vertexImpl.hasTexCoords();
   }
 
-  // Use white when shader exists without vertex colors, to prevent paintColor from affecting
-  // texture color (some shaders like TiledTextureEffect multiply by inputColor.a internally).
-  auto gpColor = ToPMColor(brush.color, dstColorSpace);
-  if (brush.shader && !hasColors) {
-    gpColor = PMColor::White();
+  // Determine final color based on blending rules (see Canvas.h drawMesh documentation):
+  // Paint color is only used when no shader and no vertex colors; otherwise use white.
+  PMColor gpColor = PMColor::White();
+  if (!brush.shader && !hasColors) {
+    gpColor = ToPMColor(brush.color, dstColorSpace);
   }
 
   auto meshProxy = proxyProvider()->createGPUMeshProxy(mesh, renderFlags);

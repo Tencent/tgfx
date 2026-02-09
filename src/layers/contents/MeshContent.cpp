@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeshContent.h"
+#include "core/MeshImpl.h"
+#include "core/ShapeMeshImpl.h"
 
 namespace tgfx {
 
@@ -29,11 +31,31 @@ Rect MeshContent::onGetBounds() const {
 }
 
 Rect MeshContent::getTightBounds(const Matrix& matrix) const {
+  auto& impl = MeshImpl::ReadAccess(*mesh);
+  if (impl.type() == MeshImpl::Type::Shape) {
+    auto& shapeImpl = static_cast<const ShapeMeshImpl&>(impl);
+    auto shape = shapeImpl.shape();
+    if (shape != nullptr) {
+      auto path = shape->getPath();
+      path.transform(matrix);
+      return path.getBounds();
+    }
+  }
+  // Fallback for VertexMesh or when shape has been released
   auto bounds = mesh->bounds();
   return matrix.mapRect(bounds);
 }
 
 bool MeshContent::hitTestPoint(float localX, float localY) const {
+  auto& impl = MeshImpl::ReadAccess(*mesh);
+  if (impl.type() == MeshImpl::Type::Shape) {
+    auto& shapeImpl = static_cast<const ShapeMeshImpl&>(impl);
+    auto shape = shapeImpl.shape();
+    if (shape != nullptr) {
+      return shape->getPath().contains(localX, localY);
+    }
+  }
+  // Fallback for VertexMesh or when shape has been released
   return mesh->bounds().contains(localX, localY);
 }
 

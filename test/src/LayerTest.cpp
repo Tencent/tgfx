@@ -3294,7 +3294,7 @@ TGFX_TEST(LayerTest, MeshLayer) {
   // Test bounds
   auto bounds1 = meshLayer1->getBounds();
   // Triangle with vertices at (100,50), (50,150), (150,150)
-  // Bounds should be approximately (50, 50, 150, 150)
+  // Bounds: (50, 50, 150, 150)
   EXPECT_FLOAT_EQ(bounds1.left, 50);
   EXPECT_FLOAT_EQ(bounds1.top, 50);
   EXPECT_FLOAT_EQ(bounds1.right, 150);

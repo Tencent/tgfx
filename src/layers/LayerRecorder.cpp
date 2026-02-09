@@ -80,7 +80,11 @@ void LayerRecorder::addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint& paint)
   }
   flushPending();
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
-  list.push_back(std::make_unique<MeshContent>(std::move(mesh), paint));
+  std::unique_ptr<GeometryContent> content = std::make_unique<MeshContent>(std::move(mesh), paint);
+  if (!_matrix.isIdentity()) {
+    content = std::make_unique<MatrixContent>(std::move(content), _matrix);
+  }
+  list.push_back(std::move(content));
 }
 
 const Matrix& LayerRecorder::getMatrix() const {
