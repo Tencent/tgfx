@@ -4183,7 +4183,6 @@ TGFX_TEST(VectorLayerTest, TextAnchors) {
   auto textPath3 = std::make_shared<TextPath>();
   textPath3->setPath(curvePath);
   textPath3->setPerpendicular(true);
-  textPath3->setBaselineOrigin({0, -30});
   group3->setElements({textSpan3, textPath3, MakeFillStyle(Color::FromRGBA(0, 128, 0, 255))});
   groups.push_back(group3);
 
@@ -4194,7 +4193,6 @@ TGFX_TEST(VectorLayerTest, TextAnchors) {
   auto textPath4 = std::make_shared<TextPath>();
   textPath4->setPath(curvePath);
   textPath4->setPerpendicular(true);
-  textPath4->setBaselineOrigin({0, -30});
   group4->setElements({textSpan4, textPath4, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
   groups.push_back(group4);
 
