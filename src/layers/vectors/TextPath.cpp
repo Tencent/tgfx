@@ -37,11 +37,11 @@ void TextPath::setPath(Path value) {
   invalidateContent();
 }
 
-void TextPath::setTextOriginOffset(Point value) {
-  if (_textOriginOffset == value) {
+void TextPath::setTextOrigin(Point value) {
+  if (_textOrigin == value) {
     return;
   }
-  _textOriginOffset = value;
+  _textOrigin = value;
   invalidateContent();
 }
 
@@ -178,10 +178,8 @@ void TextPath::apply(VectorContext* context) {
   float cosR = std::cos(rotationRadians);
   float sinR = std::sin(rotationRadians);
 
-  // textOrigin = first glyph's origin + offset
-  auto origin = GetGlyphOrigin(*allGlyphs[0].glyph, allGlyphs[0].geometryMatrix);
-  origin.x += _textOriginOffset.x;
-  origin.y += _textOriginOffset.y;
+  // textOrigin is the fixed baseline reference point in local coordinate space.
+  auto origin = _textOrigin;
 
   if (_forceAlignment) {
     // ForceAlignment mode: lay out glyphs using advance, then adjust spacing

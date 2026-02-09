@@ -2797,7 +2797,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto fill1 = MakeFillStyle(Color::Blue());
   group1->setElements({textSpan1, textPath1, fill1});
 
-  // Group 2: Center alignment using textOriginOffset
+  // Group 2: Center alignment using textOrigin
   auto group2 = std::make_shared<VectorGroup>();
   group2->setPosition({58, 163});
 
@@ -2807,11 +2807,11 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textPath2 = std::make_shared<TextPath>();
   textPath2->setPath(curvePath);
   textPath2->setPerpendicular(true);
-  // Calculate center alignment: textOriginOffset.x = -(pathLength - textWidth) / 2
+  // Calculate center alignment: textOrigin.x = -(pathLength - textWidth) / 2
   // For center alignment, shift origin to negative so text moves right
   auto textWidth2 = textBlob2->getTightBounds().width();
   auto pathLength2 = PathMeasure::MakeFrom(curvePath)->getLength();
-  textPath2->setTextOriginOffset({-(pathLength2 - textWidth2) / 2, 0});
+  textPath2->setTextOrigin({-(pathLength2 - textWidth2) / 2, 0});
 
   auto fill2 = MakeFillStyle(Color::Red());
   group2->setElements({textSpan2, textPath2, fill2});
@@ -2865,8 +2865,8 @@ TGFX_TEST(VectorLayerTest, TextPath) {
 
   auto textPath6 = std::make_shared<TextPath>();
   textPath6->setPath(curvePath);
-  textPath6->setFirstMargin(30);
-  textPath6->setLastMargin(-30);
+  textPath6->setFirstMargin(60);
+  textPath6->setLastMargin(-60);
   textPath6->setForceAlignment(true);
   textPath6->setPerpendicular(true);
 
@@ -2880,19 +2880,22 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   largerCurvePath.moveTo(40, 80);
   largerCurvePath.cubicTo(140, -120, 340, 280, 440, 80);  // More extreme curve
 
-  // Group 7: Two consecutive TextPaths - second should override first
+  // Group 7: Two consecutive TextPaths - second applies on top of first
   auto group7 = std::make_shared<VectorGroup>();
   group7->setPosition({548, 63});
 
   auto textSpan7 = Text::Make(TextBlob::MakeFrom("Second Override", font));
+  textSpan7->setPosition({40, 80});
 
   auto textPathFirst = std::make_shared<TextPath>();
   textPathFirst->setPath(curvePath);
   textPathFirst->setPerpendicular(true);
+  textPathFirst->setTextOrigin({40, 80});
 
   auto textPathSecond = std::make_shared<TextPath>();
   textPathSecond->setPath(largerCurvePath);
   textPathSecond->setPerpendicular(true);
+  textPathSecond->setTextOrigin({40, 80});
 
   auto fill7 = MakeFillStyle(Color::Blue());
   group7->setElements({textSpan7, textPathFirst, textPathSecond, fill7});
@@ -2902,7 +2905,6 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   group8->setPosition({548, 163});
 
   auto innerGroup8 = std::make_shared<VectorGroup>();
-  innerGroup8->setPosition({20, 60});
   innerGroup8->setScale({1.5f, 0.8f});
 
   auto textSpan8 = Text::Make(TextBlob::MakeFrom("Group Override", font));
@@ -3013,9 +3015,13 @@ TGFX_TEST(VectorLayerTest, TextPath) {
 
   auto textBlob13a = TextBlob::MakeFrom("Multiple", font);
   auto textSpan13a = Text::Make(textBlob13a);
-  auto textBlob13b = TextBlob::MakeFrom("Lines", font);
+  auto textBlob13b = TextBlob::MakeFrom("Text Lines", font);
   auto textSpan13b = Text::Make(textBlob13b);
-  textSpan13b->setPosition({0, 20});
+  float lineSpacing13 = 24 * 1.2f;
+  auto centerOffset13 =
+      (textBlob13b->getTightBounds().width() - textBlob13a->getTightBounds().width()) / 2;
+  textSpan13a->setPosition({centerOffset13, 0});
+  textSpan13b->setPosition({0, lineSpacing13});
 
   auto innerGroup13 = std::make_shared<VectorGroup>();
   innerGroup13->setElements({textSpan13a, textSpan13b});
@@ -3026,7 +3032,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textWidth13 =
       std::max(textBlob13a->getTightBounds().width(), textBlob13b->getTightBounds().width());
   auto pathLength13 = PathMeasure::MakeFrom(curvePath)->getLength();
-  textPath13->setTextOriginOffset({-(pathLength13 - textWidth13) / 2, 0});
+  textPath13->setTextOrigin({-(pathLength13 - textWidth13) / 12, 0});
 
   auto fill13 = MakeFillStyle(Color::Green());
   group13->setElements({innerGroup13, textPath13, fill13});
@@ -3096,7 +3102,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   textPath14->setPath(curvePath);
   textPath14->setPerpendicular(true);
   textPath14->setBaselineRotation(90.0f);
-  textPath14->setTextOriginOffset({capHeight * 0.5f, 0});
+  textPath14->setTextOrigin({capHeight * 0.5f, 0});
 
   auto fill14 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
   group14->setElements({innerGroup14, textPath14, fill14});
@@ -3149,16 +3155,16 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   }
 
   // Column 2 helper paths
-  // Row 1 (group7): Second Override
+  // Row 1 (group7): Two TextPaths
   canvas->save();
   canvas->translate(548, 63);
-  pathPaint.setColor(Color::Blue());
+  pathPaint.setColor(Color{0.8f, 0.8f, 0.8f, 1.0f});  // Gray for first path
   canvas->drawPath(curvePath, pathPaint);
   canvas->restore();
 
   canvas->save();
   canvas->translate(548, 63);
-  pathPaint.setColor(Color{0.8f, 0.8f, 0.8f, 1.0f});  // Gray for overridden path
+  pathPaint.setColor(Color::Blue());
   canvas->drawPath(largerCurvePath, pathPaint);
   canvas->restore();
 

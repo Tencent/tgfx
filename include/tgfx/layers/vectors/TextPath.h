@@ -48,19 +48,19 @@ class TextPath : public VectorElement {
   void setPath(Path value);
 
   /**
-   * Returns the offset for the text origin. The text origin is the baseline reference point for
-   * path layout, calculated as the first glyph's position plus this offset. Each glyph's position
-   * on the path is determined by projecting the distance between its anchor and the text origin
-   * onto the baseline direction. Default is (0, 0).
+   * Returns the baseline reference origin in the TextPath's local coordinate space. Each glyph's
+   * position on the path is determined by projecting the distance between its anchor point and this
+   * origin onto the baseline direction. Default is (0, 0), which means the coordinate origin serves
+   * as the baseline reference.
    */
-  Point textOriginOffset() const {
-    return _textOriginOffset;
+  Point textOrigin() const {
+    return _textOrigin;
   }
 
   /**
-   * Sets the offset for the text origin.
+   * Sets the baseline reference origin.
    */
-  void setTextOriginOffset(Point value);
+  void setTextOrigin(Point value);
 
   /**
    * Returns the rotation angle in degrees for the baseline coordinate system. 0 means horizontal
@@ -151,7 +151,7 @@ class TextPath : public VectorElement {
 
  private:
   Path _path = {};
-  Point _textOriginOffset = Point::Zero();
+  Point _textOrigin = Point::Zero();
   float _firstMargin = 0.0f;
   float _lastMargin = 0.0f;
   bool _perpendicular = true;
