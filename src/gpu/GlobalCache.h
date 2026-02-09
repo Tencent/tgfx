@@ -23,6 +23,7 @@
 #include <optional>
 #include <unordered_map>
 #include "core/utils/SlidingWindowTracker.h"
+#include "gpu/AAType.h"
 #include "gpu/Program.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -79,15 +80,9 @@ class GlobalCache {
 
   /**
    * Returns a GPU buffer containing indices for rendering a rounded rectangle, either for filling
-   * or stroking.
+   * or stroking, with specified anti-aliasing mode.
    */
-  std::shared_ptr<GPUBufferProxy> getRRectIndexBuffer(bool stroke);
-
-  /**
-   * Returns a GPU buffer containing indices for rendering filled round rectangles without
-   * antialiasing using NonAARRectOp.
-   */
-  std::shared_ptr<GPUBufferProxy> getNonAARRectIndexBuffer();
+  std::shared_ptr<GPUBufferProxy> getRRectIndexBuffer(bool stroke, AAType aaType);
 
   /**
    * Finds a static resource in the cache by its unique key. Returns nullptr if no resource is found.

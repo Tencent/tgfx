@@ -18,7 +18,6 @@
 
 #include "OpsCompositor.h"
 #include "core/PathRasterizer.h"
-#include "gpu/ops/NonAARRectOp.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/utils/ColorHelper.h"
@@ -27,7 +26,6 @@
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/ShapeUtils.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/NonAARRectsVertexProvider.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
@@ -134,26 +132,9 @@ void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Br
                               const Stroke* stroke) {
   DEBUG_ASSERT(!rRect.rect.isEmpty());
   auto rectBrush = brush.makeWithMatrix(state.matrix);
-  auto aaType = getAAType(rectBrush);
-  // Try AA mode first (RRectDrawOp with EllipseGeometryProcessor).
-  if (aaType != AAType::None) {
-    if (!canAppend(PendingOpType::RRect, state.clip, rectBrush) ||
-        (pendingStrokes.empty() != (stroke == nullptr))) {
-      flushPendingOps(PendingOpType::RRect, state.clip, rectBrush);
-    }
-    auto record = drawingAllocator()->make<RRectRecord>(rRect, state.matrix, rectBrush.color);
-    pendingRRects.emplace_back(std::move(record));
-    if (stroke) {
-      auto strokeRecord = drawingAllocator()->make<Stroke>(*stroke);
-      pendingStrokes.emplace_back(std::move(strokeRecord));
-    }
-    return;
-  }
-  // Fall back to NonAARRectOp for non-AA RRect (both fill and stroke).
-  // Fill and stroke don't batch together due to different vertex layouts.
-  if (!canAppend(PendingOpType::NonAARRect, state.clip, rectBrush) ||
-      (pendingStrokes.empty() != (stroke == nullptr))) {
-    flushPendingOps(PendingOpType::NonAARRect, state.clip, rectBrush);
+  if (!canAppend(PendingOpType::RRect, state.clip, rectBrush) ||
+      ShouldFlushRectOps(pendingStrokes, stroke)) {
+    flushPendingOps(PendingOpType::RRect, state.clip, rectBrush);
   }
   auto record = drawingAllocator()->make<RRectRecord>(rRect, state.matrix, rectBrush.color);
   pendingRRects.emplace_back(std::move(record));
@@ -279,8 +260,6 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Brush&
       return pendingRects.size() < RectDrawOp::MaxNumRects;
     case PendingOpType::RRect:
       return pendingRRects.size() < RRectDrawOp::MaxNumRRects;
-    case PendingOpType::NonAARRect:
-      return pendingRRects.size() < NonAARRectOp::MaxNumRRects;
     default:
       break;
   }
@@ -342,7 +321,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
   }
 
   if (needLocalBounds || needDeviceBounds) {
-    if (pendingType == PendingOpType::RRect || pendingType == PendingOpType::NonAARRect) {
+    if (pendingType == PendingOpType::RRect) {
       deviceBounds = Rect::MakeEmpty();
       for (auto& record : pendingRRects) {
         auto rect = record->viewMatrix.mapRect(record->rRect.rect);
@@ -409,15 +388,10 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
-      auto provider =
-          RRectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRRects), aaType,
-                                         std::move(pendingStrokes), dstColorSpace);
+      auto provider = RRectsVertexProvider::MakeFrom(
+          drawingAllocator(), std::move(pendingRRects), aaType, std::move(pendingStrokes),
+          dstColorSpace);
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
-    } break;
-    case PendingOpType::NonAARRect: {
-      auto provider = NonAARRectsVertexProvider::MakeFrom(
-          drawingAllocator(), std::move(pendingRRects), std::move(pendingStrokes), dstColorSpace);
-      drawOp = NonAARRectOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::Atlas: {
       auto provider =
@@ -528,8 +502,7 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
       needDeviceBounds = true;
     }
   }
-  if ((pendingType == PendingOpType::RRect || pendingType == PendingOpType::NonAARRect) &&
-      (needDeviceBounds || needLocalBounds)) {
+  if (pendingType == PendingOpType::RRect && (needDeviceBounds || needLocalBounds)) {
     // When either localBounds or deviceBounds needs to be computed for RRect, both should be set to
     // true, since localBounds and deviceBounds are computed together in that case.
     needLocalBounds = true;

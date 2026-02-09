@@ -88,15 +88,24 @@ RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, 
       _dstColorSpace(std::move(colorSpace)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.hasColor = hasColor;
-
-  if (!this->strokes.empty()) {
-    bitFields.hasStroke = true;
-  } else {
-    bitFields.hasStroke = false;
-  }
+  bitFields.hasStroke = !this->strokes.empty();
 }
 
 size_t RRectsVertexProvider::vertexCount() const {
+  if (aaType() == AAType::None) {
+    // Non-AA mode: 4 vertices per RRect
+    // Each vertex has: position (2), localCoord (2), radii (2), rectBounds (4)
+    // Optional: strokeWidth (2) for stroke mode, color (1)
+    size_t floatsPerVertex = 10;
+    if (bitFields.hasStroke) {
+      floatsPerVertex += 2;
+    }
+    if (bitFields.hasColor) {
+      floatsPerVertex += 1;
+    }
+    return rects.size() * 4 * floatsPerVertex;
+  }
+  // AA mode: 16 vertices per RRect (4x4 grid)
   auto floatCount = rects.size() * 4 * 32;
   if (bitFields.hasColor) {
     floatCount += rects.size() * 4 * 4;
@@ -105,8 +114,16 @@ size_t RRectsVertexProvider::vertexCount() const {
 }
 
 void RRectsVertexProvider::getVertices(float* vertices) const {
+  if (aaType() == AAType::None) {
+    getNonAAVertices(vertices);
+  } else {
+    getAAVertices(vertices);
+  }
+}
+
+void RRectsVertexProvider::getAAVertices(float* vertices) const {
   auto index = 0;
-  auto aaType = static_cast<AAType>(bitFields.aaType);
+  auto currentAAType = aaType();
   size_t currentIndex = 0;
   std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
   if (bitFields.hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
@@ -158,7 +175,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
     reciprocalRadii[3] = std::min(reciprocalRadii[3], 1e6f);
     // On MSAA, bloat enough to guarantee any pixel that might be touched by the rRect has
     // full sample coverage.
-    float aaBloat = aaType == AAType::MSAA ? FLOAT_SQRT2 : .5f;
+    float aaBloat = currentAAType == AAType::MSAA ? FLOAT_SQRT2 : .5f;
     // Extend out the radii to antialias.
     float xOuterRadius = xRadius + aaBloat;
     float yOuterRadius = yRadius + aaBloat;
@@ -234,6 +251,104 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       vertices[index++] = reciprocalRadii[1];
       vertices[index++] = reciprocalRadii[2];
       vertices[index++] = reciprocalRadii[3];
+    }
+    currentIndex++;
+  }
+}
+
+void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
+  size_t index = 0;
+  std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+  if (bitFields.hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+    steps =
+        std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                               _dstColorSpace.get(), AlphaType::Premultiplied);
+  }
+
+  // Corner positions for a quad: TL, TR, BR, BL
+  static constexpr float cornerX[] = {0.0f, 1.0f, 1.0f, 0.0f};
+  static constexpr float cornerY[] = {0.0f, 0.0f, 1.0f, 1.0f};
+
+  size_t currentIndex = 0;
+  for (auto& record : rects) {
+    auto viewMatrix = record->viewMatrix;
+    auto rRect = record->rRect;
+    auto rect = rRect.rect;
+    float compressedColor = 0.f;
+    if (bitFields.hasColor) {
+      uint32_t uintColor = ToUintPMColor(record->color, steps.get());
+      compressedColor = *reinterpret_cast<float*>(&uintColor);
+    }
+
+    auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
+
+    float xRadii = rRect.radii.x;
+    float yRadii = rRect.radii.y;
+    float halfStrokeX = 0.0f;
+    float halfStrokeY = 0.0f;
+
+    if (stroke) {
+      // For hairline stroke (width == 0), use 1 pixel width in device space.
+      auto scales = viewMatrix.getAxisScales();
+      auto strokeWidth = stroke->width > 0.0f ? stroke->width : 1.0f / std::max(scales.x, scales.y);
+      halfStrokeX = 0.5f * strokeWidth;
+      halfStrokeY = 0.5f * strokeWidth;
+      // Expand rect bounds by half stroke width
+      rect.outset(halfStrokeX, halfStrokeY);
+      // Outer radii increase by half stroke width
+      xRadii += halfStrokeX;
+      yRadii += halfStrokeY;
+    }
+
+    auto left = rect.left;
+    auto top = rect.top;
+    auto right = rect.right;
+    auto bottom = rect.bottom;
+
+    // Write 4 vertices for the quad
+    for (int v = 0; v < 4; ++v) {
+      // Local position within rect [0, 1]
+      float lx = cornerX[v];
+      float ly = cornerY[v];
+
+      // Position in local space
+      float localX = left + lx * (right - left);
+      float localY = top + ly * (bottom - top);
+
+      // Transform to device space
+      float devX = viewMatrix.getScaleX() * localX + viewMatrix.getSkewX() * localY +
+                   viewMatrix.getTranslateX();
+      float devY = viewMatrix.getSkewY() * localX + viewMatrix.getScaleY() * localY +
+                   viewMatrix.getTranslateY();
+
+      // position (2 floats)
+      vertices[index++] = devX;
+      vertices[index++] = devY;
+
+      // localCoord (2 floats) - coordinates within the rect for shape evaluation
+      vertices[index++] = localX;
+      vertices[index++] = localY;
+
+      // radii (2 floats) - outer radii
+      vertices[index++] = xRadii;
+      vertices[index++] = yRadii;
+
+      // rectBounds (4 floats) - outer bounds
+      vertices[index++] = left;
+      vertices[index++] = top;
+      vertices[index++] = right;
+      vertices[index++] = bottom;
+
+      // strokeWidth (2 floats) - only for stroke mode
+      if (bitFields.hasStroke) {
+        vertices[index++] = halfStrokeX;
+        vertices[index++] = halfStrokeY;
+      }
+
+      // Optional color
+      if (bitFields.hasColor) {
+        vertices[index++] = compressedColor;
+      }
     }
     currentIndex++;
   }

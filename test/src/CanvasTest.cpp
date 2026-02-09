@@ -22,7 +22,6 @@
 #include "core/images/SubsetImage.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/RenderContext.h"
-#include "gpu/ops/NonAARRectOp.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "gtest/gtest.h"
@@ -1544,15 +1543,14 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
   canvas->drawRRect(rrect6, paint);
   canvas->restore();
 
-  // Verify NonAARRectOp is used by checking the Op type.
+  // Verify RRectDrawOp with non-AA is used by checking the Op type.
   surface->renderContext->flush();
   auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
   ASSERT_TRUE(drawingBuffer->renderTasks.size() >= 1);
   auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() >= 1);
-  // All non-AA filled RRects should be batched into NonAARRectOp.
-  EXPECT_EQ(task->drawOps.back().get()->type(), DrawOp::Type::NonAARRectOp);
-  EXPECT_EQ(static_cast<NonAARRectOp*>(task->drawOps.back().get())->rectCount, 6u);
+  // All non-AA filled RRects should be batched into RRectDrawOp.
+  EXPECT_EQ(task->drawOps.back().get()->type(), DrawOp::Type::RRectDrawOp);
 
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOp"));

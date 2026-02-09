@@ -104,6 +104,10 @@ class RRectsVertexProvider : public VertexProvider {
                        PlacementArray<Stroke>&& strokes, std::shared_ptr<BlockAllocator> reference,
                        std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
+  void getAAVertices(float* vertices) const;
+
+  void getNonAAVertices(float* vertices) const;
+
   friend class BlockAllocator;
 };
 }  // namespace tgfx

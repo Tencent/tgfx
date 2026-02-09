@@ -21,7 +21,6 @@
 #include "core/GradientGenerator.h"
 #include "core/PixelBuffer.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/ops/NonAARRectOp.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "opengl/GLBuffer.h"
@@ -312,14 +311,15 @@ static constexpr int OverstrokeIndicesCount = 6 * 4;
 // fill and standard stroke indices skip the overstroke "ring"
 static const uint16_t* StandardRRectIndices = OverstrokeRRectIndices + OverstrokeIndicesCount;
 
-class RRectIndicesProvider : public DataSource<Data> {
+class AARRectIndicesProvider : public DataSource<Data> {
  public:
-  explicit RRectIndicesProvider(size_t rectSize, bool stroke) : rectSize(rectSize), stroke(stroke) {
+  explicit AARRectIndicesProvider(size_t rectSize, bool stroke)
+      : rectSize(rectSize), stroke(stroke) {
   }
 
   std::shared_ptr<Data> getData() const override {
     auto indicesCount =
-        stroke ? RRectDrawOp::IndicesPerStrokeRRect : RRectDrawOp::IndicesPerFillRRect;
+        stroke ? RRectDrawOp::IndicesPerAAStrokeRRect : RRectDrawOp::IndicesPerAAFillRRect;
     auto bufferSize = rectSize * indicesCount * sizeof(uint16_t);
     Buffer buffer(bufferSize);
     auto indices = reinterpret_cast<uint16_t*>(buffer.data());
@@ -338,16 +338,7 @@ class RRectIndicesProvider : public DataSource<Data> {
   bool stroke = false;
 };
 
-std::shared_ptr<GPUBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke) {
-  auto& indexBuffer = stroke ? rRectStrokeIndexBuffer : rRectFillIndexBuffer;
-  if (indexBuffer == nullptr) {
-    auto provider = std::make_unique<RRectIndicesProvider>(RRectDrawOp::MaxNumRRects, stroke);
-    indexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
-  }
-  return indexBuffer;
-}
-
-// Index data for NonAARRectOp - simple quad indices
+// Index data for non-AA RRect - simple quad indices
 // 4 vertices per rrect, 6 indices per rrect (2 triangles)
 class NonAARRectIndicesProvider : public DataSource<Data> {
  public:
@@ -355,7 +346,7 @@ class NonAARRectIndicesProvider : public DataSource<Data> {
   }
 
   std::shared_ptr<Data> getData() const override {
-    auto indicesPerRRect = NonAARRectOp::IndicesPerRRect;
+    auto indicesPerRRect = RRectDrawOp::IndicesPerNonAARRect;
     auto bufferSize = rectSize * indicesPerRRect * sizeof(uint16_t);
     Buffer buffer(bufferSize);
     auto indices = reinterpret_cast<uint16_t*>(buffer.data());
@@ -363,7 +354,7 @@ class NonAARRectIndicesProvider : public DataSource<Data> {
     static constexpr uint16_t quadPattern[] = {0, 1, 2, 0, 2, 3};
     int index = 0;
     for (size_t i = 0; i < rectSize; ++i) {
-      auto offset = static_cast<uint16_t>(i * NonAARRectOp::VerticesPerRRect);
+      auto offset = static_cast<uint16_t>(i * RRectDrawOp::VerticesPerNonAARRect);
       for (size_t j = 0; j < indicesPerRRect; ++j) {
         indices[index++] = quadPattern[j] + offset;
       }
@@ -375,12 +366,20 @@ class NonAARRectIndicesProvider : public DataSource<Data> {
   size_t rectSize = 0;
 };
 
-std::shared_ptr<GPUBufferProxy> GlobalCache::getNonAARRectIndexBuffer() {
-  if (nonAARRectIndexBuffer == nullptr) {
-    auto provider = std::make_unique<NonAARRectIndicesProvider>(NonAARRectOp::MaxNumRRects);
-    nonAARRectIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
+std::shared_ptr<GPUBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke, AAType aaType) {
+  if (aaType == AAType::None) {
+    if (nonAARRectIndexBuffer == nullptr) {
+      auto provider = std::make_unique<NonAARRectIndicesProvider>(RRectDrawOp::MaxNumRRects);
+      nonAARRectIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
+    }
+    return nonAARRectIndexBuffer;
   }
-  return nonAARRectIndexBuffer;
+  auto& indexBuffer = stroke ? rRectStrokeIndexBuffer : rRectFillIndexBuffer;
+  if (indexBuffer == nullptr) {
+    auto provider = std::make_unique<AARRectIndicesProvider>(RRectDrawOp::MaxNumRRects, stroke);
+    indexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
+  }
+  return indexBuffer;
 }
 
 std::shared_ptr<Resource> GlobalCache::findStaticResource(const UniqueKey& uniqueKey) {
