@@ -4173,13 +4173,10 @@ TGFX_TEST(VectorLayerTest, TextAnchors) {
   curvePath.moveTo(0, 30);
   curvePath.quadTo(75, -30, 150, 30);
 
-  // Reuse textBlob ("TGFX") for TextPath, shift all characters -14px perpendicular to path
-  std::vector<Point> pathAnchorOffsets(glyphCount, {0, -14});
-
   // Center text on curve using firstMargin
   auto textWidth = textBlob->getTightBounds().width();
   auto curveLength = PathMeasure::MakeFrom(curvePath)->getLength();
-  float centerMargin = (curveLength - textWidth) / 2;
+  float centerMargin = std::round((curveLength - textWidth) / 2);
 
   // Left: No anchor offset, centered on curve
   auto group3 = std::make_shared<VectorGroup>();
@@ -4192,15 +4189,20 @@ TGFX_TEST(VectorLayerTest, TextAnchors) {
   group3->setElements({textSpan3, textPath3, MakeFillStyle(Color::FromRGBA(0, 128, 0, 255))});
   groups.push_back(group3);
 
-  // Right: With anchor offset - characters shift perpendicular to path, centered on curve
+  // Right: Create a separate TextBlob positioned at y=14 (aligned to anchor y=-14)
+  // This tests that different initial positions with matching anchor offsets produce the same result
   auto group4 = std::make_shared<VectorGroup>();
   group4->setPosition({220, 200});
-  auto textSpan4 = Text::Make(textBlob, pathAnchorOffsets);
+  auto textSpan4 = Text::Make(textBlob);
+  textSpan4->setPosition({0, 14});  // Move text down 14px to align baseline with anchor
+  std::vector<Point> pathAnchorOffsets(glyphCount, {0, -14});  // Anchor is 14px above glyph origin
+  auto textSpan4WithAnchor = Text::Make(textBlob, pathAnchorOffsets);
+  textSpan4WithAnchor->setPosition({0, 14});
   auto textPath4 = std::make_shared<TextPath>();
   textPath4->setPath(curvePath);
   textPath4->setPerpendicular(true);
   textPath4->setFirstMargin(centerMargin);
-  group4->setElements({textSpan4, textPath4, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
+  group4->setElements({textSpan4WithAnchor, textPath4, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
   groups.push_back(group4);
 
   vectorLayer->setContents(
