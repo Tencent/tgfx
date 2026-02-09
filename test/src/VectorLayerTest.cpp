@@ -2797,7 +2797,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto fill1 = MakeFillStyle(Color::Blue());
   group1->setElements({textSpan1, textPath1, fill1});
 
-  // Group 2: Center alignment using baselineOrigin
+  // Group 2: Center alignment using firstMargin
   auto group2 = std::make_shared<VectorGroup>();
   group2->setPosition({98, 243});
 
@@ -2807,10 +2807,10 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textPath2 = std::make_shared<TextPath>();
   textPath2->setPath(curvePath);
   textPath2->setPerpendicular(true);
-  // For center alignment, shift baselineOrigin.x so text is centered on path
+  // Center text on path using firstMargin
   auto textWidth2 = textBlob2->getTightBounds().width();
   auto pathLength2 = PathMeasure::MakeFrom(curvePath)->getLength();
-  textPath2->setBaselineOrigin({-(pathLength2 - textWidth2) / 2, 0});
+  textPath2->setFirstMargin((pathLength2 - textWidth2) / 2);
 
   auto fill2 = MakeFillStyle(Color::Red());
   group2->setElements({textSpan2, textPath2, fill2});
@@ -3028,7 +3028,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textWidth13 =
       std::max(textBlob13a->getTightBounds().width(), textBlob13b->getTightBounds().width());
   auto pathLength13 = PathMeasure::MakeFrom(curvePath)->getLength();
-  textPath13->setBaselineOrigin({-(pathLength13 - textWidth13) / 12, 0});
+  textPath13->setFirstMargin((pathLength13 - textWidth13) / 2);
 
   auto fill13 = MakeFillStyle(Color::Green());
   group13->setElements({innerGroup13, textPath13, fill13});
@@ -4176,23 +4176,30 @@ TGFX_TEST(VectorLayerTest, TextAnchors) {
   // Reuse textBlob ("TGFX") for TextPath, shift all characters -14px perpendicular to path
   std::vector<Point> pathAnchorOffsets(glyphCount, {0, -14});
 
-  // Left: No anchor offset
+  // Center text on curve using firstMargin
+  auto textWidth = textBlob->getTightBounds().width();
+  auto curveLength = PathMeasure::MakeFrom(curvePath)->getLength();
+  float centerMargin = (curveLength - textWidth) / 2;
+
+  // Left: No anchor offset, centered on curve
   auto group3 = std::make_shared<VectorGroup>();
   group3->setPosition({50, 200});
   auto textSpan3 = Text::Make(textBlob);
   auto textPath3 = std::make_shared<TextPath>();
   textPath3->setPath(curvePath);
   textPath3->setPerpendicular(true);
+  textPath3->setFirstMargin(centerMargin);
   group3->setElements({textSpan3, textPath3, MakeFillStyle(Color::FromRGBA(0, 128, 0, 255))});
   groups.push_back(group3);
 
-  // Right: With anchor offset - characters shift perpendicular to path
+  // Right: With anchor offset - characters shift perpendicular to path, centered on curve
   auto group4 = std::make_shared<VectorGroup>();
   group4->setPosition({220, 200});
   auto textSpan4 = Text::Make(textBlob, pathAnchorOffsets);
   auto textPath4 = std::make_shared<TextPath>();
   textPath4->setPath(curvePath);
   textPath4->setPerpendicular(true);
+  textPath4->setFirstMargin(centerMargin);
   group4->setElements({textSpan4, textPath4, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
   groups.push_back(group4);
 

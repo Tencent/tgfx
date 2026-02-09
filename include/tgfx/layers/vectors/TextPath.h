@@ -48,11 +48,10 @@ class TextPath : public VectorElement {
   void setPath(Path value);
 
   /**
-   * Returns the baseline reference origin as an offset relative to the path start point. Together
-   * with baselineAngle, it defines the baseline reference line used for glyph projection. Each
-   * glyph's position on the path is determined by projecting the distance between its anchor point
-   * and this origin onto the baseline direction. Default is (0, 0), which means the path start
-   * point serves as the baseline reference.
+   * Returns the baseline reference origin in the TextPath's local coordinate space. Together with
+   * baselineAngle, it defines the baseline reference line used for glyph projection. Each glyph's
+   * position on the path is determined by projecting the distance between its anchor point and this
+   * origin onto the baseline direction. Default is (0, 0).
    */
   Point baselineOrigin() const {
     return _baselineOrigin;

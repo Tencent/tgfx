@@ -277,10 +277,10 @@ void TextPath::apply(VectorContext* context) {
     // After finding the anchor's target position on the curve, the glyph origin is computed
     // by preserving its relative offset to the anchor and rotating it to follow the curve.
 
-    // baselineOrigin is relative to the path start point.
-    Point pathStart = {};
-    pathMeasure->getPosTan(0.0f, &pathStart, nullptr);
-    auto origin = pathStart + _baselineOrigin;
+    // baselineOrigin is the reference origin for the glyph coordinate system, independent of the
+    // path geometry. Each glyph's anchor position relative to this origin determines its distance
+    // along the curve.
+    auto origin = _baselineOrigin;
 
     float rotationRadians = _baselineAngle * static_cast<float>(M_PI) / 180.0f;
     float cosR = std::cos(rotationRadians);
