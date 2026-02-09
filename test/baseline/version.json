@@ -464,6 +464,7 @@
         "TruncateTextLineTest": "c4c06bec"
     },
     "TextRenderTest": {
+        "AxisAlignedRotationRender": "484bda47",
         "ShapeMakeFromMixedTextBlob": "bf48e614",
         "TextBlobMixedPositioning": "484bda47",
         "TextBlobPositioningRender": "484bda47",
