@@ -280,11 +280,6 @@ FontMetrics FTScalerContext::onComputeFontMetrics() const {
   if (setupSize(false)) {
     return metrics;
   }
-  getFontMetricsInternal(&metrics);
-  return metrics;
-}
-
-void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
   auto face = ftTypeface()->face;
   auto upem = static_cast<float>(ftTypeface()->unitsPerEmInternal());
 
@@ -300,15 +295,15 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
   }
 
   // pull from format-specific metrics as needed
-  float ascent;
-  float descent;
-  float leading;
-  float xmin;
-  float xmax;
-  float ymin;
-  float ymax;
-  float underlineThickness;
-  float underlinePosition;
+  float ascent = 0.0f;
+  float descent = 0.0f;
+  float leading = 0.0f;
+  float xmin = 0.0f;
+  float xmax = 0.0f;
+  float ymin = 0.0f;
+  float ymax = 0.0f;
+  float underlineThickness = 0.0f;
+  float underlinePosition = 0.0f;
   if (face->face_flags & FT_FACE_FLAG_SCALABLE) {  // scalable outline font
     // FreeType will always use HHEA metrics if they're not zero.
     // It completely ignores the OS/2 fsSelection::UseTypoMetrics bit.
@@ -367,7 +362,7 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
       underlinePosition = -static_cast<float>(post->underlinePosition) / upem;
     }
   } else {
-    return;
+    return metrics;
   }
 
   // synthesize elements that were not provided by the os/2 table or format-specific metrics
@@ -382,17 +377,18 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
   if (leading < 0.0f) {
     leading = 0.0f;
   }
-  metrics->top = ymax * textScale;
-  metrics->ascent = ascent * textScale;
-  metrics->descent = descent * textScale;
-  metrics->bottom = ymin * textScale;
-  metrics->leading = leading * textScale;
-  metrics->xMin = xmin * textScale;
-  metrics->xMax = xmax * textScale;
-  metrics->xHeight = xHeight;
-  metrics->capHeight = capHeight;
-  metrics->underlineThickness = underlineThickness * textScale;
-  metrics->underlinePosition = underlinePosition * textScale;
+  metrics.top = ymax * textScale;
+  metrics.ascent = ascent * textScale;
+  metrics.descent = descent * textScale;
+  metrics.bottom = ymin * textScale;
+  metrics.leading = leading * textScale;
+  metrics.xMin = xmin * textScale;
+  metrics.xMax = xmax * textScale;
+  metrics.xHeight = xHeight;
+  metrics.capHeight = capHeight;
+  metrics.underlineThickness = underlineThickness * textScale;
+  metrics.underlinePosition = underlinePosition * textScale;
+  return metrics;
 }
 
 bool FTScalerContext::getCBoxForLetter(char letter, FT_BBox* bbox) const {
@@ -688,9 +684,9 @@ float FTScalerContext::getAdvance(GlyphID glyphID, bool verticalText) const {
   auto advance = getAdvanceInternal(glyphID, verticalText);
   {
     std::lock_guard<std::mutex> cacheLock(advanceCacheLocker);
-    advanceCache[cacheKey] = advance;
+    auto [it, inserted] = advanceCache.emplace(cacheKey, advance);
+    return it->second;
   }
-  return advance;
 }
 
 float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) const {

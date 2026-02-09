@@ -71,7 +71,11 @@ ScalerContext::ScalerContext(std::shared_ptr<Typeface> typeface, float size)
 }
 
 FontMetrics ScalerContext::getFontMetrics() const {
-  std::call_once(fontMetricsOnceFlag, [this] { fontMetricsCache = onComputeFontMetrics(); });
+  std::call_once(fontMetricsOnceFlag, &ScalerContext::computeFontMetrics, this);
   return fontMetricsCache;
+}
+
+void ScalerContext::computeFontMetrics() const {
+  fontMetricsCache = onComputeFontMetrics();
 }
 }  // namespace tgfx

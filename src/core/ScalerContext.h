@@ -83,6 +83,9 @@ class ScalerContext {
   virtual FontMetrics onComputeFontMetrics() const = 0;
 
  private:
+  void computeFontMetrics() const;
+
+  // Mutable for const-method caching: computed once on first access, thread-safe via once_flag.
   mutable FontMetrics fontMetricsCache = {};
   mutable std::once_flag fontMetricsOnceFlag = {};
 

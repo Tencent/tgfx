@@ -59,8 +59,6 @@ class FTScalerContext : public ScalerContext {
  private:
   int setupSize(bool fauxItalic) const;
 
-  void getFontMetricsInternal(FontMetrics* metrics) const;
-
   float getAdvanceInternal(GlyphID glyphID, bool verticalText = false) const;
 
   bool getCBoxForLetter(char letter, FT_BBox* bbox) const;
@@ -88,6 +86,7 @@ class FTScalerContext : public ScalerContext {
   FT_Int strikeIndex = -1;  // The bitmap strike for the face (or -1 if none).
   FT_Int32 loadGlyphFlags = 0;
   float backingSize = 1.0f;
+  // Mutable for const-method caching: caches glyph advances to avoid repeated FreeType lookups.
   mutable std::mutex advanceCacheLocker = {};
   mutable std::unordered_map<uint32_t, float> advanceCache = {};
 };
