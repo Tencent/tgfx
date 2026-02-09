@@ -217,7 +217,7 @@ class SVGNode {
   static Matrix ComputeViewboxMatrix(const Rect& viewBox, const Rect& viewPort,
                                      SVGPreserveAspectRatio PreAspectRatio);
 
-  virtual void onSetAttribute(SVGAttribute /*attribute*/, const SVGValue& /*value*/){};
+  virtual void onSetAttribute(SVGAttribute /*attribute*/, const SVGValue& /*value*/) {};
 
   // Called before onRender(), to apply local attributes to the context.  Unlike onRender(),
   // onPrepareToRender() bubbles up the inheritance chain: override should always call

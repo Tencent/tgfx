@@ -114,7 +114,7 @@ class MemoryWriteStream : public WriteStream {
   /**
    * The flush operation is a no-op for memory writes, so this is an empty implementation.
    */
-  void flush() override{};
+  void flush() override {};
 
   /**
    * Reads a segment of the buffer and copies it into the provided data pointer. Returns false if

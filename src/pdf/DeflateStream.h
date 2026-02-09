@@ -30,7 +30,7 @@ class DeflateWriteStream final : public WriteStream {
 
   size_t bytesWritten() const override;
 
-  void flush() override{};
+  void flush() override {};
 
   void finalize();
 

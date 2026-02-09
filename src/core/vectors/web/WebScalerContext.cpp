@@ -31,7 +31,7 @@ WebScalerContext::WebScalerContext(std::shared_ptr<Typeface> typeface, float siz
     : ScalerContext(std::move(typeface), size), scalerContext(std::move(scalerContext)) {
 }
 
-FontMetrics WebScalerContext::getFontMetrics() const {
+FontMetrics WebScalerContext::onComputeFontMetrics() const {
   return scalerContext.call<FontMetrics>("getFontMetrics");
 }
 

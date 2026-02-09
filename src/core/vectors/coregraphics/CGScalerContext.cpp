@@ -146,7 +146,7 @@ CGScalerContext::~CGScalerContext() {
   }
 }
 
-FontMetrics CGScalerContext::getFontMetrics() const {
+FontMetrics CGScalerContext::onComputeFontMetrics() const {
   FontMetrics metrics;
   auto theBounds = CTFontGetBoundingBox(ctFont);
   metrics.top = static_cast<float>(-CGRectGetMaxY(theBounds));
