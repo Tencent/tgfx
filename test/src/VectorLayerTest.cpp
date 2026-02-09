@@ -2964,16 +2964,23 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   innerGroup11->setSkew(-20.0f);
 
   // Multiple Text elements - should maintain relative positions along path
-  auto textBlob11a = TextBlob::MakeFrom("Multi ", font);
+  auto textBlob11a = TextBlob::MakeFrom("Multi", font);
   auto textSpan11a = Text::Make(textBlob11a);
 
   auto textBlob11b = TextBlob::MakeFrom("Spans", font);
   auto textSpan11b = Text::Make(textBlob11b);
-  textSpan11b->setPosition({std::round(textBlob11a->getTightBounds().right), 0});
+  auto spaceWidth = font.getAdvance(font.getGlyphID(' '), false);
+  textSpan11b->setPosition(
+      {std::round(textBlob11a->getTightBounds().right + spaceWidth), 0});
 
   auto textPath11 = std::make_shared<TextPath>();
   textPath11->setPath(curvePath);
   textPath11->setPerpendicular(true);
+  auto textWidth11 =
+      std::round(textBlob11a->getTightBounds().right + spaceWidth) +
+      textBlob11b->getTightBounds().width();
+  auto pathLength11 = PathMeasure::MakeFrom(curvePath)->getLength();
+  textPath11->setFirstMargin(std::round((pathLength11 - textWidth11) / 2));
 
   auto fill11 = MakeFillStyle(Color{0.0f, 0.5f, 0.5f, 1.0f});  // Teal
   innerGroup11->setElements({textSpan11a, textSpan11b, textPath11, fill11});
