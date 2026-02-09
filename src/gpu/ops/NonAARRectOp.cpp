@@ -16,25 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FillRRectOp.h"
+#include "NonAARRectOp.h"
 #include "core/utils/ColorHelper.h"
-#include "gpu/FillRRectsVertexProvider.h"
+#include "gpu/NonAARRectsVertexProvider.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/processors/FillRRectGeometryProcessor.h"
+#include "gpu/processors/NonAARRectGeometryProcessor.h"
 #include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-PlacementPtr<FillRRectOp> FillRRectOp::Make(Context* context,
-                                            PlacementPtr<FillRRectsVertexProvider> provider,
-                                            uint32_t renderFlags) {
+PlacementPtr<NonAARRectOp> NonAARRectOp::Make(Context* context,
+                                              PlacementPtr<NonAARRectsVertexProvider> provider,
+                                              uint32_t renderFlags) {
   if (provider == nullptr) {
     return nullptr;
   }
   auto allocator = context->drawingAllocator();
-  auto drawOp = allocator->make<FillRRectOp>(allocator, provider.get());
-  drawOp->indexBufferProxy = context->globalCache()->getFillRRectIndexBuffer();
+  auto drawOp = allocator->make<NonAARRectOp>(allocator, provider.get());
+  drawOp->indexBufferProxy = context->globalCache()->getNonAARRectIndexBuffer();
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
     renderFlags |= RenderFlags::DisableAsyncTask;
@@ -44,21 +44,23 @@ PlacementPtr<FillRRectOp> FillRRectOp::Make(Context* context,
   return drawOp;
 }
 
-FillRRectOp::FillRRectOp(BlockAllocator* allocator, FillRRectsVertexProvider* provider)
-    : DrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()) {
+NonAARRectOp::NonAARRectOp(BlockAllocator* allocator, NonAARRectsVertexProvider* provider)
+    : DrawOp(allocator, AAType::None), rectCount(provider->rectCount()),
+      hasStroke(provider->hasStroke()) {
   if (!provider->hasColor()) {
     commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
 }
 
-PlacementPtr<GeometryProcessor> FillRRectOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+PlacementPtr<GeometryProcessor> NonAARRectOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
+  ATTRIBUTE_NAME("hasStroke", hasStroke);
   ATTRIBUTE_NAME("commonColor", commonColor);
-  return FillRRectGeometryProcessor::Make(allocator, renderTarget->width(), renderTarget->height(),
-                                          aaType, commonColor);
+  return NonAARRectGeometryProcessor::Make(allocator, renderTarget->width(),
+                                           renderTarget->height(), hasStroke, commonColor);
 }
 
-void FillRRectOp::onDraw(RenderPass* renderPass) {
+void NonAARRectOp::onDraw(RenderPass* renderPass) {
   if (indexBufferProxy == nullptr || vertexBufferProxyView == nullptr) {
     return;
   }

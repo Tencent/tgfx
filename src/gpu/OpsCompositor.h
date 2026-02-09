@@ -31,7 +31,7 @@ enum class PendingOpType {
   Image,
   Rect,
   RRect,
-  FillRRect,
+  NonAARRect,
   Shape,
   Atlas,
 };

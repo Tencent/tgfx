@@ -19,25 +19,26 @@
 #pragma once
 
 #include "core/utils/BlockAllocator.h"
-#include "gpu/AAType.h"
 #include "gpu/RRectsVertexProvider.h"
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/RRect.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 /**
- * FillRRectsVertexProvider provides vertices for drawing filled round rectangles using the
- * FillRRectOp approach. It uses a normalized [-1, +1] coordinate space and generates vertices
- * for coverage-based antialiasing.
+ * NonAARRectsVertexProvider provides vertices for drawing round rectangles without antialiasing.
+ * It uses a simple 4-vertex quad per RRect with corner positions and radii.
+ * Supports both fill and stroke modes.
  */
-class FillRRectsVertexProvider : public VertexProvider {
+class NonAARRectsVertexProvider : public VertexProvider {
  public:
   /**
-   * Creates a new FillRRectsVertexProvider from a list of RRect records.
+   * Creates a new NonAARRectsVertexProvider from a list of RRect records.
    */
-  static PlacementPtr<FillRRectsVertexProvider> MakeFrom(
-      BlockAllocator* allocator, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
+  static PlacementPtr<NonAARRectsVertexProvider> MakeFrom(
+      BlockAllocator* allocator, std::vector<PlacementPtr<RRectRecord>>&& rects,
+      std::vector<PlacementPtr<Stroke>>&& strokes = {},
       std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
@@ -48,17 +49,17 @@ class FillRRectsVertexProvider : public VertexProvider {
   }
 
   /**
-   * Returns the AAType of the provider.
-   */
-  AAType aaType() const {
-    return static_cast<AAType>(bitFields.aaType);
-  }
-
-  /**
    * Returns true if the provider generates colors.
    */
   bool hasColor() const {
     return bitFields.hasColor;
+  }
+
+  /**
+   * Returns true if the provider generates strokes.
+   */
+  bool hasStroke() const {
+    return bitFields.hasStroke;
   }
 
   /**
@@ -78,15 +79,17 @@ class FillRRectsVertexProvider : public VertexProvider {
 
  private:
   PlacementArray<RRectRecord> rects = {};
+  PlacementArray<Stroke> strokes = {};
   std::shared_ptr<ColorSpace> _dstColorSpace = nullptr;
   struct {
-    uint8_t aaType : 2;
     bool hasColor : 1;
+    bool hasStroke : 1;
   } bitFields = {};
 
-  FillRRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
-                           std::shared_ptr<BlockAllocator> reference,
-                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  NonAARRectsVertexProvider(PlacementArray<RRectRecord>&& rects, bool hasColor,
+                            PlacementArray<Stroke>&& strokes,
+                            std::shared_ptr<BlockAllocator> reference,
+                            std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   friend class BlockAllocator;
 };

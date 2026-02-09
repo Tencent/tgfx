@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "gpu/processors/FillRRectGeometryProcessor.h"
+#include "gpu/processors/NonAARRectGeometryProcessor.h"
 
 namespace tgfx {
-class GLSLFillRRectGeometryProcessor : public FillRRectGeometryProcessor {
+class GLSLNonAARRectGeometryProcessor : public NonAARRectGeometryProcessor {
  public:
-  GLSLFillRRectGeometryProcessor(int width, int height, AAType aaType,
-                                 std::optional<PMColor> commonColor);
+  GLSLNonAARRectGeometryProcessor(int width, int height, bool stroke,
+                                  std::optional<PMColor> commonColor);
 
   void emitCode(EmitArgs& args) const override;
 

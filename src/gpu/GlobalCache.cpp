@@ -21,7 +21,7 @@
 #include "core/GradientGenerator.h"
 #include "core/PixelBuffer.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/ops/FillRRectOp.h"
+#include "gpu/ops/NonAARRectOp.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "opengl/GLBuffer.h"
@@ -347,68 +347,25 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke) {
   return indexBuffer;
 }
 
-// clang-format off
-// Index data for FillRRectOp
-// 40 vertices per rrect, 90 indices per rrect
-// Inset octagon (solid coverage): 18 indices
-// AA borders (linear coverage): 24 indices
-// Corners (arc coverage): 48 indices (12 per corner)
-static constexpr uint16_t FillRRectIndexPattern[] = {
-    // Inset octagon (solid coverage)
-    0, 1, 7,
-    1, 2, 7,
-    7, 2, 6,
-    2, 3, 6,
-    6, 3, 5,
-    3, 4, 5,
-
-    // AA borders (linear coverage)
-    0, 1, 8, 1, 9, 8,
-    2, 3, 10, 3, 11, 10,
-    4, 5, 12, 5, 13, 12,
-    6, 7, 14, 7, 15, 14,
-
-    // Top-left arc
-    16, 17, 21,
-    17, 21, 18,
-    21, 18, 20,
-    18, 20, 19,
-
-    // Top-right arc
-    22, 23, 27,
-    23, 27, 24,
-    27, 24, 26,
-    24, 26, 25,
-
-    // Bottom-right arc
-    28, 29, 33,
-    29, 33, 30,
-    33, 30, 32,
-    30, 32, 31,
-
-    // Bottom-left arc
-    34, 35, 39,
-    35, 39, 36,
-    39, 36, 38,
-    36, 38, 37
-};
-// clang-format on
-
-class FillRRectIndicesProvider : public DataSource<Data> {
+// Index data for NonAARRectOp - simple quad indices
+// 4 vertices per rrect, 6 indices per rrect (2 triangles)
+class NonAARRectIndicesProvider : public DataSource<Data> {
  public:
-  explicit FillRRectIndicesProvider(size_t rectSize) : rectSize(rectSize) {
+  explicit NonAARRectIndicesProvider(size_t rectSize) : rectSize(rectSize) {
   }
 
   std::shared_ptr<Data> getData() const override {
-    auto indicesPerRRect = FillRRectOp::IndicesPerRRect;
+    auto indicesPerRRect = NonAARRectOp::IndicesPerRRect;
     auto bufferSize = rectSize * indicesPerRRect * sizeof(uint16_t);
     Buffer buffer(bufferSize);
     auto indices = reinterpret_cast<uint16_t*>(buffer.data());
+    // Quad indices pattern: TL, TR, BR, TL, BR, BL
+    static constexpr uint16_t quadPattern[] = {0, 1, 2, 0, 2, 3};
     int index = 0;
     for (size_t i = 0; i < rectSize; ++i) {
-      auto offset = static_cast<uint16_t>(i * FillRRectOp::VerticesPerRRect);
+      auto offset = static_cast<uint16_t>(i * NonAARRectOp::VerticesPerRRect);
       for (size_t j = 0; j < indicesPerRRect; ++j) {
-        indices[index++] = FillRRectIndexPattern[j] + offset;
+        indices[index++] = quadPattern[j] + offset;
       }
     }
     return buffer.release();
@@ -418,12 +375,12 @@ class FillRRectIndicesProvider : public DataSource<Data> {
   size_t rectSize = 0;
 };
 
-std::shared_ptr<GPUBufferProxy> GlobalCache::getFillRRectIndexBuffer() {
-  if (fillRRectIndexBuffer == nullptr) {
-    auto provider = std::make_unique<FillRRectIndicesProvider>(FillRRectOp::MaxNumRRects);
-    fillRRectIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
+std::shared_ptr<GPUBufferProxy> GlobalCache::getNonAARRectIndexBuffer() {
+  if (nonAARRectIndexBuffer == nullptr) {
+    auto provider = std::make_unique<NonAARRectIndicesProvider>(NonAARRectOp::MaxNumRRects);
+    nonAARRectIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
-  return fillRRectIndexBuffer;
+  return nonAARRectIndexBuffer;
 }
 
 std::shared_ptr<Resource> GlobalCache::findStaticResource(const UniqueKey& uniqueKey) {

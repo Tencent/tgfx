@@ -20,43 +20,42 @@
 
 #include <optional>
 #include "GeometryProcessor.h"
-#include "gpu/AAType.h"
 
 namespace tgfx {
 /**
- * FillRRectGeometryProcessor is used to render filled round rectangles using coverage-based
- * antialiasing. It computes vertex positions and arc coverage in the shader using a normalized
- * [-1, +1] coordinate space.
+ * NonAARRectGeometryProcessor is used to render round rectangles without antialiasing.
+ * It evaluates the round rect shape in the fragment shader using local coordinates.
+ * Supports both fill and stroke modes.
  */
-class FillRRectGeometryProcessor : public GeometryProcessor {
+class NonAARRectGeometryProcessor : public GeometryProcessor {
  public:
-  static PlacementPtr<FillRRectGeometryProcessor> Make(BlockAllocator* allocator, int width,
-                                                       int height, AAType aaType,
-                                                       std::optional<PMColor> commonColor);
+  static PlacementPtr<NonAARRectGeometryProcessor> Make(BlockAllocator* allocator, int width,
+                                                        int height, bool stroke,
+                                                        std::optional<PMColor> commonColor);
 
   std::string name() const override {
-    return "FillRRectGeometryProcessor";
+    return "NonAARRectGeometryProcessor";
   }
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  FillRRectGeometryProcessor(int width, int height, AAType aaType,
-                             std::optional<PMColor> commonColor);
+  NonAARRectGeometryProcessor(int width, int height, bool stroke,
+                              std::optional<PMColor> commonColor);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   // Vertex attributes
-  Attribute inCornerAndRadius;  // corner (2) + radius_outset (2) = float4
-  Attribute inAABloatCoverage;  // aa_bloat_dir (2) + coverage + is_linear = float4
-  Attribute inSkew;             // skew matrix (4 floats)
-  Attribute inTranslate;        // translate (2 floats)
-  Attribute inRadii;            // radii (2 floats), same for all corners
-  Attribute inColor;            // optional color
+  Attribute inPosition;     // position (2 floats)
+  Attribute inLocalCoord;   // local coordinates (2 floats)
+  Attribute inRadii;        // corner radii (2 floats)
+  Attribute inRectBounds;   // rect bounds: left, top, right, bottom (4 floats)
+  Attribute inStrokeWidth;  // half stroke width (2 floats, stroke only)
+  Attribute inColor;        // optional color
 
   int width = 1;
   int height = 1;
-  AAType aaType = AAType::Coverage;
+  bool stroke = false;
   std::optional<PMColor> commonColor = std::nullopt;
 };
 }  // namespace tgfx

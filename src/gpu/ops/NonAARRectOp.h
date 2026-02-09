@@ -24,33 +24,38 @@
 #include "gpu/proxies/VertexBufferView.h"
 
 namespace tgfx {
-class FillRRectsVertexProvider;
+class NonAARRectsVertexProvider;
 
-class FillRRectOp : public DrawOp {
+/**
+ * NonAARRectOp draws round rectangles without antialiasing. It uses a simplified
+ * vertex layout compared to RRectDrawOp, suitable for non-AA rendering only.
+ * Supports both fill and stroke modes.
+ */
+class NonAARRectOp : public DrawOp {
  public:
   /**
-   * The maximum number of fill round rects that can be drawn in a single draw call.
+   * The maximum number of round rects that can be drawn in a single draw call.
    */
   static constexpr uint16_t MaxNumRRects = 1024;
 
   /**
-   * The number of vertices per fill round rect.
-   * 8 inset vertices + 8 outset vertices + 24 corner vertices = 40 vertices
+   * The number of vertices per round rect.
+   * 4 corner vertices for a simple quad.
    */
-  static constexpr uint16_t VerticesPerRRect = 40;
+  static constexpr uint16_t VerticesPerRRect = 4;
 
   /**
-   * The number of indices per fill round rect.
-   * 18 inset octagon indices + 24 AA border indices + 48 corner indices = 90 indices
+   * The number of indices per round rect.
+   * 6 indices for 2 triangles forming a quad.
    */
-  static constexpr uint16_t IndicesPerRRect = 90;
+  static constexpr uint16_t IndicesPerRRect = 6;
 
   /**
-   * Create a new FillRRectOp for a list of fill RRect records.
+   * Create a new NonAARRectOp for a list of RRect records.
    */
-  static PlacementPtr<FillRRectOp> Make(Context* context,
-                                        PlacementPtr<FillRRectsVertexProvider> provider,
-                                        uint32_t renderFlags);
+  static PlacementPtr<NonAARRectOp> Make(Context* context,
+                                         PlacementPtr<NonAARRectsVertexProvider> provider,
+                                         uint32_t renderFlags);
 
  protected:
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
@@ -58,20 +63,21 @@ class FillRRectOp : public DrawOp {
   void onDraw(RenderPass* renderPass) override;
 
   Type type() override {
-    return Type::FillRRectOp;
+    return Type::NonAARRectOp;
   }
 
   bool hasCoverage() const override {
-    return aaType == AAType::Coverage;
+    return false;
   }
 
  private:
   size_t rectCount = 0;
+  bool hasStroke = false;
   std::optional<PMColor> commonColor = std::nullopt;
   std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<VertexBufferView> vertexBufferProxyView = nullptr;
 
-  FillRRectOp(BlockAllocator* allocator, FillRRectsVertexProvider* provider);
+  NonAARRectOp(BlockAllocator* allocator, NonAARRectsVertexProvider* provider);
 
   friend class BlockAllocator;
 };

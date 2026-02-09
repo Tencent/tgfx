@@ -22,7 +22,7 @@
 #include "core/images/SubsetImage.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/RenderContext.h"
-#include "gpu/ops/FillRRectOp.h"
+#include "gpu/ops/NonAARRectOp.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "gtest/gtest.h"
@@ -189,7 +189,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
   auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() == 1);
-  // Small RRects (8x8=64 pixels < 65536 threshold) use RRectDrawOp for fewer vertices.
+  // AA RRects use RRectDrawOp (EllipseGeometryProcessor).
   EXPECT_EQ(static_cast<RRectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount);
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
@@ -1487,110 +1487,176 @@ TGFX_TEST(CanvasTest, CMYKWithoutICCProfile) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CMYKWithoutICCProfile"));
 }
 
-TGFX_TEST(CanvasTest, FillRRectOp) {
+TGFX_TEST(CanvasTest, NonAARRectOp) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 800, 900);
+  auto surface = Surface::Make(context, 400, 500);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
-  // FillRRectOp is used when RRect area >= 65536 pixels (approximately 256x256).
-  // All RRects below are large enough to trigger FillRRectOp.
+  // NonAARRectOp is used when antiAlias is false and no stroke.
   Paint paint;
   paint.setAntiAlias(false);
 
-  // Single filled RRect with uniform radii (300x260 = 78000 pixels).
+  // Single filled RRect with uniform radii.
   paint.setColor(Color::Red());
   RRect rrect1 = {};
-  rrect1.setRectXY(Rect::MakeXYWH(50, 50, 300, 260), 30, 30);
+  rrect1.setRectXY(Rect::MakeXYWH(50, 50, 120, 80), 15, 15);
   canvas->drawRRect(rrect1, paint);
 
-  // Different colors and radii (350x280 = 98000 pixels).
+  // Different colors and radii.
   paint.setColor(Color::Green());
   RRect rrect2 = {};
-  rrect2.setRectXY(Rect::MakeXYWH(400, 50, 350, 280), 50, 40);
+  rrect2.setRectXY(Rect::MakeXYWH(200, 50, 150, 100), 30, 20);
   canvas->drawRRect(rrect2, paint);
 
-  // Ellipse-like large corner radii (300x260 = 78000 pixels).
+  // Ellipse-like (large corner radii).
   paint.setColor(Color::Blue());
   RRect rrect3 = {};
-  rrect3.setRectXY(Rect::MakeXYWH(50, 350, 300, 260), 150, 130);
+  rrect3.setRectXY(Rect::MakeXYWH(50, 160, 100, 80), 50, 40);
   canvas->drawRRect(rrect3, paint);
 
-  // Small corner radii (350x280 = 98000 pixels).
+  // Small corner radii.
   paint.setColor(Color::FromRGBA(255, 165, 0, 255));
   RRect rrect4 = {};
-  rrect4.setRectXY(Rect::MakeXYWH(400, 350, 350, 280), 10, 10);
+  rrect4.setRectXY(Rect::MakeXYWH(200, 160, 150, 100), 5, 5);
   canvas->drawRRect(rrect4, paint);
 
-  // With transformation - rotation (300x260 = 78000 pixels).
+  // With transformation - rotation.
   canvas->save();
-  canvas->translate(200, 750);
+  canvas->translate(100, 350);
   canvas->rotate(15);
   paint.setColor(Color::FromRGBA(128, 0, 128, 255));
   RRect rrect5 = {};
-  rrect5.setRectXY(Rect::MakeXYWH(-150, -130, 300, 260), 20, 20);
+  rrect5.setRectXY(Rect::MakeXYWH(-50, -30, 100, 60), 10, 10);
   canvas->drawRRect(rrect5, paint);
   canvas->restore();
 
-  // With transformation - scale (300*1.5 x 260*0.8 = 450x208 = 93600 pixels).
+  // With transformation - scale.
   canvas->save();
-  canvas->translate(600, 750);
+  canvas->translate(280, 350);
   canvas->scale(1.5f, 0.8f);
   paint.setColor(Color::FromRGBA(0, 128, 128, 255));
   RRect rrect6 = {};
-  rrect6.setRectXY(Rect::MakeXYWH(-150, -130, 300, 260), 25, 25);
+  rrect6.setRectXY(Rect::MakeXYWH(-40, -25, 80, 50), 12, 12);
   canvas->drawRRect(rrect6, paint);
   canvas->restore();
 
-  // Verify FillRRectOp is used by checking the Op type.
+  // Verify NonAARRectOp is used by checking the Op type.
   surface->renderContext->flush();
   auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
   ASSERT_TRUE(drawingBuffer->renderTasks.size() >= 1);
   auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() >= 1);
-  // All large filled RRects should be batched into FillRRectOp.
-  EXPECT_EQ(task->drawOps.back().get()->type(), DrawOp::Type::FillRRectOp);
-  EXPECT_EQ(static_cast<FillRRectOp*>(task->drawOps.back().get())->rectCount, 6u);
+  // All non-AA filled RRects should be batched into NonAARRectOp.
+  EXPECT_EQ(task->drawOps.back().get()->type(), DrawOp::Type::NonAARRectOp);
+  EXPECT_EQ(static_cast<NonAARRectOp*>(task->drawOps.back().get())->rectCount, 6u);
 
   context->flushAndSubmit();
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/FillRRectOp"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOp"));
 }
 
-TGFX_TEST(CanvasTest, FillRRectOpWithShader) {
+TGFX_TEST(CanvasTest, NonAARRectOpWithShader) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 450, 550);
+  auto surface = Surface::Make(context, 300, 350);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
-  // Test FillRRectOp with image shader to verify UV coordinates are correct.
+  // Test NonAARRectOp with image shader to verify UV coordinates are correct.
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
   auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
 
-  // Draw two large RRects (350x220 = 77000 pixels > 65536 threshold) to trigger FillRRectOp.
+  // Draw two RRects without AA.
   // Both use device coordinates for UV, so textures should tile continuously.
   Paint paint;
   paint.setAntiAlias(false);
   paint.setShader(shader);
   RRect rrect = {};
-  rrect.setRectXY(Rect::MakeXYWH(50, 50, 350, 220), 40, 40);
+  rrect.setRectXY(Rect::MakeXYWH(50, 50, 200, 120), 30, 30);
   canvas->drawRRect(rrect, paint);
 
-  // Bottom: FillRRectOp (antiAlias=true)
+  // Bottom: Also non-AA
   Paint paint2;
-  paint2.setAntiAlias(true);
+  paint2.setAntiAlias(false);
   paint2.setShader(shader);
   RRect rrect2 = {};
-  rrect2.setRectXY(Rect::MakeXYWH(50, 280, 350, 220), 40, 40);
+  rrect2.setRectXY(Rect::MakeXYWH(50, 180, 200, 120), 30, 30);
   canvas->drawRRect(rrect2, paint2);
 
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/FillRRectOpWithShader"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpWithShader"));
+}
+
+TGFX_TEST(CanvasTest, NonAARRectOpStroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 400);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setStyle(PaintStyle::Stroke);
+
+  // Draw stroked RRects with various stroke widths and corner radii.
+  // Top row: different stroke widths with same corner radius.
+  paint.setColor(Color::Red());
+  paint.setStroke(Stroke(4));
+  RRect rrect1 = {};
+  rrect1.setRectXY(Rect::MakeXYWH(50, 50, 100, 80), 20, 20);
+  canvas->drawRRect(rrect1, paint);
+
+  paint.setColor(Color::Green());
+  paint.setStroke(Stroke(8));
+  RRect rrect2 = {};
+  rrect2.setRectXY(Rect::MakeXYWH(180, 50, 100, 80), 20, 20);
+  canvas->drawRRect(rrect2, paint);
+
+  paint.setColor(Color::Blue());
+  paint.setStroke(Stroke(16));
+  RRect rrect3 = {};
+  rrect3.setRectXY(Rect::MakeXYWH(310, 50, 100, 80), 20, 20);
+  canvas->drawRRect(rrect3, paint);
+
+  // Middle row: different corner radii with same stroke width.
+  paint.setColor(Color::FromRGBA(255, 128, 0));
+  paint.setStroke(Stroke(8));
+  RRect rrect4 = {};
+  rrect4.setRectXY(Rect::MakeXYWH(50, 180, 100, 80), 10, 10);
+  canvas->drawRRect(rrect4, paint);
+
+  paint.setColor(Color::FromRGBA(128, 0, 255));
+  RRect rrect5 = {};
+  rrect5.setRectXY(Rect::MakeXYWH(180, 180, 100, 80), 30, 30);
+  canvas->drawRRect(rrect5, paint);
+
+  paint.setColor(Color::FromRGBA(0, 128, 128));
+  RRect rrect6 = {};
+  rrect6.setRectXY(Rect::MakeXYWH(310, 180, 100, 80), 50, 40);
+  canvas->drawRRect(rrect6, paint);
+
+  // Bottom: stroke that covers entire corner (thick stroke with small radius).
+  paint.setColor(Color::FromRGBA(128, 128, 0));
+  paint.setStroke(Stroke(20));
+  RRect rrect7 = {};
+  rrect7.setRectXY(Rect::MakeXYWH(100, 300, 150, 60), 10, 10);
+  canvas->drawRRect(rrect7, paint);
+
+  // Bottom right: stroke on a plain rect (no corner radius).
+  paint.setColor(Color::FromRGBA(0, 64, 128));
+  paint.setStroke(Stroke(6));
+  RRect rrect8 = {};
+  rrect8.setRectXY(Rect::MakeXYWH(300, 300, 120, 60), 0, 0);
+  canvas->drawRRect(rrect8, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpStroke"));
 }
 
 }  // namespace tgfx
