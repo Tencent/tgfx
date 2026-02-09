@@ -126,6 +126,11 @@ constexpr bool IsPow2(T value) {
 int NextLog2(uint32_t value);
 
 /**
+ * Converts an IEEE 754-2008 half-precision (16-bit) float to single-precision (32-bit) float.
+ */
+float HalfToFloat(uint16_t value);
+
+/**
  *  Returns the smallest power-of-2 that is >= the specified value. If value
  *  is already a power of 2, then it is returned unchanged. It is undefined
  *  if value is <= 0.

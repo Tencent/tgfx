@@ -30,7 +30,10 @@ namespace tgfx {
  */
 class RoundCorner : public VectorElement {
  public:
-  RoundCorner() = default;
+  /**
+   * Creates a new RoundCorner instance.
+   */
+  static std::shared_ptr<RoundCorner> Make();
 
   /**
    * Returns the radius of the rounded corners.
@@ -50,6 +53,9 @@ class RoundCorner : public VectorElement {
   }
 
   void apply(VectorContext* context) override;
+
+ protected:
+  RoundCorner() = default;
 
  private:
   float _radius = 10.0f;

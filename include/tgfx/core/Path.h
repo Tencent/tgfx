@@ -173,6 +173,36 @@ class Path {
   void cubicTo(const Point& control1, const Point& control2, const Point& point);
 
   /**
+   * Adds a conic curve from last point towards (controlX, controlY), ending at (x, y), weighted by
+   * weight. Conics can represent circular, elliptical, parabolic, or hyperbolic arcs depending on
+   * the weight value:
+   * - weight < 1: elliptical arc
+   * - weight == 1: equivalent to quadTo (parabolic arc)
+   * - weight > 1: hyperbolic arc
+   * - weight == sqrt(2)/2 ≈ 0.707: exact 90-degree circular arc
+   * @param controlX  x-coordinate of the control point
+   * @param controlY  y-coordinate of the control point
+   * @param x         x-coordinate of the end point
+   * @param y         y-coordinate of the end point
+   * @param weight    conic weight determining the curve type
+   */
+  void conicTo(float controlX, float controlY, float x, float y, float weight);
+
+  /**
+   * Adds a conic curve from last point towards control, ending at point, weighted by weight. Conics
+   * can represent circular, elliptical, parabolic, or hyperbolic arcs depending on the weight
+   * value:
+   * - weight < 1: elliptical arc
+   * - weight == 1: equivalent to quadTo (parabolic arc)
+   * - weight > 1: hyperbolic arc
+   * - weight == sqrt(2)/2 ≈ 0.707: exact 90-degree circular arc
+   * @param control  the control point
+   * @param point    the end point
+   * @param weight   conic weight determining the curve type
+   */
+  void conicTo(const Point& control, const Point& point, float weight);
+
+  /**
    * Append a line and arc to the current path. This is the same as the PostScript call "arct".
    */
   void arcTo(float x1, float y1, float x2, float y2, float radius);
@@ -337,9 +367,80 @@ class Path {
   void reverse();
 
   /**
-   * Iterates through verb array and associated Point array.
+   * Represents a single segment during path iteration.
+   * - verb: The type of path command (Move, Line, Quad, Conic, Cubic, Close, or Done).
+   * - points: Control points for the segment. The number of valid points depends on verb:
+   *     - Move: points[0]
+   *     - Line: points[0-1]
+   *     - Quad: points[0-2]
+   *     - Conic: points[0-2]
+   *     - Cubic: points[0-3]
+   *     - Close/Done: no valid points
+   * - conicWeight: The weight for conic curves. Only valid when verb is Conic.
    */
-  void decompose(const PathIterator& iterator, void* info = nullptr) const;
+  struct Segment {
+    PathVerb verb = PathVerb::Done;
+    Point points[4] = {};
+    float conicWeight = 0.0f;
+  };
+
+  /**
+   * Iterator for traversing path segments. Supports range-based for loops.
+   * The iterator provides high-performance traversal without virtual function overhead.
+   *
+   * Usage example:
+   *   for (auto& segment : path) {
+   *       switch (segment.verb) {
+   *           case PathVerb::Move: // segment.points[0] is the move-to point
+   *           case PathVerb::Line: // segment.points[0-1] are line endpoints
+   *           case PathVerb::Quad: // segment.points[0-2] are quad control points
+   *           case PathVerb::Conic: // segment.points[0-2], segment.conicWeight
+   *           case PathVerb::Cubic: // segment.points[0-3] are cubic control points
+   *           case PathVerb::Close: // no points
+   *       }
+   *   }
+   */
+  class Iterator {
+   public:
+    ~Iterator();
+    Iterator(const Iterator& other);
+    Iterator& operator=(const Iterator& other);
+
+    const Segment& operator*() const {
+      return current;
+    }
+
+    Iterator& operator++();
+
+    bool operator!=(const Iterator& other) const {
+      return isDone != other.isDone;
+    }
+
+   private:
+    explicit Iterator(const Path* path);
+    Iterator();
+
+    void advance();
+
+    friend class Path;
+
+    static constexpr size_t STORAGE_SIZE = 64;
+    alignas(8) uint8_t storage[STORAGE_SIZE] = {};
+    Segment current = {};
+    bool isDone = true;
+  };
+
+  /**
+   * Returns an iterator to the first segment.
+   */
+  Iterator begin() const;
+
+  /**
+   * Returns an iterator past the last segment.
+   */
+  Iterator end() const {
+    return Iterator();
+  }
 
   /**
    * Returns the number of points in Path.
@@ -355,6 +456,18 @@ class Path {
    * Returns last point on Path in lastPoint. Returns false if point array is empty.
    */
   bool getLastPoint(Point* lastPoint) const;
+
+  /**
+   * Converts a conic curve to a series of quadratic Bezier curves.
+   * @param p0     conic start point
+   * @param p1     conic control point
+   * @param p2     conic end point
+   * @param weight conic weight
+   * @param pow2   quad count as power of two (0 to 5), e.g., pow2=1 generates 2 quads
+   * @return       quad control points, size = 1 + 2 * numQuads
+   */
+  static std::vector<Point> ConvertConicToQuads(const Point& p0, const Point& p1, const Point& p2,
+                                                float weight, int pow2 = 1);
 
  private:
   std::shared_ptr<PathRef> pathRef = nullptr;

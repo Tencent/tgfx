@@ -38,6 +38,10 @@ static PathOp ToPathOp(MergePathOp mode) {
   return PathOp::Append;
 }
 
+std::shared_ptr<MergePath> MergePath::Make() {
+  return std::shared_ptr<MergePath>(new MergePath());
+}
+
 void MergePath::setMode(MergePathOp value) {
   if (_mode == value) {
     return;

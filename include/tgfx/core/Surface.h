@@ -162,14 +162,16 @@ class Surface {
   std::shared_ptr<Image> makeImageSnapshot();
 
   /**
-   * Returns pixel at (x, y) as unpremultiplied color. Some color precision may be lost in the
-   * conversion to unpremultiplied color; original pixel data may have additional precision. Returns
-   * a transparent color if the point (x, y) is not contained by the Surface bounds.
+   * Returns pixel at (x, y) as premultiplied color. Returns a transparent color if the point (x, y)
+   * is not contained by the Surface bounds.
    * @param x  column index, zero or greater, and less than width()
    * @param y  row index, zero or greater, and less than height()
-   * @return   pixel converted to unpremultiplied color
+   * @param dstColorSpace  the destination color space for the returned color. If nullptr, no color
+   *                       space conversion is performed.
+   * @return   pixel converted to premultiplied color.
    */
-  Color getColor(int x, int y);
+  RGBA4f<AlphaType::Premultiplied> getColor(int x, int y,
+                                            std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
 
   /**
    * Asynchronously copies a rect of pixels from the Surface and returns a SurfaceReadback. Use the

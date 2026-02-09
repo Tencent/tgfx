@@ -439,4 +439,32 @@ TGFX_TEST(LayerFilterTest, ShapeLayerContourWithDropShadow) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/ShapeLayerNoStyleWithDropShadow"));
 }
 
+TGFX_TEST(LayerFilterTest, ScaledRectWithInnerShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  // Rect 100x100 with InnerShadow, scale 14.4x, surface 270x270
+  auto surface = Surface::Make(context, 270, 270);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(ShapeStyle::Make(Color::White()));
+
+  // InnerShadow: offsetX=0, offsetY=-2, blurrinessX=0, blurrinessY=0
+  shapeLayer->setAllowsEdgeAntialiasing(true);
+  auto innerShadow = InnerShadowStyle::Make(0, -2, 0, 0, Color::FromRGBA(0, 0, 0, 128));
+  shapeLayer->setLayerStyles({innerShadow});
+
+  displayList->setContentOffset(-1200, -1300);
+  displayList->setZoomScale(14.4125204f);
+  displayList->setBackgroundColor(Color::White());
+  displayList->root()->addChild(shapeLayer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/ScaledRectWithInnerShadow"));
+}
+
 }  // namespace tgfx

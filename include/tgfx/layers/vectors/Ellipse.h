@@ -30,7 +30,10 @@ namespace tgfx {
  */
 class Ellipse : public VectorElement {
  public:
-  Ellipse() = default;
+  /**
+   * Creates a new Ellipse instance.
+   */
+  static std::shared_ptr<Ellipse> Make();
 
   /**
    * Returns the center point of the ellipse.
@@ -74,6 +77,9 @@ class Ellipse : public VectorElement {
   }
 
   void apply(VectorContext* context) override;
+
+ protected:
+  Ellipse() = default;
 
  private:
   Point _center = Point::Zero();

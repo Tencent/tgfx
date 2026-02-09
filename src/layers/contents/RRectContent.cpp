@@ -17,26 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectContent.h"
-#include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
 
 RRectContent::RRectContent(const RRect& rRect, const LayerPaint& paint)
-    : GeometryContent(paint), rRect(rRect) {
-}
-
-Rect RRectContent::onGetBounds() const {
-  return rRect.rect;
-}
-
-Path RRectContent::getFilledPath() const {
-  Path path = {};
-  path.addRRect(rRect);
-  if (stroke) {
-    stroke->applyToPath(&path);
-  }
-  return path;
+    : DrawContent(paint), rRect(rRect) {
 }
 
 Rect RRectContent::getTightBounds(const Matrix& matrix) const {
@@ -55,6 +41,10 @@ bool RRectContent::hitTestPoint(float localX, float localY) const {
   return getFilledPath().contains(localX, localY);
 }
 
+Rect RRectContent::onGetBounds() const {
+  return rRect.rect;
+}
+
 void RRectContent::onDraw(Canvas* canvas, const Paint& paint) const {
   canvas->drawRRect(rRect, paint);
 }
@@ -62,6 +52,15 @@ void RRectContent::onDraw(Canvas* canvas, const Paint& paint) const {
 bool RRectContent::onHasSameGeometry(const GeometryContent* other) const {
   auto otherRRect = static_cast<const RRectContent*>(other)->rRect;
   return rRect.rect == otherRRect.rect && rRect.radii == otherRRect.radii;
+}
+
+Path RRectContent::getFilledPath() const {
+  Path path = {};
+  path.addRRect(rRect);
+  if (stroke) {
+    stroke->applyToPath(&path);
+  }
+  return path;
 }
 
 }  // namespace tgfx

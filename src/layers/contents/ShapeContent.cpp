@@ -22,28 +22,16 @@
 namespace tgfx {
 
 ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, const LayerPaint& paint)
-    : GeometryContent(paint), shape(std::move(shape)) {
-}
-
-Rect ShapeContent::onGetBounds() const {
-  return shape->getBounds();
+    : DrawContent(paint), shape(std::move(shape)) {
 }
 
 Rect ShapeContent::getBounds() const {
-  auto result = onGetBounds();
+  auto bounds = onGetBounds();
   if (stroke) {
     // Shape may contain sharp corners, so we need to apply miter limit to the bounds.
-    ApplyStrokeToBounds(*stroke, &result, Matrix::I(), true);
+    ApplyStrokeToBounds(*stroke, &bounds, Matrix::I(), true);
   }
-  return result;
-}
-
-Path ShapeContent::getFilledPath() const {
-  auto path = shape->getPath();
-  if (stroke) {
-    stroke->applyToPath(&path);
-  }
-  return path;
+  return bounds;
 }
 
 Rect ShapeContent::getTightBounds(const Matrix& matrix) const {
@@ -59,12 +47,24 @@ bool ShapeContent::hitTestPoint(float localX, float localY) const {
   return getFilledPath().contains(localX, localY);
 }
 
+Rect ShapeContent::onGetBounds() const {
+  return shape->getBounds();
+}
+
 void ShapeContent::onDraw(Canvas* canvas, const Paint& paint) const {
   canvas->drawShape(shape, paint);
 }
 
 bool ShapeContent::onHasSameGeometry(const GeometryContent* other) const {
   return shape == static_cast<const ShapeContent*>(other)->shape;
+}
+
+Path ShapeContent::getFilledPath() const {
+  auto path = shape->getPath();
+  if (stroke) {
+    stroke->applyToPath(&path);
+  }
+  return path;
 }
 
 }  // namespace tgfx

@@ -17,20 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectsContent.h"
-#include "core/utils/StrokeUtils.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
 
 RectsContent::RectsContent(std::vector<Rect> rects, const LayerPaint& paint)
-    : GeometryContent(paint), rects(std::move(rects)) {
-}
-
-Rect RectsContent::onGetBounds() const {
-  auto bounds = rects[0];
-  for (size_t i = 1; i < rects.size(); ++i) {
-    bounds.join(rects[i]);
-  }
-  return bounds;
+    : DrawContent(paint), rects(std::move(rects)) {
 }
 
 Rect RectsContent::getTightBounds(const Matrix& matrix) const {
@@ -70,15 +62,12 @@ bool RectsContent::hitTestPoint(float localX, float localY) const {
   return false;
 }
 
-Path RectsContent::getFilledPath() const {
-  Path path = {};
-  for (const auto& rect : rects) {
-    path.addRect(rect);
+Rect RectsContent::onGetBounds() const {
+  auto bounds = rects[0];
+  for (size_t i = 1; i < rects.size(); ++i) {
+    bounds.join(rects[i]);
   }
-  if (stroke) {
-    stroke->applyToPath(&path);
-  }
-  return path;
+  return bounds;
 }
 
 void RectsContent::onDraw(Canvas* canvas, const Paint& paint) const {
@@ -89,6 +78,17 @@ void RectsContent::onDraw(Canvas* canvas, const Paint& paint) const {
 
 bool RectsContent::onHasSameGeometry(const GeometryContent* other) const {
   return rects == static_cast<const RectsContent*>(other)->rects;
+}
+
+Path RectsContent::getFilledPath() const {
+  Path path = {};
+  for (const auto& rect : rects) {
+    path.addRect(rect);
+  }
+  if (stroke) {
+    stroke->applyToPath(&path);
+  }
+  return path;
 }
 
 }  // namespace tgfx

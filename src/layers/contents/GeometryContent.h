@@ -20,39 +20,25 @@
 
 #include <memory>
 #include "layers/contents/LayerContent.h"
-#include "tgfx/layers/LayerPaint.h"
 
 namespace tgfx {
 
+class Shader;
+
 /**
- * GeometryContent is the base class for geometry-based layer contents. Each GeometryContent
- * represents a single draw operation with its own color, shader, and blend mode.
+ * GeometryContent is the abstract base class for geometry-based layer contents.
  */
 class GeometryContent : public LayerContent {
  public:
-  explicit GeometryContent(const LayerPaint& paint);
-
-  Rect getBounds() const override;
-  void drawContour(Canvas* canvas, bool antiAlias) const override;
-  bool contourEqualsOpaqueContent() const override;
-  bool hasBlendMode() const override;
-  bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
-  void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
-
   /**
    * Returns true if this content has the same geometry as the other content.
    */
-  bool hasSameGeometry(const GeometryContent* other) const;
+  virtual bool hasSameGeometry(const GeometryContent* other) const = 0;
 
-  Color color = Color::White();
-  std::shared_ptr<Shader> shader = nullptr;
-  BlendMode blendMode = BlendMode::SrcOver;
-  std::unique_ptr<Stroke> stroke = nullptr;
-
- protected:
-  virtual Rect onGetBounds() const = 0;
-  virtual void onDraw(Canvas* canvas, const Paint& paint) const = 0;
-  virtual bool onHasSameGeometry(const GeometryContent* other) const = 0;
+  /**
+   * Returns the shader of this content.
+   */
+  virtual const std::shared_ptr<Shader>& getShader() const = 0;
 };
 
 }  // namespace tgfx
