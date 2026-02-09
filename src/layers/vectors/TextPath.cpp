@@ -140,11 +140,6 @@ static std::vector<GlyphEntry> CollectGlyphs(const std::vector<Geometry*>& glyph
   return result;
 }
 
-// Returns the glyph's translation component mapped to group coordinates.
-static Point GetGlyphOrigin(const Glyph& glyph, const Matrix& geometryMatrix) {
-  return geometryMatrix.mapXY(glyph.matrix.getTranslateX(), glyph.matrix.getTranslateY());
-}
-
 // Returns the glyph's anchor point mapped through both glyph and geometry matrices to group
 // coordinates.
 static Point GetGlyphAnchor(const Glyph& glyph, const Matrix& geometryMatrix) {
@@ -267,16 +262,15 @@ void TextPath::apply(VectorContext* context) {
       accumulatedAdvance += advance;
     }
   } else {
-    // Normal mode: projects each glyph's anchor onto the curve, then translates the entire glyph
-    // so its anchor lands on the new position. The glyph rotates around its anchor to follow
-    // the curve tangent.
+    // Normal mode: projects each glyph's anchor onto the curve, then places the glyph so that
+    // its anchor lands on the computed position.
     //
     // 1. Anchor's displacement from baselineOrigin is decomposed into tangent and normal components
     //    relative to the baseline direction.
     // 2. tangentDistance determines the position along the curve.
     // 3. normalOffset determines the perpendicular distance from the curve.
     // 4. anchorNew = curve point + normal * normalOffset.
-    // 5. The glyph is rotated around anchorOld, then translated so anchorOld moves to anchorNew.
+    // 5. glyphOrigin = anchorNew - rotatedLocalAnchor (same structure as ForceAlignment mode).
     auto origin = _baselineOrigin;
 
     float rotationRadians = _baselineAngle * static_cast<float>(M_PI) / 180.0f;
@@ -288,7 +282,6 @@ void TextPath::apply(VectorContext* context) {
       auto& glyph = *entry.glyph;
 
       auto anchorOld = GetGlyphAnchor(glyph, entry.geometryMatrix);
-      auto glyphOriginOld = GetGlyphOrigin(glyph, entry.geometryMatrix);
 
       // Decompose anchor displacement into tangent and normal components
       float dx = anchorOld.x - origin.x;
@@ -312,14 +305,16 @@ void TextPath::apply(VectorContext* context) {
       auto rotationAngle = ComputeRotationAngle(tangent, _perpendicular, _reversed, _baselineAngle);
       auto rotationScale = ExtractRotationScale(glyph.matrix);
 
-      // Rotate glyphOrigin around anchorOld, then translate so anchorOld moves to anchorNew
-      Matrix transform = Matrix::I();
-      transform.postTranslate(-anchorOld.x, -anchorOld.y);
-      transform.postRotate(rotationAngle);
-      transform.postTranslate(anchorNew.x, anchorNew.y);
-      Point glyphOriginNew = transform.mapXY(glyphOriginOld.x, glyphOriginOld.y);
+      // Anchor offset in glyph's local rotation/scale space
+      auto localAnchor = rotationScale.mapXY(glyph.anchor.x, glyph.anchor.y);
 
-      BuildGlyphMatrix(glyph, rotationScale, rotationAngle, glyphOriginNew, entry.invertedMatrix);
+      // Rotate local anchor to curve space, then place glyph so that the anchor lands on anchorNew
+      Matrix curveRotation = Matrix::I();
+      curveRotation.setRotate(rotationAngle);
+      auto rotatedAnchor = curveRotation.mapXY(localAnchor.x, localAnchor.y);
+      Point glyphOrigin = {anchorNew.x - rotatedAnchor.x, anchorNew.y - rotatedAnchor.y};
+
+      BuildGlyphMatrix(glyph, rotationScale, rotationAngle, glyphOrigin, entry.invertedMatrix);
     }
   }
 }
