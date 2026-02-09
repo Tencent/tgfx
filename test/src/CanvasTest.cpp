@@ -1474,4 +1474,15 @@ TGFX_TEST(CanvasTest, DrawTextBlob) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawTextBlob"));
 }
 
+TGFX_TEST(CanvasTest, CMYKWithoutICCProfile) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/mandrill_128.jpg");
+  auto surface = Surface::Make(context, image->width(), image->height());
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CMYKWithoutICCProfile"));
+}
+
 }  // namespace tgfx
