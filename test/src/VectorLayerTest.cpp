@@ -2969,6 +2969,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
 
   auto textBlob11b = TextBlob::MakeFrom("Spans", font);
   auto textSpan11b = Text::Make(textBlob11b);
+  textSpan11b->setPosition({std::round(textBlob11a->getTightBounds().right), 0});
 
   auto textPath11 = std::make_shared<TextPath>();
   textPath11->setPath(curvePath);
