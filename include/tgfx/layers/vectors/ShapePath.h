@@ -29,7 +29,10 @@ namespace tgfx {
  */
 class ShapePath : public VectorElement {
  public:
-  ShapePath() = default;
+  /**
+   * Creates a new ShapePath instance.
+   */
+  static std::shared_ptr<ShapePath> Make();
 
   /**
    * Returns the path that defines the shape.
@@ -61,6 +64,9 @@ class ShapePath : public VectorElement {
   }
 
   void apply(VectorContext* context) override;
+
+ protected:
+  ShapePath() = default;
 
  private:
   Path _path = {};

@@ -91,6 +91,26 @@ int NextLog2(uint32_t value) {
   return 32 - CLZ(value - 1);
 }
 
+float HalfToFloat(uint16_t value) {
+  uint32_t sign = static_cast<uint32_t>(value & 0x8000) << 16;
+  auto exponent = static_cast<uint32_t>((value >> 10) & 0x1F);
+  auto mantissa = static_cast<uint32_t>(value & 0x3FF);
+  uint32_t f = 0;
+  if (exponent == 0) {
+    // Zero or denormalized number, flush to zero
+    f = sign;
+  } else if (exponent == 31) {
+    // Infinity or NaN
+    f = sign | 0x7F800000u | (mantissa << 13);
+  } else {
+    // Normalized number: convert exponent bias from 15 to 127
+    f = sign | ((exponent + 112) << 23) | (mantissa << 13);
+  }
+  float result = 0.0f;
+  memcpy(&result, &f, sizeof(float));
+  return result;
+}
+
 int NextPow2(int value) {
   DEBUG_ASSERT(value > 0);
   return 1 << NextLog2(static_cast<uint32_t>(value));

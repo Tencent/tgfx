@@ -32,7 +32,10 @@ namespace tgfx {
  */
 class VectorGroup : public VectorElement {
  public:
-  VectorGroup() = default;
+  /**
+   * Creates a new VectorGroup instance.
+   */
+  static std::shared_ptr<VectorGroup> Make();
 
   /**
    * Returns the list of child vector elements in this group.
@@ -51,14 +54,14 @@ class VectorGroup : public VectorElement {
   /**
    * Returns the anchor point for transformations, in local coordinates.
    */
-  const Point& anchorPoint() const {
-    return _anchorPoint;
+  const Point& anchor() const {
+    return _anchor;
   }
 
   /**
    * Sets the anchor point for transformations.
    */
-  void setAnchorPoint(const Point& value);
+  void setAnchor(const Point& value);
 
   /**
    * Returns the position of this group relative to its parent.
@@ -149,9 +152,12 @@ class VectorGroup : public VectorElement {
 
   void apply(VectorContext* context) override;
 
+ protected:
+  VectorGroup() = default;
+
  private:
   std::vector<std::shared_ptr<VectorElement>> _elements = {};
-  Point _anchorPoint = Point::Zero();
+  Point _anchor = Point::Zero();
   Point _position = Point::Zero();
   Point _scale = {1.0f, 1.0f};
   float _rotation = 0.0f;

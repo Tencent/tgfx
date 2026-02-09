@@ -93,8 +93,11 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
    * Adds a glyph to the typeface using a vector path. Returns the GlyphID of the new glyph, which
    * is a unique identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be
    * added because the typeface builder is full.
+   * @param path The vector path that defines the glyph's outline.
+   * @param advance The horizontal advance width of the glyph in design space coordinates. This
+   * value determines the spacing between this glyph and the next when rendering text.
    */
-  GlyphID addGlyph(const Path& path);
+  GlyphID addGlyph(const Path& path, float advance);
 
   /**
    * Adds a glyph to the typeface using a PathProvider. The PathProvider is expected to provide the
@@ -102,8 +105,10 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
    * and immutable after creation. Returns the GlyphID of the new glyph, which is a unique
    * identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be added because
    * the typeface builder is full.
+   * @param provider The PathProvider that supplies the glyph's path.
+   * @param advance The horizontal advance width of the glyph in design space coordinates.
    */
-  GlyphID addGlyph(std::shared_ptr<PathProvider> provider);
+  GlyphID addGlyph(std::shared_ptr<PathProvider> provider, float advance);
 
   /**
    * Detaches the typeface being built. After this call, the builder remains valid and can be used
@@ -115,7 +120,14 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
   std::shared_ptr<Typeface> detach() const override;
 
  private:
-  std::vector<std::shared_ptr<PathProvider>> glyphRecords = {};
+  friend class PathUserTypeface;
+
+  struct PathGlyphRecord {
+    std::shared_ptr<PathProvider> pathProvider = nullptr;
+    float advance = 0.0f;
+  };
+
+  std::vector<PathGlyphRecord> glyphRecords = {};
 };
 
 /**
@@ -140,22 +152,23 @@ class ImageTypefaceBuilder : public CustomTypefaceBuilder {
    * and immutable after creation. Returns the GlyphID of the new glyph, which is a unique
    * identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be added because
    * the typeface builder is full.
+   * @param image The ImageCodec that supplies the glyph's image.
+   * @param offset The offset from the glyph origin to the top-left corner of the image.
+   * @param advance The horizontal advance width of the glyph in design space coordinates.
    */
-  GlyphID addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset);
+  GlyphID addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset, float advance);
 
   std::shared_ptr<Typeface> detach() const override;
 
  private:
   friend class ImageUserTypeface;
 
-  struct GlyphRecord {
+  struct ImageGlyphRecord {
     std::shared_ptr<ImageCodec> image = nullptr;
     Point offset = {};
-    GlyphRecord(std::shared_ptr<ImageCodec> image, const Point& offset)
-        : image(std::move(image)), offset(offset) {
-    }
+    float advance = 0.0f;
   };
 
-  std::vector<std::shared_ptr<GlyphRecord>> glyphRecords = {};
+  std::vector<std::shared_ptr<ImageGlyphRecord>> glyphRecords = {};
 };
 }  // namespace tgfx

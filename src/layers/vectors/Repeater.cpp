@@ -24,6 +24,10 @@
 
 namespace tgfx {
 
+std::shared_ptr<Repeater> Repeater::Make() {
+  return std::shared_ptr<Repeater>(new Repeater());
+}
+
 void Repeater::setCopies(float value) {
   if (_copies == value) {
     return;
@@ -48,11 +52,11 @@ void Repeater::setOrder(RepeaterOrder value) {
   invalidateContent();
 }
 
-void Repeater::setAnchorPoint(const Point& value) {
-  if (_anchorPoint == value) {
+void Repeater::setAnchor(const Point& value) {
+  if (_anchor == value) {
     return;
   }
-  _anchorPoint = value;
+  _anchor = value;
   invalidateContent();
 }
 
@@ -98,11 +102,11 @@ void Repeater::setEndAlpha(float value) {
 
 Matrix Repeater::getMatrix(float progress) const {
   auto matrix = Matrix::I();
-  matrix.postTranslate(-_anchorPoint.x, -_anchorPoint.y);
+  matrix.postTranslate(-_anchor.x, -_anchor.y);
   matrix.postScale(powf(_scale.x, progress), powf(_scale.y, progress));
   matrix.postRotate(_rotation * progress);
   matrix.postTranslate(_position.x * progress, _position.y * progress);
-  matrix.postTranslate(_anchorPoint.x, _anchorPoint.y);
+  matrix.postTranslate(_anchor.x, _anchor.y);
   return matrix;
 }
 

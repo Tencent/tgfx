@@ -943,4 +943,5 @@ TGFX_TEST(FilterTest, ReverseFilterBounds) {
   canvas->drawPicture(picture, nullptr, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ReverseFilterBounds_dropShadow"));
 }
+
 }  // namespace tgfx

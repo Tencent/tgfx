@@ -403,4 +403,249 @@ TGFX_TEST(StrokeTest, HairlineStrokeText) {
   device->unlock();
 }
 
+TGFX_TEST(StrokeTest, HairlineRectDrawOp) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Test hairline rect rendering with RectDrawOp at different scales and LineJoin types.
+  // This test is created to verify the rendering behavior before fixing hairline issues.
+
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+
+  // Row 1: Miter join (default)
+  Stroke miterStroke(0.0f);
+  miterStroke.join = LineJoin::Miter;
+  paint.setStroke(miterStroke);
+
+  canvas->save();
+  canvas->translate(60, 60);
+  canvas->drawRect(Rect::MakeXYWH(-40, -40, 80, 80), paint);
+  canvas->translate(120, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawRect(Rect::MakeXYWH(-20, -20, 40, 40), paint);
+  canvas->translate(60, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawRect(Rect::MakeXYWH(-10, -10, 20, 20), paint);
+  canvas->restore();
+
+  // Row 2: Bevel join
+  paint.setColor(Color::Green());
+  Stroke bevelStroke(0.0f);
+  bevelStroke.join = LineJoin::Bevel;
+  paint.setStroke(bevelStroke);
+
+  canvas->save();
+  canvas->translate(60, 180);
+  canvas->drawRect(Rect::MakeXYWH(-40, -40, 80, 80), paint);
+  canvas->translate(120, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawRect(Rect::MakeXYWH(-20, -20, 40, 40), paint);
+  canvas->translate(60, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawRect(Rect::MakeXYWH(-10, -10, 20, 20), paint);
+  canvas->restore();
+
+  // Row 3: Round join
+  paint.setColor(Color::Blue());
+  Stroke roundStroke(0.0f);
+  roundStroke.join = LineJoin::Round;
+  paint.setStroke(roundStroke);
+
+  canvas->save();
+  canvas->translate(60, 300);
+  canvas->drawRect(Rect::MakeXYWH(-40, -40, 80, 80), paint);
+  canvas->translate(120, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawRect(Rect::MakeXYWH(-20, -20, 40, 40), paint);
+  canvas->translate(60, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawRect(Rect::MakeXYWH(-10, -10, 20, 20), paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineRectDrawOp"));
+}
+
+TGFX_TEST(StrokeTest, HairlineRectDrawOpWithAA) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Test hairline rect rendering with antialiasing enabled.
+
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setAntiAlias(true);
+
+  Stroke hairlineStroke(0.0f);
+  paint.setStroke(hairlineStroke);
+
+  // Draw multiple hairline rects at different positions and scales
+  canvas->save();
+  canvas->translate(60, 60);
+  canvas->drawRect(Rect::MakeXYWH(-40, -40, 80, 80), paint);
+
+  canvas->translate(120, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawRect(Rect::MakeXYWH(-20, -20, 40, 40), paint);
+
+  canvas->translate(60, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawRect(Rect::MakeXYWH(-10, -10, 20, 20), paint);
+  canvas->restore();
+
+  // Draw with rotation to test non-axis-aligned hairline
+  paint.setColor(Color::Blue());
+  canvas->save();
+  canvas->translate(60, 140);
+  canvas->rotate(15.0f);
+  canvas->drawRect(Rect::MakeXYWH(-30, -30, 60, 60), paint);
+  canvas->restore();
+
+  canvas->save();
+  canvas->translate(180, 140);
+  canvas->rotate(30.0f);
+  canvas->drawRect(Rect::MakeXYWH(-30, -30, 60, 60), paint);
+  canvas->restore();
+
+  canvas->save();
+  canvas->translate(300, 140);
+  canvas->rotate(45.0f);
+  canvas->drawRect(Rect::MakeXYWH(-30, -30, 60, 60), paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineRectDrawOpWithAA"));
+}
+
+TGFX_TEST(StrokeTest, HairlineRRectDrawOp) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Test hairline RRect/Oval/Circle rendering with RRectDrawOp (non-AA mode).
+  // This includes drawRoundRect, drawOval, and drawCircle which all go through RRectDrawOp.
+
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+
+  Stroke hairlineStroke(0.0f);
+  paint.setStroke(hairlineStroke);
+
+  // Row 1: RoundRect at different scales
+  canvas->save();
+  canvas->translate(60, 60);
+  canvas->drawRoundRect(Rect::MakeXYWH(-40, -40, 80, 80), 10, 10, paint);
+  canvas->translate(120, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawRoundRect(Rect::MakeXYWH(-20, -20, 40, 40), 5, 5, paint);
+  canvas->translate(60, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawRoundRect(Rect::MakeXYWH(-10, -10, 20, 20), 2.5f, 2.5f, paint);
+  canvas->restore();
+
+  // Row 2: Oval at different scales
+  paint.setColor(Color::Green());
+  canvas->save();
+  canvas->translate(60, 180);
+  canvas->drawOval(Rect::MakeXYWH(-40, -30, 80, 60), paint);
+  canvas->translate(120, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawOval(Rect::MakeXYWH(-20, -15, 40, 30), paint);
+  canvas->translate(60, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawOval(Rect::MakeXYWH(-10.0f, -7.5f, 20.0f, 15.0f), paint);
+  canvas->restore();
+
+  // Row 3: Circle at different scales
+  paint.setColor(Color::Blue());
+  canvas->save();
+  canvas->translate(60, 300);
+  canvas->drawCircle(0, 0, 40, paint);
+  canvas->translate(120, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawCircle(0, 0, 20, paint);
+  canvas->translate(60, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawCircle(0, 0, 10, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineRRectDrawOp"));
+}
+
+TGFX_TEST(StrokeTest, HairlineRRectDrawOpWithAA) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Test hairline RRect/Oval/Circle rendering with RRectDrawOp (AA mode).
+
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setAntiAlias(true);
+
+  Stroke hairlineStroke(0.0f);
+  paint.setStroke(hairlineStroke);
+
+  // Row 1: RoundRect at different scales
+  canvas->save();
+  canvas->translate(60, 60);
+  canvas->drawRoundRect(Rect::MakeXYWH(-40, -40, 80, 80), 10, 10, paint);
+  canvas->translate(120, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawRoundRect(Rect::MakeXYWH(-20, -20, 40, 40), 5, 5, paint);
+  canvas->translate(60, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawRoundRect(Rect::MakeXYWH(-10, -10, 20, 20), 2.5f, 2.5f, paint);
+  canvas->restore();
+
+  // Row 2: Oval at different scales
+  paint.setColor(Color::Green());
+  canvas->save();
+  canvas->translate(60, 180);
+  canvas->drawOval(Rect::MakeXYWH(-40, -30, 80, 60), paint);
+  canvas->translate(120, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawOval(Rect::MakeXYWH(-20, -15, 40, 30), paint);
+  canvas->translate(60, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawOval(Rect::MakeXYWH(-10.0f, -7.5f, 20.0f, 15.0f), paint);
+  canvas->restore();
+
+  // Row 3: Circle at different scales
+  paint.setColor(Color::Blue());
+  canvas->save();
+  canvas->translate(60, 300);
+  canvas->drawCircle(0, 0, 40, paint);
+  canvas->translate(120, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawCircle(0, 0, 20, paint);
+  canvas->translate(60, 0);
+  canvas->scale(2.0f, 2.0f);
+  canvas->drawCircle(0, 0, 10, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineRRectDrawOpWithAA"));
+}
+
 }  // namespace tgfx

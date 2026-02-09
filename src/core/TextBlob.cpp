@@ -36,34 +36,49 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font
   }
   const char* textStart = text.data();
   const char* textStop = textStart + text.size();
-  size_t glyphCount = 0;
+
+  std::vector<GlyphID> glyphs;
+  std::vector<float> advances;
+  glyphs.reserve(text.size());
+  advances.reserve(text.size());
+  bool hasEmptyGlyph = false;
   const char* ptr = textStart;
-  while (ptr < textStop) {
-    auto unichar = UTF::NextUTF8(&ptr, textStop);
-    if (font.getGlyphID(unichar) > 0) {
-      glyphCount++;
-    }
-  }
-  if (glyphCount == 0) {
-    return nullptr;
-  }
-  TextBlobBuilder builder;
-  const auto& buffer = builder.allocRunPosH(font, glyphCount, 0.0f);
-  auto emptyAdvance = font.getSize() / 2.0f;
-  float xOffset = 0;
-  size_t index = 0;
-  ptr = textStart;
   while (ptr < textStop) {
     auto unichar = UTF::NextUTF8(&ptr, textStop);
     auto glyphID = font.getGlyphID(unichar);
     if (glyphID > 0) {
-      buffer.glyphs[index] = glyphID;
-      buffer.positions[index] = xOffset;
-      xOffset += font.getAdvance(glyphID);
-      index++;
+      glyphs.push_back(glyphID);
+      advances.push_back(font.getAdvance(glyphID));
     } else {
-      xOffset += emptyAdvance;
+      hasEmptyGlyph = true;
+      advances.push_back(font.getSize() / 2.0f);
     }
+  }
+  if (glyphs.empty()) {
+    return nullptr;
+  }
+
+  TextBlobBuilder builder;
+  if (hasEmptyGlyph) {
+    const auto& buffer = builder.allocRunPosH(font, glyphs.size(), 0.0f);
+    memcpy(buffer.glyphs, glyphs.data(), glyphs.size() * sizeof(GlyphID));
+    float xOffset = 0;
+    size_t glyphIndex = 0;
+    size_t advanceIndex = 0;
+    ptr = textStart;
+    while (ptr < textStop) {
+      auto unichar = UTF::NextUTF8(&ptr, textStop);
+      auto glyphID = font.getGlyphID(unichar);
+      if (glyphID > 0) {
+        buffer.positions[glyphIndex] = xOffset;
+        glyphIndex++;
+      }
+      xOffset += advances[advanceIndex];
+      advanceIndex++;
+    }
+  } else {
+    const auto& buffer = builder.allocRun(font, glyphs.size(), 0.0f, 0.0f);
+    memcpy(buffer.glyphs, glyphs.data(), glyphs.size() * sizeof(GlyphID));
   }
   return builder.build();
 }
@@ -144,23 +159,48 @@ const RunRecord* TextBlob::firstRun() const {
 }
 
 TextBlob::Iterator TextBlob::begin() const {
-  return Iterator(firstRun(), runCount);
+  return {firstRun(), runCount};
 }
 
-GlyphRun TextBlob::Iterator::operator*() const {
-  GlyphRun run;
-  run.font = current->font;
-  run.glyphCount = current->glyphCount;
-  run.glyphs = current->glyphBuffer();
-  run.positioning = current->positioning;
-  run.positions = current->posBuffer();
-  run.offsetY = current->y;
-  return run;
+TextBlob::Iterator::Iterator(const RunRecord* record, size_t remaining)
+    : current(record), remaining(remaining) {
+  if (current != nullptr) {
+    updateGlyphRun();
+  }
+}
+
+void TextBlob::Iterator::updateGlyphRun() {
+  glyphRun.font = current->font;
+  glyphRun.glyphCount = current->glyphCount;
+  glyphRun.glyphs = current->glyphBuffer();
+  if (current->positioning == GlyphPositioning::Default) {
+    positionBuffer.resize(current->glyphCount);
+    const GlyphID* glyphs = current->glyphBuffer();
+    float x = current->offset.x;
+    for (uint32_t i = 0; i < current->glyphCount; i++) {
+      positionBuffer[i] = x;
+      x += current->font.getAdvance(glyphs[i]);
+    }
+    glyphRun.positioning = GlyphPositioning::Horizontal;
+    glyphRun.positions = positionBuffer.data();
+    glyphRun.offsetY = current->offset.y;
+  } else {
+    glyphRun.positioning = current->positioning;
+    glyphRun.positions = current->posBuffer();
+    glyphRun.offsetY = current->offset.y;
+  }
+}
+
+const GlyphRun& TextBlob::Iterator::operator*() const {
+  return glyphRun;
 }
 
 TextBlob::Iterator& TextBlob::Iterator::operator++() {
   current = current->next();
   --remaining;
+  if (remaining > 0) {
+    updateGlyphRun();
+  }
   return *this;
 }
 
