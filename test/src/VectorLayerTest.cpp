@@ -2980,7 +2980,10 @@ TGFX_TEST(VectorLayerTest, TextPath) {
       std::round(textBlob11a->getTightBounds().right + spaceWidth) +
       textBlob11b->getTightBounds().width();
   auto pathLength11 = PathMeasure::MakeFrom(curvePath)->getLength();
-  textPath11->setFirstMargin(std::round((pathLength11 - textWidth11) / 2));
+  auto centerOffset11 = std::round((pathLength11 - textWidth11) / 2);
+  textSpan11a->setPosition({centerOffset11 + 40, 5});
+  textSpan11b->setPosition(
+      {centerOffset11 + 40 + std::round(textBlob11a->getTightBounds().right + spaceWidth), 5});
 
   auto fill11 = MakeFillStyle(Color{0.0f, 0.5f, 0.5f, 1.0f});  // Teal
   innerGroup11->setElements({textSpan11a, textSpan11b, textPath11, fill11});
