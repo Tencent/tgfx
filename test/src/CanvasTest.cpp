@@ -1546,11 +1546,13 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
   // Verify RRectDrawOp with non-AA is used by checking the Op type.
   surface->renderContext->flush();
   auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
-  ASSERT_TRUE(drawingBuffer->renderTasks.size() >= 1);
+  EXPECT_EQ(drawingBuffer->renderTasks.size(), 1u);
   auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
-  ASSERT_TRUE(task->drawOps.size() >= 1);
-  // All non-AA filled RRects should be batched into RRectDrawOp.
-  EXPECT_EQ(task->drawOps.back().get()->type(), DrawOp::Type::RRectDrawOp);
+  EXPECT_EQ(task->drawOps.size(), 1u);
+  // All 6 non-AA filled RRects should be batched into a single RRectDrawOp.
+  auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp);
+  EXPECT_EQ(rrectOp->rectCount, 6u);
 
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOp"));

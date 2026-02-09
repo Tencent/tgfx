@@ -338,38 +338,14 @@ class AARRectIndicesProvider : public DataSource<Data> {
   bool stroke = false;
 };
 
-// Index data for non-AA RRect - simple quad indices
-// 4 vertices per rrect, 6 indices per rrect (2 triangles)
-class NonAARRectIndicesProvider : public DataSource<Data> {
- public:
-  explicit NonAARRectIndicesProvider(size_t rectSize) : rectSize(rectSize) {
-  }
-
-  std::shared_ptr<Data> getData() const override {
-    auto indicesPerRRect = RRectDrawOp::IndicesPerNonAARRect;
-    auto bufferSize = rectSize * indicesPerRRect * sizeof(uint16_t);
-    Buffer buffer(bufferSize);
-    auto indices = reinterpret_cast<uint16_t*>(buffer.data());
-    // Quad indices pattern: TL, TR, BR, TL, BR, BL
-    static constexpr uint16_t quadPattern[] = {0, 1, 2, 0, 2, 3};
-    int index = 0;
-    for (size_t i = 0; i < rectSize; ++i) {
-      auto offset = static_cast<uint16_t>(i * RRectDrawOp::VerticesPerNonAARRect);
-      for (size_t j = 0; j < indicesPerRRect; ++j) {
-        indices[index++] = quadPattern[j] + offset;
-      }
-    }
-    return buffer.release();
-  }
-
- private:
-  size_t rectSize = 0;
-};
+static constexpr uint16_t NonAARRectIndexPattern[] = {0, 1, 2, 0, 2, 3};
 
 std::shared_ptr<GPUBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke, AAType aaType) {
   if (aaType == AAType::None) {
     if (nonAARRectIndexBuffer == nullptr) {
-      auto provider = std::make_unique<NonAARRectIndicesProvider>(RRectDrawOp::MaxNumRRects);
+      auto provider = std::make_unique<RectIndicesProvider>(
+          NonAARRectIndexPattern, RRectDrawOp::IndicesPerNonAARRect, RRectDrawOp::MaxNumRRects,
+          RRectDrawOp::VerticesPerNonAARRect);
       nonAARRectIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
     }
     return nonAARRectIndexBuffer;
