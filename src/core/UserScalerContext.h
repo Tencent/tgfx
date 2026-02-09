@@ -29,6 +29,8 @@ class UserScalerContext : public ScalerContext {
         textScale(size / static_cast<float>(userTypeface()->unitsPerEm())) {
   }
 
+  // Custom typefaces don't provide per-glyph advance or vertical offset data. Callers are expected
+  // to position glyphs manually (e.g., via TextBlobBuilder::allocRunPos). No caching needed here.
   float getAdvance(GlyphID, bool) const override {
     return 0.0f;
   }

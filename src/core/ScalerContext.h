@@ -32,6 +32,8 @@ class ScalerContext {
  public:
   static std::shared_ptr<ScalerContext> MakeEmpty(float size);
 
+  ScalerContext(const ScalerContext&) = delete;
+  ScalerContext& operator=(const ScalerContext&) = delete;
   virtual ~ScalerContext() = default;
 
   std::shared_ptr<Typeface> getTypeface() const {

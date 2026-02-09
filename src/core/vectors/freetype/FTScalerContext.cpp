@@ -672,6 +672,7 @@ Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxI
 }
 
 float FTScalerContext::getAdvance(GlyphID glyphID, bool verticalText) const {
+  // GlyphID is uint16_t, so the high bit is free to encode verticalText.
   auto cacheKey = static_cast<uint32_t>(glyphID) | (verticalText ? 0x80000000u : 0u);
   {
     std::lock_guard<std::mutex> cacheLock(advanceCacheLocker);
@@ -706,13 +707,11 @@ float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) co
 }
 
 Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
-  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
-  if (glyphID == 0 || setupSize(false)) {
+  if (glyphID == 0) {
     return {};
   }
-  FontMetrics metrics = {};
-  getFontMetricsInternal(&metrics);
-  auto advanceX = getAdvanceInternal(glyphID);
+  auto metrics = getFontMetrics();
+  auto advanceX = getAdvance(glyphID, false);
   return {-advanceX * 0.5f, metrics.capHeight};
 }
 

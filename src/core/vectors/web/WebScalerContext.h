@@ -25,8 +25,6 @@ class WebScalerContext : public ScalerContext {
  public:
   WebScalerContext(std::shared_ptr<Typeface> typeface, float size, emscripten::val scalerContext);
 
-  FontMetrics getFontMetrics() const override;
-
   Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override;
 
   float getAdvance(GlyphID glyphID, bool verticalText) const override;
