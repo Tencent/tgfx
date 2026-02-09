@@ -2810,7 +2810,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   // Center text on path using firstMargin
   auto textWidth2 = textBlob2->getTightBounds().width();
   auto pathLength2 = PathMeasure::MakeFrom(curvePath)->getLength();
-  textPath2->setFirstMargin((pathLength2 - textWidth2) / 2);
+  textPath2->setFirstMargin(std::round((pathLength2 - textWidth2) / 2));
 
   auto fill2 = MakeFillStyle(Color::Red());
   group2->setElements({textSpan2, textPath2, fill2});
@@ -2969,7 +2969,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
 
   auto textSpan11b = Text::Make(TextBlob::MakeFrom("Spans", font));
   // Position Spans after Multi using tight bounds
-  textSpan11b->setPosition({textBlob11a->getTightBounds().right, 0});
+  textSpan11b->setPosition({std::round(textBlob11a->getTightBounds().right), 0});
 
   auto textPath11 = std::make_shared<TextPath>();
   textPath11->setPath(curvePath);
@@ -3013,9 +3013,9 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textSpan13a = Text::Make(textBlob13a);
   auto textBlob13b = TextBlob::MakeFrom("Text Lines", font);
   auto textSpan13b = Text::Make(textBlob13b);
-  float lineSpacing13 = 24 * 1.2f;
+  float lineSpacing13 = 29;
   auto centerOffset13 =
-      (textBlob13b->getTightBounds().width() - textBlob13a->getTightBounds().width()) / 2;
+      std::round((textBlob13b->getTightBounds().width() - textBlob13a->getTightBounds().width()) / 2);
   textSpan13a->setPosition({centerOffset13, 0});
   textSpan13b->setPosition({0, lineSpacing13});
 
@@ -3028,7 +3028,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textWidth13 =
       std::max(textBlob13a->getTightBounds().width(), textBlob13b->getTightBounds().width());
   auto pathLength13 = PathMeasure::MakeFrom(curvePath)->getLength();
-  textPath13->setFirstMargin((pathLength13 - textWidth13) / 2);
+  textPath13->setFirstMargin(std::round((pathLength13 - textWidth13) / 2));
 
   auto fill13 = MakeFillStyle(Color::Green());
   group13->setElements({innerGroup13, textPath13, fill13});
@@ -3040,8 +3040,6 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   std::string verticalText = "Vertical 文本";
   std::vector<std::shared_ptr<Text>> textSpans14 = {};
   float currentY = 0.0f;
-  // capHeight = 17.59
-  float capHeight = 17.59f;
   bool prevRotated = false;
 
   const char* textPtr = verticalText.c_str();
@@ -3054,7 +3052,6 @@ TGFX_TEST(VectorLayerTest, TextPath) {
     auto glyphID = font.getGlyphID(unichar);
     bool isCJK = unichar >= 0x4E00 && unichar <= 0x9FFF;
     if (isCJK) {
-      // boundsTop = -21, hAdv = 24, vAdv = 24, posX = capHeight/2 - 24/2 = -3.20
       if (prevRotated) {
         currentY += 21;
       }
@@ -3063,8 +3060,8 @@ TGFX_TEST(VectorLayerTest, TextPath) {
       buffer.glyphs[0] = glyphID;
       auto textBlob = builder.build();
       if (textBlob != nullptr) {
-        auto span = Text::Make(textBlob, {{0, -capHeight * 0.5f}});
-        span->setPosition({-3.20f, currentY});
+        auto span = Text::Make(textBlob, {{0, -9}});
+        span->setPosition({-3, currentY});
         textSpans14.push_back(span);
       }
       currentY += 24;
@@ -3078,7 +3075,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
       xform[0] = RSXform::Make(0, 1, 0, 0);
       auto textBlob = builder.build();
       if (textBlob != nullptr) {
-        auto span = Text::Make(textBlob, {{0, -capHeight * 0.5f}});
+        auto span = Text::Make(textBlob, {{0, -9}});
         span->setPosition({0, currentY});
         textSpans14.push_back(span);
       }
@@ -3098,7 +3095,7 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   textPath14->setPath(curvePath);
   textPath14->setPerpendicular(true);
   textPath14->setBaselineAngle(90.0f);
-  textPath14->setBaselineOrigin({capHeight * 0.5f, 0});
+  textPath14->setBaselineOrigin({9, 0});
 
   auto fill14 = MakeFillStyle(Color{0.5f, 0.0f, 0.5f, 1.0f});  // Purple
   group14->setElements({innerGroup14, textPath14, fill14});
@@ -4193,8 +4190,6 @@ TGFX_TEST(VectorLayerTest, TextAnchors) {
   // This tests that different initial positions with matching anchor offsets produce the same result
   auto group4 = std::make_shared<VectorGroup>();
   group4->setPosition({220, 200});
-  auto textSpan4 = Text::Make(textBlob);
-  textSpan4->setPosition({0, 14});  // Move text down 14px to align baseline with anchor
   std::vector<Point> pathAnchorOffsets(glyphCount, {0, -14});  // Anchor is 14px above glyph origin
   auto textSpan4WithAnchor = Text::Make(textBlob, pathAnchorOffsets);
   textSpan4WithAnchor->setPosition({0, 14});
