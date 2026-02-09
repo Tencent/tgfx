@@ -32,14 +32,14 @@ PlacementPtr<MeshDrawOp> MeshDrawOp::Make(std::shared_ptr<GPUMeshProxy> meshProx
 
 MeshDrawOp::MeshDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUMeshProxy> meshProxy,
                        PMColor color, const Matrix& viewMatrix)
-    : DrawOp(allocator, AAType::None), meshProxy(std::move(meshProxy)), color(color),
-      viewMatrix(viewMatrix) {
+    : DrawOp(allocator, meshProxy->attributes().hasCoverage ? AAType::Coverage : AAType::None),
+      meshProxy(std::move(meshProxy)), color(color), viewMatrix(viewMatrix) {
 }
 
 PlacementPtr<GeometryProcessor> MeshDrawOp::onMakeGeometryProcessor(RenderTarget*) {
-  const auto& impl = meshProxy->impl();
-  return MeshGeometryProcessor::Make(allocator, impl.hasTexCoords(), impl.hasColors(), color,
-                                     viewMatrix);
+  const auto& attrs = meshProxy->attributes();
+  return MeshGeometryProcessor::Make(allocator, attrs.hasTexCoords, attrs.hasColors,
+                                     attrs.hasCoverage, color, viewMatrix);
 }
 
 void MeshDrawOp::onDraw(RenderPass* renderPass) {
@@ -50,20 +50,25 @@ void MeshDrawOp::onDraw(RenderPass* renderPass) {
 
   renderPass->setVertexBuffer(0, vertexBuffer);
 
-  const auto& impl = meshProxy->impl();
-  auto primitiveType = (impl.topology() == MeshTopology::Triangles) ? PrimitiveType::Triangles
-                                                                    : PrimitiveType::TriangleStrip;
+  const auto& attrs = meshProxy->attributes();
+  auto primitiveType = (attrs.topology == MeshTopology::Triangles) ? PrimitiveType::Triangles
+                                                                   : PrimitiveType::TriangleStrip;
 
-  if (impl.hasIndices()) {
+  if (attrs.hasIndices) {
     auto indexBuffer = meshProxy->getIndexBuffer();
     if (indexBuffer == nullptr) {
       return;
     }
     renderPass->setIndexBuffer(indexBuffer, IndexFormat::UInt16);
-    renderPass->drawIndexed(primitiveType, static_cast<uint32_t>(impl.indexCount()));
+    renderPass->drawIndexed(primitiveType, static_cast<uint32_t>(attrs.indexCount));
   } else {
-    renderPass->draw(primitiveType, static_cast<uint32_t>(impl.vertexCount()));
+    auto vertexCount = meshProxy->getVertexCount();
+    renderPass->draw(primitiveType, static_cast<uint32_t>(vertexCount));
   }
+}
+
+bool MeshDrawOp::hasCoverage() const {
+  return meshProxy->attributes().hasCoverage;
 }
 
 }  // namespace tgfx

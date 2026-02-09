@@ -28,12 +28,30 @@ namespace tgfx {
 class Context;
 
 /**
+ * Attributes for drawing a mesh on GPU.
+ */
+struct GPUMeshDrawAttributes {
+  MeshTopology topology = MeshTopology::Triangles;
+  bool hasTexCoords = false;
+  bool hasColors = false;
+  bool hasCoverage = false;
+  bool hasIndices = false;
+  int vertexCount = 0;  // For VertexMesh: fixed; For ShapeMesh: 0 (computed from buffer size)
+  int indexCount = 0;
+
+  /**
+   * Creates draw attributes from a MeshImpl.
+   */
+  static GPUMeshDrawAttributes Make(const MeshImpl& impl);
+};
+
+/**
  * Proxy for GPU mesh buffer resources.
  * Vertex and index data are stored in separate buffers.
  */
 class GPUMeshProxy {
  public:
-  explicit GPUMeshProxy(Context* context, std::shared_ptr<Mesh> mesh);
+  GPUMeshProxy(Context* context, std::shared_ptr<Mesh> mesh, const GPUMeshDrawAttributes& attrs);
 
   Context* getContext() const {
     return _context;
@@ -43,11 +61,11 @@ class GPUMeshProxy {
     return _mesh;
   }
 
-  const MeshImpl& impl() const {
-    return MeshImpl::ReadAccess(*_mesh);
-  }
-
   Rect bounds() const;
+
+  const GPUMeshDrawAttributes& attributes() const {
+    return _attributes;
+  }
 
   void setVertexBufferProxy(std::shared_ptr<GPUBufferProxy> proxy) {
     vertexBufferProxy = std::move(proxy);
@@ -61,9 +79,17 @@ class GPUMeshProxy {
 
   std::shared_ptr<GPUBuffer> getIndexBuffer() const;
 
+  /**
+   * Returns the actual vertex count for drawing.
+   * For VertexMesh, returns the stored vertexCount.
+   * For ShapeMesh, computes from vertex buffer size.
+   */
+  int getVertexCount() const;
+
  private:
   Context* _context = nullptr;
   std::shared_ptr<Mesh> _mesh = nullptr;
+  GPUMeshDrawAttributes _attributes = {};
   std::shared_ptr<GPUBufferProxy> vertexBufferProxy = nullptr;
   std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
 };

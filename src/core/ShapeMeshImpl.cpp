@@ -16,30 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "layers/contents/DrawContent.h"
-#include "tgfx/core/Mesh.h"
+#include "ShapeMeshImpl.h"
+#include "core/utils/UniqueID.h"
 
 namespace tgfx {
 
-class MeshContent : public DrawContent {
- public:
-  MeshContent(std::shared_ptr<Mesh> mesh, const LayerPaint& paint);
-
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
-
-  std::shared_ptr<Mesh> mesh = nullptr;
-
- protected:
-  Type type() const override {
-    return Type::Mesh;
+std::shared_ptr<Mesh> ShapeMeshImpl::Make(std::shared_ptr<Shape> shape, bool antiAlias) {
+  if (shape == nullptr) {
+    return nullptr;
   }
+  auto impl = new ShapeMeshImpl(std::move(shape), antiAlias);
+  return std::shared_ptr<Mesh>(new Mesh(impl), [](Mesh* mesh) {
+    delete mesh->impl;
+    delete mesh;
+  });
+}
 
-  Rect onGetBounds() const override;
-  void onDraw(Canvas* canvas, const Paint& paint) const override;
-  bool onHasSameGeometry(const GeometryContent* other) const override;
-};
+ShapeMeshImpl::ShapeMeshImpl(std::shared_ptr<Shape> shape, bool antiAlias)
+    : _shape(std::move(shape)), _uniqueID(UniqueID::Next()), antiAlias(antiAlias) {
+  _bounds = _shape->getBounds();
+}
+
+UniqueKey ShapeMeshImpl::getUniqueKey() const {
+  static const auto ShapeMeshDomain = UniqueKey::Make();
+  return UniqueKey::Append(ShapeMeshDomain, &_uniqueID, 1);
+}
 
 }  // namespace tgfx

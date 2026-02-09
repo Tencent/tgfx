@@ -19,8 +19,8 @@
 #pragma once
 
 #include <memory>
-#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Shape.h"

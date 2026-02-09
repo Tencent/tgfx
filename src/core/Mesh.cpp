@@ -17,20 +17,33 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Mesh.h"
-#include "MeshImpl.h"
+#include "ShapeMeshImpl.h"
+#include "VertexMeshImpl.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 
 std::shared_ptr<Mesh> Mesh::MakeCopy(MeshTopology topology, int vertexCount, const Point* positions,
                                      const Color* colors, const Point* texCoords, int indexCount,
                                      const uint16_t* indices) {
-  return MeshImpl::Make(topology, vertexCount, positions, colors, texCoords, indexCount, indices);
+  return VertexMeshImpl::Make(topology, vertexCount, positions, colors, texCoords, indexCount,
+                              indices);
+}
+
+std::shared_ptr<Mesh> Mesh::MakeFromPath(Path path, bool antiAlias) {
+  if (path.isEmpty()) {
+    return nullptr;
+  }
+  auto shape = Shape::MakeFrom(std::move(path));
+  return MakeFromShape(std::move(shape), antiAlias);
+}
+
+std::shared_ptr<Mesh> Mesh::MakeFromShape(std::shared_ptr<Shape> shape, bool antiAlias) {
+  return ShapeMeshImpl::Make(std::move(shape), antiAlias);
 }
 
 Mesh::Mesh(MeshImpl* impl) : impl(impl) {
 }
-
-Mesh::~Mesh() = default;
 
 uint32_t Mesh::uniqueID() const {
   return impl->uniqueID();

@@ -18,7 +18,9 @@
 
 #include "ProxyProvider.h"
 #include "core/MeshImpl.h"
+#include "core/ShapeMeshImpl.h"
 #include "core/ShapeRasterizer.h"
+#include "core/ShapeVertexSource.h"
 #include "core/utils/HardwareBufferUtil.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/USE.h"
@@ -228,10 +230,14 @@ std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(std::shared_ptr<
     return nullptr;
   }
 
-  auto meshProxy = std::make_shared<GPUMeshProxy>(context, std::move(mesh));
-  const auto& impl = meshProxy->impl();
-  auto baseKey = meshProxy->impl().getUniqueKey();
-  bool disableCache = (renderFlags & RenderFlags::DisableCache) != 0;
+  auto& impl = MeshImpl::ReadAccess(*mesh);
+  auto baseKey = impl.getUniqueKey();
+  const bool disableCache = (renderFlags & RenderFlags::DisableCache) != 0;
+  const bool disableAsync = (renderFlags & RenderFlags::DisableAsyncTask) != 0;
+  const bool isVertexMesh = impl.type() == MeshImpl::Type::Vertex;
+
+  auto drawAttrs = GPUMeshDrawAttributes::Make(impl);
+  auto meshProxy = std::make_shared<GPUMeshProxy>(context, std::move(mesh), drawAttrs);
 
   // Create vertex buffer proxy
   static const auto VertexBufferType = UniqueID::Next();
@@ -246,14 +252,35 @@ std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(std::shared_ptr<
       vertexBufferProxy->uniqueKey = vertexKey;
     }
 
-    auto task =
-        context->drawingAllocator()->make<MeshVertexBufferUploadTask>(vertexBufferProxy, meshProxy);
-    context->drawingManager()->addResourceTask(std::move(task));
+    if (isVertexMesh) {
+      // VertexMesh: upload user-provided vertex data
+      auto task = context->drawingAllocator()->make<VertexMeshBufferUploadTask>(vertexBufferProxy,
+                                                                                meshProxy);
+      context->drawingManager()->addResourceTask(std::move(task));
+    } else {
+      // ShapeMesh: triangulate shape and upload
+      auto& shapeMeshImpl = static_cast<ShapeMeshImpl&>(impl);
+      auto vertexSource =
+          std::make_unique<ShapeVertexSource>(shapeMeshImpl.shape(), shapeMeshImpl.isAntiAlias());
+      std::unique_ptr<DataSource<Data>> dataSource = nullptr;
+#ifdef TGFX_USE_THREADS
+      if (!disableAsync) {
+        dataSource = DataSource<Data>::Async(std::move(vertexSource));
+      } else {
+        dataSource = std::move(vertexSource);
+      }
+#else
+      dataSource = std::move(vertexSource);
+#endif
+      auto task = context->drawingAllocator()->make<ShapeMeshBufferUploadTask>(
+          vertexBufferProxy, std::move(dataSource), meshProxy);
+      context->drawingManager()->addResourceTask(std::move(task));
+    }
   }
   meshProxy->setVertexBufferProxy(std::move(vertexBufferProxy));
 
-  // Create index buffer proxy (if needed)
-  if (impl.hasIndices()) {
+  // Create index buffer proxy (only for VertexMesh with indices)
+  if (drawAttrs.hasIndices) {
     static const auto IndexBufferType = UniqueID::Next();
     auto indexKey = UniqueKey::Append(baseKey, &IndexBufferType, 1);
 

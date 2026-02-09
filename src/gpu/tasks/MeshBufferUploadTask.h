@@ -19,16 +19,20 @@
 #pragma once
 
 #include "ResourceTask.h"
+#include "core/DataSource.h"
 #include "gpu/proxies/GPUMeshProxy.h"
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
 
+class VertexMeshImpl;
+
 /**
- * Uploads mesh vertex data to GPU with interleaved layout (position + texCoord + color).
+ * Uploads VertexMesh vertex data to GPU with interleaved layout (position + texCoord + color).
  */
-class MeshVertexBufferUploadTask : public ResourceTask {
+class VertexMeshBufferUploadTask : public ResourceTask {
  public:
-  MeshVertexBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
+  VertexMeshBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
                              std::shared_ptr<GPUMeshProxy> meshProxy);
 
  protected:
@@ -38,6 +42,9 @@ class MeshVertexBufferUploadTask : public ResourceTask {
   std::shared_ptr<GPUMeshProxy> meshProxy = nullptr;
 };
 
+/**
+ * Uploads VertexMesh index data to GPU.
+ */
 class MeshIndexBufferUploadTask : public ResourceTask {
  public:
   MeshIndexBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
@@ -47,6 +54,24 @@ class MeshIndexBufferUploadTask : public ResourceTask {
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
+  std::shared_ptr<GPUMeshProxy> meshProxy = nullptr;
+};
+
+/**
+ * Uploads ShapeMesh triangulated vertex data to GPU.
+ * Receives triangulation data from DataSource (may be computed asynchronously).
+ */
+class ShapeMeshBufferUploadTask : public ResourceTask {
+ public:
+  ShapeMeshBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
+                            std::unique_ptr<DataSource<Data>> dataSource,
+                            std::shared_ptr<GPUMeshProxy> meshProxy);
+
+ protected:
+  std::shared_ptr<Resource> onMakeResource(Context* context) override;
+
+ private:
+  std::unique_ptr<DataSource<Data>> dataSource = nullptr;
   std::shared_ptr<GPUMeshProxy> meshProxy = nullptr;
 };
 

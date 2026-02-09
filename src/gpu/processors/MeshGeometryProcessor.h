@@ -29,7 +29,7 @@ namespace tgfx {
 class MeshGeometryProcessor : public GeometryProcessor {
  public:
   static PlacementPtr<MeshGeometryProcessor> Make(BlockAllocator* allocator, bool hasTexCoords,
-                                                  bool hasColors, PMColor color,
+                                                  bool hasColors, bool hasCoverage, PMColor color,
                                                   const Matrix& viewMatrix);
 
   std::string name() const override {
@@ -39,16 +39,19 @@ class MeshGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  MeshGeometryProcessor(bool hasTexCoords, bool hasColors, PMColor color, const Matrix& viewMatrix);
+  MeshGeometryProcessor(bool hasTexCoords, bool hasColors, bool hasCoverage, PMColor color,
+                        const Matrix& viewMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   Attribute position = {};
   Attribute texCoord = {};
   Attribute color = {};
+  Attribute coverage = {};
 
   bool hasTexCoords = false;
   bool hasColors = false;
+  bool hasCoverage = false;
   PMColor commonColor = {};
   Matrix viewMatrix = {};
 };

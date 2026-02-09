@@ -22,14 +22,16 @@ namespace tgfx {
 
 PlacementPtr<MeshGeometryProcessor> MeshGeometryProcessor::Make(BlockAllocator* allocator,
                                                                 bool hasTexCoords, bool hasColors,
-                                                                PMColor color,
+                                                                bool hasCoverage, PMColor color,
                                                                 const Matrix& viewMatrix) {
-  return allocator->make<GLSLMeshGeometryProcessor>(hasTexCoords, hasColors, color, viewMatrix);
+  return allocator->make<GLSLMeshGeometryProcessor>(hasTexCoords, hasColors, hasCoverage, color,
+                                                    viewMatrix);
 }
 
 GLSLMeshGeometryProcessor::GLSLMeshGeometryProcessor(bool hasTexCoords, bool hasColors,
-                                                     PMColor color, const Matrix& viewMatrix)
-    : MeshGeometryProcessor(hasTexCoords, hasColors, color, viewMatrix) {
+                                                     bool hasCoverage, PMColor color,
+                                                     const Matrix& viewMatrix)
+    : MeshGeometryProcessor(hasTexCoords, hasColors, hasCoverage, color, viewMatrix) {
 }
 
 void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -48,13 +50,15 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
   vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
                            matrixName.c_str(), position.name().c_str());
 
-  // Handle texture coordinates
+  // Handle texture coordinates for FragmentProcessor
   if (hasTexCoords) {
+    // User provided texCoords, pass them through
     auto texCoordVar = varyingHandler->addVarying("TexCoord", SLType::Float2);
     vertBuilder->codeAppendf("%s = %s;", texCoordVar.vsOut().c_str(), texCoord.name().c_str());
-
-    // Emit transforms for FragmentProcessor texture sampling
     emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(texCoord));
+  } else {
+    // No user texCoords, use position with uvMatrix (like DefaultGeometryProcessor)
+    emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
   }
 
   if (hasColors) {
@@ -69,8 +73,16 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   }
 
-  // No coverage for mesh (no anti-aliasing)
-  fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+  // Handle coverage for anti-aliasing
+  if (hasCoverage) {
+    auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
+    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
+    fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
+                             coverageVar.fsIn().c_str());
+  } else {
+    // No coverage for mesh (no anti-aliasing)
+    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+  }
 
   vertBuilder->emitNormalizedPosition(positionName);
 }
@@ -80,10 +92,10 @@ void GLSLMeshGeometryProcessor::setData(UniformData* vertexUniformData,
                                         FPCoordTransformIter* transformIter) const {
   vertexUniformData->setData("Matrix", viewMatrix);
 
-  if (hasTexCoords) {
-    // Use identity matrix since texCoords are in pixel space, CoordTransform handles normalization
-    setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
-  }
+  // For mesh, position is already in local coordinate space (not pre-transformed like shape).
+  // Both hasTexCoords and !hasTexCoords cases use identity since coordinates don't need
+  // additional transformation - they're already suitable for shader sampling.
+  setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
 
   if (!hasColors) {
     fragmentUniformData->setData("Color", commonColor);

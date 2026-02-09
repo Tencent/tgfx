@@ -20,10 +20,10 @@
 
 namespace tgfx {
 
-MeshGeometryProcessor::MeshGeometryProcessor(bool hasTexCoords, bool hasColors, PMColor color,
-                                             const Matrix& viewMatrix)
+MeshGeometryProcessor::MeshGeometryProcessor(bool hasTexCoords, bool hasColors, bool hasCoverage,
+                                             PMColor color, const Matrix& viewMatrix)
     : GeometryProcessor(ClassID()), hasTexCoords(hasTexCoords), hasColors(hasColors),
-      commonColor(color), viewMatrix(viewMatrix) {
+      hasCoverage(hasCoverage), commonColor(color), viewMatrix(viewMatrix) {
   position = {"aPosition", VertexFormat::Float2};
   if (hasTexCoords) {
     texCoord = {"aTexCoord", VertexFormat::Float2};
@@ -31,7 +31,10 @@ MeshGeometryProcessor::MeshGeometryProcessor(bool hasTexCoords, bool hasColors, 
   if (hasColors) {
     this->color = {"aColor", VertexFormat::UByte4Normalized};
   }
-  setVertexAttributes(&position, 3);
+  if (hasCoverage) {
+    coverage = {"aCoverage", VertexFormat::Float};
+  }
+  setVertexAttributes(&position, 4);
 }
 
 void MeshGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
@@ -41,6 +44,9 @@ void MeshGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   }
   if (hasColors) {
     flags |= 2;
+  }
+  if (hasCoverage) {
+    flags |= 4;
   }
   bytesKey->write(flags);
 }

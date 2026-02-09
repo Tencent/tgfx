@@ -17,24 +17,30 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeshBufferUploadTask.h"
+#include "core/ShapeMeshImpl.h"
+#include "core/VertexMeshImpl.h"
 #include "core/utils/ColorHelper.h"
-#include "core/utils/Log.h"
 #include "gpu/resources/BufferResource.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 
-MeshVertexBufferUploadTask::MeshVertexBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
+VertexMeshBufferUploadTask::VertexMeshBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
                                                        std::shared_ptr<GPUMeshProxy> meshProxy)
     : ResourceTask(std::move(proxy)), meshProxy(std::move(meshProxy)) {
 }
 
-std::shared_ptr<Resource> MeshVertexBufferUploadTask::onMakeResource(Context* context) {
-  if (meshProxy == nullptr || meshProxy->mesh() == nullptr) {
+std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* context) {
+  auto& baseImpl = MeshImpl::ReadAccess(*meshProxy->mesh());
+  if (baseImpl.type() != MeshImpl::Type::Vertex) {
+    return nullptr;
+  }
+  auto& impl = static_cast<VertexMeshImpl&>(baseImpl);
+
+  if (impl.positions() == nullptr) {
     return nullptr;
   }
 
-  const auto& impl = MeshImpl::ReadAccess(*meshProxy->mesh());
   size_t vertexDataSize = impl.getVertexStride() * static_cast<size_t>(impl.vertexCount());
 
   // Allocate temporary buffer and write interleaved vertex data
@@ -42,19 +48,18 @@ std::shared_ptr<Resource> MeshVertexBufferUploadTask::onMakeResource(Context* co
   uint8_t* ptr = buffer.get();
   for (auto i = 0; i < impl.vertexCount(); ++i) {
     // Position (float2)
-    memcpy(ptr, &impl.positions()[i], sizeof(Point));
+    *reinterpret_cast<Point*>(ptr) = impl.positions()[i];
     ptr += sizeof(Point);
 
     // TexCoord (float2, optional)
     if (impl.hasTexCoords()) {
-      memcpy(ptr, &impl.texCoords()[i], sizeof(Point));
+      *reinterpret_cast<Point*>(ptr) = impl.texCoords()[i];
       ptr += sizeof(Point);
     }
 
     // Color (UByte4Normalized, optional)
     if (impl.hasColors()) {
-      auto uintColor = ToUintPMColor(impl.colors()[i], nullptr);
-      memcpy(ptr, &uintColor, sizeof(uint32_t));
+      *reinterpret_cast<uint32_t*>(ptr) = ToUintPMColor(impl.colors()[i], nullptr);
       ptr += sizeof(uint32_t);
     }
   }
@@ -62,11 +67,15 @@ std::shared_ptr<Resource> MeshVertexBufferUploadTask::onMakeResource(Context* co
   auto gpu = context->gpu();
   auto gpuBuffer = gpu->createBuffer(vertexDataSize, GPUBufferUsage::VERTEX);
   if (!gpuBuffer) {
-    LOGE("MeshVertexBufferUploadTask::onMakeResource() Failed to create vertex buffer!");
     return nullptr;
   }
 
   gpu->queue()->writeBuffer(gpuBuffer, 0, buffer.get(), vertexDataSize);
+
+  // Release CPU data if no index buffer upload is pending
+  if (!impl.hasIndices()) {
+    impl.releaseVertexData();
+  }
 
   return BufferResource::Wrap(context, std::move(gpuBuffer));
 }
@@ -77,11 +86,11 @@ MeshIndexBufferUploadTask::MeshIndexBufferUploadTask(std::shared_ptr<ResourcePro
 }
 
 std::shared_ptr<Resource> MeshIndexBufferUploadTask::onMakeResource(Context* context) {
-  if (meshProxy == nullptr || meshProxy->mesh() == nullptr) {
+  auto& baseImpl = MeshImpl::ReadAccess(*meshProxy->mesh());
+  if (baseImpl.type() != MeshImpl::Type::Vertex) {
     return nullptr;
   }
-
-  const auto& impl = MeshImpl::ReadAccess(*meshProxy->mesh());
+  auto& impl = static_cast<VertexMeshImpl&>(baseImpl);
 
   if (!impl.hasIndices()) {
     return nullptr;
@@ -96,6 +105,42 @@ std::shared_ptr<Resource> MeshIndexBufferUploadTask::onMakeResource(Context* con
   }
 
   gpu->queue()->writeBuffer(gpuBuffer, 0, impl.indices(), indexDataSize);
+
+  // Release CPU data after index buffer upload completes
+  impl.releaseVertexData();
+
+  return BufferResource::Wrap(context, std::move(gpuBuffer));
+}
+
+ShapeMeshBufferUploadTask::ShapeMeshBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
+                                                     std::unique_ptr<DataSource<Data>> dataSource,
+                                                     std::shared_ptr<GPUMeshProxy> meshProxy)
+    : ResourceTask(std::move(proxy)), dataSource(std::move(dataSource)),
+      meshProxy(std::move(meshProxy)) {
+}
+
+std::shared_ptr<Resource> ShapeMeshBufferUploadTask::onMakeResource(Context* context) {
+  if (dataSource == nullptr) {
+    return nullptr;
+  }
+
+  auto vertexData = dataSource->getData();
+  if (vertexData == nullptr || vertexData->empty()) {
+    return nullptr;
+  }
+
+  auto gpu = context->gpu();
+  auto gpuBuffer = gpu->createBuffer(vertexData->size(), GPUBufferUsage::VERTEX);
+  if (!gpuBuffer) {
+    return nullptr;
+  }
+
+  gpu->queue()->writeBuffer(gpuBuffer, 0, vertexData->data(), vertexData->size());
+
+  // Release data source and shape to free memory
+  dataSource = nullptr;
+  auto& impl = static_cast<ShapeMeshImpl&>(MeshImpl::ReadAccess(*meshProxy->mesh()));
+  impl.releaseShape();
 
   return BufferResource::Wrap(context, std::move(gpuBuffer));
 }

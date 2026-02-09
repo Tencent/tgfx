@@ -24,7 +24,7 @@ namespace tgfx {
 
 class GLSLMeshGeometryProcessor : public MeshGeometryProcessor {
  public:
-  GLSLMeshGeometryProcessor(bool hasTexCoords, bool hasColors, PMColor color,
+  GLSLMeshGeometryProcessor(bool hasTexCoords, bool hasColors, bool hasCoverage, PMColor color,
                             const Matrix& viewMatrix);
 
   void emitCode(EmitArgs& args) const override;

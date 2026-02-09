@@ -16,30 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "layers/contents/DrawContent.h"
-#include "tgfx/core/Mesh.h"
+#include "ShapeVertexSource.h"
+#include "PathTriangulator.h"
 
 namespace tgfx {
 
-class MeshContent : public DrawContent {
- public:
-  MeshContent(std::shared_ptr<Mesh> mesh, const LayerPaint& paint);
+ShapeVertexSource::ShapeVertexSource(std::shared_ptr<Shape> shape, bool antiAlias)
+    : shape(std::move(shape)), antiAlias(antiAlias) {
+}
 
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
-
-  std::shared_ptr<Mesh> mesh = nullptr;
-
- protected:
-  Type type() const override {
-    return Type::Mesh;
+std::shared_ptr<Data> ShapeVertexSource::getData() const {
+  if (shape == nullptr) {
+    return nullptr;
   }
 
-  Rect onGetBounds() const override;
-  void onDraw(Canvas* canvas, const Paint& paint) const override;
-  bool onHasSameGeometry(const GeometryContent* other) const override;
-};
+  auto path = shape->getPath();
+  if (path.isEmpty()) {
+    return nullptr;
+  }
+
+  std::vector<float> vertices;
+  auto bounds = path.getBounds();
+  size_t triangleCount = 0;
+
+  if (antiAlias) {
+    triangleCount = PathTriangulator::ToAATriangles(path, bounds, &vertices);
+  } else {
+    triangleCount = PathTriangulator::ToTriangles(path, bounds, &vertices);
+  }
+
+  if (triangleCount == 0) {
+    return nullptr;
+  }
+
+  return Data::MakeWithCopy(vertices.data(), vertices.size() * sizeof(float));
+}
 
 }  // namespace tgfx

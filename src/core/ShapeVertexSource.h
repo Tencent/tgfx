@@ -18,28 +18,25 @@
 
 #pragma once
 
-#include "layers/contents/DrawContent.h"
-#include "tgfx/core/Mesh.h"
+#include "DataSource.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 
-class MeshContent : public DrawContent {
+/**
+ * ShapeVertexSource converts a Shape into triangulated vertex data for Mesh rendering.
+ * Unlike ShapeRasterizer, it only performs triangulation without fallback to rasterization.
+ */
+class ShapeVertexSource : public DataSource<Data> {
  public:
-  MeshContent(std::shared_ptr<Mesh> mesh, const LayerPaint& paint);
+  ShapeVertexSource(std::shared_ptr<Shape> shape, bool antiAlias);
 
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
+  std::shared_ptr<Data> getData() const override;
 
-  std::shared_ptr<Mesh> mesh = nullptr;
-
- protected:
-  Type type() const override {
-    return Type::Mesh;
-  }
-
-  Rect onGetBounds() const override;
-  void onDraw(Canvas* canvas, const Paint& paint) const override;
-  bool onHasSameGeometry(const GeometryContent* other) const override;
+ private:
+  std::shared_ptr<Shape> shape = nullptr;
+  bool antiAlias = true;
 };
 
 }  // namespace tgfx

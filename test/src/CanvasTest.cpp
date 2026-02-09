@@ -1508,4 +1508,96 @@ TGFX_TEST(CanvasTest, DrawMesh_PaintColorOnly) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_PaintColorOnly"));
 }
 
+TGFX_TEST(CanvasTest, DrawMesh_FromPath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Create a rounded rectangle path
+  Path path = {};
+  path.addRoundRect(Rect::MakeXYWH(50, 50, 200, 150), 20, 20);
+
+  auto mesh = Mesh::MakeFromPath(path);
+  ASSERT_TRUE(mesh != nullptr);
+
+  // Test mesh bounds match path bounds
+  auto meshBounds = mesh->bounds();
+  auto pathBounds = path.getBounds();
+  EXPECT_FLOAT_EQ(meshBounds.left, pathBounds.left);
+  EXPECT_FLOAT_EQ(meshBounds.top, pathBounds.top);
+  EXPECT_FLOAT_EQ(meshBounds.right, pathBounds.right);
+  EXPECT_FLOAT_EQ(meshBounds.bottom, pathBounds.bottom);
+
+  Paint paint = {};
+  paint.setColor(Color::Blue());
+  canvas->drawMesh(mesh, paint);
+
+  // Draw multiple times with transforms to verify GPU resource reuse
+  canvas->save();
+  canvas->translate(0, 100);
+  canvas->scale(0.5f, 0.5f);
+  paint.setColor(Color::Red());
+  canvas->drawMesh(mesh, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_FromPath"));
+}
+
+TGFX_TEST(CanvasTest, DrawMesh_FromShape) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 500, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Create a shape from path with antiAlias enabled
+  Path path = {};
+  path.addOval(Rect::MakeXYWH(0, 0, 100, 100));
+  auto shape = Shape::MakeFrom(path);
+
+  auto mesh = Mesh::MakeFromShape(shape);
+  ASSERT_TRUE(mesh != nullptr);
+
+  // Left: solid color fill (green with alpha)
+  Paint paint = {};
+  paint.setColor(Color::FromRGBA(0, 128, 0, 200));
+  canvas->save();
+  canvas->translate(50, 50);
+  canvas->drawMesh(mesh, paint);
+  canvas->restore();
+
+  // Middle: gradient fill
+  auto gradientShader = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(100, 100),
+                                                   {Color::Red(), Color::Blue()}, {});
+  paint.setColor(Color::White());
+  paint.setShader(gradientShader);
+  canvas->save();
+  canvas->translate(200, 50);
+  canvas->drawMesh(mesh, paint);
+  canvas->restore();
+
+  // Right: texture fill
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  // Scale shader to map image size to mesh bounds
+  auto imageShader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
+  auto meshBounds = mesh->bounds();
+  auto scaleX = static_cast<float>(image->width()) / meshBounds.width();
+  auto scaleY = static_cast<float>(image->height()) / meshBounds.height();
+  imageShader = imageShader->makeWithMatrix(Matrix::MakeScale(scaleX, scaleY));
+  paint.setShader(imageShader);
+  canvas->save();
+  canvas->translate(350, 50);
+  canvas->drawMesh(mesh, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_FromShape"));
+}
+
 }  // namespace tgfx

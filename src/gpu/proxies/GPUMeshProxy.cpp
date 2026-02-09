@@ -17,11 +17,40 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUMeshProxy.h"
+#include "core/PathTriangulator.h"
+#include "core/VertexMeshImpl.h"
 
 namespace tgfx {
 
-GPUMeshProxy::GPUMeshProxy(Context* context, std::shared_ptr<Mesh> mesh)
-    : _context(context), _mesh(std::move(mesh)) {
+GPUMeshDrawAttributes GPUMeshDrawAttributes::Make(const MeshImpl& impl) {
+  GPUMeshDrawAttributes attrs = {};
+  attrs.hasCoverage = impl.hasCoverage();
+
+  if (impl.type() == MeshImpl::Type::Vertex) {
+    auto& vertexImpl = static_cast<const VertexMeshImpl&>(impl);
+    attrs.topology = vertexImpl.topology();
+    attrs.hasTexCoords = vertexImpl.hasTexCoords();
+    attrs.hasColors = vertexImpl.hasColors();
+    attrs.hasIndices = vertexImpl.hasIndices();
+    attrs.vertexCount = vertexImpl.vertexCount();
+    attrs.indexCount = vertexImpl.indexCount();
+  } else {
+    // ShapeMesh: always triangles, no texCoords/colors/indices
+    // vertexCount will be determined after triangulation (computed from buffer size)
+    attrs.topology = MeshTopology::Triangles;
+    attrs.hasTexCoords = false;
+    attrs.hasColors = false;
+    attrs.hasIndices = false;
+    attrs.vertexCount = 0;
+    attrs.indexCount = 0;
+  }
+
+  return attrs;
+}
+
+GPUMeshProxy::GPUMeshProxy(Context* context, std::shared_ptr<Mesh> mesh,
+                           const GPUMeshDrawAttributes& attrs)
+    : _context(context), _mesh(std::move(mesh)), _attributes(attrs) {
 }
 
 Rect GPUMeshProxy::bounds() const {
@@ -45,6 +74,29 @@ std::shared_ptr<GPUBuffer> GPUMeshProxy::getVertexBuffer() const {
 
 std::shared_ptr<GPUBuffer> GPUMeshProxy::getIndexBuffer() const {
   return GetGPUBuffer(indexBufferProxy);
+}
+
+int GPUMeshProxy::getVertexCount() const {
+  // For VertexMesh, use stored vertex count
+  if (_attributes.vertexCount > 0) {
+    return _attributes.vertexCount;
+  }
+
+  // For ShapeMesh, compute from buffer size
+  auto bufferResource = vertexBufferProxy ? vertexBufferProxy->getBuffer() : nullptr;
+  if (bufferResource == nullptr) {
+    return 0;
+  }
+
+  auto bufferSize = bufferResource->size();
+  size_t triangleCount = 0;
+  if (_attributes.hasCoverage) {
+    triangleCount = PathTriangulator::GetAATriangleCount(bufferSize);
+  } else {
+    triangleCount = PathTriangulator::GetTriangleCount(bufferSize);
+  }
+  // Each triangle has 3 vertices
+  return static_cast<int>(triangleCount * 3);
 }
 
 }  // namespace tgfx

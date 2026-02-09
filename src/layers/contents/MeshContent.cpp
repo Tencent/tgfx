@@ -21,15 +21,11 @@
 namespace tgfx {
 
 MeshContent::MeshContent(std::shared_ptr<Mesh> mesh, const LayerPaint& paint)
-    : GeometryContent(paint), mesh(std::move(mesh)) {
+    : DrawContent(paint), mesh(std::move(mesh)) {
 }
 
 Rect MeshContent::onGetBounds() const {
   return mesh->bounds();
-}
-
-Rect MeshContent::getBounds() const {
-  return onGetBounds();
 }
 
 Rect MeshContent::getTightBounds(const Matrix& matrix) const {

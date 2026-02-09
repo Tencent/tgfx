@@ -33,12 +33,14 @@
 #include "layers/contents/RRectsContent.h"
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/TextContent.h"
+#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/LayerRecorder.h"
+#include "tgfx/layers/MeshLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/TextLayer.h"
@@ -3262,6 +3264,59 @@ TGFX_TEST(LayerTest, RootLayerBackgroundColorWithBlurBackground) {
   // Compare with baseline to verify the background color is correctly drawn
   // to both the main canvas and blur background canvas
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RootLayerBackgroundColorWithBlurBackground"));
+}
+
+TGFX_TEST(LayerTest, MeshLayer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Test 1: MeshLayer with vertex colors
+  auto meshLayer1 = MeshLayer::Make();
+  EXPECT_EQ(meshLayer1->type(), LayerType::Mesh);
+  Point positions1[] = {{100, 50}, {50, 150}, {150, 150}};
+  Color colors1[] = {Color::Red(), Color::Green(), Color::Blue()};
+  auto mesh1 = Mesh::MakeCopy(MeshTopology::Triangles, 3, positions1, colors1);
+  meshLayer1->setMesh(mesh1);
+  displayList->root()->addChild(meshLayer1);
+
+  // Test 2: MeshLayer with fill style
+  auto meshLayer2 = MeshLayer::Make();
+  Path path = {};
+  path.addRoundRect(Rect::MakeXYWH(150, 150, 120, 120), 15, 15);
+  auto mesh2 = Mesh::MakeFromPath(path);
+  meshLayer2->setMesh(mesh2);
+  meshLayer2->setFillStyle(ShapeStyle::Make(Color::Blue(), BlendMode::SrcOver));
+  displayList->root()->addChild(meshLayer2);
+
+  // Test bounds
+  auto bounds1 = meshLayer1->getBounds();
+  // Triangle with vertices at (100,50), (50,150), (150,150)
+  // Bounds should be approximately (50, 50, 150, 150)
+  EXPECT_FLOAT_EQ(bounds1.left, 50);
+  EXPECT_FLOAT_EQ(bounds1.top, 50);
+  EXPECT_FLOAT_EQ(bounds1.right, 150);
+  EXPECT_FLOAT_EQ(bounds1.bottom, 150);
+
+  auto bounds2 = meshLayer2->getBounds();
+  EXPECT_FLOAT_EQ(bounds2.left, 150);
+  EXPECT_FLOAT_EQ(bounds2.top, 150);
+  EXPECT_FLOAT_EQ(bounds2.right, 270);
+  EXPECT_FLOAT_EQ(bounds2.bottom, 270);
+
+  // Test fillStyles modification
+  EXPECT_EQ(meshLayer2->fillStyles().size(), 1u);
+  meshLayer2->addFillStyle(ShapeStyle::Make(Color::Red()));
+  EXPECT_EQ(meshLayer2->fillStyles().size(), 2u);
+  meshLayer2->removeFillStyles();
+  EXPECT_EQ(meshLayer2->fillStyles().size(), 0u);
+  meshLayer2->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  EXPECT_EQ(meshLayer2->fillStyles().size(), 1u);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MeshLayer"));
 }
 
 }  // namespace tgfx

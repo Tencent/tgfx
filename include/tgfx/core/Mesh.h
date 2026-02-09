@@ -20,12 +20,14 @@
 
 #include <memory>
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
 
 class MeshImpl;
+class Shape;
 
 /**
  * Defines how vertices are organized into triangles.
@@ -67,7 +69,23 @@ class Mesh {
                                         const Point* texCoords = nullptr, int indexCount = 0,
                                         const uint16_t* indices = nullptr);
 
-  ~Mesh();
+  /**
+   * Creates a Mesh from a Path. The mesh will be triangulated when first drawn.
+   * GPU resources are persistently held until the Mesh is destroyed.
+   * @param path The path to triangulate.
+   * @param antiAlias If true, generates anti-aliased triangles with coverage values.
+   * @return A shared pointer to the created Mesh, or nullptr if the path is empty.
+   */
+  static std::shared_ptr<Mesh> MakeFromPath(Path path, bool antiAlias = true);
+
+  /**
+   * Creates a Mesh from a Shape. The mesh will be triangulated when first drawn.
+   * GPU resources are persistently held until the Mesh is destroyed.
+   * @param shape The shape to triangulate.
+   * @param antiAlias If true, generates anti-aliased triangles with coverage values.
+   * @return A shared pointer to the created Mesh, or nullptr if the shape is nullptr.
+   */
+  static std::shared_ptr<Mesh> MakeFromShape(std::shared_ptr<Shape> shape, bool antiAlias = true);
 
   /**
    * Returns a globally unique identifier for this mesh instance.
@@ -85,6 +103,8 @@ class Mesh {
   MeshImpl* impl = nullptr;
 
   friend class MeshImpl;
+  friend class VertexMeshImpl;
+  friend class ShapeMeshImpl;
 };
 
 }  // namespace tgfx

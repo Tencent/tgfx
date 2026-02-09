@@ -21,6 +21,7 @@
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
+#include "core/VertexMeshImpl.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
@@ -232,10 +233,19 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
 
   auto& meshImpl = MeshImpl::ReadAccess(*mesh);
 
+  // Determine if mesh has colors and texCoords (only VertexMesh can have these)
+  bool hasColors = false;
+  bool hasTexCoords = false;
+  if (meshImpl.type() == MeshImpl::Type::Vertex) {
+    auto& vertexImpl = static_cast<VertexMeshImpl&>(meshImpl);
+    hasColors = vertexImpl.hasColors();
+    hasTexCoords = vertexImpl.hasTexCoords();
+  }
+
   // Use white when shader exists without vertex colors, to prevent paintColor from affecting
   // texture color (some shaders like TiledTextureEffect multiply by inputColor.a internally).
   auto gpColor = ToPMColor(brush.color, dstColorSpace);
-  if (brush.shader && !meshImpl.hasColors()) {
+  if (brush.shader && !hasColors) {
     gpColor = PMColor::White();
   }
 
@@ -254,7 +264,7 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
     if (textureFP == nullptr) {
       return;
     }
-    if (meshImpl.hasColors() && meshImpl.hasTexCoords()) {
+    if (hasColors && hasTexCoords) {
       textureFP = XfermodeFragmentProcessor::MakeFromSrcProcessor(
           drawingAllocator(), std::move(textureFP), BlendMode::Modulate);
     }

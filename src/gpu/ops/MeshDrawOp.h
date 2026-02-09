@@ -28,9 +28,7 @@ class MeshDrawOp : public DrawOp {
   static PlacementPtr<MeshDrawOp> Make(std::shared_ptr<GPUMeshProxy> meshProxy, PMColor color,
                                        const Matrix& viewMatrix);
 
-  bool hasCoverage() const override {
-    return false;
-  }
+  bool hasCoverage() const override;
 
  protected:
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
