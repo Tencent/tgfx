@@ -95,7 +95,7 @@ size_t RRectsVertexProvider::vertexCount() const {
   if (aaType() == AAType::None) {
     // Non-AA mode: 4 vertices per RRect
     // Each vertex has: position (2), localCoord (2), radii (2), rectBounds (4)
-    // Optional: strokeWidth (2) for stroke mode, color (1)
+    // Optional: color (1), strokeWidth (2) for stroke mode
     size_t floatsPerVertex = 10;
     if (bitFields.hasStroke) {
       floatsPerVertex += 2;
@@ -273,13 +273,17 @@ void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
   for (auto& record : rects) {
     auto viewMatrix = record->viewMatrix;
     auto rRect = record->rRect;
-    auto rect = rRect.rect;
     float compressedColor = 0.f;
     if (bitFields.hasColor) {
       uint32_t uintColor = ToUintPMColor(record->color, steps.get());
       compressedColor = *reinterpret_cast<float*>(&uintColor);
     }
 
+    auto scales = viewMatrix.getAxisScales();
+    rRect.scale(scales.x, scales.y);
+    viewMatrix.preScale(1 / scales.x, 1 / scales.y);
+
+    auto rect = rRect.rect;
     auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
 
     float xRadii = rRect.radii.x;
@@ -289,13 +293,14 @@ void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
 
     if (stroke) {
       // For hairline stroke (width == 0), use 1 pixel width in device space.
-      auto scales = viewMatrix.getAxisScales();
       auto strokeWidth = stroke->width > 0.0f ? stroke->width : 1.0f / std::max(scales.x, scales.y);
-      halfStrokeX = 0.5f * strokeWidth;
-      halfStrokeY = 0.5f * strokeWidth;
-      // Expand rect bounds by half stroke width
+      halfStrokeX = 0.5f * scales.x * strokeWidth;
+      halfStrokeY = 0.5f * scales.y * strokeWidth;
+      if (viewMatrix.getScaleX() == 0.f) {
+        std::swap(xRadii, yRadii);
+        std::swap(halfStrokeX, halfStrokeY);
+      }
       rect.outset(halfStrokeX, halfStrokeY);
-      // Outer radii increase by half stroke width
       xRadii += halfStrokeX;
       yRadii += halfStrokeY;
     }
@@ -316,14 +321,12 @@ void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
       float localY = top + ly * (bottom - top);
 
       // Transform to device space
-      float devX = viewMatrix.getScaleX() * localX + viewMatrix.getSkewX() * localY +
-                   viewMatrix.getTranslateX();
-      float devY = viewMatrix.getSkewY() * localX + viewMatrix.getScaleY() * localY +
-                   viewMatrix.getTranslateY();
+      auto point = Point::Make(localX, localY);
+      viewMatrix.mapPoints(&point, 1);
 
       // position (2 floats)
-      vertices[index++] = devX;
-      vertices[index++] = devY;
+      vertices[index++] = point.x;
+      vertices[index++] = point.y;
 
       // localCoord (2 floats) - coordinates within the rect for shape evaluation
       vertices[index++] = localX;
@@ -339,15 +342,15 @@ void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
       vertices[index++] = right;
       vertices[index++] = bottom;
 
+      // Optional color
+      if (bitFields.hasColor) {
+        vertices[index++] = compressedColor;
+      }
+
       // strokeWidth (2 floats) - only for stroke mode
       if (bitFields.hasStroke) {
         vertices[index++] = halfStrokeX;
         vertices[index++] = halfStrokeY;
-      }
-
-      // Optional color
-      if (bitFields.hasColor) {
-        vertices[index++] = compressedColor;
       }
     }
     currentIndex++;

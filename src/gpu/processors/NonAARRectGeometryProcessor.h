@@ -45,13 +45,13 @@ class NonAARRectGeometryProcessor : public GeometryProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  // Vertex attributes
+  // Vertex attributes - declared in the same order as vertex data layout.
   Attribute inPosition;     // position (2 floats)
   Attribute inLocalCoord;   // local coordinates (2 floats)
   Attribute inRadii;        // corner radii (2 floats)
   Attribute inRectBounds;   // rect bounds: left, top, right, bottom (4 floats)
+  Attribute inColor;        // optional color (1 float as UByte4Normalized)
   Attribute inStrokeWidth;  // half stroke width (2 floats, stroke only)
-  Attribute inColor;        // optional color
 
   int width = 1;
   int height = 1;

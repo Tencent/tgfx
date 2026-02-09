@@ -46,10 +46,7 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto color = varyingHandler->addVarying("Color", SLType::Float4);
-    // In fill mode (no stroke), color attribute is stored in inStrokeWidth slot.
-    // In stroke mode, color attribute is stored in inColor slot.
-    auto& colorAttr = stroke ? inColor : inStrokeWidth;
-    vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), colorAttr.name().c_str());
+    vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), inColor.name().c_str());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
   }
 
@@ -97,8 +94,8 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   if (stroke) {
     // Stroke mode: also check inner round rect using branchless SDF
     fragBuilder->codeAppendf("vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
-    fragBuilder->codeAppend("vec2 innerHalfSize = halfSize - sw;");
-    fragBuilder->codeAppend("vec2 innerRadii = max(radii - sw, vec2(0.0));");
+    fragBuilder->codeAppend("vec2 innerHalfSize = halfSize - 2.0 * sw;");
+    fragBuilder->codeAppend("vec2 innerRadii = max(radii - 2.0 * sw, vec2(0.0));");
     fragBuilder->codeAppend("float innerCoverage = 0.0;");
     // Check if inner rect is valid (not degenerate)
     fragBuilder->codeAppend("if (innerHalfSize.x > 0.0 && innerHalfSize.y > 0.0) {");
