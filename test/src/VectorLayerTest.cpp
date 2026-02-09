@@ -4170,36 +4170,31 @@ TGFX_TEST(VectorLayerTest, TextAnchors) {
 
   // ==================== Row 2: TextPath - curved path ====================
   Path curvePath = {};
-  curvePath.moveTo(0, 0);
-  curvePath.quadTo(75, -60, 150, 0);
+  curvePath.moveTo(0, 30);
+  curvePath.quadTo(75, -30, 150, 30);
 
   // Reuse textBlob ("TGFX") for TextPath, shift all characters -14px perpendicular to path
   std::vector<Point> pathAnchorOffsets(glyphCount, {0, -14});
 
-  // Center text on path
-  auto textWidth = textBlob->getTightBounds().width();
-  auto curvePathLength = PathMeasure::MakeFrom(curvePath)->getLength();
-  Point centerOrigin = {-(curvePathLength - textWidth) / 2, 0};
-
-  // Left: No anchor offset - text sits on the path curve
+  // Left: No anchor offset
   auto group3 = std::make_shared<VectorGroup>();
-  group3->setPosition({50, 230});
+  group3->setPosition({50, 200});
   auto textSpan3 = Text::Make(textBlob);
   auto textPath3 = std::make_shared<TextPath>();
   textPath3->setPath(curvePath);
   textPath3->setPerpendicular(true);
-  textPath3->setBaselineOrigin(centerOrigin);
+  textPath3->setBaselineOrigin({0, -30});
   group3->setElements({textSpan3, textPath3, MakeFillStyle(Color::FromRGBA(0, 128, 0, 255))});
   groups.push_back(group3);
 
   // Right: With anchor offset - characters shift perpendicular to path
   auto group4 = std::make_shared<VectorGroup>();
-  group4->setPosition({220, 230});
+  group4->setPosition({220, 200});
   auto textSpan4 = Text::Make(textBlob, pathAnchorOffsets);
   auto textPath4 = std::make_shared<TextPath>();
   textPath4->setPath(curvePath);
   textPath4->setPerpendicular(true);
-  textPath4->setBaselineOrigin(centerOrigin);
+  textPath4->setBaselineOrigin({0, -30});
   group4->setElements({textSpan4, textPath4, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
   groups.push_back(group4);
 
@@ -4220,12 +4215,12 @@ TGFX_TEST(VectorLayerTest, TextAnchors) {
 
   // Row 2: draw curve path
   canvas->save();
-  canvas->translate(50, 230);
+  canvas->translate(50, 200);
   canvas->drawPath(curvePath, linePaint);
   canvas->restore();
 
   canvas->save();
-  canvas->translate(220, 230);
+  canvas->translate(220, 200);
   canvas->drawPath(curvePath, linePaint);
   canvas->restore();
 
