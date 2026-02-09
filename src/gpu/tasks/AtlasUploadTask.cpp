@@ -67,6 +67,13 @@ class CellDecodeTask : public Task {
   int offsetY = 0;
 };
 
+#ifndef TGFX_BUILD_FOR_WEB
+PlacementPtr<AtlasUploadTask> AtlasUploadTask::Make(BlockAllocator* allocator,
+                                                    std::shared_ptr<TextureProxy> proxy) {
+  return allocator->make<AtlasUploadTask>(std::move(proxy));
+}
+#endif
+
 AtlasUploadTask::AtlasUploadTask(std::shared_ptr<TextureProxy> proxy)
     : textureProxy(std::move(proxy)) {
   DEBUG_ASSERT(textureProxy != nullptr);
