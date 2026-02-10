@@ -123,9 +123,9 @@ AdvancedTypefaceInfo WebTypeface::getAdvancedInfo() const {
   AdvancedTypefaceInfo info;
   info.postScriptName = webFontFamily;
   info.type = AdvancedTypefaceInfo::FontType::Other;
-  info.flags = static_cast<AdvancedTypefaceInfo::FontFlags>(
-      AdvancedTypefaceInfo::FontFlags::NotEmbeddable |
-      AdvancedTypefaceInfo::FontFlags::NotSubsettable);
+  info.flags =
+      static_cast<AdvancedTypefaceInfo::FontFlags>(AdvancedTypefaceInfo::FontFlags::NotEmbeddable |
+                                                   AdvancedTypefaceInfo::FontFlags::NotSubsettable);
   info.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(0);
   return info;
 }

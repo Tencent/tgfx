@@ -24,7 +24,7 @@
 
 namespace tgfx {
 /**
- * A Rasterizer that rasterizes a give Glyph.
+ * A Rasterizer that rasterizes a given Glyph.
  */
 class GlyphRasterizer : public ImageCodec {
  public:
@@ -56,6 +56,8 @@ class GlyphRasterizer : public ImageCodec {
   GlyphID glyphID = 0;
   bool fauxBold = false;
   Stroke* stroke = nullptr;
+
+ private:
   Point glyphOffset = {};
 };
 }  // namespace tgfx
