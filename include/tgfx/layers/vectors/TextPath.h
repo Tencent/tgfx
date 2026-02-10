@@ -25,9 +25,11 @@
 namespace tgfx {
 
 /**
- * TextPath applies path-based layout to accumulated glyphs in the VectorContext. When applied, it
- * repositions glyphs along the specified path curve, preserving their relative positions from the
- * original text layout (kerning, baseline shift, etc.).
+ * TextPath repositions accumulated glyphs so they flow along a curve path. A baseline defined by
+ * baselineOrigin and baselineAngle serves as the text's reference line: glyphs are mapped from
+ * their positions along this baseline onto corresponding positions on the path curve, preserving
+ * their relative spacing and offsets. When forceAlignment is enabled, original glyph positions are
+ * ignored and glyphs are redistributed evenly to fill the available path length.
  */
 class TextPath : public VectorElement {
  public:
@@ -48,31 +50,31 @@ class TextPath : public VectorElement {
   void setPath(Path value);
 
   /**
-   * Returns the baseline reference origin in the TextPath's local coordinate space. Together with
-   * baselineAngle, it defines the baseline reference line used for glyph projection. Each glyph's
-   * position on the path is determined by projecting the distance between its anchor point and this
-   * origin onto the baseline direction. Default is (0, 0).
+   * Returns the origin point of the baseline in the TextPath's local coordinate space. The baseline
+   * is a straight line starting from this origin at the angle specified by baselineAngle. Each
+   * glyph's distance along the baseline determines where it lands on the curve, and its perpendicular
+   * offset from the baseline is preserved as a perpendicular offset from the curve. Default is (0, 0).
    */
   Point baselineOrigin() const {
     return _baselineOrigin;
   }
 
   /**
-   * Sets the baseline reference origin.
+   * Sets the baseline origin.
    */
   void setBaselineOrigin(Point value);
 
   /**
-   * Returns the angle in degrees of the baseline reference line. Together with baselineOrigin, it
-   * defines the baseline reference line in the TextPath's local coordinate space. 0 means horizontal
-   * text (baseline along X axis), 90 means vertical text (baseline along Y axis).
+   * Returns the angle of the baseline in degrees. 0 means a horizontal baseline (text flows left to
+   * right along the X axis), 90 means a vertical baseline (text flows top to bottom along the Y
+   * axis). Default is 0.
    */
   float baselineAngle() const {
     return _baselineAngle;
   }
 
   /**
-   * Sets the angle of the baseline reference line.
+   * Sets the angle of the baseline.
    */
   void setBaselineAngle(float value);
 

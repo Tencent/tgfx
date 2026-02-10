@@ -3707,7 +3707,7 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
   float col1X = 50;
   float col2X = 270;
 
-  // Helper to create a baseline reference line
+  // Helper to create a baseline indicator line
   auto makeBaseline = [](float width) {
     auto group = std::make_shared<VectorGroup>();
     Path linePath = {};
