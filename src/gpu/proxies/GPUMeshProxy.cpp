@@ -89,14 +89,13 @@ int GPUMeshProxy::getVertexCount() const {
   }
 
   auto bufferSize = bufferResource->size();
-  size_t triangleCount = 0;
+  size_t vertexCount = 0;
   if (_attributes.hasCoverage) {
-    triangleCount = PathTriangulator::GetAATriangleCount(bufferSize);
+    vertexCount = PathTriangulator::GetAAVertexCount(bufferSize);
   } else {
-    triangleCount = PathTriangulator::GetTriangleCount(bufferSize);
+    vertexCount = PathTriangulator::GetNonAAVertexCount(bufferSize);
   }
-  // Each triangle has 3 vertices
-  return static_cast<int>(triangleCount * 3);
+  return static_cast<int>(vertexCount);
 }
 
 }  // namespace tgfx

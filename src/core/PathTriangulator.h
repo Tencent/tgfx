@@ -33,9 +33,9 @@ class PathTriangulator {
   static bool ShouldTriangulatePath(const Path& path);
 
   /**
-   * Returns the number of triangles based on the buffer size of the vertices.
+   * Returns the number of vertices based on the buffer size. Each vertex has 2 floats (x, y).
    */
-  static size_t GetTriangleCount(size_t bufferSize);
+  static size_t GetNonAAVertexCount(size_t bufferSize);
 
   /**
    * Tessellates the path into a collection of triangles. Returns the number of triangles written
@@ -45,9 +45,10 @@ class PathTriangulator {
                             bool* isLinear = nullptr);
 
   /**
-   * Returns the number of antialiasing triangles based on the buffer size of the vertices.
+   * Returns the number of vertices for antialiasing triangles based on the buffer size. Each vertex
+   * has 3 floats (x, y, coverage).
    */
-  static size_t GetAATriangleCount(size_t bufferSize);
+  static size_t GetAAVertexCount(size_t bufferSize);
 
   /**
    * Triangulates the given path in device space with a mesh of alpha ramps for antialiasing.
