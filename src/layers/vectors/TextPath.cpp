@@ -132,9 +132,9 @@ static void PlaceGlyphOnCurve(Glyph& glyph, const Point& curvePoint, const Point
   rotationScale.setTranslateY(0);
   auto localAnchor = rotationScale.mapXY(glyph.anchor.x, glyph.anchor.y);
   if (perpendicular) {
-    // curveTangent is (cos(curveAngle), sin(curveAngle)). For reversed paths, negate the tangent
-    // to rotate by an additional 180 degrees. Then apply compound angle subtraction to compute
-    // sin/cos of (curveAngle - baselineAngle) directly, avoiding atan2 and degree conversions.
+    // Compute sin/cos of (curveAngle - baselineAngle) using the compound angle formula.
+    // curveTangent is the unit direction vector (cos, sin) of the curve at this point.
+    // Negating it for reversed paths is equivalent to adding 180 degrees.
     float curveC = reversed ? -curveTangent.x : curveTangent.x;
     float curveS = reversed ? -curveTangent.y : curveTangent.y;
     float finalCos = curveC * baselineCos + curveS * baselineSin;
@@ -220,14 +220,9 @@ void TextPath::apply(VectorContext* context) {
       }
     }
   } else {
-    // Normal mode: projects each glyph's anchor onto the curve, then places the glyph so that
-    // its anchor lands on the computed position.
-    //
-    // 1. Anchor's displacement from baselineOrigin is decomposed into tangent and normal components
-    //    relative to the baseline direction.
-    // 2. tangentDistance determines the position along the curve.
-    // 3. normalOffset determines the perpendicular distance from the curve.
-    // 4. anchorNew = curve point + normal * normalOffset.
+    // Normal mode: each glyph's anchor displacement from baselineOrigin is decomposed into
+    // tangent and normal components relative to the baseline. The tangent component maps to a
+    // position along the curve, and the normal component is preserved as perpendicular offset.
     float baselineRadians = _baselineAngle * static_cast<float>(M_PI) / 180.0f;
     float baselineCos = std::cos(baselineRadians);
     float baselineSin = std::sin(baselineRadians);
