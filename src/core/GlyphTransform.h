@@ -43,6 +43,12 @@ inline bool HasComplexTransform(const GlyphRun& run) {
 }
 
 /**
+ * Returns true if all glyph transforms in the GlyphRun keep rectangles axis-aligned (identity,
+ * scale, 90-degree rotation multiples, or mirror, with optional translation).
+ */
+bool HasOnlyAxisAlignedRotation(const GlyphRun& run);
+
+/**
  * Returns the position of a glyph at the given index within a GlyphRun.
  * Valid for Default, Horizontal, and Point positioning modes.
  */

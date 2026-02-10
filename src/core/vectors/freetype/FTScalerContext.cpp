@@ -703,12 +703,20 @@ float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) co
 }
 
 Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
-  if (glyphID == 0) {
+  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  if (setupSize(false)) {
     return {};
   }
-  auto metrics = getFontMetrics();
-  auto advanceX = getAdvance(glyphID, false);
-  return {-advanceX * 0.5f, metrics.capHeight};
+  auto face = ftTypeface()->face;
+  auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
+  auto err = FT_Load_Glyph(face, glyphID, glyphFlags);
+  if (err != FT_Err_Ok) {
+    return {};
+  }
+  auto& glyphMetrics = face->glyph->metrics;
+  auto offsetX = FDot6ToFloat(glyphMetrics.vertBearingX) - FDot6ToFloat(glyphMetrics.horiBearingX);
+  auto offsetY = FDot6ToFloat(glyphMetrics.horiBearingY) + FDot6ToFloat(glyphMetrics.vertBearingY);
+  return {offsetX, offsetY};
 }
 
 Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,

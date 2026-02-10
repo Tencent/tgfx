@@ -1579,4 +1579,127 @@ TGFX_TEST(TextRenderTest, TextBlobMixedPositioningBounds) {
   EXPECT_FALSE(blob->hitTestPoint(500.0f, 500.0f));
 }
 
+TGFX_TEST(TextRenderTest, AxisAlignedRotationRender) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 500);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 40.0f);
+
+  auto glyphA = font.getGlyphID('A');
+  auto glyphB = font.getGlyphID('B');
+  auto glyphC = font.getGlyphID('C');
+  auto glyphD = font.getGlyphID('D');
+  ASSERT_TRUE(glyphA > 0 && glyphB > 0 && glyphC > 0 && glyphD > 0);
+
+  Paint paint;
+  paint.setColor(Color::Black());
+
+  // Row 1: RSXform with exact axis-aligned rotations (0/90/180/270)
+  {
+    GlyphID glyphs[] = {glyphA, glyphB, glyphC, glyphD};
+    float angles[] = {0.0f, 90.0f, 180.0f, 270.0f};
+    TextBlobBuilder builder;
+    const auto& buffer = builder.allocRunRSXform(font, 4);
+    for (int i = 0; i < 4; i++) {
+      buffer.glyphs[i] = glyphs[i];
+      auto bounds = font.getBounds(glyphs[i]);
+      float cx = bounds.centerX();
+      float cy = bounds.centerY();
+      float rad = angles[i] * static_cast<float>(M_PI) / 180.0f;
+      float scos = cosf(rad);
+      float ssin = sinf(rad);
+      float tx = 75.0f + static_cast<float>(i) * 100.0f - (scos * cx - ssin * cy);
+      float ty = 75.0f - (ssin * cx + scos * cy);
+      reinterpret_cast<RSXform*>(buffer.positions)[i] = RSXform::Make(scos, ssin, tx, ty);
+    }
+    auto blob = builder.build();
+    canvas->drawTextBlob(blob, 0, 0, paint);
+  }
+
+  // Row 2: RSXform with exact values (no trig functions) for axis-aligned rotations
+  {
+    GlyphID glyphs[] = {glyphA, glyphB, glyphC, glyphD};
+    float scosValues[] = {1.0f, 0.0f, -1.0f, 0.0f};
+    float ssinValues[] = {0.0f, 1.0f, 0.0f, -1.0f};
+    TextBlobBuilder builder;
+    const auto& buffer = builder.allocRunRSXform(font, 4);
+    for (int i = 0; i < 4; i++) {
+      buffer.glyphs[i] = glyphs[i];
+      auto bounds = font.getBounds(glyphs[i]);
+      float cx = bounds.centerX();
+      float cy = bounds.centerY();
+      float scos = scosValues[i];
+      float ssin = ssinValues[i];
+      float tx = 75.0f + static_cast<float>(i) * 100.0f - (scos * cx - ssin * cy);
+      float ty = 200.0f - (ssin * cx + scos * cy);
+      reinterpret_cast<RSXform*>(buffer.positions)[i] = RSXform::Make(scos, ssin, tx, ty);
+    }
+    auto blob = builder.build();
+    canvas->drawTextBlob(blob, 0, 0, paint);
+  }
+
+  // Row 3: Matrix positioning with axis-aligned rotations (90/180) and scale (2x at 0 deg)
+  {
+    TextBlobBuilder builder;
+    const auto& buffer = builder.allocRunMatrix(font, 3);
+    buffer.glyphs[0] = glyphA;
+    buffer.glyphs[1] = glyphB;
+    buffer.glyphs[2] = glyphC;
+    // Glyph A: 2x scale (axis-aligned, no rotation)
+    buffer.positions[0] = 2.0f;
+    buffer.positions[1] = 0.0f;
+    buffer.positions[2] = 50.0f;
+    buffer.positions[3] = 0.0f;
+    buffer.positions[4] = 2.0f;
+    buffer.positions[5] = 290.0f;
+    // Glyph B: 90 degree rotation via matrix
+    buffer.positions[6] = 0.0f;
+    buffer.positions[7] = -1.0f;
+    buffer.positions[8] = 225.0f;
+    buffer.positions[9] = 1.0f;
+    buffer.positions[10] = 0.0f;
+    buffer.positions[11] = 290.0f;
+    // Glyph C: 180 degree rotation via matrix
+    buffer.positions[12] = -1.0f;
+    buffer.positions[13] = 0.0f;
+    buffer.positions[14] = 350.0f;
+    buffer.positions[15] = 0.0f;
+    buffer.positions[16] = -1.0f;
+    buffer.positions[17] = 350.0f;
+    auto blob = builder.build();
+    canvas->drawTextBlob(blob, 0, 0, paint);
+  }
+
+  // Row 4: Non-axis-aligned rotation (45 degrees) for comparison, rendered via path
+  {
+    GlyphID glyphs[] = {glyphA, glyphB};
+    TextBlobBuilder builder;
+    const auto& buffer = builder.allocRunRSXform(font, 2);
+    for (int i = 0; i < 2; i++) {
+      buffer.glyphs[i] = glyphs[i];
+      auto bounds = font.getBounds(glyphs[i]);
+      float cx = bounds.centerX();
+      float cy = bounds.centerY();
+      float rad = 45.0f * static_cast<float>(M_PI) / 180.0f;
+      float scos = cosf(rad);
+      float ssin = sinf(rad);
+      float tx = 125.0f + static_cast<float>(i) * 150.0f - (scos * cx - ssin * cy);
+      float ty = 430.0f - (ssin * cx + scos * cy);
+      reinterpret_cast<RSXform*>(buffer.positions)[i] = RSXform::Make(scos, ssin, tx, ty);
+    }
+    auto blob = builder.build();
+    canvas->drawTextBlob(blob, 0, 0, paint);
+  }
+
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "TextRenderTest/AxisAlignedRotationRender"));
+}
+
 }  // namespace tgfx
