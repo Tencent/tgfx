@@ -20,7 +20,6 @@
 #include <cmath>
 #include "Geometry.h"
 #include "VectorContext.h"
-#include "core/utils/MathExtra.h"
 #include "tgfx/core/PathMeasure.h"
 
 namespace tgfx {
@@ -126,26 +125,30 @@ static float AdjustPathOffset(float pathOffset, float pathLength, bool reversed,
 }
 
 static void PlaceGlyphOnCurve(Glyph& glyph, const Point& curvePoint, const Point& curveTangent,
-                               bool perpendicular, bool reversed, float baselineAngle,
-                               const Matrix& invertedMatrix) {
-  float rotationAngle = 0.0f;
-  if (perpendicular) {
-    rotationAngle = RadiansToDegrees(std::atan2(curveTangent.y, curveTangent.x));
-    if (reversed) {
-      rotationAngle += 180.0f;
-    }
-    rotationAngle -= baselineAngle;
-  }
+                               bool perpendicular, bool reversed, float baselineCos,
+                               float baselineSin, const Matrix& invertedMatrix) {
   auto rotationScale = glyph.matrix;
   rotationScale.setTranslateX(0);
   rotationScale.setTranslateY(0);
-  Matrix curveRotation = Matrix::I();
-  curveRotation.setRotate(rotationAngle);
   auto localAnchor = rotationScale.mapXY(glyph.anchor.x, glyph.anchor.y);
-  auto rotatedAnchor = curveRotation.mapXY(localAnchor.x, localAnchor.y);
-  glyph.matrix = rotationScale;
-  glyph.matrix.postConcat(curveRotation);
-  glyph.matrix.postTranslate(curvePoint.x - rotatedAnchor.x, curvePoint.y - rotatedAnchor.y);
+  if (perpendicular) {
+    // curveTangent is (cos(curveAngle), sin(curveAngle)). For reversed paths, negate the tangent
+    // to rotate by an additional 180 degrees. Then apply compound angle subtraction to compute
+    // sin/cos of (curveAngle - baselineAngle) directly, avoiding atan2 and degree conversions.
+    float curveC = reversed ? -curveTangent.x : curveTangent.x;
+    float curveS = reversed ? -curveTangent.y : curveTangent.y;
+    float finalCos = curveC * baselineCos + curveS * baselineSin;
+    float finalSin = curveS * baselineCos - curveC * baselineSin;
+    Matrix curveRotation = Matrix::I();
+    curveRotation.setSinCos(finalSin, finalCos);
+    auto rotatedAnchor = curveRotation.mapXY(localAnchor.x, localAnchor.y);
+    glyph.matrix = rotationScale;
+    glyph.matrix.postConcat(curveRotation);
+    glyph.matrix.postTranslate(curvePoint.x - rotatedAnchor.x, curvePoint.y - rotatedAnchor.y);
+  } else {
+    glyph.matrix = rotationScale;
+    glyph.matrix.postTranslate(curvePoint.x - localAnchor.x, curvePoint.y - localAnchor.y);
+  }
   glyph.matrix.postConcat(invertedMatrix);
 }
 
@@ -188,9 +191,16 @@ void TextPath::apply(VectorContext* context) {
           (availableLength - totalAdvance) / static_cast<float>(glyphCount - 1);
     }
 
+    float baselineRadians = _baselineAngle * static_cast<float>(M_PI) / 180.0f;
+    float baselineCos = std::cos(baselineRadians);
+    float baselineSin = std::sin(baselineRadians);
+
     size_t glyphIndex = 0;
     float accumulatedAdvance = 0.0f;
     for (auto* geometry : glyphGeometries) {
+      if (geometry->glyphs.empty()) {
+        continue;
+      }
       Matrix invertedMatrix = Matrix::I();
       geometry->matrix.invert(&invertedMatrix);
       for (auto& glyph : geometry->glyphs) {
@@ -202,8 +212,8 @@ void TextPath::apply(VectorContext* context) {
         Point position = {};
         Point tangent = {};
         if (GetPosTanExtended(pathMeasure.get(), pathOffset, pathLength, &position, &tangent)) {
-          PlaceGlyphOnCurve(glyph, position, tangent, _perpendicular, _reversed, _baselineAngle,
-                            invertedMatrix);
+          PlaceGlyphOnCurve(glyph, position, tangent, _perpendicular, _reversed, baselineCos,
+                            baselineSin, invertedMatrix);
         }
         accumulatedAdvance += advance;
         glyphIndex++;
@@ -218,11 +228,14 @@ void TextPath::apply(VectorContext* context) {
     // 2. tangentDistance determines the position along the curve.
     // 3. normalOffset determines the perpendicular distance from the curve.
     // 4. anchorNew = curve point + normal * normalOffset.
-    float rotationRadians = _baselineAngle * static_cast<float>(M_PI) / 180.0f;
-    float cosR = std::cos(rotationRadians);
-    float sinR = std::sin(rotationRadians);
+    float baselineRadians = _baselineAngle * static_cast<float>(M_PI) / 180.0f;
+    float baselineCos = std::cos(baselineRadians);
+    float baselineSin = std::sin(baselineRadians);
 
     for (auto* geometry : glyphGeometries) {
+      if (geometry->glyphs.empty()) {
+        continue;
+      }
       Matrix invertedMatrix = Matrix::I();
       geometry->matrix.invert(&invertedMatrix);
       for (auto& glyph : geometry->glyphs) {
@@ -231,8 +244,8 @@ void TextPath::apply(VectorContext* context) {
 
         float dx = anchorOld.x - _baselineOrigin.x;
         float dy = anchorOld.y - _baselineOrigin.y;
-        float tangentDistance = dx * cosR + dy * sinR;
-        float normalOffset = dy * cosR - dx * sinR;
+        float tangentDistance = dx * baselineCos + dy * baselineSin;
+        float normalOffset = dy * baselineCos - dx * baselineSin;
 
         float pathOffset = _firstMargin + tangentDistance;
         pathOffset = AdjustPathOffset(pathOffset, pathLength, _reversed, isClosed);
@@ -245,8 +258,8 @@ void TextPath::apply(VectorContext* context) {
 
         Point anchorNew = {position.x - tangent.y * normalOffset,
                            position.y + tangent.x * normalOffset};
-        PlaceGlyphOnCurve(glyph, anchorNew, tangent, _perpendicular, _reversed, _baselineAngle,
-                           invertedMatrix);
+        PlaceGlyphOnCurve(glyph, anchorNew, tangent, _perpendicular, _reversed, baselineCos,
+                           baselineSin, invertedMatrix);
       }
     }
   }
