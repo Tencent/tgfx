@@ -10,11 +10,20 @@ description: 提交 PR - 自动识别新建或追加提交
 
 ## 前置检查
 
+以下三组命令**并行执行**（使用多个 Bash tool call 同时发起）：
+
 ```bash
-git fetch origin main && \
-CURRENT_BRANCH=$(git branch --show-current) && \
-echo "CURRENT_BRANCH:$CURRENT_BRANCH" && \
-gh pr list --head "$CURRENT_BRANCH" --state open --json number,url && \
+# 并行 1：fetch + 分支信息
+git fetch origin main && git branch --show-current
+```
+
+```bash
+# 并行 2：查询当前分支是否有开启的 PR（用上一步的分支名替换）
+gh pr list --head "$(git branch --show-current)" --state open --json number,url
+```
+
+```bash
+# 并行 3：获取 GitHub username
 gh api user --jq '.login'
 ```
 
@@ -46,13 +55,20 @@ gh api user --jq '.login'
 
 ## 第二步：格式化代码
 
-若 `./codeformat.sh` 存在，执行：
+收集待提交的源文件列表（`.cpp`、`.c`、`.h`、`.mm`、`.m`），仅对这些文件执行 `clang-format -i`，**不要**运行 `./codeformat.sh`（全量格式化太慢）。
+
+待提交文件来源：
+- **全部提交**：`git diff --name-only HEAD` + `git ls-files --others --exclude-standard`（工作区所有变更 + 未跟踪文件）
+- **局部提交**：第一步记录的暂存区文件列表
+
+从中筛选源文件后执行：
 
 ```bash
-./codeformat.sh
+# FILES 为筛选后的源文件列表（空格分隔）
+clang-format -i {FILES}
 ```
 
-忽略输出的报错信息，只要运行就会完成格式化。
+若没有需要格式化的源文件则跳过。
 
 格式化后根据第一步结果处理暂存区：
 
@@ -70,6 +86,8 @@ git diff --cached
 ```
 
 根据暂存区变更生成 **Commit 信息**：英语，120 字符内，以句号结尾，侧重描述用户可感知的变化。
+
+**!! IMPORTANT**：将 `git diff --cached` 的结果缓存，第四步新建模式"分析完整变更"时直接复用，不再重复执行。
 
 ---
 
@@ -113,7 +131,7 @@ git push
 
 ```bash
 git log origin/main..HEAD --oneline   # 已有 commit
-git diff --cached                      # 本次暂存区变更（若第三步已获取则复用）
+# 本次暂存区变更：直接复用第三步缓存的 git diff --cached 结果
 ```
 
 若已有 commit 为空且暂存区无内容，提示无变更，终止流程。
