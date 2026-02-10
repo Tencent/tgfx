@@ -120,7 +120,6 @@ struct GlyphEntry {
   Glyph* glyph = nullptr;
   Geometry* geometry = nullptr;
   Matrix invertedMatrix = Matrix::I();
-  Matrix geometryMatrix = Matrix::I();
 };
 
 static std::vector<GlyphEntry> CollectGlyphs(const std::vector<Geometry*>& glyphGeometries) {
@@ -134,7 +133,7 @@ static std::vector<GlyphEntry> CollectGlyphs(const std::vector<Geometry*>& glyph
       invertedMatrix = Matrix::I();
     }
     for (auto& glyph : geometry->glyphs) {
-      result.push_back({&glyph, geometry, invertedMatrix, geometry->matrix});
+      result.push_back({&glyph, geometry, invertedMatrix});
     }
   }
   return result;
@@ -281,7 +280,7 @@ void TextPath::apply(VectorContext* context) {
       auto& entry = allGlyphs[idx];
       auto& glyph = *entry.glyph;
 
-      auto anchorOld = GetGlyphAnchor(glyph, entry.geometryMatrix);
+      auto anchorOld = GetGlyphAnchor(glyph, entry.geometry->matrix);
 
       // Decompose anchor displacement into tangent and normal components
       float dx = anchorOld.x - origin.x;
