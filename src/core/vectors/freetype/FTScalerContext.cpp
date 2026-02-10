@@ -678,15 +678,22 @@ float FTScalerContext::getAdvance(GlyphID glyphID, bool verticalText) const {
     }
   }
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  {
+    std::lock_guard<std::mutex> cacheLock(advanceCacheLocker);
+    auto it = advanceCache.find(cacheKey);
+    if (it != advanceCache.end()) {
+      return it->second;
+    }
+  }
   if (setupSize(false)) {
     return 0;
   }
   auto advance = getAdvanceInternal(glyphID, verticalText);
   {
     std::lock_guard<std::mutex> cacheLock(advanceCacheLocker);
-    auto [it, inserted] = advanceCache.emplace(cacheKey, advance);
-    return it->second;
+    advanceCache[cacheKey] = advance;
   }
+  return advance;
 }
 
 float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) const {
