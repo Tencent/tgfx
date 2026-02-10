@@ -169,6 +169,7 @@ static FT_Int ChooseBitmapStrike(FT_Face face, FT_F26Dot6 scaleY) {
 
 FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, float size)
     : ScalerContext(std::move(typeFace), size), textScale(size) {
+  advanceCache.reserve(256);
   backingSize = textSize;
   loadGlyphFlags |= FT_LOAD_NO_BITMAP;
   // Always using FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH to get correct
