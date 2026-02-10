@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include "ft2build.h"
@@ -87,7 +88,7 @@ class FTScalerContext : public ScalerContext {
   FT_Int32 loadGlyphFlags = 0;
   float backingSize = 1.0f;
   // Mutable for const-method caching: caches glyph advances to avoid repeated FreeType lookups.
-  mutable std::mutex advanceCacheLocker = {};
+  mutable std::shared_mutex advanceCacheLocker = {};
   mutable std::unordered_map<uint32_t, float> advanceCache = {};
 };
 }  // namespace tgfx

@@ -671,7 +671,7 @@ float FTScalerContext::getAdvance(GlyphID glyphID, bool verticalText) const {
   // GlyphID is uint16_t, so the high bit is free to encode verticalText.
   auto cacheKey = static_cast<uint32_t>(glyphID) | (verticalText ? 0x80000000u : 0u);
   {
-    std::lock_guard<std::mutex> cacheLock(advanceCacheLocker);
+    std::shared_lock<std::shared_mutex> cacheLock(advanceCacheLocker);
     auto it = advanceCache.find(cacheKey);
     if (it != advanceCache.end()) {
       return it->second;
@@ -679,7 +679,7 @@ float FTScalerContext::getAdvance(GlyphID glyphID, bool verticalText) const {
   }
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   {
-    std::lock_guard<std::mutex> cacheLock(advanceCacheLocker);
+    std::shared_lock<std::shared_mutex> cacheLock(advanceCacheLocker);
     auto it = advanceCache.find(cacheKey);
     if (it != advanceCache.end()) {
       return it->second;
@@ -690,7 +690,7 @@ float FTScalerContext::getAdvance(GlyphID glyphID, bool verticalText) const {
   }
   auto advance = getAdvanceInternal(glyphID, verticalText);
   {
-    std::lock_guard<std::mutex> cacheLock(advanceCacheLocker);
+    std::unique_lock<std::shared_mutex> cacheLock(advanceCacheLocker);
     advanceCache[cacheKey] = advance;
   }
   return advance;
