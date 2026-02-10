@@ -3049,8 +3049,9 @@ TGFX_TEST(VectorLayerTest, TextPath) {
 
   std::string verticalText = "Vertical 文本";
   std::vector<std::shared_ptr<Text>> textSpans14 = {};
+  auto fontMetrics = font.getMetrics();
+  auto centerOffset = std::round((fontMetrics.capHeight + fontMetrics.xHeight) / 4);
   float currentY = 0.0f;
-  bool prevRotated = false;
 
   const char* textPtr = verticalText.c_str();
   const char* textEnd = textPtr + verticalText.size();
@@ -3062,21 +3063,18 @@ TGFX_TEST(VectorLayerTest, TextPath) {
     auto glyphID = font.getGlyphID(unichar);
     bool isCJK = unichar >= 0x4E00 && unichar <= 0x9FFF;
     if (isCJK) {
-      if (prevRotated) {
-        currentY += 21;
-      }
       auto verticalOffset = font.getVerticalOffset(glyphID);
+      auto verticalAdvance = font.getAdvance(glyphID, true);
       TextBlobBuilder builder;
-      auto buffer = builder.allocRun(font, 1, 0, 0);
+      auto buffer = builder.allocRun(font, 1, verticalOffset.x, verticalOffset.y);
       buffer.glyphs[0] = glyphID;
       auto textBlob = builder.build();
       if (textBlob != nullptr) {
-        auto span = Text::Make(textBlob, {{0, -9}});
-        span->setPosition({verticalOffset.x, currentY});
+        auto span = Text::Make(textBlob);
+        span->setPosition({centerOffset, currentY});
         textSpans14.push_back(span);
       }
-      currentY += 24;
-      prevRotated = false;
+      currentY += verticalAdvance;
     } else {
       float horizontalAdvance = font.getAdvance(glyphID, false);
       TextBlobBuilder builder;
@@ -3086,12 +3084,11 @@ TGFX_TEST(VectorLayerTest, TextPath) {
       xform[0] = RSXform::Make(0, 1, 0, 0);
       auto textBlob = builder.build();
       if (textBlob != nullptr) {
-        auto span = Text::Make(textBlob, {{0, -9}});
+        auto span = Text::Make(textBlob, {{0, -centerOffset}});
         span->setPosition({0, currentY});
         textSpans14.push_back(span);
       }
       currentY += horizontalAdvance;
-      prevRotated = true;
     }
   }
 
