@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <memory>
 #include "gpu/resources/ResourceKey.h"
 #include "tgfx/core/Mesh.h"
 
@@ -44,29 +43,37 @@ class MeshImpl {
   virtual Type type() const = 0;
 
   /**
-   * Returns the bounding box of the mesh positions.
-   */
-  virtual Rect bounds() const = 0;
-
-  /**
-   * Returns the globally unique identifier for this mesh instance.
-   */
-  virtual uint32_t uniqueID() const = 0;
-
-  /**
-   * Returns the unique key for GPU resource caching.
-   */
-  virtual UniqueKey getUniqueKey() const = 0;
-
-  /**
    * Returns true if this mesh has per-vertex coverage values for anti-aliasing.
    */
   virtual bool hasCoverage() const = 0;
 
   /**
+   * Returns the bounding box of the mesh positions.
+   */
+  Rect bounds() const {
+    return _bounds;
+  }
+
+  /**
+   * Returns the globally unique identifier for this mesh instance.
+   */
+  uint32_t uniqueID() const {
+    return _uniqueID;
+  }
+
+  /**
+   * Returns the unique key for GPU resource caching.
+   */
+  UniqueKey getUniqueKey() const;
+
+  /**
    * Returns the MeshImpl from a Mesh for internal read access.
    */
   static MeshImpl& ReadAccess(const Mesh& mesh);
+
+ protected:
+  Rect _bounds = {};
+  uint32_t _uniqueID = 0;
 };
 
 }  // namespace tgfx

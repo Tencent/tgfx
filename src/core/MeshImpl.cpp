@@ -20,6 +20,11 @@
 
 namespace tgfx {
 
+UniqueKey MeshImpl::getUniqueKey() const {
+  static const auto MeshDomain = UniqueKey::Make();
+  return UniqueKey::Append(MeshDomain, &_uniqueID, 1);
+}
+
 MeshImpl& MeshImpl::ReadAccess(const Mesh& mesh) {
   return *mesh.impl;
 }

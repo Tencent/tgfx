@@ -88,17 +88,12 @@ std::shared_ptr<Mesh> VertexMeshImpl::Make(MeshTopology topology, int vertexCoun
 }
 
 VertexMeshImpl::VertexMeshImpl(MeshTopology topology, int vertexCount, int indexCount)
-    : _topology(topology), _vertexCount(vertexCount), _indexCount(indexCount),
-      _uniqueID(UniqueID::Next()) {
+    : _topology(topology), _vertexCount(vertexCount), _indexCount(indexCount) {
+  _uniqueID = UniqueID::Next();
 }
 
 VertexMeshImpl::~VertexMeshImpl() {
   releaseVertexData();
-}
-
-UniqueKey VertexMeshImpl::getUniqueKey() const {
-  static const auto MeshDomain = UniqueKey::Make();
-  return UniqueKey::Append(MeshDomain, &_uniqueID, 1);
 }
 
 size_t VertexMeshImpl::getVertexStride() const {

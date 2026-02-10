@@ -42,16 +42,6 @@ class VertexMeshImpl : public MeshImpl {
     return Type::Vertex;
   }
 
-  Rect bounds() const override {
-    return _bounds;
-  }
-
-  uint32_t uniqueID() const override {
-    return _uniqueID;
-  }
-
-  UniqueKey getUniqueKey() const override;
-
   bool hasCoverage() const override {
     return false;
   }
@@ -111,8 +101,6 @@ class VertexMeshImpl : public MeshImpl {
   MeshTopology _topology = MeshTopology::Triangles;
   int _vertexCount = 0;
   int _indexCount = 0;
-  uint32_t _uniqueID = 0;
-  Rect _bounds = {};
 
   // CPU data, allocated as a single block, each pointer points to internal positions
   // Memory layout: [positions][texCoords (opt)][colors (opt)][indices (opt)]

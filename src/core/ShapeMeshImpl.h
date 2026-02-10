@@ -41,16 +41,6 @@ class ShapeMeshImpl : public MeshImpl {
     return Type::Shape;
   }
 
-  Rect bounds() const override {
-    return _bounds;
-  }
-
-  uint32_t uniqueID() const override {
-    return _uniqueID;
-  }
-
-  UniqueKey getUniqueKey() const override;
-
   bool hasCoverage() const override {
     return antiAlias;
   }
@@ -72,8 +62,6 @@ class ShapeMeshImpl : public MeshImpl {
   ShapeMeshImpl(std::shared_ptr<Shape> shape, bool antiAlias);
 
   std::shared_ptr<Shape> _shape = nullptr;
-  Rect _bounds = {};
-  uint32_t _uniqueID = 0;
   bool antiAlias = true;
 };
 

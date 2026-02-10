@@ -30,13 +30,9 @@ std::shared_ptr<Mesh> ShapeMeshImpl::Make(std::shared_ptr<Shape> shape, bool ant
 }
 
 ShapeMeshImpl::ShapeMeshImpl(std::shared_ptr<Shape> shape, bool antiAlias)
-    : _shape(std::move(shape)), _uniqueID(UniqueID::Next()), antiAlias(antiAlias) {
+    : _shape(std::move(shape)), antiAlias(antiAlias) {
+  _uniqueID = UniqueID::Next();
   _bounds = _shape->getBounds();
-}
-
-UniqueKey ShapeMeshImpl::getUniqueKey() const {
-  static const auto ShapeMeshDomain = UniqueKey::Make();
-  return UniqueKey::Append(ShapeMeshDomain, &_uniqueID, 1);
 }
 
 }  // namespace tgfx
