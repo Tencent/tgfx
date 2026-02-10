@@ -2970,15 +2970,13 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textBlob11b = TextBlob::MakeFrom("Spans", font);
   auto textSpan11b = Text::Make(textBlob11b);
   auto spaceWidth = font.getAdvance(font.getGlyphID(' '), false);
-  textSpan11b->setPosition(
-      {std::round(textBlob11a->getTightBounds().right + spaceWidth), 0});
+  textSpan11b->setPosition({std::round(textBlob11a->getTightBounds().right + spaceWidth), 0});
 
   auto textPath11 = std::make_shared<TextPath>();
   textPath11->setPath(curvePath);
   textPath11->setPerpendicular(true);
-  auto textWidth11 =
-      std::round(textBlob11a->getTightBounds().right + spaceWidth) +
-      textBlob11b->getTightBounds().width();
+  auto textWidth11 = std::round(textBlob11a->getTightBounds().right + spaceWidth) +
+                     textBlob11b->getTightBounds().width();
   auto pathLength11 = PathMeasure::MakeFrom(curvePath)->getLength();
   auto centerOffset11 = std::round((pathLength11 - textWidth11) / 2);
   textSpan11a->setPosition({centerOffset11 + 40, 5});
@@ -3024,8 +3022,8 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   auto textBlob13b = TextBlob::MakeFrom("Text Lines", font);
   auto textSpan13b = Text::Make(textBlob13b);
   float lineSpacing13 = 29;
-  auto centerOffset13 =
-      std::round((textBlob13b->getTightBounds().width() - textBlob13a->getTightBounds().width()) / 2);
+  auto centerOffset13 = std::round(
+      (textBlob13b->getTightBounds().width() - textBlob13a->getTightBounds().width()) / 2);
   textSpan13a->setPosition({centerOffset13, 0});
   textSpan13b->setPosition({0, lineSpacing13});
 
@@ -3139,12 +3137,12 @@ TGFX_TEST(VectorLayerTest, TextPath) {
   std::vector<std::pair<float, Color>> pathPositions1 = {
       {143, Color::Blue()},
       {243, Color::Red()},
-      {343, Color{1.0f, 0.5f, 0.0f, 1.0f}},   // Orange
-      {443, Color{0.5f, 0.0f, 0.5f, 1.0f}},   // Purple
-      {543, Color{0.0f, 0.5f, 0.5f, 1.0f}},   // Teal (Force Alignment)
-      {643, Color{0.8f, 0.2f, 0.2f, 1.0f}},   // Dark red (Force+Margin)
-      {743, Color{0.2f, 0.2f, 0.8f, 1.0f}},   // Dark blue (Negative Spacing)
-      {843, Color::Green()},                    // Multi-line centered
+      {343, Color{1.0f, 0.5f, 0.0f, 1.0f}},  // Orange
+      {443, Color{0.5f, 0.0f, 0.5f, 1.0f}},  // Purple
+      {543, Color{0.0f, 0.5f, 0.5f, 1.0f}},  // Teal (Force Alignment)
+      {643, Color{0.8f, 0.2f, 0.2f, 1.0f}},  // Dark red (Force+Margin)
+      {743, Color{0.2f, 0.2f, 0.8f, 1.0f}},  // Dark blue (Negative Spacing)
+      {843, Color::Green()},                 // Multi-line centered
   };
 
   for (const auto& [y, color] : pathPositions1) {
@@ -4205,7 +4203,8 @@ TGFX_TEST(VectorLayerTest, TextAnchors) {
   textPath4->setPath(curvePath);
   textPath4->setPerpendicular(true);
   textPath4->setFirstMargin(centerMargin);
-  group4->setElements({textSpan4WithAnchor, textPath4, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
+  group4->setElements(
+      {textSpan4WithAnchor, textPath4, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
   groups.push_back(group4);
 
   vectorLayer->setContents(
@@ -4235,6 +4234,59 @@ TGFX_TEST(VectorLayerTest, TextAnchors) {
   canvas->restore();
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextAnchors"));
+}
+
+TGFX_TEST(VectorLayerTest, StrokeDashAdaptive) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 500);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  // Group 1: Normal dash (not adaptive) on a rectangle
+  auto group1 = std::make_shared<VectorGroup>();
+  group1->setPosition({200, 75});
+  auto rect1 = std::make_shared<Rectangle>();
+  rect1->setSize({300, 100});
+  auto stroke1 = StrokeStyle::Make(SolidColor::Make(Color::Red()));
+  stroke1->setStrokeWidth(4.0f);
+  stroke1->setDashes({20.0f, 10.0f});
+  stroke1->setDashOffset(5.0f);
+  group1->setElements({rect1, stroke1});
+
+  // Group 2: Adaptive dash on the same rectangle
+  auto group2 = std::make_shared<VectorGroup>();
+  group2->setPosition({200, 200});
+  auto rect2 = std::make_shared<Rectangle>();
+  rect2->setSize({300, 100});
+  auto stroke2 = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+  stroke2->setStrokeWidth(4.0f);
+  stroke2->setDashes({20.0f, 10.0f});
+  stroke2->setDashOffset(5.0f);
+  stroke2->setDashAdaptive(true);
+  group2->setElements({rect2, stroke2});
+
+  // Group 3: Adaptive dash on an ellipse
+  auto group3 = std::make_shared<VectorGroup>();
+  group3->setPosition({200, 375});
+  auto ellipse3 = std::make_shared<Ellipse>();
+  ellipse3->setSize({300, 100});
+  auto stroke3 = StrokeStyle::Make(SolidColor::Make(Color::Green()));
+  stroke3->setStrokeWidth(4.0f);
+  stroke3->setDashes({15.0f, 8.0f});
+  stroke3->setDashAdaptive(true);
+  group3->setElements({ellipse3, stroke3});
+
+  vectorLayer->setContents({group1, group2, group3});
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/StrokeDashAdaptive"));
 }
 
 }  // namespace tgfx

@@ -489,6 +489,7 @@
     },
     "VectorLayerTest": {
         "BasicShapes": "4a74f6aa",
+        "StrokeDashAdaptive": "4a74f6aa",
         "ChainedModifiers": "8815f728",
         "ColorSourceAdvanced": "3e96556a",
         "ComplexComposition": "8815f728",

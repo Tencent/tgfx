@@ -28,7 +28,7 @@
 namespace tgfx {
 
 static std::shared_ptr<PathEffect> CreateDashEffect(const std::vector<float>& dashes,
-                                                    float dashOffset) {
+                                                    float dashOffset, bool adaptive) {
   if (dashes.empty()) {
     return nullptr;
   }
@@ -37,7 +37,8 @@ static std::shared_ptr<PathEffect> CreateDashEffect(const std::vector<float>& da
   if (dashCount % 2 == 1) {
     dashList.insert(dashList.end(), dashes.begin(), dashes.end());
   }
-  return PathEffect::MakeDash(dashList.data(), static_cast<int>(dashList.size()), dashOffset);
+  return PathEffect::MakeDash(dashList.data(), static_cast<int>(dashList.size()), dashOffset,
+                              adaptive);
 }
 
 static float BlendStrokeWidth(float base, const GlyphStyle& style) {
@@ -332,6 +333,15 @@ void StrokeStyle::setDashOffset(float value) {
   invalidateContent();
 }
 
+void StrokeStyle::setDashAdaptive(bool value) {
+  if (_dashAdaptive == value) {
+    return;
+  }
+  _dashAdaptive = value;
+  _cachedDashEffect = nullptr;
+  invalidateContent();
+}
+
 void StrokeStyle::setStrokeAlign(StrokeAlign value) {
   if (_strokeAlign == value) {
     return;
@@ -393,7 +403,7 @@ void StrokeStyle::apply(VectorContext* context) {
   painter->stroke = _stroke;
   painter->strokeAlign = _strokeAlign;
   if (_cachedDashEffect == nullptr && !_dashes.empty()) {
-    _cachedDashEffect = CreateDashEffect(_dashes, _dashOffset);
+    _cachedDashEffect = CreateDashEffect(_dashes, _dashOffset, _dashAdaptive);
   }
   painter->pathEffect = _cachedDashEffect;
   context->painters.push_back(std::move(painter));
