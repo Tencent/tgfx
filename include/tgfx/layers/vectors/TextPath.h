@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <vector>
 #include "tgfx/core/Path.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 

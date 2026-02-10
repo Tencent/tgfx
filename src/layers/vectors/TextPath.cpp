@@ -191,10 +191,6 @@ void TextPath::apply(VectorContext* context) {
           (availableLength - totalAdvance) / static_cast<float>(glyphCount - 1);
     }
 
-    float baselineRadians = _baselineAngle * static_cast<float>(M_PI) / 180.0f;
-    float baselineCos = std::cos(baselineRadians);
-    float baselineSin = std::sin(baselineRadians);
-
     size_t glyphIndex = 0;
     float accumulatedAdvance = 0.0f;
     for (auto* geometry : glyphGeometries) {
@@ -212,8 +208,8 @@ void TextPath::apply(VectorContext* context) {
         Point position = {};
         Point tangent = {};
         if (GetPosTanExtended(pathMeasure.get(), pathOffset, pathLength, &position, &tangent)) {
-          PlaceGlyphOnCurve(glyph, position, tangent, _perpendicular, _reversed, baselineCos,
-                            baselineSin, invertedMatrix);
+          PlaceGlyphOnCurve(glyph, position, tangent, _perpendicular, _reversed, 1.0f, 0.0f,
+                            invertedMatrix);
         }
         accumulatedAdvance += advance;
         glyphIndex++;
