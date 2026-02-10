@@ -20,9 +20,26 @@
 #include "WebImageBuffer.h"
 #include "core/AtlasTypes.h"
 #include "core/utils/BlockAllocator.h"
-#include "gpu/resources/TextureView.h"
 
 namespace tgfx {
+
+class DirectCellUploadTask : public CellUploadTask {
+ public:
+  DirectCellUploadTask(std::shared_ptr<ImageBuffer> imageBuffer, int offsetX, int offsetY)
+      : imageBuffer(std::move(imageBuffer)), offsetX(offsetX), offsetY(offsetY) {
+  }
+
+  void upload(std::shared_ptr<Texture> texture, CommandQueue*) override {
+    auto webBuffer = std::static_pointer_cast<WebImageBuffer>(imageBuffer);
+    webBuffer->uploadToTexture(std::move(texture), offsetX, offsetY);
+  }
+
+ private:
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+  int offsetX = 0;
+  int offsetY = 0;
+};
+
 PlacementPtr<AtlasUploadTask> AtlasUploadTask::Make(BlockAllocator* allocator,
                                                     std::shared_ptr<TextureProxy> proxy) {
   return allocator->make<WebAtlasUploadTask>(std::move(proxy));
@@ -40,27 +57,11 @@ void WebAtlasUploadTask::addCell(BlockAllocator* allocator, std::shared_ptr<Imag
       auto padding = Plot::CellPadding;
       auto offsetX = static_cast<int>(atlasOffset.x) - padding;
       auto offsetY = static_cast<int>(atlasOffset.y) - padding;
-      DirectUploadCell cell;
-      cell.imageBuffer = std::move(imageBuffer);
-      cell.offsetX = offsetX;
-      cell.offsetY = offsetY;
-      directUploadCells.push_back(std::move(cell));
+      cellTasks.push_back(
+          std::make_shared<DirectCellUploadTask>(std::move(imageBuffer), offsetX, offsetY));
       return;
     }
   }
   AtlasUploadTask::addCell(allocator, std::move(codec), atlasOffset);
-}
-
-void WebAtlasUploadTask::upload(Context* context) {
-  auto textureView = textureProxy->getTextureView();
-  if (textureView == nullptr) {
-    return;
-  }
-  for (auto& cell : directUploadCells) {
-    auto webBuffer = std::static_pointer_cast<WebImageBuffer>(cell.imageBuffer);
-    webBuffer->uploadToTexture(textureView->getTexture(), cell.offsetX, cell.offsetY);
-  }
-  directUploadCells.clear();
-  AtlasUploadTask::upload(context);
 }
 }  // namespace tgfx

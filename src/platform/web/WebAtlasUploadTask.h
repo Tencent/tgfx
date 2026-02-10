@@ -21,24 +21,11 @@
 #include "gpu/tasks/AtlasUploadTask.h"
 
 namespace tgfx {
-class ImageBuffer;
-
-struct DirectUploadCell {
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
-  int offsetX = 0;
-  int offsetY = 0;
-};
-
 class WebAtlasUploadTask final : public AtlasUploadTask {
  public:
   explicit WebAtlasUploadTask(std::shared_ptr<TextureProxy> proxy);
 
   void addCell(BlockAllocator* allocator, std::shared_ptr<ImageCodec> codec,
                const Point& atlasOffset) override;
-
-  void upload(Context* context) override;
-
- private:
-  std::vector<DirectUploadCell> directUploadCells = {};
 };
 }  // namespace tgfx

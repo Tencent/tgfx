@@ -70,7 +70,7 @@ bool WebImageBuffer::uploadToTexture(std::shared_ptr<Texture> texture, int offse
     return false;
   }
   auto glTexture = std::static_pointer_cast<GLTexture>(texture);
-  val::module_property("tgfx").call<void>("uploadToTextureRegion", val::module_property("GL"),
+  val::module_property("tgfx").call<void>("uploadToTexture", val::module_property("GL"),
                                           nativeImage, glTexture->textureID(), offsetX, offsetY,
                                           _alphaOnly);
   return true;
@@ -83,7 +83,7 @@ std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, boo
   }
   auto glTexture = std::static_pointer_cast<GLTexture>(textureView->getTexture());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          getImage(), glTexture->textureID(), _alphaOnly);
+                                          getImage(), glTexture->textureID(), 0, 0, _alphaOnly);
   return textureView;
 }
 

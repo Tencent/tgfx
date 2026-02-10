@@ -25,7 +25,18 @@
 
 namespace tgfx {
 class BlockAllocator;
-class CellDecodeTask;
+class CommandQueue;
+class Texture;
+
+class CellUploadTask {
+ public:
+  virtual ~CellUploadTask() = default;
+
+  virtual void upload(std::shared_ptr<Texture> texture, CommandQueue* queue) = 0;
+
+  virtual void cancel() {
+  }
+};
 
 class AtlasUploadTask {
  public:
@@ -43,12 +54,12 @@ class AtlasUploadTask {
   virtual void addCell(BlockAllocator* allocator, std::shared_ptr<ImageCodec> codec,
                        const Point& atlasOffset);
 
-  virtual void upload(Context* context);
+  void upload(Context* context);
 
  protected:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   ImageInfo hardwareInfo = {};
   void* hardwarePixels = nullptr;
-  std::vector<std::shared_ptr<CellDecodeTask>> tasks = {};
+  std::vector<std::shared_ptr<CellUploadTask>> cellTasks = {};
 };
 }  // namespace tgfx
