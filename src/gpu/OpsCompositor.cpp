@@ -133,7 +133,7 @@ void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Br
   DEBUG_ASSERT(!rRect.rect.isEmpty());
   auto rectBrush = brush.makeWithMatrix(state.matrix);
   if (!canAppend(PendingOpType::RRect, state.clip, rectBrush) ||
-      (pendingStrokes.empty() != (stroke == nullptr))) {
+      ShouldFlushRectOps(pendingStrokes, stroke)) {
     flushPendingOps(PendingOpType::RRect, state.clip, rectBrush);
   }
   auto record = drawingAllocator()->make<RRectRecord>(rRect, state.matrix, rectBrush.color);
@@ -388,9 +388,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
-      auto provider =
-          RRectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRRects), aaType,
-                                         std::move(pendingStrokes), dstColorSpace);
+      auto provider = RRectsVertexProvider::MakeFrom(
+          drawingAllocator(), std::move(pendingRRects), aaType, std::move(pendingStrokes),
+          dstColorSpace);
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::Atlas: {

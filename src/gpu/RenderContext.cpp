@@ -356,8 +356,8 @@ void RenderContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCSta
       continue;
     }
     // Glyphs with per-glyph rotation/scale (RSXform/Matrix) and outlines use path rendering
-    // to avoid aliasing.
-    if (HasComplexTransform(run) && run.font.hasOutlines()) {
+    // to avoid aliasing, unless all glyphs have only axis-aligned rotations (0/90/180/270).
+    if (HasComplexTransform(run) && run.font.hasOutlines() && !HasOnlyAxisAlignedRotation(run)) {
       for (size_t i = 0; i < run.glyphCount; i++) {
         drawGlyphAsPath(run.font, run.glyphs[i], GetGlyphMatrix(run, i), state, brush, stroke,
                         localClipBounds);

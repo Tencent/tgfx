@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,18 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { TGFX } from '../types';
-import { setTGFXModule } from '../tgfx-module';
-import * as tgfx from './tgfx';
-import { Matrix } from '../core/matrix';
-import { ScalerContext } from '../core/scaler-context';
-import { PathRasterizer } from './path-rasterizer';
+#pragma once
 
-export const TGFXBind = (module: TGFX) => {
-  setTGFXModule(module);
-  module.module = module;
-  module.ScalerContext = ScalerContext;
-  module.PathRasterizer = PathRasterizer;
-  module.Matrix = Matrix;
-  module.tgfx = { ...tgfx };
+#include "gpu/processors/NonAARRectGeometryProcessor.h"
+
+namespace tgfx {
+class GLSLNonAARRectGeometryProcessor : public NonAARRectGeometryProcessor {
+ public:
+  GLSLNonAARRectGeometryProcessor(int width, int height, bool stroke,
+                                  std::optional<PMColor> commonColor);
+
+  void emitCode(EmitArgs& args) const override;
+
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
+               FPCoordTransformIter* transformIter) const override;
 };
+}  // namespace tgfx
