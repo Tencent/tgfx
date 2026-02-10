@@ -10,15 +10,15 @@ description: 提交 PR - 自动识别新建或追加提交
 
 ## 前置检查
 
-以下三组命令**并行执行**（使用多个 Bash tool call 同时发起）：
+以下命令**并行执行**（使用多个 Bash tool call 同时发起）：
 
 ```bash
-# 并行 1：fetch + 分支信息
-git fetch origin main && git branch --show-current
+# 并行 1：获取当前分支名
+git branch --show-current
 ```
 
 ```bash
-# 并行 2：查询当前分支是否有开启的 PR（用上一步的分支名替换）
+# 并行 2：查询当前分支是否有开启的 PR
 gh pr list --head "$(git branch --show-current)" --state open --json number,url
 ```
 
