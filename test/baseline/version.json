@@ -470,6 +470,7 @@
         "TruncateTextLineTest": "c4c06bec"
     },
     "TextRenderTest": {
+        "AxisAlignedRotationRender": "484bda47",
         "ShapeMakeFromMixedTextBlob": "bf48e614",
         "TextBlobMixedPositioning": "484bda47",
         "TextBlobPositioningRender": "484bda47",
@@ -520,7 +521,7 @@
         "TextBasic": "48b78e36",
         "TextEdgeCases": "48b78e36",
         "TextEmoji": "48b78e36",
-        "TextModifier": "652e01bf",
+        "TextModifier": "035e066f",
         "TextPath": "ec49a65b",
         "TextPathWithTrimPath": "9020d7e2",
         "TextSelector": "ec49a65b",

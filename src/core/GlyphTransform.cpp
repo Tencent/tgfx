@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/GlyphTransform.h"
+#include "core/utils/MathExtra.h"
+#include "tgfx/core/RSXform.h"
 
 namespace tgfx {
 
@@ -67,6 +69,42 @@ Point GetGlyphPosition(const GlyphRun& run, size_t index) {
     default:
       return {};
   }
+}
+
+static bool IsAxisAlignedTransform(const RSXform& xform) {
+  return FloatNearlyZero(xform.scos) || FloatNearlyZero(xform.ssin);
+}
+
+static bool IsAxisAlignedTransform(const Matrix& matrix) {
+  auto sx = matrix.getScaleX();
+  auto sy = matrix.getScaleY();
+  auto kx = matrix.getSkewX();
+  auto ky = matrix.getSkewY();
+  if (FloatNearlyZero(kx) && FloatNearlyZero(ky)) {
+    return !FloatNearlyZero(sx) && !FloatNearlyZero(sy);
+  }
+  if (FloatNearlyZero(sx) && FloatNearlyZero(sy)) {
+    return !FloatNearlyZero(kx) && !FloatNearlyZero(ky);
+  }
+  return false;
+}
+
+bool HasOnlyAxisAlignedRotation(const GlyphRun& run) {
+  if (run.positioning == GlyphPositioning::RSXform) {
+    auto xforms = reinterpret_cast<const RSXform*>(run.positions);
+    for (size_t i = 0; i < run.glyphCount; i++) {
+      if (!IsAxisAlignedTransform(xforms[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+  for (size_t i = 0; i < run.glyphCount; i++) {
+    if (!IsAxisAlignedTransform(GetGlyphMatrix(run, i))) {
+      return false;
+    }
+  }
+  return true;
 }
 
 }  // namespace tgfx
