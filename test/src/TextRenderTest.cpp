@@ -31,6 +31,7 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/TextBlobBuilder.h"
+#include "tgfx/core/UTF.h"
 #include "utils/TestUtils.h"
 #include "utils/TextShaper.h"
 
@@ -1700,6 +1701,120 @@ TGFX_TEST(TextRenderTest, AxisAlignedRotationRender) {
 
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "TextRenderTest/AxisAlignedRotationRender"));
+}
+
+TGFX_TEST(TextRenderTest, VerticalTextLayout) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+
+  std::string text = "你好，测试。Hi,Tgfx.";
+  float fontSizes[] = {24.0f, 48.0f, 72.0f};
+  int columnCount = 3;
+
+  // Collect glyph IDs once (glyph mapping depends only on typeface, not font size).
+  Font baseFont(typeface, fontSizes[0]);
+  std::vector<GlyphID> glyphIDs = {};
+  const char* ptr = text.data();
+  const char* end = text.data() + text.size();
+  while (ptr < end) {
+    auto unichar = UTF::NextUTF8(&ptr, end);
+    if (unichar < 0) {
+      break;
+    }
+    auto glyphID = baseFont.getGlyphID(unichar);
+    if (glyphID == 0) {
+      continue;
+    }
+    glyphIDs.push_back(glyphID);
+  }
+
+  // Measure each column height.
+  float maxHeight = 0.0f;
+  float columnHeights[3] = {};
+
+  for (int col = 0; col < columnCount; col++) {
+    Font font(typeface, fontSizes[col]);
+    float y = 0.0f;
+    for (auto glyphID : glyphIDs) {
+      y += font.getAdvance(glyphID, true);
+    }
+    columnHeights[col] = y;
+    if (y > maxHeight) {
+      maxHeight = y;
+    }
+  }
+
+  // Measure horizontal reference line width using medium font size.
+  float horizontalFontSize = 48.0f;
+  Font horizontalFont(typeface, horizontalFontSize);
+  float horizontalWidth = 0.0f;
+  for (auto glyphID : glyphIDs) {
+    horizontalWidth += horizontalFont.getAdvance(glyphID, false);
+  }
+
+  float margin = 50.0f;
+  float gap = 30.0f;
+  float columnScale = 1.5f;
+  float horizontalLineHeight = horizontalFontSize * 1.5f;
+  float totalWidth = 0.0f;
+  for (int col = 0; col < columnCount; col++) {
+    totalWidth += fontSizes[col] * columnScale;
+  }
+  totalWidth += gap * static_cast<float>(columnCount - 1);
+  auto contentWidth = std::max(totalWidth, horizontalWidth);
+  auto surfaceWidth = static_cast<int>(ceilf(contentWidth + margin * 2.0f));
+  auto surfaceHeight = static_cast<int>(ceilf(horizontalLineHeight + maxHeight + margin * 2.0f));
+
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setColor(Color::Black());
+
+  // Draw horizontal reference text at the top.
+  auto fontMetrics = horizontalFont.getMetrics();
+  float horizontalStartX = margin + (contentWidth - horizontalWidth) * 0.5f;
+  float horizontalBaselineY = margin - fontMetrics.ascent;
+  float x = horizontalStartX;
+  std::vector<Point> horizontalPositions = {};
+  horizontalPositions.reserve(glyphIDs.size());
+  for (auto glyphID : glyphIDs) {
+    horizontalPositions.push_back({x, horizontalBaselineY});
+    x += horizontalFont.getAdvance(glyphID, false);
+  }
+  canvas->drawGlyphs(glyphIDs.data(), horizontalPositions.data(), glyphIDs.size(), horizontalFont,
+                      paint);
+
+  // Draw vertical columns below the horizontal reference.
+  float verticalTopY = margin + horizontalLineHeight;
+  float columnX = margin + (contentWidth - totalWidth) * 0.5f;
+  for (int col = 0; col < columnCount; col++) {
+    Font font(typeface, fontSizes[col]);
+    float centerX = columnX + fontSizes[col] * columnScale * 0.5f;
+    float startY = verticalTopY + (maxHeight - columnHeights[col]) * 0.5f;
+    float y = startY;
+    std::vector<Point> positions = {};
+    positions.reserve(glyphIDs.size());
+
+    for (auto glyphID : glyphIDs) {
+      auto offset = font.getVerticalOffset(glyphID);
+      positions.push_back({centerX + offset.x, y + offset.y});
+      y += font.getAdvance(glyphID, true);
+    }
+
+    canvas->drawGlyphs(glyphIDs.data(), positions.data(), glyphIDs.size(), font, paint);
+    columnX += fontSizes[col] * columnScale + gap;
+  }
+
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "TextRenderTest/VerticalTextLayout"));
 }
 
 }  // namespace tgfx
