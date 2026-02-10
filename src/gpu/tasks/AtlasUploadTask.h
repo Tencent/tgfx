@@ -33,9 +33,6 @@ class CellUploadTask {
   virtual ~CellUploadTask() = default;
 
   virtual void upload(std::shared_ptr<Texture> texture, CommandQueue* queue) = 0;
-
-  virtual void cancel() {
-  }
 };
 
 class AtlasUploadTask {

@@ -41,7 +41,7 @@ class AsyncCellUploadTask : public Task, public CellUploadTask {
     }
   }
 
-  void cancel() override {
+  ~AsyncCellUploadTask() override {
     Task::cancel();
   }
 
@@ -86,9 +86,6 @@ AtlasUploadTask::AtlasUploadTask(std::shared_ptr<TextureProxy> proxy)
 }
 
 AtlasUploadTask::~AtlasUploadTask() {
-  for (auto& task : cellTasks) {
-    task->cancel();
-  }
   if (hardwarePixels != nullptr) {
     auto hardwareBuffer = textureProxy->getHardwareBuffer();
     DEBUG_ASSERT(hardwareBuffer != nullptr);

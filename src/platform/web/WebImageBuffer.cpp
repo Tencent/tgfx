@@ -77,7 +77,12 @@ bool WebImageBuffer::uploadToTexture(std::shared_ptr<Texture> texture, int offse
 }
 
 std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, bool) const {
-  auto textureView = TextureView::MakeRGBA(context, width(), height(), nullptr, 0);
+  std::shared_ptr<TextureView> textureView = nullptr;
+  if (_alphaOnly) {
+    textureView = TextureView::MakeAlpha(context, width(), height(), nullptr, 0);
+  } else {
+    textureView = TextureView::MakeRGBA(context, width(), height(), nullptr, 0);
+  }
   if (textureView == nullptr) {
     return nullptr;
   }
