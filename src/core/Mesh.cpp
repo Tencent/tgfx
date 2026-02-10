@@ -42,7 +42,7 @@ std::shared_ptr<Mesh> Mesh::MakeFromShape(std::shared_ptr<Shape> shape, bool ant
   return ShapeMeshImpl::Make(std::move(shape), antiAlias);
 }
 
-Mesh::Mesh(MeshImpl* impl) : impl(impl) {
+Mesh::Mesh(std::unique_ptr<MeshImpl> impl) : impl(std::move(impl)) {
 }
 
 uint32_t Mesh::uniqueID() const {

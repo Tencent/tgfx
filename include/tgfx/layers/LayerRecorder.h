@@ -79,6 +79,13 @@ class LayerRecorder {
                    float y = 0);
 
   /**
+   * Adds a mesh with the specified paint.
+   * @param mesh The mesh object.
+   * @param paint The paint style for the mesh.
+   */
+  void addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint& paint);
+
+  /**
    * Returns the current transformation matrix. If no matrix is set, returns the identity matrix.
    */
   const Matrix& getMatrix() const;
@@ -94,13 +101,6 @@ class LayerRecorder {
    * Resets the transformation matrix to none.
    */
   void resetMatrix();
-
-  /**
-   * Adds a mesh with the specified paint.
-   * @param mesh The mesh object.
-   * @param paint The paint style for the mesh.
-   */
-  void addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint& paint);
 
  private:
   enum class PendingType {

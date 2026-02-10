@@ -64,7 +64,6 @@ class MeshLayer : public Layer {
 
   /**
    * Replaces the current list of fill styles with the given list.
-   * @param fills The new list of fill styles.
    */
   void setFillStyles(std::vector<std::shared_ptr<ShapeStyle>> fills);
 
@@ -75,13 +74,11 @@ class MeshLayer : public Layer {
 
   /**
    * Replace the current list of fill styles with the given fill style.
-   * @param fillStyle The fill style to set.
    */
   void setFillStyle(std::shared_ptr<ShapeStyle> fillStyle);
 
   /**
    * Adds a fill style to the end of the existing fill styles.
-   * @param fillStyle The fill style to add.
    */
   void addFillStyle(std::shared_ptr<ShapeStyle> fillStyle);
 

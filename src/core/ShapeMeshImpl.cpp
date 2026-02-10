@@ -26,10 +26,7 @@ std::shared_ptr<Mesh> ShapeMeshImpl::Make(std::shared_ptr<Shape> shape, bool ant
     return nullptr;
   }
   auto impl = new ShapeMeshImpl(std::move(shape), antiAlias);
-  return std::shared_ptr<Mesh>(new Mesh(impl), [](Mesh* mesh) {
-    delete mesh->impl;
-    delete mesh;
-  });
+  return std::shared_ptr<Mesh>(new Mesh(std::unique_ptr<MeshImpl>(impl)));
 }
 
 ShapeMeshImpl::ShapeMeshImpl(std::shared_ptr<Shape> shape, bool antiAlias)

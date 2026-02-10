@@ -84,10 +84,7 @@ std::shared_ptr<Mesh> VertexMeshImpl::Make(MeshTopology topology, int vertexCoun
 
   impl->_bounds.setBounds(impl->_positions, impl->_vertexCount);
 
-  return std::shared_ptr<Mesh>(new Mesh(impl), [](Mesh* mesh) {
-    delete mesh->impl;
-    delete mesh;
-  });
+  return std::shared_ptr<Mesh>(new Mesh(std::unique_ptr<MeshImpl>(impl)));
 }
 
 VertexMeshImpl::VertexMeshImpl(MeshTopology topology, int vertexCount, int indexCount)

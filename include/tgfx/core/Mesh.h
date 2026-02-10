@@ -57,9 +57,7 @@ class Mesh {
    * @param positions Vertex positions (required).
    * @param colors Per-vertex colors (optional).
    * @param texCoords Texture coordinates in pixel space (e.g., [0, imageWidth] x [0, imageHeight]),
-   *                  with origin at top-left (optional). These coordinates are transformed by the
-   *                  ImageShader's CoordTransform which handles normalization and any necessary
-   *                  Y-axis flipping based on the texture's ImageOrigin.
+   *                  with origin at top-left (optional).
    * @param indexCount Number of indices (0 if not indexed).
    * @param indices Index array (optional, uint16_t).
    * @return A shared pointer to the created Mesh, or nullptr if parameters are invalid.
@@ -98,9 +96,9 @@ class Mesh {
   Rect bounds() const;
 
  private:
-  explicit Mesh(MeshImpl* impl);
+  explicit Mesh(std::unique_ptr<MeshImpl> impl);
 
-  MeshImpl* impl = nullptr;
+  std::unique_ptr<MeshImpl> impl = nullptr;
 
   friend class MeshImpl;
   friend class VertexMeshImpl;
