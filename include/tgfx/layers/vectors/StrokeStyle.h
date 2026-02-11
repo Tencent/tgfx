@@ -146,6 +146,19 @@ class StrokeStyle : public VectorElement {
   void setDashOffset(float value);
 
   /**
+   * Indicates whether to scale the dash intervals so that the dash segments have the same length.
+   * The default value is false.
+   */
+  bool dashAdaptive() const {
+    return _dashAdaptive;
+  }
+
+  /**
+   * Sets whether the dash segments are the same length.
+   */
+  void setDashAdaptive(bool value);
+
+  /**
    * Returns the stroke alignment relative to the shape boundary. The default value is
    * StrokeAlign::Center.
    */
@@ -194,6 +207,7 @@ class StrokeStyle : public VectorElement {
   Stroke _stroke = Stroke(1.0f);
   std::vector<float> _dashes = {};
   float _dashOffset = 0.0f;
+  bool _dashAdaptive = false;
   StrokeAlign _strokeAlign = StrokeAlign::Center;
   LayerPlacement _placement = LayerPlacement::Background;
   std::shared_ptr<PathEffect> _cachedDashEffect = nullptr;

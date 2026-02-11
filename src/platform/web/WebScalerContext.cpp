@@ -18,10 +18,10 @@
 
 #include "WebScalerContext.h"
 #include "ReadPixelsFromCanvasImage.h"
+#include "WebImageBuffer.h"
 #include "WebTypeface.h"
 #include "core/utils/Log.h"
 #include "core/utils/StrokeUtils.h"
-#include "platform/web/WebImageBuffer.h"
 
 using namespace emscripten;
 
@@ -91,6 +91,22 @@ bool WebScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* 
     return false;
   }
   return ReadPixelsFromCanvasImage(imageData, dstInfo, dstPixels);
+}
+
+emscripten::val WebScalerContext::getGlyphCanvas(GlyphID glyphID, bool fauxBold,
+                                                 const Stroke* stroke, int padding) const {
+  auto properFauxBold = !hasColor() && fauxBold;
+  auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphID), properFauxBold, false);
+  if (bounds.isEmpty()) {
+    return emscripten::val::null();
+  }
+  if (!hasColor() && stroke != nullptr) {
+    ApplyStrokeToBounds(*stroke, &bounds);
+    return scalerContext.call<val>("getGlyphCanvas", getText(glyphID), bounds, properFauxBold,
+                                   *stroke, padding);
+  }
+  return scalerContext.call<val>("getGlyphCanvas", getText(glyphID), bounds, properFauxBold,
+                                 emscripten::val::undefined(), padding);
 }
 
 std::string WebScalerContext::getText(GlyphID glyphID) const {

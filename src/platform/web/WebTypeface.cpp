@@ -20,13 +20,13 @@
 #include <vector>
 #include "WebScalerContext.h"
 #include "core/utils/UniqueID.h"
-#include "platform/web/WebImageBuffer.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/UTF.h"
 
 using namespace emscripten;
 
 namespace tgfx {
+// MakeFromName is always implemented by WebTypeface on Web platform.
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& name,
                                                  const std::string& style) {
   return WebTypeface::Make(name, style);
@@ -36,6 +36,8 @@ std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string&, const FontS
   return nullptr;
 }
 
+// MakeFromPath/Bytes/Data are only implemented here when FreeType is not enabled.
+#ifndef TGFX_USE_FREETYPE
 std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string&, int) {
   return nullptr;
 }
@@ -47,6 +49,7 @@ std::shared_ptr<Typeface> Typeface::MakeFromBytes(const void*, size_t, int) {
 std::shared_ptr<Typeface> Typeface::MakeFromData(std::shared_ptr<Data>, int) {
   return nullptr;
 }
+#endif
 
 std::shared_ptr<WebTypeface> WebTypeface::Make(const std::string& name, const std::string& style) {
   auto scalerContextClass = val::module_property("ScalerContext");
@@ -120,9 +123,9 @@ AdvancedTypefaceInfo WebTypeface::getAdvancedInfo() const {
   AdvancedTypefaceInfo info;
   info.postScriptName = webFontFamily;
   info.type = AdvancedTypefaceInfo::FontType::Other;
-  info.flags = static_cast<AdvancedTypefaceInfo::FontFlags>(
-      AdvancedTypefaceInfo::FontFlags::NotEmbeddable |
-      AdvancedTypefaceInfo::FontFlags::NotSubsettable);
+  info.flags =
+      static_cast<AdvancedTypefaceInfo::FontFlags>(AdvancedTypefaceInfo::FontFlags::NotEmbeddable |
+                                                   AdvancedTypefaceInfo::FontFlags::NotSubsettable);
   info.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(0);
   return info;
 }

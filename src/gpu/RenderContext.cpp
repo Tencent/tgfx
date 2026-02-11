@@ -128,8 +128,8 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
     glyphOffset->y = bounds.top;
     auto width = FloatCeilToInt(bounds.width());
     auto height = FloatCeilToInt(bounds.height());
-    return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, hasFauxBold,
-                                             stroke, *glyphOffset);
+    return GlyphRasterizer::MakeFrom(width, height, scalerContext, glyphID, hasFauxBold, stroke,
+                                     *glyphOffset);
   }
 
   std::shared_ptr<Shape> shape = nullptr;

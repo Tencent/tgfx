@@ -26,8 +26,8 @@
 #pragma clang diagnostic pop
 #include "base/TGFXTest.h"
 #include "core/NoConicsPathIterator.h"
-#include "core/PathRef.h"
 #include "core/PathRasterizer.h"
+#include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/ShapeRasterizer.h"
 #include "gtest/gtest.h"
