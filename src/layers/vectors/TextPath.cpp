@@ -125,8 +125,8 @@ static float AdjustPathOffset(float pathOffset, float pathLength, bool reversed,
 }
 
 static void PlaceGlyphOnCurve(Glyph& glyph, const Point& curvePoint, const Point& curveTangent,
-                               bool perpendicular, bool reversed, float baselineCos,
-                               float baselineSin, const Matrix& invertedMatrix) {
+                              bool perpendicular, bool reversed, float baselineCos,
+                              float baselineSin, const Matrix& invertedMatrix) {
   auto rotationScale = glyph.matrix;
   rotationScale.setTranslateX(0);
   rotationScale.setTranslateY(0);
@@ -187,8 +187,7 @@ void TextPath::apply(VectorContext* context) {
     auto availableLength = pathLength + _lastMargin - _firstMargin;
     float extraSpacingPerGap = 0.0f;
     if (glyphCount > 1 && totalAdvance > 0.0f) {
-      extraSpacingPerGap =
-          (availableLength - totalAdvance) / static_cast<float>(glyphCount - 1);
+      extraSpacingPerGap = (availableLength - totalAdvance) / static_cast<float>(glyphCount - 1);
     }
 
     size_t glyphIndex = 0;
@@ -250,7 +249,7 @@ void TextPath::apply(VectorContext* context) {
         Point anchorNew = {position.x - tangent.y * normalOffset,
                            position.y + tangent.x * normalOffset};
         PlaceGlyphOnCurve(glyph, anchorNew, tangent, _perpendicular, _reversed, baselineCos,
-                           baselineSin, invertedMatrix);
+                          baselineSin, invertedMatrix);
       }
     }
   }

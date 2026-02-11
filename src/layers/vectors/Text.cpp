@@ -22,8 +22,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Text> Text::Make(std::shared_ptr<TextBlob> textBlob,
-                                 std::vector<Point> anchors) {
+std::shared_ptr<Text> Text::Make(std::shared_ptr<TextBlob> textBlob, std::vector<Point> anchors) {
   if (textBlob == nullptr) {
     return nullptr;
   }

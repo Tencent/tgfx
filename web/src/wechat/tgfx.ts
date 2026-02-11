@@ -28,47 +28,54 @@ export const uploadToTexture = (
   GL: EmscriptenGL,
   source: TexImageSource | ArrayBufferImage | WxOffscreenCanvas,
   textureID: number,
+  offsetX: number,
+  offsetY: number,
   alphaOnly: boolean,
 ) => {
   if (!source) {
     return;
   }
-  const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
+  const gl = GL.currentContext?.GLctx as WebGL2RenderingContext;
   gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
-  if (!alphaOnly && ('isOffscreenCanvas' in source) && source.isOffscreenCanvas) {
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+  if (('isOffscreenCanvas' in source) && source.isOffscreenCanvas) {
     const ctx = source.getContext('2d') as OffscreenCanvasRenderingContext2D;
     const imgData = ctx.getImageData(0, 0, source.width, source.height);
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.RGBA,
-      imgData.width,
-      imgData.height,
-      0,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      new Uint8Array(imgData.data),
-    );
+    const pixels = new Uint8Array(imgData.data);
+    if (alphaOnly) {
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, offsetX, offsetY, imgData.width, imgData.height, gl.RED,
+        gl.UNSIGNED_BYTE, pixels);
+    } else {
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, offsetX, offsetY, imgData.width, imgData.height, gl.RGBA,
+        gl.UNSIGNED_BYTE, pixels);
+    }
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     return;
   }
-
-  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
   if (source instanceof ArrayBufferImage) {
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.RGBA,
-      source.width,
-      source.height,
-      0,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      new Uint8Array(source.buffer),
-    );
+    const pixels = new Uint8Array(source.buffer);
+    if (alphaOnly) {
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, offsetX, offsetY, source.width, source.height, gl.RED,
+        gl.UNSIGNED_BYTE, pixels);
+    } else {
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, offsetX, offsetY, source.width, source.height, gl.RGBA,
+        gl.UNSIGNED_BYTE, pixels);
+    }
   } else {
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource);
+    if (alphaOnly) {
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, offsetX, offsetY, gl.RED, gl.UNSIGNED_BYTE,
+        source as TexImageSource);
+    } else {
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, offsetX, offsetY, gl.RGBA, gl.UNSIGNED_BYTE,
+        source as TexImageSource);
+    }
   }
-
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 };
 

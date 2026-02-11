@@ -33,6 +33,10 @@ class ScalerContext {
 
   virtual ~ScalerContext() = default;
 
+  virtual bool asyncSupport() const {
+    return true;
+  }
+
   std::shared_ptr<Typeface> getTypeface() const {
     return typeface;
   }
