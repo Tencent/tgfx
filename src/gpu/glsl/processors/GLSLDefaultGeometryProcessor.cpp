@@ -45,7 +45,7 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
   auto matrixName =
       args.uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
   std::string positionName = "position";
-  vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
+  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
                            matrixName.c_str(), position.name().c_str());
 
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));

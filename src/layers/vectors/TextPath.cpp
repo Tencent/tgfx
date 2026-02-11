@@ -20,7 +20,6 @@
 #include <cmath>
 #include "Geometry.h"
 #include "VectorContext.h"
-#include "core/utils/MathExtra.h"
 #include "tgfx/core/PathMeasure.h"
 
 namespace tgfx {
@@ -37,11 +36,11 @@ void TextPath::setPath(Path value) {
   invalidateContent();
 }
 
-void TextPath::setTextAlign(TextAlign value) {
-  if (_textAlign == value) {
+void TextPath::setBaselineOrigin(Point value) {
+  if (_baselineOrigin == value) {
     return;
   }
-  _textAlign = value;
+  _baselineOrigin = value;
   invalidateContent();
 }
 
@@ -77,6 +76,22 @@ void TextPath::setReversed(bool value) {
   invalidateContent();
 }
 
+void TextPath::setBaselineAngle(float value) {
+  if (_baselineAngle == value) {
+    return;
+  }
+  _baselineAngle = value;
+  invalidateContent();
+}
+
+void TextPath::setForceAlignment(bool value) {
+  if (_forceAlignment == value) {
+    return;
+  }
+  _forceAlignment = value;
+  invalidateContent();
+}
+
 static bool GetPosTanExtended(PathMeasure* pathMeasure, float distance, float pathLength,
                               Point* position, Point* tangent) {
   if (distance >= 0.0f && distance <= pathLength) {
@@ -99,6 +114,44 @@ static bool GetPosTanExtended(PathMeasure* pathMeasure, float distance, float pa
   return true;
 }
 
+static float AdjustPathOffset(float pathOffset, float pathLength, bool reversed, bool isClosed) {
+  if (reversed) {
+    pathOffset = pathLength - pathOffset;
+  }
+  if (isClosed && (pathOffset < 0.0f || pathOffset > pathLength)) {
+    pathOffset = std::fmod(std::fmod(pathOffset, pathLength) + pathLength, pathLength);
+  }
+  return pathOffset;
+}
+
+static void PlaceGlyphOnCurve(Glyph& glyph, const Point& curvePoint, const Point& curveTangent,
+                               bool perpendicular, bool reversed, float baselineCos,
+                               float baselineSin, const Matrix& invertedMatrix) {
+  auto rotationScale = glyph.matrix;
+  rotationScale.setTranslateX(0);
+  rotationScale.setTranslateY(0);
+  auto localAnchor = rotationScale.mapXY(glyph.anchor.x, glyph.anchor.y);
+  if (perpendicular) {
+    // Compute sin/cos of (curveAngle - baselineAngle) using the compound angle formula.
+    // curveTangent is the unit direction vector (cos, sin) of the curve at this point.
+    // Negating it for reversed paths is equivalent to adding 180 degrees.
+    float curveC = reversed ? -curveTangent.x : curveTangent.x;
+    float curveS = reversed ? -curveTangent.y : curveTangent.y;
+    float finalCos = curveC * baselineCos + curveS * baselineSin;
+    float finalSin = curveS * baselineCos - curveC * baselineSin;
+    Matrix curveRotation = Matrix::I();
+    curveRotation.setSinCos(finalSin, finalCos);
+    auto rotatedAnchor = curveRotation.mapXY(localAnchor.x, localAnchor.y);
+    glyph.matrix = rotationScale;
+    glyph.matrix.postConcat(curveRotation);
+    glyph.matrix.postTranslate(curvePoint.x - rotatedAnchor.x, curvePoint.y - rotatedAnchor.y);
+  } else {
+    glyph.matrix = rotationScale;
+    glyph.matrix.postTranslate(curvePoint.x - localAnchor.x, curvePoint.y - localAnchor.y);
+  }
+  glyph.matrix.postConcat(invertedMatrix);
+}
+
 void TextPath::apply(VectorContext* context) {
   if (_path.isEmpty()) {
     return;
@@ -114,96 +167,91 @@ void TextPath::apply(VectorContext* context) {
   auto isClosed = pathMeasure->isClosed();
   auto glyphGeometries = context->getGlyphGeometries();
 
-  // Calculate total width
-  float totalWidth = 0.0f;
-  size_t totalGlyphCount = 0;
-  for (auto* geometry : glyphGeometries) {
-    if (geometry->glyphs.empty()) {
-      continue;
-    }
-    totalGlyphCount += geometry->glyphs.size();
-    for (const auto& glyph : geometry->glyphs) {
-      totalWidth += glyph.font.getAdvance(glyph.glyphID);
-    }
-  }
-
-  if (totalGlyphCount == 0) {
-    return;
-  }
-
-  // lastMargin is negative to shrink from end
-  auto availableLength = std::abs(pathLength + _lastMargin - _firstMargin);
-  float letterSpacing = 0.0f;
-  if (_textAlign == TextAlign::Justify && totalGlyphCount > 1) {
-    auto glyphIntervals = static_cast<float>(totalGlyphCount - 1);
-    if (_firstMargin <= pathLength + _lastMargin) {
-      letterSpacing = (availableLength - totalWidth) / glyphIntervals;
-    } else {
-      // When firstMargin exceeds the path end, use negative spacing
-      letterSpacing = -(totalWidth + availableLength) / glyphIntervals;
-    }
-  }
-
-  // When textAlign is Justify, always start from firstMargin
-  float startOffset = _firstMargin;
-  if (_textAlign != TextAlign::Justify) {
-    switch (_textAlign) {
-      case TextAlign::Center:
-        startOffset = (pathLength - totalWidth) * 0.5f + _firstMargin + _lastMargin;
-        break;
-      case TextAlign::End:
-        startOffset = pathLength + _lastMargin - totalWidth;
-        break;
-      default:
-        break;
-    }
-  }
-
-  float currentPosition = startOffset;
-  for (auto* geometry : glyphGeometries) {
-    if (geometry->glyphs.empty()) {
-      continue;
-    }
-
-    Matrix invertedMatrix = Matrix::I();
-    if (!geometry->matrix.invert(&invertedMatrix)) {
-      invertedMatrix = Matrix::I();
-    }
-
-    for (auto& glyph : geometry->glyphs) {
-      auto advance = glyph.font.getAdvance(glyph.glyphID);
-      auto centerPosition = currentPosition + glyph.anchor.x;
-
-      if (_reversed) {
-        centerPosition = pathLength - centerPosition;
+  if (_forceAlignment) {
+    // ForceAlignment mode: ignores original glyph positions and baselineOrigin. Glyphs are laid out
+    // consecutively using their advance widths, with spacing adjusted to fill the available path
+    // length between firstMargin and lastMargin. Each glyph's anchor is placed at the center of its
+    // advance on the curve.
+    size_t glyphCount = 0;
+    float totalAdvance = 0.0f;
+    for (auto* geometry : glyphGeometries) {
+      for (auto& glyph : geometry->glyphs) {
+        totalAdvance += glyph.font.getAdvance(glyph.glyphID);
+        glyphCount++;
       }
+    }
+    if (glyphCount == 0) {
+      return;
+    }
 
-      if (isClosed && (centerPosition < 0.0f || centerPosition > pathLength)) {
-        centerPosition = std::fmod(std::fmod(centerPosition, pathLength) + pathLength, pathLength);
-      }
+    auto availableLength = pathLength + _lastMargin - _firstMargin;
+    float extraSpacingPerGap = 0.0f;
+    if (glyphCount > 1 && totalAdvance > 0.0f) {
+      extraSpacingPerGap =
+          (availableLength - totalAdvance) / static_cast<float>(glyphCount - 1);
+    }
 
-      Point position = {};
-      Point tangent = {};
-      if (!GetPosTanExtended(pathMeasure.get(), centerPosition, pathLength, &position, &tangent)) {
-        currentPosition += advance + letterSpacing;
+    size_t glyphIndex = 0;
+    float accumulatedAdvance = 0.0f;
+    for (auto* geometry : glyphGeometries) {
+      if (geometry->glyphs.empty()) {
         continue;
       }
+      Matrix invertedMatrix = Matrix::I();
+      geometry->matrix.invert(&invertedMatrix);
+      for (auto& glyph : geometry->glyphs) {
+        float advance = glyph.font.getAdvance(glyph.glyphID);
+        float pathOffset = _firstMargin + advance * 0.5f + accumulatedAdvance +
+                           static_cast<float>(glyphIndex) * extraSpacingPerGap;
+        pathOffset = AdjustPathOffset(pathOffset, pathLength, _reversed, isClosed);
 
-      Matrix curveMatrix = Matrix::I();
-      if (_perpendicular) {
-        auto angle = RadiansToDegrees(std::atan2(tangent.y, tangent.x));
-        if (_reversed) {
-          angle += 180.0f;
+        Point position = {};
+        Point tangent = {};
+        if (GetPosTanExtended(pathMeasure.get(), pathOffset, pathLength, &position, &tangent)) {
+          PlaceGlyphOnCurve(glyph, position, tangent, _perpendicular, _reversed, 1.0f, 0.0f,
+                            invertedMatrix);
         }
-        curveMatrix.setRotate(angle);
+        accumulatedAdvance += advance;
+        glyphIndex++;
       }
-      curveMatrix.postTranslate(position.x, position.y);
+    }
+  } else {
+    // Normal mode: each glyph's anchor displacement from baselineOrigin is decomposed into
+    // tangent and normal components relative to the baseline. The tangent component maps to a
+    // position along the curve, and the normal component is preserved as perpendicular offset.
+    float baselineRadians = _baselineAngle * static_cast<float>(M_PI) / 180.0f;
+    float baselineCos = std::cos(baselineRadians);
+    float baselineSin = std::sin(baselineRadians);
 
-      glyph.matrix.setTranslate(-glyph.anchor.x, -glyph.anchor.y);
-      glyph.matrix.postConcat(curveMatrix);
-      glyph.matrix.postConcat(invertedMatrix);
+    for (auto* geometry : glyphGeometries) {
+      if (geometry->glyphs.empty()) {
+        continue;
+      }
+      Matrix invertedMatrix = Matrix::I();
+      geometry->matrix.invert(&invertedMatrix);
+      for (auto& glyph : geometry->glyphs) {
+        auto localPos = glyph.matrix.mapXY(glyph.anchor.x, glyph.anchor.y);
+        auto anchorOld = geometry->matrix.mapXY(localPos.x, localPos.y);
 
-      currentPosition += advance + letterSpacing;
+        float dx = anchorOld.x - _baselineOrigin.x;
+        float dy = anchorOld.y - _baselineOrigin.y;
+        float tangentDistance = dx * baselineCos + dy * baselineSin;
+        float normalOffset = dy * baselineCos - dx * baselineSin;
+
+        float pathOffset = _firstMargin + tangentDistance;
+        pathOffset = AdjustPathOffset(pathOffset, pathLength, _reversed, isClosed);
+
+        Point position = {};
+        Point tangent = {};
+        if (!GetPosTanExtended(pathMeasure.get(), pathOffset, pathLength, &position, &tangent)) {
+          continue;
+        }
+
+        Point anchorNew = {position.x - tangent.y * normalOffset,
+                           position.y + tangent.x * normalOffset};
+        PlaceGlyphOnCurve(glyph, anchorNew, tangent, _perpendicular, _reversed, baselineCos,
+                           baselineSin, invertedMatrix);
+      }
     }
   }
 }
