@@ -1760,9 +1760,11 @@ TGFX_TEST(TextRenderTest, VerticalTextLayout) {
     auto glyphID = glyphIDs[i];
     auto unichar = unichars[i];
     // Latin characters (U+0020..U+007E) are rotated 90 degrees clockwise and use horizontal
-    // advance as the vertical step. CJK and other characters use the font's built-in vertical
-    // offset and vertical advance.
+    // advance as the vertical step. CJK ideographs (U+4E00..U+9FFF) use the font's built-in
+    // vertical offset. CJK punctuation and other characters are centered within the vertical
+    // advance cell without rotation, since getVerticalOffset positions them poorly.
     bool isLatin = (unichar >= 0x0020 && unichar <= 0x007E);
+    bool isCJKIdeograph = (unichar >= 0x4E00 && unichar <= 0x9FFF);
     float step = 0.0f;
     if (isLatin) {
       auto horizontalAdvance = font.getAdvance(glyphID, false);
@@ -1776,10 +1778,24 @@ TGFX_TEST(TextRenderTest, VerticalTextLayout) {
       auto glyphPos = Point::Make(glyphX, glyphY);
       canvas->drawGlyphs(&glyphID, &glyphPos, 1, font, paint);
       canvas->restore();
-    } else {
+    } else if (isCJKIdeograph) {
       step = font.getAdvance(glyphID, true);
       auto offset = font.getVerticalOffset(glyphID);
       auto glyphPos = Point::Make(centerX + offset.x, y + offset.y);
+      canvas->drawGlyphs(&glyphID, &glyphPos, 1, font, paint);
+    } else {
+      // Fullwidth punctuation is placed in the upper-right corner of the vertical advance cell.
+      // Horizontally: align the glyph's right edge to the cell's right edge.
+      // Vertically: start from top-aligned (y - bounds.top), then shift down by 25% of the
+      // remaining space (step - bounds.height) to avoid the glyph sticking too close to the
+      // character above, matching the spacing seen in mainstream vertical text renderers.
+      step = font.getAdvance(glyphID, true);
+      auto bounds = font.getBounds(glyphID);
+      float cellRight = centerX + fontSize * 0.5f;
+      float glyphX = cellRight - bounds.right;
+      float padding = (step - bounds.height()) * 0.25f;
+      float glyphY = y - bounds.top + padding;
+      auto glyphPos = Point::Make(glyphX, glyphY);
       canvas->drawGlyphs(&glyphID, &glyphPos, 1, font, paint);
     }
     y += step;
