@@ -462,9 +462,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
-      auto provider = RRectsVertexProvider::MakeFrom(
-          drawingAllocator(), std::move(pendingRRects), aaType, std::move(pendingStrokes),
-          dstColorSpace);
+      auto provider =
+          RRectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRRects), aaType,
+                                         std::move(pendingStrokes), dstColorSpace);
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::Atlas: {

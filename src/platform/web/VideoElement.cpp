@@ -64,7 +64,7 @@ std::shared_ptr<TextureView> VideoElement::onMakeTexture(Context* context, bool 
 bool VideoElement::onUpdateTexture(std::shared_ptr<TextureView> textureView) {
   auto glTexture = std::static_pointer_cast<GLTexture>(textureView->getTexture());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          source, glTexture->textureID(), false);
+                                          source, glTexture->textureID(), 0, 0, false);
   return true;
 }
 }  // namespace tgfx

@@ -64,9 +64,6 @@ done
 获取当前分支相对 main 的完整变更：
 
 ```bash
-# 拉取最新的 main 分支
-git fetch origin main
-
 # 当前分支相对 origin/main 的完整变更（已提交 + 暂存区 + 工作区的最终结果）
 git diff origin/main
 
@@ -102,9 +99,6 @@ cd /tmp/pr-review-{pr_number}
 
 获取变更内容和评论（两种情况通用）：
 ```bash
-# 拉取最新的 main 分支
-git fetch origin main
-
 # 当前分支相对 origin/main 的完整变更
 git diff origin/main
 
