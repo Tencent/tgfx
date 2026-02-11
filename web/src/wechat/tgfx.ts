@@ -32,10 +32,6 @@ export const uploadToTexture = (
   offsetY: number,
   alphaOnly: boolean,
 ) => {
-  const sourceType = source instanceof ArrayBufferImage ? 'ArrayBufferImage'
-    : (source && ('isOffscreenCanvas' in source) && source.isOffscreenCanvas) ? 'WxOffscreenCanvas'
-    : typeof source;
-  console.log(`[uploadToTexture] textureID=${textureID} offset=(${offsetX},${offsetY}) alphaOnly=${alphaOnly} sourceType=${sourceType}`);
   if (!source) {
     return;
   }
