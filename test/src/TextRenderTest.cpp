@@ -1713,12 +1713,13 @@ TGFX_TEST(TextRenderTest, VerticalTextLayout) {
   ASSERT_TRUE(typeface != nullptr);
 
   std::string text = "你好，测试。Hi,Tgfx.";
-  float fontSizes[] = {24.0f, 48.0f, 72.0f};
-  int columnCount = 3;
+  float fontSize = 50.0f;
+  Font font(typeface, fontSize);
+  auto metrics = font.getMetrics();
 
-  // Collect glyph IDs once (glyph mapping depends only on typeface, not font size).
-  Font baseFont(typeface, fontSizes[0]);
+  // Collect glyph IDs and unichars.
   std::vector<GlyphID> glyphIDs = {};
+  std::vector<Unichar> unichars = {};
   const char* ptr = text.data();
   const char* end = text.data() + text.size();
   while (ptr < end) {
@@ -1726,50 +1727,25 @@ TGFX_TEST(TextRenderTest, VerticalTextLayout) {
     if (unichar < 0) {
       break;
     }
-    auto glyphID = baseFont.getGlyphID(unichar);
+    auto glyphID = font.getGlyphID(unichar);
     if (glyphID == 0) {
       continue;
     }
     glyphIDs.push_back(glyphID);
+    unichars.push_back(unichar);
   }
 
-  // Measure each column height.
-  float maxHeight = 0.0f;
-  float columnHeights[3] = {};
-
-  for (int col = 0; col < columnCount; col++) {
-    Font font(typeface, fontSizes[col]);
-    float y = 0.0f;
-    for (auto glyphID : glyphIDs) {
-      y += font.getAdvance(glyphID, true);
-    }
-    columnHeights[col] = y;
-    if (y > maxHeight) {
-      maxHeight = y;
-    }
-  }
-
-  // Measure horizontal reference line width using medium font size.
-  float horizontalFontSize = 48.0f;
-  Font horizontalFont(typeface, horizontalFontSize);
-  float horizontalWidth = 0.0f;
-  for (auto glyphID : glyphIDs) {
-    horizontalWidth += horizontalFont.getAdvance(glyphID, false);
+  // Measure total column height. Latin characters use horizontal advance as the vertical step
+  // after rotation, while CJK characters use the font's vertical advance.
+  float columnHeight = 0.0f;
+  for (size_t i = 0; i < glyphIDs.size(); i++) {
+    bool isLatin = (unichars[i] >= 0x0020 && unichars[i] <= 0x007E);
+    columnHeight += isLatin ? font.getAdvance(glyphIDs[i], false) : font.getAdvance(glyphIDs[i], true);
   }
 
   float margin = 50.0f;
-  float gap = 30.0f;
-  float columnScale = 1.5f;
-  float horizontalLineHeight = horizontalFontSize * 1.5f;
-  float totalWidth = 0.0f;
-  for (int col = 0; col < columnCount; col++) {
-    totalWidth += fontSizes[col] * columnScale;
-  }
-  totalWidth += gap * static_cast<float>(columnCount - 1);
-  auto contentWidth = std::max(totalWidth, horizontalWidth);
-  auto surfaceWidth = static_cast<int>(ceilf(contentWidth + margin * 2.0f));
-  auto surfaceHeight = static_cast<int>(ceilf(horizontalLineHeight + maxHeight + margin * 2.0f));
-
+  auto surfaceWidth = static_cast<int>(ceilf(fontSize + margin * 2.0f));
+  auto surfaceHeight = static_cast<int>(ceilf(columnHeight + margin * 2.0f));
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
@@ -1778,39 +1754,35 @@ TGFX_TEST(TextRenderTest, VerticalTextLayout) {
   Paint paint;
   paint.setColor(Color::Black());
 
-  // Draw horizontal reference text at the top.
-  auto fontMetrics = horizontalFont.getMetrics();
-  float horizontalStartX = margin + (contentWidth - horizontalWidth) * 0.5f;
-  float horizontalBaselineY = margin - fontMetrics.ascent;
-  float x = horizontalStartX;
-  std::vector<Point> horizontalPositions = {};
-  horizontalPositions.reserve(glyphIDs.size());
-  for (auto glyphID : glyphIDs) {
-    horizontalPositions.push_back({x, horizontalBaselineY});
-    x += horizontalFont.getAdvance(glyphID, false);
-  }
-  canvas->drawGlyphs(glyphIDs.data(), horizontalPositions.data(), glyphIDs.size(), horizontalFont,
-                      paint);
-
-  // Draw vertical columns below the horizontal reference.
-  float verticalTopY = margin + horizontalLineHeight;
-  float columnX = margin + (contentWidth - totalWidth) * 0.5f;
-  for (int col = 0; col < columnCount; col++) {
-    Font font(typeface, fontSizes[col]);
-    float centerX = columnX + fontSizes[col] * columnScale * 0.5f;
-    float startY = verticalTopY + (maxHeight - columnHeights[col]) * 0.5f;
-    float y = startY;
-    std::vector<Point> positions = {};
-    positions.reserve(glyphIDs.size());
-
-    for (auto glyphID : glyphIDs) {
+  float centerX = static_cast<float>(surfaceWidth) * 0.5f;
+  float y = margin;
+  for (size_t i = 0; i < glyphIDs.size(); i++) {
+    auto glyphID = glyphIDs[i];
+    auto unichar = unichars[i];
+    // Latin characters (U+0020..U+007E) are rotated 90 degrees clockwise and use horizontal
+    // advance as the vertical step. CJK and other characters use the font's built-in vertical
+    // offset and vertical advance.
+    bool isLatin = (unichar >= 0x0020 && unichar <= 0x007E);
+    float step = 0.0f;
+    if (isLatin) {
+      auto horizontalAdvance = font.getAdvance(glyphID, false);
+      step = horizontalAdvance;
+      float cellCenterY = y + step * 0.5f;
+      float glyphX = -horizontalAdvance * 0.5f;
+      float glyphY = -(metrics.ascent + metrics.descent) * 0.5f;
+      canvas->save();
+      canvas->translate(centerX, cellCenterY);
+      canvas->rotate(90.0f);
+      auto glyphPos = Point::Make(glyphX, glyphY);
+      canvas->drawGlyphs(&glyphID, &glyphPos, 1, font, paint);
+      canvas->restore();
+    } else {
+      step = font.getAdvance(glyphID, true);
       auto offset = font.getVerticalOffset(glyphID);
-      positions.push_back({centerX + offset.x, y + offset.y});
-      y += font.getAdvance(glyphID, true);
+      auto glyphPos = Point::Make(centerX + offset.x, y + offset.y);
+      canvas->drawGlyphs(&glyphID, &glyphPos, 1, font, paint);
     }
-
-    canvas->drawGlyphs(glyphIDs.data(), positions.data(), glyphIDs.size(), font, paint);
-    columnX += fontSizes[col] * columnScale + gap;
+    y += step;
   }
 
   context->flushAndSubmit();
