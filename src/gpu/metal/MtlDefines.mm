@@ -341,4 +341,26 @@ bool MtlDefines::IsRenderableFormat(MTLPixelFormat format) {
   }
 }
 
+MTLCullMode MtlDefines::ToMTLCullMode(CullMode cullMode) {
+  switch (cullMode) {
+    case CullMode::None:
+      return MTLCullModeNone;
+    case CullMode::Front:
+      return MTLCullModeFront;
+    case CullMode::Back:
+      return MTLCullModeBack;
+  }
+  return MTLCullModeNone;
+}
+
+MTLWinding MtlDefines::ToMTLWinding(FrontFace frontFace) {
+  switch (frontFace) {
+    case FrontFace::CW:
+      return MTLWindingClockwise;
+    case FrontFace::CCW:
+      return MTLWindingCounterClockwise;
+  }
+  return MTLWindingCounterClockwise;
+}
+
 }  // namespace tgfx

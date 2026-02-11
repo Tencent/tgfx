@@ -211,8 +211,10 @@ static std::string convertSPIRVToMSL(const std::vector<uint32_t>& spirvBinary, S
   spirv_cross::CompilerMSL mslCompiler(std::move(spvParser.get_parsed_ir()));
 
   spirv_cross::CompilerMSL::Options mslOptions;
-  mslOptions.set_msl_version(2, 0);
+  mslOptions.set_msl_version(2, 3);
   mslOptions.enable_decoration_binding = true;
+  // Enable framebuffer fetch so SPIRV-Cross converts subpassInput to [[color(0)]] in MSL.
+  mslOptions.use_framebuffer_fetch_subpasses = true;
   mslCompiler.set_msl_options(mslOptions);
 
   auto commonOptions = mslCompiler.get_common_options();

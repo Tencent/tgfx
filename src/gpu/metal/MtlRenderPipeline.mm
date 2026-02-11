@@ -37,6 +37,10 @@ MtlRenderPipeline::MtlRenderPipeline(MtlGPU* gpu, const RenderPipelineDescriptor
   createPipelineState(gpu, descriptor);
   createDepthStencilState(gpu->device(), descriptor);
 
+  // Save cull mode and front face from the primitive descriptor.
+  cullMode = MtlDefines::ToMTLCullMode(descriptor.primitive.cullMode);
+  frontFace = MtlDefines::ToMTLWinding(descriptor.primitive.frontFace);
+
   // Build texture binding mapping: logical binding -> Metal texture index (from 0).
   // This decouples the caller's binding numbers from the actual Metal texture slots,
   // matching the approach used by the OpenGL backend (GLRenderPipeline::textureUnits).

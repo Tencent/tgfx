@@ -43,25 +43,21 @@ bool MtlCaps::isFormatAsColorAttachment(PixelFormat format) const {
 }
 
 int MtlCaps::getSampleCount(int requestedCount, PixelFormat format) const {
+  if (requestedCount <= 1) {
+    return 1;
+  }
   auto it = formatTable.find(format);
-  if (it == formatTable.end()) {
-    return 0;
+  if (it == formatTable.end() || it->second.sampleCounts.empty()) {
+    return 1;
   }
-  
-  const auto& sampleCounts = it->second.sampleCounts;
-  if (sampleCounts.empty()) {
-    return 0;
-  }
-  
-  // Find the largest supported sample count that is <= requestedCount
-  int bestCount = 0;
-  for (int count : sampleCounts) {
-    if (count <= requestedCount && count > bestCount) {
-      bestCount = count;
+  // Find the smallest supported sample count that is >= requestedCount.
+  // sampleCounts is sorted in ascending order (e.g. {1, 2, 4, 8}).
+  for (int count : it->second.sampleCounts) {
+    if (count >= requestedCount) {
+      return count;
     }
   }
-  
-  return bestCount > 0 ? bestCount : sampleCounts[0];
+  return 1;
 }
 
 void MtlCaps::initFeatureSet(id<MTLDevice> device) {

@@ -105,6 +105,16 @@ class MtlDefines {
    * Check if the Metal pixel format supports rendering.
    */
   static bool IsRenderableFormat(MTLPixelFormat format);
+
+  /**
+   * Convert TGFX cull mode to Metal cull mode.
+   */
+  static MTLCullMode ToMTLCullMode(CullMode cullMode);
+
+  /**
+   * Convert TGFX front face to Metal winding order.
+   */
+  static MTLWinding ToMTLWinding(FrontFace frontFace);
 };
 
 }  // namespace tgfx

@@ -69,8 +69,11 @@ class MtlRenderPipeline : public RenderPipeline, public MtlResource {
   id<MTLDepthStencilState> depthStencilState = nil;
   id<MTLLibrary> sampleMaskLibrary = nil;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
+  MTLCullMode cullMode = MTLCullModeNone;
+  MTLWinding frontFace = MTLWindingCounterClockwise;
   
   friend class MtlGPU;
+  friend class MtlRenderPass;
 };
 
 }  // namespace tgfx

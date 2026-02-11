@@ -204,6 +204,10 @@ void MtlRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   if (currentPipeline->mtlDepthStencilState()) {
     [renderEncoder setDepthStencilState:currentPipeline->mtlDepthStencilState()];
   }
+
+  // Set cull mode and front face winding
+  [renderEncoder setCullMode:currentPipeline->cullMode];
+  [renderEncoder setFrontFacingWinding:currentPipeline->frontFace];
 }
 
 void MtlRenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer, size_t offset) {

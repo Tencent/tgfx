@@ -21,6 +21,7 @@
 
 namespace tgfx {
 static constexpr char DstColorName[] = "_dstColor";
+static constexpr char SubpassInputName[] = "tgfx_SubpassInput";
 
 GLSLFragmentShaderBuilder::GLSLFragmentShaderBuilder(ProgramBuilder* program)
     : FragmentShaderBuilder(program) {
@@ -34,13 +35,30 @@ GLSLFragmentShaderBuilder::GLSLFragmentShaderBuilder(ProgramBuilder* program)
 std::string GLSLFragmentShaderBuilder::dstColor() {
   auto shaderCaps = programBuilder->getContext()->shaderCaps();
   if (shaderCaps->frameBufferFetchSupport) {
-    addFeature(PrivateFeature::FramebufferFetch, shaderCaps->frameBufferFetchExtensionString);
+    if (shaderCaps->frameBufferFetchUsesSubpassInput) {
+      declareSubpassInput();
+      return std::string("subpassLoad(") + SubpassInputName + ")";
+    }
+    if (!shaderCaps->frameBufferFetchExtensionString.empty()) {
+      addFeature(PrivateFeature::FramebufferFetch, shaderCaps->frameBufferFetchExtensionString);
+    }
     if (shaderCaps->frameBufferFetchNeedsCustomOutput) {
       return CUSTOM_COLOR_OUTPUT_NAME;
     }
     return shaderCaps->frameBufferFetchColorName;
   }
   return DstColorName;
+}
+
+void GLSLFragmentShaderBuilder::declareSubpassInput() {
+  if (subpassInputDeclared) {
+    return;
+  }
+  subpassInputDeclared = true;
+  shaderStrings[Type::Uniforms] +=
+      "layout(input_attachment_index=0, set=2, binding=0) uniform subpassInput ";
+  shaderStrings[Type::Uniforms] += SubpassInputName;
+  shaderStrings[Type::Uniforms] += ";\n";
 }
 
 std::string GLSLFragmentShaderBuilder::colorOutputName() {
