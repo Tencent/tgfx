@@ -23,6 +23,7 @@
 #include "gpu/ProgramBuilder.h"
 #include "gpu/resources/RenderTarget.h"
 #include "inspect/InspectorMark.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
@@ -63,6 +64,7 @@ Swizzle ProgramInfo::getOutputSwizzle() const {
 PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
   PipelineColorAttachment colorAttachment = {};
   colorAttachment.format = renderTarget->format();
+  colorAttachment.sampleCount = renderTarget->sampleCount();
   if (xferProcessor != nullptr || blendMode == BlendMode::Src) {
     return colorAttachment;
   }
@@ -120,9 +122,8 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   if (xferProcessor != nullptr) {
     xferProcessor->computeProcessorKey(context, &programKey);
   }
-  programKey.write(static_cast<uint32_t>(blendMode));
   programKey.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
-  programKey.write(static_cast<uint32_t>(cullMode));
+  programKey.write(static_cast<uint32_t>(blendMode));
   CAPUTRE_PROGRAM_INFO(programKey, context, this);
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
@@ -134,6 +135,47 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
     context->globalCache()->addProgram(programKey, program);
   }
   return program;
+}
+
+std::shared_ptr<RenderPipeline> ProgramInfo::getRenderPipeline(const Program* program) const {
+  auto context = renderTarget->getContext();
+  BytesKey pipelineKey = {};
+  geometryProcessor->computeProcessorKey(context, &pipelineKey);
+  for (const auto& processor : fragmentProcessors) {
+    processor->computeProcessorKey(context, &pipelineKey);
+  }
+  if (xferProcessor != nullptr) {
+    xferProcessor->computeProcessorKey(context, &pipelineKey);
+  }
+  pipelineKey.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
+  pipelineKey.write(static_cast<uint32_t>(blendMode));
+  pipelineKey.write(static_cast<uint32_t>(cullMode));
+  pipelineKey.write(static_cast<uint32_t>(renderTarget->format()));
+  pipelineKey.write(static_cast<uint32_t>(renderTarget->sampleCount()));
+  auto globalCache = context->globalCache();
+  auto pipeline = globalCache->findRenderPipeline(pipelineKey);
+  if (pipeline != nullptr) {
+    return pipeline;
+  }
+  RenderPipelineDescriptor descriptor = {};
+  VertexBufferLayout vertexLayout(getVertexAttributes());
+  descriptor.vertex.bufferLayouts = {vertexLayout};
+  descriptor.vertex.module = program->getVertexShader();
+  descriptor.fragment.module = program->getFragmentShader();
+  descriptor.fragment.colorAttachments.push_back(getPipelineColorAttachment());
+  descriptor.layout = program->getBindingLayout();
+  // Although the vertexProvider constructs the rectangle in a counterclockwise order, the model
+  // uses a coordinate system with the Y-axis pointing downward, which is opposite to OpenGL's
+  // default Y-axis direction (upward). Therefore, it is necessary to define the clockwise
+  // direction as the front face, which is the opposite of OpenGL's default.
+  descriptor.primitive = {cullMode, FrontFace::CW};
+  pipeline = context->gpu()->createRenderPipeline(descriptor);
+  if (pipeline == nullptr) {
+    LOGE("ProgramInfo::getRenderPipeline() Failed to create the render pipeline!");
+    return nullptr;
+  }
+  globalCache->addRenderPipeline(pipelineKey, pipeline);
+  return pipeline;
 }
 
 std::shared_ptr<GPUBuffer> ProgramInfo::getUniformBuffer(const Program* program,

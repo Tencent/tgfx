@@ -49,7 +49,12 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
     LOGE("DrawOp::execute() Failed to get the program!");
     return;
   }
-  renderPass->setPipeline(program->getPipeline());
+  auto pipeline = programInfo.getRenderPipeline(program.get());
+  if (pipeline == nullptr) {
+    LOGE("DrawOp::execute() Failed to get the render pipeline!");
+    return;
+  }
+  renderPass->setPipeline(std::move(pipeline));
 
   programInfo.setUniformsAndSamplers(renderPass, program.get());
 

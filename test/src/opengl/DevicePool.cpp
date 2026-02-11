@@ -16,19 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DevicePool.h"
-#include <thread>
-#include <unordered_map>
+#include "utils/DevicePool.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace tgfx {
-thread_local std::shared_ptr<tgfx::GLDevice> cachedDevice = nullptr;
+thread_local std::shared_ptr<Device> cachedDevice = nullptr;
 
-std::shared_ptr<tgfx::GLDevice> DevicePool::Make() {
-  auto device = cachedDevice;
-  if (device == nullptr) {
-    device = tgfx::GLDevice::Make();
-    cachedDevice = device;
+std::shared_ptr<Device> DevicePool::Make() {
+  if (cachedDevice == nullptr) {
+    cachedDevice = GLDevice::Make();
   }
-  return device;
+  return cachedDevice;
 }
 }  // namespace tgfx

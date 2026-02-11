@@ -19,10 +19,12 @@
 #include "Program.h"
 
 namespace tgfx {
-Program::Program(std::shared_ptr<RenderPipeline> pipeline,
+Program::Program(std::shared_ptr<ShaderModule> vertexShader,
+                 std::shared_ptr<ShaderModule> fragmentShader, BindingLayout bindingLayout,
                  std::unique_ptr<UniformData> vertexUniformData,
                  std::unique_ptr<UniformData> fragmentUniformData)
-    : pipeline(std::move(pipeline)), vertexUniformData(std::move(vertexUniformData)),
+    : vertexShader(std::move(vertexShader)), fragmentShader(std::move(fragmentShader)),
+      bindingLayout(std::move(bindingLayout)), vertexUniformData(std::move(vertexUniformData)),
       fragmentUniformData(std::move(fragmentUniformData)) {
 }
 
