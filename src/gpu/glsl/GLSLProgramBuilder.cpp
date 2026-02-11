@@ -182,21 +182,36 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   if (fragmentShader == nullptr) {
     return nullptr;
   }
+  RenderPipelineDescriptor descriptor = {};
+  VertexBufferLayout vertexLayout(programInfo->getVertexAttributes());
+  descriptor.vertex.bufferLayouts = {vertexLayout};
+  descriptor.vertex.module = vertexShader;
+  descriptor.fragment.module = fragmentShader;
+  descriptor.fragment.colorAttachments.push_back(programInfo->getPipelineColorAttachment());
   auto vertexUniformData = _uniformHandler.makeUniformData(ShaderStage::Vertex);
   auto fragmentUniformData = _uniformHandler.makeUniformData(ShaderStage::Fragment);
-  BindingLayout bindingLayout = {};
   if (vertexUniformData) {
-    bindingLayout.uniformBlocks.emplace_back(VertexUniformBlockName, VERTEX_UBO_BINDING_POINT);
+    BindingEntry vertexBinding = {VertexUniformBlockName, VERTEX_UBO_BINDING_POINT};
+    descriptor.layout.uniformBlocks.push_back(vertexBinding);
   }
   if (fragmentUniformData) {
-    bindingLayout.uniformBlocks.emplace_back(FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT);
+    BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT};
+    descriptor.layout.uniformBlocks.push_back(fragmentBinding);
   }
   int textureBinding = TEXTURE_BINDING_POINT_START;
   for (const auto& sampler : _uniformHandler.getSamplers()) {
-    bindingLayout.textureSamplers.emplace_back(sampler.name(), textureBinding++);
+    descriptor.layout.textureSamplers.emplace_back(sampler.name(), textureBinding++);
   }
-  return std::make_shared<Program>(std::move(vertexShader), std::move(fragmentShader),
-                                   std::move(bindingLayout), std::move(vertexUniformData),
+  // Although the vertexProvider constructs the rectangle in a counterclockwise order, the model
+  // uses a coordinate system with the Y-axis pointing downward, which is opposite to OpenGL's
+  // default Y-axis direction (upward). Therefore, it is necessary to define the clockwise
+  // direction as the front face, which is the opposite of OpenGL's default.
+  descriptor.primitive = {programInfo->getCullMode(), FrontFace::CW};
+  auto pipeline = gpu->createRenderPipeline(descriptor);
+  if (pipeline == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
                                    std::move(fragmentUniformData));
 }
 

@@ -18,7 +18,6 @@
 
 #include "RuntimeDrawTask.h"
 #include "core/utils/ColorSpaceHelper.h"
-#include "gpu/GlobalCache.h"
 #include "gpu/Program.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
@@ -142,12 +141,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to get the program!");
     return nullptr;
   }
-  auto pipeline = programInfo.getRenderPipeline(program.get());
-  if (pipeline == nullptr) {
-    LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to get the render pipeline!");
-    return nullptr;
-  }
-  renderPass->setPipeline(std::move(pipeline));
+  renderPass->setPipeline(program->getPipeline());
   programInfo.setUniformsAndSamplers(renderPass.get(), program.get());
   renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 4);

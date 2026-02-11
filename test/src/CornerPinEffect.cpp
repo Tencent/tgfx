@@ -23,7 +23,7 @@
 
 namespace tgfx {
 static constexpr size_t CORNER_PIN_VERTEX_SIZE = 20 * sizeof(float);
-static constexpr int kMSAASampleCount = 4;
+static constexpr int MSAA_SAMPLE_COUNT = 4;
 
 static constexpr char CORNER_PIN_VERTEX_SHADER[] = R"(
         in vec2 aPosition;
@@ -111,7 +111,7 @@ std::shared_ptr<RenderPipeline> CornerPinEffect::createPipeline(GPU* gpu) const 
   descriptor.vertex.module = vertexShader;
   descriptor.fragment.module = fragmentShader;
   PipelineColorAttachment colorAttachment = {};
-  colorAttachment.sampleCount = kMSAASampleCount;
+  colorAttachment.sampleCount = MSAA_SAMPLE_COUNT;
   descriptor.fragment.colorAttachments.push_back(colorAttachment);
   BindingEntry textureBinding = {"sTexture", 0};
   descriptor.layout.textureSamplers.push_back(textureBinding);
@@ -135,7 +135,7 @@ bool CornerPinEffect::onDraw(CommandEncoder* encoder,
   // Ideally, this MSAA texture should be cached and reused to avoid impacting performance.
   // However, since CornerPinEffect is only used for testing, we create it each time for simplicity.
   TextureDescriptor textureDesc(outputTexture->width(), outputTexture->height(),
-                                outputTexture->format(), false, kMSAASampleCount, TextureUsage::RENDER_ATTACHMENT);
+                                outputTexture->format(), false, MSAA_SAMPLE_COUNT, TextureUsage::RENDER_ATTACHMENT);
   auto renderTexture = gpu->createTexture(textureDesc);
   if (renderTexture == nullptr) {
     return false;

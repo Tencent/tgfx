@@ -28,7 +28,6 @@
 
 namespace tgfx {
 static constexpr size_t MAX_PROGRAM_COUNT = 128;
-static constexpr size_t MAX_PIPELINE_COUNT = 256;
 static constexpr size_t MAX_NUM_CACHED_GRADIENT_BITMAPS = 32;
 static constexpr uint16_t VERTICES_PER_NON_AA_QUAD = 4;
 static constexpr uint16_t VERTICES_PER_AA_QUAD = 8;
@@ -164,34 +163,6 @@ void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program
     auto oldProgram = programLRU.back();
     programLRU.pop_back();
     programMap.erase(oldProgram->programKey);
-  }
-}
-
-std::shared_ptr<RenderPipeline> GlobalCache::findRenderPipeline(const BytesKey& pipelineKey) {
-  auto result = pipelineMap.find(pipelineKey);
-  if (result != pipelineMap.end()) {
-    auto& cached = result->second;
-    pipelineLRU.erase(cached->cachedPosition);
-    pipelineLRU.push_front(cached.get());
-    cached->cachedPosition = pipelineLRU.begin();
-    return cached->pipeline;
-  }
-  return nullptr;
-}
-
-void GlobalCache::addRenderPipeline(const BytesKey& pipelineKey,
-                                    std::shared_ptr<RenderPipeline> pipeline) {
-  if (pipeline == nullptr) {
-    return;
-  }
-  auto cached = std::make_unique<CachedPipeline>(std::move(pipeline), pipelineKey);
-  pipelineLRU.push_front(cached.get());
-  cached->cachedPosition = pipelineLRU.begin();
-  pipelineMap[pipelineKey] = std::move(cached);
-  while (pipelineLRU.size() > MAX_PIPELINE_COUNT) {
-    auto oldPipeline = pipelineLRU.back();
-    pipelineLRU.pop_back();
-    pipelineMap.erase(oldPipeline->pipelineKey);
   }
 }
 

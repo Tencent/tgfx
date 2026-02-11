@@ -26,20 +26,11 @@
 namespace tgfx {
 class Program {
  public:
-  Program(std::shared_ptr<ShaderModule> vertexShader, std::shared_ptr<ShaderModule> fragmentShader,
-          BindingLayout bindingLayout, std::unique_ptr<UniformData> vertexUniformData,
+  Program(std::shared_ptr<RenderPipeline> pipeline, std::unique_ptr<UniformData> vertexUniformData,
           std::unique_ptr<UniformData> fragmentUniformData);
 
-  std::shared_ptr<ShaderModule> getVertexShader() const {
-    return vertexShader;
-  }
-
-  std::shared_ptr<ShaderModule> getFragmentShader() const {
-    return fragmentShader;
-  }
-
-  const BindingLayout& getBindingLayout() const {
-    return bindingLayout;
+  std::shared_ptr<RenderPipeline> getPipeline() const {
+    return pipeline;
   }
 
   UniformData* getUniformData(ShaderStage stage) const;
@@ -47,9 +38,7 @@ class Program {
  private:
   BytesKey programKey = {};
   std::list<Program*>::iterator cachedPosition;
-  std::shared_ptr<ShaderModule> vertexShader = nullptr;
-  std::shared_ptr<ShaderModule> fragmentShader = nullptr;
-  BindingLayout bindingLayout = {};
+  std::shared_ptr<RenderPipeline> pipeline = nullptr;
   std::unique_ptr<UniformData> vertexUniformData = nullptr;
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
 

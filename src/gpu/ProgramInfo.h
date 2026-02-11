@@ -25,7 +25,6 @@
 #include "gpu/processors/GeometryProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/RenderPass.h"
-#include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
 struct SamplerInfo {
@@ -78,8 +77,6 @@ class ProgramInfo {
   std::string getMangledSuffix(const Processor* processor) const;
 
   std::shared_ptr<Program> getProgram() const;
-
-  std::shared_ptr<RenderPipeline> getRenderPipeline(const Program* program) const;
 
   std::shared_ptr<GPUBuffer> getUniformBuffer(const Program* program, size_t* vertexOffset,
                                               size_t* fragmentOffset) const;

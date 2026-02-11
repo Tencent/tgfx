@@ -18,7 +18,6 @@
 
 #include "DrawOp.h"
 #include "gpu/AlignTo.h"
-#include "gpu/GlobalCache.h"
 #include "gpu/Program.h"
 #include "inspect/InspectorMark.h"
 
@@ -49,12 +48,7 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
     LOGE("DrawOp::execute() Failed to get the program!");
     return;
   }
-  auto pipeline = programInfo.getRenderPipeline(program.get());
-  if (pipeline == nullptr) {
-    LOGE("DrawOp::execute() Failed to get the render pipeline!");
-    return;
-  }
-  renderPass->setPipeline(std::move(pipeline));
+  renderPass->setPipeline(program->getPipeline());
 
   programInfo.setUniformsAndSamplers(renderPass, program.get());
 

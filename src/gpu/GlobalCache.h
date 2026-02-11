@@ -62,22 +62,10 @@ class GlobalCache {
   void resetUniformBuffer();
 
   /**
-   * Adds a program to the cache with the specified key. If a program with the same key already
-   * exists, it will be replaced with the new program.
+   * Adds a program to the cache with the specified key. The caller must ensure that the key does
+   * not already exist in the cache, otherwise the LRU tracking will be corrupted.
    */
   void addProgram(const BytesKey& programKey, std::shared_ptr<Program> program);
-
-  /**
-   * Finds a render pipeline in the cache by its key. Returns nullptr if no pipeline is found. The
-   * pipeline will be kept alive for the lifetime of the GlobalCache.
-   */
-  std::shared_ptr<RenderPipeline> findRenderPipeline(const BytesKey& pipelineKey);
-
-  /**
-   * Adds a render pipeline to the cache with the specified key. If a pipeline with the same key
-   * already exists, it will be replaced with the new pipeline.
-   */
-  void addRenderPipeline(const BytesKey& pipelineKey, std::shared_ptr<RenderPipeline> pipeline);
 
   /**
    * Returns a texture that represents a gradient created from the specified colors and positions.
@@ -110,16 +98,6 @@ class GlobalCache {
   void addStaticResource(const UniqueKey& uniqueKey, std::shared_ptr<Resource> resource);
 
  private:
-  struct CachedPipeline {
-    CachedPipeline(std::shared_ptr<RenderPipeline> pipeline, BytesKey pipelineKey)
-        : pipeline(std::move(pipeline)), pipelineKey(std::move(pipelineKey)) {
-    }
-
-    std::shared_ptr<RenderPipeline> pipeline = nullptr;
-    BytesKey pipelineKey = {};
-    std::list<CachedPipeline*>::iterator cachedPosition = {};
-  };
-
   struct GradientTexture {
     GradientTexture(std::shared_ptr<TextureProxy> textureProxy, BytesKey gradientKey)
         : textureProxy(std::move(textureProxy)), gradientKey(std::move(gradientKey)) {
@@ -143,8 +121,6 @@ class GlobalCache {
   Context* context = nullptr;
   std::list<Program*> programLRU = {};
   BytesKeyMap<std::shared_ptr<Program>> programMap = {};
-  std::list<CachedPipeline*> pipelineLRU = {};
-  BytesKeyMap<std::unique_ptr<CachedPipeline>> pipelineMap = {};
   std::list<GradientTexture*> gradientLRU = {};
   BytesKeyMap<std::unique_ptr<GradientTexture>> gradientTextures = {};
   std::shared_ptr<GPUBufferProxy> aaQuadIndexBuffer = nullptr;
