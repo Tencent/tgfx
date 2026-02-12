@@ -122,8 +122,8 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   if (xferProcessor != nullptr) {
     xferProcessor->computeProcessorKey(context, &programKey);
   }
-  programKey.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
   programKey.write(static_cast<uint32_t>(blendMode));
+  programKey.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
   programKey.write(static_cast<uint32_t>(cullMode));
   programKey.write(static_cast<uint32_t>(renderTarget->format()));
   programKey.write(static_cast<uint32_t>(renderTarget->sampleCount()));
