@@ -94,6 +94,7 @@ void GLRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   }
   renderPipeline = std::static_pointer_cast<GLRenderPipeline>(pipeline);
   if (renderPipeline != nullptr) {
+    DEBUG_ASSERT(renderPipeline->multisampleCount() == descriptor.colorAttachments[0].texture->sampleCount());
     auto& attachment = descriptor.depthStencilAttachment;
     renderPipeline->activate(_gpu, attachment.depthReadOnly, attachment.stencilReadOnly,
                              stencilReference);

@@ -21,7 +21,8 @@
 
 namespace tgfx {
 
-ContextScope::ContextScope() : device(DevicePool::Make()) {
+ContextScope::ContextScope() {
+  device = DevicePool::Make();
   if (device != nullptr) {
     context = device->lockContext();
     if (context) {

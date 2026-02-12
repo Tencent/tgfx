@@ -16,22 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "utils/DevicePool.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace tgfx {
-/**
- * Types for interacting with Metal resources created externally to TGFX. Holds the MTLTexture as a
- * const void*.
- */
-struct MtlTextureInfo {
-  /**
-   * Pointer to MTLTexture.
-   */
-  const void* texture = nullptr;
+thread_local std::shared_ptr<Device> cachedDevice = nullptr;
 
-  /**
-   * The pixel format of this texture (MTLPixelFormat value).
-   */
-  unsigned format = 70;  // MTLPixelFormatRGBA8Unorm
-};
+std::shared_ptr<Device> DevicePool::Make() {
+  if (cachedDevice == nullptr) {
+    cachedDevice = GLDevice::Make();
+  }
+  return cachedDevice;
+}
 }  // namespace tgfx
