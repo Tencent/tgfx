@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <cstdint>
-
 namespace tgfx {
 /**
  * Types for interacting with Metal resources created externally to TGFX. Holds the MTLTexture as a
@@ -35,20 +33,5 @@ struct MtlTextureInfo {
    * The pixel format of this texture (MTLPixelFormat value).
    */
   unsigned format = 70;  // MTLPixelFormatRGBA8Unorm
-};
-
-/**
- * Types for interacting with Metal semaphore objects created externally to TGFX.
- */
-struct MtlSemaphoreInfo {
-  /**
-   * Pointer to MTLEvent. Used for GPU-to-GPU synchronization.
-   */
-  const void* event = nullptr;
-
-  /**
-   * The signal value for the event.
-   */
-  uint64_t value = 0;
 };
 }  // namespace tgfx

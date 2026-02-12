@@ -173,9 +173,6 @@ BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
     case Backend::OpenGL:
       glSyncInfo = that.glSyncInfo;
       break;
-    case Backend::Metal:
-      mtlSemaphoreInfo = that.mtlSemaphoreInfo;
-      break;
     default:
       break;
   }
@@ -186,8 +183,6 @@ bool BackendSemaphore::isInitialized() const {
   switch (_backend) {
     case Backend::OpenGL:
       return glSyncInfo.sync != nullptr;
-    case Backend::Metal:
-      return mtlSemaphoreInfo.event != nullptr;
     default:
       break;
   }
@@ -202,11 +197,4 @@ bool BackendSemaphore::getGLSync(GLSyncInfo* syncInfo) const {
   return true;
 }
 
-bool BackendSemaphore::getMtlSemaphore(MtlSemaphoreInfo* mtlInfo) const {
-  if (_backend != Backend::Metal || mtlSemaphoreInfo.event == nullptr) {
-    return false;
-  }
-  *mtlInfo = mtlSemaphoreInfo;
-  return true;
-}
 }  // namespace tgfx
