@@ -1,0 +1,297 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include <Metal/Metal.h>
+#include "gpu/metal/MtlGPU.h"
+#include "gpu/metal/MtlRenderPass.h"
+#include "gpu/metal/MtlRenderPipeline.h"
+#include "gpu/metal/MtlShaderModule.h"
+#include "gpu/metal/MtlBuffer.h"
+#include "gpu/metal/MtlTexture.h"
+#include "tgfx/gpu/CommandEncoder.h"
+#include "utils/TestUtils.h"
+
+namespace tgfx {
+
+// Simple MSL shader that renders a solid color triangle
+static const char* vertexShaderMSL = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexIn {
+    float2 position [[attribute(0)]];
+};
+
+struct VertexOut {
+    float4 position [[position]];
+};
+
+vertex VertexOut vertex_main(VertexIn in [[stage_in]]) {
+    VertexOut out;
+    out.position = float4(in.position, 0.0, 1.0);
+    return out;
+}
+)";
+
+static const char* fragmentShaderMSL = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexOut {
+    float4 position [[position]];
+};
+
+fragment float4 fragment_main(VertexOut in [[stage_in]]) {
+    return float4(1.0, 0.0, 0.0, 1.0);  // Red color
+}
+)";
+
+// Helper class to create MtlShaderModule directly with MSL code
+class TestMtlShaderModule : public ShaderModule {
+ public:
+  static std::shared_ptr<TestMtlShaderModule> Make(MtlGPU* gpu, const std::string& mslCode,
+                                                   bool isVertex) {
+    if (!gpu) {
+      return nullptr;
+    }
+
+    NSString* source = [NSString stringWithUTF8String:mslCode.c_str()];
+    NSError* error = nil;
+    id<MTLLibrary> library = [gpu->device() newLibraryWithSource:source options:nil error:&error];
+
+    if (!library || error) {
+      if (error) {
+        NSLog(@"Metal shader compilation error: %@", error.localizedDescription);
+      }
+      return nullptr;
+    }
+
+    id<MTLFunction> function = nil;
+    if (isVertex) {
+      function = [library newFunctionWithName:@"vertex_main"];
+    } else {
+      function = [library newFunctionWithName:@"fragment_main"];
+    }
+
+    if (!function) {
+      NSLog(@"Failed to find shader function");
+      return nullptr;
+    }
+
+    return std::make_shared<TestMtlShaderModule>(library, function, isVertex);
+  }
+
+  id<MTLLibrary> mtlLibrary() const {
+    return library;
+  }
+
+  id<MTLFunction> vertexFunction() const {
+    return isVertexShader ? function : nil;
+  }
+
+  id<MTLFunction> fragmentFunction() const {
+    return isVertexShader ? nil : function;
+  }
+
+  TestMtlShaderModule(id<MTLLibrary> lib, id<MTLFunction> func, bool isVertex)
+      : library(lib), function(func), isVertexShader(isVertex) {
+  }
+
+ private:
+  id<MTLLibrary> library = nil;
+  id<MTLFunction> function = nil;
+  bool isVertexShader = true;
+};
+
+// Helper to create render pipeline directly with Metal
+static id<MTLRenderPipelineState> CreateTestPipeline(MtlGPU* gpu,
+                                                     std::shared_ptr<TestMtlShaderModule> vertexModule,
+                                                     std::shared_ptr<TestMtlShaderModule> fragmentModule,
+                                                     MTLPixelFormat pixelFormat) {
+  MTLRenderPipelineDescriptor* descriptor = [[MTLRenderPipelineDescriptor alloc] init];
+  descriptor.vertexFunction = vertexModule->vertexFunction();
+  descriptor.fragmentFunction = fragmentModule->fragmentFunction();
+  descriptor.colorAttachments[0].pixelFormat = pixelFormat;
+
+  // Configure vertex descriptor
+  MTLVertexDescriptor* vertexDescriptor = [[MTLVertexDescriptor alloc] init];
+  vertexDescriptor.attributes[0].format = MTLVertexFormatFloat2;
+  vertexDescriptor.attributes[0].offset = 0;
+  vertexDescriptor.attributes[0].bufferIndex = 0;
+  vertexDescriptor.layouts[0].stride = sizeof(float) * 2;
+  vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
+  descriptor.vertexDescriptor = vertexDescriptor;
+
+  NSError* error = nil;
+  id<MTLRenderPipelineState> pipelineState =
+      [gpu->device() newRenderPipelineStateWithDescriptor:descriptor error:&error];
+
+  if (!pipelineState || error) {
+    if (error) {
+      NSLog(@"Pipeline creation error: %@", error.localizedDescription);
+    }
+    return nil;
+  }
+
+  return pipelineState;
+}
+
+TGFX_TEST(MtlRenderPassTest, BasicTriangle) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+
+  auto gpu = static_cast<MtlGPU*>(context->gpu());
+  ASSERT_TRUE(gpu != nullptr);
+
+  // Create shaders
+  auto vertexModule = TestMtlShaderModule::Make(gpu, vertexShaderMSL, true);
+  ASSERT_TRUE(vertexModule != nullptr);
+
+  auto fragmentModule = TestMtlShaderModule::Make(gpu, fragmentShaderMSL, false);
+  ASSERT_TRUE(fragmentModule != nullptr);
+
+  // Create render target texture
+  int width = 200;
+  int height = 200;
+  TextureDescriptor textureDesc = {};
+  textureDesc.width = width;
+  textureDesc.height = height;
+  textureDesc.format = PixelFormat::RGBA_8888;
+  textureDesc.usage = TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING;
+
+  auto renderTarget = gpu->createTexture(textureDesc);
+  ASSERT_TRUE(renderTarget != nullptr);
+
+  // Create vertex buffer with a triangle
+  // NDC coordinates: top-center, bottom-left, bottom-right
+  float vertices[] = {
+      0.0f,  0.5f,   // top center
+      -0.5f, -0.5f,  // bottom left
+      0.5f,  -0.5f   // bottom right
+  };
+
+  auto vertexBuffer = gpu->createBuffer(sizeof(vertices), GPUBufferUsage::VERTEX);
+  ASSERT_TRUE(vertexBuffer != nullptr);
+
+  void* bufferData = vertexBuffer->map();
+  ASSERT_TRUE(bufferData != nullptr);
+  memcpy(bufferData, vertices, sizeof(vertices));
+  vertexBuffer->unmap();
+
+  // Create pipeline
+  auto mtlTexture = std::static_pointer_cast<MtlTexture>(renderTarget);
+  auto pipelineState =
+      CreateTestPipeline(gpu, vertexModule, fragmentModule, mtlTexture->mtlTexture().pixelFormat);
+  ASSERT_TRUE(pipelineState != nil);
+
+  // Create command encoder and render pass
+  auto commandEncoder = gpu->createCommandEncoder();
+  ASSERT_TRUE(commandEncoder != nullptr);
+
+  RenderPassDescriptor renderPassDesc(renderTarget, LoadAction::Clear, StoreAction::Store,
+                                      Color::White().premultiply());
+
+  auto renderPass = commandEncoder->beginRenderPass(renderPassDesc);
+  ASSERT_TRUE(renderPass != nullptr);
+
+  // Get the Metal render pass to set pipeline and draw
+  auto mtlRenderPass = std::static_pointer_cast<MtlRenderPass>(renderPass);
+  auto encoder = mtlRenderPass->mtlRenderCommandEncoder();
+  ASSERT_TRUE(encoder != nil);
+
+  // Set viewport
+  MTLViewport viewport = {};
+  viewport.originX = 0;
+  viewport.originY = 0;
+  viewport.width = width;
+  viewport.height = height;
+  viewport.znear = 0.0;
+  viewport.zfar = 1.0;
+  [encoder setViewport:viewport];
+
+  // Set pipeline and draw
+  [encoder setRenderPipelineState:pipelineState];
+
+  auto mtlBuffer = std::static_pointer_cast<MtlBuffer>(vertexBuffer);
+  [encoder setVertexBuffer:mtlBuffer->mtlBuffer() offset:0 atIndex:0];
+  [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+
+  renderPass->end();
+
+  // Finish and submit
+  auto commandBuffer = commandEncoder->finish();
+  ASSERT_TRUE(commandBuffer != nullptr);
+
+  gpu->queue()->submit(commandBuffer);
+  gpu->queue()->waitUntilCompleted();
+
+  // For now, just verify the test runs without crash
+  // Full pixel comparison would require readback implementation
+  SUCCEED();
+}
+
+TGFX_TEST(MtlRenderPassTest, ClearOnly) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+
+  auto gpu = static_cast<MtlGPU*>(context->gpu());
+  ASSERT_TRUE(gpu != nullptr);
+
+  // Create render target texture
+  int width = 100;
+  int height = 100;
+  TextureDescriptor textureDesc = {};
+  textureDesc.width = width;
+  textureDesc.height = height;
+  textureDesc.format = PixelFormat::RGBA_8888;
+  textureDesc.usage = TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING;
+
+  auto renderTarget = gpu->createTexture(textureDesc);
+  ASSERT_TRUE(renderTarget != nullptr);
+
+  // Create command encoder
+  auto commandEncoder = gpu->createCommandEncoder();
+  ASSERT_TRUE(commandEncoder != nullptr);
+
+  // Create render pass that just clears to red
+  RenderPassDescriptor renderPassDesc(renderTarget, LoadAction::Clear, StoreAction::Store,
+                                      Color::Red().premultiply());
+
+  auto renderPass = commandEncoder->beginRenderPass(renderPassDesc);
+  ASSERT_TRUE(renderPass != nullptr);
+
+  // Just end the pass (clear only)
+  renderPass->end();
+
+  // Finish and submit
+  auto commandBuffer = commandEncoder->finish();
+  ASSERT_TRUE(commandBuffer != nullptr);
+
+  gpu->queue()->submit(commandBuffer);
+  gpu->queue()->waitUntilCompleted();
+
+  SUCCEED();
+}
+
+}  // namespace tgfx

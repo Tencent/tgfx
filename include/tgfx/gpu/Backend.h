@@ -218,6 +218,13 @@ class BackendSemaphore {
   BackendSemaphore(const GLSyncInfo& syncInfo) : _backend(Backend::OpenGL), glSyncInfo(syncInfo) {
   }
 
+  /**
+   * Creates a Metal backend semaphore.
+   */
+  BackendSemaphore(const MtlSemaphoreInfo& mtlInfo)
+      : _backend(Backend::Metal), mtlSemaphoreInfo(mtlInfo) {
+  }
+
   BackendSemaphore(const BackendSemaphore& that) {
     *this = that;
   }
@@ -229,12 +236,22 @@ class BackendSemaphore {
    */
   bool isInitialized() const;
 
+  /**
+   * Returns the backend API of this semaphore.
+   */
+  Backend backend() const {
+    return _backend;
+  }
+
   bool getGLSync(GLSyncInfo* syncInfo) const;
+
+  bool getMtlSemaphore(MtlSemaphoreInfo* mtlInfo) const;
 
  private:
   Backend _backend = Backend::Unknown;
   union {
     GLSyncInfo glSyncInfo;
+    MtlSemaphoreInfo mtlSemaphoreInfo;
   };
 };
 }  // namespace tgfx

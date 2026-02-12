@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,37 +18,30 @@
 
 #pragma once
 
-#include <cstdint>
+#include <list>
+#include "core/utils/ReturnQueue.h"
 
 namespace tgfx {
-/**
- * Types for interacting with Metal resources created externally to TGFX. Holds the MTLTexture as a
- * const void*.
- */
-struct MtlTextureInfo {
-  /**
-   * Pointer to MTLTexture.
-   */
-  const void* texture = nullptr;
 
-  /**
-   * The pixel format of this texture (MTLPixelFormat value).
-   */
-  unsigned format = 70;  // MTLPixelFormatRGBA8Unorm
-};
+class MtlGPU;
 
 /**
- * Types for interacting with Metal semaphore objects created externally to TGFX.
+ * Base class for Metal GPU resources. Subclasses must implement the onRelease() method to free all
+ * underlying GPU resources. No Metal API calls should be made during destruction since the resource
+ * may be destroyed on any thread.
  */
-struct MtlSemaphoreInfo {
+class MtlResource : public ReturnNode {
+ protected:
   /**
-   * Pointer to MTLEvent. Used for GPU-to-GPU synchronization.
+   * Overridden to free the underlying Metal resources. After calling this method, the MtlResource
+   * must not be used, as doing so may lead to undefined behavior.
    */
-  const void* event = nullptr;
+  virtual void onRelease(MtlGPU* gpu) = 0;
 
-  /**
-   * The signal value for the event.
-   */
-  uint64_t value = 0;
+ private:
+  std::list<MtlResource*>::iterator cachedPosition;
+
+  friend class MtlGPU;
 };
+
 }  // namespace tgfx

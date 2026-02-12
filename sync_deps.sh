@@ -18,3 +18,8 @@ else
 fi
 
 depsync || exit 1
+
+# Sync shaderc's sub-dependencies (SPIRV-Tools, glslang, etc.)
+if [ -f "third_party/shaderc/utils/git-sync-deps" ]; then
+  python3 third_party/shaderc/utils/git-sync-deps || exit 1
+fi
