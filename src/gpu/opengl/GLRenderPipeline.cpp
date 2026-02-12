@@ -284,6 +284,7 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   cullFaceState = MakeCullFaceState(descriptor.primitive);
   alphaToCoverageEnabled = descriptor.multisample.alphaToCoverageEnabled;
   sampleMask = descriptor.multisample.mask;
+  sampleCount = descriptor.multisample.count;
 
   for (auto& entry : descriptor.layout.uniformBlocks) {
     auto uniformBlockIndex = gl->getUniformBlockIndex(programID, entry.name.c_str());

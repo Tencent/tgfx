@@ -115,7 +115,13 @@
         "shaderMaskFilter": "6b4e5ce0"
     },
     "GPURenderTest": {
-        "InstancedGridRender": "62f124a1"
+        "AlphaToCoverage_Off": "faa8a587",
+        "AlphaToCoverage_On": "faa8a587",
+        "InstancedGridRender": "62f124a1",
+        "MultisampleCount_1x": "faa8a587",
+        "MultisampleCount_4x": "faa8a587",
+        "MultisampleMask_AllSamples": "faa8a587",
+        "MultisampleMask_NoSamples": "faa8a587"
     },
     "Hello2DTest": {
         "ConicGradient": "1ea63c49",

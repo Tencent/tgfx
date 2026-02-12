@@ -110,9 +110,8 @@ std::shared_ptr<RenderPipeline> CornerPinEffect::createPipeline(GPU* gpu) const 
   descriptor.vertex.bufferLayouts = {vertexLayout};
   descriptor.vertex.module = vertexShader;
   descriptor.fragment.module = fragmentShader;
-  PipelineColorAttachment colorAttachment = {};
-  colorAttachment.sampleCount = MSAA_SAMPLE_COUNT;
-  descriptor.fragment.colorAttachments.push_back(colorAttachment);
+  descriptor.fragment.colorAttachments.push_back({});
+  descriptor.multisample.count = MSAA_SAMPLE_COUNT;
   BindingEntry textureBinding = {"sTexture", 0};
   descriptor.layout.textureSamplers.push_back(textureBinding);
   return gpu->createRenderPipeline(descriptor);

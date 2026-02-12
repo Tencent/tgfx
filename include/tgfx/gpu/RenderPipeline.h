@@ -43,11 +43,6 @@ class PipelineColorAttachment {
   PixelFormat format = PixelFormat::RGBA_8888;
 
   /**
-   * The number of samples per pixel for multisampling. A value of 1 indicates no multisampling.
-   */
-  int sampleCount = 1;
-
-  /**
    * Determines whether blending is enabled for this color attachment. If blending is disabled, the
    * fragment's color is passed through unchanged.
    */

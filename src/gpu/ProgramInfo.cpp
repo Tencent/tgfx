@@ -68,7 +68,6 @@ int ProgramInfo::getSampleCount() const {
 PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
   PipelineColorAttachment colorAttachment = {};
   colorAttachment.format = renderTarget->format();
-  colorAttachment.sampleCount = renderTarget->sampleCount();
   if (xferProcessor != nullptr || blendMode == BlendMode::Src) {
     return colorAttachment;
   }
