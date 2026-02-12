@@ -68,6 +68,8 @@ class ProgramInfo {
 
   PipelineColorAttachment getPipelineColorAttachment() const;
 
+  int getSampleCount() const;
+
   /**
    * Returns the index of the processor in the ProgramInfo. Returns -1 if the processor is not in
    * the ProgramInfo.

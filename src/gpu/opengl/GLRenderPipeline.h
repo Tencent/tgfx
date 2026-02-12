@@ -90,6 +90,8 @@ class GLRenderPipeline : public RenderPipeline, public GLResource {
   std::unique_ptr<GLDepthState> depthState = nullptr;
   std::unique_ptr<GLBlendState> blendState = nullptr;
   std::unique_ptr<GLCullFaceState> cullFaceState = {};
+  bool alphaToCoverageEnabled = false;
+  uint32_t sampleMask = 0xFFFFFFFF;
 
   bool setPipelineDescriptor(GLGPU* gpu, const RenderPipelineDescriptor& descriptor);
 

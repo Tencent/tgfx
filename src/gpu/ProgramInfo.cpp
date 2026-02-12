@@ -61,6 +61,10 @@ Swizzle ProgramInfo::getOutputSwizzle() const {
   return Swizzle::ForWrite(renderTarget->format());
 }
 
+int ProgramInfo::getSampleCount() const {
+  return renderTarget->sampleCount();
+}
+
 PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
   PipelineColorAttachment colorAttachment = {};
   colorAttachment.format = renderTarget->format();

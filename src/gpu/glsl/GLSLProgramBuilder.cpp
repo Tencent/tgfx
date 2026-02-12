@@ -207,6 +207,7 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   // default Y-axis direction (upward). Therefore, it is necessary to define the clockwise
   // direction as the front face, which is the opposite of OpenGL's default.
   descriptor.primitive = {programInfo->getCullMode(), FrontFace::CW};
+  descriptor.multisample.count = programInfo->getSampleCount();
   auto pipeline = gpu->createRenderPipeline(descriptor);
   if (pipeline == nullptr) {
     return nullptr;

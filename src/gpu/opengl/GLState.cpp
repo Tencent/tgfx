@@ -170,6 +170,17 @@ void GLState::setCullFaceState(const GLCullFaceState& state) {
   cullFaceState = state;
 }
 
+void GLState::setSampleMask(uint32_t mask) {
+  if (mask == sampleMask) {
+    return;
+  }
+  auto gl = interface->functions();
+  if (gl->sampleMaski != nullptr) {
+    gl->sampleMaski(0, mask);
+  }
+  sampleMask = mask;
+}
+
 void GLState::bindTexture(GLTexture* texture, unsigned textureUnit) {
   DEBUG_ASSERT(texture != nullptr);
   DEBUG_ASSERT(texture->usage() & TextureUsage::TEXTURE_BINDING);
@@ -245,5 +256,6 @@ void GLState::reset() {
   stencilState = {};
   depthState = {};
   blendState = {};
+  sampleMask = 0xFFFFFFFF;
 };
 }  // namespace tgfx

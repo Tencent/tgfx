@@ -373,6 +373,8 @@ namespace tgfx {
 // multisample
 #define GL_MULTISAMPLE 0x809D
 #define GL_SAMPLE_POSITION 0x8E50
+#define GL_SAMPLE_MASK 0x8E51
+#define GL_SAMPLE_MASK_VALUE 0x8E52
 
 // Points
 #define GL_POINT_SMOOTH 0x0B10
