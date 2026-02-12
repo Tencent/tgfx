@@ -59,19 +59,16 @@ done
 
 ## 第一步：准备变更内容
 
-**!! CRITICAL - diff 基准**：必须先 `git fetch origin main` 获取最新的远端 main 分支，然后使用 `git merge-base origin/main HEAD` 计算分叉点作为 diff 基准，而不是直接与 `origin/main` 比较。直接比较 `origin/main` 会把 PR 分支未合入的新 commit 作为反向变更纳入 diff，导致审查范围错误。
-
 ### 本地模式
 
 获取当前分支相对 main 的完整变更：
 
 ```bash
-# 获取最新远端 main 并计算分叉点
+# 拉取最新的 main 分支
 git fetch origin main
-MERGE_BASE=$(git merge-base origin/main HEAD)
 
-# 当前分支相对分叉点的完整变更（已提交 + 暂存区 + 工作区的最终结果）
-git diff $MERGE_BASE
+# 当前分支相对 origin/main 分叉点的完整变更（已提交 + 暂存区 + 工作区的最终结果）
+git diff $(git merge-base origin/main HEAD)
 
 # 查看文件状态（用于识别未跟踪文件）
 git status
@@ -94,22 +91,22 @@ CURRENT_BRANCH=$(git branch --show-current)
 [ "$PR_BRANCH" = "$CURRENT_BRANCH" ]
 ```
 
-**若当前分支就是 PR 分支**，直接在当前目录操作，跳过 worktree 创建：
-```bash
-git fetch origin main
-```
+**若当前分支就是 PR 分支**，直接在当前目录操作，跳过 worktree 创建。
 
 **若当前分支不是 PR 分支**，创建隔离环境：
 ```bash
-git fetch origin main pull/{pr_number}/head:pr-{pr_number}
+git fetch origin pull/{pr_number}/head:pr-{pr_number}
 git worktree add /tmp/pr-review-{pr_number} pr-{pr_number}
 cd /tmp/pr-review-{pr_number}
 ```
 
 获取变更内容和评论（两种情况通用）：
 ```bash
-MERGE_BASE=$(git merge-base origin/main HEAD)
-git diff $MERGE_BASE
+# 拉取最新的 main 分支
+git fetch origin main
+
+# 当前分支相对 origin/main 分叉点的完整变更
+git diff $(git merge-base origin/main HEAD)
 
 gh pr view {pr_number} --comments
 ```
