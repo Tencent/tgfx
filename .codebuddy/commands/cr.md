@@ -94,7 +94,10 @@ CURRENT_BRANCH=$(git branch --show-current)
 [ "$PR_BRANCH" = "$CURRENT_BRANCH" ]
 ```
 
-**若当前分支就是 PR 分支**，直接在当前目录操作，跳过 worktree 创建。
+**若当前分支就是 PR 分支**，直接在当前目录操作，跳过 worktree 创建：
+```bash
+git fetch origin main
+```
 
 **若当前分支不是 PR 分支**，创建隔离环境：
 ```bash
@@ -105,7 +108,6 @@ cd /tmp/pr-review-{pr_number}
 
 获取变更内容和评论（两种情况通用）：
 ```bash
-# 计算分叉点并获取完整变更
 MERGE_BASE=$(git merge-base origin/main HEAD)
 git diff $MERGE_BASE
 
