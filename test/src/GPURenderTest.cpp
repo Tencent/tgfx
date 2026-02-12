@@ -19,6 +19,8 @@
 #include <memory>
 #include <vector>
 #include "InstancedGridRenderPass.h"
+#include "MultisampleTestEffect.h"
+#include "tgfx/core/ImageFilter.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/RenderPass.h"
 #include "utils/TestUtils.h"
@@ -90,6 +92,106 @@ TGFX_TEST(GPURenderTest, InstancedGridRender) {
 
   // Also compare with baseline
   EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/InstancedGridRender"));
+}
+
+// ==================== Multisample Tests ====================
+
+TGFX_TEST(GPURenderTest, MultisampleCount) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+
+  // sampleCount=1: no MSAA, the diagonal edge should have hard aliased pixels.
+  MultisampleConfig config1x = {};
+  config1x.sampleCount = 1;
+  config1x.outputColor = Color::Red();
+  auto effect1x = MultisampleTestEffect::Make(config1x);
+  auto filter1x = ImageFilter::Runtime(std::move(effect1x));
+  auto image1x = image->makeWithFilter(std::move(filter1x));
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(std::move(image1x));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/MultisampleCount_1x"));
+
+  // sampleCount=4: MSAA enabled, the diagonal edge should have smooth anti-aliased pixels.
+  MultisampleConfig config4x = {};
+  config4x.sampleCount = 4;
+  config4x.outputColor = Color::Red();
+  auto effect4x = MultisampleTestEffect::Make(config4x);
+  auto filter4x = ImageFilter::Runtime(std::move(effect4x));
+  auto image4x = image->makeWithFilter(std::move(filter4x));
+  canvas->clear();
+  canvas->drawImage(std::move(image4x));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/MultisampleCount_4x"));
+}
+
+TGFX_TEST(GPURenderTest, MultisampleMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+
+  // mask=0xFFFFFFFF: all samples enabled, should render the red triangle normally.
+  MultisampleConfig configAllSamples = {};
+  configAllSamples.sampleCount = 4;
+  configAllSamples.sampleMask = 0xFFFFFFFF;
+  configAllSamples.outputColor = Color::Red();
+  auto effectAll = MultisampleTestEffect::Make(configAllSamples);
+  auto filterAll = ImageFilter::Runtime(std::move(effectAll));
+  auto imageAll = image->makeWithFilter(std::move(filterAll));
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(std::move(imageAll));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/MultisampleMask_AllSamples"));
+
+  // mask=0x0: no samples written, the result should be the clear color (transparent).
+  MultisampleConfig configNoSamples = {};
+  configNoSamples.sampleCount = 4;
+  configNoSamples.sampleMask = 0x0;
+  configNoSamples.outputColor = Color::Red();
+  auto effectNone = MultisampleTestEffect::Make(configNoSamples);
+  auto filterNone = ImageFilter::Runtime(std::move(effectNone));
+  auto imageNone = image->makeWithFilter(std::move(filterNone));
+  canvas->clear();
+  canvas->drawImage(std::move(imageNone));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/MultisampleMask_NoSamples"));
+}
+
+TGFX_TEST(GPURenderTest, AlphaToCoverage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+
+  // alphaToCoverage=false with alpha=0.5: all 4 samples get (0.5,0,0,0.5), resolve = (0.5,0,0,0.5)
+  MultisampleConfig configOff = {};
+  configOff.sampleCount = 4;
+  configOff.outputColor = {1.0f, 0.0f, 0.0f, 0.5f};
+  configOff.alphaToCoverage = false;
+  auto effectOff = MultisampleTestEffect::Make(configOff);
+  auto filterOff = ImageFilter::Runtime(std::move(effectOff));
+  auto imageOff = image->makeWithFilter(std::move(filterOff));
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(std::move(imageOff));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/AlphaToCoverage_Off"));
+
+  // alphaToCoverage=true with alpha=0.5: alpha drives coverage, ~2 of 4 samples written,
+  // resolve produces a different (typically dimmer) result than alphaToCoverage=false.
+  MultisampleConfig configOn = {};
+  configOn.sampleCount = 4;
+  configOn.outputColor = {1.0f, 0.0f, 0.0f, 0.5f};
+  configOn.alphaToCoverage = true;
+  auto effectOn = MultisampleTestEffect::Make(configOn);
+  auto filterOn = ImageFilter::Runtime(std::move(effectOn));
+  auto imageOn = image->makeWithFilter(std::move(filterOn));
+  canvas->clear();
+  canvas->drawImage(std::move(imageOn));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/AlphaToCoverage_On"));
 }
 
 }  // namespace tgfx
