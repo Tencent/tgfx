@@ -129,6 +129,8 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   programKey.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
   programKey.write(static_cast<uint32_t>(cullMode));
   programKey.write(static_cast<uint32_t>(renderTarget->format()));
+  // Note: if mask or alphaToCoverage from MultisampleDescriptor are used in the pipeline
+  // creation, they must also be encoded here.
   programKey.write(static_cast<uint32_t>(renderTarget->sampleCount()));
   CAPUTRE_PROGRAM_INFO(programKey, context, this);
   auto program = context->globalCache()->findProgram(programKey);

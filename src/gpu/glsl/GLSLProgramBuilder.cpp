@@ -207,6 +207,8 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   // default Y-axis direction (upward). Therefore, it is necessary to define the clockwise
   // direction as the front face, which is the opposite of OpenGL's default.
   descriptor.primitive = {programInfo->getCullMode(), FrontFace::CW};
+  // Only sampleCount is needed here. The mask and alphaToCoverage are only used in RuntimeEffect.
+  // If they are added here later, remember to encode them into ProgramInfo::getProgram()'s key.
   descriptor.multisample.count = programInfo->getSampleCount();
   auto pipeline = gpu->createRenderPipeline(descriptor);
   if (pipeline == nullptr) {
