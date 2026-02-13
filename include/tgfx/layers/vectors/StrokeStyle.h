@@ -34,7 +34,12 @@ namespace tgfx {
  */
 class StrokeStyle : public VectorElement {
  public:
-  StrokeStyle() = default;
+  /**
+   * Creates a new StrokeStyle instance with the specified color source.
+   * @param colorSource The color source used for the stroke. If null, returns nullptr.
+   * @return A new StrokeStyle instance, or nullptr if colorSource is null.
+   */
+  static std::shared_ptr<StrokeStyle> Make(std::shared_ptr<ColorSource> colorSource);
 
   /**
    * Returns the color source used for the stroke.
@@ -42,11 +47,6 @@ class StrokeStyle : public VectorElement {
   std::shared_ptr<ColorSource> colorSource() const {
     return _colorSource;
   }
-
-  /**
-   * Sets the color source used for the stroke.
-   */
-  void setColorSource(std::shared_ptr<ColorSource> value);
 
   /**
    * Returns the alpha value applied to the stroke. Ranges from 0.0 (fully transparent) to 1.0
@@ -146,6 +146,19 @@ class StrokeStyle : public VectorElement {
   void setDashOffset(float value);
 
   /**
+   * Indicates whether to scale the dash intervals so that the dash segments have the same length.
+   * The default value is false.
+   */
+  bool dashAdaptive() const {
+    return _dashAdaptive;
+  }
+
+  /**
+   * Sets whether the dash segments are the same length.
+   */
+  void setDashAdaptive(bool value);
+
+  /**
    * Returns the stroke alignment relative to the shape boundary. The default value is
    * StrokeAlign::Center.
    */
@@ -182,6 +195,11 @@ class StrokeStyle : public VectorElement {
 
   void apply(VectorContext* context) override;
 
+ protected:
+  explicit StrokeStyle(std::shared_ptr<ColorSource> colorSource)
+      : _colorSource(std::move(colorSource)) {
+  }
+
  private:
   std::shared_ptr<ColorSource> _colorSource = nullptr;
   float _alpha = 1.0f;
@@ -189,6 +207,7 @@ class StrokeStyle : public VectorElement {
   Stroke _stroke = Stroke(1.0f);
   std::vector<float> _dashes = {};
   float _dashOffset = 0.0f;
+  bool _dashAdaptive = false;
   StrokeAlign _strokeAlign = StrokeAlign::Center;
   LayerPlacement _placement = LayerPlacement::Background;
   std::shared_ptr<PathEffect> _cachedDashEffect = nullptr;

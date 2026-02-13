@@ -42,6 +42,27 @@ static PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat) {
   return PixelFormat::RGBA_8888;
 }
 
+// MTLPixelFormat values (from Metal headers)
+static constexpr unsigned MTL_PIXEL_FORMAT_R8Unorm = 10;
+static constexpr unsigned MTL_PIXEL_FORMAT_RG8Unorm = 30;
+static constexpr unsigned MTL_PIXEL_FORMAT_RGBA8Unorm = 70;
+static constexpr unsigned MTL_PIXEL_FORMAT_BGRA8Unorm = 80;
+
+static PixelFormat MtlPixelFormatToPixelFormat(unsigned mtlFormat) {
+  switch (mtlFormat) {
+    case MTL_PIXEL_FORMAT_R8Unorm:
+      return PixelFormat::ALPHA_8;
+    case MTL_PIXEL_FORMAT_RG8Unorm:
+      return PixelFormat::RG_88;
+    case MTL_PIXEL_FORMAT_BGRA8Unorm:
+      return PixelFormat::BGRA_8888;
+    case MTL_PIXEL_FORMAT_RGBA8Unorm:
+    default:
+      break;
+  }
+  return PixelFormat::RGBA_8888;
+}
+
 BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
   if (!that.isValid()) {
     _width = _height = 0;
@@ -71,8 +92,7 @@ PixelFormat BackendTexture::format() const {
     case Backend::OpenGL:
       return GLSizeFormatToPixelFormat(glInfo.format);
     case Backend::Metal:
-      //TODO: Add Metal format mapping.
-      return PixelFormat::RGBA_8888;
+      return MtlPixelFormatToPixelFormat(mtlInfo.format);
     default:
       break;
   }
@@ -124,8 +144,7 @@ PixelFormat BackendRenderTarget::format() const {
     case Backend::OpenGL:
       return GLSizeFormatToPixelFormat(glInfo.format);
     case Backend::Metal:
-      //TODO: Add Metal format mapping.
-      return PixelFormat::RGBA_8888;
+      return MtlPixelFormatToPixelFormat(mtlInfo.format);
     default:
       break;
   }
@@ -177,4 +196,5 @@ bool BackendSemaphore::getGLSync(GLSyncInfo* syncInfo) const {
   *syncInfo = glSyncInfo;
   return true;
 }
+
 }  // namespace tgfx

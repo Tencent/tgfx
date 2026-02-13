@@ -18,7 +18,6 @@
 
 #include "RuntimeDrawTask.h"
 #include "core/utils/ColorSpaceHelper.h"
-#include "gpu/GlobalCache.h"
 #include "gpu/Program.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"

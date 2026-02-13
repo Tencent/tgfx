@@ -43,7 +43,10 @@ enum class PolystarType {
  */
 class Polystar : public VectorElement {
  public:
-  Polystar() = default;
+  /**
+   * Creates a new Polystar instance.
+   */
+  static std::shared_ptr<Polystar> Make();
 
   /**
    * Returns the center point of the polystar.
@@ -159,6 +162,9 @@ class Polystar : public VectorElement {
   }
 
   void apply(VectorContext* context) override;
+
+ protected:
+  Polystar() = default;
 
  private:
   Point _center = Point::Zero();

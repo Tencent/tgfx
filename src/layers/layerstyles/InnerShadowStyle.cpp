@@ -92,7 +92,14 @@ void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, fl
   Paint paint = {};
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
-  canvas->drawImage(content, &paint);
+  // Use nearest filtering when there's no blur to avoid edge artifacts caused by linear
+  // interpolation. When the texture is scaled up, linear filtering produces intermediate alpha
+  // values at edges, which causes visible gray borders in the inner shadow.
+  auto sampling = SamplingOptions();
+  if (_blurrinessX == 0 && _blurrinessY == 0) {
+    sampling = SamplingOptions(FilterMode::Nearest, MipmapMode::None);
+  }
+  canvas->drawImage(content, sampling, &paint);
 }
 
 std::shared_ptr<ImageFilter> InnerShadowStyle::getShadowFilter(float scale) {

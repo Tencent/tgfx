@@ -23,6 +23,7 @@
 #include <optional>
 #include <unordered_map>
 #include "core/utils/SlidingWindowTracker.h"
+#include "gpu/AAType.h"
 #include "gpu/Program.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -61,8 +62,8 @@ class GlobalCache {
   void resetUniformBuffer();
 
   /**
-   * Adds a program to the cache with the specified key. If a program with the same key already
-   * exists, it will be replaced with the new program.
+   * Adds a program to the cache with the specified key. The caller must ensure that the key does
+   * not already exist in the cache, otherwise the LRU tracking will be corrupted.
    */
   void addProgram(const BytesKey& programKey, std::shared_ptr<Program> program);
 
@@ -79,9 +80,9 @@ class GlobalCache {
 
   /**
    * Returns a GPU buffer containing indices for rendering a rounded rectangle, either for filling
-   * or stroking.
+   * or stroking, with specified anti-aliasing mode.
    */
-  std::shared_ptr<GPUBufferProxy> getRRectIndexBuffer(bool stroke);
+  std::shared_ptr<GPUBufferProxy> getRRectIndexBuffer(bool stroke, AAType aaType);
 
   /**
    * Finds a static resource in the cache by its unique key. Returns nullptr if no resource is found.
@@ -126,6 +127,7 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> nonAAQuadIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> rRectFillIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> rRectStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> nonAARRectIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> aaRectMiterStrokeIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> aaRectRoundStrokeIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> aaRectBevelStrokeIndexBuffer = nullptr;

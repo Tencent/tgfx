@@ -128,8 +128,8 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
     glyphOffset->y = bounds.top;
     auto width = FloatCeilToInt(bounds.width());
     auto height = FloatCeilToInt(bounds.height());
-    return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, hasFauxBold,
-                                             stroke, *glyphOffset);
+    return GlyphRasterizer::MakeFrom(width, height, scalerContext, glyphID, hasFauxBold, stroke,
+                                     *glyphOffset);
   }
 
   std::shared_ptr<Shape> shape = nullptr;
@@ -368,8 +368,8 @@ void RenderContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCSta
       continue;
     }
     // Glyphs with per-glyph rotation/scale (RSXform/Matrix) and outlines use path rendering
-    // to avoid aliasing.
-    if (HasComplexTransform(run) && run.font.hasOutlines()) {
+    // to avoid aliasing, unless all glyphs have only axis-aligned rotations (0/90/180/270).
+    if (HasComplexTransform(run) && run.font.hasOutlines() && !HasOnlyAxisAlignedRotation(run)) {
       for (size_t i = 0; i < run.glyphCount; i++) {
         drawGlyphAsPath(run.font, run.glyphs[i], GetGlyphMatrix(run, i), state, brush, stroke,
                         localClipBounds);

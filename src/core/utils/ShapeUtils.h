@@ -26,6 +26,8 @@
 
 namespace tgfx {
 
+class MatrixShape;
+
 class StrokeShape;
 
 class ShapeUtils {
@@ -39,7 +41,13 @@ class ShapeUtils {
 
   static float CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape);
 
+  /**
+   * Returns the shape as a MatrixShape pointer, or nullptr if it is not a MatrixShape.
+   */
+  static const MatrixShape* AsMatrixShape(const Shape* shape);
+
   static std::tuple<std::shared_ptr<StrokeShape>, Matrix> DecomposeStrokeShape(
       std::shared_ptr<Shape> shape);
 };
+
 }  // namespace tgfx

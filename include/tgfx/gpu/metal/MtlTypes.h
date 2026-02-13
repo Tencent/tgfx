@@ -28,5 +28,10 @@ struct MtlTextureInfo {
    * Pointer to MTLTexture.
    */
   const void* texture = nullptr;
+
+  /**
+   * The pixel format of this texture (MTLPixelFormat value).
+   */
+  unsigned format = 70;  // MTLPixelFormatRGBA8Unorm
 };
 }  // namespace tgfx

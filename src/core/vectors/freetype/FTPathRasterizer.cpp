@@ -20,31 +20,37 @@
 #include "FTLibrary.h"
 #include "FTPath.h"
 #include "FTRasterTarget.h"
+#include "core/NoConicsPathIterator.h"
 #include "core/utils/ClearPixels.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
 #include "core/utils/ShapeUtils.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-static void Iterator(PathVerb verb, const Point points[4], void* info) {
-  auto path = reinterpret_cast<FTPath*>(info);
-  switch (verb) {
-    case PathVerb::Move:
-      path->moveTo(points[0]);
-      break;
-    case PathVerb::Line:
-      path->lineTo(points[1]);
-      break;
-    case PathVerb::Quad:
-      path->quadTo(points[1], points[2]);
-      break;
-    case PathVerb::Cubic:
-      path->cubicTo(points[1], points[2], points[3]);
-      break;
-    case PathVerb::Close:
-      path->close();
-      break;
+static void AddPathToFTPath(const Path& path, FTPath* ftPath) {
+  NoConicsPathIterator iterator(path);
+  for (auto segment : iterator) {
+    switch (segment.verb) {
+      case PathVerb::Move:
+        ftPath->moveTo(segment.points[0]);
+        break;
+      case PathVerb::Line:
+        ftPath->lineTo(segment.points[1]);
+        break;
+      case PathVerb::Quad:
+        ftPath->quadTo(segment.points[1], segment.points[2]);
+        break;
+      case PathVerb::Cubic:
+        ftPath->cubicTo(segment.points[1], segment.points[2], segment.points[3]);
+        break;
+      case PathVerb::Close:
+        ftPath->close();
+        break;
+      default:
+        break;
+    }
   }
 }
 
@@ -82,7 +88,7 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   }
   ClearPixels(targetInfo, dstPixels);
   FTPath ftPath = {};
-  path.decompose(Iterator, &ftPath);
+  AddPathToFTPath(path, &ftPath);
   auto fillType = path.getFillType();
   ftPath.setEvenOdd(fillType == PathFillType::EvenOdd || fillType == PathFillType::InverseEvenOdd);
   auto outlines = ftPath.getOutlines();

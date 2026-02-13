@@ -28,7 +28,7 @@
 namespace tgfx {
 
 static std::shared_ptr<PathEffect> CreateDashEffect(const std::vector<float>& dashes,
-                                                    float dashOffset) {
+                                                    float dashOffset, bool adaptive) {
   if (dashes.empty()) {
     return nullptr;
   }
@@ -37,7 +37,8 @@ static std::shared_ptr<PathEffect> CreateDashEffect(const std::vector<float>& da
   if (dashCount % 2 == 1) {
     dashList.insert(dashList.end(), dashes.begin(), dashes.end());
   }
-  return PathEffect::MakeDash(dashList.data(), static_cast<int>(dashList.size()), dashOffset);
+  return PathEffect::MakeDash(dashList.data(), static_cast<int>(dashList.size()), dashOffset,
+                              adaptive);
 }
 
 static float BlendStrokeWidth(float base, const GlyphStyle& style) {
@@ -195,6 +196,7 @@ class StrokePainter : public Painter {
     runStroke.width = BlendStrokeWidth(stroke.width, run.style) * scale;
     auto paints = MakeBlendPaints(shader, alpha, blendMode, run.style);
 
+    recorder->setMatrix(matrix);
     for (const auto& info : paints) {
       if (info.shader == nullptr) {
         continue;
@@ -203,8 +205,9 @@ class StrokePainter : public Painter {
       paint.style = PaintStyle::Stroke;
       paint.stroke = runStroke;
       paint.placement = placement;
-      recorder->addTextBlob(run.textBlob, paint, matrix);
+      recorder->addTextBlob(run.textBlob, paint);
     }
+    recorder->resetMatrix();
   }
 
   void drawGlyphRunAsShape(LayerRecorder* recorder, const StyledGlyphRun& run,
@@ -257,13 +260,11 @@ class StrokePainter : public Painter {
   }
 };
 
-void StrokeStyle::setColorSource(std::shared_ptr<ColorSource> value) {
-  if (_colorSource == value) {
-    return;
+std::shared_ptr<StrokeStyle> StrokeStyle::Make(std::shared_ptr<ColorSource> colorSource) {
+  if (colorSource == nullptr) {
+    return nullptr;
   }
-  replaceChildProperty(_colorSource.get(), value.get());
-  _colorSource = std::move(value);
-  invalidateContent();
+  return std::shared_ptr<StrokeStyle>(new StrokeStyle(std::move(colorSource)));
 }
 
 void StrokeStyle::setAlpha(float value) {
@@ -332,6 +333,15 @@ void StrokeStyle::setDashOffset(float value) {
   invalidateContent();
 }
 
+void StrokeStyle::setDashAdaptive(bool value) {
+  if (_dashAdaptive == value) {
+    return;
+  }
+  _dashAdaptive = value;
+  _cachedDashEffect = nullptr;
+  invalidateContent();
+}
+
 void StrokeStyle::setStrokeAlign(StrokeAlign value) {
   if (_strokeAlign == value) {
     return;
@@ -393,7 +403,7 @@ void StrokeStyle::apply(VectorContext* context) {
   painter->stroke = _stroke;
   painter->strokeAlign = _strokeAlign;
   if (_cachedDashEffect == nullptr && !_dashes.empty()) {
-    _cachedDashEffect = CreateDashEffect(_dashes, _dashOffset);
+    _cachedDashEffect = CreateDashEffect(_dashes, _dashOffset, _dashAdaptive);
   }
   painter->pathEffect = _cachedDashEffect;
   context->painters.push_back(std::move(painter));

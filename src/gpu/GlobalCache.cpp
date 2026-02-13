@@ -311,14 +311,15 @@ static constexpr int OverstrokeIndicesCount = 6 * 4;
 // fill and standard stroke indices skip the overstroke "ring"
 static const uint16_t* StandardRRectIndices = OverstrokeRRectIndices + OverstrokeIndicesCount;
 
-class RRectIndicesProvider : public DataSource<Data> {
+class AARRectIndicesProvider : public DataSource<Data> {
  public:
-  explicit RRectIndicesProvider(size_t rectSize, bool stroke) : rectSize(rectSize), stroke(stroke) {
+  explicit AARRectIndicesProvider(size_t rectSize, bool stroke)
+      : rectSize(rectSize), stroke(stroke) {
   }
 
   std::shared_ptr<Data> getData() const override {
     auto indicesCount =
-        stroke ? RRectDrawOp::IndicesPerStrokeRRect : RRectDrawOp::IndicesPerFillRRect;
+        stroke ? RRectDrawOp::IndicesPerAAStrokeRRect : RRectDrawOp::IndicesPerAAFillRRect;
     auto bufferSize = rectSize * indicesCount * sizeof(uint16_t);
     Buffer buffer(bufferSize);
     auto indices = reinterpret_cast<uint16_t*>(buffer.data());
@@ -337,10 +338,21 @@ class RRectIndicesProvider : public DataSource<Data> {
   bool stroke = false;
 };
 
-std::shared_ptr<GPUBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke) {
+static constexpr uint16_t NonAARRectIndexPattern[] = {0, 1, 2, 0, 2, 3};
+
+std::shared_ptr<GPUBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke, AAType aaType) {
+  if (aaType == AAType::None) {
+    if (nonAARRectIndexBuffer == nullptr) {
+      auto provider = std::make_unique<RectIndicesProvider>(
+          NonAARRectIndexPattern, RRectDrawOp::IndicesPerNonAARRect, RRectDrawOp::MaxNumRRects,
+          RRectDrawOp::VerticesPerNonAARRect);
+      nonAARRectIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
+    }
+    return nonAARRectIndexBuffer;
+  }
   auto& indexBuffer = stroke ? rRectStrokeIndexBuffer : rRectFillIndexBuffer;
   if (indexBuffer == nullptr) {
-    auto provider = std::make_unique<RRectIndicesProvider>(RRectDrawOp::MaxNumRRects, stroke);
+    auto provider = std::make_unique<AARRectIndicesProvider>(RRectDrawOp::MaxNumRRects, stroke);
     indexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
   return indexBuffer;

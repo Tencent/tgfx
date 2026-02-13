@@ -19,9 +19,11 @@
 #include "WebPathRasterizer.h"
 #include <emscripten/val.h>
 #include "ReadPixelsFromCanvasImage.h"
+#include "core/NoConicsPathIterator.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/ShapeUtils.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/Path.h"
 
 using namespace emscripten;
 
@@ -37,25 +39,31 @@ std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
                                              needsGammaCorrection);
 }
 
-static void Iterator(PathVerb verb, const Point points[4], void* info) {
-  auto path2D = reinterpret_cast<val*>(info);
-  switch (verb) {
-    case PathVerb::Move:
-      path2D->call<void>("moveTo", points[0].x, points[0].y);
-      break;
-    case PathVerb::Line:
-      path2D->call<void>("lineTo", points[1].x, points[1].y);
-      break;
-    case PathVerb::Quad:
-      path2D->call<void>("quadraticCurveTo", points[1].x, points[1].y, points[2].x, points[2].y);
-      break;
-    case PathVerb::Cubic:
-      path2D->call<void>("bezierCurveTo", points[1].x, points[1].y, points[2].x, points[2].y,
-                         points[3].x, points[3].y);
-      break;
-    case PathVerb::Close:
-      path2D->call<void>("closePath");
-      break;
+static void AddPathToPath2D(const Path& path, val* path2D) {
+  NoConicsPathIterator iterator(path);
+  for (auto segment : iterator) {
+    switch (segment.verb) {
+      case PathVerb::Move:
+        path2D->call<void>("moveTo", segment.points[0].x, segment.points[0].y);
+        break;
+      case PathVerb::Line:
+        path2D->call<void>("lineTo", segment.points[1].x, segment.points[1].y);
+        break;
+      case PathVerb::Quad:
+        path2D->call<void>("quadraticCurveTo", segment.points[1].x, segment.points[1].y,
+                           segment.points[2].x, segment.points[2].y);
+        break;
+      case PathVerb::Cubic:
+        path2D->call<void>("bezierCurveTo", segment.points[1].x, segment.points[1].y,
+                           segment.points[2].x, segment.points[2].y, segment.points[3].x,
+                           segment.points[3].y);
+        break;
+      case PathVerb::Close:
+        path2D->call<void>("closePath");
+        break;
+      default:
+        break;
+    }
   }
 }
 
@@ -74,7 +82,7 @@ bool WebPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, s
     return false;
   }
   auto path2D = path2DClass.new_();
-  path.decompose(Iterator, &path2D);
+  AddPathToPath2D(path, &path2D);
   auto PathRasterizerClass = val::module_property("PathRasterizer");
   if (!PathRasterizerClass.as<bool>()) {
     return false;

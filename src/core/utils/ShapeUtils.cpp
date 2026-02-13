@@ -63,4 +63,11 @@ std::tuple<std::shared_ptr<StrokeShape>, Matrix> ShapeUtils::DecomposeStrokeShap
   return {strokeShape, matrix};
 }
 
+const MatrixShape* ShapeUtils::AsMatrixShape(const Shape* shape) {
+  if (shape != nullptr && shape->type() == Shape::Type::Matrix) {
+    return static_cast<const MatrixShape*>(shape);
+  }
+  return nullptr;
+}
+
 }  // namespace tgfx

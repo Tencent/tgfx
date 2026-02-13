@@ -92,6 +92,7 @@ class LayerContent {
     Compose,
     Rects,
     RRects,
+    Matrix,
   };
 
   /**

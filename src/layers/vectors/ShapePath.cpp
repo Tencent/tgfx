@@ -22,6 +22,10 @@
 
 namespace tgfx {
 
+std::shared_ptr<ShapePath> ShapePath::Make() {
+  return std::shared_ptr<ShapePath>(new ShapePath());
+}
+
 void ShapePath::setPath(Path value) {
   if (_path == value) {
     return;

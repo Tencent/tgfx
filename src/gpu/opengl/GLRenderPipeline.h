@@ -76,6 +76,10 @@ class GLRenderPipeline : public RenderPipeline, public GLResource {
    */
   void setStencilReference(GLGPU* gpu, unsigned reference);
 
+  int multisampleCount() const {
+    return sampleCount;
+  }
+
  protected:
   void onRelease(GLGPU* gpu) override;
 
@@ -90,6 +94,9 @@ class GLRenderPipeline : public RenderPipeline, public GLResource {
   std::unique_ptr<GLDepthState> depthState = nullptr;
   std::unique_ptr<GLBlendState> blendState = nullptr;
   std::unique_ptr<GLCullFaceState> cullFaceState = {};
+  bool alphaToCoverageEnabled = false;
+  uint32_t sampleMask = 0xFFFFFFFF;
+  int sampleCount = 1;
 
   bool setPipelineDescriptor(GLGPU* gpu, const RenderPipelineDescriptor& descriptor);
 

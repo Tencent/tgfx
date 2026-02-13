@@ -18,12 +18,12 @@
 
 #pragma once
 
-#include "layers/contents/GeometryContent.h"
+#include "layers/contents/DrawContent.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
 
-class ShapeContent : public GeometryContent {
+class ShapeContent : public DrawContent {
  public:
   ShapeContent(std::shared_ptr<Shape> shape, const LayerPaint& paint);
 

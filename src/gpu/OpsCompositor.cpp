@@ -136,7 +136,7 @@ void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Br
   DEBUG_ASSERT(!rRect.rect.isEmpty());
   auto rectBrush = brush.makeWithMatrix(state.matrix);
   if (!canAppend(PendingOpType::RRect, state.clip, rectBrush) ||
-      (pendingStrokes.empty() != (stroke == nullptr))) {
+      ShouldFlushRectOps(pendingStrokes, stroke)) {
     flushPendingOps(PendingOpType::RRect, state.clip, rectBrush);
   }
   auto record = drawingAllocator()->make<RRectRecord>(rRect, state.matrix, rectBrush.color);

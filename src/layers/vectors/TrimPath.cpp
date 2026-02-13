@@ -24,6 +24,10 @@
 
 namespace tgfx {
 
+std::shared_ptr<TrimPath> TrimPath::Make() {
+  return std::shared_ptr<TrimPath>(new TrimPath());
+}
+
 void TrimPath::setStart(float value) {
   if (_start == value) {
     return;

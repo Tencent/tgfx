@@ -19,12 +19,12 @@
 #pragma once
 
 #include <vector>
-#include "layers/contents/GeometryContent.h"
+#include "layers/contents/DrawContent.h"
 #include "tgfx/core/RRect.h"
 
 namespace tgfx {
 
-class RRectsContent : public GeometryContent {
+class RRectsContent : public DrawContent {
  public:
   RRectsContent(std::vector<RRect> rRects, const LayerPaint& paint);
 

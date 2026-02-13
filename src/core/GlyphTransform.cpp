@@ -17,11 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/GlyphTransform.h"
+#include "core/utils/MathExtra.h"
+#include "tgfx/core/RSXform.h"
 
 namespace tgfx {
 
 unsigned ScalarsPerGlyph(GlyphPositioning positioning) {
   switch (positioning) {
+    case GlyphPositioning::Default:
+      return 0;
     case GlyphPositioning::Horizontal:
       return 1;
     case GlyphPositioning::Point:
@@ -36,6 +40,7 @@ unsigned ScalarsPerGlyph(GlyphPositioning positioning) {
 
 Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
   switch (run.positioning) {
+    case GlyphPositioning::Default:
     case GlyphPositioning::Horizontal:
       return Matrix::MakeTrans(run.positions[index], run.offsetY);
     case GlyphPositioning::Point: {
@@ -52,6 +57,54 @@ Matrix GetGlyphMatrix(const GlyphRun& run, size_t index) {
     }
   }
   return {};
+}
+
+Point GetGlyphPosition(const GlyphRun& run, size_t index) {
+  switch (run.positioning) {
+    case GlyphPositioning::Default:
+    case GlyphPositioning::Horizontal:
+      return {run.positions[index], run.offsetY};
+    case GlyphPositioning::Point:
+      return reinterpret_cast<const Point*>(run.positions)[index];
+    default:
+      return {};
+  }
+}
+
+static bool IsAxisAlignedTransform(const RSXform& xform) {
+  return FloatNearlyZero(xform.scos) || FloatNearlyZero(xform.ssin);
+}
+
+static bool IsAxisAlignedTransform(const Matrix& matrix) {
+  auto sx = matrix.getScaleX();
+  auto sy = matrix.getScaleY();
+  auto kx = matrix.getSkewX();
+  auto ky = matrix.getSkewY();
+  if (FloatNearlyZero(kx) && FloatNearlyZero(ky)) {
+    return !FloatNearlyZero(sx) && !FloatNearlyZero(sy);
+  }
+  if (FloatNearlyZero(sx) && FloatNearlyZero(sy)) {
+    return !FloatNearlyZero(kx) && !FloatNearlyZero(ky);
+  }
+  return false;
+}
+
+bool HasOnlyAxisAlignedRotation(const GlyphRun& run) {
+  if (run.positioning == GlyphPositioning::RSXform) {
+    auto xforms = reinterpret_cast<const RSXform*>(run.positions);
+    for (size_t i = 0; i < run.glyphCount; i++) {
+      if (!IsAxisAlignedTransform(xforms[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+  for (size_t i = 0; i < run.glyphCount; i++) {
+    if (!IsAxisAlignedTransform(GetGlyphMatrix(run, i))) {
+      return false;
+    }
+  }
+  return true;
 }
 
 }  // namespace tgfx
