@@ -16,16 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "utils/DevicePool.h"
-#include "tgfx/gpu/metal/MetalDevice.h"
+#pragma once
+
+#include <list>
+#include "core/utils/ReturnQueue.h"
 
 namespace tgfx {
-thread_local std::shared_ptr<Device> cachedDevice = nullptr;
 
-std::shared_ptr<Device> DevicePool::Make() {
-  if (cachedDevice == nullptr) {
-    cachedDevice = MetalDevice::Make();
-  }
-  return cachedDevice;
-}
+class MetalGPU;
+
+/**
+ * Base class for Metal GPU resources. Subclasses must implement the onRelease() method to free all
+ * underlying GPU resources. No Metal API calls should be made during destruction since the resource
+ * may be destroyed on any thread.
+ */
+class MetalResource : public ReturnNode {
+ protected:
+  /**
+   * Overridden to free the underlying Metal resources. After calling this method, the MetalResource
+   * must not be used, as doing so may lead to undefined behavior.
+   */
+  virtual void onRelease(MetalGPU* gpu) = 0;
+
+ private:
+  std::list<MetalResource*>::iterator cachedPosition;
+
+  friend class MetalGPU;
+};
+
 }  // namespace tgfx

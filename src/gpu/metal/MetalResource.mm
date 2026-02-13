@@ -16,16 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "utils/DevicePool.h"
-#include "tgfx/gpu/metal/MetalDevice.h"
+#include "MetalResource.h"
 
 namespace tgfx {
-thread_local std::shared_ptr<Device> cachedDevice = nullptr;
-
-std::shared_ptr<Device> DevicePool::Make() {
-  if (cachedDevice == nullptr) {
-    cachedDevice = MetalDevice::Make();
-  }
-  return cachedDevice;
-}
 }  // namespace tgfx

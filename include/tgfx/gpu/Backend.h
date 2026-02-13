@@ -19,7 +19,7 @@
 #pragma once
 
 #include "tgfx/gpu/PixelFormat.h"
-#include "tgfx/gpu/metal/MtlTypes.h"
+#include "tgfx/gpu/metal/MetalTypes.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
 
 namespace tgfx {
@@ -49,8 +49,8 @@ class BackendTexture {
   /**
    * Creates a Metal backend texture.
    */
-  BackendTexture(const MtlTextureInfo& mtlInfo, int width, int height)
-      : _backend(Backend::Metal), _width(width), _height(height), mtlInfo(mtlInfo) {
+  BackendTexture(const MetalTextureInfo& metalInfo, int width, int height)
+      : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
   }
 
   BackendTexture(const BackendTexture& that) {
@@ -99,10 +99,10 @@ class BackendTexture {
   bool getGLTextureInfo(GLTextureInfo* glTextureInfo) const;
 
   /**
-   * If the backend API is Metal, copies a snapshot of the GrMtlTextureInfo struct into the passed
+   * If the backend API is Metal, copies a snapshot of the GrMetalTextureInfo struct into the passed
    * in pointer and returns true. Otherwise, returns false if the backend API is not Metal.
    */
-  bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
+  bool getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const;
 
  private:
   Backend _backend = Backend::Unknown;
@@ -111,7 +111,7 @@ class BackendTexture {
 
   union {
     GLTextureInfo glInfo;
-    MtlTextureInfo mtlInfo;
+    MetalTextureInfo metalInfo;
   };
 };
 
@@ -136,8 +136,8 @@ class BackendRenderTarget {
   /**
    * Creates an Metal backend render target.
    */
-  BackendRenderTarget(const MtlTextureInfo& mtlInfo, int width, int height)
-      : _backend(Backend::Metal), _width(width), _height(height), mtlInfo(mtlInfo) {
+  BackendRenderTarget(const MetalTextureInfo& metalInfo, int width, int height)
+      : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
   }
 
   BackendRenderTarget(const BackendRenderTarget& that) {
@@ -186,10 +186,10 @@ class BackendRenderTarget {
   bool getGLFramebufferInfo(GLFrameBufferInfo* glFrameBufferInfo) const;
 
   /**
-   * If the backend API is Metal, copies a snapshot of the MtlTextureInfo struct into the passed
+   * If the backend API is Metal, copies a snapshot of the MetalTextureInfo struct into the passed
    * in pointer and returns true. Otherwise, returns false if the backend API is not Metal.
    */
-  bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
+  bool getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const;
 
  private:
   Backend _backend = Backend::Unknown;
@@ -197,7 +197,7 @@ class BackendRenderTarget {
   int _height = 0;
   union {
     GLFrameBufferInfo glInfo;
-    MtlTextureInfo mtlInfo;
+    MetalTextureInfo metalInfo;
   };
 };
 
@@ -221,8 +221,8 @@ class BackendSemaphore {
   /**
    * Creates a Metal backend semaphore.
    */
-  BackendSemaphore(const MtlSemaphoreInfo& mtlInfo)
-      : _backend(Backend::Metal), mtlSemaphoreInfo(mtlInfo) {
+  BackendSemaphore(const MetalSemaphoreInfo& metalInfo)
+      : _backend(Backend::Metal), metalSemaphoreInfo(metalInfo) {
   }
 
   BackendSemaphore(const BackendSemaphore& that) {
@@ -245,13 +245,13 @@ class BackendSemaphore {
 
   bool getGLSync(GLSyncInfo* syncInfo) const;
 
-  bool getMtlSemaphore(MtlSemaphoreInfo* mtlInfo) const;
+  bool getMetalSemaphore(MetalSemaphoreInfo* metalInfo) const;
 
  private:
   Backend _backend = Backend::Unknown;
   union {
     GLSyncInfo glSyncInfo;
-    MtlSemaphoreInfo mtlSemaphoreInfo;
+    MetalSemaphoreInfo metalSemaphoreInfo;
   };
 };
 }  // namespace tgfx

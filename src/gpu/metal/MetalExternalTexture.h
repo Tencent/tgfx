@@ -16,16 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "utils/DevicePool.h"
-#include "tgfx/gpu/metal/MetalDevice.h"
+#pragma once
+
+#include "MetalTexture.h"
 
 namespace tgfx {
-thread_local std::shared_ptr<Device> cachedDevice = nullptr;
-
-std::shared_ptr<Device> DevicePool::Make() {
-  if (cachedDevice == nullptr) {
-    cachedDevice = MetalDevice::Make();
+class MetalExternalTexture : public MetalTexture {
+ public:
+  MetalExternalTexture(const TextureDescriptor& descriptor, id<MTLTexture> metalTexture)
+      : MetalTexture(descriptor, metalTexture) {
   }
-  return cachedDevice;
-}
+
+ protected:
+  void onReleaseTexture() override {
+    // External textures are not owned by TGFX, so we do not release them.
+  }
+};
 }  // namespace tgfx

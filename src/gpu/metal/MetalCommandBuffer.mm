@@ -16,16 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "utils/DevicePool.h"
-#include "tgfx/gpu/metal/MetalDevice.h"
+#include "MetalCommandBuffer.h"
 
 namespace tgfx {
-thread_local std::shared_ptr<Device> cachedDevice = nullptr;
 
-std::shared_ptr<Device> DevicePool::Make() {
-  if (cachedDevice == nullptr) {
-    cachedDevice = MetalDevice::Make();
-  }
-  return cachedDevice;
+MetalCommandBuffer::MetalCommandBuffer(id<MTLCommandBuffer> metalCommandBuffer) 
+    : commandBuffer([metalCommandBuffer retain]) {
 }
+
+MetalCommandBuffer::~MetalCommandBuffer() {
+  if (commandBuffer != nil) {
+    [commandBuffer release];
+    commandBuffer = nil;
+  }
+}
+
 }  // namespace tgfx

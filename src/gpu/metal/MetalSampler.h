@@ -16,16 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "utils/DevicePool.h"
-#include "tgfx/gpu/metal/MetalDevice.h"
+#pragma once
+
+#include <Metal/Metal.h>
+#include "tgfx/gpu/Sampler.h"
+#include "MetalResource.h"
 
 namespace tgfx {
-thread_local std::shared_ptr<Device> cachedDevice = nullptr;
 
-std::shared_ptr<Device> DevicePool::Make() {
-  if (cachedDevice == nullptr) {
-    cachedDevice = MetalDevice::Make();
+class MetalGPU;
+
+/**
+ * Metal sampler implementation.
+ */
+class MetalSampler : public Sampler, public MetalResource {
+ public:
+  static std::shared_ptr<MetalSampler> Make(MetalGPU* gpu, const SamplerDescriptor& descriptor);
+
+  /**
+   * Returns the Metal sampler state.
+   */
+  id<MTLSamplerState> metalSamplerState() const {
+    return samplerState;
   }
-  return cachedDevice;
-}
+
+ protected:
+  void onRelease(MetalGPU* gpu) override;
+
+ private:
+  explicit MetalSampler(id<MTLSamplerState> metalSamplerState);
+  ~MetalSampler() override = default;
+
+  id<MTLSamplerState> samplerState = nil;
+  
+  friend class MetalGPU;
+};
+
 }  // namespace tgfx

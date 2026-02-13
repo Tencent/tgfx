@@ -16,16 +16,43 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "utils/DevicePool.h"
-#include "tgfx/gpu/metal/MetalDevice.h"
+#pragma once
+
+#include "tgfx/gpu/Device.h"
 
 namespace tgfx {
-thread_local std::shared_ptr<Device> cachedDevice = nullptr;
 
-std::shared_ptr<Device> DevicePool::Make() {
-  if (cachedDevice == nullptr) {
-    cachedDevice = MetalDevice::Make();
-  }
-  return cachedDevice;
-}
+/**
+ * Metal device for GPU rendering.
+ */
+class MetalDevice : public Device {
+ public:
+  /**
+   * Creates a Metal device with the default Metal device.
+   */
+  static std::shared_ptr<MetalDevice> Make();
+
+  /**
+   * Creates a Metal device with the specified Metal device. The device parameter is a pointer to
+   * an id<MTLDevice> object.
+   */
+  static std::shared_ptr<MetalDevice> MakeFrom(void* device);
+
+  ~MetalDevice() override;
+
+  /**
+   * Returns the Metal device as a pointer to an id<MTLDevice> object.
+   */
+  void* metalDevice() const;
+
+ protected:
+  bool onLockContext() override;
+  void onUnlockContext() override;
+
+ private:
+  explicit MetalDevice(std::unique_ptr<class MetalGPU> gpu);
+
+  void* device = nullptr;
+};
+
 }  // namespace tgfx

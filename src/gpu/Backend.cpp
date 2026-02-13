@@ -43,25 +43,25 @@ static PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat) {
 }
 
 // MTLPixelFormat values (from Metal headers)
-static constexpr unsigned MTL_PIXEL_FORMAT_R8Unorm = 10;
-static constexpr unsigned MTL_PIXEL_FORMAT_RG8Unorm = 30;
-static constexpr unsigned MTL_PIXEL_FORMAT_RGBA8Unorm = 70;
-static constexpr unsigned MTL_PIXEL_FORMAT_BGRA8Unorm = 80;
-static constexpr unsigned MTL_PIXEL_FORMAT_Depth24Unorm_Stencil8 = 255;
-static constexpr unsigned MTL_PIXEL_FORMAT_Depth32Float_Stencil8 = 260;
+static constexpr unsigned METAL_PIXEL_FORMAT_R8Unorm = 10;
+static constexpr unsigned METAL_PIXEL_FORMAT_RG8Unorm = 30;
+static constexpr unsigned METAL_PIXEL_FORMAT_RGBA8Unorm = 70;
+static constexpr unsigned METAL_PIXEL_FORMAT_BGRA8Unorm = 80;
+static constexpr unsigned METAL_PIXEL_FORMAT_Depth24Unorm_Stencil8 = 255;
+static constexpr unsigned METAL_PIXEL_FORMAT_Depth32Float_Stencil8 = 260;
 
-static PixelFormat MtlPixelFormatToPixelFormat(unsigned mtlFormat) {
-  switch (mtlFormat) {
-    case MTL_PIXEL_FORMAT_R8Unorm:
+static PixelFormat MetalPixelFormatToPixelFormat(unsigned metalFormat) {
+  switch (metalFormat) {
+    case METAL_PIXEL_FORMAT_R8Unorm:
       return PixelFormat::ALPHA_8;
-    case MTL_PIXEL_FORMAT_RG8Unorm:
+    case METAL_PIXEL_FORMAT_RG8Unorm:
       return PixelFormat::RG_88;
-    case MTL_PIXEL_FORMAT_BGRA8Unorm:
+    case METAL_PIXEL_FORMAT_BGRA8Unorm:
       return PixelFormat::BGRA_8888;
-    case MTL_PIXEL_FORMAT_Depth24Unorm_Stencil8:
-    case MTL_PIXEL_FORMAT_Depth32Float_Stencil8:
+    case METAL_PIXEL_FORMAT_Depth24Unorm_Stencil8:
+    case METAL_PIXEL_FORMAT_Depth32Float_Stencil8:
       return PixelFormat::DEPTH24_STENCIL8;
-    case MTL_PIXEL_FORMAT_RGBA8Unorm:
+    case METAL_PIXEL_FORMAT_RGBA8Unorm:
     default:
       break;
   }
@@ -81,7 +81,7 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
       glInfo = that.glInfo;
       break;
     case Backend::Metal:
-      mtlInfo = that.mtlInfo;
+      metalInfo = that.metalInfo;
       break;
     default:
       break;
@@ -97,7 +97,7 @@ PixelFormat BackendTexture::format() const {
     case Backend::OpenGL:
       return GLSizeFormatToPixelFormat(glInfo.format);
     case Backend::Metal:
-      return MtlPixelFormatToPixelFormat(mtlInfo.format);
+      return MetalPixelFormatToPixelFormat(metalInfo.format);
     default:
       break;
   }
@@ -112,11 +112,11 @@ bool BackendTexture::getGLTextureInfo(GLTextureInfo* glTextureInfo) const {
   return true;
 }
 
-bool BackendTexture::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const {
+bool BackendTexture::getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const {
   if (!isValid() || _backend != Backend::Metal) {
     return false;
   }
-  *mtlTextureInfo = mtlInfo;
+  *metalTextureInfo = metalInfo;
   return true;
 }
 
@@ -133,7 +133,7 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
       glInfo = that.glInfo;
       break;
     case Backend::Metal:
-      mtlInfo = that.mtlInfo;
+      metalInfo = that.metalInfo;
       break;
     default:
       break;
@@ -149,7 +149,7 @@ PixelFormat BackendRenderTarget::format() const {
     case Backend::OpenGL:
       return GLSizeFormatToPixelFormat(glInfo.format);
     case Backend::Metal:
-      return MtlPixelFormatToPixelFormat(mtlInfo.format);
+      return MetalPixelFormatToPixelFormat(metalInfo.format);
     default:
       break;
   }
@@ -164,11 +164,11 @@ bool BackendRenderTarget::getGLFramebufferInfo(GLFrameBufferInfo* glFrameBufferI
   return true;
 }
 
-bool BackendRenderTarget::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const {
+bool BackendRenderTarget::getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const {
   if (!isValid() || _backend != Backend::Metal) {
     return false;
   }
-  *mtlTextureInfo = mtlInfo;
+  *metalTextureInfo = metalInfo;
   return true;
 }
 
@@ -179,7 +179,7 @@ BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
       glSyncInfo = that.glSyncInfo;
       break;
     case Backend::Metal:
-      mtlSemaphoreInfo = that.mtlSemaphoreInfo;
+      metalSemaphoreInfo = that.metalSemaphoreInfo;
       break;
     default:
       break;
@@ -192,7 +192,7 @@ bool BackendSemaphore::isInitialized() const {
     case Backend::OpenGL:
       return glSyncInfo.sync != nullptr;
     case Backend::Metal:
-      return mtlSemaphoreInfo.event != nullptr;
+      return metalSemaphoreInfo.event != nullptr;
     default:
       break;
   }
@@ -207,11 +207,11 @@ bool BackendSemaphore::getGLSync(GLSyncInfo* syncInfo) const {
   return true;
 }
 
-bool BackendSemaphore::getMtlSemaphore(MtlSemaphoreInfo* mtlInfo) const {
-  if (_backend != Backend::Metal || mtlSemaphoreInfo.event == nullptr) {
+bool BackendSemaphore::getMetalSemaphore(MetalSemaphoreInfo* metalInfo) const {
+  if (_backend != Backend::Metal || metalSemaphoreInfo.event == nullptr) {
     return false;
   }
-  *mtlInfo = mtlSemaphoreInfo;
+  *metalInfo = metalSemaphoreInfo;
   return true;
 }
 

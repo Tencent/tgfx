@@ -16,16 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "utils/DevicePool.h"
-#include "tgfx/gpu/metal/MetalDevice.h"
+#pragma once
+
+#include <Metal/Metal.h>
+#include "tgfx/gpu/CommandBuffer.h"
 
 namespace tgfx {
-thread_local std::shared_ptr<Device> cachedDevice = nullptr;
 
-std::shared_ptr<Device> DevicePool::Make() {
-  if (cachedDevice == nullptr) {
-    cachedDevice = MetalDevice::Make();
+/**
+ * Metal command buffer implementation.
+ */
+class MetalCommandBuffer : public CommandBuffer {
+ public:
+  explicit MetalCommandBuffer(id<MTLCommandBuffer> commandBuffer);
+  ~MetalCommandBuffer() override;
+
+  /**
+   * Returns the Metal command buffer.
+   */
+  id<MTLCommandBuffer> metalCommandBuffer() const {
+    return commandBuffer;
   }
-  return cachedDevice;
-}
+
+ private:
+  id<MTLCommandBuffer> commandBuffer = nil;
+};
+
 }  // namespace tgfx
