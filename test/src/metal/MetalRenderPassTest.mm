@@ -75,7 +75,7 @@ class TestMetalShaderModule : public ShaderModule {
     NSError* error = nil;
     id<MTLLibrary> library = [gpu->device() newLibraryWithSource:source options:nil error:&error];
 
-    if (!library || error) {
+    if (!library) {
       if (error) {
         LOGE("Metal shader compilation error: %s", error.localizedDescription.UTF8String);
       }
@@ -154,7 +154,7 @@ static id<MTLRenderPipelineState> CreateTestPipeline(MetalGPU* gpu,
       [gpu->device() newRenderPipelineStateWithDescriptor:descriptor error:&error];
   [descriptor release];
 
-  if (!pipelineState || error) {
+  if (!pipelineState) {
     if (error) {
       LOGE("Pipeline creation error: %s", error.localizedDescription.UTF8String);
     }
