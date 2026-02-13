@@ -20,12 +20,6 @@
 
 #include "tgfx/gpu/Device.h"
 
-#ifdef __OBJC__
-#import <Metal/Metal.h>
-#else
-typedef struct objc_object* id;
-#endif
-
 namespace tgfx {
 
 /**
@@ -39,24 +33,17 @@ class MtlDevice : public Device {
   static std::shared_ptr<MtlDevice> Make();
 
   /**
-   * Creates a Metal device with the specified Metal device.
+   * Creates a Metal device with the specified Metal device. The device parameter is a pointer to
+   * an id<MTLDevice> object.
    */
-#ifdef __OBJC__
-  static std::shared_ptr<MtlDevice> MakeFrom(id<MTLDevice> device);
-#else
   static std::shared_ptr<MtlDevice> MakeFrom(void* device);
-#endif
 
   ~MtlDevice() override;
 
   /**
-   * Returns the Metal device.
+   * Returns the Metal device as a pointer to an id<MTLDevice> object.
    */
-#ifdef __OBJC__
-  id<MTLDevice> mtlDevice() const;
-#else
   void* mtlDevice() const;
-#endif
 
  protected:
   bool onLockContext() override;
@@ -65,11 +52,7 @@ class MtlDevice : public Device {
  private:
   explicit MtlDevice(std::unique_ptr<class MtlGPU> gpu);
 
-#ifdef __OBJC__
-  id<MTLDevice> device = nil;
-#else
   void* device = nullptr;
-#endif
 };
 
 }  // namespace tgfx

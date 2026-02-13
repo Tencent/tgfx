@@ -25,23 +25,22 @@ namespace tgfx {
 
 std::shared_ptr<MtlDevice> MtlDevice::Make() {
   @autoreleasepool {
-    id<MTLDevice> device = MTLCreateSystemDefaultDevice();
-    auto result = MakeFrom(device);
-    [device release];
+    id<MTLDevice> mtlDevice = MTLCreateSystemDefaultDevice();
+    auto result = MakeFrom(mtlDevice);
+    [mtlDevice release];
     return result;
   }
 }
 
-std::shared_ptr<MtlDevice> MtlDevice::MakeFrom(id<MTLDevice> mtlDevice) {
+std::shared_ptr<MtlDevice> MtlDevice::MakeFrom(void* mtlDevice) {
   if (!mtlDevice) {
     return nullptr;
   }
   @autoreleasepool {
-    auto gpu = MtlGPU::Make(mtlDevice);
+    auto gpu = MtlGPU::Make((id<MTLDevice>)mtlDevice);
     if (!gpu) {
       return nullptr;
     }
-    
     auto device = std::shared_ptr<MtlDevice>(new MtlDevice(std::move(gpu)));
     device->weakThis = device;
     return device;
@@ -56,7 +55,7 @@ MtlDevice::~MtlDevice() {
   static_cast<MtlGPU*>(_gpu)->releaseAll(true);
 }
 
-id<MTLDevice> MtlDevice::mtlDevice() const {
+void* MtlDevice::mtlDevice() const {
   return device;
 }
 
