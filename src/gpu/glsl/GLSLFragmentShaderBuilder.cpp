@@ -55,6 +55,8 @@ void GLSLFragmentShaderBuilder::declareSubpassInput() {
     return;
   }
   subpassInputDeclared = true;
+  // Use descriptor set 2 to avoid conflict with UBO descriptor sets (set=0 by default in
+  // Vulkan GLSL). The subpassInput must reside in a separate descriptor set from uniform blocks.
   shaderStrings[Type::Uniforms] +=
       "layout(input_attachment_index=0, set=2, binding=0) uniform subpassInput ";
   shaderStrings[Type::Uniforms] += SubpassInputName;
