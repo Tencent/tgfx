@@ -34,6 +34,8 @@ class MetalRenderPass : public RenderPass {
   static std::shared_ptr<MetalRenderPass> Make(MetalCommandEncoder* encoder, 
                                            const RenderPassDescriptor& descriptor);
 
+  ~MetalRenderPass() override;
+
   /**
    * Returns the Metal render command encoder.
    */
@@ -63,7 +65,6 @@ class MetalRenderPass : public RenderPass {
 
  private:
   MetalRenderPass(MetalCommandEncoder* encoder, const RenderPassDescriptor& descriptor);
-  ~MetalRenderPass() override;
 
   MetalCommandEncoder* commandEncoder = nullptr;
   id<MTLRenderCommandEncoder> renderEncoder = nil;
