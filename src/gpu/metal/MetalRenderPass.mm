@@ -126,6 +126,7 @@ void MetalRenderPass::onEnd() {
 
 MetalRenderPass::~MetalRenderPass() {
   if (renderEncoder) {
+    [renderEncoder endEncoding];
     [renderEncoder release];
     renderEncoder = nil;
   }
