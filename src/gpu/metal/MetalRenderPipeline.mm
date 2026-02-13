@@ -139,8 +139,8 @@ bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu, const RenderPipelin
   configureColorAttachments(metalDescriptor, gpu, descriptor);
   
   // Configure depth-stencil attachment pixel format
-  if (descriptor.depthStencilFormat != PixelFormat::Unknown) {
-    MTLPixelFormat dsFormat = gpu->getMTLPixelFormat(descriptor.depthStencilFormat);
+  if (descriptor.depthStencil.format != PixelFormat::Unknown) {
+    MTLPixelFormat dsFormat = gpu->getMTLPixelFormat(descriptor.depthStencil.format);
     metalDescriptor.depthAttachmentPixelFormat = dsFormat;
     metalDescriptor.stencilAttachmentPixelFormat = dsFormat;
   }
