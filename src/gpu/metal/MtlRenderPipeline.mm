@@ -130,7 +130,7 @@ bool MtlRenderPipeline::createPipelineState(MtlGPU* gpu, const RenderPipelineDes
   
   // Configure vertex descriptor
   if (!descriptor.vertex.bufferLayouts.empty()) {
-    DEBUG_ASSERT(descriptor.vertex.bufferLayouts.size() <= kVertexBufferIndexStart + 1);
+    DEBUG_ASSERT(descriptor.vertex.bufferLayouts.size() < kVertexBufferIndexStart);
     MTLVertexDescriptor* vertexDescriptor = [[MTLVertexDescriptor alloc] init];
     
     NSUInteger globalAttributeIndex = 0;

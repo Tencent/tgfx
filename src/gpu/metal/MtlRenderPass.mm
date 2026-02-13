@@ -211,7 +211,7 @@ void MtlRenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> bu
     return;
   }
   
-  DEBUG_ASSERT(slot <= kVertexBufferIndexStart);
+  DEBUG_ASSERT(slot < kVertexBufferIndexStart);
   auto mtlBufferIndex = kVertexBufferIndexStart - slot;
   auto mtlBuffer = std::static_pointer_cast<MtlBuffer>(buffer);
   [renderEncoder setVertexBuffer:mtlBuffer->mtlBuffer()
