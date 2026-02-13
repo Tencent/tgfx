@@ -60,7 +60,7 @@ class MetalCommandEncoder : public CommandEncoder, public MetalResource {
   void onRelease(MetalGPU* gpu) override;
 
  private:
-  explicit MetalCommandEncoder(MetalGPU* gpu);
+  explicit MetalCommandEncoder(MetalGPU* gpu, id<MTLCommandBuffer> commandBuffer);
   ~MetalCommandEncoder() override = default;
 
   MetalGPU* _gpu = nullptr;

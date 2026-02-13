@@ -51,8 +51,6 @@ class MetalDevice : public Device {
 
  private:
   explicit MetalDevice(std::unique_ptr<class MetalGPU> gpu);
-
-  void* device = nullptr;
 };
 
 }  // namespace tgfx

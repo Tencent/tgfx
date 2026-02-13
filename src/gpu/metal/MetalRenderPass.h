@@ -66,7 +66,6 @@ class MetalRenderPass : public RenderPass {
 
   MetalCommandEncoder* commandEncoder = nullptr;
   id<MTLRenderCommandEncoder> renderEncoder = nil;
-  RenderPassDescriptor passDescriptor;
   std::shared_ptr<MetalRenderPipeline> currentPipeline = nullptr;
   
   // Index buffer state (Metal doesn't have separate setIndexBuffer)

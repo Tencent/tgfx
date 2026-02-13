@@ -124,7 +124,8 @@ class MetalGPU : public GPU {
 
   /**
    * Releases all managed resources. If releaseGPU is true, calls onRelease() on each resource
-   * before removing it.
+   * before removing it. The caller must ensure that all external shared_ptr references to resources
+   * created by this GPU have been released before calling this method.
    */
   void releaseAll(bool releaseGPU);
 

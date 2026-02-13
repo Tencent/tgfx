@@ -95,7 +95,7 @@ void MetalCaps::initLimits(id<MTLDevice> device) {
     if ([device supportsFamily:MTLGPUFamilyApple4]) {
       _limits.maxTextureDimension2D = 16384;
     } else if ([device supportsFamily:MTLGPUFamilyApple3]) {
-      _limits.maxTextureDimension2D = 8192;
+      _limits.maxTextureDimension2D = 16384;
     } else {
       _limits.maxTextureDimension2D = 4096;
     }

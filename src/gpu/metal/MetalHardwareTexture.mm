@@ -54,24 +54,24 @@ static std::shared_ptr<Texture> CreateTextureOfPlane(MetalGPU* gpu, CVPixelBuffe
       return nullptr;
   }
 
-  CVMetalTextureRef metalTexture = nil;
+  CVMetalTextureRef cvTexture = nil;
   CVReturn result = CVMetalTextureCacheCreateTextureFromImage(
       kCFAllocatorDefault, textureCache, pixelBuffer, nil, metalPixelFormat, width, height,
-      planeIndex, &metalTexture);
-  if (result != kCVReturnSuccess || metalTexture == nil) {
+      planeIndex, &cvTexture);
+  if (result != kCVReturnSuccess || cvTexture == nil) {
     return nullptr;
   }
 
-  id<MTLTexture> metalTexture = CVMetalTextureGetTexture(metalTexture);
-  if (metalTexture == nil) {
-    CFRelease(metalTexture);
+  id<MTLTexture> mtlTexture = CVMetalTextureGetTexture(cvTexture);
+  if (mtlTexture == nil) {
+    CFRelease(cvTexture);
     return nullptr;
   }
 
   TextureDescriptor descriptor = {static_cast<int>(width), static_cast<int>(height), pixelFormat,
                                   false, 1, usage};
-  return gpu->makeResource<MetalHardwareTexture>(descriptor, metalTexture, pixelBuffer,
-                                               metalTexture);
+  return gpu->makeResource<MetalHardwareTexture>(descriptor, mtlTexture, pixelBuffer,
+                                               cvTexture);
 }
 
 std::vector<std::shared_ptr<Texture>> MetalHardwareTexture::MakeFrom(
@@ -118,18 +118,18 @@ std::vector<std::shared_ptr<Texture>> MetalHardwareTexture::MakeFrom(
 }
 
 MetalHardwareTexture::MetalHardwareTexture(const TextureDescriptor& descriptor,
-                                       id<MTLTexture> metalTexture, CVPixelBufferRef pixelBuffer,
-                                       CVMetalTextureRef metalTexture)
-    : MetalTexture(descriptor, metalTexture),
+                                       id<MTLTexture> mtlTexture, CVPixelBufferRef pixelBuffer,
+                                       CVMetalTextureRef cvMetalTexture)
+    : MetalTexture(descriptor, mtlTexture),
       pixelBuffer(pixelBuffer),
-      metalTexture(metalTexture) {
+      cvMetalTexture(cvMetalTexture) {
   CFRetain(pixelBuffer);
 }
 
 void MetalHardwareTexture::onRelease(MetalGPU* gpu) {
-  if (metalTexture != nil) {
-    CFRelease(metalTexture);
-    metalTexture = nil;
+  if (cvMetalTexture != nil) {
+    CFRelease(cvMetalTexture);
+    cvMetalTexture = nil;
   }
   CFRelease(pixelBuffer);
   pixelBuffer = nullptr;
@@ -137,8 +137,8 @@ void MetalHardwareTexture::onRelease(MetalGPU* gpu) {
 }
 
 void MetalHardwareTexture::onReleaseTexture() {
-  // CVMetalTextureGetTexture returns an autoreleased texture that is backed by metalTexture.
-  // We should not release it directly; it will be released when metalTexture is released.
+  // CVMetalTextureGetTexture returns an autoreleased texture that is backed by cvMetalTexture.
+  // We should not release it directly; it will be released when cvMetalTexture is released.
   texture = nil;
 }
 

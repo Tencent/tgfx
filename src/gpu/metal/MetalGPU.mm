@@ -56,8 +56,9 @@ MetalGPU::MetalGPU(id<MTLDevice> device) : metalDevice([device retain]) {
 }
 
 MetalGPU::~MetalGPU() {
-  // The owner must call releaseAll() before deleting this MetalGPU, otherwise, GPU resources
-  // may leak.
+  // Releases all managed resources. The caller must ensure that all external shared_ptr references
+  // to resources created by this GPU have been released before calling this method, otherwise those
+  // shared_ptrs will dangle.
   DEBUG_ASSERT(returnQueue == nullptr);
   DEBUG_ASSERT(resources.empty());
   if (textureCache != nil) {

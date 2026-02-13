@@ -48,7 +48,6 @@ std::shared_ptr<MetalDevice> MetalDevice::MakeFrom(void* metalDevice) {
 }
 
 MetalDevice::MetalDevice(std::unique_ptr<MetalGPU> gpu) : Device(std::move(gpu)) {
-  device = static_cast<MetalGPU*>(_gpu)->device();
 }
 
 MetalDevice::~MetalDevice() {
@@ -56,7 +55,7 @@ MetalDevice::~MetalDevice() {
 }
 
 void* MetalDevice::metalDevice() const {
-  return device;
+  return static_cast<MetalGPU*>(_gpu)->device();
 }
 
 bool MetalDevice::onLockContext() {

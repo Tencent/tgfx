@@ -42,13 +42,13 @@ std::shared_ptr<MetalRenderPass> MetalRenderPass::Make(MetalCommandEncoder* enco
 }
 
 MetalRenderPass::MetalRenderPass(MetalCommandEncoder* encoder, const RenderPassDescriptor& desc)
-    : RenderPass(desc), commandEncoder(encoder), passDescriptor(desc) {
+    : RenderPass(desc), commandEncoder(encoder) {
   // Create Metal render pass descriptor
   MTLRenderPassDescriptor* metalRenderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
   
   // Configure color attachments
-  for (size_t i = 0; i < passDescriptor.colorAttachments.size(); i++) {
-    const auto& colorAttachment = passDescriptor.colorAttachments[i];
+  for (size_t i = 0; i < descriptor.colorAttachments.size(); i++) {
+    const auto& colorAttachment = descriptor.colorAttachments[i];
     if (!colorAttachment.texture) {
       continue;
     }
@@ -79,26 +79,26 @@ MetalRenderPass::MetalRenderPass(MetalCommandEncoder* encoder, const RenderPassD
   }
   
   // Configure depth-stencil attachment
-  if (passDescriptor.depthStencilAttachment.texture) {
-    auto depthStencilTexture = std::static_pointer_cast<MetalTexture>(passDescriptor.depthStencilAttachment.texture);
+  if (descriptor.depthStencilAttachment.texture) {
+    auto depthStencilTexture = std::static_pointer_cast<MetalTexture>(descriptor.depthStencilAttachment.texture);
     
     metalRenderPassDescriptor.depthAttachment.texture = depthStencilTexture->metalTexture();
     metalRenderPassDescriptor.depthAttachment.loadAction = 
-        (passDescriptor.depthStencilAttachment.loadAction == LoadAction::Clear) ? MTLLoadActionClear :
-        (passDescriptor.depthStencilAttachment.loadAction == LoadAction::Load) ? MTLLoadActionLoad : MTLLoadActionDontCare;
+        (descriptor.depthStencilAttachment.loadAction == LoadAction::Clear) ? MTLLoadActionClear :
+        (descriptor.depthStencilAttachment.loadAction == LoadAction::Load) ? MTLLoadActionLoad : MTLLoadActionDontCare;
     metalRenderPassDescriptor.depthAttachment.storeAction = 
-        (passDescriptor.depthStencilAttachment.storeAction == StoreAction::Store) ? MTLStoreActionStore : MTLStoreActionDontCare;
+        (descriptor.depthStencilAttachment.storeAction == StoreAction::Store) ? MTLStoreActionStore : MTLStoreActionDontCare;
     
     metalRenderPassDescriptor.stencilAttachment.texture = depthStencilTexture->metalTexture();
     metalRenderPassDescriptor.stencilAttachment.loadAction = 
-        (passDescriptor.depthStencilAttachment.loadAction == LoadAction::Clear) ? MTLLoadActionClear :
-        (passDescriptor.depthStencilAttachment.loadAction == LoadAction::Load) ? MTLLoadActionLoad : MTLLoadActionDontCare;
+        (descriptor.depthStencilAttachment.loadAction == LoadAction::Clear) ? MTLLoadActionClear :
+        (descriptor.depthStencilAttachment.loadAction == LoadAction::Load) ? MTLLoadActionLoad : MTLLoadActionDontCare;
     metalRenderPassDescriptor.stencilAttachment.storeAction = 
-        (passDescriptor.depthStencilAttachment.storeAction == StoreAction::Store) ? MTLStoreActionStore : MTLStoreActionDontCare;
+        (descriptor.depthStencilAttachment.storeAction == StoreAction::Store) ? MTLStoreActionStore : MTLStoreActionDontCare;
     
-    if (passDescriptor.depthStencilAttachment.loadAction == LoadAction::Clear) {
-      metalRenderPassDescriptor.depthAttachment.clearDepth = passDescriptor.depthStencilAttachment.depthClearValue;
-      metalRenderPassDescriptor.stencilAttachment.clearStencil = passDescriptor.depthStencilAttachment.stencilClearValue;
+    if (descriptor.depthStencilAttachment.loadAction == LoadAction::Clear) {
+      metalRenderPassDescriptor.depthAttachment.clearDepth = descriptor.depthStencilAttachment.depthClearValue;
+      metalRenderPassDescriptor.stencilAttachment.clearStencil = descriptor.depthStencilAttachment.stencilClearValue;
     }
   }
   
@@ -106,9 +106,9 @@ MetalRenderPass::MetalRenderPass(MetalCommandEncoder* encoder, const RenderPassD
   renderEncoder = [[commandEncoder->metalCommandBuffer() renderCommandEncoderWithDescriptor:metalRenderPassDescriptor] retain];
   
   // Set default viewport based on the first color attachment
-  if (renderEncoder && !passDescriptor.colorAttachments.empty() && 
-      passDescriptor.colorAttachments[0].texture) {
-    auto texture = passDescriptor.colorAttachments[0].texture;
+  if (renderEncoder && !descriptor.colorAttachments.empty() && 
+      descriptor.colorAttachments[0].texture) {
+    auto texture = descriptor.colorAttachments[0].texture;
     MTLViewport viewport;
     viewport.originX = 0.0;
     viewport.originY = 0.0;
@@ -153,9 +153,9 @@ void MetalRenderPass::setScissorRect(int x, int y, int width, int height) {
   // and scissor rect must be within render target bounds
   int renderWidth = 0;
   int renderHeight = 0;
-  if (!passDescriptor.colorAttachments.empty() && passDescriptor.colorAttachments[0].texture) {
-    renderWidth = passDescriptor.colorAttachments[0].texture->width();
-    renderHeight = passDescriptor.colorAttachments[0].texture->height();
+  if (!descriptor.colorAttachments.empty() && descriptor.colorAttachments[0].texture) {
+    renderWidth = descriptor.colorAttachments[0].texture->width();
+    renderHeight = descriptor.colorAttachments[0].texture->height();
   }
   
   // Clamp negative coordinates

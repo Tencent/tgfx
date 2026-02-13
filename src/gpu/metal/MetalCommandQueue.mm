@@ -19,6 +19,7 @@
 #include "MetalCommandQueue.h"
 #include "MetalGPU.h"
 #include "MetalCommandBuffer.h"
+#include "MetalDefines.h"
 #include "MetalSemaphore.h"
 #include "MetalTexture.h"
 #include "core/utils/Log.h"
@@ -90,15 +91,46 @@ void MetalCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
     return;
   }
   
-  auto metalTexture = std::static_pointer_cast<MetalTexture>(texture);
-  if (!metalTexture) {
-    LOGE("MetalCommandQueue::writeTexture() failed to cast to MetalTexture");
+  auto metalTexturePtr = std::static_pointer_cast<MetalTexture>(texture);
+  
+  id<MTLTexture> mtlTexture = metalTexturePtr->metalTexture();
+  if (!mtlTexture) {
+    LOGE("MetalCommandQueue::writeTexture() metalTexture is nil");
     return;
   }
   
-  id<MTLTexture> metalTexture = metalTexture->metalTexture();
-  if (!metalTexture) {
-    LOGE("MetalCommandQueue::writeTexture() metalTexture is nil");
+  if (mtlTexture.storageMode == MTLStorageModePrivate) {
+    // Private storage mode textures cannot be written to directly with replaceRegion.
+    // Use a blit command encoder with a staging buffer instead.
+    auto bytesPerPixel = MetalDefines::GetBytesPerPixel(mtlTexture.pixelFormat);
+    NSUInteger width = static_cast<NSUInteger>(rect.width());
+    NSUInteger height = static_cast<NSUInteger>(rect.height());
+    NSUInteger bytesPerRow = rowBytes > 0 ? static_cast<NSUInteger>(rowBytes) : width * bytesPerPixel;
+    NSUInteger dataSize = bytesPerRow * height;
+    
+    id<MTLBuffer> stagingBuffer = [gpu->device() newBufferWithBytes:pixels
+                                                             length:dataSize
+                                                            options:MTLResourceStorageModeShared];
+    id<MTLCommandBuffer> cmdBuffer = [commandQueue commandBuffer];
+    id<MTLBlitCommandEncoder> blitEncoder = [cmdBuffer blitCommandEncoder];
+    
+    MTLOrigin origin = MTLOriginMake(static_cast<NSUInteger>(rect.x()),
+                                     static_cast<NSUInteger>(rect.y()), 0);
+    MTLSize size = MTLSizeMake(width, height, 1);
+    
+    [blitEncoder copyFromBuffer:stagingBuffer
+                   sourceOffset:0
+              sourceBytesPerRow:bytesPerRow
+            sourceBytesPerImage:dataSize
+                     sourceSize:size
+                      toTexture:mtlTexture
+               destinationSlice:0
+               destinationLevel:0
+              destinationOrigin:origin];
+    [blitEncoder endEncoding];
+    [cmdBuffer commit];
+    [cmdBuffer waitUntilCompleted];
+    [stagingBuffer release];
     return;
   }
   
@@ -108,8 +140,8 @@ void MetalCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
                                      static_cast<NSUInteger>(rect.width()),
                                      static_cast<NSUInteger>(rect.height()));
   
-  // Use replaceRegion for shared storage mode textures
-  [metalTexture replaceRegion:region
+  // Use replaceRegion for shared/managed storage mode textures
+  [mtlTexture replaceRegion:region
                   mipmapLevel:0
                     withBytes:pixels
                   bytesPerRow:static_cast<NSUInteger>(rowBytes)];

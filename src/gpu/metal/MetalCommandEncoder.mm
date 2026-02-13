@@ -32,17 +32,18 @@ std::shared_ptr<MetalCommandEncoder> MetalCommandEncoder::Make(MetalGPU* gpu) {
     return nullptr;
   }
   
-  auto encoder = gpu->makeResource<MetalCommandEncoder>(gpu);
-  if (encoder->commandBuffer == nil) {
+  auto queue = static_cast<MetalCommandQueue*>(gpu->queue());
+  id<MTLCommandBuffer> commandBuffer = [queue->metalCommandQueue() commandBuffer];
+  if (commandBuffer == nil) {
     return nullptr;
   }
+  auto encoder = gpu->makeResource<MetalCommandEncoder>(gpu, commandBuffer);
+  queue->encodePendingWait(commandBuffer);
   return encoder;
 }
 
-MetalCommandEncoder::MetalCommandEncoder(MetalGPU* gpu) : _gpu(gpu) {
-  auto queue = static_cast<MetalCommandQueue*>(gpu->queue());
-  commandBuffer = [[queue->metalCommandQueue() commandBuffer] retain];
-  queue->encodePendingWait(commandBuffer);
+MetalCommandEncoder::MetalCommandEncoder(MetalGPU* gpu, id<MTLCommandBuffer> buffer) 
+    : _gpu(gpu), commandBuffer([buffer retain]) {
 }
 
 void MetalCommandEncoder::onRelease(MetalGPU*) {
