@@ -47,6 +47,8 @@ static constexpr unsigned MTL_PIXEL_FORMAT_R8Unorm = 10;
 static constexpr unsigned MTL_PIXEL_FORMAT_RG8Unorm = 30;
 static constexpr unsigned MTL_PIXEL_FORMAT_RGBA8Unorm = 70;
 static constexpr unsigned MTL_PIXEL_FORMAT_BGRA8Unorm = 80;
+static constexpr unsigned MTL_PIXEL_FORMAT_Depth24Unorm_Stencil8 = 255;
+static constexpr unsigned MTL_PIXEL_FORMAT_Depth32Float_Stencil8 = 260;
 
 static PixelFormat MtlPixelFormatToPixelFormat(unsigned mtlFormat) {
   switch (mtlFormat) {
@@ -56,6 +58,9 @@ static PixelFormat MtlPixelFormatToPixelFormat(unsigned mtlFormat) {
       return PixelFormat::RG_88;
     case MTL_PIXEL_FORMAT_BGRA8Unorm:
       return PixelFormat::BGRA_8888;
+    case MTL_PIXEL_FORMAT_Depth24Unorm_Stencil8:
+    case MTL_PIXEL_FORMAT_Depth32Float_Stencil8:
+      return PixelFormat::DEPTH24_STENCIL8;
     case MTL_PIXEL_FORMAT_RGBA8Unorm:
     default:
       break;
