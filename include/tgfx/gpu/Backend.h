@@ -99,7 +99,7 @@ class BackendTexture {
   bool getGLTextureInfo(GLTextureInfo* glTextureInfo) const;
 
   /**
-   * If the backend API is Metal, copies a snapshot of the GrMetalTextureInfo struct into the passed
+   * If the backend API is Metal, copies a snapshot of the MetalTextureInfo struct into the passed
    * in pointer and returns true. Otherwise, returns false if the backend API is not Metal.
    */
   bool getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const;
