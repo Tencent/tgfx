@@ -128,42 +128,7 @@ bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu, const RenderPipelin
     return false;
   }
   
-  // Configure vertex descriptor
-  if (!descriptor.vertex.bufferLayouts.empty()) {
-    DEBUG_ASSERT(descriptor.vertex.bufferLayouts.size() <= kVertexBufferIndexStart);
-    MTLVertexDescriptor* vertexDescriptor = [[MTLVertexDescriptor alloc] init];
-    
-    NSUInteger globalAttributeIndex = 0;
-    for (size_t bufferIndex = 0; bufferIndex < descriptor.vertex.bufferLayouts.size(); ++bufferIndex) {
-      const auto& layout = descriptor.vertex.bufferLayouts[bufferIndex];
-      
-      // Vertex buffers use high Metal buffer indices (30, 29, ...) to avoid conflict with
-      // uniform buffers at low indices (0, 1, ...).
-      auto metalBufferIndex = kVertexBufferIndexStart - bufferIndex;
-
-      // Set buffer layout
-      vertexDescriptor.layouts[metalBufferIndex].stride = layout.stride;
-      vertexDescriptor.layouts[metalBufferIndex].stepFunction = 
-          (layout.stepMode == VertexStepMode::Vertex) ? MTLVertexStepFunctionPerVertex : MTLVertexStepFunctionPerInstance;
-      vertexDescriptor.layouts[metalBufferIndex].stepRate = 1;
-      
-      // Set vertex attributes with globally unique indices across all buffer layouts
-      size_t currentOffset = 0;
-      for (size_t attrIndex = 0; attrIndex < layout.attributes.size(); ++attrIndex) {
-        const auto& attribute = layout.attributes[attrIndex];
-        if (globalAttributeIndex < 31) {
-          vertexDescriptor.attributes[globalAttributeIndex].format = MetalDefines::ToMTLVertexFormat(attribute.format());
-          vertexDescriptor.attributes[globalAttributeIndex].offset = currentOffset;
-          vertexDescriptor.attributes[globalAttributeIndex].bufferIndex = metalBufferIndex;
-          currentOffset += attribute.size();
-          globalAttributeIndex++;
-        }
-      }
-    }
-    
-    metalDescriptor.vertexDescriptor = vertexDescriptor;
-    [vertexDescriptor release];
-  }
+  configureVertexDescriptor(metalDescriptor, descriptor);
   
   // Apply multisample settings
   if (descriptor.multisample.count > 1) {
@@ -171,37 +136,13 @@ bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu, const RenderPipelin
   }
   metalDescriptor.alphaToCoverageEnabled = descriptor.multisample.alphaToCoverageEnabled;
   
-  // Configure color attachments
-  for (size_t i = 0; i < descriptor.fragment.colorAttachments.size(); ++i) {
-    const auto& colorAttachment = descriptor.fragment.colorAttachments[i];
-    
-    MTLPixelFormat pixelFormat = gpu->getMTLPixelFormat(colorAttachment.format);
-    metalDescriptor.colorAttachments[i].pixelFormat = pixelFormat;
-    
-    // Configure blending
-    if (colorAttachment.blendEnable) {
-      metalDescriptor.colorAttachments[i].blendingEnabled = YES;
-      metalDescriptor.colorAttachments[i].sourceRGBBlendFactor = 
-          MetalDefines::ToMTLBlendFactor(colorAttachment.srcColorBlendFactor);
-      metalDescriptor.colorAttachments[i].destinationRGBBlendFactor = 
-          MetalDefines::ToMTLBlendFactor(colorAttachment.dstColorBlendFactor);
-      metalDescriptor.colorAttachments[i].rgbBlendOperation = 
-          MetalDefines::ToMTLBlendOperation(colorAttachment.colorBlendOp);
-      metalDescriptor.colorAttachments[i].sourceAlphaBlendFactor = 
-          MetalDefines::ToMTLBlendFactor(colorAttachment.srcAlphaBlendFactor);
-      metalDescriptor.colorAttachments[i].destinationAlphaBlendFactor = 
-          MetalDefines::ToMTLBlendFactor(colorAttachment.dstAlphaBlendFactor);
-      metalDescriptor.colorAttachments[i].alphaBlendOperation = 
-          MetalDefines::ToMTLBlendOperation(colorAttachment.alphaBlendOp);
-    }
-    
-    // Configure write mask
-    MTLColorWriteMask writeMask = MTLColorWriteMaskNone;
-    if (colorAttachment.colorWriteMask & ColorWriteMask::RED) writeMask |= MTLColorWriteMaskRed;
-    if (colorAttachment.colorWriteMask & ColorWriteMask::GREEN) writeMask |= MTLColorWriteMaskGreen;
-    if (colorAttachment.colorWriteMask & ColorWriteMask::BLUE) writeMask |= MTLColorWriteMaskBlue;
-    if (colorAttachment.colorWriteMask & ColorWriteMask::ALPHA) writeMask |= MTLColorWriteMaskAlpha;
-    metalDescriptor.colorAttachments[i].writeMask = writeMask;
+  configureColorAttachments(metalDescriptor, gpu, descriptor);
+  
+  // Configure depth-stencil attachment pixel format
+  if (descriptor.depthStencilFormat != PixelFormat::Unknown) {
+    MTLPixelFormat dsFormat = gpu->getMTLPixelFormat(descriptor.depthStencilFormat);
+    metalDescriptor.depthAttachmentPixelFormat = dsFormat;
+    metalDescriptor.stencilAttachmentPixelFormat = dsFormat;
   }
   
   // Create pipeline state
@@ -212,7 +153,7 @@ bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu, const RenderPipelin
   [metalDescriptor.fragmentFunction release];
   [metalDescriptor release];
   
-  if (!pipelineState || error) {
+  if (!pipelineState) {
     if (error) {
       LOGE("Metal pipeline creation error: %s", error.localizedDescription.UTF8String);
     }
@@ -220,6 +161,87 @@ bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu, const RenderPipelin
   }
   
   return true;
+}
+
+void MetalRenderPipeline::configureVertexDescriptor(
+    MTLRenderPipelineDescriptor* metalDescriptor,
+    const RenderPipelineDescriptor& descriptor) {
+  if (descriptor.vertex.bufferLayouts.empty()) {
+    return;
+  }
+  DEBUG_ASSERT(descriptor.vertex.bufferLayouts.size() <= kVertexBufferIndexStart);
+  MTLVertexDescriptor* vertexDescriptor = [[MTLVertexDescriptor alloc] init];
+
+  NSUInteger globalAttributeIndex = 0;
+  for (size_t bufferIndex = 0; bufferIndex < descriptor.vertex.bufferLayouts.size(); ++bufferIndex) {
+    const auto& layout = descriptor.vertex.bufferLayouts[bufferIndex];
+
+    // Vertex buffers use high Metal buffer indices (30, 29, ...) to avoid conflict with
+    // uniform buffers at low indices (0, 1, ...).
+    auto metalBufferIndex = kVertexBufferIndexStart - bufferIndex;
+
+    // Set buffer layout
+    vertexDescriptor.layouts[metalBufferIndex].stride = layout.stride;
+    vertexDescriptor.layouts[metalBufferIndex].stepFunction =
+        (layout.stepMode == VertexStepMode::Vertex) ? MTLVertexStepFunctionPerVertex
+                                                    : MTLVertexStepFunctionPerInstance;
+    vertexDescriptor.layouts[metalBufferIndex].stepRate = 1;
+
+    // Set vertex attributes with globally unique indices across all buffer layouts
+    size_t currentOffset = 0;
+    for (size_t attrIndex = 0; attrIndex < layout.attributes.size(); ++attrIndex) {
+      const auto& attribute = layout.attributes[attrIndex];
+      if (globalAttributeIndex < 31) {
+        vertexDescriptor.attributes[globalAttributeIndex].format =
+            MetalDefines::ToMTLVertexFormat(attribute.format());
+        vertexDescriptor.attributes[globalAttributeIndex].offset = currentOffset;
+        vertexDescriptor.attributes[globalAttributeIndex].bufferIndex = metalBufferIndex;
+        currentOffset += attribute.size();
+        globalAttributeIndex++;
+      }
+    }
+  }
+
+  metalDescriptor.vertexDescriptor = vertexDescriptor;
+  [vertexDescriptor release];
+}
+
+void MetalRenderPipeline::configureColorAttachments(
+    MTLRenderPipelineDescriptor* metalDescriptor, MetalGPU* gpu,
+    const RenderPipelineDescriptor& descriptor) {
+  for (size_t i = 0; i < descriptor.fragment.colorAttachments.size(); ++i) {
+    const auto& colorAttachment = descriptor.fragment.colorAttachments[i];
+
+    MTLPixelFormat pixelFormat = gpu->getMTLPixelFormat(colorAttachment.format);
+    metalDescriptor.colorAttachments[i].pixelFormat = pixelFormat;
+
+    // Configure blending
+    if (colorAttachment.blendEnable) {
+      metalDescriptor.colorAttachments[i].blendingEnabled = YES;
+      metalDescriptor.colorAttachments[i].sourceRGBBlendFactor =
+          MetalDefines::ToMTLBlendFactor(colorAttachment.srcColorBlendFactor);
+      metalDescriptor.colorAttachments[i].destinationRGBBlendFactor =
+          MetalDefines::ToMTLBlendFactor(colorAttachment.dstColorBlendFactor);
+      metalDescriptor.colorAttachments[i].rgbBlendOperation =
+          MetalDefines::ToMTLBlendOperation(colorAttachment.colorBlendOp);
+      metalDescriptor.colorAttachments[i].sourceAlphaBlendFactor =
+          MetalDefines::ToMTLBlendFactor(colorAttachment.srcAlphaBlendFactor);
+      metalDescriptor.colorAttachments[i].destinationAlphaBlendFactor =
+          MetalDefines::ToMTLBlendFactor(colorAttachment.dstAlphaBlendFactor);
+      metalDescriptor.colorAttachments[i].alphaBlendOperation =
+          MetalDefines::ToMTLBlendOperation(colorAttachment.alphaBlendOp);
+    }
+
+    // Configure write mask
+    MTLColorWriteMask writeMask = MTLColorWriteMaskNone;
+    if (colorAttachment.colorWriteMask & ColorWriteMask::RED) writeMask |= MTLColorWriteMaskRed;
+    if (colorAttachment.colorWriteMask & ColorWriteMask::GREEN)
+      writeMask |= MTLColorWriteMaskGreen;
+    if (colorAttachment.colorWriteMask & ColorWriteMask::BLUE) writeMask |= MTLColorWriteMaskBlue;
+    if (colorAttachment.colorWriteMask & ColorWriteMask::ALPHA)
+      writeMask |= MTLColorWriteMaskAlpha;
+    metalDescriptor.colorAttachments[i].writeMask = writeMask;
+  }
 }
 
 bool MetalRenderPipeline::createDepthStencilState(id<MTLDevice> device, const RenderPipelineDescriptor& descriptor) {

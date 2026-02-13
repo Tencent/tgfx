@@ -64,6 +64,11 @@ class MetalRenderPipeline : public RenderPipeline, public MetalResource {
 
   bool createPipelineState(MetalGPU* gpu, const RenderPipelineDescriptor& descriptor);
   bool createDepthStencilState(id<MTLDevice> device, const RenderPipelineDescriptor& descriptor);
+  static void configureVertexDescriptor(MTLRenderPipelineDescriptor* metalDescriptor,
+                                        const RenderPipelineDescriptor& descriptor);
+  static void configureColorAttachments(MTLRenderPipelineDescriptor* metalDescriptor,
+                                        MetalGPU* gpu,
+                                        const RenderPipelineDescriptor& descriptor);
 
   id<MTLRenderPipelineState> pipelineState = nil;
   id<MTLDepthStencilState> depthStencilState = nil;
