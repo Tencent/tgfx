@@ -294,6 +294,12 @@ class DepthStencilDescriptor {
    * A bitmask that determines to which bits that stencil operations can write.
    */
   uint32_t stencilWriteMask = 0xFFFFFFFF;
+
+  /**
+   * The pixel format of the depth-stencil attachment. Set to PixelFormat::Unknown if no
+   * depth-stencil attachment is used. Metal requires this to be specified at pipeline creation time.
+   */
+  PixelFormat format = PixelFormat::Unknown;
 };
 
 /**
