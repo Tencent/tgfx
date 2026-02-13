@@ -295,6 +295,26 @@ size_t MetalDefines::GetBytesPerPixel(MTLPixelFormat format) {
   }
 }
 
+MTLLoadAction MetalDefines::ToMTLLoadAction(LoadAction loadAction) {
+  switch (loadAction) {
+    case LoadAction::Clear:
+      return MTLLoadActionClear;
+    case LoadAction::Load:
+      return MTLLoadActionLoad;
+    default:
+      return MTLLoadActionDontCare;
+  }
+}
+
+MTLStoreAction MetalDefines::ToMTLStoreAction(StoreAction storeAction) {
+  switch (storeAction) {
+    case StoreAction::Store:
+      return MTLStoreActionStore;
+    default:
+      return MTLStoreActionDontCare;
+  }
+}
+
 MTLCullMode MetalDefines::ToMTLCullMode(CullMode cullMode) {
   switch (cullMode) {
     case CullMode::None:

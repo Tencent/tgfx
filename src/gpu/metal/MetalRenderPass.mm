@@ -57,11 +57,9 @@ MetalRenderPass::MetalRenderPass(MetalCommandEncoder* encoder, const RenderPassD
     
     metalRenderPassDescriptor.colorAttachments[i].texture = colorTexture->metalTexture();
     metalRenderPassDescriptor.colorAttachments[i].loadAction = 
-        (colorAttachment.loadAction == LoadAction::Clear) ? MTLLoadActionClear :
-        (colorAttachment.loadAction == LoadAction::Load) ? MTLLoadActionLoad : MTLLoadActionDontCare;
-    metalRenderPassDescriptor.colorAttachments[i].storeAction = 
-        (colorAttachment.storeAction == StoreAction::Store) ? MTLStoreActionStore :
-        (colorAttachment.storeAction == StoreAction::DontCare) ? MTLStoreActionDontCare : MTLStoreActionMultisampleResolve;
+        MetalDefines::ToMTLLoadAction(colorAttachment.loadAction);
+    metalRenderPassDescriptor.colorAttachments[i].storeAction =
+        MetalDefines::ToMTLStoreAction(colorAttachment.storeAction);
     
     if (colorAttachment.loadAction == LoadAction::Clear) {
       auto clearColor = colorAttachment.clearValue;
@@ -84,17 +82,15 @@ MetalRenderPass::MetalRenderPass(MetalCommandEncoder* encoder, const RenderPassD
     
     metalRenderPassDescriptor.depthAttachment.texture = depthStencilTexture->metalTexture();
     metalRenderPassDescriptor.depthAttachment.loadAction = 
-        (descriptor.depthStencilAttachment.loadAction == LoadAction::Clear) ? MTLLoadActionClear :
-        (descriptor.depthStencilAttachment.loadAction == LoadAction::Load) ? MTLLoadActionLoad : MTLLoadActionDontCare;
+        MetalDefines::ToMTLLoadAction(descriptor.depthStencilAttachment.loadAction);
     metalRenderPassDescriptor.depthAttachment.storeAction = 
-        (descriptor.depthStencilAttachment.storeAction == StoreAction::Store) ? MTLStoreActionStore : MTLStoreActionDontCare;
+        MetalDefines::ToMTLStoreAction(descriptor.depthStencilAttachment.storeAction);
     
     metalRenderPassDescriptor.stencilAttachment.texture = depthStencilTexture->metalTexture();
     metalRenderPassDescriptor.stencilAttachment.loadAction = 
-        (descriptor.depthStencilAttachment.loadAction == LoadAction::Clear) ? MTLLoadActionClear :
-        (descriptor.depthStencilAttachment.loadAction == LoadAction::Load) ? MTLLoadActionLoad : MTLLoadActionDontCare;
+        MetalDefines::ToMTLLoadAction(descriptor.depthStencilAttachment.loadAction);
     metalRenderPassDescriptor.stencilAttachment.storeAction = 
-        (descriptor.depthStencilAttachment.storeAction == StoreAction::Store) ? MTLStoreActionStore : MTLStoreActionDontCare;
+        MetalDefines::ToMTLStoreAction(descriptor.depthStencilAttachment.storeAction);
     
     if (descriptor.depthStencilAttachment.loadAction == LoadAction::Clear) {
       metalRenderPassDescriptor.depthAttachment.clearDepth = descriptor.depthStencilAttachment.depthClearValue;

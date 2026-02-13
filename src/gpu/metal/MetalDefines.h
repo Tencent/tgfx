@@ -98,6 +98,16 @@ class MetalDefines {
 
 
   /**
+   * Convert TGFX load action to Metal load action.
+   */
+  static MTLLoadAction ToMTLLoadAction(LoadAction loadAction);
+
+  /**
+   * Convert TGFX store action to Metal store action.
+   */
+  static MTLStoreAction ToMTLStoreAction(StoreAction storeAction);
+
+  /**
    * Convert TGFX cull mode to Metal cull mode.
    */
   static MTLCullMode ToMTLCullMode(CullMode cullMode);
