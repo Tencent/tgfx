@@ -83,6 +83,7 @@ std::vector<std::shared_ptr<Texture>> MetalHardwareTexture::MakeFrom(
 
   auto pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer);
   std::vector<PixelFormat> formats = {};
+  formats.reserve(2);
   switch (pixelFormat) {
     case kCVPixelFormatType_OneComponent8:
       formats.push_back(PixelFormat::ALPHA_8);
@@ -107,6 +108,7 @@ std::vector<std::shared_ptr<Texture>> MetalHardwareTexture::MakeFrom(
   }
 
   std::vector<std::shared_ptr<Texture>> textures = {};
+  textures.reserve(formats.size());
   for (size_t i = 0; i < formats.size(); ++i) {
     auto texture = CreateTextureOfPlane(gpu, pixelBuffer, i, formats[i], usage, textureCache);
     if (texture == nullptr) {
