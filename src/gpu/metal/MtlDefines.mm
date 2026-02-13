@@ -41,10 +41,9 @@ MTLTextureUsage MtlDefines::ToMTLTextureUsage(uint32_t usage) {
   return mtlUsage;
 }
 
-MTLResourceOptions MtlDefines::ToMTLResourceOptions(uint32_t usage) {
-  if (usage & GPUBufferUsage::READBACK) {
-    return MTLResourceStorageModeShared;
-  }
+MTLResourceOptions MtlDefines::ToMTLResourceOptions(uint32_t) {
+  // TODO: Use MTLResourceStorageModePrivate for non-READBACK buffers once a staging buffer upload
+  // mechanism is implemented, to improve GPU-side performance.
   return MTLResourceStorageModeShared;
 }
 

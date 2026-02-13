@@ -176,13 +176,9 @@ void MtlRenderPass::setScissorRect(int x, int y, int width, int height) {
     height = renderHeight - y;
   }
   
-  // Ensure non-negative dimensions
+  // Metal does not allow scissor rect with zero width or height.
   if (width <= 0 || height <= 0) {
-    // Set to empty scissor (nothing will be drawn)
-    width = 0;
-    height = 0;
-    x = 0;
-    y = 0;
+    return;
   }
   
   MTLScissorRect scissorRect;

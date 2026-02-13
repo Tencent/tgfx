@@ -24,6 +24,7 @@
 #include "gpu/metal/MtlBuffer.h"
 #include "gpu/metal/MtlTexture.h"
 #include "tgfx/gpu/CommandEncoder.h"
+#include "core/utils/Log.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -76,7 +77,7 @@ class TestMtlShaderModule : public ShaderModule {
 
     if (!library || error) {
       if (error) {
-        NSLog(@"Metal shader compilation error: %@", error.localizedDescription);
+        LOGE("Metal shader compilation error: %s", error.localizedDescription.UTF8String);
       }
       return nullptr;
     }
@@ -89,7 +90,8 @@ class TestMtlShaderModule : public ShaderModule {
     }
 
     if (!function) {
-      NSLog(@"Failed to find shader function");
+      LOGE("Failed to find shader function");
+      [library release];
       return nullptr;
     }
 
@@ -110,6 +112,15 @@ class TestMtlShaderModule : public ShaderModule {
 
   TestMtlShaderModule(id<MTLLibrary> lib, id<MTLFunction> func, bool isVertex)
       : library(lib), function(func), isVertexShader(isVertex) {
+  }
+
+  ~TestMtlShaderModule() override {
+    if (function != nil) {
+      [function release];
+    }
+    if (library != nil) {
+      [library release];
+    }
   }
 
  private:
@@ -136,14 +147,16 @@ static id<MTLRenderPipelineState> CreateTestPipeline(MtlGPU* gpu,
   vertexDescriptor.layouts[0].stride = sizeof(float) * 2;
   vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
   descriptor.vertexDescriptor = vertexDescriptor;
+  [vertexDescriptor release];
 
   NSError* error = nil;
   id<MTLRenderPipelineState> pipelineState =
       [gpu->device() newRenderPipelineStateWithDescriptor:descriptor error:&error];
+  [descriptor release];
 
   if (!pipelineState || error) {
     if (error) {
-      NSLog(@"Pipeline creation error: %@", error.localizedDescription);
+      LOGE("Pipeline creation error: %s", error.localizedDescription.UTF8String);
     }
     return nil;
   }
@@ -242,6 +255,7 @@ TGFX_TEST(MtlRenderPassTest, BasicTriangle) {
 
   gpu->queue()->submit(commandBuffer);
   gpu->queue()->waitUntilCompleted();
+  [pipelineState release];
 
   // For now, just verify the test runs without crash
   // Full pixel comparison would require readback implementation

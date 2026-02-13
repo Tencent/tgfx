@@ -77,48 +77,58 @@ std::shared_ptr<GPUBuffer> MtlGPU::createBuffer(size_t size, uint32_t usage) {
   if (size == 0) {
     return nullptr;
   }
-  
-  return MtlBuffer::Make(this, size, usage);
+  @autoreleasepool {
+    return MtlBuffer::Make(this, size, usage);
+  }
 }
 
 std::shared_ptr<Texture> MtlGPU::createTexture(const TextureDescriptor& descriptor) {
   if (descriptor.width <= 0 || descriptor.height <= 0) {
-    NSLog(@"MtlGPU::createTexture() invalid dimensions: %dx%d", descriptor.width, descriptor.height);
+    LOGE("MtlGPU::createTexture() invalid dimensions: %dx%d", descriptor.width, descriptor.height);
     return nullptr;
   }
   
   // Validate format support
   if (!isFormatRenderable(descriptor.format) && 
       (descriptor.usage & TextureUsage::RENDER_ATTACHMENT)) {
-    NSLog(@"MtlGPU::createTexture() format not renderable for render attachment");
+    LOGE("MtlGPU::createTexture() format not renderable for render attachment");
     return nullptr;
   }
-  
-  auto texture = MtlTexture::Make(this, descriptor);
-  if (!texture) {
-    NSLog(@"MtlGPU::createTexture() MtlTexture::Make failed for %dx%d format=%d", 
-          descriptor.width, descriptor.height, static_cast<int>(descriptor.format));
+  @autoreleasepool {
+    auto texture = MtlTexture::Make(this, descriptor);
+    if (!texture) {
+      LOGE("MtlGPU::createTexture() MtlTexture::Make failed for %dx%d format=%d", 
+           descriptor.width, descriptor.height, static_cast<int>(descriptor.format));
+    }
+    return texture;
   }
-  return texture;
 }
 
 std::shared_ptr<Sampler> MtlGPU::createSampler(const SamplerDescriptor& descriptor) {
-  return MtlSampler::Make(this, descriptor);
+  @autoreleasepool {
+    return MtlSampler::Make(this, descriptor);
+  }
 }
 
 std::shared_ptr<ShaderModule> MtlGPU::createShaderModule(
     const ShaderModuleDescriptor& descriptor) {
-  return MtlShaderModule::Make(this, descriptor);
+  @autoreleasepool {
+    return MtlShaderModule::Make(this, descriptor);
+  }
 }
 
 std::shared_ptr<RenderPipeline> MtlGPU::createRenderPipeline(
     const RenderPipelineDescriptor& descriptor) {
-  return MtlRenderPipeline::Make(this, descriptor);
+  @autoreleasepool {
+    return MtlRenderPipeline::Make(this, descriptor);
+  }
 }
 
 std::shared_ptr<CommandEncoder> MtlGPU::createCommandEncoder() {
   processUnreferencedResources();
-  return MtlCommandEncoder::Make(this);
+  @autoreleasepool {
+    return MtlCommandEncoder::Make(this);
+  }
 }
 
 int MtlGPU::getSampleCount(int requestedCount, PixelFormat pixelFormat) const {
@@ -132,7 +142,11 @@ std::vector<std::shared_ptr<Texture>> MtlGPU::importHardwareTextures(HardwareBuf
 
 CVMetalTextureCacheRef MtlGPU::getTextureCache() {
   if (textureCache == nil) {
-    CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, mtlDevice, nil, &textureCache);
+    auto status = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, mtlDevice, nil, &textureCache);
+    if (status != kCVReturnSuccess) {
+      LOGE("MtlGPU::getTextureCache() CVMetalTextureCacheCreate failed with status: %d", status);
+      return nil;
+    }
   }
   return textureCache;
 }

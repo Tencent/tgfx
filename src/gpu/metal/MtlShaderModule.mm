@@ -18,6 +18,7 @@
 
 #include "MtlShaderModule.h"
 #include "MtlGPU.h"
+#include "core/utils/Log.h"
 #include <map>
 #include <regex>
 #include <set>
@@ -156,8 +157,8 @@ static std::vector<uint32_t> compileGLSLToSPIRV(const std::string& glslCode, Sha
       compiler.CompileGlslToSpv(glslCode, shaderKind, "shader", "main", options);
 
   if (spvResult.GetCompilationStatus() != shaderc_compilation_status_success) {
-    NSLog(@"GLSL to SPIR-V compilation error: %s", spvResult.GetErrorMessage().c_str());
-    NSLog(@"GLSL:\n%s", glslCode.c_str());
+    LOGE("GLSL to SPIR-V compilation error: %s", spvResult.GetErrorMessage().c_str());
+    LOGE("GLSL:\n%s", glslCode.c_str());
     return {};
   }
 
@@ -261,7 +262,7 @@ static std::string convertSPIRVToMSL(const std::vector<uint32_t>& spirvBinary, S
 
   std::string mslCode = mslCompiler.compile();
   if (mslCode.empty()) {
-    NSLog(@"SPIR-V to MSL conversion failed");
+    LOGE("SPIR-V to MSL conversion failed");
     return "";
   }
 
@@ -301,11 +302,11 @@ bool MtlShaderModule::compileShader(id<MTLDevice> device, const std::string& gls
   NSError* error = nil;
 
   library = [device newLibraryWithSource:mslSource options:nil error:&error];
-  if (!library || error) {
+  if (!library) {
     if (error) {
-      NSLog(@"Metal shader compilation error: %@", error.localizedDescription);
-      NSLog(@"Original GLSL:\n%s", glslCode.c_str());
-      NSLog(@"MSL code:\n%s", mslCode.c_str());
+      LOGE("Metal shader compilation error: %s", error.localizedDescription.UTF8String);
+      LOGE("Original GLSL:\n%s", glslCode.c_str());
+      LOGE("MSL code:\n%s", mslCode.c_str());
     }
     return false;
   }
@@ -350,9 +351,9 @@ SampleMaskCompileResult CompileFragmentShaderWithSampleMask(id<MTLDevice> device
   NSString* mslSource = [NSString stringWithUTF8String:mslCode.c_str()];
   NSError* error = nil;
   result.library = [device newLibraryWithSource:mslSource options:nil error:&error];
-  if (!result.library || error) {
+  if (!result.library) {
     if (error) {
-      NSLog(@"Metal shader compilation error (sample mask): %@", error.localizedDescription);
+      LOGE("Metal shader compilation error (sample mask): %s", error.localizedDescription.UTF8String);
     }
     result.library = nil;
   }

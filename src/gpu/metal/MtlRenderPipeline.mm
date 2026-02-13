@@ -30,7 +30,11 @@ std::shared_ptr<MtlRenderPipeline> MtlRenderPipeline::Make(MtlGPU* gpu,
     return nullptr;
   }
   
-  return gpu->makeResource<MtlRenderPipeline>(gpu, descriptor);
+  auto pipeline = gpu->makeResource<MtlRenderPipeline>(gpu, descriptor);
+  if (pipeline->pipelineState == nil) {
+    return nullptr;
+  }
+  return pipeline;
 }
 
 MtlRenderPipeline::MtlRenderPipeline(MtlGPU* gpu, const RenderPipelineDescriptor& descriptor) {
@@ -94,7 +98,9 @@ bool MtlRenderPipeline::createPipelineState(MtlGPU* gpu, const RenderPipelineDes
       auto compileResult =
           CompileFragmentShaderWithSampleMask(device, fragmentShader->glslCode());
       if (compileResult.library == nil) {
-        NSLog(@"Metal pipeline creation error: sample mask shader compilation failed");
+        LOGE("Metal pipeline creation error: sample mask shader compilation failed");
+        [mtlDescriptor.vertexFunction release];
+        [mtlDescriptor release];
         return false;
       }
       sampleMaskLibrary = compileResult.library;
@@ -106,7 +112,7 @@ bool MtlRenderPipeline::createPipelineState(MtlGPU* gpu, const RenderPipelineDes
           [sampleMaskLibrary newFunctionWithName:@"main0" constantValues:constants error:&funcError];
       [constants release];
       if (funcError) {
-        NSLog(@"Metal fragment function creation error: %@", funcError.localizedDescription);
+        LOGE("Metal fragment function creation error: %s", funcError.localizedDescription.UTF8String);
       }
     } else {
       mtlDescriptor.fragmentFunction =
@@ -115,7 +121,10 @@ bool MtlRenderPipeline::createPipelineState(MtlGPU* gpu, const RenderPipelineDes
   }
   
   if (mtlDescriptor.vertexFunction == nil || mtlDescriptor.fragmentFunction == nil) {
-    NSLog(@"Metal pipeline creation error: vertex or fragment function is nil");
+    LOGE("Metal pipeline creation error: vertex or fragment function is nil");
+    [mtlDescriptor.vertexFunction release];
+    [mtlDescriptor.fragmentFunction release];
+    [mtlDescriptor release];
     return false;
   }
   
@@ -205,7 +214,7 @@ bool MtlRenderPipeline::createPipelineState(MtlGPU* gpu, const RenderPipelineDes
   
   if (!pipelineState || error) {
     if (error) {
-      NSLog(@"Metal pipeline creation error: %@", error.localizedDescription);
+      LOGE("Metal pipeline creation error: %s", error.localizedDescription.UTF8String);
     }
     return false;
   }
@@ -222,7 +231,7 @@ bool MtlRenderPipeline::createDepthStencilState(id<MTLDevice> device, const Rend
       MtlDefines::ToMTLCompareFunction(descriptor.depthStencil.depthCompare);
   depthStencilDescriptor.depthWriteEnabled = descriptor.depthStencil.depthWriteEnabled;
   
-  // Configure stencil test (simplified - using same settings for front and back)
+  // Configure front face stencil
   MTLStencilDescriptor* frontStencil = [[MTLStencilDescriptor alloc] init];
   frontStencil.stencilCompareFunction = 
       MtlDefines::ToMTLCompareFunction(descriptor.depthStencil.stencilFront.compare);

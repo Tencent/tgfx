@@ -87,14 +87,9 @@ void MtlCaps::initFeatureSet(id<MTLDevice> device) {
 
 void MtlCaps::initLimits(id<MTLDevice> device) {
   // Set texture size limits
-  _limits.maxTextureDimension2D = 16384; // Conservative default
-  
 #if TARGET_OS_OSX
-  if (@available(macOS 10.15, *)) {
-    if ([device supportsFamily:MTLGPUFamilyMac2]) {
-      _limits.maxTextureDimension2D = 16384;
-    }
-  }
+  (void)device;
+  _limits.maxTextureDimension2D = 16384;
 #else
   if (@available(iOS 13.0, *)) {
     if ([device supportsFamily:MTLGPUFamilyApple4]) {
@@ -115,52 +110,58 @@ void MtlCaps::initLimits(id<MTLDevice> device) {
   _limits.minUniformBufferOffsetAlignment = 256; // Metal requirement
 }
 
-void MtlCaps::initFormatTable(id<MTLDevice> device) {
-  auto checkFormat = [device](MTLPixelFormat mtlFormat) -> FormatInfo {
-    FormatInfo info;
-    info.mtlFormat = mtlFormat;
-    switch (mtlFormat) {
-      case MTLPixelFormatRGBA8Unorm:
-      case MTLPixelFormatBGRA8Unorm:
-      case MTLPixelFormatR8Unorm:
-      case MTLPixelFormatRG8Unorm:
-        info.renderable = true;
-        info.colorAttachment = true;
-        break;
-      case MTLPixelFormatDepth24Unorm_Stencil8:
-      case MTLPixelFormatDepth32Float_Stencil8:
-        info.renderable = true;
-        info.colorAttachment = false;
-        break;
-      default:
-        info.renderable = false;
-        info.colorAttachment = false;
-        break;
-    }
-    if (info.renderable) {
-      for (int count : {1, 2, 4, 8}) {
-        if ([device supportsTextureSampleCount:static_cast<NSUInteger>(count)]) {
-          info.sampleCounts.push_back(count);
-        }
+MtlCaps::FormatInfo MtlCaps::CheckFormat(id<MTLDevice> device, MTLPixelFormat mtlFormat) {
+  FormatInfo info;
+  info.mtlFormat = mtlFormat;
+  switch (mtlFormat) {
+    case MTLPixelFormatRGBA8Unorm:
+    case MTLPixelFormatBGRA8Unorm:
+    case MTLPixelFormatR8Unorm:
+    case MTLPixelFormatRG8Unorm:
+      info.renderable = true;
+      info.colorAttachment = true;
+      break;
+#if TARGET_OS_OSX
+    case MTLPixelFormatDepth24Unorm_Stencil8:
+#endif
+    case MTLPixelFormatDepth32Float_Stencil8:
+      info.renderable = true;
+      info.colorAttachment = false;
+      break;
+    default:
+      info.renderable = false;
+      info.colorAttachment = false;
+      break;
+  }
+  if (info.renderable) {
+    for (int count : {1, 2, 4, 8}) {
+      if ([device supportsTextureSampleCount:static_cast<NSUInteger>(count)]) {
+        info.sampleCounts.push_back(count);
       }
-    } else {
-      info.sampleCounts = {1};
     }
-    return info;
-  };
-  
+  } else {
+    info.sampleCounts = {1};
+  }
+  return info;
+}
+
+void MtlCaps::initFormatTable(id<MTLDevice> device) {
   // Initialize color formats.
-  formatTable[PixelFormat::ALPHA_8] = checkFormat(MTLPixelFormatR8Unorm);
-  formatTable[PixelFormat::GRAY_8] = checkFormat(MTLPixelFormatR8Unorm);
-  formatTable[PixelFormat::RG_88] = checkFormat(MTLPixelFormatRG8Unorm);
-  formatTable[PixelFormat::RGBA_8888] = checkFormat(MTLPixelFormatRGBA8Unorm);
-  formatTable[PixelFormat::BGRA_8888] = checkFormat(MTLPixelFormatBGRA8Unorm);
+  formatTable[PixelFormat::ALPHA_8] = CheckFormat(device, MTLPixelFormatR8Unorm);
+  formatTable[PixelFormat::GRAY_8] = CheckFormat(device, MTLPixelFormatR8Unorm);
+  formatTable[PixelFormat::RG_88] = CheckFormat(device, MTLPixelFormatRG8Unorm);
+  formatTable[PixelFormat::RGBA_8888] = CheckFormat(device, MTLPixelFormatRGBA8Unorm);
+  formatTable[PixelFormat::BGRA_8888] = CheckFormat(device, MTLPixelFormatBGRA8Unorm);
 
   // Depth-stencil format depends on device capabilities.
+#if TARGET_OS_OSX
   MTLPixelFormat depthStencilFormat = [device isDepth24Stencil8PixelFormatSupported]
                                           ? MTLPixelFormatDepth24Unorm_Stencil8
                                           : MTLPixelFormatDepth32Float_Stencil8;
-  formatTable[PixelFormat::DEPTH24_STENCIL8] = checkFormat(depthStencilFormat);
+#else
+  MTLPixelFormat depthStencilFormat = MTLPixelFormatDepth32Float_Stencil8;
+#endif
+  formatTable[PixelFormat::DEPTH24_STENCIL8] = CheckFormat(device, depthStencilFormat);
 }
 
 MTLPixelFormat MtlCaps::getMTLPixelFormat(PixelFormat format) const {

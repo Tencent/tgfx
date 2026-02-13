@@ -32,12 +32,17 @@ std::shared_ptr<MtlCommandEncoder> MtlCommandEncoder::Make(MtlGPU* gpu) {
     return nullptr;
   }
   
-  return gpu->makeResource<MtlCommandEncoder>(gpu);
+  auto encoder = gpu->makeResource<MtlCommandEncoder>(gpu);
+  if (encoder->commandBuffer == nil) {
+    return nullptr;
+  }
+  return encoder;
 }
 
 MtlCommandEncoder::MtlCommandEncoder(MtlGPU* gpu) : _gpu(gpu) {
-  auto mtlCommandQueue = static_cast<MtlCommandQueue*>(gpu->queue())->mtlCommandQueue();
-  commandBuffer = [[mtlCommandQueue commandBuffer] retain];
+  auto queue = static_cast<MtlCommandQueue*>(gpu->queue());
+  commandBuffer = [[queue->mtlCommandQueue() commandBuffer] retain];
+  queue->encodePendingWait(commandBuffer);
 }
 
 void MtlCommandEncoder::onRelease(MtlGPU*) {

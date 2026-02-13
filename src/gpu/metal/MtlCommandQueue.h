@@ -55,10 +55,17 @@ class MtlCommandQueue : public CommandQueue {
   
   void waitUntilCompleted() override;
 
+  /**
+   * Encodes the pending wait semaphore into the given command buffer and clears it.
+   */
+  void encodePendingWait(id<MTLCommandBuffer> commandBuffer);
+
  private:
   MtlGPU* gpu = nullptr;
   id<MTLCommandQueue> commandQueue = nil;
-  std::shared_ptr<MtlSemaphore> pendingSemaphore = nullptr;
+  id<MTLCommandBuffer> lastSubmittedCommandBuffer = nil;
+  std::shared_ptr<MtlSemaphore> pendingSignalSemaphore = nullptr;
+  std::shared_ptr<MtlSemaphore> pendingWaitSemaphore = nullptr;
 };
 
 }  // namespace tgfx

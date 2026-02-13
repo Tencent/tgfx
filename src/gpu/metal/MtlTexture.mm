@@ -33,7 +33,9 @@ static PixelFormat ToPixelFormat(MTLPixelFormat mtlFormat) {
       return PixelFormat::RGBA_8888;
     case MTLPixelFormatBGRA8Unorm:
       return PixelFormat::BGRA_8888;
+#if TARGET_OS_OSX
     case MTLPixelFormatDepth24Unorm_Stencil8:
+#endif
     case MTLPixelFormatDepth32Float_Stencil8:
       return PixelFormat::DEPTH24_STENCIL8;
     default:

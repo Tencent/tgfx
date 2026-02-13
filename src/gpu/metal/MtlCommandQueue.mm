@@ -21,6 +21,7 @@
 #include "MtlCommandBuffer.h"
 #include "MtlSemaphore.h"
 #include "MtlTexture.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -29,6 +30,10 @@ MtlCommandQueue::MtlCommandQueue(MtlGPU* mtlGPU) : gpu(mtlGPU) {
 }
 
 MtlCommandQueue::~MtlCommandQueue() {
+  if (lastSubmittedCommandBuffer != nil) {
+    [lastSubmittedCommandBuffer release];
+    lastSubmittedCommandBuffer = nil;
+  }
   if (commandQueue != nil) {
     [commandQueue release];
     commandQueue = nil;
@@ -39,18 +44,24 @@ void MtlCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   if (!commandBuffer) {
     return;
   }
-  
-  auto mtlCommandBuffer = std::static_pointer_cast<MtlCommandBuffer>(commandBuffer);
-  if (mtlCommandBuffer && mtlCommandBuffer->mtlCommandBuffer()) {
-    // Signal the pending semaphore if one was created
-    if (pendingSemaphore != nullptr) {
-      auto value = pendingSemaphore->nextSignalValue();
-      [mtlCommandBuffer->mtlCommandBuffer() encodeSignalEvent:pendingSemaphore->mtlEvent()
-                                                        value:value];
-      pendingSemaphore = nullptr;
+  @autoreleasepool {
+    auto mtlCommandBuffer = std::static_pointer_cast<MtlCommandBuffer>(commandBuffer);
+    if (mtlCommandBuffer && mtlCommandBuffer->mtlCommandBuffer()) {
+      // Signal the pending semaphore after this command buffer completes
+      if (pendingSignalSemaphore != nullptr) {
+        auto value = pendingSignalSemaphore->nextSignalValue();
+        [mtlCommandBuffer->mtlCommandBuffer() encodeSignalEvent:pendingSignalSemaphore->mtlEvent()
+                                                          value:value];
+        pendingSignalSemaphore = nullptr;
+      }
+      
+      [mtlCommandBuffer->mtlCommandBuffer() commit];
+      
+      if (lastSubmittedCommandBuffer != nil) {
+        [lastSubmittedCommandBuffer release];
+      }
+      lastSubmittedCommandBuffer = [mtlCommandBuffer->mtlCommandBuffer() retain];
     }
-    
-    [mtlCommandBuffer->mtlCommandBuffer() commit];
   }
   
   // Process unreferenced resources after submission
@@ -74,20 +85,20 @@ void MtlCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t buff
 void MtlCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, 
                                   const void* pixels, size_t rowBytes) {
   if (!texture || !pixels) {
-    NSLog(@"MtlCommandQueue::writeTexture() invalid parameters: texture=%p, pixels=%p", 
-          static_cast<void*>(texture.get()), pixels);
+    LOGE("MtlCommandQueue::writeTexture() invalid parameters: texture=%p, pixels=%p", 
+         static_cast<void*>(texture.get()), pixels);
     return;
   }
   
   auto mtlTexture = std::static_pointer_cast<MtlTexture>(texture);
   if (!mtlTexture) {
-    NSLog(@"MtlCommandQueue::writeTexture() failed to cast to MtlTexture");
+    LOGE("MtlCommandQueue::writeTexture() failed to cast to MtlTexture");
     return;
   }
   
   id<MTLTexture> metalTexture = mtlTexture->mtlTexture();
   if (!metalTexture) {
-    NSLog(@"MtlCommandQueue::writeTexture() mtlTexture is nil");
+    LOGE("MtlCommandQueue::writeTexture() mtlTexture is nil");
     return;
   }
   
@@ -109,7 +120,7 @@ std::shared_ptr<Semaphore> MtlCommandQueue::insertSemaphore() {
   if (semaphore == nullptr) {
     return nullptr;
   }
-  pendingSemaphore = semaphore;
+  pendingSignalSemaphore = semaphore;
   return semaphore;
 }
 
@@ -123,22 +134,23 @@ void MtlCommandQueue::waitSemaphore(std::shared_ptr<Semaphore> semaphore) {
     return;
   }
   
-  // Create a command buffer to encode the wait
-  id<MTLCommandBuffer> cmdBuffer = [commandQueue commandBuffer];
-  if (cmdBuffer == nil) {
+  pendingWaitSemaphore = mtlSemaphore;
+}
+
+void MtlCommandQueue::encodePendingWait(id<MTLCommandBuffer> commandBuffer) {
+  if (pendingWaitSemaphore == nullptr || commandBuffer == nil) {
     return;
   }
-  
-  [cmdBuffer encodeWaitForEvent:mtlSemaphore->mtlEvent() value:mtlSemaphore->signalValue()];
-  [cmdBuffer commit];
+  [commandBuffer encodeWaitForEvent:pendingWaitSemaphore->mtlEvent()
+                              value:pendingWaitSemaphore->signalValue()];
+  pendingWaitSemaphore = nullptr;
 }
 
 void MtlCommandQueue::waitUntilCompleted() {
-  // Create and commit an empty command buffer to synchronize
-  id<MTLCommandBuffer> cmdBuffer = [commandQueue commandBuffer];
-  if (cmdBuffer != nil) {
-    [cmdBuffer commit];
-    [cmdBuffer waitUntilCompleted];
+  if (lastSubmittedCommandBuffer != nil) {
+    [lastSubmittedCommandBuffer waitUntilCompleted];
+    [lastSubmittedCommandBuffer release];
+    lastSubmittedCommandBuffer = nil;
   }
 }
 

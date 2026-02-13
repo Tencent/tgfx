@@ -21,6 +21,7 @@
 #include <Metal/Metal.h>
 #include <unordered_map>
 #include <vector>
+#include "core/utils/EnumHasher.h"
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/gpu/GPUInfo.h"
 #include "tgfx/gpu/GPUFeatures.h"
@@ -92,9 +93,17 @@ class MtlCaps {
   }
 
  private:
+  struct FormatInfo {
+    MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
+    bool renderable = false;
+    bool colorAttachment = false;
+    std::vector<int> sampleCounts = {};
+  };
+
   void initFeatureSet(id<MTLDevice> device);
   void initLimits(id<MTLDevice> device);
   void initFormatTable(id<MTLDevice> device);
+  static FormatInfo CheckFormat(id<MTLDevice> device, MTLPixelFormat mtlFormat);
 
   GPUInfo _info = {};
   GPUFeatures _features = {};
@@ -102,15 +111,7 @@ class MtlCaps {
 
   bool clampToBorderSupported = false;
   bool computeSupported = false;
-  
-  struct FormatInfo {
-    MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
-    bool renderable = false;
-    bool colorAttachment = false;
-    std::vector<int> sampleCounts = {};
-  };
-  
-  std::unordered_map<PixelFormat, FormatInfo> formatTable = {};
+  std::unordered_map<PixelFormat, FormatInfo, EnumHasher> formatTable = {};
 };
 
 }  // namespace tgfx

@@ -19,6 +19,7 @@
 #include "MtlBuffer.h"
 #include "MtlGPU.h"
 #include "MtlDefines.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -57,6 +58,17 @@ void* MtlBuffer::map(size_t offset, size_t size) {
   if (!buffer || mappedPointer != nullptr) {
     return nullptr;
   }
+  if (size == 0) {
+    LOGE("MtlBuffer::map() size cannot be 0!");
+    return nullptr;
+  }
+  if (size == GPU_BUFFER_WHOLE_SIZE) {
+    size = _size - offset;
+  }
+  if (offset + size > _size) {
+    LOGE("MtlBuffer::map() range out of bounds!");
+    return nullptr;
+  }
   
   // Check if buffer supports mapping (shared storage mode)
   if (buffer.storageMode != MTLStorageModeShared) {
@@ -71,8 +83,6 @@ void* MtlBuffer::map(size_t offset, size_t size) {
   }
 
   mappedPointer = static_cast<uint8_t*>(buffer.contents) + offset;
-  (void)size;
-  
   return mappedPointer;
 }
 
