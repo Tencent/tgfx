@@ -61,6 +61,11 @@ class MetalCommandQueue : public CommandQueue {
   void encodePendingWait(id<MTLCommandBuffer> commandBuffer);
 
  private:
+  void writePrivateTexture(id<MTLTexture> mtlTexture, const Rect& rect, const void* pixels,
+                           size_t rowBytes);
+  void writeSharedTexture(id<MTLTexture> mtlTexture, const Rect& rect, const void* pixels,
+                          size_t rowBytes);
+
   MetalGPU* gpu = nullptr;
   id<MTLCommandQueue> commandQueue = nil;
   id<MTLCommandBuffer> lastSubmittedCommandBuffer = nil;
