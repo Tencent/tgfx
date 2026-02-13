@@ -34,6 +34,9 @@ class MetalGPU;
 // and Google Dawn (WebGPU). Metal supports up to 31 buffer slots per shader stage.
 static constexpr unsigned kVertexBufferIndexStart = 30;
 
+// Metal supports up to 31 vertex attributes (indices 0 through 30).
+static constexpr unsigned kMaxVertexAttributes = 31;
+
 /**
  * Metal shader module implementation with GLSL to MSL conversion. It compiles the GLSL source into
  * an MTLLibrary and retains the original GLSL code so that MetalRenderPipeline can re-compile with

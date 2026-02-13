@@ -191,7 +191,7 @@ void MetalRenderPipeline::configureVertexDescriptor(
     size_t currentOffset = 0;
     for (size_t attrIndex = 0; attrIndex < layout.attributes.size(); ++attrIndex) {
       const auto& attribute = layout.attributes[attrIndex];
-      if (globalAttributeIndex < 31) {
+      if (globalAttributeIndex < kMaxVertexAttributes) {
         vertexDescriptor.attributes[globalAttributeIndex].format =
             MetalDefines::ToMTLVertexFormat(attribute.format());
         vertexDescriptor.attributes[globalAttributeIndex].offset = currentOffset;
