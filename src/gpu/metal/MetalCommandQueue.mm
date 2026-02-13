@@ -31,14 +31,8 @@ MetalCommandQueue::MetalCommandQueue(MetalGPU* metalGPU) : gpu(metalGPU) {
 }
 
 MetalCommandQueue::~MetalCommandQueue() {
-  if (lastSubmittedCommandBuffer != nil) {
-    [lastSubmittedCommandBuffer release];
-    lastSubmittedCommandBuffer = nil;
-  }
-  if (commandQueue != nil) {
-    [commandQueue release];
-    commandQueue = nil;
-  }
+  [lastSubmittedCommandBuffer release];
+  [commandQueue release];
 }
 
 void MetalCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {

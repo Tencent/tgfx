@@ -25,10 +25,7 @@ MetalCommandBuffer::MetalCommandBuffer(id<MTLCommandBuffer> metalCommandBuffer)
 }
 
 MetalCommandBuffer::~MetalCommandBuffer() {
-  if (commandBuffer != nil) {
-    [commandBuffer release];
-    commandBuffer = nil;
-  }
+  [commandBuffer release];
 }
 
 }  // namespace tgfx

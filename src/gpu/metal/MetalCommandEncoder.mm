@@ -57,10 +57,8 @@ MetalCommandEncoder::MetalCommandEncoder(MetalGPU* gpu, id<MTLCommandBuffer> buf
 }
 
 void MetalCommandEncoder::onRelease(MetalGPU*) {
-  if (commandBuffer != nil) {
-    [commandBuffer release];
-    commandBuffer = nil;
-  }
+  [commandBuffer release];
+  commandBuffer = nil;
 }
 
 GPU* MetalCommandEncoder::gpu() const {
