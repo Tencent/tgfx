@@ -102,35 +102,37 @@ void MetalCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
   if (mtlTexture.storageMode == MTLStorageModePrivate) {
     // Private storage mode textures cannot be written to directly with replaceRegion.
     // Use a blit command encoder with a staging buffer instead.
-    auto bytesPerPixel = MetalDefines::GetBytesPerPixel(mtlTexture.pixelFormat);
-    NSUInteger width = static_cast<NSUInteger>(rect.width());
-    NSUInteger height = static_cast<NSUInteger>(rect.height());
-    NSUInteger bytesPerRow = rowBytes > 0 ? static_cast<NSUInteger>(rowBytes) : width * bytesPerPixel;
-    NSUInteger dataSize = bytesPerRow * height;
-    
-    id<MTLBuffer> stagingBuffer = [gpu->device() newBufferWithBytes:pixels
-                                                             length:dataSize
-                                                            options:MTLResourceStorageModeShared];
-    id<MTLCommandBuffer> cmdBuffer = [commandQueue commandBuffer];
-    id<MTLBlitCommandEncoder> blitEncoder = [cmdBuffer blitCommandEncoder];
-    
-    MTLOrigin origin = MTLOriginMake(static_cast<NSUInteger>(rect.x()),
-                                     static_cast<NSUInteger>(rect.y()), 0);
-    MTLSize size = MTLSizeMake(width, height, 1);
-    
-    [blitEncoder copyFromBuffer:stagingBuffer
-                   sourceOffset:0
-              sourceBytesPerRow:bytesPerRow
-            sourceBytesPerImage:dataSize
-                     sourceSize:size
-                      toTexture:mtlTexture
-               destinationSlice:0
-               destinationLevel:0
-              destinationOrigin:origin];
-    [blitEncoder endEncoding];
-    [cmdBuffer commit];
-    [cmdBuffer waitUntilCompleted];
-    [stagingBuffer release];
+    @autoreleasepool {
+      auto bytesPerPixel = MetalDefines::GetBytesPerPixel(mtlTexture.pixelFormat);
+      NSUInteger width = static_cast<NSUInteger>(rect.width());
+      NSUInteger height = static_cast<NSUInteger>(rect.height());
+      NSUInteger bytesPerRow = rowBytes > 0 ? static_cast<NSUInteger>(rowBytes) : width * bytesPerPixel;
+      NSUInteger dataSize = bytesPerRow * height;
+      
+      id<MTLBuffer> stagingBuffer = [gpu->device() newBufferWithBytes:pixels
+                                                               length:dataSize
+                                                              options:MTLResourceStorageModeShared];
+      id<MTLCommandBuffer> cmdBuffer = [commandQueue commandBuffer];
+      id<MTLBlitCommandEncoder> blitEncoder = [cmdBuffer blitCommandEncoder];
+      
+      MTLOrigin origin = MTLOriginMake(static_cast<NSUInteger>(rect.x()),
+                                       static_cast<NSUInteger>(rect.y()), 0);
+      MTLSize size = MTLSizeMake(width, height, 1);
+      
+      [blitEncoder copyFromBuffer:stagingBuffer
+                     sourceOffset:0
+                sourceBytesPerRow:bytesPerRow
+              sourceBytesPerImage:dataSize
+                       sourceSize:size
+                        toTexture:mtlTexture
+                 destinationSlice:0
+                 destinationLevel:0
+                destinationOrigin:origin];
+      [blitEncoder endEncoding];
+      [cmdBuffer commit];
+      [cmdBuffer waitUntilCompleted];
+      [stagingBuffer release];
+    }
     return;
   }
   
