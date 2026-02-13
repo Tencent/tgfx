@@ -38,112 +38,118 @@ namespace tgfx {
 // overhead. Future improvements may include offline pre-compilation, shader caching, or binary
 // pipeline archive support to reduce latency.
 
+// Replace a regex pattern in the source string by invoking a callback for each match.
+// The callback receives the match and returns the replacement string.
+using MatchReplacer = std::string (*)(const std::smatch&, int&);
+
+static std::string replaceAllMatches(const std::string& source, const std::regex& pattern,
+                                     MatchReplacer replacer, int& counter) {
+  std::smatch match;
+  std::string::const_iterator searchStart(source.cbegin());
+  std::string result;
+  size_t lastPos = 0;
+  while (std::regex_search(searchStart, source.cend(), match, pattern)) {
+    auto matchPos = static_cast<size_t>(match.position(0));
+    auto iterOffset = static_cast<size_t>(searchStart - source.cbegin());
+    size_t matchStart = matchPos + iterOffset;
+    result += source.substr(lastPos, matchStart - lastPos);
+    result += replacer(match, counter);
+    lastPos = matchStart + static_cast<size_t>(match.length(0));
+    searchStart = match.suffix().first;
+  }
+  result += source.substr(lastPos);
+  return result;
+}
+
+static std::string upgradeGLSLVersion(const std::string& source) {
+  static std::regex versionRegex(R"(#version\s+\d+(\s+es)?)");
+  return std::regex_replace(source, versionRegex, "#version 450");
+}
+
+// Assign fixed binding points for internal UBOs to match CPU-side constants:
+// VertexUniformBlock -> binding 0 (VERTEX_UBO_BINDING_POINT)
+// FragmentUniformBlock -> binding 1 (FRAGMENT_UBO_BINDING_POINT)
+static std::string assignInternalUBOBindings(const std::string& source) {
+  static std::regex vertexUboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+VertexUniformBlock)");
+  auto result = std::regex_replace(source, vertexUboRegex,
+                                   "layout(std140, binding=0) uniform VertexUniformBlock");
+  static std::regex fragmentUboRegex(
+      R"(layout\s*\(\s*std140\s*\)\s*uniform\s+FragmentUniformBlock)");
+  return std::regex_replace(result, fragmentUboRegex,
+                            "layout(std140, binding=1) uniform FragmentUniformBlock");
+}
+
+static std::string replaceCustomUBO(const std::smatch& match, int& counter) {
+  return "layout(std140, binding=" + std::to_string(counter++) + ") uniform " + match[1].str();
+}
+
+// Add binding to any remaining uniform blocks (custom shaders) sequentially from 0.
+static std::string assignCustomUBOBindings(const std::string& source) {
+  static std::regex uboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+(\w+))");
+  int binding = 0;
+  return replaceAllMatches(source, uboRegex, replaceCustomUBO, binding);
+}
+
+static std::string replaceSamplerBinding(const std::smatch& match, int& counter) {
+  return "layout(binding=" + std::to_string(counter++) + ") uniform " + match[1].str() + " " +
+         match[2].str() + ";";
+}
+
+// Add binding to sampler uniforms sequentially from 0.
+// The RenderPipeline maintains a mapping from logical binding to actual Metal texture index.
+static std::string assignSamplerBindings(const std::string& source) {
+  static std::regex samplerRegex(R"(uniform\s+(sampler\w+)\s+(\w+);)");
+  int binding = 0;
+  return replaceAllMatches(source, samplerRegex, replaceSamplerBinding, binding);
+}
+
+static std::string replaceInputLocation(const std::smatch& match, int& counter) {
+  std::string interpStr = match[1].matched ? match[1].str() : "";
+  std::string precisionStr = match[2].matched ? match[2].str() : "";
+  return "layout(location=" + std::to_string(counter++) + ") " + interpStr + "in " +
+         precisionStr + match[3].str() + " " + match[4].str() + ";";
+}
+
+// Add location qualifiers to 'in' variables, handling optional interpolation qualifiers
+// (flat, noperspective) and precision qualifiers (highp, mediump, lowp).
+static std::string assignInputLocationQualifiers(const std::string& source) {
+  static std::regex inVarRegex(
+      R"((flat\s+|noperspective\s+)?in\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)\s*;)");
+  int location = 0;
+  return replaceAllMatches(source, inVarRegex, replaceInputLocation, location);
+}
+
+static std::string replaceOutputLocation(const std::smatch& match, int& counter) {
+  std::string interpStr = match[1].matched ? match[1].str() : "";
+  std::string precisionStr = match[2].matched ? match[2].str() : "";
+  return "layout(location=" + std::to_string(counter++) + ") " + interpStr + "out " +
+         precisionStr + match[3].str() + " " + match[4].str() + ";";
+}
+
+// Add location qualifiers to 'out' variables, handling optional interpolation qualifiers
+// (flat, noperspective) and precision qualifiers (highp, mediump, lowp).
+static std::string assignOutputLocationQualifiers(const std::string& source) {
+  static std::regex outVarRegex(
+      R"((flat\s+|noperspective\s+)?out\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)\s*;)");
+  int location = 0;
+  return replaceAllMatches(source, outVarRegex, replaceOutputLocation, location);
+}
+
+// Remove precision qualifiers that are not supported in desktop GLSL 450.
+static std::string removePrecisionDeclarations(const std::string& source) {
+  static std::regex precisionDeclRegex(R"(precision\s+(highp|mediump|lowp)\s+\w+\s*;)");
+  return std::regex_replace(source, precisionDeclRegex, "");
+}
+
 // Preprocess OpenGL-style GLSL to Vulkan-compatible GLSL with binding/location qualifiers.
 static std::string preprocessGLSL(const std::string& glslCode) {
-  std::string result = glslCode;
-
-  static std::regex versionRegex(R"(#version\s+\d+(\s+es)?)");
-  result = std::regex_replace(result, versionRegex, "#version 450");
-
-  // Assign fixed binding points for internal UBOs to match CPU-side constants:
-  // VertexUniformBlock -> binding 0 (VERTEX_UBO_BINDING_POINT)
-  // FragmentUniformBlock -> binding 1 (FRAGMENT_UBO_BINDING_POINT)
-  static std::regex vertexUboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+VertexUniformBlock)");
-  result = std::regex_replace(result, vertexUboRegex,
-                              "layout(std140, binding=0) uniform VertexUniformBlock");
-
-  static std::regex fragmentUboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+FragmentUniformBlock)");
-  result = std::regex_replace(result, fragmentUboRegex,
-                              "layout(std140, binding=1) uniform FragmentUniformBlock");
-
-  // Add binding to any remaining uniform blocks (custom shaders) sequentially from 0.
-  int uboBinding = 0;
-  static std::regex uboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+(\w+))");
-  std::smatch match;
-  std::string::const_iterator searchStart(result.cbegin());
-  std::string tempResult;
-  size_t lastPos = 0;
-  while (std::regex_search(searchStart, result.cend(), match, uboRegex)) {
-    auto matchPos = static_cast<size_t>(match.position(0));
-    auto iterOffset = static_cast<size_t>(searchStart - result.cbegin());
-    size_t matchStart = matchPos + iterOffset;
-    tempResult += result.substr(lastPos, matchStart - lastPos);
-    tempResult += "layout(std140, binding=" + std::to_string(uboBinding++) + ") uniform " +
-                  match[1].str();
-    lastPos = matchStart + static_cast<size_t>(match.length(0));
-    searchStart = match.suffix().first;
-  }
-  tempResult += result.substr(lastPos);
-  result = tempResult;
-
-  // Add binding to sampler uniforms sequentially from 0.
-  // The RenderPipeline maintains a mapping from logical binding to actual Metal texture index.
-  int textureBinding = 0;
-  static std::regex samplerRegex(R"(uniform\s+(sampler\w+)\s+(\w+);)");
-  searchStart = result.cbegin();
-  tempResult.clear();
-  lastPos = 0;
-  while (std::regex_search(searchStart, result.cend(), match, samplerRegex)) {
-    auto matchPos = static_cast<size_t>(match.position(0));
-    auto iterOffset = static_cast<size_t>(searchStart - result.cbegin());
-    size_t matchStart = matchPos + iterOffset;
-    tempResult += result.substr(lastPos, matchStart - lastPos);
-    tempResult += "layout(binding=" + std::to_string(textureBinding++) + ") uniform " +
-                  match[1].str() + " " + match[2].str() + ";";
-    lastPos = matchStart + static_cast<size_t>(match.length(0));
-    searchStart = match.suffix().first;
-  }
-  tempResult += result.substr(lastPos);
-  result = tempResult;
-
-  // Add location qualifiers to varying/in/out variables
-  // For vertex shader: in variables need location, out variables need location
-  // For fragment shader: in variables need location, out variables (color output) need location
-
-  // Process 'in' variables
-  int inLocation = 0;
-  static std::regex inVarRegex(R"(\bin\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)\s*;)");
-  searchStart = result.cbegin();
-  tempResult.clear();
-  lastPos = 0;
-  while (std::regex_search(searchStart, result.cend(), match, inVarRegex)) {
-    auto matchPos = static_cast<size_t>(match.position(0));
-    auto iterOffset = static_cast<size_t>(searchStart - result.cbegin());
-    size_t matchStart = matchPos + iterOffset;
-    tempResult += result.substr(lastPos, matchStart - lastPos);
-    std::string precisionStr = match[1].matched ? match[1].str() : "";
-    tempResult += "layout(location=" + std::to_string(inLocation++) + ") in " + precisionStr +
-                  match[2].str() + " " + match[3].str() + ";";
-    lastPos = matchStart + static_cast<size_t>(match.length(0));
-    searchStart = match.suffix().first;
-  }
-  tempResult += result.substr(lastPos);
-  result = tempResult;
-
-  // Process 'out' variables
-  int outLocation = 0;
-  static std::regex outVarRegex(R"(\bout\s+(highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(\w+)\s*;)");
-  searchStart = result.cbegin();
-  tempResult.clear();
-  lastPos = 0;
-  while (std::regex_search(searchStart, result.cend(), match, outVarRegex)) {
-    auto matchPos = static_cast<size_t>(match.position(0));
-    auto iterOffset = static_cast<size_t>(searchStart - result.cbegin());
-    size_t matchStart = matchPos + iterOffset;
-    tempResult += result.substr(lastPos, matchStart - lastPos);
-    std::string precisionStr = match[1].matched ? match[1].str() : "";
-    tempResult += "layout(location=" + std::to_string(outLocation++) + ") out " + precisionStr +
-                  match[2].str() + " " + match[3].str() + ";";
-    lastPos = matchStart + static_cast<size_t>(match.length(0));
-    searchStart = match.suffix().first;
-  }
-  tempResult += result.substr(lastPos);
-  result = tempResult;
-
-  // Remove precision qualifiers that are not supported in desktop GLSL 450
-  static std::regex precisionDeclRegex(R"(precision\s+(highp|mediump|lowp)\s+\w+\s*;)");
-  result = std::regex_replace(result, precisionDeclRegex, "");
-
+  auto result = upgradeGLSLVersion(glslCode);
+  result = assignInternalUBOBindings(result);
+  result = assignCustomUBOBindings(result);
+  result = assignSamplerBindings(result);
+  result = assignInputLocationQualifiers(result);
+  result = assignOutputLocationQualifiers(result);
+  result = removePrecisionDeclarations(result);
   return result;
 }
 
