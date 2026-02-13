@@ -310,8 +310,10 @@ MTLStoreAction MetalDefines::ToMTLStoreAction(StoreAction storeAction) {
   switch (storeAction) {
     case StoreAction::Store:
       return MTLStoreActionStore;
-    default:
+    case StoreAction::DontCare:
       return MTLStoreActionDontCare;
+    default:
+      return MTLStoreActionMultisampleResolve;
   }
 }
 
