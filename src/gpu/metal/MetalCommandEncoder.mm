@@ -24,6 +24,7 @@
 #include "MetalTexture.h"
 #include "MetalBuffer.h"
 #include "MetalDefines.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -83,6 +84,7 @@ void MetalCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTextu
   
   id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
   if (blitEncoder == nil) {
+    LOGE("Failed to create blit command encoder for texture copy.");
     return;
   }
   
@@ -118,6 +120,7 @@ void MetalCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextur
   
   id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
   if (blitEncoder == nil) {
+    LOGE("Failed to create blit command encoder for texture-to-buffer copy.");
     return;
   }
   
@@ -157,6 +160,7 @@ void MetalCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> tex
   
   id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
   if (blitEncoder == nil) {
+    LOGE("Failed to create blit command encoder for mipmap generation.");
     return;
   }
   [blitEncoder generateMipmapsForTexture:metalTexture->metalTexture()];
