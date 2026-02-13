@@ -215,6 +215,9 @@ void MetalRenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> 
   }
   
   DEBUG_ASSERT(slot < kVertexBufferIndexStart);
+  if (slot >= kVertexBufferIndexStart) {
+    return;
+  }
   auto metalBufferIndex = kVertexBufferIndexStart - slot;
   auto metalBuffer = std::static_pointer_cast<MetalBuffer>(buffer);
   [renderEncoder setVertexBuffer:metalBuffer->metalBuffer()
@@ -256,6 +259,9 @@ void MetalRenderPass::setUniformBuffer(unsigned binding,
     return;
   }
   DEBUG_ASSERT(binding < kVertexBufferIndexStart);
+  if (binding >= kVertexBufferIndexStart) {
+    return;
+  }
   (void)size;  // Metal doesn't need explicit size
   
   auto metalBuffer = std::static_pointer_cast<MetalBuffer>(buffer);
