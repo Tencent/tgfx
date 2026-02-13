@@ -44,7 +44,7 @@ class MtlSampler : public Sampler, public MtlResource {
   void onRelease(MtlGPU* gpu) override;
 
  private:
-  MtlSampler(const SamplerDescriptor& descriptor, id<MTLSamplerState> mtlSamplerState);
+  explicit MtlSampler(id<MTLSamplerState> mtlSamplerState);
   ~MtlSampler() override = default;
 
   id<MTLSamplerState> samplerState = nil;

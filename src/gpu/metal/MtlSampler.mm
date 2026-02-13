@@ -53,12 +53,10 @@ std::shared_ptr<MtlSampler> MtlSampler::Make(MtlGPU* gpu, const SamplerDescripto
     return nullptr;
   }
   
-  return gpu->makeResource<MtlSampler>(descriptor, mtlSamplerState);
+  return gpu->makeResource<MtlSampler>(mtlSamplerState);
 }
 
-MtlSampler::MtlSampler(const SamplerDescriptor& descriptor, id<MTLSamplerState> mtlSamplerState)
-    : samplerState(mtlSamplerState) {
-  (void)descriptor;
+MtlSampler::MtlSampler(id<MTLSamplerState> mtlSamplerState) : samplerState(mtlSamplerState) {
 }
 
 void MtlSampler::onRelease(MtlGPU*) {

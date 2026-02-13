@@ -127,12 +127,12 @@ MtlHardwareTexture::MtlHardwareTexture(const TextureDescriptor& descriptor,
 }
 
 void MtlHardwareTexture::onRelease(MtlGPU* gpu) {
-  CFRelease(pixelBuffer);
-  pixelBuffer = nullptr;
   if (metalTexture != nil) {
     CFRelease(metalTexture);
     metalTexture = nil;
   }
+  CFRelease(pixelBuffer);
+  pixelBuffer = nullptr;
   MtlTexture::onRelease(gpu);
 }
 

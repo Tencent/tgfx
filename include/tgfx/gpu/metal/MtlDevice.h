@@ -63,7 +63,6 @@ class MtlDevice : public Device {
   void onUnlockContext() override;
 
  private:
-  class Impl;
   explicit MtlDevice(std::unique_ptr<class MtlGPU> gpu);
 
 #ifdef __OBJC__
