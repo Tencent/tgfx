@@ -18,6 +18,7 @@
 
 #include "HairlineTriangulator.h"
 #include <cstddef>
+#include "core/NoConicsPathIterator.h"
 #include "core/utils/PathUtils.h"
 #include "core/utils/PointUtils.h"
 #include "tgfx/core/Matrix.h"
@@ -209,7 +210,28 @@ class PathDecomposer {
   }
 
   uint32_t decompose(const Path& path) {
-    path.decompose(ProcessPathVerb, this);
+    NoConicsPathIterator iterator(path);
+    for (const auto& segment : iterator) {
+      switch (segment.verb) {
+        case PathVerb::Move:
+          processMove();
+          break;
+        case PathVerb::Line:
+          processLine(segment.points);
+          break;
+        case PathVerb::Quad:
+          processQuad(segment.points);
+          break;
+        case PathVerb::Cubic:
+          processCubic(segment.points);
+          break;
+        case PathVerb::Close:
+          processClose(segment.points);
+          break;
+        default:
+          break;
+      }
+    }
     finalizeLastContour();
     return totalQuadCount_;
   }
@@ -319,27 +341,6 @@ class PathDecomposer {
         lines_.emplace_back(devPt.x - capLength_, devPt.y);
         lines_.emplace_back(devPt.x + capLength_, devPt.y);
       }
-    }
-  }
-
-  static void ProcessPathVerb(PathVerb verb, const Point points[4], void* userData) {
-    auto* self = static_cast<PathDecomposer*>(userData);
-    switch (verb) {
-      case PathVerb::Move:
-        self->processMove();
-        break;
-      case PathVerb::Line:
-        self->processLine(points);
-        break;
-      case PathVerb::Quad:
-        self->processQuad(points);
-        break;
-      case PathVerb::Cubic:
-        self->processCubic(points);
-        break;
-      case PathVerb::Close:
-        self->processClose(points);
-        break;
     }
   }
 
