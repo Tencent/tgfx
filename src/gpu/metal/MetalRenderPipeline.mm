@@ -169,7 +169,7 @@ void MetalRenderPipeline::configureVertexDescriptor(
   if (descriptor.vertex.bufferLayouts.empty()) {
     return;
   }
-  DEBUG_ASSERT(descriptor.vertex.bufferLayouts.size() <= kVertexBufferIndexStart);
+  DEBUG_ASSERT(descriptor.vertex.bufferLayouts.size() <= VertexBufferIndexStart);
   MTLVertexDescriptor* vertexDescriptor = [[MTLVertexDescriptor alloc] init];
 
   NSUInteger globalAttributeIndex = 0;
@@ -178,7 +178,7 @@ void MetalRenderPipeline::configureVertexDescriptor(
 
     // Vertex buffers use high Metal buffer indices (30, 29, ...) to avoid conflict with
     // uniform buffers at low indices (0, 1, ...).
-    auto metalBufferIndex = kVertexBufferIndexStart - bufferIndex;
+    auto metalBufferIndex = VertexBufferIndexStart - bufferIndex;
 
     // Set buffer layout
     vertexDescriptor.layouts[metalBufferIndex].stride = layout.stride;
@@ -191,7 +191,7 @@ void MetalRenderPipeline::configureVertexDescriptor(
     size_t currentOffset = 0;
     for (size_t attrIndex = 0; attrIndex < layout.attributes.size(); ++attrIndex) {
       const auto& attribute = layout.attributes[attrIndex];
-      if (globalAttributeIndex < kMaxVertexAttributes) {
+      if (globalAttributeIndex < MaxVertexAttributes) {
         vertexDescriptor.attributes[globalAttributeIndex].format =
             MetalDefines::ToMTLVertexFormat(attribute.format());
         vertexDescriptor.attributes[globalAttributeIndex].offset = currentOffset;
