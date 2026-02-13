@@ -40,7 +40,7 @@ std::unique_ptr<MetalGPU> MetalGPU::Make(id<MTLDevice> device) {
   }
   
   auto gpu = std::unique_ptr<MetalGPU>(new MetalGPU(device));
-  if (!gpu->caps || !gpu->commandQueue) {
+  if (gpu->commandQueue->metalCommandQueue() == nil) {
     return nullptr;
   }
   
