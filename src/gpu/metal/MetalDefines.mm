@@ -295,51 +295,6 @@ size_t MetalDefines::GetBytesPerPixel(MTLPixelFormat format) {
   }
 }
 
-bool MetalDefines::IsCompressedFormat(MTLPixelFormat format) {
-  // Metal compressed formats
-  switch (format) {
-    case MTLPixelFormatBC1_RGBA:
-    case MTLPixelFormatBC1_RGBA_sRGB:
-    case MTLPixelFormatBC2_RGBA:
-    case MTLPixelFormatBC2_RGBA_sRGB:
-    case MTLPixelFormatBC3_RGBA:
-    case MTLPixelFormatBC3_RGBA_sRGB:
-    case MTLPixelFormatBC4_RUnorm:
-    case MTLPixelFormatBC4_RSnorm:
-    case MTLPixelFormatBC5_RGUnorm:
-    case MTLPixelFormatBC5_RGSnorm:
-    case MTLPixelFormatBC6H_RGBFloat:
-    case MTLPixelFormatBC6H_RGBUfloat:
-    case MTLPixelFormatBC7_RGBAUnorm:
-    case MTLPixelFormatBC7_RGBAUnorm_sRGB:
-      return true;
-    default:
-      return false;
-  }
-}
-
-bool MetalDefines::IsRenderableFormat(MTLPixelFormat format) {
-  // Check if the format can be used as a render target
-  switch (format) {
-    case MTLPixelFormatRGBA8Unorm:
-    case MTLPixelFormatRGBA8Unorm_sRGB:
-    case MTLPixelFormatBGRA8Unorm:
-    case MTLPixelFormatBGRA8Unorm_sRGB:
-    case MTLPixelFormatRGB10A2Unorm:
-    case MTLPixelFormatRGBA16Float:
-    case MTLPixelFormatRGBA32Float:
-    case MTLPixelFormatR8Unorm:
-    case MTLPixelFormatRG8Unorm:
-    case MTLPixelFormatR16Float:
-    case MTLPixelFormatRG16Float:
-    case MTLPixelFormatR32Float:
-    case MTLPixelFormatRG32Float:
-      return true;
-    default:
-      return false;
-  }
-}
-
 MTLCullMode MetalDefines::ToMTLCullMode(CullMode cullMode) {
   switch (cullMode) {
     case CullMode::None:

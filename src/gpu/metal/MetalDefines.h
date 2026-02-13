@@ -96,15 +96,6 @@ class MetalDefines {
    */
   static size_t GetBytesPerPixel(MTLPixelFormat format);
 
-  /**
-   * Check if the Metal pixel format is compressed.
-   */
-  static bool IsCompressedFormat(MTLPixelFormat format);
-
-  /**
-   * Check if the Metal pixel format supports rendering.
-   */
-  static bool IsRenderableFormat(MTLPixelFormat format);
 
   /**
    * Convert TGFX cull mode to Metal cull mode.
