@@ -63,6 +63,7 @@ class MetalRenderPass : public RenderPass {
 
  private:
   MetalRenderPass(MetalCommandEncoder* encoder, const RenderPassDescriptor& descriptor);
+  ~MetalRenderPass() override;
 
   MetalCommandEncoder* commandEncoder = nullptr;
   id<MTLRenderCommandEncoder> renderEncoder = nil;
