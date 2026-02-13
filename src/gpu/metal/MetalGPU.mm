@@ -232,9 +232,6 @@ void MetalGPU::releaseAll(bool releaseGPU) {
     }
   }
   resources.clear();
-  // Setting returnQueue to nullptr prevents any further resource tracking. This must only be called
-  // during GPU teardown after all external shared_ptr references have been released, ensuring no
-  // deferred release callbacks will arrive via the queue.
   returnQueue = nullptr;
 }
 
