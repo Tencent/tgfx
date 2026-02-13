@@ -34,6 +34,10 @@
 
 namespace tgfx {
 
+// TODO: The current GLSL -> SPIR-V -> MSL conversion pipeline incurs high runtime compilation
+// overhead. Future improvements may include offline pre-compilation, shader caching, or binary
+// pipeline archive support to reduce latency.
+
 // Preprocess OpenGL-style GLSL to Vulkan-compatible GLSL with binding/location qualifiers.
 static std::string preprocessGLSL(const std::string& glslCode) {
   std::string result = glslCode;
