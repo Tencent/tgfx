@@ -72,6 +72,7 @@ void* MetalBuffer::map(size_t offset, size_t size) {
   
   // Check if buffer supports mapping (shared storage mode)
   if (buffer.storageMode != MTLStorageModeShared) {
+    LOGE("MetalBuffer::map() buffer storage mode is not Shared, mapping is not supported!");
     return nullptr;
   }
   
