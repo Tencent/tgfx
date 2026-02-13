@@ -53,7 +53,7 @@ class MetalHardwareTexture : public MetalTexture {
   void onReleaseTexture() override;
 
   CVPixelBufferRef pixelBuffer = nullptr;
-  CVMetalTextureRef cvMetalTexture = nil;
+  CVMetalTextureRef cvMetalTexture = nullptr;
 
   friend class MetalGPU;
 };

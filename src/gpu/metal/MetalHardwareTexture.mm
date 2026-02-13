@@ -54,11 +54,11 @@ static std::shared_ptr<Texture> CreateTextureOfPlane(MetalGPU* gpu, CVPixelBuffe
       return nullptr;
   }
 
-  CVMetalTextureRef cvTexture = nil;
+  CVMetalTextureRef cvTexture = nullptr;
   CVReturn result = CVMetalTextureCacheCreateTextureFromImage(
       kCFAllocatorDefault, textureCache, pixelBuffer, nil, metalPixelFormat, width, height,
       planeIndex, &cvTexture);
-  if (result != kCVReturnSuccess || cvTexture == nil) {
+  if (result != kCVReturnSuccess || cvTexture == nullptr) {
     return nullptr;
   }
 
@@ -77,7 +77,7 @@ static std::shared_ptr<Texture> CreateTextureOfPlane(MetalGPU* gpu, CVPixelBuffe
 std::vector<std::shared_ptr<Texture>> MetalHardwareTexture::MakeFrom(
     MetalGPU* gpu, CVPixelBufferRef pixelBuffer, uint32_t usage,
     CVMetalTextureCacheRef textureCache) {
-  if (textureCache == nil || pixelBuffer == nil) {
+  if (textureCache == nullptr || pixelBuffer == nullptr) {
     return {};
   }
 
@@ -129,9 +129,9 @@ MetalHardwareTexture::MetalHardwareTexture(const TextureDescriptor& descriptor,
 }
 
 void MetalHardwareTexture::onRelease(MetalGPU* gpu) {
-  if (cvMetalTexture != nil) {
+  if (cvMetalTexture != nullptr) {
     CFRelease(cvMetalTexture);
-    cvMetalTexture = nil;
+    cvMetalTexture = nullptr;
   }
   CFRelease(pixelBuffer);
   pixelBuffer = nullptr;
