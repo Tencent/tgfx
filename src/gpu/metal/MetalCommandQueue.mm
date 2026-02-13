@@ -47,7 +47,7 @@ void MetalCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   }
   @autoreleasepool {
     auto metalCommandBuffer = std::static_pointer_cast<MetalCommandBuffer>(commandBuffer);
-    if (metalCommandBuffer && metalCommandBuffer->metalCommandBuffer()) {
+    if (metalCommandBuffer->metalCommandBuffer()) {
       // Signal the pending semaphore after this command buffer completes
       if (pendingSignalSemaphore != nullptr) {
         auto value = pendingSignalSemaphore->nextSignalValue();
@@ -164,7 +164,7 @@ void MetalCommandQueue::waitSemaphore(std::shared_ptr<Semaphore> semaphore) {
   }
   
   auto metalSemaphore = std::static_pointer_cast<MetalSemaphore>(semaphore);
-  if (metalSemaphore == nullptr || metalSemaphore->metalEvent() == nil) {
+  if (metalSemaphore->metalEvent() == nil) {
     return;
   }
   
