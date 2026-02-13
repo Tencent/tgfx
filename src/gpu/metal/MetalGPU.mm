@@ -199,11 +199,12 @@ std::shared_ptr<Semaphore> MetalGPU::importBackendSemaphore(const BackendSemapho
 }
 
 BackendSemaphore MetalGPU::stealBackendSemaphore(std::shared_ptr<Semaphore> semaphore) {
-  if (semaphore == nullptr) {
+  if (semaphore == nullptr || semaphore.use_count() > 2) {
     return {};
   }
-  // For Metal, we don't clear the _event because the command queue's pendingSemaphore
-  // still needs to signal it during submit. The event will remain valid until
+  // For Metal, we don't clear the _event because the command queue's pendingSignalSemaphore
+  // still needs to signal it during submit. The use_count threshold is 2 instead of 1 to account
+  // for the additional reference held by pendingSignalSemaphore. The event will remain valid until
   // the semaphore is destroyed.
   return semaphore->getBackendSemaphore();
 }
