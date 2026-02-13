@@ -29,8 +29,6 @@ class WebScalerContext : public ScalerContext {
     return false;
   }
 
-  FontMetrics getFontMetrics() const override;
-
   Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override;
 
   float getAdvance(GlyphID glyphID, bool verticalText) const override;
@@ -51,6 +49,9 @@ class WebScalerContext : public ScalerContext {
    */
   emscripten::val getGlyphCanvas(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
                                  int padding) const;
+
+ protected:
+  FontMetrics onComputeFontMetrics() const override;
 
  private:
   emscripten::val scalerContext = emscripten::val::null();
