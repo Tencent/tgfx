@@ -355,12 +355,6 @@ if (APPLE)
     endif ()
 endif ()
 
-# Add OpenGL files for Apple platforms
-if (APPLE AND TGFX_USE_OPENGL)
-    file(GLOB_RECURSE APPLE_GL_FILES src/gpu/opengl/cgl/*.*)
-    list(APPEND TGFX_FILES ${APPLE_GL_FILES})
-endif ()
-
 file(GLOB_RECURSE EGL_PLATFORM_FILES src/gpu/opengl/egl/*.*)
 
 if (TGFX_USE_QT)
