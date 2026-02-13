@@ -27,6 +27,16 @@
 
 namespace tgfx {
 
+static MTLOrigin MakeMTLOrigin(const Rect& rect) {
+  return MTLOriginMake(static_cast<NSUInteger>(rect.x()),
+                       static_cast<NSUInteger>(rect.y()), 0);
+}
+
+static MTLSize MakeMTLSize(const Rect& rect) {
+  return MTLSizeMake(static_cast<NSUInteger>(rect.width()),
+                     static_cast<NSUInteger>(rect.height()), 1);
+}
+
 std::shared_ptr<MetalCommandEncoder> MetalCommandEncoder::Make(MetalGPU* gpu) {
   if (!gpu) {
     return nullptr;
@@ -75,10 +85,8 @@ void MetalCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTextu
   
   id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
   
-  MTLOrigin sourceOrigin = MTLOriginMake(static_cast<NSUInteger>(srcRect.x()),
-                                        static_cast<NSUInteger>(srcRect.y()), 0);
-  MTLSize sourceSize = MTLSizeMake(static_cast<NSUInteger>(srcRect.width()),
-                                  static_cast<NSUInteger>(srcRect.height()), 1);
+  auto sourceOrigin = MakeMTLOrigin(srcRect);
+  auto sourceSize = MakeMTLSize(srcRect);
   MTLOrigin destinationOrigin = MTLOriginMake(static_cast<NSUInteger>(dstOffset.x),
                                              static_cast<NSUInteger>(dstOffset.y), 0);
   
@@ -109,10 +117,8 @@ void MetalCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextur
   
   id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
   
-  MTLOrigin sourceOrigin = MTLOriginMake(static_cast<NSUInteger>(srcRect.x()),
-                                        static_cast<NSUInteger>(srcRect.y()), 0);
-  MTLSize sourceSize = MTLSizeMake(static_cast<NSUInteger>(srcRect.width()),
-                                  static_cast<NSUInteger>(srcRect.height()), 1);
+  auto sourceOrigin = MakeMTLOrigin(srcRect);
+  auto sourceSize = MakeMTLSize(srcRect);
   
   // Calculate bytes per row based on texture format
   auto bytesPerPixel = MetalDefines::GetBytesPerPixel(metalSrcTexture->metalTexture().pixelFormat);
