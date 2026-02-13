@@ -169,7 +169,6 @@ static FT_Int ChooseBitmapStrike(FT_Face face, FT_F26Dot6 scaleY) {
 
 FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, float size)
     : ScalerContext(std::move(typeFace), size), textScale(size) {
-  advanceCache.reserve(256);
   backingSize = textSize;
   loadGlyphFlags |= FT_LOAD_NO_BITMAP;
   // Always using FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH to get correct
@@ -669,32 +668,11 @@ Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxI
 }
 
 float FTScalerContext::getAdvance(GlyphID glyphID, bool verticalText) const {
-  // GlyphID is uint16_t, so the high bit is free to encode verticalText.
-  auto cacheKey = static_cast<uint32_t>(glyphID) | (verticalText ? 0x80000000u : 0u);
-  {
-    std::shared_lock<std::shared_mutex> cacheLock(advanceCacheLocker);
-    auto it = advanceCache.find(cacheKey);
-    if (it != advanceCache.end()) {
-      return it->second;
-    }
-  }
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
-  {
-    std::shared_lock<std::shared_mutex> cacheLock(advanceCacheLocker);
-    auto it = advanceCache.find(cacheKey);
-    if (it != advanceCache.end()) {
-      return it->second;
-    }
-  }
   if (setupSize(false)) {
     return 0;
   }
-  auto advance = getAdvanceInternal(glyphID, verticalText);
-  {
-    std::unique_lock<std::shared_mutex> cacheLock(advanceCacheLocker);
-    advanceCache[cacheKey] = advance;
-  }
-  return advance;
+  return getAdvanceInternal(glyphID, verticalText);
 }
 
 float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) const {

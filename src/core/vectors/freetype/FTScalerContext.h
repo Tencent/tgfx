@@ -19,9 +19,7 @@
 #pragma once
 
 #include <memory>
-#include <shared_mutex>
 #include <string>
-#include <unordered_map>
 #include "ft2build.h"
 #include FT_COLOR_H
 #include FT_FREETYPE_H
@@ -87,8 +85,5 @@ class FTScalerContext : public ScalerContext {
   FT_Int strikeIndex = -1;  // The bitmap strike for the face (or -1 if none).
   FT_Int32 loadGlyphFlags = 0;
   float backingSize = 1.0f;
-  // Mutable for const-method caching: caches glyph advances to avoid repeated FreeType lookups.
-  mutable std::shared_mutex advanceCacheLocker = {};
-  mutable std::unordered_map<uint32_t, float> advanceCache = {};
 };
 }  // namespace tgfx
