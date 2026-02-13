@@ -30,6 +30,8 @@ class MetalExternalTexture : public MetalTexture {
  protected:
   void onReleaseTexture() override {
     // External textures are not owned by TGFX, so we do not release them.
+    // Clear the reference to avoid dangling pointers.
+    texture = nil;
   }
 };
 }  // namespace tgfx
