@@ -100,7 +100,6 @@ void HairlineBufferUploadTask::assignBufferToProxy(
     const std::shared_ptr<BufferResource>& buffer,
     const std::shared_ptr<ResourceProxy>& proxy) {
   if (buffer && proxy) {
-    buffer->assignUniqueKey(proxy->uniqueKey);
     proxy->resource = buffer;
   }
 }
