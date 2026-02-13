@@ -132,6 +132,9 @@ void MetalTexture::onReleaseTexture() {
 }
 
 BackendTexture MetalTexture::getBackendTexture() const {
+  if (texture == nil || !(descriptor.usage & TextureUsage::TEXTURE_BINDING)) {
+    return {};
+  }
   MetalTextureInfo metalInfo;
   metalInfo.texture = (__bridge const void*)texture;
   metalInfo.format = static_cast<unsigned>(texture.pixelFormat);
@@ -139,6 +142,9 @@ BackendTexture MetalTexture::getBackendTexture() const {
 }
 
 BackendRenderTarget MetalTexture::getBackendRenderTarget() const {
+  if (texture == nil || !(descriptor.usage & TextureUsage::RENDER_ATTACHMENT)) {
+    return {};
+  }
   MetalTextureInfo metalInfo;
   metalInfo.texture = (__bridge const void*)texture;
   metalInfo.format = static_cast<unsigned>(texture.pixelFormat);
