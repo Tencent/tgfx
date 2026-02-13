@@ -19,9 +19,7 @@
 #pragma once
 
 #include <Metal/Metal.h>
-#include <set>
 #include <string>
-#include <vector>
 #include "tgfx/gpu/ShaderModule.h"
 #include "MetalResource.h"
 
