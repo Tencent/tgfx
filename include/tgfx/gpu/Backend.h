@@ -134,7 +134,7 @@ class BackendRenderTarget {
   }
 
   /**
-   * Creates an Metal backend render target.
+   * Creates a Metal backend render target.
    */
   BackendRenderTarget(const MetalTextureInfo& metalInfo, int width, int height)
       : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
