@@ -109,7 +109,7 @@ void MetalCaps::initLimits(id<MTLDevice> device) {
 }
 
 MetalCaps::FormatInfo MetalCaps::CheckFormat(id<MTLDevice> device, MTLPixelFormat metalFormat) {
-  FormatInfo info;
+  FormatInfo info = {};
   info.metalFormat = metalFormat;
   switch (metalFormat) {
     case MTLPixelFormatRGBA8Unorm:
