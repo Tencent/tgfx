@@ -105,7 +105,17 @@ void MetalCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
                                                                length:dataSize
                                                               options:MTLResourceStorageModeShared];
       id<MTLCommandBuffer> cmdBuffer = [commandQueue commandBuffer];
+      if (cmdBuffer == nil) {
+        LOGE("MetalCommandQueue::writeTexture() failed to create command buffer.");
+        [stagingBuffer release];
+        return;
+      }
       id<MTLBlitCommandEncoder> blitEncoder = [cmdBuffer blitCommandEncoder];
+      if (blitEncoder == nil) {
+        LOGE("MetalCommandQueue::writeTexture() failed to create blit command encoder.");
+        [stagingBuffer release];
+        return;
+      }
       
       MTLOrigin origin = MTLOriginMake(static_cast<NSUInteger>(rect.x()),
                                        static_cast<NSUInteger>(rect.y()), 0);
