@@ -243,8 +243,16 @@ class BackendSemaphore {
     return _backend;
   }
 
+  /**
+   * If the backend API is GL, copies a snapshot of the GLSyncInfo struct into the passed in
+   * pointer and returns true. Otherwise, returns false if the backend API is not GL.
+   */
   bool getGLSync(GLSyncInfo* syncInfo) const;
 
+  /**
+   * If the backend API is Metal, copies a snapshot of the MetalSemaphoreInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not Metal.
+   */
   bool getMetalSemaphore(MetalSemaphoreInfo* metalInfo) const;
 
  private:
