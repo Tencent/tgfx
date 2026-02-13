@@ -84,6 +84,9 @@ void MetalCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTextu
   auto metalDstTexture = std::static_pointer_cast<MetalTexture>(dstTexture);
   
   id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+  if (blitEncoder == nil) {
+    return;
+  }
   
   auto sourceOrigin = MakeMTLOrigin(srcRect);
   auto sourceSize = MakeMTLSize(srcRect);
@@ -116,6 +119,9 @@ void MetalCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextur
   auto metalDstBuffer = std::static_pointer_cast<MetalBuffer>(dstBuffer);
   
   id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+  if (blitEncoder == nil) {
+    return;
+  }
   
   auto sourceOrigin = MakeMTLOrigin(srcRect);
   auto sourceSize = MakeMTLSize(srcRect);
@@ -152,6 +158,9 @@ void MetalCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> tex
   }
   
   id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+  if (blitEncoder == nil) {
+    return;
+  }
   [blitEncoder generateMipmapsForTexture:metalTexture->metalTexture()];
   [blitEncoder endEncoding];
 }
