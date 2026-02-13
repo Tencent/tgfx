@@ -26,9 +26,6 @@ namespace tgfx {
 static PixelFormat ToPixelFormat(MTLPixelFormat metalFormat) {
   switch (metalFormat) {
     case MTLPixelFormatR8Unorm:
-      // Metal R8Unorm maps to both ALPHA_8 and GRAY_8, but reverse mapping can only return one.
-      // GRAY_8 information is lost here; callers wrapping external textures should provide the
-      // correct PixelFormat explicitly when the original format matters.
       return PixelFormat::ALPHA_8;
     case MTLPixelFormatRG8Unorm:
       return PixelFormat::RG_88;
