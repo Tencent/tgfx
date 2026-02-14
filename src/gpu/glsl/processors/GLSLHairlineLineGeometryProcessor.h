@@ -18,36 +18,21 @@
 
 #pragma once
 
-#include <memory>
-#include <tuple>
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Path.h"
-#include "tgfx/core/Shape.h"
+#include "gpu/processors/HairlineLineGeometryProcessor.h"
+#include "tgfx/core/Color.h"
 
 namespace tgfx {
 
-class MatrixShape;
-
-class StrokeShape;
-
-class ShapeUtils {
+class GLSLHairlineLineGeometryProcessor : public HairlineLineGeometryProcessor {
  public:
-  /**
-   * Returns the Shape adjusted for the current resolution scale.
-   * Used during rendering to decide whether to simplify the Path or apply hairline stroking,
-   * depending on the resolution scale.
-   */
-  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
+  GLSLHairlineLineGeometryProcessor(const PMColor& color, const Matrix& viewMatrix,
+                                    std::optional<Matrix> uvMatrix, float coverage, AAType aaType);
 
-  static float CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape);
+  void emitCode(EmitArgs& args) const override;
 
-  /**
-   * Returns the shape as a MatrixShape pointer, or nullptr if it is not a MatrixShape.
-   */
-  static const MatrixShape* AsMatrixShape(const Shape* shape);
-
-  static std::tuple<std::shared_ptr<StrokeShape>, Matrix> DecomposeStrokeShape(
-      std::shared_ptr<Shape> shape);
+ private:
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
+               FPCoordTransformIter* coordTransformIter) const override;
 };
 
 }  // namespace tgfx
