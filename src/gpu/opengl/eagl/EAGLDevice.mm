@@ -31,19 +31,19 @@ void ApplicationWillResignActive() {
   // Set applicationInBackground to true first to ensure that no new GL operation is generated
   // during the callback process.
   appInBackground = true;
-  std::vector<std::shared_ptr<Device>> devices = {};
+  std::vector<std::shared_ptr<EAGLDevice>> devices = {};
   {
     std::lock_guard<std::mutex> autoLock(deviceLocker);
     devices.reserve(deviceList.size());
     for (auto& device : deviceList) {
-      auto shared = device->weakThis.lock();
+      auto shared = std::static_pointer_cast<EAGLDevice>(device->weakThis.lock());
       if (shared) {
         devices.push_back(std::move(shared));
       }
     }
   }
   for (auto& device : devices) {
-    static_cast<EAGLDevice*>(device.get())->finish();
+    device->finish();
   }
 }
 
