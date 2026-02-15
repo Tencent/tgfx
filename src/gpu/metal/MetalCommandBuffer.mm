@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,22 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/FragmentShaderBuilder.h"
+#include "MetalCommandBuffer.h"
 
 namespace tgfx {
-class GLSLFragmentShaderBuilder : public FragmentShaderBuilder {
- public:
-  explicit GLSLFragmentShaderBuilder(ProgramBuilder* program);
 
-  std::string dstColor() override;
+MetalCommandBuffer::MetalCommandBuffer(id<MTLCommandBuffer> metalCommandBuffer) 
+    : commandBuffer([metalCommandBuffer retain]) {
+}
 
- private:
-  std::string colorOutputName() override;
+MetalCommandBuffer::~MetalCommandBuffer() {
+  [commandBuffer release];
+}
 
-  void declareSubpassInput();
-
-  bool subpassInputDeclared = false;
-};
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,20 +18,20 @@
 
 #pragma once
 
-#include "gpu/FragmentShaderBuilder.h"
+#include "MetalTexture.h"
 
 namespace tgfx {
-class GLSLFragmentShaderBuilder : public FragmentShaderBuilder {
+class MetalExternalTexture : public MetalTexture {
  public:
-  explicit GLSLFragmentShaderBuilder(ProgramBuilder* program);
+  MetalExternalTexture(const TextureDescriptor& descriptor, id<MTLTexture> metalTexture)
+      : MetalTexture(descriptor, metalTexture) {
+  }
 
-  std::string dstColor() override;
-
- private:
-  std::string colorOutputName() override;
-
-  void declareSubpassInput();
-
-  bool subpassInputDeclared = false;
+ protected:
+  void onReleaseTexture() override {
+    // External textures are not owned by TGFX, so we do not release them.
+    // Clear the reference to avoid dangling pointers.
+    texture = nil;
+  }
 };
 }  // namespace tgfx
