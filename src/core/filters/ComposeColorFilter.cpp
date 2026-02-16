@@ -44,6 +44,13 @@ bool ComposeColorFilter::isAlphaUnchanged() const {
   return outer->isAlphaUnchanged() && inner->isAlphaUnchanged();
 }
 
+bool ComposeColorFilter::affectsTransparentBlack() const {
+  // If inner affects transparent black, its output is no longer transparent, so outer will likely
+  // produce a non-transparent result too. If only outer affects transparent black, the inner's
+  // transparent output will be changed by outer.
+  return inner->affectsTransparentBlack() || outer->affectsTransparentBlack();
+}
+
 bool ComposeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   auto type = Types::Get(colorFilter);
   if (type != Types::ColorFilterType::Compose) {

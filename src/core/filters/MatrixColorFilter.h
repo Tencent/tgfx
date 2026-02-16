@@ -29,6 +29,8 @@ class MatrixColorFilter : public ColorFilter {
     return alphaIsUnchanged;
   }
 
+  bool affectsTransparentBlack() const override;
+
   std::array<float, 20> matrix;
   bool alphaIsUnchanged;
 

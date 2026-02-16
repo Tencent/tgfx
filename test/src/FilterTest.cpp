@@ -944,4 +944,161 @@ TGFX_TEST(FilterTest, ReverseFilterBounds) {
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ReverseFilterBounds_dropShadow"));
 }
 
+TGFX_TEST(FilterTest, AffectsTransparentBlack) {
+  // ModeColorFilter: modes that do NOT affect transparent black
+  EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::SrcIn)->affectsTransparentBlack());
+  // Blend(Red, DstIn) returns nullptr because alpha=1 DstIn is a no-op (result = dst * 1 = dst).
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::DstIn) == nullptr);
+  EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::DstOut)->affectsTransparentBlack());
+  EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::SrcATop)->affectsTransparentBlack());
+  EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::Modulate)->affectsTransparentBlack());
+
+  // ModeColorFilter: modes that DO affect transparent black
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Src)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::White(), BlendMode::SrcOver)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::White(), BlendMode::Screen)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::DstOver)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::SrcOut)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::DstATop)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Xor)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::PlusLighter)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Overlay)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Multiply)->affectsTransparentBlack());
+
+  // ModeColorFilter: transparent color never affects transparent black
+  auto transparentFilter = ColorFilter::Blend(Color::Transparent(), BlendMode::Screen);
+  // Blend() with alpha=0 and SrcOver converts to Dst, which is a no-op and returns nullptr.
+  // Screen with transparent color: src=(0,0,0,0), dst=(0,0,0,0) → 0, not affected.
+  EXPECT_TRUE(transparentFilter == nullptr ||
+              !transparentFilter->affectsTransparentBlack());
+
+  // MatrixColorFilter: no alpha offset → false
+  std::array<float, 20> identityMatrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                                           0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
+  EXPECT_FALSE(ColorFilter::Matrix(identityMatrix)->affectsTransparentBlack());
+
+  // MatrixColorFilter: positive alpha offset → true
+  std::array<float, 20> alphaOffsetMatrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                                              0, 0, 1, 0, 0, 0, 0, 0, 1, 0.5f};
+  EXPECT_TRUE(ColorFilter::Matrix(alphaOffsetMatrix)->affectsTransparentBlack());
+
+  // MatrixColorFilter: RGB offset only (no alpha offset) → false (premultiply makes rgb 0)
+  std::array<float, 20> rgbOffsetMatrix = {1, 0, 0, 0, 0.5f, 0, 1, 0, 0, 0,
+                                            0, 0, 1, 0, 0,    0, 0, 0, 1, 0};
+  EXPECT_FALSE(ColorFilter::Matrix(rgbOffsetMatrix)->affectsTransparentBlack());
+
+  // AlphaThresholdColorFilter
+  EXPECT_TRUE(ColorFilter::AlphaThreshold(0.0f)->affectsTransparentBlack());
+  EXPECT_FALSE(ColorFilter::AlphaThreshold(0.5f)->affectsTransparentBlack());
+
+  // LumaColorFilter
+  EXPECT_FALSE(ColorFilter::Luma()->affectsTransparentBlack());
+
+  // ComposeColorFilter
+  auto innerSafe = ColorFilter::Blend(Color::Red(), BlendMode::SrcIn);
+  auto outerUnsafe = ColorFilter::Blend(Color::White(), BlendMode::Screen);
+  EXPECT_TRUE(ColorFilter::Compose(innerSafe, outerUnsafe)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Compose(outerUnsafe, innerSafe)->affectsTransparentBlack());
+  EXPECT_FALSE(ColorFilter::Compose(innerSafe, innerSafe)->affectsTransparentBlack());
+}
+
+TGFX_TEST(FilterTest, ColorImageFilterTransparent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto width = image->width() + 100;
+  auto height = image->height() + 100;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+
+  // Apply Screen(Red) as ImageFilter::ColorFilter - affects transparent black.
+  // Transparent regions should remain transparent.
+  auto screenFilter =
+      ImageFilter::ColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Screen));
+  auto filteredImage = image->makeWithFilter(screenFilter);
+  ASSERT_TRUE(filteredImage != nullptr);
+  canvas->drawImage(filteredImage, 50, 50);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ColorImageFilterTransparent_Screen"));
+  canvas->clear();
+
+  // Apply Multiply(Red) as ImageFilter::ColorFilter - does NOT affect transparent black.
+  auto multiplyFilter =
+      ImageFilter::ColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Modulate));
+  filteredImage = image->makeWithFilter(multiplyFilter);
+  ASSERT_TRUE(filteredImage != nullptr);
+  canvas->drawImage(filteredImage, 50, 50);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ColorImageFilterTransparent_Modulate"));
+}
+
+TGFX_TEST(FilterTest, ColorFilterShaderTransparent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto width = image->width() + 100;
+  auto height = image->height() + 100;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+
+  // ImageShader + makeWithColorFilter(Screen(Red))
+  // Transparent regions should remain transparent.
+  auto shader = Shader::MakeImageShader(image);
+  ASSERT_TRUE(shader != nullptr);
+  auto coloredShader =
+      shader->makeWithColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Screen));
+  ASSERT_TRUE(coloredShader != nullptr);
+  Paint paint;
+  paint.setShader(coloredShader);
+  canvas->translate(50, 50);
+  canvas->drawRect(
+      Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())),
+      paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ColorFilterShaderTransparent"));
+}
+
+TGFX_TEST(FilterTest, BrushColorFilterTransparent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto width = image->width() + 100;
+  auto height = image->height() + 100;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+
+  // Brush with ImageShader + ColorFilter(Screen(Red))
+  // Transparent regions should remain transparent.
+  auto shader = Shader::MakeImageShader(image);
+  ASSERT_TRUE(shader != nullptr);
+  Paint paint;
+  paint.setShader(shader);
+  paint.setColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Screen));
+  canvas->translate(50, 50);
+  canvas->drawRect(
+      Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())),
+      paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/BrushColorFilterTransparent"));
+}
+
+TGFX_TEST(FilterTest, AlphaThresholdZero) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+
+  // Draw a half-transparent rect with AlphaThreshold(0).
+  // The threshold=0 with step(0,0)=1 bug would make transparent pixels opaque.
+  // After fix, transparent pixels should remain transparent.
+  Paint paint;
+  paint.setColor(Color::FromRGBA(255, 0, 0, 128));
+  paint.setColorFilter(ColorFilter::AlphaThreshold(0.0f));
+  canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/AlphaThresholdZero"));
+}
+
 }  // namespace tgfx
