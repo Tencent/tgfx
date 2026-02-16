@@ -947,7 +947,8 @@ TGFX_TEST(FilterTest, ReverseFilterBounds) {
 TGFX_TEST(FilterTest, AffectsTransparentBlack) {
   // ModeColorFilter: modes that do NOT affect transparent black
   EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::SrcIn)->affectsTransparentBlack());
-  EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::DstIn)->affectsTransparentBlack());
+  // Blend(Red, DstIn) returns nullptr because alpha=1 DstIn is a no-op (result = dst * 1 = dst).
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::DstIn) == nullptr);
   EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::DstOut)->affectsTransparentBlack());
   EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::SrcATop)->affectsTransparentBlack());
   EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::Modulate)->affectsTransparentBlack());
