@@ -92,7 +92,7 @@
       },
       {
         "url": "https://github.com/KhronosGroup/SPIRV-Cross.git",
-        "commit": "vulkan-sdk-1.4.304.1",
+        "commit": "ebe2aa0cd80f5eb5cd8a605da604cacf72205f3b",
         "dir": "third_party/SPIRV-Cross"
       }
     ]
