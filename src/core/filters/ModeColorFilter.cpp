@@ -95,7 +95,7 @@ bool ModeColorFilter::affectsTransparentBlack() const {
     case BlendMode::Modulate:
       return false;
     default:
-      return color.alpha > 0.0f || color.red > 0.0f || color.green > 0.0f || color.blue > 0.0f;
+      return color.alpha > 0.0f;
   }
 }
 }  // namespace tgfx
