@@ -47,6 +47,11 @@ PlacementPtr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
   }
   auto composed = ComposeFragmentProcessor::Make(allocator, std::move(imageProcessor),
                                                  std::move(colorProcessor));
+  if (!filter->affectsTransparentBlack()) {
+    return composed;
+  }
+  // The color filter transforms transparent pixels into non-transparent ones. Use the original
+  // image alpha as a mask to prevent coloring transparent regions.
   auto alphaSource = FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       allocator, std::move(composed), std::move(alphaSource), BlendMode::SrcIn);
