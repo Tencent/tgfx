@@ -91,13 +91,6 @@ class ColorFilter {
     return false;
   }
 
-  /**
-   * Returns true if this color filter transforms transparent black into a non-transparent color.
-   */
-  virtual bool affectsTransparentBlack() const {
-    return false;
-  }
-
   /** 
    * If the filter can be represented by a source color plus Mode, this returns true, and sets (if
    * not NULL) the color and mode appropriately.If not, this returns false and ignores the
@@ -109,6 +102,13 @@ class ColorFilter {
 
  protected:
   enum class Type { Blend, Matrix, AlphaThreshold, Compose, Luma };
+
+  /**
+   * Returns true if this color filter transforms transparent black into a non-transparent color.
+   */
+  virtual bool affectsTransparentBlack() const {
+    return false;
+  }
 
   /**
    * Returns the type of this color filter.
