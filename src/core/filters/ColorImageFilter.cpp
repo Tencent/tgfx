@@ -19,6 +19,7 @@
 #include "ColorImageFilter.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
@@ -40,9 +41,14 @@ PlacementPtr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
     return nullptr;
   }
   auto allocator = args.context->drawingAllocator();
-  auto processor = ComposeFragmentProcessor::Make(
-      allocator, std::move(imageProcessor),
-      filter->asFragmentProcessor(args.context, source->colorSpace()));
-  return FragmentProcessor::MulChildByInputAlpha(allocator, std::move(processor));
+  auto colorProcessor = filter->asFragmentProcessor(args.context, source->colorSpace());
+  if (colorProcessor == nullptr) {
+    return imageProcessor;
+  }
+  auto composed = ComposeFragmentProcessor::Make(allocator, std::move(imageProcessor),
+                                                 std::move(colorProcessor));
+  auto alphaSource = FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
+  return XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      allocator, std::move(composed), std::move(alphaSource), BlendMode::SrcIn);
 }
 }  // namespace tgfx
