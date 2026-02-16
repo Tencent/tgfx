@@ -1013,10 +1013,10 @@ TGFX_TEST(FilterTest, ColorImageFilterTransparent) {
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
 
-  // Apply Screen(White) as ImageFilter::ColorFilter - affects transparent black.
+  // Apply Screen(Red) as ImageFilter::ColorFilter - affects transparent black.
   // Transparent regions should remain transparent.
   auto screenFilter =
-      ImageFilter::ColorFilter(ColorFilter::Blend(Color::White(), BlendMode::Screen));
+      ImageFilter::ColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Screen));
   auto filteredImage = image->makeWithFilter(screenFilter);
   ASSERT_TRUE(filteredImage != nullptr);
   canvas->drawImage(filteredImage, 50, 50);
@@ -1043,18 +1043,19 @@ TGFX_TEST(FilterTest, ColorFilterShaderTransparent) {
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
 
-  // ImageShader + makeWithColorFilter(Screen(White))
+  // ImageShader + makeWithColorFilter(Screen(Red))
   // Transparent regions should remain transparent.
   auto shader = Shader::MakeImageShader(image);
   ASSERT_TRUE(shader != nullptr);
   auto coloredShader =
-      shader->makeWithColorFilter(ColorFilter::Blend(Color::White(), BlendMode::Screen));
+      shader->makeWithColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Screen));
   ASSERT_TRUE(coloredShader != nullptr);
   Paint paint;
   paint.setShader(coloredShader);
-  canvas->drawRect(Rect::MakeXYWH(50.f, 50.f, static_cast<float>(image->width()),
-                                   static_cast<float>(image->height())),
-                   paint);
+  canvas->translate(50, 50);
+  canvas->drawRect(
+      Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())),
+      paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ColorFilterShaderTransparent"));
 }
 
@@ -1069,13 +1070,13 @@ TGFX_TEST(FilterTest, BrushColorFilterTransparent) {
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
 
-  // Brush with ImageShader + ColorFilter(Screen(White))
+  // Brush with ImageShader + ColorFilter(Screen(Red))
   // Transparent regions should remain transparent.
   auto shader = Shader::MakeImageShader(image);
   ASSERT_TRUE(shader != nullptr);
   Paint paint;
   paint.setShader(shader);
-  paint.setColorFilter(ColorFilter::Blend(Color::White(), BlendMode::Screen));
+  paint.setColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Screen));
   canvas->translate(50, 50);
   canvas->drawRect(
       Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())),
