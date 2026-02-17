@@ -310,20 +310,12 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
   float underlineThickness;
   float underlinePosition;
   if (face->face_flags & FT_FACE_FLAG_SCALABLE) {  // scalable outline font
-    // FreeType will always use HHEA metrics if they're not zero.
-    // It completely ignores the OS/2 fsSelection::UseTypoMetrics bit.
-    // It also ignores the VDMX tables, which are also of interest here
-    // (and override everything else when they apply).
-    static const int UseTypoMetricsMask = (1 << 7);
-    if (os2 && os2->version != 0xFFFF && (os2->fsSelection & UseTypoMetricsMask)) {
-      ascent = -static_cast<float>(os2->sTypoAscender) / upem;
-      descent = -static_cast<float>(os2->sTypoDescender) / upem;
-      leading = static_cast<float>(os2->sTypoLineGap) / upem;
-    } else {
-      ascent = -static_cast<float>(face->ascender) / upem;
-      descent = -static_cast<float>(face->descender) / upem;
-      leading = static_cast<float>(face->height + (face->descender - face->ascender)) / upem;
-    }
+    // FreeType 2.13+ automatically respects the OS/2 fsSelection::UseTypoMetrics bit in
+    // sfnt_load_face(), overwriting face->ascender/descender/height with OS/2 Typo values
+    // when the flag is set. So we can always use face->ascender/descender/height directly.
+    ascent = -static_cast<float>(face->ascender) / upem;
+    descent = -static_cast<float>(face->descender) / upem;
+    leading = static_cast<float>(face->height + (face->descender - face->ascender)) / upem;
     xmin = static_cast<float>(face->bbox.xMin) / upem;
     xmax = static_cast<float>(face->bbox.xMax) / upem;
     ymin = -static_cast<float>(face->bbox.yMin) / upem;
