@@ -94,7 +94,16 @@ void GLRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   }
   renderPipeline = std::static_pointer_cast<GLRenderPipeline>(pipeline);
   if (renderPipeline != nullptr) {
-    DEBUG_ASSERT(renderPipeline->multisampleCount() == descriptor.colorAttachments[0].texture->sampleCount());
+    auto pipelineSampleCount = renderPipeline->multisampleCount();
+    auto textureSampleCount = descriptor.colorAttachments[0].texture->sampleCount();
+    if (pipelineSampleCount != textureSampleCount) {
+      LOGE(
+          "GLRenderPass::setPipeline() The pipeline's multisample count (%d) does not match the "
+          "render target's sample count (%d). Please ensure the RenderPipelineDescriptor's "
+          "multisample.count is set to match the target texture's sample count.",
+          pipelineSampleCount, textureSampleCount);
+    }
+    DEBUG_ASSERT(pipelineSampleCount == textureSampleCount);
     auto& attachment = descriptor.depthStencilAttachment;
     renderPipeline->activate(_gpu, attachment.depthReadOnly, attachment.stencilReadOnly,
                              stencilReference);
