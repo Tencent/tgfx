@@ -95,5 +95,6 @@ class FTScalerContext : public ScalerContext {
   // ignores vmtx even when present, so we read it ourselves.
   std::vector<FT_UShort> vertAdvanceCache = {};
   FT_UShort fallbackVertAdvance = 0;
+  bool hasVerticalMetrics = false;
 };
 }  // namespace tgfx
