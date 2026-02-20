@@ -483,10 +483,11 @@
     "TextRenderTest": {
         "AxisAlignedRotationRender": "484bda47",
         "ShapeMakeFromMixedTextBlob": "bf48e614",
-        "TextBlobMixedPositioning": "484bda47",
+        "TextBlobMixedPositioning": "977dbf19",
         "TextBlobPositioningRender": "484bda47",
         "TextBlobWithStroke": "484bda47",
         "TextBlobWithTransform": "5138bfde",
+        "VerticalTextWithEmoji": "977dbf19",
         "complexEmojiTextBlending": "bf48e614",
         "emojiTextStrokeBlending": "bf48e614",
         "textEmojiMixedBlendModes": "bf48e614",
