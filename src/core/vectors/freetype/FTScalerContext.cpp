@@ -753,6 +753,9 @@ float FTScalerContext::getVertAdvanceForGlyph(GlyphID glyphID) const {
   auto face = ftTypeface()->face;
   auto ppem = static_cast<float>(face->size->metrics.y_ppem);
   auto upem = static_cast<float>(ftTypeface()->unitsPerEmInternal());
+  if (upem == 0.0f) {
+    return 0;
+  }
   // Convert font units to pixels at the bitmap strike's ppem, then apply extraScale to match the
   // requested text size. This mirrors how FreeType scales horizontal advances for bitmap fonts.
   return advanceFUnits * ppem / upem * extraScale.y;
