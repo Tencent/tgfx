@@ -27,8 +27,8 @@ cmake --build cmake-build-debug --target TGFXFullTest
     - 其他情况：正常比较基准图，基准图不存在或不匹配则测试失败
 
 **!! IMPORTANT - 截图基准变更限制**：
-- **NEVER** 自动接受截图基准变更，包括禁止自动运行 `UpdateBaseline` target、禁止修改或覆盖 `version.json` 文件
-- 必须经过用户确认后运行 `accept_baseline.sh` 脚本来接受变更
+- **NEVER** 自动接受截图基准变更，包括禁止自动运行 `accept_baseline.sh`、`UpdateBaseline` target、禁止修改或覆盖 `version.json` 文件
+- **必须先向用户展示截图并获得明确确认**，确认后才可运行 `bash accept_baseline.sh`，**禁止**将脚本内容展开手动逐步执行
 
 ### 截图构造规范
 
