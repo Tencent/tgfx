@@ -1193,7 +1193,7 @@ TGFX_TEST(TextRenderTest, TextBlobMixedPositioning) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 285, 139);
+  auto surface = Surface::Make(context, 320, 139);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -1207,8 +1207,8 @@ TGFX_TEST(TextRenderTest, TextBlobMixedPositioning) {
   Font font(typeface, 36.0f);
   Font emojiFont(emojiTypeface, 36.0f);
 
-  auto glyphH = font.getGlyphID('H');
-  auto glyphI = font.getGlyphID('i');
+  auto glyphNi = font.getGlyphID(0x4F60);   // 你
+  auto glyphHao = font.getGlyphID(0x597D);  // 好
   auto glyphEmoji = emojiFont.getGlyphID(0x1F44B);  // 👋
   auto glyphW = font.getGlyphID('W');
   auto glyphO = font.getGlyphID('o');
@@ -1220,13 +1220,13 @@ TGFX_TEST(TextRenderTest, TextBlobMixedPositioning) {
   float x = 47.0f;
   float y = 83.0f;
 
-  // Run 1: "Hi" with horizontal positioning
+  // Run 1: "你好" with horizontal positioning
   const auto& buffer1 = builder.allocRunPosH(font, 2, y);
-  buffer1.glyphs[0] = glyphH;
-  buffer1.glyphs[1] = glyphI;
+  buffer1.glyphs[0] = glyphNi;
+  buffer1.glyphs[1] = glyphHao;
   buffer1.positions[0] = x;
-  buffer1.positions[1] = x + font.getAdvance(glyphH);
-  x += font.getAdvance(glyphH) + font.getAdvance(glyphI) + 5.0f;
+  buffer1.positions[1] = x + font.getAdvance(glyphNi);
+  x += font.getAdvance(glyphNi) + font.getAdvance(glyphHao) + 5.0f;
 
   // Run 2: Emoji with point positioning
   const auto& buffer2 = builder.allocRunPos(emojiFont, 1);
@@ -1708,68 +1708,78 @@ TGFX_TEST(TextRenderTest, VerticalTextWithEmoji) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto cjkTypeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
-  ASSERT_TRUE(cjkTypeface != nullptr);
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
   auto emojiTypeface = MakeTypeface("resources/font/NotoColorEmoji.ttf");
   ASSERT_TRUE(emojiTypeface != nullptr);
 
-  auto fontSize = 100.0f;
-  Font cjkFont(cjkTypeface, fontSize);
+  auto fontSize = 36.0f;
+  Font font(typeface, fontSize);
   Font emojiFont(emojiTypeface, fontSize);
 
-  // Build vertical text: "H" (Latin, rotated) + "3" (digit, rotated) + "你" (CJK, upright) +
-  // "😀" (Emoji, upright). Surface height is derived from the sum of all vertical advances, so an
-  // incorrect emoji vertical advance would cause the content to overflow.
-  std::string text = "H3\xE4\xBD\xA0\xF0\x9F\x98\x80";  // "H3你😀"
+  // Vertical layout of "你好👋World" — Latin rotated 90°, CJK and emoji upright.
+  // Surface height is derived from the sum of all vertical advances, so an incorrect emoji
+  // vertical advance would cause the content to overflow or leave excessive gaps.
+  struct GlyphInfo {
+    Unichar unichar = 0;
+    bool isEmoji = false;
+    bool isCJK = false;
+  };
+  std::vector<GlyphInfo> chars = {
+      {0x4F60, false, true},   // 你
+      {0x597D, false, true},   // 好
+      {0x1F44B, true, false},  // 👋
+      {'W', false, false},     {'o', false, false}, {'r', false, false},
+      {'l', false, false},     {'d', false, false},
+  };
+
+  auto metrics = font.getMetrics();
+  // Per CSS Writing Modes: after 90° rotation, center the glyph using the midpoint of ascent and
+  // descent relative to the vertical midline.
+  auto ascentDescentCenter = (metrics.ascent + metrics.descent) / 2;
+  float midlineX = fontSize / 2;
   float margin = 50.0f;
   float currentY = margin;
+  float maxWidth = fontSize;
 
   struct GlyphEntry {
     std::shared_ptr<TextBlob> blob = nullptr;
+    float xPosition = 0.0f;
     float yPosition = 0.0f;
   };
   std::vector<GlyphEntry> entries = {};
 
-  auto cjkMetrics = cjkFont.getMetrics();
-  auto centerOffset = std::round((cjkMetrics.capHeight + cjkMetrics.xHeight) / 4);
-  float maxWidth = fontSize;
-
-  const char* textPtr = text.c_str();
-  const char* textEnd = textPtr + text.size();
-  while (textPtr < textEnd) {
-    auto unichar = UTF::NextUTF8(&textPtr, textEnd);
-    if (unichar < 0) {
-      break;
-    }
-    bool isEmoji = unichar >= 0x1F000;
-    bool isCJK = unichar >= 0x4E00 && unichar <= 0x9FFF;
-    auto& font = isEmoji ? emojiFont : cjkFont;
-    auto glyphID = font.getGlyphID(unichar);
+  for (const auto& ch : chars) {
+    auto& f = (ch.isEmoji) ? emojiFont : font;
+    auto glyphID = f.getGlyphID(ch.unichar);
     ASSERT_NE(glyphID, static_cast<GlyphID>(0));
 
     GlyphEntry entry;
     entry.yPosition = currentY;
 
-    if (isCJK || isEmoji) {
-      auto verticalOffset = font.getVerticalOffset(glyphID);
-      auto verticalAdvance = font.getAdvance(glyphID, true);
-      auto horizontalAdvance = font.getAdvance(glyphID, false);
+    if (ch.isCJK || ch.isEmoji) {
+      auto verticalOffset = f.getVerticalOffset(glyphID);
+      auto verticalAdvance = f.getAdvance(glyphID, true);
+      auto horizontalAdvance = f.getAdvance(glyphID, false);
       if (horizontalAdvance > maxWidth) {
         maxWidth = horizontalAdvance;
       }
       TextBlobBuilder builder;
-      auto buffer = builder.allocRun(font, 1, verticalOffset.x, verticalOffset.y);
+      auto buffer = builder.allocRun(f, 1, verticalOffset.x, verticalOffset.y);
       buffer.glyphs[0] = glyphID;
       entry.blob = builder.build();
+      entry.xPosition = midlineX;
       currentY += verticalAdvance;
     } else {
-      auto horizontalAdvance = font.getAdvance(glyphID, false);
+      auto horizontalAdvance = f.getAdvance(glyphID, false);
+      auto tx = midlineX + ascentDescentCenter;
       TextBlobBuilder builder;
-      auto buffer = builder.allocRunRSXform(font, 1);
+      auto buffer = builder.allocRunRSXform(f, 1);
       buffer.glyphs[0] = glyphID;
       auto* xform = reinterpret_cast<RSXform*>(buffer.positions);
-      xform[0] = RSXform::Make(0, 1, 0, 0);
+      xform[0] = RSXform::Make(0, 1, tx, 0);
       entry.blob = builder.build();
+      entry.xPosition = 0;
       currentY += horizontalAdvance;
     }
     entries.push_back(entry);
@@ -1783,10 +1793,9 @@ TGFX_TEST(TextRenderTest, VerticalTextWithEmoji) {
 
   Paint paint;
   paint.setColor(Color::Black());
-  auto drawX = std::round((static_cast<float>(surfaceWidth) - maxWidth) / 2) + centerOffset;
   for (const auto& entry : entries) {
     if (entry.blob != nullptr) {
-      canvas->drawTextBlob(entry.blob, drawX, entry.yPosition, paint);
+      canvas->drawTextBlob(entry.blob, margin + entry.xPosition, entry.yPosition, paint);
     }
   }
 
