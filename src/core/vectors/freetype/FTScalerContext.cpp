@@ -681,7 +681,16 @@ float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) co
   if (err != FT_Err_Ok) {
     return 0;
   }
-  return verticalText ? FDot6ToFloat(face->glyph->advance.y) : FDot6ToFloat(face->glyph->advance.x);
+  if (verticalText) {
+    auto vertAdvance = FDot6ToFloat(face->glyph->advance.y);
+    if (vertAdvance == 0) {
+      // Some bitmap fonts (e.g. CBDT/CBLC) have a vhea table but their sbit metrics contain
+      // zero vertAdvance. Reload without vertical layout to get horizontal advance as fallback.
+      return getAdvanceInternal(glyphID, false);
+    }
+    return vertAdvance;
+  }
+  return FDot6ToFloat(face->glyph->advance.x);
 }
 
 Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
@@ -696,6 +705,14 @@ Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
     return {};
   }
   auto& glyphMetrics = face->glyph->metrics;
+  if (glyphMetrics.vertAdvance == 0) {
+    // Some bitmap fonts (e.g. CBDT/CBLC) report zero vertical metrics even when a vhea table
+    // is present. Synthesize a vertical offset consistent with WebScalerContext.
+    auto hAdv = getAdvanceInternal(glyphID, false);
+    FontMetrics metrics = {};
+    getFontMetricsInternal(&metrics);
+    return {-hAdv * 0.5f, metrics.capHeight};
+  }
   auto offsetX = FDot6ToFloat(glyphMetrics.vertBearingX) - FDot6ToFloat(glyphMetrics.horiBearingX);
   auto offsetY = FDot6ToFloat(glyphMetrics.horiBearingY) + FDot6ToFloat(glyphMetrics.vertBearingY);
   return {offsetX, offsetY};
