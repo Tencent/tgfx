@@ -248,6 +248,7 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, float size)
     loadGlyphFlags &= ~FT_LOAD_NO_BITMAP;
 
     backingSize = FDot6ToFloat(face->available_sizes[strikeIndex].y_ppem);
+    loadVerticalMetrics();
   }
 }
 
@@ -683,14 +684,70 @@ float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) co
   }
   if (verticalText) {
     auto vertAdvance = FDot6ToFloat(face->glyph->advance.y);
-    if (vertAdvance == 0) {
-      // Some bitmap fonts (e.g. CBDT/CBLC) have a vhea table but their sbit metrics contain
-      // zero vertAdvance. Reload without vertical layout to get horizontal advance as fallback.
-      return getAdvanceInternal(glyphID, false);
+    if (vertAdvance == 0 && strikeIndex != -1) {
+      // FreeType's CBDT/CBLC sbit path does not read vmtx for vertical advance even when the
+      // table is present. Retrieve the correct value from our cached vertical metrics.
+      return getVertAdvanceForGlyph(glyphID);
     }
     return vertAdvance;
   }
   return FDot6ToFloat(face->glyph->advance.x);
+}
+
+void FTScalerContext::loadVerticalMetrics() {
+  auto face = ftTypeface()->face;
+  // Try to read vmtx table. FT_Get_Sfnt_Table returns non-null for FT_SFNT_VHEA only when both
+  // vhea and vmtx tables are successfully loaded (i.e. face->vertical_info is set).
+  auto vhea = static_cast<TT_VertHeader*>(FT_Get_Sfnt_Table(face, FT_SFNT_VHEA));
+  if (vhea != nullptr && vhea->number_Of_VMetrics > 0) {
+    FT_ULong vmtxLength = 0;
+    auto tag = FT_MAKE_TAG('v', 'm', 't', 'x');
+    if (FT_Load_Sfnt_Table(face, tag, 0, nullptr, &vmtxLength) == 0 && vmtxLength > 0) {
+      std::vector<FT_Byte> vmtxData(vmtxLength);
+      if (FT_Load_Sfnt_Table(face, tag, 0, vmtxData.data(), &vmtxLength) == 0) {
+        auto numLong = static_cast<size_t>(vhea->number_Of_VMetrics);
+        vertAdvanceCache.resize(numLong);
+        for (size_t i = 0; i < numLong && (i * 4 + 1) < vmtxLength; ++i) {
+          vertAdvanceCache[i] =
+              static_cast<FT_UShort>((vmtxData[i * 4] << 8) | vmtxData[i * 4 + 1]);
+        }
+        return;
+      }
+    }
+  }
+  // No vmtx table available. Synthesize a global vertical advance from OS/2 or hhea, matching
+  // the fallback logic in FreeType's TT_Get_VMetrics (ttgload.c).
+  auto os2 = static_cast<TT_OS2*>(FT_Get_Sfnt_Table(face, FT_SFNT_OS2));
+  if (os2 != nullptr && os2->version != 0xFFFFU) {
+    fallbackVertAdvance =
+        static_cast<FT_UShort>(std::abs(os2->sTypoAscender - os2->sTypoDescender));
+  } else {
+    auto hhea = static_cast<TT_HoriHeader*>(FT_Get_Sfnt_Table(face, FT_SFNT_HHEA));
+    if (hhea != nullptr) {
+      fallbackVertAdvance =
+          static_cast<FT_UShort>(std::abs(hhea->Ascender - hhea->Descender));
+    }
+  }
+}
+
+float FTScalerContext::getVertAdvanceForGlyph(GlyphID glyphID) const {
+  FT_UShort advanceFUnits = 0;
+  if (!vertAdvanceCache.empty()) {
+    auto index = static_cast<size_t>(glyphID);
+    if (index >= vertAdvanceCache.size()) {
+      index = vertAdvanceCache.size() - 1;
+    }
+    advanceFUnits = vertAdvanceCache[index];
+  } else {
+    advanceFUnits = fallbackVertAdvance;
+  }
+  if (advanceFUnits == 0) {
+    return 0;
+  }
+  auto face = ftTypeface()->face;
+  auto ppem = static_cast<float>(face->size->metrics.y_ppem);
+  auto upem = static_cast<float>(ftTypeface()->unitsPerEmInternal());
+  return advanceFUnits * ppem / upem;
 }
 
 Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
@@ -705,10 +762,10 @@ Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
     return {};
   }
   auto& glyphMetrics = face->glyph->metrics;
-  if (glyphMetrics.vertAdvance == 0) {
-    // Some bitmap fonts (e.g. CBDT/CBLC) report zero vertical metrics even when a vhea table
-    // is present. Synthesize a vertical offset consistent with WebScalerContext.
-    auto hAdv = getAdvanceInternal(glyphID, false);
+  if (glyphMetrics.vertAdvance == 0 && strikeIndex != -1) {
+    // FreeType's CBDT/CBLC sbit path does not populate vertical bearing metrics either.
+    // Synthesize a vertical offset consistent with WebScalerContext.
+    auto hAdv = FDot6ToFloat(face->glyph->advance.x);
     FontMetrics metrics = {};
     getFontMetricsInternal(&metrics);
     return {-hAdv * 0.5f, metrics.capHeight};
