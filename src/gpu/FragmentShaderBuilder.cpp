@@ -28,7 +28,8 @@ FragmentShaderBuilder::FragmentShaderBuilder(ProgramBuilder* program) : ShaderBu
 void FragmentShaderBuilder::declareCustomOutputColor() {
   auto typeModifier = ShaderVar::TypeModifier::Out;
   auto shaderCaps = programBuilder->getContext()->shaderCaps();
-  if (shaderCaps->frameBufferFetchSupport && shaderCaps->frameBufferFetchNeedsCustomOutput &&
+  if ((features & PrivateFeature::FramebufferFetch) &&
+      shaderCaps->frameBufferFetchNeedsCustomOutput &&
       !shaderCaps->frameBufferFetchUsesSubpassInput) {
     typeModifier = ShaderVar::TypeModifier::InOut;
   }
