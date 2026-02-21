@@ -5,9 +5,10 @@ alwaysApply: true
 
 ## 编译验证
 
-修改代码后，使用以下命令验证编译。必须传递 `-DTGFX_BUILD_TESTS=ON` 以启用所有模块（layers、svg、pdf 等）。
+修改代码后，使用以下命令验证编译。编译前先运行代码格式化（忽略报错），只要运行就会生效。必须传递 `-DTGFX_BUILD_TESTS=ON` 以启用所有模块（layers、svg、pdf 等）。
 
 ```bash
+./codeformat.sh 2>/dev/null; true
 cmake -G Ninja -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
 cmake --build cmake-build-debug --target TGFXFullTest
 ```
