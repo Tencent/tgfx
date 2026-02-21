@@ -1,7 +1,7 @@
 # Judgment Matrix
 
 Team-lead uses this matrix in Phase 4 to decide whether each confirmed issue should be
-auto-fixed, recorded to `pending-issues.md` for user confirmation, or skipped entirely.
+auto-fixed, recorded to `PENDING_FILE` for user confirmation, or skipped entirely.
 
 ## Risk Level Assessment
 
@@ -36,6 +36,10 @@ low risk.
 | Low only       | Auto-fix | Confirm     | Confirm   |
 | All confirm    | Confirm  | Confirm     | Confirm   |
 
+**Special rule for "Full auto"**: issues that would change test baselines (screenshot
+comparisons, golden files) are always deferred for user confirmation, regardless of
+risk level.
+
 ## Code Modules
 
 The "Criteria" column below determines whether an issue is worth fixing. The risk level
@@ -60,7 +64,7 @@ while a logic bug requiring cross-module restructuring is high risk.
 | Full-library import when partial suffices | Fix when tree-shaking is clearly ineffective `[Web]` |
 | Code simplification | Fix when logic can be clearly simplified (early return, branch merge, etc.) |
 | Duplicate code extraction | Fix when >= 3 identical patterns |
-| Container pre-allocation | Fix when size is predictable **and** on a hot path |
+| Container pre-allocation | Fix when size is predictable (e.g., loop count known, input size available) |
 | Architecture improvement | Fix only when dependency direction or responsibility division is clearly wrong |
 | Interface usage | Fix when API is used against its design intent |
 | Rendering correctness (stale key / stale closure / wrong deps) | Fix when it causes incorrect UI behavior `[Web]` |
