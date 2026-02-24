@@ -25,18 +25,6 @@ Auto-fix is not available in PR mode.
 > reads, diffs, and context exploration MUST be performed against local
 > files. Violating this rule invalidates the entire review.
 
-### Clean up leftover worktrees
-
-Check for and remove leftover worktree directories from previous sessions:
-```
-ls -d /tmp/pr-review-* 2>/dev/null
-```
-If any exist, clean up each one:
-```
-git worktree remove /tmp/pr-review-{N} 2>/dev/null
-git branch -D pr-{N} 2>/dev/null
-```
-
 ### Validate PR and fetch metadata
 
 If `$ARGUMENTS` is a URL, extract the PR number from it for use in subsequent
@@ -62,10 +50,15 @@ that case, use the current directory and record `REVIEW_DIR` as the current
 directory, then skip the rest of this subsection.
 
 Otherwise:
-- Clean up any existing worktree for this PR number:
+- Clean up leftover worktrees from previous sessions and any existing worktree
+  for this PR number:
   ```
-  git worktree remove /tmp/pr-review-{number} 2>/dev/null
-  git branch -D pr-{number} 2>/dev/null
+  for dir in /tmp/pr-review-*; do
+      [ -d "$dir" ] || continue
+      n=$(basename "$dir" | sed 's/pr-review-//')
+      git worktree remove "$dir" 2>/dev/null
+      git branch -D "pr-${n}" 2>/dev/null
+  done
   ```
 - Create a fresh worktree:
   ```
