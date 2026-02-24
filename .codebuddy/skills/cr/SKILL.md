@@ -6,10 +6,10 @@ description: Automated code review and fix for local branches, PRs, commits, and
 # /cr — Code Review
 
 Automated code review for local branches, PRs, commits, and files. Detects
-review mode from arguments, asks the user about review priority and auto-fix
-preferences, then routes to the appropriate review flow. Supports multi-round
-iteration — each round discovers issues, applies risk-based auto-fixes, and
-loops until no new issues are found.
+review mode from arguments, then routes to the appropriate review flow. PR mode
+starts immediately; local mode asks about teams and auto-fix preferences.
+Supports multi-round iteration — each round discovers issues, applies
+risk-based auto-fixes, and loops until no new issues are found.
 
 All user-facing text matches the user's language; use interactive dialogs with
 selectable options for predefined choices.
@@ -38,10 +38,10 @@ selectable options for predefined choices.
 | URL containing `/pull/` | PR |
 | Everything else (empty, commit, range, path) | Local |
 
-**PR mode**: skip Q2 and Q3 — ask only Q1, then execute the PR review flow
-described below. After Q1, the FIRST action MUST be using the `Read` tool to
-load `references/pr-review.md`, then follow every step in that file. Key
-constraints (violating any one is a critical error):
+**PR mode**: no questions — immediately execute the PR review flow. The FIRST
+action MUST be using the `Read` tool to load `references/pr-review.md`, then
+follow every step in that file. Key constraints (violating any one is a
+critical error):
 
 - Fetch the PR branch via `git fetch` + `git worktree add` and review code
   **locally in the worktree**. NEVER use `gh pr diff` or any GitHub API to
@@ -62,29 +62,17 @@ stop processing this file.
 3. If on main/master, no uncommitted changes, and `$ARGUMENTS` is empty → abort
    (nothing to review).
 
-### Questions — single interactive prompt
+### Questions (local mode only)
 
-**Q1 — Review priority**:
-
-Priority levels apply to both code and document review checklists.
-
-- "Full review (A + B + C)": correctness, optimization, and conventions.
-  Code: null checks, duplicate code, naming. Docs: factual errors, clarity, formatting.
-- "Correctness + optimization (A + B)": skip conventions and style.
-  Code: null checks, resource leaks, simplification. Docs: factual errors, clarity.
-- "Correctness only (A)": only safety and correctness issues.
-  Code: null dereference, out-of-bounds, race conditions. Docs: factual errors,
-  contradictions.
-
-**Q2 — Teams**:
+**Q1 — Teams**:
 
 - "No": quick single-agent review.
 - "Yes": multi-agent deep review with reviewer–verifier adversarial mechanism.
 
-**Q3 — Auto-fix**:
+**Q2 — Auto-fix**:
 
 If on main/master or uncommitted changes exist: inform user that auto-fix is
-unavailable (uncommitted changes or protected branch), skip Q3.
+unavailable (uncommitted changes or protected branch), skip Q2.
 
 Otherwise:
 
@@ -98,10 +86,10 @@ Otherwise:
 
 ### Route (local mode only)
 
-| Q2 Teams | → |
+| Q1 Teams | → |
 |----------|---|
 | No | `references/local-review.md` |
 | Yes | `references/teams-review.md` |
 
-Pass to the target file: `$ARGUMENTS`, `REVIEW_PRIORITY`, `FIX_MODE` (none /
-low / low_medium / full). Hand off entirely and stop here.
+Pass to the target file: `$ARGUMENTS`, `FIX_MODE` (none / low / low_medium /
+full). Hand off entirely and stop here.
