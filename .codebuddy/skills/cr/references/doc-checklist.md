@@ -46,7 +46,8 @@ Highest impact — review these first.
 
 **A6. Reference Validity**
 - Do internal cross-references point to existing sections or files?
-- Are external links / URLs valid and pointing to the correct content?
+- Are external links / URLs well-formed and not obviously outdated (e.g., pointing
+  to known-dead domains)? Do not attempt to verify reachability.
 - Do referenced file paths, tool names, and command examples actually exist?
 
 ---
@@ -111,5 +112,5 @@ Polish and stylistic consistency. Lower impact on content quality.
 
 1. Pure formatting preferences not affecting readability
 2. Stylistic rewrites that don't improve clarity or accuracy
-3. Speculative issues without evidence from the codebase
+3. Suggestions based on assumed future requirements rather than current code
 4. Suggestions to add content beyond the document's stated scope
