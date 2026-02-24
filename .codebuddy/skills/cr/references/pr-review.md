@@ -48,34 +48,34 @@ git branch -D pr-{N} 2>/dev/null
    Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`, `PR_BODY`.
    If `STATE` is not `OPEN`, inform the user and exit.
 
-2. **Create worktree (MANDATORY — no exceptions)**:
+2. **Prepare working directory**:
 
-   > **!! CRITICAL**: You MUST create a local worktree for every PR review.
-   > This is NOT optional. Do NOT skip this step, even if the current branch
-   > happens to match the PR branch. Do NOT use `gh pr diff`, `gh api`, or
-   > any remote API to read file contents or diffs as a substitute. ALL file
-   > reads, diffs, and context exploration MUST be performed against local
-   > files inside the worktree. Violating this rule invalidates the entire
-   > review.
+   > **!! CRITICAL**: Do NOT use `gh pr diff`, `gh api`, or any remote API
+   > to read file contents or diffs as a substitute for local files. ALL
+   > file reads, diffs, and context exploration MUST be performed against
+   > local files. Violating this rule invalidates the entire review.
 
-   - Clean up any existing worktree for this PR number:
-     ```
-     git worktree remove /tmp/pr-review-{number} 2>/dev/null
-     git branch -D pr-{number} 2>/dev/null
-     ```
-   - Create a fresh worktree:
-     ```
-     git fetch origin pull/{number}/head:pr-{number}
-     git worktree add --no-track /tmp/pr-review-{number} pr-{number}
-     ```
-     If worktree creation fails, inform the user and abort.
+   - If current branch equals `PR_BRANCH` and HEAD equals `HEAD_SHA` → use
+     current directory directly. Record `WORKTREE_DIR` as empty.
+   - Otherwise, create a worktree:
+     - Clean up any existing worktree for this PR number:
+       ```
+       git worktree remove /tmp/pr-review-{number} 2>/dev/null
+       git branch -D pr-{number} 2>/dev/null
+       ```
+     - Create a fresh worktree:
+       ```
+       git fetch origin pull/{number}/head:pr-{number}
+       git worktree add --no-track /tmp/pr-review-{number} pr-{number}
+       ```
+       If worktree creation fails, inform the user and abort.
+       Record `WORKTREE_DIR=/tmp/pr-review-{number}`.
 
-   Record `WORKTREE_DIR=/tmp/pr-review-{number}`. **All subsequent file
-   reads, diffs, and grep operations MUST run inside `WORKTREE_DIR`.**
+   **All subsequent file reads, diffs, and grep operations MUST run inside
+   `WORKTREE_DIR` (or the current directory if it was used directly).**
 
-3. **Set review scope** (MUST run inside `WORKTREE_DIR`):
+3. **Set review scope** (run inside `WORKTREE_DIR` or current directory):
    ```
-   cd {WORKTREE_DIR}
    git fetch origin {BASE_BRANCH}
    git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
    ```
@@ -96,14 +96,13 @@ If diff is empty → exit.
 ## Step 2: Review
 
 1. **Read changed files**: Read the full content of every file that appears in
-   the diff from `WORKTREE_DIR` (not just the changed lines — full file context
-   is needed for accurate review). Use absolute paths under `WORKTREE_DIR` for
-   all file reads.
+   the diff from local files (not just the changed lines — full file context is
+   needed for accurate review). Use absolute paths under `WORKTREE_DIR` (or the
+   current directory) for all file reads.
 2. **Read referenced context**: For each changed file, identify symbols (types,
    base classes, called functions) that are defined elsewhere and are relevant
-   to understanding the change's correctness. Read those definitions from
-   `WORKTREE_DIR`. Stop expanding when the change's behavior can be fully
-   evaluated.
+   to understanding the change's correctness. Read those definitions from local
+   files. Stop expanding when the change's behavior can be fully evaluated.
 3. **Understand author intent**: Read `PR_BODY` (fetched in Step 1) to
    understand the stated motivation and approach. Verify the implementation
    actually achieves what the author describes.
@@ -130,6 +129,7 @@ After review is complete, immediately clean up the worktree before reporting
 results. All necessary information (issue list, file paths, line numbers, code
 snippets) has already been collected — local files are no longer needed.
 
+If `WORKTREE_DIR` was created:
 ```
 cd {original_directory}
 git worktree remove {WORKTREE_DIR}
