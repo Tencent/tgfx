@@ -1,7 +1,8 @@
 # PR Review
 
 PR review uses **Worktree mode** — fetch the PR branch locally so review can
-read related code across modules, at the exact version of the PR branch.
+read related code across modules, at the exact version of the PR branch. This
+is critical for review accuracy.
 
 ## Input from SKILL.md
 
