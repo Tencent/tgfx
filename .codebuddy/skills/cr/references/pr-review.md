@@ -74,7 +74,8 @@ Read `PR_BODY` to understand the stated motivation. Verify the implementation
 actually achieves what the author describes.
 
 Apply `code-checklist.md` to code files, `doc-checklist.md` to documentation
-files. Only include priority levels the user selected.
+files. Only include priority levels the user selected. Use
+`judgment-matrix.md` to decide whether each issue is worth reporting.
 
 Check whether issues raised in previous PR comments have been fixed.
 
