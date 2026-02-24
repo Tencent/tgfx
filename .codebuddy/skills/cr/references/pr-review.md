@@ -53,11 +53,13 @@ cd /tmp/pr-review-{number}
 
 ## Step 2: Collect diff and context
 
-Fetch PR metadata:
+Fetch PR metadata and repo info:
 ```bash
-gh pr view {number} --json baseRefName,headRefOid,state,body
+gh repo view --json nameWithOwner --jq .nameWithOwner
+gh pr view {number} --json baseRefName,headRefOid,state,body,author
 ```
-Extract: `BASE_BRANCH`, `HEAD_SHA`, `STATE`, `PR_BODY`.
+Record `OWNER_REPO` from the first command. Extract: `BASE_BRANCH`,
+`HEAD_SHA`, `STATE`, `PR_BODY`, `PR_AUTHOR`.
 If `STATE` is not `OPEN`, inform the user, clean up worktree, and exit.
 
 Get diff:
@@ -69,11 +71,11 @@ If the diff exceeds 200 lines, first run `git diff --stat` to get an overview,
 then read the diff per file using `git diff -- {file}` to avoid output
 truncation.
 
-Fetch existing PR review comments for de-duplication:
+Fetch existing PR comments for de-duplication and to verify fixes:
 ```bash
-gh api repos/{owner}/{repo}/pulls/{number}/comments
+gh pr view {number} --comments
+gh api repos/{OWNER_REPO}/pulls/{number}/comments
 ```
-Store as `EXISTING_PR_COMMENTS`.
 
 If diff is empty → clean up worktree (if created) and exit.
 
@@ -90,6 +92,9 @@ Verify the implementation actually achieves what the author describes.
 Apply `code-checklist.md` to code files, `doc-checklist.md` to documentation
 files. Only include priority levels the user selected.
 
+Verify existing PR comments: check whether issues raised in previous comments
+have actually been fixed in the current code.
+
 For each issue found:
 - Provide a code citation (file:line + snippet).
 - Self-verify before confirming — re-read the surrounding code and check:
@@ -99,23 +104,24 @@ For each issue found:
     impossible?
   - Am I misunderstanding the variable's lifetime or ownership?
   If any of these apply, withdraw the issue.
-- De-duplicate against `EXISTING_PR_COMMENTS` — skip issues already covered.
+- De-duplicate against existing PR comments — skip issues already covered.
 
 ---
 
-## Step 4: Clean up and report
+## Step 4: Report and handle issues
 
-If a worktree was created, clean it up first:
+Optimize PR title if needed:
 ```bash
-cd -
-git worktree remove /tmp/pr-review-{number}
-git branch -D pr-{number}
+gh pr edit {number} --title "New title"
 ```
+Title format: English, under 120 characters, ending with a period, no other
+punctuation, focusing on user-visible changes.
 
-**If no issues found** → inform the user that the review is clean, summarize
-the key areas checked, and ask whether to submit an approval review:
+**If no issues found** → clean up worktree (if created), inform the user that
+the review is clean, summarize the key areas checked, and ask whether to submit
+an approval review:
 ```bash
-gh api repos/{owner}/{repo}/pulls/{number}/reviews --input - <<'EOF'
+gh api repos/{OWNER_REPO}/pulls/{number}/reviews --input - <<'EOF'
 {
   "commit_id": "{HEAD_SHA}",
   "event": "APPROVE"
@@ -129,14 +135,29 @@ EOF
 {N}. [{priority}] {file}:{line} — {description of the problem and suggested fix}
 ```
 
-Where `{priority}` is the checklist item ID (e.g., A2, B1, C7). User selects
-which to submit as PR comments, declines are marked `skipped`.
+Where `{priority}` is the checklist item ID (e.g., A2, B1, C7).
+
+Determine code ownership: compare `PR_AUTHOR` with `gh api user -q '.login'`.
+
+**Own code** → ask the user which issues to fix. Fix in worktree, commit and
+push:
+```bash
+git add . && git commit -m "{message}"
+git push origin HEAD:$PR_BRANCH
+```
+Then clean up worktree (if created).
+
+**Others' code** → clean up worktree (if created) first, then ask the user
+which issues to submit as PR comments. Never auto-fix and push to others'
+branches.
+
+User selects which to submit as PR comments, declines are marked `skipped`.
 
 Submit as a **single** GitHub PR review with line-level comments. **Must** use
 `gh api` + heredoc:
 
 ```bash
-gh api repos/{owner}/{repo}/pulls/{number}/reviews --input - <<'EOF'
+gh api repos/{OWNER_REPO}/pulls/{number}/reviews --input - <<'EOF'
 {
   "commit_id": "{HEAD_SHA}",
   "event": "COMMENT",
@@ -156,5 +177,14 @@ EOF
 - `line`: line number in the **new** file (right side of diff)
 - `side`: always `"RIGHT"`
 - `body`: concise, in the user's conversation language
+
+### Worktree cleanup
+
+If a worktree was created and not yet cleaned up:
+```bash
+cd -
+git worktree remove /tmp/pr-review-{number}
+git branch -D pr-{number}
+```
 
 Summary of issues found / submitted / skipped.
