@@ -38,7 +38,22 @@ selectable options for predefined choices.
 | URL containing `/pull/` | PR |
 | Everything else (empty, commit, range, path) | Local |
 
-**PR mode**: skip Q2 and Q3 — ask only Q1, then route to PR review flow.
+**PR mode**: skip Q2 and Q3 — ask only Q1, then execute the PR review flow
+described below. After Q1, the FIRST action MUST be using the `Read` tool to
+load `references/pr-review.md`, then follow every step in that file. Key
+constraints (violating any one is a critical error):
+
+- Fetch the PR branch via `git fetch` + `git worktree add` and review code
+  **locally in the worktree**. NEVER use `gh pr diff` or any GitHub API to
+  obtain the diff.
+- Generate the diff with `git diff $(git merge-base ...)` inside the worktree.
+- Read surrounding logic, base classes, and callers from the worktree — this is
+  the reason a worktree exists.
+- Submit results via `gh api` as **line-level** PR comments.
+- Clean up the worktree and temporary branch when done.
+
+After reading `references/pr-review.md`, hand off entirely to that flow and
+stop processing this file.
 
 ### Pre-check (local mode only)
 
@@ -81,26 +96,7 @@ Otherwise:
 - "Full auto" → `FIX_MODE=full`: auto-fix everything. Only issues affecting test baselines are
   deferred.
 
-### Route
-
-**PR mode** → Read `references/pr-review.md` and follow it. The mandatory
-constraints below MUST be satisfied — violating any one is a critical error:
-
-1. **Read the reference first**: use the `Read` tool to load
-   `references/pr-review.md` before taking any action. Do NOT improvise a
-   review flow from memory.
-2. **Local worktree**: fetch the PR branch via `git fetch` + `git worktree add`
-   and review code locally. NEVER use `gh pr diff`, `gh pr view --json diff`,
-   or any GitHub API to obtain the diff.
-3. **Local diff**: generate the diff with
-   `git diff $(git merge-base origin/{BASE_BRANCH} HEAD)` inside the worktree.
-4. **Read related code**: use the local worktree to read surrounding logic,
-   base classes, and callers — this is the reason a worktree exists.
-5. **Line-level comments**: submit review results via `gh api` as line-level PR
-   comments, not via `gh pr comment` or `gh pr review`.
-6. **Cleanup**: remove the worktree and temporary branch when done.
-
-**Local mode** (not PR):
+### Route (local mode only)
 
 | Q2 Teams | → |
 |----------|---|
