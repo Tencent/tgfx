@@ -65,10 +65,23 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
     state->setCullFaceState(*cullFaceState);
   }
   state->setEnabled(GL_SAMPLE_ALPHA_TO_COVERAGE, alphaToCoverageEnabled);
-  bool sampleMaskEnabled = sampleMask != 0xFFFFFFFF;
-  state->setEnabled(GL_SAMPLE_MASK, sampleMaskEnabled);
-  if (sampleMaskEnabled) {
-    state->setSampleMask(sampleMask);
+  // GL_SAMPLE_MASK is not supported in OpenGL ES 3.0 and WebGL. According to official documentation:
+  // - OpenGL ES 3.0: Does not support GL_SAMPLE_MASK
+  //   Reference: https://registry.khronos.org/OpenGL-Refpages/es3.0/html/glEnable.xhtml
+  //   This affects mobile platforms (Android/iOS) as they require minimum OpenGL ES 3.0.
+  // - OpenGL ES 3.1+: Supports GL_SAMPLE_MASK (ANDs fragment coverage with GL_SAMPLE_MASK_VALUE)
+  //   Reference: https://registry.khronos.org/OpenGL-Refpages/es3.1/html/glEnable.xhtml
+  // - WebGL: Based on OpenGL ES 2.0/3.0, does not support GL_SAMPLE_MASK as enable capability
+  //   Reference: https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/enable
+  // - Desktop OpenGL 3.2+: Supports GL_SAMPLE_MASK (core feature)
+  // Calling gl.enable(GL_SAMPLE_MASK) in WebGL or OpenGL ES 3.0 results in INVALID_ENUM error.
+  // Only enable GL_SAMPLE_MASK for Desktop OpenGL to ensure compatibility across all platforms.
+  if (gpu->caps()->standard == GLStandard::GL) {
+    bool sampleMaskEnabled = sampleMask != 0xFFFFFFFF;
+    state->setEnabled(GL_SAMPLE_MASK, sampleMaskEnabled);
+    if (sampleMaskEnabled) {
+      state->setSampleMask(sampleMask);
+    }
   }
 }
 
