@@ -157,7 +157,7 @@ Each reviewer receives:
 - **Scope**: file list + changed line ranges for its module. Reviewers read
   full files and fetch diffs themselves — coordinator does NOT pass raw diff.
 - **Checklist**: `code-checklist.md` for code, `doc-checklist.md` for doc, both
-  for mixed. Check all priority levels (A, B, and C).
+  for mixed.
 - **Evidence requirement**: every issue must have a code citation (file:line + snippet).
 - **Known-issue exclusion** (round 2+): skip issues matching the coordinator's
   exclusion list. Focus on finding new issues.
