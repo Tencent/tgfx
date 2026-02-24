@@ -17,7 +17,7 @@ app.get('/', (req, res) => {
   res.send('Hello, tgfx!');
 });
 
-const port = 8082;
+const port = 8081;
 const args = process.argv.slice(2);
 var fileName = args.includes('wasm-mt') ? 'index': 'index-st';
 app.listen(port, () => {
