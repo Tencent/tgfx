@@ -1,10 +1,7 @@
 # PR Review
 
-PR review uses **Worktree mode**: fetch the PR branch locally so that all file
-reads, diffs, and context exploration run against local files. This is required
-because review needs to read full file contents and follow cross-file references
-(base classes, callers, type definitions) — remote diff APIs only return changed
-lines and cannot provide this context.
+PR review uses **Worktree mode** — fetch the PR branch locally so review can
+read full files and follow cross-file references, not just diff hunks.
 
 ## Input from SKILL.md
 
