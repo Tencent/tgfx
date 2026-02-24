@@ -22,10 +22,18 @@
 #include "gpu/opengl/eagl/EAGLGPU.h"
 
 namespace tgfx {
-static std::mutex deviceLocker = {};
-static std::vector<EAGLDevice*> deviceList = {};
-static std::vector<EAGLDevice*> delayPurgeList = {};
 static std::atomic_bool appInBackground = {true};
+
+struct DeviceRegistry {
+  std::mutex deviceLocker = {};
+  std::vector<EAGLDevice*> deviceList = {};
+  std::vector<EAGLDevice*> delayPurgeList = {};
+};
+
+static DeviceRegistry& GetRegistry() {
+  static auto* registry = new DeviceRegistry();
+  return *registry;
+}
 
 void ApplicationWillResignActive() {
   // Set applicationInBackground to true first to ensure that no new GL operation is generated
@@ -33,9 +41,10 @@ void ApplicationWillResignActive() {
   appInBackground = true;
   std::vector<std::shared_ptr<EAGLDevice>> devices = {};
   {
-    std::lock_guard<std::mutex> autoLock(deviceLocker);
-    devices.reserve(deviceList.size());
-    for (auto& device : deviceList) {
+    auto& registry = GetRegistry();
+    std::lock_guard<std::mutex> autoLock(registry.deviceLocker);
+    devices.reserve(registry.deviceList.size());
+    for (auto& device : registry.deviceList) {
       auto shared = std::static_pointer_cast<EAGLDevice>(device->weakThis.lock());
       if (shared) {
         devices.push_back(std::move(shared));
@@ -50,9 +59,10 @@ void ApplicationWillResignActive() {
 void ApplicationDidBecomeActive() {
   appInBackground = false;
   std::vector<EAGLDevice*> delayList = {};
-  deviceLocker.lock();
-  std::swap(delayList, delayPurgeList);
-  deviceLocker.unlock();
+  auto& registry = GetRegistry();
+  registry.deviceLocker.lock();
+  std::swap(delayList, registry.delayPurgeList);
+  registry.deviceLocker.unlock();
   for (auto& device : delayList) {
     delete device;
   }
@@ -136,22 +146,26 @@ void EAGLDevice::NotifyReferenceReachedZero(EAGLDevice* device) {
     delete device;
     return;
   }
-  std::lock_guard<std::mutex> autoLock(deviceLocker);
-  delayPurgeList.push_back(device);
+  auto& registry = GetRegistry();
+  std::lock_guard<std::mutex> autoLock(registry.deviceLocker);
+  registry.delayPurgeList.push_back(device);
 }
 
 EAGLDevice::EAGLDevice(std::unique_ptr<GPU> gpu, EAGLContext* eaglContext)
     : GLDevice(std::move(gpu), eaglContext), _eaglContext(eaglContext) {
   [_eaglContext retain];
-  std::lock_guard<std::mutex> autoLock(deviceLocker);
-  auto index = deviceList.size();
-  deviceList.push_back(this);
+  auto& registry = GetRegistry();
+  std::lock_guard<std::mutex> autoLock(registry.deviceLocker);
+  auto index = registry.deviceList.size();
+  registry.deviceList.push_back(this);
   cacheArrayIndex = index;
 }
 
 EAGLDevice::~EAGLDevice() {
   {
-    std::lock_guard<std::mutex> autoLock(deviceLocker);
+    auto& registry = GetRegistry();
+    std::lock_guard<std::mutex> autoLock(registry.deviceLocker);
+    auto& deviceList = registry.deviceList;
     auto tail = *(deviceList.end() - 1);
     auto index = cacheArrayIndex;
     deviceList[index] = tail;
