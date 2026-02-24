@@ -8,8 +8,6 @@ is critical for review accuracy.
 
 - `REVIEW_PRIORITY`: A | A+B | A+B+C
 
-Auto-fix is not available in PR mode.
-
 ## References
 
 | File | Purpose |
