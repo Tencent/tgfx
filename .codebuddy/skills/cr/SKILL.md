@@ -38,8 +38,7 @@ selectable options for predefined choices.
 | URL containing `/pull/` | PR |
 | Everything else (empty, commit, range, path) | Local |
 
-**PR mode**: skip Q2 and Q3 — ask only Q1, then hand off to
-`references/pr-review.md`.
+**PR mode**: skip Q2 and Q3 — ask only Q1, then route to PR review flow.
 
 ### Pre-check (local mode only)
 
@@ -83,6 +82,25 @@ Otherwise:
   deferred.
 
 ### Route
+
+**PR mode** → Read `references/pr-review.md` and follow it. The mandatory
+constraints below MUST be satisfied — violating any one is a critical error:
+
+1. **Read the reference first**: use the `Read` tool to load
+   `references/pr-review.md` before taking any action. Do NOT improvise a
+   review flow from memory.
+2. **Local worktree**: fetch the PR branch via `git fetch` + `git worktree add`
+   and review code locally. NEVER use `gh pr diff`, `gh pr view --json diff`,
+   or any GitHub API to obtain the diff.
+3. **Local diff**: generate the diff with
+   `git diff $(git merge-base origin/{BASE_BRANCH} HEAD)` inside the worktree.
+4. **Read related code**: use the local worktree to read surrounding logic,
+   base classes, and callers — this is the reason a worktree exists.
+5. **Line-level comments**: submit review results via `gh api` as line-level PR
+   comments, not via `gh pr comment` or `gh pr review`.
+6. **Cleanup**: remove the worktree and temporary branch when done.
+
+**Local mode** (not PR):
 
 | Q2 Teams | → |
 |----------|---|
