@@ -4,18 +4,6 @@ PR review uses **Worktree mode** — fetch the PR branch locally so review can
 read related code across modules, at the exact version of the PR branch. This
 is critical for review accuracy.
 
-## Input from SKILL.md
-
-- `REVIEW_PRIORITY`: A | A+B | A+B+C
-
-## References
-
-| File | Purpose |
-|------|---------|
-| `code-checklist.md` | Code review checklist |
-| `doc-checklist.md` | Document review checklist |
-| `judgment-matrix.md` | Worth-fixing criteria and special rules |
-
 ---
 
 ## Step 1: Create worktree
@@ -53,13 +41,11 @@ cd /tmp/pr-review-{number}
 
 ## Step 2: Collect diff and context
 
-Fetch PR metadata and repo info:
 ```bash
 gh repo view --json nameWithOwner --jq .nameWithOwner
 gh pr view {number} --json baseRefName,headRefOid,state,body
 ```
-Record `OWNER_REPO` from the first command. Extract: `BASE_BRANCH`,
-`HEAD_SHA`, `STATE`, `PR_BODY`.
+Record `OWNER_REPO`. Extract: `BASE_BRANCH`, `HEAD_SHA`, `STATE`, `PR_BODY`.
 If `STATE` is not `OPEN`, inform the user, clean up worktree, and exit.
 
 Get diff:
@@ -71,13 +57,11 @@ If the diff exceeds 200 lines, first run `git diff --stat` to get an overview,
 then read the diff per file using `git diff -- {file}` to avoid output
 truncation.
 
-Fetch existing PR comments for de-duplication and to verify fixes:
+Fetch existing PR comments:
 ```bash
 gh pr view {number} --comments
 gh api repos/{OWNER_REPO}/pulls/{number}/comments
 ```
-
-If diff is empty → clean up worktree (if created) and exit.
 
 ---
 
@@ -86,39 +70,29 @@ If diff is empty → clean up worktree (if created) and exit.
 Based on the diff, read relevant code context as needed to understand the
 change's correctness (e.g., surrounding logic, base classes, callers).
 
-Read `PR_BODY` (from Step 2) to understand the stated motivation and approach.
-Verify the implementation actually achieves what the author describes.
+Read `PR_BODY` to understand the stated motivation. Verify the implementation
+actually achieves what the author describes.
 
 Apply `code-checklist.md` to code files, `doc-checklist.md` to documentation
 files. Only include priority levels the user selected.
 
-Verify existing PR comments: check whether issues raised in previous comments
-have actually been fixed in the current code.
+Check whether issues raised in previous PR comments have been fixed.
 
-For each issue found:
-- Provide a code citation (file:line + snippet).
-- Self-verify before confirming — re-read the surrounding code and check:
-  - Is there a guard, null check, or early return elsewhere that already
-    handles this case?
-  - Does the call chain guarantee preconditions that make this issue
-    impossible?
-  - Am I misunderstanding the variable's lifetime or ownership?
-  If any of these apply, withdraw the issue.
-- De-duplicate against existing PR comments — skip issues already covered.
+For each issue found, self-verify before confirming — re-read surrounding code
+to rule out false positives. De-duplicate against existing PR comments.
 
 ---
 
 ## Step 4: Clean up and report
 
-If a worktree was created, clean it up first:
+If a worktree was created, clean it up:
 ```bash
 cd -
 git worktree remove /tmp/pr-review-{number}
 git branch -D pr-{number}
 ```
 
-**If no issues found** → inform the user that the review is clean, summarize
-the key areas checked, and ask whether to submit an approval review:
+**If no issues found** → inform the user, and ask whether to submit an approval:
 ```bash
 gh api repos/{OWNER_REPO}/pulls/{number}/reviews --input - <<'EOF'
 {
@@ -131,13 +105,12 @@ EOF
 **If issues found** → present confirmed issues:
 
 ```
-{N}. [{priority}] {file}:{line} — {description of the problem and suggested fix}
+{N}. [{priority}] {file}:{line} — {description and suggested fix}
 ```
 
-Where `{priority}` is the checklist item ID (e.g., A2, B1, C7). User selects
-which to submit as PR comments, declines are marked `skipped`.
+User selects which to submit as PR comments, declines are marked `skipped`.
 
-Submit as a **single** GitHub PR review with line-level comments. **Must** use
+Submit as a **single** GitHub PR review with line-level comments using
 `gh api` + heredoc:
 
 ```bash
@@ -150,16 +123,11 @@ gh api repos/{OWNER_REPO}/pulls/{number}/reviews --input - <<'EOF'
       "path": "relative/file/path",
       "line": 42,
       "side": "RIGHT",
-      "body": "Description of the issue and suggested fix"
+      "body": "Issue description and suggested fix"
     }
   ]
 }
 EOF
 ```
-
-- `path`: relative to repository root
-- `line`: line number in the **new** file (right side of diff)
-- `side`: always `"RIGHT"`
-- `body`: concise, in the user's conversation language
 
 Summary of issues found / submitted / skipped.
