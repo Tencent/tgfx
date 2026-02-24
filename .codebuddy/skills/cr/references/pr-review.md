@@ -54,23 +54,26 @@ supported and suggest switching to the target repository first, then abort.
 Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`, `PR_BODY`.
 If `STATE` is not `OPEN`, inform the user and exit.
 
-### Create worktree or use current directory
+### Create worktree
 
-- If current branch equals `PR_BRANCH` and HEAD equals `HEAD_SHA` → use
-  current directory directly. Record `REVIEW_DIR` as the current directory.
-- Otherwise, create a worktree:
-  - Clean up any existing worktree for this PR number:
-    ```
-    git worktree remove /tmp/pr-review-{number} 2>/dev/null
-    git branch -D pr-{number} 2>/dev/null
-    ```
-  - Create a fresh worktree:
-    ```
-    git fetch origin pull/{number}/head:pr-{number}
-    git worktree add --no-track /tmp/pr-review-{number} pr-{number}
-    ```
-    If worktree creation fails, inform the user and abort.
-    Record `REVIEW_DIR=/tmp/pr-review-{number}`.
+Create a worktree to isolate the PR code. The only exception is when the
+current branch already equals `PR_BRANCH` and HEAD equals `HEAD_SHA` — in
+that case, use the current directory and record `REVIEW_DIR` as the current
+directory, then skip the rest of this subsection.
+
+Otherwise:
+- Clean up any existing worktree for this PR number:
+  ```
+  git worktree remove /tmp/pr-review-{number} 2>/dev/null
+  git branch -D pr-{number} 2>/dev/null
+  ```
+- Create a fresh worktree:
+  ```
+  git fetch origin pull/{number}/head:pr-{number}
+  git worktree add --no-track /tmp/pr-review-{number} pr-{number}
+  ```
+  If worktree creation fails, inform the user and abort.
+  Record `REVIEW_DIR=/tmp/pr-review-{number}`.
 
 **All subsequent file reads, diffs, and grep operations MUST run inside
 `REVIEW_DIR`.**
