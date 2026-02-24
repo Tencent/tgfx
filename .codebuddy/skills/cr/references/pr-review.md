@@ -81,10 +81,8 @@ If diff is empty → clean up worktree (if created) and exit.
 
 ## Step 3: Review
 
-For each changed file, read its full content using the Read tool (not just
-the diff — full file context is needed for accurate review). Then read
-definitions of referenced symbols (types, base classes, called functions) that
-are relevant to understanding the change's correctness.
+Based on the diff, read relevant code context as needed to understand the
+change's correctness (e.g., surrounding logic, base classes, callers).
 
 Read `PR_BODY` (from Step 2) to understand the stated motivation and approach.
 Verify the implementation actually achieves what the author describes.
