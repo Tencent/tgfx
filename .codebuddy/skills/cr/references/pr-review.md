@@ -22,6 +22,16 @@ is critical for review accuracy.
 
 If `$ARGUMENTS` is a URL, extract the PR number from it.
 
+Clean up leftover worktrees from previous sessions:
+```bash
+for dir in /tmp/pr-review-*; do
+    [ -d "$dir" ] || continue
+    n=$(basename "$dir" | sed 's/pr-review-//')
+    git worktree remove "$dir" 2>/dev/null
+    git branch -D "pr-${n}" 2>/dev/null
+done
+```
+
 Check whether the current branch is already the PR branch:
 ```bash
 CURRENT_BRANCH=$(git branch --show-current)
@@ -34,15 +44,6 @@ already local.
 
 **Otherwise**, create a worktree:
 ```bash
-# Clean up leftover worktrees from previous sessions
-for dir in /tmp/pr-review-*; do
-    [ -d "$dir" ] || continue
-    n=$(basename "$dir" | sed 's/pr-review-//')
-    git worktree remove "$dir" 2>/dev/null
-    git branch -D "pr-${n}" 2>/dev/null
-done
-
-# Create worktree and switch into it
 git fetch origin pull/{number}/head:pr-{number}
 git worktree add --no-track /tmp/pr-review-{number} pr-{number}
 cd /tmp/pr-review-{number}
