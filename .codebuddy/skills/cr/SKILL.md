@@ -21,21 +21,14 @@ Determine mode from `$ARGUMENTS`, then follow the matching section below:
 
 ## PR Mode
 
-No questions — start immediately.
+No questions — `Read` `references/pr-review.md` and follow every step. Two
+constraints that differ from a typical PR review:
 
-Use the `Read` tool to load `references/pr-review.md`, then follow every step
-in that file. Key constraints (violating any one is a critical error):
-
-- Fetch the PR branch via `git fetch` + `git worktree add` and review code
-  **locally in the worktree**. NEVER use `gh pr diff` or any GitHub API to
-  obtain the diff.
-- Generate the diff with `git diff $(git merge-base ...)` inside the worktree.
-- Read surrounding logic, base classes, and callers from the worktree — this is
-  the reason a worktree exists.
-- Submit results via `gh api` as **line-level** PR comments.
-- Clean up the worktree and temporary branch when done.
-
-Hand off entirely to `references/pr-review.md` and stop processing this file.
+1. **Worktree mode**: fetch the PR branch locally via `git worktree add` and
+   review code in the worktree. NEVER use `gh pr diff` or any GitHub API to
+   obtain the diff.
+2. **Line-level comments only**: submit results via `gh api` as line-level PR
+   comments. NEVER use `gh pr comment` or `gh pr review`.
 
 ---
 
