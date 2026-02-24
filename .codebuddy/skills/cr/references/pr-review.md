@@ -67,20 +67,26 @@ gh api repos/{OWNER_REPO}/pulls/{number}/comments
 
 ## Step 3: Review
 
-Based on the diff, read relevant code context as needed to understand the
-change's correctness (e.g., surrounding logic, base classes, callers).
+**Internal analysis** (do not output anything during this phase):
 
-Read `PR_BODY` to understand the stated motivation. Verify the implementation
-actually achieves what the author describes.
+1. Based on the diff, read relevant code context as needed to understand the
+   change's correctness (e.g., surrounding logic, base classes, callers).
+2. Read `PR_BODY` to understand the stated motivation. Verify the
+   implementation actually achieves what the author describes.
+3. Apply `code-checklist.md` to code files, `doc-checklist.md` to
+   documentation files. Only include priority levels the user selected. Use
+   `judgment-matrix.md` to decide whether each issue is worth reporting.
+4. Check whether issues raised in previous PR comments have been fixed.
+5. For each potential issue, perform a second-pass verification: re-read the
+   surrounding code to rule out false positives, already-handled cases, or
+   misunderstandings.
+6. **Discard all ruled-out issues. Keep only issues confirmed to exist.**
 
-Apply `code-checklist.md` to code files, `doc-checklist.md` to documentation
-files. Only include priority levels the user selected. Use
-`judgment-matrix.md` to decide whether each issue is worth reporting.
+De-duplicate confirmed issues against existing PR comments.
 
-Check whether issues raised in previous PR comments have been fixed.
-
-For each issue found, self-verify before confirming — re-read surrounding code
-to rule out false positives. De-duplicate against existing PR comments.
+**Output rule**: only present the final confirmed issues to the user. Do not
+output analysis process, exclusion reasoning, or issues that were considered
+but ruled out.
 
 ---
 
