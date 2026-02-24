@@ -21,45 +21,57 @@ Single-agent review for local changes with optional auto-fix.
 
 Follow `scope-detection.md` to determine the review scope and fetch the diff.
 
+### Build baseline
+
+Skip if doc-only. If no build/test commands can be determined, warn that fix
+validation will be skipped. Otherwise run build + test. Fail → abort.
+
+Read git log since upstream for recent-fix context (avoid re-flagging issues
+a previous `/cr` session already fixed).
+
 ---
 
 ## Step 2: Review
 
-Read all files in scope. Apply `code-checklist.md` to code files,
-`doc-checklist.md` to documentation files. Untracked files have no diff — review their full contents as new code.
+Review the diff. Apply `code-checklist.md` to code files,
+`doc-checklist.md` to documentation files. When changed lines depend on
+surrounding context, read the relevant sections or related definitions as
+needed. Untracked files have no diff — review their full contents as new code.
 
 For each issue found:
-- Provide a code citation (file:line + snippet).
+- Provide a code citation (file:line + snippet) from the current tree.
 - Self-verify by re-reading the code — confirm or withdraw.
+- If a cited path/line no longer exists, locate the correct file/path via `git diff --name-only` or file search before reporting.
 
 **PR comment verification** (when `PR_COMMENTS` exist): verify each PR review
 comment against current code. Add verified issues to the results.
 
-If `FIX_MODE` = none → Step 3. Otherwise → Step 4.
+**Output rule**: only present the final confirmed issues to the user. Do not
+output analysis process, exclusion reasoning, or issues that were considered
+but ruled out.
 
 ---
 
-## Step 3: Report
-
-List all confirmed issues. End.
-
----
-
-## Step 4: Auto-fix
-
-### 4.1 Risk assessment
+## Step 3: Filter
 
 Consult `judgment-matrix.md` for risk level assessment, worth-fixing criteria,
-handling by risk level, and special rules.
+and special rules. Discard issues that are not worth reporting.
 
-### 4.2 Route issues
+**Fix approach** (Medium/High only): decide the specific fix approach and
+reasoning before applying. Low risk: single obvious fix, no planning needed.
+
+If `FIX_MODE` = none → Step 6 (Report).
+
+Route remaining issues:
 
 | Risk vs `FIX_MODE` | → |
 |---------------------|---|
 | At or below threshold | auto-fix |
-| Above threshold | report only |
+| Above threshold | `pending` — confirm with user |
 
-### 4.3 Apply fixes
+---
+
+## Step 4: Fix
 
 For each issue in the auto-fix queue:
 
@@ -72,7 +84,9 @@ For each issue in the auto-fix queue:
 - After each fix, check whether the change affects related comments or
   documentation within the same files. If so, update them together.
 
-### 4.4 Validate
+---
+
+## Step 5: Validate
 
 Run build + test (skip if no build/test commands available or doc-only scope).
 
@@ -81,9 +95,33 @@ Run build + test (skip if no build/test commands available or doc-only scope).
   failure, revert that fix. Retry the fix once with failure details. If still
   failing, revert and mark as failed.
 
-### 4.5 Final report
+### Continue?
 
-- Fixed issues
-- Above-threshold issues (need manual attention)
+After validation, re-review the changed code for new issues introduced by
+fixes. If new issues are found → go back to Step 3 (Filter). If no new
+issues:
+
+- `pending` or `failed` issues exist → Step 5.5 (Confirm).
+- Otherwise → Step 6 (Report).
+
+### Step 5.5: Confirm
+
+Present `pending` + `failed` issues, then ask the user to select which issues
+to fix using **a single multi-select question** where each option's label is
+the issue summary (e.g., `[risk] file:line — description`). User checks
+multiple options in one prompt. Unchecked → skipped.
+
+- **All skipped** → Step 6 (Report).
+- **Any checked** → apply fix (same rules as Step 4) → re-validate (Step 5).
+  After validation, re-review for new issues. If new issues found → back to
+  Step 3 (Filter). If no new issues but more `pending`/`failed` remain →
+  return here. If nothing remains → Step 6 (Report).
+
+---
+
+## Step 6: Report
+
+- Summary: one paragraph describing what was reviewed and key findings.
+- Issues found / fixed / skipped / failed
 - Failed/rolled-back issues with reasons
 - Final test result

@@ -30,7 +30,7 @@ share conversation history.
 
 - **Agent lifecycle**: When closing agents, send the shutdown message and continue
   immediately without waiting for acknowledgment. Do not block the workflow on
-  agent responses. When closing the team, force-terminate (TaskStop) any agents
+  agent responses. When closing the team, force-terminate any agents
   that are still running.
 - **Autonomy**: zero user interaction until Confirm (Phase 6) or Report
   (Phase 7). Record anything unresolvable to `CR_STATE_FILE` for user review.
@@ -40,7 +40,7 @@ share conversation history.
 `FIX_MODE=none` follows a short path:
 
 ```
-Scope → Review → Report
+Scope → Review → Filter → Report
 ```
 
 `FIX_MODE≠none` has two nested loops:
@@ -53,7 +53,7 @@ Scope
 │                                   │
 │  Review → Filter → Fix/Validate   │
 │    ↑                     │        │
-│    └── new issues ───────┘        │
+│    └── new issues ───────
 │                                   │
 └───────────────────────────────────┘
   │ no new issues
@@ -61,39 +61,19 @@ Scope
 pending/failed? ──no──→ Report
   │ yes
   ↓
-Confirm
-  │
-  ├── all skipped ──→ Report
-  │
-  └── approved:
-        │
-        ┌── Fix/Validate Loop ──┐
-        │                       │
-        │  Fix/Validate         │
-        │    │                  │
-        │    └→ Continue?       │
-        │         │             │
-        │    new issues ──→ Review Loop ↑
-        │         │             │
-        │    more approved ─────┘
-        │         │
-        └─────────┘
-              │ no new issues, no more approved
-              ↓
-           more pending? ──yes──→ Confirm ↑
-              │
-              no
-              ↓
-            Report
+Confirm ──all skipped──→ Report
+  │ approved
+  ↓
+Fix/Validate ──→ Review Loop ↑
 ```
 
-- **Review Loop** (outer): Review → Filter → Fix/Validate repeats as long as
-  new issues are found. Each round is a fresh review, not a targeted re-check.
-- **Fix/Validate Loop** (inner): applies fixes and validates. Reused by both
-  the Review Loop and post-Confirm.
-- **After Confirm**: approved fixes enter the Fix/Validate Loop. If fixes
-  introduce new issues, re-enter the full Review Loop. Otherwise return to
-  Confirm if more pending/failed remain, or proceed to Report.
+The Review Loop repeats as long as new issues are found. Each round is a fresh
+full review — not a targeted re-check of previous fixes.
+
+**After Confirm**: approved fixes go through Fix/Validate, then **always
+re-enter the Review Loop** (Phase 2) to catch any issues introduced by the
+fixes. The loop only exits to Confirm (if pending/failed remain) or Report
+(if nothing remains) when a round produces no new issues.
 
 ---
 
@@ -118,10 +98,34 @@ group; group related small files together. Classify each module as `code`,
 
 ### Persist state
 
-Write CR_STATE_FILE (see CR_STATE_FILE format appendix) with session info
-(mode, threshold, file list, module assignments, changed line ranges,
-build/test commands) and an issues section updated incrementally. CR_STATE_FILE
-is owned by the coordinator — team agents never read or write it.
+Write CR_STATE_FILE with session info (mode, threshold, file list, module
+assignments, changed line ranges, build/test commands) and an issues section
+updated incrementally. CR_STATE_FILE is owned by the coordinator — team agents
+never read or write it.
+
+**Issue format** in CR_STATE_FILE:
+
+```markdown
+# Issues
+
+## 1. [brief description]
+- **Status**: pending | approved | fixed | failed | skipped
+- **Reason**: [why not auto-fixed, e.g., "above auto-fix threshold (high risk)",
+  "fix failed: build error after 2 retries", "rolled back: introduced regression"]
+- **Risk**: low | medium | high
+- **File**: [file path:line number]
+- **Current**: [what the code does now]
+- **Proposed**: [what the fix would change — for medium/high risk, include the
+  specific approach chosen by the coordinator and the reasoning]
+- **Impact**: [what else would be affected]
+```
+
+Status values:
+- `pending` — recorded, awaiting user decision in Phase 6
+- `approved` — user approved fix in Phase 6, sent to Phase 4
+- `fixed` — fix applied and passed validation
+- `failed` — fix attempted but failed validation after retries
+- `skipped` — user declined or issue rejected (do not re-report)
 
 ---
 
@@ -144,9 +148,8 @@ is owned by the coordinator — team agents never read or write it.
 Create a new team for this round. Each round gets a fresh team — do not reuse
 agents from prior rounds (they lose context after team close).
 
-- One `general-purpose` reviewer agent (`reviewer-N`) per module.
-- One `general-purpose` **verifier** agent (`verifier`), shared across all
-  modules.
+- One reviewer agent (`reviewer-N`) per module.
+- One **verifier** agent (`verifier`), shared across all modules.
 
 ### Reviewer prompt
 
@@ -154,17 +157,20 @@ Stance: **thorough** — discover as many real issues as possible, self-verify
 before submitting.
 
 Each reviewer receives:
-- **Scope**: file list + changed line ranges for its module. Reviewers read
-  full files and fetch diffs themselves — coordinator does NOT pass raw diff.
+- **Scope**: file list + changed line ranges for its module. Reviewers fetch
+  diffs and read additional context themselves as needed — coordinator does NOT
+  pass raw diff or file contents.
 - **Checklist**: `code-checklist.md` for code, `doc-checklist.md` for doc, both
   for mixed.
-- **Evidence requirement**: every issue must have a code citation (file:line + snippet).
+- **Evidence requirement**: every issue must have a code citation (file:line + snippet) from the current tree.
 - **Known-issue exclusion** (round 2+): skip issues matching the coordinator's
   exclusion list. Focus on finding new issues.
 - **Checklist exclusion**: see the exclusion section in the corresponding
   checklist. Project rules loaded in context take priority.
 - **Self-check**: before submitting, re-read the relevant code and verify each
-  issue. Mark as confirmed or withdrawn. Only submit confirmed issues.
+  issue. Mark as confirmed or withdrawn. Only submit confirmed issues. If a cited
+  path/line no longer exists, locate the correct file/path via `git diff --name-only`
+  or file search before reporting.
 - **Output format**: `[file:line] [A/B/C] — [description] — [key lines]`
 
 **PR comment reviewer** (when `PR_COMMENTS` exist, round 1 only): one additional
@@ -209,15 +215,13 @@ Important constraints:
 
 ### After review
 
-- `FIX_MODE` = none → close all agents, close the team → Phase 7 (Report).
+- `FIX_MODE` = none → close all agents, close the team → Phase 3.
 - `FIX_MODE` ≠ none → **keep all reviewers alive** (reused as fixers in
   Phase 4), close the verifier → Phase 3.
 
 ---
 
 ## Phase 3: Filter — coordinator only
-
-*Skipped when `FIX_MODE` = none.*
 
 Your stance here is **neutral** — trust no single party. Treat reviewer reports
 and verifier rebuttals as equally weighted inputs. Use your project-wide view to
@@ -260,7 +264,8 @@ All confirmed issues are recorded with risk level.
   create a follow-up fix task.
 - Previously rolled-back issues: do not attempt again this round.
 
-→ Phase 4 if auto-fix queue is non-empty; otherwise → Phase 5.
+If `FIX_MODE` = none → Phase 7 (Report).
+Otherwise → Phase 4 if auto-fix queue is non-empty; Phase 5 if empty.
 
 ---
 
@@ -277,11 +282,14 @@ scope. The coordinator MUST NOT apply fixes directly.
 
 **Agent assignment**: reuse surviving reviewers as fixers — each reviewer
 already has context on the files it reviewed. Coordinator dynamically assigns
-fix tasks:
+fix tasks. The coordinator MUST assign by explicit file list and ensure a file
+is owned by only one fixer at a time:
 
 - Issue in a file that a reviewer already read → assign to that reviewer.
 - Cross-file issues or issues with no matching reviewer → assign to a
   `fixer-cross` agent (create one if needed).
+- Cross-module fixes: assign to the reviewer that owns the target files or to
+  `fixer-cross`, and include the full file list in the task.
 - Multi-file renames → single atomic task assigned to one agent.
 
 One agent may receive multiple fix tasks if it covers several files. Avoid
@@ -295,18 +303,20 @@ Each fixer receives:
 ```
 Fix rules:
 1. After fixing each issue, immediately: git commit --only <files> -m "message"
-2. Only commit files in your own module. Never use git add .
-3. Commit message: English, under 120 characters, ending with a period.
-4. When in doubt, skip the fix rather than risk a wrong change.
-5. Do not run build or tests.
-6. Do not modify public API function signatures or class definitions (comments are OK),
+2. Only modify files explicitly assigned by the coordinator. Never use git add .
+3. If a fix requires changes to unassigned files, stop and report to the coordinator
+   for re-assignment.
+4. Commit message: English, under 120 characters, ending with a period.
+5. When in doubt, skip the fix rather than risk a wrong change.
+6. Do not run build or tests.
+7. Do not modify public API function signatures or class definitions (comments are OK),
    unless the coordinator's issue description explicitly requires an API signature fix.
-7. After each fix, check whether the change affects related comments or documentation
+8. After each fix, check whether the change affects related comments or documentation
    within your assigned files (function/class doc-comments, inline comments describing
    the changed logic). If so, update them in the same commit as the fix.
    Cross-module documentation updates (README, spec files, other modules) are handled
    separately by the coordinator.
-8. When done, report the commit hash for each fix and list any skipped issues with
+9. When done, report the commit hash for each fix and list any skipped issues with
    the reason for skipping.
 ```
 
@@ -354,10 +364,10 @@ Present `pending` + `failed` issues grouped by risk (high → low), sorted by
 file path within each group:
 `[number] [file:line] [risk] [reason] — [description]`
 
-- **≤5 issues**: individual fix/skip choices per issue.
-- **>5 issues**: Fix all / Skip all / By risk group / Individual
-
-Mark selected `approved`, declined `skipped`.
+Then ask the user to select which issues to fix using **a single multi-select
+question** where each option's label is the issue summary (e.g.,
+`[risk] file:line — description`). User checks multiple options in one prompt.
+Checked → `approved`, unchecked → `skipped`.
 
 - **All skipped** → Phase 7.
 - **Any approved** → Phase 4 (Fix/Validate). After Validate, go to Phase 5
@@ -377,31 +387,3 @@ Summary:
 - Rolled-back issues and reasons
 - Final test result
 - Issues from PR comments (when `PR_COMMENTS` existed)
-
----
-
-## Appendix: CR_STATE_FILE Format
-
-Use this format to record issues in the `# Issues` section of `CR_STATE_FILE`.
-
-**Status values**:
-- `pending` — recorded, awaiting user decision in Phase 6
-- `approved` — user approved fix in Phase 6, sent to Phase 4
-- `fixed` — fix applied and passed validation
-- `failed` — fix attempted but failed validation after retries
-- `skipped` — user declined or issue rejected (do not re-report)
-
-```markdown
-# Issues
-
-## 1. [brief description]
-- **Status**: pending | approved | fixed | failed | skipped
-- **Reason**: [why not auto-fixed, e.g., "above auto-fix threshold (high risk)",
-  "fix failed: build error after 2 retries", "rolled back: introduced regression"]
-- **Risk**: low | medium | high
-- **File**: [file path:line number]
-- **Current**: [what the code does now]
-- **Proposed**: [what the fix would change — for medium/high risk, include the
-  specific approach chosen by the coordinator and the reasoning]
-- **Impact**: [what else would be affected]
-```

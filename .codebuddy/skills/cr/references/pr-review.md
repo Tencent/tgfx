@@ -1,8 +1,8 @@
 # PR Review
 
-Review for pull requests. Issues are submitted as line-level PR comments.
-
-Auto-fix is not available in PR mode.
+PR review uses **Worktree mode** — fetch the PR branch locally so review can
+read related code across modules, at the exact version of the PR branch. This
+is critical for review accuracy.
 
 ## References
 
@@ -14,122 +14,106 @@ Auto-fix is not available in PR mode.
 
 ---
 
-## Step 1: Scope
+## Step 1: Create worktree
 
-### Clean up leftover worktrees
+If `$ARGUMENTS` is a URL, extract the PR number from it.
 
-Check for and remove leftover worktree directories from previous sessions:
+Clean up leftover worktrees from previous sessions:
+```bash
+for dir in /tmp/pr-review-*; do
+    [ -d "$dir" ] || continue
+    n=$(basename "$dir" | sed 's/pr-review-//')
+    git worktree remove "$dir" 2>/dev/null
+    git branch -D "pr-${n}" 2>/dev/null
+done
 ```
-ls -d /tmp/pr-review-* 2>/dev/null
+
+Validate PR target:
+```bash
+gh repo view --json nameWithOwner --jq .nameWithOwner
+gh pr view {number} --json headRefName,baseRefName,headRefOid,state,body
 ```
-If any exist, clean up each one:
+Record `OWNER_REPO`. Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`,
+`PR_BODY`.
+If either command fails, inform the user and abort.
+If `$ARGUMENTS` is a URL containing `{owner}/{repo}`, verify it matches
+`OWNER_REPO`. If not, inform the user that cross-repo PR review is not
+supported and abort.
+If `STATE` is not `OPEN`, inform the user and exit.
+
+**If current branch equals `PR_BRANCH` and HEAD equals `HEAD_SHA`**, skip
+worktree creation — the code is already local.
+
+**Otherwise**, create a worktree:
+```bash
+git fetch origin pull/{number}/head:pr-{number}
+git worktree add --no-track /tmp/pr-review-{number} pr-{number}
+cd /tmp/pr-review-{number}
 ```
-git worktree remove /tmp/pr-review-{N} 2>/dev/null
-git branch -D pr-{N} 2>/dev/null
-```
-
-1. **Validate PR target and fetch metadata**:
-   If `$ARGUMENTS` is a URL, extract the PR number from it for use in
-   subsequent steps.
-   ```
-   gh repo view --json nameWithOwner --jq .nameWithOwner
-   gh pr view {number} --json headRefName,baseRefName,headRefOid,state,body
-   ```
-   Record `OWNER_REPO` from the first command (used in later steps).
-   If either command fails (not a git repo, gh not installed, not
-   authenticated, or PR not found), inform the user and abort.
-   If `$ARGUMENTS` is a URL containing `{owner}/{repo}`, verify it matches
-   `OWNER_REPO`. If not, inform the user that cross-repo PR review is not
-   supported and suggest switching to the target repository first, then abort.
-   Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`, `PR_BODY`.
-   If `STATE` is not `OPEN`, inform the user and exit.
-
-2. **Prepare working directory**:
-   - If current branch equals `PR_BRANCH` and HEAD equals `HEAD_SHA` → use
-     current directory directly.
-   - Otherwise:
-     - Clean up any existing worktree for this PR number:
-       ```
-       git worktree remove /tmp/pr-review-{number} 2>/dev/null
-       git branch -D pr-{number} 2>/dev/null
-       ```
-     - Create a fresh worktree:
-       ```
-       git fetch origin pull/{number}/head:pr-{number}
-       git worktree add --no-track /tmp/pr-review-{number} pr-{number}
-       ```
-       If worktree creation fails, inform the user and abort.
-       All subsequent operations use the worktree directory. Record `WORKTREE_DIR`.
-
-   **Do NOT use `gh pr diff` or any remote API to substitute for a local
-   worktree — all file reads and diffs must be performed against local files.**
-
-3. **Set review scope** (run inside `WORKTREE_DIR` if created):
-   ```
-   git fetch origin {BASE_BRANCH}
-   git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
-   ```
-   If the diff exceeds 200 lines, first run `git diff --stat` to get an
-   overview, then read the diff per file using `git diff -- {file}` to avoid
-   output truncation.
-
-4. **Fetch existing PR review comments** for de-duplication in Step 2:
-   ```
-   gh api repos/{OWNER_REPO}/pulls/{number}/comments
-   ```
-   Store as `EXISTING_PR_COMMENTS`.
-
-If diff is empty → exit.
+If worktree creation fails, inform the user and abort.
 
 ---
 
-## Step 2: Review
+## Step 2: Collect diff and context
 
-1. **Read changed files**: Read the full content of every file that appears in
-   the diff (not just the changed lines — full file context is needed for
-   accurate review).
-2. **Read referenced context**: For each changed file, identify symbols (types,
-   base classes, called functions) that are defined elsewhere and are relevant
-   to understanding the change's correctness. Read those definitions. Stop
-   expanding when the change's behavior can be fully evaluated.
-3. **Understand author intent**: Read `PR_BODY` (fetched in Step 1) to
-   understand the stated motivation and approach. Verify the implementation
-   actually achieves what the author describes.
-4. **Apply checklists**: Apply `code-checklist.md` to code files,
-   `doc-checklist.md` to documentation files.
+```bash
+git fetch origin {BASE_BRANCH}
+git merge-base origin/{BASE_BRANCH} HEAD
+git diff <merge-base-sha>
+```
+If the diff exceeds 200 lines, first run `git diff --stat` to get an overview,
+then read the diff per file using `git diff -- {file}` to avoid output
+truncation.
 
-For each issue found:
-- Provide a code citation (file:line + snippet).
-- Self-verify before confirming — re-read the surrounding code and check:
-  - Is there a guard, null check, or early return elsewhere that already
-    handles this case?
-  - Does the call chain guarantee preconditions that make this issue
-    impossible?
-  - Am I misunderstanding the variable's lifetime or ownership?
-  If any of these apply, withdraw the issue.
-- De-duplicate against `EXISTING_PR_COMMENTS` — skip issues already covered.
+If diff is empty → clean up worktree and exit.
+
+Fetch existing PR review comments for de-duplication:
+```bash
+gh api repos/{OWNER_REPO}/pulls/{number}/comments
+```
 
 ---
 
-## Step 2.5: Worktree cleanup
+## Step 3: Review
 
-After review is complete, immediately clean up the worktree before reporting
-results. All necessary information (issue list, file paths, line numbers, code
-snippets) has already been collected — local files are no longer needed.
+**Internal analysis**:
 
-If `WORKTREE_DIR` was created:
-```
-cd {original_directory}
-git worktree remove {WORKTREE_DIR}
+1. Based on the diff, read relevant code context as needed to understand the
+   change's correctness (e.g., surrounding logic, base classes, callers).
+2. Read `PR_BODY` to understand the stated motivation. Verify the
+   implementation actually achieves what the author describes.
+3. Apply `code-checklist.md` to code files, `doc-checklist.md` to
+   documentation files. Use `judgment-matrix.md` to decide whether each issue
+   is worth reporting.
+4. Check whether issues raised in previous PR comments have been fixed.
+5. For each potential issue, perform a second-pass verification: re-read the
+   surrounding code and check — is there a guard or early return elsewhere
+   that handles this? Does the call chain guarantee preconditions? Am I
+   misunderstanding lifetime or ownership?
+6. **Discard all ruled-out issues. Keep only issues confirmed to exist.**
+7. De-duplicate confirmed issues against existing PR comments.
+
+**Output rule**: only present the final confirmed issues to the user. Do not
+output analysis process, exclusion reasoning, or issues that were considered
+but ruled out.
+
+---
+
+## Step 4: Clean up and report
+
+If a worktree was created, clean it up:
+```bash
+cd -
+git worktree remove /tmp/pr-review-{number}
 git branch -D pr-{number}
 ```
 
----
+Present results to user:
+- Summary: one paragraph describing the purpose and scope of the change.
+- Overall assessment: code quality evaluation and key improvement directions.
+- Issue list (or "no issues found" if clean).
 
-## Step 3: Report
-
-If no issues found → inform the user that the review is clean, summarize the
-key areas checked, and ask whether to submit an approval review on the PR:
+If no issues → ask whether to submit an approval review on the PR:
 ```bash
 gh api repos/{OWNER_REPO}/pulls/{number}/reviews --input - <<'EOF'
 {
@@ -146,11 +130,14 @@ If issues found → present confirmed issues to user in the following format:
 {N}. [{priority}] {file}:{line} — {description of the problem and suggested fix}
 ```
 
-Where `{priority}` is the checklist item ID (e.g., A2, B1, C7). User selects
-which to submit as PR comments, declines are marked `skipped`.
+Where `{priority}` is the checklist item ID (e.g., A2, B1, C7). Then ask the
+user to select which issues to submit using **a single multi-select question**
+where each option's label is the issue summary (e.g.,
+`[A2] file:line — description`). User checks multiple options in one prompt.
+Unchecked issues are skipped.
 
-Submit as a **single** GitHub PR review with line-level comments via `gh api`.
-Do NOT use `gh pr comment` or `gh pr review`.
+**Must** use `gh api` + heredoc. Do not use `gh pr comment`, `gh pr review`,
+or any command that creates non-line-level comments:
 
 ```bash
 gh api repos/{OWNER_REPO}/pulls/{number}/reviews --input - <<'EOF'
@@ -172,7 +159,7 @@ EOF
 - `commit_id`: HEAD SHA of the PR branch
 - `path`: relative to repository root
 - `line`: line number in the **new** file (right side of diff). Must be
-  determined during Step 2 by reading the actual file in the worktree — do
+  determined during Step 3 by reading the actual file in the worktree — do
   not derive from diff hunk offsets.
 - `side`: always `"RIGHT"`
 - `body`: concise, in the user's conversation language, with a specific fix
