@@ -1,6 +1,10 @@
 # PR Review
 
-Review for pull requests. Issues are submitted as line-level PR comments.
+PR review uses **Worktree mode**: fetch the PR branch locally so that all file
+reads, diffs, and context exploration run against local files. This is required
+because review needs to read full file contents and follow cross-file references
+(base classes, callers, type definitions) — remote diff APIs only return changed
+lines and cannot provide this context.
 
 ## Input from SKILL.md
 
@@ -18,29 +22,21 @@ Auto-fix is not available in PR mode.
 
 ---
 
-## Step 1: Prepare code and diff
+## Step 1: Create worktree
 
 If `$ARGUMENTS` is a URL, extract the PR number from it.
 
-Fetch PR metadata (one call):
+Check whether the current branch is already the PR branch:
 ```bash
-gh pr view {number} --json headRefName,baseRefName,headRefOid,state,body
-```
-Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`, `PR_BODY`.
-If `STATE` is not `OPEN`, inform the user and exit.
-
-Check current branch:
-```bash
-git branch --show-current
+CURRENT_BRANCH=$(git branch --show-current)
+PR_BRANCH=$(gh pr view {number} --json headRefName --jq .headRefName)
+[ "$PR_BRANCH" = "$CURRENT_BRANCH" ]
 ```
 
-**If current branch equals `PR_BRANCH`**, work in the current directory:
-```bash
-git fetch origin {BASE_BRANCH}
-git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
-```
+**If current branch equals `PR_BRANCH`**, skip worktree creation — the code is
+already local.
 
-**Otherwise**, create a worktree and work there:
+**Otherwise**, create a worktree:
 ```bash
 # Clean up leftover worktrees from previous sessions
 for dir in /tmp/pr-review-*; do
@@ -54,17 +50,29 @@ done
 git fetch origin pull/{number}/head:pr-{number}
 git worktree add --no-track /tmp/pr-review-{number} pr-{number}
 cd /tmp/pr-review-{number}
+```
 
-# Get diff
+---
+
+## Step 2: Collect diff and context
+
+Fetch PR metadata:
+```bash
+gh pr view {number} --json baseRefName,headRefOid,state,body
+```
+Extract: `BASE_BRANCH`, `HEAD_SHA`, `STATE`, `PR_BODY`.
+If `STATE` is not `OPEN`, inform the user, clean up worktree, and exit.
+
+Get diff:
+```bash
 git fetch origin {BASE_BRANCH}
 git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
 ```
-
 If the diff exceeds 200 lines, first run `git diff --stat` to get an overview,
 then read the diff per file using `git diff -- {file}` to avoid output
 truncation.
 
-Fetch existing PR review comments for de-duplication in Step 2:
+Fetch existing PR review comments for de-duplication:
 ```bash
 gh api repos/{owner}/{repo}/pulls/{number}/comments
 ```
@@ -74,14 +82,14 @@ If diff is empty → clean up worktree (if created) and exit.
 
 ---
 
-## Step 2: Review
+## Step 3: Review
 
 For each changed file, read its full content using the Read tool (not just
 the diff — full file context is needed for accurate review). Then read
 definitions of referenced symbols (types, base classes, called functions) that
 are relevant to understanding the change's correctness.
 
-Read `PR_BODY` (from Step 1) to understand the stated motivation and approach.
+Read `PR_BODY` (from Step 2) to understand the stated motivation and approach.
 Verify the implementation actually achieves what the author describes.
 
 Apply `code-checklist.md` to code files, `doc-checklist.md` to documentation
@@ -100,7 +108,7 @@ For each issue found:
 
 ---
 
-## Step 3: Clean up and report
+## Step 4: Clean up and report
 
 If a worktree was created, clean it up first:
 ```bash
