@@ -99,7 +99,12 @@ git worktree remove /tmp/pr-review-{number}
 git branch -D pr-{number}
 ```
 
-**If no issues found** → inform the user, and ask whether to submit an approval:
+Present results to user:
+- Summary: one paragraph describing the purpose and scope of the change.
+- Overall assessment: code quality evaluation and key improvement directions.
+- Issue list (or "no issues" if none).
+
+**If no issues found** → ask whether to submit an approval:
 ```bash
 gh api repos/{OWNER_REPO}/pulls/{number}/reviews --input - <<'EOF'
 {
@@ -115,10 +120,10 @@ EOF
 {N}. [{priority}] {file}:{line} — {description and suggested fix}
 ```
 
-User selects which to submit as PR comments, declines are marked `skipped`.
+Ask user which issues to submit as line-level PR comments.
 
-Submit as a **single** GitHub PR review with line-level comments using
-`gh api` + heredoc:
+**Must** use `gh api` + heredoc. Do not use `gh pr comment`, `gh pr review`,
+or any command that creates non-line-level comments:
 
 ```bash
 gh api repos/{OWNER_REPO}/pulls/{number}/reviews --input - <<'EOF'
