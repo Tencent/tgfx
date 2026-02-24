@@ -120,7 +120,9 @@ EOF
 {N}. [{priority}] {file}:{line} — {description and suggested fix}
 ```
 
-Ask user which issues to submit as line-level PR comments.
+Ask user which issues to submit using a multi-select interactive prompt, with
+each issue as a selectable option. Submit selected issues as line-level PR
+comments.
 
 **Must** use `gh api` + heredoc. Do not use `gh pr comment`, `gh pr review`,
 or any command that creates non-line-level comments:
