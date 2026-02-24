@@ -18,79 +18,57 @@ Auto-fix is not available in PR mode.
 
 ---
 
-## Step 0: Prepare working directory
+## Step 1: Prepare code and diff
 
-> **!! CRITICAL**: Do NOT use `gh pr diff`, `gh api`, or any remote API to
-> read file contents or diffs as a substitute for local files. ALL file
-> reads, diffs, and context exploration MUST be performed against local
-> files. Violating this rule invalidates the entire review.
+If `$ARGUMENTS` is a URL, extract the PR number from it.
 
-### Validate PR and fetch metadata
-
-If `$ARGUMENTS` is a URL, extract the PR number from it for use in subsequent
-steps.
-```
-gh repo view --json nameWithOwner --jq .nameWithOwner
+Fetch PR metadata (one call):
+```bash
 gh pr view {number} --json headRefName,baseRefName,headRefOid,state,body
 ```
-Record `OWNER_REPO` from the first command (used in later steps).
-If either command fails (not a git repo, gh not installed, not authenticated,
-or PR not found), inform the user and abort.
-If `$ARGUMENTS` is a URL containing `{owner}/{repo}`, verify it matches
-`OWNER_REPO`. If not, inform the user that cross-repo PR review is not
-supported and suggest switching to the target repository first, then abort.
 Extract: `PR_BRANCH`, `BASE_BRANCH`, `HEAD_SHA`, `STATE`, `PR_BODY`.
 If `STATE` is not `OPEN`, inform the user and exit.
 
-### Create worktree
+Check current branch:
+```bash
+git branch --show-current
+```
 
-Create a worktree to isolate the PR code. The only exception is when the
-current branch already equals `PR_BRANCH` and HEAD equals `HEAD_SHA` — in
-that case, use the current directory and record `REVIEW_DIR` as the current
-directory, then skip the rest of this subsection.
+**If current branch equals `PR_BRANCH`**, work in the current directory:
+```bash
+git fetch origin {BASE_BRANCH}
+git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
+```
 
-Otherwise:
-- Clean up leftover worktrees from previous sessions and any existing worktree
-  for this PR number:
-  ```
-  for dir in /tmp/pr-review-*; do
-      [ -d "$dir" ] || continue
-      n=$(basename "$dir" | sed 's/pr-review-//')
-      git worktree remove "$dir" 2>/dev/null
-      git branch -D "pr-${n}" 2>/dev/null
-  done
-  ```
-- Create a fresh worktree:
-  ```
-  git fetch origin pull/{number}/head:pr-{number}
-  git worktree add --no-track /tmp/pr-review-{number} pr-{number}
-  ```
-  If worktree creation fails, inform the user and abort.
-  Record `REVIEW_DIR=/tmp/pr-review-{number}`.
+**Otherwise**, create a worktree and work there:
+```bash
+# Clean up leftover worktrees from previous sessions
+for dir in /tmp/pr-review-*; do
+    [ -d "$dir" ] || continue
+    n=$(basename "$dir" | sed 's/pr-review-//')
+    git worktree remove "$dir" 2>/dev/null
+    git branch -D "pr-${n}" 2>/dev/null
+done
 
-**All subsequent file reads, diffs, and grep operations MUST run inside
-`REVIEW_DIR`.**
+# Create worktree and switch into it
+git fetch origin pull/{number}/head:pr-{number}
+git worktree add --no-track /tmp/pr-review-{number} pr-{number}
+cd /tmp/pr-review-{number}
 
----
+# Get diff
+git fetch origin {BASE_BRANCH}
+git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
+```
 
-## Step 1: Scope
+If the diff exceeds 200 lines, first run `git diff --stat` to get an overview,
+then read the diff per file using `git diff -- {file}` to avoid output
+truncation.
 
-All commands in this step run inside `REVIEW_DIR`.
-
-1. **Set review scope**:
-   ```
-   git fetch origin {BASE_BRANCH}
-   git diff $(git merge-base origin/{BASE_BRANCH} HEAD)
-   ```
-   If the diff exceeds 200 lines, first run `git diff --stat` to get an
-   overview, then read the diff per file using `git diff -- {file}` to avoid
-   output truncation.
-
-2. **Fetch existing PR review comments** for de-duplication in Step 2:
-   ```
-   gh api repos/{OWNER_REPO}/pulls/{number}/comments
-   ```
-   Store as `EXISTING_PR_COMMENTS`.
+Fetch existing PR review comments for de-duplication in Step 2:
+```bash
+gh api repos/{owner}/{repo}/pulls/{number}/comments
+```
+Store as `EXISTING_PR_COMMENTS`.
 
 If diff is empty → clean up worktree (if created) and exit.
 
@@ -98,20 +76,16 @@ If diff is empty → clean up worktree (if created) and exit.
 
 ## Step 2: Review
 
-1. **Read changed files**: Read the full content of every file that appears in
-   the diff from local files (not just the changed lines — full file context is
-   needed for accurate review). Use absolute paths under `REVIEW_DIR` for all
-   file reads.
-2. **Read referenced context**: For each changed file, identify symbols (types,
-   base classes, called functions) that are defined elsewhere and are relevant
-   to understanding the change's correctness. Read those definitions from local
-   files. Stop expanding when the change's behavior can be fully evaluated.
-3. **Understand author intent**: Read `PR_BODY` (fetched in Step 0) to
-   understand the stated motivation and approach. Verify the implementation
-   actually achieves what the author describes.
-4. **Apply checklists**: Apply `code-checklist.md` to code files,
-   `doc-checklist.md` to documentation files. Only include priority levels the
-   user selected.
+For each changed file, read its full content using the Read tool (not just
+the diff — full file context is needed for accurate review). Then read
+definitions of referenced symbols (types, base classes, called functions) that
+are relevant to understanding the change's correctness.
+
+Read `PR_BODY` (from Step 1) to understand the stated motivation and approach.
+Verify the implementation actually achieves what the author describes.
+
+Apply `code-checklist.md` to code files, `doc-checklist.md` to documentation
+files. Only include priority levels the user selected.
 
 For each issue found:
 - Provide a code citation (file:line + snippet).
@@ -126,36 +100,27 @@ For each issue found:
 
 ---
 
-## Step 2.5: Worktree cleanup
+## Step 3: Clean up and report
 
-After review is complete, immediately clean up the worktree before reporting
-results. All necessary information (issue list, file paths, line numbers, code
-snippets) has already been collected — local files are no longer needed.
-
-If a worktree was created:
-```
-cd {original_directory}
+If a worktree was created, clean it up first:
+```bash
+cd -
 git worktree remove /tmp/pr-review-{number}
 git branch -D pr-{number}
 ```
 
----
-
-## Step 3: Report
-
-If no issues found → inform the user that the review is clean, summarize the
-key areas checked, and ask whether to submit an approval review on the PR:
+**If no issues found** → inform the user that the review is clean, summarize
+the key areas checked, and ask whether to submit an approval review:
 ```bash
-gh api repos/{OWNER_REPO}/pulls/{number}/reviews --input - <<'EOF'
+gh api repos/{owner}/{repo}/pulls/{number}/reviews --input - <<'EOF'
 {
   "commit_id": "{HEAD_SHA}",
   "event": "APPROVE"
 }
 EOF
 ```
-Skip the comment submission below.
 
-If issues found → present confirmed issues to user in the following format:
+**If issues found** → present confirmed issues:
 
 ```
 {N}. [{priority}] {file}:{line} — {description of the problem and suggested fix}
@@ -164,11 +129,11 @@ If issues found → present confirmed issues to user in the following format:
 Where `{priority}` is the checklist item ID (e.g., A2, B1, C7). User selects
 which to submit as PR comments, declines are marked `skipped`.
 
-Submit as a **single** GitHub PR review with line-level comments via `gh api`.
-Do NOT use `gh pr comment` or `gh pr review`.
+Submit as a **single** GitHub PR review with line-level comments. **Must** use
+`gh api` + heredoc:
 
 ```bash
-gh api repos/{OWNER_REPO}/pulls/{number}/reviews --input - <<'EOF'
+gh api repos/{owner}/{repo}/pulls/{number}/reviews --input - <<'EOF'
 {
   "commit_id": "{HEAD_SHA}",
   "event": "COMMENT",
@@ -184,13 +149,9 @@ gh api repos/{OWNER_REPO}/pulls/{number}/reviews --input - <<'EOF'
 EOF
 ```
 
-- `commit_id`: HEAD SHA of the PR branch
 - `path`: relative to repository root
-- `line`: line number in the **new** file (right side of diff). Must be
-  determined during Step 2 by reading the actual file in the worktree — do
-  not derive from diff hunk offsets.
+- `line`: line number in the **new** file (right side of diff)
 - `side`: always `"RIGHT"`
-- `body`: concise, in the user's conversation language, with a specific fix
-  suggestion when possible
+- `body`: concise, in the user's conversation language
 
 Summary of issues found / submitted / skipped.
