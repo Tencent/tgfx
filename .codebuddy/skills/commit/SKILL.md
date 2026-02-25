@@ -1,6 +1,7 @@
 ---
 name: commit
-description: Commit local changes without pushing. Use when user says "commit", "save changes", "commit my work", or "commit code".
+description: Commit local changes without pushing.
+disable-model-invocation: true
 ---
 
 # Commit — Local Commit Only
@@ -15,8 +16,6 @@ If on the default branch, creates a new branch first.
 - **NEVER** push. This skill only creates local commits.
 - All user-facing text must use the language the user has been using in the
   conversation. Do not default to English.
-- When presenting choices, use interactive dialogs with selectable options
-  rather than plain text.
 
 ---
 
@@ -31,7 +30,7 @@ If on {default_branch}, create a new branch before committing:
 
 - Generate a branch name following the project's branch naming convention if
   one exists; otherwise use `feature/{username}_topic` or
-  `bugfix/{username}_topic` (`{username}` = git config user.name, lowercase).
+  `bugfix/{username}_topic` (`{username}` = local git username, lowercase; obtain via `git config user.name`).
 - `git checkout -b {branch_name}`
 
 ---
@@ -41,14 +40,11 @@ If on {default_branch}, create a new branch before committing:
 Run `git status --porcelain` and inspect the output:
 
 - **No output** → no local changes. Inform the user and stop.
-- **Both staged and unstaged changes** → ask the user: commit only the staged
-  files (**partial**), or stage everything (**full**)?
-- **Otherwise** → **full** (stage everything).
-
-If **full**: run `git add -A`. If **partial**: skip (files are already staged).
+- **Otherwise** → run `git add -A` to stage everything.
 
 Read the staged diff (`git diff --cached`) and generate a commit message
 following the project's commit conventions. If no convention is found, default
-to a concise English message under 120 characters describing the change.
+to a concise English message under 120 characters ending with a period, with no other punctuation, focusing on user-perceivable changes.
 
-Commit and output the commit message to the user.
+Commit, then output a single line in the format:
+`已提交 {short_hash}：{commit message}`

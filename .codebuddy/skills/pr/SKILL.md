@@ -1,6 +1,7 @@
 ---
 name: pr
-description: Commit and push changes, then create a new PR or append to an existing one. Use when user says "submit PR", "push changes", "create pull request", or "open a PR".
+description: Commit and push changes, then create a new PR or append to an existing one.
+disable-model-invocation: true
 ---
 
 # PR — Commit & Push
@@ -31,7 +32,7 @@ Determine the remote's default branch and store as `{default_branch}`.
 
 | Current branch | Open PR on this branch | Mode |
 |----------------|------------------------|------|
-| {default_branch} | — | **Create** |
+| {default_branch} | N/A (new branch) | **Create** |
 | other | yes | **Append** |
 | other | no | **Create** |
 
@@ -41,7 +42,7 @@ Determine the remote's default branch and store as `{default_branch}`.
 
 Run `git status --porcelain` and inspect the output:
 
-- **No output** → no local changes. Skip to Step 3.
+- **No output** → no local changes. Skip to Step 3 (there may be unpushed commits to push).
 - **Both staged and unstaged changes** → ask the user: commit only the staged
   files (**partial**), or stage everything (**full**)?
 - **Otherwise** → **full** (stage everything).
@@ -50,7 +51,7 @@ If **full**: run `git add -A`. If **partial**: skip (files are already staged).
 
 Read the staged diff (`git diff --cached`) and generate a commit message
 following the project's commit conventions. If no convention is found, default
-to a concise English message under 120 characters describing the change.
+to a concise English message under 120 characters ending with a period, with no other punctuation, focusing on user-perceivable changes.
 
 ---
 
@@ -72,7 +73,7 @@ generate:
 
 - **Branch name** (only when on {default_branch}): follow the project's branch
   naming convention if one exists; otherwise use `feature/{username}_topic` or
-  `bugfix/{username}_topic` (`{username}` = git config user.name, lowercase).
+  `bugfix/{username}_topic` (`{username}` = local git username, lowercase; obtain via `git config user.name`).
   When on a non-default branch, use the current branch name.
 - **PR title**: concise summary following project conventions, or a short
   English sentence if none found. May reuse the commit message when there is

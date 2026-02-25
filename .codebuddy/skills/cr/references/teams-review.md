@@ -1,12 +1,15 @@
 # Teams Review
 
 You are the **coordinator**. Create an Agent Team and dispatch reviewer,
-verifier, and fixer agents — this keeps your context focused on orchestration
-and issue judgment while agents handle reading and modifying files. This is
-critical for multi-round iteration: agents are disposable, so your context
-grows only by structured issue lists, not raw file contents, avoiding context
-compression that would lose track of earlier rounds. Never modify files
-directly. Read code only for arbitration and diagnosis.
+verifier, and fixer agents. This is critical for multi-round iteration: agents
+are disposable, so your context grows only by structured issue lists, not raw
+file contents — avoiding context compression that would lose track of earlier
+rounds. Never modify files directly. Read code only for arbitration and
+diagnosis.
+
+The review loop is designed for **uninterrupted multi-round iteration**.
+Always process all auto-fixable issues before involving the user. Do NOT pause
+to ask the user anything until Confirm (Phase 6) or Report (Phase 7).
 
 The reviewer–verifier adversarial pair is the core quality mechanism: reviewers
 find issues, verifiers challenge them. This two-party check significantly reduces
@@ -15,7 +18,7 @@ share conversation history.
 
 ## Input from SKILL.md
 
-- `FIX_MODE`: none | low | low_medium | full
+- `FIX_MODE`: low | low_medium | full
 
 ## References
 
@@ -24,26 +27,8 @@ share conversation history.
 | `code-checklist.md` | Code review checklist |
 | `doc-checklist.md` | Document review checklist |
 | `judgment-matrix.md` | Risk levels, worth-fixing criteria, special rules |
-| `scope-detection.md` | Shared scope detection logic |
-
-## Additional operating rules
-
-- **Agent lifecycle**: When closing agents, send the shutdown message and continue
-  immediately without waiting for acknowledgment. Do not block the workflow on
-  agent responses. When closing the team, force-terminate any agents
-  that are still running.
-- **Autonomy**: zero user interaction until Confirm (Phase 6) or Report
-  (Phase 7). Record anything unresolvable to `CR_STATE_FILE` for user review.
 
 ## Flow
-
-`FIX_MODE=none` follows a short path:
-
-```
-Scope → Review → Filter → Report
-```
-
-`FIX_MODE≠none` has two nested loops:
 
 ```
 Scope
@@ -79,7 +64,41 @@ fixes. The loop only exits to Confirm (if pending/failed remain) or Report
 
 ## Phase 1: Scope
 
-Follow `scope-detection.md` to determine the review scope and fetch the diff.
+Determine the diff to review based on `$ARGUMENTS`:
+
+- **Empty arguments**: determine the base branch from the current branch's
+  upstream tracking branch. If no upstream, fall back to `main` (or `master`).
+  Fetch the branch diff:
+  ```
+  git merge-base origin/{base_branch} HEAD
+  git diff <merge-base-sha>
+  ```
+- **Commit hash** (e.g., `abc123`): validate with `git rev-parse --verify`,
+  then `git show`.
+- **Commit range** (e.g., `abc123..def456` or `abc123...def456`): validate both
+  endpoints. Fetch the diff including both endpoints:
+  ```
+  git diff A~1..B
+  ```
+- **File/directory paths**: verify all paths exist on disk, then read file
+  contents.
+
+If diff is empty → show usage examples and exit:
+`/cr` (uncommitted changes or current branch),
+`/cr a1b2c3d`, `/cr a1b2c3d..e4f5g6h`,
+`/cr src/foo.cpp`, `/cr 123`, `/cr https://github.com/.../pull/123`.
+
+### Associated PR comments (optional, best-effort)
+
+If `gh` is available, check whether the current branch has an open PR:
+```
+gh pr view --json number,state --jq 'select(.state == "OPEN") | .number' 2>/dev/null
+```
+If an open PR exists, fetch its line-level review comments:
+```
+gh api repos/{owner}/{repo}/pulls/{number}/comments
+```
+Store as `PR_COMMENTS` for verification in the review step.
 
 ### Build baseline
 
@@ -98,10 +117,19 @@ group; group related small files together. Classify each module as `code`,
 
 ### Persist state
 
+Initialize `CR_STATE_FILE`: create `.cr-cache/` if it does not exist. Derive the
+filename from the review scope: `.cr-cache/{branch}.md` (sanitize `/` to `-`,
+e.g., `feature/dom_text_box` → `feature-dom_text_box.md`).
+
+If the file already exists (leftover from a concurrent or crashed session),
+find the lowest unused numeric suffix (`-2`, `-3`, …) and use that.
+Record the chosen path as `CR_STATE_FILE`.
+
 Write CR_STATE_FILE with session info (mode, threshold, file list, module
 assignments, changed line ranges, build/test commands) and an issues section
 updated incrementally. CR_STATE_FILE is owned by the coordinator — team agents
-never read or write it.
+never read or write it. Record anything unresolvable to CR_STATE_FILE for user
+review.
 
 **Issue format** in CR_STATE_FILE:
 
@@ -185,8 +213,17 @@ This step is mandatory — the coordinator MUST NOT skip it or perform
 verification itself.
 
 The verifier runs as a **pipeline** — it does not wait for all reviewers to
-finish. As each reviewer reports issues, the coordinator forwards them to the
-verifier immediately. Include the following verbatim in every verifier's prompt:
+finish. As each reviewer sends a report via SendMessage, the coordinator MUST
+forward it to the verifier immediately. Forwarding rules:
+
+- **Quote verbatim**: wrap the reviewer's original SendMessage content in a
+  quote block and send it as-is.
+- **No rewriting**: do not summarize, reorganize, merge multiple reviewer
+  reports into one message, or add coordinator commentary.
+- **One forward per reviewer**: each reviewer report is a separate message to
+  the verifier.
+
+Include the following verbatim in every verifier's prompt:
 
 ```
 You are a code review verifier. Your stance is adversarial — default to doubting the
@@ -215,13 +252,16 @@ Important constraints:
 
 ### After review
 
-- `FIX_MODE` = none → close all agents, close the team → Phase 3.
-- `FIX_MODE` ≠ none → **keep all reviewers alive** (reused as fixers in
-  Phase 4), close the verifier → Phase 3.
+Keep all reviewers alive (reused as fixers in Phase 4), close the verifier
+→ Phase 3.
 
 ---
 
 ## Phase 3: Filter — coordinator only
+
+Before entering this phase, confirm: (1) all reviewers have submitted their
+final reports; (2) the verifier has given a CONFIRM/REJECT verdict for every
+forwarded finding. Do NOT proceed until both conditions are met.
 
 Your stance here is **neutral** — trust no single party. Treat reviewer reports
 and verifier rebuttals as equally weighted inputs. Use your project-wide view to
@@ -264,14 +304,13 @@ All confirmed issues are recorded with risk level.
   create a follow-up fix task.
 - Previously rolled-back issues: do not attempt again this round.
 
-If `FIX_MODE` = none → Phase 7 (Report).
-Otherwise → Phase 4 if auto-fix queue is non-empty; Phase 5 if empty.
+Phase 4 if auto-fix queue is non-empty; Phase 5 if empty.
+Always auto-fix eligible issues first — do NOT present `pending` issues to the
+user before all auto-fixable issues have been processed and validated.
 
 ---
 
 ## Phase 4: Fix/Validate
-
-*Skipped when `FIX_MODE` = none.*
 
 This phase is an atomic unit reused by the Review Loop and post-Confirm flow.
 
@@ -337,8 +376,6 @@ Wait for all fixers. Run build + test.
 
 ## Phase 5: Continue?
 
-*Skipped when `FIX_MODE` = none.*
-
 ### Step 1: Close the current round's team
 
 Close the team to release reviewers and fixers. Force-terminate any unresponsive
@@ -350,15 +387,18 @@ agents.
 
 | Condition | → |
 |-----------|---|
-| New confirmed issues this round | Phase 2 (new review round) |
+| Any issues were confirmed and fixed this round | Phase 2 (new review round) |
 | `pending` or `failed` in CR_STATE_FILE | Phase 6 |
 | Otherwise | Phase 7 |
+
+The first condition means: if this round's review found real issues and fixes
+were applied, always do a fresh full review to catch issues the previous round
+may have missed. This is NOT a targeted re-check of the fixes — it is a
+complete new review of the entire scope with a fresh team.
 
 ---
 
 ## Phase 6: Confirm
-
-*When `FIX_MODE` = none, this phase is skipped — go directly to Phase 7.*
 
 Present `pending` + `failed` issues grouped by risk (high → low), sorted by
 file path within each group:
