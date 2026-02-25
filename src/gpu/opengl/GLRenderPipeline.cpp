@@ -75,10 +75,7 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
   //   Reference: https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/enable
   // - Desktop OpenGL 3.2+: Supports GL_SAMPLE_MASK (core feature)
   // Calling gl.enable(GL_SAMPLE_MASK) in WebGL or OpenGL ES 3.0 results in INVALID_ENUM error.
-  auto caps = gpu->caps();
-  bool supportsSampleMask = (caps->standard == GLStandard::GL) ||
-                            (caps->standard == GLStandard::GLES && caps->version >= GL_VER(3, 1));
-  if (supportsSampleMask) {
+  if (gpu->caps()->sampleMaskSupport) {
     bool sampleMaskEnabled = sampleMask != 0xFFFFFFFF;
     state->setEnabled(GL_SAMPLE_MASK, sampleMaskEnabled);
     if (sampleMaskEnabled) {

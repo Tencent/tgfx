@@ -79,6 +79,7 @@ class GLCaps {
   GLVendor vendor = GLVendor::Other;
   bool pboSupport = false;
   bool multisampleDisableSupport = false;
+  bool sampleMaskSupport = false;
   bool frameBufferFetchRequiresEnablePerSample = false;
   bool flushBeforeWritePixels = false;
 
