@@ -18,10 +18,9 @@
 
 #include "Quads3DDrawOp.h"
 #include "core/utils/ColorHelper.h"
-#include "core/utils/MathExtra.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/processors/QuadPerEdgeAA3DGeometryProcessor.h"
+#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -34,13 +33,12 @@ static constexpr uint32_t IndicesPerAAQuad = 30;
 
 PlacementPtr<Quads3DDrawOp> Quads3DDrawOp::Make(Context* context,
                                                 PlacementPtr<QuadsVertexProvider> provider,
-                                                uint32_t renderFlags,
-                                                const Quads3DDrawArgs& drawArgs) {
+                                                uint32_t renderFlags) {
   if (provider == nullptr) {
     return nullptr;
   }
   auto allocator = context->drawingAllocator();
-  auto drawOp = allocator->make<Quads3DDrawOp>(allocator, provider.get(), drawArgs);
+  auto drawOp = allocator->make<Quads3DDrawOp>(allocator, provider.get());
   if (provider->aaType() == AAType::Coverage || provider->quadCount() > 1) {
     drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
         provider->aaType() == AAType::Coverage, std::nullopt);
@@ -54,9 +52,13 @@ PlacementPtr<Quads3DDrawOp> Quads3DDrawOp::Make(Context* context,
   return drawOp;
 }
 
-Quads3DDrawOp::Quads3DDrawOp(BlockAllocator* allocator, QuadsVertexProvider* provider,
-                             const Quads3DDrawArgs& drawArgs)
-    : DrawOp(allocator, provider->aaType()), drawArgs(drawArgs), quadCount(provider->quadCount()) {
+Quads3DDrawOp::Quads3DDrawOp(BlockAllocator* allocator, QuadsVertexProvider* provider)
+    : DrawOp(allocator, provider->aaType()), quadCount(provider->quadCount()) {
+  if (!provider->hasUVCoord()) {
+    auto matrix = provider->firstMatrix();
+    matrix.invert(&matrix);
+    uvMatrix = matrix;
+  }
   if (!provider->hasColor()) {
     commonColor = ToPMColor(provider->firstColor(), nullptr);
   }
@@ -65,29 +67,10 @@ Quads3DDrawOp::Quads3DDrawOp(BlockAllocator* allocator, QuadsVertexProvider* pro
 PlacementPtr<GeometryProcessor> Quads3DDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
   ATTRIBUTE_NAME("quadCount", static_cast<int>(quadCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
-  // The actual size of the rendered texture is larger than the valid size, while the current
-  // NDC coordinates were calculated based on the valid size, so they need to be adjusted
-  // accordingly.
-  //
-  // NDC_Point is the projected vertex coordinate in NDC space, and NDC_Point_shifted is the
-  // adjusted NDC coordinate. scale1 and offset1 are transformation parameters passed externally,
-  // while scale2 and offset2 map the NDC coordinates from the valid space to the actual space.
-  //
-  // NDC_Point_shifted = ((NDC_Point * scale1) + offset1) * scale2 + offset2
-  auto renderTargetW = static_cast<float>(renderTarget->width());
-  DEBUG_ASSERT(!FloatNearlyZero(renderTargetW));
-  auto renderTargetH = static_cast<float>(renderTarget->height());
-  DEBUG_ASSERT(!FloatNearlyZero(renderTargetH));
-  const Vec2 scale2(drawArgs.viewportSize.width / renderTargetW,
-                    drawArgs.viewportSize.height / renderTargetH);
-  Vec2 ndcScale = drawArgs.ndcScale * scale2;
-  Vec2 ndcOffset = drawArgs.ndcOffset * scale2 + scale2 - Vec2(1.f, 1.f);
-  if (renderTarget->origin() == ImageOrigin::BottomLeft) {
-    ndcScale.y = -ndcScale.y;
-    ndcOffset.y = -ndcOffset.y;
-  }
-  return QuadPerEdgeAA3DGeometryProcessor::Make(allocator, aaType, drawArgs.transformMatrix,
-                                                ndcScale, ndcOffset, commonColor);
+  ATTRIBUTE_NAME("uvMatrix", uvMatrix);
+  return QuadPerEdgeAAGeometryProcessor::Make(allocator, renderTarget->width(),
+                                              renderTarget->height(), aaType, commonColor, uvMatrix,
+                                              false);
 }
 
 void Quads3DDrawOp::onDraw(RenderPass* renderPass) {

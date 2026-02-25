@@ -72,13 +72,28 @@ class QuadsVertexProvider : public VertexProvider {
     return quads.front()->color;
   }
 
+  /**
+   * Returns true if the provider generates UV coordinates.
+   */
+  bool hasUVCoord() const {
+    return _hasUVCoord;
+  }
+
+  /**
+   * Returns the first matrix in the provider.
+   */
+  const Matrix& firstMatrix() const {
+    return quads.front()->matrix;
+  }
+
  protected:
   QuadsVertexProvider(PlacementArray<QuadRecord>&& quads, AAType aaType, bool hasColor,
-                      std::shared_ptr<BlockAllocator> reference);
+                      bool hasUVCoord, std::shared_ptr<BlockAllocator> reference);
 
   PlacementArray<QuadRecord> quads = {};
   AAType _aaType = AAType::None;
   bool _hasColor = false;
+  bool _hasUVCoord = false;
 };
 
 }  // namespace tgfx

@@ -16,44 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "core/utils/Log.h"
-#include "tgfx/core/Point.h"
+#include "core/MatrixUtils.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 
-/**
- * QuadCW represents a quadrilateral with vertices in clockwise order.
- * Used for logical quad operations where edge connectivity matters.
- *
- * Vertex layout (clockwise):
- *   p0 -----> p1
- *   ^          |
- *   |          v
- *   p3 <----- p2
- *
- * Edge definitions (matching QUAD_AA_FLAG_EDGE_*):
- *   EDGE_01: p0 -> p1
- *   EDGE_12: p1 -> p2
- *   EDGE_23: p2 -> p3
- *   EDGE_30: p3 -> p0
- */
-class QuadCW {
- public:
-  constexpr QuadCW() = default;
-
-  constexpr QuadCW(const Point& p0, const Point& p1, const Point& p2, const Point& p3)
-      : points{p0, p1, p2, p3} {
+bool MatrixUtils::PreservesAngles(const Matrix& matrix) {
+  const auto mask = matrix.getType();
+  if (mask <= Matrix::TranslateMask) {
+    return true;
   }
-
-  const Point& point(size_t i) const {
-    DEBUG_ASSERT(i < 4);
-    return points[i];
+  if (mask & Matrix::PerspectiveMask) {
+    return false;
   }
-
- private:
-  Point points[4] = {};
-};
+  const auto sx = matrix.getScaleX();
+  const auto sy = matrix.getScaleY();
+  const auto kx = matrix.getSkewX();
+  const auto ky = matrix.getSkewY();
+  // Check for degenerate matrix.
+  if (const auto det = sx * sy - kx * ky; FloatNearlyZero(det)) {
+    return false;
+  }
+  // Check if basis vectors are orthogonal.
+  const auto dot = sx * kx + ky * sy;
+  return FloatNearlyZero(dot);
+}
 
 }  // namespace tgfx

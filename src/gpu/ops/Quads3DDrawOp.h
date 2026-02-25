@@ -18,40 +18,15 @@
 
 #pragma once
 
+#include <optional>
 #include "DrawOp.h"
 #include "core/utils/PlacementPtr.h"
 #include "gpu/QuadsVertexProvider.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/VertexBufferView.h"
-#include "tgfx/core/Matrix3D.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-
-/**
- * Quads3DDrawArgs defines arguments for 3D quad rendering.
- */
-struct Quads3DDrawArgs {
-  /**
-   * The transformation matrix from local space to clip space.
-   */
-  Matrix3D transformMatrix = Matrix3D::I();
-
-  /**
-   * The scaling and translation parameters in NDC space. After the projected model's vertex
-   * coordinates are transformed to NDC, ndcScale is applied for scaling, followed by ndcOffset for
-   * translation. These two properties allow any rectangular region of the projected model to be
-   * mapped to any position within the target texture.
-   */
-  Vec2 ndcScale = Vec2(1.f, 1.f);
-  Vec2 ndcOffset = Vec2(0.f, 0.f);
-
-  /**
-   * Reference viewport size, used to convert NDC coordinates to window coordinates. The external
-   * transformMatrix, ndcScale, and ndcOffset are all defined based on this viewport size.
-   */
-  Size viewportSize = Size(1.f, 1.f);
-};
 
 /**
  * Quads3DDrawOp draws a batch of 3D quads with per-edge anti-aliasing support.
@@ -63,11 +38,10 @@ class Quads3DDrawOp : public DrawOp {
    */
   static PlacementPtr<Quads3DDrawOp> Make(Context* context,
                                           PlacementPtr<QuadsVertexProvider> provider,
-                                          uint32_t renderFlags, const Quads3DDrawArgs& drawArgs);
+                                          uint32_t renderFlags);
 
  private:
-  Quads3DDrawOp(BlockAllocator* allocator, QuadsVertexProvider* provider,
-                const Quads3DDrawArgs& drawArgs);
+  Quads3DDrawOp(BlockAllocator* allocator, QuadsVertexProvider* provider);
 
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
@@ -77,10 +51,9 @@ class Quads3DDrawOp : public DrawOp {
     return Type::Quads3DDrawOp;
   }
 
-  Quads3DDrawArgs drawArgs;
-
   size_t quadCount = 0;
   std::optional<PMColor> commonColor = std::nullopt;
+  std::optional<Matrix> uvMatrix = std::nullopt;
 
   std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<VertexBufferView> vertexBufferProxyView = nullptr;

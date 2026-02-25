@@ -1193,8 +1193,7 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (!canPreserve3D()) {
     needsOffscreen = blendMode != BlendMode::SrcOver || !bitFields.passThroughBackground ||
                      (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
-                     (!_filters.empty() && !args.excludeEffects) || needsMaskFilter ||
-                     hasPerspective;
+                     (!_filters.empty() && !args.excludeEffects) || needsMaskFilter;
   }
   if (needsOffscreen) {
     // Content and children are rendered together in an offscreen buffer.

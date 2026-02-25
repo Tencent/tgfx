@@ -18,10 +18,9 @@
 
 #include "Context3DCompositor.h"
 #include <algorithm>
-#include <cmath>
 #include "BspTree.h"
 #include "core/images/TextureImage.h"
-#include "core/utils/MathExtra.h"
+#include "core/Matrix3DUtils.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/QuadRecord.h"
@@ -82,7 +81,7 @@ static bool IsExteriorEdge(unsigned cornerAEdge, unsigned cornerBEdge) {
  * Computes per-edge AA flags for a quad. An edge needs AA if both endpoints lie on the same
  * edge of the original rect (i.e., it's an exterior edge, not a BSP split edge).
  */
-static unsigned GetQuadAAFlags(const QuadCW& quad, const Rect& rect) {
+static unsigned GetQuadAAFlags(const Quad& quad, const Rect& rect) {
   const unsigned p0 = DeterminePointOnRectEdge(quad.point(0), rect);
   const unsigned p1 = DeterminePointOnRectEdge(quad.point(1), rect);
   const unsigned p2 = DeterminePointOnRectEdge(quad.point(2), rect);
@@ -90,16 +89,16 @@ static unsigned GetQuadAAFlags(const QuadCW& quad, const Rect& rect) {
 
   unsigned aaFlags = QUAD_AA_FLAG_NONE;
   if (IsExteriorEdge(p0, p1)) {
-    aaFlags |= QUAD_AA_FLAG_EDGE_01;
+    aaFlags |= QUAD_AA_FLAG_EDGE_0;
   }
-  if (IsExteriorEdge(p1, p2)) {
-    aaFlags |= QUAD_AA_FLAG_EDGE_12;
+  if (IsExteriorEdge(p1, p3)) {
+    aaFlags |= QUAD_AA_FLAG_EDGE_1;
   }
-  if (IsExteriorEdge(p2, p3)) {
-    aaFlags |= QUAD_AA_FLAG_EDGE_23;
+  if (IsExteriorEdge(p2, p0)) {
+    aaFlags |= QUAD_AA_FLAG_EDGE_2;
   }
-  if (IsExteriorEdge(p3, p0)) {
-    aaFlags |= QUAD_AA_FLAG_EDGE_30;
+  if (IsExteriorEdge(p3, p2)) {
+    aaFlags |= QUAD_AA_FLAG_EDGE_3;
   }
   return aaFlags;
 }
@@ -107,26 +106,17 @@ static unsigned GetQuadAAFlags(const QuadCW& quad, const Rect& rect) {
 /**
  * Returns the quad to draw and its AA flags based on whether it's a sub-quad or the original rect.
  */
-static std::pair<QuadCW, unsigned> GetQuadAndAAFlags(const Rect& originalRect, AAType aaType,
-                                                     const QuadCW* subQuad) {
-  QuadCW quad;
-  unsigned aaFlags = QUAD_AA_FLAG_NONE;
-
+static std::pair<Quad, unsigned> GetQuadAndAAFlags(const Rect& originalRect, AAType aaType,
+                                                   const Quad* subQuad) {
   if (subQuad != nullptr) {
-    quad = *subQuad;
+    auto aaFlags = QUAD_AA_FLAG_NONE;
     if (aaType == AAType::Coverage) {
-      aaFlags = GetQuadAAFlags(quad, originalRect);
+      aaFlags = GetQuadAAFlags(*subQuad, originalRect);
     }
-  } else {
-    quad = QuadCW(Point::Make(originalRect.left, originalRect.top),
-                  Point::Make(originalRect.right, originalRect.top),
-                  Point::Make(originalRect.right, originalRect.bottom),
-                  Point::Make(originalRect.left, originalRect.bottom));
-    if (aaType == AAType::Coverage) {
-      aaFlags = QUAD_AA_FLAG_ALL;
-    }
+    return {*subQuad, aaFlags};
   }
-
+  auto quad = Quad::MakeFrom(originalRect);
+  auto aaFlags = (aaType == AAType::Coverage) ? QUAD_AA_FLAG_ALL : QUAD_AA_FLAG_NONE;
   return {quad, aaFlags};
 }
 
@@ -154,7 +144,7 @@ void Context3DCompositor::drawPolygon(const DrawPolygon3D* polygon) {
 }
 
 void Context3DCompositor::drawQuads(const DrawPolygon3D* polygon,
-                                    const std::vector<QuadCW>& subQuads) {
+                                    const std::vector<Quad>& subQuads) {
   DEBUG_ASSERT(_targetColorProxy != nullptr);
   auto context = _targetColorProxy->getContext();
   DEBUG_ASSERT(context != nullptr);
@@ -167,29 +157,20 @@ void Context3DCompositor::drawQuads(const DrawPolygon3D* polygon,
   auto allocator = context->drawingAllocator();
   // Wrap alpha as vertex color to enable semi-transparent pixel blending.
   Color vertexColor(1, 1, 1, polygon->alpha());
+  auto matrix = Matrix3DUtils::GetMayLossyMatrix(polygon->matrix());
   std::vector<PlacementPtr<QuadRecord>> quadRecords;
   if (subQuads.empty()) {
     auto [quad, aaFlags] = GetQuadAndAAFlags(originalRect, aaType, nullptr);
-    quadRecords.push_back(allocator->make<QuadRecord>(quad, aaFlags, vertexColor));
+    quadRecords.push_back(allocator->make<QuadRecord>(quad, aaFlags, vertexColor, matrix));
   } else {
     for (const auto& subQuad : subQuads) {
       auto [quad, aaFlags] = GetQuadAndAAFlags(originalRect, aaType, &subQuad);
-      quadRecords.push_back(allocator->make<QuadRecord>(quad, aaFlags, vertexColor));
+      quadRecords.push_back(allocator->make<QuadRecord>(quad, aaFlags, vertexColor, matrix));
     }
   }
 
-  // Flatten z-axis to keep vertices at their original depth, preventing clipping space culling.
-  auto matrix = polygon->matrix();
-  matrix.setRow(2, {0, 0, 1, 0});
-  auto widthF = static_cast<float>(_width);
-  auto heightF = static_cast<float>(_height);
-  // Map projected vertex coordinates from render target texture space to NDC space.
-  const Vec2 ndcScale(2.0f / widthF, 2.0f / heightF);
-  const Vec2 ndcOffset(-1.f, -1.f);
   auto vertexProvider = QuadsVertexProvider::MakeFrom(allocator, std::move(quadRecords), aaType);
-  const Size viewportSize(static_cast<float>(_width), static_cast<float>(_height));
-  const Quads3DDrawArgs drawArgs{matrix, ndcScale, ndcOffset, viewportSize};
-  auto drawOp = Quads3DDrawOp::Make(context, std::move(vertexProvider), 0, drawArgs);
+  auto drawOp = Quads3DDrawOp::Make(context, std::move(vertexProvider), 0);
 
   const SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast};
   auto textureImage = image->makeTextureImage(context);

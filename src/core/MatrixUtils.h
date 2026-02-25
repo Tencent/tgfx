@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,26 +18,16 @@
 
 #pragma once
 
-#include "gpu/processors/QuadPerEdgeAA3DGeometryProcessor.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 
-/**
- * The implementation of QuadPerEdgeAA3DGeometryProcessor using GLSL.
- */
-class GLSLQuadPerEdgeAA3DGeometryProcessor final : public QuadPerEdgeAA3DGeometryProcessor {
+class MatrixUtils {
  public:
   /**
-   * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
+   * Returns true if shapes transformed by this matrix preserve their original angles.
    */
-  explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& matrix,
-                                                const Vec2& ndcScale, const Vec2& ndcOffset,
-                                                std::optional<PMColor> commonColor);
-
-  void emitCode(EmitArgs& args) const override;
-
-  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
-               FPCoordTransformIter* transformIter) const override;
+  static bool PreservesAngles(const Matrix& matrix);
 };
 
 }  // namespace tgfx
