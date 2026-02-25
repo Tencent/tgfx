@@ -95,10 +95,12 @@ class Mesh {
    */
   Rect bounds() const;
 
+  ~Mesh();
+
  private:
   explicit Mesh(std::unique_ptr<MeshImpl> impl);
 
-  std::unique_ptr<MeshImpl> impl = nullptr;
+  std::unique_ptr<MeshImpl> impl = {};
 
   friend class MeshImpl;
   friend class VertexMeshImpl;

@@ -45,6 +45,8 @@ std::shared_ptr<Mesh> Mesh::MakeFromShape(std::shared_ptr<Shape> shape, bool ant
 Mesh::Mesh(std::unique_ptr<MeshImpl> impl) : impl(std::move(impl)) {
 }
 
+Mesh::~Mesh() = default;
+
 uint32_t Mesh::uniqueID() const {
   return impl->uniqueID();
 }
