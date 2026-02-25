@@ -79,6 +79,7 @@ class GLCaps {
   GLVendor vendor = GLVendor::Other;
   bool pboSupport = false;
   bool multisampleDisableSupport = false;
+  // GL_SAMPLE_MASK is not supported in OpenGL ES 3.0 or WebGL.
   bool sampleMaskSupport = false;
   bool frameBufferFetchRequiresEnablePerSample = false;
   bool flushBeforeWritePixels = false;
