@@ -20,7 +20,6 @@
 
 #include <memory>
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Shape.h"
@@ -28,6 +27,7 @@
 #include "tgfx/layers/LayerPaint.h"
 
 namespace tgfx {
+class Mesh;
 class LayerContent;
 class GeometryContent;
 
