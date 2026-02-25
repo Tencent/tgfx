@@ -188,6 +188,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
   auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() == 1);
+  // AA RRects use RRectDrawOp (EllipseGeometryProcessor).
   EXPECT_EQ(static_cast<RRectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount);
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
@@ -1401,6 +1402,79 @@ TGFX_TEST(CanvasTest, PictureMaskPath) {
   EXPECT_EQ(colorOutside, Color::Transparent());
 }
 
+TGFX_TEST(CanvasTest, DrawImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/apitest/imageReplacement.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+  auto offsetX = 50.0f;
+  auto padding = 25.0f;
+
+  auto surfaceWidth = static_cast<int>(offsetX + imageWidth + padding);
+  auto surfaceHeight = static_cast<int>(padding + imageHeight + padding + imageHeight + padding);
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto maskShader = Shader::MakeLinearGradient(Point{0, 0}, Point{imageWidth, 0},
+                                               {Color::White(), Color::Transparent()}, {});
+  Paint paint;
+  paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+
+  // Top: use offset parameter, mask should stay in canvas coordinate
+  canvas->drawImage(image, offsetX, padding, &paint);
+  // Bottom: use canvas matrix, mask moves with the image
+  canvas->save();
+  canvas->translate(offsetX, padding + imageHeight + padding);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawImage"));
+}
+
+TGFX_TEST(CanvasTest, DrawTextBlob) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto font = Font(typeface, 50);
+  auto textBlob = TextBlob::MakeFrom("TGFX", font);
+  ASSERT_TRUE(textBlob != nullptr);
+  auto textBounds = textBlob->getTightBounds();
+  auto textWidth = textBounds.width();
+  auto textHeight = textBounds.height();
+  auto offsetX = 50.0f;
+  auto padding = 25.0f;
+
+  auto surfaceWidth = static_cast<int>(offsetX + textWidth + padding);
+  auto surfaceHeight = static_cast<int>(padding + textHeight + padding + textHeight + padding);
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto gradientShader = Shader::MakeLinearGradient(Point{0, 0}, Point{textWidth, 0},
+                                                   {Color::Red(), Color::Blue()}, {});
+  Paint paint;
+  paint.setShader(gradientShader);
+
+  // Top: use offset parameter, shader should stay in canvas coordinate
+  canvas->drawTextBlob(textBlob, offsetX, padding - textBounds.top, paint);
+  // Bottom: use canvas matrix, shader moves with the text
+  canvas->save();
+  canvas->translate(offsetX, padding + textHeight + padding - textBounds.top);
+  canvas->drawTextBlob(textBlob, 0, 0, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawTextBlob"));
+}
+
 static inline Matrix3D MakePerspectiveMatrix(float eyeDistance = 200.f) {
   auto perspective = Matrix3D::I();
   perspective.setRowColumn(3, 2, -1.f / eyeDistance);
@@ -1544,6 +1618,397 @@ TGFX_TEST(CanvasTest, Matrix3D) {
 
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Matrix3D"));
+}
+
+TGFX_TEST(CanvasTest, CMYKWithoutICCProfile) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/mandrill_128.jpg");
+  auto surface = Surface::Make(context, image->width(), image->height());
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CMYKWithoutICCProfile"));
+}
+
+TGFX_TEST(CanvasTest, NonAARRectOp) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 500);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // NonAARRectOp is used when antiAlias is false and no stroke.
+  Paint paint;
+  paint.setAntiAlias(false);
+
+  // Single filled RRect with uniform radii.
+  paint.setColor(Color::Red());
+  RRect rrect1 = {};
+  rrect1.setRectXY(Rect::MakeXYWH(50, 50, 120, 80), 15, 15);
+  canvas->drawRRect(rrect1, paint);
+
+  // Different colors and radii.
+  paint.setColor(Color::Green());
+  RRect rrect2 = {};
+  rrect2.setRectXY(Rect::MakeXYWH(200, 50, 150, 100), 30, 20);
+  canvas->drawRRect(rrect2, paint);
+
+  // Ellipse-like (large corner radii).
+  paint.setColor(Color::Blue());
+  RRect rrect3 = {};
+  rrect3.setRectXY(Rect::MakeXYWH(50, 160, 100, 80), 50, 40);
+  canvas->drawRRect(rrect3, paint);
+
+  // Small corner radii.
+  paint.setColor(Color::FromRGBA(255, 165, 0, 255));
+  RRect rrect4 = {};
+  rrect4.setRectXY(Rect::MakeXYWH(200, 160, 150, 100), 5, 5);
+  canvas->drawRRect(rrect4, paint);
+
+  // With transformation - rotation.
+  canvas->save();
+  canvas->translate(100, 350);
+  canvas->rotate(15);
+  paint.setColor(Color::FromRGBA(128, 0, 128, 255));
+  RRect rrect5 = {};
+  rrect5.setRectXY(Rect::MakeXYWH(-50, -30, 100, 60), 10, 10);
+  canvas->drawRRect(rrect5, paint);
+  canvas->restore();
+
+  // With transformation - scale.
+  canvas->save();
+  canvas->translate(280, 350);
+  canvas->scale(1.5f, 0.8f);
+  paint.setColor(Color::FromRGBA(0, 128, 128, 255));
+  RRect rrect6 = {};
+  rrect6.setRectXY(Rect::MakeXYWH(-40, -25, 80, 50), 12, 12);
+  canvas->drawRRect(rrect6, paint);
+  canvas->restore();
+
+  // Verify RRectDrawOp with non-AA is used by checking the Op type.
+  surface->renderContext->flush();
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  EXPECT_EQ(drawingBuffer->renderTasks.size(), 1u);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
+  EXPECT_EQ(task->drawOps.size(), 1u);
+  // All 6 non-AA filled RRects should be batched into a single RRectDrawOp.
+  auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp);
+  EXPECT_EQ(rrectOp->rectCount, 6u);
+
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOp"));
+}
+
+TGFX_TEST(CanvasTest, NonAARRectOpWithShader) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 350);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Test NonAARRectOp with image shader to verify UV coordinates are correct.
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+
+  // Draw two RRects without AA.
+  // Both use device coordinates for UV, so textures should tile continuously.
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setShader(shader);
+  RRect rrect = {};
+  rrect.setRectXY(Rect::MakeXYWH(50, 50, 200, 120), 30, 30);
+  canvas->drawRRect(rrect, paint);
+
+  // Bottom: Also non-AA
+  Paint paint2;
+  paint2.setAntiAlias(false);
+  paint2.setShader(shader);
+  RRect rrect2 = {};
+  rrect2.setRectXY(Rect::MakeXYWH(50, 180, 200, 120), 30, 30);
+  canvas->drawRRect(rrect2, paint2);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpWithShader"));
+}
+
+TGFX_TEST(CanvasTest, NonAARRectOpStroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 400);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setStyle(PaintStyle::Stroke);
+
+  // Draw stroked RRects with various stroke widths and corner radii.
+  // Top row: different stroke widths with same corner radius.
+  paint.setColor(Color::Red());
+  paint.setStroke(Stroke(4));
+  RRect rrect1 = {};
+  rrect1.setRectXY(Rect::MakeXYWH(50, 50, 100, 80), 20, 20);
+  canvas->drawRRect(rrect1, paint);
+
+  paint.setColor(Color::Green());
+  paint.setStroke(Stroke(8));
+  RRect rrect2 = {};
+  rrect2.setRectXY(Rect::MakeXYWH(180, 50, 100, 80), 20, 20);
+  canvas->drawRRect(rrect2, paint);
+
+  paint.setColor(Color::Blue());
+  paint.setStroke(Stroke(16));
+  RRect rrect3 = {};
+  rrect3.setRectXY(Rect::MakeXYWH(310, 50, 100, 80), 20, 20);
+  canvas->drawRRect(rrect3, paint);
+
+  // Middle row: different corner radii with same stroke width.
+  paint.setColor(Color::FromRGBA(255, 128, 0));
+  paint.setStroke(Stroke(8));
+  RRect rrect4 = {};
+  rrect4.setRectXY(Rect::MakeXYWH(50, 180, 100, 80), 10, 10);
+  canvas->drawRRect(rrect4, paint);
+
+  paint.setColor(Color::FromRGBA(128, 0, 255));
+  RRect rrect5 = {};
+  rrect5.setRectXY(Rect::MakeXYWH(180, 180, 100, 80), 30, 30);
+  canvas->drawRRect(rrect5, paint);
+
+  paint.setColor(Color::FromRGBA(0, 128, 128));
+  RRect rrect6 = {};
+  rrect6.setRectXY(Rect::MakeXYWH(310, 180, 100, 80), 50, 40);
+  canvas->drawRRect(rrect6, paint);
+
+  // Bottom: stroke that covers entire corner (thick stroke with small radius).
+  paint.setColor(Color::FromRGBA(128, 128, 0));
+  paint.setStroke(Stroke(20));
+  RRect rrect7 = {};
+  rrect7.setRectXY(Rect::MakeXYWH(100, 300, 150, 60), 10, 10);
+  canvas->drawRRect(rrect7, paint);
+
+  // Bottom right: stroke on a plain rect (no corner radius).
+  // Note: radii < 0.5 causes Canvas::drawRRect to redirect to drawRect (RectDrawOp path).
+  paint.setColor(Color::FromRGBA(0, 64, 128));
+  paint.setStroke(Stroke(6));
+  RRect rrect8 = {};
+  rrect8.setRectXY(Rect::MakeXYWH(300, 300, 120, 60), 0, 0);
+  canvas->drawRRect(rrect8, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpStroke"));
+}
+
+TGFX_TEST(CanvasTest, NonAARRectOpTransform) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 500);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setColor(Color::Red());
+
+  RRect rrect = {};
+  rrect.setRectXY(Rect::MakeXYWH(-50, -40, 100, 80), 15, 15);
+
+  // Top-left: Non-AA with rotation
+  paint.setAntiAlias(false);
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(100, 100));
+  canvas->concat(Matrix::MakeRotate(30));
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  // Top-right: AA with rotation (same transform for comparison)
+  paint.setAntiAlias(true);
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(300, 100));
+  canvas->concat(Matrix::MakeRotate(30));
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  // Middle-left: Non-AA with skew
+  paint.setAntiAlias(false);
+  paint.setColor(Color::Blue());
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(100, 300));
+  auto skewMatrix = Matrix::I();
+  skewMatrix.setSkewX(0.3f);
+  canvas->concat(skewMatrix);
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  // Middle-right: AA with skew (same transform for comparison)
+  paint.setAntiAlias(true);
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(300, 300));
+  canvas->concat(skewMatrix);
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpTransform"));
+}
+
+TGFX_TEST(CanvasTest, NonAARRectOpStrokeScale) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 400);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(6));
+
+  RRect rrect = {};
+  rrect.setRectXY(Rect::MakeXYWH(-50, -40, 100, 80), 15, 15);
+
+  // Top-left: Non-AA with non-uniform scale
+  paint.setAntiAlias(false);
+  paint.setColor(Color::Red());
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(130, 100));
+  canvas->concat(Matrix::MakeScale(2.0f, 1.0f));
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  // Top-right: AA with non-uniform scale (same transform for comparison)
+  paint.setAntiAlias(true);
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(380, 100));
+  canvas->concat(Matrix::MakeScale(2.0f, 1.0f));
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  // Bottom-left: Non-AA with uniform scale + rotation
+  paint.setAntiAlias(false);
+  paint.setColor(Color::Blue());
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(130, 300));
+  canvas->concat(Matrix::MakeScale(1.5f));
+  canvas->concat(Matrix::MakeRotate(20));
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  // Bottom-right: AA with uniform scale + rotation (same transform for comparison)
+  paint.setAntiAlias(true);
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(380, 300));
+  canvas->concat(Matrix::MakeScale(1.5f));
+  canvas->concat(Matrix::MakeRotate(20));
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpStrokeScale"));
+}
+
+TGFX_TEST(CanvasTest, NonAARRectOpColorStroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 500);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setAntiAlias(false);
+
+  // Row 1: hasColor + hasStroke (different colors trigger hasColor)
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(6));
+  paint.setColor(Color::Red());
+  RRect rrect1 = {};
+  rrect1.setRectXY(Rect::MakeXYWH(50, 50, 120, 80), 15, 15);
+  canvas->drawRRect(rrect1, paint);
+
+  paint.setColor(Color::Blue());
+  RRect rrect2 = {};
+  rrect2.setRectXY(Rect::MakeXYWH(200, 50, 120, 80), 20, 20);
+  canvas->drawRRect(rrect2, paint);
+
+  surface->renderContext->flush();
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  ASSERT_EQ(task->drawOps.size(), 1u);
+  auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(rrectOp->rectCount, 2u);
+  context->flushAndSubmit();
+
+  // Row 2: !hasColor + hasStroke (same color batched together)
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(8));
+  paint.setColor(Color::Green());
+  RRect rrect3 = {};
+  rrect3.setRectXY(Rect::MakeXYWH(50, 170, 120, 80), 20, 20);
+  canvas->drawRRect(rrect3, paint);
+
+  RRect rrect4 = {};
+  rrect4.setRectXY(Rect::MakeXYWH(200, 170, 120, 80), 15, 15);
+  canvas->drawRRect(rrect4, paint);
+
+  surface->renderContext->flush();
+  drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  ASSERT_EQ(task->drawOps.size(), 1u);
+  rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(rrectOp->rectCount, 2u);
+  context->flushAndSubmit();
+
+  // Row 3: hasColor + !hasStroke (different colors, fill mode)
+  paint.setStyle(PaintStyle::Fill);
+  paint.setColor(Color::FromRGBA(255, 128, 0));
+  RRect rrect5 = {};
+  rrect5.setRectXY(Rect::MakeXYWH(50, 300, 120, 80), 15, 15);
+  canvas->drawRRect(rrect5, paint);
+
+  paint.setColor(Color::FromRGBA(128, 0, 255));
+  RRect rrect6 = {};
+  rrect6.setRectXY(Rect::MakeXYWH(200, 300, 120, 80), 20, 20);
+  canvas->drawRRect(rrect6, paint);
+
+  surface->renderContext->flush();
+  drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  ASSERT_EQ(task->drawOps.size(), 1u);
+  rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(rrectOp->rectCount, 2u);
+  context->flushAndSubmit();
+
+  // Row 4: !hasColor + !hasStroke (same color batched together)
+  paint.setColor(Color::FromRGBA(0, 128, 128));
+  RRect rrect7 = {};
+  rrect7.setRectXY(Rect::MakeXYWH(50, 420, 120, 40), 15, 15);
+  canvas->drawRRect(rrect7, paint);
+
+  RRect rrect8 = {};
+  rrect8.setRectXY(Rect::MakeXYWH(200, 420, 120, 40), 10, 10);
+  canvas->drawRRect(rrect8, paint);
+
+  surface->renderContext->flush();
+  drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  ASSERT_EQ(task->drawOps.size(), 1u);
+  rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(rrectOp->rectCount, 2u);
+  context->flushAndSubmit();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpColorStroke"));
 }
 
 }  // namespace tgfx

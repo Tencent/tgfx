@@ -50,6 +50,7 @@ struct GlyphStyle {
 struct Glyph {
   GlyphID glyphID = 0;
   Font font = {};
+  Point anchor = Point::Zero();
   Matrix matrix = Matrix::I();
   GlyphStyle style = {};
 };
@@ -115,6 +116,11 @@ class Geometry {
    * The text blob content, used for text-based geometries.
    */
   std::shared_ptr<TextBlob> textBlob = nullptr;
+
+  /**
+   * Anchor offsets for each glyph, used when expanding textBlob to glyphs.
+   */
+  std::vector<Point> textAnchors = {};
 
   /**
    * Individual glyphs with per-glyph transformations, expanded from textBlob for modification.

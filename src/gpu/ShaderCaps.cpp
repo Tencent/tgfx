@@ -68,7 +68,13 @@ ShaderCaps::ShaderCaps(GPU* gpu) {
   maxFragmentSamplers = limits->maxSamplersPerShaderStage;
   maxUBOSize = limits->maxUniformBufferBindingSize;
   uboOffsetAlignment = limits->minUniformBufferOffsetAlignment;
-  if (HasExtension(info, "GL_EXT_shader_framebuffer_fetch")) {
+  if (info->backend == Backend::Metal) {
+    // Metal natively supports framebuffer fetch via [[color(0)]] in MSL. The GLSL->SPIRV->MSL
+    // pipeline uses Vulkan subpassInput to represent this, and SPIRV-Cross converts it to
+    // the [[color(0)]] attribute when use_framebuffer_fetch_subpasses is enabled.
+    frameBufferFetchSupport = true;
+    frameBufferFetchUsesSubpassInput = true;
+  } else if (HasExtension(info, "GL_EXT_shader_framebuffer_fetch")) {
     frameBufferFetchNeedsCustomOutput = true;
     frameBufferFetchSupport = true;
     frameBufferFetchColorName = "gl_LastFragData[0]";

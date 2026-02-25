@@ -2345,7 +2345,8 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     minBackgroundOutset = std::min(backOutset, minBackgroundOutset);
     updateBackgroundBounds(contentScale);
   }
-  if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver)) {
+  if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver) ||
+      (content && content->hasBlendMode())) {
     bitFields.hasBlendMode = true;
   }
   propagateLayerState();

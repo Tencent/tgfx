@@ -85,21 +85,23 @@ export const uploadToTexture = (
     GL: EmscriptenGL,
     source: TexImageSource | OffscreenCanvas | BitmapImage,
     textureID: number,
+    offsetX: number,
+    offsetY: number,
     alphaOnly: boolean,
 ) => {
     let renderSource = source instanceof BitmapImage ? source.bitmap : source;
     if (!renderSource) return;
-    const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
+    const gl = GL.currentContext?.GLctx as WebGL2RenderingContext;
     gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     if (alphaOnly) {
         gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.ALPHA, gl.UNSIGNED_BYTE, renderSource);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, offsetX, offsetY, gl.RED, gl.UNSIGNED_BYTE, renderSource);
     } else {
         gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, renderSource);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, offsetX, offsetY, gl.RGBA, gl.UNSIGNED_BYTE, renderSource);
     }
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 };
 
 export const setColorSpace = (

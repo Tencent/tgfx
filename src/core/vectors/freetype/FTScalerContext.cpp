@@ -248,6 +248,7 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, float size)
     loadGlyphFlags &= ~FT_LOAD_NO_BITMAP;
 
     backingSize = FDot6ToFloat(face->available_sizes[strikeIndex].y_ppem);
+    loadVerticalMetrics();
   }
 }
 
@@ -310,20 +311,12 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
   float underlineThickness;
   float underlinePosition;
   if (face->face_flags & FT_FACE_FLAG_SCALABLE) {  // scalable outline font
-    // FreeType will always use HHEA metrics if they're not zero.
-    // It completely ignores the OS/2 fsSelection::UseTypoMetrics bit.
-    // It also ignores the VDMX tables, which are also of interest here
-    // (and override everything else when they apply).
-    static const int UseTypoMetricsMask = (1 << 7);
-    if (os2 && os2->version != 0xFFFF && (os2->fsSelection & UseTypoMetricsMask)) {
-      ascent = -static_cast<float>(os2->sTypoAscender) / upem;
-      descent = -static_cast<float>(os2->sTypoDescender) / upem;
-      leading = static_cast<float>(os2->sTypoLineGap) / upem;
-    } else {
-      ascent = -static_cast<float>(face->ascender) / upem;
-      descent = -static_cast<float>(face->descender) / upem;
-      leading = static_cast<float>(face->height + (face->descender - face->ascender)) / upem;
-    }
+    // FreeType 2.13+ automatically respects the OS/2 fsSelection::UseTypoMetrics bit in
+    // sfnt_load_face(), overwriting face->ascender/descender/height with OS/2 Typo values
+    // when the flag is set. So we can always use face->ascender/descender/height directly.
+    ascent = -static_cast<float>(face->ascender) / upem;
+    descent = -static_cast<float>(face->descender) / upem;
+    leading = static_cast<float>(face->height + (face->descender - face->ascender)) / upem;
     xmin = static_cast<float>(face->bbox.xMin) / upem;
     xmax = static_cast<float>(face->bbox.xMax) / upem;
     ymin = -static_cast<float>(face->bbox.yMin) / upem;
@@ -680,6 +673,16 @@ float FTScalerContext::getAdvance(GlyphID glyphID, bool verticalText) const {
 }
 
 float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) const {
+  if (verticalText && strikeIndex != -1) {
+    // FreeType's CBDT/CBLC sbit path does not read vmtx for vertical advance even when the
+    // table is present. Always use our cached vertical metrics for bitmap-only fonts.
+    if (hasVerticalMetrics) {
+      return getVertAdvanceForGlyph(glyphID);
+    }
+    // Fall back to horizontal advance if no vertical metrics are available at all.
+    // Cannot read advance.x here because FT_LOAD_VERTICAL_LAYOUT sets it to 0.
+    verticalText = false;
+  }
   auto face = ftTypeface()->face;
   auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
   if (verticalText) {
@@ -689,18 +692,98 @@ float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) co
   if (err != FT_Err_Ok) {
     return 0;
   }
-  return verticalText ? FDot6ToFloat(face->glyph->advance.y) : FDot6ToFloat(face->glyph->advance.x);
+  return verticalText ? FDot6ToFloat(face->glyph->advance.y)
+                      : FDot6ToFloat(face->glyph->advance.x);
+}
+
+void FTScalerContext::loadVerticalMetrics() {
+  auto face = ftTypeface()->face;
+  // Try to read vmtx table. FT_Get_Sfnt_Table returns non-null for FT_SFNT_VHEA only when both
+  // vhea and vmtx tables are successfully loaded (i.e. face->vertical_info is set).
+  auto vhea = static_cast<TT_VertHeader*>(FT_Get_Sfnt_Table(face, FT_SFNT_VHEA));
+  if (vhea != nullptr && vhea->number_Of_VMetrics > 0) {
+    FT_ULong vmtxLength = 0;
+    auto tag = FT_MAKE_TAG('v', 'm', 't', 'x');
+    if (FT_Load_Sfnt_Table(face, tag, 0, nullptr, &vmtxLength) == 0 && vmtxLength > 0) {
+      std::vector<FT_Byte> vmtxData(vmtxLength);
+      if (FT_Load_Sfnt_Table(face, tag, 0, vmtxData.data(), &vmtxLength) == 0) {
+        auto numLong = std::min(static_cast<size_t>(vhea->number_Of_VMetrics),
+                                static_cast<size_t>(vmtxLength / 4));
+        vertAdvanceCache.resize(numLong);
+        for (size_t i = 0; i < numLong; ++i) {
+          vertAdvanceCache[i] =
+              static_cast<FT_UShort>((vmtxData[i * 4] << 8) | vmtxData[i * 4 + 1]);
+        }
+        hasVerticalMetrics = true;
+        return;
+      }
+    }
+  }
+  // No vmtx table available. Synthesize a global vertical advance from OS/2 or hhea, matching
+  // the fallback logic in FreeType's TT_Get_VMetrics (ttgload.c).
+  auto os2 = static_cast<TT_OS2*>(FT_Get_Sfnt_Table(face, FT_SFNT_OS2));
+  if (os2 != nullptr && os2->version != 0xFFFFU) {
+    fallbackVertAdvance =
+        static_cast<FT_UShort>(std::abs(os2->sTypoAscender - os2->sTypoDescender));
+    hasVerticalMetrics = true;
+  } else {
+    auto hhea = static_cast<TT_HoriHeader*>(FT_Get_Sfnt_Table(face, FT_SFNT_HHEA));
+    if (hhea != nullptr) {
+      fallbackVertAdvance =
+          static_cast<FT_UShort>(std::abs(hhea->Ascender - hhea->Descender));
+      hasVerticalMetrics = true;
+    }
+  }
+}
+
+float FTScalerContext::getVertAdvanceForGlyph(GlyphID glyphID) const {
+  FT_UShort advanceFUnits = 0;
+  if (!vertAdvanceCache.empty()) {
+    auto index = static_cast<size_t>(glyphID);
+    if (index >= vertAdvanceCache.size()) {
+      index = vertAdvanceCache.size() - 1;
+    }
+    advanceFUnits = vertAdvanceCache[index];
+  } else {
+    advanceFUnits = fallbackVertAdvance;
+  }
+  if (advanceFUnits == 0) {
+    return 0;
+  }
+  auto face = ftTypeface()->face;
+  auto ppem = static_cast<float>(face->size->metrics.y_ppem);
+  auto upem = static_cast<float>(ftTypeface()->unitsPerEmInternal());
+  if (upem == 0.0f) {
+    return 0;
+  }
+  // Convert font units to pixels at the bitmap strike's ppem, then apply extraScale to match the
+  // requested text size. This mirrors how FreeType scales horizontal advances for bitmap fonts.
+  return advanceFUnits * ppem / upem * extraScale.y;
 }
 
 Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
-  if (glyphID == 0 || setupSize(false)) {
+  if (setupSize(false)) {
     return {};
   }
-  FontMetrics metrics = {};
-  getFontMetricsInternal(&metrics);
-  auto advanceX = getAdvanceInternal(glyphID);
-  return {-advanceX * 0.5f, metrics.capHeight};
+  auto face = ftTypeface()->face;
+  auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
+  auto err = FT_Load_Glyph(face, glyphID, glyphFlags);
+  if (err != FT_Err_Ok) {
+    return {};
+  }
+  auto& glyphMetrics = face->glyph->metrics;
+  if (strikeIndex != -1) {
+    // FreeType's CBDT/CBLC sbit path does not populate vertical bearing metrics either.
+    // Synthesize a vertical offset consistent with WebScalerContext.
+    auto hAdv = FDot6ToFloat(face->glyph->advance.x);
+    FontMetrics metrics = {};
+    getFontMetricsInternal(&metrics);
+    return {-hAdv * 0.5f, metrics.capHeight};
+  }
+  auto offsetX = FDot6ToFloat(glyphMetrics.vertBearingX) - FDot6ToFloat(glyphMetrics.horiBearingX);
+  auto offsetY = FDot6ToFloat(glyphMetrics.horiBearingY) + FDot6ToFloat(glyphMetrics.vertBearingY);
+  return {offsetX, offsetY};
 }
 
 Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,

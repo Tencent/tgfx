@@ -25,6 +25,11 @@ class AlphaThresholdColorFilter : public ColorFilter {
  public:
   explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold){};
 
+  bool affectsTransparentBlack() const override {
+    // GLSL step(threshold, 0) returns 1 when threshold <= 0, making transparent pixels opaque.
+    return threshold <= 0.0f;
+  }
+
   float threshold = 0.0f;
 
  protected:

@@ -19,6 +19,18 @@
 #include "GlyphRasterizer.h"
 
 namespace tgfx {
+#ifndef TGFX_BUILD_FOR_WEB
+std::shared_ptr<GlyphRasterizer> GlyphRasterizer::MakeFrom(
+    int width, int height, std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
+    bool fauxBold, const Stroke* stroke, const Point& glyphOffset) {
+  if (scalerContext == nullptr || width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  return std::make_shared<GlyphRasterizer>(width, height, std::move(scalerContext), glyphID,
+                                           fauxBold, stroke, glyphOffset);
+}
+#endif
+
 GlyphRasterizer::GlyphRasterizer(int width, int height,
                                  std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
                                  bool fauxBold, const Stroke* stroke, const Point& glyphOffset)
@@ -30,6 +42,10 @@ GlyphRasterizer::~GlyphRasterizer() {
   if (stroke) {
     delete stroke;
   }
+}
+
+bool GlyphRasterizer::asyncSupport() const {
+  return scalerContext->asyncSupport();
 }
 
 bool GlyphRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,

@@ -16,19 +16,39 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DevicePool.h"
-#include <thread>
-#include <unordered_map>
+#pragma once
+
+#include <cstdint>
 
 namespace tgfx {
-thread_local std::shared_ptr<tgfx::GLDevice> cachedDevice = nullptr;
+/**
+ * Types for interacting with Metal resources created externally to TGFX. Holds the MTLTexture as a
+ * const void*.
+ */
+struct MetalTextureInfo {
+  /**
+   * Pointer to MTLTexture.
+   */
+  const void* texture = nullptr;
 
-std::shared_ptr<tgfx::GLDevice> DevicePool::Make() {
-  auto device = cachedDevice;
-  if (device == nullptr) {
-    device = tgfx::GLDevice::Make();
-    cachedDevice = device;
-  }
-  return device;
-}
+  /**
+   * The pixel format of this texture (MTLPixelFormat value).
+   */
+  unsigned format = 70;  // MTLPixelFormatRGBA8Unorm
+};
+
+/**
+ * Types for interacting with Metal semaphore objects created externally to TGFX.
+ */
+struct MetalSemaphoreInfo {
+  /**
+   * Pointer to MTLEvent. Used for GPU-to-GPU synchronization.
+   */
+  const void* event = nullptr;
+
+  /**
+   * The signal value for the event.
+   */
+  uint64_t value = 0;
+};
 }  // namespace tgfx

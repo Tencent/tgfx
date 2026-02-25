@@ -35,6 +35,10 @@ namespace tgfx {
 class TextModifier : public VectorElement {
  public:
   /**
+   * Creates a new TextModifier instance.
+   */
+  static std::shared_ptr<TextModifier> Make();
+  /**
    * Returns the selectors that define which characters this modifier applies to.
    */
   const std::vector<std::shared_ptr<TextSelector>>& selectors() const {
@@ -50,16 +54,18 @@ class TextModifier : public VectorElement {
 
   /**
    * Returns the anchor point offset for the selected characters. This affects the center of
-   * rotation and scale. Default is (0, 0).
+   * rotation and scale. The default anchor point for each character is at (advance * 0.5, 0),
+   * which is the horizontal center of the character at the baseline. This offset is relative to
+   * that default position. Default is (0, 0).
    */
-  Point anchorPoint() const {
-    return _anchorPoint;
+  Point anchor() const {
+    return _anchor;
   }
 
   /**
    * Sets the anchor point offset for the selected characters.
    */
-  void setAnchorPoint(Point value);
+  void setAnchor(Point value);
 
   /**
    * Returns the position offset for the selected characters. Default is (0, 0).
@@ -185,11 +191,14 @@ class TextModifier : public VectorElement {
 
   void apply(VectorContext* context) override;
 
+ protected:
+  TextModifier() = default;
+
  private:
   std::vector<std::shared_ptr<TextSelector>> _selectors = {};
 
   // Transform properties
-  Point _anchorPoint = Point::Zero();
+  Point _anchor = Point::Zero();
   Point _position = Point::Zero();
   Point _scale = Point::Make(1.0f, 1.0f);
   float _skew = 0.0f;

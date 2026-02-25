@@ -21,7 +21,7 @@
 #include "core/AtlasManager.h"
 #include "core/AtlasStrikeCache.h"
 #include "core/GlyphRasterizer.h"
-#include "core/GlyphRunList.h"
+#include "core/GlyphTransform.h"
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
@@ -128,8 +128,8 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
     glyphOffset->y = bounds.top;
     auto width = FloatCeilToInt(bounds.width());
     auto height = FloatCeilToInt(bounds.height());
-    return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, hasFauxBold,
-                                             stroke, *glyphOffset);
+    return GlyphRasterizer::MakeFrom(width, height, scalerContext, glyphID, hasFauxBold, stroke,
+                                     *glyphOffset);
   }
 
   std::shared_ptr<Shape> shape = nullptr;
@@ -173,25 +173,20 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
 }
 
 static void ComputeGlyphRenderMatrix(const Rect& atlasLocation, const Matrix& stateMatrix,
-                                     const Matrix& positionMatrix, float scale,
+                                     const GlyphRun& run, size_t index, float scale,
                                      const Point& glyphOffset, bool fauxItalic,
                                      bool needsPixelAlignment, Matrix* outMatrix) {
   auto skewX = fauxItalic ? ITALIC_SKEW * scale : 0.0f;
   auto tx =
       scale * (glyphOffset.x - atlasLocation.x()) + skewX * (glyphOffset.y - atlasLocation.y());
   auto ty = scale * (glyphOffset.y - atlasLocation.y());
-  // setAll Equivalent to :
-  //   outMatrix->setTranslate(- atlasLocation.x(), - atlasLocation.y()); → [1, 0, -ax; 0, 1, -ay]
-  //   outMatrix->postTranslate(glyphOffset.x, glyphOffset.y); → [1, 0, gx-ax; 0, 1, gy-ay]
-  //   outMatrix->postScale(glyphRenderScale, glyphRenderScale); → [s, 0, s*(gx-ax); 0, s, s*(gy-ay)]
-  //   if (fauxItalic) {
-  //       outMatrix->postSkew(ITALIC_SKEW, 0); → [s, skewX, s*(gx-ax)+skewX*(gy-ay); 0, s, s*(gy-ay)]
-  //   }
-  //   outMatrix->postScale(inverseScale, inverseScale); inverseScale is folded into s above
-  //
-  // Here scale = glyphRenderScale * inverseScale, combining both into a single matrix construction.
-  outMatrix->setAll(scale, skewX, tx, 0, scale, ty);
-  outMatrix->postConcat(positionMatrix);
+  if (HasComplexTransform(run)) {
+    outMatrix->setAll(scale, skewX, tx, 0, scale, ty);
+    outMatrix->postConcat(GetGlyphMatrix(run, index));
+  } else {
+    auto position = GetGlyphPosition(run, index);
+    outMatrix->setAll(scale, skewX, tx + position.x, 0, scale, ty + position.y);
+  }
   outMatrix->postConcat(stateMatrix);
   if (needsPixelAlignment) {
     (*outMatrix)[2] = std::round((*outMatrix)[2]);
@@ -209,6 +204,9 @@ static void ApplyScaleAndStrokeToBounds(Rect* bounds, float scale, const Stroke*
 static Rect GetTypefaceBounds(const std::shared_ptr<Typeface>& typeface, float fontSize,
                               float inverseScale, const Stroke* scaledStroke) {
   auto bounds = typeface->getBounds();
+  if (bounds.isEmpty()) {
+    return bounds;
+  }
   bounds.scale(fontSize, fontSize);
   ApplyScaleAndStrokeToBounds(&bounds, inverseScale, scaledStroke);
   return bounds;
@@ -353,16 +351,15 @@ void RenderContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCSta
   }
   inverseMatrix.mapRect(&localClipBounds);
 
-  GlyphRunList glyphRuns(textBlob.get());
-  for (const auto& run : glyphRuns) {
+  for (auto run : *textBlob) {
     if (run.font.getTypeface() == nullptr) {
       continue;
     }
     // Glyphs with per-glyph rotation/scale (RSXform/Matrix) and outlines use path rendering
-    // to avoid aliasing.
-    if (run.hasComplexTransform() && run.font.hasOutlines()) {
-      for (size_t i = 0; i < run.runSize(); i++) {
-        drawGlyphAsPath(run.font, run.glyphs[i], run.getMatrix(i), state, brush, stroke,
+    // to avoid aliasing, unless all glyphs have only axis-aligned rotations (0/90/180/270).
+    if (HasComplexTransform(run) && run.font.hasOutlines() && !HasOnlyAxisAlignedRotation(run)) {
+      for (size_t i = 0; i < run.glyphCount; i++) {
+        drawGlyphAsPath(run.font, run.glyphs[i], GetGlyphMatrix(run, i), state, brush, stroke,
                         localClipBounds);
       }
       continue;
@@ -373,7 +370,7 @@ void RenderContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCSta
     if (!rejectedIndices.empty()) {
       if (!run.font.hasColor() && run.font.hasOutlines()) {
         for (size_t i : rejectedIndices) {
-          drawGlyphAsPath(run.font, run.glyphs[i], run.getMatrix(i), state, brush, stroke,
+          drawGlyphAsPath(run.font, run.glyphs[i], GetGlyphMatrix(run, i), state, brush, stroke,
                           localClipBounds);
         }
       } else {
@@ -511,8 +508,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
 
   Rect perGlyphBounds = {};
-  Matrix positionMatrix = {};
-  for (size_t i = 0; i < sourceGlyphRun.runSize(); i++) {
+  auto hasOnlyOffset = !HasComplexTransform(sourceGlyphRun);
+  for (size_t i = 0; i < sourceGlyphRun.glyphCount; i++) {
     auto glyphID = sourceGlyphRun.glyphs[i];
     auto glyphBounds = sharedBounds ? sharedBounds
                                     : GetGlyphBounds(font, glyphID, inverseScale,
@@ -521,7 +518,13 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
       continue;
     }
 
-    auto mappedBounds = sourceGlyphRun.mapBounds(i, *glyphBounds);
+    Rect mappedBounds = {};
+    if (hasOnlyOffset) {
+      auto position = GetGlyphPosition(sourceGlyphRun, i);
+      mappedBounds = glyphBounds->makeOffset(position.x, position.y);
+    } else {
+      mappedBounds = GetGlyphMatrix(sourceGlyphRun, i).mapRect(*glyphBounds);
+    }
     if (!Rect::Intersects(mappedBounds, localClipBounds)) {
       continue;
     }
@@ -578,8 +581,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
     auto glyphState = state;
     auto& rect = atlasLocator.getLocation();
-    sourceGlyphRun.getMatrix(i, &positionMatrix);
-    ComputeGlyphRenderMatrix(rect, state.matrix, positionMatrix, combinedScale, glyphOffset,
+    ComputeGlyphRenderMatrix(rect, state.matrix, sourceGlyphRun, i, combinedScale, glyphOffset,
                              font.isFauxItalic(), sampling.minFilterMode == FilterMode::Nearest,
                              &glyphState.matrix);
     compositor->fillTextAtlas(std::move(textureProxy), rect, sampling, glyphState, atlasBrush);
@@ -649,7 +651,6 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   const auto glyphRenderScale = font.scalerContext->getSize() / backingSize;
   const auto combinedScale = glyphRenderScale / (maxScale * cellScale);
 
-  Matrix positionMatrix = {};
   for (size_t i : glyphIndices) {
     auto glyphID = sourceGlyphRun.glyphs[i];
     if (strike->isEmptyGlyph(glyphID)) {
@@ -695,8 +696,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
 
     auto glyphState = state;
     auto rect = atlasLocator.getLocation();
-    sourceGlyphRun.getMatrix(i, &positionMatrix);
-    ComputeGlyphRenderMatrix(rect, state.matrix, positionMatrix, combinedScale, glyphOffset,
+    ComputeGlyphRenderMatrix(rect, state.matrix, sourceGlyphRun, i, combinedScale, glyphOffset,
                              font.isFauxItalic(), false, &glyphState.matrix);
     compositor->fillTextAtlas(std::move(textureProxy), rect,
                               SamplingOptions(FilterMode::Linear, MipmapMode::None), glyphState,

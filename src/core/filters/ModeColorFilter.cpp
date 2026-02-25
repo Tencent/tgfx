@@ -81,4 +81,21 @@ PlacementPtr<FragmentProcessor> ModeColorFilter::asFragmentProcessor(
 bool ModeColorFilter::isAlphaUnchanged() const {
   return BlendMode::Dst == mode || BlendMode::SrcATop == mode;
 }
+
+bool ModeColorFilter::affectsTransparentBlack() const {
+  // When dst is transparent black (0,0,0,0), only these modes produce zero output regardless of
+  // the src color: SrcIn (src * dstA = 0), DstIn (dst * srcA = 0), DstOut (dst * (1-srcA) = 0),
+  // SrcATop (src * dstA + dst * (1-srcA) = 0), and Modulate (src * dst = 0).
+  // Clear and Dst are already handled by ColorFilter::Blend() (converted or returned as nullptr).
+  switch (mode) {
+    case BlendMode::SrcIn:
+    case BlendMode::DstIn:
+    case BlendMode::DstOut:
+    case BlendMode::SrcATop:
+    case BlendMode::Modulate:
+      return false;
+    default:
+      return color.alpha > 0.0f;
+  }
+}
 }  // namespace tgfx

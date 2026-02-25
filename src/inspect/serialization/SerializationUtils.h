@@ -24,6 +24,7 @@
 #define FLATBUFFERS_LOCALE_INDEPENDENT 0
 #include <flatbuffers/flexbuffers.h>
 #pragma clang diagnostic pop
+#include <functional>
 #include <string>
 #include "inspect/Protocol.h"
 #include "tgfx/gpu/Context.h"

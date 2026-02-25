@@ -90,7 +90,7 @@ std::shared_ptr<ImageFilter> BackgroundBlurStyle::getBackgroundFilter(float cont
   }
   currentScale = contentScale;
   backgroundFilter =
-      ImageFilter::Blur(_blurrinessX * contentScale, _blurrinessX * contentScale, _tileMode);
+      ImageFilter::Blur(_blurrinessX * contentScale, _blurrinessY * contentScale, _tileMode);
   return backgroundFilter;
 }
 

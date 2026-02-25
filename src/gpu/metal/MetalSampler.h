@@ -16,28 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/GlyphRunList.h"
-#include "core/RunRecord.h"
-#include "tgfx/core/TextBlob.h"
+#pragma once
+
+#include <Metal/Metal.h>
+#include "tgfx/gpu/Sampler.h"
+#include "MetalResource.h"
 
 namespace tgfx {
 
-GlyphRunList::Iterator GlyphRunList::begin() const {
-  return Iterator(blob->firstRun(), blob->runCount);
-}
+class MetalGPU;
 
-bool GlyphRunList::empty() const {
-  return blob->runCount == 0;
-}
+/**
+ * Metal sampler implementation.
+ */
+class MetalSampler : public Sampler, public MetalResource {
+ public:
+  static std::shared_ptr<MetalSampler> Make(MetalGPU* gpu, const SamplerDescriptor& descriptor);
 
-GlyphRun GlyphRunList::Iterator::operator*() const {
-  return GlyphRun::From(current);
-}
+  /**
+   * Returns the Metal sampler state.
+   */
+  id<MTLSamplerState> metalSamplerState() const {
+    return samplerState;
+  }
 
-GlyphRunList::Iterator& GlyphRunList::Iterator::operator++() {
-  current = current->next();
-  --remaining;
-  return *this;
-}
+ protected:
+  void onRelease(MetalGPU* gpu) override;
+
+ private:
+  explicit MetalSampler(id<MTLSamplerState> metalSamplerState);
+  ~MetalSampler() override = default;
+
+  id<MTLSamplerState> samplerState = nil;
+  
+  friend class MetalGPU;
+};
 
 }  // namespace tgfx

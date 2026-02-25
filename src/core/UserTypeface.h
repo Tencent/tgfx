@@ -43,7 +43,7 @@ class UserTypeface : public Typeface {
   }
 
   int unitsPerEm() const override {
-    return 1;
+    return _unitsPerEm;
   }
 
   const FontMetrics& fontMetrics() const {
@@ -69,16 +69,18 @@ class UserTypeface : public Typeface {
   }
 
   bool onComputeBounds(Rect* bounds) const override {
-    *bounds = fontBounds;
+    float invUpem = 1.0f / static_cast<float>(_unitsPerEm);
+    bounds->setLTRB(fontBounds.left * invUpem, fontBounds.top * invUpem, fontBounds.right * invUpem,
+                    fontBounds.bottom * invUpem);
     return true;
   }
 
  protected:
   explicit UserTypeface(uint32_t builderID, const std::string& fontFamily,
                         const std::string& fontStyle, const FontMetrics& fontMetrics,
-                        const Rect& fontBounds)
+                        const Rect& fontBounds, int unitsPerEm)
       : _builderID(builderID), _fontFamily(fontFamily), _fontStyle(fontStyle),
-        _fontMetrics(fontMetrics), fontBounds(fontBounds) {
+        _fontMetrics(fontMetrics), fontBounds(fontBounds), _unitsPerEm(unitsPerEm) {
   }
 
  private:
@@ -88,5 +90,6 @@ class UserTypeface : public Typeface {
   std::string _fontStyle;
   FontMetrics _fontMetrics = {};
   Rect fontBounds = {};
+  int _unitsPerEm = 1;
 };
 }  // namespace tgfx

@@ -17,9 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/LayerRecorder.h"
+#include "core/shapes/MatrixShape.h"
+#include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
+#include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "layers/contents/ComposeContent.h"
 #include "layers/contents/GeometryContent.h"
+#include "layers/contents/MatrixContent.h"
 #include "layers/contents/PathContent.h"
 #include "layers/contents/RRectContent.h"
 #include "layers/contents/RRectsContent.h"
@@ -35,90 +40,152 @@ LayerRecorder::LayerRecorder() = default;
 LayerRecorder::~LayerRecorder() = default;
 
 void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint) {
-  if (rect.isEmpty()) {
-    return;
-  }
-  if (!canAppend(PendingType::Rect, paint)) {
-    flushPending(PendingType::Rect, paint);
-  }
-  pendingRects.push_back(rect);
+  addRect(rect, paint, _matrix);
 }
 
 void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint) {
-  if (rRect.rect.isEmpty()) {
-    return;
-  }
-  if (rRect.isRect()) {
-    addRect(rRect.rect, paint);
-    return;
-  }
-  if (!canAppend(PendingType::RRect, paint)) {
-    flushPending(PendingType::RRect, paint);
-  }
-  pendingRRects.push_back(rRect);
+  addRRect(rRect, paint, _matrix);
 }
 
 void LayerRecorder::addPath(const Path& path, const LayerPaint& paint) {
-  if (path.isEmpty()) {
-    return;
-  }
-  Point line[2] = {};
-  if (path.isLine(line)) {
-    if (paint.style != PaintStyle::Stroke) {
-      // A line cannot be filled.
-      return;
-    }
-    Rect rect = {};
-    if (StrokeLineToRect(paint.stroke, line, &rect)) {
-      LayerPaint fillPaint = paint;
-      fillPaint.style = PaintStyle::Fill;
-      addRect(rect, fillPaint);
-      return;
-    }
-  }
-  Rect rect = {};
-  if (path.isRect(&rect)) {
-    addRect(rect, paint);
-    return;
-  }
-  RRect rRect = {};
-  if (path.isRRect(&rRect)) {
-    addRRect(rRect, paint);
-    return;
-  }
-  flushPending(PendingType::Shape, paint);
-  pendingShape = Shape::MakeFrom(path);
+  addPath(path, paint, _matrix);
 }
 
 void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint) {
-  if (shape == nullptr) {
-    return;
-  }
-  if (shape->isSimplePath()) {
-    addPath(shape->getPath(), paint);
-    return;
-  }
-  flushPending(PendingType::Shape, paint);
-  pendingShape = std::move(shape);
+  addShape(std::move(shape), paint, _matrix);
 }
 
 void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
                                 float x, float y) {
-  addTextBlob(std::move(textBlob), paint, Matrix::MakeTrans(x, y));
-}
-
-void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
-                                const Matrix& matrix) {
   if (textBlob == nullptr) {
     return;
   }
   flushPending();
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
-  list.push_back(std::make_unique<TextContent>(std::move(textBlob), matrix, paint));
+  // The offset only affects the text position, while _matrix affects both
+  // the text position and the paint (shader/maskFilter coordinates).
+  auto offset = Point::Make(x, y);
+  std::unique_ptr<GeometryContent> content =
+      std::make_unique<TextContent>(std::move(textBlob), offset, paint);
+  if (!_matrix.isIdentity()) {
+    content = std::make_unique<MatrixContent>(std::move(content), _matrix);
+  }
+  list.push_back(std::move(content));
 }
 
-bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint) const {
+const Matrix& LayerRecorder::getMatrix() const {
+  return _matrix;
+}
+
+void LayerRecorder::setMatrix(const Matrix& matrix) {
+  _matrix = matrix;
+}
+
+void LayerRecorder::resetMatrix() {
+  _matrix = Matrix::I();
+}
+
+void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint, const Matrix& matrix) {
+  if (rect.isEmpty()) {
+    return;
+  }
+  if (!canAppend(PendingType::Rect, paint, matrix)) {
+    flushPending(PendingType::Rect, paint, matrix);
+  }
+  pendingRects.push_back(rect);
+}
+
+void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint, const Matrix& matrix) {
+  if (rRect.rect.isEmpty()) {
+    return;
+  }
+  if (rRect.isRect()) {
+    addRect(rRect.rect, paint, matrix);
+    return;
+  }
+  if (!canAppend(PendingType::RRect, paint, matrix)) {
+    flushPending(PendingType::RRect, paint, matrix);
+  }
+  pendingRRects.push_back(rRect);
+}
+
+void LayerRecorder::addPath(const Path& path, const LayerPaint& paint, const Matrix& matrix) {
+  if (path.isEmpty()) {
+    return;
+  }
+  if (tryAddSimplifiedPath(path, paint, matrix)) {
+    return;
+  }
+  flushPending(PendingType::Shape, paint, matrix);
+  pendingShape = Shape::MakeFrom(path);
+}
+
+void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint,
+                             const Matrix& matrix) {
+  if (shape == nullptr) {
+    return;
+  }
+  if (shape->isSimplePath()) {
+    addPath(shape->getPath(), paint, matrix);
+    return;
+  }
+  if (tryAddSimplifiedMatrixShape(shape, paint, matrix)) {
+    return;
+  }
+  flushPending(PendingType::Shape, paint, matrix);
+  pendingShape = std::move(shape);
+}
+
+bool LayerRecorder::tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& shape,
+                                                const LayerPaint& paint, const Matrix& matrix) {
+  auto matrixShape = ShapeUtils::AsMatrixShape(shape.get());
+  if (matrixShape == nullptr || !matrixShape->shape->isSimplePath()) {
+    return false;
+  }
+  // Skip tryAddSimplifiedPath for stroke with non-uniform scale in shape's matrix, as this
+  // optimization would cause the stroke to be scaled non-uniformly.
+  auto scales = matrixShape->matrix.getAxisScales();
+  if (paint.style == PaintStyle::Stroke && !FloatNearlyEqual(scales.x, scales.y)) {
+    return false;
+  }
+  auto combinedMatrix = matrixShape->matrix;
+  combinedMatrix.postConcat(matrix);
+  return tryAddSimplifiedPath(matrixShape->shape->getPath(), paint, combinedMatrix);
+}
+
+bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& paint,
+                                         const Matrix& matrix) {
+  Point line[2] = {};
+  if (path.isLine(line)) {
+    if (paint.style != PaintStyle::Stroke) {
+      // A line cannot be filled.
+      return true;
+    }
+    Rect rect = {};
+    if (StrokeLineToRect(paint.stroke, line, &rect)) {
+      LayerPaint fillPaint = paint;
+      fillPaint.style = PaintStyle::Fill;
+      addRect(rect, fillPaint, matrix);
+      return true;
+    }
+  }
+  if (Rect rect = {}; path.isRect(&rect)) {
+    addRect(rect, paint, matrix);
+    return true;
+  }
+  if (RRect rRect = {}; path.isRRect(&rRect)) {
+    addRRect(rRect, paint, matrix);
+    return true;
+  }
+  return false;
+}
+
+bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint,
+                              const Matrix& matrix) const {
   if (pendingType != type) {
+    return false;
+  }
+  if (pendingMatrix != matrix) {
     return false;
   }
   if (pendingPaint.placement != paint.placement || pendingPaint.style != paint.style ||
@@ -142,40 +209,52 @@ bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint) const {
   return true;
 }
 
-void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint) {
+void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint,
+                                 const Matrix& newMatrix) {
   if (pendingType != PendingType::None) {
+    std::unique_ptr<GeometryContent> content = nullptr;
     auto& list = pendingPaint.placement == LayerPlacement::Foreground ? foregrounds : contents;
     switch (pendingType) {
       case PendingType::Rect:
         if (pendingRects.size() == 1) {
-          list.push_back(std::make_unique<RectContent>(pendingRects[0], pendingPaint));
+          content = std::make_unique<RectContent>(pendingRects[0], pendingPaint);
         } else {
-          list.push_back(std::make_unique<RectsContent>(std::move(pendingRects), pendingPaint));
+          content = std::make_unique<RectsContent>(std::move(pendingRects), pendingPaint);
         }
         pendingRects = {};
         break;
       case PendingType::RRect:
         if (pendingRRects.size() == 1) {
-          list.push_back(std::make_unique<RRectContent>(pendingRRects[0], pendingPaint));
+          content = std::make_unique<RRectContent>(pendingRRects[0], pendingPaint);
         } else {
-          list.push_back(std::make_unique<RRectsContent>(std::move(pendingRRects), pendingPaint));
+          content = std::make_unique<RRectsContent>(std::move(pendingRRects), pendingPaint);
         }
         pendingRRects = {};
         break;
       case PendingType::Shape:
         if (pendingShape->isSimplePath()) {
-          list.push_back(std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint));
+          content = std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint);
         } else {
-          list.push_back(std::make_unique<ShapeContent>(std::move(pendingShape), pendingPaint));
+          content = std::make_unique<ShapeContent>(std::move(pendingShape), pendingPaint);
         }
         pendingShape = nullptr;
         break;
       default:
         break;
     }
+
+    // Wrap with MatrixContent if matrix is not identity.
+    if (content != nullptr && !pendingMatrix.isIdentity()) {
+      content = std::make_unique<MatrixContent>(std::move(content), pendingMatrix);
+    }
+    DEBUG_ASSERT(content != nullptr);
+    if (content != nullptr) {
+      list.push_back(std::move(content));
+    }
   }
   pendingType = newType;
   pendingPaint = newPaint;
+  pendingMatrix = newMatrix;
 }
 
 std::unique_ptr<LayerContent> LayerRecorder::finishRecording() {
@@ -215,7 +294,7 @@ std::unique_ptr<LayerContent> LayerRecorder::finishRecording() {
   bool needContours = false;
   for (const auto& group : groups) {
     auto nonImageContent = std::find_if(group.begin(), group.end(), [](auto content) {
-      return content->shader == nullptr || !content->shader->isAImage();
+      return content->getShader() == nullptr || !content->getShader()->isAImage();
     });
     if (nonImageContent == group.end()) {
       // All image shaders, collect all.

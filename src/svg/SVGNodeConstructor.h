@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <functional>
 #include "tgfx/svg/SVGCustomParser.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/xml/XMLDOM.h"

@@ -18,47 +18,18 @@
 
 #pragma once
 
-#include "core/GlyphRun.h"
+#include "core/GlyphRasterizer.h"
 
 namespace tgfx {
-
-class TextBlob;
-struct RunRecord;
-
-// A lightweight list class for iterating over GlyphRuns without allocating a vector.
-class GlyphRunList {
+class WebGlyphRasterizer final : public GlyphRasterizer {
  public:
-  class Iterator {
-   public:
-    Iterator(const RunRecord* record, size_t remaining) : current(record), remaining(remaining) {
-    }
-
-    GlyphRun operator*() const;
-
-    Iterator& operator++();
-
-    bool operator!=(const Iterator& other) const {
-      return remaining != other.remaining;
-    }
-
-   private:
-    const RunRecord* current = nullptr;
-    size_t remaining = 0;
-  };
-
-  explicit GlyphRunList(const TextBlob* blob) : blob(blob) {
+  WebGlyphRasterizer(int width, int height, std::shared_ptr<ScalerContext> scalerContext,
+                     GlyphID glyphID, bool fauxBold, const Stroke* stroke, const Point& glyphOffset)
+      : GlyphRasterizer(width, height, std::move(scalerContext), glyphID, fauxBold, stroke,
+                        glyphOffset) {
   }
 
-  Iterator begin() const;
-
-  Iterator end() const {
-    return Iterator(nullptr, 0);
-  }
-
-  bool empty() const;
-
- private:
-  const TextBlob* blob = nullptr;
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 };
-
 }  // namespace tgfx
