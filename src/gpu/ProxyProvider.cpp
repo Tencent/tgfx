@@ -233,7 +233,6 @@ std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(std::shared_ptr<
   auto& impl = MeshImpl::ReadAccess(*mesh);
   auto baseKey = impl.getUniqueKey();
   const bool disableCache = (renderFlags & RenderFlags::DisableCache) != 0;
-  const bool disableAsync = (renderFlags & RenderFlags::DisableAsyncTask) != 0;
   const bool isVertexMesh = impl.type() == MeshImpl::Type::Vertex;
 
   auto drawAttrs = GPUMeshDrawAttributes::Make(impl);
@@ -264,6 +263,7 @@ std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(std::shared_ptr<
           std::make_unique<ShapeVertexSource>(shapeMeshImpl.shape(), shapeMeshImpl.isAntiAlias());
       std::unique_ptr<DataSource<Data>> dataSource = nullptr;
 #ifdef TGFX_USE_THREADS
+      const bool disableAsync = (renderFlags & RenderFlags::DisableAsyncTask) != 0;
       if (!disableAsync) {
         dataSource = DataSource<Data>::Async(std::move(vertexSource));
       } else {
