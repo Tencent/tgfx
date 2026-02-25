@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,15 +18,38 @@
 
 #pragma once
 
+#include <Metal/Metal.h>
+#include "tgfx/gpu/Sampler.h"
+#include "MetalResource.h"
+
 namespace tgfx {
+
+class MetalGPU;
+
 /**
- * Types for interacting with Metal resources created externally to TGFX. Holds the MTLTexture as a
- * const void*.
+ * Metal sampler implementation.
  */
-struct MtlTextureInfo {
+class MetalSampler : public Sampler, public MetalResource {
+ public:
+  static std::shared_ptr<MetalSampler> Make(MetalGPU* gpu, const SamplerDescriptor& descriptor);
+
   /**
-   * Pointer to MTLTexture.
+   * Returns the Metal sampler state.
    */
-  const void* texture = nullptr;
+  id<MTLSamplerState> metalSamplerState() const {
+    return samplerState;
+  }
+
+ protected:
+  void onRelease(MetalGPU* gpu) override;
+
+ private:
+  explicit MetalSampler(id<MTLSamplerState> metalSamplerState);
+  ~MetalSampler() override = default;
+
+  id<MTLSamplerState> samplerState = nil;
+  
+  friend class MetalGPU;
 };
+
 }  // namespace tgfx

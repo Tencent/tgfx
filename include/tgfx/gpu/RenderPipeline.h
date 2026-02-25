@@ -38,7 +38,7 @@ namespace tgfx {
 class PipelineColorAttachment {
  public:
   /**
-   * The pixel format of the color attachment’s texture.
+   * The pixel format of the color attachment's texture.
    */
   PixelFormat format = PixelFormat::RGBA_8888;
 
@@ -294,6 +294,12 @@ class DepthStencilDescriptor {
    * A bitmask that determines to which bits that stencil operations can write.
    */
   uint32_t stencilWriteMask = 0xFFFFFFFF;
+
+  /**
+   * The pixel format of the depth-stencil attachment. Set to PixelFormat::Unknown if no
+   * depth-stencil attachment is used. Metal requires this to be specified at pipeline creation time.
+   */
+  PixelFormat format = PixelFormat::Unknown;
 };
 
 /**
@@ -345,6 +351,32 @@ class PrimitiveDescriptor {
 };
 
 /**
+ * MultisampleDescriptor describes the multisample state for a render pipeline. This controls how
+ * multisampling is performed during rasterization.
+ */
+class MultisampleDescriptor {
+ public:
+  /**
+   * The number of samples per pixel. A value of 1 means no multisampling. Common values are 1 and
+   * 4.
+   */
+  int count = 1;
+
+  /**
+   * A bitmask that controls which samples are written to. Each bit corresponds to a sample index.
+   * The default value of 0xFFFFFFFF enables all samples.
+   */
+  uint32_t mask = 0xFFFFFFFF;
+
+  /**
+   * If true, the alpha channel output from the fragment shader is used to generate a coverage mask
+   * for multisampling. This is useful for rendering semi-transparent geometry (e.g., foliage)
+   * without requiring depth sorting.
+   */
+  bool alphaToCoverageEnabled = false;
+};
+
+/**
  * Options you provide to a GPU device to create a render pipeline state.
  */
 class RenderPipelineDescriptor {
@@ -375,6 +407,11 @@ class RenderPipelineDescriptor {
    * An object that describes the face culling configuration for the render pipeline.
    */
   PrimitiveDescriptor primitive = {};
+
+  /**
+   * An object that describes the multisample state for the render pipeline.
+   */
+  MultisampleDescriptor multisample = {};
 };
 
 /**

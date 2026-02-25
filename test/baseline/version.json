@@ -92,8 +92,13 @@
     },
     "FilterTest": {
         "AlphaThreshold": "5012d73",
+        "AlphaThresholdZero": "6ae9b0e9",
         "AlphaThreshold_empty": "500c87a",
+        "BrushColorFilterTransparent": "6ae9b0e9",
         "ClipInnerShadowImageFilter": "c26ff3d9",
+        "ColorFilterShaderTransparent": "6ae9b0e9",
+        "ColorImageFilterTransparent_Modulate": "6ae9b0e9",
+        "ColorImageFilterTransparent_Screen": "6ae9b0e9",
         "ComposeColorFilter": "6b4e5ce0",
         "ComposeImageFilter": "c26ff3d9",
         "ComposeImageFilter2": "00bc6d75",
@@ -106,8 +111,8 @@
         "ModeColorFilter": "6b4e5ce0",
         "OpacityShadowTest": "ee2cc771",
         "ReverseFilterBounds_Blur": "b6757c2d",
-        "ReverseFilterBounds_color": "b6757c2d",
-        "ReverseFilterBounds_compose": "b6757c2d",
+        "ReverseFilterBounds_color": "6ae9b0e9",
+        "ReverseFilterBounds_compose": "6ae9b0e9",
         "ReverseFilterBounds_dropShadow": "b6757c2d",
         "ReverseFilterBounds_dropShadowOnly": "b6757c2d",
         "ReverseFilterBounds_inner": "b6757c2d",
@@ -121,7 +126,13 @@
         "shaderMaskFilter": "6b4e5ce0"
     },
     "GPURenderTest": {
-        "InstancedGridRender": "62f124a1"
+        "AlphaToCoverage_Off": "faa8a587",
+        "AlphaToCoverage_On": "faa8a587",
+        "InstancedGridRender": "62f124a1",
+        "MultisampleCount_1x": "faa8a587",
+        "MultisampleCount_4x": "faa8a587",
+        "MultisampleMask_AllSamples": "faa8a587",
+        "MultisampleMask_NoSamples": "faa8a587"
     },
     "Hello2DTest": {
         "ConicGradient": "1ea63c49",
@@ -190,7 +201,7 @@
         "DropShadowStyle-stroke-blur-behindLayer": "e7704264",
         "DropShadowStyle2": "e7704264",
         "InnerShadowStyle": "bf48e614",
-        "ModeColorFilter": "bf48e614",
+        "ModeColorFilter": "3594da9d",
         "PartialInnerShadow": "bf48e614",
         "ScaledRectWithInnerShadow": "2ce762fb",
         "ShapeLayerContourWithDropShadow": "1642114b",
@@ -479,10 +490,11 @@
     "TextRenderTest": {
         "AxisAlignedRotationRender": "484bda47",
         "ShapeMakeFromMixedTextBlob": "bf48e614",
-        "TextBlobMixedPositioning": "484bda47",
+        "TextBlobMixedPositioning": "977dbf19",
         "TextBlobPositioningRender": "484bda47",
         "TextBlobWithStroke": "484bda47",
         "TextBlobWithTransform": "5138bfde",
+        "VerticalTextWithEmoji": "977dbf19",
         "complexEmojiTextBlending": "bf48e614",
         "emojiTextStrokeBlending": "bf48e614",
         "textEmojiMixedBlendModes": "bf48e614",
@@ -496,7 +508,6 @@
     },
     "VectorLayerTest": {
         "BasicShapes": "4a74f6aa",
-        "StrokeDashAdaptive": "4a74f6aa",
         "ChainedModifiers": "8815f728",
         "ColorSourceAdvanced": "3e96556a",
         "ComplexComposition": "8815f728",
@@ -522,6 +533,7 @@
         "RoundCornerWithScale": "4a74f6aa",
         "SolidColor": "3e96556a",
         "StrokeAlign": "d5c84937",
+        "StrokeDashAdaptive": "4a74f6aa",
         "StrokeDashWithTrim": "4a74f6aa",
         "StrokeJoinCap": "d5c84937",
         "StrokeNestedScale": "4a74f6aa",

@@ -18,7 +18,6 @@
 
 #include "DrawOp.h"
 #include "gpu/AlignTo.h"
-#include "gpu/GlobalCache.h"
 #include "gpu/Program.h"
 #include "inspect/InspectorMark.h"
 

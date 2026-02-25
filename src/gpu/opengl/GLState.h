@@ -94,6 +94,8 @@ class GLState {
 
   void setCullFaceState(const GLCullFaceState& state);
 
+  void setSampleMask(uint32_t mask);
+
   void bindTexture(GLTexture* texture, unsigned textureUnit = 0);
 
   void bindFramebuffer(GLTexture* texture, FrameBufferTarget target = FrameBufferTarget::Both);
@@ -118,5 +120,6 @@ class GLState {
   GLDepthState depthState = {};
   GLBlendState blendState = {};
   GLCullFaceState cullFaceState = {};
+  uint32_t sampleMask = 0xFFFFFFFF;
 };
 }  // namespace tgfx

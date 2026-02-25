@@ -25,7 +25,6 @@
 #include "gpu/processors/GeometryProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/RenderPass.h"
-#include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
 struct SamplerInfo {
@@ -68,6 +67,8 @@ class ProgramInfo {
   }
 
   PipelineColorAttachment getPipelineColorAttachment() const;
+
+  int getSampleCount() const;
 
   /**
    * Returns the index of the processor in the ProgramInfo. Returns -1 if the processor is not in
