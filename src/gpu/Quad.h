@@ -51,10 +51,10 @@ class Quad {
   }
 
   /**
-   * Returns true if the quad is an axis-aligned rectangle.
+   * Returns true if the quad is a rectangle.
    */
-  bool isAxisAligned() const {
-    return _isAxisAligned;
+  bool isRect() const {
+    return _isRect;
   }
 
   /**
@@ -67,7 +67,7 @@ class Quad {
   explicit Quad(const Rect& rect, const Matrix* matrix = nullptr);
 
   Point points[4] = {};
-  bool _isAxisAligned = false;
+  bool _isRect = false;
 };
 
 }  // namespace tgfx

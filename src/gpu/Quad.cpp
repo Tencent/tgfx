@@ -21,6 +21,10 @@
 
 namespace tgfx {
 
+static inline bool RectStaysRect(const Matrix& matrix) {
+  return matrix.rectStaysRect() || MatrixUtils::PreservesAngles(matrix);
+}
+
 Quad Quad::MakeFrom(const Rect& rect, const Matrix* matrix) {
   return Quad(rect, matrix);
 }
@@ -43,7 +47,7 @@ Quad::Quad(const Rect& rect, const Matrix* matrix) {
   if (matrix) {
     matrix->mapPoints(points, 4);
   }
-  _isAxisAligned = !matrix || MatrixUtils::PreservesAngles(*matrix);
+  _isRect = !matrix || RectStaysRect(*matrix);
 }
 
 void Quad::transform(const Matrix& matrix) {
@@ -51,10 +55,10 @@ void Quad::transform(const Matrix& matrix) {
     return;
   }
   matrix.mapPoints(points, 4);
-  if (_isAxisAligned) {
-    // We don't strictly track axis-alignment through multiple transforms.
-    // For example, two 45° rotations won't restore _isAxisAligned to true.
-    _isAxisAligned = MatrixUtils::PreservesAngles(matrix);
+  if (_isRect) {
+    // We don't strictly track rect through multiple transforms.
+    // For example, two 45° rotations won't restore _isRect to true.
+    _isRect = RectStaysRect(matrix);
   }
 }
 

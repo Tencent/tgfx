@@ -110,27 +110,21 @@ static inline Vec4 NextDiag(const Vec4& v) {
  * Convert Quad to Vertices4 SoA layout.
  */
 static inline Vertices4 ToVertices4(const Quad& quad) {
-  return {
-      Vec4(quad.point(0).x, quad.point(1).x, quad.point(2).x, quad.point(3).x),
-      Vec4(quad.point(0).y, quad.point(1).y, quad.point(2).y, quad.point(3).y)
-  };
+  return {Vec4(quad.point(0).x, quad.point(1).x, quad.point(2).x, quad.point(3).x),
+          Vec4(quad.point(0).y, quad.point(1).y, quad.point(2).y, quad.point(3).y)};
 }
 
 /**
  * Transform Vertices4 by matrix.
  */
 static inline Vertices4 TransformVertices4(const Vertices4& coord, const Matrix& matrix) {
-  Point points[4] = {
-      {coord.xs[0], coord.ys[0]},
-      {coord.xs[1], coord.ys[1]},
-      {coord.xs[2], coord.ys[2]},
-      {coord.xs[3], coord.ys[3]}
-  };
+  Point points[4] = {{coord.xs[0], coord.ys[0]},
+                     {coord.xs[1], coord.ys[1]},
+                     {coord.xs[2], coord.ys[2]},
+                     {coord.xs[3], coord.ys[3]}};
   matrix.mapPoints(points, 4);
-  return {
-      Vec4(points[0].x, points[1].x, points[2].x, points[3].x),
-      Vec4(points[0].y, points[1].y, points[2].y, points[3].y)
-  };
+  return {Vec4(points[0].x, points[1].x, points[2].x, points[3].x),
+          Vec4(points[0].y, points[1].y, points[2].y, points[3].y)};
 }
 
 /**
@@ -168,22 +162,30 @@ static inline void CorrectBadCoords(const Vec4& badMask, Vec4& xs, Vec4& ys) {
  * @param pys Y coordinates of vertices to correct (in/out).
  */
 static inline void CorrectTriangleDegeneration(const EdgeEquations& offsetEdgeEqs,
-                                        const Vec4& edgeDistsV,
-                                        const Vec4& edgeDistsH,
-                                        Vec4& pxs,
-                                        Vec4& pys) {
+                                               const Vec4& edgeDistsV, const Vec4& edgeDistsH,
+                                               Vec4& pxs, Vec4& pys) {
   // Intersection of two lines a*x + b*y + c = 0:
   // denom = a0*b1 - b0*a1, x = (b0*c1 - c0*b1) / denom, y = (c0*a1 - a0*c1) / denom
   // Compute intersection of edges E0 and E3.
-  const float denomV = offsetEdgeEqs.as[0] * offsetEdgeEqs.bs[3] - offsetEdgeEqs.bs[0] * offsetEdgeEqs.as[3];
-  const float xV = (offsetEdgeEqs.bs[0] * offsetEdgeEqs.cs[3] - offsetEdgeEqs.cs[0] * offsetEdgeEqs.bs[3]) / denomV;
-  const float yV = (offsetEdgeEqs.cs[0] * offsetEdgeEqs.as[3] - offsetEdgeEqs.as[0] * offsetEdgeEqs.cs[3]) / denomV;
+  const float denomV =
+      offsetEdgeEqs.as[0] * offsetEdgeEqs.bs[3] - offsetEdgeEqs.bs[0] * offsetEdgeEqs.as[3];
+  const float xV =
+      (offsetEdgeEqs.bs[0] * offsetEdgeEqs.cs[3] - offsetEdgeEqs.cs[0] * offsetEdgeEqs.bs[3]) /
+      denomV;
+  const float yV =
+      (offsetEdgeEqs.cs[0] * offsetEdgeEqs.as[3] - offsetEdgeEqs.as[0] * offsetEdgeEqs.cs[3]) /
+      denomV;
   const bool validV = std::abs(denomV) > DENOM_TOLERANCE;
 
   // Compute intersection of edges E1 and E2.
-  const float denomH = offsetEdgeEqs.as[1] * offsetEdgeEqs.bs[2] - offsetEdgeEqs.bs[1] * offsetEdgeEqs.as[2];
-  const float xH = (offsetEdgeEqs.bs[1] * offsetEdgeEqs.cs[2] - offsetEdgeEqs.cs[1] * offsetEdgeEqs.bs[2]) / denomH;
-  const float yH = (offsetEdgeEqs.cs[1] * offsetEdgeEqs.as[2] - offsetEdgeEqs.as[1] * offsetEdgeEqs.cs[2]) / denomH;
+  const float denomH =
+      offsetEdgeEqs.as[1] * offsetEdgeEqs.bs[2] - offsetEdgeEqs.bs[1] * offsetEdgeEqs.as[2];
+  const float xH =
+      (offsetEdgeEqs.bs[1] * offsetEdgeEqs.cs[2] - offsetEdgeEqs.cs[1] * offsetEdgeEqs.bs[2]) /
+      denomH;
+  const float yH =
+      (offsetEdgeEqs.cs[1] * offsetEdgeEqs.as[2] - offsetEdgeEqs.as[1] * offsetEdgeEqs.cs[2]) /
+      denomH;
   const bool validH = std::abs(denomH) > DENOM_TOLERANCE;
 
   auto avgXs = 0.5f * (VecUtils::Shuffle<0, 1, 0, 2>(pxs) + VecUtils::Shuffle<2, 3, 1, 3>(pxs));
@@ -237,7 +239,8 @@ static inline EdgeDatas ComputeEdgeDatas(const Vertices4& vertices) {
 /**
  * Compute edge equations from vertices and edge data.
  */
-static inline EdgeEquations ComputeEdgeEquations(const Vertices4& vertices, const EdgeDatas& edgeDatas) {
+static inline EdgeEquations ComputeEdgeEquations(const Vertices4& vertices,
+                                                 const EdgeDatas& edgeDatas) {
   auto dxs = edgeDatas.dxs;
   auto dys = edgeDatas.dys;
 
@@ -260,14 +263,15 @@ static inline EdgeEquations ComputeEdgeEquations(const Vertices4& vertices, cons
 
 /**
  * Check if quad will degenerate when computing AA vertices.
- * Axis-aligned quads never degenerate since all angles are 90 degrees.
+ * Rectangle quads never degenerate since all angles are 90 degrees.
  */
-static inline bool IsAADegenerate(const EdgeDatas& edgeDatas, bool isAxisAligned) {
-  if (isAxisAligned) {
+static inline bool IsAADegenerate(const EdgeDatas& edgeDatas, bool isRect) {
+  if (isRect) {
     return false;
   }
   const auto badLength = VecUtils::GreaterEqual(edgeDatas.invLengths, INV_DIST_TOLERANCE);
-  const auto badAngle = VecUtils::GreaterEqual(VecUtils::Abs(edgeDatas.cosThetas), COS_THETA_THRESHOLD);
+  const auto badAngle =
+      VecUtils::GreaterEqual(VecUtils::Abs(edgeDatas.cosThetas), COS_THETA_THRESHOLD);
   return VecUtils::Any(VecUtils::Or(badLength, badAngle));
 }
 
@@ -289,10 +293,8 @@ static inline bool IsCollinear(const Vertices4& vertices, const EdgeEquations& e
 /**
  * Compute AA vertices for non-degenerate quads.
  */
-static inline void ComputeAAVertices(const Vertices4& vertices,
-                                     const Vec4& edgeOffset,
-                                     const EdgeDatas& edgeDatas,
-                                     Vertices4& outInset,
+static inline void ComputeAAVertices(const Vertices4& vertices, const Vec4& edgeOffset,
+                                     const EdgeDatas& edgeDatas, Vertices4& outInset,
                                      Vertices4& outOutset) {
   // For vertex[i], compute miter displacement from two adjacent edges using 1/sin(θ).
   // fromOutsets: contribution from outgoing edge (edge[i], starting at vertex[i])
@@ -312,14 +314,20 @@ static inline void ComputeAAVertices(const Vertices4& vertices,
 /**
  * Compute offset quad vertices using edge equation intersection (degenerate path).
  */
-static inline Vertices4 OffsetQuadByIntersect(const EdgeEquations& edgeEqs, const Vec4& edgeOffset) {
+static inline Vertices4 OffsetQuadByIntersect(const EdgeEquations& edgeEqs,
+                                              const Vec4& edgeOffset) {
   const auto offsetEdgeEqs = EdgeEquations{edgeEqs.as, edgeEqs.bs, edgeEqs.cs + edgeOffset};
 
   // Intersection of two lines a*x + b*y + c = 0:
   // denom = a0*b1 - b0*a1, x = (b0*c1 - c0*b1) / denom, y = (c0*a1 - a0*c1) / denom
-  const auto denoms = offsetEdgeEqs.as * NextCW(offsetEdgeEqs.bs) - offsetEdgeEqs.bs * NextCW(offsetEdgeEqs.as);
-  auto pxs = (offsetEdgeEqs.bs * NextCW(offsetEdgeEqs.cs) - offsetEdgeEqs.cs * NextCW(offsetEdgeEqs.bs)) / denoms;
-  auto pys = (offsetEdgeEqs.cs * NextCW(offsetEdgeEqs.as) - offsetEdgeEqs.as * NextCW(offsetEdgeEqs.cs)) / denoms;
+  const auto denoms =
+      offsetEdgeEqs.as * NextCW(offsetEdgeEqs.bs) - offsetEdgeEqs.bs * NextCW(offsetEdgeEqs.as);
+  auto pxs =
+      (offsetEdgeEqs.bs * NextCW(offsetEdgeEqs.cs) - offsetEdgeEqs.cs * NextCW(offsetEdgeEqs.bs)) /
+      denoms;
+  auto pys =
+      (offsetEdgeEqs.cs * NextCW(offsetEdgeEqs.as) - offsetEdgeEqs.as * NextCW(offsetEdgeEqs.cs)) /
+      denoms;
 
   const auto badMask = VecUtils::LessThan(VecUtils::Abs(denoms), DENOM_TOLERANCE);
   CorrectBadCoords(badMask, pxs, pys);
@@ -327,11 +335,11 @@ static inline Vertices4 OffsetQuadByIntersect(const EdgeEquations& edgeEqs, cons
   // Assumes quad is rectangle-like with vertex 0 at top-left, so E0/E3 are vertical and E1/E2 are
   // horizontal. Calculate signed distances from each vertex to its non-adjacent edges.
   const auto edgeDistsV = VecUtils::Shuffle<3, 3, 0, 0>(offsetEdgeEqs.as) * pxs +
-                    VecUtils::Shuffle<3, 3, 0, 0>(offsetEdgeEqs.bs) * pys +
-                    VecUtils::Shuffle<3, 3, 0, 0>(offsetEdgeEqs.cs);
+                          VecUtils::Shuffle<3, 3, 0, 0>(offsetEdgeEqs.bs) * pys +
+                          VecUtils::Shuffle<3, 3, 0, 0>(offsetEdgeEqs.cs);
   const auto edgeDistsH = VecUtils::Shuffle<1, 2, 1, 2>(offsetEdgeEqs.as) * pxs +
-                    VecUtils::Shuffle<1, 2, 1, 2>(offsetEdgeEqs.bs) * pys +
-                    VecUtils::Shuffle<1, 2, 1, 2>(offsetEdgeEqs.cs);
+                          VecUtils::Shuffle<1, 2, 1, 2>(offsetEdgeEqs.bs) * pys +
+                          VecUtils::Shuffle<1, 2, 1, 2>(offsetEdgeEqs.cs);
 
   // Check if offset vertices are beyond their non-adjacent edges.
   const auto overEdgeV = VecUtils::LessThan(edgeDistsV, DIST_TOLERANCE);
@@ -360,10 +368,8 @@ static inline Vertices4 OffsetQuadByIntersect(const EdgeEquations& edgeEqs, cons
 /**
  * Compute AA vertices for degenerate quads.
  */
-static inline void ComputeAAVerticesDegenerate(const Vertices4& vertices,
-                                               const Vec4& edgeOffset,
-                                               const EdgeEquations& edgeEqs,
-                                               Vertices4& outInset,
+static inline void ComputeAAVerticesDegenerate(const Vertices4& vertices, const Vec4& edgeOffset,
+                                               const EdgeEquations& edgeEqs, Vertices4& outInset,
                                                Vertices4& outOutset) {
   if (IsCollinear(vertices, edgeEqs)) {
     outInset = vertices;
@@ -488,19 +494,18 @@ class AAQuadsVertexProvider : public QuadsVertexProvider {
 
     auto edgeDatas = ComputeEdgeDatas(transformedVertices);
     auto aaFlags = record.aaFlags;
-    auto edgeOffset = Vec4(
-        (aaFlags & QUAD_AA_FLAG_EDGE_0) ? AA_OFFSET : 0.0f,
-        (aaFlags & QUAD_AA_FLAG_EDGE_1) ? AA_OFFSET : 0.0f,
-        (aaFlags & QUAD_AA_FLAG_EDGE_2) ? AA_OFFSET : 0.0f,
-        (aaFlags & QUAD_AA_FLAG_EDGE_3) ? AA_OFFSET : 0.0f
-    );
+    auto edgeOffset = Vec4((aaFlags & QUAD_AA_FLAG_EDGE_0) ? AA_OFFSET : 0.0f,
+                           (aaFlags & QUAD_AA_FLAG_EDGE_1) ? AA_OFFSET : 0.0f,
+                           (aaFlags & QUAD_AA_FLAG_EDGE_2) ? AA_OFFSET : 0.0f,
+                           (aaFlags & QUAD_AA_FLAG_EDGE_3) ? AA_OFFSET : 0.0f);
 
     Vertices4 insetCoord = {};
     Vertices4 outsetCoord = {};
 
-    if (IsAADegenerate(edgeDatas, transformedQuad.isAxisAligned())) {
+    if (IsAADegenerate(edgeDatas, transformedQuad.isRect())) {
       auto edgeEqs = ComputeEdgeEquations(transformedVertices, edgeDatas);
-      ComputeAAVerticesDegenerate(transformedVertices, edgeOffset, edgeEqs, insetCoord, outsetCoord);
+      ComputeAAVerticesDegenerate(transformedVertices, edgeOffset, edgeEqs, insetCoord,
+                                  outsetCoord);
     } else {
       ComputeAAVertices(transformedVertices, edgeOffset, edgeDatas, insetCoord, outsetCoord);
     }
