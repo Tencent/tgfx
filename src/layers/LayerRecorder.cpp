@@ -153,6 +153,7 @@ bool LayerRecorder::tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& sh
     }
     // Compensate stroke width for uniform scale to keep stroke width constant.
     if (!FloatNearlyEqual(scales.x, 1.0f)) {
+      DEBUG_ASSERT(scales.x != 0);
       auto compensatedPaint = paint;
       compensatedPaint.stroke.width = paint.stroke.width / scales.x;
       return tryAddSimplifiedPath(matrixShape->shape->getPath(), compensatedPaint, combinedMatrix);
