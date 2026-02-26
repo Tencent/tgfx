@@ -150,6 +150,12 @@ bool LayerRecorder::tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& sh
   }
   auto combinedMatrix = matrixShape->matrix;
   combinedMatrix.postConcat(matrix);
+  // Compensate stroke width for uniform scale to keep stroke width constant.
+  if (paint.style == PaintStyle::Stroke && !FloatNearlyEqual(scales.x, 1.0f)) {
+    auto compensatedPaint = paint;
+    compensatedPaint.stroke.width = paint.stroke.width / scales.x;
+    return tryAddSimplifiedPath(matrixShape->shape->getPath(), compensatedPaint, combinedMatrix);
+  }
   return tryAddSimplifiedPath(matrixShape->shape->getPath(), paint, combinedMatrix);
 }
 

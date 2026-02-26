@@ -2677,6 +2677,33 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
   canvas->concat(Matrix::MakeTrans(50, 0));
   content5->drawDefault(canvas, 1.0f, true);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorderMatrix"));
+
+  // Test 8: MatrixShape with uniform scale should not affect stroke width.
+  // Left: Shape wrapped with ApplyMatrix(scale=2), Right: Directly scaled rect (reference).
+  // Both should have the same stroke width of 10.
+  LayerPaint strokePaint = {};
+  strokePaint.color = Color::Blue();
+  strokePaint.style = PaintStyle::Stroke;
+  strokePaint.stroke = Stroke(10.0f);
+
+  Path rectPath = {};
+  rectPath.addRect(Rect::MakeWH(50, 50));
+  auto scaledShape = Shape::ApplyMatrix(Shape::MakeFrom(rectPath), Matrix::MakeScale(2.0f));
+  LayerRecorder recorder6 = {};
+  recorder6.addShape(scaledShape, strokePaint);
+  auto content6 = recorder6.finishRecording();
+
+  LayerRecorder recorder7 = {};
+  recorder7.addRect(Rect::MakeWH(100, 100), strokePaint);
+  auto content7 = recorder7.finishRecording();
+
+  auto surface2 = Surface::Make(context, 350, 200);
+  auto canvas2 = surface2->getCanvas();
+  canvas2->concat(Matrix::MakeTrans(50, 50));
+  content6->drawDefault(canvas2, 1.0f, true);
+  canvas2->concat(Matrix::MakeTrans(150, 0));
+  content7->drawDefault(canvas2, 1.0f, true);
+  EXPECT_TRUE(Baseline::Compare(surface2, "LayerTest/LayerRecorderMatrixStroke"));
 }
 
 TGFX_TEST(LayerTest, GetRotateBounds) {
