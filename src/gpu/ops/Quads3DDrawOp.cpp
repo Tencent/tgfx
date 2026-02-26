@@ -56,7 +56,10 @@ Quads3DDrawOp::Quads3DDrawOp(BlockAllocator* allocator, QuadsVertexProvider* pro
     : DrawOp(allocator, provider->aaType()), quadCount(provider->quadCount()) {
   if (!provider->hasUVCoord()) {
     auto matrix = provider->firstMatrix();
-    matrix.invert(&matrix);
+    if (!matrix.invert(&matrix)) {
+      DEBUG_ASSERT(false);
+      matrix = Matrix::I();
+    }
     uvMatrix = matrix;
   }
   if (!provider->hasColor()) {
