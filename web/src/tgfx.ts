@@ -86,7 +86,7 @@ export const getSourceSize = (source: TexImageSource | OffscreenCanvas) => {
 // Calling texSubImage2D immediately after setting currentTime may read stale frame data.
 // Drawing video to canvas forces the browser to composite the current frame synchronously.
 // Note: requestVideoFrameCallback is not used because it's async, requires architecture changes,
-// and has limited browser support (Chrome 83+, Safari 15.4+, no Firefox support as of 2024).
+// and has limited browser support (Chrome 83+, Safari 15.4+).
 let syncCanvas: HTMLCanvasElement | null = null;
 let syncCtx: CanvasRenderingContext2D | null = null;
 
