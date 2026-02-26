@@ -90,7 +90,7 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   return filter->filterBounds(srcRect);
 }
 
-void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> contour,
+void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
                                             float contentScale, std::shared_ptr<Image> extraSource,
                                             const Point& extraSourceOffset, float alpha,
                                             BlendMode blendMode) {
@@ -99,22 +99,28 @@ void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Imag
   if (!filter) {
     return;
   }
-  auto shadowImage = contour->makeWithFilter(filter, &offset);
+  auto shadowImage = content->makeWithFilter(filter, &offset);
+  // Use nearest filtering when there's no blur to avoid edge artifacts caused by linear
+  // interpolation. When the texture is scaled up, linear filtering produces intermediate alpha
+  // values at edges, which causes visible borders in the shadow.
+  auto sampling = (_blurrinessX == 0 && _blurrinessY == 0)
+                      ? SamplingOptions(FilterMode::Nearest, MipmapMode::None)
+                      : SamplingOptions();
   Paint paint = {};
   if (!_showBehindLayer) {
-    auto shader = Shader::MakeImageShader(extraSource, TileMode::Decal, TileMode::Decal);
+    auto shader = Shader::MakeImageShader(extraSource, TileMode::Decal, TileMode::Decal, sampling);
     auto matrixShader =
         shader->makeWithMatrix(Matrix::MakeTrans(extraSourceOffset.x, extraSourceOffset.y));
     paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
   }
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
-  canvas->drawImage(shadowImage, offset.x, offset.y, &paint);
+  canvas->drawImage(shadowImage, offset.x, offset.y, sampling, &paint);
 }
 
-void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> contour, float contentScale,
+void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                              float alpha, BlendMode blendMode) {
-  onDrawWithExtraSource(canvas, contour, contentScale, nullptr, {}, alpha, blendMode);
+  onDrawWithExtraSource(canvas, content, contentScale, nullptr, {}, alpha, blendMode);
 }
 
 std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {

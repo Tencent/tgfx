@@ -163,7 +163,7 @@ void DrawingManager::addAtlasCellTask(std::shared_ptr<TextureProxy> textureProxy
   if (result != atlasTaskMap.end()) {
     atlasUploadTask = result->second;
   } else {
-    auto atlasTask = allocator->make<AtlasUploadTask>(std::move(textureProxy));
+    auto atlasTask = AtlasUploadTask::Make(allocator, std::move(textureProxy));
     atlasUploadTask = atlasTask.get();
     drawingBuffer->atlasTasks.emplace_back(std::move(atlasTask));
     atlasTaskMap[taskKey] = atlasUploadTask;

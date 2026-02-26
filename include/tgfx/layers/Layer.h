@@ -37,7 +37,7 @@ class DisplayList;
 class DrawArgs;
 class RegionTransformer;
 class RootLayer;
-class ContourContext;
+class OpaqueContext;
 struct LayerStyleSource;
 struct MaskData;
 class BackgroundContext;
@@ -617,11 +617,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
-  virtual bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                         const Matrix3D* transform3D = nullptr);
+  virtual bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                     const Matrix3D* transform3D, const std::shared_ptr<MaskFilter>& maskFilter);
+                     const std::shared_ptr<MaskFilter>& maskFilter);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
@@ -629,20 +628,17 @@ class Layer : public std::enable_shared_from_this<Layer> {
                     const LayerStyleSource* layerStyleSource = nullptr,
                     const Layer* stopChild = nullptr);
 
-  bool drawContour(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                   const Matrix3D* transform3D = nullptr);
+  bool drawContour(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
-  bool drawContourInternal(const DrawArgs& args, Canvas* canvas, const Matrix3D* transform3D,
-                           bool contentOnly);
+  bool drawContourInternal(const DrawArgs& args, Canvas* canvas, bool contentOnly);
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr);
 
-  using LayerDrawFunc = bool (Layer::*)(const DrawArgs&, Canvas*, float, BlendMode,
-                                        const Matrix3D*);
+  using LayerDrawFunc = bool (Layer::*)(const DrawArgs&, Canvas*, float, BlendMode);
 
-  void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, LayerDrawFunc drawFunc,
-                               float alpha, BlendMode blendMode);
+  void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const Matrix3D& matrix3D,
+                               LayerDrawFunc drawFunc, float alpha, BlendMode blendMode);
 
   std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child,
                                           bool skipBackground);
@@ -658,20 +654,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getBackgroundImage(const DrawArgs& args, float contentScale,
                                             Point* offset);
 
-  /**
-   * Gets the background image of the minimum axis-aligned bounding box after drawing the layer
-   * subtree with the current layer as the root node
-   */
-  std::shared_ptr<Image> getBoundsBackgroundImage(const DrawArgs& args, float contentScale,
-                                                  Point* offset);
-
   void drawBackgroundImage(const DrawArgs& args, Canvas& canvas);
 
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position);
-
-  void drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                                 const Matrix3D& transform3D);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
@@ -681,7 +667,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
                        const std::optional<Rect>& layerClipBounds);
 
   std::shared_ptr<Picture> getMaskPicture(const DrawArgs& args, bool isContourMode, float scale,
-                                          const Matrix& affineRelativeMatrix);
+                                          const Matrix3D& relativeMatrix3D);
 
   std::shared_ptr<Image> getContentContourImage(const DrawArgs& args, float contentScale,
                                                 Point* offset, bool* contourMatchesContent);
@@ -705,9 +691,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
       Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
       std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
 
-  bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform3D) const;
+  bool shouldPassThroughBackground(BlendMode blendMode, bool hasPerspective) const;
 
-  bool canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, const Matrix3D* transform3D);
+  bool canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, bool hasPerspective);
 
   SubtreeCache* getValidSubtreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds);
 
@@ -715,7 +701,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
                                                  const Rect& scaledBounds, Matrix* drawingMatrix);
 
   bool drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                            const Matrix3D* transform3D,
                             const std::shared_ptr<MaskFilter>& maskFilter);
 
   std::shared_ptr<Image> getContentImage(const DrawArgs& args, const Matrix& contentMatrix,

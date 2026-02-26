@@ -19,6 +19,7 @@
 #include "tgfx/core/Pixmap.h"
 #include "core/PixelRef.h"
 #include "core/utils/CopyPixels.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 Pixmap::Pixmap(const ImageInfo& info, const void* pixels) : _info(info), _pixels(pixels) {
@@ -99,14 +100,16 @@ void Pixmap::reset(Bitmap& bitmap) {
   _info = pixelRef->info();
 }
 
-Color Pixmap::getColor(int x, int y) const {
-  auto dstInfo = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Unpremultiplied, 4,
-                                 ColorSpace::SRGB());
-  uint8_t color[4];
+RGBA4f<AlphaType::Unpremultiplied> Pixmap::getColor(
+    int x, int y, std::shared_ptr<ColorSpace> dstColorSpace) const {
+  auto dstInfo = ImageInfo::Make(1, 1, ColorType::RGBA_F16, AlphaType::Unpremultiplied, 8,
+                                 std::move(dstColorSpace));
+  uint16_t color[4];
   if (!readPixels(dstInfo, color, x, y)) {
-    return Color::Transparent();
+    return RGBA4f<AlphaType::Unpremultiplied>::Transparent();
   }
-  return Color::FromRGBA(color[0], color[1], color[2], color[3]);
+  return {HalfToFloat(color[0]), HalfToFloat(color[1]), HalfToFloat(color[2]),
+          HalfToFloat(color[3])};
 }
 
 Pixmap Pixmap::makeSubset(const Rect& subset) const {

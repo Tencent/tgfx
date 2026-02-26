@@ -19,7 +19,7 @@
 #pragma once
 
 #include "tgfx/gpu/PixelFormat.h"
-#include "tgfx/gpu/metal/MtlTypes.h"
+#include "tgfx/gpu/metal/MetalTypes.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
 #include "tgfx/gpu/webgpu/WebGPUTypes.h"
 
@@ -50,8 +50,8 @@ class BackendTexture {
   /**
    * Creates a Metal backend texture.
    */
-  BackendTexture(const MtlTextureInfo& mtlInfo, int width, int height)
-      : _backend(Backend::Metal), _width(width), _height(height), mtlInfo(mtlInfo) {
+  BackendTexture(const MetalTextureInfo& metalInfo, int width, int height)
+      : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
   }
 
   /**
@@ -110,10 +110,10 @@ class BackendTexture {
   bool getGLTextureInfo(GLTextureInfo* glTextureInfo) const;
 
   /**
-   * If the backend API is Metal, copies a snapshot of the GrMtlTextureInfo struct into the passed
+   * If the backend API is Metal, copies a snapshot of the MetalTextureInfo struct into the passed
    * in pointer and returns true. Otherwise, returns false if the backend API is not Metal.
    */
-  bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
+  bool getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const;
 
   /**
    * If the backend API is WebGPU, copies a snapshot of the WebGPUTextureInfo struct into the passed
@@ -128,7 +128,7 @@ class BackendTexture {
 
   union {
     GLTextureInfo glInfo;
-    MtlTextureInfo mtlInfo;
+    MetalTextureInfo metalInfo;
     WebGPUTextureInfo webGPUInfo;
   };
 };
@@ -152,10 +152,10 @@ class BackendRenderTarget {
   }
 
   /**
-   * Creates an Metal backend render target.
+   * Creates a Metal backend render target.
    */
-  BackendRenderTarget(const MtlTextureInfo& mtlInfo, int width, int height)
-      : _backend(Backend::Metal), _width(width), _height(height), mtlInfo(mtlInfo) {
+  BackendRenderTarget(const MetalTextureInfo& metalInfo, int width, int height)
+      : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
   }
 
   /**
@@ -214,10 +214,10 @@ class BackendRenderTarget {
   bool getGLFramebufferInfo(GLFrameBufferInfo* glFrameBufferInfo) const;
 
   /**
-   * If the backend API is Metal, copies a snapshot of the MtlTextureInfo struct into the passed
+   * If the backend API is Metal, copies a snapshot of the MetalTextureInfo struct into the passed
    * in pointer and returns true. Otherwise, returns false if the backend API is not Metal.
    */
-  bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
+  bool getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const;
 
   /**
    * If the backend API is WebGPU, copies a snapshot of the WebGPUTextureInfo struct into the passed
@@ -231,7 +231,7 @@ class BackendRenderTarget {
   int _height = 0;
   union {
     GLFrameBufferInfo glInfo;
-    MtlTextureInfo mtlInfo;
+    MetalTextureInfo metalInfo;
     WebGPUTextureInfo webGPUInfo;
   };
 };
@@ -253,6 +253,13 @@ class BackendSemaphore {
   BackendSemaphore(const GLSyncInfo& syncInfo) : _backend(Backend::OpenGL), glSyncInfo(syncInfo) {
   }
 
+  /**
+   * Creates a Metal backend semaphore.
+   */
+  BackendSemaphore(const MetalSemaphoreInfo& metalInfo)
+      : _backend(Backend::Metal), metalSemaphoreInfo(metalInfo) {
+  }
+
   BackendSemaphore(const BackendSemaphore& that) {
     *this = that;
   }
@@ -264,12 +271,30 @@ class BackendSemaphore {
    */
   bool isInitialized() const;
 
+  /**
+   * Returns the backend API of this semaphore.
+   */
+  Backend backend() const {
+    return _backend;
+  }
+
+  /**
+   * If the backend API is GL, copies a snapshot of the GLSyncInfo struct into the passed in
+   * pointer and returns true. Otherwise, returns false if the backend API is not GL.
+   */
   bool getGLSync(GLSyncInfo* syncInfo) const;
+
+  /**
+   * If the backend API is Metal, copies a snapshot of the MetalSemaphoreInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not Metal.
+   */
+  bool getMetalSemaphore(MetalSemaphoreInfo* metalInfo) const;
 
  private:
   Backend _backend = Backend::Unknown;
   union {
     GLSyncInfo glSyncInfo;
+    MetalSemaphoreInfo metalSemaphoreInfo;
   };
 };
 }  // namespace tgfx

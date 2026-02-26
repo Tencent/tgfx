@@ -52,7 +52,7 @@ TGFX_TEST(TextAlignTest, TextAlign) {
   textLayer->setWidth(200);
   textLayer->setHeight(0);
   textLayer->setAutoWrap(true);
-  textLayer->setTextAlign(TextAlign::Left);
+  textLayer->setTextAlign(TextAlign::Start);
   auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
   Font font(typeface, 20);
   textLayer->setFont(font);
@@ -78,7 +78,7 @@ TGFX_TEST(TextAlignTest, TextAlign) {
   textLayer3->setWidth(200);
   textLayer3->setHeight(0);
   textLayer3->setAutoWrap(true);
-  textLayer3->setTextAlign(TextAlign::Right);
+  textLayer3->setTextAlign(TextAlign::End);
   textLayer3->setFont(font);
   parentLayer->addChild(textLayer3);
 
@@ -135,7 +135,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth0Height0) {
   textLayer2->setWidth(0);
   textLayer2->setHeight(0);
   textLayer2->setAutoWrap(true);
-  textLayer2->setTextAlign(TextAlign::Left);
+  textLayer2->setTextAlign(TextAlign::Start);
   textLayer2->setFont(font);
   parentLayer->addChild(textLayer2);
 
@@ -159,7 +159,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth0Height0) {
   textLayer4->setWidth(0);
   textLayer4->setHeight(0);
   textLayer4->setAutoWrap(true);
-  textLayer4->setTextAlign(TextAlign::Right);
+  textLayer4->setTextAlign(TextAlign::End);
   textLayer4->setFont(font);
   parentLayer->addChild(textLayer4);
 
@@ -206,7 +206,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   textLayer->setWidth(1);
   textLayer->setHeight(10);
   textLayer->setAutoWrap(false);
-  textLayer->setTextAlign(TextAlign::Left);
+  textLayer->setTextAlign(TextAlign::Start);
   textLayer->setFont(font);
   parentLayer->addChild(textLayer);
   auto textLayerBounds = textLayer->getBounds(nullptr, true);
@@ -220,7 +220,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   textLayer2->setWidth(1);
   textLayer2->setHeight(10);
   textLayer2->setAutoWrap(true);
-  textLayer2->setTextAlign(TextAlign::Left);
+  textLayer2->setTextAlign(TextAlign::Start);
   textLayer2->setFont(font);
   parentLayer->addChild(textLayer2);
   auto textLayer2Bounds = textLayer2->getBounds(nullptr, true);
@@ -248,7 +248,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   textLayer4->setWidth(1);
   textLayer4->setHeight(10);
   textLayer4->setAutoWrap(true);
-  textLayer4->setTextAlign(TextAlign::Right);
+  textLayer4->setTextAlign(TextAlign::End);
   textLayer4->setFont(font);
   parentLayer->addChild(textLayer4);
   auto textLayer4Bounds = textLayer4->getBounds(nullptr, true);
@@ -310,7 +310,7 @@ TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
   textLayer->setWidth(50);
   textLayer->setHeight(400);
   textLayer->setAutoWrap(true);
-  textLayer->setTextAlign(TextAlign::Left);
+  textLayer->setTextAlign(TextAlign::Start);
   textLayer->setFont(font);
   parentLayer->addChild(textLayer);
   auto textLayerBounds = textLayer->getBounds(nullptr, true);
@@ -338,7 +338,7 @@ TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
   textLayer3->setWidth(50);
   textLayer3->setHeight(400);
   textLayer3->setAutoWrap(true);
-  textLayer3->setTextAlign(TextAlign::Right);
+  textLayer3->setTextAlign(TextAlign::End);
   textLayer3->setFont(font);
   parentLayer->addChild(textLayer3);
   auto textLayer3Bounds = textLayer3->getBounds(nullptr, true);
@@ -366,7 +366,7 @@ TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
   textLayer5->setWidth(1);
   textLayer5->setHeight(400);
   textLayer5->setAutoWrap(true);
-  textLayer5->setTextAlign(TextAlign::Left);
+  textLayer5->setTextAlign(TextAlign::Start);
   textLayer5->setFont(font);
   parentLayer->addChild(textLayer5);
   auto textLayer5Bounds = textLayer5->getBounds(nullptr, true);
@@ -394,7 +394,7 @@ TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
   textLayer7->setWidth(1);
   textLayer7->setHeight(400);
   textLayer7->setAutoWrap(true);
-  textLayer7->setTextAlign(TextAlign::Right);
+  textLayer7->setTextAlign(TextAlign::End);
   textLayer7->setFont(font);
   parentLayer->addChild(textLayer7);
   auto textLayer7Bounds = textLayer7->getBounds(nullptr, true);
@@ -458,7 +458,7 @@ TGFX_TEST(TextAlignTest, SingleLineTextAlign) {
   textLayer->setWidth(500);
   textLayer->setHeight(0);
   textLayer->setAutoWrap(false);
-  textLayer->setTextAlign(TextAlign::Left);
+  textLayer->setTextAlign(TextAlign::Start);
   textLayer->setFont(font);
   parentLayer->addChild(textLayer);
   auto textLayerBounds = textLayer->getBounds(nullptr, true);
@@ -486,7 +486,7 @@ TGFX_TEST(TextAlignTest, SingleLineTextAlign) {
   textLayer3->setWidth(500);
   textLayer3->setHeight(0);
   textLayer3->setAutoWrap(false);
-  textLayer3->setTextAlign(TextAlign::Right);
+  textLayer3->setTextAlign(TextAlign::End);
   textLayer3->setFont(font);
   parentLayer->addChild(textLayer3);
   auto textLayer3Bounds = textLayer3->getBounds(nullptr, true);
@@ -544,7 +544,7 @@ TGFX_TEST(TextAlignTest, TruncateTextLineTest) {
   textLayer->setWidth(200);
   textLayer->setHeight(100);
   textLayer->setAutoWrap(true);
-  textLayer->setTextAlign(TextAlign::Left);
+  textLayer->setTextAlign(TextAlign::Start);
   textLayer->setFont(font);
   parentLayer->addChild(textLayer);
 
@@ -568,7 +568,7 @@ TGFX_TEST(TextAlignTest, TruncateTextLineTest) {
   textLayer3->setWidth(200);
   textLayer3->setHeight(200);
   textLayer3->setAutoWrap(true);
-  textLayer3->setTextAlign(TextAlign::Right);
+  textLayer3->setTextAlign(TextAlign::End);
   textLayer3->setFont(font);
   parentLayer->addChild(textLayer3);
 
@@ -622,7 +622,7 @@ TGFX_TEST(TextAlignTest, FontFallbackTest) {
   textLayer->setWidth(100);
   textLayer->setHeight(0);
   textLayer->setAutoWrap(false);
-  textLayer->setTextAlign(TextAlign::Left);
+  textLayer->setTextAlign(TextAlign::Start);
   textLayer->setFont(font);
   parentLayer->addChild(textLayer);
   auto textLayerBounds = textLayer->getBounds(nullptr, true);
@@ -636,7 +636,7 @@ TGFX_TEST(TextAlignTest, FontFallbackTest) {
   textLayer2->setWidth(100);
   textLayer2->setHeight(0);
   textLayer2->setAutoWrap(true);
-  textLayer2->setTextAlign(TextAlign::Left);
+  textLayer2->setTextAlign(TextAlign::Start);
   textLayer2->setFont(font);
   parentLayer->addChild(textLayer2);
   auto textLayerBounds2 = textLayer2->getBounds(nullptr, true);
@@ -664,7 +664,7 @@ TGFX_TEST(TextAlignTest, FontFallbackTest) {
   textLayer4->setWidth(100);
   textLayer4->setHeight(0);
   textLayer4->setAutoWrap(true);
-  textLayer4->setTextAlign(TextAlign::Right);
+  textLayer4->setTextAlign(TextAlign::End);
   textLayer4->setFont(font);
   parentLayer->addChild(textLayer4);
   auto textLayerBounds4 = textLayer4->getBounds(nullptr, true);
@@ -728,7 +728,7 @@ TGFX_TEST(TextAlignTest, TextAlignBlankLineTest) {
   textLayer->setWidth(100);
   textLayer->setHeight(0);
   textLayer->setAutoWrap(false);
-  textLayer->setTextAlign(TextAlign::Left);
+  textLayer->setTextAlign(TextAlign::Start);
   textLayer->setFont(font);
   parentLayer->addChild(textLayer);
   auto textLayerBounds = textLayer->getBounds(nullptr, true);
@@ -742,7 +742,7 @@ TGFX_TEST(TextAlignTest, TextAlignBlankLineTest) {
   textLayer2->setWidth(100);
   textLayer2->setHeight(0);
   textLayer2->setAutoWrap(false);
-  textLayer2->setTextAlign(TextAlign::Left);
+  textLayer2->setTextAlign(TextAlign::Start);
   textLayer2->setFont(font);
   parentLayer->addChild(textLayer2);
 

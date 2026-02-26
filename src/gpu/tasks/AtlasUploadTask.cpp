@@ -25,24 +25,24 @@
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
-class CellDecodeTask : public Task {
+class AsyncCellUploadTask : public Task, public CellUploadTask {
  public:
-  CellDecodeTask(std::shared_ptr<ImageCodec> imageCodec, void* dstPixels, const ImageInfo& dstInfo,
-                 int offsetX, int offsetY)
+  AsyncCellUploadTask(std::shared_ptr<ImageCodec> imageCodec, void* dstPixels,
+                      const ImageInfo& dstInfo, int offsetX, int offsetY, bool needsWriteTexture)
       : imageCodec(std::move(imageCodec)), dstPixels(dstPixels), dstInfo(dstInfo), offsetX(offsetX),
-        offsetY(offsetY) {
+        offsetY(offsetY), needsWriteTexture(needsWriteTexture) {
   }
 
-  const ImageInfo& info() const {
-    return dstInfo;
+  void upload(std::shared_ptr<Texture> texture, CommandQueue* queue) override {
+    wait();
+    if (needsWriteTexture) {
+      auto rect = Rect::MakeXYWH(offsetX, offsetY, dstInfo.width(), dstInfo.height());
+      queue->writeTexture(std::move(texture), rect, dstPixels, dstInfo.rowBytes());
+    }
   }
 
-  void* pixels() const {
-    return dstPixels;
-  }
-
-  Rect atlasRect() const {
-    return Rect::MakeXYWH(offsetX, offsetY, dstInfo.width(), dstInfo.height());
+  ~AsyncCellUploadTask() override {
+    Task::cancel();
   }
 
  protected:
@@ -65,7 +65,15 @@ class CellDecodeTask : public Task {
   ImageInfo dstInfo = {};
   int offsetX = 0;
   int offsetY = 0;
+  bool needsWriteTexture = false;
 };
+
+#ifndef TGFX_BUILD_FOR_WEB
+PlacementPtr<AtlasUploadTask> AtlasUploadTask::Make(BlockAllocator* allocator,
+                                                    std::shared_ptr<TextureProxy> proxy) {
+  return allocator->make<AtlasUploadTask>(std::move(proxy));
+}
+#endif
 
 AtlasUploadTask::AtlasUploadTask(std::shared_ptr<TextureProxy> proxy)
     : textureProxy(std::move(proxy)) {
@@ -78,9 +86,6 @@ AtlasUploadTask::AtlasUploadTask(std::shared_ptr<TextureProxy> proxy)
 }
 
 AtlasUploadTask::~AtlasUploadTask() {
-  for (auto& task : tasks) {
-    task->cancel();
-  }
   if (hardwarePixels != nullptr) {
     auto hardwareBuffer = textureProxy->getHardwareBuffer();
     DEBUG_ASSERT(hardwareBuffer != nullptr);
@@ -109,11 +114,11 @@ void AtlasUploadTask::addCell(BlockAllocator* allocator, std::shared_ptr<ImageCo
                               const Point& atlasOffset) {
   DEBUG_ASSERT(codec != nullptr);
   auto padding = Plot::CellPadding;
+  auto offsetX = static_cast<int>(atlasOffset.x) - padding;
+  auto offsetY = static_cast<int>(atlasOffset.y) - padding;
   void* dstPixels = nullptr;
   auto dstWidth = codec->width() + 2 * padding;
   auto dstHeight = codec->height() + 2 * padding;
-  auto offsetX = static_cast<int>(atlasOffset.x) - padding;
-  auto offsetY = static_cast<int>(atlasOffset.y) - padding;
   ImageInfo dstInfo = {};
   if (hardwarePixels != nullptr) {
     dstInfo = hardwareInfo.makeIntersect(offsetX, offsetY, dstWidth, dstHeight);
@@ -127,10 +132,10 @@ void AtlasUploadTask::addCell(BlockAllocator* allocator, std::shared_ptr<ImageCo
       return;
     }
   }
-  auto task =
-      std::make_shared<CellDecodeTask>(std::move(codec), dstPixels, dstInfo, offsetX, offsetY);
+  auto task = std::make_shared<AsyncCellUploadTask>(std::move(codec), dstPixels, dstInfo, offsetX,
+                                                    offsetY, hardwarePixels == nullptr);
   Task::Run(task);
-  tasks.emplace_back(std::move(task));
+  cellTasks.emplace_back(std::move(task));
 }
 
 void AtlasUploadTask::upload(Context* context) {
@@ -138,15 +143,12 @@ void AtlasUploadTask::upload(Context* context) {
   if (textureView == nullptr) {
     return;
   }
+  auto texture = textureView->getTexture();
   auto queue = context->gpu()->queue();
-  for (auto& task : tasks) {
-    task->wait();
-    if (!hardwarePixels) {
-      queue->writeTexture(textureView->getTexture(), task->atlasRect(), task->pixels(),
-                          task->info().rowBytes());
-    }
+  for (auto& task : cellTasks) {
+    task->upload(texture, queue);
   }
-  tasks.clear();
+  cellTasks.clear();
 }
 
 }  // namespace tgfx

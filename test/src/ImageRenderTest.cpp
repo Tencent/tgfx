@@ -22,8 +22,6 @@
 #include "core/images/TransformImage.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/opengl/GLFunctions.h"
-#include "gpu/opengl/GLGPU.h"
 #include "gpu/resources/TextureView.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
@@ -196,63 +194,6 @@ TGFX_TEST(ImageRenderTest, mipmap) {
                       ->makeWithMatrix(imageMatrix));
   canvas->drawRect(Rect::MakeWH(surface->width(), surface->height()), paint);
   EXPECT_TRUE(Baseline::Compare(surface, "ImageRenderTest/mipmap_linear_texture_effect"));
-}
-
-static GLTextureInfo CreateRectangleTexture(Context* context, int width, int height) {
-  auto gl = static_cast<GLGPU*>(context->gpu())->functions();
-  GLTextureInfo glInfo = {};
-  gl->genTextures(1, &(glInfo.id));
-  if (glInfo.id == 0) {
-    return {};
-  }
-  glInfo.target = GL_TEXTURE_RECTANGLE;
-  gl->bindTexture(glInfo.target, glInfo.id);
-  auto gpu = static_cast<GLGPU*>(context->gpu());
-  const auto& textureFormat = gpu->caps()->getTextureFormat(PixelFormat::RGBA_8888);
-  gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
-                 height, 0, textureFormat.externalFormat, textureFormat.externalType, nullptr);
-  return glInfo;
-}
-
-TGFX_TEST(ImageRenderTest, TileModeFallback) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
-  ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false, false, codec->colorSpace());
-  ASSERT_FALSE(bitmap.isEmpty());
-  auto pixels = bitmap.lockPixels();
-  ASSERT_TRUE(pixels != nullptr);
-  auto result = codec->readPixels(bitmap.info(), pixels);
-  ASSERT_TRUE(result);
-  auto gpu = static_cast<GLGPU*>(context->gpu());
-  auto gl = gpu->functions();
-  GLTextureInfo glInfo = CreateRectangleTexture(context, bitmap.width(), bitmap.height());
-  ASSERT_TRUE(glInfo.id != 0);
-  const auto& textureFormat =
-      gpu->caps()->getTextureFormat(ColorTypeToPixelFormat(bitmap.colorType()));
-  gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage),
-                 bitmap.width(), bitmap.height(), 0, textureFormat.externalFormat,
-                 textureFormat.externalType, pixels);
-  bitmap.unlockPixels();
-  BackendTexture backendTexture(glInfo, bitmap.width(), bitmap.height());
-  auto image = Image::MakeFrom(context, backendTexture, ImageOrigin::TopLeft, bitmap.colorSpace());
-  ASSERT_TRUE(image != nullptr);
-  image = image->makeOriented(codec->orientation());
-  ASSERT_TRUE(image != nullptr);
-  auto surface = Surface::Make(context, image->width() / 2, image->height() / 2);
-  auto canvas = surface->getCanvas();
-  Paint paint;
-  SamplingOptions sampling(FilterMode::Linear, MipmapMode::Nearest);
-  auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Mirror, sampling)
-                    ->makeWithMatrix(Matrix::MakeScale(0.125f));
-  paint.setShader(shader);
-  canvas->translate(100, 100);
-  auto drawRect = Rect::MakeXYWH(0, 0, surface->width() - 200, surface->height() - 200);
-  canvas->drawRect(drawRect, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "ImageRenderTest/TileModeFallback"));
-  gl->deleteTextures(1, &glInfo.id);
 }
 
 TGFX_TEST(ImageRenderTest, hardwareMipmap) {
@@ -458,29 +399,6 @@ TGFX_TEST(ImageRenderTest, atlas) {
                   Rect::MakeXYWH(0, 360, 640, 360), Rect::MakeXYWH(640, 360, 640, 360)};
   canvas->drawAtlas(std::move(image), matrix, rect, nullptr, 4);
   EXPECT_TRUE(Baseline::Compare(surface, "ImageRenderTest/atlas"));
-}
-
-TGFX_TEST(ImageRenderTest, rectangleTextureAsBlendDst) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto glInfo = CreateRectangleTexture(context, 110, 110);
-  ASSERT_TRUE(glInfo.id > 0);
-  auto backendTexture = BackendTexture(glInfo, 110, 110);
-  auto surface = Surface::MakeFrom(context, backendTexture, ImageOrigin::TopLeft, 4);
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  ASSERT_TRUE(image != nullptr);
-  canvas->drawImage(image);
-  image = MakeImage("resources/apitest/image_as_mask.png");
-  ASSERT_TRUE(image != nullptr);
-  Paint paint = {};
-  paint.setBlendMode(BlendMode::Multiply);
-  canvas->drawImage(image, &paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "ImageRenderTest/hardware_render_target_blend"));
-  auto gl = static_cast<GLGPU*>(context->gpu())->functions();
-  gl->deleteTextures(1, &(glInfo.id));
 }
 
 TGFX_TEST(ImageRenderTest, YUVImage) {

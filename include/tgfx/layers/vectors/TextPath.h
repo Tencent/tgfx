@@ -24,29 +24,18 @@
 namespace tgfx {
 
 /**
- * Defines text alignment on a path.
- */
-enum class TextPathAlign {
-  /**
-   * Text starts from the beginning of the available path region.
-   */
-  Start,
-  /**
-   * Text is centered within the available path region.
-   */
-  Center,
-  /**
-   * Text ends at the end of the available path region.
-   */
-  End
-};
-
-/**
- * TextPath applies path-based layout to accumulated glyphs in the VectorContext. When applied, it
- * repositions glyphs along the specified path curve.
+ * TextPath repositions accumulated glyphs so they flow along a curve path. A baseline defined by
+ * baselineOrigin and baselineAngle serves as the text's reference line: glyphs are mapped from
+ * their positions along this baseline onto corresponding positions on the path curve, preserving
+ * their relative spacing and offsets. When forceAlignment is enabled, original glyph positions are
+ * ignored and glyphs are redistributed evenly to fill the available path length.
  */
 class TextPath : public VectorElement {
  public:
+  /**
+   * Creates a new TextPath instance.
+   */
+  static std::shared_ptr<TextPath> Make();
   /**
    * Returns the path that text follows.
    */
@@ -60,19 +49,36 @@ class TextPath : public VectorElement {
   void setPath(Path value);
 
   /**
-   * Returns the text alignment within the available path region (path length minus margins).
+   * Returns the origin point of the baseline in the TextPath's local coordinate space. The baseline
+   * is a straight line starting from this origin at the angle specified by baselineAngle. Each
+   * glyph's distance along the baseline determines where it lands on the curve, and its perpendicular
+   * offset from the baseline is preserved as a perpendicular offset from the curve. Default is (0, 0).
    */
-  TextPathAlign align() const {
-    return _align;
+  Point baselineOrigin() const {
+    return _baselineOrigin;
   }
 
   /**
-   * Sets the text alignment within the available path region.
+   * Sets the baseline origin.
    */
-  void setAlign(TextPathAlign value);
+  void setBaselineOrigin(Point value);
 
   /**
-   * Returns the margin from the path start in pixels. Positive values offset text forward along
+   * Returns the angle of the baseline in degrees. 0 means a horizontal baseline (text flows left to
+   * right along the X axis), 90 means a vertical baseline (text flows top to bottom along the Y
+   * axis). Default is 0.
+   */
+  float baselineAngle() const {
+    return _baselineAngle;
+  }
+
+  /**
+   * Sets the angle of the baseline.
+   */
+  void setBaselineAngle(float value);
+
+  /**
+   * Returns the margin from the path start in pixels. Positive values offset glyphs forward along
    * the path.
    */
   float firstMargin() const {
@@ -98,17 +104,17 @@ class TextPath : public VectorElement {
   void setLastMargin(float value);
 
   /**
-   * Returns whether characters stand perpendicular to the path. When true, characters rotate to
-   * follow the path direction. When false, characters remain upright regardless of path direction.
+   * Returns whether glyphs stand perpendicular to the path. When true, glyphs rotate to follow the
+   * path direction. When false, glyphs remain upright regardless of path direction.
    */
-  bool perpendicularToPath() const {
-    return _perpendicularToPath;
+  bool perpendicular() const {
+    return _perpendicular;
   }
 
   /**
-   * Sets whether characters stand perpendicular to the path.
+   * Sets whether glyphs stand perpendicular to the path.
    */
-  void setPerpendicularToPath(bool value);
+  void setPerpendicular(bool value);
 
   /**
    * Returns whether the path direction is reversed.
@@ -123,15 +129,16 @@ class TextPath : public VectorElement {
   void setReversed(bool value);
 
   /**
-   * Returns whether to force text to fit within the available path region. When enabled, letter
-   * spacing is adjusted to fit text within the bounds defined by firstMargin and lastMargin.
+   * Returns whether text is stretched to fit the available path length. When enabled, glyphs are
+   * laid out consecutively using their advance widths, then spacing is adjusted proportionally to
+   * fill the path region between firstMargin and lastMargin.
    */
   bool forceAlignment() const {
     return _forceAlignment;
   }
 
   /**
-   * Sets whether to force text to fit within the available path region.
+   * Sets whether text is stretched to fit the available path length.
    */
   void setForceAlignment(bool value);
 
@@ -142,13 +149,16 @@ class TextPath : public VectorElement {
 
   void apply(VectorContext* context) override;
 
+  TextPath() = default;
+
  private:
   Path _path = {};
-  TextPathAlign _align = TextPathAlign::Start;
+  Point _baselineOrigin = Point::Zero();
   float _firstMargin = 0.0f;
   float _lastMargin = 0.0f;
-  bool _perpendicularToPath = true;
+  bool _perpendicular = true;
   bool _reversed = false;
+  float _baselineAngle = 0.0f;
   bool _forceAlignment = false;
 };
 

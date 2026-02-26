@@ -19,8 +19,8 @@
 #include <memory>
 #include <vector>
 #include "InstancedGridRenderPass.h"
-#include "gpu/opengl/GLCaps.h"
-#include "gpu/opengl/GLUtil.h"
+#include "MultisampleTestEffect.h"
+#include "tgfx/core/ImageFilter.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/RenderPass.h"
 #include "utils/TestUtils.h"
@@ -94,103 +94,104 @@ TGFX_TEST(GPURenderTest, InstancedGridRender) {
   EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/InstancedGridRender"));
 }
 
-// ==================== GL Utility Tests ====================
+// ==================== Multisample Tests ====================
 
-static size_t vendorIndex = 0;
+TGFX_TEST(GPURenderTest, MultisampleCount) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
 
-std::vector<std::pair<std::string, GLVendor>> vendors = {
-    {"ATI Technologies Inc.", GLVendor::ATI},
-    {"ARM", GLVendor::ARM},
-    {"NVIDIA Corporation", GLVendor::NVIDIA},
-    {"Qualcomm", GLVendor::Qualcomm},
-    {"Intel", GLVendor::Intel},
-    {"Imagination Technologies", GLVendor::Imagination},
-};
-const unsigned char* glGetStringMock(unsigned name) {
-  if (name == GL_VENDOR) {
-    return reinterpret_cast<const unsigned char*>(vendors[vendorIndex].first.c_str());
-  } else if (name == GL_VERSION) {
-    if (vendorIndex != 0) {
-      return reinterpret_cast<const unsigned char*>("3.2");
-    } else {
-      return reinterpret_cast<const unsigned char*>("5.0");
-    }
-  }
-  return nullptr;
+  // sampleCount=1: no MSAA, the diagonal edge should have hard aliased pixels.
+  MultisampleConfig config1x = {};
+  config1x.sampleCount = 1;
+  config1x.outputColor = Color::Red();
+  auto effect1x = MultisampleTestEffect::Make(config1x);
+  auto filter1x = ImageFilter::Runtime(std::move(effect1x));
+  auto image1x = image->makeWithFilter(std::move(filter1x));
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(std::move(image1x));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/MultisampleCount_1x"));
+
+  // sampleCount=4: MSAA enabled, the diagonal edge should have smooth anti-aliased pixels.
+  MultisampleConfig config4x = {};
+  config4x.sampleCount = 4;
+  config4x.outputColor = Color::Red();
+  auto effect4x = MultisampleTestEffect::Make(config4x);
+  auto filter4x = ImageFilter::Runtime(std::move(effect4x));
+  auto image4x = image->makeWithFilter(std::move(filter4x));
+  canvas->clear();
+  canvas->drawImage(std::move(image4x));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/MultisampleCount_4x"));
 }
 
-void getIntegervMock(unsigned pname, int* params) {
-  if (pname == GL_MAX_TEXTURE_SIZE) {
-    *params = 1024;
-  }
+TGFX_TEST(GPURenderTest, MultisampleMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+
+  // mask=0xFFFFFFFF: all samples enabled, should render the red triangle normally.
+  MultisampleConfig configAllSamples = {};
+  configAllSamples.sampleCount = 4;
+  configAllSamples.sampleMask = 0xFFFFFFFF;
+  configAllSamples.outputColor = Color::Red();
+  auto effectAll = MultisampleTestEffect::Make(configAllSamples);
+  auto filterAll = ImageFilter::Runtime(std::move(effectAll));
+  auto imageAll = image->makeWithFilter(std::move(filterAll));
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(std::move(imageAll));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/MultisampleMask_AllSamples"));
+
+  // mask=0x0: no samples written, the result should be the clear color (transparent).
+  MultisampleConfig configNoSamples = {};
+  configNoSamples.sampleCount = 4;
+  configNoSamples.sampleMask = 0x0;
+  configNoSamples.outputColor = Color::Red();
+  auto effectNone = MultisampleTestEffect::Make(configNoSamples);
+  auto filterNone = ImageFilter::Runtime(std::move(effectNone));
+  auto imageNone = image->makeWithFilter(std::move(filterNone));
+  canvas->clear();
+  canvas->drawImage(std::move(imageNone));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/MultisampleMask_NoSamples"));
 }
 
-void glGetInternalformativMock(unsigned target, unsigned, unsigned pname, int, int* params) {
-  if (target != GL_RENDERBUFFER) {
-    return;
-  }
-  if (pname == GL_NUM_SAMPLE_COUNTS) {
-    *params = 2;
-    return;
-  }
-  if (pname == GL_SAMPLES) {
-    params[0] = 8;
-    params[1] = 4;
-  }
-}
+TGFX_TEST(GPURenderTest, AlphaToCoverage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
 
-void glGetShaderPrecisionFormatMock(unsigned, unsigned, int* range, int* precision) {
-  range[0] = 127;
-  range[1] = 127;
-  *precision = 32;
-}
+  // alphaToCoverage=false with alpha=0.5: all 4 samples get (0.5,0,0,0.5), resolve = (0.5,0,0,0.5)
+  MultisampleConfig configOff = {};
+  configOff.sampleCount = 4;
+  configOff.outputColor = {1.0f, 0.0f, 0.0f, 0.5f};
+  configOff.alphaToCoverage = false;
+  auto effectOff = MultisampleTestEffect::Make(configOff);
+  auto filterOff = ImageFilter::Runtime(std::move(effectOff));
+  auto imageOff = image->makeWithFilter(std::move(filterOff));
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(std::move(imageOff));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/AlphaToCoverage_Off"));
 
-TGFX_TEST(GPURenderTest, GLVersion) {
-  auto glVersion = GetGLVersion(nullptr);
-  EXPECT_EQ(glVersion.majorVersion, -1);
-  EXPECT_EQ(glVersion.minorVersion, -1);
-  glVersion = GetGLVersion("");
-  EXPECT_EQ(glVersion.majorVersion, -1);
-  EXPECT_EQ(glVersion.minorVersion, -1);
-  glVersion = GetGLVersion("2.1 Mesa 10.1.1");
-  EXPECT_EQ(glVersion.majorVersion, 2);
-  EXPECT_EQ(glVersion.minorVersion, 1);
-  glVersion = GetGLVersion("3.1");
-  EXPECT_EQ(glVersion.majorVersion, 3);
-  EXPECT_EQ(glVersion.minorVersion, 1);
-  glVersion = GetGLVersion("OpenGL ES 2.0 (WebGL 1.0 (OpenGL ES 2.0 Chromium))");
-  EXPECT_EQ(glVersion.majorVersion, 1);
-  EXPECT_EQ(glVersion.minorVersion, 0);
-  glVersion = GetGLVersion("OpenGL ES-CM 1.1 Apple A8 GPU - 50.5.1");
-  EXPECT_EQ(glVersion.majorVersion, 1);
-  EXPECT_EQ(glVersion.minorVersion, 1);
-  glVersion = GetGLVersion("OpenGL ES 2.0 Apple A8 GPU - 50.5.1");
-  EXPECT_EQ(glVersion.majorVersion, 2);
-  EXPECT_EQ(glVersion.minorVersion, 0);
-}
-
-TGFX_TEST(GPURenderTest, GLCaps) {
-  {
-    GLInfo info(glGetStringMock, nullptr, getIntegervMock, glGetInternalformativMock,
-                glGetShaderPrecisionFormatMock);
-    GLCaps caps(info);
-    EXPECT_EQ(caps.vendor, vendors[vendorIndex].second);
-    EXPECT_EQ(caps.standard, GLStandard::GL);
-    EXPECT_TRUE(caps.multisampleDisableSupport);
-    EXPECT_EQ(caps.getSampleCount(5, PixelFormat::RGBA_8888), 8);
-    EXPECT_EQ(caps.getSampleCount(10, PixelFormat::RGBA_8888), 1);
-    EXPECT_EQ(caps.getSampleCount(0, PixelFormat::RGBA_8888), 1);
-    EXPECT_EQ(caps.getSampleCount(5, PixelFormat::ALPHA_8), 8);
-  }
-  {
-    vendorIndex++;
-    for (; vendorIndex < vendors.size(); ++vendorIndex) {
-      GLInfo info(glGetStringMock, nullptr, getIntegervMock, glGetInternalformativMock,
-                  glGetShaderPrecisionFormatMock);
-      GLCaps caps(info);
-      EXPECT_EQ(caps.vendor, vendors[vendorIndex].second);
-    }
-  }
+  // alphaToCoverage=true with alpha=0.5: alpha drives coverage, ~2 of 4 samples written,
+  // resolve produces a different (typically dimmer) result than alphaToCoverage=false.
+  MultisampleConfig configOn = {};
+  configOn.sampleCount = 4;
+  configOn.outputColor = {1.0f, 0.0f, 0.0f, 0.5f};
+  configOn.alphaToCoverage = true;
+  auto effectOn = MultisampleTestEffect::Make(configOn);
+  auto filterOn = ImageFilter::Runtime(std::move(effectOn));
+  auto imageOn = image->makeWithFilter(std::move(filterOn));
+  canvas->clear();
+  canvas->drawImage(std::move(imageOn));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/AlphaToCoverage_On"));
 }
 
 }  // namespace tgfx

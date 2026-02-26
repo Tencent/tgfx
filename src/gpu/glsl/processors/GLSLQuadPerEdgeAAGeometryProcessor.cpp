@@ -84,9 +84,12 @@ void GLSLQuadPerEdgeAAGeometryProcessor::onSetTransformData(UniformData* uniform
   }
 }
 
-void GLSLQuadPerEdgeAAGeometryProcessor::onEmitTransform(
-    EmitArgs& args, VertexShaderBuilder* vertexBuilder, VaryingHandler* varyingHandler,
-    UniformHandler* uniformHandler, const std::string& transformUniformName, int index) const {
+void GLSLQuadPerEdgeAAGeometryProcessor::onEmitTransform(EmitArgs& args,
+                                                         VertexShaderBuilder* vertexBuilder,
+                                                         VaryingHandler* varyingHandler,
+                                                         UniformHandler* uniformHandler,
+                                                         const std::string& transformUniformName,
+                                                         bool hasPerspective, int index) const {
   if (index == 0 && !subset.empty()) {
     auto varying = varyingHandler->addVarying("vTexSubset", SLType::Float4, true);
     std::string subsetMatrixName = transformUniformName;
@@ -94,21 +97,25 @@ void GLSLQuadPerEdgeAAGeometryProcessor::onEmitTransform(
       subsetMatrixName = uniformHandler->addUniform("texSubsetMatrix", UniformFormat::Float3x3,
                                                     ShaderStage::Vertex);
     }
-    vertexBuilder->codeAppend("highp vec4 subset;");
-    vertexBuilder->codeAppendf("subset.xy = (%s * vec3(%s.xy, 1)).xy;", subsetMatrixName.c_str(),
-                               subset.name().c_str());
-    vertexBuilder->codeAppendf("subset.zw = (%s * vec3(%s.zw, 1)).xy;", subsetMatrixName.c_str(),
-                               subset.name().c_str());
-    vertexBuilder->codeAppendf("if (subset.x > subset.z) {");
-    vertexBuilder->codeAppendf("  highp float tmp = subset.x;");
-    vertexBuilder->codeAppendf("  subset.x = subset.z;");
-    vertexBuilder->codeAppendf("  subset.z = tmp;");
-    vertexBuilder->codeAppendf("}");
-    vertexBuilder->codeAppendf("if (subset.y > subset.w) {");
-    vertexBuilder->codeAppendf("  highp float tmp = subset.y;");
-    vertexBuilder->codeAppendf("  subset.y = subset.w;");
-    vertexBuilder->codeAppendf("  subset.w = tmp;");
-    vertexBuilder->codeAppendf("}");
+    const std::string srcLT = "srcLT";
+    const std::string srcRB = "srcRB";
+    const std::string perspLT = "perspLT";
+    const std::string perspRB = "perspRB";
+    vertexBuilder->codeAppendf("highp vec2 %s = %s.xy;", srcLT.c_str(), subset.name().c_str());
+    vertexBuilder->codeAppendf("highp vec2 %s = %s.zw;", srcRB.c_str(), subset.name().c_str());
+    vertexBuilder->emitTransformedPoint(perspLT, srcLT, subsetMatrixName, hasPerspective);
+    vertexBuilder->emitTransformedPoint(perspRB, srcRB, subsetMatrixName, hasPerspective);
+    vertexBuilder->codeAppend("highp vec4 subset = vec4(" + perspLT + ", " + perspRB + ");");
+    vertexBuilder->codeAppend("if (subset.x > subset.z) {");
+    vertexBuilder->codeAppend("  highp float tmp = subset.x;");
+    vertexBuilder->codeAppend("  subset.x = subset.z;");
+    vertexBuilder->codeAppend("  subset.z = tmp;");
+    vertexBuilder->codeAppend("}");
+    vertexBuilder->codeAppend("if (subset.y > subset.w) {");
+    vertexBuilder->codeAppend("  highp float tmp = subset.y;");
+    vertexBuilder->codeAppend("  subset.y = subset.w;");
+    vertexBuilder->codeAppend("  subset.w = tmp;");
+    vertexBuilder->codeAppend("}");
     vertexBuilder->codeAppendf("%s = subset;", varying.vsOut().c_str());
     *args.outputSubset = varying.fsIn();
   }

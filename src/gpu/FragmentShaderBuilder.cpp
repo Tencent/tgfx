@@ -18,6 +18,8 @@
 
 #include "FragmentShaderBuilder.h"
 #include "ProgramBuilder.h"
+#include "SLType.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 FragmentShaderBuilder::FragmentShaderBuilder(ProgramBuilder* program) : ShaderBuilder(program) {
@@ -25,7 +27,10 @@ FragmentShaderBuilder::FragmentShaderBuilder(ProgramBuilder* program) : ShaderBu
 
 void FragmentShaderBuilder::declareCustomOutputColor() {
   auto typeModifier = ShaderVar::TypeModifier::Out;
-  if (features & PrivateFeature::FramebufferFetch) {
+  auto shaderCaps = programBuilder->getContext()->shaderCaps();
+  if ((features & PrivateFeature::FramebufferFetch) &&
+      shaderCaps->frameBufferFetchNeedsCustomOutput &&
+      !shaderCaps->frameBufferFetchUsesSubpassInput) {
     typeModifier = ShaderVar::TypeModifier::InOut;
   }
 
@@ -38,5 +43,19 @@ void FragmentShaderBuilder::onBeforeChildProcEmitCode(const FragmentProcessor* c
 
 void FragmentShaderBuilder::onAfterChildProcEmitCode() const {
   programBuilder->currentProcessors.pop_back();
+}
+
+std::string FragmentShaderBuilder::emitPerspTextCoord(const ShaderVar& coordVar) {
+  if (coordVar.type() == SLType::Float2) {
+    return coordVar.name();
+  }
+  if (coordVar.type() == SLType::Float3) {
+    const std::string perspCoordName = "perspCoord2D";
+    codeAppendf("highp vec2 %s = %s.xy / %s.z;", perspCoordName.c_str(), coordVar.name().c_str(),
+                coordVar.name().c_str());
+    return perspCoordName;
+  }
+  DEBUG_ASSERT(false);
+  return "";
 }
 }  // namespace tgfx

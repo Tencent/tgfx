@@ -56,7 +56,7 @@ Rect BackgroundBlurStyle::filterBackground(const Rect& srcRect, float contentSca
   return filter->filterBounds(srcRect);
 }
 
-void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> contour,
+void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
                                                 float contentScale,
                                                 std::shared_ptr<Image> extraSource,
                                                 const Point& extraSourceOffset, float, BlendMode) {
@@ -71,7 +71,7 @@ void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<
   auto blurBackground = extraSource->makeWithFilter(blurFilter, &backgroundOffset, &clipRect);
   backgroundOffset += extraSourceOffset;
 
-  auto maskShader = Shader::MakeImageShader(contour, TileMode::Decal, TileMode::Decal);
+  auto maskShader = Shader::MakeImageShader(content, TileMode::Decal, TileMode::Decal);
 
   // draw blurred background in the mask
   Paint paint = {};
@@ -90,7 +90,7 @@ std::shared_ptr<ImageFilter> BackgroundBlurStyle::getBackgroundFilter(float cont
   }
   currentScale = contentScale;
   backgroundFilter =
-      ImageFilter::Blur(_blurrinessX * contentScale, _blurrinessX * contentScale, _tileMode);
+      ImageFilter::Blur(_blurrinessX * contentScale, _blurrinessY * contentScale, _tileMode);
   return backgroundFilter;
 }
 

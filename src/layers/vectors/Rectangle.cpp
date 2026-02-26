@@ -22,6 +22,10 @@
 
 namespace tgfx {
 
+std::shared_ptr<Rectangle> Rectangle::Make() {
+  return std::shared_ptr<Rectangle>(new Rectangle());
+}
+
 void Rectangle::setCenter(const Point& value) {
   if (_center == value) {
     return;

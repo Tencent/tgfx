@@ -105,7 +105,9 @@
         ],
         "arguments": [
           "-DWITH_SIMD=FALSE",
-          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
+          "-DSIZE_T=4",
+          "-DCMAKE_C_FLAGS=\"-w\""
         ],
         "platforms": [
           "web"
@@ -258,6 +260,42 @@
       "cmake": {
         "targets": [
           "hwy"
+        ]
+      }
+    },
+    {
+      "name": "shaderc",
+      "cmake": {
+        "targets": [
+          "shaderc_combined"
+        ],
+        "arguments": [
+          "-DSHADERC_SKIP_TESTS=ON",
+          "-DSHADERC_SKIP_EXAMPLES=ON",
+          "-DSHADERC_SKIP_INSTALL=ON",
+          "-DCMAKE_CXX_FLAGS=\"-w\""
+        ],
+        "platforms": [
+          "mac",
+          "ios"
+        ]
+      }
+    },
+    {
+      "name": "SPIRV-Cross",
+      "cmake": {
+        "targets": [
+          "spirv-cross-core",
+          "spirv-cross-glsl",
+          "spirv-cross-msl"
+        ],
+        "arguments": [
+          "-DSPIRV_CROSS_ENABLE_TESTS=OFF",
+          "-DCMAKE_CXX_FLAGS=\"-w\""
+        ],
+        "platforms": [
+          "mac",
+          "ios"
         ]
       }
     }

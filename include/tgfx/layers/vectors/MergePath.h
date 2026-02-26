@@ -53,7 +53,10 @@ enum class MergePathOp {
  */
 class MergePath : public VectorElement {
  public:
-  MergePath() = default;
+  /**
+   * Creates a new MergePath instance.
+   */
+  static std::shared_ptr<MergePath> Make();
 
   /**
    * Returns the operation used to merge paths.
@@ -73,6 +76,9 @@ class MergePath : public VectorElement {
   }
 
   void apply(VectorContext* context) override;
+
+ protected:
+  MergePath() = default;
 
  private:
   MergePathOp _mode = MergePathOp::Append;

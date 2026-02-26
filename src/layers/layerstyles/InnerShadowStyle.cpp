@@ -82,18 +82,24 @@ Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   return filter->filterBounds(srcRect);
 }
 
-void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> contour, float contentScale,
+void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                               float alpha, BlendMode blendMode) {
-  // create opaque image
   auto filter = getShadowFilter(contentScale);
   if (!filter) {
     return;
   }
-  contour = contour->makeWithFilter(filter);
+  content = content->makeWithFilter(filter);
   Paint paint = {};
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
-  canvas->drawImage(contour, &paint);
+  // Use nearest filtering when there's no blur to avoid edge artifacts caused by linear
+  // interpolation. When the texture is scaled up, linear filtering produces intermediate alpha
+  // values at edges, which causes visible gray borders in the inner shadow.
+  auto sampling = SamplingOptions();
+  if (_blurrinessX == 0 && _blurrinessY == 0) {
+    sampling = SamplingOptions(FilterMode::Nearest, MipmapMode::None);
+  }
+  canvas->drawImage(content, sampling, &paint);
 }
 
 std::shared_ptr<ImageFilter> InnerShadowStyle::getShadowFilter(float scale) {

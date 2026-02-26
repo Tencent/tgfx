@@ -145,7 +145,7 @@ class TextLayer : public Layer {
   Font _font = {};
   float _width = 0;
   float _height = 0;
-  TextAlign _textAlign = TextAlign::Left;
+  TextAlign _textAlign = TextAlign::Start;
   bool _autoWrap = false;
 
   static std::string PreprocessNewLines(const std::string& text);

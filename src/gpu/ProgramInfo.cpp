@@ -23,6 +23,7 @@
 #include "gpu/ProgramBuilder.h"
 #include "gpu/resources/RenderTarget.h"
 #include "inspect/InspectorMark.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
@@ -58,6 +59,10 @@ const XferProcessor* ProgramInfo::getXferProcessor() const {
 
 Swizzle ProgramInfo::getOutputSwizzle() const {
   return Swizzle::ForWrite(renderTarget->format());
+}
+
+int ProgramInfo::getSampleCount() const {
+  return renderTarget->sampleCount();
 }
 
 PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
@@ -123,6 +128,10 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   programKey.write(static_cast<uint32_t>(blendMode));
   programKey.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
   programKey.write(static_cast<uint32_t>(cullMode));
+  programKey.write(static_cast<uint32_t>(renderTarget->format()));
+  // Note: if mask or alphaToCoverage from MultisampleDescriptor are used in the pipeline
+  // creation, they must also be encoded here.
+  programKey.write(static_cast<uint32_t>(renderTarget->sampleCount()));
   CAPUTRE_PROGRAM_INFO(programKey, context, this);
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {

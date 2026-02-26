@@ -12,7 +12,7 @@
       },
       {
         "url": "${PAG_GROUP}/pathkit.git",
-        "commit": "c2a24f3828b5895c7b5e65e11fe3d341fad7c983",
+        "commit": "6dc44ae85b4614d4e5accac2d7059d7420db9ed2",
         "dir": "third_party/pathkit"
       },
       {
@@ -84,6 +84,16 @@
         "url": "https://github.com/lz4/lz4.git",
         "commit": "cacca37747572717ceb1f156eb9840644205ca4f",
         "dir": "third_party/lz4"
+      },
+      {
+        "url": "https://github.com/google/shaderc.git",
+        "commit": "3362e24c42ab5bf7ad32c0fec64b0a0ddeb2fda1",
+        "dir": "third_party/shaderc"
+      },
+      {
+        "url": "https://github.com/KhronosGroup/SPIRV-Cross.git",
+        "commit": "ebe2aa0cd80f5eb5cd8a605da604cacf72205f3b",
+        "dir": "third_party/SPIRV-Cross"
       }
     ]
   },

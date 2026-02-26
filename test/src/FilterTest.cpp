@@ -585,9 +585,9 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
   }
 
   center = Point::Make(50, 50);
-  float halfDiagonal = 50;
+  float diamondRadius = 50;
   {
-    auto shader = Shader::MakeDiamondGradient(center, halfDiagonal, colors, positions);
+    auto shader = Shader::MakeDiamondGradient(center, diamondRadius, colors, positions);
     ASSERT_TRUE(shader != nullptr);
     EXPECT_EQ(shader->type(), Shader::Type::Gradient);
 
@@ -600,7 +600,7 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
     EXPECT_EQ(info.positions, positions);
     EXPECT_FLOAT_EQ(info.points[0].x, center.x);
     EXPECT_FLOAT_EQ(info.points[0].y, center.y);
-    EXPECT_FLOAT_EQ(info.radiuses[0], halfDiagonal);
+    EXPECT_FLOAT_EQ(info.radiuses[0], diamondRadius);
   }
 }
 
@@ -837,152 +837,6 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
   }
 }
 
-TGFX_TEST(FilterTest, Transform3DImageFilter) {
-  ContextScope scope;
-  Context* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 200, 200);
-  ASSERT_TRUE(surface != nullptr);
-  Canvas* canvas = surface->getCanvas();
-  auto image = MakeImage("resources/apitest/imageReplacement.jpg");
-  Size imageSize(static_cast<float>(image->width()), static_cast<float>(image->height()));
-  auto anchor = Point::Make(0.5f, 0.5f);
-  auto offsetToAnchorMatrix =
-      Matrix3D::MakeTranslate(-anchor.x * imageSize.width, -anchor.y * imageSize.height, 0);
-  auto invOffsetToAnchorMatrix =
-      Matrix3D::MakeTranslate(anchor.x * imageSize.width, anchor.y * imageSize.height, 0);
-
-  // Test basic drawing with css perspective type.
-  {
-    canvas->save();
-    canvas->clear();
-
-    auto cssPerspectiveMatrix = Matrix3D::I();
-    constexpr float eyeDistance = 1200.f;
-    constexpr float farZ = -1000.f;
-    constexpr float shift = 10.f;
-    const float nearZ = eyeDistance - shift;
-    const float m22 = (2 - (farZ + nearZ) / eyeDistance) / (farZ - nearZ);
-    cssPerspectiveMatrix.setRowColumn(2, 2, m22);
-    const float m23 = -1.f + nearZ / eyeDistance - cssPerspectiveMatrix.getRowColumn(2, 2) * nearZ;
-    cssPerspectiveMatrix.setRowColumn(2, 3, m23);
-    cssPerspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
-
-    auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
-    modelMatrix.postTranslate(0.f, 0.f, -100.f);
-    auto transform =
-        invOffsetToAnchorMatrix * cssPerspectiveMatrix * modelMatrix * offsetToAnchorMatrix;
-    auto cssTransform3DFilter = ImageFilter::Transform3D(transform);
-    Paint paint = {};
-    paint.setImageFilter(cssTransform3DFilter);
-    canvas->drawImage(image, 45.f, 45.f, &paint);
-    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/Transform3DImageFilterCSSBasic"));
-    canvas->restore();
-  }
-
-  const float halfImageW = imageSize.width * 0.5f;
-  const float halfImageH = imageSize.height * 0.5f;
-  auto standardvViewportMatrix = Matrix3D::MakeScale(halfImageW, halfImageH, 1.f);
-  auto invStandardViewportMatrix = Matrix3D::MakeScale(1.f / halfImageW, 1.f / halfImageH, 1.f);
-  // The field of view (in degrees) for the standard perspective projection model.
-  constexpr float standardFovYDegress = 45.f;
-  // The maximum position of the near plane on the Z axis for the standard perspective projection model.
-  constexpr float standardMaxNearZ = 0.25f;
-  // The minimum position of the far plane on the Z axis for the standard perspective projection model.
-  constexpr float standardMinFarZ = 1000.f;
-  // The target position of the camera for the standard perspective projection model, in pixels.
-  constexpr Vec3 standardEyeCenter = {0.f, 0.f, 0.f};
-  // The up direction unit vector for the camera in the standard perspective projection model.
-  static constexpr Vec3 StandardEyeUp = {0.f, 1.f, 0.f};
-  const float eyePositionZ = 1.f / tanf(DegreesToRadians(standardFovYDegress * 0.5f));
-  const Vec3 eyePosition = {0.f, 0.f, eyePositionZ};
-  auto viewMatrix = Matrix3D::LookAt(eyePosition, standardEyeCenter, StandardEyeUp);
-  // Ensure nearZ is not too far away or farZ is not too close to avoid precision issues. For
-  // example, if the z value of the near plane is less than 0, the projected model will be
-  // outside the clipping range, or if the far plane is too close, the projected model may
-  // exceed the clipping range with a slight rotation.
-  const float nearZ = std::min(standardMaxNearZ, eyePositionZ * 0.1f);
-  const float farZ = std::max(standardMinFarZ, eyePositionZ * 10.f);
-  auto perspectiveMatrix = Matrix3D::Perspective(
-      standardFovYDegress, static_cast<float>(image->width()) / static_cast<float>(image->height()),
-      nearZ, farZ);
-  auto modelMatrix = Matrix3D::MakeRotate({0.f, 0.f, 1.f}, 45.f);
-  // Rotate around the ZXY axes of the model coordinate system in sequence; the latest transformation
-  // in the model coordinate system needs to be placed at the far right of the matrix multiplication
-  // equation
-  modelMatrix.preRotate({1.f, 0.f, 0.f}, 45.f);
-  modelMatrix.preRotate({0.f, 1.f, 0.f}, 45.f);
-  // Use Z-axis translation to simulate model depth
-  modelMatrix.postTranslate(0.f, 0.f, -10.f / imageSize.width);
-  auto standardTransform = invOffsetToAnchorMatrix * standardvViewportMatrix * perspectiveMatrix *
-                           viewMatrix * modelMatrix * invStandardViewportMatrix *
-                           offsetToAnchorMatrix;
-  auto standardTransform3DFilter = ImageFilter::Transform3D(standardTransform);
-
-  // Test scale drawing with standard perspective type.
-  {
-    canvas->save();
-    canvas->clear();
-
-    auto filteredImage = image->makeWithFilter(standardTransform3DFilter);
-    canvas->setMatrix(Matrix::MakeScale(0.5f, 0.5f));
-    canvas->drawImage(filteredImage, 45.f, 45.f, {});
-
-    context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/Transorm3DImageFilterStandardScale"));
-    canvas->restore();
-  }
-
-  // Test basic drawing with standard perspective type.
-  {
-    canvas->save();
-    canvas->clear();
-
-    Paint paint = {};
-    paint.setImageFilter(standardTransform3DFilter);
-    canvas->drawImage(image, 45.f, 45.f, &paint);
-
-    context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/Transorm3DImageFilterStandardBasic"));
-    canvas->restore();
-  }
-
-  // Test image clipping drawing with standard perspective type.
-  {
-    canvas->save();
-    canvas->clear();
-
-    auto filteredImage = image->makeWithFilter(standardTransform3DFilter);
-    auto filteredBounds = standardTransform3DFilter->filterBounds(
-        Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())));
-
-    auto clipRectLT = Rect::MakeXYWH(filteredBounds.left, filteredBounds.top,
-                                     filteredBounds.width() * 0.5f, filteredBounds.height() * 0.5f);
-    auto imageLT = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectLT);
-    canvas->drawImage(imageLT, 0.f, 0.f);
-
-    auto clipRectRT = Rect::MakeXYWH(clipRectLT.right, filteredBounds.top,
-                                     filteredBounds.width() * 0.5f, clipRectLT.height());
-    auto imageRT = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectRT);
-    canvas->drawImage(imageRT, static_cast<float>(imageLT->width()), 0.f);
-
-    auto clipRectLB = Rect::MakeXYWH(filteredBounds.left, clipRectLT.bottom, clipRectLT.width(),
-                                     filteredBounds.height() * 0.5f);
-    auto imageLB = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectLB);
-    canvas->drawImage(imageLB, 0.f, static_cast<float>(imageLT->height()));
-
-    auto clipRectRB =
-        Rect::MakeXYWH(clipRectRT.left, clipRectRT.bottom, clipRectRT.width(), clipRectLB.height());
-    auto imageRB = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectRB);
-    canvas->drawImage(imageRB, static_cast<float>(imageLT->width()),
-                      static_cast<float>(imageLT->height()));
-
-    context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/Transform3DImageFilterStandardClip"));
-    canvas->restore();
-  }
-}
-
 TGFX_TEST(FilterTest, ReverseFilterBounds) {
   auto rect = Rect::MakeXYWH(0, 0, 100, 100);
   ContextScope scope;
@@ -1089,4 +943,162 @@ TGFX_TEST(FilterTest, ReverseFilterBounds) {
   canvas->drawPicture(picture, nullptr, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ReverseFilterBounds_dropShadow"));
 }
+
+TGFX_TEST(FilterTest, AffectsTransparentBlack) {
+  // ModeColorFilter: modes that do NOT affect transparent black
+  EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::SrcIn)->affectsTransparentBlack());
+  // Blend(Red, DstIn) returns nullptr because alpha=1 DstIn is a no-op (result = dst * 1 = dst).
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::DstIn) == nullptr);
+  EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::DstOut)->affectsTransparentBlack());
+  EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::SrcATop)->affectsTransparentBlack());
+  EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::Modulate)->affectsTransparentBlack());
+
+  // ModeColorFilter: modes that DO affect transparent black
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Src)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::White(), BlendMode::SrcOver)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::White(), BlendMode::Screen)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::DstOver)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::SrcOut)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::DstATop)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Xor)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::PlusLighter)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Overlay)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Multiply)->affectsTransparentBlack());
+
+  // ModeColorFilter: transparent color never affects transparent black
+  auto transparentFilter = ColorFilter::Blend(Color::Transparent(), BlendMode::Screen);
+  // Blend() with alpha=0 and SrcOver converts to Dst, which is a no-op and returns nullptr.
+  // Screen with transparent color: src=(0,0,0,0), dst=(0,0,0,0) → 0, not affected.
+  EXPECT_TRUE(transparentFilter == nullptr ||
+              !transparentFilter->affectsTransparentBlack());
+
+  // MatrixColorFilter: no alpha offset → false
+  std::array<float, 20> identityMatrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                                           0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
+  EXPECT_FALSE(ColorFilter::Matrix(identityMatrix)->affectsTransparentBlack());
+
+  // MatrixColorFilter: positive alpha offset → true
+  std::array<float, 20> alphaOffsetMatrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                                              0, 0, 1, 0, 0, 0, 0, 0, 1, 0.5f};
+  EXPECT_TRUE(ColorFilter::Matrix(alphaOffsetMatrix)->affectsTransparentBlack());
+
+  // MatrixColorFilter: RGB offset only (no alpha offset) → false (premultiply makes rgb 0)
+  std::array<float, 20> rgbOffsetMatrix = {1, 0, 0, 0, 0.5f, 0, 1, 0, 0, 0,
+                                            0, 0, 1, 0, 0,    0, 0, 0, 1, 0};
+  EXPECT_FALSE(ColorFilter::Matrix(rgbOffsetMatrix)->affectsTransparentBlack());
+
+  // AlphaThresholdColorFilter
+  EXPECT_TRUE(ColorFilter::AlphaThreshold(0.0f)->affectsTransparentBlack());
+  EXPECT_FALSE(ColorFilter::AlphaThreshold(0.5f)->affectsTransparentBlack());
+
+  // LumaColorFilter
+  EXPECT_FALSE(ColorFilter::Luma()->affectsTransparentBlack());
+
+  // ComposeColorFilter
+  auto innerSafe = ColorFilter::Blend(Color::Red(), BlendMode::SrcIn);
+  auto outerUnsafe = ColorFilter::Blend(Color::White(), BlendMode::Screen);
+  EXPECT_TRUE(ColorFilter::Compose(innerSafe, outerUnsafe)->affectsTransparentBlack());
+  EXPECT_TRUE(ColorFilter::Compose(outerUnsafe, innerSafe)->affectsTransparentBlack());
+  EXPECT_FALSE(ColorFilter::Compose(innerSafe, innerSafe)->affectsTransparentBlack());
+}
+
+TGFX_TEST(FilterTest, ColorImageFilterTransparent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto width = image->width() + 100;
+  auto height = image->height() + 100;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+
+  // Apply Screen(Red) as ImageFilter::ColorFilter - affects transparent black.
+  // Transparent regions should remain transparent.
+  auto screenFilter =
+      ImageFilter::ColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Screen));
+  auto filteredImage = image->makeWithFilter(screenFilter);
+  ASSERT_TRUE(filteredImage != nullptr);
+  canvas->drawImage(filteredImage, 50, 50);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ColorImageFilterTransparent_Screen"));
+  canvas->clear();
+
+  // Apply Multiply(Red) as ImageFilter::ColorFilter - does NOT affect transparent black.
+  auto multiplyFilter =
+      ImageFilter::ColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Modulate));
+  filteredImage = image->makeWithFilter(multiplyFilter);
+  ASSERT_TRUE(filteredImage != nullptr);
+  canvas->drawImage(filteredImage, 50, 50);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ColorImageFilterTransparent_Modulate"));
+}
+
+TGFX_TEST(FilterTest, ColorFilterShaderTransparent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto width = image->width() + 100;
+  auto height = image->height() + 100;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+
+  // ImageShader + makeWithColorFilter(Screen(Red))
+  // Transparent regions should remain transparent.
+  auto shader = Shader::MakeImageShader(image);
+  ASSERT_TRUE(shader != nullptr);
+  auto coloredShader =
+      shader->makeWithColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Screen));
+  ASSERT_TRUE(coloredShader != nullptr);
+  Paint paint;
+  paint.setShader(coloredShader);
+  canvas->translate(50, 50);
+  canvas->drawRect(
+      Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())),
+      paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ColorFilterShaderTransparent"));
+}
+
+TGFX_TEST(FilterTest, BrushColorFilterTransparent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto width = image->width() + 100;
+  auto height = image->height() + 100;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+
+  // Brush with ImageShader + ColorFilter(Screen(Red))
+  // Transparent regions should remain transparent.
+  auto shader = Shader::MakeImageShader(image);
+  ASSERT_TRUE(shader != nullptr);
+  Paint paint;
+  paint.setShader(shader);
+  paint.setColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Screen));
+  canvas->translate(50, 50);
+  canvas->drawRect(
+      Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())),
+      paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/BrushColorFilterTransparent"));
+}
+
+TGFX_TEST(FilterTest, AlphaThresholdZero) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+
+  // Draw a half-transparent rect with AlphaThreshold(0).
+  // The threshold=0 with step(0,0)=1 bug would make transparent pixels opaque.
+  // After fix, transparent pixels should remain transparent.
+  Paint paint;
+  paint.setColor(Color::FromRGBA(255, 0, 0, 128));
+  paint.setColorFilter(ColorFilter::AlphaThreshold(0.0f));
+  canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/AlphaThresholdZero"));
+}
+
 }  // namespace tgfx

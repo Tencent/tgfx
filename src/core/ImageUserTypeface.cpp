@@ -28,6 +28,10 @@ class ImageUserScalerContext final : public UserScalerContext {
       : UserScalerContext(std::move(typeface), size) {
   }
 
+  float getAdvance(GlyphID glyphID, bool) const override {
+    return imageTypeface()->getGlyphAdvance(glyphID) * textScale;
+  }
+
   Rect getBounds(GlyphID glyphID, bool, bool fauxItalic) const override {
     auto record = imageTypeface()->getGlyphRecord(glyphID);
     if (record == nullptr || record->image == nullptr) {
@@ -36,7 +40,7 @@ class ImageUserScalerContext final : public UserScalerContext {
     auto bounds = Rect::MakeXYWH(record->offset.x, record->offset.y,
                                  static_cast<float>(record->image->width()),
                                  static_cast<float>(record->image->height()));
-    auto matrix = Matrix::MakeScale(textSize, textSize);
+    auto matrix = Matrix::MakeScale(textScale, textScale);
     if (fauxItalic) {
       matrix.postSkew(ITALIC_SKEW, 0.f);
     }
@@ -54,8 +58,8 @@ class ImageUserScalerContext final : public UserScalerContext {
       return {};
     }
     if (matrix) {
-      matrix->setTranslate(record->offset.x, record->offset.y);
-      matrix->postScale(textSize, textSize);
+      matrix->setScale(textScale, textScale);
+      matrix->preTranslate(record->offset.x, record->offset.y);
     }
     return Rect::MakeXYWH(record->offset.x, record->offset.y,
                           static_cast<float>(record->image->width()),
@@ -75,30 +79,34 @@ class ImageUserScalerContext final : public UserScalerContext {
   }
 
   float getBackingSize() const override {
-    return 1.f;
+    return static_cast<float>(userTypeface()->unitsPerEm());
   }
 
  private:
   ImageUserTypeface* imageTypeface() const {
-    return static_cast<ImageUserTypeface*>(typeface.get());
+    return static_cast<ImageUserTypeface*>(userTypeface());
   }
 };
 
 //////////////
 
-std::shared_ptr<UserTypeface> ImageUserTypeface::Make(
-    uint32_t builderID, const std::string& fontFamily, const std::string& fontStyle,
-    const FontMetrics& fontMetrics, const Rect& fontBounds, const ImageRecordType& glyphRecords) {
+std::shared_ptr<UserTypeface> ImageUserTypeface::Make(uint32_t builderID,
+                                                      const std::string& fontFamily,
+                                                      const std::string& fontStyle,
+                                                      const FontMetrics& fontMetrics,
+                                                      const Rect& fontBounds, int unitsPerEm,
+                                                      const GlyphRecords& glyphRecords) {
   auto typeface = std::shared_ptr<ImageUserTypeface>(new ImageUserTypeface(
-      builderID, fontFamily, fontStyle, fontMetrics, fontBounds, glyphRecords));
+      builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm, glyphRecords));
   typeface->weakThis = typeface;
   return typeface;
 }
 
 ImageUserTypeface::ImageUserTypeface(uint32_t builderID, const std::string& fontFamily,
                                      const std::string& fontStyle, const FontMetrics& fontMetrics,
-                                     const Rect& fontBounds, const ImageRecordType& glyphRecords)
-    : UserTypeface(builderID, fontFamily, fontStyle, fontMetrics, fontBounds),
+                                     const Rect& fontBounds, int unitsPerEm,
+                                     const GlyphRecords& glyphRecords)
+    : UserTypeface(builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm),
       glyphRecords(glyphRecords) {
 }
 
@@ -118,11 +126,19 @@ std::shared_ptr<ScalerContext> ImageUserTypeface::onCreateScalerContext(float si
   return std::make_shared<ImageUserScalerContext>(weakThis.lock(), size);
 }
 
-std::shared_ptr<ImageTypefaceBuilder::GlyphRecord> ImageUserTypeface::getGlyphRecord(
+std::shared_ptr<ImageTypefaceBuilder::ImageGlyphRecord> ImageUserTypeface::getGlyphRecord(
     GlyphID glyphID) const {
   if (glyphID == 0 || static_cast<size_t>(glyphID) > glyphRecords.size()) {
     return nullptr;  // Invalid GlyphID
   }
   return glyphRecords[glyphID - 1];  // GlyphID starts from 1
+}
+
+float ImageUserTypeface::getGlyphAdvance(GlyphID glyphID) const {
+  auto record = getGlyphRecord(glyphID);
+  if (record == nullptr) {
+    return 0.0f;
+  }
+  return record->advance;
 }
 }  // namespace tgfx

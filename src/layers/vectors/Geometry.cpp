@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Geometry.h"
-#include "core/GlyphRunList.h"
+#include "core/GlyphTransform.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/RSXform.h"
@@ -41,6 +41,7 @@ std::unique_ptr<Geometry> Geometry::clone() const {
   cloned->shape = shape;
   cloned->textBlob = textBlob;
   cloned->glyphs = glyphs;
+  cloned->textAnchors = textAnchors;
   return cloned;
 }
 
@@ -79,22 +80,28 @@ void Geometry::convertToShape() {
 
 void Geometry::expandToGlyphs() {
   DEBUG_ASSERT(textBlob != nullptr);
-  size_t totalCount = 0;
-  for (const auto& run : GlyphRunList(textBlob.get())) {
-    totalCount += run.runSize();
-  }
   glyphs.clear();
-  glyphs.reserve(totalCount);
-  for (const auto& run : GlyphRunList(textBlob.get())) {
-    for (size_t i = 0; i < run.runSize(); i++) {
+  size_t glyphIndex = 0;
+  for (auto run : *textBlob) {
+    glyphs.reserve(glyphs.size() + run.glyphCount);
+    for (size_t i = 0; i < run.glyphCount; i++) {
       Glyph glyph = {};
       glyph.glyphID = run.glyphs[i];
       glyph.font = run.font;
-      glyph.matrix = run.getMatrix(i);
+      // Calculate default anchor at advance * 0.5, plus any custom offset from textAnchors
+      float defaultAnchorX = run.font.getAdvance(run.glyphs[i]) * 0.5f;
+      if (glyphIndex < textAnchors.size()) {
+        glyph.anchor = {defaultAnchorX + textAnchors[glyphIndex].x, textAnchors[glyphIndex].y};
+      } else {
+        glyph.anchor = {defaultAnchorX, 0.0f};
+      }
+      glyph.matrix = GetGlyphMatrix(run, i);
       glyphs.push_back(glyph);
+      glyphIndex++;
     }
   }
   textBlob = nullptr;
+  textAnchors.clear();
   shape = nullptr;
 }
 

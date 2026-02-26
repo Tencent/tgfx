@@ -20,6 +20,7 @@
 #include "core/images/TextureImage.h"
 #include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
@@ -179,14 +180,16 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   return cachedImage;
 }
 
-Color Surface::getColor(int x, int y) {
-  uint8_t color[4];
-  auto info =
-      ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied, 0, ColorSpace::SRGB());
-  if (!readPixels(info, color, x, y)) {
-    return Color::Transparent();
+RGBA4f<AlphaType::Premultiplied> Surface::getColor(int x, int y,
+                                                   std::shared_ptr<ColorSpace> dstColorSpace) {
+  auto dstInfo = ImageInfo::Make(1, 1, ColorType::RGBA_F16, AlphaType::Premultiplied, 8,
+                                 std::move(dstColorSpace));
+  uint16_t color[4];
+  if (!readPixels(dstInfo, color, x, y)) {
+    return RGBA4f<AlphaType::Premultiplied>::Transparent();
   }
-  return Color::FromRGBA(color[0], color[1], color[2], color[3]);
+  return {HalfToFloat(color[0]), HalfToFloat(color[1]), HalfToFloat(color[2]),
+          HalfToFloat(color[3])};
 }
 
 std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {

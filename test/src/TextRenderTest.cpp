@@ -31,6 +31,7 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/TextBlobBuilder.h"
+#include "tgfx/core/UTF.h"
 #include "utils/TestUtils.h"
 #include "utils/TextShaper.h"
 
@@ -1192,7 +1193,7 @@ TGFX_TEST(TextRenderTest, TextBlobMixedPositioning) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 285, 139);
+  auto surface = Surface::Make(context, 320, 139);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -1206,8 +1207,8 @@ TGFX_TEST(TextRenderTest, TextBlobMixedPositioning) {
   Font font(typeface, 36.0f);
   Font emojiFont(emojiTypeface, 36.0f);
 
-  auto glyphH = font.getGlyphID('H');
-  auto glyphI = font.getGlyphID('i');
+  auto glyphNi = font.getGlyphID(0x4F60);   // 你
+  auto glyphHao = font.getGlyphID(0x597D);  // 好
   auto glyphEmoji = emojiFont.getGlyphID(0x1F44B);  // 👋
   auto glyphW = font.getGlyphID('W');
   auto glyphO = font.getGlyphID('o');
@@ -1219,13 +1220,13 @@ TGFX_TEST(TextRenderTest, TextBlobMixedPositioning) {
   float x = 47.0f;
   float y = 83.0f;
 
-  // Run 1: "Hi" with horizontal positioning
+  // Run 1: "你好" with horizontal positioning
   const auto& buffer1 = builder.allocRunPosH(font, 2, y);
-  buffer1.glyphs[0] = glyphH;
-  buffer1.glyphs[1] = glyphI;
+  buffer1.glyphs[0] = glyphNi;
+  buffer1.glyphs[1] = glyphHao;
   buffer1.positions[0] = x;
-  buffer1.positions[1] = x + font.getAdvance(glyphH);
-  x += font.getAdvance(glyphH) + font.getAdvance(glyphI) + 5.0f;
+  buffer1.positions[1] = x + font.getAdvance(glyphNi);
+  x += font.getAdvance(glyphNi) + font.getAdvance(glyphHao) + 5.0f;
 
   // Run 2: Emoji with point positioning
   const auto& buffer2 = builder.allocRunPos(emojiFont, 1);
@@ -1577,6 +1578,229 @@ TGFX_TEST(TextRenderTest, TextBlobMixedPositioningBounds) {
   // Verify hitTestPoint returns false for points far outside
   EXPECT_FALSE(blob->hitTestPoint(-200.0f, -200.0f));
   EXPECT_FALSE(blob->hitTestPoint(500.0f, 500.0f));
+}
+
+TGFX_TEST(TextRenderTest, AxisAlignedRotationRender) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 500);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 40.0f);
+
+  auto glyphA = font.getGlyphID('A');
+  auto glyphB = font.getGlyphID('B');
+  auto glyphC = font.getGlyphID('C');
+  auto glyphD = font.getGlyphID('D');
+  ASSERT_TRUE(glyphA > 0 && glyphB > 0 && glyphC > 0 && glyphD > 0);
+
+  Paint paint;
+  paint.setColor(Color::Black());
+
+  // Row 1: RSXform with exact axis-aligned rotations (0/90/180/270)
+  {
+    GlyphID glyphs[] = {glyphA, glyphB, glyphC, glyphD};
+    float angles[] = {0.0f, 90.0f, 180.0f, 270.0f};
+    TextBlobBuilder builder;
+    const auto& buffer = builder.allocRunRSXform(font, 4);
+    for (int i = 0; i < 4; i++) {
+      buffer.glyphs[i] = glyphs[i];
+      auto bounds = font.getBounds(glyphs[i]);
+      float cx = bounds.centerX();
+      float cy = bounds.centerY();
+      float rad = angles[i] * static_cast<float>(M_PI) / 180.0f;
+      float scos = cosf(rad);
+      float ssin = sinf(rad);
+      float tx = 75.0f + static_cast<float>(i) * 100.0f - (scos * cx - ssin * cy);
+      float ty = 75.0f - (ssin * cx + scos * cy);
+      reinterpret_cast<RSXform*>(buffer.positions)[i] = RSXform::Make(scos, ssin, tx, ty);
+    }
+    auto blob = builder.build();
+    canvas->drawTextBlob(blob, 0, 0, paint);
+  }
+
+  // Row 2: RSXform with exact values (no trig functions) for axis-aligned rotations
+  {
+    GlyphID glyphs[] = {glyphA, glyphB, glyphC, glyphD};
+    float scosValues[] = {1.0f, 0.0f, -1.0f, 0.0f};
+    float ssinValues[] = {0.0f, 1.0f, 0.0f, -1.0f};
+    TextBlobBuilder builder;
+    const auto& buffer = builder.allocRunRSXform(font, 4);
+    for (int i = 0; i < 4; i++) {
+      buffer.glyphs[i] = glyphs[i];
+      auto bounds = font.getBounds(glyphs[i]);
+      float cx = bounds.centerX();
+      float cy = bounds.centerY();
+      float scos = scosValues[i];
+      float ssin = ssinValues[i];
+      float tx = 75.0f + static_cast<float>(i) * 100.0f - (scos * cx - ssin * cy);
+      float ty = 200.0f - (ssin * cx + scos * cy);
+      reinterpret_cast<RSXform*>(buffer.positions)[i] = RSXform::Make(scos, ssin, tx, ty);
+    }
+    auto blob = builder.build();
+    canvas->drawTextBlob(blob, 0, 0, paint);
+  }
+
+  // Row 3: Matrix positioning with axis-aligned rotations (90/180) and scale (2x at 0 deg)
+  {
+    TextBlobBuilder builder;
+    const auto& buffer = builder.allocRunMatrix(font, 3);
+    buffer.glyphs[0] = glyphA;
+    buffer.glyphs[1] = glyphB;
+    buffer.glyphs[2] = glyphC;
+    // Glyph A: 2x scale (axis-aligned, no rotation)
+    buffer.positions[0] = 2.0f;
+    buffer.positions[1] = 0.0f;
+    buffer.positions[2] = 50.0f;
+    buffer.positions[3] = 0.0f;
+    buffer.positions[4] = 2.0f;
+    buffer.positions[5] = 290.0f;
+    // Glyph B: 90 degree rotation via matrix
+    buffer.positions[6] = 0.0f;
+    buffer.positions[7] = -1.0f;
+    buffer.positions[8] = 225.0f;
+    buffer.positions[9] = 1.0f;
+    buffer.positions[10] = 0.0f;
+    buffer.positions[11] = 290.0f;
+    // Glyph C: 180 degree rotation via matrix
+    buffer.positions[12] = -1.0f;
+    buffer.positions[13] = 0.0f;
+    buffer.positions[14] = 350.0f;
+    buffer.positions[15] = 0.0f;
+    buffer.positions[16] = -1.0f;
+    buffer.positions[17] = 350.0f;
+    auto blob = builder.build();
+    canvas->drawTextBlob(blob, 0, 0, paint);
+  }
+
+  // Row 4: Non-axis-aligned rotation (45 degrees) for comparison, rendered via path
+  {
+    GlyphID glyphs[] = {glyphA, glyphB};
+    TextBlobBuilder builder;
+    const auto& buffer = builder.allocRunRSXform(font, 2);
+    for (int i = 0; i < 2; i++) {
+      buffer.glyphs[i] = glyphs[i];
+      auto bounds = font.getBounds(glyphs[i]);
+      float cx = bounds.centerX();
+      float cy = bounds.centerY();
+      float rad = 45.0f * static_cast<float>(M_PI) / 180.0f;
+      float scos = cosf(rad);
+      float ssin = sinf(rad);
+      float tx = 125.0f + static_cast<float>(i) * 150.0f - (scos * cx - ssin * cy);
+      float ty = 430.0f - (ssin * cx + scos * cy);
+      reinterpret_cast<RSXform*>(buffer.positions)[i] = RSXform::Make(scos, ssin, tx, ty);
+    }
+    auto blob = builder.build();
+    canvas->drawTextBlob(blob, 0, 0, paint);
+  }
+
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "TextRenderTest/AxisAlignedRotationRender"));
+}
+
+TGFX_TEST(TextRenderTest, VerticalTextWithEmoji) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  auto emojiTypeface = MakeTypeface("resources/font/NotoColorEmoji.ttf");
+  ASSERT_TRUE(emojiTypeface != nullptr);
+
+  auto fontSize = 36.0f;
+  Font font(typeface, fontSize);
+  Font emojiFont(emojiTypeface, fontSize);
+
+  // Vertical layout of "你好👋World" — Latin rotated 90°, CJK and emoji upright.
+  // Surface height is derived from the sum of all vertical advances, so an incorrect emoji
+  // vertical advance would cause the content to overflow or leave excessive gaps.
+  struct GlyphInfo {
+    Unichar unichar = 0;
+    bool isEmoji = false;
+    bool isCJK = false;
+  };
+  std::vector<GlyphInfo> chars = {
+      {0x4F60, false, true},   // 你
+      {0x597D, false, true},   // 好
+      {0x1F44B, true, false},  // 👋
+      {'W', false, false},     {'o', false, false}, {'r', false, false},
+      {'l', false, false},     {'d', false, false},
+  };
+
+  auto metrics = font.getMetrics();
+  // Per CSS Writing Modes: after 90° rotation, center the glyph using the midpoint of ascent and
+  // descent relative to the vertical midline.
+  auto ascentDescentCenter = (metrics.ascent + metrics.descent) / 2;
+  float midlineX = fontSize / 2;
+  float margin = 50.0f;
+  float currentY = margin;
+  float maxWidth = fontSize;
+
+  struct GlyphEntry {
+    std::shared_ptr<TextBlob> blob = nullptr;
+    float xPosition = 0.0f;
+    float yPosition = 0.0f;
+  };
+  std::vector<GlyphEntry> entries = {};
+
+  for (const auto& ch : chars) {
+    auto& f = (ch.isEmoji) ? emojiFont : font;
+    auto glyphID = f.getGlyphID(ch.unichar);
+    ASSERT_NE(glyphID, static_cast<GlyphID>(0));
+
+    GlyphEntry entry;
+    entry.yPosition = currentY;
+
+    if (ch.isCJK || ch.isEmoji) {
+      auto verticalOffset = f.getVerticalOffset(glyphID);
+      auto verticalAdvance = f.getAdvance(glyphID, true);
+      auto horizontalAdvance = f.getAdvance(glyphID, false);
+      if (horizontalAdvance > maxWidth) {
+        maxWidth = horizontalAdvance;
+      }
+      TextBlobBuilder builder;
+      auto buffer = builder.allocRun(f, 1, verticalOffset.x, verticalOffset.y);
+      buffer.glyphs[0] = glyphID;
+      entry.blob = builder.build();
+      entry.xPosition = midlineX;
+      currentY += verticalAdvance;
+    } else {
+      auto horizontalAdvance = f.getAdvance(glyphID, false);
+      auto tx = midlineX + ascentDescentCenter;
+      TextBlobBuilder builder;
+      auto buffer = builder.allocRunRSXform(f, 1);
+      buffer.glyphs[0] = glyphID;
+      auto* xform = reinterpret_cast<RSXform*>(buffer.positions);
+      xform[0] = RSXform::Make(0, 1, tx, 0);
+      entry.blob = builder.build();
+      entry.xPosition = 0;
+      currentY += horizontalAdvance;
+    }
+    entries.push_back(entry);
+  }
+
+  auto totalHeight = static_cast<int>(std::ceil(currentY + margin));
+  auto surfaceWidth = static_cast<int>(std::ceil(maxWidth + margin * 2));
+  auto surface = Surface::Make(context, surfaceWidth, totalHeight);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setColor(Color::Black());
+  for (const auto& entry : entries) {
+    if (entry.blob != nullptr) {
+      canvas->drawTextBlob(entry.blob, margin + entry.xPosition, entry.yPosition, paint);
+    }
+  }
+
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "TextRenderTest/VerticalTextWithEmoji"));
 }
 
 }  // namespace tgfx

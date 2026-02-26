@@ -40,11 +40,10 @@ std::shared_ptr<ConicGradient> Gradient::MakeConic(const Point& center, float st
       new ConicGradient(center, startAngle, endAngle, colors, positions));
 }
 
-std::shared_ptr<DiamondGradient> Gradient::MakeDiamond(const Point& center, float halfDiagonal,
+std::shared_ptr<DiamondGradient> Gradient::MakeDiamond(const Point& center, float radius,
                                                        const std::vector<Color>& colors,
                                                        const std::vector<float>& positions) {
-  return std::shared_ptr<DiamondGradient>(
-      new DiamondGradient(center, halfDiagonal, colors, positions));
+  return std::shared_ptr<DiamondGradient>(new DiamondGradient(center, radius, colors, positions));
 }
 
 void Gradient::setColors(std::vector<Color> colors) {
@@ -157,16 +156,16 @@ void DiamondGradient::setCenter(const Point& center) {
   invalidateContent();
 }
 
-void DiamondGradient::setHalfDiagonal(float halfDiagonal) {
-  if (_halfDiagonal == halfDiagonal) {
+void DiamondGradient::setRadius(float radius) {
+  if (_radius == radius) {
     return;
   }
-  _halfDiagonal = halfDiagonal;
+  _radius = radius;
   invalidateContent();
 }
 
 std::shared_ptr<Shader> DiamondGradient::onCreateShader() const {
-  return Shader::MakeDiamondGradient(_center, _halfDiagonal, _colors, _positions);
+  return Shader::MakeDiamondGradient(_center, _radius, _colors, _positions);
 }
 
 }  // namespace tgfx

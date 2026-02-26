@@ -83,15 +83,15 @@ class BackgroundBlurStyle : public LayerStyle {
   Rect filterBackground(const Rect& srcRect, float contentScale) override;
 
   LayerStyleExtraSourceType extraSourceType() const override {
-    return _blurrinessX > 0 && _blurrinessY > 0 ? LayerStyleExtraSourceType::Background
-                                                : LayerStyleExtraSourceType::None;
+    return (_blurrinessX > 0 || _blurrinessY > 0) ? LayerStyleExtraSourceType::Background
+                                                 : LayerStyleExtraSourceType::None;
   }
 
  protected:
   void onDraw(Canvas*, std::shared_ptr<Image>, float, float, BlendMode) override {
   }
 
-  void onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> contour, float contentScale,
+  void onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                              std::shared_ptr<Image> extraSource, const Point& extraSourceOffset,
                              float alpha, BlendMode blendMode) override;
 

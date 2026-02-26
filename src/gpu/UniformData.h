@@ -59,14 +59,14 @@ class UniformData {
   template <typename T>
   std::enable_if_t<std::is_same_v<std::decay_t<T>, Matrix>, void> setData(const std::string& name,
                                                                           const T& matrix) const {
-    float values[6] = {};
-    matrix.get6(values);
+    float values[9] = {};
+    matrix.get9(values);
 
     // clang-format off
     const float data[] = {
-      values[0], values[3], 0, 0,
-      values[1], values[4], 0, 0,
-      values[2], values[5], 1, 0,
+      values[0], values[3], values[6], 0,
+      values[1], values[4], values[7], 0,
+      values[2], values[5], values[8], 0,
     };
     // clang-format on
     onSetData(name, data, sizeof(data));

@@ -63,6 +63,13 @@ class LayerContent {
   }
 
   /**
+   * Returns true if any part of the content uses a blend mode other than SrcOver.
+   */
+  virtual bool hasBlendMode() const {
+    return false;
+  }
+
+  /**
    * Draws the default content of the layer (content below children) to the specified canvas.
    * Returns true if the content has foreground graphics that should be drawn above children
    * by calling drawForeground().
@@ -85,6 +92,7 @@ class LayerContent {
     Compose,
     Rects,
     RRects,
+    Matrix,
   };
 
   /**
