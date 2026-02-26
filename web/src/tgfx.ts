@@ -81,6 +81,27 @@ export const getSourceSize = (source: TexImageSource | OffscreenCanvas) => {
     return {width: source.width, height: source.height};
 };
 
+// Workaround: Frame-by-frame video playback shows duplicate frames on Web.
+// Setting video.currentTime is async - the browser decodes and composites the frame in background.
+// Calling texSubImage2D immediately after setting currentTime may read stale frame data.
+// Drawing video to canvas forces the browser to composite the current frame synchronously.
+// Note: requestVideoFrameCallback is not used because it's async, requires architecture changes,
+// and has limited browser support (Chrome 83+, Safari 15.4+, no Firefox support as of 2024).
+let syncCanvas: HTMLCanvasElement | null = null;
+let syncCtx: CanvasRenderingContext2D | null = null;
+
+const syncVideoFrame = (video: HTMLVideoElement): void => {
+    if (!syncCanvas) {
+        syncCanvas = document.createElement('canvas');
+        syncCanvas.width = 1;
+        syncCanvas.height = 1;
+        syncCtx = syncCanvas.getContext('2d');
+    }
+    if (syncCtx) {
+        syncCtx.drawImage(video, 0, 0, 1, 1);
+    }
+};
+
 export const uploadToTexture = (
     GL: EmscriptenGL,
     source: TexImageSource | OffscreenCanvas | BitmapImage,
@@ -91,6 +112,9 @@ export const uploadToTexture = (
 ) => {
     let renderSource = source instanceof BitmapImage ? source.bitmap : source;
     if (!renderSource) return;
+    if (renderSource instanceof HTMLVideoElement) {
+        syncVideoFrame(renderSource);
+    }
     const gl = GL.currentContext?.GLctx as WebGL2RenderingContext;
     gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
