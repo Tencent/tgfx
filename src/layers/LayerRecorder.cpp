@@ -142,10 +142,10 @@ bool LayerRecorder::tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& sh
   if (matrixShape == nullptr || !matrixShape->shape->isSimplePath()) {
     return false;
   }
-  auto scales = matrixShape->matrix.getAxisScales();
   auto combinedMatrix = matrixShape->matrix;
   combinedMatrix.postConcat(matrix);
   if (paint.style == PaintStyle::Stroke) {
+    auto scales = matrixShape->matrix.getAxisScales();
     // Skip tryAddSimplifiedPath for stroke with non-uniform scale in shape's matrix, as this
     // optimization would cause the stroke to be scaled non-uniformly.
     if (!FloatNearlyEqual(scales.x, scales.y)) {
