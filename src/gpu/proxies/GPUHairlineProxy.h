@@ -24,36 +24,24 @@
 namespace tgfx {
 
 /**
- * GPUHairlineProxy contains vertex and index buffer proxies required for hairline rendering.
+ * GPUHairlineProxy contains vertex buffer proxies required for hairline rendering.
  */
 class GPUHairlineProxy {
  public:
   GPUHairlineProxy(const Matrix& drawingMatrix,
                    std::shared_ptr<GPUBufferProxy> lineVertexBuffer,
-                   std::shared_ptr<GPUBufferProxy> lineIndexBuffer,
-                   std::shared_ptr<GPUBufferProxy> quadVertexBuffer,
-                   std::shared_ptr<GPUBufferProxy> quadIndexBuffer)
+                   std::shared_ptr<GPUBufferProxy> quadVertexBuffer)
       : drawingMatrix(drawingMatrix),
         lineVertexProxy(std::move(lineVertexBuffer)),
-        lineIndexProxy(std::move(lineIndexBuffer)),
-        quadVertexProxy(std::move(quadVertexBuffer)),
-        quadIndexProxy(std::move(quadIndexBuffer)) {
+        quadVertexProxy(std::move(quadVertexBuffer)) {
   }
 
   std::shared_ptr<GPUBufferProxy> getLineVertexBufferProxy() const {
     return lineVertexProxy;
   }
 
-  std::shared_ptr<GPUBufferProxy> getLineIndexBufferProxy() const {
-    return lineIndexProxy;
-  }
-
   std::shared_ptr<GPUBufferProxy> getQuadVertexBufferProxy() const {
     return quadVertexProxy;
-  }
-
-  std::shared_ptr<GPUBufferProxy> getQuadIndexBufferProxy() const {
-    return quadIndexProxy;
   }
 
   const Matrix& getDrawingMatrix() const {
@@ -69,9 +57,7 @@ class GPUHairlineProxy {
  private:
   Matrix drawingMatrix;
   std::shared_ptr<GPUBufferProxy> lineVertexProxy;
-  std::shared_ptr<GPUBufferProxy> lineIndexProxy;
   std::shared_ptr<GPUBufferProxy> quadVertexProxy;
-  std::shared_ptr<GPUBufferProxy> quadIndexProxy;
 };
 
 }  // namespace tgfx

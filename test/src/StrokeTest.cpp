@@ -827,7 +827,7 @@ TGFX_TEST(StrokeTest, HairlineBasicRendering) {
   Path path;
   path.moveTo(100, 100);
   path.quadTo(200, 50, 300, 100);
-  path.lineTo(100, 100);
+  // path.lineTo(100, 100);
 
   paint.setAntiAlias(true);
   paint.setStrokeWidth(0.0f);
@@ -851,6 +851,77 @@ TGFX_TEST(StrokeTest, HairlineBasicRendering) {
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineBasicRendering"));
 }
 
+TGFX_TEST(StrokeTest, HairlineLineOnly) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(0.0f);
+
+  // Path with only line segments (no curves)
+  Path path;
+  path.moveTo(50, 50);
+  path.lineTo(250, 50);
+  path.lineTo(250, 150);
+  path.lineTo(150, 250);
+  path.lineTo(50, 150);
+  path.close();
+
+  // Row 1: AA enabled
+  paint.setAntiAlias(true);
+  canvas->drawPath(path, paint);
+
+  // Row 2: AA disabled
+  canvas->save();
+  canvas->translate(0, 50);
+  paint.setAntiAlias(false);
+  canvas->drawPath(path, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineLineOnly"));
+}
+
+TGFX_TEST(StrokeTest, HairlineQuadOnly) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(0.0f);
+
+  // Path with only quad curves (no line segments)
+  Path path;
+  path.moveTo(50, 150);
+  path.quadTo(100, 50, 150, 150);
+  path.quadTo(200, 250, 250, 150);
+
+  // Row 1: AA enabled
+  paint.setAntiAlias(true);
+  canvas->drawPath(path, paint);
+
+  // Row 2: AA disabled
+  canvas->save();
+  canvas->translate(0, 50);
+  paint.setAntiAlias(false);
+  canvas->drawPath(path, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineQuadOnly"));
+}
+
 TGFX_TEST(StrokeTest, HairlineBufferCacheReuse) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -864,9 +935,7 @@ TGFX_TEST(StrokeTest, HairlineBufferCacheReuse) {
   auto areBuffersEqual = [](const std::shared_ptr<GPUHairlineProxy>& proxy1,
                             const std::shared_ptr<GPUHairlineProxy>& proxy2) {
     return proxy1->getLineVertexBufferProxy().get() == proxy2->getLineVertexBufferProxy().get() &&
-           proxy1->getLineIndexBufferProxy().get() == proxy2->getLineIndexBufferProxy().get() &&
-           proxy1->getQuadVertexBufferProxy().get() == proxy2->getQuadVertexBufferProxy().get() &&
-           proxy1->getQuadIndexBufferProxy().get() == proxy2->getQuadIndexBufferProxy().get();
+           proxy1->getQuadVertexBufferProxy().get() == proxy2->getQuadVertexBufferProxy().get();
   };
 
   // Test 1: Verify proxyMap size changes

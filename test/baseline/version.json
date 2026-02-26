@@ -453,6 +453,8 @@
         "HairlineClipping": "4438fa30",
         "HairlineComplexPathRendering": "4438fa30",
         "HairlineLayer": "4438fa30",
+        "HairlineLineOnly": "fbfa384f",
+        "HairlineQuadOnly": "fbfa384f",
         "HairlineRRectDrawOp": "bbcba31a",
         "HairlineRRectDrawOpWithAA": "bbcba31a",
         "HairlineRectDrawOp": "bbcba31a",

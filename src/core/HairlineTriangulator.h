@@ -24,16 +24,12 @@
 namespace tgfx {
 
 struct HairlineBuffer {
-  HairlineBuffer(std::shared_ptr<Data> lineVertices, std::shared_ptr<Data> lineIndices,
-                 std::shared_ptr<Data> quadVertices, std::shared_ptr<Data> quadIndices)
-      : lineVertices(std::move(lineVertices)), lineIndices(std::move(lineIndices)),
-        quadVertices(std::move(quadVertices)), quadIndices(std::move(quadIndices)) {
+  HairlineBuffer(std::shared_ptr<Data> lineVertices, std::shared_ptr<Data> quadVertices)
+      : lineVertices(std::move(lineVertices)), quadVertices(std::move(quadVertices)) {
   }
 
   std::shared_ptr<Data> lineVertices = nullptr;
-  std::shared_ptr<Data> lineIndices = nullptr;
   std::shared_ptr<Data> quadVertices = nullptr;
-  std::shared_ptr<Data> quadIndices = nullptr;
 };
 
 class HairlineTriangulator : public DataSource<HairlineBuffer> {

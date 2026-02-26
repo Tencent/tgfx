@@ -30,9 +30,7 @@ class GPU;
 class HairlineBufferUploadTask : public ResourceTask {
  public:
   HairlineBufferUploadTask(std::shared_ptr<ResourceProxy> lineVertexProxy,
-                           std::shared_ptr<ResourceProxy> lineIndexProxy,
                            std::shared_ptr<ResourceProxy> quadVertexProxy,
-                           std::shared_ptr<ResourceProxy> quadIndexProxy,
                            std::unique_ptr<DataSource<HairlineBuffer>> source);
 
  protected:
@@ -47,9 +45,8 @@ class HairlineBufferUploadTask : public ResourceTask {
   static void assignBufferToProxy(const std::shared_ptr<BufferResource>& buffer,
                                   const std::shared_ptr<ResourceProxy>& proxy);
 
-  std::shared_ptr<ResourceProxy> lineIndexProxy = nullptr;
+  std::shared_ptr<ResourceProxy> lineVertexProxy = nullptr;
   std::shared_ptr<ResourceProxy> quadVertexProxy = nullptr;
-  std::shared_ptr<ResourceProxy> quadIndexProxy = nullptr;
   std::unique_ptr<DataSource<HairlineBuffer>> source = nullptr;
 };
 

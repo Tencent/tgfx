@@ -71,24 +71,7 @@ struct BezierVertex {
 //       a1       c1
 //
 // Rendered as three triangles: (a0,a1,b0), (b0,c1,c0), (a1,c1,b0)
-constexpr uint16_t QUAD_INDEX_BUFFER_PATTERN[] = {0, 1, 2, 2, 4, 3, 1, 4, 2};
-
-constexpr int QUAD_NUM_INDICES = std::size(QUAD_INDEX_BUFFER_PATTERN);
 constexpr int QUAD_NUM_VERTICES = 5;
-
-std::vector<uint32_t> GetQuadsIndexBuffer(size_t numQuads) {
-  std::vector<uint32_t> indices;
-  indices.reserve(numQuads * QUAD_NUM_INDICES);
-
-  for (uint32_t i = 0; i < numQuads; ++i) {
-    uint32_t baseVertex = i * QUAD_NUM_VERTICES;
-    for (auto idx : QUAD_INDEX_BUFFER_PATTERN) {
-      indices.push_back(baseVertex + idx);
-    }
-  }
-
-  return indices;
-}
 
 // Each line segment is rendered with 6 vertices for AA effect:
 // - p0, p1: Inner vertices with alpha = 1 (on the line)
@@ -108,25 +91,7 @@ std::vector<uint32_t> GetQuadsIndexBuffer(size_t numQuads) {
 //   p2                  p3
 //
 // Rendered as six triangles (18 indices):
-constexpr uint16_t LINE_INDEX_BUFFER_PATTERN[] = {0, 1, 3, 0, 3, 2, 0, 4, 5,
-                                                  0, 5, 1, 0, 2, 4, 1, 5, 3};
-
-constexpr int LINE_NUM_INDICES = std::size(LINE_INDEX_BUFFER_PATTERN);
 constexpr int LINE_NUM_VERTICES = 6;
-
-std::vector<uint32_t> GetLinesIndexBuffer(size_t numLines) {
-  std::vector<uint32_t> indices;
-  indices.reserve(numLines * LINE_NUM_INDICES);
-
-  for (uint32_t i = 0; i < numLines; ++i) {
-    uint32_t baseVertex = i * LINE_NUM_VERTICES;
-    for (auto index : LINE_INDEX_BUFFER_PATTERN) {
-      indices.push_back(baseVertex + index);
-    }
-  }
-
-  return indices;
-}
 
 // Takes 178th time of logf on Z600 / VC2010
 // Note: Caller must ensure x is a positive finite number.
@@ -551,9 +516,7 @@ std::shared_ptr<HairlineBuffer> HairlineTriangulator::getData() const {
   }
 
   std::shared_ptr<Data> lineVerticesData = nullptr;
-  std::shared_ptr<Data> lineIndicesData = nullptr;
   if (lineCount > 0) {
-    std::vector<uint32_t> lineIndices = GetLinesIndexBuffer(lineCount);
     auto lineVertexTotalSize = lineCount * LINE_NUM_VERTICES * sizeof(LineVertex);
     auto lineVertexBuffer = std::unique_ptr<uint8_t[]>(new uint8_t[lineVertexTotalSize]);
     auto vertPtr = reinterpret_cast<LineVertex*>(lineVertexBuffer.get());
@@ -561,24 +524,20 @@ std::shared_ptr<HairlineBuffer> HairlineTriangulator::getData() const {
       AddLine(&lines[2 * i], &vertPtr);
     }
     lineVerticesData = Data::MakeAdopted(lineVertexBuffer.release(), lineVertexTotalSize);
-    lineIndicesData = Data::MakeWithCopy(lineIndices.data(), lineIndices.size() * sizeof(uint32_t));
   }
 
   std::shared_ptr<Data> quadVerticesData = nullptr;
-  std::shared_ptr<Data> quadIndicesData = nullptr;
   if (quadCount > 0) {
-    std::vector<uint32_t> quadIndices = GetQuadsIndexBuffer(quadCount);
-    auto quadVertexTotalSize = static_cast<size_t>(quadCount) * QUAD_NUM_VERTICES * sizeof(BezierVertex);
+    auto quadVertexTotalSize =
+        static_cast<size_t>(quadCount) * QUAD_NUM_VERTICES * sizeof(BezierVertex);
     auto quadVertexBuffer = std::unique_ptr<uint8_t[]>(new uint8_t[quadVertexTotalSize]);
     auto vertPointer = reinterpret_cast<BezierVertex*>(quadVertexBuffer.get());
     for (size_t i = 0; i < quads.size() / 3; ++i) {
       AddQuad(&quads[3 * i], quadSubdivs[i], &vertPointer);
     }
     quadVerticesData = Data::MakeAdopted(quadVertexBuffer.release(), quadVertexTotalSize);
-    quadIndicesData = Data::MakeWithCopy(quadIndices.data(), quadIndices.size() * sizeof(uint32_t));
   }
-  return std::make_shared<HairlineBuffer>(std::move(lineVerticesData), std::move(lineIndicesData),
-                                          std::move(quadVerticesData), std::move(quadIndicesData));
+  return std::make_shared<HairlineBuffer>(std::move(lineVerticesData), std::move(quadVerticesData));
 }
 
 }  // namespace tgfx

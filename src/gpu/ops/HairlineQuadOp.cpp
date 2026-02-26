@@ -17,10 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HairlineQuadOp.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/processors/HairlineQuadGeometryProcessor.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+
+static constexpr size_t MAX_NUM_HAIRLINE_QUADS = 8192;
 
 PlacementPtr<HairlineQuadOp> HairlineQuadOp::Make(std::shared_ptr<GPUHairlineProxy> hairlineProxy,
                                                   PMColor color, const Matrix& uvMatrix,
@@ -29,16 +32,21 @@ PlacementPtr<HairlineQuadOp> HairlineQuadOp::Make(std::shared_ptr<GPUHairlinePro
     return nullptr;
   }
 
-  auto allocator = hairlineProxy->getContext()->drawingAllocator();
-  return allocator->make<HairlineQuadOp>(allocator, std::move(hairlineProxy), color, uvMatrix,
-                                         coverage, aaType);
+  auto context = hairlineProxy->getContext();
+  auto indexBufferProxy = context->globalCache()->getHairlineQuadIndexBuffer();
+  auto allocator = context->drawingAllocator();
+  return allocator->make<HairlineQuadOp>(allocator, std::move(hairlineProxy),
+                                         std::move(indexBufferProxy), color, uvMatrix, coverage,
+                                         aaType);
 }
 
 HairlineQuadOp::HairlineQuadOp(BlockAllocator* allocator,
-                               std::shared_ptr<GPUHairlineProxy> hairlineProxy, PMColor color,
+                               std::shared_ptr<GPUHairlineProxy> hairlineProxy,
+                               std::shared_ptr<GPUBufferProxy> indexBufferProxy, PMColor color,
                                const Matrix& uvMatrix, float coverage, AAType aaType)
-    : DrawOp(allocator, aaType), hairlineProxy(std::move(hairlineProxy)), color(color),
-      uvMatrix(uvMatrix), coverage(coverage) {
+    : DrawOp(allocator, aaType), hairlineProxy(std::move(hairlineProxy)),
+      indexBufferProxy(std::move(indexBufferProxy)), color(color), uvMatrix(uvMatrix),
+      coverage(coverage) {
 }
 
 PlacementPtr<GeometryProcessor> HairlineQuadOp::onMakeGeometryProcessor(
@@ -51,32 +59,43 @@ PlacementPtr<GeometryProcessor> HairlineQuadOp::onMakeGeometryProcessor(
 }
 
 void HairlineQuadOp::onDraw(RenderPass* renderPass) {
-  auto quadVertexBuffer = hairlineProxy->getQuadVertexBufferProxy();
-  auto quadIndexBuffer = hairlineProxy->getQuadIndexBufferProxy();
-
-  if (quadVertexBuffer == nullptr || quadIndexBuffer == nullptr) {
+  auto quadVertexBufferProxy = hairlineProxy->getQuadVertexBufferProxy();
+  if (quadVertexBufferProxy == nullptr || indexBufferProxy == nullptr) {
     return;
   }
 
-  auto vertexBuffer = quadVertexBuffer->getBuffer();
+  auto vertexBuffer = quadVertexBufferProxy->getBuffer();
   if (vertexBuffer == nullptr) {
     return;
   }
 
-  auto indexBuffer = quadIndexBuffer->getBuffer();
+  auto gpuVertexBuffer = vertexBuffer->gpuBuffer();
+  if (gpuVertexBuffer == nullptr) {
+    return;
+  }
+
+  auto indexBuffer = indexBufferProxy->getBuffer();
   if (indexBuffer == nullptr) {
     return;
   }
 
-  auto gpuVertexBuffer = vertexBuffer->gpuBuffer();
   auto gpuIndexBuffer = indexBuffer->gpuBuffer();
-  if (gpuVertexBuffer == nullptr || gpuIndexBuffer == nullptr) {
+  if (gpuIndexBuffer == nullptr) {
     return;
   }
-  renderPass->setVertexBuffer(0, gpuVertexBuffer);
+
+  auto totalQuadCount = vertexBuffer->size() / (VerticesPerQuad * BytesPerQuadVertex);
+  size_t vertexOffset = 0;
   renderPass->setIndexBuffer(gpuIndexBuffer, IndexFormat::UInt32);
-  auto indexCount = static_cast<uint32_t>(indexBuffer->size() / sizeof(uint32_t));
-  renderPass->drawIndexed(PrimitiveType::Triangles, indexCount);
+
+  while (totalQuadCount > 0) {
+    auto batchQuadCount = std::min(totalQuadCount, MAX_NUM_HAIRLINE_QUADS);
+    auto indexCount = static_cast<uint32_t>(batchQuadCount * IndicesPerQuad);
+    renderPass->setVertexBuffer(0, gpuVertexBuffer, vertexOffset);
+    renderPass->drawIndexed(PrimitiveType::Triangles, indexCount);
+    totalQuadCount -= batchQuadCount;
+    vertexOffset += batchQuadCount * VerticesPerQuad * BytesPerQuadVertex;
+  }
 }
 
 }  // namespace tgfx

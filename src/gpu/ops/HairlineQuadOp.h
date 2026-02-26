@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/ops/DrawOp.h"
+#include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/GPUHairlineProxy.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
@@ -27,6 +28,11 @@ namespace tgfx {
 
 class HairlineQuadOp final : public DrawOp {
  public:
+  // BezierVertex = Point(2 floats) + quadCoord/conic/padding(4 floats) = 24 bytes
+  static constexpr size_t BytesPerQuadVertex = 24;
+  static constexpr size_t VerticesPerQuad = 5;
+  static constexpr size_t IndicesPerQuad = 9;
+
   static PlacementPtr<HairlineQuadOp> Make(std::shared_ptr<GPUHairlineProxy> hairlineProxy,
                                            PMColor color, const Matrix& uvMatrix, float coverage,
                                            AAType aaType);
@@ -42,9 +48,11 @@ class HairlineQuadOp final : public DrawOp {
 
  private:
   HairlineQuadOp(BlockAllocator* allocator, std::shared_ptr<GPUHairlineProxy> hairlineProxy,
-                 PMColor color, const Matrix& uvMatrix, float coverage, AAType aaType);
+                 std::shared_ptr<GPUBufferProxy> indexBufferProxy, PMColor color,
+                 const Matrix& uvMatrix, float coverage, AAType aaType);
 
   std::shared_ptr<GPUHairlineProxy> hairlineProxy;
+  std::shared_ptr<GPUBufferProxy> indexBufferProxy;
   PMColor color;
   Matrix uvMatrix;
   float coverage = 1.0f;

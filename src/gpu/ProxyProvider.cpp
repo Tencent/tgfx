@@ -231,35 +231,23 @@ std::shared_ptr<GPUHairlineProxy> ProxyProvider::createGPUHairlineProxy(
   bounds.roundOut();
   auto drawingMatrix = Matrix::MakeTrans(bounds.x(), bounds.y());
   shape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(-bounds.x(), -bounds.y()));
-  
+
   auto uniqueKey = shape->getUniqueKey();
   if (hasCap) {
     static const auto HairlineWithCapFlag = UniqueID::Next();
     uniqueKey = UniqueKey::Append(uniqueKey, &HairlineWithCapFlag, 1);
   }
   static const auto LineVertexType = UniqueID::Next();
-  static const auto LineIndexType = UniqueID::Next();
   static const auto QuadVertexType = UniqueID::Next();
-  static const auto QuadIndexType = UniqueID::Next();
   auto lineVertexKey = UniqueKey::Append(uniqueKey, &LineVertexType, 1);
-  auto lineIndexKey = UniqueKey::Append(uniqueKey, &LineIndexType, 1);
   auto quadVertexKey = UniqueKey::Append(uniqueKey, &QuadVertexType, 1);
-  auto quadIndexKey = UniqueKey::Append(uniqueKey, &QuadIndexType, 1);
   auto lineVertexProxy = findOrWrapGPUBufferProxy(lineVertexKey);
-  auto lineIndexProxy = findOrWrapGPUBufferProxy(lineIndexKey);
   auto quadVertexProxy = findOrWrapGPUBufferProxy(quadVertexKey);
-  auto quadIndexProxy = findOrWrapGPUBufferProxy(quadIndexKey);
-  // Check if we have valid cached buffers:
-  // - Line buffers must be both present or both absent (vertex and index come in pairs)
-  // - Quad buffers must be both present or both absent
-  // - At least one buffer pair must exist
-  bool lineBuffersPaired = (lineVertexProxy != nullptr) == (lineIndexProxy != nullptr);
-  bool quadBuffersPaired = (quadVertexProxy != nullptr) == (quadIndexProxy != nullptr);
+  // Check if we have valid cached buffers: at least one vertex buffer must exist
   bool hasAnyBuffer = lineVertexProxy != nullptr || quadVertexProxy != nullptr;
-  if (lineBuffersPaired && quadBuffersPaired && hasAnyBuffer) {
+  if (hasAnyBuffer) {
     return std::make_shared<GPUHairlineProxy>(drawingMatrix, std::move(lineVertexProxy),
-                                              std::move(lineIndexProxy), std::move(quadVertexProxy),
-                                              std::move(quadIndexProxy));
+                                              std::move(quadVertexProxy));
   }
   auto rasterizer = std::make_unique<HairlineTriangulator>(shape, hasCap);
   std::unique_ptr<DataSource<HairlineBuffer>> dataSource = nullptr;
@@ -273,24 +261,17 @@ std::shared_ptr<GPUHairlineProxy> ProxyProvider::createGPUHairlineProxy(
   dataSource = std::move(rasterizer);
 #endif
   lineVertexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
-  lineIndexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
   quadVertexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
-  quadIndexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
   addResourceProxy(lineVertexProxy, lineVertexKey);
-  addResourceProxy(lineIndexProxy, lineIndexKey);
   addResourceProxy(quadVertexProxy, quadVertexKey);
-  addResourceProxy(quadIndexProxy, quadIndexKey);
   if (!(renderFlags & RenderFlags::DisableCache)) {
     lineVertexProxy->uniqueKey = lineVertexKey;
-    lineIndexProxy->uniqueKey = lineIndexKey;
     quadVertexProxy->uniqueKey = quadVertexKey;
-    quadIndexProxy->uniqueKey = quadIndexKey;
   }
   auto task = context->drawingAllocator()->make<HairlineBufferUploadTask>(
-      lineVertexProxy, lineIndexProxy, quadVertexProxy, quadIndexProxy, std::move(dataSource));
+      lineVertexProxy, quadVertexProxy, std::move(dataSource));
   context->drawingManager()->addResourceTask(std::move(task));
-  return std::make_shared<GPUHairlineProxy>(drawingMatrix, lineVertexProxy, lineIndexProxy,
-                                            quadVertexProxy, quadIndexProxy);
+  return std::make_shared<GPUHairlineProxy>(drawingMatrix, lineVertexProxy, quadVertexProxy);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(

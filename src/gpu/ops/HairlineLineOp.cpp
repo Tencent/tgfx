@@ -17,10 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HairlineLineOp.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/processors/HairlineLineGeometryProcessor.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+
+static constexpr size_t MAX_NUM_HAIRLINE_LINES = 16384;
 
 PlacementPtr<HairlineLineOp> HairlineLineOp::Make(std::shared_ptr<GPUHairlineProxy> hairlineProxy,
                                                   PMColor color, const Matrix& uvMatrix,
@@ -29,16 +32,21 @@ PlacementPtr<HairlineLineOp> HairlineLineOp::Make(std::shared_ptr<GPUHairlinePro
     return nullptr;
   }
 
-  auto allocator = hairlineProxy->getContext()->drawingAllocator();
-  return allocator->make<HairlineLineOp>(allocator, std::move(hairlineProxy), color, uvMatrix,
-                                         coverage, aaType);
+  auto context = hairlineProxy->getContext();
+  auto indexBufferProxy = context->globalCache()->getHairlineLineIndexBuffer();
+  auto allocator = context->drawingAllocator();
+  return allocator->make<HairlineLineOp>(allocator, std::move(hairlineProxy),
+                                         std::move(indexBufferProxy), color, uvMatrix, coverage,
+                                         aaType);
 }
 
 HairlineLineOp::HairlineLineOp(BlockAllocator* allocator,
-                               std::shared_ptr<GPUHairlineProxy> hairlineProxy, PMColor color,
+                               std::shared_ptr<GPUHairlineProxy> hairlineProxy,
+                               std::shared_ptr<GPUBufferProxy> indexBufferProxy, PMColor color,
                                const Matrix& uvMatrix, float coverage, AAType aaType)
-    : DrawOp(allocator, aaType), hairlineProxy(std::move(hairlineProxy)), color(color),
-      uvMatrix(uvMatrix), coverage(coverage) {
+    : DrawOp(allocator, aaType), hairlineProxy(std::move(hairlineProxy)),
+      indexBufferProxy(std::move(indexBufferProxy)), color(color), uvMatrix(uvMatrix),
+      coverage(coverage) {
 }
 
 PlacementPtr<GeometryProcessor> HairlineLineOp::onMakeGeometryProcessor(
@@ -51,32 +59,43 @@ PlacementPtr<GeometryProcessor> HairlineLineOp::onMakeGeometryProcessor(
 }
 
 void HairlineLineOp::onDraw(RenderPass* renderPass) {
-  auto lineVertexBuffer = hairlineProxy->getLineVertexBufferProxy();
-  auto lineIndexBuffer = hairlineProxy->getLineIndexBufferProxy();
-
-  if (lineVertexBuffer == nullptr || lineIndexBuffer == nullptr) {
+  auto lineVertexBufferProxy = hairlineProxy->getLineVertexBufferProxy();
+  if (lineVertexBufferProxy == nullptr || indexBufferProxy == nullptr) {
     return;
   }
 
-  auto vertexBuffer = lineVertexBuffer->getBuffer();
+  auto vertexBuffer = lineVertexBufferProxy->getBuffer();
   if (vertexBuffer == nullptr) {
     return;
   }
 
-  auto indexBuffer = lineIndexBuffer->getBuffer();
+  auto gpuVertexBuffer = vertexBuffer->gpuBuffer();
+  if (gpuVertexBuffer == nullptr) {
+    return;
+  }
+
+  auto indexBuffer = indexBufferProxy->getBuffer();
   if (indexBuffer == nullptr) {
     return;
   }
 
-  auto gpuVertexBuffer = vertexBuffer->gpuBuffer();
   auto gpuIndexBuffer = indexBuffer->gpuBuffer();
-  if (gpuVertexBuffer == nullptr || gpuIndexBuffer == nullptr) {
+  if (gpuIndexBuffer == nullptr) {
     return;
   }
-  renderPass->setVertexBuffer(0, gpuVertexBuffer);
+
+  auto totalLineCount = vertexBuffer->size() / (VerticesPerLine * BytesPerLineVertex);
+  size_t vertexOffset = 0;
   renderPass->setIndexBuffer(gpuIndexBuffer, IndexFormat::UInt32);
-  auto indexCount = static_cast<uint32_t>(indexBuffer->size() / sizeof(uint32_t));
-  renderPass->drawIndexed(PrimitiveType::Triangles, indexCount);
+
+  while (totalLineCount > 0) {
+    auto batchLineCount = std::min(totalLineCount, MAX_NUM_HAIRLINE_LINES);
+    auto indexCount = static_cast<uint32_t>(batchLineCount * IndicesPerLine);
+    renderPass->setVertexBuffer(0, gpuVertexBuffer, vertexOffset);
+    renderPass->drawIndexed(PrimitiveType::Triangles, indexCount);
+    totalLineCount -= batchLineCount;
+    vertexOffset += batchLineCount * VerticesPerLine * BytesPerLineVertex;
+  }
 }
 
 }  // namespace tgfx

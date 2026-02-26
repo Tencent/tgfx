@@ -24,13 +24,10 @@ namespace tgfx {
 
 HairlineBufferUploadTask::HairlineBufferUploadTask(
     std::shared_ptr<ResourceProxy> lineVertexProxy,
-    std::shared_ptr<ResourceProxy> lineIndexProxy,
     std::shared_ptr<ResourceProxy> quadVertexProxy,
-    std::shared_ptr<ResourceProxy> quadIndexProxy,
     std::unique_ptr<DataSource<HairlineBuffer>> source)
-    : ResourceTask(std::move(lineVertexProxy)), lineIndexProxy(std::move(lineIndexProxy)),
-      quadVertexProxy(std::move(quadVertexProxy)), quadIndexProxy(std::move(quadIndexProxy)),
-      source(std::move(source)) {
+    : ResourceTask(lineVertexProxy), lineVertexProxy(std::move(lineVertexProxy)),
+      quadVertexProxy(std::move(quadVertexProxy)), source(std::move(source)) {
 }
 
 std::shared_ptr<Resource> HairlineBufferUploadTask::onMakeResource(Context* context) {
@@ -50,32 +47,27 @@ std::shared_ptr<Resource> HairlineBufferUploadTask::onMakeResource(Context* cont
   bool failed = false;
   auto lineVertexBuffer = createBuffer(context, gpu, hairlineBuffer->lineVertices,
                                         GPUBufferUsage::VERTEX, "line vertex buffer", failed);
-  auto lineIndexBuffer = createBuffer(context, gpu, hairlineBuffer->lineIndices,
-                                       GPUBufferUsage::INDEX, "line index buffer", failed);
   auto quadVertexBuffer = createBuffer(context, gpu, hairlineBuffer->quadVertices,
                                         GPUBufferUsage::VERTEX, "quad vertex buffer", failed);
-  auto quadIndexBuffer = createBuffer(context, gpu, hairlineBuffer->quadIndices,
-                                       GPUBufferUsage::INDEX, "quad index buffer", failed);
 
   if (failed) {
     // Don't assign any buffers to proxies if any creation failed.
     return nullptr;
   }
 
-  // All buffers created successfully (or were not needed). Assign to proxies.
-  assignBufferToProxy(lineIndexBuffer, lineIndexProxy);
+  // All buffers created successfully (or were not needed). Assign to proxies manually.
+  // We manage both proxies ourselves to ensure correct assignment.
+  assignBufferToProxy(lineVertexBuffer, lineVertexProxy);
   assignBufferToProxy(quadVertexBuffer, quadVertexProxy);
-  assignBufferToProxy(quadIndexBuffer, quadIndexProxy);
 
   // Release the source data as it's no longer needed.
   source = nullptr;
 
-  // Return whichever buffer is available. The base class ResourceTask expects a non-null
-  // return value when the task succeeds. Prefer lineVertexBuffer, fall back to quadVertexBuffer.
-  if (lineVertexBuffer) {
-    return lineVertexBuffer;
-  }
-  return quadVertexBuffer;
+  // Return lineVertexBuffer for the base class. If it's nullptr (only quad data exists),
+  // the base class will not modify lineVertexProxy (since execute() returns early on nullptr).
+  // quadVertexProxy is already correctly set above.
+  // If lineVertexBuffer exists, the base class will redundantly assign it again (harmless).
+  return lineVertexBuffer;
 }
 
 std::shared_ptr<BufferResource> HairlineBufferUploadTask::createBuffer(
