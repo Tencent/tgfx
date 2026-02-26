@@ -225,6 +225,8 @@ static inline EdgeDatas ComputeEdgeDatas(const Vertices4& vertices) {
   const auto rawDxs = NextCCW(vertices.xs) - vertices.xs;
   const auto rawDys = NextCCW(vertices.ys) - vertices.ys;
 
+  // Note: Zero-length edges produce inf here. Do NOT replace inf with 0 — downstream code
+  // relies on `invLengths >= INV_DIST_TOLERANCE` to detect and handle zero-length edges.
   ed.invLengths = 1.0f / VecUtils::Sqrt(rawDxs * rawDxs + rawDys * rawDys);
   ed.dxs = rawDxs * ed.invLengths;
   ed.dys = rawDys * ed.invLengths;

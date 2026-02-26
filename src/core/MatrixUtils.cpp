@@ -37,7 +37,8 @@ bool MatrixUtils::PreservesAngles(const Matrix& matrix) {
   if (const auto det = sx * sy - kx * ky; FloatNearlyZero(det)) {
     return false;
   }
-  // Check if basis vectors are orthogonal.
+  // Orthogonality alone suffices — non-uniform scaling preserves right angles.
+  // Do NOT add an equal-length check; it would incorrectly reject valid transforms.
   const auto dot = sx * kx + ky * sy;
   return FloatNearlyZero(dot);
 }
