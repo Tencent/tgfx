@@ -31,6 +31,12 @@
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
+
+// Hairline rendering constants for IndexBuffer capacity.
+// These define the maximum number of primitives that can be rendered in a single batch.
+static constexpr size_t MAX_NUM_HAIRLINE_LINES = 256;
+static constexpr size_t MAX_NUM_HAIRLINE_QUADS = 256;
+
 /**
  * GlobalCache manages GPU resources that need to stay alive for the lifetime of the Context.
  */

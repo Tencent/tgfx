@@ -23,8 +23,6 @@
 
 namespace tgfx {
 
-static constexpr size_t MAX_NUM_HAIRLINE_QUADS = 8192;
-
 PlacementPtr<HairlineQuadOp> HairlineQuadOp::Make(std::shared_ptr<GPUHairlineProxy> hairlineProxy,
                                                   PMColor color, const Matrix& uvMatrix,
                                                   float coverage, AAType aaType) {

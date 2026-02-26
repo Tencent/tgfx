@@ -44,8 +44,6 @@ static constexpr uint32_t HAIRLINE_LINE_NUM_VERTICES = 6;
 static constexpr uint32_t HAIRLINE_LINE_NUM_INDICES = 18;
 static constexpr uint32_t HAIRLINE_QUAD_NUM_VERTICES = 5;
 static constexpr uint32_t HAIRLINE_QUAD_NUM_INDICES = 9;
-static constexpr uint32_t MAX_NUM_HAIRLINE_LINES = 16384;
-static constexpr uint32_t MAX_NUM_HAIRLINE_QUADS = 8192;
 
 // clang-format off
 static constexpr uint16_t HairlineLineIndexPattern[] = {
