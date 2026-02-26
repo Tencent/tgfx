@@ -117,7 +117,7 @@ export const uploadToTexture = (
     let renderSource = source instanceof BitmapImage ? source.bitmap : source;
     if (!renderSource) return;
     if (isInstanceOf(renderSource, globalThis.HTMLVideoElement)) {
-        syncVideoFrame(renderSource);
+        syncVideoFrame(renderSource as HTMLVideoElement);
     }
     const gl = GL.currentContext?.GLctx as WebGL2RenderingContext;
     gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
