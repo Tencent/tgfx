@@ -241,12 +241,12 @@ std::shared_ptr<RenderPipeline> WebGPUGPU::createRenderPipeline(
     LOGE("WebGPUGPU::createRenderPipeline() invalid fragment shader module!");
     return nullptr;
   }
-  if (descriptor.vertex.attributes.empty()) {
-    LOGE("WebGPUGPU::createRenderPipeline() invalid vertex attributes, no attributes set!");
+  if (descriptor.vertex.bufferLayouts.empty()) {
+    LOGE("WebGPUGPU::createRenderPipeline() invalid vertex buffer layouts, no layouts set!");
     return nullptr;
   }
-  if (descriptor.vertex.vertexStride == 0) {
-    LOGE("WebGPUGPU::createRenderPipeline() invalid vertex attributes, vertex stride is 0!");
+  if (descriptor.vertex.bufferLayouts[0].stride == 0) {
+    LOGE("WebGPUGPU::createRenderPipeline() invalid vertex buffer layout, stride is 0!");
     return nullptr;
   }
   if (descriptor.fragment.colorAttachments.empty()) {
@@ -254,12 +254,13 @@ std::shared_ptr<RenderPipeline> WebGPUGPU::createRenderPipeline(
     return nullptr;
   }
 
-  // Build vertex attributes
+  // Build vertex attributes from first buffer layout
+  const auto& bufferLayout = descriptor.vertex.bufferLayouts[0];
   std::vector<wgpu::VertexAttribute> vertexAttributes;
-  vertexAttributes.reserve(descriptor.vertex.attributes.size());
+  vertexAttributes.reserve(bufferLayout.attributes.size());
   size_t vertexOffset = 0;
   uint32_t shaderLocation = 0;
-  for (const auto& attr : descriptor.vertex.attributes) {
+  for (const auto& attr : bufferLayout.attributes) {
     wgpu::VertexAttribute wgpuAttr = {};
     wgpuAttr.format = ToWGPUVertexFormat(attr.format());
     wgpuAttr.offset = vertexOffset;
@@ -270,7 +271,7 @@ std::shared_ptr<RenderPipeline> WebGPUGPU::createRenderPipeline(
 
   // Build vertex buffer layout
   wgpu::VertexBufferLayout vertexBufferLayout = {};
-  vertexBufferLayout.arrayStride = descriptor.vertex.vertexStride;
+  vertexBufferLayout.arrayStride = bufferLayout.stride;
   vertexBufferLayout.stepMode = wgpu::VertexStepMode::Vertex;
   vertexBufferLayout.attributeCount = vertexAttributes.size();
   vertexBufferLayout.attributes = vertexAttributes.data();
@@ -436,7 +437,7 @@ std::shared_ptr<RenderPipeline> WebGPUGPU::createRenderPipeline(
 
   return std::make_shared<WebGPURenderPipeline>(std::move(pipeline), std::move(bindGroupLayout),
                                                 std::move(textureBindingMap),
-                                                descriptor.vertex.vertexStride);
+                                                bufferLayout.stride);
 }
 
 std::shared_ptr<CommandEncoder> WebGPUGPU::createCommandEncoder() {

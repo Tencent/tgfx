@@ -92,7 +92,8 @@ void WebGPURenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> tex
   bindGroupDirty = true;
 }
 
-void WebGPURenderPass::setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset) {
+void WebGPURenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer,
+                                       size_t offset) {
   if (buffer == nullptr) {
     return;
   }
@@ -101,7 +102,7 @@ void WebGPURenderPass::setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t
     return;
   }
   auto webgpuBuffer = std::static_pointer_cast<WebGPUBuffer>(buffer);
-  _passEncoder.SetVertexBuffer(0, webgpuBuffer->wgpuBuffer(), offset);
+  _passEncoder.SetVertexBuffer(slot, webgpuBuffer->wgpuBuffer(), offset);
 }
 
 void WebGPURenderPass::setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat format) {
@@ -122,15 +123,17 @@ void WebGPURenderPass::setStencilReference(uint32_t reference) {
   _passEncoder.SetStencilReference(reference);
 }
 
-void WebGPURenderPass::draw(PrimitiveType, size_t baseVertex, size_t vertexCount) {
+void WebGPURenderPass::draw(PrimitiveType, uint32_t vertexCount, uint32_t instanceCount,
+                            uint32_t firstVertex, uint32_t firstInstance) {
   flushBindGroup();
-  _passEncoder.Draw(static_cast<uint32_t>(vertexCount), 1, static_cast<uint32_t>(baseVertex), 0);
+  _passEncoder.Draw(vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
-void WebGPURenderPass::drawIndexed(PrimitiveType, size_t baseIndex, size_t indexCount) {
+void WebGPURenderPass::drawIndexed(PrimitiveType, uint32_t indexCount, uint32_t instanceCount,
+                                   uint32_t firstIndex, int32_t baseVertex,
+                                   uint32_t firstInstance) {
   flushBindGroup();
-  _passEncoder.DrawIndexed(static_cast<uint32_t>(indexCount), 1, static_cast<uint32_t>(baseIndex),
-                           0, 0);
+  _passEncoder.DrawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
 }
 
 void WebGPURenderPass::onEnd() {

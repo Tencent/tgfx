@@ -48,15 +48,19 @@ class WebGPURenderPass : public RenderPass {
   void setTexture(unsigned binding, std::shared_ptr<Texture> texture,
                   std::shared_ptr<Sampler> sampler) override;
 
-  void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset) override;
+  void setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer, size_t offset = 0) override;
 
-  void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat format) override;
+  void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer,
+                      IndexFormat format = IndexFormat::UInt16) override;
 
   void setStencilReference(uint32_t reference) override;
 
-  void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) override;
+  void draw(PrimitiveType primitiveType, uint32_t vertexCount, uint32_t instanceCount = 1,
+            uint32_t firstVertex = 0, uint32_t firstInstance = 0) override;
 
-  void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) override;
+  void drawIndexed(PrimitiveType primitiveType, uint32_t indexCount, uint32_t instanceCount = 1,
+                   uint32_t firstIndex = 0, int32_t baseVertex = 0,
+                   uint32_t firstInstance = 0) override;
 
  protected:
   void onEnd() override;
