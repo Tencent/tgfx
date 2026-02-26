@@ -22,6 +22,7 @@
 #include "gpu/AAType.h"
 #include "gpu/QuadRecord.h"
 #include "gpu/VertexProvider.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -40,9 +41,9 @@ class QuadsVertexProvider : public VertexProvider {
   /**
    * Creates a QuadsVertexProvider from a list of quad records.
    */
-  static PlacementPtr<QuadsVertexProvider> MakeFrom(BlockAllocator* allocator,
-                                                    std::vector<PlacementPtr<QuadRecord>>&& quads,
-                                                    AAType aaType);
+  static PlacementPtr<QuadsVertexProvider> MakeFrom(
+      BlockAllocator* allocator, std::vector<PlacementPtr<QuadRecord>>&& quads, AAType aaType,
+      std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
 
   /**
    * Returns the number of quads in the provider.
@@ -86,11 +87,20 @@ class QuadsVertexProvider : public VertexProvider {
     return quads.front()->matrix;
   }
 
+  /**
+   * Returns the destination color space.
+   */
+  const std::shared_ptr<ColorSpace>& dstColorSpace() const {
+    return _dstColorSpace;
+  }
+
  protected:
   QuadsVertexProvider(PlacementArray<QuadRecord>&& quads, AAType aaType, bool hasColor,
-                      bool hasUVCoord, std::shared_ptr<BlockAllocator> reference);
+                      bool hasUVCoord, std::shared_ptr<BlockAllocator> reference,
+                      std::shared_ptr<ColorSpace> dstColorSpace);
 
   PlacementArray<QuadRecord> quads = {};
+  std::shared_ptr<ColorSpace> _dstColorSpace = nullptr;
   AAType _aaType = AAType::None;
   bool _hasColor = false;
   bool _hasUVCoord = false;

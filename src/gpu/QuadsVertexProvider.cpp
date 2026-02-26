@@ -412,8 +412,10 @@ static inline void WriteQuadVertices(float* vertices, size_t& index, const Verti
 class NonAAQuadsVertexProvider : public QuadsVertexProvider {
  public:
   NonAAQuadsVertexProvider(PlacementArray<QuadRecord>&& quads, AAType aaType, bool hasColor,
-                           bool hasUVCoord, std::shared_ptr<BlockAllocator> reference)
-      : QuadsVertexProvider(std::move(quads), aaType, hasColor, hasUVCoord, std::move(reference)) {
+                           bool hasUVCoord, std::shared_ptr<BlockAllocator> reference,
+                           std::shared_ptr<ColorSpace> dstColorSpace)
+      : QuadsVertexProvider(std::move(quads), aaType, hasColor, hasUVCoord, std::move(reference),
+                            std::move(dstColorSpace)) {
   }
 
   size_t vertexCount() const override {
@@ -462,8 +464,10 @@ class NonAAQuadsVertexProvider : public QuadsVertexProvider {
 class AAQuadsVertexProvider : public QuadsVertexProvider {
  public:
   AAQuadsVertexProvider(PlacementArray<QuadRecord>&& quads, AAType aaType, bool hasColor,
-                        bool hasUVCoord, std::shared_ptr<BlockAllocator> reference)
-      : QuadsVertexProvider(std::move(quads), aaType, hasColor, hasUVCoord, std::move(reference)) {
+                        bool hasUVCoord, std::shared_ptr<BlockAllocator> reference,
+                        std::shared_ptr<ColorSpace> dstColorSpace)
+      : QuadsVertexProvider(std::move(quads), aaType, hasColor, hasUVCoord, std::move(reference),
+                            std::move(dstColorSpace)) {
   }
 
   size_t vertexCount() const override {
@@ -514,9 +518,15 @@ class AAQuadsVertexProvider : public QuadsVertexProvider {
     std::optional<Vertices4> outsetUV = std::nullopt;
     if (_hasUVCoord) {
       auto invMatrix = record.matrix;
-      invMatrix.invert(&invMatrix);
-      insetUV = TransformVertices4(insetCoord, invMatrix);
-      outsetUV = TransformVertices4(outsetCoord, invMatrix);
+      if (invMatrix.invert(&invMatrix)) {
+        insetUV = TransformVertices4(insetCoord, invMatrix);
+        outsetUV = TransformVertices4(outsetCoord, invMatrix);
+      } else {
+        // Fallback to original quad coordinates if matrix is not invertible.
+        DEBUG_ASSERT(false);
+        insetUV = ToVertices4(record.quad);
+        outsetUV = ToVertices4(record.quad);
+      }
     }
 
     std::optional<float> color = std::nullopt;
@@ -541,7 +551,8 @@ PlacementPtr<QuadsVertexProvider> QuadsVertexProvider::MakeFrom(BlockAllocator* 
 }
 
 PlacementPtr<QuadsVertexProvider> QuadsVertexProvider::MakeFrom(
-    BlockAllocator* allocator, std::vector<PlacementPtr<QuadRecord>>&& quads, AAType aaType) {
+    BlockAllocator* allocator, std::vector<PlacementPtr<QuadRecord>>&& quads, AAType aaType,
+    std::shared_ptr<ColorSpace> dstColorSpace) {
   if (quads.empty()) {
     return nullptr;
   }
@@ -556,17 +567,20 @@ PlacementPtr<QuadsVertexProvider> QuadsVertexProvider::MakeFrom(
   auto quadArray = allocator->makeArray(std::move(quads));
   if (aaType == AAType::Coverage) {
     return allocator->make<AAQuadsVertexProvider>(std::move(quadArray), aaType, hasColor,
-                                                  hasUVCoord, allocator->addReference());
+                                                  hasUVCoord, allocator->addReference(),
+                                                  std::move(dstColorSpace));
   }
   return allocator->make<NonAAQuadsVertexProvider>(std::move(quadArray), aaType, hasColor,
-                                                   hasUVCoord, allocator->addReference());
+                                                   hasUVCoord, allocator->addReference(),
+                                                   std::move(dstColorSpace));
 }
 
 QuadsVertexProvider::QuadsVertexProvider(PlacementArray<QuadRecord>&& quads, AAType aaType,
                                          bool hasColor, bool hasUVCoord,
-                                         std::shared_ptr<BlockAllocator> reference)
-    : VertexProvider(std::move(reference)), quads(std::move(quads)), _aaType(aaType),
-      _hasColor(hasColor), _hasUVCoord(hasUVCoord) {
+                                         std::shared_ptr<BlockAllocator> reference,
+                                         std::shared_ptr<ColorSpace> dstColorSpace)
+    : VertexProvider(std::move(reference)), quads(std::move(quads)), _dstColorSpace(std::move(dstColorSpace)),
+      _aaType(aaType), _hasColor(hasColor), _hasUVCoord(hasUVCoord) {
 }
 
 }  // namespace tgfx

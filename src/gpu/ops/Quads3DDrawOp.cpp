@@ -60,7 +60,7 @@ Quads3DDrawOp::Quads3DDrawOp(BlockAllocator* allocator, QuadsVertexProvider* pro
     uvMatrix = matrix;
   }
   if (!provider->hasColor()) {
-    commonColor = ToPMColor(provider->firstColor(), nullptr);
+    commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
 }
 
