@@ -142,19 +142,21 @@ bool LayerRecorder::tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& sh
   if (matrixShape == nullptr || !matrixShape->shape->isSimplePath()) {
     return false;
   }
-  // Skip tryAddSimplifiedPath for stroke with non-uniform scale in shape's matrix, as this
-  // optimization would cause the stroke to be scaled non-uniformly.
   auto scales = matrixShape->matrix.getAxisScales();
-  if (paint.style == PaintStyle::Stroke && !FloatNearlyEqual(scales.x, scales.y)) {
-    return false;
-  }
   auto combinedMatrix = matrixShape->matrix;
   combinedMatrix.postConcat(matrix);
-  // Compensate stroke width for uniform scale to keep stroke width constant.
-  if (paint.style == PaintStyle::Stroke && !FloatNearlyEqual(scales.x, 1.0f)) {
-    auto compensatedPaint = paint;
-    compensatedPaint.stroke.width = paint.stroke.width / scales.x;
-    return tryAddSimplifiedPath(matrixShape->shape->getPath(), compensatedPaint, combinedMatrix);
+  if (paint.style == PaintStyle::Stroke) {
+    // Skip tryAddSimplifiedPath for stroke with non-uniform scale in shape's matrix, as this
+    // optimization would cause the stroke to be scaled non-uniformly.
+    if (!FloatNearlyEqual(scales.x, scales.y)) {
+      return false;
+    }
+    // Compensate stroke width for uniform scale to keep stroke width constant.
+    if (!FloatNearlyEqual(scales.x, 1.0f)) {
+      auto compensatedPaint = paint;
+      compensatedPaint.stroke.width = paint.stroke.width / scales.x;
+      return tryAddSimplifiedPath(matrixShape->shape->getPath(), compensatedPaint, combinedMatrix);
+    }
   }
   return tryAddSimplifiedPath(matrixShape->shape->getPath(), paint, combinedMatrix);
 }
