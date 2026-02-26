@@ -96,6 +96,10 @@ const syncVideoFrame = (video: HTMLVideoElement): void => {
         syncCanvas.width = 1;
         syncCanvas.height = 1;
         syncCtx = syncCanvas.getContext('2d');
+        if (!syncCtx) {
+            syncCanvas = null;
+            return;
+        }
     }
     if (syncCtx) {
         syncCtx.drawImage(video, 0, 0, 1, 1);
@@ -112,7 +116,7 @@ export const uploadToTexture = (
 ) => {
     let renderSource = source instanceof BitmapImage ? source.bitmap : source;
     if (!renderSource) return;
-    if (renderSource instanceof HTMLVideoElement) {
+    if (isInstanceOf(renderSource, globalThis.HTMLVideoElement)) {
         syncVideoFrame(renderSource);
     }
     const gl = GL.currentContext?.GLctx as WebGL2RenderingContext;
