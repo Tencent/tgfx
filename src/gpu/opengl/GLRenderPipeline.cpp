@@ -65,10 +65,12 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
     state->setCullFaceState(*cullFaceState);
   }
   state->setEnabled(GL_SAMPLE_ALPHA_TO_COVERAGE, alphaToCoverageEnabled);
-  bool sampleMaskEnabled = sampleMask != 0xFFFFFFFF;
-  state->setEnabled(GL_SAMPLE_MASK, sampleMaskEnabled);
-  if (sampleMaskEnabled) {
-    state->setSampleMask(sampleMask);
+  if (gpu->caps()->sampleMaskSupport) {
+    bool sampleMaskEnabled = sampleMask != 0xFFFFFFFF;
+    state->setEnabled(GL_SAMPLE_MASK, sampleMaskEnabled);
+    if (sampleMaskEnabled) {
+      state->setSampleMask(sampleMask);
+    }
   }
 }
 
