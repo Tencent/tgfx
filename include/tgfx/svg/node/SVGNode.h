@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -27,6 +25,7 @@
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGTypes.h"
 #include "tgfx/svg/SVGValue.h"
+#include "tgfx/svg/xml/XMLDOM.h"
 
 namespace tgfx {
 
@@ -98,7 +97,7 @@ enum class SVGTag {
     return presentationAttributes.attr_name;                                          \
   }                                                                                   \
   void set##attr_name(const SVGProperty<attr_type, attr_inherited>& v) {              \
-    auto* dest = &presentationAttributes.attr_name;                                   \
+    auto dest = &presentationAttributes.attr_name;                                    \
     if (!dest->isInheritable() || v.isValue()) {                                      \
       /* TODO: If dest is not inheritable, handle v == "inherit" */                   \
       *dest = v;                                                                      \
@@ -107,7 +106,7 @@ enum class SVGTag {
     }                                                                                 \
   }                                                                                   \
   void set##attr_name(SVGProperty<attr_type, attr_inherited>&& v) {                   \
-    auto* dest = &presentationAttributes.attr_name;                                   \
+    auto dest = &presentationAttributes.attr_name;                                    \
     if (!dest->isInheritable() || v.isValue()) {                                      \
       /* TODO: If dest is not inheritable, handle v == "inherit" */                   \
       *dest = std::move(v);                                                           \
@@ -162,6 +161,7 @@ class SVGNode {
   SVG_PRES_ATTR(StopOpacity, SVGNumberType, false)
   SVG_PRES_ATTR(FloodColor, SVGColor, false)
   SVG_PRES_ATTR(FloodOpacity, SVGNumberType, false)
+  SVG_PRES_ATTR(ID, SVGStringType, false)
   SVG_PRES_ATTR(LightingColor, SVGColor, false)
 
   /**
@@ -195,6 +195,15 @@ class SVGNode {
    * Appends a child node to the SVG node.
    */
   virtual void appendChild(std::shared_ptr<SVGNode> node) = 0;
+
+  void addCustomAttribute(const std::string& name, const std::string& value);
+
+  /**
+   * Returns custom attributes.
+   * SVGNode only parses attributes related to presentation rendering; all other attributes are
+   * stored in customAttributes.
+   */
+  const std::vector<DOMAttribute>& getCustomAttributes() const;
 
  protected:
   explicit SVGNode(SVGTag tag);
@@ -233,6 +242,7 @@ class SVGNode {
  private:
   SVGTag _tag;
   SVGPresentationAttributes presentationAttributes;
+  std::vector<DOMAttribute> customAttributes;
 
   friend class SVGNodeConstructor;
   friend class SVGRenderContext;

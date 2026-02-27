@@ -19,7 +19,7 @@
 #include "tgfx/platform/ImageReader.h"
 #include "core/PixelRef.h"
 #include "core/utils/Log.h"
-#include "gpu/TextureView.h"
+#include "gpu/resources/TextureView.h"
 #include "platform/ImageStream.h"
 
 namespace tgfx {
@@ -43,6 +43,10 @@ class ImageReaderBuffer : public ImageBuffer {
 
   bool expired() const override {
     return imageReader->checkExpired(contentVersion);
+  }
+
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return imageReader->colorSpace();
   }
 
  protected:
@@ -74,6 +78,10 @@ int ImageReader::width() const {
 
 int ImageReader::height() const {
   return stream->height();
+}
+
+const std::shared_ptr<ColorSpace>& ImageReader::colorSpace() const {
+  return stream->colorSpace();
 }
 
 std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {

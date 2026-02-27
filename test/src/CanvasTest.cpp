@@ -16,51 +16,47 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/PathRef.h"
-#include "core/Records.h"
-#include "core/images/CodecImage.h"
-#include "core/images/RasterizedImage.h"
-#include "core/images/ScaledImage.h"
+#include "core/MCState.h"
+#include "core/Matrix3DUtils.h"
+#include "core/PictureRecords.h"
 #include "core/images/SubsetImage.h"
-#include "core/images/TransformImage.h"
-#include "core/shapes/AppendShape.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
-#include "gpu/TextureView.h"
-#include "gpu/opengl/GLCaps.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
-#include "tgfx/core/Buffer.h"
+#include "gtest/gtest.h"
+#include "layers/MaskContext.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
-#include "tgfx/core/PathTypes.h"
-#include "tgfx/core/Recorder.h"
+#include "tgfx/core/PictureRecorder.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/core/Shape.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
-#include "tgfx/platform/ImageReader.h"
-#include "tgfx/svg/SVGPathParser.h"
+#include "tgfx/core/TextBlob.h"
 #include "utils/TestUtils.h"
-#include "utils/TextShaper.h"
 #include "utils/common.h"
 
 namespace tgfx {
+
 TGFX_TEST(CanvasTest, clip) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto width = 1080;
   auto height = 1776;
-  GLTextureInfo textureInfo;
-  CreateGLTexture(context, width, height, &textureInfo);
-  auto surface = Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
+  auto texture = context->gpu()->createTexture({width, height, PixelFormat::RGBA_8888});
+  ASSERT_TRUE(texture != nullptr);
+  auto surface = Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->setMatrix(Matrix::MakeScale(3));
@@ -78,8 +74,6 @@ TGFX_TEST(CanvasTest, clip) {
   paint.setStyle(PaintStyle::Fill);
   canvas->drawPath(drawPath, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Clip"));
-  auto gl = GLFunctions::Get(context);
-  gl->deleteTextures(1, &textureInfo.id);
 }
 
 TGFX_TEST(CanvasTest, clipAntiAlias) {
@@ -170,9 +164,9 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
   surface->renderContext->flush();
-  auto* drawingManager = context->drawingManager();
-  ASSERT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   EXPECT_TRUE(task->drawOps.size() == 0);
 
   Paint paint;
@@ -181,8 +175,8 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   paint.setBlendMode(BlendMode::Src);
   canvas->drawRect(Rect::MakeWH(width, height), paint);
   surface->renderContext->flush();
-  ASSERT_TRUE(drawingManager->renderTasks.size() == 2);
-  task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.back().get());
+  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 2);
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   EXPECT_TRUE(task->drawOps.size() == 0);
 
   paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
@@ -193,8 +187,8 @@ TGFX_TEST(CanvasTest, DiscardContent) {
       {Color{0.f, 1.f, 0.f, 1.f}, Color{0.f, 0.f, 0.f, 1.f}}, {}));
   canvas->drawPaint(paint);
   surface->renderContext->flush();
-  ASSERT_TRUE(drawingManager->renderTasks.size() == 3);
-  task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.back().get());
+  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 3);
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   EXPECT_TRUE(task->drawOps.size() == 1);
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DiscardContent"));
@@ -228,9 +222,9 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
     }
   }
   surface->renderContext->flush();
-  auto* drawingManager = context->drawingManager();
-  EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() == 1);
   EXPECT_EQ(static_cast<RectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount);
   context->flushAndSubmit();
@@ -268,113 +262,14 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
     }
   }
   surface->renderContext->flush();
-  auto* drawingManager = context->drawingManager();
-  EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() == 1);
+  // AA RRects use RRectDrawOp (EllipseGeometryProcessor).
   EXPECT_EQ(static_cast<RRectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount);
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
-}
-
-TGFX_TEST(CanvasTest, textShape) {
-  auto serifTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
-  ASSERT_TRUE(serifTypeface != nullptr);
-  std::string text =
-      "ffi fl\n"
-      "x²-y²\n"
-      "🤡👨🏼‍🦱👨‍👨‍👧‍👦\n"
-      "🇨🇳🇫🇮\n"
-      "#️⃣#*️⃣*\n"
-      "1️⃣🔟";
-  auto positionedGlyphs = TextShaper::Shape(text, serifTypeface);
-
-  float fontSize = 25.f;
-  float lineHeight = fontSize * 1.2f;
-  float height = 0;
-  float width = 0;
-  float x;
-  struct TextRun {
-    std::vector<GlyphID> ids;
-    std::vector<Point> positions;
-    Font font;
-  };
-  std::vector<TextRun> textRuns;
-  Path path;
-  TextRun* run = nullptr;
-  auto count = positionedGlyphs.glyphCount();
-  auto newline = [&]() {
-    x = 0;
-    height += lineHeight;
-    path.moveTo({0, height});
-  };
-  newline();
-  for (size_t i = 0; i < count; ++i) {
-    auto typeface = positionedGlyphs.getTypeface(i);
-    if (run == nullptr || run->font.getTypeface() != typeface) {
-      run = &textRuns.emplace_back();
-      run->font = Font(typeface, fontSize);
-    }
-    auto index = positionedGlyphs.getStringIndex(i);
-    auto length = (i + 1 == count ? text.length() : positionedGlyphs.getStringIndex(i + 1)) - index;
-    auto name = text.substr(index, length);
-    if (name == "\n") {
-      newline();
-      continue;
-    }
-    auto glyphID = positionedGlyphs.getGlyphID(i);
-    run->ids.emplace_back(glyphID);
-    run->positions.push_back(Point{x, height});
-    x += run->font.getAdvance(glyphID);
-    path.lineTo({x, height});
-    if (width < x) {
-      width = x;
-    }
-  }
-  height += lineHeight;
-
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface =
-      Surface::Make(context, static_cast<int>(ceil(width)), static_cast<int>(ceil(height)));
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-
-  Paint strokePaint;
-  strokePaint.setColor(Color{1.f, 0.f, 0.f, 1.f});
-  strokePaint.setStrokeWidth(2.f);
-  strokePaint.setStyle(PaintStyle::Stroke);
-  canvas->drawPath(path, strokePaint);
-
-  Paint paint;
-  paint.setColor(Color::Black());
-  for (const auto& textRun : textRuns) {
-    canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                       textRun.font, paint);
-  }
-  context->flushAndSubmit();
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/text_shape"));
-}
-
-TGFX_TEST(CanvasTest, filterMode) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  ASSERT_TRUE(image != nullptr);
-  int width = image->width() * 2;
-  int height = image->height() * 2;
-  auto surface = Surface::Make(context, width, height);
-  auto canvas = surface->getCanvas();
-  canvas->setMatrix(Matrix::MakeScale(2.f));
-  canvas->drawImage(image, SamplingOptions(FilterMode::Nearest));
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/filter_mode_nearest"));
-  canvas->clear();
-  canvas->drawImage(image, SamplingOptions(FilterMode::Linear));
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/filter_mode_linear"));
 }
 
 TGFX_TEST(CanvasTest, drawPaint) {
@@ -389,9 +284,9 @@ TGFX_TEST(CanvasTest, drawPaint) {
   Font font(typeface, 50.f);
   font.setFauxBold(true);
   auto textBlob = TextBlob::MakeFrom("TGFX", font);
-  Path path = {};
-  auto success = textBlob->getPath(&path);
-  EXPECT_TRUE(success);
+  auto textShape = Shape::MakeFrom(textBlob);
+  ASSERT_TRUE(textShape != nullptr);
+  auto path = textShape->getPath();
   path.transform(Matrix::MakeTrans(10, 100));
   canvas->clear(Color::Red());
   canvas->save();
@@ -419,396 +314,6 @@ TGFX_TEST(CanvasTest, drawPaint) {
   paint.setImageFilter(imageFilter);
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawPaint_shadow"));
-}
-
-TGFX_TEST(CanvasTest, rasterizedImage) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto defaultExpirationFrames = context->resourceExpirationFrames();
-  context->setResourceExpirationFrames(1);
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  auto rasterImage = image->makeRasterized();
-  EXPECT_TRUE(rasterImage == image);
-  image = MakeImage("resources/apitest/rotation.jpg");
-  rasterImage = ScaleImage(image, 0.15f)->makeRasterized();
-  EXPECT_FALSE(rasterImage->hasMipmaps());
-  EXPECT_FALSE(rasterImage == image);
-  EXPECT_EQ(rasterImage->width(), 454);
-  EXPECT_EQ(rasterImage->height(), 605);
-  ASSERT_TRUE(image != nullptr);
-  auto surface = Surface::Make(context, 1100, 1400);
-  auto canvas = surface->getCanvas();
-  canvas->drawImage(rasterImage, 100, 100);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized"));
-  auto rasterImageUniqueKey =
-      std::static_pointer_cast<RasterizedImage>(rasterImage)->getTextureKey();
-  auto textureView = Resource::Find<TextureView>(context, rasterImageUniqueKey);
-  ASSERT_TRUE(textureView != nullptr);
-  EXPECT_TRUE(textureView != nullptr);
-  EXPECT_EQ(textureView->width(), 454);
-  EXPECT_EQ(textureView->height(), 605);
-  auto source = std::static_pointer_cast<TransformImage>(image)->source;
-  auto imageUniqueKey = std::static_pointer_cast<RasterizedImage>(source)->getTextureKey();
-  textureView = Resource::Find<TextureView>(context, imageUniqueKey);
-  EXPECT_TRUE(textureView == nullptr);
-  canvas->clear();
-  image = image->makeMipmapped(true);
-  EXPECT_TRUE(image->hasMipmaps());
-  SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
-  auto scaledImage = ScaleImage(image, 0.15f, sampling);
-  rasterImage = scaledImage->makeRasterized();
-  EXPECT_TRUE(rasterImage->hasMipmaps());
-  canvas->drawImage(rasterImage, 100, 100);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
-  textureView = Resource::Find<TextureView>(context, rasterImageUniqueKey);
-  EXPECT_TRUE(textureView == nullptr);
-  rasterImageUniqueKey = std::static_pointer_cast<RasterizedImage>(rasterImage)->getTextureKey();
-  textureView = Resource::Find<TextureView>(context, rasterImageUniqueKey);
-  EXPECT_TRUE(textureView != nullptr);
-  canvas->clear();
-  scaledImage = scaledImage->makeMipmapped(false);
-  EXPECT_FALSE(scaledImage->hasMipmaps());
-  rasterImage = scaledImage->makeScaled(907, 1210, sampling)->makeRasterized();
-  EXPECT_FALSE(rasterImage->hasMipmaps());
-  rasterImage = rasterImage->makeMipmapped(true);
-  EXPECT_TRUE(rasterImage->hasMipmaps());
-  EXPECT_EQ(rasterImage->width(), 907);
-  EXPECT_EQ(rasterImage->height(), 1210);
-  canvas->drawImage(rasterImage, 100, 100);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_scale_up"));
-  context->setResourceExpirationFrames(defaultExpirationFrames);
-}
-
-TGFX_TEST(CanvasTest, mipmap) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
-  ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false, false);
-  ASSERT_FALSE(bitmap.isEmpty());
-  Pixmap pixmap(bitmap);
-  auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
-  pixmap.reset();
-  EXPECT_TRUE(result);
-  auto imageBuffer = bitmap.makeBuffer();
-  auto image = Image::MakeFrom(imageBuffer);
-  ASSERT_TRUE(image != nullptr);
-  auto imageMipmapped = image->makeMipmapped(true);
-  ASSERT_TRUE(imageMipmapped != nullptr);
-  float scale = 0.03f;
-  auto width = codec->width();
-  auto height = codec->height();
-  auto imageWidth = static_cast<float>(width) * scale;
-  auto imageHeight = static_cast<float>(height) * scale;
-  auto imageMatrix = Matrix::MakeScale(scale);
-  auto surface =
-      Surface::Make(context, static_cast<int>(imageWidth), static_cast<int>(imageHeight));
-  auto canvas = surface->getCanvas();
-  canvas->setMatrix(imageMatrix);
-  // 绘制没有 mipmap 的 texture 时，使用 MipmapMode::Linear 会回退到 MipmapMode::None。
-  canvas->drawImage(image, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_none"));
-  canvas->clear();
-  canvas->drawImage(imageMipmapped, SamplingOptions(FilterMode::Linear, MipmapMode::Nearest));
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_nearest"));
-  canvas->clear();
-  canvas->drawImage(imageMipmapped, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_linear"));
-  surface = Surface::Make(context, static_cast<int>(imageWidth * 4.f),
-                          static_cast<int>(imageHeight * 4.f));
-  canvas = surface->getCanvas();
-  Paint paint;
-  paint.setShader(Shader::MakeImageShader(imageMipmapped, TileMode::Mirror, TileMode::Repeat,
-                                          SamplingOptions(FilterMode::Linear, MipmapMode::Linear))
-                      ->makeWithMatrix(imageMatrix));
-  canvas->drawRect(Rect::MakeWH(surface->width(), surface->height()), paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_linear_texture_effect"));
-}
-
-TGFX_TEST(CanvasTest, TileModeFallback) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto caps = (Caps*)context->caps();
-  caps->npotTextureTileSupport = false;
-  auto image = MakeImage("resources/apitest/rotation.jpg");
-  ASSERT_TRUE(image != nullptr);
-  image = image->makeMipmapped(true);
-  ASSERT_TRUE(image != nullptr);
-  auto surface = Surface::Make(context, image->width() / 2, image->height() / 2);
-  auto canvas = surface->getCanvas();
-  Paint paint;
-  SamplingOptions sampling(FilterMode::Linear, MipmapMode::Nearest);
-  auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Mirror, sampling)
-                    ->makeWithMatrix(Matrix::MakeScale(0.125f));
-  paint.setShader(shader);
-  canvas->translate(100, 100);
-  auto drawRect = Rect::MakeXYWH(0, 0, surface->width() - 200, surface->height() - 200);
-  canvas->drawRect(drawRect, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/TileModeFallback"));
-  caps->npotTextureTileSupport = true;
-}
-
-TGFX_TEST(CanvasTest, hardwareMipmap) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
-  ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false);
-  ASSERT_FALSE(bitmap.isEmpty());
-  Pixmap pixmap(bitmap);
-  auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
-  pixmap.reset();
-  EXPECT_TRUE(result);
-  auto image = Image::MakeFrom(bitmap);
-  auto imageMipmapped = image->makeMipmapped(true);
-  ASSERT_TRUE(imageMipmapped != nullptr);
-  float scale = 0.03f;
-  auto width = codec->width();
-  auto height = codec->height();
-  auto imageWidth = static_cast<float>(width) * scale;
-  auto imageHeight = static_cast<float>(height) * scale;
-  auto imageMatrix = Matrix::MakeScale(scale);
-  auto surface =
-      Surface::Make(context, static_cast<int>(imageWidth), static_cast<int>(imageHeight));
-  auto canvas = surface->getCanvas();
-  canvas->setMatrix(imageMatrix);
-  canvas->drawImage(imageMipmapped, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_linear_hardware"));
-}
-
-TGFX_TEST(CanvasTest, path) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 600, 500);
-  auto canvas = surface->getCanvas();
-  Path path;
-  path.addRect(Rect::MakeXYWH(10, 10, 100, 100));
-  Paint paint;
-  paint.setColor(Color::White());
-  canvas->drawPath(path, paint);
-  path.reset();
-  path.addRoundRect(Rect::MakeXYWH(10, 120, 100, 100), 10, 10);
-  canvas->drawPath(path, paint);
-  path.reset();
-  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
-  auto matrix = Matrix::I();
-  matrix.postRotate(30, 50, 50);
-  path.transform(matrix);
-  matrix.reset();
-  matrix.postTranslate(20, 250);
-  canvas->setMatrix(matrix);
-  canvas->drawPath(path, paint);
-  paint.setColor(Color::Black());
-  paint.setAlpha(0.7f);
-  matrix.reset();
-  matrix.postScale(0.5, 0.5, 50, 50);
-  matrix.postTranslate(20, 250);
-  canvas->setMatrix(matrix);
-  canvas->drawPath(path, paint);
-  Path roundPath = {};
-  roundPath.addRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 20, 20);
-  matrix.reset();
-  matrix.postRotate(30, 50, 50);
-  roundPath.transform(matrix);
-  matrix.reset();
-  matrix.postRotate(15, 50, 50);
-  matrix.postScale(2, 2, 50, 50);
-  matrix.postTranslate(250, 150);
-  paint.setShader(Shader::MakeLinearGradient(Point{0.f, 0.f}, Point{25.f, 100.f},
-                                             {Color{0.f, 1.f, 0.f, 1.f}, Color{1.f, 0.f, 0.f, 0.f}},
-                                             {}));
-  canvas->setMatrix(matrix);
-  canvas->drawPath(roundPath, paint);
-  matrix.reset();
-  matrix.postRotate(15, 50, 50);
-  matrix.postScale(1.5f, 0.3f, 50, 50);
-  matrix.postTranslate(250, 150);
-  paint.setShader(nullptr);
-  paint.setColor(Color::Black());
-  paint.setAlpha(0.7f);
-  canvas->setMatrix(matrix);
-  canvas->drawPath(path, paint);
-  canvas->resetMatrix();
-  paint.setStrokeWidth(20);
-  canvas->drawLine(200, 50, 400, 50, paint);
-  paint.setLineCap(LineCap::Round);
-  canvas->drawLine(200, 320, 400, 320, paint);
-  path.reset();
-  path.quadTo(Point{100, 150}, Point{150, 150});
-  paint.setColor(Color::White());
-  matrix.reset();
-  matrix.postTranslate(450, 10);
-  canvas->setMatrix(matrix);
-  canvas->drawPath(path, paint);
-  path.reset();
-  canvas->drawPath(path, paint);
-
-  path.addRect({0, 0, 150, 150});
-  paint.setColor(Color::Red());
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setStrokeWidth(1);
-  matrix.reset();
-  matrix.postTranslate(450, 200);
-  canvas->setMatrix(matrix);
-  canvas->drawPath(path, paint);
-
-  path.reset();
-  path.addArc({0, 0, 150, 150}, -90.f, 235.f);
-  Color red = {1.f, 0.f, 0.f, 1.f};
-  Color green = {0.f, 1.f, 0.f, 1.f};
-  Color blue = {0.f, 0.f, 1.f, 1.f};
-  paint.setStyle(PaintStyle::Fill);
-  paint.setShader(Shader::MakeLinearGradient(Point{0.f, 0.f}, Point{25.f, 150.f},
-                                             {red, green, blue, green, red, blue, red, green, red,
-                                              green, blue, green, red, blue, red, green, blue},
-                                             {}));
-  matrix.reset();
-  matrix.postTranslate(450, 200);
-  canvas->setMatrix(matrix);
-  canvas->drawPath(path, paint);
-
-  paint.reset();
-  auto arcStart = Point::Make(0, 0);
-  auto arcEnd = Point::Make(45, 45);
-  auto pathEnd = Point::Make(45, 0);
-  std::vector<Point> transforms = {{0, 0}, {50, 0}, {100, -50}, {100, 0}};
-  std::vector<std::pair<PathArcSize, bool>> arcType = {{PathArcSize::Small, false},
-                                                       {PathArcSize::Large, false},
-                                                       {PathArcSize::Small, true},
-                                                       {PathArcSize::Large, true}};
-  matrix.reset();
-  matrix.setTranslate(10, 450);
-  canvas->setMatrix(matrix);
-  for (uint32_t i = 0; i < 4; i++) {
-    path.reset();
-    path.moveTo(arcStart);
-    path.arcTo(45, 45, 0, arcType[i].first, arcType[i].second, arcEnd);
-    path.lineTo(pathEnd);
-    canvas->translate(transforms[i].x, transforms[i].y);
-    canvas->drawPath(path, paint);
-  }
-
-  Point latestPoint = {};
-  path.getLastPoint(&latestPoint);
-  EXPECT_EQ(latestPoint, Point::Make(45, 0));
-
-  paint.setColor(Color::Red());
-  path.reset();
-  path.arcTo({50, 0}, {50, 50}, 50);
-  path.arcTo({50, 100}, {0, 100}, 50);
-  matrix.reset();
-  matrix.postTranslate(450, 390);
-  canvas->setMatrix(matrix);
-  canvas->drawPath(path, paint);
-
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/path"));
-}
-
-TGFX_TEST(CanvasTest, simpleShape) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto width = 400;
-  auto height = 500;
-  auto surface = Surface::Make(context, width, height);
-  auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-  auto image = MakeImage("resources/apitest/imageReplacement_VP8L.webp");
-  ASSERT_TRUE(image != nullptr);
-  Paint paint;
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setStrokeWidth(2);
-  paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
-  auto point = Point::Make(width / 2, height / 2);
-  auto radius = image->width() / 2;
-  auto rect = Rect::MakeWH(radius * 2, radius * 2);
-  canvas->drawCircle(point, static_cast<float>(radius) + 30.0f, paint);
-  canvas->setMatrix(Matrix::MakeTrans(point.x - static_cast<float>(radius),
-                                      point.y - static_cast<float>(radius)));
-  canvas->drawRoundRect(rect, 10, 10, paint);
-
-  canvas->setMatrix(Matrix::MakeTrans(point.x - static_cast<float>(radius),
-                                      point.y - static_cast<float>(radius)));
-  canvas->rotate(45.0f, static_cast<float>(radius), static_cast<float>(radius));
-  canvas->drawImage(image, SamplingOptions(FilterMode::Linear));
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/shape"));
-}
-
-static std::vector<Resource*> FindResourceByDomainID(Context* context, uint32_t domainID) {
-  std::vector<Resource*> resources = {};
-  auto resourceCache = context->resourceCache();
-  for (auto& item : resourceCache->uniqueKeyMap) {
-    auto resource = item.second;
-    if (resource->uniqueKey.domainID() == domainID) {
-      resources.push_back(resource);
-    }
-  }
-  return resources;
-}
-
-TGFX_TEST(CanvasTest, inversePath) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 420, 100);
-  auto canvas = surface->getCanvas();
-  Paint paint;
-  paint.setColor(Color::Red());
-  auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
-  ASSERT_TRUE(typeface != nullptr);
-  Font font(typeface, 70.f);
-  font.setFauxBold(true);
-  auto textBlob = TextBlob::MakeFrom("Hello TGFX", font);
-  Path textPath = {};
-  auto success = textBlob->getPath(&textPath);
-  EXPECT_TRUE(success);
-  EXPECT_TRUE(!textPath.isEmpty());
-  textPath.toggleInverseFillType();
-  EXPECT_TRUE(textPath.isInverseFillType());
-  textPath.transform(Matrix::MakeTrans(10, 75));
-  canvas->clipPath(textPath);
-  Path emptyPath = {};
-  emptyPath.toggleInverseFillType();
-  auto dropShadowFilter = ImageFilter::DropShadow(2, 2, 2, 2, Color::Black());
-  paint.setImageFilter(dropShadowFilter);
-  canvas->drawPath(emptyPath, paint);
-  paint.setImageFilter(nullptr);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/inversePath_text"));
-
-  surface = Surface::Make(context, 400, 400);
-  canvas = surface->getCanvas();
-  Path clipPath = {};
-  clipPath.addRect(Rect::MakeXYWH(50, 200, 300, 150));
-  clipPath.toggleInverseFillType();
-  canvas->save();
-  canvas->clipPath(clipPath);
-  Path path = {};
-  path.addRect(Rect::MakeXYWH(50, 50, 170, 100));
-  path.addOval(Rect::MakeXYWH(180, 50, 170, 100));
-  path.setFillType(PathFillType::InverseEvenOdd);
-  paint.setColor(Color::Red());
-  canvas->drawPath(path, paint);
-  canvas->restore();
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/inversePath_rect"));
-  auto uniqueKey = PathRef::GetUniqueKey(path);
-  auto cachesBefore = FindResourceByDomainID(context, uniqueKey.domainID());
-  EXPECT_EQ(cachesBefore.size(), 1u);
-  canvas->clear();
-  canvas->clipPath(clipPath);
-  auto shape = Shape::MakeFrom(path);
-  shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(50, 50));
-  canvas->translate(-50, -50);
-  canvas->drawShape(shape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/inversePath_rect"));
-  auto cachesAfter = FindResourceByDomainID(context, uniqueKey.domainID());
-  EXPECT_EQ(cachesAfter.size(), 1u);
-  EXPECT_TRUE(cachesBefore.front() == cachesAfter.front());
 }
 
 TGFX_TEST(CanvasTest, saveLayer) {
@@ -860,380 +365,6 @@ TGFX_TEST(CanvasTest, saveLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/saveLayer"));
 }
 
-TGFX_TEST(CanvasTest, drawShape) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto width = 300;
-  auto height = 200;
-  auto surface = Surface::Make(context, width, height);
-  auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-
-  Path path = {};
-  auto rect = Rect::MakeWH(50, 50);
-  path.addRect(rect);
-  auto shape = Shape::MakeFrom(path);
-  path.reset();
-  path.addOval(Rect::MakeWH(100, 100));
-  auto shape2 = Shape::MakeFrom(path);
-  auto mergedShape = Shape::Merge(shape, shape2, PathOp::Append);
-  EXPECT_FALSE(mergedShape->isSimplePath());
-  auto transShape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(10, 10));
-  mergedShape = Shape::Merge({transShape, shape, shape2});
-  EXPECT_EQ(mergedShape->type(), Shape::Type::Append);
-  auto appendShape = std::static_pointer_cast<AppendShape>(mergedShape);
-  EXPECT_EQ(appendShape->shapes.size(), 3u);
-
-  Paint paint;
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setColor(Color::Red());
-  canvas->drawShape(transShape, paint);
-  auto sacaleShape = Shape::ApplyMatrix(shape, Matrix::MakeScale(1.5, 0.5));
-  sacaleShape = Shape::ApplyMatrix(sacaleShape, Matrix::MakeTrans(10, 70));
-  canvas->setMatrix(Matrix::MakeScale(1.5, 1.5));
-  canvas->drawShape(sacaleShape, paint);
-
-  paint.setStyle(PaintStyle::Fill);
-  paint.setColor(Color::Blue());
-  auto mergeShape1 = Shape::ApplyMatrix(shape, Matrix::MakeTrans(0, 60));
-  mergeShape1 = Shape::Merge(mergeShape1, shape);
-  mergeShape1 = Shape::ApplyMatrix(mergeShape1, Matrix::MakeTrans(100, 10));
-  canvas->setMatrix(Matrix::MakeScale(1, 1));
-  canvas->drawShape(mergeShape1, paint);
-  paint.setColor(Color::Green());
-  auto mergeShape2 = Shape::ApplyMatrix(shape, Matrix::MakeTrans(0, 30));
-  mergeShape2 = Shape::Merge(mergeShape2, shape, PathOp::Intersect);
-  mergeShape2 = Shape::ApplyMatrix(mergeShape2, Matrix::MakeTrans(170, 10));
-  canvas->drawShape(mergeShape2, paint);
-
-  transShape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(200, 90));
-  paint.setShader(Shader::MakeLinearGradient(Point{200.f, 90.f}, Point{250, 140},
-                                             {Color{1.f, 0.f, 0.f, 1.f}, Color{0.f, 1.f, 0.f, 1.f}},
-                                             {}));
-  canvas->drawShape(transShape, paint);
-  paint.setShader(nullptr);
-
-  paint.setStyle(PaintStyle::Stroke);
-  auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
-  Font font(typeface, 30.f);
-  font.setFauxBold(true);
-  auto textBlob = TextBlob::MakeFrom("Hello TGFX", font);
-  auto textShape = Shape::MakeFrom(textBlob);
-  textShape = Shape::ApplyMatrix(textShape, Matrix::MakeTrans(10, 70));
-  auto matrix = Matrix::MakeRotate(10);
-  matrix.preConcat(Matrix::MakeScale(2, 1));
-  matrix.preConcat(Matrix::MakeTrans(0, 70));
-  canvas->setMatrix(matrix);
-  canvas->drawShape(textShape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawShape"));
-}
-
-TGFX_TEST(CanvasTest, inverseFillType) {
-  Path firstPath = {};
-  firstPath.addRect(Rect::MakeXYWH(50, 50, 170, 100));
-  auto firstShape = Shape::MakeFrom(firstPath);
-  EXPECT_FALSE(firstShape->isInverseFillType());
-  Path secondPath = {};
-  secondPath.addOval(Rect::MakeXYWH(180, 50, 170, 100));
-  secondPath.toggleInverseFillType();
-  auto secondShape = Shape::MakeFrom(secondPath);
-  EXPECT_TRUE(secondShape->isInverseFillType());
-  auto shape = Shape::Merge(firstShape, secondShape, PathOp::Append);
-  EXPECT_FALSE(shape->isInverseFillType());
-  shape = Shape::Merge(firstShape, secondShape, PathOp::Difference);
-  EXPECT_FALSE(shape->isInverseFillType());
-  shape = Shape::Merge(secondShape, firstShape, PathOp::Difference);
-  EXPECT_TRUE(shape->isInverseFillType());
-  shape = Shape::Merge(firstShape, secondShape, PathOp::Intersect);
-  EXPECT_FALSE(shape->isInverseFillType());
-  shape = Shape::Merge(firstShape, secondShape, PathOp::Union);
-  EXPECT_TRUE(shape->isInverseFillType());
-  shape = Shape::Merge(firstShape, secondShape, PathOp::XOR);
-  EXPECT_TRUE(shape->isInverseFillType());
-
-  auto pathEffect = PathEffect::MakeCorner(10);
-  shape = Shape::ApplyEffect(firstShape, pathEffect);
-  EXPECT_FALSE(shape->isInverseFillType());
-  shape = Shape::ApplyMatrix(firstShape, Matrix::MakeScale(2.0f));
-  EXPECT_FALSE(shape->isInverseFillType());
-  Stroke stroke(10);
-  shape = Shape::ApplyStroke(firstShape, &stroke);
-  EXPECT_FALSE(shape->isInverseFillType());
-
-  firstShape = Shape::ApplyInverse(firstShape);
-  EXPECT_TRUE(firstShape->isInverseFillType());
-  shape = Shape::Merge(firstShape, secondShape, PathOp::Append);
-  EXPECT_TRUE(shape->isInverseFillType());
-  shape = Shape::Merge(firstShape, secondShape, PathOp::Difference);
-  EXPECT_FALSE(shape->isInverseFillType());
-  shape = Shape::Merge(firstShape, secondShape, PathOp::Intersect);
-  EXPECT_TRUE(shape->isInverseFillType());
-  shape = Shape::Merge(firstShape, secondShape, PathOp::Union);
-  EXPECT_TRUE(shape->isInverseFillType());
-  shape = Shape::Merge(firstShape, secondShape, PathOp::XOR);
-  EXPECT_FALSE(shape->isInverseFillType());
-
-  shape = Shape::ApplyEffect(firstShape, pathEffect);
-  EXPECT_FALSE(shape->isInverseFillType());
-  shape = Shape::ApplyMatrix(firstShape, Matrix::MakeScale(2.0f));
-  EXPECT_TRUE(shape->isInverseFillType());
-  shape = Shape::ApplyStroke(firstShape, &stroke);
-  EXPECT_TRUE(shape->isInverseFillType());
-}
-
-TGFX_TEST(CanvasTest, image) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 500, false, 1, false, RenderFlags::DisableCache);
-  auto canvas = surface->getCanvas();
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  ASSERT_TRUE(image != nullptr);
-  EXPECT_FALSE(image->isFullyDecoded());
-  EXPECT_FALSE(image->isTextureBacked());
-  EXPECT_FALSE(image->hasMipmaps());
-  auto rotatedImage = image->makeOriented(Orientation::RightTop);
-  EXPECT_NE(rotatedImage, image);
-  rotatedImage = rotatedImage->makeOriented(Orientation::LeftBottom);
-  EXPECT_EQ(rotatedImage, image);
-  canvas->drawImage(image);
-  auto decodedImage = image->makeDecoded(context);
-  EXPECT_FALSE(decodedImage == image);
-  context->flushAndSubmit();
-  decodedImage = image->makeDecoded(context);
-  EXPECT_FALSE(decodedImage == image);
-  auto textureImage = image->makeTextureImage(context);
-  ASSERT_TRUE(textureImage != nullptr);
-  EXPECT_TRUE(textureImage->isTextureBacked());
-  EXPECT_TRUE(textureImage->isFullyDecoded());
-  decodedImage = image->makeDecoded(context);
-  EXPECT_TRUE(decodedImage == image);
-  textureImage = nullptr;
-  decodedImage = image->makeDecoded(context);
-  EXPECT_TRUE(decodedImage == image);
-  context->flushAndSubmit();
-  decodedImage = image->makeDecoded(context);
-  EXPECT_FALSE(decodedImage == image);
-
-  surface = Surface::Make(context, 400, 500);
-  canvas = surface->getCanvas();
-  canvas->drawImage(image);
-  textureImage = image->makeTextureImage(context);
-  canvas->drawImage(textureImage, 200, 0);
-  auto subset = image->makeSubset(Rect::MakeWH(120, 120));
-  EXPECT_TRUE(subset == nullptr);
-  subset = image->makeSubset(Rect::MakeXYWH(-10, -10, 50, 50));
-  EXPECT_TRUE(subset == nullptr);
-  subset = image->makeSubset(Rect::MakeXYWH(15, 15, 80, 90));
-  ASSERT_TRUE(subset != nullptr);
-  EXPECT_EQ(subset->width(), 80);
-  EXPECT_EQ(subset->height(), 90);
-  canvas->drawImage(subset, 115, 15);
-  decodedImage = image->makeDecoded(context);
-  EXPECT_TRUE(decodedImage == image);
-  decodedImage = image->makeDecoded();
-  EXPECT_FALSE(decodedImage == image);
-  ASSERT_TRUE(decodedImage != nullptr);
-  EXPECT_TRUE(decodedImage->isFullyDecoded());
-  EXPECT_FALSE(decodedImage->isTextureBacked());
-  canvas->drawImage(decodedImage, 315, 0);
-  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/rotation.jpg"));
-  auto rotationImage = Image::MakeFromEncoded(std::move(data));
-  EXPECT_EQ(rotationImage->width(), 3024);
-  EXPECT_EQ(rotationImage->height(), 4032);
-  EXPECT_FALSE(rotationImage->hasMipmaps());
-  rotationImage = rotationImage->makeMipmapped(true);
-  EXPECT_TRUE(rotationImage->hasMipmaps());
-  auto matrix = Matrix::MakeScale(0.05f);
-  matrix.postTranslate(0, 120);
-  rotationImage = rotationImage->makeOriented(Orientation::BottomRight);
-  rotationImage = rotationImage->makeOriented(Orientation::BottomRight);
-  canvas->setMatrix(matrix);
-  canvas->drawImage(rotationImage);
-  subset = rotationImage->makeSubset(Rect::MakeXYWH(500, 800, 2000, 2400));
-  ASSERT_TRUE(subset != nullptr);
-  matrix.postTranslate(160, 30);
-  canvas->setMatrix(matrix);
-  canvas->drawImage(subset);
-  subset = subset->makeSubset(Rect::MakeXYWH(400, 500, 1600, 1900));
-  ASSERT_TRUE(subset != nullptr);
-  matrix.postTranslate(110, -30);
-  canvas->setMatrix(matrix);
-  canvas->drawImage(subset);
-  subset = subset->makeOriented(Orientation::RightTop);
-  textureImage = subset->makeTextureImage(context);
-  ASSERT_TRUE(textureImage != nullptr);
-  matrix.postTranslate(0, 110);
-  SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
-  canvas->setMatrix(matrix);
-  canvas->drawImage(textureImage, sampling);
-  auto rgbAAA = subset->makeRGBAAA(500, 500, 500, 0);
-  EXPECT_TRUE(rgbAAA != nullptr);
-  image = MakeImage("resources/apitest/rgbaaa.png");
-  EXPECT_EQ(image->width(), 1024);
-  EXPECT_EQ(image->height(), 512);
-  image = image->makeMipmapped(true);
-  rgbAAA = image->makeRGBAAA(512, 512, 512, 0);
-  EXPECT_EQ(rgbAAA->width(), 512);
-  EXPECT_EQ(rgbAAA->height(), 512);
-  matrix = Matrix::MakeScale(0.25);
-  matrix.postTranslate(0, 330);
-  canvas->setMatrix(matrix);
-  canvas->drawImage(rgbAAA);
-  subset = rgbAAA->makeSubset(Rect::MakeXYWH(100, 100, 300, 200));
-  matrix.postTranslate(140, 5);
-  canvas->setMatrix(matrix);
-  canvas->drawImage(subset);
-  auto originImage = subset->makeOriented(Orientation::BottomLeft);
-  EXPECT_TRUE(originImage != nullptr);
-  matrix.postTranslate(0, 70);
-  canvas->setMatrix(matrix);
-  canvas->drawImage(originImage);
-  rgbAAA = image->makeRGBAAA(512, 512, 0, 0);
-  EXPECT_EQ(rgbAAA->width(), 512);
-  EXPECT_EQ(rgbAAA->height(), 512);
-  matrix.postTranslate(110, -75);
-  canvas->setMatrix(matrix);
-  canvas->drawImage(rgbAAA);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawImage"));
-}
-
-TGFX_TEST(CanvasTest, drawImageRect) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  ASSERT_TRUE(image != nullptr);
-
-  int width = 400;
-  int height = 400;
-  auto surface = Surface::Make(context, width, height);
-  auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-
-  Rect srcRect = Rect::MakeWH(image->width(), image->height());
-  Rect dstRect = Rect::MakeXYWH(0, 0, width / 2, height / 2);
-  canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Linear));
-
-  srcRect = Rect::MakeXYWH(20, 20, 60, 60);
-  dstRect = Rect::MakeXYWH(width / 2, 0, width / 2, height / 2);
-  canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Nearest));
-
-  srcRect = Rect::MakeXYWH(40, 40, 40, 40);
-  dstRect = Rect::MakeXYWH(0, height / 2, width, height / 2);
-  canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Linear));
-
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawImageRect"));
-}
-
-TGFX_TEST(CanvasTest, atlas) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 1300, 740, false, 1, false, RenderFlags::DisableCache);
-  auto canvas = surface->getCanvas();
-  auto imageCodec = MakeImageCodec("resources/apitest/test_timestretch.png");
-  ASSERT_TRUE(imageCodec != nullptr);
-  EXPECT_EQ(imageCodec->width(), 1280);
-  EXPECT_EQ(imageCodec->height(), 720);
-  EXPECT_EQ(imageCodec->orientation(), Orientation::TopLeft);
-  auto rowBytes = static_cast<size_t>(imageCodec->width()) * 4;
-  Buffer buffer(rowBytes * static_cast<size_t>(imageCodec->height()));
-  auto pixels = buffer.data();
-  ASSERT_TRUE(pixels != nullptr);
-  auto RGBAInfo = ImageInfo::Make(imageCodec->width(), imageCodec->height(), ColorType::RGBA_8888,
-                                  AlphaType::Premultiplied);
-  EXPECT_TRUE(imageCodec->readPixels(RGBAInfo, pixels));
-  auto pixelsData = Data::MakeWithCopy(buffer.data(), buffer.size());
-  ASSERT_TRUE(pixelsData != nullptr);
-  auto image = Image::MakeFrom(RGBAInfo, std::move(pixelsData));
-  ASSERT_TRUE(image != nullptr);
-  Matrix matrix[4] = {Matrix::I(), Matrix::MakeTrans(660, 0), Matrix::MakeTrans(0, 380),
-                      Matrix::MakeTrans(660, 380)};
-  Rect rect[4] = {Rect::MakeXYWH(0, 0, 640, 360), Rect::MakeXYWH(640, 0, 640, 360),
-                  Rect::MakeXYWH(0, 360, 640, 360), Rect::MakeXYWH(640, 360, 640, 360)};
-  canvas->drawAtlas(std::move(image), matrix, rect, nullptr, 4);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/altas"));
-}
-
-static GLTextureInfo CreateRectangleTexture(Context* context, int width, int heigh) {
-  auto gl = GLFunctions::Get(context);
-  GLTextureInfo glInfo = {};
-  gl->genTextures(1, &(glInfo.id));
-  if (glInfo.id == 0) {
-    return {};
-  }
-  glInfo.target = GL_TEXTURE_RECTANGLE;
-  gl->bindTexture(glInfo.target, glInfo.id);
-  gl->texParameteri(glInfo.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(glInfo.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(glInfo.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  gl->texParameteri(glInfo.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  const auto& textureFormat = GLCaps::Get(context)->getTextureFormat(PixelFormat::RGBA_8888);
-  gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
-                 heigh, 0, textureFormat.externalFormat, GL_UNSIGNED_BYTE, nullptr);
-  return glInfo;
-}
-
-TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto glInfo = CreateRectangleTexture(context, 110, 110);
-  ASSERT_TRUE(glInfo.id > 0);
-  auto backendTexture = BackendTexture(glInfo, 110, 110);
-  auto surface = Surface::MakeFrom(context, backendTexture, ImageOrigin::TopLeft, 4);
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  ASSERT_TRUE(image != nullptr);
-  canvas->drawImage(image);
-  image = MakeImage("resources/apitest/image_as_mask.png");
-  ASSERT_TRUE(image != nullptr);
-  Paint paint = {};
-  paint.setBlendMode(BlendMode::Multiply);
-  canvas->drawImage(image, &paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/hardware_render_target_blend"));
-  GLFunctions::Get(context)->deleteTextures(1, &(glInfo.id));
-}
-
-TGFX_TEST(CanvasTest, YUVImage) {
-  int width = 1440;
-  size_t height = 1280;
-  size_t lineSize = 1440;
-  size_t yDataSize = lineSize * height;
-  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/yuv_data/data.yuv"));
-  ASSERT_TRUE(data != nullptr);
-  EXPECT_TRUE(data->size() == yDataSize * 2);
-  const uint8_t* dataAddress[3];
-  dataAddress[0] = data->bytes();
-  dataAddress[1] = data->bytes() + yDataSize;
-  dataAddress[2] = data->bytes() + yDataSize + yDataSize / 2;
-  const size_t lineSizes[3] = {lineSize, lineSize / 2, lineSize / 2};
-  auto yuvData = YUVData::MakeFrom(width, static_cast<int>(height), (const void**)dataAddress,
-                                   lineSizes, YUVData::I420_PLANE_COUNT);
-  ASSERT_TRUE(yuvData != nullptr);
-  auto image = Image::MakeI420(std::move(yuvData));
-  ASSERT_TRUE(image != nullptr);
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, image->width(), image->height());
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
-  canvas->drawImage(image);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/YUVImage"));
-  canvas->clear();
-  auto rgbaa = image->makeRGBAAA(width / 2, static_cast<int>(height), width / 2, 0);
-  ASSERT_TRUE(rgbaa != nullptr);
-  canvas->setMatrix(Matrix::MakeTrans(static_cast<float>(width / 4), 0.f));
-  canvas->drawImage(rgbaa);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/YUVImage_RGBAA"));
-}
-
 TGFX_TEST(CanvasTest, NothingToDraw) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -1254,7 +385,7 @@ TGFX_TEST(CanvasTest, Picture) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  Recorder recorder = {};
+  PictureRecorder recorder = {};
   auto canvas = recorder.beginRecording();
   EXPECT_TRUE(recorder.getRecordingCanvas() != nullptr);
   Path path = {};
@@ -1311,16 +442,16 @@ TGFX_TEST(CanvasTest, Picture) {
   auto picture = recorder.finishRecordingAsPicture();
   ASSERT_TRUE(picture != nullptr);
 
-  auto bounds = picture->getTightBounds();
-  auto surface = Surface::Make(context, static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height() + 20));
+  int width = 550;
+  int height = 352;
+  auto surface = Surface::Make(context, width, height + 20);
   canvas = surface->getCanvas();
   path.reset();
-  path.addOval(Rect::MakeWH(bounds.width(), bounds.height() + 100));
+  path.addOval(Rect::MakeWH(width, height + 100));
   canvas->clipPath(path);
   canvas->translate(0, 10);
   canvas->drawPicture(picture);
-  canvas->translate(0, bounds.height() + 10);
+  canvas->translate(0, static_cast<float>(height + 10));
   paint.setBlendMode(BlendMode::Screen);
   paint.setAlpha(0.8f);
   matrix = Matrix::MakeTrans(0, -180);
@@ -1350,7 +481,7 @@ TGFX_TEST(CanvasTest, Picture) {
   auto imagePicture = recorder.finishRecordingAsPicture();
   ASSERT_TRUE(imagePicture != nullptr);
   ASSERT_TRUE(imagePicture->drawCount == 1);
-  EXPECT_EQ(imagePicture->getFirstDrawRecord()->type(), RecordType::DrawImage);
+  EXPECT_EQ(imagePicture->getFirstDrawRecord()->type(), PictureRecordType::DrawImage);
 
   surface = Surface::Make(context, image->width() - 200, image->height() - 200);
   canvas = surface->getCanvas();
@@ -1385,13 +516,13 @@ TGFX_TEST(CanvasTest, Picture) {
 
   canvas = recorder.beginRecording();
   paint.reset();
-  canvas->drawSimpleText("Hello TGFX~", 0, 0, font, paint);
+  auto textBlob = TextBlob::MakeFrom("Hello TGFX~", font);
+  canvas->drawTextBlob(textBlob, 0, 0, paint);
   auto textRecord = recorder.finishRecordingAsPicture();
-  bounds = textRecord->getTightBounds();
+  auto bounds = textBlob->getTightBounds();
   matrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
-  auto width = static_cast<int>(bounds.width());
-  auto height = static_cast<int>(bounds.height());
-  auto textImage = Image::MakeFrom(textRecord, width, height, &matrix);
+  auto textImage = Image::MakeFrom(textRecord, static_cast<int>(bounds.width()),
+                                   static_cast<int>(bounds.height()), &matrix);
   EXPECT_EQ(textRecord.use_count(), 2);
   ASSERT_TRUE(textImage != nullptr);
 
@@ -1422,44 +553,78 @@ TGFX_TEST(CanvasTest, Picture) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage_Path"));
 }
 
-class ColorModifier : public FillModifier {
- public:
-  explicit ColorModifier(Color color) : color(color) {
-  }
-
-  Fill transform(const Fill& fill) const override {
-    auto newFill = fill;
-    newFill.color = color;
-    newFill.color.alpha *= fill.color.alpha;
-    return newFill;
-  }
-
- private:
-  Color color = {};
-};
-
-TGFX_TEST(CanvasTest, FillModifier) {
+TGFX_TEST(CanvasTest, PictureImageShaderOptimization) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  // Record a rectangle with default fill
-  Recorder recorder = {};
+  auto image = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image != nullptr);
+
+  // Test 1: Rect filled with ImageShader (should be optimized to asImage)
+  PictureRecorder recorder;
   auto canvas = recorder.beginRecording();
+  auto shader = Shader::MakeImageShader(image);
   Paint paint;
-  paint.setColor(Color::Red());
-  paint.setAlpha(0.5f);
-  canvas->drawRect(Rect::MakeXYWH(10, 10, 100, 100), paint);
-  auto picture = recorder.finishRecordingAsPicture();
-  ASSERT_TRUE(picture != nullptr);
-  auto surface = Surface::Make(context, 120, 120);
-  canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-  canvas->scale(0.8f, 0.8f);
-  canvas->translate(15, 15);
-  ColorModifier colorModifier(Color::Green());
-  picture->playback(canvas, &colorModifier);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/FillModifier"));
+  paint.setShader(shader);
+  auto rect = Rect::MakeWH(image->width(), image->height());
+  canvas->drawRect(rect, paint);
+  auto shaderPicture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(shaderPicture != nullptr);
+  EXPECT_EQ(shaderPicture->drawCount, 1u);
+
+  // Should be optimized to return the original image
+  Point offset = {};
+  auto extractedImage = shaderPicture->asImage(&offset);
+  ASSERT_TRUE(extractedImage != nullptr);
+  EXPECT_TRUE(extractedImage == image);
+  EXPECT_EQ(offset.x, 0.0f);
+  EXPECT_EQ(offset.y, 0.0f);
+
+  // Test 2: Rect with ImageShader but different size (should fail optimization)
+  canvas = recorder.beginRecording();
+  paint.setShader(shader);
+  rect = Rect::MakeWH(image->width() / 2, image->height() / 2);
+  canvas->drawRect(rect, paint);
+  shaderPicture = recorder.finishRecordingAsPicture();
+  extractedImage = shaderPicture->asImage(&offset);
+  EXPECT_TRUE(extractedImage == nullptr);
+
+  // Test 3: Rect with ImageShader but non-zero origin (should fail optimization)
+  canvas = recorder.beginRecording();
+  paint.setShader(shader);
+  rect = Rect::MakeXYWH(10, 10, image->width(), image->height());
+  canvas->drawRect(rect, paint);
+  shaderPicture = recorder.finishRecordingAsPicture();
+  extractedImage = shaderPicture->asImage(&offset);
+  EXPECT_TRUE(extractedImage == nullptr);
+
+  // Test 4: Rect with ImageShader that has TileMode::Repeat (should fail optimization)
+  canvas = recorder.beginRecording();
+  shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+  paint.setShader(shader);
+  rect = Rect::MakeWH(image->width(), image->height());
+  canvas->drawRect(rect, paint);
+  shaderPicture = recorder.finishRecordingAsPicture();
+  extractedImage = shaderPicture->asImage(&offset);
+  EXPECT_TRUE(extractedImage == nullptr);
+
+  // Test 5: Rect with ImageShader and clip (should be optimized with subset)
+  canvas = recorder.beginRecording();
+  shader = Shader::MakeImageShader(image);
+  paint.setShader(shader);
+  canvas->clipRect(Rect::MakeXYWH(100, 100, image->width() - 200, image->height() - 200));
+  rect = Rect::MakeWH(image->width(), image->height());
+  canvas->drawRect(rect, paint);
+  shaderPicture = recorder.finishRecordingAsPicture();
+  auto matrix = Matrix::MakeTrans(-100, -100);
+  ISize clipSize = {image->width() - 200, image->height() - 200};
+  extractedImage = shaderPicture->asImage(&offset, &matrix, &clipSize);
+  ASSERT_TRUE(extractedImage != nullptr);
+  auto subsetImage = std::static_pointer_cast<SubsetImage>(extractedImage);
+  EXPECT_TRUE(subsetImage->source == image);
+  EXPECT_EQ(offset.x, 0.0f);
+  EXPECT_EQ(offset.y, 0.0f);
 }
 
 TGFX_TEST(CanvasTest, BlendModeTest) {
@@ -1528,233 +693,6 @@ TGFX_TEST(CanvasTest, BlendModeTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/blendMode"));
 }
 
-TGFX_TEST(CanvasTest, Path_addArc) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 200, 200);
-  auto canvas = surface->getCanvas();
-  Paint paint;
-  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
-  for (int i = 1; i <= 8; ++i) {
-    canvas->clear();
-    Path path;
-    path.addArc(Rect::MakeXYWH(50, 50, 100, 100), 0, static_cast<float>(45 * i));
-    path.close();
-    canvas->drawPath(path, paint);
-    EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_addArc" + std::to_string(i)));
-  }
-  for (int i = 1; i <= 8; ++i) {
-    canvas->clear();
-    Path path;
-    path.addArc(Rect::MakeXYWH(50, 50, 100, 100), -90.f, -static_cast<float>(45 * i));
-    path.close();
-    canvas->drawPath(path, paint);
-    EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_addArc_reversed" + std::to_string(i)));
-  }
-}
-
-TGFX_TEST(CanvasTest, Path_complex) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 400);
-  auto canvas = surface->getCanvas();
-  canvas->translate(200, 200);
-  Path path;
-  auto rect = Rect::MakeLTRB(-167.200867f, -100.890869f, 167.200867f, 100.890869f);
-  path.addRect(rect);
-  auto strokeMatrix = Matrix::MakeAll(0.528697968f, 0, -9.44108581f, 0, 0.422670752f, -9.34423828f);
-  path.transform(strokeMatrix);
-  float dashList[] = {10.f, 17.f, 10.f, 10.f, 17.f, 10.f};
-  auto pathEffect = PathEffect::MakeDash(dashList, 6, 0);
-  pathEffect->filterPath(&path);
-  auto stroke = Stroke();
-  stroke.width = 8;
-  stroke.cap = LineCap::Round;
-  stroke.join = LineJoin::Miter;
-  stroke.miterLimit = 4;
-  stroke.applyToPath(&path);
-
-  Matrix invertMatrix = {};
-  strokeMatrix.invert(&invertMatrix);
-  path.transform(invertMatrix);
-  path.setFillType(PathFillType::Winding);
-  auto shader = Shader::MakeColorShader(Color::Black());
-  auto paint = Paint();
-  paint.setShader(shader);
-
-  canvas->scale(0.5f, 0.5f);
-  canvas->drawPath(path, paint);
-
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_complex"));
-}
-
-TGFX_TEST(CanvasTest, DrawPathProvider) {
-  class DrawPathProvider : public PathProvider {
-   public:
-    explicit DrawPathProvider(const std::vector<Point>& pts) : points(pts) {
-    }
-
-    Path getPath() const override {
-      if (points.size() < 2) {
-        return {};
-      }
-
-      Path path = {};
-      path.moveTo(points[0]);
-      for (size_t i = 1; i < points.size(); ++i) {
-        path.lineTo(points[i]);
-      }
-      path.close();
-      return path;
-    }
-
-    Rect getBounds() const override {
-      if (points.size() < 2) {
-        return {};
-      }
-
-      float minX = points[0].x;
-      float minY = points[0].y;
-      float maxX = points[0].x;
-      float maxY = points[0].y;
-      for (const auto& point : points) {
-        minX = std::min(minX, point.x);
-        minY = std::min(minY, point.y);
-        maxX = std::max(maxX, point.x);
-        maxY = std::max(maxY, point.y);
-      }
-      return Rect::MakeXYWH(minX, minY, maxX - minX, maxX - minX);
-    }
-
-   private:
-    std::vector<Point> points = {};
-  };
-
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 400);
-  auto canvas = surface->getCanvas();
-
-  Paint paint;
-  std::vector<Point> pts1 = {{50, 50}, {150, 50}, {150, 150}, {50, 150}};
-  auto shape1 = Shape::MakeFrom(std::make_shared<DrawPathProvider>(pts1));
-  paint.setColor(Color::Red());
-  paint.setStyle(PaintStyle::Stroke);
-  canvas->drawShape(shape1, paint);
-
-  std::vector<Point> pts2 = {{300, 0}, {360, 180}, {210, 60}, {390, 60}, {240, 180}};
-  auto shape2 = Shape::MakeFrom(std::make_shared<DrawPathProvider>(pts2));
-  paint.setColor(Color::Green());
-  paint.setStyle(PaintStyle::Fill);
-  canvas->drawShape(shape2, paint);
-
-  std::vector<Point> pts3 = {{50, 250},  {250, 250}, {250, 240}, {275, 255},
-                             {250, 270}, {250, 260}, {50, 260}};
-  auto shape3 = Shape::MakeFrom(std::make_shared<DrawPathProvider>(pts3));
-  paint.setColor(Color::Blue());
-  paint.setStyle(PaintStyle::Fill);
-  canvas->drawShape(shape3, paint);
-
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawPathProvider"));
-}
-
-TGFX_TEST(CanvasTest, StrokeShape) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 200);
-  auto canvas = surface->getCanvas();
-  Paint paint = {};
-  paint.setColor(Color::Black());
-  auto path = Path();
-  path.addRect(Rect::MakeXYWH(10, 10, 50, 50));
-  auto shape = Shape::MakeFrom(path);
-  Matrix matrix = Matrix::MakeScale(2.0, 2.0);
-  shape = Shape::ApplyMatrix(shape, matrix);
-  Stroke stroke(10);
-  shape = Shape::ApplyStroke(shape, &stroke);
-  canvas->drawShape(shape, paint);
-  shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(0.2f, 0.6f));
-  canvas->translate(150, 0);
-  canvas->drawShape(shape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/StrokeShape"));
-
-  surface = Surface::Make(context, 200, 200);
-  canvas = surface->getCanvas();
-  path.reset();
-  path.moveTo(70.0f, 190.0f);
-  path.lineTo(100.0f, 74.0f);
-  path.lineTo(130.0f, 190.0f);
-  stroke.width = 15;
-  stroke.miterLimit = 4.0f;
-  stroke.join = LineJoin::Miter;
-  shape = Shape::MakeFrom(path);
-  shape = Shape::ApplyStroke(shape, &stroke);
-  auto bounds = shape->getBounds();
-  canvas->clipRect(bounds);
-  stroke.applyToPath(&path);
-  EXPECT_EQ(bounds.top, 44.0f);
-  canvas->drawShape(shape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/StrokeShape_miter"));
-}
-
-TGFX_TEST(CanvasTest, ClipAll) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 20, 20);
-  auto canvas = surface->getCanvas();
-  canvas->clipRect(Rect::MakeXYWH(0, 0, 0, 0));
-  Paint paint = {};
-  paint.setColor(Color::Black());
-  auto path = Path();
-  path.addRect(Rect::MakeXYWH(5, 5, 10, 10));
-  canvas->drawPath(path, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipAll"));
-}
-
-TGFX_TEST(CanvasTest, RevertRect) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 10, 10);
-  auto canvas = surface->getCanvas();
-  Path path = {};
-  path.addRect(5, 5, 2, 3);
-  Paint paint = {};
-  canvas->drawPath(path, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RevertRect"));
-}
-
-TGFX_TEST(CanvasTest, AdaptiveDashEffect) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 300, 400);
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-  canvas->drawColor(Color::White());
-  Paint paint = {};
-  Stroke stroke(2);
-  paint.setStroke(stroke);
-  paint.setColor(Color::Black());
-  paint.setStyle(PaintStyle::Stroke);
-  Path path = {};
-  path.addRect(50, 50, 250, 150);
-  path.addOval(Rect::MakeXYWH(50, 200, 200, 50));
-  path.moveTo(50, 300);
-  path.cubicTo(100, 300, 100, 350, 150, 350);
-  path.quadTo(200, 350, 200, 300);
-  float dashList[] = {40.f, 50.f};
-  auto effect = PathEffect::MakeDash(dashList, 2, 20, true);
-  effect->filterPath(&path);
-  canvas->drawPath(path, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AdaptiveDashEffect"));
-}
-
 TGFX_TEST(CanvasTest, BlendFormula) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -1804,13 +742,13 @@ TGFX_TEST(CanvasTest, BlendFormula) {
 
 TGFX_TEST(CanvasTest, ShadowBoundIntersect) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 400, 400);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
 
-  Recorder shadowRecorder = {};
-  auto* picCanvas = shadowRecorder.beginRecording();
+  PictureRecorder shadowRecorder = {};
+  auto picCanvas = shadowRecorder.beginRecording();
   Paint dropShadowPaint = {};
   dropShadowPaint.setImageFilter(ImageFilter::DropShadowOnly(0, -8.f, .5f, .5f, Color::Red()));
   picCanvas->saveLayer(&dropShadowPaint);
@@ -1828,12 +766,12 @@ TGFX_TEST(CanvasTest, ShadowBoundIntersect) {
 
 TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   int surfaceWidth = 1563;
   int surfaceHeight = 1563;
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/GenMesh.png");
   int meshNumH = 5;
@@ -1844,7 +782,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
   Paint paint;
   paint.setAntiAlias(false);
   SamplingOptions options;
-  options.filterMode = FilterMode::Linear;
+  options.magFilterMode = FilterMode::Linear;
+  options.minFilterMode = FilterMode::Linear;
   for (int i = 0; i < meshNumH; i++) {
     for (int j = 0; j < meshNumV; j++) {
       Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
@@ -1858,26 +797,28 @@ TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
 
 TGFX_TEST(CanvasTest, SingleImageRect) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   int surfaceWidth = 1563;
   int surfaceHeight = 1563;
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/HappyNewYear.png");
   float scale = 5.211f;
   Rect srcRect = Rect::MakeXYWH(256, 256, 256, 256);
   Rect dstRect = Rect::MakeXYWH(0.0f, 0.0f, srcRect.width() * scale, srcRect.height() * scale);
   SamplingOptions options;
-  options.filterMode = FilterMode::Linear;
+  options.magFilterMode = FilterMode::Linear;
+  options.minFilterMode = FilterMode::Linear;
   Paint paint;
   paint.setAntiAlias(false);
   canvas->drawImageRect(image, srcRect, dstRect, options, &paint, SrcRectConstraint::Strict);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/SingleImageRect1"));
   canvas->clear();
   auto mipmapImage = image->makeMipmapped(true);
-  options.filterMode = FilterMode::Linear;
+  options.magFilterMode = FilterMode::Linear;
+  options.minFilterMode = FilterMode::Linear;
   options.mipmapMode = MipmapMode::Nearest;
   scale = 0.3f;
   dstRect = Rect::MakeXYWH(0.0f, 0.0f, srcRect.width() * scale, srcRect.height() * scale);
@@ -1887,12 +828,12 @@ TGFX_TEST(CanvasTest, SingleImageRect) {
 
 TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   int surfaceWidth = 1563;
   int surfaceHeight = 1563;
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/HappyNewYear.png");
   auto mipmapImage = image->makeMipmapped(true);
@@ -1904,7 +845,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
   float meshWidth = image->width() / meshNumH;
   float meshHeight = image->height() / meshNumV;
   SamplingOptions options;
-  options.filterMode = FilterMode::Linear;
+  options.magFilterMode = FilterMode::Linear;
+  options.minFilterMode = FilterMode::Linear;
   options.mipmapMode = MipmapMode::None;
   Point offsets[meshNumV][meshNumH] = {
       {{meshWidth, meshHeight}, {meshWidth, 0.0f}, {0.0f, meshHeight * 2}, {meshWidth * 3, 0.0f}},
@@ -1955,12 +897,12 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
 
 TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   int surfaceWidth = 1024;
   int surfaceHeight = 1024;
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/HappyNewYear.png");
   auto mipmapImage = image->makeMipmapped(true);
@@ -1971,7 +913,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   float meshWidth = image->width() / meshNumH;
   float meshHeight = image->height() / meshNumV;
   SamplingOptions options;
-  options.filterMode = FilterMode::Nearest;
+  options.magFilterMode = FilterMode::Nearest;
+  options.minFilterMode = FilterMode::Nearest;
   options.mipmapMode = MipmapMode::None;
   Point offsets[meshNumV][meshNumH] = {
       {{meshWidth, meshHeight}, {meshWidth, 0.0f}, {0.0f, meshHeight * 2}, {meshWidth * 3, 0.0f}},
@@ -2019,801 +962,295 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_NOSCALE_NEAREST_NEAREST"));
 }
 
-TGFX_TEST(CanvasTest, CornerEffectCompare) {
+TGFX_TEST(CanvasTest, RRectBlendMode) {
   ContextScope scope;
-  auto* context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  int surfaceWidth = 800;
-  int surfaceHeight = 800;
-  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  auto* canvas = surface->getCanvas();
-  Paint normalPaint;
-  normalPaint.setStyle(PaintStyle::Stroke);
-  normalPaint.setColor(Color::Red());
-  normalPaint.setStroke(Stroke(2));
-  Paint cornerPaint;
-  cornerPaint.setStyle(PaintStyle::Stroke);
-  cornerPaint.setColor(Color::White());
-  cornerPaint.setStroke(Stroke(2));
-
-  // rectangle
-  {
-    Path path;
-    path.addRect(Rect::MakeWH(200, 100));
-    auto effectedShape = Shape::MakeFrom(path);
-    effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
-    canvas->translate(50, 50);
-    canvas->drawPath(path, normalPaint);
-    canvas->drawShape(effectedShape, cornerPaint);
-
-    canvas->translate(300, 0);
-    canvas->drawPath(path, normalPaint);
-    canvas->drawRoundRect(Rect::MakeWH(200, 100), 50, 50, cornerPaint);
-  }
-
-  // isolated bezier contour
-  {
-    auto path = SVGPathParser::FromSVGString(
-        "M63.6349 2.09663C-0.921635 70.6535 -10.5027 123.902 12.936 235.723L340.451 "
-        "345.547C273.528 "
-        "257.687 177.2 90.3553 327.269 123.902C514.855 165.834 165.216 -13.8778 63.6349 2.09663Z");
-    auto effectedShape = Shape::MakeFrom(*path);
-    effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
-    canvas->translate(0, 200);
-    canvas->drawPath(*path, normalPaint);
-    canvas->drawShape(effectedShape, cornerPaint);
-  }
-
-  // open bezier contour
-  {
-    auto path = SVGPathParser::FromSVGString(
-        "M16.9138 155.924C-1.64829 106.216 -15.1766 1.13521 47.1166 1.13519C47.1166 143.654 "
-        "144.961 "
-        "149.632 150.939 226.712");
-    auto effectedShape = Shape::MakeFrom(*path);
-    effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
-    canvas->translate(-300, 0);
-    canvas->drawPath(*path, normalPaint);
-    canvas->drawShape(effectedShape, cornerPaint);
-  }
-
-  // two circle union
-  {
-    Path path1;
-    path1.addOval(Rect::MakeXYWH(100, 100, 125, 125));
-    Path unionPath;
-    unionPath.addOval(Rect::MakeXYWH(200, 100, 125, 125));
-    unionPath.addPath(path1, PathOp::Union);
-    auto effectedShape = Shape::MakeFrom(unionPath);
-    effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
-    canvas->translate(0, 300);
-    canvas->drawPath(unionPath, normalPaint);
-    canvas->drawShape(effectedShape, cornerPaint);
-  }
-
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CornerEffectCompare"));
-}
-
-TGFX_TEST(CanvasTest, CornerTest) {
-  ContextScope scope;
-  auto* context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 1024, 1024);
-  auto* canvas = surface->getCanvas();
-  canvas->clear();
-  Path rectPath = {};
-  rectPath.addRect(Rect::MakeXYWH(50, 50, 170, 100));
-  auto rectShape = Shape::MakeFrom(rectPath);
-  auto pathEffect = PathEffect::MakeCorner(10);
-  auto cornerRectshape = Shape::ApplyEffect(rectShape, pathEffect);
-
-  Path trianglePath = {};
-  trianglePath.moveTo(500, 500);
-  trianglePath.lineTo(550, 600);
-  trianglePath.lineTo(450, 600);
-  trianglePath.lineTo(500, 500);
-  trianglePath.close();
-  auto triangleShape = Shape::MakeFrom(trianglePath);
-  auto cornerTriShape = Shape::ApplyEffect(triangleShape, pathEffect);
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
   Paint paint;
-  paint.setColor(Color(0, 0, 0));
-  canvas->drawShape(cornerRectshape, paint);
-  canvas->drawShape(cornerTriShape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CornerShape"));
-  canvas->clear();
-  auto doubleCornerRectShape = Shape::ApplyEffect(cornerRectshape, pathEffect);
-  auto doubleCornerTriShape = Shape::ApplyEffect(cornerTriShape, pathEffect);
-  canvas->drawShape(doubleCornerRectShape, paint);
-  canvas->drawShape(doubleCornerTriShape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CornerShapeDouble"));
-  canvas->clear();
-  auto tripleCornerRectShape = Shape::ApplyEffect(doubleCornerRectShape, pathEffect);
-  auto tripleCornerTriShape = Shape::ApplyEffect(doubleCornerTriShape, pathEffect);
-  canvas->drawShape(tripleCornerRectShape, paint);
-  canvas->drawShape(tripleCornerTriShape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CornerShapeTriple"));
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  paint.setBlendMode(BlendMode::Darken);
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(25, 25, 150, 150), 20, 20);
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RRectBlendMode"));
+}
 
-  canvas->clear();
-  Path closeQuadPath = {};
-  closeQuadPath.moveTo(50, 50);
-  closeQuadPath.lineTo(80, 50);
-  closeQuadPath.quadTo(100, 70, 80, 80);
-  closeQuadPath.lineTo(80, 100);
-  closeQuadPath.lineTo(50, 100);
-  closeQuadPath.lineTo(50, 50);
-  closeQuadPath.close();
-  auto closeQuadShape = Shape::MakeFrom(closeQuadPath);
-  canvas->drawShape(closeQuadShape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CloseQuadShape"));
-  canvas->clear();
-  auto cornerCloseQuadShape = Shape::ApplyEffect(closeQuadShape, pathEffect);
-  canvas->drawShape(cornerCloseQuadShape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CloseQuadShapeCorner"));
+TGFX_TEST(CanvasTest, MatrixShapeStroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
 
-  canvas->clear();
-  Path openQuadPath = {};
-  openQuadPath.moveTo(50, 50);
-  openQuadPath.lineTo(80, 50);
-  openQuadPath.quadTo(100, 70, 80, 80);
-  openQuadPath.lineTo(80, 100);
-  openQuadPath.lineTo(50, 100);
-  auto openQuadShape = Shape::MakeFrom(openQuadPath);
+  Paint paint;
+  paint.setAntiAlias(true);
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
   paint.setStyle(PaintStyle::Stroke);
-  canvas->drawShape(openQuadShape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/OpenQuadShape"));
-  canvas->clear();
-  auto cornerOpenQuadShape = Shape::ApplyEffect(openQuadShape, pathEffect);
-  canvas->drawShape(cornerOpenQuadShape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/OpenQuadShapeCorner"));
+  paint.setStroke(Stroke(1.0f));
 
-  canvas->clear();
-  Path openConicPath = {};
-  openConicPath.moveTo(50, 50);
-  openConicPath.lineTo(80, 50);
-  openConicPath.cubicTo(100, 50, 150, 80, 80, 80);
-  openConicPath.lineTo(80, 100);
-  openConicPath.lineTo(50, 100);
-  auto openConicShape = Shape::MakeFrom(openConicPath);
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(0, 0, 8, 8), 2, 2);
+  auto shape = Shape::MakeFrom(path);
+  shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(20, 20));
+  canvas->translate(20, 20);
+  canvas->drawShape(shape, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MatrixShapeStroke"));
+}
+
+TGFX_TEST(CanvasTest, uninvertibleStateMatrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 128, 128);
+  auto canvas = surface->getCanvas();
+
+  auto path = Path();
+  path.addRect(-5.f, -5.f, 10.f, 10.f);
+
+  Paint paint;
   paint.setStyle(PaintStyle::Stroke);
-  canvas->drawShape(openConicShape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/OpenConicShape"));
-  canvas->clear();
-  auto cornerOpenConicShape = Shape::ApplyEffect(openConicShape, pathEffect);
-  canvas->drawShape(cornerOpenConicShape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/OpenConicShapeCorner"));
+  paint.setStroke(Stroke(0.f));
 
-  canvas->clear();
-  Path path = {};
-  path.moveTo(50, 50);
-  path.quadTo(60, 50, 220, 50);
-  path.quadTo(220, 70, 220, 150);
-  path.quadTo(200, 150, 50, 150);
-  path.quadTo(50, 120, 50, 50);
-  path.close();
-  auto quadShape = Shape::MakeFrom(path);
-  canvas->drawShape(quadShape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/QuadRectShape"));
+  auto matrix = Matrix::MakeScale(1E-8f, 1E-8f);
+  EXPECT_TRUE(matrix.invertNonIdentity(nullptr));
+  EXPECT_FALSE(matrix.invertible());
 
-  canvas->clear();
-  auto cornerShape = Shape::ApplyEffect(quadShape, pathEffect);
-  canvas->drawShape(cornerShape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/QuadRectShapeCorner"));
+  canvas->concat(matrix);
+  canvas->drawPath(path, paint);
 }
 
-TGFX_TEST(CanvasTest, textEmojiMixedBlendModes1) {
-  auto serifTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
-  ASSERT_TRUE(serifTypeface != nullptr);
-
-  std::string mixedText = "Hello TGFX! 🎨🎉😊🌟✨🚀💻❤️";
-
+TGFX_TEST(CanvasTest, FlushSemaphore) {
   ContextScope scope;
   auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  int surfaceWidth = 1200;
-  int surfaceHeight = 800;
-  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 128, 128);
   auto canvas = surface->getCanvas();
-
-  // Create gradient background
   canvas->clear(Color::White());
-  auto backgroundPaint = Paint();
-  auto colors = {Color::FromRGBA(255, 200, 200, 255), Color::FromRGBA(200, 200, 255, 255)};
-  auto positions = {0.0f, 1.0f};
-  auto shader = Shader::MakeLinearGradient(
-      Point::Make(0, 0), Point::Make(surfaceWidth, surfaceHeight), colors, positions);
-  backgroundPaint.setShader(shader);
-  canvas->drawRect(Rect::MakeWH(surfaceWidth, surfaceHeight), backgroundPaint);
-
-  float fontSize = 32.f;
-  float lineHeight = fontSize * 1.5f;
-  float startY = 60.f;
-
-  // Test different blend modes
-  std::vector<BlendMode> blendModes = {
-      BlendMode::SrcOver,   BlendMode::SrcIn,     BlendMode::Src,        BlendMode::Overlay,
-      BlendMode::Darken,    BlendMode::Lighten,   BlendMode::ColorDodge, BlendMode::ColorBurn,
-      BlendMode::HardLight, BlendMode::SoftLight, BlendMode::Difference, BlendMode::Exclusion};
-
-  std::vector<std::string> blendModeNames = {"SrcOver",   "Multiply",  "Screen",     "Overlay",
-                                             "Darken",    "Lighten",   "ColorDodge", "ColorBurn",
-                                             "HardLight", "SoftLight", "Difference", "Exclusion"};
-
-  for (size_t modeIndex = 0; modeIndex < blendModes.size(); ++modeIndex) {
-    auto blendMode = blendModes[modeIndex];
-    auto modeName = blendModeNames[modeIndex];
-
-    float y = startY + modeIndex * lineHeight;
-    float x = 20.f;
-
-    // Draw blend mode label
-    Paint labelPaint;
-    labelPaint.setColor(Color::Black());
-    auto labelFont = Font(serifTypeface, 16.f);
-    canvas->drawSimpleText(modeName, x, y - 8, labelFont, labelPaint);
-
-    // Process text using TextShaper for proper emoji handling
-    auto positionedGlyphs = TextShaper::Shape(mixedText, serifTypeface);
-
-    struct TextRun {
-      std::vector<GlyphID> ids;
-      std::vector<Point> positions;
-      Font font;
-    };
-    std::vector<TextRun> textRuns;
-    TextRun* run = nullptr;
-    auto count = positionedGlyphs.glyphCount();
-    float textX = x + 120;
-
-    for (size_t i = 0; i < count; ++i) {
-      auto typeface = positionedGlyphs.getTypeface(i);
-      if (run == nullptr || run->font.getTypeface() != typeface) {
-        textRuns.emplace_back();
-        run = &textRuns.back();
-        run->font = Font(typeface, fontSize);
-      }
-      auto glyphID = positionedGlyphs.getGlyphID(i);
-      run->ids.emplace_back(glyphID);
-      run->positions.push_back(Point{textX, y});
-      textX += run->font.getAdvance(glyphID);
-    }
-
-    // Draw mixed text with current blend mode using proper glyph rendering
-    Paint textPaint;
-    textPaint.setColor(Color::FromRGBA(255, 100, 50, 200));
-    textPaint.setBlendMode(blendMode);
-
-    for (const auto& textRun : textRuns) {
-      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, textPaint);
-    }
-  }
-
-  context->flushAndSubmit();
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/textEmojiMixedBlendModes"));
+  BackendSemaphore backendSemaphore = {};
+  context->flush(&backendSemaphore);
+  EXPECT_TRUE(backendSemaphore.isInitialized());
+  auto semaphore = context->gpu()->importBackendSemaphore(backendSemaphore);
+  EXPECT_TRUE(semaphore != nullptr);
 }
 
-TGFX_TEST(CanvasTest, textEmojiMixedBlendModes2) {
-  auto serifTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
-  ASSERT_TRUE(serifTypeface != nullptr);
-
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  int surfaceWidth = 600;
-  int surfaceHeight = 400;
-  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
-
-  // Create colorful background with circles
-  canvas->clear(Color::FromRGBA(240, 240, 255, 255));
-
-  // Test emoji and text with different blend modes in layers
-  std::vector<std::pair<std::string, BlendMode>> textBlendPairs = {{"🎨Art", BlendMode::SrcOver},
-                                                                   {"🎨Art", BlendMode::SrcIn},
-                                                                   {"🎭Mix", BlendMode::Src},
-                                                                   {"🚀Fast", BlendMode::SrcATop},
-                                                                   {"🎪Fun", BlendMode::SrcOut}};
-
-  float fontSize = 36.f;
-
-  for (size_t i = 0; i < textBlendPairs.size(); ++i) {
-    auto& pair = textBlendPairs[i];
-    auto& text = pair.first;
-    auto blendMode = pair.second;
-
-    float x = 50 + (i % 3) * 180;
-    float y = 120 + (i / 3) * 120;
-
-    // Process text using TextShaper for proper emoji handling
-    auto positionedGlyphs = TextShaper::Shape(text, serifTypeface);
-
-    struct TextRun {
-      std::vector<GlyphID> ids;
-      std::vector<Point> positions;
-      Font font;
-    };
-    std::vector<TextRun> textRuns;
-    TextRun* run = nullptr;
-    auto count = positionedGlyphs.glyphCount();
-    float textX = x;
-
-    for (size_t j = 0; j < count; ++j) {
-      auto typeface = positionedGlyphs.getTypeface(j);
-      if (run == nullptr || run->font.getTypeface() != typeface) {
-        textRuns.emplace_back();
-        run = &textRuns.back();
-        run->font = Font(typeface, fontSize);
-      }
-      auto glyphID = positionedGlyphs.getGlyphID(j);
-      run->ids.emplace_back(glyphID);
-      run->positions.push_back(Point{textX, y});
-      textX += run->font.getAdvance(glyphID);
-    }
-
-    Paint textPaint;
-    textPaint.setColor(Color::FromRGBA(255, 50, 100, 220));
-    textPaint.setBlendMode(blendMode);
-
-    for (const auto& textRun : textRuns) {
-      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, textPaint);
-    }
-  }
-
-  context->flushAndSubmit();
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/textEmojiMixedBlendModes2"));
-}
-
-TGFX_TEST(CanvasTest, complexEmojiTextBlending) {
-  auto serifTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
-  ASSERT_TRUE(serifTypeface != nullptr);
-
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  int surfaceWidth = 800;
-  int surfaceHeight = 600;
-  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
-
-  // Create complex background pattern
-  canvas->clear(Color::White());
-
-  // Draw gradient rectangles as background
-  for (int i = 0; i < 8; ++i) {
-    for (int j = 0; j < 6; ++j) {
-      Paint rectPaint;
-      auto hue = (i * 45 + j * 30) % 360;
-      // Convert HSL to RGB approximation
-      auto r = static_cast<uint8_t>(128 + 100 * sin(hue * 3.14159f / 180.0f));
-      auto g = static_cast<uint8_t>(128 + 100 * sin((hue + 120) * 3.14159f / 180.0f));
-      auto b = static_cast<uint8_t>(128 + 100 * sin((hue + 240) * 3.14159f / 180.0f));
-      auto color = Color::FromRGBA(r, g, b, 77);  // 0.3f * 255
-      rectPaint.setColor(color);
-      canvas->drawRect(Rect::MakeXYWH(i * 100, j * 100, 100, 100), rectPaint);
-    }
-  }
-
-  // Complex text with various emoji sequences
-  std::vector<std::string> complexTexts = {"👨‍👩‍👧‍👦Family测试",
-                                           "🏳️‍🌈Flag🇨🇳China",
-                                           "👨🏼‍🦱Hair👩🏾‍💻Code",
-                                           "🤡🎭🎪🎨艺术Art",
-                                           "🌍🌎🌏World世界",
-                                           "🎵🎶🎼音乐Music"};
-
-  std::vector<BlendMode> complexBlendModes = {BlendMode::Multiply,   BlendMode::Screen,
-                                              BlendMode::Overlay,    BlendMode::SoftLight,
-                                              BlendMode::Difference, BlendMode::ColorBurn};
-
-  float fontSize = 28.f;
-
-  for (size_t i = 0; i < complexTexts.size(); ++i) {
-    auto& text = complexTexts[i];
-    auto blendMode = complexBlendModes[i];
-
-    float x = 20 + (i % 2) * 380;
-    float y = 80 + (i / 2) * 100;
-
-    // Process text using TextShaper for proper emoji handling
-    auto positionedGlyphs = TextShaper::Shape(text, serifTypeface);
-
-    struct TextRun {
-      std::vector<GlyphID> ids;
-      std::vector<Point> positions;
-      Font font;
-    };
-    std::vector<TextRun> textRuns;
-    TextRun* run = nullptr;
-    auto count = positionedGlyphs.glyphCount();
-    float textX = x;
-
-    for (size_t j = 0; j < count; ++j) {
-      auto typeface = positionedGlyphs.getTypeface(j);
-      if (run == nullptr || run->font.getTypeface() != typeface) {
-        textRuns.emplace_back();
-        run = &textRuns.back();
-        run->font = Font(typeface, fontSize);
-      }
-      auto glyphID = positionedGlyphs.getGlyphID(j);
-      run->ids.emplace_back(glyphID);
-      run->positions.push_back(Point{textX, y});
-      textX += run->font.getAdvance(glyphID);
-    }
-
-    // Draw text with blend mode
-    Paint textPaint;
-    textPaint.setColor(Color::FromRGBA(40, 80, 160, 255));
-    textPaint.setBlendMode(blendMode);
-
-    for (const auto& textRun : textRuns) {
-      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, textPaint);
-    }
-
-    // Draw blend mode label
-    Paint labelPaint;
-    labelPaint.setColor(Color::Black());
-    auto labelFont = Font(serifTypeface, 12.f);
-    std::string label = "BlendMode: " + std::to_string(static_cast<int>(blendMode));
-    canvas->drawSimpleText(label, x, y + 15, labelFont, labelPaint);
-  }
-
-  context->flushAndSubmit();
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/complexEmojiTextBlending"));
-}
-
-TGFX_TEST(CanvasTest, emojiTextStrokeBlending) {
-  auto serifTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
-  ASSERT_TRUE(serifTypeface != nullptr);
-
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  int surfaceWidth = 700;
-  int surfaceHeight = 500;
-  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
-
-  // Rainbow gradient background
-  canvas->clear(Color::Black());
-  auto colors = {Color::FromRGBA(255, 0, 0, 255),   Color::FromRGBA(255, 127, 0, 255),
-                 Color::FromRGBA(255, 255, 0, 255), Color::FromRGBA(0, 255, 0, 255),
-                 Color::FromRGBA(0, 0, 255, 255),   Color::FromRGBA(75, 0, 130, 255),
-                 Color::FromRGBA(148, 0, 211, 255)};
-  auto positions = {0.0f, 0.16f, 0.33f, 0.5f, 0.66f, 0.83f, 1.0f};
-  auto shader = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(0, surfaceHeight), colors,
-                                           positions);
-  Paint bgPaint;
-  bgPaint.setShader(shader);
-  canvas->drawRect(Rect::MakeWH(surfaceWidth, surfaceHeight), bgPaint);
-
-  // Test stroke and fill with different blend modes
-  std::string emojiText = "🎨🌈🎭🎪🚀";
-  std::string normalText = "ArtRainbowMask";
-
-  float fontSize = 48.f;
-
-  std::vector<BlendMode> strokeBlendModes = {BlendMode::SrcOver, BlendMode::Multiply,
-                                             BlendMode::Screen, BlendMode::Overlay,
-                                             BlendMode::Difference};
-
-  for (size_t i = 0; i < strokeBlendModes.size(); ++i) {
-    auto blendMode = strokeBlendModes[i];
-    float y = 80 + i * 80;
-
-    // Process emoji text using TextShaper
-    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, serifTypeface);
-    struct TextRun {
-      std::vector<GlyphID> ids;
-      std::vector<Point> positions;
-      Font font;
-    };
-    std::vector<TextRun> emojiTextRuns;
-    TextRun* emojiRun = nullptr;
-    auto emojiCount = emojiPositionedGlyphs.glyphCount();
-    float emojiX = 50;
-
-    for (size_t j = 0; j < emojiCount; ++j) {
-      auto typeface = emojiPositionedGlyphs.getTypeface(j);
-      if (emojiRun == nullptr || emojiRun->font.getTypeface() != typeface) {
-        emojiTextRuns.emplace_back();
-        emojiRun = &emojiTextRuns.back();
-        emojiRun->font = Font(typeface, fontSize);
-      }
-      auto glyphID = emojiPositionedGlyphs.getGlyphID(j);
-      emojiRun->ids.emplace_back(glyphID);
-      emojiRun->positions.push_back(Point{emojiX, y});
-      emojiX += emojiRun->font.getAdvance(glyphID);
-    }
-
-    // Draw emoji with stroke and fill
-    Paint emojiStrokePaint;
-    emojiStrokePaint.setColor(Color::White());
-    emojiStrokePaint.setStyle(PaintStyle::Stroke);
-    emojiStrokePaint.setStrokeWidth(3.0f);
-    emojiStrokePaint.setBlendMode(blendMode);
-
-    Paint emojiFillPaint;
-    emojiFillPaint.setColor(Color::FromRGBA(255, 200, 100, 200));
-    emojiFillPaint.setBlendMode(blendMode);
-
-    for (const auto& textRun : emojiTextRuns) {
-      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, emojiStrokePaint);
-      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, emojiFillPaint);
-    }
-
-    // Process normal text using TextShaper
-    auto normalPositionedGlyphs = TextShaper::Shape(normalText, serifTypeface);
-    std::vector<TextRun> normalTextRuns;
-    TextRun* normalRun = nullptr;
-    auto normalCount = normalPositionedGlyphs.glyphCount();
-    float normalX = 350;
-
-    for (size_t j = 0; j < normalCount; ++j) {
-      auto typeface = normalPositionedGlyphs.getTypeface(j);
-      if (normalRun == nullptr || normalRun->font.getTypeface() != typeface) {
-        normalTextRuns.emplace_back();
-        normalRun = &normalTextRuns.back();
-        normalRun->font = Font(typeface, fontSize);
-      }
-      auto glyphID = normalPositionedGlyphs.getGlyphID(j);
-      normalRun->ids.emplace_back(glyphID);
-      normalRun->positions.push_back(Point{normalX, y});
-      normalX += normalRun->font.getAdvance(glyphID);
-    }
-
-    // Draw normal text for comparison
-    Paint textStrokePaint;
-    textStrokePaint.setColor(Color::Green());
-    textStrokePaint.setStyle(PaintStyle::Stroke);
-    textStrokePaint.setStrokeWidth(2.0f);
-    textStrokePaint.setBlendMode(blendMode);
-
-    Paint textFillPaint;
-    textFillPaint.setColor(Color::FromRGBA(100, 150, 255, 200));
-    textFillPaint.setBlendMode(blendMode);
-
-    for (const auto& textRun : normalTextRuns) {
-      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, textStrokePaint);
-      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, textFillPaint);
-    }
-  }
-
-  context->flushAndSubmit();
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/emojiTextStrokeBlending"));
-}
-
-TGFX_TEST(CanvasTest, textEmojiOverlayBlendModes) {
-  auto serifTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
-  ASSERT_TRUE(serifTypeface != nullptr);
-
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  int surfaceWidth = 1200;
-  int surfaceHeight = 900;
-  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
-
-  // Create striped background
-  canvas->clear(Color::FromRGBA(230, 230, 250, 255));
-  Paint stripePaint;
-  stripePaint.setColor(Color::FromRGBA(200, 220, 240, 255));
-  for (int i = 0; i < surfaceHeight; i += 20) {
-    if ((i / 20) % 2 == 0) {
-      canvas->drawRect(Rect::MakeXYWH(0, i, surfaceWidth, 20), stripePaint);
-    }
-  }
-
-  float fontSize = 36.f;
-  float lineHeight = 80.f;
-  float startY = 60.f;
-
-  // Test different blend modes for emoji overlays on text
-  std::vector<BlendMode> blendModes = {
-      BlendMode::SrcOver,   BlendMode::SrcIn,     BlendMode::SrcOut,     BlendMode::SrcATop,
-      BlendMode::DstOver,   BlendMode::DstIn,     BlendMode::DstOut,     BlendMode::DstATop,
-      BlendMode::Xor,       BlendMode::Multiply,  BlendMode::Screen,     BlendMode::Overlay,
-      BlendMode::Darken,    BlendMode::Lighten,   BlendMode::ColorDodge, BlendMode::ColorBurn,
-      BlendMode::HardLight, BlendMode::SoftLight, BlendMode::Difference, BlendMode::Exclusion};
-
-  std::vector<std::string> blendModeNames = {
-      "SrcOver", "SrcIn",      "SrcOut",    "SrcATop",   "DstOver",   "DstIn",      "DstOut",
-      "DstATop", "Xor",        "Plus",      "Multiply",  "Screen",    "Overlay",    "Darken",
-      "Lighten", "ColorDodge", "ColorBurn", "HardLight", "SoftLight", "Difference", "Exclusion"};
-
-  std::string baseText = "Hello 世界";
-  std::string emojiText = "🎨🎉🌟";
-
-  for (size_t modeIndex = 0; modeIndex < blendModes.size(); ++modeIndex) {
-    auto blendMode = blendModes[modeIndex];
-    auto modeName = blendModeNames[modeIndex];
-
-    float y = startY + (modeIndex / 3) * lineHeight;
-    float x = 50.f + (modeIndex % 3) * 380.f;
-
-    // Draw blend mode label
-    Paint labelPaint;
-    labelPaint.setColor(Color::Black());
-    auto labelFont = Font(serifTypeface, 14.f);
-    canvas->drawSimpleText(modeName, x, y - 20, labelFont, labelPaint);
-
-    // First draw base text layer
-    auto basePositionedGlyphs = TextShaper::Shape(baseText, serifTypeface);
-
-    struct TextRun {
-      std::vector<GlyphID> ids;
-      std::vector<Point> positions;
-      Font font;
-    };
-    std::vector<TextRun> baseTextRuns;
-    TextRun* baseRun = nullptr;
-    auto baseCount = basePositionedGlyphs.glyphCount();
-    float baseX = x;
-
-    for (size_t i = 0; i < baseCount; ++i) {
-      auto typeface = basePositionedGlyphs.getTypeface(i);
-      if (baseRun == nullptr || baseRun->font.getTypeface() != typeface) {
-        baseTextRuns.emplace_back();
-        baseRun = &baseTextRuns.back();
-        baseRun->font = Font(typeface, fontSize);
-      }
-      auto glyphID = basePositionedGlyphs.getGlyphID(i);
-      baseRun->ids.emplace_back(glyphID);
-      baseRun->positions.push_back(Point{baseX, y});
-      baseX += baseRun->font.getAdvance(glyphID);
-    }
-
-    // Draw base text with semi-transparent blue
-    Paint baseTextPaint;
-    baseTextPaint.setColor(Color::FromRGBA(50, 100, 200, 180));
-    baseTextPaint.setBlendMode(BlendMode::SrcOver);
-
-    for (const auto& textRun : baseTextRuns) {
-      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, baseTextPaint);
-    }
-
-    // Then overlay emoji with different blend modes
-    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, serifTypeface);
-    std::vector<TextRun> emojiTextRuns;
-    TextRun* emojiRun = nullptr;
-    auto emojiCount = emojiPositionedGlyphs.glyphCount();
-    float emojiX = x + 20;
-
-    for (size_t i = 0; i < emojiCount; ++i) {
-      auto typeface = emojiPositionedGlyphs.getTypeface(i);
-      if (emojiRun == nullptr || emojiRun->font.getTypeface() != typeface) {
-        emojiTextRuns.emplace_back();
-        emojiRun = &emojiTextRuns.back();
-        emojiRun->font = Font(typeface, fontSize);
-      }
-      auto glyphID = emojiPositionedGlyphs.getGlyphID(i);
-      emojiRun->ids.emplace_back(glyphID);
-      emojiRun->positions.push_back(Point{emojiX, y + 5});
-      emojiX += emojiRun->font.getAdvance(glyphID);
-    }
-
-    // Draw overlaid emoji with the current blend mode
-    Paint emojiPaint;
-    emojiPaint.setColor(Color::FromRGBA(255, 150, 50, 200));
-    emojiPaint.setBlendMode(blendMode);
-
-    for (const auto& textRun : emojiTextRuns) {
-      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, emojiPaint);
-    }
-  }
-
-  context->flushAndSubmit();
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/textEmojiOverlayBlendModes"));
-}
-
-TGFX_TEST(CanvasTest, RotateImageRect) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  int surfaceWidth = 100;
-  int surfaceHeight = 100;
-  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
+TGFX_TEST(CanvasTest, ScaleMatrixShader) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
-  image = image->makeOriented(Orientation::RightBottom);
   ASSERT_TRUE(image != nullptr);
-
-  auto srcRect = Rect::MakeXYWH(20, 20, 40, 40);
-  auto dstRect = Rect::MakeXYWH(0, 0, 100, 100);
-  canvas->drawImageRect(image, srcRect, dstRect, {}, nullptr, SrcRectConstraint::Strict);
-  context->flushAndSubmit();
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RotateImageRect"));
-}
-
-TGFX_TEST(CanvasTest, ScaleImage) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  auto scaledImage = image->makeScaled(image->width(), image->height());
-  EXPECT_TRUE(scaledImage == image);
-  image = MakeImage("resources/apitest/rotation.jpg");
-  scaledImage = ScaleImage(image, 0.15f);
-  EXPECT_FALSE(scaledImage->hasMipmaps());
-  EXPECT_FALSE(scaledImage == image);
-  EXPECT_EQ(scaledImage->width(), 454);
-  EXPECT_EQ(scaledImage->height(), 605);
-  ASSERT_TRUE(image != nullptr);
-  auto surface = Surface::Make(context, 1100, 1400);
+  auto surface = Surface::Make(context, 100, 100);
+  ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
-  canvas->drawImage(scaledImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_image"));
+  auto paint = Paint();
+  auto shader = Shader::MakeImageShader(image);
+  auto rect = Rect::MakeXYWH(25, 25, 50, 50);
+  rect.scale(10, 10);
+  shader = shader->makeWithMatrix(Matrix::MakeScale(10, 10));
+  paint.setShader(shader);
+  canvas->scale(0.1f, 0.1f);
+  canvas->drawRect(rect, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ScaleMatrixShader"));
+}
+
+TGFX_TEST(CanvasTest, Matrix3DShapeStroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+
+  auto origin = Point::Make(100, 100);
+  auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+  Size pathSize = {100, 100};
+  auto anchor = Point::Make(0.5f, 0.5f);
+  auto invOffsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(anchor.x * pathSize.width, anchor.y * pathSize.height, 0);
+  auto perspectiveMatrix = Matrix3D::I();
+  constexpr float eyeDistance = 1200.f;
+  constexpr float farZ = -1000.f;
+  constexpr float shift = 10.f;
+  const float nearZ = eyeDistance - shift;
+  const float m22 = (2 - (farZ + nearZ) / eyeDistance) / (farZ - nearZ);
+  perspectiveMatrix.setRowColumn(2, 2, m22);
+  const float m23 = -1.f + nearZ / eyeDistance - perspectiveMatrix.getRowColumn(2, 2) * nearZ;
+  perspectiveMatrix.setRowColumn(2, 3, m23);
+  perspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
+  auto modelMatrix = Matrix3D::MakeScale(2, 2, 1);
+  modelMatrix.postRotate({0, 0, 1}, 45);
+  modelMatrix.postRotate({1, 0, 0}, 45);
+  modelMatrix.postRotate({0, 1, 0}, 45);
+  modelMatrix.postTranslate(0, 0, -20);
+  auto offsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(-anchor.x * pathSize.width, -anchor.y * pathSize.height, 0);
+  auto transform = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                   modelMatrix * offsetToAnchorMatrix;
+
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(0.f, 0.f, pathSize.width, pathSize.height), 20, 20);
+  auto rawShape = Shape::MakeFrom(path);
+
+  Paint paint1;
+  paint1.setAntiAlias(true);
+  paint1.setColor(Color::FromRGBA(0, 255, 0, 255));
+  paint1.setStyle(PaintStyle::Fill);
+  canvas->save();
+  canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
+  canvas->drawShape(rawShape, paint1);
+  canvas->restore();
+
+  auto mappedShape = Shape::ApplyMatrix3D(rawShape, transform);
+  Paint paint2;
+  paint2.setAntiAlias(true);
+  paint2.setColor(Color::FromRGBA(255, 0, 0, 255));
+  paint2.setStyle(PaintStyle::Stroke);
+  paint2.setStroke(Stroke(2.0f));
+  canvas->drawShape(mappedShape, paint2);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Matrix3DShapeStroke"));
+}
+
+TGFX_TEST(CanvasTest, LumaFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 3024, 4032);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  Paint paint{};
+  paint.setColorFilter(ColorFilter::Luma());
+  auto shader = Shader::MakeColorShader(Color::FromRGBA(125, 0, 255));
+  paint.setShader(shader);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/LumaFilterToSRGB"));
+  ColorMatrix33 matrix{};
+  NamedPrimaries::Rec601.toXYZD50(&matrix);
+  surface = Surface::Make(context, 3024, 4032, false, 1, false, 0,
+                          ColorSpace::MakeRGB(NamedTransferFunction::Rec601, matrix));
+  ASSERT_TRUE(surface != nullptr);
+  canvas = surface->getCanvas();
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/LumaFilterToRec601"));
+  NamedPrimaries::Rec2020.toXYZD50(&matrix);
+  surface = Surface::Make(context, 3024, 4032, false, 1, false, 0,
+                          ColorSpace::MakeRGB(NamedTransferFunction::Rec2020, matrix));
+  ASSERT_TRUE(surface != nullptr);
+  canvas = surface->getCanvas();
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/LumaFilterToRec2020"));
+}
+
+TGFX_TEST(CanvasTest, ConvertColorSpace) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface =
+      Surface::Make(context, 1024, 1024, false, 1, false, 0, ColorSpace::SRGB()->makeColorSpin());
+  auto canvas = surface->getCanvas();
+  const TransferFunction tfs[] = {
+      NamedTransferFunction::SRGB,
+      NamedTransferFunction::TwoDotTwo,
+      NamedTransferFunction::Linear,
+      NamedTransferFunction::Rec2020,
+      {-3.0f, 2.0f, 2.0f, 1 / 0.17883277f, 0.28466892f, 0.55991073f, 3.0f}};
+
+  const ColorMatrix33 gamuts[] = {NamedGamut::SRGB, NamedGamut::AdobeRGB, NamedGamut::DisplayP3,
+                                  NamedGamut::Rec2020, NamedGamut::XYZ};
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  const int width = image->width();
+  const int height = image->height();
+  int tfNum = sizeof(tfs) / sizeof(TransferFunction);
+  int gamutNum = sizeof(gamuts) / sizeof(ColorMatrix33);
+  for (int i = 0; i < tfNum; i++) {
+    for (int j = 0; j < gamutNum; j++) {
+      auto midCS = ColorSpace::MakeRGB(tfs[i], gamuts[j]);
+      auto offscreen = Surface::Make(context, width, height, false, 1, false, 0, midCS);
+      offscreen->getCanvas()->drawImage(image);
+      canvas->drawImage(offscreen->makeImageSnapshot(), static_cast<float>(i * width),
+                        static_cast<float>(j * height));
+    }
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ConvertColorSpace"));
+}
+
+TGFX_TEST(CanvasTest, ColorSpace) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1024, 1024, false, 1, false, 0, ColorSpace::DisplayP3());
+  auto canvas = surface->getCanvas();
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::DisplayP3()), BlendMode::SrcOver);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawP3ColorToP3"));
   canvas->clear();
-  image = image->makeMipmapped(true);
-  EXPECT_TRUE(image->hasMipmaps());
-  SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
-  scaledImage = ScaleImage(image, 0.15f, sampling);
-  EXPECT_TRUE(scaledImage->hasMipmaps());
-  canvas->drawImage(scaledImage, 100, 100);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_mipmap"));
+  Paint paint;
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  auto imageShader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+  paint.setShader(imageShader);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawImageShaderToP3"));
   canvas->clear();
-  scaledImage = scaledImage->makeMipmapped(false);
-  EXPECT_FALSE(scaledImage->hasMipmaps());
-  scaledImage = ScaleImage(scaledImage, 2.0f, sampling);
-  EXPECT_FALSE(scaledImage->hasMipmaps());
-  scaledImage = scaledImage->makeMipmapped(true);
-  EXPECT_TRUE(scaledImage->hasMipmaps());
-  EXPECT_EQ(scaledImage->width(), 908);
-  EXPECT_EQ(scaledImage->height(), 1210);
-  canvas->drawImage(scaledImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_scale_up"));
+  auto colorShader = Shader::MakeColorShader(Color::Green());
+  paint.setShader(colorShader);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBColorShaderToP3"));
   canvas->clear();
-  canvas->clipRect(Rect::MakeXYWH(100, 100, 500, 500));
-  canvas->drawImage(scaledImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_clip"));
-  auto imagePath = "resources/apitest/rotation.jpg";
-  image = MakeImage(imagePath);
-  auto newWidth = image->width() / 8;
-  auto newHeight = image->height() / 8;
-  scaledImage = image->makeScaled(newWidth, newHeight);
+  auto linearGradient = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(1024, 0),
+                                                   {Color::Green(), Color::Red()}, {});
+  paint.setShader(linearGradient);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBLinearShaderToP3"));
   canvas->clear();
-  canvas->drawImage(scaledImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_imageCodec_box_filter"));
-  auto codec = MakeImageCodec(imagePath);
-  ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false);
-  ASSERT_FALSE(bitmap.isEmpty());
-  Pixmap pixmap(bitmap);
-  auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
-  pixmap.reset();
-  EXPECT_TRUE(result);
-  image = Image::MakeFrom(bitmap);
-  newWidth = image->width() / 8;
-  newHeight = image->height() / 8;
-  scaledImage = image->makeScaled(newWidth, newHeight);
+  auto conicGradient =
+      Shader::MakeConicGradient(Point::Make(512, 512), 0, 360, {Color::Green(), Color::Red()}, {});
+  paint.setShader(conicGradient);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBConicShaderToP3"));
   canvas->clear();
-  canvas->drawImage(scaledImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_imageBuffer_box_filter"));
+  auto diamondGradient =
+      Shader::MakeDiamondGradient(Point::Make(512, 512), 500, {Color::Green(), Color::Red()}, {});
+  paint.setShader(diamondGradient);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBDiamondShaderToP3"));
+  canvas->clear();
+  auto radialGradient =
+      Shader::MakeRadialGradient(Point::Make(512, 512), 500, {Color::Green(), Color::Red()}, {});
+  paint.setShader(radialGradient);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBRadialShaderToP3"));
+  canvas->clear();
+  auto blendFilter = ColorFilter::Blend(Color::FromRGBA(0, 0, 125, 125), BlendMode::SrcOver);
+  paint.setColorFilter(blendFilter);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBBlendFilterToP3"));
+  canvas->clear();
+  auto image1 = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image1 != nullptr);
+  auto maskShader = Shader::MakeImageShader(std::move(image1), TileMode::Decal, TileMode::Decal);
+  auto maskFilter = MaskFilter::MakeShader(std::move(maskShader));
+  maskFilter = maskFilter->makeWithMatrix(Matrix::MakeTrans(462, 462));
+  paint.setMaskFilter(maskFilter);
+  auto imageFilter = ImageFilter::DropShadow(-10, -10, 10, 10, Color::Green());
+  paint.setImageFilter(imageFilter);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBDropShadowFilterToP3"));
+  canvas->clear();
+  PictureRecorder record;
+  auto recordCanvas = record.beginRecording();
+  recordCanvas->drawColor(Color::Green(), BlendMode::SrcOver);
+  auto picture = record.finishRecordingAsPicture();
+  canvas->drawPicture(picture);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawRecordSRGBColorToP3UseDrawPicture"));
+  canvas->clear();
+  auto pictureImage = Image::MakeFrom(picture, 1024, 1024);
+  canvas->drawImage(pictureImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawRecordSRGBColorToP3UseDrawImage"));
 }
 
 TGFX_TEST(CanvasTest, ScalePictureImage) {
@@ -2821,7 +1258,7 @@ TGFX_TEST(CanvasTest, ScalePictureImage) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/rotation.jpg");
-  Recorder recorder;
+  PictureRecorder recorder;
   auto canvas = recorder.beginRecording();
   auto filter = ImageFilter::DropShadow(10, 10, 0, 0, Color::Black());
   auto paint = Paint();
@@ -2854,74 +1291,6 @@ TGFX_TEST(CanvasTest, ScalePictureImage) {
   canvas->clipRect(Rect::MakeXYWH(100, 100, 500, 500));
   canvas->drawImage(scaledImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/pic_scaled_pic_clip"));
-}
-
-TGFX_TEST(CanvasTest, RasterizedMipmapImage) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  auto originKey = std::static_pointer_cast<RasterizedImage>(image)->getTextureKey();
-  auto textureProxy = context->proxyProvider()->findOrWrapTextureProxy(originKey);
-  EXPECT_TRUE(textureProxy == nullptr);
-  auto surface = Surface::Make(context, 300, 300);
-  auto canvas = surface->getCanvas();
-  canvas->drawImage(image);
-  context->flushAndSubmit();
-  textureProxy = context->proxyProvider()->findOrWrapTextureProxy(originKey);
-  EXPECT_TRUE(textureProxy != nullptr);
-
-  image = image->makeMipmapped(true);
-  EXPECT_TRUE(image->hasMipmaps());
-  auto mipmapKey = std::static_pointer_cast<RasterizedImage>(image)->getTextureKey();
-  EXPECT_TRUE(mipmapKey != originKey);
-  auto mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
-  EXPECT_TRUE(mipmapTexture == nullptr);
-  canvas->drawImage(image);
-  context->flushAndSubmit();
-  mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
-  EXPECT_TRUE(mipmapTexture != nullptr);
-
-  image = image->makeMipmapped(false);
-  EXPECT_FALSE(image->hasMipmaps());
-  EXPECT_TRUE(originKey == std::static_pointer_cast<RasterizedImage>(image)->getTextureKey());
-
-  textureProxy = context->proxyProvider()->findOrWrapTextureProxy(originKey);
-  EXPECT_TRUE(textureProxy != nullptr);
-  image = image->makeMipmapped(true);
-  EXPECT_TRUE(image->hasMipmaps());
-  EXPECT_TRUE(mipmapKey == std::static_pointer_cast<RasterizedImage>(image)->getTextureKey());
-  mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
-  EXPECT_TRUE(mipmapTexture != nullptr);
-}
-
-TGFX_TEST(CanvasTest, RoundRectRadii) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto rect = Rect::MakeWH(250, 150);
-  std::array<Point, 4> radii = {Point{20, 20}, Point{60, 60}, Point{10, 10}, Point{0, 0}};
-  Path path = {};
-  path.addRoundRect(rect, radii);
-  auto surface = Surface::Make(context, 400, 200);
-  auto canvas = surface->getCanvas();
-  canvas->setMatrix(Matrix::MakeTrans(75, 25));
-  Paint paint;
-  paint.setColor(Color::Blue());
-  paint.setStrokeWidth(10.f);
-  canvas->drawPath(path, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/roundRectRadii"));
-
-  radii[1] = {60, 20};
-  Path path2 = {};
-  path2.addRoundRect(rect, radii);
-  paint.setColor(Color::Red());
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setStrokeWidth(10.f);
-  canvas->clear();
-  canvas->drawPath(path2, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/roundRectRadiiStroke"));
 }
 
 TGFX_TEST(CanvasTest, ScaleTest) {
@@ -2960,77 +1329,619 @@ TGFX_TEST(CanvasTest, ScaleTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ScaleTest"));
 }
 
-TGFX_TEST(CanvasTest, drawScaleImage) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto imagePath = "resources/apitest/rotation.jpg";
-  auto codec = MakeImageCodec(imagePath);
-  ASSERT_TRUE(codec != nullptr);
-  auto image = Image::MakeFrom(codec);
-  ASSERT_TRUE(image != nullptr);
-  Recorder recorder = {};
-  auto canvas = recorder.beginRecording();
-  auto paint = Paint();
-  paint.setColor(Color::Red());
-  auto rect1 = Rect::MakeWH(1000, 1000);
-  auto rect2 = Rect::MakeXYWH(1000, 2000, 1000, 1000);
-  canvas->drawImage(image);
-  canvas->drawRect(rect1, paint);
-  canvas->drawRect(rect2, paint);
-  auto singleImageRecord = recorder.finishRecordingAsPicture();
-  auto pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height());
-  pictureImage = pictureImage->makeRasterized();
-  auto scale = 0.5f;
-  auto width = static_cast<int>(image->width() * scale);
-  auto height = static_cast<int>(image->height() * scale);
-  auto matrix = Matrix::MakeScale(scale);
-  auto surface = Surface::Make(context, width, height);
-  canvas = surface->getCanvas();
-  canvas->setMatrix(matrix);
-  canvas->drawImage(pictureImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawScalePictureImage"));
-  auto scaleImage = image->makeScaled(width, height);
-  canvas->clear();
-  canvas->setMatrix(matrix);
-  canvas->drawImage(scaleImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawScaleCodecImage"));
-  auto rect = Rect::MakeXYWH(500, 1000, 2000, 1000);
-  auto subImage = image->makeSubset(rect)->makeRasterized();
-  canvas->clear();
-  canvas->setMatrix(matrix);
-  canvas->drawImage(subImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawScaleSubImage"));
-  Bitmap bitmap(codec->width(), codec->height(), false);
-  ASSERT_FALSE(bitmap.isEmpty());
-  Pixmap pixmap(bitmap);
-  auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
-  pixmap.reset();
-  EXPECT_TRUE(result);
-  auto bufferImage = Image::MakeFrom(bitmap);
-  width = static_cast<int>(bufferImage->width() * scale);
-  height = static_cast<int>(bufferImage->height() * scale);
-  scaleImage = bufferImage->makeScaled(width, height);
-  canvas->clear();
-  canvas->setMatrix(matrix);
-  canvas->drawImage(scaleImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawScaleBufferImage"));
-}
-
-TGFX_TEST(CanvasTest, RRectBlendMode) {
+TGFX_TEST(CanvasTest, PictureMaskPath) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 200, 200);
+
+  // Helper lambda to extract mask path from picture
+  auto getMaskPath = [](const std::shared_ptr<Picture>& picture, Path* maskPath) -> bool {
+    return MaskContext::GetMaskPath(picture, maskPath);
+  };
+
+  // Test 1: Simple rect - should return valid mask path
+  PictureRecorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  Paint paint = {};
+  paint.setColor(Color::White());
+  canvas->drawRect(Rect::MakeXYWH(10.f, 20.f, 80.f, 60.f), paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  Path maskPath = {};
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeXYWH(10.f, 20.f, 80.f, 60.f));
+
+  // Test 2: RRect - should return valid mask path
+  canvas = recorder.beginRecording();
+  RRect rrect = {};
+  rrect.setRectXY(Rect::MakeWH(100.f, 80.f), 10.f, 10.f);
+  canvas->drawRRect(rrect, paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeWH(100.f, 80.f));
+
+  // Test 3: Path - should return valid mask path
+  canvas = recorder.beginRecording();
+  Path circlePath = {};
+  circlePath.addOval(Rect::MakeWH(80.f, 80.f));
+  canvas->drawPath(circlePath, paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeWH(80.f, 80.f));
+
+  // Test 4: With matrix transformation
+  canvas = recorder.beginRecording();
+  canvas->translate(20.f, 30.f);
+  canvas->drawRect(Rect::MakeWH(50.f, 40.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeXYWH(20.f, 30.f, 50.f, 40.f));
+
+  // Test 5: With clip - path should be clipped
+  canvas = recorder.beginRecording();
+  canvas->clipRect(Rect::MakeWH(60.f, 60.f));
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeWH(60.f, 60.f));
+
+  // Test 6: Semi-transparent color - should NOT return mask path
+  canvas = recorder.beginRecording();
+  paint.setAlpha(0.5f);
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+  paint.setAlpha(1.0f);
+
+  // Test 7: With color filter - should NOT return mask path
+  canvas = recorder.beginRecording();
+  paint.setColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Multiply));
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+  paint.setColorFilter(nullptr);
+
+  // Test 8: With mask filter - should NOT return mask path
+  canvas = recorder.beginRecording();
+  auto maskShader = Shader::MakeColorShader(Color::White());
+  paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+  paint.setMaskFilter(nullptr);
+
+  // Test 9: Draw image - should NOT return mask path
+  canvas = recorder.beginRecording();
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  canvas->drawImage(image);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+
+  // Test 10: Inverse fill path - should return mask path
+  canvas = recorder.beginRecording();
+  Path inversePath = {};
+  inversePath.addRect(Rect::MakeWH(50.f, 50.f));
+  inversePath.addRect(Rect::MakeLTRB(10.f, 10.f, 60.f, 60.f));
+  inversePath.setFillType(PathFillType::InverseWinding);
+  ASSERT_TRUE(inversePath.isInverseFillType());
+  canvas->drawPath(inversePath, paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+
+  // Test 11: Multiple draws - should combine paths
+  canvas = recorder.beginRecording();
+  canvas->drawRect(Rect::MakeXYWH(0.f, 0.f, 50.f, 50.f), paint);
+  canvas->drawRect(Rect::MakeXYWH(60.f, 60.f, 50.f, 50.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeWH(110.f, 110.f));
+
+  // Test 12: Transparent draw - should abort
+  canvas = recorder.beginRecording();
+  paint.setAlpha(0.5f);
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+
+  // Test 13: With stroke
+  paint.setAlpha(1.0f);
+  canvas = recorder.beginRecording();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(10.0f));
+  canvas->drawRect(Rect::MakeWH(80.f, 80.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeXYWH(-5, -5, 90, 90));
+
+  // Verify by reading pixels - draw the mask path and check pixel coverage
+  paint.reset();
+  paint.setColor(Color::Red());
+  surface->getCanvas()->clear();
+  surface->getCanvas()->drawPath(maskPath, paint);
+
+  Bitmap bitmap = {};
+  bitmap.allocPixels(200, 200);
+  auto pixels = bitmap.lockPixels();
+  ASSERT_TRUE(surface->readPixels(bitmap.info(), pixels));
+  bitmap.unlockPixels();
+
+  // Check that pixel at (2, 2) is red (inside the stroke area, near top-left corner)
+  auto colorStroke = bitmap.getColor(2, 2);
+  EXPECT_EQ(colorStroke, Color::Red());
+
+  // Check that pixel at (40, 40) is transparent (inside the rect, outside the stroke area)
+  auto colorCenter = bitmap.getColor(40, 40);
+  EXPECT_EQ(colorCenter, Color::Transparent());
+
+  // Check that pixel at (100, 100) is transparent (outside the stroke bounds)
+  auto colorOutside = bitmap.getColor(100, 100);
+  EXPECT_EQ(colorOutside, Color::Transparent());
+}
+
+TGFX_TEST(CanvasTest, DrawImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/apitest/imageReplacement.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+  auto offsetX = 50.0f;
+  auto padding = 25.0f;
+
+  auto surfaceWidth = static_cast<int>(offsetX + imageWidth + padding);
+  auto surfaceHeight = static_cast<int>(padding + imageHeight + padding + imageHeight + padding);
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto maskShader = Shader::MakeLinearGradient(Point{0, 0}, Point{imageWidth, 0},
+                                               {Color::White(), Color::Transparent()}, {});
+  Paint paint;
+  paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+
+  // Top: use offset parameter, mask should stay in canvas coordinate
+  canvas->drawImage(image, offsetX, padding, &paint);
+  // Bottom: use canvas matrix, mask moves with the image
+  canvas->save();
+  canvas->translate(offsetX, padding + imageHeight + padding);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawImage"));
+}
+
+TGFX_TEST(CanvasTest, DrawTextBlob) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto font = Font(typeface, 50);
+  auto textBlob = TextBlob::MakeFrom("TGFX", font);
+  ASSERT_TRUE(textBlob != nullptr);
+  auto textBounds = textBlob->getTightBounds();
+  auto textWidth = textBounds.width();
+  auto textHeight = textBounds.height();
+  auto offsetX = 50.0f;
+  auto padding = 25.0f;
+
+  auto surfaceWidth = static_cast<int>(offsetX + textWidth + padding);
+  auto surfaceHeight = static_cast<int>(padding + textHeight + padding + textHeight + padding);
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto gradientShader = Shader::MakeLinearGradient(Point{0, 0}, Point{textWidth, 0},
+                                                   {Color::Red(), Color::Blue()}, {});
+  Paint paint;
+  paint.setShader(gradientShader);
+
+  // Top: use offset parameter, shader should stay in canvas coordinate
+  canvas->drawTextBlob(textBlob, offsetX, padding - textBounds.top, paint);
+  // Bottom: use canvas matrix, shader moves with the text
+  canvas->save();
+  canvas->translate(offsetX, padding + textHeight + padding - textBounds.top);
+  canvas->drawTextBlob(textBlob, 0, 0, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawTextBlob"));
+}
+
+TGFX_TEST(CanvasTest, CMYKWithoutICCProfile) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/mandrill_128.jpg");
+  auto surface = Surface::Make(context, image->width(), image->height());
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CMYKWithoutICCProfile"));
+}
+
+TGFX_TEST(CanvasTest, NonAARRectOp) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 500);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
+
+  // NonAARRectOp is used when antiAlias is false and no stroke.
   Paint paint;
-  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
-  paint.setBlendMode(BlendMode::Darken);
-  auto path = Path();
-  path.addRoundRect(Rect::MakeXYWH(25, 25, 150, 150), 20, 20);
-  canvas->drawPath(path, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RRectBlendMode"));
+  paint.setAntiAlias(false);
+
+  // Single filled RRect with uniform radii.
+  paint.setColor(Color::Red());
+  RRect rrect1 = {};
+  rrect1.setRectXY(Rect::MakeXYWH(50, 50, 120, 80), 15, 15);
+  canvas->drawRRect(rrect1, paint);
+
+  // Different colors and radii.
+  paint.setColor(Color::Green());
+  RRect rrect2 = {};
+  rrect2.setRectXY(Rect::MakeXYWH(200, 50, 150, 100), 30, 20);
+  canvas->drawRRect(rrect2, paint);
+
+  // Ellipse-like (large corner radii).
+  paint.setColor(Color::Blue());
+  RRect rrect3 = {};
+  rrect3.setRectXY(Rect::MakeXYWH(50, 160, 100, 80), 50, 40);
+  canvas->drawRRect(rrect3, paint);
+
+  // Small corner radii.
+  paint.setColor(Color::FromRGBA(255, 165, 0, 255));
+  RRect rrect4 = {};
+  rrect4.setRectXY(Rect::MakeXYWH(200, 160, 150, 100), 5, 5);
+  canvas->drawRRect(rrect4, paint);
+
+  // With transformation - rotation.
+  canvas->save();
+  canvas->translate(100, 350);
+  canvas->rotate(15);
+  paint.setColor(Color::FromRGBA(128, 0, 128, 255));
+  RRect rrect5 = {};
+  rrect5.setRectXY(Rect::MakeXYWH(-50, -30, 100, 60), 10, 10);
+  canvas->drawRRect(rrect5, paint);
+  canvas->restore();
+
+  // With transformation - scale.
+  canvas->save();
+  canvas->translate(280, 350);
+  canvas->scale(1.5f, 0.8f);
+  paint.setColor(Color::FromRGBA(0, 128, 128, 255));
+  RRect rrect6 = {};
+  rrect6.setRectXY(Rect::MakeXYWH(-40, -25, 80, 50), 12, 12);
+  canvas->drawRRect(rrect6, paint);
+  canvas->restore();
+
+  // Verify RRectDrawOp with non-AA is used by checking the Op type.
+  surface->renderContext->flush();
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  EXPECT_EQ(drawingBuffer->renderTasks.size(), 1u);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
+  EXPECT_EQ(task->drawOps.size(), 1u);
+  // All 6 non-AA filled RRects should be batched into a single RRectDrawOp.
+  auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp);
+  EXPECT_EQ(rrectOp->rectCount, 6u);
+
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOp"));
 }
+
+TGFX_TEST(CanvasTest, NonAARRectOpWithShader) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 350);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Test NonAARRectOp with image shader to verify UV coordinates are correct.
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+
+  // Draw two RRects without AA.
+  // Both use device coordinates for UV, so textures should tile continuously.
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setShader(shader);
+  RRect rrect = {};
+  rrect.setRectXY(Rect::MakeXYWH(50, 50, 200, 120), 30, 30);
+  canvas->drawRRect(rrect, paint);
+
+  // Bottom: Also non-AA
+  Paint paint2;
+  paint2.setAntiAlias(false);
+  paint2.setShader(shader);
+  RRect rrect2 = {};
+  rrect2.setRectXY(Rect::MakeXYWH(50, 180, 200, 120), 30, 30);
+  canvas->drawRRect(rrect2, paint2);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpWithShader"));
+}
+
+TGFX_TEST(CanvasTest, NonAARRectOpStroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 400);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setStyle(PaintStyle::Stroke);
+
+  // Draw stroked RRects with various stroke widths and corner radii.
+  // Top row: different stroke widths with same corner radius.
+  paint.setColor(Color::Red());
+  paint.setStroke(Stroke(4));
+  RRect rrect1 = {};
+  rrect1.setRectXY(Rect::MakeXYWH(50, 50, 100, 80), 20, 20);
+  canvas->drawRRect(rrect1, paint);
+
+  paint.setColor(Color::Green());
+  paint.setStroke(Stroke(8));
+  RRect rrect2 = {};
+  rrect2.setRectXY(Rect::MakeXYWH(180, 50, 100, 80), 20, 20);
+  canvas->drawRRect(rrect2, paint);
+
+  paint.setColor(Color::Blue());
+  paint.setStroke(Stroke(16));
+  RRect rrect3 = {};
+  rrect3.setRectXY(Rect::MakeXYWH(310, 50, 100, 80), 20, 20);
+  canvas->drawRRect(rrect3, paint);
+
+  // Middle row: different corner radii with same stroke width.
+  paint.setColor(Color::FromRGBA(255, 128, 0));
+  paint.setStroke(Stroke(8));
+  RRect rrect4 = {};
+  rrect4.setRectXY(Rect::MakeXYWH(50, 180, 100, 80), 10, 10);
+  canvas->drawRRect(rrect4, paint);
+
+  paint.setColor(Color::FromRGBA(128, 0, 255));
+  RRect rrect5 = {};
+  rrect5.setRectXY(Rect::MakeXYWH(180, 180, 100, 80), 30, 30);
+  canvas->drawRRect(rrect5, paint);
+
+  paint.setColor(Color::FromRGBA(0, 128, 128));
+  RRect rrect6 = {};
+  rrect6.setRectXY(Rect::MakeXYWH(310, 180, 100, 80), 50, 40);
+  canvas->drawRRect(rrect6, paint);
+
+  // Bottom: stroke that covers entire corner (thick stroke with small radius).
+  paint.setColor(Color::FromRGBA(128, 128, 0));
+  paint.setStroke(Stroke(20));
+  RRect rrect7 = {};
+  rrect7.setRectXY(Rect::MakeXYWH(100, 300, 150, 60), 10, 10);
+  canvas->drawRRect(rrect7, paint);
+
+  // Bottom right: stroke on a plain rect (no corner radius).
+  // Note: radii < 0.5 causes Canvas::drawRRect to redirect to drawRect (RectDrawOp path).
+  paint.setColor(Color::FromRGBA(0, 64, 128));
+  paint.setStroke(Stroke(6));
+  RRect rrect8 = {};
+  rrect8.setRectXY(Rect::MakeXYWH(300, 300, 120, 60), 0, 0);
+  canvas->drawRRect(rrect8, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpStroke"));
+}
+
+TGFX_TEST(CanvasTest, NonAARRectOpTransform) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 500);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setColor(Color::Red());
+
+  RRect rrect = {};
+  rrect.setRectXY(Rect::MakeXYWH(-50, -40, 100, 80), 15, 15);
+
+  // Top-left: Non-AA with rotation
+  paint.setAntiAlias(false);
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(100, 100));
+  canvas->concat(Matrix::MakeRotate(30));
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  // Top-right: AA with rotation (same transform for comparison)
+  paint.setAntiAlias(true);
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(300, 100));
+  canvas->concat(Matrix::MakeRotate(30));
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  // Middle-left: Non-AA with skew
+  paint.setAntiAlias(false);
+  paint.setColor(Color::Blue());
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(100, 300));
+  auto skewMatrix = Matrix::I();
+  skewMatrix.setSkewX(0.3f);
+  canvas->concat(skewMatrix);
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  // Middle-right: AA with skew (same transform for comparison)
+  paint.setAntiAlias(true);
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(300, 300));
+  canvas->concat(skewMatrix);
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpTransform"));
+}
+
+TGFX_TEST(CanvasTest, NonAARRectOpStrokeScale) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 400);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(6));
+
+  RRect rrect = {};
+  rrect.setRectXY(Rect::MakeXYWH(-50, -40, 100, 80), 15, 15);
+
+  // Top-left: Non-AA with non-uniform scale
+  paint.setAntiAlias(false);
+  paint.setColor(Color::Red());
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(130, 100));
+  canvas->concat(Matrix::MakeScale(2.0f, 1.0f));
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  // Top-right: AA with non-uniform scale (same transform for comparison)
+  paint.setAntiAlias(true);
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(380, 100));
+  canvas->concat(Matrix::MakeScale(2.0f, 1.0f));
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  // Bottom-left: Non-AA with uniform scale + rotation
+  paint.setAntiAlias(false);
+  paint.setColor(Color::Blue());
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(130, 300));
+  canvas->concat(Matrix::MakeScale(1.5f));
+  canvas->concat(Matrix::MakeRotate(20));
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  // Bottom-right: AA with uniform scale + rotation (same transform for comparison)
+  paint.setAntiAlias(true);
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(380, 300));
+  canvas->concat(Matrix::MakeScale(1.5f));
+  canvas->concat(Matrix::MakeRotate(20));
+  canvas->drawRRect(rrect, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpStrokeScale"));
+}
+
+TGFX_TEST(CanvasTest, NonAARRectOpColorStroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 500);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setAntiAlias(false);
+
+  // Row 1: hasColor + hasStroke (different colors trigger hasColor)
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(6));
+  paint.setColor(Color::Red());
+  RRect rrect1 = {};
+  rrect1.setRectXY(Rect::MakeXYWH(50, 50, 120, 80), 15, 15);
+  canvas->drawRRect(rrect1, paint);
+
+  paint.setColor(Color::Blue());
+  RRect rrect2 = {};
+  rrect2.setRectXY(Rect::MakeXYWH(200, 50, 120, 80), 20, 20);
+  canvas->drawRRect(rrect2, paint);
+
+  surface->renderContext->flush();
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  ASSERT_EQ(task->drawOps.size(), 1u);
+  auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(rrectOp->rectCount, 2u);
+  context->flushAndSubmit();
+
+  // Row 2: !hasColor + hasStroke (same color batched together)
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(8));
+  paint.setColor(Color::Green());
+  RRect rrect3 = {};
+  rrect3.setRectXY(Rect::MakeXYWH(50, 170, 120, 80), 20, 20);
+  canvas->drawRRect(rrect3, paint);
+
+  RRect rrect4 = {};
+  rrect4.setRectXY(Rect::MakeXYWH(200, 170, 120, 80), 15, 15);
+  canvas->drawRRect(rrect4, paint);
+
+  surface->renderContext->flush();
+  drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  ASSERT_EQ(task->drawOps.size(), 1u);
+  rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(rrectOp->rectCount, 2u);
+  context->flushAndSubmit();
+
+  // Row 3: hasColor + !hasStroke (different colors, fill mode)
+  paint.setStyle(PaintStyle::Fill);
+  paint.setColor(Color::FromRGBA(255, 128, 0));
+  RRect rrect5 = {};
+  rrect5.setRectXY(Rect::MakeXYWH(50, 300, 120, 80), 15, 15);
+  canvas->drawRRect(rrect5, paint);
+
+  paint.setColor(Color::FromRGBA(128, 0, 255));
+  RRect rrect6 = {};
+  rrect6.setRectXY(Rect::MakeXYWH(200, 300, 120, 80), 20, 20);
+  canvas->drawRRect(rrect6, paint);
+
+  surface->renderContext->flush();
+  drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  ASSERT_EQ(task->drawOps.size(), 1u);
+  rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(rrectOp->rectCount, 2u);
+  context->flushAndSubmit();
+
+  // Row 4: !hasColor + !hasStroke (same color batched together)
+  paint.setColor(Color::FromRGBA(0, 128, 128));
+  RRect rrect7 = {};
+  rrect7.setRectXY(Rect::MakeXYWH(50, 420, 120, 40), 15, 15);
+  canvas->drawRRect(rrect7, paint);
+
+  RRect rrect8 = {};
+  rrect8.setRectXY(Rect::MakeXYWH(200, 420, 120, 40), 10, 10);
+  canvas->drawRRect(rrect8, paint);
+
+  surface->renderContext->flush();
+  drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  ASSERT_EQ(task->drawOps.size(), 1u);
+  rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(rrectOp->rectCount, 2u);
+  context->flushAndSubmit();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpColorStroke"));
+}
+
 }  // namespace tgfx

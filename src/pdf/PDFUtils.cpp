@@ -20,10 +20,13 @@
 #include <array>
 #include <cfloat>
 #include <string>
+#include "core/NoConicsPathIterator.h"
+#include "core/utils/Log.h"
 #include "pdf/PDFResourceDictionary.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/UTF.h"
@@ -36,7 +39,7 @@ namespace {
 size_t PrintPermilAsDecimal(int x, char* result, int places) {
   result[0] = '.';
   for (int i = places; i > 0; --i) {
-    result[i] = '0' + x % 10;
+    result[i] = static_cast<char>('0' + x % 10);
     x /= 10;
   }
   size_t j = 0;
@@ -54,6 +57,7 @@ constexpr int IntPow(int base, unsigned exp, int acc = 1) {
 }
 
 std::array<float, 6> MatrixToPDFAffine(const Matrix& matrix) {
+  DEBUG_ASSERT(!matrix.hasPerspective());
   std::array<float, 6> origin = {};
   matrix.get6(origin.data());
 
@@ -304,17 +308,18 @@ void PDFUtils::EmitPath(const Path& path, bool doConsumeDegerates,
   auto lastMovePt = Point::Make(0, 0);
   auto currentSegment = MemoryWriteStream::Make();
 
-  auto pathIterator = [&](PathVerb verb, const Point points[4], void* /*info*/) -> void {
-    switch (verb) {
+  NoConicsPathIterator iterator(path);
+  for (auto segment : iterator) {
+    switch (segment.verb) {
       case PathVerb::Move:
-        MoveTo(points[0].x, points[0].y, currentSegment);
-        lastMovePt = points[0];
+        MoveTo(segment.points[0].x, segment.points[0].y, currentSegment);
+        lastMovePt = segment.points[0];
         fillState = SkipFillState::Empty;
         break;
       case PathVerb::Line:
-        if (!doConsumeDegerates || !AllPointsEqual(points, 2)) {
-          AppendLine(points[1].x, points[1].y, currentSegment);
-          if ((fillState == SkipFillState::Empty) && (points[0] != lastMovePt)) {
+        if (!doConsumeDegerates || !AllPointsEqual(segment.points, 2)) {
+          AppendLine(segment.points[1].x, segment.points[1].y, currentSegment);
+          if ((fillState == SkipFillState::Empty) && (segment.points[0] != lastMovePt)) {
             fillState = SkipFillState::SingleLine;
             break;
           }
@@ -322,14 +327,15 @@ void PDFUtils::EmitPath(const Path& path, bool doConsumeDegerates,
         }
         break;
       case PathVerb::Quad:
-        if (!doConsumeDegerates || !AllPointsEqual(points, 3)) {
-          AppendQuad(points, currentSegment);
+        if (!doConsumeDegerates || !AllPointsEqual(segment.points, 3)) {
+          AppendQuad(segment.points, currentSegment);
           fillState = SkipFillState::NonSingleLine;
         }
         break;
       case PathVerb::Cubic:
-        if (!doConsumeDegerates || !AllPointsEqual(points, 4)) {
-          AppendCubic(points[1].x, points[1].y, points[2].x, points[2].y, points[3].x, points[3].y,
+        if (!doConsumeDegerates || !AllPointsEqual(segment.points, 4)) {
+          AppendCubic(segment.points[1].x, segment.points[1].y, segment.points[2].x,
+                      segment.points[2].y, segment.points[3].x, segment.points[3].y,
                       currentSegment);
           fillState = SkipFillState::NonSingleLine;
         }
@@ -338,10 +344,10 @@ void PDFUtils::EmitPath(const Path& path, bool doConsumeDegerates,
         ClosePath(currentSegment);
         currentSegment->writeToAndReset(content);
         break;
+      default:
+        break;
     }
-  };
-
-  path.decompose(pathIterator, nullptr);
+  }
 
   if (currentSegment->bytesWritten() > 0) {
     currentSegment->writeToStream(content);

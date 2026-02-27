@@ -21,10 +21,10 @@
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
-static std::unique_ptr<GPUTexture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBufferRef pixelBuffer,
-                                                        size_t planeIndex, PixelFormat pixelFormat,
-                                                        uint32_t usage,
-                                                        CVOpenGLESTextureCacheRef textureCache) {
+static std::shared_ptr<Texture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBufferRef pixelBuffer,
+                                                     size_t planeIndex, PixelFormat pixelFormat,
+                                                     uint32_t usage,
+                                                     CVOpenGLESTextureCacheRef textureCache) {
   auto width = static_cast<int>(CVPixelBufferGetWidthOfPlane(pixelBuffer, planeIndex));
   auto height = static_cast<int>(CVPixelBufferGetHeightOfPlane(pixelBuffer, planeIndex));
   CVOpenGLESTextureRef texture = nil;
@@ -35,51 +35,63 @@ static std::unique_ptr<GPUTexture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBuf
       kCFAllocatorDefault, textureCache, pixelBuffer, NULL,             /* texture attributes */
       GL_TEXTURE_2D, static_cast<GLint>(format.internalFormatTexImage), /* opengl format */
       width, height, format.externalFormat,                             /* native iOS format */
-      GL_UNSIGNED_BYTE, planeIndex, &texture);
+      format.externalType, planeIndex, &texture);
   if (result != kCVReturnSuccess && texture != nil) {
     CFRelease(texture);
     return nullptr;
   }
   auto textureID = CVOpenGLESTextureGetName(texture);
   auto target = CVOpenGLESTextureGetTarget(texture);
-  GPUTextureDescriptor descriptor = {static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
-                                     static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)),
-                                     pixelFormat,
-                                     false,
-                                     1,
-                                     usage};
-  auto hardwareTexture = std::unique_ptr<EAGLHardwareTexture>(
-      new EAGLHardwareTexture(descriptor, pixelBuffer, texture, target, textureID));
-  if (!hardwareTexture->checkFrameBuffer(gpu)) {
-    hardwareTexture->release(gpu);
+  TextureDescriptor descriptor = {static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
+                                  static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)),
+                                  pixelFormat,
+                                  false,
+                                  1,
+                                  usage};
+  auto hardwareTexture =
+      gpu->makeResource<EAGLHardwareTexture>(descriptor, pixelBuffer, texture, target, textureID);
+  if (hardwareTexture->usage() & TextureUsage::RENDER_ATTACHMENT &&
+      !hardwareTexture->checkFrameBuffer(gpu)) {
     return nullptr;
   }
   return hardwareTexture;
 }
 
-std::vector<std::unique_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(EAGLGPU* gpu,
-                                                                       CVPixelBufferRef pixelBuffer,
-                                                                       uint32_t usage) {
+std::vector<std::shared_ptr<Texture>> EAGLHardwareTexture::MakeFrom(EAGLGPU* gpu,
+                                                                    CVPixelBufferRef pixelBuffer,
+                                                                    uint32_t usage) {
   auto textureCache = gpu->getTextureCache();
   if (textureCache == nil) {
     return {};
   }
-  auto yuvFormat = YUVFormat::Unknown;
-  auto formats = gpu->getHardwareTextureFormats(pixelBuffer, &yuvFormat);
+  auto pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer);
+  std::vector<PixelFormat> formats = {};
+  switch (pixelFormat) {
+    case kCVPixelFormatType_OneComponent8:
+      formats.push_back(PixelFormat::ALPHA_8);
+      break;
+    case kCVPixelFormatType_32BGRA:
+      formats.push_back(PixelFormat::BGRA_8888);
+      break;
+    case kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange:
+    case kCVPixelFormatType_420YpCbCr8BiPlanarFullRange:
+      formats.push_back(PixelFormat::GRAY_8);
+      formats.push_back(PixelFormat::RG_88);
+      break;
+    default:
+      break;
+  }
   if (formats.empty()) {
     return {};
   }
-  if (usage & GPUTextureUsage::RENDER_ATTACHMENT &&
-      (yuvFormat != YUVFormat::Unknown || !gpu->caps()->isFormatRenderable(formats.front()))) {
+  if (usage & TextureUsage::RENDER_ATTACHMENT &&
+      (formats.size() != 1 || !gpu->isFormatRenderable(formats.front()))) {
     return {};
   }
-  std::vector<std::unique_ptr<GPUTexture>> textures = {};
+  std::vector<std::shared_ptr<Texture>> textures = {};
   for (size_t i = 0; i < formats.size(); ++i) {
     auto texture = CreateTextureOfPlane(gpu, pixelBuffer, i, formats[i], usage, textureCache);
     if (texture == nullptr) {
-      for (auto& plane : textures) {
-        plane->release(gpu);
-      }
       return {};
     }
     textures.push_back(std::move(texture));
@@ -87,7 +99,7 @@ std::vector<std::unique_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(EAGLGPU* 
   return textures;
 }
 
-EAGLHardwareTexture::EAGLHardwareTexture(const GPUTextureDescriptor& descriptor,
+EAGLHardwareTexture::EAGLHardwareTexture(const TextureDescriptor& descriptor,
                                          CVPixelBufferRef pixelBuffer, CVOpenGLESTextureRef texture,
                                          unsigned target, unsigned textureID)
     : GLTexture(descriptor, target, textureID), pixelBuffer(pixelBuffer), texture(texture) {
@@ -101,7 +113,7 @@ EAGLHardwareTexture::~EAGLHardwareTexture() {
   }
 }
 
-void EAGLHardwareTexture::onRelease(GLGPU* gpu) {
+void EAGLHardwareTexture::onReleaseTexture(GLGPU* gpu) {
   if (texture == nil) {
     return;
   }

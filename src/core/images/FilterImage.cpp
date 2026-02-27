@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FilterImage.h"
+#include "core/filters/ComposeImageFilter.h"
 #include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/utils/AddressOf.h"
@@ -113,9 +114,7 @@ std::shared_ptr<Image> FilterImage::onMakeScaled(int newWidth, int newHeight,
 }
 
 std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) const {
-  auto inputBounds = Rect::MakeWH(source->width(), source->height());
-  auto filterBounds = filter->filterBounds(inputBounds);
-  return filter->lockTextureProxy(source, filterBounds, args);
+  return filter->lockTextureProxy(source, bounds, args);
 }
 
 PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& args,
@@ -152,6 +151,8 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
   if (fpMatrix) {
     matrix.preConcat(*fpMatrix);
   }
-  return TiledTextureEffect::Make(textureProxy, samplingArgs, &matrix, source->isAlphaOnly());
+  auto allocator = args.context->drawingAllocator();
+  return TiledTextureEffect::Make(allocator, textureProxy, samplingArgs, &matrix,
+                                  source->isAlphaOnly());
 }
 }  // namespace tgfx

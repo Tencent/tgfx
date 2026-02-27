@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "gpu/Blend.h"
+#include "gpu/BlendFormula.h"
 #include "gpu/processors/XferProcessor.h"
 #include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
 class PorterDuffXferProcessor : public XferProcessor {
  public:
-  static PlacementPtr<PorterDuffXferProcessor> Make(BlockBuffer* buffer, BlendMode blend,
+  static PlacementPtr<PorterDuffXferProcessor> Make(BlockAllocator* allocator, BlendMode blend,
                                                     DstTextureInfo dstTextureInfo);
 
   std::string name() const override {

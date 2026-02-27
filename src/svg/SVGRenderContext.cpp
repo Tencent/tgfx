@@ -31,7 +31,7 @@
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/core/Recorder.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
@@ -289,8 +289,8 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
   }
 
   auto maskNode = std::static_pointer_cast<SVGMask>(node);
-  Recorder maskRecorder;
-  auto* maskCanvas = maskRecorder.beginRecording();
+  PictureRecorder maskRecorder;
+  auto maskCanvas = maskRecorder.beginRecording();
   {
     SVGRenderContext maskContext(*this, maskCanvas);
     maskNode->renderMask(maskContext);

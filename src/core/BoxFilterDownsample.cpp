@@ -251,7 +251,7 @@ static void ResizeAreaFast(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo, c
   ResizeAreaFastVec vecOp(scaleX, scaleY, channelNum, srcInfo.layout.rowBytes,
                           dstInfo.layout.rowBytes);
   for (dstY = 0; dstY < dstInfo.layout.height; dstY++) {
-    auto* dstData = static_cast<uint8_t*>(dstInfo.pixels) + dstY * dstInfo.layout.rowBytes;
+    auto dstData = static_cast<uint8_t*>(dstInfo.pixels) + dstY * dstInfo.layout.rowBytes;
     int srcY0 = dstY * scaleY;
     int w = srcY0 + scaleY <= srcInfo.layout.height ? dwith1 : 0;
     if (srcY0 >= srcInfo.layout.height) {

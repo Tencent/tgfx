@@ -19,7 +19,7 @@
 #pragma once
 
 #include "core/images/PixelImage.h"
-#include "gpu/ResourceKey.h"
+#include "gpu/resources/ResourceKey.h"
 
 namespace tgfx {
 /**
@@ -48,6 +48,10 @@ class RasterizedImage : public Image {
 
   bool hasMipmaps() const override {
     return source->hasMipmaps();
+  }
+
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return source->colorSpace();
   }
 
   std::shared_ptr<Image> makeRasterized() const override;

@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "platform/web/VideoElement.h"
-#include "gpu/DefaultTextureView.h"
 #include "gpu/opengl/GLTexture.h"
+#include "gpu/resources/DefaultTextureView.h"
 
 namespace tgfx {
 using namespace emscripten;
@@ -62,9 +62,9 @@ std::shared_ptr<TextureView> VideoElement::onMakeTexture(Context* context, bool 
 }
 
 bool VideoElement::onUpdateTexture(std::shared_ptr<TextureView> textureView) {
-  auto glTexture = static_cast<const GLTexture*>(textureView->getTexture());
+  auto glTexture = std::static_pointer_cast<GLTexture>(textureView->getTexture());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          source, glTexture->textureID(), false);
+                                          source, glTexture->textureID(), 0, 0, false);
   return true;
 }
 }  // namespace tgfx

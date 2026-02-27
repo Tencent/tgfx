@@ -19,6 +19,7 @@
 #include "ColorImageFilter.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
@@ -35,14 +36,24 @@ ColorImageFilter::ColorImageFilter(std::shared_ptr<tgfx::ColorFilter> filter)
 PlacementPtr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  auto imageProcessor =
-      FragmentProcessor::Make(std::move(source), args, sampling, constraint, uvMatrix);
+  auto imageProcessor = FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
   if (imageProcessor == nullptr) {
     return nullptr;
   }
-  auto drawingBuffer = args.context->drawingBuffer();
-  auto processor = ComposeFragmentProcessor::Make(drawingBuffer, std::move(imageProcessor),
-                                                  filter->asFragmentProcessor(args.context));
-  return FragmentProcessor::MulChildByInputAlpha(drawingBuffer, std::move(processor));
+  auto allocator = args.context->drawingAllocator();
+  auto colorProcessor = filter->asFragmentProcessor(args.context, source->colorSpace());
+  if (colorProcessor == nullptr) {
+    return imageProcessor;
+  }
+  auto composed = ComposeFragmentProcessor::Make(allocator, std::move(imageProcessor),
+                                                 std::move(colorProcessor));
+  if (!filter->affectsTransparentBlack()) {
+    return composed;
+  }
+  // The color filter transforms transparent pixels into non-transparent ones. Use the original
+  // image alpha as a mask to prevent coloring transparent regions.
+  auto alphaSource = FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
+  return XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      allocator, std::move(composed), std::move(alphaSource), BlendMode::SrcIn);
 }
 }  // namespace tgfx

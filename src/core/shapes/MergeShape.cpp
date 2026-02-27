@@ -37,41 +37,52 @@ std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_pt
   return std::make_shared<MergeShape>(std::move(first), std::move(second), pathOp);
 }
 
-bool MergeShape::isInverseFillType() const {
+PathFillType MergeShape::fillType() const {
+  bool firstInverse = first->isInverseFillType();
+  bool secondInverse = second->isInverseFillType();
+  bool inverse = false;
   switch (pathOp) {
     case PathOp::Difference:
-      return first->isInverseFillType() && !second->isInverseFillType();
+      inverse = firstInverse && !secondInverse;
+      break;
     case PathOp::Intersect:
-      return first->isInverseFillType() && second->isInverseFillType();
+      inverse = firstInverse && secondInverse;
+      break;
     case PathOp::Union:
-      return first->isInverseFillType() || second->isInverseFillType();
+      inverse = firstInverse || secondInverse;
+      break;
     case PathOp::XOR:
-      return first->isInverseFillType() != second->isInverseFillType();
+      inverse = firstInverse != secondInverse;
+      break;
     default:
-      return false;
+      break;
   }
+  // PathOp always produces EvenOdd fill type regardless of input fill types.
+  return inverse ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd;
 }
 
-Rect MergeShape::getBounds() const {
-  auto firstBounds = first->getBounds();
-  auto secondBounds = second->getBounds();
+Rect MergeShape::onGetBounds() const {
+  auto firstBounds = first->onGetBounds();
+  auto secondBounds = second->onGetBounds();
+  bool firstInverse = first->isInverseFillType();
+  bool secondInverse = second->isInverseFillType();
   switch (pathOp) {
     case PathOp::Difference:
-      return second->isInverseFillType() ? secondBounds : firstBounds;
+      return secondInverse ? secondBounds : firstBounds;
     case PathOp::Intersect:
-      if (first->isInverseFillType() == second->isInverseFillType()) {
+      if (firstInverse == secondInverse) {
         return firstBounds.intersect(secondBounds) ? firstBounds : Rect::MakeEmpty();
       }
-      return first->isInverseFillType() ? secondBounds : firstBounds;
+      return firstInverse ? secondBounds : firstBounds;
     default:
       firstBounds.join(secondBounds);
       return firstBounds;
   }
 }
 
-Path MergeShape::getPath() const {
-  auto path = first->getPath();
-  auto secondPath = second->getPath();
+Path MergeShape::onGetPath(float resolutionScale) const {
+  auto path = first->onGetPath(resolutionScale);
+  auto secondPath = second->onGetPath(resolutionScale);
   path.addPath(secondPath, pathOp);
   return path;
 }

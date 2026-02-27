@@ -28,7 +28,8 @@ namespace tgfx {
 class PictureImage : public Image {
  public:
   PictureImage(std::shared_ptr<Picture> picture, int width, int height,
-               const Matrix* matrix = nullptr, bool mipmapped = false);
+               const Matrix* matrix = nullptr, bool mipmapped = false,
+               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   ~PictureImage() override;
 
@@ -46,6 +47,10 @@ class PictureImage : public Image {
 
   bool hasMipmaps() const override {
     return mipmapped;
+  }
+
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return _colorSpace;
   }
 
   std::shared_ptr<Picture> picture = nullptr;
@@ -74,5 +79,6 @@ class PictureImage : public Image {
   int _width = 0;
   int _height = 0;
   bool mipmapped = false;
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 };
 }  // namespace tgfx

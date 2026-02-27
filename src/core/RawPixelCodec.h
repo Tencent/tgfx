@@ -24,7 +24,8 @@ namespace tgfx {
 class RawPixelCodec : public ImageCodec {
  public:
   RawPixelCodec(const ImageInfo& info, std::shared_ptr<Data> pixels)
-      : ImageCodec(info.width(), info.height()), info(info), pixels(std::move(pixels)) {
+      : ImageCodec(info.width(), info.height(), Orientation::TopLeft, info.colorSpace()),
+        info(info), pixels(std::move(pixels)) {
   }
 
   bool isAlphaOnly() const override {
@@ -35,8 +36,9 @@ class RawPixelCodec : public ImageCodec {
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
   bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                    void* dstPixels) const override {
-    auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+                    std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const override {
+    auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes,
+                                   std::move(dstColorSpace));
     return Pixmap(info, pixels->data()).readPixels(dstInfo, dstPixels);
   }
 

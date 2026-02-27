@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ModeColorFilter.h"
+#include "core/utils/ColorHelper.h"
 #include "core/utils/Types.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -68,14 +69,33 @@ bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   return color == other->color && mode == other->mode;
 }
 
-PlacementPtr<FragmentProcessor> ModeColorFilter::asFragmentProcessor(Context* context) const {
+PlacementPtr<FragmentProcessor> ModeColorFilter::asFragmentProcessor(
+    Context* context, const std::shared_ptr<ColorSpace>& dstColorSpace) const {
+  auto dstColor = ToPMColor(color, dstColorSpace);
   auto processor =
-      ConstColorProcessor::Make(context->drawingBuffer(), color.premultiply(), InputMode::Ignore);
-  return XfermodeFragmentProcessor::MakeFromSrcProcessor(context->drawingBuffer(),
+      ConstColorProcessor::Make(context->drawingAllocator(), dstColor, InputMode::Ignore);
+  return XfermodeFragmentProcessor::MakeFromSrcProcessor(context->drawingAllocator(),
                                                          std::move(processor), mode);
 }
 
 bool ModeColorFilter::isAlphaUnchanged() const {
   return BlendMode::Dst == mode || BlendMode::SrcATop == mode;
+}
+
+bool ModeColorFilter::affectsTransparentBlack() const {
+  // When dst is transparent black (0,0,0,0), only these modes produce zero output regardless of
+  // the src color: SrcIn (src * dstA = 0), DstIn (dst * srcA = 0), DstOut (dst * (1-srcA) = 0),
+  // SrcATop (src * dstA + dst * (1-srcA) = 0), and Modulate (src * dst = 0).
+  // Clear and Dst are already handled by ColorFilter::Blend() (converted or returned as nullptr).
+  switch (mode) {
+    case BlendMode::SrcIn:
+    case BlendMode::DstIn:
+    case BlendMode::DstOut:
+    case BlendMode::SrcATop:
+    case BlendMode::Modulate:
+      return false;
+    default:
+      return color.alpha > 0.0f;
+  }
 }
 }  // namespace tgfx

@@ -18,9 +18,12 @@
 
 #pragma once
 
+#include <cassert>
 #include <cfloat>
 #include <cinttypes>
 #include <limits>
+#include "tgfx/core/AlphaType.h"
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 
@@ -28,46 +31,66 @@ namespace tgfx {
  * RGBA color value, holding four floating point components. Color components are always in a known
  * order.
  */
-struct Color {
+template <AlphaType AT>
+struct RGBA4f {
   /**
-   * Returns a fully transparent Color.
+   * Returns a fully transparent Color in sRGB gamut.
    */
-  static const Color& Transparent();
+  static const RGBA4f& Transparent() {
+    static const RGBA4f color = {0.0f, 0.0f, 0.0f, 0.0f};
+    return color;
+  }
 
   /**
-   * Returns a fully opaque black Color.
+   * Returns a fully opaque black Color in srgb gamut.
    */
-  static const Color& Black();
+  static const RGBA4f& Black() {
+    static const RGBA4f color = {0.0f, 0.0f, 0.0f, 1.0f};
+    return color;
+  }
 
   /**
-   * Returns a fully opaque white Color.
+   * Returns a fully opaque white Color in sRGB gamut.
    */
-  static const Color& White();
+  static const RGBA4f& White() {
+    static const RGBA4f color = {1.0f, 1.0f, 1.0f, 1.0f};
+    return color;
+  }
 
   /**
-   * Returns a fully opaque red Color.
+   * Returns a fully opaque red Color in sRGB gamut.
    */
-  static const Color& Red();
+  static const RGBA4f& Red() {
+    static const RGBA4f color = {1.0f, 0.0f, 0.0f, 1.0f};
+    return color;
+  }
 
   /**
-   * Returns a fully opaque green Color.
+   * Returns a fully opaque green Color in sRGB gamut.
    */
-  static const Color& Green();
+  static const RGBA4f& Green() {
+    static const RGBA4f color = {0.0f, 1.0f, 0.0f, 1.0f};
+    return color;
+  }
 
   /**
-   * Returns a fully opaque blue Color.
+   * Returns a fully opaque blue Color in sRGB gamut.
    */
-  static const Color& Blue();
+  static const RGBA4f& Blue() {
+    static const RGBA4f color = {0.0f, 0.0f, 1.0f, 1.0f};
+    return color;
+  }
 
   /**
-   * Returns color value from 8-bit component values.
+   * Returns color value from 8-bit component values and ColorSpace.
    */
-  static Color FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
+  static RGBA4f FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255,
+                         const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
 
   /**
    * Constructs an opaque white Color.
    */
-  constexpr Color() : red(1.0f), green(1.0f), blue(1.0f), alpha(1.0f) {
+  RGBA4f() : red(1.0f), green(1.0f), blue(1.0f), alpha(1.0f) {
   }
 
   /**
@@ -77,7 +100,7 @@ struct Color {
    * @param b  blue component
    * @param a  alpha component
    */
-  constexpr Color(float r, float g, float b, float a = 1.0f) : red(r), green(g), blue(b), alpha(a) {
+  RGBA4f(float r, float g, float b, float a = 1.0f) : red(r), green(g), blue(b), alpha(a) {
   }
 
   /**
@@ -103,14 +126,14 @@ struct Color {
   /**
    * Compares Color with other, and returns true if all components are equal.
    */
-  bool operator==(const Color& other) const {
+  bool operator==(const RGBA4f& other) const {
     return alpha == other.alpha && red == other.red && green == other.green && blue == other.blue;
   }
 
   /**
    * Compares Color with other, and returns true if not all components are equal.
    */
-  bool operator!=(const Color& other) const {
+  bool operator!=(const RGBA4f& other) const {
     return !(*this == other);
   }
 
@@ -133,42 +156,77 @@ struct Color {
    * @param index  one of: 0 (r), 1 (g), 2 (b), 3 (a)
    * @return value corresponding to index.
    */
-  float operator[](int index) const;
+  float operator[](int index) const {
+    assert(index >= 0 && index < 4);
+    return (&red)[index];
+  }
 
   /**
    * Returns one component.
    * @param index  one of: 0 (r), 1 (g), 2 (b), 3 (a)
    * @return value corresponding to index.
    */
-  float& operator[](int index);
-
-  /**
-   * Returns true if all channels are in [0, 1].
-   **/
-  bool isValid() const;
+  float& operator[](int index) {
+    assert(index >= 0 && index < 4);
+    return (&red)[index];
+  }
 
   /**
    * Returns true if Color is an opaque color.
    */
-  bool isOpaque() const;
+  bool isOpaque() const {
+    assert(alpha <= 1.0f && alpha >= 0.0f);
+    return alpha == 1.0f;
+  }
 
   /**
    * Returns a Color with the alpha set to 1.0.
    */
-  Color makeOpaque() const {
+  RGBA4f makeOpaque() const {
     return {red, green, blue, 1.0f};
   }
 
   /**
-   * Returns a Color premultiplied by alpha.
+   * Returns a Color premultiplied by alpha. Asserts at compile time if RGBA4f is already
+   * premultiplied.
    */
-  Color premultiply() const {
+  RGBA4f<AlphaType::Premultiplied> premultiply() const {
+    static_assert(AT == AlphaType::Unpremultiplied);
     return {red * alpha, green * alpha, blue * alpha, alpha};
   }
 
   /**
-   * Returns a Color unpremultiplied by alpha.
+   * Returns a Color unpremultiplied by alpha. Asserts at compile time if RGBA4f is already
+   * unpremultiplied.
    */
-  Color unpremultiply() const;
+  RGBA4f<AlphaType::Unpremultiplied> unpremultiply() const {
+    static_assert(AT == AlphaType::Premultiplied);
+    if (alpha == 0.0f) {
+      return {0, 0, 0, 0};
+    } else {
+      float invAlpha = 1 / alpha;
+      return {red * invAlpha, green * invAlpha, blue * invAlpha, alpha};
+    }
+  }
 };
+
+template <>
+RGBA4f<AlphaType::Premultiplied> RGBA4f<AlphaType::Premultiplied>::FromRGBA(
+    uint8_t r, uint8_t g, uint8_t b, uint8_t a, const std::shared_ptr<ColorSpace>& colorSpace);
+
+template <>
+RGBA4f<AlphaType::Unpremultiplied> RGBA4f<AlphaType::Unpremultiplied>::FromRGBA(
+    uint8_t r, uint8_t g, uint8_t b, uint8_t a, const std::shared_ptr<ColorSpace>& colorSpace);
+
+/**
+ * For convenience, Color is an alias for RGBA4f<AlphaType::Unpremultiplied>.
+ * Note: Color values are always in sRGB color space.
+ */
+using Color = RGBA4f<AlphaType::Unpremultiplied>;
+
+/**
+ * For convenience, PMColor is an alias for RGBA4f<AlphaType::Premultiplied>.
+ */
+using PMColor = RGBA4f<AlphaType::Premultiplied>;
+
 }  // namespace tgfx

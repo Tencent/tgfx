@@ -18,16 +18,17 @@
 
 #pragma once
 
-#include "tgfx/core/Fill.h"
+#include "tgfx/core/Brush.h"
 
 namespace tgfx {
 
 struct Resources {
   Resources() = default;
-  explicit Resources(const Fill& fill);
+  explicit Resources(const Color& color);
   std::string paintColor;
   std::string filter;
   std::string mask;
+  Color colorValue;
 };
 
 // TODO(YGAurora) implements the feature to reuse resources

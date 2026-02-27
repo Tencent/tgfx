@@ -19,7 +19,8 @@
 #pragma once
 
 #include <vector>
-#include "ShaderVar.h"
+#include "gpu/ShaderVar.h"
+#include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
 class ProgramBuilder;

@@ -41,7 +41,8 @@ class QGLWindow : public Window {
    * However, if you intend to perform drawing in other threads, you must set singleBufferMode to
    * false.
    */
-  static std::shared_ptr<QGLWindow> MakeFrom(QQuickItem* quickItem, bool singleBufferMode = false);
+  static std::shared_ptr<QGLWindow> MakeFrom(QQuickItem* quickItem, bool singleBufferMode = false,
+                                             std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Changes the thread affinity for this object and its children.
@@ -56,7 +57,7 @@ class QGLWindow : public Window {
 
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-  void onPresent(Context* context, int64_t presentationTime) override;
+  void onPresent(Context* context) override;
   void onFreeSurface() override;
 
  private:
@@ -67,11 +68,13 @@ class QGLWindow : public Window {
   unsigned pendingTextureID = 0;
   std::shared_ptr<Surface> pendingSurface = nullptr;
   std::shared_ptr<Surface> displayingSurface = nullptr;
-  std::shared_ptr<Surface> fontSurface = nullptr;
+  std::shared_ptr<Surface> frontSurface = nullptr;
   QSGTexture* outTexture = nullptr;
   QGLDeviceCreator* deviceCreator = nullptr;
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
-  explicit QGLWindow(QQuickItem* quickItem, bool singleBufferMode = false);
+  explicit QGLWindow(QQuickItem* quickItem, bool singleBufferMode = false,
+                     std::shared_ptr<ColorSpace> colorSpace = nullptr);
   void initDevice();
   void createDevice(QOpenGLContext* context);
 

@@ -18,6 +18,7 @@
 
 #include "AtlasTextOp.h"
 #include "RectDrawOp.h"
+#include "core/utils/ColorHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
@@ -35,11 +36,13 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
       textureProxy->height() <= 0) {
     return nullptr;
   }
-  auto atlasTextOp = context->drawingBuffer()->make<AtlasTextOp>(provider.get(),
-                                                                 std::move(textureProxy), sampling);
+  auto allocator = context->drawingAllocator();
+  auto atlasTextOp =
+      allocator->make<AtlasTextOp>(allocator, provider.get(), std::move(textureProxy), sampling);
+  CAPUTRE_RECT_MESH(atlasTextOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
-    atlasTextOp->indexBufferProxy =
-        context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
+    atlasTextOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
+        provider->aaType() == AAType::Coverage, std::nullopt);
   }
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
@@ -50,22 +53,24 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
   return atlasTextOp;
 }
 
-AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
+AtlasTextOp::AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provider,
+                         std::shared_ptr<TextureProxy> textureProxy,
                          const SamplingOptions& sampling)
-    : DrawOp(provider->aaType()), rectCount(provider->rectCount()),
+    : DrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()),
       textureProxy(std::move(textureProxy)), sampling(sampling) {
   if (!provider->hasColor()) {
-    commonColor = provider->firstColor();
+    commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
 }
 
-void AtlasTextOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
-  OPERATE_MARK(tgfx::inspect::OpTaskType::RRectDrawOp);
+PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarget*) {
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
-  ATTRIBUTE_NAME_ENUM("blenderMode", blendMode, tgfx::inspect::CustomEnumType::BlendMode);
-  ATTRIBUTE_NAME_ENUM("aaType", aaType, tgfx::inspect::CustomEnumType::AAType);
-  std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
+  return AtlasTextGeometryProcessor::Make(allocator, textureProxy, aaType, commonColor, sampling);
+}
+
+void AtlasTextOp::onDraw(RenderPass* renderPass) {
+  std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
     if (indexBuffer == nullptr) {
@@ -76,14 +81,8 @@ void AtlasTextOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   if (vertexBuffer == nullptr) {
     return;
   }
-
-  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
-  auto atlasGeometryProcessor =
-      AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor, sampling);
-  auto programInfo = createProgramInfo(renderTarget, std::move(atlasGeometryProcessor));
-  renderPass->bindProgramAndScissorClip(programInfo.get(), scissorRect);
-  renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
-                          vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
     uint16_t numIndicesPerQuad;
     if (aaType == AAType::Coverage) {
@@ -91,9 +90,10 @@ void AtlasTextOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
     } else {
       numIndicesPerQuad = RectDrawOp::IndicesPerNonAAQuad;
     }
-    renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerQuad);
+    renderPass->drawIndexed(PrimitiveType::Triangles,
+                            static_cast<uint32_t>(rectCount * numIndicesPerQuad));
   } else {
-    renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
+    renderPass->draw(PrimitiveType::TriangleStrip, 4);
   }
 }
 

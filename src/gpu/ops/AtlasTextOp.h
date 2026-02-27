@@ -22,7 +22,7 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/ops/DrawOp.h"
-#include "gpu/proxies/VertexBufferProxyView.h"
+#include "gpu/proxies/VertexBufferView.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/gpu/Context.h"
 
@@ -35,21 +35,28 @@ class AtlasTextOp final : public DrawOp {
                                         std::shared_ptr<TextureProxy> textureProxy,
                                         const SamplingOptions& sampling);
 
-  void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
-
   bool hasCoverage() const override;
+
+ protected:
+  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
+
+  void onDraw(RenderPass* renderPass) override;
+
+  Type type() override {
+    return Type::AtlasTextOp;
+  }
 
  private:
   size_t rectCount = 0;
-  std::optional<Color> commonColor = std::nullopt;
-  std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;
-  std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = {};
+  std::optional<PMColor> commonColor = std::nullopt;
+  std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
+  std::shared_ptr<VertexBufferView> vertexBufferProxyView = {};
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   SamplingOptions sampling{FilterMode::Nearest, MipmapMode::None};
 
-  explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
-                       const SamplingOptions& sampling);
+  AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provider,
+              std::shared_ptr<TextureProxy> textureProxy, const SamplingOptions& sampling);
 
-  friend class BlockBuffer;
+  friend class BlockAllocator;
 };
 }  // namespace tgfx

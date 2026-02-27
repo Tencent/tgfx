@@ -26,7 +26,7 @@ enum class InputMode { Ignore = 0, ModulateRGBA = 1, ModulateA = 2 };
 
 class ConstColorProcessor : public FragmentProcessor {
  public:
-  static PlacementPtr<ConstColorProcessor> Make(BlockBuffer* buffer, Color color,
+  static PlacementPtr<ConstColorProcessor> Make(BlockAllocator* allocator, PMColor color,
                                                 InputMode inputMode);
 
   std::string name() const override {
@@ -38,11 +38,11 @@ class ConstColorProcessor : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  ConstColorProcessor(Color color, InputMode mode)
+  ConstColorProcessor(PMColor color, InputMode mode)
       : FragmentProcessor(ClassID()), color(color), inputMode(mode) {
   }
 
-  Color color;
+  PMColor color;
   InputMode inputMode;
 };
 }  // namespace tgfx

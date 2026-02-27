@@ -18,8 +18,13 @@
 
 #pragma once
 
+#include <atomic>
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathProvider.h"
+#include "tgfx/core/PathTypes.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
@@ -41,11 +46,12 @@ class Shape {
   static std::shared_ptr<Shape> MakeFrom(Path path);
 
   /**
-   * Creates a new Shape from the given text blob. The specified scale is applied to the text blob
-   * before extracting its paths. Returns nullptr if the text blob is nullptr or if none of the
-   * glyphs in the blob can generate a path, such as when using bitmap typefaces.
+   * Creates a new Shape from the given text blob. Glyphs that can generate path outlines are
+   * extracted and merged into a single Shape. Glyphs that cannot generate paths, such as bitmap
+   * or color emoji typefaces, are skipped. Returns nullptr if the text blob is nullptr or if none
+   * of the glyphs can generate a path.
    */
-  static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob, float scale = 1.0f);
+  static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob);
 
   /**
    * Creates a new Shape from the given PathProvider. Returns nullptr if pathProvider is nullptr.
@@ -72,8 +78,8 @@ class Shape {
   static std::shared_ptr<Shape> Merge(const std::vector<std::shared_ptr<Shape>>& shapes);
 
   /**
-   * Applies the specified stroke to the given Shape. If the stroke is nullptr, the original Shape
-   * is returned. Returns nullptr if the Shape is nullptr.
+   * Applies the specified stroke to the Shape. If the stroke is nullptr, the original Shape is
+   * returned. Returns nullptr if the Shape is nullptr or if the stroke width is zero or less.
    */
   static std::shared_ptr<Shape> ApplyStroke(std::shared_ptr<Shape> shape, const Stroke* stroke);
 
@@ -84,6 +90,13 @@ class Shape {
   static std::shared_ptr<Shape> ApplyMatrix(std::shared_ptr<Shape> shape, const Matrix& matrix);
 
   /**
+   * Applies the specified 3D matrix to the given Shape. If the matrix is identity, the original
+   * Shape is returned. Returns nullptr if the Shape is nullptr.
+   */
+  static std::shared_ptr<Shape> ApplyMatrix3D(std::shared_ptr<Shape> shape,
+                                              const Matrix3D& matrix3D);
+
+  /**
    * Applies the specified path effect to the given Shape. If the effect is nullptr, the original
    * Shape is returned. Returns nullptr if the Shape is nullptr.
    */
@@ -91,12 +104,19 @@ class Shape {
                                             std::shared_ptr<PathEffect> effect);
 
   /**
-   * Creates a new Shape by applying the inverse fill type to the given Shape. Returns nullptr if
-   * the shape is nullptr.
+   * Creates a new Shape by applying the specified fill type to the given Shape. If the shape
+   * already has the specified fill type, the original shape is returned. Returns nullptr if the
+   * shape is nullptr.
    */
-  static std::shared_ptr<Shape> ApplyInverse(std::shared_ptr<Shape> shape);
+  static std::shared_ptr<Shape> ApplyFillType(std::shared_ptr<Shape> shape, PathFillType fillType);
 
-  virtual ~Shape() = default;
+  /**
+   * Creates a new Shape by reversing the path direction of the given Shape. Returns nullptr if the
+   * shape is nullptr.
+   */
+  static std::shared_ptr<Shape> ApplyReverse(std::shared_ptr<Shape> shape);
+
+  virtual ~Shape();
 
   /**
    * Returns true if the Shape contains a simple path that can be directly retrieved using getPath()
@@ -107,26 +127,41 @@ class Shape {
   }
 
   /**
-   * Returns true if the PathFillType of the computed path is InverseWinding or InverseEvenOdd.
+   * Returns the PathFillType of the Shape.
    */
-  virtual bool isInverseFillType() const {
-    return false;
-  }
+  virtual PathFillType fillType() const = 0;
+
+  /**
+   * Returns true if the PathFillType is InverseWinding or InverseEvenOdd.
+   */
+  bool isInverseFillType() const;
 
   /**
    * Returns the bounding box of the Shape. The bounds might be larger than the actual shape because
-   * the exact bounds can't be determined until the shape is computed.
+   * the exact bounds can't be determined until the shape is computed. The result is cached lazily.
    */
-  virtual Rect getBounds() const = 0;
+  Rect getBounds() const;
 
   /**
-   * Returns the Shape's computed path.  Note: The path is recalculated each time this method is
-   * called, as it is not cached.
+   * Returns the Shape's computed path. The result is cached lazily.
    */
-  virtual Path getPath() const = 0;
+  Path getPath() const;
 
  protected:
-  enum class Type { Append, Effect, Text, Inverse, Matrix, Merge, Path, Stroke, Provider, Glyph };
+  enum class Type {
+    Append,
+    Effect,
+    Text,
+    FillType,
+    Matrix,
+    Merge,
+    Path,
+    Reverse,
+    Stroke,
+    Provider,
+    Glyph,
+    Matrix3D
+  };
 
   /**
    * Returns the type of the Shape.
@@ -139,12 +174,36 @@ class Shape {
    */
   virtual UniqueKey getUniqueKey() const = 0;
 
+  /**
+   * Called by getBounds() to compute the bounding box of the Shape.
+   */
+  virtual Rect onGetBounds() const = 0;
+
+  /**
+   * Called by getPath() to compute the actual path of the Shape. The resolution scale parameter
+   * provides any scale applied within the Shape.
+   * During rendering, complex Shapes may be simplified based on the current resolution scale to
+   * improve performance. Extremely thin strokes may also be converted to hairline strokes for
+   * better rendering quality.
+   */
+  virtual Path onGetPath(float resolutionScale) const = 0;
+
   friend class AppendShape;
   friend class StrokeShape;
   friend class MatrixShape;
+  friend class Matrix3DShape;
+  friend class FillTypeShape;
+  friend class ReverseShape;
+  friend class MergeShape;
+  friend class EffectShape;
   friend class ShapeDrawOp;
   friend class ProxyProvider;
   friend class Canvas;
   friend class Types;
+  friend class ShapeUtils;
+
+ private:
+  mutable std::atomic<Rect*> bounds = {nullptr};
+  mutable std::atomic<Path*> path = {nullptr};
 };
 }  // namespace tgfx

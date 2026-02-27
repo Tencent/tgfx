@@ -44,6 +44,13 @@ bool ComposeColorFilter::isAlphaUnchanged() const {
   return outer->isAlphaUnchanged() && inner->isAlphaUnchanged();
 }
 
+bool ComposeColorFilter::affectsTransparentBlack() const {
+  // If inner affects transparent black, its output is no longer transparent, so outer will likely
+  // produce a non-transparent result too. If only outer affects transparent black, the inner's
+  // transparent output will be changed by outer.
+  return inner->affectsTransparentBlack() || outer->affectsTransparentBlack();
+}
+
 bool ComposeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   auto type = Types::Get(colorFilter);
   if (type != Types::ColorFilterType::Compose) {
@@ -53,10 +60,11 @@ bool ComposeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   return inner->isEqual(other->inner.get()) && outer->isEqual(other->outer.get());
 }
 
-PlacementPtr<FragmentProcessor> ComposeColorFilter::asFragmentProcessor(Context* context) const {
-  auto innerProcessor = inner->asFragmentProcessor(context);
-  auto outerProcessor = outer->asFragmentProcessor(context);
-  return FragmentProcessor::Compose(context->drawingBuffer(), std::move(innerProcessor),
+PlacementPtr<FragmentProcessor> ComposeColorFilter::asFragmentProcessor(
+    Context* context, const std::shared_ptr<ColorSpace>& dstColorSpace) const {
+  auto innerProcessor = inner->asFragmentProcessor(context, dstColorSpace);
+  auto outerProcessor = outer->asFragmentProcessor(context, dstColorSpace);
+  return FragmentProcessor::Compose(context->drawingAllocator(), std::move(innerProcessor),
                                     std::move(outerProcessor));
 }
 }  // namespace tgfx

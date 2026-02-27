@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Tencent is pleased to support the open source community by making libpag available.
+//  Tencent is pleased to support the open source community by making tgfx available.
 //
 //  Copyright (C) 2024 Tencent. All rights reserved.
 //
@@ -24,10 +24,11 @@ using namespace hello2d;
 using namespace emscripten;
 
 EMSCRIPTEN_BINDINGS(TGFXDemo) {
-
   class_<TGFXBaseView>("TGFXBaseView")
-      .function("setImage", &TGFXBaseView::setImage)
+      .function("setImagePath", &TGFXBaseView::setImagePath)
       .function("updateSize", &TGFXBaseView::updateSize)
+      .function("updateLayerTree", &TGFXBaseView::updateLayerTree)
+      .function("updateZoomScaleAndOffset", &TGFXBaseView::updateZoomScaleAndOffset)
       .function("draw", &TGFXBaseView::draw);
 
   class_<TGFXView, base<TGFXBaseView>>("TGFXView")
@@ -37,7 +38,8 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
                           return std::shared_ptr<TGFXView>(nullptr);
                         }
                         return std::make_shared<TGFXView>(canvasID);
-                      }));
+                      }))
+      .function("registerFonts", &TGFXView::registerFonts);
 
   class_<TGFXThreadsView, base<TGFXBaseView>>("TGFXThreadsView")
       .smart_ptr<std::shared_ptr<TGFXThreadsView>>("TGFXThreadsView")

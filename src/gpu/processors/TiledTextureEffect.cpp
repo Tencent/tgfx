@@ -23,17 +23,16 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-using Wrap = SamplerState::WrapMode;
-
-TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(Wrap wrap, FilterMode filter,
-                                                                 MipmapMode mm) {
-  switch (wrap) {
-    case Wrap::MirrorRepeat:
+TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(TileMode tileMode,
+                                                                 FilterMode filter,
+                                                                 MipmapMode mipmapMode) {
+  switch (tileMode) {
+    case TileMode::Mirror:
       return ShaderMode::MirrorRepeat;
-    case Wrap::Clamp:
+    case TileMode::Clamp:
       return ShaderMode::Clamp;
-    case Wrap::Repeat:
-      switch (mm) {
+    case TileMode::Repeat:
+      switch (mipmapMode) {
         case MipmapMode::None:
           switch (filter) {
             case FilterMode::Nearest:
@@ -50,7 +49,7 @@ TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(Wrap wrap, Filt
               return ShaderMode::RepeatLinearMipmap;
           }
       }
-    case Wrap::ClampToBorder:
+    case TileMode::Decal:
       switch (filter) {
         case FilterMode::Nearest:
           return ShaderMode::ClampToBorderNearest;
@@ -78,51 +77,53 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
     ShaderMode shaderMode = ShaderMode::None;
     Span shaderSubset;
     Span shaderClamp;
-    Wrap hwWrap = Wrap::Clamp;
+    TileMode hwMode = TileMode::Clamp;
   };
-  auto caps = textureView->getContext()->caps();
-  auto canDoWrapInHW = [&](int size, Wrap wrap) {
-    if (wrap == Wrap::ClampToBorder && !caps->clampToBorderSupport) {
+  auto features = textureView->getContext()->gpu()->features();
+  auto canDoWrapInHW = [&](TileMode tileMode) {
+    if (tileMode == TileMode::Decal && !features->clampToBorder) {
       return false;
     }
-    if (wrap != Wrap::Clamp && !caps->npotTextureTileSupport && !IsPow2(size)) {
-      return false;
-    }
-    if (textureView->getTexture()->type() != GPUTextureType::TwoD &&
-        !(wrap == Wrap::Clamp || wrap == Wrap::ClampToBorder)) {
+    if (textureView->getTexture()->type() != TextureType::TwoD &&
+        !(tileMode == TileMode::Clamp || tileMode == TileMode::Decal)) {
       return false;
     }
     return true;
   };
-  auto resolve = [&](int size, Wrap wrap, Span subset, SamplerState samplerState,
-                     float linearFilterInset) {
+  auto resolve = [&](int size, TileMode tileMode, Span subsetSpan, float linearFilterInset) {
     Result1D r;
-    bool canDoModeInHW = canDoWrapInHW(size, wrap);
-    if (canDoModeInHW && subset.a <= 0 && subset.b >= static_cast<float>(size)) {
-      r.hwWrap = wrap;
+    bool canDoModeInHW = canDoWrapInHW(tileMode);
+    if (canDoModeInHW && subsetSpan.a <= 0 && subsetSpan.b >= static_cast<float>(size)) {
+      r.hwMode = tileMode;
       return r;
     }
-    r.shaderSubset = subset;
-    if (samplerState.filterMode == FilterMode::Nearest) {
-      Span isubset{std::floor(subset.a), std::ceil(subset.b)};
+    r.shaderSubset = subsetSpan;
+    if (sampler.magFilterMode == FilterMode::Nearest &&
+        sampler.minFilterMode == FilterMode::Nearest) {
+      Span isubset{std::floor(subsetSpan.a), std::ceil(subsetSpan.b)};
       // This inset prevents sampling neighboring texels that could occur when
       // texture coords fall exactly at texel boundaries (depending on precision
       // and GPU-specific snapping at the boundary).
       r.shaderClamp = isubset.makeInset(0.5f);
     } else {
-      r.shaderClamp = subset.makeInset(linearFilterInset);
+      r.shaderClamp = subsetSpan.makeInset(linearFilterInset);
     }
     auto mipmapMode = textureView->hasMipmaps() ? sampler.mipmapMode : MipmapMode::None;
-    r.shaderMode = GetShaderMode(wrap, sampler.filterMode, mipmapMode);
+    auto filterMode =
+        sampler.minFilterMode == FilterMode::Nearest || sampler.magFilterMode == FilterMode::Nearest
+            ? FilterMode::Nearest
+            : FilterMode::Linear;
+    r.shaderMode = GetShaderMode(tileMode, filterMode, mipmapMode);
     DEBUG_ASSERT(r.shaderMode != ShaderMode::None);
     return r;
   };
 
   Span subsetX{subset.left, subset.right};
-  auto x = resolve(textureView->width(), sampler.wrapModeX, subsetX, sampler, 0.5f);
+  auto x = resolve(textureView->width(), sampler.tileModeX, subsetX, 0.5f);
   Span subsetY{subset.top, subset.bottom};
-  auto y = resolve(textureView->height(), sampler.wrapModeY, subsetY, sampler, 0.5f);
-  hwSampler = SamplerState(x.hwWrap, y.hwWrap, sampler.filterMode, sampler.mipmapMode);
+  auto y = resolve(textureView->height(), sampler.tileModeY, subsetY, 0.5f);
+  hwSampler = SamplerState(x.hwMode, y.hwMode, sampler.minFilterMode, sampler.magFilterMode,
+                           sampler.mipmapMode);
   shaderModeX = x.shaderMode;
   shaderModeY = y.shaderMode;
   shaderSubset = {x.shaderSubset.a, y.shaderSubset.a, x.shaderSubset.b, y.shaderSubset.b};
@@ -152,6 +153,7 @@ void TiledTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   auto flags = static_cast<uint32_t>(sampling.shaderModeX);
   flags |= static_cast<uint32_t>(sampling.shaderModeY) << 4;
   flags |= constraint == SrcRectConstraint::Strict ? static_cast<uint32_t>(1) << 8 : 0;
+  flags |= coordTransform.matrix.hasPerspective() ? static_cast<uint32_t>(1) << 9 : 0;
   bytesKey->write(flags);
 }
 
@@ -160,7 +162,7 @@ size_t TiledTextureEffect::onCountTextureSamplers() const {
   return textureView ? 1 : 0;
 }
 
-GPUTexture* TiledTextureEffect::onTextureAt(size_t) const {
+std::shared_ptr<Texture> TiledTextureEffect::onTextureAt(size_t) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     return nullptr;

@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/gpu/Device.h"
 
 namespace tgfx {
 class DevicePool {
  public:
-  static std::shared_ptr<tgfx::GLDevice> Make();
+  static std::shared_ptr<Device> Make();
 };
 }  // namespace tgfx

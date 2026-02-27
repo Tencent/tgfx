@@ -44,13 +44,15 @@ void Draw(Canvas* canvas, std::shared_ptr<Image> image, Color paintColor) {
   canvas->drawImage(std::move(image), SamplingOptions(), &paint);
 }
 
-Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image) {
-  auto surface = Surface::Make(context, image->width(), image->height());
-  auto* canvas = surface->getCanvas();
+Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image,
+                           std::shared_ptr<ColorSpace> colorSpace) {
+  auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
+                               std::move(colorSpace));
+  auto canvas = surface->getCanvas();
   canvas->drawImage(image);
 
-  Bitmap bitmap(surface->width(), surface->height());
-  auto* pixels = bitmap.lockPixels();
+  Bitmap bitmap(surface->width(), surface->height(), false, true, surface->colorSpace());
+  auto pixels = bitmap.lockPixels();
   if (surface->readPixels(bitmap.info(), pixels)) {
     bitmap.unlockPixels();
     return bitmap;
@@ -89,8 +91,8 @@ void FillColorFromBitmap(Canvas* canvas, float left, float top, float right, flo
 
 Color AdjustColor(const std::shared_ptr<Shader>& shader, Color paintColor) {
   if (Types::Get(shader.get()) == Types::ShaderType::Image) {
-    const auto* imageShader = static_cast<const ImageShader*>(shader.get());
-    const auto* img = imageShader->image.get();
+    const auto imageShader = static_cast<const ImageShader*>(shader.get());
+    const auto img = imageShader->image.get();
     if (img && img->isAlphaOnly()) {
       return paintColor;
     }
@@ -109,8 +111,9 @@ Matrix ScaleTranslate(float sx, float sy, float tx, float ty) {
 }
 
 Bitmap ExtractSubset(Bitmap src, Rect subset) {
-  Bitmap destination(static_cast<int>(subset.width()), static_cast<int>(subset.height()));
-  const auto* srcPixels = src.lockPixels();
+  Bitmap destination(static_cast<int>(subset.width()), static_cast<int>(subset.height()), false,
+                     true, src.colorSpace());
+  const auto srcPixels = src.lockPixels();
   destination.writePixels(src.info(), srcPixels, static_cast<int>(subset.left),
                           static_cast<int>(subset.top));
   src.unlockPixels();
@@ -124,19 +127,18 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
   DEBUG_ASSERT(shader);
   DEBUG_ASSERT(doc);
   if (Types::Get(shader.get()) == Types::ShaderType::Gradient) {
-    const auto* gradientShader = static_cast<const GradientShader*>(shader.get());
+    const auto gradientShader = static_cast<const GradientShader*>(shader.get());
     return PDFGradientShader::Make(doc, gradientShader, canvasTransform, surfaceBBox);
   }
   if (surfaceBBox.isEmpty()) {
     return PDFIndirectReference();
   }
-  Bitmap image;
 
   paintColor = AdjustColor(shader, paintColor);
   TileMode imageTileModes[2];
 
   if (Types::Get(shader.get()) == Types::ShaderType::Image) {
-    const auto* imageShader = static_cast<const ImageShader*>(shader.get());
+    const auto imageShader = static_cast<const ImageShader*>(shader.get());
     auto shaderImage = imageShader->image;
     // TODO (YGaurora): Cache image shaders and remove duplicates
     PDFIndirectReference pdfShader =
@@ -214,7 +216,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
   if (tileModesX == TileMode::Clamp || tileModesY == TileMode::Clamp) {
     // For now, the easiest way to access the colors in the corners and sides is
     // to just make a bitmap from the image.
-    bitmap = ImageExportToBitmap(doc->context(), image);
+    bitmap = ImageExportToBitmap(doc->context(), image, doc->dstColorSpace());
   }
 
   // If both x and y are in clamp mode, we start by filling in the corners.
@@ -351,7 +353,8 @@ PDFIndirectReference PDFShader::MakeFallbackShader(PDFDocumentImpl* doc,
   Size scale = {static_cast<float>(size.width) / shaderRect.width(),
                 static_cast<float>(size.height) / shaderRect.height()};
 
-  auto surface = Surface::Make(doc->context(), size.width, size.height);
+  auto surface = Surface::Make(doc->context(), size.width, size.height, false, 1, false, 0,
+                               doc->dstColorSpace());
   DEBUG_ASSERT(surface);
   Canvas* canvas = surface->getCanvas();
   canvas->clear(Color::Transparent());

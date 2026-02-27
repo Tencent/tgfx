@@ -17,13 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
+#include <unordered_map>
+
 namespace tgfx::inspect {
 
-static constexpr int Lz4CompressBound(int size) {
-  return size + (size / 255) + 16;
-}
+static constexpr int LZ4HeaderSize = 12;
+static constexpr int MinLZ4EncodeSize = 1024 * 4;
 static constexpr int TargetFrameSize = 256 * 1024;
-static constexpr int LZ4Size = Lz4CompressBound(TargetFrameSize);
 static constexpr int HandshakeShibbolethSize = 4;
 static constexpr char HandshakeShibboleth[HandshakeShibbolethSize] = {'T', 'G', 'F', 'X'};
 
@@ -65,6 +66,7 @@ enum class ServerQuery : uint8_t {
   String,
   ValueName,
   Disconnect,
+  CaptureFrame,
 };
 
 struct ServerQueryPacket {
@@ -92,9 +94,16 @@ enum class OpTaskType : uint8_t {
   RectDrawOp,
   RRectDrawOp,
   ShapeDrawOp,
+  AtlasTextOp,
+  Quads3DDrawOp,
   DstTextureCopyOp,
   ResolveOp,
   OpTaskTypeSize,
+};
+
+static std::unordered_map<uint8_t, OpTaskType> DrawOpTypeToOpTaskType = {
+    {0, OpTaskType::RectDrawOp},  {1, OpTaskType::RRectDrawOp},   {2, OpTaskType::ShapeDrawOp},
+    {3, OpTaskType::AtlasTextOp}, {4, OpTaskType::Quads3DDrawOp},
 };
 
 enum class CustomEnumType : uint8_t {
@@ -120,5 +129,24 @@ enum class LayerTreeMessage : uint8_t {
   LayerAttribute,
   LayerSubAttribute,
   ImageData
+};
+
+enum class VertexProviderType { RectsVertexProvider, RRectsVertexProvider };
+
+struct MeshInfo {
+  size_t rectCount = 0;
+  uint64_t drawOpPtr = 0;
+};
+
+struct RectMeshInfo : MeshInfo {
+  uint8_t aaType = 2;
+  bool hasUVCoord = false;
+  bool hasColor = false;
+  bool hasSubset = false;
+};
+
+struct RRectMeshInfo : MeshInfo {
+  bool hasColor = false;
+  bool hasStroke = false;
 };
 }  // namespace tgfx::inspect

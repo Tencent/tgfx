@@ -27,21 +27,26 @@ class AtlasManager : public AtlasGenerationCounter {
  public:
   explicit AtlasManager(Context* context);
 
+  // This function must be called first, before other functions which use the atlas.
+  // if it returns empty, the client must not try to use other functions.
   const std::vector<std::shared_ptr<TextureProxy>>& getTextureProxies(MaskFormat maskFormat);
 
-  bool getCellLocator(MaskFormat, const BytesKey& key, AtlasCellLocator& locator) const;
+  bool hasGlyph(MaskFormat, const AtlasGlyph* glyph) const;
 
-  bool addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken, AtlasLocator&) const;
+  bool addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken, AtlasLocator*) const;
 
   void setPlotUseToken(PlotUseUpdater&, const PlotLocator&, MaskFormat, AtlasToken) const;
 
-  void preFlush();
+  void preFlush() {
+  }
 
   void postFlush();
 
-  void releaseAll();
-
   AtlasToken nextFlushToken() const;
+
+  // Releases all atlas resources,
+  // including their underlying textures.
+  void releaseAll();
 
  private:
   bool initAtlas(MaskFormat format);

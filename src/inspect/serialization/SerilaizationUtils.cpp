@@ -34,10 +34,11 @@ namespace tgfx {
 constexpr int padding = 20;
 static int insertionCounter = 0;
 std::string SerializeUtils::LayerTypeToString(LayerType type) {
-  static std::unordered_map<LayerType, const char*> m = {
-      {LayerType::Layer, "Layer"},      {LayerType::Image, "ImageLayer"},
-      {LayerType::Shape, "ShapeLayer"}, {LayerType::Gradient, "GradientLayer"},
-      {LayerType::Text, "TextLayer"},   {LayerType::Solid, "SolidLayer"}};
+  static std::unordered_map<LayerType, const char*> m = {{LayerType::Layer, "Layer"},
+                                                         {LayerType::Image, "ImageLayer"},
+                                                         {LayerType::Shape, "ShapeLayer"},
+                                                         {LayerType::Text, "TextLayer"},
+                                                         {LayerType::Solid, "SolidLayer"}};
   return m[type];
 }
 
@@ -115,14 +116,6 @@ std::string SerializeUtils::LayerStyleExtraSourceTypeToString(LayerStyleExtraSou
       {LayerStyleExtraSourceType::None, "None"},
       {LayerStyleExtraSourceType::Background, "Background"},
       {LayerStyleExtraSourceType::Contour, "Contour"}};
-  return m[type];
-}
-
-std::string SerializeUtils::RecordedContentTypeToString(Types::LayerContentType type) {
-  static std::unordered_map<Types::LayerContentType, const char*> m = {
-      {Types::LayerContentType::Default, "Default"},
-      {Types::LayerContentType::Foreground, "Foreground"},
-      {Types::LayerContentType::Contour, "Contour"}};
   return m[type];
 }
 

@@ -18,6 +18,7 @@
 
 #include "TileCache.h"
 #include "core/utils/Log.h"
+#include "core/utils/TileSortCompareFunc.h"
 
 namespace tgfx {
 constexpr int64_t TileKey(int tileX, int tileY) {
@@ -99,5 +100,21 @@ void TileCache::addTile(std::shared_ptr<Tile> tile) {
 bool TileCache::removeTile(int tileX, int tileY) {
   auto key = TileKey(tileX, tileY);
   return tileMap.erase(key) > 0;
+}
+
+std::vector<std::shared_ptr<Tile>> TileCache::getReusableTiles(float centerX, float centerY) {
+  std::vector<std::shared_ptr<Tile>> tiles = {};
+  for (auto& item : tileMap) {
+    if (item.second.use_count() == 1) {
+      tiles.push_back(item.second);
+    }
+  }
+  std::sort(tiles.begin(), tiles.end(),
+            [centerX, centerY, tileSize = static_cast<float>(tileSize)](
+                const std::shared_ptr<Tile>& a, const std::shared_ptr<Tile>& b) {
+              return TileSortCompareFunc({centerX, centerY}, tileSize, {a->tileX, a->tileY},
+                                         {b->tileX, b->tileY}, SortOrder::Descending);
+            });
+  return tiles;
 }
 }  // namespace tgfx

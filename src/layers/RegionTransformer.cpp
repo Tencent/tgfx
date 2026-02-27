@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RegionTransformer.h"
+#include "core/Matrix3DUtils.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -80,6 +81,49 @@ class StyleRegionTransformer : public RegionTransformer {
   float contentScale;
 };
 
+class MatrixRegionTransformer : public RegionTransformer {
+ public:
+  MatrixRegionTransformer(const Matrix& matrix, std::shared_ptr<RegionTransformer> outer)
+      : RegionTransformer(std::move(outer)), matrix(matrix) {
+  }
+
+  Matrix matrix;
+
+ protected:
+  void onTransform(Rect* bounds) const override {
+    *bounds = matrix.mapRect(*bounds);
+  }
+
+  bool isMatrix() const override {
+    return true;
+  }
+};
+
+class Matrix3DRegionTransformer : public RegionTransformer {
+ public:
+  Matrix3DRegionTransformer(const Matrix3D& matrix, std::shared_ptr<RegionTransformer> outer,
+                            bool canCombine = false)
+      : RegionTransformer(std::move(outer)), matrix(matrix), canCombine(canCombine) {
+  }
+
+  Matrix3D matrix;
+  bool canCombine = false;
+
+ protected:
+  void onTransform(Rect* bounds) const override {
+    // Check if the rect is behind the camera before applying 3D transformation
+    if (Matrix3DUtils::IsRectBehindCamera(*bounds, matrix)) {
+      bounds->setEmpty();
+      return;
+    }
+    *bounds = matrix.mapRect(*bounds);
+  }
+
+  bool isMatrix3D() const override {
+    return true;
+  }
+};
+
 std::shared_ptr<RegionTransformer> RegionTransformer::MakeFromClip(
     const Rect& clipRect, std::shared_ptr<RegionTransformer> outer) {
   if (!outer || !outer->isClip()) {
@@ -89,7 +133,7 @@ std::shared_ptr<RegionTransformer> RegionTransformer::MakeFromClip(
   if (!outClipRect.intersect(clipRect)) {
     outClipRect = {};
   }
-  return std::make_unique<ClipRegionTransformer>(outClipRect, nullptr);
+  return std::make_unique<ClipRegionTransformer>(outClipRect, outer->outer);
 }
 
 std::shared_ptr<RegionTransformer> RegionTransformer::MakeFromFilters(
@@ -110,6 +154,42 @@ std::shared_ptr<RegionTransformer> RegionTransformer::MakeFromStyles(
   return std::make_shared<StyleRegionTransformer>(styles, contentScale, std::move(outer));
 }
 
+std::shared_ptr<RegionTransformer> RegionTransformer::MakeFromMatrix(
+    const Matrix& matrix, std::shared_ptr<RegionTransformer> outer) {
+  if (matrix.isIdentity()) {
+    return outer;
+  }
+  if (!outer || !outer->isMatrix()) {
+    return std::make_shared<MatrixRegionTransformer>(matrix, std::move(outer));
+  }
+
+  auto combineMatrix = matrix;
+  combineMatrix.postConcat(static_cast<MatrixRegionTransformer*>(outer.get())->matrix);
+  return std::make_shared<MatrixRegionTransformer>(combineMatrix, outer->outer);
+}
+
+std::shared_ptr<RegionTransformer> RegionTransformer::MakeFromMatrix3D(
+    const Matrix3D& matrix, std::shared_ptr<RegionTransformer> outer, bool canCombine) {
+  if (matrix == Matrix3D::I()) {
+    return outer;
+  }
+
+  if (!outer || !outer->isMatrix3D()) {
+    return std::make_shared<Matrix3DRegionTransformer>(matrix, std::move(outer), canCombine);
+  }
+
+  auto outerMatrix3D = static_cast<Matrix3DRegionTransformer*>(outer.get());
+  // Only combine if both allow combining
+  if (canCombine && outerMatrix3D->canCombine) {
+    auto combineMatrix = matrix;
+    combineMatrix.postConcat(outerMatrix3D->matrix);
+    return std::make_shared<Matrix3DRegionTransformer>(combineMatrix, outer->outer, canCombine);
+  }
+
+  // Don't combine, create new transformer
+  return std::make_shared<Matrix3DRegionTransformer>(matrix, std::move(outer), canCombine);
+}
+
 RegionTransformer::RegionTransformer(std::shared_ptr<RegionTransformer> outer)
     : outer(std::move(outer)) {
 }
@@ -120,6 +200,35 @@ void RegionTransformer::transform(Rect* bounds) const {
   if (outer) {
     outer->transform(bounds);
   }
+}
+
+float RegionTransformer::getMaxScale() const {
+  Matrix matrix = Matrix::I();
+  getTotalMatrix(&matrix);
+  return matrix.getMaxScale();
+}
+
+void RegionTransformer::getTotalMatrix(Matrix* matrix) const {
+  DEBUG_ASSERT(matrix != nullptr);
+  if (isMatrix()) {
+    matrix->postConcat(static_cast<const MatrixRegionTransformer*>(this)->matrix);
+  }
+  if (outer) {
+    outer->getTotalMatrix(matrix);
+  }
+}
+
+std::optional<Matrix3D> RegionTransformer::getConsecutiveMatrix3D() const {
+  if (!isMatrix3D()) {
+    return std::nullopt;
+  }
+  auto result = static_cast<const Matrix3DRegionTransformer*>(this)->matrix;
+  auto current = outer;
+  while (current && current->isMatrix3D()) {
+    result.postConcat(static_cast<const Matrix3DRegionTransformer*>(current.get())->matrix);
+    current = current->outer;
+  }
+  return result;
 }
 
 }  // namespace tgfx

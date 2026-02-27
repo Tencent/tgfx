@@ -19,53 +19,47 @@
 #pragma once
 
 #include "core/DrawContext.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 class MeasureContext : public DrawContext {
  public:
-  explicit MeasureContext(bool computeTightBounds = false)
-      : computeTightBounds(computeTightBounds) {
-  }
-
   Rect getBounds() const {
     return bounds;
   }
 
-  void drawFill(const Fill& fill) override;
+  void drawFill(const Brush& brush) override;
 
-  void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override;
+  void drawRect(const Rect& rect, const MCState& state, const Brush& brush,
+                const Stroke* stroke) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+  void drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
                  const Stroke* stroke) override;
 
-  void drawPath(const Path& path, const MCState& state, const Fill& fill) override;
+  void drawPath(const Path& path, const MCState& state, const Brush& brush) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush,
+                 const Stroke* stroke) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const Fill& fill) override;
+                 const MCState& state, const Brush& brush) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     const SamplingOptions& sampling, const MCState& state, const Brush& brush,
                      SrcRectConstraint constraint) override;
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const Fill& fill, const Stroke* stroke) override;
+  void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state, const Brush& brush,
+                    const Stroke* stroke) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                 const MCState& state, const Fill& fill) override;
+                 const MCState& state, const Brush& brush) override;
 
  private:
-  bool computeTightBounds = false;
   Rect bounds = {};
 
-  void addTightBounds(const Path& path, const MCState& state, const Fill& fill);
-
-  void addLocalBounds(const MCState& state, const Fill& fill, const Rect& localBounds,
-                      bool unbounded = false);
-  void addDeviceBounds(const Path& clip, const Fill& fill, const Rect& deviceBounds,
-                       bool unbounded = false);
+  void addLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded = false);
+  void addDeviceBounds(const Path& clip, const Rect& deviceBounds, bool unbounded = false);
 };
 }  // namespace tgfx

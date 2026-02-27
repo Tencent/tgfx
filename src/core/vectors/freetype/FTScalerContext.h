@@ -19,7 +19,10 @@
 #pragma once
 
 #include <memory>
+#include <string>
+#include <vector>
 #include "ft2build.h"
+#include FT_COLOR_H
 #include FT_FREETYPE_H
 #include "FTTypeface.h"
 #include "core/PixelBuffer.h"
@@ -46,7 +49,11 @@ class FTScalerContext : public ScalerContext {
                          Matrix* matrix) const override;
 
   bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
-                  void* dstPixels) const override;
+                  void* dstPixels, const Point& glyphOffset) const override;
+
+  float getBackingSize() const override {
+    return backingSize;
+  }
 
  private:
   int setupSize(bool fauxItalic) const;
@@ -54,6 +61,10 @@ class FTScalerContext : public ScalerContext {
   void getFontMetricsInternal(FontMetrics* metrics) const;
 
   float getAdvanceInternal(GlyphID glyphID, bool verticalText = false) const;
+
+  void loadVerticalMetrics();
+
+  float getVertAdvanceForGlyph(GlyphID glyphID) const;
 
   bool getCBoxForLetter(char letter, FT_BBox* bbox) const;
 
@@ -67,10 +78,23 @@ class FTScalerContext : public ScalerContext {
 
   bool loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxBold, bool fauxItalic) const;
 
+  void collectCOLRv1GlyphPaths(FT_Face face, const FT_OpaquePaint& opaquePaint, bool fauxBold,
+                               bool fauxItalic, Path* path) const;
+
+#if defined(__ANDROID__) || defined(ANDROID)
+  bool MeasureColorVectorGlyph(GlyphID glyphID, Rect* rect) const;
+#endif
+
   float textScale = 1.0f;
   Point extraScale = Point::Make(1.f, 1.f);
   FT_Size ftSize = nullptr;
   FT_Int strikeIndex = -1;  // The bitmap strike for the face (or -1 if none).
   FT_Int32 loadGlyphFlags = 0;
+  float backingSize = 1.0f;
+  // Cached vertical advance heights from vmtx table for bitmap-only fonts. FreeType's CBDT path
+  // ignores vmtx even when present, so we read it ourselves.
+  std::vector<FT_UShort> vertAdvanceCache = {};
+  FT_UShort fallbackVertAdvance = 0;
+  bool hasVerticalMetrics = false;
 };
 }  // namespace tgfx

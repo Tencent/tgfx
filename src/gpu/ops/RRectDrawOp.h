@@ -21,8 +21,8 @@
 #include <optional>
 #include "DrawOp.h"
 #include "gpu/RRectsVertexProvider.h"
-#include "gpu/proxies/IndexBufferProxy.h"
-#include "gpu/proxies/VertexBufferProxyView.h"
+#include "gpu/proxies/GPUBufferProxy.h"
+#include "gpu/proxies/VertexBufferView.h"
 
 namespace tgfx {
 class RRectDrawOp : public DrawOp {
@@ -33,35 +33,55 @@ class RRectDrawOp : public DrawOp {
   static constexpr uint16_t MaxNumRRects = 1024;
 
   /**
-   * The maximum number of vertices per fill round rect.
+   * The number of indices per AA fill round rect.
    */
-  static constexpr uint16_t IndicesPerFillRRect = 54;
+  static constexpr uint16_t IndicesPerAAFillRRect = 54;
 
   /**
-   * The maximum number of vertices per stroke round rect.
+   * The number of indices per AA stroke round rect.
    */
-  static constexpr uint16_t IndicesPerStrokeRRect = 48;
+  static constexpr uint16_t IndicesPerAAStrokeRRect = 48;
 
   /**
-   * Create a new RRectDrawOp for a list of RRect records. Note that the returned RRectDrawOp is in
-   * the device space.
+   * The number of indices per non-AA round rect (6 indices for 2 triangles).
+   */
+  static constexpr uint16_t IndicesPerNonAARRect = 6;
+
+  /**
+   * The number of vertices per non-AA round rect (4 corner vertices).
+   */
+  static constexpr uint16_t VerticesPerNonAARRect = 4;
+
+  /**
+   * Create a new RRectDrawOp for a list of RRect records.
    */
   static PlacementPtr<RRectDrawOp> Make(Context* context,
                                         PlacementPtr<RRectsVertexProvider> provider,
                                         uint32_t renderFlags);
 
-  void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
+ protected:
+  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
+
+  void onDraw(RenderPass* renderPass) override;
+
+  Type type() override {
+    return Type::RRectDrawOp;
+  }
+
+  bool hasCoverage() const override {
+    return aaType != AAType::None;
+  }
 
  private:
   size_t rectCount = 0;
-  bool useScale = false;
   bool hasStroke = false;
-  std::optional<Color> commonColor = std::nullopt;
-  std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;
-  std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = nullptr;
+  size_t indicesPerRRect = 0;
+  std::optional<PMColor> commonColor = std::nullopt;
+  std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
+  std::shared_ptr<VertexBufferView> vertexBufferProxyView = nullptr;
 
-  explicit RRectDrawOp(RRectsVertexProvider* provider);
+  RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provider);
 
-  friend class BlockBuffer;
+  friend class BlockAllocator;
 };
 }  // namespace tgfx

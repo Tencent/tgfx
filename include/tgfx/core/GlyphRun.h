@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,35 +21,71 @@
 #include "tgfx/core/Font.h"
 
 namespace tgfx {
+
 /**
- * GlyphRun represents a sequence of glyphs from a single font, along with their positions.
+ * Defines the positioning mode of glyphs within a GlyphRun.
+ */
+enum class GlyphPositioning {
+  /**
+   * Default positioning: no position data, glyphs are positioned by their advances.
+   * Position is computed as (offset.x + accumulated_advances, offset.y).
+   */
+  Default = 0,
+  /**
+   * Horizontal positioning: each glyph has an x position, sharing a common y from offset.y.
+   */
+  Horizontal = 1,
+  /**
+   * Point positioning: each glyph has an independent (x, y) position.
+   */
+  Point = 2,
+  /**
+   * RSXform positioning: each glyph has rotation, scale, and translation (scos, ssin, tx, ty).
+   */
+  RSXform = 3,
+  /**
+   * Matrix positioning: each glyph has a full 2x3 affine matrix.
+   */
+  Matrix = 4,
+};
+
+/**
+ * GlyphRun represents a sequence of glyphs sharing the same font and positioning mode. It provides
+ * read-only access to glyph data stored in a TextBlob.
  */
 struct GlyphRun {
   /**
-   * Constructs an empty GlyphRun.
-   */
-  GlyphRun() = default;
-
-  /**
-   * Constructs a GlyphRun using a font, a list of glyph IDs, and their positions.
-   */
-  GlyphRun(Font font, std::vector<GlyphID> glyphIDs, std::vector<Point> positions)
-      : font(std::move(font)), glyphs(std::move(glyphIDs)), positions(std::move(positions)) {
-  }
-
-  /**
-   * Returns the Font used to render the glyphs in this run.
+   * The font used for this run.
    */
   Font font = {};
 
   /**
-   * Returns the sequence of glyph IDs in this run.
+   * The number of glyphs in this run.
    */
-  std::vector<GlyphID> glyphs = {};
+  size_t glyphCount = 0;
 
   /**
-   * Returns the sequence of positions for each glyph in this run.
+   * Pointer to the glyph ID array. The array contains glyphCount elements.
    */
-  std::vector<Point> positions = {};
+  const GlyphID* glyphs = nullptr;
+
+  /**
+   * The positioning mode for this run. When iterating a TextBlob, Default positioning is
+   * automatically expanded to Horizontal, with position data stored in the iterator.
+   */
+  GlyphPositioning positioning = GlyphPositioning::Point;
+
+  /**
+   * Pointer to the raw position data array. The number of floats per glyph depends on the
+   * positioning mode: Default=1, Horizontal=1, Point=2, RSXform=4, Matrix=6. Note that Default
+   * positioning is automatically expanded to Horizontal when iterating a TextBlob.
+   */
+  const float* positions = nullptr;
+
+  /**
+   * The shared y offset for Horizontal positioning mode. For other modes, this value is 0.
+   */
+  float offsetY = 0;
 };
+
 }  // namespace tgfx

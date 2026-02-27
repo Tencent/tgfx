@@ -39,11 +39,12 @@ std::shared_ptr<EGLWindow> EGLWindow::Current() {
 }
 
 std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
-                                               EGLContext sharedContext) {
+                                               EGLContext sharedContext,
+                                               std::shared_ptr<ColorSpace> colorSpace) {
   if (!nativeWindow) {
     return nullptr;
   }
-  auto device = EGLDevice::MakeFrom(nativeWindow, sharedContext);
+  auto device = EGLDevice::MakeFrom(nativeWindow, sharedContext, colorSpace);
   if (device == nullptr) {
     return nullptr;
   }
@@ -97,8 +98,8 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
     // If the rendering size changes，eglQuerySurface() may give the wrong size on same platforms.
     size = GetNativeWindowSize(nativeWindow);
   }
+  auto eglDevice = static_cast<EGLDevice*>(device.get());
   if (size.width <= 0 || size.height <= 0) {
-    auto eglDevice = static_cast<EGLDevice*>(device.get());
     eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &size.width);
     eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &size.height);
   }
@@ -109,20 +110,26 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
   BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0,
+                           eglDevice->colorSpace);
 }
 
-void EGLWindow::onPresent(Context*, int64_t presentationTime) {
+void EGLWindow::setPresentationTime(int64_t time) {
+  presentationTime = time;
+}
+
+void EGLWindow::onPresent(Context*) {
   auto device = std::static_pointer_cast<EGLDevice>(this->device);
   auto eglDisplay = device->eglDisplay;
   // eglSurface cannot be nullptr in EGLWindow.
   auto eglSurface = device->eglSurface;
-  if (presentationTime != INT64_MIN) {
+  if (presentationTime.has_value()) {
     static auto eglPresentationTimeANDROID = reinterpret_cast<PFNEGLPRESENTATIONTIMEANDROIDPROC>(
         eglGetProcAddress("eglPresentationTimeANDROID"));
     if (eglPresentationTimeANDROID) {
       // egl uses nano seconds
-      eglPresentationTimeANDROID(eglDisplay, eglSurface, presentationTime * 1000);
+      eglPresentationTimeANDROID(eglDisplay, eglSurface, *presentationTime * 1000);
+      presentationTime = std::nullopt;
     }
   }
   eglSwapBuffers(eglDisplay, eglSurface);

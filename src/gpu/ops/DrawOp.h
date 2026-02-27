@@ -20,15 +20,14 @@
 
 #include "gpu/AAType.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/RenderPass.h"
+#include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
 class DrawOp {
  public:
-  virtual ~DrawOp() = default;
+  enum class Type { RectDrawOp, RRectDrawOp, ShapeDrawOp, AtlasTextOp, Quads3DDrawOp };
 
-  PlacementPtr<ProgramInfo> createProgramInfo(RenderTarget* renderTarget,
-                                              PlacementPtr<GeometryProcessor> geometryProcessor);
+  virtual ~DrawOp() = default;
 
   void setScissorRect(const Rect& rect) {
     scissorRect = rect;
@@ -36,6 +35,10 @@ class DrawOp {
 
   void setBlendMode(BlendMode mode) {
     blendMode = mode;
+  }
+
+  void setCullMode(CullMode mode) {
+    cullMode = mode;
   }
 
   void setXferProcessor(PlacementPtr<XferProcessor> processor) {
@@ -54,17 +57,25 @@ class DrawOp {
     return !coverages.empty();
   }
 
-  virtual void execute(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
+  void execute(RenderPass* renderPass, RenderTarget* renderTarget);
 
  protected:
+  BlockAllocator* allocator = nullptr;
   AAType aaType = AAType::None;
   Rect scissorRect = {};
   std::vector<PlacementPtr<FragmentProcessor>> colors = {};
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
+  CullMode cullMode = CullMode::None;
 
-  explicit DrawOp(AAType aaType) : aaType(aaType) {
+  DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
   }
+
+  virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
+
+  virtual void onDraw(RenderPass* renderPass) = 0;
+
+  virtual Type type() = 0;
 };
 }  // namespace tgfx

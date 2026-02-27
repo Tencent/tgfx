@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "core/utils/BlockBuffer.h"
+#include "core/ColorSpaceXformSteps.h"
+#include "core/utils/BlockAllocator.h"
 #include "gpu/AAType.h"
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
@@ -44,10 +45,10 @@ class RRectsVertexProvider : public VertexProvider {
   /**
    * Creates a new RRectsVertexProvider from a list of RRect records.
    */
-  static PlacementPtr<RRectsVertexProvider> MakeFrom(BlockBuffer* blockBuffer,
-                                                     std::vector<PlacementPtr<RRectRecord>>&& rects,
-                                                     AAType aaType, bool useScale,
-                                                     std::vector<PlacementPtr<Stroke>>&& strokes);
+  static PlacementPtr<RRectsVertexProvider> MakeFrom(
+      BlockAllocator* allocator, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
+      std::vector<PlacementPtr<Stroke>>&& strokes,
+      std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Returns the number of round rects in the provider.
@@ -61,10 +62,6 @@ class RRectsVertexProvider : public VertexProvider {
    */
   AAType aaType() const {
     return static_cast<AAType>(bitFields.aaType);
-  }
-
-  bool useScale() const {
-    return bitFields.useScale;
   }
 
   /**
@@ -89,20 +86,28 @@ class RRectsVertexProvider : public VertexProvider {
 
   void getVertices(float* vertices) const override;
 
+  const std::shared_ptr<ColorSpace>& dstColorSpace() const {
+    return _dstColorSpace;
+  }
+
  private:
   PlacementArray<RRectRecord> rects = {};
   PlacementArray<Stroke> strokes = {};
+  std::shared_ptr<ColorSpace> _dstColorSpace = nullptr;
   struct {
     uint8_t aaType : 2;
-    bool useScale : 1;
     bool hasColor : 1;
     bool hasStroke : 1;
   } bitFields = {};
 
-  RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool useScale,
-                       bool hasColor, PlacementArray<Stroke>&& strokes,
-                       std::shared_ptr<BlockBuffer> reference);
+  RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
+                       PlacementArray<Stroke>&& strokes, std::shared_ptr<BlockAllocator> reference,
+                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
-  friend class BlockBuffer;
+  void getAAVertices(float* vertices) const;
+
+  void getNonAAVertices(float* vertices) const;
+
+  friend class BlockAllocator;
 };
 }  // namespace tgfx

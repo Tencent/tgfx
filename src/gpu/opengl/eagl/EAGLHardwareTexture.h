@@ -25,11 +25,10 @@
 namespace tgfx {
 class EAGLHardwareTexture : public GLTexture {
  public:
-  static std::vector<std::unique_ptr<GPUTexture>> MakeFrom(EAGLGPU* gpu,
-                                                           CVPixelBufferRef pixelBuffer,
-                                                           uint32_t usage);
+  static std::vector<std::shared_ptr<Texture>> MakeFrom(EAGLGPU* gpu, CVPixelBufferRef pixelBuffer,
+                                                        uint32_t usage);
 
-  explicit EAGLHardwareTexture(const GPUTextureDescriptor& descriptor, CVPixelBufferRef pixelBuffer,
+  explicit EAGLHardwareTexture(const TextureDescriptor& descriptor, CVPixelBufferRef pixelBuffer,
                                CVOpenGLESTextureRef texture, unsigned target, unsigned textureID);
 
   ~EAGLHardwareTexture() override;
@@ -39,7 +38,7 @@ class EAGLHardwareTexture : public GLTexture {
   }
 
  protected:
-  void onRelease(GLGPU* gpu) override;
+  void onReleaseTexture(GLGPU* gpu) override;
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;

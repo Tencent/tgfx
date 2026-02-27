@@ -37,6 +37,9 @@ std::shared_ptr<Shape> Shape::Merge(const std::vector<std::shared_ptr<Shape>>& s
   }
   std::vector<std::shared_ptr<Shape>> list = {};
   for (auto& shape : shapes) {
+    if (shape == nullptr) {
+      continue;
+    }
     AppendShape::Append(&list, shape);
   }
   if (list.size() == 1) {
@@ -56,24 +59,24 @@ std::shared_ptr<Shape> AppendShape::MakeFrom(std::shared_ptr<Shape> first,
   return std::shared_ptr<AppendShape>(new AppendShape(std::move(shapes)));
 }
 
-bool AppendShape::isInverseFillType() const {
-  return shapes.front()->isInverseFillType();
+PathFillType AppendShape::fillType() const {
+  return shapes.front()->fillType();
 }
 
-Rect AppendShape::getBounds() const {
+Rect AppendShape::onGetBounds() const {
   Rect bounds = {};
   for (const auto& shape : shapes) {
-    bounds.join(shape->getBounds());
+    bounds.join(shape->onGetBounds());
   }
   return bounds;
 }
 
-Path AppendShape::getPath() const {
+Path AppendShape::onGetPath(float resolutionScale) const {
   auto firstShape = shapes.front();
   // the first path determines the fill type
-  auto path = firstShape->getPath();
+  auto path = firstShape->onGetPath(resolutionScale);
   for (size_t i = 1; i < shapes.size(); ++i) {
-    path.addPath(shapes[i]->getPath());
+    path.addPath(shapes[i]->onGetPath(resolutionScale));
   }
   return path;
 }

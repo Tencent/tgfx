@@ -15,7 +15,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
-#include "layers/OpaqueThreshold.h"
 
 namespace tgfx {
 
@@ -65,9 +64,6 @@ void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<
     return;
   }
 
-  auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD));
-  auto opaqueContent = content->makeWithFilter(opaqueFilter);
-
   // create blurred background
   auto blurFilter = getBackgroundFilter(contentScale);
   Point backgroundOffset = {};
@@ -75,7 +71,7 @@ void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<
   auto blurBackground = extraSource->makeWithFilter(blurFilter, &backgroundOffset, &clipRect);
   backgroundOffset += extraSourceOffset;
 
-  auto maskShader = Shader::MakeImageShader(opaqueContent, TileMode::Decal, TileMode::Decal);
+  auto maskShader = Shader::MakeImageShader(content, TileMode::Decal, TileMode::Decal);
 
   // draw blurred background in the mask
   Paint paint = {};
@@ -94,7 +90,7 @@ std::shared_ptr<ImageFilter> BackgroundBlurStyle::getBackgroundFilter(float cont
   }
   currentScale = contentScale;
   backgroundFilter =
-      ImageFilter::Blur(_blurrinessX * contentScale, _blurrinessX * contentScale, _tileMode);
+      ImageFilter::Blur(_blurrinessX * contentScale, _blurrinessY * contentScale, _tileMode);
   return backgroundFilter;
 }
 

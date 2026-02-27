@@ -17,10 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Path.h"
+#include <functional>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfloat-conversion"
+#pragma clang diagnostic ignored "-Wimplicit-int-conversion"
+#include <include/core/SkPath.h>
+#pragma clang diagnostic pop
 #include <include/core/SkPathTypes.h>
 #include <include/core/SkRect.h>
-#include <memory>
 #include "core/PathRef.h"
+#include "core/utils/AtomicCache.h"
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
@@ -86,6 +92,9 @@ PathFillType Path::getFillType() const {
 }
 
 void Path::setFillType(PathFillType fillType) {
+  if (getFillType() == fillType) {
+    return;
+  }
   SkPathFillType type;
   switch (fillType) {
     case PathFillType::EvenOdd:
@@ -224,6 +233,14 @@ void Path::cubicTo(const Point& control1, const Point& control2, const Point& po
   cubicTo(control1.x, control1.y, control2.x, control2.y, point.x, point.y);
 }
 
+void Path::conicTo(float controlX, float controlY, float x, float y, float weight) {
+  writableRef()->path.conicTo(controlX, controlY, x, y, weight);
+}
+
+void Path::conicTo(const Point& control, const Point& point, float weight) {
+  conicTo(control.x, control.y, point.x, point.y, weight);
+}
+
 void Path::arcTo(float x1, float y1, float x2, float y2, float radius) {
   writableRef()->path.arcTo(x1, y1, x2, y2, radius);
 }
@@ -328,7 +345,7 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, PathArcSize largeArc, bo
                         float_is_integer(rx) && float_is_integer(ry) &&
                         float_is_integer(endPoint.x) && float_is_integer(endPoint.y);
 
-  auto* path = &(writableRef()->path);
+  auto path = &(writableRef()->path);
   for (int i = 0; i < static_cast<int>(segments); ++i) {
     auto endTheta = startTheta + thetaWidth;
     auto sinEndTheta = SinSnapToZero(endTheta);
@@ -483,11 +500,12 @@ void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) 
 void Path::addPath(const Path& src, PathOp op) {
   auto& path = writableRef()->path;
   const auto& newPath = src.pathRef->path;
-  if (op == PathOp::Append) {
+  if (op == PathOp::Append || op == PathOp::Extend) {
     if (path.isEmpty()) {
       path = newPath;
     } else {
-      path.addPath(newPath);
+      auto mode = op == PathOp::Extend ? SkPath::kExtend_AddPathMode : SkPath::kAppend_AddPathMode;
+      path.addPath(newPath, mode);
     }
     return;
   }
@@ -524,49 +542,29 @@ void Path::transform(const Matrix& matrix) {
   writableRef()->path.transform(skMatrix);
 }
 
-void Path::reverse() {
-  auto& path = writableRef()->path;
-  SkPath tempPath;
-  tempPath.reverseAddPath(path);
-  path = tempPath;
-}
-
-void Path::decompose(const PathIterator& iterator, void* info) const {
-  if (iterator == nullptr) {
+void Path::transform3D(const Matrix3D& matrix) {
+  if (matrix.isIdentity()) {
     return;
   }
-  const auto& skPath = pathRef->path;
-  SkPath::Iter iter(skPath, false);
-  SkPoint points[4];
-  SkPoint quads[5];
-  SkPath::Verb verb;
-  while ((verb = iter.next(points)) != SkPath::kDone_Verb) {
-    switch (verb) {
-      case SkPath::kMove_Verb:
-        iterator(PathVerb::Move, reinterpret_cast<Point*>(points), info);
-        break;
-      case SkPath::kLine_Verb:
-        iterator(PathVerb::Line, reinterpret_cast<Point*>(points), info);
-        break;
-      case SkPath::kQuad_Verb:
-        iterator(PathVerb::Quad, reinterpret_cast<Point*>(points), info);
-        break;
-      case SkPath::kConic_Verb:
-        // approximate with 2^1=2 quads.
-        SkPath::ConvertConicToQuads(points[0], points[1], points[2], iter.conicWeight(), quads, 1);
-        iterator(PathVerb::Quad, reinterpret_cast<Point*>(quads), info);
-        iterator(PathVerb::Quad, reinterpret_cast<Point*>(quads) + 2, info);
-        break;
-      case SkPath::kCubic_Verb:
-        iterator(PathVerb::Cubic, reinterpret_cast<Point*>(points), info);
-        break;
-      case SkPath::kClose_Verb:
-        iterator(PathVerb::Close, reinterpret_cast<Point*>(points), info);
-        break;
-      default:
-        break;
-    }
-  }
+  float values[16] = {};
+  matrix.getColumnMajor(values);
+  SkMatrix skMatrix = {};
+  // All vertices inside the Path have an initial z-coordinate of 0, so the third column of the 4x4
+  // matrix does not affect the final transformation result and can be ignored. Additionally, since
+  // we do not care about the final projected z-axis coordinate, the third row can also be ignored.
+  // Therefore, the 4x4 matrix can be simplified to a 3x3 matrix.
+  skMatrix.setAll(values[0], values[4], values[12], values[1], values[5], values[13], values[3],
+                  values[7], values[15]);
+  writableRef()->path.transform(skMatrix);
+}
+
+void Path::reverse() {
+  auto& path = writableRef()->path;
+  auto fillType = path.getFillType();
+  SkPath tempPath;
+  tempPath.reverseAddPath(path);
+  tempPath.setFillType(fillType);
+  path = tempPath;
 }
 
 PathRef* Path::writableRef() {
@@ -575,7 +573,7 @@ PathRef* Path::writableRef() {
   } else {
     // There only one reference to this PathRef, so we can safely reset the uniqueKey and bounds.
     pathRef->uniqueKey.reset();
-    pathRef->bounds.reset();
+    AtomicCacheReset(pathRef->bounds);
   }
   return pathRef.get();
 }
@@ -599,5 +597,93 @@ bool Path::getLastPoint(Point* lastPoint) const {
   }
   return false;
 };
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// Path::Iterator implementation
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+static_assert(sizeof(pk::SkPath::Iter) <= 64,
+              "Path::Iterator storage size is too small for SkPath::Iter");
+static_assert(alignof(pk::SkPath::Iter) <= 8,
+              "Path::Iterator storage alignment is insufficient for SkPath::Iter");
+
+Path::Iterator::Iterator(const Path* path) : isDone(false) {
+  new (storage) pk::SkPath::Iter(PathRef::ReadAccess(*path), false);
+  // Advance to the first segment.
+  ++(*this);
+}
+
+Path::Iterator::Iterator() = default;
+
+Path::Iterator::~Iterator() {
+  if (!isDone) {
+    reinterpret_cast<pk::SkPath::Iter*>(storage)->~Iter();
+  }
+}
+
+Path::Iterator::Iterator(const Iterator& other) : current(other.current), isDone(other.isDone) {
+  if (!isDone) {
+    new (storage) pk::SkPath::Iter(*reinterpret_cast<const pk::SkPath::Iter*>(other.storage));
+  }
+}
+
+Path::Iterator& Path::Iterator::operator=(const Iterator& other) {
+  if (this == &other) {
+    return *this;
+  }
+  if (!isDone) {
+    reinterpret_cast<pk::SkPath::Iter*>(storage)->~Iter();
+  }
+  current = other.current;
+  isDone = other.isDone;
+  if (!isDone) {
+    new (storage) pk::SkPath::Iter(*reinterpret_cast<const pk::SkPath::Iter*>(other.storage));
+  }
+  return *this;
+}
+
+Path::Iterator& Path::Iterator::operator++() {
+  advance();
+  return *this;
+}
+
+void Path::Iterator::advance() {
+  auto* iter = reinterpret_cast<pk::SkPath::Iter*>(storage);
+  // Point and SkPoint have identical memory layout (two consecutive floats),
+  // so we can directly pass current.points as SkPoint* to avoid memcpy.
+  auto* pts = reinterpret_cast<pk::SkPoint*>(current.points);
+  auto verb = iter->next(pts);
+  if (verb == pk::SkPath::kDone_Verb) {
+    isDone = true;
+    iter->~Iter();
+    current = {};
+  } else {
+    current.verb = static_cast<PathVerb>(verb);
+    if (verb == pk::SkPath::kConic_Verb) {
+      current.conicWeight = iter->conicWeight();
+    } else {
+      current.conicWeight = 0.0f;
+    }
+  }
+}
+
+Path::Iterator Path::begin() const {
+  if (isEmpty()) {
+    return Iterator();
+  }
+  return Iterator(this);
+}
+
+std::vector<Point> Path::ConvertConicToQuads(const Point& p0, const Point& p1, const Point& p2,
+                                             float weight, int pow2) {
+  size_t maxQuads = static_cast<size_t>(1) << pow2;
+  std::vector<Point> quads(1 + (2 * maxQuads));
+  int numQuads = SkPath::ConvertConicToQuads(*reinterpret_cast<const SkPoint*>(&p0),
+                                             *reinterpret_cast<const SkPoint*>(&p1),
+                                             *reinterpret_cast<const SkPoint*>(&p2), weight,
+                                             reinterpret_cast<SkPoint*>(quads.data()), pow2);
+  quads.resize(1 + (2 * static_cast<size_t>(numQuads)));
+  return quads;
+}
 
 }  // namespace tgfx

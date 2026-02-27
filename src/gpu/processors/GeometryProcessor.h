@@ -19,15 +19,16 @@
 #pragma once
 
 #include <vector>
-#include "gpu/Attribute.h"
 #include "gpu/FragmentShaderBuilder.h"
-#include "gpu/GPUTexture.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/ShaderVar.h"
-#include "gpu/UniformBuffer.h"
+#include "gpu/UniformData.h"
 #include "gpu/VaryingHandler.h"
 #include "gpu/VertexShaderBuilder.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/Processor.h"
+#include "tgfx/gpu/Attribute.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 class GeometryProcessor : public Processor {
@@ -65,7 +66,7 @@ class GeometryProcessor : public Processor {
 
   struct EmitArgs {
     EmitArgs(VertexShaderBuilder* vertBuilder, FragmentShaderBuilder* fragBuilder,
-             VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const Caps* caps,
+             VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const ShaderCaps* caps,
              std::string outputColor, std::string outputCoverage,
              FPCoordTransformHandler* transformHandler, std::string* outputSubset)
         : vertBuilder(vertBuilder), fragBuilder(fragBuilder), varyingHandler(varyingHandler),
@@ -77,7 +78,7 @@ class GeometryProcessor : public Processor {
     FragmentShaderBuilder* fragBuilder;
     VaryingHandler* varyingHandler;
     UniformHandler* uniformHandler;
-    const Caps* caps;
+    const ShaderCaps* caps;
     const std::string outputColor;
     const std::string outputCoverage;
     FPCoordTransformHandler* fpCoordTransformHandler;
@@ -86,14 +87,14 @@ class GeometryProcessor : public Processor {
 
   virtual void emitCode(EmitArgs&) const = 0;
 
-  virtual void setData(UniformBuffer* uniformBuffer,
+  virtual void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                        FPCoordTransformIter* coordTransformIter) const = 0;
 
   size_t numTextureSamplers() const {
     return textureSamplerCount;
   }
 
-  GPUTexture* textureAt(size_t index) const {
+  std::shared_ptr<Texture> textureAt(size_t index) const {
     return onTextureAt(index);
   }
 
@@ -109,12 +110,19 @@ class GeometryProcessor : public Processor {
   explicit GeometryProcessor(uint32_t classID) : Processor(classID) {
   }
 
+  /**
+   * Returns whether the uvMatrix has perspective. Subclass should override this if needed.
+   */
+  virtual bool hasUVPerspective() const {
+    return false;
+  }
+
   void setVertexAttributes(const Attribute* attrs, int attrCount);
 
   /**
    * A helper to upload coord transform matrices in setData().
    */
-  void setTransformDataHelper(const Matrix& uvMatrix, UniformBuffer* uniformBuffer,
+  void setTransformDataHelper(const Matrix& uvMatrix, UniformData* uniformData,
                               FPCoordTransformIter* transformIter) const;
 
   /**
@@ -129,7 +137,7 @@ class GeometryProcessor : public Processor {
   virtual void onComputeProcessorKey(BytesKey*) const {
   }
 
-  virtual GPUTexture* onTextureAt(size_t) const {
+  virtual std::shared_ptr<Texture> onTextureAt(size_t) const {
     return nullptr;
   }
 
@@ -138,10 +146,10 @@ class GeometryProcessor : public Processor {
   }
 
   virtual void onEmitTransform(EmitArgs&, VertexShaderBuilder*, VaryingHandler*, UniformHandler*,
-                               const std::string&, int) const {
+                               const std::string&, bool, int) const {
   }
 
-  virtual void onSetTransformData(UniformBuffer*, const CoordTransform*, int) const {
+  virtual void onSetTransformData(UniformData*, const CoordTransform*, int) const {
   }
 
   std::vector<Attribute> attributes = {};

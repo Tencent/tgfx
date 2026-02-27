@@ -20,19 +20,21 @@
 
 #include "gpu/SamplerState.h"
 #include "gpu/SamplingArgs.h"
-#include "gpu/YUVTextureView.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/resources/YUVTextureView.h"
 
 namespace tgfx {
 class TextureEffect : public FragmentProcessor {
  public:
-  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> proxy,
+  static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
+                                              std::shared_ptr<TextureProxy> proxy,
                                               const SamplingArgs& args = {},
                                               const Matrix* uvMatrix = nullptr,
                                               bool forceAsMask = false);
 
-  static PlacementPtr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
+  static PlacementPtr<FragmentProcessor> MakeRGBAAA(BlockAllocator* allocator,
+                                                    std::shared_ptr<TextureProxy> proxy,
                                                     const SamplingArgs& args,
                                                     const Point& alphaStart,
                                                     const Matrix* uvMatrix = nullptr);
@@ -52,7 +54,7 @@ class TextureEffect : public FragmentProcessor {
 
   size_t onCountTextureSamplers() const override;
 
-  GPUTexture* onTextureAt(size_t index) const override;
+  std::shared_ptr<Texture> onTextureAt(size_t index) const override;
 
   SamplerState onSamplerStateAt(size_t) const override {
     return samplerState;

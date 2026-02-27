@@ -19,6 +19,7 @@
 #include "ColorFilterShader.h"
 #include "core/utils/Types.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/XfermodeFragmentProcessor.h"
 
 namespace tgfx {
 std::shared_ptr<Shader> ColorFilterShader::makeWithMatrix(const Matrix& viewMatrix) const {
@@ -39,12 +40,26 @@ bool ColorFilterShader::isEqual(const Shader* otherShader) const {
 }
 
 PlacementPtr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
-    const FPArgs& args, const Matrix* uvMatrix) const {
-  auto fp1 = FragmentProcessor::Make(shader, args, uvMatrix);
-  if (fp1 == nullptr) {
+    const FPArgs& args, const Matrix* uvMatrix,
+    const std::shared_ptr<ColorSpace>& dstColorSpace) const {
+  auto shaderProcessor = FragmentProcessor::Make(shader, args, uvMatrix, dstColorSpace);
+  if (shaderProcessor == nullptr) {
     return nullptr;
   }
-  auto fp2 = colorFilter->asFragmentProcessor(args.context);
-  return FragmentProcessor::Compose(args.context->drawingBuffer(), std::move(fp1), std::move(fp2));
+  auto cfProcessor = colorFilter->asFragmentProcessor(args.context, dstColorSpace);
+  if (cfProcessor == nullptr) {
+    return shaderProcessor;
+  }
+  auto allocator = args.context->drawingAllocator();
+  auto composed = FragmentProcessor::Compose(allocator, std::move(shaderProcessor),
+                                             std::move(cfProcessor));
+  if (!colorFilter->affectsTransparentBlack()) {
+    return composed;
+  }
+  // The color filter transforms transparent pixels into non-transparent ones. Use the original
+  // shader alpha as a mask to prevent coloring transparent regions.
+  auto alphaSource = FragmentProcessor::Make(shader, args, uvMatrix, dstColorSpace);
+  return XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      allocator, std::move(composed), std::move(alphaSource), BlendMode::SrcIn);
 }
 }  // namespace tgfx

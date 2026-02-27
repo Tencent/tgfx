@@ -17,8 +17,57 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Backend.h"
+#include "opengl/GLDefines.h"
 
 namespace tgfx {
+static PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat) {
+  switch (sizeFormat) {
+    case GL_BGRA:
+    case GL_BGRA8:
+      return PixelFormat::BGRA_8888;
+    case GL_R8:
+    case GL_RED:
+    case GL_ALPHA8:
+    case GL_ALPHA:
+      return PixelFormat::ALPHA_8;
+    case GL_LUMINANCE8:
+    case GL_LUMINANCE:
+      return PixelFormat::GRAY_8;
+    case GL_RG8:
+    case GL_RG:
+      return PixelFormat::RG_88;
+    default:
+      break;
+  }
+  return PixelFormat::RGBA_8888;
+}
+
+// MTLPixelFormat values (from Metal headers)
+static constexpr unsigned METAL_PIXEL_FORMAT_R8Unorm = 10;
+static constexpr unsigned METAL_PIXEL_FORMAT_RG8Unorm = 30;
+static constexpr unsigned METAL_PIXEL_FORMAT_RGBA8Unorm = 70;
+static constexpr unsigned METAL_PIXEL_FORMAT_BGRA8Unorm = 80;
+static constexpr unsigned METAL_PIXEL_FORMAT_Depth24Unorm_Stencil8 = 255;
+static constexpr unsigned METAL_PIXEL_FORMAT_Depth32Float_Stencil8 = 260;
+
+static PixelFormat MetalPixelFormatToPixelFormat(unsigned metalFormat) {
+  switch (metalFormat) {
+    case METAL_PIXEL_FORMAT_R8Unorm:
+      return PixelFormat::ALPHA_8;
+    case METAL_PIXEL_FORMAT_RG8Unorm:
+      return PixelFormat::RG_88;
+    case METAL_PIXEL_FORMAT_BGRA8Unorm:
+      return PixelFormat::BGRA_8888;
+    case METAL_PIXEL_FORMAT_Depth24Unorm_Stencil8:
+    case METAL_PIXEL_FORMAT_Depth32Float_Stencil8:
+      return PixelFormat::DEPTH24_STENCIL8;
+    case METAL_PIXEL_FORMAT_RGBA8Unorm:
+    default:
+      break;
+  }
+  return PixelFormat::RGBA_8888;
+}
+
 BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
   if (!that.isValid()) {
     _width = _height = 0;
@@ -28,11 +77,11 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
   _height = that._height;
   _backend = that._backend;
   switch (that._backend) {
-    case Backend::OPENGL:
+    case Backend::OpenGL:
       glInfo = that.glInfo;
       break;
-    case Backend::METAL:
-      mtlInfo = that.mtlInfo;
+    case Backend::Metal:
+      metalInfo = that.metalInfo;
       break;
     default:
       break;
@@ -40,19 +89,34 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
   return *this;
 }
 
+PixelFormat BackendTexture::format() const {
+  if (!isValid()) {
+    return PixelFormat::Unknown;
+  }
+  switch (_backend) {
+    case Backend::OpenGL:
+      return GLSizeFormatToPixelFormat(glInfo.format);
+    case Backend::Metal:
+      return MetalPixelFormatToPixelFormat(metalInfo.format);
+    default:
+      break;
+  }
+  return PixelFormat::Unknown;
+}
+
 bool BackendTexture::getGLTextureInfo(GLTextureInfo* glTextureInfo) const {
-  if (!isValid() || _backend != Backend::OPENGL) {
+  if (!isValid() || _backend != Backend::OpenGL) {
     return false;
   }
   *glTextureInfo = glInfo;
   return true;
 }
 
-bool BackendTexture::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const {
-  if (!isValid() || _backend != Backend::METAL) {
+bool BackendTexture::getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const {
+  if (!isValid() || _backend != Backend::Metal) {
     return false;
   }
-  *mtlTextureInfo = mtlInfo;
+  *metalTextureInfo = metalInfo;
   return true;
 }
 
@@ -65,11 +129,11 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
   _height = that._height;
   _backend = that._backend;
   switch (that._backend) {
-    case Backend::OPENGL:
+    case Backend::OpenGL:
       glInfo = that.glInfo;
       break;
-    case Backend::METAL:
-      mtlInfo = that.mtlInfo;
+    case Backend::Metal:
+      metalInfo = that.metalInfo;
       break;
     default:
       break;
@@ -77,27 +141,45 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
   return *this;
 }
 
+PixelFormat BackendRenderTarget::format() const {
+  if (!isValid()) {
+    return PixelFormat::Unknown;
+  }
+  switch (_backend) {
+    case Backend::OpenGL:
+      return GLSizeFormatToPixelFormat(glInfo.format);
+    case Backend::Metal:
+      return MetalPixelFormatToPixelFormat(metalInfo.format);
+    default:
+      break;
+  }
+  return PixelFormat::Unknown;
+}
+
 bool BackendRenderTarget::getGLFramebufferInfo(GLFrameBufferInfo* glFrameBufferInfo) const {
-  if (!isValid() || _backend != Backend::OPENGL) {
+  if (!isValid() || _backend != Backend::OpenGL) {
     return false;
   }
   *glFrameBufferInfo = glInfo;
   return true;
 }
 
-bool BackendRenderTarget::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const {
-  if (!isValid() || _backend != Backend::METAL) {
+bool BackendRenderTarget::getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const {
+  if (!isValid() || _backend != Backend::Metal) {
     return false;
   }
-  *mtlTextureInfo = mtlInfo;
+  *metalTextureInfo = metalInfo;
   return true;
 }
 
 BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
   _backend = that._backend;
   switch (that._backend) {
-    case Backend::OPENGL:
+    case Backend::OpenGL:
       glSyncInfo = that.glSyncInfo;
+      break;
+    case Backend::Metal:
+      metalSemaphoreInfo = that.metalSemaphoreInfo;
       break;
     default:
       break;
@@ -107,8 +189,10 @@ BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
 
 bool BackendSemaphore::isInitialized() const {
   switch (_backend) {
-    case Backend::OPENGL:
+    case Backend::OpenGL:
       return glSyncInfo.sync != nullptr;
+    case Backend::Metal:
+      return metalSemaphoreInfo.event != nullptr;
     default:
       break;
   }
@@ -116,10 +200,19 @@ bool BackendSemaphore::isInitialized() const {
 }
 
 bool BackendSemaphore::getGLSync(GLSyncInfo* syncInfo) const {
-  if (_backend != Backend::OPENGL || glSyncInfo.sync == nullptr) {
+  if (_backend != Backend::OpenGL || glSyncInfo.sync == nullptr) {
     return false;
   }
   *syncInfo = glSyncInfo;
   return true;
 }
+
+bool BackendSemaphore::getMetalSemaphore(MetalSemaphoreInfo* metalInfo) const {
+  if (_backend != Backend::Metal || metalSemaphoreInfo.event == nullptr) {
+    return false;
+  }
+  *metalInfo = metalSemaphoreInfo;
+  return true;
+}
+
 }  // namespace tgfx

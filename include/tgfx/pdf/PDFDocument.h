@@ -49,6 +49,9 @@ class PDFDocument {
   /**
    * Creates a new page with the given width and height. If contentRect is provided, content will be
    * clipped to this area. Returns nullptr if the document has been closed.
+   * @note PDF format only supports affine transformations. If a matrix with perspective is applied
+   * to the Canvas, only the affine portion will be used and the perspective components will be
+   * ignored, resulting in incorrect rendering.
    */
   virtual Canvas* beginPage(float pageWidth, float pageHeight,
                             const Rect* contentRect = nullptr) = 0;
