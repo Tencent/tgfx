@@ -233,13 +233,11 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
     deviceBounds = state.matrix.mapRect(meshBounds);
   }
 
-  // Determine if mesh has colors and texCoords (only VertexMesh can have these)
+  // Determine if mesh has vertex colors (only VertexMesh can have these)
   bool hasColors = false;
-  bool hasTexCoords = false;
   if (meshImpl.type() == MeshImpl::Type::Vertex) {
     auto& vertexImpl = static_cast<VertexMeshImpl&>(meshImpl);
     hasColors = vertexImpl.hasColors();
-    hasTexCoords = vertexImpl.hasTexCoords();
   }
 
   // Determine final color based on blending rules (see Canvas.h drawMesh documentation):
@@ -264,7 +262,7 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
     if (textureFP == nullptr) {
       return;
     }
-    if (hasColors && hasTexCoords) {
+    if (hasColors) {
       textureFP = XfermodeFragmentProcessor::MakeFromSrcProcessor(
           drawingAllocator(), std::move(textureFP), BlendMode::Modulate);
     }
