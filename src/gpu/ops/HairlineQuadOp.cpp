@@ -19,6 +19,7 @@
 #include "HairlineQuadOp.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/processors/HairlineQuadGeometryProcessor.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -49,6 +50,8 @@ HairlineQuadOp::HairlineQuadOp(BlockAllocator* allocator,
 
 PlacementPtr<GeometryProcessor> HairlineQuadOp::onMakeGeometryProcessor(
     RenderTarget* /*renderTarget*/) {
+  ATTRIBUTE_NAME("color", color);
+  ATTRIBUTE_NAME("coverage", coverage);
   auto viewMatrix = hairlineProxy->getDrawingMatrix();
   auto realUVMatrix = uvMatrix;
   realUVMatrix.preConcat(viewMatrix);
@@ -61,35 +64,22 @@ void HairlineQuadOp::onDraw(RenderPass* renderPass) {
   if (quadVertexBufferProxy == nullptr || indexBufferProxy == nullptr) {
     return;
   }
-
   auto vertexBuffer = quadVertexBufferProxy->getBuffer();
   if (vertexBuffer == nullptr) {
     return;
   }
-
-  auto gpuVertexBuffer = vertexBuffer->gpuBuffer();
-  if (gpuVertexBuffer == nullptr) {
-    return;
-  }
-
   auto indexBuffer = indexBufferProxy->getBuffer();
   if (indexBuffer == nullptr) {
     return;
   }
-
-  auto gpuIndexBuffer = indexBuffer->gpuBuffer();
-  if (gpuIndexBuffer == nullptr) {
-    return;
-  }
-
   auto totalQuadCount = vertexBuffer->size() / (VerticesPerQuad * BytesPerQuadVertex);
   size_t vertexOffset = 0;
-  renderPass->setIndexBuffer(gpuIndexBuffer, IndexFormat::UInt32);
+  renderPass->setIndexBuffer(indexBuffer->gpuBuffer(), IndexFormat::UInt32);
 
   while (totalQuadCount > 0) {
-    auto batchQuadCount = std::min(totalQuadCount, MAX_NUM_HAIRLINE_QUADS);
+    auto batchQuadCount = std::min(totalQuadCount, MaxNumQuads);
     auto indexCount = static_cast<uint32_t>(batchQuadCount * IndicesPerQuad);
-    renderPass->setVertexBuffer(0, gpuVertexBuffer, vertexOffset);
+    renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer(), vertexOffset);
     renderPass->drawIndexed(PrimitiveType::Triangles, indexCount);
     totalQuadCount -= batchQuadCount;
     vertexOffset += batchQuadCount * VerticesPerQuad * BytesPerQuadVertex;

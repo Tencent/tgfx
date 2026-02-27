@@ -32,6 +32,7 @@ class HairlineQuadOp final : public DrawOp {
   static constexpr size_t BytesPerQuadVertex = 24;
   static constexpr size_t VerticesPerQuad = 5;
   static constexpr size_t IndicesPerQuad = 9;
+  static constexpr size_t MaxNumQuads = 256;
 
   static PlacementPtr<HairlineQuadOp> Make(std::shared_ptr<GPUHairlineProxy> hairlineProxy,
                                            PMColor color, const Matrix& uvMatrix, float coverage,

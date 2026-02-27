@@ -32,6 +32,7 @@ class HairlineLineOp final : public DrawOp {
   static constexpr size_t BytesPerLineVertex = 12;
   static constexpr size_t VerticesPerLine = 6;
   static constexpr size_t IndicesPerLine = 18;
+  static constexpr size_t MaxNumLines = 256;
 
   static PlacementPtr<HairlineLineOp> Make(std::shared_ptr<GPUHairlineProxy> hairlineProxy,
                                            PMColor color, const Matrix& uvMatrix, float coverage,

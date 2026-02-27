@@ -21,6 +21,8 @@
 #include "core/GradientGenerator.h"
 #include "core/PixelBuffer.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/ops/HairlineLineOp.h"
+#include "gpu/ops/HairlineQuadOp.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "opengl/GLBuffer.h"
@@ -38,12 +40,6 @@ static constexpr uint16_t VERTICES_PER_AA_ROUND_STROKE_RECT = 24;
 static constexpr uint16_t VERTICES_PER_NON_AA_MITER_STROKE_RECT = 8;
 static constexpr uint16_t VERTICES_PER_NON_AA_BEVEL_STROKE_RECT = 12;
 static constexpr uint16_t VERTICES_PER_NON_AA_ROUND_STROKE_RECT = 20;
-
-// Hairline rendering constants
-static constexpr uint32_t HAIRLINE_LINE_NUM_VERTICES = 6;
-static constexpr uint32_t HAIRLINE_LINE_NUM_INDICES = 18;
-static constexpr uint32_t HAIRLINE_QUAD_NUM_VERTICES = 5;
-static constexpr uint32_t HAIRLINE_QUAD_NUM_INDICES = 9;
 
 // clang-format off
 static constexpr uint16_t HairlineLineIndexPattern[] = {
@@ -666,8 +662,8 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getRoundStrokeIndexBuffer(bool anti
 std::shared_ptr<GPUBufferProxy> GlobalCache::getHairlineLineIndexBuffer() {
   if (hairlineLineIndexBuffer == nullptr) {
     auto provider = std::make_unique<HairlineIndicesProvider>(
-        HairlineLineIndexPattern, HAIRLINE_LINE_NUM_INDICES, MAX_NUM_HAIRLINE_LINES,
-        HAIRLINE_LINE_NUM_VERTICES);
+        HairlineLineIndexPattern, HairlineLineOp::IndicesPerLine, HairlineLineOp::MaxNumLines,
+        HairlineLineOp::VerticesPerLine);
     hairlineLineIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
   return hairlineLineIndexBuffer;
@@ -676,8 +672,8 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getHairlineLineIndexBuffer() {
 std::shared_ptr<GPUBufferProxy> GlobalCache::getHairlineQuadIndexBuffer() {
   if (hairlineQuadIndexBuffer == nullptr) {
     auto provider = std::make_unique<HairlineIndicesProvider>(
-        HairlineQuadIndexPattern, HAIRLINE_QUAD_NUM_INDICES, MAX_NUM_HAIRLINE_QUADS,
-        HAIRLINE_QUAD_NUM_VERTICES);
+        HairlineQuadIndexPattern, HairlineQuadOp::IndicesPerQuad, HairlineQuadOp::MaxNumQuads,
+        HairlineQuadOp::VerticesPerQuad);
     hairlineQuadIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
   return hairlineQuadIndexBuffer;

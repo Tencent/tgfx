@@ -19,6 +19,7 @@
 #include "HairlineLineOp.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/processors/HairlineLineGeometryProcessor.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -49,6 +50,8 @@ HairlineLineOp::HairlineLineOp(BlockAllocator* allocator,
 
 PlacementPtr<GeometryProcessor> HairlineLineOp::onMakeGeometryProcessor(
     RenderTarget* /*renderTarget*/) {
+  ATTRIBUTE_NAME("color", color);
+  ATTRIBUTE_NAME("coverage", coverage);
   auto viewMatrix = hairlineProxy->getDrawingMatrix();
   auto realUVMatrix = uvMatrix;
   realUVMatrix.preConcat(viewMatrix);
@@ -61,35 +64,22 @@ void HairlineLineOp::onDraw(RenderPass* renderPass) {
   if (lineVertexBufferProxy == nullptr || indexBufferProxy == nullptr) {
     return;
   }
-
   auto vertexBuffer = lineVertexBufferProxy->getBuffer();
   if (vertexBuffer == nullptr) {
     return;
   }
-
-  auto gpuVertexBuffer = vertexBuffer->gpuBuffer();
-  if (gpuVertexBuffer == nullptr) {
-    return;
-  }
-
   auto indexBuffer = indexBufferProxy->getBuffer();
   if (indexBuffer == nullptr) {
     return;
   }
-
-  auto gpuIndexBuffer = indexBuffer->gpuBuffer();
-  if (gpuIndexBuffer == nullptr) {
-    return;
-  }
-
   auto totalLineCount = vertexBuffer->size() / (VerticesPerLine * BytesPerLineVertex);
   size_t vertexOffset = 0;
-  renderPass->setIndexBuffer(gpuIndexBuffer, IndexFormat::UInt32);
+  renderPass->setIndexBuffer(indexBuffer->gpuBuffer(), IndexFormat::UInt32);
 
   while (totalLineCount > 0) {
-    auto batchLineCount = std::min(totalLineCount, MAX_NUM_HAIRLINE_LINES);
+    auto batchLineCount = std::min(totalLineCount, MaxNumLines);
     auto indexCount = static_cast<uint32_t>(batchLineCount * IndicesPerLine);
-    renderPass->setVertexBuffer(0, gpuVertexBuffer, vertexOffset);
+    renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer(), vertexOffset);
     renderPass->drawIndexed(PrimitiveType::Triangles, indexCount);
     totalLineCount -= batchLineCount;
     vertexOffset += batchLineCount * VerticesPerLine * BytesPerLineVertex;
