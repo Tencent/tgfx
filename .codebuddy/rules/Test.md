@@ -5,9 +5,10 @@ alwaysApply: true
 
 ## 编译验证
 
-修改代码后，使用以下命令验证编译。必须传递 `-DTGFX_BUILD_TESTS=ON` 以启用所有模块（layers、svg、pdf 等）。
+修改代码后，使用以下命令验证编译。编译前先运行代码格式化（忽略报错），只要运行就会生效。必须传递 `-DTGFX_BUILD_TESTS=ON` 以启用所有模块（layers、svg、pdf 等）。
 
 ```bash
+./codeformat.sh 2>/dev/null; true
 cmake -G Ninja -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
 cmake --build cmake-build-debug --target TGFXFullTest
 ```
@@ -18,6 +19,7 @@ cmake --build cmake-build-debug --target TGFXFullTest
 - 测试代码可通过编译参数访问所有 private 成员，无需 friend class
 - 运行测试：按上述编译验证步骤构建并执行 `TGFXFullTest`
 - 测试命令返回非零退出码表示测试失败，这是正常行为，不要重复执行同一命令
+
 ## 截图测试
 
 - 使用 `Baseline::Compare(pixels, key)` 比较截图，key 格式为 `{folder}/{name}`，例如 `CanvasTest/Clip`
