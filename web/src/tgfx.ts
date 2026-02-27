@@ -101,9 +101,11 @@ const syncVideoFrame = (video: HTMLVideoElement): void => {
             return;
         }
     }
-    if (syncCtx) {
-        syncCtx.drawImage(video, 0, 0, 1, 1);
+    if (!syncCtx) {
+        syncCanvas = null;
+        return;
     }
+    syncCtx.drawImage(video, 0, 0, 1, 1);
 };
 
 export const uploadToTexture = (
