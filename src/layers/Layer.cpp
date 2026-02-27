@@ -22,6 +22,7 @@
 #include <cmath>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include "compositing3d/Context3DCompositor.h"
 #include "compositing3d/Layer3DContext.h"
 #include "core/MCState.h"
@@ -101,12 +102,21 @@ struct MaskData {
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
 };
 
+struct LayerStyleSourceEntry {
+  std::shared_ptr<Image> image = nullptr;
+  Point offset = {};
+};
+
+struct LayerStyleSourceGroup {
+  LayerStyleSourceEntry content = {};
+  std::optional<LayerStyleSourceEntry> contour = std::nullopt;
+};
+
 struct LayerStyleSource {
   float contentScale = 1.0f;
-  std::shared_ptr<Image> content = nullptr;
-  Point contentOffset = {};
-  std::shared_ptr<Image> contour = nullptr;
-  Point contourOffset = {};
+  // groups[0]: excludeChildEffects = false
+  // groups[1]: excludeChildEffects = true
+  std::unique_ptr<LayerStyleSourceGroup> groups[2] = {};
 };
 
 // Computes which layers need to be marked dirty during children reordering.
@@ -538,14 +548,6 @@ void Layer::setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value
     _layerStyles.push_back(layerStyle);
   }
   invalidateSubtree();
-  invalidateTransform();
-}
-
-void Layer::setExcludeChildEffectsInLayerStyle(bool value) {
-  if (value == bitFields.excludeChildEffectsInLayerStyle) {
-    return;
-  }
-  bitFields.excludeChildEffectsInLayerStyle = value;
   invalidateTransform();
 }
 
@@ -2012,48 +2014,58 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     return nullptr;
   }
 
+  // Collect which excludeChildEffects values need content and/or contour.
+  bool needContent[2] = {false, false};
+  bool needContour[2] = {false, false};
+  for (const auto& layerStyle : _layerStyles) {
+    auto index = static_cast<int>(layerStyle->excludeChildEffects());
+    needContent[index] = true;
+    if (!excludeContour && layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour) {
+      needContour[index] = true;
+    }
+  }
+
   auto source = std::make_unique<LayerStyleSource>();
   source->contentScale = contentScale;
 
   DrawArgs drawArgs = args;
   drawArgs.blurBackground = nullptr;
-  drawArgs.excludeEffects = bitFields.excludeChildEffectsInLayerStyle;
-  // Layer style source content should be rendered to a regular texture, not to 3D compositor.
   drawArgs.render3DContext = nullptr;
 
-  auto needContour =
-      excludeContour
-          ? false
-          : std::any_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& layerStyle) {
-              return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour;
-            });
+  for (int i = 0; i < 2; i++) {
+    if (!needContent[i] && !needContour[i]) {
+      continue;
+    }
+    drawArgs.excludeEffects = static_cast<bool>(i);
+    auto group = std::make_unique<LayerStyleSourceGroup>();
 
-  // Draw contour and check if all drawn content's contour matches its opaque content.
-  // When true, we can reuse the contour image as content image.
-  bool allContourMatch = false;
-  if (needContour) {
-    source->contour =
-        getContentContourImage(drawArgs, contentScale, &source->contourOffset, &allContourMatch);
-    if (source->contour == nullptr) {
-      return nullptr;
+    bool allContourMatch = false;
+    if (needContour[i]) {
+      LayerStyleSourceEntry contourEntry = {};
+      contourEntry.image =
+          getContentContourImage(drawArgs, contentScale, &contourEntry.offset, &allContourMatch);
+      if (contourEntry.image == nullptr) {
+        return nullptr;
+      }
+      if (allContourMatch) {
+        group->content = contourEntry;
+        needContent[i] = false;
+      }
+      group->contour = std::move(contourEntry);
     }
-    if (allContourMatch) {
-      // Contour is identical to content for all drawn children, reuse contour image as content.
-      source->content = source->contour;
-      source->contentOffset = source->contourOffset;
-    }
-  }
 
-  // Need to draw content separately when any drawn child's contour differs from content.
-  if (!allContourMatch) {
-    auto picture = RecordOpaquePicture(contentScale, [&](Canvas* canvas, OpaqueContext*) {
-      drawContents(drawArgs, canvas, 1.0f);
-    });
-    source->content =
-        ToImageWithOffset(std::move(picture), &source->contentOffset, nullptr, args.dstColorSpace);
-    if (source->content == nullptr) {
-      return nullptr;
+    if (needContent[i]) {
+      auto picture = RecordOpaquePicture(contentScale, [&](Canvas* canvas, OpaqueContext*) {
+        drawContents(drawArgs, canvas, 1.0f);
+      });
+      group->content.image = ToImageWithOffset(std::move(picture), &group->content.offset, nullptr,
+                                               args.dstColorSpace);
+      if (group->content.image == nullptr) {
+        return nullptr;
+      }
     }
+
+    source->groups[i] = std::move(group);
   }
 
   return source;
@@ -2109,27 +2121,31 @@ void Layer::drawBackgroundImage(const DrawArgs& args, Canvas& canvas) {
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                             const LayerStyleSource* source, LayerStylePosition position) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
-  auto& contour = source->contour;
-  auto contourOffset = source->contourOffset - source->contentOffset;
   auto backgroundCanvas = args.blurBackground ? args.blurBackground->getCanvas() : nullptr;
-  // Apply the content transform matrix to canvas instead of pictureCanvas to avoid blurry results
-  // when scaled up, since picture recording at a smaller scale loses resolution.
-  AutoCanvasRestore restoreCanvas(canvas);
-  AutoCanvasRestore restoreBackground(backgroundCanvas);
-  auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
-  matrix.preTranslate(source->contentOffset.x, source->contentOffset.y);
-  canvas->concat(matrix);
-  if (backgroundCanvas) {
-    backgroundCanvas->concat(matrix);
-  }
-  auto clipBounds =
-      args.blurBackground ? GetClipBounds(args.blurBackground->getCanvas()) : std::nullopt;
   for (const auto& layerStyle : _layerStyles) {
     DEBUG_ASSERT(layerStyle != nullptr);
     if (layerStyle->position() != position ||
         !HasStyleSource(args.styleSourceTypes, layerStyle->extraSourceType())) {
       continue;
     }
+    auto groupIndex = static_cast<int>(layerStyle->excludeChildEffects());
+    auto* group = source->groups[groupIndex].get();
+    if (group == nullptr) {
+      continue;
+    }
+    auto& contentEntry = group->content;
+    // Apply the content transform matrix to canvas instead of pictureCanvas to avoid blurry
+    // results when scaled up, since picture recording at a smaller scale loses resolution.
+    AutoCanvasRestore restoreCanvas(canvas);
+    AutoCanvasRestore restoreBackground(backgroundCanvas);
+    auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
+    matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
+    canvas->concat(matrix);
+    if (backgroundCanvas) {
+      backgroundCanvas->concat(matrix);
+    }
+    auto clipBounds =
+        args.blurBackground ? GetClipBounds(args.blurBackground->getCanvas()) : std::nullopt;
     PictureRecorder recorder = {};
     auto pictureCanvas = recorder.beginRecording();
     if (clipBounds.has_value()) {
@@ -2137,24 +2153,26 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
     }
     switch (layerStyle->extraSourceType()) {
       case LayerStyleExtraSourceType::None:
-        layerStyle->draw(pictureCanvas, source->content, source->contentScale, alpha);
+        layerStyle->draw(pictureCanvas, contentEntry.image, source->contentScale, alpha);
         break;
       case LayerStyleExtraSourceType::Background: {
         Point backgroundOffset = {};
         auto background = getBackgroundImage(args, source->contentScale, &backgroundOffset);
         if (background != nullptr) {
-          backgroundOffset = backgroundOffset - source->contentOffset;
-          layerStyle->drawWithExtraSource(pictureCanvas, source->content, source->contentScale,
+          backgroundOffset = backgroundOffset - contentEntry.offset;
+          layerStyle->drawWithExtraSource(pictureCanvas, contentEntry.image, source->contentScale,
                                           background, backgroundOffset, alpha);
         }
         break;
       }
-      case LayerStyleExtraSourceType::Contour:
-        if (contour != nullptr) {
-          layerStyle->drawWithExtraSource(pictureCanvas, source->content, source->contentScale,
-                                          contour, contourOffset, alpha);
+      case LayerStyleExtraSourceType::Contour: {
+        if (group->contour.has_value()) {
+          auto contourOffset = group->contour->offset - contentEntry.offset;
+          layerStyle->drawWithExtraSource(pictureCanvas, contentEntry.image, source->contentScale,
+                                          group->contour->image, contourOffset, alpha);
         }
         break;
+      }
     }
     auto picture = recorder.finishRecordingAsPicture();
     if (picture == nullptr) {
