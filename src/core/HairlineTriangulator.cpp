@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -127,8 +127,10 @@ bool IsDegenQuadOrConic(const Point p[3], float* distanceSquared) {
   return false;
 }
 
-// we subdivide the quads to avoid huge overfill
-// if it returns -1 then should be drawn as lines
+// Calculates the required number of subdivisions for a quadratic curve to avoid excessive overfill.
+// Returns -1 if the curve is degenerate and should be drawn as lines instead.
+// Returns 0-4 (MAX_SUB) subdivisions based on the curve's deviation from a straight line.
+// We subdivide the quads to avoid huge overfill.
 int NumQuadSubdivs(const Point points[3]) {
   float distanceSquared = 0.0f;
   if (IsDegenQuadOrConic(points, &distanceSquared)) {
@@ -325,6 +327,9 @@ class PathDecomposer {
   Point zeroVerbPt_;
 };
 
+// Generates 6 vertices forming a diamond-shaped region around a line segment with antialiased edges.
+// Creates 2 inner vertices with full coverage and 4 outer vertices with zero coverage to achieve
+// smooth AA transitions. For subpixel-length lines, modulates coverage to ensure correct rendering.
 void AddLine(const Point p[2], LineVertex** vert) {
   const auto a = p[0];
   const auto b = p[1];
@@ -369,6 +374,8 @@ void AddLine(const Point p[2], LineVertex** vert) {
   *vert += LINE_NUM_VERTICES;
 }
 
+// Computes the intersection point of two lines defined by point and normal vectors.
+// Handles parallel lines by returning the midpoint between the two input points.
 Point IntersectLines(const Point& pointA, const Point& normA, const Point& pointB,
                      const Point& normB) {
   auto result = Point::Zero();
