@@ -636,10 +636,11 @@ TGFX_TEST(LayerTest, StrokeOnTop) {
   shapeLayer->setStrokeStyle(strokeColor);
   shapeLayer->setLineWidth(16);
   auto innerShadow = InnerShadowStyle::Make(30, 30, 0, 0, Color::FromRGBA(100, 0, 0, 128));
+  innerShadow->setExcludeChildEffects(true);
   auto dropShadow = DropShadowStyle::Make(-20, -20, 0, 0, Color::Black());
   dropShadow->setShowBehindLayer(false);
+  dropShadow->setExcludeChildEffects(true);
   shapeLayer->setLayerStyles({dropShadow, innerShadow});
-  shapeLayer->setExcludeChildEffectsInLayerStyle(true);
   layer->addChild(shapeLayer);
   auto solidLayer = SolidLayer::Make();
   solidLayer->setWidth(100);
@@ -1617,7 +1618,6 @@ TGFX_TEST(LayerTest, BottomLeftSurface) {
 
   auto childFrame = tgfx::Rect::MakeWH(150, 150);
   auto childLayer = tgfx::ShapeLayer::Make();
-  childLayer->setExcludeChildEffectsInLayerStyle(true);
 
   tgfx::Path childPath;
   childPath.addRect(childFrame);

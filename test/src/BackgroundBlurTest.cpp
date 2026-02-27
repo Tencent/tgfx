@@ -55,11 +55,11 @@ TGFX_TEST(BackgroundBlurTest, BackgroundBlur) {
   layer->setStrokeStyle(strokeStyle);
   layer->setLineWidth(10);
   layer->setStrokeOnTop(true);
-  layer->setExcludeChildEffectsInLayerStyle(true);
   auto filter = BackgroundBlurStyle::Make(2, 2);
+  filter->setExcludeChildEffects(true);
   auto dropShadow = DropShadowStyle::Make(10, 10, 0, 0, Color::FromRGBA(0, 0, 0, 100));
   dropShadow->setShowBehindLayer(true);
-  layer->setExcludeChildEffectsInLayerStyle(true);
+  dropShadow->setExcludeChildEffects(true);
   layer->setLayerStyles({dropShadow, filter});
 
   auto blurFilter = BlurFilter::Make(1, 2);
@@ -71,7 +71,9 @@ TGFX_TEST(BackgroundBlurTest, BackgroundBlur) {
   silbing->setPath(rect);
   silbing->setMatrix(Matrix::MakeTrans(-10, 0));
   auto newBackgroundBlur = BackgroundBlurStyle::Make(3, 3);
-  silbing->setLayerStyles({dropShadow, newBackgroundBlur});
+  auto silbingDropShadow = DropShadowStyle::Make(10, 10, 0, 0, Color::FromRGBA(0, 0, 0, 100));
+  silbingDropShadow->setShowBehindLayer(true);
+  silbing->setLayerStyles({silbingDropShadow, newBackgroundBlur});
   silbing->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 100, 100)));
   layer->addChild(silbing);
 
