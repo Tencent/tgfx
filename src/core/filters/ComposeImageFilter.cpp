@@ -62,10 +62,16 @@ ComposeImageFilter::ComposeImageFilter(std::vector<std::shared_ptr<ImageFilter>>
     : filters(std::move(filters)) {
 }
 
-Rect ComposeImageFilter::onFilterBounds(const Rect& srcRect) const {
-  auto bounds = srcRect;
-  for (auto& filter : filters) {
-    bounds = filter->filterBounds(bounds);
+Rect ComposeImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDirection) const {
+  auto bounds = rect;
+  if (mapDirection == MapDirection::Forward) {
+    for (auto& filter : filters) {
+      bounds = filter->filterBounds(bounds);
+    }
+    return bounds;
+  }
+  for (auto it = filters.rbegin(); it != filters.rend(); ++it) {
+    bounds = (*it)->filterBounds(bounds, mapDirection);
   }
   return bounds;
 }

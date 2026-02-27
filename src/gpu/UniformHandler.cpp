@@ -21,7 +21,7 @@
 #include "gpu/ProgramBuilder.h"
 
 namespace tgfx {
-static const std::string OES_TEXTURE_EXTENSION = "GL_OES_EGL_image_external";
+static constexpr char OES_TEXTURE_EXTENSION[] = "GL_OES_EGL_image_external_essl3";
 
 std::string UniformHandler::addUniform(const std::string& name, UniformFormat format,
                                        ShaderStage stage) {
@@ -37,16 +37,17 @@ std::string UniformHandler::addUniform(const std::string& name, UniformFormat fo
   return uniformName;
 }
 
-SamplerHandle UniformHandler::addSampler(GPUTexture* texture, const std::string& name) {
+SamplerHandle UniformHandler::addSampler(std::shared_ptr<Texture> texture,
+                                         const std::string& name) {
   // The same texture can be added multiple times, each with a different name.
   UniformFormat format;
   switch (texture->type()) {
-    case GPUTextureType::External:
+    case TextureType::External:
       programBuilder->fragmentShaderBuilder()->addFeature(PrivateFeature::OESTexture,
                                                           OES_TEXTURE_EXTENSION);
       format = UniformFormat::TextureExternalSampler;
       break;
-    case GPUTextureType::Rectangle:
+    case TextureType::Rectangle:
       format = UniformFormat::Texture2DRectSampler;
       break;
     default:
@@ -55,8 +56,7 @@ SamplerHandle UniformHandler::addSampler(GPUTexture* texture, const std::string&
   }
   auto samplerName = programBuilder->nameVariable(name);
   samplers.emplace_back(samplerName, format);
-  auto caps = programBuilder->getContext()->caps();
-  auto& swizzle = caps->getReadSwizzle(texture->format());
+  auto swizzle = Swizzle::ForRead(texture->format());
   samplerSwizzles.push_back(swizzle);
   return SamplerHandle(samplers.size() - 1);
 }
@@ -66,36 +66,24 @@ ShaderVar UniformHandler::getSamplerVariable(SamplerHandle handle) const {
   return ShaderVar(uniform);
 }
 
-std::unique_ptr<UniformBuffer> UniformHandler::makeUniformBuffer() const {
-  std::vector<Uniform> uniforms = {};
-  std::unordered_map<std::string, size_t> uniformMap = {};
-  size_t index = 0;
-  // Merge uniforms with the same name across shader stages.
-  for (auto& uniform : vertexUniforms) {
-    if (uniformMap.count(uniform.name()) > 0) {
-      continue;
-    }
-    uniformMap[uniform.name()] = index++;
-    uniforms.emplace_back(uniform);
+std::unique_ptr<UniformData> UniformHandler::makeUniformData(ShaderStage stage) const {
+  if (stage == ShaderStage::Vertex && vertexUniforms.empty()) {
+    return nullptr;
   }
-  for (auto& uniform : fragmentUniforms) {
-    if (uniformMap.count(uniform.name()) > 0) {
-      continue;
-    }
-    uniformMap[uniform.name()] = index++;
-    uniforms.emplace_back(uniform);
+
+  if (stage == ShaderStage::Fragment && fragmentUniforms.empty()) {
+    return nullptr;
   }
-  return std::unique_ptr<UniformBuffer>(
-      new UniformBuffer(std::move(uniforms), std::move(uniformMap)));
+
+  return std::unique_ptr<UniformData>(
+      new UniformData(stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms));
 }
 
 std::string UniformHandler::getUniformDeclarations(ShaderStage stage) const {
   std::string ret;
   auto& uniforms = stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms;
-  for (auto& uniform : uniforms) {
-    ret += programBuilder->getShaderVarDeclarations(ShaderVar(uniform), stage);
-    ret += ";\n";
-  }
+  ret += programBuilder->getUniformBlockDeclaration(stage, uniforms);
+
   if (stage == ShaderStage::Fragment) {
     for (const auto& sampler : samplers) {
       ret += programBuilder->getShaderVarDeclarations(ShaderVar(sampler), stage);

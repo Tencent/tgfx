@@ -58,8 +58,12 @@ class Tile {
   /**
    * Returns the rectangle of the tile in the zoomed display list grid.
    */
-  Rect getTileRect(int tileSize) const {
-    return Rect::MakeXYWH(tileX * tileSize, tileY * tileSize, tileSize, tileSize);
+  Rect getTileRect(int tileSize, const Rect* clipRect = nullptr) const {
+    auto result = Rect::MakeXYWH(tileX * tileSize, tileY * tileSize, tileSize, tileSize);
+    if (clipRect != nullptr && !result.intersect(*clipRect)) {
+      return Rect::MakeEmpty();
+    }
+    return result;
   }
 };
 
@@ -109,7 +113,7 @@ class TileCache {
 
   /**
    * Returns a list of reusable tiles. These tiles have no external references and are sorted by
-   * their distance to the viewport center, with the closest ones first.
+   * their distance to the viewport center, with the farthest ones first.
    */
   std::vector<std::shared_ptr<Tile>> getReusableTiles(float centerX, float centerY);
 

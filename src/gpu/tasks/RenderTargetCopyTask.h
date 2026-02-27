@@ -24,7 +24,7 @@
 namespace tgfx {
 class RenderTargetCopyTask : public RenderTask {
  public:
-  RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
+  RenderTargetCopyTask(BlockAllocator* allocator, std::shared_ptr<RenderTargetProxy> source,
                        std::shared_ptr<TextureProxy> dest, int srcX, int srcY);
 
   void execute(CommandEncoder* encoder) override;

@@ -19,22 +19,26 @@
 #include "TextureImage.h"
 #include "ScaledImage.h"
 #include "gpu/TPArgs.h"
+#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
-std::shared_ptr<Image> TextureImage::Wrap(std::shared_ptr<TextureProxy> textureProxy) {
+std::shared_ptr<Image> TextureImage::Wrap(std::shared_ptr<TextureProxy> textureProxy,
+                                          std::shared_ptr<ColorSpace> colorSpace) {
   if (textureProxy == nullptr) {
     return nullptr;
   }
   auto contextID = textureProxy->getContext()->uniqueID();
-  auto textureImage =
-      std::shared_ptr<TextureImage>(new TextureImage(std::move(textureProxy), contextID));
+  auto textureImage = std::shared_ptr<TextureImage>(
+      new TextureImage(std::move(textureProxy), contextID, std::move(colorSpace)));
   textureImage->weakThis = textureImage;
   return textureImage;
 }
 
-TextureImage::TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID)
-    : textureProxy(std::move(textureProxy)), contextID(contextID) {
+TextureImage::TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID,
+                           std::shared_ptr<ColorSpace> colorSpace)
+    : textureProxy(std::move(textureProxy)), contextID(contextID),
+      _colorSpace(std::move(colorSpace)) {
 }
 
 BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* origin) const {
@@ -82,6 +86,7 @@ PlacementPtr<FragmentProcessor> TextureImage::asFragmentProcessor(const FPArgs& 
   if (args.context == nullptr || args.context->uniqueID() != contextID) {
     return nullptr;
   }
-  return TiledTextureEffect::Make(textureProxy, samplingArgs, uvMatrix, isAlphaOnly());
+  auto allocator = args.context->drawingAllocator();
+  return TiledTextureEffect::Make(allocator, textureProxy, samplingArgs, uvMatrix, isAlphaOnly());
 }
 }  // namespace tgfx

@@ -20,7 +20,9 @@
 
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/MapDirection.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/RuntimeEffect.h"
@@ -66,7 +68,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the drop shadow.
+   * @param color         The color of the drop shadow in sRGB gamut, may exceed 0-1.
    */
   static std::shared_ptr<ImageFilter> DropShadow(float dx, float dy, float blurrinessX,
                                                  float blurrinessY, const Color& color);
@@ -78,7 +80,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the drop shadow.
+   * @param color         The color of the drop shadow in sRGB gamut, may exceed 0-1.
    */
   static std::shared_ptr<ImageFilter> DropShadowOnly(float dx, float dy, float blurrinessX,
                                                      float blurrinessY, const Color& color);
@@ -90,7 +92,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the inner shadow.
+   * @param color         The color of the inner shadow in sRGB gamut, may exceed 0-1.
    */
   static std::shared_ptr<ImageFilter> InnerShadow(float dx, float dy, float blurrinessX,
                                                   float blurrinessY, const Color& color);
@@ -102,7 +104,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the inner shadow.
+   * @param color         The color of the inner shadow in sRGB gamut, may exceed 0-1.
    */
   static std::shared_ptr<ImageFilter> InnerShadowOnly(float dx, float dy, float blurrinessX,
                                                       float blurrinessY, const Color& color);
@@ -122,9 +124,12 @@ class ImageFilter {
 
   /**
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
-   * image of the given bounds.
+   * image of the given bounds. MapDirection::Forward is used to determine which pixels of the
+   * destination canvas a source image rect would touch after filtering. MapDirection::Reverse
+   * is used to determine which rect of the source image would be required to fill the given
+   * rect (typically, clip bounds).
    */
-  Rect filterBounds(const Rect& rect) const;
+  Rect filterBounds(const Rect& rect, MapDirection mapDirection = MapDirection::Forward) const;
 
  protected:
   enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime };
@@ -137,8 +142,11 @@ class ImageFilter {
   /**
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
    * image of the given bounds.
+   * MapDirection::Forward is used to determine which pixels of the destination canvas a source
+   * image rect would touch after filtering. MapDirection::Reverse is used to determine which rect
+   * of the source image would be required to fill the given rect.
    */
-  virtual Rect onFilterBounds(const Rect& srcRect) const;
+  virtual Rect onFilterBounds(const Rect& rect, MapDirection mapDirection) const;
 
   /**
    * Returns a texture proxy that applies this filter to the source image.
@@ -174,4 +182,5 @@ class ImageFilter {
   friend class FilterImage;
   friend class Types;
 };
+
 }  // namespace tgfx

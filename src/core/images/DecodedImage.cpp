@@ -32,17 +32,19 @@ std::shared_ptr<Image> DecodedImage::MakeFrom(std::shared_ptr<ImageGenerator> ge
   auto width = generator->width();
   auto height = generator->height();
   auto alphaOnly = generator->isAlphaOnly();
-  auto source = ImageSource::MakeFrom(std::move(generator), tryHardware, asyncDecoding);
+  auto source = ImageSource::MakeFrom(generator, tryHardware, asyncDecoding);
+  auto colorSpace = generator->colorSpace();
   auto image = std::shared_ptr<DecodedImage>(
-      new DecodedImage(width, height, alphaOnly, std::move(source), mipmapped));
+      new DecodedImage(width, height, alphaOnly, std::move(source), mipmapped, colorSpace));
   image->weakThis = image;
   return image;
 }
 
 DecodedImage::DecodedImage(int width, int height, bool alphaOnly,
-                           std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped)
+                           std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped,
+                           std::shared_ptr<ColorSpace> colorSpace)
     : PixelImage(mipmapped), _width(width), _height(height), _alphaOnly(alphaOnly),
-      source(std::move(source)) {
+      source(std::move(source)), _colorSpace(std::move(colorSpace)) {
 }
 
 std::shared_ptr<TextureProxy> DecodedImage::lockTextureProxy(const TPArgs& args) const {
@@ -52,7 +54,7 @@ std::shared_ptr<TextureProxy> DecodedImage::lockTextureProxy(const TPArgs& args)
 
 std::shared_ptr<Image> DecodedImage::onMakeMipmapped(bool mipmapped) const {
   auto image = std::shared_ptr<DecodedImage>(
-      new DecodedImage(_width, _height, _alphaOnly, source, mipmapped));
+      new DecodedImage(_width, _height, _alphaOnly, source, mipmapped, colorSpace()));
   image->weakThis = image;
   return image;
 }

@@ -71,7 +71,8 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
     }
     TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
     auto proxy = source->lockTextureProxy(tpArgs);
-    return TextureEffect::MakeRGBAAA(std::move(proxy), newSamplingArgs, alphaStart,
+    auto allocator = args.context->drawingAllocator();
+    return TextureEffect::MakeRGBAAA(allocator, std::move(proxy), newSamplingArgs, alphaStart,
                                      AddressOf(matrix));
   }
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
@@ -80,15 +81,16 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
     return nullptr;
   }
   newSamplingArgs.sampleArea = std::nullopt;
-  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, uvMatrix);
+  auto allocator = args.context->drawingAllocator();
+  return TiledTextureEffect::Make(allocator, textureProxy, newSamplingArgs, uvMatrix);
 }
 
 std::shared_ptr<TextureProxy> RGBAAAImage::lockTextureProxy(const TPArgs& args) const {
   auto textureWidth = width();
   auto textureHeight = height();
   auto renderTarget =
-      RenderTargetProxy::MakeFallback(args.context, textureWidth, textureHeight, isAlphaOnly(), 1,
-                                      args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+      RenderTargetProxy::Make(args.context, textureWidth, textureHeight, isAlphaOnly(), 1,
+                              args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }

@@ -23,7 +23,7 @@
 namespace tgfx {
 class AARectEffect : public FragmentProcessor {
  public:
-  static PlacementPtr<AARectEffect> Make(BlockBuffer* buffer, const Rect& rect);
+  static PlacementPtr<AARectEffect> Make(BlockAllocator* allocator, const Rect& rect);
 
   std::string name() const override {
     return "AARectEffect";

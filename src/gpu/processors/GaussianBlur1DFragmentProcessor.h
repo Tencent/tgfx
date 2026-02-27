@@ -26,7 +26,7 @@ enum class GaussianBlurDirection { Horizontal, Vertical };
 
 class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
  public:
-  static PlacementPtr<FragmentProcessor> Make(BlockBuffer* buffer,
+  static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               PlacementPtr<FragmentProcessor> processor,
                                               float sigma, GaussianBlurDirection direction,
                                               float stepLength, int maxSigma);

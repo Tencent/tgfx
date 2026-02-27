@@ -33,7 +33,7 @@ class RuntimeImageFilter : public ImageFilter {
     return Type::Runtime;
   }
 
-  Rect onFilterBounds(const Rect& srcRect) const override;
+  Rect onFilterBounds(const Rect& rect, MapDirection mapDirection) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
                                                  const Rect& renderBounds,

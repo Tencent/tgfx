@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "GLCaps.h"
-#include "GLProcGetter.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "gpu/opengl/GLCaps.h"
+#include "gpu/opengl/GLFunctions.h"
+#include "gpu/opengl/GLProcGetter.h"
 
 namespace tgfx {
 class GLInterface {

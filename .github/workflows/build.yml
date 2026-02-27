@@ -12,8 +12,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -43,7 +41,7 @@ jobs:
       - name: Build iOS
         run: |
           cd ios
-          node gen_ios -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON
+          node gen_ios -DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON
           xcodebuild -workspace Hello2D.xcworkspace -scheme Hello2D -configuration Release -sdk iphoneos -arch arm64 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
 
       - name: Save Third-Party Cache
@@ -66,8 +64,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -94,7 +90,7 @@ jobs:
       - name: Build Android
         run: |
           cd android
-          ./gradlew assembleRelease -Parm64-only --no-daemon -PcmakeArgs="-DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON"
+          ./gradlew assembleRelease -Parm64-only --no-daemon -PcmakeArgs="-DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON"
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -112,12 +108,10 @@ jobs:
           path: android
 
   web:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Environment Cache
         id: environment-cache
@@ -126,8 +120,8 @@ jobs:
           path: |
             web/emsdk
             web/node_modules
-          key: tgfx-environment-web-20241106
-          restore-keys: tgfx-environment-web-
+          key: tgfx-environment-web-linux-20241106
+          restore-keys: tgfx-environment-web-linux-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -153,19 +147,17 @@ jobs:
           cd emsdk
           ./emsdk install 3.1.71
           ./emsdk activate 3.1.71
-        shell: bash
 
       - name: Run depsync
         run: |
           npm install depsync -g
           depsync
-        shell: bash
 
       - name: Build Web
         run: |
           cd web
-          emsdk/emsdk_env
-          npm run build:st:debug
+          source emsdk/emsdk_env.sh
+          npm run build:st
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -174,7 +166,7 @@ jobs:
           path: |
             web/emsdk
             web/node_modules
-          key: tgfx-environment-web-20241106
+          key: tgfx-environment-web-linux-20241106
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -199,8 +191,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -219,7 +209,7 @@ jobs:
 
       - name: Build Windows
         run: |
-          node build_tgfx -s ./win Hello2D -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/win -a x64 -d
+          node build_tgfx -s ./win Hello2D -DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/win -a x64 -d
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -241,8 +231,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -268,7 +256,7 @@ jobs:
 
       - name: Build Linux
         run: |
-          node build_tgfx -s ./linux Hello2D -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/linux -a x64 -d
+          node build_tgfx -s ./linux Hello2D -DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/linux -a x64 -d
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -290,8 +278,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -324,7 +310,7 @@ jobs:
 
       - name: Build QT
         run: |
-          node build_tgfx -s ./qt Hello2D -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/qt -a x64
+          node build_tgfx -s ./qt Hello2D -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/qt -a x64
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -343,25 +329,22 @@ jobs:
 
 
   ohos:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get CLI Tools Cache
         id: cli-tools-cache
         uses: actions/cache/restore@v4
         with:
           path: /opt/ohos-cmd-tools
-          key: ohos-cli-5.0.9.310-mac-arm64
-          restore-keys: ohos-cli-
+          key: ohos-cli-6.0.0.868-linux-x64
 
       - name: Install CLI Tools
         if: steps.cli-tools-cache.outputs.cache-hit != 'true'
         run: |
-          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/5.0.9/commandline-tools-mac-arm64-5.0.9.310.zip"
+          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/6.0.0.868/commandline-tools-linux-x64-6.0.0.868.zip"
           curl -L -o /tmp/cmdtools.zip "$TOOLS_URL"
           unzip -q /tmp/cmdtools.zip -d /tmp
           sudo mv /tmp/command-line-tools /opt/ohos-cmd-tools
@@ -371,7 +354,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /opt/ohos-cmd-tools
-          key: ohos-cli-5.0.9.310-mac-arm64
+          key: ohos-cli-6.0.0.868-linux-x64
 
       - name: Configure Environment
         run: |
@@ -393,13 +376,33 @@ jobs:
           npm install -g pnpm@8.13.1
           echo "$(npm prefix -g)/bin" >> $GITHUB_PATH
 
+      - name: Cache hvigor & ohpm
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.hvigor
+            ~/.ohpm
+          key: hvigor-${{ runner.os }}-${{ hashFiles('ohos/**/oh-package.json5', 'ohos/**/hvigorfile.ts') }}
+          restore-keys: |
+            hvigor-${{ runner.os }}-
+
+      - name: Cache Hvigor Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ohos/hello2d/build
+            ohos/.hvigor
+          key: ohos-hvigor-${{ runner.os }}-${{ hashFiles('ohos/**/*.ets', 'ohos/**/*.json5') }}
+          restore-keys: |
+            ohos-hvigor-${{ runner.os }}-
+
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
         with:
           path: third_party
-          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
-          restore-keys: third-party-openharmony-
+          key: third-party-ohos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-ohos-
 
       - name: Run depsync
         run: |
@@ -412,22 +415,49 @@ jobs:
           ohpm config set registry https://ohpm.openharmony.cn/ohpm/
           ohpm install --all
 
+      - name: Setup ccache
+        run: |
+          sudo apt-get update && sudo apt-get install -y ccache
+          ccache --version
+          ccache --max-size=500M
+          ccache --zero-stats
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-ohos-${{ runner.os }}-main
+          restore-keys: |
+            ccache-ohos-${{ runner.os }}-
+
       - name: Build Harmony
         run: |
           cd ohos
-          hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
-          hvigorw assembleHap -Dohos.sdk.root=$DEVECO_SDK_HOME -p buildMode=release --no-daemon
+          sed -i '/"abiFilters"/,/\]/{ /"x86_64"/d }' hello2d/build-profile.json5
+          sed -i 's/"arguments": "\(.*\)"/"arguments": "\1 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"/' hello2d/build-profile.json5
+          hvigorw assembleHap \
+            -Dohos.sdk.root=$DEVECO_SDK_HOME \
+            -p buildMode=release \
+            --parallel \
+            --no-daemon
+
+      - name: Save ccache
+        if: ${{ github.event_name == 'push' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-ohos-${{ runner.os }}-main
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
         with:
           path: third_party
-          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          key: third-party-ohos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: openharmony_build
+          name: ohos_build
           path: ohos/out

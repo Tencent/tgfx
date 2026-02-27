@@ -19,6 +19,7 @@
 #include <hb-subset.h>
 #include <hb.h>
 #include "base/TGFXTest.h"
+#include "core/utils/MD5.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
@@ -57,7 +58,7 @@ bool ComparePDF(const std::shared_ptr<MemoryWriteStream>& stream, const std::str
 
 TGFX_TEST(PDFExportTest, Empty) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
@@ -76,7 +77,7 @@ TGFX_TEST(PDFExportTest, Empty) {
 
 TGFX_TEST(PDFExportTest, EmptyMultiPage) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
@@ -97,13 +98,13 @@ TGFX_TEST(PDFExportTest, EmptyMultiPage) {
 
 TGFX_TEST(PDFExportTest, DrawColor) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto* canvas = document->beginPage(256.f, 256.f);
+  auto canvas = document->beginPage(256.f, 256.f);
   canvas->drawColor(Color::Red());
   document->endPage();
   document->close();
@@ -114,13 +115,13 @@ TGFX_TEST(PDFExportTest, DrawColor) {
 
 TGFX_TEST(PDFExportTest, DrawShape) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto* canvas = document->beginPage(512.f, 512.f);
+  auto canvas = document->beginPage(512.f, 512.f);
   {
     Paint paint;
     paint.setStyle(PaintStyle::Fill);
@@ -146,13 +147,13 @@ TGFX_TEST(PDFExportTest, DrawShape) {
 
 TGFX_TEST(PDFExportTest, DrawShapeStroke) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto* canvas = document->beginPage(512.f, 512.f);
+  auto canvas = document->beginPage(512.f, 512.f);
   {
     Paint paint;
     paint.setStyle(PaintStyle::Stroke);
@@ -179,13 +180,13 @@ TGFX_TEST(PDFExportTest, DrawShapeStroke) {
 
 TGFX_TEST(PDFExportTest, SimpleText) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto* canvas = document->beginPage(1500.f, 400.f);
+  auto canvas = document->beginPage(1500.f, 400.f);
   canvas->translate(40.0, 20.0);
   {
     auto typeface =
@@ -211,13 +212,13 @@ TGFX_TEST(PDFExportTest, SimpleText) {
 
 TGFX_TEST(PDFExportTest, EmojiText) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto* canvas = document->beginPage(1500.f, 500.f);
+  auto canvas = document->beginPage(1500.f, 500.f);
   canvas->translate(40.0, 20.0);
   {
     auto typeface =
@@ -236,13 +237,13 @@ TGFX_TEST(PDFExportTest, EmojiText) {
 
 TGFX_TEST(PDFExportTest, Image) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto* canvas = document->beginPage(500.f, 500.f);
+  auto canvas = document->beginPage(500.f, 500.f);
   {
     canvas->translate(50.f, 50.f);
     auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/assets/glyph1.png"));
@@ -260,13 +261,13 @@ TGFX_TEST(PDFExportTest, Image) {
 
 TGFX_TEST(PDFExportTest, Complex) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto* canvas = document->beginPage(1000.f, 500.f);
+  auto canvas = document->beginPage(1000.f, 500.f);
   canvas->translate(40.0, 20.0);
 
   {
@@ -357,4 +358,104 @@ TGFX_TEST(PDFExportTest, Complex) {
 
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/Complex"));
 }
+
+TGFX_TEST(PDFExportTest, MD5Test) {
+  const char* testString = "The quick brown fox jumps over the lazy dog";
+  auto digest = MD5::Calculate(testString, strlen(testString));
+  const uint8_t expectedDigest[16] = {0x9e, 0x10, 0x7d, 0x9d, 0x37, 0x2b, 0xb6, 0x82,
+                                      0x6b, 0xd8, 0x1d, 0x35, 0x42, 0xa4, 0x19, 0xd6};
+  EXPECT_EQ(0, std::memcmp(digest.data(), expectedDigest, 16));
+}
+
+TGFX_TEST(PDFExportTest, DstColorSpace) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+
+  PDFMetadata metadata{};
+  metadata.targetColorSpace = ColorSpace::DisplayP3();
+  auto document = PDFDocument::Make(PDFStream, context, metadata);
+  auto canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::DisplayP3()));
+  document->endPage();
+  canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::SRGB()));
+  document->endPage();
+  canvas = document->beginPage(2048.f, 2048.f);
+  auto image = MakeImage("resources/apitest/green_p3.png");
+  canvas->drawImage(image);
+  document->endPage();
+  canvas = document->beginPage(2048.f, 2048.f);
+  Paint paint{};
+  paint.setImageFilter(ImageFilter::DropShadow(500, 500, 10, 10, Color::Green()));
+  canvas->drawImage(image, &paint);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DstColorSpace"));
+}
+
+TGFX_TEST(PDFExportTest, AssignColorSpace) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+
+  PDFMetadata metadata{};
+  metadata.assignColorSpace = ColorSpace::SRGB();
+  auto document = PDFDocument::Make(PDFStream, context, metadata);
+  auto canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::DisplayP3()));
+  document->endPage();
+  canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::SRGB()));
+  document->endPage();
+  canvas = document->beginPage(2048.f, 2048.f);
+  auto image = MakeImage("resources/apitest/green_p3.png");
+  canvas->drawImage(image);
+  document->endPage();
+  canvas = document->beginPage(2048.f, 2048.f);
+  Paint paint{};
+  paint.setImageFilter(ImageFilter::DropShadow(500, 500, 10, 10, Color::Green()));
+  canvas->drawImage(image, &paint);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/AssignColorSpace"));
+}
+
+TGFX_TEST(PDFExportTest, DstAssignColorSpace) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+
+  PDFMetadata metadata{};
+  metadata.targetColorSpace = ColorSpace::DisplayP3();
+  metadata.assignColorSpace = ColorSpace::SRGB();
+  auto document = PDFDocument::Make(PDFStream, context, metadata);
+  auto canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::DisplayP3()));
+  document->endPage();
+  canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::SRGB()));
+  document->endPage();
+  canvas = document->beginPage(2048.f, 2048.f);
+  auto image = MakeImage("resources/apitest/green_p3.png");
+  canvas->drawImage(image);
+  document->endPage();
+  canvas = document->beginPage(2048.f, 2048.f);
+  Paint paint{};
+  paint.setImageFilter(ImageFilter::DropShadow(500, 500, 10, 10, Color::Green()));
+  canvas->drawImage(image, &paint);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DstAssignColorSpace"));
+}
+
 }  // namespace tgfx

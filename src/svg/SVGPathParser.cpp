@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/SVGPathParser.h"
+#include "core/NoConicsPathIterator.h"
 #include "core/utils/Log.h"
 #include "svg/SVGUtils.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
 
@@ -126,29 +128,29 @@ std::string SVGPathParser::ToSVGString(const Path& path, PathEncoding encoding) 
                     points[offset + count - 1].y * static_cast<float>(relSelector)};
   };
 
-  auto pathIter = [&](PathVerb verb, const Point points[4], void* info) -> void {
-    auto* castedString = reinterpret_cast<std::string*>(info);
-    switch (verb) {
+  std::string svgString;
+  NoConicsPathIterator iterator(path);
+  for (auto segment : iterator) {
+    switch (segment.verb) {
       case PathVerb::Move:
-        appendCommand(*castedString, 'M', points, 0, 1);
+        appendCommand(svgString, 'M', segment.points, 0, 1);
         break;
       case PathVerb::Line:
-        appendCommand(*castedString, 'L', points, 1, 1);
+        appendCommand(svgString, 'L', segment.points, 1, 1);
         break;
       case PathVerb::Quad:
-        appendCommand(*castedString, 'Q', points, 1, 2);
+        appendCommand(svgString, 'Q', segment.points, 1, 2);
         break;
       case PathVerb::Cubic:
-        appendCommand(*castedString, 'C', points, 1, 3);
+        appendCommand(svgString, 'C', segment.points, 1, 3);
         break;
       case PathVerb::Close:
-        castedString->push_back('Z');
+        svgString.push_back('Z');
+        break;
+      default:
         break;
     }
-  };
-
-  std::string svgString;
-  path.decompose(pathIter, &svgString);
+  }
   return svgString;
 }
 

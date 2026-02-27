@@ -20,9 +20,9 @@
 #include <dirent.h>
 #include <fstream>
 #include "ProjectPath.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
 #ifdef GENERATE_BASELINE_IMAGES
@@ -31,24 +31,6 @@ static const std::string OUT_ROOT = ProjectPath::Absolute("test/baseline-out/");
 static const std::string OUT_ROOT = ProjectPath::Absolute("test/out/");
 #endif
 static const std::string WEBP_FILE_EXT = ".webp";
-
-bool CreateGLTexture(Context* context, int width, int height, GLTextureInfo* texture) {
-  texture->target = GL_TEXTURE_2D;
-  texture->format = GL_RGBA8;
-  auto gl = GLFunctions::Get(context);
-  gl->genTextures(1, &texture->id);
-  if (texture->id <= 0) {
-    return false;
-  }
-  gl->bindTexture(texture->target, texture->id);
-  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  gl->texParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  gl->texImage2D(texture->target, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  gl->bindTexture(texture->target, 0);
-  return true;
-}
 
 std::shared_ptr<ImageCodec> MakeImageCodec(const std::string& path) {
   return ImageCodec::MakeFrom(ProjectPath::Absolute(path));

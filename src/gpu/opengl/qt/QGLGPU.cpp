@@ -30,45 +30,12 @@ bool HardwareBufferAvailable() {
   return true;
 }
 
-std::vector<PixelFormat> QGLGPU::getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
-                                                           YUVFormat* yuvFormat) const {
-  if (!HardwareBufferCheck(hardwareBuffer)) {
-    return {};
-  }
-  std::vector<PixelFormat> formats = {};
-  auto pixelFormat = CVPixelBufferGetPixelFormatType(hardwareBuffer);
-  switch (pixelFormat) {
-    case kCVPixelFormatType_OneComponent8:
-      formats.push_back(PixelFormat::ALPHA_8);
-      break;
-    case kCVPixelFormatType_32BGRA:
-      formats.push_back(PixelFormat::RGBA_8888);
-      break;
-    default:
-      break;
-  }
-  if (yuvFormat != nullptr) {
-    *yuvFormat = YUVFormat::Unknown;
-  }
-  return formats;
-}
-
-std::vector<std::unique_ptr<GPUTexture>> QGLGPU::importHardwareTextures(
+std::vector<std::shared_ptr<Texture>> QGLGPU::importHardwareTextures(
     HardwareBufferRef hardwareBuffer, uint32_t usage) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  auto texture = CGLHardwareTexture::MakeFrom(caps(), hardwareBuffer, usage, getTextureCache());
-  if (texture == nullptr) {
-    return {};
-  }
-  if (!texture->checkFrameBuffer(this)) {
-    texture->release(this);
-    return {};
-  }
-  std::vector<std::unique_ptr<GPUTexture>> textures = {};
-  textures.push_back(std::move(texture));
-  return textures;
+  return CGLHardwareTexture::MakeFrom(this, hardwareBuffer, usage, getTextureCache());
 }
 
 QGLGPU::~QGLGPU() {
@@ -101,12 +68,7 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
-std::vector<PixelFormat> QGLGPU::getHardwareTextureFormats(HardwareBufferRef, YUVFormat*) const {
-  return {};
-}
-
-std::vector<std::unique_ptr<GPUTexture>> QGLGPU::importHardwareTextures(HardwareBufferRef,
-                                                                        uint32_t) {
+std::vector<std::shared_ptr<Texture>> QGLGPU::importHardwareTextures(HardwareBufferRef, uint32_t) {
   return {};
 }
 

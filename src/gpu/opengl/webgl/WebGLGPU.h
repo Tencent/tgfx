@@ -26,10 +26,7 @@ class WebGLGPU : public GLGPU {
   explicit WebGLGPU(std::shared_ptr<GLInterface> glInterface) : GLGPU(std::move(glInterface)) {
   }
 
-  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
-                                                     YUVFormat* yuvFormat) const override;
-
-  std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(HardwareBufferRef hardwareBuffer,
-                                                                  uint32_t usage) override;
+  std::vector<std::shared_ptr<Texture>> importHardwareTextures(HardwareBufferRef hardwareBuffer,
+                                                               uint32_t usage) override;
 };
 }  // namespace tgfx

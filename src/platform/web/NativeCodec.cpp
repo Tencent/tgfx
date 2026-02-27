@@ -86,7 +86,7 @@ bool NativeCodec::asyncSupport() const {
 }
 
 bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                               void* dstPixels) const {
+                               std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const {
   if (dstPixels == nullptr) {
     return false;
   }
@@ -97,8 +97,10 @@ bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t 
   if (imageData == nullptr) {
     return false;
   }
-  auto info = ImageInfo::Make(width(), height(), ColorType::RGBA_8888, AlphaType::Unpremultiplied);
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+  auto info = ImageInfo::Make(width(), height(), ColorType::RGBA_8888, AlphaType::Unpremultiplied,
+                              0, colorSpace());
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   Pixmap pixmap(info, imageData->data());
   auto result = pixmap.readPixels(dstInfo, dstPixels);
   return result;

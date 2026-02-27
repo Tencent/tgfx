@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Path.h"
+#include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -45,5 +46,12 @@ class PathProvider {
    * the exact bounds can't be determined until the path is computed.
    */
   virtual Rect getBounds() const = 0;
+
+  /**
+   * Returns the fill type of the path. The default implementation returns PathFillType::Winding.
+   */
+  virtual PathFillType fillType() const {
+    return PathFillType::Winding;
+  }
 };
 }  // namespace tgfx

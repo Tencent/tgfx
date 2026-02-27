@@ -74,7 +74,8 @@ PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);
   }
-  return TiledTextureEffect::Make(std::move(textureProxy), newSamplingArgs, &fpMatrix,
+  auto allocator = args.context->drawingAllocator();
+  return TiledTextureEffect::Make(allocator, std::move(textureProxy), newSamplingArgs, &fpMatrix,
                                   isAlphaOnly());
 }
 

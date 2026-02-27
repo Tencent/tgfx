@@ -20,7 +20,7 @@
 
 namespace tgfx {
 QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
-                                                               std::optional<Color> commonColor,
+                                                               std::optional<PMColor> commonColor,
                                                                std::optional<Matrix> uvMatrix,
                                                                bool hasSubset)
     : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), commonColor(commonColor),

@@ -51,35 +51,35 @@ PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> i
   return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
 }
 
-PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,
-                                                        const FPArgs& args,
-                                                        const Matrix* uvMatrix) {
+PlacementPtr<FragmentProcessor> FragmentProcessor::Make(
+    std::shared_ptr<Shader> shader, const FPArgs& args, const Matrix* uvMatrix,
+    const std::shared_ptr<ColorSpace>& dstColorSpace) {
   DEBUG_ASSERT(shader != nullptr);
-  return shader->asFragmentProcessor(args, uvMatrix);
+  return shader->asFragmentProcessor(args, uvMatrix, dstColorSpace);
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(
-    BlockBuffer* buffer, PlacementPtr<FragmentProcessor> child) {
+    BlockAllocator* allocator, PlacementPtr<FragmentProcessor> child) {
   if (child == nullptr) {
     return nullptr;
   }
-  return XfermodeFragmentProcessor::MakeFromDstProcessor(buffer, std::move(child),
+  return XfermodeFragmentProcessor::MakeFromDstProcessor(allocator, std::move(child),
                                                          BlendMode::DstIn);
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::MulInputByChildAlpha(
-    BlockBuffer* buffer, PlacementPtr<FragmentProcessor> child, bool inverted) {
+    BlockAllocator* allocator, PlacementPtr<FragmentProcessor> child, bool inverted) {
   if (child == nullptr) {
     return nullptr;
   }
   return XfermodeFragmentProcessor::MakeFromDstProcessor(
-      buffer, std::move(child), inverted ? BlendMode::SrcOut : BlendMode::SrcIn);
+      allocator, std::move(child), inverted ? BlendMode::SrcOut : BlendMode::SrcIn);
 }
 
-PlacementPtr<FragmentProcessor> FragmentProcessor::Compose(BlockBuffer* buffer,
-                                                           PlacementPtr<FragmentProcessor> f,
-                                                           PlacementPtr<FragmentProcessor> g) {
-  return ComposeFragmentProcessor::Make(buffer, std::move(f), std::move(g));
+PlacementPtr<FragmentProcessor> FragmentProcessor::Compose(BlockAllocator* allocator,
+                                                           PlacementPtr<FragmentProcessor> first,
+                                                           PlacementPtr<FragmentProcessor> second) {
+  return ComposeFragmentProcessor::Make(allocator, std::move(first), std::move(second));
 }
 
 void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey) const {
@@ -137,14 +137,15 @@ const CoordTransform* FragmentProcessor::CoordTransformIter::next() {
   return currFP->coordTransform(currentIndex++);
 }
 
-void FragmentProcessor::setData(UniformBuffer* uniformBuffer) const {
-  onSetData(uniformBuffer);
+void FragmentProcessor::setData(UniformData* vertexUniformData,
+                                UniformData* fragmentUniformData) const {
+  onSetData(vertexUniformData, fragmentUniformData);
 }
 
 void FragmentProcessor::emitChild(size_t childIndex, const std::string& inputColor,
                                   std::string* outputColor, EmitArgs& args,
                                   std::function<std::string(std::string_view)> coordFunc) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   auto programInfo = fragBuilder->getProgramInfo();
   outputColor->append(programInfo->getMangledSuffix(this));
   fragBuilder->codeAppendf("vec4 %s;", outputColor->c_str());
@@ -159,8 +160,8 @@ void FragmentProcessor::emitChild(size_t childIndex, const std::string& inputCol
 void FragmentProcessor::internalEmitChild(
     size_t childIndex, const std::string& inputColor, const std::string& outputColor,
     EmitArgs& args, std::function<std::string(std::string_view)> coordFunc) const {
-  auto* fragBuilder = args.fragBuilder;
-  const auto* childProc = childProcessor(childIndex);
+  auto fragBuilder = args.fragBuilder;
+  const auto childProc = childProcessor(childIndex);
   fragBuilder->onBeforeChildProcEmitCode(childProc);  // call first so mangleString is updated
   auto programInfo = fragBuilder->getProgramInfo();
   // Prepare a mangled input color variable if the default is not used,

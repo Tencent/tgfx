@@ -24,12 +24,12 @@
 namespace tgfx {
 class ImageUserTypeface final : public UserTypeface {
  public:
-  using ImageRecordType = std::vector<std::shared_ptr<ImageTypefaceBuilder::GlyphRecord>>;
+  using GlyphRecords = std::vector<std::shared_ptr<ImageTypefaceBuilder::ImageGlyphRecord>>;
 
   static std::shared_ptr<UserTypeface> Make(uint32_t builderID, const std::string& fontFamily,
                                             const std::string& fontStyle,
                                             const FontMetrics& fontMetrics, const Rect& fontBounds,
-                                            const ImageRecordType& glyphRecords);
+                                            int unitsPerEm, const GlyphRecords& glyphRecords);
 
   size_t glyphsCount() const override;
 
@@ -37,15 +37,18 @@ class ImageUserTypeface final : public UserTypeface {
 
   bool hasOutlines() const override;
 
-  std::shared_ptr<ImageTypefaceBuilder::GlyphRecord> getGlyphRecord(GlyphID glyphID) const;
+  std::shared_ptr<ImageTypefaceBuilder::ImageGlyphRecord> getGlyphRecord(GlyphID glyphID) const;
+
+  float getGlyphAdvance(GlyphID glyphID) const;
 
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
  private:
   explicit ImageUserTypeface(uint32_t builderID, const std::string& fontFamily,
                              const std::string& fontStyle, const FontMetrics& fontMetrics,
-                             const Rect& fontBounds, const ImageRecordType& glyphRecords);
+                             const Rect& fontBounds, int unitsPerEm,
+                             const GlyphRecords& glyphRecords);
 
-  ImageRecordType glyphRecords = {};
+  GlyphRecords glyphRecords = {};
 };
 }  // namespace tgfx

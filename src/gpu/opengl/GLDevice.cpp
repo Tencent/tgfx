@@ -18,6 +18,7 @@
 
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include <thread>
+#include "gpu/ResourceCache.h"
 #include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
@@ -30,13 +31,16 @@ std::shared_ptr<GLDevice> GLDevice::MakeWithFallback() {
     return device;
   }
 #ifndef TGFX_BUILD_FOR_WEB
-  for (auto& item : deviceMap) {
-    device = std::static_pointer_cast<GLDevice>(item.second->weakThis.lock());
-    if (device != nullptr && !device->externallyOwned) {
-      LOGE(
-          "GLDevice::MakeWithFallback(): Failed to create a new GLDevice! Fall back to the "
-          "existing one.");
-      return device;
+  {
+    std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+    for (auto& item : deviceMap) {
+      device = std::static_pointer_cast<GLDevice>(item.second->weakThis.lock());
+      if (device != nullptr && !device->externallyOwned) {
+        LOGE(
+            "GLDevice::MakeWithFallback(): Failed to create a new GLDevice! Fall back to the "
+            "existing one.");
+        return device;
+      }
     }
   }
 #endif
@@ -66,7 +70,26 @@ GLDevice::GLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle)
 }
 
 GLDevice::~GLDevice() {
+  // Subclasses must call releaseAll() before GLDevice is destroyed to clean up all GPU resources in
+  // the context. Otherwise, GPU resources may leak due to OpenGL context loss.
+  DEBUG_ASSERT(context == nullptr);
   std::lock_guard<std::mutex> autoLock(deviceMapLocker);
   deviceMap.erase(nativeHandle);
+}
+
+void GLDevice::releaseAll() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (context == nullptr) {
+    // make sure all resources are released even there is no context.
+    static_cast<GLGPU*>(_gpu)->releaseAll(false);
+    return;
+  }
+  auto releaseGPU = onLockContext();
+  static_cast<GLGPU*>(_gpu)->releaseAll(releaseGPU);
+  if (releaseGPU) {
+    onUnlockContext();
+  }
+  delete context;
+  context = nullptr;
 }
 }  // namespace tgfx

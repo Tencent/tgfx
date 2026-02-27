@@ -20,6 +20,10 @@
 
 #include <string>
 #include "gpu/opengl/GLInterface.h"
+#include "tgfx/gpu/BlendFactor.h"
+#include "tgfx/gpu/BlendOperation.h"
+#include "tgfx/gpu/CompareFunction.h"
+#include "tgfx/gpu/StencilOperation.h"
 
 namespace tgfx {
 struct GLVersion {
@@ -32,16 +36,21 @@ struct GLVersion {
   }
 };
 
-PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat);
+unsigned ToGLBlendFactor(BlendFactor blendFactor);
+
+unsigned ToGLBlendOperation(BlendOperation blendOperation);
+
+unsigned ToGLCompareFunction(CompareFunction compare);
+
+unsigned ToGLFrontFace(FrontFace frontFace);
+
+unsigned ToGLCullMode(CullMode mode);
+
+unsigned ToGLStencilOperation(StencilOperation stencilOp);
 
 unsigned PixelFormatToGLSizeFormat(PixelFormat pixelFormat);
 
 GLVersion GetGLVersion(const char* versionString);
-
-unsigned CreateGLProgram(const GLFunctions* gl, const std::string& vertex,
-                         const std::string& fragment);
-
-unsigned LoadGLShader(const GLFunctions* gl, unsigned shaderType, const std::string& source);
 
 void ClearGLError(const GLFunctions* gl);
 

@@ -46,10 +46,10 @@ bool ShaderMaskFilter::isEqual(const MaskFilter* maskFilter) const {
 PlacementPtr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(
     const FPArgs& args, const Matrix* uvMatrix) const {
   auto processor = FragmentProcessor::Make(shader, args, uvMatrix);
-  auto drawingBuffer = args.context->drawingBuffer();
+  auto allocator = args.context->drawingAllocator();
   if (processor == nullptr && inverted) {
-    return ConstColorProcessor::Make(drawingBuffer, {}, InputMode::Ignore);
+    return ConstColorProcessor::Make(allocator, {}, InputMode::Ignore);
   }
-  return FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor), inverted);
+  return FragmentProcessor::MulInputByChildAlpha(allocator, std::move(processor), inverted);
 }
 }  // namespace tgfx

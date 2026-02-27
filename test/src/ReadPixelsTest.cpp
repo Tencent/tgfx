@@ -17,12 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <vector>
-#include "gpu/opengl/GLUtil.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -35,10 +33,12 @@ namespace tgfx {
 
 TGFX_TEST(ReadPixelsTest, PixelMap) {
   auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
+  auto colorSpace = codec->colorSpace();
   EXPECT_TRUE(codec != nullptr);
   auto width = codec->width();
   auto height = codec->height();
-  auto RGBAInfo = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Unpremultiplied);
+  auto RGBAInfo = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Unpremultiplied,
+                                  0, colorSpace);
   auto byteSize = RGBAInfo.byteSize();
   Buffer pixelsA(byteSize);
   Buffer pixelsB(byteSize * 2);
@@ -81,7 +81,8 @@ TGFX_TEST(ReadPixelsTest, PixelMap) {
   EXPECT_TRUE(result);
   CHECK_PIXELS(RGBAInfo, pixelsB.data(), "PixelMap_RGBA_to_RGBA_100_100");
 
-  auto RGBARectInfo = ImageInfo::Make(500, 500, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  auto RGBARectInfo =
+      ImageInfo::Make(500, 500, ColorType::RGBA_8888, AlphaType::Premultiplied, 0, colorSpace);
   pixelsB.clear();
   result = RGBAMap.readPixels(RGBARectInfo, pixelsB.data(), -100, -100);
   EXPECT_TRUE(result);
@@ -135,7 +136,8 @@ TGFX_TEST(ReadPixelsTest, PixelMap) {
   EXPECT_TRUE(result);
   CHECK_PIXELS(bgr_AInfo, pixelsB.data(), "PixelMap_rgb_A_to_bgr_A");
 
-  auto A8Info = ImageInfo::Make(width, height, ColorType::ALPHA_8, AlphaType::Unpremultiplied);
+  auto A8Info =
+      ImageInfo::Make(width, height, ColorType::ALPHA_8, AlphaType::Unpremultiplied, 0, colorSpace);
   EXPECT_EQ(A8Info.alphaType(), AlphaType::Premultiplied);
   auto alphaByteSize = A8Info.byteSize();
   Buffer pixelsC(alphaByteSize);
@@ -158,7 +160,7 @@ TGFX_TEST(ReadPixelsTest, PixelMap) {
 TGFX_TEST(ReadPixelsTest, Surface) {
   auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false, false);
+  Bitmap bitmap(codec->width(), codec->height(), false, false, codec->colorSpace());
   ASSERT_FALSE(bitmap.isEmpty());
   auto pixels = bitmap.lockPixels();
   auto result = codec->readPixels(bitmap.info(), pixels);
@@ -179,12 +181,15 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   auto height = bitmap.height();
   pixels = bitmap.lockPixels();
 
-  auto RGBAInfo = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  auto colorSpace = surface->colorSpace();
+  auto RGBAInfo =
+      ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied, 0, colorSpace);
   result = surface->readPixels(RGBAInfo, pixels);
   EXPECT_TRUE(result);
   CHECK_PIXELS(RGBAInfo, pixels, "Surface_rgb_A_to_rgb_A");
 
-  auto BGRAInfo = ImageInfo::Make(width, height, ColorType::BGRA_8888, AlphaType::Premultiplied);
+  auto BGRAInfo =
+      ImageInfo::Make(width, height, ColorType::BGRA_8888, AlphaType::Premultiplied, 0, colorSpace);
   result = surface->readPixels(BGRAInfo, pixels);
   EXPECT_TRUE(result);
   CHECK_PIXELS(BGRAInfo, pixels, "Surface_rgb_A_to_bgr_A");
@@ -194,7 +199,8 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   EXPECT_TRUE(result);
   CHECK_PIXELS(RGBAInfo, pixels, "Surface_rgb_A_to_rgb_A_100_100");
 
-  auto RGBARectInfo = ImageInfo::Make(500, 500, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  auto RGBARectInfo =
+      ImageInfo::Make(500, 500, ColorType::RGBA_8888, AlphaType::Premultiplied, 0, colorSpace);
   memset(pixels, 0, RGBARectInfo.byteSize());
   result = surface->readPixels(RGBARectInfo, pixels, -100, -100);
   EXPECT_TRUE(result);
@@ -206,11 +212,13 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   CHECK_PIXELS(RGBARectInfo, pixels, "Surface_rgb_A_to_rgb_A_100_-100");
 
   surface = Surface::Make(context, width, height, true);
+  colorSpace = surface->colorSpace();
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
   canvas->drawImage(image);
 
-  auto A8Info = ImageInfo::Make(width, height, ColorType::ALPHA_8, AlphaType::Premultiplied);
+  auto A8Info =
+      ImageInfo::Make(width, height, ColorType::ALPHA_8, AlphaType::Premultiplied, 0, colorSpace);
   result = surface->readPixels(A8Info, pixels);
   EXPECT_TRUE(result);
   CHECK_PIXELS(A8Info, pixels, "Surface_alpha_to_alpha");
@@ -219,16 +227,17 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   EXPECT_TRUE(result);
   CHECK_PIXELS(RGBAInfo, pixels, "Surface_alpha_to_rgba");
 
-  auto AlphaRectInfo = ImageInfo::Make(500, 500, ColorType::ALPHA_8, AlphaType::Premultiplied);
+  auto AlphaRectInfo =
+      ImageInfo::Make(500, 500, ColorType::ALPHA_8, AlphaType::Premultiplied, 0, colorSpace);
   memset(pixels, 0, AlphaRectInfo.byteSize());
   result = surface->readPixels(AlphaRectInfo, pixels, 100, -100);
   EXPECT_TRUE(result);
   CHECK_PIXELS(AlphaRectInfo, pixels, "Surface_alpha_to_alpha_100_-100");
 
-  GLTextureInfo textureInfo = {};
-  result = CreateGLTexture(context, width, height, &textureInfo);
-  EXPECT_TRUE(result);
-  surface = Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
+  auto texture = context->gpu()->createTexture({width, height, PixelFormat::RGBA_8888});
+  ASSERT_TRUE(texture != nullptr);
+  surface = Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
+  colorSpace = surface->colorSpace();
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
   canvas->clear();
@@ -252,13 +261,12 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   result = surface->readPixels(RGBARectInfo, pixels, 100, -100);
   EXPECT_TRUE(result);
   CHECK_PIXELS(RGBARectInfo, pixels, "Surface_BL_rgb_A_to_rgb_A_100_-100");
-  auto gl = GLFunctions::Get(context);
-  gl->deleteTextures(1, &textureInfo.id);
   bitmap.unlockPixels();
 }
 
 TGFX_TEST(ReadPixelsTest, PngCodec) {
   auto rgbaCodec = MakeImageCodec("resources/apitest/imageReplacement.png");
+  auto colorSpace = rgbaCodec->colorSpace();
   ASSERT_TRUE(rgbaCodec != nullptr);
   EXPECT_EQ(rgbaCodec->width(), 110);
   EXPECT_EQ(rgbaCodec->height(), 110);
@@ -268,7 +276,7 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
   auto pixels = buffer.data();
   ASSERT_TRUE(pixels);
   auto RGBAInfo = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::RGBA_8888,
-                                  AlphaType::Premultiplied);
+                                  AlphaType::Premultiplied, 0, colorSpace);
   EXPECT_TRUE(rgbaCodec->readPixels(RGBAInfo, pixels));
   // set each pixel's alpha to 255
   for (size_t i = 3; i < rowBytes * static_cast<size_t>(rgbaCodec->height()); i += 4) {
@@ -286,7 +294,7 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
   CHECK_PIXELS(RGBAInfo, pixels, "PngCodec_Encode_RGBA");
 
   auto A8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::ALPHA_8,
-                                AlphaType::Premultiplied);
+                                AlphaType::Premultiplied, 0, colorSpace);
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "PngCodec_Decode_Alpha8");
@@ -298,7 +306,7 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
   CHECK_PIXELS(A8Info, pixels, "PngCodec_Encode_Alpha8");
 
   auto Gray8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::Gray_8,
-                                   AlphaType::Opaque);
+                                   AlphaType::Opaque, 0, colorSpace);
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(Gray8Info, pixels));
   CHECK_PIXELS(Gray8Info, pixels, "PngCodec_Decode_Gray8");
@@ -310,7 +318,7 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
   CHECK_PIXELS(Gray8Info, pixels, "PngCodec_Encode_Gray8");
 
   auto RGB565Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::RGB_565,
-                                    AlphaType::Opaque);
+                                    AlphaType::Opaque, 0, colorSpace);
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(RGB565Info, pixels));
   CHECK_PIXELS(RGB565Info, pixels, "PngCodec_Decode_RGB565");
@@ -324,12 +332,13 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
 
 TGFX_TEST(ReadPixelsTest, WebpCodec) {
   auto rgbaCodec = MakeImageCodec("resources/apitest/imageReplacement.webp");
+  auto colorSpace = rgbaCodec->colorSpace();
   ASSERT_TRUE(rgbaCodec != nullptr);
   EXPECT_EQ(rgbaCodec->width(), 110);
   EXPECT_EQ(rgbaCodec->height(), 110);
   EXPECT_EQ(rgbaCodec->orientation(), Orientation::TopLeft);
   auto RGBAInfo = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::RGBA_8888,
-                                  AlphaType::Premultiplied);
+                                  AlphaType::Premultiplied, 0, colorSpace);
 
   Buffer buffer(RGBAInfo.byteSize());
   auto pixels = buffer.data();
@@ -348,7 +357,7 @@ TGFX_TEST(ReadPixelsTest, WebpCodec) {
   CHECK_PIXELS(RGBAInfo, pixels, "WebpCodec_Encode_RGBA");
 
   auto A8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::ALPHA_8,
-                                AlphaType::Premultiplied);
+                                AlphaType::Premultiplied, 0, colorSpace);
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "WebpCodec_Decode_Alpha8");
@@ -359,7 +368,7 @@ TGFX_TEST(ReadPixelsTest, WebpCodec) {
   CHECK_PIXELS(A8Info, pixels, "WebpCodec_Encode_Alpha8");
 
   auto Gray8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::Gray_8,
-                                   AlphaType::Opaque);
+                                   AlphaType::Opaque, 0, colorSpace);
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(Gray8Info, pixels));
   CHECK_PIXELS(Gray8Info, pixels, "WebpCodec_Decode_Gray8");
@@ -370,7 +379,7 @@ TGFX_TEST(ReadPixelsTest, WebpCodec) {
   CHECK_PIXELS(Gray8Info, pixels, "WebpCodec_Encode_Gray8");
 
   auto RGB565Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::RGB_565,
-                                    AlphaType::Opaque);
+                                    AlphaType::Opaque, 0, colorSpace);
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(RGB565Info, pixels));
   CHECK_PIXELS(RGB565Info, pixels, "WebpCodec_Decode_RGB565");
@@ -383,12 +392,13 @@ TGFX_TEST(ReadPixelsTest, WebpCodec) {
 
 TGFX_TEST(ReadPixelsTest, JpegCodec) {
   auto rgbaCodec = MakeImageCodec("resources/apitest/imageReplacement.jpg");
+  auto colorSpace = rgbaCodec->colorSpace();
   ASSERT_TRUE(rgbaCodec != nullptr);
   EXPECT_EQ(rgbaCodec->width(), 110);
   EXPECT_EQ(rgbaCodec->height(), 110);
   EXPECT_EQ(rgbaCodec->orientation(), Orientation::RightTop);
   auto RGBAInfo = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::RGBA_8888,
-                                  AlphaType::Premultiplied);
+                                  AlphaType::Premultiplied, 0, colorSpace);
   Buffer buffer(RGBAInfo.byteSize());
   auto pixels = buffer.data();
   ASSERT_TRUE(pixels);
@@ -405,7 +415,7 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
   CHECK_PIXELS(RGBAInfo, pixels, "JpegCodec_Encode_RGBA");
 
   auto A8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::ALPHA_8,
-                                AlphaType::Premultiplied);
+                                AlphaType::Premultiplied, 0, colorSpace);
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "JpegCodec_Decode_Alpha8");
@@ -416,7 +426,7 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
   CHECK_PIXELS(A8Info, pixels, "JpegCodec_Encode_Alpha8");
 
   auto Gray8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::Gray_8,
-                                   AlphaType::Opaque);
+                                   AlphaType::Opaque, 0, colorSpace);
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(Gray8Info, pixels));
   CHECK_PIXELS(Gray8Info, pixels, "JpegCodec_Decode_Gray8");
@@ -427,7 +437,7 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
   CHECK_PIXELS(Gray8Info, pixels, "JpegCodec_Encode_Gray8");
 
   auto RGB565Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::RGB_565,
-                                    AlphaType::Opaque);
+                                    AlphaType::Opaque, 0, colorSpace);
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(RGB565Info, pixels));
   CHECK_PIXELS(RGB565Info, pixels, "JpegCodec_Decode_RGB565");
@@ -440,12 +450,13 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
 
 TGFX_TEST(ReadPixelsTest, NativeCodec) {
   auto rgbaCodec = MakeNativeCodec("resources/apitest/imageReplacement.png");
+  auto colorSpace = rgbaCodec->colorSpace();
   ASSERT_TRUE(rgbaCodec != nullptr);
   EXPECT_EQ(rgbaCodec->width(), 110);
   EXPECT_EQ(rgbaCodec->height(), 110);
   EXPECT_EQ(rgbaCodec->orientation(), Orientation::TopLeft);
   auto RGBAInfo = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::RGBA_8888,
-                                  AlphaType::Premultiplied);
+                                  AlphaType::Premultiplied, 0, colorSpace);
   Buffer buffer(RGBAInfo.byteSize());
   auto pixels = buffer.data();
   ASSERT_TRUE(pixels);
@@ -462,7 +473,7 @@ TGFX_TEST(ReadPixelsTest, NativeCodec) {
   CHECK_PIXELS(RGBAInfo, pixels, "NativeCodec_Encode_RGBA");
 
   auto A8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::ALPHA_8,
-                                AlphaType::Premultiplied);
+                                AlphaType::Premultiplied, 0, colorSpace);
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "NativeCodec_Decode_Alpha8");
@@ -476,26 +487,28 @@ TGFX_TEST(ReadPixelsTest, NativeCodec) {
 
 TGFX_TEST(ReadPixelsTest, ReadScaleCodec) {
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
+  auto colorSpace = codec->colorSpace();
   EXPECT_TRUE(codec != nullptr);
   auto width = codec->width() / 10;
   auto height = codec->height() / 10;
-  auto RGBA_1010102Info =
-      ImageInfo::Make(width, height, ColorType::RGBA_1010102, AlphaType::Unpremultiplied);
+  auto RGBA_1010102Info = ImageInfo::Make(width, height, ColorType::RGBA_1010102,
+                                          AlphaType::Unpremultiplied, 0, colorSpace);
   auto byteSize = RGBA_1010102Info.byteSize();
   Buffer pixelsA(byteSize);
   auto result = codec->readPixels(RGBA_1010102Info, pixelsA.data());
   EXPECT_TRUE(result);
   EXPECT_TRUE(Baseline::Compare(Pixmap(RGBA_1010102Info, pixelsA.data()),
                                 "ReadPixelsTest/read_RGBA_1010102_scaled_codec"));
-  auto RGBInfo = ImageInfo::Make(width, height, ColorType::RGB_565, AlphaType::Unpremultiplied);
+  auto RGBInfo =
+      ImageInfo::Make(width, height, ColorType::RGB_565, AlphaType::Unpremultiplied, 0, colorSpace);
   byteSize = RGBInfo.byteSize();
   Buffer pixelsB(byteSize);
   result = codec->readPixels(RGBInfo, pixelsB.data());
   EXPECT_TRUE(result);
   EXPECT_TRUE(Baseline::Compare(Pixmap(RGBInfo, pixelsB.data()),
                                 "ReadPixelsTest/read_RGB_565_scaled_codec"));
-  auto RGBA_F16Info =
-      ImageInfo::Make(width, height, ColorType::RGBA_F16, AlphaType::Unpremultiplied);
+  auto RGBA_F16Info = ImageInfo::Make(width, height, ColorType::RGBA_F16,
+                                      AlphaType::Unpremultiplied, 0, colorSpace);
   byteSize = RGBA_F16Info.byteSize();
   Buffer pixelsC(byteSize);
   result = codec->readPixels(RGBA_F16Info, pixelsC.data());

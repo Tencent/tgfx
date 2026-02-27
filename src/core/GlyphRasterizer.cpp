@@ -19,11 +19,23 @@
 #include "GlyphRasterizer.h"
 
 namespace tgfx {
+#ifndef TGFX_BUILD_FOR_WEB
+std::shared_ptr<GlyphRasterizer> GlyphRasterizer::MakeFrom(
+    int width, int height, std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
+    bool fauxBold, const Stroke* stroke, const Point& glyphOffset) {
+  if (scalerContext == nullptr || width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  return std::make_shared<GlyphRasterizer>(width, height, std::move(scalerContext), glyphID,
+                                           fauxBold, stroke, glyphOffset);
+}
+#endif
+
 GlyphRasterizer::GlyphRasterizer(int width, int height,
                                  std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
-                                 bool fauxBold, const Stroke* stroke)
+                                 bool fauxBold, const Stroke* stroke, const Point& glyphOffset)
     : ImageCodec(width, height), scalerContext(std::move(scalerContext)), glyphID(glyphID),
-      fauxBold(fauxBold), stroke(stroke ? new Stroke(*stroke) : nullptr) {
+      fauxBold(fauxBold), stroke(stroke ? new Stroke(*stroke) : nullptr), glyphOffset(glyphOffset) {
 }
 
 GlyphRasterizer::~GlyphRasterizer() {
@@ -32,9 +44,15 @@ GlyphRasterizer::~GlyphRasterizer() {
   }
 }
 
+bool GlyphRasterizer::asyncSupport() const {
+  return scalerContext->asyncSupport();
+}
+
 bool GlyphRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                   std::shared_ptr<ColorSpace> dstColorSpace,
                                    void* dstPixels) const {
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
-  return scalerContext->readPixels(glyphID, fauxBold, stroke, dstInfo, dstPixels);
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
+  return scalerContext->readPixels(glyphID, fauxBold, stroke, dstInfo, dstPixels, glyphOffset);
 }
 }  // namespace tgfx

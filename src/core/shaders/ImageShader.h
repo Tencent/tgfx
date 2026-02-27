@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/TextureView.h"
+#include "gpu/resources/TextureView.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Shader.h"
 
@@ -41,8 +41,9 @@ class ImageShader : public Shader {
 
   bool isEqual(const Shader* shader) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                      const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      const FPArgs& args, const Matrix* uvMatrix,
+      const std::shared_ptr<ColorSpace>& dstColorSpace) const override;
 
  private:
   ImageShader(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,

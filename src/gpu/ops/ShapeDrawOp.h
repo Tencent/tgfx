@@ -20,27 +20,34 @@
 
 #include "DrawOp.h"
 #include "gpu/proxies/GPUShapeProxy.h"
-#include "gpu/proxies/VertexBufferProxyView.h"
+#include "gpu/proxies/VertexBufferView.h"
 
 namespace tgfx {
 class ShapeDrawOp : public DrawOp {
  public:
-  static PlacementPtr<ShapeDrawOp> Make(std::shared_ptr<GPUShapeProxy> shapeProxy, Color color,
+  static PlacementPtr<ShapeDrawOp> Make(std::shared_ptr<GPUShapeProxy> shapeProxy, PMColor color,
                                         const Matrix& uvMatrix, AAType aaType);
-
-  void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
   bool hasCoverage() const override;
 
+ protected:
+  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
+
+  void onDraw(RenderPass* renderPass) override;
+
+  Type type() override {
+    return Type::ShapeDrawOp;
+  }
+
  private:
   std::shared_ptr<GPUShapeProxy> shapeProxy = nullptr;
-  std::shared_ptr<VertexBufferProxyView> maskBufferProxy = {};
-  Color color = Color::Transparent();
+  std::shared_ptr<VertexBufferView> maskBufferProxy = {};
+  PMColor color = PMColor::Transparent();
   Matrix uvMatrix = {};
 
-  ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, const Matrix& uvMatrix,
-              AAType aaType);
+  ShapeDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUShapeProxy> proxy, PMColor color,
+              const Matrix& uvMatrix, AAType aaType);
 
-  friend class BlockBuffer;
+  friend class BlockAllocator;
 };
 }  // namespace tgfx

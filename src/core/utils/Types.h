@@ -24,8 +24,8 @@
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Shader.h"
-#include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/vectors/ColorSource.h"
 
 namespace tgfx {
 class Types {
@@ -37,7 +37,7 @@ class Types {
   using MaskFilterType = MaskFilter::Type;
   using ShapeType = Shape::Type;
   using LayerContentType = LayerContent::Type;
-  using ShapeStyleType = ShapeStyle::Type;
+  using ColorSourceType = ColorSource::Type;
   using LayerFilterType = LayerFilter::Type;
 
   static ShaderType Get(const Shader* shader) {
@@ -75,9 +75,9 @@ class Types {
     return layerContent->type();
   }
 
-  static ShapeStyleType Get(const ShapeStyle* shapeStyle) {
-    DEBUG_ASSERT(shapeStyle != nullptr)
-    return shapeStyle->getType();
+  static ColorSourceType Get(const ColorSource* colorSource) {
+    DEBUG_ASSERT(colorSource != nullptr)
+    return colorSource->getType();
   }
 
   static LayerFilterType Get(const LayerFilter* layerFilter) {

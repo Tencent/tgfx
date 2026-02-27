@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
+#include "gpu/resources/ResourceKey.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -31,13 +32,13 @@ class MatrixShape : public Shape {
       : shape(std::move(shape)), matrix(matrix) {
   }
 
-  bool isInverseFillType() const override {
-    return shape->isInverseFillType();
+  PathFillType fillType() const override {
+    return shape->fillType();
   }
 
-  Rect getBounds() const override;
+  Rect onGetBounds() const override;
 
-  Path getPath() const override;
+  static UniqueKey MakeUniqueKey(const UniqueKey& key, const Matrix& matrix);
 
   std::shared_ptr<Shape> shape = nullptr;
   Matrix matrix = {};
@@ -46,6 +47,8 @@ class MatrixShape : public Shape {
   Type type() const override {
     return Type::Matrix;
   }
+
+  Path onGetPath(float resolutionScale) const override;
 
   UniqueKey getUniqueKey() const override;
 };

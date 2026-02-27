@@ -28,17 +28,13 @@ enum class LayerType {
    */
   Layer,
   /**
-   * A layer displaying an image.
+   * A layer displaying a simple image.
    */
   Image,
   /**
-   * A layer displaying a shape.
+   * A layer displaying a simple shape.
    */
   Shape,
-  /**
-   * A layer displaying a color gradient.
-   */
-  Gradient,
   /**
    * A layer displaying a simple text.
    */
@@ -46,6 +42,10 @@ enum class LayerType {
   /**
    * A layer that fills its bounds with a solid color.
    */
-  Solid
+  Solid,
+  /**
+   * A layer displaying vector elements (shapes, text, images) with fill/stroke styles and modifiers.
+   */
+  Vector
 };
 }  // namespace tgfx

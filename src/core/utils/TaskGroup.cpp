@@ -19,6 +19,7 @@
 #include "TaskGroup.h"
 #include <cmath>
 #include <cstdlib>
+#include "MathExtra.h"
 #include "core/utils/Log.h"
 
 #ifdef __APPLE__
@@ -75,8 +76,7 @@ void OnAppExit() {
 }
 
 TaskGroup::TaskGroup() : maxThreads(GetMaxThreads()) {
-  lowPriorityThreads =
-      static_cast<int>(roundf(static_cast<float>(maxThreads) * LOW_PRIORITY_THREAD_RATIO));
+  lowPriorityThreads = FloatRoundToInt(static_cast<float>(maxThreads) * LOW_PRIORITY_THREAD_RATIO);
   if (lowPriorityThreads < 1) {
     lowPriorityThreads = 1;
   }
@@ -124,7 +124,6 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task, TaskPriority priority) {
 }
 
 std::shared_ptr<Task> TaskGroup::popTask() {
-  std::unique_lock<std::mutex> autoLock(locker);
   while (!exited) {
     std::shared_ptr<Task> task = nullptr;
     for (size_t i = 0; i < static_cast<size_t>(TaskPriority::Low); i++) {
@@ -142,11 +141,15 @@ std::shared_ptr<Task> TaskGroup::popTask() {
       return nullptr;
     }
     ++waitingThreads;
-    auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
-    --waitingThreads;
-    if (status == std::cv_status::timeout) {
-      return nullptr;
+    {
+      std::unique_lock<std::mutex> autoLock(locker);
+      auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
+      if (status == std::cv_status::timeout) {
+        --waitingThreads;
+        return nullptr;
+      }
     }
+    --waitingThreads;
   }
   return nullptr;
 }

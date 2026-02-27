@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
-#include "layers/OpaqueThreshold.h"
 
 namespace tgfx {
 
@@ -95,27 +94,28 @@ void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Imag
                                             float contentScale, std::shared_ptr<Image> extraSource,
                                             const Point& extraSourceOffset, float alpha,
                                             BlendMode blendMode) {
-  // create opaque image
-  auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD));
-  auto opaqueImage = content->makeWithFilter(opaqueFilter);
-
   Point offset = {};
   auto filter = getShadowFilter(contentScale);
   if (!filter) {
     return;
   }
-  auto shadowImage = opaqueImage->makeWithFilter(filter, &offset);
+  auto shadowImage = content->makeWithFilter(filter, &offset);
+  // Use nearest filtering when there's no blur to avoid edge artifacts caused by linear
+  // interpolation. When the texture is scaled up, linear filtering produces intermediate alpha
+  // values at edges, which causes visible borders in the shadow.
+  auto sampling = (_blurrinessX == 0 && _blurrinessY == 0)
+                      ? SamplingOptions(FilterMode::Nearest, MipmapMode::None)
+                      : SamplingOptions();
   Paint paint = {};
   if (!_showBehindLayer) {
-    extraSource = extraSource->makeWithFilter(opaqueFilter);
-    auto shader = Shader::MakeImageShader(extraSource, TileMode::Decal, TileMode::Decal);
+    auto shader = Shader::MakeImageShader(extraSource, TileMode::Decal, TileMode::Decal, sampling);
     auto matrixShader =
         shader->makeWithMatrix(Matrix::MakeTrans(extraSourceOffset.x, extraSourceOffset.y));
     paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
   }
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
-  canvas->drawImage(shadowImage, offset.x, offset.y, &paint);
+  canvas->drawImage(shadowImage, offset.x, offset.y, sampling, &paint);
 }
 
 void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,

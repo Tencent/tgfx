@@ -22,8 +22,6 @@
 #include <jni.h>
 
 namespace tgfx {
-static constexpr int HARDWAREBUFFER_FORMAT_R8_UNORM = 0x38;
-
 using Allocate = int(const AHardwareBuffer_Desc* desc, AHardwareBuffer** outBuffer);
 using Acquire = void(AHardwareBuffer* buffer);
 using Release = void(AHardwareBuffer* buffer);

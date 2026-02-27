@@ -49,7 +49,8 @@ class Bitmap {
    * backed PixelRef is allocated. Otherwise, a raster PixelRef is allocated. The isEmpty() method
    * of the Bitmap will return true if allocation fails.
    */
-  Bitmap(int width, int height, bool alphaOnly = false, bool tryHardware = true);
+  Bitmap(int width, int height, bool alphaOnly = false, bool tryHardware = true,
+         std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Copies settings from src to returned Bitmap. Shares pixels if src has pixels allocated, so both
@@ -67,7 +68,8 @@ class Bitmap {
    * buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
    * platform. The Bitmap takes a reference to the hardwareBuffer.
    */
-  explicit Bitmap(HardwareBufferRef hardwareBuffer);
+  explicit Bitmap(HardwareBufferRef hardwareBuffer,
+                  std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Copies settings from src to returned Bitmap. Shares pixels if src has pixels allocated, so both
@@ -87,7 +89,8 @@ class Bitmap {
    * allocated. Otherwise, a raster PixelRef is allocated. Returns true if the PixelRef is
    * allocated successfully.
    */
-  bool allocPixels(int width, int height, bool alphaOnly = false, bool tryHardware = true);
+  bool allocPixels(int width, int height, bool alphaOnly = false, bool tryHardware = true,
+                   std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Locks and returns the writable pixels, the base address corresponding to the pixel origin.
@@ -188,6 +191,11 @@ class Bitmap {
    * the returned hardware buffer. Returns nullptr if the Bitmap is not backed by a hardware buffer.
    */
   HardwareBufferRef getHardwareBuffer() const;
+
+  /**
+   * Return the colorSpace of this bitmap.
+   */
+  std::shared_ptr<ColorSpace> colorSpace() const;
 
   /**
    * Encodes the pixels in Bitmap into a binary image format.

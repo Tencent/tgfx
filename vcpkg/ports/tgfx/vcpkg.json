@@ -1,0 +1,121 @@
+{
+  "name": "tgfx",
+  "version": "2.1.1",
+  "description": "A lightweight 2D graphics library for rendering texts, geometries, and images with high-performance APIs that work across various platforms.",
+  "homepage": "https://github.com/Tencent/tgfx",
+  "license": "BSD-3-Clause",
+  "dependencies": [
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-get-vars",
+      "host": true
+    },
+    {
+      "name": "vcpkg-tool-nodejs",
+      "host": true
+    },    
+    {
+      "name": "vcpkg-tool-ninja",
+      "host": true
+    }
+  ],
+  "default-features": [
+    {
+      "name": "opengl"
+    },
+    {
+      "name": "threads",
+      "platform": "!wasm32"
+    },
+    {
+      "name": "freetype",
+      "platform": "!(osx | ios | wasm32)"
+    },
+    {
+      "name": "webp-decode",
+      "platform": "!(android | ohos)"
+    },
+    {
+      "name": "png-decode",
+      "platform": "!(android | ohos) & !(ios | wasm32)"
+    },
+    {
+      "name": "png-encode",
+      "platform": "!(android | ohos) & !(ios | wasm32)"
+    },
+    {
+      "name": "jpeg-decode",
+      "platform": "!(android | ohos) & !(ios | wasm32)"
+    },
+    {
+      "name": "jpeg-encode",
+      "platform": "!(android | ohos) & !(ios | wasm32)"
+    },
+    {
+      "name": "webp-encode",
+      "platform": "!(android | ohos) & !(ios | wasm32)"
+    }
+  ],
+  "features": {
+    "svg": {
+      "description": "Enable building the SVG module"
+    },
+    "pdf": {
+      "description": "Enable building the PDF module"
+    },
+    "framework": {
+      "description": "Enable building framework",
+      "supports": "osx | ios"
+    },
+    "qt": {
+      "description": "Enable building with the Qt framework"
+    },
+    "swiftshader": {
+      "description": "Enable building with the SwiftShader library"
+    },
+    "angle": {
+      "description": "Enable building with the ANGLE library"
+    },
+    "opengl": {
+      "description": "Enable OpenGL as the GPU backend"
+    },
+    "threads": {
+      "description": "Enable support for multithreaded rendering"
+    },
+    "freetype": {
+      "description": "Enable Freetype as the vector backend"
+    },
+    "inspector": {
+      "description": "Enable profiling support for the TGFX Inspector tool"
+    },
+    "png-decode": {
+      "description": "Enable embedded PNG decoding support"
+    },
+    "png-encode": {
+      "description": "Enable embedded PNG encoding support"
+    },
+    "jpeg-decode": {
+      "description": "Enable embedded JPEG decoding support"
+    },
+    "jpeg-encode": {
+      "description": "Enable embedded JPEG encoding support"
+    },
+    "webp-decode": {
+      "description": "Enable embedded WEBP decoding support"
+    },
+    "webp-encode": {
+      "description": "Enable embedded WEBP encoding support"
+    },
+    "text-gamma-correction": {
+      "description": "Enable gamma correction when rendering text"
+    }
+  },
+  "supports": "!uwp"
+}

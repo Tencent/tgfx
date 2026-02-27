@@ -24,7 +24,7 @@
 namespace tgfx {
 class GenerateMipmapsTask : public RenderTask {
  public:
-  explicit GenerateMipmapsTask(std::shared_ptr<TextureProxy> textureProxy);
+  GenerateMipmapsTask(BlockAllocator* allocator, std::shared_ptr<TextureProxy> textureProxy);
 
   void execute(CommandEncoder* encoder) override;
 

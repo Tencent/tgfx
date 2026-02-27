@@ -1,0 +1,47 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2025 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include <wincodec.h>
+#include "tgfx/core/ImageCodec.h"
+
+namespace tgfx {
+class NativeCodec : public ImageCodec {
+ public:
+  ~NativeCodec() override;
+
+ protected:
+  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                    std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const override;
+
+ private:
+  std::string imagePath = {};
+  std::shared_ptr<Data> imageBytes = nullptr;
+
+  NativeCodec(int width, int height, Orientation orientation,
+              std::shared_ptr<ColorSpace> colorSpace)
+      : ImageCodec(width, height, orientation, std::move(colorSpace)) {
+  }
+
+  bool decodePixels(IWICBitmapSource* source, ColorType colorType, AlphaType alphaType,
+                    size_t dstRowBytes, void* dstPixels) const;
+
+  friend class ImageCodec;
+};
+}  // namespace tgfx

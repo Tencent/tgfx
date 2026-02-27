@@ -32,10 +32,10 @@ class SVGLengthContext;
 class SVGRoot : public SVGContainer {
  public:
   enum class Type {
-    kRoot,
-    kInner,
+    Root,
+    Inner,
   };
-  static std::shared_ptr<SVGRoot> Make(Type t = Type::kInner) {
+  static std::shared_ptr<SVGRoot> Make(Type t = Type::Inner) {
     return std::shared_ptr<SVGRoot>(new SVGRoot(t));
   }
 

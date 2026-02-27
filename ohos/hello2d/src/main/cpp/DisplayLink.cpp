@@ -21,7 +21,7 @@ void DisplayLink::stop() {
 }
 
 void DisplayLink::VSyncCallback(long long, void* data) {
-    auto* displayLink = static_cast<DisplayLink*>(data);
+    auto displayLink = static_cast<DisplayLink*>(data);
     if (displayLink->playing) {
         displayLink->callback();
         OH_NativeVSync_RequestFrame(displayLink->vSync, &DisplayLink::VSyncCallback, displayLink);

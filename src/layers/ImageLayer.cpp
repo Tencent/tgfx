@@ -40,7 +40,11 @@ void ImageLayer::setImage(std::shared_ptr<Image> value) {
 }
 
 void ImageLayer::onUpdateContent(LayerRecorder* recorder) {
-  auto canvas = recorder->getCanvas();
-  canvas->drawImage(_image, _sampling);
+  if (!_image) {
+    return;
+  }
+  auto rect = Rect::MakeWH(_image->width(), _image->height());
+  auto shader = Shader::MakeImageShader(_image, TileMode::Clamp, TileMode::Clamp, _sampling);
+  recorder->addRect(rect, LayerPaint(std::move(shader)));
 }
 }  // namespace tgfx

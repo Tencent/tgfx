@@ -18,11 +18,12 @@
 
 #pragma once
 
-#include "SamplerHandle.h"
-#include "ShaderVar.h"
-#include "Swizzle.h"
-#include "gpu/GPUTexture.h"
-#include "gpu/UniformBuffer.h"
+#include "gpu/SamplerHandle.h"
+#include "gpu/ShaderVar.h"
+#include "gpu/Swizzle.h"
+#include "gpu/UniformData.h"
+#include "tgfx/gpu/ShaderStage.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 class ProgramBuilder;
@@ -50,7 +51,7 @@ class UniformHandler {
   /**
    * Adds a sampler to the current program.
    */
-  SamplerHandle addSampler(GPUTexture* texture, const std::string& name);
+  SamplerHandle addSampler(std::shared_ptr<Texture> texture, const std::string& name);
 
   /**
    * Returns the sampler variable for the given sampler handle.
@@ -64,7 +65,7 @@ class UniformHandler {
     return samplerSwizzles[samplerHandle.toIndex()];
   }
 
-  std::unique_ptr<UniformBuffer> makeUniformBuffer() const;
+  std::unique_ptr<UniformData> makeUniformData(ShaderStage stage) const;
 
   /**
    * Returns the declarations of all uniforms that are visible in the given shader visibility.

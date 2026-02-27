@@ -57,8 +57,11 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
     return nullptr;
   }
   auto result = NativeCodec::Make(imageSource);
-  result->imagePath = filePath;
   OH_ImageSourceNative_Release(imageSource);
+  if (result == nullptr) {
+    return nullptr;
+  }
+  result->imagePath = filePath;
   return result;
 }
 
@@ -71,20 +74,23 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
     return nullptr;
   }
   auto result = NativeCodec::Make(imageSource);
-  result->imageBytes = imageBytes;
   OH_ImageSourceNative_Release(imageSource);
+  if (result == nullptr) {
+    return nullptr;
+  }
+  result->imageBytes = imageBytes;
   return result;
 }
 
 bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                               void* dstPixels) const {
+                               std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const {
   auto image = CreateImageSource();
   if (!image) {
     return false;
   }
-  OH_DecodingOptions* options;
+  OH_DecodingOptions* options = nullptr;
   auto errorCode = OH_DecodingOptions_Create(&options);
-  if (errorCode != Image_ErrorCode::IMAGE_SUCCESS) {
+  if (errorCode != Image_ErrorCode::IMAGE_SUCCESS || options == nullptr) {
     LOGE("NativeCodec::readPixels() Failed to Create Decode Option");
     OH_ImageSourceNative_Release(image);
     return false;
@@ -93,13 +99,15 @@ bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t 
   // decode
   OH_PixelmapNative* pixelmap = nullptr;
   errorCode = OH_ImageSourceNative_CreatePixelmap(image, options, &pixelmap);
-  if (errorCode != IMAGE_SUCCESS) {
+  OH_DecodingOptions_Release(options);
+  if (errorCode != IMAGE_SUCCESS || pixelmap == nullptr) {
     OH_ImageSourceNative_Release(image);
     LOGE("NativeCodec::readPixels() Failed to Decode Image");
     return false;
   }
   auto info = GetPixelmapInfo(pixelmap);
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   bool result = false;
   if (info == dstInfo) {
     size_t bufferSize = info.byteSize();
@@ -194,7 +202,8 @@ ImageInfo NativeCodec::GetPixelmapInfo(OH_PixelmapNative* pixelmap) {
   uint32_t rowBytes = 0;
   OH_PixelmapImageInfo_GetRowStride(currentInfo, &rowBytes);
   OH_PixelmapImageInfo_Release(currentInfo);
-  return ImageInfo::Make((int)width, (int)height, colorType, alphaType, rowBytes);
+  return ImageInfo::Make((int)width, (int)height, colorType, alphaType, rowBytes,
+                         ColorSpace::SRGB());
 }
 
 OH_ImageSourceNative* NativeCodec::CreateImageSource() const {

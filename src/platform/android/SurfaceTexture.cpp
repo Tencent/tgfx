@@ -20,10 +20,12 @@
 #include <chrono>
 #include "HandlerThread.h"
 #include "JNIUtil.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
-#include "gpu/DefaultTextureView.h"
+#include "gpu/opengl/GLFunctions.h"
+#include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLTexture.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "gpu/resources/DefaultTextureView.h"
 
 namespace tgfx {
 static Global<jclass> SurfaceTextureClass;
@@ -37,6 +39,7 @@ static jmethodID SurfaceTexture_attachToGLContext;
 static jmethodID SurfaceTexture_detachFromGLContext;
 static jmethodID SurfaceTexture_getTransformMatrix;
 static jmethodID SurfaceTexture_release;
+static jmethodID SurfaceTexture_getDataSpace;
 static Global<jclass> SurfaceClass;
 static jmethodID Surface_Constructor;
 static jmethodID Surface_release;
@@ -44,6 +47,9 @@ static Global<jclass> HandlerClass;
 static jmethodID Handler_Constructor;
 static Global<jclass> EventHandlerClass;
 static jmethodID EventHandler_Constructor;
+static Global<jclass> DataSpaceClass;
+static jmethodID DataSpaceClass_getStandard;
+static jmethodID DataSpaceClass_getTransfer;
 
 void SurfaceTexture::JNIInit(JNIEnv* env) {
   SurfaceTextureClass = env->FindClass("android/graphics/SurfaceTexture");
@@ -82,10 +88,23 @@ void SurfaceTexture::JNIInit(JNIEnv* env) {
   SurfaceTexture_getTransformMatrix =
       env->GetMethodID(SurfaceTextureClass.get(), "getTransformMatrix", "([F)V");
   SurfaceTexture_release = env->GetMethodID(SurfaceTextureClass.get(), "release", "()V");
+  SurfaceTexture_getDataSpace = env->GetMethodID(SurfaceTextureClass.get(), "getDataSpace", "()I");
+  if (SurfaceTexture_getDataSpace == nullptr) {
+    env->ExceptionClear();
+  }
   SurfaceClass = env->FindClass("android/view/Surface");
   Surface_Constructor =
       env->GetMethodID(SurfaceClass.get(), "<init>", "(Landroid/graphics/SurfaceTexture;)V");
   Surface_release = env->GetMethodID(SurfaceClass.get(), "release", "()V");
+  DataSpaceClass = env->FindClass("android/hardware/DataSpace");
+  if (DataSpaceClass.get() != nullptr) {
+    DataSpaceClass_getStandard =
+        env->GetStaticMethodID(DataSpaceClass.get(), "getStandard", "(I)I");
+    DataSpaceClass_getTransfer =
+        env->GetStaticMethodID(DataSpaceClass.get(), "getTransfer", "(I)I");
+  } else {
+    env->ExceptionClear();
+  }
 }
 
 static std::mutex threadLocker = {};
@@ -201,17 +220,19 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
   }
   auto textureSize = updateTexImage();
   if (textureSize.isEmpty()) {
-    auto gl = GLFunctions::Get(context);
+    auto gl = static_cast<GLGPU*>(context->gpu())->functions();
     gl->deleteTextures(1, &textureID);
     return nullptr;
   }
-  GPUTextureDescriptor descriptor = {textureSize.width,
-                                     textureSize.height,
-                                     PixelFormat::RGBA_8888,
-                                     false,
-                                     1,
-                                     GPUTextureUsage::TEXTURE_BINDING};
-  auto texture = std::make_unique<GLTexture>(descriptor, GL_TEXTURE_EXTERNAL_OES, textureID);
+  TextureDescriptor descriptor = {textureSize.width,
+                                  textureSize.height,
+                                  PixelFormat::RGBA_8888,
+                                  false,
+                                  1,
+                                  TextureUsage::TEXTURE_BINDING};
+  auto gpu = static_cast<GLGPU*>(context->gpu());
+  auto texture = gpu->makeResource<GLTexture>(
+      descriptor, static_cast<unsigned>(GL_TEXTURE_EXTERNAL_OES), textureID);
   return Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
 }
 
@@ -227,7 +248,7 @@ unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
   if (env == nullptr) {
     return 0;
   }
-  auto gl = GLFunctions::Get(context);
+  auto gl = static_cast<GLGPU*>(context->gpu())->functions();
   unsigned textureID = 0;
   gl->genTextures(1, &textureID);
   if (textureID == 0) {
@@ -264,6 +285,14 @@ ISize SurfaceTexture::updateTexImage() {
     env->ExceptionClear();
     LOGE("NativeImageReader::onUpdateTexture(): failed to updateTexImage!");
     return {};
+  }
+  if (SurfaceTexture_getDataSpace) {
+    jint dataSpace = env->CallIntMethod(surfaceTexture.get(), SurfaceTexture_getDataSpace);
+    jint standard =
+        env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getStandard, dataSpace);
+    jint transfer =
+        env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getTransfer, dataSpace);
+    _colorSpace = AndroidDataSpaceToColorSpace(standard, transfer);
   }
   auto floatArray = env->NewFloatArray(16);
   env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_getTransformMatrix, floatArray);

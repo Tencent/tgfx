@@ -23,6 +23,7 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/svg/SVGCustomParser.h"
 #include "tgfx/svg/TextShaper.h"
 #include "tgfx/svg/node/SVGRoot.h"
 
@@ -53,9 +54,12 @@ class SVGDOM {
    * Creates an SVGDOM object from the provided stream.
    * If textShaper is nullptr, only text with specified system fonts will render. Text without a
    * specified font or requiring fallback fonts will not render.
+   * If customParser is nullptr, the default parser will be used. All custom attributes will be
+   * add into SVGNode's customAttributes.
    */
   static std::shared_ptr<SVGDOM> Make(Stream& stream,
-                                      std::shared_ptr<TextShaper> textShaper = nullptr);
+                                      std::shared_ptr<TextShaper> textShaper = nullptr,
+                                      std::shared_ptr<SVGCustomParser> customParser = nullptr);
 
   /**
    * Returns the root SVG node.

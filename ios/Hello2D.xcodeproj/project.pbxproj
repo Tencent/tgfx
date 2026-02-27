@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E1BF1B702E44A64000F99C5E /* tgfx.png in Resources */ = {isa = PBXBuildFile; fileRef = E1BF1B6F2E44A64000F99C5E /* tgfx.png */; };
 		E61EC8172AF1FCAE00C82F9E /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = E61EC8162AF1FCAE00C82F9E /* AppDelegate.m */; };
 		E61EC81A2AF1FCAE00C82F9E /* SceneDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = E61EC8192AF1FCAE00C82F9E /* SceneDelegate.m */; };
 		E61EC81D2AF1FCAE00C82F9E /* ViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = E61EC81C2AF1FCAE00C82F9E /* ViewController.mm */; };
@@ -17,10 +18,11 @@
 		F2272B672AF87D96004DEF8D /* tgfx.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F2272B662AF87D96004DEF8D /* tgfx.a */; };
 		F25AD0712AF90ECD0017339D /* bridge.jpg in Resources */ = {isa = PBXBuildFile; fileRef = F25AD0702AF90ECD0017339D /* bridge.jpg */; };
 		F276A9802AF8D42200E482B7 /* TGFXView.mm in Sources */ = {isa = PBXBuildFile; fileRef = F276A97F2AF8D42200E482B7 /* TGFXView.mm */; };
-		F2F2CEFA2B0B51CD0092BD3B /* tgfx-drawers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F2F2CEF92B0B51CD0092BD3B /* tgfx-drawers.a */; };
+		F2F2CEFA2B0B51CD0092BD3B /* tgfx-hello2d.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F2F2CEF92B0B51CD0092BD3B /* tgfx-hello2d.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		E1BF1B6F2E44A64000F99C5E /* tgfx.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = tgfx.png; sourceTree = "<group>"; };
 		E61EC8122AF1FCAE00C82F9E /* Hello2D.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hello2D.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E61EC8152AF1FCAE00C82F9E /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		E61EC8162AF1FCAE00C82F9E /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
@@ -37,7 +39,7 @@
 		F25AD0702AF90ECD0017339D /* bridge.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = bridge.jpg; sourceTree = "<group>"; };
 		F276A97E2AF8D3EB00E482B7 /* TGFXView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TGFXView.h; sourceTree = "<group>"; };
 		F276A97F2AF8D42200E482B7 /* TGFXView.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TGFXView.mm; sourceTree = "<group>"; };
-		F2F2CEF92B0B51CD0092BD3B /* tgfx-drawers.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "tgfx-drawers.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F2F2CEF92B0B51CD0092BD3B /* tgfx-hello2d.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "tgfx-hello2d.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,7 +47,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F2F2CEFA2B0B51CD0092BD3B /* tgfx-drawers.a in Frameworks */,
+				F2F2CEFA2B0B51CD0092BD3B /* tgfx-hello2d.a in Frameworks */,
 				F2272B672AF87D96004DEF8D /* tgfx.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -94,7 +96,7 @@
 		E61EC82E2AF1FEAE00C82F9E /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				F2F2CEF92B0B51CD0092BD3B /* tgfx-drawers.a */,
+				F2F2CEF92B0B51CD0092BD3B /* tgfx-hello2d.a */,
 				F2272B662AF87D96004DEF8D /* tgfx.a */,
 			);
 			name = Frameworks;
@@ -103,6 +105,7 @@
 		F25AD06F2AF90ECD0017339D /* assets */ = {
 			isa = PBXGroup;
 			children = (
+				E1BF1B6F2E44A64000F99C5E /* tgfx.png */,
 				F25AD0702AF90ECD0017339D /* bridge.jpg */,
 			);
 			name = assets;
@@ -167,6 +170,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E61EC8252AF1FCB000C82F9E /* LaunchScreen.storyboard in Resources */,
+				E1BF1B702E44A64000F99C5E /* tgfx.png in Resources */,
 				E61EC8222AF1FCB000C82F9E /* Assets.xcassets in Resources */,
 				F25AD0712AF90ECD0017339D /* bridge.jpg in Resources */,
 				E61EC8202AF1FCAE00C82F9E /* Main.storyboard in Resources */,
@@ -365,7 +369,7 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 				USER_HEADER_SEARCH_PATHS = (
 					../include,
-					../drawers/include,
+					../hello2d/include,
 				);
 				USE_HEADERMAP = YES;
 			};
@@ -405,7 +409,7 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 				USER_HEADER_SEARCH_PATHS = (
 					../include,
-					../drawers/include,
+					../hello2d/include,
 				);
 				USE_HEADERMAP = YES;
 			};

@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CanvasState.h"
-#include "core/RecordingContext.h"
+#include "core/PictureContext.h"
 
 namespace tgfx {
 CanvasLayer::CanvasLayer(DrawContext* drawContext, const Paint* paint)
-    : drawContext(drawContext), layerContext(std::make_unique<RecordingContext>()) {
+    : drawContext(drawContext), layerContext(std::make_unique<PictureContext>()) {
   if (paint) {
     layerPaint = *paint;
     layerPaint.setShader(nullptr);

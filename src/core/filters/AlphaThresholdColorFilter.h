@@ -25,6 +25,11 @@ class AlphaThresholdColorFilter : public ColorFilter {
  public:
   explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold){};
 
+  bool affectsTransparentBlack() const override {
+    // GLSL step(threshold, 0) returns 1 when threshold <= 0, making transparent pixels opaque.
+    return threshold <= 0.0f;
+  }
+
   float threshold = 0.0f;
 
  protected:
@@ -35,6 +40,7 @@ class AlphaThresholdColorFilter : public ColorFilter {
   bool isEqual(const ColorFilter* colorFilter) const override;
 
  private:
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      Context* context, const std::shared_ptr<ColorSpace>& dstColorSpace) const override;
 };
 }  // namespace tgfx

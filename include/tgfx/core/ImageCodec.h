@@ -93,14 +93,15 @@ class ImageCodec : public ImageGenerator {
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const;
 
  protected:
-  ImageCodec(int width, int height, Orientation orientation = Orientation::TopLeft)
-      : ImageGenerator(width, height), _orientation(orientation) {
+  ImageCodec(int width, int height, Orientation orientation = Orientation::TopLeft,
+             std::shared_ptr<ColorSpace> colorSpace = nullptr)
+      : ImageGenerator(width, height, std::move(colorSpace)), _orientation(orientation) {
   }
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
   virtual bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                            void* dstPixels) const = 0;
+                            std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const = 0;
 
   virtual std::shared_ptr<Data> getEncodedData() const {
     return nullptr;

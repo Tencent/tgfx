@@ -19,13 +19,14 @@
 #pragma once
 
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/FillModifier.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
+
 /**
- * LayerContent represents the recorded contents of a layer, which can include default content,
- * foreground content, and the layer's contour. LayerContent is immutable and cannot be changed
- * after it is created.
+ * LayerContent is the base class for all drawable layer contents. It provides a unified interface
+ * for rendering geometries with their fill styles.
  */
 class LayerContent {
  public:
@@ -43,32 +44,63 @@ class LayerContent {
 
   /**
    * Checks if the layer content overlaps or intersects with the specified point (localX, localY).
-   * The localX and localY coordinates are in the layer's local coordinate space. If the
-   * shapeHitTest flag is true, it checks the actual shape of the layer content; otherwise, it
-   * checks the bounding box.
+   * The localX and localY coordinates are in the layer's local coordinate space. This method
+   * performs precise hit testing on the actual shape of the layer content.
    */
-  virtual bool hitTestPoint(float localX, float localY, bool shapeHitTest) const = 0;
+  virtual bool hitTestPoint(float localX, float localY) const = 0;
 
   /**
-   * Draws the default content of the layer to the specified canvas using the provided layer fill.
+   * Draws the contour of the content to the specified canvas.
    */
-  virtual void drawDefault(Canvas* canvas, const FillModifier* modifier) const = 0;
+  virtual void drawContour(Canvas* canvas, bool antiAlias) const = 0;
 
   /**
-   * Draws the foreground content of the layer to the specified canvas using the provided layer fill.
+   * Returns true if the contour drawing result equals the opaque content drawing result.
+   * This is true when the content is visible and has no non-opaque non-image shader.
    */
-  virtual void drawForeground(Canvas* canvas, const FillModifier* modifier) const = 0;
+  virtual bool contourEqualsOpaqueContent() const {
+    return false;
+  }
 
   /**
-    * Draws the contour content of the layer to the specified canvas using the provided layer fill.
-    */
-  virtual void drawContour(Canvas* canvas, const FillModifier* modifier) const = 0;
+   * Returns true if any part of the content uses a blend mode other than SrcOver.
+   */
+  virtual bool hasBlendMode() const {
+    return false;
+  }
+
+  /**
+   * Draws the default content of the layer (content below children) to the specified canvas.
+   * Returns true if the content has foreground graphics that should be drawn above children
+   * by calling drawForeground().
+   */
+  virtual bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const = 0;
+
+  /**
+   * Draws the foreground content of the layer (content above children) to the specified canvas.
+   * This method should only be called if drawDefault() returned true.
+   */
+  virtual void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const = 0;
 
  protected:
-  enum class Type { Default, Foreground, Contour };
+  enum class Type {
+    Rect,
+    RRect,
+    Path,
+    Shape,
+    Text,
+    Compose,
+    Rects,
+    RRects,
+    Matrix,
+  };
 
+  /**
+   * Returns the type of this content.
+   */
   virtual Type type() const = 0;
 
   friend class Types;
 };
+
 }  // namespace tgfx

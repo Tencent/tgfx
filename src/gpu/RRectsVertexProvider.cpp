@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectsVertexProvider.h"
+#include "core/utils/ColorHelper.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
@@ -52,8 +54,8 @@ namespace tgfx {
 // vertical line).
 
 PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
-    BlockBuffer* buffer, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
-    bool useScale, std::vector<PlacementPtr<Stroke>>&& strokes) {
+    BlockAllocator* allocator, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
+    std::vector<PlacementPtr<Stroke>>&& strokes, std::shared_ptr<ColorSpace> colorSpace) {
   if (rects.empty()) {
     return nullptr;
   }
@@ -67,75 +69,116 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
       }
     }
   }
-  auto array = buffer->makeArray(std::move(rects));
-  auto strokeArray = buffer->makeArray(std::move(strokes));
-  return buffer->make<RRectsVertexProvider>(std::move(array), aaType, useScale, hasColor,
-                                            std::move(strokeArray), buffer->addReference());
-}
-
-static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
-  auto bytes = reinterpret_cast<uint8_t*>(&vertices[index++]);
-  bytes[0] = static_cast<uint8_t>(color.red * 255);
-  bytes[1] = static_cast<uint8_t>(color.green * 255);
-  bytes[2] = static_cast<uint8_t>(color.blue * 255);
-  bytes[3] = static_cast<uint8_t>(color.alpha * 255);
+  auto array = allocator->makeArray(std::move(rects));
+  auto strokeArray = allocator->makeArray(std::move(strokes));
+  return allocator->make<RRectsVertexProvider>(std::move(array), aaType, hasColor,
+                                               std::move(strokeArray), allocator->addReference(),
+                                               std::move(colorSpace));
 }
 
 static float FloatInvert(float value) {
   return value == 0.0f ? 1e6f : 1 / value;
 }
 
-RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
-                                           bool useScale, bool hasColor,
-                                           PlacementArray<Stroke>&& strokes,
-                                           std::shared_ptr<BlockBuffer> reference)
-    : VertexProvider(std::move(reference)), rects(std::move(rects)), strokes(std::move(strokes)) {
-  bitFields.aaType = static_cast<uint8_t>(aaType);
-  bitFields.useScale = useScale;
-  bitFields.hasColor = hasColor;
+struct StrokeParams {
+  float halfStrokeX = 0.0f;
+  float halfStrokeY = 0.0f;
+};
 
-  if (!this->strokes.empty()) {
-    bitFields.hasStroke = true;
-  } else {
-    bitFields.hasStroke = false;
+static StrokeParams ApplyScales(RRect* rRect, Matrix* viewMatrix, const Point& scales,
+                                const Stroke* stroke) {
+  rRect->scale(scales.x, scales.y);
+  viewMatrix->preScale(1 / scales.x, 1 / scales.y);
+  StrokeParams params;
+  if (stroke) {
+    auto strokeWidth = stroke->width > 0.0f ? stroke->width : 1.0f / std::max(scales.x, scales.y);
+    params.halfStrokeX = 0.5f * scales.x * strokeWidth;
+    params.halfStrokeY = 0.5f * scales.y * strokeWidth;
+    if (viewMatrix->getScaleX() == 0.f) {
+      std::swap(rRect->radii.x, rRect->radii.y);
+      std::swap(params.halfStrokeX, params.halfStrokeY);
+    }
   }
+  return params;
+}
+
+RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
+                                           bool hasColor, PlacementArray<Stroke>&& strokes,
+                                           std::shared_ptr<BlockAllocator> reference,
+                                           std::shared_ptr<ColorSpace> colorSpace)
+    : VertexProvider(std::move(reference)), rects(std::move(rects)), strokes(std::move(strokes)),
+      _dstColorSpace(std::move(colorSpace)) {
+  bitFields.aaType = static_cast<uint8_t>(aaType);
+  bitFields.hasColor = hasColor;
+  bitFields.hasStroke = !this->strokes.empty();
 }
 
 size_t RRectsVertexProvider::vertexCount() const {
-  auto floatCount = rects.size() * 4 * 36;
-  if (bitFields.useScale) {
+  if (aaType() == AAType::None) {
+    // Non-AA mode: 4 vertices per RRect
+    // Each vertex has: position (2), localCoord (2), radii (2), rectBounds (4)
+    // Optional: color (1), strokeWidth (2) for stroke mode
+    size_t floatsPerVertex = 10;
+    if (bitFields.hasStroke) {
+      floatsPerVertex += 2;
+    }
+    if (bitFields.hasColor) {
+      floatsPerVertex += 1;
+    }
+    return rects.size() * 4 * floatsPerVertex;
+  }
+  // AA mode: 16 vertices per RRect (4x4 grid)
+  auto floatCount = rects.size() * 4 * 32;
+  if (bitFields.hasColor) {
     floatCount += rects.size() * 4 * 4;
   }
   return floatCount;
 }
 
 void RRectsVertexProvider::getVertices(float* vertices) const {
-  auto index = 0;
-  auto aaType = static_cast<AAType>(bitFields.aaType);
+  if (aaType() == AAType::None) {
+    getNonAAVertices(vertices);
+  } else {
+    getAAVertices(vertices);
+  }
+}
+
+void RRectsVertexProvider::getAAVertices(float* vertices) const {
+  size_t index = 0;
+  auto currentAAType = aaType();
   size_t currentIndex = 0;
+  std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+  if (bitFields.hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+    steps =
+        std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                               _dstColorSpace.get(), AlphaType::Premultiplied);
+  }
   for (auto& record : rects) {
     auto viewMatrix = record->viewMatrix;
     auto rRect = record->rRect;
-    auto& color = record->color;
     auto scales = viewMatrix.getAxisScales();
-    rRect.scale(scales.x, scales.y);
-    viewMatrix.preScale(1 / scales.x, 1 / scales.y);
+    float compressedColor = 0.f;
+    if (bitFields.hasColor) {
+      uint32_t uintColor = ToUintPMColor(record->color, steps.get());
+      compressedColor = *reinterpret_cast<float*>(&uintColor);
+    }
+
+    auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
+    auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
 
     bool stroked = false;
-    auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
     float xRadius = rRect.radii.x;
     float yRadius = rRect.radii.y;
     float innerXRadius = 0;
     float innerYRadius = 0;
     auto rectBounds = rRect.rect;
-    if (stroke && stroke->width > 0.0f) {
-      float halfStrokeWidth = stroke->width / 2;
-      innerXRadius = rRect.radii.x - halfStrokeWidth;
-      innerYRadius = rRect.radii.y - halfStrokeWidth;
-      stroked = innerXRadius > 0 && innerYRadius > 0;
-      xRadius += halfStrokeWidth;
-      yRadius += halfStrokeWidth;
-      rectBounds.outset(halfStrokeWidth, halfStrokeWidth);
+    if (stroke) {
+      innerXRadius = xRadius - strokeParams.halfStrokeX;
+      innerYRadius = yRadius - strokeParams.halfStrokeY;
+      stroked = innerXRadius > 0.0f && innerYRadius > 0.0f;
+      xRadius += strokeParams.halfStrokeX;
+      yRadius += strokeParams.halfStrokeY;
+      rectBounds.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
     }
 
     float reciprocalRadii[4] = {FloatInvert(xRadius), FloatInvert(yRadius),
@@ -146,7 +189,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
     reciprocalRadii[3] = std::min(reciprocalRadii[3], 1e6f);
     // On MSAA, bloat enough to guarantee any pixel that might be touched by the rRect has
     // full sample coverage.
-    float aaBloat = aaType == AAType::MSAA ? FLOAT_SQRT2 : .5f;
+    float aaBloat = currentAAType == AAType::MSAA ? FLOAT_SQRT2 : .5f;
     // Extend out the radii to antialias.
     float xOuterRadius = xRadius + aaBloat;
     float yOuterRadius = yRadius + aaBloat;
@@ -159,27 +202,23 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       xMaxOffset /= xRadius;
       yMaxOffset /= yRadius;
     }
-    auto bounds = rRect.rect.makeOutset(aaBloat, aaBloat);
+    auto bounds = rectBounds.makeOutset(aaBloat, aaBloat);
     float yCoords[4] = {bounds.top, bounds.top + yOuterRadius, bounds.bottom - yOuterRadius,
                         bounds.bottom};
     float yOuterOffsets[4] = {
         yMaxOffset,
         FLOAT_NEARLY_ZERO,  // we're using inversesqrt() in shader, so can't be exactly 0
         FLOAT_NEARLY_ZERO, yMaxOffset};
-    auto maxRadius = std::max(xRadius, yRadius);
     for (int i = 0; i < 4; ++i) {
       auto point = Point::Make(bounds.left, yCoords[i]);
       viewMatrix.mapPoints(&point, 1);
       vertices[index++] = point.x;
       vertices[index++] = point.y;
       if (bitFields.hasColor) {
-        WriteUByte4Color(vertices, index, color);
+        vertices[index++] = compressedColor;
       }
       vertices[index++] = xMaxOffset;
       vertices[index++] = yOuterOffsets[i];
-      if (bitFields.useScale) {
-        vertices[index++] = maxRadius;
-      }
       vertices[index++] = reciprocalRadii[0];
       vertices[index++] = reciprocalRadii[1];
       vertices[index++] = reciprocalRadii[2];
@@ -190,13 +229,10 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       vertices[index++] = point.x;
       vertices[index++] = point.y;
       if (bitFields.hasColor) {
-        WriteUByte4Color(vertices, index, color);
+        vertices[index++] = compressedColor;
       }
       vertices[index++] = FLOAT_NEARLY_ZERO;
       vertices[index++] = yOuterOffsets[i];
-      if (bitFields.useScale) {
-        vertices[index++] = maxRadius;
-      }
       vertices[index++] = reciprocalRadii[0];
       vertices[index++] = reciprocalRadii[1];
       vertices[index++] = reciprocalRadii[2];
@@ -207,13 +243,10 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       vertices[index++] = point.x;
       vertices[index++] = point.y;
       if (bitFields.hasColor) {
-        WriteUByte4Color(vertices, index, color);
+        vertices[index++] = compressedColor;
       }
       vertices[index++] = FLOAT_NEARLY_ZERO;
       vertices[index++] = yOuterOffsets[i];
-      if (bitFields.useScale) {
-        vertices[index++] = maxRadius;
-      }
       vertices[index++] = reciprocalRadii[0];
       vertices[index++] = reciprocalRadii[1];
       vertices[index++] = reciprocalRadii[2];
@@ -224,17 +257,96 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       vertices[index++] = point.x;
       vertices[index++] = point.y;
       if (bitFields.hasColor) {
-        WriteUByte4Color(vertices, index, color);
+        vertices[index++] = compressedColor;
       }
       vertices[index++] = xMaxOffset;
       vertices[index++] = yOuterOffsets[i];
-      if (bitFields.useScale) {
-        vertices[index++] = maxRadius;
-      }
       vertices[index++] = reciprocalRadii[0];
       vertices[index++] = reciprocalRadii[1];
       vertices[index++] = reciprocalRadii[2];
       vertices[index++] = reciprocalRadii[3];
+    }
+    currentIndex++;
+  }
+}
+
+void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
+  size_t index = 0;
+  std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+  if (bitFields.hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+    steps =
+        std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                               _dstColorSpace.get(), AlphaType::Premultiplied);
+  }
+
+  size_t currentIndex = 0;
+  for (auto& record : rects) {
+    auto viewMatrix = record->viewMatrix;
+    auto rRect = record->rRect;
+    float compressedColor = 0.f;
+    if (bitFields.hasColor) {
+      uint32_t uintColor = ToUintPMColor(record->color, steps.get());
+      compressedColor = *reinterpret_cast<float*>(&uintColor);
+    }
+
+    auto scales = viewMatrix.getAxisScales();
+    auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
+    auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
+
+    auto rect = rRect.rect;
+    float xRadii = rRect.radii.x;
+    float yRadii = rRect.radii.y;
+
+    if (stroke) {
+      rect.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
+      xRadii += strokeParams.halfStrokeX;
+      yRadii += strokeParams.halfStrokeY;
+    }
+
+    // Corner positions for a quad: TL, TR, BR, BL
+    const Point corners[] = {
+        {rect.left, rect.top},
+        {rect.right, rect.top},
+        {rect.right, rect.bottom},
+        {rect.left, rect.bottom},
+    };
+
+    // Write 4 vertices for the quad
+    for (int v = 0; v < 4; ++v) {
+      float localX = corners[v].x;
+      float localY = corners[v].y;
+
+      auto point = Point::Make(localX, localY);
+      viewMatrix.mapPoints(&point, 1);
+
+      // position (2 floats)
+      vertices[index++] = point.x;
+      vertices[index++] = point.y;
+
+      // localCoord (2 floats) - coordinates within the rect for shape evaluation
+      vertices[index++] = localX;
+      vertices[index++] = localY;
+
+      // radii (2 floats) - outer radii
+      vertices[index++] = xRadii;
+      vertices[index++] = yRadii;
+
+      // rectBounds (4 floats) - outer bounds
+      vertices[index++] = rect.left;
+      vertices[index++] = rect.top;
+      vertices[index++] = rect.right;
+      vertices[index++] = rect.bottom;
+
+      // Optional color
+      if (bitFields.hasColor) {
+        vertices[index++] = compressedColor;
+      }
+
+      // strokeWidth (2 floats) - only for stroke mode
+      if (bitFields.hasStroke) {
+        vertices[index++] = strokeParams.halfStrokeX;
+        vertices[index++] = strokeParams.halfStrokeY;
+      }
     }
     currentIndex++;
   }

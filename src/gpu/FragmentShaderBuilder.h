@@ -19,9 +19,12 @@
 #pragma once
 
 #include "ShaderBuilder.h"
+#include "ShaderVar.h"
 
 namespace tgfx {
 class FragmentProcessor;
+
+static constexpr char CUSTOM_COLOR_OUTPUT_NAME[] = "tgfx_FragColor";
 
 class FragmentShaderBuilder : public ShaderBuilder {
  public:
@@ -33,18 +36,25 @@ class FragmentShaderBuilder : public ShaderBuilder {
 
   virtual std::string dstColor() = 0;
 
-  void onBeforeChildProcEmitCode(const FragmentProcessor* child);
+  void onBeforeChildProcEmitCode(const FragmentProcessor* child) const;
 
-  void onAfterChildProcEmitCode();
+  void onAfterChildProcEmitCode() const;
 
   void declareCustomOutputColor();
 
+  /**
+   * Emits perspective division code for a texture coordinate variable if needed, and returns the
+   * resulting 2D coordinate variable name.
+   * If coordVar is Float3, generates "highp vec2 perspCoord2D = {coord}.xy / {coord}.z;" and
+   * returns "perspCoord2D". If coordVar is Float2, returns the original variable name without
+   * generating any code.
+   * @param coordVar The input coordinate variable (Float2 or Float3)
+   * @return The name of the 2D coordinate variable to use for texture sampling
+   */
+  std::string emitPerspTextCoord(const ShaderVar& coordVar);
+
  protected:
   virtual std::string colorOutputName() = 0;
-
-  static std::string CustomColorOutputName() {
-    return "tgfx_FragColor";
-  }
 
   friend class ProgramBuilder;
 };

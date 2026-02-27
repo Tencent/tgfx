@@ -27,17 +27,20 @@ class WebGLWindow : public Window {
   /**
    * Creates a new window from a canvas.
    */
-  static std::shared_ptr<WebGLWindow> MakeFrom(const std::string& canvasID);
+  static std::shared_ptr<WebGLWindow> MakeFrom(const std::string& canvasID,
+                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
 
-  void onPresent(Context*, int64_t) override {
+  void onPresent(Context*) override {
   }
 
  private:
   std::string canvasID;
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
-  explicit WebGLWindow(std::shared_ptr<Device> device);
+  explicit WebGLWindow(std::shared_ptr<Device> device,
+                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
 };
 }  // namespace tgfx

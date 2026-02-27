@@ -24,10 +24,12 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "core/ColorSpaceXformSteps.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "svg/SVGUtils.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/UTF.h"
 #include "tgfx/svg/SVGTypes.h"
@@ -65,7 +67,7 @@ SVGAttributeParser::SVGAttributeParser(const char* str, size_t length)
 
 template <typename F>
 inline bool SVGAttributeParser::advanceWhile(F f) {
-  const auto* initial = currentPos;
+  const auto initial = currentPos;
   while (currentPos < endPos && f(*currentPos)) {
     currentPos++;
   }
@@ -388,9 +390,75 @@ bool SVGAttributeParser::parseRGBAColorToken(Color* c) {
       c);
 }
 
+// https://www.w3.org/TR/css-color-4/#color-function
+// Parses color(<colorspace> r g b [ / alpha ]?) format.
+// Supported colorspaces: display-p3, a98-rgb, rec2020
+// Color components can be numbers (0-1) or percentages (0%-100%).
+// Colors are converted to sRGB for storage.
+bool SVGAttributeParser::parseColorFunctionToken(Color* c) {
+  return this->parseParenthesized(
+      "color",
+      [this](Color* c) -> bool {
+        std::shared_ptr<ColorSpace> srcColorSpace = nullptr;
+        if (this->parseExpectedStringToken("display-p3")) {
+          srcColorSpace = ColorSpace::DisplayP3();
+        } else if (this->parseExpectedStringToken("a98-rgb")) {
+          srcColorSpace = ColorSpace::MakeRGB(NamedTransferFunction::A98RGB, NamedGamut::AdobeRGB);
+        } else if (this->parseExpectedStringToken("rec2020")) {
+          srcColorSpace = ColorSpace::MakeRGB(NamedTransferFunction::Rec2020, NamedGamut::Rec2020);
+        } else {
+          return false;
+        }
+
+        auto parseComponent = [this](float* value) -> bool {
+          float s = 0.0f;
+          if (!this->parseScalarToken(&s)) {
+            return false;
+          }
+          if (this->parseExpectedStringToken("%")) {
+            s /= 100.0f;
+          }
+          *value = s;
+          return true;
+        };
+
+        this->parseWSToken();
+        float r = 0.0f;
+        float g = 0.0f;
+        float b = 0.0f;
+        float a = 1.0f;
+        if (!parseComponent(&r)) {
+          return false;
+        }
+        this->parseWSToken();
+        if (!parseComponent(&g)) {
+          return false;
+        }
+        this->parseWSToken();
+        if (!parseComponent(&b)) {
+          return false;
+        }
+        this->parseWSToken();
+        if (this->parseExpectedStringToken("/")) {
+          this->parseWSToken();
+          if (!parseComponent(&a)) {
+            return false;
+          }
+        }
+        float rgba[4] = {r, g, b, a};
+        ColorSpaceXformSteps steps(srcColorSpace.get(), AlphaType::Unpremultiplied,
+                                   ColorSpace::SRGB().get(), AlphaType::Unpremultiplied);
+        steps.apply(rgba);
+        *c = Color{rgba[0], rgba[1], rgba[2], rgba[3]};
+        return true;
+      },
+      c);
+}
+
 bool SVGAttributeParser::parseColorToken(Color* c) {
   return this->parseHexColorToken(c) || this->parseNamedColorToken(c) ||
-         this->parseRGBAColorToken(c) || this->parseRGBColorToken(c);
+         this->parseRGBAColorToken(c) || this->parseRGBColorToken(c) ||
+         this->parseColorFunctionToken(c);
 }
 
 bool SVGAttributeParser::parseSVGColorType(SVGColorType* color) {
@@ -481,7 +549,7 @@ bool SVGAttributeParser::parse(SVGIRI* iri) {
     iriType = SVGIRI::Type::Nonlocal;
   }
 
-  const auto* start = currentPos;
+  const auto start = currentPos;
   if (!this->advanceWhile([](char c) -> bool { return c != ')'; })) {
     return false;
   }
@@ -1004,7 +1072,7 @@ bool SVGAttributeParser::parse(SVGFontFamily* family) {
   } else {
     // The spec allows specifying a comma-separated list for explicit fallback order.
     // For now, we only use the first entry and rely on the font manager to handle fallback.
-    const auto* comma = strchr(currentPos, ',');
+    const auto comma = strchr(currentPos, ',');
     auto family_name = comma ? std::string(currentPos, static_cast<uint32_t>(comma - currentPos))
                              : std::string(currentPos);
     *family = SVGFontFamily(family_name);

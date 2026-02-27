@@ -143,6 +143,7 @@ class SVGAttributeParser {
   bool parseColorToken(Color*);
   bool parseRGBColorToken(Color*);
   bool parseRGBAColorToken(Color*);
+  bool parseColorFunctionToken(Color*);
   bool parseSVGColor(SVGColor*, SVGColor::Vars&&);
   bool parseSVGColorType(SVGColorType*);
   bool parseFuncIRI(SVGFuncIRI*);

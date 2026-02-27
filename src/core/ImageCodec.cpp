@@ -155,7 +155,8 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     return false;
   }
   if (dstInfo.width() == width() && dstInfo.height() == height()) {
-    return onReadPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels);
+    return onReadPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(),
+                        dstInfo.colorSpace(), dstPixels);
   }
 
   Buffer buffer = {};
@@ -173,7 +174,7 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     if (dstRowBytes % 16) {
       dstRowBytes = dstImageInfo.rowBytes() + GetPaddingAlignment16(dstImageInfo.rowBytes());
       dstImageInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), colorType,
-                                     dstInfo.alphaType(), dstRowBytes);
+                                     dstInfo.alphaType(), dstRowBytes, dstInfo.colorSpace());
     }
     if (!dstTempBuffer.alloc(dstImageInfo.byteSize())) {
       return false;
@@ -184,7 +185,8 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (!buffer.alloc(srcRowBytes * static_cast<size_t>(height()))) {
     return false;
   }
-  auto result = onReadPixels(colorType, dstInfo.alphaType(), srcRowBytes, buffer.data());
+  auto result = onReadPixels(colorType, dstInfo.alphaType(), srcRowBytes, dstInfo.colorSpace(),
+                             buffer.data());
   if (!result) {
     return false;
   }
@@ -201,7 +203,7 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 }
 
 std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware) const {
-  auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware);
+  auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware, colorSpace());
   if (pixelBuffer == nullptr) {
     return nullptr;
   }

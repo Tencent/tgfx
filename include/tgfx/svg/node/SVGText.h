@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <vector>
 #include "tgfx/core/Path.h"
@@ -66,6 +67,7 @@ class SVGTextContainer : public SVGTextFragment {
   SVG_ATTR(Rotate, std::vector<SVGNumberType>, {})
 
   void appendChild(std::shared_ptr<SVGNode> child) final;
+  const std::vector<std::shared_ptr<SVGTextFragment>>& getTextChildren() const;
 
  protected:
   explicit SVGTextContainer(SVGTag t) : INHERITED(t) {

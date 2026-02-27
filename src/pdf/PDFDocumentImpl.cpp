@@ -131,10 +131,10 @@ PDFIndirectReference generate_page_tree(PDFDocumentImpl* doc,
 
     static std::vector<PageTreeNode> Layer(std::vector<PageTreeNode> vec, PDFDocumentImpl* doc) {
       std::vector<PageTreeNode> result;
-      static constexpr size_t kMaxNodeSize = 8;
+      static constexpr size_t MAX_NODE_SIZE = 8;
       const size_t n = vec.size();
       DEBUG_ASSERT(n >= 1);
-      const size_t result_len = ((n - 1) / kMaxNodeSize) + 1;
+      const size_t result_len = ((n - 1) / MAX_NODE_SIZE) + 1;
       DEBUG_ASSERT(result_len >= 1);
       DEBUG_ASSERT((n == 1 || result_len < n));
       result.reserve(result_len);
@@ -147,7 +147,7 @@ PDFIndirectReference generate_page_tree(PDFDocumentImpl* doc,
         PDFIndirectReference parent = doc->reserveRef();
         auto kids_list = MakePDFArray();
         int descendantCount = 0;
-        for (size_t j = 0; j < kMaxNodeSize && index < n; ++j) {
+        for (size_t j = 0; j < MAX_NODE_SIZE && index < n; ++j) {
           PageTreeNode& node = vec[index++];
           node.fNode->insertRef("Parent", parent);
           kids_list->appendRef(doc->emit(*node.fNode, node.fReservedRef));
@@ -296,7 +296,7 @@ Canvas* PDFDocumentImpl::beginPage(float pageWidth, float pageHeight, const Rect
   if (state == State::InPage) {
     endPage();
   }
-  auto* canvas = onBeginPage(pageWidth, pageHeight);
+  auto canvas = onBeginPage(pageWidth, pageHeight);
   state = State::InPage;
   if (canvas && contentRect) {
     Rect rect = *contentRect;
@@ -343,8 +343,10 @@ Canvas* PDFDocumentImpl::onBeginPage(float width, float height) {
   if (pages.empty()) {
     // if this is the first page if the document.
     SerializeHeader(&offsetMap, _stream);
-
     infoDictionary = this->emit(*PDFMetadataUtils::MakeDocumentInformationDict(_metadata));
+    if (_metadata.targetColorSpace != nullptr || _metadata.assignColorSpace != nullptr) {
+      _colorSpaceRef = emitColorSpace();
+    }
     if (_metadata.PDFA) {
       documentUUID = PDFMetadataUtils::CreateUUID(_metadata);
       // We use the same UUID for Document ID and Instance ID since this
@@ -381,6 +383,11 @@ void PDFDocumentImpl::onEndPage() {
   auto pageContent = drawContext->getContent();
 
   auto resourceDict = drawContext->makeResourceDict();
+  if (_colorSpaceRef) {
+    auto colorSpaceDic = PDFDictionary::Make();
+    colorSpaceDic->insertRef("CS", _colorSpaceRef);
+    resourceDict->insertObject("ColorSpace", std::move(colorSpaceDic));
+  }
   DEBUG_ASSERT(!pageRefs.empty());
 
   page->insertObject("Resources", std::move(resourceDict));
@@ -450,7 +457,7 @@ void PDFDocumentImpl::onClose() {
 
   auto docCatalogRef = this->emit(*docCatalog);
 
-  for (const auto* f : get_fonts(*this)) {
+  for (const auto f : get_fonts(*this)) {
     f->emitSubset(this);
   }
   serialize_footer(offsetMap, _stream, infoDictionary, docCatalogRef, documentUUID);
@@ -489,6 +496,22 @@ std::shared_ptr<WriteStream> PDFDocumentImpl::beginObject(PDFIndirectReference r
 
 void PDFDocumentImpl::endObject() {
   end_indirect_object(_stream);
+}
+
+PDFIndirectReference PDFDocumentImpl::emitColorSpace() {
+  DEBUG_ASSERT(_metadata.targetColorSpace != nullptr || _metadata.assignColorSpace != nullptr);
+  auto writeColorSpace =
+      _metadata.assignColorSpace ? _metadata.assignColorSpace : _metadata.targetColorSpace;
+  auto colorSpaceDictionary = PDFDictionary::Make();
+  colorSpaceDictionary->insertInt("N", 3);
+  colorSpaceDictionary->insertName("Alternate", "DeviceRGB");
+  auto iccProfile = writeColorSpace->toICCProfile();
+  auto stream = Stream::MakeFromData(iccProfile);
+  auto ref = PDFStreamOut(std::move(colorSpaceDictionary), std::move(stream), this);
+  PDFArray array{};
+  array.appendName("ICCBased");
+  array.appendRef(ref);
+  return this->emit(array);
 }
 
 PDFIndirectReference PDFDocumentImpl::getPage(size_t pageIndex) const {

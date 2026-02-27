@@ -25,7 +25,8 @@
 namespace tgfx {
 class TiledTextureEffect : public FragmentProcessor {
  public:
-  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> textureProxy,
+  static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
+                                              std::shared_ptr<TextureProxy> textureProxy,
                                               const SamplingArgs& args,
                                               const Matrix* uvMatrix = nullptr,
                                               bool forceAsMask = false);
@@ -67,13 +68,13 @@ class TiledTextureEffect : public FragmentProcessor {
 
   size_t onCountTextureSamplers() const override;
 
-  GPUTexture* onTextureAt(size_t) const override;
+  std::shared_ptr<Texture> onTextureAt(size_t) const override;
 
   SamplerState onSamplerStateAt(size_t) const override;
 
   const TextureView* getTextureView() const;
 
-  static ShaderMode GetShaderMode(SamplerState::WrapMode mode, FilterMode filter, MipmapMode mm);
+  static ShaderMode GetShaderMode(TileMode tileMode, FilterMode filter, MipmapMode mipmapMode);
 
   std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;

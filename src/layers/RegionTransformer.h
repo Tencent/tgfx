@@ -18,11 +18,15 @@
 
 #pragma once
 
+#include <memory>
+#include <optional>
+#include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
+
 /**
  * The RegionTransformer class is used to transform a rectangle region.
  */
@@ -48,6 +52,23 @@ class RegionTransformer {
       const std::vector<std::shared_ptr<LayerStyle>>& styles, float contentScale,
       std::shared_ptr<RegionTransformer> outer = nullptr);
 
+  /**
+   * Creates a RegionTransformer that applies the given matrix transformation to the given rectangle.
+   */
+  static std::shared_ptr<RegionTransformer> MakeFromMatrix(
+      const Matrix& matrix, std::shared_ptr<RegionTransformer> outer = nullptr);
+
+  /**
+   * Creates a RegionTransformer that applies the given 3D matrix transformation to the given
+   * rectangle.
+   * @param matrix The 3D transformation matrix to apply.
+   * @param outer The outer RegionTransformer to chain with.
+   * @param canCombine Whether this transformer can combine with outer Matrix3D transformers.
+   */
+  static std::shared_ptr<RegionTransformer> MakeFromMatrix3D(
+      const Matrix3D& matrix, std::shared_ptr<RegionTransformer> outer = nullptr,
+      bool canCombine = false);
+
   explicit RegionTransformer(std::shared_ptr<RegionTransformer> outer);
 
   virtual ~RegionTransformer() = default;
@@ -57,12 +78,30 @@ class RegionTransformer {
    */
   void transform(Rect* bounds) const;
 
+  float getMaxScale() const;
+
+  /**
+   * Returns the accumulated matrix from consecutive Matrix3DRegionTransformers.
+   * Returns nullopt if this transformer is not a Matrix3DRegionTransformer.
+   */
+  std::optional<Matrix3D> getConsecutiveMatrix3D() const;
+
  protected:
   virtual void onTransform(Rect* bounds) const = 0;
 
   virtual bool isClip() const {
     return false;
   }
+
+  virtual bool isMatrix() const {
+    return false;
+  }
+
+  virtual bool isMatrix3D() const {
+    return false;
+  }
+
+  void getTotalMatrix(Matrix* matrix) const;
 
  private:
   std::shared_ptr<RegionTransformer> outer = nullptr;

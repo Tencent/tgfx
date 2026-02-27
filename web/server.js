@@ -11,6 +11,7 @@ app.use((req, res, next) => {
 
 app.use('', express.static(path.join('../')));
 app.use('', express.static(path.join('demo/')));
+app.use('/resources', express.static(path.join('../resources')));
 
 app.get('/', (req, res) => {
   res.send('Hello, tgfx!');
@@ -20,8 +21,6 @@ const port = 8081;
 const args = process.argv.slice(2);
 var fileName = args.includes('wasm-mt') ? 'index': 'index-st';
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-
   var url = `http://localhost:${port}/${fileName}.html`;
   var start = (process.platform == 'darwin'? 'open': 'start');
   require('child_process').exec(start + ' ' + url);

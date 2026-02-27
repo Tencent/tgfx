@@ -34,15 +34,15 @@ class SVGFeMorphology : public SVGFe {
   };
 
   enum class Operator {
-    kErode,
-    kDilate,
+    Erode,
+    Dilate,
   };
 
   static std::shared_ptr<SVGFeMorphology> Make() {
     return std::shared_ptr<SVGFeMorphology>(new SVGFeMorphology());
   }
 
-  SVG_ATTR(MorphOperator, Operator, Operator::kErode)
+  SVG_ATTR(MorphOperator, Operator, Operator::Erode)
   SVG_ATTR(MorphRadius, Radius, Radius({0, 0}))
 
  protected:

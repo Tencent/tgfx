@@ -15,15 +15,15 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include <tgfx/core/DataView.h>
-#include <tgfx/core/Stream.h>
-#include <tgfx/core/UTF.h>
 #include <cstring>
 #include <filesystem>
 #include <sstream>
 #include "base/TGFXTest.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/DataView.h"
+#include "tgfx/core/Stream.h"
+#include "tgfx/core/UTF.h"
 #include "tgfx/core/WriteStream.h"
 #include "utils/TestUtils.h"
 

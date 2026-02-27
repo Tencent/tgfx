@@ -18,29 +18,31 @@
 
 #pragma once
 
-#include "gpu/CommandQueue.h"
-#include "gpu/opengl/GLInterface.h"
+#include "tgfx/gpu/CommandQueue.h"
 
 namespace tgfx {
+class GLGPU;
+
 class GLCommandQueue : public CommandQueue {
  public:
-  explicit GLCommandQueue(std::shared_ptr<GLInterface> interface)
-      : interface(std::move(interface)) {
+  explicit GLCommandQueue(GLGPU* gpu) : gpu(gpu) {
   }
 
-  bool writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const void* data, size_t size) override;
+  void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
+                   size_t size) override;
 
-  void writeTexture(GPUTexture* texture, const Rect& rect, const void* pixels,
+  void writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, const void* pixels,
                     size_t rowBytes) override;
 
-  bool readTexture(GPUTexture* texture, const Rect& rect, void* pixels,
-                   size_t rowBytes) const override;
-
   void submit(std::shared_ptr<CommandBuffer>) override;
+
+  std::shared_ptr<Semaphore> insertSemaphore() override;
+
+  void waitSemaphore(std::shared_ptr<Semaphore> semaphore) override;
 
   void waitUntilCompleted() override;
 
  private:
-  std::shared_ptr<GLInterface> interface = nullptr;
+  GLGPU* gpu = nullptr;
 };
 }  // namespace tgfx

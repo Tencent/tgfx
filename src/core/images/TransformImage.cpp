@@ -38,10 +38,9 @@ std::shared_ptr<TextureProxy> TransformImage::lockTextureProxySubset(
     rect.scale(args.drawScale, args.drawScale);
   }
   rect.round();
-  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
-  auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()),
-      alphaRenderable && isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+  auto renderTarget = RenderTargetProxy::Make(
+      args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()), isAlphaOnly(),
+      1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }

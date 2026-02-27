@@ -31,13 +31,13 @@ std::shared_ptr<Shape> Shape::ApplyEffect(std::shared_ptr<Shape> shape,
   return std::make_shared<EffectShape>(std::move(shape), std::move(effect));
 }
 
-Rect EffectShape::getBounds() const {
-  auto bounds = shape->getBounds();
+Rect EffectShape::onGetBounds() const {
+  auto bounds = shape->onGetBounds();
   return effect->filterBounds(bounds);
 }
 
-Path EffectShape::getPath() const {
-  auto path = shape->getPath();
+Path EffectShape::onGetPath(float resolutionScale) const {
+  auto path = shape->onGetPath(resolutionScale);
   effect->filterPath(&path);
   return path;
 }

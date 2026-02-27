@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,9 +18,10 @@
 
 #include <filesystem>
 #include <fstream>
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/layers/DisplayList.h"
 #include "tgfx/platform/Print.h"
 
 static std::string GetRootPath() {
@@ -40,9 +41,11 @@ static void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& output
 
 int main() {
   auto rootPath = GetRootPath();
-  drawers::AppHost appHost(720, 720, 2.0f);
+  hello2d::AppHost appHost;
   auto image = tgfx::Image::MakeFromFile(rootPath + "resources/assets/bridge.jpg");
   appHost.addImage("bridge", std::move(image));
+  auto image2 = tgfx::Image::MakeFromFile(rootPath + "resources/assets/tgfx.png");
+  appHost.addImage("TGFX", std::move(image2));
   auto typeface = tgfx::Typeface::MakeFromPath(rootPath + "resources/font/NotoSansSC-Regular.otf");
   appHost.addTypeface("default", std::move(typeface));
   typeface = tgfx::Typeface::MakeFromPath(rootPath + "resources/font/NotoColorEmoji.ttf");
@@ -58,13 +61,43 @@ int main() {
     tgfx::PrintError("Failed to lock the Context!");
     return -1;
   }
-  auto surface = tgfx::Surface::Make(context, appHost.width(), appHost.height());
+  auto surfaceWidth = 720;
+  auto surfaceHeight = 720;
+  auto surface = tgfx::Surface::Make(context, surfaceWidth, surfaceHeight);
   auto canvas = surface->getCanvas();
-  auto drawerNames = drawers::Drawer::Names();
-  for (auto& name : drawerNames) {
-    auto drawer = drawers::Drawer::GetByName(name);
+
+  tgfx::DisplayList displayList;
+  displayList.setRenderMode(tgfx::RenderMode::Direct);
+
+  // Calculate zoom and offset to fit 720x720 design size to window
+  static constexpr float DESIGN_SIZE = 720.0f;
+  auto scaleX = static_cast<float>(surfaceWidth) / DESIGN_SIZE;
+  auto scaleY = static_cast<float>(surfaceHeight) / DESIGN_SIZE;
+  auto scale = std::min(scaleX, scaleY);
+  auto scaledSize = DESIGN_SIZE * scale;
+  auto offsetX = (static_cast<float>(surfaceWidth) - scaledSize) * 0.5f;
+  auto offsetY = (static_cast<float>(surfaceHeight) - scaledSize) * 0.5f;
+
+  displayList.setZoomScale(scale);
+  displayList.setContentOffset(offsetX, offsetY);
+
+  auto& builderNames = hello2d::LayerBuilder::Names();
+  auto index = 0;
+
+  for (auto& name : builderNames) {
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      auto layer = builder->buildLayerTree(&appHost);
+      if (layer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(layer);
+      }
+    }
+
     canvas->clear();
-    drawer->draw(canvas, &appHost);
+    hello2d::DrawBackground(canvas, surfaceWidth, surfaceHeight, 2.0f);
+    displayList.render(surface.get(), false);
+
     tgfx::Bitmap bitmap = {};
     bitmap.allocPixels(surface->width(), surface->height());
     auto pixels = bitmap.lockPixels();
@@ -80,6 +113,7 @@ int main() {
       return -1;
     }
     SaveFile(data, "out/" + name + ".png");
+    index++;
   }
   device->unlock();
   tgfx::PrintLog("All images have been saved to the 'out/' directory");

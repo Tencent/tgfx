@@ -39,6 +39,10 @@ class BufferImage : public PixelImage {
     return imageBuffer->isAlphaOnly();
   }
 
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return imageBuffer->colorSpace();
+  }
+
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
 
  protected:

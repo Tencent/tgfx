@@ -1,4 +1,9 @@
 #!/bin/sh
+
+# Update local baseline cache from remote changes.
+# Run this after pulling main branch that contains baseline changes from others.
+# Without updating the cache, affected tests will be skipped, leading to inaccurate results.
+
 {
   CACHE_VERSION_FILE=./test/baseline/.cache/version.json
   if [ -f "$CACHE_VERSION_FILE" ]; then
@@ -11,44 +16,26 @@
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
   CURRENT_COMMIT=$(git rev-parse HEAD)
   STASH_LIST_BEFORE=$(git stash list)
-  git stash push --quiet
+  git stash push --include-untracked --quiet
   STASH_LIST_AFTER=$(git stash list)
   git switch main --quiet
 
   ./install_tools.sh
   depsync
 
-  if [[ $1 == "1" ]]; then
-    BUILD_DIR=build
-  else
-    BUILD_DIR=cmake-build-debug
-  fi
+  BUILD_DIR=build
 
-  if [ ! -d "./${BUILD_DIR}" ]; then
-    mkdir ${BUILD_DIR}
-  fi
+  rm -rf ${BUILD_DIR}
+  mkdir ${BUILD_DIR}
   cd ${BUILD_DIR}
 
-  if [ -f "./CMakeCache.txt" ]; then
-    TEXT=$(cat ./CMakeCache.txt)
-    TEXT=${TEXT#*CMAKE_COMMAND:INTERNAL=}
-    for line in ${TEXT}; do
-      CMAKE_COMMAND=$line
-      break
-    done
-  fi
-  if [ ! -f "$CMAKE_COMMAND" ]; then
-    CMAKE_COMMAND="cmake"
-  fi
-  echo $CMAKE_COMMAND
-
-  if [[ $1 == "1" ]]; then
-    $CMAKE_COMMAND -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_USE_SWIFTSHADER=ON -DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ../
+  if [[ "$1" == "USE_SWIFTSHADER" ]]; then
+    cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_USE_SWIFTSHADER=ON -DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ../
   else
-    $CMAKE_COMMAND  -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ../
+    cmake  -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ../
   fi
 
-  $CMAKE_COMMAND --build . --target UpdateBaseline -- -j 12
+  cmake --build . --target UpdateBaseline -- -j 12
   ./UpdateBaseline
 
   if test $? -eq 0; then
@@ -76,4 +63,5 @@
     cp -r test/out result
     exit 1
   fi
+  rm -rf ${BUILD_DIR}
 }

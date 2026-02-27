@@ -1,0 +1,196 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const https = require('https');
+const {execSync} = require('child_process');
+
+const TGFXRepo = "https://github.com/Tencent/tgfx";
+
+function getRemoteLatestTag(repoUrl) {
+    const output = execSync(`git ls-remote --tags ${repoUrl}`).toString();
+    let tags = output.split('\n')
+        .map(line => line.trim())
+        .filter(line => line)
+        .map(line => {
+            const [commit, ref] = line.split('\t');
+            const tagMatch = ref.match(/refs\/tags\/v?(\d+\.\d+\.\d+)$/);
+            return tagMatch ? {version: tagMatch[1], commit} : null;
+        })
+        .filter(Boolean);
+    if (!tags || tags.length == 0) {
+        console.error("Error: No tags found in the repository");
+        process.exit(1);
+    }
+    tags.sort((a, b) => b.version.localeCompare(a.version, undefined, {numeric: true}));
+    return tags[0];
+}
+
+function validateCommitHash(commitHash) {
+    const commitRegex = /^[a-f0-9]{40}$/i;
+    return commitRegex.test(commitHash);
+}
+
+function downloadFile(url) {
+    return new Promise((resolve, reject) => {
+        console.log(`Downloading: ${url}`);
+
+        https.get(url, (response) => {
+            if (response.statusCode === 302 || response.statusCode === 301) {
+                return downloadFile(response.headers.location).then(resolve).catch(reject);
+            }
+
+            if (response.statusCode !== 200) {
+                reject(new Error(`Download failed, HTTP status: ${response.statusCode}`));
+                return;
+            }
+
+            const chunks = [];
+            let totalLength = 0;
+
+            response.on('data', (chunk) => {
+                chunks.push(chunk);
+                totalLength += chunk.length;
+
+                if (totalLength % (1024 * 1024) === 0) {
+                    process.stdout.write(`\rDownloaded: ${(totalLength / 1024 / 1024).toFixed(1)} MB`);
+                }
+            });
+
+            response.on('end', () => {
+                console.log(`\nDownload complete, size: ${(totalLength / 1024 / 1024).toFixed(2)} MB`);
+                const buffer = Buffer.concat(chunks);
+                resolve(buffer);
+            });
+
+            response.on('error', reject);
+        }).on('error', reject);
+    });
+}
+
+function calculateSHA512(buffer) {
+    console.log('Calculating SHA512 hash ...');
+    const hash = crypto.createHash('sha512');
+    hash.update(buffer);
+    const sha512 = hash.digest('hex');
+    console.log(`SHA512: ${sha512}`);
+    return sha512;
+}
+
+function updatePortfile(commitHash, sha512) {
+    const portFilePath = path.resolve(__dirname, 'vcpkg', 'ports', 'tgfx', 'portfile.cmake');
+
+    if (!fs.existsSync(portFilePath)) {
+        throw new Error(`Portfile not found: ${portFilePath}`);
+    }
+
+    console.log(`Updating ${portFilePath}...`);
+
+    let content = fs.readFileSync(portFilePath, 'utf8');
+
+    const refRegex = /(\s+REF\s+)[a-f0-9]{40}/i;
+    const refMatch = content.match(refRegex);
+    if (!refMatch) {
+        throw new Error('REF line not found in portfile.cmake');
+    }
+    content = content.replace(refRegex, `${refMatch[1]}${commitHash}`);
+
+    const sha512Regex = /(\s+SHA512\s+)[a-f0-9]{128}/i;
+    const sha512Match = content.match(sha512Regex);
+    if (!sha512Match) {
+        throw new Error('SHA512 line not found in portfile.cmake');
+    }
+    content = content.replace(sha512Regex, `${sha512Match[1]}${sha512}`);
+
+    fs.writeFileSync(portFilePath, content, 'utf8');
+
+    console.log('portfile.cmake updated successfully!');
+    console.log(`   REF: ${commitHash}`);
+    console.log(`   SHA512: ${sha512}`);
+}
+
+function getVcpkgJsonVersion() {
+    const vcpkgJsonPath = path.resolve(__dirname, 'vcpkg', 'ports', 'tgfx', 'vcpkg.json');
+    if (!fs.existsSync(vcpkgJsonPath)) {
+        return "";
+    }
+    const content = fs.readFileSync(vcpkgJsonPath, 'utf8');
+    const versionRegex = /"version"\s*:\s*"([^"]+)"/;
+    const match = content.match(versionRegex);
+    if (!match) {
+        return "";
+    }
+    return match[1];
+}
+
+
+function updateVcpkgJsonVersion(version) {
+    const vcpkgJsonPath = path.resolve(__dirname, 'vcpkg', 'ports', 'tgfx', 'vcpkg.json');
+    if (!fs.existsSync(vcpkgJsonPath)) {
+        throw new Error(`vcpkg.json not found: ${vcpkgJsonPath}`);
+    }
+    let content = fs.readFileSync(vcpkgJsonPath, 'utf8');
+    const versionRegex = /("version"\s*:\s*")[^"]*(")/;
+    if (!versionRegex.test(content)) {
+        throw new Error('vcpkg.json version line not found');
+    }
+    content = content.replace(versionRegex, `$1${version}$2`);
+    fs.writeFileSync(vcpkgJsonPath, content, 'utf8');
+    console.log(`vcpkg.json version updated to ${version}`);
+}
+
+async function main() {
+    const args = process.argv.slice(2);
+    let commitHash = args[0];
+    let version = "";
+    if (commitHash) {
+        if (!validateCommitHash(commitHash)) {
+            console.error('Error: Invalid commit hash format');
+            console.error('   Commit hash should be 40 hexadecimal characters');
+            console.error(`   Provided: ${commitHash}`);
+            process.exit(1);
+        }
+        console.log(`Updating to Commit: ${commitHash}`);
+    } else {
+        version = getVcpkgJsonVersion();
+        const repoUrl = TGFXRepo + ".git";
+        const latest = getRemoteLatestTag(repoUrl);
+        if (version && latest.version === version) {
+            console.log(`Already the latest version: ${version}`);
+            return;
+        }
+        commitHash = latest.commit;
+        version = latest.version;
+        console.log(`Updating to Version: ${version} Commit: ${commitHash}`);
+    }
+
+
+    try {
+        const archiveUrl = `${TGFXRepo}/archive/${commitHash}.tar.gz`;
+        const buffer = await downloadFile(archiveUrl);
+        const sha512 = calculateSHA512(buffer);
+        updatePortfile(commitHash, sha512);
+        if (version) {
+            updateVcpkgJsonVersion(version);
+        }
+
+    } catch (error) {
+        console.error('Error:', error.message);
+        process.exit(1);
+    }
+}
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught exception:', error.message);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled promise rejection:', reason);
+    process.exit(1);
+});
+
+if (require.main === module) {
+    main();
+}

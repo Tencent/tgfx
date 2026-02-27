@@ -59,7 +59,9 @@ PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& a
   }
   auto newSamplingArgs = samplingArgs;
   newSamplingArgs.sampleArea = std::nullopt;
-  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, &fpMatrix, isAlphaOnly());
+  auto allocator = args.context->drawingAllocator();
+  return TiledTextureEffect::Make(allocator, textureProxy, newSamplingArgs, &fpMatrix,
+                                  isAlphaOnly());
 }
 
 std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args) const {

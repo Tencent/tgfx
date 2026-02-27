@@ -55,7 +55,7 @@ Plot::Plot(uint32_t pageIndex, uint32_t plotIndex, AtlasGenerationCounter* gener
       _plotLocator(pageIndex, plotIndex, _genID) {
 }
 
-bool Plot::addRect(int imageWidth, int imageHeight, AtlasLocator& atlasLocator) {
+bool Plot::addRect(int imageWidth, int imageHeight, AtlasLocator* atlasLocator) {
   auto widthWithPadding = imageWidth + 2 * CellPadding;
   auto heightWithPadding = imageHeight + 2 * CellPadding;
   Point location;
@@ -67,8 +67,8 @@ bool Plot::addRect(int imageWidth, int imageHeight, AtlasLocator& atlasLocator) 
   auto rectY = static_cast<int>(location.y) + CellPadding;
   auto rect = Rect::MakeXYWH(rectX, rectY, imageWidth, imageHeight);
   rect.offset(_pixelOffset.x, _pixelOffset.y);
-  atlasLocator.updateRect(rect);
-  atlasLocator.setPlotLocator(_plotLocator);
+  atlasLocator->updateRect(rect);
+  atlasLocator->setPlotLocator(_plotLocator);
   return true;
 }
 

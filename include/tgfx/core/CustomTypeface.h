@@ -39,9 +39,18 @@ class CustomTypefaceBuilder {
   void setFontName(const std::string& fontFamily, const std::string& fontStyle);
 
   /**
-   * Sets the font metrics for the typeface.
+   * Sets the font metrics for the typeface. The metrics should be specified in design space
+   * coordinates (the same coordinate system as the glyph paths or images). When rendering, metrics
+   * will be scaled by (fontSize / unitsPerEm) to convert to pixel values.
    */
   void setMetrics(const FontMetrics& metrics);
+
+  /**
+   * Returns the units-per-em value for the typeface.
+   */
+  int unitsPerEm() const {
+    return _unitsPerEm;
+  }
 
   /**
    * Detaches the typeface being built. After this call, the builder remains valid and can be used
@@ -53,9 +62,12 @@ class CustomTypefaceBuilder {
   virtual std::shared_ptr<Typeface> detach() const = 0;
 
  protected:
+  explicit CustomTypefaceBuilder(int unitsPerEm);
+
   std::string _fontFamily;
   std::string _fontStyle;
   FontMetrics _fontMetrics = {};
+  int _unitsPerEm = 1;
   uint32_t uniqueID = 0;
   Rect fontBounds = {};
 };
@@ -68,11 +80,24 @@ class CustomTypefaceBuilder {
 class PathTypefaceBuilder : public CustomTypefaceBuilder {
  public:
   /**
+   * Creates a PathTypefaceBuilder with the specified units-per-em value. This value defines the
+   * coordinate space in which the glyph paths and font metrics are designed. The default value is
+   * 1, meaning all data is expected to be in normalized coordinates. When rendering, all values
+   * will be scaled by (fontSize / unitsPerEm). For example, if your glyphs are designed in a
+   * 1000x1000 coordinate space, set unitsPerEm to 1000. If your glyph paths are extracted from
+   * another font at a specific font size (e.g., 48px), set unitsPerEm to that font size (48).
+   */
+  explicit PathTypefaceBuilder(int unitsPerEm = 1);
+
+  /**
    * Adds a glyph to the typeface using a vector path. Returns the GlyphID of the new glyph, which
    * is a unique identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be
    * added because the typeface builder is full.
+   * @param path The vector path that defines the glyph's outline.
+   * @param advance The horizontal advance width of the glyph in design space coordinates. This
+   * value determines the spacing between this glyph and the next when rendering text.
    */
-  GlyphID addGlyph(const Path& path);
+  GlyphID addGlyph(const Path& path, float advance);
 
   /**
    * Adds a glyph to the typeface using a PathProvider. The PathProvider is expected to provide the
@@ -80,8 +105,10 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
    * and immutable after creation. Returns the GlyphID of the new glyph, which is a unique
    * identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be added because
    * the typeface builder is full.
+   * @param provider The PathProvider that supplies the glyph's path.
+   * @param advance The horizontal advance width of the glyph in design space coordinates.
    */
-  GlyphID addGlyph(std::shared_ptr<PathProvider> provider);
+  GlyphID addGlyph(std::shared_ptr<PathProvider> provider, float advance);
 
   /**
    * Detaches the typeface being built. After this call, the builder remains valid and can be used
@@ -93,7 +120,14 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
   std::shared_ptr<Typeface> detach() const override;
 
  private:
-  std::vector<std::shared_ptr<PathProvider>> glyphRecords = {};
+  friend class PathUserTypeface;
+
+  struct PathGlyphRecord {
+    std::shared_ptr<PathProvider> pathProvider = nullptr;
+    float advance = 0.0f;
+  };
+
+  std::vector<PathGlyphRecord> glyphRecords = {};
 };
 
 /**
@@ -103,13 +137,14 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
  */
 class ImageTypefaceBuilder : public CustomTypefaceBuilder {
  public:
-  struct GlyphRecord {
-    std::shared_ptr<ImageCodec> image = nullptr;
-    Point offset = {};
-    GlyphRecord(std::shared_ptr<ImageCodec> image, const Point& offset)
-        : image(std::move(image)), offset(offset) {
-    }
-  };
+  /**
+   * Creates an ImageTypefaceBuilder with the specified units-per-em value. This value defines the
+   * coordinate space in which the glyph images and font metrics are designed. The default value is
+   * 1, meaning all data is expected to be in normalized coordinates. When rendering, all values
+   * will be scaled by (fontSize / unitsPerEm). For example, if your glyph images are rasterized
+   * from another font at a specific font size (e.g., 48px), set unitsPerEm to that font size (48).
+   */
+  explicit ImageTypefaceBuilder(int unitsPerEm = 1);
 
   /**
    * Adds a glyph to the typeface using an ImageCodec. The ImageCodec is expected to provide the
@@ -117,12 +152,23 @@ class ImageTypefaceBuilder : public CustomTypefaceBuilder {
    * and immutable after creation. Returns the GlyphID of the new glyph, which is a unique
    * identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be added because
    * the typeface builder is full.
+   * @param image The ImageCodec that supplies the glyph's image.
+   * @param offset The offset from the glyph origin to the top-left corner of the image.
+   * @param advance The horizontal advance width of the glyph in design space coordinates.
    */
-  GlyphID addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset);
+  GlyphID addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset, float advance);
 
   std::shared_ptr<Typeface> detach() const override;
 
  private:
-  std::vector<std::shared_ptr<GlyphRecord>> glyphRecords = {};
+  friend class ImageUserTypeface;
+
+  struct ImageGlyphRecord {
+    std::shared_ptr<ImageCodec> image = nullptr;
+    Point offset = {};
+    float advance = 0.0f;
+  };
+
+  std::vector<std::shared_ptr<ImageGlyphRecord>> glyphRecords = {};
 };
 }  // namespace tgfx

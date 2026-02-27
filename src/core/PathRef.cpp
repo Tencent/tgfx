@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PathRef.h"
+#include "core/utils/AtomicCache.h"
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
@@ -34,9 +35,12 @@ UniqueKey PathRef::GetUniqueKey(const Path& path) {
   return path.pathRef->uniqueKey.get();
 }
 
+PathRef::~PathRef() {
+  AtomicCacheReset(bounds);
+}
+
 Rect PathRef::getBounds() {
-  auto cachedBounds = bounds.get();
-  if (cachedBounds) {
+  if (auto cachedBounds = AtomicCacheGet(bounds)) {
     return *cachedBounds;
   }
   // Internally, SkPath lazily computes bounds. Use this function instead of path.getBounds()
@@ -47,8 +51,8 @@ Rect PathRef::getBounds() {
   auto rect = SkRect::MakeEmpty();
   rect.setBounds(points, count);
   delete[] points;
-  Rect newBounds(rect.fLeft, rect.fTop, rect.fRight, rect.fBottom);
-  bounds.update(newBounds);
-  return newBounds;
+  Rect totalBounds(rect.fLeft, rect.fTop, rect.fRight, rect.fBottom);
+  AtomicCacheSet(bounds, &totalBounds);
+  return totalBounds;
 }
 }  // namespace tgfx

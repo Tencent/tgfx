@@ -124,7 +124,7 @@ static bool can_discard(PDFTagNode* node) {
     return false;
   }
   for (size_t i = 0; i < node->children->size(); ++i) {
-    auto* child = &(*node->children)[i];
+    auto child = &(*node->children)[i];
     if (!can_discard(child)) {
       node->canDiscard = PDFTagNode::State::No;
       return false;
@@ -140,7 +140,7 @@ PDFIndirectReference PDFTagTree::PrepareTagTreeToEmit(PDFIndirectReference paren
   std::unique_ptr<PDFArray> kids = MakePDFArray();
   const auto& children = node->children;
   for (size_t i = 0; i < children->size(); ++i) {
-    auto* child = &(*children)[i];
+    auto child = &(*children)[i];
     if (!(can_discard(child))) {
       kids->appendRef(PrepareTagTreeToEmit(ref, child, document));
     }
@@ -192,7 +192,7 @@ void PDFTagTree::addNodeAnnotation(int nodeId, PDFIndirectReference annotationRe
   if (iter == nodeMap.end()) {
     return;
   }
-  auto* tag = iter->second;
+  auto tag = iter->second;
   DEBUG_ASSERT(tag);
 
   PDFTagNode::AnnotationInfo annotationInfo = {pageIndex, annotationRef};
@@ -207,7 +207,7 @@ void PDFTagTree::addNodeTitle(int nodeId, const std::vector<char>& title) {
   if (iter == nodeMap.end()) {
     return;
   }
-  auto* tag = iter->second;
+  auto tag = iter->second;
   DEBUG_ASSERT(tag);
 
   if (tag->wantTitle) {
@@ -263,7 +263,7 @@ PDFIndirectReference PDFTagTree::makeStructTreeRoot(PDFDocumentImpl* document) {
     if (iter == nodeMap.end()) {
       continue;
     }
-    auto* tag = iter->second;
+    auto tag = iter->second;
     parentTreeNums->appendInt(structParentKey);
     parentTreeNums->appendRef(tag->ref);
   }

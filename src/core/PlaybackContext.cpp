@@ -20,14 +20,10 @@
 #include "DrawContext.h"
 
 namespace tgfx {
-PlaybackContext::PlaybackContext(MCState state, const FillModifier* fillModifier)
-    : initState(std::move(state)), fillModifier(fillModifier) {
+PlaybackContext::PlaybackContext(MCState state) : initState(std::move(state)) {
   hasInitMatrix = !initState.matrix.isIdentity();
   hasInitClip = !initState.clip.isEmpty() || !initState.clip.isInverseFillType();
   _state = initState;
-  if (fillModifier) {
-    _fill = fillModifier->transform(lastOriginalFill);
-  }
 }
 
 void PlaybackContext::setMatrix(const Matrix& matrix) {
@@ -49,21 +45,11 @@ void PlaybackContext::setClip(const Clip& clip) {
 }
 
 void PlaybackContext::setColor(const Color& color) {
-  if (fillModifier) {
-    lastOriginalFill.color = color;
-    _fill = fillModifier->transform(lastOriginalFill);
-  } else {
-    _fill.color = color;
-  }
+  _brush.color = color;
 }
 
-void PlaybackContext::setFill(const Fill& fill) {
-  if (fillModifier) {
-    lastOriginalFill = fill;
-    _fill = fillModifier->transform(lastOriginalFill);
-  } else {
-    _fill = fill;
-  }
+void PlaybackContext::setBrush(const Brush& brush) {
+  _brush = brush;
 }
 
 void PlaybackContext::setStrokeWidth(float width) {
@@ -82,13 +68,13 @@ void PlaybackContext::setHasStroke(bool value) {
 
 void PlaybackContext::drawFill(DrawContext* context) {
   if (hasInitClip) {
-    auto fill = _fill.makeWithMatrix(initState.matrix);
-    fill.antiAlias = initState.clip.forceAntiAlias;
-    context->drawPath(initState.clip.path, {}, fill);
+    auto brush = _brush.makeWithMatrix(initState.matrix);
+    brush.antiAlias = initState.clip.forceAntiAlias;
+    context->drawPath(initState.clip.path, {}, brush);
   } else if (hasInitMatrix) {
-    context->drawFill(_fill.makeWithMatrix(initState.matrix));
+    context->drawFill(_brush.makeWithMatrix(initState.matrix));
   } else {
-    context->drawFill(_fill);
+    context->drawFill(_brush);
   }
 }
 

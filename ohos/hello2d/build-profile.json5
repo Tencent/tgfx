@@ -7,7 +7,7 @@
         "arm64-v8a",
         "x86_64"
       ],
-      "arguments": "",
+      "arguments": "-DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON",
       "cppFlags": "",
     }
   },

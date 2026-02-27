@@ -23,4 +23,9 @@ LinearGradientLayout::LinearGradientLayout(Matrix matrix)
     : FragmentProcessor(ClassID()), coordTransform(matrix) {
   addCoordTransform(&coordTransform);
 }
+
+void LinearGradientLayout::onComputeProcessorKey(BytesKey* bytesKey) const {
+  const uint32_t flags = coordTransform.matrix.hasPerspective() ? 1 : 0;
+  bytesKey->write(flags);
+}
 }  // namespace tgfx

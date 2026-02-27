@@ -18,73 +18,75 @@
 
 #pragma once
 
+#include "tgfx/core/BlendMode.h"
+#include "tgfx/core/Color.h"
 #include "tgfx/core/Shader.h"
-#include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
+
 /**
- * ShapeStyle specifies the source color(s) for what is being drawn in a shape layer. There are
- * three types of ShapeStyle: SolidColor, Gradient, and ImagePattern. Note: All ShapeStyle objects
- * are not thread-safe and should only be accessed from a single thread.
+ * ShapeStyle defines the visual appearance for filling or stroking shapes in a ShapeLayer. It
+ * contains a color, an optional shader for color generation, and a blend mode for compositing.
+ * ShapeStyle is immutable; to change properties, create a new instance.
  */
-class ShapeStyle : public LayerProperty {
+class ShapeStyle {
  public:
   /**
-   * Returns the alpha transparency value of the shape style. Valid values are 0 (fully transparent)
-   * to 1 (fully opaque). The default value is 1.
+   * Creates a new ShapeStyle with a solid color.
+   * @param color The solid color to use.
+   * @param blendMode The blend mode for compositing. Default is BlendMode::SrcOver.
    */
-  float alpha() const {
-    return _alpha;
+  static std::shared_ptr<ShapeStyle> Make(const Color& color,
+                                          BlendMode blendMode = BlendMode::SrcOver);
+
+  /**
+   * Creates a new ShapeStyle with a shader.
+   * @param shader The shader to use for color generation.
+   * @param alpha The alpha transparency value (0.0 to 1.0). Default is 1.0.
+   * @param blendMode The blend mode for compositing. Default is BlendMode::SrcOver.
+   */
+  static std::shared_ptr<ShapeStyle> Make(std::shared_ptr<Shader> shader, float alpha = 1.0f,
+                                          BlendMode blendMode = BlendMode::SrcOver);
+
+  /**
+   * Returns the color used for rendering. If a shader is set, only the alpha component of the color
+   * is used. The default value is Color::White().
+   */
+  Color color() const {
+    return _color;
   }
 
   /**
-   * Sets the alpha transparency of the shape style.
+   * Returns the alpha transparency value. This is equivalent to color().alpha. Valid values are 0
+   * (fully transparent) to 1 (fully opaque). The default value is 1.
    */
-  void setAlpha(float value);
+  float alpha() const {
+    return _color.alpha;
+  }
 
   /**
-   * Returns the blend mode used to composite the shape style with the content below it. The default
-   * value is BlendMode::SrcOver.
+   * Returns the optional shader used for color generation. If nullptr, the color is used directly.
+   */
+  std::shared_ptr<Shader> shader() const {
+    return _shader;
+  }
+
+  /**
+   * Returns the blend mode used to composite the shape with the content below it. The default value
+   * is BlendMode::SrcOver.
    */
   BlendMode blendMode() const {
     return _blendMode;
   }
 
-  /**
-   * Sets the blend mode of the shape style.
-   */
-  void setBlendMode(BlendMode value);
-
-  /**
-   * Returns the transformation matrix applied to the ShapeStyle.
-   */
-  const Matrix& matrix() const {
-    return _matrix;
+ private:
+  ShapeStyle(const Color& color, std::shared_ptr<Shader> shader, BlendMode blendMode)
+      : _color(color), _shader(std::move(shader)), _blendMode(blendMode) {
   }
 
-  /**
-   * Sets the transformation matrix applied to the ShapeStyle.
-   */
-  void setMatrix(const Matrix& value);
-
- protected:
-  enum class Type { Gradient, ImagePattern, SolidColor };
-
-  virtual Type getType() const = 0;
-
-  std::shared_ptr<Shader> getShader() const;
-
-  /**
-   * Returns the current shader that will be used to draw the shape.
-   */
-  virtual std::shared_ptr<Shader> onGetShader() const = 0;
-
- private:
-  float _alpha = 1.0f;
+  Color _color = Color::White();
+  std::shared_ptr<Shader> _shader = nullptr;
   BlendMode _blendMode = BlendMode::SrcOver;
-  Matrix _matrix = {};
-
-  friend class Types;
-  friend class ShapeLayer;
 };
+
 }  // namespace tgfx

@@ -23,12 +23,12 @@
 namespace tgfx {
 class ComposeFragmentProcessor : public FragmentProcessor {
  public:
-  static PlacementPtr<FragmentProcessor> Make(BlockBuffer* buffer,
+  static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               PlacementPtr<FragmentProcessor> first,
                                               PlacementPtr<FragmentProcessor> second);
 
   static PlacementPtr<FragmentProcessor> Make(
-      BlockBuffer* buffer, std::vector<PlacementPtr<FragmentProcessor>> processors);
+      BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> processors);
 
   std::string name() const override {
     return "ComposeFragmentProcessor";

@@ -19,7 +19,7 @@
 #pragma once
 
 #include "pdf/PDFTypes.h"
-#include "tgfx/core/Fill.h"
+#include "tgfx/core/Brush.h"
 
 namespace tgfx {
 
@@ -56,7 +56,8 @@ class PDFGraphicState {
     Luminosity,
   };
 
-  static PDFIndirectReference GetGraphicStateForPaint(PDFDocumentImpl* document, const Fill& fill);
+  static PDFIndirectReference GetGraphicStateForPaint(PDFDocumentImpl* document,
+                                                      const Brush& brush);
 
   static PDFIndirectReference GetSMaskGraphicState(PDFIndirectReference sMask, bool invert,
                                                    SMaskMode sMaskMode, PDFDocumentImpl* document);

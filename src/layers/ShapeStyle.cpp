@@ -19,36 +19,19 @@
 #include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx {
-void ShapeStyle::setAlpha(float value) {
-  if (_alpha == value) {
-    return;
-  }
-  _alpha = value;
-  invalidateContent();
+
+std::shared_ptr<ShapeStyle> ShapeStyle::Make(const Color& color, BlendMode blendMode) {
+  return std::shared_ptr<ShapeStyle>(new ShapeStyle(color, nullptr, blendMode));
 }
 
-void ShapeStyle::setBlendMode(BlendMode value) {
-  if (_blendMode == value) {
-    return;
-  }
-  _blendMode = value;
-  invalidateContent();
-}
-
-void ShapeStyle::setMatrix(const Matrix& value) {
-  if (_matrix == value) {
-    return;
-  }
-  _matrix = value;
-  invalidateContent();
-}
-
-std::shared_ptr<Shader> ShapeStyle::getShader() const {
-  auto shader = onGetShader();
-  if (!shader) {
+std::shared_ptr<ShapeStyle> ShapeStyle::Make(std::shared_ptr<Shader> shader, float alpha,
+                                             BlendMode blendMode) {
+  if (shader == nullptr) {
     return nullptr;
   }
-  return shader->makeWithMatrix(_matrix);
+  Color color = Color::White();
+  color.alpha = alpha;
+  return std::shared_ptr<ShapeStyle>(new ShapeStyle(color, std::move(shader), blendMode));
 }
 
 }  // namespace tgfx

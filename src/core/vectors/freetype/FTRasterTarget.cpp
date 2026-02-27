@@ -20,9 +20,9 @@
 
 namespace tgfx {
 void GraySpanFunc(int y, int count, const FT_Span* spans, void* user) {
-  auto* target = reinterpret_cast<FTRasterTarget*>(user);
+  auto target = reinterpret_cast<FTRasterTarget*>(user);
   for (int i = 0; i < count; i++) {
-    auto* q = target->origin - target->pitch * y + spans[i].x;
+    auto q = target->origin - target->pitch * y + spans[i].x;
     auto c = target->gammaTable[spans[i].coverage];
     auto aCount = spans[i].len;
     /**

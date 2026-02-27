@@ -105,5 +105,14 @@ class Stroke {
    * The limit at which a sharp corner is drawn beveled.
    */
   float miterLimit = 4.0f;
+
+  bool operator==(const Stroke& other) const {
+    return width == other.width && cap == other.cap && join == other.join &&
+           miterLimit == other.miterLimit;
+  }
+
+  bool operator!=(const Stroke& other) const {
+    return !(*this == other);
+  }
 };
 }  // namespace tgfx

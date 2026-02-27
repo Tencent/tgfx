@@ -28,7 +28,7 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
    * The color input to the returned processor is treated as the src and the passed in processor is
    * the dst.
    */
-  static PlacementPtr<FragmentProcessor> MakeFromDstProcessor(BlockBuffer* buffer,
+  static PlacementPtr<FragmentProcessor> MakeFromDstProcessor(BlockAllocator* allocator,
                                                               PlacementPtr<FragmentProcessor> dst,
                                                               BlendMode mode);
 
@@ -36,7 +36,7 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
    * The color input to the returned processor is treated as the dst and the passed in processor is
    * the src.
    */
-  static PlacementPtr<FragmentProcessor> MakeFromSrcProcessor(BlockBuffer* buffer,
+  static PlacementPtr<FragmentProcessor> MakeFromSrcProcessor(BlockAllocator* allocator,
                                                               PlacementPtr<FragmentProcessor> src,
                                                               BlendMode mode);
 
@@ -45,7 +45,7 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
    * to both src and dst. The outputs of a src and dst are blended using mode and the original
    * input's alpha is applied to the blended color to produce a premul output.
    */
-  static PlacementPtr<FragmentProcessor> MakeFromTwoProcessors(BlockBuffer* buffer,
+  static PlacementPtr<FragmentProcessor> MakeFromTwoProcessors(BlockAllocator* allocator,
                                                                PlacementPtr<FragmentProcessor> src,
                                                                PlacementPtr<FragmentProcessor> dst,
                                                                BlendMode mode);

@@ -146,7 +146,7 @@ std::shared_ptr<Data> ConvertType1FontStream(const std::unique_ptr<Stream>& sour
   if (!sourceStream->read(sourceBuffer.data(), sourceLength)) {
     return nullptr;
   }
-  const auto* source = sourceBuffer.bytes();
+  const auto source = sourceBuffer.bytes();
   if (ParsePFB(source, sourceLength, headerLength, dataLength, trailerLength)) {
     constexpr int PFBSectionHeaderLength = 6;
     const size_t length = *headerLength + *dataLength + *trailerLength;
@@ -159,8 +159,8 @@ std::shared_ptr<Data> ConvertType1FontStream(const std::unique_ptr<Stream>& sour
     const uint8_t* const sourceData = sourceHeader + *headerLength + PFBSectionHeaderLength;
     const uint8_t* const srcTrailer = sourceData + *headerLength;
 
-    auto* data = malloc(length);
-    auto* const resultHeader = static_cast<uint8_t*>(data);
+    auto data = malloc(length);
+    auto const resultHeader = static_cast<uint8_t*>(data);
     uint8_t* const resultData = resultHeader + *headerLength;
     uint8_t* const resultTrailer = resultData + *dataLength;
 
@@ -181,8 +181,8 @@ std::shared_ptr<Data> ConvertType1FontStream(const std::unique_ptr<Stream>& sour
   }
   const size_t length = *headerLength + *dataLength + *trailerLength;
   DEBUG_ASSERT(length > 0);
-  auto* data = malloc(length);
-  auto* buffer = static_cast<uint8_t*>(data);
+  auto data = malloc(length);
+  auto buffer = static_cast<uint8_t*>(data);
 
   memcpy(buffer, source, *headerLength);
   uint8_t* const resultData = &(buffer[*headerLength]);
@@ -273,7 +273,7 @@ PDFIndirectReference Type1FontDescriptor(PDFDocumentImpl* doc, const PDFStrikeSp
   if (iter != doc->fontDescriptors.end()) {
     return iter->second;
   }
-  const auto* info = PDFFont::GetAdvancedInfo(typeface, textSize, doc);
+  const auto info = PDFFont::GetAdvancedInfo(typeface, textSize, doc);
   auto fontDescriptor = MakeType1FontDescriptor(doc, pdfStrikeSpec, info);
   doc->fontDescriptors[typefaceID] = fontDescriptor;
   return fontDescriptor;
@@ -293,7 +293,7 @@ void EmitSubsetType1(const PDFFont& pdfFont, PDFDocumentImpl* document) {
   fontDictionary->insertRef("FontDescriptor",
                             Type1FontDescriptor(document, pdfFont.strike().strikeSpec));
   fontDictionary->insertName("Subtype", "Type1");
-  if (const auto* info = PDFFont::GetAdvancedInfo(typeface, textSize, document)) {
+  if (const auto info = PDFFont::GetAdvancedInfo(typeface, textSize, document)) {
     fontDictionary->insertName("BaseFont", info->postScriptName);
   }
 

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/TextShaper.h"
+#include "tgfx/core/TextBlobBuilder.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -29,71 +30,78 @@ class TextShaperPrimitive : public TextShaper {
 
   std::shared_ptr<TextBlob> shape(const std::string& text, std::shared_ptr<Typeface> typeface,
                                   float fontSize) override {
-    std::vector<GlyphRun> glyphRuns = {};
-    std::vector<GlyphID> glyphIDs = {};
-    std::vector<Point> positions = {};
+    std::vector<GlyphID> glyphs;
+    std::vector<Point> positions;
+    Font currentFont = Font();
+    TextBlobBuilder builder;
 
-    Font previousFont = Font();
     auto emptyAdvance = fontSize / 2.0f;
-    float XOffset = 0.0f;
+    float xOffset = 0.0f;
 
     const char* textStart = text.data();
     const char* textStop = textStart + text.size();
     while (textStart < textStop) {
-      const auto* oldPosition = textStart;
+      const auto oldPosition = textStart;
       UTF::NextUTF8(&textStart, textStop);
       auto length = textStart - oldPosition;
       auto str = std::string(oldPosition, static_cast<size_t>(length));
 
-      GlyphID currentGlyphID = 0;
-      std::shared_ptr<Typeface> currentTypeface = nullptr;
+      GlyphID glyphID = 0;
+      std::shared_ptr<Typeface> matchedTypeface = nullptr;
 
-      // Match the string with SVG-parsed typeface, and try fallback typefaces if no match
-      // is found
-      GlyphID glyphID = typeface ? typeface->getGlyphID(str) : 0;
-      if (glyphID != 0) {
-        currentGlyphID = glyphID;
-        currentTypeface = typeface;
+      // Match the string with SVG-parsed typeface, and try fallback typefaces if no match is found
+      GlyphID id = typeface ? typeface->getGlyphID(str) : 0;
+      if (id != 0) {
+        glyphID = id;
+        matchedTypeface = typeface;
       } else {
-        for (const auto& typefaceItem : fallbackTypefaces) {
-          if (typefaceItem == nullptr) {
+        for (const auto& fallback : fallbackTypefaces) {
+          if (fallback == nullptr) {
             continue;
           }
-          glyphID = typefaceItem->getGlyphID(str);
-          if (glyphID != 0) {
-            currentGlyphID = glyphID;
-            currentTypeface = typefaceItem;
+          id = fallback->getGlyphID(str);
+          if (id != 0) {
+            glyphID = id;
+            matchedTypeface = fallback;
             break;
           }
         }
       }
 
       // Skip with empty advance if no matching typeface is found
-      if (!currentTypeface) {
-        XOffset += emptyAdvance;
+      if (!matchedTypeface) {
+        xOffset += emptyAdvance;
         continue;
       }
 
-      if (!previousFont.getTypeface()) {
-        previousFont = Font(currentTypeface, fontSize);
-      } else if (currentTypeface->uniqueID() != previousFont.getTypeface()->uniqueID()) {
-        // If the current typeface differs from the previous one, create a glyph run from current
-        // glyphs and start a new font
-        glyphRuns.emplace_back(previousFont, glyphIDs, positions);
-        glyphIDs.clear();
-        positions.clear();
-        previousFont = Font(currentTypeface, fontSize);
+      auto newFont = Font(matchedTypeface, fontSize);
+      if (!currentFont.getTypeface()) {
+        currentFont = newFont;
+      } else if (matchedTypeface->uniqueID() != currentFont.getTypeface()->uniqueID()) {
+        // Flush current run and start a new one
+        if (!glyphs.empty()) {
+          const auto& buffer = builder.allocRunPos(currentFont, glyphs.size());
+          memcpy(buffer.glyphs, glyphs.data(), glyphs.size() * sizeof(GlyphID));
+          memcpy(buffer.positions, positions.data(), positions.size() * sizeof(Point));
+          glyphs.clear();
+          positions.clear();
+        }
+        currentFont = newFont;
       }
 
-      glyphIDs.emplace_back(currentGlyphID);
-      positions.emplace_back(Point::Make(XOffset, 0.0f));
-      XOffset += previousFont.getAdvance(currentGlyphID);
+      glyphs.push_back(glyphID);
+      positions.push_back(Point::Make(xOffset, 0.0f));
+      xOffset += currentFont.getAdvance(glyphID);
     }
 
-    if (!glyphIDs.empty()) {
-      glyphRuns.emplace_back(previousFont, glyphIDs, positions);
+    // Flush remaining glyphs
+    if (!glyphs.empty()) {
+      const auto& buffer = builder.allocRunPos(currentFont, glyphs.size());
+      memcpy(buffer.glyphs, glyphs.data(), glyphs.size() * sizeof(GlyphID));
+      memcpy(buffer.positions, positions.data(), positions.size() * sizeof(Point));
     }
-    return glyphRuns.empty() ? nullptr : TextBlob::MakeFrom(glyphRuns);
+
+    return builder.build();
   }
 
  private:

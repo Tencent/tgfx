@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <functional>
 #include "tgfx/core/Point.h"
 
 namespace tgfx {
@@ -52,6 +51,10 @@ enum class PathOp {
    * Appended to destination unaltered.
    */
   Append,
+  /**
+   * Appended with a line connecting the end of the destination to the start of the source.
+   */
+  Extend,
   /**
    * Subtract the op path from the destination path.
    */
@@ -87,13 +90,21 @@ enum class PathVerb {
    */
   Quad,
   /**
+   * PathIterator returns 3 points and a weight.
+   */
+  Conic,
+  /**
    * PathIterator returns 4 points.
    */
   Cubic,
   /**
    * PathIterator returns 0 points.
    */
-  Close
+  Close,
+  /**
+   * Iteration is complete, no more verbs to return.
+   */
+  Done
 };
 
 /**
@@ -109,10 +120,5 @@ enum class PathArcSize {
    */
   Large,
 };
-
-/**
- * Zero to four Point are stored in points, depending on the returned PathVerb
- */
-using PathIterator = std::function<void(PathVerb verb, const Point points[4], void* info)>;
 
 }  // namespace tgfx

@@ -23,7 +23,7 @@
 namespace tgfx {
 class DeviceSpaceTextureEffect : public FragmentProcessor {
  public:
-  static PlacementPtr<DeviceSpaceTextureEffect> Make(BlockBuffer* buffer,
+  static PlacementPtr<DeviceSpaceTextureEffect> Make(BlockAllocator* allocator,
                                                      std::shared_ptr<TextureProxy> textureProxy,
                                                      const Matrix& uvMatrix);
 
@@ -40,7 +40,7 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
     return 1;
   }
 
-  GPUTexture* onTextureAt(size_t) const override;
+  std::shared_ptr<Texture> onTextureAt(size_t) const override;
 
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   Matrix uvMatrix = {};

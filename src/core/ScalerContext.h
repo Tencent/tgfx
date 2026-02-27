@@ -33,6 +33,10 @@ class ScalerContext {
 
   virtual ~ScalerContext() = default;
 
+  virtual bool asyncSupport() const {
+    return true;
+  }
+
   std::shared_ptr<Typeface> getTypeface() const {
     return typeface;
   }
@@ -63,7 +67,12 @@ class ScalerContext {
                                  Matrix* matrix) const = 0;
 
   virtual bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
-                          const ImageInfo& dstInfo, void* dstPixels) const = 0;
+                          const ImageInfo& dstInfo, void* dstPixels,
+                          const Point& glyphOffset) const = 0;
+
+  virtual float getBackingSize() const {
+    return textSize;
+  }
 
  protected:
   // Note: This could be nullptr.

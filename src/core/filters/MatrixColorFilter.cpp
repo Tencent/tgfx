@@ -46,7 +46,15 @@ bool MatrixColorFilter::isEqual(const ColorFilter* colorFilter) const {
   return matrix == other->matrix;
 }
 
-PlacementPtr<FragmentProcessor> MatrixColorFilter::asFragmentProcessor(Context* context) const {
-  return ColorMatrixFragmentProcessor::Make(context->drawingBuffer(), matrix);
+bool MatrixColorFilter::affectsTransparentBlack() const {
+  // Applying the matrix to (0,0,0,0) produces the offset vector (e, j, o, t) = matrix[4,9,14,19].
+  // After clamping to [0,1] and premultiplying (rgb *= a), the result is non-zero only if the alpha
+  // offset is positive.
+  return std::max(matrix[19], 0.0f) > 0.0f;
+}
+
+PlacementPtr<FragmentProcessor> MatrixColorFilter::asFragmentProcessor(
+    Context* context, const std::shared_ptr<ColorSpace>&) const {
+  return ColorMatrixFragmentProcessor::Make(context->drawingAllocator(), matrix);
 }
 }  // namespace tgfx

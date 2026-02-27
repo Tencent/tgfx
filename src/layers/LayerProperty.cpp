@@ -22,30 +22,39 @@
 namespace tgfx {
 
 void LayerProperty::invalidateContent() {
-  for (auto& owner : owners) {
-    if (auto layer = owner.lock()) {
-      layer->invalidateContent();
-    }
+  for (const auto& owner : owners) {
+    owner->invalidateContent();
   }
 }
 
 void LayerProperty::invalidateTransform() {
-  for (auto& owner : owners) {
-    if (auto layer = owner.lock()) {
-      layer->invalidateTransform();
-    }
+  for (const auto& owner : owners) {
+    owner->invalidateTransform();
   }
 }
 
 void LayerProperty::attachToLayer(Layer* layer) {
-  owners.push_back(layer->weak_from_this());
+  owners.push_back(layer);
 }
 
 void LayerProperty::detachFromLayer(Layer* layer) {
-  for (auto owner = owners.begin(); owner != owners.end(); ++owner) {
-    if (owner->lock().get() == layer) {
-      owners.erase(owner);
+  for (auto it = owners.begin(); it != owners.end(); ++it) {
+    if (*it == layer) {
+      owners.erase(it);
       break;
+    }
+  }
+}
+
+void LayerProperty::replaceChildProperty(LayerProperty* oldChild, LayerProperty* newChild) {
+  if (oldChild) {
+    for (const auto& owner : owners) {
+      oldChild->detachFromLayer(owner);
+    }
+  }
+  if (newChild) {
+    for (const auto& owner : owners) {
+      newChild->attachToLayer(owner);
     }
   }
 }

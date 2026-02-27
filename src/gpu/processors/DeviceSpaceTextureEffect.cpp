@@ -24,7 +24,7 @@ DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy>
     : FragmentProcessor(ClassID()), textureProxy(std::move(textureProxy)), uvMatrix(uvMatrix) {
 }
 
-GPUTexture* DeviceSpaceTextureEffect::onTextureAt(size_t) const {
+std::shared_ptr<Texture> DeviceSpaceTextureEffect::onTextureAt(size_t) const {
   auto textureView = textureProxy->getTextureView();
   return textureView == nullptr ? nullptr : textureView->getTexture();
 }

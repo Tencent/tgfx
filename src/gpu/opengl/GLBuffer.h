@@ -18,27 +18,26 @@
 
 #pragma once
 
-#include "gpu/GPUBuffer.h"
 #include "gpu/opengl/GLInterface.h"
+#include "gpu/opengl/GLResource.h"
+#include "tgfx/gpu/GPUBuffer.h"
 
 namespace tgfx {
 /**
  * GLBuffer is a GPUBuffer implementation for OpenGL. It encapsulates an OpenGL buffer object and
  * provides methods to access its properties and release its resources.
  */
-class GLBuffer : public GPUBuffer {
+class GLBuffer : public GPUBuffer, public GLResource {
  public:
   /**
    * Creates a new GLBuffer with the specified size and usage flags.
    */
-  GLBuffer(unsigned bufferID, size_t size, uint32_t usage)
-      : GPUBuffer(size, usage), _bufferID(bufferID) {
-  }
+  GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size, uint32_t usage);
 
   /**
-   * Returns the OpenGL target for this buffer based on its usage flags.
+   * Returns the OpenGL target for the buffer based on its usage flags.
    */
-  unsigned target() const;
+  static unsigned GetTarget(uint32_t usage);
 
   /**
    * Returns the OpenGL buffer ID associated with this buffer.
@@ -47,11 +46,19 @@ class GLBuffer : public GPUBuffer {
     return _bufferID;
   }
 
-  void release(GPU* gpu) override;
+  bool isReady() const override;
 
- private:
+  void* map(size_t offset, size_t size) override;
+
+  void unmap() override;
+
+  void insertReadbackFence();
+
+ protected:
+  std::shared_ptr<GLInterface> _interface = nullptr;
   unsigned _bufferID = 0;
+  void* readbackFence = nullptr;
 
-  friend class GLGPU;
+  void onRelease(GLGPU* gpu) override;
 };
 }  // namespace tgfx

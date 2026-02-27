@@ -17,20 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSemaphore.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "gpu/opengl/GLFunctions.h"
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-std::shared_ptr<Semaphore> Semaphore::Wrap(Context* context,
-                                           const BackendSemaphore& backendSemaphore) {
-  GLSyncInfo glSyncInfo = {};
-  if (context == nullptr || !context->caps()->semaphoreSupport ||
-      !backendSemaphore.getGLSync(&glSyncInfo)) {
-    return nullptr;
-  }
-  auto semaphore = new GLSemaphore(glSyncInfo.sync);
-  return Resource::AddToCache(context, semaphore);
-}
-
 BackendSemaphore GLSemaphore::getBackendSemaphore() const {
   if (_glSync == nullptr) {
     return {};
@@ -40,9 +30,9 @@ BackendSemaphore GLSemaphore::getBackendSemaphore() const {
   return {glSyncInfo};
 }
 
-void GLSemaphore::onReleaseGPU() {
+void GLSemaphore::onRelease(GLGPU* gpu) {
   if (_glSync != nullptr) {
-    auto gl = GLFunctions::Get(context);
+    auto gl = gpu->functions();
     gl->deleteSync(_glSync);
     _glSync = nullptr;
   }

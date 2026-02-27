@@ -21,6 +21,7 @@
 #include "core/PixelBufferCodec.h"
 #include "core/ScaledImageGenerator.h"
 #include "core/images/CodecImage.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/NextCacheScaleLevel.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
@@ -47,8 +48,8 @@ float BufferImage::getRasterizedScale(float drawScale) const {
 }
 
 std::shared_ptr<TextureProxy> BufferImage::lockTextureProxy(const TPArgs& args) const {
-  auto scaleWidth = static_cast<int>(roundf(static_cast<float>(width()) * args.drawScale));
-  auto scaleHeight = static_cast<int>(roundf(static_cast<float>(height()) * args.drawScale));
+  auto scaleWidth = FloatRoundToInt(static_cast<float>(width()) * args.drawScale);
+  auto scaleHeight = FloatRoundToInt(static_cast<float>(height()) * args.drawScale);
   if (imageBuffer->isPixelBuffer() && scaleWidth < imageBuffer->width() &&
       scaleHeight < imageBuffer->height()) {
     auto codec = PixelBufferCodec::Make(std::static_pointer_cast<PixelBuffer>(imageBuffer));

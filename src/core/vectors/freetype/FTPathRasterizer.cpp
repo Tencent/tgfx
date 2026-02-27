@@ -20,28 +20,38 @@
 #include "FTLibrary.h"
 #include "FTPath.h"
 #include "FTRasterTarget.h"
+#include "core/NoConicsPathIterator.h"
 #include "core/utils/ClearPixels.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
+#include "core/utils/ScalePixelsAlpha.h"
+#include "core/utils/ShapeUtils.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-static void Iterator(PathVerb verb, const Point points[4], void* info) {
-  auto path = reinterpret_cast<FTPath*>(info);
-  switch (verb) {
-    case PathVerb::Move:
-      path->moveTo(points[0]);
-      break;
-    case PathVerb::Line:
-      path->lineTo(points[1]);
-      break;
-    case PathVerb::Quad:
-      path->quadTo(points[1], points[2]);
-      break;
-    case PathVerb::Cubic:
-      path->cubicTo(points[1], points[2], points[3]);
-      break;
-    case PathVerb::Close:
-      path->close();
-      break;
+static void AddPathToFTPath(const Path& path, FTPath* ftPath) {
+  NoConicsPathIterator iterator(path);
+  for (auto segment : iterator) {
+    switch (segment.verb) {
+      case PathVerb::Move:
+        ftPath->moveTo(segment.points[0]);
+        break;
+      case PathVerb::Line:
+        ftPath->lineTo(segment.points[1]);
+        break;
+      case PathVerb::Quad:
+        ftPath->quadTo(segment.points[1], segment.points[2]);
+        break;
+      case PathVerb::Cubic:
+        ftPath->cubicTo(segment.points[1], segment.points[2], segment.points[3]);
+        break;
+      case PathVerb::Close:
+        ftPath->close();
+        break;
+      default:
+        break;
+    }
   }
 }
 
@@ -57,6 +67,7 @@ std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
 }
 
 bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                    std::shared_ptr<ColorSpace> dstColorSpace,
                                     void* dstPixels) const {
   if (dstPixels == nullptr) {
     return false;
@@ -65,7 +76,8 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   if (path.isEmpty()) {
     return false;
   }
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
   auto totalMatrix = Matrix::MakeScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(targetInfo.height()));
@@ -77,11 +89,12 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   }
   ClearPixels(targetInfo, dstPixels);
   FTPath ftPath = {};
-  path.decompose(Iterator, &ftPath);
+  AddPathToFTPath(path, &ftPath);
   auto fillType = path.getFillType();
   ftPath.setEvenOdd(fillType == PathFillType::EvenOdd || fillType == PathFillType::InverseEvenOdd);
   auto outlines = ftPath.getOutlines();
   auto ftLibrary = FTLibrary::Get();
+  auto alphaScale = ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
   if (!needsGammaCorrection) {
     FT_Bitmap bitmap;
     bitmap.width = static_cast<unsigned>(targetInfo.width());
@@ -92,6 +105,11 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
     bitmap.num_grays = 256;
     for (auto& outline : outlines) {
       FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
+    }
+    ScalePixelsAlpha(targetInfo, dstPixels, alphaScale);
+    if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+      ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
+                               dstColorSpace, dstPixels);
     }
     return true;
   }
@@ -110,6 +128,11 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
                      static_cast<FT_Pos>(targetInfo.height())};
   for (const auto& outline : outlines) {
     FT_Outline_Render(ftLibrary, &(outline->outline), &params);
+  }
+  ScalePixelsAlpha(targetInfo, dstPixels, alphaScale);
+  if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+    ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
+                             dstColorSpace, dstPixels);
   }
   return true;
 }

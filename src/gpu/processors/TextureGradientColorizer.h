@@ -24,7 +24,7 @@
 namespace tgfx {
 class TextureGradientColorizer : public FragmentProcessor {
  public:
-  static PlacementPtr<TextureGradientColorizer> Make(BlockBuffer* buffer,
+  static PlacementPtr<TextureGradientColorizer> Make(BlockAllocator* allocator,
                                                      std::shared_ptr<TextureProxy> gradient);
 
   std::string name() const override {
@@ -42,7 +42,7 @@ class TextureGradientColorizer : public FragmentProcessor {
     return 1;
   }
 
-  GPUTexture* onTextureAt(size_t) const override {
+  std::shared_ptr<Texture> onTextureAt(size_t) const override {
     auto textureView = gradient->getTextureView();
     return textureView ? textureView->getTexture() : nullptr;
   }

@@ -19,8 +19,12 @@
 #pragma once
 
 #include <core/utils/Types.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
 #define FLATBUFFERS_LOCALE_INDEPENDENT 0
 #include <flatbuffers/flexbuffers.h>
+#pragma clang diagnostic pop
+#include <functional>
 #include <string>
 #include "inspect/Protocol.h"
 #include "tgfx/gpu/Context.h"
@@ -45,8 +49,6 @@ std::string LayerStyleTypeToString(LayerStyleType type);
 std::string LayerStylePositionToString(LayerStylePosition position);
 
 std::string LayerStyleExtraSourceTypeToString(LayerStyleExtraSourceType type);
-
-std::string RecordedContentTypeToString(Types::LayerContentType type);
 
 void SerializeBegin(flexbuffers::Builder& fbb, tgfx::inspect::LayerTreeMessage type,
                     size_t& mapStart, size_t& contentStart);

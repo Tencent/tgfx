@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureUploadTask.h"
-#include "gpu/TextureView.h"
+#include "gpu/resources/TextureView.h"
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {

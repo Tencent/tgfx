@@ -34,6 +34,10 @@ class VideoElement : public ImageStream {
    */
   static std::shared_ptr<VideoElement> MakeFrom(emscripten::val video, int width, int height);
 
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return ColorSpace::SRGB();
+  }
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override;
 

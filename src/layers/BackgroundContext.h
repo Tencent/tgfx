@@ -25,32 +25,43 @@ class BackgroundContext {
  public:
   static std::shared_ptr<BackgroundContext> Make(Context* context, const Rect& drawRect,
                                                  float maxOutset, float minOutset,
-                                                 const Matrix& matrix);
+                                                 const Matrix& matrix,
+                                                 std::shared_ptr<ColorSpace> colorSpace);
 
-  Canvas* getCanvas() const {
-    return surface->getCanvas();
-  }
+  virtual ~BackgroundContext() = default;
 
-  std::shared_ptr<Image> getBackgroundImage() const;
+  virtual Canvas* getCanvas() = 0;
 
-  Matrix backgroundMatrix() const {
-    return imageMatrix;
-  }
+  Matrix backgroundMatrix() const;
 
-  std::shared_ptr<BackgroundContext> createSubContext() const;
+  std::shared_ptr<Image> getBackgroundImage();
 
-  void drawToParent(const Matrix& paintMatrix, const Paint& paint);
+  std::shared_ptr<BackgroundContext> createSubContext(const Rect& renderBounds,
+                                                      bool clipToBackgroundRect);
+
+  void drawToParent(const Paint& paint);
 
   Rect getBackgroundRect() const {
     return backgroundRect;
   }
 
- private:
-  BackgroundContext() = default;
-  std::shared_ptr<Surface> surface = nullptr;
+ protected:
+  virtual std::shared_ptr<Image> onGetBackgroundImage() = 0;
+
+  BackgroundContext(Context* context, const Matrix& matrix, const Rect& rect,
+                    std::shared_ptr<ColorSpace> colorSpace)
+      : context(context), imageMatrix(matrix), backgroundRect(rect),
+        colorSpace(std::move(colorSpace)){};
+  Context* context = nullptr;
   Matrix imageMatrix = Matrix::I();
-  const BackgroundContext* parent = nullptr;
   Rect backgroundRect = Rect::MakeEmpty();
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
+
+  BackgroundContext* parent = nullptr;
+
+  // Offset of this context's surface origin in parent's surface coordinates.
+  // Only used when created by createSubContext(renderBounds, ...).
+  Point surfaceOffset = Point::Zero();
 };
 
 }  // namespace tgfx

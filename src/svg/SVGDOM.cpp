@@ -34,19 +34,35 @@
 #include "tgfx/svg/xml/XMLDOM.h"
 
 namespace tgfx {
+class DefaultCustomParser : public SVGCustomParser {
+ public:
+  void handleCustomAttribute(SVGNode& node, const std::string& name,
+                             const std::string& value) override {
+    if (name.empty() || value.empty()) {
+      return;
+    }
+    node.addCustomAttribute(name, value);
+  }
+};
 
-std::shared_ptr<SVGDOM> SVGDOM::Make(Stream& stream, std::shared_ptr<TextShaper> textShaper) {
+std::shared_ptr<SVGDOM> SVGDOM::Make(Stream& stream, std::shared_ptr<TextShaper> textShaper,
+                                     std::shared_ptr<SVGCustomParser> customParser) {
   // Parse the data into an XML DOM structure
   auto xmlDom = DOM::Make(stream);
   if (!xmlDom) {
     return nullptr;
   }
 
+  // Create a custom parser if it is not provided
+  if (!customParser) {
+    customParser = std::make_shared<DefaultCustomParser>();
+  }
+
   // Convert the XML structure to an SVG structure, translating XML elements and attributes into
   // SVG elements and attributes
   SVGIDMapper mapper;
   CSSMapper cssMapper;
-  ConstructionContext constructionContext(&mapper, &cssMapper);
+  ConstructionContext constructionContext(&mapper, &cssMapper, std::move(customParser));
   auto root =
       SVGNodeConstructor::ConstructSVGNode(constructionContext, xmlDom->getRootNode().get());
   if (!root || root->tag() != SVGTag::Svg) {

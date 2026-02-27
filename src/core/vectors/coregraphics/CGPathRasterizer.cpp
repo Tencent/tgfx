@@ -18,39 +18,50 @@
 
 #include "CGPathRasterizer.h"
 #include <CoreGraphics/CGBitmapContext.h>
+#include "core/NoConicsPathIterator.h"
 #include "core/PixelBuffer.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
+#include "core/utils/MathExtra.h"
+#include "core/utils/ScalePixelsAlpha.h"
+#include "core/utils/ShapeUtils.h"
 #include "platform/apple/BitmapContextUtil.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 
 namespace tgfx {
-static void Iterator(PathVerb verb, const Point points[4], void* info) {
-  auto cgPath = reinterpret_cast<CGMutablePathRef>(info);
-  switch (verb) {
-    case PathVerb::Move:
-      CGPathMoveToPoint(cgPath, nullptr, points[0].x, points[0].y);
-      break;
-    case PathVerb::Line:
-      CGPathAddLineToPoint(cgPath, nullptr, points[1].x, points[1].y);
-      break;
-    case PathVerb::Quad:
-      CGPathAddQuadCurveToPoint(cgPath, nullptr, points[1].x, points[1].y, points[2].x,
-                                points[2].y);
-      break;
-    case PathVerb::Cubic:
-      CGPathAddCurveToPoint(cgPath, nullptr, points[1].x, points[1].y, points[2].x, points[2].y,
-                            points[3].x, points[3].y);
-      break;
-    case PathVerb::Close:
-      CGPathCloseSubpath(cgPath);
-      break;
+static void AddPathToCGPath(const Path& path, CGMutablePathRef cgPath) {
+  NoConicsPathIterator iterator(path);
+  for (auto segment : iterator) {
+    switch (segment.verb) {
+      case PathVerb::Move:
+        CGPathMoveToPoint(cgPath, nullptr, segment.points[0].x, segment.points[0].y);
+        break;
+      case PathVerb::Line:
+        CGPathAddLineToPoint(cgPath, nullptr, segment.points[1].x, segment.points[1].y);
+        break;
+      case PathVerb::Quad:
+        CGPathAddQuadCurveToPoint(cgPath, nullptr, segment.points[1].x, segment.points[1].y,
+                                  segment.points[2].x, segment.points[2].y);
+        break;
+      case PathVerb::Cubic:
+        CGPathAddCurveToPoint(cgPath, nullptr, segment.points[1].x, segment.points[1].y,
+                              segment.points[2].x, segment.points[2].y, segment.points[3].x,
+                              segment.points[3].y);
+        break;
+      case PathVerb::Close:
+        CGPathCloseSubpath(cgPath);
+        break;
+      default:
+        break;
+    }
   }
 }
 
 static void DrawPath(const Path& path, CGContextRef cgContext, const ImageInfo& info,
                      bool antiAlias) {
   auto cgPath = CGPathCreateMutable();
-  path.decompose(Iterator, cgPath);
+  AddPathToCGPath(path, cgPath);
 
   CGContextSetShouldAntialias(cgContext, antiAlias);
   static const CGFloat white[] = {1.f, 1.f, 1.f, 1.f};
@@ -88,7 +99,7 @@ static CGImageRef CreateCGImage(const Path& path, void* pixels, const ImageInfo&
   CGContextTranslateCTM(cgContext, -left, -top);
   DrawPath(path, cgContext, info, antiAlias);
   CGContextFlush(cgContext);
-  auto* p = static_cast<uint8_t*>(pixels);
+  auto p = static_cast<uint8_t*>(pixels);
   auto stride = info.rowBytes();
   for (int y = 0; y < info.height(); ++y) {
     for (int x = 0; x < info.width(); ++x) {
@@ -114,6 +125,7 @@ std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
 }
 
 bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                    std::shared_ptr<ColorSpace> dstColorSpace,
                                     void* dstPixels) const {
   if (dstPixels == nullptr) {
     return false;
@@ -122,7 +134,8 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   if (path.isEmpty()) {
     return false;
   }
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
   auto cgContext = CreateBitmapContext(targetInfo, dstPixels);
   if (cgContext == nullptr) {
@@ -140,8 +153,8 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   if (!bounds.intersect(clipBounds)) {
     return false;
   }
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto width = FloatCeilToInt(bounds.width());
+  auto height = FloatCeilToInt(bounds.height());
   auto tempBuffer = PixelBuffer::Make(width, height, true, false);
   if (tempBuffer == nullptr) {
     CGContextRelease(cgContext);
@@ -164,6 +177,12 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   CGContextDrawImage(cgContext, rect, image);
   CGContextRelease(cgContext);
   CGImageRelease(image);
+  auto alphaScale = ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
+  ScalePixelsAlpha(targetInfo, dstPixels, alphaScale);
+  if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+    ConvertColorSpaceInPlace(ImageGenerator::width(), ImageGenerator::height(), colorType,
+                             alphaType, dstRowBytes, colorSpace(), dstColorSpace, dstPixels);
+  }
   return true;
 }
 

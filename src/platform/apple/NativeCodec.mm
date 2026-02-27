@@ -18,6 +18,7 @@
 
 #include "NativeCodec.h"
 #include "BitmapContextUtil.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
@@ -124,7 +125,7 @@ NativeCodec::~NativeCodec() {
 }
 
 bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                               void* dstPixels) const {
+                               std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const {
   if (dstPixels == nullptr) {
     return false;
   }
@@ -158,12 +159,18 @@ bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t 
     }
   }
   Buffer tempBuffer = {};
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
-  auto info = dstInfo;
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   auto pixels = dstPixels;
+  auto info = dstInfo;
   if (colorType != ColorType::RGBA_8888 && colorType != ColorType::BGRA_8888 &&
       colorType != ColorType::ALPHA_8) {
     info = dstInfo.makeColorType(ColorType::RGBA_8888);
+    info = info.makeColorSpace(colorSpace());
+    tempBuffer.alloc(info.byteSize());
+    pixels = tempBuffer.data();
+  } else if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+    info = dstInfo.makeColorSpace(colorSpace());
     tempBuffer.alloc(info.byteSize());
     pixels = tempBuffer.data();
   }

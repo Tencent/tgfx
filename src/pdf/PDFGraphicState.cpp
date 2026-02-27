@@ -37,11 +37,11 @@ uint8_t FilterPDFBlendMode(BlendMode mode) {
 }  // namespace
 
 PDFIndirectReference PDFGraphicState::GetGraphicStateForPaint(PDFDocumentImpl* document,
-                                                              const Fill& fill) {
+                                                              const Brush& brush) {
   DEBUG_ASSERT(document);
-  auto mode = fill.blendMode;
+  auto mode = brush.blendMode;
 
-  PDFFillGraphicState fillKey = {fill.color.alpha, FilterPDFBlendMode(mode)};
+  PDFFillGraphicState fillKey = {brush.color.alpha, FilterPDFBlendMode(mode)};
   auto& fillMap = document->fillGSMap;
   auto iter = fillMap.find(fillKey);
   if (iter != fillMap.end()) {

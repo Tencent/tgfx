@@ -29,7 +29,7 @@
 #include "tgfx/core/Clock.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
-#include "tgfx/layers/SolidColor.h"
+#include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx::inspect {
 static moodycamel::ConcurrentQueue<uint64_t> imageIDQueue;
@@ -210,7 +210,7 @@ void LayerTree::addHighLightOverlay(Color color, std::shared_ptr<Layer> layer) {
   highlightLayer->setBlendMode(BlendMode::SrcOver);
   auto rectPath = Path();
   rectPath.addRect(hoverdLayer->getBounds());
-  highlightLayer->setFillStyle(SolidColor::Make(color));
+  highlightLayer->setFillStyle(ShapeStyle::Make(color));
   highlightLayer->setPath(rectPath);
   highlightLayer->setAlpha(0.66f);
   hoverdLayer->addChild(highlightLayer);

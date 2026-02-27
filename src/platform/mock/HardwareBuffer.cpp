@@ -17,13 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/HardwareBuffer.h"
-#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace) {
-  return nullptr;
-}
-
 bool HardwareBufferCheck(HardwareBufferRef) {
   return false;
 }
@@ -46,11 +41,7 @@ void* HardwareBufferLock(HardwareBufferRef) {
 void HardwareBufferUnlock(HardwareBufferRef) {
 }
 
-ISize HardwareBufferGetSize(HardwareBufferRef) {
-  return {};
-}
-
-ImageInfo HardwareBufferGetInfo(HardwareBufferRef) {
+HardwareBufferInfo HardwareBufferGetInfo(HardwareBufferRef) {
   return {};
 }
 }  // namespace tgfx

@@ -22,12 +22,11 @@ import android.graphics.PointF
 import android.graphics.SurfaceTexture
 import android.view.Surface
 import android.view.TextureView
-import java.io.ByteArrayOutputStream
-
 import java.io.InputStream
 
-
 open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
+
+
     constructor(context: android.content.Context) : super(context) {
         setupSurfaceTexture()
     }
@@ -47,59 +46,125 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
         setupSurfaceTexture()
     }
 
+
     private fun setupSurfaceTexture() {
         surfaceTextureListener = this
     }
 
-    override fun onSurfaceTextureAvailable(p0: SurfaceTexture, p1: Int, p2: Int) {
+
+    override fun onSurfaceTextureAvailable(
+        surfaceTexture: SurfaceTexture,
+        width: Int,
+        height: Int
+    ) {
         release()
-        val stream: InputStream = context.assets.open("bridge.jpg")
-        val imageBytes: ByteArray = ByteArray(stream.available())
-        stream.read(imageBytes)
-        stream.close();
+
+        val streamBridge: InputStream = context.assets.open("bridge.jpg")
+        val imageBytesBridge = ByteArray(streamBridge.available())
+        streamBridge.read(imageBytesBridge)
+        streamBridge.close()
+
+        val streamTGFX: InputStream = context.assets.open("tgfx.png")
+        val imageBytesTGFX = ByteArray(streamTGFX.available())
+        streamTGFX.read(imageBytesTGFX)
+        streamTGFX.close()
+
+        val streamFont: InputStream = context.assets.open("NotoColorEmoji.ttf")
+        val fontBytes = ByteArray(streamFont.available())
+        streamFont.read(fontBytes)
+        streamFont.close()
+
         val metrics = resources.displayMetrics
-        surface = Surface(p0)
-        nativePtr = setupFromSurface(surface!!, imageBytes, metrics.density)
+
+        surface = Surface(surfaceTexture)
+        val imageBytesArray = arrayOf(imageBytesBridge, imageBytesTGFX)
+        nativePtr = setupFromSurface(
+            surface,
+            imageBytesArray,
+            fontBytes,
+            metrics.density
+        )
+
+        // Only initialize if native initialization was successful
+        if (nativePtr != 0L) {
+            updateLayerTree(0)
+            updateZoomScaleAndOffset(1.0f, PointF(0f, 0f))
+        }
     }
 
-    override fun onSurfaceTextureSizeChanged(p0: SurfaceTexture, p1: Int, p2: Int) {
-        updateSize()
+
+    override fun onSurfaceTextureSizeChanged(
+        surfaceTexture: SurfaceTexture,
+        width: Int,
+        height: Int
+    ) {
+        nativeUpdateSize()
     }
 
-    override fun onSurfaceTextureDestroyed(p0: SurfaceTexture): Boolean {
+    override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
         return true
     }
 
-    override fun onSurfaceTextureUpdated(p0: SurfaceTexture) {
+
+    override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) {
     }
+
 
     fun release() {
-        if (surface != null) {
-            surface!!.release()
-            surface = null
+        if (::surface.isInitialized) {
+            surface.release()
         }
-        nativeRelease()
+        if (nativePtr != 0L) {
+            nativeRelease()
+            nativePtr = 0L
+        }
     }
 
-    fun draw(index: Int, zoom: Float, offset: PointF) {
-        nativeDraw(index, zoom, offset.x, offset.y)
+
+    fun updateLayerTree(drawIndex: Int) {
+        if (nativePtr != 0L) {
+            nativeUpdateDisplayList(drawIndex)
+        }
     }
 
-    private external fun updateSize()
+    fun updateZoomScaleAndOffset(zoom: Float, offset: PointF) {
+        if (nativePtr != 0L) {
+            nativeUpdateDisplayTransform(zoom, offset.x, offset.y)
+        }
+    }
+
+    fun draw() {
+        if (nativePtr != 0L) {
+            nativeDraw()
+        }
+    }
+
+
+    private external fun nativeUpdateSize()
 
     private external fun nativeRelease()
 
-    private external fun nativeDraw(drawIndex: Int, zoom: Float, offsetX: Float, offsetY: Float)
+    private external fun nativeUpdateDisplayList(drawIndex: Int)
 
-    private var surface: Surface? = null
+    private external fun nativeUpdateDisplayTransform(zoom: Float, offsetX: Float, offsetY: Float)
+
+    private external fun nativeDraw()
+
+
+    private lateinit var surface: Surface
 
     private var nativePtr: Long = 0
 
+
     companion object {
+
         private external fun nativeInit()
 
+
         private external fun setupFromSurface(
-            surface: Surface, imageBytes: ByteArray,
+            surface: Surface,
+            imageBytes: Array<ByteArray>,
+            fontBytes: ByteArray,
             density: Float
         ): Long
 

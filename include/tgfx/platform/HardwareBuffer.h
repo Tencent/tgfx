@@ -42,6 +42,67 @@ typedef void* HardwareBufferRef;
 #endif
 
 /**
+ * Defines the possible pixel formats for a hardware buffer.
+ */
+enum class HardwareBufferFormat {
+  /**
+   * Uninitialized.
+   */
+  Unknown,
+
+  /**
+   * Each pixel is stored as a single translucency (alpha) channel. This is very useful for
+   * storing masks efficiently, for instance. No color information is stored. With this
+   * configuration, each pixel requires 1 byte of memory.
+   */
+  ALPHA_8,
+
+  /**
+   * Each pixel is stored on 4 bytes. Each channel (RGB and alpha for translucency) is stored with 8
+   * bits of precision (256 possible values). The channel order is: red, green, blue, alpha.
+   */
+  RGBA_8888,
+
+  /**
+   * Each pixel is stored on 4 bytes. Each channel (RGB and alpha for translucency) is stored with 8
+   * bits of precision (256 possible values). The channel order is: blue, green, red, alpha.
+   */
+  BGRA_8888,
+
+  /**
+   * Each pixel is stored in YCbCr 4:2:0 semi-planar format, also known as NV12. Commonly used for
+   * video buffers, with a full-resolution Y plane and interleaved CbCr plane. Each pixel uses 1.5
+   * bytes of memory.
+   */
+  YCBCR_420_SP
+};
+
+/**
+ * Describes the properties of a hardware buffer.
+ */
+struct HardwareBufferInfo {
+  /**
+   * The width of the hardware buffer in pixels.
+   */
+  int width = 0;
+
+  /**
+   * The height of the hardware buffer in pixels.
+   */
+  int height = 0;
+
+  /**
+   * The pixel format of the hardware buffer.
+   */
+  HardwareBufferFormat format = HardwareBufferFormat::Unknown;
+
+  /**
+   * The number of bytes per row of the hardware buffer.
+   */
+  size_t rowBytes = 0;
+};
+
+/**
  * Returns true if the current platform has hardware buffer support. Otherwise, returns false.
  */
 bool HardwareBufferAvailable();
@@ -84,16 +145,10 @@ void* HardwareBufferLock(HardwareBufferRef buffer);
 void HardwareBufferUnlock(HardwareBufferRef buffer);
 
 /**
- * Returns the size of the hardware buffer in pixels as an ISize object. Returns an empty ISize if
- * the buffer is nullptr or not recognized.
+ * Returns a HardwareBufferInfo containing the width, height, format, and row bytes of the specified
+ * hardware buffer. If the buffer is nullptr or unrecognized, returns an empty HardwareBufferInfo
+ * with width and height set to zero.
  */
-ISize HardwareBufferGetSize(HardwareBufferRef buffer);
-
-/**
- * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
- * given hardware buffer object. Returns an empty ImageInfo if the buffer is nullptr or not
- * recognized.
- */
-ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer);
+HardwareBufferInfo HardwareBufferGetInfo(HardwareBufferRef buffer);
 
 }  // namespace tgfx

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/codecs/webp/WebpUtility.h"
+#include <src/skcms_public.h>
 #include <cstdint>
 #include <cstdio>
 #include "core/utils/Log.h"
@@ -65,7 +66,7 @@ struct WebpFile {
   size_t _riff_end;
 };
 
-static const uint32_t kBitMask[VP8L_MAX_NUM_BIT_READ + 1] = {
+static const uint32_t BIT_MASK[VP8L_MAX_NUM_BIT_READ + 1] = {
     0,        0x000001, 0x000003, 0x000007, 0x00000f, 0x00001f, 0x00003f, 0x00007f, 0x0000ff,
     0x0001ff, 0x0003ff, 0x0007ff, 0x000fff, 0x001fff, 0x003fff, 0x007fff, 0x00ffff, 0x01ffff,
     0x03ffff, 0x07ffff, 0x0fffff, 0x1fffff, 0x3fffff, 0x7fffff, 0xffffff};
@@ -148,7 +149,7 @@ static uint32_t VP8LReadBits(VP8LBitReader* const br, int n_bits) {
   ASSERT(n_bits >= 0);
   // Flag an error if end_of_stream or n_bits is more than allowed limit.
   if (!br->eos_ && n_bits <= VP8L_MAX_NUM_BIT_READ) {
-    const uint32_t val = VP8LPrefetchBits(br) & kBitMask[n_bits];
+    const uint32_t val = VP8LPrefetchBits(br) & BIT_MASK[n_bits];
     const int new_bits = br->bit_pos_ + n_bits;
     br->bit_pos_ = new_bits;
     ShiftBytes(br);
@@ -247,6 +248,7 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
   webpFile._start = 12;
   auto chunkHeader = static_cast<uint8_t*>(malloc(RIFF_HEADER_SIZE));
   bool foundOrientation = false;
+  bool foundColorSpace = false;
   do {
     fseek(infile, static_cast<int>(webpFile._start), SEEK_SET);
     if ((fileLength - webpFile._start) < RIFF_HEADER_SIZE) break;
@@ -286,6 +288,25 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
         }
         break;
       }
+      case MKFOURCC('I', 'C', 'C', 'P'): {
+        foundColorSpace = true;
+        fseek(infile, static_cast<int>(webpFile._start) + CHUNK_HEADER_SIZE, SEEK_SET);
+        auto profiler = static_cast<uint8_t*>(malloc(chunk_size));
+        if (fread(profiler, 1, chunk_size, infile) != chunk_size) {
+          needBreak = true;
+          break;
+        }
+        decodeInfo.colorSpace = ColorSpace::MakeFromICC(profiler, chunk_size);
+        if (decodeInfo.colorSpace == nullptr) {
+          decodeInfo.colorSpace = ColorSpace::SRGB();
+        }
+        if (chunk_size_padded <= webpFile._end - webpFile._start) {
+          Skip(&webpFile, chunk_size_padded + CHUNK_HEADER_SIZE);
+        } else {
+          needBreak = true;
+        }
+        break;
+      }
       default: {
         if (chunk_size_padded <= webpFile._end - webpFile._start) {
           Skip(&webpFile, chunk_size_padded + CHUNK_HEADER_SIZE);
@@ -296,7 +317,8 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
       }
     }
     if (needBreak) break;
-  } while (!foundOrientation && (fileLength - webpFile._start) >= RIFF_HEADER_SIZE);
+  } while ((!foundColorSpace || !foundOrientation) &&
+           (fileLength - webpFile._start) >= RIFF_HEADER_SIZE);
   free(chunkHeader);
   fclose(infile);
   return decodeInfo;
@@ -335,8 +357,20 @@ DecodeInfo WebpUtility::getDecodeInfo(const void* fileBytes, size_t byteLength) 
     }
     WebPDemuxReleaseChunkIterator(&chunkIterator);
   }
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
+  {
+    WebPChunkIterator chunkIterator;
+    if (WebPDemuxGetChunk(demux, "ICCP", 1, &chunkIterator)) {
+      auto chunk = Data::MakeWithCopy(chunkIterator.chunk.bytes, chunkIterator.chunk.size);
+      colorSpace = ColorSpace::MakeFromICC(chunk->data(), chunk->size());
+    }
+    if (colorSpace == nullptr) {
+      colorSpace = ColorSpace::SRGB();
+    }
+    WebPDemuxReleaseChunkIterator(&chunkIterator);
+  }
   WebPDemuxDelete(demux);
-  return {width, height, orientation};
+  return {width, height, orientation, colorSpace};
 }
 
 }  // namespace tgfx

@@ -20,20 +20,20 @@
 
 namespace tgfx {
 void Paint::setShader(std::shared_ptr<Shader> newShader) {
-  fill.shader = std::move(newShader);
-  if (fill.shader) {
+  brush.shader = std::move(newShader);
+  if (brush.shader) {
     Color color = {};
-    if (fill.shader->asColor(&color)) {
-      color.alpha *= fill.color.alpha;
-      fill.color = color;
-      fill.shader = nullptr;
+    if (brush.shader->asColor(&color)) {
+      color.alpha *= brush.color.alpha;
+      brush.color = color;
+      brush.shader = nullptr;
     }
   }
 }
 
 void Paint::reset() {
   stroke = Stroke(0);
-  fill = {};
+  brush = {};
   imageFilter = nullptr;
   style = PaintStyle::Fill;
 }

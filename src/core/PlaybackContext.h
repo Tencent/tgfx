@@ -19,7 +19,6 @@
 #pragma once
 
 #include "core/MCState.h"
-#include "tgfx/core/FillModifier.h"
 
 namespace tgfx {
 
@@ -27,14 +26,14 @@ class PlaybackContext {
  public:
   PlaybackContext() = default;
 
-  explicit PlaybackContext(MCState state, const FillModifier* fillModifier = nullptr);
+  explicit PlaybackContext(MCState state);
 
   const MCState& state() const {
     return _state;
   }
 
-  const Fill& fill() const {
-    return _fill;
+  const Brush& brush() const {
+    return _brush;
   }
 
   const Stroke* stroke() const {
@@ -47,7 +46,7 @@ class PlaybackContext {
 
   void setColor(const Color& color);
 
-  void setFill(const Fill& fill);
+  void setBrush(const Brush& brush);
 
   void setStrokeWidth(float width);
 
@@ -61,10 +60,8 @@ class PlaybackContext {
   MCState initState = {};
   bool hasInitMatrix = false;
   bool hasInitClip = false;
-  const FillModifier* fillModifier = nullptr;
   MCState _state = {};
-  Fill _fill = {};
-  Fill lastOriginalFill = {};
+  Brush _brush = {};
   Stroke _stroke = {};
   bool hasStroke = false;
 };

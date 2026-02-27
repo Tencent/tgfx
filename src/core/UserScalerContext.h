@@ -21,14 +21,29 @@
 #include "core/ScalerContext.h"
 
 namespace tgfx {
+
 class UserScalerContext : public ScalerContext {
  public:
   UserScalerContext(std::shared_ptr<Typeface> typeface, float size)
-      : ScalerContext(std::move(typeface), size) {
+      : ScalerContext(std::move(typeface), size),
+        textScale(size / static_cast<float>(userTypeface()->unitsPerEm())) {
   }
 
   FontMetrics getFontMetrics() const override {
-    return static_cast<UserTypeface*>(typeface.get())->fontMetrics();
+    const auto& metrics = userTypeface()->fontMetrics();
+    FontMetrics result = {};
+    result.top = metrics.top * textScale;
+    result.ascent = metrics.ascent * textScale;
+    result.descent = metrics.descent * textScale;
+    result.bottom = metrics.bottom * textScale;
+    result.leading = metrics.leading * textScale;
+    result.xMin = metrics.xMin * textScale;
+    result.xMax = metrics.xMax * textScale;
+    result.xHeight = metrics.xHeight * textScale;
+    result.capHeight = metrics.capHeight * textScale;
+    result.underlineThickness = metrics.underlineThickness * textScale;
+    result.underlinePosition = metrics.underlinePosition * textScale;
+    return result;
   }
 
   float getAdvance(GlyphID, bool) const override {
@@ -38,5 +53,12 @@ class UserScalerContext : public ScalerContext {
   Point getVerticalOffset(GlyphID) const override {
     return {};
   }
+
+ protected:
+  UserTypeface* userTypeface() const {
+    return static_cast<UserTypeface*>(typeface.get());
+  }
+
+  float textScale = 1.0f;
 };
 }  // namespace tgfx

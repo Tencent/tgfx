@@ -17,11 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GenerateMipmapsTask.h"
-#include "gpu/GPU.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
-GenerateMipmapsTask::GenerateMipmapsTask(std::shared_ptr<TextureProxy> textureProxy)
-    : textureProxy(std::move(textureProxy)) {
+GenerateMipmapsTask::GenerateMipmapsTask(BlockAllocator* allocator,
+                                         std::shared_ptr<TextureProxy> textureProxy)
+    : RenderTask(allocator), textureProxy(std::move(textureProxy)) {
 }
 
 void GenerateMipmapsTask::execute(CommandEncoder* encoder) {
