@@ -18,36 +18,39 @@
 
 #pragma once
 
-#include "gpu/QuadCW.h"
+#include "gpu/Quad.h"
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
 
 /**
- * AA flags for each edge of a quad. Edge is defined by vertex indices in clockwise order.
+ * AA flags for each edge of a quad. Each flag represents the edge starting from the vertex.
+ *
+ * Vertex and edge layout:
+ *   0 ←-- 2
+ *   ↓     ↑
+ *   1 --→ 3
  */
-static constexpr unsigned QUAD_AA_FLAG_EDGE_01 = 0b0001;  // Edge from vertex 0 to vertex 1
-static constexpr unsigned QUAD_AA_FLAG_EDGE_12 = 0b0010;  // Edge from vertex 1 to vertex 2
-static constexpr unsigned QUAD_AA_FLAG_EDGE_23 = 0b0100;  // Edge from vertex 2 to vertex 3
-static constexpr unsigned QUAD_AA_FLAG_EDGE_30 = 0b1000;  // Edge from vertex 3 to vertex 0
+static constexpr unsigned QUAD_AA_FLAG_EDGE_0 = 0b0001;
+static constexpr unsigned QUAD_AA_FLAG_EDGE_1 = 0b0010;
+static constexpr unsigned QUAD_AA_FLAG_EDGE_2 = 0b0100;
+static constexpr unsigned QUAD_AA_FLAG_EDGE_3 = 0b1000;
 static constexpr unsigned QUAD_AA_FLAG_NONE = 0b0000;
 static constexpr unsigned QUAD_AA_FLAG_ALL = 0b1111;
 
 /**
- * QuadRecord stores a CW-ordered quad with per-edge AA flags for rendering.
- * Vertices are in clockwise order. For triangles, point(2) == point(3).
+ * QuadRecord stores a Z-order quad with per-edge AA flags and optional transform matrix.
  */
 struct QuadRecord {
-  QuadRecord() = default;
-
-  QuadRecord(const QuadCW& quad, unsigned aaFlags, const Color& color = {})
-      : quad(quad), aaFlags(aaFlags), color(color) {
+  QuadRecord(const Quad& quad, unsigned aaFlags, const Color& color = {},
+             const Matrix& matrix = Matrix::I())
+      : quad(quad), aaFlags(aaFlags), color(color), matrix(matrix) {
   }
 
   /**
-   * Four vertices in clockwise order.
+   * Four vertices in Z-order.
    */
-  QuadCW quad;
+  Quad quad;
 
   /**
    * Per-edge AA flags.
@@ -58,6 +61,11 @@ struct QuadRecord {
    * Vertex color for blending.
    */
   Color color = {};
+
+  /**
+   * Transform matrix applied to quad vertices.
+   */
+  Matrix matrix = Matrix::I();
 };
 
 }  // namespace tgfx

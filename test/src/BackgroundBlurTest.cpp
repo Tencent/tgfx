@@ -511,4 +511,71 @@ TGFX_TEST(BackgroundBlurTest, ScaledInnerShadowWithBackgroundBlur) {
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/ScaledInnerShadowWithBackgroundBlur"));
 }
 
+/**
+ * Test background blur with perspective transform (preserve3D = false).
+ * When preserve3D is false, layers with perspective transforms should still be able to
+ * apply background blur.
+ */
+TGFX_TEST(BackgroundBlurTest, NestedFlat3DLayer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 250, 250);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Background image layer
+  auto backImage = MakeImage("resources/assets/HappyNewYear.png");
+  auto background = ImageLayer::Make();
+  background->setImage(backImage);
+  background->setMatrix(Matrix::MakeScale(250.f / 1024.f));
+  displayList->root()->addChild(background);
+
+  // Parent layer with preserve3D = false (default) and perspective transform
+  auto parentLayer = SolidLayer::Make();
+  parentLayer->setColor(Color::FromRGBA(200, 200, 200, 100));
+  parentLayer->setWidth(150);
+  parentLayer->setHeight(150);
+  {
+    auto size = Size::Make(150, 150);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, 25);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 400.0f);
+    auto origin = Matrix3D::MakeTranslate(50, 50, 0);
+    parentLayer->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  parentLayer->setPreserve3D(false);
+  parentLayer->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
+  displayList->root()->addChild(parentLayer);
+
+  // Child layer also with preserve3D = false and perspective transform + background blur
+  auto childLayer = SolidLayer::Make();
+  childLayer->setColor(Color::FromRGBA(255, 255, 255, 150));
+  childLayer->setWidth(80);
+  childLayer->setHeight(80);
+  {
+    auto size = Size::Make(80, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({1, 0, 0}, 20);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 300.0f);
+    auto origin = Matrix3D::MakeTranslate(35, 35, 0);
+    childLayer->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  childLayer->setPreserve3D(false);
+  childLayer->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
+  parentLayer->addChild(childLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/NestedFlat3DLayer"));
+}
+
 }  // namespace tgfx
