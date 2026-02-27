@@ -383,6 +383,14 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   drawContext->drawShape(std::move(shape), state, brush, stroke);
 }
 
+void Canvas::drawMesh(std::shared_ptr<Mesh> mesh, const Paint& paint) {
+  if (mesh == nullptr) {
+    return;
+  }
+  SaveLayerForImageFilter(paint.getImageFilter());
+  drawContext->drawMesh(std::move(mesh), *mcState, paint.getBrush());
+}
+
 void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                        const Paint* paint) {
   if (image == nullptr) {

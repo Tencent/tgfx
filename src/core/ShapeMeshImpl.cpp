@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,40 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "ShapeMeshImpl.h"
+#include "core/utils/UniqueID.h"
 
 namespace tgfx {
-/**
- * Defines the types of a layer.
- */
-enum class LayerType {
-  /**
-   * The type for a generic layer. May be used as a container for other child layers.
-   */
-  Layer,
-  /**
-   * A layer displaying a simple image.
-   */
-  Image,
-  /**
-   * A layer displaying a simple shape.
-   */
-  Shape,
-  /**
-   * A layer displaying a simple text.
-   */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid,
-  /**
-   * A layer displaying vector elements (shapes, text, images) with fill/stroke styles and modifiers.
-   */
-  Vector,
-  /**
-   * A layer displaying a mesh with vertex colors or textures.
-   */
-  Mesh
-};
+
+std::shared_ptr<Mesh> ShapeMeshImpl::Make(std::shared_ptr<Shape> shape, bool antiAlias) {
+  if (shape == nullptr) {
+    return nullptr;
+  }
+  auto impl = new ShapeMeshImpl(std::move(shape), antiAlias);
+  return std::shared_ptr<Mesh>(new Mesh(std::unique_ptr<MeshImpl>(impl)));
+}
+
+ShapeMeshImpl::ShapeMeshImpl(std::shared_ptr<Shape> shape, bool antiAlias)
+    : _shape(std::move(shape)), antiAlias(antiAlias) {
+  _uniqueID = UniqueID::Next();
+  _bounds = _shape->getBounds();
+}
+
 }  // namespace tgfx

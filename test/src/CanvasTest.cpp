@@ -33,6 +33,7 @@
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
+#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PictureRecorder.h"
@@ -1864,6 +1865,204 @@ TGFX_TEST(CanvasTest, NonAARRectOpColorStroke) {
   context->flushAndSubmit();
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpColorStroke"));
+}
+
+TGFX_TEST(CanvasTest, DrawMesh_ColorsOnly) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Create a simple triangle with vertex colors (no texture)
+  Point positions[] = {{100, 50}, {50, 150}, {150, 150}};
+  Color colors[] = {Color::Red(), Color::Green(), Color::Blue()};
+
+  auto mesh = Mesh::MakeCopy(MeshTopology::Triangles, 3, positions, colors);
+  ASSERT_TRUE(mesh != nullptr);
+
+  Paint paint = {};
+  canvas->drawMesh(mesh, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_ColorsOnly"));
+}
+
+TGFX_TEST(CanvasTest, DrawMesh_TextureOnly) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+
+  // Create a quad with TriangleStrip topology (no vertex colors)
+  Point positions[] = {{50, 50}, {150, 50}, {50, 150}, {150, 150}};
+  Point texCoords[] = {{0, 0}, {imageWidth, 0}, {0, imageHeight}, {imageWidth, imageHeight}};
+
+  auto mesh = Mesh::MakeCopy(MeshTopology::TriangleStrip, 4, positions, nullptr, texCoords);
+  ASSERT_TRUE(mesh != nullptr);
+
+  Paint paint = {};
+  paint.setShader(Shader::MakeImageShader(image));
+  canvas->drawMesh(mesh, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_TextureOnly"));
+}
+
+TGFX_TEST(CanvasTest, DrawMesh_TextureAndColors) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+
+  // Create a quad with indices, texture coordinates and vertex colors
+  // The result should be texture * vertexColor (Modulate blend)
+  Point positions[] = {{50, 50}, {150, 50}, {150, 150}, {50, 150}};
+  Point texCoords[] = {{0, 0}, {imageWidth, 0}, {imageWidth, imageHeight}, {0, imageHeight}};
+  // Use semi-transparent colors to modulate the texture
+  Color colors[] = {Color::FromRGBA(255, 0, 0, 128), Color::FromRGBA(0, 255, 0, 128),
+                    Color::FromRGBA(0, 0, 255, 128), Color::FromRGBA(255, 255, 0, 128)};
+  uint16_t indices[] = {0, 1, 2, 0, 2, 3};
+
+  auto mesh = Mesh::MakeCopy(MeshTopology::Triangles, 4, positions, colors, texCoords, 6, indices);
+  ASSERT_TRUE(mesh != nullptr);
+
+  Paint paint = {};
+  paint.setShader(Shader::MakeImageShader(image));
+  canvas->drawMesh(mesh, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_TextureAndColors"));
+}
+
+TGFX_TEST(CanvasTest, DrawMesh_PaintColorOnly) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Create a simple triangle with no colors and no texture
+  // The paint color should be used as fallback
+  Point positions[] = {{100, 50}, {50, 150}, {150, 150}};
+
+  auto mesh = Mesh::MakeCopy(MeshTopology::Triangles, 3, positions);
+  ASSERT_TRUE(mesh != nullptr);
+
+  Paint paint = {};
+  paint.setColor(Color::Red());
+  canvas->drawMesh(mesh, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_PaintColorOnly"));
+}
+
+TGFX_TEST(CanvasTest, DrawMesh_FromPath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Create a rounded rectangle path
+  Path path = {};
+  path.addRoundRect(Rect::MakeXYWH(50, 50, 200, 150), 20, 20);
+
+  auto mesh = Mesh::MakeFromPath(path);
+  ASSERT_TRUE(mesh != nullptr);
+
+  // Test mesh bounds match path bounds
+  auto meshBounds = mesh->bounds();
+  auto pathBounds = path.getBounds();
+  EXPECT_FLOAT_EQ(meshBounds.left, pathBounds.left);
+  EXPECT_FLOAT_EQ(meshBounds.top, pathBounds.top);
+  EXPECT_FLOAT_EQ(meshBounds.right, pathBounds.right);
+  EXPECT_FLOAT_EQ(meshBounds.bottom, pathBounds.bottom);
+
+  Paint paint = {};
+  paint.setColor(Color::Blue());
+  canvas->drawMesh(mesh, paint);
+
+  // Draw multiple times with transforms to verify GPU resource reuse
+  canvas->save();
+  canvas->translate(0, 100);
+  canvas->scale(0.5f, 0.5f);
+  paint.setColor(Color::Red());
+  canvas->drawMesh(mesh, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_FromPath"));
+}
+
+TGFX_TEST(CanvasTest, DrawMesh_FromShape) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 500, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Create a shape from path with antiAlias enabled
+  Path path = {};
+  path.addOval(Rect::MakeXYWH(0, 0, 100, 100));
+  auto shape = Shape::MakeFrom(path);
+
+  auto mesh = Mesh::MakeFromShape(shape);
+  ASSERT_TRUE(mesh != nullptr);
+
+  // Left: solid color fill (green with alpha)
+  Paint paint = {};
+  paint.setColor(Color::FromRGBA(0, 128, 0, 200));
+  canvas->save();
+  canvas->translate(50, 50);
+  canvas->drawMesh(mesh, paint);
+  canvas->restore();
+
+  // Middle: gradient fill
+  auto gradientShader = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(100, 100),
+                                                   {Color::Red(), Color::Blue()}, {});
+  paint.setColor(Color::White());
+  paint.setShader(gradientShader);
+  canvas->save();
+  canvas->translate(200, 50);
+  canvas->drawMesh(mesh, paint);
+  canvas->restore();
+
+  // Right: texture fill
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  // Scale shader to map image size to mesh bounds
+  auto imageShader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
+  auto meshBounds = mesh->bounds();
+  auto scaleX = static_cast<float>(image->width()) / meshBounds.width();
+  auto scaleY = static_cast<float>(image->height()) / meshBounds.height();
+  imageShader = imageShader->makeWithMatrix(Matrix::MakeScale(scaleX, scaleY));
+  paint.setShader(imageShader);
+  canvas->save();
+  canvas->translate(350, 50);
+  canvas->drawMesh(mesh, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_FromShape"));
 }
 
 }  // namespace tgfx

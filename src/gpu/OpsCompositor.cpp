@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsCompositor.h"
+#include "core/MeshImpl.h"
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
+#include "core/VertexMeshImpl.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
@@ -28,12 +30,14 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
+#include "gpu/ops/MeshDrawOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "inspect/InspectorMark.h"
 #include "processors/ColorSpaceXFormEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
+#include "processors/XfermodeFragmentProcessor.h"
 
 namespace tgfx {
 /**
@@ -201,6 +205,76 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), dstColor, uvMatrix, aaType);
   CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
   addDrawOp(std::move(drawOp), clip, brush, localBounds, deviceBounds, drawScale);
+}
+
+void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush) {
+  DEBUG_ASSERT(mesh != nullptr);
+  flushPendingOps();
+
+  auto& meshImpl = MeshImpl::ReadAccess(*mesh);
+
+  std::optional<Rect> localBounds = std::nullopt;
+  std::optional<Rect> deviceBounds = std::nullopt;
+  auto& clip = state.clip;
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, meshImpl.hasCoverage());
+  auto clipBounds = getClipBounds(clip);
+
+  float drawScale = 1.0f;
+  auto meshBounds = mesh->bounds();
+  if (needLocalBounds) {
+    localBounds = ClipLocalBounds(meshBounds, state.matrix, clipBounds);
+    if (localBounds->isEmpty()) {
+      return;
+    }
+    drawScale = std::min(state.matrix.getMaxScale(), 1.0f);
+  }
+
+  if (needDeviceBounds) {
+    deviceBounds = state.matrix.mapRect(meshBounds);
+  }
+
+  // Determine if mesh has colors and texCoords (only VertexMesh can have these)
+  bool hasColors = false;
+  bool hasTexCoords = false;
+  if (meshImpl.type() == MeshImpl::Type::Vertex) {
+    auto& vertexImpl = static_cast<VertexMeshImpl&>(meshImpl);
+    hasColors = vertexImpl.hasColors();
+    hasTexCoords = vertexImpl.hasTexCoords();
+  }
+
+  // Determine final color based on blending rules (see Canvas.h drawMesh documentation):
+  // Paint color is only used when no shader and no vertex colors; otherwise use white.
+  PMColor gpColor = PMColor::White();
+  if (!brush.shader && !hasColors) {
+    gpColor = ToPMColor(brush.color, dstColorSpace);
+  }
+
+  auto meshProxy = proxyProvider()->createGPUMeshProxy(mesh, renderFlags);
+  auto drawOp = MeshDrawOp::Make(std::move(meshProxy), gpColor, state.matrix);
+  if (drawOp == nullptr) {
+    return;
+  }
+
+  // Handle shader for mesh with special blending rules:
+  // - shader + colors: texture * vertexColor (Modulate)
+  // - shader only: pure texture
+  if (brush.shader) {
+    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
+    auto textureFP = FragmentProcessor::Make(brush.shader, args, nullptr, dstColorSpace);
+    if (textureFP == nullptr) {
+      return;
+    }
+    if (hasColors && hasTexCoords) {
+      textureFP = XfermodeFragmentProcessor::MakeFromSrcProcessor(
+          drawingAllocator(), std::move(textureFP), BlendMode::Modulate);
+    }
+    drawOp->addColorFP(std::move(textureFP));
+  }
+
+  // Create a brush without shader to pass to addDrawOp, since we handled shader above.
+  Brush meshBrush = brush;
+  meshBrush.shader = nullptr;
+  addDrawOp(std::move(drawOp), clip, meshBrush, localBounds, deviceBounds, drawScale);
 }
 
 void OpsCompositor::discardAll() {

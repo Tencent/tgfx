@@ -93,6 +93,7 @@ class LayerContent {
     Rects,
     RRects,
     Matrix,
+    Mesh,
   };
 
   /**

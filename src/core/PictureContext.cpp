@@ -108,6 +108,15 @@ void PictureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
   drawCount++;
 }
 
+void PictureContext::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state,
+                              const Brush& brush) {
+  DEBUG_ASSERT(mesh != nullptr);
+  recordAll(state, brush);
+  auto record = blockAllocator.make<DrawMesh>(std::move(mesh));
+  records.emplace_back(std::move(record));
+  drawCount++;
+}
+
 void PictureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                const MCState& state, const Brush& brush) {
   DEBUG_ASSERT(image != nullptr);

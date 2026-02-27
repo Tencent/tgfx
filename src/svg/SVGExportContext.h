@@ -63,6 +63,10 @@ class SVGExportContext : public DrawContext {
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush,
                  const Stroke* stroke) override;
 
+  void drawMesh(std::shared_ptr<Mesh>, const MCState&, const Brush&) override {
+    // SVG does not support mesh rendering.
+  }
+
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const MCState& state, const Brush& brush) override;
 
