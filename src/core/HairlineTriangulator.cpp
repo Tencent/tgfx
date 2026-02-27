@@ -130,8 +130,8 @@ bool IsDegenQuadOrConic(const Point p[3], float* distanceSquared) {
 // we subdivide the quads to avoid huge overfill
 // if it returns -1 then should be drawn as lines
 int NumQuadSubdivs(const Point points[3]) {
-  float dsqd;
-  if (IsDegenQuadOrConic(points, &dsqd)) {
+  float distanceSquared = 0.0f;
+  if (IsDegenQuadOrConic(points, &distanceSquared)) {
     return -1;
   }
 
@@ -141,7 +141,7 @@ int NumQuadSubdivs(const Point points[3]) {
   // maybe different when do this using gpu (geo or tess shaders)
   constexpr float SUBDIV_TOLERANCE = 175.f;
 
-  if (dsqd <= SUBDIV_TOLERANCE * SUBDIV_TOLERANCE) {
+  if (distanceSquared <= SUBDIV_TOLERANCE * SUBDIV_TOLERANCE) {
     return 0;
   } else {
     constexpr int MAX_SUB = 4;
@@ -150,7 +150,7 @@ int NumQuadSubdivs(const Point points[3]) {
     // = log2(d*d/tol*tol)
 
     // +1 since we're ignoring the mantissa contribution.
-    int log = GetFloatExp(dsqd / (SUBDIV_TOLERANCE * SUBDIV_TOLERANCE)) + 1;
+    int log = GetFloatExp(distanceSquared / (SUBDIV_TOLERANCE * SUBDIV_TOLERANCE)) + 1;
     log = std::min(std::max(0, log), MAX_SUB);
     return log;
   }
@@ -331,7 +331,7 @@ void AddLine(const Point p[2], LineVertex** vert) {
 
   auto ortho = Point::Zero();
   auto vec = b - a;
-  float lengthSqd = PointUtils::LengthSquared(vec);
+  float lengthSquared = PointUtils::LengthSquared(vec);
   if (PointUtils::SetLength(vec, HALF_PIXEL_LENGTH)) {
     // Create a vector orthogonal to 'vec'. The factor of 2.0 compensates for the fact that
     // 'vec' has been normalized to HALF_PIXEL_LENGTH, so we need to scale by 2 to get a
@@ -341,14 +341,14 @@ void AddLine(const Point p[2], LineVertex** vert) {
 
     // For lines shorter than a pixel, modulate coverage by the actual length to ensure
     // correct antialiasing for subpixel movements. For normal lines, use full coverage.
-    float coverage = (lengthSqd < 1.0f) ? std::sqrt(lengthSqd) : 1.0f;
+    float coverage = (lengthSquared < 1.0f) ? std::sqrt(lengthSquared) : 1.0f;
     Point innerOffset = vec;
 
     // The inner vertices are inset half a pixel along the line direction.
     // For short lines, both inner vertices converge toward the center.
-    (*vert)[0].pos = (lengthSqd < 1.0f) ? (b - innerOffset) : (a + innerOffset);
+    (*vert)[0].pos = (lengthSquared < 1.0f) ? (b - innerOffset) : (a + innerOffset);
     (*vert)[0].coverage = coverage;
-    (*vert)[1].pos = (lengthSqd < 1.0f) ? (a + innerOffset) : (b - innerOffset);
+    (*vert)[1].pos = (lengthSquared < 1.0f) ? (a + innerOffset) : (b - innerOffset);
     (*vert)[1].coverage = coverage;
 
     // The outer vertices are outset half a pixel along the line and a full pixel orthogonally.
