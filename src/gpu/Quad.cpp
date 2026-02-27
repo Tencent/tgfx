@@ -22,7 +22,7 @@
 namespace tgfx {
 
 static inline bool RectStaysRect(const Matrix& matrix) {
-  return matrix.rectStaysRect() || MatrixUtils::PreservesAngles(matrix);
+  return matrix.rectStaysRect() || MatrixUtils::PreservesRightAngles(matrix);
 }
 
 Quad Quad::MakeFrom(const Rect& rect, const Matrix* matrix) {

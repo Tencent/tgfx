@@ -18,7 +18,9 @@
 
 #include "QuadsVertexProvider.h"
 #include <optional>
+#include "core/ColorSpaceXformSteps.h"
 #include "core/utils/ColorHelper.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/VecUtils.h"
 
@@ -434,11 +436,17 @@ class NonAAQuadsVertexProvider : public QuadsVertexProvider {
 
   void getVertices(float* vertices) const override {
     size_t index = 0;
+    std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+    if (_hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+      steps =
+          std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                                 _dstColorSpace.get(), AlphaType::Premultiplied);
+    }
     for (size_t i = 0; i < quads.size(); ++i) {
       auto& record = quads[i];
       float compressedColor = 0.f;
       if (_hasColor) {
-        const auto uintColor = ToUintPMColor(record->color, nullptr);
+        const auto uintColor = ToUintPMColor(record->color, steps.get());
         compressedColor = *reinterpret_cast<const float*>(&uintColor);
       }
       auto transformedQuad = record->quad;
@@ -487,13 +495,20 @@ class AAQuadsVertexProvider : public QuadsVertexProvider {
 
   void getVertices(float* vertices) const override {
     size_t index = 0;
+    std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+    if (_hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+      steps =
+          std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                                 _dstColorSpace.get(), AlphaType::Premultiplied);
+    }
     for (size_t i = 0; i < quads.size(); ++i) {
-      writeAAQuadVertices(vertices, index, *quads[i]);
+      writeAAQuadVertices(vertices, index, *quads[i], steps.get());
     }
   }
 
  private:
-  void writeAAQuadVertices(float* vertices, size_t& index, const QuadRecord& record) const {
+  void writeAAQuadVertices(float* vertices, size_t& index, const QuadRecord& record,
+                           const ColorSpaceXformSteps* steps) const {
     auto transformedQuad = record.quad;
     transformedQuad.transform(record.matrix);
     auto transformedVertices = ToVertices4(transformedQuad);
@@ -533,7 +548,7 @@ class AAQuadsVertexProvider : public QuadsVertexProvider {
 
     std::optional<float> color = std::nullopt;
     if (_hasColor) {
-      const auto uintColor = ToUintPMColor(record.color, nullptr);
+      const auto uintColor = ToUintPMColor(record.color, steps);
       color = *reinterpret_cast<const float*>(&uintColor);
     }
 
@@ -581,8 +596,9 @@ QuadsVertexProvider::QuadsVertexProvider(PlacementArray<QuadRecord>&& quads, AAT
                                          bool hasColor, bool hasUVCoord,
                                          std::shared_ptr<BlockAllocator> reference,
                                          std::shared_ptr<ColorSpace> dstColorSpace)
-    : VertexProvider(std::move(reference)), quads(std::move(quads)), _dstColorSpace(std::move(dstColorSpace)),
-      _aaType(aaType), _hasColor(hasColor), _hasUVCoord(hasUVCoord) {
+    : VertexProvider(std::move(reference)), quads(std::move(quads)),
+      _dstColorSpace(std::move(dstColorSpace)), _aaType(aaType), _hasColor(hasColor),
+      _hasUVCoord(hasUVCoord) {
 }
 
 }  // namespace tgfx

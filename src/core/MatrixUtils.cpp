@@ -21,7 +21,7 @@
 
 namespace tgfx {
 
-bool MatrixUtils::PreservesAngles(const Matrix& matrix) {
+bool MatrixUtils::PreservesRightAngles(const Matrix& matrix) {
   const auto mask = matrix.getType();
   if (mask <= Matrix::TranslateMask) {
     return true;
@@ -38,7 +38,6 @@ bool MatrixUtils::PreservesAngles(const Matrix& matrix) {
     return false;
   }
   // Orthogonality alone suffices — non-uniform scaling preserves right angles.
-  // Do NOT add an equal-length check; it would incorrectly reject valid transforms.
   const auto dot = sx * kx + ky * sy;
   return FloatNearlyZero(dot);
 }

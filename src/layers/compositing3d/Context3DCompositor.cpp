@@ -39,6 +39,9 @@ static constexpr unsigned RECT_EDGE_TOP = 0b0001;
 static constexpr unsigned RECT_EDGE_RIGHT = 0b0010;
 static constexpr unsigned RECT_EDGE_BOTTOM = 0b0100;
 
+// The color space used for the compositor's render target.
+static const auto TargetColorSpace = ColorSpace::SRGB;
+
 static inline AAType GetAAType(int sampleCount, bool antiAlias) {
   if (sampleCount > 1) {
     return AAType::MSAA;
@@ -169,7 +172,8 @@ void Context3DCompositor::drawQuads(const DrawPolygon3D* polygon,
     }
   }
 
-  auto vertexProvider = QuadsVertexProvider::MakeFrom(allocator, std::move(quadRecords), aaType);
+  auto vertexProvider =
+      QuadsVertexProvider::MakeFrom(allocator, std::move(quadRecords), aaType, TargetColorSpace());
   auto drawOp = Quads3DDrawOp::Make(context, std::move(vertexProvider), 0);
 
   const SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast};
@@ -208,7 +212,7 @@ std::shared_ptr<Image> Context3DCompositor::finish() {
   auto opArray = context->drawingAllocator()->makeArray(std::move(_drawOps));
   context->drawingManager()->addOpsRenderTask(_targetColorProxy, std::move(opArray),
                                               PMColor::Transparent());
-  auto image = TextureImage::Wrap(_targetColorProxy->asTextureProxy(), ColorSpace::SRGB());
+  auto image = TextureImage::Wrap(_targetColorProxy->asTextureProxy(), TargetColorSpace());
   _targetColorProxy = nullptr;
   return image;
 }

@@ -25,9 +25,9 @@ namespace tgfx {
 class MatrixUtils {
  public:
   /**
-   * Returns true if shapes transformed by this matrix preserve their original angles.
+   * Returns true if the matrix preserves right angles.
    */
-  static bool PreservesAngles(const Matrix& matrix);
+  static bool PreservesRightAngles(const Matrix& matrix);
 };
 
 }  // namespace tgfx
