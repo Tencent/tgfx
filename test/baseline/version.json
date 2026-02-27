@@ -260,6 +260,7 @@
         "Matrix_3D_2D": "9e2c8c8ee",
         "Matrix_3D_2D_3D": "9e2c8c8ee",
         "Matrix_3D_2D_3D_Preserve3D": "9e2c8c8ee",
+        "Matrix_3D_Offscreen_Blend": "7ce872bef",
         "Matrix_Behind_Viewer": "9e2c8c8ee",
         "PartialDrawLayer": "af282892",
         "PartialDrawLayer_shapeLayer": "af282892",
