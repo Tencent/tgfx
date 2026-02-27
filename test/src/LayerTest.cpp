@@ -2353,20 +2353,28 @@ TGFX_TEST(LayerTest, Matrix) {
     imageLayer3D->setMatrix3D(transformMatrix);
     displayList3D->root()->addChild(imageLayer3D);
 
-    auto solidLayer = SolidLayer::Make();
-    solidLayer->setColor(Color::FromRGBA(0, 255, 0, 128));
-    solidLayer->setWidth(imageSize.width);
-    solidLayer->setHeight(imageSize.height);
-    solidLayer->setBlendMode(BlendMode::SrcOver);
+    auto layerWithMask = SolidLayer::Make();
+    layerWithMask->setColor(Color::FromRGBA(255, 0, 0, 26));
+    layerWithMask->setWidth(imageSize.width);
+    layerWithMask->setHeight(imageSize.height);
+    layerWithMask->setBlendMode(BlendMode::SrcOver);
+    imageLayer3D->addChild(layerWithMask);
+
+    auto blendLayer = SolidLayer::Make();
+    blendLayer->setColor(Color::FromRGBA(0, 255, 0, 128));
+    blendLayer->setWidth(imageSize.width);
+    blendLayer->setHeight(imageSize.height);
+    blendLayer->setBlendMode(BlendMode::SrcIn);
+    layerWithMask->addChild(blendLayer);
+
     auto imageMaskLayer = ImageLayer::Make();
     auto maskImage = MakeImage("resources/apitest/test_timestretch.png");
     imageMaskLayer->setImage(maskImage);
     auto maskScale = Matrix::MakeScale(imageSize.width / static_cast<float>(maskImage->width()),
                                        imageSize.height / static_cast<float>(maskImage->height()));
     imageMaskLayer->setMatrix(maskScale);
-    solidLayer->addChild(imageMaskLayer);
-    solidLayer->setMask(imageMaskLayer);
-    imageLayer3D->addChild(solidLayer);
+    layerWithMask->addChild(imageMaskLayer);
+    layerWithMask->setMask(imageMaskLayer);
 
     displayList3D->render(surface3D.get());
     EXPECT_TRUE(Baseline::Compare(surface3D, "LayerTest/Matrix_3D_Offscreen_Blend"));
