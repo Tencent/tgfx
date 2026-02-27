@@ -714,8 +714,16 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const B
   }
 
   FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
+  auto colorFilter = brush.colorFilter;
   if (brush.shader) {
-    if (auto processor = FragmentProcessor::Make(brush.shader, args, nullptr, dstColorSpace)) {
+    auto shader = brush.shader;
+    // If the color filter transforms transparent pixels into non-transparent ones, merge it with
+    // the shader so that the original shader alpha masks the color filter output.
+    if (colorFilter && colorFilter->affectsTransparentBlack()) {
+      shader = shader->makeWithColorFilter(colorFilter);
+      colorFilter = nullptr;
+    }
+    if (auto processor = FragmentProcessor::Make(shader, args, nullptr, dstColorSpace)) {
       op->addColorFP(std::move(processor));
     } else {
       // The shader is the main source of color, so if it fails to create a processor, we can't
@@ -723,8 +731,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const B
       return;
     }
   }
-  if (brush.colorFilter) {
-    if (auto processor = brush.colorFilter->asFragmentProcessor(context, dstColorSpace)) {
+  if (colorFilter) {
+    if (auto processor = colorFilter->asFragmentProcessor(context, dstColorSpace)) {
       op->addColorFP(std::move(processor));
     }
   }

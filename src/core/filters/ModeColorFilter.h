@@ -29,6 +29,8 @@ class ModeColorFilter : public ColorFilter {
 
   bool isAlphaUnchanged() const override;
 
+  bool affectsTransparentBlack() const override;
+
   bool asColorMode(Color* color, BlendMode* mode) const override;
 
   Color color;
