@@ -1179,8 +1179,7 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     return true;
   }
   bool needsMaskFilter = maskFilter != nullptr;
-  bool hasPerspective = canvas->getMatrix().hasPerspective();
-  if (canUseSubtreeCache(args, blendMode, hasPerspective) &&
+  if (canUseSubtreeCache(args, blendMode) &&
       drawWithSubtreeCache(args, canvas, alpha, blendMode, maskFilter)) {
     return true;
   }
@@ -1454,7 +1453,7 @@ std::shared_ptr<Image> Layer::getPassThroughContentImage(const DrawArgs& args, C
   return finalImage;
 }
 
-bool Layer::shouldPassThroughBackground(BlendMode blendMode, bool hasPerspective) const {
+bool Layer::shouldPassThroughBackground(BlendMode blendMode) const {
   // Pass-through background is only possible when:
   // 1. The feature is enabled
   if (!bitFields.passThroughBackground) {
@@ -1467,10 +1466,8 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode, bool hasPerspective
   }
 
   // 3. No offscreen rendering is required
-  // (Offscreen rendering happens when: non-SrcOver blend mode OR has filters OR has perspective
-  // transform)
-  bool needsOffscreen = blendMode != BlendMode::SrcOver || !_filters.empty() || hasPerspective;
-  if (needsOffscreen) {
+  // (Offscreen rendering happens when: non-SrcOver blend mode OR has filters)
+  if (blendMode != BlendMode::SrcOver || !_filters.empty()) {
     return false;
   }
 
@@ -1484,7 +1481,7 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode, bool hasPerspective
   return true;
 }
 
-bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, bool hasPerspective) {
+bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
   // If the layer can start or extend a 3D rendering context, child layers need to maintain
   // independent 3D states, so subtree caching is not supported.
   if (canPreserve3D()) {
@@ -1505,7 +1502,7 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, bool h
     }
     return true;
   }
-  if (shouldPassThroughBackground(blendMode, hasPerspective) || hasBackgroundStyle()) {
+  if (shouldPassThroughBackground(blendMode) || hasBackgroundStyle()) {
     return false;
   }
   if (!bitFields.staticSubtree) {
@@ -1641,8 +1638,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   auto clipBounds = GetClipBounds(clipBoundsCanvas);
   auto contentArgs = args;
 
-  const auto hasPerspective = canvas->getMatrix().hasPerspective();
-  if (shouldPassThroughBackground(blendMode, hasPerspective) && canvas->getSurface()) {
+  if (shouldPassThroughBackground(blendMode) && canvas->getSurface()) {
     // In pass-through mode, the image drawn to canvas contains the blended background, while
     // the image drawn to backgroundCanvas should be the layer content without background blending.
     // Use canvas's clipBounds instead of blurBackground's for pass-through rendering.

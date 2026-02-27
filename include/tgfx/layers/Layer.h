@@ -691,9 +691,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
       Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
       std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
 
-  bool shouldPassThroughBackground(BlendMode blendMode, bool hasPerspective) const;
+  bool shouldPassThroughBackground(BlendMode blendMode) const;
 
-  bool canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, bool hasPerspective);
+  bool canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode);
 
   SubtreeCache* getValidSubtreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds);
 
