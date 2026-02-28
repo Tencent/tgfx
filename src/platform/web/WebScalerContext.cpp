@@ -31,7 +31,7 @@ WebScalerContext::WebScalerContext(std::shared_ptr<Typeface> typeface, float siz
     : ScalerContext(std::move(typeface), size), scalerContext(std::move(scalerContext)) {
 }
 
-FontMetrics WebScalerContext::getFontMetrics() const {
+FontMetrics WebScalerContext::onComputeFontMetrics() const {
   return scalerContext.call<FontMetrics>("getFontMetrics");
 }
 
@@ -39,6 +39,7 @@ Rect WebScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic
   return scalerContext.call<Rect>("getBounds", getText(glyphID), fauxBold, fauxItalic);
 }
 
+// Web Canvas 2D API only provides horizontal advance, so verticalText is ignored.
 float WebScalerContext::getAdvance(GlyphID glyphID, bool) const {
   return scalerContext.call<float>("getAdvance", getText(glyphID));
 }
@@ -50,6 +51,7 @@ Point WebScalerContext::getVerticalOffset(GlyphID glyphID) const {
 }
 
 bool WebScalerContext::generatePath(GlyphID, bool, bool, Path*) const {
+  // Web Canvas 2D API does not support glyph path extraction.
   return false;
 }
 
@@ -74,18 +76,18 @@ bool WebScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* 
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
+  auto text = getText(glyphID);
   auto properFauxBold = !hasColor() && fauxBold;
-  auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphID), properFauxBold, false);
+  auto bounds = scalerContext.call<Rect>("getBounds", text, properFauxBold, false);
   if (bounds.isEmpty()) {
     return false;
   }
   emscripten::val imageData = emscripten::val::null();
   if (!hasColor() && stroke != nullptr) {
     ApplyStrokeToBounds(*stroke, &bounds);
-    imageData =
-        scalerContext.call<val>("readPixels", getText(glyphID), bounds, properFauxBold, *stroke);
+    imageData = scalerContext.call<val>("readPixels", text, bounds, properFauxBold, *stroke);
   } else {
-    imageData = scalerContext.call<val>("readPixels", getText(glyphID), bounds, properFauxBold);
+    imageData = scalerContext.call<val>("readPixels", text, bounds, properFauxBold);
   }
   if (!imageData.as<bool>()) {
     return false;
@@ -95,17 +97,18 @@ bool WebScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* 
 
 emscripten::val WebScalerContext::getGlyphCanvas(GlyphID glyphID, bool fauxBold,
                                                  const Stroke* stroke, int padding) const {
+  auto text = getText(glyphID);
   auto properFauxBold = !hasColor() && fauxBold;
-  auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphID), properFauxBold, false);
+  auto bounds = scalerContext.call<Rect>("getBounds", text, properFauxBold, false);
   if (bounds.isEmpty()) {
     return emscripten::val::null();
   }
   if (!hasColor() && stroke != nullptr) {
     ApplyStrokeToBounds(*stroke, &bounds);
-    return scalerContext.call<val>("getGlyphCanvas", getText(glyphID), bounds, properFauxBold,
-                                   *stroke, padding);
+    return scalerContext.call<val>("getGlyphCanvas", text, bounds, properFauxBold, *stroke,
+                                   padding);
   }
-  return scalerContext.call<val>("getGlyphCanvas", getText(glyphID), bounds, properFauxBold,
+  return scalerContext.call<val>("getGlyphCanvas", text, bounds, properFauxBold,
                                  emscripten::val::undefined(), padding);
 }
 

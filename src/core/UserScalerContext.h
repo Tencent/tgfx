@@ -29,7 +29,18 @@ class UserScalerContext : public ScalerContext {
         textScale(size / static_cast<float>(userTypeface()->unitsPerEm())) {
   }
 
-  FontMetrics getFontMetrics() const override {
+  // Custom typefaces don't provide per-glyph advance or vertical offset data. Callers are expected
+  // to position glyphs manually (e.g., via TextBlobBuilder::allocRunPos). No caching needed here.
+  float getAdvance(GlyphID, bool) const override {
+    return 0.0f;
+  }
+
+  Point getVerticalOffset(GlyphID) const override {
+    return {};
+  }
+
+ protected:
+  FontMetrics onComputeFontMetrics() const override {
     const auto& metrics = userTypeface()->fontMetrics();
     FontMetrics result = {};
     result.top = metrics.top * textScale;
@@ -46,15 +57,6 @@ class UserScalerContext : public ScalerContext {
     return result;
   }
 
-  float getAdvance(GlyphID, bool) const override {
-    return 0.0f;
-  }
-
-  Point getVerticalOffset(GlyphID) const override {
-    return {};
-  }
-
- protected:
   UserTypeface* userTypeface() const {
     return static_cast<UserTypeface*>(typeface.get());
   }

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <emscripten/val.h>
 #include "core/ScalerContext.h"
 
 namespace tgfx {
@@ -28,8 +29,6 @@ class WebScalerContext : public ScalerContext {
   bool asyncSupport() const override {
     return false;
   }
-
-  FontMetrics getFontMetrics() const override;
 
   Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override;
 
@@ -51,6 +50,9 @@ class WebScalerContext : public ScalerContext {
    */
   emscripten::val getGlyphCanvas(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
                                  int padding) const;
+
+ protected:
+  FontMetrics onComputeFontMetrics() const override;
 
  private:
   emscripten::val scalerContext = emscripten::val::null();

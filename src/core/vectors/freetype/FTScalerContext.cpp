@@ -275,17 +275,12 @@ int FTScalerContext::setupSize(bool fauxItalic) const {
   return 0;
 }
 
-FontMetrics FTScalerContext::getFontMetrics() const {
+FontMetrics FTScalerContext::onComputeFontMetrics() const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   FontMetrics metrics = {};
   if (setupSize(false)) {
     return metrics;
   }
-  getFontMetricsInternal(&metrics);
-  return metrics;
-}
-
-void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
   auto face = ftTypeface()->face;
   auto upem = static_cast<float>(ftTypeface()->unitsPerEmInternal());
 
@@ -301,15 +296,15 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
   }
 
   // pull from format-specific metrics as needed
-  float ascent;
-  float descent;
-  float leading;
-  float xmin;
-  float xmax;
-  float ymin;
-  float ymax;
-  float underlineThickness;
-  float underlinePosition;
+  float ascent = 0.0f;
+  float descent = 0.0f;
+  float leading = 0.0f;
+  float xmin = 0.0f;
+  float xmax = 0.0f;
+  float ymin = 0.0f;
+  float ymax = 0.0f;
+  float underlineThickness = 0.0f;
+  float underlinePosition = 0.0f;
   if (face->face_flags & FT_FACE_FLAG_SCALABLE) {  // scalable outline font
     // FreeType 2.13+ automatically respects the OS/2 fsSelection::UseTypoMetrics bit in
     // sfnt_load_face(), overwriting face->ascender/descender/height with OS/2 Typo values
@@ -360,7 +355,7 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
       underlinePosition = -static_cast<float>(post->underlinePosition) / upem;
     }
   } else {
-    return;
+    return metrics;
   }
 
   // synthesize elements that were not provided by the os/2 table or format-specific metrics
@@ -375,17 +370,18 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
   if (leading < 0.0f) {
     leading = 0.0f;
   }
-  metrics->top = ymax * textScale;
-  metrics->ascent = ascent * textScale;
-  metrics->descent = descent * textScale;
-  metrics->bottom = ymin * textScale;
-  metrics->leading = leading * textScale;
-  metrics->xMin = xmin * textScale;
-  metrics->xMax = xmax * textScale;
-  metrics->xHeight = xHeight;
-  metrics->capHeight = capHeight;
-  metrics->underlineThickness = underlineThickness * textScale;
-  metrics->underlinePosition = underlinePosition * textScale;
+  metrics.top = ymax * textScale;
+  metrics.ascent = ascent * textScale;
+  metrics.descent = descent * textScale;
+  metrics.bottom = ymin * textScale;
+  metrics.leading = leading * textScale;
+  metrics.xMin = xmin * textScale;
+  metrics.xMax = xmax * textScale;
+  metrics.xHeight = xHeight;
+  metrics.capHeight = capHeight;
+  metrics.underlineThickness = underlineThickness * textScale;
+  metrics.underlinePosition = underlinePosition * textScale;
+  return metrics;
 }
 
 bool FTScalerContext::getCBoxForLetter(char letter, FT_BBox* bbox) const {
@@ -692,8 +688,7 @@ float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) co
   if (err != FT_Err_Ok) {
     return 0;
   }
-  return verticalText ? FDot6ToFloat(face->glyph->advance.y)
-                      : FDot6ToFloat(face->glyph->advance.x);
+  return verticalText ? FDot6ToFloat(face->glyph->advance.y) : FDot6ToFloat(face->glyph->advance.x);
 }
 
 void FTScalerContext::loadVerticalMetrics() {
@@ -729,8 +724,7 @@ void FTScalerContext::loadVerticalMetrics() {
   } else {
     auto hhea = static_cast<TT_HoriHeader*>(FT_Get_Sfnt_Table(face, FT_SFNT_HHEA));
     if (hhea != nullptr) {
-      fallbackVertAdvance =
-          static_cast<FT_UShort>(std::abs(hhea->Ascender - hhea->Descender));
+      fallbackVertAdvance = static_cast<FT_UShort>(std::abs(hhea->Ascender - hhea->Descender));
       hasVerticalMetrics = true;
     }
   }
@@ -762,6 +756,7 @@ float FTScalerContext::getVertAdvanceForGlyph(GlyphID glyphID) const {
 }
 
 Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
+  auto fontMetrics = getFontMetrics();
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   if (setupSize(false)) {
     return {};
@@ -777,9 +772,7 @@ Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
     // FreeType's CBDT/CBLC sbit path does not populate vertical bearing metrics either.
     // Synthesize a vertical offset consistent with WebScalerContext.
     auto hAdv = FDot6ToFloat(face->glyph->advance.x);
-    FontMetrics metrics = {};
-    getFontMetricsInternal(&metrics);
-    return {-hAdv * 0.5f, metrics.capHeight};
+    return {-hAdv * 0.5f, fontMetrics.capHeight};
   }
   auto offsetX = FDot6ToFloat(glyphMetrics.vertBearingX) - FDot6ToFloat(glyphMetrics.horiBearingX);
   auto offsetY = FDot6ToFloat(glyphMetrics.horiBearingY) + FDot6ToFloat(glyphMetrics.vertBearingY);
