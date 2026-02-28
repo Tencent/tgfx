@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProxyProvider.h"
+#include "core/HairlineTriangulator.h"
 #include "core/ShapeRasterizer.h"
 #include "core/utils/HardwareBufferUtil.h"
 #include "core/utils/MathExtra.h"
@@ -28,6 +29,7 @@
 #include "gpu/proxies/HardwareRenderTargetProxy.h"
 #include "gpu/proxies/TextureRenderTargetProxy.h"
 #include "gpu/tasks/GPUBufferUploadTask.h"
+#include "gpu/tasks/HairlineBufferUploadTask.h"
 #include "gpu/tasks/ReadbackBufferCreateTask.h"
 #include "gpu/tasks/ShapeBufferUploadTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
@@ -203,7 +205,7 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
 #else
   dataSource = std::move(rasterizer);
 #endif
-  triangleProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+    triangleProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
   addResourceProxy(triangleProxy, triangleKey);
   if (!(renderFlags & RenderFlags::DisableCache)) {
     triangleProxy->uniqueKey = triangleKey;
@@ -218,6 +220,58 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
   }
   context->drawingManager()->addResourceTask(std::move(task));
   return std::make_shared<GPUShapeProxy>(drawingMatrix, triangleProxy, textureProxy);
+}
+
+std::shared_ptr<GPUHairlineProxy> ProxyProvider::createGPUHairlineProxy(
+    std::shared_ptr<Shape> shape, bool hasCap, uint32_t renderFlags) {
+  if (shape == nullptr) {
+    return nullptr;
+  }
+  auto bounds = shape->getBounds();
+  bounds.roundOut();
+  auto drawingMatrix = Matrix::MakeTrans(bounds.x(), bounds.y());
+  shape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(-bounds.x(), -bounds.y()));
+
+  auto uniqueKey = shape->getUniqueKey();
+  if (hasCap) {
+    static const auto HairlineWithCapFlag = UniqueID::Next();
+    uniqueKey = UniqueKey::Append(uniqueKey, &HairlineWithCapFlag, 1);
+  }
+  static const auto LineVertexType = UniqueID::Next();
+  static const auto QuadVertexType = UniqueID::Next();
+  auto lineVertexKey = UniqueKey::Append(uniqueKey, &LineVertexType, 1);
+  auto quadVertexKey = UniqueKey::Append(uniqueKey, &QuadVertexType, 1);
+  auto lineVertexProxy = findOrWrapGPUBufferProxy(lineVertexKey);
+  auto quadVertexProxy = findOrWrapGPUBufferProxy(quadVertexKey);
+  // Check if we have valid cached buffers: at least one vertex buffer must exist
+  bool hasAnyBuffer = lineVertexProxy != nullptr || quadVertexProxy != nullptr;
+  if (hasAnyBuffer) {
+    return std::make_shared<GPUHairlineProxy>(drawingMatrix, std::move(lineVertexProxy),
+                                              std::move(quadVertexProxy));
+  }
+  auto rasterizer = std::make_unique<HairlineTriangulator>(shape, hasCap);
+  std::unique_ptr<DataSource<HairlineBuffer>> dataSource = nullptr;
+#ifdef TGFX_USE_THREADS
+  if (!(renderFlags & RenderFlags::DisableAsyncTask)) {
+    dataSource = DataSource<HairlineBuffer>::Async(std::move(rasterizer));
+  } else {
+    dataSource = std::move(rasterizer);
+  }
+#else
+  dataSource = std::move(rasterizer);
+#endif
+  lineVertexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+  quadVertexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+  addResourceProxy(lineVertexProxy, lineVertexKey);
+  addResourceProxy(quadVertexProxy, quadVertexKey);
+  if (!(renderFlags & RenderFlags::DisableCache)) {
+    lineVertexProxy->uniqueKey = lineVertexKey;
+    quadVertexProxy->uniqueKey = quadVertexKey;
+  }
+  auto task = context->drawingAllocator()->make<HairlineBufferUploadTask>(
+      lineVertexProxy, quadVertexProxy, std::move(dataSource));
+  context->drawingManager()->addResourceTask(std::move(task));
+  return std::make_shared<GPUHairlineProxy>(drawingMatrix, lineVertexProxy, quadVertexProxy);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(

@@ -102,6 +102,12 @@ struct Point {
   }
 
   /**
+   * Scales the point so that its length becomes 1. If the original length is zero or nearly zero,
+   * the point is set to (0, 0) and returns false; otherwise returns true.
+   */
+  bool normalize();
+
+  /**
    * Returns true if a is equivalent to b.
    */
   friend bool operator==(const Point& a, const Point& b) {
@@ -174,6 +180,20 @@ struct Point {
    */
   static float Distance(const Point& a, const Point& b) {
     return Length(a.x - b.x, a.y - b.y);
+  }
+
+  /**
+   * Returns the dot product of a and b.
+   */
+  static float DotProduct(const Point& a, const Point& b) {
+    return (a.x * b.x) + (a.y * b.y);
+  }
+
+  /**
+   * Returns the cross product of a and b (the z-component of the 3D cross product).
+   */
+  static float CrossProduct(const Point& a, const Point& b) {
+    return (a.x * b.y) - (a.y * b.x);
   }
 };
 }  // namespace tgfx

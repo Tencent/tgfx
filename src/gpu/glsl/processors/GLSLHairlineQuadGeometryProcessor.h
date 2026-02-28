@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2026 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,11 +18,21 @@
 
 #pragma once
 
-#include "tgfx/core/ImageInfo.h"
+#include "gpu/processors/HairlineQuadGeometryProcessor.h"
+#include "tgfx/core/Color.h"
 
 namespace tgfx {
-/**
- * Scales the alpha value of each pixel by the given factor.
- */
-void ScalePixelsAlpha(const ImageInfo& info, void* pixels, float alphaScale);
+
+class GLSLHairlineQuadGeometryProcessor : public HairlineQuadGeometryProcessor {
+ public:
+  GLSLHairlineQuadGeometryProcessor(const PMColor& color, const Matrix& viewMatrix,
+                                    std::optional<Matrix> uvMatrix, float coverage, AAType aaType);
+
+  void emitCode(EmitArgs& args) const override;
+
+ private:
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
+               FPCoordTransformIter* coordTransformIter) const override;
+};
+
 }  // namespace tgfx

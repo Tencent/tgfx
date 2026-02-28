@@ -21,6 +21,8 @@
 #include "core/GradientGenerator.h"
 #include "core/PixelBuffer.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/ops/HairlineLineOp.h"
+#include "gpu/ops/HairlineQuadOp.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "opengl/GLBuffer.h"
@@ -38,6 +40,16 @@ static constexpr uint16_t VERTICES_PER_AA_ROUND_STROKE_RECT = 24;
 static constexpr uint16_t VERTICES_PER_NON_AA_MITER_STROKE_RECT = 8;
 static constexpr uint16_t VERTICES_PER_NON_AA_BEVEL_STROKE_RECT = 12;
 static constexpr uint16_t VERTICES_PER_NON_AA_ROUND_STROKE_RECT = 20;
+
+// clang-format off
+static constexpr uint16_t HairlineLineIndexPattern[] = {
+  0, 1, 3, 0, 3, 2, 0, 4, 5, 0, 5, 1, 0, 2, 4, 1, 5, 3
+};
+
+static constexpr uint16_t HairlineQuadIndexPattern[] = {
+  0, 1, 2, 2, 4, 3, 1, 4, 2
+};
+// clang-format on
 
 GlobalCache::GlobalCache(Context* context) : context(context) {
 }
@@ -246,6 +258,37 @@ class RectIndicesProvider : public DataSource<Data> {
   uint16_t patternSize = 0;
   uint16_t reps = 0;
   uint16_t vertCount = 0;
+};
+
+class HairlineIndicesProvider : public DataSource<Data> {
+ public:
+  HairlineIndicesProvider(const uint16_t* pattern, uint32_t patternSize, uint32_t reps,
+                          uint32_t vertCount)
+      : pattern(pattern), patternSize(patternSize), reps(reps), vertCount(vertCount) {
+  }
+
+  std::shared_ptr<Data> getData() const override {
+    auto size = sizeof(uint32_t) * reps * patternSize;
+    Buffer buffer(size);
+    if (buffer.isEmpty()) {
+      return nullptr;
+    }
+    auto data = reinterpret_cast<uint32_t*>(buffer.data());
+    for (uint32_t i = 0; i < reps; ++i) {
+      auto baseIdx = static_cast<size_t>(i) * patternSize;
+      auto baseVert = i * vertCount;
+      for (uint32_t j = 0; j < patternSize; ++j) {
+        data[baseIdx + j] = baseVert + pattern[j];
+      }
+    }
+    return buffer.release();
+  }
+
+ private:
+  const uint16_t* pattern = nullptr;
+  uint32_t patternSize = 0;
+  uint32_t reps = 0;
+  uint32_t vertCount = 0;
 };
 
 std::shared_ptr<GPUBufferProxy> GlobalCache::getRectIndexBuffer(
@@ -614,5 +657,25 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getRoundStrokeIndexBuffer(bool anti
     indexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
   return indexBuffer;
+}
+
+std::shared_ptr<GPUBufferProxy> GlobalCache::getHairlineLineIndexBuffer() {
+  if (hairlineLineIndexBuffer == nullptr) {
+    auto provider = std::make_unique<HairlineIndicesProvider>(
+        HairlineLineIndexPattern, HairlineLineOp::IndicesPerLine, HairlineLineOp::MaxNumLines,
+        HairlineLineOp::VerticesPerLine);
+    hairlineLineIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
+  }
+  return hairlineLineIndexBuffer;
+}
+
+std::shared_ptr<GPUBufferProxy> GlobalCache::getHairlineQuadIndexBuffer() {
+  if (hairlineQuadIndexBuffer == nullptr) {
+    auto provider = std::make_unique<HairlineIndicesProvider>(
+        HairlineQuadIndexPattern, HairlineQuadOp::IndicesPerQuad, HairlineQuadOp::MaxNumQuads,
+        HairlineQuadOp::VerticesPerQuad);
+    hairlineQuadIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
+  }
+  return hairlineQuadIndexBuffer;
 }
 }  // namespace tgfx

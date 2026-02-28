@@ -25,9 +25,12 @@
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/ShapeUtils.h"
+#include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
+#include "gpu/ops/HairlineLineOp.h"
+#include "gpu/ops/HairlineQuadOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -193,14 +196,55 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   if (needDeviceBounds) {
     deviceBounds = shape->isInverseFillType() ? clipBounds : shape->getBounds();
   }
+
   auto aaType = getAAType(brush);
-  auto color = brush.color;
-  color.alpha *= ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
   auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
-  auto dstColor = ToPMColor(color, dstColorSpace);
+  auto dstColor = ToPMColor(brush.color, dstColorSpace);
   auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), dstColor, uvMatrix, aaType);
   CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
   addDrawOp(std::move(drawOp), clip, brush, localBounds, deviceBounds, drawScale);
+}
+
+void OpsCompositor::drawHairlineShape(std::shared_ptr<Shape> shape, const MCState& state,
+                                      const Brush& brush, const Stroke* stroke) {
+  DEBUG_ASSERT(shape != nullptr);
+  flushPendingOps();
+  Matrix uvMatrix = {};
+  if (!state.matrix.invert(&uvMatrix)) {
+    return;
+  }
+  std::optional<Rect> localBounds = std::nullopt;
+  std::optional<Rect> deviceBounds = std::nullopt;
+  float drawScale = 1.0f;
+
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, true);
+  auto& clip = state.clip;
+  auto clipBounds = getClipBounds(clip);
+  if (needLocalBounds) {
+    localBounds = shape->getBounds();
+    localBounds = ClipLocalBounds(*localBounds, state.matrix, clipBounds);
+    drawScale = std::min(state.matrix.getMaxScale(), 1.0f);
+  }
+  shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
+  if (!shape) {
+    return;
+  }
+  if (needDeviceBounds) {
+    deviceBounds = shape->getBounds();
+  }
+
+  bool hasCap = stroke != nullptr && (stroke->cap == LineCap::Round || stroke->cap == LineCap::Square);
+  auto aaType = getAAType(brush);
+  auto dstColor = ToPMColor(brush.color, dstColorSpace);
+  auto hairlineProxy = proxyProvider()->createGPUHairlineProxy(shape, hasCap, renderFlags);
+  if (hairlineProxy == nullptr) {
+    return;
+  }
+  auto coverage = GetHairlineAlphaFactor(*stroke, state.matrix);
+  auto lineDrawOp = HairlineLineOp::Make(hairlineProxy, dstColor, uvMatrix, coverage, aaType);
+  addDrawOp(std::move(lineDrawOp), clip, brush, localBounds, deviceBounds, drawScale);
+  auto quadDrawOp = HairlineQuadOp::Make(hairlineProxy, dstColor, uvMatrix, coverage, aaType);
+  addDrawOp(std::move(quadDrawOp), clip, brush, localBounds, deviceBounds, drawScale);
 }
 
 void OpsCompositor::discardAll() {

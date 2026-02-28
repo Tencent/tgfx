@@ -85,6 +85,16 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> getRRectIndexBuffer(bool stroke, AAType aaType);
 
   /**
+   * Returns a shared GPU buffer containing indices for rendering hairline lines.
+   */
+  std::shared_ptr<GPUBufferProxy> getHairlineLineIndexBuffer();
+
+  /**
+   * Returns a shared GPU buffer containing indices for rendering hairline quads.
+   */
+  std::shared_ptr<GPUBufferProxy> getHairlineQuadIndexBuffer();
+
+  /**
    * Finds a static resource in the cache by its unique key. Returns nullptr if no resource is found.
    * The resource will be kept alive for the lifetime of the GlobalCache.
    */
@@ -134,6 +144,8 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> nonAARectMiterStrokeIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> nonAARectBevelStrokeIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> nonAARectRoundStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> hairlineLineIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> hairlineQuadIndexBuffer = nullptr;
 
   ResourceKeyMap<std::shared_ptr<Resource>> staticResources = {};
   // Triple buffering for uniform buffer management

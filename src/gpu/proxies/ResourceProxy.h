@@ -57,5 +57,7 @@ class ResourceProxy {
   friend class ResourceTask;
   friend class ShapeBufferUploadTask;
   friend class ProxyProvider;
+  friend class GPUHairlineProxy;
+  friend class HairlineBufferUploadTask;
 };
 }  // namespace tgfx
