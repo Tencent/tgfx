@@ -24,8 +24,8 @@ namespace tgfx {
 
 /**
  * Mesh implementation with user-provided vertex data.
- * Memory layout: VertexMeshImpl object and vertex data are allocated separately,
- * allowing CPU data to be released independently after GPU upload.
+ * Memory layout: VertexMeshImpl object and vertex data are allocated separately.
+ * CPU data is retained until the Mesh is destroyed to support GPU resource re-upload.
  */
 class VertexMeshImpl : public MeshImpl {
  public:
@@ -92,11 +92,10 @@ class VertexMeshImpl : public MeshImpl {
    */
   size_t getVertexStride() const;
 
-  // Releases CPU vertex data after GPU upload.
-  void releaseVertexData();
-
  private:
   VertexMeshImpl(MeshTopology topology, int vertexCount, int indexCount);
+
+  void releaseVertexData();
 
   MeshTopology _topology = MeshTopology::Triangles;
   int _vertexCount = 0;

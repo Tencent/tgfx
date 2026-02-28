@@ -84,11 +84,6 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
 
   gpu->queue()->writeBuffer(gpuBuffer, 0, buffer.get(), vertexDataSize);
 
-  // Release CPU data if no index buffer upload is pending
-  if (!impl.hasIndices()) {
-    impl.releaseVertexData();
-  }
-
   return BufferResource::Wrap(context, std::move(gpuBuffer));
 }
 
@@ -118,9 +113,6 @@ std::shared_ptr<Resource> MeshIndexBufferUploadTask::onMakeResource(Context* con
 
   gpu->queue()->writeBuffer(gpuBuffer, 0, impl.indices(), indexDataSize);
 
-  // Release CPU data after index buffer upload completes
-  impl.releaseVertexData();
-
   return BufferResource::Wrap(context, std::move(gpuBuffer));
 }
 
@@ -148,11 +140,6 @@ std::shared_ptr<Resource> ShapeMeshBufferUploadTask::onMakeResource(Context* con
   }
 
   gpu->queue()->writeBuffer(gpuBuffer, 0, vertexData->data(), vertexData->size());
-
-  // Release data source and shape to free memory
-  dataSource = nullptr;
-  auto& impl = static_cast<ShapeMeshImpl&>(MeshImpl::ReadAccess(*meshProxy->mesh()));
-  impl.releaseShape();
 
   return BufferResource::Wrap(context, std::move(gpuBuffer));
 }
