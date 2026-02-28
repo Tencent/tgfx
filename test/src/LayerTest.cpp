@@ -638,10 +638,11 @@ TGFX_TEST(LayerTest, StrokeOnTop) {
   shapeLayer->setStrokeStyle(strokeColor);
   shapeLayer->setLineWidth(16);
   auto innerShadow = InnerShadowStyle::Make(30, 30, 0, 0, Color::FromRGBA(100, 0, 0, 128));
+  innerShadow->setExcludeChildEffects(true);
   auto dropShadow = DropShadowStyle::Make(-20, -20, 0, 0, Color::Black());
   dropShadow->setShowBehindLayer(false);
+  dropShadow->setExcludeChildEffects(true);
   shapeLayer->setLayerStyles({dropShadow, innerShadow});
-  shapeLayer->setExcludeChildEffectsInLayerStyle(true);
   layer->addChild(shapeLayer);
   auto solidLayer = SolidLayer::Make();
   solidLayer->setWidth(100);
@@ -1619,7 +1620,6 @@ TGFX_TEST(LayerTest, BottomLeftSurface) {
 
   auto childFrame = tgfx::Rect::MakeWH(150, 150);
   auto childLayer = tgfx::ShapeLayer::Make();
-  childLayer->setExcludeChildEffectsInLayerStyle(true);
 
   tgfx::Path childPath;
   childPath.addRect(childFrame);
@@ -2323,6 +2323,64 @@ TGFX_TEST(LayerTest, Matrix) {
   }
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_Behind_Viewer"));
+
+  // Test offscreen rendering blending with 3D background layer
+  {
+    auto displayList3D = std::make_unique<DisplayList>();
+    auto surface3D = Surface::Make(context, 200, 200);
+
+    auto imageLayer2D = ImageLayer::Make();
+    auto image2D = MakeImage("resources/assets/HappyNewYear.png");
+    imageLayer2D->setImage(image2D);
+    imageLayer2D->setMatrix(Matrix::MakeScale(0.5f));
+    displayList3D->root()->addChild(imageLayer2D);
+
+    auto imageLayer3D = ImageLayer::Make();
+    auto image3D = MakeImage("resources/apitest/imageReplacement.jpg");
+    imageLayer3D->setImage(image3D);
+    auto imageSize =
+        Size::Make(static_cast<float>(image3D->width()), static_cast<float>(image3D->height()));
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(-anchor.x * imageSize.width, -anchor.y * imageSize.height, 0.f);
+    auto invOffsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(anchor.x * imageSize.width, anchor.y * imageSize.height, 0.f);
+    auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
+    auto perspectiveMatrix = Matrix3D::I();
+    perspectiveMatrix.setRowColumn(3, 2, -1.f / 200.f);
+    auto origin = Point::Make(100 - anchor.x * imageSize.width, 100 - anchor.y * imageSize.height);
+    auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+    auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                           modelMatrix * offsetToAnchorMatrix;
+    imageLayer3D->setMatrix3D(transformMatrix);
+    displayList3D->root()->addChild(imageLayer3D);
+
+    auto layerWithMask = SolidLayer::Make();
+    layerWithMask->setColor(Color::FromRGBA(255, 0, 0, 26));
+    layerWithMask->setWidth(imageSize.width);
+    layerWithMask->setHeight(imageSize.height);
+    layerWithMask->setBlendMode(BlendMode::SrcOver);
+    imageLayer3D->addChild(layerWithMask);
+
+    auto blendLayer = SolidLayer::Make();
+    blendLayer->setColor(Color::FromRGBA(0, 255, 0, 128));
+    blendLayer->setWidth(imageSize.width);
+    blendLayer->setHeight(imageSize.height);
+    blendLayer->setBlendMode(BlendMode::SrcIn);
+    layerWithMask->addChild(blendLayer);
+
+    auto imageMaskLayer = ImageLayer::Make();
+    auto maskImage = MakeImage("resources/apitest/test_timestretch.png");
+    imageMaskLayer->setImage(maskImage);
+    auto maskScale = Matrix::MakeScale(imageSize.width / static_cast<float>(maskImage->width()),
+                                       imageSize.height / static_cast<float>(maskImage->height()));
+    imageMaskLayer->setMatrix(maskScale);
+    layerWithMask->addChild(imageMaskLayer);
+    layerWithMask->setMask(imageMaskLayer);
+
+    displayList3D->render(surface3D.get());
+    EXPECT_TRUE(Baseline::Compare(surface3D, "LayerTest/Matrix_3D_Offscreen_Blend"));
+  }
 }
 
 TGFX_TEST(LayerTest, DisplayListBackground) {

@@ -82,8 +82,6 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
   SerializeUtils::SetFlexBufferMap(fbb, "visible", layer->visible());
   SerializeUtils::SetFlexBufferMap(fbb, "allowsEdgeAntialiasing", layer->allowsEdgeAntialiasing());
   SerializeUtils::SetFlexBufferMap(fbb, "allowsGroupOpacity", layer->allowsGroupOpacity());
-  SerializeUtils::SetFlexBufferMap(fbb, "excludeChildEffectsInLayerStyle",
-                                   layer->excludeChildEffectsInLayerStyle());
   SerializeUtils::SetFlexBufferMap(fbb, "blendMode",
                                    SerializeUtils::BlendModeToString(layer->blendMode()));
   SerializeUtils::SetFlexBufferMap(fbb, "name", layer->name());
