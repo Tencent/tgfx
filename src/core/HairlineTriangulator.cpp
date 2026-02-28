@@ -19,8 +19,10 @@
 #include "HairlineTriangulator.h"
 #include <cstddef>
 #include "core/NoConicsPathIterator.h"
+#include "core/shapes/MatrixShape.h"
 #include "core/utils/PathUtils.h"
 #include "core/utils/PointUtils.h"
+#include "core/utils/ShapeUtils.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Point.h"
@@ -510,6 +512,10 @@ bool HairlineTriangulator::asyncSupport() const {
   static constexpr int AsyncVerbThreshold = 32;
   if (shape->isSimplePath()) {
     return shape->getPath().countVerbs() > AsyncVerbThreshold;
+  }
+  auto matrixShape = ShapeUtils::AsMatrixShape(shape.get());
+  if (matrixShape != nullptr && matrixShape->shape->isSimplePath()) {
+    return matrixShape->shape->getPath().countVerbs() > AsyncVerbThreshold;
   }
   return true;
 }
