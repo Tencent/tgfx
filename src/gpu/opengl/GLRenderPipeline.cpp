@@ -64,6 +64,14 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
   if (cullFaceState) {
     state->setCullFaceState(*cullFaceState);
   }
+  state->setEnabled(GL_SAMPLE_ALPHA_TO_COVERAGE, alphaToCoverageEnabled);
+  if (gpu->caps()->sampleMaskSupport) {
+    bool sampleMaskEnabled = sampleMask != 0xFFFFFFFF;
+    state->setEnabled(GL_SAMPLE_MASK, sampleMaskEnabled);
+    if (sampleMaskEnabled) {
+      state->setSampleMask(sampleMask);
+    }
+  }
 }
 
 void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GLBuffer* buffer,
@@ -276,6 +284,9 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   depthState = MakeDepthState(descriptor.depthStencil);
   blendState = MakeBlendState(attachment);
   cullFaceState = MakeCullFaceState(descriptor.primitive);
+  alphaToCoverageEnabled = descriptor.multisample.alphaToCoverageEnabled;
+  sampleMask = descriptor.multisample.mask;
+  sampleCount = descriptor.multisample.count;
 
   for (auto& entry : descriptor.layout.uniformBlocks) {
     auto uniformBlockIndex = gl->getUniformBlockIndex(programID, entry.name.c_str());

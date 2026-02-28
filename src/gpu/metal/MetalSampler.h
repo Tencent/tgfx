@@ -18,42 +18,38 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
-#include "tgfx/core/Point.h"
+#include <Metal/Metal.h>
+#include "tgfx/gpu/Sampler.h"
+#include "MetalResource.h"
 
 namespace tgfx {
 
+class MetalGPU;
+
 /**
- * QuadCW represents a quadrilateral with vertices in clockwise order.
- * Used for logical quad operations where edge connectivity matters.
- *
- * Vertex layout (clockwise):
- *   p0 -----> p1
- *   ^          |
- *   |          v
- *   p3 <----- p2
- *
- * Edge definitions (matching QUAD_AA_FLAG_EDGE_*):
- *   EDGE_01: p0 -> p1
- *   EDGE_12: p1 -> p2
- *   EDGE_23: p2 -> p3
- *   EDGE_30: p3 -> p0
+ * Metal sampler implementation.
  */
-class QuadCW {
+class MetalSampler : public Sampler, public MetalResource {
  public:
-  constexpr QuadCW() = default;
+  static std::shared_ptr<MetalSampler> Make(MetalGPU* gpu, const SamplerDescriptor& descriptor);
 
-  constexpr QuadCW(const Point& p0, const Point& p1, const Point& p2, const Point& p3)
-      : points{p0, p1, p2, p3} {
+  /**
+   * Returns the Metal sampler state.
+   */
+  id<MTLSamplerState> metalSamplerState() const {
+    return samplerState;
   }
 
-  const Point& point(size_t i) const {
-    DEBUG_ASSERT(i < 4);
-    return points[i];
-  }
+ protected:
+  void onRelease(MetalGPU* gpu) override;
 
  private:
-  Point points[4] = {};
+  explicit MetalSampler(id<MTLSamplerState> metalSamplerState);
+  ~MetalSampler() override = default;
+
+  id<MTLSamplerState> samplerState = nil;
+  
+  friend class MetalGPU;
 };
 
 }  // namespace tgfx

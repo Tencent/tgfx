@@ -20,7 +20,7 @@
 
 #include <memory>
 #include <vector>
-#include "gpu/QuadCW.h"
+#include "gpu/Quad.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix3D.h"
 
@@ -94,11 +94,11 @@ class DrawPolygon3D {
 
   /**
    * Converts this polygon to a list of quads for rendering.
-   * Each quad contains 4 vertices in local space (clockwise order).
-   * For triangles, the last two vertices are the same.
-   * @return A list of quads in clockwise vertex order.
+   * Each quad contains 4 vertices in local space (Z-order: LT, LB, RT, RB).
+   * For triangles, the last two vertices are the same (RT == RB).
+   * @return A list of quads in Z-order vertex layout.
    */
-  std::vector<QuadCW> toQuads() const;
+  std::vector<Quad> toQuads() const;
 
  private:
   // Constructs a polygon from already-transformed 3D points (used for split polygons).

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,19 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DevicePool.h"
-#include <thread>
-#include <unordered_map>
+#pragma once
+
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-thread_local std::shared_ptr<tgfx::GLDevice> cachedDevice = nullptr;
 
-std::shared_ptr<tgfx::GLDevice> DevicePool::Make() {
-  auto device = cachedDevice;
-  if (device == nullptr) {
-    device = tgfx::GLDevice::Make();
-    cachedDevice = device;
-  }
-  return device;
-}
+class MatrixUtils {
+ public:
+  /**
+   * Returns true if the matrix preserves right angles.
+   */
+  static bool PreservesRightAngles(const Matrix& matrix);
+};
+
 }  // namespace tgfx

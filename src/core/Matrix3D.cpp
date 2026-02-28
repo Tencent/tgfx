@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Matrix3D.h"
+#include "core/utils/VecUtils.h"
 #include "utils/Log.h"
 #include "utils/MathExtra.h"
 
@@ -155,9 +156,9 @@ static bool InvertMatrix3D(const float inMat[16], float outMat[16]) {
 static Rect MapRectAffine(const Rect& srcRect, const float mat[16]) {
   constexpr Vec4 flip{1.f, 1.f, -1.f, -1.f};
 
-  auto c0 = Shuffle<0, 1, 0, 1>(Vec2::Load(mat)) * flip;
-  auto c1 = Shuffle<0, 1, 0, 1>(Vec2::Load(mat + 4)) * flip;
-  auto c3 = Shuffle<0, 1, 0, 1>(Vec2::Load(mat + 12));
+  const auto c0 = VecUtils::Shuffle<0, 1, 0, 1>(Vec2::Load(mat)) * flip;
+  const auto c1 = VecUtils::Shuffle<0, 1, 0, 1>(Vec2::Load(mat + 4)) * flip;
+  const auto c3 = VecUtils::Shuffle<0, 1, 0, 1>(Vec2::Load(mat + 12));
 
   auto p0 = Min(c0 * srcRect.left + c1 * srcRect.top, c0 * srcRect.right + c1 * srcRect.top);
   auto p1 = Min(c0 * srcRect.left + c1 * srcRect.bottom, c0 * srcRect.right + c1 * srcRect.bottom);
@@ -180,13 +181,13 @@ static Rect MapRectPerspective(const Rect& srcRect, const float mat[16]) {
   auto project = [&flip](const Vec4& p0, const Vec4& p1, const Vec4& p2) {
     const float w0 = p0[3];
     if (constexpr float w0PlaneDistance = 1.f / (1 << 14); w0 >= w0PlaneDistance) {
-      return flip * Shuffle<0, 1, 0, 1>(Vec2(p0.x, p0.y)) / w0;
+      return flip * VecUtils::Shuffle<0, 1, 0, 1>(Vec2(p0.x, p0.y)) / w0;
     } else {
       auto clip = [&](const Vec4& p) {
         if (const float w = p[3]; w >= w0PlaneDistance) {
           const float t = (w0PlaneDistance - w0) / (w - w0);
           auto c = (t * Vec2::Load(p.ptr()) + (1.f - t) * Vec2::Load(p0.ptr())) / w0PlaneDistance;
-          return flip * Shuffle<0, 1, 0, 1>(c);
+          return flip * VecUtils::Shuffle<0, 1, 0, 1>(c);
         } else {
           return Vec4(std::numeric_limits<float>::infinity());
         }

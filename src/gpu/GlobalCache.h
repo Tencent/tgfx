@@ -62,8 +62,8 @@ class GlobalCache {
   void resetUniformBuffer();
 
   /**
-   * Adds a program to the cache with the specified key. If a program with the same key already
-   * exists, it will be replaced with the new program.
+   * Adds a program to the cache with the specified key. The caller must ensure that the key does
+   * not already exist in the cache, otherwise the LRU tracking will be corrupted.
    */
   void addProgram(const BytesKey& programKey, std::shared_ptr<Program> program);
 

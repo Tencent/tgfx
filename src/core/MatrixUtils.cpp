@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,17 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "core/MatrixUtils.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
-/**
- * Types for interacting with Metal resources created externally to TGFX. Holds the MTLTexture as a
- * const void*.
- */
-struct MtlTextureInfo {
-  /**
-   * Pointer to MTLTexture.
-   */
-  const void* texture = nullptr;
-};
+
+bool MatrixUtils::PreservesRightAngles(const Matrix& matrix) {
+  const auto mask = matrix.getType();
+  if (mask <= Matrix::TranslateMask) {
+    return true;
+  }
+  if (mask & Matrix::PerspectiveMask) {
+    return false;
+  }
+  const auto sx = matrix.getScaleX();
+  const auto sy = matrix.getScaleY();
+  const auto kx = matrix.getSkewX();
+  const auto ky = matrix.getSkewY();
+  // Check for degenerate matrix.
+  if (const auto det = sx * sy - kx * ky; FloatNearlyZero(det)) {
+    return false;
+  }
+  // Orthogonality alone suffices — non-uniform scaling preserves right angles.
+  const auto dot = sx * kx + ky * sy;
+  return FloatNearlyZero(dot);
+}
+
 }  // namespace tgfx
