@@ -53,6 +53,11 @@ class ShapeMeshImpl : public MeshImpl {
     return antiAlias;
   }
 
+  //  Releases the Shape after GPU upload.
+  void releaseShape() {
+    _shape = nullptr;
+  }
+
  private:
   ShapeMeshImpl(std::shared_ptr<Shape> shape, bool antiAlias);
 
