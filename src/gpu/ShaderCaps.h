@@ -69,6 +69,13 @@ class ShaderCaps {
   std::string frameBufferFetchExtensionString;
 
   /**
+   * Indicates if framebuffer fetch uses Vulkan-style subpass input instead of GL ES-style inout.
+   * When true, the fragment shader will declare a subpassInput uniform and use subpassLoad()
+   * to read the destination color. SPIRV-Cross will convert this to MSL's [[color(0)]] attribute.
+   */
+  bool frameBufferFetchUsesSubpassInput = false;
+
+  /**
    * Returns the maximum number of texture samplers that can be used in a shader.
    */
   int maxFragmentSamplers = 0;

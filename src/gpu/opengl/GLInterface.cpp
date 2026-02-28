@@ -197,6 +197,8 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
       getter->getProcAddress("glRenderbufferStorageMultisample"));
   functions->blitFramebuffer =
       reinterpret_cast<GLBlitFramebuffer*>(getter->getProcAddress("glBlitFramebuffer"));
+  functions->sampleMaski =
+      reinterpret_cast<GLSampleMaski*>(getter->getProcAddress("glSampleMaski"));
   functions->scissor = reinterpret_cast<GLScissor*>(getter->getProcAddress("glScissor"));
   functions->shaderSource =
       reinterpret_cast<GLShaderSource*>(getter->getProcAddress("glShaderSource"));

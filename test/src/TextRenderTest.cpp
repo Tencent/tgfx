@@ -1193,7 +1193,7 @@ TGFX_TEST(TextRenderTest, TextBlobMixedPositioning) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 285, 139);
+  auto surface = Surface::Make(context, 320, 139);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -1207,8 +1207,8 @@ TGFX_TEST(TextRenderTest, TextBlobMixedPositioning) {
   Font font(typeface, 36.0f);
   Font emojiFont(emojiTypeface, 36.0f);
 
-  auto glyphH = font.getGlyphID('H');
-  auto glyphI = font.getGlyphID('i');
+  auto glyphNi = font.getGlyphID(0x4F60);           // 你
+  auto glyphHao = font.getGlyphID(0x597D);          // 好
   auto glyphEmoji = emojiFont.getGlyphID(0x1F44B);  // 👋
   auto glyphW = font.getGlyphID('W');
   auto glyphO = font.getGlyphID('o');
@@ -1220,13 +1220,13 @@ TGFX_TEST(TextRenderTest, TextBlobMixedPositioning) {
   float x = 47.0f;
   float y = 83.0f;
 
-  // Run 1: "Hi" with horizontal positioning
+  // Run 1: "你好" with horizontal positioning
   const auto& buffer1 = builder.allocRunPosH(font, 2, y);
-  buffer1.glyphs[0] = glyphH;
-  buffer1.glyphs[1] = glyphI;
+  buffer1.glyphs[0] = glyphNi;
+  buffer1.glyphs[1] = glyphHao;
   buffer1.positions[0] = x;
-  buffer1.positions[1] = x + font.getAdvance(glyphH);
-  x += font.getAdvance(glyphH) + font.getAdvance(glyphI) + 5.0f;
+  buffer1.positions[1] = x + font.getAdvance(glyphNi);
+  x += font.getAdvance(glyphNi) + font.getAdvance(glyphHao) + 5.0f;
 
   // Run 2: Emoji with point positioning
   const auto& buffer2 = builder.allocRunPos(emojiFont, 1);
@@ -1706,34 +1706,26 @@ TGFX_TEST(TextRenderTest, AxisAlignedRotationRender) {
 // Returns true if the character should be typeset upright in vertical text (UAX #50).
 static bool IsUprightInVerticalText(Unichar unichar) {
   // CJK Ideographs
-  if ((unichar >= 0x4E00 && unichar <= 0x9FFF) ||
-      (unichar >= 0x3400 && unichar <= 0x4DBF) ||
-      (unichar >= 0x20000 && unichar <= 0x2A6DF) ||
-      (unichar >= 0x2A700 && unichar <= 0x2B81F) ||
-      (unichar >= 0x2B820 && unichar <= 0x2CEAF) ||
-      (unichar >= 0x30000 && unichar <= 0x3134F) ||
-      (unichar >= 0x31350 && unichar <= 0x323AF) ||
-      (unichar >= 0xF900 && unichar <= 0xFAFF) ||
+  if ((unichar >= 0x4E00 && unichar <= 0x9FFF) || (unichar >= 0x3400 && unichar <= 0x4DBF) ||
+      (unichar >= 0x20000 && unichar <= 0x2A6DF) || (unichar >= 0x2A700 && unichar <= 0x2B81F) ||
+      (unichar >= 0x2B820 && unichar <= 0x2CEAF) || (unichar >= 0x30000 && unichar <= 0x3134F) ||
+      (unichar >= 0x31350 && unichar <= 0x323AF) || (unichar >= 0xF900 && unichar <= 0xFAFF) ||
       (unichar >= 0x2F800 && unichar <= 0x2FA1F)) {
     return true;
   }
   // Hiragana, Katakana
-  if ((unichar >= 0x3040 && unichar <= 0x309F) ||
-      (unichar >= 0x30A0 && unichar <= 0x30FF) ||
+  if ((unichar >= 0x3040 && unichar <= 0x309F) || (unichar >= 0x30A0 && unichar <= 0x30FF) ||
       (unichar >= 0x31F0 && unichar <= 0x31FF)) {
     return true;
   }
   // Hangul
-  if ((unichar >= 0xAC00 && unichar <= 0xD7AF) ||
-      (unichar >= 0x1100 && unichar <= 0x11FF) ||
-      (unichar >= 0x3130 && unichar <= 0x318F) ||
-      (unichar >= 0xA960 && unichar <= 0xA97F) ||
+  if ((unichar >= 0xAC00 && unichar <= 0xD7AF) || (unichar >= 0x1100 && unichar <= 0x11FF) ||
+      (unichar >= 0x3130 && unichar <= 0x318F) || (unichar >= 0xA960 && unichar <= 0xA97F) ||
       (unichar >= 0xD7B0 && unichar <= 0xD7FF)) {
     return true;
   }
   // Bopomofo
-  if ((unichar >= 0x3100 && unichar <= 0x312F) ||
-      (unichar >= 0x31A0 && unichar <= 0x31BF)) {
+  if ((unichar >= 0x3100 && unichar <= 0x312F) || (unichar >= 0x31A0 && unichar <= 0x31BF)) {
     return true;
   }
   // Yi Syllables and Radicals
@@ -1741,30 +1733,25 @@ static bool IsUprightInVerticalText(Unichar unichar) {
     return true;
   }
   // CJK Symbols, Punctuation, Vertical Forms, Compatibility Forms
-  if ((unichar >= 0x3000 && unichar <= 0x303F) ||
-      (unichar >= 0xFE10 && unichar <= 0xFE19) ||
+  if ((unichar >= 0x3000 && unichar <= 0x303F) || (unichar >= 0xFE10 && unichar <= 0xFE19) ||
       (unichar >= 0xFE30 && unichar <= 0xFE4F)) {
     return true;
   }
   // Fullwidth Forms and Symbols
-  if ((unichar >= 0xFF01 && unichar <= 0xFF60) ||
-      (unichar >= 0xFFE0 && unichar <= 0xFFE6)) {
+  if ((unichar >= 0xFF01 && unichar <= 0xFF60) || (unichar >= 0xFFE0 && unichar <= 0xFFE6)) {
     return true;
   }
   // CJK Enclosed Letters, Compatibility, Enclosed Supplement
-  if ((unichar >= 0x3200 && unichar <= 0x32FF) ||
-      (unichar >= 0x3300 && unichar <= 0x33FF) ||
+  if ((unichar >= 0x3200 && unichar <= 0x32FF) || (unichar >= 0x3300 && unichar <= 0x33FF) ||
       (unichar >= 0x1F200 && unichar <= 0x1F2FF)) {
     return true;
   }
   // Emoji
-  if ((unichar >= 0x1F000 && unichar <= 0x1FAFF) ||
-      (unichar >= 0x2600 && unichar <= 0x27BF)) {
+  if ((unichar >= 0x1F000 && unichar <= 0x1FAFF) || (unichar >= 0x2600 && unichar <= 0x27BF)) {
     return true;
   }
   // CJK Radicals, Kangxi Radicals, Ideographic Description
-  if ((unichar >= 0x2E80 && unichar <= 0x2EFF) ||
-      (unichar >= 0x2F00 && unichar <= 0x2FDF) ||
+  if ((unichar >= 0x2E80 && unichar <= 0x2EFF) || (unichar >= 0x2F00 && unichar <= 0x2FDF) ||
       (unichar >= 0x2FF0 && unichar <= 0x2FFF)) {
     return true;
   }
@@ -1867,6 +1854,106 @@ TGFX_TEST(TextRenderTest, VerticalTextLayout) {
 
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "TextRenderTest/VerticalTextLayout"));
+}
+
+TGFX_TEST(TextRenderTest, VerticalTextWithEmoji) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  auto emojiTypeface = MakeTypeface("resources/font/NotoColorEmoji.ttf");
+  ASSERT_TRUE(emojiTypeface != nullptr);
+
+  auto fontSize = 36.0f;
+  Font font(typeface, fontSize);
+  Font emojiFont(emojiTypeface, fontSize);
+
+  // Vertical layout of "你好👋World" — Latin rotated 90°, CJK and emoji upright.
+  // Surface height is derived from the sum of all vertical advances, so an incorrect emoji
+  // vertical advance would cause the content to overflow or leave excessive gaps.
+  struct GlyphInfo {
+    Unichar unichar = 0;
+    bool isEmoji = false;
+    bool isCJK = false;
+  };
+  std::vector<GlyphInfo> chars = {
+      {0x4F60, false, true},   // 你
+      {0x597D, false, true},   // 好
+      {0x1F44B, true, false},  // 👋
+      {'W', false, false},    {'o', false, false}, {'r', false, false},
+      {'l', false, false},    {'d', false, false},
+  };
+
+  auto metrics = font.getMetrics();
+  // Per CSS Writing Modes: after 90° rotation, center the glyph using the midpoint of ascent and
+  // descent relative to the vertical midline.
+  auto ascentDescentCenter = (metrics.ascent + metrics.descent) / 2;
+  float midlineX = fontSize / 2;
+  float margin = 50.0f;
+  float currentY = margin;
+  float maxWidth = fontSize;
+
+  struct GlyphEntry {
+    std::shared_ptr<TextBlob> blob = nullptr;
+    float xPosition = 0.0f;
+    float yPosition = 0.0f;
+  };
+  std::vector<GlyphEntry> entries = {};
+
+  for (const auto& ch : chars) {
+    auto& f = (ch.isEmoji) ? emojiFont : font;
+    auto glyphID = f.getGlyphID(ch.unichar);
+    ASSERT_NE(glyphID, static_cast<GlyphID>(0));
+
+    GlyphEntry entry;
+    entry.yPosition = currentY;
+
+    if (ch.isCJK || ch.isEmoji) {
+      auto verticalOffset = f.getVerticalOffset(glyphID);
+      auto verticalAdvance = f.getAdvance(glyphID, true);
+      auto horizontalAdvance = f.getAdvance(glyphID, false);
+      if (horizontalAdvance > maxWidth) {
+        maxWidth = horizontalAdvance;
+      }
+      TextBlobBuilder builder;
+      auto buffer = builder.allocRun(f, 1, verticalOffset.x, verticalOffset.y);
+      buffer.glyphs[0] = glyphID;
+      entry.blob = builder.build();
+      entry.xPosition = midlineX;
+      currentY += verticalAdvance;
+    } else {
+      auto horizontalAdvance = f.getAdvance(glyphID, false);
+      auto tx = midlineX + ascentDescentCenter;
+      TextBlobBuilder builder;
+      auto buffer = builder.allocRunRSXform(f, 1);
+      buffer.glyphs[0] = glyphID;
+      auto* xform = reinterpret_cast<RSXform*>(buffer.positions);
+      xform[0] = RSXform::Make(0, 1, tx, 0);
+      entry.blob = builder.build();
+      entry.xPosition = 0;
+      currentY += horizontalAdvance;
+    }
+    entries.push_back(entry);
+  }
+
+  auto totalHeight = static_cast<int>(std::ceil(currentY + margin));
+  auto surfaceWidth = static_cast<int>(std::ceil(maxWidth + margin * 2));
+  auto surface = Surface::Make(context, surfaceWidth, totalHeight);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setColor(Color::Black());
+  for (const auto& entry : entries) {
+    if (entry.blob != nullptr) {
+      canvas->drawTextBlob(entry.blob, margin + entry.xPosition, entry.yPosition, paint);
+    }
+  }
+
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "TextRenderTest/VerticalTextWithEmoji"));
 }
 
 }  // namespace tgfx

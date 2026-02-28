@@ -104,6 +104,13 @@ class ColorFilter {
   enum class Type { Blend, Matrix, AlphaThreshold, Compose, Luma };
 
   /**
+   * Returns true if this color filter transforms transparent black into a non-transparent color.
+   */
+  virtual bool affectsTransparentBlack() const {
+    return false;
+  }
+
+  /**
    * Returns the type of this color filter.
    */
   virtual Type type() const = 0;

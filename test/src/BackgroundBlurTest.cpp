@@ -55,11 +55,11 @@ TGFX_TEST(BackgroundBlurTest, BackgroundBlur) {
   layer->setStrokeStyle(strokeStyle);
   layer->setLineWidth(10);
   layer->setStrokeOnTop(true);
-  layer->setExcludeChildEffectsInLayerStyle(true);
   auto filter = BackgroundBlurStyle::Make(2, 2);
+  filter->setExcludeChildEffects(true);
   auto dropShadow = DropShadowStyle::Make(10, 10, 0, 0, Color::FromRGBA(0, 0, 0, 100));
   dropShadow->setShowBehindLayer(true);
-  layer->setExcludeChildEffectsInLayerStyle(true);
+  dropShadow->setExcludeChildEffects(true);
   layer->setLayerStyles({dropShadow, filter});
 
   auto blurFilter = BlurFilter::Make(1, 2);
@@ -71,7 +71,9 @@ TGFX_TEST(BackgroundBlurTest, BackgroundBlur) {
   silbing->setPath(rect);
   silbing->setMatrix(Matrix::MakeTrans(-10, 0));
   auto newBackgroundBlur = BackgroundBlurStyle::Make(3, 3);
-  silbing->setLayerStyles({dropShadow, newBackgroundBlur});
+  auto silbingDropShadow = DropShadowStyle::Make(10, 10, 0, 0, Color::FromRGBA(0, 0, 0, 100));
+  silbingDropShadow->setShowBehindLayer(true);
+  silbing->setLayerStyles({silbingDropShadow, newBackgroundBlur});
   silbing->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 100, 100)));
   layer->addChild(silbing);
 
@@ -509,6 +511,73 @@ TGFX_TEST(BackgroundBlurTest, ScaledInnerShadowWithBackgroundBlur) {
   displayList->setContentOffset(-1000, -1000);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/ScaledInnerShadowWithBackgroundBlur"));
+}
+
+/**
+ * Test background blur with perspective transform (preserve3D = false).
+ * When preserve3D is false, layers with perspective transforms should still be able to
+ * apply background blur.
+ */
+TGFX_TEST(BackgroundBlurTest, NestedFlat3DLayer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 250, 250);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Background image layer
+  auto backImage = MakeImage("resources/assets/HappyNewYear.png");
+  auto background = ImageLayer::Make();
+  background->setImage(backImage);
+  background->setMatrix(Matrix::MakeScale(250.f / 1024.f));
+  displayList->root()->addChild(background);
+
+  // Parent layer with preserve3D = false (default) and perspective transform
+  auto parentLayer = SolidLayer::Make();
+  parentLayer->setColor(Color::FromRGBA(200, 200, 200, 100));
+  parentLayer->setWidth(150);
+  parentLayer->setHeight(150);
+  {
+    auto size = Size::Make(150, 150);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, 25);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 400.0f);
+    auto origin = Matrix3D::MakeTranslate(50, 50, 0);
+    parentLayer->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  parentLayer->setPreserve3D(false);
+  parentLayer->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
+  displayList->root()->addChild(parentLayer);
+
+  // Child layer also with preserve3D = false and perspective transform + background blur
+  auto childLayer = SolidLayer::Make();
+  childLayer->setColor(Color::FromRGBA(255, 255, 255, 150));
+  childLayer->setWidth(80);
+  childLayer->setHeight(80);
+  {
+    auto size = Size::Make(80, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({1, 0, 0}, 20);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 300.0f);
+    auto origin = Matrix3D::MakeTranslate(35, 35, 0);
+    childLayer->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  childLayer->setPreserve3D(false);
+  childLayer->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
+  parentLayer->addChild(childLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/NestedFlat3DLayer"));
 }
 
 }  // namespace tgfx

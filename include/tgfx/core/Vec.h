@@ -96,6 +96,19 @@ struct Vec2 {
   friend Vec2 operator/(const Vec2& v, float s);
 
   /**
+   * Returns the i-th component of this vector.
+   * Valid values for i are 0 and 1. 0 corresponds to x, and 1 to y.
+   */
+  float operator[](int i) const;
+
+  /**
+   * Returns a pointer to the underlying float array.
+   */
+  const float* ptr() const {
+    return &x;
+  }
+
+  /**
    * The x component value.
    */
   float x;
@@ -389,17 +402,13 @@ struct Vec4 {
   /**
    * Returns the negation of the vector, computed as (-x, -y, -z, -w).
    */
-  Vec4 operator-() const {
-    return {-x, -y, -z, -w};
-  }
+  Vec4 operator-() const;
 
   /**
    * Returns the sum of this vector and another vector, computed as
    * (x + v.x, y + v.y, z + v.z, w + v.w).
    */
-  Vec4 operator+(const Vec4& v) const {
-    return {x + v.x, y + v.y, z + v.z, w + v.w};
-  }
+  Vec4 operator+(const Vec4& v) const;
 
   /**
    * Adds another vector to this vector. Sets this vector to (x + v.x, y + v.y, z + v.z, w + v.w).
@@ -412,9 +421,7 @@ struct Vec4 {
    * Returns the difference between this vector and another vector, computed as
    * (x - v.x, y - v.y, z - v.z, w - v.w).
    */
-  Vec4 operator-(const Vec4& v) const {
-    return {x - v.x, y - v.y, z - v.z, w - v.w};
-  }
+  Vec4 operator-(const Vec4& v) const;
 
   /**
    * Subtracts another vector from this vector. Sets this vector to (x - v.x, y - v.y, z - v.z, w - v.w).
@@ -427,9 +434,7 @@ struct Vec4 {
    * Returns the component-wise product of this vector and another vector, computed as
    * (x * v.x, y * v.y, z * v.z, w * v.w).
    */
-  Vec4 operator*(const Vec4& v) const {
-    return {x * v.x, y * v.y, z * v.z, w * v.w};
-  }
+  Vec4 operator*(const Vec4& v) const;
 
   /**
    * Multiplies this vector component-wise by another vector. Sets this vector to
@@ -440,18 +445,14 @@ struct Vec4 {
   }
 
   /**
-   * Returns the product of a vector and a scalar, computed as (v.x * s, v.y * s, v.z * s, v.w * s).
+   * Returns the product of this vector and a scalar, computed as (x * s, y * s, z * s, w * s).
    */
-  friend Vec4 operator*(const Vec4& v, float s) {
-    return {v.x * s, v.y * s, v.z * s, v.w * s};
-  }
+  Vec4 operator*(float s) const;
 
   /**
    * Returns the product of a scalar and a vector, computed as (v.x * s, v.y * s, v.z * s, v.w * s).
    */
-  friend Vec4 operator*(float s, const Vec4& v) {
-    return v * s;
-  }
+  friend Vec4 operator*(float s, const Vec4& v);
 
   /**
    * Multiplies this vector by a scalar. Sets this vector to (x * s, y * s, z * s, w * s).
@@ -464,33 +465,31 @@ struct Vec4 {
    * Returns the component-wise quotient of this vector and another vector, computed as
    * (x / v.x, y / v.y, z / v.z, w / v.w).
    */
-  Vec4 operator/(const Vec4& v) const {
-    return {x / v.x, y / v.y, z / v.z, w / v.w};
-  }
+  Vec4 operator/(const Vec4& v) const;
 
   /**
-   * Returns the component-wise quotient of a vector and a scalar, computed as
-   * (v.x / s, v.y / s, v.z / s, v.w / s).
+   * Returns the component-wise quotient of this vector and a scalar, computed as
+   * (x / s, y / s, z / s, w / s).
    */
-  friend Vec4 operator/(const Vec4& v, float s) {
-    return {v.x / s, v.y / s, v.z / s, v.w / s};
-  }
+  Vec4 operator/(float s) const;
+
+  /**
+   * Returns the component-wise quotient of a scalar and a vector, computed as
+   * (s / v.x, s / v.y, s / v.z, s / v.w).
+   */
+  friend Vec4 operator/(float s, const Vec4& v);
 
   /**
    * Returns the i-th component of this vector.
    * Valid values for i are 0, 1, 2, and 3. 0 corresponds to x, 1 to y, 2 to z, and 3 to w.
    */
-  float operator[](int i) const {
-    return this->ptr()[i];
-  }
+  float operator[](int i) const;
 
   /**
    * Returns a reference to the i-th component of this vector.
    * Valid values for i are 0, 1, 2, and 3. 0 corresponds to x, 1 to y, 2 to z, and 3 to w.
    */
-  float& operator[](int i) {
-    return this->ptr()[i];
-  }
+  float& operator[](int i);
 
   /**
    * The x component value.
@@ -514,30 +513,13 @@ struct Vec4 {
 };
 
 /**
- * Shuffles the components of a Vec2 into a Vec4.
- * @tparam Ix Indices specifying which components to use from the Vec2. Valid values for Ix are 0
- * and 1. 0 corresponds to x, and 1 to y.
- */
-template <int... Ix>
-static inline Vec4 Shuffle(const Vec2& v) {
-  const float arr[2] = {v.x, v.y};
-  return {arr[Ix]...};
-}
-
-/**
  * Returns a vector containing the minimum components of two vectors.
  */
-static inline Vec4 Min(const Vec4& a, const Vec4& b) {
-  return {a.x < b.x ? a.x : b.x, a.y < b.y ? a.y : b.y, a.z < b.z ? a.z : b.z,
-          a.w < b.w ? a.w : b.w};
-}
+Vec4 Min(const Vec4& a, const Vec4& b);
 
 /**
  * Returns a vector containing the maximum components of two vectors.
  */
-static inline Vec4 Max(const Vec4& a, const Vec4& b) {
-  return {a.x > b.x ? a.x : b.x, a.y > b.y ? a.y : b.y, a.z > b.z ? a.z : b.z,
-          a.w > b.w ? a.w : b.w};
-}
+Vec4 Max(const Vec4& a, const Vec4& b);
 
 }  // namespace tgfx

@@ -25,7 +25,7 @@ and various video-editing apps.
 - Windows 7.0+
 - Linux (No specific version requirement)
 - Chrome 69.0+ (Web)
-- Safari 11.3+ (Web)
+- Safari 15.0+ (Web)
 
 ## Rendering Backends
 

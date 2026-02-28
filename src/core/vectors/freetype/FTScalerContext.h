@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 #include "ft2build.h"
 #include FT_COLOR_H
 #include FT_FREETYPE_H
@@ -60,6 +61,10 @@ class FTScalerContext : public ScalerContext {
 
   float getAdvanceInternal(GlyphID glyphID, bool verticalText = false) const;
 
+  void loadVerticalMetrics();
+
+  float getVertAdvanceForGlyph(GlyphID glyphID) const;
+
   bool getCBoxForLetter(char letter, FT_BBox* bbox) const;
 
   void getBBoxForCurrentGlyph(FT_BBox* bbox) const;
@@ -85,5 +90,10 @@ class FTScalerContext : public ScalerContext {
   FT_Int strikeIndex = -1;  // The bitmap strike for the face (or -1 if none).
   FT_Int32 loadGlyphFlags = 0;
   float backingSize = 1.0f;
+  // Cached vertical advance heights from vmtx table for bitmap-only fonts. FreeType's CBDT path
+  // ignores vmtx even when present, so we read it ourselves.
+  std::vector<FT_UShort> vertAdvanceCache = {};
+  FT_UShort fallbackVertAdvance = 0;
+  bool hasVerticalMetrics = false;
 };
 }  // namespace tgfx

@@ -16,29 +16,39 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "QuadPerEdgeAA3DGeometryProcessor.h"
+#pragma once
+
+#include <cstdint>
 
 namespace tgfx {
+/**
+ * Types for interacting with Metal resources created externally to TGFX. Holds the MTLTexture as a
+ * const void*.
+ */
+struct MetalTextureInfo {
+  /**
+   * Pointer to MTLTexture.
+   */
+  const void* texture = nullptr;
 
-QuadPerEdgeAA3DGeometryProcessor::QuadPerEdgeAA3DGeometryProcessor(
-    AAType aa, const Matrix3D& transform, const Vec2& ndcScale, const Vec2& ndcOffset,
-    std::optional<PMColor> commonColor)
-    : GeometryProcessor(ClassID()), aa(aa), matrix(transform), ndcScale(ndcScale),
-      ndcOffset(ndcOffset), commonColor(commonColor) {
-  position = {"aPosition", VertexFormat::Float2};
-  if (aa == AAType::Coverage) {
-    coverage = {"inCoverage", VertexFormat::Float};
-  }
-  if (!commonColor.has_value()) {
-    color = {"inColor", VertexFormat::UByte4Normalized};
-  }
-  setVertexAttributes(&position, 3);
-}
+  /**
+   * The pixel format of this texture (MTLPixelFormat value).
+   */
+  unsigned format = 70;  // MTLPixelFormatRGBA8Unorm
+};
 
-void QuadPerEdgeAA3DGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  uint32_t flags = (aa == AAType::Coverage ? 1 : 0);
-  flags |= commonColor.has_value() ? 2 : 0;
-  bytesKey->write(flags);
-}
+/**
+ * Types for interacting with Metal semaphore objects created externally to TGFX.
+ */
+struct MetalSemaphoreInfo {
+  /**
+   * Pointer to MTLEvent. Used for GPU-to-GPU synchronization.
+   */
+  const void* event = nullptr;
 
+  /**
+   * The signal value for the event.
+   */
+  uint64_t value = 0;
+};
 }  // namespace tgfx

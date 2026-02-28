@@ -29,5 +29,9 @@ class GLSLFragmentShaderBuilder : public FragmentShaderBuilder {
 
  private:
   std::string colorOutputName() override;
+
+  void declareSubpassInput();
+
+  bool subpassInputDeclared = false;
 };
 }  // namespace tgfx

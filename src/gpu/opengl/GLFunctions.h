@@ -139,6 +139,7 @@ using GLRenderbufferStorageMultisample = void GL_FUNCTION_TYPE(unsigned target, 
 using GLBlitFramebuffer = void GL_FUNCTION_TYPE(int srcX0, int srcY0, int srcX1, int srcY1,
                                                 int dstX0, int dstY0, int dstX1, int dstY1,
                                                 unsigned mask, unsigned filter);
+using GLSampleMaski = void GL_FUNCTION_TYPE(unsigned maskNumber, unsigned mask);
 using GLScissor = void GL_FUNCTION_TYPE(int x, int y, int width, int height);
 using GLShaderSource = void GL_FUNCTION_TYPE(unsigned shader, int count, const char* const* str,
                                              const int* length);
@@ -259,6 +260,7 @@ class GLFunctions {
   GLRenderbufferStorage* renderbufferStorage = nullptr;
   GLRenderbufferStorageMultisample* renderbufferStorageMultisample = nullptr;
   GLBlitFramebuffer* blitFramebuffer = nullptr;
+  GLSampleMaski* sampleMaski = nullptr;
   GLScissor* scissor = nullptr;
   GLShaderSource* shaderSource = nullptr;
   GLStencilFunc* stencilFunc = nullptr;

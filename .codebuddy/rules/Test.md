@@ -5,9 +5,10 @@ alwaysApply: true
 
 ## 编译验证
 
-修改代码后，使用以下命令验证编译。必须传递 `-DTGFX_BUILD_TESTS=ON` 以启用所有模块（layers、svg、pdf 等）。
+修改代码后，使用以下命令验证编译。编译前先运行代码格式化（忽略报错），只要运行就会生效。必须传递 `-DTGFX_BUILD_TESTS=ON` 以启用所有模块（layers、svg、pdf 等）。
 
 ```bash
+./codeformat.sh 2>/dev/null; true
 cmake -G Ninja -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
 cmake --build cmake-build-debug --target TGFXFullTest
 ```
@@ -18,6 +19,7 @@ cmake --build cmake-build-debug --target TGFXFullTest
 - 测试代码可通过编译参数访问所有 private 成员，无需 friend class
 - 运行测试：按上述编译验证步骤构建并执行 `TGFXFullTest`
 - 测试命令返回非零退出码表示测试失败，这是正常行为，不要重复执行同一命令
+
 ## 截图测试
 
 - 使用 `Baseline::Compare(pixels, key)` 比较截图，key 格式为 `{folder}/{name}`，例如 `CanvasTest/Clip`
@@ -27,8 +29,8 @@ cmake --build cmake-build-debug --target TGFXFullTest
     - 其他情况：正常比较基准图，基准图不存在或不匹配则测试失败
 
 **!! IMPORTANT - 截图基准变更限制**：
-- **NEVER** 自动接受截图基准变更，包括禁止自动运行 `UpdateBaseline` target、禁止修改或覆盖 `version.json` 文件
-- 必须经过用户确认后运行 `accept_baseline.sh` 脚本来接受变更
+- **NEVER** 自动接受截图基准变更，包括禁止自动运行 `accept_baseline.sh`、`UpdateBaseline` target、禁止修改或覆盖 `version.json` 文件
+- **必须先向用户展示截图并获得明确确认**，确认后才可运行 `bash accept_baseline.sh`，**禁止**将脚本内容展开手动逐步执行
 
 ### 截图构造规范
 

@@ -285,21 +285,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value);
 
   /**
-   * Whether to exclude child effects in the layer style. If true, child layer
-   * styles and filters are not included in the layer content used to generate
-   * the layer style. This option only affects the appearance of the LayerStyle, not the layer
-   * itself. The default value is false.
-   */
-  bool excludeChildEffectsInLayerStyle() const {
-    return bitFields.excludeChildEffectsInLayerStyle;
-  }
-
-  /**
-   * Sets whether exclude child effects in the layer style.
-   */
-  void setExcludeChildEffectsInLayerStyle(bool value);
-
-  /**
    * Returns the list of filters applied to the layer. Layer filters create new offscreen images
    * to replace the original layer content. Each filter takes the output of the previous filter as
    * input, and the final output is drawn on the canvas. Layer filters are applied after layer
@@ -691,9 +676,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
       Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
       std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
 
-  bool shouldPassThroughBackground(BlendMode blendMode, bool hasPerspective) const;
+  bool shouldPassThroughBackground(BlendMode blendMode) const;
 
-  bool canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, bool hasPerspective);
+  bool canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode);
 
   SubtreeCache* getValidSubtreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds);
 
@@ -728,7 +713,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool visible : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
-    bool excludeChildEffectsInLayerStyle : 1;
     bool passThroughBackground : 1;
     bool hasBlendMode : 1;
     bool matrix3DIsAffine : 1;  // Whether the matrix3D is equivalent to a 2D affine matrix

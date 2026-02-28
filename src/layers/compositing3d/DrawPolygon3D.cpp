@@ -214,8 +214,8 @@ bool DrawPolygon3D::isFacingPositiveZ() const {
   return _normal.z > 0.0f;
 }
 
-std::vector<QuadCW> DrawPolygon3D::toQuads() const {
-  std::vector<QuadCW> quads;
+std::vector<Quad> DrawPolygon3D::toQuads() const {
+  std::vector<Quad> quads;
   size_t n = _points.size();
   if (n < 3) {
     DEBUG_ASSERT(false);
@@ -235,24 +235,25 @@ std::vector<QuadCW> DrawPolygon3D::toQuads() const {
   }
 
   if (n == 3) {
-    // Triangle: degenerate to quad (p2 == p3)
-    quads.push_back(QuadCW(localPoints[0], localPoints[1], localPoints[2], localPoints[2]));
+    // Triangle: degenerate to quad (duplicate last vertex)
+    quads.push_back(
+        Quad::MakeFromCW(localPoints[0], localPoints[1], localPoints[2], localPoints[2]));
     return quads;
   }
   if (n == 4) {
-    // Quadrilateral: direct mapping
-    quads.push_back(QuadCW(localPoints[0], localPoints[1], localPoints[2], localPoints[3]));
+    quads.push_back(
+        Quad::MakeFromCW(localPoints[0], localPoints[1], localPoints[2], localPoints[3]));
     return quads;
   }
   // n > 4: Fan decomposition into quads, each quad covers two triangles when possible.
   for (size_t i = 1; i + 2 < n; i += 2) {
-    auto p3 = (i + 2 < n) ? localPoints[i + 2] : localPoints[i + 1];
-    quads.push_back(QuadCW(localPoints[0], localPoints[i], localPoints[i + 1], p3));
+    quads.push_back(
+        Quad::MakeFromCW(localPoints[0], localPoints[i], localPoints[i + 1], localPoints[i + 2]));
   }
   // Handle remaining triangle if odd number of triangles.
   if ((n - 2) % 2 == 1) {
-    quads.push_back(
-        QuadCW(localPoints[0], localPoints[n - 2], localPoints[n - 1], localPoints[n - 1]));
+    quads.push_back(Quad::MakeFromCW(localPoints[0], localPoints[n - 2], localPoints[n - 1],
+                                     localPoints[n - 1]));
   }
   return quads;
 }
