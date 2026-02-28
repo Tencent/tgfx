@@ -33,7 +33,7 @@ void MeshBase::retainGpuBuffer(uint32_t contextID, const UniqueKey& bufferKey) {
 UniqueKey MeshBase::getBufferKey(uint32_t contextID) const {
   std::lock_guard<std::mutex> lock(bufferKeysMutex);
   auto it = retainedBufferKeys.find(contextID);
-  if (it != boundBufferKeys.end()) {
+  if (it != retainedBufferKeys.end()) {
     return it->second;
   }
   return {};
