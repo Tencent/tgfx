@@ -38,21 +38,23 @@ Window {
         console.log("Zoom set to " + targetZoom + " centered at screen center, offset: (" + newOffsetX + ", " + newOffsetY + ")")
     }
 
-    Keys.onPressed: function(event) {
-        if (event.key === Qt.Key_T) {
-            setZoomToCenter(1.73)
-            event.accepted = true
-        } else if (event.key === Qt.Key_R) {
-            currentZoom = 1.0
-            currentOffset = Qt.point(0, 0)
-            tgfxView.updateTransform(currentZoom, currentOffset)
-            console.log("Zoom reset to 1.0")
-            event.accepted = true
-        }
-    }
+    Item {
+        id: keyHandler
+        anchors.fill: parent
+        focus: true
 
-    Component.onCompleted: {
-        mainWindow.requestActivate()
+        Keys.onPressed: function(event) {
+            if (event.key === Qt.Key_T) {
+                setZoomToCenter(1.73)
+                event.accepted = true
+            } else if (event.key === Qt.Key_R) {
+                currentZoom = 1.0
+                currentOffset = Qt.point(0, 0)
+                tgfxView.updateTransform(currentZoom, currentOffset)
+                console.log("Zoom reset to 1.0")
+                event.accepted = true
+            }
+        }
     }
 
     PinchArea {
