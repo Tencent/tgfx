@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <emscripten/val.h>
 #include "core/ScalerContext.h"
 
 namespace tgfx {

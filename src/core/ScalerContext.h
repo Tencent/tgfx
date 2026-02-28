@@ -20,7 +20,7 @@
 
 #include <mutex>
 #include "tgfx/core/FontMetrics.h"
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/Typeface.h"
