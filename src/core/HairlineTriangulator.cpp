@@ -504,6 +504,16 @@ HairlineTriangulator::HairlineTriangulator(std::shared_ptr<Shape> shape, bool ha
     : shape(std::move(shape)), hasCap(hasCap) {
 }
 
+bool HairlineTriangulator::asyncSupport() const {
+  // For simple paths with few verbs, synchronous execution is faster than async due to thread
+  // scheduling overhead. Only use async for complex paths or non-simple shapes.
+  static constexpr int AsyncVerbThreshold = 32;
+  if (shape->isSimplePath()) {
+    return shape->getPath().countVerbs() > AsyncVerbThreshold;
+  }
+  return true;
+}
+
 std::shared_ptr<HairlineBuffer> HairlineTriangulator::getData() const {
   auto path = shape->getPath();
 

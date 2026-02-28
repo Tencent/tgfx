@@ -252,14 +252,7 @@ std::shared_ptr<GPUHairlineProxy> ProxyProvider::createGPUHairlineProxy(
   auto rasterizer = std::make_unique<HairlineTriangulator>(shape, hasCap);
   std::unique_ptr<DataSource<HairlineBuffer>> dataSource = nullptr;
 #ifdef TGFX_USE_THREADS
-  // For simple paths with few verbs, synchronous execution is faster than async due to thread
-  // scheduling overhead. Only use async for complex paths (>32 verbs) or non-simple shapes.
-  static constexpr int AsyncVerbThreshold = 32;
-  bool useAsync = !(renderFlags & RenderFlags::DisableAsyncTask);
-  if (useAsync && shape->isSimplePath()) {
-    useAsync = shape->getPath().countVerbs() > AsyncVerbThreshold;
-  }
-  if (useAsync) {
+  if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
     dataSource = DataSource<HairlineBuffer>::Async(std::move(rasterizer));
   } else {
     dataSource = std::move(rasterizer);
