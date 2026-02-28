@@ -18,22 +18,22 @@
 
 #include "GPUMeshProxy.h"
 #include "core/PathTriangulator.h"
-#include "core/VertexMeshImpl.h"
+#include "core/VertexMesh.h"
 
 namespace tgfx {
 
-GPUMeshDrawAttributes GPUMeshDrawAttributes::Make(const MeshImpl& impl) {
+GPUMeshDrawAttributes GPUMeshDrawAttributes::Make(const MeshBase& mesh) {
   GPUMeshDrawAttributes attrs = {};
-  attrs.hasCoverage = impl.hasCoverage();
+  attrs.hasCoverage = mesh.hasCoverage();
 
-  if (impl.type() == MeshImpl::Type::Vertex) {
-    auto& vertexImpl = static_cast<const VertexMeshImpl&>(impl);
-    attrs.topology = vertexImpl.topology();
-    attrs.hasTexCoords = vertexImpl.hasTexCoords();
-    attrs.hasColors = vertexImpl.hasColors();
-    attrs.hasIndices = vertexImpl.hasIndices();
-    attrs.vertexCount = vertexImpl.vertexCount();
-    attrs.indexCount = vertexImpl.indexCount();
+  if (mesh.type() == MeshBase::Type::Vertex) {
+    auto& vertexMesh = static_cast<const VertexMesh&>(mesh);
+    attrs.topology = vertexMesh.topology();
+    attrs.hasTexCoords = vertexMesh.hasTexCoords();
+    attrs.hasColors = vertexMesh.hasColors();
+    attrs.hasIndices = vertexMesh.hasIndices();
+    attrs.vertexCount = vertexMesh.vertexCount();
+    attrs.indexCount = vertexMesh.indexCount();
   } else {
     // ShapeMesh: always triangles, no texCoords/colors/indices
     // vertexCount will be determined after triangulation (computed from buffer size)

@@ -26,7 +26,6 @@
 
 namespace tgfx {
 
-class MeshImpl;
 class Shape;
 
 /**
@@ -49,6 +48,8 @@ enum class MeshTopology {
  */
 class Mesh {
  public:
+  virtual ~Mesh() = default;
+
   /**
    * Creates a Mesh by copying the provided vertex data.
    * @param topology How vertices are organized into triangles.
@@ -69,7 +70,7 @@ class Mesh {
 
   /**
    * Creates a Mesh from a Path. The mesh will be triangulated when first drawn.
-   * GPU resources are persistently held until the Mesh is destroyed.
+   * GPU resources remain cached and protected from eviction while the Mesh is alive.
    * @param path The path to triangulate.
    * @param antiAlias If true, generates anti-aliased triangles with coverage values.
    * @return A shared pointer to the created Mesh, or nullptr if the path is empty.
@@ -78,7 +79,7 @@ class Mesh {
 
   /**
    * Creates a Mesh from a Shape. The mesh will be triangulated when first drawn.
-   * GPU resources are persistently held until the Mesh is destroyed.
+   * GPU resources remain cached and protected from eviction while the Mesh is alive.
    * @param shape The shape to triangulate.
    * @param antiAlias If true, generates anti-aliased triangles with coverage values.
    * @return A shared pointer to the created Mesh, or nullptr if the shape is nullptr.
@@ -88,23 +89,15 @@ class Mesh {
   /**
    * Returns a globally unique identifier for this mesh instance.
    */
-  uint32_t uniqueID() const;
+  virtual uint32_t uniqueID() const = 0;
 
   /**
    * Returns the bounding box of the mesh positions.
    */
-  Rect bounds() const;
+  virtual Rect bounds() const = 0;
 
-  ~Mesh();
-
- private:
-  explicit Mesh(std::unique_ptr<MeshImpl> impl);
-
-  std::unique_ptr<MeshImpl> impl;
-
-  friend class MeshImpl;
-  friend class VertexMeshImpl;
-  friend class ShapeMeshImpl;
+ protected:
+  Mesh() = default;
 };
 
 }  // namespace tgfx

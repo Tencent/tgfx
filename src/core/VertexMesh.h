@@ -18,25 +18,21 @@
 
 #pragma once
 
-#include "MeshImpl.h"
+#include "MeshBase.h"
 
 namespace tgfx {
 
 /**
  * Mesh implementation with user-provided vertex data.
- * Memory layout: VertexMeshImpl object and vertex data are allocated separately,
- * allowing CPU data to be released independently after GPU upload.
+ * CPU data is retained for multi-Context support.
  */
-class VertexMeshImpl : public MeshImpl {
+class VertexMesh : public MeshBase {
  public:
-  /**
-   * Creates a Mesh with the given vertex data. All data is copied into a single contiguous buffer.
-   */
   static std::shared_ptr<Mesh> Make(MeshTopology topology, int vertexCount, const Point* positions,
                                     const Color* colors, const Point* texCoords, int indexCount,
                                     const uint16_t* indices);
 
-  ~VertexMeshImpl() override;
+  ~VertexMesh() override;
 
   Type type() const override {
     return Type::Vertex;
@@ -92,11 +88,8 @@ class VertexMeshImpl : public MeshImpl {
    */
   size_t getVertexStride() const;
 
-  // Releases CPU vertex data after GPU upload.
-  void releaseVertexData();
-
  private:
-  VertexMeshImpl(MeshTopology topology, int vertexCount, int indexCount);
+  VertexMesh(MeshTopology topology, int vertexCount, int indexCount);
 
   MeshTopology _topology = MeshTopology::Triangles;
   int _vertexCount = 0;

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "MeshImpl.h"
+#include "MeshBase.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -26,15 +26,10 @@ namespace tgfx {
 /**
  * Mesh implementation constructed from Path/Shape.
  * Triangulation is performed asynchronously during GPU upload via ShapeVertexSource.
+ * Shape is retained for multi-Context support.
  */
-class ShapeMeshImpl : public MeshImpl {
+class ShapeMesh : public MeshBase {
  public:
-  /**
-   * Creates a Mesh from a Shape. Triangulation is deferred until first render.
-   * @param shape The shape to triangulate.
-   * @param antiAlias If true, generates anti-aliased triangles with coverage values.
-   * @return A shared pointer to the created Mesh, or nullptr if the shape is nullptr.
-   */
   static std::shared_ptr<Mesh> Make(std::shared_ptr<Shape> shape, bool antiAlias);
 
   Type type() const override {
@@ -53,13 +48,8 @@ class ShapeMeshImpl : public MeshImpl {
     return antiAlias;
   }
 
-  //  Releases the Shape after GPU upload.
-  void releaseShape() {
-    _shape = nullptr;
-  }
-
  private:
-  ShapeMeshImpl(std::shared_ptr<Shape> shape, bool antiAlias);
+  ShapeMesh(std::shared_ptr<Shape> shape, bool antiAlias);
 
   std::shared_ptr<Shape> _shape = nullptr;
   bool antiAlias = true;

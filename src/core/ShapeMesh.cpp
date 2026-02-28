@@ -16,20 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ShapeMeshImpl.h"
+#include "ShapeMesh.h"
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
 
-std::shared_ptr<Mesh> ShapeMeshImpl::Make(std::shared_ptr<Shape> shape, bool antiAlias) {
+std::shared_ptr<Mesh> ShapeMesh::Make(std::shared_ptr<Shape> shape, bool antiAlias) {
   if (shape == nullptr) {
     return nullptr;
   }
-  auto impl = new ShapeMeshImpl(std::move(shape), antiAlias);
-  return std::shared_ptr<Mesh>(new Mesh(std::unique_ptr<MeshImpl>(impl)));
+  return std::shared_ptr<ShapeMesh>(new ShapeMesh(std::move(shape), antiAlias));
 }
 
-ShapeMeshImpl::ShapeMeshImpl(std::shared_ptr<Shape> shape, bool antiAlias)
+ShapeMesh::ShapeMesh(std::shared_ptr<Shape> shape, bool antiAlias)
     : _shape(std::move(shape)), antiAlias(antiAlias) {
   _uniqueID = UniqueID::Next();
   _bounds = _shape->getBounds();

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "VertexMeshImpl.h"
+#include "VertexMesh.h"
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
@@ -36,10 +36,10 @@ static size_t CalculateDataSize(size_t vertexCount, size_t indexCount, bool hasT
   return size;
 }
 
-std::shared_ptr<Mesh> VertexMeshImpl::Make(MeshTopology topology, int vertexCount,
-                                           const Point* positions, const Color* colors,
-                                           const Point* texCoords, int indexCount,
-                                           const uint16_t* indices) {
+std::shared_ptr<Mesh> VertexMesh::Make(MeshTopology topology, int vertexCount,
+                                       const Point* positions, const Color* colors,
+                                       const Point* texCoords, int indexCount,
+                                       const uint16_t* indices) {
   if (vertexCount <= 0 || positions == nullptr) {
     return nullptr;
   }
@@ -58,46 +58,48 @@ std::shared_ptr<Mesh> VertexMeshImpl::Make(MeshTopology topology, int vertexCoun
     return nullptr;
   }
 
-  auto impl = new VertexMeshImpl(topology, vertexCount, indexCount);
-  impl->vertexData = vertexData;
+  auto mesh = std::shared_ptr<VertexMesh>(new VertexMesh(topology, vertexCount, indexCount));
+  mesh->vertexData = vertexData;
 
   auto ptr = static_cast<uint8_t*>(vertexData);
-  impl->_positions = reinterpret_cast<Point*>(ptr);
-  std::memcpy(impl->_positions, positions, sizeof(Point) * numVertices);
+  mesh->_positions = reinterpret_cast<Point*>(ptr);
+  std::memcpy(mesh->_positions, positions, sizeof(Point) * numVertices);
   ptr += sizeof(Point) * numVertices;
 
   if (texCoords != nullptr) {
-    impl->_texCoords = reinterpret_cast<Point*>(ptr);
-    std::memcpy(impl->_texCoords, texCoords, sizeof(Point) * numVertices);
+    mesh->_texCoords = reinterpret_cast<Point*>(ptr);
+    std::memcpy(mesh->_texCoords, texCoords, sizeof(Point) * numVertices);
     ptr += sizeof(Point) * numVertices;
   }
 
   if (colors != nullptr) {
-    impl->_colors = reinterpret_cast<Color*>(ptr);
-    std::memcpy(impl->_colors, colors, sizeof(Color) * numVertices);
+    mesh->_colors = reinterpret_cast<Color*>(ptr);
+    std::memcpy(mesh->_colors, colors, sizeof(Color) * numVertices);
     ptr += sizeof(Color) * numVertices;
   }
 
   if (indexCount > 0) {
-    impl->_indices = reinterpret_cast<uint16_t*>(ptr);
-    std::memcpy(impl->_indices, indices, sizeof(uint16_t) * numIndices);
+    mesh->_indices = reinterpret_cast<uint16_t*>(ptr);
+    std::memcpy(mesh->_indices, indices, sizeof(uint16_t) * numIndices);
   }
 
-  impl->_bounds.setBounds(impl->_positions, impl->_vertexCount);
+  mesh->_bounds.setBounds(mesh->_positions, mesh->_vertexCount);
 
-  return std::shared_ptr<Mesh>(new Mesh(std::unique_ptr<MeshImpl>(impl)));
+  return mesh;
 }
 
-VertexMeshImpl::VertexMeshImpl(MeshTopology topology, int vertexCount, int indexCount)
+VertexMesh::VertexMesh(MeshTopology topology, int vertexCount, int indexCount)
     : _topology(topology), _vertexCount(vertexCount), _indexCount(indexCount) {
   _uniqueID = UniqueID::Next();
 }
 
-VertexMeshImpl::~VertexMeshImpl() {
-  releaseVertexData();
+VertexMesh::~VertexMesh() {
+  if (vertexData != nullptr) {
+    ::operator delete(vertexData);
+  }
 }
 
-size_t VertexMeshImpl::getVertexStride() const {
+size_t VertexMesh::getVertexStride() const {
   size_t stride = sizeof(float) * 2;  // position.xy
   if (_texCoords != nullptr) {
     stride += sizeof(float) * 2;  // texCoord.xy
@@ -106,17 +108,6 @@ size_t VertexMeshImpl::getVertexStride() const {
     stride += sizeof(uint8_t) * 4;  // color.rgba (UByte4Normalized)
   }
   return stride;
-}
-
-void VertexMeshImpl::releaseVertexData() {
-  if (vertexData != nullptr) {
-    ::operator delete(vertexData);
-    vertexData = nullptr;
-    _positions = nullptr;
-    _texCoords = nullptr;
-    _colors = nullptr;
-    _indices = nullptr;
-  }
 }
 
 }  // namespace tgfx

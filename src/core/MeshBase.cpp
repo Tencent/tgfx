@@ -16,29 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Mesh.h"
-#include "ShapeMesh.h"
-#include "VertexMesh.h"
-#include "tgfx/core/Shape.h"
+#include "MeshBase.h"
 
 namespace tgfx {
 
-std::shared_ptr<Mesh> Mesh::MakeCopy(MeshTopology topology, int vertexCount, const Point* positions,
-                                     const Color* colors, const Point* texCoords, int indexCount,
-                                     const uint16_t* indices) {
-  return VertexMesh::Make(topology, vertexCount, positions, colors, texCoords, indexCount, indices);
+UniqueKey MeshBase::getUniqueKey() const {
+  static const auto MeshDomain = UniqueKey::Make();
+  return UniqueKey::Append(MeshDomain, &_uniqueID, 1);
 }
 
-std::shared_ptr<Mesh> Mesh::MakeFromPath(Path path, bool antiAlias) {
-  if (path.isEmpty()) {
-    return nullptr;
+void MeshBase::bindGpuBufferKey(uint32_t contextID, const UniqueKey& bufferKey) {
+  std::lock_guard<std::mutex> lock(bufferKeysMutex);
+  boundBufferKeys[contextID] = bufferKey;
+}
+
+UniqueKey MeshBase::getBufferKey(uint32_t contextID) const {
+  std::lock_guard<std::mutex> lock(bufferKeysMutex);
+  auto it = boundBufferKeys.find(contextID);
+  if (it != boundBufferKeys.end()) {
+    return it->second;
   }
-  auto shape = Shape::MakeFrom(std::move(path));
-  return MakeFromShape(std::move(shape), antiAlias);
-}
-
-std::shared_ptr<Mesh> Mesh::MakeFromShape(std::shared_ptr<Shape> shape, bool antiAlias) {
-  return ShapeMesh::Make(std::move(shape), antiAlias);
+  return {};
 }
 
 }  // namespace tgfx

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/MeshImpl.h"
+#include "core/MeshBase.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "tgfx/core/Mesh.h"
 #include "tgfx/gpu/GPUBuffer.h"
@@ -40,9 +40,9 @@ struct GPUMeshDrawAttributes {
   int indexCount = 0;
 
   /**
-   * Creates draw attributes from a MeshImpl.
+   * Creates draw attributes from a MeshBase.
    */
-  static GPUMeshDrawAttributes Make(const MeshImpl& impl);
+  static GPUMeshDrawAttributes Make(const MeshBase& mesh);
 };
 
 /**

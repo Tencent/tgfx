@@ -25,8 +25,6 @@
 
 namespace tgfx {
 
-class VertexMeshImpl;
-
 /**
  * Uploads VertexMesh vertex data to GPU with interleaved layout (position + texCoord + color).
  */

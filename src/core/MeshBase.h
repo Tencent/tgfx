@@ -16,17 +16,52 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "MeshImpl.h"
+#pragma once
+
+#include <mutex>
+#include <unordered_map>
+#include "gpu/resources/ResourceKey.h"
+#include "tgfx/core/Mesh.h"
 
 namespace tgfx {
 
-UniqueKey MeshImpl::getUniqueKey() const {
-  static const auto MeshDomain = UniqueKey::Make();
-  return UniqueKey::Append(MeshDomain, &_uniqueID, 1);
-}
+class Context;
 
-MeshImpl& MeshImpl::ReadAccess(const Mesh& mesh) {
-  return *mesh.impl;
-}
+/**
+ * Internal base class for Mesh implementations.
+ * Provides shared functionality for VertexMesh and ShapeMesh.
+ */
+class MeshBase : public Mesh {
+ public:
+  enum class Type {
+    Vertex,  // User-provided vertex data
+    Shape,   // Constructed from Path/Shape
+  };
+
+  uint32_t uniqueID() const override {
+    return _uniqueID;
+  }
+
+  Rect bounds() const override {
+    return _bounds;
+  }
+
+  virtual Type type() const = 0;
+
+  virtual bool hasCoverage() const = 0;
+
+  UniqueKey getUniqueKey() const;
+
+  void bindGpuBufferKey(uint32_t contextID, const UniqueKey& bufferKey);
+
+  UniqueKey getBufferKey(uint32_t contextID) const;
+
+ protected:
+  Rect _bounds = {};
+  uint32_t _uniqueID = 0;
+
+  mutable std::mutex bufferKeysMutex;
+  mutable std::unordered_map<uint32_t, UniqueKey> boundBufferKeys;
+};
 
 }  // namespace tgfx

@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsCompositor.h"
-#include "core/MeshImpl.h"
+#include "core/MeshBase.h"
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
-#include "core/VertexMeshImpl.h"
+#include "core/VertexMesh.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
@@ -211,12 +211,12 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
   DEBUG_ASSERT(mesh != nullptr);
   flushPendingOps();
 
-  auto& meshImpl = MeshImpl::ReadAccess(*mesh);
+  auto* meshBase = static_cast<MeshBase*>(mesh.get());
 
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
   auto& clip = state.clip;
-  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, meshImpl.hasCoverage());
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, meshBase->hasCoverage());
   auto clipBounds = getClipBounds(clip);
 
   float drawScale = 1.0f;
@@ -235,9 +235,9 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
 
   // Determine if mesh has vertex colors (only VertexMesh can have these)
   bool hasColors = false;
-  if (meshImpl.type() == MeshImpl::Type::Vertex) {
-    auto& vertexImpl = static_cast<VertexMeshImpl&>(meshImpl);
-    hasColors = vertexImpl.hasColors();
+  if (meshBase->type() == MeshBase::Type::Vertex) {
+    auto& vertexMesh = static_cast<VertexMesh&>(*meshBase);
+    hasColors = vertexMesh.hasColors();
   }
 
   // Determine final color based on blending rules (see Canvas.h drawMesh documentation):

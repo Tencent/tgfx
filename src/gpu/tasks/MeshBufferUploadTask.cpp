@@ -18,8 +18,8 @@
 
 #include "MeshBufferUploadTask.h"
 #include "core/ColorSpaceXformSteps.h"
-#include "core/ShapeMeshImpl.h"
-#include "core/VertexMeshImpl.h"
+#include "core/MeshBase.h"
+#include "core/VertexMesh.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "gpu/resources/BufferResource.h"
@@ -35,21 +35,22 @@ VertexMeshBufferUploadTask::VertexMeshBufferUploadTask(std::shared_ptr<ResourceP
 }
 
 std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* context) {
-  auto& baseImpl = MeshImpl::ReadAccess(*meshProxy->mesh());
-  if (baseImpl.type() != MeshImpl::Type::Vertex) {
+  auto* meshBase = static_cast<MeshBase*>(meshProxy->mesh().get());
+  if (meshBase == nullptr || meshBase->type() != MeshBase::Type::Vertex) {
     return nullptr;
   }
-  auto& impl = static_cast<VertexMeshImpl&>(baseImpl);
+  auto& vertexMesh = static_cast<VertexMesh&>(*meshBase);
 
-  if (impl.positions() == nullptr) {
+  if (vertexMesh.positions() == nullptr) {
     return nullptr;
   }
 
-  size_t vertexDataSize = impl.getVertexStride() * static_cast<size_t>(impl.vertexCount());
+  size_t vertexDataSize =
+      vertexMesh.getVertexStride() * static_cast<size_t>(vertexMesh.vertexCount());
 
   // Create color space transform steps if needed
   std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
-  if (impl.hasColors() && NeedConvertColorSpace(ColorSpace::SRGB(), dstColorSpace)) {
+  if (vertexMesh.hasColors() && NeedConvertColorSpace(ColorSpace::SRGB(), dstColorSpace)) {
     steps =
         std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
                                                dstColorSpace.get(), AlphaType::Premultiplied);
@@ -58,20 +59,20 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
   // Allocate temporary buffer and write interleaved vertex data
   auto buffer = std::make_unique<uint8_t[]>(vertexDataSize);
   uint8_t* ptr = buffer.get();
-  for (auto i = 0; i < impl.vertexCount(); ++i) {
+  for (auto i = 0; i < vertexMesh.vertexCount(); ++i) {
     // Position (float2)
-    *reinterpret_cast<Point*>(ptr) = impl.positions()[i];
+    *reinterpret_cast<Point*>(ptr) = vertexMesh.positions()[i];
     ptr += sizeof(Point);
 
     // TexCoord (float2, optional)
-    if (impl.hasTexCoords()) {
-      *reinterpret_cast<Point*>(ptr) = impl.texCoords()[i];
+    if (vertexMesh.hasTexCoords()) {
+      *reinterpret_cast<Point*>(ptr) = vertexMesh.texCoords()[i];
       ptr += sizeof(Point);
     }
 
     // Color (UByte4Normalized, optional)
-    if (impl.hasColors()) {
-      *reinterpret_cast<uint32_t*>(ptr) = ToUintPMColor(impl.colors()[i], steps.get());
+    if (vertexMesh.hasColors()) {
+      *reinterpret_cast<uint32_t*>(ptr) = ToUintPMColor(vertexMesh.colors()[i], steps.get());
       ptr += sizeof(uint32_t);
     }
   }
@@ -84,12 +85,15 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
 
   gpu->queue()->writeBuffer(gpuBuffer, 0, buffer.get(), vertexDataSize);
 
-  // Release CPU data if no index buffer upload is pending
-  if (!impl.hasIndices()) {
-    impl.releaseVertexData();
+  auto resource = BufferResource::Wrap(context, std::move(gpuBuffer));
+
+  // Bind buffer key to mesh for LRU eviction protection
+  if (resource != nullptr) {
+    auto bufferKey = meshBase->getUniqueKey();
+    meshBase->bindGpuBufferKey(context->uniqueID(), bufferKey);
   }
 
-  return BufferResource::Wrap(context, std::move(gpuBuffer));
+  return resource;
 }
 
 MeshIndexBufferUploadTask::MeshIndexBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
@@ -98,17 +102,17 @@ MeshIndexBufferUploadTask::MeshIndexBufferUploadTask(std::shared_ptr<ResourcePro
 }
 
 std::shared_ptr<Resource> MeshIndexBufferUploadTask::onMakeResource(Context* context) {
-  auto& baseImpl = MeshImpl::ReadAccess(*meshProxy->mesh());
-  if (baseImpl.type() != MeshImpl::Type::Vertex) {
+  auto* meshBase = static_cast<MeshBase*>(meshProxy->mesh().get());
+  if (meshBase == nullptr || meshBase->type() != MeshBase::Type::Vertex) {
     return nullptr;
   }
-  auto& impl = static_cast<VertexMeshImpl&>(baseImpl);
+  auto& vertexMesh = static_cast<VertexMesh&>(*meshBase);
 
-  if (!impl.hasIndices()) {
+  if (!vertexMesh.hasIndices()) {
     return nullptr;
   }
 
-  size_t indexDataSize = sizeof(uint16_t) * static_cast<size_t>(impl.indexCount());
+  size_t indexDataSize = sizeof(uint16_t) * static_cast<size_t>(vertexMesh.indexCount());
   auto gpu = context->gpu();
   auto gpuBuffer = gpu->createBuffer(indexDataSize, GPUBufferUsage::INDEX);
   if (!gpuBuffer) {
@@ -116,10 +120,7 @@ std::shared_ptr<Resource> MeshIndexBufferUploadTask::onMakeResource(Context* con
     return nullptr;
   }
 
-  gpu->queue()->writeBuffer(gpuBuffer, 0, impl.indices(), indexDataSize);
-
-  // Release CPU data after index buffer upload completes
-  impl.releaseVertexData();
+  gpu->queue()->writeBuffer(gpuBuffer, 0, vertexMesh.indices(), indexDataSize);
 
   return BufferResource::Wrap(context, std::move(gpuBuffer));
 }
@@ -149,12 +150,21 @@ std::shared_ptr<Resource> ShapeMeshBufferUploadTask::onMakeResource(Context* con
 
   gpu->queue()->writeBuffer(gpuBuffer, 0, vertexData->data(), vertexData->size());
 
-  // Release data source and shape to free memory
+  // Release data source to free memory (triangulation result)
   dataSource = nullptr;
-  auto& impl = static_cast<ShapeMeshImpl&>(MeshImpl::ReadAccess(*meshProxy->mesh()));
-  impl.releaseShape();
 
-  return BufferResource::Wrap(context, std::move(gpuBuffer));
+  auto resource = BufferResource::Wrap(context, std::move(gpuBuffer));
+
+  // Bind buffer key to mesh for LRU eviction protection
+  if (resource != nullptr) {
+    auto* meshBase = static_cast<MeshBase*>(meshProxy->mesh().get());
+    if (meshBase != nullptr) {
+      auto bufferKey = meshBase->getUniqueKey();
+      meshBase->bindGpuBufferKey(context->uniqueID(), bufferKey);
+    }
+  }
+
+  return resource;
 }
 
 }  // namespace tgfx

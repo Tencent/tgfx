@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProxyProvider.h"
-#include "core/MeshImpl.h"
-#include "core/ShapeMeshImpl.h"
+#include "core/MeshBase.h"
+#include "core/ShapeMesh.h"
 #include "core/ShapeRasterizer.h"
 #include "core/ShapeVertexSource.h"
 #include "core/utils/HardwareBufferUtil.h"
@@ -230,12 +230,12 @@ std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(
     return nullptr;
   }
 
-  auto& impl = MeshImpl::ReadAccess(*mesh);
-  auto baseKey = impl.getUniqueKey();
+  auto* meshBase = static_cast<MeshBase*>(mesh.get());
+  auto baseKey = meshBase->getUniqueKey();
   const bool disableCache = (renderFlags & RenderFlags::DisableCache) != 0;
-  const bool isVertexMesh = impl.type() == MeshImpl::Type::Vertex;
+  const bool isVertexMesh = meshBase->type() == MeshBase::Type::Vertex;
 
-  auto drawAttrs = GPUMeshDrawAttributes::Make(impl);
+  auto drawAttrs = GPUMeshDrawAttributes::Make(*meshBase);
   auto meshProxy = std::make_shared<GPUMeshProxy>(context, std::move(mesh), drawAttrs);
 
   // Create vertex buffer proxy
@@ -258,9 +258,9 @@ std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(
       context->drawingManager()->addResourceTask(std::move(task));
     } else {
       // ShapeMesh: triangulate shape and upload
-      auto& shapeMeshImpl = static_cast<ShapeMeshImpl&>(impl);
+      auto& shapeMesh = static_cast<ShapeMesh&>(*meshBase);
       auto vertexSource =
-          std::make_unique<ShapeVertexSource>(shapeMeshImpl.shape(), shapeMeshImpl.isAntiAlias());
+          std::make_unique<ShapeVertexSource>(shapeMesh.shape(), shapeMesh.isAntiAlias());
       std::unique_ptr<DataSource<Data>> dataSource = nullptr;
 #ifdef TGFX_USE_THREADS
       const bool disableAsync = (renderFlags & RenderFlags::DisableAsyncTask) != 0;
