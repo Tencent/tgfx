@@ -39,8 +39,7 @@ class MetalSemaphore : public Semaphore, public MetalResource {
   /**
    * Creates a Metal semaphore from an existing MTLEvent.
    */
-  static std::shared_ptr<MetalSemaphore> MakeFrom(MetalGPU* gpu, id<MTLEvent> event,
-                                                  uint64_t value);
+  static std::shared_ptr<MetalSemaphore> MakeFrom(MetalGPU* gpu, id<MTLEvent> event, uint64_t value);
 
   MetalSemaphore(id<MTLEvent> event, uint64_t value);
   ~MetalSemaphore() override = default;

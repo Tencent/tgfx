@@ -51,15 +51,15 @@ PlacementPtr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
     return shaderProcessor;
   }
   auto allocator = args.context->drawingAllocator();
-  auto composed =
-      FragmentProcessor::Compose(allocator, std::move(shaderProcessor), std::move(cfProcessor));
+  auto composed = FragmentProcessor::Compose(allocator, std::move(shaderProcessor),
+                                             std::move(cfProcessor));
   if (!colorFilter->affectsTransparentBlack()) {
     return composed;
   }
   // The color filter transforms transparent pixels into non-transparent ones. Use the original
   // shader alpha as a mask to prevent coloring transparent regions.
   auto alphaSource = FragmentProcessor::Make(shader, args, uvMatrix, dstColorSpace);
-  return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(composed),
-                                                          std::move(alphaSource), BlendMode::SrcIn);
+  return XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      allocator, std::move(composed), std::move(alphaSource), BlendMode::SrcIn);
 }
 }  // namespace tgfx

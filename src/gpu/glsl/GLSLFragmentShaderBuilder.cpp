@@ -55,8 +55,7 @@ void GLSLFragmentShaderBuilder::declareSubpassInput() {
     return;
   }
   subpassInputDeclared = true;
-  shaderStrings[Type::Uniforms] +=
-      "layout(input_attachment_index=0, set=2, binding=0) uniform subpassInput ";
+  shaderStrings[Type::Uniforms] += "layout(input_attachment_index=0, set=2, binding=0) uniform subpassInput ";
   shaderStrings[Type::Uniforms] += SubpassInputName;
   shaderStrings[Type::Uniforms] += ";\n";
 }

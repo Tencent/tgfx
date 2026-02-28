@@ -42,17 +42,17 @@ class MetalCommandQueue : public CommandQueue {
   }
 
   void submit(std::shared_ptr<CommandBuffer> commandBuffer) override;
-
+  
   void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
                    size_t dataSize) override;
-
+  
   void writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, const void* pixels,
                     size_t rowBytes) override;
-
+  
   std::shared_ptr<Semaphore> insertSemaphore() override;
-
+  
   void waitSemaphore(std::shared_ptr<Semaphore> semaphore) override;
-
+  
   void waitUntilCompleted() override;
 
   /**

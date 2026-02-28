@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalDevice.h"
-#include "MetalCommandQueue.h"
 #include "MetalGPU.h"
+#include "MetalCommandQueue.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {

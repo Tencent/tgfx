@@ -20,8 +20,8 @@
 
 #include <Metal/Metal.h>
 #include <string>
-#include "MetalResource.h"
 #include "tgfx/gpu/ShaderModule.h"
+#include "MetalResource.h"
 
 namespace tgfx {
 
@@ -45,7 +45,7 @@ static constexpr unsigned MaxVertexAttributes = 31;
 class MetalShaderModule : public ShaderModule, public MetalResource {
  public:
   static std::shared_ptr<MetalShaderModule> Make(MetalGPU* gpu,
-                                                 const ShaderModuleDescriptor& descriptor);
+                                               const ShaderModuleDescriptor& descriptor);
 
   /**
    * Returns the Metal library containing the compiled shader.

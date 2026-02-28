@@ -17,15 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalGPU.h"
-#include "MetalBuffer.h"
-#include "MetalCommandEncoder.h"
 #include "MetalCommandQueue.h"
+#include "MetalCommandEncoder.h"
+#include "MetalBuffer.h"
+#include "MetalTexture.h"
 #include "MetalHardwareTexture.h"
-#include "MetalRenderPipeline.h"
 #include "MetalSampler.h"
 #include "MetalSemaphore.h"
 #include "MetalShaderModule.h"
-#include "MetalTexture.h"
+#include "MetalRenderPipeline.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -38,19 +38,19 @@ std::unique_ptr<MetalGPU> MetalGPU::Make(id<MTLDevice> device) {
   if (device == nil) {
     return nullptr;
   }
-
+  
   auto gpu = std::unique_ptr<MetalGPU>(new MetalGPU(device));
   if (!gpu->caps || gpu->commandQueue->metalCommandQueue() == nil) {
     return nullptr;
   }
-
+  
   return gpu;
 }
 
 MetalGPU::MetalGPU(id<MTLDevice> device) : metalDevice([device retain]) {
   // Initialize capabilities
   caps = std::make_unique<MetalCaps>(device);
-
+  
   // Initialize command queue
   commandQueue = std::make_unique<MetalCommandQueue>(this);
 }
@@ -85,13 +85,12 @@ std::shared_ptr<GPUBuffer> MetalGPU::createBuffer(size_t size, uint32_t usage) {
 
 std::shared_ptr<Texture> MetalGPU::createTexture(const TextureDescriptor& descriptor) {
   if (descriptor.width <= 0 || descriptor.height <= 0) {
-    LOGE("MetalGPU::createTexture() invalid dimensions: %dx%d", descriptor.width,
-         descriptor.height);
+    LOGE("MetalGPU::createTexture() invalid dimensions: %dx%d", descriptor.width, descriptor.height);
     return nullptr;
   }
-
+  
   // Validate format support
-  if (!isFormatRenderable(descriptor.format) &&
+  if (!isFormatRenderable(descriptor.format) && 
       (descriptor.usage & TextureUsage::RENDER_ATTACHMENT)) {
     LOGE("MetalGPU::createTexture() format not renderable for render attachment");
     return nullptr;
@@ -99,7 +98,7 @@ std::shared_ptr<Texture> MetalGPU::createTexture(const TextureDescriptor& descri
   @autoreleasepool {
     auto texture = MetalTexture::Make(this, descriptor);
     if (!texture) {
-      LOGE("MetalGPU::createTexture() MetalTexture::Make failed for %dx%d format=%d",
+      LOGE("MetalGPU::createTexture() MetalTexture::Make failed for %dx%d format=%d", 
            descriptor.width, descriptor.height, static_cast<int>(descriptor.format));
     }
     return texture;
@@ -137,15 +136,14 @@ int MetalGPU::getSampleCount(int requestedCount, PixelFormat pixelFormat) const 
   return caps->getSampleCount(requestedCount, pixelFormat);
 }
 
-std::vector<std::shared_ptr<Texture>> MetalGPU::importHardwareTextures(
-    HardwareBufferRef hardwareBuffer, uint32_t usage) {
+std::vector<std::shared_ptr<Texture>> MetalGPU::importHardwareTextures(HardwareBufferRef hardwareBuffer,
+                                                                     uint32_t usage) {
   return MetalHardwareTexture::MakeFrom(this, hardwareBuffer, usage, getTextureCache());
 }
 
 CVMetalTextureCacheRef MetalGPU::getTextureCache() {
   if (textureCache == nil) {
-    auto status =
-        CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, metalDevice, nil, &textureCache);
+    auto status = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, metalDevice, nil, &textureCache);
     if (status != kCVReturnSuccess) {
       LOGE("MetalGPU::getTextureCache() CVMetalTextureCacheCreate failed with status: %d", status);
       return nil;
@@ -155,16 +153,16 @@ CVMetalTextureCacheRef MetalGPU::getTextureCache() {
 }
 
 std::shared_ptr<Texture> MetalGPU::importBackendTexture(const BackendTexture& backendTexture,
-                                                        uint32_t usage, bool adopted) {
+                                                      uint32_t usage, bool adopted) {
   if (backendTexture.backend() != Backend::Metal) {
     return nullptr;
   }
-
+  
   MetalTextureInfo metalInfo = {};
   if (!backendTexture.getMetalTextureInfo(&metalInfo) || metalInfo.texture == nullptr) {
     return nullptr;
   }
-
+  
   id<MTLTexture> metalTexture = (__bridge id<MTLTexture>)metalInfo.texture;
   return MetalTexture::MakeFrom(this, metalTexture, usage, adopted);
 }
@@ -190,12 +188,12 @@ std::shared_ptr<Semaphore> MetalGPU::importBackendSemaphore(const BackendSemapho
   if (semaphore.backend() != Backend::Metal) {
     return nullptr;
   }
-
+  
   MetalSemaphoreInfo metalInfo = {};
   if (!semaphore.getMetalSemaphore(&metalInfo) || metalInfo.event == nullptr) {
     return nullptr;
   }
-
+  
   id<MTLEvent> event = (__bridge id<MTLEvent>)metalInfo.event;
   return MetalSemaphore::MakeFrom(this, event, metalInfo.value);
 }

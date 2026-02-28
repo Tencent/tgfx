@@ -17,19 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalRenderPipeline.h"
-#include "MetalDefines.h"
 #include "MetalGPU.h"
 #include "MetalShaderModule.h"
+#include "MetalDefines.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
 
-std::shared_ptr<MetalRenderPipeline> MetalRenderPipeline::Make(
-    MetalGPU* gpu, const RenderPipelineDescriptor& descriptor) {
+std::shared_ptr<MetalRenderPipeline> MetalRenderPipeline::Make(MetalGPU* gpu, 
+                                                          const RenderPipelineDescriptor& descriptor) {
   if (!gpu) {
     return nullptr;
   }
-
+  
   auto pipeline = gpu->makeResource<MetalRenderPipeline>(gpu, descriptor);
   if (pipeline->pipelineState == nil) {
     return nullptr;
@@ -37,8 +37,7 @@ std::shared_ptr<MetalRenderPipeline> MetalRenderPipeline::Make(
   return pipeline;
 }
 
-MetalRenderPipeline::MetalRenderPipeline(MetalGPU* gpu,
-                                         const RenderPipelineDescriptor& descriptor) {
+MetalRenderPipeline::MetalRenderPipeline(MetalGPU* gpu, const RenderPipelineDescriptor& descriptor) {
   createPipelineState(gpu, descriptor);
   createDepthStencilState(gpu->device(), descriptor);
 
@@ -78,18 +77,17 @@ unsigned MetalRenderPipeline::getTextureIndex(unsigned binding) const {
   return binding;
 }
 
-bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu,
-                                              const RenderPipelineDescriptor& descriptor) {
+bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu, const RenderPipelineDescriptor& descriptor) {
   auto device = gpu->device();
   // Create Metal render pipeline descriptor
   MTLRenderPipelineDescriptor* metalDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
-
+  
   // Create vertex function from library
   if (descriptor.vertex.module) {
     auto vertexShader = std::static_pointer_cast<MetalShaderModule>(descriptor.vertex.module);
     metalDescriptor.vertexFunction = [vertexShader->metalLibrary() newFunctionWithName:@"main0"];
   }
-
+  
   // Create fragment function from library, with optional sample mask injection
   if (descriptor.fragment.module) {
     auto fragmentShader = std::static_pointer_cast<MetalShaderModule>(descriptor.fragment.module);
@@ -97,7 +95,8 @@ bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu,
     if (needsSampleMask) {
       // Re-compile the fragment shader with sample mask injection using a two-pass approach
       // that picks a constant_id not conflicting with user-defined specialization constants.
-      auto compileResult = CompileFragmentShaderWithSampleMask(device, fragmentShader->glslCode());
+      auto compileResult =
+          CompileFragmentShaderWithSampleMask(device, fragmentShader->glslCode());
       if (compileResult.library == nil) {
         LOGE("Metal pipeline creation error: sample mask shader compilation failed");
         [metalDescriptor.vertexFunction release];
@@ -109,20 +108,18 @@ bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu,
       uint32_t mask = descriptor.multisample.mask;
       [constants setConstantValue:&mask type:MTLDataTypeUInt atIndex:compileResult.constantID];
       NSError* funcError = nil;
-      metalDescriptor.fragmentFunction = [sampleMaskLibrary newFunctionWithName:@"main0"
-                                                                 constantValues:constants
-                                                                          error:&funcError];
+      metalDescriptor.fragmentFunction =
+          [sampleMaskLibrary newFunctionWithName:@"main0" constantValues:constants error:&funcError];
       [constants release];
       if (funcError) {
-        LOGE("Metal fragment function creation error: %s",
-             funcError.localizedDescription.UTF8String);
+        LOGE("Metal fragment function creation error: %s", funcError.localizedDescription.UTF8String);
       }
     } else {
       metalDescriptor.fragmentFunction =
           [fragmentShader->metalLibrary() newFunctionWithName:@"main0"];
     }
   }
-
+  
   if (metalDescriptor.vertexFunction == nil || metalDescriptor.fragmentFunction == nil) {
     LOGE("Metal pipeline creation error: vertex or fragment function is nil");
     [metalDescriptor.vertexFunction release];
@@ -130,24 +127,24 @@ bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu,
     [metalDescriptor release];
     return false;
   }
-
+  
   configureVertexDescriptor(metalDescriptor, descriptor);
-
+  
   // Apply multisample settings
   if (descriptor.multisample.count > 1) {
     metalDescriptor.rasterSampleCount = static_cast<NSUInteger>(descriptor.multisample.count);
   }
   metalDescriptor.alphaToCoverageEnabled = descriptor.multisample.alphaToCoverageEnabled;
-
+  
   configureColorAttachments(metalDescriptor, gpu, descriptor);
-
+  
   // Configure depth-stencil attachment pixel format
   if (descriptor.depthStencil.format != PixelFormat::Unknown) {
     MTLPixelFormat dsFormat = gpu->getMTLPixelFormat(descriptor.depthStencil.format);
     metalDescriptor.depthAttachmentPixelFormat = dsFormat;
     metalDescriptor.stencilAttachmentPixelFormat = dsFormat;
   }
-
+  
   // Create pipeline state
   NSError* error = nil;
   pipelineState = [device newRenderPipelineStateWithDescriptor:metalDescriptor error:&error];
@@ -155,19 +152,20 @@ bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu,
   [metalDescriptor.vertexFunction release];
   [metalDescriptor.fragmentFunction release];
   [metalDescriptor release];
-
+  
   if (!pipelineState) {
     if (error) {
       LOGE("Metal pipeline creation error: %s", error.localizedDescription.UTF8String);
     }
     return false;
   }
-
+  
   return true;
 }
 
-void MetalRenderPipeline::configureVertexDescriptor(MTLRenderPipelineDescriptor* metalDescriptor,
-                                                    const RenderPipelineDescriptor& descriptor) {
+void MetalRenderPipeline::configureVertexDescriptor(
+    MTLRenderPipelineDescriptor* metalDescriptor,
+    const RenderPipelineDescriptor& descriptor) {
   if (descriptor.vertex.bufferLayouts.empty()) {
     return;
   }
@@ -175,8 +173,7 @@ void MetalRenderPipeline::configureVertexDescriptor(MTLRenderPipelineDescriptor*
   MTLVertexDescriptor* vertexDescriptor = [[MTLVertexDescriptor alloc] init];
 
   NSUInteger globalAttributeIndex = 0;
-  for (size_t bufferIndex = 0; bufferIndex < descriptor.vertex.bufferLayouts.size();
-       ++bufferIndex) {
+  for (size_t bufferIndex = 0; bufferIndex < descriptor.vertex.bufferLayouts.size(); ++bufferIndex) {
     const auto& layout = descriptor.vertex.bufferLayouts[bufferIndex];
 
     // Vertex buffers use high Metal buffer indices (30, 29, ...) to avoid conflict with
@@ -209,9 +206,9 @@ void MetalRenderPipeline::configureVertexDescriptor(MTLRenderPipelineDescriptor*
   [vertexDescriptor release];
 }
 
-void MetalRenderPipeline::configureColorAttachments(MTLRenderPipelineDescriptor* metalDescriptor,
-                                                    MetalGPU* gpu,
-                                                    const RenderPipelineDescriptor& descriptor) {
+void MetalRenderPipeline::configureColorAttachments(
+    MTLRenderPipelineDescriptor* metalDescriptor, MetalGPU* gpu,
+    const RenderPipelineDescriptor& descriptor) {
   for (size_t i = 0; i < descriptor.fragment.colorAttachments.size(); ++i) {
     const auto& colorAttachment = descriptor.fragment.colorAttachments[i];
 
@@ -238,59 +235,60 @@ void MetalRenderPipeline::configureColorAttachments(MTLRenderPipelineDescriptor*
     // Configure write mask
     MTLColorWriteMask writeMask = MTLColorWriteMaskNone;
     if (colorAttachment.colorWriteMask & ColorWriteMask::RED) writeMask |= MTLColorWriteMaskRed;
-    if (colorAttachment.colorWriteMask & ColorWriteMask::GREEN) writeMask |= MTLColorWriteMaskGreen;
+    if (colorAttachment.colorWriteMask & ColorWriteMask::GREEN)
+      writeMask |= MTLColorWriteMaskGreen;
     if (colorAttachment.colorWriteMask & ColorWriteMask::BLUE) writeMask |= MTLColorWriteMaskBlue;
-    if (colorAttachment.colorWriteMask & ColorWriteMask::ALPHA) writeMask |= MTLColorWriteMaskAlpha;
+    if (colorAttachment.colorWriteMask & ColorWriteMask::ALPHA)
+      writeMask |= MTLColorWriteMaskAlpha;
     metalDescriptor.colorAttachments[i].writeMask = writeMask;
   }
 }
 
-bool MetalRenderPipeline::createDepthStencilState(id<MTLDevice> device,
-                                                  const RenderPipelineDescriptor& descriptor) {
+bool MetalRenderPipeline::createDepthStencilState(id<MTLDevice> device, const RenderPipelineDescriptor& descriptor) {
   // Always create a depth stencil state for consistency
   MTLDepthStencilDescriptor* depthStencilDescriptor = [[MTLDepthStencilDescriptor alloc] init];
-
+  
   // Configure depth test
-  depthStencilDescriptor.depthCompareFunction =
+  depthStencilDescriptor.depthCompareFunction = 
       MetalDefines::ToMTLCompareFunction(descriptor.depthStencil.depthCompare);
   depthStencilDescriptor.depthWriteEnabled = descriptor.depthStencil.depthWriteEnabled;
-
+  
   // Configure front face stencil
   MTLStencilDescriptor* frontStencil = [[MTLStencilDescriptor alloc] init];
-  frontStencil.stencilCompareFunction =
+  frontStencil.stencilCompareFunction = 
       MetalDefines::ToMTLCompareFunction(descriptor.depthStencil.stencilFront.compare);
-  frontStencil.stencilFailureOperation =
+  frontStencil.stencilFailureOperation = 
       MetalDefines::ToMTLStencilOperation(descriptor.depthStencil.stencilFront.failOp);
-  frontStencil.depthFailureOperation =
+  frontStencil.depthFailureOperation = 
       MetalDefines::ToMTLStencilOperation(descriptor.depthStencil.stencilFront.depthFailOp);
-  frontStencil.depthStencilPassOperation =
+  frontStencil.depthStencilPassOperation = 
       MetalDefines::ToMTLStencilOperation(descriptor.depthStencil.stencilFront.passOp);
   frontStencil.readMask = descriptor.depthStencil.stencilReadMask;
   frontStencil.writeMask = descriptor.depthStencil.stencilWriteMask;
-
+  
   depthStencilDescriptor.frontFaceStencil = frontStencil;
   [frontStencil release];
-
+  
   // Back face stencil
   MTLStencilDescriptor* backStencil = [[MTLStencilDescriptor alloc] init];
-  backStencil.stencilCompareFunction =
+  backStencil.stencilCompareFunction = 
       MetalDefines::ToMTLCompareFunction(descriptor.depthStencil.stencilBack.compare);
-  backStencil.stencilFailureOperation =
+  backStencil.stencilFailureOperation = 
       MetalDefines::ToMTLStencilOperation(descriptor.depthStencil.stencilBack.failOp);
-  backStencil.depthFailureOperation =
+  backStencil.depthFailureOperation = 
       MetalDefines::ToMTLStencilOperation(descriptor.depthStencil.stencilBack.depthFailOp);
-  backStencil.depthStencilPassOperation =
+  backStencil.depthStencilPassOperation = 
       MetalDefines::ToMTLStencilOperation(descriptor.depthStencil.stencilBack.passOp);
   backStencil.readMask = descriptor.depthStencil.stencilReadMask;
   backStencil.writeMask = descriptor.depthStencil.stencilWriteMask;
-
+  
   depthStencilDescriptor.backFaceStencil = backStencil;
   [backStencil release];
-
+  
   // Create depth stencil state
   depthStencilState = [device newDepthStencilStateWithDescriptor:depthStencilDescriptor];
   [depthStencilDescriptor release];
-
+  
   return depthStencilState != nil;
 }
 

@@ -17,49 +17,46 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalSampler.h"
-#include "MetalDefines.h"
 #include "MetalGPU.h"
+#include "MetalDefines.h"
 
 namespace tgfx {
 
-std::shared_ptr<MetalSampler> MetalSampler::Make(MetalGPU* gpu,
-                                                 const SamplerDescriptor& descriptor) {
+std::shared_ptr<MetalSampler> MetalSampler::Make(MetalGPU* gpu, const SamplerDescriptor& descriptor) {
   if (!gpu) {
     return nullptr;
   }
-
+  
   // Create Metal sampler descriptor
   MTLSamplerDescriptor* metalDescriptor = [[MTLSamplerDescriptor alloc] init];
-
+  
   // Set filtering
   metalDescriptor.minFilter = MetalDefines::ToMTLSamplerFilter(descriptor.minFilter);
   metalDescriptor.magFilter = MetalDefines::ToMTLSamplerFilter(descriptor.magFilter);
   metalDescriptor.mipFilter = MetalDefines::ToMTLSamplerMipFilter(descriptor.mipmapMode);
-
+  
   // Set address modes
   metalDescriptor.sAddressMode = MetalDefines::ToMTLSamplerAddressMode(descriptor.addressModeX);
   metalDescriptor.tAddressMode = MetalDefines::ToMTLSamplerAddressMode(descriptor.addressModeY);
-
+  
   // Set border color (if supported)
   if (descriptor.addressModeX == AddressMode::ClampToBorder ||
       descriptor.addressModeY == AddressMode::ClampToBorder) {
     // Metal supports transparent black and opaque black/white border colors
     metalDescriptor.borderColor = MTLSamplerBorderColorTransparentBlack;
   }
-
+  
   // Create Metal sampler state
-  id<MTLSamplerState> metalSamplerState =
-      [gpu->device() newSamplerStateWithDescriptor:metalDescriptor];
+  id<MTLSamplerState> metalSamplerState = [gpu->device() newSamplerStateWithDescriptor:metalDescriptor];
   [metalDescriptor release];
   if (!metalSamplerState) {
     return nullptr;
   }
-
+  
   return gpu->makeResource<MetalSampler>(metalSamplerState);
 }
 
-MetalSampler::MetalSampler(id<MTLSamplerState> metalSamplerState)
-    : samplerState(metalSamplerState) {
+MetalSampler::MetalSampler(id<MTLSamplerState> metalSamplerState) : samplerState(metalSamplerState) {
 }
 
 void MetalSampler::onRelease(MetalGPU*) {

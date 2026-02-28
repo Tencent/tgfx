@@ -84,7 +84,7 @@ class BackgroundBlurStyle : public LayerStyle {
 
   LayerStyleExtraSourceType extraSourceType() const override {
     return (_blurrinessX > 0 || _blurrinessY > 0) ? LayerStyleExtraSourceType::Background
-                                                  : LayerStyleExtraSourceType::None;
+                                                 : LayerStyleExtraSourceType::None;
   }
 
  protected:

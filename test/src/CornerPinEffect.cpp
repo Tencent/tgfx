@@ -134,8 +134,7 @@ bool CornerPinEffect::onDraw(CommandEncoder* encoder,
   // Ideally, this MSAA texture should be cached and reused to avoid impacting performance.
   // However, since CornerPinEffect is only used for testing, we create it each time for simplicity.
   TextureDescriptor textureDesc(outputTexture->width(), outputTexture->height(),
-                                outputTexture->format(), false, MSAA_SAMPLE_COUNT,
-                                TextureUsage::RENDER_ATTACHMENT);
+                                outputTexture->format(), false, MSAA_SAMPLE_COUNT, TextureUsage::RENDER_ATTACHMENT);
   auto renderTexture = gpu->createTexture(textureDesc);
   if (renderTexture == nullptr) {
     return false;

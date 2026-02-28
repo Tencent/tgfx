@@ -31,8 +31,8 @@ class MetalRenderPipeline;
  */
 class MetalRenderPass : public RenderPass {
  public:
-  static std::shared_ptr<MetalRenderPass> Make(MetalCommandEncoder* encoder,
-                                               const RenderPassDescriptor& descriptor);
+  static std::shared_ptr<MetalRenderPass> Make(MetalCommandEncoder* encoder, 
+                                           const RenderPassDescriptor& descriptor);
 
   ~MetalRenderPass() override;
 
@@ -48,21 +48,17 @@ class MetalRenderPass : public RenderPass {
   void setViewport(int x, int y, int width, int height) override;
   void setScissorRect(int x, int y, int width, int height) override;
   void setPipeline(std::shared_ptr<RenderPipeline> pipeline) override;
-  void setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer,
-                       size_t offset = 0) override;
-  void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer,
-                      IndexFormat format = IndexFormat::UInt16) override;
-  void setTexture(unsigned binding, std::shared_ptr<Texture> texture,
-                  std::shared_ptr<Sampler> sampler) override;
-  void setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer, size_t offset,
-                        size_t size) override;
+  void setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer, size_t offset = 0) override;
+  void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat format = IndexFormat::UInt16) override;
+  void setTexture(unsigned binding, std::shared_ptr<Texture> texture, std::shared_ptr<Sampler> sampler) override;
+  void setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer, size_t offset, size_t size) override;
   void setStencilReference(uint32_t reference) override;
 
   void draw(PrimitiveType primitiveType, uint32_t vertexCount, uint32_t instanceCount = 1,
             uint32_t firstVertex = 0, uint32_t firstInstance = 0) override;
-  void drawIndexed(PrimitiveType primitiveType, uint32_t indexCount, uint32_t instanceCount = 1,
-                   uint32_t firstIndex = 0, int32_t baseVertex = 0,
-                   uint32_t firstInstance = 0) override;
+  void drawIndexed(PrimitiveType primitiveType, uint32_t indexCount,
+                   uint32_t instanceCount = 1, uint32_t firstIndex = 0,
+                   int32_t baseVertex = 0, uint32_t firstInstance = 0) override;
 
  protected:
   void onEnd() override;
@@ -73,7 +69,7 @@ class MetalRenderPass : public RenderPass {
   MetalCommandEncoder* commandEncoder = nullptr;
   id<MTLRenderCommandEncoder> renderEncoder = nil;
   std::shared_ptr<MetalRenderPipeline> currentPipeline = nullptr;
-
+  
   // Index buffer state (Metal doesn't have separate setIndexBuffer)
   std::shared_ptr<class MetalBuffer> indexBuffer = nullptr;
   IndexFormat indexFormat = IndexFormat::UInt16;

@@ -17,31 +17,32 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalCommandEncoder.h"
-#include "MetalBuffer.h"
-#include "MetalCommandBuffer.h"
-#include "MetalCommandQueue.h"
-#include "MetalDefines.h"
 #include "MetalGPU.h"
+#include "MetalCommandQueue.h"
+#include "MetalCommandBuffer.h"
 #include "MetalRenderPass.h"
 #include "MetalTexture.h"
+#include "MetalBuffer.h"
+#include "MetalDefines.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
 
 static MTLOrigin MakeMTLOrigin(const Rect& rect) {
-  return MTLOriginMake(static_cast<NSUInteger>(rect.x()), static_cast<NSUInteger>(rect.y()), 0);
+  return MTLOriginMake(static_cast<NSUInteger>(rect.x()),
+                       static_cast<NSUInteger>(rect.y()), 0);
 }
 
 static MTLSize MakeMTLSize(const Rect& rect) {
-  return MTLSizeMake(static_cast<NSUInteger>(rect.width()), static_cast<NSUInteger>(rect.height()),
-                     1);
+  return MTLSizeMake(static_cast<NSUInteger>(rect.width()),
+                     static_cast<NSUInteger>(rect.height()), 1);
 }
 
 std::shared_ptr<MetalCommandEncoder> MetalCommandEncoder::Make(MetalGPU* gpu) {
   if (!gpu) {
     return nullptr;
   }
-
+  
   auto queue = static_cast<MetalCommandQueue*>(gpu->queue());
   id<MTLCommandBuffer> commandBuffer = [queue->metalCommandQueue() commandBuffer];
   if (commandBuffer == nil) {
@@ -52,7 +53,7 @@ std::shared_ptr<MetalCommandEncoder> MetalCommandEncoder::Make(MetalGPU* gpu) {
   return encoder;
 }
 
-MetalCommandEncoder::MetalCommandEncoder(MetalGPU* gpu, id<MTLCommandBuffer> buffer)
+MetalCommandEncoder::MetalCommandEncoder(MetalGPU* gpu, id<MTLCommandBuffer> buffer) 
     : _gpu(gpu), commandBuffer([buffer retain]) {
 }
 
@@ -70,28 +71,28 @@ std::shared_ptr<RenderPass> MetalCommandEncoder::onBeginRenderPass(
   return MetalRenderPass::Make(this, descriptor);
 }
 
-void MetalCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTexture,
-                                               const Rect& srcRect,
-                                               std::shared_ptr<Texture> dstTexture,
-                                               const Point& dstOffset) {
+void MetalCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTexture, 
+                                           const Rect& srcRect,
+                                           std::shared_ptr<Texture> dstTexture, 
+                                           const Point& dstOffset) {
   if (!srcTexture || !dstTexture) {
     return;
   }
-
+  
   auto metalSrcTexture = std::static_pointer_cast<MetalTexture>(srcTexture);
   auto metalDstTexture = std::static_pointer_cast<MetalTexture>(dstTexture);
-
+  
   id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
   if (blitEncoder == nil) {
     LOGE("Failed to create blit command encoder for texture copy.");
     return;
   }
-
+  
   auto sourceOrigin = MakeMTLOrigin(srcRect);
   auto sourceSize = MakeMTLSize(srcRect);
-  MTLOrigin destinationOrigin =
-      MTLOriginMake(static_cast<NSUInteger>(dstOffset.x), static_cast<NSUInteger>(dstOffset.y), 0);
-
+  MTLOrigin destinationOrigin = MTLOriginMake(static_cast<NSUInteger>(dstOffset.x),
+                                             static_cast<NSUInteger>(dstOffset.y), 0);
+  
   [blitEncoder copyFromTexture:metalSrcTexture->metalTexture()
                    sourceSlice:0
                    sourceLevel:0
@@ -101,37 +102,37 @@ void MetalCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTextu
               destinationSlice:0
               destinationLevel:0
              destinationOrigin:destinationOrigin];
-
+  
   [blitEncoder endEncoding];
 }
 
-void MetalCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTexture,
-                                              const Rect& srcRect,
-                                              std::shared_ptr<GPUBuffer> dstBuffer,
-                                              size_t dstOffset, size_t dstRowBytes) {
+void MetalCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTexture, 
+                                          const Rect& srcRect,
+                                          std::shared_ptr<GPUBuffer> dstBuffer, 
+                                          size_t dstOffset,
+                                          size_t dstRowBytes) {
   if (!srcTexture || !dstBuffer) {
     return;
   }
-
+  
   auto metalSrcTexture = std::static_pointer_cast<MetalTexture>(srcTexture);
   auto metalDstBuffer = std::static_pointer_cast<MetalBuffer>(dstBuffer);
-
+  
   id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
   if (blitEncoder == nil) {
     LOGE("Failed to create blit command encoder for texture-to-buffer copy.");
     return;
   }
-
+  
   auto sourceOrigin = MakeMTLOrigin(srcRect);
   auto sourceSize = MakeMTLSize(srcRect);
-
+  
   // Calculate bytes per row based on texture format
   auto bytesPerPixel = MetalDefines::GetBytesPerPixel(metalSrcTexture->metalTexture().pixelFormat);
-  NSUInteger bytesPerRow = dstRowBytes > 0
-                               ? static_cast<NSUInteger>(dstRowBytes)
-                               : static_cast<NSUInteger>(srcRect.width()) * bytesPerPixel;
+  NSUInteger bytesPerRow = dstRowBytes > 0 ? static_cast<NSUInteger>(dstRowBytes) : 
+                          static_cast<NSUInteger>(srcRect.width()) * bytesPerPixel;
   NSUInteger bytesPerImage = bytesPerRow * static_cast<NSUInteger>(srcRect.height());
-
+  
   [blitEncoder copyFromTexture:metalSrcTexture->metalTexture()
                    sourceSlice:0
                    sourceLevel:0
@@ -141,9 +142,9 @@ void MetalCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextur
              destinationOffset:dstOffset
         destinationBytesPerRow:bytesPerRow
       destinationBytesPerImage:bytesPerImage];
-
+  
   [blitEncoder endEncoding];
-
+  
   metalDstBuffer->insertReadbackFence(commandBuffer);
 }
 
@@ -151,12 +152,12 @@ void MetalCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> tex
   if (!texture) {
     return;
   }
-
+  
   auto metalTexture = std::static_pointer_cast<MetalTexture>(texture);
   if (metalTexture->mipLevelCount() <= 1) {
     return;
   }
-
+  
   id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
   if (blitEncoder == nil) {
     LOGE("Failed to create blit command encoder for mipmap generation.");

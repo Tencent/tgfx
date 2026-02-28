@@ -53,7 +53,7 @@ PlacementPtr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
   // The color filter transforms transparent pixels into non-transparent ones. Use the original
   // image alpha as a mask to prevent coloring transparent regions.
   auto alphaSource = FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
-  return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(composed),
-                                                          std::move(alphaSource), BlendMode::SrcIn);
+  return XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      allocator, std::move(composed), std::move(alphaSource), BlendMode::SrcIn);
 }
 }  // namespace tgfx

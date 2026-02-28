@@ -19,8 +19,8 @@
 #include "Context3DCompositor.h"
 #include <algorithm>
 #include "BspTree.h"
-#include "core/Matrix3DUtils.h"
 #include "core/images/TextureImage.h"
+#include "core/Matrix3DUtils.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/QuadRecord.h"

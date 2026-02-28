@@ -19,8 +19,8 @@
 #pragma once
 
 #include <Metal/Metal.h>
-#include "MetalResource.h"
 #include "tgfx/gpu/CommandEncoder.h"
+#include "MetalResource.h"
 
 namespace tgfx {
 
@@ -42,15 +42,16 @@ class MetalCommandEncoder : public CommandEncoder, public MetalResource {
 
   // CommandEncoder interface implementation
   GPU* gpu() const override;
-
-  std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;
+  
+  std::shared_ptr<RenderPass> onBeginRenderPass(
+      const RenderPassDescriptor& descriptor) override;
 
   void copyTextureToTexture(std::shared_ptr<Texture> srcTexture, const Rect& srcRect,
-                            std::shared_ptr<Texture> dstTexture, const Point& dstOffset) override;
+                           std::shared_ptr<Texture> dstTexture, const Point& dstOffset) override;
 
   void copyTextureToBuffer(std::shared_ptr<Texture> srcTexture, const Rect& srcRect,
-                           std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset = 0,
-                           size_t dstRowBytes = 0) override;
+                          std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset = 0,
+                          size_t dstRowBytes = 0) override;
 
   void generateMipmapsForTexture(std::shared_ptr<Texture> texture) override;
 
@@ -64,7 +65,7 @@ class MetalCommandEncoder : public CommandEncoder, public MetalResource {
 
   MetalGPU* _gpu = nullptr;
   id<MTLCommandBuffer> commandBuffer = nil;
-
+  
   friend class MetalGPU;
 };
 

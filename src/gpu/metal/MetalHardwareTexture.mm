@@ -68,9 +68,10 @@ static std::shared_ptr<Texture> CreateTextureOfPlane(MetalGPU* gpu, CVPixelBuffe
     return nullptr;
   }
 
-  TextureDescriptor descriptor = {
-      static_cast<int>(width), static_cast<int>(height), pixelFormat, false, 1, usage};
-  return gpu->makeResource<MetalHardwareTexture>(descriptor, mtlTexture, pixelBuffer, cvTexture);
+  TextureDescriptor descriptor = {static_cast<int>(width), static_cast<int>(height), pixelFormat,
+                                  false, 1, usage};
+  return gpu->makeResource<MetalHardwareTexture>(descriptor, mtlTexture, pixelBuffer,
+                                               cvTexture);
 }
 
 std::vector<std::shared_ptr<Texture>> MetalHardwareTexture::MakeFrom(
@@ -119,8 +120,8 @@ std::vector<std::shared_ptr<Texture>> MetalHardwareTexture::MakeFrom(
 }
 
 MetalHardwareTexture::MetalHardwareTexture(const TextureDescriptor& descriptor,
-                                           id<MTLTexture> mtlTexture, CVPixelBufferRef pixelBuffer,
-                                           CVMetalTextureRef cvMetalTexture)
+                                       id<MTLTexture> mtlTexture, CVPixelBufferRef pixelBuffer,
+                                       CVMetalTextureRef cvMetalTexture)
     : MetalTexture(descriptor, mtlTexture),
       pixelBuffer(pixelBuffer),
       cvMetalTexture(cvMetalTexture) {

@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalCommandQueue.h"
+#include "MetalGPU.h"
 #include "MetalCommandBuffer.h"
 #include "MetalDefines.h"
-#include "MetalGPU.h"
 #include "MetalSemaphore.h"
 #include "MetalTexture.h"
 #include "core/utils/Log.h"
@@ -45,31 +45,30 @@ void MetalCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
       // Signal the pending semaphore after this command buffer completes
       if (pendingSignalSemaphore != nullptr) {
         auto value = pendingSignalSemaphore->nextSignalValue();
-        [metalCommandBuffer->metalCommandBuffer()
-            encodeSignalEvent:pendingSignalSemaphore->metalEvent()
-                        value:value];
+        [metalCommandBuffer->metalCommandBuffer() encodeSignalEvent:pendingSignalSemaphore->metalEvent()
+                                                          value:value];
         pendingSignalSemaphore = nullptr;
       }
-
+      
       [metalCommandBuffer->metalCommandBuffer() commit];
-
+      
       if (lastSubmittedCommandBuffer != nil) {
         [lastSubmittedCommandBuffer release];
       }
       lastSubmittedCommandBuffer = [metalCommandBuffer->metalCommandBuffer() retain];
     }
   }
-
+  
   // Process unreferenced resources after submission
   gpu->processUnreferencedResources();
 }
 
-void MetalCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset,
-                                    const void* data, size_t dataSize) {
+void MetalCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, 
+                                 const void* data, size_t dataSize) {
   if (!buffer || !data || dataSize == 0) {
     return;
   }
-
+  
   // Map buffer and copy data
   void* mappedData = buffer->map(bufferOffset, dataSize);
   if (mappedData) {
@@ -78,31 +77,30 @@ void MetalCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bu
   }
 }
 
-void MetalCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rect& rect,
-                                     const void* pixels, size_t rowBytes) {
+void MetalCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, 
+                                  const void* pixels, size_t rowBytes) {
   if (!texture || !pixels) {
-    LOGE("MetalCommandQueue::writeTexture() invalid parameters: texture=%p, pixels=%p",
+    LOGE("MetalCommandQueue::writeTexture() invalid parameters: texture=%p, pixels=%p", 
          static_cast<void*>(texture.get()), pixels);
     return;
   }
-
+  
   auto metalTexturePtr = std::static_pointer_cast<MetalTexture>(texture);
-
+  
   id<MTLTexture> mtlTexture = metalTexturePtr->metalTexture();
   if (!mtlTexture) {
     LOGE("MetalCommandQueue::writeTexture() metalTexture is nil");
     return;
   }
-
+  
   if (mtlTexture.storageMode == MTLStorageModePrivate) {
     @autoreleasepool {
       auto bytesPerPixel = MetalDefines::GetBytesPerPixel(mtlTexture.pixelFormat);
       NSUInteger width = static_cast<NSUInteger>(rect.width());
       NSUInteger height = static_cast<NSUInteger>(rect.height());
-      NSUInteger bytesPerRow =
-          rowBytes > 0 ? static_cast<NSUInteger>(rowBytes) : width * bytesPerPixel;
+      NSUInteger bytesPerRow = rowBytes > 0 ? static_cast<NSUInteger>(rowBytes) : width * bytesPerPixel;
       NSUInteger dataSize = bytesPerRow * height;
-
+      
       id<MTLBuffer> stagingBuffer = [gpu->device() newBufferWithBytes:pixels
                                                                length:dataSize
                                                               options:MTLResourceStorageModeShared];
@@ -118,11 +116,11 @@ void MetalCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
         [stagingBuffer release];
         return;
       }
-
-      MTLOrigin origin =
-          MTLOriginMake(static_cast<NSUInteger>(rect.x()), static_cast<NSUInteger>(rect.y()), 0);
+      
+      MTLOrigin origin = MTLOriginMake(static_cast<NSUInteger>(rect.x()),
+                                       static_cast<NSUInteger>(rect.y()), 0);
       MTLSize size = MTLSizeMake(width, height, 1);
-
+      
       [blitEncoder copyFromBuffer:stagingBuffer
                      sourceOffset:0
                 sourceBytesPerRow:bytesPerRow
@@ -138,13 +136,14 @@ void MetalCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
       [stagingBuffer release];
     }
   } else {
-    MTLRegion region = MTLRegionMake2D(
-        static_cast<NSUInteger>(rect.x()), static_cast<NSUInteger>(rect.y()),
-        static_cast<NSUInteger>(rect.width()), static_cast<NSUInteger>(rect.height()));
+    MTLRegion region = MTLRegionMake2D(static_cast<NSUInteger>(rect.x()),
+                                       static_cast<NSUInteger>(rect.y()),
+                                       static_cast<NSUInteger>(rect.width()),
+                                       static_cast<NSUInteger>(rect.height()));
     [mtlTexture replaceRegion:region
-                  mipmapLevel:0
-                    withBytes:pixels
-                  bytesPerRow:static_cast<NSUInteger>(rowBytes)];
+                    mipmapLevel:0
+                      withBytes:pixels
+                    bytesPerRow:static_cast<NSUInteger>(rowBytes)];
   }
 }
 
@@ -161,12 +160,12 @@ void MetalCommandQueue::waitSemaphore(std::shared_ptr<Semaphore> semaphore) {
   if (semaphore == nullptr) {
     return;
   }
-
+  
   auto metalSemaphore = std::static_pointer_cast<MetalSemaphore>(semaphore);
   if (metalSemaphore->metalEvent() == nil) {
     return;
   }
-
+  
   pendingWaitSemaphore = metalSemaphore;
 }
 

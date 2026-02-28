@@ -26,7 +26,7 @@ MetalCaps::MetalCaps(id<MTLDevice> device) {
   _info.vendor = "Apple";
   _info.renderer = [device.name UTF8String];
   _info.version = "Metal";
-
+  
   initFeatureSet(device);
   initLimits(device);
   initFormatTable(device);
@@ -63,7 +63,7 @@ int MetalCaps::getSampleCount(int requestedCount, PixelFormat format) const {
 void MetalCaps::initFeatureSet(id<MTLDevice> device) {
   // Metal always supports semaphore (MTLEvent) synchronization
   _features.semaphore = true;
-
+  
   // Check for clamp to border support
 #if TARGET_OS_OSX
   if (@available(macOS 10.15, *)) {
@@ -82,7 +82,7 @@ void MetalCaps::initFeatureSet(id<MTLDevice> device) {
   _features.clampToBorder = clampToBorderSupported;
 
   // Check for compute support
-  computeSupported = true;  // Metal always supports compute shaders
+  computeSupported = true; // Metal always supports compute shaders
 }
 
 void MetalCaps::initLimits(id<MTLDevice> device) {
@@ -103,9 +103,9 @@ void MetalCaps::initLimits(id<MTLDevice> device) {
 #endif
 
   // Set other limits
-  _limits.maxSamplersPerShaderStage = 16;         // Metal supports up to 16 samplers per stage
-  _limits.maxUniformBufferBindingSize = 65536;    // 64KB
-  _limits.minUniformBufferOffsetAlignment = 256;  // Metal requirement
+  _limits.maxSamplersPerShaderStage = 16; // Metal supports up to 16 samplers per stage
+  _limits.maxUniformBufferBindingSize = 65536; // 64KB
+  _limits.minUniformBufferOffsetAlignment = 256; // Metal requirement
 }
 
 MetalCaps::FormatInfo MetalCaps::CheckFormat(id<MTLDevice> device, MTLPixelFormat metalFormat) {

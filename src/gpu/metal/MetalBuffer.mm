@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalBuffer.h"
-#include "MetalDefines.h"
 #include "MetalGPU.h"
+#include "MetalDefines.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -27,15 +27,15 @@ std::shared_ptr<MetalBuffer> MetalBuffer::Make(MetalGPU* gpu, size_t size, uint3
   if (!gpu || size == 0) {
     return nullptr;
   }
-
+  
   // Create Metal buffer
   MTLResourceOptions options = MetalDefines::ToMTLResourceOptions(usage);
   id<MTLBuffer> metalBuffer = [gpu->device() newBufferWithLength:size options:options];
-
+  
   if (!metalBuffer) {
     return nullptr;
   }
-
+  
   return gpu->makeResource<MetalBuffer>(size, usage, metalBuffer);
 }
 
@@ -69,13 +69,13 @@ void* MetalBuffer::map(size_t offset, size_t size) {
     LOGE("MetalBuffer::map() range out of bounds!");
     return nullptr;
   }
-
+  
   // Check if buffer supports mapping (shared storage mode)
   if (buffer.storageMode != MTLStorageModeShared) {
     LOGE("MetalBuffer::map() buffer storage mode is not Shared, mapping is not supported!");
     return nullptr;
   }
-
+  
   // For readback buffers, wait for the GPU to finish writing before reading.
   if (pendingCommandBuffer != nil) {
     [pendingCommandBuffer waitUntilCompleted];

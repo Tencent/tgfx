@@ -236,19 +236,19 @@ std::vector<Quad> DrawPolygon3D::toQuads() const {
 
   if (n == 3) {
     // Triangle: degenerate to quad (duplicate last vertex)
-    quads.push_back(
-        Quad::MakeFromCW(localPoints[0], localPoints[1], localPoints[2], localPoints[2]));
+    quads.push_back(Quad::MakeFromCW(localPoints[0], localPoints[1], localPoints[2],
+                                     localPoints[2]));
     return quads;
   }
   if (n == 4) {
-    quads.push_back(
-        Quad::MakeFromCW(localPoints[0], localPoints[1], localPoints[2], localPoints[3]));
+    quads.push_back(Quad::MakeFromCW(localPoints[0], localPoints[1], localPoints[2],
+                                     localPoints[3]));
     return quads;
   }
   // n > 4: Fan decomposition into quads, each quad covers two triangles when possible.
   for (size_t i = 1; i + 2 < n; i += 2) {
-    quads.push_back(
-        Quad::MakeFromCW(localPoints[0], localPoints[i], localPoints[i + 1], localPoints[i + 2]));
+    quads.push_back(Quad::MakeFromCW(localPoints[0], localPoints[i], localPoints[i + 1],
+                                     localPoints[i + 2]));
   }
   // Handle remaining triangle if odd number of triangles.
   if ((n - 2) % 2 == 1) {

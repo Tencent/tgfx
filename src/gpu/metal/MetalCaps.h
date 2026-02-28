@@ -22,10 +22,10 @@
 #include <unordered_map>
 #include <vector>
 #include "core/utils/EnumHasher.h"
-#include "tgfx/gpu/GPUFeatures.h"
-#include "tgfx/gpu/GPUInfo.h"
-#include "tgfx/gpu/GPULimits.h"
 #include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/gpu/GPUInfo.h"
+#include "tgfx/gpu/GPUFeatures.h"
+#include "tgfx/gpu/GPULimits.h"
 
 namespace tgfx {
 

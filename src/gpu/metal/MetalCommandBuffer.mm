@@ -20,7 +20,7 @@
 
 namespace tgfx {
 
-MetalCommandBuffer::MetalCommandBuffer(id<MTLCommandBuffer> metalCommandBuffer)
+MetalCommandBuffer::MetalCommandBuffer(id<MTLCommandBuffer> metalCommandBuffer) 
     : commandBuffer([metalCommandBuffer retain]) {
 }
 

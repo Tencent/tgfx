@@ -19,8 +19,8 @@
 #pragma once
 
 #include <Metal/Metal.h>
-#include "MetalResource.h"
 #include "tgfx/gpu/GPUBuffer.h"
+#include "MetalResource.h"
 
 namespace tgfx {
 
@@ -57,7 +57,7 @@ class MetalBuffer : public GPUBuffer, public MetalResource {
   id<MTLBuffer> buffer = nil;
   id<MTLCommandBuffer> pendingCommandBuffer = nil;
   void* mappedPointer = nullptr;
-
+  
   friend class MetalGPU;
 };
 

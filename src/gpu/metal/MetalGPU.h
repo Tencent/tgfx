@@ -22,9 +22,9 @@
 #include <Metal/Metal.h>
 #include <list>
 #include <memory>
+#include "tgfx/gpu/GPU.h"
 #include "MetalCaps.h"
 #include "core/utils/ReturnQueue.h"
-#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 

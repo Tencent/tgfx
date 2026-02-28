@@ -1484,7 +1484,8 @@ static inline Matrix3D MakePerspectiveMatrix(float eyeDistance = 200.f) {
 static Matrix3D MakeTransformMatrix(const Point& origin, const Size& size, float rotateX,
                                     float rotateY, float rotateZ, float eyeDistance = 200.f) {
   auto anchor = Point::Make(0.5f, 0.5f);
-  auto offsetToAnchor = Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+  auto offsetToAnchor =
+      Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
   auto invOffsetToAnchor =
       Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
   auto model = Matrix3D::I();
@@ -1565,8 +1566,8 @@ TGFX_TEST(CanvasTest, Matrix3D) {
 
     auto image = MakeImage("resources/apitest/test_timestretch.png");
     ASSERT_TRUE(image != nullptr);
-    image =
-        image->makeScaled(static_cast<int>(shapeSize.width), static_cast<int>(shapeSize.height));
+    image = image->makeScaled(static_cast<int>(shapeSize.width),
+                              static_cast<int>(shapeSize.height));
     ASSERT_TRUE(image != nullptr);
 
     AutoCanvasRestore autoRestore(canvas);

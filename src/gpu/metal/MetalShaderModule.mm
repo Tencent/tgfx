@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalShaderModule.h"
+#include "MetalGPU.h"
+#include "core/utils/Log.h"
 #include <map>
 #include <regex>
 #include <set>
 #include <shaderc/shaderc.hpp>
-#include "MetalGPU.h"
-#include "core/utils/Log.h"
 // Suppress warnings from SPIRV-Cross headers
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
@@ -106,8 +106,8 @@ static std::string assignSamplerBindings(const std::string& source) {
 static std::string replaceInputLocation(const std::smatch& match, int& counter) {
   std::string interpStr = match[1].matched ? match[1].str() : "";
   std::string precisionStr = match[2].matched ? match[2].str() : "";
-  return "layout(location=" + std::to_string(counter++) + ") " + interpStr + "in " + precisionStr +
-         match[3].str() + " " + match[4].str() + ";";
+  return "layout(location=" + std::to_string(counter++) + ") " + interpStr + "in " +
+         precisionStr + match[3].str() + " " + match[4].str() + ";";
 }
 
 // Add location qualifiers to 'in' variables, handling optional interpolation qualifiers
@@ -122,8 +122,8 @@ static std::string assignInputLocationQualifiers(const std::string& source) {
 static std::string replaceOutputLocation(const std::smatch& match, int& counter) {
   std::string interpStr = match[1].matched ? match[1].str() : "";
   std::string precisionStr = match[2].matched ? match[2].str() : "";
-  return "layout(location=" + std::to_string(counter++) + ") " + interpStr + "out " + precisionStr +
-         match[3].str() + " " + match[4].str() + ";";
+  return "layout(location=" + std::to_string(counter++) + ") " + interpStr + "out " +
+         precisionStr + match[3].str() + " " + match[4].str() + ";";
 }
 
 // Add location qualifiers to 'out' variables, handling optional interpolation qualifiers
@@ -279,8 +279,8 @@ static std::string convertSPIRVToMSL(const std::vector<uint32_t>& spirvBinary, S
   return mslCode;
 }
 
-std::shared_ptr<MetalShaderModule> MetalShaderModule::Make(
-    MetalGPU* gpu, const ShaderModuleDescriptor& descriptor) {
+std::shared_ptr<MetalShaderModule> MetalShaderModule::Make(MetalGPU* gpu,
+                                                      const ShaderModuleDescriptor& descriptor) {
   if (!gpu) {
     return nullptr;
   }
@@ -302,7 +302,7 @@ void MetalShaderModule::onRelease(MetalGPU*) {
 }
 
 bool MetalShaderModule::compileShader(id<MTLDevice> device, const std::string& glslCode,
-                                      ShaderStage stage) {
+                                    ShaderStage stage) {
   std::string mslCode = convertGLSLToMSL(glslCode, stage);
   if (mslCode.empty()) {
     return false;
@@ -363,8 +363,7 @@ SampleMaskCompileResult CompileFragmentShaderWithSampleMask(id<MTLDevice> device
   result.library = [device newLibraryWithSource:mslSource options:nil error:&error];
   if (!result.library) {
     if (error) {
-      LOGE("Metal shader compilation error (sample mask): %s",
-           error.localizedDescription.UTF8String);
+      LOGE("Metal shader compilation error (sample mask): %s", error.localizedDescription.UTF8String);
     }
     result.library = nil;
   }

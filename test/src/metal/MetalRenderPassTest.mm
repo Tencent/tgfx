@@ -17,14 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <Metal/Metal.h>
-#include "core/utils/Log.h"
-#include "gpu/metal/MetalBuffer.h"
 #include "gpu/metal/MetalGPU.h"
 #include "gpu/metal/MetalRenderPass.h"
 #include "gpu/metal/MetalRenderPipeline.h"
 #include "gpu/metal/MetalShaderModule.h"
+#include "gpu/metal/MetalBuffer.h"
 #include "gpu/metal/MetalTexture.h"
 #include "tgfx/gpu/CommandEncoder.h"
+#include "core/utils/Log.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -66,7 +66,7 @@ fragment float4 fragment_main(VertexOut in [[stage_in]]) {
 class TestMetalShaderModule : public ShaderModule {
  public:
   static std::shared_ptr<TestMetalShaderModule> Make(MetalGPU* gpu, const std::string& mslCode,
-                                                     bool isVertex) {
+                                                   bool isVertex) {
     if (!gpu) {
       return nullptr;
     }
@@ -130,9 +130,10 @@ class TestMetalShaderModule : public ShaderModule {
 };
 
 // Helper to create render pipeline directly with Metal
-static id<MTLRenderPipelineState> CreateTestPipeline(
-    MetalGPU* gpu, std::shared_ptr<TestMetalShaderModule> vertexModule,
-    std::shared_ptr<TestMetalShaderModule> fragmentModule, MTLPixelFormat pixelFormat) {
+static id<MTLRenderPipelineState> CreateTestPipeline(MetalGPU* gpu,
+                                                     std::shared_ptr<TestMetalShaderModule> vertexModule,
+                                                     std::shared_ptr<TestMetalShaderModule> fragmentModule,
+                                                     MTLPixelFormat pixelFormat) {
   MTLRenderPipelineDescriptor* descriptor = [[MTLRenderPipelineDescriptor alloc] init];
   descriptor.vertexFunction = vertexModule->vertexFunction();
   descriptor.fragmentFunction = fragmentModule->fragmentFunction();
@@ -210,8 +211,8 @@ TGFX_TEST(MetalRenderPassTest, BasicTriangle) {
 
   // Create pipeline
   auto metalTexture = std::static_pointer_cast<MetalTexture>(renderTarget);
-  auto pipelineState = CreateTestPipeline(gpu, vertexModule, fragmentModule,
-                                          metalTexture->metalTexture().pixelFormat);
+  auto pipelineState =
+      CreateTestPipeline(gpu, vertexModule, fragmentModule, metalTexture->metalTexture().pixelFormat);
   ASSERT_TRUE(pipelineState != nil);
 
   // Create command encoder and render pass

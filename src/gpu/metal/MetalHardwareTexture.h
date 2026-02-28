@@ -46,7 +46,7 @@ class MetalHardwareTexture : public MetalTexture {
 
  private:
   MetalHardwareTexture(const TextureDescriptor& descriptor, id<MTLTexture> mtlTexture,
-                       CVPixelBufferRef pixelBuffer, CVMetalTextureRef cvMetalTexture);
+                     CVPixelBufferRef pixelBuffer, CVMetalTextureRef cvMetalTexture);
 
   void onRelease(MetalGPU* gpu) override;
 

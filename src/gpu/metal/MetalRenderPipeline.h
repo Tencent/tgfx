@@ -20,8 +20,8 @@
 
 #include <Metal/Metal.h>
 #include <unordered_map>
-#include "MetalResource.h"
 #include "tgfx/gpu/RenderPipeline.h"
+#include "MetalResource.h"
 
 namespace tgfx {
 
@@ -32,8 +32,7 @@ class MetalGPU;
  */
 class MetalRenderPipeline : public RenderPipeline, public MetalResource {
  public:
-  static std::shared_ptr<MetalRenderPipeline> Make(MetalGPU* gpu,
-                                                   const RenderPipelineDescriptor& descriptor);
+  static std::shared_ptr<MetalRenderPipeline> Make(MetalGPU* gpu, const RenderPipelineDescriptor& descriptor);
 
   /**
    * Returns the Metal render pipeline state.
@@ -67,7 +66,8 @@ class MetalRenderPipeline : public RenderPipeline, public MetalResource {
   bool createDepthStencilState(id<MTLDevice> device, const RenderPipelineDescriptor& descriptor);
   static void configureVertexDescriptor(MTLRenderPipelineDescriptor* metalDescriptor,
                                         const RenderPipelineDescriptor& descriptor);
-  static void configureColorAttachments(MTLRenderPipelineDescriptor* metalDescriptor, MetalGPU* gpu,
+  static void configureColorAttachments(MTLRenderPipelineDescriptor* metalDescriptor,
+                                        MetalGPU* gpu,
                                         const RenderPipelineDescriptor& descriptor);
 
   id<MTLRenderPipelineState> pipelineState = nil;
@@ -76,7 +76,7 @@ class MetalRenderPipeline : public RenderPipeline, public MetalResource {
   std::unordered_map<unsigned, unsigned> textureUnits = {};
   MTLCullMode cullMode = MTLCullModeNone;
   MTLWinding frontFace = MTLWindingCounterClockwise;
-
+  
   friend class MetalGPU;
   friend class MetalRenderPass;
 };

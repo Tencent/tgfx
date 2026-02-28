@@ -19,8 +19,8 @@
 #pragma once
 
 #include <Metal/Metal.h>
-#include "MetalResource.h"
 #include "tgfx/gpu/Sampler.h"
+#include "MetalResource.h"
 
 namespace tgfx {
 
@@ -48,7 +48,7 @@ class MetalSampler : public Sampler, public MetalResource {
   ~MetalSampler() override = default;
 
   id<MTLSamplerState> samplerState = nil;
-
+  
   friend class MetalGPU;
 };
 

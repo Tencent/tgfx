@@ -19,8 +19,8 @@
 #pragma once
 
 #include <Metal/Metal.h>
-#include "MetalResource.h"
 #include "tgfx/gpu/Texture.h"
+#include "MetalResource.h"
 
 namespace tgfx {
 
@@ -37,7 +37,7 @@ class MetalTexture : public Texture, public MetalResource {
    * Creates a MetalTexture wrapper from an external Metal texture.
    */
   static std::shared_ptr<MetalTexture> MakeFrom(MetalGPU* gpu, id<MTLTexture> metalTexture,
-                                                uint32_t usage, bool adopted);
+                                              uint32_t usage, bool adopted);
 
   /**
    * Returns the Metal texture.

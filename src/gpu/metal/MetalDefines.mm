@@ -18,15 +18,15 @@
 
 #include "MetalDefines.h"
 #include "tgfx/gpu/Attribute.h"
-#include "tgfx/gpu/BlendFactor.h"
-#include "tgfx/gpu/BlendOperation.h"
-#include "tgfx/gpu/CompareFunction.h"
-#include "tgfx/gpu/FilterMode.h"
 #include "tgfx/gpu/GPUBuffer.h"
 #include "tgfx/gpu/RenderPass.h"
-#include "tgfx/gpu/Sampler.h"
-#include "tgfx/gpu/StencilOperation.h"
 #include "tgfx/gpu/Texture.h"
+#include "tgfx/gpu/CompareFunction.h"
+#include "tgfx/gpu/StencilOperation.h"
+#include "tgfx/gpu/BlendFactor.h"
+#include "tgfx/gpu/BlendOperation.h"
+#include "tgfx/gpu/Sampler.h"
+#include "tgfx/gpu/FilterMode.h"
 
 namespace tgfx {
 
@@ -241,7 +241,7 @@ size_t MetalDefines::GetBytesPerPixel(MTLPixelFormat format) {
     case MTLPixelFormatR8Uint:
     case MTLPixelFormatR8Sint:
       return 1;
-
+    
     case MTLPixelFormatR16Unorm:
     case MTLPixelFormatR16Snorm:
     case MTLPixelFormatR16Uint:
@@ -255,7 +255,7 @@ size_t MetalDefines::GetBytesPerPixel(MTLPixelFormat format) {
     case MTLPixelFormatA1BGR5Unorm:
     case MTLPixelFormatABGR4Unorm:
       return 2;
-
+    
     case MTLPixelFormatRGBA8Unorm:
     case MTLPixelFormatRGBA8Unorm_sRGB:
     case MTLPixelFormatRGBA8Snorm:
@@ -274,7 +274,7 @@ size_t MetalDefines::GetBytesPerPixel(MTLPixelFormat format) {
     case MTLPixelFormatR32Sint:
     case MTLPixelFormatR32Float:
       return 4;
-
+    
     case MTLPixelFormatRGBA16Unorm:
     case MTLPixelFormatRGBA16Snorm:
     case MTLPixelFormatRGBA16Uint:
@@ -284,14 +284,14 @@ size_t MetalDefines::GetBytesPerPixel(MTLPixelFormat format) {
     case MTLPixelFormatRG32Sint:
     case MTLPixelFormatRG32Float:
       return 8;
-
+    
     case MTLPixelFormatRGBA32Uint:
     case MTLPixelFormatRGBA32Sint:
     case MTLPixelFormatRGBA32Float:
       return 16;
-
+    
     default:
-      return 4;  // Default to 4 bytes per pixel
+      return 4; // Default to 4 bytes per pixel
   }
 }
 

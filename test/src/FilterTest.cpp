@@ -969,21 +969,22 @@ TGFX_TEST(FilterTest, AffectsTransparentBlack) {
   auto transparentFilter = ColorFilter::Blend(Color::Transparent(), BlendMode::Screen);
   // Blend() with alpha=0 and SrcOver converts to Dst, which is a no-op and returns nullptr.
   // Screen with transparent color: src=(0,0,0,0), dst=(0,0,0,0) → 0, not affected.
-  EXPECT_TRUE(transparentFilter == nullptr || !transparentFilter->affectsTransparentBlack());
+  EXPECT_TRUE(transparentFilter == nullptr ||
+              !transparentFilter->affectsTransparentBlack());
 
   // MatrixColorFilter: no alpha offset → false
   std::array<float, 20> identityMatrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-                                          0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
+                                           0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
   EXPECT_FALSE(ColorFilter::Matrix(identityMatrix)->affectsTransparentBlack());
 
   // MatrixColorFilter: positive alpha offset → true
   std::array<float, 20> alphaOffsetMatrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-                                             0, 0, 1, 0, 0, 0, 0, 0, 1, 0.5f};
+                                              0, 0, 1, 0, 0, 0, 0, 0, 1, 0.5f};
   EXPECT_TRUE(ColorFilter::Matrix(alphaOffsetMatrix)->affectsTransparentBlack());
 
   // MatrixColorFilter: RGB offset only (no alpha offset) → false (premultiply makes rgb 0)
   std::array<float, 20> rgbOffsetMatrix = {1, 0, 0, 0, 0.5f, 0, 1, 0, 0, 0,
-                                           0, 0, 1, 0, 0,    0, 0, 0, 1, 0};
+                                            0, 0, 1, 0, 0,    0, 0, 0, 1, 0};
   EXPECT_FALSE(ColorFilter::Matrix(rgbOffsetMatrix)->affectsTransparentBlack());
 
   // AlphaThresholdColorFilter
@@ -1014,7 +1015,8 @@ TGFX_TEST(FilterTest, ColorImageFilterTransparent) {
 
   // Apply Screen(Red) as ImageFilter::ColorFilter - affects transparent black.
   // Transparent regions should remain transparent.
-  auto screenFilter = ImageFilter::ColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Screen));
+  auto screenFilter =
+      ImageFilter::ColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Screen));
   auto filteredImage = image->makeWithFilter(screenFilter);
   ASSERT_TRUE(filteredImage != nullptr);
   canvas->drawImage(filteredImage, 50, 50);
@@ -1052,7 +1054,8 @@ TGFX_TEST(FilterTest, ColorFilterShaderTransparent) {
   paint.setShader(coloredShader);
   canvas->translate(50, 50);
   canvas->drawRect(
-      Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())), paint);
+      Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())),
+      paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ColorFilterShaderTransparent"));
 }
 
@@ -1076,7 +1079,8 @@ TGFX_TEST(FilterTest, BrushColorFilterTransparent) {
   paint.setColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Screen));
   canvas->translate(50, 50);
   canvas->drawRect(
-      Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())), paint);
+      Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())),
+      paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/BrushColorFilterTransparent"));
 }
 

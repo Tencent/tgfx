@@ -20,14 +20,14 @@
 
 #include <Metal/Metal.h>
 #include "tgfx/gpu/Attribute.h"
+#include "tgfx/gpu/RenderPass.h"
+#include "tgfx/gpu/CompareFunction.h"
+#include "tgfx/gpu/StencilOperation.h"
 #include "tgfx/gpu/BlendFactor.h"
 #include "tgfx/gpu/BlendOperation.h"
-#include "tgfx/gpu/CompareFunction.h"
+#include "tgfx/gpu/Sampler.h"
 #include "tgfx/gpu/FilterMode.h"
 #include "tgfx/gpu/MipmapMode.h"
-#include "tgfx/gpu/RenderPass.h"
-#include "tgfx/gpu/Sampler.h"
-#include "tgfx/gpu/StencilOperation.h"
 
 namespace tgfx {
 
@@ -95,6 +95,7 @@ class MetalDefines {
    * Get the bytes per pixel for a Metal pixel format.
    */
   static size_t GetBytesPerPixel(MTLPixelFormat format);
+
 
   /**
    * Convert TGFX load action to Metal load action.
