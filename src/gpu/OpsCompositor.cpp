@@ -247,7 +247,7 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
     gpColor = ToPMColor(brush.color, dstColorSpace);
   }
 
-  auto meshProxy = proxyProvider()->createGPUMeshProxy(mesh, renderFlags);
+  auto meshProxy = proxyProvider()->createGPUMeshProxy(mesh, renderFlags, dstColorSpace);
   auto drawOp = MeshDrawOp::Make(std::move(meshProxy), gpColor, state.matrix);
   if (drawOp == nullptr) {
     return;

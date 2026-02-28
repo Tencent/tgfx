@@ -33,13 +33,15 @@ class VertexMeshImpl;
 class VertexMeshBufferUploadTask : public ResourceTask {
  public:
   VertexMeshBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
-                             std::shared_ptr<GPUMeshProxy> meshProxy);
+                             std::shared_ptr<GPUMeshProxy> meshProxy,
+                             std::shared_ptr<ColorSpace> dstColorSpace);
 
  protected:
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
   std::shared_ptr<GPUMeshProxy> meshProxy = nullptr;
+  std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
 };
 
 /**

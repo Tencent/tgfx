@@ -84,8 +84,9 @@ class ProxyProvider {
    * Creates a GPUMeshProxy for the given Mesh. The vertex and index buffers will be uploaded
    * asynchronously.
    */
-  std::shared_ptr<GPUMeshProxy> createGPUMeshProxy(std::shared_ptr<Mesh> mesh,
-                                                   uint32_t renderFlags = 0);
+  std::shared_ptr<GPUMeshProxy> createGPUMeshProxy(
+      std::shared_ptr<Mesh> mesh, uint32_t renderFlags = 0,
+      std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
 
   /*
    * Creates a TextureProxy for the given ImageBuffer. The image buffer will be released after being

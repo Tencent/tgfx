@@ -17,17 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeshBufferUploadTask.h"
+#include "core/ColorSpaceXformSteps.h"
 #include "core/ShapeMeshImpl.h"
 #include "core/VertexMeshImpl.h"
 #include "core/utils/ColorHelper.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "gpu/resources/BufferResource.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 
 VertexMeshBufferUploadTask::VertexMeshBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
-                                                       std::shared_ptr<GPUMeshProxy> meshProxy)
-    : ResourceTask(std::move(proxy)), meshProxy(std::move(meshProxy)) {
+                                                       std::shared_ptr<GPUMeshProxy> meshProxy,
+                                                       std::shared_ptr<ColorSpace> dstColorSpace)
+    : ResourceTask(std::move(proxy)), meshProxy(std::move(meshProxy)),
+      dstColorSpace(std::move(dstColorSpace)) {
 }
 
 std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* context) {
@@ -42,6 +46,14 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
   }
 
   size_t vertexDataSize = impl.getVertexStride() * static_cast<size_t>(impl.vertexCount());
+
+  // Create color space transform steps if needed
+  std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+  if (impl.hasColors() && NeedConvertColorSpace(ColorSpace::SRGB(), dstColorSpace)) {
+    steps =
+        std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                               dstColorSpace.get(), AlphaType::Premultiplied);
+  }
 
   // Allocate temporary buffer and write interleaved vertex data
   auto buffer = std::make_unique<uint8_t[]>(vertexDataSize);
@@ -59,7 +71,7 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
 
     // Color (UByte4Normalized, optional)
     if (impl.hasColors()) {
-      *reinterpret_cast<uint32_t*>(ptr) = ToUintPMColor(impl.colors()[i], nullptr);
+      *reinterpret_cast<uint32_t*>(ptr) = ToUintPMColor(impl.colors()[i], steps.get());
       ptr += sizeof(uint32_t);
     }
   }

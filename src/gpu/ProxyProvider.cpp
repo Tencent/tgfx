@@ -224,8 +224,8 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
   return std::make_shared<GPUShapeProxy>(drawingMatrix, triangleProxy, textureProxy);
 }
 
-std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(std::shared_ptr<Mesh> mesh,
-                                                                uint32_t renderFlags) {
+std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(
+    std::shared_ptr<Mesh> mesh, uint32_t renderFlags, std::shared_ptr<ColorSpace> dstColorSpace) {
   if (mesh == nullptr) {
     return nullptr;
   }
@@ -253,8 +253,8 @@ std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(std::shared_ptr<
 
     if (isVertexMesh) {
       // VertexMesh: upload user-provided vertex data
-      auto task = context->drawingAllocator()->make<VertexMeshBufferUploadTask>(vertexBufferProxy,
-                                                                                meshProxy);
+      auto task = context->drawingAllocator()->make<VertexMeshBufferUploadTask>(
+          vertexBufferProxy, meshProxy, std::move(dstColorSpace));
       context->drawingManager()->addResourceTask(std::move(task));
     } else {
       // ShapeMesh: triangulate shape and upload
