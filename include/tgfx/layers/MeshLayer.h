@@ -26,6 +26,10 @@ namespace tgfx {
 /**
  * MeshLayer is a layer that draws a mesh with vertex colors or textures. Unlike ShapeLayer,
  * MeshLayer does not support stroke styles since meshes are rendered as filled triangles.
+ *
+ * Note: Hit testing for MeshLayer uses bounding box only, not precise triangle intersection.
+ * This may produce false positives for concave or sparse meshes where a point lies inside the
+ * bounding box but outside all triangles.
  */
 class MeshLayer : public Layer {
  public:
