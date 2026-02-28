@@ -25,14 +25,14 @@ UniqueKey MeshBase::getUniqueKey() const {
   return UniqueKey::Append(MeshDomain, &_uniqueID, 1);
 }
 
-void MeshBase::bindGpuBufferKey(uint32_t contextID, const UniqueKey& bufferKey) {
+void MeshBase::retainGpuBuffer(uint32_t contextID, const UniqueKey& bufferKey) {
   std::lock_guard<std::mutex> lock(bufferKeysMutex);
-  boundBufferKeys[contextID] = bufferKey;
+  retainedBufferKeys[contextID] = bufferKey;
 }
 
 UniqueKey MeshBase::getBufferKey(uint32_t contextID) const {
   std::lock_guard<std::mutex> lock(bufferKeysMutex);
-  auto it = boundBufferKeys.find(contextID);
+  auto it = retainedBufferKeys.find(contextID);
   if (it != boundBufferKeys.end()) {
     return it->second;
   }

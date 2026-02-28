@@ -95,9 +95,6 @@ class Mesh {
    * Returns the bounding box of the mesh positions.
    */
   virtual Rect bounds() const = 0;
-
- protected:
-  Mesh() = default;
 };
 
 }  // namespace tgfx

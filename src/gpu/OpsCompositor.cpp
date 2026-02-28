@@ -211,7 +211,7 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
   DEBUG_ASSERT(mesh != nullptr);
   flushPendingOps();
 
-  auto* meshBase = static_cast<MeshBase*>(mesh.get());
+  auto meshBase = static_cast<MeshBase*>(mesh.get());
 
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
@@ -236,8 +236,8 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
   // Determine if mesh has vertex colors (only VertexMesh can have these)
   bool hasColors = false;
   if (meshBase->type() == MeshBase::Type::Vertex) {
-    auto& vertexMesh = static_cast<VertexMesh&>(*meshBase);
-    hasColors = vertexMesh.hasColors();
+    auto vertexMesh = static_cast<VertexMesh*>(meshBase);
+    hasColors = vertexMesh->hasColors();
   }
 
   // Determine final color based on blending rules (see Canvas.h drawMesh documentation):

@@ -230,7 +230,7 @@ std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(
     return nullptr;
   }
 
-  auto* meshBase = static_cast<MeshBase*>(mesh.get());
+  auto meshBase = static_cast<MeshBase*>(mesh.get());
   auto baseKey = meshBase->getUniqueKey();
   const bool disableCache = (renderFlags & RenderFlags::DisableCache) != 0;
   const bool isVertexMesh = meshBase->type() == MeshBase::Type::Vertex;
@@ -258,9 +258,9 @@ std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(
       context->drawingManager()->addResourceTask(std::move(task));
     } else {
       // ShapeMesh: triangulate shape and upload
-      auto& shapeMesh = static_cast<ShapeMesh&>(*meshBase);
+      auto shapeMesh = static_cast<ShapeMesh*>(meshBase);
       auto vertexSource =
-          std::make_unique<ShapeVertexSource>(shapeMesh.shape(), shapeMesh.isAntiAlias());
+          std::make_unique<ShapeVertexSource>(shapeMesh->shape(), shapeMesh->isAntiAlias());
       std::unique_ptr<DataSource<Data>> dataSource = nullptr;
 #ifdef TGFX_USE_THREADS
       const bool disableAsync = (renderFlags & RenderFlags::DisableAsyncTask) != 0;

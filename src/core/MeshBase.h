@@ -52,7 +52,7 @@ class MeshBase : public Mesh {
 
   UniqueKey getUniqueKey() const;
 
-  void bindGpuBufferKey(uint32_t contextID, const UniqueKey& bufferKey);
+  void retainGpuBuffer(uint32_t contextID, const UniqueKey& bufferKey);
 
   UniqueKey getBufferKey(uint32_t contextID) const;
 
@@ -61,7 +61,7 @@ class MeshBase : public Mesh {
   uint32_t _uniqueID = 0;
 
   mutable std::mutex bufferKeysMutex;
-  mutable std::unordered_map<uint32_t, UniqueKey> boundBufferKeys;
+  mutable std::unordered_map<uint32_t, UniqueKey> retainedBufferKeys;
 };
 
 }  // namespace tgfx
