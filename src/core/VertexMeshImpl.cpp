@@ -43,7 +43,8 @@ std::shared_ptr<Mesh> VertexMeshImpl::Make(MeshTopology topology, int vertexCoun
   if (vertexCount <= 0 || positions == nullptr) {
     return nullptr;
   }
-  if (indexCount < 0 || (indexCount > 0 && indices == nullptr)) {
+  // Indices are 16-bit, so vertexCount must not exceed 65536 when using indices.
+  if (indexCount < 0 || (indexCount > 0 && (indices == nullptr || vertexCount > 65536))) {
     return nullptr;
   }
 
