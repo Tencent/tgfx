@@ -27,6 +27,34 @@ Window {
         currentZoom = newZoom
     }
 
+    function setZoomToCenter(targetZoom) {
+        var centerX = width / 2 * devicePixelRatio
+        var centerY = height / 2 * devicePixelRatio
+        var newOffsetX = (currentOffset.x - centerX) * (targetZoom / currentZoom) + centerX
+        var newOffsetY = (currentOffset.y - centerY) * (targetZoom / currentZoom) + centerY
+        currentOffset = Qt.point(newOffsetX, newOffsetY)
+        currentZoom = targetZoom
+        tgfxView.updateTransform(currentZoom, currentOffset)
+        console.log("Zoom set to " + targetZoom + " centered at screen center, offset: (" + newOffsetX + ", " + newOffsetY + ")")
+    }
+
+    Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_T) {
+            setZoomToCenter(1.73)
+            event.accepted = true
+        } else if (event.key === Qt.Key_R) {
+            currentZoom = 1.0
+            currentOffset = Qt.point(0, 0)
+            tgfxView.updateTransform(currentZoom, currentOffset)
+            console.log("Zoom reset to 1.0")
+            event.accepted = true
+        }
+    }
+
+    Component.onCompleted: {
+        mainWindow.requestActivate()
+    }
+
     PinchArea {
         id: pinchArea
         anchors.fill: parent
