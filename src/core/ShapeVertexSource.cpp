@@ -36,13 +36,15 @@ std::shared_ptr<Data> ShapeVertexSource::getData() const {
   }
 
   std::vector<float> vertices;
-  auto bounds = path.getBounds();
+  // Use path bounds as clip bounds to include the entire path without clipping.
+  // Unlike ShapeRasterizer which clips to render target size, Mesh triangulation needs all vertices.
+  auto clipBounds = path.getBounds();
   size_t triangleCount = 0;
 
   if (antiAlias) {
-    triangleCount = PathTriangulator::ToAATriangles(path, bounds, &vertices);
+    triangleCount = PathTriangulator::ToAATriangles(path, clipBounds, &vertices);
   } else {
-    triangleCount = PathTriangulator::ToTriangles(path, bounds, &vertices);
+    triangleCount = PathTriangulator::ToTriangles(path, clipBounds, &vertices);
   }
 
   if (triangleCount == 0) {
