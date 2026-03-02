@@ -51,10 +51,8 @@ class MeshBase : public Mesh {
   }
 
  protected:
-  MeshBase();
-
   Rect _bounds = {};
-  UniqueKey uniqueKey = {};
+  UniqueKey uniqueKey = UniqueKey::Make();
 };
 
 }  // namespace tgfx
