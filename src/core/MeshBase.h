@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/resources/ResourceKey.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Mesh.h"
 
 namespace tgfx {
@@ -44,6 +45,10 @@ class MeshBase : public Mesh {
 
   virtual bool hitTestPoint(float x, float y) const {
     return _bounds.contains(x, y);
+  }
+
+  virtual Rect getTightBounds(const Matrix& matrix) const {
+    return matrix.mapRect(_bounds);
   }
 
   /**

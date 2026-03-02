@@ -42,6 +42,8 @@ class ShapeMesh : public MeshBase {
 
   bool hitTestPoint(float x, float y) const override;
 
+  Rect getTightBounds(const Matrix& matrix) const override;
+
   std::shared_ptr<Shape> shape() const {
     return _shape;
   }

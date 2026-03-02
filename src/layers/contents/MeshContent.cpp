@@ -30,7 +30,7 @@ Rect MeshContent::onGetBounds() const {
 }
 
 Rect MeshContent::getTightBounds(const Matrix& matrix) const {
-  return matrix.mapRect(mesh->bounds());
+  return std::static_pointer_cast<MeshBase>(mesh)->getTightBounds(matrix);
 }
 
 bool MeshContent::hitTestPoint(float localX, float localY) const {

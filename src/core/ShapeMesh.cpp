@@ -39,4 +39,10 @@ bool ShapeMesh::hitTestPoint(float x, float y) const {
   return _shape->getPath().contains(x, y);
 }
 
+Rect ShapeMesh::getTightBounds(const Matrix& matrix) const {
+  auto path = _shape->getPath();
+  path.transform(matrix);
+  return path.getBounds();
+}
+
 }  // namespace tgfx
