@@ -77,8 +77,9 @@ std::shared_ptr<GPUBuffer> GPUMeshProxy::getIndexBuffer() const {
 }
 
 int GPUMeshProxy::getVertexCount() const {
+  auto meshBase = static_cast<MeshBase*>(_mesh.get());
   // For VertexMesh, use stored vertex count
-  if (_attributes.vertexCount > 0) {
+  if (meshBase != nullptr && meshBase->type() == MeshBase::Type::Vertex) {
     return _attributes.vertexCount;
   }
 
