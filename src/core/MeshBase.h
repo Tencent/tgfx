@@ -42,6 +42,10 @@ class MeshBase : public Mesh {
 
   virtual bool hasCoverage() const = 0;
 
+  virtual bool hitTestPoint(float x, float y) const {
+    return _bounds.contains(x, y);
+  }
+
   /**
    * Returns the unique key for this mesh. All GPU buffers derived from this mesh share the same
    * UniqueKey domain, so holding this key protects all related buffers from LRU eviction.

@@ -32,4 +32,11 @@ ShapeMesh::ShapeMesh(std::shared_ptr<Shape> shape, bool antiAlias)
   _bounds = _shape->getBounds();
 }
 
+bool ShapeMesh::hitTestPoint(float x, float y) const {
+  if (!_bounds.contains(x, y)) {
+    return false;
+  }
+  return _shape->getPath().contains(x, y);
+}
+
 }  // namespace tgfx

@@ -18,7 +18,6 @@
 
 #include "MeshContent.h"
 #include "core/MeshBase.h"
-#include "core/ShapeMesh.h"
 
 namespace tgfx {
 
@@ -35,17 +34,7 @@ Rect MeshContent::getTightBounds(const Matrix& matrix) const {
 }
 
 bool MeshContent::hitTestPoint(float localX, float localY) const {
-  if (!mesh->bounds().contains(localX, localY)) {
-    return false;
-  }
-  // For ShapeMesh, use Path for precise hit testing
-  auto meshBase = static_cast<MeshBase*>(mesh.get());
-  if (meshBase->type() == MeshBase::Type::Shape) {
-    auto shapeMesh = static_cast<ShapeMesh*>(meshBase);
-    return shapeMesh->shape()->getPath().contains(localX, localY);
-  }
-  // VertexMesh: bounds check is sufficient (no Path information available)
-  return true;
+  return std::static_pointer_cast<MeshBase>(mesh)->hitTestPoint(localX, localY);
 }
 
 void MeshContent::onDraw(Canvas* canvas, const Paint& paint) const {

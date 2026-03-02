@@ -40,6 +40,8 @@ class ShapeMesh : public MeshBase {
     return antiAlias;
   }
 
+  bool hitTestPoint(float x, float y) const override;
+
   std::shared_ptr<Shape> shape() const {
     return _shape;
   }
