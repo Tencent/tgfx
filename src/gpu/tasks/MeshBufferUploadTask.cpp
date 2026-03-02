@@ -40,10 +40,8 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
     return nullptr;
   }
   auto vertexMesh = static_cast<VertexMesh*>(meshBase);
-
-  if (vertexMesh->positions() == nullptr) {
-    return nullptr;
-  }
+  // VertexMesh::Make() guarantees positions != nullptr
+  DEBUG_ASSERT(vertexMesh->positions() != nullptr);
 
   size_t vertexDataSize =
       vertexMesh->getVertexStride() * static_cast<size_t>(vertexMesh->vertexCount());
@@ -107,10 +105,8 @@ std::shared_ptr<Resource> MeshIndexBufferUploadTask::onMakeResource(Context* con
     return nullptr;
   }
   auto vertexMesh = static_cast<VertexMesh*>(meshBase);
-
-  if (!vertexMesh->hasIndices()) {
-    return nullptr;
-  }
+  // Caller (ProxyProvider::createGPUMeshProxy) only creates this task when hasIndices == true
+  DEBUG_ASSERT(vertexMesh->hasIndices());
 
   size_t indexDataSize = sizeof(uint16_t) * static_cast<size_t>(vertexMesh->indexCount());
   auto gpu = context->gpu();
