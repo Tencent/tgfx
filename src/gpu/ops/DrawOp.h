@@ -31,6 +31,7 @@ class DrawOp {
     ShapeDrawOp,
     AtlasTextOp,
     Quads3DDrawOp,
+    MeshDrawOp,
     HairlineLineOp,
     HairlineQuadOp,
   };
