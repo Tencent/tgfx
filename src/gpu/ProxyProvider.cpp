@@ -252,7 +252,7 @@ std::shared_ptr<GPUHairlineProxy> ProxyProvider::createGPUHairlineProxy(
   auto rasterizer = std::make_unique<HairlineTriangulator>(shape, hasCap);
   std::unique_ptr<DataSource<HairlineBuffer>> dataSource = nullptr;
 #ifdef TGFX_USE_THREADS
-  if (!(renderFlags & RenderFlags::DisableAsyncTask)) {
+  if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
     dataSource = DataSource<HairlineBuffer>::Async(std::move(rasterizer));
   } else {
     dataSource = std::move(rasterizer);

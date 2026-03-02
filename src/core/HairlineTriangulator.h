@@ -36,6 +36,12 @@ class HairlineTriangulator : public DataSource<HairlineBuffer> {
  public:
   HairlineTriangulator(std::shared_ptr<Shape> shape, bool hasCap);
 
+  /**
+   * Returns true if the HairlineTriangulator benefits from asynchronous execution. For simple paths
+   * with few verbs, synchronous execution is faster due to thread scheduling overhead.
+   */
+  bool asyncSupport() const;
+
   std::shared_ptr<HairlineBuffer> getData() const override;
 
  private:

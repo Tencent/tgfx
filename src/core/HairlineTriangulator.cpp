@@ -19,8 +19,10 @@
 #include "HairlineTriangulator.h"
 #include <cstddef>
 #include "core/NoConicsPathIterator.h"
+#include "core/shapes/MatrixShape.h"
 #include "core/utils/PathUtils.h"
 #include "core/utils/PointUtils.h"
+#include "core/utils/ShapeUtils.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Point.h"
@@ -502,6 +504,20 @@ void AddQuad(const Point points[3], int subdiv, BezierVertex** vert) {
 
 HairlineTriangulator::HairlineTriangulator(std::shared_ptr<Shape> shape, bool hasCap)
     : shape(std::move(shape)), hasCap(hasCap) {
+}
+
+bool HairlineTriangulator::asyncSupport() const {
+  // For simple paths with few verbs, synchronous execution is faster than async due to thread
+  // scheduling overhead. Only use async for complex paths or non-simple shapes.
+  static constexpr int AsyncVerbThreshold = 32;
+  if (shape->isSimplePath()) {
+    return shape->getPath().countVerbs() > AsyncVerbThreshold;
+  }
+  auto matrixShape = ShapeUtils::AsMatrixShape(shape.get());
+  if (matrixShape != nullptr && matrixShape->shape->isSimplePath()) {
+    return matrixShape->shape->getPath().countVerbs() > AsyncVerbThreshold;
+  }
+  return true;
 }
 
 std::shared_ptr<HairlineBuffer> HairlineTriangulator::getData() const {
