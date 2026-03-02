@@ -2,7 +2,7 @@
 cd $(dirname $0)
 
 if [[ $(uname) == 'Darwin' ]]; then
-  MAC_REQUIRED_TOOLS="python3"
+  MAC_REQUIRED_TOOLS="python3 pipx"
   for TOOL in ${MAC_REQUIRED_TOOLS[@]}; do
     if [ ! $(which $TOOL) ]; then
       if [ ! $(which brew) ]; then
@@ -14,13 +14,14 @@ if [[ $(uname) == 'Darwin' ]]; then
       brew install $TOOL || exit 1
     fi
   done
+  export PATH=${HOME}/.local/bin:/opt/homebrew/bin:$PATH
   clangformat=`clang-format --version`
   if [[ $clangformat =~ "14." ]]
   then
       echo "----$clangformat----"
   else
       echo "----install clang-format----"
-      pip3 install --break-system-packages clang-format==14
+      pipx install clang-format==14
   fi
 fi
 
