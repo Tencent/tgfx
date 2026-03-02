@@ -21,12 +21,13 @@
 
 namespace tgfx {
 
-static UniqueKey MakeMeshUniqueKey(uint32_t meshID) {
+static UniqueKey MakeMeshUniqueKey() {
   static const auto MeshDomain = UniqueKey::Make();
+  auto meshID = UniqueID::Next();
   return UniqueKey::Append(MeshDomain, &meshID, 1);
 }
 
-MeshBase::MeshBase() : _uniqueID(UniqueID::Next()), uniqueKey(MakeMeshUniqueKey(_uniqueID)) {
+MeshBase::MeshBase() : uniqueKey(MakeMeshUniqueKey()) {
 }
 
 }  // namespace tgfx

@@ -95,11 +95,6 @@ class Mesh {
   static std::shared_ptr<Mesh> MakeFromShape(std::shared_ptr<Shape> shape, bool antiAlias = true);
 
   /**
-   * Returns a globally unique identifier for this mesh instance.
-   */
-  virtual uint32_t uniqueID() const = 0;
-
-  /**
    * Returns the bounding box of the mesh positions.
    */
   virtual Rect bounds() const = 0;

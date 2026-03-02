@@ -34,10 +34,6 @@ class MeshBase : public Mesh {
     Shape,   // Constructed from Path/Shape
   };
 
-  uint32_t uniqueID() const override {
-    return _uniqueID;
-  }
-
   Rect bounds() const override {
     return _bounds;
   }
@@ -58,7 +54,6 @@ class MeshBase : public Mesh {
   MeshBase();
 
   Rect _bounds = {};
-  uint32_t _uniqueID = 0;
   UniqueKey uniqueKey = {};
 };
 
