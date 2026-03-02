@@ -54,10 +54,10 @@ class MeshLayer : public Layer {
   /**
    * Returns the list of fill styles used to fill the mesh. Each style contains a shader, alpha,
    * and blend mode. The fill styles are drawn in the order they are added. If the fill styles list
-   * is empty, the mesh is rendered using vertex colors if present (VertexMesh only); otherwise, it
-   * will be rendered in white (always the case for ShapeMesh since it has no vertex colors). By
-   * default, the fill styles list is empty. Note: If the mesh has vertex colors, they take priority
-   * over the fill style colors. The fill style shader (if any) will be modulated with vertex colors.
+   * is empty, the mesh is rendered using vertex colors if present; otherwise, it will be rendered
+   * in white. Note: Meshes created from a Path or Shape have no vertex colors. If the mesh has
+   * vertex colors, they take priority over the fill style colors. The fill style shader (if any)
+   * will be modulated with vertex colors. By default, the fill styles list is empty.
    */
   const std::vector<std::shared_ptr<ShapeStyle>>& fillStyles() const {
     return _fillStyles;
