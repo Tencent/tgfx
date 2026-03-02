@@ -87,8 +87,7 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
 
   // Retain buffer key to mesh for LRU eviction protection
   if (resource != nullptr) {
-    auto bufferKey = meshBase->getUniqueKey();
-    meshBase->retainGpuBuffer(context->uniqueID(), bufferKey);
+    meshBase->retainGpuBuffer(meshBase->getUniqueKey());
   }
 
   return resource;
@@ -155,8 +154,7 @@ std::shared_ptr<Resource> ShapeMeshBufferUploadTask::onMakeResource(Context* con
   if (resource != nullptr) {
     auto meshBase = static_cast<MeshBase*>(meshProxy->mesh().get());
     if (meshBase != nullptr) {
-      auto bufferKey = meshBase->getUniqueKey();
-      meshBase->retainGpuBuffer(context->uniqueID(), bufferKey);
+      meshBase->retainGpuBuffer(meshBase->getUniqueKey());
     }
   }
 

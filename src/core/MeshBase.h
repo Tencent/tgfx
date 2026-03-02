@@ -18,14 +18,10 @@
 
 #pragma once
 
-#include <mutex>
-#include <unordered_map>
 #include "gpu/resources/ResourceKey.h"
 #include "tgfx/core/Mesh.h"
 
 namespace tgfx {
-
-class Context;
 
 /**
  * Internal base class for Mesh implementations.
@@ -52,14 +48,16 @@ class MeshBase : public Mesh {
 
   UniqueKey getUniqueKey() const;
 
-  void retainGpuBuffer(uint32_t contextID, const UniqueKey& bufferKey);
+  /**
+   * Retains the GPU buffer key to prevent LRU eviction. All GPU buffers derived from this mesh
+   * share the same UniqueKey domain, so retaining the base key protects all related buffers.
+   */
+  void retainGpuBuffer(const UniqueKey& bufferKey);
 
  protected:
   Rect _bounds = {};
   uint32_t _uniqueID = 0;
-
-  std::mutex bufferKeysMutex = {};
-  std::unordered_map<uint32_t, UniqueKey> retainedBufferKeys = {};
+  UniqueKey retainedBufferKey = {};
 };
 
 }  // namespace tgfx

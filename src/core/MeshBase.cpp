@@ -25,9 +25,8 @@ UniqueKey MeshBase::getUniqueKey() const {
   return UniqueKey::Append(MeshDomain, &_uniqueID, 1);
 }
 
-void MeshBase::retainGpuBuffer(uint32_t contextID, const UniqueKey& bufferKey) {
-  std::lock_guard<std::mutex> lock(bufferKeysMutex);
-  retainedBufferKeys[contextID] = bufferKey;
+void MeshBase::retainGpuBuffer(const UniqueKey& bufferKey) {
+  retainedBufferKey = bufferKey;
 }
 
 }  // namespace tgfx
