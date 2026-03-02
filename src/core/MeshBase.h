@@ -52,8 +52,7 @@ class MeshBase : public Mesh {
   }
 
   /**
-   * Returns the unique key for this mesh. All GPU buffers derived from this mesh share the same
-   * UniqueKey domain, so holding this key protects all related buffers from LRU eviction.
+   * Returns the unique key that identifies this mesh's GPU resources in the cache.
    */
   const UniqueKey& getUniqueKey() const {
     return uniqueKey;
