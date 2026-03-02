@@ -35,6 +35,7 @@ enum class PictureRecordType {
   DrawRRect,
   DrawPath,
   DrawShape,
+  DrawMesh,
   DrawImage,
   DrawImageRect,
   DrawImageRectToRect,
@@ -258,6 +259,22 @@ class DrawShape : public PictureRecord {
   }
 
   std::shared_ptr<Shape> shape = nullptr;
+};
+
+class DrawMesh : public PictureRecord {
+ public:
+  explicit DrawMesh(std::shared_ptr<Mesh> mesh) : mesh(std::move(mesh)) {
+  }
+
+  PictureRecordType type() const override {
+    return PictureRecordType::DrawMesh;
+  }
+
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawMesh(mesh, playback->state(), playback->brush());
+  }
+
+  std::shared_ptr<Mesh> mesh = nullptr;
 };
 
 class DrawImage : public PictureRecord {
