@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeMesh.h"
-#include "core/utils/UniqueID.h"
 
 namespace tgfx {
 
@@ -30,7 +29,6 @@ std::shared_ptr<Mesh> ShapeMesh::Make(std::shared_ptr<Shape> shape, bool antiAli
 
 ShapeMesh::ShapeMesh(std::shared_ptr<Shape> shape, bool antiAlias)
     : _shape(std::move(shape)), antiAlias(antiAlias) {
-  _uniqueID = UniqueID::Next();
   _bounds = _shape->getBounds();
 }
 

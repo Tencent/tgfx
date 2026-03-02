@@ -18,7 +18,6 @@
 
 #include "MeshBufferUploadTask.h"
 #include "core/ColorSpaceXformSteps.h"
-#include "core/MeshBase.h"
 #include "core/VertexMesh.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -83,14 +82,7 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
 
   gpu->queue()->writeBuffer(gpuBuffer, 0, buffer.get(), vertexDataSize);
 
-  auto resource = BufferResource::Wrap(context, std::move(gpuBuffer));
-
-  // Retain buffer key to mesh for LRU eviction protection
-  if (resource != nullptr) {
-    meshBase->retainGpuBuffer(meshBase->getUniqueKey());
-  }
-
-  return resource;
+  return BufferResource::Wrap(context, std::move(gpuBuffer));
 }
 
 MeshIndexBufferUploadTask::MeshIndexBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
@@ -148,17 +140,7 @@ std::shared_ptr<Resource> ShapeMeshBufferUploadTask::onMakeResource(Context* con
   // Release data source to free memory (triangulation result)
   dataSource = nullptr;
 
-  auto resource = BufferResource::Wrap(context, std::move(gpuBuffer));
-
-  // Retain buffer key to mesh for LRU eviction protection
-  if (resource != nullptr) {
-    auto meshBase = static_cast<MeshBase*>(meshProxy->mesh().get());
-    if (meshBase != nullptr) {
-      meshBase->retainGpuBuffer(meshBase->getUniqueKey());
-    }
-  }
-
-  return resource;
+  return BufferResource::Wrap(context, std::move(gpuBuffer));
 }
 
 }  // namespace tgfx

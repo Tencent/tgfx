@@ -46,18 +46,20 @@ class MeshBase : public Mesh {
 
   virtual bool hasCoverage() const = 0;
 
-  UniqueKey getUniqueKey() const;
-
   /**
-   * Retains the GPU buffer key to prevent LRU eviction. All GPU buffers derived from this mesh
-   * share the same UniqueKey domain, so retaining the base key protects all related buffers.
+   * Returns the unique key for this mesh. All GPU buffers derived from this mesh share the same
+   * UniqueKey domain, so holding this key protects all related buffers from LRU eviction.
    */
-  void retainGpuBuffer(const UniqueKey& bufferKey);
+  const UniqueKey& getUniqueKey() const {
+    return uniqueKey;
+  }
 
  protected:
+  MeshBase();
+
   Rect _bounds = {};
   uint32_t _uniqueID = 0;
-  UniqueKey retainedBufferKey = {};
+  UniqueKey uniqueKey = {};
 };
 
 }  // namespace tgfx

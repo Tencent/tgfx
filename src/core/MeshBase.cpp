@@ -17,16 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeshBase.h"
+#include "core/utils/UniqueID.h"
 
 namespace tgfx {
 
-UniqueKey MeshBase::getUniqueKey() const {
+static UniqueKey MakeMeshUniqueKey(uint32_t meshID) {
   static const auto MeshDomain = UniqueKey::Make();
-  return UniqueKey::Append(MeshDomain, &_uniqueID, 1);
+  return UniqueKey::Append(MeshDomain, &meshID, 1);
 }
 
-void MeshBase::retainGpuBuffer(const UniqueKey& bufferKey) {
-  retainedBufferKey = bufferKey;
+MeshBase::MeshBase() : _uniqueID(UniqueID::Next()), uniqueKey(MakeMeshUniqueKey(_uniqueID)) {
 }
 
 }  // namespace tgfx

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VertexMesh.h"
-#include "core/utils/UniqueID.h"
 
 namespace tgfx {
 
@@ -90,7 +89,6 @@ std::shared_ptr<Mesh> VertexMesh::Make(MeshTopology topology, int vertexCount,
 
 VertexMesh::VertexMesh(MeshTopology topology, int vertexCount, int indexCount)
     : _topology(topology), _vertexCount(vertexCount), _indexCount(indexCount) {
-  _uniqueID = UniqueID::Next();
 }
 
 VertexMesh::~VertexMesh() {
