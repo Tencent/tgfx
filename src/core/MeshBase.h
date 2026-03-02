@@ -54,14 +54,12 @@ class MeshBase : public Mesh {
 
   void retainGpuBuffer(uint32_t contextID, const UniqueKey& bufferKey);
 
-  UniqueKey getBufferKey(uint32_t contextID) const;
-
  protected:
   Rect _bounds = {};
   uint32_t _uniqueID = 0;
 
-  mutable std::mutex bufferKeysMutex;
-  mutable std::unordered_map<uint32_t, UniqueKey> retainedBufferKeys;
+  std::mutex bufferKeysMutex = {};
+  std::unordered_map<uint32_t, UniqueKey> retainedBufferKeys = {};
 };
 
 }  // namespace tgfx
