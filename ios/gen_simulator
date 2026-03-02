@@ -8,8 +8,40 @@ process.argv.push("../");
 process.argv.push("-w");
 process.argv.push("-DTGFX_BUILD_HELLO2D=ON")
 let args = process.argv.slice(2);
+const useMetal = args.some(arg => arg === "-DTGFX_USE_METAL=ON");
+// shaderc's glslang dependency uses std::filesystem which requires iOS 14.0+.
+if (useMetal && !args.some(arg => arg.startsWith("-DDEPLOYMENT_TARGET="))) {
+    process.argv.push("-DDEPLOYMENT_TARGET=14.0");
+}
 if (args.indexOf("-p") === -1 && args.indexOf("--platform") === -1) {
     process.argv.push("-p");
     process.argv.push("simulator");
 }
 require("../third_party/vendor_tools/xcode-gen");
+
+const fs = require("fs");
+const path = require("path");
+const pbxprojPath = path.join(__dirname, "Hello2D.xcodeproj/project.pbxproj");
+let pbxproj = fs.readFileSync(pbxprojPath, "utf8");
+pbxproj = pbxproj.replace(/\s*TGFX_USE_METAL,?\n?/g, "");
+pbxproj = pbxproj.replace(/\s*TGFX_USE_METAL;?\n?/g, "");
+if (useMetal) {
+    pbxproj = pbxproj.replace(
+        /GCC_PREPROCESSOR_DEFINITIONS = \(\s*\n([\s\S]*?GLES_SILENCE_DEPRECATION[\s\S]*?)\);/g,
+        function (match, inner) {
+            let trimmed = inner.trimEnd();
+            if (!trimmed.endsWith(",")) {
+                trimmed += ",";
+            }
+            return "GCC_PREPROCESSOR_DEFINITIONS = (\n" + trimmed + "\n\t\t\t\t\tTGFX_USE_METAL,\n\t\t\t\t);";
+        }
+    );
+    pbxproj = pbxproj.replace(
+        /GCC_PREPROCESSOR_DEFINITIONS = "(GLES_SILENCE_DEPRECATION=1)";/g,
+        "GCC_PREPROCESSOR_DEFINITIONS = (\n\t\t\t\t\t\"$1\",\n\t\t\t\t\tTGFX_USE_METAL,\n\t\t\t\t);"
+    );
+    // std::filesystem requires iOS 14.0+, needed by shaderc's glslang dependency.
+    pbxproj = pbxproj.replace(/IPHONEOS_DEPLOYMENT_TARGET = 13\.0;/g,
+                              "IPHONEOS_DEPLOYMENT_TARGET = 14.0;");
+}
+fs.writeFileSync(pbxprojPath, pbxproj);

@@ -17,27 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/metal/MetalWindow.h"
-#include <Metal/Metal.h>
-#include <QuartzCore/CAMetalLayer.h>
-#include "core/utils/Log.h"
+#import <Metal/Metal.h>
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/metal/MetalTypes.h"
 
 namespace tgfx {
 
-std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(void* layer, std::shared_ptr<MetalDevice> device,
+std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(CAMetalLayer* layer,
+                                                   std::shared_ptr<MetalDevice> device,
                                                    std::shared_ptr<ColorSpace> colorSpace) {
-  if (layer == nullptr) {
-    return nullptr;
-  }
-  auto metalLayer = (__bridge CAMetalLayer*)layer;
-  if (![metalLayer isKindOfClass:[CAMetalLayer class]]) {
-    LOGE("MetalWindow::MakeFrom() The layer parameter is not a CAMetalLayer.");
+  if (layer == nil) {
     return nullptr;
   }
   if (device == nullptr) {
-    if (metalLayer.device != nil) {
-      device = MetalDevice::MakeFrom((__bridge void*)metalLayer.device);
+    if (layer.device != nil) {
+      device = MetalDevice::MakeFrom((__bridge void*)layer.device);
     } else {
       device = MetalDevice::Make();
     }
@@ -45,25 +39,60 @@ std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(void* layer, std::shared_ptr<
   if (device == nullptr) {
     return nullptr;
   }
-  if (metalLayer.device == nil) {
-    metalLayer.device = (__bridge id<MTLDevice>)device->metalDevice();
+  if (layer.device == nil) {
+    layer.device = (__bridge id<MTLDevice>)device->metalDevice();
   }
   return std::shared_ptr<MetalWindow>(new MetalWindow(device, layer, std::move(colorSpace)));
 }
 
-MetalWindow::MetalWindow(std::shared_ptr<Device> device, void* layer,
+std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(MTKView* view,
+                                                   std::shared_ptr<ColorSpace> colorSpace) {
+  if (view == nil) {
+    return nullptr;
+  }
+  auto layer = static_cast<CAMetalLayer*>(view.layer);
+  if (layer == nil) {
+    return nullptr;
+  }
+  auto device = layer.device != nil ? MetalDevice::MakeFrom((__bridge void*)layer.device)
+                                    : MetalDevice::Make();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  if (layer.device == nil) {
+    layer.device = (__bridge id<MTLDevice>)device->metalDevice();
+  }
+  return std::shared_ptr<MetalWindow>(new MetalWindow(device, view, layer, std::move(colorSpace)));
+}
+
+// Do not retain layer/view here, otherwise it can cause circular reference.
+MetalWindow::MetalWindow(std::shared_ptr<Device> device, CAMetalLayer* layer,
                          std::shared_ptr<ColorSpace> colorSpace)
     : Window(std::move(device)), metalLayer(layer), colorSpace(std::move(colorSpace)) {
 }
 
+MetalWindow::MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalLayer* layer,
+                         std::shared_ptr<ColorSpace> colorSpace)
+    : Window(std::move(device)),
+      metalLayer(layer),
+      metalView(view),
+      colorSpace(std::move(colorSpace)) {
+}
+
+MetalWindow::~MetalWindow() {
+  [currentDrawable release];
+}
+
 std::shared_ptr<Surface> MetalWindow::onCreateSurface(Context* context) {
-  auto layer = (__bridge CAMetalLayer*)metalLayer;
-  auto drawable = [layer nextDrawable];
+  if (metalView != nil) {
+    metalLayer.drawableSize = metalView.drawableSize;
+  }
+  auto drawable = [metalLayer nextDrawable];
   if (drawable == nil) {
     return nullptr;
   }
-  [drawable retain];
-  currentDrawable = (__bridge void*)drawable;
+  [currentDrawable release];
+  currentDrawable = [drawable retain];
   id<MTLTexture> texture = drawable.texture;
   auto width = static_cast<int>(texture.width);
   auto height = static_cast<int>(texture.height);
@@ -75,22 +104,21 @@ std::shared_ptr<Surface> MetalWindow::onCreateSurface(Context* context) {
 }
 
 void MetalWindow::onPresent(Context*) {
-  if (currentDrawable == nullptr) {
+  if (currentDrawable == nil) {
     return;
   }
-  auto drawable = (__bridge id<CAMetalDrawable>)currentDrawable;
-  [drawable present];
-  [drawable release];
-  currentDrawable = nullptr;
+  [currentDrawable present];
+  [currentDrawable release];
+  currentDrawable = nil;
+  // Metal's CAMetalLayer provides a different drawable texture each frame, so we must release the
+  // surface after presenting to ensure a new one is created on the next getSurface() call.
+  surface = nullptr;
 }
 
 void MetalWindow::onFreeSurface() {
   Window::onFreeSurface();
-  if (currentDrawable != nullptr) {
-    auto drawable = (__bridge id<CAMetalDrawable>)currentDrawable;
-    [drawable release];
-    currentDrawable = nullptr;
-  }
+  [currentDrawable release];
+  currentDrawable = nil;
 }
 
 }  // namespace tgfx

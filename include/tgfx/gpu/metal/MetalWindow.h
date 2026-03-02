@@ -18,26 +18,35 @@
 
 #pragma once
 
+#import <MetalKit/MetalKit.h>
+#import <QuartzCore/QuartzCore.h>
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/Window.h"
 #include "tgfx/gpu/metal/MetalDevice.h"
 
 namespace tgfx {
 /**
- * MetalWindow is a Window implementation backed by a CAMetalLayer. It acquires a drawable from the
- * layer each frame and presents it after rendering.
+ * MetalWindow is a Window implementation backed by a CAMetalLayer.
  */
 class MetalWindow : public Window {
  public:
   /**
-   * Creates a new MetalWindow from a CAMetalLayer. The layer parameter is a pointer to a
-   * CAMetalLayer object. If no device is provided, a new MetalDevice will be created. The caller
-   * is responsible for configuring the layer properties (e.g., pixelFormat, drawableSize) before
-   * creating the window.
+   * Creates a new window from a CAMetalLayer with the specified device. If no device is provided,
+   * a new MetalDevice will be created automatically. The caller is responsible for configuring the
+   * layer properties (e.g., pixelFormat, drawableSize) before creating the window.
    */
-  static std::shared_ptr<MetalWindow> MakeFrom(void* layer,
+  static std::shared_ptr<MetalWindow> MakeFrom(CAMetalLayer* layer,
                                                std::shared_ptr<MetalDevice> device = nullptr,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
+  /**
+   * Creates a new window from an MTKView with its underlying CAMetalLayer. Returns nullptr if the
+   * view or its layer is invalid.
+   */
+  static std::shared_ptr<MetalWindow> MakeFrom(MTKView* view,
+                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
+  ~MetalWindow() override;
 
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
@@ -45,11 +54,15 @@ class MetalWindow : public Window {
   void onFreeSurface() override;
 
  private:
-  void* metalLayer = nullptr;
-  void* currentDrawable = nullptr;
+  CAMetalLayer* metalLayer = nil;
+  MTKView* metalView = nil;
+  id<CAMetalDrawable> currentDrawable = nil;
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
-  MetalWindow(std::shared_ptr<Device> device, void* layer, std::shared_ptr<ColorSpace> colorSpace);
+  MetalWindow(std::shared_ptr<Device> device, CAMetalLayer* layer,
+              std::shared_ptr<ColorSpace> colorSpace);
+  MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalLayer* layer,
+              std::shared_ptr<ColorSpace> colorSpace);
 };
 
 }  // namespace tgfx
