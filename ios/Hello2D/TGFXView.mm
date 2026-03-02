@@ -22,7 +22,7 @@
 #include "tgfx/gpu/Recording.h"
 
 @implementation TGFXView {
-  std::shared_ptr<tgfx::EAGLWindow> tgfxWindow;
+  std::shared_ptr<tgfx::Window> tgfxWindow;
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer;
@@ -33,7 +33,11 @@
 }
 
 + (Class)layerClass {
+#ifdef TGFX_USE_METAL
+  return [CAMetalLayer class];
+#else
   return [CAEAGLLayer class];
+#endif
 }
 
 - (void)setBounds:(CGRect)bounds {
@@ -83,6 +87,12 @@
   lastSurfaceWidth = static_cast<int>(self.bounds.size.width * self.contentScaleFactor);
   lastSurfaceHeight = static_cast<int>(self.bounds.size.height * self.contentScaleFactor);
   if (tgfxWindow != nullptr) {
+#ifdef TGFX_USE_METAL
+    auto metalLayer = static_cast<CAMetalLayer*>(self.layer);
+    metalLayer.contentsScale = self.contentScaleFactor;
+    metalLayer.drawableSize = CGSizeMake(self.bounds.size.width * self.contentScaleFactor,
+                                         self.bounds.size.height * self.contentScaleFactor);
+#endif
     tgfxWindow->invalidSize();
   }
 }
@@ -124,7 +134,16 @@
     return;
   }
   if (tgfxWindow == nullptr) {
+#ifdef TGFX_USE_METAL
+    auto metalLayer = static_cast<CAMetalLayer*>(self.layer);
+    metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
+    metalLayer.contentsScale = self.contentScaleFactor;
+    metalLayer.drawableSize = CGSizeMake(self.bounds.size.width * self.contentScaleFactor,
+                                         self.bounds.size.height * self.contentScaleFactor);
+    tgfxWindow = tgfx::MetalWindow::MakeFrom(metalLayer);
+#else
     tgfxWindow = tgfx::EAGLWindow::MakeFrom((CAEAGLLayer*)[self layer]);
+#endif
   }
   if (tgfxWindow == nullptr) {
     return;

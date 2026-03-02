@@ -21,8 +21,12 @@
 #import <UIKit/UIKit.h>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Surface.h"
+#ifdef TGFX_USE_METAL
+#include "tgfx/gpu/metal/MetalWindow.h"
+#else
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
+#endif
 #include "tgfx/layers/DisplayList.h"
 
 @interface TGFXView : UIView

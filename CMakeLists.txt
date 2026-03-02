@@ -334,6 +334,8 @@ elseif (APPLE)
         list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
         find_library(Metal_LIBS Metal REQUIRED)
         list(APPEND TGFX_SHARED_LIBS ${Metal_LIBS})
+        find_library(MetalKit_LIBS MetalKit REQUIRED)
+        list(APPEND TGFX_SHARED_LIBS ${MetalKit_LIBS})
         list(APPEND TGFX_DEFINES TGFX_USE_METAL)
         # Add shaderc and SPIRV-Cross for GLSL to MSL conversion
         list(APPEND TGFX_STATIC_VENDORS shaderc SPIRV-Cross)

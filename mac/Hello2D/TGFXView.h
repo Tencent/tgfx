@@ -21,8 +21,11 @@
 #import <Cocoa/Cocoa.h>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#ifdef TGFX_USE_METAL
+#include "tgfx/gpu/metal/MetalWindow.h"
+#else
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
+#endif
 #include "tgfx/layers/DisplayList.h"
 
 @interface TGFXView : NSView

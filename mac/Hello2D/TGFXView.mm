@@ -31,7 +31,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 }
 
 @implementation TGFXView {
-  std::shared_ptr<tgfx::CGLWindow> tgfxWindow;
+  std::shared_ptr<tgfx::Window> tgfxWindow;
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer;
@@ -88,6 +88,11 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   lastSurfaceHeight = static_cast<int>(backingSize.height);
   [self applyCenteringTransform];
   if (tgfxWindow != nullptr) {
+#ifdef TGFX_USE_METAL
+    auto metalLayer = static_cast<CAMetalLayer*>(self.layer);
+    metalLayer.contentsScale = self.window.backingScaleFactor;
+    metalLayer.drawableSize = [self convertSizeToBacking:self.bounds.size];
+#endif
     tgfxWindow->invalidSize();
     presentImmediately = true;
   }
@@ -187,7 +192,17 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return;
   }
   if (tgfxWindow == nullptr) {
+#ifdef TGFX_USE_METAL
+    [self setWantsLayer:YES];
+    auto metalLayer = [CAMetalLayer layer];
+    metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
+    metalLayer.contentsScale = self.window.backingScaleFactor;
+    metalLayer.drawableSize = [self convertSizeToBacking:self.bounds.size];
+    self.layer = metalLayer;
+    tgfxWindow = tgfx::MetalWindow::MakeFrom(metalLayer);
+#else
     tgfxWindow = tgfx::CGLWindow::MakeFrom(self);
+#endif
   }
   if (tgfxWindow == nullptr) {
     return;
