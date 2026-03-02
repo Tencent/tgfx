@@ -18,8 +18,9 @@
 
 #pragma once
 
+#include <mutex>
 #include "tgfx/core/FontMetrics.h"
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/Typeface.h"
@@ -31,6 +32,8 @@ class ScalerContext {
  public:
   static std::shared_ptr<ScalerContext> MakeEmpty(float size);
 
+  ScalerContext(const ScalerContext&) = delete;
+  ScalerContext& operator=(const ScalerContext&) = delete;
   virtual ~ScalerContext() = default;
 
   virtual bool asyncSupport() const {
@@ -53,7 +56,7 @@ class ScalerContext {
     return textSize;
   }
 
-  virtual FontMetrics getFontMetrics() const = 0;
+  FontMetrics getFontMetrics() const;
 
   virtual Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const = 0;
 
@@ -81,7 +84,15 @@ class ScalerContext {
 
   ScalerContext(std::shared_ptr<Typeface> typeface, float size);
 
+  virtual FontMetrics onComputeFontMetrics() const = 0;
+
  private:
+  void computeFontMetrics() const;
+
+  // Mutable for const-method caching: computed once on first access, thread-safe via once_flag.
+  mutable FontMetrics fontMetricsCache = {};
+  mutable std::once_flag fontMetricsOnceFlag = {};
+
   friend class Font;
 };
 }  // namespace tgfx

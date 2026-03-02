@@ -1207,8 +1207,8 @@ TGFX_TEST(TextRenderTest, TextBlobMixedPositioning) {
   Font font(typeface, 36.0f);
   Font emojiFont(emojiTypeface, 36.0f);
 
-  auto glyphNi = font.getGlyphID(0x4F60);   // 你
-  auto glyphHao = font.getGlyphID(0x597D);  // 好
+  auto glyphNi = font.getGlyphID(0x4F60);           // 你
+  auto glyphHao = font.getGlyphID(0x597D);          // 好
   auto glyphEmoji = emojiFont.getGlyphID(0x1F44B);  // 👋
   auto glyphW = font.getGlyphID('W');
   auto glyphO = font.getGlyphID('o');
@@ -1703,6 +1703,159 @@ TGFX_TEST(TextRenderTest, AxisAlignedRotationRender) {
   EXPECT_TRUE(Baseline::Compare(surface, "TextRenderTest/AxisAlignedRotationRender"));
 }
 
+// Returns true if the character should be typeset upright in vertical text (UAX #50).
+static bool IsUprightInVerticalText(Unichar unichar) {
+  // CJK Ideographs
+  if ((unichar >= 0x4E00 && unichar <= 0x9FFF) || (unichar >= 0x3400 && unichar <= 0x4DBF) ||
+      (unichar >= 0x20000 && unichar <= 0x2A6DF) || (unichar >= 0x2A700 && unichar <= 0x2B81F) ||
+      (unichar >= 0x2B820 && unichar <= 0x2CEAF) || (unichar >= 0x30000 && unichar <= 0x3134F) ||
+      (unichar >= 0x31350 && unichar <= 0x323AF) || (unichar >= 0xF900 && unichar <= 0xFAFF) ||
+      (unichar >= 0x2F800 && unichar <= 0x2FA1F)) {
+    return true;
+  }
+  // Hiragana, Katakana
+  if ((unichar >= 0x3040 && unichar <= 0x309F) || (unichar >= 0x30A0 && unichar <= 0x30FF) ||
+      (unichar >= 0x31F0 && unichar <= 0x31FF)) {
+    return true;
+  }
+  // Hangul
+  if ((unichar >= 0xAC00 && unichar <= 0xD7AF) || (unichar >= 0x1100 && unichar <= 0x11FF) ||
+      (unichar >= 0x3130 && unichar <= 0x318F) || (unichar >= 0xA960 && unichar <= 0xA97F) ||
+      (unichar >= 0xD7B0 && unichar <= 0xD7FF)) {
+    return true;
+  }
+  // Bopomofo
+  if ((unichar >= 0x3100 && unichar <= 0x312F) || (unichar >= 0x31A0 && unichar <= 0x31BF)) {
+    return true;
+  }
+  // Yi Syllables and Radicals
+  if (unichar >= 0xA000 && unichar <= 0xA4CF) {
+    return true;
+  }
+  // CJK Symbols, Punctuation, Vertical Forms, Compatibility Forms
+  if ((unichar >= 0x3000 && unichar <= 0x303F) || (unichar >= 0xFE10 && unichar <= 0xFE19) ||
+      (unichar >= 0xFE30 && unichar <= 0xFE4F)) {
+    return true;
+  }
+  // Fullwidth Forms and Symbols
+  if ((unichar >= 0xFF01 && unichar <= 0xFF60) || (unichar >= 0xFFE0 && unichar <= 0xFFE6)) {
+    return true;
+  }
+  // CJK Enclosed Letters, Compatibility, Enclosed Supplement
+  if ((unichar >= 0x3200 && unichar <= 0x32FF) || (unichar >= 0x3300 && unichar <= 0x33FF) ||
+      (unichar >= 0x1F200 && unichar <= 0x1F2FF)) {
+    return true;
+  }
+  // Emoji
+  if ((unichar >= 0x1F000 && unichar <= 0x1FAFF) || (unichar >= 0x2600 && unichar <= 0x27BF)) {
+    return true;
+  }
+  // CJK Radicals, Kangxi Radicals, Ideographic Description
+  if ((unichar >= 0x2E80 && unichar <= 0x2EFF) || (unichar >= 0x2F00 && unichar <= 0x2FDF) ||
+      (unichar >= 0x2FF0 && unichar <= 0x2FFF)) {
+    return true;
+  }
+  return false;
+}
+
+// Computes the local drawing position for a sideways glyph. The canvas is translated to the cell
+// center then rotated 90° CW before drawing. glyphX centers the glyph within its advance cell,
+// glyphY shifts it toward the central baseline. The W3C central baseline formula
+// (ascent + descent) / 2 was tried first but produced misaligned results for mixed CJK/Latin
+// text, so we use (capHeight + xHeight) * 0.25 instead (aligned with libpag).
+static Point ComputeSidewaysGlyphPosition(const Font& font, GlyphID glyphID,
+                                          const FontMetrics& metrics) {
+  auto horizontalAdvance = font.getAdvance(glyphID, false);
+  float glyphX = -horizontalAdvance * 0.5f;
+  float glyphY = (metrics.capHeight + metrics.xHeight) * 0.25f;
+  return Point::Make(glyphX, glyphY);
+}
+
+// Draws text in vertical layout (top to bottom, text-orientation: mixed).
+static void DrawVerticalText(Canvas* canvas, const Font& font, const std::string& text,
+                             float centerX, float startY, const Paint& paint) {
+  auto metrics = font.getMetrics();
+  const char* ptr = text.data();
+  const char* end = ptr + text.size();
+  float y = startY;
+  while (ptr < end) {
+    auto unichar = UTF::NextUTF8(&ptr, end);
+    if (unichar < 0) {
+      break;
+    }
+    auto glyphID = font.getGlyphID(unichar);
+    if (glyphID == 0) {
+      continue;
+    }
+    bool upright = IsUprightInVerticalText(unichar);
+    float advance = font.getAdvance(glyphID, upright);
+    if (upright) {
+      auto offset = font.getVerticalOffset(glyphID);
+      auto position = Point::Make(centerX + offset.x, y + offset.y);
+      canvas->drawGlyphs(&glyphID, &position, 1, font, paint);
+    } else {
+      auto localPosition = ComputeSidewaysGlyphPosition(font, glyphID, metrics);
+      canvas->save();
+      canvas->translate(centerX, y + advance * 0.5f);
+      canvas->rotate(90.0f);
+      canvas->drawGlyphs(&glyphID, &localPosition, 1, font, paint);
+      canvas->restore();
+    }
+    y += advance;
+  }
+}
+
+// Returns the total vertical height occupied by a string of text in vertical layout.
+static float MeasureVerticalTextHeight(const Font& font, const std::string& text) {
+  float height = 0.0f;
+  const char* ptr = text.data();
+  const char* end = ptr + text.size();
+  while (ptr < end) {
+    auto unichar = UTF::NextUTF8(&ptr, end);
+    if (unichar < 0) {
+      break;
+    }
+    auto glyphID = font.getGlyphID(unichar);
+    if (glyphID == 0) {
+      continue;
+    }
+    height += font.getAdvance(glyphID, IsUprightInVerticalText(unichar));
+  }
+  return height;
+}
+
+TGFX_TEST(TextRenderTest, VerticalTextLayout) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+
+  std::string text = "你好，测试。Hi,Tgfx.";
+  float fontSize = 50;
+  Font font(typeface, fontSize);
+
+  float columnHeight = MeasureVerticalTextHeight(font, text);
+  float margin = 50;
+  auto surfaceWidth = static_cast<int>(ceilf(fontSize + margin * 2));
+  auto surfaceHeight = static_cast<int>(ceilf(columnHeight + margin * 2));
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setColor(Color::Black());
+
+  float centerX = static_cast<float>(surfaceWidth) * 0.5f;
+  DrawVerticalText(canvas, font, text, centerX, margin, paint);
+
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "TextRenderTest/VerticalTextLayout"));
+}
+
 TGFX_TEST(TextRenderTest, VerticalTextWithEmoji) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -1729,8 +1882,8 @@ TGFX_TEST(TextRenderTest, VerticalTextWithEmoji) {
       {0x4F60, false, true},   // 你
       {0x597D, false, true},   // 好
       {0x1F44B, true, false},  // 👋
-      {'W', false, false},     {'o', false, false}, {'r', false, false},
-      {'l', false, false},     {'d', false, false},
+      {'W', false, false},    {'o', false, false}, {'r', false, false},
+      {'l', false, false},    {'d', false, false},
   };
 
   auto metrics = font.getMetrics();
