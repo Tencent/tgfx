@@ -26,8 +26,8 @@ HairlineBufferUploadTask::HairlineBufferUploadTask(
     std::shared_ptr<ResourceProxy> lineVertexProxy,
     std::shared_ptr<ResourceProxy> quadVertexProxy,
     std::unique_ptr<DataSource<HairlineBuffer>> source)
-    : ResourceTask(lineVertexProxy), lineVertexProxy(std::move(lineVertexProxy)),
-      quadVertexProxy(std::move(quadVertexProxy)), source(std::move(source)) {
+    : ResourceTask(std::move(lineVertexProxy)), quadVertexProxy(std::move(quadVertexProxy)),
+      source(std::move(source)) {
 }
 
 std::shared_ptr<Resource> HairlineBufferUploadTask::onMakeResource(Context* context) {
@@ -55,18 +55,21 @@ std::shared_ptr<Resource> HairlineBufferUploadTask::onMakeResource(Context* cont
     return nullptr;
   }
 
-  // All buffers created successfully (or were not needed). Assign to proxies manually.
-  // We manage both proxies ourselves to ensure correct assignment.
-  assignBufferToProxy(lineVertexBuffer, lineVertexProxy);
-  assignBufferToProxy(quadVertexBuffer, quadVertexProxy);
+  // All buffers created successfully (or were not needed).
+  // quadVertexProxy is managed here; lineVertexProxy is managed by the base class.
+  if (quadVertexBuffer && quadVertexProxy) {
+    if (!quadVertexProxy->uniqueKey.empty()) {
+      quadVertexBuffer->assignUniqueKey(quadVertexProxy->uniqueKey);
+    }
+    quadVertexProxy->resource = quadVertexBuffer;
+  }
 
   // Release the source data as it's no longer needed.
   source = nullptr;
 
-  // Return lineVertexBuffer for the base class. If it's nullptr (only quad data exists),
-  // the base class will not modify lineVertexProxy (since execute() returns early on nullptr).
-  // quadVertexProxy is already correctly set above.
-  // If lineVertexBuffer exists, the base class will redundantly assign it again (harmless).
+  // Return lineVertexBuffer for the base class to assign to lineVertexProxy.
+  // If lineVertexBuffer is nullptr (only quad data exists), the base class returns early,
+  // but quadVertexProxy is already correctly set above.
   return lineVertexBuffer;
 }
 
@@ -86,14 +89,6 @@ std::shared_ptr<BufferResource> HairlineBufferUploadTask::createBuffer(
 
   gpu->queue()->writeBuffer(gpuBuffer, 0, data->data(), data->size());
   return BufferResource::Wrap(context, std::move(gpuBuffer));
-}
-
-void HairlineBufferUploadTask::assignBufferToProxy(
-    const std::shared_ptr<BufferResource>& buffer,
-    const std::shared_ptr<ResourceProxy>& proxy) {
-  if (buffer && proxy) {
-    proxy->resource = buffer;
-  }
 }
 
 }  // namespace tgfx

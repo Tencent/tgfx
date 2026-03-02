@@ -42,10 +42,6 @@ class HairlineBufferUploadTask : public ResourceTask {
                                                       uint32_t usage, const char* bufferName,
                                                       bool* creationFailed);
 
-  static void assignBufferToProxy(const std::shared_ptr<BufferResource>& buffer,
-                                  const std::shared_ptr<ResourceProxy>& proxy);
-
-  std::shared_ptr<ResourceProxy> lineVertexProxy = nullptr;
   std::shared_ptr<ResourceProxy> quadVertexProxy = nullptr;
   std::unique_ptr<DataSource<HairlineBuffer>> source = nullptr;
 };

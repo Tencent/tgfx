@@ -55,9 +55,9 @@ class GPUHairlineProxy {
   }
 
  private:
-  Matrix drawingMatrix;
-  std::shared_ptr<GPUBufferProxy> lineVertexProxy;
-  std::shared_ptr<GPUBufferProxy> quadVertexProxy;
+  Matrix drawingMatrix = {};
+  std::shared_ptr<GPUBufferProxy> lineVertexProxy = nullptr;
+  std::shared_ptr<GPUBufferProxy> quadVertexProxy = nullptr;
 };
 
 }  // namespace tgfx

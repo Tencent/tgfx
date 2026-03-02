@@ -112,6 +112,6 @@ class QuadUVMatrix {
   void apply(void* vertices, int vertexCount, size_t stride, size_t uvOffset) const;
 
  private:
-  float matrix[6];
+  float matrix[6] = {};
 };
 }  // namespace tgfx
