@@ -45,13 +45,20 @@ enum class MeshTopology {
 /**
  * Mesh represents an immutable collection of triangles for GPU rendering.
  * Thread-safe and immutable once created.
+ *
+ * GPU Resource Management:
+ * - GPU buffers are uploaded on first draw and remain cached while the Mesh is alive.
+ * - GPU resources are protected from LRU eviction to avoid re-upload overhead.
+ * - When the Mesh is destroyed, GPU resources become eligible for eviction.
+ * - To free GPU memory promptly, release the Mesh (set to nullptr) when no longer needed.
  */
 class Mesh {
  public:
   virtual ~Mesh() = default;
 
   /**
-   * Creates a Mesh by copying the provided vertex data.
+   * Creates a Mesh by copying the provided vertex data. GPU buffers are uploaded on first draw and
+   * protected from eviction while the Mesh is alive. Release the Mesh when done to free GPU memory.
    * @param topology How vertices are organized into triangles.
    * @param vertexCount Number of vertices (must be > 0, and must not exceed 65536 when using
    *                    indices since indices are 16-bit).
@@ -69,8 +76,8 @@ class Mesh {
                                         const uint16_t* indices = nullptr);
 
   /**
-   * Creates a Mesh from a Path. The mesh will be triangulated when first drawn.
-   * GPU resources remain cached and protected from eviction while the Mesh is alive.
+   * Creates a Mesh from a Path. The mesh will be triangulated when first drawn. GPU buffers are
+   * protected from eviction while the Mesh is alive. Release the Mesh when done to free GPU memory.
    * @param path The path to triangulate.
    * @param antiAlias If true, generates anti-aliased triangles with coverage values.
    * @return A shared pointer to the created Mesh, or nullptr if the path is empty.
@@ -78,8 +85,8 @@ class Mesh {
   static std::shared_ptr<Mesh> MakeFromPath(Path path, bool antiAlias = true);
 
   /**
-   * Creates a Mesh from a Shape. The mesh will be triangulated when first drawn.
-   * GPU resources remain cached and protected from eviction while the Mesh is alive.
+   * Creates a Mesh from a Shape. The mesh will be triangulated when first drawn. GPU buffers are
+   * protected from eviction while the Mesh is alive. Release the Mesh when done to free GPU memory.
    * @param shape The shape to triangulate.
    * @param antiAlias If true, generates anti-aliased triangles with coverage values.
    * @return A shared pointer to the created Mesh, or nullptr if the shape is nullptr.
