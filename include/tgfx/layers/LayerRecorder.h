@@ -27,6 +27,7 @@
 #include "tgfx/layers/LayerPaint.h"
 
 namespace tgfx {
+class Mesh;
 class LayerContent;
 class GeometryContent;
 
@@ -78,13 +79,20 @@ class LayerRecorder {
                    float y = 0);
 
   /**
+   * Adds a mesh with the specified paint.
+   * @param mesh The mesh object.
+   * @param paint The paint style for the mesh.
+   */
+  void addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint& paint);
+
+  /**
    * Returns the current transformation matrix. If no matrix is set, returns the identity matrix.
    */
   const Matrix& getMatrix() const;
 
   /**
    * Sets the transformation matrix for subsequent drawing operations. The matrix is applied to both
-   * the geometry (Rect, RRect, Path, Shape, TextBlob) and the paint.
+   * the geometry (Rect, RRect, Path, Shape, Mesh, TextBlob) and the paint.
    * @param matrix The transformation matrix to apply.
    */
   void setMatrix(const Matrix& matrix);

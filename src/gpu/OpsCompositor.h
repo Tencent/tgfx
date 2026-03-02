@@ -23,6 +23,7 @@
 #include "gpu/ops/RectDrawOp.h"
 #include "tgfx/core/Brush.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -76,6 +77,11 @@ class OpsCompositor {
    * Fills the given shape with the given state and fill.
    */
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush);
+
+  /**
+   * Draws the given mesh with the given state and brush.
+   */
+  void drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush);
 
   /**
    * Fills the given rect with the given atlas textureProxy, sampling options, state and fill.

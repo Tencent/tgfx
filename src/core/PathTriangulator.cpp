@@ -62,7 +62,8 @@ bool PathTriangulator::ShouldTriangulatePath(const Path& path) {
   return path.countPoints() * AA_TESSELLATOR_BUFFER_SIZE_FACTOR <= width * height;
 }
 
-size_t PathTriangulator::GetTriangleCount(size_t bufferSize) {
+size_t PathTriangulator::GetNonAAVertexCount(size_t bufferSize) {
+  // Each vertex has 2 floats: x, y
   return bufferSize / (sizeof(float) * 2);
 }
 
@@ -78,7 +79,8 @@ size_t PathTriangulator::ToTriangles(const Path& path, const Rect& clipBounds,
   return static_cast<size_t>(count);
 }
 
-size_t PathTriangulator::GetAATriangleCount(size_t bufferSize) {
+size_t PathTriangulator::GetAAVertexCount(size_t bufferSize) {
+  // Each vertex has 3 floats: x, y, coverage
   return bufferSize / (sizeof(float) * 3);
 }
 
