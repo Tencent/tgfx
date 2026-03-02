@@ -52,7 +52,7 @@ class Mesh {
   virtual ~Mesh() = default;
 
   /**
-   * Creates a Mesh by copying the provided vertex data.
+   * Creates a Mesh by copying the provided vertex data. Returns nullptr if parameters are invalid.
    * @param topology How vertices are organized into triangles.
    * @param vertexCount Number of vertices (must be > 0, and must not exceed 65536 when using
    *                    indices since indices are 16-bit).
@@ -62,7 +62,6 @@ class Mesh {
    * @param colors Per-vertex colors (optional).
    * @param indexCount Number of indices (0 if not indexed).
    * @param indices Index array (optional, uint16_t).
-   * @return A shared pointer to the created Mesh, or nullptr if parameters are invalid.
    */
   static std::shared_ptr<Mesh> MakeCopy(MeshTopology topology, int vertexCount,
                                         const Point* positions,
@@ -71,18 +70,18 @@ class Mesh {
                                         const uint16_t* indices = nullptr);
 
   /**
-   * Creates a Mesh from a Path. The path will be triangulated when first drawn.
+   * Creates a Mesh from a Path. The path will be triangulated into vertices for GPU rendering.
+   * Returns nullptr if the path is empty.
    * @param path The path to triangulate.
    * @param antiAlias If true, generates anti-aliased triangles with coverage values.
-   * @return A shared pointer to the created Mesh, or nullptr if the path is empty.
    */
   static std::shared_ptr<Mesh> MakeFromPath(Path path, bool antiAlias = true);
 
   /**
-   * Creates a Mesh from a Shape. The shape will be triangulated when first drawn.
+   * Creates a Mesh from a Shape. The shape will be triangulated into vertices for GPU rendering.
+   * Returns nullptr if the shape is nullptr.
    * @param shape The shape to triangulate.
    * @param antiAlias If true, generates anti-aliased triangles with coverage values.
-   * @return A shared pointer to the created Mesh, or nullptr if the shape is nullptr.
    */
   static std::shared_ptr<Mesh> MakeFromShape(std::shared_ptr<Shape> shape, bool antiAlias = true);
 
