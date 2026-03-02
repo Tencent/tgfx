@@ -37,8 +37,8 @@ static size_t CalculateDataSize(size_t vertexCount, size_t indexCount, bool hasT
 }
 
 std::shared_ptr<Mesh> VertexMesh::Make(MeshTopology topology, int vertexCount,
-                                       const Point* positions, const Color* colors,
-                                       const Point* texCoords, int indexCount,
+                                       const Point* positions, const Point* texCoords,
+                                       const Color* colors, int indexCount,
                                        const uint16_t* indices) {
   if (vertexCount <= 0 || positions == nullptr) {
     return nullptr;

@@ -24,9 +24,9 @@
 namespace tgfx {
 
 std::shared_ptr<Mesh> Mesh::MakeCopy(MeshTopology topology, int vertexCount, const Point* positions,
-                                     const Color* colors, const Point* texCoords, int indexCount,
+                                     const Point* texCoords, const Color* colors, int indexCount,
                                      const uint16_t* indices) {
-  return VertexMesh::Make(topology, vertexCount, positions, colors, texCoords, indexCount, indices);
+  return VertexMesh::Make(topology, vertexCount, positions, texCoords, colors, indexCount, indices);
 }
 
 std::shared_ptr<Mesh> Mesh::MakeFromPath(Path path, bool antiAlias) {

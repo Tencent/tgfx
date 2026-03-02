@@ -29,7 +29,7 @@ namespace tgfx {
 class VertexMesh : public MeshBase {
  public:
   static std::shared_ptr<Mesh> Make(MeshTopology topology, int vertexCount, const Point* positions,
-                                    const Color* colors, const Point* texCoords, int indexCount,
+                                    const Point* texCoords, const Color* colors, int indexCount,
                                     const uint16_t* indices);
 
   ~VertexMesh() override;

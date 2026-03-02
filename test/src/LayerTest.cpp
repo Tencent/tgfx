@@ -3363,7 +3363,7 @@ TGFX_TEST(LayerTest, MeshLayer) {
   EXPECT_EQ(meshLayer1->type(), LayerType::Mesh);
   Point positions1[] = {{100, 50}, {50, 150}, {150, 150}};
   Color colors1[] = {Color::Red(), Color::Green(), Color::Blue()};
-  auto mesh1 = Mesh::MakeCopy(MeshTopology::Triangles, 3, positions1, colors1);
+  auto mesh1 = Mesh::MakeCopy(MeshTopology::Triangles, 3, positions1, nullptr, colors1);
   meshLayer1->setMesh(mesh1);
   displayList->root()->addChild(meshLayer1);
 

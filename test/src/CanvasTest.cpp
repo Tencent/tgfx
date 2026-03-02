@@ -2025,7 +2025,7 @@ TGFX_TEST(CanvasTest, DrawMesh_ColorsOnly) {
   Point positions[] = {{100, 50}, {50, 150}, {150, 150}};
   Color colors[] = {Color::Red(), Color::Green(), Color::Blue()};
 
-  auto mesh = Mesh::MakeCopy(MeshTopology::Triangles, 3, positions, colors);
+  auto mesh = Mesh::MakeCopy(MeshTopology::Triangles, 3, positions, nullptr, colors);
   ASSERT_TRUE(mesh != nullptr);
 
   Paint paint = {};
@@ -2052,7 +2052,7 @@ TGFX_TEST(CanvasTest, DrawMesh_TextureOnly) {
   Point positions[] = {{50, 50}, {150, 50}, {50, 150}, {150, 150}};
   Point texCoords[] = {{0, 0}, {imageWidth, 0}, {0, imageHeight}, {imageWidth, imageHeight}};
 
-  auto mesh = Mesh::MakeCopy(MeshTopology::TriangleStrip, 4, positions, nullptr, texCoords);
+  auto mesh = Mesh::MakeCopy(MeshTopology::TriangleStrip, 4, positions, texCoords);
   ASSERT_TRUE(mesh != nullptr);
 
   Paint paint = {};
@@ -2085,7 +2085,7 @@ TGFX_TEST(CanvasTest, DrawMesh_TextureAndColors) {
                     Color::FromRGBA(0, 0, 255, 128), Color::FromRGBA(255, 255, 0, 128)};
   uint16_t indices[] = {0, 1, 2, 0, 2, 3};
 
-  auto mesh = Mesh::MakeCopy(MeshTopology::Triangles, 4, positions, colors, texCoords, 6, indices);
+  auto mesh = Mesh::MakeCopy(MeshTopology::Triangles, 4, positions, texCoords, colors, 6, indices);
   ASSERT_TRUE(mesh != nullptr);
 
   Paint paint = {};

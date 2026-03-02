@@ -63,16 +63,17 @@ class Mesh {
    * @param vertexCount Number of vertices (must be > 0, and must not exceed 65536 when using
    *                    indices since indices are 16-bit).
    * @param positions Vertex positions (required).
-   * @param colors Per-vertex colors (optional).
    * @param texCoords Texture coordinates in pixel space (e.g., [0, imageWidth] x [0, imageHeight]),
    *                  with origin at top-left (optional).
+   * @param colors Per-vertex colors (optional).
    * @param indexCount Number of indices (0 if not indexed).
    * @param indices Index array (optional, uint16_t).
    * @return A shared pointer to the created Mesh, or nullptr if parameters are invalid.
    */
   static std::shared_ptr<Mesh> MakeCopy(MeshTopology topology, int vertexCount,
-                                        const Point* positions, const Color* colors = nullptr,
-                                        const Point* texCoords = nullptr, int indexCount = 0,
+                                        const Point* positions,
+                                        const Point* texCoords = nullptr,
+                                        const Color* colors = nullptr, int indexCount = 0,
                                         const uint16_t* indices = nullptr);
 
   /**
