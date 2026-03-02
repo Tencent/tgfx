@@ -39,6 +39,10 @@ class ShapeUtils {
    */
   static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
 
+  /**
+   * Calculates the alpha reduction factor for hairline rendering, or returns 1.0 if the shape is
+   * not rendered as a hairline.
+   */
   static float CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape);
 
   /**
@@ -46,6 +50,10 @@ class ShapeUtils {
    */
   static const MatrixShape* AsMatrixShape(const Shape* shape);
 
+  /**
+   * Decomposes a shape into its underlying StrokeShape and the associated matrix, or returns
+   * nullptr if the shape is not a StrokeShape.
+   */
   static std::tuple<std::shared_ptr<StrokeShape>, Matrix> DecomposeStrokeShape(
       std::shared_ptr<Shape> shape);
 };
