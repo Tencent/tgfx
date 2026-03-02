@@ -17,17 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeshBase.h"
-#include "core/utils/UniqueID.h"
 
 namespace tgfx {
 
-static UniqueKey MakeMeshUniqueKey() {
-  static const auto MeshDomain = UniqueKey::Make();
-  auto meshID = UniqueID::Next();
-  return UniqueKey::Append(MeshDomain, &meshID, 1);
-}
-
-MeshBase::MeshBase() : uniqueKey(MakeMeshUniqueKey()) {
+MeshBase::MeshBase() : uniqueKey(UniqueKey::Make()) {
 }
 
 }  // namespace tgfx
