@@ -22,12 +22,11 @@
 
 namespace tgfx {
 /**
- * Types for interacting with Metal resources created externally to TGFX. Holds the MTLTexture as a
- * const void*.
+ * Types for interacting with Metal textures created externally to TGFX.
  */
 struct MetalTextureInfo {
   /**
-   * Pointer to MTLTexture.
+   * Pointer to an id<MTLTexture> object.
    */
   const void* texture = nullptr;
 
@@ -42,7 +41,7 @@ struct MetalTextureInfo {
  */
 struct MetalSemaphoreInfo {
   /**
-   * Pointer to MTLEvent. Used for GPU-to-GPU synchronization.
+   * Pointer to an id<MTLEvent> object.
    */
   const void* event = nullptr;
 
