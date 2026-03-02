@@ -179,7 +179,7 @@ BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
       glSyncInfo = that.glSyncInfo;
       break;
     case Backend::Metal:
-      metalSemaphoreInfo = that.metalSemaphoreInfo;
+      metalSyncInfo = that.metalSyncInfo;
       break;
     default:
       break;
@@ -192,7 +192,7 @@ bool BackendSemaphore::isInitialized() const {
     case Backend::OpenGL:
       return glSyncInfo.sync != nullptr;
     case Backend::Metal:
-      return metalSemaphoreInfo.event != nullptr;
+      return metalSyncInfo.event != nullptr;
     default:
       break;
   }
@@ -207,11 +207,11 @@ bool BackendSemaphore::getGLSync(GLSyncInfo* syncInfo) const {
   return true;
 }
 
-bool BackendSemaphore::getMetalSemaphore(MetalSemaphoreInfo* metalInfo) const {
-  if (_backend != Backend::Metal || metalSemaphoreInfo.event == nullptr) {
+bool BackendSemaphore::getMetalSync(MetalSyncInfo* metalInfo) const {
+  if (_backend != Backend::Metal || metalSyncInfo.event == nullptr) {
     return false;
   }
-  *metalInfo = metalSemaphoreInfo;
+  *metalInfo = metalSyncInfo;
   return true;
 }
 

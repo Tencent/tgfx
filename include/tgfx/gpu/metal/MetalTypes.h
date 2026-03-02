@@ -37,9 +37,9 @@ struct MetalTextureInfo {
 };
 
 /**
- * Types for interacting with Metal semaphore objects created externally to TGFX.
+ * Types for interacting with Metal sync objects created externally to TGFX.
  */
-struct MetalSemaphoreInfo {
+struct MetalSyncInfo {
   /**
    * Pointer to an id<MTLEvent> object.
    */
