@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalTexture.h"
+#include "MetalDefines.h"
 #include "MetalExternalTexture.h"
 #include "MetalGPU.h"
-#include "MetalDefines.h"
 
 namespace tgfx {
 
@@ -43,7 +43,8 @@ static PixelFormat ToPixelFormat(MTLPixelFormat metalFormat) {
   }
 }
 
-std::shared_ptr<MetalTexture> MetalTexture::Make(MetalGPU* gpu, const TextureDescriptor& descriptor) {
+std::shared_ptr<MetalTexture> MetalTexture::Make(MetalGPU* gpu,
+                                                 const TextureDescriptor& descriptor) {
   if (!gpu || descriptor.width <= 0 || descriptor.height <= 0) {
     return nullptr;
   }
@@ -91,7 +92,7 @@ std::shared_ptr<MetalTexture> MetalTexture::Make(MetalGPU* gpu, const TextureDes
 }
 
 std::shared_ptr<MetalTexture> MetalTexture::MakeFrom(MetalGPU* gpu, id<MTLTexture> metalTexture,
-                                                 uint32_t usage, bool adopted) {
+                                                     uint32_t usage, bool adopted) {
   if (!gpu || !metalTexture) {
     return nullptr;
   }
@@ -135,7 +136,8 @@ BackendTexture MetalTexture::getBackendTexture() const {
   MetalTextureInfo metalInfo;
   metalInfo.texture = (__bridge const void*)texture;
   metalInfo.format = static_cast<unsigned>(texture.pixelFormat);
-  return BackendTexture(metalInfo, static_cast<int>(texture.width), static_cast<int>(texture.height));
+  return BackendTexture(metalInfo, static_cast<int>(texture.width),
+                        static_cast<int>(texture.height));
 }
 
 BackendRenderTarget MetalTexture::getBackendRenderTarget() const {
@@ -145,7 +147,8 @@ BackendRenderTarget MetalTexture::getBackendRenderTarget() const {
   MetalTextureInfo metalInfo;
   metalInfo.texture = (__bridge const void*)texture;
   metalInfo.format = static_cast<unsigned>(texture.pixelFormat);
-  return BackendRenderTarget(metalInfo, static_cast<int>(texture.width), static_cast<int>(texture.height));
+  return BackendRenderTarget(metalInfo, static_cast<int>(texture.width),
+                             static_cast<int>(texture.height));
 }
 
 }  // namespace tgfx

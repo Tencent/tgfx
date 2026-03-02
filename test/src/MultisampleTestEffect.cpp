@@ -100,8 +100,7 @@ std::shared_ptr<RenderPipeline> MultisampleTestEffect::createPipeline(GPU* gpu) 
 
 bool MultisampleTestEffect::onDraw(CommandEncoder* encoder,
                                    const std::vector<std::shared_ptr<Texture>>&,
-                                   std::shared_ptr<Texture> outputTexture,
-                                   const Point&) const {
+                                   std::shared_ptr<Texture> outputTexture, const Point&) const {
   auto gpu = encoder->gpu();
   auto pipeline = createPipeline(gpu);
   if (pipeline == nullptr) {
