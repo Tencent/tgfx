@@ -20,7 +20,7 @@ if [[ $(uname) == 'Darwin' ]]; then
       echo "----$clangformat----"
   else
       echo "----install clang-format----"
-      pip3 install clang-format==14
+      pip3 install --break-system-packages clang-format==14
   fi
 fi
 
