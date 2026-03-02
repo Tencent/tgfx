@@ -205,13 +205,13 @@ class PathDecomposer {
     return totalQuadCount_;
   }
 
-  std::vector<Point>& lines() {
+  const std::vector<Point>& lines() const {
     return lines_;
   }
-  std::vector<Point>& quads() {
+  const std::vector<Point>& quads() const {
     return quads_;
   }
-  std::vector<int>& quadSubdivCounts() {
+  const std::vector<int>& quadSubdivCounts() const {
     return quadSubdivCounts_;
   }
 

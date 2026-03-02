@@ -262,22 +262,22 @@ class RectIndicesProvider : public DataSource<Data> {
 
 class HairlineIndicesProvider : public DataSource<Data> {
  public:
-  HairlineIndicesProvider(const uint16_t* pattern, uint32_t patternSize, uint32_t reps,
-                          uint32_t vertCount)
+  HairlineIndicesProvider(const uint16_t* pattern, uint16_t patternSize, uint16_t reps,
+                          uint16_t vertCount)
       : pattern(pattern), patternSize(patternSize), reps(reps), vertCount(vertCount) {
   }
 
   std::shared_ptr<Data> getData() const override {
-    auto size = sizeof(uint32_t) * reps * patternSize;
+    auto size = sizeof(uint16_t) * reps * patternSize;
     Buffer buffer(size);
     if (buffer.isEmpty()) {
       return nullptr;
     }
-    auto data = reinterpret_cast<uint32_t*>(buffer.data());
-    for (uint32_t i = 0; i < reps; ++i) {
+    auto data = reinterpret_cast<uint16_t*>(buffer.data());
+    for (uint16_t i = 0; i < reps; ++i) {
       auto baseIdx = static_cast<size_t>(i) * patternSize;
-      auto baseVert = i * vertCount;
-      for (uint32_t j = 0; j < patternSize; ++j) {
+      auto baseVert = static_cast<uint16_t>(i * vertCount);
+      for (uint16_t j = 0; j < patternSize; ++j) {
         data[baseIdx + j] = baseVert + pattern[j];
       }
     }
@@ -286,9 +286,9 @@ class HairlineIndicesProvider : public DataSource<Data> {
 
  private:
   const uint16_t* pattern = nullptr;
-  uint32_t patternSize = 0;
-  uint32_t reps = 0;
-  uint32_t vertCount = 0;
+  uint16_t patternSize = 0;
+  uint16_t reps = 0;
+  uint16_t vertCount = 0;
 };
 
 std::shared_ptr<GPUBufferProxy> GlobalCache::getRectIndexBuffer(

@@ -46,9 +46,9 @@ std::shared_ptr<Resource> HairlineBufferUploadTask::onMakeResource(Context* cont
   // This ensures atomic success/failure behavior.
   bool failed = false;
   auto lineVertexBuffer = createBuffer(context, gpu, hairlineBuffer->lineVertices,
-                                        GPUBufferUsage::VERTEX, "line vertex buffer", failed);
+                                        GPUBufferUsage::VERTEX, "line vertex buffer", &failed);
   auto quadVertexBuffer = createBuffer(context, gpu, hairlineBuffer->quadVertices,
-                                        GPUBufferUsage::VERTEX, "quad vertex buffer", failed);
+                                        GPUBufferUsage::VERTEX, "quad vertex buffer", &failed);
 
   if (failed) {
     // Don't assign any buffers to proxies if any creation failed.
@@ -72,7 +72,7 @@ std::shared_ptr<Resource> HairlineBufferUploadTask::onMakeResource(Context* cont
 
 std::shared_ptr<BufferResource> HairlineBufferUploadTask::createBuffer(
     Context* context, GPU* gpu, const std::shared_ptr<Data>& data, uint32_t usage,
-    const char* bufferName, bool& creationFailed) {
+    const char* bufferName, bool* creationFailed) {
   if (!data || data->empty()) {
     return nullptr;
   }
@@ -80,7 +80,7 @@ std::shared_ptr<BufferResource> HairlineBufferUploadTask::createBuffer(
   auto gpuBuffer = gpu->createBuffer(data->size(), usage);
   if (!gpuBuffer) {
     LOGE("HairlineBufferUploadTask: Failed to create %s!", bufferName);
-    creationFailed = true;
+    *creationFailed = true;
     return nullptr;
   }
 

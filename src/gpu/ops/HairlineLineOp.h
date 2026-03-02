@@ -52,10 +52,10 @@ class HairlineLineOp final : public DrawOp {
                  std::shared_ptr<GPUBufferProxy> indexBufferProxy, PMColor color,
                  const Matrix& uvMatrix, float coverage, AAType aaType);
 
-  std::shared_ptr<GPUHairlineProxy> hairlineProxy;
-  std::shared_ptr<GPUBufferProxy> indexBufferProxy;
-  PMColor color;
-  Matrix uvMatrix;
+  std::shared_ptr<GPUHairlineProxy> hairlineProxy = nullptr;
+  std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
+  PMColor color = {};
+  Matrix uvMatrix = {};
   float coverage = 1.0f;
 
   friend class BlockAllocator;

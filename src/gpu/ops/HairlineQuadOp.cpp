@@ -74,7 +74,7 @@ void HairlineQuadOp::onDraw(RenderPass* renderPass) {
   }
   auto totalQuadCount = vertexBuffer->size() / (VerticesPerQuad * BytesPerQuadVertex);
   size_t vertexOffset = 0;
-  renderPass->setIndexBuffer(indexBuffer->gpuBuffer(), IndexFormat::UInt32);
+  renderPass->setIndexBuffer(indexBuffer->gpuBuffer(), IndexFormat::UInt16);
 
   while (totalQuadCount > 0) {
     auto batchQuadCount = std::min(totalQuadCount, MaxNumQuads);

@@ -74,7 +74,7 @@ void HairlineLineOp::onDraw(RenderPass* renderPass) {
   }
   auto totalLineCount = vertexBuffer->size() / (VerticesPerLine * BytesPerLineVertex);
   size_t vertexOffset = 0;
-  renderPass->setIndexBuffer(indexBuffer->gpuBuffer(), IndexFormat::UInt32);
+  renderPass->setIndexBuffer(indexBuffer->gpuBuffer(), IndexFormat::UInt16);
 
   while (totalLineCount > 0) {
     auto batchLineCount = std::min(totalLineCount, MaxNumLines);
