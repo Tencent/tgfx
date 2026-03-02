@@ -35,8 +35,6 @@ class FTScalerContext : public ScalerContext {
 
   ~FTScalerContext() override;
 
-  FontMetrics getFontMetrics() const override;
-
   Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override;
 
   float getAdvance(GlyphID glyphID, bool verticalText) const override;
@@ -55,10 +53,11 @@ class FTScalerContext : public ScalerContext {
     return backingSize;
   }
 
+ protected:
+  FontMetrics onComputeFontMetrics() const override;
+
  private:
   int setupSize(bool fauxItalic) const;
-
-  void getFontMetricsInternal(FontMetrics* metrics) const;
 
   float getAdvanceInternal(GlyphID glyphID, bool verticalText = false) const;
 

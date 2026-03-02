@@ -68,7 +68,7 @@ class Context3DCompositor {
 
  private:
   void drawPolygon(const DrawPolygon3D* polygon);
-  void drawQuads(const DrawPolygon3D* polygon, const std::vector<QuadCW>& subQuads);
+  void drawQuads(const DrawPolygon3D* polygon, const std::vector<Quad>& subQuads);
 
   int _width = 0;
   int _height = 0;

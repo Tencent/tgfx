@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,28 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/processors/QuadPerEdgeAA3DGeometryProcessor.h"
+#include "core/MatrixUtils.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 
-/**
- * The implementation of QuadPerEdgeAA3DGeometryProcessor using GLSL.
- */
-class GLSLQuadPerEdgeAA3DGeometryProcessor final : public QuadPerEdgeAA3DGeometryProcessor {
- public:
-  /**
-   * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
-   */
-  explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& matrix,
-                                                const Vec2& ndcScale, const Vec2& ndcOffset,
-                                                std::optional<PMColor> commonColor);
-
-  void emitCode(EmitArgs& args) const override;
-
-  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
-               FPCoordTransformIter* transformIter) const override;
-};
+bool MatrixUtils::PreservesRightAngles(const Matrix& matrix) {
+  const auto mask = matrix.getType();
+  if (mask <= Matrix::TranslateMask) {
+    return true;
+  }
+  if (mask & Matrix::PerspectiveMask) {
+    return false;
+  }
+  const auto sx = matrix.getScaleX();
+  const auto sy = matrix.getScaleY();
+  const auto kx = matrix.getSkewX();
+  const auto ky = matrix.getSkewY();
+  // Check for degenerate matrix.
+  if (const auto det = sx * sy - kx * ky; FloatNearlyZero(det)) {
+    return false;
+  }
+  // Orthogonality alone suffices — non-uniform scaling preserves right angles.
+  const auto dot = sx * kx + ky * sy;
+  return FloatNearlyZero(dot);
+}
 
 }  // namespace tgfx

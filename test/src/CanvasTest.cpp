@@ -1475,6 +1475,151 @@ TGFX_TEST(CanvasTest, DrawTextBlob) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawTextBlob"));
 }
 
+static inline Matrix3D MakePerspectiveMatrix(float eyeDistance = 200.f) {
+  auto perspective = Matrix3D::I();
+  perspective.setRowColumn(3, 2, -1.f / eyeDistance);
+  return perspective;
+}
+
+static Matrix3D MakeTransformMatrix(const Point& origin, const Size& size, float rotateX,
+                                    float rotateY, float rotateZ, float eyeDistance = 200.f) {
+  auto anchor = Point::Make(0.5f, 0.5f);
+  auto offsetToAnchor =
+      Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+  auto invOffsetToAnchor =
+      Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+  auto model = Matrix3D::I();
+  model.postRotate({0, 0, 1}, rotateZ);
+  model.postRotate({1, 0, 0}, rotateX);
+  model.postRotate({0, 1, 0}, rotateY);
+  auto perspective = MakePerspectiveMatrix(eyeDistance);
+  auto originTranslate = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+  return originTranslate * invOffsetToAnchor * perspective * model * offsetToAnchor;
+}
+
+TGFX_TEST(CanvasTest, Matrix3D) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // 6 tests: 3 columns x 2 rows, each cell 100x100, with 50px margin
+  // Layout: 50 + 100*3 + 50 = 400 width, 50 + 100*2 + 50 = 300 height
+  auto surface = Surface::Make(context, 400, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto shapeSize = Size{60, 60};
+  auto cellSize = Size{100, 100};
+  auto margin = 50.f;
+
+  // Test 1: drawRect - covers OpsCompositor::fillRect
+  {
+    auto cellOrigin = Point::Make(margin, margin);
+    auto origin = Point::Make(cellOrigin.x + (cellSize.width - shapeSize.width) / 2,
+                              cellOrigin.y + (cellSize.height - shapeSize.height) / 2);
+    auto transform = MakeTransformMatrix(origin, shapeSize, 45, 0, 0);
+    AutoCanvasRestore autoRestore(canvas);
+    canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
+    Paint paint;
+    paint.setColor(Color::FromRGBA(255, 0, 0, 200));
+    canvas->drawRect(Rect::MakeWH(shapeSize.width, shapeSize.height), paint);
+  }
+
+  // Test 2: drawRRect - covers OpsCompositor::drawRRect
+  {
+    auto cellOrigin = Point::Make(margin + cellSize.width, margin);
+    auto origin = Point::Make(cellOrigin.x + (cellSize.width - shapeSize.width) / 2,
+                              cellOrigin.y + (cellSize.height - shapeSize.height) / 2);
+    auto transform = MakeTransformMatrix(origin, shapeSize, 0, 45, 0);
+    AutoCanvasRestore autoRestore(canvas);
+    canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
+    Paint paint;
+    paint.setColor(Color::FromRGBA(0, 255, 0, 200));
+    canvas->drawRoundRect(Rect::MakeWH(shapeSize.width, shapeSize.height), 10, 10, paint);
+  }
+
+  // Test 3: drawPath (bezier curve) - covers OpsCompositor::drawShape
+  {
+    auto cellOrigin = Point::Make(margin + cellSize.width * 2, margin);
+    auto origin = Point::Make(cellOrigin.x + (cellSize.width - shapeSize.width) / 2,
+                              cellOrigin.y + (cellSize.height - shapeSize.height) / 2);
+    auto transform = MakeTransformMatrix(origin, shapeSize, 35, 35, 0);
+
+    Path path;
+    path.moveTo(0, shapeSize.height);
+    path.cubicTo(0, 0, shapeSize.width, 0, shapeSize.width, shapeSize.height);
+    path.close();
+
+    AutoCanvasRestore autoRestore(canvas);
+    canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
+    Paint paint;
+    paint.setColor(Color::FromRGBA(0, 0, 255, 200));
+    canvas->drawPath(path, paint);
+  }
+
+  // Test 4: drawImage - covers OpsCompositor::fillImage
+  {
+    auto cellOrigin = Point::Make(margin, margin + cellSize.height);
+    auto origin = Point::Make(cellOrigin.x + (cellSize.width - shapeSize.width) / 2,
+                              cellOrigin.y + (cellSize.height - shapeSize.height) / 2);
+    auto transform = MakeTransformMatrix(origin, shapeSize, 45, 0, 0);
+
+    auto image = MakeImage("resources/apitest/test_timestretch.png");
+    ASSERT_TRUE(image != nullptr);
+    image = image->makeScaled(static_cast<int>(shapeSize.width),
+                              static_cast<int>(shapeSize.height));
+    ASSERT_TRUE(image != nullptr);
+
+    AutoCanvasRestore autoRestore(canvas);
+    canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
+    Paint paint;
+    canvas->drawImage(image, &paint);
+  }
+
+  // Test 5: drawImageRect - covers OpsCompositor::fillImageRect
+  {
+    auto cellOrigin = Point::Make(margin + cellSize.width, margin + cellSize.height);
+    auto origin = Point::Make(cellOrigin.x + (cellSize.width - shapeSize.width) / 2,
+                              cellOrigin.y + (cellSize.height - shapeSize.height) / 2);
+    auto transform = MakeTransformMatrix(origin, shapeSize, 0, 45, 0);
+
+    auto image = MakeImage("resources/apitest/test_timestretch.png");
+    ASSERT_TRUE(image != nullptr);
+
+    auto srcRect =
+        Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height()));
+    auto dstRect = Rect::MakeWH(shapeSize.width, shapeSize.height);
+
+    AutoCanvasRestore autoRestore(canvas);
+    canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
+    Paint paint;
+    canvas->drawImageRect(image, srcRect, dstRect, {}, &paint);
+  }
+
+  // Test 6: drawSimpleText - covers OpsCompositor::fillTextAtlas
+  {
+    auto textSize = Size{40, 30};
+    auto cellOrigin = Point::Make(margin + cellSize.width * 2, margin + cellSize.height);
+    auto origin = Point::Make(cellOrigin.x + (cellSize.width - textSize.width) / 2,
+                              cellOrigin.y + (cellSize.height - textSize.height) / 2);
+    auto transform = MakeTransformMatrix(origin, textSize, 35, 35, 0);
+
+    auto typeface =
+        Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+    ASSERT_TRUE(typeface != nullptr);
+    Font font(typeface, 24);
+
+    AutoCanvasRestore autoRestore(canvas);
+    canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
+    Paint paint;
+    paint.setColor(Color::Black());
+    canvas->drawSimpleText("3D", 0, 24, font, paint);
+  }
+
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Matrix3D"));
+}
+
 TGFX_TEST(CanvasTest, CMYKWithoutICCProfile) {
   ContextScope scope;
   auto context = scope.getContext();

@@ -36,6 +36,7 @@ static void SerializeBasicLayerStyleImpl(flexbuffers::Builder& fbb, const LayerS
   SerializeUtils::SetFlexBufferMap(
       fbb, "extraSourceType",
       SerializeUtils::LayerStyleExtraSourceTypeToString(layerStyle->extraSourceType()));
+  SerializeUtils::SetFlexBufferMap(fbb, "excludeChildEffects", layerStyle->excludeChildEffects());
 }
 
 static void SerializeBackGroundBlurStyleImpl(flexbuffers::Builder& fbb,
