@@ -24,6 +24,11 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/VectorLayer.h"
+#include "tgfx/layers/vectors/FillStyle.h"
+#include "tgfx/layers/vectors/ShapePath.h"
+#include "tgfx/layers/vectors/SolidColor.h"
+#include "tgfx/layers/vectors/StrokeStyle.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "utils/TestUtils.h"
 
@@ -1300,6 +1305,77 @@ TGFX_TEST(StrokeTest, HairlineStrokeTextAsPath) {
   canvas->drawTextBlob(textBlob, 0, 0, strokePaint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineStrokeTextAsPath"));
+}
+
+static std::shared_ptr<VectorLayer> MakeDashVectorLayer(const Path& path, float lineWidth,
+                                                        LineCap cap,
+                                                        const std::vector<float>& dashes) {
+  auto vectorLayer = VectorLayer::Make();
+  auto shapePath = ShapePath::Make();
+  shapePath->setPath(path);
+  auto strokeStyle = StrokeStyle::Make(SolidColor::Make(Color::Red()));
+  strokeStyle->setStrokeWidth(lineWidth);
+  strokeStyle->setLineCap(cap);
+  strokeStyle->setDashes(dashes);
+  vectorLayer->setContents({shapePath, strokeStyle});
+  return vectorLayer;
+}
+
+static std::shared_ptr<ShapeLayer> MakeDashShapeLayer(const Path& path, float lineWidth,
+                                                      LineCap cap,
+                                                      const std::vector<float>& dashes) {
+  auto shapeLayer = ShapeLayer::Make();
+  shapeLayer->setPath(path);
+  shapeLayer->setLineWidth(lineWidth);
+  shapeLayer->setLineCap(cap);
+  shapeLayer->setLineDashPattern(dashes);
+  shapeLayer->setStrokeStyle(ShapeStyle::Make(Color::Red()));
+  return shapeLayer;
+}
+
+// Compares dash behavior between VectorLayer and ShapeLayer to ensure consistency.
+// Left column: VectorLayer, Right column: ShapeLayer.
+// Row 1: Square cap + gap <= lineWidth (dash simplified to solid line)
+// Row 2: Square cap + mixed gaps (partial simplification)
+// Row 3: Butt cap + dash (no simplification)
+TGFX_TEST(StrokeTest, DashConsistencyBetweenVectorAndShapeLayer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 500);
+
+  Path rectPath = {};
+  rectPath.addRect(-60, -40, 60, 40);
+
+  struct DashCase {
+    std::vector<float> dashes;
+    float lineWidth;
+    LineCap cap;
+    float offsetY;
+  };
+
+  std::vector<DashCase> cases = {
+      {{2, 2}, 4, LineCap::Square, 80},
+      {{2, 2, 2, 8}, 4, LineCap::Square, 220},
+      {{10, 8}, 4, LineCap::Butt, 380},
+  };
+
+  float leftX = 110;
+  float rightX = 290;
+
+  DisplayList displayList;
+  for (const auto& c : cases) {
+    auto vectorLayer = MakeDashVectorLayer(rectPath, c.lineWidth, c.cap, c.dashes);
+    vectorLayer->setMatrix(Matrix::MakeTrans(leftX, c.offsetY));
+    displayList.root()->addChild(vectorLayer);
+
+    auto shapeLayer = MakeDashShapeLayer(rectPath, c.lineWidth, c.cap, c.dashes);
+    shapeLayer->setMatrix(Matrix::MakeTrans(rightX, c.offsetY));
+    displayList.root()->addChild(shapeLayer);
+  }
+  displayList.render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/DashConsistencyBetweenVectorAndShapeLayer"));
 }
 
 }  // namespace tgfx
