@@ -28,11 +28,9 @@ namespace tgfx {
  */
 class GPUHairlineProxy {
  public:
-  GPUHairlineProxy(const Matrix& drawingMatrix,
-                   std::shared_ptr<GPUBufferProxy> lineVertexBuffer,
+  GPUHairlineProxy(const Matrix& drawingMatrix, std::shared_ptr<GPUBufferProxy> lineVertexBuffer,
                    std::shared_ptr<GPUBufferProxy> quadVertexBuffer)
-      : drawingMatrix(drawingMatrix),
-        lineVertexProxy(std::move(lineVertexBuffer)),
+      : drawingMatrix(drawingMatrix), lineVertexProxy(std::move(lineVertexBuffer)),
         quadVertexProxy(std::move(quadVertexBuffer)) {
   }
 

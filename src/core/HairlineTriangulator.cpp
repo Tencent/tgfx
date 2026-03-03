@@ -170,8 +170,7 @@ int NumQuadSubdivs(const Point points[3]) {
  */
 class PathDecomposer {
  public:
-  PathDecomposer(const Matrix& matrix, float capLength)
-      : matrix_(matrix), capLength_(capLength) {
+  PathDecomposer(const Matrix& matrix, float capLength) : matrix_(matrix), capLength_(capLength) {
     // Reserve space based on empirical testing. For typical paths, 128 points provide a good
     // balance between avoiding frequent reallocations and not over-allocating memory.
     lines_.reserve(128);

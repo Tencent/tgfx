@@ -65,8 +65,9 @@ size_t PathTriangulator::ToTriangles(const Path& path, const Rect& clipBounds,
                                      std::vector<float>* vertices, bool* isLinear) {
   const auto& skPath = PathRef::ReadAccess(path);
   bool linear = false;
-  auto count = skPath.toTriangles(
-      PathUtils::DefaultTolerance, *reinterpret_cast<const pk::SkRect*>(&clipBounds), vertices, &linear);
+  auto count =
+      skPath.toTriangles(PathUtils::DefaultTolerance,
+                         *reinterpret_cast<const pk::SkRect*>(&clipBounds), vertices, &linear);
   if (isLinear) {
     *isLinear = linear;
   }
