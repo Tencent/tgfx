@@ -460,6 +460,7 @@
     },
     "StrokeTest": {
         "ConvertCubicToQuads": "779da4bd",
+        "DashConsistencyBetweenVectorAndShapeLayer": "a318e2d1",
         "DashStrokeAsSolidStroke": "eefb7a46",
         "DrawPathByHairlinePaint": "5ff7fdca",
         "DrawShapeByHairlinePaint": "5ff7fdca",

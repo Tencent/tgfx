@@ -17,10 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
-#include "core/utils/StrokeUtils.h"
+#include "DashEffect.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
-#include "tgfx/core/PathEffect.h"
 #include "tgfx/layers/LayerPaint.h"
 
 namespace tgfx {
@@ -249,15 +248,9 @@ std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
     tempStroke.width *= 2;
   }
   if (!_lineDashPattern.empty()) {
-    auto dashes = _lineDashPattern;
-    if (_lineDashPattern.size() % 2 != 0) {
-      dashes.insert(dashes.end(), _lineDashPattern.begin(), _lineDashPattern.end());
-    }
-    dashes = SimplifyLineDashPattern(dashes, tempStroke);
-    // dashes may be simplified to solid line.
-    if (!dashes.empty()) {
-      auto dash = PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()),
-                                       _lineDashPhase, shapeBitFields.lineDashAdaptive);
+    auto dash = CreateDashPathEffect(_lineDashPattern, _lineDashPhase,
+                                     shapeBitFields.lineDashAdaptive, tempStroke);
+    if (dash) {
       strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(dash));
     }
   }
