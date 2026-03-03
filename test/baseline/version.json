@@ -222,6 +222,7 @@
         "InvalidMask": "bf48e614",
         "MaskAlpha": "bf48e614",
         "MaskInvalidation_NoMask": "6d7f38ad",
+        "MaskInvalidation_SwitchMask": "92ee56bb",
         "MaskInvalidation_WithMask": "6d7f38ad",
         "MaskPathOptimization": "bf48e614",
         "RoundRectMaskWithTiledRender": "bf48e614",

@@ -801,6 +801,56 @@ TGFX_TEST(LayerMaskTest, MaskInvalidation) {
   EXPECT_FALSE(child->bitFields.dirtyTransform);
   EXPECT_FALSE(maskLayer->bitFields.dirtyTransform);
   EXPECT_FALSE(root->bitFields.dirtyDescendents);
+
+  // Remove mask, both child and old maskLayer should be marked dirty.
+  child->setMask(nullptr);
+  EXPECT_TRUE(child->bitFields.dirtyTransform);
+  EXPECT_TRUE(maskLayer->bitFields.dirtyTransform);
+  EXPECT_TRUE(root->bitFields.dirtyDescendents);
+
+  // Third render without mask. Both child and maskLayer should be visible again.
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/MaskInvalidation_NoMask"));
+
+  // Verify dirty flags are cleared.
+  EXPECT_FALSE(child->bitFields.dirtyTransform);
+  EXPECT_FALSE(maskLayer->bitFields.dirtyTransform);
+  EXPECT_FALSE(root->bitFields.dirtyDescendents);
+
+  // Create a second mask and set it on child.
+  Path maskPath2;
+  maskPath2.addRect(Rect::MakeXYWH(40, 40, 80, 80));
+  auto maskLayer2 = ShapeLayer::Make();
+  maskLayer2->setPath(maskPath2);
+  maskLayer2->setFillStyle(ShapeStyle::Make(Color::Green()));
+  root->addChild(maskLayer2);
+  child->setMask(maskLayer2);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/MaskInvalidation_SwitchMask"));
+
+  // Verify dirty flags are cleared.
+  EXPECT_FALSE(child->bitFields.dirtyTransform);
+  EXPECT_FALSE(maskLayer2->bitFields.dirtyTransform);
+  EXPECT_FALSE(root->bitFields.dirtyDescendents);
+
+  // Switch mask from maskLayer2 to maskLayer. Both old and new mask should be marked dirty.
+  child->setMask(maskLayer);
+  EXPECT_TRUE(child->bitFields.dirtyTransform);
+  EXPECT_TRUE(maskLayer->bitFields.dirtyTransform);
+  EXPECT_TRUE(maskLayer2->bitFields.dirtyTransform);
+  EXPECT_TRUE(root->bitFields.dirtyDescendents);
+
+  // Remove maskLayer2 so it won't render as a normal child.
+  maskLayer2->removeFromParent();
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/MaskInvalidation_WithMask"));
+
+  // Verify dirty flags are cleared.
+  EXPECT_FALSE(child->bitFields.dirtyTransform);
+  EXPECT_FALSE(maskLayer->bitFields.dirtyTransform);
+  EXPECT_FALSE(root->bitFields.dirtyDescendents);
 }
 
 }  // namespace tgfx
