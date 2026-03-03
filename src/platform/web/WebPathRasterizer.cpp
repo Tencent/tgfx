@@ -21,7 +21,6 @@
 #include "ReadPixelsFromCanvasImage.h"
 #include "core/NoConicsPathIterator.h"
 #include "core/utils/ColorSpaceHelper.h"
-#include "core/utils/ScalePixelsAlpha.h"
 #include "core/utils/ShapeUtils.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Path.h"
@@ -100,8 +99,6 @@ bool WebPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, s
   if (!result) {
     return false;
   }
-  auto alphaScale = ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
-  ScalePixelsAlpha(targetInfo, dstPixels, alphaScale);
   if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
     ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
                              dstColorSpace, dstPixels);
