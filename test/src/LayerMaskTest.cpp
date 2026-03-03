@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "layers/RootLayer.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -749,6 +750,57 @@ TGFX_TEST(LayerMaskTest, RoundRectMaskWithTiledRender) {
   displayList.setContentOffset(-200.179016f, -221.704529f);
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/RoundRectMaskWithTiledRender"));
+}
+
+TGFX_TEST(LayerMaskTest, MaskInvalidation) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+  auto root = static_cast<RootLayer*>(displayList->root());
+
+  // root
+  //   --child (mask = maskLayer, later)
+  //   --maskLayer
+  Path childPath;
+  childPath.addRect(Rect::MakeXYWH(20, 20, 160, 160));
+  auto child = ShapeLayer::Make();
+  child->setPath(childPath);
+  child->setFillStyle(ShapeStyle::Make(Color::Red()));
+
+  Path maskPath;
+  maskPath.addOval(Rect::MakeXYWH(60, 30, 120, 160));
+  auto maskLayer = ShapeLayer::Make();
+  maskLayer->setPath(maskPath);
+  maskLayer->setFillStyle(ShapeStyle::Make(Color::Blue()));
+
+  root->addChild(child);
+  root->addChild(maskLayer);
+
+  // First render without mask, both child and maskLayer are visible.
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/MaskInvalidation_NoMask"));
+
+  // Verify all dirty flags are cleared after render.
+  EXPECT_FALSE(child->bitFields.dirtyTransform);
+  EXPECT_FALSE(maskLayer->bitFields.dirtyTransform);
+  EXPECT_FALSE(root->bitFields.dirtyDescendents);
+
+  // Set mask, both child and maskLayer should be marked dirty.
+  child->setMask(maskLayer);
+  EXPECT_TRUE(child->bitFields.dirtyTransform);
+  EXPECT_TRUE(maskLayer->bitFields.dirtyTransform);
+  EXPECT_TRUE(root->bitFields.dirtyDescendents);
+
+  // Second render with mask. maskLayer should be hidden (used as mask, skipped via maskOwner).
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/MaskInvalidation_WithMask"));
+
+  // Verify dirty flags are cleared again.
+  EXPECT_FALSE(child->bitFields.dirtyTransform);
+  EXPECT_FALSE(maskLayer->bitFields.dirtyTransform);
+  EXPECT_FALSE(root->bitFields.dirtyDescendents);
 }
 
 }  // namespace tgfx

@@ -23,8 +23,7 @@
 namespace tgfx {
 
 HairlineBufferUploadTask::HairlineBufferUploadTask(
-    std::shared_ptr<ResourceProxy> lineVertexProxy,
-    std::shared_ptr<ResourceProxy> quadVertexProxy,
+    std::shared_ptr<ResourceProxy> lineVertexProxy, std::shared_ptr<ResourceProxy> quadVertexProxy,
     std::unique_ptr<DataSource<HairlineBuffer>> source)
     : ResourceTask(std::move(lineVertexProxy)), quadVertexProxy(std::move(quadVertexProxy)),
       source(std::move(source)) {
@@ -46,9 +45,9 @@ std::shared_ptr<Resource> HairlineBufferUploadTask::onMakeResource(Context* cont
   // This ensures atomic success/failure behavior.
   bool failed = false;
   auto lineVertexBuffer = createBuffer(context, gpu, hairlineBuffer->lineVertices,
-                                        GPUBufferUsage::VERTEX, "line vertex buffer", &failed);
+                                       GPUBufferUsage::VERTEX, "line vertex buffer", &failed);
   auto quadVertexBuffer = createBuffer(context, gpu, hairlineBuffer->quadVertices,
-                                        GPUBufferUsage::VERTEX, "quad vertex buffer", &failed);
+                                       GPUBufferUsage::VERTEX, "quad vertex buffer", &failed);
 
   if (failed) {
     // Don't assign any buffers to proxies if any creation failed.

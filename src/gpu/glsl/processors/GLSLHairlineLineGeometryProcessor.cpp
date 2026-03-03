@@ -31,8 +31,7 @@ PlacementPtr<HairlineLineGeometryProcessor> HairlineLineGeometryProcessor::Make(
 GLSLHairlineLineGeometryProcessor::GLSLHairlineLineGeometryProcessor(const PMColor& color,
                                                                      const Matrix& viewMatrix,
                                                                      std::optional<Matrix> uvMatrix,
-                                                                     float coverage,
-                                                                     AAType aaType)
+                                                                     float coverage, AAType aaType)
     : HairlineLineGeometryProcessor(color, viewMatrix, uvMatrix, coverage, aaType) {
 }
 

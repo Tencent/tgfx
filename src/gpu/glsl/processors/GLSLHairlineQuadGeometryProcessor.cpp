@@ -31,8 +31,7 @@ PlacementPtr<HairlineQuadGeometryProcessor> HairlineQuadGeometryProcessor::Make(
 GLSLHairlineQuadGeometryProcessor::GLSLHairlineQuadGeometryProcessor(const PMColor& color,
                                                                      const Matrix& viewMatrix,
                                                                      std::optional<Matrix> uvMatrix,
-                                                                     float coverage,
-                                                                     AAType aaType)
+                                                                     float coverage, AAType aaType)
     : HairlineQuadGeometryProcessor(color, viewMatrix, uvMatrix, coverage, aaType) {
 }
 

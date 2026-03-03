@@ -221,6 +221,8 @@
         "HighZoomWithMask_Tiled": "bf48e614",
         "InvalidMask": "bf48e614",
         "MaskAlpha": "bf48e614",
+        "MaskInvalidation_NoMask": "6d7f38ad",
+        "MaskInvalidation_WithMask": "6d7f38ad",
         "MaskPathOptimization": "bf48e614",
         "RoundRectMaskWithTiledRender": "bf48e614",
         "imageMask": "bf48e614",
