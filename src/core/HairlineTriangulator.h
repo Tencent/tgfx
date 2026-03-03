@@ -18,11 +18,35 @@
 
 #pragma once
 
-#include "tgfx/core/ImageInfo.h"
+#include "core/DataSource.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
-/**
- * Scales the alpha value of each pixel by the given factor.
- */
-void ScalePixelsAlpha(const ImageInfo& info, void* pixels, float alphaScale);
+
+struct HairlineBuffer {
+  HairlineBuffer(std::shared_ptr<Data> lineVertices, std::shared_ptr<Data> quadVertices)
+      : lineVertices(std::move(lineVertices)), quadVertices(std::move(quadVertices)) {
+  }
+
+  std::shared_ptr<Data> lineVertices = nullptr;
+  std::shared_ptr<Data> quadVertices = nullptr;
+};
+
+class HairlineTriangulator : public DataSource<HairlineBuffer> {
+ public:
+  HairlineTriangulator(std::shared_ptr<Shape> shape, bool hasCap);
+
+  /**
+   * Returns true if the HairlineTriangulator benefits from asynchronous execution. For simple paths
+   * with few verbs, synchronous execution is faster due to thread scheduling overhead.
+   */
+  bool asyncSupport() const;
+
+  std::shared_ptr<HairlineBuffer> getData() const override;
+
+ private:
+  std::shared_ptr<Shape> shape = nullptr;
+  bool hasCap = false;
+};
+
 }  // namespace tgfx

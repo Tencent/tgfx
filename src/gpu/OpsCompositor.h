@@ -79,6 +79,12 @@ class OpsCompositor {
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush);
 
   /**
+   * Draws the given shape with hairline rendering.
+   */
+  void drawHairlineShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush,
+                         const Stroke* stroke);
+
+  /**
    * Draws the given mesh with the given state and brush.
    */
   void drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush);
