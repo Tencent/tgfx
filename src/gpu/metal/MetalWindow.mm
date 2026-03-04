@@ -22,27 +22,13 @@
 #include "MetalCommandQueue.h"
 #include "MetalGPU.h"
 #include "core/utils/Log.h"
+#include "core/utils/PixelFormatUtil.h"
 #include "gpu/proxies/DelayRenderTargetProxy.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/metal/MetalTypes.h"
 
 namespace tgfx {
-
-static PixelFormat MTLPixelFormatToPixelFormat(MTLPixelFormat format) {
-  switch (format) {
-    case MTLPixelFormatBGRA8Unorm:
-      return PixelFormat::BGRA_8888;
-    case MTLPixelFormatRGBA8Unorm:
-      return PixelFormat::RGBA_8888;
-    case MTLPixelFormatR8Unorm:
-      return PixelFormat::ALPHA_8;
-    case MTLPixelFormatRG8Unorm:
-      return PixelFormat::RG_88;
-    default:
-      return PixelFormat::RGBA_8888;
-  }
-}
 
 class MetalDrawableProvider : public RenderTargetProvider {
  public:
@@ -139,7 +125,7 @@ std::shared_ptr<Surface> MetalWindow::onCreateSurface(Context* context) {
     return nullptr;
   }
   drawableProvider = std::make_shared<MetalDrawableProvider>(metalLayer);
-  auto format = MTLPixelFormatToPixelFormat(metalLayer.pixelFormat);
+  auto format = MetalPixelFormatToPixelFormat(static_cast<unsigned>(metalLayer.pixelFormat));
   drawableProxy = std::make_shared<DelayRenderTargetProxy>(context, width, height, format,
                                                            ImageOrigin::TopLeft, drawableProvider);
   return Surface::MakeFrom(drawableProxy, 0, false, colorSpace);
