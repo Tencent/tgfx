@@ -25,6 +25,7 @@
 #include "MetalShaderModule.h"
 #include "MetalTexture.h"
 #include "core/utils/Log.h"
+#include "gpu/UniformData.h"
 
 namespace tgfx {
 
@@ -191,6 +192,15 @@ void MetalRenderPass::setScissorRect(int x, int y, int width, int height) {
     return;
   }
 
+  if (x == lastScissorX && y == lastScissorY && width == lastScissorWidth &&
+      height == lastScissorHeight) {
+    return;
+  }
+  lastScissorX = x;
+  lastScissorY = y;
+  lastScissorWidth = width;
+  lastScissorHeight = height;
+
   MTLScissorRect scissorRect;
   scissorRect.x = static_cast<NSUInteger>(x);
   scissorRect.y = static_cast<NSUInteger>(y);
@@ -202,18 +212,28 @@ void MetalRenderPass::setScissorRect(int x, int y, int width, int height) {
 
 void MetalRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   if (!renderEncoder || !pipeline) return;
+  if (currentPipeline == pipeline) return;
 
   currentPipeline = std::static_pointer_cast<MetalRenderPipeline>(pipeline);
   [renderEncoder setRenderPipelineState:currentPipeline->metalRenderPipelineState()];
 
   // Set depth stencil state if available
-  if (currentPipeline->metalDepthStencilState()) {
-    [renderEncoder setDepthStencilState:currentPipeline->metalDepthStencilState()];
+  auto depthStencilState = currentPipeline->metalDepthStencilState();
+  if (depthStencilState && depthStencilState != lastDepthStencilState) {
+    lastDepthStencilState = depthStencilState;
+    [renderEncoder setDepthStencilState:depthStencilState];
   }
 
-  // Set cull mode and front face winding
-  [renderEncoder setCullMode:currentPipeline->cullMode];
-  [renderEncoder setFrontFacingWinding:currentPipeline->frontFace];
+  // Set cull mode and front face winding with caching
+  if (!cullModeInitialized || currentPipeline->cullMode != lastCullMode) {
+    lastCullMode = currentPipeline->cullMode;
+    [renderEncoder setCullMode:lastCullMode];
+  }
+  if (!cullModeInitialized || currentPipeline->frontFace != lastFrontFace) {
+    lastFrontFace = currentPipeline->frontFace;
+    [renderEncoder setFrontFacingWinding:lastFrontFace];
+  }
+  cullModeInitialized = true;
 }
 
 void MetalRenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer,
@@ -221,9 +241,26 @@ void MetalRenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> 
   if (!renderEncoder || !buffer) {
     return;
   }
+  if (slot < MaxVertexBufferSlots && lastVertexBuffers[slot] == buffer.get() &&
+      lastVertexOffsets[slot] == offset) {
+    return;
+  }
 
   DEBUG_ASSERT(slot < VertexBufferIndexStart);
   auto metalBufferIndex = VertexBufferIndexStart - slot;
+
+  if (slot < MaxVertexBufferSlots && lastVertexBuffers[slot] == buffer.get()) {
+    // Same buffer, only offset changed — use lightweight offset-only update.
+    lastVertexOffsets[slot] = offset;
+    [renderEncoder setVertexBufferOffset:offset atIndex:metalBufferIndex];
+    return;
+  }
+
+  if (slot < MaxVertexBufferSlots) {
+    lastVertexBuffers[slot] = buffer.get();
+    lastVertexOffsets[slot] = offset;
+  }
+
   auto metalBuffer = std::static_pointer_cast<MetalBuffer>(buffer);
   [renderEncoder setVertexBuffer:metalBuffer->metalBuffer() offset:offset atIndex:metalBufferIndex];
 }
@@ -244,6 +281,15 @@ void MetalRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> text
   // Remap logical binding to actual Metal texture index via the pipeline's mapping table.
   unsigned textureIndex = currentPipeline ? currentPipeline->getTextureIndex(binding) : binding;
 
+  if (textureIndex < MaxTextureBindings && lastTextures[textureIndex] == texture.get() &&
+      lastSamplers[textureIndex] == sampler.get()) {
+    return;
+  }
+  if (textureIndex < MaxTextureBindings) {
+    lastTextures[textureIndex] = texture.get();
+    lastSamplers[textureIndex] = sampler.get();
+  }
+
   auto metalTexture = std::static_pointer_cast<MetalTexture>(texture);
   [renderEncoder setFragmentTexture:metalTexture->metalTexture() atIndex:textureIndex];
 
@@ -261,11 +307,36 @@ void MetalRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuff
   DEBUG_ASSERT(binding < VertexBufferIndexStart);
   (void)size;  // Metal doesn't need explicit size
 
+  if (binding < MaxUniformBindings && lastUniformBuffers[binding] == buffer.get() &&
+      lastUniformOffsets[binding] == offset) {
+    return;
+  }
+
+  if (binding < MaxUniformBindings && lastUniformBuffers[binding] == buffer.get()) {
+    // Same buffer, only offset changed — use lightweight offset-only update.
+    lastUniformOffsets[binding] = offset;
+    if (binding == VERTEX_UBO_BINDING_POINT) {
+      [renderEncoder setVertexBufferOffset:offset atIndex:binding];
+    } else {
+      [renderEncoder setFragmentBufferOffset:offset atIndex:binding];
+    }
+    return;
+  }
+
+  if (binding < MaxUniformBindings) {
+    lastUniformBuffers[binding] = buffer.get();
+    lastUniformOffsets[binding] = offset;
+  }
+
   auto metalBuffer = std::static_pointer_cast<MetalBuffer>(buffer);
 
-  // Uniform buffers use low Metal buffer indices (0, 1, ...) directly.
-  [renderEncoder setVertexBuffer:metalBuffer->metalBuffer() offset:offset atIndex:binding];
-  [renderEncoder setFragmentBuffer:metalBuffer->metalBuffer() offset:offset atIndex:binding];
+  // Vertex UBO (binding 0) is only used by vertex shader, fragment UBO (binding 1) is only used
+  // by fragment shader. Bind to the corresponding stage only.
+  if (binding == VERTEX_UBO_BINDING_POINT) {
+    [renderEncoder setVertexBuffer:metalBuffer->metalBuffer() offset:offset atIndex:binding];
+  } else {
+    [renderEncoder setFragmentBuffer:metalBuffer->metalBuffer() offset:offset atIndex:binding];
+  }
 }
 
 void MetalRenderPass::setStencilReference(uint32_t reference) {
