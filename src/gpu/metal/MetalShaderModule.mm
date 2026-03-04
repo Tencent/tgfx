@@ -34,10 +34,6 @@
 
 namespace tgfx {
 
-// TODO: The current GLSL -> SPIR-V -> MSL conversion pipeline incurs high runtime compilation
-// overhead. Future improvements may include offline pre-compilation, shader caching, or binary
-// pipeline archive support to reduce latency.
-
 // Replace a regex pattern in the source string by invoking a callback for each match.
 // The callback receives the match and returns the replacement string.
 using MatchReplacer = std::string (*)(const std::smatch&, int&);
@@ -303,14 +299,13 @@ void MetalShaderModule::onRelease(MetalGPU*) {
 
 bool MetalShaderModule::compileShader(id<MTLDevice> device, const std::string& glslCode,
                                       ShaderStage stage) {
-  std::string mslCode = convertGLSLToMSL(glslCode, stage);
+  auto mslCode = convertGLSLToMSL(glslCode, stage);
   if (mslCode.empty()) {
     return false;
   }
 
   NSString* mslSource = [NSString stringWithUTF8String:mslCode.c_str()];
   NSError* error = nil;
-
   library = [device newLibraryWithSource:mslSource options:nil error:&error];
   if (!library) {
     if (error) {
@@ -353,7 +348,7 @@ SampleMaskCompileResult CompileFragmentShaderWithSampleMask(id<MTLDevice> device
   if (injectedSPIRV.empty()) {
     return result;
   }
-  std::string mslCode = convertSPIRVToMSL(injectedSPIRV, stage);
+  auto mslCode = convertSPIRVToMSL(injectedSPIRV, stage);
   if (mslCode.empty()) {
     return result;
   }

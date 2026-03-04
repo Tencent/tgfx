@@ -27,7 +27,6 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceCache.h"
 #include "gpu/ShaderCaps.h"
-#include "tgfx/core/Clock.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -168,4 +167,5 @@ void Context::purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point p
 bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit) {
   return _resourceCache->purgeUntilMemoryTo(bytesLimit);
 }
+
 }  // namespace tgfx
