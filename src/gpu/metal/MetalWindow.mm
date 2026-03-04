@@ -18,8 +18,10 @@
 
 #include "tgfx/gpu/metal/MetalWindow.h"
 #import <Metal/Metal.h>
+#import <MetalKit/MetalKit.h>
 #include "MetalCommandQueue.h"
 #include "MetalGPU.h"
+#include "core/utils/Log.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/metal/MetalTypes.h"
 
@@ -108,7 +110,6 @@ MetalWindow::MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalL
 }
 
 MetalWindow::~MetalWindow() {
-  [currentDrawable release];
   [offscreenTexture release];
   [copyPipelineState release];
 }
@@ -152,8 +153,6 @@ void MetalWindow::onPresent(Context* context) {
   if (drawable == nil) {
     return;
   }
-  [currentDrawable release];
-  currentDrawable = [drawable retain];
 
   auto metalGPU = static_cast<MetalGPU*>(context->gpu());
   auto queue = static_cast<MetalCommandQueue*>(metalGPU->queue());
@@ -167,9 +166,6 @@ void MetalWindow::onPresent(Context* context) {
 
   [commandBuffer presentDrawable:drawable];
   [commandBuffer commit];
-
-  [currentDrawable release];
-  currentDrawable = nil;
 }
 
 void MetalWindow::blitToDrawable(id<MTLCommandBuffer> commandBuffer, id<CAMetalDrawable> drawable) {
@@ -183,6 +179,9 @@ void MetalWindow::renderCopyToDrawable(id<MTLCommandBuffer> commandBuffer,
   auto metalDevice = static_cast<MetalDevice*>(device.get());
   auto mtlDevice = (__bridge id<MTLDevice>)metalDevice->metalDevice();
   ensureCopyPipelineState(mtlDevice, drawable.texture.pixelFormat);
+  if (copyPipelineState == nil) {
+    return;
+  }
 
   auto renderPassDesc = [MTLRenderPassDescriptor renderPassDescriptor];
   renderPassDesc.colorAttachments[0].texture = drawable.texture;
@@ -197,11 +196,20 @@ void MetalWindow::renderCopyToDrawable(id<MTLCommandBuffer> commandBuffer,
 }
 
 void MetalWindow::ensureCopyPipelineState(id<MTLDevice> device, MTLPixelFormat pixelFormat) {
-  if (copyPipelineState != nil) {
+  if (copyPipelineState != nil && copyPixelFormat == pixelFormat) {
     return;
   }
+  [copyPipelineState release];
+  copyPipelineState = nil;
+  copyPixelFormat = MTLPixelFormatInvalid;
+
   NSError* error = nil;
   auto library = [device newLibraryWithSource:CopyShaderSource options:nil error:&error];
+  if (library == nil) {
+    LOGE("MetalWindow::ensureCopyPipelineState() failed to compile copy shader: %s",
+         error.localizedDescription.UTF8String);
+    return;
+  }
   auto vertexFunc = [library newFunctionWithName:@"copyVertex"];
   auto fragmentFunc = [library newFunctionWithName:@"copyFragment"];
 
@@ -211,6 +219,12 @@ void MetalWindow::ensureCopyPipelineState(id<MTLDevice> device, MTLPixelFormat p
   pipelineDesc.colorAttachments[0].pixelFormat = pixelFormat;
 
   copyPipelineState = [device newRenderPipelineStateWithDescriptor:pipelineDesc error:&error];
+  if (copyPipelineState != nil) {
+    copyPixelFormat = pixelFormat;
+  } else {
+    LOGE("MetalWindow::ensureCopyPipelineState() failed to create pipeline state: %s",
+         error.localizedDescription.UTF8String);
+  }
 
   [pipelineDesc release];
   [fragmentFunc release];
@@ -220,8 +234,6 @@ void MetalWindow::ensureCopyPipelineState(id<MTLDevice> device, MTLPixelFormat p
 
 void MetalWindow::onFreeSurface() {
   Window::onFreeSurface();
-  [currentDrawable release];
-  currentDrawable = nil;
   [offscreenTexture release];
   offscreenTexture = nil;
   offscreenWidth = 0;

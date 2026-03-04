@@ -18,8 +18,10 @@
 
 #pragma once
 
-#import <MetalKit/MetalKit.h>
+#import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
+
+@class MTKView;
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/Window.h"
 #include "tgfx/gpu/metal/MetalDevice.h"
@@ -56,9 +58,9 @@ class MetalWindow : public Window {
  private:
   CAMetalLayer* metalLayer = nil;
   MTKView* metalView = nil;
-  id<CAMetalDrawable> currentDrawable = nil;
   id<MTLTexture> offscreenTexture = nil;
   id<MTLRenderPipelineState> copyPipelineState = nil;
+  MTLPixelFormat copyPixelFormat = MTLPixelFormatInvalid;
   int offscreenWidth = 0;
   int offscreenHeight = 0;
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
