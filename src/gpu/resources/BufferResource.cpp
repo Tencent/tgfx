@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,22 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ReadbackBufferCreateTask.h"
 #include "gpu/resources/BufferResource.h"
 
 namespace tgfx {
-ReadbackBufferCreateTask::ReadbackBufferCreateTask(std::shared_ptr<GPUBufferProxy> proxy,
-                                                   size_t size)
-    : ResourceTask(std::move(proxy)), size(size) {
-  DEBUG_ASSERT(size > 0);
+ScratchKey BufferResource::ComputeScratchKey(size_t size, uint32_t usage) {
+  static const uint32_t BufferResourceType = UniqueID::Next();
+  BytesKey bytesKey(4);
+  bytesKey.write(BufferResourceType);
+  bytesKey.write(static_cast<uint32_t>(size & 0xFFFFFFFF));
+  bytesKey.write(static_cast<uint32_t>(size >> 32));
+  bytesKey.write(usage);
+  return bytesKey;
 }
 
-std::shared_ptr<Resource> ReadbackBufferCreateTask::onMakeResource(Context* context) {
-  auto bufferResource = BufferResource::FindOrCreate(context, size, GPUBufferUsage::READBACK);
-  if (!bufferResource) {
-    LOGE("ReadbackBufferCreateTask::onMakeResource() Failed to create buffer!");
+std::shared_ptr<BufferResource> BufferResource::FindOrCreate(Context* context, size_t size,
+                                                             uint32_t usage) {
+  auto scratchKey = ComputeScratchKey(size, usage);
+  auto resource = Resource::Find<BufferResource>(context, scratchKey);
+  if (resource != nullptr) {
+    return resource;
   }
-  return bufferResource;
+  auto gpuBuffer = context->gpu()->createBuffer(size, usage);
+  if (!gpuBuffer) {
+    return nullptr;
+  }
+  return Wrap(context, std::move(gpuBuffer), scratchKey);
 }
-
 }  // namespace tgfx

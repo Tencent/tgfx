@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/utils/UniqueID.h"
 #include "gpu/resources/Resource.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/GPUBuffer.h"
@@ -28,6 +29,18 @@ namespace tgfx {
  */
 class BufferResource : public Resource {
  public:
+  /**
+   * Computes a ScratchKey for a buffer with the given size and usage flags.
+   */
+  static ScratchKey ComputeScratchKey(size_t size, uint32_t usage);
+
+  /**
+   * Finds a reusable BufferResource from the cache or creates a new one. The returned buffer is
+   * guaranteed to have at least the specified size and matching usage flags.
+   */
+  static std::shared_ptr<BufferResource> FindOrCreate(Context* context, size_t size,
+                                                      uint32_t usage);
+
   /**
    * Wraps an existing GPUBuffer into a BufferResource.
    */
