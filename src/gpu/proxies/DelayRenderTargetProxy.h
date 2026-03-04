@@ -18,23 +18,10 @@
 
 #pragma once
 
+#include "gpu/proxies/RenderTargetProvider.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-/**
- * An interface for providing render targets on demand. Implementations can defer the actual render
- * target creation until it is needed, for example, acquiring a Metal drawable at flush time.
- */
-class RenderTargetProvider {
- public:
-  virtual ~RenderTargetProvider() = default;
-
-  /**
-   * Creates or retrieves a render target. Called by DelayRenderTargetProxy when the render target is
-   * first needed during a frame.
-   */
-  virtual std::shared_ptr<RenderTarget> getRenderTarget(Context* context) = 0;
-};
 
 /**
  * A RenderTargetProxy that defers the creation of the underlying render target until
@@ -44,7 +31,8 @@ class RenderTargetProvider {
 class DelayRenderTargetProxy : public RenderTargetProxy {
  public:
   DelayRenderTargetProxy(Context* context, int width, int height, PixelFormat format,
-                         ImageOrigin origin, std::shared_ptr<RenderTargetProvider> provider);
+                         ImageOrigin origin, std::shared_ptr<RenderTargetProvider> provider,
+                         int sampleCount = 1);
 
   Context* getContext() const override;
   int width() const override;
@@ -67,6 +55,7 @@ class DelayRenderTargetProxy : public RenderTargetProxy {
   int _width = 0;
   int _height = 0;
   PixelFormat _format = PixelFormat::RGBA_8888;
+  int _sampleCount = 1;
   ImageOrigin _origin = ImageOrigin::TopLeft;
   std::shared_ptr<RenderTargetProvider> _provider = nullptr;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;

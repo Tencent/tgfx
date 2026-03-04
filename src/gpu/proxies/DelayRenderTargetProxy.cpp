@@ -21,9 +21,10 @@
 namespace tgfx {
 DelayRenderTargetProxy::DelayRenderTargetProxy(Context* context, int width, int height,
                                                PixelFormat format, ImageOrigin origin,
-                                               std::shared_ptr<RenderTargetProvider> provider)
-    : _context(context), _width(width), _height(height), _format(format), _origin(origin),
-      _provider(std::move(provider)) {
+                                               std::shared_ptr<RenderTargetProvider> provider,
+                                               int sampleCount)
+    : _context(context), _width(width), _height(height), _format(format), _sampleCount(sampleCount),
+      _origin(origin), _provider(std::move(provider)) {
 }
 
 Context* DelayRenderTargetProxy::getContext() const {
@@ -43,7 +44,7 @@ PixelFormat DelayRenderTargetProxy::format() const {
 }
 
 int DelayRenderTargetProxy::sampleCount() const {
-  return 1;
+  return _sampleCount;
 }
 
 ImageOrigin DelayRenderTargetProxy::origin() const {
