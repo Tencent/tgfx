@@ -97,10 +97,10 @@ PixelFormat MetalPixelFormatToPixelFormat(unsigned metalFormat) {
     case METAL_PIXEL_FORMAT_Depth32Float_Stencil8:
       return PixelFormat::DEPTH24_STENCIL8;
     case METAL_PIXEL_FORMAT_RGBA8Unorm:
+      return PixelFormat::RGBA_8888;
     default:
-      break;
+      return PixelFormat::Unknown;
   }
-  return PixelFormat::RGBA_8888;
 }
 
 }  // namespace tgfx

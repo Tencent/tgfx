@@ -30,6 +30,7 @@ std::shared_ptr<Resource> ReadbackBufferCreateTask::onMakeResource(Context* cont
   auto bufferResource = BufferResource::FindOrCreate(context, size, GPUBufferUsage::READBACK);
   if (!bufferResource) {
     LOGE("ReadbackBufferCreateTask::onMakeResource() Failed to create buffer!");
+    return nullptr;
   }
   return bufferResource;
 }

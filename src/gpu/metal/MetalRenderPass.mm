@@ -132,11 +132,7 @@ void MetalRenderPass::onEnd() {
 }
 
 MetalRenderPass::~MetalRenderPass() {
-  if (renderEncoder) {
-    [renderEncoder endEncoding];
-    [renderEncoder release];
-    renderEncoder = nil;
-  }
+  onEnd();
 }
 
 GPU* MetalRenderPass::gpu() const {
