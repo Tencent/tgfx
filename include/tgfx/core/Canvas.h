@@ -21,6 +21,7 @@
 #include <stack>
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Picture.h"
@@ -302,6 +303,22 @@ class Canvas {
    * @param paint  the paint to use for stroke, blend, color, etc.
    */
   void drawShape(std::shared_ptr<Shape> shape, const Paint& paint);
+
+  /**
+   * Draws a mesh using the current clip, matrix, and specified paint.
+   *
+   * Color blending rules for mesh rendering:
+   * - If shader exists with vertex colors: texture color * vertex color (Modulate blend)
+   * - If shader exists without vertex colors: pure texture color
+   * - If no shader with vertex colors: vertex color
+   * - If no shader and no vertex colors: paint color
+   *
+   * Note: Paint color does not participate in blending when shader or vertex colors are present.
+   *
+   * @param mesh  the mesh to draw.
+   * @param paint  the paint to use for blending, color, shader, etc.
+   */
+  void drawMesh(std::shared_ptr<Mesh> mesh, const Paint& paint);
 
   /**
    * Draws an image with its top-left corner at (0, 0) using the current clip and matrix.

@@ -112,6 +112,10 @@ void MaskContext::drawShape(std::shared_ptr<Shape>, const MCState&, const Brush&
   _aborted = true;
 }
 
+void MaskContext::drawMesh(std::shared_ptr<Mesh>, const MCState&, const Brush&) {
+  _aborted = true;
+}
+
 void MaskContext::drawImage(std::shared_ptr<Image>, const SamplingOptions&, const MCState&,
                             const Brush&) {
   _aborted = true;

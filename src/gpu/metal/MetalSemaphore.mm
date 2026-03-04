@@ -25,17 +25,17 @@ std::shared_ptr<MetalSemaphore> MetalSemaphore::Make(MetalGPU* gpu) {
   if (gpu == nullptr) {
     return nullptr;
   }
-  
+
   id<MTLEvent> event = [gpu->device() newEvent];
   if (event == nil) {
     return nullptr;
   }
-  
+
   return gpu->makeResource<MetalSemaphore>(event, static_cast<uint64_t>(0));
 }
 
 std::shared_ptr<MetalSemaphore> MetalSemaphore::MakeFrom(MetalGPU* gpu, id<MTLEvent> event,
-                                                     uint64_t value) {
+                                                         uint64_t value) {
   if (gpu == nullptr || event == nil) {
     return nullptr;
   }
@@ -43,15 +43,14 @@ std::shared_ptr<MetalSemaphore> MetalSemaphore::MakeFrom(MetalGPU* gpu, id<MTLEv
   return gpu->makeResource<MetalSemaphore>(event, value);
 }
 
-MetalSemaphore::MetalSemaphore(id<MTLEvent> event, uint64_t value)
-    : _event(event), _value(value) {
+MetalSemaphore::MetalSemaphore(id<MTLEvent> event, uint64_t value) : _event(event), _value(value) {
 }
 
 BackendSemaphore MetalSemaphore::getBackendSemaphore() const {
   if (_event == nil) {
     return {};
   }
-  MetalSemaphoreInfo metalInfo = {};
+  MetalSyncInfo metalInfo = {};
   metalInfo.event = (__bridge const void*)_event;
   metalInfo.value = _value;
   return BackendSemaphore(metalInfo);

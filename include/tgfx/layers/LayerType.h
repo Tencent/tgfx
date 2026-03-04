@@ -46,6 +46,10 @@ enum class LayerType {
   /**
    * A layer displaying vector elements (shapes, text, images) with fill/stroke styles and modifiers.
    */
-  Vector
+  Vector,
+  /**
+   * A layer displaying a mesh with vertex colors or textures.
+   */
+  Mesh
 };
 }  // namespace tgfx
