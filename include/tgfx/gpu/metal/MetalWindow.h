@@ -57,12 +57,20 @@ class MetalWindow : public Window {
   CAMetalLayer* metalLayer = nil;
   MTKView* metalView = nil;
   id<CAMetalDrawable> currentDrawable = nil;
+  id<MTLTexture> offscreenTexture = nil;
+  id<MTLRenderPipelineState> copyPipelineState = nil;
+  int offscreenWidth = 0;
+  int offscreenHeight = 0;
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   MetalWindow(std::shared_ptr<Device> device, CAMetalLayer* layer,
               std::shared_ptr<ColorSpace> colorSpace);
   MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalLayer* layer,
               std::shared_ptr<ColorSpace> colorSpace);
+
+  void blitToDrawable(id<MTLCommandBuffer> commandBuffer, id<CAMetalDrawable> drawable);
+  void renderCopyToDrawable(id<MTLCommandBuffer> commandBuffer, id<CAMetalDrawable> drawable);
+  void ensureCopyPipelineState(id<MTLDevice> device, MTLPixelFormat pixelFormat);
 };
 
 }  // namespace tgfx

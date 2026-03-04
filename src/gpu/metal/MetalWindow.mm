@@ -18,10 +18,38 @@
 
 #include "tgfx/gpu/metal/MetalWindow.h"
 #import <Metal/Metal.h>
+#include "MetalCommandQueue.h"
+#include "MetalGPU.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/metal/MetalTypes.h"
 
 namespace tgfx {
+
+static NSString* const CopyShaderSource = @R"msl(
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexOut {
+  float4 position [[position]];
+  float2 texCoord;
+};
+
+vertex VertexOut copyVertex(uint vertexID [[vertex_id]]) {
+  // Full-screen triangle: 3 vertices covering the entire clip space.
+  float2 positions[3] = {float2(-1.0, -1.0), float2(3.0, -1.0), float2(-1.0, 3.0)};
+  float2 texCoords[3] = {float2(0.0, 1.0), float2(2.0, 1.0), float2(0.0, -1.0)};
+  VertexOut out;
+  out.position = float4(positions[vertexID], 0.0, 1.0);
+  out.texCoord = texCoords[vertexID];
+  return out;
+}
+
+fragment float4 copyFragment(VertexOut in [[stage_in]],
+                             texture2d<float> srcTexture [[texture(0)]]) {
+  constexpr sampler texSampler(mag_filter::nearest, min_filter::nearest);
+  return srcTexture.sample(texSampler, in.texCoord);
+}
+)msl";
 
 std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(CAMetalLayer* layer,
                                                    std::shared_ptr<MetalDevice> device,
@@ -81,44 +109,123 @@ MetalWindow::MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalL
 
 MetalWindow::~MetalWindow() {
   [currentDrawable release];
+  [offscreenTexture release];
+  [copyPipelineState release];
 }
 
 std::shared_ptr<Surface> MetalWindow::onCreateSurface(Context* context) {
   if (metalView != nil) {
     metalLayer.drawableSize = metalView.drawableSize;
   }
-  auto drawable = [metalLayer nextDrawable];
-  if (drawable == nil) {
+  auto drawableSize = metalLayer.drawableSize;
+  auto width = static_cast<int>(drawableSize.width);
+  auto height = static_cast<int>(drawableSize.height);
+  if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  [currentDrawable release];
-  currentDrawable = [drawable retain];
-  id<MTLTexture> texture = drawable.texture;
-  auto width = static_cast<int>(texture.width);
-  auto height = static_cast<int>(texture.height);
+  if (offscreenTexture == nil || offscreenWidth != width || offscreenHeight != height) {
+    [offscreenTexture release];
+    auto metalDevice = static_cast<MetalDevice*>(device.get());
+    auto mtlDevice = (__bridge id<MTLDevice>)metalDevice->metalDevice();
+    auto desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:metalLayer.pixelFormat
+                                                                   width:(NSUInteger)width
+                                                                  height:(NSUInteger)height
+                                                               mipmapped:NO];
+    desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModePrivate;
+    offscreenTexture = [mtlDevice newTextureWithDescriptor:desc];
+    offscreenWidth = width;
+    offscreenHeight = height;
+  }
   MetalTextureInfo metalInfo = {};
-  metalInfo.texture = (__bridge const void*)texture;
-  metalInfo.format = static_cast<unsigned>(texture.pixelFormat);
+  metalInfo.texture = (__bridge const void*)offscreenTexture;
+  metalInfo.format = static_cast<unsigned>(offscreenTexture.pixelFormat);
   BackendRenderTarget renderTarget(metalInfo, width, height);
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::TopLeft, 0, colorSpace);
 }
 
-void MetalWindow::onPresent(Context*) {
-  if (currentDrawable == nil) {
+void MetalWindow::onPresent(Context* context) {
+  if (offscreenTexture == nil) {
     return;
   }
-  [currentDrawable present];
+  auto drawable = [metalLayer nextDrawable];
+  if (drawable == nil) {
+    return;
+  }
+  [currentDrawable release];
+  currentDrawable = [drawable retain];
+
+  auto metalGPU = static_cast<MetalGPU*>(context->gpu());
+  auto queue = static_cast<MetalCommandQueue*>(metalGPU->queue());
+  auto commandBuffer = [queue->metalCommandQueue() commandBuffer];
+
+  if (metalLayer.framebufferOnly) {
+    renderCopyToDrawable(commandBuffer, drawable);
+  } else {
+    blitToDrawable(commandBuffer, drawable);
+  }
+
+  [commandBuffer presentDrawable:drawable];
+  [commandBuffer commit];
+
   [currentDrawable release];
   currentDrawable = nil;
-  // Metal's CAMetalLayer provides a different drawable texture each frame, so we must release the
-  // surface after presenting to ensure a new one is created on the next getSurface() call.
-  surface = nullptr;
+}
+
+void MetalWindow::blitToDrawable(id<MTLCommandBuffer> commandBuffer, id<CAMetalDrawable> drawable) {
+  auto blitEncoder = [commandBuffer blitCommandEncoder];
+  [blitEncoder copyFromTexture:offscreenTexture toTexture:drawable.texture];
+  [blitEncoder endEncoding];
+}
+
+void MetalWindow::renderCopyToDrawable(id<MTLCommandBuffer> commandBuffer,
+                                       id<CAMetalDrawable> drawable) {
+  auto metalDevice = static_cast<MetalDevice*>(device.get());
+  auto mtlDevice = (__bridge id<MTLDevice>)metalDevice->metalDevice();
+  ensureCopyPipelineState(mtlDevice, drawable.texture.pixelFormat);
+
+  auto renderPassDesc = [MTLRenderPassDescriptor renderPassDescriptor];
+  renderPassDesc.colorAttachments[0].texture = drawable.texture;
+  renderPassDesc.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+  renderPassDesc.colorAttachments[0].storeAction = MTLStoreActionStore;
+
+  auto renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
+  [renderEncoder setRenderPipelineState:copyPipelineState];
+  [renderEncoder setFragmentTexture:offscreenTexture atIndex:0];
+  [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+  [renderEncoder endEncoding];
+}
+
+void MetalWindow::ensureCopyPipelineState(id<MTLDevice> device, MTLPixelFormat pixelFormat) {
+  if (copyPipelineState != nil) {
+    return;
+  }
+  NSError* error = nil;
+  auto library = [device newLibraryWithSource:CopyShaderSource options:nil error:&error];
+  auto vertexFunc = [library newFunctionWithName:@"copyVertex"];
+  auto fragmentFunc = [library newFunctionWithName:@"copyFragment"];
+
+  auto pipelineDesc = [[MTLRenderPipelineDescriptor alloc] init];
+  pipelineDesc.vertexFunction = vertexFunc;
+  pipelineDesc.fragmentFunction = fragmentFunc;
+  pipelineDesc.colorAttachments[0].pixelFormat = pixelFormat;
+
+  copyPipelineState = [device newRenderPipelineStateWithDescriptor:pipelineDesc error:&error];
+
+  [pipelineDesc release];
+  [fragmentFunc release];
+  [vertexFunc release];
+  [library release];
 }
 
 void MetalWindow::onFreeSurface() {
   Window::onFreeSurface();
   [currentDrawable release];
   currentDrawable = nil;
+  [offscreenTexture release];
+  offscreenTexture = nil;
+  offscreenWidth = 0;
+  offscreenHeight = 0;
 }
 
 }  // namespace tgfx
