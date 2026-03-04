@@ -27,8 +27,12 @@
 #include "tgfx/gpu/metal/MetalDevice.h"
 
 namespace tgfx {
+class DelayRenderTargetProxy;
+class MetalDrawableProvider;
+
 /**
- * MetalWindow is a Window implementation backed by a CAMetalLayer.
+ * MetalWindow is a Window implementation backed by a CAMetalLayer. It renders directly to the
+ * layer's drawable by deferring drawable acquisition until flush time via DelayRenderTargetProxy.
  */
 class MetalWindow : public Window {
  public:
@@ -48,7 +52,7 @@ class MetalWindow : public Window {
   static std::shared_ptr<MetalWindow> MakeFrom(MTKView* view,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
-  ~MetalWindow() override;
+  ~MetalWindow() override = default;
 
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
@@ -58,21 +62,14 @@ class MetalWindow : public Window {
  private:
   CAMetalLayer* metalLayer = nil;
   MTKView* metalView = nil;
-  id<MTLTexture> offscreenTexture = nil;
-  id<MTLRenderPipelineState> copyPipelineState = nil;
-  MTLPixelFormat copyPixelFormat = MTLPixelFormatInvalid;
-  int offscreenWidth = 0;
-  int offscreenHeight = 0;
+  std::shared_ptr<MetalDrawableProvider> drawableProvider = nullptr;
+  std::shared_ptr<DelayRenderTargetProxy> drawableProxy = nullptr;
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   MetalWindow(std::shared_ptr<Device> device, CAMetalLayer* layer,
               std::shared_ptr<ColorSpace> colorSpace);
   MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalLayer* layer,
               std::shared_ptr<ColorSpace> colorSpace);
-
-  void blitToDrawable(id<MTLCommandBuffer> commandBuffer, id<CAMetalDrawable> drawable);
-  void renderCopyToDrawable(id<MTLCommandBuffer> commandBuffer, id<CAMetalDrawable> drawable);
-  void ensureCopyPipelineState(id<MTLDevice> device, MTLPixelFormat pixelFormat);
 };
 
 }  // namespace tgfx
