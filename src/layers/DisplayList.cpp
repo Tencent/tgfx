@@ -38,7 +38,7 @@ static constexpr int MAX_ATLAS_SIZE = 8192;
 class DrawTask {
  public:
   DrawTask(std::shared_ptr<Tile> tile, int tileSize, const Rect& drawRect = {}, float scale = 1.0f)
-      : tiles({std::move(tile)}) {
+      : tiles({std::move(tile)}), _identityScale(scale == 1.0f) {
     calculateRects(tileSize, drawRect, scale);
   }
 
@@ -73,11 +73,16 @@ class DrawTask {
     return tiles;
   }
 
+  bool identityScale() const {
+    return _identityScale;
+  }
+
  private:
   // Hold strong references to tiles to ensure they aren't reused by TileCache.
   std::vector<std::shared_ptr<Tile>> tiles = {};
   Rect _sourceRect = {};
   Rect _tileRect = {};
+  bool _identityScale = true;
 
   void calculateRects(int tileSize, const Rect& drawRect, float scale) {
     DEBUG_ASSERT(!tiles.empty());
@@ -210,6 +215,9 @@ void DisplayList::setZoomScalePrecision(int precision) {
 }
 
 void DisplayList::setContentOffset(float offsetX, float offsetY) {
+  // Round to integer pixels to avoid subpixel positioning artifacts.
+  offsetX = roundf(offsetX);
+  offsetY = roundf(offsetY);
   if (offsetX == _contentOffset.x && offsetY == _contentOffset.y) {
     return;
   }
@@ -424,7 +432,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   for (auto& task : tileTasks) {
     drawTileTask(task);
     auto dirtyRect = task.tileRect();
-    dirtyRect.offset(roundf(_contentOffset.x), roundf(_contentOffset.y));
+    dirtyRect.offset(_contentOffset.x, _contentOffset.y);
     if (dirtyRect.intersect(surfaceRect)) {
       dirtyRects.emplace_back(dirtyRect);
     }
@@ -926,13 +934,15 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
   if (autoClear) {
     paint.setBlendMode(BlendMode::Src);
   }
-  static SamplingOptions sampling(FilterMode::Nearest, MipmapMode::None);
+  static SamplingOptions NearestSampling(FilterMode::Nearest, MipmapMode::None);
+  static SamplingOptions LinearSampling(FilterMode::Linear, MipmapMode::None);
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
   Rect tileRect = {};
   for (auto& task : screenTasks) {
     auto surfaceCache = surfaceCaches[task.sourceIndex()];
     DEBUG_ASSERT(surfaceCache != nullptr);
     auto image = surfaceCache->makeImageSnapshot();
+    auto& sampling = task.identityScale() ? NearestSampling : LinearSampling;
     canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
                           SrcRectConstraint::Strict);
     tileRect.join(task.tileRect());
