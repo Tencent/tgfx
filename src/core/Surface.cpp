@@ -241,7 +241,7 @@ std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
   double addTaskMs =
       std::chrono::duration<double, std::milli>(addTaskEnd - addTaskStart).count();
 
-  printf("[tgfx::asyncReadPixels] %dx%d byteSize=%zu | createBufProxy=%.2fms renderCtx::flush=%.2fms addTransferTask=%.2fms\n",
+  PERF_LOG("[tgfx::asyncReadPixels] %dx%d byteSize=%zu | createBufProxy=%.2fms renderCtx::flush=%.2fms addTransferTask=%.2fms",
          info.width(), info.height(), info.byteSize(), createBufMs, flushMs, addTaskMs);
 
   return std::shared_ptr<SurfaceReadback>(new SurfaceReadback(info, std::move(readbackBuffer)));
