@@ -19,6 +19,16 @@
 #include "tgfx/core/Surface.h"
 #include <chrono>
 #include <cstdio>
+#ifdef __EMSCRIPTEN__
+#include <emscripten/console.h>
+#define PERF_LOG(fmt, ...) do { \
+  char _buf[256]; \
+  snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__); \
+  emscripten_console_warn(_buf); \
+} while(0)
+#else
+#define PERF_LOG(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
+#endif
 #include "core/images/TextureImage.h"
 #include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
@@ -260,7 +270,7 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
       std::chrono::duration<double, std::milli>(asyncEnd - asyncStart).count();
 
   if (readback == nullptr) {
-    printf("[tgfx::readPixels] asyncReadPixels failed, area=%dx%d\n",
+    PERF_LOG("[tgfx::readPixels] asyncReadPixels failed, area=%dx%d",
            outInfo.width(), outInfo.height());
     return false;
   }
@@ -273,7 +283,7 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
       std::chrono::duration<double, std::milli>(lockEnd - lockStart).count();
 
   if (srcPixels == nullptr) {
-    printf("[tgfx::readPixels] lockPixels failed, area=%dx%d\n",
+    PERF_LOG("[tgfx::readPixels] lockPixels failed, area=%dx%d",
            outInfo.width(), outInfo.height());
     return false;
   }
@@ -291,7 +301,7 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   double totalMs =
       std::chrono::duration<double, std::milli>(totalEnd - totalStart).count();
 
-  printf("[tgfx::readPixels] area=%dx%d bytes=%zu srcColorType=%d dstColorType=%d flipY=%s | async=%.2fms lock=%.2fms copy=%.2fms | total=%.2fms\n",
+  PERF_LOG("[tgfx::readPixels] area=%dx%d bytes=%zu srcColorType=%d dstColorType=%d flipY=%s | async=%.2fms lock=%.2fms copy=%.2fms | total=%.2fms",
          outInfo.width(), outInfo.height(), outInfo.byteSize(),
          static_cast<int>(colorType), static_cast<int>(outInfo.colorType()),
          flipY ? "yes" : "no",

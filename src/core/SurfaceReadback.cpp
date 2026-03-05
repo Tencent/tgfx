@@ -19,6 +19,16 @@
 #include "tgfx/core/SurfaceReadback.h"
 #include <chrono>
 #include <cstdio>
+#ifdef __EMSCRIPTEN__
+#include <emscripten/console.h>
+#define PERF_LOG(fmt, ...) do { \
+  char _buf[256]; \
+  snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__); \
+  emscripten_console_warn(_buf); \
+} while(0)
+#else
+#define PERF_LOG(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
+#endif
 #include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
 #include "gpu/proxies/GPUBufferProxy.h"
@@ -97,7 +107,7 @@ const void* SurfaceReadback::lockPixels(Context* context, bool flipY) {
   double lockTotalMs =
       std::chrono::duration<double, std::milli>(lockTotalEnd - lockTotalStart).count();
 
-  printf("[tgfx::lockPixels] %dx%d | flushAndSubmit(%s)=%.2fms gpuBuffer::map=%.2fms flipY(%s)=%.2fms | total=%.2fms\n",
+  PERF_LOG("[tgfx::lockPixels] %dx%d | flushAndSubmit(%s)=%.2fms gpuBuffer::map=%.2fms flipY(%s)=%.2fms | total=%.2fms",
          _info.width(), _info.height(),
          didFlush ? "yes" : "no", flushMs,
          mapMs,
