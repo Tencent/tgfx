@@ -21,14 +21,18 @@
 #include <cstdio>
 #ifdef __EMSCRIPTEN__
 #include <emscripten/console.h>
-#define PERF_LOG(fmt, ...) do { \
-  char _buf[256]; \
-  snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__); \
-  emscripten_console_warn(_buf); \
-} while(0)
-#else
-#define PERF_LOG(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 #endif
+
+template <typename... Args>
+inline void PERF_LOG(const char* fmt, Args... args) {
+  char buf[256];
+  snprintf(buf, sizeof(buf), fmt, args...);
+#ifdef __EMSCRIPTEN__
+  emscripten_console_warn(buf);
+#else
+  printf("%s\n", buf);
+#endif
+}
 #include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
 #include "gpu/proxies/GPUBufferProxy.h"
