@@ -23,25 +23,25 @@
 namespace tgfx {
 
 /**
- * Metal device for GPU rendering.
+ * The Metal interface for drawing graphics.
  */
 class MetalDevice : public Device {
  public:
   /**
-   * Creates a Metal device with the default Metal device.
+   * Creates a new MetalDevice using the system default MTLDevice.
    */
   static std::shared_ptr<MetalDevice> Make();
 
   /**
-   * Creates a Metal device with the specified Metal device. The device parameter is a pointer to
-   * an id<MTLDevice> object.
+   * Creates a new MetalDevice from an existing MTLDevice. The device parameter is a pointer to an
+   * id<MTLDevice> object.
    */
   static std::shared_ptr<MetalDevice> MakeFrom(void* device);
 
   ~MetalDevice() override;
 
   /**
-   * Returns the Metal device as a pointer to an id<MTLDevice> object.
+   * Returns the underlying MTLDevice as a pointer to an id<MTLDevice> object.
    */
   void* metalDevice() const;
 

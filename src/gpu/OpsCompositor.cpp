@@ -17,23 +17,30 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsCompositor.h"
+#include "core/MeshBase.h"
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
+#include "core/VertexMesh.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/ShapeUtils.h"
+#include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
+#include "gpu/ops/HairlineLineOp.h"
+#include "gpu/ops/HairlineQuadOp.h"
+#include "gpu/ops/MeshDrawOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "inspect/InspectorMark.h"
 #include "processors/ColorSpaceXFormEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
+#include "processors/XfermodeFragmentProcessor.h"
 
 namespace tgfx {
 /**
@@ -193,14 +200,124 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   if (needDeviceBounds) {
     deviceBounds = shape->isInverseFillType() ? clipBounds : shape->getBounds();
   }
+
   auto aaType = getAAType(brush);
-  auto color = brush.color;
-  color.alpha *= ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
   auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
-  auto dstColor = ToPMColor(color, dstColorSpace);
+  auto dstColor = ToPMColor(brush.color, dstColorSpace);
   auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), dstColor, uvMatrix, aaType);
   CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
   addDrawOp(std::move(drawOp), clip, brush, localBounds, deviceBounds, drawScale);
+}
+
+void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush) {
+  DEBUG_ASSERT(mesh != nullptr);
+  flushPendingOps();
+
+  auto meshBase = static_cast<MeshBase*>(mesh.get());
+
+  std::optional<Rect> localBounds = std::nullopt;
+  std::optional<Rect> deviceBounds = std::nullopt;
+  auto& clip = state.clip;
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, meshBase->hasCoverage());
+  auto clipBounds = getClipBounds(clip);
+
+  float drawScale = 1.0f;
+  auto meshBounds = mesh->bounds();
+  if (needLocalBounds) {
+    localBounds = ClipLocalBounds(meshBounds, state.matrix, clipBounds);
+    if (localBounds->isEmpty()) {
+      return;
+    }
+    drawScale = std::min(state.matrix.getMaxScale(), 1.0f);
+  }
+
+  if (needDeviceBounds) {
+    deviceBounds = state.matrix.mapRect(meshBounds);
+  }
+
+  // Determine if mesh has vertex colors (only VertexMesh can have these)
+  bool hasColors = false;
+  if (meshBase->type() == MeshBase::Type::Vertex) {
+    auto vertexMesh = static_cast<VertexMesh*>(meshBase);
+    hasColors = vertexMesh->hasColors();
+  }
+
+  // Determine final color based on blending rules (see Canvas.h drawMesh documentation):
+  // Paint color is only used when no shader and no vertex colors; otherwise use white.
+  PMColor gpColor = PMColor::White();
+  if (!brush.shader && !hasColors) {
+    gpColor = ToPMColor(brush.color, dstColorSpace);
+  }
+
+  auto meshProxy = proxyProvider()->createGPUMeshProxy(mesh, renderFlags, dstColorSpace);
+  auto drawOp = MeshDrawOp::Make(std::move(meshProxy), gpColor, state.matrix);
+  if (drawOp == nullptr) {
+    return;
+  }
+
+  // Handle shader for mesh with special blending rules:
+  // - shader + colors: texture * vertexColor (Modulate)
+  // - shader only: pure texture
+  if (brush.shader) {
+    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
+    auto textureFP = FragmentProcessor::Make(brush.shader, args, nullptr, dstColorSpace);
+    if (textureFP == nullptr) {
+      return;
+    }
+    if (hasColors) {
+      textureFP = XfermodeFragmentProcessor::MakeFromSrcProcessor(
+          drawingAllocator(), std::move(textureFP), BlendMode::Modulate);
+    }
+    drawOp->addColorFP(std::move(textureFP));
+  }
+
+  // Create a brush without shader to pass to addDrawOp, since we handled shader above.
+  Brush meshBrush = brush;
+  meshBrush.shader = nullptr;
+  addDrawOp(std::move(drawOp), clip, meshBrush, localBounds, deviceBounds, drawScale);
+}
+
+void OpsCompositor::drawHairlineShape(std::shared_ptr<Shape> shape, const MCState& state,
+                                      const Brush& brush, const Stroke* stroke) {
+  DEBUG_ASSERT(shape != nullptr);
+  flushPendingOps();
+  Matrix uvMatrix = {};
+  if (!state.matrix.invert(&uvMatrix)) {
+    return;
+  }
+  std::optional<Rect> localBounds = std::nullopt;
+  std::optional<Rect> deviceBounds = std::nullopt;
+  float drawScale = 1.0f;
+
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, true);
+  auto& clip = state.clip;
+  auto clipBounds = getClipBounds(clip);
+  if (needLocalBounds) {
+    localBounds = shape->getBounds();
+    localBounds = ClipLocalBounds(*localBounds, state.matrix, clipBounds);
+    drawScale = std::min(state.matrix.getMaxScale(), 1.0f);
+  }
+  shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
+  if (!shape) {
+    return;
+  }
+  if (needDeviceBounds) {
+    deviceBounds = shape->getBounds();
+  }
+
+  bool hasCap =
+      stroke != nullptr && (stroke->cap == LineCap::Round || stroke->cap == LineCap::Square);
+  auto aaType = getAAType(brush);
+  auto dstColor = ToPMColor(brush.color, dstColorSpace);
+  auto hairlineProxy = proxyProvider()->createGPUHairlineProxy(shape, hasCap, renderFlags);
+  if (hairlineProxy == nullptr) {
+    return;
+  }
+  auto coverage = GetHairlineAlphaFactor(*stroke, state.matrix);
+  auto lineDrawOp = HairlineLineOp::Make(hairlineProxy, dstColor, uvMatrix, coverage, aaType);
+  addDrawOp(std::move(lineDrawOp), clip, brush, localBounds, deviceBounds, drawScale);
+  auto quadDrawOp = HairlineQuadOp::Make(hairlineProxy, dstColor, uvMatrix, coverage, aaType);
+  addDrawOp(std::move(quadDrawOp), clip, brush, localBounds, deviceBounds, drawScale);
 }
 
 void OpsCompositor::discardAll() {

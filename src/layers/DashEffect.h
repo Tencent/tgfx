@@ -18,11 +18,16 @@
 
 #pragma once
 
-#include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/PathEffect.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
+
 /**
- * Scales the alpha value of each pixel by the given factor.
+ * Creates a dash path effect from the given dash pattern. Handles odd-count pattern expansion and
+ * simplification for square caps. Returns nullptr if dashes are empty or simplified to solid.
  */
-void ScalePixelsAlpha(const ImageInfo& info, void* pixels, float alphaScale);
+std::shared_ptr<PathEffect> CreateDashPathEffect(const std::vector<float>& dashes, float dashOffset,
+                                                 bool adaptive, const Stroke& stroke);
+
 }  // namespace tgfx

@@ -25,6 +25,7 @@
 #include "layers/contents/ComposeContent.h"
 #include "layers/contents/GeometryContent.h"
 #include "layers/contents/MatrixContent.h"
+#include "layers/contents/MeshContent.h"
 #include "layers/contents/PathContent.h"
 #include "layers/contents/RRectContent.h"
 #include "layers/contents/RRectsContent.h"
@@ -67,6 +68,19 @@ void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerP
   auto offset = Point::Make(x, y);
   std::unique_ptr<GeometryContent> content =
       std::make_unique<TextContent>(std::move(textBlob), offset, paint);
+  if (!_matrix.isIdentity()) {
+    content = std::make_unique<MatrixContent>(std::move(content), _matrix);
+  }
+  list.push_back(std::move(content));
+}
+
+void LayerRecorder::addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint& paint) {
+  if (mesh == nullptr) {
+    return;
+  }
+  flushPending();
+  auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
+  std::unique_ptr<GeometryContent> content = std::make_unique<MeshContent>(std::move(mesh), paint);
   if (!_matrix.isIdentity()) {
     content = std::make_unique<MatrixContent>(std::move(content), _matrix);
   }

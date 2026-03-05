@@ -33,12 +33,14 @@
 #include "layers/contents/RRectsContent.h"
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/TextContent.h"
+#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/LayerRecorder.h"
+#include "tgfx/layers/MeshLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/TextLayer.h"
@@ -636,10 +638,11 @@ TGFX_TEST(LayerTest, StrokeOnTop) {
   shapeLayer->setStrokeStyle(strokeColor);
   shapeLayer->setLineWidth(16);
   auto innerShadow = InnerShadowStyle::Make(30, 30, 0, 0, Color::FromRGBA(100, 0, 0, 128));
+  innerShadow->setExcludeChildEffects(true);
   auto dropShadow = DropShadowStyle::Make(-20, -20, 0, 0, Color::Black());
   dropShadow->setShowBehindLayer(false);
+  dropShadow->setExcludeChildEffects(true);
   shapeLayer->setLayerStyles({dropShadow, innerShadow});
-  shapeLayer->setExcludeChildEffectsInLayerStyle(true);
   layer->addChild(shapeLayer);
   auto solidLayer = SolidLayer::Make();
   solidLayer->setWidth(100);
@@ -1617,7 +1620,6 @@ TGFX_TEST(LayerTest, BottomLeftSurface) {
 
   auto childFrame = tgfx::Rect::MakeWH(150, 150);
   auto childLayer = tgfx::ShapeLayer::Make();
-  childLayer->setExcludeChildEffectsInLayerStyle(true);
 
   tgfx::Path childPath;
   childPath.addRect(childFrame);
@@ -2321,6 +2323,64 @@ TGFX_TEST(LayerTest, Matrix) {
   }
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_Behind_Viewer"));
+
+  // Test offscreen rendering blending with 3D background layer
+  {
+    auto displayList3D = std::make_unique<DisplayList>();
+    auto surface3D = Surface::Make(context, 200, 200);
+
+    auto imageLayer2D = ImageLayer::Make();
+    auto image2D = MakeImage("resources/assets/HappyNewYear.png");
+    imageLayer2D->setImage(image2D);
+    imageLayer2D->setMatrix(Matrix::MakeScale(0.5f));
+    displayList3D->root()->addChild(imageLayer2D);
+
+    auto imageLayer3D = ImageLayer::Make();
+    auto image3D = MakeImage("resources/apitest/imageReplacement.jpg");
+    imageLayer3D->setImage(image3D);
+    auto imageSize =
+        Size::Make(static_cast<float>(image3D->width()), static_cast<float>(image3D->height()));
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(-anchor.x * imageSize.width, -anchor.y * imageSize.height, 0.f);
+    auto invOffsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(anchor.x * imageSize.width, anchor.y * imageSize.height, 0.f);
+    auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
+    auto perspectiveMatrix = Matrix3D::I();
+    perspectiveMatrix.setRowColumn(3, 2, -1.f / 200.f);
+    auto origin = Point::Make(100 - anchor.x * imageSize.width, 100 - anchor.y * imageSize.height);
+    auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+    auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                           modelMatrix * offsetToAnchorMatrix;
+    imageLayer3D->setMatrix3D(transformMatrix);
+    displayList3D->root()->addChild(imageLayer3D);
+
+    auto layerWithMask = SolidLayer::Make();
+    layerWithMask->setColor(Color::FromRGBA(255, 0, 0, 26));
+    layerWithMask->setWidth(imageSize.width);
+    layerWithMask->setHeight(imageSize.height);
+    layerWithMask->setBlendMode(BlendMode::SrcOver);
+    imageLayer3D->addChild(layerWithMask);
+
+    auto blendLayer = SolidLayer::Make();
+    blendLayer->setColor(Color::FromRGBA(0, 255, 0, 128));
+    blendLayer->setWidth(imageSize.width);
+    blendLayer->setHeight(imageSize.height);
+    blendLayer->setBlendMode(BlendMode::SrcIn);
+    layerWithMask->addChild(blendLayer);
+
+    auto imageMaskLayer = ImageLayer::Make();
+    auto maskImage = MakeImage("resources/apitest/test_timestretch.png");
+    imageMaskLayer->setImage(maskImage);
+    auto maskScale = Matrix::MakeScale(imageSize.width / static_cast<float>(maskImage->width()),
+                                       imageSize.height / static_cast<float>(maskImage->height()));
+    imageMaskLayer->setMatrix(maskScale);
+    layerWithMask->addChild(imageMaskLayer);
+    layerWithMask->setMask(imageMaskLayer);
+
+    displayList3D->render(surface3D.get());
+    EXPECT_TRUE(Baseline::Compare(surface3D, "LayerTest/Matrix_3D_Offscreen_Blend"));
+  }
 }
 
 TGFX_TEST(LayerTest, DisplayListBackground) {
@@ -3289,6 +3349,59 @@ TGFX_TEST(LayerTest, RootLayerBackgroundColorWithBlurBackground) {
   // Compare with baseline to verify the background color is correctly drawn
   // to both the main canvas and blur background canvas
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RootLayerBackgroundColorWithBlurBackground"));
+}
+
+TGFX_TEST(LayerTest, MeshLayer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Test 1: MeshLayer with vertex colors
+  auto meshLayer1 = MeshLayer::Make();
+  EXPECT_EQ(meshLayer1->type(), LayerType::Mesh);
+  Point positions1[] = {{100, 50}, {50, 150}, {150, 150}};
+  Color colors1[] = {Color::Red(), Color::Green(), Color::Blue()};
+  auto mesh1 = Mesh::MakeCopy(MeshTopology::Triangles, 3, positions1, nullptr, colors1);
+  meshLayer1->setMesh(mesh1);
+  displayList->root()->addChild(meshLayer1);
+
+  // Test 2: MeshLayer with fill style
+  auto meshLayer2 = MeshLayer::Make();
+  Path path = {};
+  path.addRoundRect(Rect::MakeXYWH(150, 150, 120, 120), 15, 15);
+  auto mesh2 = Mesh::MakeFromPath(path);
+  meshLayer2->setMesh(mesh2);
+  meshLayer2->setFillStyle(ShapeStyle::Make(Color::Blue(), BlendMode::SrcOver));
+  displayList->root()->addChild(meshLayer2);
+
+  // Test bounds
+  auto bounds1 = meshLayer1->getBounds();
+  // Triangle with vertices at (100,50), (50,150), (150,150)
+  // Bounds: (50, 50, 150, 150)
+  EXPECT_FLOAT_EQ(bounds1.left, 50);
+  EXPECT_FLOAT_EQ(bounds1.top, 50);
+  EXPECT_FLOAT_EQ(bounds1.right, 150);
+  EXPECT_FLOAT_EQ(bounds1.bottom, 150);
+
+  auto bounds2 = meshLayer2->getBounds();
+  EXPECT_FLOAT_EQ(bounds2.left, 150);
+  EXPECT_FLOAT_EQ(bounds2.top, 150);
+  EXPECT_FLOAT_EQ(bounds2.right, 270);
+  EXPECT_FLOAT_EQ(bounds2.bottom, 270);
+
+  // Test fillStyles modification
+  EXPECT_EQ(meshLayer2->fillStyles().size(), 1u);
+  meshLayer2->addFillStyle(ShapeStyle::Make(Color::Red()));
+  EXPECT_EQ(meshLayer2->fillStyles().size(), 2u);
+  meshLayer2->removeFillStyles();
+  EXPECT_EQ(meshLayer2->fillStyles().size(), 0u);
+  meshLayer2->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  EXPECT_EQ(meshLayer2->fillStyles().size(), 1u);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MeshLayer"));
 }
 
 }  // namespace tgfx

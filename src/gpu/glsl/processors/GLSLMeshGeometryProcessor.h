@@ -18,42 +18,19 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
-#include "tgfx/core/Point.h"
+#include "gpu/processors/MeshGeometryProcessor.h"
 
 namespace tgfx {
 
-/**
- * QuadCW represents a quadrilateral with vertices in clockwise order.
- * Used for logical quad operations where edge connectivity matters.
- *
- * Vertex layout (clockwise):
- *   p0 -----> p1
- *   ^          |
- *   |          v
- *   p3 <----- p2
- *
- * Edge definitions (matching QUAD_AA_FLAG_EDGE_*):
- *   EDGE_01: p0 -> p1
- *   EDGE_12: p1 -> p2
- *   EDGE_23: p2 -> p3
- *   EDGE_30: p3 -> p0
- */
-class QuadCW {
+class GLSLMeshGeometryProcessor : public MeshGeometryProcessor {
  public:
-  constexpr QuadCW() = default;
+  GLSLMeshGeometryProcessor(bool hasTexCoords, bool hasColors, bool hasCoverage, PMColor color,
+                            const Matrix& viewMatrix);
 
-  constexpr QuadCW(const Point& p0, const Point& p1, const Point& p2, const Point& p3)
-      : points{p0, p1, p2, p3} {
-  }
+  void emitCode(EmitArgs& args) const override;
 
-  const Point& point(size_t i) const {
-    DEBUG_ASSERT(i < 4);
-    return points[i];
-  }
-
- private:
-  Point points[4] = {};
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
+               FPCoordTransformIter* transformIter) const override;
 };
 
 }  // namespace tgfx

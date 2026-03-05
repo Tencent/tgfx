@@ -19,23 +19,55 @@
 #pragma once
 
 #include "core/utils/Log.h"
-#include "tgfx/core/Data.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
+
+/**
+ * Quad represents a quadrilateral with vertices in Z-order.
+ *
+ * Vertex layout:
+ *   0(LT) --- 2(RT)
+ *     |         |
+ *   1(LB) --- 3(RB)
+ */
 class Quad {
  public:
+  /**
+   * Creates a Quad from a rectangle. If matrix is provided, the quad vertices are transformed.
+   */
   static Quad MakeFrom(const Rect& rect, const Matrix* matrix = nullptr);
+
+  /**
+   * Creates a Quad from four points in clockwise order. If the four points form a rectangle,
+   * prefer using MakeFrom(const Rect&, const Matrix*) for optimized processing.
+   */
+  static Quad MakeFromCW(const Point& p0, const Point& p1, const Point& p2, const Point& p3);
 
   const Point& point(size_t i) const {
     DEBUG_ASSERT(i < 4);
     return points[i];
   }
 
+  /**
+   * Returns true if the quad is a rectangle.
+   */
+  bool isRect() const {
+    return _isRect;
+  }
+
+  /**
+   * Transforms all four vertices by the given matrix in place.
+   */
+  void transform(const Matrix& matrix);
+
  private:
+  Quad() = default;
   explicit Quad(const Rect& rect, const Matrix* matrix = nullptr);
 
   Point points[4] = {};
+  bool _isRect = false;
 };
+
 }  // namespace tgfx

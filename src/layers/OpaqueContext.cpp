@@ -86,6 +86,15 @@ void OpaqueContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   drawContour(Contour(std::move(shape), stroke), state, brush);
 }
 
+void OpaqueContext::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush) {
+  auto bounds = state.matrix.mapRect(mesh->bounds());
+  if (containContourBound(bounds)) {
+    return;
+  }
+  flushPendingContour();
+  pictureContext.drawMesh(std::move(mesh), state, brush);
+}
+
 void OpaqueContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                               const MCState& state, const Brush& brush) {
   auto newBrush = brush;

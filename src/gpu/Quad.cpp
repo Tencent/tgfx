@@ -17,11 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Quad.h"
-#include "tgfx/core/Buffer.h"
+#include "core/MatrixUtils.h"
 
 namespace tgfx {
+
+static inline bool RectStaysRect(const Matrix& matrix) {
+  return matrix.rectStaysRect() || MatrixUtils::PreservesRightAngles(matrix);
+}
+
 Quad Quad::MakeFrom(const Rect& rect, const Matrix* matrix) {
   return Quad(rect, matrix);
+}
+
+Quad Quad::MakeFromCW(const Point& p0, const Point& p1, const Point& p2, const Point& p3) {
+  Quad quad;
+  // Convert CW to Z-order.
+  quad.points[0] = p0;
+  quad.points[1] = p3;
+  quad.points[2] = p1;
+  quad.points[3] = p2;
+  return quad;
 }
 
 Quad::Quad(const Rect& rect, const Matrix* matrix) {
@@ -32,5 +47,19 @@ Quad::Quad(const Rect& rect, const Matrix* matrix) {
   if (matrix) {
     matrix->mapPoints(points, 4);
   }
+  _isRect = !matrix || RectStaysRect(*matrix);
 }
+
+void Quad::transform(const Matrix& matrix) {
+  if (matrix.isIdentity()) {
+    return;
+  }
+  matrix.mapPoints(points, 4);
+  if (_isRect) {
+    // We don't strictly track rect through multiple transforms.
+    // For example, two 45° rotations won't restore _isRect to true.
+    _isRect = RectStaysRect(matrix);
+  }
+}
+
 }  // namespace tgfx

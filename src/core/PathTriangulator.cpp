@@ -20,15 +20,9 @@
 #include "PathRef.h"
 #include "pathkit.h"
 #include "utils/MathExtra.h"
+#include "utils/PathUtils.h"
 
 namespace tgfx {
-/**
- * When tessellating curved paths into linear segments, this defines the maximum distance in
- * screen space which a segment may deviate from the mathematically correct value. Above this
- * value, the segment will be subdivided. This value was chosen to approximate the super sampling
- * accuracy of the raster path (16 samples, or one quarter pixel).
- */
-static constexpr float DefaultTolerance = 0.25f;
 
 // https://chromium-review.googlesource.com/c/chromium/src/+/1099564/
 static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
@@ -62,7 +56,8 @@ bool PathTriangulator::ShouldTriangulatePath(const Path& path) {
   return path.countPoints() * AA_TESSELLATOR_BUFFER_SIZE_FACTOR <= width * height;
 }
 
-size_t PathTriangulator::GetTriangleCount(size_t bufferSize) {
+size_t PathTriangulator::GetNonAAVertexCount(size_t bufferSize) {
+  // Each vertex has 2 floats: x, y
   return bufferSize / (sizeof(float) * 2);
 }
 
@@ -70,22 +65,24 @@ size_t PathTriangulator::ToTriangles(const Path& path, const Rect& clipBounds,
                                      std::vector<float>* vertices, bool* isLinear) {
   const auto& skPath = PathRef::ReadAccess(path);
   bool linear = false;
-  auto count = skPath.toTriangles(
-      DefaultTolerance, *reinterpret_cast<const pk::SkRect*>(&clipBounds), vertices, &linear);
+  auto count =
+      skPath.toTriangles(PathUtils::DefaultTolerance,
+                         *reinterpret_cast<const pk::SkRect*>(&clipBounds), vertices, &linear);
   if (isLinear) {
     *isLinear = linear;
   }
   return static_cast<size_t>(count);
 }
 
-size_t PathTriangulator::GetAATriangleCount(size_t bufferSize) {
+size_t PathTriangulator::GetAAVertexCount(size_t bufferSize) {
+  // Each vertex has 3 floats: x, y, coverage
   return bufferSize / (sizeof(float) * 3);
 }
 
 size_t PathTriangulator::ToAATriangles(const Path& path, const Rect& clipBounds,
                                        std::vector<float>* vertices) {
   const auto& skPath = PathRef::ReadAccess(path);
-  auto count = skPath.toAATriangles(DefaultTolerance,
+  auto count = skPath.toAATriangles(PathUtils::DefaultTolerance,
                                     *reinterpret_cast<const pk::SkRect*>(&clipBounds), vertices);
   return static_cast<size_t>(count);
 }

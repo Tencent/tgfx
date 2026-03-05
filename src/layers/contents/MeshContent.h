@@ -16,23 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ScalePixelsAlpha.h"
-#include <cmath>
+#pragma once
+
+#include "layers/contents/DrawContent.h"
+#include "tgfx/core/Mesh.h"
 
 namespace tgfx {
-void ScalePixelsAlpha(const ImageInfo& info, void* pixels, float alphaScale) {
-  if (alphaScale >= 1.f) {
-    return;
+
+class MeshContent : public DrawContent {
+ public:
+  MeshContent(std::shared_ptr<Mesh> mesh, const LayerPaint& paint);
+
+  Rect getTightBounds(const Matrix& matrix) const override;
+  bool hitTestPoint(float localX, float localY) const override;
+
+  std::shared_ptr<Mesh> mesh = nullptr;
+
+ protected:
+  Type type() const override {
+    return Type::Mesh;
   }
-  auto buffer = static_cast<unsigned char*>(pixels);
-  auto width = static_cast<size_t>(info.width());
-  auto height = static_cast<size_t>(info.height());
-  auto rowBytes = info.rowBytes();
-  for (size_t y = 0; y < height; ++y) {
-    auto* row = buffer + y * rowBytes;
-    for (size_t x = 0; x < width; ++x) {
-      row[x] = static_cast<unsigned char>(std::lroundf(row[x] * alphaScale));
-    }
-  }
-}
+
+  Rect onGetBounds() const override;
+  void onDraw(Canvas* canvas, const Paint& paint) const override;
+  bool onHasSameGeometry(const GeometryContent* other) const override;
+};
+
 }  // namespace tgfx

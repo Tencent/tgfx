@@ -19,8 +19,8 @@
 #pragma once
 
 #include <Metal/Metal.h>
-#include "tgfx/gpu/metal/MetalDevice.h"
 #include "MetalGPU.h"
+#include "tgfx/gpu/metal/MetalDevice.h"
 
 namespace tgfx {
 

@@ -18,26 +18,21 @@
 
 #pragma once
 
-#include "gpu/processors/QuadPerEdgeAA3DGeometryProcessor.h"
+#include "gpu/processors/HairlineQuadGeometryProcessor.h"
+#include "tgfx/core/Color.h"
 
 namespace tgfx {
 
-/**
- * The implementation of QuadPerEdgeAA3DGeometryProcessor using GLSL.
- */
-class GLSLQuadPerEdgeAA3DGeometryProcessor final : public QuadPerEdgeAA3DGeometryProcessor {
+class GLSLHairlineQuadGeometryProcessor : public HairlineQuadGeometryProcessor {
  public:
-  /**
-   * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
-   */
-  explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& matrix,
-                                                const Vec2& ndcScale, const Vec2& ndcOffset,
-                                                std::optional<PMColor> commonColor);
+  GLSLHairlineQuadGeometryProcessor(const PMColor& color, const Matrix& viewMatrix,
+                                    std::optional<Matrix> uvMatrix, float coverage, AAType aaType);
 
   void emitCode(EmitArgs& args) const override;
 
+ private:
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
-               FPCoordTransformIter* transformIter) const override;
+               FPCoordTransformIter* coordTransformIter) const override;
 };
 
 }  // namespace tgfx
