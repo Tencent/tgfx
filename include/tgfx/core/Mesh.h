@@ -1,0 +1,93 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include <memory>
+#include "tgfx/core/Color.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Point.h"
+#include "tgfx/core/Rect.h"
+
+namespace tgfx {
+
+class Shape;
+
+/**
+ * Defines how vertices are organized into triangles.
+ */
+enum class MeshTopology {
+  /**
+   * Each 3 vertices/indices form an independent triangle.
+   */
+  Triangles,
+  /**
+   * Triangle strip, consecutive triangles sharing edges.
+   */
+  TriangleStrip,
+};
+
+/**
+ * Mesh represents an immutable collection of triangles for GPU rendering. The Mesh class is
+ * thread-safe and immutable once created. GPU resources are cached while the Mesh is alive
+ * and become eligible for release after the Mesh is destroyed.
+ */
+class Mesh {
+ public:
+  virtual ~Mesh() = default;
+
+  /**
+   * Creates a Mesh by copying the provided vertex data. Returns nullptr if parameters are invalid.
+   * @param topology How vertices are organized into triangles.
+   * @param vertexCount Number of vertices (must be > 0, and must not exceed 65536 when using
+   *                    indices since indices are 16-bit).
+   * @param positions Vertex positions (required).
+   * @param texCoords Texture coordinates in pixel space (e.g., [0, imageWidth] x [0, imageHeight]),
+   *                  with origin at top-left (optional).
+   * @param colors Per-vertex colors (optional).
+   * @param indexCount Number of indices (0 if not indexed).
+   * @param indices Index array (optional, uint16_t).
+   */
+  static std::shared_ptr<Mesh> MakeCopy(MeshTopology topology, int vertexCount,
+                                        const Point* positions, const Point* texCoords = nullptr,
+                                        const Color* colors = nullptr, int indexCount = 0,
+                                        const uint16_t* indices = nullptr);
+
+  /**
+   * Creates a Mesh from a Path. The path will be triangulated into vertices for GPU rendering.
+   * Returns nullptr if the path is empty.
+   * @param path The path to triangulate.
+   * @param antiAlias If true, generates anti-aliased triangles with coverage values.
+   */
+  static std::shared_ptr<Mesh> MakeFromPath(Path path, bool antiAlias = true);
+
+  /**
+   * Creates a Mesh from a Shape. The shape will be triangulated into vertices for GPU rendering.
+   * Returns nullptr if the shape is nullptr.
+   * @param shape The shape to triangulate.
+   * @param antiAlias If true, generates anti-aliased triangles with coverage values.
+   */
+  static std::shared_ptr<Mesh> MakeFromShape(std::shared_ptr<Shape> shape, bool antiAlias = true);
+
+  /**
+   * Returns the bounding box of the mesh positions.
+   */
+  virtual Rect bounds() const = 0;
+};
+
+}  // namespace tgfx

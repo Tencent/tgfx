@@ -221,8 +221,8 @@ class BackendSemaphore {
   /**
    * Creates a Metal backend semaphore.
    */
-  BackendSemaphore(const MetalSemaphoreInfo& metalInfo)
-      : _backend(Backend::Metal), metalSemaphoreInfo(metalInfo) {
+  BackendSemaphore(const MetalSyncInfo& metalInfo)
+      : _backend(Backend::Metal), metalSyncInfo(metalInfo) {
   }
 
   BackendSemaphore(const BackendSemaphore& that) {
@@ -250,16 +250,16 @@ class BackendSemaphore {
   bool getGLSync(GLSyncInfo* syncInfo) const;
 
   /**
-   * If the backend API is Metal, copies a snapshot of the MetalSemaphoreInfo struct into the passed
-   * in pointer and returns true. Otherwise, returns false if the backend API is not Metal.
+   * If the backend API is Metal, copies a snapshot of the MetalSyncInfo struct into the passed in
+   * pointer and returns true. Otherwise, returns false if the backend API is not Metal.
    */
-  bool getMetalSemaphore(MetalSemaphoreInfo* metalInfo) const;
+  bool getMetalSync(MetalSyncInfo* metalInfo) const;
 
  private:
   Backend _backend = Backend::Unknown;
   union {
     GLSyncInfo glSyncInfo;
-    MetalSemaphoreInfo metalSemaphoreInfo;
+    MetalSyncInfo metalSyncInfo;
   };
 };
 }  // namespace tgfx

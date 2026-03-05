@@ -32,6 +32,14 @@ Rect LayerStyle::filterBackground(const Rect& srcRect, float) {
   return srcRect;
 }
 
+void LayerStyle::setExcludeChildEffects(bool value) {
+  if (_excludeChildEffects == value) {
+    return;
+  }
+  _excludeChildEffects = value;
+  invalidateTransform();
+}
+
 void LayerStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
                                        float contentScale, std::shared_ptr<Image>, const Point&,
                                        float alpha, BlendMode blendMode) {

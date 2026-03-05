@@ -126,6 +126,21 @@ class LayerStyle : public LayerProperty {
   }
 
   /**
+   * Whether to exclude child effects when generating the source images for this layer style.
+   * If true, child layer styles and filters are not included in the content, contour, or
+   * background images used by this layer style. This option only affects the source images of
+   * this layer style, not the layer itself. The default value is false.
+   */
+  bool excludeChildEffects() const {
+    return _excludeChildEffects;
+  }
+
+  /**
+   * Sets whether to exclude child effects when generating the source images for this layer style.
+   */
+  void setExcludeChildEffects(bool value);
+
+  /**
    * Returns the type of the extra source required by the layer style.
    * Default is LayerStyleExtraSourceType::None.
    */
@@ -191,5 +206,6 @@ class LayerStyle : public LayerProperty {
 
  private:
   BlendMode _blendMode = BlendMode::SrcOver;
+  bool _excludeChildEffects = false;
 };
 }  // namespace tgfx

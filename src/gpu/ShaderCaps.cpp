@@ -44,8 +44,10 @@ static void PrintGPUInfo(const GPUInfo* info) {
       backend = "Unknown";
       break;
   }
+#if DEBUG
   LOGI("[GPUInfo] Backend: %s | Version: %s | Renderer: %s | Vendor: %s", backend.c_str(),
        info->version.c_str(), info->renderer.c_str(), info->vendor.c_str());
+#endif
 }
 
 ShaderCaps::ShaderCaps(GPU* gpu) {

@@ -21,6 +21,7 @@
 #include <stack>
 #include "core/CanvasState.h"
 #include "tgfx/core/Brush.h"
+#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/SrcRectConstraint.h"
@@ -64,6 +65,11 @@ class DrawContext {
    */
   virtual void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush,
                          const Stroke* stroke) = 0;
+
+  /**
+   * Draws a Mesh with the specified MCState and Brush.
+   */
+  virtual void drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush) = 0;
 
   /**
    * Draws a image with the specified SamplingOptions, MCState, Brush.
