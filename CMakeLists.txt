@@ -340,9 +340,18 @@ elseif (APPLE)
         list(APPEND TGFX_INCLUDES third_party/shaderc/libshaderc/include)
         list(APPEND TGFX_INCLUDES third_party/SPIRV-Cross)
         list(APPEND TGFX_DEFINES SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS)
-        # Verify shaderc's sub-dependencies are present. Run ./sync_deps.sh to fetch them.
+        # Auto-sync shaderc's sub-dependencies (glslang, SPIRV-Tools, etc.) if not present.
         if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc/third_party/glslang)
-            message(FATAL_ERROR "shaderc sub-dependencies not found. Please run ./sync_deps.sh first.")
+            find_package(Python3 COMPONENTS Interpreter REQUIRED)
+            message(STATUS "Syncing shaderc sub-dependencies...")
+            execute_process(
+                    COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc/utils/git-sync-deps
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc
+                    RESULT_VARIABLE SYNC_RESULT)
+            if (NOT SYNC_RESULT EQUAL 0)
+                message(FATAL_ERROR "Failed to sync shaderc sub-dependencies.")
+            endif ()
         endif ()
     endif ()
 endif ()
@@ -571,6 +580,7 @@ list(APPEND TGFX_SHARED_LIBS ${TGFX_VENDOR_SHARED_LIBRARIES})
 if (HasParent)
     set(TGFX_STATIC_LIBS ${TGFX_STATIC_LIBS} PARENT_SCOPE)
     set(TGFX_SHARED_LIBS ${TGFX_SHARED_LIBS} PARENT_SCOPE)
+    set(TGFX_DEFINES ${TGFX_DEFINES} PARENT_SCOPE)
 endif ()
 
 foreach (FILE_PATH ${TGFX_FILES})
