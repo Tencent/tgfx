@@ -193,7 +193,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return;
   }
 
-  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+  if (!presentImmediately && !displayList.hasContentChanged() && lastRecording == nullptr) {
     return;
   }
 
@@ -219,6 +219,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
   if (presentImmediately) {
     presentImmediately = false;
+    lastRecording = nullptr;
     if (recording) {
       context->submit(std::move(recording));
       tgfxWindow->present(context);

@@ -146,7 +146,7 @@
     return;
   }
 
-  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+  if (!presentImmediately && !displayList.hasContentChanged() && lastRecording == nullptr) {
     return;
   }
 
@@ -172,6 +172,7 @@
 
   if (presentImmediately) {
     presentImmediately = false;
+    lastRecording = nullptr;
     if (recording) {
       context->submit(std::move(recording));
       tgfxWindow->present(context);

@@ -30,6 +30,7 @@
   std::unique_ptr<tgfx::Recording> lastRecording;
   int lastSurfaceWidth;
   int lastSurfaceHeight;
+  bool presentImmediately;
 }
 
 - (instancetype)initWithCoder:(NSCoder*)coder {
@@ -80,14 +81,17 @@
     lastDrawIndex = -1;
     lastSurfaceWidth = 0;
     lastSurfaceHeight = 0;
+    presentImmediately = true;
     displayList.setRenderMode(tgfx::RenderMode::Tiled);
     displayList.setAllowZoomBlur(true);
     displayList.setMaxTileCount(512);
   }
   lastSurfaceWidth = static_cast<int>(self.drawableSize.width);
   lastSurfaceHeight = static_cast<int>(self.drawableSize.height);
+  [self applyCenteringTransform];
   if (tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
+    presentImmediately = true;
   }
 }
 
@@ -134,7 +138,7 @@
     return;
   }
 
-  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+  if (!presentImmediately && !displayList.hasContentChanged() && lastRecording == nullptr) {
     return;
   }
 
@@ -158,12 +162,20 @@
 
   auto recording = context->flush();
 
-  // Delayed one-frame present
-  std::swap(lastRecording, recording);
+  if (presentImmediately) {
+    presentImmediately = false;
+    lastRecording = nullptr;
+    if (recording) {
+      context->submit(std::move(recording));
+      tgfxWindow->present(context);
+    }
+  } else {
+    std::swap(lastRecording, recording);
 
-  if (recording) {
-    context->submit(std::move(recording));
-    tgfxWindow->present(context);
+    if (recording) {
+      context->submit(std::move(recording));
+      tgfxWindow->present(context);
+    }
   }
 
   device->unlock();
