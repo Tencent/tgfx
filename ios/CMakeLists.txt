@@ -8,8 +8,15 @@ set(TGFX_BUILD_HELLO2D ON)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/.. ./tgfx)
 
-file(GLOB HELLO2D_SOURCES Hello2D/*.m Hello2D/*.mm)
-file(GLOB HELLO2D_HEADERS Hello2D/*.h)
+if (TGFX_USE_METAL)
+    set(TGFX_VIEW_DIR Hello2D/metal)
+    find_library(MetalKit_LIBS MetalKit REQUIRED)
+else ()
+    set(TGFX_VIEW_DIR Hello2D/opengl)
+endif ()
+
+file(GLOB HELLO2D_SOURCES Hello2D/*.m Hello2D/*.mm ${TGFX_VIEW_DIR}/*.mm)
+file(GLOB HELLO2D_HEADERS Hello2D/*.h ${TGFX_VIEW_DIR}/*.h)
 
 set(HELLO2D_STORYBOARDS
         Hello2D/Base.lproj/LaunchScreen.storyboard
@@ -44,5 +51,10 @@ set_source_files_properties(
         PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 
 target_compile_definitions(Hello2D PRIVATE ${TGFX_DEFINES})
-target_include_directories(Hello2D PRIVATE ../include ../hello2d/include)
-target_link_libraries(Hello2D tgfx-hello2d tgfx ${TGFX_SHARED_LIBS})
+target_include_directories(Hello2D PRIVATE ../include ../hello2d/include ${TGFX_VIEW_DIR})
+
+if (TGFX_USE_METAL)
+    target_link_libraries(Hello2D tgfx-hello2d tgfx ${TGFX_SHARED_LIBS} ${MetalKit_LIBS})
+else ()
+    target_link_libraries(Hello2D tgfx-hello2d tgfx ${TGFX_SHARED_LIBS})
+endif ()

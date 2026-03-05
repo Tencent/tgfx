@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -88,11 +88,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   lastSurfaceHeight = static_cast<int>(backingSize.height);
   [self applyCenteringTransform];
   if (tgfxWindow != nullptr) {
-#ifdef TGFX_USE_METAL
-    auto metalLayer = static_cast<CAMetalLayer*>(self.layer);
-    metalLayer.contentsScale = self.window.backingScaleFactor;
-    metalLayer.drawableSize = [self convertSizeToBacking:self.bounds.size];
-#endif
     tgfxWindow->invalidSize();
     presentImmediately = true;
   }
@@ -192,17 +187,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return;
   }
   if (tgfxWindow == nullptr) {
-#ifdef TGFX_USE_METAL
-    [self setWantsLayer:YES];
-    auto metalLayer = [CAMetalLayer layer];
-    metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
-    metalLayer.contentsScale = self.window.backingScaleFactor;
-    metalLayer.drawableSize = [self convertSizeToBacking:self.bounds.size];
-    self.layer = metalLayer;
-    tgfxWindow = tgfx::MetalWindow::MakeFrom(metalLayer);
-#else
     tgfxWindow = tgfx::CGLWindow::MakeFrom(self);
-#endif
   }
   if (tgfxWindow == nullptr) {
     return;

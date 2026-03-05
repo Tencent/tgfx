@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,21 +18,20 @@
 
 #pragma once
 
-#import <UIKit/UIKit.h>
-#include "tgfx/core/Canvas.h"
-#include "tgfx/core/Surface.h"
-#ifdef TGFX_USE_METAL
+#import <MetalKit/MetalKit.h>
 #include "tgfx/gpu/metal/MetalWindow.h"
-#else
-#include "tgfx/gpu/opengl/GLDevice.h"
-#include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
-#endif
 #include "tgfx/layers/DisplayList.h"
 
-@interface TGFXView : UIView
+@interface TGFXView : MTKView
 
-- (void)updateLayerTree:(int)index;
-- (void)updateZoomScaleAndOffset:(float)zoom offset:(CGPoint)offset;
+@property(nonatomic) int drawIndex;
+@property(nonatomic) float zoomScale;
+@property(nonatomic) CGPoint contentOffset;
+
 - (void)draw;
+- (void)startDisplayLink;
+- (void)stopDisplayLink;
+- (void)updateLayerTree;
+- (void)updateZoomScaleAndOffset;
 
 @end

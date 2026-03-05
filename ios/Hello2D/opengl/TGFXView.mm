@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -33,11 +33,7 @@
 }
 
 + (Class)layerClass {
-#ifdef TGFX_USE_METAL
-  return [CAMetalLayer class];
-#else
   return [CAEAGLLayer class];
-#endif
 }
 
 - (void)setBounds:(CGRect)bounds {
@@ -87,12 +83,6 @@
   lastSurfaceWidth = static_cast<int>(self.bounds.size.width * self.contentScaleFactor);
   lastSurfaceHeight = static_cast<int>(self.bounds.size.height * self.contentScaleFactor);
   if (tgfxWindow != nullptr) {
-#ifdef TGFX_USE_METAL
-    auto metalLayer = static_cast<CAMetalLayer*>(self.layer);
-    metalLayer.contentsScale = self.contentScaleFactor;
-    metalLayer.drawableSize = CGSizeMake(self.bounds.size.width * self.contentScaleFactor,
-                                         self.bounds.size.height * self.contentScaleFactor);
-#endif
     tgfxWindow->invalidSize();
   }
 }
@@ -134,16 +124,7 @@
     return;
   }
   if (tgfxWindow == nullptr) {
-#ifdef TGFX_USE_METAL
-    auto metalLayer = static_cast<CAMetalLayer*>(self.layer);
-    metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
-    metalLayer.contentsScale = self.contentScaleFactor;
-    metalLayer.drawableSize = CGSizeMake(self.bounds.size.width * self.contentScaleFactor,
-                                         self.bounds.size.height * self.contentScaleFactor);
-    tgfxWindow = tgfx::MetalWindow::MakeFrom(metalLayer);
-#else
     tgfxWindow = tgfx::EAGLWindow::MakeFrom((CAEAGLLayer*)[self layer]);
-#endif
   }
   if (tgfxWindow == nullptr) {
     return;
