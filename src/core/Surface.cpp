@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Surface.h"
+#include <chrono>
+#include <cstdio>
 #include "core/images/TextureImage.h"
 #include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
@@ -205,17 +207,39 @@ std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
   auto colorType = PixelFormatToColorType(renderTarget->format());
   auto info = ImageInfo::Make(static_cast<int>(srcRect.width()), static_cast<int>(srcRect.height()),
                               colorType, AlphaType::Premultiplied, 0, colorSpace());
+
+  auto createBufStart = std::chrono::high_resolution_clock::now();
   auto context = renderTarget->getContext();
   auto readbackBuffer = context->proxyProvider()->createReadbackBufferProxy(info.byteSize());
+  auto createBufEnd = std::chrono::high_resolution_clock::now();
+  double createBufMs =
+      std::chrono::duration<double, std::milli>(createBufEnd - createBufStart).count();
+
   if (readbackBuffer == nullptr) {
     return nullptr;
   }
+
+  auto flushStart = std::chrono::high_resolution_clock::now();
   renderContext->flush();
+  auto flushEnd = std::chrono::high_resolution_clock::now();
+  double flushMs =
+      std::chrono::duration<double, std::milli>(flushEnd - flushStart).count();
+
+  auto addTaskStart = std::chrono::high_resolution_clock::now();
   context->drawingManager()->addTransferPixelsTask(renderTarget, srcRect, readbackBuffer);
+  auto addTaskEnd = std::chrono::high_resolution_clock::now();
+  double addTaskMs =
+      std::chrono::duration<double, std::milli>(addTaskEnd - addTaskStart).count();
+
+  printf("[tgfx::asyncReadPixels] %dx%d byteSize=%zu | createBufProxy=%.2fms renderCtx::flush=%.2fms addTransferTask=%.2fms\n",
+         info.width(), info.height(), info.byteSize(), createBufMs, flushMs, addTaskMs);
+
   return std::shared_ptr<SurfaceReadback>(new SurfaceReadback(info, std::move(readbackBuffer)));
 }
 
 bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
+  auto totalStart = std::chrono::high_resolution_clock::now();
+
   auto renderTarget = renderContext->renderTarget;
   auto outInfo = dstInfo.makeIntersect(-srcX, -srcY, renderTarget->width(), renderTarget->height());
   if (outInfo.isEmpty() || dstPixels == nullptr) {
@@ -228,18 +252,51 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   auto readX = std::max(0, srcX);
   auto readY = std::max(0, srcY);
   auto rect = Rect::MakeXYWH(readX, readY, outInfo.width(), outInfo.height());
+
+  auto asyncStart = std::chrono::high_resolution_clock::now();
   auto readback = asyncReadPixels(rect);
+  auto asyncEnd = std::chrono::high_resolution_clock::now();
+  double asyncMs =
+      std::chrono::duration<double, std::milli>(asyncEnd - asyncStart).count();
+
   if (readback == nullptr) {
+    printf("[tgfx::readPixels] asyncReadPixels failed, area=%dx%d\n",
+           outInfo.width(), outInfo.height());
     return false;
   }
+
+  auto lockStart = std::chrono::high_resolution_clock::now();
   auto context = renderTarget->getContext();
   auto srcPixels = readback->lockPixels(context);
+  auto lockEnd = std::chrono::high_resolution_clock::now();
+  double lockMs =
+      std::chrono::duration<double, std::milli>(lockEnd - lockStart).count();
+
   if (srcPixels == nullptr) {
+    printf("[tgfx::readPixels] lockPixels failed, area=%dx%d\n",
+           outInfo.width(), outInfo.height());
     return false;
   }
+
+  auto copyStart = std::chrono::high_resolution_clock::now();
   auto flipY = renderTarget->origin() == ImageOrigin::BottomLeft;
   CopyPixels(srcInfo, srcPixels, outInfo, dstPixels, flipY);
+  auto copyEnd = std::chrono::high_resolution_clock::now();
+  double copyMs =
+      std::chrono::duration<double, std::milli>(copyEnd - copyStart).count();
+
   readback->unlockPixels(context);
+
+  auto totalEnd = std::chrono::high_resolution_clock::now();
+  double totalMs =
+      std::chrono::duration<double, std::milli>(totalEnd - totalStart).count();
+
+  printf("[tgfx::readPixels] area=%dx%d bytes=%zu srcColorType=%d dstColorType=%d flipY=%s | async=%.2fms lock=%.2fms copy=%.2fms | total=%.2fms\n",
+         outInfo.width(), outInfo.height(), outInfo.byteSize(),
+         static_cast<int>(colorType), static_cast<int>(outInfo.colorType()),
+         flipY ? "yes" : "no",
+         asyncMs, lockMs, copyMs, totalMs);
+
   return true;
 }
 
