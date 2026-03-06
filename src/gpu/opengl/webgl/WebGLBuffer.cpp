@@ -57,7 +57,7 @@ void* WebGLBuffer::map(size_t offset, size_t size) {
       auto gl = _interface->functions();
       auto target = GetTarget(_usage);  // GL_PIXEL_PACK_BUFFER
       gl->bindBuffer(target, _bufferID);
-      gl->getBufferSubData(target, static_cast<GLintptr>(offset), static_cast<GLintptr>(size),
+      gl->getBufferSubData(target, static_cast<GLintptr>(offset), static_cast<GLsizeiptr>(size),
                            bufferData);
     }
 
