@@ -16,30 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/resources/BufferResource.h"
+#include "utils/DevicePool.h"
+#include "tgfx/gpu/opengl/webgl/WebGLDevice.h"
 
 namespace tgfx {
-ScratchKey BufferResource::ComputeScratchKey(size_t size, uint32_t usage) {
-  static const uint32_t BufferResourceType = UniqueID::Next();
-  BytesKey bytesKey(4);
-  bytesKey.write(BufferResourceType);
-  bytesKey.write(static_cast<uint32_t>(size & 0xFFFFFFFF));
-  bytesKey.write(static_cast<uint32_t>(static_cast<uint64_t>(size) >> 32));
-  bytesKey.write(usage);
-  return bytesKey;
+
+static std::shared_ptr<Device> cachedDevice = nullptr;
+
+std::shared_ptr<Device> DevicePool::Make() {
+  if (cachedDevice == nullptr) {
+    cachedDevice = WebGLDevice::MakeFrom("#tgfx-test-canvas");
+  }
+  return cachedDevice;
 }
 
-std::shared_ptr<BufferResource> BufferResource::FindOrCreate(Context* context, size_t size,
-                                                             uint32_t usage) {
-  auto scratchKey = ComputeScratchKey(size, usage);
-  auto resource = Resource::Find<BufferResource>(context, scratchKey);
-  if (resource != nullptr) {
-    return resource;
-  }
-  auto gpuBuffer = context->gpu()->createBuffer(size, usage);
-  if (!gpuBuffer) {
-    return nullptr;
-  }
-  return Wrap(context, std::move(gpuBuffer), scratchKey);
-}
 }  // namespace tgfx

@@ -21,9 +21,13 @@
 
 namespace tgfx {
 static std::string GetRootPath() {
+#ifdef __EMSCRIPTEN__
+  return "/";
+#else
   std::filesystem::path filePath = __FILE__;
   auto dir = filePath.parent_path().string();
   return std::filesystem::path(dir + "/../../..").lexically_normal();
+#endif
 }
 std::string ProjectPath::Absolute(const std::string& relativePath) {
   std::filesystem::path path = relativePath;
