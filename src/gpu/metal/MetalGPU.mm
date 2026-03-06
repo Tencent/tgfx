@@ -107,9 +107,29 @@ std::shared_ptr<Texture> MetalGPU::createTexture(const TextureDescriptor& descri
 }
 
 std::shared_ptr<Sampler> MetalGPU::createSampler(const SamplerDescriptor& descriptor) {
-  @autoreleasepool {
-    return MetalSampler::Make(this, descriptor);
+  auto key = MakeSamplerKey(descriptor);
+  auto iter = samplerCache.find(key);
+  if (iter != samplerCache.end()) {
+    return iter->second;
   }
+  std::shared_ptr<Sampler> sampler = nullptr;
+  @autoreleasepool {
+    sampler = MetalSampler::Make(this, descriptor);
+  }
+  if (sampler != nullptr) {
+    samplerCache[key] = sampler;
+  }
+  return sampler;
+}
+
+uint32_t MetalGPU::MakeSamplerKey(const SamplerDescriptor& descriptor) {
+  uint32_t key = 0;
+  key |= static_cast<uint32_t>(descriptor.addressModeX);
+  key |= static_cast<uint32_t>(descriptor.addressModeY) << 3;
+  key |= static_cast<uint32_t>(descriptor.minFilter) << 6;
+  key |= static_cast<uint32_t>(descriptor.magFilter) << 8;
+  key |= static_cast<uint32_t>(descriptor.mipmapMode) << 10;
+  return key;
 }
 
 std::shared_ptr<ShaderModule> MetalGPU::createShaderModule(
@@ -228,6 +248,7 @@ void MetalGPU::processUnreferencedResources() {
 }
 
 void MetalGPU::releaseAll(bool releaseGPU) {
+  samplerCache.clear();
   if (releaseGPU) {
     for (auto& resource : resources) {
       resource->onRelease(this);
