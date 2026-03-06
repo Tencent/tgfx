@@ -79,15 +79,15 @@ std::shared_ptr<BufferResource> HairlineBufferUploadTask::createBuffer(
     return nullptr;
   }
 
-  auto gpuBuffer = gpu->createBuffer(data->size(), usage);
-  if (!gpuBuffer) {
+  auto bufferResource = BufferResource::FindOrCreate(context, data->size(), usage);
+  if (!bufferResource) {
     LOGE("HairlineBufferUploadTask: Failed to create %s!", bufferName);
     *creationFailed = true;
     return nullptr;
   }
 
-  gpu->queue()->writeBuffer(gpuBuffer, 0, data->data(), data->size());
-  return BufferResource::Wrap(context, std::move(gpuBuffer));
+  gpu->queue()->writeBuffer(bufferResource->gpuBuffer(), 0, data->data(), data->size());
+  return bufferResource;
 }
 
 }  // namespace tgfx
