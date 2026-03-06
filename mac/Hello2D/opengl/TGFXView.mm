@@ -32,8 +32,12 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 }
 
 @implementation TGFXView {
+<<<<<<< HEAD:mac/Hello2D/TGFXView.mm
   std::shared_ptr<tgfx::CGLWindow> tgfxWindow;
   std::shared_ptr<tgfx::Surface> surface;
+=======
+  std::shared_ptr<tgfx::Window> tgfxWindow;
+>>>>>>> d7bcbbabb (Migrate Hello2D to CMake-generated Xcode projects and split TGFXView into Metal and OpenGL implementations.):mac/Hello2D/opengl/TGFXView.mm
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer;
@@ -195,7 +199,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return;
   }
 
-  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+  if (!presentImmediately && !displayList.hasContentChanged() && lastRecording == nullptr) {
     return;
   }
 
@@ -223,6 +227,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
   if (presentImmediately) {
     presentImmediately = false;
+    lastRecording = nullptr;
     if (recording) {
       context->submit(std::move(recording));
     }
