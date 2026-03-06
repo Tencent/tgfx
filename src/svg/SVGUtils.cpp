@@ -170,6 +170,9 @@ std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
   }
 
   auto out = static_cast<unsigned char*>(malloc(outLength));
+  if (out == nullptr) {
+    return nullptr;
+  }
   auto outData = Data::MakeAdopted(out, outLength, Data::FreeProc);
 
   for (size_t i = 0, j = 0; i < inLength;) {
