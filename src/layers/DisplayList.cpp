@@ -934,15 +934,15 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
   if (autoClear) {
     paint.setBlendMode(BlendMode::Src);
   }
-  static SamplingOptions NearestSampling(FilterMode::Nearest, MipmapMode::None);
-  static SamplingOptions LinearSampling(FilterMode::Linear, MipmapMode::None);
+  static SamplingOptions nearestSampling(FilterMode::Nearest, MipmapMode::None);
+  static SamplingOptions linearSampling(FilterMode::Linear, MipmapMode::None);
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
   Rect tileRect = {};
   for (auto& task : screenTasks) {
     auto surfaceCache = surfaceCaches[task.sourceIndex()];
     DEBUG_ASSERT(surfaceCache != nullptr);
     auto image = surfaceCache->makeImageSnapshot();
-    auto& sampling = task.identityScale() ? NearestSampling : LinearSampling;
+    auto& sampling = task.identityScale() ? nearestSampling : linearSampling;
     canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
                           SrcRectConstraint::Strict);
     tileRect.join(task.tileRect());
