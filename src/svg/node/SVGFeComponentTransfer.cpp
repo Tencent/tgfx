@@ -112,6 +112,7 @@ std::vector<uint8_t> SVGFeFunc::getTable() const {
     case SVGFeFuncType::Gamma:
       return make_gamma();
   }
+  return {};
 }
 
 bool SVGFeFunc::parseAndSetAttribute(const std::string& name, const std::string& value) {
