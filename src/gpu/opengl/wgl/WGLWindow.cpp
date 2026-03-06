@@ -19,6 +19,7 @@
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 #include <GL/GL.h>
 #include "core/utils/Log.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedContext,
@@ -42,10 +43,10 @@ std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedCo
 }
 
 WGLWindow::WGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device)), colorSpace(std::move(colorSpace)) {
+    : Window(std::move(device), std::move(colorSpace)) {
 }
 
-std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<RenderTargetProxy> WGLWindow::onCreateRenderTarget(Context* context) {
   ISize size = {0, 0};
   if (nativeWindow) {
     RECT rect = {};
@@ -59,7 +60,7 @@ std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context) {
 
   GLFrameBufferInfo frameBuffer = {0, GL_RGBA8};
   BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
+  return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
 void WGLWindow::onPresent(Context*) {

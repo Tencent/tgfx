@@ -34,6 +34,7 @@
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 
@@ -240,7 +241,8 @@ RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
       _colorSpace(std::move(colorSpace)) {
   if (clearAll) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags,
+    auto window = surface ? surface->_window : std::shared_ptr<Window>{};
+    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags, window,
                                                      PMColor::Transparent(), _colorSpace);
   }
 }
@@ -459,8 +461,9 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   }
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor =
-        drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
+    auto window = surface ? surface->_window : std::shared_ptr<Window>{};
+    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags, window,
+                                                     std::nullopt, _colorSpace);
   } else if (discardContent) {
     opsCompositor->discardAll();
   }
@@ -474,8 +477,8 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
     DEBUG_ASSERT(oldContent->width() == renderTarget->width() &&
                  oldContent->height() == renderTarget->height());
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor =
-        drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
+    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags, {},
+                                                     std::nullopt, _colorSpace);
     Brush brush = {{}, BlendMode::Src, false};
     opsCompositor->fillImageRect(std::move(oldContent), renderTarget->bounds(),
                                  renderTarget->bounds(), {}, MCState{}, brush,

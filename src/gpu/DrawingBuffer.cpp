@@ -21,6 +21,7 @@
 #include "gpu/GlobalCache.h"
 #include "inspect/InspectorMark.h"
 #include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 // We set the maxBlockSize to 2MB because allocating blocks that are too large can cause memory
@@ -57,8 +58,23 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   vertexMaxValueTracker.addValue(vertexAllocator.size());
   drawingMaxValueTracker.addValue(drawingAllocator.size());
   auto commandBuffer = commandEncoder->finish();
+  if (commandBuffer != nullptr) {
+    for (auto& weakWindow : windows) {
+      if (auto window = weakWindow.lock()) {
+        window->onEncodePresent(context, commandBuffer);
+      }
+    }
+  }
   context->globalCache()->resetUniformBuffer();
   return commandBuffer;
+}
+
+void DrawingBuffer::presentWindows(Context* context) {
+  for (auto& weakWindow : windows) {
+    if (auto window = weakWindow.lock()) {
+      window->onPresent(context);
+    }
+  }
 }
 
 bool DrawingBuffer::empty() const {
@@ -69,6 +85,7 @@ void DrawingBuffer::reset() {
   renderTasks.clear();
   resourceTasks.clear();
   atlasTasks.clear();
+  windows.clear();
   vertexAllocator.clear(vertexMaxValueTracker.getMaxValue());
   drawingAllocator.clear(drawingMaxValueTracker.getMaxValue());
   _generation++;

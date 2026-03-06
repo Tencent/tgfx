@@ -17,12 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Window.h"
-#include "core/utils/Log.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
-Window::Window(std::shared_ptr<Device> device) : device(std::move(device)) {
+Window::Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
+    : device(std::move(device)), _colorSpace(std::move(colorSpace)) {
+}
+
+std::shared_ptr<ColorSpace> Window::colorSpace() const {
+  return _colorSpace;
 }
 
 std::shared_ptr<Device> Window::getDevice() {
@@ -30,58 +33,9 @@ std::shared_ptr<Device> Window::getDevice() {
   return device;
 }
 
-std::shared_ptr<tgfx::Surface> Window::getSurface(Context* context, bool queryOnly) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  if (!checkContext(context)) {
-    return nullptr;
-  }
-  if (surface != nullptr && !sizeInvalid) {
-    return surface;
-  }
-  if (queryOnly) {
-    return nullptr;
-  }
-  surface = onCreateSurface(context);
-  sizeInvalid = false;
-  return surface;
+void Window::onEncodePresent(Context*, std::shared_ptr<CommandBuffer>) {
 }
 
-void Window::invalidSize() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  sizeInvalid = true;
-  onInvalidSize();
-}
-
-void Window::freeSurface() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  onFreeSurface();
-}
-
-void Window::present(Context* context) {
-  FRAME_MARK;
-  std::lock_guard<std::mutex> autoLock(locker);
-  if (!checkContext(context)) {
-    return;
-  }
-  context->flushAndSubmit();
-  onPresent(context);
-}
-
-void Window::onInvalidSize() {
-}
-
-void Window::onFreeSurface() {
-  surface = nullptr;
-}
-
-bool Window::checkContext(Context* context) {
-  if (context == nullptr) {
-    return false;
-  }
-  if (context->device() != device.get()) {
-    LOGE("Window::checkContext() : context is not locked from the same device of this window");
-    return false;
-  }
-  return true;
+void Window::onPresent(Context*) {
 }
 }  // namespace tgfx

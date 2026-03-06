@@ -27,6 +27,7 @@
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
+class Window;
 enum class PendingOpType {
   Unknown,
   Image,
@@ -46,6 +47,7 @@ class OpsCompositor {
    * Creates an OpsCompositor with the given render target proxy, render flags and render queue.
    */
   OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
+                std::weak_ptr<Window> window = {},
                 std::optional<PMColor> clearColor = std::nullopt,
                 std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
@@ -134,6 +136,7 @@ class OpsCompositor {
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
   std::optional<PMColor> clearColor = std::nullopt;
   std::vector<PlacementPtr<DrawOp>> drawOps = {};
+  std::weak_ptr<Window> weakWindow = {};
   std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
 
   static bool CompareBrush(const Brush& a, const Brush& b);

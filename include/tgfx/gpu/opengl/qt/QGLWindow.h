@@ -21,13 +21,15 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-copy"
 #include <QQuickItem>
-#include <QSGTexture>
 #pragma clang diagnostic pop
+#include <QSGTexture>
+#include <vector>
 #include "QGLDevice.h"
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 class QGLDeviceCreator;
+class RenderTargetProxy;
 
 class QGLWindow : public Window {
  public:
@@ -50,34 +52,45 @@ class QGLWindow : public Window {
   void moveToThread(QThread* renderThread);
 
   /**
-   * Returns the current QSGTexture for displaying. This method can only be called from the QSG
-   * render thread.
+   * Returns the QSGTexture for the most recently presented frame. Returns nullptr if no frame has
+   * been presented yet. The returned QSGTexture is owned by this QGLWindow and should not be
+   * deleted by the caller.
    */
-  QSGTexture* getQSGTexture();
+  QSGTexture* getQSGTexture() const;
+
+  /**
+   * Invalidates the current size. Call this before the drawable size changes to allow the texture
+   * pool to release stale textures that no longer match the new size.
+   */
+  void invalidSize();
 
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
+  std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   void onPresent(Context* context) override;
-  void onFreeSurface() override;
 
  private:
+  struct TextureSlot {
+    std::shared_ptr<RenderTargetProxy> proxy = nullptr;
+    bool available = true;
+  };
+
   std::weak_ptr<QGLWindow> weakThis;
   QQuickItem* quickItem = nullptr;
-  bool singleBufferMode = false;
+  int maxTextureCount = 2;
   QThread* renderThread = nullptr;
-  unsigned pendingTextureID = 0;
-  std::shared_ptr<Surface> pendingSurface = nullptr;
-  std::shared_ptr<Surface> displayingSurface = nullptr;
-  std::shared_ptr<Surface> frontSurface = nullptr;
-  QSGTexture* outTexture = nullptr;
+  std::vector<TextureSlot> textureSlots = {};
   QGLDeviceCreator* deviceCreator = nullptr;
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
+  QSGTexture* presentedQSGTexture = nullptr;
+  std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
 
   explicit QGLWindow(QQuickItem* quickItem, bool singleBufferMode = false,
                      std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  std::shared_ptr<RenderTargetProxy> acquireTexture(Context* context, int width, int height);
+  void releaseTexture(const std::shared_ptr<RenderTargetProxy>& proxy);
   void initDevice();
   void createDevice(QOpenGLContext* context);
 
   friend class QGLDeviceCreator;
+  friend class QGLDrawableProxy;
 };
 }  // namespace tgfx

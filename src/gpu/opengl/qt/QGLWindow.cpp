@@ -21,8 +21,10 @@
 #include <QColorSpace>
 #include <QQuickWindow>
 #include <QThread>
+#include "QGLDrawableProxy.h"
 #include "core/utils/ColorSpaceHelper.h"
-#include "gpu/opengl/GLTexture.h"
+#include "core/utils/Log.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 class QGLDeviceCreator : public QObject {
@@ -58,7 +60,6 @@ class QGLDeviceCreator : public QObject {
     if (nativeWindow != nullptr) {
       auto shareContext = getShareContext();
       if (shareContext && shareContext->thread() == QThread::currentThread()) {
-        // We are on the same thread as the QSG render thread, so we can create the device here.
         createDevice(shareContext);
       } else {
         connect(nativeWindow, SIGNAL(beforeRendering()), this, SLOT(onBeforeRendering()),
@@ -108,8 +109,7 @@ std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singl
   }
   auto nativeWindow = quickItem->window();
   auto icc = nativeWindow->format().colorSpace().iccProfile();
-  std::shared_ptr<ColorSpace> currentColorSpace =
-      ColorSpace::MakeFromICC(icc.data(), static_cast<size_t>(icc.size()));
+  auto currentColorSpace = ColorSpace::MakeFromICC(icc.data(), static_cast<size_t>(icc.size()));
   if (colorSpace != nullptr && !NearlyEqual(currentColorSpace.get(), colorSpace.get())) {
     LOGE(
         "QGLWindow::MakeFrom() The specified ColorSpace does not match the window's ColorSpace. "
@@ -124,15 +124,18 @@ std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singl
 
 QGLWindow::QGLWindow(QQuickItem* quickItem, bool singleBufferMode,
                      std::shared_ptr<ColorSpace> colorSpace)
-    : quickItem(quickItem), singleBufferMode(singleBufferMode), colorSpace(std::move(colorSpace)) {
+    : quickItem(quickItem), maxTextureCount(singleBufferMode ? 1 : 2) {
+  _colorSpace = std::move(colorSpace);
   if (QThread::currentThread() != QApplication::instance()->thread()) {
     renderThread = QThread::currentThread();
   }
 }
 
 QGLWindow::~QGLWindow() {
-  delete outTexture;
   delete deviceCreator;
+  drawableProxy = nullptr;
+  textureSlots.clear();
+  delete presentedQSGTexture;
 }
 
 void QGLWindow::moveToThread(QThread* thread) {
@@ -143,43 +146,16 @@ void QGLWindow::moveToThread(QThread* thread) {
   }
 }
 
-QSGTexture* QGLWindow::getQSGTexture() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  auto nativeWindow = quickItem->window();
-  if (nativeWindow == nullptr || device == nullptr) {
-    return nullptr;
-  }
-  if (pendingTextureID > 0 && pendingSurface != nullptr) {
-    if (outTexture) {
-      delete outTexture;
-      outTexture = nullptr;
-    }
-    auto width = static_cast<int>(ceil(quickItem->width()));
-    auto height = static_cast<int>(ceil(quickItem->height()));
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-    outTexture = QNativeInterface::QSGOpenGLTexture::fromNative(
-        pendingTextureID, nativeWindow, QSize(width, height), QQuickWindow::TextureHasAlphaChannel);
-
-#elif (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
-    outTexture = nativeWindow->createTextureFromNativeObject(
-        QQuickWindow::NativeObjectTexture, &pendingTextureID, 0, QSize(width, height),
-        QQuickWindow::TextureHasAlphaChannel);
-#else
-    outTexture = nativeWindow->createTextureFromId(pendingTextureID, QSize(width, height),
-                                                   QQuickWindow::TextureHasAlphaChannel);
-#endif
-    // Keep the surface alive until the next getQSGTexture() call.
-    displayingSurface = pendingSurface;
-    pendingSurface = nullptr;
-    pendingTextureID = 0;
-    if (!singleBufferMode) {
-      std::swap(frontSurface, surface);
-    }
-  }
-  return outTexture;
+QSGTexture* QGLWindow::getQSGTexture() const {
+  return presentedQSGTexture;
 }
 
-std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
+void QGLWindow::invalidSize() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  textureSlots.clear();
+}
+
+std::shared_ptr<RenderTargetProxy> QGLWindow::onCreateRenderTarget(Context* context) {
   auto nativeWindow = quickItem->window();
   if (nativeWindow == nullptr) {
     return nullptr;
@@ -190,36 +166,85 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  if (!singleBufferMode) {
-    frontSurface =
-        Surface::Make(context, width, height, ColorType::RGBA_8888, 1, false, 0, colorSpace);
-    if (frontSurface == nullptr) {
-      return nullptr;
-    }
-  }
-  auto backSurface =
-      Surface::Make(context, width, height, ColorType::RGBA_8888, 1, false, 0, colorSpace);
-  if (backSurface == nullptr) {
-    frontSurface = nullptr;
-    return nullptr;
-  }
-  sizeInvalid = false;
-  return backSurface;
+  drawableProxy = std::make_shared<QGLDrawableProxy>(context, width, height, PixelFormat::RGBA_8888,
+                                                     1, ImageOrigin::BottomLeft, this);
+  return drawableProxy;
 }
 
 void QGLWindow::onPresent(Context*) {
-  GLTextureInfo textureInfo = {};
-  // Surface->getBackendTexture() triggers a flush, so we need to call it under the context.
-  surface->getBackendTexture().getGLTextureInfo(&textureInfo);
-  pendingTextureID = textureInfo.id;
-  // Keep the surface alive until the next getQSGTexture() call.
-  pendingSurface = surface;
+  if (drawableProxy == nullptr) {
+    return;
+  }
+  auto proxy = std::static_pointer_cast<QGLDrawableProxy>(drawableProxy);
+  auto textureView = proxy->getTextureView();
+  if (textureView == nullptr) {
+    return;
+  }
+  GLTextureInfo info = {};
+  if (!textureView->getBackendTexture().getGLTextureInfo(&info)) {
+    return;
+  }
+  auto nativeWindow = quickItem->window();
+  if (nativeWindow == nullptr) {
+    return;
+  }
+  auto textureWidth = proxy->width();
+  auto textureHeight = proxy->height();
+  delete presentedQSGTexture;
+  presentedQSGTexture = nullptr;
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+  presentedQSGTexture = QNativeInterface::QSGOpenGLTexture::fromNative(
+      info.id, nativeWindow, QSize(textureWidth, textureHeight),
+      QQuickWindow::TextureHasAlphaChannel);
+#elif (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
+  presentedQSGTexture = nativeWindow->createTextureFromNativeObject(
+      QQuickWindow::NativeObjectTexture, &info.id, 0, QSize(textureWidth, textureHeight),
+      QQuickWindow::TextureHasAlphaChannel);
+#else
+  presentedQSGTexture = nativeWindow->createTextureFromId(
+      info.id, QSize(textureWidth, textureHeight), QQuickWindow::TextureHasAlphaChannel);
+#endif
+  releaseTexture(proxy->getTextureTargetProxy());
   QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
 }
 
-void QGLWindow::onFreeSurface() {
-  frontSurface = nullptr;
-  surface = nullptr;
+std::shared_ptr<RenderTargetProxy> QGLWindow::acquireTexture(Context* context, int width,
+                                                             int height) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  for (auto& slot : textureSlots) {
+    if (slot.available && slot.proxy->width() == width && slot.proxy->height() == height) {
+      slot.available = false;
+      return slot.proxy;
+    }
+  }
+  if (static_cast<int>(textureSlots.size()) >= maxTextureCount) {
+    for (auto& slot : textureSlots) {
+      if (slot.available) {
+        LOGE(
+            "QGLWindow::acquireTexture() Texture pool has stale textures with mismatched size. "
+            "Call invalidSize() before changing the drawable size.");
+        return nullptr;
+      }
+    }
+    LOGE("QGLWindow::acquireTexture() All textures are in use. No available texture in the pool.");
+    return nullptr;
+  }
+  auto proxy = RenderTargetProxy::Make(context, width, height, false);
+  if (proxy == nullptr) {
+    return nullptr;
+  }
+  textureSlots.push_back({proxy, false});
+  return proxy;
+}
+
+void QGLWindow::releaseTexture(const std::shared_ptr<RenderTargetProxy>& proxy) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  for (auto& slot : textureSlots) {
+    if (slot.proxy == proxy) {
+      slot.available = true;
+      return;
+    }
+  }
 }
 
 void QGLWindow::initDevice() {

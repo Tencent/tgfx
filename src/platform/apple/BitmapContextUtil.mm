@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BitmapContextUtil.h"
-#include "tgfx/core/ColorSpace.h"
+#include "CGColorSpaceUtil.h"
 
 namespace tgfx {
 static uint32_t GetBitmapInfo(AlphaType alphaType, ColorType colorType) {
@@ -40,31 +40,6 @@ static uint32_t GetBitmapInfo(AlphaType alphaType, ColorType colorType) {
       break;
   }
   return static_cast<uint32_t>(bitmapInfo) | static_cast<uint32_t>(alphaInfo);
-}
-
-static CGColorSpaceRef CreateCGColorSpace(const std::shared_ptr<ColorSpace>& colorSpace) {
-  if (colorSpace != nullptr) {
-    if (auto iccData = colorSpace->toICCProfile()) {
-      if (CFDataRef cfData =
-              CFDataCreate(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(iccData->data()),
-                           static_cast<CFIndex>(iccData->size()))) {
-        CGColorSpaceRef cgColorSpace = nullptr;
-        if (@available(iOS 10.0, macOS 10.12, *)) {
-          cgColorSpace = CGColorSpaceCreateWithICCData(cfData);
-        } else {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-          cgColorSpace = CGColorSpaceCreateWithICCProfile(cfData);
-#pragma clang diagnostic pop
-        }
-        CFRelease(cfData);
-        if (cgColorSpace != nullptr) {
-          return cgColorSpace;
-        }
-      }
-    }
-  }
-  return CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
 }
 
 CGContextRef CreateBitmapContext(const ImageInfo& info, void* pixels) {

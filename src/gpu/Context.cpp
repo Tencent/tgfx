@@ -117,6 +117,7 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
       auto commandBuffer = drawingBuffer->encode();
       _resourceCache->advanceFrameAndPurge();
       queue->submit(std::move(commandBuffer));
+      drawingBuffer->presentWindows(this);
       pendingDrawingBuffers.pop_front();
       if (drawingBuffer == targetBuffer) {
         break;

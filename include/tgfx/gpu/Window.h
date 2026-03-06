@@ -18,12 +18,20 @@
 
 #pragma once
 
-#include "tgfx/core/Surface.h"
-#include "tgfx/gpu/Context.h"
+#include <memory>
+#include <mutex>
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
+class CommandBuffer;
+class Context;
+class Device;
+class RenderTargetProxy;
+
 /**
- * Window represents a native displayable resource that can be rendered or written to by a Device.
+ * Window represents a native displayable resource that can be rendered to by a Device. Use
+ * Surface::MakeFrom(context, window) to obtain a Surface for rendering, then call
+ * context->submit() to automatically present the result.
  */
 class Window {
  public:
@@ -36,43 +44,39 @@ class Window {
   std::shared_ptr<Device> getDevice();
 
   /**
-   * Returns the Surface associated with this Window. If the queryOnly is true, it will not create
-   * a new surface if it doesn't exist.
+   * Returns the color space associated with this Window. Returns nullptr for the default sRGB.
    */
-  std::shared_ptr<Surface> getSurface(Context* context, bool queryOnly = false);
+  virtual std::shared_ptr<ColorSpace> colorSpace() const;
 
   /**
-   * Applies all pending graphics changes to the window.
+   * Creates a platform-specific RenderTargetProxy for this window. Subclasses must implement this
+   * to provide the appropriate render target for the platform's graphics API. Returns nullptr if
+   * the render target cannot be created.
    */
-  void present(Context* context);
-
-  /**
-   * Invalidates the cached surface associated with this Window. This is useful when the window is
-   * resized and the surface needs to be recreated.
-   */
-  void invalidSize();
-
-  /**
-   * Frees the cached surface associated with this Window immediately. This is useful when the
-   * window is hidden and the surface is no longer needed for a while.
-   */
-  void freeSurface();
+  virtual std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) = 0;
 
  protected:
   std::mutex locker = {};
-  bool sizeInvalid = false;
   std::shared_ptr<Device> device = nullptr;
-  std::shared_ptr<Surface> surface = nullptr;
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
-  explicit Window(std::shared_ptr<Device> device);
+  explicit Window(std::shared_ptr<Device> device,
+                  std::shared_ptr<ColorSpace> colorSpace = nullptr);
   Window() = default;
 
-  virtual void onInvalidSize();
-  virtual std::shared_ptr<Surface> onCreateSurface(Context* context) = 0;
-  virtual void onPresent(Context* context) = 0;
-  virtual void onFreeSurface();
+  /**
+   * Called during the encode phase to schedule present commands into the command buffer.
+   * Metal uses this to call [commandBuffer presentDrawable:] before commit.
+   */
+  virtual void onEncodePresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer);
+
+  /**
+   * Called after command buffer submission to perform platform-level buffer swaps.
+   * OpenGL uses this for swapBuffers/flushBuffer.
+   */
+  virtual void onPresent(Context* context);
 
  private:
-  bool checkContext(Context* context);
+  friend class DrawingBuffer;
 };
 }  // namespace tgfx

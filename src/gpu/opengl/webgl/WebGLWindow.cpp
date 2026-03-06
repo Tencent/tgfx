@@ -20,6 +20,7 @@
 #include <emscripten.h>
 #include "core/utils/Log.h"
 #include "gpu/opengl/GLDefines.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 
@@ -38,21 +39,20 @@ std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID,
 }
 
 WebGLWindow::WebGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device)), colorSpace(std::move(colorSpace)) {
+    : Window(std::move(device), std::move(colorSpace)) {
 }
 
-std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<RenderTargetProxy> WebGLWindow::onCreateRenderTarget(Context* context) {
   int width = 0;
   int height = 0;
   emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
   if (width <= 0 || height <= 0) {
-    LOGE("WebGLWindow::onCreateSurface() Can not create a Surface with zero size.");
+    LOGE("WebGLWindow::onCreateRenderTarget() Can not create a RenderTarget with zero size.");
     return nullptr;
   }
   GLFrameBufferInfo glInfo = {};
   glInfo.id = 0;
   glInfo.format = GL_RGBA8;
-  return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft, 0,
-                           colorSpace);
+  return RenderTargetProxy::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft);
 }
 }  // namespace tgfx

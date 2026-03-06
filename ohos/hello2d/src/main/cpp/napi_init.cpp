@@ -1,5 +1,6 @@
 #include "napi/native_api.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
 #include "tgfx/gpu/Recording.h"
 #include "hello2d/AppHost.h"
@@ -14,6 +15,7 @@ static double contentOffsetX = 0;
 static double contentOffsetY = 0;
 static std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 static std::shared_ptr<tgfx::Window> window = nullptr;
+static std::shared_ptr<tgfx::Surface> surface = nullptr;
 static std::shared_ptr<DisplayLink> displayLink = nullptr;
 static tgfx::DisplayList displayList = {};
 static std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
@@ -111,7 +113,9 @@ static void Draw() {
     return;
   }
 
-  auto surface = window->getSurface(context);
+  if (surface == nullptr) {
+    surface = tgfx::Surface::MakeFrom(context, window);
+  }
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -130,7 +134,6 @@ static void Draw() {
 
   if (recording) {
     context->submit(std::move(recording));
-    window->present(context);
   }
 
   device->unlock();
@@ -209,9 +212,7 @@ static void UpdateSize(OH_NativeXComponent* component, void* nativeWindow) {
   }
   lastSurfaceWidth = static_cast<int>(width);
   lastSurfaceHeight = static_cast<int>(height);
-  if (window != nullptr) {
-    window->invalidSize();
-  }
+  surface = nullptr;
 }
 
 static void OnSurfaceChangedCB(OH_NativeXComponent* component, void* nativeWindow) {
@@ -219,6 +220,7 @@ static void OnSurfaceChangedCB(OH_NativeXComponent* component, void* nativeWindo
 }
 
 static void OnSurfaceDestroyedCB(OH_NativeXComponent*, void*) {
+  surface = nullptr;
   window = nullptr;
   displayLink = nullptr;
   lastRecording = nullptr;

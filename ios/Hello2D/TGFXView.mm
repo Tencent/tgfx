@@ -19,10 +19,12 @@
 #import "TGFXView.h"
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 
 @implementation TGFXView {
   std::shared_ptr<tgfx::EAGLWindow> tgfxWindow;
+  std::shared_ptr<tgfx::Surface> surface;
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer;
@@ -82,9 +84,7 @@
   }
   lastSurfaceWidth = static_cast<int>(self.bounds.size.width * self.contentScaleFactor);
   lastSurfaceHeight = static_cast<int>(self.bounds.size.height * self.contentScaleFactor);
-  if (tgfxWindow != nullptr) {
-    tgfxWindow->invalidSize();
-  }
+  surface = nullptr;
 }
 
 - (void)updateLayerTree:(int)drawIndex {
@@ -140,7 +140,11 @@
     return;
   }
 
-  auto surface = tgfxWindow->getSurface(context);
+  auto surface = this->surface;
+  if (surface == nullptr) {
+    surface = tgfx::Surface::MakeFrom(context, tgfxWindow);
+    this->surface = surface;
+  }
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -159,7 +163,6 @@
 
   if (recording) {
     context->submit(std::move(recording));
-    tgfxWindow->present(context);
   }
 
   device->unlock();
