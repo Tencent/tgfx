@@ -23,7 +23,14 @@
 namespace tgfx {
 class AARectEffect : public FragmentProcessor {
  public:
-  static PlacementPtr<AARectEffect> Make(BlockAllocator* allocator, const Rect& rect);
+  /**
+   * Creates an AARectEffect that clips to the given rectangle.
+   * @param allocator The allocator to use for memory allocation.
+   * @param rect The rectangle to clip to, in device coordinates.
+   * @param antiAlias If true, the clip edge will be anti-aliased.
+   */
+  static PlacementPtr<AARectEffect> Make(BlockAllocator* allocator, const Rect& rect,
+                                         bool antiAlias = true);
 
   std::string name() const override {
     return "AARectEffect";
@@ -32,9 +39,11 @@ class AARectEffect : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  explicit AARectEffect(const Rect& rect) : FragmentProcessor(ClassID()), rect(rect) {
+  AARectEffect(const Rect& rect, bool antiAlias)
+      : FragmentProcessor(ClassID()), rect(rect), antiAlias(antiAlias) {
   }
 
   Rect rect = {};
+  bool antiAlias = true;
 };
 }  // namespace tgfx

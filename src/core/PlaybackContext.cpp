@@ -20,28 +20,42 @@
 #include "DrawContext.h"
 
 namespace tgfx {
-PlaybackContext::PlaybackContext(MCState state) : initState(std::move(state)) {
-  hasInitMatrix = !initState.matrix.isIdentity();
-  hasInitClip = !initState.clip.isEmpty() || !initState.clip.isInverseFillType();
-  _state = initState;
+PlaybackContext::PlaybackContext(const Matrix& matrix, const ClipStack& clip)
+    : initMatrix(matrix), initClipStack(clip) {
+  hasInitMatrix = !initMatrix.isIdentity();
+  hasInitClip = initClipStack.state() != ClipState::WideOpen;
+  _matrix = initMatrix;
+  _clipStack = initClipStack;
 }
 
 void PlaybackContext::setMatrix(const Matrix& matrix) {
-  _state.matrix = matrix;
+  _matrix = matrix;
   if (hasInitMatrix) {
-    _state.matrix.postConcat(initState.matrix);
+    _matrix.postConcat(initMatrix);
   }
 }
 
-void PlaybackContext::setClip(const Clip& clip) {
-  _state.clip = clip;
+void PlaybackContext::setClip(const ClipRecord& record, const std::vector<ClipElement>& elements) {
+  _clipStack.reset(record, elements);
   if (hasInitMatrix) {
-    _state.clip.path.transform(initState.matrix);
+    // Transform clip elements by init matrix.
+    // Note: ClipStack stores transformed paths, so we need to transform them again.
+    auto& clipElements = const_cast<std::vector<ClipElement>&>(_clipStack.elements());
+    for (auto& element : clipElements) {
+      auto transformedPath = element.getPath();
+      transformedPath.transform(initMatrix);
+      element = ClipElement(transformedPath, element.isAntiAlias());
+    }
   }
   if (hasInitClip) {
-    _state.clip.path.addPath(initState.clip.path, PathOp::Intersect);
+    // Intersect with init clip by adding all init clip elements.
+    auto& initElements = initClipStack.elements();
+    for (size_t i = initClipStack.oldestValidIndex(); i < initElements.size(); ++i) {
+      if (initElements[i].isValid()) {
+        _clipStack.clip(initElements[i].getPath(), initElements[i].isAntiAlias());
+      }
+    }
   }
-  _state.clip.forceAntiAlias = clip.forceAntiAlias;
 }
 
 void PlaybackContext::setColor(const Color& color) {
@@ -68,11 +82,17 @@ void PlaybackContext::setHasStroke(bool value) {
 
 void PlaybackContext::drawFill(DrawContext* context) {
   if (hasInitClip) {
-    auto brush = _brush.makeWithMatrix(initState.matrix);
-    brush.antiAlias = initState.clip.forceAntiAlias;
-    context->drawPath(initState.clip.path, {}, brush);
+    // Draw each clip element as a fill path.
+    auto brush = _brush.makeWithMatrix(initMatrix);
+    auto& initElements = initClipStack.elements();
+    for (size_t i = initClipStack.oldestValidIndex(); i < initElements.size(); ++i) {
+      if (initElements[i].isValid()) {
+        brush.antiAlias = initElements[i].isAntiAlias();
+        context->drawPath(initElements[i].getPath(), Matrix::I(), _clipStack, brush);
+      }
+    }
   } else if (hasInitMatrix) {
-    context->drawFill(_brush.makeWithMatrix(initState.matrix));
+    context->drawFill(_brush.makeWithMatrix(initMatrix));
   } else {
     context->drawFill(_brush);
   }

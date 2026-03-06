@@ -25,7 +25,6 @@
 #include <utility>
 #include "compositing3d/Context3DCompositor.h"
 #include "compositing3d/Layer3DContext.h"
-#include "core/MCState.h"
 #include "core/Matrix3DUtils.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
@@ -219,19 +218,17 @@ static std::optional<Rect> GetClipBounds(const Canvas* canvas) {
   if (canvas == nullptr) {
     return std::nullopt;
   }
-  const auto& clipPath = canvas->getTotalClip();
-  auto clipRect = Rect::MakeEmpty();
+  auto clipRect = canvas->getClipBounds();
   auto surface = canvas->getSurface();
-  if (clipPath.isInverseFillType()) {
+  // Check for infinite bounds (no clip applied)
+  if (clipRect.left <= -FLT_MAX / 2 || clipRect.top <= -FLT_MAX / 2 ||
+      clipRect.right >= FLT_MAX / 2 || clipRect.bottom >= FLT_MAX / 2) {
     if (!surface) {
       return std::nullopt;
     }
     clipRect = Rect::MakeWH(surface->width(), surface->height());
-  } else {
-    clipRect = clipPath.getBounds();
-    if (surface && !clipRect.intersect(Rect::MakeWH(surface->width(), surface->height()))) {
-      return Rect::MakeEmpty();
-    }
+  } else if (surface && !clipRect.intersect(Rect::MakeWH(surface->width(), surface->height()))) {
+    return Rect::MakeEmpty();
   }
   if (clipRect.isEmpty()) {
     return Rect::MakeEmpty();

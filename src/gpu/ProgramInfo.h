@@ -24,6 +24,7 @@
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
 #include "gpu/resources/RenderTarget.h"
+#include "tgfx/core/BlendMode.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {

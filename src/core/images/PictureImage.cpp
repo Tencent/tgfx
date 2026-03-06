@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PictureImage.h"
+#include "core/ClipStack.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpsCompositor.h"
@@ -171,8 +172,8 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
   if (matrix) {
     totalMatrix.preConcat(*matrix);
   }
-  MCState replayState(totalMatrix);
-  picture->playback(&renderContext, replayState);
+  ClipStack clip;
+  picture->playback(&renderContext, totalMatrix, clip);
   renderContext.flush();
   return true;
 }

@@ -36,6 +36,7 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Shape.h"
 
 #if defined _WIN32
 #include <intrin.h>

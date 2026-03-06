@@ -24,11 +24,13 @@
 namespace tgfx {
 class GLSLAARectEffect : public AARectEffect {
  public:
-  explicit GLSLAARectEffect(const Rect& rect);
+  GLSLAARectEffect(const Rect& rect, bool antiAlias);
 
   void emitCode(EmitArgs& args) const override;
 
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
+
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 };
 }  // namespace tgfx

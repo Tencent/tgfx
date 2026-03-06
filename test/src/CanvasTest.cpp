@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/MCState.h"
 #include "core/Matrix3DUtils.h"
 #include "core/PictureRecords.h"
 #include "core/images/SubsetImage.h"
@@ -109,8 +108,7 @@ TGFX_TEST(CanvasTest, clipAntiAlias) {
     path.lineTo(100, 200);
     path.lineTo(0, 200);
     path.close();
-    canvas->clipPath(path);
-    canvas->setForceClipAntialias(false);
+    canvas->clipPath(path, false);
     const Rect drawRect = Rect::MakeXYWH(20, 20, 180, 180);
     Paint paint;
     paint.setColor(Color::Blue());
@@ -2285,6 +2283,235 @@ TGFX_TEST(CanvasTest, DrawMesh_FromShape) {
   canvas->restore();
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_FromShape"));
+}
+
+TGFX_TEST(CanvasTest, ClipStateTransition) {
+  const ContextScope scope;
+  Context* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // 200x250 surface to show 4 rows:
+  // Row 1: WideOpen (no clip) - red rect visible
+  // Row 2: Rect state (single rect clip) - green rect clipped to rect
+  // Row 3: Complex state (multiple clips) - blue rect clipped by both
+  // Row 4: Empty state (non-intersecting clips) - nothing drawn
+  auto surface = Surface::Make(context, 200, 250);
+  ASSERT_TRUE(surface != nullptr);
+  Canvas* canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint = {};
+
+  // Row 1: WideOpen - no clip applied, draw full rect
+  paint.setColor(Color::Red());
+  canvas->drawRect(Rect::MakeXYWH(10, 10, 80, 40), paint);
+
+  // Row 2: Rect state - single rectangle clip
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(20, 70, 60, 40));
+  paint.setColor(Color::Green());
+  canvas->drawRect(Rect::MakeXYWH(10, 60, 80, 60), paint);
+  canvas->restore();
+
+  // Row 3: Complex state - multiple clips (rect + path)
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(10, 130, 80, 50));
+  Path trianglePath = {};
+  trianglePath.moveTo(50, 125);
+  trianglePath.lineTo(100, 185);
+  trianglePath.lineTo(0, 185);
+  trianglePath.close();
+  canvas->clipPath(trianglePath);
+  paint.setColor(Color::Blue());
+  canvas->drawRect(Rect::MakeXYWH(0, 120, 100, 70), paint);
+  canvas->restore();
+
+  // Row 4: Empty state - non-intersecting clips
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(10, 200, 30, 40));
+  canvas->clipRect(Rect::MakeXYWH(60, 200, 30, 40));  // Non-intersecting
+  paint.setColor(Color::FromRGBA(255, 165, 0));       // Orange, but should not be visible
+  canvas->drawRect(Rect::MakeXYWH(0, 195, 100, 50), paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipStateTransition"));
+}
+
+TGFX_TEST(CanvasTest, ClipElementMerge) {
+  const ContextScope scope;
+  Context* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // 200x200 surface to show merge and elimination logic
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  Canvas* canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint = {};
+
+  // Test 1: Containing rectangles merge - larger rect contains smaller
+  // Adding clip(50,50,150,150) then clip(70,70,130,130) should result in smaller rect only
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(20, 20, 80, 80));  // Outer rect
+  canvas->clipRect(Rect::MakeXYWH(30, 30, 60, 60));  // Inner rect (contained)
+  paint.setColor(Color::Red());
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 120, 120), paint);
+  canvas->restore();
+
+  // Test 2: Partially overlapping rectangles - both needed
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(100, 20, 80, 60));
+  canvas->clipRect(Rect::MakeXYWH(120, 40, 60, 60));  // Partial overlap
+  paint.setColor(Color::Green());
+  canvas->drawRect(Rect::MakeXYWH(90, 10, 100, 100), paint);
+  canvas->restore();
+
+  // Test 3: Same AA rectangles can be combined
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(20, 110, 80, 70), false);  // Non-AA rect 1
+  canvas->clipRect(Rect::MakeXYWH(40, 130, 80, 60), false);  // Non-AA rect 2 (same AA)
+  paint.setColor(Color::Blue());
+  canvas->drawRect(Rect::MakeXYWH(0, 100, 140, 100), paint);
+  canvas->restore();
+
+  // Test 4: Different AA rectangles cannot be combined
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(110, 110, 70, 70), true);   // AA rect
+  canvas->clipRect(Rect::MakeXYWH(130, 130, 60, 60), false);  // Non-AA rect
+  paint.setColor(Color::FromRGBA(255, 165, 0));               // Orange
+  canvas->drawRect(Rect::MakeXYWH(100, 100, 100, 100), paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipElementMerge"));
+}
+
+TGFX_TEST(CanvasTest, ClipSaveRestore) {
+  const ContextScope scope;
+  Context* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // 250x200 surface to verify save/restore behavior
+  auto surface = Surface::Make(context, 250, 200);
+  ASSERT_TRUE(surface != nullptr);
+  Canvas* canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint = {};
+
+  // Column 1: Basic save/restore
+  // Draw red with outer clip, then save, add inner clip, draw green, restore, draw blue
+  canvas->clipRect(Rect::MakeXYWH(10, 10, 70, 180));
+  paint.setColor(Color::Red());
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 90, 60), paint);
+
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(20, 70, 50, 60));
+  paint.setColor(Color::Green());
+  canvas->drawRect(Rect::MakeXYWH(0, 60, 90, 80), paint);
+  canvas->restore();
+
+  // After restore, inner clip should be gone, only outer clip remains
+  paint.setColor(Color::Blue());
+  canvas->drawRect(Rect::MakeXYWH(0, 140, 90, 60), paint);
+
+  // Column 2: Nested save/restore with paths
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(90, 10, 70, 180));
+
+  paint.setColor(Color::FromRGBA(255, 128, 0));  // Orange
+  canvas->drawRect(Rect::MakeXYWH(85, 5, 80, 60), paint);
+
+  canvas->save();
+  Path circlePath = {};
+  circlePath.addOval(Rect::MakeXYWH(95, 70, 60, 60));
+  canvas->clipPath(circlePath);
+  paint.setColor(Color::FromRGBA(128, 0, 128));  // Purple
+  canvas->drawRect(Rect::MakeXYWH(85, 65, 80, 70), paint);
+
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(105, 80, 40, 40));
+  paint.setColor(Color::FromRGBA(0, 128, 128));  // Teal
+  canvas->drawRect(Rect::MakeXYWH(85, 65, 80, 70), paint);
+  canvas->restore();
+
+  canvas->restore();  // Restore circle clip
+
+  paint.setColor(Color::FromRGBA(128, 128, 0));  // Olive
+  canvas->drawRect(Rect::MakeXYWH(85, 140, 80, 55), paint);
+  canvas->restore();
+
+  // Column 3: Invalidation and restoration
+  // When restore happens, elements invalidated by the popped level should be restored
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(170, 10, 70, 180));
+
+  canvas->save();
+  // This larger clip should invalidate the previous rect
+  canvas->clipRect(Rect::MakeXYWH(175, 20, 60, 70));
+  paint.setColor(Color::Red());
+  canvas->drawRect(Rect::MakeXYWH(165, 15, 80, 80), paint);
+  canvas->restore();
+
+  // After restore, the original rect should be restored
+  paint.setColor(Color::Green());
+  canvas->drawRect(Rect::MakeXYWH(165, 100, 80, 90), paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipSaveRestore"));
+}
+
+TGFX_TEST(CanvasTest, ClipRecordPlayback) {
+  const ContextScope scope;
+  Context* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Test clip state recording and playback in PictureContext
+  PictureRecorder recorder = {};
+  auto recordCanvas = recorder.beginRecording();
+
+  Paint paint = {};
+  paint.setColor(Color::Red());
+
+  // Record with various clip operations
+  recordCanvas->save();
+  recordCanvas->clipRect(Rect::MakeXYWH(20, 20, 160, 60));
+  recordCanvas->drawRect(Rect::MakeXYWH(0, 0, 200, 100), paint);
+  recordCanvas->restore();
+
+  // Record with path clip
+  paint.setColor(Color::Green());
+  recordCanvas->save();
+  Path trianglePath = {};
+  trianglePath.moveTo(100, 90);
+  trianglePath.lineTo(180, 180);
+  trianglePath.lineTo(20, 180);
+  trianglePath.close();
+  recordCanvas->clipPath(trianglePath, true);  // With AA
+  recordCanvas->drawRect(Rect::MakeXYWH(0, 80, 200, 120), paint);
+  recordCanvas->restore();
+
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  // Playback the recorded picture
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  Canvas* canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->drawPicture(picture);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipRecordPlayback"));
+
+  // Verify playback with additional transformation
+  auto surface2 = Surface::Make(context, 300, 300);
+  ASSERT_TRUE(surface2 != nullptr);
+  Canvas* canvas2 = surface2->getCanvas();
+  canvas2->clear(Color::White());
+  canvas2->translate(50, 50);
+  canvas2->drawPicture(picture);
+
+  EXPECT_TRUE(Baseline::Compare(surface2, "CanvasTest/ClipRecordPlayback_Transformed"));
 }
 
 }  // namespace tgfx

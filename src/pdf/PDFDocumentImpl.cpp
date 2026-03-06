@@ -18,6 +18,7 @@
 
 #include "PDFDocumentImpl.h"
 #include <utility>
+#include "core/CanvasState.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFMetadataUtils.h"
 #include "pdf/PDFTypes.h"

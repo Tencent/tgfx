@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MaskContext.h"
-#include "core/MCState.h"
 #include "tgfx/core/Canvas.h"
 
 namespace tgfx {
@@ -27,21 +26,22 @@ bool MaskContext::GetMaskPath(const std::shared_ptr<Picture>& picture, Path* res
     return false;
   }
   MaskContext maskContext;
-  picture->playback(&maskContext, MCState(Matrix::I()), &maskContext);
+  ClipStack clip;
+  picture->playback(&maskContext, Matrix::I(), clip, &maskContext);
   return maskContext.finish(result);
 }
 
-void MaskContext::addPath(Path path, const MCState& state, const Stroke* stroke) {
+void MaskContext::addPath(Path path, const Matrix& matrix, const ClipStack& clip,
+                          const Stroke* stroke) {
   if (_aborted) {
     return;
   }
-  auto& clip = state.clip;
-  if (clip.isEmpty() && !clip.isInverseFillType()) {
+  if (clip.state() == ClipState::Empty) {
     return;
   }
   PathRecord record = {};
   record.path = std::move(path);
-  record.state = state;
+  record.matrix = matrix;
   if (stroke) {
     record.stroke = *stroke;
     record.hasStroke = true;
@@ -58,10 +58,8 @@ bool MaskContext::finish(Path* result) {
     if (record.hasStroke && !record.stroke.applyToPath(&record.path)) {
       return false;
     }
-    record.path.transform(record.state.matrix);
-    Path clippedPath = record.state.clip.path;
-    clippedPath.addPath(record.path, PathOp::Intersect);
-    maskPath.addPath(clippedPath);
+    record.path.transform(record.matrix);
+    maskPath.addPath(record.path);
   }
   *result = std::move(maskPath);
   return true;
@@ -74,81 +72,86 @@ void MaskContext::drawFill(const Brush& brush) {
   }
   Path shapePath = {};
   shapePath.toggleInverseFillType();
-  addPath(std::move(shapePath), MCState(Matrix::I()), nullptr);
+  ClipStack clip;
+  addPath(std::move(shapePath), Matrix::I(), clip, nullptr);
 }
 
-void MaskContext::drawRect(const Rect& rect, const MCState& state, const Brush& brush,
-                           const Stroke* stroke) {
+void MaskContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
+                           const Brush& brush, const Stroke* stroke) {
   if (!brush.isOpaque()) {
     _aborted = true;
     return;
   }
   Path shapePath = {};
   shapePath.addRect(rect);
-  addPath(std::move(shapePath), state, stroke);
+  addPath(std::move(shapePath), matrix, clip, stroke);
 }
 
-void MaskContext::drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
-                            const Stroke* stroke) {
+void MaskContext::drawRRect(const RRect& rRect, const Matrix& matrix, const ClipStack& clip,
+                            const Brush& brush, const Stroke* stroke) {
   if (!brush.isOpaque()) {
     _aborted = true;
     return;
   }
   Path shapePath = {};
   shapePath.addRRect(rRect);
-  addPath(std::move(shapePath), state, stroke);
+  addPath(std::move(shapePath), matrix, clip, stroke);
 }
 
-void MaskContext::drawPath(const Path& path, const MCState& state, const Brush& brush) {
+void MaskContext::drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
+                           const Brush& brush) {
   if (!brush.isOpaque()) {
     _aborted = true;
     return;
   }
-  addPath(path, state, nullptr);
+  addPath(path, matrix, clip, nullptr);
 }
 
-void MaskContext::drawShape(std::shared_ptr<Shape>, const MCState&, const Brush&, const Stroke*) {
+void MaskContext::drawShape(std::shared_ptr<Shape>, const Matrix&, const ClipStack&, const Brush&,
+                            const Stroke*) {
   // Avoid getting path directly due to performance concerns.
   _aborted = true;
 }
 
-void MaskContext::drawMesh(std::shared_ptr<Mesh>, const MCState&, const Brush&) {
+void MaskContext::drawMesh(std::shared_ptr<Mesh>, const Matrix&, const ClipStack&, const Brush&) {
   _aborted = true;
 }
 
-void MaskContext::drawImage(std::shared_ptr<Image>, const SamplingOptions&, const MCState&,
-                            const Brush&) {
+void MaskContext::drawImage(std::shared_ptr<Image>, const SamplingOptions&, const Matrix&,
+                            const ClipStack&, const Brush&) {
   _aborted = true;
 }
 
 void MaskContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Rect&,
-                                const SamplingOptions&, const MCState&, const Brush&,
-                                SrcRectConstraint) {
+                                const SamplingOptions&, const Matrix&, const ClipStack&,
+                                const Brush&, SrcRectConstraint) {
   _aborted = true;
 }
 
-void MaskContext::drawTextBlob(std::shared_ptr<TextBlob>, const MCState&, const Brush&,
-                               const Stroke*) {
+void MaskContext::drawTextBlob(std::shared_ptr<TextBlob>, const Matrix&, const ClipStack&,
+                               const Brush&, const Stroke*) {
   // Avoid getting path directly due to performance concerns.
   _aborted = true;
 }
 
-void MaskContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
+void MaskContext::drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,
+                              const ClipStack& clip) {
   if (_aborted || picture == nullptr) {
     return;
   }
   MaskContext subContext;
-  picture->playback(&subContext, state, &subContext);
+  picture->playback(&subContext, matrix, clip, &subContext);
   Path subPath = {};
   if (!subContext.finish(&subPath)) {
     _aborted = true;
     return;
   }
-  addPath(std::move(subPath), MCState(Matrix::I()), nullptr);
+  ClipStack emptyClip;
+  addPath(std::move(subPath), Matrix::I(), emptyClip, nullptr);
 }
 
-void MaskContext::drawLayer(std::shared_ptr<Picture>, std::shared_ptr<ImageFilter>, const MCState&,
-                            const Brush&) {
+void MaskContext::drawLayer(std::shared_ptr<Picture>, std::shared_ptr<ImageFilter>, const Matrix&,
+                            const ClipStack&, const Brush&) {
   _aborted = true;
 }
 

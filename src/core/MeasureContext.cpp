@@ -26,97 +26,102 @@ namespace tgfx {
 void MeasureContext::drawFill(const Brush&) {
 }
 
-void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Brush&,
-                              const Stroke* stroke) {
+void MeasureContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
+                              const Brush&, const Stroke* stroke) {
   if (stroke == nullptr) {
-    addLocalBounds(state, rect);
+    addLocalBounds(matrix, clip, rect);
     return;
   }
   auto localBounds = rect;
-  ApplyStrokeToBounds(*stroke, &localBounds, state.matrix);
-  addLocalBounds(state, localBounds);
+  ApplyStrokeToBounds(*stroke, &localBounds, matrix);
+  addLocalBounds(matrix, clip, localBounds);
 }
 
-void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const Brush&,
-                               const Stroke* stroke) {
+void MeasureContext::drawRRect(const RRect& rRect, const Matrix& matrix, const ClipStack& clip,
+                               const Brush&, const Stroke* stroke) {
   auto rect = rRect.rect;
   if (stroke) {
-    ApplyStrokeToBounds(*stroke, &rect, state.matrix);
+    ApplyStrokeToBounds(*stroke, &rect, matrix);
   }
-  addLocalBounds(state, rect, false);
+  addLocalBounds(matrix, clip, rect, false);
 }
 
-void MeasureContext::drawPath(const Path& path, const MCState& state, const Brush&) {
+void MeasureContext::drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
+                              const Brush&) {
   auto localBounds = path.getBounds();
-  addLocalBounds(state, localBounds, path.isInverseFillType());
+  addLocalBounds(matrix, clip, localBounds, path.isInverseFillType());
 }
 
-void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush&,
-                               const Stroke* stroke) {
+void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix,
+                               const ClipStack& clip, const Brush&, const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   auto localBounds = shape->getBounds();
   if (stroke) {
-    ApplyStrokeToBounds(*stroke, &localBounds, state.matrix, true);
+    ApplyStrokeToBounds(*stroke, &localBounds, matrix, true);
   }
-  addLocalBounds(state, localBounds, shape->isInverseFillType());
+  addLocalBounds(matrix, clip, localBounds, shape->isInverseFillType());
 }
 
-void MeasureContext::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush&) {
+void MeasureContext::drawMesh(std::shared_ptr<Mesh> mesh, const Matrix& matrix,
+                              const ClipStack& clip, const Brush&) {
   DEBUG_ASSERT(mesh != nullptr);
-  addLocalBounds(state, mesh->bounds());
+  addLocalBounds(matrix, clip, mesh->bounds());
 }
 
 void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
-                               const MCState& state, const Brush&) {
-  addLocalBounds(state, Rect::MakeWH(image->width(), image->height()));
+                               const Matrix& matrix, const ClipStack& clip, const Brush&) {
+  addLocalBounds(matrix, clip, Rect::MakeWH(image->width(), image->height()));
 }
 
 void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Rect& dstRect,
-                                   const SamplingOptions&, const MCState& state, const Brush&,
-                                   SrcRectConstraint) {
-  addLocalBounds(state, dstRect);
+                                   const SamplingOptions&, const Matrix& matrix,
+                                   const ClipStack& clip, const Brush&, SrcRectConstraint) {
+  addLocalBounds(matrix, clip, dstRect);
 }
 
-void MeasureContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
-                                  const Brush&, const Stroke* stroke) {
+void MeasureContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
+                                  const ClipStack& clip, const Brush&, const Stroke* stroke) {
   DEBUG_ASSERT(textBlob != nullptr);
   auto localBounds = textBlob->getBounds();
   if (stroke) {
-    ApplyStrokeToBounds(*stroke, &localBounds, state.matrix);
+    ApplyStrokeToBounds(*stroke, &localBounds, matrix);
   }
-  addLocalBounds(state, localBounds);
+  addLocalBounds(matrix, clip, localBounds);
 }
 
 void MeasureContext::drawLayer(std::shared_ptr<Picture> picture,
-                               std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
-                               const Brush&) {
+                               std::shared_ptr<ImageFilter> imageFilter, const Matrix& matrix,
+                               const ClipStack& clip, const Brush&) {
   DEBUG_ASSERT(picture != nullptr);
   auto localBounds = picture->getBounds();
   if (imageFilter) {
     localBounds = imageFilter->filterBounds(localBounds);
   }
-  addLocalBounds(state, localBounds, picture->hasUnboundedFill());
+  addLocalBounds(matrix, clip, localBounds, picture->hasUnboundedFill());
 }
 
-void MeasureContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
+void MeasureContext::drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,
+                                 const ClipStack& clip) {
   DEBUG_ASSERT(picture != nullptr);
-  picture->playback(this, state);
+  picture->playback(this, matrix, clip);
 }
 
-void MeasureContext::addLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded) {
-  auto deviceBounds = state.matrix.mapRect(localBounds);
-  addDeviceBounds(state.clip.path, deviceBounds, unbounded);
+void MeasureContext::addLocalBounds(const Matrix& matrix, const ClipStack& clip,
+                                    const Rect& localBounds, bool unbounded) {
+  auto deviceBounds = matrix.mapRect(localBounds);
+  addDeviceBounds(clip, deviceBounds, unbounded);
 }
 
-void MeasureContext::addDeviceBounds(const Path& clip, const Rect& deviceBounds, bool unbounded) {
-  if (clip.isInverseFillType()) {
+void MeasureContext::addDeviceBounds(const ClipStack& clip, const Rect& deviceBounds,
+                                     bool unbounded) {
+  if (clip.state() == ClipState::WideOpen) {
     bounds.join(deviceBounds);
     return;
   }
-  if (clip.isEmpty()) {
+  if (clip.state() == ClipState::Empty) {
     return;
   }
-  auto intersectBounds = clip.getBounds();
+  auto intersectBounds = clip.bound();
   if (!unbounded && !intersectBounds.intersect(deviceBounds)) {
     return;
   }

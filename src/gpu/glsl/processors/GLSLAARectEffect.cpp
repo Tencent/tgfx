@@ -19,11 +19,13 @@
 #include "GLSLAARectEffect.h"
 
 namespace tgfx {
-PlacementPtr<AARectEffect> AARectEffect::Make(BlockAllocator* allocator, const Rect& rect) {
-  return allocator->make<GLSLAARectEffect>(rect);
+PlacementPtr<AARectEffect> AARectEffect::Make(BlockAllocator* allocator, const Rect& rect,
+                                              bool antiAlias) {
+  return allocator->make<GLSLAARectEffect>(rect, antiAlias);
 }
 
-GLSLAARectEffect::GLSLAARectEffect(const Rect& rect) : AARectEffect(rect) {
+GLSLAARectEffect::GLSLAARectEffect(const Rect& rect, bool antiAlias)
+    : AARectEffect(rect, antiAlias) {
 }
 
 void GLSLAARectEffect::emitCode(EmitArgs& args) const {
@@ -31,20 +33,38 @@ void GLSLAARectEffect::emitCode(EmitArgs& args) const {
   auto uniformHandler = args.uniformHandler;
 
   auto rectName = uniformHandler->addUniform("Rect", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->codeAppendf(
-      "vec4 dists4 = clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - %s), 0.0, 1.0);",
-      rectName.c_str());
-  fragBuilder->codeAppend("vec2 dists2 = dists4.xy + dists4.zw - 1.0;");
-  fragBuilder->codeAppend("float coverage = dists2.x * dists2.y;");
+  if (antiAlias) {
+    // AA mode: calculate distance to edges with smooth transition
+    fragBuilder->codeAppendf(
+        "vec4 dists4 = clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - %s), 0.0, 1.0);",
+        rectName.c_str());
+    fragBuilder->codeAppend("vec2 dists2 = dists4.xy + dists4.zw - 1.0;");
+    fragBuilder->codeAppend("float coverage = dists2.x * dists2.y;");
+  } else {
+    // Non-AA mode: hard edge clipping
+    fragBuilder->codeAppendf(
+        "float coverage = (gl_FragCoord.x >= %s.x && gl_FragCoord.y >= %s.y && "
+        "gl_FragCoord.x <= %s.z && gl_FragCoord.y <= %s.w) ? 1.0 : 0.0;",
+        rectName.c_str(), rectName.c_str(), rectName.c_str(), rectName.c_str());
+  }
   fragBuilder->codeAppendf("%s = %s * coverage;", args.outputColor.c_str(),
                            args.inputColor.c_str());
 }
 
 void GLSLAARectEffect::onSetData(UniformData* /*vertexUniformData*/,
                                  UniformData* fragmentUniformData) const {
-  // The AA math in the shader evaluates to 0 at the uploaded coordinates, so outset by 0.5
-  // to interpolate from 0 at a half pixel inset and 1 at a half pixel outset of rect.
-  auto outRect = rect.makeOutset(0.5f, 0.5f);
-  fragmentUniformData->setData("Rect", outRect);
+  if (antiAlias) {
+    // The AA math in the shader evaluates to 0 at the uploaded coordinates, so outset by 0.5
+    // to interpolate from 0 at a half pixel inset and 1 at a half pixel outset of rect.
+    auto outRect = rect.makeOutset(0.5f, 0.5f);
+    fragmentUniformData->setData("Rect", outRect);
+  } else {
+    // Non-AA mode uses the exact rectangle boundaries
+    fragmentUniformData->setData("Rect", rect);
+  }
+}
+
+void GLSLAARectEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
+  bytesKey->write(static_cast<uint32_t>(antiAlias ? 1 : 0));
 }
 }  // namespace tgfx
