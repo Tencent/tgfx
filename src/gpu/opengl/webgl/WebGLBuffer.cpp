@@ -53,6 +53,14 @@ void* WebGLBuffer::map(size_t offset, size_t size) {
     subDataOffset = offset;
     subDataSize = size;
 
+    if (_usage & GPUBufferUsage::READBACK) {
+      auto gl = _interface->functions();
+      auto target = GetTarget(_usage);  // GL_PIXEL_PACK_BUFFER
+      gl->bindBuffer(target, _bufferID);
+      gl->getBufferSubData(target, static_cast<GLintptr>(offset), static_cast<GLintptr>(size),
+                           bufferData);
+    }
+
     return bufferData;
   }
   return nullptr;
@@ -62,12 +70,16 @@ void WebGLBuffer::unmap() {
   if (bufferData == nullptr) {
     return;
   }
-  auto target = GetTarget(_usage);
-  DEBUG_ASSERT(target != 0);
-  auto gl = _interface->functions();
-  gl->bindBuffer(target, _bufferID);
-  gl->bufferSubData(target, static_cast<GLintptr>(subDataOffset),
-                    static_cast<GLsizeiptr>(subDataSize), bufferData);
+
+  if (!(_usage & GPUBufferUsage::READBACK)) {
+    auto target = GetTarget(_usage);
+    DEBUG_ASSERT(target != 0);
+    auto gl = _interface->functions();
+    gl->bindBuffer(target, _bufferID);
+    gl->bufferSubData(target, static_cast<GLintptr>(subDataOffset),
+                      static_cast<GLsizeiptr>(subDataSize), bufferData);
+  }
+
   free(bufferData);
   bufferData = nullptr;
 }
