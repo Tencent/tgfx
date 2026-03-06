@@ -208,6 +208,7 @@ class Surface {
 
   bool aboutToDraw(bool discardContent = false);
 
+  friend class MetalWindow;
   friend class RenderContext;
 };
 }  // namespace tgfx
