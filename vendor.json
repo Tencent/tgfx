@@ -275,7 +275,7 @@
           "-DSHADERC_SKIP_TESTS=ON",
           "-DSHADERC_SKIP_EXAMPLES=ON",
           "-DSHADERC_SKIP_INSTALL=ON",
-          "-DCMAKE_CXX_FLAGS=\"-w\""
+          "-DCMAKE_CXX_FLAGS=\"-w -D_LIBCPP_DISABLE_AVAILABILITY\""
         ],
         "platforms": [
           "mac",

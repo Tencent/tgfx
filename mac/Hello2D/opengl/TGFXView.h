@@ -18,17 +18,22 @@
 
 #pragma once
 
-#import <UIKit/UIKit.h>
-#include "tgfx/core/Canvas.h"
-#include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
-#include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
+#import <Cocoa/Cocoa.h>
+#include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 #include "tgfx/layers/DisplayList.h"
 
-@interface TGFXView : UIView
+@interface TGFXView : NSView
 
-- (void)updateLayerTree:(int)index;
-- (void)updateZoomScaleAndOffset:(float)zoom offset:(CGPoint)offset;
+@property(nonatomic) int drawIndex;
+@property(nonatomic) float zoomScale;
+@property(nonatomic) CGPoint contentOffset;
+@property(nonatomic) CVDisplayLinkRef cvDisplayLink;
+@property(nonatomic, strong) CADisplayLink* caDisplayLink API_AVAILABLE(macos(14.0));
+
 - (void)draw;
+- (void)startDisplayLink;
+- (void)stopDisplayLink;
+- (void)updateLayerTree;
+- (void)updateZoomScaleAndOffset;
 
 @end
