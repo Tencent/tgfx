@@ -67,6 +67,7 @@ ColorMatrix SVGFeColorMatrix::makeMatrixForType() const {
     case SVGFeColorMatrixType::LuminanceToAlpha:
       return MakeLuminanceToAlpha();
   }
+  return ColorMatrix();
 }
 
 ColorMatrix SVGFeColorMatrix::MakeSaturate(SVGNumberType sat) {
