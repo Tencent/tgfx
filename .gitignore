@@ -80,6 +80,7 @@ win/Debug-x86/
 win/Release-x86/
 QTCMAKE.cfg
 test/baseline/.cache
+test/baseline/.cache-web
 /result
 .vscode
 ios/TGFX
