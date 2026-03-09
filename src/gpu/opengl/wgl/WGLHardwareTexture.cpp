@@ -17,8 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WGLHardwareTexture.h"
+// clang-format off
+// windows.h must precede GL/gl.h because GL/gl.h depends on WINGDIAPI and APIENTRY macros.
 #include <windows.h>
 #include <GL/gl.h>
+// clang-format on
 #include <cstring>
 #include <mutex>
 #include <vector>
