@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WGLHardwareTexture.h"
-#include <GL/gl.h>
 #include <windows.h>
+#include <GL/gl.h>
 #include <cstring>
 #include <mutex>
 #include <vector>
