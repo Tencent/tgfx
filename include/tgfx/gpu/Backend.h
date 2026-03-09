@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/gpu/d3d11/D3D11Types.h"
 #include "tgfx/gpu/metal/MetalTypes.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
 
@@ -26,7 +27,7 @@ namespace tgfx {
 /**
  * Possible GPU backend APIs that may be used by TGFX.
  */
-enum class Backend { Unknown, OpenGL, Metal, Vulkan, WebGPU };
+enum class Backend { Unknown, OpenGL, Metal, Vulkan, WebGPU, D3D11 };
 
 /**
  * Wrapper class for passing into and receiving data from TGFX about a backend texture object.
@@ -51,6 +52,13 @@ class BackendTexture {
    */
   BackendTexture(const MetalTextureInfo& metalInfo, int width, int height)
       : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
+  }
+
+  /**
+   * Creates a D3D11 backend texture.
+   */
+  BackendTexture(const D3D11TextureInfo& d3d11Info, int width, int height)
+      : _backend(Backend::D3D11), _width(width), _height(height), d3d11Info(d3d11Info) {
   }
 
   BackendTexture(const BackendTexture& that) {
@@ -104,6 +112,12 @@ class BackendTexture {
    */
   bool getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const;
 
+  /**
+   * If the backend API is D3D11, copies a snapshot of the D3D11TextureInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not D3D11.
+   */
+  bool getD3D11TextureInfo(D3D11TextureInfo* d3d11TextureInfo) const;
+
  private:
   Backend _backend = Backend::Unknown;
   int _width = 0;
@@ -112,6 +126,7 @@ class BackendTexture {
   union {
     GLTextureInfo glInfo;
     MetalTextureInfo metalInfo;
+    D3D11TextureInfo d3d11Info;
   };
 };
 

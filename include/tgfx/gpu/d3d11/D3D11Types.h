@@ -16,31 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "WGLGPU.h"
-#include "WGLHardwareTexture.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#pragma once
+
+#include <cstdint>
 
 namespace tgfx {
+/**
+ * D3D11 texture info for importing a D3D11 shared texture into tgfx.
+ * The texture must be created with D3D11_RESOURCE_MISC_SHARED flag and
+ * DXGI_FORMAT_B8G8R8A8_UNORM format. tgfx will use WGL_NV_DX_interop or
+ * GL_EXT_memory_object to share it with OpenGL.
+ */
+struct D3D11TextureInfo {
+  /**
+   * The ID3D11Device* that owns the texture. Must remain valid while the
+   * BackendTexture is in use.
+   */
+  void* device = nullptr;
 
-bool HardwareBufferAvailable() {
-  return true;
-}
-
-std::vector<std::shared_ptr<Texture>> WGLGPU::importHardwareTextures(
-    HardwareBufferRef hardwareBuffer, uint32_t usage) {
-  if (!HardwareBufferCheck(hardwareBuffer)) {
-    return {};
-  }
-  auto info = HardwareBufferGetInfo(hardwareBuffer);
-  if (info.format == HardwareBufferFormat::YCBCR_420_SP) {
-    // NV12 textures should be converted to BGRA before reaching here.
-    return {};
-  }
-  auto texture = WGLHardwareTexture::MakeFrom(this, hardwareBuffer, usage);
-  if (texture == nullptr) {
-    return {};
-  }
-  return {std::move(texture)};
-}
-
+  /**
+   * The ID3D11Texture2D* to share with OpenGL. Must be created with
+   * D3D11_RESOURCE_MISC_SHARED and DXGI_FORMAT_B8G8R8A8_UNORM.
+   */
+  void* texture = nullptr;
+};
 }  // namespace tgfx
