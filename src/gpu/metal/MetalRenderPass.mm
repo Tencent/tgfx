@@ -25,7 +25,6 @@
 #include "MetalShaderModule.h"
 #include "MetalTexture.h"
 #include "core/utils/Log.h"
-#include "gpu/UniformData.h"
 
 namespace tgfx {
 
@@ -308,12 +307,16 @@ void MetalRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuff
     return;
   }
 
+  uint32_t visibility = currentPipeline ? currentPipeline->getUniformBlockVisibility(binding)
+                                        : ShaderVisibility::VertexFragment;
+
   if (binding < MaxUniformBindings && lastUniformBuffers[binding] == buffer.get()) {
     // Same buffer, only offset changed — use lightweight offset-only update.
     lastUniformOffsets[binding] = offset;
-    if (binding == VERTEX_UBO_BINDING_POINT) {
+    if (visibility & ShaderVisibility::Vertex) {
       [renderEncoder setVertexBufferOffset:offset atIndex:binding];
-    } else {
+    }
+    if (visibility & ShaderVisibility::Fragment) {
       [renderEncoder setFragmentBufferOffset:offset atIndex:binding];
     }
     return;
@@ -326,11 +329,11 @@ void MetalRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuff
 
   auto metalBuffer = std::static_pointer_cast<MetalBuffer>(buffer);
 
-  // Vertex UBO (binding 0) is only used by vertex shader, fragment UBO (binding 1) is only used
-  // by fragment shader. Bind to the corresponding stage only.
-  if (binding == VERTEX_UBO_BINDING_POINT) {
+  // Bind the uniform buffer to the shader stages specified by the pipeline's visibility flags.
+  if (visibility & ShaderVisibility::Vertex) {
     [renderEncoder setVertexBuffer:metalBuffer->metalBuffer() offset:offset atIndex:binding];
-  } else {
+  }
+  if (visibility & ShaderVisibility::Fragment) {
     [renderEncoder setFragmentBuffer:metalBuffer->metalBuffer() offset:offset atIndex:binding];
   }
 }

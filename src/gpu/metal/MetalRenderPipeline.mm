@@ -53,6 +53,11 @@ MetalRenderPipeline::MetalRenderPipeline(MetalGPU* gpu,
   for (auto& entry : descriptor.layout.textureSamplers) {
     textureUnits[entry.binding] = textureUnit++;
   }
+
+  // Build uniform block visibility mapping: binding -> shader stage visibility flags.
+  for (auto& entry : descriptor.layout.uniformBlocks) {
+    uniformBlockVisibility[entry.binding] = entry.visibility;
+  }
 }
 
 void MetalRenderPipeline::onRelease(MetalGPU*) {
@@ -76,6 +81,14 @@ unsigned MetalRenderPipeline::getTextureIndex(unsigned binding) const {
     return result->second;
   }
   return binding;
+}
+
+uint32_t MetalRenderPipeline::getUniformBlockVisibility(unsigned binding) const {
+  auto result = uniformBlockVisibility.find(binding);
+  if (result != uniformBlockVisibility.end()) {
+    return result->second;
+  }
+  return ShaderVisibility::VertexFragment;
 }
 
 bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu,
