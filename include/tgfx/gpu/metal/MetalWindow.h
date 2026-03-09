@@ -30,29 +30,20 @@ namespace tgfx {
 class DelayRenderTargetProxy;
 class MetalDrawableProvider;
 
-/**
- * MetalWindow is a Window implementation backed by a CAMetalLayer. It renders directly to the
- * layer's drawable by deferring drawable acquisition until flush time via DelayRenderTargetProxy.
- */
 class MetalWindow : public Window {
  public:
   /**
-   * Creates a new window from a CAMetalLayer with the specified device. If no device is provided,
-   * a new MetalDevice will be created automatically. The caller is responsible for configuring the
-   * layer properties (e.g., pixelFormat, drawableSize) before creating the window.
+   * Creates a new window from a CAMetalLayer with the specified device.
    */
   static std::shared_ptr<MetalWindow> MakeFrom(CAMetalLayer* layer,
                                                std::shared_ptr<MetalDevice> device = nullptr,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
-   * Creates a new window from an MTKView with its underlying CAMetalLayer. Returns nullptr if the
-   * view or its layer is invalid.
+   * Creates a new window from an MTKView with its underlying CAMetalLayer.
    */
   static std::shared_ptr<MetalWindow> MakeFrom(MTKView* view,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
-
-  ~MetalWindow() override = default;
 
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
