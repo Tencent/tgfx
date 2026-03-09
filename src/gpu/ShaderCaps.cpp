@@ -40,6 +40,9 @@ static void PrintGPUInfo(const GPUInfo* info) {
     case Backend::WebGPU:
       backend = "WebGPU";
       break;
+    case Backend::D3D11:
+      backend = "D3D11";
+      break;
     case Backend::Unknown:
       backend = "Unknown";
       break;

@@ -82,10 +82,8 @@ bool HardwareBufferCheck(HardwareBufferRef buffer) {
   D3D11_TEXTURE2D_DESC_MINIMAL desc = {};
   if (!GetTextureDesc(buffer, &desc)) return false;
   // Verify it's a known format
-  return desc.Format == DXGI_FORMAT_B8G8R8A8_UNORM ||
-         desc.Format == DXGI_FORMAT_R8G8B8A8_UNORM ||
-         desc.Format == DXGI_FORMAT_NV12 ||
-         desc.Format == DXGI_FORMAT_A8_UNORM;
+  return desc.Format == DXGI_FORMAT_B8G8R8A8_UNORM || desc.Format == DXGI_FORMAT_R8G8B8A8_UNORM ||
+         desc.Format == DXGI_FORMAT_NV12 || desc.Format == DXGI_FORMAT_A8_UNORM;
 }
 
 HardwareBufferRef HardwareBufferAllocate(int, int, bool) {

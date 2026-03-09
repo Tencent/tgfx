@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WGLHardwareTexture.h"
-#include <windows.h>
 #include <GL/gl.h>
+#include <windows.h>
 #include <cstring>
 #include <mutex>
 #include <vector>
@@ -61,15 +61,15 @@ typedef void(GL_FUNCTION_TYPE* PFNGLCREATEMEMORYOBJECTSEXTPROC)(int n, unsigned*
 typedef void(GL_FUNCTION_TYPE* PFNGLDELETEMEMORYOBJECTSEXTPROC)(int n,
                                                                 const unsigned* memoryObjects);
 typedef void(GL_FUNCTION_TYPE* PFNGLMEMORYOBJECTPARAMETERIVEXTPROC)(unsigned memoryObject,
-                                                                     unsigned pname,
-                                                                     const int* params);
+                                                                    unsigned pname,
+                                                                    const int* params);
 typedef void(GL_FUNCTION_TYPE* PFNGLTEXSTORAGEMEM2DEXTPROC)(unsigned target, int levels,
-                                                             unsigned internalFormat, int width,
-                                                             int height, unsigned memory,
-                                                             uint64_t offset);
+                                                            unsigned internalFormat, int width,
+                                                            int height, unsigned memory,
+                                                            uint64_t offset);
 typedef void(GL_FUNCTION_TYPE* PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC)(unsigned memory, uint64_t size,
-                                                                     unsigned handleType,
-                                                                     void* handle);
+                                                                    unsigned handleType,
+                                                                    void* handle);
 
 namespace tgfx {
 
@@ -165,8 +165,7 @@ static bool HasExtension(const char* extensions, const char* extension) {
   const char* where;
   while ((where = strstr(start, extension)) != nullptr) {
     const char* terminator = where + extLen;
-    if ((where == start || *(where - 1) == ' ') &&
-        (*terminator == ' ' || *terminator == '\0')) {
+    if ((where == start || *(where - 1) == ' ') && (*terminator == ' ' || *terminator == '\0')) {
       return true;
     }
     start = terminator;
@@ -177,13 +176,11 @@ static bool HasExtension(const char* extensions, const char* extension) {
 static bool CheckNVDXInteropWithContext() {
   wglDXOpenDeviceNV = (PFNWGLDXOPENDEVICENVPROC)wglGetProcAddress("wglDXOpenDeviceNV");
   wglDXCloseDeviceNV = (PFNWGLDXCLOSEDEVICENVPROC)wglGetProcAddress("wglDXCloseDeviceNV");
-  wglDXRegisterObjectNV =
-      (PFNWGLDXREGISTEROBJECTNVPROC)wglGetProcAddress("wglDXRegisterObjectNV");
+  wglDXRegisterObjectNV = (PFNWGLDXREGISTEROBJECTNVPROC)wglGetProcAddress("wglDXRegisterObjectNV");
   wglDXUnregisterObjectNV =
       (PFNWGLDXUNREGISTEROBJECTNVPROC)wglGetProcAddress("wglDXUnregisterObjectNV");
   wglDXLockObjectsNV = (PFNWGLDXLOCKOBJECTSNVPROC)wglGetProcAddress("wglDXLockObjectsNV");
-  wglDXUnlockObjectsNV =
-      (PFNWGLDXUNLOCKOBJECTSNVPROC)wglGetProcAddress("wglDXUnlockObjectsNV");
+  wglDXUnlockObjectsNV = (PFNWGLDXUNLOCKOBJECTSNVPROC)wglGetProcAddress("wglDXUnlockObjectsNV");
   return wglDXOpenDeviceNV && wglDXCloseDeviceNV && wglDXRegisterObjectNV &&
          wglDXUnregisterObjectNV && wglDXLockObjectsNV && wglDXUnlockObjectsNV;
 }
@@ -200,9 +197,9 @@ static bool CheckNVDXInteropWithTempContext() {
       return false;
     }
   }
-  HWND tempHwnd = CreateWindowEx(0, TEXT("TGFXWGLTempWindow"), TEXT("TGFX WGL Temp"),
-                                 WS_OVERLAPPEDWINDOW, 0, 0, 1, 1, nullptr, nullptr,
-                                 GetModuleHandle(nullptr), nullptr);
+  HWND tempHwnd =
+      CreateWindowEx(0, TEXT("TGFXWGLTempWindow"), TEXT("TGFX WGL Temp"), WS_OVERLAPPEDWINDOW, 0, 0,
+                     1, 1, nullptr, nullptr, GetModuleHandle(nullptr), nullptr);
   if (!tempHwnd) {
     return false;
   }
@@ -260,8 +257,8 @@ static bool IsNVDXInteropAvailable() {
   }
   g_nvInteropChecked = true;
   HGLRC currentContext = wglGetCurrentContext();
-  g_nvInteropAvailable = currentContext ? CheckNVDXInteropWithContext()
-                                        : CheckNVDXInteropWithTempContext();
+  g_nvInteropAvailable =
+      currentContext ? CheckNVDXInteropWithContext() : CheckNVDXInteropWithTempContext();
   return g_nvInteropAvailable;
 }
 
@@ -272,12 +269,11 @@ static bool CheckMemoryObjectInteropWithContext() {
       (PFNGLDELETEMEMORYOBJECTSEXTPROC)wglGetProcAddress("glDeleteMemoryObjectsEXT");
   glMemoryObjectParameterivEXT =
       (PFNGLMEMORYOBJECTPARAMETERIVEXTPROC)wglGetProcAddress("glMemoryObjectParameterivEXT");
-  glTexStorageMem2DEXT =
-      (PFNGLTEXSTORAGEMEM2DEXTPROC)wglGetProcAddress("glTexStorageMem2DEXT");
+  glTexStorageMem2DEXT = (PFNGLTEXSTORAGEMEM2DEXTPROC)wglGetProcAddress("glTexStorageMem2DEXT");
   glImportMemoryWin32HandleEXT =
       (PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC)wglGetProcAddress("glImportMemoryWin32HandleEXT");
-  return glCreateMemoryObjectsEXT && glDeleteMemoryObjectsEXT &&
-         glMemoryObjectParameterivEXT && glTexStorageMem2DEXT && glImportMemoryWin32HandleEXT;
+  return glCreateMemoryObjectsEXT && glDeleteMemoryObjectsEXT && glMemoryObjectParameterivEXT &&
+         glTexStorageMem2DEXT && glImportMemoryWin32HandleEXT;
 }
 
 static bool IsMemoryObjectInteropAvailable() {
@@ -291,7 +287,8 @@ static bool IsMemoryObjectInteropAvailable() {
   }
   g_memObjInteropChecked = true;
 
-  typedef const unsigned char*(GL_FUNCTION_TYPE* PFNGLGETSTRINGIPROC)(unsigned name, unsigned index);
+  typedef const unsigned char*(GL_FUNCTION_TYPE * PFNGLGETSTRINGIPROC)(unsigned name,
+                                                                       unsigned index);
   auto glGetStringi = (PFNGLGETSTRINGIPROC)wglGetProcAddress("glGetStringi");
   if (!glGetStringi) {
     g_memObjInteropAvailable = false;
@@ -304,7 +301,8 @@ static bool IsMemoryObjectInteropAvailable() {
     const char* ext = reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, i));
     if (ext) {
       if (strcmp(ext, "GL_EXT_memory_object") == 0) hasMemObj = true;
-      else if (strcmp(ext, "GL_EXT_memory_object_win32") == 0) hasMemObjWin32 = true;
+      else if (strcmp(ext, "GL_EXT_memory_object_win32") == 0)
+        hasMemObjWin32 = true;
     }
     if (hasMemObj && hasMemObjWin32) break;
   }
@@ -326,19 +324,21 @@ static unsigned ImportViaMemoryObject(void* d3d11Texture, int width, int height,
   }
 
   // IID_IDXGIResource = {035f3ab4-482e-4e50-b41f-8a7f8bd8960b}
-  static const GUID IID_IDXGIResource_local =
-      {0x035f3ab4, 0x482e, 0x4e50, {0xb4, 0x1f, 0x8a, 0x7f, 0x8b, 0xd8, 0x96, 0x0b}};
+  static const GUID IID_IDXGIResource_local = {0x035f3ab4,
+                                               0x482e,
+                                               0x4e50,
+                                               {0xb4, 0x1f, 0x8a, 0x7f, 0x8b, 0xd8, 0x96, 0x0b}};
 
   IUnknown* textureUnk = static_cast<IUnknown*>(d3d11Texture);
   IUnknown* dxgiResource = nullptr;
-  HRESULT hr = textureUnk->QueryInterface(IID_IDXGIResource_local,
-                                           reinterpret_cast<void**>(&dxgiResource));
+  HRESULT hr =
+      textureUnk->QueryInterface(IID_IDXGIResource_local, reinterpret_cast<void**>(&dxgiResource));
   if (FAILED(hr) || !dxgiResource) {
     LOGE("WGLHardwareTexture: Failed to get IDXGIResource, hr=0x%08X", hr);
     return 0;
   }
 
-  typedef HRESULT(STDMETHODCALLTYPE* GetSharedHandleFn)(IUnknown* self, HANDLE* pSharedHandle);
+  typedef HRESULT(STDMETHODCALLTYPE * GetSharedHandleFn)(IUnknown * self, HANDLE * pSharedHandle);
   auto vtable = *reinterpret_cast<void***>(dxgiResource);
   auto GetSharedHandle = reinterpret_cast<GetSharedHandleFn>(vtable[8]);
 
@@ -402,8 +402,8 @@ static unsigned ImportViaMemoryObject(void* d3d11Texture, int width, int height,
 // ============================================================================
 // D3D11→GL import via WGL_NV_DX_interop
 // ============================================================================
-static unsigned ImportViaWglDX(void* d3d11Device, void* d3d11Texture,
-                                void** outInteropDevice, void** outInteropTexture) {
+static unsigned ImportViaWglDX(void* d3d11Device, void* d3d11Texture, void** outInteropDevice,
+                               void** outInteropTexture) {
   if (!wglDXRegisterObjectNV) {
     return 0;
   }
@@ -421,9 +421,8 @@ static unsigned ImportViaWglDX(void* d3d11Device, void* d3d11Texture,
     return 0;
   }
 
-  void* interopTex = wglDXRegisterObjectNV(interopDev, d3d11Texture,
-                                            glTextureId, GL_TEXTURE_2D,
-                                            WGL_ACCESS_READ_ONLY_NV);
+  void* interopTex = wglDXRegisterObjectNV(interopDev, d3d11Texture, glTextureId, GL_TEXTURE_2D,
+                                           WGL_ACCESS_READ_ONLY_NV);
   if (!interopTex) {
     LOGE("WGLHardwareTexture: Failed to register D3D11 texture with OpenGL.");
     glDeleteTextures(1, &glTextureId);
@@ -453,7 +452,7 @@ static void* GetDeviceFromTexture(void* d3d11Texture) {
   IUnknown* unk = static_cast<IUnknown*>(d3d11Texture);
   auto vtable = *reinterpret_cast<void***>(unk);
   // ID3D11DeviceChild::GetDevice(ID3D11Device** ppDevice) is at index 3
-  typedef void(__stdcall* GetDeviceFn)(IUnknown* self, void** ppDevice);
+  typedef void(__stdcall * GetDeviceFn)(IUnknown * self, void** ppDevice);
   auto getDevice = reinterpret_cast<GetDeviceFn>(vtable[3]);
   void* device = nullptr;
   getDevice(unk, &device);
@@ -480,13 +479,14 @@ WGLHardwareTexture::~WGLHardwareTexture() {
 }
 
 std::shared_ptr<WGLHardwareTexture> WGLHardwareTexture::MakeFrom(WGLGPU* gpu,
-                                                                   HardwareBufferRef hardwareBuffer,
-                                                                   uint32_t usage) {
+                                                                 HardwareBufferRef hardwareBuffer,
+                                                                 uint32_t usage) {
   if (!gpu || !HardwareBufferCheck(hardwareBuffer)) {
     return nullptr;
   }
   auto info = HardwareBufferGetInfo(hardwareBuffer);
-  if (info.format == HardwareBufferFormat::Unknown || info.format == HardwareBufferFormat::YCBCR_420_SP) {
+  if (info.format == HardwareBufferFormat::Unknown ||
+      info.format == HardwareBufferFormat::YCBCR_420_SP) {
     return nullptr;
   }
 
@@ -515,9 +515,8 @@ std::shared_ptr<WGLHardwareTexture> WGLHardwareTexture::MakeFrom(WGLGPU* gpu,
     unsigned memObj = 0;
     unsigned glTextureId = ImportViaMemoryObject(d3d11Tex, info.width, info.height, &memObj);
     if (glTextureId != 0) {
-      auto texture = gpu->makeResource<WGLHardwareTexture>(descriptor, hardwareBuffer,
-                                                            static_cast<unsigned>(GL_TEXTURE_2D),
-                                                            glTextureId);
+      auto texture = gpu->makeResource<WGLHardwareTexture>(
+          descriptor, hardwareBuffer, static_cast<unsigned>(GL_TEXTURE_2D), glTextureId);
       if (needSwizzle) {
         auto state = gpu->state();
         state->bindTexture(texture.get());
@@ -540,9 +539,8 @@ std::shared_ptr<WGLHardwareTexture> WGLHardwareTexture::MakeFrom(WGLGPU* gpu,
     void* interopTex = nullptr;
     unsigned glTextureId = ImportViaWglDX(d3dDevice, d3d11Tex, &interopDev, &interopTex);
     if (glTextureId != 0) {
-      auto texture = gpu->makeResource<WGLHardwareTexture>(descriptor, hardwareBuffer,
-                                                            static_cast<unsigned>(GL_TEXTURE_2D),
-                                                            glTextureId);
+      auto texture = gpu->makeResource<WGLHardwareTexture>(
+          descriptor, hardwareBuffer, static_cast<unsigned>(GL_TEXTURE_2D), glTextureId);
       texture->interopDevice = interopDev;
       texture->d3d11Device = d3dDevice;
       texture->interopTexture = interopTex;
