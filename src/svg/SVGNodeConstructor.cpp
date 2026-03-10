@@ -221,7 +221,6 @@ std::unordered_map<std::string, AttrParseInfo> SVGNodeConstructor::InitAttribute
       {"r", {SVGAttribute::R, SVGNodeConstructor::SetLengthAttribute}},
       {"rx", {SVGAttribute::Rx, SVGNodeConstructor::SetLengthAttribute}},
       {"ry", {SVGAttribute::Ry, SVGNodeConstructor::SetLengthAttribute}},
-      // "style" is handled directly in SetAttribute to pass customParser through.
       {"text", {SVGAttribute::Text, SVGNodeConstructor::SetStringAttribute}},
       {"transform", {SVGAttribute::Transform, SVGNodeConstructor::SetTransformAttribute}},
       {"viewBox", {SVGAttribute::ViewBox, SVGNodeConstructor::SetViewBoxAttribute}},
