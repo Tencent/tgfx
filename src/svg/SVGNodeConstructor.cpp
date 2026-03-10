@@ -293,11 +293,6 @@ SVGNodeConstructor::InitElementFactories() {
 bool SVGNodeConstructor::SetAttribute(SVGNode& node, const std::string& name,
                                       const std::string& value,
                                       const std::shared_ptr<SVGCustomParser>& customParser) {
-  // Handle "style" attribute separately so that customParser is passed through
-  // to each CSS property parsed from the style string.
-  if (name == "style") {
-    return SetStyleAttributes(node, value, customParser);
-  }
   if (node.parseAndSetAttribute(name, value)) {
     // Handled by new code path
     return true;
@@ -309,6 +304,11 @@ bool SVGNodeConstructor::SetAttribute(SVGNode& node, const std::string& name,
   }
   if (customParser) {
     customParser->handleCustomAttribute(node, name, value);
+  }
+  // Handle "style" attribute separately so that customParser is passed through
+  // to each CSS property parsed from the style string.
+  if (name == "style") {
+    return SetStyleAttributes(node, value, customParser);
   }
   return true;
 }
