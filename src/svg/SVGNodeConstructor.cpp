@@ -189,8 +189,8 @@ class StyleIterator {
   const char* pos;
 };
 
-bool SVGNodeConstructor::SetStyleAttributes(SVGNode& node, SVGAttribute,
-                                            const std::string& stringValue) {
+bool SVGNodeConstructor::SetStyleAttributes(SVGNode& node, const std::string& stringValue,
+                                            const std::shared_ptr<SVGCustomParser>& customParser) {
 
   std::string name;
   std::string value;
@@ -200,7 +200,7 @@ bool SVGNodeConstructor::SetStyleAttributes(SVGNode& node, SVGAttribute,
     if (name.empty()) {
       break;
     }
-    SetAttribute(node, name, value, nullptr);
+    SetAttribute(node, name, value, customParser);
   }
 
   return true;
@@ -221,7 +221,7 @@ std::unordered_map<std::string, AttrParseInfo> SVGNodeConstructor::InitAttribute
       {"r", {SVGAttribute::R, SVGNodeConstructor::SetLengthAttribute}},
       {"rx", {SVGAttribute::Rx, SVGNodeConstructor::SetLengthAttribute}},
       {"ry", {SVGAttribute::Ry, SVGNodeConstructor::SetLengthAttribute}},
-      {"style", {SVGAttribute::Unknown, SVGNodeConstructor::SetStyleAttributes}},
+      // "style" is handled directly in SetAttribute to pass customParser through.
       {"text", {SVGAttribute::Text, SVGNodeConstructor::SetStringAttribute}},
       {"transform", {SVGAttribute::Transform, SVGNodeConstructor::SetTransformAttribute}},
       {"viewBox", {SVGAttribute::ViewBox, SVGNodeConstructor::SetViewBoxAttribute}},
@@ -294,6 +294,11 @@ SVGNodeConstructor::InitElementFactories() {
 bool SVGNodeConstructor::SetAttribute(SVGNode& node, const std::string& name,
                                       const std::string& value,
                                       const std::shared_ptr<SVGCustomParser>& customParser) {
+  // Handle "style" attribute separately so that customParser is passed through
+  // to each CSS property parsed from the style string.
+  if (name == "style") {
+    return SetStyleAttributes(node, value, customParser);
+  }
   if (node.parseAndSetAttribute(name, value)) {
     // Handled by new code path
     return true;
@@ -470,7 +475,7 @@ void SVGNodeConstructor::SetClassStyleAttributes(SVGNode& root, const CSSMapper&
       auto iter = mapper.find(*classStr);
       if (iter != mapper.end()) {
         std::string style = iter->second;
-        SetStyleAttributes(*node, SVGAttribute::Class, style);
+        SetStyleAttributes(*node, style, nullptr);
       }
     }
     if (node->hasChildren()) {
