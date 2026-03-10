@@ -302,13 +302,13 @@ bool SVGNodeConstructor::SetAttribute(SVGNode& node, const std::string& name,
     auto attributeSetter = iter->second.setter;
     return attributeSetter(node, iter->second.attribute, value);
   }
-  if (customParser) {
-    customParser->handleCustomAttribute(node, name, value);
-  }
   // Handle "style" attribute separately so that customParser is passed through
   // to each CSS property parsed from the style string.
   if (name == "style") {
     return SetStyleAttributes(node, value, customParser);
+  }
+  if (customParser) {
+    customParser->handleCustomAttribute(node, name, value);
   }
   return true;
 }

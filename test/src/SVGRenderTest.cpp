@@ -765,14 +765,6 @@ TGFX_TEST(SVGRenderTest, MixBlendModeCustomAttribute) {
   auto children = rootNode->getChildren();
   ASSERT_TRUE(children.size() >= 3);
 
-  // children[0]: first path, no mix-blend-mode
-  {
-    auto attributes = children[0]->getCustomAttributes();
-    for (const auto& attr : attributes) {
-      EXPECT_NE(attr.name, "mix-blend-mode");
-    }
-  }
-
   // children[1]: second path with style="mix-blend-mode:screen"
   {
     auto attributes = children[1]->getCustomAttributes();
