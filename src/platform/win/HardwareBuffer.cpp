@@ -66,7 +66,9 @@ constexpr int kGetDescVtableIndex = 10;
 typedef void(__stdcall* GetDescFn)(IUnknown* self, D3D11_TEXTURE2D_DESC_MINIMAL* pDesc);
 
 bool GetTextureDesc(void* texture, D3D11_TEXTURE2D_DESC_MINIMAL* outDesc) {
-  if (!texture || !outDesc) return false;
+  if (!texture || !outDesc) {
+    return false;
+  }
   auto* unk = static_cast<IUnknown*>(texture);
   auto vtable = *reinterpret_cast<void***>(unk);
   auto getDesc = reinterpret_cast<GetDescFn>(vtable[kGetDescVtableIndex]);
@@ -78,7 +80,9 @@ bool GetTextureDesc(void* texture, D3D11_TEXTURE2D_DESC_MINIMAL* outDesc) {
 namespace tgfx {
 
 bool HardwareBufferCheck(HardwareBufferRef buffer) {
-  if (!buffer) return false;
+  if (!buffer) {
+    return false;
+  }
   D3D11_TEXTURE2D_DESC_MINIMAL desc = {};
   if (!GetTextureDesc(buffer, &desc)) return false;
   // Verify it's a known format
@@ -114,9 +118,13 @@ void HardwareBufferUnlock(HardwareBufferRef) {
 }
 
 HardwareBufferInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
-  if (!buffer) return {};
+  if (!buffer) {
+    return {};
+  }
   D3D11_TEXTURE2D_DESC_MINIMAL desc = {};
-  if (!GetTextureDesc(buffer, &desc)) return {};
+  if (!GetTextureDesc(buffer, &desc)) {
+    return {};
+  }
 
   HardwareBufferInfo info = {};
   info.width = static_cast<int>(desc.Width);

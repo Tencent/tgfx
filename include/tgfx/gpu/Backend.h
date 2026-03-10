@@ -19,7 +19,6 @@
 #pragma once
 
 #include "tgfx/gpu/PixelFormat.h"
-#include "tgfx/gpu/d3d11/D3D11Types.h"
 #include "tgfx/gpu/metal/MetalTypes.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
 
@@ -55,10 +54,11 @@ class BackendTexture {
   }
 
   /**
-   * Creates a D3D11 backend texture.
+   * Creates a D3D11 backend texture. The d3d11Texture parameter is a pointer to an
+   * ID3D11Texture2D object.
    */
-  BackendTexture(const D3D11TextureInfo& d3d11Info, int width, int height)
-      : _backend(Backend::D3D11), _width(width), _height(height), d3d11Info(d3d11Info) {
+  BackendTexture(void* d3d11Texture, int width, int height)
+      : _backend(Backend::D3D11), _width(width), _height(height), d3d11Texture(d3d11Texture) {
   }
 
   BackendTexture(const BackendTexture& that) {
@@ -113,10 +113,9 @@ class BackendTexture {
   bool getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const;
 
   /**
-   * If the backend API is D3D11, copies a snapshot of the D3D11TextureInfo struct into the passed
-   * in pointer and returns true. Otherwise, returns false if the backend API is not D3D11.
+   * If the backend API is D3D11, returns the ID3D11Texture2D* pointer. Otherwise, returns nullptr.
    */
-  bool getD3D11TextureInfo(D3D11TextureInfo* d3d11TextureInfo) const;
+  void* getD3D11Texture() const;
 
  private:
   Backend _backend = Backend::Unknown;
@@ -126,7 +125,7 @@ class BackendTexture {
   union {
     GLTextureInfo glInfo;
     MetalTextureInfo metalInfo;
-    D3D11TextureInfo d3d11Info;
+    void* d3d11Texture;
   };
 };
 

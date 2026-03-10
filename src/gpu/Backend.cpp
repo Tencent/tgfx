@@ -84,7 +84,7 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
       metalInfo = that.metalInfo;
       break;
     case Backend::D3D11:
-      d3d11Info = that.d3d11Info;
+      d3d11Texture = that.d3d11Texture;
       break;
     default:
       break;
@@ -125,12 +125,11 @@ bool BackendTexture::getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) con
   return true;
 }
 
-bool BackendTexture::getD3D11TextureInfo(D3D11TextureInfo* d3d11TextureInfo) const {
+void* BackendTexture::getD3D11Texture() const {
   if (!isValid() || _backend != Backend::D3D11) {
-    return false;
+    return nullptr;
   }
-  *d3d11TextureInfo = d3d11Info;
-  return true;
+  return d3d11Texture;
 }
 
 BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& that) {
