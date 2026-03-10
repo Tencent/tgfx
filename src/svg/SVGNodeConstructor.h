@@ -64,7 +64,7 @@ class SVGNodeConstructor {
                                   const std::shared_ptr<SVGCustomParser>& setter);
 
   static bool SetStyleAttributes(SVGNode& node, const std::string& stringValue,
-                                  const std::shared_ptr<SVGCustomParser>& customParser);
+                                 const std::shared_ptr<SVGCustomParser>& customParser);
 
   static bool SetPreserveAspectRatioAttribute(SVGNode& node, SVGAttribute attr,
                                               const std::string& stringValue);
