@@ -38,6 +38,12 @@ function(build_tgfx_single_config SOURCE_PATH NODEJS OUTPUT_DIR IS_DEBUG)
         list(APPEND BUILD_ARGS -DTGFX_BUILD_PDF=OFF)
     endif()
 
+    if("layers" IN_LIST FEATURES)
+        list(APPEND BUILD_ARGS -DTGFX_BUILD_LAYERS=ON)
+    else()
+        list(APPEND BUILD_ARGS -DTGFX_BUILD_LAYERS=OFF)
+    endif()
+
     if("framework" IN_LIST FEATURES)
         list(APPEND BUILD_ARGS -DTGFX_BUILD_FRAMEWORK=ON)
     else()
