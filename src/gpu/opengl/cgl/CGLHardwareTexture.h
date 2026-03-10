@@ -41,6 +41,8 @@ class CGLHardwareTexture : public GLTexture {
   CVPixelBufferRef pixelBuffer = nullptr;
   CVOpenGLTextureRef texture = nil;
   CVOpenGLTextureCacheRef textureCache = nil;
+  unsigned ownedTextureID =
+      0;  // Used when creating GL_TEXTURE_2D directly (non-zero means we own the texture)
 
   CGLHardwareTexture(const TextureDescriptor& descriptor, CVPixelBufferRef pixelBuffer,
                      CVOpenGLTextureCacheRef textureCache, unsigned target, unsigned textureID);
