@@ -66,6 +66,18 @@ void MeasureContext::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, 
   addLocalBounds(state, mesh->bounds());
 }
 
+void MeasureContext::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matrix matrices[],
+                                        const Color[], size_t count, const MCState& state,
+                                        const Brush&) {
+  DEBUG_ASSERT(shape != nullptr);
+  auto shapeBounds = shape->getBounds();
+  Rect localBounds = Rect::MakeEmpty();
+  for (size_t i = 0; i < count; i++) {
+    localBounds.join(matrices[i].mapRect(shapeBounds));
+  }
+  addLocalBounds(state, localBounds);
+}
+
 void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
                                const MCState& state, const Brush&) {
   addLocalBounds(state, Rect::MakeWH(image->width(), image->height()));

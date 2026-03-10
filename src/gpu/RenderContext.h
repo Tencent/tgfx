@@ -51,6 +51,10 @@ class RenderContext : public DrawContext {
 
   void drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush) override;
 
+  void drawShapeInstanced(std::shared_ptr<Shape> shape, const Matrix matrices[],
+                          const Color colors[], size_t count, const MCState& state,
+                          const Brush& brush) override;
+
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const MCState& state, const Brush& brush) override;
 

@@ -66,6 +66,10 @@ class ProgramInfo {
     return geometryProcessor->vertexAttributes();
   }
 
+  const std::vector<Attribute>& getInstanceAttributes() const {
+    return geometryProcessor->instanceAttributes();
+  }
+
   PipelineColorAttachment getPipelineColorAttachment() const;
 
   int getSampleCount() const;
