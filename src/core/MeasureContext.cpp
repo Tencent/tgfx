@@ -71,7 +71,7 @@ void MeasureContext::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matr
                                         const Brush&) {
   DEBUG_ASSERT(shape != nullptr);
   auto shapeBounds = shape->getBounds();
-  Rect localBounds = Rect::MakeEmpty();
+  Rect localBounds = {};
   for (size_t i = 0; i < count; i++) {
     localBounds.join(matrices[i].mapRect(shapeBounds));
   }

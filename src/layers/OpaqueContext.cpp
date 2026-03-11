@@ -99,7 +99,7 @@ void OpaqueContext::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matri
                                        const Color colors[], size_t count, const MCState& state,
                                        const Brush& brush) {
   auto shapeBounds = shape->getBounds();
-  Rect unionBounds = Rect::MakeEmpty();
+  Rect unionBounds = {};
   for (size_t i = 0; i < count; i++) {
     auto viewMatrix = state.matrix * matrices[i];
     unionBounds.join(viewMatrix.mapRect(shapeBounds));
