@@ -33,8 +33,7 @@ class MetalWindow : public Window {
   /**
    * Creates a new window from a CAMetalLayer with the specified device.
    * @param layer The CAMetalLayer to render into. Must not be nil.
-   * @param device An optional MetalDevice. If nullptr, a new device is created from the layer's
-   * existing device, or the system default device if the layer has none.
+   * @param device An optional MetalDevice. If nullptr, a default device is created automatically.
    * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
    */
   static std::shared_ptr<MetalWindow> MakeFrom(CAMetalLayer* layer,
@@ -42,8 +41,8 @@ class MetalWindow : public Window {
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
-   * Creates a new window from an MTKView with its underlying CAMetalLayer.
-   * @param view The MTKView whose underlying CAMetalLayer is used for rendering. Must not be nil.
+   * Creates a new window from an MTKView.
+   * @param view The MTKView to render into. Must not be nil.
    * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
    */
   static std::shared_ptr<MetalWindow> MakeFrom(MTKView* view,

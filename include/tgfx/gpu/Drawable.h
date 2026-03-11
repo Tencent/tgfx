@@ -27,11 +27,9 @@ class RenderTargetProxy;
 class Surface;
 
 /**
- * Drawable represents a rendering target that can be presented to the display. It provides a
- * RenderTargetProxy for creating Surfaces and handles platform-specific presentation logic.
- * Subclasses implement platform-specific behavior for acquiring render targets and presenting
- * content (e.g., Metal drawables, OpenGL framebuffers). Use Surface::MakeFrom() to create a
- * Surface from a Drawable, then call present() after rendering to display the content.
+ * Drawable represents a rendering target that can be presented to the display. Use
+ * Surface::MakeFrom() to create a Surface from a Drawable, then call present() after rendering to
+ * display the content.
  */
 class Drawable {
  public:
@@ -88,8 +86,6 @@ class Drawable {
 
   /**
    * Called to present the rendered content to the display after GPU commands have been submitted.
-   * Subclasses implement platform-specific presentation logic (e.g., eglSwapBuffers,
-   * presentDrawable, flushBuffer).
    */
   virtual void onPresent(Context* context) = 0;
 

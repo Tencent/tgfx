@@ -30,16 +30,14 @@ namespace tgfx {
 class RenderTargetProxy;
 
 /**
- * QGLDrawable represents a Qt OpenGL rendering target backed by a framework-managed texture.
- * It provides a RenderTargetProxy for rendering and exposes the underlying texture as a QSGTexture
- * for display by the Qt Scene Graph. After calling present(), use getQSGTexture() to retrieve the
- * texture for the most recently presented frame.
+ * QGLDrawable is a Drawable for rendering within the Qt Scene Graph. After calling present(),
+ * use getQSGTexture() to retrieve the texture for the most recently presented frame.
  */
 class QGLDrawable : public Drawable {
  public:
   /**
-   * Creates a new QGLDrawable backed by a GL texture for rendering within the Qt Scene Graph.
-   * @param quickItem the QQuickItem that owns the OpenGL texture for rendering.
+   * Creates a new QGLDrawable for rendering within the Qt Scene Graph.
+   * @param quickItem the QQuickItem associated with this drawable.
    * @param width the width of the drawable surface in pixels.
    * @param height the height of the drawable surface in pixels.
    * @param colorSpace optional color space for rendering. If nullptr, the default sRGB is used.
@@ -49,9 +47,8 @@ class QGLDrawable : public Drawable {
   ~QGLDrawable() override;
 
   /**
-   * Returns a QSGTexture wrapping this drawable's GL texture for display by the Qt Scene Graph.
-   * Returns nullptr if the texture has not yet been created (i.e., present() has not been called).
-   * The returned QSGTexture is owned by this QGLDrawable and is invalidated on the next call.
+   * Returns a QSGTexture for display by the Qt Scene Graph. Returns nullptr if present() has not
+   * been called yet. The returned QSGTexture is owned by this QGLDrawable.
    */
   QSGTexture* getQSGTexture();
 

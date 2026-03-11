@@ -25,9 +25,8 @@ namespace tgfx {
 class Device;
 
 /**
- * Window represents a native displayable resource that can be rendered to by a Device. It serves
- * as a factory for creating Drawable objects that provide the actual rendering targets. The caller
- * uses getDrawable() to obtain a Drawable, then creates a Surface from it for rendering.
+ * Window represents a native displayable resource that can be rendered to by a Device. Use
+ * getDrawable() to obtain a Drawable, then create a Surface from it for rendering.
  */
 class Window {
  public:
@@ -40,9 +39,10 @@ class Window {
   std::shared_ptr<Device> getDevice();
 
   /**
-   * Returns a Drawable for rendering to this window. Returns the cached drawable if it is reusable,
-   * otherwise creates a new one. If queryOnly is true, returns the last drawable without creating a
-   * new one.
+   * Returns a Drawable for rendering to this window.
+   * @param context The GPU context used for rendering.
+   * @param queryOnly If true, only returns an existing Drawable without allocating a new one.
+   * Defaults to false.
    */
   std::shared_ptr<Drawable> getDrawable(Context* context, bool queryOnly = false);
 
@@ -68,7 +68,7 @@ class Window {
 
   /**
    * Called when the window size is invalidated. Subclasses can override this to clean up
-   * size-dependent resources (e.g., cached EGL surfaces). The default implementation does nothing.
+   * size-dependent resources. The default implementation does nothing.
    */
   virtual void onInvalidSize();
 };
