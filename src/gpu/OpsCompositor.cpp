@@ -305,22 +305,24 @@ void OpsCompositor::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matri
   bool hasColors = colors != nullptr;
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, true);
   auto shapeBounds = shape->getBounds();
+  // Compute the union of all instance bounds in tessellation-local space. Each instance i maps
+  // shapeBounds via inverse(matrices[0]) * matrices[i]. The result is reused for both localBounds
+  // (shader sampling range) and deviceBounds (mapRect produces a conservative superset).
+  Rect unionLocalBounds = {};
+  if ((needLocalBounds || needDeviceBounds) && !shape->isInverseFillType()) {
+    Matrix inverseFirst = {};
+    if (!matrices[0].invert(&inverseFirst)) {
+      return;
+    }
+    for (size_t i = 0; i < count; ++i) {
+      auto localMatrix = inverseFirst * matrices[i];
+      unionLocalBounds.join(localMatrix.mapRect(shapeBounds));
+    }
+  }
   if (needLocalBounds) {
     if (shape->isInverseFillType()) {
       localBounds = ToLocalBounds(clipBounds, tessellationMatrix);
     } else {
-      // Compute the union of all instance bounds in tessellation-local space (the coordinate system
-      // defined by uvMatrix = inverse(tessellationMatrix)). Each instance i maps shapeBounds via
-      // inverse(matrices[0]) * matrices[i], so we union all transformed bounds and clip.
-      Matrix inverseFirst = {};
-      if (!matrices[0].invert(&inverseFirst)) {
-        return;
-      }
-      Rect unionLocalBounds = {};
-      for (size_t i = 0; i < count; ++i) {
-        auto localMatrix = inverseFirst * matrices[i];
-        unionLocalBounds.join(localMatrix.mapRect(shapeBounds));
-      }
       localBounds = ClipLocalBounds(unionLocalBounds, tessellationMatrix, clipBounds);
     }
     if (localBounds->isEmpty()) {
@@ -332,12 +334,7 @@ void OpsCompositor::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matri
     if (shape->isInverseFillType()) {
       deviceBounds = clipBounds;
     } else {
-      Rect unionDeviceBounds = {};
-      for (size_t i = 0; i < count; ++i) {
-        auto instanceViewMatrix = state.matrix * matrices[i];
-        unionDeviceBounds.join(instanceViewMatrix.mapRect(shapeBounds));
-      }
-      deviceBounds = unionDeviceBounds;
+      deviceBounds = tessellationMatrix.mapRect(unionLocalBounds);
     }
   }
 
