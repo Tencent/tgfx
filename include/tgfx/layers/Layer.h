@@ -501,6 +501,22 @@ class Layer : public std::enable_shared_from_this<Layer> {
   Point localToGlobal(const Point& localPoint) const;
 
   /**
+   * Returns the relative transformation matrix from this layer's coordinate space to the target
+   * layer's coordinate space. If the target layer is nullptr or the same as the calling layer,
+   * returns an identity matrix.
+   * @param target The layer that defines the target coordinate system.
+   * @return A Matrix representing the relative transformation from this layer to the target layer.
+   */
+  Matrix relativeMatrix(const Layer* target) const;
+
+  /**
+   * Returns the transformation matrix from this layer's local coordinate space to the root layer's
+   * coordinate space.
+   * @return A Matrix representing the global transformation of this layer.
+   */
+  Matrix globalMatrix() const;
+
+  /**
    * Returns an array of layers under the specified point that are children (or descendants) of the
    * calling layer. The layers are checked against their bounding boxes for quick selection. The
    * first layer in the array is the top-most layer under the point, and the last layer is the

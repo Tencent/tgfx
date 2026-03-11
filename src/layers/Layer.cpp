@@ -892,6 +892,14 @@ Point Layer::localToGlobal(const Point& localPoint) const {
   return {result.x, result.y};
 }
 
+Matrix Layer::relativeMatrix(const Layer* target) const {
+  return Matrix3DUtils::GetMayLossyMatrix(getRelativeMatrix(target));
+}
+
+Matrix Layer::globalMatrix() const {
+  return Matrix3DUtils::GetMayLossyMatrix(getGlobalMatrix());
+}
+
 bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
   if (auto content = getContent()) {
     Point localPoint = globalToLocal(Point::Make(x, y));
