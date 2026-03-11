@@ -31,6 +31,8 @@
 #include "hello2d/AppHost.h"
 #include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 #include "tgfx/layers/DisplayList.h"
@@ -51,6 +53,8 @@ class TGFXWindow {
   float zoomScale = 1.0f;
   tgfx::Point contentOffset = {0.0f, 0.0f};
   std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
+  std::shared_ptr<tgfx::Drawable> drawable = nullptr;
+  std::shared_ptr<tgfx::Surface> surface = nullptr;
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
   tgfx::DisplayList displayList = {};
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;

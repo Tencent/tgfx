@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,38 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/Window.h"
-#include "inspect/InspectorMark.h"
-#include "tgfx/gpu/Device.h"
+#include "WGLDrawable.h"
+#include <GL/GL.h>
+#include "gpu/opengl/GLDefines.h"
+#include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
-Window::Window(std::shared_ptr<Device> device) : device(std::move(device)) {
+WGLDrawable::WGLDrawable(HDC deviceContext, int width, int height,
+                         std::shared_ptr<ColorSpace> colorSpace)
+    : Drawable(width, height, std::move(colorSpace)), deviceContext(deviceContext) {
 }
 
-std::shared_ptr<Device> Window::getDevice() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return device;
+std::shared_ptr<RenderTargetProxy> WGLDrawable::getProxy(Context* context) {
+  GLFrameBufferInfo frameBuffer = {0, GL_RGBA8};
+  BackendRenderTarget renderTarget(frameBuffer, width(), height());
+  return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
-std::shared_ptr<Drawable> Window::getDrawable(Context* context, bool queryOnly) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  if (queryOnly) {
-    return currentDrawable;
-  }
-  if (currentDrawable != nullptr && currentDrawable->isReusable()) {
-    return currentDrawable;
-  }
-  currentDrawable = nullptr;
-  currentDrawable = onCreateDrawable(context);
-  return currentDrawable;
-}
-
-void Window::invalidSize() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  currentDrawable = nullptr;
-  onInvalidSize();
-}
-
-void Window::onInvalidSize() {
+void WGLDrawable::onPresent(Context*) {
+  SwapBuffers(deviceContext);
 }
 }  // namespace tgfx

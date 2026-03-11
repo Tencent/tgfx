@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,26 +18,12 @@
 
 #pragma once
 
-#include "WebGLDevice.h"
-#include "tgfx/gpu/Window.h"
+#include <CoreGraphics/CGColorSpace.h>
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
-class WebGLWindow : public Window {
- public:
-  /**
-   * Creates a new window from a canvas.
-   */
-  static std::shared_ptr<WebGLWindow> MakeFrom(const std::string& canvasID,
-                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
-
- protected:
-  std::shared_ptr<Drawable> onCreateDrawable(Context* context) override;
-
- private:
-  std::string canvasID;
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
-
-  explicit WebGLWindow(std::shared_ptr<Device> device,
-                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
-};
+// Converts a tgfx ColorSpace to a CGColorSpaceRef via ICC profile data. Returns
+// kCGColorSpaceSRGB when the input is null or conversion fails. The caller must
+// release the returned CGColorSpaceRef with CFRelease().
+CGColorSpaceRef CreateCGColorSpace(const std::shared_ptr<ColorSpace>& colorSpace);
 }  // namespace tgfx

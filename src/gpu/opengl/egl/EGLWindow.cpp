@@ -25,9 +25,8 @@
 #elif defined(_WIN32)
 #include <WinUser.h>
 #endif
-#include <EGL/eglext.h>
-#include <GLES3/gl3.h>
 #include "core/utils/USE.h"
+#include "tgfx/gpu/opengl/egl/EGLDrawable.h"
 
 namespace tgfx {
 std::shared_ptr<EGLWindow> EGLWindow::Current() {
@@ -92,10 +91,9 @@ void EGLWindow::onInvalidSize() {
 #endif
 }
 
-std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Drawable> EGLWindow::onCreateDrawable(Context*) {
   ISize size = {0, 0};
   if (nativeWindow) {
-    // If the rendering size changes，eglQuerySurface() may give the wrong size on same platforms.
     size = GetNativeWindowSize(nativeWindow);
   }
   auto eglDevice = static_cast<EGLDevice*>(device.get());
@@ -106,32 +104,7 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-  GLFrameBufferInfo frameBuffer = {};
-  frameBuffer.id = 0;
-  frameBuffer.format = GL_RGBA8;
-  BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0,
-                           eglDevice->colorSpace);
-}
-
-void EGLWindow::setPresentationTime(int64_t time) {
-  presentationTime = time;
-}
-
-void EGLWindow::onPresent(Context*) {
-  auto device = std::static_pointer_cast<EGLDevice>(this->device);
-  auto eglDisplay = device->eglDisplay;
-  // eglSurface cannot be nullptr in EGLWindow.
-  auto eglSurface = device->eglSurface;
-  if (presentationTime.has_value()) {
-    static auto eglPresentationTimeANDROID = reinterpret_cast<PFNEGLPRESENTATIONTIMEANDROIDPROC>(
-        eglGetProcAddress("eglPresentationTimeANDROID"));
-    if (eglPresentationTimeANDROID) {
-      // egl uses nano seconds
-      eglPresentationTimeANDROID(eglDisplay, eglSurface, *presentationTime * 1000);
-      presentationTime = std::nullopt;
-    }
-  }
-  eglSwapBuffers(eglDisplay, eglSurface);
+  return std::make_shared<EGLDrawable>(eglDevice->eglDisplay, eglDevice->eglSurface, size.width,
+                                       size.height, eglDevice->colorSpace);
 }
 }  // namespace tgfx

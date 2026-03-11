@@ -27,8 +27,6 @@
 #include "tgfx/gpu/metal/MetalDevice.h"
 
 namespace tgfx {
-class DelayRenderTargetProxy;
-class MetalDrawableProvider;
 
 class MetalWindow : public Window {
  public:
@@ -46,15 +44,11 @@ class MetalWindow : public Window {
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-  void onPresent(Context* context) override;
-  void onFreeSurface() override;
+  std::shared_ptr<Drawable> onCreateDrawable(Context* context) override;
 
  private:
   CAMetalLayer* metalLayer = nil;
   MTKView* metalView = nil;
-  std::shared_ptr<MetalDrawableProvider> drawableProvider = nullptr;
-  std::shared_ptr<DelayRenderTargetProxy> drawableProxy = nullptr;
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   MetalWindow(std::shared_ptr<Device> device, CAMetalLayer* layer,

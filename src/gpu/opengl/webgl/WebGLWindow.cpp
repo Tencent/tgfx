@@ -19,7 +19,7 @@
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 #include <emscripten.h>
 #include "core/utils/Log.h"
-#include "gpu/opengl/GLDefines.h"
+#include "gpu/opengl/webgl/WebGLDrawable.h"
 
 namespace tgfx {
 
@@ -41,18 +41,14 @@ WebGLWindow::WebGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSp
     : Window(std::move(device)), colorSpace(std::move(colorSpace)) {
 }
 
-std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Drawable> WebGLWindow::onCreateDrawable(Context*) {
   int width = 0;
   int height = 0;
   emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
   if (width <= 0 || height <= 0) {
-    LOGE("WebGLWindow::onCreateSurface() Can not create a Surface with zero size.");
+    LOGE("WebGLWindow::getDrawable() Can not create a Drawable with zero size.");
     return nullptr;
   }
-  GLFrameBufferInfo glInfo = {};
-  glInfo.id = 0;
-  glInfo.format = GL_RGBA8;
-  return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft, 0,
-                           colorSpace);
+  return std::make_shared<WebGLDrawable>(width, height, colorSpace);
 }
 }  // namespace tgfx

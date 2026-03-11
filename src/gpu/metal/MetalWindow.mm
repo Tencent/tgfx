@@ -17,60 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/metal/MetalWindow.h"
-#import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
-#include "MetalCommandQueue.h"
-#include "MetalGPU.h"
-#include "core/utils/Log.h"
-#include "gpu/proxies/DelayRenderTargetProxy.h"
-#include "tgfx/core/Surface.h"
-#include "tgfx/gpu/Backend.h"
-#include "tgfx/gpu/metal/MetalTypes.h"
+#include "gpu/metal/MetalDrawable.h"
+#include "platform/apple/CGColorSpaceUtil.h"
 
 namespace tgfx {
 
-static PixelFormat MTLPixelFormatToPixelFormat(MTLPixelFormat format) {
-  switch (format) {
-    case MTLPixelFormatBGRA8Unorm:
-      return PixelFormat::BGRA_8888;
-    case MTLPixelFormatRGBA8Unorm:
-      return PixelFormat::RGBA_8888;
-    case MTLPixelFormatR8Unorm:
-      return PixelFormat::ALPHA_8;
-    case MTLPixelFormatRG8Unorm:
-      return PixelFormat::RG_88;
-    default:
-      return PixelFormat::RGBA_8888;
+static void ApplyColorSpace(CAMetalLayer* layer, const std::shared_ptr<ColorSpace>& colorSpace) {
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
+    auto cgColorSpace = CreateCGColorSpace(colorSpace);
+    layer.colorspace = cgColorSpace;
+    CFRelease(cgColorSpace);
   }
 }
-
-class MetalDrawableProvider : public RenderTargetProvider {
- public:
-  explicit MetalDrawableProvider(CAMetalLayer* layer) : layer(layer) {
-  }
-
-  std::shared_ptr<RenderTarget> getRenderTarget(Context* context) override {
-    drawable = [layer nextDrawable];
-    if (drawable == nil) {
-      return nullptr;
-    }
-    MetalTextureInfo metalInfo = {};
-    metalInfo.texture = (__bridge const void*)drawable.texture;
-    metalInfo.format = static_cast<unsigned>(drawable.texture.pixelFormat);
-    auto width = static_cast<int>(drawable.texture.width);
-    auto height = static_cast<int>(drawable.texture.height);
-    BackendRenderTarget backendRT(metalInfo, width, height);
-    return RenderTarget::MakeFrom(context, backendRT, ImageOrigin::TopLeft);
-  }
-
-  id<CAMetalDrawable> getDrawable() const {
-    return drawable;
-  }
-
- private:
-  CAMetalLayer* layer = nil;
-  id<CAMetalDrawable> drawable = nil;
-};
 
 std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(CAMetalLayer* layer,
                                                    std::shared_ptr<MetalDevice> device,
@@ -91,6 +50,7 @@ std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(CAMetalLayer* layer,
   if (layer.device == nil) {
     layer.device = (__bridge id<MTLDevice>)device->metalDevice();
   }
+  ApplyColorSpace(layer, colorSpace);
   return std::shared_ptr<MetalWindow>(new MetalWindow(device, layer, std::move(colorSpace)));
 }
 
@@ -111,6 +71,7 @@ std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(MTKView* view,
   if (layer.device == nil) {
     layer.device = (__bridge id<MTLDevice>)device->metalDevice();
   }
+  ApplyColorSpace(layer, colorSpace);
   return std::shared_ptr<MetalWindow>(new MetalWindow(device, view, layer, std::move(colorSpace)));
 }
 
@@ -128,7 +89,7 @@ MetalWindow::MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalL
       colorSpace(std::move(colorSpace)) {
 }
 
-std::shared_ptr<Surface> MetalWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Drawable> MetalWindow::onCreateDrawable(Context*) {
   if (metalView != nil) {
     metalLayer.drawableSize = metalView.drawableSize;
   }
@@ -138,36 +99,7 @@ std::shared_ptr<Surface> MetalWindow::onCreateSurface(Context* context) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  drawableProvider = std::make_shared<MetalDrawableProvider>(metalLayer);
-  auto format = MTLPixelFormatToPixelFormat(metalLayer.pixelFormat);
-  drawableProxy = std::make_shared<DelayRenderTargetProxy>(context, width, height, format,
-                                                           ImageOrigin::TopLeft, drawableProvider);
-  return Surface::MakeFrom(drawableProxy, 0, false, colorSpace);
-}
-
-void MetalWindow::onPresent(Context* context) {
-  if (drawableProvider == nullptr) {
-    return;
-  }
-  auto drawable = drawableProvider->getDrawable();
-  if (drawable == nil) {
-    return;
-  }
-  auto metalGPU = static_cast<MetalGPU*>(context->gpu());
-  auto queue = static_cast<MetalCommandQueue*>(metalGPU->queue());
-  auto commandBuffer = [queue->metalCommandQueue() commandBuffer];
-  [commandBuffer presentDrawable:drawable];
-  [commandBuffer commit];
-  drawableProxy->reset();
-}
-
-void MetalWindow::onFreeSurface() {
-  Window::onFreeSurface();
-  if (drawableProxy != nullptr) {
-    drawableProxy->reset();
-  }
-  drawableProxy = nullptr;
-  drawableProvider = nullptr;
+  return std::make_shared<MetalDrawable>(metalLayer, width, height, colorSpace);
 }
 
 }  // namespace tgfx

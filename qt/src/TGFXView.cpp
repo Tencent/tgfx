@@ -23,6 +23,7 @@
 #include <QSGImageNode>
 #include <QThread>
 #include "hello2d/LayerBuilder.h"
+#include "tgfx/core/Surface.h"
 
 namespace hello2d {
 TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
@@ -93,9 +94,7 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   auto pixelRatio = window()->devicePixelRatio();
   auto screenWidth = static_cast<int>(ceil(width() * pixelRatio));
   auto screenHeight = static_cast<int>(ceil(height() * pixelRatio));
-  if (tgfxWindow->getSurface(nullptr) == nullptr ||
-      tgfxWindow->getSurface(nullptr)->width() != screenWidth ||
-      tgfxWindow->getSurface(nullptr)->height() != screenHeight) {
+  if (lastSurfaceWidth != screenWidth || lastSurfaceHeight != screenHeight) {
     lastSurfaceWidth = screenWidth;
     lastSurfaceHeight = screenHeight;
     applyCenteringTransform();
@@ -106,7 +105,7 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   draw();
 
   auto node = static_cast<QSGImageNode*>(oldNode);
-  auto texture = tgfxWindow->getQSGTexture();
+  auto texture = presentedDrawable ? presentedDrawable->getQSGTexture() : nullptr;
   if (texture) {
     if (node == nullptr) {
       node = window()->createImageNode();
@@ -120,6 +119,9 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 
 void TGFXView::onSceneGraphInvalidated() {
   disconnect(window(), SIGNAL(sceneGraphInvalidated()), this, SLOT(onSceneGraphInvalidated()));
+  presentedDrawable = nullptr;
+  lastDrawable = nullptr;
+  lastRecording = nullptr;
   tgfxWindow = nullptr;
 }
 
@@ -153,42 +155,46 @@ void TGFXView::draw() {
   if (context == nullptr) {
     return;
   }
-
   if (!displayList.hasContentChanged() && lastRecording == nullptr) {
     device->unlock();
     return;
   }
-
-  auto surface = tgfxWindow->getSurface(context);
+  auto previousDrawable = std::move(lastDrawable);
+  auto drawable = tgfxWindow->getDrawable(context);
+  if (drawable == nullptr) {
+    device->unlock();
+    return;
+  }
+  auto surface = tgfx::Surface::MakeFrom(context, drawable);
   if (surface == nullptr) {
     device->unlock();
     return;
   }
-
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto pixelRatio = static_cast<float>(window()->devicePixelRatio());
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), pixelRatio);
-
   displayList.render(surface.get(), false);
-
   auto recording = context->flush();
-
-  if (presentImmediately) {
+  if (presentImmediately || drawable == previousDrawable) {
     presentImmediately = false;
+    lastRecording = nullptr;
     if (recording) {
       context->submit(std::move(recording));
-      tgfxWindow->present(context);
+      drawable->present(context);
+      presentedDrawable = std::dynamic_pointer_cast<tgfx::QGLDrawable>(drawable);
     }
   } else {
     std::swap(lastRecording, recording);
-
     if (recording) {
       context->submit(std::move(recording));
-      tgfxWindow->present(context);
+      if (previousDrawable) {
+        previousDrawable->present(context);
+        presentedDrawable = std::dynamic_pointer_cast<tgfx::QGLDrawable>(previousDrawable);
+      }
     }
   }
-
+  lastDrawable = drawable;
   device->unlock();
 }
 }  // namespace hello2d

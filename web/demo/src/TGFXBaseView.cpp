@@ -20,6 +20,7 @@
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/core/Surface.h"
 
 using namespace emscripten;
 namespace hello2d {
@@ -38,23 +39,26 @@ void TGFXBaseView::updateSize() {
   if (window == nullptr) {
     return;
   }
+  drawable = nullptr;
+  surface = nullptr;
   window->invalidSize();
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
     return;
   }
-  auto surface = window->getSurface(context);
-  if (surface == nullptr) {
+  auto newDrawable = window->getDrawable(context);
+  if (newDrawable == nullptr) {
     device->unlock();
     return;
   }
-  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
-    lastSurfaceWidth = surface->width();
-    lastSurfaceHeight = surface->height();
+  if (newDrawable->width() != lastSurfaceWidth || newDrawable->height() != lastSurfaceHeight) {
+    lastSurfaceWidth = newDrawable->width();
+    lastSurfaceHeight = newDrawable->height();
     applyCenteringTransform();
     presentImmediately = true;
   }
+  drawable = std::move(newDrawable);
   device->unlock();
 }
 
@@ -115,7 +119,12 @@ void TGFXBaseView::draw() {
     return;
   }
 
-  auto surface = window->getSurface(context);
+  if (drawable == nullptr || surface == nullptr) {
+    drawable = window->getDrawable(context);
+    if (drawable != nullptr) {
+      surface = tgfx::Surface::MakeFrom(context, drawable);
+    }
+  }
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -137,14 +146,14 @@ void TGFXBaseView::draw() {
     presentImmediately = false;
     if (recording) {
       context->submit(std::move(recording));
-      window->present(context);
+      drawable->present(context);
     }
   } else {
     std::swap(lastRecording, recording);
 
     if (recording) {
       context->submit(std::move(recording));
-      window->present(context);
+      drawable->present(context);
     }
   }
 

@@ -18,24 +18,24 @@
 
 #pragma once
 
-#include <memory>
+#include "tgfx/gpu/Drawable.h"
+
+@class CAEAGLLayer;
 
 namespace tgfx {
-class Context;
-class RenderTarget;
+class EAGLLayerTexture;
 
-/**
- * An interface for providing render targets on demand. Implementations can defer the actual render
- * target creation until it is needed, for example, acquiring a Metal drawable at flush time.
- */
-class RenderTargetProvider {
+class EAGLDrawable : public Drawable {
  public:
-  virtual ~RenderTargetProvider() = default;
+  EAGLDrawable(CAEAGLLayer* layer, int width, int height,
+               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
-  /**
-   * Creates or retrieves a render target. Called by DelayRenderTargetProxy when the render target is
-   * first needed during a frame.
-   */
-  virtual std::shared_ptr<RenderTarget> getRenderTarget(Context* context) = 0;
+ protected:
+  std::shared_ptr<RenderTargetProxy> getProxy(Context* context) override;
+  void onPresent(Context* context) override;
+
+ private:
+  CAEAGLLayer* layer = nil;
+  std::shared_ptr<EAGLLayerTexture> layerTexture = nullptr;
 };
 }  // namespace tgfx

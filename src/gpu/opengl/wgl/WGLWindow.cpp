@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
-#include <GL/GL.h>
 #include "core/utils/Log.h"
+#include "gpu/opengl/wgl/WGLDrawable.h"
 
 namespace tgfx {
 std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedContext,
@@ -45,7 +45,7 @@ WGLWindow::WGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace>
     : Window(std::move(device)), colorSpace(std::move(colorSpace)) {
 }
 
-std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Drawable> WGLWindow::onCreateDrawable(Context*) {
   ISize size = {0, 0};
   if (nativeWindow) {
     RECT rect = {};
@@ -56,15 +56,9 @@ std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context) {
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-
-  GLFrameBufferInfo frameBuffer = {0, GL_RGBA8};
-  BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
-}
-
-void WGLWindow::onPresent(Context*) {
-  const auto wglDevice = std::static_pointer_cast<WGLDevice>(this->device);
-  SwapBuffers(wglDevice->deviceContext);
+  auto wglDevice = std::static_pointer_cast<WGLDevice>(this->device);
+  return std::make_shared<WGLDrawable>(wglDevice->deviceContext, size.width, size.height,
+                                       colorSpace);
 }
 
 }  // namespace tgfx

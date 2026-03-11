@@ -18,21 +18,19 @@
 
 #pragma once
 
-#include "gpu/proxies/RenderTargetProvider.h"
+#import <QuartzCore/QuartzCore.h>
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-
 /**
- * A RenderTargetProxy that defers the creation of the underlying render target until
- * getRenderTarget() is called. The provider is invoked at most once per frame; call reset() after
- * presenting to allow a new render target to be acquired on the next frame.
+ * MetalDrawableProxy defers the acquisition of a Metal drawable until the render target is actually
+ * needed. It calls [CAMetalLayer nextDrawable] lazily in getRenderTarget() and wraps the resulting
+ * texture as an ExternalRenderTarget.
  */
-class DelayRenderTargetProxy : public RenderTargetProxy {
+class MetalDrawableProxy : public RenderTargetProxy {
  public:
-  DelayRenderTargetProxy(Context* context, int width, int height, PixelFormat format,
-                         ImageOrigin origin, std::shared_ptr<RenderTargetProvider> provider,
-                         int sampleCount = 1);
+  MetalDrawableProxy(Context* context, CAMetalLayer* metalLayer, int width, int height,
+                     PixelFormat format);
 
   Context* getContext() const override;
   int width() const override;
@@ -44,20 +42,17 @@ class DelayRenderTargetProxy : public RenderTargetProxy {
   std::shared_ptr<TextureView> getTextureView() const override;
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
-  /**
-   * Resets the cached render target. The next call to getRenderTarget() will re-invoke the provider
-   * to acquire a new render target.
-   */
-  void reset();
+  id<CAMetalDrawable> getDrawable() const;
 
  private:
   Context* _context = nullptr;
+  CAMetalLayer* _metalLayer = nil;
   int _width = 0;
   int _height = 0;
   PixelFormat _format = PixelFormat::RGBA_8888;
-  int _sampleCount = 1;
-  ImageOrigin _origin = ImageOrigin::TopLeft;
-  std::shared_ptr<RenderTargetProvider> _provider = nullptr;
+  // Mutable because getRenderTarget() is const (inherited from RenderTargetProxy) but needs to
+  // lazily acquire the Metal drawable on first access.
+  mutable id<CAMetalDrawable> _metalDrawable = nil;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
 };
 }  // namespace tgfx

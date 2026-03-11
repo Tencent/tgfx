@@ -22,7 +22,6 @@
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
-class EAGLLayerTexture;
 
 class EAGLWindow : public Window {
  public:
@@ -34,12 +33,10 @@ class EAGLWindow : public Window {
                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-  void onPresent(Context* context) override;
+  std::shared_ptr<Drawable> onCreateDrawable(Context* context) override;
 
  private:
   CAEAGLLayer* layer = nil;
-  std::shared_ptr<EAGLLayerTexture> layerTexture;
   std::shared_ptr<ColorSpace> colorSpace;
 
   EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,

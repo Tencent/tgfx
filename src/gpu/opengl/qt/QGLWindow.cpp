@@ -22,7 +22,8 @@
 #include <QQuickWindow>
 #include <QThread>
 #include "core/utils/ColorSpaceHelper.h"
-#include "gpu/opengl/GLTexture.h"
+#include "core/utils/Log.h"
+#include "tgfx/gpu/opengl/qt/QGLDrawable.h"
 
 namespace tgfx {
 class QGLDeviceCreator : public QObject {
@@ -131,7 +132,6 @@ QGLWindow::QGLWindow(QQuickItem* quickItem, bool singleBufferMode,
 }
 
 QGLWindow::~QGLWindow() {
-  delete outTexture;
   delete deviceCreator;
 }
 
@@ -143,43 +143,7 @@ void QGLWindow::moveToThread(QThread* thread) {
   }
 }
 
-QSGTexture* QGLWindow::getQSGTexture() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  auto nativeWindow = quickItem->window();
-  if (nativeWindow == nullptr || device == nullptr) {
-    return nullptr;
-  }
-  if (pendingTextureID > 0 && pendingSurface != nullptr) {
-    if (outTexture) {
-      delete outTexture;
-      outTexture = nullptr;
-    }
-    auto width = static_cast<int>(ceil(quickItem->width()));
-    auto height = static_cast<int>(ceil(quickItem->height()));
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-    outTexture = QNativeInterface::QSGOpenGLTexture::fromNative(
-        pendingTextureID, nativeWindow, QSize(width, height), QQuickWindow::TextureHasAlphaChannel);
-
-#elif (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
-    outTexture = nativeWindow->createTextureFromNativeObject(
-        QQuickWindow::NativeObjectTexture, &pendingTextureID, 0, QSize(width, height),
-        QQuickWindow::TextureHasAlphaChannel);
-#else
-    outTexture = nativeWindow->createTextureFromId(pendingTextureID, QSize(width, height),
-                                                   QQuickWindow::TextureHasAlphaChannel);
-#endif
-    // Keep the surface alive until the next getQSGTexture() call.
-    displayingSurface = pendingSurface;
-    pendingSurface = nullptr;
-    pendingTextureID = 0;
-    if (!singleBufferMode) {
-      std::swap(frontSurface, surface);
-    }
-  }
-  return outTexture;
-}
-
-std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Drawable> QGLWindow::onCreateDrawable(Context*) {
   auto nativeWindow = quickItem->window();
   if (nativeWindow == nullptr) {
     return nullptr;
@@ -190,36 +154,22 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  if (!singleBufferMode) {
-    frontSurface =
-        Surface::Make(context, width, height, ColorType::RGBA_8888, 1, false, 0, colorSpace);
-    if (frontSurface == nullptr) {
-      return nullptr;
+  auto maxCount = singleBufferMode ? 1 : 2;
+  for (auto& drawable : drawables) {
+    if (drawable.use_count() == 1 && drawable->width() == width && drawable->height() == height) {
+      return drawable;
     }
   }
-  auto backSurface =
-      Surface::Make(context, width, height, ColorType::RGBA_8888, 1, false, 0, colorSpace);
-  if (backSurface == nullptr) {
-    frontSurface = nullptr;
+  if (static_cast<int>(drawables.size()) >= maxCount) {
     return nullptr;
   }
-  sizeInvalid = false;
-  return backSurface;
+  auto drawable = std::make_shared<QGLDrawable>(quickItem, width, height, colorSpace);
+  drawables.push_back(drawable);
+  return drawable;
 }
 
-void QGLWindow::onPresent(Context*) {
-  GLTextureInfo textureInfo = {};
-  // Surface->getBackendTexture() triggers a flush, so we need to call it under the context.
-  surface->getBackendTexture().getGLTextureInfo(&textureInfo);
-  pendingTextureID = textureInfo.id;
-  // Keep the surface alive until the next getQSGTexture() call.
-  pendingSurface = surface;
-  QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
-}
-
-void QGLWindow::onFreeSurface() {
-  frontSurface = nullptr;
-  surface = nullptr;
+void QGLWindow::onInvalidSize() {
+  drawables.clear();
 }
 
 void QGLWindow::initDevice() {

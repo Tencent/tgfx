@@ -37,6 +37,8 @@ void JTGFXView::updateSize() {
   if (width > 0 && height > 0) {
     lastSurfaceWidth = width;
     lastSurfaceHeight = height;
+    drawable = nullptr;
+    surface = nullptr;
     window->invalidSize();
   }
 }
@@ -81,7 +83,12 @@ void JTGFXView::draw() {
     return;
   }
 
-  auto surface = window->getSurface(context);
+  if (drawable == nullptr || surface == nullptr) {
+    drawable = window->getDrawable(context);
+    if (drawable != nullptr) {
+      surface = tgfx::Surface::MakeFrom(context, drawable);
+    }
+  }
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -103,7 +110,7 @@ void JTGFXView::draw() {
 
   if (recording) {
     context->submit(std::move(recording));
-    window->present(context);
+    drawable->present(context);
   }
 
   device->unlock();
