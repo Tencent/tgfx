@@ -21,6 +21,7 @@
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/eagl/EAGLDrawable.h"
 #include "gpu/opengl/eagl/EAGLLayerTexture.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,

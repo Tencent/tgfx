@@ -93,6 +93,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   if (tgfxWindow != nullptr) {
     drawable = nullptr;
     surface = nullptr;
+    lastRecording = nullptr;
     tgfxWindow->invalidSize();
     presentImmediately = true;
   }
@@ -198,7 +199,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return;
   }
 
-  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+  if (!displayList.hasContentChanged() && lastRecording == nullptr && !presentImmediately) {
     return;
   }
 
@@ -227,19 +228,14 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
   auto recording = context->flush();
 
-  if (presentImmediately) {
-    presentImmediately = false;
-    if (recording) {
-      context->submit(std::move(recording));
-      drawable->present(context);
-    }
-  } else {
+  if (!presentImmediately) {
     std::swap(lastRecording, recording);
+  }
+  presentImmediately = false;
 
-    if (recording) {
-      context->submit(std::move(recording));
-      drawable->present(context);
-    }
+  if (recording) {
+    context->submit(std::move(recording));
+    drawable->present(context);
   }
 
   device->unlock();
