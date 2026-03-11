@@ -46,7 +46,7 @@ std::shared_ptr<Drawable> WebGLWindow::onCreateDrawable(Context*) {
   int height = 0;
   emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
   if (width <= 0 || height <= 0) {
-    LOGE("WebGLWindow::getDrawable() Can not create a Drawable with zero size.");
+    LOGE("WebGLWindow::onCreateDrawable() Can not create a Drawable with zero size.");
     return nullptr;
   }
   return std::make_shared<WebGLDrawable>(width, height, colorSpace);
