@@ -20,14 +20,12 @@
 
 #include "tgfx/gpu/Drawable.h"
 
-@class CAEAGLLayer;
-
 namespace tgfx {
 class EAGLLayerTexture;
 
 class EAGLDrawable : public Drawable {
  public:
-  EAGLDrawable(CAEAGLLayer* layer, int width, int height,
+  EAGLDrawable(std::weak_ptr<EAGLLayerTexture> layerTexture, int width, int height,
                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  protected:
@@ -35,7 +33,6 @@ class EAGLDrawable : public Drawable {
   void onPresent(Context* context) override;
 
  private:
-  CAEAGLLayer* layer = nil;
-  std::shared_ptr<EAGLLayerTexture> layerTexture = nullptr;
+  std::weak_ptr<EAGLLayerTexture> layerTexture;
 };
 }  // namespace tgfx

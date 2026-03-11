@@ -20,31 +20,32 @@
 #include "gpu/opengl/GLDefines.h"
 #include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
-#include "gpu/opengl/eagl/EAGLDevice.h"
 #include "gpu/opengl/eagl/EAGLLayerTexture.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
-EAGLDrawable::EAGLDrawable(CAEAGLLayer* layer, int width, int height,
+EAGLDrawable::EAGLDrawable(std::weak_ptr<EAGLLayerTexture> layerTexture, int width, int height,
                            std::shared_ptr<ColorSpace> colorSpace)
-    : Drawable(width, height, std::move(colorSpace)), layer(layer) {
+    : Drawable(width, height, std::move(colorSpace)), layerTexture(std::move(layerTexture)) {
 }
 
 std::shared_ptr<RenderTargetProxy> EAGLDrawable::getProxy(Context* context) {
-  layerTexture = EAGLLayerTexture::MakeFrom(static_cast<GLGPU*>(context->gpu()), layer);
-  if (layerTexture == nullptr) {
+  auto texture = layerTexture.lock();
+  if (texture == nullptr) {
     return nullptr;
   }
-  auto backendRT = layerTexture->getBackendRenderTarget();
+  auto backendRT = texture->getBackendRenderTarget();
   return RenderTargetProxy::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
 }
 
 void EAGLDrawable::onPresent(Context* context) {
-  if (layerTexture == nullptr) {
+  auto texture = layerTexture.lock();
+  if (texture == nullptr) {
     return;
   }
   auto gl = static_cast<GLGPU*>(context->gpu())->functions();
-  gl->bindRenderbuffer(GL_RENDERBUFFER, layerTexture->colorBufferID());
+  gl->bindRenderbuffer(GL_RENDERBUFFER, texture->colorBufferID());
   auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();
   [eaglContext presentRenderbuffer:GL_RENDERBUFFER];
   gl->bindRenderbuffer(GL_RENDERBUFFER, 0);

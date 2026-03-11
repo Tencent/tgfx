@@ -22,6 +22,7 @@
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
+class EAGLLayerTexture;
 
 class EAGLWindow : public Window {
  public:
@@ -42,6 +43,7 @@ class EAGLWindow : public Window {
  private:
   CAEAGLLayer* layer = nil;
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
+  std::shared_ptr<EAGLLayerTexture> layerTexture = nullptr;
 
   EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
              std::shared_ptr<ColorSpace> colorSpace = nullptr);

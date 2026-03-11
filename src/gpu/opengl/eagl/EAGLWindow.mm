@@ -18,7 +18,9 @@
 
 #include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
 #include "core/utils/Log.h"
+#include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/eagl/EAGLDrawable.h"
+#include "gpu/opengl/eagl/EAGLLayerTexture.h"
 
 namespace tgfx {
 std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
@@ -46,12 +48,21 @@ EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
   // do not retain layer here, otherwise it can cause circular reference.
 }
 
-std::shared_ptr<Drawable> EAGLWindow::onCreateDrawable(Context*) {
+std::shared_ptr<Drawable> EAGLWindow::onCreateDrawable(Context* context) {
   auto width = static_cast<int>(layer.bounds.size.width * layer.contentsScale);
   auto height = static_cast<int>(layer.bounds.size.height * layer.contentsScale);
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  return std::make_shared<EAGLDrawable>(layer, width, height, colorSpace);
+  // Release old layer texture to unbind the renderbuffer from the layer before creating a new one.
+  if (layerTexture != nullptr) {
+    layerTexture->release(static_cast<GLGPU*>(context->gpu()));
+    layerTexture = nullptr;
+  }
+  layerTexture = EAGLLayerTexture::MakeFrom(static_cast<GLGPU*>(context->gpu()), layer);
+  if (layerTexture == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<EAGLDrawable>(layerTexture, width, height, colorSpace);
 }
 }  // namespace tgfx
