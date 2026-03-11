@@ -309,9 +309,9 @@ void OpsCompositor::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matri
       localBounds = ToLocalBounds(clipBounds, state.matrix);
     } else {
       localBounds = ClipLocalBounds(shape->getBounds(), state.matrix, clipBounds);
-      if (localBounds->isEmpty()) {
-        return;
-      }
+    }
+    if (localBounds->isEmpty()) {
+      return;
     }
     drawScale = std::min(state.matrix.getMaxScale(), 1.0f);
   }
