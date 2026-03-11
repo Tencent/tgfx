@@ -37,6 +37,13 @@ class RenderTargetProxy;
  */
 class QGLDrawable : public Drawable {
  public:
+  /**
+   * Creates a new QGLDrawable backed by a GL texture for rendering within the Qt Scene Graph.
+   * @param quickItem the QQuickItem that owns the OpenGL texture for rendering.
+   * @param width the width of the drawable surface in pixels.
+   * @param height the height of the drawable surface in pixels.
+   * @param colorSpace optional color space for rendering. If nullptr, the default sRGB is used.
+   */
   QGLDrawable(QQuickItem* quickItem, int width, int height,
               std::shared_ptr<ColorSpace> colorSpace = nullptr);
   ~QGLDrawable() override;
