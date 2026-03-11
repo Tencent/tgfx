@@ -35,6 +35,9 @@ void ShapeInstancedLayer::setShape(std::shared_ptr<Shape> shape) {
 }
 
 void ShapeInstancedLayer::setMatrices(std::vector<Matrix> matrices) {
+  // Use memcmp instead of operator== for faster comparison on large arrays. Although Matrix is not
+  // a POD type (it has a mutable typeMask cache field), the worst case of memcmp mismatch is an
+  // extra invalidation, which is acceptable for the performance gain in dynamic instancing scenes.
   if (_matrices.size() == matrices.size() &&
       memcmp(_matrices.data(), matrices.data(), sizeof(Matrix) * matrices.size()) == 0) {
     return;
