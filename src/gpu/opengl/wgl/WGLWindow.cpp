@@ -19,6 +19,7 @@
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 #include "core/utils/Log.h"
 #include "gpu/opengl/wgl/WGLDrawable.h"
+#include "tgfx/core/Size.h"
 
 namespace tgfx {
 std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedContext,

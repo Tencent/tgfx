@@ -20,6 +20,9 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
+// X11/Xlib.h defines macros (e.g. None, Status) that conflict with C++ identifiers.
+#undef None
+#undef Status
 #include "gpu/opengl/GLDefines.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/gpu/Backend.h"
