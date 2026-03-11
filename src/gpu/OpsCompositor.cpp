@@ -325,9 +325,6 @@ void OpsCompositor::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matri
         auto instanceViewMatrix = state.matrix * matrices[i];
         unionDeviceBounds.join(instanceViewMatrix.mapRect(shapeBounds));
       }
-      if (!Rect::Intersects(unionDeviceBounds, clipBounds)) {
-        return;
-      }
       deviceBounds = unionDeviceBounds;
     }
   }
