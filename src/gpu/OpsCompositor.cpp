@@ -305,7 +305,11 @@ void OpsCompositor::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matri
   bool hasColors = colors != nullptr;
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, true);
   if (needLocalBounds) {
-    localBounds = ClipLocalBounds(shape->getBounds(), state.matrix, clipBounds);
+    if (shape->isInverseFillType()) {
+      localBounds = ToLocalBounds(clipBounds, state.matrix);
+    } else {
+      localBounds = ClipLocalBounds(shape->getBounds(), state.matrix, clipBounds);
+    }
     drawScale = std::min(state.matrix.getMaxScale(), 1.0f);
   }
   if (needDeviceBounds) {
