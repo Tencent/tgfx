@@ -17,13 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeInstancedDrawOp.h"
+#include "core/ColorSpaceXformSteps.h"
 #include "core/PathTriangulator.h"
 #include "core/utils/ColorHelper.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/resources/BufferResource.h"
 #include "tgfx/core/RenderFlags.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -39,7 +42,7 @@ struct InstanceRecordWithColor {
   float matrixCol0[2];
   float matrixCol1[2];
   float matrixCol2[2];
-  float color[4];  // [r, g, b, a] premultiplied
+  uint32_t color;  // UByte4Normalized premultiplied RGBA
 };
 
 PlacementPtr<ShapeInstancedDrawOp> ShapeInstancedDrawOp::Make(
@@ -126,24 +129,31 @@ PlacementPtr<GeometryProcessor> ShapeInstancedDrawOp::onMakeGeometryProcessor(
 
 void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass) {
   auto vertexBuffer = shapeProxy->getTriangles();
-  auto gpu = renderPass->gpu();
   bool hasInstanceColors = instanceColors != nullptr;
   size_t instanceStride =
       hasInstanceColors ? sizeof(InstanceRecordWithColor) : sizeof(InstanceRecord);
   size_t instanceBufferSize = instanceStride * instanceCount;
-  auto instanceBuffer = gpu->createBuffer(instanceBufferSize, GPUBufferUsage::VERTEX);
-  if (instanceBuffer == nullptr) {
+  auto bufferResource = BufferResource::FindOrCreate(shapeProxy->getContext(), instanceBufferSize,
+                                                     GPUBufferUsage::VERTEX);
+  if (bufferResource == nullptr) {
     LOGE("ShapeInstancedDrawOp::onDraw() Failed to create instance buffer!");
     return;
   }
-  auto buffer = static_cast<uint8_t*>(instanceBuffer->map());
+  auto instanceBuffer = bufferResource->gpuBuffer();
+  auto buffer = instanceBuffer->map();
   if (buffer == nullptr) {
     LOGE("ShapeInstancedDrawOp::onDraw() Failed to map instance buffer!");
     return;
   }
 
+  std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+  if (hasInstanceColors && NeedConvertColorSpace(ColorSpace::SRGB(), dstColorSpace)) {
+    steps =
+        std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                               dstColorSpace.get(), AlphaType::Premultiplied);
+  }
   for (size_t i = 0; i < instanceCount; i++) {
-    auto record = reinterpret_cast<InstanceRecord*>(buffer);
+    auto record = static_cast<InstanceRecord*>(buffer);
     auto& m = matrices[i];
     record->matrixCol0[0] = m.getScaleX();
     record->matrixCol0[1] = m.getSkewY();
@@ -152,14 +162,10 @@ void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass) {
     record->matrixCol2[0] = m.getTranslateX();
     record->matrixCol2[1] = m.getTranslateY();
     if (hasInstanceColors) {
-      auto colorRecord = reinterpret_cast<InstanceRecordWithColor*>(buffer);
-      auto pmColor = ToPMColor(instanceColors[i], dstColorSpace);
-      colorRecord->color[0] = pmColor.red;
-      colorRecord->color[1] = pmColor.green;
-      colorRecord->color[2] = pmColor.blue;
-      colorRecord->color[3] = pmColor.alpha;
+      auto colorRecord = static_cast<InstanceRecordWithColor*>(buffer);
+      colorRecord->color = ToUintPMColor(instanceColors[i], steps.get());
     }
-    buffer += instanceStride;
+    buffer = static_cast<uint8_t*>(buffer) + instanceStride;
   }
   instanceBuffer->unmap();
 

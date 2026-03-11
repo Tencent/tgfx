@@ -36,7 +36,7 @@ ShapeInstancedGeometryProcessor::ShapeInstancedGeometryProcessor(PMColor color, 
   matrixCol1 = {"aMatrixCol1", VertexFormat::Float2};
   matrixCol2 = {"aMatrixCol2", VertexFormat::Float2};
   if (hasColors) {
-    instanceColor = {"aColor", VertexFormat::Float4};
+    instanceColor = {"aColor", VertexFormat::UByte4Normalized};
   }
   setInstanceAttributes(&matrixCol0, 4);
 }
