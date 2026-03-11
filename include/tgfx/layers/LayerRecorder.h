@@ -83,7 +83,7 @@ class LayerRecorder {
    * per-instance colors.
    * @param shape The shape shared by all instances.
    * @param matrices Per-instance transformation matrices.
-   * @param colors Per-instance colors. Pass an empty vector to use paint color only.
+   * @param colors Per-instance colors. Pass an empty vector to use paint color or shader color only.
    * @param paint The paint style for the instances.
    */
   void addShapeInstanced(std::shared_ptr<Shape> shape, const std::vector<Matrix>& matrices,
