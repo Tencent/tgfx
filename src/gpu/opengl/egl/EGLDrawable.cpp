@@ -24,7 +24,7 @@
 #include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
-EGLDrawable::EGLDrawable(EGLDisplay display, EGLSurface surface, int width, int height,
+EGLDrawable::EGLDrawable(void* display, void* surface, int width, int height,
                          std::shared_ptr<ColorSpace> colorSpace)
     : Drawable(width, height, std::move(colorSpace)), eglDisplay(display), eglSurface(surface) {
 }
@@ -42,15 +42,17 @@ std::shared_ptr<RenderTargetProxy> EGLDrawable::getProxy(Context* context) {
 }
 
 void EGLDrawable::onPresent(Context*) {
+  auto display = static_cast<EGLDisplay>(eglDisplay);
+  auto surface = static_cast<EGLSurface>(eglSurface);
   if (presentationTime.has_value()) {
     static auto eglPresentationTimeANDROID = reinterpret_cast<PFNEGLPRESENTATIONTIMEANDROIDPROC>(
         eglGetProcAddress("eglPresentationTimeANDROID"));
     if (eglPresentationTimeANDROID) {
       // egl uses nano seconds
-      eglPresentationTimeANDROID(eglDisplay, eglSurface, *presentationTime * 1000);
+      eglPresentationTimeANDROID(display, surface, *presentationTime * 1000);
       presentationTime = std::nullopt;
     }
   }
-  eglSwapBuffers(eglDisplay, eglSurface);
+  eglSwapBuffers(display, surface);
 }
 }  // namespace tgfx

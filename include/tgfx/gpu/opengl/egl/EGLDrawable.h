@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <EGL/egl.h>
 #include <optional>
 #include "tgfx/gpu/Drawable.h"
 
@@ -31,9 +30,11 @@ namespace tgfx {
 class EGLDrawable : public Drawable {
  public:
   /**
-   * Creates a new EGLDrawable with the specified EGL display, surface, and dimensions.
+   * Creates a new EGLDrawable with the specified EGL display, surface, and dimensions. The
+   * eglDisplay and eglSurface parameters accept EGLDisplay and EGLSurface handles as void* to avoid
+   * pulling in EGL headers that conflict with X11 macros.
    */
-  EGLDrawable(EGLDisplay display, EGLSurface surface, int width, int height,
+  EGLDrawable(void* eglDisplay, void* eglSurface, int width, int height,
               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
@@ -48,8 +49,8 @@ class EGLDrawable : public Drawable {
   void onPresent(Context* context) override;
 
  private:
-  EGLDisplay eglDisplay = nullptr;
-  EGLSurface eglSurface = nullptr;
+  void* eglDisplay = nullptr;
+  void* eglSurface = nullptr;
   std::optional<int64_t> presentationTime = std::nullopt;
 };
 }  // namespace tgfx
