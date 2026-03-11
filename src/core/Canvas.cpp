@@ -398,6 +398,7 @@ void Canvas::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matrix matri
   }
   if (count == 1) {
     // Single instance degrades to regular drawShape for better optimization.
+    SaveLayerForImageFilter(paint.getImageFilter());
     auto state = *mcState;
     state.matrix.preConcat(matrices[0]);
     auto brush = paint.getBrush();
