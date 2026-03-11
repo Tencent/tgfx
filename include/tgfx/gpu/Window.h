@@ -66,6 +66,10 @@ class Window {
    */
   virtual std::shared_ptr<Drawable> onCreateDrawable(Context* context) = 0;
 
+  /**
+   * Called when the window size is invalidated. Subclasses can override this to clean up
+   * size-dependent resources (e.g., cached EGL surfaces). The default implementation does nothing.
+   */
   virtual void onInvalidSize();
 };
 }  // namespace tgfx
