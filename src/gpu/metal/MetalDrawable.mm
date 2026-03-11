@@ -35,6 +35,10 @@ static PixelFormat MTLPixelFormatToPixelFormat(MTLPixelFormat format) {
       return PixelFormat::ALPHA_8;
     case MTLPixelFormatRG8Unorm:
       return PixelFormat::RG_88;
+    case MTLPixelFormatBGRA8Unorm_sRGB:
+      return PixelFormat::BGRA_8888;
+    case MTLPixelFormatRGBA8Unorm_sRGB:
+      return PixelFormat::RGBA_8888;
     default:
       return PixelFormat::RGBA_8888;
   }
