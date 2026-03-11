@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeInstancedLayer.h"
+#include <cstring>
 #include "tgfx/layers/LayerPaint.h"
 
 namespace tgfx {
@@ -34,7 +35,8 @@ void ShapeInstancedLayer::setShape(std::shared_ptr<Shape> shape) {
 }
 
 void ShapeInstancedLayer::setMatrices(std::vector<Matrix> matrices) {
-  if (_matrices == matrices) {
+  if (_matrices.size() == matrices.size() &&
+      memcmp(_matrices.data(), matrices.data(), sizeof(Matrix) * matrices.size()) == 0) {
     return;
   }
   _matrices = std::move(matrices);
@@ -42,7 +44,8 @@ void ShapeInstancedLayer::setMatrices(std::vector<Matrix> matrices) {
 }
 
 void ShapeInstancedLayer::setColors(std::vector<Color> colors) {
-  if (_colors == colors) {
+  if (_colors.size() == colors.size() &&
+      memcmp(_colors.data(), colors.data(), sizeof(Color) * colors.size()) == 0) {
     return;
   }
   _colors = std::move(colors);
