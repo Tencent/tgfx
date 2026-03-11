@@ -156,11 +156,12 @@ std::shared_ptr<Drawable> QGLWindow::onCreateDrawable(Context*) {
   }
   auto maxCount = singleBufferMode ? 1 : 2;
   for (auto& drawable : drawables) {
-    if (drawable.use_count() == 1 && drawable->width() == width && drawable->height() == height) {
+    if (drawable.use_count() <= 2 && drawable->width() == width && drawable->height() == height) {
       return drawable;
     }
   }
   if (static_cast<int>(drawables.size()) >= maxCount) {
+    DEBUG_ASSERT(false);
     return nullptr;
   }
   auto drawable = std::make_shared<QGLDrawable>(quickItem, width, height, colorSpace);

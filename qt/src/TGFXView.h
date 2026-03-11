@@ -44,9 +44,10 @@ class TGFXView : public QQuickItem {
   int currentDrawerIndex = 0;
   int lastDrawIndex = -1;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
-  std::shared_ptr<tgfx::QGLDrawable> presentedDrawable = nullptr;
+  std::shared_ptr<tgfx::Drawable> presentedDrawable = nullptr;
   std::shared_ptr<tgfx::Drawable> lastDrawable = nullptr;
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
+  bool singleBufferMode = true;
   bool presentImmediately = false;
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
   tgfx::DisplayList displayList = {};

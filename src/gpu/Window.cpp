@@ -37,7 +37,6 @@ std::shared_ptr<Drawable> Window::getDrawable(Context* context, bool queryOnly) 
   if (currentDrawable != nullptr && currentDrawable->isReusable()) {
     return currentDrawable;
   }
-  currentDrawable = nullptr;
   currentDrawable = onCreateDrawable(context);
   return currentDrawable;
 }

@@ -87,7 +87,7 @@ void TGFXView::applyCenteringTransform() {
 
 QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   if (!tgfxWindow) {
-    tgfxWindow = tgfx::QGLWindow::MakeFrom(this, true);
+    tgfxWindow = tgfx::QGLWindow::MakeFrom(this, singleBufferMode);
     connect(window(), SIGNAL(sceneGraphInvalidated()), this, SLOT(onSceneGraphInvalidated()),
             Qt::DirectConnection);
   }
@@ -99,13 +99,16 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     lastSurfaceHeight = screenHeight;
     applyCenteringTransform();
     tgfxWindow->invalidSize();
+    lastDrawable = nullptr;
     presentImmediately = true;
   }
 
   draw();
 
   auto node = static_cast<QSGImageNode*>(oldNode);
-  auto texture = presentedDrawable ? presentedDrawable->getQSGTexture() : nullptr;
+  auto texture = presentedDrawable
+                     ? static_cast<tgfx::QGLDrawable*>(presentedDrawable.get())->getQSGTexture()
+                     : nullptr;
   if (texture) {
     if (node == nullptr) {
       node = window()->createImageNode();
@@ -160,7 +163,7 @@ void TGFXView::draw() {
     return;
   }
   auto previousDrawable = std::move(lastDrawable);
-  auto drawable = tgfxWindow->getDrawable(context);
+  auto drawable = tgfxWindow->getDrawable(context, previousDrawable && singleBufferMode);
   if (drawable == nullptr) {
     device->unlock();
     return;
@@ -176,25 +179,26 @@ void TGFXView::draw() {
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), pixelRatio);
   displayList.render(surface.get(), false);
   auto recording = context->flush();
-  if (presentImmediately || drawable == previousDrawable) {
+  if (presentImmediately) {
     presentImmediately = false;
     lastRecording = nullptr;
     if (recording) {
       context->submit(std::move(recording));
       drawable->present(context);
-      presentedDrawable = std::dynamic_pointer_cast<tgfx::QGLDrawable>(drawable);
+      presentedDrawable = drawable;
     }
   } else {
     std::swap(lastRecording, recording);
     if (recording) {
       context->submit(std::move(recording));
-      if (previousDrawable) {
-        previousDrawable->present(context);
-        presentedDrawable = std::dynamic_pointer_cast<tgfx::QGLDrawable>(previousDrawable);
-      }
+      previousDrawable->present(context);
+      presentedDrawable = previousDrawable;
     }
   }
   lastDrawable = drawable;
   device->unlock();
+  if (lastRecording) {
+    update();
+  }
 }
 }  // namespace hello2d
