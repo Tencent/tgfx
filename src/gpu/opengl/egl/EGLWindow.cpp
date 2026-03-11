@@ -26,6 +26,7 @@
 #include <WinUser.h>
 #endif
 #include "core/utils/USE.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/gpu/opengl/egl/EGLDrawable.h"
 
 namespace tgfx {
