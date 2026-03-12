@@ -33,8 +33,15 @@ std::vector<std::shared_ptr<Texture>> WGLGPU::importHardwareTextures(
   }
   auto info = HardwareBufferGetInfo(hardwareBuffer);
   if (info.format == HardwareBufferFormat::YCBCR_420_SP) {
-    // NV12 textures should be converted to BGRA before reaching here.
-    return {};
+    if (usage & TextureUsage::RENDER_ATTACHMENT) {
+      return {};
+    }
+    auto yTexture = WGLHardwareTexture::MakeFrom(this, hardwareBuffer, usage, 0);
+    auto uvTexture = WGLHardwareTexture::MakeFrom(this, hardwareBuffer, usage, 1);
+    if (yTexture == nullptr || uvTexture == nullptr) {
+      return {};
+    }
+    return {std::move(yTexture), std::move(uvTexture)};
   }
   auto texture = WGLHardwareTexture::MakeFrom(this, hardwareBuffer, usage);
   if (texture == nullptr) {

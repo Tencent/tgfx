@@ -41,12 +41,32 @@
 #ifndef GL_RGBA8
 #define GL_RGBA8 0x8058
 #endif
+#ifndef GL_R8
+#define GL_R8 0x8229
+#endif
+#ifndef GL_RG8
+#define GL_RG8 0x822B
+#endif
 #ifndef GL_TEXTURE_SWIZZLE_R
 #define GL_TEXTURE_SWIZZLE_R 0x8E42
 #endif
 #ifndef GL_TEXTURE_SWIZZLE_B
 #define GL_TEXTURE_SWIZZLE_B 0x8E44
 #endif
+
+// Minimal DXGI format constants for NV12 plane SRV creation
+#ifndef DXGI_FORMAT_R8_UNORM
+#define DXGI_FORMAT_R8_UNORM 61
+#endif
+#ifndef DXGI_FORMAT_R8G8_UNORM
+#define DXGI_FORMAT_R8G8_UNORM 49
+#endif
+
+// D3D11 SRV dimension constant
+#define D3D11_SRV_DIMENSION_TEXTURE2D 4
+
+// ID3D11Device::CreateShaderResourceView is vtable index 7
+static constexpr int kCreateSRVVtableIndex = 7;
 
 // WGL_NV_DX_interop function typedefs
 typedef HANDLE(WINAPI* PFNWGLDXOPENDEVICENVPROC)(void* dxDevice);
@@ -318,9 +338,50 @@ static bool IsMemoryObjectInteropAvailable() {
 }
 
 // ============================================================================
+// D3D11 SRV creation for NV12 planes via vtable
+// ============================================================================
+
+// D3D11_SHADER_RESOURCE_VIEW_DESC for Texture2D (minimal layout)
+struct D3D11SRVDesc {
+  unsigned int format = 0;         // DXGI_FORMAT
+  unsigned int viewDimension = 0;  // D3D11_SRV_DIMENSION
+  // D3D11_TEX2D_SRV
+  unsigned int mostDetailedMip = 0;
+  unsigned int mipLevels = 1;
+};
+
+typedef long(__stdcall* CreateSRVFn)(IUnknown* self, IUnknown* pResource, const D3D11SRVDesc* pDesc,
+                                     void** ppSRView);
+
+// Creates a per-plane SRV from a D3D11 NV12 texture. Returns nullptr on failure.
+// planeIndex 0 = Y plane (DXGI_FORMAT_R8_UNORM), 1 = UV plane (DXGI_FORMAT_R8G8_UNORM).
+static IUnknown* CreateD3D11NV12PlaneSRV(void* d3d11Device, void* d3d11Texture, int planeIndex) {
+  if (!d3d11Device || !d3d11Texture) {
+    return nullptr;
+  }
+  D3D11SRVDesc desc = {};
+  desc.format = (planeIndex == 0) ? DXGI_FORMAT_R8_UNORM : DXGI_FORMAT_R8G8_UNORM;
+  desc.viewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+  desc.mostDetailedMip = 0;
+  desc.mipLevels = 1;
+  auto vtable = *reinterpret_cast<void***>(d3d11Device);
+  auto createSRV = reinterpret_cast<CreateSRVFn>(vtable[kCreateSRVVtableIndex]);
+  void* srv = nullptr;
+  long hr = createSRV(static_cast<IUnknown*>(d3d11Device), static_cast<IUnknown*>(d3d11Texture),
+                      &desc, &srv);
+  if (FAILED(hr) || !srv) {
+    LOGE("WGLHardwareTexture: Failed to create NV12 plane SRV (plane=%d), hr=0x%08X", planeIndex,
+         hr);
+    return nullptr;
+  }
+  return static_cast<IUnknown*>(srv);
+}
+
+// ============================================================================
 // D3D11→GL import via memory_object (KMT handle)
 // ============================================================================
 static unsigned ImportViaMemoryObject(void* d3d11Texture, int width, int height,
+                                      unsigned internalFormat, uint64_t planeOffset,
                                       unsigned* outMemoryObject) {
   if (!glCreateMemoryObjectsEXT || !glImportMemoryWin32HandleEXT || !glTexStorageMem2DEXT) {
     return 0;
@@ -377,7 +438,7 @@ static unsigned ImportViaMemoryObject(void* d3d11Texture, int width, int height,
   }
 
   glBindTexture(GL_TEXTURE_2D, glTextureId);
-  glTexStorageMem2DEXT(GL_TEXTURE_2D, 1, GL_RGBA8, width, height, glMemObj, 0);
+  glTexStorageMem2DEXT(GL_TEXTURE_2D, 1, internalFormat, width, height, glMemObj, planeOffset);
 
   err = glGetError();
   if (err != GL_NO_ERROR) {
@@ -405,7 +466,7 @@ static unsigned ImportViaMemoryObject(void* d3d11Texture, int width, int height,
 // ============================================================================
 // D3D11→GL import via WGL_NV_DX_interop
 // ============================================================================
-static unsigned ImportViaWglDX(void* d3d11Device, void* d3d11Texture, void** outInteropDevice,
+static unsigned ImportViaWglDX(void* d3d11Device, void* dxObject, void** outInteropDevice,
                                void** outInteropTexture) {
   if (!wglDXRegisterObjectNV) {
     return 0;
@@ -424,7 +485,7 @@ static unsigned ImportViaWglDX(void* d3d11Device, void* d3d11Texture, void** out
     return 0;
   }
 
-  void* interopTex = wglDXRegisterObjectNV(interopDev, d3d11Texture, glTextureId, GL_TEXTURE_2D,
+  void* interopTex = wglDXRegisterObjectNV(interopDev, dxObject, glTextureId, GL_TEXTURE_2D,
                                            WGL_ACCESS_READ_ONLY_NV);
   if (!interopTex) {
     LOGE("WGLHardwareTexture: Failed to register D3D11 texture with OpenGL.");
@@ -483,39 +544,71 @@ WGLHardwareTexture::~WGLHardwareTexture() {
 
 std::shared_ptr<WGLHardwareTexture> WGLHardwareTexture::MakeFrom(WGLGPU* gpu,
                                                                  HardwareBufferRef hardwareBuffer,
-                                                                 uint32_t usage) {
+                                                                 uint32_t usage, int planeIndex) {
   if (!gpu || !HardwareBufferCheck(hardwareBuffer)) {
     return nullptr;
   }
   auto info = HardwareBufferGetInfo(hardwareBuffer);
-  if (info.format == HardwareBufferFormat::Unknown ||
-      info.format == HardwareBufferFormat::YCBCR_420_SP) {
+  if (info.format == HardwareBufferFormat::Unknown) {
     return nullptr;
   }
 
-  auto pixelFormat = PixelFormat::Unknown;
-  bool needSwizzle = false;
-  switch (info.format) {
-    case HardwareBufferFormat::BGRA_8888:
-      pixelFormat = PixelFormat::BGRA_8888;
-      needSwizzle = true;
-      break;
-    case HardwareBufferFormat::RGBA_8888:
-      pixelFormat = PixelFormat::RGBA_8888;
-      break;
-    case HardwareBufferFormat::ALPHA_8:
-      pixelFormat = PixelFormat::ALPHA_8;
-      break;
-    default:
-      return nullptr;
+  bool isNV12 = info.format == HardwareBufferFormat::YCBCR_420_SP;
+  if (isNV12 && (planeIndex < 0 || planeIndex > 1)) {
+    return nullptr;
+  }
+  if (!isNV12 && planeIndex != 0) {
+    return nullptr;
   }
 
-  TextureDescriptor descriptor = {info.width, info.height, pixelFormat, false, 1, usage};
+  // Determine per-plane dimensions, GL internal format, and pixel format.
+  int planeWidth = info.width;
+  int planeHeight = info.height;
+  unsigned glInternalFormat = 0;
+  uint64_t memObjPlaneOffset = 0;
+  auto pixelFormat = PixelFormat::Unknown;
+  bool needSwizzle = false;
+
+  if (isNV12) {
+    if (planeIndex == 0) {
+      glInternalFormat = GL_R8;
+      pixelFormat = PixelFormat::GRAY_8;
+      memObjPlaneOffset = 0;
+    } else {
+      planeWidth = info.width / 2;
+      planeHeight = info.height / 2;
+      glInternalFormat = GL_RG8;
+      pixelFormat = PixelFormat::RG_88;
+      // UV plane follows the Y plane in NV12 memory layout.
+      memObjPlaneOffset = static_cast<uint64_t>(info.width) * info.height;
+    }
+  } else {
+    switch (info.format) {
+      case HardwareBufferFormat::BGRA_8888:
+        pixelFormat = PixelFormat::BGRA_8888;
+        glInternalFormat = GL_RGBA8;
+        needSwizzle = true;
+        break;
+      case HardwareBufferFormat::RGBA_8888:
+        pixelFormat = PixelFormat::RGBA_8888;
+        glInternalFormat = GL_RGBA8;
+        break;
+      case HardwareBufferFormat::ALPHA_8:
+        pixelFormat = PixelFormat::ALPHA_8;
+        glInternalFormat = GL_R8;
+        break;
+      default:
+        return nullptr;
+    }
+  }
+
+  TextureDescriptor descriptor = {planeWidth, planeHeight, pixelFormat, false, 1, usage};
 
   // Try memory_object path first
   if (IsMemoryObjectInteropAvailable()) {
     unsigned memObj = 0;
-    unsigned glTextureId = ImportViaMemoryObject(hardwareBuffer, info.width, info.height, &memObj);
+    unsigned glTextureId = ImportViaMemoryObject(hardwareBuffer, planeWidth, planeHeight,
+                                                 glInternalFormat, memObjPlaneOffset, &memObj);
     if (glTextureId != 0) {
       auto texture = gpu->makeResource<WGLHardwareTexture>(
           descriptor, hardwareBuffer, static_cast<unsigned>(GL_TEXTURE_2D), glTextureId);
@@ -537,9 +630,22 @@ std::shared_ptr<WGLHardwareTexture> WGLHardwareTexture::MakeFrom(WGLGPU* gpu,
       LOGE("WGLHardwareTexture: Failed to get D3D11 device from texture.");
       return nullptr;
     }
+    // For NV12, register a per-plane SRV rather than the raw texture.
+    IUnknown* srvToRelease = nullptr;
+    void* dxObject = hardwareBuffer;
+    if (isNV12) {
+      srvToRelease = CreateD3D11NV12PlaneSRV(d3dDevice, hardwareBuffer, planeIndex);
+      if (!srvToRelease) {
+        return nullptr;
+      }
+      dxObject = srvToRelease;
+    }
     void* interopDev = nullptr;
     void* interopTex = nullptr;
-    unsigned glTextureId = ImportViaWglDX(d3dDevice, hardwareBuffer, &interopDev, &interopTex);
+    unsigned glTextureId = ImportViaWglDX(d3dDevice, dxObject, &interopDev, &interopTex);
+    if (srvToRelease) {
+      srvToRelease->Release();
+    }
     if (glTextureId != 0) {
       auto texture = gpu->makeResource<WGLHardwareTexture>(
           descriptor, hardwareBuffer, static_cast<unsigned>(GL_TEXTURE_2D), glTextureId);

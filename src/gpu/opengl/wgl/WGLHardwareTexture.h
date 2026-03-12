@@ -29,7 +29,7 @@ namespace tgfx {
 class WGLHardwareTexture : public GLTexture {
  public:
   static std::shared_ptr<WGLHardwareTexture> MakeFrom(WGLGPU* gpu, HardwareBufferRef hardwareBuffer,
-                                                      uint32_t usage);
+                                                      uint32_t usage, int planeIndex = 0);
   ~WGLHardwareTexture() override;
 
   HardwareBufferRef getHardwareBuffer() const override {
