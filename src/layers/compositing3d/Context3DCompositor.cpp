@@ -160,7 +160,7 @@ void Context3DCompositor::drawQuads(const DrawPolygon3D* polygon,
   auto allocator = context->drawingAllocator();
   // Wrap alpha as vertex color to enable semi-transparent pixel blending.
   Color vertexColor(1, 1, 1, polygon->alpha());
-  auto matrix = Matrix3DUtils::GetMayLossyMatrix(polygon->matrix());
+  auto matrix = polygon->matrix().asMatrix();
   std::vector<PlacementPtr<QuadRecord>> quadRecords;
   if (subQuads.empty()) {
     auto [quad, aaFlags] = GetQuadAndAAFlags(originalRect, aaType, nullptr);
