@@ -770,7 +770,7 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
 }
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {
-  auto matrix = getRelativeMatrix(targetCoordinateSpace);
+  auto matrix = getRelativeMatrix3D(targetCoordinateSpace);
   return getBoundsInternal(matrix, computeTightBounds);
 }
 
@@ -839,7 +839,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
       }
     }
     if (child->hasValidMask()) {
-      auto maskRelativeMatrix = child->_mask->getRelativeMatrix(child.get());
+      auto maskRelativeMatrix = child->_mask->getRelativeMatrix3D(child.get());
       maskRelativeMatrix.postConcat(childMatrix);
       auto maskBounds = child->_mask->getBoundsInternal(maskRelativeMatrix, computeTightBounds);
       if (!childBounds.intersect(maskBounds)) {
@@ -874,8 +874,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
 }
 
 Point Layer::globalToLocal(const Point& globalPoint) const {
-  auto globalMatrix = getGlobalMatrix();
-  auto matrix = Matrix3DUtils::GetMayLossyMatrix(globalMatrix);
+  auto matrix = getGlobalMatrix().asMatrix();
   Matrix inversedMatrix;
   if (!matrix.invert(&inversedMatrix)) {
     DEBUG_ASSERT(false);
@@ -892,12 +891,22 @@ Point Layer::localToGlobal(const Point& localPoint) const {
   return {result.x, result.y};
 }
 
-Matrix Layer::relativeMatrix(const Layer* target) const {
-  return Matrix3DUtils::GetMayLossyMatrix(getRelativeMatrix(target));
+Matrix Layer::getRelativeMatrix(const Layer* target) const {
+  return getRelativeMatrix3D(target).asMatrix();
 }
 
-Matrix Layer::globalMatrix() const {
-  return Matrix3DUtils::GetMayLossyMatrix(getGlobalMatrix());
+Matrix3D Layer::getRelativeMatrix3D(const Layer* target) const {
+  if (target == nullptr || target == this) {
+    return {};
+  }
+  auto targetMatrix = target->getGlobalMatrix();
+  Matrix3D targetInverseMatrix = {};
+  if (!targetMatrix.invert(&targetInverseMatrix)) {
+    return {};
+  }
+  Matrix3D matrix = getGlobalMatrix();
+  matrix.postConcat(targetInverseMatrix);
+  return matrix;
 }
 
 bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
@@ -994,14 +1003,14 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     auto scale = canvas->getMatrix().getMaxScale();
     auto backgroundRect = clippedBounds;
     backgroundRect.scale(scale, scale);
-    auto backgroundMatrix = Matrix3DUtils::GetMayLossyMatrix(globalToLocalMatrix);
+    auto backgroundMatrix = globalToLocalMatrix.asMatrix();
     backgroundMatrix.postScale(scale, scale);
     if (auto backgroundContext =
             createBackgroundContext(context, backgroundRect, backgroundMatrix,
                                     bounds == clippedBounds, surface->colorSpace())) {
       auto backgroundCanvas = backgroundContext->getCanvas();
       auto actualMatrix = backgroundCanvas->getMatrix();
-      actualMatrix.preConcat(Matrix3DUtils::GetMayLossyMatrix(localToGlobalMatrix));
+      actualMatrix.preConcat(localToGlobalMatrix.asMatrix());
       backgroundCanvas->setMatrix(actualMatrix);
       Point offset = {};
       auto image = getBackgroundImage(args, scale, &offset);
@@ -1216,20 +1225,6 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   return true;
 }
 
-Matrix3D Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
-  if (targetCoordinateSpace == nullptr || targetCoordinateSpace == this) {
-    return {};
-  }
-  auto targetLayerMatrix = targetCoordinateSpace->getGlobalMatrix();
-  Matrix3D targetLayerInverseMatrix = {};
-  if (!targetLayerMatrix.invert(&targetLayerInverseMatrix)) {
-    return {};
-  }
-  Matrix3D relativeMatrix = getGlobalMatrix();
-  relativeMatrix.postConcat(targetLayerInverseMatrix);
-  return relativeMatrix;
-}
-
 bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
                         std::shared_ptr<MaskFilter>* maskFilter) {
   if (!hasValidMask()) {
@@ -1265,7 +1260,7 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   auto maskCanPreserve3D = _mask->canPreserve3D();
   // When mask enables 3D context, the full 3D relative matrix is handled by the 3D context.
   // Otherwise, use the 2D projection of the relative matrix on canvas.
-  auto canvasMatrix = Matrix3DUtils::GetMayLossyMatrix(relativeMatrix3D);
+  auto canvasMatrix = relativeMatrix3D.asMatrix();
   if (isContourMode) {
     auto drawMask = [&](Canvas* canvas, OpaqueContext* opaqueContext) {
       maskArgs.opaqueContext = opaqueContext;
@@ -1298,7 +1293,7 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   auto isContourMode = maskType == LayerMaskType::Contour;
 
-  auto relativeMatrix3D = _mask->getRelativeMatrix(this);
+  auto relativeMatrix3D = _mask->getRelativeMatrix3D(this);
   auto maskPicture = getMaskPicture(args, isContourMode, scale, relativeMatrix3D);
   if (maskPicture == nullptr) {
     return {};
@@ -1962,8 +1957,7 @@ bool Layer::drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, f
   auto context3D = childArgs.render3DContext.get();
   // For layers outside a 3D context, matrices are applied to the canvas directly.
   // For layers inside a 3D context, matrices are handled by render3DContext.
-  const auto canvasMatrix =
-      context3D == nullptr ? Matrix3DUtils::GetMayLossyMatrix(childTransform3D) : Matrix::I();
+  const auto canvasMatrix = context3D == nullptr ? childTransform3D.asMatrix() : Matrix::I();
   const auto* scrollRectTransform = context3D == nullptr ? nullptr : &childTransform3D;
   canvas->concat(canvasMatrix);
   ClipScrollRect(canvas, child->_scrollRect.get(), scrollRectTransform);
@@ -2006,7 +2000,7 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
   auto currentAlpha = _parent->drawBackgroundLayers(args, canvas);
   auto layerStyleSource = _parent->getLayerStyleSource(args, canvas->getMatrix());
   _parent->drawContents(args, canvas, currentAlpha, layerStyleSource.get(), this);
-  canvas->concat(Matrix3DUtils::GetMayLossyMatrix(getMatrixWithScrollRect()));
+  canvas->concat(getMatrixWithScrollRect().asMatrix());
   if (_scrollRect) {
     canvas->clipRect(*_scrollRect);
   }
@@ -2092,7 +2086,7 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
   canvas->scale(contentScale, contentScale);
-  auto localToGlobalMatrix = Matrix3DUtils::GetMayLossyMatrix(getGlobalMatrix());
+  auto localToGlobalMatrix = getGlobalMatrix().asMatrix();
   Matrix globalToLocalMatrix = {};
   if (!localToGlobalMatrix.invert(&globalToLocalMatrix)) {
     return nullptr;
@@ -2320,8 +2314,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       childTransformer = RegionTransformer::MakeFromMatrix3D(childMatrix, transformer, true);
     } else {
       // Child is outside 3D context - project to 2D plane.
-      childTransformer = RegionTransformer::MakeFromMatrix(
-          Matrix3DUtils::GetMayLossyMatrix(childMatrix), transformer);
+      childTransformer = RegionTransformer::MakeFromMatrix(childMatrix.asMatrix(), transformer);
     }
     std::optional<Rect> clipRect = std::nullopt;
     if (child->_scrollRect) {
@@ -2383,8 +2376,7 @@ void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    auto childTransformer = RegionTransformer::MakeFromMatrix(
-        Matrix3DUtils::GetMayLossyMatrix(childMatrix), transformer);
+    auto childTransformer = RegionTransformer::MakeFromMatrix(childMatrix.asMatrix(), transformer);
     child->checkBackgroundStyles(childTransformer);
   }
   updateBackgroundBounds(transformer ? transformer->getMaxScale() : 1.0f);
