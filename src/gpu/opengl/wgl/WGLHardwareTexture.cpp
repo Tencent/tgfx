@@ -511,12 +511,11 @@ std::shared_ptr<WGLHardwareTexture> WGLHardwareTexture::MakeFrom(WGLGPU* gpu,
   }
 
   TextureDescriptor descriptor = {info.width, info.height, pixelFormat, false, 1, usage};
-  void* d3d11Tex = hardwareBuffer;  // HardwareBufferRef == void* == ID3D11Texture2D*
 
   // Try memory_object path first
   if (IsMemoryObjectInteropAvailable()) {
     unsigned memObj = 0;
-    unsigned glTextureId = ImportViaMemoryObject(d3d11Tex, info.width, info.height, &memObj);
+    unsigned glTextureId = ImportViaMemoryObject(hardwareBuffer, info.width, info.height, &memObj);
     if (glTextureId != 0) {
       auto texture = gpu->makeResource<WGLHardwareTexture>(
           descriptor, hardwareBuffer, static_cast<unsigned>(GL_TEXTURE_2D), glTextureId);
@@ -533,14 +532,14 @@ std::shared_ptr<WGLHardwareTexture> WGLHardwareTexture::MakeFrom(WGLGPU* gpu,
 
   // Fall back to WGL_NV_DX_interop
   if (IsNVDXInteropAvailable()) {
-    void* d3dDevice = GetDeviceFromTexture(d3d11Tex);
+    void* d3dDevice = GetDeviceFromTexture(hardwareBuffer);
     if (!d3dDevice) {
       LOGE("WGLHardwareTexture: Failed to get D3D11 device from texture.");
       return nullptr;
     }
     void* interopDev = nullptr;
     void* interopTex = nullptr;
-    unsigned glTextureId = ImportViaWglDX(d3dDevice, d3d11Tex, &interopDev, &interopTex);
+    unsigned glTextureId = ImportViaWglDX(d3dDevice, hardwareBuffer, &interopDev, &interopTex);
     if (glTextureId != 0) {
       auto texture = gpu->makeResource<WGLHardwareTexture>(
           descriptor, hardwareBuffer, static_cast<unsigned>(GL_TEXTURE_2D), glTextureId);

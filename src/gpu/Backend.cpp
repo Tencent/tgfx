@@ -83,9 +83,6 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
     case Backend::Metal:
       metalInfo = that.metalInfo;
       break;
-    case Backend::D3D11:
-      d3d11Texture = that.d3d11Texture;
-      break;
     default:
       break;
   }
@@ -101,8 +98,6 @@ PixelFormat BackendTexture::format() const {
       return GLSizeFormatToPixelFormat(glInfo.format);
     case Backend::Metal:
       return MetalPixelFormatToPixelFormat(metalInfo.format);
-    case Backend::D3D11:
-      return PixelFormat::BGRA_8888;
     default:
       break;
   }
@@ -123,13 +118,6 @@ bool BackendTexture::getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) con
   }
   *metalTextureInfo = metalInfo;
   return true;
-}
-
-void* BackendTexture::getD3D11Texture() const {
-  if (!isValid() || _backend != Backend::D3D11) {
-    return nullptr;
-  }
-  return d3d11Texture;
 }
 
 BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& that) {
