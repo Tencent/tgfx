@@ -20,6 +20,7 @@
 
 #include <memory>
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/gpu/CommandBuffer.h"
 #include "tgfx/gpu/ImageOrigin.h"
 #include "tgfx/gpu/PixelFormat.h"
 
@@ -76,7 +77,7 @@ class Drawable {
   virtual ImageOrigin onGetOrigin() const;
   virtual int onGetSampleCount() const;
   virtual std::shared_ptr<RenderTarget> onCreateRenderTarget(Context* context);
-  virtual void onPresent(Context* context) = 0;
+  virtual void onPresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) = 0;
 
   DrawableProxy* _proxy = nullptr;
 
@@ -88,7 +89,7 @@ class Drawable {
 
   std::shared_ptr<DrawableProxy> getProxy(Context* context);
   virtual std::shared_ptr<DrawableProxy> onCreateProxy(Context* context);
-  void present(Context* context);
+  void present(Context* context, std::shared_ptr<CommandBuffer> commandBuffer);
 
   friend class DrawableProxy;
   friend class Surface;

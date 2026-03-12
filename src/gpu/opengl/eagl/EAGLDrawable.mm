@@ -39,7 +39,7 @@ std::shared_ptr<RenderTarget> EAGLDrawable::onCreateRenderTarget(Context* contex
   return RenderTarget::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
 }
 
-void EAGLDrawable::onPresent(Context* context) {
+void EAGLDrawable::onPresent(Context* context, std::shared_ptr<CommandBuffer>) {
   auto texture = layerTexture.lock();
   if (texture == nullptr) {
     return;

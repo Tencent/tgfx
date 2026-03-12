@@ -54,7 +54,7 @@ class QGLDrawable : public Drawable {
   bool isReusable() const override {
     return false;
   }
-  void onPresent(Context* context) override;
+  void onPresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) override;
 
  private:
   QQuickItem* quickItem = nullptr;

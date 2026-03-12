@@ -29,7 +29,7 @@ class WGLDrawable : public GLDrawable {
 
  protected:
   std::shared_ptr<RenderTarget> onCreateRenderTarget(Context* context) override;
-  void onPresent(Context* context) override;
+  void onPresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) override;
 
  private:
   HDC deviceContext = nullptr;

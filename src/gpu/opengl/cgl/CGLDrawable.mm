@@ -40,7 +40,7 @@ std::shared_ptr<RenderTarget> CGLDrawable::onCreateRenderTarget(Context* context
   return RenderTarget::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
 }
 
-void CGLDrawable::onPresent(Context*) {
+void CGLDrawable::onPresent(Context*, std::shared_ptr<CommandBuffer>) {
   [glContext flushBuffer];
 }
 }  // namespace tgfx

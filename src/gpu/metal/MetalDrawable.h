@@ -34,7 +34,7 @@ class MetalDrawable : public Drawable {
   }
   ImageOrigin onGetOrigin() const override;
   PixelFormat onGetPixelFormat() const override;
-  void onPresent(Context* context) override;
+  void onPresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) override;
 
  private:
   CAMetalLayer* metalLayer = nil;

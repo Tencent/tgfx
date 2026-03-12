@@ -52,9 +52,9 @@ std::shared_ptr<DrawableProxy> Drawable::onCreateProxy(Context* context) {
   return std::make_shared<DrawableProxy>(context, this);
 }
 
-void Drawable::present(Context* context) {
+void Drawable::present(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) {
   FRAME_MARK;
   DEBUG_ASSERT(context != nullptr);
-  onPresent(context);
+  onPresent(context, std::move(commandBuffer));
 }
 }  // namespace tgfx

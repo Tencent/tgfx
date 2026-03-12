@@ -45,7 +45,7 @@ std::shared_ptr<RenderTarget> EGLDrawable::onCreateRenderTarget(Context* context
   return RenderTarget::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
 }
 
-void EGLDrawable::onPresent(Context*) {
+void EGLDrawable::onPresent(Context*, std::shared_ptr<CommandBuffer>) {
   auto display = static_cast<EGLDisplay>(eglDisplay);
   auto surface = static_cast<EGLSurface>(eglSurface);
   if (presentationTime.has_value()) {

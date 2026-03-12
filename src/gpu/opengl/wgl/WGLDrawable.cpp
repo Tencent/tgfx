@@ -34,7 +34,7 @@ std::shared_ptr<RenderTarget> WGLDrawable::onCreateRenderTarget(Context* context
   return RenderTarget::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
 }
 
-void WGLDrawable::onPresent(Context*) {
+void WGLDrawable::onPresent(Context*, std::shared_ptr<CommandBuffer>) {
   SwapBuffers(deviceContext);
 }
 }  // namespace tgfx

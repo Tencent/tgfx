@@ -85,9 +85,8 @@ std::unique_ptr<Recording> Context::flush(BackendSemaphore* signalSemaphore) {
   _atlasManager->postFlush();
   _proxyProvider->purgeExpiredProxies();
   pendingDrawingBuffers.push_back(drawingBuffer);
-  return std::unique_ptr<Recording>(new Recording(uniqueID(), drawingBuffer->uniqueID(),
-                                                  drawingBuffer->generation(),
-                                                  std::move(drawingBuffer->drawables)));
+  return std::unique_ptr<Recording>(
+      new Recording(uniqueID(), drawingBuffer->uniqueID(), drawingBuffer->generation()));
 }
 
 std::shared_ptr<DrawingBuffer> Context::getDrawingBuffer(const Recording* recording) const {
@@ -113,25 +112,23 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
   _resourceCache->processUnreferencedResources();
   auto queue = gpu()->queue();
   auto targetBuffer = getDrawingBuffer(recording.get());
-  std::vector<Drawable*> drawablesToPresent;
   if (targetBuffer != nullptr) {
     while (!pendingDrawingBuffers.empty()) {
       auto drawingBuffer = pendingDrawingBuffers.front();
       auto commandBuffer = drawingBuffer->encode();
       _resourceCache->advanceFrameAndPurge();
+      for (auto* drawable : drawingBuffer->drawables) {
+        drawable->present(this, commandBuffer);
+      }
       queue->submit(std::move(commandBuffer));
       pendingDrawingBuffers.pop_front();
       if (drawingBuffer == targetBuffer) {
         break;
       }
     }
-    drawablesToPresent = std::move(recording->drawables);
   }
   if (syncCpu) {
     queue->waitUntilCompleted();
-  }
-  for (auto* drawable : drawablesToPresent) {
-    drawable->present(this);
   }
 }
 

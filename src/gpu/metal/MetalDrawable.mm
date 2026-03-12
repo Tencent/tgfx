@@ -18,10 +18,8 @@
 
 #include "MetalDrawable.h"
 #import <Metal/Metal.h>
-#include "MetalCommandQueue.h"
+#include "MetalCommandBuffer.h"
 #include "MetalDrawableProxy.h"
-#include "MetalGPU.h"
-#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 
@@ -62,16 +60,13 @@ std::shared_ptr<DrawableProxy> MetalDrawable::onCreateProxy(Context* context) {
   return std::make_shared<MetalDrawableProxy>(context, this, metalLayer, pixelFormat);
 }
 
-void MetalDrawable::onPresent(Context* context) {
+void MetalDrawable::onPresent(Context*, std::shared_ptr<CommandBuffer> commandBuffer) {
   auto metalProxy = static_cast<MetalDrawableProxy*>(_proxy);
   auto drawable = metalProxy->getMetalDrawable();
   if (drawable == nil) {
     return;
   }
-  auto metalGPU = static_cast<MetalGPU*>(context->gpu());
-  auto queue = static_cast<MetalCommandQueue*>(metalGPU->queue());
-  auto commandBuffer = [queue->metalCommandQueue() commandBuffer];
-  [commandBuffer presentDrawable:drawable];
-  [commandBuffer commit];
+  auto metalCB = std::static_pointer_cast<MetalCommandBuffer>(commandBuffer);
+  [metalCB->metalCommandBuffer() presentDrawable:drawable];
 }
 }  // namespace tgfx

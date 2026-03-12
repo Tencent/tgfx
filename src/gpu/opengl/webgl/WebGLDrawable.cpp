@@ -34,6 +34,6 @@ std::shared_ptr<RenderTarget> WebGLDrawable::onCreateRenderTarget(Context* conte
   return RenderTarget::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
 }
 
-void WebGLDrawable::onPresent(Context*) {
+void WebGLDrawable::onPresent(Context*, std::shared_ptr<CommandBuffer>) {
 }
 }  // namespace tgfx

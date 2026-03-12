@@ -65,7 +65,7 @@ std::shared_ptr<DrawableProxy> QGLDrawable::onCreateProxy(Context* context) {
   return std::make_shared<QGLDrawableProxy>(context, this);
 }
 
-void QGLDrawable::onPresent(Context*) {
+void QGLDrawable::onPresent(Context*, std::shared_ptr<CommandBuffer>) {
   if (textureID == 0 && _proxy != nullptr) {
     auto textureView = _proxy->getTextureView();
     if (textureView != nullptr) {
