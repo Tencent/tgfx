@@ -35,6 +35,9 @@
 #ifndef GL_RGBA8
 #define GL_RGBA8 0x8058
 #endif
+#ifndef GL_R8
+#define GL_R8 0x8229
+#endif
 #ifndef GL_TEXTURE_SWIZZLE_R
 #define GL_TEXTURE_SWIZZLE_R 0x8E42
 #endif
@@ -48,7 +51,7 @@ namespace tgfx {
 // D3D11→GL import via memory_object (KMT handle)
 // ============================================================================
 static unsigned ImportViaMemoryObject(WGLGPU* gpu, void* d3d11Texture, int width, int height,
-                                      unsigned* outMemoryObject) {
+                                      unsigned glInternalFormat, unsigned* outMemoryObject) {
   auto* state = gpu->getInteropState();
   if (!state->glCreateMemoryObjectsEXT || !state->glImportMemoryWin32HandleEXT ||
       !state->glTexStorageMem2DEXT) {
@@ -110,7 +113,7 @@ static unsigned ImportViaMemoryObject(WGLGPU* gpu, void* d3d11Texture, int width
   }
 
   glBindTexture(GL_TEXTURE_2D, glTextureId);
-  state->glTexStorageMem2DEXT(GL_TEXTURE_2D, 1, GL_RGBA8, width, height, glMemObj, 0);
+  state->glTexStorageMem2DEXT(GL_TEXTURE_2D, 1, glInternalFormat, width, height, glMemObj, 0);
 
   err = glGetError();
   if (err != GL_NO_ERROR) {
@@ -215,6 +218,7 @@ std::shared_ptr<WGLHardwareTexture> WGLHardwareTexture::MakeFrom(WGLGPU* gpu,
   }
 
   auto pixelFormat = PixelFormat::Unknown;
+  unsigned glInternalFormat = GL_RGBA8;
   bool needSwizzle = false;
   switch (info.format) {
     case HardwareBufferFormat::BGRA_8888:
@@ -226,6 +230,7 @@ std::shared_ptr<WGLHardwareTexture> WGLHardwareTexture::MakeFrom(WGLGPU* gpu,
       break;
     case HardwareBufferFormat::ALPHA_8:
       pixelFormat = PixelFormat::ALPHA_8;
+      glInternalFormat = GL_R8;
       break;
     default:
       return nullptr;
@@ -237,7 +242,7 @@ std::shared_ptr<WGLHardwareTexture> WGLHardwareTexture::MakeFrom(WGLGPU* gpu,
   if (gpu->isMemoryObjectInteropAvailable()) {
     unsigned memObj = 0;
     unsigned glTextureId =
-        ImportViaMemoryObject(gpu, hardwareBuffer, info.width, info.height, &memObj);
+        ImportViaMemoryObject(gpu, hardwareBuffer, info.width, info.height, glInternalFormat, &memObj);
     if (glTextureId != 0) {
       auto texture = gpu->makeResource<WGLHardwareTexture>(
           descriptor, hardwareBuffer, static_cast<unsigned>(GL_TEXTURE_2D), glTextureId);
