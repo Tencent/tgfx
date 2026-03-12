@@ -117,7 +117,7 @@ std::shared_ptr<RenderPipeline> InstancedGridRenderPass::createPipeline(GPU* gpu
   colorAttachment.srcAlphaBlendFactor = tgfx::BlendFactor::One;
   colorAttachment.dstAlphaBlendFactor = tgfx::BlendFactor::OneMinusSrcAlpha;
   descriptor.fragment.colorAttachments.push_back(colorAttachment);
-  descriptor.layout.uniformBlocks = {{"Args", 0}};
+  descriptor.layout.uniformBlocks = {{"Args", 0, ShaderVisibility::Vertex}};
   return gpu->createRenderPipeline(descriptor);
 }
 

@@ -74,6 +74,34 @@ class MetalRenderPass : public RenderPass {
   id<MTLRenderCommandEncoder> renderEncoder = nil;
   std::shared_ptr<MetalRenderPipeline> currentPipeline = nullptr;
 
+  // Cached scissor rect to avoid redundant Metal API calls.
+  int lastScissorX = -1;
+  int lastScissorY = -1;
+  int lastScissorWidth = -1;
+  int lastScissorHeight = -1;
+
+  // Cached uniform buffer state to avoid redundant Metal API calls.
+  // Index 0 = VERTEX_UBO_BINDING_POINT, Index 1 = FRAGMENT_UBO_BINDING_POINT.
+  static constexpr int MaxUniformBindings = 2;
+  GPUBuffer* lastUniformBuffers[MaxUniformBindings] = {};
+  size_t lastUniformOffsets[MaxUniformBindings] = {};
+
+  // Cached texture/sampler state to avoid redundant Metal API calls.
+  static constexpr int MaxTextureBindings = 16;
+  Texture* lastTextures[MaxTextureBindings] = {};
+  Sampler* lastSamplers[MaxTextureBindings] = {};
+
+  // Cached vertex buffer state to avoid redundant Metal API calls.
+  static constexpr int MaxVertexBufferSlots = 4;
+  GPUBuffer* lastVertexBuffers[MaxVertexBufferSlots] = {};
+  size_t lastVertexOffsets[MaxVertexBufferSlots] = {};
+
+  // Cached pipeline sub-states to avoid redundant Metal API calls.
+  id<MTLDepthStencilState> lastDepthStencilState = nil;
+  MTLCullMode lastCullMode = MTLCullModeNone;
+  MTLWinding lastFrontFace = MTLWindingClockwise;
+  bool cullModeInitialized = false;
+
   // Index buffer state (Metal doesn't have separate setIndexBuffer)
   std::shared_ptr<class MetalBuffer> indexBuffer = nullptr;
   IndexFormat indexFormat = IndexFormat::UInt16;

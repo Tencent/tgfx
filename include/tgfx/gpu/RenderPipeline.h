@@ -28,6 +28,7 @@
 #include "tgfx/gpu/CompareFunction.h"
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/gpu/ShaderModule.h"
+#include "tgfx/gpu/ShaderVisibility.h"
 #include "tgfx/gpu/StencilOperation.h"
 
 namespace tgfx {
@@ -199,9 +200,15 @@ class VertexDescriptor {
 class BindingEntry {
  public:
   /**
-   * Creates a BindingEntry with the specified name and binding point.
+   * Creates a BindingEntry with the specified name, binding point, and shader stage visibility.
+   * @param name The name of the resource in the shader program.
+   * @param binding The binding point of the resource.
+   * @param visibility A bitmask of ShaderVisibility flags indicating which shader stages can access
+   * this resource. Defaults to ShaderVisibility::VertexFragment (both stages).
    */
-  BindingEntry(std::string name, unsigned binding) : name(std::move(name)), binding(binding) {
+  BindingEntry(std::string name, unsigned binding,
+               uint32_t visibility = ShaderVisibility::VertexFragment)
+      : name(std::move(name)), binding(binding), visibility(visibility) {
   }
 
   /**
@@ -213,6 +220,14 @@ class BindingEntry {
    * The binding point of the resource.
    */
   unsigned binding = 0;
+
+  /**
+   * A bitmask of ShaderVisibility flags indicating which shader stages can access this resource.
+   * For example, ShaderVisibility::Vertex means only the vertex shader can access it,
+   * ShaderVisibility::Fragment means only the fragment shader, and
+   * ShaderVisibility::VertexFragment means both stages can access it.
+   */
+  uint32_t visibility = ShaderVisibility::VertexFragment;
 };
 
 /**
