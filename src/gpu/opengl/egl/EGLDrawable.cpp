@@ -24,25 +24,25 @@
 #undef None
 #undef Status
 #include "gpu/opengl/GLDefines.h"
-#include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
 EGLDrawable::EGLDrawable(void* display, void* surface, int width, int height,
                          std::shared_ptr<ColorSpace> colorSpace)
-    : Drawable(width, height, std::move(colorSpace)), eglDisplay(display), eglSurface(surface) {
+    : GLDrawable(width, height, std::move(colorSpace)), eglDisplay(display), eglSurface(surface) {
 }
 
 void EGLDrawable::setPresentationTime(int64_t time) {
   presentationTime = time;
 }
 
-std::shared_ptr<RenderTargetProxy> EGLDrawable::getProxy(Context* context) {
+std::shared_ptr<RenderTarget> EGLDrawable::onCreateRenderTarget(Context* context) {
   GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
-  BackendRenderTarget renderTarget(frameBuffer, width(), height());
-  return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  BackendRenderTarget backendRT(frameBuffer, width(), height());
+  return RenderTarget::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
 }
 
 void EGLDrawable::onPresent(Context*) {

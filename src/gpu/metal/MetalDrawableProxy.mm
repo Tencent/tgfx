@@ -23,41 +23,17 @@
 #include "tgfx/gpu/metal/MetalTypes.h"
 
 namespace tgfx {
-MetalDrawableProxy::MetalDrawableProxy(Context* context, CAMetalLayer* metalLayer, int width,
-                                       int height, PixelFormat format)
-    : _context(context), _metalLayer(metalLayer), _width(width), _height(height), _format(format) {
-}
-
-Context* MetalDrawableProxy::getContext() const {
-  return _context;
-}
-
-int MetalDrawableProxy::width() const {
-  return _width;
-}
-
-int MetalDrawableProxy::height() const {
-  return _height;
+MetalDrawableProxy::MetalDrawableProxy(Context* context, Drawable* drawable,
+                                       CAMetalLayer* metalLayer, PixelFormat format)
+    : DrawableProxy(context, drawable), _metalLayer(metalLayer), _format(format) {
 }
 
 PixelFormat MetalDrawableProxy::format() const {
   return _format;
 }
 
-int MetalDrawableProxy::sampleCount() const {
-  return 1;
-}
-
 ImageOrigin MetalDrawableProxy::origin() const {
   return ImageOrigin::TopLeft;
-}
-
-bool MetalDrawableProxy::externallyOwned() const {
-  return true;
-}
-
-std::shared_ptr<TextureView> MetalDrawableProxy::getTextureView() const {
-  return nullptr;
 }
 
 std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
@@ -77,7 +53,7 @@ std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
   return _renderTarget;
 }
 
-id<CAMetalDrawable> MetalDrawableProxy::getDrawable() const {
+id<CAMetalDrawable> MetalDrawableProxy::getMetalDrawable() const {
   return _metalDrawable;
 }
 }  // namespace tgfx

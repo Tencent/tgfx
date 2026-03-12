@@ -19,7 +19,8 @@
 #include "tgfx/gpu/opengl/qt/QGLDrawable.h"
 #include <QMetaObject>
 #include <QQuickWindow>
-#include "gpu/proxies/RenderTargetProxy.h"
+#include "QGLDrawableProxy.h"
+#include "gpu/proxies/DrawableProxy.h"
 #include "gpu/resources/TextureView.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
@@ -60,16 +61,13 @@ QSGTexture* QGLDrawable::getQSGTexture() {
   return outTexture;
 }
 
-std::shared_ptr<RenderTargetProxy> QGLDrawable::getProxy(Context* context) {
-  if (proxy == nullptr) {
-    proxy = RenderTargetProxy::Make(context, width(), height(), false);
-  }
-  return proxy;
+std::shared_ptr<DrawableProxy> QGLDrawable::onCreateProxy(Context* context) {
+  return std::make_shared<QGLDrawableProxy>(context, this);
 }
 
 void QGLDrawable::onPresent(Context*) {
-  if (textureID == 0 && proxy != nullptr) {
-    auto textureView = proxy->getTextureView();
+  if (textureID == 0 && _proxy != nullptr) {
+    auto textureView = _proxy->getTextureView();
     if (textureView != nullptr) {
       GLTextureInfo info = {};
       if (textureView->getBackendTexture().getGLTextureInfo(&info)) {

@@ -32,12 +32,14 @@ class MetalDrawable : public Drawable {
   bool isReusable() const override {
     return false;
   }
-  std::shared_ptr<RenderTargetProxy> getProxy(Context* context) override;
+  ImageOrigin onGetOrigin() const override;
+  PixelFormat onGetPixelFormat() const override;
   void onPresent(Context* context) override;
 
  private:
   CAMetalLayer* metalLayer = nil;
   PixelFormat pixelFormat = PixelFormat::RGBA_8888;
-  std::shared_ptr<RenderTargetProxy> proxy = nullptr;
+
+  std::shared_ptr<DrawableProxy> onCreateProxy(Context* context) override;
 };
 }  // namespace tgfx

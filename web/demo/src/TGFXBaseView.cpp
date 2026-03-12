@@ -47,7 +47,7 @@ void TGFXBaseView::updateSize() {
   if (context == nullptr) {
     return;
   }
-  auto newDrawable = window->getDrawable(context);
+  auto newDrawable = window->nextDrawable(context);
   if (newDrawable == nullptr) {
     device->unlock();
     return;
@@ -120,7 +120,7 @@ void TGFXBaseView::draw() {
   }
 
   if (drawable == nullptr || surface == nullptr) {
-    drawable = window->getDrawable(context);
+    drawable = window->nextDrawable(context);
     if (drawable != nullptr) {
       surface = tgfx::Surface::MakeFrom(context, drawable);
     }
@@ -146,14 +146,12 @@ void TGFXBaseView::draw() {
     presentImmediately = false;
     if (recording) {
       context->submit(std::move(recording));
-      drawable->present(context);
     }
   } else {
     std::swap(lastRecording, recording);
 
     if (recording) {
       context->submit(std::move(recording));
-      drawable->present(context);
     }
   }
 

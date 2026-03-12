@@ -19,19 +19,19 @@
 #include "WGLDrawable.h"
 #include <GL/GL.h>
 #include "gpu/opengl/GLDefines.h"
-#include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
 WGLDrawable::WGLDrawable(HDC deviceContext, int width, int height,
                          std::shared_ptr<ColorSpace> colorSpace)
-    : Drawable(width, height, std::move(colorSpace)), deviceContext(deviceContext) {
+    : GLDrawable(width, height, std::move(colorSpace)), deviceContext(deviceContext) {
 }
 
-std::shared_ptr<RenderTargetProxy> WGLDrawable::getProxy(Context* context) {
+std::shared_ptr<RenderTarget> WGLDrawable::onCreateRenderTarget(Context* context) {
   GLFrameBufferInfo frameBuffer = {0, GL_RGBA8};
-  BackendRenderTarget renderTarget(frameBuffer, width(), height());
-  return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  BackendRenderTarget backendRT(frameBuffer, width(), height());
+  return RenderTarget::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
 }
 
 void WGLDrawable::onPresent(Context*) {

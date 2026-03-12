@@ -18,20 +18,20 @@
 
 #include "WebGLDrawable.h"
 #include "gpu/opengl/GLDefines.h"
-#include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
 WebGLDrawable::WebGLDrawable(int width, int height, std::shared_ptr<ColorSpace> colorSpace)
-    : Drawable(width, height, std::move(colorSpace)) {
+    : GLDrawable(width, height, std::move(colorSpace)) {
 }
 
-std::shared_ptr<RenderTargetProxy> WebGLDrawable::getProxy(Context* context) {
+std::shared_ptr<RenderTarget> WebGLDrawable::onCreateRenderTarget(Context* context) {
   GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
-  BackendRenderTarget renderTarget(frameBuffer, width(), height());
-  return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  BackendRenderTarget backendRT(frameBuffer, width(), height());
+  return RenderTarget::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
 }
 
 void WebGLDrawable::onPresent(Context*) {

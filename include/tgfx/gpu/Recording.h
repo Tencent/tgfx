@@ -19,8 +19,11 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 namespace tgfx {
+class Drawable;
+
 /**
  * Recording represents a snapshot of rendering commands that have been flushed from a Context but
  * not yet submitted to the GPU. This allows for deferred submission, giving applications control
@@ -31,13 +34,16 @@ namespace tgfx {
  */
 class Recording {
  private:
-  Recording(uint32_t contextID, uint32_t drawingBufferID, uint64_t generation)
-      : contextID(contextID), drawingBufferID(drawingBufferID), generation(generation) {
+  Recording(uint32_t contextID, uint32_t drawingBufferID, uint64_t generation,
+            std::vector<Drawable*> drawables)
+      : contextID(contextID), drawingBufferID(drawingBufferID), generation(generation),
+        drawables(std::move(drawables)) {
   }
 
   uint32_t contextID = 0;
   uint32_t drawingBufferID = 0;
   uint64_t generation = 0;
+  std::vector<Drawable*> drawables = {};
 
   friend class Context;
 };

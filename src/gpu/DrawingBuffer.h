@@ -26,6 +26,8 @@
 #include "gpu/tasks/ResourceTask.h"
 
 namespace tgfx {
+class Drawable;
+
 class DrawingBuffer {
  public:
   explicit DrawingBuffer(Context* context);
@@ -71,7 +73,9 @@ class DrawingBuffer {
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::vector<PlacementPtr<AtlasUploadTask>> atlasTasks = {};
+  std::vector<Drawable*> drawables = {};
 
   friend class DrawingManager;
+  friend class Context;
 };
 }  // namespace tgfx

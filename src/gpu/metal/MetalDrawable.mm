@@ -50,14 +50,21 @@ MetalDrawable::MetalDrawable(CAMetalLayer* layer, int width, int height,
   pixelFormat = MTLPixelFormatToPixelFormat(layer.pixelFormat);
 }
 
-std::shared_ptr<RenderTargetProxy> MetalDrawable::getProxy(Context* context) {
-  proxy = std::make_shared<MetalDrawableProxy>(context, metalLayer, width(), height(), pixelFormat);
-  return proxy;
+ImageOrigin MetalDrawable::onGetOrigin() const {
+  return ImageOrigin::TopLeft;
+}
+
+PixelFormat MetalDrawable::onGetPixelFormat() const {
+  return pixelFormat;
+}
+
+std::shared_ptr<DrawableProxy> MetalDrawable::onCreateProxy(Context* context) {
+  return std::make_shared<MetalDrawableProxy>(context, this, metalLayer, pixelFormat);
 }
 
 void MetalDrawable::onPresent(Context* context) {
-  auto metalProxy = static_cast<MetalDrawableProxy*>(proxy.get());
-  auto drawable = metalProxy->getDrawable();
+  auto metalProxy = static_cast<MetalDrawableProxy*>(_proxy);
+  auto drawable = metalProxy->getMetalDrawable();
   if (drawable == nil) {
     return;
   }

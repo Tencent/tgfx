@@ -18,15 +18,15 @@
 
 #pragma once
 
-#include "tgfx/gpu/Drawable.h"
+#include "tgfx/gpu/GLDrawable.h"
 
 namespace tgfx {
-class WebGLDrawable : public Drawable {
+class WebGLDrawable : public GLDrawable {
  public:
   WebGLDrawable(int width, int height, std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  protected:
-  std::shared_ptr<RenderTargetProxy> getProxy(Context* context) override;
+  std::shared_ptr<RenderTarget> onCreateRenderTarget(Context* context) override;
   void onPresent(Context* context) override;
 };
 }  // namespace tgfx

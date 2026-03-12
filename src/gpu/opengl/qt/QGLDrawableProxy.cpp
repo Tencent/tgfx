@@ -16,45 +16,37 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "QGLDrawableProxy.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/gpu/Drawable.h"
-#include "core/utils/Log.h"
-#include "gpu/proxies/DrawableProxy.h"
-#include "inspect/InspectorMark.h"
 
 namespace tgfx {
-PixelFormat Drawable::onGetPixelFormat() const {
-  return PixelFormat::RGBA_8888;
+QGLDrawableProxy::QGLDrawableProxy(Context* context, Drawable* drawable)
+    : DrawableProxy(context, drawable) {
 }
 
-ImageOrigin Drawable::onGetOrigin() const {
-  return ImageOrigin::BottomLeft;
+bool QGLDrawableProxy::externallyOwned() const {
+  return false;
 }
 
-int Drawable::onGetSampleCount() const {
-  return 1;
-}
-
-std::shared_ptr<RenderTarget> Drawable::onCreateRenderTarget(Context*) {
-  return nullptr;
-}
-
-std::shared_ptr<DrawableProxy> Drawable::getProxy(Context* context) {
-  if (_proxyHolder == nullptr) {
-    _proxyHolder = onCreateProxy(context);
-    if (_proxyHolder != nullptr) {
-      _proxy = _proxyHolder.get();
-    }
+void QGLDrawableProxy::ensureTextureRTProxy() const {
+  if (textureRTProxy == nullptr) {
+    textureRTProxy = RenderTargetProxy::Make(_context, width(), height(), false);
   }
-  return _proxyHolder;
 }
 
-std::shared_ptr<DrawableProxy> Drawable::onCreateProxy(Context* context) {
-  return std::make_shared<DrawableProxy>(context, this);
+std::shared_ptr<TextureView> QGLDrawableProxy::getTextureView() const {
+  ensureTextureRTProxy();
+  return textureRTProxy ? textureRTProxy->getTextureView() : nullptr;
 }
 
-void Drawable::present(Context* context) {
-  FRAME_MARK;
-  DEBUG_ASSERT(context != nullptr);
-  onPresent(context);
+std::shared_ptr<TextureProxy> QGLDrawableProxy::asTextureProxy() const {
+  ensureTextureRTProxy();
+  return textureRTProxy ? textureRTProxy->asTextureProxy() : nullptr;
+}
+
+std::shared_ptr<RenderTarget> QGLDrawableProxy::getRenderTarget() const {
+  ensureTextureRTProxy();
+  return textureRTProxy ? textureRTProxy->getRenderTarget() : nullptr;
 }
 }  // namespace tgfx

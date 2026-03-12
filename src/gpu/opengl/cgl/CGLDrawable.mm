@@ -18,7 +18,7 @@
 
 #include "CGLDrawable.h"
 #include "gpu/opengl/GLDefines.h"
-#include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
 
 #pragma clang diagnostic push
@@ -27,17 +27,17 @@
 namespace tgfx {
 CGLDrawable::CGLDrawable(NSOpenGLContext* glContext, NSView* view, int width, int height,
                          std::shared_ptr<ColorSpace> colorSpace)
-    : Drawable(width, height, std::move(colorSpace)), glContext(glContext), view(view) {
+    : GLDrawable(width, height, std::move(colorSpace)), glContext(glContext), view(view) {
 }
 
-std::shared_ptr<RenderTargetProxy> CGLDrawable::getProxy(Context* context) {
+std::shared_ptr<RenderTarget> CGLDrawable::onCreateRenderTarget(Context* context) {
   [glContext update];
   [glContext setView:view];
   GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
-  BackendRenderTarget renderTarget(frameBuffer, width(), height());
-  return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  BackendRenderTarget backendRT(frameBuffer, width(), height());
+  return RenderTarget::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
 }
 
 void CGLDrawable::onPresent(Context*) {

@@ -115,7 +115,7 @@ static void Draw() {
   }
 
   if (drawable == nullptr || surface == nullptr) {
-    drawable = window->getDrawable(context);
+    drawable = window->nextDrawable(context);
     if (drawable != nullptr) {
       surface = tgfx::Surface::MakeFrom(context, drawable);
     }
@@ -138,7 +138,6 @@ static void Draw() {
 
   if (recording) {
     context->submit(std::move(recording));
-    drawable->present(context);
   }
 
   device->unlock();

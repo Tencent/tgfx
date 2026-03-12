@@ -20,16 +20,19 @@
 
 #include <memory>
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/gpu/ImageOrigin.h"
+#include "tgfx/gpu/PixelFormat.h"
 
 namespace tgfx {
 class Context;
-class RenderTargetProxy;
+class DrawableProxy;
+class RenderTarget;
 class Surface;
 
 /**
  * Drawable represents a rendering target that can be presented to the display. Use
- * Surface::MakeFrom() to create a Surface from a Drawable, then call present() after rendering to
- * display the content.
+ * Surface::MakeFrom() to create a Surface from a Drawable. The rendered content is automatically
+ * presented when Context::submit() is called with the associated Recording.
  */
 class Drawable {
  public:
@@ -57,43 +60,38 @@ class Drawable {
   }
 
   /**
-   * Presents the rendered content to the display. The caller must flush and submit all GPU commands
-   * before calling this method.
-   */
-  void present(Context* context);
-
-  /**
    * Returns whether this drawable can be reused for the next frame. If false, a new drawable is
-   * created each time getDrawable() is called.
+   * created each time nextDrawable() is called on the Window.
    */
   virtual bool isReusable() const {
     return true;
   }
 
  protected:
-  /**
-   * Creates a new Drawable with the specified dimensions.
-   */
   Drawable(int width, int height, std::shared_ptr<ColorSpace> colorSpace = nullptr)
       : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
   }
 
-  /**
-   * Returns the RenderTargetProxy for this drawable. Subclasses implement platform-specific proxy
-   * creation logic.
-   */
-  virtual std::shared_ptr<RenderTargetProxy> getProxy(Context* context) = 0;
-
-  /**
-   * Called to present the rendered content to the display after GPU commands have been submitted.
-   */
+  virtual PixelFormat onGetPixelFormat() const;
+  virtual ImageOrigin onGetOrigin() const;
+  virtual int onGetSampleCount() const;
+  virtual std::shared_ptr<RenderTarget> onCreateRenderTarget(Context* context);
   virtual void onPresent(Context* context) = 0;
+
+  DrawableProxy* _proxy = nullptr;
 
  private:
   int _width = 0;
   int _height = 0;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
+  std::shared_ptr<DrawableProxy> _proxyHolder = nullptr;
 
+  std::shared_ptr<DrawableProxy> getProxy(Context* context);
+  virtual std::shared_ptr<DrawableProxy> onCreateProxy(Context* context);
+  void present(Context* context);
+
+  friend class DrawableProxy;
   friend class Surface;
+  friend class Context;
 };
 }  // namespace tgfx

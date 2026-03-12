@@ -18,21 +18,27 @@
 
 #pragma once
 
-#include <AppKit/AppKit.h>
-#include "tgfx/gpu/GLDrawable.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-class CGLDrawable : public GLDrawable {
+class DrawableProxy : public RenderTargetProxy {
  public:
-  CGLDrawable(NSOpenGLContext* glContext, NSView* view, int width, int height,
-              std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  DrawableProxy(Context* context, Drawable* drawable);
+
+  Context* getContext() const override;
+  int width() const override;
+  int height() const override;
+  PixelFormat format() const override;
+  int sampleCount() const override;
+  ImageOrigin origin() const override;
+  bool externallyOwned() const override;
+  std::shared_ptr<TextureView> getTextureView() const override;
+  std::shared_ptr<RenderTarget> getRenderTarget() const override;
+  Drawable* getDrawable() const override;
 
  protected:
-  std::shared_ptr<RenderTarget> onCreateRenderTarget(Context* context) override;
-  void onPresent(Context* context) override;
-
- private:
-  NSOpenGLContext* glContext = nil;
-  NSView* view = nil;
+  Context* _context = nullptr;
+  Drawable* _drawable = nullptr;
+  mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
 };
 }  // namespace tgfx

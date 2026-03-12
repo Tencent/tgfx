@@ -26,7 +26,7 @@ class Device;
 
 /**
  * Window represents a native displayable resource that can be rendered to by a Device. Use
- * getDrawable() to obtain a Drawable, then create a Surface from it for rendering.
+ * nextDrawable() to obtain a Drawable, then create a Surface from it for rendering.
  */
 class Window {
  public:
@@ -39,15 +39,14 @@ class Window {
   std::shared_ptr<Device> getDevice();
 
   /**
-   * Returns a Drawable for rendering to this window.
+   * Returns a Drawable for rendering to this window. If the current Drawable is reusable, the same
+   * instance is returned. Otherwise, a new Drawable is created via onCreateDrawable().
    * @param context The GPU context used for rendering.
-   * @param queryOnly If true, only returns an existing Drawable without allocating a new one.
-   * Defaults to false.
    */
-  std::shared_ptr<Drawable> getDrawable(Context* context, bool queryOnly = false);
+  std::shared_ptr<Drawable> nextDrawable(Context* context);
 
   /**
-   * Marks the window size as invalid. The next call to getDrawable() will query the current window
+   * Marks the window size as invalid. The next call to nextDrawable() will query the current window
    * size and create a new appropriately-sized Drawable.
    */
   void invalidSize();

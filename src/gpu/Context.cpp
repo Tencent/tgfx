@@ -28,6 +28,7 @@
 #include "gpu/ResourceCache.h"
 #include "gpu/ShaderCaps.h"
 #include "tgfx/core/Clock.h"
+#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -84,8 +85,9 @@ std::unique_ptr<Recording> Context::flush(BackendSemaphore* signalSemaphore) {
   _atlasManager->postFlush();
   _proxyProvider->purgeExpiredProxies();
   pendingDrawingBuffers.push_back(drawingBuffer);
-  return std::unique_ptr<Recording>(
-      new Recording(uniqueID(), drawingBuffer->uniqueID(), drawingBuffer->generation()));
+  return std::unique_ptr<Recording>(new Recording(uniqueID(), drawingBuffer->uniqueID(),
+                                                  drawingBuffer->generation(),
+                                                  std::move(drawingBuffer->drawables)));
 }
 
 std::shared_ptr<DrawingBuffer> Context::getDrawingBuffer(const Recording* recording) const {
@@ -111,6 +113,7 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
   _resourceCache->processUnreferencedResources();
   auto queue = gpu()->queue();
   auto targetBuffer = getDrawingBuffer(recording.get());
+  std::vector<Drawable*> drawablesToPresent;
   if (targetBuffer != nullptr) {
     while (!pendingDrawingBuffers.empty()) {
       auto drawingBuffer = pendingDrawingBuffers.front();
@@ -122,9 +125,13 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
         break;
       }
     }
+    drawablesToPresent = std::move(recording->drawables);
   }
   if (syncCpu) {
     queue->waitUntilCompleted();
+  }
+  for (auto* drawable : drawablesToPresent) {
+    drawable->present(this);
   }
 }
 

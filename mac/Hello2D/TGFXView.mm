@@ -210,7 +210,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   }
 
   if (drawable == nullptr || surface == nullptr) {
-    drawable = tgfxWindow->getDrawable(context);
+    drawable = tgfxWindow->nextDrawable(context);
     if (drawable != nullptr) {
       surface = tgfx::Surface::MakeFrom(context, drawable);
     }
@@ -235,7 +235,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
   if (recording) {
     context->submit(std::move(recording));
-    drawable->present(context);
   }
 
   device->unlock();

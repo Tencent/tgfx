@@ -28,11 +28,8 @@ std::shared_ptr<Device> Window::getDevice() {
   return device;
 }
 
-std::shared_ptr<Drawable> Window::getDrawable(Context* context, bool queryOnly) {
+std::shared_ptr<Drawable> Window::nextDrawable(Context* context) {
   std::lock_guard<std::mutex> autoLock(locker);
-  if (queryOnly) {
-    return currentDrawable;
-  }
   if (currentDrawable != nullptr && currentDrawable->isReusable()) {
     return currentDrawable;
   }

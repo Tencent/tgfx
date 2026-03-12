@@ -19,40 +19,23 @@
 #pragma once
 
 #import <QuartzCore/QuartzCore.h>
-#include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/proxies/DrawableProxy.h"
 
 namespace tgfx {
-/**
- * MetalDrawableProxy defers the acquisition of a Metal drawable until the render target is actually
- * needed. It calls [CAMetalLayer nextDrawable] lazily in getRenderTarget() and wraps the resulting
- * texture as an ExternalRenderTarget.
- */
-class MetalDrawableProxy : public RenderTargetProxy {
+class MetalDrawableProxy : public DrawableProxy {
  public:
-  MetalDrawableProxy(Context* context, CAMetalLayer* metalLayer, int width, int height,
+  MetalDrawableProxy(Context* context, Drawable* drawable, CAMetalLayer* metalLayer,
                      PixelFormat format);
 
-  Context* getContext() const override;
-  int width() const override;
-  int height() const override;
   PixelFormat format() const override;
-  int sampleCount() const override;
   ImageOrigin origin() const override;
-  bool externallyOwned() const override;
-  std::shared_ptr<TextureView> getTextureView() const override;
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
-  id<CAMetalDrawable> getDrawable() const;
+  id<CAMetalDrawable> getMetalDrawable() const;
 
  private:
-  Context* _context = nullptr;
   CAMetalLayer* _metalLayer = nil;
-  int _width = 0;
-  int _height = 0;
   PixelFormat _format = PixelFormat::RGBA_8888;
-  // Mutable because getRenderTarget() is const (inherited from RenderTargetProxy) but needs to
-  // lazily acquire the Metal drawable on first access.
   mutable id<CAMetalDrawable> _metalDrawable = nil;
-  mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
 };
 }  // namespace tgfx

@@ -163,7 +163,7 @@ void TGFXView::draw() {
     return;
   }
   auto previousDrawable = std::move(lastDrawable);
-  auto drawable = tgfxWindow->getDrawable(context, previousDrawable && singleBufferMode);
+  auto drawable = tgfxWindow->nextDrawable(context);
   if (drawable == nullptr) {
     device->unlock();
     return;
@@ -184,14 +184,12 @@ void TGFXView::draw() {
     lastRecording = nullptr;
     if (recording) {
       context->submit(std::move(recording));
-      drawable->present(context);
       presentedDrawable = drawable;
     }
   } else {
     std::swap(lastRecording, recording);
     if (recording) {
       context->submit(std::move(recording));
-      previousDrawable->present(context);
       presentedDrawable = previousDrawable;
     }
   }

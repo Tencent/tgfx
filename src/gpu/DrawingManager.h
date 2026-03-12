@@ -96,6 +96,8 @@ class DrawingManager {
 
   DrawingBuffer* createDrawingBuffer();
 
+  void collectDrawable(RenderTargetProxy* proxy);
+
   friend class OpsCompositor;
 };
 }  // namespace tgfx

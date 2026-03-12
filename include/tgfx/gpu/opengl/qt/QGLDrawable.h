@@ -27,11 +27,9 @@
 #include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
-class RenderTargetProxy;
-
 /**
- * QGLDrawable is a Drawable for rendering within the Qt Scene Graph. After calling present(),
- * use getQSGTexture() to retrieve the texture for the most recently presented frame.
+ * QGLDrawable is a Drawable for rendering within the Qt Scene Graph. After rendering, use
+ * getQSGTexture() to retrieve the texture for the most recently presented frame.
  */
 class QGLDrawable : public Drawable {
  public:
@@ -47,8 +45,8 @@ class QGLDrawable : public Drawable {
   ~QGLDrawable() override;
 
   /**
-   * Returns a QSGTexture for display by the Qt Scene Graph. Returns nullptr if present() has not
-   * been called yet. The returned QSGTexture is owned by this QGLDrawable.
+   * Returns a QSGTexture for display by the Qt Scene Graph. Returns nullptr if the drawable has not
+   * been presented yet. The returned QSGTexture is owned by this QGLDrawable.
    */
   QSGTexture* getQSGTexture();
 
@@ -56,13 +54,13 @@ class QGLDrawable : public Drawable {
   bool isReusable() const override {
     return false;
   }
-  std::shared_ptr<RenderTargetProxy> getProxy(Context* context) override;
   void onPresent(Context* context) override;
 
  private:
   QQuickItem* quickItem = nullptr;
-  std::shared_ptr<RenderTargetProxy> proxy = nullptr;
   unsigned textureID = 0;
   QSGTexture* outTexture = nullptr;
+
+  std::shared_ptr<DrawableProxy> onCreateProxy(Context* context) override;
 };
 }  // namespace tgfx

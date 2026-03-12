@@ -69,6 +69,7 @@ void DrawingBuffer::reset() {
   renderTasks.clear();
   resourceTasks.clear();
   atlasTasks.clear();
+  drawables.clear();
   vertexAllocator.clear(vertexMaxValueTracker.getMaxValue());
   drawingAllocator.clear(drawingMaxValueTracker.getMaxValue());
   _generation++;

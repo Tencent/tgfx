@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
+#include <algorithm>
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -49,6 +50,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   if (renderTarget == nullptr || processor == nullptr) {
     return false;
   }
+  collectDrawable(renderTarget.get());
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
@@ -81,6 +83,7 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
+  collectDrawable(renderTarget.get());
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
@@ -97,6 +100,7 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
+  collectDrawable(renderTarget.get());
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
@@ -193,5 +197,16 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
   bufferPool.push_back(currentBuffer);
   currentBuffer = nullptr;
   return drawingBuffer;
+}
+
+void DrawingManager::collectDrawable(RenderTargetProxy* proxy) {
+  auto drawable = proxy->getDrawable();
+  if (drawable == nullptr) {
+    return;
+  }
+  auto& drawables = getDrawingBuffer()->drawables;
+  if (std::find(drawables.begin(), drawables.end(), drawable) == drawables.end()) {
+    drawables.push_back(drawable);
+  }
 }
 }  // namespace tgfx

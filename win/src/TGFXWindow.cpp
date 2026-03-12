@@ -363,7 +363,7 @@ void TGFXWindow::draw() {
     return;
   }
   if (drawable == nullptr || surface == nullptr) {
-    drawable = tgfxWindow->getDrawable(context);
+    drawable = tgfxWindow->nextDrawable(context);
     if (drawable != nullptr) {
       surface = tgfx::Surface::MakeFrom(context, drawable);
     }
@@ -385,14 +385,12 @@ void TGFXWindow::draw() {
     presentImmediately = false;
     if (recording) {
       context->submit(std::move(recording));
-      drawable->present(context);
     }
   } else {
     std::swap(lastRecording, recording);
 
     if (recording) {
       context->submit(std::move(recording));
-      drawable->present(context);
     }
   }
 

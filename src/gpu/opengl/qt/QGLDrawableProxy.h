@@ -16,45 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/Drawable.h"
-#include "core/utils/Log.h"
+#pragma once
+
 #include "gpu/proxies/DrawableProxy.h"
-#include "inspect/InspectorMark.h"
 
 namespace tgfx {
-PixelFormat Drawable::onGetPixelFormat() const {
-  return PixelFormat::RGBA_8888;
-}
+class QGLDrawableProxy : public DrawableProxy {
+ public:
+  QGLDrawableProxy(Context* context, Drawable* drawable);
 
-ImageOrigin Drawable::onGetOrigin() const {
-  return ImageOrigin::BottomLeft;
-}
+  bool externallyOwned() const override;
+  std::shared_ptr<TextureView> getTextureView() const override;
+  std::shared_ptr<TextureProxy> asTextureProxy() const override;
+  std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
-int Drawable::onGetSampleCount() const {
-  return 1;
-}
+ private:
+  mutable std::shared_ptr<RenderTargetProxy> textureRTProxy = nullptr;
 
-std::shared_ptr<RenderTarget> Drawable::onCreateRenderTarget(Context*) {
-  return nullptr;
-}
-
-std::shared_ptr<DrawableProxy> Drawable::getProxy(Context* context) {
-  if (_proxyHolder == nullptr) {
-    _proxyHolder = onCreateProxy(context);
-    if (_proxyHolder != nullptr) {
-      _proxy = _proxyHolder.get();
-    }
-  }
-  return _proxyHolder;
-}
-
-std::shared_ptr<DrawableProxy> Drawable::onCreateProxy(Context* context) {
-  return std::make_shared<DrawableProxy>(context, this);
-}
-
-void Drawable::present(Context* context) {
-  FRAME_MARK;
-  DEBUG_ASSERT(context != nullptr);
-  onPresent(context);
-}
+  void ensureTextureRTProxy() const;
+};
 }  // namespace tgfx

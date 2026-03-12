@@ -24,6 +24,8 @@
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
+class Drawable;
+
 /**
  * This class defers the acquisition of render targets until they are actually required.
  */
@@ -145,5 +147,13 @@ class RenderTargetProxy {
    * Y-axis for ImageOrigin::BottomLeft.
    */
   Matrix getOriginTransform() const;
+
+  /**
+   * Returns the Drawable associated with this proxy, or nullptr if this proxy is not backed by a
+   * Drawable.
+   */
+  virtual Drawable* getDrawable() const {
+    return nullptr;
+  }
 };
 }  // namespace tgfx

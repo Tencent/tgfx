@@ -25,6 +25,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
+#include "gpu/proxies/DrawableProxy.h"
 #include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
@@ -87,7 +88,7 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Dra
     return nullptr;
   }
   auto colorSpace = drawable->colorSpace();
-  auto proxy = drawable->getProxy(context);
+  std::shared_ptr<RenderTargetProxy> proxy = drawable->getProxy(context);
   return MakeFrom(std::move(proxy), renderFlags, false, std::move(colorSpace));
 }
 

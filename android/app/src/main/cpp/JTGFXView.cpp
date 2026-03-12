@@ -84,7 +84,7 @@ void JTGFXView::draw() {
   }
 
   if (drawable == nullptr || surface == nullptr) {
-    drawable = window->getDrawable(context);
+    drawable = window->nextDrawable(context);
     if (drawable != nullptr) {
       surface = tgfx::Surface::MakeFrom(context, drawable);
     }
@@ -110,7 +110,6 @@ void JTGFXView::draw() {
 
   if (recording) {
     context->submit(std::move(recording));
-    drawable->present(context);
   }
 
   device->unlock();
