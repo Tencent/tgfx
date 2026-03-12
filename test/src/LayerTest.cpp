@@ -3405,6 +3405,41 @@ TGFX_TEST(LayerTest, MeshLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MeshLayer"));
 }
 
+TGFX_TEST(LayerTest, BackgroundBlurWithFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto solidLayer = tgfx::SolidLayer::Make();
+  solidLayer->setWidth(302);
+  solidLayer->setHeight(227);
+  solidLayer->setColor(tgfx::Color::White());
+
+  auto backgroundBlur = tgfx::BackgroundBlurStyle::Make(4, 4);
+  auto innerShadow =
+      tgfx::InnerShadowStyle::Make(75, 60, 0, 0, tgfx::Color::FromRGBA(255, 0, 0, 60));
+  solidLayer->setLayerStyles({backgroundBlur, innerShadow});
+
+  auto blur = tgfx::BlurFilter::Make(20, 20);
+  solidLayer->setFilters({blur});
+
+  auto rootLayer = tgfx::Layer::Make();
+  rootLayer->addChild(solidLayer);
+  DisplayList displayList;
+  displayList.root()->addChild(rootLayer);
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.render(surface.get());
+
+  displayList.setZoomScale(1.5);
+  displayList.setContentOffset(-10, -10);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurWithFilter_Tiled"));
+
+  displayList.setRenderMode(RenderMode::Partial);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurWithFilter_Partial"));
+}
+
 TGFX_TEST(LayerTest, ShapeInstancedLayer) {
   ContextScope scope;
   auto context = scope.getContext();
