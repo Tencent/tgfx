@@ -377,9 +377,9 @@ bool Matrix3D::operator==(const Matrix3D& other) const {
 }
 
 Matrix Matrix3D::asMatrix() const {
-  return Matrix::MakeAll(getRowColumn(0, 0), getRowColumn(0, 1), getRowColumn(0, 3),
-                         getRowColumn(1, 0), getRowColumn(1, 1), getRowColumn(1, 3),
-                         getRowColumn(3, 0), getRowColumn(3, 1), getRowColumn(3, 3));
+  // Column-major storage: values[col * 4 + row]
+  return Matrix::MakeAll(values[0], values[4], values[12], values[1], values[5], values[13],
+                         values[3], values[7], values[15]);
 }
 
 void Matrix3D::getRowMajor(float buffer[16]) const {
