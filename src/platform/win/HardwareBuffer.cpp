@@ -182,6 +182,11 @@ void* HardwareBufferLock(HardwareBufferRef buffer) {
   if (!GetTextureDesc(buffer, &desc)) {
     return nullptr;
   }
+  // NV12 is a multi-planar format; its CPU data cannot be represented as a single base address.
+  // NV12 buffers are consumed via the GPU texture path (YUVTextureView) and should never reach here.
+  if (desc.Format == DXGI_FORMAT_NV12) {
+    return nullptr;
+  }
 
   // Step 1: Get ID3D11Device from the texture via ID3D11DeviceChild::GetDevice
   auto* texUnk = static_cast<IUnknown*>(buffer);
