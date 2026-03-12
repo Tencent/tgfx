@@ -18,12 +18,17 @@
 
 #include "tgfx/layers/ShapeInstancedLayer.h"
 #include <cstring>
+#include "ShapeStrokeEffect.h"
 #include "tgfx/layers/LayerPaint.h"
 
 namespace tgfx {
 
 std::shared_ptr<ShapeInstancedLayer> ShapeInstancedLayer::Make() {
   return std::shared_ptr<ShapeInstancedLayer>(new ShapeInstancedLayer());
+}
+
+ShapeInstancedLayer::ShapeInstancedLayer() {
+  memset(&shapeBitFields, 0, sizeof(shapeBitFields));
 }
 
 void ShapeInstancedLayer::setShape(std::shared_ptr<Shape> shape) {
@@ -88,18 +93,175 @@ void ShapeInstancedLayer::addFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
   invalidateContent();
 }
 
+void ShapeInstancedLayer::setStrokeStyles(std::vector<std::shared_ptr<ShapeStyle>> strokes) {
+  if (_strokeStyles.size() == strokes.size() &&
+      std::equal(_strokeStyles.begin(), _strokeStyles.end(), strokes.begin())) {
+    return;
+  }
+  _strokeStyles = std::move(strokes);
+  invalidateContent();
+}
+
+void ShapeInstancedLayer::removeStrokeStyles() {
+  if (_strokeStyles.empty()) {
+    return;
+  }
+  _strokeStyles = {};
+  invalidateContent();
+}
+
+void ShapeInstancedLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> strokeStyle) {
+  if (strokeStyle == nullptr) {
+    removeStrokeStyles();
+  } else {
+    setStrokeStyles({std::move(strokeStyle)});
+  }
+}
+
+void ShapeInstancedLayer::addStrokeStyle(std::shared_ptr<ShapeStyle> strokeStyle) {
+  if (strokeStyle == nullptr) {
+    return;
+  }
+  _strokeStyles.push_back(std::move(strokeStyle));
+  invalidateContent();
+}
+
+void ShapeInstancedLayer::setLineCap(LineCap cap) {
+  if (stroke.cap == cap) {
+    return;
+  }
+  stroke.cap = cap;
+  invalidateContent();
+}
+
+void ShapeInstancedLayer::setLineJoin(LineJoin join) {
+  if (stroke.join == join) {
+    return;
+  }
+  stroke.join = join;
+  invalidateContent();
+}
+
+void ShapeInstancedLayer::setMiterLimit(float limit) {
+  if (stroke.miterLimit == limit) {
+    return;
+  }
+  stroke.miterLimit = limit;
+  invalidateContent();
+}
+
+void ShapeInstancedLayer::setLineWidth(float width) {
+  if (stroke.width == width) {
+    return;
+  }
+  stroke.width = width;
+  invalidateContent();
+}
+
+void ShapeInstancedLayer::setLineDashPattern(const std::vector<float>& pattern) {
+  if (_lineDashPattern.size() == pattern.size() &&
+      std::equal(_lineDashPattern.begin(), _lineDashPattern.end(), pattern.begin())) {
+    return;
+  }
+  _lineDashPattern = pattern;
+  invalidateContent();
+}
+
+void ShapeInstancedLayer::setLineDashPhase(float phase) {
+  if (_lineDashPhase == phase) {
+    return;
+  }
+  _lineDashPhase = phase;
+  invalidateContent();
+}
+
+void ShapeInstancedLayer::setLineDashAdaptive(bool adaptive) {
+  if (shapeBitFields.lineDashAdaptive == adaptive) {
+    return;
+  }
+  shapeBitFields.lineDashAdaptive = adaptive;
+  invalidateContent();
+}
+
+void ShapeInstancedLayer::setStrokeAlign(StrokeAlign align) {
+  auto alignment = static_cast<uint8_t>(align);
+  if (shapeBitFields.strokeAlign == alignment) {
+    return;
+  }
+  shapeBitFields.strokeAlign = alignment;
+  invalidateContent();
+}
+
+void ShapeInstancedLayer::setStrokeOnTop(bool value) {
+  if (shapeBitFields.strokeOnTop == value) {
+    return;
+  }
+  shapeBitFields.strokeOnTop = value;
+  invalidateContent();
+}
+
 void ShapeInstancedLayer::onUpdateContent(LayerRecorder* recorder) {
   if (_shape == nullptr || _matrices.empty()) {
     return;
   }
 
-  if (_fillStyles.empty()) {
-    recorder->addShapeInstanced(_shape, _matrices, _colors, LayerPaint(Color::White()));
+  bool hasFill = !_fillStyles.empty() || !_colors.empty();
+  bool hasStroke = stroke.width > 0 && (!_strokeStyles.empty() || !_colors.empty());
+
+  if (!hasFill && !hasStroke) {
+    return;
+  }
+
+  if (hasFill) {
+    if (_fillStyles.empty()) {
+      recorder->addShapeInstanced(_shape, _matrices, _colors, LayerPaint(Color::White()));
+    } else {
+      for (const auto& style : _fillStyles) {
+        LayerPaint paint(style->color(), style->blendMode());
+        paint.shader = style->shader();
+        recorder->addShapeInstanced(_shape, _matrices, _colors, paint);
+      }
+    }
   } else {
-    for (const auto& style : _fillStyles) {
-      LayerPaint paint(style->color(), style->blendMode());
-      paint.shader = style->shader();
-      recorder->addShapeInstanced(_shape, _matrices, _colors, paint);
+    // Create a contour-only content for the shape (transparent color, no shader).
+    recorder->addShapeInstanced(_shape, _matrices, _colors, LayerPaint(Color::Transparent()));
+  }
+
+  if (hasStroke) {
+    auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
+    bool simpleStroke = _lineDashPattern.empty() && strokeAlign == StrokeAlign::Center;
+    std::shared_ptr<Shape> strokeShape = nullptr;
+    if (!simpleStroke) {
+      strokeShape = CreateStrokeShape(_shape, stroke, strokeAlign, _lineDashPattern, _lineDashPhase,
+                                      shapeBitFields.lineDashAdaptive);
+    }
+    if (_strokeStyles.empty()) {
+      LayerPaint paint(Color::White());
+      if (shapeBitFields.strokeOnTop) {
+        paint.placement = LayerPlacement::Foreground;
+      }
+      if (simpleStroke) {
+        paint.style = PaintStyle::Stroke;
+        paint.stroke = stroke;
+        recorder->addShapeInstanced(_shape, _matrices, _colors, paint);
+      } else {
+        recorder->addShapeInstanced(strokeShape, _matrices, _colors, paint);
+      }
+    } else {
+      for (const auto& style : _strokeStyles) {
+        LayerPaint paint(style->color(), style->blendMode());
+        paint.shader = style->shader();
+        if (shapeBitFields.strokeOnTop) {
+          paint.placement = LayerPlacement::Foreground;
+        }
+        if (simpleStroke) {
+          paint.style = PaintStyle::Stroke;
+          paint.stroke = stroke;
+          recorder->addShapeInstanced(_shape, _matrices, _colors, paint);
+        } else {
+          recorder->addShapeInstanced(strokeShape, _matrices, _colors, paint);
+        }
+      }
     }
   }
 }

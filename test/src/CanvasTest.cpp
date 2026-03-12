@@ -2404,4 +2404,76 @@ TGFX_TEST(CanvasTest, DrawShapeInstanced_SingleInstance) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_SingleInstance"));
 }
 
+TGFX_TEST(CanvasTest, DrawShapeInstanced_Stroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Path path = {};
+  path.addRoundRect(Rect::MakeXYWH(-30, -30, 60, 60), 10, 10);
+  auto shape = Shape::MakeFrom(path);
+
+  Matrix matrices[] = {
+      Matrix::MakeTrans(75, 75),
+      Matrix::MakeTrans(225, 75),
+      Matrix::MakeTrans(75, 225),
+      Matrix::MakeTrans(225, 225),
+  };
+  Color colors[] = {
+      Color::Red(),
+      Color::Green(),
+      Color::Blue(),
+      Color::FromRGBA(255, 165, 0, 255),
+  };
+
+  Paint paint = {};
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(6);
+  canvas->drawShapeInstanced(shape, matrices, colors, 4, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_Stroke"));
+}
+
+TGFX_TEST(CanvasTest, DrawShapeInstanced_StrokeAndFill) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Path path = {};
+  path.addRoundRect(Rect::MakeXYWH(-30, -30, 60, 60), 10, 10);
+  auto shape = Shape::MakeFrom(path);
+
+  Matrix matrices[] = {
+      Matrix::MakeTrans(75, 75),
+      Matrix::MakeTrans(225, 75),
+      Matrix::MakeTrans(75, 225),
+      Matrix::MakeTrans(225, 225),
+  };
+  Color colors[] = {
+      Color::FromRGBA(255, 0, 0, 128),
+      Color::FromRGBA(0, 255, 0, 128),
+      Color::FromRGBA(0, 0, 255, 128),
+      Color::FromRGBA(255, 165, 0, 128),
+  };
+
+  Paint fillPaint = {};
+  canvas->drawShapeInstanced(shape, matrices, colors, 4, fillPaint);
+
+  Paint strokePaint = {};
+  strokePaint.setStyle(PaintStyle::Stroke);
+  strokePaint.setStrokeWidth(4);
+  strokePaint.setColor(Color::Black());
+  canvas->drawShapeInstanced(shape, matrices, nullptr, 4, strokePaint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_StrokeAndFill"));
+}
+
 }  // namespace tgfx
