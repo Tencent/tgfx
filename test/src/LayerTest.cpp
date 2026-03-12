@@ -3449,4 +3449,46 @@ TGFX_TEST(LayerTest, ShapeInstancedLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeInstancedLayer"));
 }
 
+TGFX_TEST(LayerTest, ShapeInstancedLayerStroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 450);
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+
+  Path path = {};
+  path.addRoundRect(Rect::MakeXYWH(-40, -30, 80, 60), 10, 10);
+  auto shape = Shape::MakeFrom(path);
+
+  std::vector<Color> colors = {
+      Color::Red(),
+      Color::Green(),
+      Color::Blue(),
+  };
+
+  StrokeAlign aligns[] = {StrokeAlign::Center, StrokeAlign::Inside, StrokeAlign::Outside};
+  float rowY[] = {75, 225, 375};
+
+  for (int row = 0; row < 3; row++) {
+    auto instancedLayer = ShapeInstancedLayer::Make();
+    instancedLayer->setShape(shape);
+    std::vector<Matrix> matrices = {
+        Matrix::MakeTrans(100, rowY[row]),
+        Matrix::MakeTrans(250, rowY[row]),
+        Matrix::MakeTrans(400, rowY[row]),
+    };
+    instancedLayer->setMatrices(matrices);
+    instancedLayer->setColors(colors);
+    instancedLayer->setColorRole(ColorRole::Stroke);
+    instancedLayer->setLineWidth(15);
+    instancedLayer->setStrokeAlign(aligns[row]);
+    layer->addChild(instancedLayer);
+  }
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeInstancedLayerStroke"));
+}
+
 }  // namespace tgfx
