@@ -1957,8 +1957,7 @@ bool Layer::drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, f
   auto context3D = childArgs.render3DContext.get();
   // For layers outside a 3D context, matrices are applied to the canvas directly.
   // For layers inside a 3D context, matrices are handled by render3DContext.
-  const auto canvasMatrix =
-      context3D == nullptr ? childTransform3D.asMatrix() : Matrix::I();
+  const auto canvasMatrix = context3D == nullptr ? childTransform3D.asMatrix() : Matrix::I();
   const auto* scrollRectTransform = context3D == nullptr ? nullptr : &childTransform3D;
   canvas->concat(canvasMatrix);
   ClipScrollRect(canvas, child->_scrollRect.get(), scrollRectTransform);
@@ -2315,8 +2314,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       childTransformer = RegionTransformer::MakeFromMatrix3D(childMatrix, transformer, true);
     } else {
       // Child is outside 3D context - project to 2D plane.
-      childTransformer = RegionTransformer::MakeFromMatrix(
-          childMatrix.asMatrix(), transformer);
+      childTransformer = RegionTransformer::MakeFromMatrix(childMatrix.asMatrix(), transformer);
     }
     std::optional<Rect> clipRect = std::nullopt;
     if (child->_scrollRect) {
@@ -2378,8 +2376,7 @@ void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    auto childTransformer = RegionTransformer::MakeFromMatrix(
-        childMatrix.asMatrix(), transformer);
+    auto childTransformer = RegionTransformer::MakeFromMatrix(childMatrix.asMatrix(), transformer);
     child->checkBackgroundStyles(childTransformer);
   }
   updateBackgroundBounds(transformer ? transformer->getMaxScale() : 1.0f);
