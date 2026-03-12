@@ -74,6 +74,13 @@ class ProxyProvider {
                                                             uint32_t renderFlags = 0);
 
   /**
+   * Allocates a region from the shared instance buffer and writes instance data into it. Returns a
+   * VertexBufferView pointing to the allocated region. The data is uploaded to the GPU in a single
+   * batch when flushSharedInstanceBuffer() is called.
+   */
+  std::shared_ptr<VertexBufferView> createInstanceBufferProxy(const void* data, size_t dataSize);
+
+  /**
    * Creates a GPUShapeProxy for the given Shape. The shape will be released after being uploaded to
    * the GPU.
    */
@@ -176,6 +183,11 @@ class ProxyProvider {
   void flushSharedVertexBuffer();
 
   /**
+   * Flushes the pending shared instance buffer to upload the instance data to the GPU.
+   */
+  void flushSharedInstanceBuffer();
+
+  /**
    * Stores the given proxy in the map with the new uniqueKey.
    */
   void assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
@@ -185,11 +197,14 @@ class ProxyProvider {
   ResourceKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};
   std::shared_ptr<GPUBufferProxy> sharedVertexBuffer = nullptr;
   std::vector<std::shared_ptr<Task>> sharedVertexBufferTasks = {};
+  std::shared_ptr<GPUBufferProxy> sharedInstanceBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> findOrWrapGPUBufferProxy(const UniqueKey& uniqueKey);
 
   void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey = {});
 
   void uploadSharedVertexBuffer(std::shared_ptr<Data> data);
+
+  void uploadSharedInstanceBuffer(std::shared_ptr<Data> data);
 
   std::shared_ptr<TextureProxy> createTextureProxyByImageSource(
       std::shared_ptr<DataSource<ImageBuffer>> source, int width, int height, bool alphaOnly,

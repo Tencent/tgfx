@@ -26,9 +26,7 @@
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
-#include "gpu/resources/BufferResource.h"
 #include "tgfx/core/RenderFlags.h"
-#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 
@@ -45,6 +43,16 @@ struct InstanceRecordWithColor {
   uint32_t color;  // UByte4Normalized premultiplied RGBA
 };
 
+static void FillInstanceRecord(void* buffer, const Matrix& matrix) {
+  auto record = static_cast<InstanceRecord*>(buffer);
+  record->matrixCol0[0] = matrix.getScaleX();
+  record->matrixCol0[1] = matrix.getSkewY();
+  record->matrixCol1[0] = matrix.getSkewX();
+  record->matrixCol1[1] = matrix.getScaleY();
+  record->matrixCol2[0] = matrix.getTranslateX();
+  record->matrixCol2[1] = matrix.getTranslateY();
+}
+
 PlacementPtr<ShapeInstancedDrawOp> ShapeInstancedDrawOp::Make(
     std::shared_ptr<GPUShapeProxy> shapeProxy, const Matrix* matrices, const Color* colors,
     size_t count, PMColor gpColor, const Matrix& uvMatrix, const Matrix& stateMatrix, AAType aaType,
@@ -52,36 +60,49 @@ PlacementPtr<ShapeInstancedDrawOp> ShapeInstancedDrawOp::Make(
   if (shapeProxy == nullptr || matrices == nullptr || count == 0) {
     return nullptr;
   }
-  auto allocator = shapeProxy->getContext()->drawingAllocator();
-  auto storedMatrices = reinterpret_cast<Matrix*>(allocator->allocate(sizeof(Matrix) * count));
-  if (storedMatrices == nullptr) {
+  auto context = shapeProxy->getContext();
+  bool hasColors = colors != nullptr;
+  size_t instanceStride = hasColors ? sizeof(InstanceRecordWithColor) : sizeof(InstanceRecord);
+  size_t instanceBufferSize = instanceStride * count;
+  auto drawingAllocator = context->drawingAllocator();
+  auto instanceData = drawingAllocator->allocate(instanceBufferSize);
+  if (instanceData == nullptr) {
     return nullptr;
   }
-  memcpy(storedMatrices, matrices, sizeof(Matrix) * count);
-
-  const Color* storedColors = nullptr;
-  if (colors != nullptr) {
-    auto colorPtr = reinterpret_cast<Color*>(allocator->allocate(sizeof(Color) * count));
-    if (colorPtr == nullptr) {
-      return nullptr;
-    }
-    memcpy(colorPtr, colors, sizeof(Color) * count);
-    storedColors = colorPtr;
+  std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+  if (hasColors && NeedConvertColorSpace(ColorSpace::SRGB(), dstColorSpace)) {
+    steps =
+        std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                               dstColorSpace.get(), AlphaType::Premultiplied);
   }
-  return allocator->make<ShapeInstancedDrawOp>(allocator, std::move(shapeProxy), storedMatrices,
-                                               storedColors, count, gpColor, uvMatrix, stateMatrix,
-                                               aaType, std::move(dstColorSpace));
+  auto buffer = instanceData;
+  for (size_t i = 0; i < count; i++) {
+    FillInstanceRecord(buffer, matrices[i]);
+    if (hasColors) {
+      auto colorRecord = static_cast<InstanceRecordWithColor*>(buffer);
+      colorRecord->color = ToUintPMColor(colors[i], steps.get());
+    }
+    buffer = static_cast<uint8_t*>(buffer) + instanceStride;
+  }
+  auto instanceBufferProxy =
+      context->proxyProvider()->createInstanceBufferProxy(instanceData, instanceBufferSize);
+  if (instanceBufferProxy == nullptr) {
+    return nullptr;
+  }
+  return drawingAllocator->make<ShapeInstancedDrawOp>(
+      drawingAllocator, std::move(shapeProxy), std::move(instanceBufferProxy), hasColors, count,
+      gpColor, uvMatrix, stateMatrix, aaType);
 }
 
 ShapeInstancedDrawOp::ShapeInstancedDrawOp(BlockAllocator* allocator,
                                            std::shared_ptr<GPUShapeProxy> proxy,
-                                           const Matrix* matrices, const Color* instanceColors,
-                                           size_t count, PMColor gpColor, const Matrix& uvMatrix,
-                                           const Matrix& stateMatrix, AAType aaType,
-                                           std::shared_ptr<ColorSpace> dstColorSpace)
-    : DrawOp(allocator, aaType), shapeProxy(std::move(proxy)), matrices(matrices),
-      instanceColors(instanceColors), instanceCount(count), gpColor(gpColor), uvMatrix(uvMatrix),
-      stateMatrix(stateMatrix), dstColorSpace(std::move(dstColorSpace)) {
+                                           std::shared_ptr<VertexBufferView> instanceBuffer,
+                                           bool hasInstanceColors, size_t count, PMColor gpColor,
+                                           const Matrix& uvMatrix, const Matrix& stateMatrix,
+                                           AAType aaType)
+    : DrawOp(allocator, aaType), shapeProxy(std::move(proxy)),
+      instanceBufferProxy(std::move(instanceBuffer)), hasInstanceColors(hasInstanceColors),
+      instanceCount(count), gpColor(gpColor), uvMatrix(uvMatrix), stateMatrix(stateMatrix) {
   auto context = shapeProxy->getContext();
   if (auto textureProxy = shapeProxy->getTextureProxy()) {
     auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
@@ -96,7 +117,6 @@ PlacementPtr<GeometryProcessor> ShapeInstancedDrawOp::onMakeGeometryProcessor(
   if (shapeProxy == nullptr) {
     return nullptr;
   }
-  bool hasInstanceColors = instanceColors != nullptr;
   bool hasShader = !colors.empty();
   auto realUVMatrix = uvMatrix;
   realUVMatrix.preConcat(shapeProxy->getDrawingMatrix());
@@ -129,49 +149,14 @@ PlacementPtr<GeometryProcessor> ShapeInstancedDrawOp::onMakeGeometryProcessor(
 
 void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass) {
   auto vertexBuffer = shapeProxy->getTriangles();
-  bool hasInstanceColors = instanceColors != nullptr;
-  size_t instanceStride =
-      hasInstanceColors ? sizeof(InstanceRecordWithColor) : sizeof(InstanceRecord);
-  size_t instanceBufferSize = instanceStride * instanceCount;
-  auto bufferResource = BufferResource::FindOrCreate(shapeProxy->getContext(), instanceBufferSize,
-                                                     GPUBufferUsage::VERTEX);
-  if (bufferResource == nullptr) {
-    LOGE("ShapeInstancedDrawOp::onDraw() Failed to create instance buffer!");
+  auto instanceBuffer = instanceBufferProxy->getBuffer();
+  if (instanceBuffer == nullptr) {
+    LOGE("ShapeInstancedDrawOp::onDraw() Failed to get instance buffer!");
     return;
   }
-  auto instanceBuffer = bufferResource->gpuBuffer();
-  auto buffer = instanceBuffer->map();
-  if (buffer == nullptr) {
-    LOGE("ShapeInstancedDrawOp::onDraw() Failed to map instance buffer!");
-    return;
-  }
-
-  std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
-  if (hasInstanceColors && NeedConvertColorSpace(ColorSpace::SRGB(), dstColorSpace)) {
-    steps =
-        std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
-                                               dstColorSpace.get(), AlphaType::Premultiplied);
-  }
-  for (size_t i = 0; i < instanceCount; i++) {
-    auto record = static_cast<InstanceRecord*>(buffer);
-    auto& m = matrices[i];
-    record->matrixCol0[0] = m.getScaleX();
-    record->matrixCol0[1] = m.getSkewY();
-    record->matrixCol1[0] = m.getSkewX();
-    record->matrixCol1[1] = m.getScaleY();
-    record->matrixCol2[0] = m.getTranslateX();
-    record->matrixCol2[1] = m.getTranslateY();
-    if (hasInstanceColors) {
-      auto colorRecord = static_cast<InstanceRecordWithColor*>(buffer);
-      colorRecord->color = ToUintPMColor(instanceColors[i], steps.get());
-    }
-    buffer = static_cast<uint8_t*>(buffer) + instanceStride;
-  }
-  instanceBuffer->unmap();
-
   if (vertexBuffer != nullptr) {
     renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer());
-    renderPass->setVertexBuffer(1, std::move(instanceBuffer));
+    renderPass->setVertexBuffer(1, instanceBuffer->gpuBuffer(), instanceBufferProxy->offset());
     auto vertexCount = aaType == AAType::Coverage
                            ? PathTriangulator::GetAAVertexCount(vertexBuffer->size())
                            : PathTriangulator::GetNonAAVertexCount(vertexBuffer->size());
@@ -180,7 +165,7 @@ void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass) {
   } else {
     auto maskBuffer = maskBufferProxy->getBuffer();
     renderPass->setVertexBuffer(0, maskBuffer->gpuBuffer(), maskBufferProxy->offset());
-    renderPass->setVertexBuffer(1, std::move(instanceBuffer));
+    renderPass->setVertexBuffer(1, instanceBuffer->gpuBuffer(), instanceBufferProxy->offset());
     renderPass->draw(PrimitiveType::TriangleStrip, 4, static_cast<uint32_t>(instanceCount));
   }
 }

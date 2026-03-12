@@ -126,6 +126,53 @@ void ProxyProvider::flushSharedVertexBuffer() {
   }
 }
 
+std::shared_ptr<VertexBufferView> ProxyProvider::createInstanceBufferProxy(const void* data,
+                                                                           size_t dataSize) {
+  if (data == nullptr || dataSize == 0) {
+    return nullptr;
+  }
+  auto allocator = context->drawingManager()->instanceAllocator();
+  DEBUG_ASSERT(allocator != nullptr);
+  auto lastBlock = allocator->currentBlock();
+  auto destination = allocator->allocate(dataSize);
+  if (destination == nullptr) {
+    LOGE("ProxyProvider::createInstanceBufferProxy() Failed to allocate memory!");
+    return nullptr;
+  }
+  auto offset = lastBlock.second;
+  auto currentBlock = allocator->currentBlock();
+  if (lastBlock.first != nullptr && lastBlock.first != currentBlock.first) {
+    DEBUG_ASSERT(sharedInstanceBuffer != nullptr);
+    auto blockData = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
+    uploadSharedInstanceBuffer(std::move(blockData));
+    offset = 0;
+  }
+  memcpy(destination, data, dataSize);
+  if (sharedInstanceBuffer == nullptr) {
+    sharedInstanceBuffer = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+    addResourceProxy(sharedInstanceBuffer);
+  }
+  return std::make_shared<VertexBufferView>(sharedInstanceBuffer, offset, dataSize);
+}
+
+void ProxyProvider::flushSharedInstanceBuffer() {
+  if (sharedInstanceBuffer != nullptr) {
+    auto allocator = context->drawingManager()->instanceAllocator();
+    auto lastBlock = allocator->currentBlock();
+    auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
+    uploadSharedInstanceBuffer(std::move(data));
+  }
+}
+
+void ProxyProvider::uploadSharedInstanceBuffer(std::shared_ptr<Data> data) {
+  DEBUG_ASSERT(sharedInstanceBuffer != nullptr);
+  auto dataSource = DataSource<Data>::Wrap(std::move(data));
+  auto task = context->drawingAllocator()->make<GPUBufferUploadTask>(
+      sharedInstanceBuffer, BufferType::Vertex, std::move(dataSource));
+  context->drawingManager()->addResourceTask(std::move(task));
+  sharedInstanceBuffer = nullptr;
+}
+
 void ProxyProvider::assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy,
                                          const UniqueKey& uniqueKey) {
   DEBUG_ASSERT(proxy != nullptr && proxy->context == context);
