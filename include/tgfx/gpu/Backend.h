@@ -26,7 +26,7 @@ namespace tgfx {
 /**
  * Possible GPU backend APIs that may be used by TGFX.
  */
-enum class Backend { Unknown, OpenGL, Metal, Vulkan, WebGPU, D3D11 };
+enum class Backend { Unknown, OpenGL, Metal, Vulkan, WebGPU };
 
 /**
  * Wrapper class for passing into and receiving data from TGFX about a backend texture object.
@@ -51,14 +51,6 @@ class BackendTexture {
    */
   BackendTexture(const MetalTextureInfo& metalInfo, int width, int height)
       : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
-  }
-
-  /**
-   * Creates a D3D11 backend texture. The d3d11Texture parameter is a pointer to an
-   * ID3D11Texture2D object.
-   */
-  BackendTexture(void* d3d11Texture, int width, int height)
-      : _backend(Backend::D3D11), _width(width), _height(height), d3d11Texture(d3d11Texture) {
   }
 
   BackendTexture(const BackendTexture& that) {
@@ -112,11 +104,6 @@ class BackendTexture {
    */
   bool getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const;
 
-  /**
-   * If the backend API is D3D11, returns the ID3D11Texture2D* pointer. Otherwise, returns nullptr.
-   */
-  void* getD3D11Texture() const;
-
  private:
   Backend _backend = Backend::Unknown;
   int _width = 0;
@@ -125,7 +112,6 @@ class BackendTexture {
   union {
     GLTextureInfo glInfo;
     MetalTextureInfo metalInfo;
-    void* d3d11Texture;
   };
 };
 
