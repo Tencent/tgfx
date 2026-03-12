@@ -2358,11 +2358,16 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     }
     // When a layer has both background styles and filters, the outer filter needs to sample
     // beyond the background content area. Expand the background outset to include the filter's
-    // sampling range.
-    if (backOutset > 0) {
-      for (auto& filter : _filters) {
-        auto filterOutset = filter->filterBounds(Rect::MakeEmpty(), 1.0f);
-        backOutset += std::max(filterOutset.right, filterOutset.bottom);
+    // sampling range. Use Reverse direction to calculate required input bounds.
+    if (backOutset > 0 && !_filters.empty()) {
+      auto imageFilter = getImageFilter(contentScale);
+      if (imageFilter) {
+        auto baseBounds = imageFilter->filterBounds(Rect::MakeEmpty(), MapDirection::Reverse);
+        if (!baseBounds.isEmpty()) {
+          auto maxOutset =
+              std::max({-baseBounds.left, -baseBounds.top, baseBounds.right, baseBounds.bottom});
+          backOutset += maxOutset;
+        }
       }
     }
   }
