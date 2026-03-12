@@ -32,6 +32,4 @@ size_t PixelFormatBytesPerPixel(PixelFormat format);
 
 PixelFormat MaskFormatToPixelFormat(MaskFormat format);
 
-PixelFormat MetalPixelFormatToPixelFormat(unsigned metalFormat);
-
 }  // namespace tgfx

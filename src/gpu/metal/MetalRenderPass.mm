@@ -19,11 +19,11 @@
 #include "MetalRenderPass.h"
 #include "MetalBuffer.h"
 #include "MetalCommandEncoder.h"
-#include "MetalDefines.h"
 #include "MetalRenderPipeline.h"
 #include "MetalSampler.h"
 #include "MetalShaderModule.h"
 #include "MetalTexture.h"
+#include "MetalUtil.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -58,9 +58,9 @@ MetalRenderPass::MetalRenderPass(MetalCommandEncoder* encoder, const RenderPassD
 
     metalRenderPassDescriptor.colorAttachments[i].texture = colorTexture->metalTexture();
     metalRenderPassDescriptor.colorAttachments[i].loadAction =
-        MetalDefines::ToMTLLoadAction(colorAttachment.loadAction);
+        ToMTLLoadAction(colorAttachment.loadAction);
     metalRenderPassDescriptor.colorAttachments[i].storeAction =
-        MetalDefines::ToMTLStoreAction(colorAttachment.storeAction);
+        ToMTLStoreAction(colorAttachment.storeAction);
 
     if (colorAttachment.loadAction == LoadAction::Clear) {
       auto clearColor = colorAttachment.clearValue;
@@ -85,15 +85,15 @@ MetalRenderPass::MetalRenderPass(MetalCommandEncoder* encoder, const RenderPassD
 
     metalRenderPassDescriptor.depthAttachment.texture = depthStencilTexture->metalTexture();
     metalRenderPassDescriptor.depthAttachment.loadAction =
-        MetalDefines::ToMTLLoadAction(descriptor.depthStencilAttachment.loadAction);
+        ToMTLLoadAction(descriptor.depthStencilAttachment.loadAction);
     metalRenderPassDescriptor.depthAttachment.storeAction =
-        MetalDefines::ToMTLStoreAction(descriptor.depthStencilAttachment.storeAction);
+        ToMTLStoreAction(descriptor.depthStencilAttachment.storeAction);
 
     metalRenderPassDescriptor.stencilAttachment.texture = depthStencilTexture->metalTexture();
     metalRenderPassDescriptor.stencilAttachment.loadAction =
-        MetalDefines::ToMTLLoadAction(descriptor.depthStencilAttachment.loadAction);
+        ToMTLLoadAction(descriptor.depthStencilAttachment.loadAction);
     metalRenderPassDescriptor.stencilAttachment.storeAction =
-        MetalDefines::ToMTLStoreAction(descriptor.depthStencilAttachment.storeAction);
+        ToMTLStoreAction(descriptor.depthStencilAttachment.storeAction);
 
     if (descriptor.depthStencilAttachment.loadAction == LoadAction::Clear) {
       metalRenderPassDescriptor.depthAttachment.clearDepth =
@@ -351,7 +351,7 @@ void MetalRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
     return;
   }
 
-  MTLPrimitiveType metalPrimitiveType = MetalDefines::ToMTLPrimitiveType(primitiveType);
+  MTLPrimitiveType metalPrimitiveType = ToMTLPrimitiveType(primitiveType);
   [renderEncoder drawPrimitives:metalPrimitiveType
                     vertexStart:firstVertex
                     vertexCount:vertexCount
@@ -366,7 +366,7 @@ void MetalRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCou
     return;
   }
 
-  MTLPrimitiveType metalPrimitiveType = MetalDefines::ToMTLPrimitiveType(primitiveType);
+  MTLPrimitiveType metalPrimitiveType = ToMTLPrimitiveType(primitiveType);
 
   // Convert IndexFormat to Metal types
   MTLIndexType indexType =

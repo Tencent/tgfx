@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalBuffer.h"
-#include "MetalDefines.h"
 #include "MetalGPU.h"
+#include "MetalUtil.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -29,7 +29,7 @@ std::shared_ptr<MetalBuffer> MetalBuffer::Make(MetalGPU* gpu, size_t size, uint3
   }
 
   // Create Metal buffer
-  MTLResourceOptions options = MetalDefines::ToMTLResourceOptions(usage);
+  MTLResourceOptions options = ToMTLResourceOptions(usage);
   id<MTLBuffer> metalBuffer = [gpu->device() newBufferWithLength:size options:options];
 
   if (!metalBuffer) {

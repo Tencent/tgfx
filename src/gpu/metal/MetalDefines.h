@@ -18,103 +18,33 @@
 
 #pragma once
 
-#include <Metal/Metal.h>
-#include "tgfx/gpu/Attribute.h"
-#include "tgfx/gpu/BlendFactor.h"
-#include "tgfx/gpu/BlendOperation.h"
-#include "tgfx/gpu/CompareFunction.h"
-#include "tgfx/gpu/FilterMode.h"
-#include "tgfx/gpu/MipmapMode.h"
-#include "tgfx/gpu/RenderPass.h"
-#include "tgfx/gpu/Sampler.h"
-#include "tgfx/gpu/StencilOperation.h"
+#include "tgfx/gpu/PixelFormat.h"
 
 namespace tgfx {
 
-/**
- * Metal-specific constants and utility definitions.
- */
-class MetalDefines {
- public:
-  /**
-   * Convert TGFX texture usage to Metal texture usage.
-   */
-  static MTLTextureUsage ToMTLTextureUsage(uint32_t usage);
+// MTLPixelFormat values (from Metal headers)
+#define MTL_PIXEL_FORMAT_R8Unorm 10
+#define MTL_PIXEL_FORMAT_RG8Unorm 30
+#define MTL_PIXEL_FORMAT_RGBA8Unorm 70
+#define MTL_PIXEL_FORMAT_BGRA8Unorm 80
+#define MTL_PIXEL_FORMAT_Depth24Unorm_Stencil8 255
+#define MTL_PIXEL_FORMAT_Depth32Float_Stencil8 260
 
-  /**
-   * Convert TGFX buffer usage to Metal resource options.
-   */
-  static MTLResourceOptions ToMTLResourceOptions(uint32_t usage);
-
-  /**
-   * Convert TGFX primitive type to Metal primitive type.
-   */
-  static MTLPrimitiveType ToMTLPrimitiveType(PrimitiveType primitiveType);
-
-  /**
-   * Convert TGFX vertex format to Metal vertex format.
-   */
-  static MTLVertexFormat ToMTLVertexFormat(VertexFormat format);
-
-  /**
-   * Convert TGFX compare function to Metal compare function.
-   */
-  static MTLCompareFunction ToMTLCompareFunction(CompareFunction compareFunction);
-
-  /**
-   * Convert TGFX stencil operation to Metal stencil operation.
-   */
-  static MTLStencilOperation ToMTLStencilOperation(StencilOperation stencilOp);
-
-  /**
-   * Convert TGFX blend factor to Metal blend factor.
-   */
-  static MTLBlendFactor ToMTLBlendFactor(BlendFactor blendFactor);
-
-  /**
-   * Convert TGFX blend operation to Metal blend operation.
-   */
-  static MTLBlendOperation ToMTLBlendOperation(BlendOperation blendOp);
-
-  /**
-   * Convert TGFX sampler address mode to Metal sampler address mode.
-   */
-  static MTLSamplerAddressMode ToMTLSamplerAddressMode(AddressMode addressMode);
-
-  /**
-   * Convert TGFX sampler filter to Metal sampler filter.
-   */
-  static MTLSamplerMinMagFilter ToMTLSamplerFilter(FilterMode filter);
-
-  /**
-   * Convert TGFX sampler mipmap filter to Metal sampler mipmap filter.
-   */
-  static MTLSamplerMipFilter ToMTLSamplerMipFilter(MipmapMode filter);
-
-  /**
-   * Get the bytes per pixel for a Metal pixel format.
-   */
-  static size_t GetBytesPerPixel(MTLPixelFormat format);
-
-  /**
-   * Convert TGFX load action to Metal load action.
-   */
-  static MTLLoadAction ToMTLLoadAction(LoadAction loadAction);
-
-  /**
-   * Convert TGFX store action to Metal store action.
-   */
-  static MTLStoreAction ToMTLStoreAction(StoreAction storeAction);
-
-  /**
-   * Convert TGFX cull mode to Metal cull mode.
-   */
-  static MTLCullMode ToMTLCullMode(CullMode cullMode);
-
-  /**
-   * Convert TGFX front face to Metal winding order.
-   */
-  static MTLWinding ToMTLWinding(FrontFace frontFace);
-};
+inline PixelFormat MetalPixelFormatToPixelFormat(unsigned metalFormat) {
+  switch (metalFormat) {
+    case MTL_PIXEL_FORMAT_R8Unorm:
+      return PixelFormat::ALPHA_8;
+    case MTL_PIXEL_FORMAT_RG8Unorm:
+      return PixelFormat::RG_88;
+    case MTL_PIXEL_FORMAT_BGRA8Unorm:
+      return PixelFormat::BGRA_8888;
+    case MTL_PIXEL_FORMAT_Depth24Unorm_Stencil8:
+    case MTL_PIXEL_FORMAT_Depth32Float_Stencil8:
+      return PixelFormat::DEPTH24_STENCIL8;
+    case MTL_PIXEL_FORMAT_RGBA8Unorm:
+    default:
+      return PixelFormat::RGBA_8888;
+  }
+}
 
 }  // namespace tgfx

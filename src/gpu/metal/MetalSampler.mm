@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalSampler.h"
-#include "MetalDefines.h"
 #include "MetalGPU.h"
+#include "MetalUtil.h"
 
 namespace tgfx {
 
@@ -32,13 +32,13 @@ std::shared_ptr<MetalSampler> MetalSampler::Make(MetalGPU* gpu,
   MTLSamplerDescriptor* metalDescriptor = [[MTLSamplerDescriptor alloc] init];
 
   // Set filtering
-  metalDescriptor.minFilter = MetalDefines::ToMTLSamplerFilter(descriptor.minFilter);
-  metalDescriptor.magFilter = MetalDefines::ToMTLSamplerFilter(descriptor.magFilter);
-  metalDescriptor.mipFilter = MetalDefines::ToMTLSamplerMipFilter(descriptor.mipmapMode);
+  metalDescriptor.minFilter = ToMTLSamplerFilter(descriptor.minFilter);
+  metalDescriptor.magFilter = ToMTLSamplerFilter(descriptor.magFilter);
+  metalDescriptor.mipFilter = ToMTLSamplerMipFilter(descriptor.mipmapMode);
 
   // Set address modes
-  metalDescriptor.sAddressMode = MetalDefines::ToMTLSamplerAddressMode(descriptor.addressModeX);
-  metalDescriptor.tAddressMode = MetalDefines::ToMTLSamplerAddressMode(descriptor.addressModeY);
+  metalDescriptor.sAddressMode = ToMTLSamplerAddressMode(descriptor.addressModeX);
+  metalDescriptor.tAddressMode = ToMTLSamplerAddressMode(descriptor.addressModeY);
 
   // Set border color (if supported)
   if (descriptor.addressModeX == AddressMode::ClampToBorder ||

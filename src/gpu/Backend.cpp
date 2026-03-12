@@ -17,10 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Backend.h"
-#include "core/utils/PixelFormatUtil.h"
+#include "metal/MetalDefines.h"
 #include "opengl/GLDefines.h"
 
 namespace tgfx {
+
 static PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat) {
   switch (sizeFormat) {
     case GL_BGRA:
