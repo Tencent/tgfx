@@ -35,6 +35,8 @@
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
+class InstanceProvider;
+
 /**
  * A factory for creating proxy-derived objects.
  */
@@ -74,12 +76,12 @@ class ProxyProvider {
                                                             uint32_t renderFlags = 0);
 
   /**
-   * Allocates a region of the given size from the shared instance buffer and returns a writable
-   * pointer along with a VertexBufferView pointing to the allocated region. The caller should write
-   * instance data directly into the returned pointer. The data is uploaded to the GPU in a single
-   * batch when flushSharedInstanceBuffer() is called. Returns nullptr if the allocation fails.
+   * Creates a VertexBufferView from the given InstanceProvider. The provider writes instance data
+   * into the shared instance buffer. The data is uploaded to the GPU in a single batch when
+   * flushSharedInstanceBuffer() is called. Returns nullptr if the allocation fails.
    */
-  std::shared_ptr<VertexBufferView> createInstanceBufferProxy(size_t dataSize, void** data);
+  std::shared_ptr<VertexBufferView> createInstanceBufferProxy(
+      PlacementPtr<InstanceProvider> provider);
 
   /**
    * Creates a GPUShapeProxy for the given Shape. The shape will be released after being uploaded to

@@ -27,6 +27,7 @@
 #include "core/utils/USE.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/InstanceProvider.h"
 #include "gpu/proxies/DefaultTextureProxy.h"
 #include "gpu/proxies/ExternalTextureRenderTargetProxy.h"
 #include "gpu/proxies/HardwareRenderTargetProxy.h"
@@ -126,11 +127,12 @@ void ProxyProvider::flushSharedVertexBuffer() {
   }
 }
 
-std::shared_ptr<VertexBufferView> ProxyProvider::createInstanceBufferProxy(size_t dataSize,
-                                                                           void** data) {
-  if (dataSize == 0 || data == nullptr) {
+std::shared_ptr<VertexBufferView> ProxyProvider::createInstanceBufferProxy(
+    PlacementPtr<InstanceProvider> provider) {
+  if (provider == nullptr || provider->dataSize() == 0) {
     return nullptr;
   }
+  auto dataSize = provider->dataSize();
   auto allocator = context->drawingManager()->instanceAllocator();
   DEBUG_ASSERT(allocator != nullptr);
   auto lastBlock = allocator->currentBlock();
@@ -147,7 +149,7 @@ std::shared_ptr<VertexBufferView> ProxyProvider::createInstanceBufferProxy(size_
     uploadSharedInstanceBuffer(std::move(blockData));
     offset = 0;
   }
-  *data = destination;
+  provider->getData(destination);
   if (sharedInstanceBuffer == nullptr) {
     sharedInstanceBuffer = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
     addResourceProxy(sharedInstanceBuffer);

@@ -32,7 +32,7 @@ class ShapeInstancedDrawOp : public DrawOp {
                                                  size_t count, PMColor gpColor,
                                                  const Matrix& uvMatrix, const Matrix& stateMatrix,
                                                  AAType aaType,
-                                                 std::shared_ptr<ColorSpace> dstColorSpace);
+                                                 const std::shared_ptr<ColorSpace>& dstColorSpace);
 
   bool hasCoverage() const override;
 

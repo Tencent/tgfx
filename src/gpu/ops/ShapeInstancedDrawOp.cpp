@@ -17,11 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeInstancedDrawOp.h"
-#include "core/ColorSpaceXformSteps.h"
 #include "core/PathTriangulator.h"
-#include "core/utils/ColorHelper.h"
-#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
+#include "gpu/InstanceProvider.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
@@ -30,62 +28,26 @@
 
 namespace tgfx {
 
-struct InstanceRecord {
-  float matrixCol0[2];  // [scaleX, skewY]
-  float matrixCol1[2];  // [skewX, scaleY]
-  float matrixCol2[2];  // [transX, transY]
-};
-
-struct InstanceRecordWithColor {
-  float matrixCol0[2];
-  float matrixCol1[2];
-  float matrixCol2[2];
-  uint32_t color;  // UByte4Normalized premultiplied RGBA
-};
-
-static void FillInstanceRecord(void* buffer, const Matrix& matrix) {
-  auto record = static_cast<InstanceRecord*>(buffer);
-  record->matrixCol0[0] = matrix.getScaleX();
-  record->matrixCol0[1] = matrix.getSkewY();
-  record->matrixCol1[0] = matrix.getSkewX();
-  record->matrixCol1[1] = matrix.getScaleY();
-  record->matrixCol2[0] = matrix.getTranslateX();
-  record->matrixCol2[1] = matrix.getTranslateY();
-}
-
 PlacementPtr<ShapeInstancedDrawOp> ShapeInstancedDrawOp::Make(
     std::shared_ptr<GPUShapeProxy> shapeProxy, const Matrix* matrices, const Color* colors,
     size_t count, PMColor gpColor, const Matrix& uvMatrix, const Matrix& stateMatrix, AAType aaType,
-    std::shared_ptr<ColorSpace> dstColorSpace) {
+    const std::shared_ptr<ColorSpace>& dstColorSpace) {
   if (shapeProxy == nullptr || matrices == nullptr || count == 0) {
     return nullptr;
   }
   auto context = shapeProxy->getContext();
-  bool hasColors = colors != nullptr;
-  size_t instanceStride = hasColors ? sizeof(InstanceRecordWithColor) : sizeof(InstanceRecord);
-  size_t instanceBufferSize = instanceStride * count;
-  void* instanceData = nullptr;
+  auto drawingAllocator = context->drawingAllocator();
+  auto provider =
+      InstanceProvider::MakeFrom(drawingAllocator, matrices, colors, count, dstColorSpace);
+  if (provider == nullptr) {
+    return nullptr;
+  }
+  bool hasColors = provider->hasColors();
   auto instanceBufferProxy =
-      context->proxyProvider()->createInstanceBufferProxy(instanceBufferSize, &instanceData);
+      context->proxyProvider()->createInstanceBufferProxy(std::move(provider));
   if (instanceBufferProxy == nullptr) {
     return nullptr;
   }
-  std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
-  if (hasColors && NeedConvertColorSpace(ColorSpace::SRGB(), dstColorSpace)) {
-    steps =
-        std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
-                                               dstColorSpace.get(), AlphaType::Premultiplied);
-  }
-  auto buffer = instanceData;
-  for (size_t i = 0; i < count; i++) {
-    FillInstanceRecord(buffer, matrices[i]);
-    if (hasColors) {
-      auto colorRecord = static_cast<InstanceRecordWithColor*>(buffer);
-      colorRecord->color = ToUintPMColor(colors[i], steps.get());
-    }
-    buffer = static_cast<uint8_t*>(buffer) + instanceStride;
-  }
-  auto drawingAllocator = context->drawingAllocator();
   return drawingAllocator->make<ShapeInstancedDrawOp>(
       drawingAllocator, std::move(shapeProxy), std::move(instanceBufferProxy), hasColors, count,
       gpColor, uvMatrix, stateMatrix, aaType);
