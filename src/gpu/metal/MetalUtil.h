@@ -25,7 +25,6 @@
 #include "tgfx/gpu/CompareFunction.h"
 #include "tgfx/gpu/FilterMode.h"
 #include "tgfx/gpu/MipmapMode.h"
-#include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/gpu/RenderPass.h"
 #include "tgfx/gpu/Sampler.h"
 #include "tgfx/gpu/StencilOperation.h"
@@ -63,7 +62,5 @@ MTLStoreAction ToMTLStoreAction(StoreAction storeAction);
 MTLCullMode ToMTLCullMode(CullMode cullMode);
 
 MTLWinding ToMTLWinding(FrontFace frontFace);
-
-PixelFormat MTLPixelFormatToPixelFormat(MTLPixelFormat metalFormat);
 
 }  // namespace tgfx

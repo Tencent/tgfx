@@ -331,22 +331,4 @@ MTLWinding ToMTLWinding(FrontFace frontFace) {
   return MTLWindingCounterClockwise;
 }
 
-PixelFormat MTLPixelFormatToPixelFormat(MTLPixelFormat metalFormat) {
-  switch (metalFormat) {
-    case MTLPixelFormatR8Unorm:
-      return PixelFormat::ALPHA_8;
-    case MTLPixelFormatRG8Unorm:
-      return PixelFormat::RG_88;
-    case MTLPixelFormatBGRA8Unorm:
-      return PixelFormat::BGRA_8888;
-    case MTLPixelFormatDepth24Unorm_Stencil8:
-    case MTLPixelFormatDepth32Float_Stencil8:
-      return PixelFormat::DEPTH24_STENCIL8;
-    case MTLPixelFormatRGBA8Unorm:
-      return PixelFormat::RGBA_8888;
-    default:
-      return PixelFormat::Unknown;
-  }
-}
-
 }  // namespace tgfx
