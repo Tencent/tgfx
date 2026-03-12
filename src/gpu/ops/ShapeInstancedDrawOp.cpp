@@ -64,9 +64,10 @@ PlacementPtr<ShapeInstancedDrawOp> ShapeInstancedDrawOp::Make(
   bool hasColors = colors != nullptr;
   size_t instanceStride = hasColors ? sizeof(InstanceRecordWithColor) : sizeof(InstanceRecord);
   size_t instanceBufferSize = instanceStride * count;
-  auto drawingAllocator = context->drawingAllocator();
-  auto instanceData = drawingAllocator->allocate(instanceBufferSize);
-  if (instanceData == nullptr) {
+  void* instanceData = nullptr;
+  auto instanceBufferProxy =
+      context->proxyProvider()->createInstanceBufferProxy(instanceBufferSize, &instanceData);
+  if (instanceBufferProxy == nullptr) {
     return nullptr;
   }
   std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
@@ -84,11 +85,7 @@ PlacementPtr<ShapeInstancedDrawOp> ShapeInstancedDrawOp::Make(
     }
     buffer = static_cast<uint8_t*>(buffer) + instanceStride;
   }
-  auto instanceBufferProxy =
-      context->proxyProvider()->createInstanceBufferProxy(instanceData, instanceBufferSize);
-  if (instanceBufferProxy == nullptr) {
-    return nullptr;
-  }
+  auto drawingAllocator = context->drawingAllocator();
   return drawingAllocator->make<ShapeInstancedDrawOp>(
       drawingAllocator, std::move(shapeProxy), std::move(instanceBufferProxy), hasColors, count,
       gpColor, uvMatrix, stateMatrix, aaType);

@@ -74,11 +74,12 @@ class ProxyProvider {
                                                             uint32_t renderFlags = 0);
 
   /**
-   * Allocates a region from the shared instance buffer and writes instance data into it. Returns a
-   * VertexBufferView pointing to the allocated region. The data is uploaded to the GPU in a single
-   * batch when flushSharedInstanceBuffer() is called.
+   * Allocates a region of the given size from the shared instance buffer and returns a writable
+   * pointer along with a VertexBufferView pointing to the allocated region. The caller should write
+   * instance data directly into the returned pointer. The data is uploaded to the GPU in a single
+   * batch when flushSharedInstanceBuffer() is called. Returns nullptr if the allocation fails.
    */
-  std::shared_ptr<VertexBufferView> createInstanceBufferProxy(const void* data, size_t dataSize);
+  std::shared_ptr<VertexBufferView> createInstanceBufferProxy(size_t dataSize, void** data);
 
   /**
    * Creates a GPUShapeProxy for the given Shape. The shape will be released after being uploaded to

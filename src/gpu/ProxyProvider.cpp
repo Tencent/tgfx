@@ -126,9 +126,9 @@ void ProxyProvider::flushSharedVertexBuffer() {
   }
 }
 
-std::shared_ptr<VertexBufferView> ProxyProvider::createInstanceBufferProxy(const void* data,
-                                                                           size_t dataSize) {
-  if (data == nullptr || dataSize == 0) {
+std::shared_ptr<VertexBufferView> ProxyProvider::createInstanceBufferProxy(size_t dataSize,
+                                                                           void** data) {
+  if (dataSize == 0 || data == nullptr) {
     return nullptr;
   }
   auto allocator = context->drawingManager()->instanceAllocator();
@@ -147,7 +147,7 @@ std::shared_ptr<VertexBufferView> ProxyProvider::createInstanceBufferProxy(const
     uploadSharedInstanceBuffer(std::move(blockData));
     offset = 0;
   }
-  memcpy(destination, data, dataSize);
+  *data = destination;
   if (sharedInstanceBuffer == nullptr) {
     sharedInstanceBuffer = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
     addResourceProxy(sharedInstanceBuffer);
