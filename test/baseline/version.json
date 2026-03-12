@@ -232,6 +232,8 @@
     },
     "LayerTest": {
         "AdaptiveDashEffect": "eefb7a46",
+        "BackgroundBlurWithFilter_Partial": "ad116c00",
+        "BackgroundBlurWithFilter_Tiled": "ad116c00",
         "BottomLeftSurface": "543054b5",
         "Contour3DWithDropShadow": "9e2c8c8ee",
         "ContourTest": "1642114b",

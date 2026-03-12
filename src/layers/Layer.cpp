@@ -2356,6 +2356,15 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       backOutset = std::max(backOutset, outset.right);
       backOutset = std::max(backOutset, outset.bottom);
     }
+    // When a layer has both background styles and filters, the outer filter needs to sample
+    // beyond the background content area. Expand the background outset to include the filter's
+    // sampling range.
+    if (backOutset > 0) {
+      for (auto& filter : _filters) {
+        auto filterOutset = filter->filterBounds(Rect::MakeEmpty(), 1.0f);
+        backOutset += std::max(filterOutset.right, filterOutset.bottom);
+      }
+    }
   }
   if (backOutset > 0) {
     maxBackgroundOutset = std::max(backOutset, maxBackgroundOutset);
