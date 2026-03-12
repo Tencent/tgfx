@@ -60,6 +60,14 @@ void ShapeInstancedLayer::setColors(std::vector<Color> colors) {
   invalidateContent();
 }
 
+void ShapeInstancedLayer::setColorRole(ColorRole role) {
+  if (_colorRole == role) {
+    return;
+  }
+  _colorRole = role;
+  invalidateContent();
+}
+
 void ShapeInstancedLayer::setFillStyles(std::vector<std::shared_ptr<ShapeStyle>> fills) {
   if (_fillStyles.size() == fills.size() &&
       std::equal(_fillStyles.begin(), _fillStyles.end(), fills.begin())) {
@@ -205,26 +213,34 @@ void ShapeInstancedLayer::onUpdateContent(LayerRecorder* recorder) {
     return;
   }
 
-  bool hasFill = !_fillStyles.empty() || !_colors.empty();
-  bool hasStroke = stroke.width > 0 && (!_strokeStyles.empty() || !_colors.empty());
+  bool colorForFill =
+      !_colors.empty() && (_colorRole == ColorRole::Fill || _colorRole == ColorRole::FillAndStroke);
+  bool colorForStroke = !_colors.empty() &&
+                        (_colorRole == ColorRole::Stroke || _colorRole == ColorRole::FillAndStroke);
+  bool hasFill = !_fillStyles.empty() || colorForFill;
+  bool hasStroke = stroke.width > 0 && (!_strokeStyles.empty() || colorForStroke);
 
   if (!hasFill && !hasStroke) {
     return;
   }
 
+  static const std::vector<Color> emptyColors = {};
+  const auto& fillColors = colorForFill ? _colors : emptyColors;
+  const auto& strokeColors = colorForStroke ? _colors : emptyColors;
+
   if (hasFill) {
     if (_fillStyles.empty()) {
-      recorder->addShapeInstanced(_shape, _matrices, _colors, LayerPaint(Color::White()));
+      recorder->addShapeInstanced(_shape, _matrices, fillColors, LayerPaint(Color::White()));
     } else {
       for (const auto& style : _fillStyles) {
         LayerPaint paint(style->color(), style->blendMode());
         paint.shader = style->shader();
-        recorder->addShapeInstanced(_shape, _matrices, _colors, paint);
+        recorder->addShapeInstanced(_shape, _matrices, fillColors, paint);
       }
     }
   } else {
     // Create a contour-only content for the shape (transparent color, no shader).
-    recorder->addShapeInstanced(_shape, _matrices, _colors, LayerPaint(Color::Transparent()));
+    recorder->addShapeInstanced(_shape, _matrices, emptyColors, LayerPaint(Color::Transparent()));
   }
 
   if (hasStroke) {
@@ -243,9 +259,9 @@ void ShapeInstancedLayer::onUpdateContent(LayerRecorder* recorder) {
       if (simpleStroke) {
         paint.style = PaintStyle::Stroke;
         paint.stroke = stroke;
-        recorder->addShapeInstanced(_shape, _matrices, _colors, paint);
+        recorder->addShapeInstanced(_shape, _matrices, strokeColors, paint);
       } else {
-        recorder->addShapeInstanced(strokeShape, _matrices, _colors, paint);
+        recorder->addShapeInstanced(strokeShape, _matrices, strokeColors, paint);
       }
     } else {
       for (const auto& style : _strokeStyles) {
@@ -257,9 +273,9 @@ void ShapeInstancedLayer::onUpdateContent(LayerRecorder* recorder) {
         if (simpleStroke) {
           paint.style = PaintStyle::Stroke;
           paint.stroke = stroke;
-          recorder->addShapeInstanced(_shape, _matrices, _colors, paint);
+          recorder->addShapeInstanced(_shape, _matrices, strokeColors, paint);
         } else {
-          recorder->addShapeInstanced(strokeShape, _matrices, _colors, paint);
+          recorder->addShapeInstanced(strokeShape, _matrices, strokeColors, paint);
         }
       }
     }

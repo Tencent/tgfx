@@ -27,6 +27,25 @@
 
 namespace tgfx {
 /**
+ * Defines the role of per-instance colors in ShapeInstancedLayer, determining whether they apply to
+ * fill, stroke, or both.
+ */
+enum class ColorRole {
+  /**
+   * Per-instance colors are used only for fill rendering. This is the default value.
+   */
+  Fill,
+  /**
+   * Per-instance colors are used only for stroke rendering.
+   */
+  Stroke,
+  /**
+   * Per-instance colors are used for both fill and stroke rendering.
+   */
+  FillAndStroke
+};
+
+/**
  * ShapeInstancedLayer is a layer that draws multiple instances of the same shape with different
  * transformations and optional per-instance colors. All instances share the same geometry, enabling
  * efficient batched rendering via GPU instancing.
@@ -76,9 +95,24 @@ class ShapeInstancedLayer : public Layer {
 
   /**
    * Sets the per-instance colors. If provided, the vector must have the same number of elements as
-   * matrices. Pass an empty vector to use paint color or shader color only.
+   * matrices. Pass an empty vector to use paint color or shader color only. The colorRole property
+   * determines whether these colors apply to fill, stroke, or both.
    */
   void setColors(std::vector<Color> colors);
+
+  /**
+   * Returns the role of per-instance colors, determining whether they apply to fill, stroke, or
+   * both. The default value is ColorRole::Fill.
+   */
+  ColorRole colorRole() const {
+    return _colorRole;
+  }
+
+  /**
+   * Sets the role of per-instance colors. Use ColorRole::Fill to apply colors only to fill
+   * rendering, ColorRole::Stroke for stroke only, or ColorRole::FillAndStroke for both.
+   */
+  void setColorRole(ColorRole role);
 
   /**
    * Returns the list of fill styles used to fill the instances. Each style contains a shader, alpha,
@@ -116,9 +150,9 @@ class ShapeInstancedLayer : public Layer {
   /**
    * Returns the list of stroke styles used to stroke the instances. Each style contains a shader,
    * alpha, and blend mode. The stroke styles are drawn in the order they are added, after the fill
-   * styles. If the stroke styles list is empty, the instances will not be stroked unless
-   * per-instance colors are set and lineWidth is greater than 0. By default, the stroke styles list
-   * is empty.
+   * styles. If the stroke styles list is empty, the instances will only be stroked when per-instance
+   * colors are set with colorRole set to Stroke or FillAndStroke, and lineWidth is greater than 0.
+   * By default, the stroke styles list is empty.
    */
   const std::vector<std::shared_ptr<ShapeStyle>>& strokeStyles() const {
     return _strokeStyles;
@@ -272,6 +306,7 @@ class ShapeInstancedLayer : public Layer {
   std::shared_ptr<Shape> _shape = nullptr;
   std::vector<Matrix> _matrices = {};
   std::vector<Color> _colors = {};
+  ColorRole _colorRole = ColorRole::Fill;
   std::vector<std::shared_ptr<ShapeStyle>> _fillStyles = {};
   std::vector<std::shared_ptr<ShapeStyle>> _strokeStyles = {};
   Stroke stroke = {};

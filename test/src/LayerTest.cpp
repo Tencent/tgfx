@@ -3432,6 +3432,7 @@ TGFX_TEST(LayerTest, ShapeInstancedLayer) {
       Color::Blue(),
   };
   instancedLayer->setColors(colors);
+  instancedLayer->setColorRole(ColorRole::FillAndStroke);
 
   instancedLayer->setLineWidth(10);
   instancedLayer->setLineCap(LineCap::Butt);
