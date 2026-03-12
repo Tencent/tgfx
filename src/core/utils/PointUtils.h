@@ -18,33 +18,38 @@
 
 #pragma once
 
-#include "gpu/opengl/GLBuffer.h"
-#include "gpu/opengl/GLState.h"
-#include "gpu/opengl/GLTexture.h"
+#include "core/utils/Log.h"
+#include "tgfx/core/Point.h"
 
 namespace tgfx {
-/**
- * GLTextureBuffer is a readback buffer implementation that uses a texture as an intermediate buffer
- * to read pixels from the GPU when PBO is not supported.
- */
-class GLTextureBuffer : public GLBuffer {
+
+class PointUtils {
  public:
-  GLTextureBuffer(std::shared_ptr<GLInterface> interface, std::shared_ptr<GLState> state,
-                  size_t size);
+  enum class Side {
+    Left = -1,
+    On = 0,
+    Right = 1,
+  };
 
-  void* map(size_t offset, size_t size) override;
+  static float LengthSquared(const Point& p) {
+    return (p.x * p.x) + (p.y * p.y);
+  }
 
-  void unmap() override;
+  static bool SetLength(Point& point, float length);
 
-  std::shared_ptr<Texture> acquireTexture(GPU* gpu, std::shared_ptr<Texture> srcTexture,
-                                          const Rect& srcRect, size_t dstOffset,
-                                          size_t dstRowBytes);
+  static float DistanceSquared(const Point& a, const Point& b) {
+    float dx = a.x - b.x;
+    float dy = a.y - b.y;
+    return (dx * dx) + (dy * dy);
+  }
 
- private:
-  std::shared_ptr<GLState> state = nullptr;
-  std::shared_ptr<Texture> texture = nullptr;
-  size_t readOffset = 0;
-  size_t readRowBytes = 0;
-  void* bufferData = nullptr;
+  static float DistanceToLineBetweenSquared(const Point& point, const Point& linePointA,
+                                            const Point& linePointB, Side* side = nullptr);
+
+  static Point MakeOrthogonal(const Point& vec, Side side = Side::Left) {
+    DEBUG_ASSERT((side == Side::Right || side == Side::Left));
+    return (side == Side::Right) ? Point::Make(-vec.y, vec.x) : Point::Make(vec.y, -vec.x);
+  }
 };
+
 }  // namespace tgfx

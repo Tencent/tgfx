@@ -64,8 +64,7 @@ class Mesh {
    * @param indices Index array (optional, uint16_t).
    */
   static std::shared_ptr<Mesh> MakeCopy(MeshTopology topology, int vertexCount,
-                                        const Point* positions,
-                                        const Point* texCoords = nullptr,
+                                        const Point* positions, const Point* texCoords = nullptr,
                                         const Color* colors = nullptr, int indexCount = 0,
                                         const uint16_t* indices = nullptr);
 

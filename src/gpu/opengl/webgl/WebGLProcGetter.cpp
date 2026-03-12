@@ -30,6 +30,7 @@ void* WebGLProcGetter::getProcAddress(const char* name) const {
   }
 
   GL_CORE_FUNCTIONS_EACH(M)
+  M(glGetBufferSubData)
   M(glBindVertexArrayOES)
   M(glDeleteVertexArraysOES)
   M(glGenVertexArraysOES)

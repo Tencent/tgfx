@@ -754,4 +754,42 @@ TGFX_TEST(SVGRenderTest, WideGamutColorSpaces) {
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/widegamut"));
 }
 
+TGFX_TEST(SVGRenderTest, MixBlendModeCustomAttribute) {
+  auto stream =
+      Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/mixBlendMode.svg"));
+  ASSERT_TRUE(stream != nullptr);
+  auto SVGDom = SVGDOM::Make(*stream);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
+
+  auto children = rootNode->getChildren();
+  ASSERT_TRUE(children.size() >= 3);
+
+  // children[1]: second path with style="mix-blend-mode:screen"
+  {
+    auto attributes = children[1]->getCustomAttributes();
+    bool found = false;
+    for (const auto& attr : attributes) {
+      if (attr.name == "mix-blend-mode") {
+        EXPECT_EQ(attr.value, "screen");
+        found = true;
+      }
+    }
+    EXPECT_TRUE(found);
+  }
+
+  // children[2]: g element with style="mix-blend-mode:overlay"
+  {
+    auto attributes = children[2]->getCustomAttributes();
+    bool found = false;
+    for (const auto& attr : attributes) {
+      if (attr.name == "mix-blend-mode") {
+        EXPECT_EQ(attr.value, "overlay");
+        found = true;
+      }
+    }
+    EXPECT_TRUE(found);
+  }
+}
+
 }  // namespace tgfx

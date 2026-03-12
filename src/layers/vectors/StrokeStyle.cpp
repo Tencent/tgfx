@@ -22,24 +22,10 @@
 #include "VectorContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
-#include "tgfx/core/PathEffect.h"
+#include "layers/DashEffect.h"
 #include "tgfx/layers/LayerRecorder.h"
 
 namespace tgfx {
-
-static std::shared_ptr<PathEffect> CreateDashEffect(const std::vector<float>& dashes,
-                                                    float dashOffset, bool adaptive) {
-  if (dashes.empty()) {
-    return nullptr;
-  }
-  auto dashCount = dashes.size();
-  std::vector<float> dashList = dashes;
-  if (dashCount % 2 == 1) {
-    dashList.insert(dashList.end(), dashes.begin(), dashes.end());
-  }
-  return PathEffect::MakeDash(dashList.data(), static_cast<int>(dashList.size()), dashOffset,
-                              adaptive);
-}
 
 static float BlendStrokeWidth(float base, const GlyphStyle& style) {
   if (style.strokeWidthFactor <= 0.0f) {
@@ -403,7 +389,7 @@ void StrokeStyle::apply(VectorContext* context) {
   painter->stroke = _stroke;
   painter->strokeAlign = _strokeAlign;
   if (_cachedDashEffect == nullptr && !_dashes.empty()) {
-    _cachedDashEffect = CreateDashEffect(_dashes, _dashOffset, _dashAdaptive);
+    _cachedDashEffect = CreateDashPathEffect(_dashes, _dashOffset, _dashAdaptive, _stroke);
   }
   painter->pathEffect = _cachedDashEffect;
   context->painters.push_back(std::move(painter));

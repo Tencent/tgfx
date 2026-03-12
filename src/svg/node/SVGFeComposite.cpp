@@ -56,6 +56,7 @@ BlendMode SVGFeComposite::BlendModeForOperator(SVGFeCompositeOperator op) {
       ASSERT(false);
       return BlendMode::SrcOver;
   }
+  return BlendMode::SrcOver;
 }
 
 std::shared_ptr<ImageFilter> SVGFeComposite::onMakeImageFilter(

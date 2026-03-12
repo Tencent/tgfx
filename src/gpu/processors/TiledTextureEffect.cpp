@@ -57,6 +57,7 @@ TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(TileMode tileMo
           return ShaderMode::ClampToBorderLinear;
       }
   }
+  return ShaderMode::None;
 }
 
 TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerState sampler,

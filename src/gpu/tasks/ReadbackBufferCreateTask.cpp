@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ReadbackBufferCreateTask.h"
-#include "core/utils/UniqueID.h"
 #include "gpu/resources/BufferResource.h"
-#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 ReadbackBufferCreateTask::ReadbackBufferCreateTask(std::shared_ptr<GPUBufferProxy> proxy,
@@ -29,22 +27,12 @@ ReadbackBufferCreateTask::ReadbackBufferCreateTask(std::shared_ptr<GPUBufferProx
 }
 
 std::shared_ptr<Resource> ReadbackBufferCreateTask::onMakeResource(Context* context) {
-  static const uint32_t ReadbackBufferType = UniqueID::Next();
-  BytesKey bytesKey(2);
-  bytesKey.write(ReadbackBufferType);
-  bytesKey.write(static_cast<uint32_t>(size));
-  ScratchKey scratchKey = bytesKey;
-  auto resource = Resource::Find<BufferResource>(context, scratchKey);
-  if (resource != nullptr) {
-    return resource;
-  }
-  auto gpu = context->gpu();
-  auto gpuBuffer = gpu->createBuffer(size, GPUBufferUsage::READBACK);
-  if (!gpuBuffer) {
+  auto bufferResource = BufferResource::FindOrCreate(context, size, GPUBufferUsage::READBACK);
+  if (!bufferResource) {
     LOGE("ReadbackBufferCreateTask::onMakeResource() Failed to create buffer!");
     return nullptr;
   }
-  return BufferResource::Wrap(context, std::move(gpuBuffer), scratchKey);
+  return bufferResource;
 }
 
 }  // namespace tgfx

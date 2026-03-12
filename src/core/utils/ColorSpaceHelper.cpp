@@ -54,6 +54,7 @@ std::shared_ptr<ColorSpace> MakeColorSpaceFromYUVColorSpace(YUVColorSpace yuvCol
     case YUVColorSpace::BT2020_LIMITED:
       return ColorSpace::MakeRGB(NamedTransferFunction::Rec2020, NamedGamut::Rec2020);
   }
+  return nullptr;
 }
 
 std::shared_ptr<ColorSpace> AndroidDataSpaceToColorSpace(int standard, int transfer) {

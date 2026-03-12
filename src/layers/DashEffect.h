@@ -16,23 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ScalePixelsAlpha.h"
-#include <cmath>
+#pragma once
+
+#include "tgfx/core/PathEffect.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
-void ScalePixelsAlpha(const ImageInfo& info, void* pixels, float alphaScale) {
-  if (alphaScale >= 1.f) {
-    return;
-  }
-  auto buffer = static_cast<unsigned char*>(pixels);
-  auto width = static_cast<size_t>(info.width());
-  auto height = static_cast<size_t>(info.height());
-  auto rowBytes = info.rowBytes();
-  for (size_t y = 0; y < height; ++y) {
-    auto* row = buffer + y * rowBytes;
-    for (size_t x = 0; x < width; ++x) {
-      row[x] = static_cast<unsigned char>(std::lroundf(row[x] * alphaScale));
-    }
-  }
-}
+
+/**
+ * Creates a dash path effect from the given dash pattern. Handles odd-count pattern expansion and
+ * simplification for square caps. Returns nullptr if dashes are empty or simplified to solid.
+ */
+std::shared_ptr<PathEffect> CreateDashPathEffect(const std::vector<float>& dashes, float dashOffset,
+                                                 bool adaptive, const Stroke& stroke);
+
 }  // namespace tgfx

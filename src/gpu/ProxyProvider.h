@@ -24,6 +24,7 @@
 #include "gpu/BackingFit.h"
 #include "gpu/VertexProvider.h"
 #include "gpu/proxies/GPUBufferProxy.h"
+#include "gpu/proxies/GPUHairlineProxy.h"
 #include "gpu/proxies/GPUMeshProxy.h"
 #include "gpu/proxies/GPUShapeProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -79,6 +80,13 @@ class ProxyProvider {
   std::shared_ptr<GPUShapeProxy> createGPUShapeProxy(std::shared_ptr<Shape> shape, AAType aaType,
                                                      const Rect& clipBounds,
                                                      uint32_t renderFlags = 0);
+
+  /**
+   * Creates a GPUHairlineProxy for the given Path. The hairline vertex data will be generated
+   * in a background thread and uploaded to the GPU.
+   */
+  std::shared_ptr<GPUHairlineProxy> createGPUHairlineProxy(std::shared_ptr<Shape> shape,
+                                                           bool hasCap, uint32_t renderFlags = 0);
 
   /**
    * Creates a GPUMeshProxy for the given Mesh. The vertex and index buffers will be uploaded

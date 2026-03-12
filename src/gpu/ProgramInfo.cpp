@@ -226,6 +226,7 @@ static AddressMode ToAddressMode(TileMode tileMode) {
     case TileMode::Decal:
       return AddressMode::ClampToBorder;
   }
+  return AddressMode::ClampToEdge;
 }
 
 void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* program) const {

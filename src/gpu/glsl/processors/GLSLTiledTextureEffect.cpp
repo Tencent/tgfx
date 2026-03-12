@@ -63,6 +63,7 @@ bool GLSLTiledTextureEffect::ShaderModeRequiresUnormCoord(TiledTextureEffect::Sh
     case TiledTextureEffect::ShaderMode::ClampToBorderLinear:
       return true;
   }
+  return false;
 }
 
 bool GLSLTiledTextureEffect::ShaderModeUsesSubset(TiledTextureEffect::ShaderMode m) {
@@ -79,6 +80,7 @@ bool GLSLTiledTextureEffect::ShaderModeUsesSubset(TiledTextureEffect::ShaderMode
     case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
       return true;
   }
+  return false;
 }
 
 bool GLSLTiledTextureEffect::ShaderModeUsesClamp(TiledTextureEffect::ShaderMode m) {
@@ -95,6 +97,7 @@ bool GLSLTiledTextureEffect::ShaderModeUsesClamp(TiledTextureEffect::ShaderMode 
     case TiledTextureEffect::ShaderMode::ClampToBorderLinear:
       return true;
   }
+  return false;
 }
 
 void GLSLTiledTextureEffect::readColor(EmitArgs& args, const std::string& dimensionsName,
