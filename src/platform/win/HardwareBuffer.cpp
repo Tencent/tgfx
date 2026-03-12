@@ -200,8 +200,8 @@ void* HardwareBufferLock(HardwareBufferRef buffer) {
 
   // Step 2: Get immediate context from device
   void* context = nullptr;
-  auto getCtx =
-      reinterpret_cast<GetImmediateContextFn>(GetVtable(deviceUnk)[kGetImmediateContextVtableIndex]);
+  auto getCtx = reinterpret_cast<GetImmediateContextFn>(
+      GetVtable(deviceUnk)[kGetImmediateContextVtableIndex]);
   getCtx(deviceUnk, &context);
   if (!context) {
     deviceUnk->Release();
@@ -248,7 +248,8 @@ void* HardwareBufferLock(HardwareBufferRef buffer) {
   // Store the lock state for Unlock
   {
     std::lock_guard<std::mutex> lock(g_lockMutex);
-    g_lockStates[buffer] = {static_cast<IUnknown*>(stagingTexture), static_cast<IUnknown*>(context)};
+    g_lockStates[buffer] = {static_cast<IUnknown*>(stagingTexture),
+                            static_cast<IUnknown*>(context)};
   }
   return mapped.pData;
 }
