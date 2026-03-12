@@ -1025,7 +1025,7 @@ TGFX_TEST(CanvasTest, Matrix3DShapeStroke) {
   paint1.setColor(Color::FromRGBA(0, 255, 0, 255));
   paint1.setStyle(PaintStyle::Fill);
   canvas->save();
-  canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
+  canvas->concat(transform.asMatrix());
   canvas->drawShape(rawShape, paint1);
   canvas->restore();
 
@@ -1520,7 +1520,7 @@ TGFX_TEST(CanvasTest, Matrix3D) {
                               cellOrigin.y + (cellSize.height - shapeSize.height) / 2);
     auto transform = MakeTransformMatrix(origin, shapeSize, 45, 0, 0);
     AutoCanvasRestore autoRestore(canvas);
-    canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
+    canvas->concat(transform.asMatrix());
     Paint paint;
     paint.setColor(Color::FromRGBA(255, 0, 0, 200));
     canvas->drawRect(Rect::MakeWH(shapeSize.width, shapeSize.height), paint);
@@ -1533,7 +1533,7 @@ TGFX_TEST(CanvasTest, Matrix3D) {
                               cellOrigin.y + (cellSize.height - shapeSize.height) / 2);
     auto transform = MakeTransformMatrix(origin, shapeSize, 0, 45, 0);
     AutoCanvasRestore autoRestore(canvas);
-    canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
+    canvas->concat(transform.asMatrix());
     Paint paint;
     paint.setColor(Color::FromRGBA(0, 255, 0, 200));
     canvas->drawRoundRect(Rect::MakeWH(shapeSize.width, shapeSize.height), 10, 10, paint);
@@ -1552,7 +1552,7 @@ TGFX_TEST(CanvasTest, Matrix3D) {
     path.close();
 
     AutoCanvasRestore autoRestore(canvas);
-    canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
+    canvas->concat(transform.asMatrix());
     Paint paint;
     paint.setColor(Color::FromRGBA(0, 0, 255, 200));
     canvas->drawPath(path, paint);
@@ -1572,7 +1572,7 @@ TGFX_TEST(CanvasTest, Matrix3D) {
     ASSERT_TRUE(image != nullptr);
 
     AutoCanvasRestore autoRestore(canvas);
-    canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
+    canvas->concat(transform.asMatrix());
     Paint paint;
     canvas->drawImage(image, &paint);
   }
@@ -1592,7 +1592,7 @@ TGFX_TEST(CanvasTest, Matrix3D) {
     auto dstRect = Rect::MakeWH(shapeSize.width, shapeSize.height);
 
     AutoCanvasRestore autoRestore(canvas);
-    canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
+    canvas->concat(transform.asMatrix());
     Paint paint;
     canvas->drawImageRect(image, srcRect, dstRect, {}, &paint);
   }
@@ -1611,7 +1611,7 @@ TGFX_TEST(CanvasTest, Matrix3D) {
     Font font(typeface, 24);
 
     AutoCanvasRestore autoRestore(canvas);
-    canvas->concat(Matrix3DUtils::GetMayLossyMatrix(transform));
+    canvas->concat(transform.asMatrix());
     Paint paint;
     paint.setColor(Color::Black());
     canvas->drawSimpleText("3D", 0, 24, font, paint);

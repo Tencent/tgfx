@@ -39,13 +39,6 @@ bool Matrix3DUtils::IsMatrix3DAffine(const Matrix3D& matrix) {
          matrix.getRow(2) == Vec4(0, 0, 1, 0) && matrix.getRow(3) == Vec4(0, 0, 0, 1);
 }
 
-Matrix Matrix3DUtils::GetMayLossyMatrix(const Matrix3D& matrix) {
-  return Matrix::MakeAll(
-      matrix.getRowColumn(0, 0), matrix.getRowColumn(0, 1), matrix.getRowColumn(0, 3),
-      matrix.getRowColumn(1, 0), matrix.getRowColumn(1, 1), matrix.getRowColumn(1, 3),
-      matrix.getRowColumn(3, 0), matrix.getRowColumn(3, 1), matrix.getRowColumn(3, 3));
-}
-
 Matrix Matrix3DUtils::GetMayLossyAffineMatrix(const Matrix3D& matrix) {
   return Matrix::MakeAll(matrix.getRowColumn(0, 0), matrix.getRowColumn(0, 1),
                          matrix.getRowColumn(0, 3), matrix.getRowColumn(1, 0),
@@ -53,7 +46,7 @@ Matrix Matrix3DUtils::GetMayLossyAffineMatrix(const Matrix3D& matrix) {
 }
 
 Rect Matrix3DUtils::InverseMapRect(const Rect& rect, const Matrix3D& matrix) {
-  auto matrix2D = GetMayLossyMatrix(matrix);
+  auto matrix2D = matrix.asMatrix();
   Matrix inversedMatrix;
   if (!matrix2D.invert(&inversedMatrix)) {
     return Rect::MakeEmpty();

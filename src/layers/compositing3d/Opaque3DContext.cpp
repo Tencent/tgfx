@@ -56,7 +56,7 @@ void Opaque3DContext::finishAndDrawTo(Canvas* canvas, bool antialiasing) {
   paint.setAntiAlias(antialiasing);
   for (const auto& entry : _opaqueImages) {
     AutoCanvasRestore autoRestore(canvas);
-    auto imageMatrix = Matrix3DUtils::GetMayLossyMatrix(entry.transform);
+    auto imageMatrix = entry.transform.asMatrix();
     canvas->concat(imageMatrix);
     canvas->drawImage(entry.image, &paint);
   }

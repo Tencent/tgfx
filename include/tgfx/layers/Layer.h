@@ -501,20 +501,25 @@ class Layer : public std::enable_shared_from_this<Layer> {
   Point localToGlobal(const Point& localPoint) const;
 
   /**
-   * Returns the relative transformation matrix from this layer's coordinate space to the target
+   * Returns the 2D relative transformation matrix from this layer's coordinate space to the target
+   * layer's coordinate space. This method only captures the X and Y components of the
+   * transformation; any Z-axis transformation information will be lost. If the target layer is
+   * nullptr or the same as the calling layer, returns an identity matrix.
+   * @param target The layer that defines the target coordinate system.
+   * @return A Matrix representing the 2D relative transformation from this layer to the target
+   * layer.
+   */
+  Matrix getRelativeMatrix(const Layer* target) const;
+
+  /**
+   * Returns the 3D relative transformation matrix from this layer's coordinate space to the target
    * layer's coordinate space. If the target layer is nullptr or the same as the calling layer,
    * returns an identity matrix.
    * @param target The layer that defines the target coordinate system.
-   * @return A Matrix representing the relative transformation from this layer to the target layer.
+   * @return A Matrix3D representing the relative transformation from this layer to the target
+   * layer.
    */
-  Matrix relativeMatrix(const Layer* target) const;
-
-  /**
-   * Returns the transformation matrix from this layer's local coordinate space to the root layer's
-   * coordinate space.
-   * @return A Matrix representing the global transformation of this layer.
-   */
-  Matrix globalMatrix() const;
+  Matrix3D getRelativeMatrix3D(const Layer* target) const;
 
   /**
    * Returns an array of layers under the specified point that are children (or descendants) of the
@@ -672,8 +677,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   std::shared_ptr<Image> getContentContourImage(const DrawArgs& args, float contentScale,
                                                 Point* offset, bool* contourMatchesContent);
-
-  Matrix3D getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 
   bool hasValidMask() const;
 
