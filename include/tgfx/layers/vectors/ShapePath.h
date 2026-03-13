@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Path.h"
+#include "tgfx/core/Point.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
@@ -33,6 +34,18 @@ class ShapePath : public VectorElement {
    * Creates a new ShapePath instance.
    */
   static std::shared_ptr<ShapePath> Make();
+
+  /**
+   * Returns the position of the path in the parent coordinate system.
+   */
+  const Point& position() const {
+    return _position;
+  }
+
+  /**
+   * Sets the position of the path in the parent coordinate system.
+   */
+  void setPosition(const Point& value);
 
   /**
    * Returns the path that defines the shape.
@@ -69,6 +82,7 @@ class ShapePath : public VectorElement {
   ShapePath() = default;
 
  private:
+  Point _position = Point::Zero();
   Path _path = {};
   bool _reversed = false;
   std::shared_ptr<Shape> _cachedShape = nullptr;

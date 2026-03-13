@@ -37,6 +37,11 @@ class VectorContext {
   void addShape(std::shared_ptr<Shape> shape);
 
   /**
+   * Adds a shape geometry with the given position to the list.
+   */
+  void addShape(std::shared_ptr<Shape> shape, const Point& position);
+
+  /**
    * Adds a text geometry with the given position and optional text anchors to the list.
    */
   void addTextBlob(std::shared_ptr<TextBlob> blob, const Point& position,

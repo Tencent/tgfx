@@ -147,6 +147,103 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
 }
 
 /**
+ * Test ShapePath with position set via setPosition().
+ * Verifies that ShapePath::setPosition() correctly applies position as a translation
+ * matrix in the rendered output, separate from the cached shape itself.
+ */
+TGFX_TEST(VectorLayerTest, ShapePathPosition) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 650, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  // Group 1: Circle at position (100, 100) using setPosition()
+  auto group1 = std::make_shared<VectorGroup>();
+  Path circlePath1 = {};
+  circlePath1.addOval(Rect::MakeXYWH(-50, -50, 100, 100));
+
+  auto shapePath1 = std::make_shared<ShapePath>();
+  shapePath1->setPath(circlePath1);
+  shapePath1->setPosition({100, 100});
+
+  auto redFill = MakeFillStyle(Color::Red());
+  group1->setElements({shapePath1, redFill});
+
+  // Group 2: Circle at position (325, 100) using setPosition()
+  auto group2 = std::make_shared<VectorGroup>();
+  Path circlePath2 = {};
+  circlePath2.addOval(Rect::MakeXYWH(-50, -50, 100, 100));
+
+  auto shapePath2 = std::make_shared<ShapePath>();
+  shapePath2->setPath(circlePath2);
+  shapePath2->setPosition({325, 100});
+
+  auto blueFill = MakeFillStyle(Color::Blue());
+  group2->setElements({shapePath2, blueFill});
+
+  // Group 3: Square at position (550, 100) using setPosition()
+  auto group3 = std::make_shared<VectorGroup>();
+  Path squarePath = {};
+  squarePath.addRect(Rect::MakeXYWH(-40, -40, 80, 80));
+
+  auto shapePath3 = std::make_shared<ShapePath>();
+  shapePath3->setPath(squarePath);
+  shapePath3->setPosition({550, 100});
+
+  auto greenFill = MakeFillStyle(Color::Green());
+  group3->setElements({shapePath3, greenFill});
+
+  // Group 4: Multiple circles testing position offset effect
+  // Center circle at (150, 200) - reference
+  auto group4 = std::make_shared<VectorGroup>();
+  Path circlePath4 = {};
+  circlePath4.addOval(Rect::MakeXYWH(-35, -35, 70, 70));
+
+  auto shapePath4 = std::make_shared<ShapePath>();
+  shapePath4->setPath(circlePath4);
+  shapePath4->setPosition({150, 200});
+
+  auto yellowFill = MakeFillStyle(Color::FromRGBA(255, 200, 0, 255));
+  group4->setElements({shapePath4, yellowFill});
+
+  // Group 5: Same shape, different position (300, 200)
+  auto group5 = std::make_shared<VectorGroup>();
+  Path circlePath5 = {};
+  circlePath5.addOval(Rect::MakeXYWH(-35, -35, 70, 70));
+
+  auto shapePath5 = std::make_shared<ShapePath>();
+  shapePath5->setPath(circlePath5);
+  shapePath5->setPosition({300, 200});
+
+  auto orangeFill = MakeFillStyle(Color::FromRGBA(255, 128, 0, 255));
+  group5->setElements({shapePath5, orangeFill});
+
+  // Group 6: Same shape, yet another position (450, 200)
+  auto group6 = std::make_shared<VectorGroup>();
+  Path circlePath6 = {};
+  circlePath6.addOval(Rect::MakeXYWH(-35, -35, 70, 70));
+
+  auto shapePath6 = std::make_shared<ShapePath>();
+  shapePath6->setPath(circlePath6);
+  shapePath6->setPosition({450, 200});
+
+  auto purpleFill = MakeFillStyle(Color::FromRGBA(128, 0, 128, 255));
+  group6->setElements({shapePath6, purpleFill});
+
+  vectorLayer->setContents({group1, group2, group3, group4, group5, group6});
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/ShapePathPosition"));
+}
+
+/**
  * Test TrimPath: both Separate and Continuous modes.
  * TrimPath should affect the innermost shapes before styles are applied.
  */
