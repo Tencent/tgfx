@@ -19,7 +19,7 @@
 #include "WGLGPU.h"
 #include <cstring>
 #include "WGLHardwareTexture.h"
-#include "WGLInteropState.h"
+#include "WGLDefines.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 typedef const char*(WINAPI* PFNWGLGETEXTENSIONSSTRINGARBPROC)(HDC hdc);

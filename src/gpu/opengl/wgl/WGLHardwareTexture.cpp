@@ -18,7 +18,7 @@
 
 #include "WGLHardwareTexture.h"
 #include <Unknwn.h>
-#include "WGLInteropState.h"
+#include "WGLDefines.h"
 #include "core/utils/Log.h"
 #include "platform/win/D3D11Util.h"
 #include "tgfx/platform/HardwareBuffer.h"
