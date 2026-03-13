@@ -21,8 +21,6 @@
 #include <unordered_map>
 #include "D3D11Util.h"
 
-struct ID3D11Device;
-
 namespace {
 
 // ============================================================================

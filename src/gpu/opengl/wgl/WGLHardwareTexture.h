@@ -21,8 +21,6 @@
 #include "gpu/opengl/GLTexture.h"
 #include "gpu/opengl/wgl/WGLGPU.h"
 
-struct ID3D11Device;
-
 namespace tgfx {
 /**
  * A GLTexture subclass that wraps a D3D11 texture imported into OpenGL via
