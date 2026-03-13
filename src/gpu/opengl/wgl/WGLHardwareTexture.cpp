@@ -23,13 +23,6 @@
 #include "platform/win/D3D11Util.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
-// WGL_NV_DX_interop definitions
-#define WGL_ACCESS_READ_ONLY_NV 0x0000
-
-// GL_EXT_memory_object definitions
-#define GL_DEDICATED_MEMORY_OBJECT_EXT 0x9581
-#define GL_HANDLE_TYPE_D3D11_IMAGE_KMT_EXT 0x958C
-
 namespace tgfx {
 
 // ============================================================================
