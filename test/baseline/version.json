@@ -350,7 +350,8 @@
         "shape": "cad4b77f"
     },
     "PathTest": {
-        "DrawInfiniteLoopPath": "898f84dd"
+        "DrawInfiniteLoopPath": "898f84dd",
+        "TwoPathsIntersect": "6ee601e8"
     },
     "ReadPixelsTest": {
         "JpegCodec_Decode_Alpha8": "afd80b4",
