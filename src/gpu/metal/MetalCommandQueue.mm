@@ -18,10 +18,10 @@
 
 #include "MetalCommandQueue.h"
 #include "MetalCommandBuffer.h"
-#include "MetalDefines.h"
 #include "MetalGPU.h"
 #include "MetalSemaphore.h"
 #include "MetalTexture.h"
+#include "MetalUtil.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -96,7 +96,7 @@ void MetalCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
 
   if (mtlTexture.storageMode == MTLStorageModePrivate) {
     @autoreleasepool {
-      auto bytesPerPixel = MetalDefines::GetBytesPerPixel(mtlTexture.pixelFormat);
+      auto bytesPerPixel = MTLPixelFormatBytesPerPixel(mtlTexture.pixelFormat);
       NSUInteger width = static_cast<NSUInteger>(rect.width());
       NSUInteger height = static_cast<NSUInteger>(rect.height());
       NSUInteger bytesPerRow =

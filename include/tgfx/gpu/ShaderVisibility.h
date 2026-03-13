@@ -18,33 +18,29 @@
 
 #pragma once
 
-#include "tgfx/gpu/PixelFormat.h"
+#include <cstdint>
 
 namespace tgfx {
+/**
+ * ShaderVisibility defines bitmask flags that specify which shader stages can access a resource
+ * binding. These flags can be combined with bitwise OR to indicate visibility across multiple
+ * stages, following the same pattern as WebGPU's GPUShaderStageFlags, Vulkan's
+ * VkShaderStageFlags, and D3D12's D3D12_SHADER_VISIBILITY.
+ */
+namespace ShaderVisibility {
+/**
+ * The resource is accessible to the vertex shader stage.
+ */
+static constexpr uint32_t Vertex = 1 << 0;
 
-// MTLPixelFormat values (from Metal headers)
-#define MTL_PIXEL_FORMAT_R8Unorm 10
-#define MTL_PIXEL_FORMAT_RG8Unorm 30
-#define MTL_PIXEL_FORMAT_RGBA8Unorm 70
-#define MTL_PIXEL_FORMAT_BGRA8Unorm 80
-#define MTL_PIXEL_FORMAT_Depth24Unorm_Stencil8 255
-#define MTL_PIXEL_FORMAT_Depth32Float_Stencil8 260
+/**
+ * The resource is accessible to the fragment shader stage.
+ */
+static constexpr uint32_t Fragment = 1 << 1;
 
-inline PixelFormat MetalPixelFormatToPixelFormat(unsigned metalFormat) {
-  switch (metalFormat) {
-    case MTL_PIXEL_FORMAT_R8Unorm:
-      return PixelFormat::ALPHA_8;
-    case MTL_PIXEL_FORMAT_RG8Unorm:
-      return PixelFormat::RG_88;
-    case MTL_PIXEL_FORMAT_BGRA8Unorm:
-      return PixelFormat::BGRA_8888;
-    case MTL_PIXEL_FORMAT_Depth24Unorm_Stencil8:
-    case MTL_PIXEL_FORMAT_Depth32Float_Stencil8:
-      return PixelFormat::DEPTH24_STENCIL8;
-    case MTL_PIXEL_FORMAT_RGBA8Unorm:
-    default:
-      return PixelFormat::RGBA_8888;
-  }
-}
-
+/**
+ * The resource is accessible to both vertex and fragment shader stages.
+ */
+static constexpr uint32_t VertexFragment = Vertex | Fragment;
+}  // namespace ShaderVisibility
 }  // namespace tgfx

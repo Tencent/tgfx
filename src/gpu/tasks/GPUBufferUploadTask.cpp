@@ -39,16 +39,15 @@ std::shared_ptr<Resource> GPUBufferUploadTask::onMakeResource(Context* context) 
     LOGE("GPUBufferUploadTask::onMakeResource() Failed to get data!");
     return nullptr;
   }
-  auto gpu = context->gpu();
   auto usage = bufferType == BufferType::Index ? GPUBufferUsage::INDEX : GPUBufferUsage::VERTEX;
-  auto gpuBuffer = gpu->createBuffer(data->size(), usage);
-  if (!gpuBuffer) {
+  auto bufferResource = BufferResource::FindOrCreate(context, data->size(), usage);
+  if (!bufferResource) {
     LOGE("GPUBufferUploadTask::onMakeResource() Failed to create buffer!");
     return nullptr;
   }
-  gpu->queue()->writeBuffer(gpuBuffer, 0, data->data(), data->size());
+  context->gpu()->queue()->writeBuffer(bufferResource->gpuBuffer(), 0, data->data(), data->size());
   // Free the data source immediately to reduce memory pressure.
   source = nullptr;
-  return BufferResource::Wrap(context, std::move(gpuBuffer));
+  return bufferResource;
 }
 }  // namespace tgfx

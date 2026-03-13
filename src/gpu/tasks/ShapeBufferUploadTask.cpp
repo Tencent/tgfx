@@ -40,14 +40,13 @@ std::shared_ptr<Resource> ShapeBufferUploadTask::onMakeResource(Context* context
   }
   std::shared_ptr<BufferResource> vertexBuffer = nullptr;
   if (auto triangles = shapeBuffer->triangles) {
-    auto gpu = context->gpu();
-    auto gpuBuffer = gpu->createBuffer(triangles->size(), GPUBufferUsage::VERTEX);
-    if (!gpuBuffer) {
+    vertexBuffer = BufferResource::FindOrCreate(context, triangles->size(), GPUBufferUsage::VERTEX);
+    if (!vertexBuffer) {
       LOGE("ShapeBufferUploadTask::onMakeResource() Failed to create buffer!");
       return nullptr;
     }
-    gpu->queue()->writeBuffer(gpuBuffer, 0, triangles->data(), triangles->size());
-    vertexBuffer = BufferResource::Wrap(context, std::move(gpuBuffer));
+    context->gpu()->queue()->writeBuffer(vertexBuffer->gpuBuffer(), 0, triangles->data(),
+                                         triangles->size());
   } else {
     auto textureView = TextureView::MakeFrom(context, std::move(shapeBuffer->imageBuffer));
     if (!textureView) {

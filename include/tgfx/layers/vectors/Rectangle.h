@@ -36,16 +36,16 @@ class Rectangle : public VectorElement {
   static std::shared_ptr<Rectangle> Make();
 
   /**
-   * Returns the center point of the rectangle.
+   * Returns the position of the rectangle center point.
    */
-  const Point& center() const {
-    return _center;
+  const Point& position() const {
+    return _position;
   }
 
   /**
-   * Sets the center point of the rectangle.
+   * Sets the position of the rectangle center point.
    */
-  void setCenter(const Point& value);
+  void setPosition(const Point& value);
 
   /**
    * Returns the size of the rectangle.
@@ -94,7 +94,7 @@ class Rectangle : public VectorElement {
   Rectangle() = default;
 
  private:
-  Point _center = Point::Zero();
+  Point _position = Point::Zero();
   Size _size = {100.0f, 100.0f};
   float _roundness = 0.0f;
   bool _reversed = false;

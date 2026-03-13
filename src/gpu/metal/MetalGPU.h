@@ -22,6 +22,7 @@
 #include <Metal/Metal.h>
 #include <list>
 #include <memory>
+#include <unordered_map>
 #include "MetalCaps.h"
 #include "core/utils/ReturnQueue.h"
 #include "tgfx/gpu/GPU.h"
@@ -134,12 +135,15 @@ class MetalGPU : public GPU {
 
   std::shared_ptr<MetalResource> addResource(MetalResource* resource);
 
+  static uint32_t MakeSamplerKey(const SamplerDescriptor& descriptor);
+
   id<MTLDevice> metalDevice = nil;
   std::unique_ptr<MetalCaps> caps = nullptr;
   std::unique_ptr<MetalCommandQueue> commandQueue = nullptr;
   std::list<MetalResource*> resources = {};
   std::shared_ptr<ReturnQueue> returnQueue = ReturnQueue::Make();
   CVMetalTextureCacheRef textureCache = nil;
+  std::unordered_map<uint32_t, std::shared_ptr<Sampler>> samplerCache = {};
 };
 
 }  // namespace tgfx

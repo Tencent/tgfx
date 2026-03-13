@@ -129,6 +129,8 @@ class DisplayList {
    * how far the origin of the layer tree is shifted relative to the surface's origin. Adjusting the
    * contentOffset to move the layer tree is more efficient than applying a matrix directly, as it
    * avoids invalidating the layer tree's internal caches. The default value is (0, 0).
+   * Note: The provided values are rounded to the nearest integer pixels internally to ensure
+   * pixel-perfect alignment across different rendering modes.
    */
   void setContentOffset(float offsetX, float offsetY);
 

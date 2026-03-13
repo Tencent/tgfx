@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalRenderPipeline.h"
-#include "MetalDefines.h"
 #include "MetalGPU.h"
 #include "MetalShaderModule.h"
+#include "MetalUtil.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -43,8 +43,8 @@ MetalRenderPipeline::MetalRenderPipeline(MetalGPU* gpu,
   createDepthStencilState(gpu->device(), descriptor);
 
   // Save cull mode and front face from the primitive descriptor.
-  cullMode = MetalDefines::ToMTLCullMode(descriptor.primitive.cullMode);
-  frontFace = MetalDefines::ToMTLWinding(descriptor.primitive.frontFace);
+  cullMode = ToMTLCullMode(descriptor.primitive.cullMode);
+  frontFace = ToMTLWinding(descriptor.primitive.frontFace);
 
   // Build texture binding mapping: logical binding -> Metal texture index (from 0).
   // This decouples the caller's binding numbers from the actual Metal texture slots,
@@ -52,6 +52,11 @@ MetalRenderPipeline::MetalRenderPipeline(MetalGPU* gpu,
   unsigned textureUnit = 0;
   for (auto& entry : descriptor.layout.textureSamplers) {
     textureUnits[entry.binding] = textureUnit++;
+  }
+
+  // Build uniform block visibility mapping: binding -> shader stage visibility flags.
+  for (auto& entry : descriptor.layout.uniformBlocks) {
+    uniformBlockVisibility[entry.binding] = entry.visibility;
   }
 }
 
@@ -76,6 +81,14 @@ unsigned MetalRenderPipeline::getTextureIndex(unsigned binding) const {
     return result->second;
   }
   return binding;
+}
+
+uint32_t MetalRenderPipeline::getUniformBlockVisibility(unsigned binding) const {
+  auto result = uniformBlockVisibility.find(binding);
+  if (result != uniformBlockVisibility.end()) {
+    return result->second;
+  }
+  return ShaderVisibility::VertexFragment;
 }
 
 bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu,
@@ -196,7 +209,7 @@ void MetalRenderPipeline::configureVertexDescriptor(MTLRenderPipelineDescriptor*
       const auto& attribute = layout.attributes[attrIndex];
       if (globalAttributeIndex < MaxVertexAttributes) {
         vertexDescriptor.attributes[globalAttributeIndex].format =
-            MetalDefines::ToMTLVertexFormat(attribute.format());
+            ToMTLVertexFormat(attribute.format());
         vertexDescriptor.attributes[globalAttributeIndex].offset = currentOffset;
         vertexDescriptor.attributes[globalAttributeIndex].bufferIndex = metalBufferIndex;
         currentOffset += attribute.size();
@@ -222,17 +235,17 @@ void MetalRenderPipeline::configureColorAttachments(MTLRenderPipelineDescriptor*
     if (colorAttachment.blendEnable) {
       metalDescriptor.colorAttachments[i].blendingEnabled = YES;
       metalDescriptor.colorAttachments[i].sourceRGBBlendFactor =
-          MetalDefines::ToMTLBlendFactor(colorAttachment.srcColorBlendFactor);
+          ToMTLBlendFactor(colorAttachment.srcColorBlendFactor);
       metalDescriptor.colorAttachments[i].destinationRGBBlendFactor =
-          MetalDefines::ToMTLBlendFactor(colorAttachment.dstColorBlendFactor);
+          ToMTLBlendFactor(colorAttachment.dstColorBlendFactor);
       metalDescriptor.colorAttachments[i].rgbBlendOperation =
-          MetalDefines::ToMTLBlendOperation(colorAttachment.colorBlendOp);
+          ToMTLBlendOperation(colorAttachment.colorBlendOp);
       metalDescriptor.colorAttachments[i].sourceAlphaBlendFactor =
-          MetalDefines::ToMTLBlendFactor(colorAttachment.srcAlphaBlendFactor);
+          ToMTLBlendFactor(colorAttachment.srcAlphaBlendFactor);
       metalDescriptor.colorAttachments[i].destinationAlphaBlendFactor =
-          MetalDefines::ToMTLBlendFactor(colorAttachment.dstAlphaBlendFactor);
+          ToMTLBlendFactor(colorAttachment.dstAlphaBlendFactor);
       metalDescriptor.colorAttachments[i].alphaBlendOperation =
-          MetalDefines::ToMTLBlendOperation(colorAttachment.alphaBlendOp);
+          ToMTLBlendOperation(colorAttachment.alphaBlendOp);
     }
 
     // Configure write mask
@@ -252,19 +265,19 @@ bool MetalRenderPipeline::createDepthStencilState(id<MTLDevice> device,
 
   // Configure depth test
   depthStencilDescriptor.depthCompareFunction =
-      MetalDefines::ToMTLCompareFunction(descriptor.depthStencil.depthCompare);
+      ToMTLCompareFunction(descriptor.depthStencil.depthCompare);
   depthStencilDescriptor.depthWriteEnabled = descriptor.depthStencil.depthWriteEnabled;
 
   // Configure front face stencil
   MTLStencilDescriptor* frontStencil = [[MTLStencilDescriptor alloc] init];
   frontStencil.stencilCompareFunction =
-      MetalDefines::ToMTLCompareFunction(descriptor.depthStencil.stencilFront.compare);
+      ToMTLCompareFunction(descriptor.depthStencil.stencilFront.compare);
   frontStencil.stencilFailureOperation =
-      MetalDefines::ToMTLStencilOperation(descriptor.depthStencil.stencilFront.failOp);
+      ToMTLStencilOperation(descriptor.depthStencil.stencilFront.failOp);
   frontStencil.depthFailureOperation =
-      MetalDefines::ToMTLStencilOperation(descriptor.depthStencil.stencilFront.depthFailOp);
+      ToMTLStencilOperation(descriptor.depthStencil.stencilFront.depthFailOp);
   frontStencil.depthStencilPassOperation =
-      MetalDefines::ToMTLStencilOperation(descriptor.depthStencil.stencilFront.passOp);
+      ToMTLStencilOperation(descriptor.depthStencil.stencilFront.passOp);
   frontStencil.readMask = descriptor.depthStencil.stencilReadMask;
   frontStencil.writeMask = descriptor.depthStencil.stencilWriteMask;
 
@@ -274,13 +287,13 @@ bool MetalRenderPipeline::createDepthStencilState(id<MTLDevice> device,
   // Back face stencil
   MTLStencilDescriptor* backStencil = [[MTLStencilDescriptor alloc] init];
   backStencil.stencilCompareFunction =
-      MetalDefines::ToMTLCompareFunction(descriptor.depthStencil.stencilBack.compare);
+      ToMTLCompareFunction(descriptor.depthStencil.stencilBack.compare);
   backStencil.stencilFailureOperation =
-      MetalDefines::ToMTLStencilOperation(descriptor.depthStencil.stencilBack.failOp);
+      ToMTLStencilOperation(descriptor.depthStencil.stencilBack.failOp);
   backStencil.depthFailureOperation =
-      MetalDefines::ToMTLStencilOperation(descriptor.depthStencil.stencilBack.depthFailOp);
+      ToMTLStencilOperation(descriptor.depthStencil.stencilBack.depthFailOp);
   backStencil.depthStencilPassOperation =
-      MetalDefines::ToMTLStencilOperation(descriptor.depthStencil.stencilBack.passOp);
+      ToMTLStencilOperation(descriptor.depthStencil.stencilBack.passOp);
   backStencil.readMask = descriptor.depthStencil.stencilReadMask;
   backStencil.writeMask = descriptor.depthStencil.stencilWriteMask;
 

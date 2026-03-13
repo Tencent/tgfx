@@ -376,6 +376,12 @@ bool Matrix3D::operator==(const Matrix3D& other) const {
   return ((a0 == b0) && (a1 == b1) && (a2 == b2) && (a3 == b3));
 }
 
+Matrix Matrix3D::asMatrix() const {
+  // Column-major storage: values[col * 4 + row]
+  return Matrix::MakeAll(values[0], values[4], values[12], values[1], values[5], values[13],
+                         values[3], values[7], values[15]);
+}
+
 void Matrix3D::getRowMajor(float buffer[16]) const {
   TransposeArrays(values, buffer);
 }
