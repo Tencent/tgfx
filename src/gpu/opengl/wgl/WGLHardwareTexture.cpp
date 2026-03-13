@@ -25,25 +25,9 @@
 // WGL_NV_DX_interop definitions
 #define WGL_ACCESS_READ_ONLY_NV 0x0000
 
-// GL_EXT_memory_object definitions
+// GL_EXT_memory_object definitions (not in GLDefines.h)
 #define GL_DEDICATED_MEMORY_OBJECT_EXT 0x9581
 #define GL_HANDLE_TYPE_D3D11_IMAGE_KMT_EXT 0x958C
-
-#ifndef GL_CLAMP_TO_EDGE
-#define GL_CLAMP_TO_EDGE 0x812F
-#endif
-#ifndef GL_RGBA8
-#define GL_RGBA8 0x8058
-#endif
-#ifndef GL_R8
-#define GL_R8 0x8229
-#endif
-#ifndef GL_TEXTURE_SWIZZLE_R
-#define GL_TEXTURE_SWIZZLE_R 0x8E42
-#endif
-#ifndef GL_TEXTURE_SWIZZLE_B
-#define GL_TEXTURE_SWIZZLE_B 0x8E44
-#endif
 
 namespace tgfx {
 
