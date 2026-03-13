@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/HardwareBuffer.h"
-#include "D3D11Util.h"
 #include <Unknwn.h>
 #include <mutex>
 #include <unordered_map>
+#include "D3D11Util.h"
 
 namespace {
 
@@ -28,8 +28,7 @@ namespace {
 // Vtable function typedefs — HardwareBuffer-internal only
 // ============================================================================
 typedef void(__stdcall* GetImmediateContextFn)(IUnknown* self, void** ppContext);
-typedef long(__stdcall* CreateTexture2DFn)(IUnknown* self,
-                                           const tgfx::D3D11Texture2DDesc* pDesc,
+typedef long(__stdcall* CreateTexture2DFn)(IUnknown* self, const tgfx::D3D11Texture2DDesc* pDesc,
                                            const void* pInitialData, void** ppTexture2D);
 typedef long(__stdcall* MapFn)(IUnknown* self, IUnknown* pResource, unsigned int Subresource,
                                unsigned int MapType, unsigned int MapFlags,
@@ -107,8 +106,8 @@ void* HardwareBufferLock(HardwareBufferRef buffer) {
 
   // Step 2: Get immediate context from device
   void* context = nullptr;
-  auto getCtx = reinterpret_cast<GetImmediateContextFn>(
-      GetVtable(deviceUnk)[kD3D11GetImmCtxVtable]);
+  auto getCtx =
+      reinterpret_cast<GetImmediateContextFn>(GetVtable(deviceUnk)[kD3D11GetImmCtxVtable]);
   getCtx(deviceUnk, &context);
   if (!context) {
     return nullptr;
@@ -135,8 +134,7 @@ void* HardwareBufferLock(HardwareBufferRef buffer) {
   }
 
   // Step 4: Copy the source texture to the staging texture
-  auto copyResource =
-      reinterpret_cast<CopyResourceFn>(GetVtable(context)[kD3D11CopyResVtable]);
+  auto copyResource = reinterpret_cast<CopyResourceFn>(GetVtable(context)[kD3D11CopyResVtable]);
   copyResource(static_cast<IUnknown*>(context), static_cast<IUnknown*>(stagingTexture),
                static_cast<IUnknown*>(buffer));
 

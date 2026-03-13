@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WGLGPU.h"
-#include "WGLInteropState.h"
 #include <cstring>
 #include "WGLHardwareTexture.h"
+#include "WGLInteropState.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 typedef const char*(WINAPI* PFNWGLGETEXTENSIONSSTRINGARBPROC)(HDC hdc);
@@ -63,14 +63,12 @@ bool CheckNVDXInteropFunctions(WGLInteropState* state) {
   state->wglDXUnlockObjectsNV =
       reinterpret_cast<PFNWGLDXUNLOCKOBJECTSNVPROC>(wglGetProcAddress("wglDXUnlockObjectsNV"));
   return state->wglDXOpenDeviceNV && state->wglDXCloseDeviceNV && state->wglDXRegisterObjectNV &&
-         state->wglDXUnregisterObjectNV && state->wglDXLockObjectsNV &&
-         state->wglDXUnlockObjectsNV;
+         state->wglDXUnregisterObjectNV && state->wglDXLockObjectsNV && state->wglDXUnlockObjectsNV;
 }
 
 bool CheckNVDXInteropViaCurrentContext(WGLInteropState* state) {
-  auto wglGetExtensionsStringARB =
-      reinterpret_cast<PFNWGLGETEXTENSIONSSTRINGARBPROC>(
-          wglGetProcAddress("wglGetExtensionsStringARB"));
+  auto wglGetExtensionsStringARB = reinterpret_cast<PFNWGLGETEXTENSIONSSTRINGARBPROC>(
+      wglGetProcAddress("wglGetExtensionsStringARB"));
   if (!wglGetExtensionsStringARB) {
     return false;
   }
@@ -95,8 +93,8 @@ bool CheckNVDXInteropViaTempContext(WGLInteropState* state) {
     }
   }
   HWND tempHwnd =
-      CreateWindowEx(0, TEXT("TGFXWGLTempWindow"), TEXT("TGFX WGL Temp"), WS_OVERLAPPEDWINDOW, 0,
-                     0, 1, 1, nullptr, nullptr, GetModuleHandle(nullptr), nullptr);
+      CreateWindowEx(0, TEXT("TGFXWGLTempWindow"), TEXT("TGFX WGL Temp"), WS_OVERLAPPEDWINDOW, 0, 0,
+                     1, 1, nullptr, nullptr, GetModuleHandle(nullptr), nullptr);
   if (!tempHwnd) {
     return false;
   }
@@ -132,9 +130,8 @@ bool CheckNVDXInteropViaTempContext(WGLInteropState* state) {
     DestroyWindow(tempHwnd);
     return false;
   }
-  auto wglGetExtensionsStringARB =
-      reinterpret_cast<PFNWGLGETEXTENSIONSSTRINGARBPROC>(
-          wglGetProcAddress("wglGetExtensionsStringARB"));
+  auto wglGetExtensionsStringARB = reinterpret_cast<PFNWGLGETEXTENSIONSSTRINGARBPROC>(
+      wglGetProcAddress("wglGetExtensionsStringARB"));
   bool hasExt = false;
   if (wglGetExtensionsStringARB) {
     const char* extensions = wglGetExtensionsStringARB(tempDC);
@@ -155,8 +152,8 @@ bool CheckMemoryObjectInteropFunctions(WGLInteropState* state) {
       wglGetProcAddress("glDeleteMemoryObjectsEXT"));
   state->glMemoryObjectParameterivEXT = reinterpret_cast<PFNGLMEMORYOBJECTPARAMETERIVEXTPROC>(
       wglGetProcAddress("glMemoryObjectParameterivEXT"));
-  state->glTexStorageMem2DEXT = reinterpret_cast<PFNGLTEXSTORAGEMEM2DEXTPROC>(
-      wglGetProcAddress("glTexStorageMem2DEXT"));
+  state->glTexStorageMem2DEXT =
+      reinterpret_cast<PFNGLTEXSTORAGEMEM2DEXTPROC>(wglGetProcAddress("glTexStorageMem2DEXT"));
   state->glImportMemoryWin32HandleEXT = reinterpret_cast<PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC>(
       wglGetProcAddress("glImportMemoryWin32HandleEXT"));
   return state->glCreateMemoryObjectsEXT && state->glDeleteMemoryObjectsEXT &&
@@ -193,9 +190,8 @@ bool WGLGPU::isNVDXInteropAvailable() {
   }
   interopState->nvChecked = true;
   HGLRC currentContext = wglGetCurrentContext();
-  interopState->nvAvailable = currentContext
-                                  ? CheckNVDXInteropViaCurrentContext(interopState.get())
-                                  : CheckNVDXInteropViaTempContext(interopState.get());
+  interopState->nvAvailable = currentContext ? CheckNVDXInteropViaCurrentContext(interopState.get())
+                                             : CheckNVDXInteropViaTempContext(interopState.get());
   return interopState->nvAvailable;
 }
 
@@ -210,8 +206,7 @@ bool WGLGPU::isMemoryObjectInteropAvailable() {
 
   typedef const unsigned char*(GL_FUNCTION_TYPE * PFNGLGETSTRINGIPROC)(unsigned name,
                                                                        unsigned index);
-  auto glGetStringi =
-      reinterpret_cast<PFNGLGETSTRINGIPROC>(wglGetProcAddress("glGetStringi"));
+  auto glGetStringi = reinterpret_cast<PFNGLGETSTRINGIPROC>(wglGetProcAddress("glGetStringi"));
   if (!glGetStringi) {
     interopState->memObjAvailable = false;
     return false;
