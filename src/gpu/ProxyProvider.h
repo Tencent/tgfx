@@ -18,10 +18,9 @@
 
 #pragma once
 
-#include "core/utils/BlockAllocator.h"
-#include "core/utils/SlidingWindowTracker.h"
 #include "gpu/AAType.h"
 #include "gpu/BackingFit.h"
+#include "gpu/InstanceProvider.h"
 #include "gpu/VertexProvider.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/GPUHairlineProxy.h"
@@ -35,7 +34,6 @@
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
-class InstanceProvider;
 
 /**
  * A factory for creating proxy-derived objects.
@@ -76,9 +74,8 @@ class ProxyProvider {
                                                             uint32_t renderFlags = 0);
 
   /**
-   * Creates a VertexBufferView from the given InstanceProvider. The provider writes instance data
-   * into the shared instance buffer. The data is uploaded to the GPU in a single batch when
-   * flushSharedInstanceBuffer() is called. Returns nullptr if the allocation fails.
+   * Creates a VertexBufferView from the given InstanceProvider. The provider will be released
+   * after being uploaded to the GPU.
    */
   std::shared_ptr<VertexBufferView> createInstanceBufferProxy(
       PlacementPtr<InstanceProvider> provider);

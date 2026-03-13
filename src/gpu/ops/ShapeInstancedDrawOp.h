@@ -46,19 +46,19 @@ class ShapeInstancedDrawOp : public DrawOp {
   }
 
  private:
+  ShapeInstancedDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUShapeProxy> proxy,
+                       std::shared_ptr<VertexBufferView> instanceBufferProxy,
+                       bool hasInstanceColors, size_t count, PMColor gpColor,
+                       const Matrix& uvMatrix, const Matrix& stateMatrix, AAType aaType);
+
   std::shared_ptr<GPUShapeProxy> shapeProxy = nullptr;
   std::shared_ptr<VertexBufferView> maskBufferProxy = nullptr;
   std::shared_ptr<VertexBufferView> instanceBufferProxy = nullptr;
   bool hasInstanceColors = false;
   size_t instanceCount = 0;
-  PMColor gpColor = PMColor::Transparent();
+  PMColor gpColor = {};
   Matrix uvMatrix = {};
   Matrix stateMatrix = {};
-
-  ShapeInstancedDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUShapeProxy> proxy,
-                       std::shared_ptr<VertexBufferView> instanceBufferProxy,
-                       bool hasInstanceColors, size_t count, PMColor gpColor,
-                       const Matrix& uvMatrix, const Matrix& stateMatrix, AAType aaType);
 
   friend class BlockAllocator;
 };

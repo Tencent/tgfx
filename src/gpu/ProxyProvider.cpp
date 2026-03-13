@@ -27,7 +27,6 @@
 #include "core/utils/USE.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/InstanceProvider.h"
 #include "gpu/proxies/DefaultTextureProxy.h"
 #include "gpu/proxies/ExternalTextureRenderTargetProxy.h"
 #include "gpu/proxies/HardwareRenderTargetProxy.h"

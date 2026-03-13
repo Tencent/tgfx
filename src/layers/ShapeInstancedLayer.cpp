@@ -218,7 +218,7 @@ void ShapeInstancedLayer::onUpdateContent(LayerRecorder* recorder) {
   bool colorForStroke = !_colors.empty() &&
                         (_colorRole == ColorRole::Stroke || _colorRole == ColorRole::FillAndStroke);
   bool hasFill = !_fillStyles.empty() || colorForFill;
-  bool hasStroke = stroke.width > 0 && (!_strokeStyles.empty() || colorForStroke);
+  bool hasStroke = stroke.width > 0.0f && (!_strokeStyles.empty() || colorForStroke);
 
   if (!hasFill && !hasStroke) {
     return;

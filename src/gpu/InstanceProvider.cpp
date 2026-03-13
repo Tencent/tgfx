@@ -74,15 +74,14 @@ InstanceProvider::InstanceProvider(std::shared_ptr<BlockAllocator> reference,
 
 void InstanceProvider::getData(void* buffer) const {
   size_t instanceStride = _hasColors ? sizeof(InstanceRecordWithColor) : sizeof(InstanceRecord);
-  auto dest = buffer;
   auto steps = xformSteps.get();
   for (size_t i = 0; i < count; i++) {
-    FillInstanceRecord(dest, matrices[i]);
+    FillInstanceRecord(buffer, matrices[i]);
     if (_hasColors) {
-      auto colorRecord = static_cast<InstanceRecordWithColor*>(dest);
+      auto colorRecord = static_cast<InstanceRecordWithColor*>(buffer);
       colorRecord->color = ToUintPMColor(colors[i], steps);
     }
-    dest = static_cast<uint8_t*>(dest) + instanceStride;
+    buffer = static_cast<uint8_t*>(buffer) + instanceStride;
   }
 }
 

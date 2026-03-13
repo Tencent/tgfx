@@ -40,8 +40,6 @@ class InstanceProvider {
                                                  const Color* colors, size_t count,
                                                  const std::shared_ptr<ColorSpace>& colorSpace);
 
-  ~InstanceProvider() = default;
-
   /**
    * Returns the total size in bytes of the instance data.
    */
@@ -62,8 +60,6 @@ class InstanceProvider {
   void getData(void* buffer) const;
 
  private:
-  friend class BlockAllocator;
-
   InstanceProvider(std::shared_ptr<BlockAllocator> reference, const Matrix* matrices,
                    const Color* colors, size_t count, size_t dataSize, bool hasColors,
                    std::unique_ptr<ColorSpaceXformSteps> steps);
@@ -75,5 +71,7 @@ class InstanceProvider {
   size_t count = 0;
   size_t _dataSize = 0;
   bool _hasColors = false;
+
+  friend class BlockAllocator;
 };
 }  // namespace tgfx
