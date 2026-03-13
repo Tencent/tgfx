@@ -236,7 +236,7 @@ bool WGLGPU::isMemoryObjectInteropAvailable() {
   return interopState->memObjAvailable;
 }
 
-HANDLE WGLGPU::acquireSharedInteropDevice(IUnknown* d3d11Device) {
+HANDLE WGLGPU::acquireSharedInteropDevice(ID3D11Device* d3d11Device) {
   if (!interopState->wglDXOpenDeviceNV || !d3d11Device) {
     return nullptr;
   }
@@ -254,7 +254,7 @@ HANDLE WGLGPU::acquireSharedInteropDevice(IUnknown* d3d11Device) {
   return interopDev;
 }
 
-void WGLGPU::releaseSharedInteropDevice(HANDLE interopDevice, IUnknown* d3d11Device) {
+void WGLGPU::releaseSharedInteropDevice(HANDLE interopDevice, ID3D11Device* d3d11Device) {
   if (!interopDevice) {
     return;
   }

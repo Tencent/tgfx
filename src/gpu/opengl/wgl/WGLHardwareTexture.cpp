@@ -49,22 +49,24 @@ static unsigned ImportViaMemoryObject(WGLGPU* gpu, HardwareBufferRef hardwareBuf
                                                0x4e50,
                                                {0xb4, 0x1f, 0x8a, 0x7f, 0x8b, 0xd8, 0x96, 0x0b}};
 
-  IUnknown* textureUnk = reinterpret_cast<IUnknown*>(hardwareBuffer);
-  IUnknown* dxgiResource = nullptr;
-  HRESULT hr =
-      textureUnk->QueryInterface(IID_IDXGIResource_local, reinterpret_cast<void**>(&dxgiResource));
+  typedef HRESULT(STDMETHODCALLTYPE * QueryInterfaceFn)(void* self, const GUID& riid,
+                                                        void** ppvObject);
+  typedef void(STDMETHODCALLTYPE * ReleaseFn)(void* self);
+  typedef HRESULT(STDMETHODCALLTYPE * GetSharedHandleFn)(void* self, HANDLE* pSharedHandle);
+
+  auto** textureVtable = *reinterpret_cast<void***>(hardwareBuffer);
+  void* dxgiResource = nullptr;
+  HRESULT hr = reinterpret_cast<QueryInterfaceFn>(textureVtable[0])(
+      hardwareBuffer, IID_IDXGIResource_local, &dxgiResource);
   if (FAILED(hr) || !dxgiResource) {
     LOGE("WGLHardwareTexture: Failed to get IDXGIResource, hr=0x%08X", hr);
     return 0;
   }
 
-  typedef HRESULT(STDMETHODCALLTYPE * GetSharedHandleFn)(IUnknown * self, HANDLE * pSharedHandle);
-  auto vtable = *reinterpret_cast<void***>(dxgiResource);
-  auto getSharedHandle = reinterpret_cast<GetSharedHandleFn>(vtable[8]);
-
+  auto** dxgiVtable = *reinterpret_cast<void***>(dxgiResource);
   HANDLE kmtHandle = nullptr;
-  hr = getSharedHandle(dxgiResource, &kmtHandle);
-  dxgiResource->Release();
+  hr = reinterpret_cast<GetSharedHandleFn>(dxgiVtable[8])(dxgiResource, &kmtHandle);
+  reinterpret_cast<ReleaseFn>(dxgiVtable[2])(dxgiResource);
 
   if (FAILED(hr) || !kmtHandle) {
     LOGE("WGLHardwareTexture: Failed to get KMT shared handle, hr=0x%08X", hr);
@@ -126,8 +128,9 @@ static unsigned ImportViaMemoryObject(WGLGPU* gpu, HardwareBufferRef hardwareBuf
 // ============================================================================
 // D3D11→GL import via WGL_NV_DX_interop
 // ============================================================================
-static unsigned ImportViaWglDX(WGLGPU* gpu, IUnknown* d3d11Device, HardwareBufferRef hardwareBuffer,
-                               HANDLE* outInteropDevice, HANDLE* outInteropTexture) {
+static unsigned ImportViaWglDX(WGLGPU* gpu, ID3D11Device* d3d11Device,
+                               HardwareBufferRef hardwareBuffer, HANDLE* outInteropDevice,
+                               HANDLE* outInteropTexture) {
   auto* state = gpu->getInteropState();
   if (!state->wglDXRegisterObjectNV) {
     return 0;
@@ -146,9 +149,8 @@ static unsigned ImportViaWglDX(WGLGPU* gpu, IUnknown* d3d11Device, HardwareBuffe
     return 0;
   }
 
-  HANDLE interopTex =
-      state->wglDXRegisterObjectNV(interopDev, reinterpret_cast<IUnknown*>(hardwareBuffer),
-                                   glTextureId, GL_TEXTURE_2D, WGL_ACCESS_READ_ONLY_NV);
+  HANDLE interopTex = state->wglDXRegisterObjectNV(interopDev, hardwareBuffer, glTextureId,
+                                                   GL_TEXTURE_2D, WGL_ACCESS_READ_ONLY_NV);
   if (!interopTex) {
     LOGE("WGLHardwareTexture: Failed to register D3D11 texture with OpenGL.");
     glDeleteTextures(1, &glTextureId);
@@ -242,7 +244,7 @@ std::shared_ptr<WGLHardwareTexture> WGLHardwareTexture::MakeFrom(WGLGPU* gpu,
 
   // Fall back to WGL_NV_DX_interop.
   if (gpu->isNVDXInteropAvailable()) {
-    IUnknown* d3dDevice = D3D11GetDeviceFromTexture(reinterpret_cast<IUnknown*>(hardwareBuffer));
+    ID3D11Device* d3dDevice = D3D11GetDeviceFromTexture(hardwareBuffer);
     if (!d3dDevice) {
       LOGE("WGLHardwareTexture: Failed to get D3D11 device from texture.");
       return nullptr;

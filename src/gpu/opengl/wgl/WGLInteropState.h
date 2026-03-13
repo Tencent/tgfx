@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <Unknwn.h>
 // clang-format off
 // NOMINMAX must be defined before windows.h to prevent min/max macro pollution.
 #define NOMINMAX
@@ -27,12 +26,16 @@
 #include <GL/gl.h>
 // clang-format on
 #include <vector>
+#include "tgfx/platform/HardwareBuffer.h"
+
+struct ID3D11Device;
 
 // WGL_NV_DX_interop function typedefs
-typedef HANDLE(WINAPI* PFNWGLDXOPENDEVICENVPROC)(IUnknown* dxDevice);
+typedef HANDLE(WINAPI* PFNWGLDXOPENDEVICENVPROC)(ID3D11Device* dxDevice);
 typedef BOOL(WINAPI* PFNWGLDXCLOSEDEVICENVPROC)(HANDLE hDevice);
-typedef HANDLE(WINAPI* PFNWGLDXREGISTEROBJECTNVPROC)(HANDLE hDevice, IUnknown* dxObject,
-                                                     GLuint name, GLenum type, GLenum access);
+typedef HANDLE(WINAPI* PFNWGLDXREGISTEROBJECTNVPROC)(HANDLE hDevice,
+                                                     tgfx::HardwareBufferRef dxObject, GLuint name,
+                                                     GLenum type, GLenum access);
 typedef BOOL(WINAPI* PFNWGLDXUNREGISTEROBJECTNVPROC)(HANDLE hDevice, HANDLE hObject);
 typedef BOOL(WINAPI* PFNWGLDXLOCKOBJECTSNVPROC)(HANDLE hDevice, GLint count, HANDLE* hObjects);
 typedef BOOL(WINAPI* PFNWGLDXUNLOCKOBJECTSNVPROC)(HANDLE hDevice, GLint count, HANDLE* hObjects);
@@ -56,7 +59,7 @@ namespace tgfx {
 
 struct SharedInteropDevice {
   HANDLE interopDevice = nullptr;
-  IUnknown* d3d11Device = nullptr;
+  ID3D11Device* d3d11Device = nullptr;
   int refCount = 0;
 };
 

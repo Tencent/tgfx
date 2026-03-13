@@ -18,13 +18,16 @@
 
 #pragma once
 
-// NOMINMAX must be defined before any Windows header to prevent min/max macro pollution.
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <Unknwn.h>
 #include <memory>
 #include "gpu/opengl/GLGPU.h"
+
+struct ID3D11Device;
+
+// Forward-declare HANDLE without pulling in windows.h.
+// HANDLE is defined as void* in the Windows SDK (winnt.h).
+#ifndef DECLARE_HANDLE
+typedef void* HANDLE;
+#endif
 
 namespace tgfx {
 
@@ -56,13 +59,13 @@ class WGLGPU : public GLGPU {
    * wglDXOpenDeviceNV if needed. Each call increments an internal ref-count; the caller must
    * eventually call releaseSharedInteropDevice with the same pointers.
    */
-  HANDLE acquireSharedInteropDevice(IUnknown* d3d11Device);
+  HANDLE acquireSharedInteropDevice(ID3D11Device* d3d11Device);
 
   /**
    * Decrements the ref-count for the given interop device. When the count reaches zero the device
    * is closed via wglDXCloseDeviceNV.
    */
-  void releaseSharedInteropDevice(HANDLE interopDevice, IUnknown* d3d11Device);
+  void releaseSharedInteropDevice(HANDLE interopDevice, ID3D11Device* d3d11Device);
 
   WGLInteropState* getInteropState() const {
     return interopState.get();

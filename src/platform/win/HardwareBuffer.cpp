@@ -17,35 +17,42 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/HardwareBuffer.h"
-#include <Unknwn.h>
 #include <mutex>
 #include <unordered_map>
 #include "D3D11Util.h"
 
+struct ID3D11Device;
+
 namespace {
 
 // ============================================================================
-// Vtable function typedefs — HardwareBuffer-internal only
+// Vtable function typedefs for ID3D11Device and ID3D11DeviceContext.
+// These interfaces are accessed via raw vtable dispatch to avoid including d3d11.h.
 // ============================================================================
-typedef void(__stdcall* GetImmediateContextFn)(IUnknown* self, IUnknown** ppContext);
-typedef long(__stdcall* CreateTexture2DFn)(IUnknown* self, const tgfx::D3D11Texture2DDesc* pDesc,
-                                           const void* pInitialData, IUnknown** ppTexture2D);
-typedef long(__stdcall* MapFn)(IUnknown* self, IUnknown* pResource, unsigned int Subresource,
+typedef void(__stdcall* ReleaseFn)(void* self);
+typedef void(__stdcall* GetImmediateContextFn)(void* self, void** ppContext);
+typedef long(__stdcall* CreateTexture2DFn)(void* self, const tgfx::D3D11Texture2DDesc* pDesc,
+                                           const void* pInitialData, void** ppTexture2D);
+typedef long(__stdcall* MapFn)(void* self, void* pResource, unsigned int Subresource,
                                unsigned int MapType, unsigned int MapFlags,
                                tgfx::D3D11MappedSubresource* pMappedResource);
-typedef void(__stdcall* UnmapFn)(IUnknown* self, IUnknown* pResource, unsigned int Subresource);
-typedef void(__stdcall* CopyResourceFn)(IUnknown* self, IUnknown* pDst, IUnknown* pSrc);
+typedef void(__stdcall* UnmapFn)(void* self, void* pResource, unsigned int Subresource);
+typedef void(__stdcall* CopyResourceFn)(void* self, void* pDst, void* pSrc);
 
-static void** GetVtable(IUnknown* comObj) {
+static void** GetVtable(void* comObj) {
   return *reinterpret_cast<void***>(comObj);
+}
+
+static void ComRelease(void* comObj) {
+  reinterpret_cast<ReleaseFn>(GetVtable(comObj)[2])(comObj);
 }
 
 // ============================================================================
 // Lock state management
 // ============================================================================
 struct LockState {
-  IUnknown* stagingTexture = nullptr;
-  IUnknown* context = nullptr;
+  void* stagingTexture = nullptr;
+  void* context = nullptr;
 };
 
 static std::mutex g_lockMutex;
@@ -59,8 +66,7 @@ bool HardwareBufferCheck(HardwareBufferRef buffer) {
     return false;
   }
   D3D11Texture2DDesc desc = {};
-  if (!D3D11GetTextureDesc(reinterpret_cast<IUnknown*>(buffer), &desc)) return false;
-  // Verify it's a known format
+  if (!D3D11GetTextureDesc(buffer, &desc)) return false;
   return desc.format == DXGI_FORMAT_B8G8R8A8_UNORM || desc.format == DXGI_FORMAT_R8G8B8A8_UNORM ||
          desc.format == DXGI_FORMAT_NV12 || desc.format == DXGI_FORMAT_A8_UNORM;
 }
@@ -71,16 +77,12 @@ HardwareBufferRef HardwareBufferAllocate(int, int, bool) {
 }
 
 HardwareBufferRef HardwareBufferRetain(HardwareBufferRef buffer) {
-  if (buffer) {
-    reinterpret_cast<IUnknown*>(buffer)->AddRef();
-  }
+  D3D11AddRef(buffer);
   return buffer;
 }
 
 void HardwareBufferRelease(HardwareBufferRef buffer) {
-  if (buffer) {
-    reinterpret_cast<IUnknown*>(buffer)->Release();
-  }
+  D3D11Release(buffer);
 }
 
 void* HardwareBufferLock(HardwareBufferRef buffer) {
@@ -88,7 +90,7 @@ void* HardwareBufferLock(HardwareBufferRef buffer) {
     return nullptr;
   }
   D3D11Texture2DDesc desc = {};
-  if (!D3D11GetTextureDesc(reinterpret_cast<IUnknown*>(buffer), &desc)) {
+  if (!D3D11GetTextureDesc(buffer, &desc)) {
     return nullptr;
   }
   // NV12 is a multi-planar format; its CPU data cannot be represented as a single base address.
@@ -99,16 +101,15 @@ void* HardwareBufferLock(HardwareBufferRef buffer) {
 
   // Step 1: Get ID3D11Device from the texture. D3D11GetDeviceFromTexture returns a non-owning
   // pointer; the texture itself holds a reference to the device for the duration of this call.
-  auto* deviceUnk = D3D11GetDeviceFromTexture(reinterpret_cast<IUnknown*>(buffer));
-  if (!deviceUnk) {
+  ID3D11Device* device = D3D11GetDeviceFromTexture(buffer);
+  if (!device) {
     return nullptr;
   }
 
   // Step 2: Get immediate context from device
-  IUnknown* context = nullptr;
-  auto getCtx =
-      reinterpret_cast<GetImmediateContextFn>(GetVtable(deviceUnk)[kD3D11GetImmCtxVtable]);
-  getCtx(deviceUnk, &context);
+  void* context = nullptr;
+  reinterpret_cast<GetImmediateContextFn>(GetVtable(device)[kD3D11GetImmCtxVtable])(device,
+                                                                                    &context);
   if (!context) {
     return nullptr;
   }
@@ -124,26 +125,25 @@ void* HardwareBufferLock(HardwareBufferRef buffer) {
   stagingDesc.cpuAccessFlags = D3D11_CPU_ACCESS_READ;
   stagingDesc.miscFlags = 0;
 
-  IUnknown* stagingTexture = nullptr;
-  auto createTex =
-      reinterpret_cast<CreateTexture2DFn>(GetVtable(deviceUnk)[kD3D11CreateTex2DVtable]);
-  long hr = createTex(deviceUnk, &stagingDesc, nullptr, &stagingTexture);
+  void* stagingTexture = nullptr;
+  long hr = reinterpret_cast<CreateTexture2DFn>(GetVtable(device)[kD3D11CreateTex2DVtable])(
+      device, &stagingDesc, nullptr, &stagingTexture);
   if (hr < 0 || !stagingTexture) {
-    context->Release();
+    ComRelease(context);
     return nullptr;
   }
 
   // Step 4: Copy the source texture to the staging texture
-  auto copyResource = reinterpret_cast<CopyResourceFn>(GetVtable(context)[kD3D11CopyResVtable]);
-  copyResource(context, stagingTexture, reinterpret_cast<IUnknown*>(buffer));
+  reinterpret_cast<CopyResourceFn>(GetVtable(context)[kD3D11CopyResVtable])(context, stagingTexture,
+                                                                            buffer);
 
   // Step 5: Map the staging texture for CPU read
   D3D11MappedSubresource mapped = {};
-  auto map = reinterpret_cast<MapFn>(GetVtable(context)[kD3D11MapVtable]);
-  hr = map(context, stagingTexture, 0, D3D11_MAP_READ, 0, &mapped);
+  hr = reinterpret_cast<MapFn>(GetVtable(context)[kD3D11MapVtable])(context, stagingTexture, 0,
+                                                                    D3D11_MAP_READ, 0, &mapped);
   if (hr < 0 || !mapped.data) {
-    stagingTexture->Release();
-    context->Release();
+    ComRelease(stagingTexture);
+    ComRelease(context);
     return nullptr;
   }
 
@@ -171,12 +171,12 @@ void HardwareBufferUnlock(HardwareBufferRef buffer) {
   }
 
   // Unmap the staging texture
-  auto unmap = reinterpret_cast<UnmapFn>(GetVtable(state.context)[kD3D11UnmapVtable]);
-  unmap(state.context, state.stagingTexture, 0);
+  reinterpret_cast<UnmapFn>(GetVtable(state.context)[kD3D11UnmapVtable])(state.context,
+                                                                         state.stagingTexture, 0);
 
   // Release staging texture and context
-  state.stagingTexture->Release();
-  state.context->Release();
+  ComRelease(state.stagingTexture);
+  ComRelease(state.context);
 }
 
 HardwareBufferInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
@@ -184,7 +184,7 @@ HardwareBufferInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
     return {};
   }
   D3D11Texture2DDesc desc = {};
-  if (!D3D11GetTextureDesc(reinterpret_cast<IUnknown*>(buffer), &desc)) {
+  if (!D3D11GetTextureDesc(buffer, &desc)) {
     return {};
   }
 

@@ -21,6 +21,8 @@
 #include "gpu/opengl/GLTexture.h"
 #include "gpu/opengl/wgl/WGLGPU.h"
 
+struct ID3D11Device;
+
 namespace tgfx {
 /**
  * A GLTexture subclass that wraps a D3D11 texture imported into OpenGL via
@@ -43,7 +45,7 @@ class WGLHardwareTexture : public GLTexture {
   HardwareBufferRef hardwareBuffer = nullptr;
   unsigned memoryObject = 0;
   HANDLE interopDevice = nullptr;
-  IUnknown* d3d11Device = nullptr;
+  ID3D11Device* d3d11Device = nullptr;
   HANDLE interopTexture = nullptr;
 
   WGLHardwareTexture(const TextureDescriptor& descriptor, HardwareBufferRef hardwareBuffer,

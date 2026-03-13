@@ -18,7 +18,9 @@
 
 #pragma once
 
-#include <Unknwn.h>
+#include "tgfx/platform/HardwareBuffer.h"
+
+struct ID3D11Device;
 
 // Minimal DXGI format constants to avoid including dxgiformat.h.
 #ifndef DXGI_FORMAT_R8G8B8A8_UNORM
@@ -99,15 +101,25 @@ struct D3D11MappedSubresource {
 };
 
 /**
+ * Increments the reference count of the given D3D11 texture.
+ */
+void D3D11AddRef(HardwareBufferRef texture);
+
+/**
+ * Decrements the reference count of the given D3D11 texture.
+ */
+void D3D11Release(HardwareBufferRef texture);
+
+/**
  * Retrieves the texture descriptor from an ID3D11Texture2D pointer via vtable call.
  * Returns false if texture is null or the dimensions are zero.
  */
-bool D3D11GetTextureDesc(IUnknown* texture, D3D11Texture2DDesc* outDesc);
+bool D3D11GetTextureDesc(HardwareBufferRef texture, D3D11Texture2DDesc* outDesc);
 
 /**
  * Retrieves the ID3D11Device that owns the given ID3D11Texture2D. The returned pointer does not
  * carry an extra reference (the reference added by GetDevice is immediately released).
  */
-IUnknown* D3D11GetDeviceFromTexture(IUnknown* texture);
+ID3D11Device* D3D11GetDeviceFromTexture(HardwareBufferRef texture);
 
 }  // namespace tgfx
