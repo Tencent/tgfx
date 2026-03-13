@@ -49,16 +49,16 @@ class Polystar : public VectorElement {
   static std::shared_ptr<Polystar> Make();
 
   /**
-   * Returns the center point of the polystar.
+   * Returns the position of the polystar center point.
    */
-  const Point& center() const {
-    return _center;
+  const Point& position() const {
+    return _position;
   }
 
   /**
-   * Sets the center point of the polystar.
+   * Sets the position of the polystar center point.
    */
-  void setCenter(const Point& value);
+  void setPosition(const Point& value);
 
   /**
    * Returns whether this is a star or a polygon.
@@ -167,7 +167,7 @@ class Polystar : public VectorElement {
   Polystar() = default;
 
  private:
-  Point _center = Point::Zero();
+  Point _position = Point::Zero();
   PolystarType _polystarType = PolystarType::Star;
   float _pointCount = 5.0f;
   float _rotation = 0.0f;
