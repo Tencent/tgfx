@@ -21,8 +21,6 @@
 #include <memory>
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/CommandBuffer.h"
-#include "tgfx/gpu/ImageOrigin.h"
-#include "tgfx/gpu/PixelFormat.h"
 
 namespace tgfx {
 class Context;
@@ -72,9 +70,6 @@ class Drawable {
       : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
   }
 
-  virtual PixelFormat onGetPixelFormat() const;
-  virtual ImageOrigin onGetOrigin() const;
-  virtual int onGetSampleCount() const;
   virtual void onPresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) = 0;
 
   RenderTargetProxy* _proxy = nullptr;

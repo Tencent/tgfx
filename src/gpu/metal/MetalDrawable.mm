@@ -48,14 +48,6 @@ MetalDrawable::MetalDrawable(CAMetalLayer* layer, int width, int height,
   pixelFormat = MTLPixelFormatToPixelFormat(layer.pixelFormat);
 }
 
-ImageOrigin MetalDrawable::onGetOrigin() const {
-  return ImageOrigin::TopLeft;
-}
-
-PixelFormat MetalDrawable::onGetPixelFormat() const {
-  return pixelFormat;
-}
-
 std::shared_ptr<RenderTargetProxy> MetalDrawable::onCreateProxy(Context* context) {
   return std::make_shared<MetalDrawableProxy>(context, width(), height(), metalLayer, pixelFormat);
 }

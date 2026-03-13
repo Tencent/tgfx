@@ -22,6 +22,6 @@
 namespace tgfx {
 std::shared_ptr<RenderTargetProxy> GLDrawable::onCreateProxy(Context* context) {
   auto backendRT = onCreateBackendRenderTarget();
-  return RenderTargetProxy::MakeFrom(context, backendRT, onGetOrigin());
+  return RenderTargetProxy::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
 }
 }  // namespace tgfx

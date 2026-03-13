@@ -61,8 +61,8 @@ QSGTexture* QGLDrawable::getQSGTexture() {
 }
 
 std::shared_ptr<RenderTargetProxy> QGLDrawable::onCreateProxy(Context* context) {
-  return std::make_shared<QGLDrawableProxy>(context, width(), height(), onGetPixelFormat(),
-                                            onGetSampleCount(), onGetOrigin());
+  return std::make_shared<QGLDrawableProxy>(context, width(), height(), PixelFormat::RGBA_8888, 1,
+                                            ImageOrigin::BottomLeft);
 }
 
 void QGLDrawable::onPresent(Context*, std::shared_ptr<CommandBuffer>) {

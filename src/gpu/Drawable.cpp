@@ -22,18 +22,6 @@
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {
-PixelFormat Drawable::onGetPixelFormat() const {
-  return PixelFormat::RGBA_8888;
-}
-
-ImageOrigin Drawable::onGetOrigin() const {
-  return ImageOrigin::BottomLeft;
-}
-
-int Drawable::onGetSampleCount() const {
-  return 1;
-}
-
 std::shared_ptr<RenderTargetProxy> Drawable::getProxy(Context* context) {
   if (_proxyHolder == nullptr) {
     _proxyHolder = onCreateProxy(context);
