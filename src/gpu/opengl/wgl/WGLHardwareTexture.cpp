@@ -50,8 +50,9 @@ namespace tgfx {
 // ============================================================================
 // D3D11→GL import via memory_object (KMT handle)
 // ============================================================================
-static unsigned ImportViaMemoryObject(WGLGPU* gpu, void* d3d11Texture, int width, int height,
-                                      unsigned glInternalFormat, unsigned* outMemoryObject) {
+static unsigned ImportViaMemoryObject(WGLGPU* gpu, HardwareBufferRef hardwareBuffer, int width,
+                                      int height, unsigned glInternalFormat,
+                                      unsigned* outMemoryObject) {
   auto* state = gpu->getInteropState();
   if (!state->glCreateMemoryObjectsEXT || !state->glImportMemoryWin32HandleEXT ||
       !state->glTexStorageMem2DEXT) {
@@ -64,7 +65,7 @@ static unsigned ImportViaMemoryObject(WGLGPU* gpu, void* d3d11Texture, int width
                                                0x4e50,
                                                {0xb4, 0x1f, 0x8a, 0x7f, 0x8b, 0xd8, 0x96, 0x0b}};
 
-  IUnknown* textureUnk = static_cast<IUnknown*>(d3d11Texture);
+  IUnknown* textureUnk = static_cast<IUnknown*>(hardwareBuffer);
   IUnknown* dxgiResource = nullptr;
   HRESULT hr =
       textureUnk->QueryInterface(IID_IDXGIResource_local, reinterpret_cast<void**>(&dxgiResource));
@@ -141,8 +142,9 @@ static unsigned ImportViaMemoryObject(WGLGPU* gpu, void* d3d11Texture, int width
 // ============================================================================
 // D3D11→GL import via WGL_NV_DX_interop
 // ============================================================================
-static unsigned ImportViaWglDX(WGLGPU* gpu, void* d3d11Device, void* d3d11Texture,
-                               void** outInteropDevice, void** outInteropTexture) {
+static unsigned ImportViaWglDX(WGLGPU* gpu, void* d3d11Device,
+                               HardwareBufferRef hardwareBuffer, void** outInteropDevice,
+                               void** outInteropTexture) {
   auto* state = gpu->getInteropState();
   if (!state->wglDXRegisterObjectNV) {
     return 0;
@@ -162,7 +164,7 @@ static unsigned ImportViaWglDX(WGLGPU* gpu, void* d3d11Device, void* d3d11Textur
   }
 
   void* interopTex =
-      state->wglDXRegisterObjectNV(static_cast<HANDLE>(interopDev), d3d11Texture, glTextureId,
+      state->wglDXRegisterObjectNV(static_cast<HANDLE>(interopDev), hardwareBuffer, glTextureId,
                                    GL_TEXTURE_2D, WGL_ACCESS_READ_ONLY_NV);
   if (!interopTex) {
     LOGE("WGLHardwareTexture: Failed to register D3D11 texture with OpenGL.");
