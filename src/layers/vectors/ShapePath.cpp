@@ -31,7 +31,6 @@ void ShapePath::setPosition(const Point& value) {
     return;
   }
   _position = value;
-  _cachedShape = nullptr;
   invalidateContent();
 }
 
@@ -60,12 +59,9 @@ void ShapePath::apply(VectorContext* context) {
     if (_reversed) {
       _cachedShape = Shape::ApplyReverse(_cachedShape);
     }
-    if (_position.x != 0.0f || _position.y != 0.0f) {
-      _cachedShape = Shape::ApplyMatrix(_cachedShape, Matrix::MakeTrans(_position.x, _position.y));
-    }
   }
   if (_cachedShape) {
-    context->addShape(_cachedShape);
+    context->addShape(_cachedShape, _position);
   }
 }
 
