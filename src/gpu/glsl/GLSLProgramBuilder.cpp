@@ -196,11 +196,13 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   auto vertexUniformData = _uniformHandler.makeUniformData(ShaderStage::Vertex);
   auto fragmentUniformData = _uniformHandler.makeUniformData(ShaderStage::Fragment);
   if (vertexUniformData) {
-    BindingEntry vertexBinding = {VertexUniformBlockName, VERTEX_UBO_BINDING_POINT};
+    BindingEntry vertexBinding = {VertexUniformBlockName, VERTEX_UBO_BINDING_POINT,
+                                  ShaderVisibility::Vertex};
     descriptor.layout.uniformBlocks.push_back(vertexBinding);
   }
   if (fragmentUniformData) {
-    BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT};
+    BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT,
+                                    ShaderVisibility::Fragment};
     descriptor.layout.uniformBlocks.push_back(fragmentBinding);
   }
   int textureBinding = TEXTURE_BINDING_POINT_START;

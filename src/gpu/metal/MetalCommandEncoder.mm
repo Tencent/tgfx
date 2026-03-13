@@ -20,10 +20,10 @@
 #include "MetalBuffer.h"
 #include "MetalCommandBuffer.h"
 #include "MetalCommandQueue.h"
-#include "MetalDefines.h"
 #include "MetalGPU.h"
 #include "MetalRenderPass.h"
 #include "MetalTexture.h"
+#include "MetalUtil.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -126,7 +126,7 @@ void MetalCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextur
   auto sourceSize = MakeMTLSize(srcRect);
 
   // Calculate bytes per row based on texture format
-  auto bytesPerPixel = MetalDefines::GetBytesPerPixel(metalSrcTexture->metalTexture().pixelFormat);
+  auto bytesPerPixel = MTLPixelFormatBytesPerPixel(metalSrcTexture->metalTexture().pixelFormat);
   NSUInteger bytesPerRow = dstRowBytes > 0
                                ? static_cast<NSUInteger>(dstRowBytes)
                                : static_cast<NSUInteger>(srcRect.width()) * bytesPerPixel;
