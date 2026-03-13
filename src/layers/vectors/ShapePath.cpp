@@ -26,6 +26,15 @@ std::shared_ptr<ShapePath> ShapePath::Make() {
   return std::shared_ptr<ShapePath>(new ShapePath());
 }
 
+void ShapePath::setPosition(const Point& value) {
+  if (_position == value) {
+    return;
+  }
+  _position = value;
+  _cachedShape = nullptr;
+  invalidateContent();
+}
+
 void ShapePath::setPath(Path value) {
   if (_path == value) {
     return;
@@ -50,6 +59,9 @@ void ShapePath::apply(VectorContext* context) {
     _cachedShape = Shape::MakeFrom(_path);
     if (_reversed) {
       _cachedShape = Shape::ApplyReverse(_cachedShape);
+    }
+    if (_position.x != 0.0f || _position.y != 0.0f) {
+      _cachedShape = Shape::ApplyMatrix(_cachedShape, Matrix::MakeTrans(_position.x, _position.y));
     }
   }
   if (_cachedShape) {
