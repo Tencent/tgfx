@@ -34,7 +34,7 @@ class Surface;
  * Surface::MakeFrom() to create a Surface from a Drawable. The rendered content is automatically
  * presented when Context::submit() is called with the associated Recording.
  */
-class Drawable : public std::enable_shared_from_this<Drawable> {
+class Drawable {
  public:
   virtual ~Drawable() = default;
 
