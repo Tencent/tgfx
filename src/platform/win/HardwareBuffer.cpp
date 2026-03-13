@@ -21,7 +21,7 @@
 #include <unordered_map>
 #include "D3D11Util.h"
 
-namespace {
+namespace tgfx {
 
 // ============================================================================
 // Vtable function typedefs for ID3D11Device and ID3D11DeviceContext.
@@ -29,11 +29,11 @@ namespace {
 // ============================================================================
 typedef void(__stdcall* ReleaseFn)(void* self);
 typedef void(__stdcall* GetImmediateContextFn)(void* self, void** ppContext);
-typedef long(__stdcall* CreateTexture2DFn)(void* self, const tgfx::D3D11Texture2DDesc* pDesc,
+typedef long(__stdcall* CreateTexture2DFn)(void* self, const D3D11Texture2DDesc* pDesc,
                                            const void* pInitialData, void** ppTexture2D);
 typedef long(__stdcall* MapFn)(void* self, void* pResource, unsigned int Subresource,
                                unsigned int MapType, unsigned int MapFlags,
-                               tgfx::D3D11MappedSubresource* pMappedResource);
+                               D3D11MappedSubresource* pMappedResource);
 typedef void(__stdcall* UnmapFn)(void* self, void* pResource, unsigned int Subresource);
 typedef void(__stdcall* CopyResourceFn)(void* self, void* pDst, void* pSrc);
 
@@ -54,10 +54,7 @@ struct LockState {
 };
 
 static std::mutex g_lockMutex;
-static std::unordered_map<tgfx::HardwareBufferRef, LockState> g_lockStates;
-}  // namespace
-
-namespace tgfx {
+static std::unordered_map<HardwareBufferRef, LockState> g_lockStates;
 
 bool HardwareBufferCheck(HardwareBufferRef buffer) {
   if (!buffer) {
@@ -212,4 +209,5 @@ HardwareBufferInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   }
   return info;
 }
+
 }  // namespace tgfx
