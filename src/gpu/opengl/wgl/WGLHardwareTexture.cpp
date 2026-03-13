@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WGLHardwareTexture.h"
+#include <Unknwn.h>
 #include "WGLInteropState.h"
 #include "core/utils/Log.h"
 #include "platform/win/D3D11Util.h"
@@ -49,15 +50,12 @@ static unsigned ImportViaMemoryObject(WGLGPU* gpu, HardwareBufferRef hardwareBuf
                                                0x4e50,
                                                {0xb4, 0x1f, 0x8a, 0x7f, 0x8b, 0xd8, 0x96, 0x0b}};
 
-  typedef HRESULT(STDMETHODCALLTYPE * QueryInterfaceFn)(void* self, const GUID& riid,
-                                                        void** ppvObject);
-  typedef void(STDMETHODCALLTYPE * ReleaseFn)(void* self);
-  typedef HRESULT(STDMETHODCALLTYPE * GetSharedHandleFn)(void* self, HANDLE* pSharedHandle);
+  typedef HRESULT(STDMETHODCALLTYPE * GetSharedHandleFn)(IUnknown * self, HANDLE * pSharedHandle);
 
-  auto** textureVtable = *reinterpret_cast<void***>(hardwareBuffer);
-  void* dxgiResource = nullptr;
-  HRESULT hr = reinterpret_cast<QueryInterfaceFn>(textureVtable[0])(
-      hardwareBuffer, IID_IDXGIResource_local, &dxgiResource);
+  auto* textureUnk = reinterpret_cast<IUnknown*>(hardwareBuffer);
+  IUnknown* dxgiResource = nullptr;
+  HRESULT hr =
+      textureUnk->QueryInterface(IID_IDXGIResource_local, reinterpret_cast<void**>(&dxgiResource));
   if (FAILED(hr) || !dxgiResource) {
     LOGE("WGLHardwareTexture: Failed to get IDXGIResource, hr=0x%08X", hr);
     return 0;
@@ -66,7 +64,7 @@ static unsigned ImportViaMemoryObject(WGLGPU* gpu, HardwareBufferRef hardwareBuf
   auto** dxgiVtable = *reinterpret_cast<void***>(dxgiResource);
   HANDLE kmtHandle = nullptr;
   hr = reinterpret_cast<GetSharedHandleFn>(dxgiVtable[8])(dxgiResource, &kmtHandle);
-  reinterpret_cast<ReleaseFn>(dxgiVtable[2])(dxgiResource);
+  dxgiResource->Release();
 
   if (FAILED(hr) || !kmtHandle) {
     LOGE("WGLHardwareTexture: Failed to get KMT shared handle, hr=0x%08X", hr);
