@@ -20,7 +20,6 @@
 #import <QuartzCore/CADisplayLink.h>
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
-#include "tgfx/core/Point.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 
@@ -33,8 +32,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
 @implementation TGFXView {
   std::shared_ptr<tgfx::CGLWindow> tgfxWindow;
-  std::shared_ptr<tgfx::Drawable> drawable;
-  std::shared_ptr<tgfx::Surface> surface;
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer;
@@ -91,8 +88,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   lastSurfaceHeight = static_cast<int>(backingSize.height);
   [self applyCenteringTransform];
   if (tgfxWindow != nullptr) {
-    drawable = nullptr;
-    surface = nullptr;
     lastRecording = nullptr;
     tgfxWindow->invalidSize();
     presentImmediately = true;
@@ -209,12 +204,12 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return;
   }
 
-  if (drawable == nullptr || surface == nullptr) {
-    drawable = tgfxWindow->nextDrawable(context);
-    if (drawable != nullptr) {
-      surface = tgfx::Surface::MakeFrom(context, drawable);
-    }
+  auto drawable = tgfxWindow->nextDrawable(context);
+  if (drawable == nullptr) {
+    device->unlock();
+    return;
   }
+  auto surface = tgfx::Surface::MakeFrom(context, drawable);
   if (surface == nullptr) {
     device->unlock();
     return;

@@ -24,8 +24,6 @@
 
 @implementation TGFXView {
   std::shared_ptr<tgfx::EAGLWindow> tgfxWindow;
-  std::shared_ptr<tgfx::Drawable> drawable;
-  std::shared_ptr<tgfx::Surface> surface;
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer;
@@ -89,8 +87,6 @@
   lastSurfaceHeight = static_cast<int>(self.bounds.size.height * self.contentScaleFactor);
   [self applyCenteringTransform];
   if (tgfxWindow != nullptr) {
-    drawable = nullptr;
-    surface = nullptr;
     lastRecording = nullptr;
     tgfxWindow->invalidSize();
     presentImmediately = true;
@@ -150,12 +146,12 @@
     return;
   }
 
-  if (drawable == nullptr || surface == nullptr) {
-    drawable = tgfxWindow->nextDrawable(context);
-    if (drawable != nullptr) {
-      surface = tgfx::Surface::MakeFrom(context, drawable);
-    }
+  auto drawable = tgfxWindow->nextDrawable(context);
+  if (drawable == nullptr) {
+    device->unlock();
+    return;
   }
+  auto surface = tgfx::Surface::MakeFrom(context, drawable);
   if (surface == nullptr) {
     device->unlock();
     return;

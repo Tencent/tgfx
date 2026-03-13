@@ -23,8 +23,6 @@
 #include <string>
 #include "hello2d/AppHost.h"
 #include "hello2d/LayerBuilder.h"
-#include "tgfx/core/Surface.h"
-#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/Window.h"
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
@@ -50,8 +48,6 @@ class JTGFXView {
 
   ANativeWindow* nativeWindow = nullptr;
   std::shared_ptr<tgfx::Window> window;
-  std::shared_ptr<tgfx::Drawable> drawable = nullptr;
-  std::shared_ptr<tgfx::Surface> surface = nullptr;
   std::unique_ptr<hello2d::AppHost> appHost = nullptr;
   tgfx::DisplayList displayList = {};
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;

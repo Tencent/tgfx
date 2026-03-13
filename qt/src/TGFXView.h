@@ -18,11 +18,8 @@
 
 #pragma once
 
-#include <QOpenGLContext>
 #include <QQuickItem>
 #include "hello2d/AppHost.h"
-#include "tgfx/core/Surface.h"
-#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/qt/QGLDrawable.h"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"

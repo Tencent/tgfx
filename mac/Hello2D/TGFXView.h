@@ -19,9 +19,6 @@
 #pragma once
 
 #import <Cocoa/Cocoa.h>
-#include "tgfx/core/Canvas.h"
-#include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 #include "tgfx/layers/DisplayList.h"
 

@@ -21,8 +21,6 @@
 #include <emscripten/bind.h>
 #include "hello2d/AppHost.h"
 #include "hello2d/LayerBuilder.h"
-#include "tgfx/core/Surface.h"
-#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 #include "tgfx/layers/DisplayList.h"
@@ -51,8 +49,6 @@ class TGFXBaseView {
 
   std::string canvasID = "";
   std::shared_ptr<tgfx::Window> window = nullptr;
-  std::shared_ptr<tgfx::Drawable> drawable = nullptr;
-  std::shared_ptr<tgfx::Surface> surface = nullptr;
   tgfx::DisplayList displayList = {};
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   int lastDrawIndex = -1;

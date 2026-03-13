@@ -18,6 +18,7 @@
 
 #include "JTGFXView.h"
 #include "hello2d/LayerBuilder.h"
+#include "tgfx/core/Surface.h"
 
 namespace hello2d {
 static jfieldID TGFXView_nativePtr;
@@ -37,8 +38,7 @@ void JTGFXView::updateSize() {
   if (width > 0 && height > 0) {
     lastSurfaceWidth = width;
     lastSurfaceHeight = height;
-    drawable = nullptr;
-    surface = nullptr;
+    lastRecording = nullptr;
     window->invalidSize();
   }
 }
@@ -83,12 +83,12 @@ void JTGFXView::draw() {
     return;
   }
 
-  if (drawable == nullptr || surface == nullptr) {
-    drawable = window->nextDrawable(context);
-    if (drawable != nullptr) {
-      surface = tgfx::Surface::MakeFrom(context, drawable);
-    }
+  auto drawable = window->nextDrawable(context);
+  if (drawable == nullptr) {
+    device->unlock();
+    return;
   }
+  auto surface = tgfx::Surface::MakeFrom(context, drawable);
   if (surface == nullptr) {
     device->unlock();
     return;

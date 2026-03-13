@@ -19,7 +19,6 @@
 #include "TGFXBaseView.h"
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
-#include "tgfx/core/Point.h"
 #include "tgfx/core/Surface.h"
 
 using namespace emscripten;
@@ -36,30 +35,11 @@ void TGFXBaseView::updateSize() {
   if (window == nullptr) {
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
   }
-  if (window == nullptr) {
-    return;
-  }
-  drawable = nullptr;
-  surface = nullptr;
-  window->invalidSize();
-  auto device = window->getDevice();
-  auto context = device->lockContext();
-  if (context == nullptr) {
-    return;
-  }
-  auto newDrawable = window->nextDrawable(context);
-  if (newDrawable == nullptr) {
-    device->unlock();
-    return;
-  }
-  if (newDrawable->width() != lastSurfaceWidth || newDrawable->height() != lastSurfaceHeight) {
-    lastSurfaceWidth = newDrawable->width();
-    lastSurfaceHeight = newDrawable->height();
-    applyCenteringTransform();
+  if (window != nullptr) {
+    lastRecording = nullptr;
+    window->invalidSize();
     presentImmediately = true;
   }
-  drawable = std::move(newDrawable);
-  device->unlock();
 }
 
 void TGFXBaseView::setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage) {
@@ -119,12 +99,17 @@ void TGFXBaseView::draw() {
     return;
   }
 
-  if (drawable == nullptr || surface == nullptr) {
-    drawable = window->nextDrawable(context);
-    if (drawable != nullptr) {
-      surface = tgfx::Surface::MakeFrom(context, drawable);
-    }
+  auto drawable = window->nextDrawable(context);
+  if (drawable == nullptr) {
+    device->unlock();
+    return;
   }
+  if (drawable->width() != lastSurfaceWidth || drawable->height() != lastSurfaceHeight) {
+    lastSurfaceWidth = drawable->width();
+    lastSurfaceHeight = drawable->height();
+    applyCenteringTransform();
+  }
+  auto surface = tgfx::Surface::MakeFrom(context, drawable);
   if (surface == nullptr) {
     device->unlock();
     return;
