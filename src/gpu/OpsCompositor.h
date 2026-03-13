@@ -90,6 +90,14 @@ class OpsCompositor {
   void drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush);
 
   /**
+   * Draws multiple instances of the same shape with different transformations and optional
+   * per-instance colors.
+   */
+  void drawShapeInstanced(std::shared_ptr<Shape> shape, const Matrix matrices[],
+                          const Color colors[], size_t count, const MCState& state,
+                          const Brush& brush);
+
+  /**
    * Fills the given rect with the given atlas textureProxy, sampling options, state and fill.
    */
   void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,

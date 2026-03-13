@@ -72,6 +72,14 @@ class DrawContext {
   virtual void drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush) = 0;
 
   /**
+   * Draws multiple instances of the same shape with different transformations and optional
+   * per-instance colors.
+   */
+  virtual void drawShapeInstanced(std::shared_ptr<Shape> shape, const Matrix matrices[],
+                                  const Color colors[], size_t count, const MCState& state,
+                                  const Brush& brush) = 0;
+
+  /**
    * Draws a image with the specified SamplingOptions, MCState, Brush.
    */
   virtual void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,

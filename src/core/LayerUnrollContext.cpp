@@ -57,6 +57,14 @@ void LayerUnrollContext::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& sta
   unrolled = true;
 }
 
+void LayerUnrollContext::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matrix matrices[],
+                                            const Color colors[], size_t count,
+                                            const MCState& state, const Brush& brush) {
+  drawContext->drawShapeInstanced(std::move(shape), matrices, colors, count, state,
+                                  mergeBrush(brush));
+  unrolled = true;
+}
+
 void LayerUnrollContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                    const MCState& state, const Brush& brush) {
   drawContext->drawImage(std::move(image), sampling, state, mergeBrush(brush));

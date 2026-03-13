@@ -2209,4 +2209,271 @@ TGFX_TEST(CanvasTest, DrawMesh_FromShape) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_FromShape"));
 }
 
+TGFX_TEST(CanvasTest, DrawShapeInstanced_ColorsOnly) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Create a simple star-like shape
+  Path path = {};
+  path.addRoundRect(Rect::MakeXYWH(-30, -30, 60, 60), 10, 10);
+  auto shape = Shape::MakeFrom(path);
+
+  // 4 instances arranged in a 2x2 grid, each with a different color
+  Matrix matrices[] = {
+      Matrix::MakeTrans(75, 75),
+      Matrix::MakeTrans(225, 75),
+      Matrix::MakeTrans(75, 225),
+      Matrix::MakeTrans(225, 225),
+  };
+  Color colors[] = {
+      Color::Red(),
+      Color::Green(),
+      Color::Blue(),
+      Color::FromRGBA(255, 165, 0, 255),
+  };
+
+  Paint paint = {};
+  canvas->drawShapeInstanced(shape, matrices, colors, 4, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_ColorsOnly"));
+}
+
+TGFX_TEST(CanvasTest, DrawShapeInstanced_PaintColorOnly) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Create a circle shape
+  Path path = {};
+  path.addOval(Rect::MakeXYWH(-25, -25, 50, 50));
+  auto shape = Shape::MakeFrom(path);
+
+  // 5 instances with different transforms (translate + rotate + scale)
+  Matrix matrices[] = {
+      Matrix::MakeTrans(75, 75),   Matrix::MakeTrans(150, 75),  Matrix::MakeTrans(225, 75),
+      Matrix::MakeTrans(112, 200), Matrix::MakeTrans(188, 200),
+  };
+
+  Paint paint = {};
+  paint.setColor(Color::FromRGBA(0, 100, 200, 255));
+  canvas->drawShapeInstanced(shape, matrices, nullptr, 5, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_PaintColorOnly"));
+}
+
+TGFX_TEST(CanvasTest, DrawShapeInstanced_TransformVariety) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 400, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Create a simple rect shape
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(-20, -30, 40, 60));
+  auto shape = Shape::MakeFrom(path);
+
+  // Instances with various transforms: identity, scale, rotate, combined
+  Matrix m0 = Matrix::MakeTrans(50, 100);
+
+  Matrix m1 = Matrix::MakeTrans(150, 100);
+  m1.preScale(2, 1);
+
+  Matrix m2 = Matrix::MakeTrans(250, 100);
+  m2.preRotate(45);
+
+  Matrix m3 = Matrix::MakeTrans(350, 100);
+  m3.preScale(1, 2);
+  m3.preRotate(30);
+
+  Matrix matrices[] = {m0, m1, m2, m3};
+  Color colors[] = {
+      Color::Red(),
+      Color::Green(),
+      Color::Blue(),
+      Color::FromRGBA(128, 0, 128, 255),
+  };
+
+  Paint paint = {};
+  canvas->drawShapeInstanced(shape, matrices, colors, 4, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_TransformVariety"));
+}
+
+TGFX_TEST(CanvasTest, DrawShapeInstanced_WithShader) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Create a circle shape
+  Path path = {};
+  path.addOval(Rect::MakeXYWH(-30, -30, 60, 60));
+  auto shape = Shape::MakeFrom(path);
+
+  // 4 instances in a 2x2 grid
+  Matrix matrices[] = {
+      Matrix::MakeTrans(75, 75),
+      Matrix::MakeTrans(225, 75),
+      Matrix::MakeTrans(75, 225),
+      Matrix::MakeTrans(225, 225),
+  };
+
+  // Gradient shader
+  auto shader = Shader::MakeLinearGradient({-30, -30}, {30, 30}, {Color::Red(), Color::Blue()}, {});
+
+  Paint paint = {};
+  paint.setShader(shader);
+  canvas->drawShapeInstanced(shape, matrices, nullptr, 4, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_WithShader"));
+}
+
+TGFX_TEST(CanvasTest, DrawShapeInstanced_ShaderAndColors) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Create a rounded rect shape
+  Path path = {};
+  path.addRoundRect(Rect::MakeXYWH(-30, -30, 60, 60), 10, 10);
+  auto shape = Shape::MakeFrom(path);
+
+  // 4 instances
+  Matrix matrices[] = {
+      Matrix::MakeTrans(75, 75),
+      Matrix::MakeTrans(225, 75),
+      Matrix::MakeTrans(75, 225),
+      Matrix::MakeTrans(225, 225),
+  };
+  Color colors[] = {
+      Color::FromRGBA(255, 255, 255, 255),
+      Color::FromRGBA(255, 0, 0, 128),
+      Color::FromRGBA(0, 255, 0, 128),
+      Color::FromRGBA(0, 0, 255, 128),
+  };
+
+  // Gradient shader + per-instance colors (Modulate blend)
+  auto shader = Shader::MakeLinearGradient({-30, -30}, {30, 30}, {Color::Red(), Color::Blue()}, {});
+
+  Paint paint = {};
+  paint.setShader(shader);
+  canvas->drawShapeInstanced(shape, matrices, colors, 4, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_ShaderAndColors"));
+}
+
+TGFX_TEST(CanvasTest, DrawShapeInstanced_SingleInstance) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Single instance should degrade to drawShape
+  Path path = {};
+  path.addOval(Rect::MakeXYWH(-40, -40, 80, 80));
+  auto shape = Shape::MakeFrom(path);
+
+  Matrix matrices[] = {Matrix::MakeTrans(100, 100)};
+  Color colors[] = {Color::Red()};
+
+  Paint paint = {};
+  canvas->drawShapeInstanced(shape, matrices, colors, 1, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_SingleInstance"));
+}
+
+TGFX_TEST(CanvasTest, DrawShapeInstanced_Stroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Path path = {};
+  path.addRoundRect(Rect::MakeXYWH(-30, -30, 60, 60), 10, 10);
+  auto shape = Shape::MakeFrom(path);
+
+  Matrix matrices[] = {
+      Matrix::MakeTrans(75, 75),
+      Matrix::MakeTrans(225, 75),
+      Matrix::MakeTrans(75, 225),
+      Matrix::MakeTrans(225, 225),
+  };
+  Color colors[] = {
+      Color::Red(),
+      Color::Green(),
+      Color::Blue(),
+      Color::FromRGBA(255, 165, 0, 255),
+  };
+
+  Paint paint = {};
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(6);
+  canvas->drawShapeInstanced(shape, matrices, colors, 4, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_Stroke"));
+}
+
+TGFX_TEST(CanvasTest, DrawShapeInstanced_StrokeAndFill) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Path path = {};
+  path.addRoundRect(Rect::MakeXYWH(-30, -30, 60, 60), 10, 10);
+  auto shape = Shape::MakeFrom(path);
+
+  Matrix matrices[] = {
+      Matrix::MakeTrans(75, 75),
+      Matrix::MakeTrans(225, 75),
+      Matrix::MakeTrans(75, 225),
+      Matrix::MakeTrans(225, 225),
+  };
+  Color colors[] = {
+      Color::FromRGBA(255, 0, 0, 128),
+      Color::FromRGBA(0, 255, 0, 128),
+      Color::FromRGBA(0, 0, 255, 128),
+      Color::FromRGBA(255, 165, 0, 128),
+  };
+
+  Paint fillPaint = {};
+  canvas->drawShapeInstanced(shape, matrices, colors, 4, fillPaint);
+
+  Paint strokePaint = {};
+  strokePaint.setStyle(PaintStyle::Stroke);
+  strokePaint.setStrokeWidth(4);
+  strokePaint.setColor(Color::Black());
+  canvas->drawShapeInstanced(shape, matrices, nullptr, 4, strokePaint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_StrokeAndFill"));
+}
+
 }  // namespace tgfx

@@ -18,10 +18,9 @@
 
 #pragma once
 
-#include "core/utils/BlockAllocator.h"
-#include "core/utils/SlidingWindowTracker.h"
 #include "gpu/AAType.h"
 #include "gpu/BackingFit.h"
+#include "gpu/InstanceProvider.h"
 #include "gpu/VertexProvider.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/GPUHairlineProxy.h"
@@ -35,6 +34,7 @@
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
+
 /**
  * A factory for creating proxy-derived objects.
  */
@@ -72,6 +72,13 @@ class ProxyProvider {
    */
   std::shared_ptr<VertexBufferView> createVertexBufferProxy(PlacementPtr<VertexProvider> provider,
                                                             uint32_t renderFlags = 0);
+
+  /**
+   * Creates a VertexBufferView from the given InstanceProvider. The provider will be released
+   * after being uploaded to the GPU.
+   */
+  std::shared_ptr<VertexBufferView> createInstanceBufferProxy(
+      PlacementPtr<InstanceProvider> provider);
 
   /**
    * Creates a GPUShapeProxy for the given Shape. The shape will be released after being uploaded to
@@ -176,6 +183,11 @@ class ProxyProvider {
   void flushSharedVertexBuffer();
 
   /**
+   * Flushes the pending shared instance buffer to upload the instance data to the GPU.
+   */
+  void flushSharedInstanceBuffer();
+
+  /**
    * Stores the given proxy in the map with the new uniqueKey.
    */
   void assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
@@ -185,11 +197,14 @@ class ProxyProvider {
   ResourceKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};
   std::shared_ptr<GPUBufferProxy> sharedVertexBuffer = nullptr;
   std::vector<std::shared_ptr<Task>> sharedVertexBufferTasks = {};
+  std::shared_ptr<GPUBufferProxy> sharedInstanceBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> findOrWrapGPUBufferProxy(const UniqueKey& uniqueKey);
 
   void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey = {});
 
   void uploadSharedVertexBuffer(std::shared_ptr<Data> data);
+
+  void uploadSharedInstanceBuffer(std::shared_ptr<Data> data);
 
   std::shared_ptr<TextureProxy> createTextureProxyByImageSource(
       std::shared_ptr<DataSource<ImageBuffer>> source, int width, int height, bool alphaOnly,

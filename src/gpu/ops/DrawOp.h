@@ -34,6 +34,7 @@ class DrawOp {
     MeshDrawOp,
     HairlineLineOp,
     HairlineQuadOp,
+    ShapeInstancedDrawOp,
   };
 
   virtual ~DrawOp() = default;

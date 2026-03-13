@@ -22,7 +22,7 @@
 #include "VectorContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
-#include "layers/DashEffect.h"
+#include "layers/ShapeStrokeEffect.h"
 #include "tgfx/layers/LayerRecorder.h"
 
 namespace tgfx {

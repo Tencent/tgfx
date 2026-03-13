@@ -94,6 +94,7 @@ class LayerContent {
     RRects,
     Matrix,
     Mesh,
+    ShapeInstanced,
   };
 
   /**

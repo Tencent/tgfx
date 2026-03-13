@@ -16,26 +16,37 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DashEffect.h"
-#include "core/utils/StrokeUtils.h"
+#pragma once
+
+#include "layers/contents/DrawContent.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 
-std::shared_ptr<PathEffect> CreateDashPathEffect(const std::vector<float>& dashes, float dashOffset,
-                                                 bool adaptive, const Stroke& stroke) {
-  if (dashes.empty()) {
-    return nullptr;
+class ShapeInstancedContent : public DrawContent {
+ public:
+  ShapeInstancedContent(std::shared_ptr<Shape> shape, std::vector<Matrix> matrices,
+                        std::vector<Color> colors, const LayerPaint& paint);
+
+  Rect getBounds() const override;
+  Rect getTightBounds(const Matrix& matrix) const override;
+  bool hitTestPoint(float localX, float localY) const override;
+
+  std::shared_ptr<Shape> shape = nullptr;
+  std::vector<Matrix> matrices = {};
+  std::vector<Color> instanceColors = {};
+
+ protected:
+  Type type() const override {
+    return Type::ShapeInstanced;
   }
-  std::vector<float> dashList = dashes;
-  if (dashes.size() % 2 != 0) {
-    dashList.insert(dashList.end(), dashes.begin(), dashes.end());
-  }
-  dashList = SimplifyLineDashPattern(dashList, stroke);
-  if (dashList.empty()) {
-    return nullptr;
-  }
-  return PathEffect::MakeDash(dashList.data(), static_cast<int>(dashList.size()), dashOffset,
-                              adaptive);
-}
+
+  Rect onGetBounds() const override;
+  void onDraw(Canvas* canvas, const Paint& paint) const override;
+  bool onHasSameGeometry(const GeometryContent* other) const override;
+
+ private:
+  Path getFilledPath() const;
+};
 
 }  // namespace tgfx

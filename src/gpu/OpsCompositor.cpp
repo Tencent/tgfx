@@ -35,6 +35,7 @@
 #include "gpu/ops/HairlineQuadOp.h"
 #include "gpu/ops/MeshDrawOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
+#include "gpu/ops/ShapeInstancedDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "inspect/InspectorMark.h"
@@ -275,6 +276,110 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
   Brush meshBrush = brush;
   meshBrush.shader = nullptr;
   addDrawOp(std::move(drawOp), clip, meshBrush, localBounds, deviceBounds, drawScale);
+}
+
+void OpsCompositor::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matrix matrices[],
+                                       const Color colors[], size_t count, const MCState& state,
+                                       const Brush& brush) {
+  DEBUG_ASSERT(shape != nullptr);
+  DEBUG_ASSERT(matrices != nullptr);
+  DEBUG_ASSERT(count > 0);
+  flushPendingOps();
+
+  // tessellationMatrix = state.matrix * matrices[0] (canvas transform * first instance transform,
+  // maps local coords to device space, consistent with drawShape's approach).
+  auto tessellationMatrix = state.matrix * matrices[0];
+
+  // uvMatrix = inverse(tessellationMatrix), used to recover local coords in vertex shader.
+  Matrix uvMatrix = {};
+  if (!tessellationMatrix.invert(&uvMatrix)) {
+    return;
+  }
+
+  auto& clip = state.clip;
+  auto clipBounds = getClipBounds(clip);
+
+  std::optional<Rect> localBounds = std::nullopt;
+  std::optional<Rect> deviceBounds = std::nullopt;
+  float drawScale = 1.0f;
+  bool hasColors = colors != nullptr;
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, true);
+  auto shapeBounds = shape->getBounds();
+  // Compute the union of all instance bounds in tessellation-local space. Each instance i maps
+  // shapeBounds via inverse(matrices[0]) * matrices[i]. The result is reused for both localBounds
+  // (shader sampling range) and deviceBounds (mapRect produces a conservative superset).
+  Rect unionLocalBounds = {};
+  if ((needLocalBounds || needDeviceBounds) && !shape->isInverseFillType()) {
+    Matrix inverseFirst = {};
+    if (!matrices[0].invert(&inverseFirst)) {
+      return;
+    }
+    for (size_t i = 0; i < count; ++i) {
+      auto localMatrix = inverseFirst * matrices[i];
+      unionLocalBounds.join(localMatrix.mapRect(shapeBounds));
+    }
+  }
+  if (needLocalBounds) {
+    if (shape->isInverseFillType()) {
+      localBounds = ToLocalBounds(clipBounds, tessellationMatrix);
+    } else {
+      localBounds = ClipLocalBounds(unionLocalBounds, tessellationMatrix, clipBounds);
+    }
+    if (localBounds->isEmpty()) {
+      return;
+    }
+    drawScale = std::min(tessellationMatrix.getMaxScale(), 1.0f);
+  }
+  if (needDeviceBounds) {
+    if (shape->isInverseFillType()) {
+      deviceBounds = clipBounds;
+    } else {
+      deviceBounds = tessellationMatrix.mapRect(unionLocalBounds);
+    }
+  }
+
+  // Apply tessellationMatrix to shape for CPU tessellation (same as drawShape).
+  auto transformedShape = Shape::ApplyMatrix(std::move(shape), tessellationMatrix);
+  if (!transformedShape) {
+    return;
+  }
+
+  auto aaType = getAAType(brush);
+  auto shapeProxy =
+      proxyProvider()->createGPUShapeProxy(transformedShape, aaType, clipBounds, renderFlags);
+
+  // Paint color is only used when no shader and no instance colors; otherwise use white.
+  PMColor gpColor = PMColor::White();
+  if (!brush.shader && !hasColors) {
+    gpColor = ToPMColor(brush.color, dstColorSpace);
+  }
+
+  auto drawOp = ShapeInstancedDrawOp::Make(std::move(shapeProxy), matrices, colors, count, gpColor,
+                                           uvMatrix, state.matrix, aaType, dstColorSpace);
+  if (drawOp == nullptr) {
+    return;
+  }
+
+  // Handle shader for instanced drawing with special blending rules (same as drawMesh):
+  // - shader + colors: texture * instanceColor (Modulate)
+  // - shader only: pure texture
+  if (brush.shader) {
+    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
+    auto textureFP = FragmentProcessor::Make(brush.shader, args, nullptr, dstColorSpace);
+    if (textureFP == nullptr) {
+      return;
+    }
+    if (hasColors) {
+      textureFP = XfermodeFragmentProcessor::MakeFromSrcProcessor(
+          drawingAllocator(), std::move(textureFP), BlendMode::Modulate);
+    }
+    drawOp->addColorFP(std::move(textureFP));
+  }
+
+  // Create a brush without shader to pass to addDrawOp, since we handled shader above.
+  Brush instancedBrush = brush;
+  instancedBrush.shader = nullptr;
+  addDrawOp(std::move(drawOp), clip, instancedBrush, localBounds, deviceBounds, drawScale);
 }
 
 void OpsCompositor::drawHairlineShape(std::shared_ptr<Shape> shape, const MCState& state,
