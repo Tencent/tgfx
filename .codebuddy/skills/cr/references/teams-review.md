@@ -251,6 +251,8 @@ All confirmed issues are recorded with risk level.
 - Cross-module impact: if a fix requires updates outside the fixer's module,
   add it to the current fix queue and assign to the appropriate fixer.
 
+Always auto-fix eligible issues first — do NOT present `pending` issues to the
+user before all auto-fixable issues have been processed and validated.
 Phase 4 if auto-fix queue is non-empty. Otherwise jump to Phase 5 if pending
 issues exist, or Phase 6 if none.
 
