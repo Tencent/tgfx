@@ -18,8 +18,8 @@
 
 #include "WGLGPU.h"
 #include <cstring>
-#include "WGLHardwareTexture.h"
 #include "WGLDefines.h"
+#include "WGLHardwareTexture.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 typedef const char*(WINAPI* PFNWGLGETEXTENSIONSSTRINGARBPROC)(HDC hdc);

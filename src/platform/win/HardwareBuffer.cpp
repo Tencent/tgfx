@@ -106,7 +106,7 @@ void* HardwareBufferLock(HardwareBufferRef buffer) {
   // Step 2: Get immediate context from device
   void* context = nullptr;
   reinterpret_cast<GetImmediateContextFn>(GetVtable(device)[D3D11GetImmCtxVtable])(device,
-                                                                                    &context);
+                                                                                   &context);
   if (!context) {
     return nullptr;
   }
@@ -132,12 +132,12 @@ void* HardwareBufferLock(HardwareBufferRef buffer) {
 
   // Step 4: Copy the source texture to the staging texture
   reinterpret_cast<CopyResourceFn>(GetVtable(context)[D3D11CopyResVtable])(context, stagingTexture,
-                                                                            buffer);
+                                                                           buffer);
 
   // Step 5: Map the staging texture for CPU read
   D3D11MappedSubresource mapped = {};
   hr = reinterpret_cast<MapFn>(GetVtable(context)[D3D11MapVtable])(context, stagingTexture, 0,
-                                                                    D3D11_MAP_READ, 0, &mapped);
+                                                                   D3D11_MAP_READ, 0, &mapped);
   if (hr < 0 || !mapped.data) {
     ComRelease(stagingTexture);
     ComRelease(context);
@@ -169,7 +169,7 @@ void HardwareBufferUnlock(HardwareBufferRef buffer) {
 
   // Unmap the staging texture
   reinterpret_cast<UnmapFn>(GetVtable(state.context)[D3D11UnmapVtable])(state.context,
-                                                                         state.stagingTexture, 0);
+                                                                        state.stagingTexture, 0);
 
   // Release staging texture and context
   ComRelease(state.stagingTexture);
