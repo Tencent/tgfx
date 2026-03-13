@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalTexture.h"
-#include "MetalDefines.h"
 #include "MetalExternalTexture.h"
 #include "MetalGPU.h"
+#include "MetalUtil.h"
 
 namespace tgfx {
 
@@ -63,7 +63,7 @@ std::shared_ptr<MetalTexture> MetalTexture::Make(MetalGPU* gpu,
   metalDescriptor.arrayLength = 1;
 
   // Set usage flags
-  metalDescriptor.usage = MetalDefines::ToMTLTextureUsage(descriptor.usage);
+  metalDescriptor.usage = ToMTLTextureUsage(descriptor.usage);
 
   // Check if this is a depth-stencil texture
   bool isDepthStencil = (descriptor.format == PixelFormat::DEPTH24_STENCIL8);

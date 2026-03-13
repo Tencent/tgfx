@@ -16,35 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/gpu/PixelFormat.h"
+#include "gpu/resources/BufferResource.h"
 
 namespace tgfx {
-
-// MTLPixelFormat values (from Metal headers)
-#define MTL_PIXEL_FORMAT_R8Unorm 10
-#define MTL_PIXEL_FORMAT_RG8Unorm 30
-#define MTL_PIXEL_FORMAT_RGBA8Unorm 70
-#define MTL_PIXEL_FORMAT_BGRA8Unorm 80
-#define MTL_PIXEL_FORMAT_Depth24Unorm_Stencil8 255
-#define MTL_PIXEL_FORMAT_Depth32Float_Stencil8 260
-
-inline PixelFormat MetalPixelFormatToPixelFormat(unsigned metalFormat) {
-  switch (metalFormat) {
-    case MTL_PIXEL_FORMAT_R8Unorm:
-      return PixelFormat::ALPHA_8;
-    case MTL_PIXEL_FORMAT_RG8Unorm:
-      return PixelFormat::RG_88;
-    case MTL_PIXEL_FORMAT_BGRA8Unorm:
-      return PixelFormat::BGRA_8888;
-    case MTL_PIXEL_FORMAT_Depth24Unorm_Stencil8:
-    case MTL_PIXEL_FORMAT_Depth32Float_Stencil8:
-      return PixelFormat::DEPTH24_STENCIL8;
-    case MTL_PIXEL_FORMAT_RGBA8Unorm:
-    default:
-      return PixelFormat::RGBA_8888;
-  }
+ScratchKey BufferResource::ComputeScratchKey(size_t size, uint32_t usage) {
+  static const uint32_t BufferResourceType = UniqueID::Next();
+  BytesKey bytesKey(4);
+  bytesKey.write(BufferResourceType);
+  bytesKey.write(static_cast<uint32_t>(size & 0xFFFFFFFF));
+  bytesKey.write(static_cast<uint32_t>(static_cast<uint64_t>(size) >> 32));
+  bytesKey.write(usage);
+  return bytesKey;
 }
 
+std::shared_ptr<BufferResource> BufferResource::FindOrCreate(Context* context, size_t size,
+                                                             uint32_t usage) {
+  auto scratchKey = ComputeScratchKey(size, usage);
+  auto resource = Resource::Find<BufferResource>(context, scratchKey);
+  if (resource != nullptr) {
+    return resource;
+  }
+  auto gpuBuffer = context->gpu()->createBuffer(size, usage);
+  if (!gpuBuffer) {
+    return nullptr;
+  }
+  return Wrap(context, std::move(gpuBuffer), scratchKey);
+}
 }  // namespace tgfx

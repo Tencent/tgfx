@@ -21,7 +21,6 @@
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLRenderPass.h"
 #include "gpu/opengl/GLTexture.h"
-#include "gpu/opengl/GLTextureBuffer.h"
 
 namespace tgfx {
 GPU* GLCommandEncoder::gpu() const {
@@ -131,18 +130,6 @@ void GLCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTexture, 
     return;
   }
   auto caps = _gpu->caps();
-  if (!caps->pboSupport) {
-    auto textureBuffer = static_cast<GLTextureBuffer*>(dstBuffer.get());
-    auto dstTexture =
-        textureBuffer->acquireTexture(_gpu, srcTexture, srcRect, dstOffset, dstRowBytes);
-    if (dstTexture == nullptr) {
-      LOGE("GLCommandEncoder::copyTextureToBuffer() failed to acquire intermediate texture!");
-      return;
-    }
-    copyTextureToTexture(srcTexture, srcRect, dstTexture, Point::Zero());
-    textureBuffer->insertReadbackFence();
-    return;
-  }
   auto gl = _gpu->functions();
   auto glTexture = static_cast<GLTexture*>(srcTexture.get());
   if (srcTexture->usage() & TextureUsage::RENDER_ATTACHMENT) {

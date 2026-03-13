@@ -303,6 +303,25 @@ class Matrix3D {
     return !(other == *this);
   }
 
+  /**
+   * Converts this 4x4 matrix to a 2D 3x3 matrix.
+   *
+   * The Z-axis components are discarded, meaning any depth information from mapped points will be
+   * lost. Given a 4x4 matrix:
+   *      | m00 m01 m02 m03 |
+   *      | m10 m11 m12 m13 |
+   *      | m20 m21 m22 m23 |
+   *      | m30 m31 m32 m33 |
+   *
+   * The resulting 3x3 matrix is:
+   *      | m00 m01 m03 |
+   *      | m10 m11 m13 |
+   *      | m30 m31 m33 |
+   *
+   * @return A 2D Matrix containing the X and Y transformation components.
+   */
+  Matrix asMatrix() const;
+
   friend Matrix3D operator*(const Matrix3D& a, const Matrix3D& b) {
     Matrix3D result;
     result.setConcat(a, b);

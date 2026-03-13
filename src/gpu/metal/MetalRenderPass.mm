@@ -19,11 +19,11 @@
 #include "MetalRenderPass.h"
 #include "MetalBuffer.h"
 #include "MetalCommandEncoder.h"
-#include "MetalDefines.h"
 #include "MetalRenderPipeline.h"
 #include "MetalSampler.h"
 #include "MetalShaderModule.h"
 #include "MetalTexture.h"
+#include "MetalUtil.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -58,9 +58,9 @@ MetalRenderPass::MetalRenderPass(MetalCommandEncoder* encoder, const RenderPassD
 
     metalRenderPassDescriptor.colorAttachments[i].texture = colorTexture->metalTexture();
     metalRenderPassDescriptor.colorAttachments[i].loadAction =
-        MetalDefines::ToMTLLoadAction(colorAttachment.loadAction);
+        ToMTLLoadAction(colorAttachment.loadAction);
     metalRenderPassDescriptor.colorAttachments[i].storeAction =
-        MetalDefines::ToMTLStoreAction(colorAttachment.storeAction);
+        ToMTLStoreAction(colorAttachment.storeAction);
 
     if (colorAttachment.loadAction == LoadAction::Clear) {
       auto clearColor = colorAttachment.clearValue;
@@ -85,15 +85,15 @@ MetalRenderPass::MetalRenderPass(MetalCommandEncoder* encoder, const RenderPassD
 
     metalRenderPassDescriptor.depthAttachment.texture = depthStencilTexture->metalTexture();
     metalRenderPassDescriptor.depthAttachment.loadAction =
-        MetalDefines::ToMTLLoadAction(descriptor.depthStencilAttachment.loadAction);
+        ToMTLLoadAction(descriptor.depthStencilAttachment.loadAction);
     metalRenderPassDescriptor.depthAttachment.storeAction =
-        MetalDefines::ToMTLStoreAction(descriptor.depthStencilAttachment.storeAction);
+        ToMTLStoreAction(descriptor.depthStencilAttachment.storeAction);
 
     metalRenderPassDescriptor.stencilAttachment.texture = depthStencilTexture->metalTexture();
     metalRenderPassDescriptor.stencilAttachment.loadAction =
-        MetalDefines::ToMTLLoadAction(descriptor.depthStencilAttachment.loadAction);
+        ToMTLLoadAction(descriptor.depthStencilAttachment.loadAction);
     metalRenderPassDescriptor.stencilAttachment.storeAction =
-        MetalDefines::ToMTLStoreAction(descriptor.depthStencilAttachment.storeAction);
+        ToMTLStoreAction(descriptor.depthStencilAttachment.storeAction);
 
     if (descriptor.depthStencilAttachment.loadAction == LoadAction::Clear) {
       metalRenderPassDescriptor.depthAttachment.clearDepth =
@@ -131,11 +131,7 @@ void MetalRenderPass::onEnd() {
 }
 
 MetalRenderPass::~MetalRenderPass() {
-  if (renderEncoder) {
-    [renderEncoder endEncoding];
-    [renderEncoder release];
-    renderEncoder = nil;
-  }
+  onEnd();
 }
 
 GPU* MetalRenderPass::gpu() const {
@@ -191,6 +187,15 @@ void MetalRenderPass::setScissorRect(int x, int y, int width, int height) {
     return;
   }
 
+  if (x == lastScissorX && y == lastScissorY && width == lastScissorWidth &&
+      height == lastScissorHeight) {
+    return;
+  }
+  lastScissorX = x;
+  lastScissorY = y;
+  lastScissorWidth = width;
+  lastScissorHeight = height;
+
   MTLScissorRect scissorRect;
   scissorRect.x = static_cast<NSUInteger>(x);
   scissorRect.y = static_cast<NSUInteger>(y);
@@ -202,18 +207,28 @@ void MetalRenderPass::setScissorRect(int x, int y, int width, int height) {
 
 void MetalRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   if (!renderEncoder || !pipeline) return;
+  if (currentPipeline == pipeline) return;
 
   currentPipeline = std::static_pointer_cast<MetalRenderPipeline>(pipeline);
   [renderEncoder setRenderPipelineState:currentPipeline->metalRenderPipelineState()];
 
   // Set depth stencil state if available
-  if (currentPipeline->metalDepthStencilState()) {
-    [renderEncoder setDepthStencilState:currentPipeline->metalDepthStencilState()];
+  auto depthStencilState = currentPipeline->metalDepthStencilState();
+  if (depthStencilState && depthStencilState != lastDepthStencilState) {
+    lastDepthStencilState = depthStencilState;
+    [renderEncoder setDepthStencilState:depthStencilState];
   }
 
-  // Set cull mode and front face winding
-  [renderEncoder setCullMode:currentPipeline->cullMode];
-  [renderEncoder setFrontFacingWinding:currentPipeline->frontFace];
+  // Set cull mode and front face winding with caching
+  if (!cullModeInitialized || currentPipeline->cullMode != lastCullMode) {
+    lastCullMode = currentPipeline->cullMode;
+    [renderEncoder setCullMode:lastCullMode];
+  }
+  if (!cullModeInitialized || currentPipeline->frontFace != lastFrontFace) {
+    lastFrontFace = currentPipeline->frontFace;
+    [renderEncoder setFrontFacingWinding:lastFrontFace];
+  }
+  cullModeInitialized = true;
 }
 
 void MetalRenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer,
@@ -221,9 +236,26 @@ void MetalRenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> 
   if (!renderEncoder || !buffer) {
     return;
   }
+  if (slot < MaxVertexBufferSlots && lastVertexBuffers[slot] == buffer.get() &&
+      lastVertexOffsets[slot] == offset) {
+    return;
+  }
 
   DEBUG_ASSERT(slot < VertexBufferIndexStart);
   auto metalBufferIndex = VertexBufferIndexStart - slot;
+
+  if (slot < MaxVertexBufferSlots && lastVertexBuffers[slot] == buffer.get()) {
+    // Same buffer, only offset changed — use lightweight offset-only update.
+    lastVertexOffsets[slot] = offset;
+    [renderEncoder setVertexBufferOffset:offset atIndex:metalBufferIndex];
+    return;
+  }
+
+  if (slot < MaxVertexBufferSlots) {
+    lastVertexBuffers[slot] = buffer.get();
+    lastVertexOffsets[slot] = offset;
+  }
+
   auto metalBuffer = std::static_pointer_cast<MetalBuffer>(buffer);
   [renderEncoder setVertexBuffer:metalBuffer->metalBuffer() offset:offset atIndex:metalBufferIndex];
 }
@@ -244,6 +276,15 @@ void MetalRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> text
   // Remap logical binding to actual Metal texture index via the pipeline's mapping table.
   unsigned textureIndex = currentPipeline ? currentPipeline->getTextureIndex(binding) : binding;
 
+  if (textureIndex < MaxTextureBindings && lastTextures[textureIndex] == texture.get() &&
+      lastSamplers[textureIndex] == sampler.get()) {
+    return;
+  }
+  if (textureIndex < MaxTextureBindings) {
+    lastTextures[textureIndex] = texture.get();
+    lastSamplers[textureIndex] = sampler.get();
+  }
+
   auto metalTexture = std::static_pointer_cast<MetalTexture>(texture);
   [renderEncoder setFragmentTexture:metalTexture->metalTexture() atIndex:textureIndex];
 
@@ -261,11 +302,40 @@ void MetalRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuff
   DEBUG_ASSERT(binding < VertexBufferIndexStart);
   (void)size;  // Metal doesn't need explicit size
 
+  if (binding < MaxUniformBindings && lastUniformBuffers[binding] == buffer.get() &&
+      lastUniformOffsets[binding] == offset) {
+    return;
+  }
+
+  uint32_t visibility = currentPipeline ? currentPipeline->getUniformBlockVisibility(binding)
+                                        : ShaderVisibility::VertexFragment;
+
+  if (binding < MaxUniformBindings && lastUniformBuffers[binding] == buffer.get()) {
+    // Same buffer, only offset changed — use lightweight offset-only update.
+    lastUniformOffsets[binding] = offset;
+    if (visibility & ShaderVisibility::Vertex) {
+      [renderEncoder setVertexBufferOffset:offset atIndex:binding];
+    }
+    if (visibility & ShaderVisibility::Fragment) {
+      [renderEncoder setFragmentBufferOffset:offset atIndex:binding];
+    }
+    return;
+  }
+
+  if (binding < MaxUniformBindings) {
+    lastUniformBuffers[binding] = buffer.get();
+    lastUniformOffsets[binding] = offset;
+  }
+
   auto metalBuffer = std::static_pointer_cast<MetalBuffer>(buffer);
 
-  // Uniform buffers use low Metal buffer indices (0, 1, ...) directly.
-  [renderEncoder setVertexBuffer:metalBuffer->metalBuffer() offset:offset atIndex:binding];
-  [renderEncoder setFragmentBuffer:metalBuffer->metalBuffer() offset:offset atIndex:binding];
+  // Bind the uniform buffer to the shader stages specified by the pipeline's visibility flags.
+  if (visibility & ShaderVisibility::Vertex) {
+    [renderEncoder setVertexBuffer:metalBuffer->metalBuffer() offset:offset atIndex:binding];
+  }
+  if (visibility & ShaderVisibility::Fragment) {
+    [renderEncoder setFragmentBuffer:metalBuffer->metalBuffer() offset:offset atIndex:binding];
+  }
 }
 
 void MetalRenderPass::setStencilReference(uint32_t reference) {
@@ -281,7 +351,7 @@ void MetalRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
     return;
   }
 
-  MTLPrimitiveType metalPrimitiveType = MetalDefines::ToMTLPrimitiveType(primitiveType);
+  MTLPrimitiveType metalPrimitiveType = ToMTLPrimitiveType(primitiveType);
   [renderEncoder drawPrimitives:metalPrimitiveType
                     vertexStart:firstVertex
                     vertexCount:vertexCount
@@ -296,7 +366,7 @@ void MetalRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCou
     return;
   }
 
-  MTLPrimitiveType metalPrimitiveType = MetalDefines::ToMTLPrimitiveType(primitiveType);
+  MTLPrimitiveType metalPrimitiveType = ToMTLPrimitiveType(primitiveType);
 
   // Convert IndexFormat to Metal types
   MTLIndexType indexType =

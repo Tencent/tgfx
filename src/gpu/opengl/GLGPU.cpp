@@ -18,7 +18,6 @@
 
 #include "GLGPU.h"
 #include "gpu/opengl/GLBuffer.h"
-#include "gpu/opengl/GLTextureBuffer.h"
 #if defined(__EMSCRIPTEN__)
 #include "gpu/opengl/webgl/WebGLBuffer.h"
 #endif
@@ -54,17 +53,6 @@ std::shared_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
     LOGE("GLGPU::createBuffer() invalid buffer usage!");
     return nullptr;
   }
-  auto caps = interface->caps();
-  if (!caps->pboSupport && usage & GPUBufferUsage::READBACK) {
-    if (usage != GPUBufferUsage::READBACK) {
-      LOGE(
-          "GLGPU::createBuffer() READBACK usage can't be combined with other usages when PBO is "
-          "not supported!");
-      return nullptr;
-    }
-    return makeResource<GLTextureBuffer>(interface, _state, size);
-  }
-
   auto gl = interface->functions();
   unsigned bufferID = 0;
   gl->genBuffers(1, &bufferID);

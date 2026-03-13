@@ -52,6 +52,8 @@ using GLBufferData = void GL_FUNCTION_TYPE(unsigned target, GLsizeiptr size, con
                                            unsigned usage);
 using GLBufferSubData = void GL_FUNCTION_TYPE(unsigned target, GLintptr offset, GLsizeiptr size,
                                               const void* data);
+using GLGetBufferSubData = void GL_FUNCTION_TYPE(unsigned target, GLintptr srcByteOffset,
+                                                 GLsizeiptr dstSize, void* dstData);
 using GLCheckFramebufferStatus = unsigned GL_FUNCTION_TYPE(unsigned target);
 using GLClear = void GL_FUNCTION_TYPE(unsigned mask);
 using GLClearColor = void GL_FUNCTION_TYPE(float red, float green, float blue, float alpha);
@@ -197,6 +199,7 @@ class GLFunctions {
   GLBlendFuncSeparate* blendFuncSeparate = nullptr;
   GLBufferData* bufferData = nullptr;
   GLBufferSubData* bufferSubData = nullptr;
+  GLGetBufferSubData* getBufferSubData = nullptr;
   GLCheckFramebufferStatus* checkFramebufferStatus = nullptr;
   GLClear* clear = nullptr;
   GLClearColor* clearColor = nullptr;
