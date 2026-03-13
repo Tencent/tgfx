@@ -26,11 +26,11 @@ std::shared_ptr<Ellipse> Ellipse::Make() {
   return std::shared_ptr<Ellipse>(new Ellipse());
 }
 
-void Ellipse::setCenter(const Point& value) {
-  if (_center == value) {
+void Ellipse::setPosition(const Point& value) {
+  if (_position == value) {
     return;
   }
-  _center = value;
+  _position = value;
   _cachedShape = nullptr;
   invalidateContent();
 }
@@ -59,7 +59,7 @@ void Ellipse::apply(VectorContext* context) {
     auto halfWidth = _size.width * 0.5f;
     auto halfHeight = _size.height * 0.5f;
     auto rect =
-        Rect::MakeXYWH(_center.x - halfWidth, _center.y - halfHeight, _size.width, _size.height);
+        Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, _size.width, _size.height);
     Path path;
     path.addOval(rect, _reversed);
     _cachedShape = Shape::MakeFrom(path);

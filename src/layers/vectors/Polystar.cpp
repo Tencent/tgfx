@@ -179,11 +179,11 @@ std::shared_ptr<Polystar> Polystar::Make() {
   return std::shared_ptr<Polystar>(new Polystar());
 }
 
-void Polystar::setCenter(const Point& value) {
-  if (_center == value) {
+void Polystar::setPosition(const Point& value) {
+  if (_position == value) {
     return;
   }
-  _center = value;
+  _position = value;
   _cachedShape = nullptr;
   invalidateContent();
 }
@@ -264,7 +264,7 @@ void Polystar::apply(VectorContext* context) {
   DEBUG_ASSERT(context != nullptr);
   if (_cachedShape == nullptr) {
     auto pathProvider = std::make_shared<PolystarPathProvider>(
-        _center, _polystarType, _pointCount, _rotation, _outerRadius, _outerRoundness, _innerRadius,
+        _position, _polystarType, _pointCount, _rotation, _outerRadius, _outerRoundness, _innerRadius,
         _innerRoundness, _reversed);
     _cachedShape = Shape::MakeFrom(std::move(pathProvider));
   }
