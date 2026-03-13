@@ -39,8 +39,8 @@ class Window {
   std::shared_ptr<Device> getDevice();
 
   /**
-   * Returns a Drawable for rendering to this window. If the current Drawable is reusable, the same
-   * instance is returned. Otherwise, a new Drawable is created via onCreateDrawable().
+   * Returns a new Drawable for rendering to this window. A new Drawable is created via
+   * onCreateDrawable() each time this method is called.
    * @param context The GPU context used for rendering.
    */
   std::shared_ptr<Drawable> nextDrawable(Context* context);
@@ -54,7 +54,6 @@ class Window {
  protected:
   std::mutex locker = {};
   std::shared_ptr<Device> device = nullptr;
-  std::shared_ptr<Drawable> currentDrawable = nullptr;
 
   explicit Window(std::shared_ptr<Device> device);
   Window() = default;

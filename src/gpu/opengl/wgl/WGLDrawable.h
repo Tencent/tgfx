@@ -19,16 +19,16 @@
 #pragma once
 
 #include <Windows.h>
-#include "tgfx/gpu/GLDrawable.h"
+#include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
-class WGLDrawable : public GLDrawable {
+class WGLDrawable : public Drawable {
  public:
   WGLDrawable(HDC deviceContext, int width, int height,
               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  protected:
-  BackendRenderTarget onCreateBackendRenderTarget() override;
+  std::shared_ptr<RenderTargetProxy> onCreateProxy(Context* context) override;
   void onPresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) override;
 
  private:

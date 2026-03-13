@@ -57,19 +57,12 @@ class Drawable {
     return _colorSpace;
   }
 
-  /**
-   * Returns whether this drawable can be reused for the next frame. If false, a new drawable is
-   * created each time nextDrawable() is called on the Window.
-   */
-  virtual bool isReusable() const {
-    return true;
-  }
-
  protected:
   Drawable(int width, int height, std::shared_ptr<ColorSpace> colorSpace = nullptr)
       : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
   }
 
+  virtual std::shared_ptr<RenderTargetProxy> onCreateProxy(Context* context) = 0;
   virtual void onPresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) = 0;
 
   RenderTargetProxy* _proxy = nullptr;
@@ -81,7 +74,6 @@ class Drawable {
   std::shared_ptr<RenderTargetProxy> _proxyHolder = nullptr;
 
   std::shared_ptr<RenderTargetProxy> getProxy(Context* context);
-  virtual std::shared_ptr<RenderTargetProxy> onCreateProxy(Context* context) = 0;
   void present(Context* context, std::shared_ptr<CommandBuffer> commandBuffer);
 
   friend class Surface;

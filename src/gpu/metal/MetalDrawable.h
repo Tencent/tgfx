@@ -29,15 +29,11 @@ class MetalDrawable : public Drawable {
                 std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  protected:
-  bool isReusable() const override {
-    return false;
-  }
+  std::shared_ptr<RenderTargetProxy> onCreateProxy(Context* context) override;
   void onPresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) override;
 
  private:
   CAMetalLayer* metalLayer = nil;
   PixelFormat pixelFormat = PixelFormat::RGBA_8888;
-
-  std::shared_ptr<RenderTargetProxy> onCreateProxy(Context* context) override;
 };
 }  // namespace tgfx

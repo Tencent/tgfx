@@ -21,20 +21,22 @@
 #include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/eagl/EAGLLayerTexture.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
 EAGLDrawable::EAGLDrawable(std::weak_ptr<EAGLLayerTexture> layerTexture, int width, int height,
                            std::shared_ptr<ColorSpace> colorSpace)
-    : GLDrawable(width, height, std::move(colorSpace)), layerTexture(std::move(layerTexture)) {
+    : Drawable(width, height, std::move(colorSpace)), layerTexture(std::move(layerTexture)) {
 }
 
-BackendRenderTarget EAGLDrawable::onCreateBackendRenderTarget() {
+std::shared_ptr<RenderTargetProxy> EAGLDrawable::onCreateProxy(Context* context) {
   auto texture = layerTexture.lock();
   if (texture == nullptr) {
-    return {};
+    return nullptr;
   }
-  return texture->getBackendRenderTarget();
+  auto backendRT = texture->getBackendRenderTarget();
+  return RenderTargetProxy::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
 }
 
 void EAGLDrawable::onPresent(Context* context, std::shared_ptr<CommandBuffer>) {

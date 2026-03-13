@@ -19,16 +19,16 @@
 #pragma once
 
 #include <AppKit/AppKit.h>
-#include "tgfx/gpu/GLDrawable.h"
+#include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
-class CGLDrawable : public GLDrawable {
+class CGLDrawable : public Drawable {
  public:
   CGLDrawable(NSOpenGLContext* glContext, NSView* view, int width, int height,
               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  protected:
-  BackendRenderTarget onCreateBackendRenderTarget() override;
+  std::shared_ptr<RenderTargetProxy> onCreateProxy(Context* context) override;
   void onPresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) override;
 
  private:

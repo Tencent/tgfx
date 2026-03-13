@@ -19,7 +19,7 @@
 #pragma once
 
 #include <optional>
-#include "tgfx/gpu/GLDrawable.h"
+#include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
 /**
@@ -27,7 +27,7 @@ namespace tgfx {
  * It supports setting a presentation time for Android SurfaceTexture timestamps. The caller must
  * ensure that the EGLDevice (and its EGLDisplay/EGLSurface) outlives this Drawable.
  */
-class EGLDrawable : public GLDrawable {
+class EGLDrawable : public Drawable {
  public:
   /**
    * Creates a new EGLDrawable with the specified EGL display, surface, and dimensions. The
@@ -45,7 +45,7 @@ class EGLDrawable : public GLDrawable {
   void setPresentationTime(int64_t time);
 
  protected:
-  BackendRenderTarget onCreateBackendRenderTarget() override;
+  std::shared_ptr<RenderTargetProxy> onCreateProxy(Context* context) override;
   void onPresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) override;
 
  private:

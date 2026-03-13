@@ -30,16 +30,11 @@ std::shared_ptr<Device> Window::getDevice() {
 
 std::shared_ptr<Drawable> Window::nextDrawable(Context* context) {
   std::lock_guard<std::mutex> autoLock(locker);
-  if (currentDrawable != nullptr && currentDrawable->isReusable()) {
-    return currentDrawable;
-  }
-  currentDrawable = onCreateDrawable(context);
-  return currentDrawable;
+  return onCreateDrawable(context);
 }
 
 void Window::invalidSize() {
   std::lock_guard<std::mutex> autoLock(locker);
-  currentDrawable = nullptr;
   onInvalidSize();
 }
 

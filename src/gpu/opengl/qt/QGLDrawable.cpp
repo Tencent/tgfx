@@ -75,6 +75,7 @@ void QGLDrawable::onPresent(Context*, std::shared_ptr<CommandBuffer>) {
       }
     }
   }
+  _available = true;
   QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
 }
 }  // namespace tgfx

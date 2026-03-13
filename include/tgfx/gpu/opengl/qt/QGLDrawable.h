@@ -51,16 +51,15 @@ class QGLDrawable : public Drawable {
   QSGTexture* getQSGTexture();
 
  protected:
-  bool isReusable() const override {
-    return false;
-  }
+  std::shared_ptr<RenderTargetProxy> onCreateProxy(Context* context) override;
   void onPresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) override;
 
  private:
+  bool _available = true;
   QQuickItem* quickItem = nullptr;
   unsigned textureID = 0;
   QSGTexture* outTexture = nullptr;
 
-  std::shared_ptr<RenderTargetProxy> onCreateProxy(Context* context) override;
+  friend class QGLWindow;
 };
 }  // namespace tgfx
