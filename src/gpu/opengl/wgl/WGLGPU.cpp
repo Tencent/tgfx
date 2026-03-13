@@ -174,7 +174,7 @@ WGLGPU::WGLGPU(std::shared_ptr<GLInterface> glInterface)
 WGLGPU::~WGLGPU() {
   for (auto& shared : interopState->sharedDevices) {
     if (shared.interopDevice && interopState->wglDXCloseDeviceNV) {
-      interopState->wglDXCloseDeviceNV(static_cast<HANDLE>(shared.interopDevice));
+      interopState->wglDXCloseDeviceNV(shared.interopDevice);
     }
   }
   interopState->sharedDevices.clear();
@@ -236,7 +236,7 @@ bool WGLGPU::isMemoryObjectInteropAvailable() {
   return interopState->memObjAvailable;
 }
 
-void* WGLGPU::acquireSharedInteropDevice(void* d3d11Device) {
+HANDLE WGLGPU::acquireSharedInteropDevice(IUnknown* d3d11Device) {
   if (!interopState->wglDXOpenDeviceNV || !d3d11Device) {
     return nullptr;
   }
@@ -246,7 +246,7 @@ void* WGLGPU::acquireSharedInteropDevice(void* d3d11Device) {
       return shared.interopDevice;
     }
   }
-  void* interopDev = interopState->wglDXOpenDeviceNV(d3d11Device);
+  HANDLE interopDev = interopState->wglDXOpenDeviceNV(d3d11Device);
   if (!interopDev) {
     return nullptr;
   }
@@ -254,7 +254,7 @@ void* WGLGPU::acquireSharedInteropDevice(void* d3d11Device) {
   return interopDev;
 }
 
-void WGLGPU::releaseSharedInteropDevice(void* interopDevice, void* d3d11Device) {
+void WGLGPU::releaseSharedInteropDevice(HANDLE interopDevice, IUnknown* d3d11Device) {
   if (!interopDevice) {
     return;
   }
@@ -264,7 +264,7 @@ void WGLGPU::releaseSharedInteropDevice(void* interopDevice, void* d3d11Device) 
       it->refCount--;
       if (it->refCount <= 0) {
         if (interopState->wglDXCloseDeviceNV) {
-          interopState->wglDXCloseDeviceNV(static_cast<HANDLE>(interopDevice));
+          interopState->wglDXCloseDeviceNV(interopDevice);
         }
         interopState->sharedDevices.erase(it);
       }
@@ -273,7 +273,7 @@ void WGLGPU::releaseSharedInteropDevice(void* interopDevice, void* d3d11Device) 
   }
   // Not found in the pool — close directly as a fallback.
   if (interopState->wglDXCloseDeviceNV) {
-    interopState->wglDXCloseDeviceNV(static_cast<HANDLE>(interopDevice));
+    interopState->wglDXCloseDeviceNV(interopDevice);
   }
 }
 

@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <Unknwn.h>
+
 // Minimal DXGI format constants to avoid including dxgiformat.h.
 #ifndef DXGI_FORMAT_R8G8B8A8_UNORM
 #define DXGI_FORMAT_R8G8B8A8_UNORM 28
@@ -100,12 +102,12 @@ struct D3D11MappedSubresource {
  * Retrieves the texture descriptor from an ID3D11Texture2D pointer via vtable call.
  * Returns false if texture is null or the dimensions are zero.
  */
-bool D3D11GetTextureDesc(void* texture, D3D11Texture2DDesc* outDesc);
+bool D3D11GetTextureDesc(IUnknown* texture, D3D11Texture2DDesc* outDesc);
 
 /**
  * Retrieves the ID3D11Device that owns the given ID3D11Texture2D. The returned pointer does not
  * carry an extra reference (the reference added by GetDevice is immediately released).
  */
-void* D3D11GetDeviceFromTexture(void* texture);
+IUnknown* D3D11GetDeviceFromTexture(IUnknown* texture);
 
 }  // namespace tgfx

@@ -42,9 +42,9 @@ class WGLHardwareTexture : public GLTexture {
  private:
   HardwareBufferRef hardwareBuffer = nullptr;
   unsigned memoryObject = 0;
-  void* interopDevice = nullptr;
-  void* d3d11Device = nullptr;
-  void* interopTexture = nullptr;
+  HANDLE interopDevice = nullptr;
+  IUnknown* d3d11Device = nullptr;
+  HANDLE interopTexture = nullptr;
 
   WGLHardwareTexture(const TextureDescriptor& descriptor, HardwareBufferRef hardwareBuffer,
                      unsigned target, unsigned textureID);

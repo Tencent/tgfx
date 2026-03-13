@@ -17,39 +17,37 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "D3D11Util.h"
-#include <Unknwn.h>
 
 namespace tgfx {
 
 namespace {
-void** GetVtable(void* comObj) {
+void** GetVtable(IUnknown* comObj) {
   return *reinterpret_cast<void***>(comObj);
 }
 
 typedef void(__stdcall* GetDescFn)(IUnknown* self, D3D11Texture2DDesc* pDesc);
-typedef void(__stdcall* GetDeviceFn)(IUnknown* self, void** ppDevice);
+typedef void(__stdcall* GetDeviceFn)(IUnknown* self, IUnknown** ppDevice);
 }  // namespace
 
-bool D3D11GetTextureDesc(void* texture, D3D11Texture2DDesc* outDesc) {
+bool D3D11GetTextureDesc(IUnknown* texture, D3D11Texture2DDesc* outDesc) {
   if (!texture || !outDesc) {
     return false;
   }
   auto getDesc = reinterpret_cast<GetDescFn>(GetVtable(texture)[kD3D11GetDescVtable]);
-  getDesc(static_cast<IUnknown*>(texture), outDesc);
+  getDesc(texture, outDesc);
   return outDesc->width > 0 && outDesc->height > 0;
 }
 
-void* D3D11GetDeviceFromTexture(void* texture) {
+IUnknown* D3D11GetDeviceFromTexture(IUnknown* texture) {
   if (!texture) {
     return nullptr;
   }
-  auto* unk = static_cast<IUnknown*>(texture);
-  auto getDevice = reinterpret_cast<GetDeviceFn>(GetVtable(unk)[kD3D11GetDeviceVtable]);
-  void* device = nullptr;
-  getDevice(unk, &device);
+  auto getDevice = reinterpret_cast<GetDeviceFn>(GetVtable(texture)[kD3D11GetDeviceVtable]);
+  IUnknown* device = nullptr;
+  getDevice(texture, &device);
   // GetDevice adds a reference; release it immediately to keep the ref-count balanced.
   if (device) {
-    static_cast<IUnknown*>(device)->Release();
+    device->Release();
   }
   return device;
 }

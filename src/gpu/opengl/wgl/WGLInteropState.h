@@ -18,7 +18,10 @@
 
 #pragma once
 
+#include <Unknwn.h>
 // clang-format off
+// NOMINMAX must be defined before windows.h to prevent min/max macro pollution.
+#define NOMINMAX
 // windows.h must precede GL/gl.h because GL/gl.h depends on WINGDIAPI and APIENTRY macros.
 #include <windows.h>
 #include <GL/gl.h>
@@ -26,10 +29,10 @@
 #include <vector>
 
 // WGL_NV_DX_interop function typedefs
-typedef HANDLE(WINAPI* PFNWGLDXOPENDEVICENVPROC)(void* dxDevice);
+typedef HANDLE(WINAPI* PFNWGLDXOPENDEVICENVPROC)(IUnknown* dxDevice);
 typedef BOOL(WINAPI* PFNWGLDXCLOSEDEVICENVPROC)(HANDLE hDevice);
-typedef HANDLE(WINAPI* PFNWGLDXREGISTEROBJECTNVPROC)(HANDLE hDevice, void* dxObject, GLuint name,
-                                                     GLenum type, GLenum access);
+typedef HANDLE(WINAPI* PFNWGLDXREGISTEROBJECTNVPROC)(HANDLE hDevice, IUnknown* dxObject,
+                                                     GLuint name, GLenum type, GLenum access);
 typedef BOOL(WINAPI* PFNWGLDXUNREGISTEROBJECTNVPROC)(HANDLE hDevice, HANDLE hObject);
 typedef BOOL(WINAPI* PFNWGLDXLOCKOBJECTSNVPROC)(HANDLE hDevice, GLint count, HANDLE* hObjects);
 typedef BOOL(WINAPI* PFNWGLDXUNLOCKOBJECTSNVPROC)(HANDLE hDevice, GLint count, HANDLE* hObjects);
@@ -47,13 +50,13 @@ typedef void(GL_FUNCTION_TYPE* PFNGLTEXSTORAGEMEM2DEXTPROC)(unsigned target, int
                                                             uint64_t offset);
 typedef void(GL_FUNCTION_TYPE* PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC)(unsigned memory, uint64_t size,
                                                                     unsigned handleType,
-                                                                    void* handle);
+                                                                    HANDLE handle);
 
 namespace tgfx {
 
 struct SharedInteropDevice {
-  void* interopDevice = nullptr;
-  void* d3d11Device = nullptr;
+  HANDLE interopDevice = nullptr;
+  IUnknown* d3d11Device = nullptr;
   int refCount = 0;
 };
 

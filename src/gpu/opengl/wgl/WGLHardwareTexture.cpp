@@ -126,15 +126,14 @@ static unsigned ImportViaMemoryObject(WGLGPU* gpu, HardwareBufferRef hardwareBuf
 // ============================================================================
 // D3D11→GL import via WGL_NV_DX_interop
 // ============================================================================
-static unsigned ImportViaWglDX(WGLGPU* gpu, void* d3d11Device,
-                               HardwareBufferRef hardwareBuffer, void** outInteropDevice,
-                               void** outInteropTexture) {
+static unsigned ImportViaWglDX(WGLGPU* gpu, IUnknown* d3d11Device, HardwareBufferRef hardwareBuffer,
+                               HANDLE* outInteropDevice, HANDLE* outInteropTexture) {
   auto* state = gpu->getInteropState();
   if (!state->wglDXRegisterObjectNV) {
     return 0;
   }
 
-  void* interopDev = gpu->acquireSharedInteropDevice(d3d11Device);
+  HANDLE interopDev = gpu->acquireSharedInteropDevice(d3d11Device);
   if (!interopDev) {
     LOGE("WGLHardwareTexture: Failed to get shared GL interop device.");
     return 0;
@@ -147,9 +146,9 @@ static unsigned ImportViaWglDX(WGLGPU* gpu, void* d3d11Device,
     return 0;
   }
 
-  void* interopTex =
-      state->wglDXRegisterObjectNV(static_cast<HANDLE>(interopDev), hardwareBuffer, glTextureId,
-                                   GL_TEXTURE_2D, WGL_ACCESS_READ_ONLY_NV);
+  HANDLE interopTex =
+      state->wglDXRegisterObjectNV(interopDev, reinterpret_cast<IUnknown*>(hardwareBuffer),
+                                   glTextureId, GL_TEXTURE_2D, WGL_ACCESS_READ_ONLY_NV);
   if (!interopTex) {
     LOGE("WGLHardwareTexture: Failed to register D3D11 texture with OpenGL.");
     glDeleteTextures(1, &glTextureId);
@@ -157,11 +156,9 @@ static unsigned ImportViaWglDX(WGLGPU* gpu, void* d3d11Device,
     return 0;
   }
 
-  if (!state->wglDXLockObjectsNV(static_cast<HANDLE>(interopDev), 1,
-                                 reinterpret_cast<HANDLE*>(&interopTex))) {
+  if (!state->wglDXLockObjectsNV(interopDev, 1, &interopTex)) {
     LOGE("WGLHardwareTexture: Failed to lock D3D11 texture for GL access.");
-    state->wglDXUnregisterObjectNV(static_cast<HANDLE>(interopDev),
-                                   static_cast<HANDLE>(interopTex));
+    state->wglDXUnregisterObjectNV(interopDev, interopTex);
     glDeleteTextures(1, &glTextureId);
     gpu->releaseSharedInteropDevice(interopDev, d3d11Device);
     return 0;
@@ -245,13 +242,13 @@ std::shared_ptr<WGLHardwareTexture> WGLHardwareTexture::MakeFrom(WGLGPU* gpu,
 
   // Fall back to WGL_NV_DX_interop.
   if (gpu->isNVDXInteropAvailable()) {
-    void* d3dDevice = D3D11GetDeviceFromTexture(hardwareBuffer);
+    IUnknown* d3dDevice = D3D11GetDeviceFromTexture(reinterpret_cast<IUnknown*>(hardwareBuffer));
     if (!d3dDevice) {
       LOGE("WGLHardwareTexture: Failed to get D3D11 device from texture.");
       return nullptr;
     }
-    void* interopDev = nullptr;
-    void* interopTex = nullptr;
+    HANDLE interopDev = nullptr;
+    HANDLE interopTex = nullptr;
     unsigned glTextureId = ImportViaWglDX(gpu, d3dDevice, hardwareBuffer, &interopDev, &interopTex);
     if (glTextureId != 0) {
       auto texture = gpu->makeResource<WGLHardwareTexture>(
@@ -274,12 +271,10 @@ void WGLHardwareTexture::onReleaseTexture(GLGPU* gpu) {
   // Cleanup wglDX interop.
   if (interopTexture) {
     if (state->wglDXUnlockObjectsNV && interopDevice) {
-      state->wglDXUnlockObjectsNV(static_cast<HANDLE>(interopDevice), 1,
-                                  reinterpret_cast<HANDLE*>(&interopTexture));
+      state->wglDXUnlockObjectsNV(interopDevice, 1, &interopTexture);
     }
     if (state->wglDXUnregisterObjectNV && interopDevice) {
-      state->wglDXUnregisterObjectNV(static_cast<HANDLE>(interopDevice),
-                                     static_cast<HANDLE>(interopTexture));
+      state->wglDXUnregisterObjectNV(interopDevice, interopTexture);
     }
     interopTexture = nullptr;
   }
