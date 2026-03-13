@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/SlidingWindowTracker.h"
@@ -73,7 +74,7 @@ class DrawingBuffer {
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::vector<PlacementPtr<AtlasUploadTask>> atlasTasks = {};
-  std::vector<Drawable*> drawables = {};
+  std::vector<std::shared_ptr<Drawable>> drawables = {};
 
   friend class DrawingManager;
   friend class Context;

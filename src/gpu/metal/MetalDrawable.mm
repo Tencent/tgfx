@@ -61,6 +61,9 @@ std::shared_ptr<DrawableProxy> MetalDrawable::onCreateProxy(Context* context) {
 }
 
 void MetalDrawable::onPresent(Context*, std::shared_ptr<CommandBuffer> commandBuffer) {
+  if (commandBuffer == nullptr || _proxy == nullptr) {
+    return;
+  }
   auto metalProxy = static_cast<MetalDrawableProxy*>(_proxy);
   auto drawable = metalProxy->getMetalDrawable();
   if (drawable == nil) {

@@ -22,6 +22,7 @@
 #include "core/AtlasManager.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "tgfx/gpu/Drawable.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
@@ -200,13 +201,17 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
 }
 
 void DrawingManager::collectDrawable(RenderTargetProxy* proxy) {
-  auto drawable = proxy->getDrawable();
+  auto* drawable = proxy->getDrawable();
   if (drawable == nullptr) {
     return;
   }
+  auto sharedDrawable = drawable->shared_from_this();
   auto& drawables = getDrawingBuffer()->drawables;
-  if (std::find(drawables.begin(), drawables.end(), drawable) == drawables.end()) {
-    drawables.push_back(drawable);
+  for (const auto& d : drawables) {
+    if (d.get() == drawable) {
+      return;
+    }
   }
+  drawables.push_back(std::move(sharedDrawable));
 }
 }  // namespace tgfx
