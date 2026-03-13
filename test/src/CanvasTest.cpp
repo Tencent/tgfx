@@ -2209,7 +2209,7 @@ TGFX_TEST(CanvasTest, DrawMesh_FromShape) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_FromShape"));
 }
 
-TGFX_TEST(CanvasTest, DrawShapeInstanced_ColorsOnly) {
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_ColorsOnly) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2224,12 +2224,7 @@ TGFX_TEST(CanvasTest, DrawShapeInstanced_ColorsOnly) {
   auto shape = Shape::MakeFrom(path);
 
   // 4 instances arranged in a 2x2 grid, each with a different color
-  Matrix matrices[] = {
-      Matrix::MakeTrans(75, 75),
-      Matrix::MakeTrans(225, 75),
-      Matrix::MakeTrans(75, 225),
-      Matrix::MakeTrans(225, 225),
-  };
+  Point positions[] = {{75, 75}, {225, 75}, {75, 225}, {225, 225}};
   Color colors[] = {
       Color::Red(),
       Color::Green(),
@@ -2237,13 +2232,19 @@ TGFX_TEST(CanvasTest, DrawShapeInstanced_ColorsOnly) {
       Color::FromRGBA(255, 165, 0, 255),
   };
 
-  Paint paint = {};
-  canvas->drawShapeInstanced(shape, matrices, colors, 4, paint);
+  for (int i = 0; i < 4; i++) {
+    Paint paint = {};
+    paint.setColor(colors[i]);
+    canvas->save();
+    canvas->concat(Matrix::MakeTrans(positions[i].x, positions[i].y));
+    canvas->drawShape(shape, paint);
+    canvas->restore();
+  }
 
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_ColorsOnly"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_ColorsOnly"));
 }
 
-TGFX_TEST(CanvasTest, DrawShapeInstanced_PaintColorOnly) {
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_PaintColorOnly) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2257,20 +2258,22 @@ TGFX_TEST(CanvasTest, DrawShapeInstanced_PaintColorOnly) {
   path.addOval(Rect::MakeXYWH(-25, -25, 50, 50));
   auto shape = Shape::MakeFrom(path);
 
-  // 5 instances with different transforms (translate + rotate + scale)
-  Matrix matrices[] = {
-      Matrix::MakeTrans(75, 75),   Matrix::MakeTrans(150, 75),  Matrix::MakeTrans(225, 75),
-      Matrix::MakeTrans(112, 200), Matrix::MakeTrans(188, 200),
-  };
+  // 5 instances with same paint color, translation-only differences
+  Point positions[] = {{75, 75}, {150, 75}, {225, 75}, {112, 200}, {188, 200}};
 
   Paint paint = {};
   paint.setColor(Color::FromRGBA(0, 100, 200, 255));
-  canvas->drawShapeInstanced(shape, matrices, nullptr, 5, paint);
+  for (int i = 0; i < 5; i++) {
+    canvas->save();
+    canvas->concat(Matrix::MakeTrans(positions[i].x, positions[i].y));
+    canvas->drawShape(shape, paint);
+    canvas->restore();
+  }
 
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_PaintColorOnly"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_SameColor"));
 }
 
-TGFX_TEST(CanvasTest, DrawShapeInstanced_TransformVariety) {
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_TransformVariety) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2285,19 +2288,21 @@ TGFX_TEST(CanvasTest, DrawShapeInstanced_TransformVariety) {
   auto shape = Shape::MakeFrom(path);
 
   // Instances with various transforms: identity, scale, rotate, combined
-  Matrix m0 = Matrix::MakeTrans(50, 100);
+  // These will NOT auto-batch (different scale/rotate) but should still render correctly
+  Matrix matrices[] = {
+      Matrix::MakeTrans(50, 100),
+      Matrix::I(),
+      Matrix::I(),
+      Matrix::I(),
+  };
+  matrices[1] = Matrix::MakeTrans(150, 100);
+  matrices[1].preScale(2, 1);
+  matrices[2] = Matrix::MakeTrans(250, 100);
+  matrices[2].preRotate(45);
+  matrices[3] = Matrix::MakeTrans(350, 100);
+  matrices[3].preScale(1, 2);
+  matrices[3].preRotate(30);
 
-  Matrix m1 = Matrix::MakeTrans(150, 100);
-  m1.preScale(2, 1);
-
-  Matrix m2 = Matrix::MakeTrans(250, 100);
-  m2.preRotate(45);
-
-  Matrix m3 = Matrix::MakeTrans(350, 100);
-  m3.preScale(1, 2);
-  m3.preRotate(30);
-
-  Matrix matrices[] = {m0, m1, m2, m3};
   Color colors[] = {
       Color::Red(),
       Color::Green(),
@@ -2305,13 +2310,19 @@ TGFX_TEST(CanvasTest, DrawShapeInstanced_TransformVariety) {
       Color::FromRGBA(128, 0, 128, 255),
   };
 
-  Paint paint = {};
-  canvas->drawShapeInstanced(shape, matrices, colors, 4, paint);
+  for (int i = 0; i < 4; i++) {
+    Paint paint = {};
+    paint.setColor(colors[i]);
+    canvas->save();
+    canvas->concat(matrices[i]);
+    canvas->drawShape(shape, paint);
+    canvas->restore();
+  }
 
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_TransformVariety"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_TransformVariety"));
 }
 
-TGFX_TEST(CanvasTest, DrawShapeInstanced_WithShader) {
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_WithShader) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2326,24 +2337,24 @@ TGFX_TEST(CanvasTest, DrawShapeInstanced_WithShader) {
   auto shape = Shape::MakeFrom(path);
 
   // 4 instances in a 2x2 grid
-  Matrix matrices[] = {
-      Matrix::MakeTrans(75, 75),
-      Matrix::MakeTrans(225, 75),
-      Matrix::MakeTrans(75, 225),
-      Matrix::MakeTrans(225, 225),
-  };
+  Point positions[] = {{75, 75}, {225, 75}, {75, 225}, {225, 225}};
 
   // Gradient shader
   auto shader = Shader::MakeLinearGradient({-30, -30}, {30, 30}, {Color::Red(), Color::Blue()}, {});
 
   Paint paint = {};
   paint.setShader(shader);
-  canvas->drawShapeInstanced(shape, matrices, nullptr, 4, paint);
+  for (int i = 0; i < 4; i++) {
+    canvas->save();
+    canvas->concat(Matrix::MakeTrans(positions[i].x, positions[i].y));
+    canvas->drawShape(shape, paint);
+    canvas->restore();
+  }
 
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_WithShader"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_WithShader"));
 }
 
-TGFX_TEST(CanvasTest, DrawShapeInstanced_ShaderAndColors) {
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_ShaderAndColors) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2357,31 +2368,28 @@ TGFX_TEST(CanvasTest, DrawShapeInstanced_ShaderAndColors) {
   path.addRoundRect(Rect::MakeXYWH(-30, -30, 60, 60), 10, 10);
   auto shape = Shape::MakeFrom(path);
 
-  // 4 instances
-  Matrix matrices[] = {
-      Matrix::MakeTrans(75, 75),
-      Matrix::MakeTrans(225, 75),
-      Matrix::MakeTrans(75, 225),
-      Matrix::MakeTrans(225, 225),
-  };
-  Color colors[] = {
-      Color::FromRGBA(255, 255, 255, 255),
-      Color::FromRGBA(255, 0, 0, 128),
-      Color::FromRGBA(0, 255, 0, 128),
-      Color::FromRGBA(0, 0, 255, 128),
-  };
+  // Note: with auto-batching, shader+colors batching is not supported via drawShape
+  // because each drawShape call only has one color. The shader is the same across instances
+  // so they can auto-batch, but per-instance color modulation is not available.
+  // This test uses shader-only (no per-instance color modulation).
+  Point positions[] = {{75, 75}, {225, 75}, {75, 225}, {225, 225}};
 
-  // Gradient shader + per-instance colors (Modulate blend)
+  // Gradient shader
   auto shader = Shader::MakeLinearGradient({-30, -30}, {30, 30}, {Color::Red(), Color::Blue()}, {});
 
   Paint paint = {};
   paint.setShader(shader);
-  canvas->drawShapeInstanced(shape, matrices, colors, 4, paint);
+  for (int i = 0; i < 4; i++) {
+    canvas->save();
+    canvas->concat(Matrix::MakeTrans(positions[i].x, positions[i].y));
+    canvas->drawShape(shape, paint);
+    canvas->restore();
+  }
 
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_ShaderAndColors"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_ShaderAndColors"));
 }
 
-TGFX_TEST(CanvasTest, DrawShapeInstanced_SingleInstance) {
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_SingleInstance) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2395,16 +2403,17 @@ TGFX_TEST(CanvasTest, DrawShapeInstanced_SingleInstance) {
   path.addOval(Rect::MakeXYWH(-40, -40, 80, 80));
   auto shape = Shape::MakeFrom(path);
 
-  Matrix matrices[] = {Matrix::MakeTrans(100, 100)};
-  Color colors[] = {Color::Red()};
-
   Paint paint = {};
-  canvas->drawShapeInstanced(shape, matrices, colors, 1, paint);
+  paint.setColor(Color::Red());
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(100, 100));
+  canvas->drawShape(shape, paint);
+  canvas->restore();
 
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_SingleInstance"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_SingleInstance"));
 }
 
-TGFX_TEST(CanvasTest, DrawShapeInstanced_Stroke) {
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_Stroke) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2417,12 +2426,7 @@ TGFX_TEST(CanvasTest, DrawShapeInstanced_Stroke) {
   path.addRoundRect(Rect::MakeXYWH(-30, -30, 60, 60), 10, 10);
   auto shape = Shape::MakeFrom(path);
 
-  Matrix matrices[] = {
-      Matrix::MakeTrans(75, 75),
-      Matrix::MakeTrans(225, 75),
-      Matrix::MakeTrans(75, 225),
-      Matrix::MakeTrans(225, 225),
-  };
+  Point positions[] = {{75, 75}, {225, 75}, {75, 225}, {225, 225}};
   Color colors[] = {
       Color::Red(),
       Color::Green(),
@@ -2430,15 +2434,21 @@ TGFX_TEST(CanvasTest, DrawShapeInstanced_Stroke) {
       Color::FromRGBA(255, 165, 0, 255),
   };
 
-  Paint paint = {};
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setStrokeWidth(6);
-  canvas->drawShapeInstanced(shape, matrices, colors, 4, paint);
+  for (int i = 0; i < 4; i++) {
+    Paint paint = {};
+    paint.setColor(colors[i]);
+    paint.setStyle(PaintStyle::Stroke);
+    paint.setStrokeWidth(6);
+    canvas->save();
+    canvas->concat(Matrix::MakeTrans(positions[i].x, positions[i].y));
+    canvas->drawShape(shape, paint);
+    canvas->restore();
+  }
 
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_Stroke"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_Stroke"));
 }
 
-TGFX_TEST(CanvasTest, DrawShapeInstanced_StrokeAndFill) {
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_StrokeAndFill) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2451,12 +2461,7 @@ TGFX_TEST(CanvasTest, DrawShapeInstanced_StrokeAndFill) {
   path.addRoundRect(Rect::MakeXYWH(-30, -30, 60, 60), 10, 10);
   auto shape = Shape::MakeFrom(path);
 
-  Matrix matrices[] = {
-      Matrix::MakeTrans(75, 75),
-      Matrix::MakeTrans(225, 75),
-      Matrix::MakeTrans(75, 225),
-      Matrix::MakeTrans(225, 225),
-  };
+  Point positions[] = {{75, 75}, {225, 75}, {75, 225}, {225, 225}};
   Color colors[] = {
       Color::FromRGBA(255, 0, 0, 128),
       Color::FromRGBA(0, 255, 0, 128),
@@ -2464,16 +2469,29 @@ TGFX_TEST(CanvasTest, DrawShapeInstanced_StrokeAndFill) {
       Color::FromRGBA(255, 165, 0, 128),
   };
 
-  Paint fillPaint = {};
-  canvas->drawShapeInstanced(shape, matrices, colors, 4, fillPaint);
+  // Fill pass
+  for (int i = 0; i < 4; i++) {
+    Paint fillPaint = {};
+    fillPaint.setColor(colors[i]);
+    canvas->save();
+    canvas->concat(Matrix::MakeTrans(positions[i].x, positions[i].y));
+    canvas->drawShape(shape, fillPaint);
+    canvas->restore();
+  }
 
-  Paint strokePaint = {};
-  strokePaint.setStyle(PaintStyle::Stroke);
-  strokePaint.setStrokeWidth(4);
-  strokePaint.setColor(Color::Black());
-  canvas->drawShapeInstanced(shape, matrices, nullptr, 4, strokePaint);
+  // Stroke pass
+  for (int i = 0; i < 4; i++) {
+    Paint strokePaint = {};
+    strokePaint.setStyle(PaintStyle::Stroke);
+    strokePaint.setStrokeWidth(4);
+    strokePaint.setColor(Color::Black());
+    canvas->save();
+    canvas->concat(Matrix::MakeTrans(positions[i].x, positions[i].y));
+    canvas->drawShape(shape, strokePaint);
+    canvas->restore();
+  }
 
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeInstanced_StrokeAndFill"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_StrokeAndFill"));
 }
 
 }  // namespace tgfx
