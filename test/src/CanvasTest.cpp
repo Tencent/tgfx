@@ -2209,7 +2209,7 @@ TGFX_TEST(CanvasTest, DrawMesh_FromShape) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_FromShape"));
 }
 
-TGFX_TEST(CanvasTest, DrawShapeAutoBatch_ColorsOnly) {
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_MultiColors) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2241,10 +2241,10 @@ TGFX_TEST(CanvasTest, DrawShapeAutoBatch_ColorsOnly) {
     canvas->restore();
   }
 
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_ColorsOnly"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_MultiColors"));
 }
 
-TGFX_TEST(CanvasTest, DrawShapeAutoBatch_PaintColorOnly) {
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_SameColor) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
