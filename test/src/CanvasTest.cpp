@@ -2305,41 +2305,6 @@ TGFX_TEST(CanvasTest, DrawShapeAutoBatch_WithShader) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_WithShader"));
 }
 
-TGFX_TEST(CanvasTest, DrawShapeAutoBatch_ShaderAndColors) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto surface = Surface::Make(context, 300, 300);
-  auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-
-  // Create a rounded rect shape
-  Path path = {};
-  path.addRoundRect(Rect::MakeXYWH(-30, -30, 60, 60), 10, 10);
-  auto shape = Shape::MakeFrom(path);
-
-  // Note: with auto-batching, shader+colors batching is not supported via drawShape
-  // because each drawShape call only has one color. The shader is the same across instances
-  // so they can auto-batch, but per-instance color modulation is not available.
-  // This test uses shader-only (no per-instance color modulation).
-  Point positions[] = {{75, 75}, {225, 75}, {75, 225}, {225, 225}};
-
-  // Gradient shader
-  auto shader = Shader::MakeLinearGradient({-30, -30}, {30, 30}, {Color::Red(), Color::Blue()}, {});
-
-  Paint paint = {};
-  paint.setShader(shader);
-  for (int i = 0; i < 4; i++) {
-    canvas->save();
-    canvas->concat(Matrix::MakeTrans(positions[i].x, positions[i].y));
-    canvas->drawShape(shape, paint);
-    canvas->restore();
-  }
-
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_ShaderAndColors"));
-}
-
 TGFX_TEST(CanvasTest, DrawShapeAutoBatch_SingleInstance) {
   ContextScope scope;
   auto context = scope.getContext();
