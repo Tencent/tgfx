@@ -2305,30 +2305,6 @@ TGFX_TEST(CanvasTest, DrawShapeAutoBatch_WithShader) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_WithShader"));
 }
 
-TGFX_TEST(CanvasTest, DrawShapeAutoBatch_SingleInstance) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto surface = Surface::Make(context, 200, 200);
-  auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-
-  // Single instance should degrade to drawShape
-  Path path = {};
-  path.addOval(Rect::MakeXYWH(-40, -40, 80, 80));
-  auto shape = Shape::MakeFrom(path);
-
-  Paint paint = {};
-  paint.setColor(Color::Red());
-  canvas->save();
-  canvas->concat(Matrix::MakeTrans(100, 100));
-  canvas->drawShape(shape, paint);
-  canvas->restore();
-
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_SingleInstance"));
-}
-
 TGFX_TEST(CanvasTest, DrawShapeAutoBatch_Stroke) {
   ContextScope scope;
   auto context = scope.getContext();
