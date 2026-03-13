@@ -22,12 +22,12 @@
 #include "core/AtlasManager.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
-#include "tgfx/gpu/Drawable.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "inspect/InspectorMark.h"
 #include "tasks/TransferPixelsTask.h"
+#include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
 DrawingManager::DrawingManager(Context* context) : context(context) {
