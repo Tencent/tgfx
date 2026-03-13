@@ -74,8 +74,8 @@ void Rectangle::apply(VectorContext* context) {
     if (radius > halfHeight) {
       radius = halfHeight;
     }
-    auto rect =
-        Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, _size.width, _size.height);
+    auto rect = Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, _size.width,
+                               _size.height);
     Path path;
     path.addRoundRect(rect, radius, radius, _reversed, 2);
     _cachedShape = Shape::MakeFrom(path);
