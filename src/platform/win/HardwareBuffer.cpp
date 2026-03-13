@@ -61,7 +61,9 @@ bool HardwareBufferCheck(HardwareBufferRef buffer) {
     return false;
   }
   D3D11Texture2DDesc desc = {};
-  if (!D3D11GetTextureDesc(buffer, &desc)) return false;
+  if (!D3D11GetTextureDesc(buffer, &desc)) {
+    return false;
+  }
   return desc.format == DXGI_FORMAT_B8G8R8A8_UNORM || desc.format == DXGI_FORMAT_R8G8B8A8_UNORM ||
          desc.format == DXGI_FORMAT_NV12 || desc.format == DXGI_FORMAT_A8_UNORM;
 }
