@@ -17,12 +17,36 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "QGLDrawableProxy.h"
-#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 QGLDrawableProxy::QGLDrawableProxy(Context* context, int width, int height, PixelFormat format,
                                    int sampleCount, ImageOrigin origin)
-    : DrawableProxy(context, width, height, format, sampleCount, origin, nullptr) {
+    : _context(context), _width(width), _height(height), _format(format), _sampleCount(sampleCount),
+      _origin(origin) {
+}
+
+Context* QGLDrawableProxy::getContext() const {
+  return _context;
+}
+
+int QGLDrawableProxy::width() const {
+  return _width;
+}
+
+int QGLDrawableProxy::height() const {
+  return _height;
+}
+
+PixelFormat QGLDrawableProxy::format() const {
+  return _format;
+}
+
+int QGLDrawableProxy::sampleCount() const {
+  return _sampleCount;
+}
+
+ImageOrigin QGLDrawableProxy::origin() const {
+  return _origin;
 }
 
 bool QGLDrawableProxy::externallyOwned() const {

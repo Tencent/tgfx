@@ -18,7 +18,7 @@
 
 #include "tgfx/gpu/Drawable.h"
 #include "core/utils/Log.h"
-#include "gpu/proxies/DrawableProxy.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {
@@ -34,11 +34,7 @@ int Drawable::onGetSampleCount() const {
   return 1;
 }
 
-std::shared_ptr<RenderTarget> Drawable::onCreateRenderTarget(Context*) {
-  return nullptr;
-}
-
-std::shared_ptr<DrawableProxy> Drawable::getProxy(Context* context) {
+std::shared_ptr<RenderTargetProxy> Drawable::getProxy(Context* context) {
   if (_proxyHolder == nullptr) {
     _proxyHolder = onCreateProxy(context);
     if (_proxyHolder != nullptr) {
@@ -46,13 +42,6 @@ std::shared_ptr<DrawableProxy> Drawable::getProxy(Context* context) {
     }
   }
   return _proxyHolder;
-}
-
-std::shared_ptr<DrawableProxy> Drawable::onCreateProxy(Context* context) {
-  auto renderTarget = onCreateRenderTarget(context);
-  return std::make_shared<DrawableProxy>(context, _width, _height, onGetPixelFormat(),
-                                         onGetSampleCount(), onGetOrigin(),
-                                         std::move(renderTarget));
 }
 
 void Drawable::present(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) {

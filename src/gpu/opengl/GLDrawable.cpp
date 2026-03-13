@@ -16,33 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
+#include "tgfx/gpu/GLDrawable.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-class DrawableProxy : public RenderTargetProxy {
- public:
-  DrawableProxy(Context* context, int width, int height, PixelFormat format, int sampleCount,
-                ImageOrigin origin, std::shared_ptr<RenderTarget> renderTarget);
-
-  Context* getContext() const override;
-  int width() const override;
-  int height() const override;
-  PixelFormat format() const override;
-  int sampleCount() const override;
-  ImageOrigin origin() const override;
-  bool externallyOwned() const override;
-  std::shared_ptr<TextureView> getTextureView() const override;
-  std::shared_ptr<RenderTarget> getRenderTarget() const override;
-
- protected:
-  Context* _context = nullptr;
-  int _width = 0;
-  int _height = 0;
-  PixelFormat _format = PixelFormat::RGBA_8888;
-  int _sampleCount = 1;
-  ImageOrigin _origin = ImageOrigin::BottomLeft;
-  mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
-};
+std::shared_ptr<RenderTargetProxy> GLDrawable::onCreateProxy(Context* context) {
+  auto backendRT = onCreateBackendRenderTarget();
+  return RenderTargetProxy::MakeFrom(context, backendRT, onGetOrigin());
+}
 }  // namespace tgfx

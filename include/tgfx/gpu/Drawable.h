@@ -26,8 +26,7 @@
 
 namespace tgfx {
 class Context;
-class DrawableProxy;
-class RenderTarget;
+class RenderTargetProxy;
 class Surface;
 
 /**
@@ -76,19 +75,18 @@ class Drawable : public std::enable_shared_from_this<Drawable> {
   virtual PixelFormat onGetPixelFormat() const;
   virtual ImageOrigin onGetOrigin() const;
   virtual int onGetSampleCount() const;
-  virtual std::shared_ptr<RenderTarget> onCreateRenderTarget(Context* context);
   virtual void onPresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) = 0;
 
-  DrawableProxy* _proxy = nullptr;
+  RenderTargetProxy* _proxy = nullptr;
 
  private:
   int _width = 0;
   int _height = 0;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
-  std::shared_ptr<DrawableProxy> _proxyHolder = nullptr;
+  std::shared_ptr<RenderTargetProxy> _proxyHolder = nullptr;
 
-  std::shared_ptr<DrawableProxy> getProxy(Context* context);
-  virtual std::shared_ptr<DrawableProxy> onCreateProxy(Context* context);
+  std::shared_ptr<RenderTargetProxy> getProxy(Context* context);
+  virtual std::shared_ptr<RenderTargetProxy> onCreateProxy(Context* context) = 0;
   void present(Context* context, std::shared_ptr<CommandBuffer> commandBuffer);
 
   friend class Surface;

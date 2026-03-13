@@ -18,20 +18,32 @@
 
 #pragma once
 
-#include "gpu/proxies/DrawableProxy.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-class QGLDrawableProxy : public DrawableProxy {
+class QGLDrawableProxy : public RenderTargetProxy {
  public:
   QGLDrawableProxy(Context* context, int width, int height, PixelFormat format, int sampleCount,
                    ImageOrigin origin);
 
+  Context* getContext() const override;
+  int width() const override;
+  int height() const override;
+  PixelFormat format() const override;
+  int sampleCount() const override;
+  ImageOrigin origin() const override;
   bool externallyOwned() const override;
   std::shared_ptr<TextureView> getTextureView() const override;
   std::shared_ptr<TextureProxy> asTextureProxy() const override;
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
  private:
+  Context* _context = nullptr;
+  int _width = 0;
+  int _height = 0;
+  PixelFormat _format = PixelFormat::RGBA_8888;
+  int _sampleCount = 1;
+  ImageOrigin _origin = ImageOrigin::BottomLeft;
   mutable std::shared_ptr<RenderTargetProxy> textureRTProxy = nullptr;
 
   void ensureTextureRTProxy() const;

@@ -18,8 +18,6 @@
 
 #include "CGLDrawable.h"
 #include "gpu/opengl/GLDefines.h"
-#include "gpu/resources/RenderTarget.h"
-#include "tgfx/gpu/Backend.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -30,14 +28,13 @@ CGLDrawable::CGLDrawable(NSOpenGLContext* glContext, NSView* view, int width, in
     : GLDrawable(width, height, std::move(colorSpace)), glContext(glContext), view(view) {
 }
 
-std::shared_ptr<RenderTarget> CGLDrawable::onCreateRenderTarget(Context* context) {
+BackendRenderTarget CGLDrawable::onCreateBackendRenderTarget() {
   [glContext update];
   [glContext setView:view];
   GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
-  BackendRenderTarget backendRT(frameBuffer, width(), height());
-  return RenderTarget::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
+  return {frameBuffer, width(), height()};
 }
 
 void CGLDrawable::onPresent(Context*, std::shared_ptr<CommandBuffer>) {

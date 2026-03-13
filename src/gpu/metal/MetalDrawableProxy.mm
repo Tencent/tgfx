@@ -25,8 +25,39 @@
 namespace tgfx {
 MetalDrawableProxy::MetalDrawableProxy(Context* context, int width, int height,
                                        CAMetalLayer* metalLayer, PixelFormat format)
-    : DrawableProxy(context, width, height, format, 1, ImageOrigin::TopLeft, nullptr),
-      _metalLayer(metalLayer) {
+    : _context(context), _width(width), _height(height), _format(format), _metalLayer(metalLayer) {
+}
+
+Context* MetalDrawableProxy::getContext() const {
+  return _context;
+}
+
+int MetalDrawableProxy::width() const {
+  return _width;
+}
+
+int MetalDrawableProxy::height() const {
+  return _height;
+}
+
+PixelFormat MetalDrawableProxy::format() const {
+  return _format;
+}
+
+int MetalDrawableProxy::sampleCount() const {
+  return 1;
+}
+
+ImageOrigin MetalDrawableProxy::origin() const {
+  return ImageOrigin::TopLeft;
+}
+
+bool MetalDrawableProxy::externallyOwned() const {
+  return true;
+}
+
+std::shared_ptr<TextureView> MetalDrawableProxy::getTextureView() const {
+  return nullptr;
 }
 
 std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {

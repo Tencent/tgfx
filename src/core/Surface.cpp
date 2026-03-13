@@ -25,7 +25,6 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
-#include "gpu/proxies/DrawableProxy.h"
 #include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {

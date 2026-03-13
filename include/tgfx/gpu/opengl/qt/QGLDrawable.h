@@ -61,6 +61,6 @@ class QGLDrawable : public Drawable {
   unsigned textureID = 0;
   QSGTexture* outTexture = nullptr;
 
-  std::shared_ptr<DrawableProxy> onCreateProxy(Context* context) override;
+  std::shared_ptr<RenderTargetProxy> onCreateProxy(Context* context) override;
 };
 }  // namespace tgfx

@@ -40,6 +40,6 @@ class MetalDrawable : public Drawable {
   CAMetalLayer* metalLayer = nil;
   PixelFormat pixelFormat = PixelFormat::RGBA_8888;
 
-  std::shared_ptr<DrawableProxy> onCreateProxy(Context* context) override;
+  std::shared_ptr<RenderTargetProxy> onCreateProxy(Context* context) override;
 };
 }  // namespace tgfx

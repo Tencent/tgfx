@@ -19,8 +19,6 @@
 #include "WGLDrawable.h"
 #include <GL/GL.h>
 #include "gpu/opengl/GLDefines.h"
-#include "gpu/resources/RenderTarget.h"
-#include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
 WGLDrawable::WGLDrawable(HDC deviceContext, int width, int height,
@@ -28,10 +26,9 @@ WGLDrawable::WGLDrawable(HDC deviceContext, int width, int height,
     : GLDrawable(width, height, std::move(colorSpace)), deviceContext(deviceContext) {
 }
 
-std::shared_ptr<RenderTarget> WGLDrawable::onCreateRenderTarget(Context* context) {
+BackendRenderTarget WGLDrawable::onCreateBackendRenderTarget() {
   GLFrameBufferInfo frameBuffer = {0, GL_RGBA8};
-  BackendRenderTarget backendRT(frameBuffer, width(), height());
-  return RenderTarget::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
+  return {frameBuffer, width(), height()};
 }
 
 void WGLDrawable::onPresent(Context*, std::shared_ptr<CommandBuffer>) {

@@ -18,20 +18,17 @@
 
 #include "WebGLDrawable.h"
 #include "gpu/opengl/GLDefines.h"
-#include "gpu/resources/RenderTarget.h"
-#include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
 WebGLDrawable::WebGLDrawable(int width, int height, std::shared_ptr<ColorSpace> colorSpace)
     : GLDrawable(width, height, std::move(colorSpace)) {
 }
 
-std::shared_ptr<RenderTarget> WebGLDrawable::onCreateRenderTarget(Context* context) {
+BackendRenderTarget WebGLDrawable::onCreateBackendRenderTarget() {
   GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
-  BackendRenderTarget backendRT(frameBuffer, width(), height());
-  return RenderTarget::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
+  return {frameBuffer, width(), height()};
 }
 
 void WebGLDrawable::onPresent(Context*, std::shared_ptr<CommandBuffer>) {

@@ -45,7 +45,7 @@ class EGLDrawable : public GLDrawable {
   void setPresentationTime(int64_t time);
 
  protected:
-  std::shared_ptr<RenderTarget> onCreateRenderTarget(Context* context) override;
+  BackendRenderTarget onCreateBackendRenderTarget() override;
   void onPresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) override;
 
  private:

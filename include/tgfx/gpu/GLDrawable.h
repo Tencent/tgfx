@@ -18,17 +18,25 @@
 
 #pragma once
 
+#include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
 /**
  * GLDrawable is the base class for all OpenGL-backed drawables. It requires subclasses to implement
- * onCreateRenderTarget() for platform-specific render target creation.
+ * onCreateBackendRenderTarget() for platform-specific render target creation.
  */
 class GLDrawable : public Drawable {
  protected:
   using Drawable::Drawable;
 
-  std::shared_ptr<RenderTarget> onCreateRenderTarget(Context* context) override = 0;
+  /**
+   * Creates a BackendRenderTarget for the platform-specific OpenGL context. Returns an invalid
+   * BackendRenderTarget if creation fails.
+   */
+  virtual BackendRenderTarget onCreateBackendRenderTarget() = 0;
+
+ private:
+  std::shared_ptr<RenderTargetProxy> onCreateProxy(Context* context) override;
 };
 }  // namespace tgfx

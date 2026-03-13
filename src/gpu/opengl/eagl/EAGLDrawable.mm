@@ -21,7 +21,6 @@
 #include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/eagl/EAGLLayerTexture.h"
-#include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
@@ -30,13 +29,12 @@ EAGLDrawable::EAGLDrawable(std::weak_ptr<EAGLLayerTexture> layerTexture, int wid
     : GLDrawable(width, height, std::move(colorSpace)), layerTexture(std::move(layerTexture)) {
 }
 
-std::shared_ptr<RenderTarget> EAGLDrawable::onCreateRenderTarget(Context* context) {
+BackendRenderTarget EAGLDrawable::onCreateBackendRenderTarget() {
   auto texture = layerTexture.lock();
   if (texture == nullptr) {
-    return nullptr;
+    return {};
   }
-  auto backendRT = texture->getBackendRenderTarget();
-  return RenderTarget::MakeFrom(context, backendRT, ImageOrigin::BottomLeft);
+  return texture->getBackendRenderTarget();
 }
 
 void EAGLDrawable::onPresent(Context* context, std::shared_ptr<CommandBuffer>) {

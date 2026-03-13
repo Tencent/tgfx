@@ -28,7 +28,7 @@ class WGLDrawable : public GLDrawable {
               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  protected:
-  std::shared_ptr<RenderTarget> onCreateRenderTarget(Context* context) override;
+  BackendRenderTarget onCreateBackendRenderTarget() override;
   void onPresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) override;
 
  private:

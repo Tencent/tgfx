@@ -19,20 +19,33 @@
 #pragma once
 
 #import <QuartzCore/QuartzCore.h>
-#include "gpu/proxies/DrawableProxy.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-class MetalDrawableProxy : public DrawableProxy {
+class MetalDrawableProxy : public RenderTargetProxy {
  public:
   MetalDrawableProxy(Context* context, int width, int height, CAMetalLayer* metalLayer,
                      PixelFormat format);
 
+  Context* getContext() const override;
+  int width() const override;
+  int height() const override;
+  PixelFormat format() const override;
+  int sampleCount() const override;
+  ImageOrigin origin() const override;
+  bool externallyOwned() const override;
+  std::shared_ptr<TextureView> getTextureView() const override;
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
   id<CAMetalDrawable> getMetalDrawable() const;
 
  private:
+  Context* _context = nullptr;
+  int _width = 0;
+  int _height = 0;
+  PixelFormat _format = PixelFormat::RGBA_8888;
   CAMetalLayer* _metalLayer = nil;
   mutable id<CAMetalDrawable> _metalDrawable = nil;
+  mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
 };
 }  // namespace tgfx
