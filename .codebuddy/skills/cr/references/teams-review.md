@@ -214,7 +214,9 @@ same verification pipeline. Skip in subsequent rounds.
 Stance: **adversarial** — default to doubting the reviewer, actively look for
 reasons each issue is wrong. Reject with real evidence, confirm if it holds up.
 This step is mandatory — the coordinator MUST NOT skip it or perform
-verification itself.
+verification itself. **Exception**: if every reviewer explicitly reports zero
+issues (LGTM / no issues found), skip verification and proceed directly to
+Phase 3 (which will immediately fall through to Phase 5).
 
 The verifier runs as a **pipeline** — it does not wait for all reviewers to
 finish. As each reviewer sends a report via SendMessage, the coordinator MUST
