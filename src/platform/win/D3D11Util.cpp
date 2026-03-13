@@ -28,7 +28,7 @@ void** GetVtable(void* comObj) {
 typedef void(__stdcall* AddRefFn)(void* self);
 typedef void(__stdcall* ReleaseFn)(void* self);
 typedef void(__stdcall* GetDescFn)(void* self, D3D11Texture2DDesc* pDesc);
-typedef void(__stdcall* GetDeviceFn)(void* self, void** ppDevice);
+typedef void(__stdcall* GetDeviceFn)(void* self, ID3D11Device** ppDevice);
 }  // namespace
 
 void D3D11AddRef(HardwareBufferRef texture) {
@@ -57,13 +57,13 @@ ID3D11Device* D3D11GetDeviceFromTexture(HardwareBufferRef texture) {
   if (!texture) {
     return nullptr;
   }
-  void* device = nullptr;
+  ID3D11Device* device = nullptr;
   reinterpret_cast<GetDeviceFn>(GetVtable(texture)[kD3D11GetDeviceVtable])(texture, &device);
   // GetDevice adds a reference; release it immediately to keep the ref-count balanced.
   if (device) {
     reinterpret_cast<ReleaseFn>(GetVtable(device)[2])(device);
   }
-  return static_cast<ID3D11Device*>(device);
+  return device;
 }
 
 }  // namespace tgfx
