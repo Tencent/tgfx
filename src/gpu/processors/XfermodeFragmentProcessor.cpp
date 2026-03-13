@@ -39,6 +39,7 @@ std::string XfermodeFragmentProcessor::name() const {
     case Child::SrcChild:
       return "XfermodeFragmentProcessor - src";
   }
+  return "XfermodeFragmentProcessor";
 }
 
 XfermodeFragmentProcessor::XfermodeFragmentProcessor(PlacementPtr<FragmentProcessor> src,

@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Backend.h"
+#include "metal/MetalDefines.h"
 #include "opengl/GLDefines.h"
 
 namespace tgfx {
+
 static PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat) {
   switch (sizeFormat) {
     case GL_BGRA:
@@ -36,32 +38,6 @@ static PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat) {
     case GL_RG8:
     case GL_RG:
       return PixelFormat::RG_88;
-    default:
-      break;
-  }
-  return PixelFormat::RGBA_8888;
-}
-
-// MTLPixelFormat values (from Metal headers)
-static constexpr unsigned METAL_PIXEL_FORMAT_R8Unorm = 10;
-static constexpr unsigned METAL_PIXEL_FORMAT_RG8Unorm = 30;
-static constexpr unsigned METAL_PIXEL_FORMAT_RGBA8Unorm = 70;
-static constexpr unsigned METAL_PIXEL_FORMAT_BGRA8Unorm = 80;
-static constexpr unsigned METAL_PIXEL_FORMAT_Depth24Unorm_Stencil8 = 255;
-static constexpr unsigned METAL_PIXEL_FORMAT_Depth32Float_Stencil8 = 260;
-
-static PixelFormat MetalPixelFormatToPixelFormat(unsigned metalFormat) {
-  switch (metalFormat) {
-    case METAL_PIXEL_FORMAT_R8Unorm:
-      return PixelFormat::ALPHA_8;
-    case METAL_PIXEL_FORMAT_RG8Unorm:
-      return PixelFormat::RG_88;
-    case METAL_PIXEL_FORMAT_BGRA8Unorm:
-      return PixelFormat::BGRA_8888;
-    case METAL_PIXEL_FORMAT_Depth24Unorm_Stencil8:
-    case METAL_PIXEL_FORMAT_Depth32Float_Stencil8:
-      return PixelFormat::DEPTH24_STENCIL8;
-    case METAL_PIXEL_FORMAT_RGBA8Unorm:
     default:
       break;
   }

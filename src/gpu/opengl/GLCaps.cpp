@@ -194,7 +194,6 @@ int GLCaps::getSampleCount(int requestedCount, PixelFormat pixelFormat) const {
 }
 
 void GLCaps::initGLSupport(const GLInfo& info) {
-  pboSupport = true;
   multisampleDisableSupport = true;
   sampleMaskSupport = true;
   _features.textureBarrier =
@@ -206,7 +205,6 @@ void GLCaps::initGLSupport(const GLInfo& info) {
 }
 
 void GLCaps::initGLESSupport(const GLInfo& info) {
-  pboSupport = true;
   multisampleDisableSupport = info.hasExtension("GL_EXT_multisample_compatibility");
   sampleMaskSupport = version >= GL_VER(3, 1);
   _features.textureBarrier = info.hasExtension("GL_NV_texture_barrier");
@@ -220,7 +218,6 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
 }
 
 void GLCaps::initWebGLSupport(const GLInfo&) {
-  pboSupport = false;
   multisampleDisableSupport = false;
   sampleMaskSupport = false;
   frameBufferFetchRequiresEnablePerSample = false;

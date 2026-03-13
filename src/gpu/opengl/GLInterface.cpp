@@ -92,6 +92,8 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
   functions->bufferData = reinterpret_cast<GLBufferData*>(getter->getProcAddress("glBufferData"));
   functions->bufferSubData =
       reinterpret_cast<GLBufferSubData*>(getter->getProcAddress("glBufferSubData"));
+  functions->getBufferSubData =
+      reinterpret_cast<GLGetBufferSubData*>(getter->getProcAddress("glGetBufferSubData"));
   functions->checkFramebufferStatus = reinterpret_cast<GLCheckFramebufferStatus*>(
       getter->getProcAddress("glCheckFramebufferStatus"));
   functions->clear = reinterpret_cast<GLClear*>(getter->getProcAddress("glClear"));

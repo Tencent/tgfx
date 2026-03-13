@@ -74,15 +74,16 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
     }
   }
 
-  auto gpu = context->gpu();
-  auto gpuBuffer = gpu->createBuffer(vertexDataSize, GPUBufferUsage::VERTEX);
-  if (!gpuBuffer) {
+  auto bufferResource =
+      BufferResource::FindOrCreate(context, vertexDataSize, GPUBufferUsage::VERTEX);
+  if (!bufferResource) {
     return nullptr;
   }
 
-  gpu->queue()->writeBuffer(gpuBuffer, 0, buffer.get(), vertexDataSize);
+  context->gpu()->queue()->writeBuffer(bufferResource->gpuBuffer(), 0, buffer.get(),
+                                       vertexDataSize);
 
-  return BufferResource::Wrap(context, std::move(gpuBuffer));
+  return bufferResource;
 }
 
 MeshIndexBufferUploadTask::MeshIndexBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
@@ -100,16 +101,16 @@ std::shared_ptr<Resource> MeshIndexBufferUploadTask::onMakeResource(Context* con
   DEBUG_ASSERT(vertexMesh->hasIndices());
 
   size_t indexDataSize = sizeof(uint16_t) * static_cast<size_t>(vertexMesh->indexCount());
-  auto gpu = context->gpu();
-  auto gpuBuffer = gpu->createBuffer(indexDataSize, GPUBufferUsage::INDEX);
-  if (!gpuBuffer) {
+  auto bufferResource = BufferResource::FindOrCreate(context, indexDataSize, GPUBufferUsage::INDEX);
+  if (!bufferResource) {
     LOGE("MeshIndexBufferUploadTask::onMakeResource() Failed to create index buffer!");
     return nullptr;
   }
 
-  gpu->queue()->writeBuffer(gpuBuffer, 0, vertexMesh->indices(), indexDataSize);
+  context->gpu()->queue()->writeBuffer(bufferResource->gpuBuffer(), 0, vertexMesh->indices(),
+                                       indexDataSize);
 
-  return BufferResource::Wrap(context, std::move(gpuBuffer));
+  return bufferResource;
 }
 
 ShapeMeshBufferUploadTask::ShapeMeshBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
@@ -129,18 +130,19 @@ std::shared_ptr<Resource> ShapeMeshBufferUploadTask::onMakeResource(Context* con
     return nullptr;
   }
 
-  auto gpu = context->gpu();
-  auto gpuBuffer = gpu->createBuffer(vertexData->size(), GPUBufferUsage::VERTEX);
-  if (!gpuBuffer) {
+  auto bufferResource =
+      BufferResource::FindOrCreate(context, vertexData->size(), GPUBufferUsage::VERTEX);
+  if (!bufferResource) {
     return nullptr;
   }
 
-  gpu->queue()->writeBuffer(gpuBuffer, 0, vertexData->data(), vertexData->size());
+  context->gpu()->queue()->writeBuffer(bufferResource->gpuBuffer(), 0, vertexData->data(),
+                                       vertexData->size());
 
   // Release data source to free memory (triangulation result)
   dataSource = nullptr;
 
-  return BufferResource::Wrap(context, std::move(gpuBuffer));
+  return bufferResource;
 }
 
 }  // namespace tgfx

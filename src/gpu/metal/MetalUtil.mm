@@ -16,21 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "MetalDefines.h"
-#include "tgfx/gpu/Attribute.h"
-#include "tgfx/gpu/BlendFactor.h"
-#include "tgfx/gpu/BlendOperation.h"
-#include "tgfx/gpu/CompareFunction.h"
-#include "tgfx/gpu/FilterMode.h"
+#include "MetalUtil.h"
 #include "tgfx/gpu/GPUBuffer.h"
-#include "tgfx/gpu/RenderPass.h"
-#include "tgfx/gpu/Sampler.h"
-#include "tgfx/gpu/StencilOperation.h"
 #include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 
-MTLTextureUsage MetalDefines::ToMTLTextureUsage(uint32_t usage) {
+MTLTextureUsage ToMTLTextureUsage(uint32_t usage) {
   MTLTextureUsage metalUsage = MTLTextureUsageUnknown;
   if (usage & TextureUsage::TEXTURE_BINDING) {
     metalUsage |= MTLTextureUsageShaderRead;
@@ -41,13 +33,13 @@ MTLTextureUsage MetalDefines::ToMTLTextureUsage(uint32_t usage) {
   return metalUsage;
 }
 
-MTLResourceOptions MetalDefines::ToMTLResourceOptions(uint32_t) {
+MTLResourceOptions ToMTLResourceOptions(uint32_t) {
   // TODO: Use MTLResourceStorageModePrivate for non-READBACK buffers once a staging buffer upload
   // mechanism is implemented, to improve GPU-side performance.
   return MTLResourceStorageModeShared;
 }
 
-MTLPrimitiveType MetalDefines::ToMTLPrimitiveType(PrimitiveType primitiveType) {
+MTLPrimitiveType ToMTLPrimitiveType(PrimitiveType primitiveType) {
   switch (primitiveType) {
     case PrimitiveType::Triangles:
       return MTLPrimitiveTypeTriangle;
@@ -58,7 +50,7 @@ MTLPrimitiveType MetalDefines::ToMTLPrimitiveType(PrimitiveType primitiveType) {
   }
 }
 
-MTLVertexFormat MetalDefines::ToMTLVertexFormat(VertexFormat format) {
+MTLVertexFormat ToMTLVertexFormat(VertexFormat format) {
   switch (format) {
     case VertexFormat::Float:
       return MTLVertexFormatFloat;
@@ -97,7 +89,7 @@ MTLVertexFormat MetalDefines::ToMTLVertexFormat(VertexFormat format) {
   }
 }
 
-MTLCompareFunction MetalDefines::ToMTLCompareFunction(CompareFunction compareFunction) {
+MTLCompareFunction ToMTLCompareFunction(CompareFunction compareFunction) {
   switch (compareFunction) {
     case CompareFunction::Never:
       return MTLCompareFunctionNever;
@@ -120,7 +112,7 @@ MTLCompareFunction MetalDefines::ToMTLCompareFunction(CompareFunction compareFun
   }
 }
 
-MTLStencilOperation MetalDefines::ToMTLStencilOperation(StencilOperation stencilOp) {
+MTLStencilOperation ToMTLStencilOperation(StencilOperation stencilOp) {
   switch (stencilOp) {
     case StencilOperation::Keep:
       return MTLStencilOperationKeep;
@@ -143,7 +135,7 @@ MTLStencilOperation MetalDefines::ToMTLStencilOperation(StencilOperation stencil
   }
 }
 
-MTLBlendFactor MetalDefines::ToMTLBlendFactor(BlendFactor blendFactor) {
+MTLBlendFactor ToMTLBlendFactor(BlendFactor blendFactor) {
   switch (blendFactor) {
     case BlendFactor::Zero:
       return MTLBlendFactorZero;
@@ -178,7 +170,7 @@ MTLBlendFactor MetalDefines::ToMTLBlendFactor(BlendFactor blendFactor) {
   }
 }
 
-MTLBlendOperation MetalDefines::ToMTLBlendOperation(BlendOperation blendOp) {
+MTLBlendOperation ToMTLBlendOperation(BlendOperation blendOp) {
   switch (blendOp) {
     case BlendOperation::Add:
       return MTLBlendOperationAdd;
@@ -195,7 +187,7 @@ MTLBlendOperation MetalDefines::ToMTLBlendOperation(BlendOperation blendOp) {
   }
 }
 
-MTLSamplerAddressMode MetalDefines::ToMTLSamplerAddressMode(AddressMode addressMode) {
+MTLSamplerAddressMode ToMTLSamplerAddressMode(AddressMode addressMode) {
   switch (addressMode) {
     case AddressMode::ClampToEdge:
       return MTLSamplerAddressModeClampToEdge;
@@ -210,7 +202,7 @@ MTLSamplerAddressMode MetalDefines::ToMTLSamplerAddressMode(AddressMode addressM
   }
 }
 
-MTLSamplerMinMagFilter MetalDefines::ToMTLSamplerFilter(FilterMode filter) {
+MTLSamplerMinMagFilter ToMTLSamplerFilter(FilterMode filter) {
   switch (filter) {
     case FilterMode::Nearest:
       return MTLSamplerMinMagFilterNearest;
@@ -221,7 +213,7 @@ MTLSamplerMinMagFilter MetalDefines::ToMTLSamplerFilter(FilterMode filter) {
   }
 }
 
-MTLSamplerMipFilter MetalDefines::ToMTLSamplerMipFilter(MipmapMode filter) {
+MTLSamplerMipFilter ToMTLSamplerMipFilter(MipmapMode filter) {
   switch (filter) {
     case MipmapMode::None:
       return MTLSamplerMipFilterNotMipmapped;
@@ -234,7 +226,7 @@ MTLSamplerMipFilter MetalDefines::ToMTLSamplerMipFilter(MipmapMode filter) {
   }
 }
 
-size_t MetalDefines::GetBytesPerPixel(MTLPixelFormat format) {
+size_t MTLPixelFormatBytesPerPixel(MTLPixelFormat format) {
   switch (format) {
     case MTLPixelFormatR8Unorm:
     case MTLPixelFormatR8Snorm:
@@ -291,11 +283,11 @@ size_t MetalDefines::GetBytesPerPixel(MTLPixelFormat format) {
       return 16;
 
     default:
-      return 4;  // Default to 4 bytes per pixel
+      return 4;
   }
 }
 
-MTLLoadAction MetalDefines::ToMTLLoadAction(LoadAction loadAction) {
+MTLLoadAction ToMTLLoadAction(LoadAction loadAction) {
   switch (loadAction) {
     case LoadAction::Clear:
       return MTLLoadActionClear;
@@ -306,7 +298,7 @@ MTLLoadAction MetalDefines::ToMTLLoadAction(LoadAction loadAction) {
   }
 }
 
-MTLStoreAction MetalDefines::ToMTLStoreAction(StoreAction storeAction) {
+MTLStoreAction ToMTLStoreAction(StoreAction storeAction) {
   switch (storeAction) {
     case StoreAction::Store:
       return MTLStoreActionStore;
@@ -317,7 +309,7 @@ MTLStoreAction MetalDefines::ToMTLStoreAction(StoreAction storeAction) {
   }
 }
 
-MTLCullMode MetalDefines::ToMTLCullMode(CullMode cullMode) {
+MTLCullMode ToMTLCullMode(CullMode cullMode) {
   switch (cullMode) {
     case CullMode::None:
       return MTLCullModeNone;
@@ -329,7 +321,7 @@ MTLCullMode MetalDefines::ToMTLCullMode(CullMode cullMode) {
   return MTLCullModeNone;
 }
 
-MTLWinding MetalDefines::ToMTLWinding(FrontFace frontFace) {
+MTLWinding ToMTLWinding(FrontFace frontFace) {
   switch (frontFace) {
     case FrontFace::CW:
       return MTLWindingClockwise;

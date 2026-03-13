@@ -53,6 +53,7 @@ LineCap toCap(const SVGLineCap& cap) {
     case SVGLineCap::Square:
       return LineCap::Square;
   }
+  return LineCap::Butt;
 }
 
 LineJoin toJoin(const SVGLineJoin& join) {
@@ -408,6 +409,7 @@ SVGColorType SVGRenderContext::resolveSVGColor(const SVGColor& color) const {
     case SVGColor::Type::ICCColor:
       return Color::Black();
   }
+  return Color::Black();
 }
 
 float SVGRenderContext::resolveFontSize() const {
@@ -449,6 +451,7 @@ std::shared_ptr<Typeface> SVGRenderContext::resolveTypeface() const {
         return FontWeight::Normal;
       }
     }
+    return FontWeight::Normal;
   };
 
   auto slant = [](const SVGFontStyle& s) {
@@ -463,6 +466,7 @@ std::shared_ptr<Typeface> SVGRenderContext::resolveTypeface() const {
         return FontSlant::Upright;
       }
     }
+    return FontSlant::Upright;
   };
 
   const auto& family = presentationContext()._inherited.FontFamily->family();

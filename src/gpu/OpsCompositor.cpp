@@ -219,7 +219,7 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
   std::optional<Rect> deviceBounds = std::nullopt;
   auto& clip = state.clip;
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, meshBase->hasCoverage());
-  auto clipBounds = getClipBounds(clip);
+  auto clipBounds = getClipBounds(clip.path);
 
   float drawScale = 1.0f;
   auto meshBounds = mesh->bounds();
@@ -291,7 +291,7 @@ void OpsCompositor::drawHairlineShape(std::shared_ptr<Shape> shape, const MCStat
 
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, true);
   auto& clip = state.clip;
-  auto clipBounds = getClipBounds(clip);
+  auto clipBounds = getClipBounds(clip.path);
   if (needLocalBounds) {
     localBounds = shape->getBounds();
     localBounds = ClipLocalBounds(*localBounds, state.matrix, clipBounds);

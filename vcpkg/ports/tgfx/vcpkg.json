@@ -70,6 +70,9 @@
     "pdf": {
       "description": "Enable building the PDF module"
     },
+    "layers": {
+      "description": "Enable building the layers module"
+    },
     "framework": {
       "description": "Enable building framework",
       "supports": "osx | ios"

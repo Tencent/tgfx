@@ -23,9 +23,11 @@ namespace tgfx {
  * RSXform is a compressed form of a rotation+scale matrix.
  *
  * The transformation matrix is:
+ * <pre>
  *   | scos  -ssin   tx |
  *   | ssin   scos   ty |
  *   |   0      0     1 |
+ * </pre>
  *
  * Where scos = scale * cos(angle) and ssin = scale * sin(angle).
  */
