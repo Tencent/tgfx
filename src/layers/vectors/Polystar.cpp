@@ -141,9 +141,9 @@ class PolystarPathProvider final : public PathProvider {
   PolystarPathProvider(Point position, PolystarType polystarType, float pointCount, float rotation,
                        float outerRadius, float outerRoundness, float innerRadius,
                        float innerRoundness, bool reversed)
-      : _position(position), _polystarType(polystarType), _pointCount(pointCount), _rotation(rotation),
-        _outerRadius(outerRadius), _outerRoundness(outerRoundness), _innerRadius(innerRadius),
-        _innerRoundness(innerRoundness), _reversed(reversed) {
+      : _position(position), _polystarType(polystarType), _pointCount(pointCount),
+        _rotation(rotation), _outerRadius(outerRadius), _outerRoundness(outerRoundness),
+        _innerRadius(innerRadius), _innerRoundness(innerRoundness), _reversed(reversed) {
   }
 
   Path getPath() const override {
