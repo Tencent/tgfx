@@ -412,6 +412,13 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
     }
     return;
   }
+  // Shape has its own bounds computation in flushPendingShapeOps, so handle it before the general
+  // bounds calculation that only knows about Rect/RRect/Image types.
+  if (pendingType == PendingOpType::Shape) {
+    PendingOpsAutoReset autoReset(this, type, std::move(clip), std::move(brush));
+    flushPendingShapeOps();
+    return;
+  }
   PendingOpsAutoReset autoReset(this, type, std::move(clip), std::move(brush));
   PlacementPtr<DrawOp> drawOp = nullptr;
   std::optional<Rect> localBounds = std::nullopt;
