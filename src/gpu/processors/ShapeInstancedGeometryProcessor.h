@@ -45,9 +45,7 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
 
   Attribute position = {};
   Attribute coverage = {};
-  Attribute matrixCol0 = {};
-  Attribute matrixCol1 = {};
-  Attribute matrixCol2 = {};
+  Attribute offset = {};
   Attribute instanceColor = {};
 
   PMColor color = {};

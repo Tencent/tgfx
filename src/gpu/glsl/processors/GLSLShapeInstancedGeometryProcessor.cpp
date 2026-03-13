@@ -47,20 +47,18 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   vertBuilder->codeAppendf("highp vec2 local = (%s * vec3(%s, 1.0)).xy;", uvMatrixName.c_str(),
                            position.name().c_str());
 
-  // Step 2: assemble per-instance matrix from column attributes.
-  vertBuilder->codeAppendf(
-      "highp mat3 instanceMatrix = mat3(vec3(%s, 0.0), vec3(%s, 0.0), vec3(%s, 1.0));",
-      matrixCol0.name().c_str(), matrixCol1.name().c_str(), matrixCol2.name().c_str());
-
-  // Step 3: apply instance transform then canvas transform to get device-space position.
-  // P_device = stateMatrix * instanceMatrix * local
+  // Step 2: apply per-instance offset then stateMatrix to get device-space position.
+  // P_device = stateMatrix * (local + offset)
   auto stateMatrixName =
       uniformHandler->addUniform("StateMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
   std::string positionName = "position";
-  vertBuilder->codeAppendf("highp vec2 %s = (%s * instanceMatrix * vec3(local, 1.0)).xy;",
-                           positionName.c_str(), stateMatrixName.c_str());
+  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(local + %s, 1.0)).xy;",
+                           positionName.c_str(), stateMatrixName.c_str(), offset.name().c_str());
 
-  // Emit UV transforms using local coords (in shape's local space).
+  // Emit UV transforms using unshifted local coords. All FP coord transforms (both color shader
+  // and mask coverage) use 'local' without offset, because: (1) mask texture is rasterized at a
+  // fixed position shared by all instances, (2) shader patterns are defined in local space and
+  // are the same for all instances. The offset only affects device-space position.
   ShaderVar localVar("local", SLType::Float2);
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, localVar);
 

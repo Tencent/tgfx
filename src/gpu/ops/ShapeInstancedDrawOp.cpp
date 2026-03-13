@@ -29,16 +29,16 @@
 namespace tgfx {
 
 PlacementPtr<ShapeInstancedDrawOp> ShapeInstancedDrawOp::Make(
-    std::shared_ptr<GPUShapeProxy> shapeProxy, const Matrix* matrices, const Color* colors,
+    std::shared_ptr<GPUShapeProxy> shapeProxy, const Point* offsets, const Color* colors,
     size_t count, PMColor gpColor, const Matrix& uvMatrix, const Matrix& stateMatrix, AAType aaType,
     const std::shared_ptr<ColorSpace>& dstColorSpace) {
-  if (shapeProxy == nullptr || matrices == nullptr || count == 0) {
+  if (shapeProxy == nullptr || offsets == nullptr || count == 0) {
     return nullptr;
   }
   auto context = shapeProxy->getContext();
   auto drawingAllocator = context->drawingAllocator();
   auto provider =
-      InstanceProvider::MakeFrom(drawingAllocator, matrices, colors, count, dstColorSpace);
+      InstanceProvider::MakeFrom(drawingAllocator, offsets, colors, count, dstColorSpace);
   if (provider == nullptr) {
     return nullptr;
   }

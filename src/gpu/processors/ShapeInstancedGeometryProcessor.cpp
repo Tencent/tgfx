@@ -32,13 +32,11 @@ ShapeInstancedGeometryProcessor::ShapeInstancedGeometryProcessor(PMColor color, 
   }
   setVertexAttributes(&position, 2);
 
-  matrixCol0 = {"aMatrixCol0", VertexFormat::Float2};
-  matrixCol1 = {"aMatrixCol1", VertexFormat::Float2};
-  matrixCol2 = {"aMatrixCol2", VertexFormat::Float2};
+  offset = {"aOffset", VertexFormat::Float2};
   if (hasColors) {
     instanceColor = {"aColor", VertexFormat::UByte4Normalized};
   }
-  setInstanceAttributes(&matrixCol0, 4);
+  setInstanceAttributes(&offset, 2);
 }
 
 void ShapeInstancedGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
