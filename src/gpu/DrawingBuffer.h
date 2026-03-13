@@ -58,6 +58,13 @@ class DrawingBuffer {
   }
 
   /**
+   * Returns the list of drawables collected during this drawing buffer's lifetime.
+   */
+  const std::vector<std::shared_ptr<Drawable>>& getDrawables() const {
+    return drawables;
+  }
+
+  /**
    * Encodes all pending render tasks into GPU commands and returns a CommandBuffer ready for
    * submission to the GPU. Returns nullptr if there are no tasks to encode.
    */
@@ -77,6 +84,5 @@ class DrawingBuffer {
   std::vector<std::shared_ptr<Drawable>> drawables = {};
 
   friend class DrawingManager;
-  friend class Context;
 };
 }  // namespace tgfx

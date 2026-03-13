@@ -117,7 +117,7 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
       auto drawingBuffer = pendingDrawingBuffers.front();
       auto commandBuffer = drawingBuffer->encode();
       _resourceCache->advanceFrameAndPurge();
-      for (auto& drawable : drawingBuffer->drawables) {
+      for (auto& drawable : drawingBuffer->getDrawables()) {
         drawable->present(this, commandBuffer);
       }
       queue->submit(std::move(commandBuffer));
