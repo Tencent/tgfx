@@ -80,23 +80,23 @@ namespace tgfx {
 //   ID3D11DeviceChild: 3=GetDevice, 4=GetPrivateData, 5=SetPrivateData, 6=SetPrivateDataInterface
 //   ID3D11Resource: 7=GetType, 8=SetEvictionPriority, 9=GetEvictionPriority
 //   ID3D11Texture2D: 10=GetDesc
-constexpr int kD3D11GetDeviceVtable = 3;
-constexpr int kD3D11GetDescVtable = 10;
+constexpr int D3D11GetDeviceVtable = 3;
+constexpr int D3D11GetDescVtable = 10;
 
 // ID3D11Device vtable layout:
 //   IUnknown: 0=QueryInterface, 1=AddRef, 2=Release
 //   3=CreateBuffer, 4=CreateTexture1D, 5=CreateTexture2D, 6=CreateTexture3D,
 //   7=CreateShaderResourceView, ..., 40=GetImmediateContext
-constexpr int kD3D11CreateTex2DVtable = 5;
-constexpr int kD3D11GetImmCtxVtable = 40;
+constexpr int D3D11CreateTex2DVtable = 5;
+constexpr int D3D11GetImmCtxVtable = 40;
 
 // ID3D11DeviceContext vtable layout:
 //   IUnknown: 0=QueryInterface, 1=AddRef, 2=Release
 //   ID3D11DeviceChild: 3=GetDevice, ...
 //   14=Map, 15=Unmap, ..., 47=CopyResource
-constexpr int kD3D11MapVtable = 14;
-constexpr int kD3D11UnmapVtable = 15;
-constexpr int kD3D11CopyResVtable = 47;
+constexpr int D3D11MapVtable = 14;
+constexpr int D3D11UnmapVtable = 15;
+constexpr int D3D11CopyResVtable = 47;
 
 // ============================================================================
 // D3D11 Minimal Structure Definitions

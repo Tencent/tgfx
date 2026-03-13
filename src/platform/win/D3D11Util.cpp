@@ -49,7 +49,7 @@ bool D3D11GetTextureDesc(HardwareBufferRef texture, D3D11Texture2DDesc* outDesc)
   if (!texture || !outDesc) {
     return false;
   }
-  reinterpret_cast<GetDescFn>(GetVtable(texture)[kD3D11GetDescVtable])(texture, outDesc);
+  reinterpret_cast<GetDescFn>(GetVtable(texture)[D3D11GetDescVtable])(texture, outDesc);
   return outDesc->width > 0 && outDesc->height > 0;
 }
 
@@ -58,7 +58,7 @@ ID3D11Device* D3D11GetDeviceFromTexture(HardwareBufferRef texture) {
     return nullptr;
   }
   ID3D11Device* device = nullptr;
-  reinterpret_cast<GetDeviceFn>(GetVtable(texture)[kD3D11GetDeviceVtable])(texture, &device);
+  reinterpret_cast<GetDeviceFn>(GetVtable(texture)[D3D11GetDeviceVtable])(texture, &device);
   // GetDevice adds a reference; release it immediately to keep the ref-count balanced.
   if (device) {
     reinterpret_cast<ReleaseFn>(GetVtable(device)[2])(device);
