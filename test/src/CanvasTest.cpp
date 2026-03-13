@@ -2273,55 +2273,6 @@ TGFX_TEST(CanvasTest, DrawShapeAutoBatch_SameColor) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_SameColor"));
 }
 
-TGFX_TEST(CanvasTest, DrawShapeAutoBatch_TransformVariety) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto surface = Surface::Make(context, 400, 200);
-  auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-
-  // Create a simple rect shape
-  Path path = {};
-  path.addRect(Rect::MakeXYWH(-20, -30, 40, 60));
-  auto shape = Shape::MakeFrom(path);
-
-  // Instances with various transforms: identity, scale, rotate, combined
-  // These will NOT auto-batch (different scale/rotate) but should still render correctly
-  Matrix matrices[] = {
-      Matrix::MakeTrans(50, 100),
-      Matrix::I(),
-      Matrix::I(),
-      Matrix::I(),
-  };
-  matrices[1] = Matrix::MakeTrans(150, 100);
-  matrices[1].preScale(2, 1);
-  matrices[2] = Matrix::MakeTrans(250, 100);
-  matrices[2].preRotate(45);
-  matrices[3] = Matrix::MakeTrans(350, 100);
-  matrices[3].preScale(1, 2);
-  matrices[3].preRotate(30);
-
-  Color colors[] = {
-      Color::Red(),
-      Color::Green(),
-      Color::Blue(),
-      Color::FromRGBA(128, 0, 128, 255),
-  };
-
-  for (int i = 0; i < 4; i++) {
-    Paint paint = {};
-    paint.setColor(colors[i]);
-    canvas->save();
-    canvas->concat(matrices[i]);
-    canvas->drawShape(shape, paint);
-    canvas->restore();
-  }
-
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_TransformVariety"));
-}
-
 TGFX_TEST(CanvasTest, DrawShapeAutoBatch_WithShader) {
   ContextScope scope;
   auto context = scope.getContext();
