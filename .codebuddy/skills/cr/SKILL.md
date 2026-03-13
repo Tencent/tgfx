@@ -50,7 +50,7 @@ fixes, and submit results.
 
 Ask a **single question**:
 "Agent Teams is available (multiple agents working in parallel). Enable multi-agent review with reviewer–verifier adversarial mechanism and auto-fix?"
-Provide 4 options:
+Provide 4 options (use the Option column verbatim as the option label):
 
 | Option | Description |
 |--------|-------------|
