@@ -72,14 +72,14 @@ HardwareBufferRef HardwareBufferAllocate(int, int, bool) {
 
 HardwareBufferRef HardwareBufferRetain(HardwareBufferRef buffer) {
   if (buffer) {
-    static_cast<IUnknown*>(buffer)->AddRef();
+    reinterpret_cast<IUnknown*>(buffer)->AddRef();
   }
   return buffer;
 }
 
 void HardwareBufferRelease(HardwareBufferRef buffer) {
   if (buffer) {
-    static_cast<IUnknown*>(buffer)->Release();
+    reinterpret_cast<IUnknown*>(buffer)->Release();
   }
 }
 
@@ -136,7 +136,7 @@ void* HardwareBufferLock(HardwareBufferRef buffer) {
   // Step 4: Copy the source texture to the staging texture
   auto copyResource = reinterpret_cast<CopyResourceFn>(GetVtable(context)[kD3D11CopyResVtable]);
   copyResource(static_cast<IUnknown*>(context), static_cast<IUnknown*>(stagingTexture),
-               static_cast<IUnknown*>(buffer));
+               reinterpret_cast<IUnknown*>(buffer));
 
   // Step 5: Map the staging texture for CPU read
   D3D11MappedSubresource mapped = {};

@@ -25,7 +25,7 @@
 // WGL_NV_DX_interop definitions
 #define WGL_ACCESS_READ_ONLY_NV 0x0000
 
-// GL_EXT_memory_object definitions (not in GLDefines.h)
+// GL_EXT_memory_object definitions
 #define GL_DEDICATED_MEMORY_OBJECT_EXT 0x9581
 #define GL_HANDLE_TYPE_D3D11_IMAGE_KMT_EXT 0x958C
 
@@ -49,7 +49,7 @@ static unsigned ImportViaMemoryObject(WGLGPU* gpu, HardwareBufferRef hardwareBuf
                                                0x4e50,
                                                {0xb4, 0x1f, 0x8a, 0x7f, 0x8b, 0xd8, 0x96, 0x0b}};
 
-  IUnknown* textureUnk = static_cast<IUnknown*>(hardwareBuffer);
+  IUnknown* textureUnk = reinterpret_cast<IUnknown*>(hardwareBuffer);
   IUnknown* dxgiResource = nullptr;
   HRESULT hr =
       textureUnk->QueryInterface(IID_IDXGIResource_local, reinterpret_cast<void**>(&dxgiResource));
