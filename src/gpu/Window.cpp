@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Window.h"
-#include "core/utils/Log.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
@@ -30,58 +28,16 @@ std::shared_ptr<Device> Window::getDevice() {
   return device;
 }
 
-std::shared_ptr<tgfx::Surface> Window::getSurface(Context* context, bool queryOnly) {
+std::shared_ptr<Drawable> Window::nextDrawable(Context* context) {
   std::lock_guard<std::mutex> autoLock(locker);
-  if (!checkContext(context)) {
-    return nullptr;
-  }
-  if (surface != nullptr && !sizeInvalid) {
-    return surface;
-  }
-  if (queryOnly) {
-    return nullptr;
-  }
-  surface = onCreateSurface(context);
-  sizeInvalid = false;
-  return surface;
+  return onCreateDrawable(context);
 }
 
 void Window::invalidSize() {
   std::lock_guard<std::mutex> autoLock(locker);
-  sizeInvalid = true;
   onInvalidSize();
 }
 
-void Window::freeSurface() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  onFreeSurface();
-}
-
-void Window::present(Context* context) {
-  FRAME_MARK;
-  std::lock_guard<std::mutex> autoLock(locker);
-  if (!checkContext(context)) {
-    return;
-  }
-  context->flushAndSubmit();
-  onPresent(context);
-}
-
 void Window::onInvalidSize() {
-}
-
-void Window::onFreeSurface() {
-  surface = nullptr;
-}
-
-bool Window::checkContext(Context* context) {
-  if (context == nullptr) {
-    return false;
-  }
-  if (context->device() != device.get()) {
-    LOGE("Window::checkContext() : context is not locked from the same device of this window");
-    return false;
-  }
-  return true;
 }
 }  // namespace tgfx

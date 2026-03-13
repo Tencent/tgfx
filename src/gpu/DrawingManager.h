@@ -96,6 +96,9 @@ class DrawingManager {
 
   DrawingBuffer* createDrawingBuffer();
 
+  void collectDrawable(std::shared_ptr<Drawable> drawable);
+
   friend class OpsCompositor;
+  friend class RenderContext;
 };
 }  // namespace tgfx

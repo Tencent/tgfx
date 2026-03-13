@@ -33,8 +33,7 @@ class CGLWindow : public Window {
   ~CGLWindow() override;
 
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-  void onPresent(Context* context) override;
+  std::shared_ptr<Drawable> onCreateDrawable(Context* context) override;
 
  private:
   NSView* view = nil;

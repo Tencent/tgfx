@@ -21,6 +21,7 @@
 #include <cstdint>
 
 namespace tgfx {
+
 /**
  * Recording represents a snapshot of rendering commands that have been flushed from a Context but
  * not yet submitted to the GPU. This allows for deferred submission, giving applications control

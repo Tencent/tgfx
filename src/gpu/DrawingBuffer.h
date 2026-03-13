@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/SlidingWindowTracker.h"
@@ -26,6 +27,8 @@
 #include "gpu/tasks/ResourceTask.h"
 
 namespace tgfx {
+class Drawable;
+
 class DrawingBuffer {
  public:
   explicit DrawingBuffer(Context* context);
@@ -55,6 +58,13 @@ class DrawingBuffer {
   }
 
   /**
+   * Returns the list of drawables collected during this drawing buffer's lifetime.
+   */
+  const std::vector<std::shared_ptr<Drawable>>& getDrawables() const {
+    return drawables;
+  }
+
+  /**
    * Encodes all pending render tasks into GPU commands and returns a CommandBuffer ready for
    * submission to the GPU. Returns nullptr if there are no tasks to encode.
    */
@@ -71,6 +81,7 @@ class DrawingBuffer {
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::vector<PlacementPtr<AtlasUploadTask>> atlasTasks = {};
+  std::vector<std::shared_ptr<Drawable>> drawables = {};
 
   friend class DrawingManager;
 };

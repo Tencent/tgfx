@@ -18,8 +18,10 @@
 
 #include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
 #include "core/utils/Log.h"
-#include "gpu/opengl/GLFunctions.h"
+#include "gpu/opengl/GLGPU.h"
+#include "gpu/opengl/eagl/EAGLDrawable.h"
 #include "gpu/opengl/eagl/EAGLLayerTexture.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
@@ -47,10 +49,14 @@ EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
   // do not retain layer here, otherwise it can cause circular reference.
 }
 
-std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Drawable> EAGLWindow::onCreateDrawable(Context* context) {
+  auto width = static_cast<int>(layer.bounds.size.width * layer.contentsScale);
+  auto height = static_cast<int>(layer.bounds.size.height * layer.contentsScale);
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  // Release old layer texture to unbind the renderbuffer from the layer before creating a new one.
   if (layerTexture != nullptr) {
-    // Immediately release the previous layer texture to prevent new texture creation from failing
-    // due to repeated binding of the same layer.
     layerTexture->release(static_cast<GLGPU*>(context->gpu()));
     layerTexture = nullptr;
   }
@@ -58,15 +64,6 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
   if (layerTexture == nullptr) {
     return nullptr;
   }
-  BackendRenderTarget renderTarget = layerTexture->getBackendRenderTarget();
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
-}
-
-void EAGLWindow::onPresent(Context* context) {
-  auto gl = static_cast<GLGPU*>(context->gpu())->functions();
-  gl->bindRenderbuffer(GL_RENDERBUFFER, layerTexture->colorBufferID());
-  auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();
-  [eaglContext presentRenderbuffer:GL_RENDERBUFFER];
-  gl->bindRenderbuffer(GL_RENDERBUFFER, 0);
+  return std::make_shared<EAGLDrawable>(layerTexture, width, height, colorSpace);
 }
 }  // namespace tgfx

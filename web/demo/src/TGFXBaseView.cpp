@@ -19,7 +19,7 @@
 #include "TGFXBaseView.h"
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
-#include "tgfx/core/Point.h"
+#include "tgfx/core/Surface.h"
 
 using namespace emscripten;
 namespace hello2d {
@@ -35,27 +35,11 @@ void TGFXBaseView::updateSize() {
   if (window == nullptr) {
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
   }
-  if (window == nullptr) {
-    return;
-  }
-  window->invalidSize();
-  auto device = window->getDevice();
-  auto context = device->lockContext();
-  if (context == nullptr) {
-    return;
-  }
-  auto surface = window->getSurface(context);
-  if (surface == nullptr) {
-    device->unlock();
-    return;
-  }
-  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
-    lastSurfaceWidth = surface->width();
-    lastSurfaceHeight = surface->height();
-    applyCenteringTransform();
+  if (window != nullptr) {
+    lastRecording = nullptr;
+    window->invalidSize();
     presentImmediately = true;
   }
-  device->unlock();
 }
 
 void TGFXBaseView::setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage) {
@@ -115,7 +99,17 @@ void TGFXBaseView::draw() {
     return;
   }
 
-  auto surface = window->getSurface(context);
+  auto drawable = window->nextDrawable(context);
+  if (drawable == nullptr) {
+    device->unlock();
+    return;
+  }
+  if (drawable->width() != lastSurfaceWidth || drawable->height() != lastSurfaceHeight) {
+    lastSurfaceWidth = drawable->width();
+    lastSurfaceHeight = drawable->height();
+    applyCenteringTransform();
+  }
+  auto surface = tgfx::Surface::MakeFrom(context, drawable);
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -137,14 +131,12 @@ void TGFXBaseView::draw() {
     presentImmediately = false;
     if (recording) {
       context->submit(std::move(recording));
-      window->present(context);
     }
   } else {
     std::swap(lastRecording, recording);
 
     if (recording) {
       context->submit(std::move(recording));
-      window->present(context);
     }
   }
 

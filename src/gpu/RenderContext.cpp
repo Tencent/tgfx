@@ -448,6 +448,10 @@ bool RenderContext::flush() {
     auto closed = opsCompositor->isClosed();
     opsCompositor->makeClosed();
     opsCompositor = nullptr;
+    if (!closed && surface != nullptr && surface->_drawable != nullptr) {
+      auto drawingManager = renderTarget->getContext()->drawingManager();
+      drawingManager->collectDrawable(surface->_drawable);
+    }
     return !closed;
   }
   return false;

@@ -18,12 +18,15 @@
 
 #pragma once
 
-#include "tgfx/core/Surface.h"
-#include "tgfx/gpu/Context.h"
+#include <mutex>
+#include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
+class Device;
+
 /**
- * Window represents a native displayable resource that can be rendered or written to by a Device.
+ * Window represents a native displayable resource that can be rendered to by a Device. Use
+ * nextDrawable() to obtain a Drawable, then create a Surface from it for rendering.
  */
 class Window {
  public:
@@ -36,43 +39,35 @@ class Window {
   std::shared_ptr<Device> getDevice();
 
   /**
-   * Returns the Surface associated with this Window. If the queryOnly is true, it will not create
-   * a new surface if it doesn't exist.
+   * Returns a new Drawable for rendering to this window. A new Drawable is created via
+   * onCreateDrawable() each time this method is called.
+   * @param context The GPU context used for rendering.
    */
-  std::shared_ptr<Surface> getSurface(Context* context, bool queryOnly = false);
+  std::shared_ptr<Drawable> nextDrawable(Context* context);
 
   /**
-   * Applies all pending graphics changes to the window.
-   */
-  void present(Context* context);
-
-  /**
-   * Invalidates the cached surface associated with this Window. This is useful when the window is
-   * resized and the surface needs to be recreated.
+   * Marks the window size as invalid. The next call to nextDrawable() will query the current window
+   * size and create a new appropriately-sized Drawable.
    */
   void invalidSize();
 
-  /**
-   * Frees the cached surface associated with this Window immediately. This is useful when the
-   * window is hidden and the surface is no longer needed for a while.
-   */
-  void freeSurface();
-
  protected:
   std::mutex locker = {};
-  bool sizeInvalid = false;
   std::shared_ptr<Device> device = nullptr;
-  std::shared_ptr<Surface> surface = nullptr;
 
   explicit Window(std::shared_ptr<Device> device);
   Window() = default;
 
-  virtual void onInvalidSize();
-  virtual std::shared_ptr<Surface> onCreateSurface(Context* context) = 0;
-  virtual void onPresent(Context* context) = 0;
-  virtual void onFreeSurface();
+  /**
+   * Creates a new Drawable for this window. Subclasses implement platform-specific Drawable
+   * creation. Called by getDrawable() when a new Drawable is needed.
+   */
+  virtual std::shared_ptr<Drawable> onCreateDrawable(Context* context) = 0;
 
- private:
-  bool checkContext(Context* context);
+  /**
+   * Called when the window size is invalidated. Subclasses can override this to clean up
+   * size-dependent resources. The default implementation does nothing.
+   */
+  virtual void onInvalidSize();
 };
 }  // namespace tgfx

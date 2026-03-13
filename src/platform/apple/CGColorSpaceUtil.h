@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,22 +18,12 @@
 
 #pragma once
 
-#import <Cocoa/Cocoa.h>
-#include "tgfx/gpu/opengl/cgl/CGLWindow.h"
-#include "tgfx/layers/DisplayList.h"
+#include <CoreGraphics/CGColorSpace.h>
+#include "tgfx/core/ColorSpace.h"
 
-@interface TGFXView : NSView
-
-@property(nonatomic) int drawIndex;
-@property(nonatomic) float zoomScale;
-@property(nonatomic) CGPoint contentOffset;
-@property(nonatomic) CVDisplayLinkRef cvDisplayLink;
-@property(nonatomic, strong) CADisplayLink* caDisplayLink API_AVAILABLE(macos(14.0));
-
-- (void)draw;
-- (void)startDisplayLink;
-- (void)stopDisplayLink;
-- (void)updateLayerTree;
-- (void)updateZoomScaleAndOffset;
-
-@end
+namespace tgfx {
+// Converts a tgfx ColorSpace to a CGColorSpaceRef via ICC profile data. Returns
+// kCGColorSpaceSRGB when the input is null or conversion fails. The caller must
+// release the returned CGColorSpaceRef with CFRelease().
+CGColorSpaceRef CreateCGColorSpace(const std::shared_ptr<ColorSpace>& colorSpace);
+}  // namespace tgfx

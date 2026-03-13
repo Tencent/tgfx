@@ -31,10 +31,7 @@ class WebGLWindow : public Window {
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-
-  void onPresent(Context*) override {
-  }
+  std::shared_ptr<Drawable> onCreateDrawable(Context* context) override;
 
  private:
   std::string canvasID;

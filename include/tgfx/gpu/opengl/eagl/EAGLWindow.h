@@ -28,19 +28,22 @@ class EAGLWindow : public Window {
  public:
   /**
    * Creates a new window from a CAEAGLLayer with the specified device.
+   * @param layer The CAEAGLLayer to render into. Must not be nil.
+   * @param device An optional GLDevice. If nullptr, a new device is created from the current
+   * EAGLContext.
+   * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
    */
   static std::shared_ptr<EAGLWindow> MakeFrom(CAEAGLLayer* layer,
                                               std::shared_ptr<GLDevice> device = nullptr,
                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-  void onPresent(Context* context) override;
+  std::shared_ptr<Drawable> onCreateDrawable(Context* context) override;
 
  private:
   CAEAGLLayer* layer = nil;
-  std::shared_ptr<EAGLLayerTexture> layerTexture;
-  std::shared_ptr<ColorSpace> colorSpace;
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
+  std::shared_ptr<EAGLLayerTexture> layerTexture = nullptr;
 
   EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
              std::shared_ptr<ColorSpace> colorSpace = nullptr);

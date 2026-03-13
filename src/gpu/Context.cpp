@@ -28,6 +28,7 @@
 #include "gpu/ResourceCache.h"
 #include "gpu/ShaderCaps.h"
 #include "tgfx/core/Clock.h"
+#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -116,6 +117,9 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
       auto drawingBuffer = pendingDrawingBuffers.front();
       auto commandBuffer = drawingBuffer->encode();
       _resourceCache->advanceFrameAndPurge();
+      for (auto& drawable : drawingBuffer->getDrawables()) {
+        drawable->present(this, commandBuffer);
+      }
       queue->submit(std::move(commandBuffer));
       pendingDrawingBuffers.pop_front();
       if (drawingBuffer == targetBuffer) {

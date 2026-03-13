@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,24 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "tgfx/gpu/Drawable.h"
+#include "core/utils/Log.h"
+#include "gpu/proxies/RenderTargetProxy.h"
+#include "inspect/InspectorMark.h"
 
-#import <Cocoa/Cocoa.h>
-#include "tgfx/gpu/opengl/cgl/CGLWindow.h"
-#include "tgfx/layers/DisplayList.h"
+namespace tgfx {
+std::shared_ptr<RenderTargetProxy> Drawable::getProxy(Context* context) {
+  if (_proxyHolder == nullptr) {
+    _proxyHolder = onCreateProxy(context);
+    if (_proxyHolder != nullptr) {
+      _proxy = _proxyHolder.get();
+    }
+  }
+  return _proxyHolder;
+}
 
-@interface TGFXView : NSView
-
-@property(nonatomic) int drawIndex;
-@property(nonatomic) float zoomScale;
-@property(nonatomic) CGPoint contentOffset;
-@property(nonatomic) CVDisplayLinkRef cvDisplayLink;
-@property(nonatomic, strong) CADisplayLink* caDisplayLink API_AVAILABLE(macos(14.0));
-
-- (void)draw;
-- (void)startDisplayLink;
-- (void)stopDisplayLink;
-- (void)updateLayerTree;
-- (void)updateZoomScaleAndOffset;
-
-@end
+void Drawable::present(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) {
+  FRAME_MARK;
+  DEBUG_ASSERT(context != nullptr);
+  onPresent(context, std::move(commandBuffer));
+}
+}  // namespace tgfx

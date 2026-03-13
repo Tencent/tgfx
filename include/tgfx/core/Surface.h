@@ -29,6 +29,7 @@
 namespace tgfx {
 class Canvas;
 class Context;
+class Drawable;
 class RenderContext;
 class RenderTargetProxy;
 
@@ -92,6 +93,15 @@ class Surface {
   static std::shared_ptr<Surface> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
                                            int sampleCount = 1, uint32_t renderFlags = 0,
                                            std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
+  /**
+   * Creates a new Surface from a Drawable. The Drawable provides the backend render target on
+   * demand each frame, allowing deferred acquisition of platform-specific resources. The returned
+   * Surface is reusable across frames. Returns nullptr if the context or drawable is nullptr, or
+   * the drawable has zero dimensions.
+   */
+  static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Drawable> drawable,
+                                           uint32_t renderFlags = 0);
 
   virtual ~Surface();
 
@@ -198,6 +208,7 @@ class Surface {
   RenderContext* renderContext = nullptr;
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
+  std::shared_ptr<Drawable> _drawable = nullptr;
 
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                                            uint32_t renderFlags = 0, bool clearAll = false,

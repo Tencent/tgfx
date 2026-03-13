@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
+#include <algorithm>
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -193,5 +194,18 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
   bufferPool.push_back(currentBuffer);
   currentBuffer = nullptr;
   return drawingBuffer;
+}
+
+void DrawingManager::collectDrawable(std::shared_ptr<Drawable> drawable) {
+  if (drawable == nullptr) {
+    return;
+  }
+  auto& drawables = getDrawingBuffer()->drawables;
+  for (const auto& d : drawables) {
+    if (d == drawable) {
+      return;
+    }
+  }
+  drawables.push_back(std::move(drawable));
 }
 }  // namespace tgfx

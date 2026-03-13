@@ -26,6 +26,7 @@
 #endif
 #include "hello2d/AppHost.h"
 #include "hello2d/LayerBuilder.h"
+#include "tgfx/core/Surface.h"
 
 namespace hello2d {
 static constexpr LPCWSTR ClassName = L"TGFXWindow";
@@ -111,6 +112,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       lastSurfaceHeight = static_cast<int>(rect.bottom - rect.top);
       applyCenteringTransform();
       if (tgfxWindow) {
+        lastRecording = nullptr;
         tgfxWindow->invalidSize();
         presentImmediately = true;
       }
@@ -360,12 +362,12 @@ void TGFXWindow::draw() {
   if (context == nullptr) {
     return;
   }
-  auto surface = tgfxWindow->getSurface(context);
-  if (surface == nullptr) {
+  auto drawable = tgfxWindow->nextDrawable(context);
+  auto surface = drawable ? tgfx::Surface::MakeFrom(context, drawable) : nullptr;
+  if (drawable == nullptr || surface == nullptr) {
     device->unlock();
     return;
   }
-
   auto canvas = surface->getCanvas();
   canvas->clear();
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), pixelRatio);
@@ -378,14 +380,12 @@ void TGFXWindow::draw() {
     presentImmediately = false;
     if (recording) {
       context->submit(std::move(recording));
-      tgfxWindow->present(context);
     }
   } else {
     std::swap(lastRecording, recording);
 
     if (recording) {
       context->submit(std::move(recording));
-      tgfxWindow->present(context);
     }
   }
 

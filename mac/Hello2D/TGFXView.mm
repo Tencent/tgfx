@@ -20,7 +20,7 @@
 #import <QuartzCore/CADisplayLink.h>
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
-#include "tgfx/core/Point.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 
 static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
@@ -88,6 +88,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   lastSurfaceHeight = static_cast<int>(backingSize.height);
   [self applyCenteringTransform];
   if (tgfxWindow != nullptr) {
+    lastRecording = nullptr;
     tgfxWindow->invalidSize();
     presentImmediately = true;
   }
@@ -193,7 +194,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return;
   }
 
-  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+  if (!displayList.hasContentChanged() && lastRecording == nullptr && !presentImmediately) {
     return;
   }
 
@@ -203,7 +204,12 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return;
   }
 
-  auto surface = tgfxWindow->getSurface(context);
+  auto drawable = tgfxWindow->nextDrawable(context);
+  if (drawable == nullptr) {
+    device->unlock();
+    return;
+  }
+  auto surface = tgfx::Surface::MakeFrom(context, drawable);
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -217,19 +223,13 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
   auto recording = context->flush();
 
-  if (presentImmediately) {
-    presentImmediately = false;
-    if (recording) {
-      context->submit(std::move(recording));
-      tgfxWindow->present(context);
-    }
-  } else {
+  if (!presentImmediately) {
     std::swap(lastRecording, recording);
+  }
+  presentImmediately = false;
 
-    if (recording) {
-      context->submit(std::move(recording));
-      tgfxWindow->present(context);
-    }
+  if (recording) {
+    context->submit(std::move(recording));
   }
 
   device->unlock();

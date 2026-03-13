@@ -19,6 +19,7 @@
 #import "TGFXView.h"
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 
 @implementation TGFXView {
@@ -30,6 +31,7 @@
   std::unique_ptr<tgfx::Recording> lastRecording;
   int lastSurfaceWidth;
   int lastSurfaceHeight;
+  bool presentImmediately;
 }
 
 + (Class)layerClass {
@@ -76,14 +78,18 @@
     lastDrawIndex = -1;
     lastSurfaceWidth = 0;
     lastSurfaceHeight = 0;
+    presentImmediately = true;
     displayList.setRenderMode(tgfx::RenderMode::Tiled);
     displayList.setAllowZoomBlur(true);
     displayList.setMaxTileCount(512);
   }
   lastSurfaceWidth = static_cast<int>(self.bounds.size.width * self.contentScaleFactor);
   lastSurfaceHeight = static_cast<int>(self.bounds.size.height * self.contentScaleFactor);
+  [self applyCenteringTransform];
   if (tgfxWindow != nullptr) {
+    lastRecording = nullptr;
     tgfxWindow->invalidSize();
+    presentImmediately = true;
   }
 }
 
@@ -130,7 +136,7 @@
     return;
   }
 
-  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+  if (!displayList.hasContentChanged() && lastRecording == nullptr && !presentImmediately) {
     return;
   }
 
@@ -140,7 +146,12 @@
     return;
   }
 
-  auto surface = tgfxWindow->getSurface(context);
+  auto drawable = tgfxWindow->nextDrawable(context);
+  if (drawable == nullptr) {
+    device->unlock();
+    return;
+  }
+  auto surface = tgfx::Surface::MakeFrom(context, drawable);
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -154,12 +165,13 @@
 
   auto recording = context->flush();
 
-  // Delayed one-frame present
-  std::swap(lastRecording, recording);
+  if (!presentImmediately) {
+    std::swap(lastRecording, recording);
+  }
+  presentImmediately = false;
 
   if (recording) {
     context->submit(std::move(recording));
-    tgfxWindow->present(context);
   }
 
   device->unlock();

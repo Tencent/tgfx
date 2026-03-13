@@ -21,13 +21,14 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-copy"
 #include <QQuickItem>
-#include <QSGTexture>
 #pragma clang diagnostic pop
+#include <vector>
 #include "QGLDevice.h"
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 class QGLDeviceCreator;
+class QGLDrawable;
 
 class QGLWindow : public Window {
  public:
@@ -49,27 +50,16 @@ class QGLWindow : public Window {
    */
   void moveToThread(QThread* renderThread);
 
-  /**
-   * Returns the current QSGTexture for displaying. This method can only be called from the QSG
-   * render thread.
-   */
-  QSGTexture* getQSGTexture();
-
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-  void onPresent(Context* context) override;
-  void onFreeSurface() override;
+  std::shared_ptr<Drawable> onCreateDrawable(Context* context) override;
+  void onInvalidSize() override;
 
  private:
   std::weak_ptr<QGLWindow> weakThis;
   QQuickItem* quickItem = nullptr;
   bool singleBufferMode = false;
   QThread* renderThread = nullptr;
-  unsigned pendingTextureID = 0;
-  std::shared_ptr<Surface> pendingSurface = nullptr;
-  std::shared_ptr<Surface> displayingSurface = nullptr;
-  std::shared_ptr<Surface> frontSurface = nullptr;
-  QSGTexture* outTexture = nullptr;
+  std::vector<std::shared_ptr<QGLDrawable>> drawables = {};
   QGLDeviceCreator* deviceCreator = nullptr;
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
 

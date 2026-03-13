@@ -17,10 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
-#include <thread>
-#include "core/utils/Log.h"
-#include "gpu/opengl/GLDefines.h"
-#include "tgfx/gpu/Backend.h"
+#include "gpu/opengl/cgl/CGLDrawable.h"
+#include "platform/apple/CGColorSpaceUtil.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -37,12 +35,9 @@ std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj share
     return nullptr;
   }
   if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
-    if (ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
-      view.window.colorSpace = [NSColorSpace displayP3ColorSpace];
-    } else {
-      LOGE("CGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. "
-           "Rendering may have color inaccuracies.");
-    }
+    auto cgColorSpace = CreateCGColorSpace(colorSpace);
+    view.window.colorSpace = [[NSColorSpace alloc] initWithCGColorSpace:cgColorSpace];
+    CFRelease(cgColorSpace);
   }
   return std::shared_ptr<CGLWindow>(new CGLWindow(device, view, std::move(colorSpace)));
 }
@@ -59,25 +54,15 @@ CGLWindow::~CGLWindow() {
   view = nil;
 }
 
-std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Drawable> CGLWindow::onCreateDrawable(Context*) {
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
-  [glContext update];
   CGSize size = [view convertSizeToBacking:view.bounds.size];
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-  [glContext setView:view];
-  GLFrameBufferInfo frameBuffer = {};
-  frameBuffer.id = 0;
-  frameBuffer.format = GL_RGBA8;
-  BackendRenderTarget renderTarget(frameBuffer, static_cast<int>(size.width),
-                                   static_cast<int>(size.height));
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
-}
-
-void CGLWindow::onPresent(Context*) {
-  auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
-  [glContext flushBuffer];
+  auto width = static_cast<int>(size.width);
+  auto height = static_cast<int>(size.height);
+  return std::make_shared<CGLDrawable>(glContext, view, width, height, colorSpace);
 }
 }  // namespace tgfx
 
