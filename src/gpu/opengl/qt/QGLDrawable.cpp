@@ -20,7 +20,6 @@
 #include <QMetaObject>
 #include <QQuickWindow>
 #include "QGLDrawableProxy.h"
-#include "gpu/proxies/DrawableProxy.h"
 #include "gpu/resources/TextureView.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
@@ -62,7 +61,8 @@ QSGTexture* QGLDrawable::getQSGTexture() {
 }
 
 std::shared_ptr<DrawableProxy> QGLDrawable::onCreateProxy(Context* context) {
-  return std::make_shared<QGLDrawableProxy>(context, this);
+  return std::make_shared<QGLDrawableProxy>(context, width(), height(), onGetPixelFormat(),
+                                            onGetSampleCount(), onGetOrigin());
 }
 
 void QGLDrawable::onPresent(Context*, std::shared_ptr<CommandBuffer>) {

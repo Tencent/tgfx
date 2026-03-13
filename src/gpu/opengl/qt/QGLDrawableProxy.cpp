@@ -18,11 +18,11 @@
 
 #include "QGLDrawableProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
-QGLDrawableProxy::QGLDrawableProxy(Context* context, Drawable* drawable)
-    : DrawableProxy(context, drawable) {
+QGLDrawableProxy::QGLDrawableProxy(Context* context, int width, int height, PixelFormat format,
+                                   int sampleCount, ImageOrigin origin)
+    : DrawableProxy(context, width, height, format, sampleCount, origin, nullptr) {
 }
 
 bool QGLDrawableProxy::externallyOwned() const {
@@ -31,7 +31,7 @@ bool QGLDrawableProxy::externallyOwned() const {
 
 void QGLDrawableProxy::ensureTextureRTProxy() const {
   if (textureRTProxy == nullptr) {
-    textureRTProxy = RenderTargetProxy::Make(_context, width(), height(), false);
+    textureRTProxy = RenderTargetProxy::Make(_context, _width, _height, false);
   }
 }
 

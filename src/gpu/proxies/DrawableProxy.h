@@ -23,7 +23,8 @@
 namespace tgfx {
 class DrawableProxy : public RenderTargetProxy {
  public:
-  DrawableProxy(Context* context, Drawable* drawable);
+  DrawableProxy(Context* context, int width, int height, PixelFormat format, int sampleCount,
+                ImageOrigin origin, std::shared_ptr<RenderTarget> renderTarget);
 
   Context* getContext() const override;
   int width() const override;
@@ -34,11 +35,14 @@ class DrawableProxy : public RenderTargetProxy {
   bool externallyOwned() const override;
   std::shared_ptr<TextureView> getTextureView() const override;
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
-  Drawable* getDrawable() const override;
 
  protected:
   Context* _context = nullptr;
-  Drawable* _drawable = nullptr;
+  int _width = 0;
+  int _height = 0;
+  PixelFormat _format = PixelFormat::RGBA_8888;
+  int _sampleCount = 1;
+  ImageOrigin _origin = ImageOrigin::BottomLeft;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
 };
 }  // namespace tgfx

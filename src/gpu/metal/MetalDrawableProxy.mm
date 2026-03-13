@@ -23,17 +23,10 @@
 #include "tgfx/gpu/metal/MetalTypes.h"
 
 namespace tgfx {
-MetalDrawableProxy::MetalDrawableProxy(Context* context, Drawable* drawable,
+MetalDrawableProxy::MetalDrawableProxy(Context* context, int width, int height,
                                        CAMetalLayer* metalLayer, PixelFormat format)
-    : DrawableProxy(context, drawable), _metalLayer(metalLayer), _format(format) {
-}
-
-PixelFormat MetalDrawableProxy::format() const {
-  return _format;
-}
-
-ImageOrigin MetalDrawableProxy::origin() const {
-  return ImageOrigin::TopLeft;
+    : DrawableProxy(context, width, height, format, 1, ImageOrigin::TopLeft, nullptr),
+      _metalLayer(metalLayer) {
 }
 
 std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {

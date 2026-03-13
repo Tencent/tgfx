@@ -17,11 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawableProxy.h"
-#include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
-DrawableProxy::DrawableProxy(Context* context, Drawable* drawable)
-    : _context(context), _drawable(drawable) {
+DrawableProxy::DrawableProxy(Context* context, int width, int height, PixelFormat format,
+                             int sampleCount, ImageOrigin origin,
+                             std::shared_ptr<RenderTarget> renderTarget)
+    : _context(context), _width(width), _height(height), _format(format), _sampleCount(sampleCount),
+      _origin(origin), _renderTarget(std::move(renderTarget)) {
 }
 
 Context* DrawableProxy::getContext() const {
@@ -29,23 +31,23 @@ Context* DrawableProxy::getContext() const {
 }
 
 int DrawableProxy::width() const {
-  return _drawable->width();
+  return _width;
 }
 
 int DrawableProxy::height() const {
-  return _drawable->height();
+  return _height;
 }
 
 PixelFormat DrawableProxy::format() const {
-  return _drawable->onGetPixelFormat();
+  return _format;
 }
 
 int DrawableProxy::sampleCount() const {
-  return _drawable->onGetSampleCount();
+  return _sampleCount;
 }
 
 ImageOrigin DrawableProxy::origin() const {
-  return _drawable->onGetOrigin();
+  return _origin;
 }
 
 bool DrawableProxy::externallyOwned() const {
@@ -57,13 +59,6 @@ std::shared_ptr<TextureView> DrawableProxy::getTextureView() const {
 }
 
 std::shared_ptr<RenderTarget> DrawableProxy::getRenderTarget() const {
-  if (_renderTarget == nullptr) {
-    _renderTarget = _drawable->onCreateRenderTarget(_context);
-  }
   return _renderTarget;
-}
-
-Drawable* DrawableProxy::getDrawable() const {
-  return _drawable;
 }
 }  // namespace tgfx

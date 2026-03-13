@@ -27,7 +27,6 @@
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "inspect/InspectorMark.h"
 #include "tasks/TransferPixelsTask.h"
-#include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
 DrawingManager::DrawingManager(Context* context) : context(context) {
@@ -51,7 +50,6 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   if (renderTarget == nullptr || processor == nullptr) {
     return false;
   }
-  collectDrawable(renderTarget.get());
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
@@ -84,7 +82,6 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
-  collectDrawable(renderTarget.get());
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
@@ -101,7 +98,6 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
-  collectDrawable(renderTarget.get());
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
@@ -200,18 +196,16 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
   return drawingBuffer;
 }
 
-void DrawingManager::collectDrawable(RenderTargetProxy* proxy) {
-  auto* drawable = proxy->getDrawable();
+void DrawingManager::collectDrawable(std::shared_ptr<Drawable> drawable) {
   if (drawable == nullptr) {
     return;
   }
-  auto sharedDrawable = drawable->shared_from_this();
   auto& drawables = getDrawingBuffer()->drawables;
   for (const auto& d : drawables) {
-    if (d.get() == drawable) {
+    if (d == drawable) {
       return;
     }
   }
-  drawables.push_back(std::move(sharedDrawable));
+  drawables.push_back(std::move(drawable));
 }
 }  // namespace tgfx

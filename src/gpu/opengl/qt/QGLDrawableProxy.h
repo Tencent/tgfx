@@ -23,7 +23,8 @@
 namespace tgfx {
 class QGLDrawableProxy : public DrawableProxy {
  public:
-  QGLDrawableProxy(Context* context, Drawable* drawable);
+  QGLDrawableProxy(Context* context, int width, int height, PixelFormat format, int sampleCount,
+                   ImageOrigin origin);
 
   bool externallyOwned() const override;
   std::shared_ptr<TextureView> getTextureView() const override;

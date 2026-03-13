@@ -91,7 +91,6 @@ class Drawable : public std::enable_shared_from_this<Drawable> {
   virtual std::shared_ptr<DrawableProxy> onCreateProxy(Context* context);
   void present(Context* context, std::shared_ptr<CommandBuffer> commandBuffer);
 
-  friend class DrawableProxy;
   friend class Surface;
   friend class Context;
 };

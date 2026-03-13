@@ -89,7 +89,11 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Dra
   }
   auto colorSpace = drawable->colorSpace();
   std::shared_ptr<RenderTargetProxy> proxy = drawable->getProxy(context);
-  return MakeFrom(std::move(proxy), renderFlags, false, std::move(colorSpace));
+  auto surface = MakeFrom(std::move(proxy), renderFlags, false, std::move(colorSpace));
+  if (surface != nullptr) {
+    surface->_drawable = std::move(drawable);
+  }
+  return surface;
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,

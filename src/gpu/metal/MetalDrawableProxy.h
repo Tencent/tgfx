@@ -24,18 +24,15 @@
 namespace tgfx {
 class MetalDrawableProxy : public DrawableProxy {
  public:
-  MetalDrawableProxy(Context* context, Drawable* drawable, CAMetalLayer* metalLayer,
+  MetalDrawableProxy(Context* context, int width, int height, CAMetalLayer* metalLayer,
                      PixelFormat format);
 
-  PixelFormat format() const override;
-  ImageOrigin origin() const override;
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
   id<CAMetalDrawable> getMetalDrawable() const;
 
  private:
   CAMetalLayer* _metalLayer = nil;
-  PixelFormat _format = PixelFormat::RGBA_8888;
   mutable id<CAMetalDrawable> _metalDrawable = nil;
 };
 }  // namespace tgfx

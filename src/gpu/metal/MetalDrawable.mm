@@ -57,7 +57,7 @@ PixelFormat MetalDrawable::onGetPixelFormat() const {
 }
 
 std::shared_ptr<DrawableProxy> MetalDrawable::onCreateProxy(Context* context) {
-  return std::make_shared<MetalDrawableProxy>(context, this, metalLayer, pixelFormat);
+  return std::make_shared<MetalDrawableProxy>(context, width(), height(), metalLayer, pixelFormat);
 }
 
 void MetalDrawable::onPresent(Context*, std::shared_ptr<CommandBuffer> commandBuffer) {

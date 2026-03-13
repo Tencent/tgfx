@@ -49,7 +49,10 @@ std::shared_ptr<DrawableProxy> Drawable::getProxy(Context* context) {
 }
 
 std::shared_ptr<DrawableProxy> Drawable::onCreateProxy(Context* context) {
-  return std::make_shared<DrawableProxy>(context, this);
+  auto renderTarget = onCreateRenderTarget(context);
+  return std::make_shared<DrawableProxy>(context, _width, _height, onGetPixelFormat(),
+                                         onGetSampleCount(), onGetOrigin(),
+                                         std::move(renderTarget));
 }
 
 void Drawable::present(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) {
