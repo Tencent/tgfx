@@ -41,8 +41,7 @@ enum class PictureRecordType {
   DrawImageRectToRect,
   DrawTextBlob,
   DrawPicture,
-  DrawLayer,
-  DrawShapeInstanced
+  DrawLayer
 };
 
 class PictureRecord {
@@ -260,29 +259,6 @@ class DrawShape : public PictureRecord {
   }
 
   std::shared_ptr<Shape> shape = nullptr;
-};
-
-class DrawShapeInstanced : public PictureRecord {
- public:
-  DrawShapeInstanced(std::shared_ptr<Shape> shape, const Matrix* matrices, const Color* colors,
-                     size_t count)
-      : shape(std::move(shape)), matrices(matrices), colors(colors), count(count) {
-  }
-
-  PictureRecordType type() const override {
-    return PictureRecordType::DrawShapeInstanced;
-  }
-
-  void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawShapeInstanced(shape, matrices, colors, count, playback->state(),
-                                playback->brush());
-  }
-
-  std::shared_ptr<Shape> shape = nullptr;
-  // Allocated by BlockAllocator, owned by the same Picture. No need to free.
-  const Matrix* matrices = nullptr;
-  const Color* colors = nullptr;
-  size_t count = 0;
 };
 
 class DrawMesh : public PictureRecord {

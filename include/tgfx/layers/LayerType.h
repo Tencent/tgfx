@@ -50,10 +50,6 @@ enum class LayerType {
   /**
    * A layer displaying a mesh with vertex colors or textures.
    */
-  Mesh,
-  /**
-   * A layer displaying multiple instances of the same shape with different transformations.
-   */
-  ShapeInstanced
+  Mesh
 };
 }  // namespace tgfx

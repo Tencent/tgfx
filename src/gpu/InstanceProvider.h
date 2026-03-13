@@ -22,21 +22,22 @@
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/PlacementPtr.h"
 #include "tgfx/core/Color.h"
-#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Point.h"
 
 namespace tgfx {
 /**
- * A provider for instance data used in instanced drawing. It holds matrices and optional per-
- * instance colors, and writes them as GPU-ready instance records into a given buffer.
+ * A provider for instance data used in instanced drawing. It holds per-instance offsets and
+ * optional per-instance colors, and writes them as GPU-ready instance records into a given buffer.
  */
 class InstanceProvider {
  public:
   /**
-   * Creates an InstanceProvider that generates instance records from the given matrices and optional
-   * colors. If colors is not nullptr, each instance record will include a color field. The
-   * colorSpace is used to convert colors from sRGB to the destination color space.
+   * Creates an InstanceProvider that generates instance records from the given offsets and optional
+   * colors. Each offset represents the translation difference relative to the first instance. If
+   * colors is not nullptr, each instance record will include a color field. The colorSpace is used
+   * to convert colors from sRGB to the destination color space.
    */
-  static PlacementPtr<InstanceProvider> MakeFrom(BlockAllocator* allocator, const Matrix* matrices,
+  static PlacementPtr<InstanceProvider> MakeFrom(BlockAllocator* allocator, const Point* offsets,
                                                  const Color* colors, size_t count,
                                                  const std::shared_ptr<ColorSpace>& colorSpace);
 
@@ -60,13 +61,13 @@ class InstanceProvider {
   void getData(void* buffer) const;
 
  private:
-  InstanceProvider(std::shared_ptr<BlockAllocator> reference, const Matrix* matrices,
+  InstanceProvider(std::shared_ptr<BlockAllocator> reference, const Point* offsets,
                    const Color* colors, size_t count, size_t dataSize, bool hasColors,
                    std::unique_ptr<ColorSpaceXformSteps> steps);
 
   std::shared_ptr<BlockAllocator> reference = nullptr;
   std::unique_ptr<ColorSpaceXformSteps> xformSteps = nullptr;
-  const Matrix* matrices = nullptr;
+  const Point* offsets = nullptr;
   const Color* colors = nullptr;
   size_t count = 0;
   size_t _dataSize = 0;

@@ -321,28 +321,6 @@ class Canvas {
   void drawMesh(std::shared_ptr<Mesh> mesh, const Paint& paint);
 
   /**
-   * Draws multiple instances of the same shape with different transformations and optional
-   * per-instance colors. All instances share the same geometry, enabling efficient batched
-   * rendering.
-   *
-   * Color blending follows the same rules as drawMesh():
-   * - If colors is not null and paint has a shader: texture color * instance color (Modulate blend).
-   * - If colors is null and paint has a shader: pure texture color.
-   * - If colors is not null and paint has no shader: instance color.
-   * - If colors is null and paint has no shader: paint color.
-   * The paint color is not used when either colors or shader is present.
-   *
-   * @param shape    The shape to be drawn. All instances share this shape's geometry.
-   * @param matrices Array of transformation matrices, one per instance.
-   * @param colors   Optional array of per-instance colors. Pass nullptr to use paint color or shader
-   *                 color only. If provided, must have exactly `count` elements.
-   * @param count    Number of instances to draw.
-   * @param paint    Controls shader, color, blend mode, and other drawing attributes.
-   */
-  void drawShapeInstanced(std::shared_ptr<Shape> shape, const Matrix matrices[],
-                          const Color colors[], size_t count, const Paint& paint);
-
-  /**
    * Draws an image with its top-left corner at (0, 0) using the current clip and matrix.
    * Uses the default sampling option: FilterMode::Linear and MipmapMode::Linear.
    * @param image  The image to draw.

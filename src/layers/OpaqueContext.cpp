@@ -95,22 +95,6 @@ void OpaqueContext::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
   pictureContext.drawMesh(std::move(mesh), state, brush);
 }
 
-void OpaqueContext::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matrix matrices[],
-                                       const Color colors[], size_t count, const MCState& state,
-                                       const Brush& brush) {
-  auto shapeBounds = shape->getBounds();
-  Rect unionBounds = {};
-  for (size_t i = 0; i < count; i++) {
-    auto viewMatrix = state.matrix * matrices[i];
-    unionBounds.join(viewMatrix.mapRect(shapeBounds));
-  }
-  if (containContourBound(unionBounds)) {
-    return;
-  }
-  flushPendingContour();
-  pictureContext.drawShapeInstanced(std::move(shape), matrices, colors, count, state, brush);
-}
-
 void OpaqueContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                               const MCState& state, const Brush& brush) {
   auto newBrush = brush;

@@ -391,29 +391,6 @@ void Canvas::drawMesh(std::shared_ptr<Mesh> mesh, const Paint& paint) {
   drawContext->drawMesh(std::move(mesh), *mcState, paint.getBrush());
 }
 
-void Canvas::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matrix matrices[],
-                                const Color colors[], size_t count, const Paint& paint) {
-  if (shape == nullptr || matrices == nullptr || count == 0) {
-    return;
-  }
-  SaveLayerForImageFilter(paint.getImageFilter());
-  if (count == 1) {
-    // Single instance degrades to regular drawShape for better optimization.
-    auto state = *mcState;
-    state.matrix.preConcat(matrices[0]);
-    auto brush = paint.getBrush();
-    if (colors != nullptr) {
-      brush.color = colors[0];
-    }
-    drawContext->drawShape(std::move(shape), state, brush, paint.getStroke());
-    return;
-  }
-  auto stroke = paint.getStroke();
-  shape = Shape::ApplyStroke(std::move(shape), stroke);
-  drawContext->drawShapeInstanced(std::move(shape), matrices, colors, count, *mcState,
-                                  paint.getBrush());
-}
-
 void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                        const Paint* paint) {
   if (image == nullptr) {

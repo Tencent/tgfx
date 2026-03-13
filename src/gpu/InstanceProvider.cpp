@@ -23,32 +23,18 @@
 namespace tgfx {
 
 struct InstanceRecord {
-  float matrixCol0[2];  // [scaleX, skewY]
-  float matrixCol1[2];  // [skewX, scaleY]
-  float matrixCol2[2];  // [transX, transY]
+  float offset[2];  // [dx, dy]
 };
 
 struct InstanceRecordWithColor {
-  float matrixCol0[2];
-  float matrixCol1[2];
-  float matrixCol2[2];
-  uint32_t color;  // UByte4Normalized premultiplied RGBA
+  float offset[2];  // [dx, dy]
+  uint32_t color;   // UByte4Normalized premultiplied RGBA
 };
 
-static void FillInstanceRecord(void* buffer, const Matrix& matrix) {
-  auto record = static_cast<InstanceRecord*>(buffer);
-  record->matrixCol0[0] = matrix.getScaleX();
-  record->matrixCol0[1] = matrix.getSkewY();
-  record->matrixCol1[0] = matrix.getSkewX();
-  record->matrixCol1[1] = matrix.getScaleY();
-  record->matrixCol2[0] = matrix.getTranslateX();
-  record->matrixCol2[1] = matrix.getTranslateY();
-}
-
 PlacementPtr<InstanceProvider> InstanceProvider::MakeFrom(
-    BlockAllocator* allocator, const Matrix* matrices, const Color* colors, size_t count,
+    BlockAllocator* allocator, const Point* offsets, const Color* colors, size_t count,
     const std::shared_ptr<ColorSpace>& colorSpace) {
-  if (allocator == nullptr || matrices == nullptr || count == 0) {
+  if (allocator == nullptr || offsets == nullptr || count == 0) {
     return nullptr;
   }
   bool hasColors = colors != nullptr;
@@ -60,15 +46,14 @@ PlacementPtr<InstanceProvider> InstanceProvider::MakeFrom(
         std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
                                                colorSpace.get(), AlphaType::Premultiplied);
   }
-  return allocator->make<InstanceProvider>(allocator->addReference(), matrices, colors, count,
+  return allocator->make<InstanceProvider>(allocator->addReference(), offsets, colors, count,
                                            dataSize, hasColors, std::move(steps));
 }
 
-InstanceProvider::InstanceProvider(std::shared_ptr<BlockAllocator> reference,
-                                   const Matrix* matrices, const Color* colors, size_t count,
-                                   size_t dataSize, bool hasColors,
-                                   std::unique_ptr<ColorSpaceXformSteps> steps)
-    : reference(std::move(reference)), xformSteps(std::move(steps)), matrices(matrices),
+InstanceProvider::InstanceProvider(std::shared_ptr<BlockAllocator> reference, const Point* offsets,
+                                   const Color* colors, size_t count, size_t dataSize,
+                                   bool hasColors, std::unique_ptr<ColorSpaceXformSteps> steps)
+    : reference(std::move(reference)), xformSteps(std::move(steps)), offsets(offsets),
       colors(colors), count(count), _dataSize(dataSize), _hasColors(hasColors) {
 }
 
@@ -76,7 +61,9 @@ void InstanceProvider::getData(void* buffer) const {
   size_t instanceStride = _hasColors ? sizeof(InstanceRecordWithColor) : sizeof(InstanceRecord);
   auto steps = xformSteps.get();
   for (size_t i = 0; i < count; i++) {
-    FillInstanceRecord(buffer, matrices[i]);
+    auto record = static_cast<InstanceRecord*>(buffer);
+    record->offset[0] = offsets[i].x;
+    record->offset[1] = offsets[i].y;
     if (_hasColors) {
       auto colorRecord = static_cast<InstanceRecordWithColor*>(buffer);
       colorRecord->color = ToUintPMColor(colors[i], steps);

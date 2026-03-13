@@ -324,14 +324,6 @@ void RenderContext::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
   }
 }
 
-void RenderContext::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matrix matrices[],
-                                       const Color colors[], size_t count, const MCState& state,
-                                       const Brush& brush) {
-  if (auto compositor = getOpsCompositor()) {
-    compositor->drawShapeInstanced(std::move(shape), matrices, colors, count, state, brush);
-  }
-}
-
 void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                   const Rect& dstRect, const SamplingOptions& sampling,
                                   const MCState& state, const Brush& brush,

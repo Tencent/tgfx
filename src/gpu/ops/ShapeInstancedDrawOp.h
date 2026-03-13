@@ -23,12 +23,13 @@
 #include "gpu/proxies/VertexBufferView.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/Point.h"
 
 namespace tgfx {
 class ShapeInstancedDrawOp : public DrawOp {
  public:
   static PlacementPtr<ShapeInstancedDrawOp> Make(std::shared_ptr<GPUShapeProxy> shapeProxy,
-                                                 const Matrix* matrices, const Color* colors,
+                                                 const Point* offsets, const Color* colors,
                                                  size_t count, PMColor gpColor,
                                                  const Matrix& uvMatrix, const Matrix& stateMatrix,
                                                  AAType aaType,

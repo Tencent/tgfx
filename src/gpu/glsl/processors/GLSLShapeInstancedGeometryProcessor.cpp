@@ -52,8 +52,8 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   auto stateMatrixName =
       uniformHandler->addUniform("StateMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
   std::string positionName = "position";
-  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(local + %s, 1.0)).xy;",
-                           positionName.c_str(), stateMatrixName.c_str(), offset.name().c_str());
+  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(local + %s, 1.0)).xy;", positionName.c_str(),
+                           stateMatrixName.c_str(), offset.name().c_str());
 
   // Emit UV transforms using unshifted local coords. All FP coord transforms (both color shader
   // and mask coverage) use 'local' without offset, because: (1) mask texture is rasterized at a

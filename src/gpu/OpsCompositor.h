@@ -90,14 +90,6 @@ class OpsCompositor {
   void drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush);
 
   /**
-   * Draws multiple instances of the same shape with different transformations and optional
-   * per-instance colors.
-   */
-  void drawShapeInstanced(std::shared_ptr<Shape> shape, const Matrix matrices[],
-                          const Color colors[], size_t count, const MCState& state,
-                          const Brush& brush);
-
-  /**
    * Fills the given rect with the given atlas textureProxy, sampling options, state and fill.
    */
   void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
@@ -140,6 +132,10 @@ class OpsCompositor {
   std::vector<PlacementPtr<Rect>> pendingUVRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
+  std::shared_ptr<Shape> pendingShape = nullptr;
+  Matrix pendingShapeMatrix = {};
+  std::vector<Point> pendingShapeOffsets = {};
+  std::vector<Color> pendingShapeColors = {};
   std::optional<PMColor> clearColor = std::nullopt;
   std::vector<PlacementPtr<DrawOp>> drawOps = {};
   std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
@@ -158,6 +154,7 @@ class OpsCompositor {
   bool canAppend(PendingOpType type, const Path& clip, const Brush& brush) const;
   void flushPendingOps(PendingOpType currentType = PendingOpType::Unknown, Path currentClip = {},
                        Brush currentBrush = {});
+  void flushPendingShapeOps();
   void resetPendingOps(PendingOpType currentType = PendingOpType::Unknown, Path currentClip = {},
                        Brush currentBrush = {});
   AAType getAAType(const Brush& brush) const;

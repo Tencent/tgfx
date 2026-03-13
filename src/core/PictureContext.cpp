@@ -117,26 +117,6 @@ void PictureContext::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state,
   drawCount++;
 }
 
-void PictureContext::drawShapeInstanced(std::shared_ptr<Shape> shape, const Matrix matrices[],
-                                        const Color colors[], size_t count, const MCState& state,
-                                        const Brush& brush) {
-  DEBUG_ASSERT(shape != nullptr);
-  DEBUG_ASSERT(matrices != nullptr);
-  DEBUG_ASSERT(count > 0);
-  recordAll(state, brush);
-  auto storedMatrices = static_cast<Matrix*>(blockAllocator.allocate(sizeof(Matrix) * count));
-  memcpy(storedMatrices, matrices, sizeof(Matrix) * count);
-  Color* storedColors = nullptr;
-  if (colors != nullptr) {
-    storedColors = static_cast<Color*>(blockAllocator.allocate(sizeof(Color) * count));
-    memcpy(storedColors, colors, sizeof(Color) * count);
-  }
-  auto record = blockAllocator.make<DrawShapeInstanced>(std::move(shape), storedMatrices,
-                                                        storedColors, count);
-  records.emplace_back(std::move(record));
-  drawCount++;
-}
-
 void PictureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                const MCState& state, const Brush& brush) {
   DEBUG_ASSERT(image != nullptr);

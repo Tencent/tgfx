@@ -32,7 +32,6 @@
 #include "layers/contents/RectContent.h"
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/ShapeContent.h"
-#include "layers/contents/ShapeInstancedContent.h"
 #include "layers/contents/TextContent.h"
 
 namespace tgfx {
@@ -69,22 +68,6 @@ void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerP
   auto offset = Point::Make(x, y);
   std::unique_ptr<GeometryContent> content =
       std::make_unique<TextContent>(std::move(textBlob), offset, paint);
-  if (!_matrix.isIdentity()) {
-    content = std::make_unique<MatrixContent>(std::move(content), _matrix);
-  }
-  list.push_back(std::move(content));
-}
-
-void LayerRecorder::addShapeInstanced(std::shared_ptr<Shape> shape,
-                                      const std::vector<Matrix>& matrices,
-                                      const std::vector<Color>& colors, const LayerPaint& paint) {
-  if (shape == nullptr || matrices.empty()) {
-    return;
-  }
-  flushPending();
-  auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
-  std::unique_ptr<GeometryContent> content =
-      std::make_unique<ShapeInstancedContent>(std::move(shape), matrices, colors, paint);
   if (!_matrix.isIdentity()) {
     content = std::make_unique<MatrixContent>(std::move(content), _matrix);
   }

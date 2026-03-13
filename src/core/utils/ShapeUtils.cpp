@@ -70,4 +70,11 @@ const MatrixShape* ShapeUtils::AsMatrixShape(const Shape* shape) {
   return nullptr;
 }
 
+UniqueKey ShapeUtils::GetUniqueKey(const std::shared_ptr<Shape>& shape) {
+  if (shape == nullptr) {
+    return {};
+  }
+  return shape->getUniqueKey();
+}
+
 }  // namespace tgfx
