@@ -36,16 +36,16 @@ class Ellipse : public VectorElement {
   static std::shared_ptr<Ellipse> Make();
 
   /**
-   * Returns the center point of the ellipse.
+   * Returns the position of the ellipse center point.
    */
-  const Point& center() const {
-    return _center;
+  const Point& position() const {
+    return _position;
   }
 
   /**
-   * Sets the center point of the ellipse.
+   * Sets the position of the ellipse center point.
    */
-  void setCenter(const Point& value);
+  void setPosition(const Point& value);
 
   /**
    * Returns the size of the ellipse (width and height of the bounding box).
@@ -82,7 +82,7 @@ class Ellipse : public VectorElement {
   Ellipse() = default;
 
  private:
-  Point _center = Point::Zero();
+  Point _position = Point::Zero();
   Size _size = {100.0f, 100.0f};
   bool _reversed = false;
   std::shared_ptr<Shape> _cachedShape = nullptr;

@@ -75,7 +75,7 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   // Group 1: Rectangle with red fill and roundness
   auto group1 = std::make_shared<VectorGroup>();
   auto rect = std::make_shared<Rectangle>();
-  rect->setCenter({130, 130});
+  rect->setPosition({130, 130});
   rect->setSize({160, 160});
   rect->setRoundness(20);
   auto redFill = MakeFillStyle(Color::Red());
@@ -84,7 +84,7 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   // Group 2: Ellipse with blue stroke
   auto group2 = std::make_shared<VectorGroup>();
   auto ellipse = std::make_shared<Ellipse>();
-  ellipse->setCenter({330, 130});
+  ellipse->setPosition({330, 130});
   ellipse->setSize({160, 120});
   auto blueStroke = MakeStrokeStyle(Color::Blue(), 8.0f);
   group2->setElements({ellipse, blueStroke});
@@ -106,7 +106,7 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   // Group 4: Star with yellow fill and roundness
   auto group4 = std::make_shared<VectorGroup>();
   auto star = std::make_shared<Polystar>();
-  star->setCenter({130, 330});
+  star->setPosition({130, 330});
   star->setPolystarType(PolystarType::Star);
   star->setPointCount(5);
   star->setOuterRadius(80);
@@ -119,7 +119,7 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   // Group 5: Six-pointed star without roundness for comparison
   auto group5 = std::make_shared<VectorGroup>();
   auto starSharp = std::make_shared<Polystar>();
-  starSharp->setCenter({310, 330});
+  starSharp->setPosition({310, 330});
   starSharp->setPolystarType(PolystarType::Star);
   starSharp->setPointCount(6);
   starSharp->setOuterRadius(80);
@@ -130,7 +130,7 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   // Group 6: Hexagon with purple stroke and roundness
   auto group6 = std::make_shared<VectorGroup>();
   auto polygon = std::make_shared<Polystar>();
-  polygon->setCenter({530, 330});
+  polygon->setPosition({530, 330});
   polygon->setPolystarType(PolystarType::Polygon);
   polygon->setPointCount(6);
   polygon->setOuterRadius(80);
@@ -144,6 +144,103 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/BasicShapes"));
+}
+
+/**
+ * Test ShapePath with position set via setPosition().
+ * Verifies that ShapePath::setPosition() correctly applies position as a translation
+ * matrix in the rendered output, separate from the cached shape itself.
+ */
+TGFX_TEST(VectorLayerTest, ShapePathPosition) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 650, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  // Group 1: Circle at position (100, 100) using setPosition()
+  auto group1 = std::make_shared<VectorGroup>();
+  Path circlePath1 = {};
+  circlePath1.addOval(Rect::MakeXYWH(-50, -50, 100, 100));
+
+  auto shapePath1 = std::make_shared<ShapePath>();
+  shapePath1->setPath(circlePath1);
+  shapePath1->setPosition({100, 100});
+
+  auto redFill = MakeFillStyle(Color::Red());
+  group1->setElements({shapePath1, redFill});
+
+  // Group 2: Circle at position (325, 100) using setPosition()
+  auto group2 = std::make_shared<VectorGroup>();
+  Path circlePath2 = {};
+  circlePath2.addOval(Rect::MakeXYWH(-50, -50, 100, 100));
+
+  auto shapePath2 = std::make_shared<ShapePath>();
+  shapePath2->setPath(circlePath2);
+  shapePath2->setPosition({325, 100});
+
+  auto blueFill = MakeFillStyle(Color::Blue());
+  group2->setElements({shapePath2, blueFill});
+
+  // Group 3: Square at position (550, 100) using setPosition()
+  auto group3 = std::make_shared<VectorGroup>();
+  Path squarePath = {};
+  squarePath.addRect(Rect::MakeXYWH(-40, -40, 80, 80));
+
+  auto shapePath3 = std::make_shared<ShapePath>();
+  shapePath3->setPath(squarePath);
+  shapePath3->setPosition({550, 100});
+
+  auto greenFill = MakeFillStyle(Color::Green());
+  group3->setElements({shapePath3, greenFill});
+
+  // Group 4: Multiple circles testing position offset effect
+  // Center circle at (150, 200) - reference
+  auto group4 = std::make_shared<VectorGroup>();
+  Path circlePath4 = {};
+  circlePath4.addOval(Rect::MakeXYWH(-35, -35, 70, 70));
+
+  auto shapePath4 = std::make_shared<ShapePath>();
+  shapePath4->setPath(circlePath4);
+  shapePath4->setPosition({150, 200});
+
+  auto yellowFill = MakeFillStyle(Color::FromRGBA(255, 200, 0, 255));
+  group4->setElements({shapePath4, yellowFill});
+
+  // Group 5: Same shape, different position (300, 200)
+  auto group5 = std::make_shared<VectorGroup>();
+  Path circlePath5 = {};
+  circlePath5.addOval(Rect::MakeXYWH(-35, -35, 70, 70));
+
+  auto shapePath5 = std::make_shared<ShapePath>();
+  shapePath5->setPath(circlePath5);
+  shapePath5->setPosition({300, 200});
+
+  auto orangeFill = MakeFillStyle(Color::FromRGBA(255, 128, 0, 255));
+  group5->setElements({shapePath5, orangeFill});
+
+  // Group 6: Same shape, yet another position (450, 200)
+  auto group6 = std::make_shared<VectorGroup>();
+  Path circlePath6 = {};
+  circlePath6.addOval(Rect::MakeXYWH(-35, -35, 70, 70));
+
+  auto shapePath6 = std::make_shared<ShapePath>();
+  shapePath6->setPath(circlePath6);
+  shapePath6->setPosition({450, 200});
+
+  auto purpleFill = MakeFillStyle(Color::FromRGBA(128, 0, 128, 255));
+  group6->setElements({shapePath6, purpleFill});
+
+  vectorLayer->setContents({group1, group2, group3, group4, group5, group6});
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/ShapePathPosition"));
 }
 
 /**
@@ -169,7 +266,7 @@ TGFX_TEST(VectorLayerTest, TrimPath) {
   rect1->setSize({100, 200});
 
   auto ellipse1 = std::make_shared<Ellipse>();
-  ellipse1->setCenter({110, 0});
+  ellipse1->setPosition({110, 0});
   ellipse1->setSize({100, 200});
 
   auto trim1 = std::make_shared<TrimPath>();
@@ -188,7 +285,7 @@ TGFX_TEST(VectorLayerTest, TrimPath) {
   rect2->setSize({100, 200});
 
   auto ellipse2 = std::make_shared<Ellipse>();
-  ellipse2->setCenter({110, 0});
+  ellipse2->setPosition({110, 0});
   ellipse2->setSize({100, 200});
 
   auto trim2 = std::make_shared<TrimPath>();
@@ -326,7 +423,7 @@ TGFX_TEST(VectorLayerTest, MergePath) {
   rect1a->setSize({160, 160});
 
   auto rect1b = std::make_shared<Rectangle>();
-  rect1b->setCenter({60, 40});
+  rect1b->setPosition({60, 40});
   rect1b->setSize({160, 160});
 
   auto fill1 = MakeFillStyle(Color::FromRGBA(255, 0, 0, 128));
@@ -340,7 +437,7 @@ TGFX_TEST(VectorLayerTest, MergePath) {
   rect2a->setSize({160, 160});
 
   auto rect2b = std::make_shared<Rectangle>();
-  rect2b->setCenter({60, 40});
+  rect2b->setPosition({60, 40});
   rect2b->setSize({160, 160});
 
   auto merge = std::make_shared<MergePath>();
@@ -373,7 +470,7 @@ TGFX_TEST(VectorLayerTest, MergePathClearsPainters) {
   auto vectorLayer = VectorLayer::Make();
 
   auto rect = std::make_shared<Rectangle>();
-  rect->setCenter({150, 150});
+  rect->setPosition({150, 150});
   rect->setSize({200, 200});
 
   // This fill should be cleared by MergePath
@@ -672,7 +769,7 @@ TGFX_TEST(VectorLayerTest, MultipleFillsAndStrokes) {
   auto vectorLayer = VectorLayer::Make();
 
   auto rect = std::make_shared<Rectangle>();
-  rect->setCenter({180, 180});
+  rect->setPosition({180, 180});
   rect->setSize({240, 240});
 
   // First fill (bottom)
@@ -937,11 +1034,11 @@ TGFX_TEST(VectorLayerTest, TrimPathReversedWrapAround) {
   group4->setPosition({448, 80});
 
   auto rect4a = std::make_shared<Rectangle>();
-  rect4a->setCenter({-30, 0});
+  rect4a->setPosition({-30, 0});
   rect4a->setSize({60, 120});
 
   auto rect4b = std::make_shared<Rectangle>();
-  rect4b->setCenter({30, 0});
+  rect4b->setPosition({30, 0});
   rect4b->setSize({60, 120});
 
   auto trim4 = std::make_shared<TrimPath>();
@@ -1320,7 +1417,7 @@ TGFX_TEST(VectorLayerTest, MergePathOps) {
     rect->setSize({80, 80});
 
     auto ellipse = std::make_shared<Ellipse>();
-    ellipse->setCenter({40, 0});
+    ellipse->setPosition({40, 0});
     ellipse->setSize({80, 80});
 
     return std::make_tuple(group, rect, ellipse);
@@ -2254,7 +2351,7 @@ TGFX_TEST(VectorLayerTest, RichText) {
 
   // === Row 1: [image] "TGFX Rich Text Demo" ===
   auto imageRect = std::make_shared<Rectangle>();
-  imageRect->setCenter({82, 82});
+  imageRect->setPosition({82, 82});
   imageRect->setSize({64, 64});
 
   SamplingOptions nearestSampling(FilterMode::Nearest, MipmapMode::None);
@@ -2341,7 +2438,7 @@ TGFX_TEST(VectorLayerTest, RichText) {
   linkSpan->setPosition({97, 0});
 
   auto underline = std::make_shared<Rectangle>();
-  underline->setCenter({177, 16});
+  underline->setPosition({177, 16});
   underline->setSize({159, 3});
 
   auto linkGroup = std::make_shared<VectorGroup>();
@@ -2405,7 +2502,7 @@ TGFX_TEST(VectorLayerTest, SolidColor) {
   // Group 1: Default SolidColor (black)
   auto group1 = std::make_shared<VectorGroup>();
   auto rect1 = std::make_shared<Rectangle>();
-  rect1->setCenter({100, 100});
+  rect1->setPosition({100, 100});
   rect1->setSize({100, 100});
   auto fill1 = FillStyle::Make(solidDefault);
   group1->setElements({rect1, fill1});
@@ -2413,7 +2510,7 @@ TGFX_TEST(VectorLayerTest, SolidColor) {
   // Group 2: SolidColor with specific color
   auto group2 = std::make_shared<VectorGroup>();
   auto rect2 = std::make_shared<Rectangle>();
-  rect2->setCenter({240, 100});
+  rect2->setPosition({240, 100});
   rect2->setSize({100, 100});
   auto fill2 = FillStyle::Make(solidRed);
   group2->setElements({rect2, fill2});
@@ -2421,7 +2518,7 @@ TGFX_TEST(VectorLayerTest, SolidColor) {
   // Group 3: SolidColor with alpha
   auto group3 = std::make_shared<VectorGroup>();
   auto rect3 = std::make_shared<Rectangle>();
-  rect3->setCenter({380, 100});
+  rect3->setPosition({380, 100});
   rect3->setSize({100, 100});
   auto fill3 = FillStyle::Make(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
   group3->setElements({rect3, fill3});
@@ -2453,7 +2550,7 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   // Linear gradient
   auto group1 = std::make_shared<VectorGroup>();
   auto rect1 = std::make_shared<Rectangle>();
-  rect1->setCenter({110, 110});
+  rect1->setPosition({110, 110});
   rect1->setSize({120, 120});
   auto linear = Gradient::MakeLinear({50, 110}, {170, 110}, colors);
   EXPECT_EQ(linear->type(), GradientType::Linear);
@@ -2467,7 +2564,7 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   // Radial gradient
   auto group2 = std::make_shared<VectorGroup>();
   auto rect2 = std::make_shared<Rectangle>();
-  rect2->setCenter({260, 110});
+  rect2->setPosition({260, 110});
   rect2->setSize({120, 120});
   auto radial = Gradient::MakeRadial({260, 110}, 85, colors);
   EXPECT_EQ(radial->type(), GradientType::Radial);
@@ -2481,7 +2578,7 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   // Conic gradient
   auto group3 = std::make_shared<VectorGroup>();
   auto rect3 = std::make_shared<Rectangle>();
-  rect3->setCenter({410, 110});
+  rect3->setPosition({410, 110});
   rect3->setSize({120, 120});
   auto conic = Gradient::MakeConic({410, 110}, 0, 360, colors);
   EXPECT_EQ(conic->type(), GradientType::Conic);
@@ -2497,7 +2594,7 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   // Diamond gradient
   auto group4 = std::make_shared<VectorGroup>();
   auto rect4 = std::make_shared<Rectangle>();
-  rect4->setCenter({560, 110});
+  rect4->setPosition({560, 110});
   rect4->setSize({120, 120});
   auto diamond = Gradient::MakeDiamond({560, 110}, 85, colors);
   EXPECT_EQ(diamond->type(), GradientType::Diamond);
@@ -2538,7 +2635,7 @@ TGFX_TEST(VectorLayerTest, GradientEdgeCases) {
   // Group 1: Empty colors (invisible fill, with stroke to show rect bounds)
   auto group1 = std::make_shared<VectorGroup>();
   auto rect1 = std::make_shared<Rectangle>();
-  rect1->setCenter({101, 101});
+  rect1->setPosition({101, 101});
   rect1->setSize({100, 100});
   auto emptyGradient = Gradient::MakeLinear({51, 101}, {151, 101}, {});
   EXPECT_TRUE(emptyGradient->colors().empty());
@@ -2549,7 +2646,7 @@ TGFX_TEST(VectorLayerTest, GradientEdgeCases) {
   // Group 2: Single color
   auto group2 = std::make_shared<VectorGroup>();
   auto rect2 = std::make_shared<Rectangle>();
-  rect2->setCenter({241, 101});
+  rect2->setPosition({241, 101});
   rect2->setSize({100, 100});
   auto singleGradient = Gradient::MakeLinear({191, 101}, {291, 101}, {Color::Red()});
   EXPECT_EQ(singleGradient->colors().size(), 1u);
@@ -2559,7 +2656,7 @@ TGFX_TEST(VectorLayerTest, GradientEdgeCases) {
   // Group 3: With rotation matrix (gradient rotated 45 degrees around center)
   auto group3 = std::make_shared<VectorGroup>();
   auto rect3 = std::make_shared<Rectangle>();
-  rect3->setCenter({381, 101});
+  rect3->setPosition({381, 101});
   rect3->setSize({100, 100});
   // Create a gradient from top-left to bottom-right of the rect
   auto matrixGradient = Gradient::MakeLinear({331, 51}, {431, 151}, {Color::Red(), Color::Blue()});
@@ -2599,7 +2696,7 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   // Group 1: Clamp tile mode - rect larger than image to show edge clamping
   auto group1 = std::make_shared<VectorGroup>();
   auto rect1 = std::make_shared<Rectangle>();
-  rect1->setCenter({100, 100});
+  rect1->setPosition({100, 100});
   rect1->setSize({100, 100});  // Rect is 100x100, larger than 50x50 image
   auto pattern1 = ImagePattern::Make(image, TileMode::Clamp, TileMode::Clamp);
   ASSERT_TRUE(pattern1 != nullptr);
@@ -2619,7 +2716,7 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   // Group 2: Repeat tile mode - small scale to show tiling
   auto group2 = std::make_shared<VectorGroup>();
   auto rect2 = std::make_shared<Rectangle>();
-  rect2->setCenter({240, 100});
+  rect2->setPosition({240, 100});
   rect2->setSize({100, 100});
   auto pattern2 = ImagePattern::Make(image2, TileMode::Repeat, TileMode::Repeat);
   // Scale image to ~25x25 pixels to show tiling, position at rect's top-left (190, 50)
@@ -2632,7 +2729,7 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   // Group 3: Mirror tile mode with rotation
   auto group3 = std::make_shared<VectorGroup>();
   auto rect3 = std::make_shared<Rectangle>();
-  rect3->setCenter({380, 100});
+  rect3->setPosition({380, 100});
   rect3->setSize({100, 100});
   auto pattern3 = ImagePattern::Make(image2, TileMode::Mirror, TileMode::Mirror);
   // Scale image to ~25x25 pixels, rotate, and position at rect's top-left (330, 50)
@@ -2668,7 +2765,7 @@ TGFX_TEST(VectorLayerTest, ColorSourceAdvanced) {
   // Group 1: SolidColor stroke
   auto group1 = std::make_shared<VectorGroup>();
   auto rect1 = std::make_shared<Rectangle>();
-  rect1->setCenter({104, 104});
+  rect1->setPosition({104, 104});
   rect1->setSize({100, 100});
   auto stroke1 = StrokeStyle::Make(SolidColor::Make(Color::Red()));
   stroke1->setStrokeWidth(8.0f);
@@ -2677,7 +2774,7 @@ TGFX_TEST(VectorLayerTest, ColorSourceAdvanced) {
   // Group 2: Gradient stroke
   auto group2 = std::make_shared<VectorGroup>();
   auto rect2 = std::make_shared<Rectangle>();
-  rect2->setCenter({244, 104});
+  rect2->setPosition({244, 104});
   rect2->setSize({100, 100});
   auto stroke2 = StrokeStyle::Make(
       Gradient::MakeLinear({194, 54}, {294, 154}, {Color::Blue(), Color::Green()}));
@@ -2689,7 +2786,7 @@ TGFX_TEST(VectorLayerTest, ColorSourceAdvanced) {
       {384, 104}, 70, {Color::FromRGBA(255, 255, 0, 255), Color::FromRGBA(255, 0, 255, 255)});
   auto group3 = std::make_shared<VectorGroup>();
   auto rect3 = std::make_shared<Rectangle>();
-  rect3->setCenter({384, 104});
+  rect3->setPosition({384, 104});
   rect3->setSize({100, 100});
   auto fill3 = FillStyle::Make(sharedGradient);
   group3->setElements({rect3, fill3});
@@ -4021,7 +4118,7 @@ TGFX_TEST(VectorLayerTest, LayerPlacement) {
   auto vectorLayer1 = VectorLayer::Make();
   auto rect1 = std::make_shared<Rectangle>();
   rect1->setSize({80, 80});
-  rect1->setCenter({40, 40});
+  rect1->setPosition({40, 40});
   auto fill1 = MakeFillStyle(Color::Red());
   // fill1->placement() is Background by default
   vectorLayer1->setContents({rect1, fill1});
@@ -4039,7 +4136,7 @@ TGFX_TEST(VectorLayerTest, LayerPlacement) {
   vectorLayer2->setPosition({120, 0});
   auto rect2 = std::make_shared<Rectangle>();
   rect2->setSize({80, 80});
-  rect2->setCenter({40, 40});
+  rect2->setPosition({40, 40});
   auto fill2 = MakeFillStyle(Color::Red());
   fill2->setPlacement(LayerPlacement::Foreground);
   vectorLayer2->setContents({rect2, fill2});
@@ -4056,7 +4153,7 @@ TGFX_TEST(VectorLayerTest, LayerPlacement) {
   vectorLayer3->setPosition({240, 0});
   auto rect3 = std::make_shared<Rectangle>();
   rect3->setSize({60, 60});
-  rect3->setCenter({40, 40});
+  rect3->setPosition({40, 40});
   auto stroke3 = MakeStrokeStyle(Color::Green(), 20);
   // stroke3->placement() is Background by default
   vectorLayer3->setContents({rect3, stroke3});
@@ -4073,7 +4170,7 @@ TGFX_TEST(VectorLayerTest, LayerPlacement) {
   vectorLayer4->setPosition({360, 0});
   auto rect4 = std::make_shared<Rectangle>();
   rect4->setSize({60, 60});
-  rect4->setCenter({40, 40});
+  rect4->setPosition({40, 40});
   auto stroke4 = MakeStrokeStyle(Color::Green(), 20);
   stroke4->setPlacement(LayerPlacement::Foreground);
   vectorLayer4->setContents({rect4, stroke4});
