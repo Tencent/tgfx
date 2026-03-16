@@ -575,7 +575,7 @@ void OpsCompositor::flushPendingShapeOps() {
     } else {
       localBounds = ClipLocalBounds(shapeBounds, shapeMatrix, clipBounds);
     }
-    if (!localBounds || localBounds->isEmpty()) {
+    if (localBounds->isEmpty()) {
       return;
     }
     drawScale = std::min(shapeMatrix.getMaxScale(), 1.0f);
