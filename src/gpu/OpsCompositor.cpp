@@ -369,7 +369,7 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Brush&
     case PendingOpType::RRect:
       return pendingRRects.size() < RRectDrawOp::MaxNumRRects;
     case PendingOpType::Shape:
-      return pendingShapeOffsets.size() < 65536;
+      return pendingShapeOffsets.size() < ShapeInstancedDrawOp::MaxNumInstances;
     default:
       break;
   }
