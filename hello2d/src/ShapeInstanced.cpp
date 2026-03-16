@@ -17,22 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/LayerBuilders.h"
+#include "tgfx/core/PathProvider.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
 
 namespace hello2d {
 
+// Creates a 5-pointed star path centered at the origin.
 static tgfx::Path MakeStarPath(float radius) {
   tgfx::Path path = {};
-  // 5-pointed star: alternate between outer radius and inner radius
   auto innerRadius = radius * 0.382f;
   constexpr float startAngle = -90.0f;
   for (int i = 0; i < 10; i++) {
-    auto angle = startAngle + i * 36.0f;
-    auto radians = angle * M_PI / 180.0f;
+    auto angle = startAngle + static_cast<float>(i) * 36.0f;
+    auto radians = angle * static_cast<float>(M_PI) / 180.0f;
     auto r = (i % 2 == 0) ? radius : innerRadius;
-    auto x = r * cosf(static_cast<float>(radians));
-    auto y = r * sinf(static_cast<float>(radians));
+    auto x = r * cosf(radians);
+    auto y = r * sinf(radians);
     if (i == 0) {
       path.moveTo(x, y);
     } else {
@@ -46,12 +47,15 @@ static tgfx::Path MakeStarPath(float radius) {
 std::shared_ptr<tgfx::Layer> ShapeInstanced::onBuildLayerTree(const AppHost*) {
   auto root = tgfx::Layer::Make();
 
-  // Create a single shared star shape so all four ShapeLayers share the same uniqueKey,
-  // which triggers instanced drawing when only translation differs.
+  // Use PathProvider to wrap the path so that Shape::MakeFrom(PathProvider) creates a
+  // ProviderShape instead of a PathShape. ProviderShape has isSimplePath()=false, which
+  // prevents Canvas::drawShape from inlining it as a plain path draw. This allows
+  // OpsCompositor::drawShape to batch multiple draws of the same shape (same uniqueKey)
+  // with different translations into a single ShapeInstancedDrawOp.
   auto starPath = MakeStarPath(100);
-  auto starShape = tgfx::Shape::MakeFrom(starPath);
+  auto pathProvider = tgfx::PathProvider::Wrap(std::move(starPath));
+  auto starShape = tgfx::Shape::MakeFrom(std::move(pathProvider));
 
-  // Four colors for the four stars
   tgfx::Color colors[] = {
       tgfx::Color::FromRGBA(255, 80, 80),   // red
       tgfx::Color::FromRGBA(80, 180, 255),  // blue
@@ -59,7 +63,7 @@ std::shared_ptr<tgfx::Layer> ShapeInstanced::onBuildLayerTree(const AppHost*) {
       tgfx::Color::FromRGBA(255, 200, 60),  // yellow
   };
 
-  // Place four stars in a 2x2 grid, centered in a 620x620 area
+  // 2x2 grid positions in a 620x620 area
   tgfx::Point positions[] = {
       {155, 155},
       {465, 155},
