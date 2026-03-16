@@ -26,7 +26,6 @@
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
-#include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
@@ -179,9 +178,9 @@ static bool MatrixOnlyDiffersInTranslation(const Matrix& a, const Matrix& b) {
 void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                               const Brush& brush) {
   DEBUG_ASSERT(shape != nullptr);
-  auto shapeKey = ShapeUtils::GetUniqueKey(shape);
+  auto shapeKey = shape->getUniqueKey();
   if (canAppend(PendingOpType::Shape, state.clip, brush) && pendingShape &&
-      ShapeUtils::GetUniqueKey(pendingShape) == shapeKey &&
+      pendingShape->getUniqueKey() == shapeKey &&
       MatrixOnlyDiffersInTranslation(pendingShapeMatrix, state.matrix)) {
     auto dx = state.matrix.getTranslateX() - pendingShapeMatrix.getTranslateX();
     auto dy = state.matrix.getTranslateY() - pendingShapeMatrix.getTranslateY();
