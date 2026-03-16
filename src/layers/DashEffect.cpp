@@ -38,28 +38,4 @@ std::shared_ptr<PathEffect> CreateDashPathEffect(const std::vector<float>& dashe
                               adaptive);
 }
 
-std::shared_ptr<Shape> CreateStrokeShape(std::shared_ptr<Shape> shape, const Stroke& stroke,
-                                         StrokeAlign strokeAlign,
-                                         const std::vector<float>& lineDashPattern,
-                                         float lineDashPhase, bool lineDashAdaptive) {
-  auto strokeShape = shape;
-  auto tempStroke = stroke;
-  if (strokeAlign != StrokeAlign::Center) {
-    tempStroke.width *= 2;
-  }
-  if (!lineDashPattern.empty()) {
-    auto dash = CreateDashPathEffect(lineDashPattern, lineDashPhase, lineDashAdaptive, tempStroke);
-    if (dash) {
-      strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(dash));
-    }
-  }
-  strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
-  if (strokeAlign == StrokeAlign::Inside) {
-    strokeShape = Shape::Merge(std::move(strokeShape), shape, PathOp::Intersect);
-  } else if (strokeAlign == StrokeAlign::Outside) {
-    strokeShape = Shape::Merge(std::move(strokeShape), shape, PathOp::Difference);
-  }
-  return strokeShape;
-}
-
 }  // namespace tgfx
