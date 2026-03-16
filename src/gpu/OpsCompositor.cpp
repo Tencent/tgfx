@@ -179,21 +179,20 @@ static bool MatrixOnlyDiffersInTranslation(const Matrix& a, const Matrix& b) {
 void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                               const Brush& brush) {
   DEBUG_ASSERT(shape != nullptr);
-  auto shapeKey = shape->getUniqueKey();
   if (canAppend(PendingOpType::Shape, state.clip, brush) && pendingShape &&
-      pendingShape->getUniqueKey() == shapeKey &&
+      pendingShape->getUniqueKey() == shape->getUniqueKey() &&
       MatrixOnlyDiffersInTranslation(pendingShapeMatrix, state.matrix)) {
     auto dx = state.matrix.getTranslateX() - pendingShapeMatrix.getTranslateX();
     auto dy = state.matrix.getTranslateY() - pendingShapeMatrix.getTranslateY();
-    pendingShapeOffsets.push_back({dx, dy});
-    pendingShapeColors.push_back(brush.color);
+    pendingShapeOffsets.emplace_back(dx, dy);
+    pendingShapeColors.emplace_back(brush.color);
     return;
   }
   flushPendingOps(PendingOpType::Shape, state.clip, brush);
   pendingShape = std::move(shape);
   pendingShapeMatrix = state.matrix;
-  pendingShapeOffsets.push_back({0, 0});
-  pendingShapeColors.push_back(brush.color);
+  pendingShapeOffsets.emplace_back(0.0f, 0.0f);
+  pendingShapeColors.emplace_back(brush.color);
 }
 
 void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush) {
@@ -412,14 +411,12 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
     }
     return;
   }
-  // Shape has its own bounds computation in flushPendingShapeOps, so handle it before the general
-  // bounds calculation that only knows about Rect/RRect/Image types.
+  PendingOpsAutoReset autoReset(this, type, std::move(clip), std::move(brush));
+  // Shape is handled separately with its own bounds computation.
   if (pendingType == PendingOpType::Shape) {
-    PendingOpsAutoReset autoReset(this, type, std::move(clip), std::move(brush));
     flushPendingShapeOps();
     return;
   }
-  PendingOpsAutoReset autoReset(this, type, std::move(clip), std::move(brush));
   PlacementPtr<DrawOp> drawOp = nullptr;
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
@@ -517,10 +514,6 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
                                  std::move(pendingAtlasTexture), pendingSampling);
     } break;
-    case PendingOpType::Shape: {
-      flushPendingShapeOps();
-      return;
-    }
     default:
       break;
   }
@@ -546,14 +539,12 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
 }
 
 void OpsCompositor::flushPendingShapeOps() {
+  DEBUG_ASSERT(pendingShape != nullptr);
+  DEBUG_ASSERT(!pendingShapeOffsets.empty());
   auto shape = std::move(pendingShape);
   auto shapeMatrix = pendingShapeMatrix;
   auto offsets = std::move(pendingShapeOffsets);
   auto shapeColors = std::move(pendingShapeColors);
-
-  if (!shape || offsets.empty()) {
-    return;
-  }
 
   Matrix uvMatrix = {};
   if (!shapeMatrix.invert(&uvMatrix)) {
@@ -562,64 +553,23 @@ void OpsCompositor::flushPendingShapeOps() {
 
   auto clipBounds = getClipBounds(pendingClip);
   auto count = offsets.size();
-  bool hasColors = pendingBrush.shader == nullptr;
-
-  if (count == 1) {
-    // Single instance: use ShapeDrawOp (no instanced draw overhead).
-    std::optional<Rect> localBounds = std::nullopt;
-    std::optional<Rect> deviceBounds = std::nullopt;
-    float drawScale = 1.0f;
-    auto [needLocalBounds, needDeviceBounds] = needComputeBounds(pendingBrush, true);
-    if (needLocalBounds) {
-      if (shape->isInverseFillType()) {
-        localBounds = ToLocalBounds(clipBounds, shapeMatrix);
-      } else {
-        localBounds = shape->getBounds();
-        localBounds = ClipLocalBounds(*localBounds, shapeMatrix, clipBounds);
-      }
-      drawScale = std::min(shapeMatrix.getMaxScale(), 1.0f);
-    }
-    auto transformedShape = Shape::ApplyMatrix(std::move(shape), shapeMatrix);
-    if (!transformedShape) {
-      return;
-    }
-    if (needDeviceBounds) {
-      deviceBounds =
-          transformedShape->isInverseFillType() ? clipBounds : transformedShape->getBounds();
-    }
-
-    auto aaType = getAAType(pendingBrush);
-    auto shapeProxy =
-        proxyProvider()->createGPUShapeProxy(transformedShape, aaType, clipBounds, renderFlags);
-    auto dstColor = ToPMColor(shapeColors[0], dstColorSpace);
-    Brush singleBrush = pendingBrush;
-    singleBrush.color = shapeColors[0];
-    auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), dstColor, uvMatrix, aaType);
-    CAPUTRE_SHAPE_MESH(drawOp.get(), transformedShape, aaType, clipBounds);
-    addDrawOp(std::move(drawOp), pendingClip, singleBrush, localBounds, deviceBounds, drawScale);
-    return;
-  }
-
-  // Multiple instances: use ShapeInstancedDrawOp.
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
   float drawScale = 1.0f;
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(pendingBrush, true);
 
   // Compute the union of all instance bounds in the first instance's local space.
-  auto shapeBounds = shape->getBounds();
-  Rect unionLocalBounds = {};
+  Rect shapeBounds = {};
   if ((needLocalBounds || needDeviceBounds) && !shape->isInverseFillType()) {
     for (size_t i = 0; i < count; ++i) {
-      auto offsetBounds = shapeBounds.makeOffset(offsets[i].x, offsets[i].y);
-      unionLocalBounds.join(offsetBounds);
+      shapeBounds.join(shape->getBounds().makeOffset(offsets[i].x, offsets[i].y));
     }
   }
   if (needLocalBounds) {
     if (shape->isInverseFillType()) {
       localBounds = ToLocalBounds(clipBounds, shapeMatrix);
     } else {
-      localBounds = ClipLocalBounds(unionLocalBounds, shapeMatrix, clipBounds);
+      localBounds = ClipLocalBounds(shapeBounds, shapeMatrix, clipBounds);
     }
     if (localBounds->isEmpty()) {
       return;
@@ -627,57 +577,30 @@ void OpsCompositor::flushPendingShapeOps() {
     drawScale = std::min(shapeMatrix.getMaxScale(), 1.0f);
   }
   if (needDeviceBounds) {
-    if (shape->isInverseFillType()) {
-      deviceBounds = clipBounds;
-    } else {
-      deviceBounds = shapeMatrix.mapRect(unionLocalBounds);
-    }
+    deviceBounds = shape->isInverseFillType() ? clipBounds : shapeMatrix.mapRect(shapeBounds);
   }
 
-  auto transformedShape = Shape::ApplyMatrix(std::move(shape), shapeMatrix);
-  if (!transformedShape) {
+  shape = Shape::ApplyMatrix(std::move(shape), shapeMatrix);
+  if (!shape) {
     return;
   }
 
   auto aaType = getAAType(pendingBrush);
-  auto shapeProxy =
-      proxyProvider()->createGPUShapeProxy(transformedShape, aaType, clipBounds, renderFlags);
+  auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
 
-  // Determine hasColors for the DrawOp: only when no shader (colors come from instances).
-  bool instanceHasColors = hasColors;
-  const Color* colorsPtr = instanceHasColors ? shapeColors.data() : nullptr;
-
-  PMColor gpColor = PMColor::White();
-  if (!pendingBrush.shader && !instanceHasColors) {
-    gpColor = ToPMColor(pendingBrush.color, dstColorSpace);
+  if (count == 1) {
+    auto dstColor = ToPMColor(pendingBrush.color, dstColorSpace);
+    auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), dstColor, uvMatrix, aaType);
+    CAPUTRE_SHAPE_MESH(drawOp.get(), std::move(shape), aaType, clipBounds);
+    addDrawOp(std::move(drawOp), pendingClip, pendingBrush, localBounds, deviceBounds, drawScale);
+  } else {
+    const Color* colorsPtr = pendingBrush.shader ? nullptr : shapeColors.data();
+    auto drawOp =
+        ShapeInstancedDrawOp::Make(std::move(shapeProxy), offsets.data(), colorsPtr, count, {},
+                                   uvMatrix, shapeMatrix, aaType, dstColorSpace);
+    CAPUTRE_SHAPE_MESH(drawOp.get(), std::move(shape), aaType, clipBounds);
+    addDrawOp(std::move(drawOp), pendingClip, pendingBrush, localBounds, deviceBounds, drawScale);
   }
-
-  auto drawOp = ShapeInstancedDrawOp::Make(std::move(shapeProxy), offsets.data(), colorsPtr, count,
-                                           gpColor, uvMatrix, shapeMatrix, aaType, dstColorSpace);
-  if (drawOp == nullptr) {
-    return;
-  }
-
-  // Handle shader for instanced drawing with special blending rules (same as drawMesh):
-  // - shader + colors: texture * instanceColor (Modulate)
-  // - shader only: pure texture
-  if (pendingBrush.shader) {
-    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
-    auto textureFP = FragmentProcessor::Make(pendingBrush.shader, args, nullptr, dstColorSpace);
-    if (textureFP == nullptr) {
-      return;
-    }
-    if (instanceHasColors) {
-      textureFP = XfermodeFragmentProcessor::MakeFromSrcProcessor(
-          drawingAllocator(), std::move(textureFP), BlendMode::Modulate);
-    }
-    drawOp->addColorFP(std::move(textureFP));
-  }
-
-  // Create a brush without shader to pass to addDrawOp, since we handled shader above.
-  Brush instancedBrush = pendingBrush;
-  instancedBrush.shader = nullptr;
-  addDrawOp(std::move(drawOp), pendingClip, instancedBrush, localBounds, deviceBounds, drawScale);
 }
 
 static void FlipYIfNeeded(Rect* rect, const RenderTargetProxy* renderTarget) {
