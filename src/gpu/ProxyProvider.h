@@ -34,7 +34,6 @@
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
-
 /**
  * A factory for creating proxy-derived objects.
  */
