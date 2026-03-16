@@ -23,31 +23,6 @@
 #include "tgfx/layers/LayerPaint.h"
 
 namespace tgfx {
-
-static std::shared_ptr<Shape> CreateStrokeShape(std::shared_ptr<Shape> shape, const Stroke& stroke,
-                                                StrokeAlign strokeAlign,
-                                                const std::vector<float>& lineDashPattern,
-                                                float lineDashPhase, bool lineDashAdaptive) {
-  auto strokeShape = shape;
-  auto tempStroke = stroke;
-  if (strokeAlign != StrokeAlign::Center) {
-    tempStroke.width *= 2;
-  }
-  if (!lineDashPattern.empty()) {
-    auto dash = CreateDashPathEffect(lineDashPattern, lineDashPhase, lineDashAdaptive, tempStroke);
-    if (dash) {
-      strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(dash));
-    }
-  }
-  strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
-  if (strokeAlign == StrokeAlign::Inside) {
-    strokeShape = Shape::Merge(std::move(strokeShape), shape, PathOp::Intersect);
-  } else if (strokeAlign == StrokeAlign::Outside) {
-    strokeShape = Shape::Merge(std::move(strokeShape), shape, PathOp::Difference);
-  }
-  return strokeShape;
-}
-
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
   return std::shared_ptr<ShapeLayer>(new ShapeLayer());
 }
@@ -246,8 +221,7 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
     bool simpleStroke = _lineDashPattern.empty() && strokeAlign == StrokeAlign::Center;
     std::shared_ptr<Shape> strokeShape = nullptr;
     if (!simpleStroke) {
-      strokeShape = CreateStrokeShape(_shape, stroke, strokeAlign, _lineDashPattern, _lineDashPhase,
-                                      shapeBitFields.lineDashAdaptive);
+      strokeShape = createStrokeShape();
     }
     for (const auto& style : _strokeStyles) {
       LayerPaint paint(style->color(), style->blendMode());
@@ -266,4 +240,26 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
   }
 }
 
+std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
+  auto strokeShape = _shape;
+  auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
+  auto tempStroke = stroke;
+  if (strokeAlign != StrokeAlign::Center) {
+    tempStroke.width *= 2;
+  }
+  if (!_lineDashPattern.empty()) {
+    auto dash = CreateDashPathEffect(_lineDashPattern, _lineDashPhase,
+                                     shapeBitFields.lineDashAdaptive, tempStroke);
+    if (dash) {
+      strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(dash));
+    }
+  }
+  strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
+  if (strokeAlign == StrokeAlign::Inside) {
+    strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Intersect);
+  } else if (strokeAlign == StrokeAlign::Outside) {
+    strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
+  }
+  return strokeShape;
+}
 }  // namespace tgfx

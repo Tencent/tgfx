@@ -259,5 +259,7 @@ class ShapeLayer : public Layer {
     bool lineDashAdaptive : 1;
     uint8_t strokeAlign : 2;
   } shapeBitFields = {};
+
+  std::shared_ptr<Shape> createStrokeShape() const;
 };
 }  // namespace tgfx
