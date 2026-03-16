@@ -23,24 +23,10 @@
 
 namespace hello2d {
 
-// Creates a 5-pointed star path centered at the origin.
-static tgfx::Path MakeStarPath(float radius) {
+// Creates a rounded rectangle path centered at the origin.
+static tgfx::Path MakeRoundRectPath(float width, float height, float radius) {
   tgfx::Path path = {};
-  auto innerRadius = radius * 0.382f;
-  constexpr float startAngle = -90.0f;
-  for (int i = 0; i < 10; i++) {
-    auto angle = startAngle + static_cast<float>(i) * 36.0f;
-    auto radians = angle * static_cast<float>(M_PI) / 180.0f;
-    auto r = (i % 2 == 0) ? radius : innerRadius;
-    auto x = r * cosf(radians);
-    auto y = r * sinf(radians);
-    if (i == 0) {
-      path.moveTo(x, y);
-    } else {
-      path.lineTo(x, y);
-    }
-  }
-  path.close();
+  path.addRoundRect(tgfx::Rect::MakeXYWH(-width / 2, -height / 2, width, height), radius, radius);
   return path;
 }
 
@@ -52,9 +38,13 @@ std::shared_ptr<tgfx::Layer> ShapeInstanced::onBuildLayerTree(const AppHost*) {
   // prevents Canvas::drawShape from inlining it as a plain path draw. This allows
   // OpsCompositor::drawShape to batch multiple draws of the same shape (same uniqueKey)
   // with different translations into a single ShapeInstancedDrawOp.
-  auto starPath = MakeStarPath(100);
-  auto pathProvider = tgfx::PathProvider::Wrap(std::move(starPath));
-  auto starShape = tgfx::Shape::MakeFrom(std::move(pathProvider));
+  constexpr float rectWidth = 180;
+  constexpr float rectHeight = 180;
+  constexpr float cornerRadius = 20;
+  constexpr float gap = 30;
+  auto roundRectPath = MakeRoundRectPath(rectWidth, rectHeight, cornerRadius);
+  auto pathProvider = tgfx::PathProvider::Wrap(std::move(roundRectPath));
+  auto roundRectShape = tgfx::Shape::MakeFrom(std::move(pathProvider));
 
   tgfx::Color colors[] = {
       tgfx::Color::FromRGBA(255, 80, 80),   // red
@@ -63,18 +53,20 @@ std::shared_ptr<tgfx::Layer> ShapeInstanced::onBuildLayerTree(const AppHost*) {
       tgfx::Color::FromRGBA(255, 200, 60),  // yellow
   };
 
-  // 2x2 grid layout. Star path bounds: [-95, -100, 95, 81], size roughly 190x181.
-  // Place star centers so the overall bounds start near (0, 0) with ~30px gap between stars.
+  // 2x2 grid layout. RoundRect path bounds: [-90, -90, 90, 90], size 180x180.
+  // Centers placed so overall bounds start at (0, 0): center = halfSize, second = halfSize+size+gap.
+  auto halfWidth = rectWidth / 2;
+  auto halfHeight = rectHeight / 2;
   tgfx::Point positions[] = {
-      {96, 100},
-      {316, 100},
-      {96, 311},
-      {316, 311},
+      {halfWidth, halfHeight},
+      {halfWidth + rectWidth + gap, halfHeight},
+      {halfWidth, halfHeight + rectHeight + gap},
+      {halfWidth + rectWidth + gap, halfHeight + rectHeight + gap},
   };
 
   for (int i = 0; i < 4; i++) {
     auto layer = tgfx::ShapeLayer::Make();
-    layer->setShape(starShape);
+    layer->setShape(roundRectShape);
     layer->setFillStyle(tgfx::ShapeStyle::Make(colors[i]));
     layer->setMatrix(tgfx::Matrix::MakeTrans(positions[i].x, positions[i].y));
     root->addChild(layer);
