@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cmath>
 #include "core/MCState.h"
 #include "core/Matrix3DUtils.h"
 #include "core/PictureRecords.h"
@@ -36,6 +37,7 @@
 #include "tgfx/core/Mesh.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/PathProvider.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
@@ -48,6 +50,25 @@
 #include "utils/common.h"
 
 namespace tgfx {
+
+// Creates a regular pentagon path centered at the origin with the given circumradius.
+static Path MakePentagonPath(float radius) {
+  Path path = {};
+  constexpr float PI = 3.14159265f;
+  constexpr int sides = 5;
+  for (int i = 0; i < sides; i++) {
+    float angle = -PI / 2.0f + i * 2.0f * PI / sides;
+    float x = radius * std::cos(angle);
+    float y = radius * std::sin(angle);
+    if (i == 0) {
+      path.moveTo(x, y);
+    } else {
+      path.lineTo(x, y);
+    }
+  }
+  path.close();
+  return path;
+}
 
 TGFX_TEST(CanvasTest, clip) {
   ContextScope scope;
@@ -2218,10 +2239,8 @@ TGFX_TEST(CanvasTest, DrawShapeAutoBatch_MultiColors) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
-  // Create a simple star-like shape
-  Path path = {};
-  path.addRoundRect(Rect::MakeXYWH(-30, -30, 60, 60), 10, 10);
-  auto shape = Shape::MakeFrom(path);
+  auto path = MakePentagonPath(50);
+  auto shape = Shape::MakeFrom(PathProvider::Wrap(path));
 
   // 4 instances arranged in a 2x2 grid, each with a different color
   Point positions[] = {{75, 75}, {225, 75}, {75, 225}, {225, 225}};
@@ -2253,10 +2272,8 @@ TGFX_TEST(CanvasTest, DrawShapeAutoBatch_SameColor) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
-  // Create a circle shape
-  Path path = {};
-  path.addOval(Rect::MakeXYWH(-25, -25, 50, 50));
-  auto shape = Shape::MakeFrom(path);
+  auto path = MakePentagonPath(35);
+  auto shape = Shape::MakeFrom(PathProvider::Wrap(path));
 
   // 5 instances with same paint color, translation-only differences
   Point positions[] = {{75, 75}, {150, 75}, {225, 75}, {112, 200}, {188, 200}};
@@ -2282,10 +2299,8 @@ TGFX_TEST(CanvasTest, DrawShapeAutoBatch_WithShader) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
-  // Create a circle shape
-  Path path = {};
-  path.addOval(Rect::MakeXYWH(-30, -30, 60, 60));
-  auto shape = Shape::MakeFrom(path);
+  auto path = MakePentagonPath(50);
+  auto shape = Shape::MakeFrom(PathProvider::Wrap(path));
 
   // 4 instances in a 2x2 grid
   Point positions[] = {{75, 75}, {225, 75}, {75, 225}, {225, 225}};
@@ -2314,9 +2329,8 @@ TGFX_TEST(CanvasTest, DrawShapeAutoBatch_Stroke) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
-  Path path = {};
-  path.addRoundRect(Rect::MakeXYWH(-30, -30, 60, 60), 10, 10);
-  auto shape = Shape::MakeFrom(path);
+  auto path = MakePentagonPath(50);
+  auto shape = Shape::MakeFrom(PathProvider::Wrap(path));
 
   Point positions[] = {{75, 75}, {225, 75}, {75, 225}, {225, 225}};
   Color colors[] = {
