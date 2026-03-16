@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFGraphicStackState.h"
-#include "core/MCState.h"
+#include "core/ClipStack.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFUtils.h"
 #include "tgfx/core/Color.h"
@@ -39,14 +39,19 @@ void EmitPDFColor(Color color, const std::shared_ptr<WriteStream>& result) {
   result->writeText(" ");
 }
 
-void AppendClip(const MCState& state, const std::shared_ptr<MemoryWriteStream>& stream) {
-  if (state.clip.path.isRect()) {
-    auto bound = state.clip.path.getBounds();
+void AppendClip(const ClipStack& clip, const std::shared_ptr<MemoryWriteStream>& stream) {
+  // PDF does not support anti-aliasing for clipping regions.
+  auto clipPath = clip.getClipPath();
+  if (clipPath.isEmpty()) {
+    return;
+  }
+  if (clipPath.isRect()) {
+    auto bound = clipPath.getBounds();
     PDFUtils::AppendRectangle(bound, stream);
     stream->writeText("W* n\n");
   } else {
-    PDFUtils::EmitPath(state.clip.path, false, stream);
-    auto clipFill = state.clip.path.getFillType();
+    PDFUtils::EmitPath(clipPath, false, stream);
+    auto clipFill = clipPath.getFillType();
     if (clipFill == PathFillType::EvenOdd) {
       stream->writeText("W* n\n");
     } else {
@@ -59,40 +64,40 @@ void AppendClip(const MCState& state, const std::shared_ptr<MemoryWriteStream>& 
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void PDFGraphicStackState::updateClip(const MCState& state) {
-  if (state.clip.isEmpty()) {
+void PDFGraphicStackState::updateMatrixClip(const Matrix& matrix, const ClipStack& clip) {
+  if (clip.state() == ClipState::Empty) {
     return;
   }
-  const auto& currentState = this->currentEntry()->state;
-  if (currentState.clip.isSame(state.clip) && currentState.matrix == state.matrix) {
+  const auto entry = this->currentEntry();
+  if (entry->clip.isSame(clip) && entry->matrix == matrix) {
     return;
   }
   while (stackDepth > 0) {
     pop();
-    if (currentState.clip.isSame(state.clip) && currentState.matrix == state.matrix) {
+    if (entry->clip.isSame(clip) && entry->matrix == matrix) {
       return;
     }
   }
 
   push();
-  this->currentEntry()->state = state;
-  AppendClip(state, contentStream);
+  this->currentEntry()->clip = clip;
+  this->currentEntry()->matrix = matrix;
+  AppendClip(clip, contentStream);
 }
 
-void PDFGraphicStackState::updateMatrix(const Matrix& matrix) {
-  if (matrix == currentEntry()->matrix) {
+void PDFGraphicStackState::updateEntryMatrix(const Matrix& matrix) {
+  if (matrix == currentEntry()->entryMatrix) {
     return;
   }
 
-  if (!currentEntry()->matrix.isIdentity()) {
+  if (!currentEntry()->entryMatrix.isIdentity()) {
     DEBUG_ASSERT(stackDepth > 0);
-    const auto& currentState = entries[stackDepth].state;
-    const auto& previousState = entries[stackDepth - 1].state;
-
-    ASSERT(currentState.clip.isSame(previousState.clip) &&
-           currentState.matrix == previousState.matrix);
+    const auto& currentEntry = entries[stackDepth];
+    const auto& previousEntry = entries[stackDepth - 1];
+    ASSERT(currentEntry.clip.isSame(previousEntry.clip) &&
+           currentEntry.matrix == previousEntry.matrix);
     pop();
-    DEBUG_ASSERT(currentEntry()->matrix.isIdentity());
+    DEBUG_ASSERT(this->currentEntry()->entryMatrix.isIdentity());
   }
 
   if (matrix.isIdentity()) {
@@ -101,7 +106,7 @@ void PDFGraphicStackState::updateMatrix(const Matrix& matrix) {
 
   push();
   PDFUtils::AppendTransform(matrix, contentStream);
-  currentEntry()->matrix = matrix;
+  currentEntry()->entryMatrix = matrix;
 }
 
 void PDFGraphicStackState::updateDrawingState(const PDFGraphicStackState::Entry& state,

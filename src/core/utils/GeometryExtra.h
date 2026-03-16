@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,20 @@
 
 #pragma once
 
-#include <memory>
-#include "core/DrawContext.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Paint.h"
+#include <cmath>
 
 namespace tgfx {
 
-class CanvasLayer {
- public:
-  CanvasLayer(DrawContext* drawContext, const Paint* paint);
+/**
+ * Defines the maximum distance a draw can extend beyond a clip's boundary and still be considered
+ * 'on the other side'. This tolerance accounts for potential floating point rounding errors. The
+ * value of 1e-3 is chosen because, in the coverage case, as long as coverage stays within
+ * 0.5 * 1/256 of its intended value, it shouldn't affect the final pixel values.
+ */
+static constexpr float BOUNDS_TOLERANCE = 1e-3f;
 
-  DrawContext* drawContext = nullptr;
-  std::unique_ptr<DrawContext> layerContext = nullptr;
-  Paint layerPaint = {};
-};
+inline bool IsPixelAligned(float value) {
+  return fabsf(roundf(value) - value) <= BOUNDS_TOLERANCE;
+}
 
-class CanvasState {
- public:
-  explicit CanvasState(const Matrix& matrix, std::unique_ptr<CanvasLayer> savedLayer = nullptr)
-      : matrix(matrix), savedLayer(std::move(savedLayer)) {
-  }
-
-  Matrix matrix = Matrix::I();
-  std::unique_ptr<CanvasLayer> savedLayer = nullptr;
-};
 }  // namespace tgfx

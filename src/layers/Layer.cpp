@@ -25,7 +25,6 @@
 #include <utility>
 #include "compositing3d/Context3DCompositor.h"
 #include "compositing3d/Layer3DContext.h"
-#include "core/MCState.h"
 #include "core/Matrix3DUtils.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
@@ -219,16 +218,16 @@ static std::optional<Rect> GetClipBounds(const Canvas* canvas) {
   if (canvas == nullptr) {
     return std::nullopt;
   }
-  const auto& clipPath = canvas->getTotalClip();
+  const auto clipBound = canvas->getClipBound();
   auto clipRect = Rect::MakeEmpty();
   auto surface = canvas->getSurface();
-  if (clipPath.isInverseFillType()) {
+  if (!clipBound.has_value()) {
     if (!surface) {
       return std::nullopt;
     }
     clipRect = Rect::MakeWH(surface->width(), surface->height());
   } else {
-    clipRect = clipPath.getBounds();
+    clipRect = *clipBound;
     if (surface && !clipRect.intersect(Rect::MakeWH(surface->width(), surface->height()))) {
       return Rect::MakeEmpty();
     }

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Picture.h"
+#include "core/ClipStack.h"
 #include "core/MeasureContext.h"
 #include "core/PictureRecords.h"
 #include "core/shaders/ImageShader.h"
@@ -54,8 +55,7 @@ Rect Picture::getBounds() const {
     return *cachedBounds;
   }
   MeasureContext context;
-  MCState state(Matrix::I());
-  playback(&context, state);
+  playback(&context, Matrix::I(), ClipStack());
   auto totalBounds = context.getBounds();
   AtomicCacheSet(bounds, &totalBounds);
   return totalBounds;
@@ -65,13 +65,13 @@ void Picture::playback(Canvas* canvas, AbortCallback* callback) const {
   if (canvas == nullptr) {
     return;
   }
-  playback(canvas->drawContext, *canvas->mcState, callback);
+  playback(canvas->drawContext, canvas->matrix, *canvas->clipStack, callback);
 }
 
-void Picture::playback(DrawContext* drawContext, const MCState& state,
+void Picture::playback(DrawContext* drawContext, const Matrix& matrix, const ClipStack& clip,
                        AbortCallback* callback) const {
   DEBUG_ASSERT(drawContext != nullptr);
-  PlaybackContext playbackContext(state);
+  PlaybackContext playbackContext(matrix, clip);
   for (auto& record : records) {
     if (callback && callback->abort()) {
       break;
@@ -80,18 +80,31 @@ void Picture::playback(DrawContext* drawContext, const MCState& state,
   }
 }
 
-static bool GetClipRect(const Path& clip, const Matrix* matrix, Rect* clipRect) {
-  if (clip.isInverseFillType()) {
-    if (clip.isEmpty()) {
+// Returns a hard-edged clip rectangle. Returns false if the clip cannot be represented as a
+// hard-edged rectangle.
+static bool GetHardClipRect(const ClipStack& clip, const Matrix* matrix, Rect* clipRect) {
+  switch (clip.state()) {
+    case ClipState::WideOpen:
       clipRect->setEmpty();
       return true;
+    case ClipState::Empty:
+    case ClipState::Complex:
+      return false;
+    case ClipState::Rect:
+      break;
+  }
+  auto& elements = clip.elements();
+  for (size_t i = clip.oldestValidIndex(); i < elements.size(); ++i) {
+    const auto& element = elements[i];
+    // Skip invalid elements or pixel-aligned rectangles (hard edges even with anti-aliasing).
+    if (!element.isValid() || (element.isRect() && element.isPixelAligned())) {
+      continue;
     }
-    return false;
+    if (element.isAntiAlias()) {
+      return false;
+    }
   }
-  Rect rect = {};
-  if (!clip.isRect(&rect)) {
-    return false;
-  }
+  auto rect = clip.bound();
   if (matrix != nullptr) {
     if (!matrix->rectStaysRect()) {
       return false;
@@ -107,10 +120,11 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   if (drawCount != 1) {
     return nullptr;
   }
-  MCState state = {};
+  auto recordMatrix = Matrix::I();
+  ClipStack clip = {};
   Brush brush = {};
   bool hasStroke = false;
-  auto record = getFirstDrawRecord(&state, &brush, &hasStroke);
+  auto record = getFirstDrawRecord(&recordMatrix, &clip, &brush, &hasStroke);
   if (record == nullptr || hasStroke) {
     return nullptr;
   }
@@ -166,15 +180,16 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
     return nullptr;
   }
 
-  auto imageMatrix = state.matrix;
+  auto imageMatrix = recordMatrix;
   if (matrix) {
     imageMatrix.postConcat(*matrix);
   }
   if (!imageMatrix.isTranslate()) {
     return nullptr;
   }
+  // Extracting a sub-image requires hard clip edges to ensure precise pixel boundaries.
   Rect clipRect = {};
-  if (!GetClipRect(state.clip.path, matrix, &clipRect)) {
+  if (!GetHardClipRect(clip, matrix, &clipRect)) {
     return nullptr;
   }
   Rect subset = {};
@@ -208,7 +223,7 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   return image;
 }
 
-const PictureRecord* Picture::getFirstDrawRecord(MCState* state, Brush* brush,
+const PictureRecord* Picture::getFirstDrawRecord(Matrix* matrix, ClipStack* clip, Brush* brush,
                                                  bool* hasStroke) const {
   PlaybackContext playback = {};
   PictureRecord* drawRecord = nullptr;
@@ -219,8 +234,11 @@ const PictureRecord* Picture::getFirstDrawRecord(MCState* state, Brush* brush,
     }
     record->playback(nullptr, &playback);
   }
-  if (state) {
-    *state = playback.state();
+  if (matrix) {
+    *matrix = playback.matrix();
+  }
+  if (clip) {
+    *clip = playback.clip();
   }
   if (brush) {
     *brush = playback.brush();

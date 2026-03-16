@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include <stack>
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
@@ -34,8 +35,8 @@
 namespace tgfx {
 class Surface;
 class DrawContext;
-class MCState;
 class CanvasState;
+class ClipStack;
 
 /**
  * Canvas provides an interface for drawing, including how the drawing is clipped and transformed.
@@ -177,37 +178,33 @@ class Canvas {
   void resetMatrix();
 
   /**
-   * Returns the current total clip Path.
+   * Returns the combined clip Path from all clip elements.
+   * @note This function ignores the anti-alias setting of each clip element and forcibly merges
+   * them into a single path. If you only need the clip bounds, use getClipBound() instead, which
+   * is more efficient.
    */
-  const Path& getTotalClip() const;
+  Path getTotalClip() const;
 
   /**
-   * Returns whether forced anti-aliasing is enabled on the edges of the current clipping region.
+   * Returns the bounds of the current clip, or std::nullopt if no clip has been applied.
    */
-  bool getForceClipAntialias() const;
+  std::optional<Rect> getClipBound() const;
 
   /**
-   * Replaces the current clip with the intersection of the clip and the rectangle. The resulting
-   * clip is aliased, meaning pixels are fully contained by the clip. The rectangle is transformed
-   * by the current matrix before being combined with the clip.
-   * @param rect  the rectangle to clip to.
+   * Replaces the current clip with the intersection of the clip and the specified rectangle. The
+   * rectangle is transformed by the current matrix before clipping.
+   * @param rect The rectangle to intersect with the current clip.
+   * @param antiAlias If true, the clip edge will be anti-aliased.
    */
-  void clipRect(const Rect& rect);
+  void clipRect(const Rect& rect, bool antiAlias = true);
 
   /**
-   * Replaces the current clip with the intersection of the clip and the path. The path is
-   * transformed by the Matrix before being combined with the clip.
-   * @param path  the path to clip to.
+   * Replaces the current clip with the intersection of the clip and the specified path. The path is
+   * transformed by the current matrix before clipping.
+   * @param path The path to intersect with the current clip.
+   * @param antiAlias If true, the clip edge will be anti-aliased.
    */
-  void clipPath(const Path& path);
-
-  /**
-   * Set whether anti-aliasing should be forcibly enabled on the edges of the clipping region,
-   * enabled by default. If the Surface supports multisampling, anti-aliasing will be automatically
-   * enabled on the edges of the clipping region. Set this value to true if you need to forcibly
-   * enable anti-aliasing when multisampling is not enabled.
-   */
-  void setForceClipAntialias(bool forceAntiAlias);
+  void clipPath(const Path& path, bool antiAlias = true);
 
   /**
    * Fills the current clip with the specified color, using BlendMode::Src. This replaces all pixels
@@ -476,20 +473,21 @@ class Canvas {
  private:
   DrawContext* drawContext = nullptr;
   Surface* surface = nullptr;
-  std::unique_ptr<MCState> mcState;
+  Matrix matrix = Matrix::I();
   std::stack<std::unique_ptr<CanvasState>> stateStack;
+  std::unique_ptr<ClipStack> clipStack;
 
   explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
-  void drawPath(const Path& path, const MCState& state, const Brush& brush,
+  void drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip, const Brush& brush,
                 const Stroke* stroke = nullptr) const;
   void drawImage(std::shared_ptr<Image> image, const Brush& brush, const SamplingOptions& sampling,
                  const Matrix* dstMatrix);
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                      const SamplingOptions& sampling, const Brush& brush,
                      SrcRectConstraint constraint = SrcRectConstraint::Fast);
-  void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Brush& brush,
-                 std::shared_ptr<ImageFilter> imageFilter = nullptr);
-  void drawFill(const MCState& state, const Brush& brush) const;
+  void drawLayer(std::shared_ptr<Picture> picture, const Matrix& matrix, const ClipStack& clip,
+                 const Brush& brush, std::shared_ptr<ImageFilter> imageFilter = nullptr);
+  void drawFill(const Matrix& matrix, const ClipStack& clip, const Brush& brush) const;
   void resetStateStack();
 
   friend class Surface;

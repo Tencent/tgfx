@@ -20,28 +20,46 @@
 #include "DrawContext.h"
 
 namespace tgfx {
-PlaybackContext::PlaybackContext(MCState state) : initState(std::move(state)) {
-  hasInitMatrix = !initState.matrix.isIdentity();
-  hasInitClip = !initState.clip.isEmpty() || !initState.clip.isInverseFillType();
-  _state = initState;
+PlaybackContext::PlaybackContext(const Matrix& matrix, const ClipStack& clip)
+    : initMatrix(matrix), initClip(clip) {
+  hasInitMatrix = !initMatrix.isIdentity();
+  hasInitClip = initClip.state() != ClipState::WideOpen;
+  _matrix = initMatrix;
+  _clip = initClip;
 }
 
 void PlaybackContext::setMatrix(const Matrix& matrix) {
-  _state.matrix = matrix;
+  _matrix = matrix;
   if (hasInitMatrix) {
-    _state.matrix.postConcat(initState.matrix);
+    _matrix.postConcat(initMatrix);
   }
 }
 
-void PlaybackContext::setClip(const Clip& clip) {
-  _state.clip = clip;
-  if (hasInitMatrix) {
-    _state.clip.path.transform(initState.matrix);
+void PlaybackContext::setClip(const ClipStack& clip) {
+  if (!hasInitMatrix && !hasInitClip) {
+    _clip = clip;
+    return;
   }
-  if (hasInitClip) {
-    _state.clip.path.addPath(initState.clip.path, PathOp::Intersect);
+
+  if (!hasInitClip) {
+    _clip = clip;
+    _clip.transform(initMatrix);
+    return;
   }
-  _state.clip.forceAntiAlias = clip.forceAntiAlias;
+
+  _clip = initClip;
+  auto& elements = clip.elements();
+  for (size_t i = clip.oldestValidIndex(); i < elements.size(); ++i) {
+    const auto& element = elements[i];
+    if (!element.isValid()) {
+      continue;
+    }
+    auto path = element.path();
+    if (hasInitMatrix) {
+      path.transform(initMatrix);
+    }
+    _clip.clip(path, element.isAntiAlias());
+  }
 }
 
 void PlaybackContext::setColor(const Color& color) {
@@ -68,11 +86,12 @@ void PlaybackContext::setHasStroke(bool value) {
 
 void PlaybackContext::drawFill(DrawContext* context) {
   if (hasInitClip) {
-    auto brush = _brush.makeWithMatrix(initState.matrix);
-    brush.antiAlias = initState.clip.forceAntiAlias;
-    context->drawPath(initState.clip.path, {}, brush);
+    // Use an empty inverse path to fill the entire area, clipped by the current clip.
+    Path path = {};
+    path.setFillType(PathFillType::InverseWinding);
+    context->drawPath(path, Matrix::I(), _clip, _brush.makeWithMatrix(initMatrix));
   } else if (hasInitMatrix) {
-    context->drawFill(_brush.makeWithMatrix(initState.matrix));
+    context->drawFill(_brush.makeWithMatrix(initMatrix));
   } else {
     context->drawFill(_brush);
   }

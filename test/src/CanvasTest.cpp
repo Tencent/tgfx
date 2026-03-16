@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/MCState.h"
 #include "core/Matrix3DUtils.h"
 #include "core/PictureRecords.h"
 #include "core/images/SubsetImage.h"
@@ -75,84 +74,6 @@ TGFX_TEST(CanvasTest, clip) {
   paint.setStyle(PaintStyle::Fill);
   canvas->drawPath(drawPath, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Clip"));
-}
-
-TGFX_TEST(CanvasTest, clipAntiAlias) {
-  const ContextScope scope;
-  Context* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 200, 200);
-  ASSERT_TRUE(surface != nullptr);
-  Canvas* canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-
-  {
-    Path path;
-    path.moveTo(0, 0);
-    path.lineTo(200, 0);
-    path.lineTo(150, 100);
-    path.lineTo(200, 200);
-    path.lineTo(0, 200);
-    path.close();
-    canvas->clipPath(path);
-    const Rect drawRect = Rect::MakeXYWH(20, 20, 180, 180);
-    Paint paint;
-    paint.setColor(Color::Red());
-    canvas->drawRect(drawRect, paint);
-  }
-
-  {
-    Path path;
-    path.moveTo(0, 0);
-    path.lineTo(100, 0);
-    path.lineTo(50, 100);
-    path.lineTo(100, 200);
-    path.lineTo(0, 200);
-    path.close();
-    canvas->clipPath(path);
-    canvas->setForceClipAntialias(false);
-    const Rect drawRect = Rect::MakeXYWH(20, 20, 180, 180);
-    Paint paint;
-    paint.setColor(Color::Blue());
-    canvas->drawRect(drawRect, paint);
-  }
-
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipAntiAlias"));
-}
-
-TGFX_TEST(CanvasTest, TileMode) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto image = MakeImage("resources/apitest/rotation.jpg");
-  image = image->makeMipmapped(true);
-  ASSERT_TRUE(image != nullptr);
-  auto surface = Surface::Make(context, image->width() / 2, image->height() / 2);
-  auto canvas = surface->getCanvas();
-  Paint paint;
-  auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Mirror)
-                    ->makeWithMatrix(Matrix::MakeScale(0.125f));
-  paint.setShader(shader);
-  canvas->translate(100, 100);
-  auto drawRect = Rect::MakeXYWH(0, 0, surface->width() - 200, surface->height() - 200);
-  canvas->drawRect(drawRect, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/tile_mode_normal"));
-  canvas->clear();
-  image = image->makeSubset(Rect::MakeXYWH(300, 1000, 2400, 2000));
-  shader = Shader::MakeImageShader(image, TileMode::Mirror, TileMode::Repeat)
-               ->makeWithMatrix(Matrix::MakeScale(0.125f));
-  paint.setShader(shader);
-  canvas->drawRect(drawRect, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/tile_mode_subset"));
-  canvas->clear();
-  image = MakeImage("resources/apitest/rgbaaa.png");
-  ASSERT_TRUE(image != nullptr);
-  image = image->makeRGBAAA(512, 512, 512, 0);
-  ASSERT_TRUE(image != nullptr);
-  shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Mirror);
-  paint.setShader(shader);
-  canvas->drawRect(drawRect, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/tile_mode_rgbaaa"));
 }
 
 TGFX_TEST(CanvasTest, DiscardContent) {

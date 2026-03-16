@@ -21,6 +21,7 @@
 #include <memory>
 #include <utility>
 #include "ElementWriter.h"
+#include "core/CanvasState.h"
 #include "core/utils/Log.h"
 #include "svg/SVGExportContext.h"
 #include "svg/xml/XMLWriter.h"
