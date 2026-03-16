@@ -559,10 +559,14 @@ void OpsCompositor::flushPendingShapeOps() {
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(pendingBrush, true);
 
   // Compute the union of all instance bounds in the first instance's local space.
+  // offsets are in device space, so convert them to local space using uvMatrix (inverse of
+  // shapeMatrix) before offsetting shape bounds.
   Rect shapeBounds = {};
   if ((needLocalBounds || needDeviceBounds) && !shape->isInverseFillType()) {
     for (size_t i = 0; i < count; ++i) {
-      shapeBounds.join(shape->getBounds().makeOffset(offsets[i].x, offsets[i].y));
+      auto localX = uvMatrix.getScaleX() * offsets[i].x + uvMatrix.getSkewX() * offsets[i].y;
+      auto localY = uvMatrix.getSkewY() * offsets[i].x + uvMatrix.getScaleY() * offsets[i].y;
+      shapeBounds.join(shape->getBounds().makeOffset(localX, localY));
     }
   }
   if (needLocalBounds) {
