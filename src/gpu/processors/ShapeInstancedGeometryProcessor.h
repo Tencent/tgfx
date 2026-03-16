@@ -26,7 +26,7 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
  public:
   static PlacementPtr<ShapeInstancedGeometryProcessor> Make(BlockAllocator* allocator, int width,
                                                             int height, AAType aa, bool hasColors,
-                                                            bool hasShader, const Matrix& uvMatrix,
+                                                            const Matrix& uvMatrix,
                                                             const Matrix& stateMatrix);
 
   std::string name() const override {
@@ -36,7 +36,7 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  ShapeInstancedGeometryProcessor(int width, int height, AAType aa, bool hasColors, bool hasShader,
+  ShapeInstancedGeometryProcessor(int width, int height, AAType aa, bool hasColors,
                                   const Matrix& uvMatrix, const Matrix& stateMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
@@ -50,7 +50,6 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
   int height = 1;
   AAType aa = AAType::None;
   bool hasColors = false;
-  bool hasShader = false;
   Matrix uvMatrix = {};
   Matrix stateMatrix = {};
 };

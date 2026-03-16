@@ -20,11 +20,11 @@
 
 namespace tgfx {
 ShapeInstancedGeometryProcessor::ShapeInstancedGeometryProcessor(int width, int height, AAType aa,
-                                                                 bool hasColors, bool hasShader,
+                                                                 bool hasColors,
                                                                  const Matrix& uvMatrix,
                                                                  const Matrix& stateMatrix)
     : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), hasColors(hasColors),
-      hasShader(hasShader), uvMatrix(uvMatrix), stateMatrix(stateMatrix) {
+      uvMatrix(uvMatrix), stateMatrix(stateMatrix) {
   position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", VertexFormat::Float};
@@ -41,8 +41,7 @@ ShapeInstancedGeometryProcessor::ShapeInstancedGeometryProcessor(int width, int 
 void ShapeInstancedGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = 0;
   if (hasColors) flags |= 1;
-  if (hasShader) flags |= 2;
-  if (aa == AAType::Coverage) flags |= 4;
+  if (aa == AAType::Coverage) flags |= 2;
   bytesKey->write(flags);
 }
 }  // namespace tgfx

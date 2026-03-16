@@ -20,19 +20,17 @@
 
 namespace tgfx {
 PlacementPtr<ShapeInstancedGeometryProcessor> ShapeInstancedGeometryProcessor::Make(
-    BlockAllocator* allocator, int width, int height, AAType aa, bool hasColors, bool hasShader,
+    BlockAllocator* allocator, int width, int height, AAType aa, bool hasColors,
     const Matrix& uvMatrix, const Matrix& stateMatrix) {
   return allocator->make<GLSLShapeInstancedGeometryProcessor>(width, height, aa, hasColors,
-                                                              hasShader, uvMatrix, stateMatrix);
+                                                              uvMatrix, stateMatrix);
 }
 
 GLSLShapeInstancedGeometryProcessor::GLSLShapeInstancedGeometryProcessor(int width, int height,
                                                                          AAType aa, bool hasColors,
-                                                                         bool hasShader,
                                                                          const Matrix& uvMatrix,
                                                                          const Matrix& stateMatrix)
-    : ShapeInstancedGeometryProcessor(width, height, aa, hasColors, hasShader, uvMatrix,
-                                      stateMatrix) {
+    : ShapeInstancedGeometryProcessor(width, height, aa, hasColors, uvMatrix, stateMatrix) {
 }
 
 void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
