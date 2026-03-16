@@ -599,8 +599,10 @@ void OpsCompositor::flushPendingShapeOps() {
     addDrawOp(std::move(drawOp), pendingClip, pendingBrush, localBounds, deviceBounds, drawScale);
   } else {
     const Color* colorsPtr = pendingBrush.shader ? nullptr : shapeColors.data();
-    auto drawOp = ShapeInstancedDrawOp::Make(std::move(shapeProxy), offsets.data(), colorsPtr,
-                                             count, uvMatrix, shapeMatrix, aaType, dstColorSpace);
+    bool hasShader = pendingBrush.shader != nullptr;
+    auto drawOp =
+        ShapeInstancedDrawOp::Make(std::move(shapeProxy), offsets.data(), colorsPtr, count,
+                                   hasShader, uvMatrix, shapeMatrix, aaType, dstColorSpace);
     CAPUTRE_SHAPE_MESH(drawOp.get(), std::move(shape), aaType, clipBounds);
     addDrawOp(std::move(drawOp), pendingClip, pendingBrush, localBounds, deviceBounds, drawScale);
   }
