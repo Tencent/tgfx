@@ -36,5 +36,6 @@ DEFINE_LAYER_BUILDER(ImageWithMipmap);
 DEFINE_LAYER_BUILDER(ImageWithShadow);
 DEFINE_LAYER_BUILDER(Layer3DTree);
 DEFINE_LAYER_BUILDER(RichText);
+DEFINE_LAYER_BUILDER(ShapeInstanced);
 DEFINE_LAYER_BUILDER(SimpleLayerTree);
 }  // namespace hello2d
