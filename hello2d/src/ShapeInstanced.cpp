@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/LayerBuilders.h"
-#include "tgfx/core/PathProvider.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
 
@@ -33,18 +32,15 @@ static tgfx::Path MakeRoundRectPath(float width, float height, float radius) {
 std::shared_ptr<tgfx::Layer> ShapeInstanced::onBuildLayerTree(const AppHost*) {
   auto root = tgfx::Layer::Make();
 
-  // Use PathProvider to wrap the path so that Shape::MakeFrom(PathProvider) creates a
-  // ProviderShape instead of a PathShape. ProviderShape has isSimplePath()=false, which
-  // prevents Canvas::drawShape from inlining it as a plain path draw. This allows
-  // OpsCompositor::drawShape to batch multiple draws of the same shape (same uniqueKey)
-  // with different translations into a single ShapeInstancedDrawOp.
+  // Create shape directly from path. Shape::MakeFrom(Path) creates a PathShape which has
+  // isSimplePath()=true, so Canvas::drawShape will inline it as a plain path draw instead of
+  // going through the ShapeInstancedDrawOp batching path.
   constexpr float rectWidth = 180;
   constexpr float rectHeight = 180;
   constexpr float cornerRadius = 20;
   constexpr float gap = 30;
   auto roundRectPath = MakeRoundRectPath(rectWidth, rectHeight, cornerRadius);
-  auto pathProvider = tgfx::PathProvider::Wrap(std::move(roundRectPath));
-  auto roundRectShape = tgfx::Shape::MakeFrom(std::move(pathProvider));
+  auto roundRectShape = tgfx::Shape::MakeFrom(std::move(roundRectPath));
 
   tgfx::Color colors[] = {
       tgfx::Color::FromRGBA(255, 80, 80),   // red
