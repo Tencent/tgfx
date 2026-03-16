@@ -45,6 +45,46 @@ namespace tgfx {
 ProxyProvider::ProxyProvider(Context* context) : context(context) {
 }
 
+std::shared_ptr<ResourceProxy> ProxyProvider::findProxy(const UniqueKey& uniqueKey) {
+  if (uniqueKey.empty()) {
+    return nullptr;
+  }
+  auto result = proxyMap.find(uniqueKey);
+  if (result != proxyMap.end()) {
+    auto proxy = result->second.lock();
+    if (proxy != nullptr) {
+      return proxy;
+    }
+    proxyMap.erase(result);
+  }
+  return nullptr;
+}
+
+std::shared_ptr<TextureProxy> ProxyProvider::findOrWrapTextureProxy(const UniqueKey& uniqueKey) {
+  auto proxy = std::static_pointer_cast<TextureProxy>(findProxy(uniqueKey));
+  if (proxy != nullptr) {
+    return proxy;
+  }
+  auto textureView = Resource::Find<TextureView>(context, uniqueKey);
+  if (textureView == nullptr) {
+    return nullptr;
+  }
+  if (auto renderTarget = textureView->asRenderTarget()) {
+    proxy = std::shared_ptr<TextureProxy>(new TextureRenderTargetProxy(
+        textureView->width(), textureView->height(), renderTarget->format(),
+        renderTarget->sampleCount(), textureView->hasMipmaps(), textureView->origin(),
+        renderTarget->externallyOwned()));
+  } else {
+    auto format = textureView->isYUV() ? PixelFormat::Unknown : textureView->getTexture()->format();
+    proxy = std::shared_ptr<TextureProxy>(
+        new TextureProxy(textureView->width(), textureView->height(), format,
+                         textureView->hasMipmaps(), textureView->origin()));
+  }
+  proxy->resource = std::move(textureView);
+  addResourceProxy(proxy, uniqueKey);
+  return proxy;
+}
+
 std::shared_ptr<GPUBufferProxy> ProxyProvider::createIndexBufferProxy(
     std::unique_ptr<DataSource<Data>> source, uint32_t renderFlags) {
   if (source == nullptr) {
@@ -117,15 +157,6 @@ std::shared_ptr<VertexBufferView> ProxyProvider::createVertexBufferProxy(
   return std::make_shared<VertexBufferView>(sharedVertexBuffer, offset, byteSize);
 }
 
-void ProxyProvider::flushSharedVertexBuffer() {
-  if (sharedVertexBuffer != nullptr) {
-    auto vertexAllocator = context->drawingManager()->vertexAllocator();
-    auto lastBlock = vertexAllocator->currentBlock();
-    auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
-    uploadSharedVertexBuffer(std::move(data));
-  }
-}
-
 std::shared_ptr<VertexBufferView> ProxyProvider::createInstanceBufferProxy(
     PlacementPtr<InstanceProvider> provider) {
   if (provider == nullptr || provider->dataSize() == 0) {
@@ -154,45 +185,6 @@ std::shared_ptr<VertexBufferView> ProxyProvider::createInstanceBufferProxy(
     addResourceProxy(sharedInstanceBuffer);
   }
   return std::make_shared<VertexBufferView>(sharedInstanceBuffer, offset, dataSize);
-}
-
-void ProxyProvider::flushSharedInstanceBuffer() {
-  if (sharedInstanceBuffer != nullptr) {
-    auto allocator = context->drawingManager()->instanceAllocator();
-    auto lastBlock = allocator->currentBlock();
-    auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
-    uploadSharedInstanceBuffer(std::move(data));
-  }
-}
-
-void ProxyProvider::uploadSharedInstanceBuffer(std::shared_ptr<Data> data) {
-  DEBUG_ASSERT(sharedInstanceBuffer != nullptr);
-  auto dataSource = DataSource<Data>::Wrap(std::move(data));
-  auto task = context->drawingAllocator()->make<GPUBufferUploadTask>(
-      sharedInstanceBuffer, BufferType::Vertex, std::move(dataSource));
-  context->drawingManager()->addResourceTask(std::move(task));
-  sharedInstanceBuffer = nullptr;
-}
-
-void ProxyProvider::assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy,
-                                         const UniqueKey& uniqueKey) {
-  DEBUG_ASSERT(proxy != nullptr && proxy->context == context);
-  if (!proxy->uniqueKey.empty()) {
-    proxyMap.erase(proxy->uniqueKey);
-  }
-  if (!uniqueKey.empty()) {
-    proxyMap[uniqueKey] = proxy;
-  }
-}
-
-void ProxyProvider::uploadSharedVertexBuffer(std::shared_ptr<Data> data) {
-  DEBUG_ASSERT(sharedVertexBuffer != nullptr);
-  auto dataSource =
-      std::make_unique<AsyncVertexSource>(std::move(data), std::move(sharedVertexBufferTasks));
-  auto task = context->drawingAllocator()->make<GPUBufferUploadTask>(
-      sharedVertexBuffer, BufferType::Vertex, std::move(dataSource));
-  context->drawingManager()->addResourceTask(std::move(task));
-  sharedVertexBuffer = nullptr;
 }
 
 static UniqueKey AppendClipBoundsKey(const UniqueKey& uniqueKey, const Rect& clipBounds) {
@@ -274,6 +266,58 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
   return std::make_shared<GPUShapeProxy>(drawingMatrix, triangleProxy, textureProxy);
 }
 
+std::shared_ptr<GPUHairlineProxy> ProxyProvider::createGPUHairlineProxy(
+    std::shared_ptr<Shape> shape, bool hasCap, uint32_t renderFlags) {
+  if (shape == nullptr) {
+    return nullptr;
+  }
+  auto bounds = shape->getBounds();
+  bounds.roundOut();
+  auto drawingMatrix = Matrix::MakeTrans(bounds.x(), bounds.y());
+  shape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(-bounds.x(), -bounds.y()));
+
+  auto uniqueKey = shape->getUniqueKey();
+  if (hasCap) {
+    static const auto HairlineWithCapFlag = UniqueID::Next();
+    uniqueKey = UniqueKey::Append(uniqueKey, &HairlineWithCapFlag, 1);
+  }
+  static const auto LineVertexType = UniqueID::Next();
+  static const auto QuadVertexType = UniqueID::Next();
+  auto lineVertexKey = UniqueKey::Append(uniqueKey, &LineVertexType, 1);
+  auto quadVertexKey = UniqueKey::Append(uniqueKey, &QuadVertexType, 1);
+  auto lineVertexProxy = findOrWrapGPUBufferProxy(lineVertexKey);
+  auto quadVertexProxy = findOrWrapGPUBufferProxy(quadVertexKey);
+  // Check if we have valid cached buffers: at least one vertex buffer must exist
+  bool hasAnyBuffer = lineVertexProxy != nullptr || quadVertexProxy != nullptr;
+  if (hasAnyBuffer) {
+    return std::make_shared<GPUHairlineProxy>(drawingMatrix, std::move(lineVertexProxy),
+                                              std::move(quadVertexProxy));
+  }
+  auto rasterizer = std::make_unique<HairlineTriangulator>(shape, hasCap);
+  std::unique_ptr<DataSource<HairlineBuffer>> dataSource = nullptr;
+#ifdef TGFX_USE_THREADS
+  if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
+    dataSource = DataSource<HairlineBuffer>::Async(std::move(rasterizer));
+  } else {
+    dataSource = std::move(rasterizer);
+  }
+#else
+  dataSource = std::move(rasterizer);
+#endif
+  lineVertexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+  quadVertexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+  addResourceProxy(lineVertexProxy, lineVertexKey);
+  addResourceProxy(quadVertexProxy, quadVertexKey);
+  if (!(renderFlags & RenderFlags::DisableCache)) {
+    lineVertexProxy->uniqueKey = lineVertexKey;
+    quadVertexProxy->uniqueKey = quadVertexKey;
+  }
+  auto task = context->drawingAllocator()->make<HairlineBufferUploadTask>(
+      lineVertexProxy, quadVertexProxy, std::move(dataSource));
+  context->drawingManager()->addResourceTask(std::move(task));
+  return std::make_shared<GPUHairlineProxy>(drawingMatrix, lineVertexProxy, quadVertexProxy);
+}
+
 std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(
     std::shared_ptr<Mesh> mesh, uint32_t renderFlags, std::shared_ptr<ColorSpace> dstColorSpace) {
   if (mesh == nullptr) {
@@ -351,72 +395,6 @@ std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(
   }
 
   return meshProxy;
-}
-
-std::shared_ptr<GPUHairlineProxy> ProxyProvider::createGPUHairlineProxy(
-    std::shared_ptr<Shape> shape, bool hasCap, uint32_t renderFlags) {
-  if (shape == nullptr) {
-    return nullptr;
-  }
-  auto bounds = shape->getBounds();
-  bounds.roundOut();
-  auto drawingMatrix = Matrix::MakeTrans(bounds.x(), bounds.y());
-  shape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(-bounds.x(), -bounds.y()));
-
-  auto uniqueKey = shape->getUniqueKey();
-  if (hasCap) {
-    static const auto HairlineWithCapFlag = UniqueID::Next();
-    uniqueKey = UniqueKey::Append(uniqueKey, &HairlineWithCapFlag, 1);
-  }
-  static const auto LineVertexType = UniqueID::Next();
-  static const auto QuadVertexType = UniqueID::Next();
-  auto lineVertexKey = UniqueKey::Append(uniqueKey, &LineVertexType, 1);
-  auto quadVertexKey = UniqueKey::Append(uniqueKey, &QuadVertexType, 1);
-  auto lineVertexProxy = findOrWrapGPUBufferProxy(lineVertexKey);
-  auto quadVertexProxy = findOrWrapGPUBufferProxy(quadVertexKey);
-  // Check if we have valid cached buffers: at least one vertex buffer must exist
-  bool hasAnyBuffer = lineVertexProxy != nullptr || quadVertexProxy != nullptr;
-  if (hasAnyBuffer) {
-    return std::make_shared<GPUHairlineProxy>(drawingMatrix, std::move(lineVertexProxy),
-                                              std::move(quadVertexProxy));
-  }
-  auto rasterizer = std::make_unique<HairlineTriangulator>(shape, hasCap);
-  std::unique_ptr<DataSource<HairlineBuffer>> dataSource = nullptr;
-#ifdef TGFX_USE_THREADS
-  if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
-    dataSource = DataSource<HairlineBuffer>::Async(std::move(rasterizer));
-  } else {
-    dataSource = std::move(rasterizer);
-  }
-#else
-  dataSource = std::move(rasterizer);
-#endif
-  lineVertexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
-  quadVertexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
-  addResourceProxy(lineVertexProxy, lineVertexKey);
-  addResourceProxy(quadVertexProxy, quadVertexKey);
-  if (!(renderFlags & RenderFlags::DisableCache)) {
-    lineVertexProxy->uniqueKey = lineVertexKey;
-    quadVertexProxy->uniqueKey = quadVertexKey;
-  }
-  auto task = context->drawingAllocator()->make<HairlineBufferUploadTask>(
-      lineVertexProxy, quadVertexProxy, std::move(dataSource));
-  context->drawingManager()->addResourceTask(std::move(task));
-  return std::make_shared<GPUHairlineProxy>(drawingMatrix, lineVertexProxy, quadVertexProxy);
-}
-
-std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(
-    std::shared_ptr<DataSource<ImageBuffer>> source, int width, int height, bool alphaOnly,
-    bool mipmapped) {
-  auto format = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::Unknown;
-  auto proxy = std::shared_ptr<TextureProxy>(new TextureProxy(width, height, format, mipmapped));
-  addResourceProxy(proxy, {});
-  auto task =
-      context->drawingAllocator()->make<TextureUploadTask>(proxy, std::move(source), mipmapped);
-  auto drawingManager = context->drawingManager();
-  drawingManager->addResourceTask(std::move(task));
-  drawingManager->addGenerateMipmapsTask(proxy);
-  return proxy;
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
@@ -606,6 +584,35 @@ void ProxyProvider::purgeExpiredProxies() {
   }
 }
 
+void ProxyProvider::flushSharedVertexBuffer() {
+  if (sharedVertexBuffer != nullptr) {
+    auto vertexAllocator = context->drawingManager()->vertexAllocator();
+    auto lastBlock = vertexAllocator->currentBlock();
+    auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
+    uploadSharedVertexBuffer(std::move(data));
+  }
+}
+
+void ProxyProvider::flushSharedInstanceBuffer() {
+  if (sharedInstanceBuffer != nullptr) {
+    auto allocator = context->drawingManager()->instanceAllocator();
+    auto lastBlock = allocator->currentBlock();
+    auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
+    uploadSharedInstanceBuffer(std::move(data));
+  }
+}
+
+void ProxyProvider::assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy,
+                                         const UniqueKey& uniqueKey) {
+  DEBUG_ASSERT(proxy != nullptr && proxy->context == context);
+  if (!proxy->uniqueKey.empty()) {
+    proxyMap.erase(proxy->uniqueKey);
+  }
+  if (!uniqueKey.empty()) {
+    proxyMap[uniqueKey] = proxy;
+  }
+}
+
 std::shared_ptr<GPUBufferProxy> ProxyProvider::findOrWrapGPUBufferProxy(
     const UniqueKey& uniqueKey) {
   auto proxy = std::static_pointer_cast<GPUBufferProxy>(findProxy(uniqueKey));
@@ -622,52 +629,45 @@ std::shared_ptr<GPUBufferProxy> ProxyProvider::findOrWrapGPUBufferProxy(
   return proxy;
 }
 
-std::shared_ptr<TextureProxy> ProxyProvider::findOrWrapTextureProxy(const UniqueKey& uniqueKey) {
-  auto proxy = std::static_pointer_cast<TextureProxy>(findProxy(uniqueKey));
-  if (proxy != nullptr) {
-    return proxy;
-  }
-  auto textureView = Resource::Find<TextureView>(context, uniqueKey);
-  if (textureView == nullptr) {
-    return nullptr;
-  }
-  if (auto renderTarget = textureView->asRenderTarget()) {
-    proxy = std::shared_ptr<TextureProxy>(new TextureRenderTargetProxy(
-        textureView->width(), textureView->height(), renderTarget->format(),
-        renderTarget->sampleCount(), textureView->hasMipmaps(), textureView->origin(),
-        renderTarget->externallyOwned()));
-  } else {
-    auto format = textureView->isYUV() ? PixelFormat::Unknown : textureView->getTexture()->format();
-    proxy = std::shared_ptr<TextureProxy>(
-        new TextureProxy(textureView->width(), textureView->height(), format,
-                         textureView->hasMipmaps(), textureView->origin()));
-  }
-  proxy->resource = std::move(textureView);
-  addResourceProxy(proxy, uniqueKey);
-  return proxy;
-}
-
-std::shared_ptr<ResourceProxy> ProxyProvider::findProxy(const UniqueKey& uniqueKey) {
-  if (uniqueKey.empty()) {
-    return nullptr;
-  }
-  auto result = proxyMap.find(uniqueKey);
-  if (result != proxyMap.end()) {
-    auto proxy = result->second.lock();
-    if (proxy != nullptr) {
-      return proxy;
-    }
-    proxyMap.erase(result);
-  }
-  return nullptr;
-}
-
 void ProxyProvider::addResourceProxy(std::shared_ptr<ResourceProxy> proxy,
                                      const UniqueKey& uniqueKey) {
   proxy->context = context;
   if (!uniqueKey.empty()) {
     proxyMap[uniqueKey] = proxy;
   }
+}
+
+void ProxyProvider::uploadSharedVertexBuffer(std::shared_ptr<Data> data) {
+  DEBUG_ASSERT(sharedVertexBuffer != nullptr);
+  auto dataSource =
+      std::make_unique<AsyncVertexSource>(std::move(data), std::move(sharedVertexBufferTasks));
+  auto task = context->drawingAllocator()->make<GPUBufferUploadTask>(
+      sharedVertexBuffer, BufferType::Vertex, std::move(dataSource));
+  context->drawingManager()->addResourceTask(std::move(task));
+  sharedVertexBuffer = nullptr;
+}
+
+void ProxyProvider::uploadSharedInstanceBuffer(std::shared_ptr<Data> data) {
+  DEBUG_ASSERT(sharedInstanceBuffer != nullptr);
+  auto dataSource = DataSource<Data>::Wrap(std::move(data));
+  auto task = context->drawingAllocator()->make<GPUBufferUploadTask>(
+      sharedInstanceBuffer, BufferType::Vertex, std::move(dataSource));
+  context->drawingManager()->addResourceTask(std::move(task));
+  sharedInstanceBuffer = nullptr;
+}
+
+std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(
+    std::shared_ptr<DataSource<ImageBuffer>> source, int width, int height, bool alphaOnly,
+    bool mipmapped) {
+  auto format = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::Unknown;
+  auto proxy = std::shared_ptr<TextureProxy>(new TextureProxy(width, height, format, mipmapped));
+  addResourceProxy(proxy, {});
+  auto task =
+      context->drawingAllocator()->make<TextureUploadTask>(proxy, std::move(source), mipmapped);
+  auto drawingManager = context->drawingManager();
+  drawingManager->addResourceTask(std::move(task));
+  drawingManager->addGenerateMipmapsTask(proxy);
+  return proxy;
 }
 
 }  // namespace tgfx
