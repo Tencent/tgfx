@@ -30,7 +30,7 @@ namespace tgfx {
 
 PlacementPtr<ShapeInstancedDrawOp> ShapeInstancedDrawOp::Make(
     std::shared_ptr<GPUShapeProxy> shapeProxy, const Point* offsets, const Color* colors,
-    size_t count, PMColor gpColor, const Matrix& uvMatrix, const Matrix& stateMatrix, AAType aaType,
+    size_t count, const Matrix& uvMatrix, const Matrix& stateMatrix, AAType aaType,
     const std::shared_ptr<ColorSpace>& dstColorSpace) {
   if (shapeProxy == nullptr || offsets == nullptr || count == 0) {
     return nullptr;
@@ -48,20 +48,20 @@ PlacementPtr<ShapeInstancedDrawOp> ShapeInstancedDrawOp::Make(
   if (instanceBufferProxy == nullptr) {
     return nullptr;
   }
-  return drawingAllocator->make<ShapeInstancedDrawOp>(
-      drawingAllocator, std::move(shapeProxy), std::move(instanceBufferProxy), hasColors, count,
-      gpColor, uvMatrix, stateMatrix, aaType);
+  return drawingAllocator->make<ShapeInstancedDrawOp>(drawingAllocator, std::move(shapeProxy),
+                                                      std::move(instanceBufferProxy), hasColors,
+                                                      count, uvMatrix, stateMatrix, aaType);
 }
 
 ShapeInstancedDrawOp::ShapeInstancedDrawOp(BlockAllocator* allocator,
                                            std::shared_ptr<GPUShapeProxy> proxy,
                                            std::shared_ptr<VertexBufferView> instanceBuffer,
-                                           bool hasInstanceColors, size_t count, PMColor gpColor,
+                                           bool hasInstanceColors, size_t count,
                                            const Matrix& uvMatrix, const Matrix& stateMatrix,
                                            AAType aaType)
     : DrawOp(allocator, aaType), shapeProxy(std::move(proxy)),
       instanceBufferProxy(std::move(instanceBuffer)), hasInstanceColors(hasInstanceColors),
-      instanceCount(count), gpColor(gpColor), uvMatrix(uvMatrix), stateMatrix(stateMatrix) {
+      instanceCount(count), uvMatrix(uvMatrix), stateMatrix(stateMatrix) {
   auto context = shapeProxy->getContext();
   if (auto textureProxy = shapeProxy->getTextureProxy()) {
     auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
@@ -101,7 +101,7 @@ PlacementPtr<GeometryProcessor> ShapeInstancedDrawOp::onMakeGeometryProcessor(
     }
     addCoverageFP(std::move(maskFP));
   }
-  return ShapeInstancedGeometryProcessor::Make(allocator, gpColor, renderTarget->width(),
+  return ShapeInstancedGeometryProcessor::Make(allocator, renderTarget->width(),
                                                renderTarget->height(), aa, hasInstanceColors,
                                                hasShader, realUVMatrix, stateMatrix);
 }

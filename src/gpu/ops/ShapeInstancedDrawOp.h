@@ -28,11 +28,15 @@
 namespace tgfx {
 class ShapeInstancedDrawOp : public DrawOp {
  public:
+  /**
+   * The maximum number of instances that can be drawn in a single draw call.
+   */
+  static constexpr size_t MaxNumInstances = 65536;
+
   static PlacementPtr<ShapeInstancedDrawOp> Make(std::shared_ptr<GPUShapeProxy> shapeProxy,
                                                  const Point* offsets, const Color* colors,
-                                                 size_t count, PMColor gpColor,
-                                                 const Matrix& uvMatrix, const Matrix& stateMatrix,
-                                                 AAType aaType,
+                                                 size_t count, const Matrix& uvMatrix,
+                                                 const Matrix& stateMatrix, AAType aaType,
                                                  const std::shared_ptr<ColorSpace>& dstColorSpace);
 
   bool hasCoverage() const override;
@@ -49,15 +53,14 @@ class ShapeInstancedDrawOp : public DrawOp {
  private:
   ShapeInstancedDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUShapeProxy> proxy,
                        std::shared_ptr<VertexBufferView> instanceBufferProxy,
-                       bool hasInstanceColors, size_t count, PMColor gpColor,
-                       const Matrix& uvMatrix, const Matrix& stateMatrix, AAType aaType);
+                       bool hasInstanceColors, size_t count, const Matrix& uvMatrix,
+                       const Matrix& stateMatrix, AAType aaType);
 
   std::shared_ptr<GPUShapeProxy> shapeProxy = nullptr;
   std::shared_ptr<VertexBufferView> maskBufferProxy = nullptr;
   std::shared_ptr<VertexBufferView> instanceBufferProxy = nullptr;
   bool hasInstanceColors = false;
   size_t instanceCount = 0;
-  PMColor gpColor = {};
   Matrix uvMatrix = {};
   Matrix stateMatrix = {};
 

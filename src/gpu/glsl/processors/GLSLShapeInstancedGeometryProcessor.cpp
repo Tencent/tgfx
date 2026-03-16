@@ -20,16 +20,18 @@
 
 namespace tgfx {
 PlacementPtr<ShapeInstancedGeometryProcessor> ShapeInstancedGeometryProcessor::Make(
-    BlockAllocator* allocator, PMColor color, int width, int height, AAType aa, bool hasColors,
-    bool hasShader, const Matrix& uvMatrix, const Matrix& stateMatrix) {
-  return allocator->make<GLSLShapeInstancedGeometryProcessor>(color, width, height, aa, hasColors,
+    BlockAllocator* allocator, int width, int height, AAType aa, bool hasColors, bool hasShader,
+    const Matrix& uvMatrix, const Matrix& stateMatrix) {
+  return allocator->make<GLSLShapeInstancedGeometryProcessor>(width, height, aa, hasColors,
                                                               hasShader, uvMatrix, stateMatrix);
 }
 
-GLSLShapeInstancedGeometryProcessor::GLSLShapeInstancedGeometryProcessor(
-    PMColor color, int width, int height, AAType aa, bool hasColors, bool hasShader,
-    const Matrix& uvMatrix, const Matrix& stateMatrix)
-    : ShapeInstancedGeometryProcessor(color, width, height, aa, hasColors, hasShader, uvMatrix,
+GLSLShapeInstancedGeometryProcessor::GLSLShapeInstancedGeometryProcessor(int width, int height,
+                                                                         AAType aa, bool hasColors,
+                                                                         bool hasShader,
+                                                                         const Matrix& uvMatrix,
+                                                                         const Matrix& stateMatrix)
+    : ShapeInstancedGeometryProcessor(width, height, aa, hasColors, hasShader, uvMatrix,
                                       stateMatrix) {
 }
 
@@ -74,29 +76,23 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
   }
 
-  // Color: per-instance color or uniform color.
+  // Color: per-instance color or opaque white (overridden by shader FP).
   if (hasColors) {
     auto colorVar = varyingHandler->addVarying("InstanceColor", SLType::Float4);
     vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), instanceColor.name().c_str());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
   } else {
-    auto colorName =
-        uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputColor.c_str());
   }
 
   // Emit the vertex position to NDC.
   vertBuilder->emitNormalizedPosition(positionName);
 }
 
-void GLSLShapeInstancedGeometryProcessor::setData(UniformData* vertexUniformData,
-                                                  UniformData* fragmentUniformData,
+void GLSLShapeInstancedGeometryProcessor::setData(UniformData* vertexUniformData, UniformData*,
                                                   FPCoordTransformIter* transformIter) const {
   vertexUniformData->setData("UVMatrix", uvMatrix);
   vertexUniformData->setData("StateMatrix", stateMatrix);
-  if (!hasColors) {
-    fragmentUniformData->setData("Color", color);
-  }
   // For instanced rendering, emitTransforms uses local coords directly. The coord transform
   // matrices only need the FP's own transform since uvMatrix already recovers local coords.
   setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);

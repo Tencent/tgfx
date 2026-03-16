@@ -20,7 +20,6 @@
 
 #include <memory>
 #include <tuple>
-#include "gpu/resources/ResourceKey.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Shape.h"
@@ -57,11 +56,6 @@ class ShapeUtils {
    */
   static std::tuple<std::shared_ptr<StrokeShape>, Matrix> DecomposeStrokeShape(
       std::shared_ptr<Shape> shape);
-
-  /**
-   * Returns the unique key of the given shape.
-   */
-  static UniqueKey GetUniqueKey(const std::shared_ptr<Shape>& shape);
 };
 
 }  // namespace tgfx

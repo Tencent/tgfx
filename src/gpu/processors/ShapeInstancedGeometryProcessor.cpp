@@ -19,13 +19,12 @@
 #include "ShapeInstancedGeometryProcessor.h"
 
 namespace tgfx {
-ShapeInstancedGeometryProcessor::ShapeInstancedGeometryProcessor(PMColor color, int width,
-                                                                 int height, AAType aa,
+ShapeInstancedGeometryProcessor::ShapeInstancedGeometryProcessor(int width, int height, AAType aa,
                                                                  bool hasColors, bool hasShader,
                                                                  const Matrix& uvMatrix,
                                                                  const Matrix& stateMatrix)
-    : GeometryProcessor(ClassID()), color(color), width(width), height(height), aa(aa),
-      hasColors(hasColors), hasShader(hasShader), uvMatrix(uvMatrix), stateMatrix(stateMatrix) {
+    : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), hasColors(hasColors),
+      hasShader(hasShader), uvMatrix(uvMatrix), stateMatrix(stateMatrix) {
   position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", VertexFormat::Float};

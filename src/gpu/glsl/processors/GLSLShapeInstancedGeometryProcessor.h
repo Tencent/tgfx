@@ -23,8 +23,8 @@
 namespace tgfx {
 class GLSLShapeInstancedGeometryProcessor : public ShapeInstancedGeometryProcessor {
  public:
-  GLSLShapeInstancedGeometryProcessor(PMColor color, int width, int height, AAType aa,
-                                      bool hasColors, bool hasShader, const Matrix& uvMatrix,
+  GLSLShapeInstancedGeometryProcessor(int width, int height, AAType aa, bool hasColors,
+                                      bool hasShader, const Matrix& uvMatrix,
                                       const Matrix& stateMatrix);
 
   void emitCode(EmitArgs& args) const override;

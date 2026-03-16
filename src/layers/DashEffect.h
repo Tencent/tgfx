@@ -19,9 +19,7 @@
 #pragma once
 
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
-#include "tgfx/layers/StrokeAlign.h"
 
 namespace tgfx {
 
@@ -31,15 +29,5 @@ namespace tgfx {
  */
 std::shared_ptr<PathEffect> CreateDashPathEffect(const std::vector<float>& dashes, float dashOffset,
                                                  bool adaptive, const Stroke& stroke);
-
-/**
- * Creates a stroke shape from the given shape and stroke parameters. Handles dash effects, stroke
- * alignment (inside/outside), and returns the resulting filled shape that represents the stroke
- * outline.
- */
-std::shared_ptr<Shape> CreateStrokeShape(std::shared_ptr<Shape> shape, const Stroke& stroke,
-                                         StrokeAlign strokeAlign,
-                                         const std::vector<float>& lineDashPattern,
-                                         float lineDashPhase, bool lineDashAdaptive);
 
 }  // namespace tgfx
