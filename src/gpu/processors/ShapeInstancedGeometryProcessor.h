@@ -24,9 +24,8 @@
 namespace tgfx {
 class ShapeInstancedGeometryProcessor : public GeometryProcessor {
  public:
-  static PlacementPtr<ShapeInstancedGeometryProcessor> Make(BlockAllocator* allocator,
-                                                            PMColor color, int width, int height,
-                                                            AAType aa, bool hasColors,
+  static PlacementPtr<ShapeInstancedGeometryProcessor> Make(BlockAllocator* allocator, int width,
+                                                            int height, AAType aa, bool hasColors,
                                                             bool hasShader, const Matrix& uvMatrix,
                                                             const Matrix& stateMatrix);
 
@@ -37,9 +36,8 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  ShapeInstancedGeometryProcessor(PMColor color, int width, int height, AAType aa, bool hasColors,
-                                  bool hasShader, const Matrix& uvMatrix,
-                                  const Matrix& stateMatrix);
+  ShapeInstancedGeometryProcessor(int width, int height, AAType aa, bool hasColors, bool hasShader,
+                                  const Matrix& uvMatrix, const Matrix& stateMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -48,7 +46,6 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
   Attribute offset = {};
   Attribute instanceColor = {};
 
-  PMColor color = {};
   int width = 1;
   int height = 1;
   AAType aa = AAType::None;
