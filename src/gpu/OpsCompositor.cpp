@@ -170,9 +170,10 @@ static Rect ClipLocalBounds(const Rect& localBounds, const Matrix& viewMatrix,
   return result;
 }
 
+// Matrix layout: [0]scaleX [1]skewX [2]transX [3]skewY [4]scaleY [5]transY [6]persp0 [7]persp1 [8]persp2
 static bool MatrixOnlyDiffersInTranslation(const Matrix& a, const Matrix& b) {
-  return a.getScaleX() == b.getScaleX() && a.getSkewX() == b.getSkewX() &&
-         a.getSkewY() == b.getSkewY() && a.getScaleY() == b.getScaleY();
+  return a[0] == b[0] && a[1] == b[1] && a[3] == b[3] && a[4] == b[4] && a[6] == b[6] &&
+         a[7] == b[7] && a[8] == b[8];
 }
 
 void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
