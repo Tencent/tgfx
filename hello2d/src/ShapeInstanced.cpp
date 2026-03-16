@@ -63,12 +63,13 @@ std::shared_ptr<tgfx::Layer> ShapeInstanced::onBuildLayerTree(const AppHost*) {
       tgfx::Color::FromRGBA(255, 200, 60),  // yellow
   };
 
-  // 2x2 grid positions in a 620x620 area
+  // 2x2 grid layout. Star path bounds: [-95, -100, 95, 81], size roughly 190x181.
+  // Place star centers so the overall bounds start near (0, 0) with ~30px gap between stars.
   tgfx::Point positions[] = {
-      {155, 155},
-      {465, 155},
-      {155, 465},
-      {465, 465},
+      {96, 100},
+      {316, 100},
+      {96, 311},
+      {316, 311},
   };
 
   for (int i = 0; i < 4; i++) {
