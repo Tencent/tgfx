@@ -26,11 +26,11 @@ std::shared_ptr<Rectangle> Rectangle::Make() {
   return std::shared_ptr<Rectangle>(new Rectangle());
 }
 
-void Rectangle::setCenter(const Point& value) {
-  if (_center == value) {
+void Rectangle::setPosition(const Point& value) {
+  if (_position == value) {
     return;
   }
-  _center = value;
+  _position = value;
   _cachedShape = nullptr;
   invalidateContent();
 }
@@ -74,8 +74,8 @@ void Rectangle::apply(VectorContext* context) {
     if (radius > halfHeight) {
       radius = halfHeight;
     }
-    auto rect =
-        Rect::MakeXYWH(_center.x - halfWidth, _center.y - halfHeight, _size.width, _size.height);
+    auto rect = Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, _size.width,
+                               _size.height);
     Path path;
     path.addRoundRect(rect, radius, radius, _reversed, 2);
     _cachedShape = Shape::MakeFrom(path);

@@ -33,6 +33,9 @@ void VaryingHandler::emitAttributes(const GeometryProcessor& processor) {
   for (auto& attribute : processor.vertexAttributes()) {
     addAttribute(ShaderVar(attribute));
   }
+  for (auto& attribute : processor.instanceAttributes()) {
+    addAttribute(ShaderVar(attribute));
+  }
 }
 
 void VaryingHandler::addAttribute(const ShaderVar& var) {

@@ -197,6 +197,7 @@ class Shape {
   friend class MergeShape;
   friend class EffectShape;
   friend class ShapeDrawOp;
+  friend class OpsCompositor;
   friend class ProxyProvider;
   friend class Canvas;
   friend class Types;

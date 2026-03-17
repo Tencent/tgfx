@@ -30,6 +30,11 @@ void GeometryProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const 
       bytesKey->write(static_cast<uint32_t>(attribute.format()));
     }
   }
+  for (auto& attribute : _instanceAttributes) {
+    if (!attribute.empty()) {
+      bytesKey->write(static_cast<uint32_t>(attribute.format()));
+    }
+  }
 }
 
 void GeometryProcessor::setVertexAttributes(const Attribute* attrs, int attrCount) {
@@ -37,6 +42,15 @@ void GeometryProcessor::setVertexAttributes(const Attribute* attrs, int attrCoun
     auto& attribute = attrs[i];
     if (!attribute.empty()) {
       attributes.push_back(attribute);
+    }
+  }
+}
+
+void GeometryProcessor::setInstanceAttributes(const Attribute* attrs, int attrCount) {
+  for (int i = 0; i < attrCount; ++i) {
+    auto& attribute = attrs[i];
+    if (!attribute.empty()) {
+      _instanceAttributes.push_back(attribute);
     }
   }
 }

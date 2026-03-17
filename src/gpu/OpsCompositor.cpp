@@ -24,7 +24,6 @@
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
-#include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
@@ -33,6 +32,7 @@
 #include "gpu/ops/HairlineQuadOp.h"
 #include "gpu/ops/MeshDrawOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
+#include "gpu/ops/ShapeInstancedDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "inspect/InspectorMark.h"
@@ -160,42 +160,31 @@ static Rect ClipLocalBounds(const Rect& localBounds, const Matrix& viewMatrix,
   return result;
 }
 
+static bool MatrixOnlyDiffersInTranslation(const Matrix& a, const Matrix& b) {
+  // Exact floating-point comparison is intentional: we prefer missing a batch opportunity over
+  // incorrectly batching shapes with different non-translation transforms.
+  // [0]scaleX [1]skewX [2]transX [3]skewY [4]scaleY [5]transY [6]persp0 [7]persp1 [8]persp2
+  return a[0] == b[0] && a[1] == b[1] && a[3] == b[3] && a[4] == b[4] && a[6] == b[6] &&
+         a[7] == b[7] && a[8] == b[8];
+}
+
 void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix,
                               const ClipStack& clip, const Brush& brush) {
   DEBUG_ASSERT(shape != nullptr);
-  flushPendingOps();
-  Matrix uvMatrix = {};
-  if (!matrix.invert(&uvMatrix)) {
+  if (canAppend(PendingOpType::Shape, clip, brush) && pendingShape &&
+      pendingShape->getUniqueKey() == shape->getUniqueKey() &&
+      MatrixOnlyDiffersInTranslation(pendingShapeMatrix, matrix)) {
+    auto dx = matrix.getTranslateX() - pendingShapeMatrix.getTranslateX();
+    auto dy = matrix.getTranslateY() - pendingShapeMatrix.getTranslateY();
+    pendingShapeOffsets.emplace_back(dx, dy);
+    pendingShapeColors.emplace_back(brush.color);
     return;
   }
-  std::optional<Rect> localBounds = std::nullopt;
-  std::optional<Rect> deviceBounds = std::nullopt;
-  float drawScale = 1.0f;
-  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, true);
-  auto clipBounds = getClipBounds(clip);
-  if (needLocalBounds) {
-    if (shape->isInverseFillType()) {
-      localBounds = ToLocalBounds(clipBounds, matrix);
-    } else {
-      localBounds = shape->getBounds();
-      localBounds = ClipLocalBounds(*localBounds, matrix, clipBounds);
-    }
-    drawScale = std::min(matrix.getMaxScale(), 1.0f);
-  }
-  shape = Shape::ApplyMatrix(std::move(shape), matrix);
-  if (!shape) {
-    return;
-  }
-  if (needDeviceBounds) {
-    deviceBounds = shape->isInverseFillType() ? clipBounds : shape->getBounds();
-  }
-
-  auto aaType = getAAType(brush);
-  auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
-  auto dstColor = ToPMColor(brush.color, dstColorSpace);
-  auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), dstColor, uvMatrix, aaType);
-  CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
-  addDrawOp(std::move(drawOp), clip, brush, localBounds, deviceBounds, drawScale);
+  flushPendingOps(PendingOpType::Shape, clip, brush);
+  pendingShape = std::move(shape);
+  pendingShapeMatrix = matrix;
+  pendingShapeOffsets.emplace_back(0.0f, 0.0f);
+  pendingShapeColors.emplace_back(brush.color);
 }
 
 void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const Matrix& matrix,
@@ -330,6 +319,10 @@ void OpsCompositor::resetPendingOps(PendingOpType type, ClipStack clip, Brush br
   pendingRRects.clear();
   pendingStrokes.clear();
   pendingAtlasTexture = nullptr;
+  pendingShape = nullptr;
+  pendingShapeMatrix = {};
+  pendingShapeOffsets.clear();
+  pendingShapeColors.clear();
 }
 
 bool OpsCompositor::CompareBrush(const Brush& a, const Brush& b) {
@@ -366,6 +359,8 @@ bool OpsCompositor::canAppend(PendingOpType type, const ClipStack& clip, const B
       return pendingRects.size() < RectDrawOp::MaxNumRects;
     case PendingOpType::RRect:
       return pendingRRects.size() < RRectDrawOp::MaxNumRRects;
+    case PendingOpType::Shape:
+      return pendingShapeOffsets.size() < ShapeInstancedDrawOp::MaxNumInstances;
     default:
       break;
   }
@@ -407,6 +402,11 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
     return;
   }
   PendingOpsAutoReset autoReset(this, type, std::move(clip), std::move(brush));
+  // Shape is handled separately with its own bounds computation.
+  if (pendingType == PendingOpType::Shape) {
+    flushPendingShapeOps();
+    return;
+  }
   PlacementPtr<DrawOp> drawOp = nullptr;
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
@@ -525,6 +525,75 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
   }
   addDrawOp(std::move(drawOp), pendingClip, pendingBrush, localBounds, deviceBounds,
             drawScale.value_or(1.0f));
+}
+
+void OpsCompositor::flushPendingShapeOps() {
+  DEBUG_ASSERT(pendingShape != nullptr);
+  DEBUG_ASSERT(!pendingShapeOffsets.empty());
+  auto shape = std::move(pendingShape);
+  auto shapeMatrix = pendingShapeMatrix;
+  auto offsets = std::move(pendingShapeOffsets);
+  auto shapeColors = std::move(pendingShapeColors);
+
+  Matrix uvMatrix = {};
+  if (!shapeMatrix.invert(&uvMatrix)) {
+    return;
+  }
+
+  auto clipBounds = getClipBounds(pendingClip);
+  auto count = offsets.size();
+  std::optional<Rect> localBounds = std::nullopt;
+  std::optional<Rect> deviceBounds = std::nullopt;
+  float drawScale = 1.0f;
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(pendingBrush, true);
+
+  // Compute the union of all instance bounds in the first instance's local space.
+  // offsets are in device space, so convert them to local space using uvMatrix (inverse of
+  // shapeMatrix) before offsetting shape bounds.
+  Rect shapeBounds = {};
+  if ((needLocalBounds || needDeviceBounds) && !shape->isInverseFillType()) {
+    const auto baseBounds = shape->getBounds();
+    for (size_t i = 0; i < count; ++i) {
+      auto localX = uvMatrix.getScaleX() * offsets[i].x + uvMatrix.getSkewX() * offsets[i].y;
+      auto localY = uvMatrix.getSkewY() * offsets[i].x + uvMatrix.getScaleY() * offsets[i].y;
+      shapeBounds.join(baseBounds.makeOffset(localX, localY));
+    }
+  }
+  if (needLocalBounds) {
+    if (shape->isInverseFillType()) {
+      localBounds = ToLocalBounds(clipBounds, shapeMatrix);
+    } else {
+      localBounds = ClipLocalBounds(shapeBounds, shapeMatrix, clipBounds);
+    }
+    if (localBounds->isEmpty()) {
+      return;
+    }
+    drawScale = std::min(shapeMatrix.getMaxScale(), 1.0f);
+  }
+  if (needDeviceBounds) {
+    deviceBounds = shape->isInverseFillType() ? clipBounds : shapeMatrix.mapRect(shapeBounds);
+  }
+
+  shape = Shape::ApplyMatrix(std::move(shape), shapeMatrix);
+  if (!shape) {
+    return;
+  }
+
+  auto aaType = getAAType(pendingBrush);
+  auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
+
+  if (count == 1) {
+    auto dstColor = ToPMColor(pendingBrush.color, dstColorSpace);
+    auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), dstColor, uvMatrix, aaType);
+    CAPUTRE_SHAPE_MESH(drawOp.get(), std::move(shape), aaType, clipBounds);
+    addDrawOp(std::move(drawOp), pendingClip, pendingBrush, localBounds, deviceBounds, drawScale);
+  } else {
+    const Color* colorsPtr = pendingBrush.shader ? nullptr : shapeColors.data();
+    auto drawOp = ShapeInstancedDrawOp::Make(std::move(shapeProxy), offsets.data(), colorsPtr,
+                                             count, uvMatrix, shapeMatrix, aaType, dstColorSpace);
+    CAPUTRE_SHAPE_MESH(drawOp.get(), std::move(shape), aaType, clipBounds);
+    addDrawOp(std::move(drawOp), pendingClip, pendingBrush, localBounds, deviceBounds, drawScale);
+  }
 }
 
 static void FlipYIfNeeded(Rect* rect, const RenderTargetProxy* renderTarget) {

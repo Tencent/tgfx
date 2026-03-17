@@ -26,6 +26,14 @@ std::shared_ptr<ShapePath> ShapePath::Make() {
   return std::shared_ptr<ShapePath>(new ShapePath());
 }
 
+void ShapePath::setPosition(const Point& value) {
+  if (_position == value) {
+    return;
+  }
+  _position = value;
+  invalidateContent();
+}
+
 void ShapePath::setPath(Path value) {
   if (_path == value) {
     return;
@@ -53,7 +61,7 @@ void ShapePath::apply(VectorContext* context) {
     }
   }
   if (_cachedShape) {
-    context->addShape(_cachedShape);
+    context->addShape(_cachedShape, _position);
   }
 }
 

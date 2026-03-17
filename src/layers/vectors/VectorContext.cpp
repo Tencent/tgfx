@@ -29,6 +29,16 @@ void VectorContext::addShape(std::shared_ptr<Shape> shape) {
   geometries.push_back(std::move(geometry));
 }
 
+void VectorContext::addShape(std::shared_ptr<Shape> shape, const Point& position) {
+  if (shape == nullptr) {
+    return;
+  }
+  auto geometry = std::make_unique<Geometry>();
+  geometry->shape = std::move(shape);
+  geometry->matrix = Matrix::MakeTrans(position.x, position.y);
+  geometries.push_back(std::move(geometry));
+}
+
 void VectorContext::addTextBlob(std::shared_ptr<TextBlob> blob, const Point& position,
                                 const std::vector<Point>& textAnchors) {
   if (blob == nullptr) {
