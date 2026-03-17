@@ -315,9 +315,13 @@ void ClipStack::transform(const Matrix& matrix) {
 
   willModify();
   for (auto& element : _data->elements) {
+    auto invalidatedByIndex = element.invalidatedByIndex();
     auto path = element.path();
     path.transform(matrix);
     element = ClipElement(path, element.isAntiAlias());
+    if (invalidatedByIndex >= 0) {
+      element.markInvalid(invalidatedByIndex);
+    }
   }
 
   // Update the current record after transforming all elements.
