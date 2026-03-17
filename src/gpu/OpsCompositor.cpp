@@ -171,6 +171,8 @@ static Rect ClipLocalBounds(const Rect& localBounds, const Matrix& viewMatrix,
 }
 
 static bool MatrixOnlyDiffersInTranslation(const Matrix& a, const Matrix& b) {
+  // Exact floating-point comparison is intentional: we prefer missing a batch opportunity over
+  // incorrectly batching shapes with different non-translation transforms.
   // [0]scaleX [1]skewX [2]transX [3]skewY [4]scaleY [5]transY [6]persp0 [7]persp1 [8]persp2
   return a[0] == b[0] && a[1] == b[1] && a[3] == b[3] && a[4] == b[4] && a[6] == b[6] &&
          a[7] == b[7] && a[8] == b[8];
