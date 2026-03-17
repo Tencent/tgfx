@@ -22,9 +22,9 @@ namespace tgfx {
 ShapeInstancedGeometryProcessor::ShapeInstancedGeometryProcessor(int width, int height, AAType aa,
                                                                  bool hasColors,
                                                                  const Matrix& uvMatrix,
-                                                                 const Matrix& stateMatrix)
+                                                                 const Matrix& viewMatrix)
     : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), hasColors(hasColors),
-      uvMatrix(uvMatrix), stateMatrix(stateMatrix) {
+      uvMatrix(uvMatrix), viewMatrix(viewMatrix) {
   position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", VertexFormat::Float};

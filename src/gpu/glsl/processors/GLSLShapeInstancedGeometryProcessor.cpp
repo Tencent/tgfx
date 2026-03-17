@@ -47,15 +47,15 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   vertBuilder->codeAppendf("highp vec2 local = (%s * vec3(%s, 1.0)).xy;", uvMatrixName.c_str(),
                            position.name().c_str());
 
-  // Step 2: transform local coords to device space, then add per-instance offset.
-  // The offset is already in device space (computed as the difference of translated positions),
-  // so it must be applied after the stateMatrix transform, not before.
-  // P_device = stateMatrix * vec3(local, 1.0) + offset
-  auto stateMatrixName =
-      uniformHandler->addUniform("StateMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
+  // Step 2: transform tessellation-space position directly to device space, then add per-instance
+  // offset. viewMatrix = stateMatrix * uvMatrix, which maps tessellation space to device space in
+  // one step. The offset is already in device space (computed as the difference of translated
+  // positions), so it must be applied after the viewMatrix transform.
+  auto viewMatrixName =
+      uniformHandler->addUniform("ViewMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
   std::string positionName = "position";
-  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(local, 1.0)).xy + %s;", positionName.c_str(),
-                           stateMatrixName.c_str(), offset.name().c_str());
+  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy + %s;", positionName.c_str(),
+                           viewMatrixName.c_str(), position.name().c_str(), offset.name().c_str());
 
   // Emit UV transforms using unshifted local coords. All FP coord transforms (both color shader
   // and mask coverage) use 'local' without offset, because: (1) mask texture is rasterized at a
@@ -90,7 +90,7 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
 void GLSLShapeInstancedGeometryProcessor::setData(UniformData* vertexUniformData, UniformData*,
                                                   FPCoordTransformIter* transformIter) const {
   vertexUniformData->setData("UVMatrix", uvMatrix);
-  vertexUniformData->setData("StateMatrix", stateMatrix);
+  vertexUniformData->setData("ViewMatrix", viewMatrix);
   // For instanced rendering, emitTransforms uses local coords directly. The coord transform
   // matrices only need the FP's own transform since uvMatrix already recovers local coords.
   setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);

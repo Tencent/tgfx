@@ -27,7 +27,7 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
   static PlacementPtr<ShapeInstancedGeometryProcessor> Make(BlockAllocator* allocator, int width,
                                                             int height, AAType aa, bool hasColors,
                                                             const Matrix& uvMatrix,
-                                                            const Matrix& stateMatrix);
+                                                            const Matrix& viewMatrix);
 
   std::string name() const override {
     return "ShapeInstancedGeometryProcessor";
@@ -37,7 +37,7 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   ShapeInstancedGeometryProcessor(int width, int height, AAType aa, bool hasColors,
-                                  const Matrix& uvMatrix, const Matrix& stateMatrix);
+                                  const Matrix& uvMatrix, const Matrix& viewMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -51,6 +51,6 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
   AAType aa = AAType::None;
   bool hasColors = false;
   Matrix uvMatrix = {};
-  Matrix stateMatrix = {};
+  Matrix viewMatrix = {};
 };
 }  // namespace tgfx

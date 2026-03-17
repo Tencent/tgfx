@@ -100,9 +100,10 @@ PlacementPtr<GeometryProcessor> ShapeInstancedDrawOp::onMakeGeometryProcessor(
     }
     addCoverageFP(std::move(maskFP));
   }
+  auto viewMatrix = stateMatrix * realUVMatrix;
   return ShapeInstancedGeometryProcessor::Make(allocator, renderTarget->width(),
                                                renderTarget->height(), aa, hasInstanceColors,
-                                               realUVMatrix, stateMatrix);
+                                               realUVMatrix, viewMatrix);
 }
 
 void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass) {

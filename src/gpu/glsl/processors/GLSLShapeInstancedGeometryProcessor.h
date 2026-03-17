@@ -24,7 +24,7 @@ namespace tgfx {
 class GLSLShapeInstancedGeometryProcessor : public ShapeInstancedGeometryProcessor {
  public:
   GLSLShapeInstancedGeometryProcessor(int width, int height, AAType aa, bool hasColors,
-                                      const Matrix& uvMatrix, const Matrix& stateMatrix);
+                                      const Matrix& uvMatrix, const Matrix& viewMatrix);
 
   void emitCode(EmitArgs& args) const override;
 
