@@ -21,6 +21,7 @@
 #include "core/Matrix3DUtils.h"
 #include "core/PictureRecords.h"
 #include "core/images/SubsetImage.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/RenderContext.h"
 #include "gpu/ops/RRectDrawOp.h"
@@ -54,10 +55,9 @@ namespace tgfx {
 // Creates a regular pentagon path centered at the origin with the given circumradius.
 static Path MakePentagonPath(float radius) {
   Path path = {};
-  constexpr float PI = 3.14159265f;
   constexpr int sides = 5;
   for (int i = 0; i < sides; i++) {
-    float angle = -PI / 2.0f + i * 2.0f * PI / sides;
+    float angle = -M_PI_F / 2.0f + i * 2.0f * M_PI_F / sides;
     float x = radius * std::cos(angle);
     float y = radius * std::sin(angle);
     if (i == 0) {
