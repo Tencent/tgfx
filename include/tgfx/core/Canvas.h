@@ -46,6 +46,8 @@ class ClipStack;
  */
 class Canvas {
  public:
+  ~Canvas();
+
   /**
    * Returns the associated Surface if the Canvas has one, otherwise returns nullptr.
    */

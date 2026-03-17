@@ -73,6 +73,8 @@ static Brush GetBrushForImage(const Paint* paint, const Image* image) {
   return brush;
 }
 
+Canvas::~Canvas() = default;
+
 Canvas::Canvas(DrawContext* drawContext, Surface* surface)
     : drawContext(drawContext), surface(surface) {
   clipStack = std::make_unique<ClipStack>();
