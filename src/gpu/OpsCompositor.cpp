@@ -565,10 +565,11 @@ void OpsCompositor::flushPendingShapeOps() {
   // shapeMatrix) before offsetting shape bounds.
   Rect shapeBounds = {};
   if ((needLocalBounds || needDeviceBounds) && !shape->isInverseFillType()) {
+    auto baseBounds = shape->getBounds();
     for (size_t i = 0; i < count; ++i) {
       auto localX = uvMatrix.getScaleX() * offsets[i].x + uvMatrix.getSkewX() * offsets[i].y;
       auto localY = uvMatrix.getSkewY() * offsets[i].x + uvMatrix.getScaleY() * offsets[i].y;
-      shapeBounds.join(shape->getBounds().makeOffset(localX, localY));
+      shapeBounds.join(baseBounds.makeOffset(localX, localY));
     }
   }
   if (needLocalBounds) {
