@@ -21,6 +21,7 @@
 #include "core/DrawContext.h"
 #include "core/PictureContext.h"
 #include "tgfx/core/Brush.h"
+#include "tgfx/core/Canvas.h"
 
 namespace tgfx {
 /**
