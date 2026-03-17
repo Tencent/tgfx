@@ -211,7 +211,7 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
   auto meshBounds = mesh->bounds();
   if (needLocalBounds) {
     localBounds = ClipLocalBounds(meshBounds, state.matrix, clipBounds);
-    if (!localBounds || localBounds->isEmpty()) {
+    if (localBounds->isEmpty()) {
       return;
     }
     drawScale = std::min(state.matrix.getMaxScale(), 1.0f);
