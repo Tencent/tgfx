@@ -68,13 +68,12 @@ void PDFGraphicStackState::updateMatrixClip(const Matrix& matrix, const ClipStac
   if (clip.state() == ClipState::Empty) {
     return;
   }
-  const auto entry = this->currentEntry();
-  if (entry->clip.isSame(clip) && entry->matrix == matrix) {
+  if (currentEntry()->clip.isSame(clip) && currentEntry()->matrix == matrix) {
     return;
   }
   while (stackDepth > 0) {
     pop();
-    if (entry->clip.isSame(clip) && entry->matrix == matrix) {
+    if (currentEntry()->clip.isSame(clip) && currentEntry()->matrix == matrix) {
       return;
     }
   }
