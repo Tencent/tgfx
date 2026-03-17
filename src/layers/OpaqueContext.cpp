@@ -128,6 +128,7 @@ void OpaqueContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcR
   if (containContourBound(bounds)) {
     return;
   }
+  flushPendingContour();
   pictureContext.drawImageRect(image, srcRect, dstRect, sampling, matrix, clip, brush, constraint);
 }
 
@@ -141,6 +142,7 @@ void OpaqueContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matri
   if (containContourBound(bounds)) {
     return;
   }
+  flushPendingContour();
   pictureContext.drawTextBlob(textBlob, matrix, clip, brush, stroke);
 }
 
