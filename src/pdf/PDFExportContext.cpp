@@ -1142,7 +1142,6 @@ void PDFExportContext::finishContentEntry(const Matrix& matrix, const ClipStack&
       // Draw shape into a form-xobject.
       Brush filledBrush;
       filledBrush.color = Color::Black();
-      ClipStack empty;
       PDFExportContext shapeContext(_pageSize, document, _initialTransform);
       shapeContext.onDrawPath(matrix, clip, *path, filledBrush);
       xObject = destination;
