@@ -24,6 +24,7 @@
 #include <stack>
 #include <vector>
 #include "core/utils/GeometryExtra.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
 
@@ -124,6 +125,7 @@ struct ClipRecord {
    * Decrements the deferred save count.
    */
   void popSave() {
+    DEBUG_ASSERT(deferredSaveCount > 0);
     deferredSaveCount--;
   }
 };

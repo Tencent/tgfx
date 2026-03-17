@@ -192,10 +192,10 @@ class OpsCompositor {
                                                 uint32_t uniqueID, const Rect& clipBound,
                                                 PlacementPtr<FragmentProcessor> inputFP);
   std::shared_ptr<TextureProxy> makeClipTexture(const std::vector<const ClipElement*>& elements,
-                                                const Rect& bounds);
+                                                const Rect& bounds) const;
   PlacementPtr<FragmentProcessor> makeMaskFP(std::shared_ptr<TextureProxy> maskTexture,
                                              const Rect& bounds,
-                                             PlacementPtr<FragmentProcessor> inputFP);
+                                             PlacementPtr<FragmentProcessor> inputFP) const;
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
   void addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, const Brush& brush,
                  const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds,

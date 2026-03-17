@@ -157,14 +157,16 @@ void ClipStack::clip(const Path& path, bool antiAlias) {
 }
 
 void ClipStack::save() {
+  detachIfShared();
   current().pushSave();
 }
 
 void ClipStack::restore() {
+  detachIfShared();
   auto& cur = current();
-  cur.popSave();
   if (cur.hasDeferredSave()) {
     // This was just a deferred save being undone, so the record doesn't need to be removed yet.
+    cur.popSave();
     return;
   }
 
@@ -172,7 +174,6 @@ void ClipStack::restore() {
     return;
   }
 
-  detachIfShared();
   const auto startIndex = current().startIndex;
   _data->elements.resize(startIndex);
   for (auto& element : _data->elements) {

@@ -719,10 +719,10 @@ PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(
 }
 
 std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
-    const std::vector<const ClipElement*>& elements, const Rect& bounds) {
-  auto width = FloatSaturateToInt(bounds.width());
-  auto height = FloatSaturateToInt(bounds.height());
-  auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+    const std::vector<const ClipElement*>& elements, const Rect& bounds) const {
+  const auto width = FloatSaturateToInt(bounds.width());
+  const auto height = FloatSaturateToInt(bounds.height());
+  const auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
   auto clipRenderTarget = RenderTargetProxy::Make(context, width, height, true, 1, false,
                                                   ImageOrigin::TopLeft, BackingFit::Approx);
   if (clipRenderTarget == nullptr) {
@@ -733,9 +733,9 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
   std::vector<PlacementPtr<DrawOp>> clipDrawOps;
   clipDrawOps.reserve(elements.size());
   for (size_t i = 0; i < elements.size(); ++i) {
-    auto element = elements[i];
+    const auto element = elements[i];
     DEBUG_ASSERT(element->isValid());
-    auto aaType = element->isAntiAlias() ? AAType::Coverage : AAType::None;
+    const auto aaType = element->isAntiAlias() ? AAType::Coverage : AAType::None;
     auto clipBounds = Rect::MakeWH(width, height);
     auto shape = Shape::MakeFrom(element->path());
     shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
@@ -745,7 +745,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
     if (i > 0) {
       drawOp->setBlendMode(BlendMode::Modulate);
     }
-    clipDrawOps.push_back(std::move(drawOp));
+    clipDrawOps.emplace_back(std::move(drawOp));
   }
 
   auto opArray = drawingAllocator()->makeArray(std::move(clipDrawOps));
@@ -755,10 +755,10 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
   return textureProxy;
 }
 
-PlacementPtr<FragmentProcessor> OpsCompositor::makeMaskFP(std::shared_ptr<TextureProxy> maskTexture,
-                                                          const Rect& bounds,
-                                                          PlacementPtr<FragmentProcessor> inputFP) {
-  auto allocator = drawingAllocator();
+PlacementPtr<FragmentProcessor> OpsCompositor::makeMaskFP(
+    std::shared_ptr<TextureProxy> maskTexture, const Rect& bounds,
+    PlacementPtr<FragmentProcessor> inputFP) const {
+  const auto allocator = drawingAllocator();
   auto uvMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {
     uvMatrix.preConcat(renderTarget->getOriginTransform());
