@@ -40,6 +40,10 @@ class GeometryProcessor : public Processor {
     return attributes;
   }
 
+  const std::vector<Attribute>& instanceAttributes() const {
+    return _instanceAttributes;
+  }
+
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
 
   class FPCoordTransformHandler {
@@ -119,6 +123,8 @@ class GeometryProcessor : public Processor {
 
   void setVertexAttributes(const Attribute* attrs, int attrCount);
 
+  void setInstanceAttributes(const Attribute* attrs, int attrCount);
+
   /**
    * A helper to upload coord transform matrices in setData().
    */
@@ -153,6 +159,7 @@ class GeometryProcessor : public Processor {
   }
 
   std::vector<Attribute> attributes = {};
+  std::vector<Attribute> _instanceAttributes = {};
   size_t textureSamplerCount = 0;
 };
 }  // namespace tgfx

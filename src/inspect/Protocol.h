@@ -101,6 +101,7 @@ enum class OpTaskType : uint8_t {
   OpTaskTypeSize,
 };
 
+// TODO: Keep this map in sync with all DrawOp types (e.g., ShapeInstancedDrawOp, HairlineOps).
 static std::unordered_map<uint8_t, OpTaskType> DrawOpTypeToOpTaskType = {
     {0, OpTaskType::RectDrawOp},  {1, OpTaskType::RRectDrawOp},   {2, OpTaskType::ShapeDrawOp},
     {3, OpTaskType::AtlasTextOp}, {4, OpTaskType::Quads3DDrawOp},

@@ -28,7 +28,7 @@ namespace tgfx {
 // to pre-allocation optimizations on some platforms.
 DrawingBuffer::DrawingBuffer(Context* context)
     : context(context), _uniqueID(UniqueID::Next()), drawingAllocator(1 << 14, 1 << 21),
-      vertexAllocator(1 << 14, 1 << 21) {
+      vertexAllocator(1 << 14, 1 << 21), instanceAllocator(1 << 14, 1 << 21) {
   DEBUG_ASSERT(context != nullptr);
 }
 
@@ -55,6 +55,7 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
     }
   }
   vertexMaxValueTracker.addValue(vertexAllocator.size());
+  instanceMaxValueTracker.addValue(instanceAllocator.size());
   drawingMaxValueTracker.addValue(drawingAllocator.size());
   auto commandBuffer = commandEncoder->finish();
   context->globalCache()->resetUniformBuffer();
@@ -70,6 +71,7 @@ void DrawingBuffer::reset() {
   resourceTasks.clear();
   atlasTasks.clear();
   vertexAllocator.clear(vertexMaxValueTracker.getMaxValue());
+  instanceAllocator.clear(instanceMaxValueTracker.getMaxValue());
   drawingAllocator.clear(drawingMaxValueTracker.getMaxValue());
   _generation++;
 }

@@ -44,6 +44,10 @@ class DrawingManager {
     return &getDrawingBuffer()->vertexAllocator;
   }
 
+  BlockAllocator* instanceAllocator() {
+    return &getDrawingBuffer()->instanceAllocator;
+  }
+
   /**
    * Fills the render target using the provided fragment processor, and automatically resolves the
    * render target. Returns false if the render target or fragment processor is nullptr.
