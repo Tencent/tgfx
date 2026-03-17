@@ -783,6 +783,10 @@ PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(
     return makeMaskFP(clipTexture, clipBound, std::move(inputFP));
   }
   clipTexture = makeClipTexture(elements, clipBound);
+  if (clipTexture == nullptr) {
+    DEBUG_ASSERT(false);
+    return inputFP;
+  }
   cachedClipID = uniqueID;
   return makeMaskFP(clipTexture, clipBound, std::move(inputFP));
 }

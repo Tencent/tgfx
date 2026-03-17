@@ -231,7 +231,6 @@ void ClipStack::replaceWithElement(const ClipElement& toAdd) {
 bool ClipStack::appendElement(ClipElement toAdd) {
   auto& cur = current();
   size_t oldestActiveInvalidIdx = _data->elements.size();
-  ClipElement* oldestActiveInvalid = nullptr;
   size_t oldestValidIdx = _data->elements.size();
   int64_t youngestValidIdx = static_cast<int64_t>(cur.startIndex) - 1;
 
@@ -250,7 +249,6 @@ bool ClipStack::appendElement(ClipElement toAdd) {
       return false;
     } else if (!existing.isValid()) {
       if (i >= cur.startIndex) {
-        oldestActiveInvalid = &existing;
         oldestActiveInvalidIdx = i;
       }
     } else {
@@ -263,9 +261,9 @@ bool ClipStack::appendElement(ClipElement toAdd) {
   // If no active invalid element found, or its index is beyond the youngest valid element,
   // we need to append a new slot after the youngest valid element.
   // "Active" means belonging to the current ClipRecord.
-  if (!oldestActiveInvalid || oldestActiveInvalidIdx >= targetEndIdx) {
+  auto reuseInvalidSlot = oldestActiveInvalidIdx < targetEndIdx;
+  if (!reuseInvalidSlot) {
     targetEndIdx++;
-    oldestActiveInvalid = nullptr;
   }
 
   // If oldestValidIdx remains unchanged, all existing elements are invalid, so the clip state
@@ -274,8 +272,8 @@ bool ClipStack::appendElement(ClipElement toAdd) {
                                                                            : ClipState::Complex;
   _data->elements.resize(targetEndIdx);
   // Reuse the active invalid slot if available, otherwise append to the end.
-  if (oldestActiveInvalid) {
-    *oldestActiveInvalid = toAdd;
+  if (reuseInvalidSlot) {
+    _data->elements[oldestActiveInvalidIdx] = toAdd;
   } else {
     _data->elements.back() = toAdd;
   }

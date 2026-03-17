@@ -25,6 +25,7 @@
 #include <vector>
 #include "core/utils/GeometryExtra.h"
 #include "core/utils/Log.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
 

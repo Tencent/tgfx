@@ -222,8 +222,8 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
 
 void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                      const Rect& dstRect, const SamplingOptions&,
-                                     const Matrix& matrix, const ClipStack&, const Brush& brush,
-                                     SrcRectConstraint) {
+                                     const Matrix& matrix, const ClipStack& clip,
+                                     const Brush& brush, SrcRectConstraint) {
   DEBUG_ASSERT(image != nullptr);
   auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
   auto subsetImage = modifyImage->makeSubset(srcRect);
@@ -232,6 +232,8 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
   }
   Bitmap bitmap = ImageExportToBitmap(context, subsetImage);
   if (!bitmap.isEmpty()) {
+    applyClip(clip, dstRect);
+
     auto viewMatrix =
         MakeRectToRectMatrix(Rect::MakeWH(srcRect.width(), srcRect.height()), dstRect);
 
