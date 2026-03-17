@@ -91,9 +91,9 @@ PlacementPtr<GeometryProcessor> ShapeInstancedDrawOp::onMakeGeometryProcessor(
     if (!realUVMatrix.invert(&maskMatrix)) {
       return nullptr;
     }
-    static SamplingArgs args(TileMode::Clamp, TileMode::Clamp,
-                             SamplingOptions(FilterMode::Nearest, MipmapMode::None),
-                             SrcRectConstraint::Fast);
+    static const SamplingArgs args(TileMode::Clamp, TileMode::Clamp,
+                                   SamplingOptions(FilterMode::Nearest, MipmapMode::None),
+                                   SrcRectConstraint::Fast);
     auto maskFP = TextureEffect::Make(allocator, std::move(textureProxy), args, &maskMatrix, true);
     if (maskFP == nullptr) {
       return nullptr;
