@@ -970,10 +970,9 @@ bool TreatAsRegularPDFBlendMode(BlendMode blendMode) {
 }
 
 void PopulateGraphicStateEntryFromPaint(
-    PDFDocumentImpl* document, const Matrix& matrix, const ClipStack&, Rect deviceBounds,
-    const Brush& brush, const Matrix& initialTransform, float textScale,
-    const std::shared_ptr<ColorSpace>& colorSpace, PDFGraphicStackState::Entry* entry,
-    std::unordered_set<PDFIndirectReference>* shaderResources,
+    PDFDocumentImpl* document, const Matrix& matrix, Rect deviceBounds, const Brush& brush,
+    const Matrix& initialTransform, float textScale, const std::shared_ptr<ColorSpace>& colorSpace,
+    PDFGraphicStackState::Entry* entry, std::unordered_set<PDFIndirectReference>* shaderResources,
     std::unordered_set<PDFIndirectReference>* graphicStateResources) {
 
   entry->matrix = matrix;
@@ -1061,9 +1060,9 @@ std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
   DEBUG_ASSERT(fActiveStackState.contentStream);
   auto contentMatrix = matrix * contentExtraMatrix;
   PDFGraphicStackState::Entry entry;
-  PopulateGraphicStateEntryFromPaint(document, contentMatrix, clip, Rect::MakeSize(_pageSize),
-                                     brush, _initialTransform, scale, document->dstColorSpace(),
-                                     &entry, &shaderResources, &graphicStateResources);
+  PopulateGraphicStateEntryFromPaint(document, contentMatrix, Rect::MakeSize(_pageSize), brush,
+                                     _initialTransform, scale, document->dstColorSpace(), &entry,
+                                     &shaderResources, &graphicStateResources);
   fActiveStackState.updateMatrixClip(matrix, clip);
   fActiveStackState.updateEntryMatrix(entry.matrix);
   fActiveStackState.updateDrawingState(entry, document->colorSpaceRef());
