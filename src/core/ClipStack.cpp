@@ -138,36 +138,45 @@ ClipRecord::ClipRecord() : uniqueID(UniqueID::Next()) {
 }
 
 ClipData::ClipData() {
-  records.push(ClipRecord());
+  records.emplace();
 }
 
 ClipStack::ClipStack() : _data(std::make_shared<ClipData>()) {
 }
 
 void ClipStack::clip(const Path& path, bool antiAlias) {
-  detachIfShared();
+  bool didSave = willModify();
   ClipElement toAdd(path, antiAlias);
-  addElement(toAdd);
+  if (addElement(toAdd) || !didSave) {
+    return;
+  }
+  // We made a new save record, but ended up not adding an element to the stack.
+  // So instead of keeping an empty save record around, pop it off and restore the counter.
+  _data->records.pop();
+  current().pushSave();
 }
 
 void ClipStack::save() {
-  detachIfShared();
-  auto cur = current();
-  cur.startIndex = _data->elements.size();
-  _data->records.push(cur);
+  current().pushSave();
 }
 
 void ClipStack::restore() {
+  auto& cur = current();
+  cur.popSave();
+  if (cur.hasDeferredSave()) {
+    // This was just a deferred save being undone, so the record doesn't need to be removed yet.
+    return;
+  }
+
   if (_data->records.size() <= 1) {
     return;
   }
 
   detachIfShared();
-  auto& cur = current();
-  auto startIndex = static_cast<int>(cur.startIndex);
-  _data->elements.resize(cur.startIndex);
+  const auto startIndex = current().startIndex;
+  _data->elements.resize(startIndex);
   for (auto& element : _data->elements) {
-    if (element.invalidatedByIndex() >= startIndex) {
+    if (element.invalidatedByIndex() >= static_cast<int>(startIndex)) {
       element.markInvalid(-1);
     }
   }
@@ -181,33 +190,31 @@ void ClipStack::detachIfShared() {
   _data = std::make_shared<ClipData>(*_data);
 }
 
-void ClipStack::addElement(const ClipElement& toAdd) {
+bool ClipStack::addElement(const ClipElement& toAdd) {
   auto& cur = current();
   if (cur.state == ClipState::Empty) {
-    return;
+    // Already empty, adding more clips won't change anything.
+    return false;
   }
   if (toAdd.bound().isEmpty()) {
     cur.state = ClipState::Empty;
-    return;
+    return true;
   }
   if (!Rect::Intersects(toAdd.bound(), cur.bound)) {
     cur.state = ClipState::Empty;
-    return;
+    return true;
   }
-  if (toAdd.isRect()) {
-    if (toAdd.bound().contains(cur.bound)) {
-      return;
-    }
-  } else {
-    if (toAdd.path().contains(cur.bound)) {
-      return;
-    }
+  // The new element completely contains current clip, so it's redundant.
+  auto curIsContained =
+      toAdd.isRect() ? toAdd.bound().contains(cur.bound) : toAdd.path().contains(cur.bound);
+  if (curIsContained) {
+    return false;
   }
   if (cur.state == ClipState::WideOpen) {
     replaceWithElement(toAdd);
-    return;
+    return true;
   }
-  appendElement(toAdd);
+  return appendElement(toAdd);
 }
 
 void ClipStack::replaceWithElement(const ClipElement& toAdd) {
@@ -220,7 +227,7 @@ void ClipStack::replaceWithElement(const ClipElement& toAdd) {
   cur.uniqueID = UniqueID::Next();
 }
 
-void ClipStack::appendElement(ClipElement toAdd) {
+bool ClipStack::appendElement(ClipElement toAdd) {
   auto& cur = current();
   size_t oldestActiveInvalidIdx = _data->elements.size();
   ClipElement* oldestActiveInvalid = nullptr;
@@ -234,9 +241,12 @@ void ClipStack::appendElement(ClipElement toAdd) {
 
     if (!toAdd.isValid()) {
       if (!existing.isValid()) {
+        // Both new and old invalid implies the entire clip becomes empty.
         cur.state = ClipState::Empty;
+        return true;
       }
-      return;
+      // The new element doesn't change the clip beyond what the old element already does.
+      return false;
     } else if (!existing.isValid()) {
       if (i >= cur.startIndex) {
         oldestActiveInvalid = &existing;
@@ -272,6 +282,7 @@ void ClipStack::appendElement(ClipElement toAdd) {
   cur.oldestValidIndex = std::min(oldestValidIdx, oldestActiveInvalidIdx);
   cur.bound.intersect(toAdd.bound());
   cur.uniqueID = UniqueID::Next();
+  return true;
 }
 
 const ClipRecord& ClipStack::current() const {
@@ -303,7 +314,7 @@ void ClipStack::transform(const Matrix& matrix) {
     return;
   }
 
-  detachIfShared();
+  willModify();
   for (auto& element : _data->elements) {
     auto path = element.path();
     path.transform(matrix);
@@ -317,6 +328,22 @@ void ClipStack::transform(const Matrix& matrix) {
     cur.state = ClipState::Complex;
   }
   cur.uniqueID = UniqueID::Next();
+}
+
+bool ClipStack::willModify() {
+  detachIfShared();
+  auto& cur = current();
+  if (!cur.hasDeferredSave()) {
+    return false;
+  }
+
+  // Materialize the deferred save.
+  cur.popSave();
+  auto newRecord = cur;
+  newRecord.startIndex = _data->elements.size();
+  newRecord.deferredSaveCount = 0;
+  _data->records.push(newRecord);
+  return true;
 }
 
 }  // namespace tgfx

@@ -101,8 +101,31 @@ struct ClipRecord {
   Rect bound = Rect::MakeLTRB(-FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MAX);
   ClipState state = ClipState::WideOpen;
   uint32_t uniqueID = 0;
+  // Number of save() calls without modifications (yet). When > 0, this record has deferred saves.
+  int deferredSaveCount = 0;
 
   ClipRecord();
+
+  /**
+   * Returns true if there are deferred saves pending.
+   */
+  bool hasDeferredSave() const {
+    return deferredSaveCount > 0;
+  }
+
+  /**
+   * Increments the deferred save count.
+   */
+  void pushSave() {
+    deferredSaveCount++;
+  }
+
+  /**
+   * Decrements the deferred save count.
+   */
+  void popSave() {
+    deferredSaveCount--;
+  }
 };
 
 struct ClipData {
@@ -162,12 +185,27 @@ class ClipStack {
   void transform(const Matrix& matrix);
 
  private:
-  void addElement(const ClipElement& toAdd);
+  /**
+   * Adds a clip element to the stack.
+   * @return true if the element was actually added or affected the clip state, false if it was
+   * redundant.
+   */
+  bool addElement(const ClipElement& toAdd);
   void replaceWithElement(const ClipElement& toAdd);
-  void appendElement(ClipElement toAdd);
+  /**
+   * Appends a clip element, updating existing elements as needed.
+   * @return true if the element was added or affected the clip state, false if it was redundant.
+   */
+  bool appendElement(ClipElement toAdd);
   void detachIfShared();
   const ClipRecord& current() const;
   ClipRecord& current();
+  /**
+   * Prepares the clip stack for modification. Detaches shared data and materializes
+   * any deferred save if needed.
+   * @return true if a deferred save was materialized, false otherwise.
+   */
+  bool willModify();
 
   std::shared_ptr<ClipData> _data;
 };
