@@ -132,6 +132,10 @@ class OpsCompositor {
   std::vector<PlacementPtr<Rect>> pendingUVRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
+  std::shared_ptr<Shape> pendingShape = nullptr;
+  Matrix pendingShapeMatrix = {};
+  std::vector<Point> pendingShapeOffsets = {};
+  std::vector<Color> pendingShapeColors = {};
   std::optional<PMColor> clearColor = std::nullopt;
   std::vector<PlacementPtr<DrawOp>> drawOps = {};
   std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
@@ -150,6 +154,7 @@ class OpsCompositor {
   bool canAppend(PendingOpType type, const Path& clip, const Brush& brush) const;
   void flushPendingOps(PendingOpType currentType = PendingOpType::Unknown, Path currentClip = {},
                        Brush currentBrush = {});
+  void flushPendingShapeOps();
   void resetPendingOps(PendingOpType currentType = PendingOpType::Unknown, Path currentClip = {},
                        Brush currentBrush = {});
   AAType getAAType(const Brush& brush) const;

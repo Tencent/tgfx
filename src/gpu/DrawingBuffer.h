@@ -68,6 +68,8 @@ class DrawingBuffer {
   SlidingWindowTracker drawingMaxValueTracker = {10};
   BlockAllocator vertexAllocator = {};
   SlidingWindowTracker vertexMaxValueTracker = {10};
+  BlockAllocator instanceAllocator = {};
+  SlidingWindowTracker instanceMaxValueTracker = {10};
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::vector<PlacementPtr<AtlasUploadTask>> atlasTasks = {};

@@ -16,10 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cmath>
 #include "core/MCState.h"
 #include "core/Matrix3DUtils.h"
 #include "core/PictureRecords.h"
 #include "core/images/SubsetImage.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/RenderContext.h"
 #include "gpu/ops/RRectDrawOp.h"
@@ -36,6 +38,7 @@
 #include "tgfx/core/Mesh.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/PathProvider.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
@@ -48,6 +51,24 @@
 #include "utils/common.h"
 
 namespace tgfx {
+
+// Creates a regular pentagon path centered at the origin with the given circumradius.
+static Path MakePentagonPath(float radius) {
+  Path path = {};
+  constexpr int sides = 5;
+  for (int i = 0; i < sides; i++) {
+    float angle = -M_PI_F / 2.0f + i * 2.0f * M_PI_F / sides;
+    float x = radius * std::cos(angle);
+    float y = radius * std::sin(angle);
+    if (i == 0) {
+      path.moveTo(x, y);
+    } else {
+      path.lineTo(x, y);
+    }
+  }
+  path.close();
+  return path;
+}
 
 TGFX_TEST(CanvasTest, clip) {
   ContextScope scope;
@@ -2207,6 +2228,130 @@ TGFX_TEST(CanvasTest, DrawMesh_FromShape) {
   canvas->restore();
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawMesh_FromShape"));
+}
+
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_MultiColors) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto path = MakePentagonPath(50);
+  auto shape = Shape::MakeFrom(PathProvider::Wrap(path));
+
+  // 4 instances arranged in a 2x2 grid, each with a different color
+  Point positions[] = {{75, 75}, {225, 75}, {75, 225}, {225, 225}};
+  Color colors[] = {
+      Color::Red(),
+      Color::Green(),
+      Color::Blue(),
+      Color::FromRGBA(255, 165, 0, 255),
+  };
+
+  for (int i = 0; i < 4; i++) {
+    Paint paint = {};
+    paint.setColor(colors[i]);
+    canvas->save();
+    canvas->concat(Matrix::MakeTrans(positions[i].x, positions[i].y));
+    canvas->drawShape(shape, paint);
+    canvas->restore();
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_MultiColors"));
+}
+
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_SameColor) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto path = MakePentagonPath(35);
+  auto shape = Shape::MakeFrom(PathProvider::Wrap(path));
+
+  // 5 instances with same paint color, translation-only differences
+  Point positions[] = {{75, 75}, {150, 75}, {225, 75}, {112, 200}, {188, 200}};
+
+  Paint paint = {};
+  paint.setColor(Color::FromRGBA(0, 100, 200, 255));
+  for (int i = 0; i < 5; i++) {
+    canvas->save();
+    canvas->concat(Matrix::MakeTrans(positions[i].x, positions[i].y));
+    canvas->drawShape(shape, paint);
+    canvas->restore();
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_SameColor"));
+}
+
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_WithShader) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto path = MakePentagonPath(50);
+  auto shape = Shape::MakeFrom(PathProvider::Wrap(path));
+
+  // 4 instances in a 2x2 grid
+  Point positions[] = {{75, 75}, {225, 75}, {75, 225}, {225, 225}};
+
+  // Gradient shader
+  auto shader = Shader::MakeLinearGradient({-30, -30}, {30, 30}, {Color::Red(), Color::Blue()}, {});
+
+  Paint paint = {};
+  paint.setShader(shader);
+  for (int i = 0; i < 4; i++) {
+    canvas->save();
+    canvas->concat(Matrix::MakeTrans(positions[i].x, positions[i].y));
+    canvas->drawShape(shape, paint);
+    canvas->restore();
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_WithShader"));
+}
+
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_Stroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto path = MakePentagonPath(50);
+  auto shape = Shape::MakeFrom(PathProvider::Wrap(path));
+
+  Point positions[] = {{75, 75}, {225, 75}, {75, 225}, {225, 225}};
+  Color colors[] = {
+      Color::Red(),
+      Color::Green(),
+      Color::Blue(),
+      Color::FromRGBA(255, 165, 0, 255),
+  };
+
+  for (int i = 0; i < 4; i++) {
+    Paint paint = {};
+    paint.setColor(colors[i]);
+    paint.setStyle(PaintStyle::Stroke);
+    paint.setStrokeWidth(6);
+    canvas->save();
+    canvas->concat(Matrix::MakeTrans(positions[i].x, positions[i].y));
+    canvas->drawShape(shape, paint);
+    canvas->restore();
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_Stroke"));
 }
 
 }  // namespace tgfx

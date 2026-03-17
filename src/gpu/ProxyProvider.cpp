@@ -117,12 +117,51 @@ std::shared_ptr<VertexBufferView> ProxyProvider::createVertexBufferProxy(
   return std::make_shared<VertexBufferView>(sharedVertexBuffer, offset, byteSize);
 }
 
+std::shared_ptr<VertexBufferView> ProxyProvider::createInstanceBufferProxy(
+    PlacementPtr<InstanceProvider> provider) {
+  if (provider == nullptr || provider->dataSize() == 0) {
+    return nullptr;
+  }
+  auto dataSize = provider->dataSize();
+  auto allocator = context->drawingManager()->instanceAllocator();
+  DEBUG_ASSERT(allocator != nullptr);
+  auto lastBlock = allocator->currentBlock();
+  auto destination = allocator->allocate(dataSize);
+  if (destination == nullptr) {
+    LOGE("ProxyProvider::createInstanceBufferProxy() Failed to allocate memory!");
+    return nullptr;
+  }
+  auto offset = lastBlock.second;
+  auto currentBlock = allocator->currentBlock();
+  if (lastBlock.first != nullptr && lastBlock.first != currentBlock.first) {
+    DEBUG_ASSERT(sharedInstanceBuffer != nullptr);
+    auto blockData = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
+    uploadSharedInstanceBuffer(std::move(blockData));
+    offset = 0;
+  }
+  provider->getData(destination);
+  if (sharedInstanceBuffer == nullptr) {
+    sharedInstanceBuffer = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+    addResourceProxy(sharedInstanceBuffer);
+  }
+  return std::make_shared<VertexBufferView>(sharedInstanceBuffer, offset, dataSize);
+}
+
 void ProxyProvider::flushSharedVertexBuffer() {
   if (sharedVertexBuffer != nullptr) {
     auto vertexAllocator = context->drawingManager()->vertexAllocator();
     auto lastBlock = vertexAllocator->currentBlock();
     auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
     uploadSharedVertexBuffer(std::move(data));
+  }
+}
+
+void ProxyProvider::flushSharedInstanceBuffer() {
+  if (sharedInstanceBuffer != nullptr) {
+    auto allocator = context->drawingManager()->instanceAllocator();
+    auto lastBlock = allocator->currentBlock();
+    auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
+    uploadSharedInstanceBuffer(std::move(data));
   }
 }
 
@@ -145,6 +184,15 @@ void ProxyProvider::uploadSharedVertexBuffer(std::shared_ptr<Data> data) {
       sharedVertexBuffer, BufferType::Vertex, std::move(dataSource));
   context->drawingManager()->addResourceTask(std::move(task));
   sharedVertexBuffer = nullptr;
+}
+
+void ProxyProvider::uploadSharedInstanceBuffer(std::shared_ptr<Data> data) {
+  DEBUG_ASSERT(sharedInstanceBuffer != nullptr);
+  auto dataSource = DataSource<Data>::Wrap(std::move(data));
+  auto task = context->drawingAllocator()->make<GPUBufferUploadTask>(
+      sharedInstanceBuffer, BufferType::Vertex, std::move(dataSource));
+  context->drawingManager()->addResourceTask(std::move(task));
+  sharedInstanceBuffer = nullptr;
 }
 
 static UniqueKey AppendClipBoundsKey(const UniqueKey& uniqueKey, const Rect& clipBounds) {

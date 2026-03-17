@@ -182,6 +182,7 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
   }
   // Flush the shared vertex buffer before executing the tasks. It may generate new resource tasks.
   context->proxyProvider()->flushSharedVertexBuffer();
+  context->proxyProvider()->flushSharedInstanceBuffer();
   atlasTaskMap.clear();
 
   if (currentBuffer->empty()) {
