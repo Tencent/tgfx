@@ -28,6 +28,7 @@
 #include "core/UserTypeface.h"
 #include "core/shapes/GlyphShape.h"
 #include "core/shapes/StrokeShape.h"
+#include "core/utils/GeometryExtra.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
@@ -279,16 +280,6 @@ void RenderContext::drawPath(const Path& path, const Matrix& matrix, const ClipS
                              const Brush& brush) {
   // Temporarily use drawShape for rendering, and perform merging in the compositor later.
   drawShape(Shape::MakeFrom(path), matrix, clip, brush, nullptr);
-}
-
-static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
-  Matrix invertMatrix = {};
-  if (!viewMatrix.invert(&invertMatrix)) {
-    return {};
-  }
-  auto localBounds = bounds;
-  invertMatrix.mapRect(&localBounds);
-  return localBounds;
 }
 
 void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,

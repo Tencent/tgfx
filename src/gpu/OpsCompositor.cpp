@@ -22,6 +22,7 @@
 #include "core/VertexMesh.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
+#include "core/utils/GeometryExtra.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/StrokeUtils.h"
@@ -139,16 +140,6 @@ void OpsCompositor::drawRRect(const RRect& rRect, const Matrix& matrix, const Cl
     auto strokeRecord = drawingAllocator()->make<Stroke>(*stroke);
     pendingStrokes.emplace_back(std::move(strokeRecord));
   }
-}
-
-static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
-  Matrix invertMatrix = {};
-  if (!viewMatrix.invert(&invertMatrix)) {
-    return {};
-  }
-  auto localBounds = bounds;
-  invertMatrix.mapRect(&localBounds);
-  return localBounds;
 }
 
 static Rect ClipLocalBounds(const Rect& localBounds, const Matrix& viewMatrix,

@@ -19,6 +19,8 @@
 #pragma once
 
 #include <cmath>
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 
@@ -32,6 +34,16 @@ static constexpr float BOUNDS_TOLERANCE = 1e-3f;
 
 inline bool IsPixelAligned(float value) {
   return fabsf(roundf(value) - value) <= BOUNDS_TOLERANCE;
+}
+
+inline Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
+  Matrix invertMatrix = {};
+  if (!viewMatrix.invert(&invertMatrix)) {
+    return {};
+  }
+  auto localBounds = bounds;
+  invertMatrix.mapRect(&localBounds);
+  return localBounds;
 }
 
 }  // namespace tgfx
