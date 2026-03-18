@@ -205,10 +205,8 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return;
   }
 
-  auto surface = this->surface;
   if (surface == nullptr) {
     surface = tgfx::Surface::MakeFrom(context, tgfxWindow);
-    this->surface = surface;
   }
   if (surface == nullptr) {
     device->unlock();

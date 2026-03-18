@@ -45,7 +45,7 @@ void TGFXBaseView::updateSize() {
     return;
   }
   surface = nullptr;
-  auto surface = tgfx::Surface::MakeFrom(context, window);
+  surface = tgfx::Surface::MakeFrom(context, window);
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -56,7 +56,6 @@ void TGFXBaseView::updateSize() {
     applyCenteringTransform();
     presentImmediately = true;
   }
-  this->surface = surface;
   device->unlock();
 }
 
