@@ -36,7 +36,7 @@ std::shared_ptr<EGLWindow> EGLWindow::Current() {
   if (device == nullptr || device->eglSurface == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<EGLWindow>(new EGLWindow(device));
+  return std::shared_ptr<EGLWindow>(new EGLWindow(device, device->colorSpace));
 }
 
 std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
@@ -78,12 +78,17 @@ ISize GetNativeWindowSize(EGLNativeWindowType nativeWindow) {
 }
 
 std::shared_ptr<RenderTargetProxy> EGLWindow::onCreateRenderTarget(Context* context) {
+  auto eglDevice = static_cast<EGLDevice*>(device.get());
+  if (nativeWindow) {
+    if (!eglDevice->recreateSurfaceIfNeeded(nativeWindow)) {
+      return nullptr;
+    }
+  }
   ISize size = {0, 0};
   if (nativeWindow) {
     // If the rendering size changes，eglQuerySurface() may give the wrong size on same platforms.
     size = GetNativeWindowSize(nativeWindow);
   }
-  auto eglDevice = static_cast<EGLDevice*>(device.get());
   if (size.width <= 0 || size.height <= 0) {
     eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &size.width);
     eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &size.height);
