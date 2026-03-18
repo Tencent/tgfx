@@ -75,10 +75,6 @@ class EGLDevice : public GLDevice {
   EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle,
             std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
-  /**
-   * Recreates the EGLSurface for ANGLE on Windows when the native window size changes.
-   * Returns true if the surface was successfully recreated or no recreation was needed.
-   */
   bool recreateSurfaceIfNeeded(EGLNativeWindowType nativeWindow);
 
   friend class GLDevice;
