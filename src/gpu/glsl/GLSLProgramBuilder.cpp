@@ -18,6 +18,7 @@
 
 #include "GLSLProgramBuilder.h"
 #include <string>
+#include <fstream>
 #include "gpu/UniformData.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -167,6 +168,22 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
 std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   fragmentShaderBuilder()->declareCustomOutputColor();
   finalizeShaders();
+
+  // const auto& vertex = vertexShaderBuilder()->shaderString();
+  // const auto& fragment = fragmentShaderBuilder()->shaderString();
+  // static int index = 0;
+  // if (std::ofstream vertexFile("~/Desktop/Shader/" + std::to_string(index) + "_vs.txt");
+  //     vertexFile.is_open()) {
+  //   vertexFile << vertex;
+  //   vertexFile.close();
+  // }
+  // if (std::ofstream fragmentFile("~/Desktop/Shader/" + std::to_string(index) + "_fs.txt");
+  //     fragmentFile.is_open()) {
+  //   fragmentFile << fragment;
+  //   fragmentFile.close();
+  // }
+  // index++;
+
   auto gpu = context->gpu();
   ShaderModuleDescriptor vertexModule = {};
   vertexModule.code = vertexShaderBuilder()->shaderString();
