@@ -21,7 +21,6 @@
 #include <QColorSpace>
 #include <QQuickWindow>
 #include <QThread>
-#include <algorithm>
 #include "QGLDrawableProxy.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
@@ -216,12 +215,14 @@ std::shared_ptr<RenderTargetProxy> QGLWindow::acquireTexture(Context* context, i
     }
   }
   // Remove stale available slots whose size no longer matches.
-  textureSlots.erase(std::remove_if(textureSlots.begin(), textureSlots.end(),
-                                    [width, height](const TextureSlot& slot) {
-                                      return slot.available && (slot.proxy->width() != width ||
-                                                                slot.proxy->height() != height);
-                                    }),
-                     textureSlots.end());
+  auto it = textureSlots.begin();
+  while (it != textureSlots.end()) {
+    if (it->available && (it->proxy->width() != width || it->proxy->height() != height)) {
+      it = textureSlots.erase(it);
+    } else {
+      ++it;
+    }
+  }
   if (static_cast<int>(textureSlots.size()) >= maxTextureCount) {
     LOGE("QGLWindow::acquireTexture() All textures are in use. No available texture in the pool.");
     return nullptr;

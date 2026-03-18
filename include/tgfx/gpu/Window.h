@@ -48,13 +48,6 @@ class Window {
    */
   std::shared_ptr<ColorSpace> colorSpace() const;
 
-  /**
-   * Creates a platform-specific RenderTargetProxy for this window. Subclasses must implement this
-   * to provide the appropriate render target for the platform's graphics API. Returns nullptr if
-   * the render target cannot be created.
-   */
-  virtual std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) = 0;
-
  protected:
   std::mutex locker = {};
   std::shared_ptr<Device> device = nullptr;
@@ -62,6 +55,13 @@ class Window {
 
   explicit Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace = nullptr);
   Window() = default;
+
+  /**
+   * Creates a platform-specific RenderTargetProxy for this window. Subclasses must implement this
+   * to provide the appropriate render target for the platform's graphics API. Returns nullptr if
+   * the render target cannot be created.
+   */
+  virtual std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) = 0;
 
   /**
    * Called during the encode phase to schedule present commands into the command buffer.
@@ -77,5 +77,6 @@ class Window {
 
  private:
   friend class DrawingBuffer;
+  friend class Surface;
 };
 }  // namespace tgfx
