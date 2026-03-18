@@ -19,6 +19,7 @@
 #include "tgfx/gpu/metal/MetalWindow.h"
 #import <MetalKit/MetalKit.h>
 #include "gpu/metal/MetalCommandBuffer.h"
+#include "gpu/metal/MetalDefines.h"
 #include "gpu/metal/MetalDrawableProxy.h"
 #include "platform/apple/CGColorSpaceUtil.h"
 
@@ -97,8 +98,9 @@ std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* co
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  drawableProxy = std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer,
-                                                       PixelFormat::BGRA_8888);
+  auto pixelFormat = MetalPixelFormatToPixelFormat(static_cast<unsigned>(metalLayer.pixelFormat));
+  drawableProxy =
+      std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer, pixelFormat);
   return drawableProxy;
 }
 

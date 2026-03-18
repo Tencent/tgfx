@@ -26,7 +26,9 @@ namespace tgfx {
 #define MTL_PIXEL_FORMAT_R8Unorm 10
 #define MTL_PIXEL_FORMAT_RG8Unorm 30
 #define MTL_PIXEL_FORMAT_RGBA8Unorm 70
+#define MTL_PIXEL_FORMAT_RGBA8Unorm_sRGB 71
 #define MTL_PIXEL_FORMAT_BGRA8Unorm 80
+#define MTL_PIXEL_FORMAT_BGRA8Unorm_sRGB 81
 #define MTL_PIXEL_FORMAT_Depth24Unorm_Stencil8 255
 #define MTL_PIXEL_FORMAT_Depth32Float_Stencil8 260
 
@@ -37,11 +39,13 @@ inline PixelFormat MetalPixelFormatToPixelFormat(unsigned metalFormat) {
     case MTL_PIXEL_FORMAT_RG8Unorm:
       return PixelFormat::RG_88;
     case MTL_PIXEL_FORMAT_BGRA8Unorm:
+    case MTL_PIXEL_FORMAT_BGRA8Unorm_sRGB:
       return PixelFormat::BGRA_8888;
     case MTL_PIXEL_FORMAT_Depth24Unorm_Stencil8:
     case MTL_PIXEL_FORMAT_Depth32Float_Stencil8:
       return PixelFormat::DEPTH24_STENCIL8;
     case MTL_PIXEL_FORMAT_RGBA8Unorm:
+    case MTL_PIXEL_FORMAT_RGBA8Unorm_sRGB:
     default:
       return PixelFormat::RGBA_8888;
   }
