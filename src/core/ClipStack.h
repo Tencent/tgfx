@@ -77,6 +77,8 @@ class ClipElement {
 
   bool tryCombine(const ClipElement& other);
 
+  void transform(const Matrix& matrix);
+
   void markInvalid(int byIndex) {
     _invalidatedByIndex = byIndex;
   }

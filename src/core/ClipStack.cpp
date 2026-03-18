@@ -134,6 +134,15 @@ bool ClipElement::tryCombine(const ClipElement& other) {
   return true;
 }
 
+void ClipElement::transform(const Matrix& matrix) {
+  _path.transform(matrix);
+  if (_path.isInverseFillType()) {
+    return;
+  }
+  _bound = _path.getBounds();
+  _isRect = _path.isRect(nullptr);
+}
+
 ClipRecord::ClipRecord() : uniqueID(UniqueID::Next()) {
 }
 
@@ -315,13 +324,7 @@ void ClipStack::transform(const Matrix& matrix) {
 
   willModify();
   for (auto& element : _data->elements) {
-    auto invalidatedByIndex = element.invalidatedByIndex();
-    auto path = element.path();
-    path.transform(matrix);
-    element = ClipElement(path, element.isAntiAlias());
-    if (invalidatedByIndex >= 0) {
-      element.markInvalid(invalidatedByIndex);
-    }
+    element.transform(matrix);
   }
 
   // Update the current record after transforming all elements.
