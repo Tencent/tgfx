@@ -44,7 +44,6 @@ void TGFXBaseView::updateSize() {
   if (context == nullptr) {
     return;
   }
-  surface = nullptr;
   surface = tgfx::Surface::MakeFrom(context, window);
   if (surface == nullptr) {
     device->unlock();
