@@ -751,16 +751,14 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
 
 PlacementPtr<FragmentProcessor> OpsCompositor::makeAnalyticFP(
     const ClipElement& element, PlacementPtr<FragmentProcessor> inputFP) {
-  PlacementPtr<FragmentProcessor> clipFP = nullptr;
-  if (element.isRect()) {
-    auto rect = element.bound();
-    FlipYIfNeeded(&rect, renderTarget.get());
-    clipFP = AARectEffect::Make(drawingAllocator(), rect);
-  }
-  // Future extension: RRectEffect, etc.
-  if (!clipFP) {
+  if (!element.isRect()) {
+    // Future extension: RRectEffect, etc.
     return inputFP;
   }
+
+  auto rect = element.bound();
+  FlipYIfNeeded(&rect, renderTarget.get());
+  auto clipFP = AARectEffect::Make(drawingAllocator(), rect);
   if (!inputFP) {
     return clipFP;
   }
@@ -935,9 +933,9 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     op->setScissorRect(*appliedClip.scissor);
   }
   op->setBlendMode(brush.blendMode);
-  auto fillAAType = getAAType(brush);
+  auto aaType = getAAType(brush);
   if (BlendModeNeedDstTexture(brush.blendMode, op->hasCoverage())) {
-    auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), fillAAType);
+    auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
     auto shaderCaps = context->shaderCaps();
     if (!shaderCaps->frameBufferFetchSupport && dstTextureInfo.textureProxy == nullptr) {
       return;

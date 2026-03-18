@@ -180,6 +180,7 @@ void ClipStack::restore() {
   }
 
   if (_data->records.size() <= 1) {
+    DEBUG_ASSERT(false);  // restore() called without matching save()
     return;
   }
 
