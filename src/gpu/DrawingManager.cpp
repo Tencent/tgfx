@@ -210,5 +210,4 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
   currentBuffer = nullptr;
   return drawingBuffer;
 }
-
 }  // namespace tgfx

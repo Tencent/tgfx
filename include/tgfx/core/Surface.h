@@ -196,8 +196,7 @@ class Surface {
    * Copies a rect of pixels to dstPixels with specified ImageInfo. Copy starts at (srcX, srcY), and
    * does not exceed Surface (width(), height()). Pixels are always provided in top-left origin
    * format; if the Surface's origin is bottom-left, the pixels are flipped during the copy. Pixels
-   * are copied only if pixel conversion is possible. Returns true if pixels are copied to
-   * dstPixels.
+   * are copied only if pixel conversion is possible. Returns true if pixels are copied to dstPixels.
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
   /**

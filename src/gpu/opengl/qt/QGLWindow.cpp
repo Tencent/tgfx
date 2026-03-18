@@ -61,6 +61,7 @@ class QGLDeviceCreator : public QObject {
     if (nativeWindow != nullptr) {
       auto shareContext = getShareContext();
       if (shareContext && shareContext->thread() == QThread::currentThread()) {
+        // We are on the same thread as the QSG render thread, so we can create the device here.
         createDevice(shareContext);
       } else {
         connect(nativeWindow, SIGNAL(beforeRendering()), this, SLOT(onBeforeRendering()),
@@ -110,7 +111,8 @@ std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singl
   }
   auto nativeWindow = quickItem->window();
   auto icc = nativeWindow->format().colorSpace().iccProfile();
-  auto currentColorSpace = ColorSpace::MakeFromICC(icc.data(), static_cast<size_t>(icc.size()));
+  std::shared_ptr<ColorSpace> currentColorSpace =
+      ColorSpace::MakeFromICC(icc.data(), static_cast<size_t>(icc.size()));
   if (colorSpace != nullptr && !NearlyEqual(currentColorSpace.get(), colorSpace.get())) {
     LOGE(
         "QGLWindow::MakeFrom() The specified ColorSpace does not match the window's ColorSpace. "
