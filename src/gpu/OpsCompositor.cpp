@@ -65,11 +65,10 @@ static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& 
 }
 
 OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
-                             std::weak_ptr<Window> window, std::optional<PMColor> clearColor,
+                             std::optional<PMColor> clearColor,
                              std::shared_ptr<ColorSpace> colorSpace)
     : context(proxy->getContext()), renderTarget(std::move(proxy)), renderFlags(renderFlags),
-      clearColor(clearColor), pendingWindow(std::move(window)),
-      dstColorSpace(std::move(colorSpace)) {
+      clearColor(clearColor), dstColorSpace(std::move(colorSpace)) {
   DEBUG_ASSERT(renderTarget != nullptr);
 }
 
@@ -592,9 +591,6 @@ void OpsCompositor::makeClosed() {
   }
   flushPendingOps();
   submitDrawOps();
-  if (!pendingWindow.expired()) {
-    context->drawingManager()->collectWindow(pendingWindow);
-  }
   renderTarget = nullptr;
   // Remove the compositor from the list, so it won't be flushed again.
   context->drawingManager()->compositors.erase(cachedPosition);

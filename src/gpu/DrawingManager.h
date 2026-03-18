@@ -31,7 +31,6 @@
 
 namespace tgfx {
 struct RuntimeInputTexture;
-class Window;
 
 class DrawingManager {
  public:
@@ -54,7 +53,6 @@ class DrawingManager {
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   uint32_t renderFlags,
-                                                  std::weak_ptr<Window> window = {},
                                                   std::optional<PMColor> clearColor = std::nullopt,
                                                   std::shared_ptr<ColorSpace> colorSpace = nullptr);
 

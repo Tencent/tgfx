@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
-#include <algorithm>
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -27,7 +26,6 @@
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "inspect/InspectorMark.h"
 #include "tasks/TransferPixelsTask.h"
-#include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 DrawingManager::DrawingManager(Context* context) : context(context) {
@@ -68,10 +66,10 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
 }
 
 std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
-    std::shared_ptr<RenderTargetProxy> target, uint32_t renderFlags, std::weak_ptr<Window> window,
+    std::shared_ptr<RenderTargetProxy> target, uint32_t renderFlags,
     std::optional<PMColor> clearColor, std::shared_ptr<ColorSpace> colorSpace) {
-  auto compositor = std::make_shared<OpsCompositor>(
-      std::move(target), renderFlags, std::move(window), clearColor, std::move(colorSpace));
+  auto compositor = std::make_shared<OpsCompositor>(std::move(target), renderFlags, clearColor,
+                                                    std::move(colorSpace));
   compositors.push_back(compositor);
   compositor->cachedPosition = --compositors.end();
   return compositor;

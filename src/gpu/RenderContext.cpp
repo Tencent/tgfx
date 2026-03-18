@@ -241,9 +241,11 @@ RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
       _colorSpace(std::move(colorSpace)) {
   if (clearAll) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    auto window = surface ? surface->_window : std::shared_ptr<Window>{};
-    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags, window,
+    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags,
                                                      PMColor::Transparent(), _colorSpace);
+    if (surface && surface->_window) {
+      drawingManager->collectWindow(surface->_window);
+    }
   }
 }
 
@@ -461,9 +463,11 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   }
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    auto window = surface ? surface->_window : std::shared_ptr<Window>{};
-    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags, window,
-                                                     std::nullopt, _colorSpace);
+    opsCompositor =
+        drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
+    if (surface && surface->_window) {
+      drawingManager->collectWindow(surface->_window);
+    }
   } else if (discardContent) {
     opsCompositor->discardAll();
   }
@@ -478,7 +482,7 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
                  oldContent->height() == renderTarget->height());
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor =
-        drawingManager->addOpsCompositor(renderTarget, renderFlags, {}, std::nullopt, _colorSpace);
+        drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
     Brush brush = {{}, BlendMode::Src, false};
     opsCompositor->fillImageRect(std::move(oldContent), renderTarget->bounds(),
                                  renderTarget->bounds(), {}, MCState{}, brush,
