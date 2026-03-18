@@ -29,7 +29,6 @@
 
 namespace tgfx {
 class QGLDeviceCreator;
-class RenderTargetProxy;
 
 class QGLWindow : public Window {
  public:

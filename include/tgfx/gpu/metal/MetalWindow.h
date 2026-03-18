@@ -28,8 +28,6 @@
 
 namespace tgfx {
 
-class RenderTargetProxy;
-
 class MetalWindow : public Window {
  public:
   /**
