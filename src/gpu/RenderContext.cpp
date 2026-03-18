@@ -477,8 +477,8 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
     DEBUG_ASSERT(oldContent->width() == renderTarget->width() &&
                  oldContent->height() == renderTarget->height());
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags, {},
-                                                     std::nullopt, _colorSpace);
+    opsCompositor =
+        drawingManager->addOpsCompositor(renderTarget, renderFlags, {}, std::nullopt, _colorSpace);
     Brush brush = {{}, BlendMode::Src, false};
     opsCompositor->fillImageRect(std::move(oldContent), renderTarget->bounds(),
                                  renderTarget->bounds(), {}, MCState{}, brush,

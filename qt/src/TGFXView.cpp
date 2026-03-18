@@ -98,7 +98,6 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     lastSurfaceWidth = screenWidth;
     lastSurfaceHeight = screenHeight;
     applyCenteringTransform();
-    tgfxWindow->invalidSize();
     surface = nullptr;
     presentImmediately = true;
   }

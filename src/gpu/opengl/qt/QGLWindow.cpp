@@ -21,6 +21,7 @@
 #include <QColorSpace>
 #include <QQuickWindow>
 #include <QThread>
+#include <algorithm>
 #include "QGLDrawableProxy.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
@@ -150,11 +151,6 @@ QSGTexture* QGLWindow::getQSGTexture() const {
   return presentedQSGTexture;
 }
 
-void QGLWindow::invalidSize() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  textureSlots.clear();
-}
-
 std::shared_ptr<RenderTargetProxy> QGLWindow::onCreateRenderTarget(Context* context) {
   auto nativeWindow = quickItem->window();
   if (nativeWindow == nullptr) {
@@ -204,7 +200,7 @@ void QGLWindow::onPresent(Context*) {
   presentedQSGTexture = nativeWindow->createTextureFromId(
       info.id, QSize(textureWidth, textureHeight), QQuickWindow::TextureHasAlphaChannel);
 #endif
-  releaseTexture(proxy->getTextureTargetProxy());
+  reuseTexture(proxy->getTextureTargetProxy());
   QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
 }
 
@@ -217,15 +213,14 @@ std::shared_ptr<RenderTargetProxy> QGLWindow::acquireTexture(Context* context, i
       return slot.proxy;
     }
   }
+  // Remove stale available slots whose size no longer matches.
+  textureSlots.erase(std::remove_if(textureSlots.begin(), textureSlots.end(),
+                                    [width, height](const TextureSlot& slot) {
+                                      return slot.available && (slot.proxy->width() != width ||
+                                                                slot.proxy->height() != height);
+                                    }),
+                     textureSlots.end());
   if (static_cast<int>(textureSlots.size()) >= maxTextureCount) {
-    for (auto& slot : textureSlots) {
-      if (slot.available) {
-        LOGE(
-            "QGLWindow::acquireTexture() Texture pool has stale textures with mismatched size. "
-            "Call invalidSize() before changing the drawable size.");
-        return nullptr;
-      }
-    }
     LOGE("QGLWindow::acquireTexture() All textures are in use. No available texture in the pool.");
     return nullptr;
   }
@@ -237,7 +232,7 @@ std::shared_ptr<RenderTargetProxy> QGLWindow::acquireTexture(Context* context, i
   return proxy;
 }
 
-void QGLWindow::releaseTexture(const std::shared_ptr<RenderTargetProxy>& proxy) {
+void QGLWindow::reuseTexture(const std::shared_ptr<RenderTargetProxy>& proxy) {
   std::lock_guard<std::mutex> autoLock(locker);
   for (auto& slot : textureSlots) {
     if (slot.proxy == proxy) {

@@ -59,8 +59,8 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   drawingMaxValueTracker.addValue(drawingAllocator.size());
   auto commandBuffer = commandEncoder->finish();
   if (commandBuffer != nullptr) {
-    for (auto& weakWindow : windows) {
-      if (auto window = weakWindow.lock()) {
+    for (auto& pendingWindow : windows) {
+      if (auto window = pendingWindow.lock()) {
         window->onEncodePresent(context, commandBuffer);
       }
     }
@@ -70,10 +70,15 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
 }
 
 void DrawingBuffer::presentWindows(Context* context) {
-  for (auto& weakWindow : windows) {
-    if (auto window = weakWindow.lock()) {
+  bool presented = false;
+  for (auto& pendingWindow : windows) {
+    if (auto window = pendingWindow.lock()) {
       window->onPresent(context);
+      presented = true;
     }
+  }
+  if (presented) {
+    FRAME_MARK;
   }
 }
 

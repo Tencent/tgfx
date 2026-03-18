@@ -58,12 +58,6 @@ class QGLWindow : public Window {
    */
   QSGTexture* getQSGTexture() const;
 
-  /**
-   * Invalidates the current size. Call this before the drawable size changes to allow the texture
-   * pool to release stale textures that no longer match the new size.
-   */
-  void invalidSize();
-
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   void onPresent(Context* context) override;
@@ -86,7 +80,7 @@ class QGLWindow : public Window {
   explicit QGLWindow(QQuickItem* quickItem, bool singleBufferMode = false,
                      std::shared_ptr<ColorSpace> colorSpace = nullptr);
   std::shared_ptr<RenderTargetProxy> acquireTexture(Context* context, int width, int height);
-  void releaseTexture(const std::shared_ptr<RenderTargetProxy>& proxy);
+  void reuseTexture(const std::shared_ptr<RenderTargetProxy>& proxy);
   void initDevice();
   void createDevice(QOpenGLContext* context);
 

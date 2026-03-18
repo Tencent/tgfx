@@ -84,9 +84,7 @@ MetalWindow::MetalWindow(std::shared_ptr<Device> device, CAMetalLayer* layer,
 
 MetalWindow::MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalLayer* layer,
                          std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)),
-      metalLayer(layer),
-      metalView(view) {
+    : Window(std::move(device), std::move(colorSpace)), metalLayer(layer), metalView(view) {
 }
 
 std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* context) {

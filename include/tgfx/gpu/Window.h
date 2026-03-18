@@ -21,11 +21,11 @@
 #include <memory>
 #include <mutex>
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/gpu/CommandBuffer.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/Device.h"
 
 namespace tgfx {
-class CommandBuffer;
-class Context;
-class Device;
 class RenderTargetProxy;
 
 /**
@@ -60,8 +60,7 @@ class Window {
   std::shared_ptr<Device> device = nullptr;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
-  explicit Window(std::shared_ptr<Device> device,
-                  std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  explicit Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace = nullptr);
   Window() = default;
 
   /**
