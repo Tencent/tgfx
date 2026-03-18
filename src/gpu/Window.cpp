@@ -33,9 +33,6 @@ std::shared_ptr<Device> Window::getDevice() {
   return device;
 }
 
-void Window::onEncodePresent(Context*, std::shared_ptr<CommandBuffer>) {
-}
-
 void Window::onPresent(Context*) {
 }
 }  // namespace tgfx

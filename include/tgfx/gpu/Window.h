@@ -25,7 +25,6 @@
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
-class CommandBuffer;
 class RenderTargetProxy;
 
 /**
@@ -64,13 +63,7 @@ class Window {
   virtual std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) = 0;
 
   /**
-   * Called during the encode phase to schedule present commands into the command buffer. The default
-   * implementation does nothing.
-   */
-  virtual void onEncodePresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer);
-
-  /**
-   * Called after command buffer submission to perform platform-level buffer swaps. The default
+   * Called after command buffer submission to present the rendered content. The default
    * implementation does nothing.
    */
   virtual void onPresent(Context* context);

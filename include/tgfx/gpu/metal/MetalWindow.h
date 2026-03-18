@@ -50,7 +50,7 @@ class MetalWindow : public Window {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
-  void onEncodePresent(Context* context, std::shared_ptr<CommandBuffer> commandBuffer) override;
+  void onPresent(Context* context) override;
 
  private:
   CAMetalLayer* metalLayer = nil;

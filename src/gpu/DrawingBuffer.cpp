@@ -58,13 +58,6 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   vertexMaxValueTracker.addValue(vertexAllocator.size());
   drawingMaxValueTracker.addValue(drawingAllocator.size());
   auto commandBuffer = commandEncoder->finish();
-  if (commandBuffer != nullptr) {
-    for (auto& pendingWindow : windows) {
-      if (auto window = pendingWindow.lock()) {
-        window->onEncodePresent(context, commandBuffer);
-      }
-    }
-  }
   context->globalCache()->resetUniformBuffer();
   return commandBuffer;
 }

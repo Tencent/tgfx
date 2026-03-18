@@ -18,7 +18,6 @@
 
 #include "tgfx/gpu/metal/MetalWindow.h"
 #import <MetalKit/MetalKit.h>
-#include "gpu/metal/MetalCommandBuffer.h"
 #include "gpu/metal/MetalDefines.h"
 #include "gpu/metal/MetalDrawableProxy.h"
 #include "platform/apple/CGColorSpaceUtil.h"
@@ -104,17 +103,15 @@ std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* co
   return drawableProxy;
 }
 
-void MetalWindow::onEncodePresent(Context*, std::shared_ptr<CommandBuffer> commandBuffer) {
+void MetalWindow::onPresent(Context*) {
   if (drawableProxy == nullptr) {
     return;
   }
   auto proxy = std::static_pointer_cast<MetalDrawableProxy>(drawableProxy);
   auto metalDrawable = proxy->getMetalDrawable();
-  if (metalDrawable != nil && commandBuffer != nullptr) {
-    auto metalCB = std::static_pointer_cast<MetalCommandBuffer>(commandBuffer);
-    [metalCB->metalCommandBuffer() presentDrawable:metalDrawable];
+  if (metalDrawable != nil) {
+    [metalDrawable present];
   }
-  // Release the drawable so next frame's getRenderTarget() acquires a new one.
   proxy->releaseDrawable();
 }
 
