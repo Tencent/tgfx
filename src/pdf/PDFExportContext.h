@@ -20,7 +20,6 @@
 
 #include <unordered_set>
 #include "core/DrawContext.h"
-#include "core/MCState.h"
 #include "core/PictureRecords.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
@@ -48,35 +47,37 @@ class PDFExportContext : public DrawContext {
 
   void drawFill(const Brush& brush) override;
 
-  void drawRect(const Rect& rect, const MCState& state, const Brush& brush,
+  void drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip, const Brush& brush,
                 const Stroke* stroke) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
-                 const Stroke* stroke) override;
+  void drawRRect(const RRect& rRect, const Matrix& matrix, const ClipStack& clip,
+                 const Brush& brush, const Stroke* stroke) override;
 
-  void drawPath(const Path& path, const MCState& state, const Brush& brush) override;
+  void drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
+                const Brush& brush) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush,
-                 const Stroke* stroke) override;
+  void drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix, const ClipStack& clip,
+                 const Brush& brush, const Stroke* stroke) override;
 
-  void drawMesh(std::shared_ptr<Mesh>, const MCState&, const Brush&) override {
+  void drawMesh(std::shared_ptr<Mesh>, const Matrix&, const ClipStack&, const Brush&) override {
     // PDF does not support mesh rendering.
   }
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const Brush& brush) override;
+                 const Matrix& matrix, const ClipStack& clip, const Brush& brush) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling, const MCState& state, const Brush& brush,
-                     SrcRectConstraint constraint) override;
+                     const SamplingOptions& sampling, const Matrix& matrix, const ClipStack& clip,
+                     const Brush& brush, SrcRectConstraint constraint) override;
 
-  void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state, const Brush& brush,
-                    const Stroke* stroke) override;
+  void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix, const ClipStack& clip,
+                    const Brush& brush, const Stroke* stroke) override;
 
-  void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
+  void drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,
+                   const ClipStack& clip) override;
 
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                 const MCState& state, const Brush& brush) override;
+                 const Matrix& matrix, const ClipStack& clip, const Brush& brush) override;
 
   std::unique_ptr<PDFDictionary> makeResourceDictionary();
 
@@ -95,26 +96,31 @@ class PDFExportContext : public DrawContext {
  private:
   void reset();
 
-  void onDrawPath(const MCState& state, const Path& path, const Brush& brush);
+  void onDrawPath(const Matrix& matrix, const ClipStack& clip, const Path& path,
+                  const Brush& brush);
 
   void onDrawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                       const SamplingOptions& sampling, const MCState& state, const Brush& brush);
+                       const SamplingOptions& sampling, const Matrix& matrix, const ClipStack& clip,
+                       const Brush& brush);
 
-  void onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& state, const Brush& brush,
-                      const Stroke* stroke);
+  void onDrawGlyphRun(const GlyphRun& glyphRun, const Matrix& matrix, const ClipStack& clip,
+                      const Brush& brush, const Stroke* stroke);
 
-  void exportGlyphRunAsText(const GlyphRun& glyphRun, const MCState& state, const Brush& brush);
+  void exportGlyphRunAsText(const GlyphRun& glyphRun, const Matrix& matrix, const ClipStack& clip,
+                            const Brush& brush);
 
-  void exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCState& state, const Brush& brush,
-                            const Stroke* stroke);
+  void exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matrix& matrix, const ClipStack& clip,
+                            const Brush& brush, const Stroke* stroke);
 
-  void exportGlyphRunAsImage(const GlyphRun& glyphRun, const MCState& state, const Brush& brush);
+  void exportGlyphRunAsImage(const GlyphRun& glyphRun, const Matrix& matrix, const ClipStack& clip,
+                             const Brush& brush);
 
-  std::shared_ptr<MemoryWriteStream> setUpContentEntry(const MCState& state, const Matrix& matrix,
+  std::shared_ptr<MemoryWriteStream> setUpContentEntry(const Matrix& matrix, const ClipStack& clip,
+                                                       const Matrix& contentExtraMatrix,
                                                        const Brush& brush, float scale,
                                                        PDFIndirectReference* destination);
 
-  void finishContentEntry(const MCState& state, BlendMode blendMode,
+  void finishContentEntry(const Matrix& matrix, const ClipStack& clip, BlendMode blendMode,
                           PDFIndirectReference destination, Path* path);
 
   bool isContentEmpty();
@@ -140,18 +146,18 @@ class PDFExportContext : public DrawContext {
 
   void drawDropShadowBeforeLayer(const std::shared_ptr<Picture>& picture,
                                  const DropShadowImageFilter* dropShadowFilter,
-                                 const MCState& state, const Brush& brush);
+                                 const Matrix& matrix, const ClipStack& clip, const Brush& brush);
 
   void drawInnerShadowAfterLayer(const PictureRecord* record,
                                  const InnerShadowImageFilter* innerShadowFilter,
-                                 const MCState& state);
+                                 const Matrix& matrix, const ClipStack& clip);
 
   void drawBlurLayer(const std::shared_ptr<Picture>& picture,
-                     const std::shared_ptr<ImageFilter>& imageFilter, const MCState& state,
-                     const Brush& brush);
+                     const std::shared_ptr<ImageFilter>& imageFilter, const Matrix& matrix,
+                     const ClipStack& clip, const Brush& brush);
 
-  void drawPathWithFilter(const MCState& state, const Path& originPath, const Matrix& matrix,
-                          const Brush& originPaint);
+  void drawPathWithFilter(const Matrix& matrix, const ClipStack& clip, const Path& originPath,
+                          const Matrix& pathExtraMatrix, const Brush& originPaint);
 
   ISize _pageSize = {};
   PDFDocumentImpl* document = nullptr;
