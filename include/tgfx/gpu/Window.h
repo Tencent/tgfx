@@ -46,7 +46,7 @@ class Window {
   /**
    * Returns the color space associated with this Window. Returns nullptr for the default sRGB.
    */
-  virtual std::shared_ptr<ColorSpace> colorSpace() const;
+  std::shared_ptr<ColorSpace> colorSpace() const;
 
   /**
    * Creates a platform-specific RenderTargetProxy for this window. Subclasses must implement this
