@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/PictureRecorder.h"
-#include "core/CanvasState.h"
 #include "core/PictureContext.h"
 
 namespace tgfx {

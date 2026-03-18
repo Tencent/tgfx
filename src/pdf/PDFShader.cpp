@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFShader.h"
-#include "core/CanvasState.h"
 #include "core/shaders/ImageShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/Types.h"

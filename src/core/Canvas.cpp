@@ -78,6 +78,8 @@ Canvas::Canvas(DrawContext* drawContext, Surface* surface)
   clipStack = std::make_unique<ClipStack>();
 }
 
+Canvas::~Canvas() = default;
+
 int Canvas::save() {
   stateStack.push(std::make_unique<CanvasState>(matrix));
   clipStack->save();
