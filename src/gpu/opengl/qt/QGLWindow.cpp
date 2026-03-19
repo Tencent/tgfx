@@ -169,28 +169,23 @@ std::shared_ptr<RenderTargetProxy> QGLWindow::onCreateRenderTarget(Context* cont
 }
 
 void QGLWindow::onPresent(Context*) {
-  auto proxy = presentingProxy;
-  presentingProxy = nullptr;
-  if (proxy == nullptr) {
+  if (presentingProxy == nullptr) {
     return;
   }
-  auto textureView = proxy->getTextureView();
+  auto textureView = presentingProxy->getTextureView();
   if (textureView == nullptr) {
-    proxy->releaseTexture();
     return;
   }
   GLTextureInfo info = {};
   if (!textureView->getBackendTexture().getGLTextureInfo(&info)) {
-    proxy->releaseTexture();
     return;
   }
   auto nativeWindow = quickItem->window();
   if (nativeWindow == nullptr) {
-    proxy->releaseTexture();
     return;
   }
-  auto textureWidth = proxy->width();
-  auto textureHeight = proxy->height();
+  auto textureWidth = presentingProxy->width();
+  auto textureHeight = presentingProxy->height();
   delete presentedQSGTexture;
   presentedQSGTexture = nullptr;
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
@@ -205,7 +200,6 @@ void QGLWindow::onPresent(Context*) {
   presentedQSGTexture = nativeWindow->createTextureFromId(
       info.id, QSize(textureWidth, textureHeight), QQuickWindow::TextureHasAlphaChannel);
 #endif
-  proxy->releaseTexture();
   QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
 }
 
