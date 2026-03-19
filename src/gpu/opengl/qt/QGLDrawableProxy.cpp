@@ -57,6 +57,9 @@ bool QGLDrawableProxy::externallyOwned() const {
 void QGLDrawableProxy::ensureTextureRTProxy() const {
   if (textureRTProxy == nullptr) {
     textureRTProxy = _window->acquireTexture(_context, _width, _height);
+    if (textureRTProxy != nullptr) {
+      _window->presentingProxy = const_cast<QGLDrawableProxy*>(this);
+    }
   }
 }
 
@@ -78,6 +81,9 @@ std::shared_ptr<RenderTargetProxy> QGLDrawableProxy::getTextureTargetProxy() con
 }
 
 void QGLDrawableProxy::releaseTexture() {
-  textureRTProxy = nullptr;
+  if (textureRTProxy != nullptr) {
+    _window->reuseTexture(textureRTProxy);
+    textureRTProxy = nullptr;
+  }
 }
 }  // namespace tgfx
