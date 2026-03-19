@@ -61,7 +61,7 @@ bool MaskContext::finish(Path* result) {
     record.path.transform(record.state.matrix);
     Path clippedPath = record.state.clip;
     clippedPath.addPath(record.path, PathOp::Intersect);
-    maskPath.addPath(clippedPath);
+    maskPath.addPath(clippedPath, PathOp::Union);
   }
   *result = std::move(maskPath);
   return true;

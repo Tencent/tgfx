@@ -853,4 +853,40 @@ TGFX_TEST(LayerMaskTest, MaskInvalidation) {
   EXPECT_FALSE(root->bitFields.dirtyDescendents);
 }
 
+TGFX_TEST(LayerMaskTest, solidLayerWithTwoFillMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Surface: 400x400, content layer centered with ~50px margin
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+  auto root = Layer::Make();
+  displayList->root()->addChild(root);
+
+  // Content layer: blue solid layer, 300x300, positioned at (50, 50)
+  auto contentLayer = SolidLayer::Make();
+  contentLayer->setWidth(300);
+  contentLayer->setHeight(300);
+  contentLayer->setColor(Color{0, 0, 1, 1});
+  contentLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  root->addChild(contentLayer);
+
+  // Mask layer: ShapeLayer with two opaque solid-color fills, oval shape covering center of content.
+  // fill1: opaque white, fill2: opaque red, both SrcOver.
+  // Mask coordinates are in root space; oval at (100,100)-(300,300) covers center of contentLayer.
+  auto maskLayer = ShapeLayer::Make();
+  Path maskPath = {};
+  maskPath.addOval(Rect::MakeXYWH(100, 100, 200, 200));
+  maskLayer->setPath(maskPath);
+  maskLayer->addFillStyle(ShapeStyle::Make(Color{1, 1, 1, 1}));
+  maskLayer->addFillStyle(ShapeStyle::Make(Color{1, 0, 0, 1}));
+  root->addChild(maskLayer);
+
+  contentLayer->setMask(maskLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/SolidLayerWithTwoFillMask"));
+}
+
 }  // namespace tgfx
