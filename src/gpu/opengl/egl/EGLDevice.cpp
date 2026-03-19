@@ -245,17 +245,6 @@ bool EGLDevice::onLockContext() {
     // The read/draw surface may be different.
     return true;
   }
-#if defined(_WIN32)
-  auto nativeWindow = sizeInvalidWindow.exchange(nullptr, std::memory_order_relaxed);
-  if (nativeWindow != nullptr) {
-    eglDestroySurface(eglDisplay, eglSurface);
-    eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, EGLGlobals::Get());
-    if (eglSurface == nullptr) {
-      LOGE("EGLDevice::onLockContext() CreateFixedSizeSurfaceForAngle error=%d", eglGetError());
-      return false;
-    }
-  }
-#endif
   auto result = eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
   if (!result) {
     LOGE("EGLDevice::onLockContext() failure result = %d error= %d", result, eglGetError());
@@ -273,5 +262,36 @@ void EGLDevice::onUnlockContext() {
     // 可能失败。
     eglMakeCurrent(oldEglDisplay, oldEglDrawSurface, oldEglReadSurface, oldEglContext);
   }
+}
+
+bool EGLDevice::recreateSurfaceIfNeeded(EGLNativeWindowType nativeWindow) {
+#if defined(_WIN32)
+  if (nativeWindow == nullptr) {
+    return true;
+  }
+  EGLint surfaceWidth = 0;
+  EGLint surfaceHeight = 0;
+  eglQuerySurface(eglDisplay, eglSurface, EGL_WIDTH, &surfaceWidth);
+  eglQuerySurface(eglDisplay, eglSurface, EGL_HEIGHT, &surfaceHeight);
+  RECT rect = {};
+  GetClientRect(nativeWindow, &rect);
+  auto windowWidth = static_cast<int>(rect.right - rect.left);
+  auto windowHeight = static_cast<int>(rect.bottom - rect.top);
+  if (surfaceWidth == windowWidth && surfaceHeight == windowHeight) {
+    return true;
+  }
+  eglDestroySurface(eglDisplay, eglSurface);
+  eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, EGLGlobals::Get());
+  if (eglSurface == nullptr) {
+    LOGE("EGLDevice::recreateSurfaceIfNeeded() CreateFixedSizeSurfaceForAngle error=%d",
+         eglGetError());
+    return false;
+  }
+  // Re-bind the new surface to the current context.
+  eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
+#else
+  (void)nativeWindow;
+#endif
+  return true;
 }
 }  // namespace tgfx

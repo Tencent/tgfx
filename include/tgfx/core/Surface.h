@@ -31,6 +31,7 @@ class Canvas;
 class Context;
 class RenderContext;
 class RenderTargetProxy;
+class Window;
 
 /**
  * The Surface class is responsible for managing the pixels that a Canvas draws into. The Surface
@@ -92,6 +93,16 @@ class Surface {
   static std::shared_ptr<Surface> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
                                            int sampleCount = 1, uint32_t renderFlags = 0,
                                            std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
+  /**
+   * Creates a new Surface for rendering to the specified Window. The returned Surface is bound
+   * to the window's current size at the time of creation. If the window is resized, you must
+   * call MakeFrom() again to obtain a new Surface that matches the updated dimensions.
+   * The color space is automatically obtained from the Window via window->colorSpace().
+   * Returns nullptr if the context is nullptr or the window cannot provide a valid render target.
+   */
+  static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Window> window,
+                                           uint32_t renderFlags = 0);
 
   virtual ~Surface();
 
@@ -198,13 +209,16 @@ class Surface {
   RenderContext* renderContext = nullptr;
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
+  std::shared_ptr<Window> _window = nullptr;
 
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                                            uint32_t renderFlags = 0, bool clearAll = false,
-                                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                           std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                           std::shared_ptr<Window> window = nullptr);
 
   Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0, bool clearAll = false,
-          std::shared_ptr<ColorSpace> colorSpace = nullptr);
+          std::shared_ptr<ColorSpace> colorSpace = nullptr,
+          std::shared_ptr<Window> window = nullptr);
 
   bool aboutToDraw(bool discardContent = false);
 

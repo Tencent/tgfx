@@ -37,8 +37,8 @@ void JTGFXView::updateSize() {
   if (width > 0 && height > 0) {
     lastSurfaceWidth = width;
     lastSurfaceHeight = height;
-    window->invalidSize();
   }
+  surface = nullptr;
 }
 
 void JTGFXView::updateLayerTree(int drawIndex) {
@@ -81,7 +81,9 @@ void JTGFXView::draw() {
     return;
   }
 
-  auto surface = window->getSurface(context);
+  if (surface == nullptr) {
+    surface = tgfx::Surface::MakeFrom(context, window);
+  }
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -103,7 +105,6 @@ void JTGFXView::draw() {
 
   if (recording) {
     context->submit(std::move(recording));
-    window->present(context);
   }
 
   device->unlock();

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/SlidingWindowTracker.h"
@@ -26,6 +27,9 @@
 #include "gpu/tasks/ResourceTask.h"
 
 namespace tgfx {
+
+class Window;
+
 class DrawingBuffer {
  public:
   explicit DrawingBuffer(Context* context);
@@ -60,6 +64,11 @@ class DrawingBuffer {
    */
   std::shared_ptr<CommandBuffer> encode();
 
+  /**
+   * Calls onPresent on all windows after command buffer submission.
+   */
+  void presentWindows(Context* context);
+
  private:
   Context* context = nullptr;
   uint32_t _uniqueID = 0;
@@ -73,6 +82,7 @@ class DrawingBuffer {
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::vector<PlacementPtr<AtlasUploadTask>> atlasTasks = {};
+  std::vector<std::weak_ptr<Window>> windows = {};
 
   friend class DrawingManager;
 };

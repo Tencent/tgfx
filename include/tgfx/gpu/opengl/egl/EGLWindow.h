@@ -46,14 +46,14 @@ class EGLWindow : public Window {
   void setPresentationTime(int64_t presentationTime);
 
  protected:
-  void onInvalidSize() override;
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
+  std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   void onPresent(Context* context) override;
 
  private:
   EGLNativeWindowType nativeWindow;
   std::optional<int64_t> presentationTime = std::nullopt;
 
-  explicit EGLWindow(std::shared_ptr<Device> device);
+  explicit EGLWindow(std::shared_ptr<Device> device,
+                     std::shared_ptr<ColorSpace> colorSpace = nullptr);
 };
 }  // namespace tgfx

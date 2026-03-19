@@ -20,6 +20,7 @@
 #include <thread>
 #include "core/utils/Log.h"
 #include "gpu/opengl/GLDefines.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/gpu/Backend.h"
 
 #pragma clang diagnostic push
@@ -49,7 +50,7 @@ std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj share
 
 CGLWindow::CGLWindow(std::shared_ptr<Device> device, NSView* view,
                      std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device)), view(view), colorSpace(std::move(colorSpace)) {
+    : Window(std::move(device), std::move(colorSpace)), view(view) {
   // do not retain view here, otherwise it can cause circular reference.
 }
 
@@ -59,7 +60,7 @@ CGLWindow::~CGLWindow() {
   view = nil;
 }
 
-std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<RenderTargetProxy> CGLWindow::onCreateRenderTarget(Context* context) {
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
   [glContext update];
   CGSize size = [view convertSizeToBacking:view.bounds.size];
@@ -72,7 +73,7 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
   frameBuffer.format = GL_RGBA8;
   BackendRenderTarget renderTarget(frameBuffer, static_cast<int>(size.width),
                                    static_cast<int>(size.height));
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
+  return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
 void CGLWindow::onPresent(Context*) {
