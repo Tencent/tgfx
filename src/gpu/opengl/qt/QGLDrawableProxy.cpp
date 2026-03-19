@@ -76,4 +76,8 @@ std::shared_ptr<RenderTarget> QGLDrawableProxy::getRenderTarget() const {
 std::shared_ptr<RenderTargetProxy> QGLDrawableProxy::getTextureTargetProxy() const {
   return textureRTProxy;
 }
+
+void QGLDrawableProxy::releaseTexture() {
+  textureRTProxy = nullptr;
+}
 }  // namespace tgfx

@@ -202,6 +202,7 @@ void QGLWindow::onPresent(Context*) {
       info.id, QSize(textureWidth, textureHeight), QQuickWindow::TextureHasAlphaChannel);
 #endif
   reuseTexture(proxy->getTextureTargetProxy());
+  proxy->releaseTexture();
   QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
 }
 

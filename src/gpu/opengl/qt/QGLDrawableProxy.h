@@ -40,6 +40,7 @@ class QGLDrawableProxy : public RenderTargetProxy {
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
   std::shared_ptr<RenderTargetProxy> getTextureTargetProxy() const;
+  void releaseTexture();
 
  private:
   Context* _context = nullptr;
