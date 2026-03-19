@@ -51,7 +51,10 @@ class QGLDrawableProxy : public RenderTargetProxy {
   ImageOrigin _origin = ImageOrigin::BottomLeft;
   QGLWindow* _window = nullptr;
   mutable std::shared_ptr<RenderTargetProxy> textureRTProxy = nullptr;
+  std::weak_ptr<RenderTargetProxy> weakThis;
 
   void ensureTextureRTProxy() const;
+
+  friend class QGLWindow;
 };
 }  // namespace tgfx

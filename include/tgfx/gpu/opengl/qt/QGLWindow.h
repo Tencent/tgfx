@@ -76,7 +76,7 @@ class QGLWindow : public Window {
   QGLDeviceCreator* deviceCreator = nullptr;
   QSGTexture* presentedQSGTexture = nullptr;
   std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
-  QGLDrawableProxy* presentingProxy = nullptr;
+  std::shared_ptr<RenderTargetProxy> presentingProxy = nullptr;
 
   explicit QGLWindow(QQuickItem* quickItem, bool singleBufferMode = false,
                      std::shared_ptr<ColorSpace> colorSpace = nullptr);

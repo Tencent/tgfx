@@ -58,7 +58,7 @@ void QGLDrawableProxy::ensureTextureRTProxy() const {
   if (textureRTProxy == nullptr) {
     textureRTProxy = _window->acquireTexture(_context, _width, _height);
     if (textureRTProxy != nullptr) {
-      _window->presentingProxy = const_cast<QGLDrawableProxy*>(this);
+      _window->presentingProxy = weakThis.lock();
     }
   }
 }

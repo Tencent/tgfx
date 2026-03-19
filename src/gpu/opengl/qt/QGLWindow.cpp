@@ -165,15 +165,16 @@ std::shared_ptr<RenderTargetProxy> QGLWindow::onCreateRenderTarget(Context* cont
   }
   drawableProxy = std::make_shared<QGLDrawableProxy>(context, width, height, PixelFormat::RGBA_8888,
                                                      1, ImageOrigin::BottomLeft, this);
+  std::static_pointer_cast<QGLDrawableProxy>(drawableProxy)->weakThis = drawableProxy;
   return drawableProxy;
 }
 
 void QGLWindow::onPresent(Context*) {
-  auto proxy = presentingProxy;
-  presentingProxy = nullptr;
-  if (proxy == nullptr) {
+  if (presentingProxy == nullptr) {
     return;
   }
+  auto proxy = std::static_pointer_cast<QGLDrawableProxy>(presentingProxy);
+  presentingProxy = nullptr;
   auto textureView = proxy->getTextureView();
   if (textureView == nullptr) {
     proxy->releaseTexture();
