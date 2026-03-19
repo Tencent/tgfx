@@ -230,6 +230,7 @@
         "MaskInvalidation_WithMask": "6d7f38ad",
         "MaskPathOptimization": "bf48e614",
         "RoundRectMaskWithTiledRender": "bf48e614",
+        "SolidLayerWithTwoFillMask": "03743384c",
         "imageMask": "bf48e614",
         "shapeMask": "bf48e614",
         "textMask": "bf48e614"
