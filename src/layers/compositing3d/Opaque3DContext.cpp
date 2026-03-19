@@ -56,6 +56,10 @@ void Opaque3DContext::finishAndDrawTo(Canvas* canvas, bool antialiasing) {
   paint.setAntiAlias(antialiasing);
   for (const auto& entry : _opaqueImages) {
     AutoCanvasRestore autoRestore(canvas);
+    // Apply inverse scale first to compensate for the canvas's existing scale,
+    // similar to Render3DContext::finishAndDrawTo.
+    auto invScaleMatrix = Matrix::MakeScale(1.0f / _contentScale, 1.0f / _contentScale);
+    canvas->concat(invScaleMatrix);
     auto imageMatrix = entry.transform.asMatrix();
     canvas->concat(imageMatrix);
     canvas->drawImage(entry.image, &paint);

@@ -1827,6 +1827,7 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
   }
 
   // Draw children's contour directly (not using drawChildren to avoid background logic)
+  // Children inherit excludeEffects from parent args, so their effects are also skipped
   auto childArgs = args;
   for (auto& child : _children) {
     if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
