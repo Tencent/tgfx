@@ -19,6 +19,7 @@
 #pragma once
 
 #include "core/ClipStack.h"
+#include "core/SmallVector.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "tgfx/core/Brush.h"
@@ -141,6 +142,9 @@ class OpsCompositor {
   }
 
  private:
+  // SmallVector for clip elements to reduce heap allocations in applyClip().
+  using ClipElementList = SmallVector<const ClipElement*, 4>;
+
   Context* context = nullptr;
   std::list<std::shared_ptr<OpsCompositor>>::iterator cachedPosition;
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
@@ -193,10 +197,10 @@ class OpsCompositor {
   AppliedClip applyClip(const ClipStack& clipStack);
   PlacementPtr<FragmentProcessor> makeAnalyticFP(const ClipElement& element,
                                                  PlacementPtr<FragmentProcessor> inputFP);
-  PlacementPtr<FragmentProcessor> getClipMaskFP(const std::vector<const ClipElement*>& elements,
-                                                uint32_t uniqueID, const Rect& clipBound,
+  PlacementPtr<FragmentProcessor> getClipMaskFP(const ClipElementList& elements, uint32_t uniqueID,
+                                                const Rect& clipBound,
                                                 PlacementPtr<FragmentProcessor> inputFP);
-  std::shared_ptr<TextureProxy> makeClipTexture(const std::vector<const ClipElement*>& elements,
+  std::shared_ptr<TextureProxy> makeClipTexture(const ClipElementList& elements,
                                                 const Rect& bounds) const;
   PlacementPtr<FragmentProcessor> makeMaskFP(std::shared_ptr<TextureProxy> maskTexture,
                                              const Rect& bounds,
