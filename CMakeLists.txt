@@ -399,21 +399,18 @@ if (TGFX_BUILD_SVG)
     endif ()
 endif ()
 if (TGFX_BUILD_PDF)
-    if (HARFBUZZ_LIB AND HARFBUZZ_SUBSET_LIB AND HARFBUZZ_INCLUDE)
+    if (HARFBUZZ_LIBS AND HARFBUZZ_INCLUDE)
         # Prebuilt HarfBuzz static libraries and headers provided externally.
-        # HARFBUZZ_LIB: path to libharfbuzz.a (core library providing base symbols)
-        # HARFBUZZ_SUBSET_LIB: path to libharfbuzz-subset.a (for font subsetting in PDF)
+        # HARFBUZZ_LIBS: paths to libharfbuzz.a and libharfbuzz-subset.a
         # HARFBUZZ_INCLUDE: path to HarfBuzz headers directory
-        message("HARFBUZZ_LIB: ${HARFBUZZ_LIB}")
-        message("HARFBUZZ_SUBSET_LIB: ${HARFBUZZ_SUBSET_LIB}")
+        message("HARFBUZZ_LIBS: ${HARFBUZZ_LIBS}")
         message("HARFBUZZ_INCLUDE: ${HARFBUZZ_INCLUDE}")
         list(APPEND TGFX_INCLUDES ${HARFBUZZ_INCLUDE})
         # Use TGFX_SHARED_LIBS to avoid embedding into the static libtgfx archive.
-        # Link harfbuzz first as harfbuzz-subset depends on it.
-        list(APPEND TGFX_SHARED_LIBS ${HARFBUZZ_LIB} ${HARFBUZZ_SUBSET_LIB})
+        list(APPEND TGFX_SHARED_LIBS ${HARFBUZZ_LIBS})
     else ()
         # Built-in HarfBuzz, compile from third_party.
-        list(APPEND TGFX_STATIC_VENDORS harfbuzz-subset)
+        list(APPEND TGFX_STATIC_VENDORS harfbuzz)
         list(APPEND TGFX_INCLUDES third_party/harfbuzz/src)
     endif ()
 endif ()
@@ -687,8 +684,8 @@ if (TGFX_BUILD_TESTS)
                 third_party/googletest/googletest
                 third_party/googletest/googletest/include)
     else ()
-        # Use built-in HarfBuzz (harfbuzz-subset includes both harfbuzz and harfbuzz-subset).
-        add_vendor_target(test-vendor STATIC_VENDORS harfbuzz-subset googletest)
+        # Use built-in HarfBuzz (includes both harfbuzz and harfbuzz-subset).
+        add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest)
         find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
         list(APPEND TGFX_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
         list(APPEND TGFX_TEST_INCLUDES

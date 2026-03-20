@@ -203,8 +203,7 @@
       }
     },
     {
-      "name": "harfbuzz-subset",
-      "dir": "harfbuzz",
+      "name": "harfbuzz",
       "cmake": {
         "targets": [
           "harfbuzz",
