@@ -19,6 +19,7 @@
 #include "Opaque3DContext.h"
 #include "core/Matrix3DUtils.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Paint.h"
 
@@ -58,7 +59,7 @@ void Opaque3DContext::finishAndDrawTo(Canvas* canvas, bool antialiasing) {
   AutoCanvasRestore outerRestore(canvas);
   // The imageMatrix already contains the scale needed for drawing the image to the canvas.
   // Apply inverse scale to cancel out the canvas's existing scale transformation.
-  DEBUG_ASSERT(_contentScale != 0);
+  DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
   canvas->concat(Matrix::MakeScale(1.0f / _contentScale, 1.0f / _contentScale));
   for (const auto& entry : _opaqueImages) {
     AutoCanvasRestore autoRestore(canvas);
