@@ -687,8 +687,8 @@ if (TGFX_BUILD_TESTS)
                 third_party/googletest/googletest
                 third_party/googletest/googletest/include)
     else ()
-        # Use built-in HarfBuzz.
-        add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest)
+        # Use built-in HarfBuzz (harfbuzz-subset includes both harfbuzz and harfbuzz-subset).
+        add_vendor_target(test-vendor STATIC_VENDORS harfbuzz-subset googletest)
         find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
         list(APPEND TGFX_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
         list(APPEND TGFX_TEST_INCLUDES
