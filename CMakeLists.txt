@@ -399,8 +399,20 @@ if (TGFX_BUILD_SVG)
     endif ()
 endif ()
 if (TGFX_BUILD_PDF)
-    list(APPEND TGFX_STATIC_VENDORS harfbuzz)
-    list(APPEND TGFX_INCLUDES third_party/harfbuzz/src)
+    if (HARFBUZZ_SUBSET_LIB AND HARFBUZZ_INCLUDE)
+        # Prebuilt HarfBuzz-subset static library and headers provided externally.
+        # HARFBUZZ_SUBSET_LIB: path to libharfbuzz-subset.a (for font subsetting in PDF)
+        # HARFBUZZ_INCLUDE: path to HarfBuzz headers directory
+        message("HARFBUZZ_SUBSET_LIB: ${HARFBUZZ_SUBSET_LIB}")
+        message("HARFBUZZ_INCLUDE: ${HARFBUZZ_INCLUDE}")
+        list(APPEND TGFX_INCLUDES ${HARFBUZZ_INCLUDE})
+        # Use TGFX_SHARED_LIBS to avoid embedding into the static libtgfx archive.
+        list(APPEND TGFX_SHARED_LIBS ${HARFBUZZ_SUBSET_LIB})
+    else ()
+        # Built-in HarfBuzz, compile from third_party.
+        list(APPEND TGFX_STATIC_VENDORS harfbuzz-subset)
+        list(APPEND TGFX_INCLUDES third_party/harfbuzz/src)
+    endif ()
 endif ()
 
 if (WEB)
@@ -659,13 +671,28 @@ if (TGFX_BUILD_TESTS)
     list(APPEND TGFX_TEST_LIBS tgfx-hello2d tgfx ${TGFX_SHARED_LIBS})
     list(APPEND TGFX_TEST_INCLUDES src test/src hello2d/include third_party/json/include)
 
-    add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest)
-    find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
-    list(APPEND TGFX_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
-    list(APPEND TGFX_TEST_INCLUDES
-            third_party/harfbuzz/src
-            third_party/googletest/googletest
-            third_party/googletest/googletest/include)
+    if (HARFBUZZ_LIB AND HARFBUZZ_INCLUDE)
+        # Use externally provided HarfBuzz.
+        # HARFBUZZ_LIB: path to libharfbuzz.a (for text shaping in tests)
+        # HARFBUZZ_INCLUDE: path to HarfBuzz headers directory
+        message("HARFBUZZ_LIB: ${HARFBUZZ_LIB}")
+        add_vendor_target(test-vendor STATIC_VENDORS googletest)
+        find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
+        list(APPEND TGFX_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES} ${HARFBUZZ_LIB})
+        list(APPEND TGFX_TEST_INCLUDES
+                ${HARFBUZZ_INCLUDE}
+                third_party/googletest/googletest
+                third_party/googletest/googletest/include)
+    else ()
+        # Use built-in HarfBuzz.
+        add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest)
+        find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
+        list(APPEND TGFX_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
+        list(APPEND TGFX_TEST_INCLUDES
+                third_party/harfbuzz/src
+                third_party/googletest/googletest
+                third_party/googletest/googletest/include)
+    endif ()
 
     list(APPEND TGFX_TEST_COMPILE_OPTIONS ${TGFX_COMPILE_OPTIONS} -fno-access-control)
     list(APPEND TGFX_TEST_DEFINES ${TGFX_DEFINES})
