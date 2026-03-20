@@ -38,9 +38,22 @@ if (TEST_OPENGL_FILES)
     list(REMOVE_ITEM TEST_SOURCES ${TEST_OPENGL_FILES})
 endif ()
 
-# Include WebGL-specific test sources
-file(GLOB_RECURSE TEST_WEBGL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgl/*.*)
-list(APPEND TEST_SOURCES ${TEST_WEBGL_FILES})
+# Include backend-specific test sources
+if (TGFX_USE_WEBGPU)
+    file(GLOB_RECURSE TEST_WEBGL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgl/*.*)
+    if (TEST_WEBGL_FILES)
+        list(REMOVE_ITEM TEST_SOURCES ${TEST_WEBGL_FILES})
+    endif ()
+    file(GLOB_RECURSE TEST_WEBGPU_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgpu/*.*)
+    list(APPEND TEST_SOURCES ${TEST_WEBGPU_FILES})
+else ()
+    file(GLOB_RECURSE TEST_WEBGPU_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgpu/*.*)
+    if (TEST_WEBGPU_FILES)
+        list(REMOVE_ITEM TEST_SOURCES ${TEST_WEBGPU_FILES})
+    endif ()
+    file(GLOB_RECURSE TEST_WEBGL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgl/*.*)
+    list(APPEND TEST_SOURCES ${TEST_WEBGL_FILES})
+endif ()
 
 # Exclude TestMain.cpp since web uses WebTestRunner.cpp as entry point
 list(FILTER TEST_SOURCES EXCLUDE REGEX ".*/TestMain\\.cpp$")
@@ -100,12 +113,18 @@ target_compile_definitions(tgfx-test PRIVATE
     $<$<BOOL:${TGFX_UPDATE_BASELINE}>:UPDATE_BASELINE>
 )
 
+if (TGFX_USE_WEBGPU)
+    set(WEB_GRAPHICS_LINK_OPTIONS -sUSE_WEBGPU=1)
+else ()
+    set(WEB_GRAPHICS_LINK_OPTIONS -sMAX_WEBGL_VERSION=2)
+endif ()
+
 target_link_options(tgfx-test PRIVATE
     -lembind
     -fno-rtti
     -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0
     -sWASM=1
-    -sMAX_WEBGL_VERSION=2
+    ${WEB_GRAPHICS_LINK_OPTIONS}
     -sALLOW_MEMORY_GROWTH=1
     -sINITIAL_MEMORY=256MB
     -sMAXIMUM_MEMORY=2GB
