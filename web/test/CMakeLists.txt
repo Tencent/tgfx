@@ -83,6 +83,10 @@ if (EXISTS ${CACHE_WEB_DIR}/md5.json AND EXISTS ${CACHE_WEB_DIR}/version.json)
         "SHELL:--preload-file ${CACHE_WEB_DIR}/md5.json@/test/baseline/.cache-web/md5.json"
         "SHELL:--preload-file ${CACHE_WEB_DIR}/version.json@/test/baseline/.cache-web/version.json"
     )
+else ()
+    message(WARNING "Baseline cache not found at ${CACHE_WEB_DIR}/. "
+        "Screenshot tests will pass without actual comparison. "
+        "Run 'bash update_baseline.sh' first to generate the baseline cache from main branch.")
 endif ()
 
 target_compile_options(tgfx-test PRIVATE
@@ -93,6 +97,7 @@ target_compile_options(tgfx-test PRIVATE
 
 target_compile_definitions(tgfx-test PRIVATE
     GENERATE_BASELINE_IMAGES
+    $<$<BOOL:${TGFX_UPDATE_BASELINE}>:UPDATE_BASELINE>
 )
 
 target_link_options(tgfx-test PRIVATE

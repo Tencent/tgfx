@@ -23,6 +23,8 @@
 
 static bool initialized = false;
 
+static const char* excludeFilter = "-ReadPixelsTest.NativeCodec:ReadPixelsTest.JpegCodec";
+
 static void initTests() {
   if (initialized) {
     return;
@@ -33,7 +35,7 @@ static void initTests() {
   testing::AddGlobalTestEnvironment(new tgfx::TestEnvironment());
   testing::InitGoogleTest(&argc, const_cast<char**>(argv));
   // Exclude tests that depend on platform-specific native image codecs unavailable in Emscripten.
-  testing::GTEST_FLAG(filter) = "-ReadPixelsTest.NativeCodec";
+  testing::GTEST_FLAG(filter) = excludeFilter;
 }
 
 extern "C" {
@@ -48,7 +50,7 @@ EMSCRIPTEN_KEEPALIVE
 int RunTest(const char* filter) {
   initTests();
   if (filter != nullptr && filter[0] != '\0') {
-    testing::GTEST_FLAG(filter) = std::string(filter);
+    testing::GTEST_FLAG(filter) = std::string(filter) + ":" + excludeFilter;
   }
   return RUN_ALL_TESTS();
 }

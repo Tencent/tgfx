@@ -5,7 +5,7 @@
   "scripts": {
     "build": "emcmake cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -- -j 8 && npm run copy",
     "build:debug": "emcmake cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build -- -j 8 && npm run copy",
-    "copy": "cp build/tgfx-test.js build/tgfx-test.wasm build/tgfx-test.data . 2>/dev/null || true",
+    "copy": "cp build/tgfx-test.js build/tgfx-test.wasm build/tgfx-test.data . 2>/dev/null || true; cp ../lib/tgfx.esm.js . 2>/dev/null || true",
     "serve": "npx http-server -p 8082 -c-1",
     "test": "npm run build && npm run serve",
     "autotest": "node run_test.js",
