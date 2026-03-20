@@ -184,14 +184,28 @@ void ClipStack::restore() {
     return;
   }
 
-  const auto startIndex = current().startIndex;
+  const auto startIndex = cur.startIndex;
   _data->elements.resize(startIndex);
   for (auto& element : _data->elements) {
     if (element.invalidatedByIndex() >= static_cast<int>(startIndex)) {
       element.markInvalid(-1);
     }
   }
+
+  const auto curTransform = cur.transform;
   _data->records.pop();
+
+  // Restore elements transformed during this save level.
+  // The accumulated transform is guaranteed to be invertible (checked in transform()).
+  if (curTransform.isIdentity()) {
+    return;
+  }
+  Matrix inverse = {};
+  [[maybe_unused]] auto invertible = curTransform.invert(&inverse);
+  DEBUG_ASSERT(invertible);
+  for (auto& element : _data->elements) {
+    element.transform(inverse);
+  }
 }
 
 void ClipStack::detachIfShared() {
@@ -323,6 +337,14 @@ void ClipStack::transform(const Matrix& matrix) {
     return;
   }
 
+  auto newTransform = current().transform;
+  newTransform.postConcat(matrix);
+  Matrix inverse = {};
+  if (!newTransform.invert(&inverse)) {
+    DEBUG_ASSERT(false);
+    return;
+  }
+
   willModify();
   for (auto& element : _data->elements) {
     element.transform(matrix);
@@ -330,6 +352,7 @@ void ClipStack::transform(const Matrix& matrix) {
 
   // Update the current record after transforming all elements.
   auto& cur = current();
+  cur.transform = newTransform;
   cur.bound = matrix.mapRect(cur.bound);
   if (cur.state == ClipState::Rect && !matrix.rectStaysRect()) {
     cur.state = ClipState::Complex;

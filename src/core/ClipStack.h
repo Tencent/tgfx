@@ -107,6 +107,8 @@ struct ClipRecord {
   uint32_t uniqueID = 0;
   // Number of save() calls without modifications (yet). When > 0, this record has deferred saves.
   int deferredSaveCount = 0;
+  // Accumulated transform applied during this save level. Used to restore elements on pop.
+  Matrix transform = Matrix::I();
 
   ClipRecord();
 
