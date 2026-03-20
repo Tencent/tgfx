@@ -54,15 +54,12 @@ Web 端的 baseline 机制与原生主干一致，核心流程相同，但因 WA
 
 ### 原生主干流程（对照）
 
-原生通过两个 target 完成 baseline：
+原生通过 `accept_baseline.sh` 脚本完成 baseline 更新，内部依赖两个 target：
 
-1. **`UpdateBaseline`**（带 `UPDATE_BASELINE` + `GENERATE_BASELINE_IMAGES` 宏）：运行所有测试，生成 baseline 图片到 `test/baseline-out/`，同时更新本地 cache（`test/baseline/.cache/md5.json`）
-2. **`TGFXFullTest`**：用当前代码运行测试，对比 `test/baseline/version.json`（仓库）与 `test/baseline/.cache/version.json`（本地 cache）的版本号，决定是否做实际图片比较
+1. **`TGFXFullTest`**（无特殊宏）：运行所有测试，输出 `test/out/version.json` 记录当前各 key 的版本
+2. **`UpdateBaseline`**（带 `UPDATE_BASELINE` + `GENERATE_BASELINE_IMAGES` 宏）：运行所有测试，无条件记录每个 key 的 MD5 到 cache，生成 baseline 图片，TearDown 时写入 `test/baseline/.cache/md5.json`
 
-`accept_baseline.sh` 的完整流程：
-1. 构建并运行 `TGFXFullTest` → 生成 `test/out/version.json`
-2. 拷贝 `test/out/version.json` 到 `test/baseline/version.json`
-3. 构建并运行 `UpdateBaseline` → 生成 baseline 图片 + 更新 cache
+Web 端不需要 `accept_baseline.sh`，用 `update_baseline.sh` 替代（见下文）。
 
 ### Web 端流程
 
