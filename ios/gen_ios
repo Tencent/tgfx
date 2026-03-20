@@ -2,31 +2,16 @@
 process.chdir(__dirname);
 
 const childProcess = require("child_process");
-childProcess.execSync("depsync");
+childProcess.execSync("depsync", {stdio: "inherit"});
 
-process.argv.push("./");
-process.argv.push("-DTGFX_BUILD_HELLO2D=ON")
-let args = process.argv.slice(2);
-const useMetal = args.some(arg => arg === "-DTGFX_USE_METAL=ON");
-// shaderc's glslang dependency uses std::filesystem which requires iOS 14.0+.
-if (useMetal && !args.some(arg => arg.startsWith("-DDEPLOYMENT_TARGET="))) {
-    process.argv.push("-DDEPLOYMENT_TARGET=14.0");
-}
-if (args.indexOf("-p") === -1 && args.indexOf("--platform") === -1) {
-    process.argv.push("-p");
-    process.argv.push("ios");
-}
-require("../third_party/vendor_tools/xcode-gen");
+const xcodeGen = require("path").resolve(__dirname, "../third_party/vendor_tools/xcode-gen");
 
-// Post-process the generated pbxproj to fix CMake Xcode generator issue:
-// CMake marks the app product as "compiled.mach-o.executable" but it should be
-// "wrapper.application" for Xcode to recognize it as an app bundle.
-const fs = require("fs");
-const path = require("path");
-const pbxprojPath = path.join(__dirname, "Hello2D.xcodeproj/project.pbxproj");
-let pbxproj = fs.readFileSync(pbxprojPath, "utf8");
-pbxproj = pbxproj.replace(
-    /(\/\*\s*Hello2D\s*\*\/\s*=\s*\{isa\s*=\s*PBXFileReference;\s*)explicitFileType\s*=\s*"compiled\.mach-o\.executable"(;\s*)(path\s*=\s*)Hello2D(;)/,
-    "$1explicitFileType = wrapper.application; includeInIndex = 0$2$3Hello2D.app$4"
+childProcess.execSync(
+    `node "${xcodeGen}" ../ -w -DTGFX_BUILD_HELLO2D=ON -DTGFX_USE_METAL=ON -p ios -o metal`,
+    {stdio: "inherit"}
 );
-fs.writeFileSync(pbxprojPath, pbxproj);
+
+childProcess.execSync(
+    `node "${xcodeGen}" ../ -w -DTGFX_BUILD_HELLO2D=ON -p ios -o opengl`,
+    {stdio: "inherit"}
+);
