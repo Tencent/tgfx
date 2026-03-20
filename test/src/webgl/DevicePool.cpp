@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,26 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ProjectPath.h"
-#include <filesystem>
+#include "utils/DevicePool.h"
+#include "tgfx/gpu/opengl/webgl/WebGLDevice.h"
 
 namespace tgfx {
-static std::string GetRootPath() {
-#ifdef __EMSCRIPTEN__
-  return "/";
-#else
-  std::filesystem::path filePath = __FILE__;
-  auto dir = filePath.parent_path().string();
-  return std::filesystem::path(dir + "/../../..").lexically_normal();
-#endif
-}
-std::string ProjectPath::Absolute(const std::string& relativePath) {
-  std::filesystem::path path = relativePath;
-  if (path.is_absolute()) {
-    return path;
+
+static std::shared_ptr<Device> cachedDevice = nullptr;
+
+std::shared_ptr<Device> DevicePool::Make() {
+  if (cachedDevice == nullptr) {
+    cachedDevice = WebGLDevice::MakeFrom("#tgfx-test-canvas");
   }
-  static const std::string rootPath = GetRootPath() + "/";
-  return std::filesystem::path(rootPath + relativePath).lexically_normal();
+  return cachedDevice;
 }
 
 }  // namespace tgfx
