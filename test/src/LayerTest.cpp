@@ -3240,9 +3240,10 @@ TGFX_TEST(LayerTest, Contour3DWithDropShadow) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 300, 300);
+  auto surface = Surface::Make(context, 600, 600);
 
   auto displayList = std::make_unique<DisplayList>();
+  displayList->setZoomScale(2.0f);
 
   // Create parent layer with preserve3D and drop shadow (showBehindLayer = false)
   // Parent is semi-transparent so we can see shadow through it
@@ -3251,8 +3252,9 @@ TGFX_TEST(LayerTest, Contour3DWithDropShadow) {
   parentLayer->setWidth(150);
   parentLayer->setHeight(150);
   parentLayer->setMatrix(Matrix::MakeTrans(75, 75));
+  parentLayer->setPreserve3D(true);
 
-  auto dropShadow = DropShadowStyle::Make(10, 10, 8, 8, Color::FromRGBA(0, 0, 0, 200));
+  auto dropShadow = DropShadowStyle::Make(10, 10, 8, 8, Color::FromRGBA(0, 255, 0, 255));
   dropShadow->setShowBehindLayer(false);
   parentLayer->setLayerStyles({dropShadow});
 
