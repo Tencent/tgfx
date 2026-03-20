@@ -23,12 +23,8 @@
 #include "tgfx/gpu/Recording.h"
 
 @implementation TGFXView {
-<<<<<<< HEAD:ios/Hello2D/TGFXView.mm
-  std::shared_ptr<tgfx::EAGLWindow> tgfxWindow;
-  std::shared_ptr<tgfx::Surface> surface;
-=======
   std::shared_ptr<tgfx::Window> tgfxWindow;
->>>>>>> d7bcbbabb (Migrate Hello2D to CMake-generated Xcode projects and split TGFXView into Metal and OpenGL implementations.):ios/Hello2D/opengl/TGFXView.mm
+  std::shared_ptr<tgfx::Surface> surface;
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer;
@@ -90,15 +86,11 @@
   }
   lastSurfaceWidth = static_cast<int>(self.bounds.size.width * self.contentScaleFactor);
   lastSurfaceHeight = static_cast<int>(self.bounds.size.height * self.contentScaleFactor);
-<<<<<<< HEAD:ios/Hello2D/TGFXView.mm
-  surface = nullptr;
-=======
   [self applyCenteringTransform];
   if (tgfxWindow != nullptr) {
-    tgfxWindow->invalidSize();
+    surface = nullptr;
     presentImmediately = true;
   }
->>>>>>> d7bcbbabb (Migrate Hello2D to CMake-generated Xcode projects and split TGFXView into Metal and OpenGL implementations.):ios/Hello2D/opengl/TGFXView.mm
 }
 
 - (void)updateLayerTree:(int)drawIndex {
@@ -175,20 +167,13 @@
     lastRecording = nullptr;
     if (recording) {
       context->submit(std::move(recording));
-      tgfxWindow->present(context);
     }
   } else {
     std::swap(lastRecording, recording);
 
-<<<<<<< HEAD:ios/Hello2D/TGFXView.mm
-  if (recording) {
-    context->submit(std::move(recording));
-=======
     if (recording) {
       context->submit(std::move(recording));
-      tgfxWindow->present(context);
     }
->>>>>>> d7bcbbabb (Migrate Hello2D to CMake-generated Xcode projects and split TGFXView into Metal and OpenGL implementations.):ios/Hello2D/opengl/TGFXView.mm
   }
 
   device->unlock();
