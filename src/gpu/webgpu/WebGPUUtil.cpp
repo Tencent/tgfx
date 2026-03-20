@@ -149,13 +149,13 @@ WGPUBlendFactor ToWGPUBlendFactor(BlendFactor blendFactor) {
       return WGPUBlendFactor_Zero;
     case BlendFactor::One:
       return WGPUBlendFactor_One;
-    case BlendFactor::SrcColor:
+    case BlendFactor::Src:
       return WGPUBlendFactor_Src;
-    case BlendFactor::OneMinusSrcColor:
+    case BlendFactor::OneMinusSrc:
       return WGPUBlendFactor_OneMinusSrc;
-    case BlendFactor::DstColor:
+    case BlendFactor::Dst:
       return WGPUBlendFactor_Dst;
-    case BlendFactor::OneMinusDstColor:
+    case BlendFactor::OneMinusDst:
       return WGPUBlendFactor_OneMinusDst;
     case BlendFactor::SrcAlpha:
       return WGPUBlendFactor_SrcAlpha;
@@ -165,6 +165,14 @@ WGPUBlendFactor ToWGPUBlendFactor(BlendFactor blendFactor) {
       return WGPUBlendFactor_DstAlpha;
     case BlendFactor::OneMinusDstAlpha:
       return WGPUBlendFactor_OneMinusDstAlpha;
+    case BlendFactor::Src1:
+      return WGPUBlendFactor_Src;
+    case BlendFactor::OneMinusSrc1:
+      return WGPUBlendFactor_OneMinusSrc;
+    case BlendFactor::Src1Alpha:
+      return WGPUBlendFactor_SrcAlpha;
+    case BlendFactor::OneMinusSrc1Alpha:
+      return WGPUBlendFactor_OneMinusSrcAlpha;
   }
   return WGPUBlendFactor_One;
 }

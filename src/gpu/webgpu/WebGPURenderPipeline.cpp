@@ -25,8 +25,6 @@
 
 namespace tgfx {
 
-static constexpr unsigned VERTEX_BUFFER_BASE_SLOT = 30;
-
 std::shared_ptr<WebGPURenderPipeline> WebGPURenderPipeline::Make(
     WebGPUGPU* gpu, const RenderPipelineDescriptor& descriptor) {
   if (gpu == nullptr) {
