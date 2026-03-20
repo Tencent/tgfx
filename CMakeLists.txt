@@ -399,15 +399,17 @@ if (TGFX_BUILD_SVG)
     endif ()
 endif ()
 if (TGFX_BUILD_PDF)
-    if (HARFBUZZ_LIBS AND HARFBUZZ_INCLUDE)
+    if (HARFBUZZ_LIB AND HARFBUZZ_SUBSET_LIB AND HARFBUZZ_INCLUDE)
         # Prebuilt HarfBuzz static libraries and headers provided externally.
-        # HARFBUZZ_LIBS: paths to libharfbuzz.a and libharfbuzz-subset.a
+        # HARFBUZZ_LIB: path to libharfbuzz.a
+        # HARFBUZZ_SUBSET_LIB: path to libharfbuzz-subset.a
         # HARFBUZZ_INCLUDE: path to HarfBuzz headers directory
-        message("HARFBUZZ_LIBS: ${HARFBUZZ_LIBS}")
+        message("HARFBUZZ_LIB: ${HARFBUZZ_LIB}")
+        message("HARFBUZZ_SUBSET_LIB: ${HARFBUZZ_SUBSET_LIB}")
         message("HARFBUZZ_INCLUDE: ${HARFBUZZ_INCLUDE}")
         list(APPEND TGFX_INCLUDES ${HARFBUZZ_INCLUDE})
         # Use TGFX_SHARED_LIBS to avoid embedding into the static libtgfx archive.
-        list(APPEND TGFX_SHARED_LIBS ${HARFBUZZ_LIBS})
+        list(APPEND TGFX_SHARED_LIBS ${HARFBUZZ_LIB} ${HARFBUZZ_SUBSET_LIB})
     else ()
         # Built-in HarfBuzz, compile from third_party.
         list(APPEND TGFX_STATIC_VENDORS harfbuzz)
