@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalGPU.h"
+#include <shaderc/shaderc.hpp>
 #include "MetalBuffer.h"
 #include "MetalCommandEncoder.h"
 #include "MetalCommandQueue.h"
@@ -53,6 +54,7 @@ MetalGPU::MetalGPU(id<MTLDevice> device) : metalDevice([device retain]) {
 
   // Initialize command queue
   commandQueue = std::make_unique<MetalCommandQueue>(this);
+  compiler = std::make_unique<shaderc::Compiler>();
 }
 
 MetalGPU::~MetalGPU() {
@@ -72,6 +74,10 @@ MetalGPU::~MetalGPU() {
 
 CommandQueue* MetalGPU::queue() const {
   return commandQueue.get();
+}
+
+const shaderc::Compiler* MetalGPU::shaderCompiler() const {
+  return compiler.get();
 }
 
 std::shared_ptr<GPUBuffer> MetalGPU::createBuffer(size_t size, uint32_t usage) {

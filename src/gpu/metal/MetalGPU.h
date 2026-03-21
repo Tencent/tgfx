@@ -27,6 +27,10 @@
 #include "core/utils/ReturnQueue.h"
 #include "tgfx/gpu/GPU.h"
 
+namespace shaderc {
+class Compiler;
+};
+
 namespace tgfx {
 
 class MetalCommandQueue;
@@ -65,6 +69,8 @@ class MetalGPU : public GPU {
   }
 
   CommandQueue* queue() const override;
+
+  const shaderc::Compiler* shaderCompiler() const;
 
   bool isFormatRenderable(PixelFormat format) const override {
     return caps->isFormatRenderable(format);
@@ -140,6 +146,10 @@ class MetalGPU : public GPU {
   id<MTLDevice> metalDevice = nil;
   std::unique_ptr<MetalCaps> caps = nullptr;
   std::unique_ptr<MetalCommandQueue> commandQueue = nullptr;
+  // Keep one shader compiler per MetalGPU so glslang stays initialized across shader
+  // compilations. The win is not the Compiler object itself, which is lightweight, but avoiding
+  // repeated rebuilds of glslang's global built-in symbol tables after init/finalize churn.
+  std::unique_ptr<shaderc::Compiler> compiler = nullptr;
   std::list<MetalResource*> resources = {};
   std::shared_ptr<ReturnQueue> returnQueue = ReturnQueue::Make();
   CVMetalTextureCacheRef textureCache = nil;
