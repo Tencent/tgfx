@@ -153,9 +153,20 @@ static std::string preprocessGLSL(const std::string& glslCode) {
   return result;
 }
 
+static shaderc::Compiler* getThreadLocalShaderCompiler() {
+  thread_local std::unique_ptr<shaderc::Compiler> compiler;
+  if (compiler == nullptr) {
+    compiler = std::make_unique<shaderc::Compiler>();
+  }
+  return compiler.get();
+}
+
 // Compile GLSL source to SPIR-V binary.
 static std::vector<uint32_t> compileGLSLToSPIRV(const std::string& glslCode, ShaderStage stage) {
-  shaderc::Compiler compiler;
+  auto* compiler = getThreadLocalShaderCompiler();
+  if (compiler == nullptr) {
+    return {};
+  }
   shaderc::CompileOptions options;
   options.SetOptimizationLevel(shaderc_optimization_level_performance);
   options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_0);
@@ -164,7 +175,7 @@ static std::vector<uint32_t> compileGLSLToSPIRV(const std::string& glslCode, Sha
       (stage == ShaderStage::Vertex) ? shaderc_vertex_shader : shaderc_fragment_shader;
 
   shaderc::SpvCompilationResult spvResult =
-      compiler.CompileGlslToSpv(glslCode, shaderKind, "shader", "main", options);
+      compiler->CompileGlslToSpv(glslCode, shaderKind, "shader", "main", options);
 
   if (spvResult.GetCompilationStatus() != shaderc_compilation_status_success) {
     LOGE("GLSL to SPIR-V compilation error: %s", spvResult.GetErrorMessage().c_str());
