@@ -182,7 +182,7 @@ class Canvas {
   /**
    * Returns the combined clip Path from all clip elements.
    * @note This function ignores the anti-alias setting of each clip element and forcibly merges
-   * them into a single path. If you only need the clip bounds, use getClipBound() instead, which
+   * them into a single path. If you only need the clip bounds, use getClipBounds() instead, which
    * is more efficient.
    */
   Path getTotalClip() const;
@@ -190,7 +190,7 @@ class Canvas {
   /**
    * Returns the bounds of the current clip, or std::nullopt if no clip has been applied.
    */
-  std::optional<Rect> getClipBound() const;
+  std::optional<Rect> getClipBounds() const;
 
   /**
    * Replaces the current clip with the intersection of the clip and the specified rectangle. The

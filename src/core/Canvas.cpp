@@ -176,7 +176,7 @@ Path Canvas::getTotalClip() const {
   return clipStack->getClipPath();
 }
 
-std::optional<Rect> Canvas::getClipBound() const {
+std::optional<Rect> Canvas::getClipBounds() const {
   if (clipStack->state() == ClipState::WideOpen) {
     return std::nullopt;
   }
