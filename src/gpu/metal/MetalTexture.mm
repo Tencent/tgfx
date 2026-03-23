@@ -69,10 +69,11 @@ std::shared_ptr<MetalTexture> MetalTexture::Make(MetalGPU* gpu,
   bool isDepthStencil = (descriptor.format == PixelFormat::DEPTH24_STENCIL8);
 
   // Handle multisampling and storage mode.
-  // On Apple Silicon (TBDR architecture), render targets must use Private storage mode. Shared mode
+  // Render targets use Private storage mode as recommended by Apple for TBDR GPUs. Shared mode
   // causes visual corruption when multiple render passes within the same command buffer read/write
-  // the same textures (e.g., gaussian blur ping-pong), because tile memory writeback to shared
-  // system memory does not synchronize correctly across render pass boundaries.
+  // the same textures (e.g., gaussian blur ping-pong). Sampling-only textures use Shared mode to
+  // allow direct CPU writes via replaceRegion (e.g., atlas uploads). CPU readback from Private
+  // render targets is handled through blit encoder copies to Shared buffers.
   bool isRenderTarget = (descriptor.usage & TextureUsage::RENDER_ATTACHMENT) != 0;
   if (descriptor.sampleCount > 1) {
     metalDescriptor.textureType = MTLTextureType2DMultisample;
