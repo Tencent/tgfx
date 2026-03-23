@@ -81,7 +81,7 @@ Canvas::Canvas(DrawContext* drawContext, Surface* surface)
 Canvas::~Canvas() = default;
 
 int Canvas::save() {
-  stateStack.push(std::make_unique<CanvasState>(matrix));
+  stateStack.push(std::make_unique<CanvasState>(_matrix));
   clipStack->save();
   return static_cast<int>(stateStack.size()) - 1;
 }
@@ -89,7 +89,7 @@ int Canvas::save() {
 int Canvas::saveLayer(const Paint* paint) {
   auto layer = std::make_unique<CanvasLayer>(drawContext, paint);
   drawContext = layer->layerContext.get();
-  stateStack.push(std::make_unique<CanvasState>(matrix, std::move(layer)));
+  stateStack.push(std::make_unique<CanvasState>(_matrix, std::move(layer)));
   clipStack->save();
   return static_cast<int>(stateStack.size()) - 1;
 }
@@ -105,7 +105,7 @@ void Canvas::restore() {
     return;
   }
   auto& canvasState = stateStack.top();
-  matrix = canvasState->matrix;
+  _matrix = canvasState->matrix;
   clipStack->restore();
   auto layer = std::move(canvasState->savedLayer);
   stateStack.pop();
@@ -135,41 +135,41 @@ void Canvas::restoreToCount(int saveCount) {
 }
 
 void Canvas::translate(float dx, float dy) {
-  matrix.preTranslate(dx, dy);
+  _matrix.preTranslate(dx, dy);
 }
 
 void Canvas::scale(float sx, float sy) {
-  matrix.preScale(sx, sy);
+  _matrix.preScale(sx, sy);
 }
 
 void Canvas::rotate(float degrees) {
-  matrix.preRotate(degrees);
+  _matrix.preRotate(degrees);
 }
 
 void Canvas::rotate(float degrees, float px, float py) {
   Matrix m = {};
   m.setRotate(degrees, px, py);
-  matrix.preConcat(m);
+  _matrix.preConcat(m);
 }
 
 void Canvas::skew(float sx, float sy) {
-  matrix.preSkew(sx, sy);
+  _matrix.preSkew(sx, sy);
 }
 
 void Canvas::concat(const Matrix& matrix) {
-  this->matrix.preConcat(matrix);
+  _matrix.preConcat(matrix);
 }
 
 void Canvas::setMatrix(const Matrix& matrix) {
-  this->matrix = matrix;
+  _matrix = matrix;
 }
 
 void Canvas::resetMatrix() {
-  matrix.reset();
+  _matrix.reset();
 }
 
 const Matrix& Canvas::getMatrix() const {
-  return matrix;
+  return _matrix;
 }
 
 Path Canvas::getTotalClip() const {
@@ -191,12 +191,12 @@ void Canvas::clipRect(const Rect& rect, bool antiAlias) {
 
 void Canvas::clipPath(const Path& path, bool antiAlias) {
   auto clipPath = path;
-  clipPath.transform(matrix);
+  clipPath.transform(_matrix);
   clipStack->clip(clipPath, antiAlias);
 }
 
 void Canvas::resetStateStack() {
-  matrix = Matrix::I();
+  _matrix = Matrix::I();
   std::stack<std::unique_ptr<CanvasState>>().swap(stateStack);
   clipStack = std::make_unique<ClipStack>();
 }
@@ -206,12 +206,12 @@ void Canvas::clear(const Color& color) {
 }
 
 void Canvas::drawColor(const Color& color, BlendMode blendMode) {
-  drawFill(matrix, *clipStack, {color, blendMode, false});
+  drawFill(_matrix, *clipStack, {color, blendMode, false});
 }
 
 void Canvas::drawPaint(const Paint& paint) {
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawFill(matrix, *clipStack, paint.getBrush());
+  drawFill(_matrix, *clipStack, paint.getBrush());
 }
 
 void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint) {
@@ -228,7 +228,7 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawContext->drawRect(rect, matrix, *clipStack, paint.getBrush(), paint.getStroke());
+  drawContext->drawRect(rect, _matrix, *clipStack, paint.getBrush(), paint.getStroke());
 }
 
 void Canvas::drawOval(const Rect& oval, const Paint& paint) {
@@ -296,7 +296,7 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
     drawRect(rRect.rect, paint);
     return;
   }
-  if (UseDrawPath(paint, radii, matrix)) {
+  if (UseDrawPath(paint, radii, _matrix)) {
     Path path = {};
     path.addRRect(rRect);
     drawPath(path, paint);
@@ -306,7 +306,7 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawContext->drawRRect(rRect, matrix, *clipStack, paint.getBrush(), paint.getStroke());
+  drawContext->drawRRect(rRect, _matrix, *clipStack, paint.getBrush(), paint.getStroke());
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
@@ -314,11 +314,11 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   if (path.isEmpty()) {
     if (path.isInverseFillType()) {
       // No geometry to draw, so draw the fill instead.
-      drawFill(matrix, *clipStack, paint.getBrush());
+      drawFill(_matrix, *clipStack, paint.getBrush());
     }
     return;
   }
-  drawPath(path, matrix, *clipStack, paint.getBrush(), paint.getStroke());
+  drawPath(path, _matrix, *clipStack, paint.getBrush(), paint.getStroke());
 }
 
 // Checks if the line is axis-aligned and not a hairline stroke, allowing it to be converted to a
@@ -369,7 +369,7 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   }
   SaveLayerForImageFilter(paint.getImageFilter());
   auto brush = paint.getBrush();
-  auto drawMatrix = matrix;
+  auto drawMatrix = _matrix;
   auto stroke = paint.getStroke();
   Path* path = nullptr;
   if (shape->type() == Shape::Type::Path) {
@@ -404,7 +404,7 @@ void Canvas::drawMesh(std::shared_ptr<Mesh> mesh, const Paint& paint) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawContext->drawMesh(std::move(mesh), matrix, *clipStack, paint.getBrush());
+  drawContext->drawMesh(std::move(mesh), _matrix, *clipStack, paint.getBrush());
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
@@ -452,7 +452,7 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const Brush& brush,
                        const SamplingOptions& sampling, const Matrix* dstMatrix) {
   DEBUG_ASSERT(image != nullptr);
   auto type = Types::Get(image.get());
-  auto drawMatrix = matrix;
+  auto drawMatrix = _matrix;
   auto newBrush = brush;
   if (dstMatrix) {
     drawMatrix.preConcat(*dstMatrix);
@@ -483,7 +483,7 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
   DEBUG_ASSERT(!dstRect.isEmpty());
   auto type = Types::Get(image.get());
   if (type != Types::ImageType::Subset || image->hasMipmaps()) {
-    drawContext->drawImageRect(std::move(image), srcRect, dstRect, sampling, matrix, *clipStack,
+    drawContext->drawImageRect(std::move(image), srcRect, dstRect, sampling, _matrix, *clipStack,
                                brush, constraint);
     return;
   }
@@ -497,7 +497,7 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
     imageRect.offset(subset.left, subset.top);
     image = subsetImage->source;
   }
-  drawContext->drawImageRect(std::move(image), imageRect, dstRect, sampling, matrix, *clipStack,
+  drawContext->drawImageRect(std::move(image), imageRect, dstRect, sampling, _matrix, *clipStack,
                              brush, constraint);
 }
 
@@ -521,7 +521,7 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
   if (textBlob == nullptr) {
     return;
   }
-  drawContext->drawTextBlob(std::move(textBlob), matrix, *clipStack, paint.getBrush(),
+  drawContext->drawTextBlob(std::move(textBlob), _matrix, *clipStack, paint.getBrush(),
                             paint.getStroke());
 }
 
@@ -531,7 +531,7 @@ void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  auto drawMatrix = matrix;
+  auto drawMatrix = _matrix;
   if (!FloatNearlyZero(x) || !FloatNearlyZero(y)) {
     drawMatrix.preTranslate(x, y);
     auto brush = paint.getBrush().makeWithMatrix(Matrix::MakeTrans(-x, -y));
@@ -547,7 +547,7 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture) {
   if (picture == nullptr) {
     return;
   }
-  drawContext->drawPicture(std::move(picture), matrix, *clipStack);
+  drawContext->drawPicture(std::move(picture), _matrix, *clipStack);
 }
 
 void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
@@ -555,7 +555,7 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
   if (picture == nullptr) {
     return;
   }
-  auto drawMatrix = this->matrix;
+  auto drawMatrix = _matrix;
   if (matrix) {
     drawMatrix.preConcat(*matrix);
   }

@@ -65,7 +65,7 @@ void Picture::playback(Canvas* canvas, AbortCallback* callback) const {
   if (canvas == nullptr) {
     return;
   }
-  playback(canvas->drawContext, canvas->matrix, *canvas->clipStack, callback);
+  playback(canvas->drawContext, canvas->_matrix, *canvas->clipStack, callback);
 }
 
 void Picture::playback(DrawContext* drawContext, const Matrix& matrix, const ClipStack& clip,
