@@ -770,6 +770,8 @@ PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(const ClipElementLi
                                                              uint32_t uniqueID,
                                                              const Rect& clipBound,
                                                              PlacementPtr<FragmentProcessor> inputFP) {
+  // OpsCompositor is bound to a single RenderTarget, so using uniqueID alone as the cache key
+  // (without clipBound) is safe.
   if (uniqueID == cachedClipID && clipTexture) {
     return makeMaskFP(clipTexture, clipBound, std::move(inputFP));
   }
