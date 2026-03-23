@@ -294,8 +294,9 @@ void OpaqueContext::flushPendingContour(const Contour& contour, const Matrix& ma
     // Shrink opaque bounds to fully covered pixels if clip has AA edges. We conservatively shrink
     // all edges rather than checking each clip element's AA status per edge, as the cost is minimal
     // (fewer optimization opportunities).
-    auto hasAAClip = std::any_of(pendingClip.elements().begin(), pendingClip.elements().end(),
-                                 [](const ClipElement& e) { return e.isValid() && e.isAntiAlias(); });
+    auto hasAAClip =
+        std::any_of(pendingClip.elements().begin(), pendingClip.elements().end(),
+                    [](const ClipElement& e) { return e.isValid() && e.isAntiAlias(); });
     if (hasAAClip) {
       globalBounds.roundIn();
     }

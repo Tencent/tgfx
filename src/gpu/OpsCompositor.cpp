@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsCompositor.h"
-#include "core/SmallVector.h"
 #include "core/MeshBase.h"
 #include "core/PathRef.h"
+#include "core/SmallVector.h"
 #include "core/VertexMesh.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -403,8 +403,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
   std::optional<float> drawScale = std::nullopt;
-  bool hasCoverage = pendingBrush.maskFilter != nullptr ||
-                     pendingClip.state() == ClipState::Rect ||
+  bool hasCoverage = pendingBrush.maskFilter != nullptr || pendingClip.state() == ClipState::Rect ||
                      pendingClip.state() == ClipState::Complex;
   bool hasImageFill = pendingType == PendingOpType::Image;
   auto [needLocalBounds, needDeviceBounds] =
@@ -768,10 +767,9 @@ PlacementPtr<FragmentProcessor> OpsCompositor::makeAnalyticFP(
   return FragmentProcessor::Compose(drawingAllocator(), std::move(inputFP), std::move(clipFP));
 }
 
-PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(const ClipElementList& elements,
-                                                             uint32_t uniqueID,
-                                                             const Rect& clipBound,
-                                                             PlacementPtr<FragmentProcessor> inputFP) {
+PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(
+    const ClipElementList& elements, uint32_t uniqueID, const Rect& clipBound,
+    PlacementPtr<FragmentProcessor> inputFP) {
   // OpsCompositor is bound to a single RenderTarget, so using uniqueID alone as the cache key
   // (without clipBound) is safe.
   if (uniqueID == cachedClipID && clipTexture) {
