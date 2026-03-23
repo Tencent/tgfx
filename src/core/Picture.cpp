@@ -104,7 +104,7 @@ static bool GetHardClipRect(const ClipStack& clip, const Matrix* matrix, Rect* c
       return false;
     }
   }
-  auto rect = clip.bound();
+  auto rect = clip.bounds();
   if (matrix != nullptr) {
     if (!matrix->rectStaysRect()) {
       return false;

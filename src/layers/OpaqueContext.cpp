@@ -261,7 +261,7 @@ bool OpaqueContext::canAppend(const Contour& contour, const Matrix& matrix, cons
 Rect GetGlobalBounds(const Matrix& matrix, const ClipStack& clip, const Rect& localBounds) {
   auto globalBounds = matrix.mapRect(localBounds);
   if (clip.state() != ClipState::WideOpen) {
-    if (!globalBounds.intersect(clip.bound())) {
+    if (!globalBounds.intersect(clip.bounds())) {
       return Rect::MakeEmpty();
     }
   }

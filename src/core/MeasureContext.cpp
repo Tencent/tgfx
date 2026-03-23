@@ -121,7 +121,7 @@ void MeasureContext::addDeviceBounds(const ClipStack& clip, const Rect& deviceBo
   if (clip.state() == ClipState::Empty) {
     return;
   }
-  auto intersectBounds = clip.bound();
+  auto intersectBounds = clip.bounds();
   if (!unbounded && !intersectBounds.intersect(deviceBounds)) {
     return;
   }

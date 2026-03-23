@@ -612,7 +612,7 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const Matrix& matrix, const Cl
       clipRect = deviceBounds;
       break;
     case ClipState::Rect:
-      clipRect = clip.bound();
+      clipRect = clip.bounds();
       break;
     case ClipState::Empty:
     case ClipState::Complex:
@@ -687,7 +687,7 @@ Rect OpsCompositor::getClipBounds(const ClipStack& clip) const {
   if (clip.state() == ClipState::WideOpen) {
     return renderTarget->bounds();
   }
-  auto bounds = clip.bound();
+  auto bounds = clip.bounds();
   if (!bounds.intersect(renderTarget->bounds())) {
     bounds.setEmpty();
   }
@@ -708,7 +708,7 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
   }
 
   // Stage 2: Set initial scissor from clip bounds to restrict drawing area.
-  auto clipBounds = clipStack.bound();
+  auto clipBounds = clipStack.bounds();
   if (!clipBounds.intersect(renderTarget->bounds())) {
     out.status = AppliedClipStatus::ClippedOut;
     return out;
@@ -759,7 +759,7 @@ PlacementPtr<FragmentProcessor> OpsCompositor::makeAnalyticFP(
     return inputFP;
   }
 
-  auto rect = element.bound();
+  auto rect = element.bounds();
   FlipYIfNeeded(&rect, renderTarget.get());
   auto clipFP = AARectEffect::Make(drawingAllocator(), rect);
   if (!inputFP) {

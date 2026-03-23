@@ -249,7 +249,7 @@ Rect RenderContext::getClipBounds(const ClipStack& clip) {
   if (clip.state() == ClipState::WideOpen) {
     return renderTarget->bounds();
   }
-  auto bounds = clip.bound();
+  auto bounds = clip.bounds();
   if (!bounds.intersect(renderTarget->bounds())) {
     bounds.setEmpty();
   }

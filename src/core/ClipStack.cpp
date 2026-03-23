@@ -37,8 +37,8 @@ enum class ClipGeometry {
 };
 
 static ClipGeometry ResolveClipGeometry(const ClipElement& a, const ClipElement& b) {
-  const auto boundsA = a.bound();
-  const auto boundsB = b.bound();
+  const auto boundsA = a.bounds();
+  const auto boundsB = b.bounds();
   if (!Rect::Intersects(boundsA, boundsB)) {
     return ClipGeometry::Empty;
   }
@@ -101,11 +101,11 @@ static void UpdateElements(ClipElement& existing, ClipElement& toAdd, const Clip
 
 ClipElement::ClipElement(const Path& path, bool antiAlias) : _path(path), _antiAlias(antiAlias) {
   if (path.isInverseFillType()) {
-    _bound = Rect::MakeLTRB(-FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MAX);
+    _bounds = Rect::MakeLTRB(-FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MAX);
     return;
   }
 
-  _bound = path.getBounds();
+  _bounds = path.getBounds();
   _isRect = path.isRect(nullptr);
 }
 
@@ -119,12 +119,12 @@ bool ClipElement::tryCombine(const ClipElement& other) {
   if (!thisPixelAligned && !otherPixelAligned && _antiAlias != other._antiAlias) {
     return false;
   }
-  auto combined = _bound;
-  if (!combined.intersect(other._bound)) {
+  auto combined = _bounds;
+  if (!combined.intersect(other._bounds)) {
     return false;
   }
 
-  _bound = combined;
+  _bounds = combined;
   _path = Path();
   _path.addRect(combined);
   // Use the non-pixel-aligned element's AA type.
@@ -139,7 +139,7 @@ void ClipElement::transform(const Matrix& matrix) {
   if (_path.isInverseFillType()) {
     return;
   }
-  _bound = _path.getBounds();
+  _bounds = _path.getBounds();
   _isRect = _path.isRect(nullptr);
 }
 
@@ -221,17 +221,17 @@ bool ClipStack::addElement(ClipElement&& toAdd) {
     // Already empty, adding more clips won't change anything.
     return false;
   }
-  if (toAdd.bound().isEmpty()) {
+  if (toAdd.bounds().isEmpty()) {
     cur.state = ClipState::Empty;
     return true;
   }
-  if (!Rect::Intersects(toAdd.bound(), cur.bound)) {
+  if (!Rect::Intersects(toAdd.bounds(), cur.bounds)) {
     cur.state = ClipState::Empty;
     return true;
   }
   // The new element completely contains current clip, so it's redundant.
   auto curIsContained =
-      toAdd.isRect() ? toAdd.bound().contains(cur.bound) : toAdd.path().contains(cur.bound);
+      toAdd.isRect() ? toAdd.bounds().contains(cur.bounds) : toAdd.path().contains(cur.bounds);
   if (curIsContained) {
     return false;
   }
@@ -245,7 +245,7 @@ bool ClipStack::addElement(ClipElement&& toAdd) {
 void ClipStack::replaceWithElement(ClipElement&& toAdd) {
   auto& cur = current();
   _data->elements.resize(cur.startIndex);
-  cur.bound = toAdd.bound();
+  cur.bounds = toAdd.bounds();
   cur.state = toAdd.isRect() ? ClipState::Rect : ClipState::Complex;
   _data->elements.push_back(std::move(toAdd));
   cur.oldestValidIndex = _data->elements.size() - 1;
@@ -295,7 +295,7 @@ bool ClipStack::appendElement(ClipElement&& toAdd) {
   cur.state = (oldestValidIdx == _data->elements.size() && toAdd.isRect()) ? ClipState::Rect
                                                                            : ClipState::Complex;
   cur.oldestValidIndex = std::min(oldestValidIdx, oldestActiveInvalidIdx);
-  cur.bound.intersect(toAdd.bound());
+  cur.bounds.intersect(toAdd.bounds());
   cur.uniqueID = UniqueID::Next();
 
   _data->elements.resize(targetEndIdx);
@@ -353,7 +353,7 @@ void ClipStack::transform(const Matrix& matrix) {
   // Update the current record after transforming all elements.
   auto& cur = current();
   cur.transform = newTransform;
-  cur.bound = matrix.mapRect(cur.bound);
+  cur.bounds = matrix.mapRect(cur.bounds);
   if (cur.state == ClipState::Rect && !matrix.rectStaysRect()) {
     cur.state = ClipState::Complex;
   }

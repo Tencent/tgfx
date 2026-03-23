@@ -180,7 +180,7 @@ std::optional<Rect> Canvas::getClipBounds() const {
   if (clipStack->state() == ClipState::WideOpen) {
     return std::nullopt;
   }
-  return clipStack->bound();
+  return clipStack->bounds();
 }
 
 void Canvas::clipRect(const Rect& rect, bool antiAlias) {

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MaskContext.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/Canvas.h"
 
 namespace tgfx {
@@ -60,11 +61,35 @@ bool MaskContext::finish(Path* result) {
       return false;
     }
     record.path.transform(record.matrix);
-    // Get the combined clip path. Note: anti-aliasing attributes of clip elements do not affect
-    // the geometric description of the combined path.
-    auto clippedPath = record.clip.getClipPath();
-    clippedPath.addPath(record.path, PathOp::Intersect);
-    maskPath.addPath(clippedPath);
+    switch (record.clip.state()) {
+      case ClipState::Empty:
+        // Already filtered out in addPath().
+        DEBUG_ASSERT(false);
+        break;
+      case ClipState::WideOpen:
+        maskPath.addPath(record.path);
+        break;
+      case ClipState::Rect: {
+        auto clipBounds = record.clip.bounds();
+        auto pathBounds = record.path.getBounds();
+        if (!Rect::Intersects(clipBounds, pathBounds)) {
+          break;
+        }
+        if (clipBounds.contains(pathBounds)) {
+          maskPath.addPath(record.path);
+          break;
+        }
+        // Partial intersection, use PathOp.
+        [[fallthrough]];
+      }
+      case ClipState::Complex: {
+        // Anti-aliasing attributes of clip elements can be safely discarded for mask generation.
+        auto clippedPath = record.clip.getClipPath();
+        clippedPath.addPath(record.path, PathOp::Intersect);
+        maskPath.addPath(clippedPath);
+        break;
+      }
+    }
   }
   *result = std::move(maskPath);
   return true;

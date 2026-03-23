@@ -58,8 +58,8 @@ class ClipElement {
     return _antiAlias;
   }
 
-  const Rect& bound() const {
-    return _bound;
+  const Rect& bounds() const {
+    return _bounds;
   }
 
   bool isRect() const {
@@ -71,8 +71,8 @@ class ClipElement {
   }
 
   bool isPixelAligned() const {
-    return IsPixelAligned(_bound.left) && IsPixelAligned(_bound.top) &&
-           IsPixelAligned(_bound.right) && IsPixelAligned(_bound.bottom);
+    return IsPixelAligned(_bounds.left) && IsPixelAligned(_bounds.top) &&
+           IsPixelAligned(_bounds.right) && IsPixelAligned(_bounds.bottom);
   }
 
   bool tryCombine(const ClipElement& other);
@@ -90,7 +90,7 @@ class ClipElement {
  private:
   Path _path = {};
   bool _antiAlias = false;
-  Rect _bound = {};
+  Rect _bounds = {};
   bool _isRect = false;
   // The startIndex of the ClipRecord that invalidated this element. -1 means valid.
   int _invalidatedByIndex = -1;
@@ -102,7 +102,7 @@ struct ClipRecord {
   // Oldest valid element index globally.
   size_t oldestValidIndex = 0;
   // Infinite bounds for WideOpen state, actual clip bounds otherwise.
-  Rect bound = Rect::MakeLTRB(-FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MAX);
+  Rect bounds = Rect::MakeLTRB(-FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MAX);
   ClipState state = ClipState::WideOpen;
   uint32_t uniqueID = 0;
   // Number of save() calls without modifications (yet). When > 0, this record has deferred saves.
@@ -160,8 +160,8 @@ class ClipStack {
     return current().state;
   }
 
-  const Rect& bound() const {
-    return current().bound;
+  const Rect& bounds() const {
+    return current().bounds;
   }
 
   const std::vector<ClipElement>& elements() const {
