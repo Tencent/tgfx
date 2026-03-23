@@ -25,6 +25,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
+#include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
@@ -79,19 +80,32 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context, HardwareBufferRef h
   return MakeFrom(std::move(proxy), renderFlags, false, std::move(colorSpace));
 }
 
+std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Window> window,
+                                           uint32_t renderFlags) {
+  if (context == nullptr || window == nullptr) {
+    return nullptr;
+  }
+  auto proxy = window->onCreateRenderTarget(context);
+  if (proxy == nullptr) {
+    return nullptr;
+  }
+  return MakeFrom(std::move(proxy), renderFlags, true, window->colorSpace(), std::move(window));
+}
+
 std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                                            uint32_t renderFlags, bool clearAll,
-                                           std::shared_ptr<ColorSpace> colorSpace) {
+                                           std::shared_ptr<ColorSpace> colorSpace,
+                                           std::shared_ptr<Window> window) {
   if (renderTargetProxy == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<Surface>(
-      new Surface(std::move(renderTargetProxy), renderFlags, clearAll, std::move(colorSpace)));
+  return std::shared_ptr<Surface>(new Surface(std::move(renderTargetProxy), renderFlags, clearAll,
+                                              std::move(colorSpace), window));
 }
 
 Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags, bool clearAll,
-                 std::shared_ptr<ColorSpace> colorSpace)
-    : _uniqueID(UniqueID::Next()) {
+                 std::shared_ptr<ColorSpace> colorSpace, std::shared_ptr<Window> window)
+    : _uniqueID(UniqueID::Next()), _window(std::move(window)) {
   DEBUG_ASSERT(proxy != nullptr);
   renderContext =
       new RenderContext(std::move(proxy), renderFlags, clearAll, this, std::move(colorSpace));

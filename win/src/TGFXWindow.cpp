@@ -111,7 +111,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       lastSurfaceHeight = static_cast<int>(rect.bottom - rect.top);
       applyCenteringTransform();
       if (tgfxWindow) {
-        tgfxWindow->invalidSize();
+        surface = nullptr;
         presentImmediately = true;
       }
       ::InvalidateRect(windowHandle, nullptr, FALSE);
@@ -360,7 +360,9 @@ void TGFXWindow::draw() {
   if (context == nullptr) {
     return;
   }
-  auto surface = tgfxWindow->getSurface(context);
+  if (surface == nullptr) {
+    surface = tgfx::Surface::MakeFrom(context, tgfxWindow);
+  }
   if (surface == nullptr) {
     device->unlock();
     return;
@@ -378,14 +380,12 @@ void TGFXWindow::draw() {
     presentImmediately = false;
     if (recording) {
       context->submit(std::move(recording));
-      tgfxWindow->present(context);
     }
   } else {
     std::swap(lastRecording, recording);
 
     if (recording) {
       context->submit(std::move(recording));
-      tgfxWindow->present(context);
     }
   }
 

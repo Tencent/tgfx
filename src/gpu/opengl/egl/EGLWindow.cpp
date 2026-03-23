@@ -28,6 +28,7 @@
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
 #include "core/utils/USE.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 std::shared_ptr<EGLWindow> EGLWindow::Current() {
@@ -35,7 +36,7 @@ std::shared_ptr<EGLWindow> EGLWindow::Current() {
   if (device == nullptr || device->eglSurface == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<EGLWindow>(new EGLWindow(device));
+  return std::shared_ptr<EGLWindow>(new EGLWindow(device, device->colorSpace));
 }
 
 std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
@@ -48,12 +49,13 @@ std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
   if (device == nullptr) {
     return nullptr;
   }
-  auto eglWindow = std::shared_ptr<EGLWindow>(new EGLWindow(device));
+  auto eglWindow = std::shared_ptr<EGLWindow>(new EGLWindow(device, std::move(colorSpace)));
   eglWindow->nativeWindow = nativeWindow;
   return eglWindow;
 }
 
-EGLWindow::EGLWindow(std::shared_ptr<Device> device) : Window(std::move(device)) {
+EGLWindow::EGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
+    : Window(std::move(device), std::move(colorSpace)) {
 }
 
 ISize GetNativeWindowSize(EGLNativeWindowType nativeWindow) {
@@ -75,30 +77,18 @@ ISize GetNativeWindowSize(EGLNativeWindowType nativeWindow) {
   return size;
 }
 
-void EGLWindow::onInvalidSize() {
-#if defined(_WIN32)
-  if (nativeWindow == nullptr) {
-    return;
-  }
-  auto size = GetNativeWindowSize(nativeWindow);
-  EGLint surfaceWidth = 0;
-  EGLint surfaceHeight = 0;
+std::shared_ptr<RenderTargetProxy> EGLWindow::onCreateRenderTarget(Context* context) {
   auto eglDevice = static_cast<EGLDevice*>(device.get());
-  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &surfaceWidth);
-  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &surfaceHeight);
-  if (surfaceWidth != size.width || surfaceHeight != size.height) {
-    eglDevice->sizeInvalidWindow.store(nativeWindow, std::memory_order_relaxed);
+  if (nativeWindow) {
+    if (!eglDevice->recreateSurfaceIfNeeded(nativeWindow)) {
+      return nullptr;
+    }
   }
-#endif
-}
-
-std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   ISize size = {0, 0};
   if (nativeWindow) {
     // If the rendering size changes，eglQuerySurface() may give the wrong size on same platforms.
     size = GetNativeWindowSize(nativeWindow);
   }
-  auto eglDevice = static_cast<EGLDevice*>(device.get());
   if (size.width <= 0 || size.height <= 0) {
     eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &size.width);
     eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &size.height);
@@ -110,8 +100,7 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
   BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0,
-                           eglDevice->colorSpace);
+  return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
 void EGLWindow::setPresentationTime(int64_t time) {

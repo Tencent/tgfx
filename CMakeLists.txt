@@ -399,14 +399,28 @@ if (TGFX_BUILD_SVG)
     endif ()
 endif ()
 if (TGFX_BUILD_PDF)
-    list(APPEND TGFX_STATIC_VENDORS harfbuzz)
-    list(APPEND TGFX_INCLUDES third_party/harfbuzz/src)
+    if (HARFBUZZ_LIB AND HARFBUZZ_SUBSET_LIB AND HARFBUZZ_INCLUDE)
+        # Prebuilt HarfBuzz static libraries and headers provided externally.
+        # HARFBUZZ_LIB: path to libharfbuzz.a
+        # HARFBUZZ_SUBSET_LIB: path to libharfbuzz-subset.a
+        # HARFBUZZ_INCLUDE: path to HarfBuzz headers directory
+        message("HARFBUZZ_LIB: ${HARFBUZZ_LIB}")
+        message("HARFBUZZ_SUBSET_LIB: ${HARFBUZZ_SUBSET_LIB}")
+        message("HARFBUZZ_INCLUDE: ${HARFBUZZ_INCLUDE}")
+        list(APPEND TGFX_INCLUDES ${HARFBUZZ_INCLUDE})
+        # Use TGFX_SHARED_LIBS to avoid embedding into the static libtgfx archive.
+        list(APPEND TGFX_SHARED_LIBS ${HARFBUZZ_LIB} ${HARFBUZZ_SUBSET_LIB})
+    else ()
+        # Built-in HarfBuzz, compile from third_party.
+        list(APPEND TGFX_STATIC_VENDORS harfbuzz)
+        list(APPEND TGFX_INCLUDES third_party/harfbuzz/src)
+    endif ()
 endif ()
 
 if (WEB)
     file(GLOB_RECURSE PLATFORM_FILES src/platform/web/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
-    list(APPEND TGFX_DEFINES TGFX_BUILD_FOR_WEB)
+    list(APPEND TGFX_DEFINES TGFX_BUILD_FOR_WEB TGFX_USE_FALLBACK_MD5)
     if (TGFX_USE_NATIVE_GL)
         file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/webgl/*.*)
         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
@@ -651,14 +665,18 @@ if (TGFX_BUILD_TESTS)
         list(REMOVE_ITEM TGFX_TEST_FILES ${TGFX_TEST_METAL_FILES})
     endif ()
 
+    file(GLOB_RECURSE TGFX_TEST_WEBGL_FILES test/src/webgl/*.*)
+    if (TGFX_TEST_WEBGL_FILES)
+        list(REMOVE_ITEM TGFX_TEST_FILES ${TGFX_TEST_WEBGL_FILES})
+    endif ()
+
     list(APPEND TGFX_TEST_LIBS tgfx-hello2d tgfx ${TGFX_SHARED_LIBS})
     list(APPEND TGFX_TEST_INCLUDES src test/src hello2d/include third_party/json/include)
 
-    add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest)
+    add_vendor_target(test-vendor STATIC_VENDORS googletest)
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
     list(APPEND TGFX_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
     list(APPEND TGFX_TEST_INCLUDES
-            third_party/harfbuzz/src
             third_party/googletest/googletest
             third_party/googletest/googletest/include)
 
@@ -699,4 +717,9 @@ if (TGFX_BUILD_TESTS)
     target_include_directories(TGFXFullTest PRIVATE ${TGFX_INCLUDES})
     target_link_options(TGFXFullTest PRIVATE ${TGFX_TEST_LINK_OPTIONS})
     target_link_libraries(TGFXFullTest ${TGFX_TEST_LIBS})
+endif ()
+
+# Export TGFX_INCLUDES to the parent scope for external test targets (e.g., web/test).
+if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(TGFX_INCLUDES "${TGFX_INCLUDES}" PARENT_SCOPE)
 endif ()

@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Baseline.h"
+#ifdef __APPLE__
 #include <CommonCrypto/CommonCrypto.h>
+#endif
 #include <fstream>
 #include <unordered_set>
 #include "base/TGFXTest.h"
@@ -32,9 +34,15 @@
 namespace tgfx {
 static const std::string BASELINE_ROOT = ProjectPath::Absolute("test/baseline/");
 static const std::string BASELINE_VERSION_PATH = BASELINE_ROOT + "/version.json";
+#ifdef __EMSCRIPTEN__
+static const std::string CACHE_MD5_PATH = BASELINE_ROOT + "/.cache-web/md5.json";
+static const std::string CACHE_VERSION_PATH = BASELINE_ROOT + "/.cache-web/version.json";
+static const std::string GIT_HEAD_PATH = BASELINE_ROOT + "/.cache-web/HEAD";
+#else
 static const std::string CACHE_MD5_PATH = BASELINE_ROOT + "/.cache/md5.json";
 static const std::string CACHE_VERSION_PATH = BASELINE_ROOT + "/.cache/version.json";
 static const std::string GIT_HEAD_PATH = BASELINE_ROOT + "/.cache/HEAD";
+#endif
 static const std::string EXISTING_OUT_ROOT = ProjectPath::Absolute("test/out/");
 #ifdef GENERATE_BASELINE_IMAGES
 static const std::string OUT_ROOT = ProjectPath::Absolute("test/baseline-out/");

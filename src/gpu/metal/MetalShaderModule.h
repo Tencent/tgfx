@@ -23,6 +23,10 @@
 #include "MetalResource.h"
 #include "tgfx/gpu/ShaderModule.h"
 
+namespace shaderc {
+class Compiler;
+};
+
 namespace tgfx {
 
 class MetalGPU;
@@ -75,8 +79,10 @@ class MetalShaderModule : public ShaderModule, public MetalResource {
   MetalShaderModule(MetalGPU* gpu, const ShaderModuleDescriptor& descriptor);
   ~MetalShaderModule() override = default;
 
-  bool compileShader(id<MTLDevice> device, const std::string& glslCode, ShaderStage stage);
-  std::string convertGLSLToMSL(const std::string& glslCode, ShaderStage stage);
+  bool compileShader(id<MTLDevice> device, const shaderc::Compiler* compiler,
+                     const std::string& glslCode, ShaderStage stage);
+  std::string convertGLSLToMSL(const shaderc::Compiler* compiler, const std::string& glslCode,
+                               ShaderStage stage);
 
   id<MTLLibrary> library = nil;
   ShaderStage _stage = ShaderStage::Vertex;
@@ -94,7 +100,7 @@ struct SampleMaskCompileResult {
 // GLSL to SPIR-V to discover which constant_id values are already in use, picks an unused one,
 // injects tgfx_SampleMask + gl_SampleMask output, and re-compiles the modified GLSL to produce
 // a new MTLLibrary. Returns a nil library on failure.
-SampleMaskCompileResult CompileFragmentShaderWithSampleMask(id<MTLDevice> device,
+SampleMaskCompileResult CompileFragmentShaderWithSampleMask(MetalGPU* gpu,
                                                             const std::string& glslCode);
 
 }  // namespace tgfx

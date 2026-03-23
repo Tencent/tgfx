@@ -20,7 +20,6 @@
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-#include <atomic>
 #include "tgfx/gpu/opengl/GLDevice.h"
 
 #ifdef None
@@ -57,7 +56,6 @@ class EGLDevice : public GLDevice {
   EGLSurface eglSurface = nullptr;
   EGLContext eglContext = nullptr;
   EGLContext shareContext = nullptr;
-  std::atomic<EGLNativeWindowType> sizeInvalidWindow = {EGLNativeWindowType(0)};
 
   EGLDisplay oldEglDisplay = nullptr;
   EGLContext oldEglContext = nullptr;
@@ -76,6 +74,8 @@ class EGLDevice : public GLDevice {
 
   EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle,
             std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
+  bool recreateSurfaceIfNeeded(EGLNativeWindowType nativeWindow);
 
   friend class GLDevice;
 

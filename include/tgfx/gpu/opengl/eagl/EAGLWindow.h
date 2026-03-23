@@ -34,13 +34,12 @@ class EAGLWindow : public Window {
                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
+  std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   void onPresent(Context* context) override;
 
  private:
   CAEAGLLayer* layer = nil;
-  std::shared_ptr<EAGLLayerTexture> layerTexture;
-  std::shared_ptr<ColorSpace> colorSpace;
+  std::shared_ptr<EAGLLayerTexture> layerTexture = nullptr;
 
   EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
              std::shared_ptr<ColorSpace> colorSpace = nullptr);

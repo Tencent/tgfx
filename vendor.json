@@ -56,6 +56,7 @@
         "targets": [
           "webp",
           "webpdemux",
+          "sharpyuv",
           "libwebpmux"
         ],
         "arguments": [
@@ -205,8 +206,8 @@
       "name": "harfbuzz",
       "cmake": {
         "targets": [
-          "harfbuzz-subset",
-          "harfbuzz"
+          "harfbuzz",
+          "harfbuzz-subset"
         ],
         "arguments": [
           "-DHB_HAVE_FREETYPE=OFF",
@@ -226,7 +227,8 @@
         "platforms": [
           "mac",
           "win",
-          "linux"
+          "linux",
+          "web"
         ]
       }
     },

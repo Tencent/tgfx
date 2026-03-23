@@ -33,12 +33,11 @@ class CGLWindow : public Window {
   ~CGLWindow() override;
 
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
+  std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   void onPresent(Context* context) override;
 
  private:
   NSView* view = nil;
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   CGLWindow(std::shared_ptr<Device> device, NSView* view,
             std::shared_ptr<ColorSpace> colorSpace = nullptr);

@@ -1,0 +1,22 @@
+# Build artifacts
+build/
+node_modules/
+*.log
+
+# Compiled WASM output
+tgfx-test.js
+tgfx-test.wasm
+tgfx-test.data
+
+# Copied from web/lib/ at runtime
+tgfx.esm.js
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Puppeteer downloads temp directory
+.downloads/

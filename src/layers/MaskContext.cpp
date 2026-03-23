@@ -67,7 +67,7 @@ bool MaskContext::finish(Path* result) {
         DEBUG_ASSERT(false);
         break;
       case ClipState::WideOpen:
-        maskPath.addPath(record.path);
+        maskPath.addPath(record.path, PathOp::Union);
         break;
       case ClipState::Rect: {
         auto clipBounds = record.clip.bounds();
@@ -76,7 +76,7 @@ bool MaskContext::finish(Path* result) {
           break;
         }
         if (clipBounds.contains(pathBounds)) {
-          maskPath.addPath(record.path);
+          maskPath.addPath(record.path, PathOp::Union);
           break;
         }
         // Partial intersection, use PathOp.
@@ -86,7 +86,7 @@ bool MaskContext::finish(Path* result) {
         // Anti-aliasing attributes of clip elements can be safely discarded for mask generation.
         auto clippedPath = record.clip.getClipPath();
         clippedPath.addPath(record.path, PathOp::Intersect);
-        maskPath.addPath(clippedPath);
+        maskPath.addPath(clippedPath, PathOp::Union);
         break;
       }
     }

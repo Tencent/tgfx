@@ -227,9 +227,10 @@
         "MaskAlpha": "bf48e614",
         "MaskInvalidation_NoMask": "6d7f38ad",
         "MaskInvalidation_SwitchMask": "92ee56bb",
-        "MaskInvalidation_WithMask": "21b2121c",
+"MaskInvalidation_WithMask": "21b2121c",
         "MaskPathOptimization": "21b2121c",
         "RoundRectMaskWithTiledRender": "21b2121c",
+        "SolidLayerWithTwoFillMask": "03743384c",
         "imageMask": "bf48e614",
         "shapeMask": "bf48e614",
         "textMask": "bf48e614"
@@ -239,7 +240,7 @@
         "BackgroundBlurWithFilter_Partial": "ad116c00",
         "BackgroundBlurWithFilter_Tiled": "ad116c00",
         "BottomLeftSurface": "543054b5",
-        "Contour3DWithDropShadow": "9e2c8c8ee",
+        "Contour3DWithDropShadow": "03743384",
         "ContourTest": "1642114b",
         "ContourWithMask": "21b2121c",
         "DiffFilterModeImagePattern -- zoomIn": "ac049958",
@@ -315,8 +316,8 @@
         "EmojiText": "21b2121c",
         "Empty": "79ce3a28",
         "EmptyMultiPage": "79ce3a28",
-        "Image": "21b2121c",
-        "SimpleText": "21b2121c"
+"Image": "79ce3a28",
+        "SimpleText": "a173610f9"
     },
     "PathShapeTest": {
         "AdaptiveDashEffect": "0448e0fe",

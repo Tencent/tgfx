@@ -34,6 +34,7 @@
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 
@@ -242,6 +243,9 @@ RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags,
                                                      PMColor::Transparent(), _colorSpace);
+    if (surface && surface->_window) {
+      drawingManager->collectWindow(surface->_window);
+    }
   }
 }
 
@@ -454,6 +458,9 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor =
         drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
+    if (surface && surface->_window) {
+      drawingManager->collectWindow(surface->_window);
+    }
   } else if (discardContent) {
     opsCompositor->discardAll();
   }

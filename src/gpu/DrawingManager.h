@@ -81,6 +81,11 @@ class DrawingManager {
                         std::shared_ptr<ImageCodec> codec);
 
   /**
+   * Collects a Window that needs to be presented after command buffer submission.
+   */
+  void collectWindow(std::weak_ptr<Window> window);
+
+  /**
    * Flushes all pending drawing operations and returns the DrawingBuffer. Returns nullptr if there
    * are no pending drawing operations. The returned DrawingBuffer will be automatically recycled
    * to the pool after it's no longer referenced.
@@ -101,5 +106,6 @@ class DrawingManager {
   DrawingBuffer* createDrawingBuffer();
 
   friend class OpsCompositor;
+  friend class RenderContext;
 };
 }  // namespace tgfx
