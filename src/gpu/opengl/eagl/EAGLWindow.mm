@@ -57,7 +57,8 @@ std::shared_ptr<RenderTargetProxy> EAGLWindow::onCreateRenderTarget(Context* con
     layerTexture->release(static_cast<GLGPU*>(context->gpu()));
     layerTexture = nullptr;
   }
-  layerTexture = EAGLLayerTexture::MakeFrom(static_cast<GLGPU*>(context->gpu()), layer);
+  layerTexture =
+      EAGLLayerTexture::MakeFrom(static_cast<GLGPU*>(context->gpu()), layer, _sampleCount);
   if (layerTexture == nullptr) {
     return nullptr;
   }
@@ -66,7 +67,15 @@ std::shared_ptr<RenderTargetProxy> EAGLWindow::onCreateRenderTarget(Context* con
 }
 
 void EAGLWindow::onPresent(Context* context) {
-  auto gl = static_cast<GLGPU*>(context->gpu())->functions();
+  auto gpu = static_cast<GLGPU*>(context->gpu());
+  auto gl = gpu->functions();
+  if (layerTexture->needsResolve()) {
+    gl->bindFramebuffer(GL_READ_FRAMEBUFFER, layerTexture->frameBufferID());
+    gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, layerTexture->resolveFrameBufferID());
+    auto width = layerTexture->width();
+    auto height = layerTexture->height();
+    gl->blitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+  }
   gl->bindRenderbuffer(GL_RENDERBUFFER, layerTexture->colorBufferID());
   auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();
   [eaglContext presentRenderbuffer:GL_RENDERBUFFER];

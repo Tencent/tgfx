@@ -25,14 +25,23 @@
 namespace tgfx {
 class EAGLLayerTexture : public GLTexture {
  public:
-  static std::shared_ptr<EAGLLayerTexture> MakeFrom(GLGPU* gpu, CAEAGLLayer* layer);
+  static std::shared_ptr<EAGLLayerTexture> MakeFrom(GLGPU* gpu, CAEAGLLayer* layer,
+                                                    int sampleCount = 1);
 
   unsigned frameBufferID() const override {
     return _frameBufferID;
   }
 
   unsigned colorBufferID() const {
-    return renderBufferID;
+    return resolveBufferID;
+  }
+
+  unsigned resolveFrameBufferID() const {
+    return _resolveFrameBufferID;
+  }
+
+  bool needsResolve() const {
+    return _resolveFrameBufferID > 0;
   }
 
   void release(GLGPU* gpu) {
@@ -44,7 +53,9 @@ class EAGLLayerTexture : public GLTexture {
 
  private:
   unsigned _frameBufferID = 0;
-  unsigned renderBufferID = 0;
+  unsigned msaaBufferID = 0;
+  unsigned resolveBufferID = 0;
+  unsigned _resolveFrameBufferID = 0;
 
   EAGLLayerTexture(const TextureDescriptor& descriptor, unsigned frameBufferID)
       : GLTexture(descriptor, GL_TEXTURE_2D, 0), _frameBufferID(frameBufferID) {
