@@ -214,7 +214,7 @@ class ClipStack {
    */
   bool willModify();
 
-  std::shared_ptr<ClipData> _data;
+  std::shared_ptr<ClipData> _data = nullptr;
 };
 
 }  // namespace tgfx
