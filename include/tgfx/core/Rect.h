@@ -447,6 +447,17 @@ struct Rect {
   }
 
   /**
+   * Sets Rect by rounding up left and top; and rounding down right and bottom, shrinking the rect
+   * to only include fully covered pixels.
+   */
+  void roundIn() {
+    left = ceilf(left);
+    top = ceilf(top);
+    right = floorf(right);
+    bottom = floorf(bottom);
+  }
+
+  /**
    * Sets Rect by rounding of left, top, right and bottom.
    */
   void round() {

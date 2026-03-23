@@ -291,12 +291,23 @@ void OpaqueContext::flushPendingContour(const Contour& contour, const Matrix& ma
   }
   if (fillIsFull && pendingMatrix.rectStaysRect() && pendingContour.type < Contour::Type::Path &&
       !pendingContour.isInverseFillType() && !pendingContour.hasStroke) {
+    // Shrink opaque bounds to fully covered pixels if clip has AA edges. We conservatively shrink
+    // all edges rather than checking each clip element's AA status per edge, as the cost is minimal
+    // (fewer optimization opportunities).
+    auto hasAAClip = std::any_of(pendingClip.elements().begin(), pendingClip.elements().end(),
+                                 [](const ClipElement& e) { return e.isValid() && e.isAntiAlias(); });
+    if (hasAAClip) {
+      globalBounds.roundIn();
+    }
     if (pendingContour.type == Contour::Type::Rect) {
       mergeContourBound(globalBounds);
     } else if (pendingContour.type == Contour::Type::RRect) {
       localBounds.inset(pendingContour.rRect.radii.x, pendingContour.rRect.radii.y);
       if (localBounds.isSorted()) {
         globalBounds = GetGlobalBounds(pendingMatrix, pendingClip, localBounds);
+        if (hasAAClip) {
+          globalBounds.roundIn();
+        }
         mergeContourBound(globalBounds);
       }
     }
