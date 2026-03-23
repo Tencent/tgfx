@@ -69,7 +69,7 @@ class RRectDrawOp : public DrawOp {
   }
 
   bool hasCoverage() const override {
-    return aaType != AAType::None;
+    return aaType == AAType::Coverage;
   }
 
  private:
