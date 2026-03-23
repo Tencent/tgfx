@@ -477,7 +477,7 @@ class Canvas {
   Surface* surface = nullptr;
   Matrix _matrix = Matrix::I();
   std::stack<std::unique_ptr<CanvasState>> stateStack;
-  std::unique_ptr<ClipStack> clipStack = nullptr;
+  std::unique_ptr<ClipStack> clipStack;
 
   explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
   void drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip, const Brush& brush,
