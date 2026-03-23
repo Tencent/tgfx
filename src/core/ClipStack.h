@@ -197,13 +197,13 @@ class ClipStack {
    * @return true if the element was actually added or affected the clip state, false if it was
    * redundant.
    */
-  bool addElement(const ClipElement& toAdd);
-  void replaceWithElement(const ClipElement& toAdd);
+  bool addElement(ClipElement&& toAdd);
+  void replaceWithElement(ClipElement&& toAdd);
   /**
    * Appends a clip element, updating existing elements as needed.
    * @return true if the element was added or affected the clip state, false if it was redundant.
    */
-  bool appendElement(ClipElement toAdd);
+  bool appendElement(ClipElement&& toAdd);
   void detachIfShared();
   const ClipRecord& current() const;
   ClipRecord& current();

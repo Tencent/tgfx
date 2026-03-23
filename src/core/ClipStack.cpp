@@ -156,7 +156,7 @@ ClipStack::ClipStack() : _data(std::make_shared<ClipData>()) {
 void ClipStack::clip(const Path& path, bool antiAlias) {
   bool didSave = willModify();
   ClipElement toAdd(path, antiAlias);
-  if (addElement(toAdd) || !didSave) {
+  if (addElement(std::move(toAdd)) || !didSave) {
     return;
   }
   // We made a new save record, but ended up not adding an element to the stack.
@@ -215,7 +215,7 @@ void ClipStack::detachIfShared() {
   _data = std::make_shared<ClipData>(*_data);
 }
 
-bool ClipStack::addElement(const ClipElement& toAdd) {
+bool ClipStack::addElement(ClipElement&& toAdd) {
   auto& cur = current();
   if (cur.state == ClipState::Empty) {
     // Already empty, adding more clips won't change anything.
@@ -236,23 +236,23 @@ bool ClipStack::addElement(const ClipElement& toAdd) {
     return false;
   }
   if (cur.state == ClipState::WideOpen) {
-    replaceWithElement(toAdd);
+    replaceWithElement(std::move(toAdd));
     return true;
   }
-  return appendElement(toAdd);
+  return appendElement(std::move(toAdd));
 }
 
-void ClipStack::replaceWithElement(const ClipElement& toAdd) {
+void ClipStack::replaceWithElement(ClipElement&& toAdd) {
   auto& cur = current();
   _data->elements.resize(cur.startIndex);
-  _data->elements.push_back(toAdd);
   cur.bound = toAdd.bound();
   cur.state = toAdd.isRect() ? ClipState::Rect : ClipState::Complex;
+  _data->elements.push_back(std::move(toAdd));
   cur.oldestValidIndex = _data->elements.size() - 1;
   cur.uniqueID = UniqueID::Next();
 }
 
-bool ClipStack::appendElement(ClipElement toAdd) {
+bool ClipStack::appendElement(ClipElement&& toAdd) {
   auto& cur = current();
   size_t oldestActiveInvalidIdx = _data->elements.size();
   size_t oldestValidIdx = _data->elements.size();
@@ -294,17 +294,17 @@ bool ClipStack::appendElement(ClipElement toAdd) {
   // depends solely on the new element. Must be checked before modifying _data->elements.
   cur.state = (oldestValidIdx == _data->elements.size() && toAdd.isRect()) ? ClipState::Rect
                                                                            : ClipState::Complex;
-  _data->elements.resize(targetEndIdx);
-  // Reuse the active invalid slot if available, otherwise append to the end.
-  if (reuseInvalidSlot) {
-    _data->elements[oldestActiveInvalidIdx] = toAdd;
-  } else {
-    _data->elements.back() = toAdd;
-  }
-
   cur.oldestValidIndex = std::min(oldestValidIdx, oldestActiveInvalidIdx);
   cur.bound.intersect(toAdd.bound());
   cur.uniqueID = UniqueID::Next();
+
+  _data->elements.resize(targetEndIdx);
+  // Reuse the active invalid slot if available, otherwise append to the end.
+  if (reuseInvalidSlot) {
+    _data->elements[oldestActiveInvalidIdx] = std::move(toAdd);
+  } else {
+    _data->elements.back() = std::move(toAdd);
+  }
   return true;
 }
 
