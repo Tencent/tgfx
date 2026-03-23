@@ -100,19 +100,19 @@ TGFX_TEST(CanvasTest, Clip) {
   canvas->clipRect(Rect::MakeXYWH(10, 20, 100, 80), true);
   EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
   EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
-  EXPECT_EQ(canvas->clipStack->bound(), Rect::MakeXYWH(10, 20, 100, 80));
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(10, 20, 100, 80));
   EXPECT_TRUE(canvas->clipStack->elements()[0].isAntiAlias());
 
   // ========== 3. Redundant clip elimination ==========
   canvas->clipRect(Rect::MakeXYWH(0, 0, 200, 200), true);
   EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
-  EXPECT_EQ(canvas->clipStack->bound(), Rect::MakeXYWH(10, 20, 100, 80));
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(10, 20, 100, 80));
 
   // ========== 4. Merge: same AA, pixel-aligned ==========
   auto elemCountBefore = canvas->clipStack->elements().size();
   canvas->clipRect(Rect::MakeXYWH(50, 50, 100, 100), true);
   EXPECT_EQ(canvas->clipStack->elements().size(), elemCountBefore);
-  EXPECT_EQ(canvas->clipStack->bound(), Rect::MakeXYWH(50, 50, 60, 50));
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(50, 50, 60, 50));
   EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
 
   // ========== 5. NoMerge: different AA, non-pixel-aligned ==========
@@ -158,7 +158,7 @@ TGFX_TEST(CanvasTest, Clip) {
   canvas->clipRect(Rect::MakeXYWH(20, 20, 60, 60), true);
   EXPECT_NE(canvas->clipStack->uniqueID(), uniqueIDBefore);
   EXPECT_EQ(canvas->clipStack->_data->records.size(), 2u);
-  EXPECT_EQ(canvas->clipStack->bound(), Rect::MakeXYWH(20, 20, 60, 60));
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(20, 20, 60, 60));
 
   // ========== 10. Restore ==========
   canvas->restore();
@@ -166,7 +166,7 @@ TGFX_TEST(CanvasTest, Clip) {
   canvas->restore();
   canvas->restore();
   EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
-  EXPECT_EQ(canvas->clipStack->bound(), Rect::MakeXYWH(0, 0, 100, 100));
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(0, 0, 100, 100));
 
   // ========== 11. getTotalClip and getClipBounds ==========
   surface = Surface::Make(context, 100, 100);
