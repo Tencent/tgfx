@@ -133,6 +133,12 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
       if (drawingBuffer == targetBuffer) {
         break;
       }
+      // Insert a GPU fence between consecutive command buffers so that the next command buffer
+      // waits for this one to complete before reading any shared render target textures.
+      auto semaphore = queue->insertSemaphore();
+      if (semaphore != nullptr) {
+        queue->waitSemaphore(std::move(semaphore));
+      }
     }
   }
   if (syncCpu) {
