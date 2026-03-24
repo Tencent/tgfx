@@ -827,9 +827,9 @@ std::vector<std::shared_ptr<Tile>> DisplayList::createContinuousTiles(const Surf
     countY = requestCountY;
     countX = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countY));
   }
-  auto surface =
-      Surface::Make(context, countX * _tileSize, countY * _tileSize, ColorType::RGBA_8888, 1, false,
-                    renderSurface->renderFlags(), renderSurface->colorSpace());
+  auto surface = Surface::Make(context, countX * _tileSize, countY * _tileSize,
+                               ColorType::RGBA_8888, renderSurface->sampleCount(), false,
+                               renderSurface->renderFlags(), renderSurface->colorSpace());
   if (surface == nullptr) {
     return {};
   }

@@ -166,7 +166,7 @@ std::shared_ptr<RenderTargetProxy> QGLWindow::onCreateRenderTarget(Context* cont
     return nullptr;
   }
   drawableProxy = std::make_shared<QGLDrawableProxy>(context, width, height, PixelFormat::RGBA_8888,
-                                                     1, ImageOrigin::BottomLeft, this);
+                                                     _sampleCount, ImageOrigin::BottomLeft, this);
   std::static_pointer_cast<QGLDrawableProxy>(drawableProxy)->weakThis = drawableProxy;
   return drawableProxy;
 }
