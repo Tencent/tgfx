@@ -187,7 +187,7 @@ void RRectsVertexProvider::getAAVertices(float* vertices) const {
     reciprocalRadii[2] = std::min(reciprocalRadii[2], 1e6f);
     reciprocalRadii[3] = std::min(reciprocalRadii[3], 1e6f);
     // Extend out the radii to antialias.
-    float aaBloat = .5f;
+    constexpr float aaBloat = 0.5f;
     float xOuterRadius = xRadius + aaBloat;
     float yOuterRadius = yRadius + aaBloat;
 
