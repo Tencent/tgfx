@@ -104,8 +104,10 @@ std::shared_ptr<RenderTargetProxy> EGLWindow::onCreateRenderTarget(Context* cont
   GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
-  auto sampleCount = context->gpu()->getSampleCount(_sampleCount, PixelFormat::RGBA_8888);
-  if (!nativeWindow) {
+  int sampleCount = 1;
+  if (nativeWindow) {
+    sampleCount = context->gpu()->getSampleCount(_sampleCount, PixelFormat::RGBA_8888);
+  } else {
     // For the Current() path, query the actual MSAA sample count from the GL context since there is
     // no user-specified sampleCount parameter.
     int samples = 1;
