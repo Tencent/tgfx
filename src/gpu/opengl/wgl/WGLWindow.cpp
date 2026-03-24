@@ -23,7 +23,8 @@
 
 namespace tgfx {
 std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedContext,
-                                               std::shared_ptr<ColorSpace> colorSpace) {
+                                               std::shared_ptr<ColorSpace> colorSpace,
+                                               int sampleCount) {
   if (nativeWindow == nullptr) {
     return nullptr;
   }
@@ -37,13 +38,15 @@ std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedCo
         "WGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. "
         "Rendering may have color inaccuracies.");
   }
-  auto wglWindow = std::shared_ptr<WGLWindow>(new WGLWindow(device, std::move(colorSpace)));
+  auto wglWindow =
+      std::shared_ptr<WGLWindow>(new WGLWindow(device, std::move(colorSpace), sampleCount));
   wglWindow->nativeWindow = nativeWindow;
   return wglWindow;
 }
 
-WGLWindow::WGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)) {
+WGLWindow::WGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
+                     int sampleCount)
+    : Window(std::move(device), std::move(colorSpace), sampleCount) {
 }
 
 std::shared_ptr<RenderTargetProxy> WGLWindow::onCreateRenderTarget(Context* context) {
@@ -59,7 +62,7 @@ std::shared_ptr<RenderTargetProxy> WGLWindow::onCreateRenderTarget(Context* cont
   }
 
   GLFrameBufferInfo frameBuffer = {0, GL_RGBA8};
-  BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
+  BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height, _sampleCount};
   return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 

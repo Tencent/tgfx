@@ -26,7 +26,7 @@ PlacementPtr<FragmentProcessor> PixelImage::asFragmentProcessor(const FPArgs& ar
                                                                 const SamplingArgs& samplingArgs,
                                                                 const Matrix* uvMatrix) const {
   auto mipmapped = hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale, BackingFit::Approx);
+  TPArgs tpArgs(args.context, args.renderFlags, 1, mipmapped, args.drawScale, BackingFit::Approx);
   auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;

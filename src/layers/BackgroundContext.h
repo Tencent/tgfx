@@ -26,7 +26,8 @@ class BackgroundContext {
   static std::shared_ptr<BackgroundContext> Make(Context* context, const Rect& drawRect,
                                                  float maxOutset, float minOutset,
                                                  const Matrix& matrix,
-                                                 std::shared_ptr<ColorSpace> colorSpace);
+                                                 std::shared_ptr<ColorSpace> colorSpace,
+                                                 int sampleCount = 1);
 
   virtual ~BackgroundContext() = default;
 
@@ -49,13 +50,14 @@ class BackgroundContext {
   virtual std::shared_ptr<Image> onGetBackgroundImage() = 0;
 
   BackgroundContext(Context* context, const Matrix& matrix, const Rect& rect,
-                    std::shared_ptr<ColorSpace> colorSpace)
+                    std::shared_ptr<ColorSpace> colorSpace, int sampleCount = 1)
       : context(context), imageMatrix(matrix), backgroundRect(rect),
-        colorSpace(std::move(colorSpace)){};
+        colorSpace(std::move(colorSpace)), _sampleCount(sampleCount){};
   Context* context = nullptr;
   Matrix imageMatrix = Matrix::I();
   Rect backgroundRect = Rect::MakeEmpty();
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
+  int _sampleCount = 1;
 
   BackgroundContext* parent = nullptr;
 

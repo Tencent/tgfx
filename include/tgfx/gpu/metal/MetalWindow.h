@@ -35,18 +35,22 @@ class MetalWindow : public Window {
    * @param layer The CAMetalLayer to render into. Must not be nil.
    * @param device An optional MetalDevice. If nullptr, a default device is created automatically.
    * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param sampleCount The number of samples for MSAA rendering. Defaults to 1 (no MSAA).
    */
   static std::shared_ptr<MetalWindow> MakeFrom(CAMetalLayer* layer,
                                                std::shared_ptr<MetalDevice> device = nullptr,
-                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                               std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                               int sampleCount = 1);
 
   /**
    * Creates a new window from an MTKView.
    * @param view The MTKView to render into. Must not be nil.
    * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param sampleCount The number of samples for MSAA rendering. Defaults to 1 (no MSAA).
    */
   static std::shared_ptr<MetalWindow> MakeFrom(MTKView* view,
-                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                               std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                               int sampleCount = 1);
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
@@ -58,9 +62,9 @@ class MetalWindow : public Window {
   std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
 
   MetalWindow(std::shared_ptr<Device> device, CAMetalLayer* layer,
-              std::shared_ptr<ColorSpace> colorSpace);
+              std::shared_ptr<ColorSpace> colorSpace, int sampleCount);
   MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalLayer* layer,
-              std::shared_ptr<ColorSpace> colorSpace);
+              std::shared_ptr<ColorSpace> colorSpace, int sampleCount);
 };
 
 }  // namespace tgfx

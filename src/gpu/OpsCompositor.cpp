@@ -247,7 +247,8 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
   // - shader + colors: texture * vertexColor (Modulate)
   // - shader only: pure texture
   if (brush.shader) {
-    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
+    FPArgs args = {context, renderFlags, renderTarget->sampleCount(),
+                   localBounds.value_or(Rect::MakeEmpty()), drawScale};
     auto textureFP = FragmentProcessor::Make(brush.shader, args, nullptr, dstColorSpace);
     if (textureFP == nullptr) {
       return;
@@ -520,8 +521,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
       break;
   }
   if (drawOp != nullptr && pendingType == PendingOpType::Image) {
-    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
-                   drawScale.value_or(1.0f)};
+    FPArgs args = {context, renderFlags, renderTarget->sampleCount(),
+                   localBounds.value_or(Rect::MakeEmpty()), drawScale.value_or(1.0f)};
     auto processor =
         FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint);
     if (processor == nullptr) {
@@ -749,8 +750,9 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
     CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
-    auto clipRenderTarget = RenderTargetProxy::Make(context, width, height, true, 1, false,
-                                                    ImageOrigin::TopLeft, BackingFit::Approx);
+    auto clipRenderTarget =
+        RenderTargetProxy::Make(context, width, height, true, renderTarget->sampleCount(), false,
+                                ImageOrigin::TopLeft, BackingFit::Approx);
     if (clipRenderTarget == nullptr) {
       return nullptr;
     }
@@ -854,7 +856,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const B
     return;
   }
 
-  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
+  FPArgs args = {context, renderFlags, renderTarget->sampleCount(),
+                 localBounds.value_or(Rect::MakeEmpty()), drawScale};
   auto colorFilter = brush.colorFilter;
   if (brush.shader) {
     auto shader = brush.shader;

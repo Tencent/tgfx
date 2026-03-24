@@ -66,7 +66,7 @@ BackendRenderTarget GLTexture::getBackendRenderTarget() const {
   GLFrameBufferInfo glInfo = {};
   glInfo.id = frameBufferID();
   glInfo.format = PixelFormatToGLSizeFormat(format());
-  return {glInfo, width(), height()};
+  return {glInfo, width(), height(), sampleCount()};
 }
 
 void GLTexture::onRelease(GLGPU* gpu) {

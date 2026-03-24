@@ -27,18 +27,19 @@ class SurfaceBackgroundContext : public BackgroundContext {
  public:
   static std::shared_ptr<SurfaceBackgroundContext> Make(Context* context, const Matrix& matrix,
                                                         const Rect& rect,
-                                                        std::shared_ptr<ColorSpace> colorSpace) {
+                                                        std::shared_ptr<ColorSpace> colorSpace,
+                                                        int sampleCount = 1) {
     auto invertMatrix = Matrix::I();
     matrix.invert(&invertMatrix);
     auto surfaceRect = invertMatrix.mapRect(rect);
-    auto surface =
-        Surface::Make(context, static_cast<int>(surfaceRect.width()),
-                      static_cast<int>(surfaceRect.height()), false, 1, false, 0, colorSpace);
+    auto surface = Surface::Make(context, static_cast<int>(surfaceRect.width()),
+                                 static_cast<int>(surfaceRect.height()), false, sampleCount, false,
+                                 0, colorSpace);
     if (!surface) {
       return nullptr;
     }
     return std::shared_ptr<SurfaceBackgroundContext>(
-        new SurfaceBackgroundContext(surface, matrix, rect, std::move(colorSpace)));
+        new SurfaceBackgroundContext(surface, matrix, rect, std::move(colorSpace), sampleCount));
   }
   Canvas* getCanvas() override {
     return surface->getCanvas();
@@ -47,8 +48,8 @@ class SurfaceBackgroundContext : public BackgroundContext {
 
  private:
   SurfaceBackgroundContext(std::shared_ptr<Surface> surface, const Matrix& matrix, const Rect& rect,
-                           std::shared_ptr<ColorSpace> colorSpace)
-      : BackgroundContext(surface->getContext(), matrix, rect, std::move(colorSpace)),
+                           std::shared_ptr<ColorSpace> colorSpace, int sampleCount)
+      : BackgroundContext(surface->getContext(), matrix, rect, std::move(colorSpace), sampleCount),
         surface(std::move(surface)) {
   }
   std::shared_ptr<Surface> surface = nullptr;
@@ -72,7 +73,8 @@ static float MaxBlurOutset() {
 std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, const Rect& drawRect,
                                                            float maxOutset, float minOutset,
                                                            const Matrix& matrix,
-                                                           std::shared_ptr<ColorSpace> colorSpace) {
+                                                           std::shared_ptr<ColorSpace> colorSpace,
+                                                           int sampleCount) {
   if (!context) {
     return nullptr;
   }
@@ -95,8 +97,8 @@ std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, con
   }
   auto backgroundRect = Rect::MakeWH(rect.width(), rect.height());
   imageMatrix.mapRect(&backgroundRect);
-  std::shared_ptr<BackgroundContext> result =
-      SurfaceBackgroundContext::Make(context, imageMatrix, backgroundRect, std::move(colorSpace));
+  std::shared_ptr<BackgroundContext> result = SurfaceBackgroundContext::Make(
+      context, imageMatrix, backgroundRect, std::move(colorSpace), sampleCount);
   if (!result) {
     return result;
   }
@@ -206,8 +208,8 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rec
   childCanvasMatrix.preConcat(imageMatrix);
   childCanvasMatrix.preConcat(parentCanvasMatrix);
 
-  std::shared_ptr<BackgroundContext> child =
-      SurfaceBackgroundContext::Make(context, childImageMatrix, childBackgroundRect, colorSpace);
+  std::shared_ptr<BackgroundContext> child = SurfaceBackgroundContext::Make(
+      context, childImageMatrix, childBackgroundRect, colorSpace, _sampleCount);
   if (!child) {
     return nullptr;
   }

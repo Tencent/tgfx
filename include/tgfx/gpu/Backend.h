@@ -129,15 +129,17 @@ class BackendRenderTarget {
   /**
    * Creates an OpenGL backend render target.
    */
-  BackendRenderTarget(const GLFrameBufferInfo& glInfo, int width, int height)
-      : _backend(Backend::OpenGL), _width(width), _height(height), glInfo(glInfo) {
+  BackendRenderTarget(const GLFrameBufferInfo& glInfo, int width, int height, int sampleCount = 1)
+      : _backend(Backend::OpenGL), _width(width), _height(height), _sampleCount(sampleCount),
+        glInfo(glInfo) {
   }
 
   /**
    * Creates a Metal backend render target.
    */
-  BackendRenderTarget(const MetalTextureInfo& metalInfo, int width, int height)
-      : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
+  BackendRenderTarget(const MetalTextureInfo& metalInfo, int width, int height, int sampleCount = 1)
+      : _backend(Backend::Metal), _width(width), _height(height), _sampleCount(sampleCount),
+        metalInfo(metalInfo) {
   }
 
   BackendRenderTarget(const BackendRenderTarget& that) {
@@ -168,6 +170,13 @@ class BackendRenderTarget {
   }
 
   /**
+   * Returns the sample count of this render target. Returns 1 if MSAA is not enabled.
+   */
+  int sampleCount() const {
+    return _sampleCount;
+  }
+
+  /**
    * Returns the backend API of this render target.
    */
   Backend backend() const {
@@ -195,6 +204,7 @@ class BackendRenderTarget {
   Backend _backend = Backend::Unknown;
   int _width = 0;
   int _height = 0;
+  int _sampleCount = 1;
   union {
     GLFrameBufferInfo glInfo;
     MetalTextureInfo metalInfo;

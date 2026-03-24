@@ -23,6 +23,7 @@
 #include "core/shapes/ProviderShape.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/RenderContext.h"
+#include "gpu/resources/RenderTarget.h"
 #include "gpu/resources/TextureView.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
@@ -147,6 +148,175 @@ TGFX_TEST(SurfaceRenderTest, OutOfRenderTarget) {
   paint.setBlendMode(BlendMode::SoftLight);
   canvas->drawPath(drawPath, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "SurfaceRenderTest/OutOfRenderTarget"));
+}
+
+// ==================== SampleCount Propagation Tests ====================
+
+TGFX_TEST(SurfaceRenderTest, SampleCountAPI) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Surface::Make with default sampleCount (1).
+  auto surface1x = Surface::Make(context, 100, 100);
+  ASSERT_TRUE(surface1x != nullptr);
+  EXPECT_EQ(surface1x->sampleCount(), 1);
+
+  // Surface::Make with sampleCount=4.
+  auto surface4x = Surface::Make(context, 100, 100, false, 4);
+  ASSERT_TRUE(surface4x != nullptr);
+  EXPECT_TRUE(surface4x->sampleCount() > 1);
+
+  // Surface::MakeFrom(BackendTexture) with sampleCount=4.
+  auto texture = context->gpu()->createTexture({100, 100, PixelFormat::RGBA_8888});
+  ASSERT_TRUE(texture != nullptr);
+  auto surfaceFromTexture =
+      Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::TopLeft, 4);
+  ASSERT_TRUE(surfaceFromTexture != nullptr);
+  EXPECT_TRUE(surfaceFromTexture->sampleCount() > 1);
+
+  // Surface::MakeFrom(BackendRenderTarget) carries sampleCount from BackendRenderTarget itself.
+  auto rt = RenderTarget::Make(context, 100, 100, PixelFormat::RGBA_8888, 4);
+  ASSERT_TRUE(rt != nullptr);
+  auto backendRT = rt->getBackendRenderTarget();
+  EXPECT_TRUE(backendRT.sampleCount() > 1);
+  auto surfaceFromRT = Surface::MakeFrom(context, backendRT, ImageOrigin::TopLeft);
+  ASSERT_TRUE(surfaceFromRT != nullptr);
+  EXPECT_TRUE(surfaceFromRT->sampleCount() > 1);
+}
+
+TGFX_TEST(SurfaceRenderTest, SampleCountRendering) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Build a five-pointed star path centered at (200, 200) with outer radius 160 and inner radius 70.
+  // The star must be large enough to trigger GPU triangle tessellation instead of CPU rasterization.
+  Path star;
+  auto outerRadius = 160.f;
+  auto innerRadius = 70.f;
+  auto centerX = 200.f;
+  auto centerY = 200.f;
+  for (int i = 0; i < 5; i++) {
+    auto outerAngle = static_cast<float>(-M_PI_2 + i * 2 * M_PI / 5);
+    auto innerAngle = static_cast<float>(-M_PI_2 + (i + 0.5f) * 2 * M_PI / 5);
+    auto outerX = centerX + outerRadius * cosf(outerAngle);
+    auto outerY = centerY + outerRadius * sinf(outerAngle);
+    auto innerX = centerX + innerRadius * cosf(innerAngle);
+    auto innerY = centerY + innerRadius * sinf(innerAngle);
+    if (i == 0) {
+      star.moveTo(outerX, outerY);
+    } else {
+      star.lineTo(outerX, outerY);
+    }
+    star.lineTo(innerX, innerY);
+  }
+  star.close();
+
+  // Disable antiAlias so only MSAA can provide anti-aliasing.
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setColor(Color::Red());
+
+  // Draw the star on a 1x surface — edges should have hard aliased pixels.
+  auto surface1x = Surface::Make(context, 400, 400);
+  ASSERT_TRUE(surface1x != nullptr);
+  auto canvas = surface1x->getCanvas();
+  canvas->clear(Color::White());
+  canvas->drawPath(star, paint);
+  EXPECT_TRUE(Baseline::Compare(surface1x, "SurfaceRenderTest/SampleCountRendering_1x"));
+
+  // Draw the same star on a 4x MSAA surface — edges should be smoother due to MSAA.
+  auto surface4x = Surface::Make(context, 400, 400, false, 4);
+  ASSERT_TRUE(surface4x != nullptr);
+  canvas = surface4x->getCanvas();
+  canvas->clear(Color::White());
+  canvas->drawPath(star, paint);
+  EXPECT_TRUE(Baseline::Compare(surface4x, "SurfaceRenderTest/SampleCountRendering_4x"));
+}
+
+TGFX_TEST(SurfaceRenderTest, SampleCountWithClip) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Build a rounded rectangle path for clipping.
+  Path clipRoundRect;
+  clipRoundRect.addRoundRect(Rect::MakeLTRB(10, 10, 190, 190), 30, 30);
+
+  // Disable antiAlias so only MSAA can provide anti-aliasing on clip edges.
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setColor(Color::Red());
+
+  // Draw a filled rect clipped by a round rect on a 1x surface.
+  auto surface1x = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface1x != nullptr);
+  auto canvas = surface1x->getCanvas();
+  canvas->clear(Color::White());
+  canvas->clipPath(clipRoundRect);
+  canvas->drawRect(Rect::MakeWH(200, 200), paint);
+  EXPECT_TRUE(Baseline::Compare(surface1x, "SurfaceRenderTest/SampleCountWithClip_1x"));
+
+  // Same drawing on a 4x MSAA surface — clip edge should be smoother.
+  auto surface4x = Surface::Make(context, 200, 200, false, 4);
+  ASSERT_TRUE(surface4x != nullptr);
+  canvas = surface4x->getCanvas();
+  canvas->clear(Color::White());
+  canvas->clipPath(clipRoundRect);
+  canvas->drawRect(Rect::MakeWH(200, 200), paint);
+  EXPECT_TRUE(Baseline::Compare(surface4x, "SurfaceRenderTest/SampleCountWithClip_4x"));
+}
+
+TGFX_TEST(SurfaceRenderTest, SampleCountSnapshotRoundTrip) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Create a 4x MSAA surface and draw a five-pointed star on it.
+  auto surface = Surface::Make(context, 400, 400, false, 4);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(surface->sampleCount() > 1);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Build a five-pointed star path centered at (200, 200).
+  Path star;
+  auto outerRadius = 140.f;
+  auto innerRadius = 60.f;
+  auto centerX = 200.f;
+  auto centerY = 200.f;
+  for (int i = 0; i < 5; i++) {
+    auto outerAngle = static_cast<float>(-M_PI_2 + i * 2 * M_PI / 5);
+    auto innerAngle = static_cast<float>(-M_PI_2 + (i + 0.5f) * 2 * M_PI / 5);
+    auto outerX = centerX + outerRadius * cosf(outerAngle);
+    auto outerY = centerY + outerRadius * sinf(outerAngle);
+    auto innerX = centerX + innerRadius * cosf(innerAngle);
+    auto innerY = centerY + innerRadius * sinf(innerAngle);
+    if (i == 0) {
+      star.moveTo(outerX, outerY);
+    } else {
+      star.lineTo(outerX, outerY);
+    }
+    star.lineTo(innerX, innerY);
+  }
+  star.close();
+
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setColor(Color::Blue());
+  canvas->drawPath(star, paint);
+
+  // Snapshot the MSAA surface and redraw onto a 1x surface — the resolved content should be
+  // preserved exactly.
+  auto snapshot = surface->makeImageSnapshot();
+  ASSERT_TRUE(snapshot != nullptr);
+  auto compareSurface = Surface::Make(context, 400, 400);
+  ASSERT_TRUE(compareSurface != nullptr);
+  EXPECT_EQ(compareSurface->sampleCount(), 1);
+  auto compareCanvas = compareSurface->getCanvas();
+  compareCanvas->drawImage(snapshot);
+  EXPECT_TRUE(Baseline::Compare(compareSurface, "SurfaceRenderTest/SampleCountSnapshotRoundTrip"));
 }
 
 }  // namespace tgfx

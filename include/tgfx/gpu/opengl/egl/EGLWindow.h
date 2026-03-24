@@ -36,7 +36,8 @@ class EGLWindow : public Window {
    */
   static std::shared_ptr<EGLWindow> MakeFrom(EGLNativeWindowType nativeWindow,
                                              EGLContext sharedContext = nullptr,
-                                             std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                             std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                             int sampleCount = 1);
 
   /**
    * Sets the presentation time for the next frame in microseconds. This is only applicable on
@@ -54,6 +55,6 @@ class EGLWindow : public Window {
   std::optional<int64_t> presentationTime = std::nullopt;
 
   explicit EGLWindow(std::shared_ptr<Device> device,
-                     std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                     std::shared_ptr<ColorSpace> colorSpace = nullptr, int sampleCount = 1);
 };
 }  // namespace tgfx

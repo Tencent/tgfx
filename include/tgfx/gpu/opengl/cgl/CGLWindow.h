@@ -28,7 +28,8 @@ class CGLWindow : public Window {
    * Creates a new window from an NSView with specified shared context.
    */
   static std::shared_ptr<CGLWindow> MakeFrom(NSView* view, CGLContextObj sharedContext = nullptr,
-                                             std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                             std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                             int sampleCount = 1);
 
   ~CGLWindow() override;
 
@@ -39,7 +40,7 @@ class CGLWindow : public Window {
  private:
   NSView* view = nil;
 
-  CGLWindow(std::shared_ptr<Device> device, NSView* view,
-            std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  CGLWindow(std::shared_ptr<Device> device, NSView* view, std::shared_ptr<ColorSpace> colorSpace,
+            int sampleCount);
 };
 }  // namespace tgfx

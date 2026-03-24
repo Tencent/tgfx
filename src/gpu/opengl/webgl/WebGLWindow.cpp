@@ -25,7 +25,8 @@
 namespace tgfx {
 
 std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID,
-                                                   std::shared_ptr<ColorSpace> colorSpace) {
+                                                   std::shared_ptr<ColorSpace> colorSpace,
+                                                   int sampleCount) {
   if (canvasID.empty()) {
     return nullptr;
   }
@@ -33,13 +34,15 @@ std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID,
   if (device == nullptr) {
     return nullptr;
   }
-  auto window = std::shared_ptr<WebGLWindow>(new WebGLWindow(device, std::move(colorSpace)));
+  auto window =
+      std::shared_ptr<WebGLWindow>(new WebGLWindow(device, std::move(colorSpace), sampleCount));
   window->canvasID = canvasID;
   return window;
 }
 
-WebGLWindow::WebGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)) {
+WebGLWindow::WebGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
+                         int sampleCount)
+    : Window(std::move(device), std::move(colorSpace), sampleCount) {
 }
 
 std::shared_ptr<RenderTargetProxy> WebGLWindow::onCreateRenderTarget(Context* context) {
@@ -53,6 +56,7 @@ std::shared_ptr<RenderTargetProxy> WebGLWindow::onCreateRenderTarget(Context* co
   GLFrameBufferInfo glInfo = {};
   glInfo.id = 0;
   glInfo.format = GL_RGBA8;
-  return RenderTargetProxy::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft);
+  return RenderTargetProxy::MakeFrom(context, {glInfo, width, height, _sampleCount},
+                                     ImageOrigin::BottomLeft);
 }
 }  // namespace tgfx

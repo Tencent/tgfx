@@ -40,12 +40,15 @@ class FPArgs {
  public:
   FPArgs() = default;
 
-  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect, float drawScale = 1.0f)
-      : context(context), renderFlags(renderFlags), drawRect(drawRect), drawScale(drawScale) {
+  FPArgs(Context* context, uint32_t renderFlags, int sampleCount, const Rect& drawRect,
+         float drawScale = 1.0f)
+      : context(context), renderFlags(renderFlags), sampleCount(sampleCount), drawRect(drawRect),
+        drawScale(drawScale) {
   }
 
   Context* context = nullptr;
   uint32_t renderFlags = 0;
+  int sampleCount = 1;
   Rect drawRect = {};
   float drawScale = 1.0f;
 };

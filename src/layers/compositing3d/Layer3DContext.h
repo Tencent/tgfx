@@ -52,7 +52,8 @@ class Layer3DContext {
   static std::shared_ptr<Layer3DContext> Make(bool contourMode, Context* context,
                                               const Rect& renderRect, float contentScale,
                                               std::shared_ptr<ColorSpace> colorSpace,
-                                              std::shared_ptr<BackgroundContext> backgroundContext);
+                                              std::shared_ptr<BackgroundContext> backgroundContext,
+                                              int sampleCount = 1);
 
   Layer3DContext(const Rect& renderRect, float contentScale,
                  std::shared_ptr<ColorSpace> colorSpace);

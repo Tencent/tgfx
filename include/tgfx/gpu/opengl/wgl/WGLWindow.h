@@ -28,7 +28,8 @@ class WGLWindow : public Window {
    * Creates a new window from a HWND with specialed shared context.
    */
   static std::shared_ptr<WGLWindow> MakeFrom(HWND nativeWindow, HGLRC sharedContext = nullptr,
-                                             std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                             std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                             int sampleCount = 1);
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
@@ -38,6 +39,6 @@ class WGLWindow : public Window {
   HWND nativeWindow = nullptr;
 
   explicit WGLWindow(std::shared_ptr<Device> device,
-                     std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                     std::shared_ptr<ColorSpace> colorSpace = nullptr, int sampleCount = 1);
 };
 }  // namespace tgfx

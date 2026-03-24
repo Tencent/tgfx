@@ -54,7 +54,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  FPArgs fpArgs(args.context, args.renderFlags,
+  FPArgs fpArgs(args.context, args.renderFlags, 1,
                 Rect::MakeWH(renderTarget->width(), renderTarget->height()),
                 std::max(textureScaleX, textureScaleY));
   Matrix matrix = Matrix::MakeTrans(renderBounds.left, renderBounds.top);
@@ -93,7 +93,7 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   }
   auto isAlphaOnly = source->isAlphaOnly();
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
+  TPArgs tpArgs(args.context, args.renderFlags, 1, mipmapped, args.drawScale);
   auto textureProxy = lockTextureProxy(std::move(source), dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;

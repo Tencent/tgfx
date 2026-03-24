@@ -124,6 +124,11 @@ class Surface {
   uint32_t renderFlags() const;
 
   /**
+   * Returns the sample count for MSAA rendering. Returns 1 if MSAA is not enabled.
+   */
+  int sampleCount() const;
+
+  /**
    * Returns the width of this surface.
    */
   int width() const;

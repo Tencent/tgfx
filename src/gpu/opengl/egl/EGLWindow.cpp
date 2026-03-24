@@ -28,6 +28,8 @@
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
 #include "core/utils/USE.h"
+#include "gpu/opengl/GLDefines.h"
+#include "gpu/opengl/GLGPU.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
@@ -41,7 +43,8 @@ std::shared_ptr<EGLWindow> EGLWindow::Current() {
 
 std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
                                                EGLContext sharedContext,
-                                               std::shared_ptr<ColorSpace> colorSpace) {
+                                               std::shared_ptr<ColorSpace> colorSpace,
+                                               int sampleCount) {
   if (!nativeWindow) {
     return nullptr;
   }
@@ -49,13 +52,15 @@ std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
   if (device == nullptr) {
     return nullptr;
   }
-  auto eglWindow = std::shared_ptr<EGLWindow>(new EGLWindow(device, std::move(colorSpace)));
+  auto eglWindow =
+      std::shared_ptr<EGLWindow>(new EGLWindow(device, std::move(colorSpace), sampleCount));
   eglWindow->nativeWindow = nativeWindow;
   return eglWindow;
 }
 
-EGLWindow::EGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)) {
+EGLWindow::EGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
+                     int sampleCount)
+    : Window(std::move(device), std::move(colorSpace), sampleCount) {
 }
 
 ISize GetNativeWindowSize(EGLNativeWindowType nativeWindow) {
@@ -99,7 +104,15 @@ std::shared_ptr<RenderTargetProxy> EGLWindow::onCreateRenderTarget(Context* cont
   GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
-  BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
+  auto sampleCount = _sampleCount;
+  if (!nativeWindow) {
+    // For the Current() path, query the actual MSAA sample count from the GL context since there is
+    // no user-specified sampleCount parameter.
+    int samples = 1;
+    static_cast<GLGPU*>(context->gpu())->functions()->getIntegerv(GL_SAMPLES, &samples);
+    sampleCount = std::max(samples, 1);
+  }
+  BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height, sampleCount};
   return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 

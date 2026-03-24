@@ -199,7 +199,7 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProces
   scaledDrawRect.scale(scales.x, scales.y);
   scaledDrawRect.round();
   FPArgs args =
-      FPArgs(context, renderFlags, Rect::MakeWH(scaledDrawRect.width(), scaledDrawRect.height()),
+      FPArgs(context, renderFlags, 1, Rect::MakeWH(scaledDrawRect.width(), scaledDrawRect.height()),
              std::max(scales.x, scales.y));
 
   SamplingArgs samplingArgs = {};

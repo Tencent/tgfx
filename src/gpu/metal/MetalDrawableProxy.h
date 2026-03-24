@@ -25,7 +25,7 @@ namespace tgfx {
 class MetalDrawableProxy : public RenderTargetProxy {
  public:
   MetalDrawableProxy(Context* context, int width, int height, CAMetalLayer* metalLayer,
-                     PixelFormat format);
+                     PixelFormat format, int sampleCount = 1);
 
   Context* getContext() const override;
   int width() const override;
@@ -45,6 +45,7 @@ class MetalDrawableProxy : public RenderTargetProxy {
   int _width = 0;
   int _height = 0;
   PixelFormat _format = PixelFormat::RGBA_8888;
+  int _sampleCount = 1;
   CAMetalLayer* _metalLayer = nil;
   mutable id<CAMetalDrawable> _metalDrawable = nil;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;

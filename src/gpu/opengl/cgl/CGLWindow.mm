@@ -29,7 +29,8 @@
 namespace tgfx {
 
 std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj sharedContext,
-                                               std::shared_ptr<ColorSpace> colorSpace) {
+                                               std::shared_ptr<ColorSpace> colorSpace,
+                                               int sampleCount) {
   if (view == nil) {
     return nullptr;
   }
@@ -45,12 +46,13 @@ std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj share
            "Rendering may have color inaccuracies.");
     }
   }
-  return std::shared_ptr<CGLWindow>(new CGLWindow(device, view, std::move(colorSpace)));
+  return std::shared_ptr<CGLWindow>(
+      new CGLWindow(device, view, std::move(colorSpace), sampleCount));
 }
 
 CGLWindow::CGLWindow(std::shared_ptr<Device> device, NSView* view,
-                     std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)), view(view) {
+                     std::shared_ptr<ColorSpace> colorSpace, int sampleCount)
+    : Window(std::move(device), std::move(colorSpace), sampleCount), view(view) {
   // do not retain view here, otherwise it can cause circular reference.
 }
 
@@ -72,7 +74,7 @@ std::shared_ptr<RenderTargetProxy> CGLWindow::onCreateRenderTarget(Context* cont
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
   BackendRenderTarget renderTarget(frameBuffer, static_cast<int>(size.width),
-                                   static_cast<int>(size.height));
+                                   static_cast<int>(size.height), _sampleCount);
   return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 

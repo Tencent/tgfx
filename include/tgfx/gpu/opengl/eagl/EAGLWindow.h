@@ -31,7 +31,8 @@ class EAGLWindow : public Window {
    */
   static std::shared_ptr<EAGLWindow> MakeFrom(CAEAGLLayer* layer,
                                               std::shared_ptr<GLDevice> device = nullptr,
-                                              std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                              std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                              int sampleCount = 1);
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
@@ -42,6 +43,6 @@ class EAGLWindow : public Window {
   std::shared_ptr<EAGLLayerTexture> layerTexture = nullptr;
 
   EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
-             std::shared_ptr<ColorSpace> colorSpace = nullptr);
+             std::shared_ptr<ColorSpace> colorSpace, int sampleCount);
 };
 }  // namespace tgfx

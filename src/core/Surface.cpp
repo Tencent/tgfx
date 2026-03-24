@@ -124,6 +124,10 @@ uint32_t Surface::renderFlags() const {
   return renderContext->renderFlags;
 }
 
+int Surface::sampleCount() const {
+  return renderContext->renderTarget->sampleCount();
+}
+
 int Surface::width() const {
   return renderContext->renderTarget->width();
 }

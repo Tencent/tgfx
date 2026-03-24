@@ -44,7 +44,8 @@ class QGLWindow : public Window {
    * false.
    */
   static std::shared_ptr<QGLWindow> MakeFrom(QQuickItem* quickItem, bool singleBufferMode = false,
-                                             std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                             std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                             int sampleCount = 1);
 
   /**
    * Changes the thread affinity for this object and its children.
@@ -79,7 +80,7 @@ class QGLWindow : public Window {
   std::shared_ptr<RenderTargetProxy> presentingProxy = nullptr;
 
   explicit QGLWindow(QQuickItem* quickItem, bool singleBufferMode = false,
-                     std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                     std::shared_ptr<ColorSpace> colorSpace = nullptr, int sampleCount = 1);
   std::shared_ptr<RenderTargetProxy> acquireTexture(Context* context, int width, int height);
   void reuseTexture(const std::shared_ptr<RenderTargetProxy>& proxy);
   void initDevice();

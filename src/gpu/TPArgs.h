@@ -29,10 +29,10 @@ class TPArgs {
  public:
   TPArgs() = default;
 
-  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped, float drawScale,
+  TPArgs(Context* context, uint32_t renderFlags, int sampleCount, bool mipmapped, float drawScale,
          BackingFit backingFit = BackingFit::Approx)
-      : context(context), renderFlags(renderFlags), mipmapped(mipmapped), backingFit(backingFit),
-        drawScale(drawScale) {
+      : context(context), renderFlags(renderFlags), sampleCount(sampleCount), mipmapped(mipmapped),
+        backingFit(backingFit), drawScale(drawScale) {
   }
 
   /**
@@ -44,6 +44,11 @@ class TPArgs {
    * The render flags to create the texture proxy.
    */
   uint32_t renderFlags = 0;
+
+  /**
+   * The sample count for MSAA rendering. 1 means no MSAA.
+   */
+  int sampleCount = 1;
 
   /**
    * Specifies whether the texture proxy should be mipmapped. This may be ignored if the associated

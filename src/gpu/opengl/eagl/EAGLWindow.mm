@@ -25,7 +25,8 @@
 namespace tgfx {
 std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
                                                  std::shared_ptr<GLDevice> device,
-                                                 std::shared_ptr<ColorSpace> colorSpace) {
+                                                 std::shared_ptr<ColorSpace> colorSpace,
+                                                 int sampleCount) {
   if (layer == nil) {
     return nullptr;
   }
@@ -39,12 +40,13 @@ std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
     LOGE("EAGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. "
          "Rendering may have color inaccuracies.");
   }
-  return std::shared_ptr<EAGLWindow>(new EAGLWindow(device, layer, std::move(colorSpace)));
+  return std::shared_ptr<EAGLWindow>(
+      new EAGLWindow(device, layer, std::move(colorSpace), sampleCount));
 }
 
 EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
-                       std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)), layer(layer) {
+                       std::shared_ptr<ColorSpace> colorSpace, int sampleCount)
+    : Window(std::move(device), std::move(colorSpace), sampleCount), layer(layer) {
   // do not retain layer here, otherwise it can cause circular reference.
 }
 
