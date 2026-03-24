@@ -25,6 +25,7 @@
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 class QGLDeviceCreator : public QObject {
@@ -165,6 +166,7 @@ std::shared_ptr<RenderTargetProxy> QGLWindow::onCreateRenderTarget(Context* cont
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
+  _sampleCount = context->gpu()->getSampleCount(_sampleCount, PixelFormat::RGBA_8888);
   drawableProxy = std::make_shared<QGLDrawableProxy>(context, width, height, PixelFormat::RGBA_8888,
                                                      _sampleCount, ImageOrigin::BottomLeft, this);
   std::static_pointer_cast<QGLDrawableProxy>(drawableProxy)->weakThis = drawableProxy;

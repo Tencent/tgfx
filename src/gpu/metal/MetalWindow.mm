@@ -21,6 +21,7 @@
 #include "gpu/metal/MetalDefines.h"
 #include "gpu/metal/MetalDrawableProxy.h"
 #include "platform/apple/CGColorSpaceUtil.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 
@@ -104,6 +105,7 @@ std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* co
     return nullptr;
   }
   auto pixelFormat = MetalPixelFormatToPixelFormat(static_cast<unsigned>(metalLayer.pixelFormat));
+  _sampleCount = context->gpu()->getSampleCount(_sampleCount, pixelFormat);
   drawableProxy = std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer,
                                                        pixelFormat, _sampleCount);
   return drawableProxy;

@@ -21,6 +21,7 @@
 #include "core/utils/Log.h"
 #include "gpu/opengl/GLDefines.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 
@@ -53,6 +54,7 @@ std::shared_ptr<RenderTargetProxy> WebGLWindow::onCreateRenderTarget(Context* co
     LOGE("WebGLWindow::onCreateRenderTarget() Can not create a RenderTarget with zero size.");
     return nullptr;
   }
+  _sampleCount = context->gpu()->getSampleCount(_sampleCount, PixelFormat::RGBA_8888);
   GLFrameBufferInfo glInfo = {};
   glInfo.id = 0;
   glInfo.format = GL_RGBA8;

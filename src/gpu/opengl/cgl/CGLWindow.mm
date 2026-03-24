@@ -22,6 +22,7 @@
 #include "gpu/opengl/GLDefines.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/gpu/Backend.h"
+#include "tgfx/gpu/GPU.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -70,6 +71,7 @@ std::shared_ptr<RenderTargetProxy> CGLWindow::onCreateRenderTarget(Context* cont
     return nullptr;
   }
   [glContext setView:view];
+  _sampleCount = context->gpu()->getSampleCount(_sampleCount, PixelFormat::RGBA_8888);
   GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;

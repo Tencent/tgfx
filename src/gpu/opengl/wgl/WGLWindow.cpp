@@ -20,6 +20,7 @@
 #include <GL/GL.h>
 #include "core/utils/Log.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedContext,
@@ -60,7 +61,7 @@ std::shared_ptr<RenderTargetProxy> WGLWindow::onCreateRenderTarget(Context* cont
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-
+  _sampleCount = context->gpu()->getSampleCount(_sampleCount, PixelFormat::RGBA_8888);
   GLFrameBufferInfo frameBuffer = {0, GL_RGBA8};
   BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height, _sampleCount};
   return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
