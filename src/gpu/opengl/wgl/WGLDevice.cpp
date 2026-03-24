@@ -26,21 +26,16 @@ static void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2], int sam
   if (!wglInterface->pixelFormatSupport) {
     return;
   }
-  std::vector<int> intAttributes{WGL_DRAW_TO_WINDOW,
-                                 TRUE,
-                                 WGL_DOUBLE_BUFFER,
-                                 TRUE,
-                                 WGL_ACCELERATION,
-                                 WGL_FULL_ACCELERATION,
-                                 WGL_SUPPORT_OPENGL,
-                                 TRUE,
-                                 WGL_COLOR_BITS,
-                                 24,
-                                 WGL_ALPHA_BITS,
-                                 8,
-                                 WGL_STENCIL_BITS,
-                                 8,
+  // clang-format off
+  std::vector<int> intAttributes{WGL_DRAW_TO_WINDOW,  TRUE,
+                                 WGL_DOUBLE_BUFFER,   TRUE,
+                                 WGL_ACCELERATION,    WGL_FULL_ACCELERATION,
+                                 WGL_SUPPORT_OPENGL,  TRUE,
+                                 WGL_COLOR_BITS,      24,
+                                 WGL_ALPHA_BITS,      8,
+                                 WGL_STENCIL_BITS,    8,
                                  0};
+  // clang-format on
 
   if (sampleCount > 1 && wglInterface->multisampleSupport) {
     intAttributes.insert(intAttributes.end() - 1,
