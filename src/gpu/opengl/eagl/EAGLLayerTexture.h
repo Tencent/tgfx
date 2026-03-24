@@ -33,7 +33,7 @@ class EAGLLayerTexture : public GLTexture {
   }
 
   unsigned colorBufferID() const {
-    return resolveBufferID;
+    return _colorBufferID;
   }
 
   unsigned resolveFrameBufferID() const {
@@ -54,7 +54,7 @@ class EAGLLayerTexture : public GLTexture {
  private:
   unsigned _frameBufferID = 0;
   unsigned msaaBufferID = 0;
-  unsigned resolveBufferID = 0;
+  unsigned _colorBufferID = 0;
   unsigned _resolveFrameBufferID = 0;
 
   EAGLLayerTexture(const TextureDescriptor& descriptor, unsigned frameBufferID)

@@ -23,7 +23,6 @@
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 namespace tgfx {
-
 void* GLDevice::CurrentNativeHandle() {
   return CGLGetCurrentContext();
 }

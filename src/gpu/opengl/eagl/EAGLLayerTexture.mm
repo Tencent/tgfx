@@ -63,7 +63,7 @@ std::shared_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
         static_cast<int>(width),        static_cast<int>(height), PixelFormat::RGBA_8888, false, 1,
         TextureUsage::RENDER_ATTACHMENT};
     auto texture = gpu->makeResource<EAGLLayerTexture>(descriptor, frameBufferID);
-    texture->resolveBufferID = resolveRBID;
+    texture->_colorBufferID = resolveRBID;
     auto state = gpu->state();
     state->bindFramebuffer(texture.get());
     gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, resolveRBID);
@@ -109,7 +109,7 @@ std::shared_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
                                   TextureUsage::RENDER_ATTACHMENT};
   auto texture = gpu->makeResource<EAGLLayerTexture>(descriptor, msaaFBO);
   texture->msaaBufferID = msaaRBID;
-  texture->resolveBufferID = resolveRBID;
+  texture->_colorBufferID = resolveRBID;
   auto state = gpu->state();
   state->bindFramebuffer(texture.get());
   gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, msaaRBID);
@@ -153,9 +153,9 @@ void EAGLLayerTexture::onReleaseTexture(GLGPU* gpu) {
     gl->deleteRenderbuffers(1, &msaaBufferID);
     msaaBufferID = 0;
   }
-  if (resolveBufferID > 0) {
-    gl->deleteRenderbuffers(1, &resolveBufferID);
-    resolveBufferID = 0;
+  if (_colorBufferID > 0) {
+    gl->deleteRenderbuffers(1, &_colorBufferID);
+    _colorBufferID = 0;
   }
 }
 }  // namespace tgfx
