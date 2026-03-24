@@ -48,7 +48,7 @@ std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
   if (!nativeWindow) {
     return nullptr;
   }
-  auto device = EGLDevice::MakeFrom(nativeWindow, sharedContext, colorSpace);
+  auto device = EGLDevice::MakeFrom(nativeWindow, sharedContext, colorSpace, sampleCount);
   if (device == nullptr) {
     return nullptr;
   }

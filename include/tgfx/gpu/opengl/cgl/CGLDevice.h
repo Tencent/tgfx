@@ -46,6 +46,8 @@ class CGLDevice : public GLDevice {
 #pragma clang diagnostic pop
   CGLContextObj oldContext = nil;
 
+  static std::shared_ptr<GLDevice> Make(CGLContextObj sharedContext, int sampleCount);
+
   static std::shared_ptr<CGLDevice> Wrap(CGLContextObj cglContext, bool externallyOwned);
 
   CGLDevice(std::unique_ptr<GPU> gpu, CGLContextObj cglContext);

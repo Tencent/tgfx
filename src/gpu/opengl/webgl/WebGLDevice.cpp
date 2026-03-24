@@ -41,14 +41,15 @@ std::shared_ptr<GLDevice> GLDevice::Make(void*) {
 }
 
 std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
-                                                   std::shared_ptr<ColorSpace> colorSpace) {
+                                                   std::shared_ptr<ColorSpace> colorSpace,
+                                                   int sampleCount) {
   auto oldContext = emscripten_webgl_get_current_context();
 
   EmscriptenWebGLContextAttributes attrs;
   emscripten_webgl_init_context_attributes(&attrs);
   attrs.depth = EM_FALSE;
   attrs.stencil = EM_FALSE;
-  attrs.antialias = EM_FALSE;
+  attrs.antialias = sampleCount > 1 ? EM_TRUE : EM_FALSE;
   attrs.powerPreference = EM_WEBGL_POWER_PREFERENCE_HIGH_PERFORMANCE;
   attrs.enableExtensionsByDefault = EM_TRUE;
   attrs.majorVersion = 2;

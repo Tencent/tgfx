@@ -30,7 +30,7 @@ std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID,
   if (canvasID.empty()) {
     return nullptr;
   }
-  auto device = WebGLDevice::MakeFrom(canvasID, colorSpace);
+  auto device = WebGLDevice::MakeFrom(canvasID, colorSpace, sampleCount);
   if (device == nullptr) {
     return nullptr;
   }

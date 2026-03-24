@@ -34,7 +34,7 @@ std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj share
   if (view == nil) {
     return nullptr;
   }
-  auto device = GLDevice::Make(sharedContext);
+  auto device = CGLDevice::Make(sharedContext, sampleCount);
   if (device == nullptr) {
     return nullptr;
   }

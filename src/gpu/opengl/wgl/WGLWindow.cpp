@@ -29,7 +29,7 @@ std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedCo
     return nullptr;
   }
 
-  auto device = WGLDevice::MakeFrom(nativeWindow, sharedContext);
+  auto device = WGLDevice::MakeFrom(nativeWindow, sharedContext, sampleCount);
   if (device == nullptr) {
     return nullptr;
   }
