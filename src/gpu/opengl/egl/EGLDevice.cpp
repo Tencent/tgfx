@@ -116,37 +116,25 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLDisplay eglDisplay, EGLSurface
                          std::move(colorSpace));
 }
 
-static EGLConfig ChooseMSAAConfig(EGLDisplay display, EGLConfig fallbackConfig, int sampleCount) {
-  if (sampleCount <= 1) {
-    return fallbackConfig;
-  }
-  const EGLint configAttribs[] = {EGL_SURFACE_TYPE,
-                                  EGL_WINDOW_BIT,
-                                  EGL_RENDERABLE_TYPE,
-                                  EGL_OPENGL_ES2_BIT,
-                                  EGL_RED_SIZE,
-                                  8,
-                                  EGL_GREEN_SIZE,
-                                  8,
-                                  EGL_BLUE_SIZE,
-                                  8,
-                                  EGL_ALPHA_SIZE,
-                                  8,
-                                  EGL_STENCIL_SIZE,
-                                  8,
-                                  EGL_SAMPLE_BUFFERS,
-                                  1,
-                                  EGL_SAMPLES,
-                                  sampleCount,
-                                  EGL_NONE};
+static EGLConfig ChooseMSAAConfig(EGLDisplay display, int sampleCount) {
+  // clang-format off
+  const EGLint configAttribs[] = {
+      EGL_SURFACE_TYPE,     EGL_WINDOW_BIT,
+      EGL_RENDERABLE_TYPE,  EGL_OPENGL_ES2_BIT,
+      EGL_RED_SIZE,         8,
+      EGL_GREEN_SIZE,       8,
+      EGL_BLUE_SIZE,        8,
+      EGL_ALPHA_SIZE,       8,
+      EGL_STENCIL_SIZE,     8,
+      EGL_SAMPLE_BUFFERS,   1,
+      EGL_SAMPLES,          sampleCount,
+      EGL_NONE };
+  // clang-format on
+
   EGLConfig msaaConfig = nullptr;
   EGLint numConfigs = 0;
-  if (eglChooseConfig(display, configAttribs, &msaaConfig, 1, &numConfigs) && numConfigs > 0) {
-    return msaaConfig;
-  }
-  LOGE("EGLDevice ChooseMSAAConfig() failed for sampleCount=%d, falling back to non-MSAA config.",
-       sampleCount);
-  return fallbackConfig;
+  eglChooseConfig(display, configAttribs, &msaaConfig, 1, &numConfigs);
+  return msaaConfig;
 }
 
 std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
@@ -154,7 +142,13 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
                                                std::shared_ptr<ColorSpace> colorSpace,
                                                int sampleCount) {
   auto eglGlobals = EGLGlobals::Get();
-  auto windowConfig = ChooseMSAAConfig(eglGlobals->display, eglGlobals->windowConfig, sampleCount);
+  auto windowConfig = eglGlobals->windowConfig;
+  if (sampleCount > 1) {
+    auto msaaConfig = ChooseMSAAConfig(eglGlobals->display, sampleCount);
+    if (msaaConfig != nullptr) {
+      windowConfig = msaaConfig;
+    }
+  }
 #if defined(_WIN32)
   auto eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, eglGlobals, windowConfig);
   if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
