@@ -403,8 +403,11 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
   std::optional<float> drawScale = std::nullopt;
-  bool hasCoverage = pendingBrush.maskFilter != nullptr || pendingClip.state() == ClipState::Rect ||
-                     pendingClip.state() == ClipState::Complex;
+  // Conservative prediction of whether the final DrawOp will have coverage. This determines if
+  // deviceBounds needs to be computed for DstTexture creation. We assume coverage exists unless
+  // clip is empty, since some ops (e.g., AtlasTextOp) always have coverage regardless of clip.
+  // Underestimating causes draws to be skipped on GPUs without frameBufferFetch (e.g., SwiftShader).
+  bool hasCoverage = pendingBrush.maskFilter != nullptr || pendingClip.state() != ClipState::Empty;
   bool hasImageFill = pendingType == PendingOpType::Image;
   auto [needLocalBounds, needDeviceBounds] =
       needComputeBounds(pendingBrush, hasCoverage, hasImageFill);
