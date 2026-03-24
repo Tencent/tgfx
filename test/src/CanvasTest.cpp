@@ -168,17 +168,17 @@ TGFX_TEST(CanvasTest, Clip) {
   EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
   EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(0, 0, 100, 100));
 
-  // ========== 11. getTotalClip and getClipBounds ==========
+  // ========== 11. getTotalClip and getTotalClipBounds ==========
   surface = Surface::Make(context, 100, 100);
   canvas = surface->getCanvas();
   auto totalClip1 = canvas->getTotalClip();
   EXPECT_TRUE(totalClip1.isInverseFillType());
-  EXPECT_FALSE(canvas->getClipBounds().has_value());
+  EXPECT_FALSE(canvas->getTotalClipBounds().has_value());
   canvas->clipRect(Rect::MakeXYWH(10, 10, 80, 80), true);
   auto totalClip2 = canvas->getTotalClip();
   EXPECT_FALSE(totalClip2.isInverseFillType());
   EXPECT_EQ(totalClip2.getBounds(), Rect::MakeXYWH(10, 10, 80, 80));
-  auto clipBound = canvas->getClipBounds();
+  auto clipBound = canvas->getTotalClipBounds();
   EXPECT_TRUE(clipBound.has_value());
   EXPECT_EQ(clipBound.value(), Rect::MakeXYWH(10, 10, 80, 80));
 

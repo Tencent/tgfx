@@ -218,7 +218,7 @@ static std::optional<Rect> GetClipBounds(const Canvas* canvas) {
   if (canvas == nullptr) {
     return std::nullopt;
   }
-  const auto clipBound = canvas->getClipBounds();
+  const auto clipBound = canvas->getTotalClipBounds();
   auto clipRect = Rect::MakeEmpty();
   auto surface = canvas->getSurface();
   if (!clipBound.has_value()) {
