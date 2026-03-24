@@ -40,12 +40,10 @@ static void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2], int sam
                                  8,
                                  WGL_STENCIL_BITS,
                                  8,
-                                 0,
                                  0};
 
   if (sampleCount > 1 && wglInterface->multisampleSupport) {
-    // Insert MSAA attributes before the trailing 0, 0.
-    intAttributes.insert(intAttributes.end() - 2,
+    intAttributes.insert(intAttributes.end() - 1,
                          {WGL_SAMPLE_BUFFERS, 1, WGL_SAMPLES, sampleCount});
   }
 
