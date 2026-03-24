@@ -39,7 +39,6 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
 
 std::shared_ptr<GLDevice> CGLDevice::Make(CGLContextObj sharedContext, int sampleCount) {
   CGLPixelFormatObj format = nullptr;
-  bool ownsFormat = false;
   if (sharedContext == nullptr) {
     std::vector<CGLPixelFormatAttribute> attributes = {
         kCGLPFAStencilSize,   (CGLPixelFormatAttribute)8,
@@ -55,7 +54,6 @@ std::shared_ptr<GLDevice> CGLDevice::Make(CGLContextObj sharedContext, int sampl
     attributes.push_back((CGLPixelFormatAttribute)0);
     GLint npix = 0;
     CGLChoosePixelFormat(attributes.data(), &format, &npix);
-    ownsFormat = true;
   } else {
     format = CGLGetPixelFormat(sharedContext);
     if (sampleCount > 1) {
@@ -65,7 +63,7 @@ std::shared_ptr<GLDevice> CGLDevice::Make(CGLContextObj sharedContext, int sampl
   }
   CGLContextObj cglContext = nullptr;
   CGLCreateContext(format, sharedContext, &cglContext);
-  if (ownsFormat) {
+  if (sharedContext == nullptr) {
     CGLDestroyPixelFormat(format);
   }
   if (cglContext == nullptr) {
