@@ -54,7 +54,6 @@ std::shared_ptr<RenderTargetProxy> WebGLWindow::onCreateRenderTarget(Context* co
     LOGE("WebGLWindow::onCreateRenderTarget() Can not create a RenderTarget with zero size.");
     return nullptr;
   }
-  _sampleCount = context->gpu()->getSampleCount(_sampleCount, PixelFormat::RGBA_8888);
   GLFrameBufferInfo glInfo = {};
   glInfo.id = 0;
   glInfo.format = GL_RGBA8;
