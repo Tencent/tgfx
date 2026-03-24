@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/cgl/CGLDevice.h"
-#include "core/utils/Log.h"
 #include "gpu/opengl/cgl/CGLGPU.h"
 
 #pragma clang diagnostic push
@@ -56,10 +55,6 @@ std::shared_ptr<GLDevice> CGLDevice::Make(CGLContextObj sharedContext, int sampl
     CGLChoosePixelFormat(attributes.data(), &format, &npix);
   } else {
     format = CGLGetPixelFormat(sharedContext);
-    if (sampleCount > 1) {
-      LOGE("CGLDevice::Make() The sampleCount parameter is ignored when a shared context is "
-           "provided because the pixel format is inherited from the shared context.");
-    }
   }
   CGLContextObj cglContext = nullptr;
   CGLCreateContext(format, sharedContext, &cglContext);
