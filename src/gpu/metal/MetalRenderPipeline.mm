@@ -110,7 +110,7 @@ bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu,
     if (needsSampleMask) {
       // Re-compile the fragment shader with sample mask injection using a two-pass approach
       // that picks a constant_id not conflicting with user-defined specialization constants.
-      auto compileResult = CompileFragmentShaderWithSampleMask(device, fragmentShader->glslCode());
+      auto compileResult = CompileFragmentShaderWithSampleMask(gpu, fragmentShader->glslCode());
       if (compileResult.library == nil) {
         LOGE("Metal pipeline creation error: sample mask shader compilation failed");
         [metalDescriptor.vertexFunction release];

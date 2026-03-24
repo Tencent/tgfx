@@ -154,8 +154,11 @@ static std::string preprocessGLSL(const std::string& glslCode) {
 }
 
 // Compile GLSL source to SPIR-V binary.
-static std::vector<uint32_t> compileGLSLToSPIRV(const std::string& glslCode, ShaderStage stage) {
-  shaderc::Compiler compiler;
+static std::vector<uint32_t> compileGLSLToSPIRV(const shaderc::Compiler* compiler,
+                                                const std::string& glslCode, ShaderStage stage) {
+  if (compiler == nullptr) {
+    return {};
+  }
   shaderc::CompileOptions options;
   options.SetOptimizationLevel(shaderc_optimization_level_performance);
   options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_0);
@@ -164,7 +167,7 @@ static std::vector<uint32_t> compileGLSLToSPIRV(const std::string& glslCode, Sha
       (stage == ShaderStage::Vertex) ? shaderc_vertex_shader : shaderc_fragment_shader;
 
   shaderc::SpvCompilationResult spvResult =
-      compiler.CompileGlslToSpv(glslCode, shaderKind, "shader", "main", options);
+      compiler->CompileGlslToSpv(glslCode, shaderKind, "shader", "main", options);
 
   if (spvResult.GetCompilationStatus() != shaderc_compilation_status_success) {
     LOGE("GLSL to SPIR-V compilation error: %s", spvResult.GetErrorMessage().c_str());
@@ -291,7 +294,7 @@ std::shared_ptr<MetalShaderModule> MetalShaderModule::Make(
 MetalShaderModule::MetalShaderModule(MetalGPU* gpu, const ShaderModuleDescriptor& descriptor)
     : _stage(descriptor.stage),
       _glslCode(descriptor.stage == ShaderStage::Fragment ? descriptor.code : std::string{}) {
-  compileShader(gpu->device(), descriptor.code, descriptor.stage);
+  compileShader(gpu->device(), gpu->shaderCompiler(), descriptor.code, descriptor.stage);
 }
 
 void MetalShaderModule::onRelease(MetalGPU*) {
@@ -301,9 +304,9 @@ void MetalShaderModule::onRelease(MetalGPU*) {
   }
 }
 
-bool MetalShaderModule::compileShader(id<MTLDevice> device, const std::string& glslCode,
-                                      ShaderStage stage) {
-  std::string mslCode = convertGLSLToMSL(glslCode, stage);
+bool MetalShaderModule::compileShader(id<MTLDevice> device, const shaderc::Compiler* compiler,
+                                      const std::string& glslCode, ShaderStage stage) {
+  std::string mslCode = convertGLSLToMSL(compiler, glslCode, stage);
   if (mslCode.empty()) {
     return false;
   }
@@ -324,23 +327,29 @@ bool MetalShaderModule::compileShader(id<MTLDevice> device, const std::string& g
   return true;
 }
 
-std::string MetalShaderModule::convertGLSLToMSL(const std::string& glslCode, ShaderStage stage) {
+std::string MetalShaderModule::convertGLSLToMSL(const shaderc::Compiler* compiler,
+                                                const std::string& glslCode, ShaderStage stage) {
   std::string vulkanGLSL = preprocessGLSL(glslCode);
-  auto spirvBinary = compileGLSLToSPIRV(vulkanGLSL, stage);
+  auto spirvBinary = compileGLSLToSPIRV(compiler, vulkanGLSL, stage);
   if (spirvBinary.empty()) {
     return "";
   }
   return convertSPIRVToMSL(spirvBinary, stage);
 }
 
-SampleMaskCompileResult CompileFragmentShaderWithSampleMask(id<MTLDevice> device,
+SampleMaskCompileResult CompileFragmentShaderWithSampleMask(MetalGPU* gpu,
                                                             const std::string& glslCode) {
   SampleMaskCompileResult result = {};
+  if (gpu == nullptr) {
+    return result;
+  }
+  auto device = gpu->device();
+  auto* compiler = gpu->shaderCompiler();
   auto stage = ShaderStage::Fragment;
   std::string vulkanGLSL = preprocessGLSL(glslCode);
 
   // First pass: compile to SPIR-V and collect used specialization constant IDs.
-  auto spirvBinary = compileGLSLToSPIRV(vulkanGLSL, stage);
+  auto spirvBinary = compileGLSLToSPIRV(compiler, vulkanGLSL, stage);
   if (spirvBinary.empty()) {
     return result;
   }
@@ -349,7 +358,7 @@ SampleMaskCompileResult CompileFragmentShaderWithSampleMask(id<MTLDevice> device
 
   // Second pass: inject sample mask with the chosen constant_id and re-compile.
   std::string injectedGLSL = injectSampleMask(vulkanGLSL, result.constantID);
-  auto injectedSPIRV = compileGLSLToSPIRV(injectedGLSL, stage);
+  auto injectedSPIRV = compileGLSLToSPIRV(compiler, injectedGLSL, stage);
   if (injectedSPIRV.empty()) {
     return result;
   }
