@@ -221,7 +221,7 @@
         "innerShadow": "bf48e614"
     },
     "LayerMaskTest": {
-        "ChildMask": "bf48e614",
+        "ChildMask": "3247ebaa",
         "HighZoomWithMask_Tiled": "bf48e614",
         "InvalidMask": "bf48e614",
         "MaskAlpha": "bf48e614",
@@ -295,7 +295,7 @@
         "draw_shape": "eefb7a46",
         "draw_solid": "b4a1231",
         "draw_text": "ba7ed034",
-        "getBounds": "cad4b77f",
+        "getBounds": "3247ebaa",
         "getLayersUnderPoint": "4d602959",
         "getTightBounds": "880d5a6c",
         "imageLayer": "e5103ae6"
@@ -477,7 +477,7 @@
         "ExtremelyThinStrokePathIdentityMatrix": "5ff7fdca",
         "HairlineBasicRendering": "4438fa30",
         "HairlineCanvasTransformations": "4438fa30",
-        "HairlineClipping": "4438fa30",
+        "HairlineClipping": "3247ebaa",
         "HairlineComplexPathRendering": "4438fa30",
         "HairlineLayer": "4438fa30",
         "HairlineLineOnly": "fbfa384f",
