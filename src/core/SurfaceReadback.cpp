@@ -78,7 +78,24 @@ const void* SurfaceReadback::lockPixels(Context* context, bool flipY) {
     // to, resulting in stale or garbage pixel data (observed as test failures on Vulkan).
     context->gpu()->queue()->waitUntilCompleted();
   }
-  auto pixels = readbackBuffer->gpuBuffer()->map();
+  auto gpuBuffer = readbackBuffer->gpuBuffer();
+  // For async-only backends like WebGPU, trigger async mapping if not already started
+  if (!gpuBuffer->isReady()) {
+    gpuBuffer->requestMapAsync();
+    // Poll isReady() with a simple busy-wait. The exact mechanism varies by backend:
+    // - On WebGPU via Emscripten, the mapAsync callback will set mapReady when wgpuBufferMapAsync completes
+    // - This busy-wait lets the callback fire between iterations (if the browser yields)
+    // - Timeout of 1000 iterations (~instant) prevents infinite loops
+    int maxWaits = 1000;
+    while (!gpuBuffer->isReady() && maxWaits-- > 0) {
+      // Empty loop body to allow event processing on next iteration
+    }
+    if (!gpuBuffer->isReady()) {
+      LOGE("SurfaceReadback::lockPixels() async mapping timeout!");
+      return nullptr;
+    }
+  }
+  auto pixels = gpuBuffer->map();
   if (pixels == nullptr) {
     return nullptr;
   }

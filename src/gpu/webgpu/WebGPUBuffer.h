@@ -44,7 +44,7 @@ class WebGPUBuffer : public GPUBuffer, public WebGPUResource {
    * Initiates an asynchronous map request for READBACK buffers. After calling this, poll isReady()
    * to check completion, then call map() to access the data.
    */
-  void requestMapAsync();
+  void requestMapAsync() override;
 
   void onRelease(WebGPUGPU* gpu) override;
 
