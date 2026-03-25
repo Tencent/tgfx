@@ -267,13 +267,14 @@ WGPUTextureFormat ToWGPUTextureFormat(PixelFormat format) {
 WGPULoadOp ToWGPULoadOp(LoadAction loadAction) {
   switch (loadAction) {
     case LoadAction::DontCare:
-      return WGPULoadOp_Undefined;
+      // WebGPU does not have a DontCare load op. Use Clear as the closest equivalent.
+      return WGPULoadOp_Clear;
     case LoadAction::Load:
       return WGPULoadOp_Load;
     case LoadAction::Clear:
       return WGPULoadOp_Clear;
   }
-  return WGPULoadOp_Undefined;
+  return WGPULoadOp_Clear;
 }
 
 WGPUStoreOp ToWGPUStoreOp(StoreAction storeAction) {

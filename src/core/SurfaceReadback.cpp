@@ -79,6 +79,9 @@ const void* SurfaceReadback::lockPixels(Context* context, bool flipY) {
     context->gpu()->queue()->waitUntilCompleted();
   }
   auto pixels = readbackBuffer->gpuBuffer()->map();
+  if (pixels == nullptr) {
+    return nullptr;
+  }
   if (flipY) {
     flipYPixels = malloc(_info.byteSize());
     if (flipYPixels == nullptr) {

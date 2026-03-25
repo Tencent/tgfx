@@ -31,7 +31,7 @@ class WebGPUGPU;
 class WebGPURenderPipeline : public RenderPipeline, public WebGPUResource {
  public:
   static std::shared_ptr<WebGPURenderPipeline> Make(WebGPUGPU* gpu,
-                                                     const RenderPipelineDescriptor& descriptor);
+                                                    const RenderPipelineDescriptor& descriptor);
 
   WGPURenderPipeline webgpuRenderPipeline() const {
     return pipeline;

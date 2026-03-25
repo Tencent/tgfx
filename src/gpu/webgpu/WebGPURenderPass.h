@@ -31,7 +31,7 @@ class WebGPURenderPipeline;
 class WebGPURenderPass : public RenderPass {
  public:
   static std::shared_ptr<WebGPURenderPass> Make(WebGPUGPU* gpu, WGPUCommandEncoder encoder,
-                                                 const RenderPassDescriptor& descriptor);
+                                                const RenderPassDescriptor& descriptor);
 
   GPU* gpu() const override;
 

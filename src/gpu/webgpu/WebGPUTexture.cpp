@@ -20,11 +20,14 @@
 #include "WebGPUDefines.h"
 #include "WebGPUGPU.h"
 #include "WebGPUUtil.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten/console.h>
+#endif
 
 namespace tgfx {
 
 std::shared_ptr<WebGPUTexture> WebGPUTexture::Make(WebGPUGPU* gpu,
-                                                    const TextureDescriptor& descriptor) {
+                                                   const TextureDescriptor& descriptor) {
   if (gpu == nullptr || descriptor.width <= 0 || descriptor.height <= 0) {
     return nullptr;
   }
@@ -38,6 +41,12 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::Make(WebGPUGPU* gpu,
   textureDesc.sampleCount = static_cast<uint32_t>(descriptor.sampleCount);
   textureDesc.usage = ToWGPUTextureUsage(descriptor.usage);
   auto texture = wgpuDeviceCreateTexture(gpu->device(), &textureDesc);
+  emscripten_console_logf("[WebGPU Texture] Make: %dx%d format=%u usage=%u mip=%u sample=%u => %p",
+                          descriptor.width, descriptor.height,
+                          static_cast<unsigned>(format),
+                          static_cast<unsigned>(textureDesc.usage),
+                          textureDesc.mipLevelCount, textureDesc.sampleCount,
+                          static_cast<void*>(texture));
   if (texture == nullptr) {
     return nullptr;
   }
@@ -50,7 +59,7 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::Make(WebGPUGPU* gpu,
 }
 
 std::shared_ptr<WebGPUTexture> WebGPUTexture::MakeFrom(WebGPUGPU* gpu, WGPUTexture texture,
-                                                        uint32_t usage, bool adopted) {
+                                                       uint32_t usage, bool adopted) {
   if (gpu == nullptr || texture == nullptr) {
     return nullptr;
   }
@@ -74,8 +83,8 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::MakeFrom(WebGPUGPU* gpu, WGPUTextu
 }
 
 WebGPUTexture::WebGPUTexture(WGPUTexture texture, WGPUTextureView textureView,
-                              WGPUTextureFormat format, const TextureDescriptor& descriptor,
-                              bool adopted)
+                             WGPUTextureFormat format, const TextureDescriptor& descriptor,
+                             bool adopted)
     : Texture(descriptor), texture(texture), textureView(textureView), wgpuFormat(format),
       adopted(adopted) {
 }

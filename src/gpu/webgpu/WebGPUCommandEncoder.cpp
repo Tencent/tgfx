@@ -23,6 +23,9 @@
 #include "WebGPURenderPass.h"
 #include "WebGPUTexture.h"
 #include "WebGPUUtil.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten/console.h>
+#endif
 
 namespace tgfx {
 
@@ -44,13 +47,16 @@ GPU* WebGPUCommandEncoder::gpu() const {
 
 std::shared_ptr<RenderPass> WebGPUCommandEncoder::onBeginRenderPass(
     const RenderPassDescriptor& descriptor) {
+  emscripten_console_logf("[WebGPU CmdEncoder] beginRenderPass: colorAttachments=%zu hasDS=%d",
+                          descriptor.colorAttachments.size(),
+                          descriptor.depthStencilAttachment.texture != nullptr);
   return WebGPURenderPass::Make(_gpu, commandEncoder, descriptor);
 }
 
 void WebGPUCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTexture,
-                                                  const Rect& srcRect,
-                                                  std::shared_ptr<Texture> dstTexture,
-                                                  const Point& dstOffset) {
+                                                const Rect& srcRect,
+                                                std::shared_ptr<Texture> dstTexture,
+                                                const Point& dstOffset) {
   if (commandEncoder == nullptr || srcTexture == nullptr || dstTexture == nullptr) {
     return;
   }
@@ -66,15 +72,15 @@ void WebGPUCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcText
   dstCopy.origin = {static_cast<uint32_t>(dstOffset.x), static_cast<uint32_t>(dstOffset.y), 0};
 
   WGPUExtent3D copySize = {static_cast<uint32_t>(srcRect.width()),
-                            static_cast<uint32_t>(srcRect.height()), 1};
+                           static_cast<uint32_t>(srcRect.height()), 1};
 
   wgpuCommandEncoderCopyTextureToTexture(commandEncoder, &srcCopy, &dstCopy, &copySize);
 }
 
 void WebGPUCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTexture,
-                                                const Rect& srcRect,
-                                                std::shared_ptr<GPUBuffer> dstBuffer,
-                                                size_t dstOffset, size_t dstRowBytes) {
+                                               const Rect& srcRect,
+                                               std::shared_ptr<GPUBuffer> dstBuffer,
+                                               size_t dstOffset, size_t dstRowBytes) {
   if (commandEncoder == nullptr || srcTexture == nullptr || dstBuffer == nullptr) {
     return;
   }

@@ -40,13 +40,22 @@ class WebGPUBuffer : public GPUBuffer, public WebGPUResource {
 
   void unmap() override;
 
+  /**
+   * Initiates an asynchronous map request for READBACK buffers. After calling this, poll isReady()
+   * to check completion, then call map() to access the data.
+   */
+  void requestMapAsync();
+
   void onRelease(WebGPUGPU* gpu) override;
 
  private:
-  WebGPUBuffer(WGPUBuffer buffer, size_t size, uint32_t usage);
+  WebGPUBuffer(WebGPUGPU* gpu, WGPUBuffer buffer, size_t size, uint32_t usage);
 
+  WebGPUGPU* _gpu = nullptr;
   WGPUBuffer buffer = nullptr;
-  void* mappedPointer = nullptr;
+  void* stagingData = nullptr;
+  size_t stagingOffset = 0;
+  size_t stagingSize = 0;
   bool mapReady = false;
 
   friend class WebGPUGPU;

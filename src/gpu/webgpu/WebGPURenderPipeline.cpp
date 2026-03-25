@@ -22,6 +22,9 @@
 #include "WebGPUUtil.h"
 #include "core/utils/Log.h"
 #include "tgfx/gpu/ShaderVisibility.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten/console.h>
+#endif
 
 namespace tgfx {
 
@@ -30,22 +33,31 @@ std::shared_ptr<WebGPURenderPipeline> WebGPURenderPipeline::Make(
   if (gpu == nullptr) {
     return nullptr;
   }
-  return gpu->makeResource<WebGPURenderPipeline>(gpu, descriptor);
+  auto renderPipeline = gpu->makeResource<WebGPURenderPipeline>(gpu, descriptor);
+  if (renderPipeline->pipeline == nullptr) {
+    return nullptr;
+  }
+  return renderPipeline;
 }
 
 WebGPURenderPipeline::WebGPURenderPipeline(WebGPUGPU* gpu,
-                                            const RenderPipelineDescriptor& descriptor) {
-  createPipelineState(gpu, descriptor);
+                                           const RenderPipelineDescriptor& descriptor) {
+  if (!createPipelineState(gpu, descriptor)) {
+    LOGE("WebGPU: Failed to create render pipeline state");
+  }
 }
 
 bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
-                                                const RenderPipelineDescriptor& descriptor) {
-  auto vertexModule =
-      std::static_pointer_cast<WebGPUShaderModule>(descriptor.vertex.module);
-  auto fragmentModule =
-      std::static_pointer_cast<WebGPUShaderModule>(descriptor.fragment.module);
+                                               const RenderPipelineDescriptor& descriptor) {
+  auto vertexModule = std::static_pointer_cast<WebGPUShaderModule>(descriptor.vertex.module);
+  auto fragmentModule = std::static_pointer_cast<WebGPUShaderModule>(descriptor.fragment.module);
   if (vertexModule == nullptr || fragmentModule == nullptr) {
     LOGE("WebGPU: Vertex or fragment shader module is null");
+    return false;
+  }
+  if (vertexModule->webgpuShaderModule() == nullptr ||
+      fragmentModule->webgpuShaderModule() == nullptr) {
+    LOGE("WebGPU: Shader compilation failed, cannot create pipeline");
     return false;
   }
 
@@ -126,7 +138,7 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
     WGPUVertexBufferLayout vbLayout = {};
     vbLayout.arrayStride = layout.stride;
     vbLayout.stepMode = (layout.stepMode == VertexStepMode::Vertex) ? WGPUVertexStepMode_Vertex
-                                                                     : WGPUVertexStepMode_Instance;
+                                                                    : WGPUVertexStepMode_Instance;
     vbLayout.attributeCount = allAttributes[i].size();
     vbLayout.attributes = allAttributes[i].data();
     vertexBuffers.push_back(vbLayout);
@@ -196,8 +208,7 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
   pipelineDesc.layout = pipelineLayout;
   pipelineDesc.vertex = vertexState;
   pipelineDesc.fragment = &fragmentState;
-  pipelineDesc.primitive.topology =
-      WGPUPrimitiveTopology_TriangleList;
+  pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
   pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
   pipelineDesc.primitive.frontFace = frontFace;
   pipelineDesc.primitive.cullMode = cullMode;
@@ -210,9 +221,13 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
 
   pipeline = wgpuDeviceCreateRenderPipeline(gpu->device(), &pipelineDesc);
   if (pipeline == nullptr) {
-    LOGE("WebGPU: Failed to create render pipeline");
+    emscripten_console_logf("[WebGPU Pipeline] FAILED (entries=%zu vbufs=%zu ctargets=%zu ds=%d)",
+                            layoutEntries.size(), vertexBuffers.size(), colorTargets.size(),
+                            hasDepthStencil);
     return false;
   }
+  emscripten_console_logf("[WebGPU Pipeline] Created OK: %p (bindings=%zu)",
+                          static_cast<void*>(pipeline), layoutEntries.size());
 
   return true;
 }
