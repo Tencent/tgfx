@@ -19,6 +19,8 @@
 #pragma once
 
 #include <Metal/Metal.h>
+#import <QuartzCore/QuartzCore.h>
+#include <atomic>
 #include "tgfx/gpu/CommandQueue.h"
 
 namespace tgfx {
@@ -41,6 +43,10 @@ class MetalCommandQueue : public CommandQueue {
     return commandQueue;
   }
 
+  uint64_t completedSubmission() const override {
+    return _completedSubmission.load(std::memory_order_acquire);
+  }
+
   void submit(std::shared_ptr<CommandBuffer> commandBuffer) override;
 
   void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
@@ -60,12 +66,19 @@ class MetalCommandQueue : public CommandQueue {
    */
   void encodePendingWait(id<MTLCommandBuffer> commandBuffer);
 
+  /**
+   * Schedules a drawable to be presented when the next command buffer is committed.
+   */
+  void schedulePresent(id<CAMetalDrawable> drawable);
+
  private:
   MetalGPU* gpu = nullptr;
   id<MTLCommandQueue> commandQueue = nil;
   id<MTLCommandBuffer> lastSubmittedCommandBuffer = nil;
   std::shared_ptr<MetalSemaphore> pendingSignalSemaphore = nullptr;
   std::shared_ptr<MetalSemaphore> pendingWaitSemaphore = nullptr;
+  id<CAMetalDrawable> pendingDrawable = nil;
+  std::atomic<uint64_t> _completedSubmission = {0};
 };
 
 }  // namespace tgfx

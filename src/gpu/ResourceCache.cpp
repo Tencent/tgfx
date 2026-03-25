@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include "core/utils/Log.h"
 #include "gpu/resources/Resource.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 static constexpr size_t MAX_EXPIRATION_FRAMES = 1000000;  // About 4.5 hours at 60 FPS
@@ -125,6 +126,7 @@ void ResourceCache::purgeResourcesByLRU(bool scratchResourceOnly,
 }
 
 void ResourceCache::processUnreferencedResources() {
+  auto submission = context->gpu()->queue()->submissionCount();
   while (auto resource = static_cast<Resource*>(returnQueue->dequeue())) {
     DEBUG_ASSERT(resource->isPurgeable());
     RemoveFromList(nonpurgeableResources, resource);
@@ -132,6 +134,7 @@ void ResourceCache::processUnreferencedResources() {
       AddToList(purgeableResources, resource);
       purgeableBytes += resource->memoryUsage();
       resource->lastUsedTime = currentFrameTime;
+      resource->lastSubmission = submission;
     } else {
       removeResource(resource);
     }
@@ -160,11 +163,13 @@ std::shared_ptr<Resource> ResourceCache::findScratchResource(const ScratchKey& s
   if (result == scratchKeyMap.end()) {
     return nullptr;
   }
+  auto completed = context->gpu()->queue()->completedSubmission();
   auto& list = result->second;
   size_t index = 0;
   bool found = false;
   for (auto& resource : list) {
-    if (resource->isPurgeable() && !resource->hasExternalReferences()) {
+    if (resource->isPurgeable() && !resource->hasExternalReferences() &&
+        resource->lastSubmission <= completed) {
       found = true;
       break;
     }

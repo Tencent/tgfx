@@ -125,19 +125,24 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
   if (targetBuffer != nullptr) {
     while (!pendingDrawingBuffers.empty()) {
       auto drawingBuffer = pendingDrawingBuffers.front();
+      queue->advanceSubmissionCount();
       auto commandBuffer = drawingBuffer->encode();
       _resourceCache->advanceFrameAndPurge();
+      bool isLast = (drawingBuffer == targetBuffer);
+      if (!isLast) {
+        // Insert a GPU fence so that the next command buffer waits for this one to complete
+        // before reading any shared render target textures. The semaphore must be inserted
+        // before submit() so the signal is encoded into the current command buffer.
+        auto semaphore = queue->insertSemaphore();
+        if (semaphore != nullptr) {
+          queue->waitSemaphore(std::move(semaphore));
+        }
+      }
       queue->submit(std::move(commandBuffer));
       drawingBuffer->presentWindows(this);
       pendingDrawingBuffers.pop_front();
-      if (drawingBuffer == targetBuffer) {
+      if (isLast) {
         break;
-      }
-      // Insert a GPU fence between consecutive command buffers so that the next command buffer
-      // waits for this one to complete before reading any shared render target textures.
-      auto semaphore = queue->insertSemaphore();
-      if (semaphore != nullptr) {
-        queue->waitSemaphore(std::move(semaphore));
       }
     }
   }

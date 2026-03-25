@@ -51,6 +51,17 @@ void MetalCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
         pendingSignalSemaphore = nullptr;
       }
 
+      // Present the drawable after the command buffer's GPU work completes.
+      if (pendingDrawable != nil) {
+        [metalCommandBuffer->metalCommandBuffer() presentDrawable:pendingDrawable];
+        pendingDrawable = nil;
+      }
+
+      auto submission = _submissionCount;
+      [metalCommandBuffer->metalCommandBuffer() addCompletedHandler:^(id<MTLCommandBuffer>) {
+        _completedSubmission.store(submission, std::memory_order_release);
+      }];
+
       [metalCommandBuffer->metalCommandBuffer() commit];
 
       if (lastSubmittedCommandBuffer != nil) {
@@ -177,6 +188,10 @@ void MetalCommandQueue::encodePendingWait(id<MTLCommandBuffer> commandBuffer) {
   [commandBuffer encodeWaitForEvent:pendingWaitSemaphore->metalEvent()
                               value:pendingWaitSemaphore->signalValue()];
   pendingWaitSemaphore = nullptr;
+}
+
+void MetalCommandQueue::schedulePresent(id<CAMetalDrawable> drawable) {
+  pendingDrawable = drawable;
 }
 
 void MetalCommandQueue::waitUntilCompleted() {
