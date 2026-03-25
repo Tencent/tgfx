@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <deque>
 #include "tgfx/gpu/CommandQueue.h"
 
 namespace tgfx {
@@ -29,9 +28,7 @@ class GLCommandQueue : public CommandQueue {
   explicit GLCommandQueue(GLGPU* gpu) : gpu(gpu) {
   }
 
-  ~GLCommandQueue() override;
-
-  uint64_t completedSubmission() const override;
+  uint64_t completedFrameIndex() const override;
 
   void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
                    size_t size) override;
@@ -48,15 +45,6 @@ class GLCommandQueue : public CommandQueue {
   void waitUntilCompleted() override;
 
  private:
-  struct SubmissionFence {
-    uint64_t submission = 0;
-    void* glSync = nullptr;
-  };
-
-  void updateCompletedSubmission() const;
-
   GLGPU* gpu = nullptr;
-  mutable std::deque<SubmissionFence> pendingFences = {};
-  mutable uint64_t _completedSubmission = 0;
 };
 }  // namespace tgfx

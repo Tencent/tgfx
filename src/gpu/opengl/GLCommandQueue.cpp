@@ -27,15 +27,6 @@
 
 namespace tgfx {
 
-GLCommandQueue::~GLCommandQueue() {
-  auto gl = gpu->functions();
-  for (auto& fence : pendingFences) {
-    if (fence.glSync != nullptr) {
-      gl->deleteSync(fence.glSync);
-    }
-  }
-}
-
 void GLCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset,
                                  const void* data, size_t size) {
   if (data == nullptr || size == 0) {
@@ -85,37 +76,16 @@ void GLCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rect& 
 void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
   gpu->processUnreferencedResources();
   auto gl = gpu->functions();
-  auto glSync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-  if (glSync != nullptr) {
-    pendingFences.push_back({_submissionCount, glSync});
-  }
   gl->flush();
   // Reset GL state every frame to avoid interference from external GL calls.
   gpu->resetGLState();
 }
 
-uint64_t GLCommandQueue::completedSubmission() const {
-  updateCompletedSubmission();
-  return _completedSubmission;
-}
-
-void GLCommandQueue::updateCompletedSubmission() const {
-  auto gl = gpu->functions();
-  while (!pendingFences.empty()) {
-    auto& fence = pendingFences.front();
-#if defined(__EMSCRIPTEN__)
-    auto result = gl->clientWaitSync(fence.glSync, 0, 0, 0);
-#else
-    auto result = gl->clientWaitSync(fence.glSync, 0, 0);
-#endif
-    if (result == GL_ALREADY_SIGNALED || result == GL_CONDITION_SATISFIED) {
-      _completedSubmission = fence.submission;
-      gl->deleteSync(fence.glSync);
-      pendingFences.pop_front();
-    } else {
-      break;
-    }
-  }
+uint64_t GLCommandQueue::completedFrameIndex() const {
+  // OpenGL commands execute in order after glFlush(). When the current submit()
+  // calls glFlush(), all previously submitted commands are guaranteed to have
+  // entered the GPU pipeline. So the previous frame is considered complete.
+  return _frameIndex > 0 ? _frameIndex - 1 : 0;
 }
 
 std::shared_ptr<Semaphore> GLCommandQueue::insertSemaphore() {

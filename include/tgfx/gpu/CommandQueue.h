@@ -83,34 +83,19 @@ class CommandQueue {
   virtual void waitUntilCompleted() = 0;
 
  protected:
-  /**
-   * Returns the number of command buffers that have been submitted so far. This counter is
-   * incremented each time submit() is called.
-   */
-  uint64_t submissionCount() const {
-    return _submissionCount;
+  uint64_t frameIndex() const {
+    return _frameIndex;
   }
 
-  /**
-   * Returns the submission counter of the most recent command buffer that has finished GPU
-   * execution. A shared buffer is safe to reuse only when the submission it was last used in has
-   * completed (i.e., its lastSubmission <= completedSubmission()). The default implementation
-   * returns submissionCount(), which means all submissions are considered completed (suitable for
-   * backends where the driver handles synchronization automatically).
-   */
-  virtual uint64_t completedSubmission() const {
-    return _submissionCount;
+  virtual uint64_t completedFrameIndex() const {
+    return _frameIndex;
   }
 
-  /**
-   * Advances the submission counter. Must be called before encoding a new command buffer so that
-   * resources used during encoding are tagged with the correct submission number.
-   */
-  void advanceSubmissionCount() {
-    _submissionCount++;
+  void advanceFrameIndex() {
+    _frameIndex++;
   }
 
-  uint64_t _submissionCount = 0;
+  uint64_t _frameIndex = 0;
 
  private:
   friend class Context;

@@ -126,7 +126,7 @@ void ResourceCache::purgeResourcesByLRU(bool scratchResourceOnly,
 }
 
 void ResourceCache::processUnreferencedResources() {
-  auto submission = context->gpu()->queue()->submissionCount();
+  auto frameIndex = context->gpu()->queue()->frameIndex();
   while (auto resource = static_cast<Resource*>(returnQueue->dequeue())) {
     DEBUG_ASSERT(resource->isPurgeable());
     RemoveFromList(nonpurgeableResources, resource);
@@ -134,7 +134,7 @@ void ResourceCache::processUnreferencedResources() {
       AddToList(purgeableResources, resource);
       purgeableBytes += resource->memoryUsage();
       resource->lastUsedTime = currentFrameTime;
-      resource->lastSubmission = submission;
+      resource->lastFrameIndex = frameIndex;
     } else {
       removeResource(resource);
     }
@@ -163,13 +163,13 @@ std::shared_ptr<Resource> ResourceCache::findScratchResource(const ScratchKey& s
   if (result == scratchKeyMap.end()) {
     return nullptr;
   }
-  auto completed = context->gpu()->queue()->completedSubmission();
+  auto completed = context->gpu()->queue()->completedFrameIndex();
   auto& list = result->second;
   size_t index = 0;
   bool found = false;
   for (auto& resource : list) {
     if (resource->isPurgeable() && !resource->hasExternalReferences() &&
-        resource->lastSubmission <= completed) {
+        resource->lastFrameIndex <= completed) {
       found = true;
       break;
     }

@@ -43,8 +43,8 @@ class MetalCommandQueue : public CommandQueue {
     return commandQueue;
   }
 
-  uint64_t completedSubmission() const override {
-    return _completedSubmission.load(std::memory_order_acquire);
+  uint64_t completedFrameIndex() const override {
+    return _completedFrameIndex.load(std::memory_order_acquire);
   }
 
   void submit(std::shared_ptr<CommandBuffer> commandBuffer) override;
@@ -78,7 +78,7 @@ class MetalCommandQueue : public CommandQueue {
   std::shared_ptr<MetalSemaphore> pendingSignalSemaphore = nullptr;
   std::shared_ptr<MetalSemaphore> pendingWaitSemaphore = nullptr;
   id<CAMetalDrawable> pendingDrawable = nil;
-  std::atomic<uint64_t> _completedSubmission = {0};
+  std::atomic<uint64_t> _completedFrameIndex = {0};
 };
 
 }  // namespace tgfx

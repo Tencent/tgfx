@@ -125,7 +125,7 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
   if (targetBuffer != nullptr) {
     while (!pendingDrawingBuffers.empty()) {
       auto drawingBuffer = pendingDrawingBuffers.front();
-      queue->advanceSubmissionCount();
+      queue->advanceFrameIndex();
       auto commandBuffer = drawingBuffer->encode();
       _resourceCache->advanceFrameAndPurge();
       bool isLast = (drawingBuffer == targetBuffer);

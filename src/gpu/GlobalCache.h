@@ -121,7 +121,7 @@ class GlobalCache {
     std::vector<std::shared_ptr<GPUBuffer>> gpuBuffers = {};
     size_t bufferIndex = 0;
     size_t cursor = 0;
-    uint64_t submission = 0;
+    uint64_t frameIndex = 0;
   };
 
   std::shared_ptr<GPUBufferProxy> getMiterStrokeIndexBuffer(bool antialias);

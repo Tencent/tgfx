@@ -5,13 +5,14 @@ const childProcess = require("child_process");
 childProcess.execSync("depsync", {stdio: "inherit"});
 
 const xcodeGen = require("path").resolve(__dirname, "../third_party/vendor_tools/xcode-gen");
+const extraArgs = process.argv.slice(2).join(" ");
 
 childProcess.execSync(
-    `node "${xcodeGen}" ../ -w -DTGFX_BUILD_HELLO2D=ON -DTGFX_USE_METAL=ON -p simulator -o metal`,
+    `node "${xcodeGen}" ../ -w -DTGFX_BUILD_HELLO2D=ON -DTGFX_USE_METAL=ON -p simulator -o metal ${extraArgs}`,
     {stdio: "inherit"}
 );
 
 childProcess.execSync(
-    `node "${xcodeGen}" ../ -w -DTGFX_BUILD_HELLO2D=ON -p simulator -o opengl`,
+    `node "${xcodeGen}" ../ -w -DTGFX_BUILD_HELLO2D=ON -p simulator -o opengl ${extraArgs}`,
     {stdio: "inherit"}
 );

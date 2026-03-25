@@ -89,7 +89,7 @@ class Resource : public ReturnNode {
   std::list<Resource*>* cachedList = nullptr;
   std::list<Resource*>::iterator cachedPosition;
   std::chrono::steady_clock::time_point lastUsedTime = {};
-  uint64_t lastSubmission = 0;
+  uint64_t lastFrameIndex = 0;
 
   bool isPurgeable() const {
     return weakThis.expired();
