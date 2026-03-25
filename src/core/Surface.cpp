@@ -89,7 +89,8 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Win
   if (proxy == nullptr) {
     return nullptr;
   }
-  return MakeFrom(std::move(proxy), renderFlags, true, window->colorSpace(), std::move(window));
+  auto colorSpace = window->colorSpace();
+  return MakeFrom(std::move(proxy), renderFlags, true, std::move(colorSpace), std::move(window));
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
