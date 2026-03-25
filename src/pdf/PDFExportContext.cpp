@@ -621,7 +621,8 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
 
 void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
                                                  const InnerShadowImageFilter* innerShadowFilter,
-                                                 const MCState& state) {
+                                                 const MCState& state,
+                                                 const Matrix& currentMatrix) {
   MeasureContext measureContext;
   PlaybackContext playbackContext = {};
   record->playback(&measureContext, &playbackContext);
@@ -640,9 +641,21 @@ void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
   DEBUG_ASSERT(Types::Get(innerShadowFilter->blurFilter.get()) == Types::ImageFilterType::Blur);
   const auto blurFilter =
       static_cast<const GaussianBlurImageFilter*>(innerShadowFilter->blurFilter.get());
-  auto copyFilter = ImageFilter::InnerShadowOnly(innerShadowFilter->dx, innerShadowFilter->dy,
-                                                 blurFilter->blurrinessX, blurFilter->blurrinessY,
-                                                 innerShadowFilter->color);
+  // Transform (dx, dy) as a vector through the inverse matrix (ignoring translation)
+  Matrix invertedMatrix = Matrix::I();
+  currentMatrix.invert(&invertedMatrix);
+  auto correctedDx = (innerShadowFilter->dx * invertedMatrix.getScaleX()) +
+                     (innerShadowFilter->dy * invertedMatrix.getSkewX());
+  auto correctedDy = (innerShadowFilter->dx * invertedMatrix.getSkewY()) +
+                     (innerShadowFilter->dy * invertedMatrix.getScaleY());
+  // Scale blur values by inverse scale
+  auto scaleX = currentMatrix.getScaleX();
+  auto scaleY = currentMatrix.getScaleY();
+  auto invScaleX = scaleX != 0.0f ? 1.0f / scaleX : 1.0f;
+  auto invScaleY = scaleY != 0.0f ? 1.0f / scaleY : 1.0f;
+  auto copyFilter =
+      ImageFilter::InnerShadowOnly(correctedDx, correctedDy, blurFilter->blurrinessX * invScaleX,
+                                   blurFilter->blurrinessY * invScaleY, innerShadowFilter->color);
 
   Paint picturePaint = {};
   picturePaint.setImageFilter(copyFilter);
@@ -651,10 +664,9 @@ void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
   {
     auto surfaceContext = canvas->drawContext;
     auto matrix = Matrix::MakeTrans(-pictureBounds.x(), -pictureBounds.y());
-    PlaybackContext tempPlaybackContext = {};
-    tempPlaybackContext.setMatrix(matrix);
-    tempPlaybackContext.setClip(state.clip);
-    record->playback(surfaceContext, &playbackContext);
+    MCState tempState(matrix, state.clip);
+    PlaybackContext tempPlaybackContext(tempState);
+    record->playback(surfaceContext, &tempPlaybackContext);
   }
   canvas->restore();
 
@@ -663,7 +675,9 @@ void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
     auto imageShader = Shader::MakeImageShader(image);
     imageShader =
         imageShader->makeWithMatrix(Matrix::MakeTrans(pictureBounds.x(), pictureBounds.y()));
-    PlaybackContext tempPlaybackContext(state);
+    MCState tempState(state);
+    tempState.matrix.preConcat(currentMatrix);
+    PlaybackContext tempPlaybackContext(tempState);
     Brush tempBrush;
     tempBrush.shader = imageShader;
     tempPlaybackContext.setBrush(tempBrush);
@@ -719,9 +733,14 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
     if (Types::Get(imageFilter.get()) == Types::ImageFilterType::InnerShadow) {
       const auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
       PlaybackContext playbackContext = {};
+      Matrix currentMatrix = Matrix::I();
       for (const auto& record : picture->records) {
         record->playback(this, &playbackContext);
-        drawInnerShadowAfterLayer(record.get(), innerShadowFilter, state);
+        if (record->type() == PictureRecordType::SetMatrix) {
+          const auto setMatrix = static_cast<const SetMatrix*>(record.get());
+          currentMatrix.preConcat(setMatrix->matrix);
+        }
+        drawInnerShadowAfterLayer(record.get(), innerShadowFilter, state, currentMatrix);
       }
       return;
     }

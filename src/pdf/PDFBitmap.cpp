@@ -79,6 +79,8 @@ void FillStream(WriteStream* out, char value, size_t n) {
   out->write(buffer, n % sizeof(buffer));
 }
 
+// Extract RGB from RGBA_8888 pixel format.
+// RGBA_8888: memory order [R, G, B, A], uint32_t little-endian = 0xAABBGGRR
 uint32_t GetNeighborAvgColor(const Pixmap& pixmap, int xOrig, int yOrig) {
   unsigned r = 0;
   unsigned g = 0;
@@ -98,9 +100,9 @@ uint32_t GetNeighborAvgColor(const Pixmap& pixmap, int xOrig, int yOrig) {
     for (int x = xmin; x <= xmax; ++x) {
       uint32_t color = *scanline++;
       if (color != 0x00000000) {
-        r += (((color) >> 16) & 0xFF);
+        r += (((color) >> 0) & 0xFF);
         g += (((color) >> 8) & 0xFF);
-        b += (((color) >> 0) & 0xFF);
+        b += (((color) >> 16) & 0xFF);
         n++;
       }
     }
@@ -109,8 +111,8 @@ uint32_t GetNeighborAvgColor(const Pixmap& pixmap, int xOrig, int yOrig) {
     auto avgR = static_cast<uint8_t>(r / n);
     auto avgG = static_cast<uint8_t>(g / n);
     auto avgB = static_cast<uint8_t>(b / n);
-    return ((static_cast<uint32_t>(avgR) << 16) | (static_cast<uint32_t>(avgG) << 8) |
-            static_cast<uint32_t>(avgB) << 0);
+    return ((static_cast<uint32_t>(avgR) << 0) | (static_cast<uint32_t>(avgG) << 8) |
+            (static_cast<uint32_t>(avgB) << 16));
   }
   return 0x00000000;
 }
@@ -232,6 +234,8 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
       break;
     }
     default:
+      // Expects RGBA_8888 pixel format from SerializeImage.
+      // RGBA_8888: memory order [R, G, B, A], uint32_t little-endian = 0xAABBGGRR
       auto colorSpaceRef = document->colorSpaceRef();
       if (colorSpaceRef) {
         colorSpace = PDFUnion::Ref(colorSpaceRef);
@@ -253,9 +257,9 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
           if ((((color) >> 24) & 0xFF) == 0x00) {
             color = GetNeighborAvgColor(pixmap, x, y);
           }
-          *bufferPointer++ = (((color) >> 16) & 0xFF);
-          *bufferPointer++ = (((color) >> 8) & 0xFF);
           *bufferPointer++ = (((color) >> 0) & 0xFF);
+          *bufferPointer++ = (((color) >> 8) & 0xFF);
+          *bufferPointer++ = (((color) >> 16) & 0xFF);
           if (bufferPointer == bufferStop) {
             stream->write(byteBuffer, sizeof(byteBuffer));
             bufferPointer = byteBuffer;
@@ -294,10 +298,15 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
     auto canvas = surface->getCanvas();
     canvas->drawImage(image);
 
-    Bitmap bitmap(surface->width(), surface->height(), false, true, surface->colorSpace());
+    // Always use RGBA_8888 format for PDF export to ensure consistent pixel layout across all
+    // platforms. RGBA is the industry standard format used by PNG, JPEG, and PDF's DeviceRGB.
+    // This avoids R/B channel swap issues between platforms with different native formats.
+    auto dstInfo = ImageInfo::Make(surface->width(), surface->height(), ColorType::RGBA_8888,
+                                   AlphaType::Unpremultiplied, 0, surface->colorSpace());
+    Bitmap bitmap(surface->width(), surface->height(), false, false, surface->colorSpace());
     auto pixels = bitmap.lockPixels();
     //bitmap in pdf must be unpremultiplied
-    if (surface->readPixels(bitmap.info().makeAlphaType(AlphaType::Unpremultiplied), pixels)) {
+    if (surface->readPixels(dstInfo, pixels)) {
       bitmap.unlockPixels();
       return bitmap;
     }

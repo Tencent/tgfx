@@ -427,6 +427,140 @@ TGFX_TEST(PDFExportTest, AssignColorSpace) {
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/AssignColorSpace"));
 }
 
+TGFX_TEST(PDFExportTest, InnerShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(600.f, 400.f);
+  {
+    Paint paint;
+
+    // 1. Translate only (50, 50)
+    canvas->save();
+    canvas->translate(50, 50);
+    paint.setColor(Color::FromRGBA(100, 200, 255));
+    paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(0, 0, 100)));
+    canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+    canvas->restore();
+
+    // 2. Scale only (0.5)
+    canvas->save();
+    canvas->scale(0.5f, 0.5f);
+    paint.setColor(Color::FromRGBA(255, 180, 100));
+    paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(100, 0, 0)));
+    canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+    canvas->restore();
+
+    // 3. Translate + Rotate (15 degrees)
+    canvas->save();
+    canvas->translate(400, 80);
+    canvas->rotate(15);
+    paint.setColor(Color::FromRGBA(150, 255, 150));
+    paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(0, 100, 0)));
+    canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
+    canvas->restore();
+
+    // 4. Translate + Scale (1.2)
+    canvas->save();
+    canvas->translate(50, 250);
+    canvas->scale(1.2f, 1.2f);
+    paint.setColor(Color::FromRGBA(255, 150, 255));
+    paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(100, 0, 100)));
+    canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+    canvas->restore();
+
+    // 5. Translate + Rotate (-30 degrees) + Scale (0.7)
+    canvas->save();
+    canvas->translate(300, 280);
+    canvas->rotate(-30);
+    canvas->scale(0.7f, 0.7f);
+    paint.setColor(Color::FromRGBA(255, 255, 150));
+    paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(100, 100, 0)));
+    canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
+    canvas->restore();
+
+    // 6. Translate + Rotate (45 degrees)
+    canvas->save();
+    canvas->translate(480, 280);
+    canvas->rotate(45);
+    paint.setColor(Color::FromRGBA(150, 200, 255));
+    paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(0, 50, 100)));
+    canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
+    canvas->restore();
+  }
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/InnerShadow"));
+
+  // Also render the same content to an image for comparison
+  auto surface = Surface::Make(context, 600, 400);
+  auto imgCanvas = surface->getCanvas();
+  imgCanvas->clear(Color::White());
+  {
+    Paint paint;
+
+    // 1. Translate only (50, 50)
+    imgCanvas->save();
+    imgCanvas->translate(50, 50);
+    paint.setColor(Color::FromRGBA(100, 200, 255));
+    paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(0, 0, 100)));
+    imgCanvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+    imgCanvas->restore();
+
+    // 2. Scale only (0.5)
+    imgCanvas->save();
+    imgCanvas->scale(0.5f, 0.5f);
+    paint.setColor(Color::FromRGBA(255, 180, 100));
+    paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(100, 0, 0)));
+    imgCanvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+    imgCanvas->restore();
+
+    // 3. Translate + Rotate (15 degrees)
+    imgCanvas->save();
+    imgCanvas->translate(400, 80);
+    imgCanvas->rotate(15);
+    paint.setColor(Color::FromRGBA(150, 255, 150));
+    paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(0, 100, 0)));
+    imgCanvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
+    imgCanvas->restore();
+
+    // 4. Translate + Scale (1.2)
+    imgCanvas->save();
+    imgCanvas->translate(50, 250);
+    imgCanvas->scale(1.2f, 1.2f);
+    paint.setColor(Color::FromRGBA(255, 150, 255));
+    paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(100, 0, 100)));
+    imgCanvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+    imgCanvas->restore();
+
+    // 5. Translate + Rotate (-30 degrees) + Scale (0.7)
+    imgCanvas->save();
+    imgCanvas->translate(300, 280);
+    imgCanvas->rotate(-30);
+    imgCanvas->scale(0.7f, 0.7f);
+    paint.setColor(Color::FromRGBA(255, 255, 150));
+    paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(100, 100, 0)));
+    imgCanvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
+    imgCanvas->restore();
+
+    // 6. Translate + Rotate (45 degrees)
+    imgCanvas->save();
+    imgCanvas->translate(480, 280);
+    imgCanvas->rotate(45);
+    paint.setColor(Color::FromRGBA(150, 200, 255));
+    paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(0, 50, 100)));
+    imgCanvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
+    imgCanvas->restore();
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFTest/InnerShadow"));
+}
+
 TGFX_TEST(PDFExportTest, DstAssignColorSpace) {
   ContextScope scope;
   auto context = scope.getContext();
