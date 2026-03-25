@@ -648,11 +648,12 @@ void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
                      (innerShadowFilter->dy * invertedMatrix.getSkewX());
   auto correctedDy = (innerShadowFilter->dx * invertedMatrix.getSkewY()) +
                      (innerShadowFilter->dy * invertedMatrix.getScaleY());
-  // Scale blur values by inverse scale
-  auto scaleX = currentMatrix.getScaleX();
-  auto scaleY = currentMatrix.getScaleY();
-  auto invScaleX = scaleX != 0.0f ? 1.0f / scaleX : 1.0f;
-  auto invScaleY = scaleY != 0.0f ? 1.0f / scaleY : 1.0f;
+  // Scale blur values by inverse scale. Use getAxisScales() to correctly decompose the scale
+  // factors from a matrix that may contain rotation. getScaleX/Y would give wrong values for
+  // rotated matrices (e.g., cos(45°) instead of 1.0 for pure rotation).
+  auto scales = currentMatrix.getAxisScales();
+  auto invScaleX = scales.x != 0.0f ? 1.0f / scales.x : 1.0f;
+  auto invScaleY = scales.y != 0.0f ? 1.0f / scales.y : 1.0f;
   auto copyFilter =
       ImageFilter::InnerShadowOnly(correctedDx, correctedDy, blurFilter->blurrinessX * invScaleX,
                                    blurFilter->blurrinessY * invScaleY, innerShadowFilter->color);
