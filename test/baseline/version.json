@@ -307,7 +307,7 @@
     },
     "PDFTest": {
         "AssignColorSpace": "5133a852",
-        "Complex": "880d5a6c",
+        "Complex": "134247074",
         "DrawColor": "79ce3a28",
         "DrawShape": "79ce3a28",
         "DrawShapeStroke": "79ce3a28",
@@ -317,6 +317,7 @@
         "Empty": "79ce3a28",
         "EmptyMultiPage": "79ce3a28",
         "Image": "79ce3a28",
+        "InnerShadow": "134247074",
         "SimpleText": "a173610f9"
     },
     "PathShapeTest": {
