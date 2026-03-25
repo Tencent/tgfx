@@ -71,7 +71,8 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
   if (textureView) {
     textureView->_origin = origin;
   } else {
-    TextureDescriptor descriptor = {width, height, pixelFormat, mipmapped};
+    TextureDescriptor descriptor = {width, height, pixelFormat, mipmapped, 1,
+                                    TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT};
     auto texture = gpu->createTexture(descriptor);
     if (texture == nullptr) {
       return nullptr;

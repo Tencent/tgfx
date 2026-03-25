@@ -61,7 +61,8 @@ class TextureDescriptor {
    * Constructs a TextureDescriptor with the specified properties.
    */
   TextureDescriptor(int width, int height, PixelFormat format, bool mipmapped = false,
-                    int sampleCount = 1, uint32_t usage = TextureUsage::TEXTURE_BINDING);
+                    int sampleCount = 1,
+                    uint32_t usage = TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT);
 
   /**
    * The width of the texture in pixels.
@@ -92,7 +93,7 @@ class TextureDescriptor {
    * The bitwise flags that indicate the usage options for the texture. The value is the sum of the
    * decimal values for each flag. See TextureUsage for more details.
    */
-  uint32_t usage = TextureUsage::TEXTURE_BINDING;
+  uint32_t usage = TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT;
 };
 
 /**
