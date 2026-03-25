@@ -41,6 +41,12 @@ void GLSLClampedGradientEffect::emitCode(EmitArgs& args) const {
       "rightBorderColor", UniformFormat::Float4, ShaderStage::Fragment);
   std::string _child1 = "_child1";
   emitChild(gradLayoutIndex, &_child1, args);
+  // Emit colorizer outside the conditional to satisfy WGSL uniformity requirements.
+  // When colorizer contains texture sampling (e.g., TextureGradientColorizer), the
+  // textureSample operation must be in uniform control flow, not inside if/else blocks.
+  std::string _input0 = "t";
+  std::string _child0 = "_child0";
+  emitChild(colorizerIndex, _input0, &_child0, args);
   fragBuilder->codeAppendf("vec4 t = %s;", _child1.c_str());
   fragBuilder->codeAppend("if (t.y < 0.0) {");
   fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
@@ -49,9 +55,6 @@ void GLSLClampedGradientEffect::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("} else if (t.x >= 1.0) {");
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), rightBorderColorName.c_str());
   fragBuilder->codeAppend("} else {");
-  std::string _input0 = "t";
-  std::string _child0 = "_child0";
-  emitChild(colorizerIndex, _input0, &_child0, args);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), _child0.c_str());
   fragBuilder->codeAppend("}");
   // make sure the output color is premultiplied
