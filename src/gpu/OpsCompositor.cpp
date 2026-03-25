@@ -51,6 +51,10 @@ namespace tgfx {
  */
 static constexpr float BOUNDS_TOLERANCE = 1e-3f;
 
+static bool HasExtraCoverage(const Brush& brush, const Path& clip) {
+  return brush.maskFilter != nullptr || !clip.isEmpty() || clip.isInverseFillType();
+}
+
 static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& rects) {
   if (rects.size() <= 1) {
     return false;
@@ -206,7 +210,8 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, c
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
   auto& clip = state.clip;
-  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, meshBase->hasCoverage());
+  bool hasCoverage = meshBase->hasCoverage() || HasExtraCoverage(brush, clip);
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, hasCoverage);
   auto clipBounds = getClipBounds(clip);
 
   float drawScale = 1.0f;
@@ -424,12 +429,14 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
   std::optional<float> drawScale = std::nullopt;
-  bool hasCoverage = pendingBrush.maskFilter != nullptr || !pendingClip.isEmpty() ||
-                     pendingClip.isInverseFillType();
+  auto aaType = getAAType(pendingBrush);
+  bool hasCoverage = HasExtraCoverage(pendingBrush, pendingClip);
+  if (pendingType == PendingOpType::RRect) {
+    hasCoverage = hasCoverage || aaType == AAType::Coverage;
+  }
   bool hasImageFill = pendingType == PendingOpType::Image;
   auto [needLocalBounds, needDeviceBounds] =
       needComputeBounds(pendingBrush, hasCoverage, hasImageFill);
-  auto aaType = getAAType(pendingBrush);
   Rect clipBounds = {};
   if (needLocalBounds) {
     clipBounds = getClipBounds(pendingClip);
@@ -559,7 +566,9 @@ void OpsCompositor::flushPendingShapeOps() {
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
   float drawScale = 1.0f;
-  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(pendingBrush, true);
+  auto aaType = getAAType(pendingBrush);
+  bool hasCoverage = aaType == AAType::Coverage || HasExtraCoverage(pendingBrush, pendingClip);
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(pendingBrush, hasCoverage);
 
   // Compute the union of all instance bounds in the first instance's local space.
   // offsets are in device space, so convert them to local space using uvMatrix (inverse of
@@ -593,7 +602,6 @@ void OpsCompositor::flushPendingShapeOps() {
     return;
   }
 
-  auto aaType = getAAType(pendingBrush);
   auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
 
   if (count == 1) {
