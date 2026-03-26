@@ -28,7 +28,7 @@ class GLCommandQueue : public CommandQueue {
   explicit GLCommandQueue(GLGPU* gpu) : gpu(gpu) {
   }
 
-  uint64_t completedFrameIndex() const override;
+  std::chrono::steady_clock::time_point completedFrameTime() const override;
 
   void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
                    size_t size) override;

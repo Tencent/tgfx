@@ -139,15 +139,16 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
 }
 
 void GlobalCache::resetUniformBuffer() {
-  // Record the submission counter for the active packet before releasing it.
-  activePacket->frameIndex = context->gpu()->queue()->frameIndex();
+  // Record the frame timestamp for the active packet before releasing it.
+  activePacket->frameTime = context->gpu()->queue()->frameTime();
   maxUniformBufferTracker.addValue(activePacket->gpuBuffers.size());
 
   // Find a completed packet from the pool to reuse.
-  auto completed = context->gpu()->queue()->completedFrameIndex();
+  auto completed = context->gpu()->queue()->completedFrameTime();
   UniformBufferPacket* reusable = nullptr;
-  for (auto& packet : uniformBufferPool) {
-    if (&packet != activePacket && packet.frameIndex <= completed) {
+  for (size_t i = 0; i < uniformBufferPool.size(); i++) {
+    auto& packet = uniformBufferPool[i];
+    if (&packet != activePacket && packet.frameTime <= completed) {
       reusable = &packet;
       break;
     }

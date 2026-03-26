@@ -57,9 +57,9 @@ void MetalCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
         pendingDrawable = nil;
       }
 
-      auto frameIndex = _frameIndex;
+      auto frameTicks = _frameTime.time_since_epoch().count();
       [metalCommandBuffer->metalCommandBuffer() addCompletedHandler:^(id<MTLCommandBuffer>) {
-        _completedFrameIndex.store(frameIndex, std::memory_order_release);
+        _completedFrameTime.store(frameTicks, std::memory_order_release);
       }];
 
       [metalCommandBuffer->metalCommandBuffer() commit];

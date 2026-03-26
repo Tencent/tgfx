@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <cstdint>
+#include <chrono>
 #include <memory>
 #include "tgfx/core/Rect.h"
 #include "tgfx/gpu/CommandBuffer.h"
@@ -83,19 +83,19 @@ class CommandQueue {
   virtual void waitUntilCompleted() = 0;
 
  protected:
-  uint64_t frameIndex() const {
-    return _frameIndex;
+  std::chrono::steady_clock::time_point frameTime() const {
+    return _frameTime;
   }
 
-  virtual uint64_t completedFrameIndex() const {
-    return _frameIndex;
+  virtual std::chrono::steady_clock::time_point completedFrameTime() const {
+    return _frameTime;
   }
 
-  void advanceFrameIndex() {
-    _frameIndex++;
+  void advanceFrameTime() {
+    _frameTime = std::chrono::steady_clock::now();
   }
 
-  uint64_t _frameIndex = 0;
+  std::chrono::steady_clock::time_point _frameTime = {};
 
  private:
   friend class Context;

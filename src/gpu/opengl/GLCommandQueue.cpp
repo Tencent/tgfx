@@ -81,11 +81,13 @@ void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
   gpu->resetGLState();
 }
 
-uint64_t GLCommandQueue::completedFrameIndex() const {
+std::chrono::steady_clock::time_point GLCommandQueue::completedFrameTime() const {
   // OpenGL commands execute in order after glFlush(). When the current submit()
   // calls glFlush(), all previously submitted commands are guaranteed to have
   // entered the GPU pipeline. So the previous frame is considered complete.
-  return _frameIndex > 0 ? _frameIndex - 1 : 0;
+  // Returns a time point just before the current frame time, ensuring resources
+  // used in the current frame are not considered completed.
+  return _frameTime - std::chrono::steady_clock::duration(1);
 }
 
 std::shared_ptr<Semaphore> GLCommandQueue::insertSemaphore() {

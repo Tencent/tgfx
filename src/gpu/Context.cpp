@@ -125,9 +125,10 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
   if (targetBuffer != nullptr) {
     while (!pendingDrawingBuffers.empty()) {
       auto drawingBuffer = pendingDrawingBuffers.front();
-      queue->advanceFrameIndex();
+      queue->advanceFrameTime();
+      _resourceCache->syncFrameTime();
       auto commandBuffer = drawingBuffer->encode();
-      _resourceCache->advanceFrameAndPurge();
+      _resourceCache->recordFrameAndPurge();
       bool isLast = (drawingBuffer == targetBuffer);
       if (!isLast) {
         // Insert a GPU fence so that the next command buffer waits for this one to complete
