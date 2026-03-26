@@ -114,37 +114,38 @@ RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, 
 }
 
 size_t RRectsVertexProvider::vertexCount() const {
-  if (aaType() == AAType::Coverage) {
-    // Coverage AA mode: 16 vertices per RRect (4x4 grid)
-    auto floatCount = rects.size() * 4 * 32;
-    if (bitFields.hasColor) {
-      floatCount += rects.size() * 4 * 4;
+  if (aaType() == AAType::None) {
+    // Non-AA mode: 4 vertices per RRect
+    // Each vertex has: position (2), localCoord (2), radii (2), rectBounds (4)
+    // Optional: color (1), strokeWidth (2) for stroke mode
+    size_t floatsPerVertex = 10;
+    if (bitFields.hasStroke) {
+      floatsPerVertex += 2;
     }
-    return floatCount;
+    if (bitFields.hasColor) {
+      floatsPerVertex += 1;
+    }
+    return rects.size() * 4 * floatsPerVertex;
   }
-  // Non-AA / MSAA mode: 4 vertices per RRect
-  // Each vertex has: position (2), localCoord (2), radii (2), rectBounds (4)
-  // Optional: color (1), strokeWidth (2) for stroke mode
-  size_t floatsPerVertex = 10;
-  if (bitFields.hasStroke) {
-    floatsPerVertex += 2;
-  }
+  // AA mode: 16 vertices per RRect (4x4 grid)
+  auto floatCount = rects.size() * 4 * 32;
   if (bitFields.hasColor) {
-    floatsPerVertex += 1;
+    floatCount += rects.size() * 4 * 4;
   }
-  return rects.size() * 4 * floatsPerVertex;
+  return floatCount;
 }
 
 void RRectsVertexProvider::getVertices(float* vertices) const {
-  if (aaType() == AAType::Coverage) {
-    getAAVertices(vertices);
-  } else {
+  if (aaType() == AAType::None) {
     getNonAAVertices(vertices);
+  } else {
+    getAAVertices(vertices);
   }
 }
 
 void RRectsVertexProvider::getAAVertices(float* vertices) const {
   size_t index = 0;
+  auto currentAAType = aaType();
   size_t currentIndex = 0;
   std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
   if (bitFields.hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
@@ -186,8 +187,10 @@ void RRectsVertexProvider::getAAVertices(float* vertices) const {
     // Pin to a large value, to avoid infinities in the shader. crbug.com/1139750
     reciprocalRadii[2] = std::min(reciprocalRadii[2], 1e6f);
     reciprocalRadii[3] = std::min(reciprocalRadii[3], 1e6f);
+    // On MSAA, bloat enough to guarantee any pixel that might be touched by the rRect has
+    // full sample coverage.
+    float aaBloat = currentAAType == AAType::MSAA ? FLOAT_SQRT2 : .5f;
     // Extend out the radii to antialias.
-    constexpr float aaBloat = 0.5f;
     float xOuterRadius = xRadius + aaBloat;
     float yOuterRadius = yRadius + aaBloat;
 

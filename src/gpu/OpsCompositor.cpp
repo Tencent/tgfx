@@ -432,7 +432,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
   auto aaType = getAAType(pendingBrush);
   bool hasCoverage = HasExtraCoverage(pendingBrush, pendingClip);
   if (pendingType == PendingOpType::RRect) {
-    hasCoverage = hasCoverage || aaType == AAType::Coverage;
+    hasCoverage = hasCoverage || aaType != AAType::None;
   }
   bool hasImageFill = pendingType == PendingOpType::Image;
   auto [needLocalBounds, needDeviceBounds] =

@@ -384,7 +384,7 @@ class AARRectIndicesProvider : public DataSource<Data> {
 static constexpr uint16_t NonAARRectIndexPattern[] = {0, 1, 2, 0, 2, 3};
 
 std::shared_ptr<GPUBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke, AAType aaType) {
-  if (aaType != AAType::Coverage) {
+  if (aaType == AAType::None) {
     if (nonAARRectIndexBuffer == nullptr) {
       auto provider = std::make_unique<RectIndicesProvider>(
           NonAARRectIndexPattern, RRectDrawOp::IndicesPerNonAARRect, RRectDrawOp::MaxNumRRects,

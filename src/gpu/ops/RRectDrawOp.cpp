@@ -53,10 +53,10 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
     commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
   hasStroke = provider->hasStroke();
-  if (aaType == AAType::Coverage) {
-    indicesPerRRect = hasStroke ? IndicesPerAAStrokeRRect : IndicesPerAAFillRRect;
-  } else {
+  if (aaType == AAType::None) {
     indicesPerRRect = IndicesPerNonAARRect;
+  } else {
+    indicesPerRRect = hasStroke ? IndicesPerAAStrokeRRect : IndicesPerAAFillRRect;
   }
 }
 
@@ -64,7 +64,7 @@ PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarge
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("hasStroke", hasStroke);
   ATTRIBUTE_NAME("commonColor", commonColor);
-  if (aaType != AAType::Coverage) {
+  if (aaType == AAType::None) {
     return NonAARRectGeometryProcessor::Make(allocator, renderTarget->width(),
                                              renderTarget->height(), hasStroke, commonColor);
   }
