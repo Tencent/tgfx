@@ -57,7 +57,8 @@ static Path MakePentagonPath(float radius) {
   Path path = {};
   constexpr int sides = 5;
   for (int i = 0; i < sides; i++) {
-    float angle = -M_PI_F / 2.0f + static_cast<float>(i) * 2.0f * M_PI_F / static_cast<float>(sides);
+    float angle =
+        -M_PI_F / 2.0f + static_cast<float>(i) * 2.0f * M_PI_F / static_cast<float>(sides);
     float x = radius * std::cos(angle);
     float y = radius * std::sin(angle);
     if (i == 0) {

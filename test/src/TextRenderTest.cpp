@@ -314,8 +314,10 @@ TGFX_TEST(TextRenderTest, complexEmojiTextBlending) {
       auto hue = (i * 45 + j * 30) % 360;
       // Convert HSL to RGB approximation
       auto r = static_cast<uint8_t>(128 + 100 * sin(static_cast<float>(hue) * 3.14159f / 180.0f));
-      auto g = static_cast<uint8_t>(128 + 100 * sin(static_cast<float>(hue + 120) * 3.14159f / 180.0f));
-      auto b = static_cast<uint8_t>(128 + 100 * sin(static_cast<float>(hue + 240) * 3.14159f / 180.0f));
+      auto g =
+          static_cast<uint8_t>(128 + 100 * sin(static_cast<float>(hue + 120) * 3.14159f / 180.0f));
+      auto b =
+          static_cast<uint8_t>(128 + 100 * sin(static_cast<float>(hue + 240) * 3.14159f / 180.0f));
       auto color = Color::FromRGBA(r, g, b, 77);  // 0.3f * 255
       rectPaint.setColor(color);
       canvas->drawRect(Rect::MakeXYWH(i * 100, j * 100, 100, 100), rectPaint);
