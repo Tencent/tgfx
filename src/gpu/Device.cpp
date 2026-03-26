@@ -43,17 +43,13 @@ Context* Device::lockContext() {
   if (context == nullptr) {
     context = new Context(this, _gpu);
   }
-#if DEBUG
   SINGLE_OWNER_ACQUIRE(*context->singleOwner);
-#endif
   return context;
 }
 
 void Device::unlock() {
   if (contextLocked) {
-#if DEBUG
     SINGLE_OWNER_RELEASE(*context->singleOwner);
-#endif
     contextLocked = false;
     onUnlockContext();
   }
