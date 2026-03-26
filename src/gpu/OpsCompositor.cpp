@@ -433,10 +433,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
   bool hasCoverage = HasExtraCoverage(pendingBrush, pendingClip);
   // RRect and Rect with round stroke use shader-controlled edges (step+discard),
   // so they need coverage even under MSAA mode.
-  if (pendingType == PendingOpType::RRect) {
-    hasCoverage = hasCoverage || aaType != AAType::None;
-  } else if (pendingType == PendingOpType::Rect && !pendingStrokes.empty() &&
-             pendingStrokes.front()->join == LineJoin::Round) {
+  auto isRoundStrokeRect = pendingType == PendingOpType::Rect && !pendingStrokes.empty() &&
+                           pendingStrokes.front()->join == LineJoin::Round;
+  if (pendingType == PendingOpType::RRect || isRoundStrokeRect) {
     hasCoverage = hasCoverage || aaType != AAType::None;
   }
   bool hasImageFill = pendingType == PendingOpType::Image;
