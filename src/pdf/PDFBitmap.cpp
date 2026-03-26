@@ -98,7 +98,7 @@ uint32_t GetNeighborAvgColor(const Pixmap& pixmap, int xOrig, int yOrig) {
     auto scanline =
         reinterpret_cast<const uint32_t*>(pixelPointer + (static_cast<size_t>(y) * rowBytes));
     for (int x = xmin; x <= xmax; ++x) {
-      uint32_t color = *scanline++;
+      uint32_t color = scanline[x];
       if (color != 0x00000000) {
         r += (((color) >> 0) & 0xFF);
         g += (((color) >> 8) & 0xFF);
