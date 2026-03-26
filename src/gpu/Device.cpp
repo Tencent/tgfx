@@ -18,6 +18,7 @@
 
 #include "tgfx/gpu/Device.h"
 #include "core/utils/Log.h"
+#include "core/utils/SingleOwner.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
@@ -42,11 +43,13 @@ Context* Device::lockContext() {
   if (context == nullptr) {
     context = new Context(this, _gpu);
   }
+  SINGLE_OWNER_ACQUIRE(*context->singleOwner);
   return context;
 }
 
 void Device::unlock() {
   if (contextLocked) {
+    SINGLE_OWNER_RELEASE(*context->singleOwner);
     contextLocked = false;
     onUnlockContext();
   }
