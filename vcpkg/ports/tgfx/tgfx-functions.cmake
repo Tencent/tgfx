@@ -74,6 +74,12 @@ function(build_tgfx_single_config SOURCE_PATH NODEJS OUTPUT_DIR IS_DEBUG)
         list(APPEND BUILD_ARGS -DTGFX_USE_OPENGL=OFF)
     endif()
 
+    if("d3d12" IN_LIST FEATURES)
+        list(APPEND BUILD_ARGS -DTGFX_USE_D3D12=ON)
+    else()
+        list(APPEND BUILD_ARGS -DTGFX_USE_D3D12=OFF)
+    endif()
+
     if("threads" IN_LIST FEATURES)
         list(APPEND BUILD_ARGS -DTGFX_USE_THREADS=ON)
         if(VCPKG_TARGET_IS_EMSCRIPTEN)
