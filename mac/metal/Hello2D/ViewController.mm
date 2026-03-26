@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "ViewController.h"
-#import <CoreVideo/CoreVideo.h>
 #import "TGFXView.h"
 @interface ViewController ()
 @property(strong, nonatomic) TGFXView* tgfxView;
