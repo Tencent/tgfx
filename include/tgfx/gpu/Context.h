@@ -20,6 +20,9 @@
 
 #include <chrono>
 #include <deque>
+#if DEBUG
+#include <memory>
+#endif
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Device.h"
 #include "tgfx/gpu/Recording.h"
@@ -38,6 +41,9 @@ class AtlasManager;
 class CommandBuffer;
 class ShaderCaps;
 class AtlasStrikeCache;
+#if DEBUG
+class SingleOwner;
+#endif
 
 /**
  * Context is responsible for creating and managing GPU resources, as well as issuing drawing
@@ -210,6 +216,11 @@ class Context {
   AtlasManager* _atlasManager = nullptr;
   AtlasStrikeCache* _atlasStrikeCache = nullptr;
   std::deque<std::shared_ptr<DrawingBuffer>> pendingDrawingBuffers = {};
+
+#if DEBUG
+  std::unique_ptr<SingleOwner> singleOwner;
+  friend class Device;
+#endif
 };
 
 }  // namespace tgfx
