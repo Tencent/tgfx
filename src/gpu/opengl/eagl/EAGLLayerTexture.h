@@ -26,7 +26,7 @@ namespace tgfx {
 class EAGLLayerTexture : public GLTexture {
  public:
   static std::shared_ptr<EAGLLayerTexture> MakeFrom(GLGPU* gpu, CAEAGLLayer* layer,
-                                                    int sampleCount = 1);
+                                                    int sampleCount);
 
   unsigned frameBufferID() const override {
     return _frameBufferID;
