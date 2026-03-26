@@ -739,7 +739,7 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
         record->playback(this, &playbackContext);
         if (record->type() == PictureRecordType::SetMatrix) {
           const auto setMatrix = static_cast<const SetMatrix*>(record.get());
-          currentMatrix.preConcat(setMatrix->matrix);
+          currentMatrix = setMatrix->matrix;
         }
         drawInnerShadowAfterLayer(record.get(), innerShadowFilter, state, currentMatrix);
       }

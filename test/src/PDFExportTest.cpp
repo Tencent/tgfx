@@ -499,6 +499,65 @@ TGFX_TEST(PDFExportTest, InnerShadow) {
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/InnerShadow"));
 }
 
+TGFX_TEST(PDFExportTest, InnerShadowMultipleMatrices) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(600.f, 400.f);
+  {
+    // Use explicit saveLayer with InnerShadow filter so that multiple draw
+    // operations with different matrices end up in a single Picture, producing
+    // multiple SetMatrix records. This verifies that the matrix is tracked as
+    // an absolute value (direct assignment) rather than accumulated (preConcat).
+    Paint layerPaint;
+    layerPaint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(0, 0, 100)));
+    canvas->saveLayer(&layerPaint);
+
+    // Draw 1: translate only
+    Paint paint;
+    paint.setColor(Color::FromRGBA(100, 200, 255));
+    canvas->save();
+    canvas->translate(50, 50);
+    canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+    canvas->restore();
+
+    // Draw 2: different translate — absolute matrix should be translate(250, 50),
+    // NOT translate(50,50) * translate(250,50) which preConcat would produce.
+    paint.setColor(Color::FromRGBA(255, 180, 100));
+    canvas->save();
+    canvas->translate(250, 50);
+    canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+    canvas->restore();
+
+    // Draw 3: translate + rotate
+    paint.setColor(Color::FromRGBA(150, 255, 150));
+    canvas->save();
+    canvas->translate(450, 100);
+    canvas->rotate(45);
+    canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
+    canvas->restore();
+
+    // Draw 4: translate + scale
+    paint.setColor(Color::FromRGBA(255, 150, 255));
+    canvas->save();
+    canvas->translate(150, 250);
+    canvas->scale(1.5f, 1.5f);
+    canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+    canvas->restore();
+
+    canvas->restore();  // end saveLayer
+  }
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/InnerShadowMultipleMatrices"));
+}
+
 TGFX_TEST(PDFExportTest, DstAssignColorSpace) {
   ContextScope scope;
   auto context = scope.getContext();
