@@ -19,7 +19,6 @@
 #import "TGFXView.h"
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
-#include "tgfx/core/Point.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 
