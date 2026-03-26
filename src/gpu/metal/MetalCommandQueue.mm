@@ -31,6 +31,9 @@ MetalCommandQueue::MetalCommandQueue(MetalGPU* metalGPU) : gpu(metalGPU) {
 }
 
 MetalCommandQueue::~MetalCommandQueue() {
+  // Wait for the last submitted command buffer to complete before releasing, ensuring all
+  // async completion handlers (which capture `this`) have fired before the object is destroyed.
+  [lastSubmittedCommandBuffer waitUntilCompleted];
   [lastSubmittedCommandBuffer release];
   [commandQueue release];
 }
