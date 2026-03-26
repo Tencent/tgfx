@@ -1007,9 +1007,11 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     backgroundRect.scale(scale, scale);
     auto backgroundMatrix = globalToLocalMatrix.asMatrix();
     backgroundMatrix.postScale(scale, scale);
-    if (auto backgroundContext = createBackgroundContext(
-            context, backgroundRect, backgroundMatrix, bounds == clippedBounds,
-            surface->colorSpace(), surface->sampleCount())) {
+    auto colorSpace = surface ? surface->colorSpace() : nullptr;
+    auto sampleCount = surface ? surface->sampleCount() : 1;
+    if (auto backgroundContext =
+            createBackgroundContext(context, backgroundRect, backgroundMatrix,
+                                    bounds == clippedBounds, colorSpace, sampleCount)) {
       auto backgroundCanvas = backgroundContext->getCanvas();
       auto actualMatrix = backgroundCanvas->getMatrix();
       actualMatrix.preConcat(localToGlobalMatrix.asMatrix());
