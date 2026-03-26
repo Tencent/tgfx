@@ -218,7 +218,7 @@ class Context {
   std::deque<std::shared_ptr<DrawingBuffer>> pendingDrawingBuffers = {};
 
 #if DEBUG
-  std::unique_ptr<SingleOwner> singleOwner;
+  std::unique_ptr<SingleOwner> singleOwner = nullptr;
   friend class Device;
 #endif
 };
