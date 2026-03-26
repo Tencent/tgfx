@@ -21,6 +21,7 @@
 #include <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
 #include <atomic>
+#include <vector>
 #include "tgfx/gpu/CommandQueue.h"
 
 namespace tgfx {
@@ -78,7 +79,7 @@ class MetalCommandQueue : public CommandQueue {
   id<MTLCommandBuffer> lastSubmittedCommandBuffer = nil;
   std::shared_ptr<MetalSemaphore> pendingSignalSemaphore = nullptr;
   std::shared_ptr<MetalSemaphore> pendingWaitSemaphore = nullptr;
-  id<CAMetalDrawable> pendingDrawable = nil;
+  std::vector<id<CAMetalDrawable>> pendingDrawables = {};
   std::atomic<int64_t> _completedFrameTime = {0};
 };
 

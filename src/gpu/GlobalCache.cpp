@@ -92,6 +92,14 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
 
   auto& uniformBufferPacket = *activePacket;
 
+  auto getAverageUniformBufferSize = [this]() {
+    size_t totalUniformBufferSize = 0;
+    for (const auto& packet : uniformBufferPool) {
+      totalUniformBufferSize += packet.gpuBuffers.size();
+    }
+    return (totalUniformBufferSize + uniformBufferPool.size() - 1) / uniformBufferPool.size();
+  };
+
   if (uniformBufferPacket.gpuBuffers.empty()) {
     auto buffer = context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
     if (buffer == nullptr) {
@@ -104,6 +112,7 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
     uniformBufferPacket.gpuBuffers.emplace_back(std::move(buffer));
     uniformBufferPacket.bufferIndex = 0;
     uniformBufferPacket.cursor = 0;
+    maxUniformBufferTracker.addValue(getAverageUniformBufferSize());
   }
 
   // Check if the active packet has enough space
@@ -130,6 +139,7 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
       return nullptr;
     }
     uniformBufferPacket.gpuBuffers.emplace_back(std::move(buffer));
+    maxUniformBufferTracker.addValue(getAverageUniformBufferSize());
   }
 
   *lastBufferOffset = uniformBufferPacket.cursor;
@@ -141,7 +151,6 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
 void GlobalCache::resetUniformBuffer() {
   // Record the frame timestamp for the active packet before releasing it.
   activePacket->frameTime = context->gpu()->queue()->frameTime();
-  maxUniformBufferTracker.addValue(activePacket->gpuBuffers.size());
 
   // Find a completed packet from the pool to reuse.
   auto completed = context->gpu()->queue()->completedFrameTime();
