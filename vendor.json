@@ -279,7 +279,8 @@
         ],
         "platforms": [
           "mac",
-          "ios"
+          "ios",
+          "win"
         ]
       }
     },
@@ -298,6 +299,23 @@
         "platforms": [
           "mac",
           "ios"
+        ]
+      }
+    },
+    {
+      "name": "SPIRV-Cross",
+      "cmake": {
+        "targets": [
+          "spirv-cross-core",
+          "spirv-cross-glsl",
+          "spirv-cross-hlsl"
+        ],
+        "arguments": [
+          "-DSPIRV_CROSS_ENABLE_TESTS=OFF",
+          "-DCMAKE_CXX_FLAGS=\"-w\""
+        ],
+        "platforms": [
+          "win"
         ]
       }
     }

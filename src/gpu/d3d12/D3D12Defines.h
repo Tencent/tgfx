@@ -22,47 +22,18 @@
 
 namespace tgfx {
 
-// DXGI_FORMAT values (from dxgiformat.h)
-// Use #ifndef guards to avoid redefinition when the Windows SDK headers are also included.
-#ifndef DXGI_FORMAT_UNKNOWN
-#define DXGI_FORMAT_UNKNOWN 0
-#endif
-
-#ifndef DXGI_FORMAT_R8_UNORM
-#define DXGI_FORMAT_R8_UNORM 61
-#endif
-
-#ifndef DXGI_FORMAT_A8_UNORM
-#define DXGI_FORMAT_A8_UNORM 65
-#endif
-
-#ifndef DXGI_FORMAT_R8G8_UNORM
-#define DXGI_FORMAT_R8G8_UNORM 49
-#endif
-
-#ifndef DXGI_FORMAT_R8G8B8A8_UNORM
-#define DXGI_FORMAT_R8G8B8A8_UNORM 28
-#endif
-
-#ifndef DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
-#define DXGI_FORMAT_R8G8B8A8_UNORM_SRGB 29
-#endif
-
-#ifndef DXGI_FORMAT_B8G8R8A8_UNORM
-#define DXGI_FORMAT_B8G8R8A8_UNORM 87
-#endif
-
-#ifndef DXGI_FORMAT_B8G8R8A8_UNORM_SRGB
-#define DXGI_FORMAT_B8G8R8A8_UNORM_SRGB 91
-#endif
-
-#ifndef DXGI_FORMAT_D24_UNORM_S8_UINT
-#define DXGI_FORMAT_D24_UNORM_S8_UINT 45
-#endif
-
-#ifndef DXGI_FORMAT_D32_FLOAT_S8X24_UINT
-#define DXGI_FORMAT_D32_FLOAT_S8X24_UINT 20
-#endif
+// DXGI_FORMAT values (from dxgiformat.h). Defined as constexpr constants instead of #define macros
+// to avoid conflicts with the Windows SDK's DXGI_FORMAT enum when both headers are included.
+static constexpr unsigned DXGI_FORMAT_UNKNOWN = 0;
+static constexpr unsigned DXGI_FORMAT_D32_FLOAT_S8X24_UINT = 20;
+static constexpr unsigned DXGI_FORMAT_R8G8B8A8_UNORM = 28;
+static constexpr unsigned DXGI_FORMAT_R8G8B8A8_UNORM_SRGB = 29;
+static constexpr unsigned DXGI_FORMAT_D24_UNORM_S8_UINT = 45;
+static constexpr unsigned DXGI_FORMAT_R8G8_UNORM = 49;
+static constexpr unsigned DXGI_FORMAT_R8_UNORM = 61;
+static constexpr unsigned DXGI_FORMAT_A8_UNORM = 65;
+static constexpr unsigned DXGI_FORMAT_B8G8R8A8_UNORM = 87;
+static constexpr unsigned DXGI_FORMAT_B8G8R8A8_UNORM_SRGB = 91;
 
 inline PixelFormat DXGIFormatToPixelFormat(unsigned dxgiFormat) {
   switch (dxgiFormat) {

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Backend.h"
+#include "d3d12/D3D12Defines.h"
 #include "metal/MetalDefines.h"
 #include "opengl/GLDefines.h"
 
@@ -59,6 +60,9 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
     case Backend::Metal:
       metalInfo = that.metalInfo;
       break;
+    case Backend::D3D12:
+      d3d12Info = that.d3d12Info;
+      break;
     default:
       break;
   }
@@ -74,6 +78,8 @@ PixelFormat BackendTexture::format() const {
       return GLSizeFormatToPixelFormat(glInfo.format);
     case Backend::Metal:
       return MetalPixelFormatToPixelFormat(metalInfo.format);
+    case Backend::D3D12:
+      return DXGIFormatToPixelFormat(d3d12Info.format);
     default:
       break;
   }
@@ -96,6 +102,14 @@ bool BackendTexture::getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) con
   return true;
 }
 
+bool BackendTexture::getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const {
+  if (!isValid() || _backend != Backend::D3D12) {
+    return false;
+  }
+  *d3d12TextureInfo = d3d12Info;
+  return true;
+}
+
 BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& that) {
   if (!that.isValid()) {
     _width = _height = 0;
@@ -110,6 +124,9 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
       break;
     case Backend::Metal:
       metalInfo = that.metalInfo;
+      break;
+    case Backend::D3D12:
+      d3d12Info = that.d3d12Info;
       break;
     default:
       break;
@@ -126,6 +143,8 @@ PixelFormat BackendRenderTarget::format() const {
       return GLSizeFormatToPixelFormat(glInfo.format);
     case Backend::Metal:
       return MetalPixelFormatToPixelFormat(metalInfo.format);
+    case Backend::D3D12:
+      return DXGIFormatToPixelFormat(d3d12Info.format);
     default:
       break;
   }
@@ -148,6 +167,14 @@ bool BackendRenderTarget::getMetalTextureInfo(MetalTextureInfo* metalTextureInfo
   return true;
 }
 
+bool BackendRenderTarget::getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const {
+  if (!isValid() || _backend != Backend::D3D12) {
+    return false;
+  }
+  *d3d12TextureInfo = d3d12Info;
+  return true;
+}
+
 BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
   _backend = that._backend;
   switch (that._backend) {
@@ -156,6 +183,9 @@ BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
       break;
     case Backend::Metal:
       metalSyncInfo = that.metalSyncInfo;
+      break;
+    case Backend::D3D12:
+      d3d12SyncInfo = that.d3d12SyncInfo;
       break;
     default:
       break;
@@ -169,6 +199,8 @@ bool BackendSemaphore::isInitialized() const {
       return glSyncInfo.sync != nullptr;
     case Backend::Metal:
       return metalSyncInfo.event != nullptr;
+    case Backend::D3D12:
+      return d3d12SyncInfo.fence != nullptr;
     default:
       break;
   }
@@ -188,6 +220,14 @@ bool BackendSemaphore::getMetalSync(MetalSyncInfo* metalInfo) const {
     return false;
   }
   *metalInfo = metalSyncInfo;
+  return true;
+}
+
+bool BackendSemaphore::getD3D12Sync(D3D12SyncInfo* d3d12Info) const {
+  if (_backend != Backend::D3D12 || d3d12SyncInfo.fence == nullptr) {
+    return false;
+  }
+  *d3d12Info = d3d12SyncInfo;
   return true;
 }
 
