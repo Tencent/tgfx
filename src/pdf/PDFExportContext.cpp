@@ -736,7 +736,9 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
       PlaybackContext playbackContext = {};
       Matrix currentMatrix = Matrix::I();
       for (const auto& record : picture->records) {
-        record->playback(this, &playbackContext);
+        if (!innerShadowFilter->shadowOnly) {
+          record->playback(this, &playbackContext);
+        }
         if (record->type() == PictureRecordType::SetMatrix) {
           const auto setMatrix = static_cast<const SetMatrix*>(record.get());
           currentMatrix = setMatrix->matrix;
