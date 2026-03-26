@@ -150,7 +150,8 @@ class PDFExportContext : public DrawContext {
 
   void drawInnerShadowAfterLayer(const PictureRecord* record,
                                  const InnerShadowImageFilter* innerShadowFilter,
-                                 const Matrix& matrix, const ClipStack& clip);
+                                 const Matrix& matrix, const ClipStack& clip,
+                                 const Matrix& currentMatrix);
 
   void drawBlurLayer(const std::shared_ptr<Picture>& picture,
                      const std::shared_ptr<ImageFilter>& imageFilter, const Matrix& matrix,

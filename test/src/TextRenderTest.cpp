@@ -164,7 +164,7 @@ TGFX_TEST(TextRenderTest, textEmojiMixedBlendModes1) {
     auto blendMode = blendModes[modeIndex];
     auto modeName = blendModeNames[modeIndex];
 
-    float y = startY + modeIndex * lineHeight;
+    float y = startY + static_cast<float>(modeIndex) * lineHeight;
     float x = 20.f;
 
     // Draw blend mode label
@@ -246,8 +246,8 @@ TGFX_TEST(TextRenderTest, textEmojiMixedBlendModes2) {
     auto& text = pair.first;
     auto blendMode = pair.second;
 
-    float x = 50 + (i % 3) * 180;
-    float y = 120 + (i / 3) * 120;
+    float x = 50 + static_cast<float>(i % 3) * 180;
+    float y = 120 + static_cast<float>(i / 3) * 120;
 
     // Process text using TextShaper for proper emoji handling
     auto positionedGlyphs = TextShaper::Shape(text, serifTypeface);
@@ -313,9 +313,11 @@ TGFX_TEST(TextRenderTest, complexEmojiTextBlending) {
       Paint rectPaint;
       auto hue = (i * 45 + j * 30) % 360;
       // Convert HSL to RGB approximation
-      auto r = static_cast<uint8_t>(128 + 100 * sin(hue * 3.14159f / 180.0f));
-      auto g = static_cast<uint8_t>(128 + 100 * sin((hue + 120) * 3.14159f / 180.0f));
-      auto b = static_cast<uint8_t>(128 + 100 * sin((hue + 240) * 3.14159f / 180.0f));
+      auto r = static_cast<uint8_t>(128 + 100 * sin(static_cast<float>(hue) * 3.14159f / 180.0f));
+      auto g =
+          static_cast<uint8_t>(128 + 100 * sin(static_cast<float>(hue + 120) * 3.14159f / 180.0f));
+      auto b =
+          static_cast<uint8_t>(128 + 100 * sin(static_cast<float>(hue + 240) * 3.14159f / 180.0f));
       auto color = Color::FromRGBA(r, g, b, 77);  // 0.3f * 255
       rectPaint.setColor(color);
       canvas->drawRect(Rect::MakeXYWH(i * 100, j * 100, 100, 100), rectPaint);
@@ -340,8 +342,8 @@ TGFX_TEST(TextRenderTest, complexEmojiTextBlending) {
     auto& text = complexTexts[i];
     auto blendMode = complexBlendModes[i];
 
-    float x = 20 + (i % 2) * 380;
-    float y = 80 + (i / 2) * 100;
+    float x = 20 + static_cast<float>(i % 2) * 380;
+    float y = 80 + static_cast<float>(i / 2) * 100;
 
     // Process text using TextShaper for proper emoji handling
     auto positionedGlyphs = TextShaper::Shape(text, serifTypeface);
@@ -434,7 +436,7 @@ TGFX_TEST(TextRenderTest, emojiTextStrokeBlending) {
 
   for (size_t i = 0; i < strokeBlendModes.size(); ++i) {
     auto blendMode = strokeBlendModes[i];
-    float y = 80 + i * 80;
+    float y = 80 + static_cast<float>(i) * 80;
 
     // Process emoji text using TextShaper
     auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, emojiTypeface);
@@ -564,8 +566,8 @@ TGFX_TEST(TextRenderTest, textEmojiOverlayBlendModes) {
     auto blendMode = blendModes[modeIndex];
     auto modeName = blendModeNames[modeIndex];
 
-    float y = startY + (modeIndex / 3) * lineHeight;
-    float x = 50.f + (modeIndex % 3) * 380.f;
+    float y = startY + static_cast<float>(modeIndex / 3) * lineHeight;
+    float x = 50.f + static_cast<float>(modeIndex % 3) * 380.f;
 
     // Draw blend mode label
     Paint labelPaint;

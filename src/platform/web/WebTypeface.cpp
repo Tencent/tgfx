@@ -19,6 +19,7 @@
 #include "WebTypeface.h"
 #include <vector>
 #include "WebScalerContext.h"
+#include "core/AdvancedTypefaceInfo.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/UTF.h"
