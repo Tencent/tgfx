@@ -39,6 +39,8 @@
   self = [super initWithCoder:coder];
   if (self) {
     self.device = MTLCreateSystemDefaultDevice();
+    self.paused = YES;
+    self.enableSetNeedsDisplay = NO;
   }
   return self;
 }
