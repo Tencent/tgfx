@@ -87,6 +87,12 @@ static const float MaxZoom = 1000.0f;
   [self.displayLink setPaused:NO];
 }
 
+- (void)viewWillDisappear:(BOOL)animated {
+  [super viewWillDisappear:animated];
+  [self.displayLink invalidate];
+  self.displayLink = nil;
+}
+
 - (void)dealloc {
   [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
