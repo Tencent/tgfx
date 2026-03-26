@@ -583,8 +583,8 @@ TGFX_TEST(ImageRenderTest, drawScaleImage) {
   auto pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height());
   pictureImage = pictureImage->makeRasterized();
   auto scale = 0.5f;
-  auto width = static_cast<int>(image->width() * scale);
-  auto height = static_cast<int>(image->height() * scale);
+  auto width = static_cast<int>(static_cast<float>(image->width()) * scale);
+  auto height = static_cast<int>(static_cast<float>(image->height()) * scale);
   auto matrix = Matrix::MakeScale(scale);
   auto surface = Surface::Make(context, width, height);
   canvas = surface->getCanvas();
@@ -609,8 +609,8 @@ TGFX_TEST(ImageRenderTest, drawScaleImage) {
   pixmap.reset();
   EXPECT_TRUE(result);
   auto bufferImage = Image::MakeFrom(bitmap);
-  width = static_cast<int>(bufferImage->width() * scale);
-  height = static_cast<int>(bufferImage->height() * scale);
+  width = static_cast<int>(static_cast<float>(bufferImage->width()) * scale);
+  height = static_cast<int>(static_cast<float>(bufferImage->height()) * scale);
   scaleImage = bufferImage->makeScaled(width, height);
   canvas->clear();
   canvas->setMatrix(matrix);
