@@ -19,7 +19,6 @@
 #include "OpsCompositor.h"
 #include "core/MeshBase.h"
 #include "core/PathRef.h"
-#include "core/SmallVector.h"
 #include "core/VertexMesh.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -721,7 +720,8 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
 
   // Stage 3: Iterate through valid elements.
   auto& elements = clipStack.elements();
-  ClipElementList elementsForMask;
+  std::vector<const ClipElement*> elementsForMask;
+  elementsForMask.reserve(elements.size() - clipStack.oldestValidIndex());
   PlacementPtr<FragmentProcessor> clipFP = nullptr;
   for (size_t i = clipStack.oldestValidIndex(); i < elements.size(); ++i) {
     auto& element = elements[i];
@@ -771,7 +771,7 @@ PlacementPtr<FragmentProcessor> OpsCompositor::makeAnalyticFP(
 }
 
 PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(
-    const ClipElementList& elements, uint32_t uniqueID, const Rect& clipBound,
+    const std::vector<const ClipElement*>& elements, uint32_t uniqueID, const Rect& clipBound,
     PlacementPtr<FragmentProcessor> inputFP) {
   // OpsCompositor is bound to a single RenderTarget, so using uniqueID alone as the cache key
   // (without clipBound) is safe.
@@ -787,8 +787,8 @@ PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(
   return makeMaskFP(clipTexture, clipBound, std::move(inputFP));
 }
 
-std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(const ClipElementList& elements,
-                                                             const Rect& bounds) const {
+std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
+    const std::vector<const ClipElement*>& elements, const Rect& bounds) const {
   const auto width = FloatSaturateToInt(bounds.width());
   const auto height = FloatSaturateToInt(bounds.height());
   const auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
