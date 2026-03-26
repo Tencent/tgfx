@@ -306,17 +306,19 @@
         "rasterize_path_texture": "c475bfb"
     },
     "PDFTest": {
-        "AssignColorSpace": "5133a852",
-        "Complex": "880d5a6c",
+        "AssignColorSpace": "1c876ab37",
+        "Complex": "1c876ab37",
         "DrawColor": "79ce3a28",
         "DrawShape": "79ce3a28",
         "DrawShapeStroke": "79ce3a28",
-        "DstAssignColorSpace": "5133a852",
-        "DstColorSpace": "5133a852",
-        "EmojiText": "79ce3a28",
+        "DstAssignColorSpace": "1c876ab37",
+        "DstColorSpace": "1c876ab37",
+        "EmojiText": "1c876ab37",
         "Empty": "79ce3a28",
         "EmptyMultiPage": "79ce3a28",
-        "Image": "79ce3a28",
+        "Image": "d410635b",
+        "InnerShadow": "c08322f1a",
+        "InnerShadowMultipleMatrices": "1c876ab37",
         "SimpleText": "a173610f9"
     },
     "PathShapeTest": {
