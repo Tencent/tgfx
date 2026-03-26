@@ -874,17 +874,18 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
   auto strokeArray = allocator->makeArray(std::move(strokes));
   // For round stroke, MSAA also needs to use AA vertex provider because the round corners
   // are controlled by shader (step+discard), not real geometry edges.
-  if (aaType != AAType::None && isRound) {
-    return allocator->make<AARoundStrokeRectsVertexProvider>(
-        std::move(rectArray), std::move(uvRectArray), std::move(strokeArray), aaType, needUVCoord,
-        hasColor, allocator->addReference(), std::move(colorSpace));
-  }
-  if (aaType == AAType::Coverage) {
+  // For angular stroke (Miter/Bevel), only Coverage mode needs AA vertex provider.
+  const auto needAA = aaType == AAType::Coverage || (aaType == AAType::MSAA && isRound);
+  if (needAA) {
+    if (isRound) {
+      return allocator->make<AARoundStrokeRectsVertexProvider>(
+          std::move(rectArray), std::move(uvRectArray), std::move(strokeArray), aaType, needUVCoord,
+          hasColor, allocator->addReference(), std::move(colorSpace));
+    }
     return allocator->make<AAAngularStrokeRectsVertexProvider>(
         std::move(rectArray), std::move(uvRectArray), std::move(strokeArray), aaType, needUVCoord,
         hasColor, allocator->addReference(), std::move(colorSpace));
   }
-
   if (isRound) {
     return allocator->make<NonAARoundStrokeRectsVertexProvider>(
         std::move(rectArray), std::move(uvRectArray), std::move(strokeArray), aaType, needUVCoord,
