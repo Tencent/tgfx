@@ -57,7 +57,7 @@ static Path MakePentagonPath(float radius) {
   Path path = {};
   constexpr int sides = 5;
   for (int i = 0; i < sides; i++) {
-    float angle = -M_PI_F / 2.0f + i * 2.0f * M_PI_F / sides;
+    float angle = -M_PI_F / 2.0f + static_cast<float>(i) * 2.0f * M_PI_F / static_cast<float>(sides);
     float x = radius * std::cos(angle);
     float y = radius * std::sin(angle);
     if (i == 0) {
@@ -653,7 +653,7 @@ TGFX_TEST(CanvasTest, BlendFormula) {
   texturePath.lineTo(100, 170);
   for (int i = 0; i < 100; ++i) {
     // make sure the path will be rasterized as coverage
-    texturePath.lineTo(90 + i, 50 + i);
+    texturePath.lineTo(90.0f + static_cast<float>(i), 50.0f + static_cast<float>(i));
   }
 
   Path trianglePath = {};
@@ -662,7 +662,7 @@ TGFX_TEST(CanvasTest, BlendFormula) {
 
   for (int i = 0; i < 100; ++i) {
     // make sure the path will be rasterized as coverage
-    texturePath.lineTo(90 + i, 50 + i);
+    texturePath.lineTo(90.0f + static_cast<float>(i), 50.0f + static_cast<float>(i));
   }
   Paint strokePaint = {};
   strokePaint.setColor(Color::FromRGBA(255, 0, 0, 128));
@@ -720,8 +720,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
   auto image = MakeImage("resources/assets/GenMesh.png");
   int meshNumH = 5;
   int meshNumV = 5;
-  float meshWidth = image->width() / meshNumH;
-  float meshHeight = image->height() / meshNumV;
+  auto meshWidth = static_cast<float>(image->width()) / static_cast<float>(meshNumH);
+  auto meshHeight = static_cast<float>(image->height()) / static_cast<float>(meshNumV);
   float scale = 0.9f;
   Paint paint;
   paint.setAntiAlias(false);
@@ -730,9 +730,11 @@ TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
   options.minFilterMode = FilterMode::Linear;
   for (int i = 0; i < meshNumH; i++) {
     for (int j = 0; j < meshNumV; j++) {
-      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
-      Rect dstRect = Rect::MakeXYWH(i * meshWidth * scale, j * meshHeight * scale,
-                                    meshWidth * scale, meshHeight * scale);
+      Rect srcRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth,
+                                    static_cast<float>(j) * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth * scale,
+                                    static_cast<float>(j) * meshHeight * scale, meshWidth * scale,
+                                    meshHeight * scale);
       canvas->drawImageRect(image, srcRect, dstRect, options, &paint, SrcRectConstraint::Fast);
     }
   }
@@ -786,8 +788,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
   paint.setAntiAlias(false);
   constexpr int meshNumH = 4;
   constexpr int meshNumV = 4;
-  float meshWidth = image->width() / meshNumH;
-  float meshHeight = image->height() / meshNumV;
+  auto meshWidth = static_cast<float>(image->width()) / static_cast<float>(meshNumH);
+  auto meshHeight = static_cast<float>(image->height()) / static_cast<float>(meshNumV);
   SamplingOptions options;
   options.magFilterMode = FilterMode::Linear;
   options.minFilterMode = FilterMode::Linear;
@@ -808,7 +810,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
        {meshWidth * 3, meshHeight * 3}}};
   for (int i = 0; i < meshNumH; i++)
     for (int j = 0; j < meshNumV; j++) {
-      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect srcRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth,
+                                    static_cast<float>(j) * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
                                     meshWidth * scale, meshHeight * scale);
       canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
@@ -819,7 +822,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
   options.mipmapMode = MipmapMode::Linear;
   for (int i = 0; i < meshNumH; i++)
     for (int j = 0; j < meshNumV; j++) {
-      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect srcRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth,
+                                    static_cast<float>(j) * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
                                     meshWidth * scale, meshHeight * scale);
       canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
@@ -830,7 +834,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
   options.mipmapMode = MipmapMode::Nearest;
   for (int i = 0; i < meshNumH; i++)
     for (int j = 0; j < meshNumV; j++) {
-      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect srcRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth,
+                                    static_cast<float>(j) * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
                                     meshWidth * scale, meshHeight * scale);
       canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
@@ -854,8 +859,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   paint.setAntiAlias(false);
   constexpr int meshNumH = 4;
   constexpr int meshNumV = 4;
-  float meshWidth = image->width() / meshNumH;
-  float meshHeight = image->height() / meshNumV;
+  auto meshWidth = static_cast<float>(image->width()) / static_cast<float>(meshNumH);
+  auto meshHeight = static_cast<float>(image->height()) / static_cast<float>(meshNumV);
   SamplingOptions options;
   options.magFilterMode = FilterMode::Nearest;
   options.minFilterMode = FilterMode::Nearest;
@@ -876,7 +881,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
        {meshWidth * 3, meshHeight * 3}}};
   for (int i = 0; i < meshNumH; i++)
     for (int j = 0; j < meshNumV; j++) {
-      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect srcRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth,
+                                    static_cast<float>(j) * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
       canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
                             SrcRectConstraint::Strict);
@@ -887,7 +893,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   options.mipmapMode = MipmapMode::Linear;
   for (int i = 0; i < meshNumH; i++)
     for (int j = 0; j < meshNumV; j++) {
-      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect srcRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth,
+                                    static_cast<float>(j) * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
       canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
                             SrcRectConstraint::Strict);
@@ -898,7 +905,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   options.mipmapMode = MipmapMode::Nearest;
   for (int i = 0; i < meshNumH; i++)
     for (int j = 0; j < meshNumV; j++) {
-      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect srcRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth,
+                                    static_cast<float>(j) * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
       canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
                             SrcRectConstraint::Strict);

@@ -25,7 +25,10 @@
 #include "base/TGFXTest.h"
 #include "core/utils/MD5.h"
 #include "core/utils/USE.h"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-literal-operator"
 #include "nlohmann/json.hpp"
+#pragma clang diagnostic pop
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Surface.h"
 #include "utils/ProjectPath.h"
