@@ -53,7 +53,7 @@ class Layer3DContext {
                                               const Rect& renderRect, float contentScale,
                                               std::shared_ptr<ColorSpace> colorSpace,
                                               std::shared_ptr<BackgroundContext> backgroundContext,
-                                              int sampleCount = 1);
+                                              int sampleCount);
 
   Layer3DContext(const Rect& renderRect, float contentScale,
                  std::shared_ptr<ColorSpace> colorSpace);

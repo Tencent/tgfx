@@ -3125,7 +3125,7 @@ TGFX_TEST(LayerTest, Layer3DContextAPI) {
 
   // Test Render3DContext creation (opaqueMode = false)
   auto render3DContext =
-      Layer3DContext::Make(false, context, renderRect, contentScale, colorSpace, nullptr);
+      Layer3DContext::Make(false, context, renderRect, contentScale, colorSpace, nullptr, 1);
   ASSERT_TRUE(render3DContext != nullptr);
   EXPECT_TRUE(render3DContext->isFinished());
 
@@ -3145,7 +3145,7 @@ TGFX_TEST(LayerTest, Layer3DContextAPI) {
 
   // Test Opaque3DContext creation (opaqueMode = true)
   auto opaque3DContext =
-      Layer3DContext::Make(true, context, renderRect, contentScale, colorSpace, nullptr);
+      Layer3DContext::Make(true, context, renderRect, contentScale, colorSpace, nullptr, 1);
   ASSERT_TRUE(opaque3DContext != nullptr);
   EXPECT_TRUE(opaque3DContext->isFinished());
 
