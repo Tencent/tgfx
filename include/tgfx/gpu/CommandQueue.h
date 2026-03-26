@@ -27,8 +27,6 @@
 #include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
-class Context;
-
 /**
  * CommandQueue is an interface for managing the execution of encoded commands on the GPU.
  * The primary queue can be accessed via the GPU::queue() method.
@@ -83,36 +81,18 @@ class CommandQueue {
   virtual void waitUntilCompleted() = 0;
 
  protected:
-  /**
-   * Returns the time point recorded at the start of the current frame. This value is set by
-   * advanceFrameTime() and is used to timestamp resources and uniform buffer packets during
-   * encoding. Only accessed on the context-lock thread.
-   */
   std::chrono::steady_clock::time_point frameTime() const {
     return _frameTime;
   }
 
-  /**
-   * Returns the time point of the most recent frame whose GPU commands have fully completed.
-   * Subclasses should override this to reflect asynchronous GPU completion (e.g., via Metal
-   * completion handlers). The default implementation returns the current frame time, which assumes
-   * synchronous execution (e.g., OpenGL after glFlush). Only accessed on the context-lock thread.
-   */
   virtual std::chrono::steady_clock::time_point completedFrameTime() const {
     return _frameTime;
   }
 
-  /**
-   * Records the current wall-clock time as the start of a new frame. Called once per frame before
-   * encoding begins. Only accessed on the context-lock thread.
-   */
   void advanceFrameTime() {
     _frameTime = std::chrono::steady_clock::now();
   }
 
-  /**
-   * The time point recorded at the start of the current frame.
-   */
   std::chrono::steady_clock::time_point _frameTime = {};
 
  private:
