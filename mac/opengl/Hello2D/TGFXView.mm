@@ -26,7 +26,9 @@
 static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
                                       CVOptionFlags, CVOptionFlags*, void* userInfo) {
   TGFXView* view = (__bridge TGFXView*)userInfo;
-  [view draw];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [view draw];
+  });
   return kCVReturnSuccess;
 }
 
