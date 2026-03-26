@@ -49,7 +49,7 @@ struct ConfigInfo {
   std::vector<int> colorSampleCounts;
 };
 
-enum class GLVendor { ARM, Google, Imagination, Intel, Qualcomm, NVIDIA, ATI, Other };
+enum class GLVendor { ARM, Google, Imagination, Intel, Qualcomm, NVIDIA, ATI, Apple, Other };
 
 class GLInfo {
  public:

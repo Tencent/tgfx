@@ -107,8 +107,8 @@ std::shared_ptr<WebGLDevice> WebGLDevice::Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE w
   }
   // Activate WEBGL_debug_renderer_info extension via JavaScript. This must be done before
   // GLInterface::GetNative() so that glGetString(GL_UNMASKED_VENDOR/RENDERER_WEBGL) can work.
-  emscripten::val::module_property("tgfx").call<void>(
-      "activateDebugRendererInfo", emscripten::val::module_property("GL"));
+  emscripten::val::module_property("tgfx").call<void>("activateDebugRendererInfo",
+                                                      emscripten::val::module_property("GL"));
   std::shared_ptr<WebGLDevice> device = nullptr;
   auto interface = GLInterface::GetNative();
   if (interface != nullptr) {

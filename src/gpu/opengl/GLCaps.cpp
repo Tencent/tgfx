@@ -62,7 +62,8 @@ static GLVendor GetVendorFromString(const char* vendorString) {
     if (0 == strcmp(vendorString, "Imagination Technologies")) {
       return GLVendor::Imagination;
     }
-    if (0 == strncmp(vendorString, "Intel ", 6) || 0 == strcmp(vendorString, "Intel")) {
+    if (0 == strncmp(vendorString, "Intel ", 6) || 0 == strcmp(vendorString, "Intel") ||
+        0 == strcmp(vendorString, "Google Inc. (Intel)")) {
       return GLVendor::Intel;
     }
     if (0 == strcmp(vendorString, "Qualcomm")) {
@@ -73,6 +74,9 @@ static GLVendor GetVendorFromString(const char* vendorString) {
     }
     if (0 == strcmp(vendorString, "ATI Technologies Inc.")) {
       return GLVendor::ATI;
+    }
+    if (0 == strcmp(vendorString, "Apple") || 0 == strcmp(vendorString, "Google Inc. (Apple)")) {
+      return GLVendor::Apple;
     }
   }
   return GLVendor::Other;
