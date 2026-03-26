@@ -8,7 +8,7 @@ const xcodeGen = require("path").resolve(__dirname, "../third_party/vendor_tools
 const extraArgs = process.argv.slice(2).join(" ");
 
 childProcess.execSync(
-    `node "${xcodeGen}" ../ -w -DTGFX_BUILD_HELLO2D=ON -DTGFX_USE_METAL=ON -p ios -o metal ${extraArgs}`,
+    `node "${xcodeGen}" ../ -w -DTGFX_BUILD_HELLO2D=ON -DTGFX_USE_METAL=ON -DDEPLOYMENT_TARGET=13.0 -p ios -o metal ${extraArgs}`,
     {stdio: "inherit"}
 );
 
