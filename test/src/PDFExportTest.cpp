@@ -526,10 +526,13 @@ TGFX_TEST(PDFExportTest, InnerShadowMultipleMatrices) {
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   auto canvas = document->beginPage(600.f, 400.f);
   {
-    // Use explicit saveLayer with InnerShadow filter so that multiple draw
-    // operations with different matrices end up in a single Picture, producing
-    // multiple SetMatrix records. This verifies that the matrix is tracked as
-    // an absolute value (direct assignment) rather than accumulated (preConcat).
+    // Use explicit saveLayer with InnerShadow filter so that multiple draw operations with
+    // different matrices are recorded into a single Picture. Each canvas->save/restore pair
+    // resets the matrix state, so the recorded SetMatrix values are absolute (e.g.,
+    // translate(50,50) then translate(250,50)). In drawLayer, the code tracks currentMatrix
+    // by direct assignment from SetMatrix records. If it incorrectly used preConcat instead,
+    // the second draw's matrix would become translate(50,50) * translate(250,50), causing
+    // wrong shadow offset and blur compensation.
     Paint layerPaint;
     layerPaint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(0, 0, 100)));
     canvas->saveLayer(&layerPaint);
