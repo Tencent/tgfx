@@ -20,9 +20,7 @@
 
 #include <chrono>
 #include <deque>
-#if DEBUG
 #include <memory>
-#endif
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Device.h"
 #include "tgfx/gpu/Recording.h"
@@ -41,9 +39,7 @@ class AtlasManager;
 class CommandBuffer;
 class ShaderCaps;
 class AtlasStrikeCache;
-#if DEBUG
 class SingleOwner;
-#endif
 
 /**
  * Context is responsible for creating and managing GPU resources, as well as issuing drawing
