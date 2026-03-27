@@ -79,8 +79,8 @@ class QGLWindow : public Window {
   std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
   std::shared_ptr<RenderTargetProxy> presentingProxy = nullptr;
 
-  explicit QGLWindow(QQuickItem* quickItem, bool singleBufferMode = false,
-                     std::shared_ptr<ColorSpace> colorSpace = nullptr, int sampleCount = 1);
+  QGLWindow(QQuickItem* quickItem, bool singleBufferMode, std::shared_ptr<ColorSpace> colorSpace,
+            int sampleCount);
   std::shared_ptr<RenderTargetProxy> acquireTexture(Context* context, int width, int height);
   void reuseTexture(const std::shared_ptr<RenderTargetProxy>& proxy);
   void initDevice();

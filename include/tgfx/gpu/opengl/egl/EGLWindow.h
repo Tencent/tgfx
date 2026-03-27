@@ -54,7 +54,7 @@ class EGLWindow : public Window {
   EGLNativeWindowType nativeWindow;
   std::optional<int64_t> presentationTime = std::nullopt;
 
-  explicit EGLWindow(std::shared_ptr<Device> device,
-                     std::shared_ptr<ColorSpace> colorSpace = nullptr, int sampleCount = 1);
+  EGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
+            int sampleCount);
 };
 }  // namespace tgfx

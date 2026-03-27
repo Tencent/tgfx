@@ -38,7 +38,7 @@ std::shared_ptr<EGLWindow> EGLWindow::Current() {
   if (device == nullptr || device->eglSurface == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<EGLWindow>(new EGLWindow(device, device->colorSpace));
+  return std::shared_ptr<EGLWindow>(new EGLWindow(device, device->colorSpace, 1));
 }
 
 std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,

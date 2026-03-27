@@ -38,7 +38,7 @@ class WGLWindow : public Window {
  private:
   HWND nativeWindow = nullptr;
 
-  explicit WGLWindow(std::shared_ptr<Device> device,
-                     std::shared_ptr<ColorSpace> colorSpace = nullptr, int sampleCount = 1);
+  WGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
+            int sampleCount);
 };
 }  // namespace tgfx
