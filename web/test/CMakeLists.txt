@@ -120,13 +120,13 @@ else ()
     set(WEB_GRAPHICS_LINK_OPTIONS -sMAX_WEBGL_VERSION=2)
 endif ()
 
-# Async buffer mapping in WebGPU: No built-in synchronous support.
-# WebGPU buffer.mapAsync() is fully async and requires a promise-based or callback-based model.
-# Emscripten's Asyncify (WASM stack switching) would theoretically work but introduces
-# compatibility issues with Google Test's dynamic function dispatch and crashes with both
-# JSPI and traditional Asyncify modes.
-# Solution: Disable async mapping for now, rely on polling with a reasonable timeout.
-option(TGFX_USE_ASYNCIFY "Enable Asyncify for WebGPU async buffer mapping" OFF)
+# Asyncify enables synchronous C++ code to await JS Promises.
+# Required for WebGPU buffer.mapAsync() which is fully async. Without Asyncify, readPixels() will
+# timeout because the WASM busy-wait blocks the JS event loop preventing callbacks from firing.
+# Asyncify automatically instruments all code to allow suspend/resume at await points,
+# making it compatible with Google Test's virtual function dispatch (unlike JSPI which requires
+# explicit export declarations and fails with indirect calls).
+option(TGFX_USE_ASYNCIFY "Enable Asyncify for WebGPU async buffer mapping" ON)
 if (TGFX_USE_ASYNCIFY)
     set(ASYNCIFY_LINK_OPTIONS
         -sASYNCIFY=1
