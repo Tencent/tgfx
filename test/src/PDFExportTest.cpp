@@ -445,42 +445,50 @@ TGFX_TEST(PDFExportTest, InnerShadow) {
 
   // 1. InnerShadow with translate only
   EXPECT_TRUE(ComparePDF(makePDF([](Canvas* canvas) {
-    Paint paint;
-    canvas->translate(50, 50);
-    paint.setColor(Color::FromRGBA(100, 200, 255));
-    paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(0, 0, 100)));
-    canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
-  }), "PDFTest/InnerShadow_Translate"));
+                           Paint paint;
+                           canvas->translate(50, 50);
+                           paint.setColor(Color::FromRGBA(100, 200, 255));
+                           paint.setImageFilter(
+                               ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(0, 0, 100)));
+                           canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+                         }),
+                         "PDFTest/InnerShadow_Translate"));
 
   // 2. InnerShadow with translate + rotate + scale (covers all matrix types)
   EXPECT_TRUE(ComparePDF(makePDF([](Canvas* canvas) {
-    Paint paint;
-    canvas->translate(100, 100);
-    canvas->rotate(-30);
-    canvas->scale(0.7f, 0.7f);
-    paint.setColor(Color::FromRGBA(255, 255, 150));
-    paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(100, 100, 0)));
-    canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
-  }), "PDFTest/InnerShadow_TranslateRotateScale"));
+                           Paint paint;
+                           canvas->translate(100, 100);
+                           canvas->rotate(-30);
+                           canvas->scale(0.7f, 0.7f);
+                           paint.setColor(Color::FromRGBA(255, 255, 150));
+                           paint.setImageFilter(
+                               ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(100, 100, 0)));
+                           canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
+                         }),
+                         "PDFTest/InnerShadow_TranslateRotateScale"));
 
   // 3. InnerShadowOnly with translate
   EXPECT_TRUE(ComparePDF(makePDF([](Canvas* canvas) {
-    Paint paint;
-    canvas->translate(50, 50);
-    paint.setColor(Color::FromRGBA(200, 200, 200));
-    paint.setImageFilter(ImageFilter::InnerShadowOnly(8, 8, 6, 6, Color::FromRGBA(50, 0, 80)));
-    canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
-  }), "PDFTest/InnerShadowOnly_Translate"));
+                           Paint paint;
+                           canvas->translate(50, 50);
+                           paint.setColor(Color::FromRGBA(200, 200, 200));
+                           paint.setImageFilter(ImageFilter::InnerShadowOnly(
+                               8, 8, 6, 6, Color::FromRGBA(50, 0, 80)));
+                           canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+                         }),
+                         "PDFTest/InnerShadowOnly_Translate"));
 
   // 4. InnerShadowOnly with translate + rotate
   EXPECT_TRUE(ComparePDF(makePDF([](Canvas* canvas) {
-    Paint paint;
-    canvas->translate(100, 100);
-    canvas->rotate(30);
-    paint.setColor(Color::FromRGBA(200, 200, 200));
-    paint.setImageFilter(ImageFilter::InnerShadowOnly(8, 8, 6, 6, Color::FromRGBA(80, 50, 0)));
-    canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
-  }), "PDFTest/InnerShadowOnly_TranslateRotate"));
+                           Paint paint;
+                           canvas->translate(100, 100);
+                           canvas->rotate(30);
+                           paint.setColor(Color::FromRGBA(200, 200, 200));
+                           paint.setImageFilter(ImageFilter::InnerShadowOnly(
+                               8, 8, 6, 6, Color::FromRGBA(80, 50, 0)));
+                           canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
+                         }),
+                         "PDFTest/InnerShadowOnly_TranslateRotate"));
 }
 
 TGFX_TEST(PDFExportTest, InnerShadowMultipleMatrices) {
