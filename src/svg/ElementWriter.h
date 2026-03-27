@@ -52,7 +52,7 @@ class ElementWriter {
                 ResourceStore* bucket, std::shared_ptr<ColorSpace> targetColorSpace = nullptr,
                 std::shared_ptr<ColorSpace> assignColorSpace = nullptr);
   ElementWriter(const std::string& name, Context* context, SVGExportContext* svgContext,
-                XMLWriter* writer, ResourceStore* bucket, bool disableWarning, const MCState& state,
+                XMLWriter* writer, ResourceStore* bucket, bool disableWarning, const Matrix& matrix,
                 const Brush& brush, const Stroke* stroke = nullptr,
                 std::shared_ptr<ColorSpace> targetColorSpace = nullptr,
                 std::shared_ptr<ColorSpace> assignColorSpace = nullptr);

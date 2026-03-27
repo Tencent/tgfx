@@ -71,7 +71,7 @@ ElementWriter::ElementWriter(const std::string& name, const std::unique_ptr<XMLW
 
 ElementWriter::ElementWriter(const std::string& name, Context* context,
                              SVGExportContext* svgContext, XMLWriter* writer, ResourceStore* bucket,
-                             bool disableWarning, const MCState& state, const Brush& brush,
+                             bool disableWarning, const Matrix& matrix, const Brush& brush,
                              const Stroke* stroke, std::shared_ptr<ColorSpace> targetColorSpace,
                              std::shared_ptr<ColorSpace> assignColorSpace)
     : writer(writer), resourceStore(bucket), disableWarning(disableWarning),
@@ -84,8 +84,8 @@ ElementWriter::ElementWriter(const std::string& name, Context* context,
 
   addFillAndStroke(brush, stroke, resource);
 
-  if (!state.matrix.isIdentity()) {
-    addAttribute("transform", ToSVGTransform(state.matrix));
+  if (!matrix.isIdentity()) {
+    addAttribute("transform", ToSVGTransform(matrix));
   }
 }
 
@@ -945,9 +945,9 @@ void ElementWriter::addPictureImageMaskResources(const PictureImage* pictureImag
     writer->endElement();
   }
 
-  MCState state;
+  auto matrix = Matrix::I();
   if (pictureImage->matrix) {
-    state.matrix = *pictureImage->matrix;
+    matrix = *pictureImage->matrix;
   }
 
   writer->startElement("g");
@@ -957,7 +957,7 @@ void ElementWriter::addPictureImageMaskResources(const PictureImage* pictureImag
   if (!filterID.empty()) {
     writer->addAttribute("filter", filterID);
   }
-  svgContext->drawPicture(picture, state);
+  svgContext->drawPicture(picture, matrix, ClipStack());
   writer->endElement();
 }
 
