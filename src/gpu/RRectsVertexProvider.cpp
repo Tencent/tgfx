@@ -189,7 +189,7 @@ void RRectsVertexProvider::getAAVertices(float* vertices) const {
     reciprocalRadii[3] = std::min(reciprocalRadii[3], 1e6f);
     // On MSAA, bloat enough to guarantee any pixel that might be touched by the rRect has
     // full sample coverage.
-    float aaBloat = currentAAType == AAType::MSAA ? FLOAT_SQRT2 : .5f;
+    float aaBloat = currentAAType == AAType::MSAA ? FLOAT_SQRT2 : 0.5f;
     // Extend out the radii to antialias.
     float xOuterRadius = xRadius + aaBloat;
     float yOuterRadius = yRadius + aaBloat;
