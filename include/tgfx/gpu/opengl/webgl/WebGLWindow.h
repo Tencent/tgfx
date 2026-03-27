@@ -37,7 +37,7 @@ class WebGLWindow : public Window {
  private:
   std::string canvasID;
 
-  WebGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
-              int sampleCount);
+  explicit WebGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
+                       int sampleCount);
 };
 }  // namespace tgfx

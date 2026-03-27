@@ -40,7 +40,7 @@ class CGLWindow : public Window {
  private:
   NSView* view = nil;
 
-  CGLWindow(std::shared_ptr<Device> device, NSView* view, std::shared_ptr<ColorSpace> colorSpace,
-            int sampleCount);
+  explicit CGLWindow(std::shared_ptr<Device> device, NSView* view,
+                     std::shared_ptr<ColorSpace> colorSpace, int sampleCount);
 };
 }  // namespace tgfx
