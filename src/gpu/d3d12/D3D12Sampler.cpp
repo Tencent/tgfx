@@ -1,0 +1,56 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "D3D12Sampler.h"
+#include "D3D12GPU.h"
+
+namespace tgfx {
+
+std::shared_ptr<D3D12Sampler> D3D12Sampler::Make(D3D12GPU* gpu,
+                                                  const SamplerDescriptor& descriptor) {
+  if (gpu == nullptr) {
+    return nullptr;
+  }
+
+  D3D12_SAMPLER_DESC samplerDesc = {};
+  samplerDesc.Filter = ToD3D12Filter(descriptor.minFilter, descriptor.magFilter,
+                                     descriptor.mipmapMode);
+  samplerDesc.AddressU = ToD3D12AddressMode(descriptor.addressModeX);
+  samplerDesc.AddressV = ToD3D12AddressMode(descriptor.addressModeY);
+  samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+  samplerDesc.MipLODBias = 0.0f;
+  samplerDesc.MaxAnisotropy = 1;
+  samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+  samplerDesc.BorderColor[0] = 0.0f;
+  samplerDesc.BorderColor[1] = 0.0f;
+  samplerDesc.BorderColor[2] = 0.0f;
+  samplerDesc.BorderColor[3] = 0.0f;
+  samplerDesc.MinLOD = 0.0f;
+  samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+
+  return gpu->makeResource<D3D12Sampler>(samplerDesc);
+}
+
+D3D12Sampler::D3D12Sampler(const D3D12_SAMPLER_DESC& samplerDesc) : _samplerDesc(samplerDesc) {
+}
+
+void D3D12Sampler::onRelease(D3D12GPU*) {
+  // D3D12 samplers are pure descriptors. No GPU resource to release.
+}
+
+}  // namespace tgfx

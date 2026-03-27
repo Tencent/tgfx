@@ -20,8 +20,11 @@
 #include <dxgi1_4.h>
 #include <shaderc/shaderc.hpp>
 #include <string>
+#include "D3D12Buffer.h"
 #include "D3D12CommandQueue.h"
 #include "D3D12Resource.h"
+#include "D3D12Sampler.h"
+#include "D3D12Texture.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -81,7 +84,12 @@ void D3D12GPU::initInfo() {
     DXGI_ADAPTER_DESC1 desc = {};
     dxgiAdapter->GetDesc1(&desc);
     std::wstring wRenderer(desc.Description);
-    _info.renderer = std::string(wRenderer.begin(), wRenderer.end());
+    int sizeNeeded =
+        WideCharToMultiByte(CP_UTF8, 0, wRenderer.data(),
+                            static_cast<int>(wRenderer.size()), nullptr, 0, nullptr, nullptr);
+    _info.renderer.resize(static_cast<size_t>(sizeNeeded));
+    WideCharToMultiByte(CP_UTF8, 0, wRenderer.data(), static_cast<int>(wRenderer.size()),
+                        _info.renderer.data(), sizeNeeded, nullptr, nullptr);
     if (desc.VendorId == 0x10DE) {
       _info.vendor = "NVIDIA";
     } else if (desc.VendorId == 0x1002) {
@@ -150,19 +158,43 @@ bool D3D12GPU::isFormatRenderable(PixelFormat format) const {
   return (formatSupport.Support1 & D3D12_FORMAT_SUPPORT1_RENDER_TARGET) != 0;
 }
 
-std::shared_ptr<GPUBuffer> D3D12GPU::createBuffer(size_t, uint32_t) {
-  // Will be implemented in sub-task 3 (D3D12Buffer).
-  return nullptr;
+std::shared_ptr<GPUBuffer> D3D12GPU::createBuffer(size_t size, uint32_t usage) {
+  if (size == 0) {
+    return nullptr;
+  }
+  return D3D12Buffer::Make(this, size, usage);
 }
 
-std::shared_ptr<Texture> D3D12GPU::createTexture(const TextureDescriptor&) {
-  // Will be implemented in sub-task 3 (D3D12Texture).
-  return nullptr;
+std::shared_ptr<Texture> D3D12GPU::createTexture(const TextureDescriptor& descriptor) {
+  if (descriptor.width <= 0 || descriptor.height <= 0) {
+    LOGE("D3D12GPU::createTexture() invalid dimensions: %dx%d", descriptor.width,
+         descriptor.height);
+    return nullptr;
+  }
+  if (!isFormatRenderable(descriptor.format) &&
+      (descriptor.usage & TextureUsage::RENDER_ATTACHMENT)) {
+    LOGE("D3D12GPU::createTexture() format not renderable for render attachment");
+    return nullptr;
+  }
+  auto texture = D3D12Texture::Make(this, descriptor);
+  if (texture == nullptr) {
+    LOGE("D3D12GPU::createTexture() D3D12Texture::Make failed for %dx%d format=%d",
+         descriptor.width, descriptor.height, static_cast<int>(descriptor.format));
+  }
+  return texture;
 }
 
-std::shared_ptr<Sampler> D3D12GPU::createSampler(const SamplerDescriptor&) {
-  // Will be implemented in sub-task 3 (D3D12Sampler).
-  return nullptr;
+std::shared_ptr<Sampler> D3D12GPU::createSampler(const SamplerDescriptor& descriptor) {
+  auto key = MakeSamplerKey(descriptor);
+  auto iter = samplerCache.find(key);
+  if (iter != samplerCache.end()) {
+    return iter->second;
+  }
+  auto sampler = D3D12Sampler::Make(this, descriptor);
+  if (sampler != nullptr) {
+    samplerCache[key] = sampler;
+  }
+  return sampler;
 }
 
 uint32_t D3D12GPU::MakeSamplerKey(const SamplerDescriptor& descriptor) {
@@ -219,14 +251,45 @@ std::vector<std::shared_ptr<Texture>> D3D12GPU::importHardwareTextures(HardwareB
   return {};
 }
 
-std::shared_ptr<Texture> D3D12GPU::importBackendTexture(const BackendTexture&, uint32_t, bool) {
-  // Will be implemented in sub-task 3 (D3D12Texture).
-  return nullptr;
+std::shared_ptr<Texture> D3D12GPU::importBackendTexture(const BackendTexture& backendTexture,
+                                                        uint32_t usage, bool adopted) {
+  if (backendTexture.backend() != Backend::D3D12) {
+    return nullptr;
+  }
+  D3D12TextureInfo d3d12Info = {};
+  if (!backendTexture.getD3D12TextureInfo(&d3d12Info) || d3d12Info.resource == nullptr) {
+    return nullptr;
+  }
+  auto d3d12Resource = const_cast<ID3D12Resource*>(static_cast<const ID3D12Resource*>(d3d12Info.resource));
+  ComPtr<ID3D12Resource> resource = nullptr;
+  d3d12Resource->QueryInterface(IID_PPV_ARGS(&resource));
+  if (resource == nullptr) {
+    return nullptr;
+  }
+  return D3D12Texture::MakeFrom(this, std::move(resource), d3d12Info.format, usage, adopted);
 }
 
-std::shared_ptr<Texture> D3D12GPU::importBackendRenderTarget(const BackendRenderTarget&) {
-  // Will be implemented in sub-task 3 (D3D12Texture).
-  return nullptr;
+std::shared_ptr<Texture> D3D12GPU::importBackendRenderTarget(
+    const BackendRenderTarget& backendRenderTarget) {
+  if (backendRenderTarget.backend() != Backend::D3D12) {
+    return nullptr;
+  }
+  D3D12TextureInfo d3d12Info = {};
+  if (!backendRenderTarget.getD3D12TextureInfo(&d3d12Info) || d3d12Info.resource == nullptr) {
+    return nullptr;
+  }
+  auto format = backendRenderTarget.format();
+  if (!isFormatRenderable(format)) {
+    return nullptr;
+  }
+  auto d3d12Resource = const_cast<ID3D12Resource*>(static_cast<const ID3D12Resource*>(d3d12Info.resource));
+  ComPtr<ID3D12Resource> resource = nullptr;
+  d3d12Resource->QueryInterface(IID_PPV_ARGS(&resource));
+  if (resource == nullptr) {
+    return nullptr;
+  }
+  return D3D12Texture::MakeFrom(this, std::move(resource), d3d12Info.format,
+                                TextureUsage::RENDER_ATTACHMENT, false);
 }
 
 std::shared_ptr<Semaphore> D3D12GPU::importBackendSemaphore(const BackendSemaphore&) {
