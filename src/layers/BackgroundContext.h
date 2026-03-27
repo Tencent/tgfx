@@ -52,12 +52,12 @@ class BackgroundContext {
   BackgroundContext(Context* context, const Matrix& matrix, const Rect& rect,
                     std::shared_ptr<ColorSpace> colorSpace, int sampleCount)
       : context(context), imageMatrix(matrix), backgroundRect(rect),
-        colorSpace(std::move(colorSpace)), _sampleCount(sampleCount){};
+        colorSpace(std::move(colorSpace)), sampleCount(sampleCount){};
   Context* context = nullptr;
   Matrix imageMatrix = Matrix::I();
   Rect backgroundRect = Rect::MakeEmpty();
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
-  int _sampleCount = 1;
+  int sampleCount = 1;
 
   BackgroundContext* parent = nullptr;
 

@@ -209,7 +209,7 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rec
   childCanvasMatrix.preConcat(parentCanvasMatrix);
 
   std::shared_ptr<BackgroundContext> child = SurfaceBackgroundContext::Make(
-      context, childImageMatrix, childBackgroundRect, colorSpace, _sampleCount);
+      context, childImageMatrix, childBackgroundRect, colorSpace, sampleCount);
   if (!child) {
     return nullptr;
   }
