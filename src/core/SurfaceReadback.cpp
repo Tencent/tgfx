@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/SurfaceReadback.h"
+#include <chrono>
+#include <thread>
 #include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
 #include "gpu/proxies/GPUBufferProxy.h"
@@ -79,19 +81,28 @@ const void* SurfaceReadback::lockPixels(Context* context, bool flipY) {
     context->gpu()->queue()->waitUntilCompleted();
   }
   auto gpuBuffer = readbackBuffer->gpuBuffer();
-  // For async-only backends like WebGPU, trigger async mapping if not already started
+  // For async-only backends like WebGPU, trigger async mapping if not already started.
+  // Without Asyncify, requestMapAsync() triggers wgpuBufferMapAsync with a callback.
+  // The callback will be invoked later when the JS event loop processes it.
   if (!gpuBuffer->isReady()) {
     gpuBuffer->requestMapAsync();
-    // Poll isReady() with a simple busy-wait. The exact mechanism varies by backend:
-    // - On WebGPU via Emscripten, the mapAsync callback will set mapReady when wgpuBufferMapAsync completes
-    // - This busy-wait lets the callback fire between iterations (if the browser yields)
-    // - Timeout of 1000 iterations (~instant) prevents infinite loops
-    int maxWaits = 1000;
-    while (!gpuBuffer->isReady() && maxWaits-- > 0) {
-      // Empty loop body to allow event processing on next iteration
+    // Poll with a timeout, allowing some time for the callback to fire.
+    // The callback will update mapReady flag when buffer mapping completes.
+    const int POLL_TIMEOUT_MS = 5000;  // 5 second timeout
+    const int POLL_INTERVAL_US = 1000;  // Poll every 1ms
+    auto startTime = std::chrono::steady_clock::now();
+    while (!gpuBuffer->isReady()) {
+      auto elapsed = std::chrono::steady_clock::now() - startTime;
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() > POLL_TIMEOUT_MS) {
+        break;
+      }
+      // Without Asyncify, yield by sleeping a tiny bit. This is not ideal since it still blocks,
+      // but some systems may give OS scheduler a chance to process async events.
+      // Ideally this should use Asyncify or a fully async API redesign.
+      std::this_thread::sleep_for(std::chrono::microseconds(POLL_INTERVAL_US));
     }
     if (!gpuBuffer->isReady()) {
-      LOGE("SurfaceReadback::lockPixels() async mapping timeout!");
+      LOGE("SurfaceReadback::lockPixels() buffer mapping failed!");
       return nullptr;
     }
   }

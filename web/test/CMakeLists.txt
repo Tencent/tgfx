@@ -111,6 +111,7 @@ target_compile_options(tgfx-test PRIVATE
 target_compile_definitions(tgfx-test PRIVATE
     GENERATE_BASELINE_IMAGES
     $<$<BOOL:${TGFX_UPDATE_BASELINE}>:UPDATE_BASELINE>
+    ${ASYNCIFY_COMPILE_DEFS}
 )
 
 if (TGFX_USE_WEBGPU)
@@ -119,15 +120,36 @@ else ()
     set(WEB_GRAPHICS_LINK_OPTIONS -sMAX_WEBGL_VERSION=2)
 endif ()
 
+# Async buffer mapping in WebGPU: No built-in synchronous support.
+# WebGPU buffer.mapAsync() is fully async and requires a promise-based or callback-based model.
+# Emscripten's Asyncify (WASM stack switching) would theoretically work but introduces
+# compatibility issues with Google Test's dynamic function dispatch and crashes with both
+# JSPI and traditional Asyncify modes.
+# Solution: Disable async mapping for now, rely on polling with a reasonable timeout.
+option(TGFX_USE_ASYNCIFY "Enable Asyncify for WebGPU async buffer mapping" OFF)
+if (TGFX_USE_ASYNCIFY)
+    set(ASYNCIFY_LINK_OPTIONS
+        -sASYNCIFY=1
+        -sASYNCIFY_IMPORTS=['__asyncjs__webgpu_buffer_map_sync']
+    )
+    set(ASYNCIFY_COMPILE_DEFS TGFX_USE_ASYNCIFY)
+    target_compile_definitions(tgfx PUBLIC TGFX_USE_ASYNCIFY)
+else ()
+    set(ASYNCIFY_LINK_OPTIONS "")
+    set(ASYNCIFY_COMPILE_DEFS "")
+endif ()
+
 target_link_options(tgfx-test PRIVATE
     -lembind
     -fno-rtti
     -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0
     -sWASM=1
     ${WEB_GRAPHICS_LINK_OPTIONS}
+    ${ASYNCIFY_LINK_OPTIONS}
     -sALLOW_MEMORY_GROWTH=1
     -sINITIAL_MEMORY=256MB
     -sMAXIMUM_MEMORY=2GB
+    -sSTACK_SIZE=1MB
     -sEXPORT_NAME='TGFXTest'
     -sEXPORTED_FUNCTIONS=['_RunAllTests','_RunTest']
     -sEXPORTED_RUNTIME_METHODS=['FS','ccall','cwrap','GL']
@@ -145,6 +167,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_link_options(tgfx-test PRIVATE
         -g3 -O0
         -gsource-map
+        -sASSERTIONS=2
         -Wno-limited-postlink-optimizations
     )
 else ()
