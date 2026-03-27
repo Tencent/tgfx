@@ -438,6 +438,7 @@ TGFX_TEST(PDFExportTest, InnerShadow) {
   auto canvas = document->beginPage(600.f, 400.f);
   {
     Paint paint;
+
     // 1. Translate only (50, 50)
     canvas->save();
     canvas->translate(50, 50);
