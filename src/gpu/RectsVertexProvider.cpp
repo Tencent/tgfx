@@ -885,6 +885,7 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
         std::move(rectArray), std::move(uvRectArray), std::move(strokeArray), aaType, needUVCoord,
         hasColor, allocator->addReference(), std::move(colorSpace));
   }
+  
   if (isRound) {
     return allocator->make<NonAARoundStrokeRectsVertexProvider>(
         std::move(rectArray), std::move(uvRectArray), std::move(strokeArray), aaType, needUVCoord,
