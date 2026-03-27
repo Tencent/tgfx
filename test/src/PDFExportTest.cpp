@@ -54,6 +54,53 @@ bool ComparePDF(const std::shared_ptr<MemoryWriteStream>& stream, const std::str
   }
   return result;
 }
+
+std::shared_ptr<MemoryWriteStream> MakeSinglePagePDF(Context* context, float width, float height,
+                                                     void (*drawFunc)(Canvas*)) {
+  auto stream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(stream, context, PDFMetadata());
+  auto canvas = document->beginPage(width, height);
+  drawFunc(canvas);
+  document->endPage();
+  document->close();
+  stream->flush();
+  return stream;
+}
+
+void DrawInnerShadowTranslate(Canvas* canvas) {
+  Paint paint{};
+  canvas->translate(50, 50);
+  paint.setColor(Color::FromRGBA(100, 200, 255));
+  paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(0, 0, 100)));
+  canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+}
+
+void DrawInnerShadowTranslateRotateScale(Canvas* canvas) {
+  Paint paint{};
+  canvas->translate(100, 100);
+  canvas->rotate(-30);
+  canvas->scale(0.7f, 0.7f);
+  paint.setColor(Color::FromRGBA(255, 255, 150));
+  paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(100, 100, 0)));
+  canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
+}
+
+void DrawInnerShadowOnlyTranslate(Canvas* canvas) {
+  Paint paint{};
+  canvas->translate(50, 50);
+  paint.setColor(Color::FromRGBA(200, 200, 200));
+  paint.setImageFilter(ImageFilter::InnerShadowOnly(8, 8, 6, 6, Color::FromRGBA(50, 0, 80)));
+  canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+}
+
+void DrawInnerShadowOnlyTranslateRotate(Canvas* canvas) {
+  Paint paint{};
+  canvas->translate(100, 100);
+  canvas->rotate(30);
+  paint.setColor(Color::FromRGBA(200, 200, 200));
+  paint.setImageFilter(ImageFilter::InnerShadowOnly(8, 8, 6, 6, Color::FromRGBA(80, 50, 0)));
+  canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
+}
 }  // namespace
 
 TGFX_TEST(PDFExportTest, Empty) {
@@ -432,63 +479,23 @@ TGFX_TEST(PDFExportTest, InnerShadow) {
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
-  auto makePDF = [&](auto drawFunc) {
-    auto stream = MemoryWriteStream::Make();
-    auto document = PDFDocument::Make(stream, context, PDFMetadata());
-    auto canvas = document->beginPage(200.f, 200.f);
-    drawFunc(canvas);
-    document->endPage();
-    document->close();
-    stream->flush();
-    return stream;
-  };
-
   // 1. InnerShadow with translate only
-  EXPECT_TRUE(ComparePDF(makePDF([](Canvas* canvas) {
-                           Paint paint;
-                           canvas->translate(50, 50);
-                           paint.setColor(Color::FromRGBA(100, 200, 255));
-                           paint.setImageFilter(
-                               ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(0, 0, 100)));
-                           canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
-                         }),
+  EXPECT_TRUE(ComparePDF(MakeSinglePagePDF(context, 200.f, 200.f, DrawInnerShadowTranslate),
                          "PDFTest/InnerShadow_Translate"));
 
   // 2. InnerShadow with translate + rotate + scale (covers all matrix types)
-  EXPECT_TRUE(ComparePDF(makePDF([](Canvas* canvas) {
-                           Paint paint;
-                           canvas->translate(100, 100);
-                           canvas->rotate(-30);
-                           canvas->scale(0.7f, 0.7f);
-                           paint.setColor(Color::FromRGBA(255, 255, 150));
-                           paint.setImageFilter(
-                               ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(100, 100, 0)));
-                           canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
-                         }),
-                         "PDFTest/InnerShadow_TranslateRotateScale"));
+  EXPECT_TRUE(
+      ComparePDF(MakeSinglePagePDF(context, 200.f, 200.f, DrawInnerShadowTranslateRotateScale),
+                 "PDFTest/InnerShadow_TranslateRotateScale"));
 
   // 3. InnerShadowOnly with translate
-  EXPECT_TRUE(ComparePDF(makePDF([](Canvas* canvas) {
-                           Paint paint;
-                           canvas->translate(50, 50);
-                           paint.setColor(Color::FromRGBA(200, 200, 200));
-                           paint.setImageFilter(ImageFilter::InnerShadowOnly(
-                               8, 8, 6, 6, Color::FromRGBA(50, 0, 80)));
-                           canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
-                         }),
+  EXPECT_TRUE(ComparePDF(MakeSinglePagePDF(context, 200.f, 200.f, DrawInnerShadowOnlyTranslate),
                          "PDFTest/InnerShadowOnly_Translate"));
 
   // 4. InnerShadowOnly with translate + rotate
-  EXPECT_TRUE(ComparePDF(makePDF([](Canvas* canvas) {
-                           Paint paint;
-                           canvas->translate(100, 100);
-                           canvas->rotate(30);
-                           paint.setColor(Color::FromRGBA(200, 200, 200));
-                           paint.setImageFilter(ImageFilter::InnerShadowOnly(
-                               8, 8, 6, 6, Color::FromRGBA(80, 50, 0)));
-                           canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
-                         }),
-                         "PDFTest/InnerShadowOnly_TranslateRotate"));
+  EXPECT_TRUE(
+      ComparePDF(MakeSinglePagePDF(context, 200.f, 200.f, DrawInnerShadowOnlyTranslateRotate),
+                 "PDFTest/InnerShadowOnly_TranslateRotate"));
 }
 
 TGFX_TEST(PDFExportTest, InnerShadowMultipleMatrices) {
