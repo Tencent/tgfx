@@ -43,8 +43,8 @@
 
 namespace tgfx {
 
-static bool HasExtraCoverage(const Brush& brush, const Path& clip) {
-  return brush.maskFilter != nullptr || !clip.isEmpty() || clip.isInverseFillType();
+static bool HasExtraCoverage(const Brush& brush, const ClipStack& clip) {
+  return brush.maskFilter != nullptr || clip.state() != ClipState::Empty;
 }
 
 static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& rects) {
@@ -191,8 +191,6 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const Matrix& matrix,
 
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
-  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, meshBase->hasCoverage());
-  auto& clip = state.clip;
   bool hasCoverage = meshBase->hasCoverage() || HasExtraCoverage(brush, clip);
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, hasCoverage);
   auto clipBounds = getClipBounds(clip);
@@ -414,9 +412,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
   // deviceBounds needs to be computed for DstTexture creation. We assume coverage exists unless
   // clip is empty, since some ops (e.g., AtlasTextOp) always have coverage regardless of clip.
   // Underestimating causes draws to be skipped on GPUs without frameBufferFetch (e.g., SwiftShader).
-  bool hasCoverage = pendingBrush.maskFilter != nullptr || pendingClip.state() != ClipState::Empty;
-  auto aaType = getAAType(pendingBrush);
   bool hasCoverage = HasExtraCoverage(pendingBrush, pendingClip);
+  auto aaType = getAAType(pendingBrush);
   // RRect and Rect with round stroke use shader-controlled edges,
   // so they need coverage even under MSAA mode.
   auto isRoundStrokeRect = pendingType == PendingOpType::Rect && !pendingStrokes.empty() &&
@@ -809,8 +806,9 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
   const auto width = FloatSaturateToInt(bounds.width());
   const auto height = FloatSaturateToInt(bounds.height());
   const auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
-  auto clipRenderTarget = RenderTargetProxy::Make(context, width, height, true, 1, false,
-                                                  ImageOrigin::TopLeft, BackingFit::Approx);
+  auto clipRenderTarget =
+      RenderTargetProxy::Make(context, width, height, true, renderTarget->sampleCount(), false,
+                              ImageOrigin::TopLeft, BackingFit::Approx);
   if (clipRenderTarget == nullptr) {
     DEBUG_ASSERT(false);
     return nullptr;
