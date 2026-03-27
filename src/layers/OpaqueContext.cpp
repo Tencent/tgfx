@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpaqueContext.h"
+#include "core/CanvasState.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/StrokeUtils.h"
 #include "layers/OpaqueThreshold.h"
@@ -27,18 +28,19 @@ namespace tgfx {
 class PendingOpaqueAutoReset {
  public:
   PendingOpaqueAutoReset(OpaqueContext* context, const OpaqueContext::Contour& contour,
-                         MCState state, Brush brush)
-      : context(context), contour(contour), state(std::move(state)), brush(std::move(brush)) {
+                         const Matrix& matrix, const ClipStack& clip, Brush brush)
+      : context(context), contour(contour), matrix(matrix), clip(clip), brush(std::move(brush)) {
   }
 
   ~PendingOpaqueAutoReset() {
-    context->resetPendingContour(contour, state, brush);
+    context->resetPendingContour(contour, matrix, clip, brush);
   }
 
  private:
   OpaqueContext* context = nullptr;
   OpaqueContext::Contour contour;
-  MCState state;
+  Matrix matrix;
+  ClipStack clip;
   Brush brush;
 };
 
@@ -55,7 +57,8 @@ Canvas* OpaqueContext::beginRecording() {
     canvas->resetStateStack();
   }
   pendingContour = {};
-  pendingState = {};
+  pendingMatrix = {};
+  pendingClip = {};
   pendingBrushes.clear();
   contourBounds.clear();
   pictureContext.clear();
@@ -64,91 +67,97 @@ Canvas* OpaqueContext::beginRecording() {
 
 void OpaqueContext::drawFill(const Brush& brush) {
   static Contour FillContour = Contour(Contour::Type::Fill);
-  drawContour(FillContour, {}, brush);
+  drawContour(FillContour, Matrix::I(), ClipStack(), brush);
 }
 
-void OpaqueContext::drawRect(const Rect& rect, const MCState& state, const Brush& brush,
-                             const Stroke* stroke) {
-  drawContour(Contour(rect, stroke), state, brush);
+void OpaqueContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
+                             const Brush& brush, const Stroke* stroke) {
+  drawContour(Contour(rect, stroke), matrix, clip, brush);
 }
 
-void OpaqueContext::drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
-                              const Stroke* stroke) {
-  drawContour(Contour(rRect, stroke), state, brush);
-}
-
-void OpaqueContext::drawPath(const Path& path, const MCState& state, const Brush& brush) {
-  drawContour(Contour(path), state, brush);
-}
-
-void OpaqueContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+void OpaqueContext::drawRRect(const RRect& rRect, const Matrix& matrix, const ClipStack& clip,
                               const Brush& brush, const Stroke* stroke) {
-  drawContour(Contour(std::move(shape), stroke), state, brush);
+  drawContour(Contour(rRect, stroke), matrix, clip, brush);
 }
 
-void OpaqueContext::drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush) {
-  auto bounds = state.matrix.mapRect(mesh->bounds());
+void OpaqueContext::drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
+                             const Brush& brush) {
+  drawContour(Contour(path), matrix, clip, brush);
+}
+
+void OpaqueContext::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix,
+                              const ClipStack& clip, const Brush& brush, const Stroke* stroke) {
+  drawContour(Contour(std::move(shape), stroke), matrix, clip, brush);
+}
+
+void OpaqueContext::drawMesh(std::shared_ptr<Mesh> mesh, const Matrix& matrix,
+                             const ClipStack& clip, const Brush& brush) {
+  auto bounds = matrix.mapRect(mesh->bounds());
   if (containContourBound(bounds)) {
     return;
   }
   flushPendingContour();
-  pictureContext.drawMesh(std::move(mesh), state, brush);
+  pictureContext.drawMesh(std::move(mesh), matrix, clip, brush);
 }
 
 void OpaqueContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                              const MCState& state, const Brush& brush) {
+                              const Matrix& matrix, const ClipStack& clip, const Brush& brush) {
   auto newBrush = brush;
   newBrush.shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, sampling);
-  drawRect(Rect::MakeWH(image->width(), image->height()), state, newBrush, nullptr);
+  drawRect(Rect::MakeWH(image->width(), image->height()), matrix, clip, newBrush, nullptr);
 }
 
 void OpaqueContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                   const Rect& dstRect, const SamplingOptions& sampling,
-                                  const MCState& state, const Brush& brush,
+                                  const Matrix& matrix, const ClipStack& clip, const Brush& brush,
                                   SrcRectConstraint constraint) {
   if (constraint != SrcRectConstraint::Strict) {
-    auto newState = state;
-    newState.matrix.preConcat(MakeRectToRectMatrix(srcRect, dstRect));
+    auto newMatrix = matrix;
+    newMatrix.preConcat(MakeRectToRectMatrix(srcRect, dstRect));
     auto path = Path();
     path.addRect(dstRect);
-    path.transform(state.matrix);
-    newState.clip.addPath(path);
+    path.transform(matrix);
+    auto newClip = clip;
+    newClip.clip(path, false);
     auto newBrush = brush;
     newBrush.shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, sampling);
-    drawRect(dstRect, newState, newBrush, nullptr);
+    drawRect(dstRect, newMatrix, newClip, newBrush, nullptr);
     return;
   }
-  auto bounds = state.matrix.mapRect(dstRect);
+  auto bounds = matrix.mapRect(dstRect);
   if (containContourBound(bounds)) {
     return;
   }
-  pictureContext.drawImageRect(image, srcRect, dstRect, sampling, state, brush, constraint);
+  flushPendingContour();
+  pictureContext.drawImageRect(image, srcRect, dstRect, sampling, matrix, clip, brush, constraint);
 }
 
-void OpaqueContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
-                                 const Brush& brush, const Stroke* stroke) {
+void OpaqueContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
+                                 const ClipStack& clip, const Brush& brush, const Stroke* stroke) {
   auto bounds = textBlob->getBounds();
   if (stroke) {
-    ApplyStrokeToBounds(*stroke, &bounds, state.matrix);
+    ApplyStrokeToBounds(*stroke, &bounds, matrix);
   }
-  bounds = state.matrix.mapRect(bounds);
+  bounds = matrix.mapRect(bounds);
   if (containContourBound(bounds)) {
     return;
   }
-  pictureContext.drawTextBlob(textBlob, state, brush, stroke);
+  flushPendingContour();
+  pictureContext.drawTextBlob(textBlob, matrix, clip, brush, stroke);
 }
 
-void OpaqueContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
-  picture->playback(this, state);
+void OpaqueContext::drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,
+                                const ClipStack& clip) {
+  picture->playback(this, matrix, clip);
 }
 
 void OpaqueContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                              const MCState& state, const Brush& brush) {
+                              const Matrix& matrix, const ClipStack& clip, const Brush& brush) {
   if (brush.nothingToDraw()) {
     return;
   }
   if (!filter && !brush.maskFilter) {
-    drawPicture(picture, state);
+    drawPicture(picture, matrix, clip);
     return;
   }
   if (!picture->hasUnboundedFill()) {
@@ -156,21 +165,22 @@ void OpaqueContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
     if (filter) {
       bounds = filter->filterBounds(bounds);
     }
-    bounds = state.matrix.mapRect(bounds);
+    bounds = matrix.mapRect(bounds);
     if (containContourBound(bounds)) {
       return;
     }
   }
   flushPendingContour();
-  pictureContext.drawLayer(picture, filter, state, brush);
+  pictureContext.drawLayer(picture, filter, matrix, clip, brush);
 }
 
-void OpaqueContext::drawContour(const Contour& contour, const MCState& state, const Brush& brush) {
-  if (canAppend(contour, state, brush)) {
+void OpaqueContext::drawContour(const Contour& contour, const Matrix& matrix, const ClipStack& clip,
+                                const Brush& brush) {
+  if (canAppend(contour, matrix, clip, brush)) {
     appendFill(brush);
     return;
   }
-  flushPendingContour(contour, state, brush);
+  flushPendingContour(contour, matrix, clip, brush);
 }
 
 bool OpaqueContext::containContourBound(const Rect& bounds) const {
@@ -237,8 +247,9 @@ bool OpaqueContext::containsOpaqueBounds(const Rect& bounds) const {
   return containContourBound(bounds);
 }
 
-bool OpaqueContext::canAppend(const Contour& contour, const MCState& state, const Brush& brush) {
-  if (state.clip != pendingState.clip || state.matrix != pendingState.matrix) {
+bool OpaqueContext::canAppend(const Contour& contour, const Matrix& matrix, const ClipStack& clip,
+                              const Brush& brush) {
+  if (!clip.isSame(pendingClip) || matrix != pendingMatrix) {
     return false;
   }
   if (pendingBrushes.empty() || brush.maskFilter != pendingBrushes.back().maskFilter) {
@@ -247,27 +258,27 @@ bool OpaqueContext::canAppend(const Contour& contour, const MCState& state, cons
   return contour == pendingContour;
 }
 
-Rect GetGlobalBounds(const MCState& state, const Rect& localBounds) {
-  auto globalBounds = state.matrix.mapRect(localBounds);
-  if (!state.clip.isInverseFillType()) {
-    if (!globalBounds.intersect(state.clip.getBounds())) {
+Rect GetGlobalBounds(const Matrix& matrix, const ClipStack& clip, const Rect& localBounds) {
+  auto globalBounds = matrix.mapRect(localBounds);
+  if (clip.state() != ClipState::WideOpen) {
+    if (!globalBounds.intersect(clip.bounds())) {
       return Rect::MakeEmpty();
     }
   }
   return globalBounds;
 }
 
-void OpaqueContext::flushPendingContour(const Contour& contour, const MCState& state,
-                                        const Brush& brush) {
-  PendingOpaqueAutoReset autoReset(this, contour, state, brush);
+void OpaqueContext::flushPendingContour(const Contour& contour, const Matrix& matrix,
+                                        const ClipStack& clip, const Brush& brush) {
+  PendingOpaqueAutoReset autoReset(this, contour, matrix, clip, brush);
   if (pendingContour.type == Contour::Type::None) {
     return;
   }
   Rect localBounds = pendingContour.getBounds();
   if (pendingContour.hasStroke) {
-    ApplyStrokeToBounds(pendingContour.stroke, &localBounds, pendingState.matrix);
+    ApplyStrokeToBounds(pendingContour.stroke, &localBounds, pendingMatrix);
   }
-  auto globalBounds = GetGlobalBounds(pendingState, localBounds);
+  auto globalBounds = GetGlobalBounds(pendingMatrix, pendingClip, localBounds);
   bool fillIsFull = false;
   if (containContourBound(globalBounds) && !pendingContour.isInverseFillType()) {
     return;
@@ -276,17 +287,28 @@ void OpaqueContext::flushPendingContour(const Contour& contour, const MCState& s
     fillIsFull =
         fillIsFull || ((pendingBrush.shader == nullptr || !pendingBrush.shader->isAImage()) &&
                        !pendingBrush.maskFilter);
-    pendingContour.draw(pictureContext, pendingState, pendingBrush);
+    pendingContour.draw(pictureContext, pendingMatrix, pendingClip, pendingBrush);
   }
-  if (fillIsFull && pendingState.matrix.rectStaysRect() &&
-      pendingContour.type < Contour::Type::Path && !pendingContour.isInverseFillType() &&
-      !pendingContour.hasStroke) {
+  if (fillIsFull && pendingMatrix.rectStaysRect() && pendingContour.type < Contour::Type::Path &&
+      !pendingContour.isInverseFillType() && !pendingContour.hasStroke) {
+    // Shrink opaque bounds to fully covered pixels if clip has AA edges. We conservatively shrink
+    // all edges rather than checking each clip element's AA status per edge, as the cost is minimal
+    // (fewer optimization opportunities).
+    auto hasAAClip =
+        std::any_of(pendingClip.elements().begin(), pendingClip.elements().end(),
+                    [](const ClipElement& e) { return e.isValid() && e.isAntiAlias(); });
+    if (hasAAClip) {
+      globalBounds.roundIn();
+    }
     if (pendingContour.type == Contour::Type::Rect) {
       mergeContourBound(globalBounds);
     } else if (pendingContour.type == Contour::Type::RRect) {
       localBounds.inset(pendingContour.rRect.radii.x, pendingContour.rRect.radii.y);
       if (localBounds.isSorted()) {
-        globalBounds = GetGlobalBounds(pendingState, localBounds);
+        globalBounds = GetGlobalBounds(pendingMatrix, pendingClip, localBounds);
+        if (hasAAClip) {
+          globalBounds.roundIn();
+        }
         mergeContourBound(globalBounds);
       }
     }
@@ -318,10 +340,11 @@ void OpaqueContext::appendFill(const Brush& brush) {
   pendingBrushes.emplace_back(GetOpaqueBrush(brush));
 }
 
-void OpaqueContext::resetPendingContour(const Contour& contour, const MCState& state,
-                                        const Brush& brush) {
+void OpaqueContext::resetPendingContour(const Contour& contour, const Matrix& matrix,
+                                        const ClipStack& clip, const Brush& brush) {
   pendingContour = contour;
-  pendingState = state;
+  pendingMatrix = matrix;
+  pendingClip = clip;
   pendingBrushes = {GetOpaqueBrush(brush)};
 }
 
@@ -358,8 +381,8 @@ Rect OpaqueContext::Contour::getBounds() const {
   return Rect::MakeEmpty();
 }
 
-void OpaqueContext::Contour::draw(PictureContext& context, const MCState& state,
-                                  const Brush& brush) const {
+void OpaqueContext::Contour::draw(PictureContext& context, const Matrix& matrix,
+                                  const ClipStack& clip, const Brush& brush) const {
   const Stroke* strokePtr = hasStroke ? &stroke : nullptr;
   switch (type) {
     case Type::Fill: {
@@ -367,19 +390,19 @@ void OpaqueContext::Contour::draw(PictureContext& context, const MCState& state,
       break;
     }
     case Type::Rect: {
-      context.drawRect(rect, state, brush, strokePtr);
+      context.drawRect(rect, matrix, clip, brush, strokePtr);
       break;
     }
     case Type::RRect: {
-      context.drawRRect(rRect, state, brush, strokePtr);
+      context.drawRRect(rRect, matrix, clip, brush, strokePtr);
       break;
     }
     case Type::Path: {
-      context.drawPath(path, state, brush);
+      context.drawPath(path, matrix, clip, brush);
       break;
     }
     case Type::Shape: {
-      context.drawShape(shape, state, brush, strokePtr);
+      context.drawShape(shape, matrix, clip, brush, strokePtr);
       break;
     }
     default:

@@ -54,43 +54,47 @@ class MaskContext : public DrawContext, public Picture::AbortCallback {
 
   void drawFill(const Brush& brush) override;
 
-  void drawRect(const Rect& rect, const MCState& state, const Brush& brush,
+  void drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip, const Brush& brush,
                 const Stroke* stroke) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
-                 const Stroke* stroke) override;
+  void drawRRect(const RRect& rRect, const Matrix& matrix, const ClipStack& clip,
+                 const Brush& brush, const Stroke* stroke) override;
 
-  void drawPath(const Path& path, const MCState& state, const Brush& brush) override;
+  void drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
+                const Brush& brush) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush,
-                 const Stroke* stroke) override;
+  void drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix, const ClipStack& clip,
+                 const Brush& brush, const Stroke* stroke) override;
 
-  void drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush) override;
+  void drawMesh(std::shared_ptr<Mesh> mesh, const Matrix& matrix, const ClipStack& clip,
+                const Brush& brush) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const Brush& brush) override;
+                 const Matrix& matrix, const ClipStack& clip, const Brush& brush) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling, const MCState& state, const Brush& brush,
-                     SrcRectConstraint constraint) override;
+                     const SamplingOptions& sampling, const Matrix& matrix, const ClipStack& clip,
+                     const Brush& brush, SrcRectConstraint constraint) override;
 
-  void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state, const Brush& brush,
-                    const Stroke* stroke) override;
+  void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix, const ClipStack& clip,
+                    const Brush& brush, const Stroke* stroke) override;
 
-  void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
+  void drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,
+                   const ClipStack& clip) override;
 
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                 const MCState& state, const Brush& brush) override;
+                 const Matrix& matrix, const ClipStack& clip, const Brush& brush) override;
 
  private:
   struct PathRecord {
     Path path;
-    MCState state;
+    Matrix matrix = {};
+    ClipStack clip = {};
     Stroke stroke = {};
     bool hasStroke = false;
   };
 
-  void addPath(Path path, const MCState& state, const Stroke* stroke);
+  void addPath(Path path, const Matrix& matrix, const ClipStack& clip, const Stroke* stroke);
 
   std::vector<PathRecord> _records = {};
   bool _aborted = false;

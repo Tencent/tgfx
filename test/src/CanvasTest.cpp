@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
-#include "core/MCState.h"
+#include "core/ClipStack.h"
 #include "core/Matrix3DUtils.h"
 #include "core/PictureRecords.h"
 #include "core/images/SubsetImage.h"
@@ -52,6 +52,21 @@
 
 namespace tgfx {
 
+static Path MakePath(std::initializer_list<Point> points, bool close = true) {
+  Path path;
+  auto it = points.begin();
+  if (it != points.end()) {
+    path.moveTo(*it++);
+    while (it != points.end()) {
+      path.lineTo(*it++);
+    }
+    if (close) {
+      path.close();
+    }
+  }
+  return path;
+}
+
 // Creates a regular pentagon path centered at the origin with the given circumradius.
 static Path MakePentagonPath(float radius) {
   Path path = {};
@@ -71,32 +86,138 @@ static Path MakePentagonPath(float radius) {
   return path;
 }
 
-TGFX_TEST(CanvasTest, clip) {
+TGFX_TEST(CanvasTest, Clip) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto width = 1080;
-  auto height = 1776;
-  auto texture = context->gpu()->createTexture({width, height, PixelFormat::RGBA_8888});
-  ASSERT_TRUE(texture != nullptr);
-  auto surface = Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
+  auto surface = Surface::Make(context, 100, 100);
   auto canvas = surface->getCanvas();
-  canvas->clear();
-  canvas->setMatrix(Matrix::MakeScale(3));
-  auto clipPath = Path();
-  clipPath.addRect(Rect::MakeLTRB(0, 0, 200, 300));
-  auto paint = Paint();
-  paint.setColor(Color::FromRGBA(0, 0, 0));
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setStroke(Stroke(1));
-  canvas->drawPath(clipPath, paint);
-  canvas->clipPath(clipPath);
-  auto drawPath = Path();
-  drawPath.addRect(Rect::MakeLTRB(50, 295, 150, 590));
-  paint.setColor(Color::FromRGBA(255, 0, 0));
-  paint.setStyle(PaintStyle::Fill);
-  canvas->drawPath(drawPath, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Clip"));
+
+  // ========== 1. Initial state ==========
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::WideOpen);
+  EXPECT_TRUE(canvas->clipStack->elements().empty());
+
+  // ========== 2. Single rect clip ==========
+  canvas->clipRect(Rect::MakeXYWH(10, 20, 100, 80), true);
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
+  EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(10, 20, 100, 80));
+  EXPECT_TRUE(canvas->clipStack->elements()[0].isAntiAlias());
+
+  // ========== 3. Redundant clip elimination ==========
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 200, 200), true);
+  EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(10, 20, 100, 80));
+
+  // ========== 4. Merge: same AA, pixel-aligned ==========
+  auto elemCountBefore = canvas->clipStack->elements().size();
+  canvas->clipRect(Rect::MakeXYWH(50, 50, 100, 100), true);
+  EXPECT_EQ(canvas->clipStack->elements().size(), elemCountBefore);
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(50, 50, 60, 50));
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
+
+  // ========== 5. NoMerge: different AA, non-pixel-aligned ==========
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeXYWH(10.5f, 20.5f, 50.0f, 50.0f), true);
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
+  elemCountBefore = canvas->clipStack->elements().size();
+  canvas->clipRect(Rect::MakeXYWH(20.5f, 30.5f, 50.0f, 50.0f), false);
+  EXPECT_EQ(canvas->clipStack->elements().size(), elemCountBefore + 1);
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+
+  // ========== 6. Empty clip ==========
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 5, 5), true);
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Empty);
+  canvas->restore();
+
+  // ========== 7. Path clip -> Complex state ==========
+  canvas->save();
+  Path ovalPath;
+  ovalPath.addOval(Rect::MakeXYWH(20, 30, 60, 60));
+  canvas->clipPath(ovalPath, false);
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+  auto& lastElem = canvas->clipStack->elements().back();
+  EXPECT_FALSE(lastElem.isAntiAlias());
+  EXPECT_FALSE(lastElem.isRect());
+  canvas->restore();
+
+  // ========== 8. Deferred save ==========
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 100, 100), true);
+  auto uniqueIDBefore = canvas->clipStack->uniqueID();
+  EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
+  canvas->save();
+  canvas->save();
+  canvas->save();
+  EXPECT_EQ(canvas->clipStack->uniqueID(), uniqueIDBefore);
+  EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
+
+  // ========== 9. Materialize on modify ==========
+  canvas->clipRect(Rect::MakeXYWH(20, 20, 60, 60), true);
+  EXPECT_NE(canvas->clipStack->uniqueID(), uniqueIDBefore);
+  EXPECT_EQ(canvas->clipStack->_data->records.size(), 2u);
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(20, 20, 60, 60));
+
+  // ========== 10. Restore ==========
+  canvas->restore();
+  EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
+  canvas->restore();
+  canvas->restore();
+  EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(0, 0, 100, 100));
+
+  // ========== 11. getTotalClip and getTotalClipBounds ==========
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  auto totalClip1 = canvas->getTotalClip();
+  EXPECT_TRUE(totalClip1.isInverseFillType());
+  EXPECT_FALSE(canvas->getTotalClipBounds().has_value());
+  canvas->clipRect(Rect::MakeXYWH(10, 10, 80, 80), true);
+  auto totalClip2 = canvas->getTotalClip();
+  EXPECT_FALSE(totalClip2.isInverseFillType());
+  EXPECT_EQ(totalClip2.getBounds(), Rect::MakeXYWH(10, 10, 80, 80));
+  auto clipBound = canvas->getTotalClipBounds();
+  EXPECT_TRUE(clipBound.has_value());
+  EXPECT_EQ(clipBound.value(), Rect::MakeXYWH(10, 10, 80, 80));
+
+  // ========== 12. Transform ==========
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 100, 100), true);
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
+  canvas->clipStack->transform(Matrix::MakeRotate(45.0f));
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+
+  // ========== 13. Screenshot: AA vs non-AA ==========
+  // Note: When the path bounds are small, texture-based rasterization is used internally
+  // for performance reasons. In this case, setting antiAlias to false may not completely
+  // eliminate edge smoothing due to texture sampling characteristics.
+  surface = Surface::Make(context, 200, 200);
+  canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->scale(2.0f, 2.0f);
+  {
+    canvas->save();
+    auto path = MakePath({{50, 0}, {100, 0}, {75, 50}, {100, 100}, {50, 100}});
+    canvas->clipPath(path, true);
+    Paint paint;
+    paint.setColor(Color::Red());
+    canvas->drawRect(Rect::MakeWH(100, 100), paint);
+    canvas->restore();
+  }
+  {
+    canvas->save();
+    auto path = MakePath({{0, 0}, {50, 0}, {25, 50}, {50, 100}, {0, 100}});
+    canvas->clipPath(path, false);
+    Paint paint;
+    paint.setColor(Color::Blue());
+    canvas->drawRect(Rect::MakeWH(100, 100), paint);
+    canvas->restore();
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipAntiAlias"));
 }
 
 TGFX_TEST(CanvasTest, DiscardContent) {
