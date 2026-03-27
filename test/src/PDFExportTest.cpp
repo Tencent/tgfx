@@ -54,53 +54,6 @@ bool ComparePDF(const std::shared_ptr<MemoryWriteStream>& stream, const std::str
   }
   return result;
 }
-
-std::shared_ptr<MemoryWriteStream> MakeSinglePagePDF(Context* context, float width, float height,
-                                                     void (*drawFunc)(Canvas*)) {
-  auto stream = MemoryWriteStream::Make();
-  auto document = PDFDocument::Make(stream, context, PDFMetadata());
-  auto canvas = document->beginPage(width, height);
-  drawFunc(canvas);
-  document->endPage();
-  document->close();
-  stream->flush();
-  return stream;
-}
-
-void DrawInnerShadowTranslate(Canvas* canvas) {
-  Paint paint{};
-  canvas->translate(50, 50);
-  paint.setColor(Color::FromRGBA(100, 200, 255));
-  paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(0, 0, 100)));
-  canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
-}
-
-void DrawInnerShadowTranslateRotateScale(Canvas* canvas) {
-  Paint paint{};
-  canvas->translate(100, 100);
-  canvas->rotate(-30);
-  canvas->scale(0.7f, 0.7f);
-  paint.setColor(Color::FromRGBA(255, 255, 150));
-  paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(100, 100, 0)));
-  canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
-}
-
-void DrawInnerShadowOnlyTranslate(Canvas* canvas) {
-  Paint paint{};
-  canvas->translate(50, 50);
-  paint.setColor(Color::FromRGBA(200, 200, 200));
-  paint.setImageFilter(ImageFilter::InnerShadowOnly(8, 8, 6, 6, Color::FromRGBA(50, 0, 80)));
-  canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
-}
-
-void DrawInnerShadowOnlyTranslateRotate(Canvas* canvas) {
-  Paint paint{};
-  canvas->translate(100, 100);
-  canvas->rotate(30);
-  paint.setColor(Color::FromRGBA(200, 200, 200));
-  paint.setImageFilter(ImageFilter::InnerShadowOnly(8, 8, 6, 6, Color::FromRGBA(80, 50, 0)));
-  canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
-}
 }  // namespace
 
 TGFX_TEST(PDFExportTest, Empty) {
@@ -473,6 +426,55 @@ TGFX_TEST(PDFExportTest, AssignColorSpace) {
   PDFStream->flush();
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/AssignColorSpace"));
 }
+
+namespace {
+std::shared_ptr<MemoryWriteStream> MakeSinglePagePDF(Context* context, float width, float height,
+                                                     void (*drawFunc)(Canvas*)) {
+  auto stream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(stream, context, PDFMetadata());
+  auto canvas = document->beginPage(width, height);
+  drawFunc(canvas);
+  document->endPage();
+  document->close();
+  stream->flush();
+  return stream;
+}
+
+void DrawInnerShadowTranslate(Canvas* canvas) {
+  Paint paint{};
+  canvas->translate(50, 50);
+  paint.setColor(Color::FromRGBA(100, 200, 255));
+  paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(0, 0, 100)));
+  canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+}
+
+void DrawInnerShadowTranslateRotateScale(Canvas* canvas) {
+  Paint paint{};
+  canvas->translate(100, 100);
+  canvas->rotate(-30);
+  canvas->scale(0.7f, 0.7f);
+  paint.setColor(Color::FromRGBA(255, 255, 150));
+  paint.setImageFilter(ImageFilter::InnerShadow(8, 8, 6, 6, Color::FromRGBA(100, 100, 0)));
+  canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
+}
+
+void DrawInnerShadowOnlyTranslate(Canvas* canvas) {
+  Paint paint{};
+  canvas->translate(50, 50);
+  paint.setColor(Color::FromRGBA(200, 200, 200));
+  paint.setImageFilter(ImageFilter::InnerShadowOnly(8, 8, 6, 6, Color::FromRGBA(50, 0, 80)));
+  canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+}
+
+void DrawInnerShadowOnlyTranslateRotate(Canvas* canvas) {
+  Paint paint{};
+  canvas->translate(100, 100);
+  canvas->rotate(30);
+  paint.setColor(Color::FromRGBA(200, 200, 200));
+  paint.setImageFilter(ImageFilter::InnerShadowOnly(8, 8, 6, 6, Color::FromRGBA(80, 50, 0)));
+  canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
+}
+}  // namespace
 
 TGFX_TEST(PDFExportTest, InnerShadow) {
   ContextScope scope;
