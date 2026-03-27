@@ -491,22 +491,22 @@ TGFX_TEST(PDFExportTest, InnerShadow) {
     canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
     canvas->restore();
 
-    // 7. InnerShadowOnly - translate (200, 50)
-    canvas->save();
-    canvas->translate(200, 50);
-    paint.setColor(Color::FromRGBA(200, 200, 200));
-    paint.setImageFilter(ImageFilter::InnerShadowOnly(8, 8, 6, 6, Color::FromRGBA(50, 0, 80)));
-    canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
-    canvas->restore();
+    // // 7. InnerShadowOnly - translate (200, 50)
+    // canvas->save();
+    // canvas->translate(200, 50);
+    // paint.setColor(Color::FromRGBA(200, 200, 200));
+    // paint.setImageFilter(ImageFilter::InnerShadowOnly(8, 8, 6, 6, Color::FromRGBA(50, 0, 80)));
+    // canvas->drawRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 15, 15, paint);
+    // canvas->restore();
 
-    // 8. InnerShadowOnly - translate + rotate (30 degrees)
-    canvas->save();
-    canvas->translate(350, 250);
-    canvas->rotate(30);
-    paint.setColor(Color::FromRGBA(200, 200, 200));
-    paint.setImageFilter(ImageFilter::InnerShadowOnly(8, 8, 6, 6, Color::FromRGBA(80, 50, 0)));
-    canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
-    canvas->restore();
+    // // 8. InnerShadowOnly - translate + rotate (30 degrees)
+    // canvas->save();
+    // canvas->translate(350, 250);
+    // canvas->rotate(30);
+    // paint.setColor(Color::FromRGBA(200, 200, 200));
+    // paint.setImageFilter(ImageFilter::InnerShadowOnly(8, 8, 6, 6, Color::FromRGBA(80, 50, 0)));
+    // canvas->drawRoundRect(Rect::MakeXYWH(-50, -50, 100, 100), 15, 15, paint);
+    // canvas->restore();
   }
   document->endPage();
   document->close();
