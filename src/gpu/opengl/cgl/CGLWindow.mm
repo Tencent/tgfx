@@ -71,12 +71,12 @@ std::shared_ptr<RenderTargetProxy> CGLWindow::onCreateRenderTarget(Context* cont
     return nullptr;
   }
   [glContext setView:view];
-  _sampleCount = context->gpu()->getSampleCount(_sampleCount, PixelFormat::RGBA_8888);
+  sampleCount = context->gpu()->getSampleCount(sampleCount, PixelFormat::RGBA_8888);
   GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
   BackendRenderTarget renderTarget(frameBuffer, static_cast<int>(size.width),
-                                   static_cast<int>(size.height), _sampleCount);
+                                   static_cast<int>(size.height), sampleCount);
   return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 

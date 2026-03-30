@@ -61,9 +61,9 @@ std::shared_ptr<RenderTargetProxy> WGLWindow::onCreateRenderTarget(Context* cont
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-  _sampleCount = context->gpu()->getSampleCount(_sampleCount, PixelFormat::RGBA_8888);
+  sampleCount = context->gpu()->getSampleCount(sampleCount, PixelFormat::RGBA_8888);
   GLFrameBufferInfo frameBuffer = {0, GL_RGBA8};
-  BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height, _sampleCount};
+  BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height, sampleCount};
   return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 

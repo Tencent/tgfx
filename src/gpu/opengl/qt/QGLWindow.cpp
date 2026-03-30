@@ -130,7 +130,7 @@ QGLWindow::QGLWindow(QQuickItem* quickItem, bool singleBufferMode,
                      std::shared_ptr<ColorSpace> colorSpace, int sampleCount)
     : quickItem(quickItem), maxTextureCount(singleBufferMode ? 1 : 2) {
   _colorSpace = std::move(colorSpace);
-  _sampleCount = sampleCount;
+  this->sampleCount = sampleCount;
   if (QThread::currentThread() != QApplication::instance()->thread()) {
     renderThread = QThread::currentThread();
   }
@@ -166,9 +166,9 @@ std::shared_ptr<RenderTargetProxy> QGLWindow::onCreateRenderTarget(Context* cont
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  _sampleCount = context->gpu()->getSampleCount(_sampleCount, PixelFormat::RGBA_8888);
+  sampleCount = context->gpu()->getSampleCount(sampleCount, PixelFormat::RGBA_8888);
   drawableProxy = std::make_shared<QGLDrawableProxy>(context, width, height, PixelFormat::RGBA_8888,
-                                                     _sampleCount, ImageOrigin::BottomLeft, this);
+                                                     sampleCount, ImageOrigin::BottomLeft, this);
   std::static_pointer_cast<QGLDrawableProxy>(drawableProxy)->weakThis = drawableProxy;
   return drawableProxy;
 }

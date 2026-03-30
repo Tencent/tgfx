@@ -105,9 +105,9 @@ std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* co
     return nullptr;
   }
   auto pixelFormat = MetalPixelFormatToPixelFormat(static_cast<unsigned>(metalLayer.pixelFormat));
-  _sampleCount = context->gpu()->getSampleCount(_sampleCount, pixelFormat);
+  sampleCount = context->gpu()->getSampleCount(sampleCount, pixelFormat);
   drawableProxy = std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer,
-                                                       pixelFormat, _sampleCount);
+                                                       pixelFormat, sampleCount);
   return drawableProxy;
 }
 

@@ -58,7 +58,7 @@ std::shared_ptr<RenderTargetProxy> EAGLWindow::onCreateRenderTarget(Context* con
     layerTexture = nullptr;
   }
   layerTexture =
-      EAGLLayerTexture::MakeFrom(static_cast<GLGPU*>(context->gpu()), layer, _sampleCount);
+      EAGLLayerTexture::MakeFrom(static_cast<GLGPU*>(context->gpu()), layer, sampleCount);
   if (layerTexture == nullptr) {
     return nullptr;
   }

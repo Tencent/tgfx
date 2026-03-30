@@ -22,7 +22,7 @@
 namespace tgfx {
 Window::Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
                int sampleCount)
-    : device(std::move(device)), _colorSpace(std::move(colorSpace)), _sampleCount(sampleCount) {
+    : device(std::move(device)), _colorSpace(std::move(colorSpace)), sampleCount(sampleCount) {
 }
 
 std::shared_ptr<ColorSpace> Window::colorSpace() const {

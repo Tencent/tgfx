@@ -105,15 +105,15 @@ std::shared_ptr<RenderTargetProxy> EGLWindow::onCreateRenderTarget(Context* cont
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
   if (nativeWindow) {
-    _sampleCount = context->gpu()->getSampleCount(_sampleCount, PixelFormat::RGBA_8888);
+    sampleCount = context->gpu()->getSampleCount(sampleCount, PixelFormat::RGBA_8888);
   } else {
     // For the Current() path, query the actual MSAA sample count from the GL context since there is
     // no user-specified sampleCount parameter.
     int samples = 1;
     static_cast<GLGPU*>(context->gpu())->functions()->getIntegerv(GL_SAMPLES, &samples);
-    _sampleCount = std::max(samples, 1);
+    sampleCount = std::max(samples, 1);
   }
-  BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height, _sampleCount};
+  BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height, sampleCount};
   return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
