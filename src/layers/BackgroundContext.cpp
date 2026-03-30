@@ -28,7 +28,7 @@ class SurfaceBackgroundContext : public BackgroundContext {
   static std::shared_ptr<SurfaceBackgroundContext> Make(Context* context, const Matrix& matrix,
                                                         const Rect& rect,
                                                         std::shared_ptr<ColorSpace> colorSpace,
-                                                        int sampleCount = 1) {
+                                                        int sampleCount) {
     auto invertMatrix = Matrix::I();
     matrix.invert(&invertMatrix);
     auto surfaceRect = invertMatrix.mapRect(rect);
