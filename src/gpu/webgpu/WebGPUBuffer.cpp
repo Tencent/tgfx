@@ -63,12 +63,15 @@ bool WebGPUBuffer::isReady() const {
 // indirect calls (including through virtual function dispatch), unlike JSPI which requires
 // explicit export declarations for all entry points.
 EM_ASYNC_JS(int, webgpu_buffer_map_sync, (WGPUBuffer bufHandle, size_t size), {
-  var buffer = WebGPU.mgrBuffer.get(bufHandle);
-  if (!buffer) {
+  var bufferWrapper = WebGPU.mgrBuffer.objects[bufHandle];
+  if (!bufferWrapper) {
     return 1;
   }
   try {
-    await buffer.mapAsync(1 /* GPUMapMode.READ */, 0, size);
+    await bufferWrapper.object.mapAsync(1 /* GPUMapMode.READ */, 0, size);
+    // Initialize onUnmap so that wgpuBufferGetConstMappedRange can register cleanup callbacks.
+    // The standard wgpuBufferMapAsync path does this, but we bypass it via EM_ASYNC_JS.
+    bufferWrapper.onUnmap = bufferWrapper.onUnmap || [];
     return 0;
   } catch (e) {
     return 1;
