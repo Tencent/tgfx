@@ -27,8 +27,9 @@
 
 namespace hello2d {
 static std::vector<LayerBuilder*> layerBuilders = {
-    new ConicGradient(), new ImageWithMipmap(), new ImageWithShadow(),
-    new Layer3DTree(),   new RichText(),        new SimpleLayerTree(),
+    //    new ConicGradient(), new ImageWithMipmap(), new ImageWithShadow(),
+    //    new Layer3DTree(),   new RichText(),        new SimpleLayerTree(),
+    new Layer3DTree(),
 };
 
 static std::vector<std::string> GetLayerBuilderNames() {
@@ -94,9 +95,13 @@ void LayerBuilder::ApplyCenteringTransform(std::shared_ptr<tgfx::Layer> layer, f
   if (!bounds.isEmpty()) {
     static constexpr float CONTENT_SCALE = 620.0f / 720.0f;
     auto scale = std::min(viewWidth / bounds.width(), viewHeight / bounds.height()) * CONTENT_SCALE;
+    // Translate content center to view center
+    auto contentCenterX = bounds.centerX() * scale;
+    auto contentCenterY = bounds.centerY() * scale;
+    auto viewCenterX = viewWidth * 0.5f;
+    auto viewCenterY = viewHeight * 0.5f;
     tgfx::Matrix matrix = tgfx::Matrix::MakeScale(scale);
-    matrix.postTranslate((viewWidth - bounds.width() * scale) * 0.5f,
-                         (viewHeight - bounds.height() * scale) * 0.5f);
+    matrix.postTranslate(viewCenterX - contentCenterX, viewCenterY - contentCenterY);
     layer->setMatrix(matrix);
   }
 }
