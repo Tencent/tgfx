@@ -19,10 +19,11 @@
 #include "WebGPUShaderModule.h"
 #include <regex>
 #include <shaderc/shaderc.hpp>
-#include "src/tint/lang/spirv/reader/reader.h"
-#include "src/tint/lang/wgsl/writer/writer.h"
 #include "WebGPUGPU.h"
 #include "core/utils/Log.h"
+#include "gpu/UniformData.h"
+#include "src/tint/lang/spirv/reader/reader.h"
+#include "src/tint/lang/wgsl/writer/writer.h"
 
 namespace tgfx {
 
@@ -72,15 +73,59 @@ static std::string assignCustomUBOBindings(const std::string& source) {
   return replaceAllMatches(source, uboRegex, replaceCustomUBO, binding);
 }
 
-static std::string replaceSamplerBinding(const std::smatch& match, int& counter) {
-  return "layout(binding=" + std::to_string(counter++) + ") uniform " + match[1].str() + " " +
-         match[2].str() + ";";
+// Separates combined sampler declarations into distinct texture and sampler resources.
+// Input:  "uniform sampler2D TextureSampler_0;"
+// Output: "layout(binding=N) uniform texture2D TextureSampler_0;
+//          layout(binding=N+1) uniform sampler TextureSampler_0_Sampler;"
+static std::string replaceSeparatedSampler(const std::smatch& match, int& counter) {
+  auto samplerType = match[1].str();
+  auto name = match[2].str();
+  std::string textureType;
+  if (samplerType == "sampler2D") {
+    textureType = "texture2D";
+  } else if (samplerType == "sampler2DRect") {
+    textureType = "texture2DRect";
+  } else {
+    textureType = "texture2D";
+  }
+  auto textureDecl =
+      "layout(binding=" + std::to_string(counter++) + ") uniform " + textureType + " " + name + ";";
+  auto samplerDecl =
+      "\nlayout(binding=" + std::to_string(counter++) + ") uniform sampler " + name + "_Sampler;";
+  return textureDecl + samplerDecl;
 }
 
-static std::string assignSamplerBindings(const std::string& source) {
+static std::string separateSamplerDeclarations(const std::string& source) {
   static std::regex samplerRegex(R"(uniform\s+(sampler\w+)\s+(\w+);)");
-  int binding = 0;
-  return replaceAllMatches(source, samplerRegex, replaceSamplerBinding, binding);
+  int binding = TEXTURE_BINDING_POINT_START;
+  return replaceAllMatches(source, samplerRegex, replaceSeparatedSampler, binding);
+}
+
+// Replaces texture lookup calls to use separated texture and sampler resources.
+// Input:  "texture(TextureSampler_0, coord)"
+// Output: "texture(sampler2D(TextureSampler_0, TextureSampler_0_Sampler), coord)"
+static std::string separateTextureLookups(const std::string& source,
+                                          const std::vector<std::string>& samplerNames) {
+  auto result = source;
+  for (const auto& name : samplerNames) {
+    std::regex lookupRegex("texture\\(" + name + "\\s*,");
+    std::string replacement = "texture(sampler2D(" + name + ", " + name + "_Sampler),";
+    result = std::regex_replace(result, lookupRegex, replacement);
+  }
+  return result;
+}
+
+// Collects sampler variable names from GLSL source.
+static std::vector<std::string> collectSamplerNames(const std::string& source) {
+  static std::regex samplerRegex(R"(uniform\s+sampler\w+\s+(\w+);)");
+  std::vector<std::string> names = {};
+  std::smatch match;
+  std::string::const_iterator searchStart(source.cbegin());
+  while (std::regex_search(searchStart, source.cend(), match, samplerRegex)) {
+    names.push_back(match[1].str());
+    searchStart = match.suffix().first;
+  }
+  return names;
 }
 
 static std::string replaceInputLocation(const std::smatch& match, int& counter) {
@@ -120,7 +165,10 @@ static std::string preprocessGLSL(const std::string& glslCode) {
   auto result = upgradeGLSLVersion(glslCode);
   result = assignInternalUBOBindings(result);
   result = assignCustomUBOBindings(result);
-  result = assignSamplerBindings(result);
+  // Collect sampler names before separating declarations.
+  auto samplerNames = collectSamplerNames(result);
+  result = separateSamplerDeclarations(result);
+  result = separateTextureLookups(result, samplerNames);
   result = assignInputLocationQualifiers(result);
   result = assignOutputLocationQualifiers(result);
   result = removePrecisionDeclarations(result);
@@ -131,8 +179,8 @@ static std::vector<uint32_t> compileGLSLToSPIRV(const std::string& glslCode, Sha
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
   options.SetOptimizationLevel(shaderc_optimization_level_performance);
-  options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_0);
-  
+  options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_1);
+
   // Enable auto binding to help with texture/sampler separation
   options.SetAutoBindUniforms(true);
   options.SetAutoMapLocations(true);
