@@ -27,6 +27,13 @@
 
 namespace tgfx {
 
+GLCommandQueue::~GLCommandQueue() {
+  auto gl = gpu->functions();
+  for (auto& fence : pendingFences) {
+    gl->deleteSync(fence.sync);
+  }
+}
+
 void GLCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset,
                                  const void* data, size_t size) {
   if (data == nullptr || size == 0) {
@@ -77,17 +84,31 @@ void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
   gpu->processUnreferencedResources();
   auto gl = gpu->functions();
   gl->flush();
+  auto sync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+  if (sync != nullptr) {
+    pendingFences.push_back({sync, _frameTime});
+  }
   // Reset GL state every frame to avoid interference from external GL calls.
   gpu->resetGLState();
 }
 
 std::chrono::steady_clock::time_point GLCommandQueue::completedFrameTime() const {
-  // OpenGL commands execute in order after glFlush(). When the current submit()
-  // calls glFlush(), all previously submitted commands are guaranteed to have
-  // entered the GPU pipeline. So the previous frame is considered complete.
-  // Returns a time point just before the current frame time, ensuring resources
-  // used in the current frame are not considered completed.
-  return _frameTime - std::chrono::steady_clock::duration(1);
+  auto gl = gpu->functions();
+  while (!pendingFences.empty()) {
+    auto& front = pendingFences.front();
+#if defined(__EMSCRIPTEN__)
+    auto result = gl->clientWaitSync(front.sync, 0, 0, 0);
+#else
+    auto result = gl->clientWaitSync(front.sync, 0, 0);
+#endif
+    if (result != GL_ALREADY_SIGNALED && result != GL_CONDITION_SATISFIED) {
+      break;
+    }
+    _completedFrameTime = front.frameTime;
+    gl->deleteSync(front.sync);
+    pendingFences.erase(pendingFences.begin());
+  }
+  return _completedFrameTime;
 }
 
 std::shared_ptr<Semaphore> GLCommandQueue::insertSemaphore() {
