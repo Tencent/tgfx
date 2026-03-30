@@ -132,6 +132,10 @@ static std::vector<uint32_t> compileGLSLToSPIRV(const std::string& glslCode, Sha
   shaderc::CompileOptions options;
   options.SetOptimizationLevel(shaderc_optimization_level_performance);
   options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_0);
+  
+  // Enable auto binding to help with texture/sampler separation
+  options.SetAutoBindUniforms(true);
+  options.SetAutoMapLocations(true);
 
   shaderc_shader_kind shaderKind =
       (stage == ShaderStage::Vertex) ? shaderc_vertex_shader : shaderc_fragment_shader;
@@ -172,12 +176,15 @@ bool WebGPUShaderModule::compileShader(WGPUDevice device, const std::string& gls
 
   // Convert SPIR-V to WGSL using Tint.
   tint::spirv::reader::Options readerOptions;
-  // Enable non-uniform derivatives to match common shaders
   readerOptions.allow_non_uniform_derivatives = true;
   tint::Program program = tint::spirv::reader::Read(spirvBinary, readerOptions);
   if (!program.IsValid()) {
-    LOGE("Tint SPIR-V reader failed: %zu words, magic=%08x", spirvBinary.size(),
+    LOGE("Tint SPIR-V reader failed (%zu words, magic=0x%08x):", spirvBinary.size(),
          spirvBinary.size() > 0 ? spirvBinary[0] : 0);
+    for (const auto& diag : program.Diagnostics()) {
+      LOGE("  [tint] %s", diag.message.Plain().c_str());
+    }
+    LOGE("  [glsl] %s", glslCode.c_str());
     return false;
   }
 
