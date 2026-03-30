@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <vector>
 #include "tgfx/gpu/CommandQueue.h"
 
 namespace tgfx {
@@ -28,7 +27,6 @@ class GLCommandQueue : public CommandQueue {
  public:
   explicit GLCommandQueue(GLGPU* gpu) : gpu(gpu) {
   }
-  ~GLCommandQueue() override;
 
   std::chrono::steady_clock::time_point completedFrameTime() const override;
 
@@ -47,13 +45,8 @@ class GLCommandQueue : public CommandQueue {
   void waitUntilCompleted() override;
 
  private:
-  struct FrameFence {
-    void* sync = nullptr;
-    std::chrono::steady_clock::time_point frameTime = {};
-  };
-
   GLGPU* gpu = nullptr;
-  mutable std::vector<FrameFence> pendingFences = {};
-  mutable std::chrono::steady_clock::time_point _completedFrameTime = {};
+  std::chrono::steady_clock::time_point completedTime = {};
+  std::chrono::steady_clock::time_point lastSubmittedFrameTime = {};
 };
 }  // namespace tgfx
