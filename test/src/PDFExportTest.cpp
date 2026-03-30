@@ -30,6 +30,9 @@
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/core/WriteStream.h"
+#include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/pdf/PDFDocument.h"
 #include "tgfx/pdf/PDFMetadata.h"
 #include "tgfx/svg/SVGPathParser.h"
@@ -562,6 +565,40 @@ TGFX_TEST(PDFExportTest, InnerShadowMultipleMatrices) {
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/InnerShadowMultipleMatrices"));
 }
 
+TGFX_TEST(PDFExportTest, LayerLinearGradient) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto shapeLayer = ShapeLayer::Make();
+  Rect rect = Rect::MakeWH(2501.f, 1860.f);
+  Path path;
+  path.addRect(rect);
+  shapeLayer->setPath(path);
+  shapeLayer->removeFillStyles();
+
+  // Create vertical linear gradient with matrix wrapping
+  auto shader = Shader::MakeLinearGradient(
+      Point{0.f, 0.f}, Point{0.f, 1860.f},
+      {Color::FromRGBA(227, 136, 136), Color::FromRGBA(140, 210, 183)}, {});
+  shader = shader->makeWithMatrix(Matrix::MakeTrans(10.f, 10.f));
+  shapeLayer->addFillStyle(ShapeStyle::Make(shader));
+
+  auto layer = Layer::Make();
+  layer->addChild(shapeLayer);
+
+  // Draw layer directly to PDF canvas
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(2501.f, 1860.f);
+  layer->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/LayerLinearGradient"));
+}
+
 TGFX_TEST(PDFExportTest, DstAssignColorSpace) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -591,6 +628,29 @@ TGFX_TEST(PDFExportTest, DstAssignColorSpace) {
   document->close();
   PDFStream->flush();
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DstAssignColorSpace"));
+}
+
+TGFX_TEST(PDFExportTest, DiamondGradientMultiStop) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(2501.f, 1860.f);
+  {
+    Paint paint;
+    auto shader =
+        Shader::MakeDiamondGradient(Point{1250.5f, 930.f}, 930.f,
+                                    {Color::FromRGBA(227, 136, 136), Color::FromRGBA(247, 140, 12),
+                                     Color::FromRGBA(140, 210, 183)},
+                                    {0.f, 0.5f, 1.f});
+    paint.setShader(shader);
+    canvas->drawRect(Rect::MakeWH(2501.f, 1860.f), paint);
+  }
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DiamondGradientMultiStop"));
 }
 
 }  // namespace tgfx

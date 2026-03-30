@@ -724,7 +724,175 @@ PDFIndirectReference MakePSFunction(std::unique_ptr<Stream> psCode,
   return PDFStreamOut(std::move(dict), std::move(psCode), document);
 }
 
+// Encode a single vertex for ShadingType 4 binary stream.
+// Format: flag(1B) + x(4B big-endian uint32) + y(4B big-endian uint32) + RGB(3B) = 12 bytes.
+// Coordinates are normalized to [0, 0xFFFFFFFF] which maps to Decode array range.
+void WriteGouraudVertex(const std::shared_ptr<MemoryWriteStream>& stream, uint8_t flag, float normX,
+                        float normY, const Color& color) {
+  // Decode array is [-0.1, 1.1, -0.1, 1.1, 0, 1, 0, 1, 0, 1]
+  // Encode: raw = (norm - (-0.1)) / 1.2 * 0xFFFFFFFF
+  auto encode = [](float value) -> uint32_t {
+    float ratio = (value + 0.1f) / 1.2f;
+    ratio = std::max(0.0f, std::min(1.0f, ratio));
+    return static_cast<uint32_t>(ratio * 4294967295.0f);
+  };
+  uint32_t xRaw = encode(normX);
+  uint32_t yRaw = encode(normY);
+  uint8_t data[12] = {};
+  data[0] = flag;
+  data[1] = static_cast<uint8_t>((xRaw >> 24) & 0xFF);
+  data[2] = static_cast<uint8_t>((xRaw >> 16) & 0xFF);
+  data[3] = static_cast<uint8_t>((xRaw >> 8) & 0xFF);
+  data[4] = static_cast<uint8_t>(xRaw & 0xFF);
+  data[5] = static_cast<uint8_t>((yRaw >> 24) & 0xFF);
+  data[6] = static_cast<uint8_t>((yRaw >> 16) & 0xFF);
+  data[7] = static_cast<uint8_t>((yRaw >> 8) & 0xFF);
+  data[8] = static_cast<uint8_t>(yRaw & 0xFF);
+  data[9] = static_cast<uint8_t>(color.red * 255);
+  data[10] = static_cast<uint8_t>(color.green * 255);
+  data[11] = static_cast<uint8_t>(color.blue * 255);
+  stream->write(data, 12);
+}
+
+// Generate ShadingType 4 (Free-form Gouraud Triangle Mesh) for Diamond gradient.
+// Uses normalized coordinates [0,1]x[0,1] with Pattern Matrix mapping to page space.
+// Mesh structure:
+//   - Background rect: 2 triangles, all outer color (clamp extension)
+//   - Inner ring: 4 triangles, center color -> first stop ring
+//   - Each additional ring: 8 triangles between adjacent stop rings
+PDFIndirectReference MakeDiamondShader(PDFDocumentImpl* doc, const PDFGradientShader::Key& state) {
+  const GradientInfo& info = state.info;
+  const auto& colors = info.colors;
+  const auto& positions = info.positions;
+  auto stopCount = colors.size();
+  if (stopCount < 2) {
+    return PDFIndirectReference();
+  }
+
+  // Diamond center and radius in shader coordinates
+  Point center = info.points[0];
+  float radius = info.radiuses[0];
+
+  // Build the binary stream
+  auto meshStream = MemoryWriteStream::Make();
+
+  // The outermost color for background and clamp
+  const Color& outerColor = colors[stopCount - 1];
+
+  // Background rectangle: 2 triangles covering the extended area with outer color.
+  // Uses coordinates outside [0,1] to ensure full coverage after clamp.
+  WriteGouraudVertex(meshStream, 0, -0.1f, -0.1f, outerColor);
+  WriteGouraudVertex(meshStream, 0, -0.1f, 1.1f, outerColor);
+  WriteGouraudVertex(meshStream, 0, 1.1f, -0.1f, outerColor);
+  WriteGouraudVertex(meshStream, 1, 1.1f, 1.1f, outerColor);
+
+  // Normalized center (in [0,1] space, will be mapped by Pattern Matrix)
+  float cx = 0.5f;
+  float cy = 0.5f;
+  float halfSize = 0.5f;
+
+  // Inner ring (ring 0): 4 triangles from center to first stop's diamond tips.
+  // The first stop (index 1) ring tips are at position[1] fraction of the radius.
+  float ringFraction = positions[1];
+  float tipDist = halfSize * ringFraction;
+  // 4 diamond tips: right, top, left, bottom
+  float rightX = cx + tipDist;
+  float topY = cy - tipDist;
+  float leftX = cx - tipDist;
+  float bottomY = cy + tipDist;
+
+  const Color& centerColor = colors[0];
+  const Color& ring0Color = colors[1];
+
+  // Fan from center: center -> right -> top -> left -> bottom -> right (closing)
+  WriteGouraudVertex(meshStream, 0, cx, cy, centerColor);
+  WriteGouraudVertex(meshStream, 0, rightX, cy, ring0Color);
+  WriteGouraudVertex(meshStream, 0, cx, topY, ring0Color);
+  WriteGouraudVertex(meshStream, 2, leftX, cy, ring0Color);
+  WriteGouraudVertex(meshStream, 2, cx, bottomY, ring0Color);
+  WriteGouraudVertex(meshStream, 2, rightX, cy, ring0Color);
+
+  // Subsequent rings: 8 triangles each, connecting inner ring tips to outer ring tips.
+  // Uses a zigzag strip: inner_right -> outer_right -> inner_top -> outer_top -> ...
+  float prevTipDist = tipDist;
+  for (size_t i = 2; i < stopCount; i++) {
+    float outerFraction = positions[i];
+    float outerTipDist = halfSize * outerFraction;
+
+    const Color& innerColor = colors[i - 1];
+    const Color& outerRingColor = colors[i];
+
+    float innerRight = cx + prevTipDist;
+    float innerTop = cy - prevTipDist;
+    float innerLeft = cx - prevTipDist;
+    float innerBottom = cy + prevTipDist;
+
+    float outerRight = cx + outerTipDist;
+    float outerTop = cy - outerTipDist;
+    float outerLeft = cx - outerTipDist;
+    float outerBottom = cy + outerTipDist;
+
+    // 8 triangles as a zigzag strip starting from inner_right -> outer_right -> inner_top ...
+    // First triangle (flag=0,0,0): inner_right -> outer_right -> inner_top
+    WriteGouraudVertex(meshStream, 0, innerRight, cy, innerColor);
+    WriteGouraudVertex(meshStream, 0, outerRight, cy, outerRingColor);
+    WriteGouraudVertex(meshStream, 0, cx, innerTop, innerColor);
+    // Remaining 7 triangles via flag=1 (share BC edge)
+    WriteGouraudVertex(meshStream, 1, cx, outerTop, outerRingColor);
+    WriteGouraudVertex(meshStream, 1, innerLeft, cy, innerColor);
+    WriteGouraudVertex(meshStream, 1, outerLeft, cy, outerRingColor);
+    WriteGouraudVertex(meshStream, 1, cx, innerBottom, innerColor);
+    WriteGouraudVertex(meshStream, 1, cx, outerBottom, outerRingColor);
+    WriteGouraudVertex(meshStream, 1, innerRight, cy, innerColor);
+    WriteGouraudVertex(meshStream, 1, outerRight, cy, outerRingColor);
+
+    prevTipDist = outerTipDist;
+  }
+
+  auto meshData = meshStream->readData();
+  auto stream = Stream::MakeFromData(meshData);
+
+  // Build Shading dictionary
+  auto pdfShader = PDFDictionary::Make();
+  pdfShader->insertInt("ShadingType", 4);
+  pdfShader->insertInt("BitsPerFlag", 8);
+  pdfShader->insertInt("BitsPerCoordinate", 32);
+  pdfShader->insertInt("BitsPerComponent", 8);
+  pdfShader->insertObject(
+      "Decode", MakePDFArray(-0.1f, 1.1f, -0.1f, 1.1f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f));
+  auto ref = doc->colorSpaceRef();
+  if (ref) {
+    pdfShader->insertRef("ColorSpace", ref);
+  } else {
+    pdfShader->insertName("ColorSpace", "DeviceRGB");
+  }
+
+  auto shadingRef = PDFStreamOut(std::move(pdfShader), std::move(stream), doc);
+
+  // Build Pattern Matrix to map [0,1]x[0,1] to the actual diamond region.
+  // The diamond is defined by center and radius in shader coordinates.
+  // In normalized space, (0,0) maps to (center.x - radius, center.y - radius)
+  // and (1,1) maps to (center.x + radius, center.y + radius).
+  float diameter = radius * 2.0f;
+  Matrix shaderToPage =
+      Matrix::MakeAll(diameter, 0, center.x - radius, 0, diameter, center.y - radius, 0, 0, 1);
+  Matrix finalMatrix = state.canvasTransform;
+  finalMatrix.preConcat(state.shaderTransform);
+  finalMatrix.preConcat(shaderToPage);
+
+  auto pdfFunctionShader = PDFDictionary::Make("Pattern");
+  pdfFunctionShader->insertInt("PatternType", 2);
+  pdfFunctionShader->insertObject("Matrix", PDFUtils::MatrixToArray(finalMatrix));
+  pdfFunctionShader->insertRef("Shading", shadingRef);
+  return doc->emit(*pdfFunctionShader);
+}
+
 PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientShader::Key& state) {
+  // Diamond gradient uses ShadingType 4 (Gouraud Triangle Mesh) instead of Function/Axial/Radial.
+  if (state.type == GradientType::Diamond) {
+    return MakeDiamondShader(doc, state);
+  }
+
   Point transformPoints[2];
   const GradientInfo& info = state.info;
   Matrix finalMatrix = state.canvasTransform;

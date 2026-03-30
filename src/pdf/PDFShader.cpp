@@ -18,6 +18,7 @@
 
 #include "PDFShader.h"
 #include "core/shaders/ImageShader.h"
+#include "core/shaders/MatrixShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/Types.h"
 #include "pdf/PDFDocumentImpl.h"
@@ -126,9 +127,17 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
                                      Color paintColor) {
   DEBUG_ASSERT(shader);
   DEBUG_ASSERT(doc);
-  if (Types::Get(shader.get()) == Types::ShaderType::Gradient) {
-    const auto gradientShader = static_cast<const GradientShader*>(shader.get());
-    return PDFGradientShader::Make(doc, gradientShader, canvasTransform, surfaceBBox);
+  // Unwrap MatrixShader layers to find the underlying shader and accumulate the matrix.
+  auto innerShader = shader.get();
+  auto combinedTransform = canvasTransform;
+  while (Types::Get(innerShader) == Types::ShaderType::Matrix) {
+    const auto matrixShader = static_cast<const MatrixShader*>(innerShader);
+    combinedTransform.preConcat(matrixShader->matrix);
+    innerShader = matrixShader->source.get();
+  }
+  if (Types::Get(innerShader) == Types::ShaderType::Gradient) {
+    const auto gradientShader = static_cast<const GradientShader*>(innerShader);
+    return PDFGradientShader::Make(doc, gradientShader, combinedTransform, surfaceBBox);
   }
   if (surfaceBBox.isEmpty()) {
     return PDFIndirectReference();
