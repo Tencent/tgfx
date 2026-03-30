@@ -44,7 +44,9 @@ EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer)
 EAGLWindow::~EAGLWindow() {
   auto context = device->lockContext();
   if (context) {
-    layerTexture->release(context->gpu());
+    if (layerTexture != nullptr) {
+        layerTexture->release(context->gpu());
+     }
     device->unlock();
   }
 }
