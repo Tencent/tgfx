@@ -61,10 +61,10 @@ class MetalWindow : public Window {
   MTKView* metalView = nil;
   std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
 
-  MetalWindow(std::shared_ptr<Device> device, CAMetalLayer* layer,
-              std::shared_ptr<ColorSpace> colorSpace, int sampleCount);
-  MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalLayer* layer,
-              std::shared_ptr<ColorSpace> colorSpace, int sampleCount);
+  explicit MetalWindow(std::shared_ptr<Device> device, CAMetalLayer* layer,
+                       std::shared_ptr<ColorSpace> colorSpace, int sampleCount);
+  explicit MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalLayer* layer,
+                       std::shared_ptr<ColorSpace> colorSpace, int sampleCount);
 };
 
 }  // namespace tgfx

@@ -42,7 +42,7 @@ class EAGLWindow : public Window {
   CAEAGLLayer* layer = nil;
   std::shared_ptr<EAGLLayerTexture> layerTexture = nullptr;
 
-  EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
-             std::shared_ptr<ColorSpace> colorSpace, int sampleCount);
+  explicit EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
+                      std::shared_ptr<ColorSpace> colorSpace, int sampleCount);
 };
 }  // namespace tgfx
