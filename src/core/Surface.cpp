@@ -218,9 +218,14 @@ std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
   auto renderTarget = renderContext->renderTarget;
   auto srcRect = renderTarget->getOriginTransform().mapRect(rect);
   auto colorType = PixelFormatToColorType(renderTarget->format());
-  auto info = ImageInfo::Make(static_cast<int>(srcRect.width()), static_cast<int>(srcRect.height()),
-                              colorType, AlphaType::Premultiplied, 0, colorSpace());
   auto context = renderTarget->getContext();
+  auto rowBytes = static_cast<size_t>(srcRect.width()) * ImageInfo::GetBytesPerPixel(colorType);
+  auto alignment = static_cast<size_t>(context->gpu()->limits()->minBufferCopyRowAlignment);
+  if (alignment > 1) {
+    rowBytes = (rowBytes + alignment - 1) & ~(alignment - 1);
+  }
+  auto info = ImageInfo::Make(static_cast<int>(srcRect.width()), static_cast<int>(srcRect.height()),
+                              colorType, AlphaType::Premultiplied, rowBytes, colorSpace());
   auto readbackBuffer = context->proxyProvider()->createReadbackBufferProxy(info.byteSize());
   if (readbackBuffer == nullptr) {
     return nullptr;

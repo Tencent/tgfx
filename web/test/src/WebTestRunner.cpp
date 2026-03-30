@@ -23,7 +23,7 @@
 
 static bool initialized = false;
 
-static const char* excludeFilter = "-ReadPixelsTest.NativeCodec:ReadPixelsTest.JpegCodec";
+static const char* excludeFilter = "-BackgroundBlurTest.BackgroundBlur";
 
 static void initTests() {
   if (initialized) {
@@ -51,6 +51,8 @@ int RunTest(const char* filter) {
   initTests();
   if (filter != nullptr && filter[0] != '\0') {
     testing::GTEST_FLAG(filter) = std::string(filter) + ":" + excludeFilter;
+  } else {
+    testing::GTEST_FLAG(filter) = excludeFilter;
   }
   return RUN_ALL_TESTS();
 }

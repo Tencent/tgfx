@@ -21,5 +21,4 @@
 #include "WebGPUGPU.h"
 #include "tgfx/gpu/webgpu/WebGPUDevice.h"
 
-namespace tgfx {
-}  // namespace tgfx
+namespace tgfx {}  // namespace tgfx

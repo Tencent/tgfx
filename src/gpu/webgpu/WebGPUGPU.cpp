@@ -89,12 +89,12 @@ int WebGPUGPU::getSampleCount(int requestedCount, PixelFormat pixelFormat) const
 }
 
 std::vector<std::shared_ptr<Texture>> WebGPUGPU::importHardwareTextures(HardwareBufferRef,
-                                                                         uint32_t) {
+                                                                        uint32_t) {
   return {};
 }
 
 std::shared_ptr<Texture> WebGPUGPU::importBackendTexture(const BackendTexture& backendTexture,
-                                                          uint32_t usage, bool adopted) {
+                                                         uint32_t usage, bool adopted) {
   WebGPUTextureInfo textureInfo = {};
   if (!backendTexture.getWebGPUTextureInfo(&textureInfo)) {
     return nullptr;
@@ -116,9 +116,8 @@ std::shared_ptr<Texture> WebGPUGPU::importBackendRenderTarget(
   if (wgpuTexture == nullptr) {
     return nullptr;
   }
-  return WebGPUTexture::MakeFrom(this, wgpuTexture,
-                                 TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING,
-                                 false);
+  return WebGPUTexture::MakeFrom(
+      this, wgpuTexture, TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING, false);
 }
 
 std::shared_ptr<Semaphore> WebGPUGPU::importBackendSemaphore(const BackendSemaphore&) {

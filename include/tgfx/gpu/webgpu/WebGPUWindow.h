@@ -31,7 +31,7 @@ class WebGPUWindow : public Window {
    * @param device An optional WebGPUDevice. If nullptr, a default device is created automatically.
    */
   static std::shared_ptr<WebGPUWindow> MakeFrom(const std::string& canvasSelector,
-                                                 std::shared_ptr<WebGPUDevice> device = nullptr);
+                                                std::shared_ptr<WebGPUDevice> device = nullptr);
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;

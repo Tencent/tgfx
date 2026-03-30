@@ -25,8 +25,7 @@ namespace tgfx {
 
 class WebGPUCommandBuffer : public CommandBuffer {
  public:
-  explicit WebGPUCommandBuffer(WGPUCommandBuffer commandBuffer)
-      : commandBuffer(commandBuffer) {
+  explicit WebGPUCommandBuffer(WGPUCommandBuffer commandBuffer) : commandBuffer(commandBuffer) {
   }
 
   ~WebGPUCommandBuffer() override {

@@ -85,14 +85,6 @@ const void* SurfaceReadback::lockPixels(Context* context, bool flipY) {
   if (!gpuBuffer->isReady()) {
     gpuBuffer->requestMapAsync();
     if (!gpuBuffer->isReady()) {
-      // Without Asyncify, fall back to busy-wait polling as a last resort.
-      // Note: This polling will likely timeout without Asyncify, as WASM's busy-wait
-      // blocks the JS event loop, preventing WebGPU callbacks from firing.
-      int maxWaits = 1000;
-      while (!gpuBuffer->isReady() && maxWaits-- > 0) {
-      }
-    }
-    if (!gpuBuffer->isReady()) {
       LOGE("SurfaceReadback::lockPixels() buffer mapping failed!");
       return nullptr;
     }

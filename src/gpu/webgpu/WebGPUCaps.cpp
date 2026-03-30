@@ -41,16 +41,16 @@ void WebGPUCaps::initFeatureSet(WGPUDevice) {
   gpuFeatures.textureBarrier = false;
 }
 
-void WebGPUCaps::initLimits(WGPUDevice device) {
-  WGPUSupportedLimits supportedLimits = {};
-  wgpuDeviceGetLimits(device, &supportedLimits);
-  auto& deviceLimits = supportedLimits.limits;
-  gpuLimits.maxTextureDimension2D = static_cast<int>(deviceLimits.maxTextureDimension2D);
-  gpuLimits.maxSamplersPerShaderStage = static_cast<int>(deviceLimits.maxSamplersPerShaderStage);
-  gpuLimits.maxUniformBufferBindingSize =
-      static_cast<int>(deviceLimits.maxUniformBufferBindingSize);
-  gpuLimits.minUniformBufferOffsetAlignment =
-      static_cast<int>(deviceLimits.minUniformBufferOffsetAlignment);
+void WebGPUCaps::initLimits(WGPUDevice) {
+  // Emscripten's wgpuDeviceGetLimits crashes under ASSERTIONS=2 because Chrome's
+  // GPUSupportedLimits may not include all property names that the Emscripten WebGPU
+  // binding expects (e.g. maxBindGroupsPlusVertexBuffers), causing 'undefined' to be
+  // written into the integer heap. Use conservative defaults instead.
+  gpuLimits.maxTextureDimension2D = 8192;
+  gpuLimits.maxSamplersPerShaderStage = 16;
+  gpuLimits.maxUniformBufferBindingSize = 65536;
+  gpuLimits.minUniformBufferOffsetAlignment = 256;
+  gpuLimits.minBufferCopyRowAlignment = 256;
 }
 
 void WebGPUCaps::initFormatTable(WGPUDevice) {

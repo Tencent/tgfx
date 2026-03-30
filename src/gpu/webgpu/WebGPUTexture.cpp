@@ -42,11 +42,9 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::Make(WebGPUGPU* gpu,
   textureDesc.usage = ToWGPUTextureUsage(descriptor.usage);
   auto texture = wgpuDeviceCreateTexture(gpu->device(), &textureDesc);
   emscripten_console_logf("[WebGPU Texture] Make: %dx%d format=%u usage=%u mip=%u sample=%u => %p",
-                          descriptor.width, descriptor.height,
-                          static_cast<unsigned>(format),
-                          static_cast<unsigned>(textureDesc.usage),
-                          textureDesc.mipLevelCount, textureDesc.sampleCount,
-                          static_cast<void*>(texture));
+                          descriptor.width, descriptor.height, static_cast<unsigned>(format),
+                          static_cast<unsigned>(textureDesc.usage), textureDesc.mipLevelCount,
+                          textureDesc.sampleCount, static_cast<void*>(texture));
   if (texture == nullptr) {
     return nullptr;
   }

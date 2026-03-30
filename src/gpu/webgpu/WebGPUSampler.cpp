@@ -23,7 +23,7 @@
 namespace tgfx {
 
 std::shared_ptr<WebGPUSampler> WebGPUSampler::Make(WebGPUGPU* gpu,
-                                                    const SamplerDescriptor& descriptor) {
+                                                   const SamplerDescriptor& descriptor) {
   if (gpu == nullptr) {
     return nullptr;
   }

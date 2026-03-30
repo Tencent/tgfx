@@ -26,11 +26,7 @@ namespace tgfx {
 WebGPUDrawableProxy::WebGPUDrawableProxy(Context* context, int width, int height,
                                          WGPUSurface surface, WGPUTextureFormat format,
                                          PixelFormat pixelFormat)
-    : _context(context),
-      _width(width),
-      _height(height),
-      _surface(surface),
-      _wgpuFormat(format),
+    : _context(context), _width(width), _height(height), _surface(surface), _wgpuFormat(format),
       _pixelFormat(pixelFormat) {
 }
 

@@ -18,5 +18,4 @@
 
 #include "WebGPUResource.h"
 
-namespace tgfx {
-}  // namespace tgfx
+namespace tgfx {}  // namespace tgfx

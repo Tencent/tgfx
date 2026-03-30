@@ -31,7 +31,7 @@ class WebGPUTexture : public Texture, public WebGPUResource {
   static std::shared_ptr<WebGPUTexture> Make(WebGPUGPU* gpu, const TextureDescriptor& descriptor);
 
   static std::shared_ptr<WebGPUTexture> MakeFrom(WebGPUGPU* gpu, WGPUTexture texture,
-                                                  uint32_t usage, bool adopted);
+                                                 uint32_t usage, bool adopted);
 
   WGPUTexture webgpuTexture() const {
     return texture;

@@ -17,18 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebGPUShaderModule.h"
-#include <map>
 #include <regex>
-#include <set>
 #include <shaderc/shaderc.hpp>
+#include "src/tint/lang/spirv/reader/reader.h"
+#include "src/tint/lang/wgsl/writer/writer.h"
 #include "WebGPUGPU.h"
 #include "core/utils/Log.h"
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wsign-conversion"
-#pragma clang diagnostic ignored "-Weffc++"
-#include <spirv_msl.hpp>
-#include <spirv_parser.hpp>
-#pragma clang diagnostic pop
 
 namespace tgfx {
 
@@ -154,66 +148,6 @@ static std::vector<uint32_t> compileGLSLToSPIRV(const std::string& glslCode, Sha
   return {spvResult.cbegin(), spvResult.cend()};
 }
 
-// Convert SPIR-V binary to MSL string using SPIRV-Cross, then extract WGSL-compatible code.
-// Since SPIRV-Cross may not have a WGSL backend in all versions, we use the MSL backend and
-// then pass SPIR-V directly to WebGPU via WGPUShaderModuleSPIRVDescriptor (Emscripten extension).
-static std::string convertSPIRVToMSL(const std::vector<uint32_t>& spirvBinary, ShaderStage stage) {
-  spirv_cross::Parser spvParser(spirvBinary.data(), spirvBinary.size());
-  spvParser.parse();
-
-  spirv_cross::CompilerMSL mslCompiler(std::move(spvParser.get_parsed_ir()));
-
-  spirv_cross::CompilerMSL::Options mslOptions;
-  mslOptions.set_msl_version(2, 3);
-  mslOptions.enable_decoration_binding = true;
-  mslCompiler.set_msl_options(mslOptions);
-
-  auto commonOptions = mslCompiler.get_common_options();
-  commonOptions.vertex.flip_vert_y = true;
-  mslCompiler.set_common_options(commonOptions);
-
-  auto executionModel =
-      (stage == ShaderStage::Vertex) ? spv::ExecutionModelVertex : spv::ExecutionModelFragment;
-
-  struct MslBindingInfo {
-    uint32_t mslBuffer = 0;
-    uint32_t mslTexture = 0;
-    uint32_t mslSampler = 0;
-  };
-  std::map<std::pair<uint32_t, uint32_t>, MslBindingInfo> bindingMap = {};
-
-  auto uboResources = mslCompiler.get_shader_resources().uniform_buffers;
-  for (auto& ubo : uboResources) {
-    uint32_t spvBinding = mslCompiler.get_decoration(ubo.id, spv::DecorationBinding);
-    uint32_t spvDescSet = mslCompiler.get_decoration(ubo.id, spv::DecorationDescriptorSet);
-    auto key = std::make_pair(spvDescSet, spvBinding);
-    bindingMap[key].mslBuffer = spvBinding;
-  }
-
-  auto sampledImages = mslCompiler.get_shader_resources().sampled_images;
-  for (auto& image : sampledImages) {
-    uint32_t spvBinding = mslCompiler.get_decoration(image.id, spv::DecorationBinding);
-    uint32_t spvDescSet = mslCompiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-    auto key = std::make_pair(spvDescSet, spvBinding);
-    bindingMap[key].mslTexture = spvBinding;
-    bindingMap[key].mslSampler = spvBinding;
-  }
-
-  for (auto& [key, info] : bindingMap) {
-    spirv_cross::MSLResourceBinding resourceBinding = {};
-    resourceBinding.stage = executionModel;
-    resourceBinding.desc_set = key.first;
-    resourceBinding.binding = key.second;
-    resourceBinding.msl_buffer = info.mslBuffer;
-    resourceBinding.msl_texture = info.mslTexture;
-    resourceBinding.msl_sampler = info.mslSampler;
-    mslCompiler.add_msl_resource_binding(resourceBinding);
-  }
-
-  std::string mslCode = mslCompiler.compile();
-  return mslCode;
-}
-
 std::shared_ptr<WebGPUShaderModule> WebGPUShaderModule::Make(
     WebGPUGPU* gpu, const ShaderModuleDescriptor& descriptor) {
   if (gpu == nullptr) {
@@ -229,21 +163,44 @@ WebGPUShaderModule::WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescrip
 }
 
 bool WebGPUShaderModule::compileShader(WGPUDevice device, const std::string& glslCode,
-                                        ShaderStage stage) {
+                                       ShaderStage stage) {
   std::string vulkanGLSL = preprocessGLSL(glslCode);
   auto spirvBinary = compileGLSLToSPIRV(vulkanGLSL, stage);
   if (spirvBinary.empty()) {
     return false;
   }
 
-  // Use Emscripten's SPIR-V extension to pass SPIR-V directly to WebGPU.
-  WGPUShaderModuleSPIRVDescriptor spirvDesc = {};
-  spirvDesc.chain.sType = WGPUSType_ShaderModuleSPIRVDescriptor;
-  spirvDesc.codeSize = static_cast<uint32_t>(spirvBinary.size());
-  spirvDesc.code = spirvBinary.data();
+  // Convert SPIR-V to WGSL using Tint.
+  tint::spirv::reader::Options readerOptions;
+  // Enable non-uniform derivatives to match common shaders
+  readerOptions.allow_non_uniform_derivatives = true;
+  tint::Program program = tint::spirv::reader::Read(spirvBinary, readerOptions);
+  if (!program.IsValid()) {
+    LOGE("Tint SPIR-V reader failed: %zu words, magic=%08x", spirvBinary.size(),
+         spirvBinary.size() > 0 ? spirvBinary[0] : 0);
+    return false;
+  }
+
+  tint::wgsl::writer::Options writerOptions;
+  auto result = tint::wgsl::writer::Generate(program, writerOptions);
+  if (result != tint::Success) {
+    LOGE("Tint WGSL writer failed to generate WGSL");
+    return false;
+  }
+
+  std::string wgslCode = result->wgsl;
+  if (wgslCode.empty()) {
+    LOGE("Tint generated empty WGSL code");
+    return false;
+  }
+
+  // Create shader module with WGSL code.
+  WGPUShaderModuleWGSLDescriptor wgslDescriptor = {};
+  wgslDescriptor.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
+  wgslDescriptor.code = wgslCode.c_str();
 
   WGPUShaderModuleDescriptor moduleDesc = {};
-  moduleDesc.nextInChain = &spirvDesc.chain;
+  moduleDesc.nextInChain = &wgslDescriptor.chain;
 
   shaderModule = wgpuDeviceCreateShaderModule(device, &moduleDesc);
   if (shaderModule == nullptr) {
@@ -251,16 +208,6 @@ bool WebGPUShaderModule::compileShader(WGPUDevice device, const std::string& gls
     return false;
   }
   return true;
-}
-
-std::string WebGPUShaderModule::ConvertGLSLToWGSL(const std::string& glslCode,
-                                                    ShaderStage stage) {
-  std::string vulkanGLSL = preprocessGLSL(glslCode);
-  auto spirvBinary = compileGLSLToSPIRV(vulkanGLSL, stage);
-  if (spirvBinary.empty()) {
-    return "";
-  }
-  return convertSPIRVToMSL(spirvBinary, stage);
 }
 
 void WebGPUShaderModule::onRelease(WebGPUGPU*) {

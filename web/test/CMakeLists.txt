@@ -104,6 +104,7 @@ endif ()
 
 target_compile_options(tgfx-test PRIVATE
     -fno-rtti
+    -fno-exceptions
     -fno-access-control
     -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0
 )
@@ -128,9 +129,14 @@ endif ()
 # explicit export declarations and fails with indirect calls).
 option(TGFX_USE_ASYNCIFY "Enable Asyncify for WebGPU async buffer mapping" ON)
 if (TGFX_USE_ASYNCIFY)
+    # Asyncify is needed to synchronously wait for WebGPU async buffer mapping.
+    # ASYNCIFY_REMOVE excludes shader compilation libraries (shaderc, glslang, tint, spvtools)
+    # from instrumentation. These are pure CPU computation and never participate in async
+    # operations. Without this exclusion, Asyncify corrupts their execution state.
     set(ASYNCIFY_LINK_OPTIONS
         -sASYNCIFY=1
-        -sASYNCIFY_IMPORTS=['__asyncjs__webgpu_buffer_map_sync']
+        -sASYNCIFY_STACK_SIZE=65536
+        "-sASYNCIFY_REMOVE=['shaderc*','glslang*','spv::*','spvtools*','tint::*','Glslang*','TShader*','Compile*ToSpv*','SpvCompilat*']"
     )
     set(ASYNCIFY_COMPILE_DEFS TGFX_USE_ASYNCIFY)
     target_compile_definitions(tgfx PUBLIC TGFX_USE_ASYNCIFY)

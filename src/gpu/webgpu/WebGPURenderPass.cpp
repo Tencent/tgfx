@@ -49,10 +49,9 @@ std::shared_ptr<WebGPURenderPass> WebGPURenderPass::Make(WebGPUGPU* gpu, WGPUCom
     colorAttach.clearValue = {attachment.clearValue.red, attachment.clearValue.green,
                               attachment.clearValue.blue, attachment.clearValue.alpha};
     colorAttach.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
-    emscripten_console_logf(
-        "[WebGPU RenderPass] Color[%zu]: view=%p loadOp=%d storeOp=%d",
-        colorAttachments.size(), static_cast<void*>(colorAttach.view), colorAttach.loadOp,
-        colorAttach.storeOp);
+    emscripten_console_logf("[WebGPU RenderPass] Color[%zu]: view=%p loadOp=%d storeOp=%d",
+                            colorAttachments.size(), static_cast<void*>(colorAttach.view),
+                            colorAttach.loadOp, colorAttach.storeOp);
     if (attachment.resolveTexture != nullptr) {
       auto resolveTexture = std::static_pointer_cast<WebGPUTexture>(attachment.resolveTexture);
       colorAttach.resolveTarget = resolveTexture->webgpuTextureView();

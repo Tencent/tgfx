@@ -32,7 +32,7 @@ class WebGPUGPU;
 class WebGPUShaderModule : public ShaderModule, public WebGPUResource {
  public:
   static std::shared_ptr<WebGPUShaderModule> Make(WebGPUGPU* gpu,
-                                                   const ShaderModuleDescriptor& descriptor);
+                                                  const ShaderModuleDescriptor& descriptor);
 
   WGPUShaderModule webgpuShaderModule() const {
     return shaderModule;
@@ -52,8 +52,6 @@ class WebGPUShaderModule : public ShaderModule, public WebGPUResource {
   WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescriptor& descriptor);
 
   bool compileShader(WGPUDevice device, const std::string& glslCode, ShaderStage stage);
-
-  static std::string ConvertGLSLToWGSL(const std::string& glslCode, ShaderStage stage);
 
   WGPUShaderModule shaderModule = nullptr;
   ShaderStage _stage = ShaderStage::Vertex;

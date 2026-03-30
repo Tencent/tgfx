@@ -373,14 +373,22 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
       ifStr = "else if";
     }
     if (repeatX) {
+      if (!(repeatX && repeatY)) {
+        // Read texture outside the conditional to satisfy WGSL uniformity requirements.
+        // When both repeatX and repeatY are true, these reads were already done above.
+        readColor(args, names.dimensionsName, "vec2(repeatCoordX, clampedCoord.y)", repeatReadX);
+      }
       fragBuilder->codeAppendf("%s (errX != 0.0) {", ifStr);
-      readColor(args, names.dimensionsName, "vec2(repeatCoordX, clampedCoord.y)", repeatReadX);
       fragBuilder->codeAppendf("textureColor = mix(textureColor, %s, errX);", repeatReadX);
       fragBuilder->codeAppend("}");
     }
     if (repeatY) {
+      if (!(repeatX && repeatY)) {
+        // Read texture outside the conditional to satisfy WGSL uniformity requirements.
+        // When both repeatX and repeatY are true, these reads were already done above.
+        readColor(args, names.dimensionsName, "vec2(clampedCoord.x, repeatCoordY)", repeatReadY);
+      }
       fragBuilder->codeAppendf("%s (errY != 0.0) {", ifStr);
-      readColor(args, names.dimensionsName, "vec2(clampedCoord.x, repeatCoordY)", repeatReadY);
       fragBuilder->codeAppendf("textureColor = mix(textureColor, %s, errY);", repeatReadY);
       fragBuilder->codeAppend("}");
     }

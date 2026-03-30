@@ -22,6 +22,9 @@
 #include "WebGPUGPU.h"
 #include "WebGPUUtil.h"
 #include "core/utils/Log.h"
+#ifdef TGFX_USE_ASYNCIFY
+#include <emscripten.h>
+#endif
 
 namespace tgfx {
 
@@ -53,10 +56,30 @@ bool WebGPUBuffer::isReady() const {
   return true;
 }
 
+#ifdef TGFX_USE_ASYNCIFY
+// Asyncify suspends the WASM stack when hitting 'await', yields to the JS event loop,
+// and resumes after the Promise resolves. This makes buffer.mapAsync() appear synchronous
+// to C++ code without blocking the JS event loop. Asyncify automatically instruments all
+// indirect calls (including through virtual function dispatch), unlike JSPI which requires
+// explicit export declarations for all entry points.
+EM_ASYNC_JS(int, webgpu_buffer_map_sync, (WGPUBuffer bufHandle, size_t size), {
+  var buffer = WebGPU.mgrBuffer.get(bufHandle);
+  if (!buffer) {
+    return 1;
+  }
+  try {
+    await buffer.mapAsync(1 /* GPUMapMode.READ */, 0, size);
+    return 0;
+  } catch (e) {
+    return 1;
+  }
+});
+#else
 static void OnBufferMapped(WGPUBufferMapAsyncStatus status, void* userdata) {
   auto ready = static_cast<bool*>(userdata);
   *ready = (status == WGPUBufferMapAsyncStatus_Success);
 }
+#endif
 
 void* WebGPUBuffer::map(size_t offset, size_t mapSize) {
   if (buffer == nullptr) {
@@ -91,7 +114,12 @@ void WebGPUBuffer::requestMapAsync() {
     return;
   }
   mapReady = false;
+#ifdef TGFX_USE_ASYNCIFY
+  int result = webgpu_buffer_map_sync(buffer, _size);
+  mapReady = (result == 0);
+#else
   wgpuBufferMapAsync(buffer, WGPUMapMode_Read, 0, _size, OnBufferMapped, &mapReady);
+#endif
 }
 
 void WebGPUBuffer::unmap() {

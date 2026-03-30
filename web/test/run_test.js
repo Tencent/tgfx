@@ -76,6 +76,9 @@ async function run() {
         '--use-gl=angle',
         '--use-angle=metal',
         '--enable-webgl2-compute-context',
+        '--enable-unsafe-webgpu',
+        '--enable-features=Vulkan,UseSkiaRenderer,WebGPU',
+        '--experimental-wasm-stack-switching',
       ],
     });
 

@@ -53,10 +53,10 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
     // Clamp scissor rect to render target bounds
     int scissorX = std::max(0, static_cast<int>(scissorRect.x()));
     int scissorY = std::max(0, static_cast<int>(scissorRect.y()));
-    int scissorRight = std::min(renderTarget->width(),
-                                static_cast<int>(scissorRect.x() + scissorRect.width()));
-    int scissorBottom = std::min(renderTarget->height(),
-                                 static_cast<int>(scissorRect.y() + scissorRect.height()));
+    int scissorRight =
+        std::min(renderTarget->width(), static_cast<int>(scissorRect.x() + scissorRect.width()));
+    int scissorBottom =
+        std::min(renderTarget->height(), static_cast<int>(scissorRect.y() + scissorRect.height()));
     int scissorWidth = std::max(0, scissorRight - scissorX);
     int scissorHeight = std::max(0, scissorBottom - scissorY);
     renderPass->setScissorRect(scissorX, scissorY, scissorWidth, scissorHeight);
