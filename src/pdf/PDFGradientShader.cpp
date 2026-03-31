@@ -384,134 +384,7 @@ void RadialCode(const GradientInfo& info, const Matrix& /*perspectiveRemover*/,
   function->writeText("}");
 }
 
-/**  
- * Conical gradient shader, based on the Canvas spec for radial gradients
- * See: http://www.w3.org/TR/2dcontext/#dom-context-2d-createradialgradient
- */
-void TwoPointConicalCode(const GradientInfo& info, const Matrix& /*perspectiveRemover*/,
-                         const std::shared_ptr<MemoryWriteStream>& function) {
-  float dx = info.points[1].x - info.points[0].x;
-  float dy = info.points[1].y - info.points[0].y;
-  float r0 = info.radiuses[0];
-  float dr = info.radiuses[1] - info.radiuses[0];
-  float a = (dx * dx) + (dy * dy) - (dr * dr);
-
-  // First compute t, if the pixel falls outside the cone, then we'll end
-  // with 'false' on the stack, otherwise we'll push 'true' with t below it
-
-  // We start with a stack of (x y), copy it and then consume one copy in
-  // order to calculate b and the other to calculate c.
-  function->writeText("{");
-
-  function->writeText("2 copy ");
-
-  // Calculate b and b^2; b = -2 * (y * dy + x * dx + r0 * dr).
-  PDFUtils::AppendFloat(dy, function);
-  function->writeText(" mul exch ");
-  PDFUtils::AppendFloat(dx, function);
-  function->writeText(" mul add ");
-  PDFUtils::AppendFloat(r0 * dr, function);
-  function->writeText(" add -2 mul dup dup mul\n");
-
-  // c = x^2 + y^2 + radius0^2
-  function->writeText("4 2 roll dup mul exch dup mul add ");
-  PDFUtils::AppendFloat(r0 * r0, function);
-  function->writeText(" sub dup 4 1 roll\n");
-
-  // Contents of the stack at this point: c, b, b^2, c
-  // if a = 0, then we collapse to a simpler linear case
-  if (a == 0) {
-
-    // t = -c/b
-    function->writeText("pop pop div neg dup ");
-
-    // compute radius(t)
-    PDFUtils::AppendFloat(dr, function);
-    function->writeText(" mul ");
-    PDFUtils::AppendFloat(r0, function);
-    function->writeText(" add\n");
-
-    // if r(t) < 0, then it's outside the cone
-    function->writeText("0 lt {pop false} {true} ifelse\n");
-
-  } else {
-
-    // quadratic case: the Canvas spec wants the largest
-    // root t for which radius(t) > 0
-
-    // compute the discriminant (b^2 - 4ac)
-    PDFUtils::AppendFloat(a * 4, function);
-    function->writeText(" mul sub dup\n");
-
-    // if d >= 0, proceed
-    function->writeText("0 ge {\n");
-
-    // an intermediate value we'll use to compute the roots:
-    // q = -0.5 * (b +/- sqrt(d))
-    function->writeText("sqrt exch dup 0 lt {exch -1 mul} if");
-    function->writeText(" add -0.5 mul dup\n");
-
-    // first root = q / a
-    PDFUtils::AppendFloat(a, function);
-    function->writeText(" div\n");
-
-    // second root = c / q
-    function->writeText("3 1 roll div\n");
-
-    // put the larger root on top of the stack
-    function->writeText("2 copy gt {exch} if\n");
-
-    // compute radius(t) for larger root
-    function->writeText("dup ");
-    PDFUtils::AppendFloat(dr, function);
-    function->writeText(" mul ");
-    PDFUtils::AppendFloat(r0, function);
-    function->writeText(" add\n");
-
-    // if r(t) > 0, we have our t, pop off the smaller root and we're done
-    function->writeText(" 0 gt {exch pop true}\n");
-
-    // otherwise, throw out the larger one and try the smaller root
-    function->writeText("{pop dup\n");
-    PDFUtils::AppendFloat(dr, function);
-    function->writeText(" mul ");
-    PDFUtils::AppendFloat(r0, function);
-    function->writeText(" add\n");
-
-    // if r(t) < 0, push false, otherwise the smaller root is our t
-    function->writeText("0 le {pop false} {true} ifelse\n");
-    function->writeText("} ifelse\n");
-
-    // d < 0, clear the stack and push false
-    function->writeText("} {pop pop pop false} ifelse\n");
-  }
-
-  // if the pixel is in the cone, proceed to compute a color
-  function->writeText("{");
-  TileModeCode(TileMode::Clamp, function);
-  GradientFunctionCode(info, function);
-
-  // otherwise, just write black
-  // The "gradients" gm works as falls into the 8.7.4.5.4 "Type 3 (Radial) Shadings" case.
-  function->writeText("} {0 0 0} ifelse }");
-}
-
 ///////////////////////////////////////////////////////////////////////////
-
-// catch cases where the inner just touches the outer circle
-// and make the inner circle just inside the outer one to match raster
-void FixUpRadius(const Point& p1, float& r1, const Point& p2, float& r2) {
-  // detect touching circles
-  auto distance = Point::Distance(p1, p2);
-  auto subtractRadii = fabs(r1 - r2);
-  if (fabs(distance - subtractRadii) < 0.002f) {
-    if (r1 > r2) {
-      r1 += 0.002f;
-    } else {
-      r2 += 0.002f;
-    }
-  }
-}
 
 PDFGradientShader::Key MakeKey(const GradientShader* gradientShader, const Matrix& canvasTransform,
                                const Rect& bbox) {
@@ -724,183 +597,14 @@ PDFIndirectReference MakePSFunction(std::unique_ptr<Stream> psCode,
   return PDFStreamOut(std::move(dict), std::move(psCode), document);
 }
 
-// Encode a single vertex for ShadingType 4 binary stream.
-// Format: flag(1B) + x(4B big-endian uint32) + y(4B big-endian uint32) + RGB(3B) = 12 bytes.
-// Coordinates are normalized to [0, 0xFFFFFFFF] which maps to Decode array range.
-void WriteGouraudVertex(const std::shared_ptr<MemoryWriteStream>& stream, uint8_t flag, float normX,
-                        float normY, const Color& color) {
-  // Decode array is [-0.1, 1.1, -0.1, 1.1, 0, 1, 0, 1, 0, 1]
-  // Encode: raw = (norm - (-0.1)) / 1.2 * 0xFFFFFFFF
-  auto encode = [](float value) -> uint32_t {
-    float ratio = (value + 0.1f) / 1.2f;
-    ratio = std::max(0.0f, std::min(1.0f, ratio));
-    return static_cast<uint32_t>(ratio * 4294967295.0f);
-  };
-  uint32_t xRaw = encode(normX);
-  uint32_t yRaw = encode(normY);
-  uint8_t data[12] = {};
-  data[0] = flag;
-  data[1] = static_cast<uint8_t>((xRaw >> 24) & 0xFF);
-  data[2] = static_cast<uint8_t>((xRaw >> 16) & 0xFF);
-  data[3] = static_cast<uint8_t>((xRaw >> 8) & 0xFF);
-  data[4] = static_cast<uint8_t>(xRaw & 0xFF);
-  data[5] = static_cast<uint8_t>((yRaw >> 24) & 0xFF);
-  data[6] = static_cast<uint8_t>((yRaw >> 16) & 0xFF);
-  data[7] = static_cast<uint8_t>((yRaw >> 8) & 0xFF);
-  data[8] = static_cast<uint8_t>(yRaw & 0xFF);
-  data[9] = static_cast<uint8_t>(color.red * 255);
-  data[10] = static_cast<uint8_t>(color.green * 255);
-  data[11] = static_cast<uint8_t>(color.blue * 255);
-  stream->write(data, 12);
-}
-
-// Generate ShadingType 4 (Free-form Gouraud Triangle Mesh) for Diamond gradient.
-// Uses normalized coordinates [0,1]x[0,1] with Pattern Matrix mapping to page space.
-// Mesh structure:
-//   - Background rect: 2 triangles, all outer color (clamp extension)
-//   - Inner ring: 4 triangles, center color -> first stop ring
-//   - Each additional ring: 8 triangles between adjacent stop rings
-PDFIndirectReference MakeDiamondShader(PDFDocumentImpl* doc, const PDFGradientShader::Key& state) {
-  const GradientInfo& info = state.info;
-  const auto& colors = info.colors;
-  const auto& positions = info.positions;
-  auto stopCount = colors.size();
-  if (stopCount < 2) {
-    return PDFIndirectReference();
-  }
-
-  // Diamond center and radius in shader coordinates
-  Point center = info.points[0];
-  float radius = info.radiuses[0];
-
-  // Build the binary stream
-  auto meshStream = MemoryWriteStream::Make();
-
-  // The outermost color for background and clamp
-  const Color& outerColor = colors[stopCount - 1];
-
-  // Background rectangle: 2 triangles covering the extended area with outer color.
-  // Uses coordinates outside [0,1] to ensure full coverage after clamp.
-  WriteGouraudVertex(meshStream, 0, -0.1f, -0.1f, outerColor);
-  WriteGouraudVertex(meshStream, 0, -0.1f, 1.1f, outerColor);
-  WriteGouraudVertex(meshStream, 0, 1.1f, -0.1f, outerColor);
-  WriteGouraudVertex(meshStream, 1, 1.1f, 1.1f, outerColor);
-
-  // Normalized center (in [0,1] space, will be mapped by Pattern Matrix)
-  float cx = 0.5f;
-  float cy = 0.5f;
-  float halfSize = 0.5f;
-
-  // Inner ring (ring 0): 4 triangles from center to first stop's diamond tips.
-  // The first stop (index 1) ring tips are at position[1] fraction of the radius.
-  float ringFraction = positions[1];
-  float tipDist = halfSize * ringFraction;
-  // 4 diamond tips: right, top, left, bottom
-  float rightX = cx + tipDist;
-  float topY = cy - tipDist;
-  float leftX = cx - tipDist;
-  float bottomY = cy + tipDist;
-
-  const Color& centerColor = colors[0];
-  const Color& ring0Color = colors[1];
-
-  // Fan from center: center -> right -> top -> left -> bottom -> right (closing)
-  WriteGouraudVertex(meshStream, 0, cx, cy, centerColor);
-  WriteGouraudVertex(meshStream, 0, rightX, cy, ring0Color);
-  WriteGouraudVertex(meshStream, 0, cx, topY, ring0Color);
-  WriteGouraudVertex(meshStream, 2, leftX, cy, ring0Color);
-  WriteGouraudVertex(meshStream, 2, cx, bottomY, ring0Color);
-  WriteGouraudVertex(meshStream, 2, rightX, cy, ring0Color);
-
-  // Subsequent rings: 8 triangles each, connecting inner ring tips to outer ring tips.
-  // Uses a zigzag strip: inner_right -> outer_right -> inner_top -> outer_top -> ...
-  float prevTipDist = tipDist;
-  for (size_t i = 2; i < stopCount; i++) {
-    float outerFraction = positions[i];
-    float outerTipDist = halfSize * outerFraction;
-
-    const Color& innerColor = colors[i - 1];
-    const Color& outerRingColor = colors[i];
-
-    float innerRight = cx + prevTipDist;
-    float innerTop = cy - prevTipDist;
-    float innerLeft = cx - prevTipDist;
-    float innerBottom = cy + prevTipDist;
-
-    float outerRight = cx + outerTipDist;
-    float outerTop = cy - outerTipDist;
-    float outerLeft = cx - outerTipDist;
-    float outerBottom = cy + outerTipDist;
-
-    // 8 triangles as a zigzag strip starting from inner_right -> outer_right -> inner_top ...
-    // First triangle (flag=0,0,0): inner_right -> outer_right -> inner_top
-    WriteGouraudVertex(meshStream, 0, innerRight, cy, innerColor);
-    WriteGouraudVertex(meshStream, 0, outerRight, cy, outerRingColor);
-    WriteGouraudVertex(meshStream, 0, cx, innerTop, innerColor);
-    // Remaining 7 triangles via flag=1 (share BC edge)
-    WriteGouraudVertex(meshStream, 1, cx, outerTop, outerRingColor);
-    WriteGouraudVertex(meshStream, 1, innerLeft, cy, innerColor);
-    WriteGouraudVertex(meshStream, 1, outerLeft, cy, outerRingColor);
-    WriteGouraudVertex(meshStream, 1, cx, innerBottom, innerColor);
-    WriteGouraudVertex(meshStream, 1, cx, outerBottom, outerRingColor);
-    WriteGouraudVertex(meshStream, 1, innerRight, cy, innerColor);
-    WriteGouraudVertex(meshStream, 1, outerRight, cy, outerRingColor);
-
-    prevTipDist = outerTipDist;
-  }
-
-  auto meshData = meshStream->readData();
-  auto stream = Stream::MakeFromData(meshData);
-
-  // Build Shading dictionary
-  auto pdfShader = PDFDictionary::Make();
-  pdfShader->insertInt("ShadingType", 4);
-  pdfShader->insertInt("BitsPerFlag", 8);
-  pdfShader->insertInt("BitsPerCoordinate", 32);
-  pdfShader->insertInt("BitsPerComponent", 8);
-  pdfShader->insertObject(
-      "Decode", MakePDFArray(-0.1f, 1.1f, -0.1f, 1.1f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f));
-  auto ref = doc->colorSpaceRef();
-  if (ref) {
-    pdfShader->insertRef("ColorSpace", ref);
-  } else {
-    pdfShader->insertName("ColorSpace", "DeviceRGB");
-  }
-
-  auto shadingRef = PDFStreamOut(std::move(pdfShader), std::move(stream), doc);
-
-  // Build Pattern Matrix to map [0,1]x[0,1] to the actual diamond region.
-  // The diamond is defined by center and radius in shader coordinates.
-  // In normalized space, (0,0) maps to (center.x - radius, center.y - radius)
-  // and (1,1) maps to (center.x + radius, center.y + radius).
-  float diameter = radius * 2.0f;
-  Matrix shaderToPage =
-      Matrix::MakeAll(diameter, 0, center.x - radius, 0, diameter, center.y - radius, 0, 0, 1);
-  Matrix finalMatrix = state.canvasTransform;
-  finalMatrix.preConcat(state.shaderTransform);
-  finalMatrix.preConcat(shaderToPage);
-
-  auto pdfFunctionShader = PDFDictionary::Make("Pattern");
-  pdfFunctionShader->insertInt("PatternType", 2);
-  pdfFunctionShader->insertObject("Matrix", PDFUtils::MatrixToArray(finalMatrix));
-  pdfFunctionShader->insertRef("Shading", shadingRef);
-  return doc->emit(*pdfFunctionShader);
-}
-
 PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientShader::Key& state) {
-  // Diamond gradient uses ShadingType 4 (Gouraud Triangle Mesh) instead of Function/Axial/Radial.
-  if (state.type == GradientType::Diamond) {
-    return MakeDiamondShader(doc, state);
-  }
-
   Point transformPoints[2];
   const GradientInfo& info = state.info;
   Matrix finalMatrix = state.canvasTransform;
   finalMatrix.preConcat(state.shaderTransform);
 
   bool doStitchFunctions =
-      (state.type == GradientType::Linear || state.type == GradientType::Radial ||
-       state.type == GradientType::Conic);
+      (state.type == GradientType::Linear || state.type == GradientType::Radial);
 
   enum class ShadingType : int32_t {
     Function = 1,
@@ -938,17 +642,6 @@ PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientS
         const Point& pt1 = info.points[0];
         coords = MakePDFArray(pt1.x, pt1.y, 0, pt1.x, pt1.y, info.radiuses[0]);
       } break;
-      case GradientType::Conic: {
-        shadingType = ShadingType::Radial;
-        float r1 = info.radiuses[0];
-        float r2 = info.radiuses[1];
-        Point pt1 = info.points[0];
-        Point pt2 = info.points[1];
-        FixUpRadius(pt1, r1, pt2, r2);
-
-        coords = MakePDFArray(pt1.x, pt1.y, r1, pt2.x, pt2.y, r2);
-        break;
-      }
       case GradientType::None:
       default:
         DEBUG_ASSERT(false);
@@ -968,11 +661,6 @@ PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientS
         transformPoints[1] = transformPoints[0];
         transformPoints[1].x += info.radiuses[0];
         break;
-      case GradientType::Conic: {
-        transformPoints[1] = transformPoints[0];
-        transformPoints[1].x += 1.0f;
-        break;
-      }
       case GradientType::None:
       default:
         return PDFIndirectReference();
@@ -1007,23 +695,6 @@ PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientS
       case GradientType::Radial:
         RadialCode(info, perspectiveInverseOnly, functionCode);
         break;
-      case GradientType::Conic: {
-        // The two point radial gradient further references state.fInfo
-        // in translating from x, y coordinates to the t parameter. So, we have
-        // to transform the points and radii according to the calculated matrix.
-        GradientInfo infoCopy = info;
-        Matrix inverseMapperMatrix;
-        if (!mapperMatrix.invert(&inverseMapperMatrix)) {
-          return PDFIndirectReference();
-        }
-        inverseMapperMatrix.mapPoints(infoCopy.points.data(), 2);
-
-        infoCopy.radiuses[0] =
-            std::sqrt(inverseMapperMatrix.mapXY(info.radiuses[0], info.radiuses[0]).length());
-        infoCopy.radiuses[1] =
-            std::sqrt(inverseMapperMatrix.mapXY(info.radiuses[1], info.radiuses[1]).length());
-        TwoPointConicalCode(infoCopy, perspectiveInverseOnly, functionCode);
-      } break;
       default:
         DEBUG_ASSERT(false);
     }

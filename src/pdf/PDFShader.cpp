@@ -137,7 +137,12 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
   }
   if (Types::Get(innerShader) == Types::ShaderType::Gradient) {
     const auto gradientShader = static_cast<const GradientShader*>(innerShader);
-    return PDFGradientShader::Make(doc, gradientShader, combinedTransform, surfaceBBox);
+    auto gradientType = gradientShader->asGradient(nullptr);
+    // Only Linear and Radial have native PDF Shading support.
+    // Conic and Diamond fall through to the bitmap tiling path.
+    if (gradientType == GradientType::Linear || gradientType == GradientType::Radial) {
+      return PDFGradientShader::Make(doc, gradientShader, combinedTransform, surfaceBBox);
+    }
   }
   if (surfaceBBox.isEmpty()) {
     return PDFIndirectReference();
