@@ -21,6 +21,7 @@
 #include "WebGPUShaderModule.h"
 #include "WebGPUUtil.h"
 #include "core/utils/Log.h"
+#include "gpu/UniformData.h"
 #include "tgfx/gpu/ShaderVisibility.h"
 #ifdef __EMSCRIPTEN__
 #include <emscripten/console.h>
@@ -85,7 +86,22 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
   }
 
   for (auto& entry : descriptor.layout.textureSamplers) {
-    unsigned textureBinding = static_cast<unsigned>(layoutEntries.size());
+    // WGSL shader assigns separated texture/sampler bindings sequentially starting from
+    // TEXTURE_BINDING_POINT_START. For combined sampler at GLSL binding N, the WGSL bindings are:
+    //   texture = TEXTURE_BINDING_POINT_START + (N - TEXTURE_BINDING_POINT_START) * 2
+    //   sampler = texture_binding + 1
+    // However, some shaders (e.g. filter/effect pipelines) may have textureSamplers starting
+    // from binding=0 when there are no uniform blocks. Handle both cases.
+    unsigned textureBinding;
+    if (entry.binding >= TEXTURE_BINDING_POINT_START) {
+      auto samplerIndex =
+          static_cast<unsigned>(entry.binding - TEXTURE_BINDING_POINT_START);
+      textureBinding = TEXTURE_BINDING_POINT_START + samplerIndex * 2;
+    } else {
+      // No UBOs before textures; binding starts from entry.binding directly.
+      textureBinding = static_cast<unsigned>(entry.binding * 2);
+    }
+    unsigned samplerBinding = textureBinding + 1;
     WGPUBindGroupLayoutEntry textureEntry = {};
     textureEntry.binding = textureBinding;
     textureEntry.visibility = WGPUShaderStage_Fragment;
@@ -94,12 +110,11 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
     textureEntry.texture.multisampled = false;
     layoutEntries.push_back(textureEntry);
 
-    unsigned samplerBinding = static_cast<unsigned>(layoutEntries.size());
-    WGPUBindGroupLayoutEntry samplerEntry = {};
-    samplerEntry.binding = samplerBinding;
-    samplerEntry.visibility = WGPUShaderStage_Fragment;
-    samplerEntry.sampler.type = WGPUSamplerBindingType_Filtering;
-    layoutEntries.push_back(samplerEntry);
+    WGPUBindGroupLayoutEntry samplerLayoutEntry = {};
+    samplerLayoutEntry.binding = samplerBinding;
+    samplerLayoutEntry.visibility = WGPUShaderStage_Fragment;
+    samplerLayoutEntry.sampler.type = WGPUSamplerBindingType_Filtering;
+    layoutEntries.push_back(samplerLayoutEntry);
 
     textureUnits[entry.binding] = textureBinding;
   }
@@ -220,7 +235,18 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
   pipelineDesc.multisample.mask = descriptor.multisample.mask;
   pipelineDesc.multisample.alphaToCoverageEnabled = descriptor.multisample.alphaToCoverageEnabled;
 
+  // Push error scope to capture validation errors from pipeline creation.
+  wgpuDevicePushErrorScope(gpu->device(), WGPUErrorFilter_Validation);
   pipeline = wgpuDeviceCreateRenderPipeline(gpu->device(), &pipelineDesc);
+  // Pop error scope and log any validation errors synchronously.
+  wgpuDevicePopErrorScope(
+      gpu->device(),
+      [](WGPUErrorType type, const char* message, void* /*userdata*/) {
+        if (type != WGPUErrorType_NoError) {
+          emscripten_console_errorf("[WebGPU Pipeline] Validation error: %s", message);
+        }
+      },
+      nullptr);
   if (pipeline == nullptr) {
     emscripten_console_logf("[WebGPU Pipeline] FAILED (entries=%zu vbufs=%zu ctargets=%zu ds=%d)",
                             layoutEntries.size(), vertexBuffers.size(), colorTargets.size(),

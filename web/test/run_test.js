@@ -174,6 +174,20 @@ async function run() {
   }
 
   // Extract downloaded zip files to their destinations.
+  // Preserve the Metal baseline cache so that subsequent runs still compare against Metal,
+  // not against a previously cached WebGPU result.
+  const cacheWebDir = path.join(PROJECT_ROOT, 'test/baseline/.cache-web');
+  const md5Path = path.join(cacheWebDir, 'md5.json');
+  const versionPath = path.join(cacheWebDir, 'version.json');
+  const md5BackupPath = md5Path + '.bak';
+  const versionBackupPath = versionPath + '.bak';
+  if (fs.existsSync(md5Path)) {
+    fs.copyFileSync(md5Path, md5BackupPath);
+  }
+  if (fs.existsSync(versionPath)) {
+    fs.copyFileSync(versionPath, versionBackupPath);
+  }
+
   console.log('\nExtracting downloaded files...');
   for (const [zipName, destDir] of Object.entries(ZIP_DESTINATIONS)) {
     const zipPath = path.join(DOWNLOADS_DIR, zipName);
@@ -183,6 +197,16 @@ async function run() {
     } else {
       console.warn(`  ${zipName} not found, skipping.`);
     }
+  }
+
+  // Restore the Metal baseline cache after cache-web.zip extraction overwrites it.
+  if (fs.existsSync(md5BackupPath)) {
+    fs.copyFileSync(md5BackupPath, md5Path);
+    fs.unlinkSync(md5BackupPath);
+  }
+  if (fs.existsSync(versionBackupPath)) {
+    fs.copyFileSync(versionBackupPath, versionPath);
+    fs.unlinkSync(versionBackupPath);
   }
 
   // Clean up downloads directory.

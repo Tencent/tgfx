@@ -24,6 +24,9 @@
 #include "gpu/UniformData.h"
 #include "src/tint/lang/spirv/reader/reader.h"
 #include "src/tint/lang/wgsl/writer/writer.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten/console.h>
+#endif
 
 namespace tgfx {
 
@@ -247,6 +250,19 @@ bool WebGPUShaderModule::compileShader(WGPUDevice device, const std::string& gls
   if (wgslCode.empty()) {
     LOGE("Tint generated empty WGSL code");
     return false;
+  }
+
+  // Log WGSL binding info for debugging pipeline layout mismatches.
+  if (stage == ShaderStage::Fragment) {
+    emscripten_console_logf("[WebGPU WGSL Fragment] bindings in shader:");
+    // Find @binding lines
+    size_t pos = 0;
+    while ((pos = wgslCode.find("@binding(", pos)) != std::string::npos) {
+      auto end = wgslCode.find('\n', pos);
+      auto line = wgslCode.substr(pos, std::min(end - pos, size_t(120)));
+      emscripten_console_logf("  %s", line.c_str());
+      pos = end != std::string::npos ? end + 1 : wgslCode.size();
+    }
   }
 
   // Create shader module with WGSL code.
