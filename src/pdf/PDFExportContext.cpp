@@ -797,6 +797,37 @@ void PDFExportContext::onDrawPath(const Matrix& matrix, const ClipStack& clip, c
     return;
   }
 
+  // Intercept ImageShader: extract the original Image and draw it directly as an Image XObject
+  // (like Figma does), instead of going through the Tiling Pattern path which loses resolution.
+  if (brush.shader) {
+    auto shader = brush.shader;
+    Matrix shaderMatrix = Matrix::I();
+    // Unwrap MatrixShader layers to get the underlying ImageShader + accumulated matrix.
+    while (Types::Get(shader.get()) == Types::ShaderType::Matrix) {
+      const auto matrixShader = static_cast<const MatrixShader*>(shader.get());
+      shaderMatrix.preConcat(matrixShader->matrix);
+      shader = matrixShader->source;
+    }
+    if (Types::Get(shader.get()) == Types::ShaderType::Image) {
+      const auto imageShader = static_cast<const ImageShader*>(shader.get());
+      auto image = imageShader->image;
+      if (image) {
+        // Build a Brush without the shader so onDrawImageRect won't recurse back here.
+        Brush imageBrush = brush;
+        imageBrush.shader = nullptr;
+        // Compute the destination rect from the path bounds and apply the shader matrix.
+        auto imageRect = Rect::MakeWH(image->width(), image->height());
+        // The shader matrix maps image space → path space.
+        // We need to map imageRect through shaderMatrix to get the display rect.
+        Rect dstRect = imageRect;
+        shaderMatrix.mapRect(&dstRect);
+        // Adjust MCState to account for any difference between dstRect and pathBounds.
+        onDrawImageRect(image, dstRect, {}, matrix, clip, imageBrush);
+        return;
+      }
+    }
+  }
+
   ScopedContentEntry scopedContent(this, matrix, clip, Matrix::I(), brush);
   if (!scopedContent) {
     return;
