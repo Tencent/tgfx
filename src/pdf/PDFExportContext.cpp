@@ -918,10 +918,6 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     auto imageShader =
         Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, SamplingOptions());
     auto shaderTransform = transform;
-    Matrix inverse;
-    if (matrix.invert(&inverse)) {
-      shaderTransform.postConcat(inverse);
-    }
     imageShader = imageShader->makeWithMatrix(shaderTransform);
     modifiedBrush.shader = imageShader;
 
