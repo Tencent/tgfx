@@ -160,7 +160,7 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
     return pdfShader;
   }
   // Don't bother to de-dup fallback shader.
-  return MakeFallbackShader(doc, shader, canvasTransform, surfaceBBox, paintColor);
+  return MakeFallbackShader(doc, shader, combinedTransform, surfaceBBox, paintColor);
 }
 
 PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix finalMatrix,

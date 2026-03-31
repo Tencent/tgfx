@@ -819,8 +819,7 @@ TGFX_TEST(PDFExportTest, DropShadowLayer) {
   layerA->setPath(pathA);
   layerA->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 127)));
   layerA->setPosition(Point{50.f, 50.f});
-  layerA->setLayerStyles(
-      {DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), false)});
+  layerA->setLayerStyles({DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), false)});
   root->addChild(layerA);
 
   // Right: showBehindLayer=true
@@ -830,8 +829,7 @@ TGFX_TEST(PDFExportTest, DropShadowLayer) {
   layerB->setPath(pathB);
   layerB->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 127)));
   layerB->setPosition(Point{350.f, 50.f});
-  layerB->setLayerStyles(
-      {DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), true)});
+  layerB->setLayerStyles({DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), true)});
   root->addChild(layerB);
 
   auto PDFStream = MemoryWriteStream::Make();

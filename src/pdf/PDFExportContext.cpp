@@ -909,7 +909,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     auto graphicState = PDFGraphicState::GetSMaskGraphicState(
         xObjext, false, PDFGraphicState::SMaskMode::Luminosity, document);
     this->setGraphicState(graphicState, content.stream());
-
+    PDFUtils::AppendRectangle(Rect::MakeSize(_pageSize), content.stream());
     PDFUtils::PaintPath(PathFillType::Winding, content.stream());
     this->clearMaskOnGraphicState(content.stream());
     return;
