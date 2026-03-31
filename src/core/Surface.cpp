@@ -242,9 +242,6 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
     return false;
   }
   dstPixels = dstInfo.computeOffset(dstPixels, -srcX, -srcY);
-  auto colorType = PixelFormatToColorType(renderTarget->format());
-  auto srcInfo = ImageInfo::Make(outInfo.width(), outInfo.height(), colorType,
-                                 AlphaType::Premultiplied, 0, colorSpace());
   auto readX = std::max(0, srcX);
   auto readY = std::max(0, srcY);
   auto rect = Rect::MakeXYWH(readX, readY, outInfo.width(), outInfo.height());
@@ -258,6 +255,8 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
     return false;
   }
   auto flipY = renderTarget->origin() == ImageOrigin::BottomLeft;
+  // Use the readback's ImageInfo which has the correct aligned rowBytes for GPU buffer layout.
+  auto srcInfo = readback->info();
   CopyPixels(srcInfo, srcPixels, outInfo, dstPixels, flipY);
   readback->unlockPixels(context);
   return true;
