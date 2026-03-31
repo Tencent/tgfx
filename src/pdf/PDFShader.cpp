@@ -90,9 +90,9 @@ void FillColorFromBitmap(Canvas* canvas, float left, float top, float right, flo
   }
 }
 
-Color AdjustColor(const std::shared_ptr<Shader>& shader, Color paintColor) {
-  if (Types::Get(shader.get()) == Types::ShaderType::Image) {
-    const auto imageShader = static_cast<const ImageShader*>(shader.get());
+Color AdjustColor(const Shader* shader, Color paintColor) {
+  if (Types::Get(shader) == Types::ShaderType::Image) {
+    const auto imageShader = static_cast<const ImageShader*>(shader);
     const auto img = imageShader->image.get();
     if (img && img->isAlphaOnly()) {
       return paintColor;
@@ -148,16 +148,15 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
     return PDFIndirectReference();
   }
 
-  paintColor = AdjustColor(shader, paintColor);
-  TileMode imageTileModes[2];
+  paintColor = AdjustColor(innerShader, paintColor);
 
-  if (Types::Get(shader.get()) == Types::ShaderType::Image) {
-    const auto imageShader = static_cast<const ImageShader*>(shader.get());
+  if (Types::Get(innerShader) == Types::ShaderType::Image) {
+    const auto imageShader = static_cast<const ImageShader*>(innerShader);
     auto shaderImage = imageShader->image;
     // TODO (YGaurora): Cache image shaders and remove duplicates
     PDFIndirectReference pdfShader =
-        MakeImageShader(doc, canvasTransform, imageTileModes[0], imageTileModes[1], surfaceBBox,
-                        shaderImage, paintColor);
+        MakeImageShader(doc, combinedTransform, imageShader->tileModeX, imageShader->tileModeY,
+                        surfaceBBox, shaderImage, paintColor);
     return pdfShader;
   }
   // Don't bother to de-dup fallback shader.

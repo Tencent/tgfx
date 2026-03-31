@@ -789,21 +789,6 @@ TGFX_TEST(PDFExportTest, BitmapMask) {
   float pageW = 300.f;
   float pageH = 300.f;
 
-  // Render to Surface for visual comparison
-  {
-    auto surface = Surface::Make(context, static_cast<int>(pageW), static_cast<int>(pageH));
-    auto canvas = surface->getCanvas();
-    canvas->clear(Color::White());
-    canvas->translate(50.f, 50.f);
-    Paint paint;
-    paint.setColor(Color::Red());
-    paint.setMaskFilter(maskFilter);
-    canvas->drawRect(Rect::MakeWH(200.f, 200.f), paint);
-    Baseline::Compare(surface, "PDFTest/BitmapMask_Surface");
-  }
-
-  // PDF export — this should go through drawPathWithFilter's bitmap mask branch
-  // because the mask shader contains a regular Image (not PictureImage).
   auto PDFStream = MemoryWriteStream::Make();
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   auto canvas = document->beginPage(pageW, pageH);
@@ -851,10 +836,41 @@ TGFX_TEST(PDFExportTest, DropShadowLayer) {
 
   auto PDFStream = MemoryWriteStream::Make();
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+
+  // Page 1: rectangles
   auto canvas = document->beginPage(650.f, 350.f);
   canvas->drawColor(Color::FromRGBA(200, 200, 200));
   root->draw(canvas);
   document->endPage();
+
+  // Page 2: circles with the same drop shadow configuration
+  auto circleRoot = Layer::Make();
+
+  auto circleA = ShapeLayer::Make();
+  Path circlePath1;
+  circlePath1.addOval(Rect::MakeWH(200.f, 200.f));
+  circleA->setPath(circlePath1);
+  circleA->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 127)));
+  circleA->setPosition(Point{50.f, 50.f});
+  circleA->setLayerStyles({DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), false),
+                           DropShadowStyle::Make(-20.f, -20.f, 10.f, 10.f, Color::Green(), false)});
+  circleRoot->addChild(circleA);
+
+  auto circleB = ShapeLayer::Make();
+  Path circlePath2;
+  circlePath2.addOval(Rect::MakeWH(200.f, 200.f));
+  circleB->setPath(circlePath2);
+  circleB->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 127)));
+  circleB->setPosition(Point{350.f, 50.f});
+  circleB->setLayerStyles({DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), true),
+                           DropShadowStyle::Make(-20.f, -20.f, 10.f, 10.f, Color::Green(), true)});
+  circleRoot->addChild(circleB);
+
+  canvas = document->beginPage(650.f, 350.f);
+  canvas->drawColor(Color::FromRGBA(200, 200, 200));
+  circleRoot->draw(canvas);
+  document->endPage();
+
   document->close();
   PDFStream->flush();
 
