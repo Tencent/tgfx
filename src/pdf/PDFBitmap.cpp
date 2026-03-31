@@ -310,6 +310,7 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
                                PDFDocumentImpl* doc, PDFIndirectReference ref) {
   // Unwrap RasterizedImage / OrientImage layers to find the underlying CodecImage.
   auto source = image;
+  bool hasOrientImage = false;
   while (source) {
     auto imageType = Types::Get(source.get());
     if (imageType == Types::ImageType::Codec) {
@@ -318,6 +319,7 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
     if (imageType == Types::ImageType::Rasterized) {
       source = static_cast<const RasterizedImage*>(source.get())->source;
     } else if (imageType == Types::ImageType::Orient) {
+      hasOrientImage = true;
       source = static_cast<const TransformImage*>(source.get())->source;
     } else {
       source = nullptr;
@@ -326,8 +328,9 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
   if (source && Types::Get(source.get()) == Types::ImageType::Codec) {
     const auto codecImage = static_cast<const CodecImage*>(source.get());
     auto codec = codecImage->getCodec();
-    // Only embed the original JPEG data when the image has not been scaled.
-    if (image->width() == codec->width() && image->height() == codec->height()) {
+    // Only embed original JPEG bytes when no orientation transform is pending.
+    if (!hasOrientImage && codec->orientation() == Orientation::TopLeft &&
+        image->width() == codec->width() && image->height() == codec->height()) {
       auto encodedData = codec->getEncodedData();
       if (encodedData && JpegCodec::IsJpeg(encodedData)) {
         EmitJpegStream(doc, ref, ISize::Make(image->width(), image->height()), encodedData);
