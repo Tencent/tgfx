@@ -118,6 +118,7 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
   std::vector<WGPUVertexBufferLayout> vertexBuffers = {};
   std::vector<std::vector<WGPUVertexAttribute>> allAttributes = {};
 
+  uint32_t globalShaderLocation = 0;
   for (size_t i = 0; i < descriptor.vertex.bufferLayouts.size(); i++) {
     auto& layout = descriptor.vertex.bufferLayouts[i];
     std::vector<WGPUVertexAttribute> attrs = {};
@@ -126,7 +127,7 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
       WGPUVertexAttribute attr = {};
       attr.format = ToWGPUVertexFormat(layout.attributes[j].format());
       attr.offset = offset;
-      attr.shaderLocation = static_cast<uint32_t>(j);
+      attr.shaderLocation = globalShaderLocation++;
       attrs.push_back(attr);
       offset += layout.attributes[j].size();
     }
