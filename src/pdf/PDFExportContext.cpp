@@ -909,7 +909,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     auto graphicState = PDFGraphicState::GetSMaskGraphicState(
         xObjext, false, PDFGraphicState::SMaskMode::Luminosity, document);
     this->setGraphicState(graphicState, content.stream());
-    PDFUtils::AppendRectangle(Rect::MakeSize(_pageSize), content.stream());
+
     PDFUtils::PaintPath(PathFillType::Winding, content.stream());
     this->clearMaskOnGraphicState(content.stream());
     return;
@@ -917,7 +917,12 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
   if (modifiedBrush.maskFilter) {
     auto imageShader =
         Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, SamplingOptions());
-    imageShader = imageShader->makeWithMatrix(transform);
+    auto shaderTransform = transform;
+    Matrix inverse;
+    if (matrix.invert(&inverse)) {
+      shaderTransform.postConcat(inverse);
+    }
+    imageShader = imageShader->makeWithMatrix(shaderTransform);
     modifiedBrush.shader = imageShader;
 
     Path path;
@@ -1338,6 +1343,9 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
   }
   const auto shaderMaskFilter = static_cast<const ShaderMaskFilter*>(originPaint.maskFilter.get());
   auto [picture, pictureMatrix] = MaskFilterToPicture(shaderMaskFilter);
+  if (shaderMaskFilter->isInverted()) {
+    picture = nullptr;
+  }
 
   auto maskContext = makeCongruentDevice();
   if (!picture) {  //mask as image
@@ -1346,7 +1354,14 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
                                  document->dstColorSpace());
     Canvas* maskCanvas = surface->getCanvas();
     Paint maskPaint;
-    maskPaint.setShader(shaderMaskFilter->getShader());
+    // Compensate for maskBound offset: the mask shader's coordinates are in the path's
+    // coordinate space (which starts at maskBound.x/y), but the surface starts at (0,0).
+    // Apply an inverse translation to the shader so it samples from the correct region.
+    auto shader = shaderMaskFilter->getShader();
+    if (maskBound.x() != 0 || maskBound.y() != 0) {
+      shader = shader->makeWithMatrix(Matrix::MakeTrans(-maskBound.x(), -maskBound.y()));
+    }
+    maskPaint.setShader(shader);
     maskCanvas->drawPaint(maskPaint);
 
     auto grayscaleInfo = ImageInfo::Make(surface->width(), surface->height(), ColorType::ALPHA_8);
@@ -1356,11 +1371,32 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
       free(pixels);
       return;
     }
-    auto pixelData = Data::MakeAdopted(pixels, byteSize, Data::FreeProc);
-    // Convert alpha-8 to a grayscale image
-    grayscaleInfo = ImageInfo::Make(surface->width(), surface->height(), ColorType::Gray_8,
-                                    AlphaType::Premultiplied, 0, document->dstColorSpace());
-    auto maskImage = Image::MakeFrom(grayscaleInfo, pixelData);
+    // Convert ALPHA_8 pixels to RGBA to avoid GPU texture upload issues.
+    // Gray_8 and ALPHA_8 formats both trigger texture upload attempts, which fail for CPU-only data.
+    // Instead, convert to RGBA_8888 so PDF serialization can handle it without GPU.
+    int w = static_cast<int>(maskBound.width());
+    int h = static_cast<int>(maskBound.height());
+    auto rgbaInfo = ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Unpremultiplied);
+    auto rgbaSize = rgbaInfo.byteSize();
+    auto* rgbaPixels = static_cast<uint8_t*>(malloc(rgbaSize));
+    auto* alphaPixels = static_cast<const uint8_t*>(pixels);
+    for (int i = 0; i < w * h; ++i) {
+      uint8_t a = alphaPixels[i];
+      // When inverted, flip the mask: areas that were opaque become transparent and vice versa.
+      // PDF SMask has no native inversion support, so we invert the pixel values directly.
+      if (shaderMaskFilter->isInverted()) {
+        a = static_cast<uint8_t>(255 - a);
+      }
+      // For mask, replicate alpha to RGB channels for luminosity blending in PDF
+      rgbaPixels[i * 4 + 0] = a;
+      rgbaPixels[i * 4 + 1] = a;
+      rgbaPixels[i * 4 + 2] = a;
+      rgbaPixels[i * 4 + 3] = 255;  // Full opacity
+    }
+    free(pixels);  // Release ALPHA_8 data
+
+    auto rgbaData = Data::MakeAdopted(rgbaPixels, rgbaSize, Data::FreeProc);
+    auto maskImage = Image::MakeFrom(rgbaInfo, rgbaData);
 
     // PDF doesn't seem to allow masking vector graphics with an Image XObject.
     // Must mask with a Form XObject.
