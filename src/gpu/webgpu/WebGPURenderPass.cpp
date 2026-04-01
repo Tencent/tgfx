@@ -260,24 +260,37 @@ void WebGPURenderPass::updateBindGroup() {
   }
 }
 
-void WebGPURenderPass::draw(PrimitiveType, uint32_t vertexCount, uint32_t instanceCount,
-                            uint32_t firstVertex, uint32_t firstInstance) {
+void WebGPURenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
+                            uint32_t instanceCount, uint32_t firstVertex,
+                            uint32_t firstInstance) {
   if (passEncoder == nullptr || currentPipeline == nullptr) {
     return;
   }
-  emscripten_console_logf("[WebGPU Draw] vertexCount=%u instanceCount=%u", vertexCount,
-                          instanceCount);
+  // WebGPU requires topology at pipeline creation time. Select the correct pipeline variant.
+  auto topology = ToWGPUPrimitiveTopology(primitiveType);
+  auto wgpuPipeline = currentPipeline->webgpuRenderPipeline(topology);
+  wgpuRenderPassEncoderSetPipeline(passEncoder, wgpuPipeline);
+  emscripten_console_logf("[WebGPU Draw] vertexCount=%u instanceCount=%u topology=%d", vertexCount,
+                          instanceCount, static_cast<int>(topology));
   updateBindGroup();
   wgpuRenderPassEncoderDraw(passEncoder, vertexCount, instanceCount, firstVertex, firstInstance);
   emscripten_console_logf("[WebGPU Draw] Done");
 }
 
-void WebGPURenderPass::drawIndexed(PrimitiveType, uint32_t indexCount, uint32_t instanceCount,
-                                   uint32_t firstIndex, int32_t baseVertex,
-                                   uint32_t firstInstance) {
+void WebGPURenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCount,
+                                   uint32_t instanceCount, uint32_t firstIndex,
+                                   int32_t baseVertex, uint32_t firstInstance) {
   if (passEncoder == nullptr || currentPipeline == nullptr) {
+    emscripten_console_logf("[WebGPU DrawIndexed] SKIPPED: encoder=%p pipeline=%p",
+                            static_cast<void*>(passEncoder),
+                            currentPipeline ? static_cast<void*>(currentPipeline->webgpuRenderPipeline()) : nullptr);
     return;
   }
+  auto topology = ToWGPUPrimitiveTopology(primitiveType);
+  auto wgpuPipeline = currentPipeline->webgpuRenderPipeline(topology);
+  wgpuRenderPassEncoderSetPipeline(passEncoder, wgpuPipeline);
+  emscripten_console_logf("[WebGPU DrawIndexed] indexCount=%u instanceCount=%u baseVertex=%d topology=%d",
+                          indexCount, instanceCount, baseVertex, static_cast<int>(topology));
   updateBindGroup();
   wgpuRenderPassEncoderDrawIndexed(passEncoder, indexCount, instanceCount, firstIndex, baseVertex,
                                    firstInstance);

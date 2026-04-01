@@ -247,6 +247,12 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
         }
       },
       nullptr);
+
+  // Also create a TriangleStrip variant since WebGPU requires topology at pipeline creation time,
+  // but TGFX specifies it at draw time. Many draw calls use TriangleStrip(4 vertices) for quads.
+  pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleStrip;
+  pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Uint16;
+  pipelineStrip = wgpuDeviceCreateRenderPipeline(gpu->device(), &pipelineDesc);
   if (pipeline == nullptr) {
     emscripten_console_logf("[WebGPU Pipeline] FAILED (entries=%zu vbufs=%zu ctargets=%zu ds=%d)",
                             layoutEntries.size(), vertexBuffers.size(), colorTargets.size(),
@@ -279,6 +285,10 @@ void WebGPURenderPipeline::onRelease(WebGPUGPU*) {
   if (pipeline != nullptr) {
     wgpuRenderPipelineRelease(pipeline);
     pipeline = nullptr;
+  }
+  if (pipelineStrip != nullptr) {
+    wgpuRenderPipelineRelease(pipelineStrip);
+    pipelineStrip = nullptr;
   }
   if (_bindGroupLayout != nullptr) {
     wgpuBindGroupLayoutRelease(_bindGroupLayout);

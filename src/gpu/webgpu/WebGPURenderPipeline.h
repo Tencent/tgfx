@@ -33,8 +33,11 @@ class WebGPURenderPipeline : public RenderPipeline, public WebGPUResource {
   static std::shared_ptr<WebGPURenderPipeline> Make(WebGPUGPU* gpu,
                                                     const RenderPipelineDescriptor& descriptor);
 
-  WGPURenderPipeline webgpuRenderPipeline() const {
-    return pipeline;
+  WGPURenderPipeline webgpuRenderPipeline(WGPUPrimitiveTopology topology =
+                                              WGPUPrimitiveTopology_TriangleList) const {
+    return topology == WGPUPrimitiveTopology_TriangleStrip && pipelineStrip != nullptr
+               ? pipelineStrip
+               : pipeline;
   }
 
   WGPUBindGroupLayout bindGroupLayout() const {
@@ -53,7 +56,8 @@ class WebGPURenderPipeline : public RenderPipeline, public WebGPUResource {
 
   bool createPipelineState(WebGPUGPU* gpu, const RenderPipelineDescriptor& descriptor);
 
-  WGPURenderPipeline pipeline = nullptr;
+  WGPURenderPipeline pipeline = nullptr;       // TriangleList
+  WGPURenderPipeline pipelineStrip = nullptr;  // TriangleStrip
   WGPUBindGroupLayout _bindGroupLayout = nullptr;
   WGPUPipelineLayout pipelineLayout = nullptr;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
