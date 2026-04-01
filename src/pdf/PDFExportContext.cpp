@@ -1343,12 +1343,11 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
   }
   const auto shaderMaskFilter = static_cast<const ShaderMaskFilter*>(originPaint.maskFilter.get());
   auto [picture, pictureMatrix] = MaskFilterToPicture(shaderMaskFilter);
-  if (shaderMaskFilter->isInverted()) {
-    picture = nullptr;
-  }
+  // Inverted masks have no vector Picture representation — always rasterize as bitmap.
+  bool useBitmapMask = !picture || shaderMaskFilter->isInverted();
 
   auto maskContext = makeCongruentDevice();
-  if (!picture) {  //mask as image
+  if (useBitmapMask) {
     auto surface = Surface::Make(document->context(), static_cast<int>(maskBound.width()),
                                  static_cast<int>(maskBound.height()), false, 1, false, 0,
                                  document->dstColorSpace());
@@ -1381,13 +1380,10 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
     auto* rgbaPixels = static_cast<uint8_t*>(malloc(rgbaSize));
     auto* alphaPixels = static_cast<const uint8_t*>(pixels);
     for (int i = 0; i < w * h; ++i) {
-      uint8_t a = alphaPixels[i];
-      // When inverted, flip the mask: areas that were opaque become transparent and vice versa.
       // PDF SMask has no native inversion support, so we invert the pixel values directly.
-      if (shaderMaskFilter->isInverted()) {
-        a = static_cast<uint8_t>(255 - a);
-      }
-      // For mask, replicate alpha to RGB channels for luminosity blending in PDF
+      uint8_t a = shaderMaskFilter->isInverted() ? static_cast<uint8_t>(255 - alphaPixels[i])
+                                                  : alphaPixels[i];
+      // Replicate alpha to RGB channels for luminosity blending in PDF
       rgbaPixels[i * 4 + 0] = a;
       rgbaPixels[i * 4 + 1] = a;
       rgbaPixels[i * 4 + 2] = a;
@@ -1421,7 +1417,7 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
   setGraphicState(
       PDFGraphicState::GetSMaskGraphicState(
           maskContext->makeFormXObjectFromDevice(maskBound, true), false,
-          picture ? PDFGraphicState::SMaskMode::Alpha : PDFGraphicState::SMaskMode::Luminosity,
+          useBitmapMask ? PDFGraphicState::SMaskMode::Luminosity : PDFGraphicState::SMaskMode::Alpha,
           document),
       contentEntry.stream());
 
