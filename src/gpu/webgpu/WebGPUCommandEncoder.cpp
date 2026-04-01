@@ -263,6 +263,7 @@ void WebGPUCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> te
     // Begin render pass targeting this mip level.
     WGPURenderPassColorAttachment colorAttachment = {};
     colorAttachment.view = dstView;
+    colorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
     colorAttachment.loadOp = WGPULoadOp_Clear;
     colorAttachment.storeOp = WGPUStoreOp_Store;
     colorAttachment.clearValue = {0.0, 0.0, 0.0, 0.0};

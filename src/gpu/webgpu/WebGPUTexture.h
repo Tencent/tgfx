@@ -41,6 +41,12 @@ class WebGPUTexture : public Texture, public WebGPUResource {
     return textureView;
   }
 
+  // Returns a view suitable for use as a render target attachment (single mip level).
+  // Falls back to the default textureView if no separate render view exists.
+  WGPUTextureView webgpuRenderView() const {
+    return renderView != nullptr ? renderView : textureView;
+  }
+
   WGPUTextureFormat webgpuFormat() const {
     return wgpuFormat;
   }
@@ -57,6 +63,7 @@ class WebGPUTexture : public Texture, public WebGPUResource {
 
   WGPUTexture texture = nullptr;
   WGPUTextureView textureView = nullptr;
+  WGPUTextureView renderView = nullptr;  // single mip level view for render targets
   WGPUTextureFormat wgpuFormat = WGPUTextureFormat_RGBA8Unorm;
   bool adopted = false;
 

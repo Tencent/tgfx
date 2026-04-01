@@ -43,7 +43,7 @@ std::shared_ptr<WebGPURenderPass> WebGPURenderPass::Make(WebGPUGPU* gpu, WGPUCom
     }
     auto texture = std::static_pointer_cast<WebGPUTexture>(attachment.texture);
     WGPURenderPassColorAttachment colorAttach = {};
-    colorAttach.view = texture->webgpuTextureView();
+    colorAttach.view = texture->webgpuRenderView();
     colorAttach.loadOp = ToWGPULoadOp(attachment.loadAction);
     colorAttach.storeOp = ToWGPUStoreOp(attachment.storeAction);
     colorAttach.clearValue = {attachment.clearValue.red, attachment.clearValue.green,
@@ -54,7 +54,7 @@ std::shared_ptr<WebGPURenderPass> WebGPURenderPass::Make(WebGPUGPU* gpu, WGPUCom
                             colorAttach.loadOp, colorAttach.storeOp);
     if (attachment.resolveTexture != nullptr) {
       auto resolveTexture = std::static_pointer_cast<WebGPUTexture>(attachment.resolveTexture);
-      colorAttach.resolveTarget = resolveTexture->webgpuTextureView();
+      colorAttach.resolveTarget = resolveTexture->webgpuRenderView();
     }
     colorAttachments.push_back(colorAttach);
   }

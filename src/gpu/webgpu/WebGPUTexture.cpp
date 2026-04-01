@@ -48,12 +48,28 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::Make(WebGPUGPU* gpu,
   if (texture == nullptr) {
     return nullptr;
   }
+  // Default view includes all mip levels (used for sampling).
   auto textureView = wgpuTextureCreateView(texture, nullptr);
   if (textureView == nullptr) {
     wgpuTextureRelease(texture);
     return nullptr;
   }
-  return gpu->makeResource<WebGPUTexture>(texture, textureView, format, descriptor, true);
+  // When a texture has mipmaps and is used as a render attachment, WebGPU requires the view
+  // to reference exactly one mip level. Create a separate single-level view for rendering.
+  WGPUTextureView renderView = nullptr;
+  if (descriptor.mipLevelCount > 1 && (descriptor.usage & TextureUsage::RENDER_ATTACHMENT)) {
+    WGPUTextureViewDescriptor viewDesc = {};
+    viewDesc.format = format;
+    viewDesc.dimension = WGPUTextureViewDimension_2D;
+    viewDesc.baseMipLevel = 0;
+    viewDesc.mipLevelCount = 1;
+    viewDesc.baseArrayLayer = 0;
+    viewDesc.arrayLayerCount = 1;
+    renderView = wgpuTextureCreateView(texture, &viewDesc);
+  }
+  auto result = gpu->makeResource<WebGPUTexture>(texture, textureView, format, descriptor, true);
+  result->renderView = renderView;
+  return result;
 }
 
 std::shared_ptr<WebGPUTexture> WebGPUTexture::MakeFrom(WebGPUGPU* gpu, WGPUTexture texture,
@@ -110,6 +126,10 @@ BackendRenderTarget WebGPUTexture::getBackendRenderTarget() const {
 }
 
 void WebGPUTexture::onRelease(WebGPUGPU*) {
+  if (renderView != nullptr) {
+    wgpuTextureViewRelease(renderView);
+    renderView = nullptr;
+  }
   if (textureView != nullptr) {
     wgpuTextureViewRelease(textureView);
     textureView = nullptr;
