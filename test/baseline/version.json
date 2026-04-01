@@ -279,6 +279,7 @@
         "Matrix_3D_Offscreen_Blend": "7ce872bef",
         "Matrix_Behind_Viewer": "439ca4178",
         "MeshLayer": "c3630d40",
+        "Nested3DContextSampleCount": "829b100b",
         "PartialDrawLayer": "c37a86c8",
         "PartialDrawLayer_shapeLayer": "c37a86c8",
         "PassThoughAndNormal": "43cd416",
