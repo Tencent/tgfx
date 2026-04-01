@@ -80,7 +80,5 @@ class RasterizedImage : public Image {
   UniqueKey uniqueKey;
 
   std::shared_ptr<Image> source = nullptr;
-
-  friend class PDFBitmap;
 };
 }  // namespace tgfx
