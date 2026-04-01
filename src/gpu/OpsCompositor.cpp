@@ -165,8 +165,22 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix
   if (canAppend(PendingOpType::Shape, clip, brush) && pendingShape &&
       pendingShape->getUniqueKey() == shape->getUniqueKey() &&
       MatrixOnlyDiffersInTranslation(pendingShapeMatrix, matrix)) {
+    // Offset has two sources, both in device space:
+    // 1. Canvas matrix translation difference (already in device space).
+    // 2. Shape bounds difference (in local space, needs matrix linear transform to device space).
+    //    This occurs when tryAddSimplifiedMatrixShape encodes position into shape bounds
+    //    instead of the canvas matrix.
     auto dx = matrix.getTranslateX() - pendingShapeMatrix.getTranslateX();
     auto dy = matrix.getTranslateY() - pendingShapeMatrix.getTranslateY();
+    auto baseBounds = pendingShape->getBounds();
+    auto newBounds = shape->getBounds();
+    auto boundsDx = newBounds.left - baseBounds.left;
+    auto boundsDy = newBounds.top - baseBounds.top;
+    if (boundsDx != 0.0f || boundsDy != 0.0f) {
+      // Map local-space bounds offset to device space through the matrix linear part.
+      dx += matrix.getScaleX() * boundsDx + matrix.getSkewX() * boundsDy;
+      dy += matrix.getSkewY() * boundsDx + matrix.getScaleY() * boundsDy;
+    }
     pendingShapeOffsets.emplace_back(dx, dy);
     pendingShapeColors.emplace_back(brush.color);
     return;
