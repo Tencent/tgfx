@@ -270,7 +270,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
       patternBBox.left = 0;
     }
 
-    if (roundedRight > width) {
+    if (roundedRight > static_cast<int>(width)) {
       subset.offset(static_cast<float>(bitmap.width()) - 1.f, 0.f);
       Bitmap right = ExtractSubset(bitmap, subset);
       auto rightMatrix = ScaleTranslate(deviceBounds.right - width, 1, width, 0);
@@ -288,7 +288,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
     if (roundedLeft < 0) {
       patternBBox.left = 0;
     }
-    if (roundedRight > width) {
+    if (roundedRight > static_cast<int>(width)) {
       patternBBox.right = deviceBounds.width();
     }
   }
@@ -308,7 +308,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
       patternBBox.top = 0;
     }
 
-    if (roundedBottom > height) {
+    if (roundedBottom > static_cast<int>(height)) {
       subset.offset(0.f, static_cast<float>(bitmap.height()) - 1.f);
       Bitmap bottom = ExtractSubset(bitmap, subset);
 
@@ -327,7 +327,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
     if (roundedTop < 0) {
       patternBBox.top = 0;
     }
-    if (roundedBottom > height) {
+    if (roundedBottom > static_cast<int>(height)) {
       patternBBox.bottom = deviceBounds.height();
     }
   }
