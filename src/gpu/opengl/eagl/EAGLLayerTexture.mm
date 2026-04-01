@@ -94,35 +94,42 @@ std::shared_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
   }
   auto gl = gpu->functions();
   unsigned frameBufferID = 0, resolveFBO = 0, msaaRBID = 0;
-  if (sampleCount <= 1) {
-    frameBufferID = CreateFramebufferForRenderbuffer(gpu, resolveRBID);
-    if (frameBufferID == 0) {
-      LOGE("EAGLLayerTexture::MakeFrom() failed to create framebuffer!");
-      gl->deleteRenderbuffers(1, &resolveRBID);
-      return nullptr;
+  bool success = false;
+  do {
+    if (sampleCount <= 1) {
+      frameBufferID = CreateFramebufferForRenderbuffer(gpu, resolveRBID);
+      if (frameBufferID == 0) {
+        LOGE("EAGLLayerTexture::MakeFrom() failed to create framebuffer!");
+        break;
+      }
+    } else {
+      resolveFBO = CreateFramebufferForRenderbuffer(gpu, resolveRBID);
+      if (resolveFBO == 0) {
+        LOGE("EAGLLayerTexture::MakeFrom() failed to create resolve framebuffer!");
+        break;
+      }
+      msaaRBID = CreateMSAARenderbuffer(gpu, sampleCount, width, height);
+      if (msaaRBID == 0) {
+        LOGE("EAGLLayerTexture::MakeFrom() failed to create MSAA renderbuffer!");
+        break;
+      }
+      frameBufferID = CreateFramebufferForRenderbuffer(gpu, msaaRBID);
+      if (frameBufferID == 0) {
+        LOGE("EAGLLayerTexture::MakeFrom() failed to create MSAA framebuffer!");
+        break;
+      }
     }
-  } else {
-    resolveFBO = CreateFramebufferForRenderbuffer(gpu, resolveRBID);
-    if (resolveFBO == 0) {
-      LOGE("EAGLLayerTexture::MakeFrom() failed to create resolve framebuffer!");
-      gl->deleteRenderbuffers(1, &resolveRBID);
-      return nullptr;
-    }
-    msaaRBID = CreateMSAARenderbuffer(gpu, sampleCount, width, height);
-    if (msaaRBID == 0) {
-      LOGE("EAGLLayerTexture::MakeFrom() failed to create MSAA renderbuffer!");
-      gl->deleteFramebuffers(1, &resolveFBO);
-      gl->deleteRenderbuffers(1, &resolveRBID);
-      return nullptr;
-    }
-    frameBufferID = CreateFramebufferForRenderbuffer(gpu, msaaRBID);
-    if (frameBufferID == 0) {
-      LOGE("EAGLLayerTexture::MakeFrom() failed to create MSAA framebuffer!");
+    success = true;
+  } while (false);
+  if (!success) {
+    if (msaaRBID > 0) {
       gl->deleteRenderbuffers(1, &msaaRBID);
-      gl->deleteFramebuffers(1, &resolveFBO);
-      gl->deleteRenderbuffers(1, &resolveRBID);
-      return nullptr;
     }
+    if (resolveFBO > 0) {
+      gl->deleteFramebuffers(1, &resolveFBO);
+    }
+    gl->deleteRenderbuffers(1, &resolveRBID);
+    return nullptr;
   }
   TextureDescriptor descriptor = {width, height,      PixelFormat::RGBA_8888,
                                   false, sampleCount, TextureUsage::RENDER_ATTACHMENT};
