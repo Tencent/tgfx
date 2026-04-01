@@ -87,12 +87,12 @@ std::shared_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
     return nullptr;
   }
   sampleCount = gpu->getSampleCount(sampleCount, PixelFormat::RGBA_8888);
-  auto gl = gpu->functions();
   auto resolveRBID = CreateLayerRenderbuffer(gpu, layer);
   if (resolveRBID == 0) {
     LOGE("EAGLLayerTexture::MakeFrom() failed to create layer renderbuffer!");
     return nullptr;
   }
+  auto gl = gpu->functions();
   unsigned frameBufferID = 0, resolveFBO = 0, msaaRBID = 0;
   if (sampleCount <= 1) {
     frameBufferID = CreateFramebufferForRenderbuffer(gpu, resolveRBID);
