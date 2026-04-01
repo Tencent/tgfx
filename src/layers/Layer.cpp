@@ -295,10 +295,9 @@ static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Can
     return nullptr;
   }
 
-  auto sampleCount = args.sampleCount;
   bool opaqueMode = args.opaqueContext != nullptr;
   return Layer3DContext::Make(opaqueMode, args.context, validRenderRect, contentScale,
-                              args.dstColorSpace, args.blurBackground, sampleCount);
+                              args.dstColorSpace, args.blurBackground, args.sampleCount);
 }
 
 bool Layer::DefaultAllowsEdgeAntialiasing() {
