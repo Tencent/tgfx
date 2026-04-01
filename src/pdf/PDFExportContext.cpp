@@ -1382,7 +1382,7 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
     for (int i = 0; i < w * h; ++i) {
       // PDF SMask has no native inversion support, so we invert the pixel values directly.
       uint8_t a = shaderMaskFilter->isInverted() ? static_cast<uint8_t>(255 - alphaPixels[i])
-                                                  : alphaPixels[i];
+                                                 : alphaPixels[i];
       // Replicate alpha to RGB channels for luminosity blending in PDF
       rgbaPixels[i * 4 + 0] = a;
       rgbaPixels[i * 4 + 1] = a;
@@ -1414,12 +1414,12 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
     return;
   }
 
-  setGraphicState(
-      PDFGraphicState::GetSMaskGraphicState(
-          maskContext->makeFormXObjectFromDevice(maskBound, true), false,
-          useBitmapMask ? PDFGraphicState::SMaskMode::Luminosity : PDFGraphicState::SMaskMode::Alpha,
-          document),
-      contentEntry.stream());
+  setGraphicState(PDFGraphicState::GetSMaskGraphicState(
+                      maskContext->makeFormXObjectFromDevice(maskBound, true), false,
+                      useBitmapMask ? PDFGraphicState::SMaskMode::Luminosity
+                                    : PDFGraphicState::SMaskMode::Alpha,
+                      document),
+                  contentEntry.stream());
 
   PDFUtils::EmitPath(path, false, contentEntry.stream());
 
