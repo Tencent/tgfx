@@ -1023,8 +1023,9 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   auto renderRect = inverse.mapRect(drawRect);
   renderRect.roundOut();
   args.renderRect = &renderRect;
+  args.sampleCount = surface->sampleCount();
   args.blurBackground = _root->createBackgroundContext(context, drawRect, viewMatrix, false,
-                                                       args.dstColorSpace, surface->sampleCount());
+                                                       args.dstColorSpace, args.sampleCount);
   args.dstColorSpace = surface->colorSpace();
   args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);

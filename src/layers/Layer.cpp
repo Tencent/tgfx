@@ -295,8 +295,7 @@ static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Can
     return nullptr;
   }
 
-  auto surface = canvas->getSurface();
-  auto sampleCount = surface ? surface->sampleCount() : 1;
+  auto sampleCount = args.sampleCount;
   bool opaqueMode = args.opaqueContext != nullptr;
   return Layer3DContext::Make(opaqueMode, args.context, validRenderRect, contentScale,
                               args.dstColorSpace, args.blurBackground, sampleCount);
@@ -992,6 +991,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
 
   if (surface) {
     args.dstColorSpace = surface->colorSpace();
+    args.sampleCount = surface->sampleCount();
     context = surface->getContext();
     if (!(surface->renderFlags() & RenderFlags::DisableCache)) {
       args.context = context;
@@ -1007,7 +1007,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     auto backgroundMatrix = globalToLocalMatrix.asMatrix();
     backgroundMatrix.postScale(scale, scale);
     auto colorSpace = surface ? surface->colorSpace() : nullptr;
-    auto sampleCount = surface ? surface->sampleCount() : 1;
+    auto sampleCount = args.sampleCount;
     if (auto backgroundContext =
             createBackgroundContext(context, backgroundRect, backgroundMatrix,
                                     bounds == clippedBounds, colorSpace, sampleCount)) {
@@ -1447,9 +1447,9 @@ std::shared_ptr<Image> Layer::getPassThroughContentImage(const DrawArgs& args, C
   auto surfaceRect = passThroughImageMatrix.mapRect(*inputBounds);
   surfaceRect.roundOut();
   surfaceRect.intersect(Rect::MakeWH(passThroughImage->width(), passThroughImage->height()));
-  auto offscreenSurface = Surface::Make(
-      context, static_cast<int>(surfaceRect.width()), static_cast<int>(surfaceRect.height()), false,
-      surface->sampleCount(), false, surface->renderFlags(), args.dstColorSpace);
+  auto offscreenSurface = Surface::Make(context, static_cast<int>(surfaceRect.width()),
+                                        static_cast<int>(surfaceRect.height()), false,
+                                        args.sampleCount, false, 0, args.dstColorSpace);
   if (!offscreenSurface) {
     return nullptr;
   }
