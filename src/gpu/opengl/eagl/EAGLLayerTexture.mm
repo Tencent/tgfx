@@ -122,12 +122,8 @@ std::shared_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
     success = true;
   } while (false);
   if (!success) {
-    if (msaaRBID > 0) {
-      gl->deleteRenderbuffers(1, &msaaRBID);
-    }
-    if (resolveFBO > 0) {
-      gl->deleteFramebuffers(1, &resolveFBO);
-    }
+    gl->deleteRenderbuffers(1, &msaaRBID);
+    gl->deleteFramebuffers(1, &resolveFBO);
     gl->deleteRenderbuffers(1, &resolveRBID);
     return nullptr;
   }
