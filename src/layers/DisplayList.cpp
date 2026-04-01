@@ -376,6 +376,7 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   auto partialCache = surfaceCaches.empty() ? nullptr : surfaceCaches.front();
   if (partialCache == nullptr || partialCache->getContext() != context ||
       partialCache->width() != surface->width() || partialCache->height() != surface->height() ||
+      partialCache->sampleCount() != surface->sampleCount() ||
       !ColorSpace::Equals(partialCache->colorSpace().get(), surface->colorSpace().get())) {
     surfaceCaches.clear();
     partialCache =
