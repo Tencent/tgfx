@@ -75,7 +75,7 @@ class Surface {
 
   /**
    * Wraps a BackendTexture into the Surface. The caller must ensure the texture is valid for the
-   * lifetime of the returned Surface. If the sampleCount is greater than zero, creates an
+   * lifetime of the returned Surface. If the sampleCount is greater than one, creates an
    * intermediate MSAA Surface which is used for drawing backendTexture. Returns nullptr if the
    * context is nullptr or the texture is not renderable in the GPU backend.
    */

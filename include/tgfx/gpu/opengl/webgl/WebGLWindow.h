@@ -26,6 +26,9 @@ class WebGLWindow : public Window {
  public:
   /**
    * Creates a new window from a canvas.
+   * @param canvasID The ID of the HTML canvas element to render into.
+   * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param sampleCount The number of samples for MSAA rendering. Defaults to 1 (no MSAA).
    */
   static std::shared_ptr<WebGLWindow> MakeFrom(const std::string& canvasID,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr,

@@ -33,6 +33,10 @@ class EGLWindow : public Window {
 
   /**
    * Creates a new window from an EGL native window with specified shared context.
+   * @param nativeWindow The EGL native window to render into.
+   * @param sharedContext An optional shared EGL context. If nullptr, a new context is created.
+   * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param sampleCount The number of samples for MSAA rendering. Defaults to 1 (no MSAA).
    */
   static std::shared_ptr<EGLWindow> MakeFrom(EGLNativeWindowType nativeWindow,
                                              EGLContext sharedContext = nullptr,
