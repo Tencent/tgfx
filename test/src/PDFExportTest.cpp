@@ -669,15 +669,15 @@ TGFX_TEST(PDFExportTest, LayerConicGradient) {
   EXPECT_TRUE(context != nullptr);
 
   auto shapeLayer = ShapeLayer::Make();
-  Rect rect = Rect::MakeWH(256, 190);
+  Rect rect = Rect::MakeWH(256, 256);
   Path path;
   path.addRect(rect);
   shapeLayer->setPath(path);
   shapeLayer->removeFillStyles();
 
   auto shader = Shader::MakeConicGradient(
-      Point{128, 95}, 0.f, 360.f,
-      {Color::FromRGBA(227, 136, 136), Color::FromRGBA(140, 210, 183)}, {});
+      Point{128, 128}, 0.f, 360.f, {Color::FromRGBA(227, 136, 136), Color::FromRGBA(140, 210, 183)},
+      {});
   shader = shader->makeWithMatrix(Matrix::MakeTrans(2, 2));
   shapeLayer->addFillStyle(ShapeStyle::Make(shader));
 
@@ -686,7 +686,7 @@ TGFX_TEST(PDFExportTest, LayerConicGradient) {
 
   auto PDFStream = MemoryWriteStream::Make();
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto canvas = document->beginPage(256, 190);
+  auto canvas = document->beginPage(256, 256);
   layer->draw(canvas);
   document->endPage();
   document->close();
@@ -708,8 +708,7 @@ TGFX_TEST(PDFExportTest, LayerDiamondGradient) {
   shapeLayer->removeFillStyles();
 
   auto shader = Shader::MakeDiamondGradient(
-      Point{128, 95}, 95,
-      {Color::FromRGBA(227, 136, 136), Color::FromRGBA(140, 210, 183)}, {});
+      Point{128, 95}, 95, {Color::FromRGBA(227, 136, 136), Color::FromRGBA(140, 210, 183)}, {});
   shader = shader->makeWithMatrix(Matrix::MakeTrans(2, 2));
   shapeLayer->addFillStyle(ShapeStyle::Make(shader));
 
