@@ -36,6 +36,10 @@ enum class ClipGeometry {
   Both
 };
 
+/**
+ * Resolves which clip elements to keep when combining two clip elements. Returns BOnly when A and B
+ * are equivalent.
+ */
 static ClipGeometry ResolveClipGeometry(const ClipElement& a, const ClipElement& b) {
   const auto boundsA = a.bounds();
   const auto boundsB = b.bounds();
@@ -55,6 +59,9 @@ static ClipGeometry ResolveClipGeometry(const ClipElement& a, const ClipElement&
 
   // Complex paths cannot be simplified, keep both.
   if (!a.isRect() && !b.isRect()) {
+    if (a.path().isSame(b.path())) {
+      return ClipGeometry::BOnly;
+    }
     return ClipGeometry::Both;
   }
 

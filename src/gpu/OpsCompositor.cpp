@@ -806,13 +806,19 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
     DEBUG_ASSERT(element->isValid());
     const auto aaType = element->isAntiAlias() ? AAType::Coverage : AAType::None;
     auto clipBounds = Rect::MakeWH(width, height);
-    auto shape = Shape::MakeFrom(element->path());
+    auto path = element->path();
+    if (i > 0) {
+      // Modulate blend erases the mask when hasCoverage is true (source coefficient becomes zero).
+      // Use inverse fill + DstOut to erase areas outside each clip shape instead.
+      path.toggleInverseFillType();
+    }
+    auto shape = Shape::MakeFrom(path);
     shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
     auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
     if (i > 0) {
-      drawOp->setBlendMode(BlendMode::Modulate);
+      drawOp->setBlendMode(BlendMode::DstOut);
     }
     clipDrawOps.emplace_back(std::move(drawOp));
   }

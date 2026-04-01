@@ -191,7 +191,18 @@ TGFX_TEST(CanvasTest, Clip) {
   canvas->clipStack->transform(Matrix::MakeRotate(45.0f));
   EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
 
-  // ========== 13. Screenshot: AA vs non-AA ==========
+  // ========== 13. Duplicate non-rect clipPath elimination ==========
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  Path rrectPath = {};
+  rrectPath.addRoundRect(Rect::MakeLTRB(10, 10, 90, 90), 10, 10);
+  canvas->clipPath(rrectPath);
+  EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+  canvas->clipPath(rrectPath);
+  EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
+
+  // ========== 14. Screenshot: AA vs non-AA ==========
   // Note: When the path bounds are small, texture-based rasterization is used internally
   // for performance reasons. In this case, setting antiAlias to false may not completely
   // eliminate edge smoothing due to texture sampling characteristics.
@@ -218,6 +229,27 @@ TGFX_TEST(CanvasTest, Clip) {
     canvas->restore();
   }
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipAntiAlias"));
+
+  // ========== 15. Screenshot: duplicate non-rect clipPath rendering ==========
+  // Use two separately constructed paths with identical data to bypass isSame() elimination,
+  // ensuring the makeClipTexture inverse-fill + DstOut logic is exercised.
+  surface = Surface::Make(context, 200, 200);
+  canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  {
+    canvas->save();
+    Path rrPath1 = {};
+    rrPath1.addRoundRect(Rect::MakeLTRB(20, 20, 180, 180), 20, 20);
+    Path rrPath2 = {};
+    rrPath2.addRoundRect(Rect::MakeLTRB(20, 20, 180, 180), 20, 20);
+    canvas->clipPath(rrPath1);
+    canvas->clipPath(rrPath2);
+    Paint paint = {};
+    paint.setColor(Color::Blue());
+    canvas->drawRect(Rect::MakeWH(200, 200), paint);
+    canvas->restore();
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DuplicateClipPath"));
 }
 
 TGFX_TEST(CanvasTest, DiscardContent) {
