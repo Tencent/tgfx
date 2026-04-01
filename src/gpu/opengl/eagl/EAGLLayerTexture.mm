@@ -122,6 +122,7 @@ std::shared_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
     success = true;
   } while (false);
   if (!success) {
+    // Deleting 0 is a no-op in OpenGL, so no need to check before deleting.
     gl->deleteRenderbuffers(1, &msaaRBID);
     gl->deleteFramebuffers(1, &resolveFBO);
     gl->deleteRenderbuffers(1, &resolveRBID);
