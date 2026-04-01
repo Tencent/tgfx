@@ -249,9 +249,15 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
   }
 
   // Then expand the left, right, top, then bottom.
+  // Round deviceBounds edges to avoid floating-point precision issues in comparisons.
+  auto roundedLeft = static_cast<int>(std::round(deviceBounds.left));
+  auto roundedRight = static_cast<int>(std::round(deviceBounds.right));
+  auto roundedTop = static_cast<int>(std::round(deviceBounds.top));
+  auto roundedBottom = static_cast<int>(std::round(deviceBounds.bottom));
+
   if (tileModesX == TileMode::Clamp) {
     auto subset = Rect::MakeXYWH(0, 0, 1, bitmap.height());
-    if (deviceBounds.left < 0) {
+    if (roundedLeft < 0) {
       Bitmap left = ExtractSubset(bitmap, subset);
       auto leftMatrix = ScaleTranslate(-deviceBounds.left, 1, deviceBounds.left, 0);
       DrawBitmapMatrix(canvas.get(), left, leftMatrix, paintColor);
@@ -264,7 +270,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
       patternBBox.left = 0;
     }
 
-    if (deviceBounds.right > width) {
+    if (roundedRight > width) {
       subset.offset(static_cast<float>(bitmap.width()) - 1.f, 0.f);
       Bitmap right = ExtractSubset(bitmap, subset);
       auto rightMatrix = ScaleTranslate(deviceBounds.right - width, 1, width, 0);
@@ -279,17 +285,17 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
     }
   }
   if (tileModesX == TileMode::Decal) {
-    if (deviceBounds.left < 0) {
+    if (roundedLeft < 0) {
       patternBBox.left = 0;
     }
-    if (deviceBounds.right > width) {
+    if (roundedRight > width) {
       patternBBox.right = deviceBounds.width();
     }
   }
 
   if (tileModesY == TileMode::Clamp) {
     auto subset = Rect::MakeXYWH(0, 0, bitmap.width(), 1);
-    if (deviceBounds.top < 0) {
+    if (roundedTop < 0) {
       Bitmap top = ExtractSubset(bitmap, subset);
       auto topMatrix = ScaleTranslate(1, -deviceBounds.top, 0, deviceBounds.top);
       DrawBitmapMatrix(canvas.get(), top, topMatrix, paintColor);
@@ -302,7 +308,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
       patternBBox.top = 0;
     }
 
-    if (deviceBounds.bottom > height) {
+    if (roundedBottom > height) {
       subset.offset(0.f, static_cast<float>(bitmap.height()) - 1.f);
       Bitmap bottom = ExtractSubset(bitmap, subset);
 
@@ -318,10 +324,10 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
     }
   }
   if (tileModesY == TileMode::Decal) {
-    if (deviceBounds.top < 0) {
+    if (roundedTop < 0) {
       patternBBox.top = 0;
     }
-    if (deviceBounds.bottom > height) {
+    if (roundedBottom > height) {
       patternBBox.bottom = deviceBounds.height();
     }
   }
