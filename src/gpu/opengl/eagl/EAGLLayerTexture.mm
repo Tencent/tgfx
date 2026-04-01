@@ -48,6 +48,7 @@ std::shared_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
   [eaglContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:layer];
   if (!CheckGLError(gl)) {
     LOGE("EAGLLayerTexture::MakeFrom() failed to allocate renderbuffer storage!");
+    gl->deleteRenderbuffers(1, &resolveRBID);
     return nullptr;
   }
   if (sampleCount <= 1) {
