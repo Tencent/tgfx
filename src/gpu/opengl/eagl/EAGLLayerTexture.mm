@@ -22,116 +22,119 @@
 #include "gpu/opengl/eagl/EAGLGPU.h"
 
 namespace tgfx {
+static unsigned CreateFramebufferForRenderbuffer(GLGPU* gpu, unsigned renderbufferID) {
+  auto gl = gpu->functions();
+  unsigned fbo = 0;
+  gl->genFramebuffers(1, &fbo);
+  if (fbo == 0) {
+    return 0;
+  }
+  gl->bindFramebuffer(GL_FRAMEBUFFER, fbo);
+  gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
+                              renderbufferID);
+  if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    gl->deleteFramebuffers(1, &fbo);
+    return 0;
+  }
+  return fbo;
+}
+
+static unsigned CreateLayerRenderbuffer(GLGPU* gpu, CAEAGLLayer* layer) {
+  auto gl = gpu->functions();
+  ClearGLError(gl);
+  unsigned renderbufferID = 0;
+  gl->genRenderbuffers(1, &renderbufferID);
+  if (renderbufferID == 0) {
+    return 0;
+  }
+  gl->bindRenderbuffer(GL_RENDERBUFFER, renderbufferID);
+  auto eaglContext = static_cast<EAGLGPU*>(gpu)->eaglContext();
+  [eaglContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:layer];
+  if (!CheckGLError(gl)) {
+    gl->deleteRenderbuffers(1, &renderbufferID);
+    return 0;
+  }
+  return renderbufferID;
+}
+
+static unsigned CreateMSAARenderbuffer(GLGPU* gpu, int sampleCount, int width, int height) {
+  auto gl = gpu->functions();
+  ClearGLError(gl);
+  unsigned renderbufferID = 0;
+  gl->genRenderbuffers(1, &renderbufferID);
+  if (renderbufferID == 0) {
+    return 0;
+  }
+  gl->bindRenderbuffer(GL_RENDERBUFFER, renderbufferID);
+  auto format = gpu->caps()->getTextureFormat(PixelFormat::RGBA_8888).sizedFormat;
+  gl->renderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format, width, height);
+  if (!CheckGLError(gl)) {
+    gl->deleteRenderbuffers(1, &renderbufferID);
+    return 0;
+  }
+  return renderbufferID;
+}
+
 std::shared_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLLayer* layer,
                                                              int sampleCount) {
   DEBUG_ASSERT(gpu != nullptr);
   if (layer == nil) {
     return nullptr;
   }
-  auto width = layer.bounds.size.width * layer.contentsScale;
-  auto height = layer.bounds.size.height * layer.contentsScale;
+  auto width = static_cast<int>(layer.bounds.size.width * layer.contentsScale);
+  auto height = static_cast<int>(layer.bounds.size.height * layer.contentsScale);
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
   sampleCount = gpu->getSampleCount(sampleCount, PixelFormat::RGBA_8888);
   auto gl = gpu->functions();
-  ClearGLError(gl);
-  // Create the resolve renderbuffer backed by the CAEAGLLayer.
-  unsigned resolveRBID = 0;
-  gl->genRenderbuffers(1, &resolveRBID);
+  auto resolveRBID = CreateLayerRenderbuffer(gpu, layer);
   if (resolveRBID == 0) {
-    LOGE("EAGLLayerTexture::MakeFrom() failed to generate resolve renderbuffer!");
-    return nullptr;
-  }
-  gl->bindRenderbuffer(GL_RENDERBUFFER, resolveRBID);
-  auto eaglContext = static_cast<EAGLGPU*>(gpu)->eaglContext();
-  [eaglContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:layer];
-  if (!CheckGLError(gl)) {
-    LOGE("EAGLLayerTexture::MakeFrom() failed to allocate renderbuffer storage!");
-    gl->deleteRenderbuffers(1, &resolveRBID);
+    LOGE("EAGLLayerTexture::MakeFrom() failed to create layer renderbuffer!");
     return nullptr;
   }
   if (sampleCount <= 1) {
-    // No MSAA: single framebuffer with the layer renderbuffer attached.
-    unsigned frameBufferID = 0;
-    gl->genFramebuffers(1, &frameBufferID);
-    if (frameBufferID == 0) {
-      LOGE("EAGLLayerTexture::MakeFrom() failed to generate framebuffer!");
+    auto fbo = CreateFramebufferForRenderbuffer(gpu, resolveRBID);
+    if (fbo == 0) {
+      LOGE("EAGLLayerTexture::MakeFrom() failed to create framebuffer!");
       gl->deleteRenderbuffers(1, &resolveRBID);
       return nullptr;
     }
-    TextureDescriptor descriptor = {
-        static_cast<int>(width),        static_cast<int>(height), PixelFormat::RGBA_8888, false, 1,
-        TextureUsage::RENDER_ATTACHMENT};
-    auto texture = gpu->makeResource<EAGLLayerTexture>(descriptor, frameBufferID);
+    TextureDescriptor descriptor = {width, height, PixelFormat::RGBA_8888,
+                                    false, 1,      TextureUsage::RENDER_ATTACHMENT};
+    auto texture = gpu->makeResource<EAGLLayerTexture>(descriptor, fbo);
     texture->_colorBufferID = resolveRBID;
-    auto state = gpu->state();
-    state->bindFramebuffer(texture.get());
-    gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, resolveRBID);
-    if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-      LOGE("EAGLLayerTexture::MakeFrom() framebuffer is not complete!");
-      return nullptr;
-    }
     return texture;
   }
   // MSAA path: create a MSAA renderbuffer for rendering, and a separate resolve framebuffer for
   // the layer renderbuffer.
-  unsigned msaaFBO = 0;
-  gl->genFramebuffers(1, &msaaFBO);
-  if (msaaFBO == 0) {
-    LOGE("EAGLLayerTexture::MakeFrom() failed to generate MSAA framebuffer!");
-    gl->deleteRenderbuffers(1, &resolveRBID);
-    return nullptr;
-  }
-  unsigned msaaRBID = 0;
-  gl->genRenderbuffers(1, &msaaRBID);
+  auto msaaRBID = CreateMSAARenderbuffer(gpu, sampleCount, width, height);
   if (msaaRBID == 0) {
-    LOGE("EAGLLayerTexture::MakeFrom() failed to generate MSAA renderbuffer!");
-    gl->deleteFramebuffers(1, &msaaFBO);
+    LOGE("EAGLLayerTexture::MakeFrom() failed to create MSAA renderbuffer!");
     gl->deleteRenderbuffers(1, &resolveRBID);
     return nullptr;
   }
-  gl->bindRenderbuffer(GL_RENDERBUFFER, msaaRBID);
-  auto format = gpu->caps()->getTextureFormat(PixelFormat::RGBA_8888).sizedFormat;
-  gl->renderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format, static_cast<int>(width),
-                                     static_cast<int>(height));
-  if (!CheckGLError(gl)) {
-    LOGE("EAGLLayerTexture::MakeFrom() failed to allocate MSAA renderbuffer storage!");
+  auto msaaFBO = CreateFramebufferForRenderbuffer(gpu, msaaRBID);
+  if (msaaFBO == 0) {
+    LOGE("EAGLLayerTexture::MakeFrom() failed to create MSAA framebuffer!");
     gl->deleteRenderbuffers(1, &msaaRBID);
-    gl->deleteFramebuffers(1, &msaaFBO);
     gl->deleteRenderbuffers(1, &resolveRBID);
     return nullptr;
   }
-  TextureDescriptor descriptor = {static_cast<int>(width),
-                                  static_cast<int>(height),
-                                  PixelFormat::RGBA_8888,
-                                  false,
-                                  sampleCount,
-                                  TextureUsage::RENDER_ATTACHMENT};
+  auto resolveFBO = CreateFramebufferForRenderbuffer(gpu, resolveRBID);
+  if (resolveFBO == 0) {
+    LOGE("EAGLLayerTexture::MakeFrom() failed to create resolve framebuffer!");
+    gl->deleteFramebuffers(1, &msaaFBO);
+    gl->deleteRenderbuffers(1, &msaaRBID);
+    gl->deleteRenderbuffers(1, &resolveRBID);
+    return nullptr;
+  }
+  TextureDescriptor descriptor = {width, height,      PixelFormat::RGBA_8888,
+                                  false, sampleCount, TextureUsage::RENDER_ATTACHMENT};
   auto texture = gpu->makeResource<EAGLLayerTexture>(descriptor, msaaFBO);
   texture->msaaBufferID = msaaRBID;
   texture->_colorBufferID = resolveRBID;
-  auto state = gpu->state();
-  state->bindFramebuffer(texture.get());
-  gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, msaaRBID);
-  if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-    LOGE("EAGLLayerTexture::MakeFrom() MSAA framebuffer is not complete!");
-    return nullptr;
-  }
-  // Create the resolve framebuffer with the layer renderbuffer attached.
-  unsigned resolveFBO = 0;
-  gl->genFramebuffers(1, &resolveFBO);
-  if (resolveFBO == 0) {
-    LOGE("EAGLLayerTexture::MakeFrom() failed to generate resolve framebuffer!");
-    return nullptr;
-  }
   texture->_resolveFrameBufferID = resolveFBO;
-  gl->bindFramebuffer(GL_FRAMEBUFFER, resolveFBO);
-  gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, resolveRBID);
-  if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-    LOGE("EAGLLayerTexture::MakeFrom() resolve framebuffer is not complete!");
-    return nullptr;
-  }
   return texture;
 }
 
