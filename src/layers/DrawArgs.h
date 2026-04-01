@@ -71,9 +71,6 @@ class DrawArgs {
   // subtree layer cache.
   int subtreeCacheMaxSize = 0;
 
-  // The MSAA sample count inherited from the target surface.
-  int sampleCount = 1;
-
   // The 3D render context to be used during the drawing process.
   // Note: this could be nullptr. All layers within the 3D rendering context need to maintain their
   // respective 3D states to achieve per-pixel depth occlusion effects. These layers are composited
@@ -82,5 +79,8 @@ class DrawArgs {
 
   // The opaque context to be used during opaque content/contour recording. Note: this could be nullptr.
   OpaqueContext* opaqueContext = nullptr;
+
+  // The MSAA sample count inherited from the target surface.
+  int sampleCount = 1;
 };
 }  // namespace tgfx
