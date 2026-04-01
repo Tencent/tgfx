@@ -104,6 +104,7 @@ std::shared_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
                                     false, 1,      TextureUsage::RENDER_ATTACHMENT};
     auto texture = gpu->makeResource<EAGLLayerTexture>(descriptor, fbo);
     texture->_colorBufferID = resolveRBID;
+    gpu->state()->bindFramebuffer(texture.get());
     return texture;
   }
   // MSAA path: create a resolve framebuffer for the layer renderbuffer, and a MSAA renderbuffer
@@ -135,6 +136,7 @@ std::shared_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
   texture->msaaBufferID = msaaRBID;
   texture->_colorBufferID = resolveRBID;
   texture->_resolveFrameBufferID = resolveFBO;
+  gpu->state()->bindFramebuffer(texture.get());
   return texture;
 }
 
