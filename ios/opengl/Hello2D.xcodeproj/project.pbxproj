@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 71;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -42,6 +42,10 @@
 		F2F2CEF92B0B51CD0092BD3B /* tgfx-hello2d.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "tgfx-hello2d.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		3CF6DF7C2F7CC021004C64FE /* xcconfigs */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = xcconfigs; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
 		E61EC80F2AF1FCAE00C82F9E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -58,6 +62,7 @@
 		E61EC8092AF1FCAE00C82F9E = {
 			isa = PBXGroup;
 			children = (
+				3CF6DF7C2F7CC021004C64FE /* xcconfigs */,
 				E61EC8142AF1FCAE00C82F9E /* Hello2D */,
 				E61EC8132AF1FCAE00C82F9E /* Products */,
 				E61EC82E2AF1FEAE00C82F9E /* Frameworks */,
@@ -216,6 +221,8 @@
 /* Begin XCBuildConfiguration section */
 		E61EC8292AF1FCB000C82F9E /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 3CF6DF7C2F7CC021004C64FE /* xcconfigs */;
+			baseConfigurationReferenceRelativePath = Base.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -278,6 +285,8 @@
 		};
 		E61EC82A2AF1FCB000C82F9E /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 3CF6DF7C2F7CC021004C64FE /* xcconfigs */;
+			baseConfigurationReferenceRelativePath = Base.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -338,10 +347,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "$(inherited)";
+				CODE_SIGN_STYLE = "$(inherited)";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 36588GHG2N;
+				DEVELOPMENT_TEAM = "$(inherited)";
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
 					"GLES_SILENCE_DEPRECATION=1",
@@ -362,9 +371,9 @@
 				LIBRARY_SEARCH_PATHS = "";
 				MARKETING_VERSION = 1.0;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = org.tgfx.hello2d;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(inherited)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
+				PROVISIONING_PROFILE_SPECIFIER = "$(inherited)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				USER_HEADER_SEARCH_PATHS = (
@@ -381,10 +390,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "$(inherited)";
+				CODE_SIGN_STYLE = "$(inherited)";
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 36588GHG2N;
+				DEVELOPMENT_TEAM = "$(inherited)";
 				GCC_PREPROCESSOR_DEFINITIONS = "GLES_SILENCE_DEPRECATION=1";
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "";
@@ -402,9 +411,9 @@
 				LIBRARY_SEARCH_PATHS = "";
 				MARKETING_VERSION = 1.0;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = org.tgfx.hello2d;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(inherited)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
+				PROVISIONING_PROFILE_SPECIFIER = "$(inherited)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				USER_HEADER_SEARCH_PATHS = (

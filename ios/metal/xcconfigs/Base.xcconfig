@@ -1,0 +1,17 @@
+//
+//  Base.xcconfig
+//  Hello2D
+//
+//  Created by king on 2026/4/1.
+//
+
+// Configuration settings file format documentation can be found at:
+// https://help.apple.com/xcode/#/dev745c5c974
+
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = Apple Development
+DEVELOPMENT_TEAM = 36588GHG2N
+PRODUCT_BUNDLE_IDENTIFIER = org.tgfx.hello2d
+PROVISIONING_PROFILE_SPECIFIER =
+
+#include? "Development.local.xcconfig"
