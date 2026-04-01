@@ -26,6 +26,7 @@
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
+
 void GLCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset,
                                  const void* data, size_t size) {
   if (data == nullptr || size == 0) {
@@ -76,8 +77,17 @@ void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
   gpu->processUnreferencedResources();
   auto gl = gpu->functions();
   gl->flush();
+  // OpenGL commands execute in order after glFlush(). Once glFlush() returns, all previously
+  // submitted commands are guaranteed to be ahead in the GPU pipeline. So the frame submitted
+  // in the previous submit() call is now safe for resource reuse.
+  completedTime = lastSubmittedFrameTime;
+  lastSubmittedFrameTime = _frameTime;
   // Reset GL state every frame to avoid interference from external GL calls.
   gpu->resetGLState();
+}
+
+std::chrono::steady_clock::time_point GLCommandQueue::completedFrameTime() const {
+  return completedTime;
 }
 
 std::shared_ptr<Semaphore> GLCommandQueue::insertSemaphore() {

@@ -18,6 +18,7 @@
 		F2B5D47B2B0484E8000A1CEC /* ViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F2B5D4792B0484E8000A1CEC /* ViewController.mm */; };
 		F2B5D47C2B0484E8000A1CEC /* WindowController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F2B5D47A2B0484E8000A1CEC /* WindowController.mm */; };
 		F2F2CEFC2B0B5C510092BD3B /* tgfx-hello2d.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F2F2CEFB2B0B5C510092BD3B /* tgfx-hello2d.a */; };
+		A2000001000000000000000A /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2000001000000000000000B /* MetalKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,14 +32,15 @@
 		857B02B12455D81200E533CF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		857B02B22455D81200E533CF /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		857B02B42455D81200E533CF /* Hello2D.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Hello2D.entitlements; sourceTree = "<group>"; };
-		E105D3942E4098B800F4831B /* tgfx.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = tgfx.png; path = ../resources/assets/tgfx.png; sourceTree = SOURCE_ROOT; };
+		E105D3942E4098B800F4831B /* tgfx.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = tgfx.png; path = ../../resources/assets/tgfx.png; sourceTree = SOURCE_ROOT; };
 		F201BD712B046BB30020C0FA /* tgfx.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = tgfx.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		F201BD732B0471C00020C0FA /* TGFXView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TGFXView.h; sourceTree = "<group>"; };
 		F201BD742B0471C00020C0FA /* TGFXView.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TGFXView.mm; sourceTree = "<group>"; };
-		F201BD762B0472B40020C0FA /* bridge.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = bridge.jpg; path = ../../resources/assets/bridge.jpg; sourceTree = "<group>"; };
+		F201BD762B0472B40020C0FA /* bridge.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = bridge.jpg; path = ../../../resources/assets/bridge.jpg; sourceTree = "<group>"; };
 		F2B5D4792B0484E8000A1CEC /* ViewController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ViewController.mm; sourceTree = "<group>"; };
 		F2B5D47A2B0484E8000A1CEC /* WindowController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WindowController.mm; sourceTree = "<group>"; };
 		F2F2CEFB2B0B5C510092BD3B /* tgfx-hello2d.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "tgfx-hello2d.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2000001000000000000000B /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -48,6 +50,7 @@
 			files = (
 				F2F2CEFC2B0B5C510092BD3B /* tgfx-hello2d.a in Frameworks */,
 				F201BD722B046BB30020C0FA /* tgfx.a in Frameworks */,
+				A2000001000000000000000A /* MetalKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -96,6 +99,7 @@
 		EBC250D9EF61A8E129790DCC /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				A2000001000000000000000B /* MetalKit.framework */,
 				F2F2CEFB2B0B5C510092BD3B /* tgfx-hello2d.a */,
 				F201BD712B046BB30020C0FA /* tgfx.a */,
 			);
@@ -321,7 +325,7 @@
 				DEAD_CODE_STRIPPING = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
-					GL_SILENCE_DEPRECATION,
+					"$(inherited)",
 				);
 				INFOPLIST_FILE = Hello2D/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -337,8 +341,8 @@
 				PRODUCT_BUNDLE_IDENTIFIER = org.tgfx.hello2d;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				USER_HEADER_SEARCH_PATHS = (
-					../include,
-					../hello2d/include,
+					../../include,
+					../../hello2d/include,
 				);
 			};
 			name = Debug;
@@ -353,7 +357,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
-				GCC_PREPROCESSOR_DEFINITIONS = GL_SILENCE_DEPRECATION;
 				INFOPLIST_FILE = Hello2D/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -369,8 +372,8 @@
 				PRODUCT_BUNDLE_IDENTIFIER = org.tgfx.hello2d;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				USER_HEADER_SEARCH_PATHS = (
-					../include,
-					../hello2d/include,
+					../../include,
+					../../hello2d/include,
 				);
 			};
 			name = Release;

@@ -27,6 +27,7 @@
 #include "gpu/ops/RectDrawOp.h"
 #include "opengl/GLBuffer.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 static constexpr size_t MAX_PROGRAM_COUNT = 128;
@@ -52,6 +53,8 @@ static constexpr uint16_t HairlineQuadIndexPattern[] = {
 // clang-format on
 
 GlobalCache::GlobalCache(Context* context) : context(context) {
+  uniformBufferPool.resize(INITIAL_UNIFORM_PACKET_COUNT);
+  activePacket = &uniformBufferPool[0];
 }
 
 std::shared_ptr<Program> GlobalCache::findProgram(const BytesKey& programKey) {
@@ -87,14 +90,14 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
     return nullptr;
   }
 
-  auto& uniformBufferPacket = tripleUniformBuffer[tripleUniformBufferIndex];
+  auto& uniformBufferPacket = *activePacket;
 
   auto getAverageUniformBufferSize = [this]() {
     size_t totalUniformBufferSize = 0;
-    for (const auto& packet : tripleUniformBuffer) {
+    for (const auto& packet : uniformBufferPool) {
       totalUniformBufferSize += packet.gpuBuffers.size();
     }
-    return (totalUniformBufferSize + UNIFORM_BUFFER_COUNT - 1) / UNIFORM_BUFFER_COUNT;
+    return (totalUniformBufferSize + uniformBufferPool.size() - 1) / uniformBufferPool.size();
   };
 
   if (uniformBufferPacket.gpuBuffers.empty()) {
@@ -112,7 +115,7 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
     maxUniformBufferTracker.addValue(getAverageUniformBufferSize());
   }
 
-  // Check if triple buffer has enough space
+  // Check if the active packet has enough space
   if (uniformBufferPacket.bufferIndex < uniformBufferPacket.gpuBuffers.size() &&
       uniformBufferPacket.cursor + alignedBufferSize <=
           uniformBufferPacket.gpuBuffers[uniformBufferPacket.bufferIndex]->size()) {
@@ -146,21 +149,38 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
 }
 
 void GlobalCache::resetUniformBuffer() {
-  counter++;
-  tripleUniformBufferIndex = counter % UNIFORM_BUFFER_COUNT;
-  if (counter == UNIFORM_BUFFER_COUNT) {
-    counter = 0;
+  // Record the frame timestamp for the active packet before releasing it.
+  activePacket->frameTime = context->gpu()->queue()->frameTime();
+
+  // Find a completed packet from the pool to reuse.
+  auto completed = context->gpu()->queue()->completedFrameTime();
+  UniformBufferPacket* reusable = nullptr;
+  for (size_t i = 0; i < uniformBufferPool.size(); i++) {
+    auto& packet = uniformBufferPool[i];
+    if (&packet != activePacket && packet.frameTime <= completed) {
+      reusable = &packet;
+      break;
+    }
   }
 
-  auto& currentBuffer = tripleUniformBuffer[tripleUniformBufferIndex];
+  if (reusable == nullptr) {
+    // All packets are still in flight, grow the pool.
+    // Save and restore activePacket by index since emplace_back may reallocate the vector.
+    size_t activeIndex = static_cast<size_t>(activePacket - uniformBufferPool.data());
+    uniformBufferPool.emplace_back();
+    activePacket = &uniformBufferPool[activeIndex];
+    reusable = &uniformBufferPool.back();
+  }
 
+  // Trim excess buffers based on the sliding window tracker.
   size_t maxReuseSize = maxUniformBufferTracker.getMaxValue();
-  if (maxReuseSize > 0 && currentBuffer.gpuBuffers.size() > maxReuseSize) {
-    currentBuffer.gpuBuffers.resize(maxReuseSize);
+  if (maxReuseSize > 0 && reusable->gpuBuffers.size() > maxReuseSize) {
+    reusable->gpuBuffers.resize(maxReuseSize);
   }
 
-  currentBuffer.bufferIndex = 0;
-  currentBuffer.cursor = 0;
+  reusable->bufferIndex = 0;
+  reusable->cursor = 0;
+  activePacket = reusable;
 }
 
 void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program> program) {

@@ -116,10 +116,6 @@ void MetalWindow::onPresent(Context*) {
     return;
   }
   auto proxy = std::static_pointer_cast<MetalDrawableProxy>(drawableProxy);
-  auto metalDrawable = proxy->getMetalDrawable();
-  if (metalDrawable != nil) {
-    [metalDrawable present];
-  }
   proxy->releaseDrawable();
 }
 

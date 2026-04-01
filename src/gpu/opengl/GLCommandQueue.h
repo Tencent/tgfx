@@ -28,6 +28,8 @@ class GLCommandQueue : public CommandQueue {
   explicit GLCommandQueue(GLGPU* gpu) : gpu(gpu) {
   }
 
+  std::chrono::steady_clock::time_point completedFrameTime() const override;
+
   void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
                    size_t size) override;
 
@@ -44,5 +46,7 @@ class GLCommandQueue : public CommandQueue {
 
  private:
   GLGPU* gpu = nullptr;
+  std::chrono::steady_clock::time_point completedTime = {};
+  std::chrono::steady_clock::time_point lastSubmittedFrameTime = {};
 };
 }  // namespace tgfx

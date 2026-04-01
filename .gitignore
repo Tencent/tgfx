@@ -84,5 +84,7 @@ test/baseline/.cache-web
 /result
 .vscode
 ios/TGFX
+ios/*/TGFX
 mac/TGFX
+mac/*/TGFX
 /TGFX

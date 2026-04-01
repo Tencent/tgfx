@@ -20,19 +20,20 @@
 #import <QuartzCore/CADisplayLink.h>
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
-#include "tgfx/core/Point.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 
 static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
                                       CVOptionFlags, CVOptionFlags*, void* userInfo) {
   TGFXView* view = (__bridge TGFXView*)userInfo;
-  [view draw];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [view draw];
+  });
   return kCVReturnSuccess;
 }
 
 @implementation TGFXView {
-  std::shared_ptr<tgfx::CGLWindow> tgfxWindow;
+  std::shared_ptr<tgfx::Window> tgfxWindow;
   std::shared_ptr<tgfx::Surface> surface;
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
@@ -195,7 +196,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return;
   }
 
-  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+  if (!presentImmediately && !displayList.hasContentChanged() && lastRecording == nullptr) {
     return;
   }
 
@@ -215,8 +216,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
   auto canvas = surface->getCanvas();
   canvas->clear();
-  hello2d::DrawBackground(canvas, surface->width(), surface->height(),
-                          self.window.backingScaleFactor);
+  hello2d::DrawBackground(canvas, surface->width(), surface->height(), self.layer.contentsScale);
 
   displayList.render(surface.get(), false);
 
@@ -224,6 +224,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
   if (presentImmediately) {
     presentImmediately = false;
+    lastRecording = nullptr;
     if (recording) {
       context->submit(std::move(recording));
     }

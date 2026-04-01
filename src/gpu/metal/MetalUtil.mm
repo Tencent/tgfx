@@ -196,7 +196,10 @@ MTLSamplerAddressMode ToMTLSamplerAddressMode(AddressMode addressMode) {
     case AddressMode::MirrorRepeat:
       return MTLSamplerAddressModeMirrorRepeat;
     case AddressMode::ClampToBorder:
-      return MTLSamplerAddressModeClampToBorderColor;
+      if (@available(iOS 14.0, macOS 10.12, *)) {
+        return MTLSamplerAddressModeClampToBorderColor;
+      }
+      return MTLSamplerAddressModeClampToEdge;
     default:
       return MTLSamplerAddressModeClampToEdge;
   }

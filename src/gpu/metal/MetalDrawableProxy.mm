@@ -18,8 +18,10 @@
 
 #include "MetalDrawableProxy.h"
 #import <Metal/Metal.h>
+#include "gpu/metal/MetalCommandQueue.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
+#include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/metal/MetalTypes.h"
 
 namespace tgfx {
@@ -72,6 +74,10 @@ std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
     if (_metalDrawable == nil) {
       return nullptr;
     }
+    // Schedule the drawable to be presented when the command buffer is committed, so that the
+    // GPU finishes rendering before the drawable is displayed on screen.
+    auto metalQueue = static_cast<MetalCommandQueue*>(_context->gpu()->queue());
+    metalQueue->schedulePresent(_metalDrawable);
     auto textureWidth = static_cast<int>(_metalDrawable.texture.width);
     auto textureHeight = static_cast<int>(_metalDrawable.texture.height);
     MetalTextureInfo metalInfo = {};

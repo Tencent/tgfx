@@ -17,13 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "TGFXView.h"
-#include <cmath>
 #include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 
 @implementation TGFXView {
-  std::shared_ptr<tgfx::EAGLWindow> tgfxWindow;
+  std::shared_ptr<tgfx::Window> tgfxWindow;
   std::shared_ptr<tgfx::Surface> surface;
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
@@ -32,6 +31,7 @@
   std::unique_ptr<tgfx::Recording> lastRecording;
   int lastSurfaceWidth;
   int lastSurfaceHeight;
+  bool presentImmediately;
 }
 
 + (Class)layerClass {
@@ -78,13 +78,18 @@
     lastDrawIndex = -1;
     lastSurfaceWidth = 0;
     lastSurfaceHeight = 0;
+    presentImmediately = true;
     displayList.setRenderMode(tgfx::RenderMode::Tiled);
     displayList.setAllowZoomBlur(true);
     displayList.setMaxTileCount(512);
   }
   lastSurfaceWidth = static_cast<int>(self.bounds.size.width * self.contentScaleFactor);
   lastSurfaceHeight = static_cast<int>(self.bounds.size.height * self.contentScaleFactor);
-  surface = nullptr;
+  [self applyCenteringTransform];
+  if (tgfxWindow != nullptr) {
+    surface = nullptr;
+    presentImmediately = true;
+  }
 }
 
 - (void)updateLayerTree:(int)drawIndex {
@@ -130,7 +135,7 @@
     return;
   }
 
-  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+  if (!presentImmediately && !displayList.hasContentChanged() && lastRecording == nullptr) {
     return;
   }
 
@@ -156,11 +161,18 @@
 
   auto recording = context->flush();
 
-  // Delayed one-frame present
-  std::swap(lastRecording, recording);
+  if (presentImmediately) {
+    presentImmediately = false;
+    lastRecording = nullptr;
+    if (recording) {
+      context->submit(std::move(recording));
+    }
+  } else {
+    std::swap(lastRecording, recording);
 
-  if (recording) {
-    context->submit(std::move(recording));
+    if (recording) {
+      context->submit(std::move(recording));
+    }
   }
 
   device->unlock();
