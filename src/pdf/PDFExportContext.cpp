@@ -797,6 +797,41 @@ void PDFExportContext::onDrawPath(const Matrix& matrix, const ClipStack& clip, c
     return;
   }
 
+  // Fast path for simple ImageShader rectangle fills.
+  // Keep strict constraints to avoid changing non-rectangular/path-based shader behavior.
+  Rect pathRect;
+  if (!path.isInverseFillType() && path.isRect(&pathRect) && brush.shader) {
+    auto shader = brush.shader;
+    Matrix shaderMatrix = Matrix::I();
+    bool isSimpleImageShader = true;
+    while (Types::Get(shader.get()) == Types::ShaderType::Matrix) {
+      const auto matrixShader = static_cast<const MatrixShader*>(shader.get());
+      shaderMatrix.preConcat(matrixShader->matrix);
+      shader = matrixShader->source;
+    }
+    if (Types::Get(shader.get()) != Types::ShaderType::Image) {
+      isSimpleImageShader = false;
+    }
+    if (isSimpleImageShader) {
+      const auto imageShader = static_cast<const ImageShader*>(shader.get());
+      auto image = imageShader->image;
+      if (image && imageShader->tileModeX == TileMode::Clamp &&
+          imageShader->tileModeY == TileMode::Clamp) {
+        auto mappedImageRect = Rect::MakeWH(image->width(), image->height());
+        shaderMatrix.mapRect(&mappedImageRect);
+        auto sortedPathRect = pathRect.makeSorted();
+        auto sortedMappedImageRect = mappedImageRect.makeSorted();
+        if (sortedMappedImageRect == sortedPathRect) {
+          Brush imageBrush = brush;
+          imageBrush.shader = nullptr;
+          onDrawImageRect(image, sortedMappedImageRect, imageShader->sampling, matrix, clip,
+                          imageBrush);
+          return;
+        }
+      }
+    }
+  }
+
   ScopedContentEntry scopedContent(this, matrix, clip, Matrix::I(), brush);
   if (!scopedContent) {
     return;
@@ -1307,15 +1342,24 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
   }
   const auto shaderMaskFilter = static_cast<const ShaderMaskFilter*>(originPaint.maskFilter.get());
   auto [picture, pictureMatrix] = MaskFilterToPicture(shaderMaskFilter);
+  // Inverted masks have no vector Picture representation — always rasterize as bitmap.
+  bool useBitmapMask = !picture || shaderMaskFilter->isInverted();
 
   auto maskContext = makeCongruentDevice();
-  if (!picture) {  //mask as image
+  if (useBitmapMask) {
     auto surface = Surface::Make(document->context(), static_cast<int>(maskBound.width()),
                                  static_cast<int>(maskBound.height()), false, 1, false, 0,
                                  document->dstColorSpace());
     Canvas* maskCanvas = surface->getCanvas();
     Paint maskPaint;
-    maskPaint.setShader(shaderMaskFilter->getShader());
+    // Compensate for maskBound offset: the mask shader's coordinates are in the path's
+    // coordinate space (which starts at maskBound.x/y), but the surface starts at (0,0).
+    // Apply an inverse translation to the shader so it samples from the correct region.
+    auto shader = shaderMaskFilter->getShader();
+    if (maskBound.x() != 0 || maskBound.y() != 0) {
+      shader = shader->makeWithMatrix(Matrix::MakeTrans(-maskBound.x(), -maskBound.y()));
+    }
+    maskPaint.setShader(shader);
     maskCanvas->drawPaint(maskPaint);
 
     auto grayscaleInfo = ImageInfo::Make(surface->width(), surface->height(), ColorType::ALPHA_8);
@@ -1325,11 +1369,29 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
       free(pixels);
       return;
     }
-    auto pixelData = Data::MakeAdopted(pixels, byteSize, Data::FreeProc);
-    // Convert alpha-8 to a grayscale image
-    grayscaleInfo = ImageInfo::Make(surface->width(), surface->height(), ColorType::Gray_8,
-                                    AlphaType::Premultiplied, 0, document->dstColorSpace());
-    auto maskImage = Image::MakeFrom(grayscaleInfo, pixelData);
+    // Convert ALPHA_8 pixels to RGBA to avoid GPU texture upload issues.
+    // Gray_8 and ALPHA_8 formats both trigger texture upload attempts, which fail for CPU-only data.
+    // Instead, convert to RGBA_8888 so PDF serialization can handle it without GPU.
+    int w = static_cast<int>(maskBound.width());
+    int h = static_cast<int>(maskBound.height());
+    auto rgbaInfo = ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Unpremultiplied);
+    auto rgbaSize = rgbaInfo.byteSize();
+    auto* rgbaPixels = static_cast<uint8_t*>(malloc(rgbaSize));
+    auto* alphaPixels = static_cast<const uint8_t*>(pixels);
+    for (int i = 0; i < w * h; ++i) {
+      // PDF SMask has no native inversion support, so we invert the pixel values directly.
+      uint8_t a = shaderMaskFilter->isInverted() ? static_cast<uint8_t>(255 - alphaPixels[i])
+                                                 : alphaPixels[i];
+      // Replicate alpha to RGB channels for luminosity blending in PDF
+      rgbaPixels[i * 4 + 0] = a;
+      rgbaPixels[i * 4 + 1] = a;
+      rgbaPixels[i * 4 + 2] = a;
+      rgbaPixels[i * 4 + 3] = 255;  // Full opacity
+    }
+    free(pixels);  // Release ALPHA_8 data
+
+    auto rgbaData = Data::MakeAdopted(rgbaPixels, rgbaSize, Data::FreeProc);
+    auto maskImage = Image::MakeFrom(rgbaInfo, rgbaData);
 
     // PDF doesn't seem to allow masking vector graphics with an Image XObject.
     // Must mask with a Form XObject.
@@ -1351,12 +1413,12 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
     return;
   }
 
-  setGraphicState(
-      PDFGraphicState::GetSMaskGraphicState(
-          maskContext->makeFormXObjectFromDevice(maskBound, true), false,
-          picture ? PDFGraphicState::SMaskMode::Alpha : PDFGraphicState::SMaskMode::Luminosity,
-          document),
-      contentEntry.stream());
+  setGraphicState(PDFGraphicState::GetSMaskGraphicState(
+                      maskContext->makeFormXObjectFromDevice(maskBound, true), false,
+                      useBitmapMask ? PDFGraphicState::SMaskMode::Luminosity
+                                    : PDFGraphicState::SMaskMode::Alpha,
+                      document),
+                  contentEntry.stream());
 
   PDFUtils::EmitPath(path, false, contentEntry.stream());
 
