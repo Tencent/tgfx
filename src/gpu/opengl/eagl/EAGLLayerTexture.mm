@@ -134,7 +134,6 @@ std::shared_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
   texture->msaaBufferID = msaaRBID;
   texture->_colorBufferID = resolveRBID;
   texture->_resolveFrameBufferID = resolveFBO;
-  gpu->state()->bindFramebuffer(texture.get());
   return texture;
 }
 
