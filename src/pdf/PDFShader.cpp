@@ -128,15 +128,15 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
   DEBUG_ASSERT(shader);
   DEBUG_ASSERT(doc);
   // Unwrap MatrixShader layers to find the underlying shader and accumulate the matrix.
-  auto innerShader = shader.get();
+  auto unwrappedShader = shader;
   auto combinedTransform = canvasTransform;
-  while (Types::Get(innerShader) == Types::ShaderType::Matrix) {
-    const auto matrixShader = static_cast<const MatrixShader*>(innerShader);
+  while (Types::Get(unwrappedShader.get()) == Types::ShaderType::Matrix) {
+    const auto matrixShader = static_cast<const MatrixShader*>(unwrappedShader.get());
     combinedTransform.preConcat(matrixShader->matrix);
-    innerShader = matrixShader->source.get();
+    unwrappedShader = matrixShader->source;
   }
-  if (Types::Get(innerShader) == Types::ShaderType::Gradient) {
-    const auto gradientShader = static_cast<const GradientShader*>(innerShader);
+  if (Types::Get(unwrappedShader.get()) == Types::ShaderType::Gradient) {
+    const auto gradientShader = static_cast<const GradientShader*>(unwrappedShader.get());
     auto gradientType = gradientShader->asGradient(nullptr);
     // Only Linear and Radial have native PDF Shading support.
     // Conic and Diamond fall through to the bitmap tiling path.
@@ -148,10 +148,10 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
     return PDFIndirectReference();
   }
 
-  paintColor = AdjustColor(innerShader, paintColor);
+  paintColor = AdjustColor(unwrappedShader.get(), paintColor);
 
-  if (Types::Get(innerShader) == Types::ShaderType::Image) {
-    const auto imageShader = static_cast<const ImageShader*>(innerShader);
+  if (Types::Get(unwrappedShader.get()) == Types::ShaderType::Image) {
+    const auto imageShader = static_cast<const ImageShader*>(unwrappedShader.get());
     auto shaderImage = imageShader->image;
     // TODO (YGaurora): Cache image shaders and remove duplicates
     PDFIndirectReference pdfShader =
@@ -160,7 +160,7 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
     return pdfShader;
   }
   // Don't bother to de-dup fallback shader.
-  return MakeFallbackShader(doc, shader, combinedTransform, surfaceBBox, paintColor);
+  return MakeFallbackShader(doc, unwrappedShader, combinedTransform, surfaceBBox, paintColor);
 }
 
 PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix finalMatrix,

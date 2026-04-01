@@ -17,12 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFBitmap.h"
-#include "core/codecs/jpeg/JpegCodec.h"
-#include "core/images/CodecImage.h"
-#include "core/images/OrientImage.h"
-#include "core/images/RasterizedImage.h"
-#include "core/images/TransformImage.h"
-#include "core/utils/Types.h"
 #include "pdf/DeflateStream.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
@@ -33,7 +27,6 @@
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/WriteStream.h"
-#include "tgfx/core/YUVColorSpace.h"
 
 namespace tgfx {
 
@@ -290,54 +283,12 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
   }
 }
 
-void EmitJpegStream(PDFDocumentImpl* doc, PDFIndirectReference ref, ISize imageSize,
-                    const std::shared_ptr<Data>& encodedData) {
-  auto colorSpace = PDFUnion::Name("DeviceRGB");
-  if (auto colorSpaceRef = doc->colorSpaceRef()) {
-    colorSpace = PDFUnion::Ref(colorSpaceRef);
-  }
-  auto length = static_cast<int>(encodedData->size());
-  auto streamWriter = [&encodedData](const std::shared_ptr<WriteStream>& stream) {
-    stream->write(encodedData->data(), encodedData->size());
-  };
-  EmitImageStream(doc, ref, streamWriter, imageSize, std::move(colorSpace), PDFIndirectReference(),
-                  length, PDFStreamFormat::DCT);
-}
-
 }  // namespace
 
 void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodingQuality*/,
                                PDFDocumentImpl* doc, PDFIndirectReference ref) {
-  // Unwrap RasterizedImage / OrientImage layers to find the underlying CodecImage.
-  auto source = image;
-  bool hasOrientImage = false;
-  while (source) {
-    auto imageType = Types::Get(source.get());
-    if (imageType == Types::ImageType::Codec) {
-      break;
-    }
-    if (imageType == Types::ImageType::Rasterized) {
-      source = static_cast<const RasterizedImage*>(source.get())->source;
-    } else if (imageType == Types::ImageType::Orient) {
-      hasOrientImage = true;
-      source = static_cast<const TransformImage*>(source.get())->source;
-    } else {
-      source = nullptr;
-    }
-  }
-  if (source && Types::Get(source.get()) == Types::ImageType::Codec) {
-    const auto codecImage = static_cast<const CodecImage*>(source.get());
-    auto codec = codecImage->getCodec();
-    // Only embed original JPEG bytes when no orientation transform is pending.
-    if (!hasOrientImage && codec->orientation() == Orientation::TopLeft &&
-        image->width() == codec->width() && image->height() == codec->height()) {
-      auto encodedData = codec->getEncodedData();
-      if (encodedData && JpegCodec::IsJpeg(encodedData)) {
-        EmitJpegStream(doc, ref, ISize::Make(image->width(), image->height()), encodedData);
-        return;
-      }
-    }
-  }
+  // TODO (YGaurora): Re-enable JPEG direct embedding once Image provides a unified encoded data
+  // access interface, so we don't need to reach into internal Image subclass hierarchy.
   auto image2bitmap = [doc](Context* context, const std::shared_ptr<Image>& image) {
     auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
                                  doc->dstColorSpace());

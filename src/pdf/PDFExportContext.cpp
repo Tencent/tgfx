@@ -921,8 +921,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
   if (modifiedBrush.maskFilter) {
     auto imageShader =
         Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, SamplingOptions());
-    auto shaderTransform = transform;
-    imageShader = imageShader->makeWithMatrix(shaderTransform);
+    imageShader = imageShader->makeWithMatrix(transform);
     modifiedBrush.shader = imageShader;
 
     Path path;
