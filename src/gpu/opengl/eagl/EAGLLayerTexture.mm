@@ -93,9 +93,7 @@ std::shared_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
     LOGE("EAGLLayerTexture::MakeFrom() failed to create layer renderbuffer!");
     return nullptr;
   }
-  unsigned frameBufferID = 0;
-  unsigned resolveFBO = 0;
-  unsigned msaaRBID = 0;
+  unsigned frameBufferID = 0, resolveFBO = 0, msaaRBID = 0;
   if (sampleCount <= 1) {
     frameBufferID = CreateFramebufferForRenderbuffer(gpu, resolveRBID);
     if (frameBufferID == 0) {
