@@ -325,6 +325,8 @@
         "InnerShadowOnly_TranslateRotate": "e2a76e12b",
         "InnerShadow_Translate": "e2a76e12b",
         "InnerShadow_TranslateRotateScale": "e2a76e12b",
+        "LayerConicGradient": "3230001c6",
+        "LayerDiamondGradient": "3230001c6",
         "LayerLinearGradient": "23582ded6",
         "LayerRadialGradient": "23582ded6",
         "SimpleText": "c13eac52"
