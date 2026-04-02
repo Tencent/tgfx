@@ -42,6 +42,7 @@
         "DrawSRGBDropShadowFilterToP3": "8d1c38fc",
         "DrawSRGBLinearShaderToP3": "8d1c38fc",
         "DrawSRGBRadialShaderToP3": "8d1c38fc",
+        "DrawShapeAutoBatch_DifferentBounds": "802f276e",
         "DrawShapeAutoBatch_MultiColors": "4df17714",
         "DrawShapeAutoBatch_SameColor": "4df17714",
         "DrawShapeAutoBatch_Stroke": "4df17714",
