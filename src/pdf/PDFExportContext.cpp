@@ -160,6 +160,7 @@ PDFExportContext::PDFExportContext(ISize pageSize, PDFDocumentImpl* document,
     : _pageSize(pageSize), document(document), _initialTransform(transform) {
   DEBUG_ASSERT(!_pageSize.isEmpty());
   content = MemoryWriteStream::Make();
+  contentBuffer = MemoryWriteStream::Make();
 }
 
 PDFExportContext::~PDFExportContext() = default;
@@ -1099,31 +1100,31 @@ std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
   }
 
   if (TreatAsRegularPDFBlendMode(blendMode)) {
-    if (!fActiveStackState.contentStream) {
+    if (!activeStackState.contentStream) {
       if (content->bytesWritten() != 0) {
         content->writeText("Q\nq\n");
         needsExtraSave = true;
       }
-      fActiveStackState = PDFGraphicStackState(content);
+      activeStackState = PDFGraphicStackState(content);
     } else {
-      DEBUG_ASSERT(fActiveStackState.contentStream == content);
+      DEBUG_ASSERT(activeStackState.contentStream == content);
     }
   } else {
-    fActiveStackState.drainStack();
-    fActiveStackState = PDFGraphicStackState(contentBuffer);
+    activeStackState.drainStack();
+    activeStackState = PDFGraphicStackState(contentBuffer);
   }
 
-  DEBUG_ASSERT(fActiveStackState.contentStream);
+  DEBUG_ASSERT(activeStackState.contentStream);
   auto contentMatrix = matrix * contentExtraMatrix;
   PDFGraphicStackState::Entry entry;
   PopulateGraphicStateEntryFromPaint(document, contentMatrix, Rect::MakeSize(_pageSize), brush,
                                      _initialTransform, scale, document->dstColorSpace(), &entry,
                                      &shaderResources, &graphicStateResources);
-  fActiveStackState.updateMatrixClip(matrix, clip);
-  fActiveStackState.updateEntryMatrix(entry.matrix);
-  fActiveStackState.updateDrawingState(entry, document->colorSpaceRef());
+  activeStackState.updateMatrixClip(matrix, clip);
+  activeStackState.updateEntryMatrix(entry.matrix);
+  activeStackState.updateDrawingState(entry, document->colorSpaceRef());
 
-  return fActiveStackState.contentStream;
+  return activeStackState.contentStream;
 }
 
 void PDFExportContext::finishContentEntry(const Matrix& matrix, const ClipStack& clip,
@@ -1135,10 +1136,10 @@ void PDFExportContext::finishContentEntry(const Matrix& matrix, const ClipStack&
     return;
   }
 
-  DEBUG_ASSERT(fActiveStackState.contentStream);
+  DEBUG_ASSERT(activeStackState.contentStream);
 
-  fActiveStackState.drainStack();
-  fActiveStackState = PDFGraphicStackState();
+  activeStackState.drainStack();
+  activeStackState = PDFGraphicStackState();
 
   if (blendMode == BlendMode::DstOver) {
     DEBUG_ASSERT(!destination);

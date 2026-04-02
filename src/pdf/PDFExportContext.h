@@ -167,7 +167,7 @@ class PDFExportContext : public DrawContext {
   bool needsExtraSave = false;
   std::shared_ptr<MemoryWriteStream> content = nullptr;
   std::shared_ptr<MemoryWriteStream> contentBuffer = nullptr;
-  PDFGraphicStackState fActiveStackState;
+  PDFGraphicStackState activeStackState;
 
   std::unordered_set<PDFIndirectReference> graphicStateResources;
   std::unordered_set<PDFIndirectReference> xObjectResources;

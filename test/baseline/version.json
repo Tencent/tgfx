@@ -331,6 +331,7 @@
         "LayerDiamondGradient": "3230001c6",
         "LayerLinearGradient": "23582ded6",
         "LayerRadialGradient": "23582ded6",
+        "NonRegularBlendMode": "3230001c6",
         "SimpleText": "c13eac52"
     },
     "PathShapeTest": {
