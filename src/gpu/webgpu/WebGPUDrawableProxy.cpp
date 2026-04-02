@@ -51,7 +51,7 @@ int WebGPUDrawableProxy::sampleCount() const {
 }
 
 ImageOrigin WebGPUDrawableProxy::origin() const {
-  return ImageOrigin::BottomLeft;
+  return ImageOrigin::TopLeft;
 }
 
 bool WebGPUDrawableProxy::externallyOwned() const {
