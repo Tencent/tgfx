@@ -114,6 +114,7 @@ Matrix ScaleTranslate(float sx, float sy, float tx, float ty) {
 Bitmap ExtractSubset(Bitmap src, Rect subset) {
   Bitmap destination(static_cast<int>(subset.width()), static_cast<int>(subset.height()), false,
                      true, src.colorSpace());
+  destination.clear();
   const auto srcPixels = src.lockPixels();
   destination.writePixels(src.info(), srcPixels, static_cast<int>(subset.left),
                           static_cast<int>(subset.top));
