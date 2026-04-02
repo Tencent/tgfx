@@ -178,6 +178,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
   if (!PDFUtils::InverseTransformBBox(finalMatrix, &deviceBounds)) {
     return PDFIndirectReference();
   }
+  deviceBounds.roundOut();
 
   Rect bitmapBounds = Rect::MakeWH(image->width(), image->height());
 
@@ -249,11 +250,10 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
   }
 
   // Then expand the left, right, top, then bottom.
-  // Round deviceBounds edges to avoid floating-point precision issues in comparisons.
-  auto roundedLeft = static_cast<int>(std::round(deviceBounds.left));
-  auto roundedRight = static_cast<int>(std::round(deviceBounds.right));
-  auto roundedTop = static_cast<int>(std::round(deviceBounds.top));
-  auto roundedBottom = static_cast<int>(std::round(deviceBounds.bottom));
+  auto roundedLeft = static_cast<int>(deviceBounds.left);
+  auto roundedRight = static_cast<int>(deviceBounds.right);
+  auto roundedTop = static_cast<int>(deviceBounds.top);
+  auto roundedBottom = static_cast<int>(deviceBounds.bottom);
 
   if (tileModesX == TileMode::Clamp) {
     auto subset = Rect::MakeXYWH(0, 0, 1, bitmap.height());
@@ -391,7 +391,7 @@ PDFIndirectReference PDFShader::MakeFallbackShader(PDFDocumentImpl* doc,
 
   auto image = surface->makeImageSnapshot();
   DEBUG_ASSERT(image);
-  return MakeImageShader(doc, canvasTransform * shaderTransform, TileMode::Clamp, TileMode::Clamp,
+  return MakeImageShader(doc, canvasTransform * shaderTransform, TileMode::Decal, TileMode::Decal,
                          surfaceBBox, image, paintColor);
 }
 
