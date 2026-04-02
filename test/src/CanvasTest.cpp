@@ -201,6 +201,8 @@ TGFX_TEST(CanvasTest, Clip) {
   EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
   canvas->clipPath(rrectPath);
   EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
+  canvas->clipPath(rrectPath, false);
+  EXPECT_EQ(canvas->clipStack->elements().size(), 2u);
 
   // ========== 14. Screenshot: AA vs non-AA ==========
   // Note: When the path bounds are small, texture-based rasterization is used internally

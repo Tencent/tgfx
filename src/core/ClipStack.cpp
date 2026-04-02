@@ -59,7 +59,7 @@ static ClipGeometry ResolveClipGeometry(const ClipElement& a, const ClipElement&
 
   // Complex paths cannot be simplified, keep both.
   if (!a.isRect() && !b.isRect()) {
-    if (a.path().isSame(b.path())) {
+    if (a.path().isSame(b.path()) && a.isAntiAlias() == b.isAntiAlias()) {
       return ClipGeometry::BOnly;
     }
     return ClipGeometry::Both;
