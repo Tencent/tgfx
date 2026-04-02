@@ -875,4 +875,28 @@ TGFX_TEST(PDFExportTest, DropShadowLayer) {
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DropShadowLayer"));
 }
 
+TGFX_TEST(PDFExportTest, NonRegularBlendMode) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  ASSERT_TRUE(document != nullptr);
+
+  auto canvas = document->beginPage(200.f, 200.f);
+  ASSERT_TRUE(canvas != nullptr);
+
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setBlendMode(BlendMode::Src);
+  canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
+
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/NonRegularBlendMode"));
+}
+
 }  // namespace tgfx

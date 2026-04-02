@@ -160,6 +160,7 @@ PDFExportContext::PDFExportContext(ISize pageSize, PDFDocumentImpl* document,
     : _pageSize(pageSize), document(document), _initialTransform(transform) {
   DEBUG_ASSERT(!_pageSize.isEmpty());
   content = MemoryWriteStream::Make();
+  contentBuffer = MemoryWriteStream::Make();
 }
 
 PDFExportContext::~PDFExportContext() = default;
