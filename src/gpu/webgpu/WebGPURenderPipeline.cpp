@@ -94,8 +94,7 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
     // from binding=0 when there are no uniform blocks. Handle both cases.
     unsigned textureBinding;
     if (entry.binding >= TEXTURE_BINDING_POINT_START) {
-      auto samplerIndex =
-          static_cast<unsigned>(entry.binding - TEXTURE_BINDING_POINT_START);
+      auto samplerIndex = static_cast<unsigned>(entry.binding - TEXTURE_BINDING_POINT_START);
       textureBinding = TEXTURE_BINDING_POINT_START + samplerIndex * 2;
     } else {
       // No UBOs before textures; binding starts from entry.binding directly.

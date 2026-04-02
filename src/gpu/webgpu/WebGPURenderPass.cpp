@@ -261,8 +261,7 @@ void WebGPURenderPass::updateBindGroup() {
 }
 
 void WebGPURenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
-                            uint32_t instanceCount, uint32_t firstVertex,
-                            uint32_t firstInstance) {
+                            uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
   if (passEncoder == nullptr || currentPipeline == nullptr) {
     return;
   }
@@ -278,19 +277,20 @@ void WebGPURenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
 }
 
 void WebGPURenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCount,
-                                   uint32_t instanceCount, uint32_t firstIndex,
-                                   int32_t baseVertex, uint32_t firstInstance) {
+                                   uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
+                                   uint32_t firstInstance) {
   if (passEncoder == nullptr || currentPipeline == nullptr) {
-    emscripten_console_logf("[WebGPU DrawIndexed] SKIPPED: encoder=%p pipeline=%p",
-                            static_cast<void*>(passEncoder),
-                            currentPipeline ? static_cast<void*>(currentPipeline->webgpuRenderPipeline()) : nullptr);
+    emscripten_console_logf(
+        "[WebGPU DrawIndexed] SKIPPED: encoder=%p pipeline=%p", static_cast<void*>(passEncoder),
+        currentPipeline ? static_cast<void*>(currentPipeline->webgpuRenderPipeline()) : nullptr);
     return;
   }
   auto topology = ToWGPUPrimitiveTopology(primitiveType);
   auto wgpuPipeline = currentPipeline->webgpuRenderPipeline(topology);
   wgpuRenderPassEncoderSetPipeline(passEncoder, wgpuPipeline);
-  emscripten_console_logf("[WebGPU DrawIndexed] indexCount=%u instanceCount=%u baseVertex=%d topology=%d",
-                          indexCount, instanceCount, baseVertex, static_cast<int>(topology));
+  emscripten_console_logf(
+      "[WebGPU DrawIndexed] indexCount=%u instanceCount=%u baseVertex=%d topology=%d", indexCount,
+      instanceCount, baseVertex, static_cast<int>(topology));
   updateBindGroup();
   wgpuRenderPassEncoderDrawIndexed(passEncoder, indexCount, instanceCount, firstIndex, baseVertex,
                                    firstInstance);

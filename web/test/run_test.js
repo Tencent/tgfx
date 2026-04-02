@@ -174,15 +174,18 @@ async function run() {
   }
 
   // Extract downloaded zip files to their destinations.
-  // Preserve the Metal baseline cache so that subsequent runs still compare against Metal,
-  // not against a previously cached WebGPU result.
+  // Preserve the Metal baseline version.json so that subsequent runs still compare against Metal
+  // baselines. Merge new md5.json entries into the existing cache so that tests passing on the
+  // current build are recognized as passing on the next rebuild + run cycle.
   const cacheWebDir = path.join(PROJECT_ROOT, 'test/baseline/.cache-web');
   const md5Path = path.join(cacheWebDir, 'md5.json');
   const versionPath = path.join(cacheWebDir, 'version.json');
-  const md5BackupPath = md5Path + '.bak';
   const versionBackupPath = versionPath + '.bak';
+  let existingMd5 = {};
   if (fs.existsSync(md5Path)) {
-    fs.copyFileSync(md5Path, md5BackupPath);
+    try {
+      existingMd5 = JSON.parse(fs.readFileSync(md5Path, 'utf8'));
+    } catch (e) { /* ignore parse errors */ }
   }
   if (fs.existsSync(versionPath)) {
     fs.copyFileSync(versionPath, versionBackupPath);
@@ -199,14 +202,31 @@ async function run() {
     }
   }
 
-  // Restore the Metal baseline cache after cache-web.zip extraction overwrites it.
-  if (fs.existsSync(md5BackupPath)) {
-    fs.copyFileSync(md5BackupPath, md5Path);
-    fs.unlinkSync(md5BackupPath);
-  }
+  // Restore the Metal baseline version.json after cache-web.zip extraction overwrites it.
   if (fs.existsSync(versionBackupPath)) {
     fs.copyFileSync(versionBackupPath, versionPath);
     fs.unlinkSync(versionBackupPath);
+  }
+
+  // Merge new MD5 values from the test output into the existing cache.
+  // The test only writes MD5 entries for keys that failed comparison, so we merge them
+  // into the full cache rather than replacing it.
+  if (fs.existsSync(md5Path)) {
+    try {
+      const newMd5 = JSON.parse(fs.readFileSync(md5Path, 'utf8'));
+      for (const [suite, tests] of Object.entries(newMd5)) {
+        if (!existingMd5[suite]) {
+          existingMd5[suite] = {};
+        }
+        for (const [name, md5] of Object.entries(tests)) {
+          existingMd5[suite][name] = md5;
+        }
+      }
+      fs.writeFileSync(md5Path, JSON.stringify(existingMd5, null, 4) + '\n');
+      console.log('  Merged new MD5 values into .cache-web/md5.json');
+    } catch (e) {
+      console.warn('  Failed to merge MD5 values:', e.message);
+    }
   }
 
   // Clean up downloads directory.

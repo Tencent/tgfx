@@ -33,8 +33,8 @@ class WebGPURenderPipeline : public RenderPipeline, public WebGPUResource {
   static std::shared_ptr<WebGPURenderPipeline> Make(WebGPUGPU* gpu,
                                                     const RenderPipelineDescriptor& descriptor);
 
-  WGPURenderPipeline webgpuRenderPipeline(WGPUPrimitiveTopology topology =
-                                              WGPUPrimitiveTopology_TriangleList) const {
+  WGPURenderPipeline webgpuRenderPipeline(
+      WGPUPrimitiveTopology topology = WGPUPrimitiveTopology_TriangleList) const {
     return topology == WGPUPrimitiveTopology_TriangleStrip && pipelineStrip != nullptr
                ? pipelineStrip
                : pipeline;
