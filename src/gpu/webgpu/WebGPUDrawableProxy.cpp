@@ -51,7 +51,7 @@ int WebGPUDrawableProxy::sampleCount() const {
 }
 
 ImageOrigin WebGPUDrawableProxy::origin() const {
-  return ImageOrigin::TopLeft;
+  return ImageOrigin::BottomLeft;
 }
 
 bool WebGPUDrawableProxy::externallyOwned() const {
@@ -82,7 +82,7 @@ std::shared_ptr<RenderTarget> WebGPUDrawableProxy::getRenderTarget() const {
     auto textureWidth = static_cast<int>(wgpuTextureGetWidth(_surfaceTexture));
     auto textureHeight = static_cast<int>(wgpuTextureGetHeight(_surfaceTexture));
     BackendRenderTarget backendRT(textureInfo, textureWidth, textureHeight);
-    _renderTarget = RenderTarget::MakeFrom(_context, backendRT, ImageOrigin::TopLeft);
+    _renderTarget = RenderTarget::MakeFrom(_context, backendRT, ImageOrigin::BottomLeft);
   }
   return _renderTarget;
 }

@@ -25,6 +25,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
+#include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
@@ -42,8 +43,13 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
     return nullptr;
   }
   auto pixelFormat = ColorTypeToPixelFormat(colorType);
+  // WebGPU clip space Y axis points upward (like OpenGL/Vulkan), but the framebuffer origin is
+  // top-left. Use BottomLeft origin so that RTAdjust flips Y in the vertex shader, matching the
+  // convention used by the OpenGL backend.
+  auto origin = context->gpu()->info()->backend == Backend::WebGPU ? ImageOrigin::BottomLeft
+                                                                   : ImageOrigin::TopLeft;
   auto proxy = context->proxyProvider()->createRenderTargetProxy({}, width, height, pixelFormat,
-                                                                 sampleCount, mipmapped);
+                                                                 sampleCount, mipmapped, origin);
   return MakeFrom(std::move(proxy), renderFlags, true, std::move(colorSpace));
 }
 
