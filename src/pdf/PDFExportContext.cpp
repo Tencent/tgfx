@@ -166,7 +166,7 @@ PDFExportContext::PDFExportContext(ISize pageSize, PDFDocumentImpl* document,
 PDFExportContext::~PDFExportContext() = default;
 
 void PDFExportContext::reset() {
-  content.reset();
+  content->reset();
 }
 
 void PDFExportContext::drawFill(const Brush& brush) {
