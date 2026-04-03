@@ -69,13 +69,13 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
       // if samplingArgs has sampleArea, means the area is already subsetted
       newSamplingArgs.sampleArea = getSubset(drawBounds);
     }
-    TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
+    TPArgs tpArgs(args.context, args.renderFlags, 1, mipmapped, 1.0f, {});
     auto proxy = source->lockTextureProxy(tpArgs);
     auto allocator = args.context->drawingAllocator();
     return TextureEffect::MakeRGBAAA(allocator, std::move(proxy), newSamplingArgs, alphaStart,
                                      AddressOf(matrix));
   }
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
+  TPArgs tpArgs(args.context, args.renderFlags, 1, mipmapped, 1.0f, {});
   auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
@@ -95,7 +95,7 @@ std::shared_ptr<TextureProxy> RGBAAAImage::lockTextureProxy(const TPArgs& args) 
     return nullptr;
   }
   auto drawRect = Rect::MakeWH(textureWidth, textureHeight);
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect, 1.0f);
+  FPArgs fpArgs(args.context, args.renderFlags, 1, drawRect, 1.0f);
   auto processor = asFragmentProcessor(fpArgs, {}, nullptr);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {

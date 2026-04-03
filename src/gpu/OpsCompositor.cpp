@@ -43,6 +43,10 @@
 
 namespace tgfx {
 
+static bool HasExtraCoverage(const Brush& brush, const ClipStack& clip) {
+  return brush.maskFilter != nullptr || clip.state() != ClipState::Empty;
+}
+
 static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& rects) {
   if (rects.size() <= 1) {
     return false;
@@ -201,7 +205,8 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const Matrix& matrix,
 
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
-  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, meshBase->hasCoverage());
+  bool hasCoverage = meshBase->hasCoverage() || HasExtraCoverage(brush, clip);
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, hasCoverage);
   auto clipBounds = getClipBounds(clip);
 
   float drawScale = 1.0f;
@@ -242,7 +247,8 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const Matrix& matrix,
   // - shader + colors: texture * vertexColor (Modulate)
   // - shader only: pure texture
   if (brush.shader) {
-    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
+    FPArgs args = {context, renderFlags, renderTarget->sampleCount(),
+                   localBounds.value_or(Rect::MakeEmpty()), drawScale};
     auto textureFP = FragmentProcessor::Make(brush.shader, args, nullptr, dstColorSpace);
     if (textureFP == nullptr) {
       return;
@@ -420,11 +426,18 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
   // deviceBounds needs to be computed for DstTexture creation. We assume coverage exists unless
   // clip is empty, since some ops (e.g., AtlasTextOp) always have coverage regardless of clip.
   // Underestimating causes draws to be skipped on GPUs without frameBufferFetch (e.g., SwiftShader).
-  bool hasCoverage = pendingBrush.maskFilter != nullptr || pendingClip.state() != ClipState::Empty;
+  bool hasCoverage = HasExtraCoverage(pendingBrush, pendingClip);
+  auto aaType = getAAType(pendingBrush);
+  // RRect and Rect with round stroke use shader-controlled edges,
+  // so they need coverage even under MSAA mode.
+  auto isRoundStrokeRect = pendingType == PendingOpType::Rect && !pendingStrokes.empty() &&
+                           pendingStrokes.front()->join == LineJoin::Round;
+  if (pendingType == PendingOpType::RRect || isRoundStrokeRect) {
+    hasCoverage = hasCoverage || aaType != AAType::None;
+  }
   bool hasImageFill = pendingType == PendingOpType::Image;
   auto [needLocalBounds, needDeviceBounds] =
       needComputeBounds(pendingBrush, hasCoverage, hasImageFill);
-  auto aaType = getAAType(pendingBrush);
   Rect clipBounds = {};
   if (needLocalBounds) {
     clipBounds = getClipBounds(pendingClip);
@@ -516,8 +529,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
       break;
   }
   if (drawOp != nullptr && pendingType == PendingOpType::Image) {
-    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
-                   drawScale.value_or(1.0f)};
+    FPArgs args = {context, renderFlags, renderTarget->sampleCount(),
+                   localBounds.value_or(Rect::MakeEmpty()), drawScale.value_or(1.0f)};
     auto processor =
         FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint);
     if (processor == nullptr) {
@@ -554,7 +567,9 @@ void OpsCompositor::flushPendingShapeOps() {
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
   float drawScale = 1.0f;
-  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(pendingBrush, true);
+  auto aaType = getAAType(pendingBrush);
+  bool hasCoverage = aaType == AAType::Coverage || HasExtraCoverage(pendingBrush, pendingClip);
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(pendingBrush, hasCoverage);
 
   // Compute the union of all instance bounds in the first instance's local space.
   // offsets are in device space, so convert them to local space using uvMatrix (inverse of
@@ -588,7 +603,6 @@ void OpsCompositor::flushPendingShapeOps() {
     return;
   }
 
-  auto aaType = getAAType(pendingBrush);
   auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
 
   if (count == 1) {
@@ -806,8 +820,9 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
   const auto width = FloatSaturateToInt(bounds.width());
   const auto height = FloatSaturateToInt(bounds.height());
   const auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
-  auto clipRenderTarget = RenderTargetProxy::Make(context, width, height, true, 1, false,
-                                                  ImageOrigin::TopLeft, BackingFit::Approx);
+  auto clipRenderTarget =
+      RenderTargetProxy::Make(context, width, height, true, renderTarget->sampleCount(), false,
+                              ImageOrigin::TopLeft, BackingFit::Approx);
   if (clipRenderTarget == nullptr) {
     DEBUG_ASSERT(false);
     return nullptr;
@@ -921,7 +936,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     return;
   }
 
-  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
+  FPArgs args = {context, renderFlags, renderTarget->sampleCount(),
+                 localBounds.value_or(Rect::MakeEmpty()), drawScale};
   auto colorFilter = brush.colorFilter;
   if (brush.shader) {
     auto shader = brush.shader;

@@ -56,7 +56,8 @@ static EGLContext CreateContext(EGLContext sharedContext, EGLDisplay eglDisplay,
 // Create a fixed-size window surface for ANGLE, as ANGLE can only detect resizes during a swap.
 // https://groups.google.com/g/angleproject/c/j3SF7nVIpD8
 static EGLSurface CreateFixedSizeSurfaceForAngle(EGLNativeWindowType nativeWindow,
-                                                 const EGLGlobals* eglGlobals) {
+                                                 const EGLGlobals* eglGlobals,
+                                                 EGLConfig windowConfig) {
   if (nativeWindow == nullptr) {
     return nullptr;
   }
@@ -69,8 +70,7 @@ static EGLSurface CreateFixedSizeSurfaceForAngle(EGLNativeWindowType nativeWindo
   attributes.insert(attributes.end(), eglGlobals->windowSurfaceAttributes.begin(),
                     eglGlobals->windowSurfaceAttributes.end());
   attributes = GetValidAttributes(attributes);
-  return eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig, nativeWindow,
-                                attributes.data());
+  return eglCreateWindowSurface(eglGlobals->display, windowConfig, nativeWindow, attributes.data());
 }
 #endif
 
@@ -116,12 +116,41 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLDisplay eglDisplay, EGLSurface
                          std::move(colorSpace));
 }
 
+static EGLConfig ChooseMSAAConfig(EGLDisplay display, int sampleCount) {
+  // clang-format off
+  const EGLint configAttribs[] = {
+      EGL_SURFACE_TYPE,     EGL_WINDOW_BIT,
+      EGL_RENDERABLE_TYPE,  EGL_OPENGL_ES2_BIT,
+      EGL_RED_SIZE,         8,
+      EGL_GREEN_SIZE,       8,
+      EGL_BLUE_SIZE,        8,
+      EGL_ALPHA_SIZE,       8,
+      EGL_STENCIL_SIZE,     8,
+      EGL_SAMPLE_BUFFERS,   1,
+      EGL_SAMPLES,          sampleCount,
+      EGL_NONE };
+  // clang-format on
+
+  EGLConfig msaaConfig = nullptr;
+  EGLint numConfigs = 0;
+  eglChooseConfig(display, configAttribs, &msaaConfig, 1, &numConfigs);
+  return msaaConfig;
+}
+
 std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
                                                EGLContext sharedContext,
-                                               std::shared_ptr<ColorSpace> colorSpace) {
+                                               std::shared_ptr<ColorSpace> colorSpace,
+                                               int sampleCount) {
   auto eglGlobals = EGLGlobals::Get();
+  auto windowConfig = eglGlobals->windowConfig;
+  if (sampleCount > 1) {
+    auto msaaConfig = ChooseMSAAConfig(eglGlobals->display, sampleCount);
+    if (msaaConfig != nullptr) {
+      windowConfig = msaaConfig;
+    }
+  }
 #if defined(_WIN32)
-  auto eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, eglGlobals);
+  auto eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, eglGlobals, windowConfig);
   if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
     LOGE(
         "EGLDevice::MakeFrom() The specified ColorSpace is not supported on this platform. "
@@ -146,14 +175,14 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
   attributes.insert(attributes.end(), eglGlobals->windowSurfaceAttributes.begin(),
                     eglGlobals->windowSurfaceAttributes.end());
   attributes = GetValidAttributes(attributes);
-  auto eglSurface = eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig,
-                                           nativeWindow, attributes.data());
+  auto eglSurface =
+      eglCreateWindowSurface(eglGlobals->display, windowConfig, nativeWindow, attributes.data());
 #endif
   if (eglSurface == nullptr) {
     LOGE("EGLDevice::MakeFrom() eglCreateWindowSurface error=%d", eglGetError());
     return nullptr;
   }
-  auto eglContext = CreateContext(sharedContext, eglGlobals->display, eglGlobals->windowConfig);
+  auto eglContext = CreateContext(sharedContext, eglGlobals->display, windowConfig);
   if (eglContext == EGL_NO_CONTEXT) {
     eglDestroySurface(eglGlobals->display, eglSurface);
     return nullptr;
@@ -163,6 +192,8 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
   if (device == nullptr) {
     eglDestroyContext(eglGlobals->display, eglContext);
     eglDestroySurface(eglGlobals->display, eglSurface);
+  } else {
+    device->eglConfig = windowConfig;
   }
   return device;
 }
@@ -281,7 +312,8 @@ bool EGLDevice::recreateSurfaceIfNeeded(EGLNativeWindowType nativeWindow) {
     return true;
   }
   eglDestroySurface(eglDisplay, eglSurface);
-  eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, EGLGlobals::Get());
+  auto config = eglConfig ? eglConfig : EGLGlobals::Get()->windowConfig;
+  eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, EGLGlobals::Get(), config);
   if (eglSurface == nullptr) {
     LOGE("EGLDevice::recreateSurfaceIfNeeded() CreateFixedSizeSurfaceForAngle error=%d",
          eglGetError());

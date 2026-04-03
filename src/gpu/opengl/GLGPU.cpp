@@ -157,8 +157,8 @@ std::shared_ptr<Texture> GLGPU::importBackendRenderTarget(const BackendRenderTar
     return nullptr;
   }
   TextureDescriptor descriptor = {
-      renderTarget.width(),           renderTarget.height(), format, false, 1,
-      TextureUsage::RENDER_ATTACHMENT};
+      renderTarget.width(),       renderTarget.height(),          format, false,
+      renderTarget.sampleCount(), TextureUsage::RENDER_ATTACHMENT};
   return makeResource<GLExternalTexture>(descriptor, static_cast<unsigned>(GL_TEXTURE_2D), 0u,
                                          frameBufferInfo.id);
 }

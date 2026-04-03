@@ -51,8 +51,10 @@ class Window {
   std::mutex locker = {};
   std::shared_ptr<Device> device = nullptr;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
+  int sampleCount = 1;
 
-  explicit Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  explicit Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                  int sampleCount = 1);
   Window() = default;
 
   /**

@@ -21,6 +21,7 @@
 #include "gpu/metal/MetalDefines.h"
 #include "gpu/metal/MetalDrawableProxy.h"
 #include "platform/apple/CGColorSpaceUtil.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 
@@ -34,7 +35,8 @@ static void ApplyColorSpace(CAMetalLayer* layer, const std::shared_ptr<ColorSpac
 
 std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(CAMetalLayer* layer,
                                                    std::shared_ptr<MetalDevice> device,
-                                                   std::shared_ptr<ColorSpace> colorSpace) {
+                                                   std::shared_ptr<ColorSpace> colorSpace,
+                                                   int sampleCount) {
   if (layer == nil) {
     return nullptr;
   }
@@ -52,11 +54,13 @@ std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(CAMetalLayer* layer,
     layer.device = (__bridge id<MTLDevice>)device->metalDevice();
   }
   ApplyColorSpace(layer, colorSpace);
-  return std::shared_ptr<MetalWindow>(new MetalWindow(device, layer, std::move(colorSpace)));
+  return std::shared_ptr<MetalWindow>(
+      new MetalWindow(device, layer, std::move(colorSpace), sampleCount));
 }
 
 std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(MTKView* view,
-                                                   std::shared_ptr<ColorSpace> colorSpace) {
+                                                   std::shared_ptr<ColorSpace> colorSpace,
+                                                   int sampleCount) {
   if (view == nil) {
     return nullptr;
   }
@@ -73,18 +77,21 @@ std::shared_ptr<MetalWindow> MetalWindow::MakeFrom(MTKView* view,
     layer.device = (__bridge id<MTLDevice>)device->metalDevice();
   }
   ApplyColorSpace(layer, colorSpace);
-  return std::shared_ptr<MetalWindow>(new MetalWindow(device, view, layer, std::move(colorSpace)));
+  return std::shared_ptr<MetalWindow>(
+      new MetalWindow(device, view, layer, std::move(colorSpace), sampleCount));
 }
 
 // Do not retain layer/view here, otherwise it can cause circular reference.
 MetalWindow::MetalWindow(std::shared_ptr<Device> device, CAMetalLayer* layer,
-                         std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)), metalLayer(layer) {
+                         std::shared_ptr<ColorSpace> colorSpace, int sampleCount)
+    : Window(std::move(device), std::move(colorSpace), sampleCount), metalLayer(layer) {
 }
 
 MetalWindow::MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalLayer* layer,
-                         std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)), metalLayer(layer), metalView(view) {
+                         std::shared_ptr<ColorSpace> colorSpace, int sampleCount)
+    : Window(std::move(device), std::move(colorSpace), sampleCount),
+      metalLayer(layer),
+      metalView(view) {
 }
 
 std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* context) {
@@ -98,8 +105,9 @@ std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* co
     return nullptr;
   }
   auto pixelFormat = MetalPixelFormatToPixelFormat(static_cast<unsigned>(metalLayer.pixelFormat));
-  drawableProxy =
-      std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer, pixelFormat);
+  sampleCount = context->gpu()->getSampleCount(sampleCount, pixelFormat);
+  drawableProxy = std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer,
+                                                       pixelFormat, sampleCount);
   return drawableProxy;
 }
 

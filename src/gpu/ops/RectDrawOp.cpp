@@ -36,9 +36,14 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   auto allocator = context->drawingAllocator();
   auto drawOp = allocator->make<RectDrawOp>(allocator, provider.get());
   CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
-  if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 || provider->lineJoin()) {
-    drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
-        provider->aaType() == AAType::Coverage, provider->lineJoin());
+  auto aaType = provider->aaType();
+  // For round stroke, MSAA also needs AA index buffer because the round corners
+  // are controlled by shader, not real geometry edges.
+  auto needAAIndexBuffer = aaType == AAType::Coverage ||
+                           (aaType == AAType::MSAA && provider->lineJoin() == LineJoin::Round);
+  if (needAAIndexBuffer || provider->rectCount() > 1 || provider->lineJoin()) {
+    drawOp->indexBufferProxy =
+        context->globalCache()->getRectIndexBuffer(needAAIndexBuffer, provider->lineJoin());
   }
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
@@ -78,7 +83,10 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
 }
 
 static uint16_t GetNumIndicesPerQuad(AAType aaType, const std::optional<LineJoin>& lineJoin) {
-  const auto isAA = aaType == AAType::Coverage;
+  // For round stroke, MSAA also needs AA indices because the round corners
+  // are controlled by shader, not real geometry edges.
+  const auto isAA =
+      aaType == AAType::Coverage || (aaType == AAType::MSAA && lineJoin == LineJoin::Round);
   if (!lineJoin) {
     return isAA ? RectDrawOp::IndicesPerAAQuad : RectDrawOp::IndicesPerNonAAQuad;
   }

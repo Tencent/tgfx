@@ -33,10 +33,15 @@ class EGLWindow : public Window {
 
   /**
    * Creates a new window from an EGL native window with specified shared context.
+   * @param nativeWindow The EGL native window to render into.
+   * @param sharedContext An optional shared EGL context. If nullptr, a new context is created.
+   * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param sampleCount The number of samples for MSAA rendering. Defaults to 1 (no MSAA).
    */
   static std::shared_ptr<EGLWindow> MakeFrom(EGLNativeWindowType nativeWindow,
                                              EGLContext sharedContext = nullptr,
-                                             std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                             std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                             int sampleCount = 1);
 
   /**
    * Sets the presentation time for the next frame in microseconds. This is only applicable on
@@ -53,7 +58,7 @@ class EGLWindow : public Window {
   EGLNativeWindowType nativeWindow;
   std::optional<int64_t> presentationTime = std::nullopt;
 
-  explicit EGLWindow(std::shared_ptr<Device> device,
-                     std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  explicit EGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
+                     int sampleCount);
 };
 }  // namespace tgfx

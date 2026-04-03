@@ -25,10 +25,15 @@ namespace tgfx {
 class WGLWindow : public Window {
  public:
   /**
-   * Creates a new window from a HWND with specialed shared context.
+   * Creates a new window from a HWND with specified shared context.
+   * @param nativeWindow The HWND to render into.
+   * @param sharedContext An optional shared WGL context. If nullptr, a new context is created.
+   * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param sampleCount The number of samples for MSAA rendering. Defaults to 1 (no MSAA).
    */
   static std::shared_ptr<WGLWindow> MakeFrom(HWND nativeWindow, HGLRC sharedContext = nullptr,
-                                             std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                             std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                             int sampleCount = 1);
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
@@ -37,7 +42,7 @@ class WGLWindow : public Window {
  private:
   HWND nativeWindow = nullptr;
 
-  explicit WGLWindow(std::shared_ptr<Device> device,
-                     std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  explicit WGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
+                     int sampleCount);
 };
 }  // namespace tgfx

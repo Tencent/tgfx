@@ -167,7 +167,8 @@
 
   auto canvas = surface->getCanvas();
   canvas->clear();
-  hello2d::DrawBackground(canvas, surface->width(), surface->height(), self.layer.contentsScale);
+  hello2d::DrawBackground(canvas, surface->width(), surface->height(),
+                          self.window.backingScaleFactor);
 
   displayList.render(surface.get(), false);
 

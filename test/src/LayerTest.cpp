@@ -3125,7 +3125,7 @@ TGFX_TEST(LayerTest, Layer3DContextAPI) {
 
   // Test Render3DContext creation (opaqueMode = false)
   auto render3DContext =
-      Layer3DContext::Make(false, context, renderRect, contentScale, colorSpace, nullptr);
+      Layer3DContext::Make(false, context, renderRect, contentScale, colorSpace, nullptr, 1);
   ASSERT_TRUE(render3DContext != nullptr);
   EXPECT_TRUE(render3DContext->isFinished());
 
@@ -3145,7 +3145,7 @@ TGFX_TEST(LayerTest, Layer3DContextAPI) {
 
   // Test Opaque3DContext creation (opaqueMode = true)
   auto opaque3DContext =
-      Layer3DContext::Make(true, context, renderRect, contentScale, colorSpace, nullptr);
+      Layer3DContext::Make(true, context, renderRect, contentScale, colorSpace, nullptr, 1);
   ASSERT_TRUE(opaque3DContext != nullptr);
   EXPECT_TRUE(opaque3DContext->isFinished());
 
@@ -3234,6 +3234,87 @@ TGFX_TEST(LayerTest, Preserve3DNestedLayers) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Preserve3DNestedLayers"));
+}
+
+TGFX_TEST(LayerTest, Nested3DContextSampleCount) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300, false, 4);
+  ASSERT_TRUE(surface != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Outer group: preserve3D=true, starts first 3D context.
+  auto outerGroup = SolidLayer::Make();
+  outerGroup->setColor(Color::FromRGBA(220, 220, 220, 255));
+  outerGroup->setWidth(280);
+  outerGroup->setHeight(280);
+  outerGroup->setMatrix(Matrix::MakeTrans(10, 10));
+  outerGroup->setPreserve3D(true);
+
+  // Middle layer: preserve3D=false, breaks the 3D context chain.
+  auto middleLayer = SolidLayer::Make();
+  middleLayer->setColor(Color::FromRGBA(180, 180, 220, 200));
+  middleLayer->setWidth(240);
+  middleLayer->setHeight(240);
+  middleLayer->setMatrix(Matrix::MakeTrans(20, 20));
+
+  // Inner group: preserve3D=true, starts a nested 3D context. This is where the bug would
+  // manifest — without the DrawArgs fix, sampleCount would fall back to 1.
+  auto innerGroup = SolidLayer::Make();
+  innerGroup->setColor(Color::FromRGBA(200, 220, 200, 200));
+  innerGroup->setWidth(200);
+  innerGroup->setHeight(200);
+  innerGroup->setMatrix(Matrix::MakeTrans(20, 20));
+  innerGroup->setPreserve3D(true);
+
+  // Child 1 inside inner 3D context with a 3D rotation.
+  auto child1 = SolidLayer::Make();
+  child1->setColor(Color::Red());
+  child1->setWidth(80);
+  child1->setHeight(80);
+  {
+    auto size = Size::Make(80, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, 30);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(20, 20, 0);
+    child1->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+
+  // Child 2 inside inner 3D context with a different 3D rotation.
+  auto child2 = SolidLayer::Make();
+  child2->setColor(Color::Blue());
+  child2->setWidth(80);
+  child2->setHeight(80);
+  {
+    auto size = Size::Make(80, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, -30);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(100, 100, 0);
+    child2->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+
+  innerGroup->addChild(child1);
+  innerGroup->addChild(child2);
+  middleLayer->addChild(innerGroup);
+  outerGroup->addChild(middleLayer);
+  displayList->root()->addChild(outerGroup);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Nested3DContextSampleCount"));
 }
 
 TGFX_TEST(LayerTest, Contour3DWithDropShadow) {

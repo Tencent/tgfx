@@ -32,22 +32,32 @@ std::shared_ptr<GLDevice> GLDevice::Current() {
 }
 
 std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
+  return CGLDevice::Make(reinterpret_cast<CGLContextObj>(sharedContext), 1);
+}
+
+std::shared_ptr<GLDevice> CGLDevice::Make(CGLContextObj sharedContext, int sampleCount) {
   CGLPixelFormatObj format = nullptr;
-  CGLContextObj cglShareContext = reinterpret_cast<CGLContextObj>(sharedContext);
-  if (cglShareContext == nullptr) {
-    const CGLPixelFormatAttribute attributes[] = {
-        kCGLPFAStencilSize,        (CGLPixelFormatAttribute)8,
-        kCGLPFAAccelerated,        kCGLPFADoubleBuffer,
-        kCGLPFAOpenGLProfile,      (CGLPixelFormatAttribute)kCGLOGLPVersion_3_2_Core,
-        (CGLPixelFormatAttribute)0};
+  if (sharedContext == nullptr) {
+    std::vector<CGLPixelFormatAttribute> attributes = {
+        kCGLPFAStencilSize,   (CGLPixelFormatAttribute)8,
+        kCGLPFAAccelerated,   kCGLPFADoubleBuffer,
+        kCGLPFAOpenGLProfile, (CGLPixelFormatAttribute)kCGLOGLPVersion_3_2_Core,
+    };
+    if (sampleCount > 1) {
+      attributes.push_back(kCGLPFASampleBuffers);
+      attributes.push_back((CGLPixelFormatAttribute)1);
+      attributes.push_back(kCGLPFASamples);
+      attributes.push_back((CGLPixelFormatAttribute)sampleCount);
+    }
+    attributes.push_back((CGLPixelFormatAttribute)0);
     GLint npix = 0;
-    CGLChoosePixelFormat(attributes, &format, &npix);
+    CGLChoosePixelFormat(attributes.data(), &format, &npix);
   } else {
-    format = CGLGetPixelFormat(cglShareContext);
+    format = CGLGetPixelFormat(sharedContext);
   }
   CGLContextObj cglContext = nullptr;
-  CGLCreateContext(format, cglShareContext, &cglContext);
-  if (cglShareContext == nullptr) {
+  CGLCreateContext(format, sharedContext, &cglContext);
+  if (sharedContext == nullptr) {
     CGLDestroyPixelFormat(format);
   }
   if (cglContext == nullptr) {

@@ -872,7 +872,10 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
 
   const auto isRound = strokes.front()->join == LineJoin::Round;
   auto strokeArray = allocator->makeArray(std::move(strokes));
-  if (aaType == AAType::Coverage) {
+  // For round stroke, MSAA also needs to use AA vertex provider because the round corners
+  // are controlled by shader, not real geometry edges.
+  // For angular stroke (Miter/Bevel), only Coverage mode needs AA vertex provider.
+  if (aaType == AAType::Coverage || (aaType == AAType::MSAA && isRound)) {
     if (isRound) {
       return allocator->make<AARoundStrokeRectsVertexProvider>(
           std::move(rectArray), std::move(uvRectArray), std::move(strokeArray), aaType, needUVCoord,

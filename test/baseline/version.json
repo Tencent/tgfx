@@ -145,10 +145,10 @@
     "Hello2DTest": {
         "ConicGradient": "1ea63c49",
         "ImageWithMipmap": "1ea63c49",
-        "ImageWithShadow": "c37a86c8",
-        "Layer3DTree": "9e2c8c8ee",
+        "ImageWithShadow": "ec8d01bf",
+        "Layer3DTree": "ec8d01bf",
         "RichText": "1ea63c49",
-        "SimpleLayerTree": "1ea63c49"
+        "SimpleLayerTree": "ec8d01bf"
     },
     "ImageRenderTest": {
         "RotateImageRect": "bf48e614",
@@ -281,6 +281,7 @@
         "Matrix_3D_Offscreen_Blend": "7ce872bef",
         "Matrix_Behind_Viewer": "439ca4178",
         "MeshLayer": "c3630d40",
+        "Nested3DContextSampleCount": "829b100b",
         "PartialDrawLayer": "c37a86c8",
         "PartialDrawLayer_shapeLayer": "c37a86c8",
         "PassThoughAndNormal": "43cd416",
@@ -513,7 +514,12 @@
         "ImageSnapshot2": "bf48e614",
         "ImageSnapshot_Surface1": "bf48e614",
         "ImageSnapshot_Surface2": "bf48e614",
-        "OutOfRenderTarget": "bf48e614"
+        "OutOfRenderTarget": "bf48e614",
+        "SampleCountRendering_1x": "1366a578",
+        "SampleCountRendering_4x": "1366a578",
+        "SampleCountSnapshotRoundTrip": "1366a578",
+        "SampleCountWithClip_1x": "1366a578",
+        "SampleCountWithClip_4x": "1366a578"
     },
     "TextAlignTest": {
         "FontFallbackTest": "b33325c8",

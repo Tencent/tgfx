@@ -100,7 +100,7 @@ void ShapeDrawOp::onDraw(RenderPass* renderPass) {
 }
 
 bool ShapeDrawOp::hasCoverage() const {
-  return true;
+  return aaType == AAType::Coverage || DrawOp::hasCoverage();
 }
 
 }  // namespace tgfx

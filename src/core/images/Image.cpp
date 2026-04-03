@@ -134,7 +134,7 @@ std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
   if (context == nullptr) {
     return nullptr;
   }
-  TPArgs args(context, 0, hasMipmaps(), 1.0f, BackingFit::Exact);
+  TPArgs args(context, 0, 1, hasMipmaps(), 1.0f, BackingFit::Exact);
   auto textureProxy = lockTextureProxy(args);
   if (textureProxy == nullptr) {
     return nullptr;

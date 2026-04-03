@@ -29,7 +29,8 @@ class WebGLDevice : public GLDevice {
    * Creates a WebGLDevice from the id of an existing HTMLCanvasElement.
    */
   static std::shared_ptr<WebGLDevice> MakeFrom(const std::string& canvasID,
-                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                               std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                               int sampleCount = 1);
 
   ~WebGLDevice() override;
 

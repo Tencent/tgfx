@@ -26,9 +26,14 @@ class CGLWindow : public Window {
  public:
   /**
    * Creates a new window from an NSView with specified shared context.
+   * @param view The NSView to render into. Must not be nil.
+   * @param sharedContext An optional shared CGL context. If nullptr, a new context is created.
+   * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param sampleCount The number of samples for MSAA rendering. Defaults to 1 (no MSAA).
    */
   static std::shared_ptr<CGLWindow> MakeFrom(NSView* view, CGLContextObj sharedContext = nullptr,
-                                             std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                             std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                             int sampleCount = 1);
 
   ~CGLWindow() override;
 
@@ -39,7 +44,7 @@ class CGLWindow : public Window {
  private:
   NSView* view = nil;
 
-  CGLWindow(std::shared_ptr<Device> device, NSView* view,
-            std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  explicit CGLWindow(std::shared_ptr<Device> device, NSView* view,
+                     std::shared_ptr<ColorSpace> colorSpace, int sampleCount);
 };
 }  // namespace tgfx

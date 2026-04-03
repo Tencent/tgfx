@@ -48,7 +48,7 @@ std::shared_ptr<TextureProxy> TransformImage::lockTextureProxySubset(
       Matrix::MakeScale(drawRect.width() / rect.width(), drawRect.height() / rect.height());
   uvMatrix.postTranslate(drawRect.left, drawRect.top);
   auto sourceMatrix = concatUVMatrix(&uvMatrix);
-  FPArgs fpArgs(args.context, args.renderFlags, Rect::MakeWH(rect.width(), rect.height()),
+  FPArgs fpArgs(args.context, args.renderFlags, 1, Rect::MakeWH(rect.width(), rect.height()),
                 1.0f / sourceMatrix->getMinScale());
   auto processor = FragmentProcessor::Make(source, fpArgs, samplingOptions, SrcRectConstraint::Fast,
                                            AddressOf(sourceMatrix));

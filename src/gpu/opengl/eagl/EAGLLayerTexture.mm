@@ -22,54 +22,129 @@
 #include "gpu/opengl/eagl/EAGLGPU.h"
 
 namespace tgfx {
-std::shared_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLLayer* layer) {
+static unsigned CreateFramebufferForRenderbuffer(GLGPU* gpu, unsigned renderbufferID) {
+  auto gl = gpu->functions();
+  unsigned fbo = 0;
+  gl->genFramebuffers(1, &fbo);
+  if (fbo == 0) {
+    return 0;
+  }
+  gl->bindFramebuffer(GL_FRAMEBUFFER, fbo);
+  gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
+                              renderbufferID);
+  if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    gl->deleteFramebuffers(1, &fbo);
+    return 0;
+  }
+  return fbo;
+}
+
+static unsigned CreateLayerRenderbuffer(GLGPU* gpu, CAEAGLLayer* layer) {
+  auto gl = gpu->functions();
+  ClearGLError(gl);
+  unsigned renderbufferID = 0;
+  gl->genRenderbuffers(1, &renderbufferID);
+  if (renderbufferID == 0) {
+    return 0;
+  }
+  gl->bindRenderbuffer(GL_RENDERBUFFER, renderbufferID);
+  auto eaglContext = static_cast<EAGLGPU*>(gpu)->eaglContext();
+  [eaglContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:layer];
+  if (!CheckGLError(gl)) {
+    gl->deleteRenderbuffers(1, &renderbufferID);
+    return 0;
+  }
+  return renderbufferID;
+}
+
+static unsigned CreateMSAARenderbuffer(GLGPU* gpu, int sampleCount, int width, int height) {
+  auto gl = gpu->functions();
+  ClearGLError(gl);
+  unsigned renderbufferID = 0;
+  gl->genRenderbuffers(1, &renderbufferID);
+  if (renderbufferID == 0) {
+    return 0;
+  }
+  gl->bindRenderbuffer(GL_RENDERBUFFER, renderbufferID);
+  auto format = gpu->caps()->getTextureFormat(PixelFormat::RGBA_8888).sizedFormat;
+  gl->renderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format, width, height);
+  if (!CheckGLError(gl)) {
+    gl->deleteRenderbuffers(1, &renderbufferID);
+    return 0;
+  }
+  return renderbufferID;
+}
+
+std::shared_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLLayer* layer,
+                                                             int sampleCount) {
   DEBUG_ASSERT(gpu != nullptr);
   if (layer == nil) {
     return nullptr;
   }
-  auto width = layer.bounds.size.width * layer.contentsScale;
-  auto height = layer.bounds.size.height * layer.contentsScale;
+  auto width = static_cast<int>(layer.bounds.size.width * layer.contentsScale);
+  auto height = static_cast<int>(layer.bounds.size.height * layer.contentsScale);
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
+  sampleCount = gpu->getSampleCount(sampleCount, PixelFormat::RGBA_8888);
+  auto resolveRBID = CreateLayerRenderbuffer(gpu, layer);
+  if (resolveRBID == 0) {
+    LOGE("EAGLLayerTexture::MakeFrom() failed to create layer renderbuffer!");
+    return nullptr;
+  }
   auto gl = gpu->functions();
-  ClearGLError(gl);
-  unsigned frameBufferID = 0;
-  gl->genFramebuffers(1, &frameBufferID);
-  if (frameBufferID == 0) {
-    LOGE("EAGLLayerTexture::MakeFrom() failed to generate framebuffer!");
+  unsigned frameBufferID = 0, resolveFBO = 0, msaaRBID = 0;
+  bool success = false;
+  do {
+    if (sampleCount <= 1) {
+      frameBufferID = CreateFramebufferForRenderbuffer(gpu, resolveRBID);
+      if (frameBufferID == 0) {
+        LOGE("EAGLLayerTexture::MakeFrom() failed to create framebuffer!");
+        break;
+      }
+    } else {
+      resolveFBO = CreateFramebufferForRenderbuffer(gpu, resolveRBID);
+      if (resolveFBO == 0) {
+        LOGE("EAGLLayerTexture::MakeFrom() failed to create resolve framebuffer!");
+        break;
+      }
+      msaaRBID = CreateMSAARenderbuffer(gpu, sampleCount, width, height);
+      if (msaaRBID == 0) {
+        LOGE("EAGLLayerTexture::MakeFrom() failed to create MSAA renderbuffer!");
+        break;
+      }
+      frameBufferID = CreateFramebufferForRenderbuffer(gpu, msaaRBID);
+      if (frameBufferID == 0) {
+        LOGE("EAGLLayerTexture::MakeFrom() failed to create MSAA framebuffer!");
+        break;
+      }
+    }
+    success = true;
+  } while (false);
+  if (!success) {
+    // Deleting 0 is a no-op in OpenGL, so no need to check before deleting.
+    gl->deleteRenderbuffers(1, &msaaRBID);
+    gl->deleteFramebuffers(1, &resolveFBO);
+    gl->deleteRenderbuffers(1, &resolveRBID);
     return nullptr;
   }
-  TextureDescriptor descriptor = {
-      static_cast<int>(width),        static_cast<int>(height), PixelFormat::RGBA_8888, false, 1,
-      TextureUsage::RENDER_ATTACHMENT};
+  TextureDescriptor descriptor = {width, height,      PixelFormat::RGBA_8888,
+                                  false, sampleCount, TextureUsage::RENDER_ATTACHMENT};
   auto texture = gpu->makeResource<EAGLLayerTexture>(descriptor, frameBufferID);
-  gl->genRenderbuffers(1, &texture->renderBufferID);
-  if (texture->renderBufferID == 0) {
-    LOGE("EAGLLayerTexture::MakeFrom() failed to generate renderbuffer!");
-    return nullptr;
-  }
-  gl->bindRenderbuffer(GL_RENDERBUFFER, texture->renderBufferID);
-  auto eaglContext = static_cast<EAGLGPU*>(gpu)->eaglContext();
-  [eaglContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:layer];
-  if (!CheckGLError(gl)) {
-    LOGE("EAGLLayerTexture::MakeFrom() failed to allocate renderbuffer storage!");
-    return nullptr;
-  }
-  auto state = gpu->state();
-  state->bindFramebuffer(texture.get());
-  gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
-                              texture->renderBufferID);
-  auto frameBufferStatus = gl->checkFramebufferStatus(GL_FRAMEBUFFER);
-  if (frameBufferStatus != GL_FRAMEBUFFER_COMPLETE) {
-    LOGE("EAGLLayerTexture::MakeFrom() framebuffer is not complete!");
-    return nullptr;
-  }
+  texture->msaaBufferID = msaaRBID;
+  texture->_colorBufferID = resolveRBID;
+  texture->_resolveFrameBufferID = resolveFBO;
   return texture;
 }
 
 void EAGLLayerTexture::onReleaseTexture(GLGPU* gpu) {
   auto gl = gpu->functions();
+  if (_resolveFrameBufferID > 0) {
+    gl->bindFramebuffer(GL_FRAMEBUFFER, _resolveFrameBufferID);
+    gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, 0);
+    gl->deleteFramebuffers(1, &_resolveFrameBufferID);
+    _resolveFrameBufferID = 0;
+  }
   if (_frameBufferID > 0) {
     auto state = gpu->state();
     state->bindFramebuffer(this);
@@ -77,9 +152,13 @@ void EAGLLayerTexture::onReleaseTexture(GLGPU* gpu) {
     gl->deleteFramebuffers(1, &_frameBufferID);
     _frameBufferID = 0;
   }
-  if (renderBufferID > 0) {
-    gl->deleteRenderbuffers(1, &renderBufferID);
-    renderBufferID = 0;
+  if (msaaBufferID > 0) {
+    gl->deleteRenderbuffers(1, &msaaBufferID);
+    msaaBufferID = 0;
+  }
+  if (_colorBufferID > 0) {
+    gl->deleteRenderbuffers(1, &_colorBufferID);
+    _colorBufferID = 0;
   }
 }
 }  // namespace tgfx

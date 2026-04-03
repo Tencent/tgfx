@@ -62,7 +62,8 @@ static GLVendor GetVendorFromString(const char* vendorString) {
     if (0 == strcmp(vendorString, "Imagination Technologies")) {
       return GLVendor::Imagination;
     }
-    if (0 == strncmp(vendorString, "Intel ", 6) || 0 == strcmp(vendorString, "Intel")) {
+    if (0 == strncmp(vendorString, "Intel ", 6) || 0 == strcmp(vendorString, "Intel") ||
+        0 == strcmp(vendorString, "Google Inc. (Intel)")) {
       return GLVendor::Intel;
     }
     if (0 == strcmp(vendorString, "Qualcomm")) {
@@ -73,6 +74,9 @@ static GLVendor GetVendorFromString(const char* vendorString) {
     }
     if (0 == strcmp(vendorString, "ATI Technologies Inc.")) {
       return GLVendor::ATI;
+    }
+    if (0 == strcmp(vendorString, "Apple") || 0 == strcmp(vendorString, "Google Inc. (Apple)")) {
+      return GLVendor::Apple;
     }
   }
   return GLVendor::Other;
@@ -113,6 +117,31 @@ static std::string ToStdString(const unsigned char* str) {
   return str ? std::string(reinterpret_cast<const char*>(str)) : "";
 }
 
+// Parse vendor and renderer strings to determine GPU vendor. In WebGL, GL_VENDOR/GL_RENDERER
+// return browser info (e.g., "WebKit", "Mozilla") instead of real GPU info. This function uses
+// WEBGL_debug_renderer_info extension to get real GPU info when available.
+static GLVendor GetVendorInfo(const GLInfo& info, std::string* vendorString,
+                              std::string* rendererString) {
+  auto vendor = GetVendorFromString(vendorString->c_str());
+  if (vendor != GLVendor::Other) {
+    return vendor;
+  }
+  // In WebGL, WEBGL_debug_renderer_info extension provides real GPU info. The extension must be
+  // activated via JavaScript gl.getExtension() before glGetString() can return data.
+  if (info.standard == GLStandard::WebGL && info.hasExtension("WEBGL_debug_renderer_info")) {
+    auto unmaskedVendor = ToStdString(info.getString(GL_UNMASKED_VENDOR_WEBGL));
+    auto unmaskedRenderer = ToStdString(info.getString(GL_UNMASKED_RENDERER_WEBGL));
+    if (!unmaskedVendor.empty()) {
+      *vendorString = unmaskedVendor;
+      vendor = GetVendorFromString(vendorString->c_str());
+    }
+    if (!unmaskedRenderer.empty()) {
+      *rendererString = unmaskedRenderer;
+    }
+  }
+  return vendor;
+}
+
 GLCaps::GLCaps(const GLInfo& info) {
   _info.backend = Backend::OpenGL;
   _info.version = ToStdString(info.getString(GL_VERSION));
@@ -121,7 +150,7 @@ GLCaps::GLCaps(const GLInfo& info) {
   _info.extensions = info.extensions;
   standard = info.standard;
   version = info.version;
-  vendor = GetVendorFromString(_info.vendor.c_str());
+  vendor = GetVendorInfo(info, &_info.vendor, &_info.renderer);
 
   switch (standard) {
     case GLStandard::GL:

@@ -33,7 +33,7 @@ namespace tgfx {
  */
 class Context3DCompositor {
  public:
-  Context3DCompositor(const Context& context, int width, int height);
+  Context3DCompositor(const Context& context, int width, int height, int sampleCount);
 
   /**
    * Returns the width of the compositor in pixels.

@@ -50,7 +50,7 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
   inputTextures.reserve(1 + effect->extraInputs.size());
   // Request a texture proxy from the source image without mipmaps to save memory.
   // It may be ignored if the source image has preset mipmaps.
-  TPArgs tpArgs(args.context, args.renderFlags, false, 1.0f, BackingFit::Exact);
+  TPArgs tpArgs(args.context, args.renderFlags, 1, false, 1.0f, BackingFit::Exact);
   auto textureProxy = source->lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;

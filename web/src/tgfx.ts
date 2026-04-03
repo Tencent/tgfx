@@ -175,4 +175,14 @@ export const getBytesFromPath = async (module: TGFX, path: string) => {
     return new Uint8Array(buffer);
 };
 
+// Activate WEBGL_debug_renderer_info extension. This must be called from JavaScript before
+// C++ can query GL_UNMASKED_VENDOR_WEBGL/GL_UNMASKED_RENDERER_WEBGL via glGetString().
+// Without activation, glGetString() returns empty even if the extension is in the list.
+export const activateDebugRendererInfo = (GL: EmscriptenGL) => {
+    const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
+    if (gl) {
+        gl.getExtension('WEBGL_debug_renderer_info');
+    }
+};
+
 export {getCanvas2D as createCanvas2D};
