@@ -27,6 +27,10 @@
 #include "gpu/QuadsVertexProvider.h"
 #include "gpu/ops/Quads3DDrawOp.h"
 #include "gpu/processors/TextureEffect.h"
+#include "layers/BackgroundContext.h"
+#include "tgfx/core/PictureRecorder.h"
+#include "tgfx/layers/Layer.h"
+#include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
 
@@ -123,18 +127,23 @@ static std::pair<Quad, unsigned> GetQuadAndAAFlags(const Rect& originalRect, AAT
   return {quad, aaFlags};
 }
 
-Context3DCompositor::Context3DCompositor(const Context& context, int width, int height)
-    : _width(width), _height(height) {
+Context3DCompositor::Context3DCompositor(const Context& context, int width, int height,
+                                         float contentScale,
+                                         std::shared_ptr<ColorSpace> colorSpace,
+                                         std::shared_ptr<BackgroundContext> backgroundContext)
+    : _width(width), _height(height), _contentScale(contentScale),
+      _colorSpace(std::move(colorSpace)), _backgroundContext(std::move(backgroundContext)) {
   _targetColorProxy =
       context.proxyProvider()->createRenderTargetProxy({}, width, height, PixelFormat::RGBA_8888);
   DEBUG_ASSERT(_targetColorProxy != nullptr);
 }
 
-void Context3DCompositor::addImage(std::shared_ptr<Image> image, const Matrix3D& matrix, int depth,
-                                   float alpha, bool antiAlias) {
+void Context3DCompositor::addImage(Layer* sourceLayer, const Point& contentOffset,
+                                   std::shared_ptr<Image> image, const Matrix3D& matrix,
+                                   int depth, float alpha, bool antiAlias) {
   const auto sequenceIndex = _depthSequenceCounters[depth]++;
-  auto polygon = std::make_unique<DrawPolygon3D>(std::move(image), matrix, depth, sequenceIndex,
-                                                 alpha, antiAlias);
+  auto polygon = std::make_unique<DrawPolygon3D>(sourceLayer, contentOffset, std::move(image),
+                                                 matrix, depth, sequenceIndex, alpha, antiAlias);
   _polygons.push_back(std::move(polygon));
 }
 
@@ -206,7 +215,13 @@ std::shared_ptr<Image> Context3DCompositor::finish() {
     std::sort(_polygons.begin(), _polygons.end(), DrawPolygon3DOrder);
     BspTree bspTree(std::move(_polygons));
     _polygons.clear();
-    bspTree.traverseBackToFront([this](const DrawPolygon3D* polygon) { drawPolygon(polygon); });
+    bspTree.traverseBackToFront([this](const DrawPolygon3D* polygon) {
+      if (hasBackgroundStyle(polygon)) {
+        drawBackgroundStyles(polygon);
+      }
+      drawPolygon(polygon);
+      syncToBackgroundContext(polygon);
+    });
   }
 
   auto opArray = context->drawingAllocator()->makeArray(std::move(_drawOps));
@@ -215,6 +230,69 @@ std::shared_ptr<Image> Context3DCompositor::finish() {
   auto image = TextureImage::Wrap(_targetColorProxy->asTextureProxy(), TargetColorSpace());
   _targetColorProxy = nullptr;
   return image;
+}
+
+bool Context3DCompositor::hasBackgroundStyle(const DrawPolygon3D* polygon) const {
+  if (_backgroundContext == nullptr) {
+    return false;
+  }
+  for (const auto& style : polygon->sourceLayer()->layerStyles()) {
+    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+
+      return true;
+    }
+  }
+  return false;
+}
+
+void Context3DCompositor::drawBackgroundStyles(const DrawPolygon3D* polygon) {
+  auto layer = polygon->sourceLayer();
+  Point backgroundOffset = {};
+  auto bgImage = _backgroundContext->getBackgroundImageForLayer(
+      layer->getBounds(), layer->getGlobalMatrix().asMatrix(), _contentScale, &backgroundOffset,
+      _colorSpace);
+  if (bgImage == nullptr) {
+    return;
+  }
+  const auto& contentOffset = polygon->contentOffset();
+  auto relativeOffset = backgroundOffset - contentOffset;
+  const auto& contentImage = polygon->image();
+  for (const auto& style : polygon->sourceLayer()->layerStyles()) {
+    if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
+      continue;
+    }
+    // Record the background style drawing into a Picture in content image coordinate space.
+    PictureRecorder recorder = {};
+    auto pictureCanvas = recorder.beginRecording();
+    style->drawWithExtraSource(pictureCanvas, contentImage, _contentScale, bgImage, relativeOffset,
+                               polygon->alpha());
+    auto picture = recorder.finishRecordingAsPicture();
+    if (picture == nullptr) {
+      continue;
+    }
+    // Create a result Image with the same size as contentImage so we can reuse polygon->matrix().
+    auto resultImage = Image::MakeFrom(std::move(picture), contentImage->width(),
+                                       contentImage->height(), nullptr, _colorSpace);
+    if (resultImage == nullptr) {
+      continue;
+    }
+    // Reuse polygon's matrix to draw the result to the render target at the correct 3D position.
+    // The result Image has the same origin and size as contentImage, so the same matrix applies.
+    auto resultPolygon = DrawPolygon3D(polygon->sourceLayer(), contentOffset, std::move(resultImage),
+                                       polygon->matrix(), polygon->depth(),
+                                       polygon->sequenceIndex(), 1.0f, polygon->antiAlias());
+    drawPolygon(&resultPolygon);
+  }
+}
+
+void Context3DCompositor::syncToBackgroundContext(const DrawPolygon3D* polygon) {
+  if (_backgroundContext == nullptr) {
+    return;
+  }
+  auto bgCanvas = _backgroundContext->getCanvas();
+  AutoCanvasRestore autoRestore(bgCanvas);
+  bgCanvas->concat(polygon->matrix().asMatrix());
+  bgCanvas->drawImage(polygon->image());
 }
 
 }  // namespace tgfx

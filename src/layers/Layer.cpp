@@ -1907,7 +1907,7 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const 
   contextArgs.styleSourceTypes = StyleSourceTypesFor3DContext;
 
   const auto offscreenCanvas =
-      newContext->beginRecording(matrix3D, bitFields.allowsEdgeAntialiasing);
+      newContext->beginRecording(matrix3D, bitFields.allowsEdgeAntialiasing, this);
   contextArgs.opaqueContext = newContext->currentOpaqueContext();
   (this->*drawFunc)(contextArgs, offscreenCanvas, alpha, blendMode);
   newContext->endRecording();
@@ -1939,9 +1939,10 @@ std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* can
     }
     // Layers inside a 3D rendering context need to maintain independent 3D state. This means
     // layers drawn later may become the background, making it impossible to know the final
-    // background when drawing each layer. Therefore, background styles are disabled.
+    // background when drawing each layer. Therefore, background styles are disabled during
+    // recording. The blurBackground is preserved and passed to the 3D compositor so that
+    // drawBackgroundStyles can execute background styles during the compositing phase.
     childArgs.styleSourceTypes = StyleSourceTypesFor3DContext;
-    childArgs.blurBackground = nullptr;
   }
   return childArgs;
 }
@@ -1970,7 +1971,7 @@ bool Layer::drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, f
   auto drawArgs = childArgs;
   if (context3D) {
     targetCanvas =
-        context3D->beginRecording(childTransform3D, child->bitFields.allowsEdgeAntialiasing);
+        context3D->beginRecording(childTransform3D, child->bitFields.allowsEdgeAntialiasing, child);
     drawArgs.opaqueContext = context3D->currentOpaqueContext();
   }
   // If child cannot preserve 3D but has a 3D context, clear it so that child's internal rendering
@@ -2079,6 +2080,10 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
                                                  Point* offset) {
   if (args.drawMode == DrawMode::Background) {
     return nullptr;
+  }
+  if (args.blurBackground) {
+    return args.blurBackground->getBackgroundImageForLayer(
+        getBounds(), getGlobalMatrix().asMatrix(), contentScale, offset, args.dstColorSpace);
   }
   PictureRecorder recorder = {};
   auto canvas = recorder.beginRecording();

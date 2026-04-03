@@ -19,6 +19,7 @@
 #include "BackgroundContext.h"
 #include <utility>
 #include "core/filters/GaussianBlurImageFilter.h"
+#include "core/utils/MathExtra.h"
 #include "tgfx/core/PictureRecorder.h"
 
 namespace tgfx {
@@ -217,6 +218,39 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rec
   child->parent = this;
   child->surfaceOffset = childSurfaceOffset;
   return child;
+}
+
+std::shared_ptr<Image> BackgroundContext::getBackgroundImageForLayer(
+    const Rect& layerBounds, const Matrix& globalMatrix, float contentScale, Point* offset,
+    std::shared_ptr<ColorSpace> dstColorSpace) {
+  Matrix globalToLocalMatrix = {};
+  if (!globalMatrix.invert(&globalToLocalMatrix)) {
+    return nullptr;
+  }
+  PictureRecorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  auto bounds = layerBounds;
+  bounds.scale(contentScale, contentScale);
+  bounds.roundOut();
+  canvas->scale(contentScale, contentScale);
+  canvas->concat(globalToLocalMatrix);
+  // Draw the background image onto the canvas, transforming from Surface pixel space
+  // to world space via backgroundMatrix().
+  auto bgImage = getBackgroundImage();
+  canvas->concat(backgroundMatrix());
+  canvas->drawImage(bgImage);
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return nullptr;
+  }
+  auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
+  auto image = Image::MakeFrom(std::move(picture), FloatCeilToInt(bounds.width()),
+                                FloatCeilToInt(bounds.height()), &matrix, std::move(dstColorSpace));
+  if (offset) {
+    offset->x = bounds.left;
+    offset->y = bounds.top;
+  }
+  return image;
 }
 
 }  // namespace tgfx

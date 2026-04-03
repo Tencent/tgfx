@@ -518,25 +518,25 @@ TGFX_TEST(BackgroundBlurTest, ScaledInnerShadowWithBackgroundBlur) {
  * When preserve3D is false, layers with perspective transforms should still be able to
  * apply background blur.
  */
-TGFX_TEST(BackgroundBlurTest, NestedFlat3DLayer) {
+TGFX_TEST(BackgroundBlurTest, 3DLayer) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 250, 250);
   auto displayList = std::make_unique<DisplayList>();
 
-  // Background image layer
+  // A: Full-canvas background image
   auto backImage = MakeImage("resources/assets/HappyNewYear.png");
   auto background = ImageLayer::Make();
   background->setImage(backImage);
   background->setMatrix(Matrix::MakeScale(250.f / 1024.f));
   displayList->root()->addChild(background);
 
-  // Parent layer with preserve3D = false (default) and perspective transform
-  auto parentLayer = SolidLayer::Make();
-  parentLayer->setColor(Color::FromRGBA(200, 200, 200, 100));
-  parentLayer->setWidth(150);
-  parentLayer->setHeight(150);
+  // B: Semi-transparent image layer (glyph3.png) with 3D transform
+  auto parentImage = MakeImage("resources/assets/glyph3.png")->makeSubset(Rect::MakeWH(150, 150));
+  auto parentLayer = ImageLayer::Make();
+  parentLayer->setImage(parentImage);
+  parentLayer->setAlpha(0.8f);
   {
     auto size = Size::Make(150, 150);
     auto anchor = Point::Make(0.5f, 0.5f);
@@ -550,13 +550,12 @@ TGFX_TEST(BackgroundBlurTest, NestedFlat3DLayer) {
     auto origin = Matrix3D::MakeTranslate(50, 50, 0);
     parentLayer->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
   }
-  parentLayer->setPreserve3D(false);
-  parentLayer->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
   displayList->root()->addChild(parentLayer);
 
-  // Child layer also with preserve3D = false and perspective transform + background blur
+  // C: Child layer with 3D transform and BackgroundBlurStyle (red, alpha=0.3)
   auto childLayer = SolidLayer::Make();
-  childLayer->setColor(Color::FromRGBA(255, 255, 255, 150));
+  childLayer->setColor(Color::Red());
+  childLayer->setAlpha(0.3f);
   childLayer->setWidth(80);
   childLayer->setHeight(80);
   {
@@ -572,12 +571,29 @@ TGFX_TEST(BackgroundBlurTest, NestedFlat3DLayer) {
     auto origin = Matrix3D::MakeTranslate(35, 35, 0);
     childLayer->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
   }
-  childLayer->setPreserve3D(false);
-  childLayer->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
+  childLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
   parentLayer->addChild(childLayer);
 
+  // Case 1: Both B and C have blur, preserve3D=false.
+  // C's background blur penetrates through B to A via normal 2D path.
+  parentLayer->setPreserve3D(false);
+  parentLayer->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/NestedFlat3DLayer"));
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/3DLayer_BothBlur"));
+
+  // Case 2: Both B and C have blur, B.preserve3D=true, C.preserve3D=false.
+  // B has layerStyles so canPreserve3D()=false, preserve3D falls back to flat.
+  // C's background blur should still work.
+  parentLayer->setPreserve3D(true);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/3DLayer_Preserve3DFallback"));
+
+  // Case 3: B has no blur, B.preserve3D=true, C has blur.
+  // B.canPreserve3D()=true, C truly enters 3D context.
+  // C's background blur is handled by drawBackgroundStyles in the compositor.
+  parentLayer->setLayerStyles({});
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/3DLayer_Preserve3D"));
 }
 
 }  // namespace tgfx

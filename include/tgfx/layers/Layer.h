@@ -766,5 +766,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   friend class DisplayList;
   friend class LayerProperty;
   friend class LayerSerialization;
+  friend class Context3DCompositor;
 };
 }  // namespace tgfx
