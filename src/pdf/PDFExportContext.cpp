@@ -449,6 +449,9 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
   }
 
   const auto& glyphToUnicode = PDFFont::GetUnicodeMap(*typeface, document);
+  if (glyphToUnicode.empty()) {
+    return;
+  }
 
   AdvancedTypefaceInfo::FontType initialFontType = PDFFont::FontType(*pdfStrike, *advancedInfo);
 
