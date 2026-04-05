@@ -15,12 +15,12 @@
 11. [UERHIBuffer](#11-uerhibuffer)
 12. [UERHISampler](#12-uerhisampler)
 13. [UERHISemaphore](#13-uerhisemaphore)
-14. [UERHIShaderModule](#14-uerhishadermodule)
+14. [Shader 变体注册与运行时选择](#14-shader-变体注册与运行时选择)
 15. [UERHICaps](#15-uerhicaps)
 16. [枚举映射表](#16-枚举映射表)
 17. [libpag UE 集成层](#17-libpag-ue-集成层)
 18. [线程模型与生命周期](#18-线程模型与生命周期)
-19. [Shader 编译策略](#19-shader-编译策略)
+19. [Shader 编译策略 -- 离线 GLSL 预生成 + SPIRV 转 HLSL](#19-shader-编译策略----离线-glsl-预生成--spirv-转-hlsl)
 
 ---
 
@@ -1364,186 +1364,204 @@ BackendSemaphore UERHISemaphore::getBackendSemaphore() const {
 
 ---
 
-## 14. UERHIShaderModule
+## 14. Shader 变体注册与运行时选择
 
-> **重要更新**：基于 Rive UE 5.7 插件最新源码分析（详见附录 O），运行时 Shader 编译方案（shaderc +
-> SPIRV-Cross + D3DCompile）已被证明不是最优路径。Rive 已成功使用 **UE Global Shader +
-> Permutation 预编译方案**，所有 Shader 在 UE 构建时预编译，运行时零编译开销。建议 PAG 也采用此
-> 方案，以下原始设计保留作为备选参考。如采用附录 O 方案，本章 UERHIShaderModule 类不再需要。
+> 本章替代原"UERHIShaderModule"设计。UE 后端不使用运行时 Shader 编译，所有 Shader 在 UE Cook
+> 阶段预编译。运行时通过 ShaderVariantRegistry 查找预编译变体。
 
-### 14.1 接口定义
+### 14.1 架构总览
 
-**文件**: `src/gpu/ue/UERHIShaderModule.h`
+tgfx 的 Shader 系统基于 Processor 链动态拼装 GLSL。在 UE 后端中，这一机制被拆分为两个阶段：
+
+```
+构建时（Build-time）:
+  ShaderVariantEnumerator
+    ├── 遍历所有 DrawOp 类型 × Processor 配置
+    ├── 构建 ProgramInfo，调用 ProgramBuilder 生成 GLSL
+    ├── GLSL → SPIRV → HLSL（via shaderc + SPIRV-Cross）
+    ├── 生成 .usf 入口文件 + .ush Shader 模块
+    └── 生成 ShaderVariantRegistry（ProgramKey → VariantID 映射）
+
+UE Cook Pipeline:
+    .usf + .ush → UE Shader Compiler → 各平台 Shader 二进制
+
+运行时（Runtime）:
+  DrawOp::execute()
+    ├── 构建 ProgramInfo（与现有逻辑相同）
+    ├── 计算 ProgramKey（与现有逻辑相同）
+    ├── ShaderVariantRegistry::find(ProgramKey) → VariantID
+    ├── TShaderMapRef<FTgfxShader>(ShaderMap, VariantID)
+    └── UERHIRenderPass 提交 RHI 渲染命令
+```
+
+### 14.2 为什么不使用运行时 Shader 编译
+
+| 维度 | 运行时编译（旧方案） | 离线预编译（新方案） |
+|------|-------------------|-------------------|
+| **UE 兼容性** | UE 不支持运行时编译 Shader 源码 | 完全融入 UE Cook 管线 |
+| **运行时开销** | 首次编译 + 磁盘缓存 | 零编译开销 |
+| **第三方依赖** | 需 shaderc、SPIRV-Cross、d3dcompiler_47.dll | 无额外运行时依赖 |
+| **PSO 缓存** | 需自行实现 | 自动享受 UE PSO 缓存 |
+| **调试工具** | 需自行集成 | 可使用 UE Shader Debugger、RenderDoc |
+| **主机平台** | 无法支持（主机平台不允许运行时编译） | 自动支持所有 UE 平台 |
+| **已验证** | 未验证 | Rive UE 5.7 已在生产环境验证类似方案 |
+
+### 14.3 ShaderVariantRegistry
+
+ShaderVariantRegistry 是连接 tgfx ProgramKey 与 UE 预编译 Shader 的桥梁。
 
 ```cpp
-#pragma once
-
-#include "tgfx/gpu/ShaderModule.h"
-#include <string>
-#include <vector>
-
-class FRHIVertexShader;
-class FRHIPixelShader;
-typedef TRefCountPtr<FRHIVertexShader> FVertexShaderRHIRef;
-typedef TRefCountPtr<FRHIPixelShader> FPixelShaderRHIRef;
-
-namespace tgfx {
-
-class UERHIGPU;
-
-/**
- * UE RHI shader module implementation.
- * 
- * Handles shader compilation from GLSL to UE RHI compatible format.
- */
-class UERHIShaderModule : public ShaderModule {
+// ShaderVariantRegistry.h
+class ShaderVariantRegistry {
  public:
-  /**
-   * Creates a UE RHI shader module from GLSL source.
-   * 
-   * Compilation pipeline:
-   *   GLSL (#version 450) → SPIR-V (shaderc) → HLSL (SPIRV-Cross) → UE Shader Bytecode
-   * 
-   * The compiled bytecode is cached by shader hash.
-   */
-  static std::shared_ptr<UERHIShaderModule> Make(UERHIGPU* gpu,
-                                                  const ShaderModuleDescriptor& descriptor);
+  struct VariantInfo {
+    uint32_t variantID;       // UE Permutation 中的 ID
+    uint32_t drawOpType;      // 确定用哪个 .usf（即哪个 FShader 子类）
+  };
 
-  ~UERHIShaderModule() override;
+  // 在 UE 插件初始化时加载（由离线工具生成的静态数据）
+  static void Initialize();
 
-  /**
-   * Returns the shader stage.
-   */
-  ShaderStage stage() const { return _stage; }
+  // 运行时查找：ProgramKey → VariantInfo
+  static const VariantInfo* Find(const BytesKey& programKey);
 
-  /**
-   * Returns the original GLSL source code.
-   */
-  const std::string& glslCode() const { return _glslCode; }
+  // 构建时使用：注册一个变体
+  static void Register(const BytesKey& programKey, const VariantInfo& info);
 
-  /**
-   * Returns the compiled SPIR-V binary.
-   */
-  const std::vector<uint32_t>& spirvBinary() const { return _spirvBinary; }
-
-  /**
-   * Returns the UE RHI vertex shader (only valid if stage == Vertex).
-   */
-  FRHIVertexShader* rhiVertexShader() const { return _vertexShader.GetReference(); }
-
-  /**
-   * Returns the UE RHI pixel shader (only valid if stage == Fragment).
-   */
-  FRHIPixelShader* rhiPixelShader() const { return _pixelShader.GetReference(); }
+  // 检查某个 VariantID 是否有效（ShouldCompilePermutation 使用）
+  static bool IsValidVariant(uint32_t drawOpType, uint32_t variantID);
 
  private:
-  UERHIShaderModule(ShaderStage stage, const std::string& glslCode);
-
-  bool compile(UERHIGPU* gpu);
-
-  ShaderStage _stage = ShaderStage::Vertex;
-  std::string _glslCode;
-  std::vector<uint32_t> _spirvBinary;
-
-  FVertexShaderRHIRef _vertexShader;
-  FPixelShaderRHIRef _pixelShader;
+  static std::unordered_map<BytesKey, VariantInfo, BytesKeyHash> registry;
 };
-
-}  // namespace tgfx
 ```
 
-### 14.2 Shader 编译管线
+Registry 的数据由离线枚举工具生成，编译为静态表嵌入 UE 插件。运行时查找是 O(1) 的哈希表查询。
 
-```
-┌─────────────┐    shaderc    ┌──────────┐   SPIRV-Cross   ┌──────────┐
-│ GLSL #450   │ ────────────→ │ SPIR-V   │ ──────────────→ │ HLSL     │
-│ (tgfx 源码) │               │ (binary) │                 │ (source) │
-└─────────────┘               └──────────┘                 └────┬─────┘
-                                                                │
-                                                  UE ShaderCompiler
-                                                                │
-                                                           ┌────▼─────┐
-                                                           │ Platform │
-                                                           │ Bytecode │
-                                                           │ (DXIL/   │
-                                                           │  SPIR-V/ │
-                                                           │  metallib│
-                                                           └──────────┘
-```
-
-### 14.3 实现要点
+### 14.4 ProgramInfo::getProgram() 的 UE 快速路径
 
 ```cpp
-bool UERHIShaderModule::compile(UERHIGPU* gpu) {
-  // Step 1: GLSL → SPIR-V (复用 tgfx 现有的 shaderc 管线)
-  shaderc::Compiler compiler;
-  shaderc::CompileOptions options;
-  options.SetOptimizationLevel(shaderc_optimization_level_performance);
-  options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_0);
-
-  shaderc_shader_kind kind = (_stage == ShaderStage::Vertex)
-                                 ? shaderc_vertex_shader
-                                 : shaderc_fragment_shader;
-
-  auto result = compiler.CompileGlslToSpv(_glslCode, kind, "shader", options);
-  if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
-    return false;
+// ProgramInfo.cpp (修改后)
+std::shared_ptr<Program> ProgramInfo::getProgram() const {
+  auto context = renderTarget->getContext();
+  BytesKey programKey = {};
+  // ... 现有 key 计算逻辑不变 ...
+  geometryProcessor->computeProcessorKey(context, &programKey);
+  for (const auto& fp : fragmentProcessors) {
+    fp->computeProcessorKey(context, &programKey);
   }
-  _spirvBinary.assign(result.cbegin(), result.cend());
+  if (xferProcessor) xferProcessor->computeProcessorKey(context, &programKey);
+  programKey.write(static_cast<uint32_t>(blendMode));
+  programKey.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
+  programKey.write(static_cast<uint32_t>(cullMode));
+  programKey.write(static_cast<uint32_t>(renderTarget->format()));
+  programKey.write(static_cast<uint32_t>(renderTarget->sampleCount()));
 
-  // Step 2: SPIR-V → HLSL (使用 SPIRV-Cross)
-  spirv_cross::CompilerHLSL hlslCompiler(_spirvBinary);
-  spirv_cross::CompilerHLSL::Options hlslOptions;
-  hlslOptions.shader_model = 50;  // SM 5.0
-  hlslCompiler.set_hlsl_options(hlslOptions);
-  std::string hlslCode = hlslCompiler.compile();
-
-  // Step 3: HLSL → UE Shader Bytecode
-  // 注意: UE 不支持运行时 HLSL 编译
-  // 方案 A: 使用 D3DCompile (仅 Windows)
-  // 方案 B: 预编译 shader 库 (推荐)
-  // 方案 C: 直接提交 SPIR-V (Vulkan 平台)
-
-  TArray<uint8> shaderCode = CompileShaderForCurrentPlatform(hlslCode, _stage);
-
-  FSHAHash hash;
-  FSHA1::HashBuffer(shaderCode.GetData(), shaderCode.Num(), hash.Hash);
-
-  if (_stage == ShaderStage::Vertex) {
-    _vertexShader = RHICreateVertexShader(shaderCode, hash);
-  } else {
-    _pixelShader = RHICreatePixelShader(shaderCode, hash);
+  auto program = context->globalCache()->findProgram(programKey);
+  if (program == nullptr) {
+    // UE 快速路径：从 ShaderVariantRegistry 查找预编译变体
+    if (context->gpu()->backendType() == BackendType::UERHI) {
+      auto variantInfo = ShaderVariantRegistry::Find(programKey);
+      if (variantInfo == nullptr) {
+        LOGE("No precompiled shader variant for ProgramKey!");
+        return nullptr;
+      }
+      program = static_cast<UERHIGPU*>(context->gpu())
+                    ->getPrecompiledProgram(*variantInfo, this);
+    } else {
+      // 其他后端（GL/Metal/Vulkan）走现有运行时编译路径
+      program = ProgramBuilder::CreateProgram(context, this);
+    }
+    if (program) {
+      context->globalCache()->addProgram(programKey, program);
+    }
   }
-
-  return (_vertexShader.IsValid() || _pixelShader.IsValid());
+  return program;
 }
 ```
 
-### 14.4 Shader 缓存策略
+### 14.5 UERHIGPU 的 Shader 相关实现
 
 ```cpp
-// UERHIGPU 中维护 shader 缓存
-class UERHIGPU {
-  // 基于 GLSL 源码 hash 的缓存
-  std::unordered_map<size_t, std::shared_ptr<UERHIShaderModule>> shaderCache;
-  
-  std::shared_ptr<ShaderModule> createShaderModule(const ShaderModuleDescriptor& descriptor) override {
-    // 计算 hash
-    size_t hash = std::hash<std::string>{}(descriptor.code);
-    hash ^= static_cast<size_t>(descriptor.stage) << 32;
-    
-    auto it = shaderCache.find(hash);
-    if (it != shaderCache.end()) {
-      return it->second;
-    }
-    
-    auto module = UERHIShaderModule::Make(this, descriptor);
-    if (module) {
-      shaderCache[hash] = module;
-    }
-    return module;
+// UERHIGPU.h
+class UERHIGPU : public GPU {
+ public:
+  // 这两个方法在 UE 后端不使用（Shader 通过预编译获取）
+  std::shared_ptr<ShaderModule> createShaderModule(
+      const ShaderModuleDescriptor&) override {
+    return nullptr;
   }
+
+  std::shared_ptr<RenderPipeline> createRenderPipeline(
+      const RenderPipelineDescriptor&) override {
+    return nullptr;
+  }
+
+  // UE 专用：从预编译 Shader 构建 Program
+  std::shared_ptr<Program> getPrecompiledProgram(
+      const ShaderVariantRegistry::VariantInfo& variantInfo,
+      const ProgramInfo* programInfo);
+
+ private:
+  // 获取 UE Global Shader Map
+  FGlobalShaderMap* getShaderMap() const;
 };
+```
+
+`getPrecompiledProgram()` 实现要点：
+1. 根据 `variantInfo.drawOpType` 确定使用哪个 FShader 子类
+2. 用 `variantInfo.variantID` 构建 `FPermutationDomain`
+3. 通过 `TShaderMapRef<FTgfxShader>(ShaderMap, PermutationDomain)` 获取预编译 Shader
+4. 从 `ProgramInfo` 提取 BlendState、RasterizerState 等构建 `FGraphicsPipelineStateInitializer`
+5. 包装为 `UERHIRenderPipeline` 返回
+
+### 14.6 GPU::createShaderModule() / createRenderPipeline() 在各后端的行为
+
+| 后端 | createShaderModule | createRenderPipeline |
+|------|-------------------|---------------------|
+| OpenGL | 运行时编译 GLSL | 创建 GL Program |
+| Metal | SPIRV→MSL 编译 | 创建 MTLRenderPipelineState |
+| UE RHI | **返回 nullptr**（不使用） | **返回 nullptr**（不使用） |
+
+UE 后端通过 `getPrecompiledProgram()` 绕过标准 Shader 创建路径，直接访问 UE 的 Global Shader Map。
+
+### 14.7 运行时 Shader 选择完整流程
+
+```
+DrawOp::execute(renderPass, renderTarget)
+  │
+  ├── onMakeGeometryProcessor()           // 不变
+  ├── 收集 FP color/coverage               // 不变
+  ├── 构建 ProgramInfo                      // 不变
+  │
+  ├── ProgramInfo::getProgram()
+  │   ├── 计算 BytesKey programKey          // 不变
+  │   ├── GlobalCache::findProgram(key)     // 缓存命中直接返回
+  │   │
+  │   └── [UE 快速路径] (缓存未命中)
+  │       ├── ShaderVariantRegistry::Find(programKey)
+  │       │   └── 返回 VariantInfo { variantID=42, drawOpType=RectDrawOp }
+  │       │
+  │       ├── UERHIGPU::getPrecompiledProgram(variantInfo, programInfo)
+  │       │   ├── TShaderMapRef<FTgfxRectShader>(ShaderMap, FVariantDimension(42))
+  │       │   │   └── 获取预编译的 VS + PS
+  │       │   ├── 构建 FGraphicsPipelineStateInitializer
+  │       │   │   ├── BoundShaderState (VS + PS)
+  │       │   │   ├── BlendState（from ProgramInfo）
+  │       │   │   ├── RasterizerState（CullMode from ProgramInfo）
+  │       │   │   └── DepthStencilState
+  │       │   └── 返回 UERHIRenderPipeline
+  │       │
+  │       └── GlobalCache::addProgram(key, program)  // 缓存
+  │
+  ├── renderPass->setPipeline(program->getPipeline())
+  │   └── SetGraphicsPipelineState(RHICmdList, PSO)
+  │
+  ├── ProgramInfo::setUniformsAndSamplers(renderPass, program)
+  │   └── 遍历 Processor::setData() → 写入 UBO → RHI SetShaderUniformBuffer
+  │
+  └── onDraw(renderPass)
+      └── RHICmdList.DrawPrimitive / DrawIndexedPrimitive
 ```
 
 ---
@@ -2030,79 +2048,135 @@ Context 锁定失败 → lockContext 返回 nullptr → 跳过本帧渲染
 
 ---
 
-## 19. Shader 编译策略
+## 19. Shader 编译策略 -- 离线 GLSL 预生成 + SPIRV 转 HLSL
 
-> **重要更新**：本章原始设计以"运行时编译"（策略 B）为主要方案。基于 Rive UE 5.7 插件源码分析，
-> **推荐全面采用策略 A（UE Global Shader 预编译）**，使用 Shader Permutation 替代运行时动态拼装。
-> 详见附录 O 的完整方案。以下原始分析保留作为背景参考。
+> 本章替代原"策略 A vs 策略 B"对比分析。最终方案为**离线 GLSL 预生成**：构建时运行 tgfx
+> ProgramBuilder 枚举所有 Shader 变体，生成 GLSL 后通过 SPIRV-Cross 转为 HLSL，嵌入 UE 的
+> .usf/.ush 框架预编译。
 
-### 19.1 问题分析
+### 19.1 核心思路
 
-UE RHI 的 `RHICreateVertexShader/RHICreatePixelShader` 接口接收**预编译的平台字节码** (`TArrayView<const uint8>`)，不支持运行时源码编译。
+tgfx 的 `ProgramBuilder` 已经能够从 Processor 组合完整生成 GLSL 代码，且 `computeProcessorKey()`
+机制天然形成一个有限变体集合。利用这一机制，在构建时（而非运行时）运行 ProgramBuilder 枚举所有变体。
 
-tgfx 统一使用 GLSL `#version 450` 编写 shader，需要转换为 UE 兼容格式。
+**关键洞察**：相同的 ProgramKey 对应相同的 Shader 代码。ProgramKey 已经递归包含了 FP 树的所有子节点
+key，因此不需要单独拆解 ComposeFragmentProcessor / XfermodeFragmentProcessor 的嵌套树结构。
 
-### 19.2 推荐方案：混合编译策略
+### 19.2 变体枚举维度分析
+
+tgfx 的 FP 链并非任意组合，而是由 Canvas API 驱动，形成有限的**管线模板**：
+
+| 管线模板 | GP | Color FP 链 | Coverage FP | XP |
+|---------|-----|-------------|------------|-----|
+| 纯色填充 | QuadPerEdgeAA / Default | ConstColor | AARectEffect | PorterDuff |
+| 纹理绘制 | QuadPerEdgeAA | TextureEffect | AARectEffect | PorterDuff |
+| 平铺纹理 | QuadPerEdgeAA | TiledTextureEffect | AARectEffect | PorterDuff |
+| 线性渐变 | QuadPerEdgeAA | Compose(LinearGradientLayout + ClampedGradient(Colorizer)) | AARectEffect | PorterDuff |
+| 径向渐变 | QuadPerEdgeAA | Compose(RadialGradientLayout + ClampedGradient(Colorizer)) | AARectEffect | PorterDuff |
+| 高斯模糊 | QuadPerEdgeAA | GaussianBlur1D(TextureEffect) | - | PorterDuff |
+| 颜色矩阵 | QuadPerEdgeAA | Compose(source FP, ColorMatrix) | AARectEffect | PorterDuff |
+| 混合模式 | QuadPerEdgeAA | Xfermode(src FP, dst FP) | AARectEffect | PorterDuff |
+| 文字绘制 | AtlasText | ConstColor | - | PorterDuff |
+| 椭圆 | Ellipse | ConstColor / TextureEffect | - | PorterDuff |
+| 圆角矩形描边 | RoundStrokeRect | ConstColor | - | PorterDuff |
+| 细线 | HairlineLine | ConstColor | - | PorterDuff |
+| 自定义 Mesh | Mesh | TextureEffect | - | PorterDuff |
+| 实例化形状 | ShapeInstanced | ConstColor | - | PorterDuff |
+
+每个模板内部的变体来自 Processor 的 `computeProcessorKey()` 参数：
+
+| Processor | Key 变体因素 | 估算变体数 |
+|-----------|-------------|-----------|
+| QuadPerEdgeAAGP | AA flag × color × texCoord × coverage × subset | ~32 |
+| DefaultGP | AA flag × hasColor | ~4 |
+| TextureEffect | textureType × alphaType × subset × filtering | ~128 |
+| TiledTextureEffect | shaderMode × alphaType | ~64 |
+| GradientLayout (4种) | hasPerspective | 每种 ~2 |
+| Colorizer (4种) | intervalCount / thresholdCount | 每种 1-8 |
+| ConstColor | InputMode (3种) | 3 |
+| GaussianBlur1D | maxSigma | ~6 |
+| ColorSpaceXform | XFormKey | ~16 |
+| PorterDuffXP | blendMode + hasDstTexture | ~32 |
+
+**估算总变体数**：300-800 个唯一 Shader。通过离线枚举可精确确定。
+
+### 19.3 离线枚举工具设计
 
 ```
-                     构建时 (离线)                        运行时
-┌────────────┐                              ┌──────────────────────┐
-│ tgfx GLSL  │                              │ tgfx GLSL (动态生成) │
-│ (已知源码) │                              │ (如 effect shader)   │
-└─────┬──────┘                              └──────────┬───────────┘
-      │                                                │
-      ▼                                                ▼
- 预编译为 UE                                   GLSL → SPIR-V (shaderc)
- Shader Asset                                        │
- (.usf / .ush)                                       ▼
-      │                                     SPIR-V → HLSL (SPIRV-Cross)
-      ▼                                              │
- UE Cook Pipeline                                    ▼
-      │                                     D3DCompile / dxc (仅 Windows)
-      ▼                                     或提交 SPIR-V (Vulkan)
- 平台字节码                                          │
- (DXIL/SPIRV/metallib)                              ▼
-      │                                     平台字节码 (缓存到磁盘)
-      ▼                                              │
- RHICreateShader                                     ▼
-                                            RHICreateShader
+工具名：TGFXShaderVariantGenerator
+
+输入：
+  - tgfx 完整 Processor 源码（编译为库）
+  - 变体配置文件（可选，用于裁剪不需要的变体）
+
+流程：
+  1. 创建 MockContext（不需要真实 GPU，仅提供 ShaderCaps）
+  2. 对每种 DrawOp 类型，枚举其 GP × FP 链 × XP 的合法组合
+  3. 对每种组合，构建 ProgramInfo，计算 ProgramKey
+  4. 去重（相同 ProgramKey 只生成一次）
+  5. 调用 GLSLProgramBuilder 生成完整 VS/FS GLSL 代码
+  6. 通过 shaderc 编译 GLSL → SPIRV
+  7. 通过 SPIRV-Cross 将 SPIRV → HLSL
+  8. 输出：
+     a. 每个变体的 .ush 文件（含 HLSL VS + FS 代码）
+     b. 每种 DrawOp 类型对应的 .usf 入口文件
+     c. ShaderVariantRegistry.cpp（ProgramKey → VariantID 映射表）
+     d. TgfxShaders.h/.cpp（UE FShader 子类声明 + IMPLEMENT_GLOBAL_SHADER）
 ```
 
-**策略 A: 静态 Shader（推荐大部分场景）**
-- 构建时将 tgfx 已知的 shader 预编译为 UE Shader Asset
-- 运行时直接从 Shader Library 加载
-- 优点：零运行时编译开销，与 UE PSO 缓存完全兼容
-- 缺点：新增 shader 需要重新构建
+### 19.4 GLSL → HLSL 转换管线
 
-**策略 B: 运行时编译（动态 shader 场景）**
-- 使用 shaderc + SPIRV-Cross 在运行时编译
-- 编译结果缓存到磁盘，后续直接加载
-- 优点：灵活
-- 缺点：首次编译有延迟，平台兼容性需要验证
-
-**推荐**：优先使用策略 A，策略 B 作为后备。
-
-### 19.3 UE Shader 集成方式
-
-```cpp
-// 在 UE 的 .usf 文件中预定义 tgfx shader 变体
-// PAGPlugin/Shaders/Private/TGFXShader.usf
-
-// 或者，使用 UE 的 Global Shader 机制
-class FTGFXVertexShader : public FGlobalShader {
-  DECLARE_GLOBAL_SHADER(FTGFXVertexShader);
-  // ...
-};
-
-class FTGFXPixelShader : public FGlobalShader {
-  DECLARE_GLOBAL_SHADER(FTGFXPixelShader);
-  // ...
-};
-
-// 运行时获取编译好的 shader
-TShaderMapRef<FTGFXVertexShader> VertexShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
-TShaderMapRef<FTGFXPixelShader> PixelShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
 ```
+tgfx ProgramBuilder 生成的 GLSL（OpenGL ES 3.0 风格）
+    │
+    ▼
+预处理：升级到 GLSL 450 + 添加 binding/location qualifiers
+    │（复用 MetalShaderModule.mm 中的 preprocessGLSL() 逻辑）
+    │
+    ▼
+shaderc：GLSL 450 → SPIR-V
+    │
+    ▼
+SPIRV-Cross：SPIR-V → HLSL 5.0（SM5）
+    │ 配置选项：
+    │   - hlsl.shader_model = 50
+    │   - hlsl.point_size_compat = false
+    │   - force_zero_initialized_variables = true
+    │
+    ▼
+后处理：适配 UE .ush 格式
+    │ - 替换 HLSL 入口函数为 UE 命名约定
+    │ - 添加 UE 标准头文件 include
+    │ - 调整 register 绑定语法为 UE 风格
+    │
+    ▼
+生成 .ush 文件（Shader 主体）+ .usf 入口文件
+```
+
+### 19.5 FP 树结构处理策略
+
+ComposeFragmentProcessor 和 XfermodeFragmentProcessor 的嵌套树结构是核心难点。
+
+**解法**：不拆解树——将整个 FP 树视为一个原子单元。
+
+tgfx 的 ProgramBuilder 已经递归遍历 FP 树并生成完整的 FS 代码。离线枚举工具利用完全相同的
+ProgramBuilder 逻辑，生成的 GLSL 已经包含了展开后的完整 FP 树代码。ProgramKey 也已经递归
+包含了所有子 FP 的 key。因此：**相同的 ProgramKey 对应相同的展开后 Shader 代码**。
+
+### 19.6 与 Rive 方案的关键差异
+
+| 维度 | Rive UE 方案 | tgfx UE 方案 |
+|------|-------------|-------------|
+| **Permutation 方式** | 11 个布尔维度（ENABLE_CLIPPING 等） | 整数 VariantID（TGFX_VARIANT_ID） |
+| **Shader 来源** | 手工将 GLSL 转换为 .ush + 宏适配层 | 自动运行 ProgramBuilder 生成 GLSL → SPIRV-Cross → HLSL |
+| **变体覆盖** | 通过布尔组合穷举特性 | 通过 ProgramKey 穷举实际使用的变体 |
+| **FP 树处理** | 无树结构（Rive 的 Shader 结构固定） | 将 FP 树视为原子单元，ProgramKey 递归包含 |
+| **与渲染器核心关系** | 需在 .ush 中维护 Rive Shader 逻辑的副本 | 100% 复用 tgfx emitCode 逻辑，零 Shader 代码重写 |
+| **新增 Processor 影响** | 需手动更新 .ush + Permutation 维度 | 重新运行枚举工具即可自动更新 |
+
+Rive 采用布尔 Permutation 是因为其渲染管线固定（每种 DrawType 的 Shader 结构相同，只是特性开关不同）。
+tgfx 的 Shader 由 Processor 链动态组合，每种组合的代码结构完全不同，无法用布尔开关表达，必须用
+VariantID 选择完整的预生成 Shader。
 
 ---
 
@@ -2168,322 +2242,134 @@ UERHIDevice
 
 ---
 
-## 附录 D: [P0] Shader 编译完整方案
+## 附录 D: [P0] 离线 Shader 变体枚举工具
 
-> **重要更新**：本附录描述的运行时编译管线（GLSL -> SPIR-V -> HLSL -> D3DCompile）已不再是推荐
-> 方案。基于 Rive UE 5.7 的实践，推荐使用 UE Global Shader + Permutation 预编译方案（附录 O）。
-> 本附录保留作为备选方案参考。
+> 本附录替代原运行时编译管线方案。描述构建时 Shader 变体枚举工具的完整设计。
 
-### D.1 问题本质
+### D.1 工具概述
 
-tgfx 的 shader 是**运行时动态生成**的：`ProgramBuilder` 根据 DrawOp 的 GeometryProcessor + FragmentProcessor 组合，在运行时拼接 GLSL 源码（`#version 450`，Vulkan 风格），然后调用 `GPU::createShaderModule()` 编译。
+`TGFXShaderVariantGenerator` 是一个离线构建工具，在 UE Cook 之前运行。它利用 tgfx 现有的
+ProgramBuilder 机制枚举所有 Shader 变体，生成 UE 可编译的 .usf/.ush 文件。
 
-UE RHI 的 `RHICreateVertexShader(TArrayView<const uint8> Code, const FSHAHash& Hash)` 接收**预编译的平台字节码**（D3D12 平台为 DXBC/DXIL，Vulkan 为 SPIR-V，Metal 为 metallib），**不支持运行时 HLSL 源码编译**。
+**核心优势**：100% 复用 tgfx 的 emitCode 逻辑，Shader 代码由 ProgramBuilder 自动生成，
+不需要手写任何 HLSL 代码。
 
-因此，UE RHI 后端的核心挑战是：如何将 tgfx 运行时生成的 GLSL 转换为 UE RHI 接受的平台字节码。
-
-### D.2 最终方案：绕过 UE RHI Shader 接口，直接使用平台原生编译
-
-**核心思路**：`UERHIShaderModule::Make()` 不调用 `RHICreateVertexShader/RHICreatePixelShader`，而是利用 UE 已集成的编译器工具链，在运行时将 GLSL 编译为平台原生字节码，再通过平台特定 RHI 接口创建 shader。
-
-**编译管线**（按平台分支）：
+### D.2 转换管线
 
 ```
-                        tgfx GLSL (#version 450)
-                                │
-                        shaderc (已集成于 tgfx)
-                                │
-                            SPIR-V
-                      ┌─────────┼─────────┐
-                      │         │         │
-                 [D3D12]    [Vulkan]   [Metal]
-                      │         │         │
-              SPIRV-Cross   直接使用   SPIRV-Cross
-              (→ HLSL)      SPIR-V    (→ MSL)
-                      │         │         │
-              D3DCompile    UE RHI    MTLLibrary
-              /DXC          直接      编译
-              (运行时)      接受       (运行时)
-                      │         │         │
-                   DXBC/     SPIR-V    metallib
-                   DXIL       字节码    字节码
-                      │         │         │
-                      └─────────┼─────────┘
-                                │
-                    平台特定 RHI 创建 Shader
+tgfx ProgramBuilder 生成的 GLSL（OpenGL ES 3.0 风格）
+    │
+    ▼
+预处理：升级到 GLSL 450 + 添加 binding/location qualifiers
+    │（复用 src/gpu/metal/MetalShaderModule.mm 中的 preprocessGLSL() 逻辑）
+    │
+    ▼
+shaderc：GLSL 450 → SPIR-V
+    │
+    ▼
+SPIRV-Cross：SPIR-V → HLSL 5.0（SM5）
+    │ 配置选项：
+    │   - hlsl.shader_model = 50
+    │   - hlsl.point_size_compat = false
+    │   - force_zero_initialized_variables = true
+    │
+    ▼
+后处理：适配 UE .ush 格式
+    │ - 替换 HLSL 入口函数名为 TgfxMainVS / TgfxMainFS
+    │ - 添加 #pragma once
+    │ - 调整 register 绑定语法
+    │
+    ▼
+生成 .ush 文件（Shader 主体）+ .usf 入口文件
 ```
 
-### D.3 各平台实现细节
+### D.3 文件组织
 
-#### D.3.1 D3D12 平台
-
-```cpp
-// 使用 d3dcompiler_47.dll 或 dxcompiler.dll 运行时编译
-// UE StandaloneRenderer 中已有此模式的先例
-
-class UERHIShaderCompiler_D3D12 {
-public:
-  static bool Compile(const std::string& glslCode, ShaderStage stage,
-                      TArray<uint8>& outBytecode) {
-    // Step 1: GLSL → SPIR-V (shaderc)
-    std::vector<uint32_t> spirv = CompileGLSLToSPIRV(glslCode, stage);
-    if (spirv.empty()) return false;
-
-    // Step 2: SPIR-V → HLSL (SPIRV-Cross)
-    spirv_cross::CompilerHLSL hlslCompiler(spirv);
-    spirv_cross::CompilerHLSL::Options options;
-    options.shader_model = 50;  // SM 5.0 for DXBC, 或 60+ for DXIL
-    hlslCompiler.set_hlsl_options(options);
-    std::string hlslCode = hlslCompiler.compile();
-
-    // Step 3: HLSL → DXBC (D3DCompile)
-    // 动态加载 d3dcompiler_47.dll (UE 已包含此 DLL)
-    HMODULE hCompiler = LoadLibraryW(L"d3dcompiler_47.dll");
-    auto pD3DCompile = (pD3DCompile_t)GetProcAddress(hCompiler, "D3DCompile");
-
-    const char* target = (stage == ShaderStage::Vertex) ? "vs_5_0" : "ps_5_0";
-    const char* entry = "main";
-
-    ID3DBlob* shaderBlob = nullptr;
-    ID3DBlob* errorBlob = nullptr;
-    HRESULT hr = pD3DCompile(
-        hlslCode.c_str(), hlslCode.size(), nullptr, nullptr, nullptr,
-        entry, target,
-        D3DCOMPILE_OPTIMIZATION_LEVEL3, 0,
-        &shaderBlob, &errorBlob);
-
-    if (FAILED(hr)) {
-      // 记录 errorBlob 中的错误信息
-      if (errorBlob) errorBlob->Release();
-      return false;
-    }
-
-    outBytecode.SetNum(shaderBlob->GetBufferSize());
-    FMemory::Memcpy(outBytecode.GetData(), shaderBlob->GetBufferPointer(),
-                    shaderBlob->GetBufferSize());
-    shaderBlob->Release();
-    return true;
-  }
-};
+```
+PAGPlugin/
+├── Shaders/Private/TGFX/
+│   ├── TgfxCommon.ush                 # 公共类型定义 + UE 适配宏
+│   ├── TgfxUniformBridge.ush          # Uniform 桥接（tgfx UBO → UE 参数）
+│   ├── Generated/
+│   │   ├── Variant_0001.ush           # ProgramKey 0x... 的 HLSL VS+FS
+│   │   ├── Variant_0002.ush
+│   │   └── ...
+│   ├── TgfxRect.usf                   # RectDrawOp 入口
+│   ├── TgfxRRect.usf                  # RRectDrawOp 入口
+│   ├── TgfxShape.usf                  # ShapeDrawOp 入口
+│   ├── TgfxAtlasText.usf             # AtlasTextOp 入口
+│   ├── TgfxMesh.usf                   # MeshDrawOp 入口
+│   ├── TgfxHairlineLine.usf          # HairlineLineOp 入口
+│   ├── TgfxHairlineQuad.usf          # HairlineQuadOp 入口
+│   └── TgfxShapeInstanced.usf        # ShapeInstancedDrawOp 入口
+│
+├── Source/TGFXShaders/
+│   ├── Public/
+│   │   └── TgfxShaderTypes.h          # Shader 类声明 + 参数结构
+│   └── Private/
+│       ├── TgfxShaderTypes.cpp        # IMPLEMENT_GLOBAL_SHADER 注册
+│       ├── TgfxShadersModule.cpp      # AddShaderSourceDirectoryMapping
+│       └── ShaderVariantRegistry.cpp  # ProgramKey → VariantID 静态映射表
+│
+└── tools/ue_shader_gen/
+    ├── ShaderVariantEnumerator.cpp    # 枚举所有 DrawOp × Processor 组合
+    ├── GLSLToHLSLConverter.cpp        # GLSL → SPIRV → HLSL 转换
+    └── ShaderFileGenerator.cpp        # 生成 .usf/.ush + Registry
 ```
 
-**创建 Shader（绕过 UE 序列化格式，直接使用平台 API）**：
+### D.4 .usf 入口文件模式
 
-```cpp
-// 方式 A: 通过 UE 平台特定 RHI 接口
-ID3D12DynamicRHI* d3d12RHI = GetID3D12DynamicRHI();
-ID3D12Device* d3dDevice = d3d12RHI->RHIGetDevice(0);
+每个 .usf 对应一种 DrawOp 类型，使用 UE Permutation 选择具体的 Variant：
 
-// 直接用 D3D12 bytecode 创建 PSO（在 RenderPipeline 阶段处理，而非 ShaderModule）
-// PSO 创建时直接嵌入 D3D12_SHADER_BYTECODE { pShaderBytecode, BytecodeLength }
+```hlsl
+// TgfxRect.usf
+#include "/Engine/Public/Platform.ush"
+#include "TgfxCommon.ush"
+#include "TgfxUniformBridge.ush"
+
+// UE Permutation 维度 TGFX_VARIANT_ID 在编译时展开为不同值
+#if TGFX_VARIANT_ID == 1
+    #include "Generated/Variant_0001.ush"
+#elif TGFX_VARIANT_ID == 2
+    #include "Generated/Variant_0002.ush"
+// ... 所有该 DrawOp 类型的 Variant
+#else
+    #error "Unknown TGFX_VARIANT_ID"
+#endif
 ```
 
-```cpp
-// 方式 B: 构造 UE 序列化格式 (更符合 UE 架构)
-// UE 的 shader Code 格式 = ShaderResourceTable header + optional data + native bytecode
-// 可以构造最简的 SRT header + 编译后的字节码
-TArray<uint8> MakeUEShaderCode(const TArray<uint8>& nativeBytecode) {
-  TArray<uint8> ueCode;
-  // 写入最小化的 FShaderResourceTable 序列化数据
-  FMemoryWriter Ar(ueCode);
-  FShaderResourceTable srt;
-  srt.Serialize(Ar);
-  // 追加原生字节码
-  ueCode.Append(nativeBytecode);
-  return ueCode;
-}
+### D.5 TgfxCommon.ush 适配层
+
+```hlsl
+// TgfxCommon.ush
+#pragma once
+#include "/Engine/Private/Common.ush"
+
+// SPIRV-Cross 已处理大部分 GLSL→HLSL 类型映射
+// 以下是 UE 特定的补充适配
+
+// 纹理采样桥接（如果 SPIRV-Cross 未自动处理）
+#ifndef TGFX_SAMPLE_TEXTURE2D
+#define TGFX_SAMPLE_TEXTURE2D(tex, samp, uv) tex.Sample(samp, uv)
+#endif
+
+// Vertex Attribute 语义映射由 SPIRV-Cross 自动处理
+// SPIRV-Cross 会将 layout(location=N) 映射为 TEXCOORD{N}
 ```
 
-#### D.3.2 Vulkan 平台
+### D.6 关键适配点
 
-```cpp
-// Vulkan 原生支持 SPIR-V，最简单的路径
-class UERHIShaderCompiler_Vulkan {
-public:
-  static bool Compile(const std::string& glslCode, ShaderStage stage,
-                      TArray<uint8>& outBytecode) {
-    // Step 1: GLSL → SPIR-V (shaderc)
-    std::vector<uint32_t> spirv = CompileGLSLToSPIRV(glslCode, stage);
-    if (spirv.empty()) return false;
+1. **Uniform Block**：tgfx 使用 `layout(std140) uniform` UBO，SPIRV-Cross 会转换为 HLSL
+   `cbuffer`，需与 UE 的 Uniform Buffer 机制对齐。推荐将 tgfx 的 UniformData buffer 直接
+   作为 raw constant buffer 上传（`RHICreateUniformBuffer`）。
 
-    // SPIR-V 就是 Vulkan 的原生格式
-    outBytecode.SetNum(spirv.size() * sizeof(uint32_t));
-    FMemory::Memcpy(outBytecode.GetData(), spirv.data(), outBytecode.Num());
-    return true;
-  }
-};
-```
+2. **Texture Sampler**：tgfx 使用 combined image sampler（`sampler2D`），SPIRV-Cross 转 HLSL
+   时会拆分为 `Texture2D` + `SamplerState`，与 UE 的分离采样器模型一致。
 
-#### D.3.3 Metal 平台
+3. **Vertex Attribute**：tgfx 的顶点属性通过 `Attribute` 类管理，SPIRV-Cross 会自动将
+   `layout(location=N) in` 映射为 HLSL 语义 `TEXCOORD{N}`，与 UE 的 Vertex Declaration 对齐。
 
-```cpp
-// 复用 tgfx Metal 后端已有的 GLSL → MSL 管线
-class UERHIShaderCompiler_Metal {
-public:
-  static bool Compile(const std::string& glslCode, ShaderStage stage,
-                      TArray<uint8>& outBytecode) {
-    // Step 1: GLSL → SPIR-V (shaderc)
-    std::vector<uint32_t> spirv = CompileGLSLToSPIRV(glslCode, stage);
-
-    // Step 2: SPIR-V → MSL (SPIRV-Cross)
-    spirv_cross::CompilerMSL mslCompiler(spirv);
-    // ... 配置选项 (与 MetalShaderModule 相同)
-    std::string mslCode = mslCompiler.compile();
-
-    // Step 3: MSL → metallib (MTLDevice 运行时编译)
-    // Metal 原生支持运行时编译 MSL
-    IMetalDynamicRHI* metalRHI = GetIMetalDynamicRHI();
-    // 通过 metalRHI 获取 MTLDevice 并编译
-    // 注意：此路径与 tgfx MetalShaderModule 完全一致
-    return true;
-  }
-};
-```
-
-### D.4 统一 ShaderModule 接口
-
-```cpp
-// src/gpu/ue/UERHIShaderModule.h
-
-class UERHIShaderModule : public ShaderModule {
- public:
-  static std::shared_ptr<UERHIShaderModule> Make(UERHIGPU* gpu,
-                                                  const ShaderModuleDescriptor& descriptor);
-
-  ShaderStage stage() const { return _stage; }
-  const std::string& glslCode() const { return _glslCode; }
-  const std::vector<uint32_t>& spirvBinary() const { return _spirvBinary; }
-
-  // D3D12 编译产物
-  const TArray<uint8>& dxBytecode() const { return _dxBytecode; }
-
-  // Vulkan 编译产物 (= SPIR-V)
-  const TArray<uint8>& vkBytecode() const { return _vkBytecode; }
-
-  // Metal 编译产物 (MSL 源码，运行时编译为 MTLLibrary)
-  const std::string& mslCode() const { return _mslCode; }
-
-  // SPIRV-Cross 反射信息 (用于参数绑定)
-  const ShaderReflection& reflection() const { return _reflection; }
-
- private:
-  ShaderStage _stage;
-  std::string _glslCode;
-  std::vector<uint32_t> _spirvBinary;
-
-  // 平台特定编译产物 (仅当前平台有效)
-  TArray<uint8> _dxBytecode;   // D3D12
-  TArray<uint8> _vkBytecode;   // Vulkan
-  std::string _mslCode;         // Metal
-
-  // 反射信息
-  ShaderReflection _reflection;
-};
-```
-
-### D.5 Shader 缓存
-
-```cpp
-// UERHIGPU 中基于 GLSL hash 的二级缓存
-
-class UERHIGPU {
-  // 内存缓存 (当前会话)
-  std::unordered_map<size_t, std::shared_ptr<UERHIShaderModule>> shaderMemoryCache;
-
-  // 磁盘缓存 (跨会话持久化)
-  // 缓存路径: {ProjectDir}/Saved/PAGShaderCache/{hash}.bin
-  FString shaderCacheDir;
-
-  std::shared_ptr<ShaderModule> createShaderModule(
-      const ShaderModuleDescriptor& descriptor) override {
-    // 1. 计算 hash
-    size_t hash = CityHash64(descriptor.code.data(), descriptor.code.size());
-    hash ^= static_cast<size_t>(descriptor.stage) << 48;
-
-    // 2. 内存缓存查找
-    auto it = shaderMemoryCache.find(hash);
-    if (it != shaderMemoryCache.end()) {
-      return it->second;
-    }
-
-    // 3. 磁盘缓存查找
-    FString cachePath = shaderCacheDir / FString::Printf(TEXT("%llx.bin"), hash);
-    TArray<uint8> cachedBytecode;
-    if (FFileHelper::LoadFileToArray(cachedBytecode, *cachePath)) {
-      auto module = UERHIShaderModule::MakeFromCache(this, descriptor, cachedBytecode);
-      if (module) {
-        shaderMemoryCache[hash] = module;
-        return module;
-      }
-    }
-
-    // 4. 运行时编译
-    auto module = UERHIShaderModule::Make(this, descriptor);
-    if (module) {
-      shaderMemoryCache[hash] = module;
-      // 持久化到磁盘
-      FFileHelper::SaveArrayToFile(module->platformBytecode(), *cachePath);
-    }
-    return module;
-  }
-};
-```
-
-### D.6 SPIRV-Cross 反射信息提取
-
-Shader 参数绑定需要知道 HLSL 中各参数的寄存器分配。SPIRV-Cross 在转换 SPIR-V → HLSL 时提供完整的反射信息：
-
-```cpp
-struct ShaderReflection {
-  // Uniform Buffer 绑定信息
-  struct UBOBinding {
-    std::string name;        // "VertexUniformBlock" / "FragmentUniformBlock"
-    unsigned binding;        // SPIR-V binding point (0 或 1)
-    unsigned hlslRegister;   // HLSL 中的 cb 寄存器 (b0, b1)
-    size_t size;             // buffer 大小
-  };
-  std::vector<UBOBinding> uniformBuffers;
-
-  // 纹理绑定信息
-  struct TextureBinding {
-    std::string name;        // sampler 名称
-    unsigned binding;        // SPIR-V binding point (从 2 开始)
-    unsigned hlslTextureRegister;  // HLSL 中的 t 寄存器
-    unsigned hlslSamplerRegister;  // HLSL 中的 s 寄存器
-  };
-  std::vector<TextureBinding> textures;
-};
-
-// 从 SPIRV-Cross 提取
-ShaderReflection ExtractReflection(spirv_cross::CompilerHLSL& compiler) {
-  ShaderReflection reflection;
-
-  // 提取 UBO 信息
-  auto resources = compiler.get_shader_resources();
-  for (auto& ubo : resources.uniform_buffers) {
-    ShaderReflection::UBOBinding binding;
-    binding.name = compiler.get_name(ubo.id);
-    binding.binding = compiler.get_decoration(ubo.id, spv::DecorationBinding);
-    binding.hlslRegister = compiler.get_decoration(ubo.id, spv::DecorationBinding);
-    // SPIRV-Cross 默认将 SPIR-V binding N 映射到 HLSL register bN
-    auto& type = compiler.get_type(ubo.base_type_id);
-    binding.size = compiler.get_declared_struct_size(type);
-    reflection.uniformBuffers.push_back(binding);
-  }
-
-  // 提取纹理信息
-  for (auto& tex : resources.sampled_images) {
-    ShaderReflection::TextureBinding binding;
-    binding.name = compiler.get_name(tex.id);
-    binding.binding = compiler.get_decoration(tex.id, spv::DecorationBinding);
-    binding.hlslTextureRegister = compiler.get_decoration(tex.id, spv::DecorationBinding);
-    binding.hlslSamplerRegister = compiler.get_decoration(tex.id, spv::DecorationBinding);
-    reflection.textures.push_back(binding);
-  }
-
-  return reflection;
-}
-```
+4. **矩阵行/列优先**：SPIRV-Cross 默认输出列优先矩阵，与 tgfx 一致。
 
 ---
 
