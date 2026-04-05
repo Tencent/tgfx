@@ -53,7 +53,7 @@
 │  │         ├── UERHIBuffer        ─────→ FRHIBuffer                 │   │
 │  │         ├── UERHISampler       ─────→ FRHISamplerState           │   │
 │  │         ├── UERHIRenderPipeline ────→ FGraphicsPipelineState     │   │
-│  │         └── UERHIShaderModule  ─────→ FRHIVertexShader/PixelShader│  │
+│  │         └── ShaderVariantRegistry ─→ UE Global Shader Map    │  │
 │  │                                                                   │   │
 │  │ UERHICommandEncoder                                              │   │
 │  │   └── UERHIRenderPass ──────────────→ IRHICommandContext         │   │
@@ -95,8 +95,8 @@ tgfx/
     ├── UERHISampler.cpp
     ├── UERHISemaphore.h
     ├── UERHISemaphore.cpp
-    ├── UERHIShaderModule.h
-    ├── UERHIShaderModule.cpp
+    ├── ShaderVariantRegistry.h
+    ├── ShaderVariantRegistry.cpp
     ├── UERHICaps.h
     └── UERHICaps.cpp
 ```
@@ -387,8 +387,15 @@ class UERHIGPU : public GPU {
    */
   std::shared_ptr<Sampler> getCachedSampler(const SamplerDescriptor& descriptor);
 
+  // UE Shader 预编译相关
+  std::shared_ptr<Program> getPrecompiledProgram(
+      const ShaderVariantRegistry::VariantInfo& variantInfo,
+      const ProgramInfo* programInfo);
+
  private:
   explicit UERHIGPU(FDynamicRHI* dynamicRHI);
+
+  FGlobalShaderMap* getShaderMap() const;
 
   FDynamicRHI* _dynamicRHI = nullptr;
   FRHICommandListImmediate* _currentRHICmdList = nullptr;
@@ -410,8 +417,8 @@ class UERHIGPU : public GPU {
 | `createBuffer()` | `RHICmdList.CreateBuffer()` | 创建 FRHIBuffer |
 | `createTexture()` | `RHICmdList.CreateTexture()` | 创建 FRHITexture |
 | `createSampler()` | `RHICreateSamplerState()` | 创建 FSamplerStateRHI |
-| `createShaderModule()` | `RHICreateVertexShader/PixelShader()` | 需要预编译字节码 |
-| `createRenderPipeline()` | `PipelineStateCache::GetAndOrCreateGraphicsPipelineState()` | 创建 PSO |
+| `createShaderModule()` | 返回 nullptr（不使用，Shader 通过预编译获取） | 详见第 14 章 |
+| `createRenderPipeline()` | 返回 nullptr（不使用，Shader 通过预编译获取） | Pipeline 由 `getPrecompiledProgram()` 构建 |
 | `createCommandEncoder()` | 返回包装的 CommandEncoder | 编码到 FRHICommandList |
 | `importBackendTexture()` | 包装外部 FRHITexture | adopted=false 不释放 |
 | `importBackendSemaphore()` | 包装 FRHIGPUFence | GPU 同步 |
@@ -903,12 +910,13 @@ class FRHIDepthStencilState;
 namespace tgfx {
 
 class UERHIGPU;
-class UERHIShaderModule;
 
 /**
  * UE RHI render pipeline implementation.
  * 
  * Wraps UE graphics pipeline state (PSO).
+ * UE backend pipelines are built by UERHIGPU::getPrecompiledProgram() from precompiled shaders,
+ * not through the createRenderPipeline() path.
  */
 class UERHIRenderPipeline : public RenderPipeline {
  public:
@@ -959,9 +967,9 @@ class UERHIRenderPipeline : public RenderPipeline {
   FRHIVertexDeclaration* vertexDeclaration = nullptr;
   FGraphicsPipelineStateInitializer psoInitializer;
 
-  // Shader 引用
-  std::shared_ptr<UERHIShaderModule> vertexShader = nullptr;
-  std::shared_ptr<UERHIShaderModule> pixelShader = nullptr;
+  // Shader 引用 (from precompiled UE Global Shader Map)
+  FRHIVertexShader* vertexShader = nullptr;
+  FRHIPixelShader* pixelShader = nullptr;
 
   // 绑定映射
   std::unordered_map<unsigned, unsigned> textureUnits;
@@ -997,8 +1005,12 @@ bool UERHIRenderPipeline::initialize(const RenderPipelineDescriptor& descriptor)
   vertexDeclaration = RHICreateVertexDeclaration(vertexElements);
 
   // 2. 获取 Shader
-  vertexShader = std::static_pointer_cast<UERHIShaderModule>(descriptor.vertex.module);
-  pixelShader = std::static_pointer_cast<UERHIShaderModule>(descriptor.fragment.module);
+  // NOTE: UE 后端的 Pipeline 由 UERHIGPU::getPrecompiledProgram() 直接构建，
+  // 不通过 createRenderPipeline() 路径。预编译 Shader 从 UE Global Shader Map
+  // 中通过 TShaderMapRef 获取（详见附录 F.4）。以下代码仅在 getPrecompiledProgram()
+  // 构建 Pipeline 时执行：
+  //   vertexShader = vs.GetVertexShader();   // from TShaderMapRef<FTgfxXxxVS>
+  //   pixelShader  = ps.GetPixelShader();    // from TShaderMapRef<FTgfxXxxPS>
 
   // 3. 创建状态对象
   FRHIBlendState* blendState = CreateBlendState(descriptor.fragment.colorAttachments);
@@ -1007,8 +1019,8 @@ bool UERHIRenderPipeline::initialize(const RenderPipelineDescriptor& descriptor)
 
   // 4. 填充 PSO 初始化器
   psoInitializer.BoundShaderState.VertexDeclarationRHI = vertexDeclaration;
-  psoInitializer.BoundShaderState.VertexShaderRHI = vertexShader->rhiVertexShader();
-  psoInitializer.BoundShaderState.PixelShaderRHI = pixelShader->rhiPixelShader();
+  psoInitializer.BoundShaderState.VertexShaderRHI = vertexShader;
+  psoInitializer.BoundShaderState.PixelShaderRHI = pixelShader;
   psoInitializer.BlendState = blendState;
   psoInitializer.RasterizerState = rasterizerState;
   psoInitializer.DepthStencilState = depthStencilState;
@@ -2042,7 +2054,7 @@ UERHISampler  ────→ std::shared_ptr + GPU 缓存 ────→ GPU �
 ```
 GPU 资源创建失败 → 返回 nullptr → 上层检查并处理
 RenderPass 开始失败 → beginRenderPass 返回 nullptr
-Shader 编译失败 → createShaderModule 返回 nullptr
+Shader 变体未找到 → ShaderVariantRegistry::Find 返回 nullptr
 Context 锁定失败 → lockContext 返回 nullptr → 跳过本帧渲染
 ```
 
@@ -2190,7 +2202,7 @@ UERHIDevice
   │           ├── creates → UERHITexture
   │           ├── creates → UERHIBuffer
   │           ├── creates → UERHISampler (cached)
-  │           ├── creates → UERHIShaderModule (cached)
+  │           ├── creates → ShaderVariantRegistry (ProgramKey → VariantID lookup)
   │           ├── creates → UERHIRenderPipeline
   │           └── creates → UERHICommandEncoder
   │                          ├── creates → UERHIRenderPass
@@ -2213,7 +2225,7 @@ UERHIDevice
 | `MetalBuffer` | `UERHIBuffer` | FRHIBuffer |
 | `MetalSampler` | `UERHISampler` | FRHISamplerState |
 | `MetalSemaphore` | `UERHISemaphore` | FRHIGPUFence |
-| `MetalShaderModule` | `UERHIShaderModule` | FRHIVertexShader/PixelShader |
+| `MetalShaderModule` | `ShaderVariantRegistry` | UE Global Shader Map (FGlobalShaderMap) |
 | `MetalCaps` | `UERHICaps` | GRHIGlobals |
 
 ## 附录 C: 预估代码量
@@ -2231,7 +2243,7 @@ UERHIDevice
 | UERHIBuffer.h/cpp | ~150 | 缓冲封装 |
 | UERHISampler.h/cpp | ~100 | 采样器封装 |
 | UERHISemaphore.h/cpp | ~100 | 同步原语 |
-| UERHIShaderModule.h/cpp | ~400 | Shader 编译 |
+| ShaderVariantRegistry.h/cpp | ~400 | ProgramKey → VariantID 映射与预编译 Shader 查找 |
 | UERHICaps.h/cpp | ~200 | GPU 能力查询 |
 | UERHITypes.h | ~50 | 类型定义 |
 | **tgfx 侧合计** | **~3,330** | |
@@ -3665,7 +3677,8 @@ Shader 结构相同，只是特性开关不同），而 tgfx 的 Shader 由 Proc
 ### O.5 对设计文档其他章节的影响
 
 1. **第 4 章（UERHIGPU）**：`createShaderModule()` 和 `createRenderPipeline()` 返回 nullptr，
-   新增 `getPrecompiledProgram()` 方法
+   新增 `getPrecompiledProgram()` 方法（从预编译 Shader 构建 Program）和
+   `getShaderMap()` 私有方法（获取 UE Global Shader Map）
 
 2. **第 8 章（UERHIRenderPass）**：`setPipeline()` 调用 `SetGraphicsPipelineState()`，
    `setUniformBuffer()` 调用 `RHI SetShaderUniformBuffer`
