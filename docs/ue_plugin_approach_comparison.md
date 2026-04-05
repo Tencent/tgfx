@@ -1,4 +1,4 @@
-# PAG UE 插件技术方案深度对比评估报告
+# PAG 游戏引擎插件技术方案深度对比评估报告
 
 ## 一、背景与目标
 
@@ -322,7 +322,7 @@ RHI 一次适配即覆盖所有 UE 支持的平台，包括主机平台。
 | 纯 UI 层动效 | 两者均可 | 方案 2 性能更优 |
 | 与 3D 场景深度融合 | **方案 2** | 可访问 UE 深度缓冲，直接共享 RenderTarget |
 | 主机平台 (PS5/Xbox) | **方案 2** | 方案 1 无法访问主机 API |
-| 多引擎项目 (UE + Unity) | 方案 1 | 纹理共享架构可复用到 Unity |
+| 多引擎项目 (UE + Unity) | 混合 | UE 用方案 2，Unity 用纹理共享（详见第十章） |
 
 ---
 
@@ -371,9 +371,9 @@ RHI 一次适配即覆盖所有 UE 支持的平台，包括主机平台。
 
 ### 方案 1 保留价值
 
-方案 1 在以下场景仍有价值：
+方案 1（纹理共享）在以下场景仍有价值：
 
-- PAG 需在 Unity 等其他引擎复用
+- PAG 需在 Unity 引擎中使用（Unity 无 RHI 抽象层，只能采用纹理共享，详见第十章）
 - 团队对原生 GPU API 更熟悉
 - 需要完全独立的 PAG 调试环境
 
@@ -390,3 +390,124 @@ RHI 一次适配即覆盖所有 UE 支持的平台，包括主机平台。
 | 可维护性 | 10% | 6 | **8** | 方案 2 单一适配层 vs 多平台共享机制 |
 | 可扩展性 | 5% | **8** | 6 | 方案 1 可复用到其他引擎 |
 | **加权总分** | **100%** | **6.35** | **9.20** | **方案 2 胜出** |
+
+---
+
+## 十、Unity 引擎适用性分析
+
+### 10.1 核心问题：Unity 能否复制 UE RHI 后端方案？
+
+**结论：不能。** Unity 的渲染插件架构与 UE 有本质差异，无法将 Unity 接口作为 tgfx 的独立渲染后端。
+
+### 10.2 UE RHI vs Unity Native Plugin 接口对比
+
+UE RHI 提供**完整的跨平台渲染抽象层**，一套统一接口覆盖所有平台的 GPU 操作：
+
+| 能力 | UE RHI 接口 |
+|------|------------|
+| 纹理创建 | `RHICreateTexture(FRHITextureCreateDesc)` |
+| Buffer 创建 | `RHICreateBuffer(Size, Usage, Access)` |
+| Shader 创建 | `RHICreateVertexShader(Code, Hash)` |
+| PSO 创建 | `RHICreateGraphicsPipelineState(Initializer)` |
+| RenderPass | `RHIBeginRenderPass` / `RHIEndRenderPass` |
+| 绘制调用 | `RHIDrawPrimitive` / `RHIDrawIndexedPrimitive` |
+| 状态设置 | `RHISetViewport` / `RHISetScissorRect` |
+
+Unity 的 Native Plugin 接口**不提供跨平台抽象层**，只暴露原生 GPU API 对象的句柄：
+
+| Unity 接口 | 暴露内容 | 使用方式 |
+|-----------|---------|---------|
+| `IUnityGraphicsD3D12v7` | `GetDevice()` -> `ID3D12Device*`<br>`GetCommandQueue()` -> `ID3D12CommandQueue*`<br>`CommandRecordingState()` -> `ID3D12GraphicsCommandList*` | 拿到原生 D3D12 对象后，插件自行调用 D3D12 API |
+| `IUnityGraphicsVulkanV2` | `Instance()` -> `VkDevice`, `VkQueue`, `VkInstance`<br>`CommandRecordingState()` -> `VkCommandBuffer` | 拿到原生 Vulkan 对象后，插件自行调用 Vulkan API |
+| `IUnityGraphicsMetal` | `MetalDevice()` -> `id<MTLDevice>` | 拿到原生 Metal 对象后，插件自行调用 Metal API |
+
+**关键差异**：
+
+| 对比维度 | UE RHI | Unity Native Plugin |
+|---------|--------|---------------------|
+| **抽象层级** | 完整的跨平台 RHI 抽象 | 无抽象，直接暴露原生 API 句柄 |
+| **资源创建** | `RHICreateTexture()` 统一接口 | 需调用 `ID3D12Device::CreateCommittedResource()` 等原生 API |
+| **PSO 创建** | `RHICreateGraphicsPipelineState()` 统一接口 | 需调用 `ID3D12Device::CreateGraphicsPipelineState()` 等原生 API |
+| **绘制命令** | `RHIDrawPrimitive()` 统一接口 | 需调用 `ID3D12GraphicsCommandList::DrawInstanced()` 等原生 API |
+| **跨平台** | 写一次代码覆盖所有平台 | 每个 GPU API 需要完全独立的实现 |
+| **可作为 tgfx 后端** | 可以，接口与 tgfx GPU 抽象层同构 | 不可以，缺少统一抽象层 |
+
+### 10.3 Unity 场景下的 PAG 集成方案
+
+由于 Unity 不提供 RHI 抽象层，PAG 在 Unity 中应采用**纹理共享方案**（即 UE 场景下的方案 1）：
+
+```
++----------------------------------------------------------------------------+
+|                          Unity Main Thread                                  |
+|   PAGPlayer::setProgress() -> 触发异步渲染                                  |
++--------------------------------------+-------------------------------------+
+                                       |
++--------------------------------------v-------------------------------------+
+|                     PAG 渲染线程 (独立线程)                                  |
+|  tgfx::Device (D3D12/Vulkan/Metal) -> 绘制到共享纹理 -> Semaphore 信号      |
++---------------+--------------------------+---------------------------------+
+                | 共享纹理                  | Semaphore
++---------------v--------------------------v---------------------------------+
+|                         Unity Render Thread                                 |
+|  CommandBuffer.IssuePluginEvent 回调:                                       |
+|    D3D12: IUnityGraphicsD3D12v7::GetDevice() -> 导入共享纹理                 |
+|    Vulkan: IUnityGraphicsVulkanV2::Instance() -> 导入共享纹理                |
+|    Metal: IUnityGraphicsMetal::MetalDevice() -> 导入共享纹理                 |
+|  -> Texture2D 显示                                                          |
++----------------------------------------------------------------------------+
+```
+
+Unity 的 Native Plugin 回调机制（`IssuePluginEvent`）天然适合纹理共享模式 -- 它的设计目的就是让插件
+在渲染线程中使用原生 GPU API 做自己的事。tgfx 已有（或将有）D3D12/Vulkan/Metal 后端可直接复用。
+
+### 10.4 为什么 Unity 接口不能作为 tgfx 后端
+
+如果尝试将 Unity 接口作为 tgfx 后端，面临以下问题：
+
+1. **无统一抽象层**：Unity 的 `IUnityGraphicsD3D12v7`、`IUnityGraphicsVulkanV2`、
+   `IUnityGraphicsMetal` 是三套完全不同的接口，没有公共基类或统一的资源创建/绘制 API。适配这三套
+   接口实质等于编写三个独立后端（D3D12、Vulkan、Metal），这正是 tgfx 自身已经在做的事。
+
+2. **接口能力有限**：Unity Native Plugin 接口只提供基础的设备句柄和命令列表访问，不提供：
+   - 跨平台的 Shader 创建接口
+   - 跨平台的 PSO 创建接口
+   - 跨平台的资源状态管理
+   - 跨平台的 RenderPass 抽象
+
+3. **回调驱动模型不兼容**：Unity 通过 `IssuePluginEvent` 回调驱动插件渲染，插件无法主动发起渲染，
+   而 tgfx 的后端模型是主动式的（由 tgfx 控制渲染节奏）。
+
+### 10.5 UE 与 Unity 集成策略总结
+
+| | UE 插件 | Unity 插件 |
+|--|--------|-----------|
+| **推荐方案** | UE RHI 后端（方案 2） | 纹理共享（方案 1） |
+| **核心原因** | UE RHI 提供完整跨平台抽象，可作为 tgfx 后端 | Unity 无跨平台抽象，只暴露原生 API 句柄 |
+| **tgfx 后端** | 新增 `UERHI` 一个后端 | 复用已有 D3D12/Vulkan/Metal 后端 |
+| **纹理传递** | 不需要（共享同一 RHI 上下文） | 通过 `IssuePluginEvent` 回调导入共享纹理 |
+| **主机平台** | 支持（UE RHI 封装） | 需单独适配（Unity 有主机平台的 Native Plugin 接口） |
+| **性能** | 最优（零拷贝零同步） | 次优（有跨上下文同步开销） |
+| **代码复用** | UE RHI 后端代码无法复用到 Unity | 纹理共享层 + 原生后端可在两个引擎间复用 |
+
+### 10.6 同时支持 UE 和 Unity 的整体架构
+
+```
+                              libpag
+                                |
+                              tgfx
+                                |
+            +-------------------+-------------------+
+            |                   |                   |
+      UE RHI 后端         D3D12 后端           Vulkan/Metal 后端
+      (方案 2)            (原生)               (原生)
+            |                   |                   |
+       UE 引擎            Unity (D3D12)        Unity (Vulkan/Metal)
+       (直接渲染)          (纹理共享)           (纹理共享)
+```
+
+同时支持两个引擎时，tgfx 的多后端架构发挥最大价值：
+
+- **UE 场景**：使用 UE RHI 后端，获得最优性能
+- **Unity 场景**：复用 D3D12/Vulkan/Metal 原生后端，通过纹理共享集成
+- **共享部分**：libpag 核心逻辑、tgfx 渲染管线、Shader 编译管线完全共用
+- **引擎差异**：仅在集成层（Drawable/Widget）和后端选择上有区别
