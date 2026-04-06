@@ -1121,10 +1121,10 @@ std::string ModularProgramBuilder::GenerateVertexShaderHeader(
   }
 
   // 4. Uniform 声明
-  header += "uniform vec4 u_RTAdjust;\n";
+  header += "uniform vec4 RTAdjust_P0;\n";
   // CoordTransform matrices
   for (int i = 0; i < coordIndex; ++i) {
-    header += "uniform mat3 u_CoordTransformMatrix_" + std::to_string(i) + ";\n";
+    header += "uniform mat3 CoordTransformMatrix_" + std::to_string(i) + "_P0;\n";
   }
 
   return header;
@@ -1161,7 +1161,93 @@ void GP_QuadPerEdgeAA_VS() {
 3. 生成 main() 胶水代码            → 调用 GP 函数 + CoordTransform 计算
 ```
 
-### 5.4 Attribute 声明方式
+### 5.4 GP 输出变量在 FS main() 中的衔接
+
+#### 当前方案的机制
+
+在 ProgramBuilder::emitAndInstallGeoProc() 中，GP 的输出变量名由 `nameExpression()` 分配：
+```cpp
+nameExpression(outputColor, "outputColor");      // → "outputColor_P0"
+nameExpression(outputCoverage, "outputCoverage"); // → "outputCoverage_P0"
+```
+
+GP 的 emitCode() 向这两个变量写入值。然后 FP 链以 `outputColor_P0` 作为 `inputColor`。
+
+#### 模块化方案的衔接方式
+
+在 ModularProgramBuilder 生成的 FS main() 中，GP 的输出需要显式处理：
+
+```glsl
+void main() {
+    // ===== GP 输出 → FP 输入 =====
+    // GP 在 FS 中的代码由 GP 模板文件生成（如 outputColor/outputCoverage 的赋值）
+    // 但模块化方案中，GP 的 FS 逻辑也需要在 main() 中调用
+
+    // 步骤 1: 初始化 GP 输出变量
+    vec4 gpOutputColor;
+    vec4 gpOutputCoverage;
+
+    // 步骤 2: GP 的 FS 逻辑
+    // 不同 GP 类型有不同的 outputColor/outputCoverage 计算方式：
+
+    // QuadPerEdgeAAGP（最常用）：
+    // - 如果 commonColor 有值 → gpOutputColor = Color_P0 (Uniform)
+    // - 否则 → gpOutputColor = v_Color (Varying from VS)
+    // - 如果 AA::Coverage → gpOutputCoverage = vec4(v_Coverage)
+    // - 否则 → gpOutputCoverage = vec4(1.0)
+#ifdef TGFX_GP_HAS_COMMON_COLOR
+    gpOutputColor = Color_P0;
+#else
+    gpOutputColor = v_Color;
+#endif
+#ifdef TGFX_GP_HAS_COVERAGE_AA
+    gpOutputCoverage = vec4(v_Coverage);
+#else
+    gpOutputCoverage = vec4(1.0);
+#endif
+
+    // 步骤 3: FP 链展开（以 gpOutputColor 作为输入）
+    vec4 fp1_result = FP_ConstColor(gpOutputColor, Color_P1);
+
+    // 步骤 4: Coverage FP（如果有）
+    // ...
+
+    // 步骤 5: XP 最终输出
+    fragColor = fp1_result * gpOutputCoverage;
+}
+```
+
+#### GP 类型决定的 FS #define
+
+ModularProgramBuilder 根据 GP 类型和参数生成 `#define`：
+
+```cpp
+std::vector<std::string> ModularProgramBuilder::GenerateGPDefines(
+    const GeometryProcessor* gp) {
+  std::vector<std::string> defines;
+
+  if (auto* quadAA = castTo<QuadPerEdgeAAGeometryProcessor>(gp)) {
+    if (quadAA->commonColor().has_value()) {
+      defines.push_back("#define TGFX_GP_HAS_COMMON_COLOR");
+    }
+    if (quadAA->aaType() == AAType::Coverage) {
+      defines.push_back("#define TGFX_GP_HAS_COVERAGE_AA");
+    }
+    if (quadAA->hasUVCoord()) {
+      defines.push_back("#define TGFX_GP_HAS_UV_COORD");
+    }
+    if (quadAA->hasSubset()) {
+      defines.push_back("#define TGFX_GP_HAS_SUBSET");
+    }
+  }
+  // ... 其他 GP 类型
+  return defines;
+}
+```
+
+这些 `#define` 控制 GP 模板文件中的条件分支（VS 和 FS 都需要），以及 main() 中的 GP 输出衔接。
+
+### 5.5 Attribute 声明方式
 
 Attribute 声明由 ProgramBuilder 根据 GP 的 `vertexAttributes()` 和 `instanceAttributes()` 在生成的 main() 文件头部自动生成：
 
@@ -1172,16 +1258,16 @@ in float coverage;
 in vec4 color;
 ```
 
-### 5.5 Varying 输出与 CoordTransform
+### 5.6 Varying 输出与 CoordTransform
 
 CoordTransform 的 varying 由 ProgramBuilder 在 VS 生成代码中统一处理。对于每个 FP 的每个 CoordTransform，生成：
 
 ```glsl
 // VS:
-uniform mat3 u_CoordTransform_0;
+uniform mat3 CoordTransformMatrix_0_P0;
 out vec2 v_TexCoord_0;        // or vec3 if hasPerspective
 // ...in main():
-v_TexCoord_0 = (u_CoordTransform_0 * vec3(srcCoord, 1.0)).xy;
+v_TexCoord_0 = (CoordTransformMatrix_0_P0 * vec3(srcCoord, 1.0)).xy;
 
 // FS:
 in vec2 v_TexCoord_0;
@@ -1190,7 +1276,7 @@ vec2 coord_0 = v_TexCoord_0;
 vec4 fp0_result = FP_LinearGradientLayout(coord_0);
 ```
 
-### 5.6 其余 8 个 GP 的属性规范
+### 5.7 其余 8 个 GP 的属性规范
 
 以下 GP 的模板文件结构与 QuadPerEdgeAA 和 Default 相同（ProgramBuilder 生成声明，GP 模块文件只含逻辑），
 此处列出每个 GP 的 Attribute/Varying/Uniform 规范，用于 ProgramBuilder 自动生成声明。
@@ -1476,7 +1562,7 @@ tgfx_float4 XP_Empty(tgfx_float4 inputColor, tgfx_float4 inputCoverage) {
 void main() {
     GP_QuadPerEdgeAA_VS(position, color, coverage, u_RTAdjust);
     // CoordTransform outputs:
-    v_TexCoord_0 = (u_CoordTransform_0 * vec3(uvCoord, 1.0)).xy;
+    v_TexCoord_0 = (CoordTransformMatrix_0_P0 * vec3(uvCoord, 1.0)).xy;
 }
 ```
 
@@ -1484,8 +1570,8 @@ void main() {
 
 ```glsl
 // In FS main():
-vec4 fp0_result = FP_TextureEffect_RGB(gpOutputColor, v_TexCoord_0, TextureSampler_0,
-                                        u_Subset_0, vec4(0.0), vec2(0.0));
+vec4 fp0_result = FP_TextureEffect_RGB(gpOutputColor, v_TexCoord_0, TextureSampler_0_P2,
+                                        Subset_P2, vec4(0.0), vec2(0.0));
 ```
 
 #### 7.2.3 ComposeFragmentProcessor → 线性调用链
@@ -1509,11 +1595,11 @@ vec4 colorResult;
 if (t.y < 0.0) {
     colorResult = vec4(0.0);
 } else if (t.x <= 0.0) {
-    colorResult = u_LeftBorderColor;
+    colorResult = LeftBorderColor_P1;
 } else if (t.x >= 1.0) {
-    colorResult = u_RightBorderColor;
+    colorResult = RightBorderColor_P1;
 } else {
-    colorResult = FP_SingleIntervalGradientColorizer(t, u_Start, u_End);
+    colorResult = FP_SingleIntervalGradientColorizer(t, Start_P2, End_P2);
 }
 colorResult.rgb *= colorResult.a;
 colorResult *= gpOutputColor.a;
@@ -1534,8 +1620,8 @@ colorResult *= gpOutputColor.a;
 
 ```glsl
 // GaussianBlur1D(childFP, sigma, direction):
-vec2 blurOffset = u_Step;
-float sigma = u_Sigma;
+vec2 blurOffset = Step_P1;
+float sigma = Sigma_P1;
 int radius = int(ceil(2.0 * sigma));
 vec4 sum = vec4(0.0);
 float total = 0.0;
@@ -1544,7 +1630,7 @@ for (int j = 0; j <= TGFX_BLUR_MAX_SAMPLES; ++j) {
     float weight = exp(-float(i * i) / (2.0 * sigma * sigma));
     total += weight;
     vec4 sample = FP_TextureEffect_RGB(gpOutputColor, v_TexCoord_0 + blurOffset * float(i),
-                                        TextureSampler_0, u_Subset_0,
+                                        TextureSampler_0_P2, Subset_P2,
                                         vec4(0.0), vec2(0.0));
     sum += sample * weight;
     if (i == radius) { break; }
@@ -1556,7 +1642,7 @@ vec4 colorResult = sum / total;
 
 ```glsl
 // Coverage FP chain:
-vec4 coverageResult = FP_AARectEffect(gpOutputCoverage, u_Rect);
+vec4 coverageResult = FP_AARectEffect(gpOutputCoverage, Rect_P4);
 ```
 
 #### 7.2.8 XP → 函数调用或硬件混合
@@ -1703,9 +1789,9 @@ std::string ModularProgramBuilder::ExpandClampedGradient(
   code += "  if (t.y < 0.0) {\n";
   code += "    " + outputVar + " = vec4(0.0);\n";
   code += "  } else if (t.x <= 0.0) {\n";
-  code += "    " + outputVar + " = u_FP" + std::to_string(fpIndex) + "_LeftBorderColor;\n";
+  code += "    " + outputVar + " = LeftBorderColor" + programInfo->getMangledSuffix(clamped) + ";\n";
   code += "  } else if (t.x >= 1.0) {\n";
-  code += "    " + outputVar + " = u_FP" + std::to_string(fpIndex) + "_RightBorderColor;\n";
+  code += "    " + outputVar + " = RightBorderColor" + programInfo->getMangledSuffix(clamped) + ";\n";
   code += "  } else {\n";
 
   // Step 3: Expand colorizer (child[0]) with t as input
@@ -1779,8 +1865,8 @@ std::string ModularProgramBuilder::ExpandGaussianBlur(
   std::string code;
   code += "// GaussianBlur1D (maxSigma=" + std::to_string(maxSigma) + ")\n";
   code += "{\n";
-  code += "  float sigma = u_FP" + std::to_string(blurFpIndex) + "_Sigma;\n";
-  code += "  vec2 step = u_FP" + std::to_string(blurFpIndex) + "_Step;\n";
+  code += "  float sigma = Sigma" + programInfo->getMangledSuffix(blur) + ";\n";
+  code += "  vec2 step = Step" + programInfo->getMangledSuffix(blur) + ";\n";
   code += "  float radius = ceil(2.0 * sigma);\n";
   code += "  vec4 sum = vec4(0.0);\n";
   code += "  float totalWeight = 0.0;\n";
@@ -1841,14 +1927,14 @@ vec4 fp0_result;
   if (t.y < 0.0) {
     fp0_result = vec4(0.0);
   } else if (t.x <= 0.0) {
-    fp0_result = u_FP1_LeftBorderColor;
+    fp0_result = LeftBorderColor_P1;
   } else if (t.x >= 1.0) {
-    fp0_result = u_FP1_RightBorderColor;
+    fp0_result = RightBorderColor_P1;
   } else {
 //     Step 3: ExpandFP(SingleIntervalColorizer, "t", "fp0_result_color", fpIndex=2)
 //       -> ExpandLeafFP(...)
     vec4 fp0_result_color = FP_SingleIntervalColorizer(t,
-                                                         u_FP2_Start, u_FP2_End);
+                                                         Start_P2, End_P2);
     fp0_result_color.rgb *= fp0_result_color.a;
     fp0_result = fp0_result_color * gpOutputColor.a;
   }
@@ -1857,34 +1943,34 @@ vec4 fp0_result;
 
 ### 7.4 Uniform 声明生成规则
 
-新方案中，Uniform 按编号命名，不需要 mangle 后缀：
+新方案中，**保持当前的 mangle 后缀命名（`{Name}_P{N}`）**。ModularProgramBuilder 生成 UBO 声明时，
+必须使用与当前 `emitCode()` 相同的命名（即 `nameVariable()` 返回的名字），确保 `onSetData()` 兼容。
+
+FP 函数的参数名使用通用名（如 `u_Color`），`main()` 胶水代码调用时传入带后缀的实际变量名（如 `Color_P2`）。
 
 ```glsl
 layout(std140) uniform FragmentUniformBlock {
-    vec4  u_FP0_Color;         // ConstColor's color
-    vec4  u_FP1_Subset;        // TextureEffect's subset
-    vec4  u_FP2_Start;         // SingleInterval's start
-    vec4  u_FP2_End;           // SingleInterval's end
-    vec4  u_Cov0_Rect;         // AARectEffect's rect
-    vec2  u_XP_DstUpperLeft;   // PorterDuff dst texture offset
-    vec2  u_XP_DstCoordScale;  // PorterDuff dst texture scale
+    vec4  Color_P1;               // ConstColor (index=1) 的 Color
+    vec4  Subset_P2;              // TextureEffect (index=2) 的 Subset
+    vec4  Start_P3;               // SingleInterval (index=3) 的 Start
+    vec4  End_P3;                 // SingleInterval (index=3) 的 End
+    vec4  Rect_P4;                // AARectEffect (index=4) 的 Rect
+    vec2  DstTextureUpperLeft_P5; // PorterDuff (index=5) dst texture offset
+    vec2  DstTextureCoordScale_P5; // PorterDuff (index=5) dst texture scale
 };
 
 layout(std140) uniform VertexUniformBlock {
-    vec4  u_RTAdjust;
-    mat3  u_CoordTransform_0;
-    mat3  u_CoordTransform_1;
-    mat3  u_GP_Matrix;
-    vec4  u_GP_Color;
+    vec4  RTAdjust_P0;
+    mat3  CoordTransformMatrix_0_P0;
+    mat3  CoordTransformMatrix_1_P0;
+    mat3  Matrix_P0;
+    vec4  Color_P0;
 };
 ```
 
-编号规则：
-- `u_FP{N}_{UniformName}` — 第 N 个 FP 的 Uniform
-- `u_Cov{N}_{UniformName}` — 第 N 个 coverage FP 的 Uniform
-- `u_XP_{UniformName}` — XP 的 Uniform
-- `u_GP_{UniformName}` — GP 的 Uniform
-- `u_CoordTransform_{N}` — 第 N 个 CoordTransform 矩阵
+命名规则：
+- `{UniformName}_P{N}` — 第 N 个 Processor 的 Uniform（N 由 `updateProcessorIndices()` 分配）
+- `CoordTransformMatrix_{I}_P0` — 第 I 个 CoordTransform 矩阵（始终归属于 GP，后缀为 `_P0`）
 
 ### 7.5 #include 列表生成规则
 
@@ -1999,7 +2085,94 @@ index 7: PorterDuffXferProcessor          (XP)
 **注意**：模块化方案保持与现有方案相同的 fpIndex 分配规则和 Uniform 命名后缀，
 以确保 GlobalCache Key 兼容性。
 
-### 7.7 ModularProgramBuilder 完整 API
+### 7.7 CoordTransform 索引映射
+
+#### 索引分配规则
+
+CoordTransform 的全局索引由 `GeometryProcessor::emitTransforms()` 在遍历
+`FPCoordTransformHandler` 时分配（src/gpu/processors/GeometryProcessor.cpp:72-107）。
+
+遍历顺序与 fpIndex 相同（FP 前序遍历），但**只计算拥有 CoordTransform 的 FP**：
+
+```cpp
+// emitTransforms 中的计数器
+int coordTransformIndex = 0;
+while (const CoordTransform* ct = transformHandler->nextCoordTransform()) {
+  // Varying 名: "v_TransformedCoords_" + coordTransformIndex
+  // Uniform 名: "CoordTransformMatrix_" + coordTransformIndex + "_P0" (GP的后缀)
+  coordTransformIndex++;
+}
+```
+
+#### 完整示例
+
+**FP 树**：
+```
+colors[0]: ClampedGradientEffect (无 CoordTransform)
+  ├── [0] SingleIntervalColorizer (无 CoordTransform)
+  └── [1] LinearGradientLayout (有 1 个 CoordTransform)
+coverages[0]: AARectEffect (无 CoordTransform)
+```
+
+**CoordTransform 前序遍历**：
+```
+ClampedGradientEffect → 0 个 CoordTransform → 跳过
+SingleIntervalColorizer → 0 个 → 跳过
+LinearGradientLayout → 1 个 → coordTransformIndex = 0
+AARectEffect → 0 个 → 跳过
+```
+
+**结果**：
+- LinearGradientLayout 的 CoordTransform → `v_TransformedCoords_0`
+- 对应 VS Uniform: `CoordTransformMatrix_0_P0`
+
+#### 多 CoordTransform 示例
+
+**FP 树**（高斯模糊 + 纹理）：
+```
+colors[0]: GaussianBlur1D (无 CoordTransform)
+  └── [0] TextureEffect (有 1 个 CoordTransform → index 0)
+colors[1]: TextureEffect (有 1 个 CoordTransform → index 1)
+```
+
+**结果**：
+- GaussianBlur1D 的子 TextureEffect → `v_TransformedCoords_0`
+- 第二个 TextureEffect → `v_TransformedCoords_1`
+
+#### ModularProgramBuilder 中的映射
+
+ProgramBuilder 在展开 FP 函数调用时，需要传入正确的 CoordTransform varying：
+
+```cpp
+int ModularProgramBuilder::GetCoordTransformIndex(
+    const ProgramInfo* programInfo,
+    const FragmentProcessor* targetFP) {
+  int index = 0;
+  FragmentProcessor::Iter fpIter(programInfo);
+  const FragmentProcessor* fp = fpIter.next();
+  while (fp) {
+    if (fp == targetFP) {
+      return index;  // 返回该 FP 的第一个 CoordTransform 的全局索引
+    }
+    index += fp->numCoordTransforms();
+    fp = fpIter.next();
+  }
+  return -1;  // not found
+}
+```
+
+在 ExpandLeafFP() 中：
+```cpp
+std::string ExpandLeafFP(const FragmentProcessor* fp, ..., int& fpIndex) {
+  int coordIndex = GetCoordTransformIndex(programInfo, fp);
+  std::string coordVar = (coordIndex >= 0)
+      ? "v_TransformedCoords_" + std::to_string(coordIndex)
+      : "vec2(0.0)";  // 无 CoordTransform 的 FP
+  // 生成函数调用时传入 coordVar
+}
+```
+
+### 7.8 ModularProgramBuilder 完整 API
 
 ```cpp
 // ModularProgramBuilder.h
@@ -2056,7 +2229,8 @@ class ModularProgramBuilder {
   static std::string GenerateUniformDeclarations(const ProgramInfo* programInfo);
 
   // 根据单个 Processor 生成其 Uniform 声明
-  static std::string GenerateProcessorUniforms(const Processor* processor, int index);
+  static std::string GenerateProcessorUniforms(const Processor* processor,
+                                                const std::string& mangledSuffix);
 
   // ========== Include 解析 ==========
 
@@ -2172,9 +2346,9 @@ std::shared_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
 }
 ```
 
-### 7.8 完整的生成结果示例
+### 7.9 完整的生成结果示例
 
-#### 7.8.1 管线模板 1：纯色填充
+#### 7.9.1 管线模板 1：纯色填充
 
 **FP 链**: GP(QuadPerEdgeAA) + ConstColor(Ignore) + AARectEffect + PorterDuff(SrcOver)
 
@@ -2194,8 +2368,8 @@ precision mediump float;
 
 // Uniforms
 layout(std140) uniform FragmentUniformBlock {
-    vec4 u_FP0_Color;
-    vec4 u_Cov0_Rect;
+    vec4 Color_P1;
+    vec4 Rect_P2;
 };
 
 // Varyings from VS
@@ -2211,17 +2385,17 @@ void main() {
     vec4 gpOutputCoverage = vec4(v_Coverage);
 
     // Color FP chain
-    vec4 colorResult = FP_ConstColor(gpOutputColor, u_FP0_Color);
+    vec4 colorResult = FP_ConstColor(gpOutputColor, Color_P1);
 
     // Coverage FP chain
-    vec4 coverageResult = FP_AARectEffect(gpOutputCoverage, u_Cov0_Rect);
+    vec4 coverageResult = FP_AARectEffect(gpOutputCoverage, Rect_P2);
 
     // XP
     fragColor = XP_PorterDuff(colorResult, coverageResult, vec4(0.0));
 }
 ```
 
-#### 7.8.2 管线模板 3：线性渐变
+#### 7.9.2 管线模板 3：线性渐变
 
 **FP 链**: GP(Default) + ClampedGradient(LinearGradientLayout, SingleIntervalColorizer) + AARectEffect + PorterDuff(SrcOver)
 
@@ -2240,12 +2414,12 @@ precision mediump float;
 #include "xp/porter_duff_xp.glsl"
 
 layout(std140) uniform FragmentUniformBlock {
-    vec4 u_GP_Color;
-    vec4 u_FP0_LeftBorderColor;
-    vec4 u_FP0_RightBorderColor;
-    vec4 u_FP0_Start;
-    vec4 u_FP0_End;
-    vec4 u_Cov0_Rect;
+    vec4 Color_P0;
+    vec4 LeftBorderColor_P1;
+    vec4 RightBorderColor_P1;
+    vec4 Start_P2;
+    vec4 End_P2;
+    vec4 Rect_P4;
 };
 
 in vec2 v_TexCoord_0;
@@ -2254,7 +2428,7 @@ in float v_Coverage;
 out vec4 fragColor;
 
 void main() {
-    vec4 gpOutputColor = u_GP_Color;
+    vec4 gpOutputColor = Color_P0;
     vec4 gpOutputCoverage = vec4(v_Coverage);
 
     // ClampedGradientEffect (container FP, inlined as control flow)
@@ -2264,24 +2438,24 @@ void main() {
     if (t.y < 0.0) {
         colorResult = vec4(0.0);
     } else if (t.x <= 0.0) {
-        colorResult = u_FP0_LeftBorderColor;
+        colorResult = LeftBorderColor_P1;
     } else if (t.x >= 1.0) {
-        colorResult = u_FP0_RightBorderColor;
+        colorResult = RightBorderColor_P1;
     } else {
-        colorResult = FP_SingleIntervalGradientColorizer(t, u_FP0_Start, u_FP0_End);
+        colorResult = FP_SingleIntervalGradientColorizer(t, Start_P2, End_P2);
     }
     colorResult.rgb *= colorResult.a;
     colorResult *= gpOutputColor.a;
 
     // Coverage
-    vec4 coverageResult = FP_AARectEffect(gpOutputCoverage, u_Cov0_Rect);
+    vec4 coverageResult = FP_AARectEffect(gpOutputCoverage, Rect_P4);
 
     // XP
     fragColor = XP_PorterDuff(colorResult, coverageResult, vec4(0.0));
 }
 ```
 
-#### 7.8.3 管线模板 5：高斯模糊
+#### 7.9.3 管线模板 5：高斯模糊
 
 **FP 链**: GP(Default) + GaussianBlur1D(TextureEffect) + PorterDuff(SrcOver)
 
@@ -2305,12 +2479,12 @@ precision mediump float;
 #include "xp/porter_duff_xp.glsl"
 
 layout(std140) uniform FragmentUniformBlock {
-    vec4 u_GP_Color;
-    float u_FP0_Sigma;
-    vec2 u_FP0_Step;
+    vec4 Color_P0;
+    float Sigma_P1;
+    vec2 Step_P1;
 };
 
-uniform sampler2D TextureSampler_0;
+uniform sampler2D TextureSampler_0_P2;
 
 in vec2 v_TexCoord_0;
 in float v_Coverage;
@@ -2318,12 +2492,12 @@ in float v_Coverage;
 out vec4 fragColor;
 
 void main() {
-    vec4 gpOutputColor = u_GP_Color;
+    vec4 gpOutputColor = Color_P0;
     vec4 gpOutputCoverage = vec4(v_Coverage);
 
     // GaussianBlur1D (container FP, inlined as loop)
-    vec2 blurOffset = u_FP0_Step;
-    float sigma = u_FP0_Sigma;
+    vec2 blurOffset = Step_P1;
+    float sigma = Sigma_P1;
     int radius = int(ceil(2.0 * sigma));
     vec4 sum = vec4(0.0);
     float total = 0.0;
@@ -2333,7 +2507,7 @@ void main() {
         total += weight;
         vec4 blurSample = FP_TextureEffect_RGB(gpOutputColor,
                                                  v_TexCoord_0 + blurOffset * float(i),
-                                                 TextureSampler_0,
+                                                 TextureSampler_0_P2,
                                                  vec4(0.0), vec4(0.0), vec2(0.0));
         sum += blurSample * weight;
         if (i == radius) { break; }
@@ -2570,19 +2744,20 @@ std::string ModularProgramBuilder::ResolveIncludes(const std::string& source) {
 
 ## 9. Uniform 与 Sampler 绑定重构
 
-### 9.1 新的 Uniform 命名约定
+### 9.1 Uniform 命名约定
 
-当前方案：Uniform 名称通过 `nameVariable()` 追加 `_P{index}` 后缀（如 `Color_P1`、`Subset_P2_P0`）。
+**模块化方案保持当前的 mangle 后缀命名（`{Name}_P{N}`）不变**。
 
-新方案：Uniform 按 Processor 编号命名（如 `u_FP0_Color`、`u_FP1_Subset`）。编号在 `ProgramInfo` 构建时确定，与 Processor 在链中的位置一一对应。
+UBO 声明中使用带后缀的名字（如 `Color_P2`），FP 模块函数的参数名使用通用名（如 `u_Color`），
+`main()` 胶水代码调用时传入带后缀的实际变量名。这确保 `onSetData()` 完全不需要修改。
 
 ```
-旧: Color_P1          → 新: u_FP0_Color
-旧: Subset_P2         → 新: u_FP1_Subset
-旧: start_P3          → 新: u_FP2_Start
-旧: end_P3            → 新: u_FP2_End
-旧: Rect_P4           → 新: u_Cov0_Rect
-旧: DstTextureUpperLeft_P5 → 新: u_XP_DstUpperLeft
+Color_P1              — ConstColor (index=1) 的 Color
+Subset_P2             — TextureEffect (index=2) 的 Subset
+Start_P3              — SingleInterval (index=3) 的 Start
+End_P3                — SingleInterval (index=3) 的 End
+Rect_P4               — AARectEffect (index=4) 的 Rect
+DstTextureUpperLeft_P5 — PorterDuff (index=5) 的 DstTextureUpperLeft
 ```
 
 ### 9.2 Uniform Buffer 布局
@@ -2595,30 +2770,127 @@ std::string ModularProgramBuilder::ResolveIncludes(const std::string& source) {
 
 成员顺序由 ProgramBuilder 在遍历 Processor 链时确定，与当前方案保持一致。
 
-### 9.3 Sampler 槽位分配规则
+### 9.3 Sampler 分配与绑定
 
-Sampler 按 FP 链中出现的顺序分配递增的 binding 编号：
+#### Sampler 分配规则
 
+Sampler 的 binding 编号由 `addSampler()` 的调用顺序决定（从 `TEXTURE_BINDING_POINT_START=2`
+开始递增）。调用顺序由 ProgramBuilder 遍历 Processor 链时对 `emitSampler()` 的调用决定。
+
+在模块化方案中，ModularProgramBuilder 需要按**与当前方案完全相同的顺序**收集和声明 Sampler：
+
+```cpp
+struct SamplerInfo {
+  std::string name;       // mangled 名称，如 "TextureSampler_0_P3"
+  UniformFormat format;   // sampler2D / samplerExternalOES / sampler2DRect
+  Swizzle swizzle;        // 采样后的分量重排
+  int binding;            // binding 编号（2, 3, 4, ...）
+};
+
+std::vector<SamplerInfo> ModularProgramBuilder::CollectSamplers(
+    const ProgramInfo* programInfo) {
+  std::vector<SamplerInfo> samplers;
+  int binding = TEXTURE_BINDING_POINT_START;  // = 2
+
+  // 1. GP 的 Sampler（如 AtlasTextGP 有一个 TextureSampler）
+  auto* gp = programInfo->getGeometryProcessor();
+  for (size_t i = 0; i < gp->numTextureSamplers(); i++) {
+    auto texture = gp->textureAt(i);
+    std::string name = "TextureSampler_" + std::to_string(i);
+    name += programInfo->getMangledSuffix(gp);  // "_P0"
+    samplers.push_back({name, GetSamplerFormat(texture), Swizzle::ForRead(texture->format()), binding++});
+  }
+
+  // 2. FP 链的 Sampler（前序遍历）
+  FragmentProcessor::Iter fpIter(programInfo);
+  int samplerIndex = 0;
+  const FragmentProcessor* fp = fpIter.next();
+  while (fp) {
+    for (size_t i = 0; i < fp->numTextureSamplers(); i++) {
+      auto texture = fp->textureAt(i);
+      std::string name = "TextureSampler_" + std::to_string(samplerIndex++);
+      name += programInfo->getMangledSuffix(fp);
+      samplers.push_back({name, GetSamplerFormat(texture), Swizzle::ForRead(texture->format()), binding++});
+    }
+    fp = fpIter.next();
+  }
+
+  // 3. XP 的 Sampler（如 PorterDuff 的 dstTexture）
+  auto* xp = programInfo->getXferProcessor();
+  if (auto dstTextureView = xp->dstTextureView()) {
+    auto texture = dstTextureView->getTexture();
+    std::string name = "DstTextureSampler";
+    name += programInfo->getMangledSuffix(xp);
+    samplers.push_back({name, GetSamplerFormat(texture), Swizzle::ForRead(texture->format()), binding++});
+  }
+
+  return samplers;
+}
 ```
-TextureSampler_0 — binding 2  (第一个 FP 的第一个 texture)
-TextureSampler_1 — binding 3  (第一个 FP 的第二个 texture, e.g. YUV U plane)
-TextureSampler_2 — binding 4  (第二个 FP 的 texture)
-DstTextureSampler — binding 5 (XP 的 dst texture)
+
+#### 纹理类型对应的 Sampler 类型
+
+| TextureType | GLSL 类型 | `#extension` |
+|------------|-----------|-------------|
+| TwoDimensional | `sampler2D` | 无 |
+| External | `samplerExternalOES` | `GL_OES_EGL_image_external_essl3` |
+| Rectangle | `sampler2DRect` | 无 |
+
+在后端适配层 `tgfx_types_glsl.glsl` 中：
+```glsl
+#define TGFX_SAMPLER_2D sampler2D
+// External 和 Rectangle 类型需要在 #extension 启用后使用原始类型名
 ```
+
+#### Sampler 在 FP 函数中的传递
+
+叶子 FP 函数通过参数接收 Sampler：
+```glsl
+// fp/texture_effect_rgb.glsl
+tgfx_float4 FP_TextureEffect_RGB(tgfx_float4 inputColor, tgfx_float2 coord,
+                                   TGFX_SAMPLER_2D s_Texture, ...) {
+    tgfx_float4 color = TGFX_SAMPLE(s_Texture, coord);
+    // ...
+}
+```
+
+main() 胶水代码中传入声明的 Sampler：
+```glsl
+uniform sampler2D TextureSampler_0_P3;  // Sampler 声明
+// ...
+vec4 fp3_result = FP_TextureEffect_RGB(inputColor, v_TransformedCoords_0,
+                                        TextureSampler_0_P3, ...);
+```
+
+#### Swizzle 处理
+
+当前方案中，`appendTextureLookup()` 在纹理采样后追加 Swizzle（如 `.rrra`）。
+模块化方案中，Swizzle 通过 `#define` 在 FP 模块内处理：
+
+```glsl
+// FP 函数内
+tgfx_float4 color = TGFX_SAMPLE(s_Texture, coord);
+#ifdef TGFX_TEXTURE_SWIZZLE
+color = color.TGFX_TEXTURE_SWIZZLE;
+#endif
+```
+
+`TGFX_TEXTURE_SWIZZLE` 由 `GenerateProcessorDefines()` 根据 `Swizzle::ForRead(texture->format())`
+生成，例如 `#define TGFX_TEXTURE_SWIZZLE rrra`（alpha-only 纹理）。
 
 ### 9.4 运行时 setData 适配
 
-`onSetData()` 的实现不变，仍然通过名称字符串设置 Uniform 值。但名称从 mangled 名改为编号名：
+`onSetData()` 的实现**完全不变**。每个 Processor 仍然通过 base name（如 `"Color"`）设置 Uniform 值，
+框架通过 `nameSuffix`（如 `"_P1"`）自动拼接完整名称：
 
 ```cpp
-// Before (mangled):
-fragmentUniformData->setData("Color_P1", color);
-
-// After (numbered):
-fragmentUniformData->setData("u_FP0_Color", color);
+// Processor 的 onSetData()（无需修改）:
+fragmentUniformData->setData("Color", color);
+// 框架自动拼接 "Color" + "_P1" = "Color_P1"，查找 UBO 中的 Color_P1 字段
 ```
 
-ProgramInfo 在 `setUniformsAndSamplers()` 中根据 Processor 编号自动添加前缀，FP 的 `onSetData()` 仍然只写 base name（如 `"Color"`），前缀由框架添加。
+这得益于保持 mangle 后缀命名不变的决策：UBO 中的字段名（如 `Color_P1`）与
+`onSetData()` 拼接出的名字完全一致。
 
 ### 9.5 Uniform 名称绑定的完整机制
 
@@ -2688,23 +2960,23 @@ std::string ModularProgramBuilder::GenerateUniformDeclarations(
     const ProgramInfo* programInfo) {
   std::string decl;
   // 遍历所有 Processor（与 updateProcessorIndices 相同的顺序）
-  int index = 0;
   // GP uniforms
   auto* gp = programInfo->getGeometryProcessor();
-  decl += generateProcessorUniforms(gp, index++);
+  decl += generateProcessorUniforms(gp, programInfo->getMangledSuffix(gp));
 
   // FP uniforms（前序遍历）
   for (size_t i = 0; i < programInfo->numFragmentProcessors(); ++i) {
     FragmentProcessor::Iter iter(programInfo->getFragmentProcessor(i));
     const FragmentProcessor* fp = iter.next();
     while (fp) {
-      decl += generateProcessorUniforms(fp, index++);
+      decl += generateProcessorUniforms(fp, programInfo->getMangledSuffix(fp));
       fp = iter.next();
     }
   }
 
   // XP uniforms
-  decl += generateProcessorUniforms(programInfo->getXferProcessor(), index++);
+  auto* xp = programInfo->getXferProcessor();
+  decl += generateProcessorUniforms(xp, programInfo->getMangledSuffix(xp));
   return decl;
 }
 ```
@@ -2790,8 +3062,8 @@ vec4 constColorResult = FP_ConstColor(gpOutputColor, Color_P2);
 | `src/gpu/ProgramBuilder.cpp` | 保留向后兼容的 emitCode 路径 |
 | `src/gpu/ProgramInfo.h` | 新增 `generateModularShader()` 入口 |
 | `src/gpu/ProgramInfo.cpp` | 增加模块化路径的 program 创建逻辑 |
-| `src/gpu/UniformHandler.h` | 支持新的编号命名约定 |
-| `src/gpu/UniformHandler.cpp` | 生成 `u_FP{N}_` 前缀 |
+| `src/gpu/UniformHandler.h` | 保持现有 mangle 后缀命名，无需修改 |
+| `src/gpu/UniformHandler.cpp` | 保持现有 `nameVariable()` 逻辑，无需修改 |
 | `src/gpu/processors/FragmentProcessor.h` | 每个 FP 子类新增 `shaderModulePath()` 方法 |
 | `src/gpu/processors/TextureEffect.h` | 新增 `shaderModulePath()` |
 | `src/gpu/processors/ConstColorProcessor.h` | 新增 `shaderModulePath()` |
