@@ -1783,9 +1783,276 @@ if (hasAdvancedBlend) {
 }
 ```
 
-### 7.6 完整的生成结果示例
+### 7.6 fpIndex 分配规则
 
-#### 7.6.1 管线模板 1：纯色填充
+tgfx 的 `ProgramInfo::updateProcessorIndices()` 对所有 Processor 分配全局索引。
+索引决定了 Uniform 名称后缀和变量名后缀。
+
+#### 分配算法
+
+```cpp
+// ProgramInfo::updateProcessorIndices() (src/gpu/ProgramInfo.cpp:39-51)
+void ProgramInfo::updateProcessorIndices() {
+  int index = 0;
+  processorIndices[geometryProcessor] = index++;          // GP = 0
+  for (auto& fragmentProcessor : fragmentProcessors) {
+    FragmentProcessor::Iter iter(fragmentProcessor);      // 前序遍历
+    const FragmentProcessor* fp = iter.next();
+    while (fp) {
+      processorIndices[fp] = index++;                     // 每个 FP 节点一个索引
+      fp = iter.next();
+    }
+  }
+  processorIndices[getXferProcessor()] = index++;          // XP = 最后
+}
+```
+
+`FragmentProcessor::Iter::next()` 实现前序遍历（DFS pre-order）：
+```cpp
+const FragmentProcessor* FragmentProcessor::Iter::next() {
+  if (fpStack.empty()) return nullptr;
+  const FragmentProcessor* back = fpStack.back();
+  fpStack.pop_back();
+  // 子 FP 逆序压栈，使第一个子 FP 在栈顶（下次先弹出）
+  for (size_t i = 0; i < back->numChildProcessors(); ++i) {
+    fpStack.push_back(back->childProcessor(back->numChildProcessors() - i - 1));
+  }
+  return back;
+}
+```
+
+#### 完整示例：线性渐变 + AARectEffect 覆盖
+
+**FP 树结构**：
+```
+ProgramInfo:
+  GP: QuadPerEdgeAAGeometryProcessor
+  colors[0]: ClampedGradientEffect
+    ├── childProcessors[0]: SingleIntervalGradientColorizer
+    └── childProcessors[1]: LinearGradientLayout
+  coverages[0]: AARectEffect
+  XP: PorterDuffXferProcessor
+```
+
+**前序遍历索引分配**：
+```
+index 0: QuadPerEdgeAAGeometryProcessor (GP)
+index 1: ClampedGradientEffect          (colors[0], 容器 FP)
+index 2: SingleIntervalGradientColorizer (colors[0].child[0])
+index 3: LinearGradientLayout            (colors[0].child[1])
+index 4: AARectEffect                    (coverages[0])
+index 5: PorterDuffXferProcessor         (XP)
+```
+
+#### 3 层嵌套示例：混合模式 + 渐变
+
+**FP 树**：
+```
+colors[0]: XfermodeFragmentProcessor (blend two sources)
+  ├── childProcessors[0]: ClampedGradientEffect (source: gradient)
+  │   ├── childProcessors[0]: DualIntervalGradientColorizer
+  │   └── childProcessors[1]: RadialGradientLayout
+  └── childProcessors[1]: TextureEffect (destination: texture)
+coverages[0]: AARectEffect
+```
+
+**前序遍历索引分配**：
+```
+index 0: GP
+index 1: XfermodeFragmentProcessor        (colors[0])
+index 2: ClampedGradientEffect            (colors[0].child[0])
+index 3: DualIntervalGradientColorizer    (colors[0].child[0].child[0])
+index 4: RadialGradientLayout             (colors[0].child[0].child[1])
+index 5: TextureEffect                    (colors[0].child[1])
+index 6: AARectEffect                     (coverages[0])
+index 7: PorterDuffXferProcessor          (XP)
+```
+
+#### 在模块化方案中的映射
+
+新方案中，fpIndex 直接决定 Uniform 名称前缀：
+- index 1 的 Processor 的 Uniform 后缀为 `_P1`（如 `LeftBorderColor_P1`）
+- index 3 的 Processor 的 Uniform 后缀为 `_P3`（如 `Start_P3`）
+
+**注意**：模块化方案保持与现有方案相同的 fpIndex 分配规则和 Uniform 命名后缀，
+以确保 GlobalCache Key 兼容性。
+
+### 7.7 ModularProgramBuilder 完整 API
+
+```cpp
+// ModularProgramBuilder.h
+class ModularProgramBuilder {
+ public:
+  // 从 ProgramInfo 生成完整的 Vertex Shader 和 Fragment Shader 源码
+  struct ShaderOutput {
+    std::string vertexShader;    // 完整的 VS GLSL 源码
+    std::string fragmentShader;  // 完整的 FS GLSL 源码
+  };
+
+  static ShaderOutput GenerateShaders(Context* context, const ProgramInfo* programInfo);
+
+ private:
+  // ========== Vertex Shader 生成 ==========
+
+  // 生成 VS 的头部（#version, attribute/varying/uniform 声明）
+  static std::string GenerateVertexShaderHeader(Context* context,
+                                                 const ProgramInfo* programInfo);
+
+  // 选择 GP 模板文件路径
+  static std::string SelectGPModule(const GeometryProcessor* gp);
+
+  // 生成 VS 的 main() 函数体（CoordTransform 计算 + GP 函数调用）
+  static std::string GenerateVertexMain(const ProgramInfo* programInfo);
+
+  // ========== Fragment Shader 生成 ==========
+
+  // 生成 FS 的头部（#version, varying/uniform 声明）
+  static std::string GenerateFragmentShaderHeader(Context* context,
+                                                   const ProgramInfo* programInfo);
+
+  // 生成所有 FP 模块的 #define 列表
+  static std::vector<std::string> GenerateAllDefines(Context* context,
+                                                      const ProgramInfo* programInfo);
+
+  // 收集需要 #include 的 FP 模块路径列表
+  static std::vector<std::string> CollectModulePaths(const ProgramInfo* programInfo);
+
+  // 生成 FS 的 main() 函数体（FP 链展开 + XP 调用）
+  static std::string GenerateFragmentMain(const ProgramInfo* programInfo);
+
+  // ========== FP 展开 ==========
+
+  // 递归展开 FP 到 GLSL 代码（详见 7.3 节）
+  static std::string ExpandFP(const FragmentProcessor* fp,
+                               const std::string& inputVar,
+                               const std::string& outputVar,
+                               int& fpIndex);
+
+  // ========== Uniform 声明 ==========
+
+  // 根据 FP 树生成 Uniform 声明块
+  static std::string GenerateUniformDeclarations(const ProgramInfo* programInfo);
+
+  // 根据单个 Processor 生成其 Uniform 声明
+  static std::string GenerateProcessorUniforms(const Processor* processor, int index);
+
+  // ========== Include 解析 ==========
+
+  // 将 #include 指令替换为实际文本
+  static std::string ResolveIncludes(const std::string& source);
+
+  // ========== 辅助 ==========
+
+  // 为单个 FP 生成 #define 宏列表
+  static std::vector<std::string> GenerateProcessorDefines(const FragmentProcessor* fp,
+                                                             int fpIndex);
+
+  // 选择 FP 模块文件路径
+  static std::string SelectFPModule(const FragmentProcessor* fp);
+};
+```
+
+#### GenerateShaders() 完整流程
+
+```cpp
+ModularProgramBuilder::ShaderOutput ModularProgramBuilder::GenerateShaders(
+    Context* context, const ProgramInfo* programInfo) {
+  ShaderOutput output;
+
+  // ===== Vertex Shader =====
+  std::string vs;
+  vs += GenerateVertexShaderHeader(context, programInfo);
+  vs += "\n";
+  // Include GP 模板文件
+  auto gpModulePath = SelectGPModule(programInfo->getGeometryProcessor());
+  auto gpModuleText = ShaderModuleRegistry::GetModuleText(gpModulePath);
+  if (gpModuleText) vs += *gpModuleText;
+  vs += "\n";
+  vs += GenerateVertexMain(programInfo);
+  output.vertexShader = ResolveIncludes(vs);
+
+  // ===== Fragment Shader =====
+  std::string fs;
+  fs += GenerateFragmentShaderHeader(context, programInfo);
+  fs += "\n";
+
+  // #define 列表
+  auto defines = GenerateAllDefines(context, programInfo);
+  for (const auto& def : defines) {
+    fs += def + "\n";
+  }
+  fs += "\n";
+
+  // #include FP 模块
+  auto modulePaths = CollectModulePaths(programInfo);
+  for (const auto& path : modulePaths) {
+    auto moduleText = ShaderModuleRegistry::GetModuleText(path);
+    if (moduleText) fs += *moduleText + "\n";
+  }
+
+  // Include 公共模块（blend 函数等）
+  auto blendText = ShaderModuleRegistry::GetModuleText("tgfx_blend.glsl");
+  if (blendText) fs += *blendText + "\n";
+
+  // Uniform 声明
+  fs += GenerateUniformDeclarations(programInfo);
+  fs += "\n";
+
+  // main() 函数体
+  fs += GenerateFragmentMain(programInfo);
+
+  output.fragmentShader = ResolveIncludes(fs);
+  return output;
+}
+```
+
+#### 与现有 ProgramBuilder 的集成
+
+```cpp
+// ProgramBuilder.cpp (修改后)
+std::shared_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
+                                                       const ProgramInfo* programInfo) {
+  // 优先尝试模块化路径
+  if (ShaderModuleRegistry::IsInitialized()) {
+    auto shaders = ModularProgramBuilder::GenerateShaders(context, programInfo);
+    if (!shaders.vertexShader.empty() && !shaders.fragmentShader.empty()) {
+      auto gpu = context->gpu();
+      ShaderModuleDescriptor vsDesc{shaders.vertexShader, ShaderStage::Vertex};
+      auto vs = gpu->createShaderModule(vsDesc);
+      ShaderModuleDescriptor fsDesc{shaders.fragmentShader, ShaderStage::Fragment};
+      auto fs = gpu->createShaderModule(fsDesc);
+      if (vs && fs) {
+        // 构建 RenderPipelineDescriptor（与现有逻辑相同）
+        RenderPipelineDescriptor desc;
+        // ... vertex layout, color attachment, blend state ...
+        desc.vertex.module = vs;
+        desc.fragment.module = fs;
+        auto pipeline = gpu->createRenderPipeline(desc);
+        if (pipeline) {
+          // UniformData 仍由 UniformHandler 在 emitAndInstallProcessors 中创建
+          // 但模块化路径不调用 emitAndInstallProcessors
+          // 需要单独创建 UniformData
+          auto vertexUniformData = CreateUniformDataFromProgramInfo(programInfo, ShaderStage::Vertex);
+          auto fragmentUniformData = CreateUniformDataFromProgramInfo(programInfo, ShaderStage::Fragment);
+          return std::make_shared<Program>(pipeline, std::move(vertexUniformData),
+                                           std::move(fragmentUniformData));
+        }
+      }
+    }
+  }
+
+  // Fallback 到旧路径
+  GLSLProgramBuilder builder(context, programInfo);
+  if (!builder.emitAndInstallProcessors()) {
+    return nullptr;
+  }
+  return builder.finalize();
+}
+```
+
+### 7.8 完整的生成结果示例
+
+#### 7.8.1 管线模板 1：纯色填充
 
 **FP 链**: GP(QuadPerEdgeAA) + ConstColor(Ignore) + AARectEffect + PorterDuff(SrcOver)
 
@@ -1832,7 +2099,7 @@ void main() {
 }
 ```
 
-#### 7.6.2 管线模板 3：线性渐变
+#### 7.8.2 管线模板 3：线性渐变
 
 **FP 链**: GP(Default) + ClampedGradient(LinearGradientLayout, SingleIntervalColorizer) + AARectEffect + PorterDuff(SrcOver)
 
@@ -1892,7 +2159,7 @@ void main() {
 }
 ```
 
-#### 7.6.3 管线模板 5：高斯模糊
+#### 7.8.3 管线模板 5：高斯模糊
 
 **FP 链**: GP(Default) + GaussianBlur1D(TextureEffect) + PorterDuff(SrcOver)
 
@@ -2230,6 +2497,110 @@ fragmentUniformData->setData("u_FP0_Color", color);
 ```
 
 ProgramInfo 在 `setUniformsAndSamplers()` 中根据 Processor 编号自动添加前缀，FP 的 `onSetData()` 仍然只写 base name（如 `"Color"`），前缀由框架添加。
+
+### 9.5 Uniform 名称绑定的完整机制
+
+#### 当前机制（保持不变）
+
+tgfx 的 Uniform 命名使用**后缀 mangle** 机制：
+
+1. **Shader 编译时**：`UniformHandler::addUniform("Color", Float4, Fragment)` 返回 mangled 名称 `"Color_P2"`
+   - 后缀 `_P2` 来自 `ProgramBuilder::nameVariable()`，由当前 Processor 的全局索引决定
+   - Shader 代码中的 Uniform 声明为 `uniform vec4 Color_P2;`
+
+2. **Shader 运行时**：Processor 的 `onSetData()` 调用 `uniformData->setData("Color", value)`
+   - UniformData 内部拼接 `"Color" + nameSuffix`（当前为 `"_P2"`）
+   - 通过 `fieldMap` 查找 `"Color_P2"` 对应的 offset，写入 UBO buffer
+   - `nameSuffix` 由 `ProgramInfo::updateUniformDataSuffix()` 在遍历 Processor 前设置
+
+3. **nameSuffix 设置流程**（src/gpu/ProgramInfo.cpp:232-276）：
+   ```cpp
+   void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* program) const {
+     // 设置 GP 的 nameSuffix
+     updateUniformDataSuffix(vertexUniformData, fragmentUniformData, geometryProcessor);
+     geometryProcessor->setData(vertexUniformData, fragmentUniformData, ...);
+
+     // 遍历 FP，每个 FP 设置自己的 nameSuffix
+     for (auto& fp : fragmentProcessors) {
+       FragmentProcessor::Iter iter(fp);
+       const FragmentProcessor* current = iter.next();
+       while (current) {
+         updateUniformDataSuffix(vertexUniformData, fragmentUniformData, current);
+         current->setData(vertexUniformData, fragmentUniformData);
+         current = iter.next();
+       }
+     }
+
+     // 设置 XP 的 nameSuffix
+     updateUniformDataSuffix(vertexUniformData, fragmentUniformData, getXferProcessor());
+     getXferProcessor()->setData(vertexUniformData, fragmentUniformData);
+
+     // 清空 nameSuffix
+     updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
+   }
+
+   void ProgramInfo::updateUniformDataSuffix(UniformData* vud, UniformData* fud,
+                                              const Processor* processor) const {
+     auto suffix = getMangledSuffix(processor);  // "_P{index}" 或 ""
+     if (vud) vud->nameSuffix = suffix;
+     if (fud) fud->nameSuffix = suffix;
+   }
+   ```
+
+#### 模块化方案中的适配
+
+**关键决策：保持 Uniform 名称后缀机制不变**。
+
+理由：
+- 保持与 GlobalCache Key 的兼容性
+- 保持 `onSetData()` 的调用方式不变（Processor 代码无需修改）
+- 仅改变 Shader 代码的**来源**（从 emitCode() 字符串拼接改为 .glsl 模块文件 + main() 胶水代码），
+  Uniform 声明和命名规则不变
+
+**模块化方案中的 Uniform 声明**：
+
+ProgramBuilder 在生成 main() 胶水代码时，根据 FP 树遍历的顺序生成 Uniform 声明：
+
+```cpp
+std::string ModularProgramBuilder::GenerateUniformDeclarations(
+    const ProgramInfo* programInfo) {
+  std::string decl;
+  // 遍历所有 Processor（与 updateProcessorIndices 相同的顺序）
+  int index = 0;
+  // GP uniforms
+  auto* gp = programInfo->getGeometryProcessor();
+  decl += generateProcessorUniforms(gp, index++);
+
+  // FP uniforms（前序遍历）
+  for (size_t i = 0; i < programInfo->numFragmentProcessors(); ++i) {
+    FragmentProcessor::Iter iter(programInfo->getFragmentProcessor(i));
+    const FragmentProcessor* fp = iter.next();
+    while (fp) {
+      decl += generateProcessorUniforms(fp, index++);
+      fp = iter.next();
+    }
+  }
+
+  // XP uniforms
+  decl += generateProcessorUniforms(programInfo->getXferProcessor(), index++);
+  return decl;
+}
+```
+
+**Processor 模块函数中的 Uniform 参数**：
+
+叶子 FP 的函数接收的 Uniform 参数名不包含后缀（如 `u_Color`），调用时传入带后缀的实际 Uniform
+变量名（如 `Color_P2`）。这通过 main() 胶水代码的参数传递实现：
+
+```glsl
+// Shader 中的 Uniform 声明（由 ProgramBuilder 生成）
+uniform vec4 Color_P2;
+
+// main() 中调用 FP 函数
+vec4 constColorResult = FP_ConstColor(gpOutputColor, Color_P2);
+//                                                   ^^^^^^^^
+//                                    传入带后缀的实际 Uniform 名
+```
 
 ---
 
