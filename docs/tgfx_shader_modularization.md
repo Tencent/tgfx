@@ -1190,6 +1190,128 @@ vec2 coord_0 = v_TexCoord_0;
 vec4 fp0_result = FP_LinearGradientLayout(coord_0);
 ```
 
+### 5.6 其余 8 个 GP 的属性规范
+
+以下 GP 的模板文件结构与 QuadPerEdgeAA 和 Default 相同（ProgramBuilder 生成声明，GP 模块文件只含逻辑），
+此处列出每个 GP 的 Attribute/Varying/Uniform 规范，用于 ProgramBuilder 自动生成声明。
+
+#### EllipseGeometryProcessor
+
+| 类型 | 名称 | GLSL 类型 | 条件 |
+|------|------|----------|------|
+| Attribute | inPosition | Float2 | 必有 |
+| Attribute | inColor | Float4 | 仅当 !commonColor |
+| Attribute | inEllipseOffset | Float2 | 必有 |
+| Attribute | inEllipseRadii | Float4 | 必有 |
+| Varying | EllipseOffsets | Float2 | 必有 |
+| Varying | EllipseRadii | Float4 | 必有 |
+| Varying | Color | Float4 | 仅当 !commonColor |
+| Uniform | Color | Float4 (FS) | 仅当 commonColor |
+| 特性 | stroke 模式 | 影响 FS 计算 | 编译期 #define |
+| OutputColor | Uniform 或 Varying | |
+| OutputCoverage | 椭圆 SDF + 梯度抗锯齿 | |
+
+#### RoundStrokeRectGeometryProcessor
+
+| 类型 | 名称 | GLSL 类型 | 条件 |
+|------|------|----------|------|
+| Attribute | inPosition | Float2 | 必有 |
+| Attribute | inCoverage | Float | 必有 |
+| Attribute | inEllipseOffset | Float2 | 必有 |
+| Attribute | inEllipseRadii | Float2 | 必有 |
+| Attribute | inUVCoord | Float2 | 可选 |
+| Attribute | inColor | Float4 | 仅当 !commonColor |
+| Varying | Coverage | Float | 仅当 AA::Coverage |
+| Varying | EllipseRadii | Float2 | 仅当 AA::Coverage |
+| Varying | EllipseOffsets | Float2 | 必有 |
+| Varying | Color | Float4 | 仅当 !commonColor |
+| Uniform | Color | Float4 (FS) | 仅当 commonColor |
+| OutputCoverage | Coverage varying × 椭圆 SDF | |
+
+#### AtlasTextGeometryProcessor
+
+| 类型 | 名称 | GLSL 类型 | 条件 |
+|------|------|----------|------|
+| Attribute | position | Float2 | 必有 |
+| Attribute | coverage | Float | 可选 |
+| Attribute | maskCoord | Float2 | 必有 |
+| Attribute | color | Float4 | 仅当 !commonColor |
+| Varying | textureCoords | Float2 | 必有 |
+| Varying | Coverage | Float | 仅当 AA::Coverage |
+| Varying | Color | Float4 | 仅当 !commonColor |
+| Uniform | atlasSizeInv | Float2 (VS) | 必有 |
+| Uniform | Color | Float4 (FS) | 仅当 commonColor |
+| Sampler | TextureSampler | - | 必有 |
+| 特性 | alphaOnly 纹理 | 影响 FS coverage 输出 | |
+
+#### MeshGeometryProcessor
+
+| 类型 | 名称 | GLSL 类型 | 条件 |
+|------|------|----------|------|
+| Attribute | position | Float2 | 必有 |
+| Attribute | texCoord | Float2 | 仅当 hasTexCoords |
+| Attribute | color | Float4 | 仅当 hasColors |
+| Attribute | coverage | Float | 仅当 hasCoverage |
+| Varying | TexCoord | Float2 | 仅当 hasTexCoords |
+| Varying | Color | Float4 | 仅当 hasColors |
+| Varying | Coverage | Float | 仅当 hasCoverage |
+| Uniform | Matrix | Float3x3 (VS) | 必有 |
+| Uniform | Color | Float4 (FS) | 仅当 !hasColors |
+
+#### NonAARRectGeometryProcessor
+
+| 类型 | 名称 | GLSL 类型 | 条件 |
+|------|------|----------|------|
+| Attribute | inPosition | Float2 | 必有 |
+| Attribute | inLocalCoord | Float2 | 必有 |
+| Attribute | inRadii | Float2 | 必有 |
+| Attribute | inRectBounds | Float4 | 必有 |
+| Attribute | inColor | UByte4Norm | 仅当 !commonColor |
+| Attribute | inStrokeWidth | Float2 | 仅当 stroke |
+| Varying | localCoord, radii, rectBounds | Float2/Float4 | 必有 |
+| Varying | strokeWidth | Float2 | 仅当 stroke |
+| Varying | Color | Float4 | 仅当 !commonColor |
+| Uniform | Color | Float4 (FS) | 仅当 commonColor |
+| OutputCoverage | 圆角矩形 SDF + stroke 内圈 | |
+
+#### HairlineLineGeometryProcessor
+
+| 类型 | 名称 | GLSL 类型 | 条件 |
+|------|------|----------|------|
+| Attribute | position | Float2 | 必有 |
+| Attribute | edgeDistance | Float | 必有 |
+| Varying | EdgeDistance | Float | 必有 |
+| Uniform | Matrix | Float3x3 (VS) | 必有 |
+| Uniform | Color | Float4 (FS) | 必有 |
+| Uniform | Coverage | Float (FS) | 必有 |
+| OutputCoverage | Coverage × abs(EdgeDistance) | |
+
+#### HairlineQuadGeometryProcessor
+
+| 类型 | 名称 | GLSL 类型 | 条件 |
+|------|------|----------|------|
+| Attribute | position | Float2 | 必有 |
+| Attribute | hairQuadEdge | Float4 | 必有 |
+| Varying | HairQuadEdge | Float4 | 必有 |
+| Uniform | Matrix | Float3x3 (VS) | 必有 |
+| Uniform | Color | Float4 (FS) | 必有 |
+| Uniform | Coverage | Float (FS) | 必有 |
+| OutputCoverage | Coverage × Loop-Blinn 隐函数 | dFdx/dFdy |
+
+#### ShapeInstancedGeometryProcessor
+
+| 类型 | 名称 | GLSL 类型 | 条件 |
+|------|------|----------|------|
+| Attribute | position | Float2 | 必有 |
+| Attribute | coverage | Float | 仅当 AA::Coverage |
+| Attribute | offset | Float2 | 必有（实例偏移）|
+| Attribute | instanceColor | Float4 | 仅当 hasColors |
+| Varying | Coverage | Float | 仅当 AA::Coverage |
+| Varying | InstanceColor | Float4 | 仅当 hasColors |
+| Uniform | UVMatrix | Float3x3 (VS) | 必有 |
+| Uniform | ViewMatrix | Float3x3 (VS) | 必有 |
+| 特性 | 双矩阵变换 | UVMatrix(局部) + ViewMatrix(设备) | |
+
 ---
 
 ## 6. XP 处理
