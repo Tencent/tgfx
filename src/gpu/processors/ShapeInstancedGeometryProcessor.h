@@ -52,5 +52,7 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
   bool hasColors = false;
   Matrix uvMatrix = {};
   Matrix viewMatrix = {};
+
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

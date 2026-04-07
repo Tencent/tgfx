@@ -18,11 +18,23 @@
 
 #include "ModularProgramBuilder.h"
 #include "gpu/glsl/GLSLBlend.h"
+#include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ConstColorProcessor.h"
+#include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/EllipseGeometryProcessor.h"
+#include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
+#include "gpu/processors/HairlineLineGeometryProcessor.h"
+#include "gpu/processors/HairlineQuadGeometryProcessor.h"
+#include "gpu/processors/MeshGeometryProcessor.h"
+#include "gpu/processors/NonAARRectGeometryProcessor.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
+#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
+#include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
@@ -68,9 +80,8 @@ ModularProgramBuilder::ModularProgramBuilder(Context* context, const ProgramInfo
 }
 
 bool ModularProgramBuilder::CanUseModularPath(const ProgramInfo* programInfo) {
-  // All fragment processors are now supported by the modular builder (either via modular .glsl
-  // modules for leaf FPs, or via legacy emitCode() fallback for containers and complex FPs).
-  // GP and XP use the same emitCode() paths as the legacy builder.
+  // All processors are now supported by the modular builder: leaf FPs via modular .glsl modules,
+  // container/complex FPs via legacy emitCode() fallback, and GP/XP via explicit dispatch overrides.
   (void)programInfo;
   return true;
 }
@@ -78,11 +89,11 @@ bool ModularProgramBuilder::CanUseModularPath(const ProgramInfo* programInfo) {
 bool ModularProgramBuilder::emitAndInstallProcessors() {
   std::string inputColor;
   std::string inputCoverage;
-  // Reuse GP emission from parent (unchanged).
+  // GP emission via override with explicit dispatch.
   emitAndInstallGeoProc(&inputColor, &inputCoverage);
-  // Use modular FP emission (new code).
+  // FP emission via modular path.
   emitModularFragProcessors(&inputColor, &inputCoverage);
-  // Reuse XP emission from parent (unchanged).
+  // XP emission via override with explicit dispatch.
   emitAndInstallXferProc(inputColor, inputCoverage);
   emitFSOutputSwizzle();
   return checkSamplerCounts();
@@ -921,8 +932,8 @@ void ModularProgramBuilder::emitTiledTextureEffect(const FragmentProcessor* proc
 // ---- Helper: compute child coordVarsIdx offset ----
 
 size_t ModularProgramBuilder::childCoordVarsOffset(const FragmentProcessor* parent,
-                                                    size_t parentCoordVarsIdx,
-                                                    size_t childIndex) const {
+                                                   size_t parentCoordVarsIdx,
+                                                   size_t childIndex) const {
   size_t offset = parentCoordVarsIdx;
   // Skip parent's own coord transforms.
   offset += parent->numCoordTransforms();
@@ -942,6 +953,22 @@ size_t ModularProgramBuilder::childCoordVarsOffset(const FragmentProcessor* pare
 // fallback branch while preserving the proven emitCode()/emitChild() mechanism.
 
 void ModularProgramBuilder::emitComposeFragmentProcessor(const FragmentProcessor* processor,
+                                                         size_t transformedCoordVarsIdx,
+                                                         const std::string& input,
+                                                         const std::string& output) {
+  FragmentProcessor::TransformedCoordVars coords(
+      processor, transformedCoordVarsIdx < transformedCoordVars.size()
+                     ? &transformedCoordVars[transformedCoordVarsIdx]
+                     : nullptr);
+  FragmentProcessor::TextureSamplers textureSamplers(
+      processor, currentTexSamplers.empty() ? nullptr : &currentTexSamplers[0]);
+  FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output,
+                                   input.empty() ? "vec4(1.0)" : input, subsetVarName, &coords,
+                                   &textureSamplers);
+  processor->emitCode(args);
+}
+
+void ModularProgramBuilder::emitXfermodeFragmentProcessor(const FragmentProcessor* processor,
                                                           size_t transformedCoordVarsIdx,
                                                           const std::string& input,
                                                           const std::string& output) {
@@ -957,25 +984,10 @@ void ModularProgramBuilder::emitComposeFragmentProcessor(const FragmentProcessor
   processor->emitCode(args);
 }
 
-void ModularProgramBuilder::emitXfermodeFragmentProcessor(const FragmentProcessor* processor,
-                                                           size_t transformedCoordVarsIdx,
-                                                           const std::string& input,
-                                                           const std::string& output) {
-  FragmentProcessor::TransformedCoordVars coords(
-      processor, transformedCoordVarsIdx < transformedCoordVars.size()
-                     ? &transformedCoordVars[transformedCoordVarsIdx]
-                     : nullptr);
-  FragmentProcessor::TextureSamplers textureSamplers(
-      processor, currentTexSamplers.empty() ? nullptr : &currentTexSamplers[0]);
-  FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output,
-                                   input.empty() ? "vec4(1.0)" : input, subsetVarName, &coords,
-                                   &textureSamplers);
-  processor->emitCode(args);
-}
-
-void ModularProgramBuilder::emitGaussianBlur1DFragmentProcessor(
-    const FragmentProcessor* processor, size_t transformedCoordVarsIdx, const std::string& input,
-    const std::string& output) {
+void ModularProgramBuilder::emitGaussianBlur1DFragmentProcessor(const FragmentProcessor* processor,
+                                                                size_t transformedCoordVarsIdx,
+                                                                const std::string& input,
+                                                                const std::string& output) {
   FragmentProcessor::TransformedCoordVars coords(
       processor, transformedCoordVarsIdx < transformedCoordVars.size()
                      ? &transformedCoordVars[transformedCoordVarsIdx]
@@ -1096,6 +1108,62 @@ void ModularProgramBuilder::emitClampedGradientEffect(const FragmentProcessor* p
   fragBuilder->codeAppendf("%s.rgb *= %s.a;", output.c_str(), output.c_str());
   fragBuilder->codeAppendf("%s *= %s.a;", output.c_str(),
                            input.empty() ? "vec4(1.0)" : input.c_str());
+}
+
+// ---- GP emission override ----
+
+void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
+                                                  std::string* outputCoverage) {
+  // Add RTAdjust uniform before pushing the processor to avoid name mangling.
+  uniformHandler()->addUniform(RTAdjustName, UniformFormat::Float4, ShaderStage::Vertex);
+  auto geometryProcessor = programInfo->getGeometryProcessor();
+  currentProcessors.push_back(geometryProcessor);
+  nameExpression(outputColor, "outputColor");
+  nameExpression(outputCoverage, "outputCoverage");
+
+  auto processorIndex = programInfo->getProcessorIndex(geometryProcessor);
+  fragmentShaderBuilder()->codeAppendf("{ // Processor%d : %s\n", processorIndex,
+                                       geometryProcessor->name().c_str());
+  vertexShaderBuilder()->codeAppendf("// Processor%d : %s\n", processorIndex,
+                                     geometryProcessor->name().c_str());
+
+  GeometryProcessor::FPCoordTransformHandler transformHandler(programInfo, &transformedCoordVars);
+  GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(),
+                                   uniformHandler(), getContext()->shaderCaps(), *outputColor,
+                                   *outputCoverage, &transformHandler, &subsetVarName);
+
+  // Explicit dispatch by GP type.
+  geometryProcessor->emitCode(args);
+
+  fragmentShaderBuilder()->codeAppend("}");
+  currentProcessors.pop_back();
+}
+
+// ---- XP emission override ----
+
+void ModularProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
+                                                   const std::string& coverageIn) {
+  auto xferProcessor = programInfo->getXferProcessor();
+  currentProcessors.push_back(xferProcessor);
+  fragmentShaderBuilder()->codeAppendf("{ // Processor%d : %s\n",
+                                       programInfo->getProcessorIndex(xferProcessor),
+                                       xferProcessor->name().c_str());
+
+  SamplerHandle dstTextureSamplerHandle;
+  if (auto dstTextureView = xferProcessor->dstTextureView()) {
+    dstTextureSamplerHandle = emitSampler(dstTextureView->getTexture(), "DstTextureSampler");
+  }
+
+  std::string inputColor = !colorIn.empty() ? colorIn : "vec4(1.0)";
+  std::string inputCoverage = !coverageIn.empty() ? coverageIn : "vec4(1.0)";
+  XferProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), inputColor, inputCoverage,
+                               fragmentShaderBuilder()->colorOutputName(), dstTextureSamplerHandle);
+
+  // Explicit dispatch by XP type.
+  xferProcessor->emitCode(args);
+
+  fragmentShaderBuilder()->codeAppend("}");
+  currentProcessors.pop_back();
 }
 
 }  // namespace tgfx

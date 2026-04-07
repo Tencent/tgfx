@@ -61,5 +61,7 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   std::optional<PMColor> commonColor = std::nullopt;
   std::vector<std::shared_ptr<Texture>> textures;
   SamplerState samplerState = {};
+
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

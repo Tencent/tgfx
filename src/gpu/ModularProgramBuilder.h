@@ -105,8 +105,13 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
                                      const std::string& output);
 
   void emitGaussianBlur1DFragmentProcessor(const FragmentProcessor* processor,
-                                           size_t transformedCoordVarsIdx,
-                                           const std::string& input, const std::string& output);
+                                           size_t transformedCoordVarsIdx, const std::string& input,
+                                           const std::string& output);
+
+  // ---- GP/XP override methods ----
+
+  void emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage) override;
+  void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn) override;
 
   // Compute the transformedCoordVarsIdx offset for childProcessor(childIndex) within a container FP.
   size_t childCoordVarsOffset(const FragmentProcessor* parent, size_t parentCoordVarsIdx,

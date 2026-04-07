@@ -60,6 +60,8 @@ class HairlineQuadGeometryProcessor : public GeometryProcessor {
 
   Attribute position = {};
   Attribute hairQuadEdge = {};
+
+  friend class ModularProgramBuilder;
 };
 
 }  // namespace tgfx

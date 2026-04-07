@@ -76,9 +76,9 @@ class ProgramBuilder {
 
   virtual bool checkSamplerCounts() = 0;
 
-  void emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage);
+  virtual void emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage);
 
-  void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn);
+  virtual void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn);
 
   SamplerHandle emitSampler(std::shared_ptr<Texture> texture, const std::string& name);
 

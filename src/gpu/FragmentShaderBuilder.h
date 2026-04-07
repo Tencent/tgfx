@@ -57,5 +57,6 @@ class FragmentShaderBuilder : public ShaderBuilder {
   virtual std::string colorOutputName() = 0;
 
   friend class ProgramBuilder;
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

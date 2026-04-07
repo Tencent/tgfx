@@ -54,5 +54,7 @@ class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
   AAType aaType = AAType::None;
   std::optional<PMColor> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
+
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

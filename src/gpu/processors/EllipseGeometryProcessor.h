@@ -56,5 +56,7 @@ class EllipseGeometryProcessor : public GeometryProcessor {
   int height = 1;
   bool stroke;
   std::optional<PMColor> commonColor = std::nullopt;
+
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx
