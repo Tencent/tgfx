@@ -1132,8 +1132,428 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
                                    uniformHandler(), getContext()->shaderCaps(), *outputColor,
                                    *outputCoverage, &transformHandler, &subsetVarName);
 
-  // Explicit dispatch by GP type.
-  geometryProcessor->emitCode(args);
+  // Explicit dispatch by GP type — inlined from each GLSL*GeometryProcessor::emitCode().
+  auto gpName = geometryProcessor->name();
+  if (gpName == "DefaultGeometryProcessor") {
+    auto gp = static_cast<const DefaultGeometryProcessor*>(geometryProcessor);
+    auto vertBuilder = args.vertBuilder;
+    auto fragBuilder = args.fragBuilder;
+    auto varyingHandler = args.varyingHandler;
+    auto uniformHandler = args.uniformHandler;
+    varyingHandler->emitAttributes(*gp);
+    auto matrixName =
+        uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
+    std::string positionName = "position";
+    vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
+                             matrixName.c_str(), gp->position.name().c_str());
+    gp->emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
+                       ShaderVar(gp->position));
+    if (gp->aa == AAType::Coverage) {
+      auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
+      vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(),
+                               gp->coverage.name().c_str());
+      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
+                               coverageVar.fsIn().c_str());
+    } else {
+      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    }
+    auto colorName =
+        uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    args.vertBuilder->emitNormalizedPosition(positionName);
+
+  } else if (gpName == "QuadPerEdgeAAGeometryProcessor") {
+    auto gp = static_cast<const QuadPerEdgeAAGeometryProcessor*>(geometryProcessor);
+    auto vertBuilder = args.vertBuilder;
+    auto fragBuilder = args.fragBuilder;
+    auto varyingHandler = args.varyingHandler;
+    auto uniformHandler = args.uniformHandler;
+    varyingHandler->emitAttributes(*gp);
+    auto& uvCoordsVar = gp->uvCoord.empty() ? gp->position : gp->uvCoord;
+    gp->emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
+    if (gp->aa == AAType::Coverage) {
+      auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
+      vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(),
+                               gp->coverage.name().c_str());
+      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
+                               coverageVar.fsIn().c_str());
+    } else {
+      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    }
+    if (gp->commonColor.has_value()) {
+      auto colorName =
+          uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    } else {
+      auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
+      vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), gp->color.name().c_str());
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
+    }
+    args.vertBuilder->emitNormalizedPosition(gp->position.name());
+
+  } else if (gpName == "EllipseGeometryProcessor") {
+    auto gp = static_cast<const EllipseGeometryProcessor*>(geometryProcessor);
+    auto vertBuilder = args.vertBuilder;
+    auto varyingHandler = args.varyingHandler;
+    auto uniformHandler = args.uniformHandler;
+    varyingHandler->emitAttributes(*gp);
+    auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
+    vertBuilder->codeAppendf("%s = %s;", ellipseOffsets.vsOut().c_str(),
+                             gp->inEllipseOffset.name().c_str());
+    auto ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float4);
+    vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(),
+                             gp->inEllipseRadii.name().c_str());
+    auto fragBuilder = args.fragBuilder;
+    if (gp->commonColor.has_value()) {
+      auto colorName =
+          uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    } else {
+      auto color = varyingHandler->addVarying("Color", SLType::Float4);
+      vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), gp->inColor.name().c_str());
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
+    }
+    args.vertBuilder->emitNormalizedPosition(gp->inPosition.name());
+    gp->emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
+                       ShaderVar(gp->inPosition));
+    fragBuilder->codeAppendf("vec2 offset = %s.xy;", ellipseOffsets.fsIn().c_str());
+    if (gp->stroke) {
+      fragBuilder->codeAppendf("offset *= %s.xy;", ellipseRadii.fsIn().c_str());
+    }
+    fragBuilder->codeAppend("float test = dot(offset, offset) - 1.0;");
+    fragBuilder->codeAppendf("vec2 grad = 2.0*offset*%s.xy;", ellipseRadii.fsIn().c_str());
+    fragBuilder->codeAppend("float grad_dot = dot(grad, grad);");
+    fragBuilder->codeAppend("grad_dot = max(grad_dot, 1.1755e-38);");
+    fragBuilder->codeAppend("float invlen = inversesqrt(grad_dot);");
+    fragBuilder->codeAppend("float edgeAlpha = clamp(0.5-test*invlen, 0.0, 1.0);");
+    if (gp->stroke) {
+      fragBuilder->codeAppendf("offset = %s.xy*%s.zw;", ellipseOffsets.fsIn().c_str(),
+                               ellipseRadii.fsIn().c_str());
+      fragBuilder->codeAppend("test = dot(offset, offset) - 1.0;");
+      fragBuilder->codeAppendf("grad = 2.0*offset*%s.zw;", ellipseRadii.fsIn().c_str());
+      fragBuilder->codeAppend("grad_dot = dot(grad, grad);");
+      fragBuilder->codeAppend("invlen = inversesqrt(grad_dot);");
+      fragBuilder->codeAppend("edgeAlpha *= clamp(0.5+test*invlen, 0.0, 1.0);");
+    }
+    fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());
+
+  } else if (gpName == "AtlasTextGeometryProcessor") {
+    auto gp = static_cast<const AtlasTextGeometryProcessor*>(geometryProcessor);
+    auto vertBuilder = args.vertBuilder;
+    auto fragBuilder = args.fragBuilder;
+    auto varyingHandler = args.varyingHandler;
+    auto uniformHandler = args.uniformHandler;
+    varyingHandler->emitAttributes(*gp);
+    auto atlasName =
+        uniformHandler->addUniform("atlasSizeInv", UniformFormat::Float2, ShaderStage::Vertex);
+    auto samplerVarying = varyingHandler->addVarying("textureCoords", SLType::Float2);
+    gp->emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(gp->position));
+    auto uvName = gp->maskCoord.name();
+    vertBuilder->codeAppendf("%s = %s * %s;", samplerVarying.vsOut().c_str(), uvName.c_str(),
+                             atlasName.c_str());
+    if (gp->aa == AAType::Coverage) {
+      auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
+      vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(),
+                               gp->coverage.name().c_str());
+      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
+                               coverageVar.fsIn().c_str());
+    } else {
+      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    }
+    if (gp->commonColor.has_value()) {
+      auto colorName =
+          uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    } else {
+      auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
+      vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), gp->color.name().c_str());
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
+    }
+    auto textureView = gp->textureProxy->getTextureView();
+    DEBUG_ASSERT(textureView != nullptr);
+    DEBUG_ASSERT(textureView->getTexture() != nullptr);
+    auto samplerHandle = uniformHandler->addSampler(textureView->getTexture(), "TextureSampler");
+    fragBuilder->codeAppend("vec4 color = ");
+    fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.vsOut());
+    fragBuilder->codeAppend(";");
+    if (textureView->isAlphaOnly()) {
+      fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
+    } else {
+      fragBuilder->codeAppendf("%s = clamp(vec4(color.rgb/color.a, 1.0), 0.0, 1.0);",
+                               args.outputColor.c_str());
+      fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
+    }
+    args.vertBuilder->emitNormalizedPosition(gp->position.name());
+
+  } else if (gpName == "MeshGeometryProcessor") {
+    auto gp = static_cast<const MeshGeometryProcessor*>(geometryProcessor);
+    auto vertBuilder = args.vertBuilder;
+    auto fragBuilder = args.fragBuilder;
+    auto varyingHandler = args.varyingHandler;
+    auto uniformHandler = args.uniformHandler;
+    varyingHandler->emitAttributes(*gp);
+    auto matrixName =
+        uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
+    std::string positionName = "position";
+    vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
+                             matrixName.c_str(), gp->position.name().c_str());
+    if (gp->hasTexCoords) {
+      auto texCoordVar = varyingHandler->addVarying("TexCoord", SLType::Float2);
+      vertBuilder->codeAppendf("%s = %s;", texCoordVar.vsOut().c_str(),
+                               gp->texCoord.name().c_str());
+      gp->emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
+                         ShaderVar(gp->texCoord));
+    } else {
+      gp->emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
+                         ShaderVar(gp->position));
+    }
+    if (gp->hasColors) {
+      auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
+      vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), gp->color.name().c_str());
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
+    } else {
+      auto colorName =
+          uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    }
+    if (gp->hasCoverage) {
+      auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
+      vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(),
+                               gp->coverage.name().c_str());
+      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
+                               coverageVar.fsIn().c_str());
+    } else {
+      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    }
+    vertBuilder->emitNormalizedPosition(positionName);
+
+  } else if (gpName == "ShapeInstancedGeometryProcessor") {
+    auto gp = static_cast<const ShapeInstancedGeometryProcessor*>(geometryProcessor);
+    auto vertBuilder = args.vertBuilder;
+    auto fragBuilder = args.fragBuilder;
+    auto varyingHandler = args.varyingHandler;
+    auto uniformHandler = args.uniformHandler;
+    varyingHandler->emitAttributes(*gp);
+    auto uvMatrixName =
+        uniformHandler->addUniform("UVMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
+    vertBuilder->codeAppendf("highp vec2 local = (%s * vec3(%s, 1.0)).xy;", uvMatrixName.c_str(),
+                             gp->position.name().c_str());
+    auto viewMatrixName =
+        uniformHandler->addUniform("ViewMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
+    std::string positionName = "position";
+    vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy + %s;",
+                             positionName.c_str(), viewMatrixName.c_str(),
+                             gp->position.name().c_str(), gp->offset.name().c_str());
+    ShaderVar localVar("local", SLType::Float2);
+    gp->emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, localVar);
+    if (gp->aa == AAType::Coverage) {
+      auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
+      vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(),
+                               gp->coverage.name().c_str());
+      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
+                               coverageVar.fsIn().c_str());
+    } else {
+      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    }
+    if (gp->hasColors) {
+      auto colorVar = varyingHandler->addVarying("InstanceColor", SLType::Float4);
+      vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(),
+                               gp->instanceColor.name().c_str());
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
+    } else {
+      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputColor.c_str());
+    }
+    vertBuilder->emitNormalizedPosition(positionName);
+
+  } else if (gpName == "NonAARRectGeometryProcessor") {
+    auto gp = static_cast<const NonAARRectGeometryProcessor*>(geometryProcessor);
+    auto vertBuilder = args.vertBuilder;
+    auto fragBuilder = args.fragBuilder;
+    auto varyingHandler = args.varyingHandler;
+    auto uniformHandler = args.uniformHandler;
+    varyingHandler->emitAttributes(*gp);
+    if (gp->commonColor.has_value()) {
+      auto colorName =
+          uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    } else {
+      auto color = varyingHandler->addVarying("Color", SLType::Float4);
+      vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), gp->inColor.name().c_str());
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
+    }
+    vertBuilder->emitNormalizedPosition(gp->inPosition.name());
+    auto localCoordVarying = varyingHandler->addVarying("localCoord", SLType::Float2);
+    vertBuilder->codeAppendf("%s = %s;", localCoordVarying.vsOut().c_str(),
+                             gp->inLocalCoord.name().c_str());
+    auto radiiVarying = varyingHandler->addVarying("radii", SLType::Float2);
+    vertBuilder->codeAppendf("%s = %s;", radiiVarying.vsOut().c_str(),
+                             gp->inRadii.name().c_str());
+    auto boundsVarying = varyingHandler->addVarying("rectBounds", SLType::Float4);
+    vertBuilder->codeAppendf("%s = %s;", boundsVarying.vsOut().c_str(),
+                             gp->inRectBounds.name().c_str());
+    Varying strokeWidthVarying;
+    if (gp->stroke) {
+      strokeWidthVarying = varyingHandler->addVarying("strokeWidth", SLType::Float2);
+      vertBuilder->codeAppendf("%s = %s;", strokeWidthVarying.vsOut().c_str(),
+                               gp->inStrokeWidth.name().c_str());
+    }
+    gp->emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
+                       ShaderVar(gp->inPosition.name(), SLType::Float2));
+    fragBuilder->codeAppendf("vec2 localCoord = %s;", localCoordVarying.fsIn().c_str());
+    fragBuilder->codeAppendf("vec2 radii = %s;", radiiVarying.fsIn().c_str());
+    fragBuilder->codeAppendf("vec4 bounds = %s;", boundsVarying.fsIn().c_str());
+    fragBuilder->codeAppend("vec2 center = (bounds.xy + bounds.zw) * 0.5;");
+    fragBuilder->codeAppend("vec2 halfSize = (bounds.zw - bounds.xy) * 0.5;");
+    fragBuilder->codeAppend("vec2 q = abs(localCoord - center) - halfSize + radii;");
+    fragBuilder->codeAppend(
+        "float d = min(max(q.x / radii.x, q.y / radii.y), 0.0) + length(max(q / radii, 0.0)) - 1.0;");
+    fragBuilder->codeAppend("float outerCoverage = step(d, 0.0);");
+    if (gp->stroke) {
+      fragBuilder->codeAppendf("vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
+      fragBuilder->codeAppend("vec2 innerHalfSize = halfSize - 2.0 * sw;");
+      fragBuilder->codeAppend("vec2 innerRadii = max(radii - 2.0 * sw, vec2(0.0));");
+      fragBuilder->codeAppend("float innerCoverage = 0.0;");
+      fragBuilder->codeAppend("if (innerHalfSize.x > 0.0 && innerHalfSize.y > 0.0) {");
+      fragBuilder->codeAppend(
+          "  vec2 qi = abs(localCoord - center) - innerHalfSize + innerRadii;");
+      fragBuilder->codeAppend("  vec2 safeInnerRadii = max(innerRadii, vec2(0.001));");
+      fragBuilder->codeAppend(
+          "  float di = min(max(qi.x / safeInnerRadii.x, qi.y / safeInnerRadii.y), 0.0) + "
+          "length(max(qi / safeInnerRadii, vec2(0.0))) - 1.0;");
+      fragBuilder->codeAppend("  innerCoverage = step(di, 0.0);");
+      fragBuilder->codeAppend("}");
+      fragBuilder->codeAppend("float coverage = outerCoverage * (1.0 - innerCoverage);");
+    } else {
+      fragBuilder->codeAppend("float coverage = outerCoverage;");
+    }
+    fragBuilder->codeAppendf("%s = vec4(coverage);", args.outputCoverage.c_str());
+
+  } else if (gpName == "HairlineLineGeometryProcessor") {
+    auto gp = static_cast<const HairlineLineGeometryProcessor*>(geometryProcessor);
+    auto vertBuilder = args.vertBuilder;
+    auto fragBuilder = args.fragBuilder;
+    auto varyingHandler = args.varyingHandler;
+    auto uniformHandler = args.uniformHandler;
+    varyingHandler->emitAttributes(*gp);
+    auto matrixName =
+        uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
+    std::string positionName = "transformedPosition";
+    vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
+                             matrixName.c_str(), gp->position.name().c_str());
+    gp->emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
+                       ShaderVar(positionName, SLType::Float2));
+    auto edgeVarying = varyingHandler->addVarying("EdgeDistance", SLType::Float);
+    vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(),
+                             gp->edgeDistance.name().c_str());
+    fragBuilder->codeAppendf("float edgeAlpha = abs(%s);", edgeVarying.fsIn().c_str());
+    fragBuilder->codeAppend("edgeAlpha = clamp(edgeAlpha, 0.0, 1.0);");
+    if (gp->aaType != AAType::Coverage) {
+      fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
+    }
+    auto colorName =
+        uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    auto coverageScale =
+        uniformHandler->addUniform("Coverage", UniformFormat::Float, ShaderStage::Fragment);
+    fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
+                             coverageScale.c_str());
+    vertBuilder->emitNormalizedPosition(positionName);
+
+  } else if (gpName == "HairlineQuadGeometryProcessor") {
+    auto gp = static_cast<const HairlineQuadGeometryProcessor*>(geometryProcessor);
+    auto vertBuilder = args.vertBuilder;
+    auto fragBuilder = args.fragBuilder;
+    auto varyingHandler = args.varyingHandler;
+    auto uniformHandler = args.uniformHandler;
+    varyingHandler->emitAttributes(*gp);
+    auto matrixName =
+        uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
+    std::string positionName = "transformedPosition";
+    vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
+                             matrixName.c_str(), gp->position.name().c_str());
+    gp->emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
+                       ShaderVar(positionName, SLType::Float2));
+    auto edgeVarying = varyingHandler->addVarying("HairQuadEdge", SLType::Float4);
+    vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(),
+                             gp->hairQuadEdge.name().c_str());
+    const char* edge = edgeVarying.fsIn().c_str();
+    fragBuilder->codeAppendf("float edgeAlpha;");
+    fragBuilder->codeAppendf("vec2 duvdx = vec2(dFdx(%s.xy));", edge);
+    fragBuilder->codeAppendf("vec2 duvdy = vec2(dFdy(%s.xy));", edge);
+    fragBuilder->codeAppendf(
+        "vec2 gF = vec2(2.0 * %s.x * duvdx.x - duvdx.y,"
+        "               2.0 * %s.x * duvdy.x - duvdy.y);",
+        edge, edge);
+    fragBuilder->codeAppendf("edgeAlpha = float(%s.x * %s.x - %s.y);", edge, edge, edge);
+    fragBuilder->codeAppend("edgeAlpha = sqrt(edgeAlpha * edgeAlpha / dot(gF, gF));");
+    fragBuilder->codeAppend("edgeAlpha = max(1.0 - edgeAlpha, 0.0);");
+    if (gp->aaType != AAType::Coverage) {
+      fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
+    }
+    auto colorName =
+        uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    auto coverageScale =
+        uniformHandler->addUniform("Coverage", UniformFormat::Float, ShaderStage::Fragment);
+    fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
+                             coverageScale.c_str());
+    vertBuilder->emitNormalizedPosition(positionName);
+
+  } else if (gpName == "RoundStrokeRectGeometryProcessor") {
+    auto gp = static_cast<const RoundStrokeRectGeometryProcessor*>(geometryProcessor);
+    auto vertBuilder = args.vertBuilder;
+    auto fragBuilder = args.fragBuilder;
+    auto varyingHandler = args.varyingHandler;
+    auto uniformHandler = args.uniformHandler;
+    varyingHandler->emitAttributes(*gp);
+    auto& uvCoordsVar = gp->inUVCoord.empty() ? gp->inPosition : gp->inUVCoord;
+    gp->emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
+    Varying ellipseRadii;
+    if (gp->aaType == AAType::Coverage) {
+      auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
+      vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(),
+                               gp->inCoverage.name().c_str());
+      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
+                               coverageVar.fsIn().c_str());
+      ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float2);
+      vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(),
+                               gp->inEllipseRadii.name().c_str());
+    } else {
+      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    }
+    auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
+    vertBuilder->codeAppendf("%s = %s;", ellipseOffsets.vsOut().c_str(),
+                             gp->inEllipseOffset.name().c_str());
+    if (gp->commonColor.has_value()) {
+      auto colorName =
+          uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    } else {
+      auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
+      vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), gp->inColor.name().c_str());
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
+    }
+    fragBuilder->codeAppendf("vec2 offset = %s;", ellipseOffsets.fsIn().c_str());
+    if (gp->aaType == AAType::Coverage) {
+      fragBuilder->codeAppend("float test = dot(offset, offset) - 1.0;");
+      fragBuilder->codeAppend("if (test > -0.5) {");
+      fragBuilder->codeAppendf("vec2 grad = 2.0 * offset * %s;", ellipseRadii.fsIn().c_str());
+      fragBuilder->codeAppend("float grad_dot = dot(grad, grad);");
+      fragBuilder->codeAppend("grad_dot = max(grad_dot, 1.1755e-38);");
+      fragBuilder->codeAppend("float invlen = inversesqrt(grad_dot);");
+      fragBuilder->codeAppend("float edgeAlpha = clamp(0.5 - test * invlen, 0.0, 1.0);");
+      fragBuilder->codeAppendf("%s *= edgeAlpha;", args.outputCoverage.c_str());
+      fragBuilder->codeAppendf("}");
+    } else {
+      fragBuilder->codeAppend("float test = dot(offset, offset);");
+      fragBuilder->codeAppend("float edgeAlpha = step(test, 1.0);");
+      fragBuilder->codeAppendf("%s *= edgeAlpha;", args.outputCoverage.c_str());
+    }
+    args.vertBuilder->emitNormalizedPosition(gp->inPosition.name());
+
+  } else {
+    geometryProcessor->emitCode(args);
+  }
 
   fragmentShaderBuilder()->codeAppend("}");
   currentProcessors.pop_back();
