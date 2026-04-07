@@ -154,7 +154,8 @@ void ModularProgramBuilder::emitModularFragProcessors(std::string* color, std::s
 
 std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* processor,
                                                        size_t transformedCoordVarsIdx,
-                                                       const std::string& input) {
+                                                       const std::string& input,
+                                                       CoordTransformFunc coordTransformFunc) {
   // Use ProcessorGuard to push this processor for correct name mangling.
   currentProcessors.push_back(processor);
   std::string output;
@@ -165,13 +166,13 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
                                        processor->name().c_str());
 
   // Collect texture samplers from FP hierarchy (same as legacy path).
-  // Skip for Compose and Xfermode containers that recursively call emitModularFragProc()
-  // for children — each child will collect its own samplers.
-  // GaussianBlur keeps collection because its child uses legacy emitChild() with pre-collected samplers.
+  // Skip for containers that recursively call emitModularFragProc() for children —
+  // each child will collect its own samplers.
   // ClampedGradientEffect keeps collection because it manages children's samplers internally.
   auto name = processor->name();
   bool skipSamplerCollection = (name == "ComposeFragmentProcessor" ||
-                                name == "XfermodeFragmentProcessor");
+                                name == "XfermodeFragmentProcessor" ||
+                                name == "GaussianBlur1DFragmentProcessor");
   if (!skipSamplerCollection) {
     currentTexSamplers.clear();
     FragmentProcessor::Iter fpIter(processor);
@@ -196,7 +197,7 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
     emitGaussianBlur1DFragmentProcessor(processor, transformedCoordVarsIdx, input, output);
   } else if (HasModularModule(processor) || name == "UnrolledBinaryGradientColorizer" ||
              name == "TextureEffect" || name == "TiledTextureEffect") {
-    emitLeafFPCall(processor, transformedCoordVarsIdx, input, output);
+    emitLeafFPCall(processor, transformedCoordVarsIdx, input, output, coordTransformFunc);
   } else {
     // Safety fallback for any unhandled FP type.
     FragmentProcessor::TransformedCoordVars coords(
@@ -220,7 +221,8 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
 
 void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
                                            size_t transformedCoordVarsIdx, const std::string& input,
-                                           const std::string& output) {
+                                           const std::string& output,
+                                           const CoordTransformFunc& coordTransformFunc) {
   auto name = processor->name();
   // Only include .glsl module for FPs that have one registered.
   if (ShaderModuleRegistry::HasModule(name)) {
@@ -336,9 +338,9 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
   } else if (name == "UnrolledBinaryGradientColorizer") {
     emitUnrolledBinaryGradientColorizer(processor, input, output);
   } else if (name == "TextureEffect") {
-    emitTextureEffect(processor, transformedCoordVarsIdx, input, output);
+    emitTextureEffect(processor, transformedCoordVarsIdx, input, output, coordTransformFunc);
   } else if (name == "TiledTextureEffect") {
-    emitTiledTextureEffect(processor, transformedCoordVarsIdx, input, output);
+    emitTiledTextureEffect(processor, transformedCoordVarsIdx, input, output, coordTransformFunc);
   }
 }
 
@@ -487,7 +489,8 @@ void ModularProgramBuilder::emitUnrolledBinaryGradientColorizer(const FragmentPr
 
 void ModularProgramBuilder::emitTextureEffect(const FragmentProcessor* processor,
                                               size_t transformedCoordVarsIdx,
-                                              const std::string& input, const std::string& output) {
+                                              const std::string& input, const std::string& output,
+                                              const CoordTransformFunc& coordTransformFunc) {
   auto texEffect = static_cast<const TextureEffect*>(processor);
   auto fragBuilder = fragmentShaderBuilder();
   auto uHandler = uniformHandler();
@@ -498,6 +501,11 @@ void ModularProgramBuilder::emitTextureEffect(const FragmentProcessor* processor
   }
   auto texCoordName =
       fragBuilder->emitPerspTextCoord(transformedCoordVars[transformedCoordVarsIdx]);
+  if (coordTransformFunc) {
+    fragBuilder->codeAppendf("highp vec2 transformedCoord = %s;",
+                             coordTransformFunc(texCoordName).c_str());
+    texCoordName = "transformedCoord";
+  }
 
   std::string subsetName;
   if (texEffect->needSubset()) {
@@ -726,7 +734,8 @@ static void EmitTiledReadColor(FragmentShaderBuilder* fragBuilder, SamplerHandle
 void ModularProgramBuilder::emitTiledTextureEffect(const FragmentProcessor* processor,
                                                    size_t transformedCoordVarsIdx,
                                                    const std::string& input,
-                                                   const std::string& output) {
+                                                   const std::string& output,
+                                                   const CoordTransformFunc& coordTransformFunc) {
   auto tiledEffect = static_cast<const TiledTextureEffect*>(processor);
   auto fragBuilder = fragmentShaderBuilder();
   auto uHandler = uniformHandler();
@@ -737,6 +746,11 @@ void ModularProgramBuilder::emitTiledTextureEffect(const FragmentProcessor* proc
   }
   auto texCoordName =
       fragBuilder->emitPerspTextCoord(transformedCoordVars[transformedCoordVarsIdx]);
+  if (coordTransformFunc) {
+    fragBuilder->codeAppendf("highp vec2 transformedCoord = %s;",
+                             coordTransformFunc(texCoordName).c_str());
+    texCoordName = "transformedCoord";
+  }
 
   TiledTextureEffect::Sampling sampling(textureView, tiledEffect->samplerState,
                                         tiledEffect->subset);
@@ -1038,31 +1052,13 @@ void ModularProgramBuilder::emitGaussianBlur1DFragmentProcessor(const FragmentPr
   fragBuilder->codeAppend("float weight = exp(-float(i*i) / (2.0*sigma*sigma));");
   fragBuilder->codeAppend("total += weight;");
 
-  // Child inside the for loop uses legacy emitChild() with coordFunc because
-  // the coordFunc uses the GLSL loop variable 'i' to offset texture coordinates.
+  // Recursively emit child FP inside the loop with coordinate offset.
   auto childCoordIdx = childCoordVarsOffset(processor, transformedCoordVarsIdx, 0);
-  FragmentProcessor::TransformedCoordVars coords(
-      processor->childProcessor(0),
-      childCoordIdx < transformedCoordVars.size() ? &transformedCoordVars[childCoordIdx] : nullptr);
-  FragmentProcessor::TextureSamplers textureSamplers(
-      processor->childProcessor(0),
-      currentTexSamplers.empty() ? nullptr : &currentTexSamplers[0]);
-  std::string tempColor = "tempColor";
-  tempColor += programInfo->getMangledSuffix(processor);
-  fragBuilder->codeAppendf("vec4 %s;", tempColor.c_str());
+  auto childOutput = emitModularFragProc(
+      processor->childProcessor(0), childCoordIdx, "vec4(1.0)",
+      [](const std::string& coord) { return "(" + coord + " + offset * float(i))"; });
 
-  fragBuilder->onBeforeChildProcEmitCode(processor->childProcessor(0));
-  fragBuilder->codeAppend("{");
-  FragmentProcessor::EmitArgs childArgs(fragBuilder, uHandler, tempColor, "vec4(1.0)",
-                                        subsetVarName, &coords, &textureSamplers,
-                                        [](std::string_view coord) {
-                                          return "(" + std::string(coord) + " + offset * float(i))";
-                                        });
-  processor->childProcessor(0)->emitCode(childArgs);
-  fragBuilder->codeAppend("}");
-  fragBuilder->onAfterChildProcEmitCode();
-
-  fragBuilder->codeAppendf("sum += %s * weight;", tempColor.c_str());
+  fragBuilder->codeAppendf("sum += %s * weight;", childOutput.c_str());
   fragBuilder->codeAppend("if (i == radius) { break; }");
   fragBuilder->codeAppend("}");
   fragBuilder->codeAppendf("%s = sum / total;", output.c_str());

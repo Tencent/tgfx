@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <functional>
 #include <set>
 #include <vector>
 #include "gpu/SamplerHandle.h"
@@ -58,8 +59,11 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
    * Emits modular FS code for a single top-level FP and its children. Returns the output variable
    * name.
    */
+  using CoordTransformFunc = std::function<std::string(const std::string&)>;
+
   std::string emitModularFragProc(const FragmentProcessor* processor,
-                                  size_t transformedCoordVarsIdx, const std::string& input);
+                                  size_t transformedCoordVarsIdx, const std::string& input,
+                                  CoordTransformFunc coordTransformFunc = {});
 
   /**
    * Emits code for ClampedGradientEffect using inline control flow + child module function calls.
@@ -71,7 +75,8 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
    * Emits a call to a leaf modular FP function (e.g., FP_ConstColor).
    */
   void emitLeafFPCall(const FragmentProcessor* processor, size_t transformedCoordVarsIdx,
-                      const std::string& input, const std::string& output);
+                      const std::string& input, const std::string& output,
+                      const CoordTransformFunc& coordTransformFunc = {});
 
   /**
    * Includes a module's function source into the FS Functions section (once per module).
@@ -89,10 +94,12 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
                                            const std::string& input, const std::string& output);
 
   void emitTextureEffect(const FragmentProcessor* processor, size_t transformedCoordVarsIdx,
-                         const std::string& input, const std::string& output);
+                         const std::string& input, const std::string& output,
+                         const CoordTransformFunc& coordTransformFunc = {});
 
   void emitTiledTextureEffect(const FragmentProcessor* processor, size_t transformedCoordVarsIdx,
-                              const std::string& input, const std::string& output);
+                              const std::string& input, const std::string& output,
+                              const CoordTransformFunc& coordTransformFunc = {});
 
   // ---- Container FP expansion methods ----
 
