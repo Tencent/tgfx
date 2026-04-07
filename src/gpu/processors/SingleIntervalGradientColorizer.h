@@ -38,6 +38,10 @@ class SingleIntervalGradientColorizer : public FragmentProcessor {
       : FragmentProcessor(ClassID()), start(start), end(end) {
   }
 
+  std::string shaderFunctionFile() const override {
+    return "fragment/single_interval_gradient.frag";
+  }
+
   Color start;
   Color end;
 };

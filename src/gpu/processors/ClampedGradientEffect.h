@@ -46,6 +46,10 @@ class ClampedGradientEffect : public FragmentProcessor {
   Color leftBorderColor;
   Color rightBorderColor;
 
+  std::string shaderFunctionFile() const override {
+    return "fragment/clamped_gradient_effect.frag";
+  }
+
   friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

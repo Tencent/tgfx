@@ -52,6 +52,37 @@ class TextureEffect : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    auto yuvTexture = getYUVTexture();
+    if (yuvTexture) {
+      macros.define("TGFX_TE_TEXTURE_MODE", yuvTexture->yuvFormat() == YUVFormat::I420 ? 1 : 2);
+      if (IsLimitedYUVColorRange(yuvTexture->yuvColorSpace())) {
+        macros.define("TGFX_TE_YUV_LIMITED_RANGE");
+      }
+    } else {
+      macros.define("TGFX_TE_TEXTURE_MODE", 0);
+    }
+    if (alphaStart != Point::Zero()) {
+      macros.define("TGFX_TE_RGBAAA");
+    }
+    if (textureProxy->isAlphaOnly()) {
+      macros.define("TGFX_TE_ALPHA_ONLY");
+    }
+    if (needSubset()) {
+      macros.define("TGFX_TE_SUBSET");
+    }
+    if (constraint == SrcRectConstraint::Strict) {
+      macros.define("TGFX_TE_STRICT_CONSTRAINT");
+    }
+    if (coordTransform.matrix.hasPerspective()) {
+      macros.define("TGFX_TE_PERSPECTIVE");
+    }
+  }
+
+  std::string shaderFunctionFile() const override {
+    return "fragment/texture_effect.frag";
+  }
+
   size_t onCountTextureSamplers() const override;
 
   std::shared_ptr<Texture> onTextureAt(size_t index) const override;

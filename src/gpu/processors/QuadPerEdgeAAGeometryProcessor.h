@@ -61,6 +61,10 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
     }
   }
 
+  std::string shaderFunctionFile() const override {
+    return "geometry/quad_aa_geometry";
+  }
+
   bool hasUVPerspective() const override {
     return uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
   }

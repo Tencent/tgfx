@@ -45,6 +45,16 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   Matrix uvMatrix = {};
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (textureProxy->isAlphaOnly()) {
+      macros.define("TGFX_DSTE_ALPHA_ONLY");
+    }
+  }
+
+  std::string shaderFunctionFile() const override {
+    return "fragment/device_space_texture_effect.frag";
+  }
+
   friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

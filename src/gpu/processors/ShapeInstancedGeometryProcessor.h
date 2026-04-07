@@ -50,6 +50,10 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
     }
   }
 
+  std::string shaderFunctionFile() const override {
+    return "geometry/shape_instanced_geometry";
+  }
+
   Attribute position = {};
   Attribute coverage = {};
   Attribute offset = {};

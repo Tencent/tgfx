@@ -36,6 +36,16 @@ class DiamondGradientLayout : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (coordTransform.matrix.hasPerspective()) {
+      macros.define("TGFX_DGRAD_PERSPECTIVE");
+    }
+  }
+
+  std::string shaderFunctionFile() const override {
+    return "fragment/diamond_gradient.frag";
+  }
+
   CoordTransform coordTransform;
 };
 }  // namespace tgfx

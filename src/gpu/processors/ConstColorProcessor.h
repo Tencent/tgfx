@@ -45,6 +45,14 @@ class ConstColorProcessor : public FragmentProcessor {
   PMColor color;
   InputMode inputMode;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    macros.define("TGFX_CC_MODE", static_cast<int>(inputMode));
+  }
+
+  std::string shaderFunctionFile() const override {
+    return "fragment/const_color.frag";
+  }
+
   friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

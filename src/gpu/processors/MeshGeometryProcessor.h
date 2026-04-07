@@ -56,6 +56,10 @@ class MeshGeometryProcessor : public GeometryProcessor {
     }
   }
 
+  std::string shaderFunctionFile() const override {
+    return "geometry/mesh_geometry";
+  }
+
   Attribute position = {};
   Attribute texCoord = {};
   Attribute color = {};

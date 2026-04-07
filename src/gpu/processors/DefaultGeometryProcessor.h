@@ -47,6 +47,10 @@ class DefaultGeometryProcessor : public GeometryProcessor {
     }
   }
 
+  std::string shaderFunctionFile() const override {
+    return "geometry/default_geometry";
+  }
+
   bool hasUVPerspective() const override {
     return uvMatrix.hasPerspective();
   }

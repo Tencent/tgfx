@@ -38,6 +38,10 @@ class TextureGradientColorizer : public FragmentProcessor {
       : FragmentProcessor(ClassID()), gradient(std::move(gradient)) {
   }
 
+  std::string shaderFunctionFile() const override {
+    return "fragment/texture_gradient_colorizer.frag";
+  }
+
   size_t onCountTextureSamplers() const override {
     return 1;
   }

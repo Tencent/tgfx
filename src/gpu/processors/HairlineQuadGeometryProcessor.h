@@ -58,6 +58,10 @@ class HairlineQuadGeometryProcessor : public GeometryProcessor {
     }
   }
 
+  std::string shaderFunctionFile() const override {
+    return "geometry/hairline_quad_geometry";
+  }
+
   PMColor color = {};
   Matrix viewMatrix = {};
   std::optional<Matrix> uvMatrix = std::nullopt;

@@ -43,6 +43,19 @@ class PorterDuffXferProcessor : public XferProcessor {
       : XferProcessor(ClassID()), blendMode(blend), dstTextureInfo(std::move(dstTextureInfo)) {
   }
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (dstTextureInfo.textureProxy) {
+      macros.define("TGFX_PDXP_DST_TEXTURE_READ");
+    }
+    if (!BlendModeAsCoeff(blendMode, true)) {
+      macros.define("TGFX_PDXP_NON_COEFF");
+    }
+  }
+
+  std::string shaderFunctionFile() const override {
+    return "xfer/porter_duff_xfer.frag";
+  }
+
   BlendMode blendMode = BlendMode::SrcOver;
   DstTextureInfo dstTextureInfo = {};
 

@@ -37,6 +37,16 @@ class ConicGradientLayout : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (coordTransform.matrix.hasPerspective()) {
+      macros.define("TGFX_CGRAD_PERSPECTIVE");
+    }
+  }
+
+  std::string shaderFunctionFile() const override {
+    return "fragment/conic_gradient.frag";
+  }
+
   CoordTransform coordTransform;
   float bias;
   float scale;

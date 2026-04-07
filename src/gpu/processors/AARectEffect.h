@@ -35,6 +35,10 @@ class AARectEffect : public FragmentProcessor {
   explicit AARectEffect(const Rect& rect) : FragmentProcessor(ClassID()), rect(rect) {
   }
 
+  std::string shaderFunctionFile() const override {
+    return "fragment/aa_rect_effect.frag";
+  }
+
   Rect rect = {};
 };
 }  // namespace tgfx

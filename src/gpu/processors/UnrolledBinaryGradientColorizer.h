@@ -36,6 +36,14 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    macros.define("TGFX_UBGC_INTERVAL_COUNT", intervalCount);
+  }
+
+  std::string shaderFunctionFile() const override {
+    return "fragment/unrolled_binary_gradient.frag";
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

@@ -58,6 +58,10 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
     }
   }
 
+  std::string shaderFunctionFile() const override {
+    return "geometry/atlas_text_geometry";
+  }
+
   std::shared_ptr<Texture> onTextureAt(size_t index) const override {
     DEBUG_ASSERT(index < textures.size());
     return textures[index];

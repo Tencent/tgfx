@@ -38,6 +38,10 @@ class ColorMatrixFragmentProcessor : public FragmentProcessor {
       : FragmentProcessor(ClassID()), matrix(matrix) {
   }
 
+  std::string shaderFunctionFile() const override {
+    return "fragment/color_matrix.frag";
+  }
+
   std::array<float, 20> matrix;
 };
 }  // namespace tgfx

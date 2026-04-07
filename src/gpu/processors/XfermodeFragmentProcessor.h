@@ -65,6 +65,14 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
   Child child;
   BlendMode mode;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    macros.define("TGFX_XFP_CHILD_MODE", static_cast<int>(child));
+  }
+
+  std::string shaderFunctionFile() const override {
+    return "fragment/xfermode.frag";
+  }
+
   friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

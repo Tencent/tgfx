@@ -43,6 +43,14 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey*) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    macros.define("TGFX_BLUR_LOOP_LIMIT", 4 * maxSigma);
+  }
+
+  std::string shaderFunctionFile() const override {
+    return "fragment/gaussian_blur_1d.frag";
+  }
+
   float sigma = 0.f;
   GaussianBlurDirection direction = GaussianBlurDirection::Horizontal;
   float stepLength = 1.f;

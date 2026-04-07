@@ -56,6 +56,10 @@ class EllipseGeometryProcessor : public GeometryProcessor {
     }
   }
 
+  std::string shaderFunctionFile() const override {
+    return "geometry/ellipse_geometry";
+  }
+
   Attribute inPosition;
   Attribute inColor;
   Attribute inEllipseOffset;

@@ -41,6 +41,10 @@ class DualIntervalGradientColorizer : public FragmentProcessor {
         bias23(bias23), threshold(threshold) {
   }
 
+  std::string shaderFunctionFile() const override {
+    return "fragment/dual_interval_gradient.frag";
+  }
+
   Color scale01;
   Color bias01;
   Color scale23;

@@ -37,6 +37,10 @@ class AlphaThresholdFragmentProcessor : public FragmentProcessor {
       : FragmentProcessor(ClassID()), threshold(threshold) {
   }
 
+  std::string shaderFunctionFile() const override {
+    return "fragment/alpha_threshold.frag";
+  }
+
   float threshold = 0.0f;
 };
 }  // namespace tgfx

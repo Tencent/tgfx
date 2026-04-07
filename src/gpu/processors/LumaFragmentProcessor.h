@@ -36,6 +36,10 @@ class LumaFragmentProcessor : public FragmentProcessor {
 
   LumaFragmentProcessor(std::shared_ptr<ColorSpace> colorSpace);
 
+  std::string shaderFunctionFile() const override {
+    return "fragment/luma.frag";
+  }
+
   struct LumaFactor {
     /** default ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
     float kr = 0.2126f;

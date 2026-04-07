@@ -36,6 +36,16 @@ class LinearGradientLayout : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (coordTransform.matrix.hasPerspective()) {
+      macros.define("TGFX_LGRAD_PERSPECTIVE");
+    }
+  }
+
+  std::string shaderFunctionFile() const override {
+    return "fragment/linear_gradient.frag";
+  }
+
   CoordTransform coordTransform;
 };
 }  // namespace tgfx

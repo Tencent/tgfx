@@ -36,6 +36,16 @@ class RadialGradientLayout : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (coordTransform.matrix.hasPerspective()) {
+      macros.define("TGFX_RGRAD_PERSPECTIVE");
+    }
+  }
+
+  std::string shaderFunctionFile() const override {
+    return "fragment/radial_gradient.frag";
+  }
+
   CoordTransform coordTransform;
 };
 }  // namespace tgfx

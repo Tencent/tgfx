@@ -66,6 +66,29 @@ class TiledTextureEffect : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    auto textureView = getTextureView();
+    if (textureView == nullptr) {
+      return;
+    }
+    Sampling sampling(textureView, samplerState, subset);
+    macros.define("TGFX_TTE_MODE_X", static_cast<int>(sampling.shaderModeX));
+    macros.define("TGFX_TTE_MODE_Y", static_cast<int>(sampling.shaderModeY));
+    if (constraint == SrcRectConstraint::Strict) {
+      macros.define("TGFX_TTE_STRICT_CONSTRAINT");
+    }
+    if (textureProxy->isAlphaOnly()) {
+      macros.define("TGFX_TTE_ALPHA_ONLY");
+    }
+    if (coordTransform.matrix.hasPerspective()) {
+      macros.define("TGFX_TTE_PERSPECTIVE");
+    }
+  }
+
+  std::string shaderFunctionFile() const override {
+    return "fragment/tiled_texture_effect.frag";
+  }
+
   size_t onCountTextureSamplers() const override;
 
   std::shared_ptr<Texture> onTextureAt(size_t) const override;

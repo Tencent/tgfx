@@ -38,6 +38,10 @@ class EmptyXferProcessor : public XferProcessor {
   EmptyXferProcessor() : XferProcessor(ClassID()) {
   }
 
+  std::string shaderFunctionFile() const override {
+    return "xfer/empty_xfer.frag";
+  }
+
  private:
   DEFINE_PROCESSOR_CLASS_ID
 };

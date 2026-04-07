@@ -38,5 +38,9 @@ class ComposeFragmentProcessor : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   explicit ComposeFragmentProcessor(std::vector<PlacementPtr<FragmentProcessor>> processors);
+
+  std::string shaderFunctionFile() const override {
+    return "";
+  }
 };
 }  // namespace tgfx
