@@ -35,11 +35,12 @@ class GLSLProgramBuilder : public ProgramBuilder {
   std::string getUniformBlockDeclaration(ShaderStage stage,
                                          const std::vector<Uniform>& uniforms) const override;
 
- private:
+ protected:
   GLSLProgramBuilder(Context* context, const ProgramInfo* programInfo);
 
   std::shared_ptr<Program> finalize();
 
+ private:
   UniformHandler* uniformHandler() override {
     return &_uniformHandler;
   }
@@ -69,6 +70,7 @@ class GLSLProgramBuilder : public ProgramBuilder {
   size_t vertexStride = 0;
 
   friend class ProgramBuilder;
+  friend class ModularProgramBuilder;
 #ifdef TGFX_USE_INSPECTOR
   friend class inspect::FrameCapture;
 #endif

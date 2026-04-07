@@ -45,5 +45,7 @@ class ClampedGradientEffect : public FragmentProcessor {
   size_t gradLayoutIndex = ULONG_MAX;
   Color leftBorderColor;
   Color rightBorderColor;
+
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

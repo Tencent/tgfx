@@ -112,5 +112,6 @@ class ShaderBuilder {
 
   friend class ProgramBuilder;
   friend class UniformHandler;
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

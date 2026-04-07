@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,33 +18,38 @@
 
 #pragma once
 
-#include "gpu/processors/FragmentProcessor.h"
-#include "tgfx/core/Color.h"
+#include <string>
 
 namespace tgfx {
-enum class InputMode { Ignore = 0, ModulateRGBA = 1, ModulateA = 2 };
 
-class ConstColorProcessor : public FragmentProcessor {
- public:
-  static PlacementPtr<ConstColorProcessor> Make(BlockAllocator* allocator, PMColor color,
-                                                InputMode inputMode);
-
-  std::string name() const override {
-    return "ConstColorProcessor";
-  }
-
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
- protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
-  ConstColorProcessor(PMColor color, InputMode mode)
-      : FragmentProcessor(ClassID()), color(color), inputMode(mode) {
-  }
-
-  PMColor color;
-  InputMode inputMode;
-
-  friend class ModularProgramBuilder;
+enum class ShaderModuleID {
+  TypesGLSL,
+  ConstColor,
+  LinearGradientLayout,
+  SingleIntervalGradientColorizer,
 };
+
+/**
+ * Registry of embedded shader module source code. Module text is compiled into the binary as C++
+ * string constants — no runtime file I/O is needed.
+ */
+class ShaderModuleRegistry {
+ public:
+  /**
+   * Returns the GLSL source text for the given module.
+   */
+  static const std::string& GetModule(ShaderModuleID id);
+
+  /**
+   * Returns true if the given processor name has a registered modular shader.
+   */
+  static bool HasModule(const std::string& processorName);
+
+  /**
+   * Returns the module ID for a processor name. The processor must have a registered module
+   * (check with HasModule() first).
+   */
+  static ShaderModuleID GetModuleID(const std::string& processorName);
+};
+
 }  // namespace tgfx

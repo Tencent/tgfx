@@ -70,11 +70,19 @@ class ProgramBuilder {
 
   ProgramBuilder(Context* context, const ProgramInfo* programInfo);
 
-  bool emitAndInstallProcessors();
+  virtual bool emitAndInstallProcessors();
 
   void finalizeShaders();
 
   virtual bool checkSamplerCounts() = 0;
+
+  void emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage);
+
+  void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn);
+
+  SamplerHandle emitSampler(std::shared_ptr<Texture> texture, const std::string& name);
+
+  void emitFSOutputSwizzle();
 
  private:
   std::vector<const Processor*> currentProcessors = {};
@@ -86,20 +94,13 @@ class ProgramBuilder {
    */
   void nameExpression(std::string* output, const std::string& baseName);
 
-  void emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage);
-
   void emitAndInstallFragProcessors(std::string* color, std::string* coverage);
 
   std::string emitAndInstallFragProc(const FragmentProcessor* processor,
                                      size_t transformedCoordVarsIdx, const std::string& input);
 
-  void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn);
-
-  SamplerHandle emitSampler(std::shared_ptr<Texture> texture, const std::string& name);
-
-  void emitFSOutputSwizzle();
-
   friend class FragmentShaderBuilder;
   friend class ProcessorGuard;
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx
