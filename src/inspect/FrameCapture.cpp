@@ -143,11 +143,6 @@ void FrameCapture::registerString(uint64_t ptr, const char* str) {
   exportedStrings[ptr] = str;
 }
 
-void FrameCapture::registerString(uint64_t ptr, const char* str, size_t len) {
-  std::lock_guard<std::mutex> lock(exportedStringsLock);
-  exportedStrings[ptr] = std::string(str, len);
-}
-
 void FrameCapture::sendAttributeData(const char* name, int val) {
   if (!isConnected()) {
     return;

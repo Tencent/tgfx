@@ -160,8 +160,6 @@ class FrameCapture {
 
   void registerString(uint64_t ptr, const char* str);
 
-  void registerString(uint64_t ptr, const char* str, size_t len);
-
   void sendString(uint64_t stringPtr, const char* str, FrameCaptureMessageType type);
 
   void sendString(uint64_t stringPtr, const char* str, size_t len, FrameCaptureMessageType type);
