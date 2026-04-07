@@ -31,25 +31,20 @@ static bool HasModularModule(const FragmentProcessor* fp) {
   return ShaderModuleRegistry::HasModule(fp->name());
 }
 
-// Returns true if the FP can be handled by the modular builder
-// (either it has a module, is a known container, or is a complex FP that falls back to emitCode).
-static bool IsModularFP(const FragmentProcessor* fp) {
+// Returns true if the FP can be handled by the modular builder.
+// Currently unused since CanUseModularPath() always returns true,
+// but retained for potential future selective path switching.
+__attribute__((unused)) static bool IsModularFP(const FragmentProcessor* fp) {
   auto name = fp->name();
   if (ShaderModuleRegistry::HasModule(name)) {
     return true;
   }
-  // ClampedGradientEffect is handled as inline control flow in main().
-  if (name == "ClampedGradientEffect") {
-    for (size_t i = 0; i < fp->numChildProcessors(); ++i) {
-      if (!IsModularFP(fp->childProcessor(i))) {
-        return false;
-      }
-    }
-    return true;
-  }
-  // Complex leaf FPs that fall back to legacy emitCode() within the modular builder.
-  // They don't have .glsl modules but are safe to use in the modular path.
-  if (name == "TextureEffect" || name == "TiledTextureEffect" ||
+  // Container FPs and complex leaf FPs that fall back to legacy emitCode() within the modular
+  // builder. They don't have .glsl modules but are safe to use in the modular path because
+  // their emitCode() methods produce correct GLSL regardless of the builder type.
+  if (name == "ClampedGradientEffect" || name == "ComposeFragmentProcessor" ||
+      name == "XfermodeFragmentProcessor" || name == "GaussianBlur1DFragmentProcessor" ||
+      name == "TextureEffect" || name == "TiledTextureEffect" ||
       name == "UnrolledBinaryGradientColorizer") {
     return true;
   }
@@ -63,11 +58,10 @@ ModularProgramBuilder::ModularProgramBuilder(Context* context, const ProgramInfo
 }
 
 bool ModularProgramBuilder::CanUseModularPath(const ProgramInfo* programInfo) {
-  for (size_t i = 0; i < programInfo->numFragmentProcessors(); ++i) {
-    if (!IsModularFP(programInfo->getFragmentProcessor(i))) {
-      return false;
-    }
-  }
+  // All fragment processors are now supported by the modular builder (either via modular .glsl
+  // modules for leaf FPs, or via legacy emitCode() fallback for containers and complex FPs).
+  // GP and XP use the same emitCode() paths as the legacy builder.
+  (void)programInfo;
   return true;
 }
 
