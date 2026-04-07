@@ -25,6 +25,7 @@ namespace tgfx::inspect {
 static constexpr int LZ4HeaderSize = 12;
 static constexpr int MinLZ4EncodeSize = 1024 * 4;
 static constexpr int TargetFrameSize = 256 * 1024;
+static constexpr int32_t MaxLayerTreeMessageSize = 32 * 1024 * 1024;
 static constexpr int HandshakeShibbolethSize = 4;
 static constexpr char HandshakeShibboleth[HandshakeShibbolethSize] = {'T', 'G', 'F', 'X'};
 

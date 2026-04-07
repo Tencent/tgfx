@@ -20,6 +20,7 @@
 #include <optional>
 #include <set>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 #include "FrameCaptureMessage.h"
 #include "FrameCaptureTexture.h"
@@ -157,6 +158,10 @@ class FrameCapture {
 
   bool sendData(const uint8_t* data, size_t len);
 
+  void registerString(uint64_t ptr, const char* str);
+
+  void registerString(uint64_t ptr, const char* str, size_t len);
+
   void sendString(uint64_t stringPtr, const char* str, FrameCaptureMessageType type);
 
   void sendString(uint64_t stringPtr, const char* str, size_t len, FrameCaptureMessageType type);
@@ -204,5 +209,6 @@ class FrameCapture {
   uint32_t captureFrameCount = 0;
   std::atomic<bool> _currentFrameShouldCaptrue = false;
   std::set<BytesKey> programKeys = {};
+  std::unordered_map<uint64_t, std::string> exportedStrings = {};
 };
 }  // namespace tgfx::inspect

@@ -137,6 +137,14 @@ void FrameCapture::sendFrameMark(const char* name) {
   queueSerialFinish(item);
 }
 
+void FrameCapture::registerString(uint64_t ptr, const char* str) {
+  exportedStrings[ptr] = str;
+}
+
+void FrameCapture::registerString(uint64_t ptr, const char* str, size_t len) {
+  exportedStrings[ptr] = std::string(str, len);
+}
+
 void FrameCapture::sendAttributeData(const char* name, int val) {
   if (!isConnected()) {
     return;
@@ -144,6 +152,7 @@ void FrameCapture::sendAttributeData(const char* name, int val) {
   FrameCaptureMessageItem item = {};
   item.hdr.type = FrameCaptureMessageType::ValueDataInt;
   item.attributeDataInt.name = reinterpret_cast<uint64_t>(name);
+  registerString(item.attributeDataInt.name, name);
   item.attributeDataInt.value = val;
   queueSerialFinish(item);
 }
@@ -155,6 +164,7 @@ void FrameCapture::sendAttributeData(const char* name, float val) {
   FrameCaptureMessageItem item = {};
   item.hdr.type = FrameCaptureMessageType::ValueDataFloat;
   item.attributeDataFloat.name = reinterpret_cast<uint64_t>(name);
+  registerString(item.attributeDataFloat.name, name);
   item.attributeDataFloat.value = val;
   queueSerialFinish(item);
 }
@@ -166,6 +176,7 @@ void FrameCapture::sendAttributeData(const char* name, bool val) {
   FrameCaptureMessageItem item = {};
   item.hdr.type = FrameCaptureMessageType::ValueDataBool;
   item.attributeDataBool.name = reinterpret_cast<uint64_t>(name);
+  registerString(item.attributeDataBool.name, name);
   item.attributeDataBool.value = val;
   queueSerialFinish(item);
 }
@@ -177,6 +188,7 @@ void FrameCapture::sendAttributeData(const char* name, uint8_t val, uint8_t type
   FrameCaptureMessageItem item = {};
   item.hdr.type = FrameCaptureMessageType::ValueDataEnum;
   item.attributeDataEnum.name = reinterpret_cast<uint64_t>(name);
+  registerString(item.attributeDataEnum.name, name);
   item.attributeDataEnum.value = static_cast<uint16_t>(type << 8 | val);
   queueSerialFinish(item);
 }
@@ -188,6 +200,7 @@ void FrameCapture::sendAttributeData(const char* name, uint32_t val, FrameCaptur
   FrameCaptureMessageItem item = {};
   item.hdr.type = type;
   item.attributeDataUint32.name = reinterpret_cast<uint64_t>(name);
+  registerString(item.attributeDataUint32.name, name);
   item.attributeDataUint32.value = val;
   queueSerialFinish(item);
 }
@@ -200,12 +213,14 @@ void FrameCapture::sendAttributeData(const char* name, float* val, int size) {
     FrameCaptureMessageItem item = {};
     item.hdr.type = FrameCaptureMessageType::ValueDataFloat4;
     item.attributeDataFloat4.name = reinterpret_cast<uint64_t>(name);
+    registerString(item.attributeDataFloat4.name, name);
     memcpy(item.attributeDataFloat4.value, val, static_cast<size_t>(size) * sizeof(float));
     queueSerialFinish(item);
   } else if (size == 6) {
     FrameCaptureMessageItem item = {};
     item.hdr.type = FrameCaptureMessageType::ValueDataMat3;
     item.attributeDataMat4.name = reinterpret_cast<uint64_t>(name);
+    registerString(item.attributeDataMat4.name, name);
     memcpy(item.attributeDataMat4.value, val, static_cast<size_t>(size) * sizeof(float));
     queueSerialFinish(item);
   }
@@ -488,6 +503,7 @@ void FrameCapture::clear() {
   dataBufferStart = 0;
   captureFrameCount = 0;
   programKeys.clear();
+  exportedStrings.clear();
   _currentFrameShouldCaptrue.store(false, std::memory_order_relaxed);
 }
 
@@ -518,16 +534,33 @@ bool FrameCapture::handleServerQuery() {
   auto ptr = payload.ptr;
   switch (type) {
     case ServerQuery::String: {
-      sendString(ptr, reinterpret_cast<const char*>(ptr), FrameCaptureMessageType::StringData);
+      auto iter = exportedStrings.find(ptr);
+      if (iter == exportedStrings.end()) {
+        return false;
+      }
+      sendString(ptr, iter->second.c_str(), iter->second.size(),
+                 FrameCaptureMessageType::StringData);
+      break;
     }
     case ServerQuery::ValueName: {
-      sendString(ptr, reinterpret_cast<const char*>(ptr), FrameCaptureMessageType::ValueName);
+      auto iter = exportedStrings.find(ptr);
+      if (iter == exportedStrings.end()) {
+        return false;
+      }
+      sendString(ptr, iter->second.c_str(), iter->second.size(),
+                 FrameCaptureMessageType::ValueName);
+      break;
     }
     case ServerQuery::CaptureFrame: {
+      static constexpr uint32_t MaxCaptureBurst = 1000;
+      if (payload.extra > MaxCaptureBurst) {
+        return false;
+      }
       captureFrameCount += payload.extra;
+      break;
     }
     default:
-      break;
+      return false;
   }
   return true;
 }
