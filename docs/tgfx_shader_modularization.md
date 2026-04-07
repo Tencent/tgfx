@@ -3705,6 +3705,7 @@ Phase 1-3 及后续复杂 FP 迁移于 2026-04-07 完成，共 4 个 commit：
 | `54aed8fb` | Phase 2 | 15 | +411/-29 |
 | `b4bdfd0d` | Phase 3 | 1 | +14/-20 |
 | `25d6a686` | 复杂 FP 迁移 | 5 | +680/-59 |
+| `2f0c882e` | 容器 FP 展开 | 4 | +105/-5 |
 
 ### 16.2 最终架构
 
@@ -3725,15 +3726,19 @@ Phase 1-3 及后续复杂 FP 迁移于 2026-04-07 完成，共 4 个 commit：
                                     │
                     ┌───────────────┼───────────────┐
                     │               │               │
-              叶子 FP (模块化)  叶子 FP (内联)     容器 FP (fallback)
-              emitLeafFPCall()  emitLeafFPCall()   emitCode()
-              调用 .glsl 函数    直接生成等价 GLSL   传统 emitChild()
+              叶子 FP (模块化)  叶子 FP (内联)     容器 FP (显式分发)
+              emitLeafFPCall()  emitLeafFPCall()   emitXxxFP()
+              调用 .glsl 函数    直接生成等价 GLSL   legacy emitCode()/emitChild()
 ```
 
 **三类 FP 处理路径**：
 1. **模块化叶子 FP**（13 个）：有对应的 `.glsl` 模块函数文件，通过 `emitLeafFPCall()` 生成函数调用 + uniform 声明
-2. **内联叶子 FP**（3 个）：TextureEffect、TiledTextureEffect、UnrolledBinaryGradientColorizer — 逻辑复杂（YUV 多通道、9 种 TileMode、8 层二叉查找），在 `emitLeafFPCall()` 中直接生成与原 emitCode() 等价的 GLSL 代码，不再通过 legacy fallback
-3. **容器 FP**（4 个）：ClampedGradientEffect（已实现模块化内联展开）、ComposeFragmentProcessor、XfermodeFragmentProcessor、GaussianBlur1DFragmentProcessor — 后 3 个通过 legacy `emitCode()` 处理
+2. **内联叶子 FP**（3 个）：TextureEffect、TiledTextureEffect、UnrolledBinaryGradientColorizer — 逻辑复杂（YUV 多通道、9 种 TileMode、8 层二叉查找），在 `emitLeafFPCall()` 中直接生成与原 emitCode() 等价的 GLSL 代码
+3. **容器 FP**（4 个）：每个有专用分发方法
+   - ClampedGradientEffect → `emitClampedGradientEffect()` 模块化内联展开
+   - ComposeFragmentProcessor → `emitComposeFragmentProcessor()` 使用 legacy emitCode()/emitChild()
+   - XfermodeFragmentProcessor → `emitXfermodeFragmentProcessor()` 使用 legacy emitCode()/emitChild()
+   - GaussianBlur1DFragmentProcessor → `emitGaussianBlur1DFragmentProcessor()` 使用 legacy emitCode()/emitChild()
 
 ### 16.3 创建的 .glsl 模块文件（13 个）
 
@@ -3763,8 +3768,8 @@ src/gpu/shaders/
 
 | 文件 | 行数 | 说明 |
 |------|------|------|
-| `src/gpu/ModularProgramBuilder.h` | 103 | ModularProgramBuilder 类定义 |
-| `src/gpu/ModularProgramBuilder.cpp` | 1039 | 核心实现：16 个叶子 FP 展开（含 3 个复杂 FP 内联）、ClampedGradient 内联、容器 FP fallback |
+| `src/gpu/ModularProgramBuilder.h` | 121 | ModularProgramBuilder 类定义 |
+| `src/gpu/ModularProgramBuilder.cpp` | 1133 | 核心实现：16 个叶子 FP 展开（含 3 个复杂 FP 内联）、4 个容器 FP 显式分发、safety fallback |
 | `src/gpu/ShaderModuleRegistry.h` | 62 | 模块 ID 枚举 + 查找 API |
 | `src/gpu/ShaderModuleRegistry.cpp` | 236 | 13 个 GLSL 模块嵌入为 C++ 字符串常量 |
 | `test/src/ModularShaderTest.cpp` | 107 | 3 个测试用例（纯色、渐变、基本渲染） |
@@ -3783,6 +3788,8 @@ src/gpu/shaders/
 | `src/gpu/processors/TextureEffect.h` | 添加 friend（访问 textureProxy、alphaStart、constraint、subset 等） |
 | `src/gpu/processors/TiledTextureEffect.h` | 添加 friend（访问 samplerState、textureProxy、subset、Sampling 等） |
 | `src/gpu/processors/UnrolledBinaryGradientColorizer.h` | 添加 friend（访问 intervalCount） |
+| `src/gpu/processors/XfermodeFragmentProcessor.h` | 添加 friend（访问 child 枚举和 mode） |
+| `src/gpu/processors/GaussianBlur1DFragmentProcessor.h` | 添加 friend（访问 sigma、maxSigma 等） |
 | `CMakeLists.txt` | 添加 `TGFX_USE_MODULAR_SHADERS` 选项 |
 
 ### 16.5 关键架构决策及理由
@@ -3814,14 +3821,19 @@ src/gpu/shaders/
 
 **理由**：不创建 `.glsl` 文件是因为这些 FP 的 uniform 数量和代码结构依赖运行时状态，无法用简单的函数签名表达。但内联生成（而非 fallback）确保了所有叶子 FP 统一由 `emitLeafFPCall()` 处理，消除了对 legacy `emitCode()` 路径的依赖。
 
-#### 决策 4：容器 FP 通过 emitCode() fallback 处理（除 ClampedGradientEffect）
+#### 决策 4：容器 FP 通过显式分发 + legacy emitCode() 处理（已从通用 fallback 迁移）
 
-**选择**：ComposeFragmentProcessor、XfermodeFragmentProcessor、GaussianBlur1DFragmentProcessor 使用传统 `emitCode()` + `emitChild()` 递归路径
+**选择**：ComposeFragmentProcessor、XfermodeFragmentProcessor、GaussianBlur1DFragmentProcessor 各有专用分发方法，内部使用传统 `emitCode()` + `emitChild()` 递归路径
+
+**原始方案**：Phase 3 中这 3 个容器 FP 通过通用 `else { processor->emitCode(args); }` fallback 处理
+
+**迁移后方案**（commit `2f0c882e`）：每个容器 FP 有独立的 `emitXxxFragmentProcessor()` 方法，在 `emitModularFragProc()` 中按名称显式分发。消除了通用 fallback 分支（仅保留 safety fallback 用于未知 FP 类型）。
 
 **理由**：
-- 容器 FP 的 emitCode() 内部调用 `emitChild()` 递归展开子 FP，子 FP 可以是任意类型
-- `emitChild()` 通过 `FragmentShaderBuilder` + `ProgramBuilder` 机制自动处理变量名 mangle 和 scope 隔离
+- 容器 FP 的 emitCode() 内部调用 `emitChild()` 递归展开子 FP，`emitChild()` 通过 `FragmentShaderBuilder` + `ProgramBuilder` 机制自动处理变量名 mangle 和 scope 隔离
+- GaussianBlur1DFragmentProcessor 的 `emitChild()` 传递 `coordFunc` lambda 修改纹理坐标，这一机制深度集成在 `EmitArgs` 中，无法简单替换为 `emitModularFragProc()` 递归调用
 - ClampedGradientEffect 被特殊处理是因为它是最常用的渐变管线入口，且子 FP 结构固定（Layout + Colorizer）
+- 显式分发（而非通用 fallback）使得 `emitModularFragProc()` 的分发逻辑完全可审计：每个 FP 类型都有明确的处理入口
 
 #### 决策 5：GP 和 XP 保留传统 emitCode() 路径
 
@@ -3847,7 +3859,7 @@ ModularProgramBuilder 处理 100% 的渲染管线，无回退到 GLSLProgramBuil
 | 项目 | 说明 | 优先级 |
 |------|------|--------|
 | ~~复杂叶子 FP 迁移~~ | ~~TextureEffect/TiledTexture/UnrolledBinary 提取为 .glsl 模块~~ | ✅ 已完成（`25d6a686`，内联生成方式） |
-| 容器 FP 模块化展开 | Compose/Xfermode/GaussianBlur 替换 emitCode() fallback | 中 |
+| ~~容器 FP 模块化展开~~ | ~~Compose/Xfermode/GaussianBlur 替换 emitCode() fallback~~ | ✅ 已完成（`2f0c882e`，显式分发 + legacy emitCode()） |
 | GP FS 逻辑提取 | 将 Ellipse/HairlineQuad 等 GP 的 SDF 计算提取为 .glsl 函数 | 低 |
 | XP blend 模块化 | 将 GLSLBlend.cpp 的 AppendMode() 提取为 tgfx_blend.glsl | 低 |
 | Layer 0 其他后端 | 实现 tgfx_types_ue.glsl / tgfx_types_vulkan.glsl / tgfx_types_metal.glsl | 取决于 UE 后端进度 |
