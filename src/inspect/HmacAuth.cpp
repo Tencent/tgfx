@@ -206,22 +206,30 @@ void hmacSha256(const uint8_t* key, size_t keyLen, const uint8_t* data, size_t d
   sha256Final(outer, out);
 }
 
-void generateChallenge(uint8_t out[ChallengeSize]) {
+bool generateChallenge(uint8_t out[ChallengeSize]) {
 #ifdef _WIN32
-  BCryptGenRandom(nullptr, out, ChallengeSize, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+  if (BCryptGenRandom(nullptr, out, ChallengeSize, BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0) {
+    return false;
+  }
 #else
   int fd = open("/dev/urandom", O_RDONLY);
-  if (fd >= 0) {
-    auto bytesRead = read(fd, out, ChallengeSize);
-    (void)bytesRead;
-    close(fd);
+  if (fd < 0) {
+    return false;
+  }
+  auto bytesRead = read(fd, out, ChallengeSize);
+  close(fd);
+  if (bytesRead != static_cast<ssize_t>(ChallengeSize)) {
+    return false;
   }
 #endif
+  return true;
 }
 
 bool authenticateClient(Socket* sock) {
   uint8_t challenge[ChallengeSize] = {};
-  generateChallenge(challenge);
+  if (!generateChallenge(challenge)) {
+    return false;
+  }
   if (sock->sendData(challenge, ChallengeSize) == -1) {
     return false;
   }

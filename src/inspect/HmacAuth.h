@@ -34,7 +34,7 @@ void sha256(const uint8_t* data, size_t len, uint8_t out[Sha256DigestSize]);
 void hmacSha256(const uint8_t* key, size_t keyLen, const uint8_t* data, size_t dataLen,
                 uint8_t out[HmacSize]);
 
-void generateChallenge(uint8_t out[ChallengeSize]);
+bool generateChallenge(uint8_t out[ChallengeSize]);
 
 /**
  * Performs challenge-response authentication on an accepted socket. The server sends a random
