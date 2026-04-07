@@ -68,5 +68,7 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
   Color bias14_15;
   Rect thresholds1_7;
   Rect thresholds9_13;
+
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

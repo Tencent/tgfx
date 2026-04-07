@@ -81,5 +81,7 @@ class TiledTextureEffect : public FragmentProcessor {
   CoordTransform coordTransform;
   Rect subset = Rect::MakeEmpty();
   SrcRectConstraint constraint = SrcRectConstraint::Fast;
+
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

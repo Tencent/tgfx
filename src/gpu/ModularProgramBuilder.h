@@ -64,9 +64,8 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
   /**
    * Emits code for ClampedGradientEffect using inline control flow + child module function calls.
    */
-  void emitClampedGradientEffect(const FragmentProcessor* processor,
-                                 size_t transformedCoordVarsIdx, const std::string& input,
-                                 const std::string& output);
+  void emitClampedGradientEffect(const FragmentProcessor* processor, size_t transformedCoordVarsIdx,
+                                 const std::string& input, const std::string& output);
 
   /**
    * Emits a call to a leaf modular FP function (e.g., FP_ConstColor).
@@ -83,6 +82,17 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
    * Emits #define directives for a processor's compile-time switches.
    */
   void emitProcessorDefines(const FragmentProcessor* processor);
+
+  // ---- Complex FP inline emission methods ----
+
+  void emitUnrolledBinaryGradientColorizer(const FragmentProcessor* processor,
+                                           const std::string& input, const std::string& output);
+
+  void emitTextureEffect(const FragmentProcessor* processor, size_t transformedCoordVarsIdx,
+                         const std::string& input, const std::string& output);
+
+  void emitTiledTextureEffect(const FragmentProcessor* processor, size_t transformedCoordVarsIdx,
+                              const std::string& input, const std::string& output);
 
   std::set<ShaderModuleID> includedModules;
   // Sampler handles collected during emitModularFragProc, available for emitLeafFPCall.

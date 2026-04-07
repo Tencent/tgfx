@@ -21,6 +21,10 @@
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/processors/UnrolledBinaryGradientColorizer.h"
+#include "gpu/resources/YUVTextureView.h"
 
 namespace tgfx {
 
@@ -43,8 +47,11 @@ __attribute__((unused)) static bool IsModularFP(const FragmentProcessor* fp) {
   // builder. They don't have .glsl modules but are safe to use in the modular path because
   // their emitCode() methods produce correct GLSL regardless of the builder type.
   if (name == "ClampedGradientEffect" || name == "ComposeFragmentProcessor" ||
-      name == "XfermodeFragmentProcessor" || name == "GaussianBlur1DFragmentProcessor" ||
-      name == "TextureEffect" || name == "TiledTextureEffect" ||
+      name == "XfermodeFragmentProcessor" || name == "GaussianBlur1DFragmentProcessor") {
+    return true;
+  }
+  // Complex leaf FPs that are handled inline in emitLeafFPCall().
+  if (name == "TextureEffect" || name == "TiledTextureEffect" ||
       name == "UnrolledBinaryGradientColorizer") {
     return true;
   }
@@ -86,8 +93,7 @@ void ModularProgramBuilder::includeModule(ShaderModuleID id) {
   }
   includedModules.insert(id);
   // Always include types first.
-  if (id != ShaderModuleID::TypesGLSL &&
-      includedModules.count(ShaderModuleID::TypesGLSL) == 0) {
+  if (id != ShaderModuleID::TypesGLSL && includedModules.count(ShaderModuleID::TypesGLSL) == 0) {
     includeModule(ShaderModuleID::TypesGLSL);
   }
   fragmentShaderBuilder()->addFunction(ShaderModuleRegistry::GetModule(id));
@@ -159,10 +165,11 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
   auto name = processor->name();
   if (name == "ClampedGradientEffect") {
     emitClampedGradientEffect(processor, transformedCoordVarsIdx, input, output);
-  } else if (HasModularModule(processor)) {
+  } else if (HasModularModule(processor) || name == "UnrolledBinaryGradientColorizer" ||
+             name == "TextureEffect" || name == "TiledTextureEffect") {
     emitLeafFPCall(processor, transformedCoordVarsIdx, input, output);
   } else {
-    // Complex FP without a .glsl module — fall back to legacy emitCode() path.
+    // Container FPs (Compose, Xfermode, GaussianBlur) fall back to legacy emitCode() path.
     // Build the EmitArgs with the collected samplers and coord transforms.
     FragmentProcessor::TransformedCoordVars coords(
         processor, transformedCoordVarsIdx < transformedCoordVars.size()
@@ -184,19 +191,22 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
 // ---- Leaf FP function call emission ----
 
 void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
-                                           size_t transformedCoordVarsIdx,
-                                           const std::string& input, const std::string& output) {
+                                           size_t transformedCoordVarsIdx, const std::string& input,
+                                           const std::string& output) {
   auto name = processor->name();
-  auto moduleID = ShaderModuleRegistry::GetModuleID(name);
-  emitProcessorDefines(processor);
-  includeModule(moduleID);
+  // Only include .glsl module for FPs that have one registered.
+  if (ShaderModuleRegistry::HasModule(name)) {
+    auto moduleID = ShaderModuleRegistry::GetModuleID(name);
+    emitProcessorDefines(processor);
+    includeModule(moduleID);
+  }
 
   auto fragBuilder = fragmentShaderBuilder();
 
   if (name == "ConstColorProcessor") {
     // Declare uniform using legacy naming convention.
-    auto colorName = uniformHandler()->addUniform("Color", UniformFormat::Float4,
-                                                  ShaderStage::Fragment);
+    auto colorName =
+        uniformHandler()->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
     fragBuilder->codeAppendf("%s = FP_ConstColor(%s, %s);", output.c_str(),
                              input.empty() ? "vec4(1.0)" : input.c_str(), colorName.c_str());
   } else if (name == "LinearGradientLayout") {
@@ -206,14 +216,13 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
     fragBuilder->codeAppendf("%s = FP_LinearGradientLayout(%s);", output.c_str(),
                              coordName.c_str());
   } else if (name == "SingleIntervalGradientColorizer") {
-    auto startName = uniformHandler()->addUniform("start", UniformFormat::Float4,
-                                                  ShaderStage::Fragment);
-    auto endName = uniformHandler()->addUniform("end", UniformFormat::Float4,
-                                                ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = FP_SingleIntervalGradientColorizer(%s, %s, %s);",
-                             output.c_str(),
-                             input.empty() ? "vec4(1.0)" : input.c_str(),
-                             startName.c_str(), endName.c_str());
+    auto startName =
+        uniformHandler()->addUniform("start", UniformFormat::Float4, ShaderStage::Fragment);
+    auto endName =
+        uniformHandler()->addUniform("end", UniformFormat::Float4, ShaderStage::Fragment);
+    fragBuilder->codeAppendf("%s = FP_SingleIntervalGradientColorizer(%s, %s, %s);", output.c_str(),
+                             input.empty() ? "vec4(1.0)" : input.c_str(), startName.c_str(),
+                             endName.c_str());
   } else if (name == "RadialGradientLayout") {
     auto& coordVar = transformedCoordVars[transformedCoordVarsIdx];
     auto coordName = fragBuilder->emitPerspTextCoord(coordVar);
@@ -247,36 +256,32 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
                              input.empty() ? "vec4(1.0)" : input.c_str(), matrixName.c_str(),
                              vectorName.c_str());
   } else if (name == "LumaFragmentProcessor") {
-    auto krName =
-        uniformHandler()->addUniform("Kr", UniformFormat::Float, ShaderStage::Fragment);
-    auto kgName =
-        uniformHandler()->addUniform("Kg", UniformFormat::Float, ShaderStage::Fragment);
-    auto kbName =
-        uniformHandler()->addUniform("Kb", UniformFormat::Float, ShaderStage::Fragment);
+    auto krName = uniformHandler()->addUniform("Kr", UniformFormat::Float, ShaderStage::Fragment);
+    auto kgName = uniformHandler()->addUniform("Kg", UniformFormat::Float, ShaderStage::Fragment);
+    auto kbName = uniformHandler()->addUniform("Kb", UniformFormat::Float, ShaderStage::Fragment);
     fragBuilder->codeAppendf("%s = FP_Luma(%s, %s, %s, %s);", output.c_str(),
                              input.empty() ? "vec4(1.0)" : input.c_str(), krName.c_str(),
                              kgName.c_str(), kbName.c_str());
   } else if (name == "DualIntervalGradientColorizer") {
-    auto scale01Name = uniformHandler()->addUniform("scale01", UniformFormat::Float4,
-                                                    ShaderStage::Fragment);
-    auto bias01Name = uniformHandler()->addUniform("bias01", UniformFormat::Float4,
-                                                   ShaderStage::Fragment);
-    auto scale23Name = uniformHandler()->addUniform("scale23", UniformFormat::Float4,
-                                                    ShaderStage::Fragment);
-    auto bias23Name = uniformHandler()->addUniform("bias23", UniformFormat::Float4,
-                                                   ShaderStage::Fragment);
-    auto thresholdName = uniformHandler()->addUniform("threshold", UniformFormat::Float,
-                                                      ShaderStage::Fragment);
-    fragBuilder->codeAppendf(
-        "%s = FP_DualIntervalGradientColorizer(%s, %s, %s, %s, %s, %s);", output.c_str(),
-        input.empty() ? "vec4(1.0)" : input.c_str(), scale01Name.c_str(), bias01Name.c_str(),
-        scale23Name.c_str(), bias23Name.c_str(), thresholdName.c_str());
+    auto scale01Name =
+        uniformHandler()->addUniform("scale01", UniformFormat::Float4, ShaderStage::Fragment);
+    auto bias01Name =
+        uniformHandler()->addUniform("bias01", UniformFormat::Float4, ShaderStage::Fragment);
+    auto scale23Name =
+        uniformHandler()->addUniform("scale23", UniformFormat::Float4, ShaderStage::Fragment);
+    auto bias23Name =
+        uniformHandler()->addUniform("bias23", UniformFormat::Float4, ShaderStage::Fragment);
+    auto thresholdName =
+        uniformHandler()->addUniform("threshold", UniformFormat::Float, ShaderStage::Fragment);
+    fragBuilder->codeAppendf("%s = FP_DualIntervalGradientColorizer(%s, %s, %s, %s, %s, %s);",
+                             output.c_str(), input.empty() ? "vec4(1.0)" : input.c_str(),
+                             scale01Name.c_str(), bias01Name.c_str(), scale23Name.c_str(),
+                             bias23Name.c_str(), thresholdName.c_str());
   } else if (name == "AlphaThresholdFragmentProcessor") {
-    auto thresholdName = uniformHandler()->addUniform("Threshold", UniformFormat::Float,
-                                                      ShaderStage::Fragment);
+    auto thresholdName =
+        uniformHandler()->addUniform("Threshold", UniformFormat::Float, ShaderStage::Fragment);
     fragBuilder->codeAppendf("%s = FP_AlphaThreshold(%s, %s);", output.c_str(),
-                             input.empty() ? "vec4(1.0)" : input.c_str(),
-                             thresholdName.c_str());
+                             input.empty() ? "vec4(1.0)" : input.c_str(), thresholdName.c_str());
   } else if (name == "TextureGradientColorizer") {
     // TextureGradientColorizer uses one sampler; the sampler handle is at index 0.
     auto samplerVar = uniformHandler()->getSamplerVariable(currentTexSamplers[0]);
@@ -298,9 +303,610 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
       fragBuilder->codeAppendf("%s = %s.a * %s;", output.c_str(), output.c_str(),
                                input.empty() ? "vec4(1.0)" : input.c_str());
     } else {
-      fragBuilder->codeAppendf("%s = %s * %s.a;", output.c_str(), output.c_str(),
-                               output.c_str());
+      fragBuilder->codeAppendf("%s = %s * %s.a;", output.c_str(), output.c_str(), output.c_str());
     }
+  } else if (name == "UnrolledBinaryGradientColorizer") {
+    emitUnrolledBinaryGradientColorizer(processor, input, output);
+  } else if (name == "TextureEffect") {
+    emitTextureEffect(processor, transformedCoordVarsIdx, input, output);
+  } else if (name == "TiledTextureEffect") {
+    emitTiledTextureEffect(processor, transformedCoordVarsIdx, input, output);
+  }
+}
+
+// ---- UnrolledBinaryGradientColorizer inline emission ----
+
+static std::string AddUniformIfNeeded(UniformHandler* handler, const std::string& name,
+                                      int intervalCount, int limit) {
+  if (intervalCount > limit) {
+    return handler->addUniform(name, UniformFormat::Float4, ShaderStage::Fragment);
+  }
+  return "";
+}
+
+static void AppendBinaryTreeCode1(FragmentShaderBuilder* fragBuilder, int intervalCount,
+                                  const std::string& scale0_1, const std::string& scale2_3,
+                                  const std::string& scale4_5, const std::string& scale6_7,
+                                  const std::string& bias0_1, const std::string& bias2_3,
+                                  const std::string& bias4_5, const std::string& bias6_7,
+                                  const std::string& thresholds1_7) {
+  if (intervalCount >= 2) {
+    fragBuilder->codeAppendf("if (t < %s.y) {", thresholds1_7.c_str());
+  }
+  fragBuilder->codeAppendf("if (t < %s.x) {", thresholds1_7.c_str());
+  fragBuilder->codeAppendf("scale = %s;", scale0_1.c_str());
+  fragBuilder->codeAppendf("bias = %s;", bias0_1.c_str());
+  if (intervalCount > 1) {
+    fragBuilder->codeAppend("} else {");
+    fragBuilder->codeAppendf("scale = %s;", scale2_3.empty() ? "vec4(0.0)" : scale2_3.c_str());
+    fragBuilder->codeAppendf("bias = %s;", bias2_3.empty() ? "vec4(0.0)" : bias2_3.c_str());
+  }
+  fragBuilder->codeAppend("}");
+  if (intervalCount > 2) {
+    fragBuilder->codeAppend("} else {");
+  }
+  if (intervalCount >= 3) {
+    fragBuilder->codeAppendf("if (t < %s.z) {", thresholds1_7.c_str());
+    fragBuilder->codeAppendf("scale = %s;", scale4_5.empty() ? "vec4(0.0)" : scale4_5.c_str());
+    fragBuilder->codeAppendf("bias = %s;", bias4_5.empty() ? "vec4(0.0)" : bias4_5.c_str());
+  }
+  if (intervalCount > 3) {
+    fragBuilder->codeAppend("} else {");
+    fragBuilder->codeAppendf("scale = %s;", scale6_7.empty() ? "vec4(0.0)" : scale6_7.c_str());
+    fragBuilder->codeAppendf("bias = %s;", bias6_7.empty() ? "vec4(0.0)" : bias6_7.c_str());
+  }
+  if (intervalCount >= 3) {
+    fragBuilder->codeAppend("}");
+  }
+  if (intervalCount >= 2) {
+    fragBuilder->codeAppend("}");
+  }
+}
+
+static void AppendBinaryTreeCode2(FragmentShaderBuilder* fragBuilder, int intervalCount,
+                                  const std::string& scale8_9, const std::string& scale10_11,
+                                  const std::string& scale12_13, const std::string& scale14_15,
+                                  const std::string& bias8_9, const std::string& bias10_11,
+                                  const std::string& bias12_13, const std::string& bias14_15,
+                                  const std::string& thresholds9_13) {
+  if (intervalCount >= 6) {
+    fragBuilder->codeAppendf("if (t < %s.y) {", thresholds9_13.c_str());
+  }
+  if (intervalCount >= 5) {
+    fragBuilder->codeAppendf("if (t < %s.x) {", thresholds9_13.c_str());
+    fragBuilder->codeAppendf("scale = %s;", scale8_9.empty() ? "vec4(0.0)" : scale8_9.c_str());
+    fragBuilder->codeAppendf("bias = %s;", bias8_9.empty() ? "vec4(0.0)" : bias8_9.c_str());
+  }
+  if (intervalCount > 5) {
+    fragBuilder->codeAppend("} else {");
+    fragBuilder->codeAppendf("scale = %s;", scale10_11.empty() ? "vec4(0.0)" : scale10_11.c_str());
+    fragBuilder->codeAppendf("bias = %s;", bias10_11.empty() ? "vec4(0.0)" : bias10_11.c_str());
+  }
+  if (intervalCount >= 5) {
+    fragBuilder->codeAppend("}");
+  }
+  if (intervalCount > 6) {
+    fragBuilder->codeAppend("} else {");
+  }
+  if (intervalCount >= 7) {
+    fragBuilder->codeAppendf("if (t < %s.z) {", thresholds9_13.c_str());
+    fragBuilder->codeAppendf("scale = %s;", scale12_13.empty() ? "vec4(0.0)" : scale12_13.c_str());
+    fragBuilder->codeAppendf("bias = %s;", bias12_13.empty() ? "vec4(0.0)" : bias12_13.c_str());
+  }
+  if (intervalCount > 7) {
+    fragBuilder->codeAppend("} else {");
+    fragBuilder->codeAppendf("scale = %s;", scale14_15.empty() ? "vec4(0.0)" : scale14_15.c_str());
+    fragBuilder->codeAppendf("bias = %s;", bias14_15.empty() ? "vec4(0.0)" : bias14_15.c_str());
+  }
+  if (intervalCount >= 7) {
+    fragBuilder->codeAppend("}");
+  }
+  if (intervalCount >= 6) {
+    fragBuilder->codeAppend("}");
+  }
+}
+
+void ModularProgramBuilder::emitUnrolledBinaryGradientColorizer(const FragmentProcessor* processor,
+                                                                const std::string& input,
+                                                                const std::string& output) {
+  auto colorizer = static_cast<const UnrolledBinaryGradientColorizer*>(processor);
+  auto fragBuilder = fragmentShaderBuilder();
+  auto uHandler = uniformHandler();
+  int ic = colorizer->intervalCount;
+
+  auto scale0_1 = AddUniformIfNeeded(uHandler, "scale0_1", ic, 0);
+  auto scale2_3 = AddUniformIfNeeded(uHandler, "scale2_3", ic, 1);
+  auto scale4_5 = AddUniformIfNeeded(uHandler, "scale4_5", ic, 2);
+  auto scale6_7 = AddUniformIfNeeded(uHandler, "scale6_7", ic, 3);
+  auto scale8_9 = AddUniformIfNeeded(uHandler, "scale8_9", ic, 4);
+  auto scale10_11 = AddUniformIfNeeded(uHandler, "scale10_11", ic, 5);
+  auto scale12_13 = AddUniformIfNeeded(uHandler, "scale12_13", ic, 6);
+  auto scale14_15 = AddUniformIfNeeded(uHandler, "scale14_15", ic, 7);
+  auto bias0_1 = AddUniformIfNeeded(uHandler, "bias0_1", ic, 0);
+  auto bias2_3 = AddUniformIfNeeded(uHandler, "bias2_3", ic, 1);
+  auto bias4_5 = AddUniformIfNeeded(uHandler, "bias4_5", ic, 2);
+  auto bias6_7 = AddUniformIfNeeded(uHandler, "bias6_7", ic, 3);
+  auto bias8_9 = AddUniformIfNeeded(uHandler, "bias8_9", ic, 4);
+  auto bias10_11 = AddUniformIfNeeded(uHandler, "bias10_11", ic, 5);
+  auto bias12_13 = AddUniformIfNeeded(uHandler, "bias12_13", ic, 6);
+  auto bias14_15 = AddUniformIfNeeded(uHandler, "bias14_15", ic, 7);
+  auto thresholds1_7 =
+      uHandler->addUniform("thresholds1_7", UniformFormat::Float4, ShaderStage::Fragment);
+  auto thresholds9_13 =
+      uHandler->addUniform("thresholds9_13", UniformFormat::Float4, ShaderStage::Fragment);
+
+  fragBuilder->codeAppendf("float t = %s.x;", input.empty() ? "vec4(1.0)" : input.c_str());
+  fragBuilder->codeAppend("vec4 scale, bias;");
+
+  if (ic >= 4) {
+    fragBuilder->codeAppendf("if (t < %s.w) {", thresholds1_7.c_str());
+  }
+  AppendBinaryTreeCode1(fragBuilder, ic, scale0_1, scale2_3, scale4_5, scale6_7, bias0_1, bias2_3,
+                        bias4_5, bias6_7, thresholds1_7);
+  if (ic > 4) {
+    fragBuilder->codeAppend("} else {");
+  }
+  AppendBinaryTreeCode2(fragBuilder, ic, scale8_9, scale10_11, scale12_13, scale14_15, bias8_9,
+                        bias10_11, bias12_13, bias14_15, thresholds9_13);
+  if (ic >= 4) {
+    fragBuilder->codeAppend("}");
+  }
+
+  fragBuilder->codeAppendf("%s = vec4(t * scale + bias);", output.c_str());
+}
+
+// ---- TextureEffect inline emission ----
+
+void ModularProgramBuilder::emitTextureEffect(const FragmentProcessor* processor,
+                                              size_t transformedCoordVarsIdx,
+                                              const std::string& input, const std::string& output) {
+  auto texEffect = static_cast<const TextureEffect*>(processor);
+  auto fragBuilder = fragmentShaderBuilder();
+  auto uHandler = uniformHandler();
+  auto textureView = texEffect->getTextureView();
+  if (textureView == nullptr) {
+    fragBuilder->codeAppendf("%s = vec4(0.0);", output.c_str());
+    return;
+  }
+  auto texCoordName =
+      fragBuilder->emitPerspTextCoord(transformedCoordVars[transformedCoordVarsIdx]);
+
+  std::string subsetName;
+  if (texEffect->needSubset()) {
+    subsetName = uHandler->addUniform("Subset", UniformFormat::Float4, ShaderStage::Fragment);
+  }
+  std::string extraSubsetName;
+  if (texEffect->constraint == SrcRectConstraint::Strict) {
+    extraSubsetName = subsetVarName;
+  }
+
+  // appendClamp helper inline
+  auto appendClamp = [&](const std::string& vertexColor, const std::string& finalCoordName) {
+    fragBuilder->codeAppendf("%s = %s;", finalCoordName.c_str(), vertexColor.c_str());
+    if (!extraSubsetName.empty()) {
+      fragBuilder->codeAppend("{");
+      fragBuilder->codeAppendf("%s = clamp(%s, %s.xy, %s.zw);", finalCoordName.c_str(),
+                               vertexColor.c_str(), extraSubsetName.c_str(),
+                               extraSubsetName.c_str());
+      fragBuilder->codeAppend("}");
+    }
+    if (!subsetName.empty()) {
+      fragBuilder->codeAppendf("%s = clamp(%s, %s.xy, %s.zw);", finalCoordName.c_str(),
+                               finalCoordName.c_str(), subsetName.c_str(), subsetName.c_str());
+    }
+  };
+
+  if (textureView->isYUV()) {
+    // ---- YUV path ----
+    auto yuvTexture = texEffect->getYUVTexture();
+    fragBuilder->codeAppend("highp vec2 finalCoord;");
+    appendClamp(texCoordName, "finalCoord");
+    fragBuilder->codeAppend("vec3 yuv;");
+    fragBuilder->codeAppend("yuv.x = ");
+    fragBuilder->appendTextureLookup(currentTexSamplers[0], "finalCoord");
+    fragBuilder->codeAppend(".r;");
+    if (yuvTexture->yuvFormat() == YUVFormat::I420) {
+      appendClamp(texCoordName, "finalCoord");
+      fragBuilder->codeAppend("yuv.y = ");
+      fragBuilder->appendTextureLookup(currentTexSamplers[1], "finalCoord");
+      fragBuilder->codeAppend(".r;");
+      appendClamp(texCoordName, "finalCoord");
+      fragBuilder->codeAppend("yuv.z = ");
+      fragBuilder->appendTextureLookup(currentTexSamplers[2], "finalCoord");
+      fragBuilder->codeAppend(".r;");
+    } else if (yuvTexture->yuvFormat() == YUVFormat::NV12) {
+      appendClamp(texCoordName, "finalCoord");
+      fragBuilder->codeAppend("yuv.yz = ");
+      fragBuilder->appendTextureLookup(currentTexSamplers[1], "finalCoord");
+      fragBuilder->codeAppend(".ra;");
+    }
+    if (IsLimitedYUVColorRange(yuvTexture->yuvColorSpace())) {
+      fragBuilder->codeAppend("yuv.x -= (16.0 / 255.0);");
+    }
+    fragBuilder->codeAppend("yuv.yz -= vec2(0.5, 0.5);");
+    auto mat3Name =
+        uHandler->addUniform("Mat3ColorConversion", UniformFormat::Float3x3, ShaderStage::Fragment);
+    fragBuilder->codeAppendf("vec3 rgb = clamp(%s * yuv, 0.0, 1.0);", mat3Name.c_str());
+    if (texEffect->alphaStart == Point::Zero()) {
+      fragBuilder->codeAppendf("%s = vec4(rgb, 1.0);", output.c_str());
+    } else {
+      auto alphaStartName =
+          uHandler->addUniform("AlphaStart", UniformFormat::Float2, ShaderStage::Fragment);
+      fragBuilder->codeAppendf("vec2 alphaVertexColor = finalCoord + %s;", alphaStartName.c_str());
+      fragBuilder->codeAppend("float yuv_a = ");
+      fragBuilder->appendTextureLookup(currentTexSamplers[0], "alphaVertexColor");
+      fragBuilder->codeAppend(".r;");
+      fragBuilder->codeAppend("yuv_a = (yuv_a - 16.0/255.0) / (219.0/255.0 - 1.0/255.0);");
+      fragBuilder->codeAppend("yuv_a = clamp(yuv_a, 0.0, 1.0);");
+      fragBuilder->codeAppendf("%s = vec4(rgb * yuv_a, yuv_a);", output.c_str());
+    }
+  } else {
+    // ---- RGB path ----
+    fragBuilder->codeAppend("highp vec2 finalCoord;");
+    appendClamp(texCoordName, "finalCoord");
+    fragBuilder->codeAppend("vec4 color = ");
+    fragBuilder->appendTextureLookup(currentTexSamplers[0], "finalCoord");
+    fragBuilder->codeAppend(";");
+    if (texEffect->alphaStart != Point::Zero()) {
+      fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
+      auto alphaStartName =
+          uHandler->addUniform("AlphaStart", UniformFormat::Float2, ShaderStage::Fragment);
+      fragBuilder->codeAppendf("vec2 alphaVertexColor = finalCoord + %s;", alphaStartName.c_str());
+      fragBuilder->codeAppend("vec4 alpha = ");
+      fragBuilder->appendTextureLookup(currentTexSamplers[0], "alphaVertexColor");
+      fragBuilder->codeAppend(";");
+      fragBuilder->codeAppend("alpha = clamp(alpha, 0.0, 1.0);");
+      fragBuilder->codeAppend("color = vec4(color.rgb * alpha.r, alpha.r);");
+    }
+    fragBuilder->codeAppendf("%s = color;", output.c_str());
+  }
+
+  // ---- Alpha-only / premultiply tail ----
+  if (texEffect->textureProxy->isAlphaOnly()) {
+    fragBuilder->codeAppendf("%s = %s.a * %s;", output.c_str(), output.c_str(),
+                             input.empty() ? "vec4(1.0)" : input.c_str());
+  } else {
+    fragBuilder->codeAppendf("%s = %s * %s.a;", output.c_str(), output.c_str(),
+                             input.empty() ? "vec4(1.0)" : input.c_str());
+  }
+}
+
+// ---- TiledTextureEffect inline emission ----
+
+// ShaderMode integer constants (mirrors TiledTextureEffect::ShaderMode which is protected).
+static constexpr int kShaderMode_None = 0;
+static constexpr int kShaderMode_Clamp = 1;
+static constexpr int kShaderMode_RepeatNearestNone = 2;
+static constexpr int kShaderMode_RepeatLinearNone = 3;
+static constexpr int kShaderMode_RepeatLinearMipmap = 4;
+static constexpr int kShaderMode_RepeatNearestMipmap = 5;
+static constexpr int kShaderMode_MirrorRepeat = 6;
+static constexpr int kShaderMode_ClampToBorderNearest = 7;
+static constexpr int kShaderMode_ClampToBorderLinear = 8;
+
+static bool TiledShaderModeRequiresUnormCoord(int mode) {
+  switch (mode) {
+    case kShaderMode_None:
+    case kShaderMode_Clamp:
+    case kShaderMode_RepeatNearestNone:
+    case kShaderMode_MirrorRepeat:
+      return false;
+    default:
+      return true;
+  }
+}
+
+static bool TiledShaderModeUsesSubset(int m) {
+  switch (m) {
+    case kShaderMode_None:
+    case kShaderMode_Clamp:
+    case kShaderMode_ClampToBorderLinear:
+      return false;
+    default:
+      return true;
+  }
+}
+
+static bool TiledShaderModeUsesClamp(int m) {
+  switch (m) {
+    case kShaderMode_None:
+    case kShaderMode_ClampToBorderNearest:
+      return false;
+    default:
+      return true;
+  }
+}
+
+static void EmitTiledSubsetCoord(FragmentShaderBuilder* fragBuilder, int mode,
+                                 const std::string& subsetName, const char* coordSwizzle,
+                                 const char* subsetStartSwizzle, const char* subsetStopSwizzle,
+                                 const char* extraCoord, const char* coordWeight) {
+  switch (mode) {
+    case kShaderMode_None:
+    case kShaderMode_ClampToBorderNearest:
+    case kShaderMode_ClampToBorderLinear:
+    case kShaderMode_Clamp:
+      fragBuilder->codeAppendf("subsetCoord.%s = inCoord.%s;", coordSwizzle, coordSwizzle);
+      break;
+    case kShaderMode_RepeatNearestNone:
+    case kShaderMode_RepeatLinearNone:
+      fragBuilder->codeAppendf("subsetCoord.%s = mod(inCoord.%s - %s.%s, %s.%s - %s.%s) + %s.%s;",
+                               coordSwizzle, coordSwizzle, subsetName.c_str(), subsetStartSwizzle,
+                               subsetName.c_str(), subsetStopSwizzle, subsetName.c_str(),
+                               subsetStartSwizzle, subsetName.c_str(), subsetStartSwizzle);
+      break;
+    case kShaderMode_RepeatNearestMipmap:
+    case kShaderMode_RepeatLinearMipmap:
+      fragBuilder->codeAppend("{");
+      fragBuilder->codeAppendf("float w = %s.%s - %s.%s;", subsetName.c_str(), subsetStopSwizzle,
+                               subsetName.c_str(), subsetStartSwizzle);
+      fragBuilder->codeAppend("float w2 = 2.0 * w;");
+      fragBuilder->codeAppendf("float d = inCoord.%s - %s.%s;", coordSwizzle, subsetName.c_str(),
+                               subsetStartSwizzle);
+      fragBuilder->codeAppend("float m = mod(d, w2);");
+      fragBuilder->codeAppend("float o = mix(m, w2 - m, step(w, m));");
+      fragBuilder->codeAppendf("subsetCoord.%s = o + %s.%s;", coordSwizzle, subsetName.c_str(),
+                               subsetStartSwizzle);
+      fragBuilder->codeAppendf("%s = w - o + %s.%s;", extraCoord, subsetName.c_str(),
+                               subsetStartSwizzle);
+      fragBuilder->codeAppend("float hw = w / 2.0;");
+      fragBuilder->codeAppend("float n = mod(d - hw, w2);");
+      fragBuilder->codeAppendf("%s = clamp(mix(n, w2 - n, step(w, n)) - hw + 0.5, 0.0, 1.0);",
+                               coordWeight);
+      fragBuilder->codeAppend("}");
+      break;
+    case kShaderMode_MirrorRepeat:
+      fragBuilder->codeAppend("{");
+      fragBuilder->codeAppendf("float w = %s.%s - %s.%s;", subsetName.c_str(), subsetStopSwizzle,
+                               subsetName.c_str(), subsetStartSwizzle);
+      fragBuilder->codeAppend("float w2 = 2.0 * w;");
+      fragBuilder->codeAppendf("float m = mod(inCoord.%s - %s.%s, w2);", coordSwizzle,
+                               subsetName.c_str(), subsetStartSwizzle);
+      fragBuilder->codeAppendf("subsetCoord.%s = mix(m, w2 - m, step(w, m)) + %s.%s;", coordSwizzle,
+                               subsetName.c_str(), subsetStartSwizzle);
+      fragBuilder->codeAppend("}");
+      break;
+  }
+}
+
+static void EmitTiledClampCoord(FragmentShaderBuilder* fragBuilder, bool clamp,
+                                const std::string& clampName, const char* coordSwizzle,
+                                const char* clampStartSwizzle, const char* clampStopSwizzle) {
+  if (clamp) {
+    fragBuilder->codeAppendf("clampedCoord%s = clamp(subsetCoord%s, %s%s, %s%s);", coordSwizzle,
+                             coordSwizzle, clampName.c_str(), clampStartSwizzle, clampName.c_str(),
+                             clampStopSwizzle);
+  } else {
+    fragBuilder->codeAppendf("clampedCoord%s = subsetCoord%s;", coordSwizzle, coordSwizzle);
+  }
+}
+
+static void EmitTiledReadColor(FragmentShaderBuilder* fragBuilder, SamplerHandle samplerHandle,
+                               const std::string& dimensionsName, const std::string& coord,
+                               const char* out) {
+  std::string normCoord;
+  if (!dimensionsName.empty()) {
+    normCoord = "(" + coord + ") * " + dimensionsName;
+  } else {
+    normCoord = coord;
+  }
+  fragBuilder->codeAppendf("vec4 %s = ", out);
+  fragBuilder->appendTextureLookup(samplerHandle, normCoord);
+  fragBuilder->codeAppend(";");
+}
+
+void ModularProgramBuilder::emitTiledTextureEffect(const FragmentProcessor* processor,
+                                                   size_t transformedCoordVarsIdx,
+                                                   const std::string& input,
+                                                   const std::string& output) {
+  auto tiledEffect = static_cast<const TiledTextureEffect*>(processor);
+  auto fragBuilder = fragmentShaderBuilder();
+  auto uHandler = uniformHandler();
+  auto textureView = tiledEffect->getTextureView();
+  if (textureView == nullptr) {
+    fragBuilder->codeAppendf("%s = vec4(0.0);", output.c_str());
+    return;
+  }
+  auto texCoordName =
+      fragBuilder->emitPerspTextCoord(transformedCoordVars[transformedCoordVarsIdx]);
+
+  TiledTextureEffect::Sampling sampling(textureView, tiledEffect->samplerState,
+                                        tiledEffect->subset);
+
+  auto modeX = static_cast<int>(sampling.shaderModeX);
+  auto modeY = static_cast<int>(sampling.shaderModeY);
+
+  if (modeX == kShaderMode_None && modeY == kShaderMode_None) {
+    fragBuilder->codeAppendf("%s = ", output.c_str());
+    fragBuilder->appendTextureLookup(currentTexSamplers[0], texCoordName);
+    fragBuilder->codeAppend(";");
+  } else {
+    fragBuilder->codeAppendf("vec2 inCoord = %s;", texCoordName.c_str());
+    bool useClamp[2] = {TiledShaderModeUsesClamp(modeX), TiledShaderModeUsesClamp(modeY)};
+
+    // Init uniforms.
+    std::string subsetName, clampName, dimensionsName;
+    if (TiledShaderModeUsesSubset(modeX) || TiledShaderModeUsesSubset(modeY)) {
+      subsetName = uHandler->addUniform("Subset", UniformFormat::Float4, ShaderStage::Fragment);
+    }
+    if (useClamp[0] || useClamp[1]) {
+      clampName = uHandler->addUniform("Clamp", UniformFormat::Float4, ShaderStage::Fragment);
+    }
+    bool unormRequired =
+        TiledShaderModeRequiresUnormCoord(modeX) || TiledShaderModeRequiresUnormCoord(modeY);
+    bool mustNormalize = textureView->getTexture()->type() != TextureType::Rectangle;
+    if (unormRequired && mustNormalize) {
+      dimensionsName =
+          uHandler->addUniform("Dimension", UniformFormat::Float2, ShaderStage::Fragment);
+    }
+    if (!dimensionsName.empty()) {
+      fragBuilder->codeAppendf("inCoord /= %s;", dimensionsName.c_str());
+    }
+
+    bool mipmapRepeatX =
+        modeX == kShaderMode_RepeatNearestMipmap || modeX == kShaderMode_RepeatLinearMipmap;
+    bool mipmapRepeatY =
+        modeY == kShaderMode_RepeatNearestMipmap || modeY == kShaderMode_RepeatLinearMipmap;
+
+    const char* extraRepeatCoordX = nullptr;
+    const char* repeatCoordWeightX = nullptr;
+    const char* extraRepeatCoordY = nullptr;
+    const char* repeatCoordWeightY = nullptr;
+    if (mipmapRepeatX || mipmapRepeatY) {
+      fragBuilder->codeAppend("vec2 extraRepeatCoord;");
+    }
+    if (mipmapRepeatX) {
+      fragBuilder->codeAppend("float repeatCoordWeightX;");
+      extraRepeatCoordX = "extraRepeatCoord.x";
+      repeatCoordWeightX = "repeatCoordWeightX";
+    }
+    if (mipmapRepeatY) {
+      fragBuilder->codeAppend("float repeatCoordWeightY;");
+      extraRepeatCoordY = "extraRepeatCoord.y";
+      repeatCoordWeightY = "repeatCoordWeightY";
+    }
+
+    fragBuilder->codeAppend("highp vec2 subsetCoord;");
+    EmitTiledSubsetCoord(fragBuilder, modeX, subsetName, "x", "x", "z", extraRepeatCoordX,
+                         repeatCoordWeightX);
+    EmitTiledSubsetCoord(fragBuilder, modeY, subsetName, "y", "y", "w", extraRepeatCoordY,
+                         repeatCoordWeightY);
+
+    fragBuilder->codeAppend("highp vec2 clampedCoord;");
+    if (useClamp[0] == useClamp[1]) {
+      EmitTiledClampCoord(fragBuilder, useClamp[0], clampName, "", ".xy", ".zw");
+    } else {
+      EmitTiledClampCoord(fragBuilder, useClamp[0], clampName, ".x", ".x", ".z");
+      EmitTiledClampCoord(fragBuilder, useClamp[1], clampName, ".y", ".y", ".w");
+    }
+
+    if (tiledEffect->constraint == SrcRectConstraint::Strict) {
+      std::string sName = subsetVarName;
+      if (!dimensionsName.empty()) {
+        fragBuilder->codeAppendf("highp vec4 extraSubset = %s;", sName.c_str());
+        sName = "extraSubset";
+        fragBuilder->codeAppendf("extraSubset.xy /= %s;", dimensionsName.c_str());
+        fragBuilder->codeAppendf("extraSubset.zw /= %s;", dimensionsName.c_str());
+      }
+      fragBuilder->codeAppendf("clampedCoord = clamp(clampedCoord, %s.xy, %s.zw);", sName.c_str(),
+                               sName.c_str());
+    }
+
+    if (mipmapRepeatX && mipmapRepeatY) {
+      fragBuilder->codeAppendf("extraRepeatCoord = clamp(extraRepeatCoord, %s.xy, %s.zw);",
+                               clampName.c_str(), clampName.c_str());
+    } else if (mipmapRepeatX) {
+      fragBuilder->codeAppendf("extraRepeatCoord.x = clamp(extraRepeatCoord.x, %s.x, %s.z);",
+                               clampName.c_str(), clampName.c_str());
+    } else if (mipmapRepeatY) {
+      fragBuilder->codeAppendf("extraRepeatCoord.y = clamp(extraRepeatCoord.y, %s.y, %s.w);",
+                               clampName.c_str(), clampName.c_str());
+    }
+
+    auto sampler = currentTexSamplers[0];
+    if (mipmapRepeatX && mipmapRepeatY) {
+      EmitTiledReadColor(fragBuilder, sampler, dimensionsName, "clampedCoord", "textureColor1");
+      EmitTiledReadColor(fragBuilder, sampler, dimensionsName,
+                         "vec2(extraRepeatCoord.x, clampedCoord.y)", "textureColor2");
+      EmitTiledReadColor(fragBuilder, sampler, dimensionsName,
+                         "vec2(clampedCoord.x, extraRepeatCoord.y)", "textureColor3");
+      EmitTiledReadColor(fragBuilder, sampler, dimensionsName,
+                         "vec2(extraRepeatCoord.x, extraRepeatCoord.y)", "textureColor4");
+      fragBuilder->codeAppend(
+          "vec4 textureColor = mix(mix(textureColor1, textureColor2, repeatCoordWeightX), "
+          "mix(textureColor3, textureColor4, repeatCoordWeightX), repeatCoordWeightY);");
+    } else if (mipmapRepeatX) {
+      EmitTiledReadColor(fragBuilder, sampler, dimensionsName, "clampedCoord", "textureColor1");
+      EmitTiledReadColor(fragBuilder, sampler, dimensionsName,
+                         "vec2(extraRepeatCoord.x, clampedCoord.y)", "textureColor2");
+      fragBuilder->codeAppend(
+          "vec4 textureColor = mix(textureColor1, textureColor2, repeatCoordWeightX);");
+    } else if (mipmapRepeatY) {
+      EmitTiledReadColor(fragBuilder, sampler, dimensionsName, "clampedCoord", "textureColor1");
+      EmitTiledReadColor(fragBuilder, sampler, dimensionsName,
+                         "vec2(clampedCoord.x, extraRepeatCoord.y)", "textureColor2");
+      fragBuilder->codeAppend(
+          "vec4 textureColor = mix(textureColor1, textureColor2, repeatCoordWeightY);");
+    } else {
+      EmitTiledReadColor(fragBuilder, sampler, dimensionsName, "clampedCoord", "textureColor");
+    }
+
+    bool repeatX = modeX == kShaderMode_RepeatLinearNone || modeX == kShaderMode_RepeatLinearMipmap;
+    bool repeatY = modeY == kShaderMode_RepeatLinearNone || modeY == kShaderMode_RepeatLinearMipmap;
+    if (repeatX || modeX == kShaderMode_ClampToBorderLinear) {
+      fragBuilder->codeAppend("float errX = subsetCoord.x - clampedCoord.x;");
+      if (repeatX) {
+        fragBuilder->codeAppendf("float repeatCoordX = errX > 0.0 ? %s.x : %s.z;",
+                                 clampName.c_str(), clampName.c_str());
+      }
+    }
+    if (repeatY || modeY == kShaderMode_ClampToBorderLinear) {
+      fragBuilder->codeAppend("float errY = subsetCoord.y - clampedCoord.y;");
+      if (repeatY) {
+        fragBuilder->codeAppendf("float repeatCoordY = errY > 0.0 ? %s.y : %s.w;",
+                                 clampName.c_str(), clampName.c_str());
+      }
+    }
+
+    const char* ifStr = "if";
+    if (repeatX && repeatY) {
+      EmitTiledReadColor(fragBuilder, sampler, dimensionsName, "vec2(repeatCoordX, clampedCoord.y)",
+                         "repeatReadX");
+      EmitTiledReadColor(fragBuilder, sampler, dimensionsName, "vec2(clampedCoord.x, repeatCoordY)",
+                         "repeatReadY");
+      EmitTiledReadColor(fragBuilder, sampler, dimensionsName, "vec2(repeatCoordX, repeatCoordY)",
+                         "repeatReadXY");
+      fragBuilder->codeAppend("if (errX != 0.0 && errY != 0.0) {");
+      fragBuilder->codeAppend("errX = abs(errX);");
+      fragBuilder->codeAppend(
+          "textureColor = mix(mix(textureColor, repeatReadX, errX), "
+          "mix(repeatReadY, repeatReadXY, errX), abs(errY));");
+      fragBuilder->codeAppend("}");
+      ifStr = "else if";
+    }
+    if (repeatX) {
+      fragBuilder->codeAppendf("%s (errX != 0.0) {", ifStr);
+      EmitTiledReadColor(fragBuilder, sampler, dimensionsName, "vec2(repeatCoordX, clampedCoord.y)",
+                         "repeatReadX");
+      fragBuilder->codeAppend("textureColor = mix(textureColor, repeatReadX, errX);");
+      fragBuilder->codeAppend("}");
+    }
+    if (repeatY) {
+      fragBuilder->codeAppendf("%s (errY != 0.0) {", ifStr);
+      EmitTiledReadColor(fragBuilder, sampler, dimensionsName, "vec2(clampedCoord.x, repeatCoordY)",
+                         "repeatReadY");
+      fragBuilder->codeAppend("textureColor = mix(textureColor, repeatReadY, errY);");
+      fragBuilder->codeAppend("}");
+    }
+
+    if (modeX == kShaderMode_ClampToBorderLinear) {
+      fragBuilder->codeAppend("textureColor = mix(textureColor, vec4(0.0), min(abs(errX), 1.0));");
+    }
+    if (modeY == kShaderMode_ClampToBorderLinear) {
+      fragBuilder->codeAppend("textureColor = mix(textureColor, vec4(0.0), min(abs(errY), 1.0));");
+    }
+    if (modeX == kShaderMode_ClampToBorderNearest) {
+      fragBuilder->codeAppend("float snappedX = floor(inCoord.x + 0.001) + 0.5;");
+      fragBuilder->codeAppendf("if (snappedX < %s.x || snappedX > %s.z) {", subsetName.c_str(),
+                               subsetName.c_str());
+      fragBuilder->codeAppend("textureColor = vec4(0.0);");
+      fragBuilder->codeAppend("}");
+    }
+    if (modeY == kShaderMode_ClampToBorderNearest) {
+      fragBuilder->codeAppend("float snappedY = floor(inCoord.y + 0.001) + 0.5;");
+      fragBuilder->codeAppendf("if (snappedY < %s.y || snappedY > %s.w) {", subsetName.c_str(),
+                               subsetName.c_str());
+      fragBuilder->codeAppend("textureColor = vec4(0.0);");
+      fragBuilder->codeAppend("}");
+    }
+    fragBuilder->codeAppendf("%s = textureColor;", output.c_str());
+  }
+  if (tiledEffect->textureProxy->isAlphaOnly()) {
+    fragBuilder->codeAppendf("%s = %s.a * %s;", output.c_str(), output.c_str(),
+                             input.empty() ? "vec4(1.0)" : input.c_str());
+  } else {
+    fragBuilder->codeAppendf("%s = %s * %s.a;", output.c_str(), output.c_str(),
+                             input.empty() ? "vec4(1.0)" : input.c_str());
   }
 }
 
@@ -314,11 +920,10 @@ void ModularProgramBuilder::emitClampedGradientEffect(const FragmentProcessor* p
   auto fragBuilder = fragmentShaderBuilder();
 
   // Declare ClampedGradientEffect's own uniforms (leftBorderColor, rightBorderColor).
-  auto leftBorderColorName = uniformHandler()->addUniform("leftBorderColor", UniformFormat::Float4,
-                                                          ShaderStage::Fragment);
-  auto rightBorderColorName = uniformHandler()->addUniform("rightBorderColor",
-                                                           UniformFormat::Float4,
-                                                           ShaderStage::Fragment);
+  auto leftBorderColorName =
+      uniformHandler()->addUniform("leftBorderColor", UniformFormat::Float4, ShaderStage::Fragment);
+  auto rightBorderColorName = uniformHandler()->addUniform(
+      "rightBorderColor", UniformFormat::Float4, ShaderStage::Fragment);
 
   // --- Step 1: Emit gradLayout child ---
   // The gradLayout child is at childProcessors[gradLayoutIndex].
@@ -353,10 +958,10 @@ void ModularProgramBuilder::emitClampedGradientEffect(const FragmentProcessor* p
     emitLeafFPCall(gradLayout, gradLayoutCoordIdx, "vec4(1.0)", child1Var);
   } else {
     // Fallback to legacy emitCode() for unmodularized layout.
-    FragmentProcessor::TransformedCoordVars coords(
-        gradLayout, gradLayoutCoordIdx < transformedCoordVars.size()
-                        ? &transformedCoordVars[gradLayoutCoordIdx]
-                        : nullptr);
+    FragmentProcessor::TransformedCoordVars coords(gradLayout,
+                                                   gradLayoutCoordIdx < transformedCoordVars.size()
+                                                       ? &transformedCoordVars[gradLayoutCoordIdx]
+                                                       : nullptr);
     FragmentProcessor::TextureSamplers textureSamplers(
         gradLayout, currentTexSamplers.empty() ? nullptr : &currentTexSamplers[0]);
     FragmentProcessor::EmitArgs childArgs(fragBuilder, uniformHandler(), child1Var, "vec4(1.0)",
