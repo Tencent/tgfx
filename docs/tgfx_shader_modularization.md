@@ -3707,6 +3707,8 @@ Phase 1-3 及后续复杂 FP 迁移于 2026-04-07 完成，共 4 个 commit：
 | `25d6a686` | 复杂 FP 迁移 | 5 | +680/-59 |
 | `2f0c882e` | 容器 FP 展开 | 4 | +105/-5 |
 | `bd660df0` | GP/XP 显式分发 | 15 | +120/-2 |
+| `d1622768` | GP 内联化 | 2 | +424/-2 |
+| `dfde0f84` | XP 内联化 | 1 | +51/-2 |
 
 ### 16.2 最终架构
 
@@ -3723,7 +3725,7 @@ Phase 1-3 及后续复杂 FP 迁移于 2026-04-07 完成，共 4 个 commit：
         ┌───────────────────────────┼───────────────────────────┐
         │                           │                           │
    emitAndInstallGeoProc()  emitModularFragProcessors()  emitAndInstallXferProc()
-   (传统 GP emitCode 路径)         │                    (传统 XP emitCode 路径)
+   (10 个 GP 内联)                 │                    (2 个 XP 内联)
                                     │
                     ┌───────────────┼───────────────┐
                     │               │               │
@@ -3769,8 +3771,8 @@ src/gpu/shaders/
 
 | 文件 | 行数 | 说明 |
 |------|------|------|
-| `src/gpu/ModularProgramBuilder.h` | 121 | ModularProgramBuilder 类定义 |
-| `src/gpu/ModularProgramBuilder.cpp` | 1133 | 核心实现：16 个叶子 FP 展开（含 3 个复杂 FP 内联）、4 个容器 FP 显式分发、safety fallback |
+| `src/gpu/ModularProgramBuilder.h` | 125 | ModularProgramBuilder 类定义 |
+| `src/gpu/ModularProgramBuilder.cpp` | 1640 | 核心实现：16 个叶子 FP 展开、4 个容器 FP 显式分发、10 个 GP 内联、2 个 XP 内联 |
 | `src/gpu/ShaderModuleRegistry.h` | 62 | 模块 ID 枚举 + 查找 API |
 | `src/gpu/ShaderModuleRegistry.cpp` | 236 | 13 个 GLSL 模块嵌入为 C++ 字符串常量 |
 | `test/src/ModularShaderTest.cpp` | 107 | 3 个测试用例（纯色、渐变、基本渲染） |
@@ -3791,6 +3793,19 @@ src/gpu/shaders/
 | `src/gpu/processors/UnrolledBinaryGradientColorizer.h` | 添加 friend（访问 intervalCount） |
 | `src/gpu/processors/XfermodeFragmentProcessor.h` | 添加 friend（访问 child 枚举和 mode） |
 | `src/gpu/processors/GaussianBlur1DFragmentProcessor.h` | 添加 friend（访问 sigma、maxSigma 等） |
+| `src/gpu/processors/GeometryProcessor.h` | 添加 friend（访问 emitTransforms 等基类方法） |
+| `src/gpu/processors/DefaultGeometryProcessor.h` | 添加 friend |
+| `src/gpu/processors/QuadPerEdgeAAGeometryProcessor.h` | 添加 friend |
+| `src/gpu/processors/EllipseGeometryProcessor.h` | 添加 friend |
+| `src/gpu/processors/AtlasTextGeometryProcessor.h` | 添加 friend |
+| `src/gpu/processors/MeshGeometryProcessor.h` | 添加 friend |
+| `src/gpu/processors/ShapeInstancedGeometryProcessor.h` | 添加 friend |
+| `src/gpu/processors/NonAARRectGeometryProcessor.h` | 添加 friend |
+| `src/gpu/processors/HairlineLineGeometryProcessor.h` | 添加 friend |
+| `src/gpu/processors/HairlineQuadGeometryProcessor.h` | 添加 friend |
+| `src/gpu/processors/RoundStrokeRectGeometryProcessor.h` | 添加 friend |
+| `src/gpu/processors/PorterDuffXferProcessor.h` | 添加 friend（访问 blendMode、dstTextureInfo） |
+| `src/gpu/FragmentShaderBuilder.h` | 添加 friend（访问 colorOutputName） |
 | `CMakeLists.txt` | 添加 `TGFX_USE_MODULAR_SHADERS` 选项 |
 
 ### 16.5 关键架构决策及理由
@@ -3836,21 +3851,25 @@ src/gpu/shaders/
 - ClampedGradientEffect 被特殊处理是因为它是最常用的渐变管线入口，且子 FP 结构固定（Layout + Colorizer）
 - 显式分发（而非通用 fallback）使得 `emitModularFragProc()` 的分发逻辑完全可审计：每个 FP 类型都有明确的处理入口
 
-#### 决策 5：GP 和 XP 通过显式分发 + legacy emitCode() 处理（已从基类通用调用迁移）
+#### 决策 5：GP 和 XP 通过内联生成处理（已从 emitCode() 调用完全迁移）
 
-**选择**：在 ModularProgramBuilder 中 override `emitAndInstallGeoProc()` 和 `emitAndInstallXferProc()`，内部仍调用 GP/XP 的 `emitCode()`，但通过显式分发而非基类通用路径
+**选择**：在 ModularProgramBuilder 中 override `emitAndInstallGeoProc()` 和 `emitAndInstallXferProc()`，将所有 GP/XP 的 emitCode() 逻辑内联到 ModularProgramBuilder 中
 
-**原始方案**：`emitAndInstallGeoProc()` 和 `emitAndInstallXferProc()` 是 ProgramBuilder 的非虚方法，ModularProgramBuilder 直接复用
+**迁移历程**：
+1. commit `bd660df0`：`ProgramBuilder.h` 标记 virtual，ModularProgramBuilder override 但仍调用 emitCode()
+2. commit `d1622768`：10 个 GP 的 emitCode() 逻辑全部内联到 `emitAndInstallGeoProc()`（+424 行）
+3. commit `dfde0f84`：2 个 XP 的 emitCode() 逻辑全部内联到 `emitAndInstallXferProc()`（+51 行）
 
-**迁移后方案**（commit `bd660df0`）：
-- `ProgramBuilder.h` 中 `emitAndInstallGeoProc()` 和 `emitAndInstallXferProc()` 标记为 `virtual`
-- `ModularProgramBuilder` override 这两个方法，构造同样的 EmitArgs 并调用 `geometryProcessor->emitCode(args)` / `xferProcessor->emitCode(args)`
-- 10 个 GP 和 1 个 XP 的 .h 文件添加 `friend class ModularProgramBuilder`
+**10 个 GP 的内联分类**：
+- **简单传递型**（5 个）：DefaultGP、QuadPerEdgeAAGP、MeshGP、NonAARRectGP、AtlasTextGP — VS 矩阵变换 + attribute→varying，FS 赋值 color/coverage
+- **SDF 计算型**（3 个）：EllipseGP、RoundStrokeRectGP、ShapeInstancedGP — FS 执行签名距离场计算
+- **曲线评估型**（2 个）：HairlineLineGP、HairlineQuadGP — FS 边缘距离/Loop-Blinn 二次曲线
 
-**理由**：
-- GP 的 emitCode() 同时操作 VS 和 FS，且调用 `emitAttributes()`、`emitTransforms()`、`emitNormalizedPosition()` 等基类方法，内联工作量巨大
-- XP 的 `AppendMode()` 552 行，覆盖 30 种 blend mode
-- 显式分发确保 ModularProgramBuilder 完全控制 GP/XP 的代码生成入口，为后续逐个内联创建了框架
+**2 个 XP 的内联**：
+- **EmptyXP**：1 行 `output = inputColor * inputCoverage`
+- **PorterDuffXP**：DST 纹理读取 + discard 优化 + `AppendMode()`（30 种 blend mode）+ coverage 调制
+
+**理由**：内联消除了 ModularProgramBuilder 对所有 `GLSL*.cpp` 中 `emitCode()` 虚函数的运行时依赖。GP/XP 的 GLSL 生成逻辑完全由 ModularProgramBuilder 控制，为后续 Phase 5 清理（删除 GLSL* 文件）创造了条件。
 
 ### 16.6 验证结果
 
@@ -3868,7 +3887,8 @@ ModularProgramBuilder 处理 100% 的渲染管线，无回退到 GLSLProgramBuil
 | ~~复杂叶子 FP 迁移~~ | ~~TextureEffect/TiledTexture/UnrolledBinary 提取为 .glsl 模块~~ | ✅ 已完成（`25d6a686`，内联生成方式） |
 | ~~容器 FP 模块化展开~~ | ~~Compose/Xfermode/GaussianBlur 替换 emitCode() fallback~~ | ✅ 已完成（`2f0c882e`，显式分发 + legacy emitCode()） |
 | ~~GP/XP 显式分发~~ | ~~GP/XP 的 emitCode() 从基类通用调用迁移到 ModularProgramBuilder override~~ | ✅ 已完成（`bd660df0`） |
-| GP 内联化 | 将 10 个 GP 的 emitCode() 逻辑内联到 ModularProgramBuilder | 中 |
+| ~~GP 内联化~~ | ~~将 10 个 GP 的 emitCode() 逻辑内联到 ModularProgramBuilder~~ | ✅ 已完成（`d1622768`） |
+| ~~XP 内联化~~ | ~~将 2 个 XP 的 emitCode() 逻辑内联到 ModularProgramBuilder~~ | ✅ 已完成（`dfde0f84`） |
 | XP blend 模块化 | 将 GLSLBlend.cpp 的 AppendMode() 提取为 tgfx_blend.glsl | 低 |
 | Layer 0 其他后端 | 实现 tgfx_types_ue.glsl / tgfx_types_vulkan.glsl / tgfx_types_metal.glsl | 取决于 UE 后端进度 |
 | tgfx_sampling.glsl | 公共纹理采样抽象层 | 取决于复杂叶子 FP 迁移 |
