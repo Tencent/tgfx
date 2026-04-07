@@ -204,6 +204,7 @@ class FrameCapture {
   std::vector<std::shared_ptr<UDPBroadcast>> broadcast = {};
   const char* programName = nullptr;
   std::mutex programNameLock = {};
+  std::mutex exportedStringsLock = {};
   int dataBufferOffset = 0;
   int dataBufferStart = 0;
   uint32_t captureFrameCount = 0;

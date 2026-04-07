@@ -139,10 +139,12 @@ void FrameCapture::sendFrameMark(const char* name) {
 }
 
 void FrameCapture::registerString(uint64_t ptr, const char* str) {
+  std::lock_guard<std::mutex> lock(exportedStringsLock);
   exportedStrings[ptr] = str;
 }
 
 void FrameCapture::registerString(uint64_t ptr, const char* str, size_t len) {
+  std::lock_guard<std::mutex> lock(exportedStringsLock);
   exportedStrings[ptr] = std::string(str, len);
 }
 
@@ -504,7 +506,10 @@ void FrameCapture::clear() {
   dataBufferStart = 0;
   captureFrameCount = 0;
   programKeys.clear();
-  exportedStrings.clear();
+  {
+    std::lock_guard<std::mutex> lock(exportedStringsLock);
+    exportedStrings.clear();
+  }
   _currentFrameShouldCaptrue.store(false, std::memory_order_relaxed);
 }
 
@@ -535,6 +540,7 @@ bool FrameCapture::handleServerQuery() {
   auto ptr = payload.ptr;
   switch (type) {
     case ServerQuery::String: {
+      std::lock_guard<std::mutex> lock(exportedStringsLock);
       auto iter = exportedStrings.find(ptr);
       if (iter == exportedStrings.end()) {
         return false;
@@ -544,6 +550,7 @@ bool FrameCapture::handleServerQuery() {
       break;
     }
     case ServerQuery::ValueName: {
+      std::lock_guard<std::mutex> lock(exportedStringsLock);
       auto iter = exportedStrings.find(ptr);
       if (iter == exportedStrings.end()) {
         return false;
