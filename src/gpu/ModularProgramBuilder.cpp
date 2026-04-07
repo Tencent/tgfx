@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ModularProgramBuilder.h"
+#include "gpu/BlendFormula.h"
 #include "gpu/glsl/GLSLBlend.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
@@ -1579,8 +1580,56 @@ void ModularProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
   XferProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), inputColor, inputCoverage,
                                fragmentShaderBuilder()->colorOutputName(), dstTextureSamplerHandle);
 
-  // Explicit dispatch by XP type.
-  xferProcessor->emitCode(args);
+  // Inline dispatch by XP type.
+  auto xpName = xferProcessor->name();
+  if (xpName == "EmptyXferProcessor") {
+    // EmptyXferProcessor: output = inputColor * inputCoverage
+    auto fragBuilder = fragmentShaderBuilder();
+    fragBuilder->codeAppendf("%s = %s * %s;", args.outputColor.c_str(), args.inputColor.c_str(),
+                             args.inputCoverage.c_str());
+  } else if (xpName == "PorterDuffXferProcessor") {
+    auto xp = static_cast<const PorterDuffXferProcessor*>(xferProcessor);
+    auto fragBuilder = fragmentShaderBuilder();
+    auto uHandler = uniformHandler();
+    const auto& dstColor = fragBuilder->dstColor();
+
+    if (args.dstTextureSamplerHandle.isValid()) {
+      fragBuilder->codeAppendf("if (%s.r <= 0.0 && %s.g <= 0.0 && %s.b <= 0.0) {",
+                               args.inputCoverage.c_str(), args.inputCoverage.c_str(),
+                               args.inputCoverage.c_str());
+      fragBuilder->codeAppend("discard;");
+      fragBuilder->codeAppend("}");
+
+      auto dstTopLeftName = uHandler->addUniform("DstTextureUpperLeft", UniformFormat::Float2,
+                                                  ShaderStage::Fragment);
+      auto dstCoordScaleName = uHandler->addUniform("DstTextureCoordScale", UniformFormat::Float2,
+                                                     ShaderStage::Fragment);
+
+      fragBuilder->codeAppend("// Read color from copy of the destination.\n");
+      std::string dstTexCoord = "_dstTexCoord";
+      fragBuilder->codeAppendf("vec2 %s = (gl_FragCoord.xy - %s) * %s;", dstTexCoord.c_str(),
+                               dstTopLeftName.c_str(), dstCoordScaleName.c_str());
+
+      fragBuilder->codeAppendf("vec4 %s = ", dstColor.c_str());
+      fragBuilder->appendTextureLookup(args.dstTextureSamplerHandle, dstTexCoord);
+      fragBuilder->codeAppend(";");
+    }
+
+    const char* outColor = "localOutputColor";
+    fragBuilder->codeAppendf("vec4 %s;", outColor);
+    AppendMode(fragBuilder, args.inputColor, args.inputCoverage, dstColor, outColor,
+               xp->blendMode, true);
+
+    if (!BlendModeAsCoeff(xp->blendMode, true)) {
+      fragBuilder->codeAppendf("%s = %s * %s + (vec4(1.0) - %s) * %s;", outColor,
+                               args.inputCoverage.c_str(), outColor, args.inputCoverage.c_str(),
+                               dstColor.c_str());
+    }
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outColor);
+  } else {
+    // Safety fallback for any unhandled XP type.
+    xferProcessor->emitCode(args);
+  }
 
   fragmentShaderBuilder()->codeAppend("}");
   currentProcessors.pop_back();
