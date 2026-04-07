@@ -117,18 +117,10 @@ void ModularProgramBuilder::includeModule(ShaderModuleID id) {
 // ---- Processor #define emission ----
 
 void ModularProgramBuilder::emitProcessorDefines(const FragmentProcessor* processor) {
-  auto name = processor->name();
-  auto& defs = fragmentShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions];
-  if (name == "ConstColorProcessor") {
-    auto constColor = static_cast<const ConstColorProcessor*>(processor);
-    defs += "#define TGFX_CONST_COLOR_INPUT_MODE ";
-    defs += std::to_string(static_cast<int>(constColor->inputMode));
-    defs += "\n";
-  } else if (name == "DeviceSpaceTextureEffect") {
-    auto deviceEffect = static_cast<const DeviceSpaceTextureEffect*>(processor);
-    defs += "#define TGFX_DST_IS_ALPHA_ONLY ";
-    defs += deviceEffect->textureProxy->isAlphaOnly() ? "1" : "0";
-    defs += "\n";
+  ShaderMacroSet macros;
+  processor->onBuildShaderMacros(macros);
+  if (!macros.empty()) {
+    fragmentShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] += macros.toPreamble();
   }
 }
 
@@ -170,9 +162,9 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
   // each child will collect its own samplers.
   // ClampedGradientEffect keeps collection because it manages children's samplers internally.
   auto name = processor->name();
-  bool skipSamplerCollection = (name == "ComposeFragmentProcessor" ||
-                                name == "XfermodeFragmentProcessor" ||
-                                name == "GaussianBlur1DFragmentProcessor");
+  bool skipSamplerCollection =
+      (name == "ComposeFragmentProcessor" || name == "XfermodeFragmentProcessor" ||
+       name == "GaussianBlur1DFragmentProcessor");
   if (!skipSamplerCollection) {
     currentTexSamplers.clear();
     FragmentProcessor::Iter fpIter(processor);
@@ -983,8 +975,8 @@ void ModularProgramBuilder::emitComposeFragmentProcessor(const FragmentProcessor
   std::string currentInput = input;
   for (size_t i = 0; i < numChildren; ++i) {
     auto childCoordIdx = childCoordVarsOffset(processor, transformedCoordVarsIdx, i);
-    auto childOutput = emitModularFragProc(processor->childProcessor(i), childCoordIdx,
-                                           currentInput);
+    auto childOutput =
+        emitModularFragProc(processor->childProcessor(i), childCoordIdx, currentInput);
     if (i == numChildren - 1) {
       fragmentShaderBuilder()->codeAppendf("%s = %s;", output.c_str(), childOutput.c_str());
     } else {
@@ -1038,8 +1030,7 @@ void ModularProgramBuilder::emitGaussianBlur1DFragmentProcessor(const FragmentPr
   auto uHandler = uniformHandler();
 
   auto sigmaName = uHandler->addUniform("Sigma", UniformFormat::Float, ShaderStage::Fragment);
-  auto texelSizeName =
-      uHandler->addUniform("Step", UniformFormat::Float2, ShaderStage::Fragment);
+  auto texelSizeName = uHandler->addUniform("Step", UniformFormat::Float2, ShaderStage::Fragment);
 
   fragBuilder->codeAppendf("vec2 offset = %s;", texelSizeName.c_str());
   fragBuilder->codeAppendf("float sigma = %s;", sigmaName.c_str());
@@ -1210,8 +1201,7 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
     std::string positionName = "position";
     vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
                              matrixName.c_str(), gp->position.name().c_str());
-    gp->emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
-                       ShaderVar(gp->position));
+    gp->emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(gp->position));
     if (gp->aa == AAType::Coverage) {
       auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
       vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(),
@@ -1405,9 +1395,9 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
     auto viewMatrixName =
         uniformHandler->addUniform("ViewMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
     std::string positionName = "position";
-    vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy + %s;",
-                             positionName.c_str(), viewMatrixName.c_str(),
-                             gp->position.name().c_str(), gp->offset.name().c_str());
+    vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy + %s;", positionName.c_str(),
+                             viewMatrixName.c_str(), gp->position.name().c_str(),
+                             gp->offset.name().c_str());
     ShaderVar localVar("local", SLType::Float2);
     gp->emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, localVar);
     if (gp->aa == AAType::Coverage) {
@@ -1450,8 +1440,7 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
     vertBuilder->codeAppendf("%s = %s;", localCoordVarying.vsOut().c_str(),
                              gp->inLocalCoord.name().c_str());
     auto radiiVarying = varyingHandler->addVarying("radii", SLType::Float2);
-    vertBuilder->codeAppendf("%s = %s;", radiiVarying.vsOut().c_str(),
-                             gp->inRadii.name().c_str());
+    vertBuilder->codeAppendf("%s = %s;", radiiVarying.vsOut().c_str(), gp->inRadii.name().c_str());
     auto boundsVarying = varyingHandler->addVarying("rectBounds", SLType::Float4);
     vertBuilder->codeAppendf("%s = %s;", boundsVarying.vsOut().c_str(),
                              gp->inRectBounds.name().c_str());
@@ -1470,7 +1459,8 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
     fragBuilder->codeAppend("vec2 halfSize = (bounds.zw - bounds.xy) * 0.5;");
     fragBuilder->codeAppend("vec2 q = abs(localCoord - center) - halfSize + radii;");
     fragBuilder->codeAppend(
-        "float d = min(max(q.x / radii.x, q.y / radii.y), 0.0) + length(max(q / radii, 0.0)) - 1.0;");
+        "float d = min(max(q.x / radii.x, q.y / radii.y), 0.0) + length(max(q / radii, 0.0)) - "
+        "1.0;");
     fragBuilder->codeAppend("float outerCoverage = step(d, 0.0);");
     if (gp->stroke) {
       fragBuilder->codeAppendf("vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
@@ -1478,8 +1468,7 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
       fragBuilder->codeAppend("vec2 innerRadii = max(radii - 2.0 * sw, vec2(0.0));");
       fragBuilder->codeAppend("float innerCoverage = 0.0;");
       fragBuilder->codeAppend("if (innerHalfSize.x > 0.0 && innerHalfSize.y > 0.0) {");
-      fragBuilder->codeAppend(
-          "  vec2 qi = abs(localCoord - center) - innerHalfSize + innerRadii;");
+      fragBuilder->codeAppend("  vec2 qi = abs(localCoord - center) - innerHalfSize + innerRadii;");
       fragBuilder->codeAppend("  vec2 safeInnerRadii = max(innerRadii, vec2(0.001));");
       fragBuilder->codeAppend(
           "  float di = min(max(qi.x / safeInnerRadii.x, qi.y / safeInnerRadii.y), 0.0) + "
@@ -1663,10 +1652,10 @@ void ModularProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
       fragBuilder->codeAppend("discard;");
       fragBuilder->codeAppend("}");
 
-      auto dstTopLeftName = uHandler->addUniform("DstTextureUpperLeft", UniformFormat::Float2,
-                                                  ShaderStage::Fragment);
+      auto dstTopLeftName =
+          uHandler->addUniform("DstTextureUpperLeft", UniformFormat::Float2, ShaderStage::Fragment);
       auto dstCoordScaleName = uHandler->addUniform("DstTextureCoordScale", UniformFormat::Float2,
-                                                     ShaderStage::Fragment);
+                                                    ShaderStage::Fragment);
 
       fragBuilder->codeAppend("// Read color from copy of the destination.\n");
       std::string dstTexCoord = "_dstTexCoord";
@@ -1680,8 +1669,8 @@ void ModularProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
 
     const char* outColor = "localOutputColor";
     fragBuilder->codeAppendf("vec4 %s;", outColor);
-    AppendMode(fragBuilder, args.inputColor, args.inputCoverage, dstColor, outColor,
-               xp->blendMode, true);
+    AppendMode(fragBuilder, args.inputColor, args.inputCoverage, dstColor, outColor, xp->blendMode,
+               true);
 
     if (!BlendModeAsCoeff(xp->blendMode, true)) {
       fragBuilder->codeAppendf("%s = %s * %s + (vec4(1.0) - %s) * %s;", outColor,

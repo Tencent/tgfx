@@ -367,5 +367,7 @@ class FragmentProcessor : public Processor {
                          std::function<std::string(std::string_view)> = {}) const;
 
   std::vector<const CoordTransform*> coordTransforms;
+
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx
