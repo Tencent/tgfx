@@ -252,13 +252,13 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
   if (dstPixels == nullptr) {
     return false;
   }
-  if (colorType == ColorType::ALPHA_8) {
-    memset(dstPixels, 255, dstRowBytes * static_cast<size_t>(height()));
-    return true;
-  }
   float scale = static_cast<float>(scaleNum) / 8.0f;
   float dstWidth = static_cast<float>(width()) * scale;
   float dstHeight = static_cast<float>(height()) * scale;
+  if (colorType == ColorType::ALPHA_8) {
+    memset(dstPixels, 255, dstRowBytes * static_cast<size_t>(dstHeight));
+    return true;
+  }
   auto dstInfo = ImageInfo::Make(static_cast<int>(dstWidth), static_cast<int>(dstHeight), colorType,
                                  alphaType, dstRowBytes, dstColorSpace);
   auto outPixels = dstPixels;
@@ -325,9 +325,17 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
     }
     JSAMPROW pRow[1];
     int line = 0;
+    int maxLines = static_cast<int>(dstHeight);
     while (cinfo.output_scanline < cinfo.output_height) {
-      pRow[0] = (JSAMPROW)(static_cast<unsigned char*>(outPixels) +
-                           outRowBytes * static_cast<size_t>(line));
+      if (line < maxLines) {
+        pRow[0] = (JSAMPROW)(static_cast<unsigned char*>(outPixels) +
+                             outRowBytes * static_cast<size_t>(line));
+      } else {
+        // libjpeg output_height exceeds our buffer; read into last valid row to drain remaining
+        // scanlines without overflowing.
+        pRow[0] = (JSAMPROW)(static_cast<unsigned char*>(outPixels) +
+                             outRowBytes * static_cast<size_t>(maxLines - 1));
+      }
       jpeg_read_scanlines(&cinfo, pRow, 1);
       line++;
     }
