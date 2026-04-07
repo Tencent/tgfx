@@ -20,9 +20,8 @@
 #include <cstring>
 
 #ifdef _WIN32
-#include <bcrypt.h>
-#include <windows.h>
-#pragma comment(lib, "bcrypt.lib")
+#define _CRT_RAND_S
+#include <stdlib.h>
 #else
 #include <fcntl.h>
 #include <unistd.h>
@@ -208,8 +207,14 @@ void hmacSha256(const uint8_t* key, size_t keyLen, const uint8_t* data, size_t d
 
 bool generateChallenge(uint8_t out[ChallengeSize]) {
 #ifdef _WIN32
-  if (BCryptGenRandom(nullptr, out, ChallengeSize, BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0) {
-    return false;
+  for (size_t i = 0; i < ChallengeSize; i += sizeof(unsigned int)) {
+    unsigned int val = 0;
+    if (rand_s(&val) != 0) {
+      return false;
+    }
+    auto remaining = ChallengeSize - i;
+    auto copySize = remaining < sizeof(unsigned int) ? remaining : sizeof(unsigned int);
+    memcpy(out + i, &val, copySize);
   }
 #else
   int fd = open("/dev/urandom", O_RDONLY);
