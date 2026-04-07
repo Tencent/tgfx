@@ -3706,6 +3706,7 @@ Phase 1-3 及后续复杂 FP 迁移于 2026-04-07 完成，共 4 个 commit：
 | `b4bdfd0d` | Phase 3 | 1 | +14/-20 |
 | `25d6a686` | 复杂 FP 迁移 | 5 | +680/-59 |
 | `2f0c882e` | 容器 FP 展开 | 4 | +105/-5 |
+| `bd660df0` | GP/XP 显式分发 | 15 | +120/-2 |
 
 ### 16.2 最终架构
 
@@ -3835,15 +3836,21 @@ src/gpu/shaders/
 - ClampedGradientEffect 被特殊处理是因为它是最常用的渐变管线入口，且子 FP 结构固定（Layout + Colorizer）
 - 显式分发（而非通用 fallback）使得 `emitModularFragProc()` 的分发逻辑完全可审计：每个 FP 类型都有明确的处理入口
 
-#### 决策 5：GP 和 XP 保留传统 emitCode() 路径
+#### 决策 5：GP 和 XP 通过显式分发 + legacy emitCode() 处理（已从基类通用调用迁移）
 
-**选择**：不模板化 GP 的 VS/FS 代码，不模块化 XP 的 blend 逻辑
+**选择**：在 ModularProgramBuilder 中 override `emitAndInstallGeoProc()` 和 `emitAndInstallXferProc()`，内部仍调用 GP/XP 的 `emitCode()`，但通过显式分发而非基类通用路径
+
+**原始方案**：`emitAndInstallGeoProc()` 和 `emitAndInstallXferProc()` 是 ProgramBuilder 的非虚方法，ModularProgramBuilder 直接复用
+
+**迁移后方案**（commit `bd660df0`）：
+- `ProgramBuilder.h` 中 `emitAndInstallGeoProc()` 和 `emitAndInstallXferProc()` 标记为 `virtual`
+- `ModularProgramBuilder` override 这两个方法，构造同样的 EmitArgs 并调用 `geometryProcessor->emitCode(args)` / `xferProcessor->emitCode(args)`
+- 10 个 GP 和 1 个 XP 的 .h 文件添加 `friend class ModularProgramBuilder`
 
 **理由**：
-- GP 的 `emitCode()` 同时操作 VS 和 FS，且高度依赖 `VaryingHandler::emitAttributes()`、`emitTransforms()`、`emitNormalizedPosition()` 等 C++ API
-- 10 个 GP 中 6 个包含复杂 SDF 计算，每个数学逻辑独特
-- XP 的 `AppendMode()` 函数 552 行，包含 30+ 种 blend mode 的 GLSL 代码生成
-- GP 和 XP 的 emitCode() 已经通过 `emitAndInstallGeoProc()` 和 `emitAndInstallXferProc()` 在 ModularProgramBuilder 中完全复用
+- GP 的 emitCode() 同时操作 VS 和 FS，且调用 `emitAttributes()`、`emitTransforms()`、`emitNormalizedPosition()` 等基类方法，内联工作量巨大
+- XP 的 `AppendMode()` 552 行，覆盖 30 种 blend mode
+- 显式分发确保 ModularProgramBuilder 完全控制 GP/XP 的代码生成入口，为后续逐个内联创建了框架
 
 ### 16.6 验证结果
 
@@ -3860,7 +3867,8 @@ ModularProgramBuilder 处理 100% 的渲染管线，无回退到 GLSLProgramBuil
 |------|------|--------|
 | ~~复杂叶子 FP 迁移~~ | ~~TextureEffect/TiledTexture/UnrolledBinary 提取为 .glsl 模块~~ | ✅ 已完成（`25d6a686`，内联生成方式） |
 | ~~容器 FP 模块化展开~~ | ~~Compose/Xfermode/GaussianBlur 替换 emitCode() fallback~~ | ✅ 已完成（`2f0c882e`，显式分发 + legacy emitCode()） |
-| GP FS 逻辑提取 | 将 Ellipse/HairlineQuad 等 GP 的 SDF 计算提取为 .glsl 函数 | 低 |
+| ~~GP/XP 显式分发~~ | ~~GP/XP 的 emitCode() 从基类通用调用迁移到 ModularProgramBuilder override~~ | ✅ 已完成（`bd660df0`） |
+| GP 内联化 | 将 10 个 GP 的 emitCode() 逻辑内联到 ModularProgramBuilder | 中 |
 | XP blend 模块化 | 将 GLSLBlend.cpp 的 AppendMode() 提取为 tgfx_blend.glsl | 低 |
 | Layer 0 其他后端 | 实现 tgfx_types_ue.glsl / tgfx_types_vulkan.glsl / tgfx_types_metal.glsl | 取决于 UE 后端进度 |
 | tgfx_sampling.glsl | 公共纹理采样抽象层 | 取决于复杂叶子 FP 迁移 |
