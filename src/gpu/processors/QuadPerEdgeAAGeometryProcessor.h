@@ -43,6 +43,24 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (aa == AAType::Coverage) {
+      macros.define("TGFX_GP_QUAD_COVERAGE_AA");
+    }
+    if (commonColor.has_value()) {
+      macros.define("TGFX_GP_QUAD_COMMON_COLOR");
+    }
+    if (uvMatrix.has_value()) {
+      macros.define("TGFX_GP_QUAD_UV_MATRIX");
+    }
+    if (hasSubset) {
+      macros.define("TGFX_GP_QUAD_SUBSET");
+      if (uvMatrix.has_value()) {
+        macros.define("TGFX_GP_QUAD_SUBSET_MATRIX");
+      }
+    }
+  }
+
   bool hasUVPerspective() const override {
     return uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
   }

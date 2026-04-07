@@ -40,6 +40,18 @@ class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
                                    std::optional<Matrix> uvMatrix);
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (aaType == AAType::Coverage) {
+      macros.define("TGFX_GP_RRECT_COVERAGE_AA");
+    }
+    if (commonColor.has_value()) {
+      macros.define("TGFX_GP_RRECT_COMMON_COLOR");
+    }
+    if (uvMatrix.has_value()) {
+      macros.define("TGFX_GP_RRECT_UV_MATRIX");
+    }
+  }
+
   bool hasUVPerspective() const override {
     return uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
   }

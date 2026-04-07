@@ -52,6 +52,12 @@ class HairlineQuadGeometryProcessor : public GeometryProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (aaType == AAType::Coverage) {
+      macros.define("TGFX_GP_HQUAD_COVERAGE_AA");
+    }
+  }
+
   PMColor color = {};
   Matrix viewMatrix = {};
   std::optional<Matrix> uvMatrix = std::nullopt;

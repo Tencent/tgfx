@@ -41,6 +41,15 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (aa == AAType::Coverage) {
+      macros.define("TGFX_GP_SHAPE_COVERAGE_AA");
+    }
+    if (hasColors) {
+      macros.define("TGFX_GP_SHAPE_VERTEX_COLORS");
+    }
+  }
+
   Attribute position = {};
   Attribute coverage = {};
   Attribute offset = {};

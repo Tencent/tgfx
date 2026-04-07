@@ -46,6 +46,18 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (aa == AAType::Coverage) {
+      macros.define("TGFX_GP_ATLAS_COVERAGE_AA");
+    }
+    if (commonColor.has_value()) {
+      macros.define("TGFX_GP_ATLAS_COMMON_COLOR");
+    }
+    if (textureProxy->isAlphaOnly()) {
+      macros.define("TGFX_GP_ATLAS_ALPHA_ONLY");
+    }
+  }
+
   std::shared_ptr<Texture> onTextureAt(size_t index) const override {
     DEBUG_ASSERT(index < textures.size());
     return textures[index];

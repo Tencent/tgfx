@@ -44,6 +44,18 @@ class MeshGeometryProcessor : public GeometryProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (hasTexCoords) {
+      macros.define("TGFX_GP_MESH_TEX_COORDS");
+    }
+    if (hasColors) {
+      macros.define("TGFX_GP_MESH_VERTEX_COLORS");
+    }
+    if (hasCoverage) {
+      macros.define("TGFX_GP_MESH_VERTEX_COVERAGE");
+    }
+  }
+
   Attribute position = {};
   Attribute texCoord = {};
   Attribute color = {};

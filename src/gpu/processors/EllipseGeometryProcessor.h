@@ -47,6 +47,15 @@ class EllipseGeometryProcessor : public GeometryProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (stroke) {
+      macros.define("TGFX_GP_ELLIPSE_STROKE");
+    }
+    if (commonColor.has_value()) {
+      macros.define("TGFX_GP_ELLIPSE_COMMON_COLOR");
+    }
+  }
+
   Attribute inPosition;
   Attribute inColor;
   Attribute inEllipseOffset;

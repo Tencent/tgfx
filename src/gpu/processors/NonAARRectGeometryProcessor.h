@@ -45,6 +45,15 @@ class NonAARRectGeometryProcessor : public GeometryProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (commonColor.has_value()) {
+      macros.define("TGFX_GP_NONAA_COMMON_COLOR");
+    }
+    if (stroke) {
+      macros.define("TGFX_GP_NONAA_STROKE");
+    }
+  }
+
   // Vertex attributes - declared in the same order as vertex data layout.
   Attribute inPosition;     // position (2 floats)
   Attribute inLocalCoord;   // local coordinates (2 floats)

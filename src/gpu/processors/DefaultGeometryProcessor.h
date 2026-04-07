@@ -41,6 +41,12 @@ class DefaultGeometryProcessor : public GeometryProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
+    if (aa == AAType::Coverage) {
+      macros.define("TGFX_GP_DEFAULT_COVERAGE_AA");
+    }
+  }
+
   bool hasUVPerspective() const override {
     return uvMatrix.hasPerspective();
   }
