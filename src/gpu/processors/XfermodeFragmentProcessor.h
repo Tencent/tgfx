@@ -64,5 +64,7 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
 
   Child child;
   BlendMode mode;
+
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

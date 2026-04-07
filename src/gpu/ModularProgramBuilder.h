@@ -94,6 +94,24 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
   void emitTiledTextureEffect(const FragmentProcessor* processor, size_t transformedCoordVarsIdx,
                               const std::string& input, const std::string& output);
 
+  // ---- Container FP expansion methods ----
+
+  void emitComposeFragmentProcessor(const FragmentProcessor* processor,
+                                    size_t transformedCoordVarsIdx, const std::string& input,
+                                    const std::string& output);
+
+  void emitXfermodeFragmentProcessor(const FragmentProcessor* processor,
+                                     size_t transformedCoordVarsIdx, const std::string& input,
+                                     const std::string& output);
+
+  void emitGaussianBlur1DFragmentProcessor(const FragmentProcessor* processor,
+                                           size_t transformedCoordVarsIdx,
+                                           const std::string& input, const std::string& output);
+
+  // Compute the transformedCoordVarsIdx offset for childProcessor(childIndex) within a container FP.
+  size_t childCoordVarsOffset(const FragmentProcessor* parent, size_t parentCoordVarsIdx,
+                              size_t childIndex) const;
+
   std::set<ShaderModuleID> includedModules;
   // Sampler handles collected during emitModularFragProc, available for emitLeafFPCall.
   std::vector<SamplerHandle> currentTexSamplers;

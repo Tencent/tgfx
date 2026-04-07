@@ -47,5 +47,7 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
   GaussianBlurDirection direction = GaussianBlurDirection::Horizontal;
   float stepLength = 1.f;
   int maxSigma = 10;
+
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

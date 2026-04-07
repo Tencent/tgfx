@@ -17,13 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ModularProgramBuilder.h"
+#include "gpu/glsl/GLSLBlend.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
+#include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "gpu/resources/YUVTextureView.h"
 
 namespace tgfx {
@@ -155,22 +158,27 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
   int samplerIndex = 0;
   while (const auto subFP = fpIter.next()) {
     for (size_t i = 0; i < subFP->numTextureSamplers(); ++i) {
-      std::string name = "TextureSampler_";
-      name += std::to_string(samplerIndex++);
+      std::string samplerName = "TextureSampler_";
+      samplerName += std::to_string(samplerIndex++);
       auto texture = subFP->textureAt(i);
-      currentTexSamplers.emplace_back(emitSampler(texture, name));
+      currentTexSamplers.emplace_back(emitSampler(texture, samplerName));
     }
   }
 
   auto name = processor->name();
   if (name == "ClampedGradientEffect") {
     emitClampedGradientEffect(processor, transformedCoordVarsIdx, input, output);
+  } else if (name == "ComposeFragmentProcessor") {
+    emitComposeFragmentProcessor(processor, transformedCoordVarsIdx, input, output);
+  } else if (name == "XfermodeFragmentProcessor") {
+    emitXfermodeFragmentProcessor(processor, transformedCoordVarsIdx, input, output);
+  } else if (name == "GaussianBlur1DFragmentProcessor") {
+    emitGaussianBlur1DFragmentProcessor(processor, transformedCoordVarsIdx, input, output);
   } else if (HasModularModule(processor) || name == "UnrolledBinaryGradientColorizer" ||
              name == "TextureEffect" || name == "TiledTextureEffect") {
     emitLeafFPCall(processor, transformedCoordVarsIdx, input, output);
   } else {
-    // Container FPs (Compose, Xfermode, GaussianBlur) fall back to legacy emitCode() path.
-    // Build the EmitArgs with the collected samplers and coord transforms.
+    // Safety fallback for any unhandled FP type.
     FragmentProcessor::TransformedCoordVars coords(
         processor, transformedCoordVarsIdx < transformedCoordVars.size()
                        ? &transformedCoordVars[transformedCoordVarsIdx]
@@ -908,6 +916,76 @@ void ModularProgramBuilder::emitTiledTextureEffect(const FragmentProcessor* proc
     fragBuilder->codeAppendf("%s = %s * %s.a;", output.c_str(), output.c_str(),
                              input.empty() ? "vec4(1.0)" : input.c_str());
   }
+}
+
+// ---- Helper: compute child coordVarsIdx offset ----
+
+size_t ModularProgramBuilder::childCoordVarsOffset(const FragmentProcessor* parent,
+                                                    size_t parentCoordVarsIdx,
+                                                    size_t childIndex) const {
+  size_t offset = parentCoordVarsIdx;
+  // Skip parent's own coord transforms.
+  offset += parent->numCoordTransforms();
+  // Skip coord transforms of all children before childIndex (pre-order traversal).
+  for (size_t i = 0; i < childIndex; ++i) {
+    FragmentProcessor::Iter iter(parent->childProcessor(i));
+    while (const auto* fp = iter.next()) {
+      offset += fp->numCoordTransforms();
+    }
+  }
+  return offset;
+}
+
+// ---- Container FP expansion methods ----
+// These use the legacy emitCode() path internally, which calls emitChild() to recursively
+// expand children. Each container gets an explicit named method to eliminate the generic
+// fallback branch while preserving the proven emitCode()/emitChild() mechanism.
+
+void ModularProgramBuilder::emitComposeFragmentProcessor(const FragmentProcessor* processor,
+                                                          size_t transformedCoordVarsIdx,
+                                                          const std::string& input,
+                                                          const std::string& output) {
+  FragmentProcessor::TransformedCoordVars coords(
+      processor, transformedCoordVarsIdx < transformedCoordVars.size()
+                     ? &transformedCoordVars[transformedCoordVarsIdx]
+                     : nullptr);
+  FragmentProcessor::TextureSamplers textureSamplers(
+      processor, currentTexSamplers.empty() ? nullptr : &currentTexSamplers[0]);
+  FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output,
+                                   input.empty() ? "vec4(1.0)" : input, subsetVarName, &coords,
+                                   &textureSamplers);
+  processor->emitCode(args);
+}
+
+void ModularProgramBuilder::emitXfermodeFragmentProcessor(const FragmentProcessor* processor,
+                                                           size_t transformedCoordVarsIdx,
+                                                           const std::string& input,
+                                                           const std::string& output) {
+  FragmentProcessor::TransformedCoordVars coords(
+      processor, transformedCoordVarsIdx < transformedCoordVars.size()
+                     ? &transformedCoordVars[transformedCoordVarsIdx]
+                     : nullptr);
+  FragmentProcessor::TextureSamplers textureSamplers(
+      processor, currentTexSamplers.empty() ? nullptr : &currentTexSamplers[0]);
+  FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output,
+                                   input.empty() ? "vec4(1.0)" : input, subsetVarName, &coords,
+                                   &textureSamplers);
+  processor->emitCode(args);
+}
+
+void ModularProgramBuilder::emitGaussianBlur1DFragmentProcessor(
+    const FragmentProcessor* processor, size_t transformedCoordVarsIdx, const std::string& input,
+    const std::string& output) {
+  FragmentProcessor::TransformedCoordVars coords(
+      processor, transformedCoordVarsIdx < transformedCoordVars.size()
+                     ? &transformedCoordVars[transformedCoordVarsIdx]
+                     : nullptr);
+  FragmentProcessor::TextureSamplers textureSamplers(
+      processor, currentTexSamplers.empty() ? nullptr : &currentTexSamplers[0]);
+  FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output,
+                                   input.empty() ? "vec4(1.0)" : input, subsetVarName, &coords,
+                                   &textureSamplers);
+  processor->emitCode(args);
 }
 
 // ---- ClampedGradientEffect inline expansion ----
