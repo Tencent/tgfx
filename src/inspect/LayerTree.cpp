@@ -277,6 +277,8 @@ void LayerTree::SocketAgent::sendWork() {
       socket = listenSocket->acceptSock();
       if (socket) {
         if (!authenticateClient(socket.get())) {
+          auto status = HandshakeStatus::HandshakeAuthenticationFailed;
+          socket->sendData(&status, sizeof(status));
           socket.reset();
           continue;
         }
