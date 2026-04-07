@@ -44,5 +44,7 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
 
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   Matrix uvMatrix = {};
+
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

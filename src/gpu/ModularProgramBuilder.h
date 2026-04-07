@@ -19,6 +19,8 @@
 #pragma once
 
 #include <set>
+#include <vector>
+#include "gpu/SamplerHandle.h"
 #include "gpu/ShaderModuleRegistry.h"
 #include "gpu/glsl/GLSLProgramBuilder.h"
 
@@ -83,6 +85,8 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
   void emitProcessorDefines(const FragmentProcessor* processor);
 
   std::set<ShaderModuleID> includedModules;
+  // Sampler handles collected during emitModularFragProc, available for emitLeafFPCall.
+  std::vector<SamplerHandle> currentTexSamplers;
 };
 
 }  // namespace tgfx

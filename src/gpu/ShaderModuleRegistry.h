@@ -27,6 +27,18 @@ enum class ShaderModuleID {
   ConstColor,
   LinearGradientLayout,
   SingleIntervalGradientColorizer,
+  // Phase 2 batch 1
+  RadialGradientLayout,
+  DiamondGradientLayout,
+  ConicGradientLayout,
+  AARectEffect,
+  ColorMatrix,
+  Luma,
+  // Phase 2 batch 2
+  DualIntervalGradientColorizer,
+  AlphaThreshold,
+  TextureGradientColorizer,
+  DeviceSpaceTextureEffect,
 };
 
 /**
