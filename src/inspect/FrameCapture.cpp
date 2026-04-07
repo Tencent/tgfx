@@ -20,6 +20,7 @@
 #include <atomic>
 #include <chrono>
 #include <iostream>
+#include "HmacAuth.h"
 #include "ProcessUtils.h"
 #include "Protocol.h"
 #include "Socket.h"
@@ -854,6 +855,12 @@ bool FrameCapture::sendData(const uint8_t* data, size_t len) {
 }
 
 bool FrameCapture::confirmProtocol() {
+  if (!authenticateClient(sock.get())) {
+    auto status = HandshakeStatus::HandshakeAuthenticationFailed;
+    sock->sendData(&status, sizeof(status));
+    sock.reset();
+    return false;
+  }
   char shibboleth[HandshakeShibbolethSize] = "";
   auto res = sock->readRaw(shibboleth, HandshakeShibbolethSize, 2000);
   if (!res || memcmp(shibboleth, HandshakeShibboleth, HandshakeShibbolethSize) != 0) {

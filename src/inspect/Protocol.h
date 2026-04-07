@@ -34,7 +34,7 @@ static constexpr size_t BroadcastPort = 8086;
 static constexpr int64_t BroadcastHeartbeatUSTime = 3000000;
 static constexpr int WelcomeMessageProgramNameSize = 64;
 static constexpr int WelcomeMessageHostInfoSize = 1024;
-static constexpr uint8_t ProtocolVersion = 1;
+static constexpr uint8_t ProtocolVersion = 2;
 static constexpr uint16_t BroadcastVersion = 1;
 
 enum class HandshakeStatus : uint8_t {
@@ -42,7 +42,8 @@ enum class HandshakeStatus : uint8_t {
   HandshakeWelcome,
   HandshakeProtocolMismatch,
   HandshakeNotAvailable,
-  HandshakeDropped
+  HandshakeDropped,
+  HandshakeAuthenticationFailed
 };
 
 enum class ToolType : uint8_t { FrameCapture = 0, LayerTree = 1 };

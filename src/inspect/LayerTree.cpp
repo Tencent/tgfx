@@ -21,6 +21,7 @@
 #include <functional>
 #include <string>
 #include <thread>
+#include "HmacAuth.h"
 #include "ProcessUtils.h"
 #include "Protocol.h"
 #include "concurrentqueue.h"
@@ -275,6 +276,10 @@ void LayerTree::SocketAgent::sendWork() {
       }
       socket = listenSocket->acceptSock();
       if (socket) {
+        if (!authenticateClient(socket.get())) {
+          socket.reset();
+          continue;
+        }
         break;
       }
     }
