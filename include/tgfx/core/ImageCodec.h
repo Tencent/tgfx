@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <utility>
 #include "tgfx/core/Data.h"
 #include "tgfx/core/EncodedFormat.h"
 #include "tgfx/core/ImageGenerator.h"
@@ -85,11 +86,19 @@ class ImageCodec : public ImageGenerator {
   }
 
   /**
-  * Decodes the image into the given pixel buffer using the specified image info. If the size
-  * in dstInfo differs from the codec's size, this method will attempt to downscale the image
-  * using a box filter algorithm to fit dstInfo. Only downscaling is supported. Returns true
-  * if decoding succeeds, false otherwise.
-  */
+   * Returns the actual output dimensions when decoding to the given target size. Subclasses that
+   * support native scaling (e.g., JPEG DCT scaling) may return different dimensions than the
+   * requested ones if the underlying decoder produces a slightly different size. The default
+   * implementation returns the input target size unchanged.
+   */
+  virtual std::pair<int, int> getScaledSize(int targetWidth, int targetHeight) const;
+
+  /**
+   * Decodes the image into the given pixel buffer using the specified image info. If the size
+   * in dstInfo differs from the codec's size, this method will attempt to downscale the image
+   * using a box filter algorithm to fit dstInfo. Only downscaling is supported. Returns true
+   * if decoding succeeds, false otherwise.
+   */
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const;
 
  protected:

@@ -53,7 +53,8 @@ std::shared_ptr<TextureProxy> BufferImage::lockTextureProxy(const TPArgs& args) 
   if (imageBuffer->isPixelBuffer() && scaleWidth < imageBuffer->width() &&
       scaleHeight < imageBuffer->height()) {
     auto codec = PixelBufferCodec::Make(std::static_pointer_cast<PixelBuffer>(imageBuffer));
-    auto generator = ScaledImageGenerator::MakeFrom(codec, scaleWidth, scaleHeight);
+    auto [actualWidth, actualHeight] = codec->getScaledSize(scaleWidth, scaleHeight);
+    auto generator = ScaledImageGenerator::MakeFrom(codec, actualWidth, actualHeight);
     return args.context->proxyProvider()->createTextureProxy(generator, args.mipmapped,
                                                              args.renderFlags);
   }

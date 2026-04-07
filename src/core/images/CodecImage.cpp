@@ -49,10 +49,12 @@ std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
 
 std::shared_ptr<TextureProxy> CodecImage::lockTextureProxy(const TPArgs& args) const {
   auto tempGenerator = generator;
+  auto codec = getCodec();
   auto scaleWidth = FloatRoundToInt(static_cast<float>(width()) * args.drawScale);
   auto scaleHeight = FloatRoundToInt(static_cast<float>(height()) * args.drawScale);
   if (scaleWidth < generator->width() && scaleHeight < generator->height()) {
-    tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), scaleWidth, scaleHeight);
+    auto [actualWidth, actualHeight] = codec->getScaledSize(scaleWidth, scaleHeight);
+    tempGenerator = ScaledImageGenerator::MakeFrom(codec, actualWidth, actualHeight);
   }
   return args.context->proxyProvider()->createTextureProxy(tempGenerator, args.mipmapped,
                                                            args.renderFlags);

@@ -207,9 +207,9 @@ static void ConvertCMYKToRGBWithFormula(void* pixels, const ImageInfo& dstInfo) 
   }
 }
 
-uint32_t JpegCodec::getScaledDimensions(int newWidth, int newHeight) const {
-  auto scaledX = static_cast<float>(newWidth) / static_cast<float>(width());
-  auto scaledY = static_cast<float>(newHeight) / static_cast<float>(height());
+uint32_t JpegCodec::getScaledDimensions(int targetWidth, int targetHeight) const {
+  auto scaledX = static_cast<float>(targetWidth) / static_cast<float>(width());
+  auto scaledY = static_cast<float>(targetHeight) / static_cast<float>(height());
   if (!FloatNearlyEqual(scaledX, scaledY)) {
     return 0;
   }
@@ -233,10 +233,26 @@ uint32_t JpegCodec::getScaledDimensions(int newWidth, int newHeight) const {
   return 0;
 }
 
+std::pair<int, int> JpegCodec::getScaledSize(int targetWidth, int targetHeight) const {
+  auto scaleNum = getScaledDimensions(targetWidth, targetHeight);
+  if (scaleNum == 0) {
+    return {targetWidth, targetHeight};
+  }
+  // Replicate libjpeg-turbo's output dimension formula:
+  // output_dim = (image_dim * scale_num + scale_denom - 1) / scale_denom
+  auto outputWidth = static_cast<int>((static_cast<long>(width()) * scaleNum + 7) / 8);
+  auto outputHeight = static_cast<int>((static_cast<long>(height()) * scaleNum + 7) / 8);
+  return {outputWidth, outputHeight};
+}
+
 bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  if (auto scaleDimensions = getScaledDimensions(dstInfo.width(), dstInfo.height())) {
-    return readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels,
-                            scaleDimensions, dstInfo.colorSpace());
+  auto [scaledWidth, scaledHeight] = getScaledSize(dstInfo.width(), dstInfo.height());
+  if (scaledWidth == dstInfo.width() && scaledHeight == dstInfo.height()) {
+    auto scaleNum = getScaledDimensions(dstInfo.width(), dstInfo.height());
+    if (scaleNum != 0) {
+      return readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(),
+                              dstPixels, scaleNum, dstInfo.colorSpace());
+    }
   }
   return ImageCodec::readPixels(dstInfo, dstPixels);
 }
@@ -252,20 +268,13 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
   if (dstPixels == nullptr) {
     return false;
   }
-  float scale = static_cast<float>(scaleNum) / 8.0f;
-  float dstWidth = static_cast<float>(width()) * scale;
-  float dstHeight = static_cast<float>(height()) * scale;
   if (colorType == ColorType::ALPHA_8) {
-    memset(dstPixels, 255, dstRowBytes * static_cast<size_t>(dstHeight));
+    auto alphaHeight = static_cast<size_t>((static_cast<long>(height()) * scaleNum + 7) / 8);
+    memset(dstPixels, 255, dstRowBytes * alphaHeight);
     return true;
   }
-  auto dstInfo = ImageInfo::Make(static_cast<int>(dstWidth), static_cast<int>(dstHeight), colorType,
-                                 alphaType, dstRowBytes, dstColorSpace);
-  auto outPixels = dstPixels;
-  auto outRowBytes = dstRowBytes;
-
-  Bitmap bitmap = {};
   J_COLOR_SPACE out_color_space;
+  bool needsBitmapConversion = false;
   switch (colorType) {
     case ColorType::RGBA_8888:
       out_color_space = JCS_EXT_RGBA;
@@ -280,18 +289,9 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
       out_color_space = JCS_RGB565;
       break;
     default:
-      auto success = bitmap.allocPixels(static_cast<int>(dstWidth), static_cast<int>(dstHeight),
-                                        false, false, colorSpace());
-      if (!success) {
-        return false;
-      }
       out_color_space = JCS_EXT_RGBA;
+      needsBitmapConversion = true;
       break;
-  }
-  Pixmap pixmap(bitmap);
-  if (!pixmap.isEmpty()) {
-    outPixels = pixmap.writablePixels();
-    outRowBytes = pixmap.rowBytes();
   }
   FILE* infile = nullptr;
   if (fileData == nullptr && (infile = fopen(filePath.c_str(), "rb")) == nullptr) {
@@ -323,21 +323,29 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
     if (!jpeg_start_decompress(&cinfo)) {
       break;
     }
-    JSAMPROW pRow[1];
-    int line = 0;
-    int maxLines = static_cast<int>(dstHeight);
-    while (cinfo.output_scanline < cinfo.output_height) {
-      if (line < maxLines) {
-        pRow[0] = (JSAMPROW)(static_cast<unsigned char*>(outPixels) +
-                             outRowBytes * static_cast<size_t>(line));
-      } else {
-        // libjpeg output_height exceeds our buffer; read into last valid row to drain remaining
-        // scanlines without overflowing.
-        pRow[0] = (JSAMPROW)(static_cast<unsigned char*>(outPixels) +
-                             outRowBytes * static_cast<size_t>(maxLines - 1));
+    // Use libjpeg's authoritative output dimensions to avoid buffer overflow.
+    auto dstWidth = static_cast<int>(cinfo.output_width);
+    auto dstHeight = static_cast<int>(cinfo.output_height);
+    auto dstInfo =
+        ImageInfo::Make(dstWidth, dstHeight, colorType, alphaType, dstRowBytes, dstColorSpace);
+    auto outPixels = dstPixels;
+    auto outRowBytes = dstRowBytes;
+    Bitmap bitmap = {};
+    if (needsBitmapConversion) {
+      if (!bitmap.allocPixels(dstWidth, dstHeight, false, false, colorSpace())) {
+        break;
       }
+    }
+    Pixmap pixmap(bitmap);
+    if (!pixmap.isEmpty()) {
+      outPixels = pixmap.writablePixels();
+      outRowBytes = pixmap.rowBytes();
+    }
+    JSAMPROW pRow[1];
+    while (cinfo.output_scanline < cinfo.output_height) {
+      pRow[0] = static_cast<JSAMPROW>(static_cast<unsigned char*>(outPixels) +
+                                      outRowBytes * static_cast<size_t>(cinfo.output_scanline));
       jpeg_read_scanlines(&cinfo, pRow, 1);
-      line++;
     }
     if (cinfo.out_color_space == JCS_CMYK) {
       bool converted = false;
@@ -349,23 +357,22 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
         }
       }
       if (!converted) {
-        // Fallback to basic CMYK to RGB conversion when no ICC profile is available.
         ConvertCMYKToRGBWithFormula(outPixels, dstInfo);
       }
     }
     result = jpeg_finish_decompress(&cinfo);
+    if (result) {
+      if (!pixmap.isEmpty()) {
+        pixmap.readPixels(dstInfo, dstPixels);
+      } else if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+        ConvertColorSpaceInPlace(dstWidth, dstHeight, colorType, alphaType, dstRowBytes,
+                                 colorSpace(), dstColorSpace, dstPixels);
+      }
+    }
   } while (false);
   jpeg_destroy_decompress(&cinfo);
   if (infile) {
     fclose(infile);
-  }
-  if (result) {
-    if (!pixmap.isEmpty()) {
-      pixmap.readPixels(dstInfo, dstPixels);
-    } else if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
-      ConvertColorSpaceInPlace(static_cast<int>(dstWidth), static_cast<int>(dstHeight), colorType,
-                               alphaType, dstRowBytes, colorSpace(), dstColorSpace, dstPixels);
-    }
   }
   return result;
 }

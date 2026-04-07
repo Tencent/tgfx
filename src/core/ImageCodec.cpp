@@ -150,6 +150,10 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
   return nullptr;
 }
 
+std::pair<int, int> ImageCodec::getScaledSize(int targetWidth, int targetHeight) const {
+  return {targetWidth, targetHeight};
+}
+
 bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.width() > width() || dstInfo.height() > height()) {
     return false;
