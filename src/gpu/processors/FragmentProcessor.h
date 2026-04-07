@@ -23,6 +23,8 @@
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/SamplerState.h"
 #include "gpu/SamplingArgs.h"
+#include "gpu/ShaderCallResult.h"
+#include "gpu/ShaderMacroSet.h"
 #include "gpu/UniformData.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
@@ -313,6 +315,36 @@ class FragmentProcessor : public Processor {
   }
 
   virtual void onSetData(UniformData*, UniformData*) const {
+  }
+
+  // ---- Modular shader virtual methods (for ModularProgramBuilder) ----
+
+  /**
+   * Subclasses override to declare their shader variant macros.
+   * Called by ModularProgramBuilder to collect all macros for the #define preamble.
+   */
+  virtual void onBuildShaderMacros(ShaderMacroSet& /*macros*/) const {
+  }
+
+  /**
+   * Returns the path to this Processor's .glsl function file (without extension prefix).
+   * Example: "fragment/texture_effect.frag" for src/gpu/shaders/fragment/texture_effect.frag.glsl
+   * Returns empty string if this Processor has no standalone .glsl file (e.g., ComposeFragmentProcessor).
+   */
+  virtual std::string shaderFunctionFile() const {
+    return "";
+  }
+
+  /**
+   * Generates the GLSL call statement for this Processor in the main() function body.
+   * @param inputColorVar The input color variable name from the previous Processor.
+   * @param fpIndex The index of this FP in the pipeline (for output variable naming).
+   * @return ShaderCallResult with the complete statement and output variable name.
+   * Default returns empty — subclasses that have .glsl files must override.
+   */
+  virtual ShaderCallResult buildCallStatement(const std::string& /*inputColorVar*/,
+                                              int /*fpIndex*/) const {
+    return {};
   }
 
  private:

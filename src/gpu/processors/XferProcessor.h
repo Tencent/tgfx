@@ -20,6 +20,8 @@
 
 #include <memory>
 #include "gpu/FragmentShaderBuilder.h"
+#include "gpu/ShaderCallResult.h"
+#include "gpu/ShaderMacroSet.h"
 #include "gpu/UniformData.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
@@ -59,6 +61,21 @@ class XferProcessor : public Processor {
 
  protected:
   explicit XferProcessor(uint32_t classID) : Processor(classID) {
+  }
+
+  // ---- Modular shader virtual methods (for ModularProgramBuilder) ----
+
+  virtual void onBuildShaderMacros(ShaderMacroSet& /*macros*/) const {
+  }
+
+  virtual std::string shaderFunctionFile() const {
+    return "";
+  }
+
+  virtual ShaderCallResult buildXferCallStatement(const std::string& /*colorInVar*/,
+                                                  const std::string& /*coverageInVar*/,
+                                                  const std::string& /*outputVar*/) const {
+    return {};
   }
 };
 }  // namespace tgfx

@@ -20,7 +20,9 @@
 
 #include <vector>
 #include "gpu/FragmentShaderBuilder.h"
+#include "gpu/ShaderCallResult.h"
 #include "gpu/ShaderCaps.h"
+#include "gpu/ShaderMacroSet.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/UniformData.h"
 #include "gpu/VaryingHandler.h"
@@ -138,6 +140,27 @@ class GeometryProcessor : public Processor {
   void emitTransforms(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
                       VaryingHandler* varyingHandler, UniformHandler* uniformHandler,
                       const ShaderVar& uvCoordsVar) const;
+
+  // ---- Modular shader virtual methods (for ModularProgramBuilder) ----
+
+  virtual void onBuildShaderMacros(ShaderMacroSet& /*macros*/) const {
+  }
+
+  virtual std::string shaderFunctionFile() const {
+    return "";
+  }
+
+  virtual std::string buildVSCallExpr() const {
+    return "";
+  }
+
+  virtual ShaderCallResult buildColorCallExpr() const {
+    return {};
+  }
+
+  virtual ShaderCallResult buildCoverageCallExpr() const {
+    return {};
+  }
 
  private:
   virtual void onComputeProcessorKey(BytesKey*) const {
