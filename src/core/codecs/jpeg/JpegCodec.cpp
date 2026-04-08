@@ -218,8 +218,11 @@ std::pair<int, int> JpegCodec::getScaledDimensions(float scale) const {
       // Replicate libjpeg-turbo's output dimension formula:
       // output_dim = (image_dim * scale_num + scale_denom - 1) / scale_denom
       auto denom = static_cast<long>(JPEG_SCALE_DENOM);
-      auto outputWidth = static_cast<int>((static_cast<long>(width()) * n + denom - 1) / denom);
-      auto outputHeight = static_cast<int>((static_cast<long>(height()) * n + denom - 1) / denom);
+      auto numLong = static_cast<long>(n);
+      auto outputWidth =
+          static_cast<int>((static_cast<long>(width()) * numLong + denom - 1) / denom);
+      auto outputHeight =
+          static_cast<int>((static_cast<long>(height()) * numLong + denom - 1) / denom);
       return {outputWidth, outputHeight};
     }
   }
