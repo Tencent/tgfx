@@ -208,47 +208,26 @@ static void ConvertCMYKToRGBWithFormula(void* pixels, const ImageInfo& dstInfo) 
   }
 }
 
-uint32_t JpegCodec::getScaleNum(float scale) const {
-  if (FloatNearlyEqual(scale, 1.f / 8.f)) {
-    return 1;
-  } else if (FloatNearlyEqual(scale, 2.f / 8.f)) {
-    return 2;
-  } else if (FloatNearlyEqual(scale, 3.f / 8.f)) {
-    return 3;
-  } else if (FloatNearlyEqual(scale, 4.f / 8.f)) {
-    return 4;
-  } else if (FloatNearlyEqual(scale, 5.f / 8.f)) {
-    return 5;
-  } else if (FloatNearlyEqual(scale, 6.f / 8.f)) {
-    return 6;
-  } else if (FloatNearlyEqual(scale, 7.f / 8.f)) {
-    return 7;
-  } else if (FloatNearlyEqual(scale, 1.f)) {
-    return 8;
-  }
-  return 0;
-}
-
 std::pair<int, int> JpegCodec::getScaledDimensions(float scale) const {
-  auto scaleNum = getScaleNum(scale);
-  if (scaleNum == 0) {
-    return ImageCodec::getScaledDimensions(scale);
+  // Match scale to a JPEG DCT scaling level (N/8, N=1..8).
+  for (uint32_t n = 1; n <= 8; n++) {
+    if (FloatNearlyEqual(scale, static_cast<float>(n) / 8.0f)) {
+      // Replicate libjpeg-turbo's output dimension formula:
+      // output_dim = (image_dim * scale_num + scale_denom - 1) / scale_denom
+      auto outputWidth = static_cast<int>((static_cast<long>(width()) * n + 7) / 8);
+      auto outputHeight = static_cast<int>((static_cast<long>(height()) * n + 7) / 8);
+      return {outputWidth, outputHeight};
+    }
   }
-  // Replicate libjpeg-turbo's output dimension formula:
-  // output_dim = (image_dim * scale_num + scale_denom - 1) / scale_denom
-  auto outputWidth = static_cast<int>((static_cast<long>(width()) * scaleNum + 7) / 8);
-  auto outputHeight = static_cast<int>((static_cast<long>(height()) * scaleNum + 7) / 8);
-  return {outputWidth, outputHeight};
+  return ImageCodec::getScaledDimensions(scale);
 }
 
 bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  auto scale = static_cast<float>(dstInfo.width()) / static_cast<float>(width());
-  auto scaleNum = getScaleNum(scale);
-  if (scaleNum != 0) {
-    auto [scaledWidth, scaledHeight] = getScaledDimensions(scale);
+  for (uint32_t n = 1; n <= 8; n++) {
+    auto [scaledWidth, scaledHeight] = getScaledDimensions(static_cast<float>(n) / 8.0f);
     if (scaledWidth == dstInfo.width() && scaledHeight == dstInfo.height()) {
       return readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(),
-                              dstPixels, scaleNum, dstInfo.colorSpace());
+                              dstPixels, n, dstInfo.colorSpace());
     }
   }
   return ImageCodec::readPixels(dstInfo, dstPixels);

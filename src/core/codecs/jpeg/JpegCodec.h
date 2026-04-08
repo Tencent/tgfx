@@ -45,8 +45,6 @@ class JpegCodec : public ImageCodec {
   std::shared_ptr<Data> fileData;
   const std::string filePath;
 
-  uint32_t getScaleNum(float scale) const;
-
   bool readScaledPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
                         void* dstPixels, uint32_t scaleNum,
                         std::shared_ptr<ColorSpace> dstColorSpace) const;
