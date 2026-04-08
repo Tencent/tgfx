@@ -219,8 +219,10 @@ std::pair<int, int> JpegCodec::getScaledDimensions(float scale) const {
       // output_dim = (image_dim * scale_num + scale_denom - 1) / scale_denom
       auto denom = static_cast<long>(JPEG_SCALE_DENOM);
       auto numLong = static_cast<long>(n);
-      auto outputWidth = static_cast<int>((static_cast<long>(width()) * numLong + denom - 1) / denom);
-      auto outputHeight = static_cast<int>((static_cast<long>(height()) * numLong + denom - 1) / denom);
+      auto outputWidth =
+          static_cast<int>((static_cast<long>(width()) * numLong + denom - 1) / denom);
+      auto outputHeight =
+          static_cast<int>((static_cast<long>(height()) * numLong + denom - 1) / denom);
       return {outputWidth, outputHeight};
     }
   }
