@@ -39,6 +39,10 @@ enum class ShaderModuleID {
   AlphaThreshold,
   TextureGradientColorizer,
   DeviceSpaceTextureEffect,
+  // Complex leaf FPs
+  TextureEffect,
+  TiledTextureEffect,
+  UnrolledBinaryGradientColorizer,
 };
 
 /**

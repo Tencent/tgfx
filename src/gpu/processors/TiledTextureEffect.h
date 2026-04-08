@@ -74,8 +74,36 @@ class TiledTextureEffect : public FragmentProcessor {
       return;
     }
     Sampling sampling(textureView, samplerState, subset);
-    macros.define("TGFX_TTE_MODE_X", static_cast<int>(sampling.shaderModeX));
-    macros.define("TGFX_TTE_MODE_Y", static_cast<int>(sampling.shaderModeY));
+    auto modeX = static_cast<int>(sampling.shaderModeX);
+    auto modeY = static_cast<int>(sampling.shaderModeY);
+    macros.define("TGFX_TTE_MODE_X", modeX);
+    macros.define("TGFX_TTE_MODE_Y", modeY);
+    bool usesSubset = (modeX != static_cast<int>(ShaderMode::None) &&
+                       modeX != static_cast<int>(ShaderMode::Clamp) &&
+                       modeX != static_cast<int>(ShaderMode::ClampToBorderLinear)) ||
+                      (modeY != static_cast<int>(ShaderMode::None) &&
+                       modeY != static_cast<int>(ShaderMode::Clamp) &&
+                       modeY != static_cast<int>(ShaderMode::ClampToBorderLinear));
+    if (usesSubset) {
+      macros.define("TGFX_TTE_HAS_SUBSET");
+    }
+    bool usesClampX = (modeX != static_cast<int>(ShaderMode::None) &&
+                       modeX != static_cast<int>(ShaderMode::ClampToBorderNearest));
+    bool usesClampY = (modeY != static_cast<int>(ShaderMode::None) &&
+                       modeY != static_cast<int>(ShaderMode::ClampToBorderNearest));
+    if (usesClampX || usesClampY) {
+      macros.define("TGFX_TTE_HAS_CLAMP");
+    }
+    auto requiresUnorm = [](int mode) {
+      return mode != static_cast<int>(ShaderMode::None) &&
+             mode != static_cast<int>(ShaderMode::Clamp) &&
+             mode != static_cast<int>(ShaderMode::RepeatNearestNone) &&
+             mode != static_cast<int>(ShaderMode::MirrorRepeat);
+    };
+    bool mustNormalize = textureView->getTexture()->type() != TextureType::Rectangle;
+    if ((requiresUnorm(modeX) || requiresUnorm(modeY)) && mustNormalize) {
+      macros.define("TGFX_TTE_HAS_DIMENSION");
+    }
     if (constraint == SrcRectConstraint::Strict) {
       macros.define("TGFX_TTE_STRICT_CONSTRAINT");
     }
@@ -85,10 +113,59 @@ class TiledTextureEffect : public FragmentProcessor {
     if (coordTransform.matrix.hasPerspective()) {
       macros.define("TGFX_TTE_PERSPECTIVE");
     }
+    if (textureView->getTexture()->type() == TextureType::Rectangle) {
+      macros.define("TGFX_SAMPLER_TYPE", "sampler2DRect");
+    }
   }
 
   std::string shaderFunctionFile() const override {
     return "fragment/tiled_texture_effect.frag";
+  }
+
+  void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
+                        MangledSamplers& /*samplers*/) const override {
+    auto textureView = getTextureView();
+    if (textureView == nullptr) {
+      return;
+    }
+    Sampling sampling(textureView, samplerState, subset);
+    auto modeX = static_cast<int>(sampling.shaderModeX);
+    auto modeY = static_cast<int>(sampling.shaderModeY);
+    bool usesSubset = (modeX != static_cast<int>(ShaderMode::None) &&
+                       modeX != static_cast<int>(ShaderMode::Clamp) &&
+                       modeX != static_cast<int>(ShaderMode::ClampToBorderLinear)) ||
+                      (modeY != static_cast<int>(ShaderMode::None) &&
+                       modeY != static_cast<int>(ShaderMode::Clamp) &&
+                       modeY != static_cast<int>(ShaderMode::ClampToBorderLinear));
+    if (usesSubset) {
+      auto subsetName =
+          uniformHandler->addUniform("Subset", UniformFormat::Float4, ShaderStage::Fragment);
+      uniforms.add("Subset", subsetName);
+    }
+    bool usesClampX = (modeX != static_cast<int>(ShaderMode::None) &&
+                       modeX != static_cast<int>(ShaderMode::ClampToBorderNearest));
+    bool usesClampY = (modeY != static_cast<int>(ShaderMode::None) &&
+                       modeY != static_cast<int>(ShaderMode::ClampToBorderNearest));
+    if (usesClampX || usesClampY) {
+      auto clampName =
+          uniformHandler->addUniform("Clamp", UniformFormat::Float4, ShaderStage::Fragment);
+      uniforms.add("Clamp", clampName);
+    }
+    auto requiresUnorm = [](int mode) {
+      return mode != static_cast<int>(ShaderMode::None) &&
+             mode != static_cast<int>(ShaderMode::Clamp) &&
+             mode != static_cast<int>(ShaderMode::RepeatNearestNone) &&
+             mode != static_cast<int>(ShaderMode::MirrorRepeat);
+    };
+    bool mustNormalize = textureView->getTexture()->type() != TextureType::Rectangle;
+    if ((requiresUnorm(modeX) || requiresUnorm(modeY)) && mustNormalize) {
+      auto dimensionName =
+          uniformHandler->addUniform("Dimension", UniformFormat::Float2, ShaderStage::Fragment);
+      uniforms.add("Dimension", dimensionName);
+    }
+    if (constraint == SrcRectConstraint::Strict) {
+      // ExtraSubset uses the GP's subset varying, not a uniform.
+    }
   }
 
   ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
@@ -135,6 +212,9 @@ class TiledTextureEffect : public FragmentProcessor {
       if (unormRequired && mustNormalize) {
         call += ", " + uniforms.get("Dimension");
       }
+    }
+    if (constraint == SrcRectConstraint::Strict) {
+      call += ", " + varyings.get("subsetVar");
     }
     call += ");";
     result.statement = call;

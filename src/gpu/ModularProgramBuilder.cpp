@@ -146,7 +146,7 @@ void ModularProgramBuilder::emitModularFragProcessors(std::string* color, std::s
 
 // Unused for now — reserved for future two-pass optimization.
 void ModularProgramBuilder::registerFPResources(const FragmentProcessor* /*processor*/,
-                                                 size_t /*transformedCoordVarsIdx*/) {
+                                                size_t /*transformedCoordVarsIdx*/) {
 }
 
 std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* processor,
@@ -227,14 +227,18 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
     FPResources resources;
     // Populate coord transform (emit perspective divide if needed).
     if (transformedCoordVarsIdx < transformedCoordVars.size()) {
-      auto texCoordName =
-          fragmentShaderBuilder()->emitPerspTextCoord(transformedCoordVars[transformedCoordVarsIdx]);
+      auto texCoordName = fragmentShaderBuilder()->emitPerspTextCoord(
+          transformedCoordVars[transformedCoordVarsIdx]);
       if (coordTransformFunc) {
         fragmentShaderBuilder()->codeAppendf("highp vec2 transformedCoord = %s;",
                                              coordTransformFunc(texCoordName).c_str());
         texCoordName = "transformedCoord";
       }
       resources.varyings.addCoordTransform(0, texCoordName);
+    }
+    // Pass the GP subset varying name (used by TextureEffect Strict constraint).
+    if (!subsetVarName.empty()) {
+      resources.varyings.add("subsetVar", subsetVarName);
     }
     for (size_t i = 0; i < currentTexSamplers.size(); ++i) {
       auto samplerVar = uniformHandler()->getSamplerVariable(currentTexSamplers[i]);
@@ -280,9 +284,9 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
         uniformHandler()->addUniform("start", UniformFormat::Float4, ShaderStage::Fragment);
     auto endName =
         uniformHandler()->addUniform("end", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = TGFX_SingleIntervalGradientColorizer(%s, %s, %s);", output.c_str(),
-                             input.empty() ? "vec4(1.0)" : input.c_str(), startName.c_str(),
-                             endName.c_str());
+    fragBuilder->codeAppendf("%s = TGFX_SingleIntervalGradientColorizer(%s, %s, %s);",
+                             output.c_str(), input.empty() ? "vec4(1.0)" : input.c_str(),
+                             startName.c_str(), endName.c_str());
   } else if (name == "RadialGradientLayout") {
     auto& coordVar = transformedCoordVars[transformedCoordVarsIdx];
     auto coordName = fragBuilder->emitPerspTextCoord(coordVar);

@@ -42,6 +42,10 @@ class ShaderMacroSet {
     macros_[name] = std::to_string(value);
   }
 
+  void define(const std::string& name, const std::string& value) {
+    macros_[name] = value;
+  }
+
   bool isDefined(const std::string& name) const {
     return macros_.count(name) > 0;
   }

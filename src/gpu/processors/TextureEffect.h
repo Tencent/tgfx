@@ -79,10 +79,35 @@ class TextureEffect : public FragmentProcessor {
     if (coordTransform.matrix.hasPerspective()) {
       macros.define("TGFX_TE_PERSPECTIVE");
     }
+    auto textureView = getTextureView();
+    if (textureView && textureView->getTexture()->type() == TextureType::Rectangle) {
+      macros.define("TGFX_SAMPLER_TYPE", "sampler2DRect");
+    }
   }
 
   std::string shaderFunctionFile() const override {
     return "fragment/texture_effect.frag";
+  }
+
+  void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
+                        MangledSamplers& /*samplers*/) const override {
+    if (needSubset()) {
+      auto subsetName =
+          uniformHandler->addUniform("Subset", UniformFormat::Float4, ShaderStage::Fragment);
+      uniforms.add("Subset", subsetName);
+    }
+    // ExtraSubset uses the GP's subset varying (subsetVarName), not a uniform.
+    // It is passed through MangledVaryings as "subsetVar" by emitLeafFPCall.
+    if (alphaStart != Point::Zero()) {
+      auto alphaStartName =
+          uniformHandler->addUniform("AlphaStart", UniformFormat::Float2, ShaderStage::Fragment);
+      uniforms.add("AlphaStart", alphaStartName);
+    }
+    if (getYUVTexture() != nullptr) {
+      auto mat3Name = uniformHandler->addUniform("Mat3ColorConversion", UniformFormat::Float3x3,
+                                                 ShaderStage::Fragment);
+      uniforms.add("Mat3ColorConversion", mat3Name);
+    }
   }
 
   ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
@@ -112,7 +137,7 @@ class TextureEffect : public FragmentProcessor {
       call += ", " + uniforms.get("Subset");
     }
     if (constraint == SrcRectConstraint::Strict) {
-      call += ", " + uniforms.get("ExtraSubset");
+      call += ", " + varyings.get("subsetVar");
     }
     if (alphaStart != Point::Zero()) {
       call += ", " + uniforms.get("AlphaStart");

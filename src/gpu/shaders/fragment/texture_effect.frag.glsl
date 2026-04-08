@@ -16,6 +16,10 @@
 #define TGFX_TE_TEXTURE_MODE 0
 #endif
 
+#ifndef TGFX_SAMPLER_TYPE
+#define TGFX_SAMPLER_TYPE sampler2D
+#endif
+
 vec2 TGFX_TE_ClampCoord(vec2 coord
 #ifdef TGFX_TE_STRICT_CONSTRAINT
     , vec4 extraSubset
@@ -37,7 +41,7 @@ vec2 TGFX_TE_ClampCoord(vec2 coord
 #if TGFX_TE_TEXTURE_MODE == 0
 
 // RGBA path
-vec4 TGFX_TextureEffect(vec4 inputColor, vec2 texCoord, sampler2D textureSampler
+vec4 TGFX_TextureEffect(vec4 inputColor, vec2 texCoord, TGFX_SAMPLER_TYPE textureSampler
 #ifdef TGFX_TE_SUBSET
     , vec4 subset
 #endif
@@ -57,6 +61,10 @@ vec4 TGFX_TextureEffect(vec4 inputColor, vec2 texCoord, sampler2D textureSampler
 #endif
     );
     vec4 color = texture(textureSampler, finalCoord);
+#ifdef TGFX_TE_ALPHA_ONLY
+    // Alpha-only textures (R8 format) store alpha in the red channel.
+    color = color.rrrr;
+#endif
 #ifdef TGFX_TE_RGBAAA
     color = clamp(color, 0.0, 1.0);
     vec2 alphaVertexColor = finalCoord + alphaStart;
@@ -67,7 +75,7 @@ vec4 TGFX_TextureEffect(vec4 inputColor, vec2 texCoord, sampler2D textureSampler
 #ifdef TGFX_TE_ALPHA_ONLY
     return color.a * inputColor;
 #else
-    return color * color.a;
+    return color * inputColor.a;
 #endif
 }
 
@@ -75,7 +83,7 @@ vec4 TGFX_TextureEffect(vec4 inputColor, vec2 texCoord, sampler2D textureSampler
 
 // I420 YUV path - 3 separate planes (Y, U, V)
 vec4 TGFX_TextureEffect(vec4 inputColor, vec2 texCoord,
-    sampler2D samplerY, sampler2D samplerU, sampler2D samplerV,
+    TGFX_SAMPLER_TYPE samplerY, TGFX_SAMPLER_TYPE samplerU, TGFX_SAMPLER_TYPE samplerV,
     mat3 colorConversion
 #ifdef TGFX_TE_SUBSET
     , vec4 subset
@@ -135,7 +143,7 @@ vec4 TGFX_TextureEffect(vec4 inputColor, vec2 texCoord,
 
 // NV12 YUV path - 2 planes (Y, UV interleaved)
 vec4 TGFX_TextureEffect(vec4 inputColor, vec2 texCoord,
-    sampler2D samplerY, sampler2D samplerUV,
+    TGFX_SAMPLER_TYPE samplerY, TGFX_SAMPLER_TYPE samplerUV,
     mat3 colorConversion
 #ifdef TGFX_TE_SUBSET
     , vec4 subset
