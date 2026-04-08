@@ -230,10 +230,12 @@ bool ClipStack::addElement(ClipElement&& toAdd) {
   }
   if (toAdd.bounds().isEmpty()) {
     cur.state = ClipState::Empty;
+    cur.uniqueID = UniqueID::Next();
     return true;
   }
   if (!Rect::Intersects(toAdd.bounds(), cur.bounds)) {
     cur.state = ClipState::Empty;
+    cur.uniqueID = UniqueID::Next();
     return true;
   }
   // The new element completely contains current clip, so it's redundant.

@@ -252,6 +252,29 @@ TGFX_TEST(CanvasTest, Clip) {
     canvas->restore();
   }
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DuplicateClipPath"));
+
+  // Verify that ClipStack updates its uniqueID when transitioning to Empty state, preventing
+  // incorrect draw op batching due to stale uniqueID comparison.
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->clipRect(Rect::MakeWH(100, 100));
+  {
+    canvas->save();
+    Path nonIntersecting;
+    nonIntersecting.addRect(Rect::MakeXYWH(300, 300, 50, 50));
+    canvas->clipPath(nonIntersecting);
+    Paint paint;
+    paint.setColor(Color::Green());
+    canvas->drawRect(Rect::MakeXYWH(10, 10, 40, 40), paint);
+    canvas->restore();
+  }
+  {
+    Paint paint;
+    paint.setColor(Color::Green());
+    canvas->drawRect(Rect::MakeXYWH(25, 25, 50, 50), paint);
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/EmptyClipMerge"));
 }
 
 TGFX_TEST(CanvasTest, DiscardContent) {

@@ -49,6 +49,7 @@
         "DrawShapeAutoBatch_WithShader": "4df17714",
         "DrawTextBlob": "29dde9e0",
         "DuplicateClipPath": "f870cce1",
+        "EmptyClipMerge": "23eac4df",
         "LumaFilterToRec2020": "82494664",
         "LumaFilterToRec601": "82494664",
         "LumaFilterToSRGB": "82494664",
