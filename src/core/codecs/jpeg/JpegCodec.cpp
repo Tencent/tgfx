@@ -35,7 +35,7 @@ extern "C" {
 namespace tgfx {
 
 // libjpeg-turbo supports DCT scaling at N/DENOM ratios (N=1..DENOM).
-const uint32_t JPEG_SCALE_DENOM = 8;
+static const uint32_t JPEG_SCALE_DENOM = 8;
 
 bool JpegCodec::IsJpeg(const std::shared_ptr<Data>& data) {
   constexpr uint8_t jpegSig[] = {0xFF, 0xD8, 0xFF};
