@@ -34,6 +34,9 @@ extern "C" {
 
 namespace tgfx {
 
+// libjpeg-turbo supports DCT scaling at N/DENOM ratios (N=1..DENOM).
+const uint32_t JPEG_SCALE_DENOM = 8;
+
 bool JpegCodec::IsJpeg(const std::shared_ptr<Data>& data) {
   constexpr uint8_t jpegSig[] = {0xFF, 0xD8, 0xFF};
   return data->size() >= 3 && !memcmp(data->bytes(), jpegSig, sizeof(jpegSig));
@@ -209,13 +212,14 @@ static void ConvertCMYKToRGBWithFormula(void* pixels, const ImageInfo& dstInfo) 
 }
 
 std::pair<int, int> JpegCodec::getScaledDimensions(float scale) const {
-  // Match scale to a JPEG DCT scaling level (N/8, N=1..8).
-  for (uint32_t n = 1; n <= 8; n++) {
-    if (FloatNearlyEqual(scale, static_cast<float>(n) / 8.0f)) {
+  // Match scale to a JPEG DCT scaling level (N/DENOM, N=1..DENOM).
+  for (uint32_t n = 1; n <= JPEG_SCALE_DENOM; n++) {
+    if (FloatNearlyEqual(scale, static_cast<float>(n) / static_cast<float>(JPEG_SCALE_DENOM))) {
       // Replicate libjpeg-turbo's output dimension formula:
       // output_dim = (image_dim * scale_num + scale_denom - 1) / scale_denom
-      auto outputWidth = static_cast<int>((static_cast<long>(width()) * n + 7) / 8);
-      auto outputHeight = static_cast<int>((static_cast<long>(height()) * n + 7) / 8);
+      auto denom = static_cast<long>(JPEG_SCALE_DENOM);
+      auto outputWidth = static_cast<int>((static_cast<long>(width()) * n + denom - 1) / denom);
+      auto outputHeight = static_cast<int>((static_cast<long>(height()) * n + denom - 1) / denom);
       return {outputWidth, outputHeight};
     }
   }
@@ -223,8 +227,9 @@ std::pair<int, int> JpegCodec::getScaledDimensions(float scale) const {
 }
 
 bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  for (uint32_t n = 1; n <= 8; n++) {
-    auto [scaledWidth, scaledHeight] = getScaledDimensions(static_cast<float>(n) / 8.0f);
+  for (uint32_t n = 1; n <= JPEG_SCALE_DENOM; n++) {
+    auto [scaledWidth, scaledHeight] =
+        getScaledDimensions(static_cast<float>(n) / static_cast<float>(JPEG_SCALE_DENOM));
     if (scaledWidth == dstInfo.width() && scaledHeight == dstInfo.height()) {
       return readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(),
                               dstPixels, n, dstInfo.colorSpace());
@@ -235,7 +240,8 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 
 bool JpegCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
                              std::shared_ptr<ColorSpace> colorSpace, void* dstPixels) const {
-  return readScaledPixels(colorType, alphaType, dstRowBytes, dstPixels, 8, std::move(colorSpace));
+  return readScaledPixels(colorType, alphaType, dstRowBytes, dstPixels, JPEG_SCALE_DENOM,
+                          std::move(colorSpace));
 }
 
 bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
@@ -245,7 +251,9 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
     return false;
   }
   if (colorType == ColorType::ALPHA_8) {
-    auto alphaHeight = static_cast<size_t>((static_cast<long>(height()) * scaleNum + 7) / 8);
+    auto denom = static_cast<long>(JPEG_SCALE_DENOM);
+    auto alphaHeight =
+        static_cast<size_t>((static_cast<long>(height()) * scaleNum + denom - 1) / denom);
     memset(dstPixels, 255, dstRowBytes * alphaHeight);
     return true;
   }
@@ -291,7 +299,7 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
       break;
     }
     cinfo.scale_num = scaleNum;
-    cinfo.scale_denom = 8;
+    cinfo.scale_denom = JPEG_SCALE_DENOM;
     cinfo.out_color_space = out_color_space;
     if (cinfo.jpeg_color_space == JCS_CMYK || cinfo.jpeg_color_space == JCS_YCCK) {
       cinfo.out_color_space = JCS_CMYK;
@@ -301,7 +309,8 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
     }
 #ifdef DEBUG
     // Verify that libjpeg's output dimensions match getScaledDimensions().
-    auto [expectedWidth, expectedHeight] = getScaledDimensions(static_cast<float>(scaleNum) / 8.0f);
+    auto [expectedWidth, expectedHeight] =
+        getScaledDimensions(static_cast<float>(scaleNum) / static_cast<float>(JPEG_SCALE_DENOM));
     ASSERT(static_cast<int>(cinfo.output_width) == expectedWidth);
     ASSERT(static_cast<int>(cinfo.output_height) == expectedHeight);
 #endif
