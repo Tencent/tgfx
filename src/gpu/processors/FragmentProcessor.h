@@ -337,6 +337,47 @@ class FragmentProcessor : public Processor {
   }
 
   /**
+   * Callback type for recursive child FP emission (used by container FPs).
+   * Parameters: child processor, child coord vars offset, input color, coord transform func.
+   * Returns the output variable name of the emitted child.
+   */
+  using EmitChildFunc = std::function<std::string(
+      const FragmentProcessor* child, size_t childCoordVarsIdx, const std::string& input,
+      std::function<std::string(const std::string&)> coordFunc)>;
+
+  /**
+   * Emits container FP code using builder and recursive emitChild callback.
+   * Container FPs (Compose, Xfermode, ClampedGradient, GaussianBlur) override this.
+   * Returns true if the container handled itself, false to fall through to leaf dispatch.
+   */
+  virtual bool emitContainerCode(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
+                                 const std::string& input, const std::string& output,
+                                 size_t transformedCoordVarsIdx,
+                                 const EmitChildFunc& emitChild) const {
+    (void)fragBuilder;
+    (void)uniformHandler;
+    (void)input;
+    (void)output;
+    (void)transformedCoordVarsIdx;
+    (void)emitChild;
+    return false;
+  }
+
+  /**
+   * Computes the coord transform offset for the i-th child of this processor.
+   */
+  size_t computeChildCoordOffset(size_t parentCoordVarsIdx, size_t childIdx) const {
+    size_t offset = parentCoordVarsIdx + numCoordTransforms();
+    for (size_t i = 0; i < childIdx; ++i) {
+      Iter iter(childProcessor(i));
+      while (const auto* fp = iter.next()) {
+        offset += fp->numCoordTransforms();
+      }
+    }
+    return offset;
+  }
+
+  /**
    * Registers this Processor's uniforms/samplers with the UniformHandler and populates
    * the MangledResources with the resulting mangled names. Called before buildCallStatement().
    * Default is empty — subclasses that need uniforms/samplers must override.

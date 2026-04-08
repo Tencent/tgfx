@@ -171,10 +171,17 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
     }
   }
 
-  if (name == "ClampedGradientEffect") {
+  // Try polymorphic container dispatch.
+  auto emitChildCallback = [this](const FragmentProcessor* child, size_t childCoordIdx,
+                                  const std::string& childInput,
+                                  CoordTransformFunc coordFunc) -> std::string {
+    return emitModularFragProc(child, childCoordIdx, childInput, std::move(coordFunc));
+  };
+  if (processor->emitContainerCode(fragmentShaderBuilder(), uniformHandler(), input, output,
+                                   transformedCoordVarsIdx, emitChildCallback)) {
+    // Container handled itself.
+  } else if (name == "ClampedGradientEffect") {
     emitClampedGradientEffect(processor, transformedCoordVarsIdx, input, output);
-  } else if (name == "ComposeFragmentProcessor") {
-    emitComposeFragmentProcessor(processor, transformedCoordVarsIdx, input, output);
   } else if (name == "XfermodeFragmentProcessor") {
     emitXfermodeFragmentProcessor(processor, transformedCoordVarsIdx, input, output);
   } else if (name == "GaussianBlur1DFragmentProcessor") {

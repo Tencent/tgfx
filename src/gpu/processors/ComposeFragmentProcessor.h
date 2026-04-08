@@ -42,5 +42,23 @@ class ComposeFragmentProcessor : public FragmentProcessor {
   std::string shaderFunctionFile() const override {
     return "";
   }
+
+  bool emitContainerCode(FragmentShaderBuilder* fragBuilder, UniformHandler* /*uniformHandler*/,
+                         const std::string& input, const std::string& output,
+                         size_t transformedCoordVarsIdx,
+                         const EmitChildFunc& emitChild) const override {
+    auto numChildren = numChildProcessors();
+    std::string currentInput = input;
+    for (size_t i = 0; i < numChildren; ++i) {
+      size_t childCoordIdx = computeChildCoordOffset(transformedCoordVarsIdx, i);
+      auto childOutput = emitChild(childProcessor(i), childCoordIdx, currentInput, {});
+      if (i == numChildren - 1) {
+        fragBuilder->codeAppendf("%s = %s;", output.c_str(), childOutput.c_str());
+      } else {
+        currentInput = childOutput;
+      }
+    }
+    return true;
+  }
 };
 }  // namespace tgfx
