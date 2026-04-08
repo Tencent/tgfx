@@ -21,9 +21,9 @@
 #include <functional>
 #include "gpu/CoordTransform.h"
 #include "gpu/FragmentShaderBuilder.h"
+#include "gpu/MangledResources.h"
 #include "gpu/SamplerState.h"
 #include "gpu/SamplingArgs.h"
-#include "gpu/MangledResources.h"
 #include "gpu/ShaderCallResult.h"
 #include "gpu/ShaderMacroSet.h"
 #include "gpu/UniformData.h"
@@ -343,8 +343,7 @@ class FragmentProcessor : public Processor {
    * @return ShaderCallResult with the complete statement and output variable name.
    * Default returns empty — subclasses that have .glsl files must override.
    */
-  virtual ShaderCallResult buildCallStatement(const std::string& /*inputColorVar*/,
-                                              int /*fpIndex*/,
+  virtual ShaderCallResult buildCallStatement(const std::string& /*inputColorVar*/, int /*fpIndex*/,
                                               const MangledUniforms& /*uniforms*/,
                                               const MangledVaryings& /*varyings*/,
                                               const MangledSamplers& /*samplers*/) const {

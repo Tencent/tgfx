@@ -45,6 +45,21 @@ class DualIntervalGradientColorizer : public FragmentProcessor {
     return "fragment/dual_interval_gradient.frag";
   }
 
+  ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
+                                      const MangledUniforms& uniforms,
+                                      const MangledVaryings& /*varyings*/,
+                                      const MangledSamplers& /*samplers*/) const override {
+    ShaderCallResult result;
+    result.outputVarName = "color_fp" + std::to_string(fpIndex);
+    result.includeFiles = {shaderFunctionFile()};
+    auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
+    result.statement = "vec4 " + result.outputVarName + " = FP_DualIntervalGradientColorizer(" +
+                       input + ", " + uniforms.get("scale01") + ", " + uniforms.get("bias01") +
+                       ", " + uniforms.get("scale23") + ", " + uniforms.get("bias23") + ", " +
+                       uniforms.get("threshold") + ");";
+    return result;
+  }
+
   Color scale01;
   Color bias01;
   Color scale23;

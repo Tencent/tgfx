@@ -41,6 +41,19 @@ class AlphaThresholdFragmentProcessor : public FragmentProcessor {
     return "fragment/alpha_threshold.frag";
   }
 
+  ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
+                                      const MangledUniforms& uniforms,
+                                      const MangledVaryings& /*varyings*/,
+                                      const MangledSamplers& /*samplers*/) const override {
+    ShaderCallResult result;
+    result.outputVarName = "color_fp" + std::to_string(fpIndex);
+    result.includeFiles = {shaderFunctionFile()};
+    auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
+    result.statement = "vec4 " + result.outputVarName + " = FP_AlphaThreshold(" + input + ", " +
+                       uniforms.get("Threshold") + ");";
+    return result;
+  }
+
   float threshold = 0.0f;
 };
 }  // namespace tgfx

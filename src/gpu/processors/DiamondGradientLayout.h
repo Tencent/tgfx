@@ -46,6 +46,19 @@ class DiamondGradientLayout : public FragmentProcessor {
     return "fragment/diamond_gradient.frag";
   }
 
+  ShaderCallResult buildCallStatement(const std::string& /*inputColorVar*/, int fpIndex,
+                                      const MangledUniforms& /*uniforms*/,
+                                      const MangledVaryings& varyings,
+                                      const MangledSamplers& /*samplers*/) const override {
+    ShaderCallResult result;
+    result.outputVarName = "color_fp" + std::to_string(fpIndex);
+    result.includeFiles = {shaderFunctionFile()};
+    auto coord = varyings.getCoordTransform(0);
+    result.statement =
+        "vec4 " + result.outputVarName + " = FP_DiamondGradientLayout(" + coord + ");";
+    return result;
+  }
+
   CoordTransform coordTransform;
 };
 }  // namespace tgfx

@@ -40,6 +40,20 @@ class LumaFragmentProcessor : public FragmentProcessor {
     return "fragment/luma.frag";
   }
 
+  ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
+                                      const MangledUniforms& uniforms,
+                                      const MangledVaryings& /*varyings*/,
+                                      const MangledSamplers& /*samplers*/) const override {
+    ShaderCallResult result;
+    result.outputVarName = "color_fp" + std::to_string(fpIndex);
+    result.includeFiles = {shaderFunctionFile()};
+    auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
+    result.statement = "vec4 " + result.outputVarName + " = FP_Luma(" + input + ", " +
+                       uniforms.get("Kr") + ", " + uniforms.get("Kg") + ", " + uniforms.get("Kb") +
+                       ");";
+    return result;
+  }
+
   struct LumaFactor {
     /** default ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
     float kr = 0.2126f;

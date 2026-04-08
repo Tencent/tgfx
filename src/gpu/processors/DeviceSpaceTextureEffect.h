@@ -55,6 +55,20 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
     return "fragment/device_space_texture_effect.frag";
   }
 
+  ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
+                                      const MangledUniforms& uniforms,
+                                      const MangledVaryings& /*varyings*/,
+                                      const MangledSamplers& samplers) const override {
+    ShaderCallResult result;
+    result.outputVarName = "color_fp" + std::to_string(fpIndex);
+    result.includeFiles = {shaderFunctionFile()};
+    auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
+    result.statement = "vec4 " + result.outputVarName + " = FP_DeviceSpaceTextureEffect(" + input +
+                       ", " + samplers.getByIndex(0) + ", " + uniforms.get("DeviceCoordMatrix") +
+                       ");";
+    return result;
+  }
+
   friend class ModularProgramBuilder;
 };
 }  // namespace tgfx
