@@ -166,7 +166,7 @@ PDFExportContext::PDFExportContext(ISize pageSize, PDFDocumentImpl* document,
 PDFExportContext::~PDFExportContext() = default;
 
 void PDFExportContext::reset() {
-  content.reset();
+  content->reset();
 }
 
 void PDFExportContext::drawFill(const Brush& brush) {
@@ -449,6 +449,9 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
   }
 
   const auto& glyphToUnicode = PDFFont::GetUnicodeMap(*typeface, document);
+  if (glyphToUnicode.empty()) {
+    return;
+  }
 
   AdvancedTypefaceInfo::FontType initialFontType = PDFFont::FontType(*pdfStrike, *advancedInfo);
 

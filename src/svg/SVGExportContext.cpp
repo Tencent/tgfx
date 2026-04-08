@@ -98,7 +98,7 @@ void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
     svg->addRectAttributes(rect);
   }
 
-  applyClip(clip, rect);
+  applyClip(clip, matrix.mapRect(rect));
 
   ElementWriter rectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
                             exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, nullptr,
@@ -116,7 +116,7 @@ void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
 
 void SVGExportContext::drawRRect(const RRect& roundRect, const Matrix& matrix,
                                  const ClipStack& clip, const Brush& brush, const Stroke*) {
-  applyClip(clip, roundRect.rect);
+  applyClip(clip, matrix.mapRect(roundRect.rect));
   if (roundRect.isOval()) {
     if (roundRect.rect.width() == roundRect.rect.height()) {
       ElementWriter circleElement("circle", context, this, xmlWriter.get(), resourceBucket.get(),
@@ -140,7 +140,7 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const Matrix& matrix,
 
 void SVGExportContext::drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
                                 const Brush& brush) {
-  applyClip(clip, path.getBounds());
+  applyClip(clip, matrix.mapRect(path.getBounds()));
   ElementWriter pathElement("path", context, this, xmlWriter.get(), resourceBucket.get(),
                             exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, nullptr,
                             _targetColorSpace, _assignColorSpace);
@@ -232,7 +232,7 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
   }
   Bitmap bitmap = ImageExportToBitmap(context, subsetImage);
   if (!bitmap.isEmpty()) {
-    applyClip(clip, dstRect);
+    applyClip(clip, matrix.mapRect(dstRect));
 
     auto viewMatrix =
         MakeRectToRectMatrix(Rect::MakeWH(srcRect.width(), srcRect.height()), dstRect);
@@ -388,7 +388,7 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
     resources = defs.addImageFilterResource(imageFilter, bound, customWriter);
   }
   {
-    applyClip(clip, picture->getBounds());
+    applyClip(clip, matrix.mapRect(picture->getBounds()));
     auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
     if (imageFilter) {
       groupElement->addAttribute("filter", resources.filter);
