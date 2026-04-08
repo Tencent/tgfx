@@ -95,8 +95,8 @@ class TextureEffect : public FragmentProcessor {
     auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
     auto coord = varyings.getCoordTransform(0);
     auto yuvTexture = getYUVTexture();
-    std::string call = "vec4 " + result.outputVarName + " = TGFX_TextureEffect(" + input + ", " +
-                       coord + ", ";
+    std::string call =
+        "vec4 " + result.outputVarName + " = TGFX_TextureEffect(" + input + ", " + coord + ", ";
     if (yuvTexture) {
       if (yuvTexture->yuvFormat() == YUVFormat::I420) {
         call += samplers.getByIndex(0) + ", " + samplers.getByIndex(1) + ", " +

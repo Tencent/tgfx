@@ -337,6 +337,15 @@ class FragmentProcessor : public Processor {
   }
 
   /**
+   * Registers this Processor's uniforms/samplers with the UniformHandler and populates
+   * the MangledResources with the resulting mangled names. Called before buildCallStatement().
+   * Default is empty — subclasses that need uniforms/samplers must override.
+   */
+  virtual void declareResources(UniformHandler* /*uniformHandler*/, MangledUniforms& /*uniforms*/,
+                                MangledSamplers& /*samplers*/) const {
+  }
+
+  /**
    * Generates the GLSL call statement for this Processor in the main() function body.
    * @param inputColorVar The input color variable name from the previous Processor.
    * @param fpIndex The index of this FP in the pipeline (for output variable naming).

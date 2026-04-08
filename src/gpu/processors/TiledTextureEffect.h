@@ -107,13 +107,12 @@ class TiledTextureEffect : public FragmentProcessor {
       Sampling sampling(textureView, samplerState, subset);
       auto modeX = static_cast<int>(sampling.shaderModeX);
       auto modeY = static_cast<int>(sampling.shaderModeY);
-      bool usesSubset =
-          (modeX != static_cast<int>(ShaderMode::None) &&
-           modeX != static_cast<int>(ShaderMode::Clamp) &&
-           modeX != static_cast<int>(ShaderMode::ClampToBorderLinear)) ||
-          (modeY != static_cast<int>(ShaderMode::None) &&
-           modeY != static_cast<int>(ShaderMode::Clamp) &&
-           modeY != static_cast<int>(ShaderMode::ClampToBorderLinear));
+      bool usesSubset = (modeX != static_cast<int>(ShaderMode::None) &&
+                         modeX != static_cast<int>(ShaderMode::Clamp) &&
+                         modeX != static_cast<int>(ShaderMode::ClampToBorderLinear)) ||
+                        (modeY != static_cast<int>(ShaderMode::None) &&
+                         modeY != static_cast<int>(ShaderMode::Clamp) &&
+                         modeY != static_cast<int>(ShaderMode::ClampToBorderLinear));
       bool usesClampX = (modeX != static_cast<int>(ShaderMode::None) &&
                          modeX != static_cast<int>(ShaderMode::ClampToBorderNearest));
       bool usesClampY = (modeY != static_cast<int>(ShaderMode::None) &&
