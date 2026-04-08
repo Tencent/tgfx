@@ -28,6 +28,7 @@
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -835,5 +836,39 @@ TGFX_TEST(SVGExportTest, DstAssignColorSpace) {
   canvas->drawRect(Rect::MakeXYWH(400, 140, 100, 100), paint);
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DstAssignColorSpace"));
+}
+
+TGFX_TEST(SVGExportTest, ClipWithMatrixTransform) {
+  // Bug: applyClip received content bounds in local coordinates while the clip path was in
+  // parent coordinates. When a matrix scaled or translated the content, the coordinate mismatch
+  // caused contains() to return a wrong result, either skipping a needed clip or applying an
+  // unnecessary one.
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  Paint backgroundPaint;
+  backgroundPaint.setColor(Color::White());
+  canvas->drawRect(Rect::MakeWH(200, 200), backgroundPaint);
+
+  Paint paint;
+  paint.setColor(Color::Red());
+
+  // A small rect (20x20) at origin that is fully inside the clip in local coordinates,
+  // but after a scale(10,10) transform it becomes 200x200 and overflows the clip.
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(80, 80, 40, 40));
+  canvas->translate(90, 90);
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 20, 20), paint);
+  canvas->restore();
+
+  exporter->close();
+
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ClipWithMatrixTransform"));
 }
 }  // namespace tgfx
