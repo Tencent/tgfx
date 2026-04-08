@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include "gpu/MangledResources.h"
 #include "gpu/SamplerState.h"
+#include "gpu/ShaderCallResult.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
 
@@ -87,6 +89,57 @@ class TiledTextureEffect : public FragmentProcessor {
 
   std::string shaderFunctionFile() const override {
     return "fragment/tiled_texture_effect.frag";
+  }
+
+  ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
+                                      const MangledUniforms& uniforms,
+                                      const MangledVaryings& varyings,
+                                      const MangledSamplers& samplers) const override {
+    ShaderCallResult result;
+    result.outputVarName = "color_fp" + std::to_string(fpIndex);
+    result.includeFiles = {shaderFunctionFile()};
+    auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
+    auto coord = varyings.getCoordTransform(0);
+    std::string call = "vec4 " + result.outputVarName + " = TGFX_TiledTextureEffect(" + input +
+                       ", " + coord + ", " + samplers.getByIndex(0);
+    auto textureView = getTextureView();
+    if (textureView != nullptr) {
+      Sampling sampling(textureView, samplerState, subset);
+      auto modeX = static_cast<int>(sampling.shaderModeX);
+      auto modeY = static_cast<int>(sampling.shaderModeY);
+      bool usesSubset =
+          (modeX != static_cast<int>(ShaderMode::None) &&
+           modeX != static_cast<int>(ShaderMode::Clamp) &&
+           modeX != static_cast<int>(ShaderMode::ClampToBorderLinear)) ||
+          (modeY != static_cast<int>(ShaderMode::None) &&
+           modeY != static_cast<int>(ShaderMode::Clamp) &&
+           modeY != static_cast<int>(ShaderMode::ClampToBorderLinear));
+      bool usesClampX = (modeX != static_cast<int>(ShaderMode::None) &&
+                         modeX != static_cast<int>(ShaderMode::ClampToBorderNearest));
+      bool usesClampY = (modeY != static_cast<int>(ShaderMode::None) &&
+                         modeY != static_cast<int>(ShaderMode::ClampToBorderNearest));
+      bool usesClamp = usesClampX || usesClampY;
+      if (usesSubset) {
+        call += ", " + uniforms.get("Subset");
+      }
+      if (usesClamp) {
+        call += ", " + uniforms.get("Clamp");
+      }
+      auto requiresUnorm = [](int mode) {
+        return mode != static_cast<int>(ShaderMode::None) &&
+               mode != static_cast<int>(ShaderMode::Clamp) &&
+               mode != static_cast<int>(ShaderMode::RepeatNearestNone) &&
+               mode != static_cast<int>(ShaderMode::MirrorRepeat);
+      };
+      bool unormRequired = requiresUnorm(modeX) || requiresUnorm(modeY);
+      bool mustNormalize = textureView->getTexture()->type() != TextureType::Rectangle;
+      if (unormRequired && mustNormalize) {
+        call += ", " + uniforms.get("Dimension");
+      }
+    }
+    call += ");";
+    result.statement = call;
+    return result;
   }
 
   size_t onCountTextureSamplers() const override;

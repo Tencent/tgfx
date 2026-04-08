@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include "gpu/MangledResources.h"
 #include "gpu/SamplerState.h"
 #include "gpu/SamplingArgs.h"
+#include "gpu/ShaderCallResult.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/YUVTextureView.h"
@@ -81,6 +83,43 @@ class TextureEffect : public FragmentProcessor {
 
   std::string shaderFunctionFile() const override {
     return "fragment/texture_effect.frag";
+  }
+
+  ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
+                                      const MangledUniforms& uniforms,
+                                      const MangledVaryings& varyings,
+                                      const MangledSamplers& samplers) const override {
+    ShaderCallResult result;
+    result.outputVarName = "color_fp" + std::to_string(fpIndex);
+    result.includeFiles = {shaderFunctionFile()};
+    auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
+    auto coord = varyings.getCoordTransform(0);
+    auto yuvTexture = getYUVTexture();
+    std::string call = "vec4 " + result.outputVarName + " = TGFX_TextureEffect(" + input + ", " +
+                       coord + ", ";
+    if (yuvTexture) {
+      if (yuvTexture->yuvFormat() == YUVFormat::I420) {
+        call += samplers.getByIndex(0) + ", " + samplers.getByIndex(1) + ", " +
+                samplers.getByIndex(2) + ", " + uniforms.get("Mat3ColorConversion");
+      } else {
+        call += samplers.getByIndex(0) + ", " + samplers.getByIndex(1) + ", " +
+                uniforms.get("Mat3ColorConversion");
+      }
+    } else {
+      call += samplers.getByIndex(0);
+    }
+    if (needSubset()) {
+      call += ", " + uniforms.get("Subset");
+    }
+    if (constraint == SrcRectConstraint::Strict) {
+      call += ", " + uniforms.get("ExtraSubset");
+    }
+    if (alphaStart != Point::Zero()) {
+      call += ", " + uniforms.get("AlphaStart");
+    }
+    call += ");";
+    result.statement = call;
+    return result;
   }
 
   size_t onCountTextureSamplers() const override;
