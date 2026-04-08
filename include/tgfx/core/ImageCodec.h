@@ -86,12 +86,13 @@ class ImageCodec : public ImageGenerator {
   }
 
   /**
-   * Returns the actual output dimensions when decoding to the given target size. Subclasses that
-   * support native scaling (e.g., JPEG DCT scaling) may return different dimensions than the
-   * requested ones if the underlying decoder produces a slightly different size. The default
-   * implementation returns the input target size unchanged.
+   * Returns the actual output dimensions when decoding at the given scale factor. Subclasses that
+   * support native scaling (e.g., JPEG DCT scaling) may return dimensions that differ from simply
+   * rounding width()*scale and height()*scale, due to the underlying decoder's rounding rules.
+   * The default implementation returns {FloatRoundToInt(width()*scale),
+   * FloatRoundToInt(height()*scale)}.
    */
-  virtual std::pair<int, int> getScaledSize(int targetWidth, int targetHeight) const;
+  virtual std::pair<int, int> getScaledDimensions(float scale) const;
 
   /**
    * Decodes the image into the given pixel buffer using the specified image info. If the size

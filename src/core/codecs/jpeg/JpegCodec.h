@@ -31,7 +31,7 @@ class JpegCodec : public ImageCodec {
   static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality);
 #endif
 
-  std::pair<int, int> getScaledSize(int targetWidth, int targetHeight) const override;
+  std::pair<int, int> getScaledDimensions(float scale) const override;
 
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
@@ -45,7 +45,7 @@ class JpegCodec : public ImageCodec {
   std::shared_ptr<Data> fileData;
   const std::string filePath;
 
-  uint32_t getScaledDimensions(int targetWidth, int targetHeight) const;
+  uint32_t getScaleNum(float scale) const;
 
   bool readScaledPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
                         void* dstPixels, uint32_t scaleNum,

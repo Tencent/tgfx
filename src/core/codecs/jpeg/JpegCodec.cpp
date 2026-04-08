@@ -207,36 +207,31 @@ static void ConvertCMYKToRGBWithFormula(void* pixels, const ImageInfo& dstInfo) 
   }
 }
 
-uint32_t JpegCodec::getScaledDimensions(int targetWidth, int targetHeight) const {
-  auto scaledX = static_cast<float>(targetWidth) / static_cast<float>(width());
-  auto scaledY = static_cast<float>(targetHeight) / static_cast<float>(height());
-  if (!FloatNearlyEqual(scaledX, scaledY)) {
-    return 0;
-  }
-  if (FloatNearlyEqual(scaledX, 1.f / 8.f)) {
+uint32_t JpegCodec::getScaleNum(float scale) const {
+  if (FloatNearlyEqual(scale, 1.f / 8.f)) {
     return 1;
-  } else if (FloatNearlyEqual(scaledX, 2.f / 8.f)) {
+  } else if (FloatNearlyEqual(scale, 2.f / 8.f)) {
     return 2;
-  } else if (FloatNearlyEqual(scaledX, 3.f / 8.f)) {
+  } else if (FloatNearlyEqual(scale, 3.f / 8.f)) {
     return 3;
-  } else if (FloatNearlyEqual(scaledX, 4.f / 8.f)) {
+  } else if (FloatNearlyEqual(scale, 4.f / 8.f)) {
     return 4;
-  } else if (FloatNearlyEqual(scaledX, 5.f / 8.f)) {
+  } else if (FloatNearlyEqual(scale, 5.f / 8.f)) {
     return 5;
-  } else if (FloatNearlyEqual(scaledX, 6.f / 8.f)) {
+  } else if (FloatNearlyEqual(scale, 6.f / 8.f)) {
     return 6;
-  } else if (FloatNearlyEqual(scaledX, 7.f / 8.f)) {
+  } else if (FloatNearlyEqual(scale, 7.f / 8.f)) {
     return 7;
-  } else if (FloatNearlyEqual(scaledX, 1.f)) {
+  } else if (FloatNearlyEqual(scale, 1.f)) {
     return 8;
   }
   return 0;
 }
 
-std::pair<int, int> JpegCodec::getScaledSize(int targetWidth, int targetHeight) const {
-  auto scaleNum = getScaledDimensions(targetWidth, targetHeight);
+std::pair<int, int> JpegCodec::getScaledDimensions(float scale) const {
+  auto scaleNum = getScaleNum(scale);
   if (scaleNum == 0) {
-    return {targetWidth, targetHeight};
+    return ImageCodec::getScaledDimensions(scale);
   }
   // Replicate libjpeg-turbo's output dimension formula:
   // output_dim = (image_dim * scale_num + scale_denom - 1) / scale_denom
@@ -246,10 +241,11 @@ std::pair<int, int> JpegCodec::getScaledSize(int targetWidth, int targetHeight) 
 }
 
 bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  auto [scaledWidth, scaledHeight] = getScaledSize(dstInfo.width(), dstInfo.height());
-  if (scaledWidth == dstInfo.width() && scaledHeight == dstInfo.height()) {
-    auto scaleNum = getScaledDimensions(dstInfo.width(), dstInfo.height());
-    if (scaleNum != 0) {
+  auto scale = static_cast<float>(dstInfo.width()) / static_cast<float>(width());
+  auto scaleNum = getScaleNum(scale);
+  if (scaleNum != 0) {
+    auto [scaledWidth, scaledHeight] = getScaledDimensions(scale);
+    if (scaledWidth == dstInfo.width() && scaledHeight == dstInfo.height()) {
       return readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(),
                               dstPixels, scaleNum, dstInfo.colorSpace());
     }
