@@ -251,10 +251,9 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
     return false;
   }
   if (colorType == ColorType::ALPHA_8) {
-    auto denom = static_cast<long>(JPEG_SCALE_DENOM);
-    auto alphaHeight =
-        static_cast<size_t>((static_cast<long>(height()) * scaleNum + denom - 1) / denom);
-    memset(dstPixels, 255, dstRowBytes * alphaHeight);
+    auto [_, alphaHeight] =
+        getScaledDimensions(static_cast<float>(scaleNum) / static_cast<float>(JPEG_SCALE_DENOM));
+    memset(dstPixels, 255, dstRowBytes * static_cast<size_t>(alphaHeight));
     return true;
   }
   J_COLOR_SPACE out_color_space;
