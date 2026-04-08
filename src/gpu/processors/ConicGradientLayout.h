@@ -47,6 +47,15 @@ class ConicGradientLayout : public FragmentProcessor {
     return "fragment/conic_gradient.frag";
   }
 
+  void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
+                        MangledSamplers& /*samplers*/) const override {
+    auto biasName = uniformHandler->addUniform("Bias", UniformFormat::Float, ShaderStage::Fragment);
+    uniforms.add("Bias", biasName);
+    auto scaleName =
+        uniformHandler->addUniform("Scale", UniformFormat::Float, ShaderStage::Fragment);
+    uniforms.add("Scale", scaleName);
+  }
+
   ShaderCallResult buildCallStatement(const std::string& /*inputColorVar*/, int fpIndex,
                                       const MangledUniforms& uniforms,
                                       const MangledVaryings& varyings,

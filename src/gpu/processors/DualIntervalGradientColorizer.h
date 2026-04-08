@@ -45,6 +45,25 @@ class DualIntervalGradientColorizer : public FragmentProcessor {
     return "fragment/dual_interval_gradient.frag";
   }
 
+  void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
+                        MangledSamplers& /*samplers*/) const override {
+    auto scale01Name =
+        uniformHandler->addUniform("scale01", UniformFormat::Float4, ShaderStage::Fragment);
+    uniforms.add("scale01", scale01Name);
+    auto bias01Name =
+        uniformHandler->addUniform("bias01", UniformFormat::Float4, ShaderStage::Fragment);
+    uniforms.add("bias01", bias01Name);
+    auto scale23Name =
+        uniformHandler->addUniform("scale23", UniformFormat::Float4, ShaderStage::Fragment);
+    uniforms.add("scale23", scale23Name);
+    auto bias23Name =
+        uniformHandler->addUniform("bias23", UniformFormat::Float4, ShaderStage::Fragment);
+    uniforms.add("bias23", bias23Name);
+    auto thresholdName =
+        uniformHandler->addUniform("threshold", UniformFormat::Float, ShaderStage::Fragment);
+    uniforms.add("threshold", thresholdName);
+  }
+
   ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
                                       const MangledUniforms& uniforms,
                                       const MangledVaryings& /*varyings*/,

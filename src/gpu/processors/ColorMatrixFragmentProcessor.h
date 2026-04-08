@@ -42,6 +42,16 @@ class ColorMatrixFragmentProcessor : public FragmentProcessor {
     return "fragment/color_matrix.frag";
   }
 
+  void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
+                        MangledSamplers& /*samplers*/) const override {
+    auto matrixName =
+        uniformHandler->addUniform("Matrix", UniformFormat::Float4x4, ShaderStage::Fragment);
+    uniforms.add("Matrix", matrixName);
+    auto vectorName =
+        uniformHandler->addUniform("Vector", UniformFormat::Float4, ShaderStage::Fragment);
+    uniforms.add("Vector", vectorName);
+  }
+
   ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
                                       const MangledUniforms& uniforms,
                                       const MangledVaryings& /*varyings*/,

@@ -55,6 +55,13 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
     return "fragment/device_space_texture_effect.frag";
   }
 
+  void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
+                        MangledSamplers& /*samplers*/) const override {
+    auto deviceCoordMatrixName = uniformHandler->addUniform(
+        "DeviceCoordMatrix", UniformFormat::Float3x3, ShaderStage::Fragment);
+    uniforms.add("DeviceCoordMatrix", deviceCoordMatrixName);
+  }
+
   ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
                                       const MangledUniforms& uniforms,
                                       const MangledVaryings& /*varyings*/,

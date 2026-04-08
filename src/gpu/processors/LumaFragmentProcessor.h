@@ -40,6 +40,16 @@ class LumaFragmentProcessor : public FragmentProcessor {
     return "fragment/luma.frag";
   }
 
+  void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
+                        MangledSamplers& /*samplers*/) const override {
+    auto krName = uniformHandler->addUniform("Kr", UniformFormat::Float, ShaderStage::Fragment);
+    uniforms.add("Kr", krName);
+    auto kgName = uniformHandler->addUniform("Kg", UniformFormat::Float, ShaderStage::Fragment);
+    uniforms.add("Kg", kgName);
+    auto kbName = uniformHandler->addUniform("Kb", UniformFormat::Float, ShaderStage::Fragment);
+    uniforms.add("Kb", kbName);
+  }
+
   ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
                                       const MangledUniforms& uniforms,
                                       const MangledVaryings& /*varyings*/,

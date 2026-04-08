@@ -42,6 +42,15 @@ class SingleIntervalGradientColorizer : public FragmentProcessor {
     return "fragment/single_interval_gradient.frag";
   }
 
+  void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
+                        MangledSamplers& /*samplers*/) const override {
+    auto startName =
+        uniformHandler->addUniform("start", UniformFormat::Float4, ShaderStage::Fragment);
+    uniforms.add("start", startName);
+    auto endName = uniformHandler->addUniform("end", UniformFormat::Float4, ShaderStage::Fragment);
+    uniforms.add("end", endName);
+  }
+
   ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
                                       const MangledUniforms& uniforms,
                                       const MangledVaryings& /*varyings*/,

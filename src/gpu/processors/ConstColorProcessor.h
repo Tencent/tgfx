@@ -53,6 +53,13 @@ class ConstColorProcessor : public FragmentProcessor {
     return "fragment/const_color.frag";
   }
 
+  void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
+                        MangledSamplers& /*samplers*/) const override {
+    auto colorName =
+        uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
+    uniforms.add("Color", colorName);
+  }
+
   ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
                                       const MangledUniforms& uniforms,
                                       const MangledVaryings& /*varyings*/,

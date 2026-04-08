@@ -39,6 +39,13 @@ class AARectEffect : public FragmentProcessor {
     return "fragment/aa_rect_effect.frag";
   }
 
+  void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
+                        MangledSamplers& /*samplers*/) const override {
+    auto rectName =
+        uniformHandler->addUniform("Rect", UniformFormat::Float4, ShaderStage::Fragment);
+    uniforms.add("Rect", rectName);
+  }
+
   ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
                                       const MangledUniforms& uniforms,
                                       const MangledVaryings& /*varyings*/,

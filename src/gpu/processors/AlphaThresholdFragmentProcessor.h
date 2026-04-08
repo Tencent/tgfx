@@ -41,6 +41,13 @@ class AlphaThresholdFragmentProcessor : public FragmentProcessor {
     return "fragment/alpha_threshold.frag";
   }
 
+  void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
+                        MangledSamplers& /*samplers*/) const override {
+    auto thresholdName =
+        uniformHandler->addUniform("Threshold", UniformFormat::Float, ShaderStage::Fragment);
+    uniforms.add("Threshold", thresholdName);
+  }
+
   ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
                                       const MangledUniforms& uniforms,
                                       const MangledVaryings& /*varyings*/,
