@@ -20,6 +20,7 @@
 
 #include <memory>
 #include "gpu/FragmentShaderBuilder.h"
+#include "gpu/MangledResources.h"
 #include "gpu/ShaderCallResult.h"
 #include "gpu/ShaderMacroSet.h"
 #include "gpu/UniformData.h"
@@ -74,7 +75,9 @@ class XferProcessor : public Processor {
 
   virtual ShaderCallResult buildXferCallStatement(const std::string& /*colorInVar*/,
                                                   const std::string& /*coverageInVar*/,
-                                                  const std::string& /*outputVar*/) const {
+                                                  const std::string& /*outputVar*/,
+                                                  const MangledUniforms& /*uniforms*/,
+                                                  const MangledSamplers& /*samplers*/) const {
     return {};
   }
 };

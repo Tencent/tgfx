@@ -20,6 +20,7 @@
 
 #include <vector>
 #include "gpu/FragmentShaderBuilder.h"
+#include "gpu/MangledResources.h"
 #include "gpu/ShaderCallResult.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/ShaderMacroSet.h"
@@ -150,15 +151,18 @@ class GeometryProcessor : public Processor {
     return "";
   }
 
-  virtual std::string buildVSCallExpr() const {
+  virtual std::string buildVSCallExpr(const MangledUniforms& /*uniforms*/,
+                                      const MangledVaryings& /*varyings*/) const {
     return "";
   }
 
-  virtual ShaderCallResult buildColorCallExpr() const {
+  virtual ShaderCallResult buildColorCallExpr(const MangledUniforms& /*uniforms*/,
+                                              const MangledVaryings& /*varyings*/) const {
     return {};
   }
 
-  virtual ShaderCallResult buildCoverageCallExpr() const {
+  virtual ShaderCallResult buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
+                                                 const MangledVaryings& /*varyings*/) const {
     return {};
   }
 
