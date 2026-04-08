@@ -86,8 +86,8 @@ class ImageCodec : public ImageGenerator {
   }
 
   /**
-   * Returns the actual output dimensions when decoding at the given scale factor. The result may
-   * differ from simply rounding width()*scale and height()*scale depending on the codec.
+   * Returns the output dimensions that the codec can natively support for the given scale factor.
+   * Use this to determine the exact decoded size before calling readPixels with a scaled target.
    */
   virtual std::pair<int, int> getScaledDimensions(float scale) const;
 
