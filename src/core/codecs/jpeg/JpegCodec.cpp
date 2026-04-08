@@ -320,10 +320,12 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
     if (!jpeg_start_decompress(&cinfo)) {
       break;
     }
+#ifdef DEBUG
     // Verify that libjpeg's output dimensions match getScaledDimensions().
     auto [expectedWidth, expectedHeight] = getScaledDimensions(static_cast<float>(scaleNum) / 8.0f);
-    DEBUG_ASSERT(static_cast<int>(cinfo.output_width) == expectedWidth);
-    DEBUG_ASSERT(static_cast<int>(cinfo.output_height) == expectedHeight);
+    ASSERT(static_cast<int>(cinfo.output_width) == expectedWidth);
+    ASSERT(static_cast<int>(cinfo.output_height) == expectedHeight);
+#endif
     // Use libjpeg's authoritative output dimensions to avoid buffer overflow.
     auto dstWidth = static_cast<int>(cinfo.output_width);
     auto dstHeight = static_cast<int>(cinfo.output_height);
