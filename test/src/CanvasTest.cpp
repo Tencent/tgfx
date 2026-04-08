@@ -2541,4 +2541,121 @@ TGFX_TEST(CanvasTest, DrawShapeAutoBatch_Stroke) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_Stroke"));
 }
 
+/**
+ * Regression test for instanced batching bug in OpsCompositor::drawShape.
+ *
+ * When tryAddSimplifiedMatrixShape decomposes MatrixShape into base PathShape + MatrixContent,
+ * position differences are encoded in shape bounds rather than canvas matrix. The old batching
+ * code only computed offset from matrix translation difference, missing the bounds component.
+ *
+ * This test covers:
+ * 1. Same base shape with different translations via Shape::ApplyMatrix (bounds-only offset)
+ * 2. Stroke outlines at different positions (real-world multi-selection scenario)
+ * 3. Different scales + different positions (matrix + bounds offset)
+ * 4. Different rotations + different positions (matrix + bounds offset with skew)
+ * 5. Different skews + different positions (matrix + bounds offset with skew)
+ */
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_DifferentBounds) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 500, 600);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Row 1: Same base shape + Shape::ApplyMatrix with different translations (bounds-only offset)
+  {
+    Path rectPath;
+    rectPath.addRect(Rect::MakeWH(80, 80));
+    auto baseShape = Shape::MakeFrom(rectPath);
+    Paint paint;
+    paint.setColor(Color::Blue());
+    paint.setStyle(PaintStyle::Stroke);
+    paint.setStrokeWidth(3);
+    float xPositions[] = {20, 170, 320};
+    for (float x : xPositions) {
+      auto shape = Shape::ApplyMatrix(baseShape, Matrix::MakeTrans(x, 10));
+      canvas->drawShape(shape, paint);
+    }
+  }
+
+  // Row 2: Stroke outlines at different positions (multi-selection scenario)
+  {
+    Path rectPath;
+    rectPath.addRect(Rect::MakeWH(100, 80));
+    auto baseShape = Shape::MakeFrom(rectPath);
+    Paint paint;
+    paint.setColor(Color::FromRGBA(0, 120, 215, 255));
+    paint.setStyle(PaintStyle::Stroke);
+    paint.setStrokeWidth(2);
+    paint.setAntiAlias(true);
+    Point positions[] = {{20, 120}, {170, 120}, {320, 120}};
+    for (const auto& pos : positions) {
+      auto shape = Shape::ApplyMatrix(baseShape, Matrix::MakeTrans(pos.x, pos.y));
+      canvas->drawShape(shape, paint);
+    }
+  }
+
+  // Row 3: Different scales + different positions (matrix + bounds offset)
+  {
+    Path rectPath;
+    rectPath.addRect(Rect::MakeWH(40, 40));
+    auto baseShape = Shape::MakeFrom(rectPath);
+    Paint paint;
+    paint.setColor(Color::Green());
+    paint.setStyle(PaintStyle::Fill);
+    float scales[] = {1.0f, 1.5f, 2.0f};
+    float xPositions[] = {20, 170, 320};
+    for (size_t i = 0; i < 3; i++) {
+      auto shape = Shape::ApplyMatrix(baseShape, Matrix::MakeScale(scales[i], scales[i]));
+      canvas->save();
+      canvas->translate(xPositions[i], 240);
+      canvas->drawShape(shape, paint);
+      canvas->restore();
+    }
+  }
+
+  // Row 4: Different rotations + different positions
+  {
+    Path rectPath;
+    rectPath.addRect(Rect::MakeWH(50, 50));
+    auto baseShape = Shape::MakeFrom(rectPath);
+    Paint paint;
+    paint.setColor(Color::Red());
+    paint.setStyle(PaintStyle::Stroke);
+    paint.setStrokeWidth(2);
+    float rotations[] = {0.0f, 30.0f, 57.0f};
+    float xPositions[] = {50, 200, 350};
+    for (size_t i = 0; i < 3; i++) {
+      auto shape = Shape::ApplyMatrix(baseShape, Matrix::MakeRotate(rotations[i]));
+      canvas->save();
+      canvas->translate(xPositions[i], 380);
+      canvas->drawShape(shape, paint);
+      canvas->restore();
+    }
+  }
+
+  // Row 5: Different skews + different positions
+  {
+    Path rectPath;
+    rectPath.addRect(Rect::MakeWH(60, 40));
+    auto baseShape = Shape::MakeFrom(rectPath);
+    Paint paint;
+    paint.setColor(Color::FromRGBA(255, 255, 0, 255));
+    paint.setStyle(PaintStyle::Fill);
+    float skews[] = {0.0f, 0.3f, 0.6f};
+    float xPositions[] = {20, 170, 320};
+    for (size_t i = 0; i < 3; i++) {
+      auto shape = Shape::ApplyMatrix(baseShape, Matrix::MakeSkew(skews[i], 0.0f));
+      canvas->save();
+      canvas->translate(xPositions[i], 490);
+      canvas->drawShape(shape, paint);
+      canvas->restore();
+    }
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_DifferentBounds"));
+}
+
 }  // namespace tgfx
