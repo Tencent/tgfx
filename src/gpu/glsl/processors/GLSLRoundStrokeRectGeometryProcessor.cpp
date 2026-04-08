@@ -42,7 +42,7 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
 
   Varying ellipseRadii;
-  if (aaType == AAType::Coverage) {
+  if (aaType != AAType::None) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), inCoverage.name().c_str());
     fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
@@ -69,7 +69,7 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   fragBuilder->codeAppendf("vec2 offset = %s;", ellipseOffsets.fsIn().c_str());
-  if (aaType == AAType::Coverage) {
+  if (aaType != AAType::None) {
     fragBuilder->codeAppend("float test = dot(offset, offset) - 1.0;");
     fragBuilder->codeAppend("if (test > -0.5) {");
     fragBuilder->codeAppendf("vec2 grad = 2.0 * offset * %s;", ellipseRadii.fsIn().c_str());

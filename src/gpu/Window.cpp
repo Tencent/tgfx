@@ -20,8 +20,9 @@
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
-Window::Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
-    : device(std::move(device)), _colorSpace(std::move(colorSpace)) {
+Window::Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
+               int sampleCount)
+    : device(std::move(device)), _colorSpace(std::move(colorSpace)), sampleCount(sampleCount) {
 }
 
 std::shared_ptr<ColorSpace> Window::colorSpace() const {

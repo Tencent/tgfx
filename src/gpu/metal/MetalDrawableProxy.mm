@@ -26,8 +26,14 @@
 
 namespace tgfx {
 MetalDrawableProxy::MetalDrawableProxy(Context* context, int width, int height,
-                                       CAMetalLayer* metalLayer, PixelFormat format)
-    : _context(context), _width(width), _height(height), _format(format), _metalLayer(metalLayer) {
+                                       CAMetalLayer* metalLayer, PixelFormat format,
+                                       int sampleCount)
+    : _context(context),
+      _width(width),
+      _height(height),
+      _format(format),
+      _sampleCount(sampleCount),
+      _metalLayer(metalLayer) {
 }
 
 Context* MetalDrawableProxy::getContext() const {
@@ -47,7 +53,7 @@ PixelFormat MetalDrawableProxy::format() const {
 }
 
 int MetalDrawableProxy::sampleCount() const {
-  return 1;
+  return _sampleCount;
 }
 
 ImageOrigin MetalDrawableProxy::origin() const {
@@ -72,13 +78,19 @@ std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
     // GPU finishes rendering before the drawable is displayed on screen.
     auto metalQueue = static_cast<MetalCommandQueue*>(_context->gpu()->queue());
     metalQueue->schedulePresent(_metalDrawable);
+    auto textureWidth = static_cast<int>(_metalDrawable.texture.width);
+    auto textureHeight = static_cast<int>(_metalDrawable.texture.height);
     MetalTextureInfo metalInfo = {};
     metalInfo.texture = (__bridge const void*)_metalDrawable.texture;
     metalInfo.format = static_cast<unsigned>(_metalDrawable.texture.pixelFormat);
-    auto textureWidth = static_cast<int>(_metalDrawable.texture.width);
-    auto textureHeight = static_cast<int>(_metalDrawable.texture.height);
-    BackendRenderTarget backendRT(metalInfo, textureWidth, textureHeight);
-    _renderTarget = RenderTarget::MakeFrom(_context, backendRT, ImageOrigin::TopLeft);
+    if (_sampleCount <= 1) {
+      BackendRenderTarget backendRT(metalInfo, textureWidth, textureHeight);
+      _renderTarget = RenderTarget::MakeFrom(_context, backendRT, ImageOrigin::TopLeft);
+    } else {
+      BackendTexture backendTexture(metalInfo, textureWidth, textureHeight);
+      _renderTarget =
+          RenderTarget::MakeFrom(_context, backendTexture, _sampleCount, ImageOrigin::TopLeft);
+    }
   }
   return _renderTarget;
 }

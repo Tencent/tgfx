@@ -23,11 +23,11 @@ RoundStrokeRectGeometryProcessor::RoundStrokeRectGeometryProcessor(
     AAType aaType, std::optional<PMColor> commonColor, std::optional<Matrix> uvMatrix)
     : GeometryProcessor(ClassID()), aaType(aaType), commonColor(commonColor), uvMatrix(uvMatrix) {
   inPosition = {"inPosition", VertexFormat::Float2};
-  if (aaType == AAType::Coverage) {
+  if (aaType != AAType::None) {
     inCoverage = {"inCoverage", VertexFormat::Float};
   }
   inEllipseOffset = {"inEllipseOffset", VertexFormat::Float2};
-  if (aaType == AAType::Coverage) {
+  if (aaType != AAType::None) {
     inEllipseRadii = {"inEllipseRadii", VertexFormat::Float2};
   }
   if (!uvMatrix.has_value()) {
@@ -40,7 +40,7 @@ RoundStrokeRectGeometryProcessor::RoundStrokeRectGeometryProcessor(
 }
 
 void RoundStrokeRectGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  uint32_t flags = aaType == AAType::Coverage ? 1 : 0;
+  uint32_t flags = aaType != AAType::None ? 1 : 0;
   flags |= commonColor.has_value() ? 2 : 0;
   flags |= uvMatrix.has_value() ? 4 : 0;
   bytesKey->write(flags);

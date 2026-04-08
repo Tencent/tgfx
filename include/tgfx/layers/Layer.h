@@ -691,9 +691,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasBackgroundStyle();
 
-  std::shared_ptr<BackgroundContext> createBackgroundContext(
-      Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
-      std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
+  std::shared_ptr<BackgroundContext> createBackgroundContext(Context* context, const Rect& drawRect,
+                                                             const Matrix& viewMatrix,
+                                                             bool fullLayer,
+                                                             std::shared_ptr<ColorSpace> colorSpace,
+                                                             int sampleCount) const;
 
   bool shouldPassThroughBackground(BlendMode blendMode) const;
 

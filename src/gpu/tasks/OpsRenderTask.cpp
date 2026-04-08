@@ -30,9 +30,14 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
     return;
   }
   auto loadOp = clearColor.has_value() ? LoadAction::Clear : LoadAction::Load;
+  auto renderTexture = renderTarget->getRenderTexture();
+  auto sampleTexture = renderTarget->getSampleTexture();
+  // Only set resolveTexture when the render target has a separate sample texture for explicit MSAA
+  // resolve. When they are the same (e.g., window-system managed MSAA), no explicit resolve is
+  // needed.
   auto resolveTexture =
-      renderTarget->sampleCount() > 1 ? renderTarget->getSampleTexture() : nullptr;
-  RenderPassDescriptor descriptor(renderTarget->getRenderTexture(), loadOp, StoreAction::Store,
+      (renderTarget->sampleCount() > 1 && sampleTexture != renderTexture) ? sampleTexture : nullptr;
+  RenderPassDescriptor descriptor(renderTexture, loadOp, StoreAction::Store,
                                   clearColor.value_or(PMColor::Transparent()), resolveTexture);
   auto renderPass = encoder->beginRenderPass(descriptor);
   if (renderPass == nullptr) {

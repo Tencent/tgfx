@@ -916,5 +916,9 @@ namespace tgfx {
 #define GL_ALREADY_SIGNALED 0x911A
 #define GL_CONDITION_SATISFIED 0x911C
 
+/* WEBGL_debug_renderer_info */
+#define GL_UNMASKED_VENDOR_WEBGL 0x9245
+#define GL_UNMASKED_RENDERER_WEBGL 0x9246
+
 #endif
 }  // namespace tgfx

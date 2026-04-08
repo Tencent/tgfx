@@ -79,5 +79,8 @@ class DrawArgs {
 
   // The opaque context to be used during opaque content/contour recording. Note: this could be nullptr.
   OpaqueContext* opaqueContext = nullptr;
+
+  // The MSAA sample count inherited from the target surface.
+  int sampleCount = 1;
 };
 }  // namespace tgfx

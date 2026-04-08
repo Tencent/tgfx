@@ -151,7 +151,7 @@ BackendRenderTarget MetalTexture::getBackendRenderTarget() const {
   metalInfo.texture = (__bridge const void*)texture;
   metalInfo.format = static_cast<unsigned>(texture.pixelFormat);
   return BackendRenderTarget(metalInfo, static_cast<int>(texture.width),
-                             static_cast<int>(texture.height));
+                             static_cast<int>(texture.height), sampleCount());
 }
 
 }  // namespace tgfx

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/gpu/metal/MetalTypes.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
@@ -128,16 +129,26 @@ class BackendRenderTarget {
 
   /**
    * Creates an OpenGL backend render target.
+   * @param glInfo The OpenGL framebuffer info.
+   * @param width The width of the render target.
+   * @param height The height of the render target.
+   * @param sampleCount The number of samples for MSAA rendering. Defaults to 1 (no MSAA).
    */
-  BackendRenderTarget(const GLFrameBufferInfo& glInfo, int width, int height)
-      : _backend(Backend::OpenGL), _width(width), _height(height), glInfo(glInfo) {
+  BackendRenderTarget(const GLFrameBufferInfo& glInfo, int width, int height, int sampleCount = 1)
+      : _backend(Backend::OpenGL), _width(width), _height(height),
+        _sampleCount(std::max(sampleCount, 1)), glInfo(glInfo) {
   }
 
   /**
    * Creates a Metal backend render target.
+   * @param metalInfo The Metal texture info.
+   * @param width The width of the render target.
+   * @param height The height of the render target.
+   * @param sampleCount The number of samples for MSAA rendering. Defaults to 1 (no MSAA).
    */
-  BackendRenderTarget(const MetalTextureInfo& metalInfo, int width, int height)
-      : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
+  BackendRenderTarget(const MetalTextureInfo& metalInfo, int width, int height, int sampleCount = 1)
+      : _backend(Backend::Metal), _width(width), _height(height),
+        _sampleCount(std::max(sampleCount, 1)), metalInfo(metalInfo) {
   }
 
   BackendRenderTarget(const BackendRenderTarget& that) {
@@ -168,6 +179,13 @@ class BackendRenderTarget {
   }
 
   /**
+   * Returns the sample count of this render target. Returns 1 if MSAA is not enabled.
+   */
+  int sampleCount() const {
+    return _sampleCount;
+  }
+
+  /**
    * Returns the backend API of this render target.
    */
   Backend backend() const {
@@ -195,6 +213,7 @@ class BackendRenderTarget {
   Backend _backend = Backend::Unknown;
   int _width = 0;
   int _height = 0;
+  int _sampleCount = 1;
   union {
     GLFrameBufferInfo glInfo;
     MetalTextureInfo metalInfo;

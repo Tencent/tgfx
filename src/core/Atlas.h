@@ -73,7 +73,7 @@ class Atlas {
   AtlasToken previousFlushToken = AtlasToken::InvalidToken();
   uint32_t flushesSinceLastUse = 0;
   uint32_t numPlots = 0;
-  int textureWidth = 2028;
+  int textureWidth = 2048;
   int textureHeight = 2048;
   int plotWidth = 512;
   int plotHeight = 512;

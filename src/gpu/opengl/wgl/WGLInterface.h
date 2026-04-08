@@ -38,6 +38,8 @@ DECLARE_HANDLE(HPBUFFER);
 #define WGL_CONTEXT_MINOR_VERSION 0x2092
 #define WGL_CONTEXT_PROFILE_MASK 0x9126
 #define WGL_CONTEXT_CORE_PROFILE_BIT 0x00000001
+#define WGL_SAMPLE_BUFFERS 0x2041
+#define WGL_SAMPLES 0x2042
 
 using GetExtensionsStringProc = const char*(WINAPI*)(HDC);
 using ChoosePixelFormatProc = BOOL(WINAPI*)(HDC, const int*, const FLOAT*, UINT, int*, UINT*);
@@ -59,6 +61,7 @@ class WGLInterface {
   bool pBufferSupport = false;
   bool swapIntervalSupport = false;
   bool createContextAttribsSupport = false;
+  bool multisampleSupport = false;
 
   int glMajorMax = 1;
   int glMinorMax = 0;

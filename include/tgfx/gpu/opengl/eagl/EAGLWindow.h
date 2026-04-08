@@ -28,10 +28,15 @@ class EAGLWindow : public Window {
  public:
   /**
    * Creates a new window from a CAEAGLLayer with the specified device.
+   * @param layer The CAEAGLLayer to render into. Must not be nil.
+   * @param device An optional GLDevice. If nullptr, a default device is created automatically.
+   * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param sampleCount The number of samples for MSAA rendering. Defaults to 1 (no MSAA).
    */
   static std::shared_ptr<EAGLWindow> MakeFrom(CAEAGLLayer* layer,
                                               std::shared_ptr<GLDevice> device = nullptr,
-                                              std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                              std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                              int sampleCount = 1);
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
@@ -41,7 +46,7 @@ class EAGLWindow : public Window {
   CAEAGLLayer* layer = nil;
   std::shared_ptr<EAGLLayerTexture> layerTexture = nullptr;
 
-  EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
-             std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  explicit EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
+                      std::shared_ptr<ColorSpace> colorSpace, int sampleCount);
 };
 }  // namespace tgfx

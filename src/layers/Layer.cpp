@@ -297,7 +297,7 @@ static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Can
 
   bool opaqueMode = args.opaqueContext != nullptr;
   return Layer3DContext::Make(opaqueMode, args.context, validRenderRect, contentScale,
-                              args.dstColorSpace, args.blurBackground);
+                              args.dstColorSpace, args.blurBackground, args.sampleCount);
 }
 
 bool Layer::DefaultAllowsEdgeAntialiasing() {
@@ -990,6 +990,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
 
   if (surface) {
     args.dstColorSpace = surface->colorSpace();
+    args.sampleCount = surface->sampleCount();
     context = surface->getContext();
     if (!(surface->renderFlags() & RenderFlags::DisableCache)) {
       args.context = context;
@@ -1004,9 +1005,9 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     backgroundRect.scale(scale, scale);
     auto backgroundMatrix = globalToLocalMatrix.asMatrix();
     backgroundMatrix.postScale(scale, scale);
-    if (auto backgroundContext =
-            createBackgroundContext(context, backgroundRect, backgroundMatrix,
-                                    bounds == clippedBounds, surface->colorSpace())) {
+    if (auto backgroundContext = createBackgroundContext(
+            context, backgroundRect, backgroundMatrix, bounds == clippedBounds,
+            surface ? surface->colorSpace() : nullptr, args.sampleCount)) {
       auto backgroundCanvas = backgroundContext->getCanvas();
       auto actualMatrix = backgroundCanvas->getMatrix();
       actualMatrix.preConcat(localToGlobalMatrix.asMatrix());
@@ -1443,9 +1444,9 @@ std::shared_ptr<Image> Layer::getPassThroughContentImage(const DrawArgs& args, C
   auto surfaceRect = passThroughImageMatrix.mapRect(*inputBounds);
   surfaceRect.roundOut();
   surfaceRect.intersect(Rect::MakeWH(passThroughImage->width(), passThroughImage->height()));
-  auto offscreenSurface =
-      Surface::Make(context, static_cast<int>(surfaceRect.width()),
-                    static_cast<int>(surfaceRect.height()), false, 1, false, 0, args.dstColorSpace);
+  auto offscreenSurface = Surface::Make(context, static_cast<int>(surfaceRect.width()),
+                                        static_cast<int>(surfaceRect.height()), false,
+                                        args.sampleCount, false, 0, args.dstColorSpace);
   if (!offscreenSurface) {
     return nullptr;
   }
@@ -2451,16 +2452,16 @@ bool Layer::hasBackgroundStyle() {
 
 std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(
     Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer,
-    std::shared_ptr<ColorSpace> colorSpace) const {
+    std::shared_ptr<ColorSpace> colorSpace, int sampleCount) const {
   if (maxBackgroundOutset <= 0.0f) {
     return nullptr;
   }
   if (fullLayer) {
-    return BackgroundContext::Make(context, drawRect, 0, 0, viewMatrix, colorSpace);
+    return BackgroundContext::Make(context, drawRect, 0, 0, viewMatrix, colorSpace, sampleCount);
   }
   auto scale = viewMatrix.getMaxScale();
   return BackgroundContext::Make(context, drawRect, maxBackgroundOutset * scale,
-                                 minBackgroundOutset * scale, viewMatrix, colorSpace);
+                                 minBackgroundOutset * scale, viewMatrix, colorSpace, sampleCount);
 }
 
 bool Layer::canPreserve3D() const {

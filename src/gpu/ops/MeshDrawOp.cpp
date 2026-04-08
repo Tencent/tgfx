@@ -68,7 +68,7 @@ void MeshDrawOp::onDraw(RenderPass* renderPass) {
 }
 
 bool MeshDrawOp::hasCoverage() const {
-  return meshProxy->attributes().hasCoverage;
+  return meshProxy->attributes().hasCoverage || DrawOp::hasCoverage();
 }
 
 }  // namespace tgfx

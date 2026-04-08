@@ -102,6 +102,8 @@ void InitializeWGLExtensions(HDC deviceContext, WGLInterface& wglInterface) {
       extensionList.find("WGL_EXT_swap_control") != extensionList.end();
   wglInterface.createContextAttribsSupport =
       extensionList.find("WGL_ARB_create_context") != extensionList.end();
+  wglInterface.multisampleSupport =
+      extensionList.find("WGL_ARB_multisample") != extensionList.end();
 }
 
 WGLInterface InitializeWGL() {

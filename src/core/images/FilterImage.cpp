@@ -140,7 +140,7 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
                                        AddressOf(fpMatrix));
   }
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
+  TPArgs tpArgs(args.context, args.renderFlags, 1, mipmapped, args.drawScale);
   auto textureProxy = filter->lockTextureProxy(source, dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;

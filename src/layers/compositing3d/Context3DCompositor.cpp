@@ -123,10 +123,11 @@ static std::pair<Quad, unsigned> GetQuadAndAAFlags(const Rect& originalRect, AAT
   return {quad, aaFlags};
 }
 
-Context3DCompositor::Context3DCompositor(const Context& context, int width, int height)
+Context3DCompositor::Context3DCompositor(const Context& context, int width, int height,
+                                         int sampleCount)
     : _width(width), _height(height) {
-  _targetColorProxy =
-      context.proxyProvider()->createRenderTargetProxy({}, width, height, PixelFormat::RGBA_8888);
+  _targetColorProxy = context.proxyProvider()->createRenderTargetProxy(
+      {}, width, height, PixelFormat::RGBA_8888, sampleCount);
   DEBUG_ASSERT(_targetColorProxy != nullptr);
 }
 

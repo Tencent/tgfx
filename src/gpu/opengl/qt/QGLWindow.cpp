@@ -25,6 +25,7 @@
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 class QGLDeviceCreator : public QObject {
@@ -104,7 +105,8 @@ class QGLDeviceCreator : public QObject {
 };
 
 std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singleBufferMode,
-                                               std::shared_ptr<ColorSpace> colorSpace) {
+                                               std::shared_ptr<ColorSpace> colorSpace,
+                                               int sampleCount) {
   if (quickItem == nullptr) {
     return nullptr;
   }
@@ -117,17 +119,18 @@ std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singl
         "QGLWindow::MakeFrom() The specified ColorSpace does not match the window's ColorSpace. "
         "Rendering may have color inaccuracies.");
   }
-  auto window =
-      std::shared_ptr<QGLWindow>(new QGLWindow(quickItem, singleBufferMode, std::move(colorSpace)));
+  auto window = std::shared_ptr<QGLWindow>(
+      new QGLWindow(quickItem, singleBufferMode, std::move(colorSpace), sampleCount));
   window->weakThis = window;
   window->initDevice();
   return window;
 }
 
 QGLWindow::QGLWindow(QQuickItem* quickItem, bool singleBufferMode,
-                     std::shared_ptr<ColorSpace> colorSpace)
+                     std::shared_ptr<ColorSpace> colorSpace, int sampleCount)
     : quickItem(quickItem), maxTextureCount(singleBufferMode ? 1 : 2) {
   _colorSpace = std::move(colorSpace);
+  this->sampleCount = sampleCount;
   if (QThread::currentThread() != QApplication::instance()->thread()) {
     renderThread = QThread::currentThread();
   }
@@ -163,8 +166,9 @@ std::shared_ptr<RenderTargetProxy> QGLWindow::onCreateRenderTarget(Context* cont
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
+  sampleCount = context->gpu()->getSampleCount(sampleCount, PixelFormat::RGBA_8888);
   drawableProxy = std::make_shared<QGLDrawableProxy>(context, width, height, PixelFormat::RGBA_8888,
-                                                     1, ImageOrigin::BottomLeft, this);
+                                                     sampleCount, ImageOrigin::BottomLeft, this);
   std::static_pointer_cast<QGLDrawableProxy>(drawableProxy)->weakThis = drawableProxy;
   return drawableProxy;
 }

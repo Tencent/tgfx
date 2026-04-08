@@ -21,25 +21,29 @@
 #include "core/utils/Log.h"
 #include "gpu/opengl/GLDefines.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 
 std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID,
-                                                   std::shared_ptr<ColorSpace> colorSpace) {
+                                                   std::shared_ptr<ColorSpace> colorSpace,
+                                                   int sampleCount) {
   if (canvasID.empty()) {
     return nullptr;
   }
-  auto device = WebGLDevice::MakeFrom(canvasID, colorSpace);
+  auto device = WebGLDevice::MakeFrom(canvasID, colorSpace, sampleCount);
   if (device == nullptr) {
     return nullptr;
   }
-  auto window = std::shared_ptr<WebGLWindow>(new WebGLWindow(device, std::move(colorSpace)));
+  auto window =
+      std::shared_ptr<WebGLWindow>(new WebGLWindow(device, std::move(colorSpace), sampleCount));
   window->canvasID = canvasID;
   return window;
 }
 
-WebGLWindow::WebGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)) {
+WebGLWindow::WebGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
+                         int sampleCount)
+    : Window(std::move(device), std::move(colorSpace), sampleCount) {
 }
 
 std::shared_ptr<RenderTargetProxy> WebGLWindow::onCreateRenderTarget(Context* context) {
@@ -50,9 +54,11 @@ std::shared_ptr<RenderTargetProxy> WebGLWindow::onCreateRenderTarget(Context* co
     LOGE("WebGLWindow::onCreateRenderTarget() Can not create a RenderTarget with zero size.");
     return nullptr;
   }
+  sampleCount = context->gpu()->getSampleCount(sampleCount, PixelFormat::RGBA_8888);
   GLFrameBufferInfo glInfo = {};
   glInfo.id = 0;
   glInfo.format = GL_RGBA8;
-  return RenderTargetProxy::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft);
+  return RenderTargetProxy::MakeFrom(context, {glInfo, width, height, sampleCount},
+                                     ImageOrigin::BottomLeft);
 }
 }  // namespace tgfx

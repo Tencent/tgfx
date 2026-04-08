@@ -21,27 +21,26 @@
 #include "gpu/opengl/wgl/WGLInterface.h"
 
 namespace tgfx {
-static void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]) {
+static void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2], int sampleCount) {
   auto wglInterface = WGLInterface::Get();
   if (!wglInterface->pixelFormatSupport) {
     return;
   }
-  std::vector<int> intAttributes{WGL_DRAW_TO_WINDOW,
-                                 TRUE,
-                                 WGL_DOUBLE_BUFFER,
-                                 TRUE,
-                                 WGL_ACCELERATION,
-                                 WGL_FULL_ACCELERATION,
-                                 WGL_SUPPORT_OPENGL,
-                                 TRUE,
-                                 WGL_COLOR_BITS,
-                                 24,
-                                 WGL_ALPHA_BITS,
-                                 8,
-                                 WGL_STENCIL_BITS,
-                                 8,
-                                 0,
+  // clang-format off
+  std::vector<int> intAttributes{WGL_DRAW_TO_WINDOW,  TRUE,
+                                 WGL_DOUBLE_BUFFER,   TRUE,
+                                 WGL_ACCELERATION,    WGL_FULL_ACCELERATION,
+                                 WGL_SUPPORT_OPENGL,  TRUE,
+                                 WGL_COLOR_BITS,      24,
+                                 WGL_ALPHA_BITS,      8,
+                                 WGL_STENCIL_BITS,    8,
                                  0};
+  // clang-format on
+
+  if (sampleCount > 1 && wglInterface->multisampleSupport) {
+    intAttributes.insert(intAttributes.end() - 1,
+                         {WGL_SAMPLE_BUFFERS, 1, WGL_SAMPLES, sampleCount});
+  }
 
   auto format = formatsToTry[0] ? &formatsToTry[0] : &formatsToTry[1];
   unsigned numFormats = 0;
@@ -134,7 +133,7 @@ static bool CreatePbufferContext(HDC parentDeviceContext, HGLRC sharedContext, H
   static std::once_flag flag;
   std::call_once(flag, [parentDeviceContext] {
     int pixelFormatsToTry[2] = {-1, -1};
-    GetPixelFormatsToTry(parentDeviceContext, pixelFormatsToTry);
+    GetPixelFormatsToTry(parentDeviceContext, pixelFormatsToTry, 1);
     pixelFormat = pixelFormatsToTry[0];
   });
 
@@ -159,10 +158,10 @@ static bool CreatePbufferContext(HDC parentDeviceContext, HGLRC sharedContext, H
   return false;
 }
 
-static HGLRC CreateWGLContext(HDC deviceContext, HGLRC sharedContext) {
+static HGLRC CreateWGLContext(HDC deviceContext, HGLRC sharedContext, int sampleCount) {
   auto set = false;
   int pixelFormatsToTry[2] = {-1, -1};
-  GetPixelFormatsToTry(deviceContext, pixelFormatsToTry);
+  GetPixelFormatsToTry(deviceContext, pixelFormatsToTry, sampleCount);
   for (auto f = 0; !set && pixelFormatsToTry[f] && f < 2; ++f) {
     PIXELFORMATDESCRIPTOR descriptor;
     DescribePixelFormat(deviceContext, pixelFormatsToTry[f], sizeof(descriptor), &descriptor);
@@ -232,12 +231,13 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   return device;
 }
 
-std::shared_ptr<WGLDevice> WGLDevice::MakeFrom(HWND nativeWindow, HGLRC sharedContext) {
+std::shared_ptr<WGLDevice> WGLDevice::MakeFrom(HWND nativeWindow, HGLRC sharedContext,
+                                               int sampleCount) {
   if (nativeWindow == nullptr) {
     return nullptr;
   }
   auto deviceContext = GetDC(nativeWindow);
-  auto glContext = CreateWGLContext(deviceContext, sharedContext);
+  auto glContext = CreateWGLContext(deviceContext, sharedContext, sampleCount);
   auto device =
       WGLDevice::Wrap(deviceContext, glContext, sharedContext, nativeWindow, nullptr, false);
   if (device == nullptr) {

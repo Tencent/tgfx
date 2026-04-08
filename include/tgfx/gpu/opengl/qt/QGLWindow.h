@@ -42,9 +42,14 @@ class QGLWindow : public Window {
    * updatePaintNode() method, you can set singleBufferMode to true to reduce the memory usage.
    * However, if you intend to perform drawing in other threads, you must set singleBufferMode to
    * false.
+   * @param quickItem The QQuickItem to render into. Must not be nullptr.
+   * @param singleBufferMode Whether to use single buffer mode to reduce memory usage.
+   * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param sampleCount The number of samples for MSAA rendering. Defaults to 1 (no MSAA).
    */
   static std::shared_ptr<QGLWindow> MakeFrom(QQuickItem* quickItem, bool singleBufferMode = false,
-                                             std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                             std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                             int sampleCount = 1);
 
   /**
    * Changes the thread affinity for this object and its children.
@@ -78,8 +83,8 @@ class QGLWindow : public Window {
   std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
   std::shared_ptr<RenderTargetProxy> presentingProxy = nullptr;
 
-  explicit QGLWindow(QQuickItem* quickItem, bool singleBufferMode = false,
-                     std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  explicit QGLWindow(QQuickItem* quickItem, bool singleBufferMode,
+                     std::shared_ptr<ColorSpace> colorSpace, int sampleCount);
   std::shared_ptr<RenderTargetProxy> acquireTexture(Context* context, int width, int height);
   void reuseTexture(const std::shared_ptr<RenderTargetProxy>& proxy);
   void initDevice();

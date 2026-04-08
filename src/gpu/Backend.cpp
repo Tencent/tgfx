@@ -103,6 +103,7 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
   }
   _width = that._width;
   _height = that._height;
+  _sampleCount = that._sampleCount;
   _backend = that._backend;
   switch (that._backend) {
     case Backend::OpenGL:

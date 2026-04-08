@@ -28,13 +28,15 @@ namespace tgfx {
 
 std::shared_ptr<Layer3DContext> Layer3DContext::Make(
     bool opaqueMode, Context* context, const Rect& renderRect, float contentScale,
-    std::shared_ptr<ColorSpace> colorSpace, std::shared_ptr<BackgroundContext> backgroundContext) {
+    std::shared_ptr<ColorSpace> colorSpace, std::shared_ptr<BackgroundContext> backgroundContext,
+    int sampleCount) {
   if (opaqueMode) {
     DEBUG_ASSERT(backgroundContext == nullptr);
     return std::make_shared<Opaque3DContext>(renderRect, contentScale, std::move(colorSpace));
   }
-  auto compositor = std::make_shared<Context3DCompositor>(
-      *context, static_cast<int>(renderRect.width()), static_cast<int>(renderRect.height()));
+  auto compositor =
+      std::make_shared<Context3DCompositor>(*context, static_cast<int>(renderRect.width()),
+                                            static_cast<int>(renderRect.height()), sampleCount);
   return std::make_shared<Render3DContext>(std::move(compositor), renderRect, contentScale,
                                            std::move(colorSpace), std::move(backgroundContext));
 }
