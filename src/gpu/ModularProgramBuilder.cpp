@@ -18,6 +18,7 @@
 
 #include "ModularProgramBuilder.h"
 #include "gpu/BlendFormula.h"
+#include "gpu/MangledResources.h"
 #include "gpu/glsl/GLSLBlend.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
