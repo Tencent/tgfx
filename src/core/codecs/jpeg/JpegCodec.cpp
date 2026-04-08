@@ -19,6 +19,7 @@
 #include "core/codecs/jpeg/JpegCodec.h"
 #include <csetjmp>
 #include "core/utils/ColorSpaceHelper.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/OrientationHelper.h"
 #include "skcms.h"
@@ -319,6 +320,10 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
     if (!jpeg_start_decompress(&cinfo)) {
       break;
     }
+    // Verify that libjpeg's output dimensions match getScaledDimensions().
+    auto [expectedWidth, expectedHeight] = getScaledDimensions(static_cast<float>(scaleNum) / 8.0f);
+    DEBUG_ASSERT(static_cast<int>(cinfo.output_width) == expectedWidth);
+    DEBUG_ASSERT(static_cast<int>(cinfo.output_height) == expectedHeight);
     // Use libjpeg's authoritative output dimensions to avoid buffer overflow.
     auto dstWidth = static_cast<int>(cinfo.output_width);
     auto dstHeight = static_cast<int>(cinfo.output_height);
