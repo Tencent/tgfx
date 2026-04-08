@@ -55,7 +55,7 @@ class DiamondGradientLayout : public FragmentProcessor {
     result.includeFiles = {shaderFunctionFile()};
     auto coord = varyings.getCoordTransform(0);
     result.statement =
-        "vec4 " + result.outputVarName + " = FP_DiamondGradientLayout(" + coord + ");";
+        "vec4 " + result.outputVarName + " = TGFX_DiamondGradientLayout(" + coord + ");";
     return result;
   }
 

@@ -68,7 +68,7 @@ class ConstColorProcessor : public FragmentProcessor {
     result.outputVarName = "color_fp" + std::to_string(fpIndex);
     result.includeFiles = {shaderFunctionFile()};
     auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
-    result.statement = "vec4 " + result.outputVarName + " = FP_ConstColor(" + input + ", " +
+    result.statement = "vec4 " + result.outputVarName + " = TGFX_ConstColor(" + input + ", " +
                        uniforms.get("Color") + ");";
     return result;
   }

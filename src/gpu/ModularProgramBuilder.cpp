@@ -136,13 +136,17 @@ void ModularProgramBuilder::emitModularFragProcessors(std::string* color, std::s
     }
     const auto fp = programInfo->getFragmentProcessor(i);
     auto output = emitModularFragProc(fp, transformedCoordVarsIdx, **inOut);
-    // Advance coord transform index using same pre-order traversal as legacy path.
     FragmentProcessor::Iter iter(fp);
     while (const FragmentProcessor* tempFP = iter.next()) {
       transformedCoordVarsIdx += tempFP->numCoordTransforms();
     }
     **inOut = output;
   }
+}
+
+// Unused for now — reserved for future two-pass optimization.
+void ModularProgramBuilder::registerFPResources(const FragmentProcessor* /*processor*/,
+                                                 size_t /*transformedCoordVarsIdx*/) {
 }
 
 std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* processor,
@@ -217,11 +221,44 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
                                            const std::string& output,
                                            const CoordTransformFunc& coordTransformFunc) {
   auto name = processor->name();
-  // Only include .glsl module for FPs that have one registered.
+
+  // Polymorphic path: only for FPs with buildCallStatement AND .glsl module in registry.
   if (ShaderModuleRegistry::HasModule(name)) {
-    auto moduleID = ShaderModuleRegistry::GetModuleID(name);
+    FPResources resources;
+    // Populate coord transform (emit perspective divide if needed).
+    if (transformedCoordVarsIdx < transformedCoordVars.size()) {
+      auto texCoordName =
+          fragmentShaderBuilder()->emitPerspTextCoord(transformedCoordVars[transformedCoordVarsIdx]);
+      if (coordTransformFunc) {
+        fragmentShaderBuilder()->codeAppendf("highp vec2 transformedCoord = %s;",
+                                             coordTransformFunc(texCoordName).c_str());
+        texCoordName = "transformedCoord";
+      }
+      resources.varyings.addCoordTransform(0, texCoordName);
+    }
+    for (size_t i = 0; i < currentTexSamplers.size(); ++i) {
+      auto samplerVar = uniformHandler()->getSamplerVariable(currentTexSamplers[i]);
+      resources.samplers.add("TextureSampler_" + std::to_string(i), samplerVar.name());
+    }
+    processor->declareResources(uniformHandler(), resources.uniforms, resources.samplers);
+    int fpIndex = programInfo->getProcessorIndex(processor);
+    auto result = processor->buildCallStatement(input, fpIndex, resources.uniforms,
+                                                resources.varyings, resources.samplers);
+    if (!result.statement.empty()) {
+      emitProcessorDefines(processor);
+      includeModule(ShaderModuleRegistry::GetModuleID(name));
+      fragmentShaderBuilder()->codeAppend(result.statement);
+      if (result.outputVarName != output) {
+        fragmentShaderBuilder()->codeAppendf("%s = %s;", output.c_str(),
+                                             result.outputVarName.c_str());
+      }
+      return;
+    }
+    // buildCallStatement returned empty — fall through to name-based dispatch.
+    // Note: declareResources may have registered uniforms; this is safe because
+    // the fallback path will use the same uniform names.
     emitProcessorDefines(processor);
-    includeModule(moduleID);
+    includeModule(ShaderModuleRegistry::GetModuleID(name));
   }
 
   auto fragBuilder = fragmentShaderBuilder();
@@ -230,31 +267,31 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
     // Declare uniform using legacy naming convention.
     auto colorName =
         uniformHandler()->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = FP_ConstColor(%s, %s);", output.c_str(),
+    fragBuilder->codeAppendf("%s = TGFX_ConstColor(%s, %s);", output.c_str(),
                              input.empty() ? "vec4(1.0)" : input.c_str(), colorName.c_str());
   } else if (name == "LinearGradientLayout") {
     // Get the transformed coordinate varying.
     auto& coordVar = transformedCoordVars[transformedCoordVarsIdx];
     auto coordName = fragBuilder->emitPerspTextCoord(coordVar);
-    fragBuilder->codeAppendf("%s = FP_LinearGradientLayout(%s);", output.c_str(),
+    fragBuilder->codeAppendf("%s = TGFX_LinearGradientLayout(%s);", output.c_str(),
                              coordName.c_str());
   } else if (name == "SingleIntervalGradientColorizer") {
     auto startName =
         uniformHandler()->addUniform("start", UniformFormat::Float4, ShaderStage::Fragment);
     auto endName =
         uniformHandler()->addUniform("end", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = FP_SingleIntervalGradientColorizer(%s, %s, %s);", output.c_str(),
+    fragBuilder->codeAppendf("%s = TGFX_SingleIntervalGradientColorizer(%s, %s, %s);", output.c_str(),
                              input.empty() ? "vec4(1.0)" : input.c_str(), startName.c_str(),
                              endName.c_str());
   } else if (name == "RadialGradientLayout") {
     auto& coordVar = transformedCoordVars[transformedCoordVarsIdx];
     auto coordName = fragBuilder->emitPerspTextCoord(coordVar);
-    fragBuilder->codeAppendf("%s = FP_RadialGradientLayout(%s);", output.c_str(),
+    fragBuilder->codeAppendf("%s = TGFX_RadialGradientLayout(%s);", output.c_str(),
                              coordName.c_str());
   } else if (name == "DiamondGradientLayout") {
     auto& coordVar = transformedCoordVars[transformedCoordVarsIdx];
     auto coordName = fragBuilder->emitPerspTextCoord(coordVar);
-    fragBuilder->codeAppendf("%s = FP_DiamondGradientLayout(%s);", output.c_str(),
+    fragBuilder->codeAppendf("%s = TGFX_DiamondGradientLayout(%s);", output.c_str(),
                              coordName.c_str());
   } else if (name == "ConicGradientLayout") {
     auto biasName =
@@ -263,26 +300,26 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
         uniformHandler()->addUniform("Scale", UniformFormat::Float, ShaderStage::Fragment);
     auto& coordVar = transformedCoordVars[transformedCoordVarsIdx];
     auto coordName = fragBuilder->emitPerspTextCoord(coordVar);
-    fragBuilder->codeAppendf("%s = FP_ConicGradientLayout(%s, %s, %s);", output.c_str(),
+    fragBuilder->codeAppendf("%s = TGFX_ConicGradientLayout(%s, %s, %s);", output.c_str(),
                              coordName.c_str(), biasName.c_str(), scaleName.c_str());
   } else if (name == "AARectEffect") {
     auto rectName =
         uniformHandler()->addUniform("Rect", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = FP_AARectEffect(%s, %s);", output.c_str(),
+    fragBuilder->codeAppendf("%s = TGFX_AARectEffect(%s, %s);", output.c_str(),
                              input.empty() ? "vec4(1.0)" : input.c_str(), rectName.c_str());
   } else if (name == "ColorMatrixFragmentProcessor") {
     auto matrixName =
         uniformHandler()->addUniform("Matrix", UniformFormat::Float4x4, ShaderStage::Fragment);
     auto vectorName =
         uniformHandler()->addUniform("Vector", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = FP_ColorMatrix(%s, %s, %s);", output.c_str(),
+    fragBuilder->codeAppendf("%s = TGFX_ColorMatrix(%s, %s, %s);", output.c_str(),
                              input.empty() ? "vec4(1.0)" : input.c_str(), matrixName.c_str(),
                              vectorName.c_str());
   } else if (name == "LumaFragmentProcessor") {
     auto krName = uniformHandler()->addUniform("Kr", UniformFormat::Float, ShaderStage::Fragment);
     auto kgName = uniformHandler()->addUniform("Kg", UniformFormat::Float, ShaderStage::Fragment);
     auto kbName = uniformHandler()->addUniform("Kb", UniformFormat::Float, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = FP_Luma(%s, %s, %s, %s);", output.c_str(),
+    fragBuilder->codeAppendf("%s = TGFX_Luma(%s, %s, %s, %s);", output.c_str(),
                              input.empty() ? "vec4(1.0)" : input.c_str(), krName.c_str(),
                              kgName.c_str(), kbName.c_str());
   } else if (name == "DualIntervalGradientColorizer") {
@@ -296,14 +333,14 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
         uniformHandler()->addUniform("bias23", UniformFormat::Float4, ShaderStage::Fragment);
     auto thresholdName =
         uniformHandler()->addUniform("threshold", UniformFormat::Float, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = FP_DualIntervalGradientColorizer(%s, %s, %s, %s, %s, %s);",
+    fragBuilder->codeAppendf("%s = TGFX_DualIntervalGradientColorizer(%s, %s, %s, %s, %s, %s);",
                              output.c_str(), input.empty() ? "vec4(1.0)" : input.c_str(),
                              scale01Name.c_str(), bias01Name.c_str(), scale23Name.c_str(),
                              bias23Name.c_str(), thresholdName.c_str());
   } else if (name == "AlphaThresholdFragmentProcessor") {
     auto thresholdName =
         uniformHandler()->addUniform("Threshold", UniformFormat::Float, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = FP_AlphaThreshold(%s, %s);", output.c_str(),
+    fragBuilder->codeAppendf("%s = TGFX_AlphaThreshold(%s, %s);", output.c_str(),
                              input.empty() ? "vec4(1.0)" : input.c_str(), thresholdName.c_str());
   } else if (name == "TextureGradientColorizer") {
     // TextureGradientColorizer uses one sampler; the sampler handle is at index 0.

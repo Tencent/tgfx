@@ -20,7 +20,9 @@
 
 #include <functional>
 #include <set>
+#include <unordered_map>
 #include <vector>
+#include "gpu/MangledResources.h"
 #include "gpu/SamplerHandle.h"
 #include "gpu/ShaderModuleRegistry.h"
 #include "gpu/glsl/GLSLProgramBuilder.h"
@@ -124,6 +126,21 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
   size_t childCoordVarsOffset(const FragmentProcessor* parent, size_t parentCoordVarsIdx,
                               size_t childIndex) const;
 
+  // ---- Two-pass resource management ----
+
+  struct FPResources {
+    MangledUniforms uniforms;
+    MangledVaryings varyings;
+    MangledSamplers samplers;
+  };
+
+  /**
+   * Pass 1: Register uniforms/samplers for a single FP and its children.
+   * Pushes/pops currentProcessors in the same order as emitModularFragProc.
+   */
+  void registerFPResources(const FragmentProcessor* processor, size_t transformedCoordVarsIdx);
+
+  std::unordered_map<const FragmentProcessor*, FPResources> fpResourceMap_;
   std::set<ShaderModuleID> includedModules;
   // Sampler handles collected during emitModularFragProc, available for emitLeafFPCall.
   std::vector<SamplerHandle> currentTexSamplers;

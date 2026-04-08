@@ -64,7 +64,7 @@ class ConicGradientLayout : public FragmentProcessor {
     result.outputVarName = "color_fp" + std::to_string(fpIndex);
     result.includeFiles = {shaderFunctionFile()};
     auto coord = varyings.getCoordTransform(0);
-    result.statement = "vec4 " + result.outputVarName + " = FP_ConicGradientLayout(" + coord +
+    result.statement = "vec4 " + result.outputVarName + " = TGFX_ConicGradientLayout(" + coord +
                        ", " + uniforms.get("Bias") + ", " + uniforms.get("Scale") + ");";
     return result;
   }

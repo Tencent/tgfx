@@ -72,7 +72,7 @@ class DualIntervalGradientColorizer : public FragmentProcessor {
     result.outputVarName = "color_fp" + std::to_string(fpIndex);
     result.includeFiles = {shaderFunctionFile()};
     auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
-    result.statement = "vec4 " + result.outputVarName + " = FP_DualIntervalGradientColorizer(" +
+    result.statement = "vec4 " + result.outputVarName + " = TGFX_DualIntervalGradientColorizer(" +
                        input + ", " + uniforms.get("scale01") + ", " + uniforms.get("bias01") +
                        ", " + uniforms.get("scale23") + ", " + uniforms.get("bias23") + ", " +
                        uniforms.get("threshold") + ");";

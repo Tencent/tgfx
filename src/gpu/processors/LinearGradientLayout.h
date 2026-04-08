@@ -55,7 +55,7 @@ class LinearGradientLayout : public FragmentProcessor {
     result.includeFiles = {shaderFunctionFile()};
     auto coord = varyings.getCoordTransform(0);
     result.statement =
-        "vec4 " + result.outputVarName + " = FP_LinearGradientLayout(" + coord + ");";
+        "vec4 " + result.outputVarName + " = TGFX_LinearGradientLayout(" + coord + ");";
     return result;
   }
 

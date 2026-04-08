@@ -44,11 +44,18 @@ static const std::string kTypesGLSL = R"GLSL(
 )GLSL";
 
 static const std::string kConstColor = R"GLSL(
-tgfx_float4 FP_ConstColor(tgfx_float4 inputColor, tgfx_float4 u_Color) {
-    tgfx_float4 result = u_Color;
-#if TGFX_CONST_COLOR_INPUT_MODE == 1
+// Copyright (C) 2026 Tencent. All rights reserved.
+// const_color.glsl - ConstColorProcessor modular shader function.
+// Compile switch: TGFX_CC_MODE
+//   0 = Ignore  (output = color)
+//   1 = ModulateRGBA (output = color * inputColor)
+//   2 = ModulateA (output = color * inputColor.a)
+
+vec4 TGFX_ConstColor(vec4 inputColor, vec4 color) {
+    vec4 result = color;
+#if TGFX_CC_MODE == 1
     result *= inputColor;
-#elif TGFX_CONST_COLOR_INPUT_MODE == 2
+#elif TGFX_CC_MODE == 2
     result *= inputColor.a;
 #endif
     return result;
@@ -56,58 +63,86 @@ tgfx_float4 FP_ConstColor(tgfx_float4 inputColor, tgfx_float4 u_Color) {
 )GLSL";
 
 static const std::string kLinearGradientLayout = R"GLSL(
-tgfx_float4 FP_LinearGradientLayout(tgfx_float2 coord) {
+// Copyright (C) 2026 Tencent. All rights reserved.
+// linear_gradient_layout.glsl - LinearGradientLayout modular shader function.
+// Takes a transformed coordinate and outputs the gradient t-value as vec4(t, 1.0, 0.0, 0.0).
+
+vec4 TGFX_LinearGradientLayout(vec2 coord) {
     float t = coord.x + 1.0000000000000001e-05;
-    return tgfx_float4(t, 1.0, 0.0, 0.0);
+    return vec4(t, 1.0, 0.0, 0.0);
 }
 )GLSL";
 
 static const std::string kSingleIntervalGradientColorizer = R"GLSL(
-tgfx_float4 FP_SingleIntervalGradientColorizer(tgfx_float4 inputColor,
-                                                 tgfx_float4 u_start,
-                                                 tgfx_float4 u_end) {
+// Copyright (C) 2026 Tencent. All rights reserved.
+// single_interval_gradient_colorizer.glsl - SingleIntervalGradientColorizer modular shader function.
+// Performs linear interpolation between start and end based on inputColor.x (the t-value).
+
+vec4 TGFX_SingleIntervalGradientColorizer(vec4 inputColor, vec4 start, vec4 end) {
     float t = inputColor.x;
-    return (1.0 - t) * u_start + t * u_end;
+    return (1.0 - t) * start + t * end;
 }
 )GLSL";
 
 static const std::string kRadialGradientLayout = R"GLSL(
-tgfx_float4 FP_RadialGradientLayout(tgfx_float2 coord) {
+// Copyright (C) 2026 Tencent. All rights reserved.
+// radial_gradient_layout.glsl - RadialGradientLayout modular shader function.
+// Takes a transformed coordinate and outputs the gradient t-value as vec4(t, 1.0, 0.0, 0.0).
+
+vec4 TGFX_RadialGradientLayout(vec2 coord) {
     float t = length(coord);
-    return tgfx_float4(t, 1.0, 0.0, 0.0);
+    return vec4(t, 1.0, 0.0, 0.0);
 }
 )GLSL";
 
 static const std::string kDiamondGradientLayout = R"GLSL(
-tgfx_float4 FP_DiamondGradientLayout(tgfx_float2 coord) {
+// Copyright (C) 2026 Tencent. All rights reserved.
+// diamond_gradient_layout.glsl - DiamondGradientLayout modular shader function.
+// Takes a transformed coordinate and outputs the gradient t-value as vec4(t, 1.0, 0.0, 0.0).
+
+vec4 TGFX_DiamondGradientLayout(vec2 coord) {
     float t = max(abs(coord.x), abs(coord.y));
-    return tgfx_float4(t, 1.0, 0.0, 0.0);
+    return vec4(t, 1.0, 0.0, 0.0);
 }
 )GLSL";
 
 static const std::string kConicGradientLayout = R"GLSL(
-tgfx_float4 FP_ConicGradientLayout(tgfx_float2 coord, float u_Bias, float u_Scale) {
+// Copyright (C) 2026 Tencent. All rights reserved.
+// conic_gradient_layout.glsl - ConicGradientLayout modular shader function.
+// Takes a transformed coordinate + bias/scale uniforms, outputs gradient t-value.
+
+vec4 TGFX_ConicGradientLayout(vec2 coord, float bias, float scale) {
     float angle = atan(-coord.y, -coord.x);
-    float t = ((angle * 0.15915494309180001 + 0.5) + u_Bias) * u_Scale;
-    return tgfx_float4(t, 1.0, 0.0, 0.0);
+    float t = ((angle * 0.15915494309180001 + 0.5) + bias) * scale;
+    return vec4(t, 1.0, 0.0, 0.0);
 }
 )GLSL";
 
 static const std::string kAARectEffect = R"GLSL(
-tgfx_float4 FP_AARectEffect(tgfx_float4 inputColor, tgfx_float4 u_Rect) {
-    tgfx_float4 dists4 = clamp(tgfx_float4(1.0, 1.0, -1.0, -1.0) *
-                                (gl_FragCoord.xyxy - u_Rect), 0.0, 1.0);
-    tgfx_float2 dists2 = dists4.xy + dists4.zw - 1.0;
+// Copyright (C) 2026 Tencent. All rights reserved.
+// aa_rect_effect.glsl - AARectEffect modular shader function.
+// Computes anti-aliased rectangle coverage using gl_FragCoord.
+// rect = vec4(left, top, right, bottom) outset by 0.5 for AA math.
+
+vec4 TGFX_AARectEffect(vec4 inputColor, vec4 rect) {
+    vec4 dists4 = clamp(vec4(1.0, 1.0, -1.0, -1.0) *
+                        (gl_FragCoord.xyxy - rect), 0.0, 1.0);
+    vec2 dists2 = dists4.xy + dists4.zw - 1.0;
     float coverage = dists2.x * dists2.y;
     return inputColor * coverage;
 }
 )GLSL";
 
 static const std::string kColorMatrix = R"GLSL(
-tgfx_float4 FP_ColorMatrix(tgfx_float4 inputColor, mat4 u_Matrix, tgfx_float4 u_Vector) {
-    tgfx_float4 unpremul = tgfx_float4(inputColor.rgb / max(inputColor.a, 9.9999997473787516e-05),
-                                         inputColor.a);
-    tgfx_float4 result = u_Matrix * unpremul + u_Vector;
+// Copyright (C) 2026 Tencent. All rights reserved.
+// color_matrix.glsl - ColorMatrixFragmentProcessor modular shader function.
+// Applies a 4x4 color matrix + offset vector to the input color.
+// Input is unpremultiplied before matrix multiply, then re-premultiplied.
+
+vec4 TGFX_ColorMatrix(vec4 inputColor, mat4 matrix, vec4 vector) {
+    vec4 unpremul = vec4(inputColor.rgb / max(inputColor.a, 9.9999997473787516e-05),
+                         inputColor.a);
+    vec4 result = matrix * unpremul + vector;
     result = clamp(result, 0.0, 1.0);
     result.rgb *= result.a;
     return result;
@@ -115,35 +150,47 @@ tgfx_float4 FP_ColorMatrix(tgfx_float4 inputColor, mat4 u_Matrix, tgfx_float4 u_
 )GLSL";
 
 static const std::string kLuma = R"GLSL(
-tgfx_float4 FP_Luma(tgfx_float4 inputColor, float u_Kr, float u_Kg, float u_Kb) {
-    float luma = dot(inputColor.rgb, tgfx_float3(u_Kr, u_Kg, u_Kb));
-    return tgfx_float4(luma);
+// Copyright (C) 2026 Tencent. All rights reserved.
+// luma.glsl - LumaFragmentProcessor modular shader function.
+// Converts input color to luminance using configurable coefficients.
+
+vec4 TGFX_Luma(vec4 inputColor, float kr, float kg, float kb) {
+    float luma = dot(inputColor.rgb, vec3(kr, kg, kb));
+    return vec4(luma);
 }
 )GLSL";
 
 static const std::string kDualIntervalGradientColorizer = R"GLSL(
-tgfx_float4 FP_DualIntervalGradientColorizer(tgfx_float4 inputColor,
-    tgfx_float4 u_scale01, tgfx_float4 u_bias01,
-    tgfx_float4 u_scale23, tgfx_float4 u_bias23, float u_threshold) {
+// Copyright (C) 2026 Tencent. All rights reserved.
+// dual_interval_gradient_colorizer.glsl - DualIntervalGradientColorizer modular shader function.
+// Performs piecewise linear interpolation across two intervals split by a threshold.
+
+vec4 TGFX_DualIntervalGradientColorizer(vec4 inputColor,
+    vec4 scale01, vec4 bias01,
+    vec4 scale23, vec4 bias23, float threshold) {
     float t = inputColor.x;
-    tgfx_float4 scale, bias;
-    if (t < u_threshold) {
-        scale = u_scale01;
-        bias = u_bias01;
+    vec4 scale, bias;
+    if (t < threshold) {
+        scale = scale01;
+        bias = bias01;
     } else {
-        scale = u_scale23;
-        bias = u_bias23;
+        scale = scale23;
+        bias = bias23;
     }
-    return tgfx_float4(t * scale + bias);
+    return vec4(t * scale + bias);
 }
 )GLSL";
 
 static const std::string kAlphaThreshold = R"GLSL(
-tgfx_float4 FP_AlphaThreshold(tgfx_float4 inputColor, float u_Threshold) {
-    tgfx_float4 result = tgfx_float4(0.0);
+// Copyright (C) 2026 Tencent. All rights reserved.
+// alpha_threshold.glsl - AlphaThresholdFragmentProcessor modular shader function.
+// Applies binary alpha thresholding: alpha becomes 0 or 1 based on threshold comparison.
+
+vec4 TGFX_AlphaThreshold(vec4 inputColor, float threshold) {
+    vec4 result = vec4(0.0);
     if (inputColor.a > 0.0) {
         result.rgb = inputColor.rgb / inputColor.a;
-        result.a = step(u_Threshold, inputColor.a);
+        result.a = step(threshold, inputColor.a);
         result = clamp(result, 0.0, 1.0);
     }
     return result;
@@ -151,18 +198,29 @@ tgfx_float4 FP_AlphaThreshold(tgfx_float4 inputColor, float u_Threshold) {
 )GLSL";
 
 static const std::string kTextureGradientColorizer = R"GLSL(
-tgfx_float4 FP_TextureGradientColorizer(tgfx_float4 inputColor, sampler2D u_Sampler) {
-    tgfx_float2 coord = tgfx_float2(inputColor.x, 0.5);
-    return texture(u_Sampler, coord);
+// Copyright (C) 2026 Tencent. All rights reserved.
+// texture_gradient_colorizer.glsl - TextureGradientColorizer modular shader function.
+// Samples a 1D gradient texture using the t-value from inputColor.x.
+
+vec4 TGFX_TextureGradientColorizer(vec4 inputColor, sampler2D gradientSampler) {
+    vec2 coord = vec2(inputColor.x, 0.5);
+    return texture(gradientSampler, coord);
 }
 )GLSL";
 
 static const std::string kDeviceSpaceTextureEffect = R"GLSL(
-tgfx_float4 FP_DeviceSpaceTextureEffect(tgfx_float4 inputColor, sampler2D u_Sampler,
-                                          mat3 u_DeviceCoordMatrix) {
-    tgfx_float3 deviceCoord = u_DeviceCoordMatrix * tgfx_float3(gl_FragCoord.xy, 1.0);
-    tgfx_float4 color = texture(u_Sampler, deviceCoord.xy);
-#if TGFX_DST_IS_ALPHA_ONLY
+// Copyright (C) 2026 Tencent. All rights reserved.
+// device_space_texture_effect.glsl - DeviceSpaceTextureEffect modular shader function.
+// Samples a texture using device-space coordinates (gl_FragCoord) transformed by a matrix.
+// Compile switch: TGFX_DSTE_ALPHA_ONLY
+//   0 = output premultiplied color (color * color.a)
+//   1 = output alpha modulated by inputColor (color.a * inputColor)
+
+vec4 TGFX_DeviceSpaceTextureEffect(vec4 inputColor, sampler2D textureSampler,
+                                    mat3 deviceCoordMatrix) {
+    vec3 deviceCoord = deviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
+    vec4 color = texture(textureSampler, deviceCoord.xy);
+#if TGFX_DSTE_ALPHA_ONLY
     return color.a * inputColor;
 #else
     return color * color.a;

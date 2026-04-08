@@ -55,7 +55,7 @@ class RadialGradientLayout : public FragmentProcessor {
     result.includeFiles = {shaderFunctionFile()};
     auto coord = varyings.getCoordTransform(0);
     result.statement =
-        "vec4 " + result.outputVarName + " = FP_RadialGradientLayout(" + coord + ");";
+        "vec4 " + result.outputVarName + " = TGFX_RadialGradientLayout(" + coord + ");";
     return result;
   }
 

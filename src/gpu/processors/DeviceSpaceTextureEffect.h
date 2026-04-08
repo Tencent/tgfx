@@ -70,7 +70,7 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
     result.outputVarName = "color_fp" + std::to_string(fpIndex);
     result.includeFiles = {shaderFunctionFile()};
     auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
-    result.statement = "vec4 " + result.outputVarName + " = FP_DeviceSpaceTextureEffect(" + input +
+    result.statement = "vec4 " + result.outputVarName + " = TGFX_DeviceSpaceTextureEffect(" + input +
                        ", " + samplers.getByIndex(0) + ", " + uniforms.get("DeviceCoordMatrix") +
                        ");";
     return result;

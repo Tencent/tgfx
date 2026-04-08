@@ -59,7 +59,7 @@ class SingleIntervalGradientColorizer : public FragmentProcessor {
     result.outputVarName = "color_fp" + std::to_string(fpIndex);
     result.includeFiles = {shaderFunctionFile()};
     auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
-    result.statement = "vec4 " + result.outputVarName + " = FP_SingleIntervalGradientColorizer(" +
+    result.statement = "vec4 " + result.outputVarName + " = TGFX_SingleIntervalGradientColorizer(" +
                        input + ", " + uniforms.get("start") + ", " + uniforms.get("end") + ");";
     return result;
   }
