@@ -77,7 +77,5 @@ class ClampedGradientEffect : public FragmentProcessor {
                              input.empty() ? "vec4(1.0)" : input.c_str());
     return true;
   }
-
-  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

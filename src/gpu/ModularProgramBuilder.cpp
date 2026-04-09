@@ -91,11 +91,6 @@ void ModularProgramBuilder::emitModularFragProcessors(std::string* color, std::s
   }
 }
 
-// Unused for now — reserved for future two-pass optimization.
-void ModularProgramBuilder::registerFPResources(const FragmentProcessor* /*processor*/,
-                                                size_t /*transformedCoordVarsIdx*/) {
-}
-
 std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* processor,
                                                        size_t transformedCoordVarsIdx,
                                                        const std::string& input,

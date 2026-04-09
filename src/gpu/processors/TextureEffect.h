@@ -167,7 +167,5 @@ class TextureEffect : public FragmentProcessor {
   Point alphaStart = {};
   CoordTransform coordTransform;
   std::optional<Rect> subset = std::nullopt;
-
-  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

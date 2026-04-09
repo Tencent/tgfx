@@ -75,7 +75,5 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
                        uniforms.get("DeviceCoordMatrix") + ");";
     return result;
   }
-
-  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

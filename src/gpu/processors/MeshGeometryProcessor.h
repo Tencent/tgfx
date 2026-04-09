@@ -70,8 +70,6 @@ class MeshGeometryProcessor : public GeometryProcessor {
   bool hasCoverage = false;
   PMColor commonColor = {};
   Matrix viewMatrix = {};
-
-  friend class ModularProgramBuilder;
 };
 
 }  // namespace tgfx

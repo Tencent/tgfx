@@ -188,7 +188,5 @@ class GeometryProcessor : public Processor {
   std::vector<Attribute> attributes = {};
   std::vector<Attribute> _instanceAttributes = {};
   size_t textureSamplerCount = 0;
-
-  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

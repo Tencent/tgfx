@@ -64,7 +64,5 @@ class DefaultGeometryProcessor : public GeometryProcessor {
   AAType aa = AAType::None;
   Matrix viewMatrix = {};
   Matrix uvMatrix = {};
-
-  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

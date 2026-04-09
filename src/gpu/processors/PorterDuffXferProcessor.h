@@ -58,7 +58,5 @@ class PorterDuffXferProcessor : public XferProcessor {
 
   BlendMode blendMode = BlendMode::SrcOver;
   DstTextureInfo dstTextureInfo = {};
-
-  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

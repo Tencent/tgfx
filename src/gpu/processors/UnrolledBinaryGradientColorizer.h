@@ -148,7 +148,5 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
       uniforms.add(uniformName, mangledName);
     }
   }
-
-  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

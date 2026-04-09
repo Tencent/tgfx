@@ -20,7 +20,6 @@
 
 #include <functional>
 #include <set>
-#include <unordered_map>
 #include <vector>
 #include "gpu/MangledResources.h"
 #include "gpu/SamplerHandle.h"
@@ -89,21 +88,12 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
   void emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage) override;
   void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn) override;
 
-  // ---- Two-pass resource management ----
-
   struct FPResources {
     MangledUniforms uniforms;
     MangledVaryings varyings;
     MangledSamplers samplers;
   };
 
-  /**
-   * Pass 1: Register uniforms/samplers for a single FP and its children.
-   * Pushes/pops currentProcessors in the same order as emitModularFragProc.
-   */
-  void registerFPResources(const FragmentProcessor* processor, size_t transformedCoordVarsIdx);
-
-  std::unordered_map<const FragmentProcessor*, FPResources> fpResourceMap_;
   std::set<ShaderModuleID> includedModules;
   // Sampler handles collected during emitModularFragProc, available for emitLeafFPCall.
   std::vector<SamplerHandle> currentTexSamplers;

@@ -70,7 +70,5 @@ class NonAARRectGeometryProcessor : public GeometryProcessor {
   int height = 1;
   bool stroke = false;
   std::optional<PMColor> commonColor = std::nullopt;
-
-  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

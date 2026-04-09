@@ -81,7 +81,5 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
   std::optional<PMColor> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
   bool hasSubset = false;
-
-  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

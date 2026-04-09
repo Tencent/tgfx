@@ -72,7 +72,5 @@ class ConstColorProcessor : public FragmentProcessor {
                        ");";
     return result;
   }
-
-  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

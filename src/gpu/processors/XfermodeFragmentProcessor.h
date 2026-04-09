@@ -72,7 +72,5 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
   std::string shaderFunctionFile() const override {
     return "fragment/xfermode.frag";
   }
-
-  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

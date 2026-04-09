@@ -70,8 +70,6 @@ class HairlineLineGeometryProcessor : public GeometryProcessor {
 
   Attribute position = {};
   Attribute edgeDistance = {};
-
-  friend class ModularProgramBuilder;
 };
 
 }  // namespace tgfx
