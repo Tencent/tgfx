@@ -16,8 +16,8 @@
 #define TGFX_TE_TEXTURE_MODE 0
 #endif
 
-#ifndef TGFX_SAMPLER_TYPE
-#define TGFX_SAMPLER_TYPE sampler2D
+#ifndef TGFX_TE_SAMPLER_TYPE
+#define TGFX_TE_SAMPLER_TYPE sampler2D
 #endif
 
 vec2 TGFX_TE_ClampCoord(vec2 coord
@@ -41,7 +41,7 @@ vec2 TGFX_TE_ClampCoord(vec2 coord
 #if TGFX_TE_TEXTURE_MODE == 0
 
 // RGBA path
-vec4 TGFX_TextureEffect(vec4 inputColor, vec2 texCoord, TGFX_SAMPLER_TYPE textureSampler
+vec4 TGFX_TextureEffect(vec4 inputColor, vec2 texCoord, TGFX_TE_SAMPLER_TYPE textureSampler
 #ifdef TGFX_TE_SUBSET
     , vec4 subset
 #endif
@@ -83,7 +83,7 @@ vec4 TGFX_TextureEffect(vec4 inputColor, vec2 texCoord, TGFX_SAMPLER_TYPE textur
 
 // I420 YUV path - 3 separate planes (Y, U, V)
 vec4 TGFX_TextureEffect(vec4 inputColor, vec2 texCoord,
-    TGFX_SAMPLER_TYPE samplerY, TGFX_SAMPLER_TYPE samplerU, TGFX_SAMPLER_TYPE samplerV,
+    TGFX_TE_SAMPLER_TYPE samplerY, TGFX_TE_SAMPLER_TYPE samplerU, TGFX_TE_SAMPLER_TYPE samplerV,
     mat3 colorConversion
 #ifdef TGFX_TE_SUBSET
     , vec4 subset
@@ -143,7 +143,7 @@ vec4 TGFX_TextureEffect(vec4 inputColor, vec2 texCoord,
 
 // NV12 YUV path - 2 planes (Y, UV interleaved)
 vec4 TGFX_TextureEffect(vec4 inputColor, vec2 texCoord,
-    TGFX_SAMPLER_TYPE samplerY, TGFX_SAMPLER_TYPE samplerUV,
+    TGFX_TE_SAMPLER_TYPE samplerY, TGFX_TE_SAMPLER_TYPE samplerUV,
     mat3 colorConversion
 #ifdef TGFX_TE_SUBSET
     , vec4 subset

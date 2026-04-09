@@ -81,7 +81,7 @@ class TextureEffect : public FragmentProcessor {
     }
     auto textureView = getTextureView();
     if (textureView && textureView->getTexture()->type() == TextureType::Rectangle) {
-      macros.define("TGFX_SAMPLER_TYPE", "sampler2DRect");
+      macros.define("TGFX_TE_SAMPLER_TYPE", "sampler2DRect");
     }
   }
 

@@ -31,8 +31,8 @@
 #define TGFX_TTE_MODE_Y 0
 #endif
 
-#ifndef TGFX_SAMPLER_TYPE
-#define TGFX_SAMPLER_TYPE sampler2D
+#ifndef TGFX_TTE_SAMPLER_TYPE
+#define TGFX_TTE_SAMPLER_TYPE sampler2D
 #endif
 
 // Helper: does mode require unorm coord?
@@ -58,7 +58,7 @@
 #define TGFX_TTE_LINEAR_REPEAT_X (TGFX_TTE_MODE_X == 3 || TGFX_TTE_MODE_X == 4)
 #define TGFX_TTE_LINEAR_REPEAT_Y (TGFX_TTE_MODE_Y == 3 || TGFX_TTE_MODE_Y == 4)
 
-vec4 TGFX_TiledTextureEffect(vec4 inputColor, vec2 texCoord, TGFX_SAMPLER_TYPE textureSampler
+vec4 TGFX_TiledTextureEffect(vec4 inputColor, vec2 texCoord, TGFX_TTE_SAMPLER_TYPE textureSampler
 #ifdef TGFX_TTE_HAS_SUBSET
     , vec4 subset
 #endif

@@ -114,7 +114,7 @@ class TiledTextureEffect : public FragmentProcessor {
       macros.define("TGFX_TTE_PERSPECTIVE");
     }
     if (textureView->getTexture()->type() == TextureType::Rectangle) {
-      macros.define("TGFX_SAMPLER_TYPE", "sampler2DRect");
+      macros.define("TGFX_TTE_SAMPLER_TYPE", "sampler2DRect");
     }
   }
 
