@@ -151,12 +151,11 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
 
   // Collect texture samplers from FP hierarchy (same as legacy path).
   // Skip for containers that recursively call emitModularFragProc() for children —
-  // each child will collect its own samplers.
-  // ClampedGradientEffect keeps collection because it manages children's samplers internally.
+  // each child will collect its own samplers when entering emitModularFragProc.
   auto name = processor->name();
   bool skipSamplerCollection =
-      (name == "ComposeFragmentProcessor" || name == "XfermodeFragmentProcessor" ||
-       name == "GaussianBlur1DFragmentProcessor");
+      (name == "ComposeFragmentProcessor" || name == "ClampedGradientEffect" ||
+       name == "GaussianBlur1DFragmentProcessor" || name == "XfermodeFragmentProcessor");
   if (!skipSamplerCollection) {
     currentTexSamplers.clear();
     FragmentProcessor::Iter fpIter(processor);
@@ -180,12 +179,8 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
   if (processor->emitContainerCode(fragmentShaderBuilder(), uniformHandler(), input, output,
                                    transformedCoordVarsIdx, emitChildCallback)) {
     // Container handled itself.
-  } else if (name == "ClampedGradientEffect") {
-    emitClampedGradientEffect(processor, transformedCoordVarsIdx, input, output);
   } else if (name == "XfermodeFragmentProcessor") {
     emitXfermodeFragmentProcessor(processor, transformedCoordVarsIdx, input, output);
-  } else if (name == "GaussianBlur1DFragmentProcessor") {
-    emitGaussianBlur1DFragmentProcessor(processor, transformedCoordVarsIdx, input, output);
   } else if (HasModularModule(processor) || name == "UnrolledBinaryGradientColorizer" ||
              name == "TextureEffect" || name == "TiledTextureEffect") {
     emitLeafFPCall(processor, transformedCoordVarsIdx, input, output, coordTransformFunc);
