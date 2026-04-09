@@ -4416,9 +4416,83 @@ emitModularFragProc()
 |------|--------|------|
 | `TGFX_USE_MODULAR_SHADERS=ON` | 419 | 全部通过 |
 
-#### 仍需 legacy emitCode() fallback 的 FP（2 个）
+#### 仍需 legacy emitCode() fallback 的 FP（~~2 个~~ 0 个）
 
-| FP | 原因 | 后续方案 |
-|----|------|---------|
-| **XfermodeFragmentProcessor** | name() 返回动态后缀名（"- two/dst/src"）不匹配 registry key；emitContainerCode 实现因 sampler 收集时序差异导致 34 个测试失败 | 需深入调试 emitContainerCode 中子 FP 的 sampler 分配与 legacy emitChild 路径的差异 |
-| **ColorSpaceXformEffect** | emitCode 动态生成 transfer function GLSL 函数（skcms_TFType → pow/PQ/HLG 公式），依赖 ShaderBuilder::addFunction() + getMangledFunctionName() 机制，无法简单提取为静态 .glsl | 需要将 transfer function 公式提取为参数化 .glsl 函数，用宏选择公式类型（sRGBish/PQish/HLGish/HLGinvish） |
+> 已在 17.8 Phase B 中全部消除。
+
+---
+
+### 17.8 Phase B 实施结果记录
+
+> 2026-04-09 完成，共 4 个 commit。目标：消除 emitLeafFPCall 中的 legacy emitCode() fallback，使所有 FP 走多态路径。
+
+#### 完成的工作
+
+| Commit | 变更文件数 | 说明 |
+|--------|-----------|------|
+| `5deb6fc2` | 2 | 修复 DeviceSpaceTextureEffect .glsl 中 alpha-only 纹理采样 bug（`color.a` → `color.r`） |
+| `c95ff25e` | 5 | 修复 TGFX_SAMPLER_TYPE 宏冲突：TextureEffect 改用 `TGFX_TE_SAMPLER_TYPE`，TiledTextureEffect 改用 `TGFX_TTE_SAMPLER_TYPE` |
+| `e999c9b4` | 3 | XfermodeFragmentProcessor 实现 emitContainerCode，emitChild callback 使用 legacy-compatible 机制 |
+| `3101973d` | 4 | ColorSpaceXformEffect 实现 emitContainerCode + 修复 AlphaStep registry key + 移除 legacy fallback |
+
+#### 解决的关键架构问题
+
+**问题 1：容器 FP 的 emitChild callback 中子 FP 的 sampler scope 不一致**
+
+- **根因**：之前的 emitChild callback 递归调用 emitModularFragProc，子 FP 在自己 scope 下重新收集 sampler（名字 mangle 后缀不同于父 scope）。但 OpenGL 的 sampler uniform location 查找依赖名字匹配。
+- **解决方案**：emitChild callback 改用 legacy-compatible 机制——在容器 FP scope 下**一次性收集整个子树的 sampler**，callback 内部通过 `TextureSamplers::childInputs()` 偏移切片传递给子 FP 的 `emitCode(EmitArgs)`。
+
+改造后的 emitChild callback 关键流程：
+```
+emitModularFragProc(containerFP)
+├── 收集整个子树的 sampler（在 containerFP scope 下）
+├── 构造 TransformedCoordVars 和 TextureSamplers
+├── emitContainerCode(callback)
+│   └── callback(child):
+│       ├── onBeforeChildProcEmitCode(child)
+│       ├── childInputs(childIndex) → 获取子 FP 的 sampler/coord 切片
+│       ├── child->emitCode(EmitArgs) → legacy 路径生成子 FP 的 GLSL
+│       └── onAfterChildProcEmitCode()
+```
+
+**问题 2：同一 Program 中同类型 FP 的宏冲突**
+
+- **根因**：TextureEffect 和 TiledTextureEffect 都使用 `TGFX_SAMPLER_TYPE` 宏，当两者同时出现在一个 Xfermode 的子 FP 中时，第一个 FP 的宏值覆盖第二个。
+- **解决方案**：宏名加 Processor 前缀（`TGFX_TE_SAMPLER_TYPE` / `TGFX_TTE_SAMPLER_TYPE`），符合设计文档 3.3 节规范。
+
+**问题 3：AlphaThresholdFragmentProcessor 的 name() 与 registry key 不匹配**
+
+- **根因**：`name()` 返回 `"AlphaStepFragmentProcessor"` 但 registry 中注册的 key 是 `"AlphaThresholdFragmentProcessor"`。
+- **解决方案**：修正 registry key 为 `"AlphaStepFragmentProcessor"`。
+
+**问题 4：DeviceSpaceTextureEffect .glsl 中 alpha-only 纹理采样错误**
+
+- **根因**：Alpha-only 纹理（R8 格式）在 OpenGL 中 `texture()` 返回 `(R, 0, 0, 1)`，legacy 路径通过 `appendTextureLookup()` 自动加 `.rrrr` swizzle，但 .glsl 模块中直接用 `color.a`（= 1.0，永远为 1）。
+- **解决方案**：改为 `color.r`。
+
+#### 改造后的最终分派架构
+
+```
+emitModularFragProc()
+├── 收集整个子树的 sampler（在当前 FP scope 下）
+├── emitContainerCode() 多态  ← 所有容器 FP + ColorSpaceXformEffect
+│   └── emitChild callback（legacy-compatible EmitArgs + emitCode）
+└── emitLeafFPCall()          ← 16 个叶子 FP（全部在 ShaderModuleRegistry）
+    └── buildCallStatement() 多态路径（无 legacy fallback）
+```
+
+**所有 FP 的处理路径**：
+
+| FP 类别 | FP 列表 | 路径 |
+|---------|--------|------|
+| 叶子 FP（16 个） | ConstColor、LinearGradientLayout、SingleIntervalGradientColorizer、RadialGradientLayout、DiamondGradientLayout、ConicGradientLayout、AARectEffect、ColorMatrix、Luma、DualIntervalGradientColorizer、AlphaStep、TextureGradientColorizer、DeviceSpaceTextureEffect、TextureEffect、TiledTextureEffect、UnrolledBinaryGradientColorizer | `buildCallStatement()` + .glsl 模块 |
+| 容器 FP（4 个） | ComposeFragmentProcessor、ClampedGradientEffect、GaussianBlur1DFragmentProcessor、XfermodeFragmentProcessor | `emitContainerCode()` + legacy emitChild callback |
+| 特殊 FP（1 个） | ColorSpaceXformEffect | `emitContainerCode()`（直接调用 appendColorGamutXform） |
+
+**Legacy emitCode() fallback**：已从 emitLeafFPCall 中完全移除（替换为 DEBUG_ASSERT）。
+
+#### 验证结果
+
+| 配置 | 测试数 | 结果 |
+|------|--------|------|
+| `TGFX_USE_MODULAR_SHADERS=ON` | 419 | 全部通过 |
