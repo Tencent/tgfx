@@ -40,10 +40,11 @@ class Device {
   }
 
   /**
-   * Locks the rendering context associated with this device, if another thread has already locked
+   * Locks the rendering context associated with this device. If another thread has already locked
    * the device by lockContext(), a call to lockContext() will block execution until the device
-   * is available. The returned context can be used to draw graphics. A nullptr is returned If the
-   * context can not be locked on the calling thread, and leaves the device unlocked.
+   * is available. The returned context can be used to draw graphics. A nullptr is returned if the
+   * context cannot be locked on the calling thread (e.g., the GPU context has been permanently lost
+   * due to a GPU reset), and leaves the device unlocked.
    */
   Context* lockContext();
 
@@ -58,6 +59,7 @@ class Device {
   GPU* _gpu = nullptr;
   Context* context = nullptr;
   std::weak_ptr<Device> weakThis;
+  bool _contextLost = false;
 
   explicit Device(std::unique_ptr<GPU> gpu);
   virtual bool onLockContext();

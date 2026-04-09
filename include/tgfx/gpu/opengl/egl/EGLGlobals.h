@@ -44,5 +44,6 @@ class EGLGlobals {
   EGLConfig pbufferConfig = nullptr;
   std::vector<EGLint> windowSurfaceAttributes = {};
   std::vector<EGLint> pbufferSurfaceAttributes = {};
+  bool hasContextRobustness = false;
 };
 }  // namespace tgfx

@@ -69,6 +69,12 @@ class GLDevice : public Device {
 
   void releaseAll();
 
+  /**
+   * Marks all registered GLDevice instances as context lost. This is used on EGL platforms where a
+   * GPU reset causes all contexts to become invalid simultaneously.
+   */
+  static void MarkAllContextsLost();
+
   friend class GLContext;
 };
 }  // namespace tgfx
