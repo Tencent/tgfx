@@ -4369,3 +4369,56 @@ Step 6：GL/Metal 运行时编译 / UE RHI 离线预编译
 - **资源声明器**：`emitCode()` 保留 varying/uniform/sampler 声明 + VS 赋值
 
 **不再有**：`fragBuilder->codeAppendf()` 生成 FS 逻辑代码
+
+---
+
+### 17.7 Phase A 实施结果记录
+
+> 2026-04-09 完成，共 2 个 commit。
+
+#### 完成的工作
+
+| Commit | 变更文件数 | 新增/删除行数 | 说明 |
+|--------|-----------|-------------|------|
+| `e96350b4` | 2 | +63/-1097 | 移除 7 个 inline emission 函数、name-based 分派逻辑、helper 函数 |
+| `13a819d7` | 22 | +0/-55 | 移除 20 个不再需要的 friend class 声明、registerFPResources 空桩、fpResourceMap_ |
+
+#### 改造后的分派架构
+
+```
+emitModularFragProc()
+├── emitContainerCode() 多态                   ← 容器 FP（Compose/ClampedGradient/GaussianBlur）
+│   └── emitChild callback → 递归 emitModularFragProc()
+└── (emitContainerCode 返回 false) → sampler 收集 → emitLeafFPCall()
+    ├── ShaderModuleRegistry 中有模块 → buildCallStatement() 多态路径  ← 16 个叶子 FP
+    └── 不在 registry → legacy emitCode() fallback                    ← Xfermode/ColorSpaceXform
+```
+
+#### 移除的 C++ 动态 Shader 拼装代码
+
+| 函数 | 行数 | 替代方案 |
+|------|------|---------|
+| `emitTextureEffect()` | ~120 | TextureEffect.buildCallStatement() + texture_effect.frag.glsl |
+| `emitTiledTextureEffect()` | ~340 | TiledTextureEffect.buildCallStatement() + tiled_texture_effect.frag.glsl |
+| `emitUnrolledBinaryGradientColorizer()` | ~140 | UnrolledBinaryGradientColorizer.buildCallStatement() + unrolled_binary_gradient.frag.glsl |
+| `emitClampedGradientEffect()` | ~106 | ClampedGradientEffect.emitContainerCode() |
+| `emitComposeFragmentProcessor()` | ~16 | ComposeFragmentProcessor.emitContainerCode() |
+| `emitXfermodeFragmentProcessor()` | ~34 | XfermodeFragmentProcessor legacy emitCode() fallback |
+| `emitGaussianBlur1DFragmentProcessor()` | ~32 | GaussianBlur1DFragmentProcessor.emitContainerCode() |
+| 18 个 name-based if-else 分支 | ~180 | ShaderModuleRegistry 统一分派 |
+| Helper 函数 (HasModularModule, IsModularFP, static helpers) | ~30 | 不再需要 |
+
+**净减少**：~1152 行 C++ Shader 拼装代码
+
+#### 验证结果
+
+| 配置 | 测试数 | 结果 |
+|------|--------|------|
+| `TGFX_USE_MODULAR_SHADERS=ON` | 419 | 全部通过 |
+
+#### 仍需 legacy emitCode() fallback 的 FP（2 个）
+
+| FP | 原因 | 后续方案 |
+|----|------|---------|
+| **XfermodeFragmentProcessor** | name() 返回动态后缀名（"- two/dst/src"）不匹配 registry key；emitContainerCode 实现因 sampler 收集时序差异导致 34 个测试失败 | 需深入调试 emitContainerCode 中子 FP 的 sampler 分配与 legacy emitChild 路径的差异 |
+| **ColorSpaceXformEffect** | emitCode 动态生成 transfer function GLSL 函数（skcms_TFType → pow/PQ/HLG 公式），依赖 ShaderBuilder::addFunction() + getMangledFunctionName() 机制，无法简单提取为静态 .glsl | 需要将 transfer function 公式提取为参数化 .glsl 函数，用宏选择公式类型（sRGBish/PQish/HLGish/HLGinvish） |
