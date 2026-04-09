@@ -91,12 +91,19 @@ class DrawTask {
     }));
     auto& tile = tiles.front();
     _tileRect = drawRect.isEmpty() ? tile->getTileRect(tileSize) : drawRect;
+    // For fallback rendering, round to integers to ensure precise pixel mapping with sourceRect.
+    if (!_identityScale) {
+      _tileRect.roundOut();
+    }
     _sourceRect = _tileRect;
     auto offsetX = (tile->sourceX - tile->tileX) * tileSize;
     auto offsetY = (tile->sourceY - tile->tileY) * tileSize;
     _sourceRect.offset(static_cast<float>(offsetX), static_cast<float>(offsetY));
     _tileRect.scale(scale, scale);
-    _tileRect.round();
+    // Round to pixel boundaries for 1:1 mapping; fallback uses linear sampling with float coords.
+    if (_identityScale) {
+      _tileRect.round();
+    }
   }
 };
 
@@ -950,10 +957,16 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
 
   auto screenRect = Rect::MakeWH(surface->width(), surface->height());
   screenRect.offset(-_contentOffset.x, -_contentOffset.y);
-  screenRect.roundOut();
   if (tileRect.contains(screenRect)) {
     return;
   }
+
+  const auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  auto renderBounds = _root->renderBounds;
+  renderBounds.scale(currentZoomScale, currentZoomScale);
+  renderBounds.roundOut();
+  // Clip to render bounds because fallback tiles may extend beyond content due to roundOut.
+  tileRect.intersect(renderBounds);
 
   paint.setColor(_root->backgroundColor());
   auto backgroundRect = GetNonIntersectingRects(screenRect, tileRect);
