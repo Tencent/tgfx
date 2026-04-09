@@ -68,13 +68,7 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
                                   CoordTransformFunc coordTransformFunc = {});
 
   /**
-   * Emits code for ClampedGradientEffect using inline control flow + child module function calls.
-   */
-  void emitClampedGradientEffect(const FragmentProcessor* processor, size_t transformedCoordVarsIdx,
-                                 const std::string& input, const std::string& output);
-
-  /**
-   * Emits a call to a leaf modular FP function (e.g., FP_ConstColor).
+   * Emits a call to a leaf modular FP function via buildCallStatement().
    */
   void emitLeafFPCall(const FragmentProcessor* processor, size_t transformedCoordVarsIdx,
                       const std::string& input, const std::string& output,
@@ -90,41 +84,10 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
    */
   void emitProcessorDefines(const FragmentProcessor* processor);
 
-  // ---- Complex FP inline emission methods ----
-
-  void emitUnrolledBinaryGradientColorizer(const FragmentProcessor* processor,
-                                           const std::string& input, const std::string& output);
-
-  void emitTextureEffect(const FragmentProcessor* processor, size_t transformedCoordVarsIdx,
-                         const std::string& input, const std::string& output,
-                         const CoordTransformFunc& coordTransformFunc = {});
-
-  void emitTiledTextureEffect(const FragmentProcessor* processor, size_t transformedCoordVarsIdx,
-                              const std::string& input, const std::string& output,
-                              const CoordTransformFunc& coordTransformFunc = {});
-
-  // ---- Container FP expansion methods ----
-
-  void emitComposeFragmentProcessor(const FragmentProcessor* processor,
-                                    size_t transformedCoordVarsIdx, const std::string& input,
-                                    const std::string& output);
-
-  void emitXfermodeFragmentProcessor(const FragmentProcessor* processor,
-                                     size_t transformedCoordVarsIdx, const std::string& input,
-                                     const std::string& output);
-
-  void emitGaussianBlur1DFragmentProcessor(const FragmentProcessor* processor,
-                                           size_t transformedCoordVarsIdx, const std::string& input,
-                                           const std::string& output);
-
   // ---- GP/XP override methods ----
 
   void emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage) override;
   void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn) override;
-
-  // Compute the transformedCoordVarsIdx offset for childProcessor(childIndex) within a container FP.
-  size_t childCoordVarsOffset(const FragmentProcessor* parent, size_t parentCoordVarsIdx,
-                              size_t childIndex) const;
 
   // ---- Two-pass resource management ----
 
