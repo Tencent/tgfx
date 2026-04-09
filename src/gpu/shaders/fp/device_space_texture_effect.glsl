@@ -10,7 +10,7 @@ vec4 TGFX_DeviceSpaceTextureEffect(vec4 inputColor, sampler2D textureSampler,
     vec3 deviceCoord = deviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
     vec4 color = texture(textureSampler, deviceCoord.xy);
 #if TGFX_DSTE_ALPHA_ONLY
-    return color.a * inputColor;
+    return color.r * inputColor;
 #else
     return color * color.a;
 #endif
