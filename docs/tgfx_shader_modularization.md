@@ -3905,3 +3905,467 @@ ModularProgramBuilder 处理 100% 的渲染管线，无回退到 GLSLProgramBuil
 | Layer 0 其他后端 | 实现 tgfx_types_ue.glsl / tgfx_types_vulkan.glsl / tgfx_types_metal.glsl | 取决于 UE 后端进度 |
 | tgfx_sampling.glsl | 公共纹理采样抽象层 | 取决于复杂叶子 FP 迁移 |
 | Phase 5 代码清理 | 删除 GLSL*.h/.cpp、移除 emitCode() 虚函数 | 低（依赖所有 FP 完全模块化） |
+
+---
+
+## 17. 原子化技术方案差异分析与改进路线
+
+> 本章对照 `tgfx_shader_atomization_design.md`（以下简称"设计文档"），分析当前实现与目标架构的偏差，并给出逐项改进计划。目标是**完全移除 C++ 代码中运行时动态拼装 Shader 的逻辑**，使所有 Shader 代码以预定义的 `*.glsl` 文件形式存在，支持 UE RHI 离线预编译。
+
+### 17.1 核心架构偏差
+
+#### 偏差 1：缺少两阶段分离架构（FPResourceRegistry）
+
+**设计文档方案**：
+
+```
+阶段 1（emitCode）：声明 varying/uniform/sampler，记录 mangled 名到 FPResourceRegistry
+阶段 2（buildCallStatement）：从 FPResourceRegistry 查询 mangled 名，生成纯函数调用
+```
+
+**当前实现**：
+- `FPResourceRegistry` 不存在
+- `registerFPResources()` 是空桩
+- `MangledResources` 的数据由 ModularProgramBuilder 在遍历时手工构造，而非由 emitCode() 记录
+
+**影响**：ModularProgramBuilder 需要大量分派逻辑来手工构造 mangled 名，无法让 Processor 自描述。这是导致 ModularProgramBuilder.cpp 膨胀到 1257 行的根本原因。
+
+**改进方案**：
+
+1. 实现 `FPResourceRegistry` 类（参考设计文档 12.1 节），包含 `recordUniform()`、`recordVarying()`、`recordSampler()`、`recordCoordTransformVarying()` 方法
+2. 在 `GeometryProcessor::EmitArgs` 和 `FragmentProcessor::EmitArgs` 中新增 `resourceRegistry` 指针字段
+3. 改造各 Processor 的 `emitCode()`：保留 varying/uniform/sampler 声明 + VS codeAppendf 赋值，新增 registry 记录调用，**删除所有 fragBuilder->codeAppendf() 调用**
+4. `buildCallStatement()` 通过 `MangledUniforms(fpRegistry.get(proc))` 获取已 mangled 的名字，生成函数调用语句
+5. ProgramBuilder 持有 `FPResourceRegistry fpRegistry` 成员，贯穿 emitCode() 到 buildCallStatement()
+
+**emitCode() 保留边界（设计文档 12.2 节，作为唯一权威定义）**：
+
+| 类型 | 保留 | 删除 |
+|------|------|------|
+| `varyingHandler->addVarying()` | ✅ 保留，生成 in/out 声明并记录到 registry | — |
+| `uniformHandler->addUniform()` | ✅ 保留，生成 UBO 字段并记录到 registry | — |
+| `uniformHandler->addSampler()` | ✅ 保留，生成 sampler 声明并记录到 registry | — |
+| `varyingHandler->emitAttributes()` | ✅ 保留，生成顶点属性 in 声明 | — |
+| `vertBuilder->codeAppendf()`（varying 赋值） | ✅ 保留，VS 中 `vVarying = aAttribute;` | — |
+| `vertBuilder->emitNormalizedPosition()` | ✅ 保留，写 gl_Position | — |
+| `emitTransforms()` | ✅ 保留，生成 CoordTransform uniform + varying | — |
+| `fragBuilder->codeAppendf()`（任何 FS 逻辑代码） | — | ❌ 全部删除 |
+
+---
+
+#### 偏差 2：GP 和 XP 未走模块化路径
+
+**设计文档方案**：所有 Processor（GP+FP+XP）统一走"函数文件 + 调用链"，GP 和 XP 子类实现 `buildVSCallExpr()`、`buildColorCallExpr()`、`buildCoverageCallExpr()`、`buildXferCallStatement()`。
+
+**当前实现**：
+- 10 个 GP 的 emitCode() 逻辑全部内联到 ModularProgramBuilder.cpp（+424 行）
+- 2 个 XP 的 emitCode() 逻辑全部内联到 ModularProgramBuilder.cpp（+51 行）
+- `buildVSCallExpr()`/`buildColorCallExpr()`/`buildCoverageCallExpr()` 虽已声明，但**无任何 GP 子类实现**
+- `buildXferCallStatement()` 虽已声明，但**无任何 XP 子类实现**
+
+**影响**：GP/XP 的 GLSL 生成逻辑集中在 ModularProgramBuilder，而非分散到各 Processor 子类中自描述。这违背了设计文档的"Processor 自治"原则。
+
+**改进方案**：
+
+1. **GP**：在各 GP 子类中实现 `onBuildShaderMacros()`、`shaderFunctionFile()`、`buildVSCallExpr()`、`buildColorCallExpr()`、`buildCoverageCallExpr()`，GP 的 FS 逻辑已有对应的 `.frag.glsl` 文件（20 个 geometry/ 下的文件），改为通过函数调用使用
+2. **XP**：在 EmptyXferProcessor 和 PorterDuffXferProcessor 中实现 `onBuildShaderMacros()`、`shaderFunctionFile()`、`buildXferCallStatement()`，XP 已有对应的 `.frag.glsl` 文件（2 个 xfer/ 下的文件）
+3. ModularProgramBuilder 的 `emitAndInstallGeoProc()` 和 `emitAndInstallXferProc()` 改为调用 Processor 的虚方法，不再内联 GLSL 生成逻辑
+
+---
+
+#### 偏差 3：ModularProgramBuilder 中的 inline emission 函数
+
+**设计文档方案**：所有叶子 FP（包括 TextureEffect、TiledTextureEffect、UnrolledBinaryGradientColorizer）都有对应的 `.glsl` 文件，通过 `buildCallStatement()` 生成函数调用。
+
+**当前实现**：ModularProgramBuilder 中有 7 个 emit* 辅助函数在 C++ 中动态拼装 GLSL 字符串：
+
+| 函数 | 行数 | 设计文档期望 |
+|------|------|-------------|
+| `emitTextureEffect()` | ~387 | 走 `texture_effect.frag.glsl` + `buildCallStatement()` |
+| `emitTiledTextureEffect()` | ~200 | 走 `tiled_texture_effect.frag.glsl` + `buildCallStatement()` |
+| `emitUnrolledBinaryGradientColorizer()` | ~150 | 走 `unrolled_binary_gradient.frag.glsl` + `buildCallStatement()` |
+| `emitClampedGradientEffect()` | ~80 | 走 `clamped_gradient_effect.frag.glsl` + `emitContainerCode()` |
+| `emitComposeFragmentProcessor()` | ~60 | 内联代码块（合理保留，无独立 .glsl） |
+| `emitXfermodeFragmentProcessor()` | ~70 | 走 `xfermode.frag.glsl` + `emitContainerCode()` |
+| `emitGaussianBlur1DFragmentProcessor()` | ~100 | 走 `gaussian_blur_1d.frag.glsl` + 参数化坐标 |
+
+> 注：`emitTextureEffect()` / `emitTiledTextureEffect()` 的 inline emission 与 .glsl 多态路径存在语义差异，是当前 17 个测试失败的根本原因。
+
+**影响**：这些函数本质上仍是"C++ 运行时动态拼装 Shader"，与项目目标矛盾，且无法被 UE RHI 离线预编译。
+
+**改进方案**：
+
+1. **TextureEffect**（设计文档 2.2、3.4 节）：
+   - `.glsl` 文件已存在（`fragment/texture_effect.frag.glsl`），需按设计文档补充完整的 YUV I420/NV12 路径、RGBAAA 路径
+   - 宏化维度：`TGFX_TE_TEXTURE_MODE`(0/1/2)、`TGFX_TE_YUV_LIMITED_RANGE`、`TGFX_TE_RGBAAA`、`TGFX_TE_ALPHA_ONLY`、`TGFX_TE_SUBSET`、`TGFX_TE_STRICT_CONSTRAINT`、`TGFX_TE_PERSPECTIVE`
+   - 在 TextureEffect 子类实现 `onBuildShaderMacros()` + `buildCallStatement()`
+   - 删除 ModularProgramBuilder::emitTextureEffect()
+   - 恢复 ShaderModuleRegistry 中的 TextureEffect 映射
+
+2. **TiledTextureEffect**（设计文档 2.2 节）：
+   - `.glsl` 文件已存在（`fragment/tiled_texture_effect.frag.glsl`），需补充 9 种 ShaderMode 的完整 `#if` 分支
+   - 宏化维度：`TGFX_TTE_MODE_X`(0-8)、`TGFX_TTE_MODE_Y`(0-8)、`TGFX_TTE_STRICT_CONSTRAINT`、`TGFX_TTE_PERSPECTIVE`、`TGFX_TTE_ALPHA_ONLY`
+   - 枚举常量定义到 `common/tgfx_tiling_modes.glsl.h`
+   - 在 TiledTextureEffect 子类实现 `onBuildShaderMacros()` + `buildCallStatement()`
+   - 删除 ModularProgramBuilder::emitTiledTextureEffect()
+   - 恢复 ShaderModuleRegistry 中的 TiledTextureEffect 映射
+
+3. **UnrolledBinaryGradientColorizer**（设计文档 2.2 节）：
+   - `.glsl` 文件已存在（`fragment/unrolled_binary_gradient.frag.glsl`），需确保 8 层二叉查找的 `#if` 分支完整
+   - 宏化维度：`TGFX_UBGC_INTERVAL_COUNT`(1-8)
+   - 在 UnrolledBinaryGradientColorizer 子类实现 `onBuildShaderMacros()` + `buildCallStatement()`
+   - 删除 ModularProgramBuilder::emitUnrolledBinaryGradientColorizer()
+
+4. **容器 FP（ClampedGradient、Xfermode、GaussianBlur）**：
+   - ClampedGradientEffect：`.glsl` 文件中定义函数，内部直接调用子 FP 的函数（设计文档 3.4 节 clamped_gradient_effect.frag.glsl 示例）
+   - XfermodeFragmentProcessor：`.glsl` 文件已存在，需完善子 FP 调用逻辑
+   - GaussianBlur1DFragmentProcessor：`.glsl` 文件已存在，需将坐标偏移参数化（设计文档建议通过函数参数传递 offset）
+   - 删除 ModularProgramBuilder 中对应的 emit* 函数
+
+5. **ComposeFragmentProcessor**：保留内联代码块（无独立 .glsl 文件，仅做顺序链式调用），但改为通过递归调用子 FP 的 `buildCallStatement()` 实现
+
+---
+
+#### 偏差 4：缺少 common/ 目录和宏常量定义文件
+
+**设计文档方案**（3.5 节）：
+```
+shaders/common/
+├── tgfx_macros.glsl.h          ← 所有宏名的文档注释和默认值
+├── tgfx_tiling_modes.glsl.h    ← TilingMode 枚举常量
+└── tgfx_blend_modes.glsl.h     ← BlendMode 枚举常量
+```
+
+**当前实现**：
+- common/ 目录不存在
+- 枚举常量散落在各 .glsl 文件中或根本未定义
+- TilingMode 9 种模式值仅在 C++ 中存在
+
+**改进方案**：
+
+1. 创建 `src/gpu/shaders/common/` 目录
+2. 创建 `tgfx_tiling_modes.glsl.h`：定义 `TGFX_TILING_NONE`(0) 到 `TGFX_TILING_BORDER_LINEAR`(8) 共 9 个常量，以及辅助宏（如 `TGFX_TILING_USES_SUBSET_X`）
+3. 创建 `tgfx_blend_modes.glsl.h`：定义 PorterDuff blend mode 枚举
+4. 创建 `tgfx_macros.glsl.h`：所有宏名的文档注释和默认值定义，作为 IDE 参考
+
+---
+
+#### 偏差 5：ShaderCallChain 未实现
+
+**设计文档方案**（4.2 节）：`ShaderCallChain` / `ShaderCallNode` 结构化描述"多 Processor 组合的调用链"，提供 `buildIncludes()` 和 `buildMainBody()` 方法。
+
+**当前实现**：调用链生成逻辑分散在 ModularProgramBuilder 的各个分支中，无统一结构。
+
+**改进方案**：
+
+此设计作为可选优化。当偏差 1-4 修复后，ModularProgramBuilder 的核心循环将简化为：
+```
+for each FP: result = fp->buildCallStatement(currentColor, i, u, v, s)
+```
+此时是否引入 ShaderCallChain 取决于代码复杂度。若 ModularProgramBuilder 的 main() 生成逻辑已足够清晰（< 100 行），可不额外引入。
+
+**优先级**：低（可选）
+
+---
+
+#### 偏差 6：宏命名规范不一致
+
+**设计文档方案**（3.3 节）：所有宏名加 Processor 类型前缀防止同一 Program 中的宏名冲突。
+
+```
+TGFX_{Processor缩写}_{特性名}
+
+例：
+  TGFX_GP_ELLIPSE_STROKE       ← EllipseGP 的 stroke 宏
+  TGFX_TE_ALPHA_ONLY           ← TextureEffect 的 alphaOnly 宏
+  TGFX_TTE_MODE_X              ← TiledTextureEffect 的 X 轴 tiling 模式
+  TGFX_CC_MODE                 ← ConstColorProcessor 的 InputMode
+  TGFX_PDXP_DST_TEXTURE_READ   ← PorterDuffXferProcessor 的 dstTexture
+```
+
+**当前实现**：部分宏已有前缀（如 `TGFX_TE_TEXTURE_MODE`），但 GP/XP 的宏命名尚未统一。
+
+**改进方案**：在各 GP/XP 子类实现 `onBuildShaderMacros()` 时，统一按设计文档 2.1-2.3 节的宏名规范命名。
+
+---
+
+### 17.2 可借鉴吸收的关键设计
+
+以下设计来自 `tgfx_shader_atomization_design.md`，当前实现中尚未体现，应在后续迭代中吸收。
+
+#### 设计 1：emitTransforms() 的 Registry 记录（12.1 节）
+
+**需求**：CoordTransform varying（如 `TransformedCoords_0_P1`）的归属追踪——它由 GP 的 `emitTransforms()` 生成，但属于某个 FP。
+
+**方案**：在 `emitTransforms()` 内部调用 `registry->recordCoordTransformVarying(proc, mangledName)`，使 FP 的 `buildCallStatement()` 能通过 `varyings.getCoordTransform(0)` 获取正确的 mangled 名。
+
+**当前问题**：ModularProgramBuilder 通过硬编码的名字构造（`"TransformedCoords_" + index + "_P" + procIndex`）来生成 CoordTransform varying 名，而非从 registry 查询。
+
+---
+
+#### 设计 2：容器 FP 的 childInputs() 机制（4.4.4 节）
+
+**需求**：容器 FP（如 ComposeFragmentProcessor）的 `buildCallStatement()` 需要访问子 FP 的 mangled 资源名。
+
+**方案**：`MangledUniforms::childInputs(childIndex)` 返回子 FP 的资源视图，使容器 FP 可以递归调用 `childFP->buildCallStatement(current, i, cu, cv, cs)`。
+
+**当前问题**：容器 FP 展开逻辑在 ModularProgramBuilder 的 emit* 函数中，通过 friend class 直接访问子 FP 的私有成员，而非通过标准接口查询。
+
+---
+
+#### 设计 3：VS 函数化（12.3 节）
+
+**需求**：VS 的顶点逻辑也需函数化为 `.vert.glsl` 文件中的函数。
+
+**方案**：
+- `.vert.glsl` 函数直接读取全局 `in` 顶点属性，通过 `out` 参数写 varying
+- `buildVSCallExpr()` 生成 VS main() 中的函数调用语句
+- `emitTransforms()` 生成的 CoordTransform varying 赋值继续保留在 `vertBuilder->codeAppendf()` 中
+
+**当前问题**：VS 完全由 ModularProgramBuilder 内联生成，`.vert.glsl` 文件虽然存在（20 个），但未被实际使用。
+
+---
+
+#### 设计 4：GaussianBlur1D 的参数化坐标方案（设计文档 3.4 节）
+
+**需求**：GaussianBlur 的循环结构中，坐标偏移需要动态计算（`coord + offset * float(i)`），当前通过 `CoordTransformFunc` lambda 实现。
+
+**方案**：将坐标偏移提取为 `.glsl` 函数参数（`vec2 baseCoord, vec2 offset, int step`），使 blur 循环可以完整放入 `gaussian_blur_1d.frag.glsl`。
+
+**当前问题**：GaussianBlur 通过 C++ lambda 传递坐标偏移，无法提取为静态 .glsl 文件。
+
+---
+
+#### 设计 5：`onComputeProcessorKey()` 改由宏 hash 驱动（4.3 节）
+
+**设计文档方案**：
+
+```cpp
+void onComputeProcessorKey(BytesKey* bytesKey) const override final {
+    ShaderMacroSet macros;
+    onBuildShaderMacros(macros);
+    macros.writeToKey(bytesKey);
+}
+```
+
+**好处**：消除 `onComputeProcessorKey()` 与 `onBuildShaderMacros()` 之间的不一致风险——同一个宏集合同时决定 Shader 内容和缓存 key。
+
+**当前问题**：两个方法独立实现，存在手动维护一致性的风险。
+
+**改进方案**：在迁移完成后，将各 Processor 的 `onComputeProcessorKey()` 改为调用 `onBuildShaderMacros()` + `writeToKey()`，然后删除原有的手动 key 计算逻辑。
+
+---
+
+#### 设计 6：UE Permutation Domain 映射（7.1-7.3 节）
+
+**设计文档方案**：每个 tgfx `ShaderMacroSet` 中的宏对应一个 UE Permutation 维度：
+- `bool` 宏 → `SHADER_PERMUTATION_BOOL("TGFX_ENABLE_XXX")`
+- `enum` 宏 → `SHADER_PERMUTATION_INT("TGFX_XXX", N+1)`
+
+**好处**：宏化完成后，UE 后端可以直接从宏定义生成 Permutation Domain 定义，实现离线预编译。
+
+**当前问题**：宏化已部分完成（`onBuildShaderMacros()` 已实现），但 GP/XP 的宏化尚未开始，无法生成完整的 UE Permutation。
+
+**改进方案**：作为最终目标，在所有 Processor 的宏化完成后实现 UE Permutation 映射层。
+
+---
+
+#### 设计 7：ColorSpaceXformEffect 缺失
+
+**当前实现**：`ColorSpaceXformEffect` 是唯一完全未模块化的 FP，仍然走 legacy `emitCode()` 路径。
+
+**改进方案**：
+- 提取 `color_space_xform.frag.glsl` 文件
+- 实现 `onBuildShaderMacros()` + `buildCallStatement()`
+- 注册到 ShaderModuleRegistry
+
+---
+
+### 17.3 全量 Processor 宏化维度清单
+
+> 以下清单来自设计文档第 2 章，是各 Processor 需要宏化的编译期分支的完整枚举。在实现各 Processor 的 `onBuildShaderMacros()` 时以此为准。
+
+#### 17.3.1 GeometryProcessor（10 个）
+
+| Processor | 宏名 | C++ 条件 | 变体数 |
+|-----------|------|----------|--------|
+| DefaultGP | `TGFX_GP_DEFAULT_COVERAGE_AA` | `aa == AAType::Coverage` | 2 |
+| QuadPerEdgeAAGP | `TGFX_GP_QUAD_COVERAGE_AA`、`TGFX_GP_QUAD_COMMON_COLOR`、`TGFX_GP_QUAD_UV_MATRIX`、`TGFX_GP_QUAD_SUBSET`、`TGFX_GP_QUAD_SUBSET_MATRIX` | 5 维 | ~24 |
+| AtlasTextGP | `TGFX_GP_ATLAS_COVERAGE_AA`、`TGFX_GP_ATLAS_COMMON_COLOR`、`TGFX_GP_ATLAS_ALPHA_ONLY_TEXTURE` | 3 维 | 8 |
+| EllipseGP | `TGFX_GP_ELLIPSE_STROKE`、`TGFX_GP_ELLIPSE_COMMON_COLOR` | 2 维 | 4 |
+| NonAARRectGP | `TGFX_GP_NONAA_COMMON_COLOR`、`TGFX_GP_NONAA_STROKE` | 2 维 | 4 |
+| HairlineLineGP | `TGFX_GP_HLINE_COVERAGE_AA` | 1 维 | 2 |
+| HairlineQuadGP | `TGFX_GP_HQUAD_COVERAGE_AA` | 1 维 | 2 |
+| RoundStrokeRectGP | `TGFX_GP_RSR_COVERAGE_AA`、`TGFX_GP_RSR_COMMON_COLOR`、`TGFX_GP_RSR_UV_MATRIX` | 3 维 | 8 |
+| MeshGP | `TGFX_GP_MESH_TEX_COORDS`、`TGFX_GP_MESH_VERTEX_COLORS`、`TGFX_GP_MESH_VERTEX_COVERAGE` | 3 维 | 8 |
+| ShapeInstancedGP | `TGFX_GP_SHAPE_COVERAGE_AA` | 1 维 | 2 |
+
+**GP 总变体数**：~64 个有效组合
+
+#### 17.3.2 FragmentProcessor（17 个叶子 + 4 个容器）
+
+| Processor | 宏名 | 变体数 |
+|-----------|------|--------|
+| ConstColorProcessor | `TGFX_CC_MODE`(0/1/2) | 3 |
+| LinearGradientLayout | `TGFX_LGRAD_PERSPECTIVE` | 2 |
+| RadialGradientLayout | `TGFX_RGRAD_PERSPECTIVE` | 2 |
+| ConicGradientLayout | `TGFX_CGRAD_PERSPECTIVE` | 2 |
+| DiamondGradientLayout | `TGFX_DGRAD_PERSPECTIVE` | 2 |
+| SingleIntervalGradientColorizer | — | 1 |
+| DualIntervalGradientColorizer | — | 1 |
+| TextureGradientColorizer | — | 1 |
+| UnrolledBinaryGradientColorizer | `TGFX_UBGC_INTERVAL_COUNT`(1-8) | 8 |
+| TextureEffect | `TGFX_TE_TEXTURE_MODE`(0/1/2)、`TGFX_TE_YUV_LIMITED_RANGE`、`TGFX_TE_RGBAAA`、`TGFX_TE_ALPHA_ONLY`、`TGFX_TE_SUBSET`、`TGFX_TE_STRICT_CONSTRAINT`、`TGFX_TE_PERSPECTIVE` | ~96 |
+| TiledTextureEffect | `TGFX_TTE_MODE_X`(0-8)、`TGFX_TTE_MODE_Y`(0-8)、`TGFX_TTE_STRICT_CONSTRAINT`、`TGFX_TTE_PERSPECTIVE`、`TGFX_TTE_ALPHA_ONLY` | ~200 |
+| DeviceSpaceTextureEffect | `TGFX_DSTE_ALPHA_ONLY` | 2 |
+| AARectEffect | — | 1 |
+| ColorMatrixFragmentProcessor | — | 1 |
+| LumaFragmentProcessor | — | 1 |
+| AlphaThresholdFragmentProcessor | — | 1 |
+| ColorSpaceXformEffect | 待分析 | 待定 |
+
+**容器 FP 不增加变体**：它们的宏由子 FP 决定。
+
+#### 17.3.3 XferProcessor（2 个）
+
+| Processor | 宏名 | 变体数 |
+|-----------|------|--------|
+| EmptyXferProcessor | — | 1 |
+| PorterDuffXferProcessor | `TGFX_PDXP_DST_TEXTURE_READ`、`TGFX_PDXP_COVERAGE_IS_ALPHA` | 4 |
+
+---
+
+### 17.4 改进实施路线
+
+> 以下路线基于设计文档第 9 章的分阶段路径，结合当前实现状态调整。每个阶段完成后必须通过 430/430 测试。
+
+#### Phase A：恢复 TextureEffect/TiledTextureEffect registry 映射 + 修复 17 个测试
+
+**目标**：回到 430/430 全部通过的状态
+
+**任务**：
+- [ ] 恢复 ShaderModuleRegistry 中 TextureEffect、TiledTextureEffect 的映射
+- [ ] 确保 .glsl 多态路径（`buildCallStatement()`）覆盖完整的宏化分支
+- [ ] 验证 ON 路径 430/430 通过
+
+---
+
+#### Phase B：实现 FPResourceRegistry + 改造 emitCode()
+
+**目标**：建立两阶段分离架构
+
+**任务**：
+- [ ] 实现 `FPResourceRegistry` 类
+- [ ] 在 EmitArgs 中注入 registry 指针
+- [ ] 逐个 Processor 改造 emitCode()：保留声明 + 新增 registry 记录 + 删除 fragBuilder->codeAppendf()
+- [ ] 改造 ModularProgramBuilder，从 fpRegistry 查询 mangled 名构造 `buildCallStatement()` 参数
+- [ ] 删除 ModularProgramBuilder 中手工构造 MangledResources 的逻辑
+
+---
+
+#### Phase C：GP 函数化迁移
+
+**目标**：10 个 GP 全部走 .glsl 函数调用路径
+
+**任务**：
+- [ ] 各 GP 子类实现 `onBuildShaderMacros()`（按 17.3.1 节宏表）
+- [ ] 各 GP 子类实现 `buildVSCallExpr()`、`buildColorCallExpr()`、`buildCoverageCallExpr()`
+- [ ] 各 GP 的 `.vert.glsl` / `.frag.glsl` 补充宏化分支（`#ifdef`）
+- [ ] ModularProgramBuilder::emitAndInstallGeoProc() 改为调用 GP 虚方法
+- [ ] 删除 ModularProgramBuilder 中 GP 内联生成代码
+
+---
+
+#### Phase D：XP 函数化迁移
+
+**目标**：2 个 XP 全部走 .glsl 函数调用路径
+
+**任务**：
+- [ ] EmptyXferProcessor 和 PorterDuffXferProcessor 实现 `onBuildShaderMacros()`
+- [ ] 实现 `buildXferCallStatement()`
+- [ ] 提取 AppendMode() blend 逻辑到 `tgfx_blend.glsl`
+- [ ] ModularProgramBuilder::emitAndInstallXferProc() 改为调用 XP 虚方法
+- [ ] 删除 ModularProgramBuilder 中 XP 内联生成代码
+
+---
+
+#### Phase E：复杂叶子 FP 完全 .glsl 化
+
+**目标**：TextureEffect、TiledTextureEffect、UnrolledBinaryGradientColorizer 的 C++ inline emission 全部移除
+
+**任务**：
+- [ ] TextureEffect.frag.glsl 补充完整 YUV/RGBAAA/Subset/Perspective 分支
+- [ ] TiledTextureEffect.frag.glsl 补充 9 种 ShaderMode 的完整 `#if` 分支
+- [ ] UnrolledBinaryGradientColorizer.frag.glsl 确认 8 层二叉查找的 `#if` 分支完整
+- [ ] 创建 `common/tgfx_tiling_modes.glsl.h` 枚举常量文件
+- [ ] 各 FP 实现 `buildCallStatement()`，通过 FPResourceRegistry 获取 mangled 名
+- [ ] 删除 ModularProgramBuilder 中对应的 emit* 函数
+
+---
+
+#### Phase F：容器 FP + ColorSpaceXformEffect 迁移
+
+**目标**：所有 FP 无需 C++ 拼装
+
+**任务**：
+- [ ] ClampedGradientEffect.frag.glsl 实现子 FP 函数调用（设计文档 3.4 节示例）
+- [ ] XfermodeFragmentProcessor.frag.glsl 完善
+- [ ] GaussianBlur1DFragmentProcessor.frag.glsl 参数化坐标偏移
+- [ ] ColorSpaceXformEffect 提取为 .glsl 文件
+- [ ] ComposeFragmentProcessor 改为通过子 FP 的 `buildCallStatement()` 递归组合
+
+---
+
+#### Phase G：清理 + onComputeProcessorKey() 统一
+
+**目标**：移除所有 legacy 代码
+
+**任务**：
+- [ ] 删除所有 GLSL*Processor.cpp 文件（legacy emitCode() 实现）
+- [ ] 移除 Processor 基类的 `emitCode()` 虚函数
+- [ ] 各 Processor 的 `onComputeProcessorKey()` 改为 `onBuildShaderMacros()` + `writeToKey()`
+- [ ] 移除 `TGFX_USE_MODULAR_SHADERS` 编译开关（模块化路径成为唯一路径）
+- [ ] 删除 friend class 依赖
+
+---
+
+### 17.5 与 16.5 节决策的修正
+
+| 原决策 | 修正 | 理由 |
+|--------|------|------|
+| 决策 3：复杂叶子 FP 通过内联生成处理 | **修正**：改为完全 .glsl 化，通过宏分支覆盖所有变体 | 内联生成仍是 C++ 动态拼装，无法被 UE RHI 离线预编译 |
+| 决策 5：GP/XP 通过内联生成处理 | **修正**：改为各子类实现 build*() 虚方法，走 .glsl 函数调用 | 内联集中在 ModularProgramBuilder 违背 Processor 自治原则 |
+| 16.3 节：13 个 .glsl 模块文件 | **扩充**：目标 42+ 个 .glsl 模块文件（已创建），需确保全部被实际使用（非 dead code） | 当前 GP/XP 的 .glsl 文件虽存在但未通过函数调用引用 |
+
+---
+
+### 17.6 最终目标架构（设计文档 8.1 节）
+
+```
+ProgramInfo {GP, FP[0..N], XP}
+          │
+          ▼
+Step 1：遍历所有 Processor，收集宏 → ShaderMacroSet → toPreamble()
+          │
+          ▼
+Step 2：emitCode() 只做 varying/uniform/sampler 声明，记录到 FPResourceRegistry
+          │
+          ▼
+Step 3：后序遍历 FP 树，收集 #include 列表（shaderFunctionFile()）
+          │
+          ▼
+Step 4：buildCallStatement() / buildVSCallExpr() 生成 main() 调用链
+          │
+          ▼
+Step 5：组装最终 Shader：preamble + 声明 + #include + main()
+          │
+          ▼
+Step 6：GL/Metal 运行时编译 / UE RHI 离线预编译
+```
+
+**C++ 层的最终角色**：
+- **宏注入器**：`onBuildShaderMacros()` 声明编译期分支
+- **调用链生成器**：`buildCallStatement()` 生成 `main()` 中的函数调用语句
+- **资源声明器**：`emitCode()` 保留 varying/uniform/sampler 声明 + VS 赋值
+
+**不再有**：`fragBuilder->codeAppendf()` 生成 FS 逻辑代码
