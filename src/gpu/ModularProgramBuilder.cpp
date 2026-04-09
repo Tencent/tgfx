@@ -104,23 +104,9 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
   fragmentShaderBuilder()->codeAppendf("{ // Processor%d : %s\n", processorIndex,
                                        processor->name().c_str());
 
-  // Try polymorphic container dispatch FIRST, before sampler collection.
-  // Container FPs that override emitContainerCode() recursively call emitModularFragProc()
-  // for each child, and each child collects its own samplers on entry.
-  auto emitChildCallback = [this](const FragmentProcessor* child, size_t childCoordIdx,
-                                  const std::string& childInput,
-                                  CoordTransformFunc coordFunc) -> std::string {
-    return emitModularFragProc(child, childCoordIdx, childInput, std::move(coordFunc));
-  };
-  if (processor->emitContainerCode(fragmentShaderBuilder(), uniformHandler(), input, output,
-                                   transformedCoordVarsIdx, emitChildCallback)) {
-    fragmentShaderBuilder()->codeAppend("}");
-    currentProcessors.pop_back();
-    return output;
-  }
-
-  // Not a container FP (or container FP without emitContainerCode override).
-  // Collect texture samplers from this FP's subtree.
+  // Collect texture samplers from this FP's entire subtree FIRST (before any dispatch).
+  // All samplers are declared under the current processor's name-mangle scope,
+  // matching the legacy emitAndInstallFragProc behavior.
   currentTexSamplers.clear();
   FragmentProcessor::Iter fpIter(processor);
   int samplerIndex = 0;
@@ -131,6 +117,67 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
       auto texture = subFP->textureAt(i);
       currentTexSamplers.emplace_back(emitSampler(texture, samplerName));
     }
+  }
+
+  // Try polymorphic container dispatch.
+  // The emitChild callback uses legacy EmitArgs + emitCode to process children,
+  // using the samplers already collected above with childInputs() offset.
+  FragmentProcessor::TransformedCoordVars rootCoords(
+      processor, transformedCoordVarsIdx < transformedCoordVars.size()
+                     ? &transformedCoordVars[transformedCoordVarsIdx]
+                     : nullptr);
+  FragmentProcessor::TextureSamplers rootSamplers(
+      processor, currentTexSamplers.empty() ? nullptr : &currentTexSamplers[0]);
+  auto emitChildCallback = [this, processor, &rootCoords, &rootSamplers](
+                               const FragmentProcessor* child, size_t /*childCoordIdx*/,
+                               const std::string& childInput,
+                               CoordTransformFunc coordFunc) -> std::string {
+    // Find child index within the container processor.
+    size_t childIndex = 0;
+    for (size_t i = 0; i < processor->numChildProcessors(); ++i) {
+      if (processor->childProcessor(i) == child) {
+        childIndex = i;
+        break;
+      }
+    }
+    // Use legacy-style child emission: push child scope, construct EmitArgs
+    // with childInputs() offset, call emitCode.
+    auto fragBuilder = fragmentShaderBuilder();
+    fragBuilder->onBeforeChildProcEmitCode(child);
+    std::string inputName;
+    if (!childInput.empty() && childInput != "vec4(1.0)") {
+      inputName = "_childInput";
+      inputName += programInfo->getMangledSuffix(child);
+      fragBuilder->codeAppendf("vec4 %s = %s;", inputName.c_str(), childInput.c_str());
+    }
+    std::string childOutput;
+    currentProcessors.push_back(child);
+    nameExpression(&childOutput, "output");
+    fragBuilder->codeAppend("{\n");
+    fragBuilder->codeAppendf("// Processor%d : %s\n", programInfo->getProcessorIndex(child),
+                             child->name().c_str());
+    FragmentProcessor::TransformedCoordVars coordVars = rootCoords.childInputs(childIndex);
+    FragmentProcessor::TextureSamplers texSamplers = rootSamplers.childInputs(childIndex);
+    std::function<std::string(std::string_view)> legacyCoordFunc;
+    if (coordFunc) {
+      legacyCoordFunc = [cf = std::move(coordFunc)](std::string_view sv) -> std::string {
+        return cf(std::string(sv));
+      };
+    }
+    FragmentProcessor::EmitArgs childArgs(
+        fragBuilder, uniformHandler(), childOutput, inputName.empty() ? "vec4(1.0)" : inputName,
+        subsetVarName, &coordVars, &texSamplers, std::move(legacyCoordFunc));
+    child->emitCode(childArgs);
+    fragBuilder->codeAppend("}\n");
+    fragBuilder->onAfterChildProcEmitCode();
+    currentProcessors.pop_back();
+    return childOutput;
+  };
+  if (processor->emitContainerCode(fragmentShaderBuilder(), uniformHandler(), input, output,
+                                   transformedCoordVarsIdx, emitChildCallback)) {
+    fragmentShaderBuilder()->codeAppend("}");
+    currentProcessors.pop_back();
+    return output;
   }
 
   // Leaf FP: dispatch via buildCallStatement() polymorphic path.

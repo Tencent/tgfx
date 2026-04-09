@@ -72,5 +72,10 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
   std::string shaderFunctionFile() const override {
     return "fragment/xfermode.frag";
   }
+
+  bool emitContainerCode(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
+                         const std::string& input, const std::string& output,
+                         size_t transformedCoordVarsIdx,
+                         const EmitChildFunc& emitChild) const override;
 };
 }  // namespace tgfx
