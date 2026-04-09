@@ -168,11 +168,6 @@ namespace tgfx {
 #define GL_CONTEXT_LOST 0x300E
 #define GL_INVALID_INDEX 0xFFFFFFFF
 
-// GL_KHR_robustness / GL_EXT_robustness
-#define GL_GUILTY_CONTEXT_RESET 0x8253
-#define GL_INNOCENT_CONTEXT_RESET 0x8254
-#define GL_UNKNOWN_CONTEXT_RESET 0x8255
-
 // FrontFaceDirection
 #define GL_CW 0x0900
 #define GL_CCW 0x0901

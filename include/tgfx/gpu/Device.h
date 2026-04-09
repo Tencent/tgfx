@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include <mutex>
 
@@ -59,7 +60,11 @@ class Device {
   GPU* _gpu = nullptr;
   Context* context = nullptr;
   std::weak_ptr<Device> weakThis;
-  bool _contextLost = false;
+  /**
+   * A permanent one-way flag indicating the GPU context has been irreversibly lost (e.g., due to a
+   * GPU reset). Once set to true, lockContext() will always return nullptr.
+   */
+  std::atomic<bool> _contextLost{false};
 
   explicit Device(std::unique_ptr<GPU> gpu);
   virtual bool onLockContext();

@@ -304,6 +304,8 @@ void EGLDevice::onUnlockContext() {
     if (error == EGL_CONTEXT_LOST) {
       LOGE("EGLDevice::onUnlockContext() EGL_CONTEXT_LOST detected.");
       markContextLost();
+    } else {
+      LOGE("EGLDevice::onUnlockContext() failure error=%d", error);
     }
   }
   if (oldEglDisplay) {
