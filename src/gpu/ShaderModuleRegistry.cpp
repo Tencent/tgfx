@@ -895,7 +895,7 @@ static const std::unordered_map<std::string, ShaderModuleID> kProcessorModuleMap
     {"ColorMatrixFragmentProcessor", ShaderModuleID::ColorMatrix},
     {"LumaFragmentProcessor", ShaderModuleID::Luma},
     {"DualIntervalGradientColorizer", ShaderModuleID::DualIntervalGradientColorizer},
-    {"AlphaThresholdFragmentProcessor", ShaderModuleID::AlphaThreshold},
+    {"AlphaStepFragmentProcessor", ShaderModuleID::AlphaThreshold},
     {"TextureGradientColorizer", ShaderModuleID::TextureGradientColorizer},
     {"DeviceSpaceTextureEffect", ShaderModuleID::DeviceSpaceTextureEffect},
     {"TextureEffect", ShaderModuleID::TextureEffect},

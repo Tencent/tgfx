@@ -41,6 +41,20 @@ void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outputColor.c_str());
 }
 
+bool ColorSpaceXformEffect::emitContainerCode(FragmentShaderBuilder* fragBuilder,
+                                              UniformHandler* uniformHandler,
+                                              const std::string& input, const std::string& output,
+                                              size_t /*transformedCoordVarsIdx*/,
+                                              const EmitChildFunc& /*emitChild*/) const {
+  ColorSpaceXformHelper helper{};
+  helper.emitCode(uniformHandler, colorSpaceXformSteps.get());
+  auto inputRef = input.empty() ? "vec4(1.0)" : input.c_str();
+  std::string outputColor;
+  fragBuilder->appendColorGamutXform(&outputColor, inputRef, &helper);
+  fragBuilder->codeAppendf("%s = %s;", output.c_str(), outputColor.c_str());
+  return true;
+}
+
 void ColorSpaceXformEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t key = ColorSpaceXformSteps::XFormKey(colorSpaceXformSteps.get());
   bytesKey->write(key);

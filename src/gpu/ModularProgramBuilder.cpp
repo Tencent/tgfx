@@ -195,20 +195,7 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
                                            const std::string& output,
                                            const CoordTransformFunc& coordTransformFunc) {
   auto name = processor->name();
-  if (!ShaderModuleRegistry::HasModule(name)) {
-    // FP not in module registry — fall back to legacy emitCode() path.
-    FragmentProcessor::TransformedCoordVars coords(
-        processor, transformedCoordVarsIdx < transformedCoordVars.size()
-                       ? &transformedCoordVars[transformedCoordVarsIdx]
-                       : nullptr);
-    FragmentProcessor::TextureSamplers textureSamplers(
-        processor, currentTexSamplers.empty() ? nullptr : &currentTexSamplers[0]);
-    FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output,
-                                     input.empty() ? "vec4(1.0)" : input, subsetVarName, &coords,
-                                     &textureSamplers);
-    processor->emitCode(args);
-    return;
-  }
+  DEBUG_ASSERT(ShaderModuleRegistry::HasModule(name));
 
   FPResources resources;
   // Populate coord transform (emit perspective divide if needed).

@@ -43,6 +43,12 @@ class ColorSpaceXformEffect : public FragmentProcessor {
 
   void emitCode(EmitArgs& args) const override;
 
+ protected:
+  bool emitContainerCode(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
+                         const std::string& input, const std::string& output,
+                         size_t transformedCoordVarsIdx,
+                         const EmitChildFunc& emitChild) const override;
+
  private:
   DEFINE_PROCESSOR_CLASS_ID
   void onSetData(UniformData*, UniformData*) const override;
