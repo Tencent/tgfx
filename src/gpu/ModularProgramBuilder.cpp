@@ -262,11 +262,12 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
   auto fragBuilder = fragmentShaderBuilder();
 
   if (name == "ConstColorProcessor") {
-    // Declare uniform using legacy naming convention.
+    auto constColor = static_cast<const ConstColorProcessor*>(processor);
     auto colorName =
         uniformHandler()->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = TGFX_ConstColor(%s, %s);", output.c_str(),
-                             input.empty() ? "vec4(1.0)" : input.c_str(), colorName.c_str());
+    fragBuilder->codeAppendf("%s = TGFX_ConstColor(%s, %s, %d);", output.c_str(),
+                             input.empty() ? "vec4(1.0)" : input.c_str(), colorName.c_str(),
+                             static_cast<int>(constColor->inputMode));
   } else if (name == "LinearGradientLayout") {
     // Get the transformed coordinate varying.
     auto& coordVar = transformedCoordVars[transformedCoordVarsIdx];

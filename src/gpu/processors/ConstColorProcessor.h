@@ -45,8 +45,7 @@ class ConstColorProcessor : public FragmentProcessor {
   PMColor color;
   InputMode inputMode;
 
-  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    macros.define("TGFX_CC_MODE", static_cast<int>(inputMode));
+  void onBuildShaderMacros(ShaderMacroSet& /*macros*/) const override {
   }
 
   std::string shaderFunctionFile() const override {
@@ -69,7 +68,8 @@ class ConstColorProcessor : public FragmentProcessor {
     result.includeFiles = {shaderFunctionFile()};
     auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
     result.statement = "vec4 " + result.outputVarName + " = TGFX_ConstColor(" + input + ", " +
-                       uniforms.get("Color") + ");";
+                       uniforms.get("Color") + ", " + std::to_string(static_cast<int>(inputMode)) +
+                       ");";
     return result;
   }
 
