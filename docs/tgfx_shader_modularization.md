@@ -4496,3 +4496,98 @@ emitModularFragProc()
 | 配置 | 测试数 | 结果 |
 |------|--------|------|
 | `TGFX_USE_MODULAR_SHADERS=ON` | 419 | 全部通过 |
+
+---
+
+### 17.9 Phase C/D 实施结果记录：GP/XP FS 模块化迁移
+
+> 2026-04-10 完成，共 7 个 commit。
+
+#### 目标
+
+消除 GP（10 个）和 XP（2 个）中 C++ 动态拼装 Fragment Shader 的逻辑，为 UE RHI 离线预编译做准备。
+
+#### 架构方案
+
+**GP 迁移策略：skipFragmentCode + buildColorCallExpr/buildCoverageCallExpr**
+
+GP 的 `emitCode()` 同时处理 VS 和 FS。迁移方案是在 `EmitArgs` 中新增 `skipFragmentCode` 标志：
+- `skipFragmentCode=true`：emitCode() 只执行 VS 部分（attribute/varying/uniform 声明、矩阵变换、emitTransforms、emitNormalizedPosition），跳过所有 `fragBuilder->codeAppendf()` 调用。同时将 varying fsIn 名和 uniform 名记录到 `args.gpVaryings` / `args.gpUniforms`
+- `skipFragmentCode=false`：保持原有完整 VS+FS 行为（legacy OFF 路径使用）
+
+FS color/coverage 输出通过 `buildColorCallExpr(uniforms, varyings)` 和 `buildCoverageCallExpr(uniforms, varyings)` 虚方法生成，使用记录的 mangled 名字构造 GLSL 赋值语句。
+
+**XP 迁移策略：buildXferCallStatement + BlendFormula 内联生成**
+
+- 系数模式（0-14）：`buildXferCallStatement()` 根据 `BlendFormula` 的 `OutputType`/`BlendFactor`/`BlendOperation` 字段直接生成等价的内联 GLSL 代码（完整复现 `AppendCoeffBlend` 逻辑）
+- 高级模式（15-29）：调用 `tgfx_blend()` 分派函数（来自 `tgfx_blend.glsl` 模块），然后应用 coverage modulation
+- dst texture read 路径：内联生成 `gl_FragCoord` 坐标变换 + texture lookup
+
+#### 完成的 Commit
+
+| Commit | 变更文件数 | 行数变化 | 说明 |
+|--------|-----------|---------|------|
+| `21e58738` | 3 | +448 | 注册 BlendModes/EmptyXfer/PorterDuffXfer 到 ShaderModuleRegistry |
+| `d9d4be79` | 7 | +375/-6 | XP 基础设施 + tgfx_blend.glsl（299 行，15 种高级 blend mode） |
+| `4dcf27d1` | 4 | +85/-14 | GP prototype：DefaultGP splitFragmentCode 架构 |
+| `e3c2b31c` | 18 | +628/-166 | 迁移全部 9 个 GP 到模块化 FS 路径 |
+| `fec79c87` | 1 | +7/-2 | 启用 9/10 GP 的模块化分派 |
+| `cac70007` | 3 | +25/-24 | 修复 AtlasTextGP texture lookup swizzle 兼容性 |
+| `6ff42da4` | 3 | +187/-22 | 激活 XP 模块化路径 + BlendFormula 系数生成 |
+
+#### 改造后的 ModularProgramBuilder 分派架构
+
+```
+emitAndInstallGeoProc()
+├── emitCode(skipFragmentCode=true)  ← VS-only：attribute/varying/uniform 声明 + VS 赋值
+├── onBuildShaderMacros()            ← GP 宏
+├── buildColorCallExpr()             ← FS color 输出（使用 mangled uniform/varying 名）
+└── buildCoverageCallExpr()          ← FS coverage/SDF/AA 输出
+
+emitModularFragProcessors()
+├── emitContainerCode()              ← 容器 FP（Compose/ClampedGradient/GaussianBlur/Xfermode/ColorSpaceXform）
+└── emitLeafFPCall()                 ← 叶子 FP（16 个，buildCallStatement + .glsl 模块）
+
+emitAndInstallXferProc()
+├── onBuildShaderMacros()            ← XP 宏（TGFX_BLEND_MODE, TGFX_PDXP_DST_TEXTURE_READ 等）
+└── buildXferCallStatement()         ← 系数模式内联生成 / 高级模式调用 tgfx_blend()
+```
+
+#### 关键技术问题及解决方案
+
+| 问题 | 根因 | 解决方案 |
+|------|------|---------|
+| AtlasTextGP 渲染全空白 | `buildColorCallExpr` 直接用 `texture()` 采样缺少 alpha-only 纹理的 `.rrrr` swizzle | 在 `skipFragmentCode=true` 路径中仍通过 `appendTextureLookup()` 生成带 swizzle 的采样代码，结果存为共享 FS 变量 `_atlasTexColor` |
+| XP BlendFormula 截图不匹配 | porter_duff_xfer.frag.glsl 的简单系数公式不等价于 `AppendCoeffBlend` 的 OutputType/BlendFactor/BlendOperation 机制 | 在 `buildXferCallStatement()` 中根据 BlendFormula 各字段直接生成等价内联 GLSL，完整复现 `AppendCoeffBlend` 逻辑 |
+| tgfx_blend.glsl 高级 blend mode | GLSLBlend.cpp 的 550 行 C++ 代码需精确翻译为 GLSL | 创建 `tgfx_blend.glsl`（299 行），包含 15 种高级 blend mode 的独立函数 + `tgfx_blend()` 分派 |
+
+#### 新增/更新的文件清单
+
+| 文件 | 状态 | 说明 |
+|------|------|------|
+| `src/gpu/shaders/common/tgfx_blend.glsl` | 新建 | 15 种高级 blend mode GLSL 实现（299 行） |
+| `src/gpu/shaders/xfer/porter_duff_xfer.frag.glsl` | 更新 | 补充高级 blend mode #if 分支 |
+| `src/gpu/processors/GeometryProcessor.h` | 更新 | EmitArgs 新增 skipFragmentCode/gpVaryings/gpUniforms + friend class |
+| `src/gpu/processors/XferProcessor.h` | 更新 | buildXferCallStatement 新增 dstColorExpr 参数 + friend class |
+| 10 个 GP .h 文件 | 更新 | 实现 buildColorCallExpr/buildCoverageCallExpr |
+| 10 个 GLSL*GP .cpp 文件 | 更新 | emitCode 支持 skipFragmentCode + gpVaryings/gpUniforms 记录 |
+| `src/gpu/glsl/processors/GLSLPorterDuffXferProcessor.cpp` | 更新 | 新增 buildXferCallStatement 完整实现 + BlendFormula 辅助函数 |
+
+#### 验证结果
+
+| 配置 | 测试数 | 结果 |
+|------|--------|------|
+| `TGFX_USE_MODULAR_SHADERS=ON` | 428 | 全部通过 |
+| `TGFX_USE_MODULAR_SHADERS=OFF` | 428 | 全部通过 |
+
+#### 当前全量模块化覆盖率
+
+| 类别 | 总数 | FS 已模块化 | FS 仍走 legacy |
+|------|------|-----------|---------------|
+| 叶子 FP | 16 | 16（buildCallStatement + .glsl） | 0 |
+| 容器 FP | 5 | 5（emitContainerCode） | 0 |
+| GP FS 部分 | 10 | 10（buildColorCallExpr/buildCoverageCallExpr） | 0 |
+| XP | 2 | 2（buildXferCallStatement） | 0 |
+| **合计 FS 逻辑** | **33** | **33** | **0** |
+
+GP VS 部分（attribute/varying/uniform 声明 + VS 赋值）仍在 C++ 的 `emitCode()` 中。这些是资源声明和 VS 赋值代码，不属于 FS shader 逻辑。对于 UE RHI 离线预编译，FS 已完全可预测——所有 FS 逻辑由 `buildColorCallExpr`/`buildCoverageCallExpr`/`buildCallStatement`/`buildXferCallStatement` 在编译期确定。
