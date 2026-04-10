@@ -4591,3 +4591,150 @@ emitAndInstallXferProc()
 | **合计 FS 逻辑** | **33** | **33** | **0** |
 
 GP VS 部分（attribute/varying/uniform 声明 + VS 赋值）仍在 C++ 的 `emitCode()` 中。这些是资源声明和 VS 赋值代码，不属于 FS shader 逻辑。对于 UE RHI 离线预编译，FS 已完全可预测——所有 FS 逻辑由 `buildColorCallExpr`/`buildCoverageCallExpr`/`buildCallStatement`/`buildXferCallStatement` 在编译期确定。
+
+### 17.10 Phase E 实施结果记录：容器 FP 静态化改造
+
+> 2026-04-11 完成，共 2 个 commit。
+
+#### 目标
+
+消除容器 FP（XfermodeFragmentProcessor、ColorSpaceXformEffect）和 GLSLBlend 中 C++ 动态拼装 Shader 的逻辑，将其迁移到静态 .glsl 文件，为 UE RHI 离线预编译做准备。
+
+#### 架构方案
+
+**1. 基础架构：模块化容器 FP 调度层**
+
+在 `FragmentProcessor` 基类新增两个虚方法：
+
+- `buildContainerCallStatement(inputColor, childOutputs, uniforms)` —— 容器 FP 覆写此方法生成对 .glsl 函数的调用语句，子 FP 输出作为参数传入
+- `getChildEmitPlan(parentInput)` —— 容器 FP 覆写此方法指定子 FP 的 emit 顺序和 input 覆盖（例如 XfermodeFragmentProcessor TwoChild 模式需要传入 opaqueInput）
+
+在 `ModularProgramBuilder` 中新增两项改造：
+
+- `emitModularFragProc()` 添加 `skipSamplerCollection` 参数：递归 emit 子 FP 时跳过 sampler 重复收集（父 FP 入口已通过 `FragmentProcessor::Iter` 遍历子树收集全部 sampler）
+- 新增 `emitModularContainerFP()` 方法：先通过 `getChildEmitPlan()` 获取子 FP emit 计划 → 递归调用 `emitModularFragProc()` emit 每个子 FP → 调用 `buildContainerCallStatement()` 生成容器 .glsl 函数调用
+
+调度优先级：`emitModularContainerFP()` > `emitContainerCode()` > `emitLeafFPCall()`。
+
+**2. emitChildCallback 改造**
+
+`emitContainerCode()` 路径中的 `emitChildCallback` 从 legacy `child->emitCode()` 改为优先对 leaf 子 FP 递归调用 `emitModularFragProc()`（走 .glsl 模块化路径），非 leaf 子 FP 回退到 legacy `emitCode()`。
+
+改造后，即使容器 FP 本身仍走 `emitContainerCode()` 路径（如 ClampedGradientEffect、GaussianBlur1D），其子 FP 也会优先走模块化 .glsl 路径。
+
+**3. XfermodeFragmentProcessor → xfermode.frag.glsl**
+
+- 重写 `xfermode.frag.glsl`（97 行）：使用 `TGFX_BLEND_MODE` 宏（0-29）+ `#if/#elif` 静态分发 30 种 blend mode
+  - 系数模式（0-14）：内联 Porter-Duff 公式（`hasCoverageProcessor=false` 时的 `Coeffs[0]` 表）
+  - 高级模式（15-29）：调用 `tgfx_blend_*()` 函数（来自已有的 `tgfx_blend.glsl`）
+- 使用 `TGFX_XFP_CHILD_MODE` 宏（0=DstChild, 1=SrcChild, 2=TwoChild）选择 3 种入口函数
+- TwoChild 模式通过 `getChildEmitPlan()` 传入 `vec4(parentInput.rgb, 1.0)` 作为子 FP 的 opaqueInput
+- `onBuildShaderMacros()` 新增 `TGFX_BLEND_MODE` 宏定义
+
+**4. ColorSpaceXformEffect → color_space_xform.frag.glsl**
+
+ColorSpaceXformEffect 没有子 FP，从 container 重新分类为 leaf FP：
+
+- 新建 `color_space_xform.frag.glsl`（106 行）：
+  - 7 个 `#ifdef` 控制处理步骤：UNPREMUL → SRC_TF → SRC_OOTF → GAMUT_XFORM → DST_OOTF → DST_TF → PREMUL
+  - 4 种 TF 类型变体（sRGBish/PQish/HLGish/HLGinvish）通过 `TGFX_CSX_SRC_TF_TYPE`/`TGFX_CSX_DST_TF_TYPE` 宏选择
+  - 固定参数列表（7 个 uniform 参数 + 输入 color），未启用的步骤传 dummy 值（`vec4(0.0)`/`mat3(1.0)`），GLSL 编译器优化掉未使用参数
+- `emitContainerCode()` 改为返回 false 以走 leaf FP 路径
+- `declareResources()` 条件注册 uniform（仅注册 flags 启用的步骤对应的 uniform）
+- `buildCallStatement()` 生成 `TGFX_ColorSpaceXformEffect(...)` 调用
+
+**5. ClampedGradientEffect 和 GaussianBlur1D：保留 hybrid 路径**
+
+分析后发现这两个容器 FP 不适合迁移到纯 .glsl：
+
+- **ClampedGradientEffect**：子 FP 有数据依赖（colorizer 需要 gradLayout 的输出作为 t 值），无法先并行 emit 所有子 FP 再调用容器函数
+- **GaussianBlur1D**：子 FP 在 for 循环内部被调用（每次迭代不同坐标偏移），架构复杂度过高
+
+保留 `emitContainerCode()` 路径，但通过 Phase 1a 的 emitChildCallback 改造，其子 FP 已走模块化 .glsl 路径。容器的控制流（if/else 分支、for 循环）是编译期确定的固定结构，满足 UE RHI 离线编译需求。
+
+#### 完成的 Commit
+
+| Commit | 变更文件数 | 行数变化 | 说明 |
+|--------|-----------|---------|------|
+| `098b7dd5` | 8 | +362/-49 | 基础架构改造（emitChildCallback 递归分派 + emitModularContainerFP + FragmentProcessor 虚方法）+ XfermodeFragmentProcessor 迁移到 xfermode.frag.glsl |
+| `781ca804` | 5 | +315/-10 | ColorSpaceXformEffect 迁移到 color_space_xform.frag.glsl |
+
+#### 改造后的 ModularProgramBuilder 分派架构
+
+```
+emitModularFragProc(processor)
+  ├─ emitModularContainerFP()          ← 新模块化容器路径
+  │   ├─ getChildEmitPlan()            ← 子 FP emit 计划（含 input 覆盖）
+  │   ├─ emitModularFragProc(child_i, skipSamplerCollection=true) ← 递归
+  │   ├─ declareResources()            ← 容器 uniform 注册
+  │   ├─ emitProcessorDefines()        ← 容器 #define
+  │   ├─ includeModule()               ← 容器 .glsl 模块
+  │   └─ buildContainerCallStatement() ← 容器函数调用
+  ├─ emitContainerCode()               ← legacy 容器路径（Compose/ClampedGradient/GaussianBlur）
+  │   └─ emitChildCallback             ← 子 FP 优先走模块化路径
+  │       ├─ leaf 子 FP → emitModularFragProc(child, skipSampler=true)
+  │       └─ 非 leaf 子 FP → legacy child->emitCode()
+  └─ emitLeafFPCall()                  ← 叶子 FP（buildCallStatement + .glsl）
+```
+
+#### 新增/更新的文件清单
+
+| 文件 | 状态 | 说明 |
+|------|------|------|
+| `src/gpu/shaders/fragment/xfermode.frag.glsl` | 重写 | 30 种 blend mode 静态分发 + 3 种 child mode 入口（97 行） |
+| `src/gpu/shaders/fragment/color_space_xform.frag.glsl` | 新建 | 7 步色彩空间变换 + 4 种 TF 类型变体（106 行） |
+| `src/gpu/processors/FragmentProcessor.h` | 更新 | 新增 buildContainerCallStatement / getChildEmitPlan / ChildEmitInfo |
+| `src/gpu/processors/XfermodeFragmentProcessor.h` | 更新 | 新增 TGFX_BLEND_MODE 宏 + buildContainerCallStatement + getChildEmitPlan |
+| `src/gpu/processors/XfermodeFragmentProcessor.cpp` | 更新 | 实现新方法 |
+| `src/gpu/processors/ColorSpaceXFormEffect.h` | 更新 | 新增 onBuildShaderMacros / declareResources / buildCallStatement / shaderFunctionFile |
+| `src/gpu/processors/ColorSpaceXFormEffect.cpp` | 更新 | 实现新方法，emitContainerCode 返回 false 走 leaf 路径 |
+| `src/gpu/ModularProgramBuilder.h` | 更新 | emitModularFragProc 新增 skipSamplerCollection + 新增 emitModularContainerFP |
+| `src/gpu/ModularProgramBuilder.cpp` | 更新 | 核心调度改造（三级分派 + emitChildCallback 递归） |
+| `src/gpu/ShaderModuleRegistry.h` | 更新 | 新增 XfermodeEffect / ColorSpaceXformEffect 模块 ID |
+| `src/gpu/ShaderModuleRegistry.cpp` | 更新 | 注册新模块 + 嵌入 .glsl 源码 |
+
+#### 关键技术问题及解决方案
+
+| 问题 | 根因 | 解决方案 |
+|------|------|---------|
+| 容器 FP 递归 emit 子 FP 时 sampler 重复收集 | `emitModularFragProc()` 入口会通过 `Iter` 遍历子树收集 sampler，递归调用时重复收集导致声明冲突 | 新增 `skipSamplerCollection` 参数，递归调用时设为 true 跳过收集 |
+| XfermodeFragmentProcessor 三个 name 变体注册模块 | `name()` 返回 "- two"/"- dst"/"- src" 后缀，`ShaderModuleRegistry::HasModule` 需要精确匹配 | 在 `kProcessorModuleMap` 中用三个 name 映射到同一个 `ShaderModuleID::XfermodeEffect` |
+| XfermodeFragmentProcessor TwoChild 的子 FP input | TwoChild 模式下子 FP 接收 `vec4(input.rgb, 1.0)` 而非原始 input | `getChildEmitPlan()` 返回 `inputOverride = "vec4(parentInput.rgb, 1.0)"`，调度层生成临时变量传入 |
+| ColorSpaceXformEffect 函数签名不能有条件参数 | GLSL 不支持 `#ifdef` 在函数参数列表中 | 固定参数列表包含所有 7 个 uniform 参数，未启用步骤传 dummy 值，编译器优化掉未使用参数 |
+| ClampedGradientEffect 子 FP 数据依赖 | colorizer 需要 gradLayout 的输出作为 input（t 值），无法先并行 emit | 保留 `emitContainerCode()` 路径；子 FP 已通过改造的 emitChildCallback 走模块化路径 |
+
+#### 验证结果
+
+| 配置 | 测试数 | 结果 |
+|------|--------|------|
+| `TGFX_USE_MODULAR_SHADERS=ON` | 428 | 全部通过 |
+| `TGFX_USE_MODULAR_SHADERS=OFF` | 428 | 全部通过 |
+
+#### 当前动态 Shader 拼装残留分析
+
+经过本轮改造后，ON 路径中仍使用 `codeAppendf` 的代码路径：
+
+| 来源 | 性质 | UE 兼容性 |
+|------|------|----------|
+| ModularProgramBuilder 调度层 | 结构性管道代码（scope 注释、变量声明、变量赋值） | 编译期确定，不含 shader 逻辑 |
+| ClampedGradientEffect emitContainerCode | 固定 if/else 控制流（子 FP 已模块化） | 编译期确定的固定结构 |
+| GaussianBlur1D emitContainerCode | 固定 for 循环 + 权重计算（子 FP 已模块化） | 编译期确定（TGFX_BLUR_LOOP_LIMIT 是常量） |
+| ComposeFragmentProcessor emitContainerCode | 纯顺序链接（1 行 codeAppendf，子 FP 已模块化） | 编译期确定 |
+| GP emitCode（skipFragmentCode=true, skipVertexCode=true） | 资源声明 + .vert.glsl 注入 | 编译期确定 |
+
+所有残留的 `codeAppendf` 调用都是编译期确定的结构性代码或固定控制流，不包含数据依赖的 shader 逻辑变化。所有 shader 逻辑（blend mode 选择、transfer function 类型、SDF 计算等）均通过 `#define` 宏 + `.glsl` 文件中的 `#if/#elif` 静态分发。
+
+#### 模块化覆盖率更新
+
+| 类别 | 总数 | 走 .glsl 模块 | 走 emitContainerCode（子 FP 模块化） | 仍走 legacy |
+|------|------|-------------|-------------------------------------|------------|
+| 叶子 FP | 16 | 16 | — | 0 |
+| ColorSpaceXformEffect | 1 | 1（重分类为 leaf） | — | 0 |
+| XfermodeFragmentProcessor | 1 | 1（buildContainerCallStatement） | — | 0 |
+| ClampedGradientEffect | 1 | — | 1（控制流固定，子 FP 模块化） | 0 |
+| GaussianBlur1D | 1 | — | 1（循环固定，子 FP 模块化） | 0 |
+| ComposeFragmentProcessor | 1 | — | 1（纯链接，子 FP 模块化） | 0 |
+| GP FS | 10 | 10 | — | 0 |
+| GP VS | 10 | 10（.vert.glsl 注入） | — | 0 |
+| XP | 2 | 2 | — | 0 |
+| **合计** | **43** | **40** | **3** | **0** |
