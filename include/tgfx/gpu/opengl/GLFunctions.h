@@ -115,6 +115,7 @@ using GLGetError = unsigned GL_FUNCTION_TYPE();
 using GLGetFramebufferAttachmentParameteriv = void GL_FUNCTION_TYPE(unsigned target,
                                                                     unsigned attachment,
                                                                     unsigned pname, int* params);
+using GLGetGraphicsResetStatus = unsigned GL_FUNCTION_TYPE();
 using GLGetIntegerv = void GL_FUNCTION_TYPE(unsigned pname, int* params);
 using GLGetInternalformativ = void GL_FUNCTION_TYPE(unsigned target, unsigned internalformat,
                                                     unsigned pname, int bufSize, int* params);
@@ -287,6 +288,7 @@ class GLFunctions {
   GLGetBufferParameteriv* getBufferParameteriv = nullptr;
   GLGetError* getError = nullptr;
   GLGetFramebufferAttachmentParameteriv* getFramebufferAttachmentParameteriv = nullptr;
+  GLGetGraphicsResetStatus* getGraphicsResetStatus = nullptr;
   GLGetIntegerv* getIntegerv = nullptr;
   GLGetInternalformativ* getInternalformativ = nullptr;
   GLGetBooleanv* getBooleanv = nullptr;

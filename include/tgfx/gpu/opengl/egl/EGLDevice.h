@@ -61,6 +61,7 @@ class EGLDevice : public GLDevice {
   EGLContext oldEglContext = nullptr;
   EGLSurface oldEglReadSurface = nullptr;
   EGLSurface oldEglDrawSurface = nullptr;
+  unsigned graphicsResetStatus = 0;  // GL_NO_ERROR
 
   static std::shared_ptr<EGLDevice> MakeFrom(EGLNativeWindowType nativeWindow,
                                              EGLContext sharedContext = nullptr);
@@ -70,6 +71,10 @@ class EGLDevice : public GLDevice {
                                          bool externallyOwned);
 
   EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle);
+
+  void handleContextLost();
+
+  bool checkGraphicsResetStatus();
 
   friend class GLDevice;
 
