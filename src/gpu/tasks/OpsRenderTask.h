@@ -26,9 +26,11 @@ namespace tgfx {
 class OpsRenderTask : public RenderTask {
  public:
   OpsRenderTask(BlockAllocator* allocator, std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                PlacementArray<DrawOp>&& drawOps, std::optional<PMColor> clearColor)
+                PlacementArray<DrawOp>&& drawOps, std::optional<PMColor> clearColor,
+                bool resolveImmediately = false)
       : RenderTask(allocator), renderTargetProxy(std::move(renderTargetProxy)),
-        drawOps(std::move(drawOps)), clearColor(clearColor) {
+        drawOps(std::move(drawOps)), clearColor(clearColor),
+        resolveImmediately(resolveImmediately) {
   }
 
   void execute(CommandEncoder* encoder) override;
@@ -37,5 +39,8 @@ class OpsRenderTask : public RenderTask {
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
   PlacementArray<DrawOp> drawOps = {};
   std::optional<PMColor> clearColor = std::nullopt;
+  // If true, MSAA content will be resolved immediately when the RenderPass ends.
+  // This is used for auxiliary render targets that will be used immediately after rendering.
+  bool resolveImmediately = false;
 };
 }  // namespace tgfx

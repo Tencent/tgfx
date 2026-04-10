@@ -59,6 +59,10 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   drawOp->setBlendMode(BlendMode::Src);
   auto drawOps = allocator->makeArray<DrawOp>(&drawOp, 1);
   auto textureProxy = renderTarget->asTextureProxy();
+  // Mark the entire render target as MSAA dirty if applicable.
+  if (renderTarget->sampleCount() > 1) {
+    renderTarget->markMSAADirty(bounds);
+  }
   auto task = allocator->make<OpsRenderTask>(allocator, std::move(renderTarget), std::move(drawOps),
                                              std::nullopt);
   drawingBuffer->renderTasks.emplace_back(std::move(task));
@@ -78,7 +82,7 @@ std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
 
 void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                                       PlacementArray<DrawOp> drawOps,
-                                      std::optional<PMColor> clearColor) {
+                                      std::optional<PMColor> clearColor, bool resolveImmediately) {
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
@@ -86,7 +90,7 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
   auto task = allocator->make<OpsRenderTask>(allocator, std::move(renderTarget), std::move(drawOps),
-                                             clearColor);
+                                             clearColor, resolveImmediately);
   drawingBuffer->renderTasks.emplace_back(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
 }

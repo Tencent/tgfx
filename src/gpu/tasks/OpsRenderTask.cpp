@@ -31,12 +31,14 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
   }
   auto loadOp = clearColor.has_value() ? LoadAction::Clear : LoadAction::Load;
   auto renderTexture = renderTarget->getRenderTexture();
+  // Set resolveTexture based on resolveImmediately flag:
+  // - When resolveImmediately is true (e.g., for clip mask RT), resolve at RenderPass end.
+  // - When resolveImmediately is false (default, for main RT), defer resolve to ResolveMSAATask.
   auto sampleTexture = renderTarget->getSampleTexture();
-  // Only set resolveTexture when the render target has a separate sample texture for explicit MSAA
-  // resolve. When they are the same (e.g., window-system managed MSAA), no explicit resolve is
-  // needed.
-  auto resolveTexture =
-      (renderTarget->sampleCount() > 1 && sampleTexture != renderTexture) ? sampleTexture : nullptr;
+  std::shared_ptr<Texture> resolveTexture = nullptr;
+  if (resolveImmediately && renderTarget->sampleCount() > 1 && sampleTexture != renderTexture) {
+    resolveTexture = sampleTexture;
+  }
   RenderPassDescriptor descriptor(renderTexture, loadOp, StoreAction::Store,
                                   clearColor.value_or(PMColor::Transparent()), resolveTexture);
   auto renderPass = encoder->beginRenderPass(descriptor);
