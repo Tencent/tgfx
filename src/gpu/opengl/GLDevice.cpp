@@ -72,4 +72,29 @@ GLDevice::~GLDevice() {
   std::lock_guard<std::mutex> autoLock(deviceMapLocker);
   deviceMap.erase(nativeHandle);
 }
+
+void GLDevice::MarkAllContextsLost() {
+  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+  for (auto& item : deviceMap) {
+    item.second->_contextLost = true;
+  }
+  LOGE("GLDevice::MarkAllContextsLost() All %zu GL contexts have been marked as lost.",
+       deviceMap.size());
+}
+
+void GLDevice::releaseAll() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (context == nullptr) {
+    // make sure all resources are released even there is no context.
+    static_cast<GLGPU*>(_gpu)->releaseAll(false);
+    return;
+  }
+  auto releaseGPU = onLockContext();
+  static_cast<GLGPU*>(_gpu)->releaseAll(releaseGPU);
+  if (releaseGPU) {
+    onUnlockContext();
+  }
+  delete context;
+  context = nullptr;
+}
 }  // namespace tgfx
