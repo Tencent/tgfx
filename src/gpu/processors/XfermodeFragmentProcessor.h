@@ -67,11 +67,18 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
     macros.define("TGFX_XFP_CHILD_MODE", static_cast<int>(child));
+    macros.define("TGFX_BLEND_MODE", static_cast<int>(mode));
   }
 
   std::string shaderFunctionFile() const override {
     return "fragment/xfermode.frag";
   }
+
+  ShaderCallResult buildContainerCallStatement(const std::string& inputColor,
+                                               const std::vector<std::string>& childOutputs,
+                                               const MangledUniforms& uniforms) const override;
+
+  std::vector<ChildEmitInfo> getChildEmitPlan(const std::string& parentInput) const override;
 
   bool emitContainerCode(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
                          const std::string& input, const std::string& output,

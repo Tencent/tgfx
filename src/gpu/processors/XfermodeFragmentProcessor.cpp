@@ -64,6 +64,37 @@ void XfermodeFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const 
   bytesKey->write(static_cast<uint32_t>(mode) | (static_cast<uint32_t>(child) << 16));
 }
 
+ShaderCallResult XfermodeFragmentProcessor::buildContainerCallStatement(
+    const std::string& inputColor, const std::vector<std::string>& childOutputs,
+    const MangledUniforms& /*uniforms*/) const {
+  ShaderCallResult result;
+  std::string code;
+  auto input = inputColor.empty() ? std::string("vec4(1.0)") : inputColor;
+  if (child == Child::TwoChild) {
+    code += "vec4 _xfpResult = TGFX_XfermodeFragmentProcessor(" + input + ", " + childOutputs[0] +
+            ", " + childOutputs[1] + ");\n";
+  } else if (child == Child::DstChild) {
+    code += "vec4 _xfpResult = TGFX_XfermodeFragmentProcessor(" + input + ", " + childOutputs[0] +
+            ");\n";
+  } else {
+    code += "vec4 _xfpResult = TGFX_XfermodeFragmentProcessor(" + input + ", " + childOutputs[0] +
+            ");\n";
+  }
+  result.statement = code;
+  result.outputVarName = "_xfpResult";
+  return result;
+}
+
+std::vector<FragmentProcessor::ChildEmitInfo> XfermodeFragmentProcessor::getChildEmitPlan(
+    const std::string& parentInput) const {
+  auto input = parentInput.empty() ? std::string("vec4(1.0)") : parentInput;
+  if (child == Child::TwoChild) {
+    auto opaqueExpr = "vec4(" + input + ".rgb, 1.0)";
+    return {{0, opaqueExpr}, {1, opaqueExpr}};
+  }
+  return {{0, ""}};
+}
+
 bool XfermodeFragmentProcessor::emitContainerCode(FragmentShaderBuilder* fragBuilder,
                                                   UniformHandler* /*uniformHandler*/,
                                                   const std::string& input,

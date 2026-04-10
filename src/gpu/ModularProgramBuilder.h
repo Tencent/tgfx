@@ -64,7 +64,16 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
 
   std::string emitModularFragProc(const FragmentProcessor* processor,
                                   size_t transformedCoordVarsIdx, const std::string& input,
-                                  CoordTransformFunc coordTransformFunc = {});
+                                  CoordTransformFunc coordTransformFunc = {},
+                                  bool skipSamplerCollection = false);
+
+  /**
+   * Emits a container FP using its buildContainerCallStatement() method. Recursively emits child
+   * FPs first, then calls the container's .glsl function with child outputs as arguments.
+   * Returns true if the container was handled, false to fall through to legacy dispatch.
+   */
+  bool emitModularContainerFP(const FragmentProcessor* processor, size_t transformedCoordVarsIdx,
+                              const std::string& input, const std::string& output);
 
   /**
    * Emits a call to a leaf modular FP function via buildCallStatement().

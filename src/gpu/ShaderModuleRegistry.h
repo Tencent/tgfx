@@ -47,6 +47,8 @@ enum class ShaderModuleID {
   BlendModes,
   EmptyXfer,
   PorterDuffXfer,
+  // Container FP modules
+  XfermodeEffect,
 };
 
 /**

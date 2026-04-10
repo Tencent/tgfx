@@ -400,6 +400,35 @@ class FragmentProcessor : public Processor {
     return {};
   }
 
+  /**
+   * Generates a GLSL call statement for a container FP that receives pre-computed child outputs.
+   * @param inputColor The input color variable name.
+   * @param childOutputs Output variable names from recursively-emitted child FPs (indexed 0..N-1).
+   * @param uniforms Mangled uniform names registered by declareResources().
+   */
+  virtual ShaderCallResult buildContainerCallStatement(
+      const std::string& /*inputColor*/, const std::vector<std::string>& /*childOutputs*/,
+      const MangledUniforms& /*uniforms*/) const {
+    return {};
+  }
+
+  struct ChildEmitInfo {
+    size_t childIndex;
+    std::string inputOverride;  // empty = use parent input
+  };
+
+  /**
+   * Returns the emit plan for child FPs. Containers override this to provide custom input colors
+   * for children (e.g., XfermodeFragmentProcessor passes opaque input to TwoChild children).
+   */
+  virtual std::vector<ChildEmitInfo> getChildEmitPlan(const std::string& /*parentInput*/) const {
+    std::vector<ChildEmitInfo> plan;
+    for (size_t i = 0; i < numChildProcessors(); ++i) {
+      plan.push_back({i, ""});
+    }
+    return plan;
+  }
+
  private:
   virtual void onComputeProcessorKey(BytesKey*) const {
   }
