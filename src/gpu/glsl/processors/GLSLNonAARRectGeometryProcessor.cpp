@@ -58,9 +58,11 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   vertBuilder->codeAppendf("%s = %s;", localCoordVarying.vsOut().c_str(),
                            inLocalCoord.name().c_str());
 
-  // Pass radii to fragment shader
-  auto radiiVarying = varyingHandler->addVarying("radii", SLType::Float2);
-  vertBuilder->codeAppendf("%s = %s;", radiiVarying.vsOut().c_str(), inRadii.name().c_str());
+  // Pass per-corner radii to fragment shader
+  auto xRadiiVarying = varyingHandler->addVarying("xRadii", SLType::Float4);
+  vertBuilder->codeAppendf("%s = %s;", xRadiiVarying.vsOut().c_str(), inXRadii.name().c_str());
+  auto yRadiiVarying = varyingHandler->addVarying("yRadii", SLType::Float4);
+  vertBuilder->codeAppendf("%s = %s;", yRadiiVarying.vsOut().c_str(), inYRadii.name().c_str());
 
   // Pass rect bounds to fragment shader
   auto boundsVarying = varyingHandler->addVarying("rectBounds", SLType::Float4);
@@ -78,17 +80,32 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
                  ShaderVar(inPosition.name(), SLType::Float2));
 
-  // Fragment shader - evaluate round rect shape using SDF
+  // Fragment shader - evaluate round rect shape using SDF with per-corner radii
   fragBuilder->codeAppendf("vec2 localCoord = %s;", localCoordVarying.fsIn().c_str());
-  fragBuilder->codeAppendf("vec2 radii = %s;", radiiVarying.fsIn().c_str());
+  fragBuilder->codeAppendf("vec4 xR = %s;", xRadiiVarying.fsIn().c_str());
+  fragBuilder->codeAppendf("vec4 yR = %s;", yRadiiVarying.fsIn().c_str());
   fragBuilder->codeAppendf("vec4 bounds = %s;", boundsVarying.fsIn().c_str());
 
-  // Calculate outer round rect coverage using SDF
+  // Select the corner radii based on which quadrant the pixel is in.
+  // xR/yR order: [TL, TR, BR, BL]
   fragBuilder->codeAppend("vec2 center = (bounds.xy + bounds.zw) * 0.5;");
+  fragBuilder->codeAppend("vec2 p = localCoord - center;");
+  fragBuilder->codeAppend("float rx, ry;");
+  fragBuilder->codeAppend("if (p.x < 0.0) {");
+  fragBuilder->codeAppend("  rx = (p.y < 0.0) ? xR.x : xR.w;");
+  fragBuilder->codeAppend("  ry = (p.y < 0.0) ? yR.x : yR.w;");
+  fragBuilder->codeAppend("} else {");
+  fragBuilder->codeAppend("  rx = (p.y < 0.0) ? xR.y : xR.z;");
+  fragBuilder->codeAppend("  ry = (p.y < 0.0) ? yR.y : yR.z;");
+  fragBuilder->codeAppend("}");
+  fragBuilder->codeAppend("vec2 radii = vec2(rx, ry);");
+
+  // Calculate outer round rect coverage using SDF
   fragBuilder->codeAppend("vec2 halfSize = (bounds.zw - bounds.xy) * 0.5;");
-  fragBuilder->codeAppend("vec2 q = abs(localCoord - center) - halfSize + radii;");
+  fragBuilder->codeAppend("vec2 q = abs(p) - halfSize + radii;");
   fragBuilder->codeAppend(
-      "float d = min(max(q.x / radii.x, q.y / radii.y), 0.0) + length(max(q / radii, 0.0)) - 1.0;");
+      "float d = min(max(q.x / radii.x, q.y / radii.y), 0.0) + "
+      "length(max(q / radii, 0.0)) - 1.0;");
   fragBuilder->codeAppend("float outerCoverage = step(d, 0.0);");
 
   if (stroke) {
@@ -99,7 +116,7 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("float innerCoverage = 0.0;");
     // Check if inner rect is valid (not degenerate)
     fragBuilder->codeAppend("if (innerHalfSize.x > 0.0 && innerHalfSize.y > 0.0) {");
-    fragBuilder->codeAppend("  vec2 qi = abs(localCoord - center) - innerHalfSize + innerRadii;");
+    fragBuilder->codeAppend("  vec2 qi = abs(p) - innerHalfSize + innerRadii;");
     // Use safe division for inner radii (avoid division by zero)
     fragBuilder->codeAppend("  vec2 safeInnerRadii = max(innerRadii, vec2(0.001));");
     fragBuilder->codeAppend(

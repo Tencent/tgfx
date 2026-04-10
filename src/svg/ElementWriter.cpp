@@ -253,11 +253,11 @@ void ElementWriter::addRectAttributes(const Rect& rect) {
 
 void ElementWriter::addRoundRectAttributes(const RRect& roundRect) {
   addRectAttributes(roundRect.rect);
-  if (FloatNearlyZero(roundRect.radii.x) && FloatNearlyZero(roundRect.radii.y)) {
+  if (FloatNearlyZero(roundRect.radii[0].x) && FloatNearlyZero(roundRect.radii[0].y)) {
     return;
   }
-  addAttribute("rx", roundRect.radii.x);
-  addAttribute("ry", roundRect.radii.y);
+  addAttribute("rx", roundRect.radii[0].x);
+  addAttribute("ry", roundRect.radii[0].y);
 }
 
 void ElementWriter::addCircleAttributes(const Rect& bound) {

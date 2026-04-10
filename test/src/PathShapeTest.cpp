@@ -25,6 +25,7 @@
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Shape.h"
@@ -739,7 +740,8 @@ TGFX_TEST(PathShapeTest, AdaptiveDashEffect) {
   Path largePath = {};
   RRect rRect;
   rRect.rect = Rect::MakeXYWH(10, 10, 432, 400);
-  rRect.radii = Point(6, 6);
+  auto cornerRadii = Point(6, 6);
+  rRect.radii = {cornerRadii, cornerRadii, cornerRadii, cornerRadii};
   largePath.addRRect(rRect);
   float largeDashList[] = {2.f, 2.f};
   auto largeEffect = PathEffect::MakeDash(largeDashList, 2, 0.0f, true);
@@ -1154,6 +1156,44 @@ TGFX_TEST(PathShapeTest, RoundRectRadii) {
   canvas->clear();
   canvas->drawPath(path2, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "PathShapeTest/roundRectRadiiStroke"));
+}
+
+TGFX_TEST(PathShapeTest, RRectPathRoundTrip) {
+  // Verify that addRRect() → isRRect() round-trip preserves per-corner radii.
+  auto rect = Rect::MakeWH(200, 120);
+  std::array<Point, 4> radii = {{{30, 30}, {10, 10}, {20, 20}, {0, 0}}};
+
+  // Simple RRect round-trip.
+  RRect simpleIn = {};
+  simpleIn.setRectXY(rect, 15, 15);
+  Path simplePath = {};
+  simplePath.addRRect(simpleIn);
+  RRect simpleOut = {};
+  EXPECT_TRUE(simplePath.isRRect(&simpleOut));
+  EXPECT_TRUE(simpleOut.isSimple());
+  EXPECT_EQ(simpleOut.radii[0], simpleIn.radii[0]);
+
+  // Complex RRect round-trip.
+  RRect complexIn = {};
+  complexIn.setRectRadii(rect, radii);
+  Path complexPath = {};
+  complexPath.addRRect(complexIn);
+  RRect complexOut = {};
+  EXPECT_TRUE(complexPath.isRRect(&complexOut));
+  EXPECT_TRUE(complexOut.isComplex());
+  for (size_t i = 0; i < 4; ++i) {
+    EXPECT_NEAR(complexOut.radii[i].x, complexIn.radii[i].x, 0.01f);
+    EXPECT_NEAR(complexOut.radii[i].y, complexIn.radii[i].y, 0.01f);
+  }
+
+  // Oval via addRRect is stored as oval internally by Skia, so isRRect() returns false
+  // and isOval() returns true. This is expected behavior.
+  RRect ovalIn = {};
+  ovalIn.setOval(rect);
+  Path ovalPath = {};
+  ovalPath.addRRect(ovalIn);
+  EXPECT_FALSE(ovalPath.isRRect(nullptr));
+  EXPECT_TRUE(ovalPath.isOval(nullptr));
 }
 
 }  // namespace tgfx

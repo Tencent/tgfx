@@ -275,12 +275,25 @@ static bool UseDrawPath(const Paint& paint, const Point& radii, const Matrix& vi
 }
 
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
-  auto& radii = rRect.radii;
-  if (radii.x < 0.5f && radii.y < 0.5f) {
+  // Check if all corner radii are too small, degenerate to rectangle.
+  auto allSmall = true;
+  for (const auto& r : rRect.radii) {
+    if (r.x >= 0.5f || r.y >= 0.5f) {
+      allSmall = false;
+      break;
+    }
+  }
+  if (allSmall) {
     drawRect(rRect.rect, paint);
     return;
   }
-  if (UseDrawPath(paint, radii, mcState->matrix)) {
+  // UseDrawPath checks overstroke using the minimum corner radii (most conservative).
+  auto minRadii = rRect.radii[0];
+  for (size_t i = 1; i < 4; ++i) {
+    minRadii.x = std::min(minRadii.x, rRect.radii[i].x);
+    minRadii.y = std::min(minRadii.y, rRect.radii[i].y);
+  }
+  if (UseDrawPath(paint, minRadii, mcState->matrix)) {
     Path path = {};
     path.addRRect(rRect);
     drawPath(path, paint);

@@ -135,6 +135,11 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, c
                                 nullptr, _targetColorSpace, _assignColorSpace);
       ovalElement.addEllipseAttributes(roundRect.rect);
     }
+  } else if (roundRect.isComplex()) {
+    // SVG <rect> only supports uniform rx/ry. Complex RRects must be exported as <path>.
+    Path path = {};
+    path.addRRect(roundRect);
+    drawPath(path, state, brush);
   } else {
     ElementWriter rrectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
                                exportFlags & SVGExportFlags::DisableWarnings, state, brush, nullptr,

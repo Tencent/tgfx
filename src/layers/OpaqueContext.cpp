@@ -284,7 +284,15 @@ void OpaqueContext::flushPendingContour(const Contour& contour, const MCState& s
     if (pendingContour.type == Contour::Type::Rect) {
       mergeContourBound(globalBounds);
     } else if (pendingContour.type == Contour::Type::RRect) {
-      localBounds.inset(pendingContour.rRect.radii.x, pendingContour.rRect.radii.y);
+      // Use the maximum corner radius for inset to ensure the inscribed rectangle
+      // is fully inside all corner arcs.
+      auto maxRadiusX = pendingContour.rRect.radii[0].x;
+      auto maxRadiusY = pendingContour.rRect.radii[0].y;
+      for (size_t i = 1; i < 4; ++i) {
+        maxRadiusX = std::max(maxRadiusX, pendingContour.rRect.radii[i].x);
+        maxRadiusY = std::max(maxRadiusY, pendingContour.rRect.radii[i].y);
+      }
+      localBounds.inset(maxRadiusX, maxRadiusY);
       if (localBounds.isSorted()) {
         globalBounds = GetGlobalBounds(pendingState, localBounds);
         mergeContourBound(globalBounds);

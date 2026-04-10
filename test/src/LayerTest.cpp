@@ -1781,7 +1781,9 @@ TGFX_TEST(LayerTest, ContourTest) {
   twoGroupsLayer->addFillStyle(imageStyle2);
   auto childLayer = ShapeLayer::Make();
   path.reset();
-  path.addRRect(RRect{Rect::MakeXYWH(120, 120, 60, 60), Point::Make(10, 10)});
+  auto rRect = RRect{};
+  rRect.setRectXY(Rect::MakeXYWH(120, 120, 60, 60), 10, 10);
+  path.addRRect(rRect);
   childLayer->setPath(path);
   childLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
   childLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
@@ -2089,7 +2091,9 @@ TGFX_TEST(LayerTest, TemporaryOffscreenImage) {
 
   auto glassLayer = ShapeLayer::Make();
   Path glassPath;
-  glassPath.addRRect(RRect{Rect::MakeXYWH(10, 10, 80, 80), Point::Make(40, 40)});
+  auto glassRRect = RRect{};
+  glassRRect.setRectXY(Rect::MakeXYWH(10, 10, 80, 80), 40, 40);
+  glassPath.addRRect(glassRRect);
   glassLayer->setPath(glassPath);
   glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 50)));
   glassLayer->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});

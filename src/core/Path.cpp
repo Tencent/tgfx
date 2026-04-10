@@ -172,14 +172,18 @@ bool Path::isOval(Rect* bounds) const {
 
 bool Path::isRRect(RRect* rRect) const {
   SkRRect skRRect = {};
-  if (!pathRef->path.isRRect(&skRRect) || !skRRect.isSimple()) {
+  if (!pathRef->path.isRRect(&skRRect) || skRRect.isEmpty() || skRRect.isRect()) {
     return false;
   }
   if (rRect) {
-    const auto& rect = skRRect.rect();
-    rRect->rect.setLTRB(rect.fLeft, rect.fTop, rect.fRight, rect.fBottom);
-    auto radii = skRRect.getSimpleRadii();
-    rRect->radii.set(radii.fX, radii.fY);
+    const auto& skRect = skRRect.rect();
+    auto rect = Rect::MakeLTRB(skRect.fLeft, skRect.fTop, skRect.fRight, skRect.fBottom);
+    std::array<Point, 4> cornerRadii = {};
+    for (size_t i = 0; i < 4; ++i) {
+      auto r = skRRect.radii(static_cast<SkRRect::Corner>(i));
+      cornerRadii[i] = {r.fX, r.fY};
+    }
+    rRect->setRectRadii(rect, cornerRadii);
   }
   return true;
 }
@@ -493,7 +497,8 @@ void Path::addRoundRect(const Rect& rect, const std::array<Point, 4>& radii, boo
 }
 
 void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) {
-  auto skRRect = SkRRect::MakeRectXY(ToSkRect(rRect.rect), rRect.radii.x, rRect.radii.y);
+  SkRRect skRRect;
+  skRRect.setRectRadii(ToSkRect(rRect.rect), reinterpret_cast<const SkPoint*>(rRect.radii.data()));
   writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);
 }
 

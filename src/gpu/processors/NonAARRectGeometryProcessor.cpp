@@ -25,7 +25,8 @@ NonAARRectGeometryProcessor::NonAARRectGeometryProcessor(int width, int height, 
       commonColor(commonColor) {
   inPosition = {"inPosition", VertexFormat::Float2};
   inLocalCoord = {"inLocalCoord", VertexFormat::Float2};
-  inRadii = {"inRadii", VertexFormat::Float2};
+  inXRadii = {"inXRadii", VertexFormat::Float4};
+  inYRadii = {"inYRadii", VertexFormat::Float4};
   inRectBounds = {"inRectBounds", VertexFormat::Float4};
   if (!commonColor.has_value()) {
     inColor = {"inColor", VertexFormat::UByte4Normalized};
@@ -33,7 +34,7 @@ NonAARRectGeometryProcessor::NonAARRectGeometryProcessor(int width, int height, 
   if (stroke) {
     inStrokeWidth = {"inStrokeWidth", VertexFormat::Float2};
   }
-  this->setVertexAttributes(&inPosition, 6);
+  this->setVertexAttributes(&inPosition, 7);
 }
 
 void NonAARRectGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {

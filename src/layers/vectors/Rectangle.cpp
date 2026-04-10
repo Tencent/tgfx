@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/vectors/Rectangle.h"
+#include <algorithm>
 #include "VectorContext.h"
 #include "core/utils/Log.h"
 
@@ -45,10 +46,20 @@ void Rectangle::setSize(const Size& value) {
 }
 
 void Rectangle::setRoundness(float value) {
-  if (_roundness == value) {
+  std::array<float, 4> values = {value, value, value, value};
+  if (_roundness == values) {
     return;
   }
-  _roundness = value;
+  _roundness = values;
+  _cachedShape = nullptr;
+  invalidateContent();
+}
+
+void Rectangle::setCornerRoundness(const std::array<float, 4>& values) {
+  if (_roundness == values) {
+    return;
+  }
+  _roundness = values;
   _cachedShape = nullptr;
   invalidateContent();
 }
@@ -67,17 +78,21 @@ void Rectangle::apply(VectorContext* context) {
   if (_cachedShape == nullptr) {
     auto halfWidth = _size.width * 0.5f;
     auto halfHeight = _size.height * 0.5f;
-    auto radius = _roundness;
-    if (radius > halfWidth) {
-      radius = halfWidth;
-    }
-    if (radius > halfHeight) {
-      radius = halfHeight;
-    }
     auto rect = Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, _size.width,
                                _size.height);
     Path path;
-    path.addRoundRect(rect, radius, radius, _reversed, 2);
+    if (_roundness[0] == _roundness[1] && _roundness[1] == _roundness[2] &&
+        _roundness[2] == _roundness[3]) {
+      auto r = std::min({_roundness[0], halfWidth, halfHeight});
+      path.addRoundRect(rect, r, r, _reversed, 2);
+    } else {
+      std::array<Point, 4> radii = {};
+      for (size_t i = 0; i < 4; ++i) {
+        auto r = std::min({_roundness[i], halfWidth, halfHeight});
+        radii[i] = {r, r};
+      }
+      path.addRoundRect(rect, radii, _reversed, 2);
+    }
     _cachedShape = Shape::MakeFrom(path);
   }
   if (_cachedShape) {

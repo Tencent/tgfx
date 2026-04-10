@@ -25,7 +25,7 @@ namespace tgfx {
 /**
  * NonAARRectGeometryProcessor is used to render round rectangles without antialiasing.
  * It evaluates the round rect shape in the fragment shader using local coordinates.
- * Supports both fill and stroke modes.
+ * Supports both fill and stroke modes, with per-corner independent radii.
  */
 class NonAARRectGeometryProcessor : public GeometryProcessor {
  public:
@@ -48,7 +48,8 @@ class NonAARRectGeometryProcessor : public GeometryProcessor {
   // Vertex attributes - declared in the same order as vertex data layout.
   Attribute inPosition;     // position (2 floats)
   Attribute inLocalCoord;   // local coordinates (2 floats)
-  Attribute inRadii;        // corner radii (2 floats)
+  Attribute inXRadii;       // per-corner x radii [TL, TR, BR, BL] (4 floats)
+  Attribute inYRadii;       // per-corner y radii [TL, TR, BR, BL] (4 floats)
   Attribute inRectBounds;   // rect bounds: left, top, right, bottom (4 floats)
   Attribute inColor;        // optional color (4 bytes as UByte4Normalized)
   Attribute inStrokeWidth;  // half stroke width (2 floats, stroke only)

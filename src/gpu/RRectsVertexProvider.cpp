@@ -95,7 +95,9 @@ static StrokeParams ApplyScales(RRect* rRect, Matrix* viewMatrix, const Point& s
     params.halfStrokeX = 0.5f * scales.x * strokeWidth;
     params.halfStrokeY = 0.5f * scales.y * strokeWidth;
     if (viewMatrix->getScaleX() == 0.f) {
-      std::swap(rRect->radii.x, rRect->radii.y);
+      for (auto& r : rRect->radii) {
+        std::swap(r.x, r.y);
+      }
       std::swap(params.halfStrokeX, params.halfStrokeY);
     }
   }
@@ -116,9 +118,9 @@ RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, 
 size_t RRectsVertexProvider::vertexCount() const {
   if (aaType() == AAType::None) {
     // Non-AA mode: 4 vertices per RRect
-    // Each vertex has: position (2), localCoord (2), radii (2), rectBounds (4)
+    // Each vertex has: position (2), localCoord (2), xRadii (4), yRadii (4), rectBounds (4)
     // Optional: color (1), strokeWidth (2) for stroke mode
-    size_t floatsPerVertex = 10;
+    size_t floatsPerVertex = 16;
     if (bitFields.hasStroke) {
       floatsPerVertex += 2;
     }
@@ -166,105 +168,106 @@ void RRectsVertexProvider::getAAVertices(float* vertices) const {
     auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
     auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
 
+    // Per-corner outer and inner radii, and reciprocal radii arrays.
+    // Corner order: TL=0, TR=1, BR=2, BL=3
+    float outerXRadii[4] = {};
+    float outerYRadii[4] = {};
+    float recipRadii[4][4] = {};  // [corner][outerRX, outerRY, innerRX, innerRY]
     bool stroked = false;
-    float xRadius = rRect.radii.x;
-    float yRadius = rRect.radii.y;
-    float innerXRadius = 0;
-    float innerYRadius = 0;
     auto rectBounds = rRect.rect;
+
     if (stroke) {
-      innerXRadius = xRadius - strokeParams.halfStrokeX;
-      innerYRadius = yRadius - strokeParams.halfStrokeY;
-      stroked = innerXRadius > 0.0f && innerYRadius > 0.0f;
-      xRadius += strokeParams.halfStrokeX;
-      yRadius += strokeParams.halfStrokeY;
+      auto allInnerPositive = true;
+      for (size_t c = 0; c < 4; ++c) {
+        auto innerX = rRect.radii[c].x - strokeParams.halfStrokeX;
+        auto innerY = rRect.radii[c].y - strokeParams.halfStrokeY;
+        if (innerX <= 0.0f || innerY <= 0.0f) {
+          allInnerPositive = false;
+        }
+        outerXRadii[c] = rRect.radii[c].x + strokeParams.halfStrokeX;
+        outerYRadii[c] = rRect.radii[c].y + strokeParams.halfStrokeY;
+        recipRadii[c][0] = FloatInvert(outerXRadii[c]);
+        recipRadii[c][1] = FloatInvert(outerYRadii[c]);
+        recipRadii[c][2] = std::min(FloatInvert(std::max(innerX, 0.0f)), 1e6f);
+        recipRadii[c][3] = std::min(FloatInvert(std::max(innerY, 0.0f)), 1e6f);
+      }
+      stroked = allInnerPositive;
       rectBounds.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
+    } else {
+      for (size_t c = 0; c < 4; ++c) {
+        outerXRadii[c] = rRect.radii[c].x;
+        outerYRadii[c] = rRect.radii[c].y;
+        recipRadii[c][0] = FloatInvert(outerXRadii[c]);
+        recipRadii[c][1] = FloatInvert(outerYRadii[c]);
+        recipRadii[c][2] = std::min(FloatInvert(0.0f), 1e6f);
+        recipRadii[c][3] = std::min(FloatInvert(0.0f), 1e6f);
+      }
     }
 
-    float reciprocalRadii[4] = {FloatInvert(xRadius), FloatInvert(yRadius),
-                                FloatInvert(innerXRadius), FloatInvert(innerYRadius)};
-    // If the stroke width is exactly double the radius, the inner radii will be zero.
-    // Pin to a large value, to avoid infinities in the shader. crbug.com/1139750
-    reciprocalRadii[2] = std::min(reciprocalRadii[2], 1e6f);
-    reciprocalRadii[3] = std::min(reciprocalRadii[3], 1e6f);
-    // On MSAA, bloat enough to guarantee any pixel that might be touched by the rRect has
-    // full sample coverage.
     float aaBloat = currentAAType == AAType::MSAA ? FLOAT_SQRT2 : .5f;
-    // Extend out the radii to antialias.
-    float xOuterRadius = xRadius + aaBloat;
-    float yOuterRadius = yRadius + aaBloat;
 
-    float xMaxOffset = xOuterRadius;
-    float yMaxOffset = yOuterRadius;
-    if (!stroked) {
-      // For filled RRectRecords we map a unit circle in the vertex attributes rather than
-      // computing an ellipse and modifying that distance, so we normalize to 1.
-      xMaxOffset /= xRadius;
-      yMaxOffset /= yRadius;
-    }
+    // 9-patch cut points: use max of adjacent corners for each side.
+    auto xOuterRadiusLeft = std::max(outerXRadii[0], outerXRadii[3]);    // max(TL, BL)
+    auto xOuterRadiusRight = std::max(outerXRadii[1], outerXRadii[2]);   // max(TR, BR)
+    auto yOuterRadiusTop = std::max(outerYRadii[0], outerYRadii[1]);     // max(TL, TR)
+    auto yOuterRadiusBottom = std::max(outerYRadii[2], outerYRadii[3]);  // max(BR, BL)
+
     auto bounds = rectBounds.makeOutset(aaBloat, aaBloat);
-    float yCoords[4] = {bounds.top, bounds.top + yOuterRadius, bounds.bottom - yOuterRadius,
-                        bounds.bottom};
-    float yOuterOffsets[4] = {
-        yMaxOffset,
-        FLOAT_NEARLY_ZERO,  // we're using inversesqrt() in shader, so can't be exactly 0
-        FLOAT_NEARLY_ZERO, yMaxOffset};
-    for (int i = 0; i < 4; ++i) {
-      auto point = Point::Make(bounds.left, yCoords[i]);
-      viewMatrix.mapPoints(&point, 1);
-      vertices[index++] = point.x;
-      vertices[index++] = point.y;
-      if (bitFields.hasColor) {
-        vertices[index++] = compressedColor;
-      }
-      vertices[index++] = xMaxOffset;
-      vertices[index++] = yOuterOffsets[i];
-      vertices[index++] = reciprocalRadii[0];
-      vertices[index++] = reciprocalRadii[1];
-      vertices[index++] = reciprocalRadii[2];
-      vertices[index++] = reciprocalRadii[3];
 
-      point = Point::Make(bounds.left + xOuterRadius, yCoords[i]);
-      viewMatrix.mapPoints(&point, 1);
-      vertices[index++] = point.x;
-      vertices[index++] = point.y;
-      if (bitFields.hasColor) {
-        vertices[index++] = compressedColor;
-      }
-      vertices[index++] = FLOAT_NEARLY_ZERO;
-      vertices[index++] = yOuterOffsets[i];
-      vertices[index++] = reciprocalRadii[0];
-      vertices[index++] = reciprocalRadii[1];
-      vertices[index++] = reciprocalRadii[2];
-      vertices[index++] = reciprocalRadii[3];
+    // 4 rows: top edge, top inner, bottom inner, bottom edge
+    float yCoords[4] = {bounds.top, bounds.top + yOuterRadiusTop + aaBloat,
+                        bounds.bottom - yOuterRadiusBottom - aaBloat, bounds.bottom};
 
-      point = Point::Make(bounds.right - xOuterRadius, yCoords[i]);
-      viewMatrix.mapPoints(&point, 1);
-      vertices[index++] = point.x;
-      vertices[index++] = point.y;
-      if (bitFields.hasColor) {
-        vertices[index++] = compressedColor;
-      }
-      vertices[index++] = FLOAT_NEARLY_ZERO;
-      vertices[index++] = yOuterOffsets[i];
-      vertices[index++] = reciprocalRadii[0];
-      vertices[index++] = reciprocalRadii[1];
-      vertices[index++] = reciprocalRadii[2];
-      vertices[index++] = reciprocalRadii[3];
+    // 4 columns: left edge, left inner, right inner, right edge
+    float xCoords[4] = {bounds.left, bounds.left + xOuterRadiusLeft + aaBloat,
+                        bounds.right - xOuterRadiusRight - aaBloat, bounds.right};
 
-      point = Point::Make(bounds.right, yCoords[i]);
-      viewMatrix.mapPoints(&point, 1);
-      vertices[index++] = point.x;
-      vertices[index++] = point.y;
-      if (bitFields.hasColor) {
-        vertices[index++] = compressedColor;
+    // Corner assignment for each of the 16 vertices in 4x4 grid.
+    // [row][col] → corner index (TL=0, TR=1, BR=2, BL=3)
+    // Row 0-1 are top rows, Row 2-3 are bottom rows.
+    // Col 0-1 are left cols, Col 2-3 are right cols.
+    static constexpr int cornerMap[4][4] = {
+        {0, 0, 1, 1},  // row 0: TL, TL, TR, TR
+        {0, 0, 1, 1},  // row 1: TL, TL, TR, TR
+        {3, 3, 2, 2},  // row 2: BL, BL, BR, BR
+        {3, 3, 2, 2},  // row 3: BL, BL, BR, BR
+    };
+
+    for (int row = 0; row < 4; ++row) {
+      for (int col = 0; col < 4; ++col) {
+        auto corner = cornerMap[row][col];
+        auto cornerXRadius = outerXRadii[corner];
+        auto cornerYRadius = outerYRadii[corner];
+
+        // Compute EllipseOffset for this vertex.
+        // For corners with non-zero radii, outer vertices get the max offset normalized
+        // to unit circle coordinates. For corners with zero radii (sharp corners), offset
+        // stays near-zero so coverage saturates to 1.0.
+        auto xOffset = FLOAT_NEARLY_ZERO;
+        auto yOffset = FLOAT_NEARLY_ZERO;
+        if ((col == 0 || col == 3) && cornerXRadius > 0) {
+          xOffset = stroked ? (cornerXRadius + aaBloat)
+                            : ((cornerXRadius + aaBloat) / cornerXRadius);
+        }
+        if ((row == 0 || row == 3) && cornerYRadius > 0) {
+          yOffset = stroked ? (cornerYRadius + aaBloat)
+                            : ((cornerYRadius + aaBloat) / cornerYRadius);
+        }
+
+        auto point = Point::Make(xCoords[col], yCoords[row]);
+        viewMatrix.mapPoints(&point, 1);
+        vertices[index++] = point.x;
+        vertices[index++] = point.y;
+        if (bitFields.hasColor) {
+          vertices[index++] = compressedColor;
+        }
+        vertices[index++] = xOffset;
+        vertices[index++] = yOffset;
+        vertices[index++] = recipRadii[corner][0];
+        vertices[index++] = recipRadii[corner][1];
+        vertices[index++] = recipRadii[corner][2];
+        vertices[index++] = recipRadii[corner][3];
       }
-      vertices[index++] = xMaxOffset;
-      vertices[index++] = yOuterOffsets[i];
-      vertices[index++] = reciprocalRadii[0];
-      vertices[index++] = reciprocalRadii[1];
-      vertices[index++] = reciprocalRadii[2];
-      vertices[index++] = reciprocalRadii[3];
     }
     currentIndex++;
   }
@@ -294,13 +297,14 @@ void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
     auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
 
     auto rect = rRect.rect;
-    float xRadii = rRect.radii.x;
-    float yRadii = rRect.radii.y;
+    auto radii = rRect.radii;
 
     if (stroke) {
       rect.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
-      xRadii += strokeParams.halfStrokeX;
-      yRadii += strokeParams.halfStrokeY;
+      for (auto& r : radii) {
+        r.x += strokeParams.halfStrokeX;
+        r.y += strokeParams.halfStrokeY;
+      }
     }
 
     // Corner positions for a quad: TL, TR, BR, BL
@@ -327,9 +331,17 @@ void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
       vertices[index++] = localX;
       vertices[index++] = localY;
 
-      // radii (2 floats) - outer radii
-      vertices[index++] = xRadii;
-      vertices[index++] = yRadii;
+      // xRadii (4 floats) - per-corner x radii [TL, TR, BR, BL]
+      vertices[index++] = radii[0].x;
+      vertices[index++] = radii[1].x;
+      vertices[index++] = radii[2].x;
+      vertices[index++] = radii[3].x;
+
+      // yRadii (4 floats) - per-corner y radii [TL, TR, BR, BL]
+      vertices[index++] = radii[0].y;
+      vertices[index++] = radii[1].y;
+      vertices[index++] = radii[2].y;
+      vertices[index++] = radii[3].y;
 
       // rectBounds (4 floats) - outer bounds
       vertices[index++] = rect.left;

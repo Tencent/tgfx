@@ -1656,7 +1656,7 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 500);
+  auto surface = Surface::Make(context, 400, 660);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
@@ -1709,18 +1709,35 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
   canvas->drawRRect(rrect6, paint);
   canvas->restore();
 
+  // Complex RRect fill: per-corner independent radii.
+  paint.setColor(Color::FromRGBA(200, 50, 50, 255));
+  RRect complexFill = {};
+  complexFill.setRectRadii(Rect::MakeXYWH(50, 420, 140, 70),
+                           {{{30, 30}, {10, 10}, {0, 0}, {20, 20}}});
+  canvas->drawRRect(complexFill, paint);
+
   // Verify RRectDrawOp with non-AA is used by checking the Op type.
   surface->renderContext->flush();
   auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
   EXPECT_EQ(drawingBuffer->renderTasks.size(), 1u);
   auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   EXPECT_EQ(task->drawOps.size(), 1u);
-  // All 6 non-AA filled RRects should be batched into a single RRectDrawOp.
+  // All 7 non-AA filled RRects (6 Simple + 1 Complex) should be batched into a single RRectDrawOp.
   auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
   EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_EQ(rrectOp->rectCount, 6u);
+  EXPECT_EQ(rrectOp->rectCount, 7u);
 
   context->flushAndSubmit();
+
+  // Complex RRect stroke: per-corner independent radii with stroke.
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(6));
+  paint.setColor(Color::FromRGBA(0, 160, 0, 255));
+  RRect complexStroke = {};
+  complexStroke.setRectRadii(Rect::MakeXYWH(100, 530, 200, 80),
+                             {{{40, 40}, {5, 5}, {20, 20}, {0, 0}}});
+  canvas->drawRRect(complexStroke, paint);
+
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOp"));
 }
 
@@ -2030,6 +2047,54 @@ TGFX_TEST(CanvasTest, NonAARRectOpColorStroke) {
   context->flushAndSubmit();
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpColorStroke"));
+}
+
+TGFX_TEST(CanvasTest, AARRectOp) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+
+  // Simple filled RRect for batching verification.
+  paint.setColor(Color::Red());
+  RRect simpleRRect = {};
+  simpleRRect.setRectXY(Rect::MakeXYWH(50, 50, 120, 80), 15, 15);
+  canvas->drawRRect(simpleRRect, paint);
+
+  // Complex filled RRect with four different corner radii.
+  paint.setColor(Color::Blue());
+  RRect complexFill = {};
+  complexFill.setRectRadii(Rect::MakeXYWH(200, 50, 140, 80),
+                           {{{30, 30}, {10, 10}, {0, 0}, {20, 20}}});
+  canvas->drawRRect(complexFill, paint);
+
+  // Verify batching: 2 AA filled RRects (1 Simple + 1 Complex) in a single Op.
+  surface->renderContext->flush();
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  EXPECT_EQ(drawingBuffer->renderTasks.size(), 1u);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
+  EXPECT_EQ(task->drawOps.size(), 1u);
+  auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp);
+  EXPECT_EQ(rrectOp->rectCount, 2u);
+
+  context->flushAndSubmit();
+
+  // Complex stroked RRect.
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(6));
+  paint.setColor(Color::FromRGBA(0, 160, 0, 255));
+  RRect complexStroke = {};
+  complexStroke.setRectRadii(Rect::MakeXYWH(80, 180, 200, 100),
+                             {{{40, 40}, {5, 5}, {20, 20}, {0, 0}}});
+  canvas->drawRRect(complexStroke, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AARRectOp"));
 }
 
 TGFX_TEST(CanvasTest, DrawMesh_ColorsOnly) {
