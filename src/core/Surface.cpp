@@ -194,6 +194,10 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   if (textureProxy == nullptr || renderTarget->externallyOwned()) {
     textureProxy = renderTarget->makeTextureProxy();
     drawingManager->addRenderTargetCopyTask(renderTarget, textureProxy);
+  } else {
+    // For MSAA surfaces that have a texture backing, we still need to ensure the MSAA content is
+    // resolved before returning the texture proxy.
+    drawingManager->ensureMSAAResolved(renderTarget);
   }
   cachedImage = TextureImage::Wrap(std::move(textureProxy), colorSpace());
   return cachedImage;

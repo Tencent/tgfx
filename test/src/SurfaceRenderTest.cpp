@@ -319,4 +319,128 @@ TGFX_TEST(SurfaceRenderTest, SampleCountSnapshotRoundTrip) {
   EXPECT_TRUE(Baseline::Compare(compareSurface, "SurfaceRenderTest/SampleCountSnapshotRoundTrip"));
 }
 
+// ==================== MSAA Dirty Rect Tracking Tests ====================
+
+TGFX_TEST(SurfaceRenderTest, MSAADirtyRectTracking) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Create a 4x MSAA surface.
+  auto surface = Surface::Make(context, 400, 400, false, 4);
+  ASSERT_TRUE(surface != nullptr);
+  if (surface->sampleCount() <= 1) {
+    // MSAA not supported on this device, skip the test.
+    return;
+  }
+
+  auto renderTarget = surface->renderContext->renderTarget;
+  ASSERT_TRUE(renderTarget != nullptr);
+
+  // Surface creation with clearAll=true marks the surface dirty.
+  // Resolve first to start from a clean state.
+  auto snapshot = surface->makeImageSnapshot();
+  ASSERT_TRUE(snapshot != nullptr);
+  snapshot = nullptr;
+
+  // After resolve, the MSAA content should not be dirty.
+  EXPECT_FALSE(renderTarget->isMSAADirty());
+  EXPECT_TRUE(renderTarget->msaaDirtyRect().isEmpty());
+
+  // Draw a small rectangle in the top-left corner.
+  auto canvas = surface->getCanvas();
+  Paint paint;
+  paint.setColor(Color::Red());
+  canvas->drawRect(Rect::MakeLTRB(10, 10, 110, 110), paint);
+  context->flushAndSubmit();
+
+  // After drawing, the MSAA content should be marked dirty with the draw bounds.
+  EXPECT_TRUE(renderTarget->isMSAADirty());
+  auto dirtyRect = renderTarget->msaaDirtyRect();
+  EXPECT_FALSE(dirtyRect.isEmpty());
+  // The dirty rect should contain the drawn area (10,10,110,110).
+  EXPECT_TRUE(dirtyRect.contains(Rect::MakeLTRB(10, 10, 110, 110)));
+
+  // Draw another rectangle in a different area — dirty rect should expand.
+  canvas->drawRect(Rect::MakeLTRB(200, 200, 300, 300), paint);
+  context->flushAndSubmit();
+
+  auto expandedDirtyRect = renderTarget->msaaDirtyRect();
+  // The dirty rect should now contain both drawn areas.
+  EXPECT_TRUE(expandedDirtyRect.contains(Rect::MakeLTRB(10, 10, 110, 110)));
+  EXPECT_TRUE(expandedDirtyRect.contains(Rect::MakeLTRB(200, 200, 300, 300)));
+
+  // makeImageSnapshot triggers MSAA resolve, which should clear the dirty state.
+  snapshot = surface->makeImageSnapshot();
+  ASSERT_TRUE(snapshot != nullptr);
+
+  // After resolve, the MSAA content should no longer be dirty.
+  EXPECT_FALSE(renderTarget->isMSAADirty());
+  EXPECT_TRUE(renderTarget->msaaDirtyRect().isEmpty());
+}
+
+TGFX_TEST(SurfaceRenderTest, MSAADirtyRectAfterClear) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Create a 4x MSAA surface.
+  auto surface = Surface::Make(context, 200, 200, false, 4);
+  ASSERT_TRUE(surface != nullptr);
+  if (surface->sampleCount() <= 1) {
+    return;
+  }
+
+  auto renderTarget = surface->renderContext->renderTarget;
+  ASSERT_TRUE(renderTarget != nullptr);
+
+  // Clear the entire surface — this should mark the entire surface as dirty.
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::Blue());
+  context->flushAndSubmit();
+
+  EXPECT_TRUE(renderTarget->isMSAADirty());
+  auto dirtyRect = renderTarget->msaaDirtyRect();
+  // Clear should mark the entire surface bounds as dirty.
+  EXPECT_TRUE(dirtyRect.contains(renderTarget->bounds()));
+}
+
+TGFX_TEST(SurfaceRenderTest, MSAAResolveOnReadPixels) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Create a 4x MSAA surface.
+  auto surface = Surface::Make(context, 100, 100, false, 4);
+  ASSERT_TRUE(surface != nullptr);
+  if (surface->sampleCount() <= 1) {
+    return;
+  }
+
+  auto renderTarget = surface->renderContext->renderTarget;
+  ASSERT_TRUE(renderTarget != nullptr);
+
+  // Draw something to make the surface dirty.
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::Green());
+  Paint paint;
+  paint.setColor(Color::Red());
+  canvas->drawRect(Rect::MakeLTRB(25, 25, 75, 75), paint);
+  context->flushAndSubmit();
+
+  EXPECT_TRUE(renderTarget->isMSAADirty());
+
+  // readPixels should trigger MSAA resolve.
+  Bitmap bitmap(100, 100, false, false);
+  ASSERT_TRUE(bitmap.isHardwareBacked() == false);
+  auto pixels = bitmap.lockPixels();
+  auto result = surface->readPixels(bitmap.info(), pixels);
+  bitmap.unlockPixels();
+  EXPECT_TRUE(result);
+
+  // After readPixels, the dirty state should be cleared.
+  EXPECT_FALSE(renderTarget->isMSAADirty());
+  EXPECT_TRUE(renderTarget->msaaDirtyRect().isEmpty());
+}
+
 }  // namespace tgfx
