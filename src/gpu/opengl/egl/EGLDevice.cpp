@@ -48,9 +48,9 @@ static std::vector<EGLint> GetValidAttributes(const std::vector<EGLint>& attribu
 }
 
 static EGLContext CreateContext(EGLContext sharedContext, EGLDisplay eglDisplay,
-                                EGLConfig eglConfig, bool hasContextRobustness) {
+                                EGLConfig eglConfig, bool contextRobustnessSupported) {
   // Try ES 3 with robustness if supported.
-  if (hasContextRobustness) {
+  if (contextRobustnessSupported) {
     static const EGLint robust3Attributes[] = {EGL_CONTEXT_CLIENT_VERSION, 3,
                                                EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_EXT,
                                                EGL_LOSE_CONTEXT_ON_RESET_EXT, EGL_NONE};
@@ -126,7 +126,7 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   }
   auto eglShareContext = reinterpret_cast<EGLContext>(sharedContext);
   auto eglContext = CreateContext(eglShareContext, eglGlobals->display, eglGlobals->pbufferConfig,
-                                  eglGlobals->hasContextRobustness);
+                                  eglGlobals->contextRobustnessSupported);
   if (eglContext == nullptr) {
     eglDestroySurface(eglGlobals->display, eglSurface);
     return nullptr;
@@ -185,7 +185,7 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
     return nullptr;
   }
   auto eglContext = CreateContext(sharedContext, eglGlobals->display, eglGlobals->windowConfig,
-                                  eglGlobals->hasContextRobustness);
+                                  eglGlobals->contextRobustnessSupported);
   if (eglContext == EGL_NO_CONTEXT) {
     eglDestroySurface(eglGlobals->display, eglSurface);
     return nullptr;
@@ -282,7 +282,7 @@ bool EGLDevice::onLockContext() {
     auto error = eglGetError();
     if (error == EGL_CONTEXT_LOST) {
       LOGE("EGLDevice::onLockContext() EGL_CONTEXT_LOST detected.");
-      markContextLost();
+      handleContextLost();
     } else {
       LOGE("EGLDevice::onLockContext() failure result = %d error= %d", result, error);
     }
@@ -303,7 +303,7 @@ void EGLDevice::onUnlockContext() {
     auto error = eglGetError();
     if (error == EGL_CONTEXT_LOST) {
       LOGE("EGLDevice::onUnlockContext() EGL_CONTEXT_LOST detected.");
-      markContextLost();
+      handleContextLost();
     } else {
       LOGE("EGLDevice::onUnlockContext() failure error=%d", error);
     }
@@ -314,11 +314,11 @@ void EGLDevice::onUnlockContext() {
   }
 }
 
-void EGLDevice::markContextLost() {
+void EGLDevice::handleContextLost() {
   if (_contextLost) {
     return;
   }
-  LOGE("EGLDevice::markContextLost() Context [%p] has been permanently lost.", eglContext);
+  LOGE("EGLDevice::handleContextLost() Context [%p] has been permanently lost.", eglContext);
   // On EGL platforms, a GPU reset affects all contexts. Notify all registered devices.
   MarkAllContextsLost();
 }

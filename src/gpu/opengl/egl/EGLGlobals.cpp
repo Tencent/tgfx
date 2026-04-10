@@ -44,7 +44,7 @@ EGLGlobals InitializeEGL() {
   eglBindAPI(EGL_OPENGL_ES_API);
   auto extensions = eglQueryString(globals.display, EGL_EXTENSIONS);
   if (extensions && strstr(extensions, "EGL_EXT_create_context_robustness")) {
-    globals.hasContextRobustness = true;
+    globals.contextRobustnessSupported = true;
   }
   EGLint numConfigs = 0;
   const EGLint configAttribs[] = {EGL_SURFACE_TYPE,

@@ -48,6 +48,6 @@ class EGLGlobals {
    * Indicates whether the EGL display supports the EGL_EXT_create_context_robustness extension,
    * which enables GPU reset detection and loss-of-context notification.
    */
-  bool hasContextRobustness = false;
+  bool contextRobustnessSupported = false;
 };
 }  // namespace tgfx

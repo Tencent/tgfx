@@ -78,7 +78,7 @@ class EGLDevice : public GLDevice {
 
   bool recreateSurfaceIfNeeded(EGLNativeWindowType nativeWindow);
 
-  void markContextLost();
+  void handleContextLost();
 
   bool checkGraphicsResetStatus();
 
