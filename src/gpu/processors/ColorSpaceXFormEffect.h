@@ -49,6 +49,20 @@ class ColorSpaceXformEffect : public FragmentProcessor {
                          size_t transformedCoordVarsIdx,
                          const EmitChildFunc& emitChild) const override;
 
+  void onBuildShaderMacros(ShaderMacroSet& macros) const override;
+
+  std::string shaderFunctionFile() const override {
+    return "fragment/color_space_xform.frag";
+  }
+
+  void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
+                        MangledSamplers& samplers) const override;
+
+  ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
+                                      const MangledUniforms& uniforms,
+                                      const MangledVaryings& varyings,
+                                      const MangledSamplers& samplers) const override;
+
  private:
   DEFINE_PROCESSOR_CLASS_ID
   void onSetData(UniformData*, UniformData*) const override;
