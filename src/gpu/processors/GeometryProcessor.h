@@ -92,6 +92,7 @@ class GeometryProcessor : public Processor {
     FPCoordTransformHandler* fpCoordTransformHandler;
     std::string* outputSubset = nullptr;
     bool skipFragmentCode = false;
+    bool skipVertexCode = false;
     MangledVaryings* gpVaryings = nullptr;
     MangledUniforms* gpUniforms = nullptr;
   };

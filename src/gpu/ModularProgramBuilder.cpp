@@ -252,23 +252,25 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
   bool useModularFS = true;
 
   if (useModularFS) {
-    // Modular FS path: call emitCode with skipFragmentCode=true for VS-only.
+    // Modular path: call emitCode with skipFragmentCode=true and skipVertexCode=true.
     MangledVaryings gpVaryings;
     MangledUniforms gpUniforms;
     GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(),
                                      varyingHandler(), uniformHandler(), getContext()->shaderCaps(),
                                      *outputColor, *outputCoverage, &transformHandler,
                                      &subsetVarName, true);
+    args.skipVertexCode = true;
     args.gpVaryings = &gpVaryings;
     args.gpUniforms = &gpUniforms;
     geometryProcessor->emitCode(args);
 
-    // Emit GP shader macros and generate FS function calls.
+    // Emit GP shader macros to both VS and FS definitions.
     ShaderMacroSet macros;
     geometryProcessor->onBuildShaderMacros(macros);
     if (!macros.empty()) {
-      fragmentShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] +=
-          macros.toPreamble();
+      auto preamble = macros.toPreamble();
+      fragmentShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] += preamble;
+      vertexShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] += preamble;
     }
     auto colorResult = geometryProcessor->buildColorCallExpr(gpUniforms, gpVaryings);
     auto coverageResult = geometryProcessor->buildCoverageCallExpr(gpUniforms, gpVaryings);
@@ -339,8 +341,12 @@ void ModularProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
   auto result = xferProcessor->buildXferCallStatement(inputColor, inputCoverage, outputColor,
                                                       dstColorExpr, uniforms, samplers);
   if (!result.statement.empty()) {
-    // Include blend mode utility functions for advanced modes.
+    // Include XP module and blend mode utility functions.
     includeModule(ShaderModuleID::BlendModes);
+    auto xpName = xferProcessor->name();
+    if (ShaderModuleRegistry::HasModule(xpName)) {
+      includeModule(ShaderModuleRegistry::GetModuleID(xpName));
+    }
     fragmentShaderBuilder()->codeAppend(result.statement);
   } else {
     // Fallback to legacy emitCode().

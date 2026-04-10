@@ -43,21 +43,54 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
 
   auto matrixName =
       args.uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  std::string positionName = "position";
-  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
-                           matrixName.c_str(), position.name().c_str());
-
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
+  if (args.gpUniforms) {
+    args.gpUniforms->add("Matrix", matrixName);
+  }
 
   std::string coverageFsIn;
+  std::string coverageVsOut;
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
     coverageFsIn = coverageVar.fsIn();
+    coverageVsOut = coverageVar.vsOut();
     if (args.gpVaryings) {
       args.gpVaryings->add("Coverage", coverageFsIn);
     }
   }
+
+  std::string positionName = "position";
+  if (args.skipVertexCode) {
+    // Modular VS: inject .vert.glsl function and generate call.
+    static const std::string kDefaultGPVert = R"GLSL(
+void TGFX_DefaultGP_VS(vec2 inPosition, mat3 matrix,
+#ifdef TGFX_GP_DEFAULT_COVERAGE_AA
+                        float inCoverage, out float vCoverage,
+#endif
+                        out vec2 position) {
+    position = (matrix * vec3(inPosition, 1.0)).xy;
+#ifdef TGFX_GP_DEFAULT_COVERAGE_AA
+    vCoverage = inCoverage;
+#endif
+}
+)GLSL";
+    // Emit GP macros to VS definitions (handled by ModularProgramBuilder).
+    vertBuilder->addFunction(kDefaultGPVert);
+    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+    std::string call = "TGFX_DefaultGP_VS(" + std::string(position.name()) + ", " + matrixName;
+    if (aa == AAType::Coverage) {
+      call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
+    }
+    call += ", " + positionName + ");";
+    vertBuilder->codeAppend(call);
+  } else {
+    vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
+                             matrixName.c_str(), position.name().c_str());
+    if (aa == AAType::Coverage) {
+      vertBuilder->codeAppendf("%s = %s;", coverageVsOut.c_str(), coverage.name().c_str());
+    }
+  }
+
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
 
   auto colorName =
       args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
