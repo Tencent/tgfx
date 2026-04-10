@@ -30,7 +30,7 @@
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
-static constexpr size_t MAX_PROGRAM_COUNT = 128;
+static constexpr size_t MAX_PROGRAM_COUNT = 256;
 static constexpr size_t MAX_NUM_CACHED_GRADIENT_BITMAPS = 32;
 static constexpr uint16_t VERTICES_PER_NON_AA_QUAD = 4;
 static constexpr uint16_t VERTICES_PER_AA_QUAD = 8;

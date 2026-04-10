@@ -81,7 +81,8 @@ static bool ShouldRasterizeForBackground(Canvas* canvas,
  * directly completed through the clipping rectangle. Otherwise, the canvas will not contain this
  * matrix information, and clipping needs to be done by transforming the Path.
  */
-static void ClipScrollRect(Canvas* canvas, const Rect* scrollRect, const Matrix3D* transform) {
+static void ClipScrollRect(Canvas* canvas, const Rect* scrollRect, const Matrix3D* transform,
+                           bool antiAlias) {
   if (scrollRect == nullptr) {
     return;
   }
@@ -90,9 +91,9 @@ static void ClipScrollRect(Canvas* canvas, const Rect* scrollRect, const Matrix3
     Path path;
     path.addRect(*scrollRect);
     path.transform3D(*transform);
-    canvas->clipPath(path);
+    canvas->clipPath(path, antiAlias);
   } else {
-    canvas->clipRect(*scrollRect);
+    canvas->clipRect(*scrollRect, antiAlias);
   }
 }
 
@@ -1236,10 +1237,10 @@ bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
     if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
       return false;
     }
-    canvas->clipPath(maskData.clipPath);
+    canvas->clipPath(maskData.clipPath, _mask->bitFields.allowsEdgeAntialiasing);
     auto blurCanvas = args.blurBackground ? args.blurBackground->getCanvas() : nullptr;
     if (blurCanvas) {
-      blurCanvas->clipPath(maskData.clipPath);
+      blurCanvas->clipPath(maskData.clipPath, _mask->bitFields.allowsEdgeAntialiasing);
     }
     return true;
   }
@@ -1377,7 +1378,7 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs,
     auto offscreenCanvas = recorder.beginRecording();
     auto mappedBounds = contentMatrix.mapRect(*inputBounds);
     mappedBounds.roundOut();
-    offscreenCanvas->clipRect(mappedBounds);
+    offscreenCanvas->clipRect(mappedBounds, false);
     offscreenCanvas->setMatrix(contentMatrix);
     drawDirectly(contentArgs, offscreenCanvas, 1.0f);
     Point offset = {};
@@ -1397,7 +1398,7 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs,
   auto mappedBounds = *inputBounds;
   mappedBounds.scale(contentScale, contentScale);
   mappedBounds.roundOut();
-  offscreenCanvas->clipRect(mappedBounds);
+  offscreenCanvas->clipRect(mappedBounds, false);
   offscreenCanvas->scale(contentScale, contentScale);
   drawDirectly(contentArgs, offscreenCanvas, 1.0f);
   Point offset = {};
@@ -1781,7 +1782,7 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
       if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
         return allMatch;
       }
-      canvas->clipPath(maskData.clipPath);
+      canvas->clipPath(maskData.clipPath, _mask->bitFields.allowsEdgeAntialiasing);
     } else {
       maskFilter = maskData.maskFilter;
     }
@@ -1959,10 +1960,11 @@ bool Layer::drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, f
   const auto canvasMatrix = context3D == nullptr ? childTransform3D.asMatrix() : Matrix::I();
   const auto* scrollRectTransform = context3D == nullptr ? nullptr : &childTransform3D;
   canvas->concat(canvasMatrix);
-  ClipScrollRect(canvas, child->_scrollRect.get(), scrollRectTransform);
+  auto scrollRectAA = child->bitFields.allowsEdgeAntialiasing;
+  ClipScrollRect(canvas, child->_scrollRect.get(), scrollRectTransform, scrollRectAA);
   if (backgroundCanvas) {
     backgroundCanvas->concat(canvasMatrix);
-    ClipScrollRect(backgroundCanvas, child->_scrollRect.get(), scrollRectTransform);
+    ClipScrollRect(backgroundCanvas, child->_scrollRect.get(), scrollRectTransform, scrollRectAA);
   }
 
   Canvas* targetCanvas = canvas;
@@ -2001,7 +2003,7 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
   _parent->drawContents(args, canvas, currentAlpha, layerStyleSource.get(), this);
   canvas->concat(getMatrixWithScrollRect().asMatrix());
   if (_scrollRect) {
-    canvas->clipRect(*_scrollRect);
+    canvas->clipRect(*_scrollRect, bitFields.allowsEdgeAntialiasing);
   }
   return currentAlpha * _alpha;
 }
@@ -2152,7 +2154,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
     PictureRecorder recorder = {};
     auto pictureCanvas = recorder.beginRecording();
     if (clipBounds.has_value()) {
-      pictureCanvas->clipRect(*clipBounds);
+      pictureCanvas->clipRect(*clipBounds, false);
     }
     switch (layerStyle->extraSourceType()) {
       case LayerStyleExtraSourceType::None:
