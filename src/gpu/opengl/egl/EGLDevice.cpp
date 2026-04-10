@@ -336,7 +336,7 @@ bool EGLDevice::checkGraphicsResetStatus() {
   if (status != GL_NO_ERROR) {
     graphicsResetStatus = status;
     LOGE("EGLDevice::checkGraphicsResetStatus() GPU reset detected: status=0x%x", status);
-    markContextLost();
+    handleContextLost();
     return true;
   }
   return false;
