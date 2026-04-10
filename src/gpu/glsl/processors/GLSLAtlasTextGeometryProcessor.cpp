@@ -83,12 +83,23 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   DEBUG_ASSERT(textureView != nullptr);
   DEBUG_ASSERT(textureView->getTexture() != nullptr);
   auto samplerHandle = uniformHandler->addSampler(textureView->getTexture(), "TextureSampler");
-  if (args.gpUniforms) {
-    auto samplerVar = uniformHandler->getSamplerVariable(samplerHandle);
-    args.gpUniforms->add("TextureSampler", samplerVar.name());
-  }
 
-  if (!args.skipFragmentCode) {
+  if (args.skipFragmentCode) {
+    // Modular path: emit the texture lookup (with correct swizzle) as a shared FS variable,
+    // then record its name so buildColorCallExpr/buildCoverageCallExpr can reference it.
+    auto fragBuilder = args.fragBuilder;
+    fragBuilder->codeAppend("vec4 _atlasTexColor = ");
+    fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.fsIn());
+    fragBuilder->codeAppend(";\n");
+    if (args.gpUniforms) {
+      args.gpUniforms->add("atlasTexColor", "_atlasTexColor");
+      if (commonColor.has_value()) {
+        // Color uniform already registered above.
+      } else {
+        // Color varying already registered above.
+      }
+    }
+  } else {
     if (aa == AAType::Coverage) {
       fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverageFsIn.c_str());
     } else {

@@ -66,10 +66,8 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
                                       const MangledVaryings& varyings) const override {
     ShaderCallResult result;
     result.outputVarName = "gpColor";
-    auto sampler = uniforms.get("TextureSampler");
-    auto coord = varyings.get("textureCoords");
+    auto texColor = uniforms.get("atlasTexColor");
     std::string code;
-    code += "vec4 texColor = texture(" + sampler + ", " + coord + ");\n";
     if (textureProxy->isAlphaOnly()) {
       if (commonColor.has_value()) {
         code += "vec4 gpColor = " + uniforms.get("Color") + ";\n";
@@ -77,28 +75,26 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
         code += "vec4 gpColor = " + varyings.get("Color") + ";\n";
       }
     } else {
-      code += "vec4 gpColor = clamp(vec4(texColor.rgb/texColor.a, 1.0), 0.0, 1.0);\n";
+      code +=
+          "vec4 gpColor = clamp(vec4(" + texColor + ".rgb/" + texColor + ".a, 1.0), 0.0, 1.0);\n";
     }
     result.statement = code;
     return result;
   }
 
-  ShaderCallResult buildCoverageCallExpr(const MangledUniforms& uniforms,
+  ShaderCallResult buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
                                          const MangledVaryings& varyings) const override {
     ShaderCallResult result;
     result.outputVarName = "gpCoverage";
-    auto sampler = uniforms.get("TextureSampler");
-    auto coord = varyings.get("textureCoords");
     std::string code;
-    code += "vec4 texColor2 = texture(" + sampler + ", " + coord + ");\n";
     if (textureProxy->isAlphaOnly()) {
-      code += "vec4 gpCoverage = vec4(texColor2.a);\n";
+      code += "vec4 gpCoverage = vec4(_atlasTexColor.a);\n";
     } else {
       if (aa == AAType::Coverage) {
         auto cov = varyings.get("Coverage");
-        code += "vec4 gpCoverage = vec4(texColor2.a) * vec4(" + cov + ");\n";
+        code += "vec4 gpCoverage = vec4(_atlasTexColor.a) * vec4(" + cov + ");\n";
       } else {
-        code += "vec4 gpCoverage = vec4(texColor2.a);\n";
+        code += "vec4 gpCoverage = vec4(_atlasTexColor.a);\n";
       }
     }
     result.statement = code;
