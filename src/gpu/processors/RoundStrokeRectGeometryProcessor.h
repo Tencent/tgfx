@@ -56,6 +56,48 @@ class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
     return "geometry/round_stroke_rect_geometry";
   }
 
+  ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,
+                                      const MangledVaryings& varyings) const override {
+    ShaderCallResult result;
+    result.outputVarName = "gpColor";
+    if (commonColor.has_value()) {
+      result.statement = "vec4 gpColor = " + uniforms.get("Color") + ";\n";
+    } else {
+      result.statement = "vec4 gpColor = " + varyings.get("Color") + ";\n";
+    }
+    return result;
+  }
+
+  ShaderCallResult buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
+                                         const MangledVaryings& varyings) const override {
+    ShaderCallResult result;
+    result.outputVarName = "gpCoverage";
+    auto offsets = varyings.get("EllipseOffsets");
+    std::string code;
+    if (aaType == AAType::Coverage) {
+      auto cov = varyings.get("Coverage");
+      auto radii = varyings.get("EllipseRadii");
+      code += "vec4 gpCoverage = vec4(" + cov + ");\n";
+      code += "vec2 offset = " + offsets + ";\n";
+      code += "float test = dot(offset, offset) - 1.0;\n";
+      code += "if (test > -0.5) {\n";
+      code += "vec2 grad = 2.0 * offset * " + radii + ";\n";
+      code += "float grad_dot = dot(grad, grad);\n";
+      code += "grad_dot = max(grad_dot, 1.1755e-38);\n";
+      code += "float invlen = inversesqrt(grad_dot);\n";
+      code += "float edgeAlpha = clamp(0.5 - test * invlen, 0.0, 1.0);\n";
+      code += "gpCoverage *= edgeAlpha;\n";
+      code += "}\n";
+    } else {
+      code += "vec2 offset = " + offsets + ";\n";
+      code += "float test = dot(offset, offset);\n";
+      code += "float edgeAlpha = step(test, 1.0);\n";
+      code += "vec4 gpCoverage = vec4(edgeAlpha);\n";
+    }
+    result.statement = code;
+    return result;
+  }
+
   bool hasUVPerspective() const override {
     return uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
   }

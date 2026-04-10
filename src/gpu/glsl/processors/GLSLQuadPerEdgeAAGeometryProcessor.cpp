@@ -43,23 +43,44 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   auto& uvCoordsVar = uvCoord.empty() ? position : uvCoord;
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
 
+  std::string coverageFsIn;
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
-    fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
-                             coverageVar.fsIn().c_str());
-  } else {
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    coverageFsIn = coverageVar.fsIn();
+    if (args.gpVaryings) {
+      args.gpVaryings->add("Coverage", coverageFsIn);
+    }
   }
 
+  std::string colorFsIn;
   if (commonColor.has_value()) {
     auto colorName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    if (args.gpUniforms) {
+      args.gpUniforms->add("Color", colorName);
+    }
+    colorFsIn = colorName;
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
     vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
+    colorFsIn = colorVar.fsIn();
+    if (args.gpVaryings) {
+      args.gpVaryings->add("Color", colorFsIn);
+    }
+  }
+
+  if (!args.skipFragmentCode) {
+    if (aa == AAType::Coverage) {
+      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverageFsIn.c_str());
+    } else {
+      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    }
+    if (commonColor.has_value()) {
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorFsIn.c_str());
+    } else {
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorFsIn.c_str());
+    }
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.

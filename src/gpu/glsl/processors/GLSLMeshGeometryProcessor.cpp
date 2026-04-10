@@ -61,27 +61,44 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
     emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
   }
 
+  std::string colorFsIn;
   if (hasColors) {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
     vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
-
-    // Output vertex color (will be modulated by FragmentProcessor if texCoords present)
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
+    colorFsIn = colorVar.fsIn();
+    if (args.gpVaryings) {
+      args.gpVaryings->add("Color", colorFsIn);
+    }
   } else {
     auto colorName =
         uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    colorFsIn = colorName;
+    if (args.gpUniforms) {
+      args.gpUniforms->add("Color", colorName);
+    }
   }
 
   // Handle coverage for anti-aliasing
+  std::string coverageFsIn;
   if (hasCoverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
-    fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
-                             coverageVar.fsIn().c_str());
-  } else {
-    // No coverage for mesh (no anti-aliasing)
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    coverageFsIn = coverageVar.fsIn();
+    if (args.gpVaryings) {
+      args.gpVaryings->add("Coverage", coverageFsIn);
+    }
+  }
+
+  if (!args.skipFragmentCode) {
+    // Output vertex color (will be modulated by FragmentProcessor if texCoords present)
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorFsIn.c_str());
+
+    if (hasCoverage) {
+      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverageFsIn.c_str());
+    } else {
+      // No coverage for mesh (no anti-aliasing)
+      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    }
   }
 
   vertBuilder->emitNormalizedPosition(positionName);

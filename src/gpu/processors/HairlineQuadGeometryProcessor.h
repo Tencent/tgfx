@@ -62,6 +62,37 @@ class HairlineQuadGeometryProcessor : public GeometryProcessor {
     return "geometry/hairline_quad_geometry";
   }
 
+  ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,
+                                      const MangledVaryings& /*varyings*/) const override {
+    ShaderCallResult result;
+    result.outputVarName = "gpColor";
+    result.statement = "vec4 gpColor = " + uniforms.get("Color") + ";\n";
+    return result;
+  }
+
+  ShaderCallResult buildCoverageCallExpr(const MangledUniforms& uniforms,
+                                         const MangledVaryings& varyings) const override {
+    ShaderCallResult result;
+    result.outputVarName = "gpCoverage";
+    auto edge = varyings.get("HairQuadEdge");
+    auto covScale = uniforms.get("Coverage");
+    std::string code;
+    code += "float edgeAlpha;\n";
+    code += "vec2 duvdx = vec2(dFdx(" + edge + ".xy));\n";
+    code += "vec2 duvdy = vec2(dFdy(" + edge + ".xy));\n";
+    code += "vec2 gF = vec2(2.0 * " + edge + ".x * duvdx.x - duvdx.y,";
+    code += "               2.0 * " + edge + ".x * duvdy.x - duvdy.y);\n";
+    code += "edgeAlpha = float(" + edge + ".x * " + edge + ".x - " + edge + ".y);\n";
+    code += "edgeAlpha = sqrt(edgeAlpha * edgeAlpha / dot(gF, gF));\n";
+    code += "edgeAlpha = max(1.0 - edgeAlpha, 0.0);\n";
+    if (aaType != AAType::Coverage) {
+      code += "edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;\n";
+    }
+    code += "vec4 gpCoverage = vec4(" + covScale + " * edgeAlpha);\n";
+    result.statement = code;
+    return result;
+  }
+
   PMColor color = {};
   Matrix viewMatrix = {};
   std::optional<Matrix> uvMatrix = std::nullopt;

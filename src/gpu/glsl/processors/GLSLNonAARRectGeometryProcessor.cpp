@@ -40,14 +40,21 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   varyingHandler->emitAttributes(*this);
 
   // Setup color output
+  std::string colorFsIn;
   if (commonColor.has_value()) {
     auto colorName =
         uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    colorFsIn = colorName;
+    if (args.gpUniforms) {
+      args.gpUniforms->add("Color", colorName);
+    }
   } else {
     auto color = varyingHandler->addVarying("Color", SLType::Float4);
     vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), inColor.name().c_str());
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
+    colorFsIn = color.fsIn();
+    if (args.gpVaryings) {
+      args.gpVaryings->add("Color", colorFsIn);
+    }
   }
 
   // Output position using RTAdjust uniform
@@ -57,14 +64,23 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   auto localCoordVarying = varyingHandler->addVarying("localCoord", SLType::Float2);
   vertBuilder->codeAppendf("%s = %s;", localCoordVarying.vsOut().c_str(),
                            inLocalCoord.name().c_str());
+  if (args.gpVaryings) {
+    args.gpVaryings->add("localCoord", localCoordVarying.fsIn());
+  }
 
   // Pass radii to fragment shader
   auto radiiVarying = varyingHandler->addVarying("radii", SLType::Float2);
   vertBuilder->codeAppendf("%s = %s;", radiiVarying.vsOut().c_str(), inRadii.name().c_str());
+  if (args.gpVaryings) {
+    args.gpVaryings->add("radii", radiiVarying.fsIn());
+  }
 
   // Pass rect bounds to fragment shader
   auto boundsVarying = varyingHandler->addVarying("rectBounds", SLType::Float4);
   vertBuilder->codeAppendf("%s = %s;", boundsVarying.vsOut().c_str(), inRectBounds.name().c_str());
+  if (args.gpVaryings) {
+    args.gpVaryings->add("rectBounds", boundsVarying.fsIn());
+  }
 
   // Pass stroke width to fragment shader (stroke mode only)
   Varying strokeWidthVarying;
@@ -72,50 +88,58 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
     strokeWidthVarying = varyingHandler->addVarying("strokeWidth", SLType::Float2);
     vertBuilder->codeAppendf("%s = %s;", strokeWidthVarying.vsOut().c_str(),
                              inStrokeWidth.name().c_str());
+    if (args.gpVaryings) {
+      args.gpVaryings->add("strokeWidth", strokeWidthVarying.fsIn());
+    }
   }
 
   // Emit transforms using position as UV coordinates.
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
                  ShaderVar(inPosition.name(), SLType::Float2));
 
-  // Fragment shader - evaluate round rect shape using SDF
-  fragBuilder->codeAppendf("vec2 localCoord = %s;", localCoordVarying.fsIn().c_str());
-  fragBuilder->codeAppendf("vec2 radii = %s;", radiiVarying.fsIn().c_str());
-  fragBuilder->codeAppendf("vec4 bounds = %s;", boundsVarying.fsIn().c_str());
+  if (!args.skipFragmentCode) {
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorFsIn.c_str());
 
-  // Calculate outer round rect coverage using SDF
-  fragBuilder->codeAppend("vec2 center = (bounds.xy + bounds.zw) * 0.5;");
-  fragBuilder->codeAppend("vec2 halfSize = (bounds.zw - bounds.xy) * 0.5;");
-  fragBuilder->codeAppend("vec2 q = abs(localCoord - center) - halfSize + radii;");
-  fragBuilder->codeAppend(
-      "float d = min(max(q.x / radii.x, q.y / radii.y), 0.0) + length(max(q / radii, 0.0)) - 1.0;");
-  fragBuilder->codeAppend("float outerCoverage = step(d, 0.0);");
+    // Fragment shader - evaluate round rect shape using SDF
+    fragBuilder->codeAppendf("vec2 localCoord = %s;", localCoordVarying.fsIn().c_str());
+    fragBuilder->codeAppendf("vec2 radii = %s;", radiiVarying.fsIn().c_str());
+    fragBuilder->codeAppendf("vec4 bounds = %s;", boundsVarying.fsIn().c_str());
 
-  if (stroke) {
-    // Stroke mode: also check inner round rect using SDF
-    fragBuilder->codeAppendf("vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
-    fragBuilder->codeAppend("vec2 innerHalfSize = halfSize - 2.0 * sw;");
-    fragBuilder->codeAppend("vec2 innerRadii = max(radii - 2.0 * sw, vec2(0.0));");
-    fragBuilder->codeAppend("float innerCoverage = 0.0;");
-    // Check if inner rect is valid (not degenerate)
-    fragBuilder->codeAppend("if (innerHalfSize.x > 0.0 && innerHalfSize.y > 0.0) {");
-    fragBuilder->codeAppend("  vec2 qi = abs(localCoord - center) - innerHalfSize + innerRadii;");
-    // Use safe division for inner radii (avoid division by zero)
-    fragBuilder->codeAppend("  vec2 safeInnerRadii = max(innerRadii, vec2(0.001));");
+    // Calculate outer round rect coverage using SDF
+    fragBuilder->codeAppend("vec2 center = (bounds.xy + bounds.zw) * 0.5;");
+    fragBuilder->codeAppend("vec2 halfSize = (bounds.zw - bounds.xy) * 0.5;");
+    fragBuilder->codeAppend("vec2 q = abs(localCoord - center) - halfSize + radii;");
     fragBuilder->codeAppend(
-        "  float di = min(max(qi.x / safeInnerRadii.x, qi.y / safeInnerRadii.y), 0.0) + "
-        "length(max(qi / safeInnerRadii, vec2(0.0))) - 1.0;");
-    fragBuilder->codeAppend("  innerCoverage = step(di, 0.0);");
-    fragBuilder->codeAppend("}");
+        "float d = min(max(q.x / radii.x, q.y / radii.y), 0.0) + length(max(q / radii, 0.0)) - "
+        "1.0;");
+    fragBuilder->codeAppend("float outerCoverage = step(d, 0.0);");
 
-    // Final coverage: inside outer but outside inner
-    fragBuilder->codeAppend("float coverage = outerCoverage * (1.0 - innerCoverage);");
-  } else {
-    // Fill mode: just use outer coverage
-    fragBuilder->codeAppend("float coverage = outerCoverage;");
+    if (stroke) {
+      // Stroke mode: also check inner round rect using SDF
+      fragBuilder->codeAppendf("vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
+      fragBuilder->codeAppend("vec2 innerHalfSize = halfSize - 2.0 * sw;");
+      fragBuilder->codeAppend("vec2 innerRadii = max(radii - 2.0 * sw, vec2(0.0));");
+      fragBuilder->codeAppend("float innerCoverage = 0.0;");
+      // Check if inner rect is valid (not degenerate)
+      fragBuilder->codeAppend("if (innerHalfSize.x > 0.0 && innerHalfSize.y > 0.0) {");
+      fragBuilder->codeAppend("  vec2 qi = abs(localCoord - center) - innerHalfSize + innerRadii;");
+      // Use safe division for inner radii (avoid division by zero)
+      fragBuilder->codeAppend("  vec2 safeInnerRadii = max(innerRadii, vec2(0.001));");
+      fragBuilder->codeAppend(
+          "  float di = min(max(qi.x / safeInnerRadii.x, qi.y / safeInnerRadii.y), 0.0) + "
+          "length(max(qi / safeInnerRadii, vec2(0.0))) - 1.0;");
+      fragBuilder->codeAppend("  innerCoverage = step(di, 0.0);");
+      fragBuilder->codeAppend("}");
+
+      // Final coverage: inside outer but outside inner
+      fragBuilder->codeAppend("float coverage = outerCoverage * (1.0 - innerCoverage);");
+    } else {
+      // Fill mode: just use outer coverage
+      fragBuilder->codeAppend("float coverage = outerCoverage;");
+    }
+
+    fragBuilder->codeAppendf("%s = vec4(coverage);", args.outputCoverage.c_str());
   }
-
-  fragBuilder->codeAppendf("%s = vec4(coverage);", args.outputCoverage.c_str());
 }
 
 void GLSLNonAARRectGeometryProcessor::setData(UniformData* vertexUniformData,

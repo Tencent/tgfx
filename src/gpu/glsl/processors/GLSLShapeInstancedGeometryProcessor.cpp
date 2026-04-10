@@ -65,22 +65,39 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, localVar);
 
   // Coverage varying for AA.
+  std::string coverageFsIn;
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
-    fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
-                             coverageVar.fsIn().c_str());
-  } else {
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    coverageFsIn = coverageVar.fsIn();
+    if (args.gpVaryings) {
+      args.gpVaryings->add("Coverage", coverageFsIn);
+    }
   }
 
   // Color: per-instance color or opaque white (overridden by shader FP).
+  std::string colorFsIn;
   if (hasColors) {
     auto colorVar = varyingHandler->addVarying("InstanceColor", SLType::Float4);
     vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), instanceColor.name().c_str());
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
-  } else {
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputColor.c_str());
+    colorFsIn = colorVar.fsIn();
+    if (args.gpVaryings) {
+      args.gpVaryings->add("InstanceColor", colorFsIn);
+    }
+  }
+
+  if (!args.skipFragmentCode) {
+    if (aa == AAType::Coverage) {
+      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverageFsIn.c_str());
+    } else {
+      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    }
+
+    if (hasColors) {
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorFsIn.c_str());
+    } else {
+      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputColor.c_str());
+    }
   }
 
   // Emit the vertex position to NDC.

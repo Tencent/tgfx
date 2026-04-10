@@ -56,23 +56,35 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   // Pass edge distance to fragment shader for anti-aliasing
   auto edgeVarying = varyingHandler->addVarying("EdgeDistance", SLType::Float);
   vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(), edgeDistance.name().c_str());
-
-  // Fragment shader: calculate anti-aliasing based on edge distance
-  fragBuilder->codeAppendf("float edgeAlpha = abs(%s);", edgeVarying.fsIn().c_str());
-  fragBuilder->codeAppend("edgeAlpha = clamp(edgeAlpha, 0.0, 1.0);");
-  if (aaType != AAType::Coverage) {
-    // Non-coverage anti-aliasing
-    fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
+  if (args.gpVaryings) {
+    args.gpVaryings->add("EdgeDistance", edgeVarying.fsIn());
   }
 
   // Output color and coverage
   auto colorName =
       uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+  if (args.gpUniforms) {
+    args.gpUniforms->add("Color", colorName);
+  }
   auto coverageScale =
       uniformHandler->addUniform("Coverage", UniformFormat::Float, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
-                           coverageScale.c_str());
+  if (args.gpUniforms) {
+    args.gpUniforms->add("Coverage", coverageScale);
+  }
+
+  if (!args.skipFragmentCode) {
+    // Fragment shader: calculate anti-aliasing based on edge distance
+    fragBuilder->codeAppendf("float edgeAlpha = abs(%s);", edgeVarying.fsIn().c_str());
+    fragBuilder->codeAppend("edgeAlpha = clamp(edgeAlpha, 0.0, 1.0);");
+    if (aaType != AAType::Coverage) {
+      // Non-coverage anti-aliasing
+      fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
+    }
+
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
+                             coverageScale.c_str());
+  }
 
   // Emit final vertex position
   vertBuilder->emitNormalizedPosition(positionName);

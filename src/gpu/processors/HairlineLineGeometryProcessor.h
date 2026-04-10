@@ -62,6 +62,31 @@ class HairlineLineGeometryProcessor : public GeometryProcessor {
     return "geometry/hairline_line_geometry";
   }
 
+  ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,
+                                      const MangledVaryings& /*varyings*/) const override {
+    ShaderCallResult result;
+    result.outputVarName = "gpColor";
+    result.statement = "vec4 gpColor = " + uniforms.get("Color") + ";\n";
+    return result;
+  }
+
+  ShaderCallResult buildCoverageCallExpr(const MangledUniforms& uniforms,
+                                         const MangledVaryings& varyings) const override {
+    ShaderCallResult result;
+    result.outputVarName = "gpCoverage";
+    auto edge = varyings.get("EdgeDistance");
+    auto covScale = uniforms.get("Coverage");
+    std::string code;
+    code += "float edgeAlpha = abs(" + edge + ");\n";
+    code += "edgeAlpha = clamp(edgeAlpha, 0.0, 1.0);\n";
+    if (aaType != AAType::Coverage) {
+      code += "edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;\n";
+    }
+    code += "vec4 gpCoverage = vec4(" + covScale + " * edgeAlpha);\n";
+    result.statement = code;
+    return result;
+  }
+
   PMColor color = {};
   Matrix viewMatrix = {};
   std::optional<Matrix> uvMatrix = std::nullopt;

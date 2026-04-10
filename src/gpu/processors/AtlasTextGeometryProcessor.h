@@ -62,6 +62,49 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
     return "geometry/atlas_text_geometry";
   }
 
+  ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,
+                                      const MangledVaryings& varyings) const override {
+    ShaderCallResult result;
+    result.outputVarName = "gpColor";
+    auto sampler = uniforms.get("TextureSampler");
+    auto coord = varyings.get("textureCoords");
+    std::string code;
+    code += "vec4 texColor = texture(" + sampler + ", " + coord + ");\n";
+    if (textureProxy->isAlphaOnly()) {
+      if (commonColor.has_value()) {
+        code += "vec4 gpColor = " + uniforms.get("Color") + ";\n";
+      } else {
+        code += "vec4 gpColor = " + varyings.get("Color") + ";\n";
+      }
+    } else {
+      code += "vec4 gpColor = clamp(vec4(texColor.rgb/texColor.a, 1.0), 0.0, 1.0);\n";
+    }
+    result.statement = code;
+    return result;
+  }
+
+  ShaderCallResult buildCoverageCallExpr(const MangledUniforms& uniforms,
+                                         const MangledVaryings& varyings) const override {
+    ShaderCallResult result;
+    result.outputVarName = "gpCoverage";
+    auto sampler = uniforms.get("TextureSampler");
+    auto coord = varyings.get("textureCoords");
+    std::string code;
+    code += "vec4 texColor2 = texture(" + sampler + ", " + coord + ");\n";
+    if (textureProxy->isAlphaOnly()) {
+      code += "vec4 gpCoverage = vec4(texColor2.a);\n";
+    } else {
+      if (aa == AAType::Coverage) {
+        auto cov = varyings.get("Coverage");
+        code += "vec4 gpCoverage = vec4(texColor2.a) * vec4(" + cov + ");\n";
+      } else {
+        code += "vec4 gpCoverage = vec4(texColor2.a);\n";
+      }
+    }
+    result.statement = code;
+    return result;
+  }
+
   std::shared_ptr<Texture> onTextureAt(size_t index) const override {
     DEBUG_ASSERT(index < textures.size());
     return textures[index];

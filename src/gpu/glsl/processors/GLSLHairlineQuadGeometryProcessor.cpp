@@ -56,40 +56,43 @@ void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
   // Pass quad edge UV coordinates to fragment shader for curve evaluation
   auto edgeVarying = varyingHandler->addVarying("HairQuadEdge", SLType::Float4);
   vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(), hairQuadEdge.name().c_str());
-
-  // Fragment shader: Loop-Blinn quadratic curve anti-aliasing
-  // The UV coordinates are set up so that the curve is defined by the implicit equation: u^2 - v = 0
-  // Points where u^2 < v are inside the curve, u^2 > v are outside.
-  const char* edge = edgeVarying.fsIn().c_str();
-  fragBuilder->codeAppendf("float edgeAlpha;");
-  // Compute screen-space partial derivatives of UV coordinates for gradient calculation
-  fragBuilder->codeAppendf("vec2 duvdx = vec2(dFdx(%s.xy));", edge);
-  fragBuilder->codeAppendf("vec2 duvdy = vec2(dFdy(%s.xy));", edge);
-  // Compute gradient of the implicit function F(u,v) = u^2 - v
-  // gradF = (dF/dx, dF/dy) where dF/dx = 2u * du/dx - dv/dx, dF/dy = 2u * du/dy - dv/dy
-  fragBuilder->codeAppendf(
-      "vec2 gF = vec2(2.0 * %s.x * duvdx.x - duvdx.y,"
-      "               2.0 * %s.x * duvdy.x - duvdy.y);",
-      edge, edge);
-  // Evaluate the implicit function: F = u^2 - v (positive outside, negative inside)
-  fragBuilder->codeAppendf("edgeAlpha = float(%s.x * %s.x - %s.y);", edge, edge, edge);
-  // Convert to signed distance and normalize by gradient magnitude for anti-aliasing
-  fragBuilder->codeAppend("edgeAlpha = sqrt(edgeAlpha * edgeAlpha / dot(gF, gF));");
-  // Invert so that 1.0 = on curve, 0.0 = far from curve
-  fragBuilder->codeAppend("edgeAlpha = max(1.0 - edgeAlpha, 0.0);");
-  if (aaType != AAType::Coverage) {
-    // Non-coverage AA: threshold to binary
-    fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
+  if (args.gpVaryings) {
+    args.gpVaryings->add("HairQuadEdge", edgeVarying.fsIn());
   }
 
-  // Output color and coverage
+  // Output color and coverage uniforms
   auto colorName =
       uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+  if (args.gpUniforms) {
+    args.gpUniforms->add("Color", colorName);
+  }
   auto coverageScale =
       uniformHandler->addUniform("Coverage", UniformFormat::Float, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
-                           coverageScale.c_str());
+  if (args.gpUniforms) {
+    args.gpUniforms->add("Coverage", coverageScale);
+  }
+
+  if (!args.skipFragmentCode) {
+    // Fragment shader: Loop-Blinn quadratic curve anti-aliasing
+    const char* edge = edgeVarying.fsIn().c_str();
+    fragBuilder->codeAppendf("float edgeAlpha;");
+    fragBuilder->codeAppendf("vec2 duvdx = vec2(dFdx(%s.xy));", edge);
+    fragBuilder->codeAppendf("vec2 duvdy = vec2(dFdy(%s.xy));", edge);
+    fragBuilder->codeAppendf(
+        "vec2 gF = vec2(2.0 * %s.x * duvdx.x - duvdx.y,"
+        "               2.0 * %s.x * duvdy.x - duvdy.y);",
+        edge, edge);
+    fragBuilder->codeAppendf("edgeAlpha = float(%s.x * %s.x - %s.y);", edge, edge, edge);
+    fragBuilder->codeAppend("edgeAlpha = sqrt(edgeAlpha * edgeAlpha / dot(gF, gF));");
+    fragBuilder->codeAppend("edgeAlpha = max(1.0 - edgeAlpha, 0.0);");
+    if (aaType != AAType::Coverage) {
+      fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
+    }
+
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
+                             coverageScale.c_str());
+  }
 
   // Emit final vertex position
   vertBuilder->emitNormalizedPosition(positionName);

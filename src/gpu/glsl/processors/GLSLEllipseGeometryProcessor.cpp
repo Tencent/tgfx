@@ -41,61 +41,68 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
   vertBuilder->codeAppendf("%s = %s;", ellipseOffsets.vsOut().c_str(),
                            inEllipseOffset.name().c_str());
+  if (args.gpVaryings) {
+    args.gpVaryings->add("EllipseOffsets", ellipseOffsets.fsIn());
+  }
 
   auto ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float4);
   vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(), inEllipseRadii.name().c_str());
+  if (args.gpVaryings) {
+    args.gpVaryings->add("EllipseRadii", ellipseRadii.fsIn());
+  }
 
-  auto fragBuilder = args.fragBuilder;
   // setup pass through color
+  std::string colorFsIn;
   if (commonColor.has_value()) {
     auto colorName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    colorFsIn = colorName;
+    if (args.gpUniforms) {
+      args.gpUniforms->add("Color", colorName);
+    }
   } else {
     auto color = varyingHandler->addVarying("Color", SLType::Float4);
     vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), inColor.name().c_str());
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
+    colorFsIn = color.fsIn();
+    if (args.gpVaryings) {
+      args.gpVaryings->add("Color", colorFsIn);
+    }
   }
 
   // Setup position
   args.vertBuilder->emitNormalizedPosition(inPosition.name());
   // emit transforms
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(inPosition));
-  // For stroked ellipses, we use the full ellipse equation (x^2/a^2 + y^2/b^2 = 1)
-  // to compute both the edges because we need two separate test equations for
-  // the single offset.
-  // For filled ellipses we can use a unit circle equation (x^2 + y^2 = 1), and warp
-  // the distance by the gradient, non-uniformly scaled by the inverse of the
-  // ellipse size.
 
-  // On medium precision devices, we scale the denominator of the distance equation
-  // before taking the inverse square root to minimize the chance that we're dividing
-  // by zero, then we scale the result back.
+  if (!args.skipFragmentCode) {
+    auto fragBuilder = args.fragBuilder;
 
-  // for outer curve
-  fragBuilder->codeAppendf("vec2 offset = %s.xy;", ellipseOffsets.fsIn().c_str());
-  if (stroke) {
-    fragBuilder->codeAppendf("offset *= %s.xy;", ellipseRadii.fsIn().c_str());
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorFsIn.c_str());
+
+    fragBuilder->codeAppendf("vec2 offset = %s.xy;", ellipseOffsets.fsIn().c_str());
+    if (stroke) {
+      fragBuilder->codeAppendf("offset *= %s.xy;", ellipseRadii.fsIn().c_str());
+    }
+    fragBuilder->codeAppend("float test = dot(offset, offset) - 1.0;");
+    fragBuilder->codeAppendf("vec2 grad = 2.0*offset*%s.xy;", ellipseRadii.fsIn().c_str());
+    fragBuilder->codeAppend("float grad_dot = dot(grad, grad);");
+    fragBuilder->codeAppend("grad_dot = max(grad_dot, 1.1755e-38);");
+    fragBuilder->codeAppend("float invlen = inversesqrt(grad_dot);");
+    fragBuilder->codeAppend("float edgeAlpha = clamp(0.5-test*invlen, 0.0, 1.0);");
+
+    // for inner curve
+    if (stroke) {
+      fragBuilder->codeAppendf("offset = %s.xy*%s.zw;", ellipseOffsets.fsIn().c_str(),
+                               ellipseRadii.fsIn().c_str());
+      fragBuilder->codeAppend("test = dot(offset, offset) - 1.0;");
+      fragBuilder->codeAppendf("grad = 2.0*offset*%s.zw;", ellipseRadii.fsIn().c_str());
+      fragBuilder->codeAppend("grad_dot = dot(grad, grad);");
+      fragBuilder->codeAppend("invlen = inversesqrt(grad_dot);");
+      fragBuilder->codeAppend("edgeAlpha *= clamp(0.5+test*invlen, 0.0, 1.0);");
+    }
+
+    fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());
   }
-  fragBuilder->codeAppend("float test = dot(offset, offset) - 1.0;");
-  fragBuilder->codeAppendf("vec2 grad = 2.0*offset*%s.xy;", ellipseRadii.fsIn().c_str());
-  fragBuilder->codeAppend("float grad_dot = dot(grad, grad);");
-  fragBuilder->codeAppend("grad_dot = max(grad_dot, 1.1755e-38);");
-  fragBuilder->codeAppend("float invlen = inversesqrt(grad_dot);");
-  fragBuilder->codeAppend("float edgeAlpha = clamp(0.5-test*invlen, 0.0, 1.0);");
-
-  // for inner curve
-  if (stroke) {
-    fragBuilder->codeAppendf("offset = %s.xy*%s.zw;", ellipseOffsets.fsIn().c_str(),
-                             ellipseRadii.fsIn().c_str());
-    fragBuilder->codeAppend("test = dot(offset, offset) - 1.0;");
-    fragBuilder->codeAppendf("grad = 2.0*offset*%s.zw;", ellipseRadii.fsIn().c_str());
-    fragBuilder->codeAppend("grad_dot = dot(grad, grad);");
-    fragBuilder->codeAppend("invlen = inversesqrt(grad_dot);");
-    fragBuilder->codeAppend("edgeAlpha *= clamp(0.5+test*invlen, 0.0, 1.0);");
-  }
-
-  fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());
 }
 
 void GLSLEllipseGeometryProcessor::setData(UniformData* vertexUniformData,

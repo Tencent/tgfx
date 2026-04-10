@@ -65,6 +65,30 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
     return "geometry/quad_aa_geometry";
   }
 
+  ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,
+                                      const MangledVaryings& varyings) const override {
+    ShaderCallResult result;
+    result.outputVarName = "gpColor";
+    if (commonColor.has_value()) {
+      result.statement = "vec4 gpColor = " + uniforms.get("Color") + ";\n";
+    } else {
+      result.statement = "vec4 gpColor = " + varyings.get("Color") + ";\n";
+    }
+    return result;
+  }
+
+  ShaderCallResult buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
+                                         const MangledVaryings& varyings) const override {
+    ShaderCallResult result;
+    result.outputVarName = "gpCoverage";
+    if (aa == AAType::Coverage) {
+      result.statement = "vec4 gpCoverage = vec4(" + varyings.get("Coverage") + ");\n";
+    } else {
+      result.statement = "vec4 gpCoverage = vec4(1.0);\n";
+    }
+    return result;
+  }
+
   bool hasUVPerspective() const override {
     return uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
   }
