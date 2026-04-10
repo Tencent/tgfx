@@ -23,6 +23,7 @@
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
+#include "gpu/tasks/ResolveMSAATask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "inspect/InspectorMark.h"
 #include "tasks/TransferPixelsTask.h"
@@ -122,6 +123,7 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   if (source == nullptr || dest == nullptr) {
     return;
   }
+  ensureMSAAResolved(source);
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task = allocator->make<RenderTargetCopyTask>(allocator, std::move(source), std::move(dest),
@@ -135,10 +137,30 @@ void DrawingManager::addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> so
   if (source == nullptr || dest == nullptr || srcRect.isEmpty()) {
     return;
   }
+  ensureMSAAResolved(source);
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task =
       allocator->make<TransferPixelsTask>(allocator, std::move(source), srcRect, std::move(dest));
+  drawingBuffer->renderTasks.emplace_back(std::move(task));
+}
+
+void DrawingManager::ensureMSAAResolved(std::shared_ptr<RenderTargetProxy> renderTarget) {
+  if (renderTarget == nullptr || renderTarget->sampleCount() <= 1 || !renderTarget->isMSAADirty()) {
+    return;
+  }
+  addResolveMSAATask(renderTarget, renderTarget->msaaDirtyRect());
+  renderTarget->markMSAAResolved();
+}
+
+void DrawingManager::addResolveMSAATask(std::shared_ptr<RenderTargetProxy> renderTarget,
+                                        const Rect& resolveRect) {
+  if (renderTarget == nullptr || resolveRect.isEmpty()) {
+    return;
+  }
+  auto drawingBuffer = getDrawingBuffer();
+  auto allocator = &drawingBuffer->drawingAllocator;
+  auto task = allocator->make<ResolveMSAATask>(allocator, std::move(renderTarget), resolveRect);
   drawingBuffer->renderTasks.emplace_back(std::move(task));
 }
 

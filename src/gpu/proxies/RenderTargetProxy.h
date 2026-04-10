@@ -30,6 +30,30 @@ namespace tgfx {
 class RenderTargetProxy {
  public:
   /**
+   * Returns true if the MSAA render target has been modified since last resolve.
+   */
+  bool isMSAADirty() const {
+    return _isMSAADirty;
+  }
+
+  /**
+   * Returns the dirty rectangle that needs to be resolved.
+   */
+  Rect msaaDirtyRect() const {
+    return _msaaDirtyRect;
+  }
+
+  /**
+   * Marks a region as dirty (modified by MSAA rendering).
+   */
+  void markMSAADirty(const Rect& bounds);
+
+  /**
+   * Marks the MSAA content as resolved.
+   */
+  void markMSAAResolved();
+
+  /**
    * Wraps a backend renderTarget into RenderTargetProxy. The caller must ensure the backend
    * renderTarget is valid for the lifetime of the returned RenderTarget. Returns nullptr if the
    * context is nullptr or the backend renderTarget is invalid.
@@ -145,5 +169,9 @@ class RenderTargetProxy {
    * Y-axis for ImageOrigin::BottomLeft.
    */
   Matrix getOriginTransform() const;
+
+ private:
+  bool _isMSAADirty = false;
+  Rect _msaaDirtyRect = Rect::MakeEmpty();
 };
 }  // namespace tgfx

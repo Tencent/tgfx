@@ -644,6 +644,10 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const Matrix& matrix, const Cl
   }
   // discard all previous ops since the clear rect covers the entire render target.
   drawOps.clear();
+  // Clear is also a modification, need to mark the entire RenderTarget dirty.
+  if (renderTarget->sampleCount() > 1) {
+    pendingDirtyRect = renderTarget->bounds();
+  }
   auto format = renderTarget->format();
   auto writeSwizzle = Swizzle::ForWrite(format);
   auto dstColor = ToPMColor(brush.color, dstColorSpace);
@@ -881,12 +885,17 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
   if (textureProxy != nullptr) {
     if (renderTarget->sampleCount() > 1) {
       // Submit draw ops immediately to ensure the MSAA render target is resolved.
+      // submitDrawOps() internally calls flushPendingDirtyRect() to mark the dirty region.
       submitDrawOps();
+      // Trigger deferred MSAA resolve for the dirty region.
+      context->drawingManager()->ensureMSAAResolved(renderTarget);
     }
     dstTextureInfo.textureProxy = std::move(textureProxy);
     return dstTextureInfo;
   }
   submitDrawOps();
+  // For MSAA render targets, resolve before copying.
+  // Note: addRenderTargetCopyTask internally calls ensureMSAAResolved, so no need to call here.
   dstTextureInfo.offset = {bounds.x(), bounds.y()};
   textureProxy = proxyProvider()->createTextureProxy(
       {}, static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
@@ -967,6 +976,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
                                                        std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
   }
+  addToPendingDirtyRect(clip, deviceBounds);
   drawOps.emplace_back(std::move(op));
 }
 
@@ -986,9 +996,38 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
 }
 
 void OpsCompositor::submitDrawOps() {
+  flushPendingDirtyRect();
   auto opArray = drawingAllocator()->makeArray(std::move(drawOps));
   context->drawingManager()->addOpsRenderTask(renderTarget, std::move(opArray), clearColor);
   clearColor.reset();
+}
+
+void OpsCompositor::flushPendingDirtyRect() {
+  if (renderTarget->sampleCount() <= 1 || pendingDirtyRect.isEmpty()) {
+    return;
+  }
+  Rect dirty = pendingDirtyRect;
+  dirty.roundOut();
+  if (dirty.intersect(renderTarget->bounds())) {
+    renderTarget->markMSAADirty(dirty);
+  }
+  pendingDirtyRect.setEmpty();
+}
+
+void OpsCompositor::addToPendingDirtyRect(const ClipStack& clip,
+                                          const std::optional<Rect>& deviceBounds) {
+  if (renderTarget->sampleCount() <= 1) {
+    return;
+  }
+  auto clipBounds = getClipBounds(clip);
+  if (deviceBounds.has_value() && !deviceBounds->isEmpty()) {
+    Rect dirty = *deviceBounds;
+    if (dirty.intersect(clipBounds)) {
+      pendingDirtyRect.join(dirty);
+    }
+  } else {
+    pendingDirtyRect.join(clipBounds);
+  }
 }
 
 }  // namespace tgfx

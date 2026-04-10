@@ -22,6 +22,7 @@
 
 namespace tgfx {
 class GLGPU;
+class RenderTarget;
 
 class GLCommandEncoder : public CommandEncoder {
  public:
@@ -38,6 +39,8 @@ class GLCommandEncoder : public CommandEncoder {
                            size_t dstRowBytes) override;
 
   void generateMipmapsForTexture(std::shared_ptr<Texture> texture) override;
+
+  void resolveRenderTarget(RenderTarget* renderTarget, const Rect& resolveRect) override;
 
  protected:
   std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;

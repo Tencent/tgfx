@@ -75,6 +75,13 @@ class DrawingManager {
   void addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> source, const Rect& srcRect,
                              std::shared_ptr<GPUBufferProxy> dest);
 
+  /**
+   * Ensures the MSAA render target is resolved before reading its content. Checks dirty state,
+   * resolves if needed, and clears the dirty rect. Call this before any operation that reads from
+   * the render target's sample texture.
+   */
+  void ensureMSAAResolved(std::shared_ptr<RenderTargetProxy> renderTarget);
+
   void addResourceTask(PlacementPtr<ResourceTask> resourceTask);
 
   void addAtlasCellTask(std::shared_ptr<TextureProxy> textureProxy, const Point& atlasOffset,
@@ -104,6 +111,8 @@ class DrawingManager {
   }
 
   DrawingBuffer* createDrawingBuffer();
+
+  void addResolveMSAATask(std::shared_ptr<RenderTargetProxy> renderTarget, const Rect& resolveRect);
 
   friend class OpsCompositor;
   friend class RenderContext;

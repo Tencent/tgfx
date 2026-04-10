@@ -25,6 +25,7 @@
 namespace tgfx {
 
 class MetalGPU;
+class RenderTarget;
 
 /**
  * Metal command encoder implementation.
@@ -53,6 +54,8 @@ class MetalCommandEncoder : public CommandEncoder, public MetalResource {
                            size_t dstRowBytes = 0) override;
 
   void generateMipmapsForTexture(std::shared_ptr<Texture> texture) override;
+
+  void resolveRenderTarget(RenderTarget* renderTarget, const Rect& resolveRect) override;
 
  protected:
   std::shared_ptr<CommandBuffer> onFinish() override;

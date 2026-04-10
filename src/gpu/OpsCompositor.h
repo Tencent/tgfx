@@ -166,6 +166,7 @@ class OpsCompositor {
   std::optional<PMColor> clearColor = std::nullopt;
   std::vector<PlacementPtr<DrawOp>> drawOps = {};
   std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
+  Rect pendingDirtyRect = Rect::MakeEmpty();
 
   static bool CompareBrush(const Brush& a, const Brush& b);
 
@@ -207,6 +208,8 @@ class OpsCompositor {
                  float drawScale);
 
   void submitDrawOps();
+  void flushPendingDirtyRect();
+  void addToPendingDirtyRect(const ClipStack& clip, const std::optional<Rect>& deviceBounds);
 
   friend class DrawingManager;
   friend class PendingOpsAutoReset;

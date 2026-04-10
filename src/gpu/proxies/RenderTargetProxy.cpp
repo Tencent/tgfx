@@ -22,6 +22,23 @@
 #include "gpu/proxies/ExternalRenderTargetProxy.h"
 
 namespace tgfx {
+void RenderTargetProxy::markMSAADirty(const Rect& bounds) {
+  if (sampleCount() <= 1) {
+    return;
+  }
+  if (!_isMSAADirty) {
+    _isMSAADirty = true;
+    _msaaDirtyRect = bounds;
+  } else {
+    _msaaDirtyRect.join(bounds);
+  }
+}
+
+void RenderTargetProxy::markMSAAResolved() {
+  _isMSAADirty = false;
+  _msaaDirtyRect.setEmpty();
+}
+
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(
     Context* context, const BackendRenderTarget& backendRenderTarget, ImageOrigin origin) {
   auto renderTarget = RenderTarget::MakeFrom(context, backendRenderTarget, origin);

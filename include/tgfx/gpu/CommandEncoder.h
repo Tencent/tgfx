@@ -23,6 +23,8 @@
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
+class RenderTarget;
+
 /**
  * CommandEncoder represents an interface for collecting a sequence of GPU commands to be issued to
  * the GPU.
@@ -80,6 +82,16 @@ class CommandEncoder {
    * highest level. This method only has an effect if the texture was created with mipmap enabled.
    */
   virtual void generateMipmapsForTexture(std::shared_ptr<Texture> texture) = 0;
+
+  /**
+   * Resolves MSAA content from the multisampled render texture to the single-sampled sample texture
+   * of the given render target. This is a no-op for non-MSAA render targets or backends that
+   * resolve automatically at RenderPass end (e.g., Metal).
+   * @param renderTarget The render target to resolve. Must have sampleCount > 1.
+   * @param resolveRect The rectangle region to resolve. Some backends may ignore this and perform a
+   * full resolve.
+   */
+  virtual void resolveRenderTarget(RenderTarget* renderTarget, const Rect& resolveRect) = 0;
 
   /**
    * Finalizes command encoding and returns a CommandBuffer with all recorded commands. You can then

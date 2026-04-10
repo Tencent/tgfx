@@ -21,6 +21,7 @@
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLRenderPass.h"
 #include "gpu/opengl/GLTexture.h"
+#include "gpu/resources/RenderTarget.h"
 
 namespace tgfx {
 GPU* GLCommandEncoder::gpu() const {
@@ -168,6 +169,32 @@ void GLCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> textur
   state->bindTexture(glTexture);
   auto gl = _gpu->functions();
   gl->generateMipmap(glTexture->target());
+}
+
+void GLCommandEncoder::resolveRenderTarget(RenderTarget* renderTarget, const Rect& resolveRect) {
+  if (renderTarget == nullptr || renderTarget->sampleCount() <= 1) {
+    return;
+  }
+  auto renderTexture = renderTarget->getRenderTexture();
+  auto sampleTexture = renderTarget->getSampleTexture();
+  if (renderTexture == sampleTexture) {
+    return;
+  }
+  auto gl = _gpu->functions();
+  auto state = _gpu->state();
+  state->bindFramebuffer(static_cast<GLTexture*>(renderTexture.get()), FrameBufferTarget::Read);
+  state->bindFramebuffer(static_cast<GLTexture*>(sampleTexture.get()), FrameBufferTarget::Draw);
+  state->setEnabled(GL_SCISSOR_TEST, false);
+  Rect rect = resolveRect;
+  rect.roundOut();
+  if (!rect.intersect(renderTarget->bounds())) {
+    return;
+  }
+  int x = static_cast<int>(rect.x());
+  int y = static_cast<int>(rect.y());
+  int w = static_cast<int>(rect.width());
+  int h = static_cast<int>(rect.height());
+  gl->blitFramebuffer(x, y, x + w, y + h, x, y, x + w, y + h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }
 
 std::shared_ptr<CommandBuffer> GLCommandEncoder::onFinish() {
