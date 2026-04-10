@@ -43,6 +43,10 @@ enum class ShaderModuleID {
   TextureEffect,
   TiledTextureEffect,
   UnrolledBinaryGradientColorizer,
+  // XferProcessor modules
+  BlendModes,
+  EmptyXfer,
+  PorterDuffXfer,
 };
 
 /**

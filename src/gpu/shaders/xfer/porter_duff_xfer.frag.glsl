@@ -28,7 +28,7 @@ void TGFX_PorterDuffXP_FS(vec4 inputColor, vec4 inputCoverage,
 
     // Read destination color from the copy texture.
     vec2 dstTexCoord = (gl_FragCoord.xy - dstTextureUpperLeft) * dstTextureCoordScale;
-    vec4 dstColor = texture2D(dstTextureSampler, dstTexCoord);
+    vec4 dstColor = texture(dstTextureSampler, dstTexCoord);
 #else
 void TGFX_PorterDuffXP_FS(vec4 inputColor, vec4 inputCoverage, vec4 dstColor,
                             out vec4 outputColor) {
@@ -100,11 +100,41 @@ void TGFX_PorterDuffXP_FS(vec4 inputColor, vec4 inputCoverage, vec4 dstColor,
     // Screen
     blended = inputColor + dstColor - inputColor * dstColor;
 #else
-    // Advanced blend modes (Overlay, Darken, Lighten, ColorDodge, ColorBurn, HardLight,
-    // SoftLight, Difference, Exclusion, Multiply, Hue, Saturation, Color, Luminosity,
-    // PlusDarker) require integration with the AppendMode() C++ code generator.
-    // TODO: Integrate GLSLBlend::AppendMode() for advanced blend modes.
+    // Advanced blend modes (15=Overlay through 29=PlusDarker).
+    // These require the tgfx_blend utility functions (included via BlendModes module).
+#if TGFX_BLEND_MODE == 15
+    blended = tgfx_blend_overlay(inputColor, dstColor);
+#elif TGFX_BLEND_MODE == 16
+    blended = tgfx_blend_darken(inputColor, dstColor);
+#elif TGFX_BLEND_MODE == 17
+    blended = tgfx_blend_lighten(inputColor, dstColor);
+#elif TGFX_BLEND_MODE == 18
+    blended = tgfx_blend_color_dodge(inputColor, dstColor);
+#elif TGFX_BLEND_MODE == 19
+    blended = tgfx_blend_color_burn(inputColor, dstColor);
+#elif TGFX_BLEND_MODE == 20
+    blended = tgfx_blend_hard_light(inputColor, dstColor);
+#elif TGFX_BLEND_MODE == 21
+    blended = tgfx_blend_soft_light(inputColor, dstColor);
+#elif TGFX_BLEND_MODE == 22
+    blended = tgfx_blend_difference(inputColor, dstColor);
+#elif TGFX_BLEND_MODE == 23
+    blended = tgfx_blend_exclusion(inputColor, dstColor);
+#elif TGFX_BLEND_MODE == 24
+    blended = tgfx_blend_multiply(inputColor, dstColor);
+#elif TGFX_BLEND_MODE == 25
+    blended = tgfx_blend_hue(inputColor, dstColor);
+#elif TGFX_BLEND_MODE == 26
+    blended = tgfx_blend_saturation(inputColor, dstColor);
+#elif TGFX_BLEND_MODE == 27
+    blended = tgfx_blend_color(inputColor, dstColor);
+#elif TGFX_BLEND_MODE == 28
+    blended = tgfx_blend_luminosity(inputColor, dstColor);
+#elif TGFX_BLEND_MODE == 29
+    blended = tgfx_blend_plus_darker(inputColor, dstColor);
+#else
     blended = inputColor + (1.0 - inputColor.a) * dstColor;  // Fallback to SrcOver
+#endif
 #endif
 
 #ifdef TGFX_PDXP_NON_COEFF

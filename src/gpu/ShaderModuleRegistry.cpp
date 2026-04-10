@@ -1230,7 +1230,7 @@ void TGFX_PorterDuffXP_FS(vec4 inputColor, vec4 inputCoverage,
 
     // Read destination color from the copy texture.
     vec2 dstTexCoord = (gl_FragCoord.xy - dstTextureUpperLeft) * dstTextureCoordScale;
-    vec4 dstColor = texture2D(dstTextureSampler, dstTexCoord);
+    vec4 dstColor = texture(dstTextureSampler, dstTexCoord);
 #else
 void TGFX_PorterDuffXP_FS(vec4 inputColor, vec4 inputCoverage, vec4 dstColor,
                             out vec4 outputColor) {

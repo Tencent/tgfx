@@ -50,10 +50,31 @@ class PorterDuffXferProcessor : public XferProcessor {
     if (!BlendModeAsCoeff(blendMode, true)) {
       macros.define("TGFX_PDXP_NON_COEFF");
     }
+    macros.define("TGFX_BLEND_MODE", static_cast<int>(blendMode));
   }
 
   std::string shaderFunctionFile() const override {
     return "xfer/porter_duff_xfer.frag";
+  }
+
+  ShaderCallResult buildXferCallStatement(const std::string& colorInVar,
+                                          const std::string& coverageInVar,
+                                          const std::string& outputVar,
+                                          const std::string& dstColorExpr,
+                                          const MangledUniforms& uniforms,
+                                          const MangledSamplers& samplers) const override {
+    ShaderCallResult result;
+    result.outputVarName = outputVar;
+    if (dstTextureInfo.textureProxy) {
+      result.statement = "TGFX_PorterDuffXP_FS(" + colorInVar + ", " + coverageInVar + ", " +
+                         uniforms.get("DstTextureUpperLeft") + ", " +
+                         uniforms.get("DstTextureCoordScale") + ", " +
+                         samplers.get("DstTextureSampler") + ", " + outputVar + ");\n";
+    } else {
+      result.statement = "TGFX_PorterDuffXP_FS(" + colorInVar + ", " + coverageInVar + ", " +
+                         dstColorExpr + ", " + outputVar + ");\n";
+    }
+    return result;
   }
 
   BlendMode blendMode = BlendMode::SrcOver;
