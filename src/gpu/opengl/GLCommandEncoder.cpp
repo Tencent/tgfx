@@ -180,10 +180,18 @@ void GLCommandEncoder::resolveRenderTarget(RenderTarget* renderTarget, const Rec
   if (renderTexture == sampleTexture) {
     return;
   }
+  auto glRenderTexture = static_cast<GLTexture*>(renderTexture.get());
+  auto glSampleTexture = static_cast<GLTexture*>(sampleTexture.get());
+  // Ensure the sample texture has a framebuffer for drawing.
+  if (!glSampleTexture->checkFrameBuffer(_gpu)) {
+    LOGE(
+        "GLCommandEncoder::resolveRenderTarget() failed to create framebuffer for sample texture!");
+    return;
+  }
   auto gl = _gpu->functions();
   auto state = _gpu->state();
-  state->bindFramebuffer(static_cast<GLTexture*>(renderTexture.get()), FrameBufferTarget::Read);
-  state->bindFramebuffer(static_cast<GLTexture*>(sampleTexture.get()), FrameBufferTarget::Draw);
+  state->bindFramebuffer(glRenderTexture, FrameBufferTarget::Read);
+  state->bindFramebuffer(glSampleTexture, FrameBufferTarget::Draw);
   state->setEnabled(GL_SCISSOR_TEST, false);
   Rect rect = resolveRect;
   rect.roundOut();
