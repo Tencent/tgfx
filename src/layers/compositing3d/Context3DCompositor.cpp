@@ -21,12 +21,19 @@
 #include "BspTree.h"
 #include "core/Matrix3DUtils.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/QuadRecord.h"
 #include "gpu/QuadsVertexProvider.h"
 #include "gpu/ops/Quads3DDrawOp.h"
 #include "gpu/processors/TextureEffect.h"
+#include "layers/BackgroundContext.h"
+#include "layers/contents/LayerContent.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/core/PictureRecorder.h"
+#include "tgfx/layers/Layer.h"
+#include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
 
@@ -123,18 +130,23 @@ static std::pair<Quad, unsigned> GetQuadAndAAFlags(const Rect& originalRect, AAT
   return {quad, aaFlags};
 }
 
-Context3DCompositor::Context3DCompositor(const Context& context, int width, int height)
-    : _width(width), _height(height) {
-  _targetColorProxy =
-      context.proxyProvider()->createRenderTargetProxy({}, width, height, PixelFormat::RGBA_8888);
+Context3DCompositor::Context3DCompositor(const Context& context, const Rect& renderRect,
+                                         float contentScale, std::shared_ptr<ColorSpace> colorSpace,
+                                         std::shared_ptr<BackgroundContext> backgroundContext)
+    : _renderRect(renderRect), _contentScale(contentScale), _colorSpace(std::move(colorSpace)),
+      _backgroundContext(std::move(backgroundContext)) {
+  _targetColorProxy = context.proxyProvider()->createRenderTargetProxy(
+      {}, static_cast<int>(renderRect.width()), static_cast<int>(renderRect.height()),
+      PixelFormat::RGBA_8888);
   DEBUG_ASSERT(_targetColorProxy != nullptr);
 }
 
-void Context3DCompositor::addImage(std::shared_ptr<Image> image, const Matrix3D& matrix, int depth,
+void Context3DCompositor::addImage(Layer* sourceLayer, const Point& contentOffset,
+                                   std::shared_ptr<Image> image, const Matrix3D& matrix, int depth,
                                    float alpha, bool antiAlias) {
   const auto sequenceIndex = _depthSequenceCounters[depth]++;
-  auto polygon = std::make_unique<DrawPolygon3D>(std::move(image), matrix, depth, sequenceIndex,
-                                                 alpha, antiAlias);
+  auto polygon = std::make_unique<DrawPolygon3D>(sourceLayer, contentOffset, std::move(image),
+                                                 matrix, depth, sequenceIndex, alpha, antiAlias);
   _polygons.push_back(std::move(polygon));
 }
 
@@ -206,7 +218,11 @@ std::shared_ptr<Image> Context3DCompositor::finish() {
     std::sort(_polygons.begin(), _polygons.end(), DrawPolygon3DOrder);
     BspTree bspTree(std::move(_polygons));
     _polygons.clear();
-    bspTree.traverseBackToFront([this](const DrawPolygon3D* polygon) { drawPolygon(polygon); });
+    bspTree.traverseBackToFront([this](const DrawPolygon3D* polygon) {
+      drawBackgroundStyles(polygon);
+      drawPolygon(polygon);
+      syncToBackgroundContext(polygon);
+    });
   }
 
   auto opArray = context->drawingAllocator()->makeArray(std::move(_drawOps));
@@ -215,6 +231,143 @@ std::shared_ptr<Image> Context3DCompositor::finish() {
   auto image = TextureImage::Wrap(_targetColorProxy->asTextureProxy(), TargetColorSpace());
   _targetColorProxy = nullptr;
   return image;
+}
+
+std::shared_ptr<Image> Context3DCompositor::getBackgroundImage(Layer& layer, Point* offset) {
+  auto localToGlobalMatrix = layer.getGlobalMatrix().asMatrix();
+  Matrix globalToLocalMatrix = {};
+  if (!localToGlobalMatrix.invert(&globalToLocalMatrix)) {
+    return nullptr;
+  }
+  auto bounds = layer.getBounds();
+  bounds.scale(_contentScale, _contentScale);
+  bounds.roundOut();
+  PictureRecorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  canvas->scale(_contentScale, _contentScale);
+  canvas->concat(globalToLocalMatrix);
+  canvas->concat(_backgroundContext->backgroundMatrix());
+  canvas->drawImage(_backgroundContext->getBackgroundImage());
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return nullptr;
+  }
+  auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
+  if (offset) {
+    offset->x = bounds.left;
+    offset->y = bounds.top;
+  }
+  return Image::MakeFrom(std::move(picture), FloatCeilToInt(bounds.width()),
+                         FloatCeilToInt(bounds.height()), &matrix, _colorSpace);
+}
+
+std::shared_ptr<Image> Context3DCompositor::getContentImage(Layer& layer) {
+  auto content = layer.getContent();
+  if (content == nullptr) {
+    return nullptr;
+  }
+  auto bounds = layer.getBounds();
+  bounds.scale(_contentScale, _contentScale);
+  bounds.roundOut();
+  PictureRecorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  canvas->scale(_contentScale, _contentScale);
+  content->drawDefault(canvas, 1.0f, layer.bitFields.allowsEdgeAntialiasing);
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return nullptr;
+  }
+  return Image::MakeFrom(std::move(picture), FloatCeilToInt(bounds.width()),
+                         FloatCeilToInt(bounds.height()), nullptr, _colorSpace);
+}
+
+void Context3DCompositor::drawBackgroundStyles(const DrawPolygon3D* polygon) {
+  if (_backgroundContext == nullptr) {
+    return;
+  }
+  auto layer = polygon->sourceLayer();
+  bool hasBackground = false;
+  for (const auto& style : layer->layerStyles()) {
+    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+      hasBackground = true;
+      break;
+    }
+  }
+  if (!hasBackground) {
+    return;
+  }
+  Point backgroundOffset = {};
+  auto bgImage = getBackgroundImage(*layer, &backgroundOffset);
+  if (bgImage == nullptr) {
+    return;
+  }
+  auto contentImage = getContentImage(*layer);
+  if (contentImage == nullptr) {
+    return;
+  }
+  const auto& contentOffset = polygon->contentOffset();
+  auto relativeOffset = backgroundOffset - contentOffset;
+  auto layerBounds = layer->getBounds();
+  layerBounds.scale(_contentScale, _contentScale);
+  layerBounds.roundOut();
+  auto w = contentImage->width();
+  auto h = contentImage->height();
+  for (const auto& style : layer->layerStyles()) {
+    if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
+      continue;
+    }
+    // Record the background style drawing into a Picture, clipped to the sourceLayer's bounds
+    // to prevent the backdrop effect from leaking into child layers that extend beyond the
+    // sourceLayer. This matches how Chrome clips backdrop-filter to the element's border box.
+    PictureRecorder recorder = {};
+    auto pictureCanvas = recorder.beginRecording();
+    pictureCanvas->clipRect(layerBounds);
+    style->drawWithExtraSource(pictureCanvas, contentImage, _contentScale, bgImage, relativeOffset,
+                               polygon->alpha());
+    auto picture = recorder.finishRecordingAsPicture();
+    if (picture == nullptr) {
+      continue;
+    }
+    auto resultImage = Image::MakeFrom(std::move(picture), w, h, nullptr, _colorSpace);
+    if (resultImage == nullptr) {
+      continue;
+    }
+    auto resultPolygon = polygon->makeWithImage(std::move(resultImage), 1.0f);
+    drawPolygon(&resultPolygon);
+  }
+}
+
+void Context3DCompositor::syncToBackgroundContext(const DrawPolygon3D* polygon) {
+  if (_backgroundContext == nullptr) {
+    return;
+  }
+  auto bgCanvas = _backgroundContext->getCanvas();
+  AutoCanvasRestore autoRestore(bgCanvas);
+  // Apply the renderRect offset so the polygon is drawn at the correct position in the
+  // backgroundContext's coordinate system.
+  bgCanvas->translate(_renderRect.x(), _renderRect.y());
+  // Build a clip path from the polygon's local-space points. The canvas matrix (including the
+  // polygon's 3D-to-2D projection) transforms these local points to the correct screen position
+  // when clipPath is applied.
+  bgCanvas->concat(polygon->matrix().asMatrix());
+  if (polygon->isSplit()) {
+    Matrix3D inverseMatrix = {};
+    if (polygon->matrix().invert(&inverseMatrix)) {
+      Path clipPath = {};
+      const auto& points = polygon->points();
+      for (size_t i = 0; i < points.size(); i++) {
+        auto local = inverseMatrix.mapPoint(points[i]);
+        if (i == 0) {
+          clipPath.moveTo(local.x, local.y);
+        } else {
+          clipPath.lineTo(local.x, local.y);
+        }
+      }
+      clipPath.close();
+      bgCanvas->clipPath(clipPath);
+    }
+  }
+  bgCanvas->drawImage(polygon->image());
 }
 
 }  // namespace tgfx

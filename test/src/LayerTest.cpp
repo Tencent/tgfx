@@ -3123,6 +3123,9 @@ TGFX_TEST(LayerTest, Layer3DContextAPI) {
   float contentScale = 1.0f;
   auto colorSpace = ColorSpace::SRGB();
 
+  // Create a dummy layer as sourceLayer for beginRecording.
+  auto dummyLayer = Layer::Make();
+
   // Test Render3DContext creation (opaqueMode = false)
   auto render3DContext =
       Layer3DContext::Make(false, context, renderRect, contentScale, colorSpace, nullptr);
@@ -3131,7 +3134,7 @@ TGFX_TEST(LayerTest, Layer3DContextAPI) {
 
   // Test beginRecording/endRecording cycle
   auto rotateMatrix = Matrix3D::MakeRotate({0, 1, 0}, 30);
-  auto recordCanvas = render3DContext->beginRecording(rotateMatrix, true);
+  auto recordCanvas = render3DContext->beginRecording(rotateMatrix, true, dummyLayer.get());
   ASSERT_TRUE(recordCanvas != nullptr);
   EXPECT_FALSE(render3DContext->isFinished());
 
@@ -3151,14 +3154,14 @@ TGFX_TEST(LayerTest, Layer3DContextAPI) {
 
   // Test nested recording (simulates nested preserve3D layers)
   auto transform1 = Matrix3D::MakeRotate({0, 1, 0}, 20);
-  auto canvas1 = opaque3DContext->beginRecording(transform1, true);
+  auto canvas1 = opaque3DContext->beginRecording(transform1, true, dummyLayer.get());
   EXPECT_FALSE(opaque3DContext->isFinished());
   paint.setColor(Color::Blue());
   canvas1->drawRect(Rect::MakeXYWH(10, 10, 80, 80), paint);
 
   // Nested recording - tests recorder stack isolation
   auto transform2 = Matrix3D::MakeRotate({1, 0, 0}, 30);
-  auto canvas2 = opaque3DContext->beginRecording(transform2, true);
+  auto canvas2 = opaque3DContext->beginRecording(transform2, true, dummyLayer.get());
   ASSERT_TRUE(canvas2 != nullptr);
   EXPECT_NE(canvas1, canvas2);
   EXPECT_FALSE(opaque3DContext->isFinished());

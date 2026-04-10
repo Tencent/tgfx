@@ -29,6 +29,7 @@
 #include "core/Matrix3DUtils.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
+#include "core/utils/DebugImage.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
 #include "layers/DrawArgs.h"
@@ -964,6 +965,7 @@ static Rect GetClippedBounds(const Rect& bounds, const Canvas* canvas) {
   return clippedBounds;
 }
 
+// TODO: Verify 3D background blur works correctly through this entry point.
 void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   if (canvas == nullptr || alpha <= 0) {
     return;
@@ -1751,6 +1753,18 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                               bitFields.allowsEdgeAntialiasing);
     }
   }
+  if (_name == "layerC") {
+    static int dcIdx = 0;
+    printf("[layerC] drawContents end #%d: blurBackground=%p, render3DContext=%p, "
+           "layerStyleSource=%p, stopChild=%p\n",
+           dcIdx, (void*)args.blurBackground.get(), (void*)args.render3DContext.get(),
+           (void*)layerStyleSource, (void*)stopChild);
+    if (args.blurBackground) {
+      DebugSaveCanvas(args.blurBackground->getCanvas(),
+                      "debug/layerC_bgCtx_after_drawContents_" + std::to_string(dcIdx));
+    }
+    dcIdx++;
+  }
 }
 
 bool Layer::drawContour(const DrawArgs& args, Canvas* canvas, float, BlendMode) {
@@ -1907,7 +1921,7 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const 
   contextArgs.styleSourceTypes = StyleSourceTypesFor3DContext;
 
   const auto offscreenCanvas =
-      newContext->beginRecording(matrix3D, bitFields.allowsEdgeAntialiasing);
+      newContext->beginRecording(matrix3D, bitFields.allowsEdgeAntialiasing, this);
   contextArgs.opaqueContext = newContext->currentOpaqueContext();
   (this->*drawFunc)(contextArgs, offscreenCanvas, alpha, blendMode);
   newContext->endRecording();
@@ -1920,6 +1934,11 @@ std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* can
   if (skipBackground) {
     RemoveStyleSource(childArgs.styleSourceTypes, LayerStyleExtraSourceType::Background);
     childArgs.blurBackground = nullptr;
+  } else if (!canPreserve3D() && _parent && _parent->canPreserve3D()) {
+    // The current layer is a 3D leaf node (cannot preserve 3D but parent can). Restore
+    // Background in styleSourceTypes for child layers so they can use background styles normally.
+    // The current layer's own background styles are handled by the 3D compositor, not here.
+    childArgs.styleSourceTypes.push_back(LayerStyleExtraSourceType::Background);
   }
   // Handle 3D context state transitions:
   // - If parent has no 3D context and child can preserve 3D, child becomes the root of a new 3D
@@ -1933,13 +1952,18 @@ std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* can
     if (childBounds.isEmpty()) {
       return std::nullopt;
     }
+    // Create the 3D context before clearing blurBackground, so the compositor receives it
+    // for executing background styles during the compositing phase.
     childArgs.render3DContext = Create3DContext(childArgs, canvas, childBounds);
     if (childArgs.render3DContext == nullptr) {
       return std::nullopt;
     }
     // Layers inside a 3D rendering context need to maintain independent 3D state. This means
     // layers drawn later may become the background, making it impossible to know the final
-    // background when drawing each layer. Therefore, background styles are disabled.
+    // background when drawing each layer. Therefore, background styles are disabled during
+    // recording, and blurBackground is cleared to prevent layers from drawing to the background
+    // canvas during recording. Background updates are handled by syncToBackgroundContext in the
+    // compositor's traversal instead.
     childArgs.styleSourceTypes = StyleSourceTypesFor3DContext;
     childArgs.blurBackground = nullptr;
   }
@@ -1970,7 +1994,7 @@ bool Layer::drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, f
   auto drawArgs = childArgs;
   if (context3D) {
     targetCanvas =
-        context3D->beginRecording(childTransform3D, child->bitFields.allowsEdgeAntialiasing);
+        context3D->beginRecording(childTransform3D, child->bitFields.allowsEdgeAntialiasing, child);
     drawArgs.opaqueContext = context3D->currentOpaqueContext();
   }
   // If child cannot preserve 3D but has a 3D context, clear it so that child's internal rendering
@@ -1978,6 +2002,22 @@ bool Layer::drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, f
   // beginRecording/endRecording above.
   if (context3D && !child->canPreserve3D()) {
     drawArgs.render3DContext = nullptr;
+    if (drawArgs.context && child->hasBackgroundStyle()) {
+      auto contentScale = targetCanvas->getMatrix().getMaxScale();
+      auto childBounds = child->getBounds();
+      auto clippedBounds = childBounds;
+      // TODO: intersect with clip bounds if available.
+      clippedBounds.scale(contentScale, contentScale);
+      auto localToGlobalMatrix = child->getGlobalMatrix();
+      auto globalToLocalMatrix = Matrix3D::I();
+      if (localToGlobalMatrix.invert(&globalToLocalMatrix)) {
+        auto backgroundMatrix = globalToLocalMatrix.asMatrix();
+        backgroundMatrix.postScale(contentScale, contentScale);
+        drawArgs.blurBackground = child->createBackgroundContext(
+            drawArgs.context, clippedBounds, Matrix::I(),
+            childBounds == clippedBounds, drawArgs.dstColorSpace);
+      }
+    }
   }
 
   auto blendMode = static_cast<BlendMode>(child->bitFields.blendMode);
@@ -2010,7 +2050,17 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
 std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& args,
                                                              const Matrix& matrix,
                                                              bool excludeContour) {
-  if (_layerStyles.empty() || args.excludeEffects) {
+  if (args.excludeEffects) {
+    return nullptr;
+  }
+  bool hasActiveStyle = false;
+  for (const auto& style : _layerStyles) {
+    if (HasStyleSource(args.styleSourceTypes, style->extraSourceType())) {
+      hasActiveStyle = true;
+      break;
+    }
+  }
+  if (!hasActiveStyle) {
     return nullptr;
   }
   auto contentScale = matrix.getMaxScale();

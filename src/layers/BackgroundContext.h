@@ -36,6 +36,21 @@ class BackgroundContext {
 
   std::shared_ptr<Image> getBackgroundImage();
 
+  /**
+   * Gets the background image transformed into the specified local coordinate space,
+   * scaled by contentScale, and clipped to the given bounds.
+   * @param layerBounds The bounds of the target layer in its local space.
+   * @param globalMatrix The 2D global transformation matrix of the target layer.
+   * @param contentScale The scale factor applied to the layer bounds.
+   * @param offset Output: the offset of the returned image relative to the origin.
+   * @param dstColorSpace The target color space for the returned image.
+   * @return The background image in the layer's local coordinate space, or nullptr on failure.
+   */
+  std::shared_ptr<Image> getBackgroundImageForLayer(const Rect& layerBounds,
+                                                    const Matrix& globalMatrix, float contentScale,
+                                                    Point* offset,
+                                                    std::shared_ptr<ColorSpace> dstColorSpace);
+
   std::shared_ptr<BackgroundContext> createSubContext(const Rect& renderBounds,
                                                       bool clipToBackgroundRect);
 

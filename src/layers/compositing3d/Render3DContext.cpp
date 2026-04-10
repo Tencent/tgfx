@@ -47,29 +47,22 @@ std::shared_ptr<Picture> Render3DContext::onFinishRecording() {
 }
 
 void Render3DContext::onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                                   const Point& pictureOffset, int depth, bool antialiasing) {
+                                   const Point& pictureOffset, int depth, bool antialiasing,
+                                   Layer* sourceLayer) {
   auto finalTransform = imageTransform;
   finalTransform.postTranslate(pictureOffset.x - _renderRect.left,
                                pictureOffset.y - _renderRect.top, 0);
-  _compositor->addImage(std::move(image), finalTransform, depth, 1.0f, antialiasing);
+  _compositor->addImage(sourceLayer, pictureOffset, std::move(image), finalTransform, depth, 1.0f,
+                        antialiasing);
 }
 
-void Render3DContext::finishAndDrawTo(Canvas* canvas, bool antialiasing) {
+void Render3DContext::finishAndDrawTo(Canvas* canvas, bool) {
   auto context3DImage = _compositor->finish();
   AutoCanvasRestore autoRestore(canvas);
   auto imageMatrix = Matrix::MakeScale(1.0f / _contentScale, 1.0f / _contentScale);
   imageMatrix.preTranslate(_renderRect.left, _renderRect.top);
   canvas->concat(imageMatrix);
   canvas->drawImage(context3DImage);
-
-  if (_backgroundContext) {
-    Paint paint = {};
-    paint.setAntiAlias(antialiasing);
-    auto backgroundCanvas = _backgroundContext->getCanvas();
-    AutoCanvasRestore autoRestoreBg(backgroundCanvas);
-    backgroundCanvas->concat(imageMatrix);
-    backgroundCanvas->drawImage(context3DImage, &paint);
-  }
 }
 
 }  // namespace tgfx
