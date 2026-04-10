@@ -301,18 +301,53 @@ void ModularProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
                                        programInfo->getProcessorIndex(xferProcessor),
                                        xferProcessor->name().c_str());
 
-  SamplerHandle dstTextureSamplerHandle;
-  if (auto dstTextureView = xferProcessor->dstTextureView()) {
-    dstTextureSamplerHandle = emitSampler(dstTextureView->getTexture(), "DstTextureSampler");
-  }
-
   std::string inputColor = !colorIn.empty() ? colorIn : "vec4(1.0)";
   std::string inputCoverage = !coverageIn.empty() ? coverageIn : "vec4(1.0)";
-  XferProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), inputColor, inputCoverage,
-                               fragmentShaderBuilder()->colorOutputName(), dstTextureSamplerHandle);
+  auto outputColor = fragmentShaderBuilder()->colorOutputName();
 
-  // Polymorphic dispatch via virtual emitCode().
-  xferProcessor->emitCode(args);
+  // Emit XP shader macros.
+  ShaderMacroSet macros;
+  xferProcessor->onBuildShaderMacros(macros);
+  if (!macros.empty()) {
+    fragmentShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] += macros.toPreamble();
+  }
+
+  // Register dst texture sampler and uniforms.
+  MangledUniforms uniforms;
+  MangledSamplers samplers;
+  SamplerHandle dstTextureSamplerHandle;
+  bool hasDstTexture = xferProcessor->dstTextureView() != nullptr;
+  if (hasDstTexture) {
+    dstTextureSamplerHandle =
+        emitSampler(xferProcessor->dstTextureView()->getTexture(), "DstTextureSampler");
+    auto samplerVar = uniformHandler()->getSamplerVariable(dstTextureSamplerHandle);
+    samplers.add("DstTextureSampler", samplerVar.name());
+    auto topLeftName = uniformHandler()->addUniform("DstTextureUpperLeft", UniformFormat::Float2,
+                                                    ShaderStage::Fragment);
+    uniforms.add("DstTextureUpperLeft", topLeftName);
+    auto scaleName = uniformHandler()->addUniform("DstTextureCoordScale", UniformFormat::Float2,
+                                                  ShaderStage::Fragment);
+    uniforms.add("DstTextureCoordScale", scaleName);
+  }
+
+  // Get dst color expression for non-texture-read path.
+  std::string dstColorExpr;
+  if (!hasDstTexture) {
+    dstColorExpr = fragmentShaderBuilder()->dstColor();
+  }
+
+  auto result = xferProcessor->buildXferCallStatement(inputColor, inputCoverage, outputColor,
+                                                      dstColorExpr, uniforms, samplers);
+  if (!result.statement.empty()) {
+    // Include blend mode utility functions for advanced modes.
+    includeModule(ShaderModuleID::BlendModes);
+    fragmentShaderBuilder()->codeAppend(result.statement);
+  } else {
+    // Fallback to legacy emitCode().
+    XferProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), inputColor,
+                                 inputCoverage, outputColor, dstTextureSamplerHandle);
+    xferProcessor->emitCode(args);
+  }
 
   fragmentShaderBuilder()->codeAppend("}");
   currentProcessors.pop_back();

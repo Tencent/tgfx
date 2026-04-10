@@ -62,20 +62,7 @@ class PorterDuffXferProcessor : public XferProcessor {
                                           const std::string& outputVar,
                                           const std::string& dstColorExpr,
                                           const MangledUniforms& uniforms,
-                                          const MangledSamplers& samplers) const override {
-    ShaderCallResult result;
-    result.outputVarName = outputVar;
-    if (dstTextureInfo.textureProxy) {
-      result.statement = "TGFX_PorterDuffXP_FS(" + colorInVar + ", " + coverageInVar + ", " +
-                         uniforms.get("DstTextureUpperLeft") + ", " +
-                         uniforms.get("DstTextureCoordScale") + ", " +
-                         samplers.get("DstTextureSampler") + ", " + outputVar + ");\n";
-    } else {
-      result.statement = "TGFX_PorterDuffXP_FS(" + colorInVar + ", " + coverageInVar + ", " +
-                         dstColorExpr + ", " + outputVar + ");\n";
-    }
-    return result;
-  }
+                                          const MangledSamplers& samplers) const override;
 
   BlendMode blendMode = BlendMode::SrcOver;
   DstTextureInfo dstTextureInfo = {};
