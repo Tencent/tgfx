@@ -252,6 +252,16 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
   bool useModularFS = true;
 
   if (useModularFS) {
+    // Emit GP shader macros to both VS and FS definitions BEFORE emitCode,
+    // so that .vert.glsl functions injected by emitCode can see the #define directives.
+    ShaderMacroSet macros;
+    geometryProcessor->onBuildShaderMacros(macros);
+    if (!macros.empty()) {
+      auto preamble = macros.toPreamble();
+      fragmentShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] += preamble;
+      vertexShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] += preamble;
+    }
+
     // Modular path: call emitCode with skipFragmentCode=true and skipVertexCode=true.
     MangledVaryings gpVaryings;
     MangledUniforms gpUniforms;
@@ -264,14 +274,7 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
     args.gpUniforms = &gpUniforms;
     geometryProcessor->emitCode(args);
 
-    // Emit GP shader macros to both VS and FS definitions.
-    ShaderMacroSet macros;
-    geometryProcessor->onBuildShaderMacros(macros);
-    if (!macros.empty()) {
-      auto preamble = macros.toPreamble();
-      fragmentShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] += preamble;
-      vertexShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] += preamble;
-    }
+    // Generate FS function calls.
     auto colorResult = geometryProcessor->buildColorCallExpr(gpUniforms, gpVaryings);
     auto coverageResult = geometryProcessor->buildCoverageCallExpr(gpUniforms, gpVaryings);
     fragmentShaderBuilder()->codeAppend(colorResult.statement);

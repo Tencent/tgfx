@@ -44,8 +44,6 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   // Step 1: uvMatrix transforms tessellation-space position back to local space.
   auto uvMatrixName =
       uniformHandler->addUniform("UVMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  vertBuilder->codeAppendf("highp vec2 local = (%s * vec3(%s, 1.0)).xy;", uvMatrixName.c_str(),
-                           position.name().c_str());
 
   // Step 2: transform tessellation-space position directly to device space, then add per-instance
   // offset. viewMatrix = stateMatrix * uvMatrix, which maps tessellation space to device space in
@@ -53,22 +51,13 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   // positions), so it must be applied after the viewMatrix transform.
   auto viewMatrixName =
       uniformHandler->addUniform("ViewMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  std::string positionName = "position";
-  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy + %s;", positionName.c_str(),
-                           viewMatrixName.c_str(), position.name().c_str(), offset.name().c_str());
-
-  // Emit UV transforms using unshifted local coords. All FP coord transforms (both color shader
-  // and mask coverage) use 'local' without offset, because: (1) mask texture is rasterized at a
-  // fixed position shared by all instances, (2) shader patterns are defined in local space and
-  // are the same for all instances. The offset only affects device-space position.
-  ShaderVar localVar("local", SLType::Float2);
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, localVar);
 
   // Coverage varying for AA.
   std::string coverageFsIn;
+  std::string coverageVsOut;
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
+    coverageVsOut = coverageVar.vsOut();
     coverageFsIn = coverageVar.fsIn();
     if (args.gpVaryings) {
       args.gpVaryings->add("Coverage", coverageFsIn);
@@ -77,14 +66,74 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
 
   // Color: per-instance color or opaque white (overridden by shader FP).
   std::string colorFsIn;
+  std::string colorVsOut;
   if (hasColors) {
     auto colorVar = varyingHandler->addVarying("InstanceColor", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), instanceColor.name().c_str());
+    colorVsOut = colorVar.vsOut();
     colorFsIn = colorVar.fsIn();
     if (args.gpVaryings) {
       args.gpVaryings->add("InstanceColor", colorFsIn);
     }
   }
+
+  std::string positionName = "position";
+  if (args.skipVertexCode) {
+    static const std::string kShapeInstancedGPVert = R"GLSL(
+void TGFX_ShapeInstancedGP_VS(vec2 inPosition, vec2 inOffset,
+                                mat3 uvMatrix, mat3 viewMatrix,
+#ifdef TGFX_GP_SHAPE_COVERAGE_AA
+                                float inCoverage, out float vCoverage,
+#endif
+#ifdef TGFX_GP_SHAPE_VERTEX_COLORS
+                                vec4 inInstanceColor, out vec4 vInstanceColor,
+#endif
+                                out vec2 position) {
+    highp vec2 local = (uvMatrix * vec3(inPosition, 1.0)).xy;
+    position = (viewMatrix * vec3(inPosition, 1.0)).xy + inOffset;
+#ifdef TGFX_GP_SHAPE_COVERAGE_AA
+    vCoverage = inCoverage;
+#endif
+#ifdef TGFX_GP_SHAPE_VERTEX_COLORS
+    vInstanceColor = inInstanceColor;
+#endif
+}
+)GLSL";
+    vertBuilder->addFunction(kShapeInstancedGPVert);
+    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+    std::string call = "TGFX_ShapeInstancedGP_VS(" + std::string(position.name()) + ", " +
+                       std::string(offset.name()) + ", " + uvMatrixName + ", " + viewMatrixName;
+    if (aa == AAType::Coverage) {
+      call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
+    }
+    if (hasColors) {
+      call += ", " + std::string(instanceColor.name()) + ", " + colorVsOut;
+    }
+    call += ", " + positionName + ");";
+    vertBuilder->codeAppend(call);
+    // Compute local separately for emitTransforms (the GLSL function computes it internally but
+    // doesn't output it, so we replicate it here for the transform system to reference).
+    vertBuilder->codeAppendf("highp vec2 local = (%s * vec3(%s, 1.0)).xy;", uvMatrixName.c_str(),
+                             position.name().c_str());
+  } else {
+    vertBuilder->codeAppendf("highp vec2 local = (%s * vec3(%s, 1.0)).xy;", uvMatrixName.c_str(),
+                             position.name().c_str());
+    vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy + %s;", positionName.c_str(),
+                             viewMatrixName.c_str(), position.name().c_str(),
+                             offset.name().c_str());
+    if (aa == AAType::Coverage) {
+      vertBuilder->codeAppendf("%s = %s;", coverageVsOut.c_str(), coverage.name().c_str());
+    }
+    if (hasColors) {
+      vertBuilder->codeAppendf("%s = %s;", colorVsOut.c_str(), instanceColor.name().c_str());
+    }
+  }
+
+  // Emit UV transforms using unshifted local coords. All FP coord transforms (both color shader
+  // and mask coverage) use 'local' without offset, because: (1) mask texture is rasterized at a
+  // fixed position shared by all instances, (2) shader patterns are defined in local space and
+  // are the same for all instances. The offset only affects device-space position.
+  ShaderVar localVar("local", SLType::Float2);
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, localVar);
 
   if (!args.skipFragmentCode) {
     if (aa == AAType::Coverage) {

@@ -42,18 +42,19 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
 
   std::string coverageFsIn;
+  std::string coverageVsOut;
   std::string ellipseRadiiFsIn;
+  std::string ellipseRadiiVsOut;
   Varying ellipseRadii;
   if (aaType == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), inCoverage.name().c_str());
+    coverageVsOut = coverageVar.vsOut();
     coverageFsIn = coverageVar.fsIn();
     if (args.gpVaryings) {
       args.gpVaryings->add("Coverage", coverageFsIn);
     }
     ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float2);
-    vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(),
-                             inEllipseRadii.name().c_str());
+    ellipseRadiiVsOut = ellipseRadii.vsOut();
     ellipseRadiiFsIn = ellipseRadii.fsIn();
     if (args.gpVaryings) {
       args.gpVaryings->add("EllipseRadii", ellipseRadiiFsIn);
@@ -61,13 +62,12 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
-  vertBuilder->codeAppendf("%s = %s;", ellipseOffsets.vsOut().c_str(),
-                           inEllipseOffset.name().c_str());
   if (args.gpVaryings) {
     args.gpVaryings->add("EllipseOffsets", ellipseOffsets.fsIn());
   }
 
   std::string colorFsIn;
+  std::string colorVsOut;
   if (commonColor.has_value()) {
     auto colorName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
@@ -77,10 +77,59 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
     }
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), inColor.name().c_str());
+    colorVsOut = colorVar.vsOut();
     colorFsIn = colorVar.fsIn();
     if (args.gpVaryings) {
       args.gpVaryings->add("Color", colorFsIn);
+    }
+  }
+
+  std::string positionName = "position";
+  if (args.skipVertexCode) {
+    static const std::string kRoundStrokeRectGPVert = R"GLSL(
+void TGFX_RoundStrokeRectGP_VS(vec2 inPosition, vec2 inEllipseOffset,
+#ifdef TGFX_GP_RRECT_COVERAGE_AA
+                                 float inCoverage, vec2 inEllipseRadii,
+                                 out float vCoverage, out vec2 vEllipseRadii,
+#endif
+#ifndef TGFX_GP_RRECT_COMMON_COLOR
+                                 vec4 inColor, out vec4 vColor,
+#endif
+                                 out vec2 vEllipseOffsets, out vec2 position) {
+    vEllipseOffsets = inEllipseOffset;
+#ifdef TGFX_GP_RRECT_COVERAGE_AA
+    vCoverage = inCoverage;
+    vEllipseRadii = inEllipseRadii;
+#endif
+#ifndef TGFX_GP_RRECT_COMMON_COLOR
+    vColor = inColor;
+#endif
+    position = inPosition;
+}
+)GLSL";
+    vertBuilder->addFunction(kRoundStrokeRectGPVert);
+    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+    std::string call = "TGFX_RoundStrokeRectGP_VS(" + std::string(inPosition.name()) + ", " +
+                       std::string(inEllipseOffset.name());
+    if (aaType == AAType::Coverage) {
+      call += ", " + std::string(inCoverage.name()) + ", " + std::string(inEllipseRadii.name()) +
+              ", " + coverageVsOut + ", " + ellipseRadiiVsOut;
+    }
+    if (!commonColor.has_value()) {
+      call += ", " + std::string(inColor.name()) + ", " + colorVsOut;
+    }
+    call += ", " + ellipseOffsets.vsOut() + ", " + positionName + ");";
+    vertBuilder->codeAppend(call);
+  } else {
+    if (aaType == AAType::Coverage) {
+      vertBuilder->codeAppendf("%s = %s;", coverageVsOut.c_str(), inCoverage.name().c_str());
+      vertBuilder->codeAppendf("%s = %s;", ellipseRadiiVsOut.c_str(),
+                               inEllipseRadii.name().c_str());
+    }
+    vertBuilder->codeAppendf("%s = %s;", ellipseOffsets.vsOut().c_str(),
+                             inEllipseOffset.name().c_str());
+    if (!commonColor.has_value()) {
+      vertBuilder->codeAppendf("%s = %s;", colorVsOut.c_str(), inColor.name().c_str());
     }
   }
 
@@ -112,7 +161,8 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(inPosition.name());
+  args.vertBuilder->emitNormalizedPosition(args.skipVertexCode ? positionName
+                                                               : std::string(inPosition.name()));
 }
 
 void GLSLRoundStrokeRectGeometryProcessor::setData(UniformData* vertexUniformData,

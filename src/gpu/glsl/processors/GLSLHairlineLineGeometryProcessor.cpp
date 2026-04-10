@@ -47,18 +47,36 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   // Transform vertex position by view matrix
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  std::string positionName = "transformedPosition";
-  vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
-                           matrixName.c_str(), position.name().c_str());
 
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
-                 ShaderVar(positionName, SLType::Float2));
   // Pass edge distance to fragment shader for anti-aliasing
   auto edgeVarying = varyingHandler->addVarying("EdgeDistance", SLType::Float);
-  vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(), edgeDistance.name().c_str());
   if (args.gpVaryings) {
     args.gpVaryings->add("EdgeDistance", edgeVarying.fsIn());
   }
+
+  std::string positionName = "transformedPosition";
+  if (args.skipVertexCode) {
+    static const std::string kHairlineLineGPVert = R"GLSL(
+void TGFX_HairlineLineGP_VS(vec2 inPosition, float inEdgeDistance, mat3 matrix,
+                              out float vEdgeDistance, out vec2 position) {
+    position = (matrix * vec3(inPosition, 1.0)).xy;
+    vEdgeDistance = inEdgeDistance;
+}
+)GLSL";
+    vertBuilder->addFunction(kHairlineLineGPVert);
+    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+    std::string call = "TGFX_HairlineLineGP_VS(" + std::string(position.name()) + ", " +
+                       std::string(edgeDistance.name()) + ", " + matrixName + ", " +
+                       edgeVarying.vsOut() + ", " + positionName + ");";
+    vertBuilder->codeAppend(call);
+  } else {
+    vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
+                             matrixName.c_str(), position.name().c_str());
+    vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(), edgeDistance.name().c_str());
+  }
+
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
+                 ShaderVar(positionName, SLType::Float2));
 
   // Output color and coverage
   auto colorName =

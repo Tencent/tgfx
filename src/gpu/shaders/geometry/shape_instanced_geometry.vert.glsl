@@ -12,7 +12,7 @@ void TGFX_ShapeInstancedGP_VS(vec2 inPosition, vec2 inOffset,
 #ifdef TGFX_GP_SHAPE_COVERAGE_AA
                                 float inCoverage, out float vCoverage,
 #endif
-#ifdef TGFX_GP_SHAPE_HAS_COLORS
+#ifdef TGFX_GP_SHAPE_VERTEX_COLORS
                                 vec4 inInstanceColor, out vec4 vInstanceColor,
 #endif
                                 out vec2 position) {
@@ -21,7 +21,7 @@ void TGFX_ShapeInstancedGP_VS(vec2 inPosition, vec2 inOffset,
 #ifdef TGFX_GP_SHAPE_COVERAGE_AA
     vCoverage = inCoverage;
 #endif
-#ifdef TGFX_GP_SHAPE_HAS_COLORS
+#ifdef TGFX_GP_SHAPE_VERTEX_COLORS
     vInstanceColor = inInstanceColor;
 #endif
 }

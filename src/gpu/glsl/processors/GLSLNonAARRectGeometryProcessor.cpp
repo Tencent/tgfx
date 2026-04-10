@@ -41,6 +41,7 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
 
   // Setup color output
   std::string colorFsIn;
+  std::string colorVsOut;
   if (commonColor.has_value()) {
     auto colorName =
         uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
@@ -50,34 +51,27 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
     }
   } else {
     auto color = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), inColor.name().c_str());
+    colorVsOut = color.vsOut();
     colorFsIn = color.fsIn();
     if (args.gpVaryings) {
       args.gpVaryings->add("Color", colorFsIn);
     }
   }
 
-  // Output position using RTAdjust uniform
-  vertBuilder->emitNormalizedPosition(inPosition.name());
-
   // Pass local coordinates to fragment shader
   auto localCoordVarying = varyingHandler->addVarying("localCoord", SLType::Float2);
-  vertBuilder->codeAppendf("%s = %s;", localCoordVarying.vsOut().c_str(),
-                           inLocalCoord.name().c_str());
   if (args.gpVaryings) {
     args.gpVaryings->add("localCoord", localCoordVarying.fsIn());
   }
 
   // Pass radii to fragment shader
   auto radiiVarying = varyingHandler->addVarying("radii", SLType::Float2);
-  vertBuilder->codeAppendf("%s = %s;", radiiVarying.vsOut().c_str(), inRadii.name().c_str());
   if (args.gpVaryings) {
     args.gpVaryings->add("radii", radiiVarying.fsIn());
   }
 
   // Pass rect bounds to fragment shader
   auto boundsVarying = varyingHandler->addVarying("rectBounds", SLType::Float4);
-  vertBuilder->codeAppendf("%s = %s;", boundsVarying.vsOut().c_str(), inRectBounds.name().c_str());
   if (args.gpVaryings) {
     args.gpVaryings->add("rectBounds", boundsVarying.fsIn());
   }
@@ -86,12 +80,67 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   Varying strokeWidthVarying;
   if (stroke) {
     strokeWidthVarying = varyingHandler->addVarying("strokeWidth", SLType::Float2);
-    vertBuilder->codeAppendf("%s = %s;", strokeWidthVarying.vsOut().c_str(),
-                             inStrokeWidth.name().c_str());
     if (args.gpVaryings) {
       args.gpVaryings->add("strokeWidth", strokeWidthVarying.fsIn());
     }
   }
+
+  std::string positionName = "position";
+  if (args.skipVertexCode) {
+    static const std::string kNonAARRectGPVert = R"GLSL(
+void TGFX_NonAARRectGP_VS(vec2 inPosition, vec2 inLocalCoord, vec2 inRadii, vec4 inRectBounds,
+#ifndef TGFX_GP_NONAA_COMMON_COLOR
+                           vec4 inColor, out vec4 vColor,
+#endif
+#ifdef TGFX_GP_NONAA_STROKE
+                           vec2 inStrokeWidth, out vec2 vStrokeWidth,
+#endif
+                           out vec2 vLocalCoord, out vec2 vRadii, out vec4 vRectBounds,
+                           out vec2 position) {
+    position = inPosition;
+    vLocalCoord = inLocalCoord;
+    vRadii = inRadii;
+    vRectBounds = inRectBounds;
+#ifndef TGFX_GP_NONAA_COMMON_COLOR
+    vColor = inColor;
+#endif
+#ifdef TGFX_GP_NONAA_STROKE
+    vStrokeWidth = inStrokeWidth;
+#endif
+}
+)GLSL";
+    vertBuilder->addFunction(kNonAARRectGPVert);
+    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+    std::string call = "TGFX_NonAARRectGP_VS(" + std::string(inPosition.name()) + ", " +
+                       std::string(inLocalCoord.name()) + ", " + std::string(inRadii.name()) +
+                       ", " + std::string(inRectBounds.name());
+    if (!commonColor.has_value()) {
+      call += ", " + std::string(inColor.name()) + ", " + colorVsOut;
+    }
+    if (stroke) {
+      call += ", " + std::string(inStrokeWidth.name()) + ", " + strokeWidthVarying.vsOut();
+    }
+    call += ", " + localCoordVarying.vsOut() + ", " + radiiVarying.vsOut() + ", " +
+            boundsVarying.vsOut() + ", " + positionName + ");";
+    vertBuilder->codeAppend(call);
+  } else {
+    if (!commonColor.has_value()) {
+      vertBuilder->codeAppendf("%s = %s;", colorVsOut.c_str(), inColor.name().c_str());
+    }
+    vertBuilder->codeAppendf("%s = %s;", localCoordVarying.vsOut().c_str(),
+                             inLocalCoord.name().c_str());
+    vertBuilder->codeAppendf("%s = %s;", radiiVarying.vsOut().c_str(), inRadii.name().c_str());
+    vertBuilder->codeAppendf("%s = %s;", boundsVarying.vsOut().c_str(),
+                             inRectBounds.name().c_str());
+    if (stroke) {
+      vertBuilder->codeAppendf("%s = %s;", strokeWidthVarying.vsOut().c_str(),
+                               inStrokeWidth.name().c_str());
+    }
+  }
+
+  // Output position using RTAdjust uniform
+  vertBuilder->emitNormalizedPosition(args.skipVertexCode ? positionName
+                                                          : std::string(inPosition.name()));
 
   // Emit transforms using position as UV coordinates.
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,

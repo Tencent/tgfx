@@ -45,17 +45,15 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
 
   auto samplerVarying = varyingHandler->addVarying("textureCoords", SLType::Float2);
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
-  auto uvName = maskCoord.name();
-  vertBuilder->codeAppendf("%s = %s * %s;", samplerVarying.vsOut().c_str(), uvName.c_str(),
-                           atlasName.c_str());
   if (args.gpVaryings) {
     args.gpVaryings->add("textureCoords", samplerVarying.fsIn());
   }
 
   std::string coverageFsIn;
+  std::string coverageVsOut;
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
+    coverageVsOut = coverageVar.vsOut();
     coverageFsIn = coverageVar.fsIn();
     if (args.gpVaryings) {
       args.gpVaryings->add("Coverage", coverageFsIn);
@@ -63,6 +61,7 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   std::string colorFsIn;
+  std::string colorVsOut;
   if (commonColor.has_value()) {
     auto colorName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
@@ -72,10 +71,54 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
     }
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
+    colorVsOut = colorVar.vsOut();
     colorFsIn = colorVar.fsIn();
     if (args.gpVaryings) {
       args.gpVaryings->add("Color", colorFsIn);
+    }
+  }
+
+  std::string positionName = "position";
+  if (args.skipVertexCode) {
+    static const std::string kAtlasTextGPVert = R"GLSL(
+void TGFX_AtlasTextGP_VS(vec2 inPosition, vec2 inMaskCoord, vec2 atlasSizeInv,
+#ifdef TGFX_GP_ATLAS_COVERAGE_AA
+                          float inCoverage, out float vCoverage,
+#endif
+#ifndef TGFX_GP_ATLAS_COMMON_COLOR
+                          vec4 inColor, out vec4 vColor,
+#endif
+                          out vec2 vTextureCoords, out vec2 position) {
+    vTextureCoords = inMaskCoord * atlasSizeInv;
+#ifdef TGFX_GP_ATLAS_COVERAGE_AA
+    vCoverage = inCoverage;
+#endif
+#ifndef TGFX_GP_ATLAS_COMMON_COLOR
+    vColor = inColor;
+#endif
+    position = inPosition;
+}
+)GLSL";
+    vertBuilder->addFunction(kAtlasTextGPVert);
+    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+    std::string call = "TGFX_AtlasTextGP_VS(" + std::string(position.name()) + ", " +
+                       std::string(maskCoord.name()) + ", " + atlasName;
+    if (aa == AAType::Coverage) {
+      call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
+    }
+    if (!commonColor.has_value()) {
+      call += ", " + std::string(color.name()) + ", " + colorVsOut;
+    }
+    call += ", " + samplerVarying.vsOut() + ", " + positionName + ");";
+    vertBuilder->codeAppend(call);
+  } else {
+    vertBuilder->codeAppendf("%s = %s * %s;", samplerVarying.vsOut().c_str(),
+                             maskCoord.name().c_str(), atlasName.c_str());
+    if (aa == AAType::Coverage) {
+      vertBuilder->codeAppendf("%s = %s;", coverageVsOut.c_str(), coverage.name().c_str());
+    }
+    if (!commonColor.has_value()) {
+      vertBuilder->codeAppendf("%s = %s;", colorVsOut.c_str(), color.name().c_str());
     }
   }
 
@@ -121,7 +164,8 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(position.name());
+  args.vertBuilder->emitNormalizedPosition(args.skipVertexCode ? positionName
+                                                               : std::string(position.name()));
 }
 
 void GLSLAtlasTextGeometryProcessor::setData(UniformData* vertexUniformData,

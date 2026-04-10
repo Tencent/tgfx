@@ -44,9 +44,10 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
 
   std::string coverageFsIn;
+  std::string coverageVsOut;
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
+    coverageVsOut = coverageVar.vsOut();
     coverageFsIn = coverageVar.fsIn();
     if (args.gpVaryings) {
       args.gpVaryings->add("Coverage", coverageFsIn);
@@ -54,6 +55,7 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   std::string colorFsIn;
+  std::string colorVsOut;
   if (commonColor.has_value()) {
     auto colorName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
@@ -63,10 +65,50 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
     colorFsIn = colorName;
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
+    colorVsOut = colorVar.vsOut();
     colorFsIn = colorVar.fsIn();
     if (args.gpVaryings) {
       args.gpVaryings->add("Color", colorFsIn);
+    }
+  }
+
+  std::string positionName = "position";
+  if (args.skipVertexCode) {
+    static const std::string kQuadAAGPVert = R"GLSL(
+void TGFX_QuadAAGP_VS(vec2 inPosition,
+#ifdef TGFX_GP_QUAD_COVERAGE_AA
+                       float inCoverage, out float vCoverage,
+#endif
+#ifndef TGFX_GP_QUAD_COMMON_COLOR
+                       vec4 inColor, out vec4 vColor,
+#endif
+                       out vec2 position) {
+    position = inPosition;
+#ifdef TGFX_GP_QUAD_COVERAGE_AA
+    vCoverage = inCoverage;
+#endif
+#ifndef TGFX_GP_QUAD_COMMON_COLOR
+    vColor = inColor;
+#endif
+}
+)GLSL";
+    vertBuilder->addFunction(kQuadAAGPVert);
+    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+    std::string call = "TGFX_QuadAAGP_VS(" + std::string(position.name());
+    if (aa == AAType::Coverage) {
+      call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
+    }
+    if (!commonColor.has_value()) {
+      call += ", " + std::string(color.name()) + ", " + colorVsOut;
+    }
+    call += ", " + positionName + ");";
+    vertBuilder->codeAppend(call);
+  } else {
+    if (aa == AAType::Coverage) {
+      vertBuilder->codeAppendf("%s = %s;", coverageVsOut.c_str(), coverage.name().c_str());
+    }
+    if (!commonColor.has_value()) {
+      vertBuilder->codeAppendf("%s = %s;", colorVsOut.c_str(), color.name().c_str());
     }
   }
 
@@ -84,7 +126,8 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(position.name());
+  args.vertBuilder->emitNormalizedPosition(args.skipVertexCode ? positionName
+                                                               : std::string(position.name()));
 }
 
 void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformData* vertexUniformData,
