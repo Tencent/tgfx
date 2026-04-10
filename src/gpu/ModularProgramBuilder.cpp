@@ -248,9 +248,14 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
 
   GeometryProcessor::FPCoordTransformHandler transformHandler(programInfo, &transformedCoordVars);
 
-  // Check if GP supports modular FS path (only migrated GPs return non-empty).
+  // Enable modular FS path per GP as verified.
   auto gpName = geometryProcessor->name();
-  bool useModularFS = (gpName == "DefaultGeometryProcessor");
+  bool useModularFS =
+      (gpName == "DefaultGeometryProcessor" || gpName == "QuadPerEdgeAAGeometryProcessor" ||
+       gpName == "EllipseGeometryProcessor" || gpName == "HairlineLineGeometryProcessor" ||
+       gpName == "MeshGeometryProcessor" || gpName == "ShapeInstancedGeometryProcessor" ||
+       gpName == "RoundStrokeRectGeometryProcessor" || gpName == "NonAARRectGeometryProcessor" ||
+       gpName == "HairlineQuadGeometryProcessor");
 
   if (useModularFS) {
     // Modular FS path: call emitCode with skipFragmentCode=true for VS-only.
