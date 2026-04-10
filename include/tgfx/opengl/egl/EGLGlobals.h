@@ -34,5 +34,10 @@ class EGLGlobals {
   EGLConfig pbufferConfig = nullptr;
   std::vector<EGLint> windowSurfaceAttributes;
   std::vector<EGLint> pbufferSurfaceAttributes;
+  /**
+   * Indicates whether the EGL display supports the EGL_EXT_create_context_robustness extension,
+   * which enables GPU reset detection and loss-of-context notification.
+   */
+  bool contextRobustnessSupported = false;
 };
 }  // namespace tgfx

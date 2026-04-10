@@ -71,6 +71,10 @@ class GLDevice : public Device {
   virtual bool onMakeCurrent() = 0;
   virtual void onClearCurrent() = 0;
 
+ private:
+  static void MarkAllContextsLost();
+
+  friend class EGLDevice;
   friend class GLContext;
 };
 }  // namespace tgfx

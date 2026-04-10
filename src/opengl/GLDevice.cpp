@@ -94,4 +94,12 @@ bool GLDevice::onLockContext() {
 void GLDevice::onUnlockContext() {
   onClearCurrent();
 }
+void GLDevice::MarkAllContextsLost() {
+  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+  for (auto& item : deviceMap) {
+    item.second->_contextLost = true;
+  }
+  LOGE("GLDevice::MarkAllContextsLost() All %zu GL contexts have been marked as lost.",
+       deviceMap.size());
+}
 }  // namespace tgfx

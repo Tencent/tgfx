@@ -177,6 +177,21 @@ std::unique_ptr<const GLInterface> GLInterface::MakeNativeInterface(const GLProc
   functions->getFramebufferAttachmentParameteriv =
       reinterpret_cast<GLGetFramebufferAttachmentParameteriv*>(
           getter->getProcAddress("glGetFramebufferAttachmentParameteriv"));
+  // Try to get glGetGraphicsResetStatus from various extensions.
+  functions->getGraphicsResetStatus = reinterpret_cast<GLGetGraphicsResetStatus*>(
+      getter->getProcAddress("glGetGraphicsResetStatus"));
+  if (functions->getGraphicsResetStatus == nullptr) {
+    functions->getGraphicsResetStatus = reinterpret_cast<GLGetGraphicsResetStatus*>(
+        getter->getProcAddress("glGetGraphicsResetStatusKHR"));
+  }
+  if (functions->getGraphicsResetStatus == nullptr) {
+    functions->getGraphicsResetStatus = reinterpret_cast<GLGetGraphicsResetStatus*>(
+        getter->getProcAddress("glGetGraphicsResetStatusARB"));
+  }
+  if (functions->getGraphicsResetStatus == nullptr) {
+    functions->getGraphicsResetStatus = reinterpret_cast<GLGetGraphicsResetStatus*>(
+        getter->getProcAddress("glGetGraphicsResetStatusEXT"));
+  }
   functions->getIntegerv =
       reinterpret_cast<GLGetIntegerv*>(getter->getProcAddress("glGetIntegerv"));
   functions->getInternalformativ =
