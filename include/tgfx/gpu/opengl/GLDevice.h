@@ -69,6 +69,10 @@ class GLDevice : public Device {
 
   void releaseAll();
 
+ private:
+  static void MarkAllContextsLost();
+
+  friend class EGLDevice;
   friend class GLContext;
 };
 }  // namespace tgfx
