@@ -21,9 +21,36 @@
 #include "opengl/egl/EGLProcGetter.h"
 #include "utils/Log.h"
 
+#ifndef EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_EXT
+#define EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_EXT 0x3138
+#endif
+
+#ifndef EGL_LOSE_CONTEXT_ON_RESET_EXT
+#define EGL_LOSE_CONTEXT_ON_RESET_EXT 0x31BF
+#endif
+
 namespace tgfx {
 static EGLContext CreateContext(EGLContext sharedContext, EGLDisplay eglDisplay,
-                                EGLConfig eglConfig) {
+                                EGLConfig eglConfig, bool contextRobustnessSupported) {
+  // Try ES 3 with robustness if supported.
+  if (contextRobustnessSupported) {
+    static const EGLint robust3Attributes[] = {EGL_CONTEXT_CLIENT_VERSION, 3,
+                                               EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_EXT,
+                                               EGL_LOSE_CONTEXT_ON_RESET_EXT, EGL_NONE};
+    auto eglContext = eglCreateContext(eglDisplay, eglConfig, sharedContext, robust3Attributes);
+    if (eglContext != EGL_NO_CONTEXT) {
+      return eglContext;
+    }
+    // Try ES 2 with robustness.
+    static const EGLint robust2Attributes[] = {EGL_CONTEXT_CLIENT_VERSION, 2,
+                                               EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_EXT,
+                                               EGL_LOSE_CONTEXT_ON_RESET_EXT, EGL_NONE};
+    eglContext = eglCreateContext(eglDisplay, eglConfig, sharedContext, robust2Attributes);
+    if (eglContext != EGL_NO_CONTEXT) {
+      return eglContext;
+    }
+    // Robustness creation failed, fall through to non-robust path.
+  }
   static const EGLint context3Attributes[] = {EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
   auto eglContext = eglCreateContext(eglDisplay, eglConfig, sharedContext, context3Attributes);
   if (eglContext != EGL_NO_CONTEXT) {
@@ -59,7 +86,8 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
     return nullptr;
   }
   auto eglShareContext = reinterpret_cast<EGLContext>(sharedContext);
-  eglContext = CreateContext(eglShareContext, eglGlobals->display, eglGlobals->pbufferConfig);
+  eglContext = CreateContext(eglShareContext, eglGlobals->display, eglGlobals->pbufferConfig,
+                             eglGlobals->contextRobustnessSupported);
   if (eglContext == nullptr) {
     eglDestroySurface(eglGlobals->display, eglSurface);
     return nullptr;
@@ -88,7 +116,8 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
     LOGE("EGLDevice::MakeFrom() eglCreateWindowSurface error=%d", eglGetError());
     return nullptr;
   }
-  auto eglContext = CreateContext(sharedContext, eglGlobals->display, eglGlobals->windowConfig);
+  auto eglContext = CreateContext(sharedContext, eglGlobals->display, eglGlobals->windowConfig,
+                                  eglGlobals->contextRobustnessSupported);
   if (eglContext == EGL_NO_CONTEXT) {
     eglDestroySurface(eglGlobals->display, eglSurface);
     return nullptr;
@@ -168,11 +197,20 @@ bool EGLDevice::onMakeCurrent() {
   if (oldEglContext == eglContext) {
     // If the current context is already set by external, we don't need to switch it again.
     // The read/draw surface may be different.
-    return true;
+    return !checkGraphicsResetStatus();
   }
   auto result = eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
   if (!result) {
-    LOGE("EGLDevice::onMakeCurrent() failure result = %d error= %d", result, eglGetError());
+    auto error = eglGetError();
+    if (error == EGL_CONTEXT_LOST) {
+      LOGE("EGLDevice::onMakeCurrent() EGL_CONTEXT_LOST detected.");
+      handleContextLost();
+    } else {
+      LOGE("EGLDevice::onMakeCurrent() failure result = %d error= %d", result, error);
+    }
+    return false;
+  }
+  if (checkGraphicsResetStatus()) {
     return false;
   }
   return true;
@@ -182,10 +220,78 @@ void EGLDevice::onClearCurrent() {
   if (oldEglContext == eglContext) {
     return;
   }
-  eglMakeCurrent(eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+  auto result = eglMakeCurrent(eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+  if (!result) {
+    auto error = eglGetError();
+    if (error == EGL_CONTEXT_LOST) {
+      LOGE("EGLDevice::onUnlockContext() EGL_CONTEXT_LOST detected.");
+      handleContextLost();
+    } else {
+      LOGE("EGLDevice::onUnlockContext() failure error=%d", error);
+    }
+  }
   if (oldEglDisplay) {
     // 可能失败。
     eglMakeCurrent(oldEglDisplay, oldEglDrawSurface, oldEglReadSurface, oldEglContext);
   }
+}
+
+void EGLDevice::handleContextLost() {
+  if (_contextLost) {
+    return;
+  }
+  LOGE("EGLDevice::handleContextLost() Context [%p] has been permanently lost.", eglContext);
+  // On EGL platforms, a GPU reset affects all contexts. Notify all registered devices.
+  MarkAllContextsLost();
+}
+
+bool EGLDevice::checkGraphicsResetStatus() {
+  if (graphicsResetStatus != GL_NO_ERROR) {
+    return true;
+  }
+  auto glGPU = static_cast<GLGPU*>(_gpu);
+  auto getGraphicsResetStatus = glGPU->functions()->getGraphicsResetStatus;
+  if (getGraphicsResetStatus == nullptr) {
+    return false;
+  }
+  auto status = getGraphicsResetStatus();
+  if (status != GL_NO_ERROR) {
+    graphicsResetStatus = status;
+    LOGE("EGLDevice::checkGraphicsResetStatus() GPU reset detected: status=0x%x", status);
+    handleContextLost();
+    return true;
+  }
+  return false;
+}
+
+bool EGLDevice::recreateSurfaceIfNeeded(EGLNativeWindowType nativeWindow) {
+#if defined(_WIN32)
+  if (nativeWindow == nullptr) {
+    return true;
+  }
+  EGLint surfaceWidth = 0;
+  EGLint surfaceHeight = 0;
+  eglQuerySurface(eglDisplay, eglSurface, EGL_WIDTH, &surfaceWidth);
+  eglQuerySurface(eglDisplay, eglSurface, EGL_HEIGHT, &surfaceHeight);
+  RECT rect = {};
+  GetClientRect(nativeWindow, &rect);
+  auto windowWidth = static_cast<int>(rect.right - rect.left);
+  auto windowHeight = static_cast<int>(rect.bottom - rect.top);
+  if (surfaceWidth == windowWidth && surfaceHeight == windowHeight) {
+    return true;
+  }
+  eglDestroySurface(eglDisplay, eglSurface);
+  eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, EGLGlobals::Get());
+  if (eglSurface == nullptr) {
+    LOGE("EGLDevice::recreateSurfaceIfNeeded() CreateFixedSizeSurfaceForAngle error=%d",
+         eglGetError());
+    return false;
+  }
+  // Re-bind the new surface to the current context.
+  eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
+#else
+  (void)nativeWindow;
+#endif
+  return true;
 }
 }  // namespace tgfx
