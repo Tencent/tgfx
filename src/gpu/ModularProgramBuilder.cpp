@@ -247,12 +247,46 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
                                      geometryProcessor->name().c_str());
 
   GeometryProcessor::FPCoordTransformHandler transformHandler(programInfo, &transformedCoordVars);
-  GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(),
-                                   uniformHandler(), getContext()->shaderCaps(), *outputColor,
-                                   *outputCoverage, &transformHandler, &subsetVarName);
 
-  // Polymorphic dispatch via virtual emitCode().
-  geometryProcessor->emitCode(args);
+  // Check if GP supports modular FS path (only migrated GPs return non-empty).
+  auto gpName = geometryProcessor->name();
+  bool useModularFS = (gpName == "DefaultGeometryProcessor");
+
+  if (useModularFS) {
+    // Modular FS path: call emitCode with skipFragmentCode=true for VS-only.
+    MangledVaryings gpVaryings;
+    MangledUniforms gpUniforms;
+    GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(),
+                                     varyingHandler(), uniformHandler(), getContext()->shaderCaps(),
+                                     *outputColor, *outputCoverage, &transformHandler,
+                                     &subsetVarName, true);
+    args.gpVaryings = &gpVaryings;
+    args.gpUniforms = &gpUniforms;
+    geometryProcessor->emitCode(args);
+
+    // Emit GP shader macros and generate FS function calls.
+    ShaderMacroSet macros;
+    geometryProcessor->onBuildShaderMacros(macros);
+    if (!macros.empty()) {
+      fragmentShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] +=
+          macros.toPreamble();
+    }
+    auto colorResult = geometryProcessor->buildColorCallExpr(gpUniforms, gpVaryings);
+    auto coverageResult = geometryProcessor->buildCoverageCallExpr(gpUniforms, gpVaryings);
+    fragmentShaderBuilder()->codeAppend(colorResult.statement);
+    fragmentShaderBuilder()->codeAppendf("%s = %s;\n", outputColor->c_str(),
+                                         colorResult.outputVarName.c_str());
+    fragmentShaderBuilder()->codeAppend(coverageResult.statement);
+    fragmentShaderBuilder()->codeAppendf("%s = %s;\n", outputCoverage->c_str(),
+                                         coverageResult.outputVarName.c_str());
+  } else {
+    // Legacy path: call emitCode with full VS+FS generation.
+    GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(),
+                                     varyingHandler(), uniformHandler(), getContext()->shaderCaps(),
+                                     *outputColor, *outputCoverage, &transformHandler,
+                                     &subsetVarName);
+    geometryProcessor->emitCode(args);
+  }
 
   fragmentShaderBuilder()->codeAppend("}");
   currentProcessors.pop_back();

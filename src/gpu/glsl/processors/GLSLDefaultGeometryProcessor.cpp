@@ -36,7 +36,6 @@ GLSLDefaultGeometryProcessor::GLSLDefaultGeometryProcessor(PMColor color, int wi
 
 void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -50,20 +49,32 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
 
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
 
+  std::string coverageFsIn;
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
-    fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
-                             coverageVar.fsIn().c_str());
-  } else {
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    coverageFsIn = coverageVar.fsIn();
+    if (args.gpVaryings) {
+      args.gpVaryings->add("Coverage", coverageFsIn);
+    }
   }
 
   auto colorName =
       args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+  if (args.gpUniforms) {
+    args.gpUniforms->add("Color", colorName);
+  }
 
-  // Emit the vertex position to the hardware in the normalized window coordinates it expects.
+  if (!args.skipFragmentCode) {
+    auto fragBuilder = args.fragBuilder;
+    if (aa == AAType::Coverage) {
+      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverageFsIn.c_str());
+    } else {
+      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    }
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+  }
+
   args.vertBuilder->emitNormalizedPosition(positionName);
 }
 

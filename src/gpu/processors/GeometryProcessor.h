@@ -75,11 +75,12 @@ class GeometryProcessor : public Processor {
     EmitArgs(VertexShaderBuilder* vertBuilder, FragmentShaderBuilder* fragBuilder,
              VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const ShaderCaps* caps,
              std::string outputColor, std::string outputCoverage,
-             FPCoordTransformHandler* transformHandler, std::string* outputSubset)
+             FPCoordTransformHandler* transformHandler, std::string* outputSubset,
+             bool skipFragmentCode = false)
         : vertBuilder(vertBuilder), fragBuilder(fragBuilder), varyingHandler(varyingHandler),
           uniformHandler(uniformHandler), caps(caps), outputColor(std::move(outputColor)),
           outputCoverage(std::move(outputCoverage)), fpCoordTransformHandler(transformHandler),
-          outputSubset(outputSubset) {
+          outputSubset(outputSubset), skipFragmentCode(skipFragmentCode) {
     }
     VertexShaderBuilder* vertBuilder;
     FragmentShaderBuilder* fragBuilder;
@@ -90,6 +91,9 @@ class GeometryProcessor : public Processor {
     const std::string outputCoverage;
     FPCoordTransformHandler* fpCoordTransformHandler;
     std::string* outputSubset = nullptr;
+    bool skipFragmentCode = false;
+    MangledVaryings* gpVaryings = nullptr;
+    MangledUniforms* gpUniforms = nullptr;
   };
 
   virtual void emitCode(EmitArgs&) const = 0;
@@ -188,5 +192,7 @@ class GeometryProcessor : public Processor {
   std::vector<Attribute> attributes = {};
   std::vector<Attribute> _instanceAttributes = {};
   size_t textureSamplerCount = 0;
+
+  friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

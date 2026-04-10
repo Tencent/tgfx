@@ -51,6 +51,26 @@ class DefaultGeometryProcessor : public GeometryProcessor {
     return "geometry/default_geometry";
   }
 
+  ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,
+                                      const MangledVaryings& /*varyings*/) const override {
+    ShaderCallResult result;
+    result.outputVarName = "gpColor";
+    result.statement = "vec4 gpColor = " + uniforms.get("Color") + ";\n";
+    return result;
+  }
+
+  ShaderCallResult buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
+                                         const MangledVaryings& varyings) const override {
+    ShaderCallResult result;
+    result.outputVarName = "gpCoverage";
+    if (aa == AAType::Coverage) {
+      result.statement = "vec4 gpCoverage = vec4(" + varyings.get("Coverage") + ");\n";
+    } else {
+      result.statement = "vec4 gpCoverage = vec4(1.0);\n";
+    }
+    return result;
+  }
+
   bool hasUVPerspective() const override {
     return uvMatrix.hasPerspective();
   }
