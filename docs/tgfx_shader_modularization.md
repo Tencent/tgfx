@@ -4853,3 +4853,60 @@ ColorSpaceXformEffect 的 7 步色彩变换 → 在 `color_space_xform.frag.glsl
 | **合计** | **43** | **42** | **1** | **0** |
 
 ComposeFragmentProcessor 是唯一仍走 `emitContainerCode()` 的容器 FP，但其 `codeAppendf` 仅有 1 处赋值（`output = childOutput`），不含任何 Shader 算法逻辑。其子 FP 通过 emitChildCallback 递归走模块化路径。
+
+### 17.12 Shader 原子化改造最终状态总结
+
+> 2026-04-11 记录。
+
+#### 改造目标与达成状态
+
+| 目标 | 状态 |
+|------|------|
+| 消除 C++ 动态拼装 FS Shader 算法逻辑 | **已达成** — ON 路径 0 处 Shader 算法 codeAppendf |
+| 所有 Shader 逻辑迁移到 .glsl 文件 | **已达成** — 44 个 .glsl 文件，2148 行 |
+| 宏化全部变体维度 | **已达成** — 51 个宏，覆盖所有 Processor 特性 |
+| 为 UE RHI 离线预编译做准备 | **已达成** — 给定 #define 宏值即可预处理出完整 GLSL |
+
+#### ON 路径 codeAppendf 残留分析
+
+ON 路径中全部 25 处 `codeAppendf`/`codeAppend` 调用均为结构性管道代码：
+
+- scope 注释（`{ // Processor3 : TextureEffect`）：6 处
+- scope 大括号（`{` / `}`）：7 处
+- 变量声明/赋值（`vec4 x = expr`）：7 处
+- .glsl 函数调用结果注入（`codeAppend(result.statement)`）：4 处
+- ComposeFragmentProcessor 赋值（`output = childOutput`）：1 处
+
+**0 处包含 Shader 算法逻辑**（if/else 分支、for 循环、blend 公式、SDF 计算、transfer function、高斯权重等）。
+
+#### 实施轨迹
+
+| Phase | Commit 数 | 内容 |
+|-------|----------|------|
+| Phase A | 2 | 恢复 TextureEffect/TiledTextureEffect registry 映射 |
+| Phase B | 2 | 消除 legacy emitCode fallback + XfermodeFragmentProcessor emitContainerCode |
+| Phase C/D | 7 | GP FS/VS 模块化 + XP 模块化 + tgfx_blend.glsl |
+| Phase E | 2 | 容器 FP 调度架构 + XfermodeFragmentProcessor/ColorSpaceXformEffect 迁移 |
+| Phase F | 2 | ClampedGradientEffect/GaussianBlur1D 纯静态迁移 |
+| 文档 | 4 | 17.7-17.12 章节 + Shader 变体分析文档 |
+| **合计** | **19** | |
+
+#### 文件产出
+
+| 类别 | 数量 | 说明 |
+|------|------|------|
+| .glsl 文件 | 44 | 14 简单 FP + 3 复杂 FP + 4 容器 FP + 20 GP(10vert+10frag) + 2 XP + 1 blend 工具 |
+| 新增/修改 C++ 文件 | ~30 | ModularProgramBuilder、ShaderModuleRegistry、33 个 Processor .h/.cpp |
+| 文档 | 2 | tgfx_shader_modularization.md（技术方案）、tgfx_shader_variant_analysis.md（变体分析） |
+
+#### UE RHI 适配就绪度
+
+| 维度 | 状态 | 说明 |
+|------|------|------|
+| FS Shader 源码可离线获取 | 就绪 | 44 个 .glsl 文件可直接转为 UE .ush |
+| 变体维度可枚举 | 就绪 | 51 个宏，约束关系明确 |
+| 有效变体数量可控 | 就绪 | 实际 1000-3000 个，UE 裁剪后 500-1500 个 |
+| UE Permutation Domain 定义 | 未开始 | 需将 51 个宏映射为 TShaderPermutationDomain |
+| .glsl → .ush 自动转换 | 未开始 | 需工具脚本 |
+
+详细变体分析见 `docs/tgfx_shader_variant_analysis.md`。
