@@ -69,7 +69,9 @@ class ClampedGradientEffect : public FragmentProcessor {
 
   ShaderCallResult buildContainerCallStatement(const std::string& inputColor,
                                                const std::vector<std::string>& childOutputs,
-                                               const MangledUniforms& uniforms) const override {
+                                               const MangledUniforms& uniforms,
+                                               const MangledSamplers& /*samplers*/,
+                                               const MangledVaryings& /*varyings*/) const override {
     auto input = inputColor.empty() ? std::string("vec4(1.0)") : inputColor;
     // childOutputs[gradLayoutIndex] = gradLayout result (t value)
     // childOutputs[colorizerIndex] = colorizer result (color at t)

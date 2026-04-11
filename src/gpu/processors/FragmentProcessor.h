@@ -405,10 +405,13 @@ class FragmentProcessor : public Processor {
    * @param inputColor The input color variable name.
    * @param childOutputs Output variable names from recursively-emitted child FPs (indexed 0..N-1).
    * @param uniforms Mangled uniform names registered by declareResources().
+   * @param samplers Mangled sampler names collected from the FP subtree.
+   * @param varyings Mangled varying names (coord transforms, subset var).
    */
   virtual ShaderCallResult buildContainerCallStatement(
       const std::string& /*inputColor*/, const std::vector<std::string>& /*childOutputs*/,
-      const MangledUniforms& /*uniforms*/) const {
+      const MangledUniforms& /*uniforms*/, const MangledSamplers& /*samplers*/,
+      const MangledVaryings& /*varyings*/) const {
     return {};
   }
 

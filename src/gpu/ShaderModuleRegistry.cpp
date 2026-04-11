@@ -1453,6 +1453,28 @@ vec4 TGFX_ClampedGradientEffect(vec4 inputColor, vec4 gradLayoutResult,
 }
 )GLSL";
 
+static const std::string kGaussianBlur1D = R"GLSL(
+#ifndef TGFX_BLUR_LOOP_LIMIT
+#define TGFX_BLUR_LOOP_LIMIT 24
+#endif
+
+vec4 TGFX_GaussianBlur1D(float sigma, vec2 step, vec2 baseCoord) {
+    vec2 offset = step;
+    int radius = int(ceil(2.0 * sigma));
+    vec4 sum = vec4(0.0);
+    float total = 0.0;
+    for (int j = 0; j <= TGFX_BLUR_LOOP_LIMIT; ++j) {
+        int i = j - radius;
+        float weight = exp(-float(i * i) / (2.0 * sigma * sigma));
+        total += weight;
+        vec2 sampleCoord = baseCoord + offset * float(i);
+        sum += TGFX_GB1D_SAMPLE(sampleCoord) * weight;
+        if (i == radius) { break; }
+    }
+    return sum / total;
+}
+)GLSL";
+
 static const std::string kColorSpaceXformEffect = R"GLSL(
 #ifdef TGFX_CSX_SRC_TF
 float tgfx_csx_src_tf(float x, vec4 tf0, vec4 tf1) {
@@ -1571,6 +1593,7 @@ static const std::unordered_map<std::string, ShaderModuleID> kProcessorModuleMap
     {"XfermodeFragmentProcessor - dst", ShaderModuleID::XfermodeEffect},
     {"XfermodeFragmentProcessor - src", ShaderModuleID::XfermodeEffect},
     {"ClampedGradientEffect", ShaderModuleID::ClampedGradientEffect},
+    {"GaussianBlur1DFragmentProcessor", ShaderModuleID::GaussianBlur1D},
     {"ColorSpaceXformEffect", ShaderModuleID::ColorSpaceXformEffect},
 };
 
@@ -1622,6 +1645,8 @@ const std::string& ShaderModuleRegistry::GetModule(ShaderModuleID id) {
       return kXfermodeEffect;
     case ShaderModuleID::ClampedGradientEffect:
       return kClampedGradientEffect;
+    case ShaderModuleID::GaussianBlur1D:
+      return kGaussianBlur1D;
     case ShaderModuleID::ColorSpaceXformEffect:
       return kColorSpaceXformEffect;
   }

@@ -217,7 +217,7 @@ bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* proc
                                                    const std::string& input,
                                                    const std::string& output) {
   // Check if the processor implements the new modular container interface.
-  auto containerResult = processor->buildContainerCallStatement(input, {}, {});
+  auto containerResult = processor->buildContainerCallStatement(input, {}, {}, {}, {});
   // Quick probe: if buildContainerCallStatement returns empty with empty args,
   // this processor doesn't support the modular container path.
   // We need a better check — use shaderFunctionFile() + numChildProcessors > 0.
@@ -232,8 +232,11 @@ bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* proc
   // doesn't support the modular path yet.
   std::vector<std::string> dummyChildren(processor->numChildProcessors(), "vec4(0.0)");
   MangledUniforms dummyUniforms;
-  auto probeResult = processor->buildContainerCallStatement(input.empty() ? "vec4(1.0)" : input,
-                                                            dummyChildren, dummyUniforms);
+  MangledSamplers dummySamplers;
+  MangledVaryings dummyVaryings;
+  auto probeResult =
+      processor->buildContainerCallStatement(input.empty() ? "vec4(1.0)" : input, dummyChildren,
+                                             dummyUniforms, dummySamplers, dummyVaryings);
   if (probeResult.statement.empty()) {
     return false;
   }
@@ -265,13 +268,29 @@ bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* proc
   FPResources resources;
   processor->declareResources(uniformHandler(), resources.uniforms, resources.samplers);
 
+  // Populate sampler names from the already-collected currentTexSamplers.
+  for (size_t i = 0; i < currentTexSamplers.size(); ++i) {
+    auto samplerVar = uniformHandler()->getSamplerVariable(currentTexSamplers[i]);
+    resources.samplers.add("TextureSampler_" + std::to_string(i), samplerVar.name());
+  }
+  // Populate coord transform varying.
+  if (transformedCoordVarsIdx < transformedCoordVars.size()) {
+    auto texCoordName =
+        fragmentShaderBuilder()->emitPerspTextCoord(transformedCoordVars[transformedCoordVarsIdx]);
+    resources.varyings.addCoordTransform(0, texCoordName);
+  }
+  if (!subsetVarName.empty()) {
+    resources.varyings.add("subsetVar", subsetVarName);
+  }
+
   // Emit macros and include module.
   emitProcessorDefines(processor);
   includeModule(ShaderModuleRegistry::GetModuleID(processor->name()));
 
   // Build and emit the container function call.
-  auto result = processor->buildContainerCallStatement(input.empty() ? "vec4(1.0)" : input,
-                                                       childOutputs, resources.uniforms);
+  auto result = processor->buildContainerCallStatement(
+      input.empty() ? "vec4(1.0)" : input, childOutputs, resources.uniforms, resources.samplers,
+      resources.varyings);
   fragmentShaderBuilder()->codeAppend(result.statement);
   if (result.outputVarName != output) {
     fragmentShaderBuilder()->codeAppendf("%s = %s;", output.c_str(), result.outputVarName.c_str());

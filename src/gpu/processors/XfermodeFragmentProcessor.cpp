@@ -66,7 +66,8 @@ void XfermodeFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const 
 
 ShaderCallResult XfermodeFragmentProcessor::buildContainerCallStatement(
     const std::string& inputColor, const std::vector<std::string>& childOutputs,
-    const MangledUniforms& /*uniforms*/) const {
+    const MangledUniforms& /*uniforms*/, const MangledSamplers& /*samplers*/,
+    const MangledVaryings& /*varyings*/) const {
   ShaderCallResult result;
   std::string code;
   auto input = inputColor.empty() ? std::string("vec4(1.0)") : inputColor;

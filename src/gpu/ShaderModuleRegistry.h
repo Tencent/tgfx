@@ -50,6 +50,7 @@ enum class ShaderModuleID {
   // Container FP modules
   XfermodeEffect,
   ClampedGradientEffect,
+  GaussianBlur1D,
   // Reclassified leaf FP (was container)
   ColorSpaceXformEffect,
 };

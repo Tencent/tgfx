@@ -51,6 +51,41 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
     return "fragment/gaussian_blur_1d.frag";
   }
 
+  std::vector<ChildEmitInfo> getChildEmitPlan(const std::string& /*parentInput*/) const override {
+    return {{0, "vec4(1.0)", -1}};
+  }
+
+  void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
+                        MangledSamplers& /*samplers*/) const override {
+    uniforms.add("Sigma",
+                 uniformHandler->addUniform("Sigma", UniformFormat::Float, ShaderStage::Fragment));
+    uniforms.add("Step",
+                 uniformHandler->addUniform("Step", UniformFormat::Float2, ShaderStage::Fragment));
+  }
+
+  ShaderCallResult buildContainerCallStatement(const std::string& /*inputColor*/,
+                                               const std::vector<std::string>& /*childOutputs*/,
+                                               const MangledUniforms& uniforms,
+                                               const MangledSamplers& samplers,
+                                               const MangledVaryings& varyings) const override {
+    // Build TGFX_GB1D_SAMPLE(coord) macro that calls the child FP's texture sampling function.
+    // The child FP (TextureEffect) function is TGFX_TextureEffect(inputColor, coord, sampler).
+    // For the common non-YUV single-sampler case, we construct the call directly.
+    auto samplerName = samplers.getByIndex(0);
+    auto coordName = varyings.getCoordTransform(0);
+    // The macro takes a coord parameter and calls texture() directly with the child's sampler.
+    // This avoids needing to know the full child FP function signature.
+    std::string sampleMacro =
+        "#define TGFX_GB1D_SAMPLE(coord) texture(" + samplerName + ", coord)\n";
+
+    ShaderCallResult result;
+    result.statement = sampleMacro + "vec4 _gb1dResult = TGFX_GaussianBlur1D(" +
+                       uniforms.get("Sigma") + ", " + uniforms.get("Step") + ", " + coordName +
+                       ");\n";
+    result.outputVarName = "_gb1dResult";
+    return result;
+  }
+
   bool emitContainerCode(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
                          const std::string& /*input*/, const std::string& output,
                          size_t transformedCoordVarsIdx,
