@@ -4738,3 +4738,118 @@ emitModularFragProc(processor)
 | GP VS | 10 | 10（.vert.glsl 注入） | — | 0 |
 | XP | 2 | 2 | — | 0 |
 | **合计** | **43** | **40** | **3** | **0** |
+
+### 17.11 Phase F 实施结果记录：容器 FP 纯静态迁移（ClampedGradient + GaussianBlur1D）
+
+> 2026-04-11 完成，共 2 个 commit。
+
+#### 目标
+
+将 17.10 节中残留的 ClampedGradientEffect 和 GaussianBlur1DFragmentProcessor 从 `emitContainerCode()` C++ 拼装路径迁移到纯 .glsl 静态路径，彻底消除 ON 路径中所有 C++ 动态拼装 Shader 算法逻辑。
+
+#### 架构改动
+
+**1. `buildContainerCallStatement()` 接口扩展**
+
+签名从 `(inputColor, childOutputs, uniforms)` 扩展为 `(inputColor, childOutputs, uniforms, samplers, varyings)`。新增的 `MangledSamplers` 和 `MangledVaryings` 参数传入已收集的子 FP sampler 名和 coord varying 名，使容器 FP 能在 .glsl 中通过宏调用子 FP 的采样函数。
+
+所有已有覆写（XfermodeFragmentProcessor、ClampedGradientEffect）同步更新签名。
+
+**2. `ChildEmitInfo` 新增 `useOutputOfChild` 字段**
+
+```cpp
+struct ChildEmitInfo {
+  size_t childIndex;
+  std::string inputOverride;
+  int useOutputOfChild = -1;  // >= 0: 用第 N 个子 FP 的输出作为 input
+};
+```
+
+解决容器 FP 中子 FP 之间的数据依赖问题：colorizer 需要 gradLayout 的 t 值输出作为 input。`emitModularContainerFP()` 按 plan 顺序依次 emit 子 FP，当 `useOutputOfChild >= 0` 时将已 emit 子 FP 的输出变量名作为 input。
+
+**3. ClampedGradientEffect 迁移方案**
+
+走 `emitModularContainerFP()` 标准路径：
+
+- `getChildEmitPlan()` 返回有序计划：先 gradLayout（input = `"vec4(1.0)"`）→ 再 colorizer（`useOutputOfChild = gradLayoutIndex`，引用 gradLayout 的 t 值输出）
+- `buildContainerCallStatement()` 生成 `TGFX_ClampedGradientEffect(input, gradLayoutResult, colorizerResult, leftBorder, rightBorder)` 调用
+- 现有 `clamped_gradient_effect.frag.glsl` 无需修改（签名已正确）
+
+**4. GaussianBlur1DFragmentProcessor 迁移方案**
+
+子 FP 在循环内反复调用（每次不同坐标偏移），不能预计算结果。采用**宏注入子 FP 采样调用**方案：
+
+- 重写 `gaussian_blur_1d.frag.glsl`：循环 + 权重计算 + `TGFX_GB1D_SAMPLE(coord)` 宏调用
+- `buildContainerCallStatement()` 中用 `samplers.getByIndex(0)` 获取子 FP 的 sampler mangled 名，生成 `#define TGFX_GB1D_SAMPLE(coord) texture(samplerName, coord)` 宏定义 + `TGFX_GaussianBlur1D(sigma, step, baseCoord)` 函数调用
+- `getChildEmitPlan()` 正常 emit 子 FP（触发 .glsl include + sampler 注册），其输出代码在 main() 中但不被使用（GLSL 编译器死代码消除）
+
+#### 完成的 Commit
+
+| Commit | 变更文件数 | 行数变化 | 说明 |
+|--------|-----------|---------|------|
+| `4216f046` | 5 | +66/-5 | ClampedGradientEffect 迁移 + useOutputOfChild 子 FP 依赖支持 |
+| `4d9b89e9` | 9 | +117/-42 | GaussianBlur1D 迁移 + buildContainerCallStatement 接口扩展（MangledSamplers/MangledVaryings） |
+
+#### 改造后的 ModularProgramBuilder 完整分派架构
+
+```
+emitModularFragProc(processor)
+  ├─ emitModularContainerFP()          ← 模块化容器路径（5 个容器 FP 全部走此路径）
+  │   ├─ getChildEmitPlan()            ← 子 FP emit 计划（支持 inputOverride / useOutputOfChild）
+  │   ├─ emitModularFragProc(child, skipSampler=true) ← 递归 emit 子 FP
+  │   ├─ declareResources()            ← 容器 uniform 注册
+  │   ├─ populateSamplers/Varyings     ← 从 currentTexSamplers/transformedCoordVars 填充
+  │   ├─ emitProcessorDefines()        ← 容器 #define（含 TGFX_GB1D_SAMPLE 宏）
+  │   ├─ includeModule()               ← 容器 .glsl 模块
+  │   └─ buildContainerCallStatement(input, childOutputs, uniforms, samplers, varyings)
+  ├─ emitContainerCode()               ← legacy 容器路径（仅 ComposeFragmentProcessor 仍走此路径）
+  │   └─ emitChildCallback → leaf 子 FP 走 emitModularFragProc
+  └─ emitLeafFPCall()                  ← 叶子 FP（buildCallStatement + .glsl）
+```
+
+#### 关键技术问题及解决方案
+
+| 问题 | 根因 | 解决方案 |
+|------|------|---------|
+| ClampedGradientEffect 子 FP 数据依赖 | colorizer 需要 gradLayout 的 t 值输出作为 input | `ChildEmitInfo::useOutputOfChild` 字段 + `emitModularContainerFP()` 按 plan 顺序依次 emit |
+| GaussianBlur1D 循环内子 FP 调用 | 子 FP 在 for 循环中每次用不同坐标调用，无法预计算 | 宏注入：`#define TGFX_GB1D_SAMPLE(coord) texture(samplerName, coord)`，.glsl 中循环调用宏 |
+| `buildContainerCallStatement()` 缺少 sampler 信息 | 原签名只有 `MangledUniforms`，无法获取子 FP sampler 名 | 扩展签名新增 `MangledSamplers` + `MangledVaryings`，调度层从 `currentTexSamplers` 填充 |
+
+#### 验证结果
+
+| 配置 | 测试数 | 结果 |
+|------|--------|------|
+| `TGFX_USE_MODULAR_SHADERS=ON` | 428 | 全部通过 |
+| `TGFX_USE_MODULAR_SHADERS=OFF` | 428 | 全部通过 |
+
+#### ON 路径动态 Shader 拼装残留分析（最终状态）
+
+| 来源 | codeAppendf 数 | 性质 | 含 Shader 算法逻辑？ |
+|------|---------------|------|-------------------|
+| ModularProgramBuilder 调度层 | ~24 | scope 注释、变量声明/赋值、临时变量 | 否 |
+| ComposeFragmentProcessor emitContainerCode | 1 | `output = childOutput` 赋值 | 否 |
+| GP emitCode（skipFragmentCode=true, skipVertexCode=true） | ~7 per GP | 资源声明 + .vert.glsl 函数注入调用 | 否（VS 侧） |
+
+**ON 路径中含 Shader 算法逻辑的 `codeAppendf` 调用：0 处。**
+
+ClampedGradientEffect 的 if/else 控制流 + premultiply → 在 `clamped_gradient_effect.frag.glsl` 中。
+GaussianBlur1D 的 for 循环 + 高斯权重 + 累加 → 在 `gaussian_blur_1d.frag.glsl` 中。
+XfermodeFragmentProcessor 的 30 种 blend mode → 在 `xfermode.frag.glsl` 中。
+ColorSpaceXformEffect 的 7 步色彩变换 → 在 `color_space_xform.frag.glsl` 中。
+
+#### 模块化覆盖率（最终状态）
+
+| 类别 | 总数 | 走 .glsl 模块 | 走 emitContainerCode（仅赋值） | 仍走 legacy |
+|------|------|-------------|-------------------------------|------------|
+| 叶子 FP | 16 | 16 | — | 0 |
+| ColorSpaceXformEffect | 1 | 1（重分类为 leaf） | — | 0 |
+| XfermodeFragmentProcessor | 1 | 1（buildContainerCallStatement） | — | 0 |
+| ClampedGradientEffect | 1 | 1（buildContainerCallStatement + useOutputOfChild） | — | 0 |
+| GaussianBlur1D | 1 | 1（buildContainerCallStatement + 宏注入采样） | — | 0 |
+| ComposeFragmentProcessor | 1 | — | 1（纯 `output = child` 赋值） | 0 |
+| GP FS | 10 | 10 | — | 0 |
+| GP VS | 10 | 10（.vert.glsl 注入） | — | 0 |
+| XP | 2 | 2 | — | 0 |
+| **合计** | **43** | **42** | **1** | **0** |
+
+ComposeFragmentProcessor 是唯一仍走 `emitContainerCode()` 的容器 FP，但其 `codeAppendf` 仅有 1 处赋值（`output = childOutput`），不含任何 Shader 算法逻辑。其子 FP 通过 emitChildCallback 递归走模块化路径。
