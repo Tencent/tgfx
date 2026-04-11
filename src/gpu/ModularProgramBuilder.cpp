@@ -244,15 +244,18 @@ bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* proc
   for (const auto& info : plan) {
     auto childCoordOffset =
         processor->computeChildCoordOffset(transformedCoordVarsIdx, info.childIndex);
-    auto childInput = info.inputOverride.empty()
-                          ? (input.empty() ? std::string("vec4(1.0)") : input)
-                          : info.inputOverride;
-    // Emit input override variable if needed.
-    if (!info.inputOverride.empty()) {
+    std::string childInput;
+    if (info.useOutputOfChild >= 0) {
+      // Use the output of a previously-emitted child as input.
+      childInput = childOutputs[static_cast<size_t>(info.useOutputOfChild)];
+    } else if (!info.inputOverride.empty()) {
+      // Use a static expression as input override.
       std::string overrideName = "_containerChildInput_" + std::to_string(info.childIndex);
       fragmentShaderBuilder()->codeAppendf("vec4 %s = %s;", overrideName.c_str(),
                                            info.inputOverride.c_str());
       childInput = overrideName;
+    } else {
+      childInput = input.empty() ? std::string("vec4(1.0)") : input;
     }
     childOutputs[info.childIndex] = emitModularFragProc(processor->childProcessor(info.childIndex),
                                                         childCoordOffset, childInput, {}, true);

@@ -49,6 +49,7 @@ enum class ShaderModuleID {
   PorterDuffXfer,
   // Container FP modules
   XfermodeEffect,
+  ClampedGradientEffect,
   // Reclassified leaf FP (was container)
   ColorSpaceXformEffect,
 };

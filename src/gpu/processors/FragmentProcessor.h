@@ -415,6 +415,7 @@ class FragmentProcessor : public Processor {
   struct ChildEmitInfo {
     size_t childIndex;
     std::string inputOverride;  // empty = use parent input
+    int useOutputOfChild = -1;  // >= 0: use output of the specified child as input
   };
 
   /**

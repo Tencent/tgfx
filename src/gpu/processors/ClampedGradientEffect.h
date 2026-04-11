@@ -50,6 +50,38 @@ class ClampedGradientEffect : public FragmentProcessor {
     return "fragment/clamped_gradient_effect.frag";
   }
 
+  void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
+                        MangledSamplers& /*samplers*/) const override {
+    uniforms.add("leftBorderColor",
+                 uniformHandler->addUniform("leftBorderColor", UniformFormat::Float4,
+                                            ShaderStage::Fragment));
+    uniforms.add("rightBorderColor",
+                 uniformHandler->addUniform("rightBorderColor", UniformFormat::Float4,
+                                            ShaderStage::Fragment));
+  }
+
+  std::vector<ChildEmitInfo> getChildEmitPlan(const std::string& /*parentInput*/) const override {
+    // Emit gradLayout first (child gradLayoutIndex), then colorizer (child colorizerIndex)
+    // using gradLayout's output as colorizer's input.
+    return {{gradLayoutIndex, "vec4(1.0)", -1},
+            {colorizerIndex, "", static_cast<int>(gradLayoutIndex)}};
+  }
+
+  ShaderCallResult buildContainerCallStatement(const std::string& inputColor,
+                                               const std::vector<std::string>& childOutputs,
+                                               const MangledUniforms& uniforms) const override {
+    auto input = inputColor.empty() ? std::string("vec4(1.0)") : inputColor;
+    // childOutputs[gradLayoutIndex] = gradLayout result (t value)
+    // childOutputs[colorizerIndex] = colorizer result (color at t)
+    ShaderCallResult result;
+    result.statement = "vec4 _cgeResult = TGFX_ClampedGradientEffect(" + input + ", " +
+                       childOutputs[gradLayoutIndex] + ", " + childOutputs[colorizerIndex] + ", " +
+                       uniforms.get("leftBorderColor") + ", " + uniforms.get("rightBorderColor") +
+                       ");\n";
+    result.outputVarName = "_cgeResult";
+    return result;
+  }
+
   bool emitContainerCode(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
                          const std::string& input, const std::string& output,
                          size_t transformedCoordVarsIdx,

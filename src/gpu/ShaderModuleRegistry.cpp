@@ -1432,6 +1432,27 @@ vec4 TGFX_XfermodeFragmentProcessor(vec4 inputColor, vec4 childSrc) {
 #endif
 )GLSL";
 
+static const std::string kClampedGradientEffect = R"GLSL(
+vec4 TGFX_ClampedGradientEffect(vec4 inputColor, vec4 gradLayoutResult,
+                                  vec4 colorizerResult,
+                                  vec4 leftBorderColor, vec4 rightBorderColor) {
+    vec4 t = gradLayoutResult;
+    vec4 output;
+    if (t.y < 0.0) {
+        output = vec4(0.0);
+    } else if (t.x <= 0.0) {
+        output = leftBorderColor;
+    } else if (t.x >= 1.0) {
+        output = rightBorderColor;
+    } else {
+        output = colorizerResult;
+    }
+    output.rgb *= output.a;
+    output *= inputColor.a;
+    return output;
+}
+)GLSL";
+
 static const std::string kColorSpaceXformEffect = R"GLSL(
 #ifdef TGFX_CSX_SRC_TF
 float tgfx_csx_src_tf(float x, vec4 tf0, vec4 tf1) {
@@ -1549,6 +1570,7 @@ static const std::unordered_map<std::string, ShaderModuleID> kProcessorModuleMap
     {"XfermodeFragmentProcessor - two", ShaderModuleID::XfermodeEffect},
     {"XfermodeFragmentProcessor - dst", ShaderModuleID::XfermodeEffect},
     {"XfermodeFragmentProcessor - src", ShaderModuleID::XfermodeEffect},
+    {"ClampedGradientEffect", ShaderModuleID::ClampedGradientEffect},
     {"ColorSpaceXformEffect", ShaderModuleID::ColorSpaceXformEffect},
 };
 
@@ -1598,6 +1620,8 @@ const std::string& ShaderModuleRegistry::GetModule(ShaderModuleID id) {
       return kPorterDuffXfer;
     case ShaderModuleID::XfermodeEffect:
       return kXfermodeEffect;
+    case ShaderModuleID::ClampedGradientEffect:
+      return kClampedGradientEffect;
     case ShaderModuleID::ColorSpaceXformEffect:
       return kColorSpaceXformEffect;
   }
