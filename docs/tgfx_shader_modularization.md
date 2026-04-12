@@ -4910,3 +4910,54 @@ ON 路径中全部 25 处 `codeAppendf`/`codeAppend` 调用均为结构性管道
 | .glsl → .ush 自动转换 | 未开始 | 需工具脚本 |
 
 详细变体分析见 `docs/tgfx_shader_variant_analysis.md`。
+
+### 17.13 Phase G 实施结果记录：ON 路径 Bug 修复
+
+> 2026-04-12 完成，共 2 个 commit。
+
+#### 背景
+
+在 CLion 中配置 `-DTGFX_USE_MODULAR_SHADERS=ON` 后运行单测发现崩溃，去掉该选项后测试通过。此前的开发环境未暴露这些问题（可能是编译缓存或 Shader 缓存导致）。本轮逐一排查并修复了 ON 路径中的 6 个 Bug。
+
+#### 修复的 Bug 清单
+
+| # | 问题 | 根因 | 修复 | 影响测试数 |
+|---|------|------|------|-----------|
+| 1 | SIGSEGV 崩溃（exit code 139） | `emitModularContainerFP()` 中 probe 调用 `buildContainerCallStatement(input, {}, {}, {}, {})` 传入空 `childOutputs`，`XfermodeFragmentProcessor` 无保护访问 `childOutputs[0]` | 删除多余的 probe 调用（后面已有正确的 dummy probe） | 全部测试 |
+| 2 | `Macro Redefined TGFX_BLEND_MODE` | `XfermodeFragmentProcessor` 和 `PorterDuffXferProcessor` 共用同名宏 `TGFX_BLEND_MODE`，同一 Shader 中重复定义 | 将 XfermodeFragmentProcessor 的宏重命名为 `TGFX_XFP_BLEND_MODE`，更新 .glsl 和嵌入字符串 | ~30 |
+| 3 | `'output' : Reserved word` | `clamped_gradient_effect.frag.glsl` 中使用 `output` 作为变量名，GLSL 150 中 `output` 是保留字 | 将变量名改为 `result`，同步更新 .glsl 文件和嵌入字符串 | ~22 |
+| 4 | `Invalid call of undeclared identifier 'TGFX_GB1D_SAMPLE'` | `#define TGFX_GB1D_SAMPLE(coord)` 宏定义被 `buildContainerCallStatement()` 写入 `result.statement`，最终通过 `codeAppend()` 进入 main() 函数体（Code section），GLSL 不允许在函数体内使用 `#define` | 新增 `ShaderCallResult::preamble` 字段；调度层将 preamble 写入 Definitions section（函数体外） | ~10 |
+| 5 | `No matching function for call to TGFX_TextureEffect/TiledTextureEffect` + 多个宏重复定义 | 同一 Shader 中多个同类型 FP 实例的不同宏值导致 .glsl 函数签名冲突（一份 .glsl 只能有一种签名）。容器 FP 递归 emit 子 FP 时也会 include 已有模块 | (a) 禁用 `emitModularContainerFP()` 容器路径，容器 FP 走 legacy `emitContainerCode()`；(b) leaf FP 在 `emitModularFragProc()` 中检查模块是否已 include，已存在则走 legacy `emitCode()`；(c) `emitContainerCode()` 的 `emitChildCallback` 中统一走 legacy 路径 | ~58 |
+| 6 | `VectorLayerTest.TextPath` 崩溃（SIGSEGV） | `TextureEffect::needSubset()` 调用 `getTextureView()` 未做 null 检查。在模块化路径中 `declareResources()` 在 Shader 编译阶段被调用，此时 deferred texture proxy 的 texture 可能还没 resolve | 在 `needSubset()` 中加 `textureView == nullptr` 检查，为 null 时保守返回 `true` | 1 |
+
+#### 架构调整说明
+
+**容器 FP 模块化路径暂时禁用**
+
+Bug #5 揭示了当前基于全局 `#define` 的模块化架构的本质限制：
+
+- 每个 .glsl 模块在一个 Shader 中只能被 include 一次
+- `#define` 宏在 Definitions section 中全局生效
+- 当同一 Shader 中有多个同类型 FP 实例且宏值不同时（如两个 `XfermodeFragmentProcessor` 用不同的 `TGFX_XFP_BLEND_MODE`），.glsl 函数只能对应一种签名
+- `#undef + #define` 方案不可行——Definitions section 在 Functions section 之前，Functions 中的函数签名只能反映最后一次 `#define` 的值
+
+因此暂时禁用 `emitModularContainerFP()` 路径，容器 FP 走 `emitContainerCode()` legacy 路径。顶层 leaf FP 保留模块化路径（首次 include 时走模块化，同类型重复实例走 legacy）。
+
+**后续如需重新启用容器 FP 模块化路径**，需要解决"per-instance function specialization"问题，可选方案包括：
+- 给 .glsl 函数名加 mangled 后缀（每个 FP 实例一个独立函数）
+- 使用 GLSL subroutine 或 function overloading
+- 将宏值作为函数参数传入而非编译期常量
+
+#### 完成的 Commit
+
+| Commit | 变更文件数 | 行数变化 | 说明 |
+|--------|-----------|---------|------|
+| `2c6dc1f8` | 7 | +139/-114 | 修复 Bug #1-#5：probe 崩溃、宏冲突、保留字、preamble、模块重复 include 回退 |
+| `ff0998a2` | 1 | +1/-1 | 修复 Bug #6：TextureEffect needSubset null TextureView 崩溃 |
+
+#### 验证结果
+
+| 配置 | 测试数 | 结果 |
+|------|--------|------|
+| `TGFX_USE_MODULAR_SHADERS=ON` | 431 | 全部通过 |
+| `TGFX_USE_MODULAR_SHADERS=OFF` | 431 | 全部通过 |
