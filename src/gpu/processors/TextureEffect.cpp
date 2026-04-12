@@ -106,7 +106,7 @@ bool TextureEffect::needSubset() const {
     return true;
   }
   auto textureView = getTextureView();
-  if (textureProxy->width() != textureView->width() ||
+  if (textureView == nullptr || textureProxy->width() != textureView->width() ||
       textureProxy->height() != textureView->height()) {
     // If the texture size is different from the proxy size, we need to use subset.
     return true;
