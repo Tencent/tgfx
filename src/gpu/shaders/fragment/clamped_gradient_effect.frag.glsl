@@ -17,18 +17,18 @@ vec4 TGFX_ClampedGradientEffect(vec4 inputColor, vec4 gradLayoutResult,
                                   vec4 colorizerResult,
                                   vec4 leftBorderColor, vec4 rightBorderColor) {
     vec4 t = gradLayoutResult;
-    vec4 output;
+    vec4 result;
     if (t.y < 0.0) {
-        output = vec4(0.0);
+        result = vec4(0.0);
     } else if (t.x <= 0.0) {
-        output = leftBorderColor;
+        result = leftBorderColor;
     } else if (t.x >= 1.0) {
-        output = rightBorderColor;
+        result = rightBorderColor;
     } else {
-        output = colorizerResult;
+        result = colorizerResult;
     }
     // Premultiply and modulate by input alpha.
-    output.rgb *= output.a;
-    output *= inputColor.a;
-    return output;
+    result.rgb *= result.a;
+    result *= inputColor.a;
+    return result;
 }

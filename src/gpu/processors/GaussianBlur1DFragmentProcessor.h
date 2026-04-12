@@ -79,9 +79,9 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
         "#define TGFX_GB1D_SAMPLE(coord) texture(" + samplerName + ", coord)\n";
 
     ShaderCallResult result;
-    result.statement = sampleMacro + "vec4 _gb1dResult = TGFX_GaussianBlur1D(" +
-                       uniforms.get("Sigma") + ", " + uniforms.get("Step") + ", " + coordName +
-                       ");\n";
+    result.preamble = sampleMacro;
+    result.statement = "vec4 _gb1dResult = TGFX_GaussianBlur1D(" + uniforms.get("Sigma") + ", " +
+                       uniforms.get("Step") + ", " + coordName + ");\n";
     result.outputVarName = "_gb1dResult";
     return result;
   }

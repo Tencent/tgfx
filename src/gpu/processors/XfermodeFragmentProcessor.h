@@ -67,7 +67,7 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
     macros.define("TGFX_XFP_CHILD_MODE", static_cast<int>(child));
-    macros.define("TGFX_BLEND_MODE", static_cast<int>(mode));
+    macros.define("TGFX_XFP_BLEND_MODE", static_cast<int>(mode));
   }
 
   std::string shaderFunctionFile() const override {

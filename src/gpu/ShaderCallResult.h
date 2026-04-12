@@ -41,6 +41,13 @@ struct ShaderCallResult {
   std::string outputVarName;
 
   /**
+   * GLSL preprocessor directives (e.g. #define macros) that must appear in the Definitions section,
+   * outside of any function body. Used by container FPs like GaussianBlur1D to inject child FP
+   * sampling macros that depend on mangled resource names only known at emit time.
+   */
+  std::string preamble;
+
+  /**
    * Shader function files required by this Processor (including children for containers).
    * These are relative paths without extension, e.g. "fragment/texture_effect.frag"
    */

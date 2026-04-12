@@ -1350,65 +1350,65 @@ void TGFX_PorterDuffXP_FS(vec4 inputColor, vec4 inputCoverage, vec4 dstColor,
 
 static const std::string kXfermodeEffect = R"GLSL(
 vec4 tgfx_xfp_blend(vec4 src, vec4 dst) {
-#if TGFX_BLEND_MODE == 0
+#if TGFX_XFP_BLEND_MODE == 0
     return vec4(0.0);
-#elif TGFX_BLEND_MODE == 1
+#elif TGFX_XFP_BLEND_MODE == 1
     return src;
-#elif TGFX_BLEND_MODE == 2
+#elif TGFX_XFP_BLEND_MODE == 2
     return dst;
-#elif TGFX_BLEND_MODE == 3
+#elif TGFX_XFP_BLEND_MODE == 3
     return src + (1.0 - src.a) * dst;
-#elif TGFX_BLEND_MODE == 4
+#elif TGFX_XFP_BLEND_MODE == 4
     return (1.0 - dst.a) * src + dst;
-#elif TGFX_BLEND_MODE == 5
+#elif TGFX_XFP_BLEND_MODE == 5
     return dst.a * src;
-#elif TGFX_BLEND_MODE == 6
+#elif TGFX_XFP_BLEND_MODE == 6
     return src.a * dst;
-#elif TGFX_BLEND_MODE == 7
+#elif TGFX_XFP_BLEND_MODE == 7
     return (1.0 - dst.a) * src;
-#elif TGFX_BLEND_MODE == 8
+#elif TGFX_XFP_BLEND_MODE == 8
     return (1.0 - src.a) * dst;
-#elif TGFX_BLEND_MODE == 9
+#elif TGFX_XFP_BLEND_MODE == 9
     return dst.a * src + (1.0 - src.a) * dst;
-#elif TGFX_BLEND_MODE == 10
+#elif TGFX_XFP_BLEND_MODE == 10
     return (1.0 - dst.a) * src + src.a * dst;
-#elif TGFX_BLEND_MODE == 11
+#elif TGFX_XFP_BLEND_MODE == 11
     return (1.0 - dst.a) * src + (1.0 - src.a) * dst;
-#elif TGFX_BLEND_MODE == 12
+#elif TGFX_XFP_BLEND_MODE == 12
     return min(src + dst, vec4(1.0));
-#elif TGFX_BLEND_MODE == 13
+#elif TGFX_XFP_BLEND_MODE == 13
     return src * dst;
-#elif TGFX_BLEND_MODE == 14
+#elif TGFX_XFP_BLEND_MODE == 14
     return src + dst - src * dst;
-#elif TGFX_BLEND_MODE == 15
+#elif TGFX_XFP_BLEND_MODE == 15
     return tgfx_blend_overlay(src, dst);
-#elif TGFX_BLEND_MODE == 16
+#elif TGFX_XFP_BLEND_MODE == 16
     return tgfx_blend_darken(src, dst);
-#elif TGFX_BLEND_MODE == 17
+#elif TGFX_XFP_BLEND_MODE == 17
     return tgfx_blend_lighten(src, dst);
-#elif TGFX_BLEND_MODE == 18
+#elif TGFX_XFP_BLEND_MODE == 18
     return tgfx_blend_color_dodge(src, dst);
-#elif TGFX_BLEND_MODE == 19
+#elif TGFX_XFP_BLEND_MODE == 19
     return tgfx_blend_color_burn(src, dst);
-#elif TGFX_BLEND_MODE == 20
+#elif TGFX_XFP_BLEND_MODE == 20
     return tgfx_blend_hard_light(src, dst);
-#elif TGFX_BLEND_MODE == 21
+#elif TGFX_XFP_BLEND_MODE == 21
     return tgfx_blend_soft_light(src, dst);
-#elif TGFX_BLEND_MODE == 22
+#elif TGFX_XFP_BLEND_MODE == 22
     return tgfx_blend_difference(src, dst);
-#elif TGFX_BLEND_MODE == 23
+#elif TGFX_XFP_BLEND_MODE == 23
     return tgfx_blend_exclusion(src, dst);
-#elif TGFX_BLEND_MODE == 24
+#elif TGFX_XFP_BLEND_MODE == 24
     return tgfx_blend_multiply(src, dst);
-#elif TGFX_BLEND_MODE == 25
+#elif TGFX_XFP_BLEND_MODE == 25
     return tgfx_blend_hue(src, dst);
-#elif TGFX_BLEND_MODE == 26
+#elif TGFX_XFP_BLEND_MODE == 26
     return tgfx_blend_saturation(src, dst);
-#elif TGFX_BLEND_MODE == 27
+#elif TGFX_XFP_BLEND_MODE == 27
     return tgfx_blend_color(src, dst);
-#elif TGFX_BLEND_MODE == 28
+#elif TGFX_XFP_BLEND_MODE == 28
     return tgfx_blend_luminosity(src, dst);
-#elif TGFX_BLEND_MODE == 29
+#elif TGFX_XFP_BLEND_MODE == 29
     return tgfx_blend_plus_darker(src, dst);
 #else
     return src + (1.0 - src.a) * dst;
@@ -1437,19 +1437,19 @@ vec4 TGFX_ClampedGradientEffect(vec4 inputColor, vec4 gradLayoutResult,
                                   vec4 colorizerResult,
                                   vec4 leftBorderColor, vec4 rightBorderColor) {
     vec4 t = gradLayoutResult;
-    vec4 output;
+    vec4 result;
     if (t.y < 0.0) {
-        output = vec4(0.0);
+        result = vec4(0.0);
     } else if (t.x <= 0.0) {
-        output = leftBorderColor;
+        result = leftBorderColor;
     } else if (t.x >= 1.0) {
-        output = rightBorderColor;
+        result = rightBorderColor;
     } else {
-        output = colorizerResult;
+        result = colorizerResult;
     }
-    output.rgb *= output.a;
-    output *= inputColor.a;
-    return output;
+    result.rgb *= result.a;
+    result *= inputColor.a;
+    return result;
 }
 )GLSL";
 
