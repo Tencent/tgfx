@@ -121,12 +121,13 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
     }
   }
 
-  // Container FPs currently fall through to the legacy emitContainerCode() path below.
-  // The modular container path (emitModularContainerFP) is disabled because it causes
-  // GLSL macro/function-signature conflicts when multiple FPs of the same type exist
-  // in the same shader program. Each .glsl module can only be included once with one
-  // set of macro values, but different FP instances may need different macro values.
-  // TODO: Re-enable once per-instance function specialization is supported.
+  // Try new modular container path: buildContainerCallStatement().
+  // This recursively emits children via emitModularFragProc, then calls the container .glsl.
+  if (emitModularContainerFP(processor, transformedCoordVarsIdx, input, output)) {
+    fragmentShaderBuilder()->codeAppend("}");
+    currentProcessors.pop_back();
+    return output;
+  }
 
   // Try legacy container dispatch via emitContainerCode().
   // The emitChild callback now recursively calls emitModularFragProc for modular children.
@@ -136,7 +137,7 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
                      : nullptr);
   FragmentProcessor::TextureSamplers rootSamplers(
       processor, currentTexSamplers.empty() ? nullptr : &currentTexSamplers[0]);
-  auto emitChildCallback = [this, processor, &rootCoords, &rootSamplers](
+  auto emitChildCallback = [this, processor, transformedCoordVarsIdx, &rootCoords, &rootSamplers](
                                const FragmentProcessor* child, size_t /*childCoordIdx*/,
                                const std::string& childInput,
                                CoordTransformFunc coordFunc) -> std::string {
@@ -149,9 +150,20 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
       }
     }
 
-    // Legacy path for all children inside emitContainerCode(): use EmitArgs + emitCode.
-    // We don't use the modular path here because the parent container already included its
-    // own .glsl module, and the child's module may conflict (same module with different macros).
+    // Compute the correct coord offset for this child.
+    size_t childCoordOffset =
+        processor->computeChildCoordOffset(transformedCoordVarsIdx, childIndex);
+
+    // Try modular path for child: recursively call emitModularFragProc.
+    // skipSamplerCollection=true because the parent already collected all samplers.
+    auto childName = child->name();
+    bool childIsLeaf =
+        (child->numChildProcessors() == 0 && ShaderModuleRegistry::HasModule(childName));
+    if (childIsLeaf) {
+      return emitModularFragProc(child, childCoordOffset, childInput, std::move(coordFunc), true);
+    }
+
+    // Legacy fallback for non-modular children: use EmitArgs + emitCode.
     auto fragBuilder = fragmentShaderBuilder();
     fragBuilder->onBeforeChildProcEmitCode(child);
     std::string inputName;
@@ -190,32 +202,8 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
     return output;
   }
 
-  // Leaf FP: try modular path first. If the module was already included by another FP instance,
-  // fall back to legacy emitCode() to avoid macro/signature conflicts.
-  auto leafName = processor->name();
-  bool canUseModular = ShaderModuleRegistry::HasModule(leafName) &&
-                       includedModules.count(ShaderModuleRegistry::GetModuleID(leafName)) == 0;
-  if (canUseModular) {
-    emitLeafFPCall(processor, transformedCoordVarsIdx, input, output, coordTransformFunc);
-  } else {
-    // Legacy fallback: build EmitArgs and call emitCode().
-    FragmentProcessor::TransformedCoordVars leafCoords(
-        processor, transformedCoordVarsIdx < transformedCoordVars.size()
-                       ? &transformedCoordVars[transformedCoordVarsIdx]
-                       : nullptr);
-    FragmentProcessor::TextureSamplers leafSamplers(
-        processor, currentTexSamplers.empty() ? nullptr : &currentTexSamplers[0]);
-    std::string inputName;
-    if (!input.empty() && input != "vec4(1.0)") {
-      inputName = "_leafInput";
-      inputName += programInfo->getMangledSuffix(processor);
-      fragmentShaderBuilder()->codeAppendf("vec4 %s = %s;", inputName.c_str(), input.c_str());
-    }
-    FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output,
-                                     inputName.empty() ? "vec4(1.0)" : inputName, subsetVarName,
-                                     &leafCoords, &leafSamplers, {});
-    processor->emitCode(args);
-  }
+  // Leaf FP: dispatch via buildCallStatement() polymorphic path.
+  emitLeafFPCall(processor, transformedCoordVarsIdx, input, output, coordTransformFunc);
 
   fragmentShaderBuilder()->codeAppend("}");
   currentProcessors.pop_back();
@@ -234,12 +222,6 @@ bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* proc
   }
   auto funcFile = processor->shaderFunctionFile();
   if (funcFile.empty() || !ShaderModuleRegistry::HasModule(processor->name())) {
-    return false;
-  }
-  // If this module was already included (another processor of the same type exists in this shader),
-  // fall back to legacy path to avoid macro redefinition errors in GLSL.
-  auto moduleID = ShaderModuleRegistry::GetModuleID(processor->name());
-  if (includedModules.count(moduleID) > 0) {
     return false;
   }
   // Probe: try building with dummy args. If the result is empty, this container
