@@ -59,6 +59,10 @@ void ModularProgramBuilder::includeModule(ShaderModuleID id) {
   if (id != ShaderModuleID::TypesGLSL && includedModules.count(ShaderModuleID::TypesGLSL) == 0) {
     includeModule(ShaderModuleID::TypesGLSL);
   }
+  // XfermodeEffect depends on BlendModes for tgfx_blend() function.
+  if (id == ShaderModuleID::XfermodeEffect) {
+    includeModule(ShaderModuleID::BlendModes);
+  }
   fragmentShaderBuilder()->addFunction(ShaderModuleRegistry::GetModule(id));
 }
 

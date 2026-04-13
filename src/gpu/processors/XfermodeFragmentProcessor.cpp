@@ -69,19 +69,26 @@ ShaderCallResult XfermodeFragmentProcessor::buildContainerCallStatement(
     const MangledUniforms& /*uniforms*/, const MangledSamplers& /*samplers*/,
     const MangledVaryings& /*varyings*/) const {
   ShaderCallResult result;
-  std::string code;
   auto input = inputColor.empty() ? std::string("vec4(1.0)") : inputColor;
+  int blendModeInt = static_cast<int>(mode);
+  int childModeInt = static_cast<int>(child);
+
+  std::string childSrc;
+  std::string childDst;
   if (child == Child::TwoChild) {
-    code += "vec4 _xfpResult = TGFX_XfermodeFragmentProcessor(" + input + ", " + childOutputs[0] +
-            ", " + childOutputs[1] + ");\n";
+    childSrc = childOutputs[0];
+    childDst = childOutputs[1];
   } else if (child == Child::DstChild) {
-    code += "vec4 _xfpResult = TGFX_XfermodeFragmentProcessor(" + input + ", " + childOutputs[0] +
-            ");\n";
+    childSrc = "vec4(0.0)";
+    childDst = childOutputs[0];
   } else {
-    code += "vec4 _xfpResult = TGFX_XfermodeFragmentProcessor(" + input + ", " + childOutputs[0] +
-            ");\n";
+    childSrc = childOutputs[0];
+    childDst = "vec4(0.0)";
   }
-  result.statement = code;
+
+  result.statement = "vec4 _xfpResult = TGFX_XfermodeFragmentProcessor(" + input + ", " + childSrc +
+                     ", " + childDst + ", " + std::to_string(blendModeInt) + ", " +
+                     std::to_string(childModeInt) + ");\n";
   result.outputVarName = "_xfpResult";
   return result;
 }
