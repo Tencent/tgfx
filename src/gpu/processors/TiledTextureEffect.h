@@ -68,16 +68,9 @@ class TiledTextureEffect : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    // Macro-free: all configuration is passed as function parameters.
-    // Only TGFX_TTE_SAMPLER_TYPE remains (sampler type cannot be a runtime param).
-    auto textureView = getTextureView();
-    if (textureView == nullptr) {
-      return;
-    }
-    if (textureView->getTexture()->type() == TextureType::Rectangle) {
-      macros.define("TGFX_TTE_SAMPLER_TYPE", "sampler2DRect");
-    }
+  void onBuildShaderMacros(ShaderMacroSet& /*macros*/) const override {
+    // Completely macro-free: all configuration passed as function parameters.
+    // sampler2D/sampler2DRect handled via GLSL function overloading.
   }
 
   std::string shaderFunctionFile() const override {

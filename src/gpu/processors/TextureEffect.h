@@ -54,35 +54,9 @@ class TextureEffect : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    auto yuvTexture = getYUVTexture();
-    if (yuvTexture) {
-      macros.define("TGFX_TE_TEXTURE_MODE", yuvTexture->yuvFormat() == YUVFormat::I420 ? 1 : 2);
-      if (IsLimitedYUVColorRange(yuvTexture->yuvColorSpace())) {
-        macros.define("TGFX_TE_YUV_LIMITED_RANGE");
-      }
-    } else {
-      macros.define("TGFX_TE_TEXTURE_MODE", 0);
-    }
-    if (alphaStart != Point::Zero()) {
-      macros.define("TGFX_TE_RGBAAA");
-    }
-    if (textureProxy->isAlphaOnly()) {
-      macros.define("TGFX_TE_ALPHA_ONLY");
-    }
-    if (needSubset()) {
-      macros.define("TGFX_TE_SUBSET");
-    }
-    if (constraint == SrcRectConstraint::Strict) {
-      macros.define("TGFX_TE_STRICT_CONSTRAINT");
-    }
-    if (coordTransform.matrix.hasPerspective()) {
-      macros.define("TGFX_TE_PERSPECTIVE");
-    }
-    auto textureView = getTextureView();
-    if (textureView && textureView->getTexture()->type() == TextureType::Rectangle) {
-      macros.define("TGFX_TE_SAMPLER_TYPE", "sampler2DRect");
-    }
+  void onBuildShaderMacros(ShaderMacroSet& /*macros*/) const override {
+    // Completely macro-free: all configuration passed as function parameters.
+    // sampler2D/sampler2DRect handled via GLSL function overloading.
   }
 
   std::string shaderFunctionFile() const override {
@@ -120,29 +94,36 @@ class TextureEffect : public FragmentProcessor {
     auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
     auto coord = varyings.getCoordTransform(0);
     auto yuvTexture = getYUVTexture();
-    std::string call =
-        "vec4 " + result.outputVarName + " = TGFX_TextureEffect(" + input + ", " + coord + ", ";
+    int hasSubsetInt = needSubset() ? 1 : 0;
+    int hasStrictInt = (constraint == SrcRectConstraint::Strict) ? 1 : 0;
+    int hasRGBAAInt = (alphaStart != Point::Zero()) ? 1 : 0;
+    int alphaOnlyInt = textureProxy->isAlphaOnly() ? 1 : 0;
+    int yuvLimitedInt = (yuvTexture && IsLimitedYUVColorRange(yuvTexture->yuvColorSpace())) ? 1 : 0;
+    std::string subsetArg = hasSubsetInt ? uniforms.get("Subset") : "vec4(0.0)";
+    std::string extraSubsetArg = hasStrictInt ? varyings.get("subsetVar") : "vec4(0.0)";
+    std::string alphaStartArg = hasRGBAAInt ? uniforms.get("AlphaStart") : "vec2(0.0)";
+    std::string call = "vec4 " + result.outputVarName + " = ";
     if (yuvTexture) {
       if (yuvTexture->yuvFormat() == YUVFormat::I420) {
-        call += samplers.getByIndex(0) + ", " + samplers.getByIndex(1) + ", " +
-                samplers.getByIndex(2) + ", " + uniforms.get("Mat3ColorConversion");
+        call += "TGFX_TextureEffect_I420(" + input + ", " + coord + ", " + samplers.getByIndex(0) +
+                ", " + samplers.getByIndex(1) + ", " + samplers.getByIndex(2) + ", " +
+                uniforms.get("Mat3ColorConversion") + ", " + subsetArg + ", " + extraSubsetArg +
+                ", " + alphaStartArg + ", " + std::to_string(hasSubsetInt) + ", " +
+                std::to_string(hasStrictInt) + ", " + std::to_string(hasRGBAAInt) + ", " +
+                std::to_string(yuvLimitedInt) + ");";
       } else {
-        call += samplers.getByIndex(0) + ", " + samplers.getByIndex(1) + ", " +
-                uniforms.get("Mat3ColorConversion");
+        call += "TGFX_TextureEffect_NV12(" + input + ", " + coord + ", " + samplers.getByIndex(0) +
+                ", " + samplers.getByIndex(1) + ", " + uniforms.get("Mat3ColorConversion") + ", " +
+                subsetArg + ", " + extraSubsetArg + ", " + alphaStartArg + ", " +
+                std::to_string(hasSubsetInt) + ", " + std::to_string(hasStrictInt) + ", " +
+                std::to_string(hasRGBAAInt) + ", " + std::to_string(yuvLimitedInt) + ");";
       }
     } else {
-      call += samplers.getByIndex(0);
+      call += "TGFX_TextureEffect_RGBA(" + input + ", " + coord + ", " + samplers.getByIndex(0) +
+              ", " + subsetArg + ", " + extraSubsetArg + ", " + alphaStartArg + ", " +
+              std::to_string(hasSubsetInt) + ", " + std::to_string(hasStrictInt) + ", " +
+              std::to_string(hasRGBAAInt) + ", " + std::to_string(alphaOnlyInt) + ");";
     }
-    if (needSubset()) {
-      call += ", " + uniforms.get("Subset");
-    }
-    if (constraint == SrcRectConstraint::Strict) {
-      call += ", " + varyings.get("subsetVar");
-    }
-    if (alphaStart != Point::Zero()) {
-      call += ", " + uniforms.get("AlphaStart");
-    }
-    call += ");";
     result.statement = call;
     return result;
   }
