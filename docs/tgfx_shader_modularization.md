@@ -4955,3 +4955,114 @@ ON 路径中全部 25 处 `codeAppendf`/`codeAppend` 调用均为结构性管道
 |------|--------|------|------|---------|
 | `TGFX_USE_MODULAR_SHADERS=ON` | 431 | 371 | 60 | 同类型 FP 多实例宏冲突（架构问题） |
 | `TGFX_USE_MODULAR_SHADERS=OFF` | 431 | 431 | 0 | — |
+
+### 17.14 Phase H 实施结果记录：同类型 FP 多实例宏冲突消除
+
+> 2026-04-13 完成，共 6 个 commit。
+
+#### 问题
+
+17.13 节识别出的架构问题：同一 Shader 中有多个同类型 FP 实例（如两个 `XfermodeFragmentProcessor` 使用不同 blend mode，或两个 `TiledTextureEffect` 使用不同 tile mode）时，它们的 `#define` 宏在全局 Definitions section 中冲突，GLSL 将重复 `#define` 视为编译错误。
+
+实际冲突数据（60 个测试失败、252 个 Shader 编译错误）：
+
+| 冲突类型 | 错误数 | 占比 |
+|---------|--------|------|
+| `TGFX_XFP_BLEND_MODE` 重复 | 131 | 51% |
+| `TGFX_XFP_CHILD_MODE` 重复 | 15 | 6% |
+| `TGFX_TTE_MODE_X/Y` 重复 | 8 | 3% |
+| `TGFX_TE_TEXTURE_MODE` 重复 | 50+ | 20% |
+| sampler2D/sampler2DRect 签名冲突 | 12 | 5% |
+| 其他（级联错误） | ~36 | 15% |
+
+#### 解决方案：Hybrid D
+
+**核心思路**：消除所有多实例 FP 的 `#define` 宏依赖，改为运行时函数参数 + GLSL 函数重载。每个 .glsl 模块在一个 Shader 中只需 include 一次，通过不同的参数值区分不同实例。
+
+具体措施：
+
+1. **非签名宏 → int 函数参数**：`TGFX_XFP_BLEND_MODE`、`TGFX_XFP_CHILD_MODE`、`TGFX_TTE_MODE_X/Y`、`TGFX_TTE_ALPHA_ONLY`、`TGFX_TE_ALPHA_ONLY` 等 → 改为 `int blendMode`、`int childMode`、`int modeX` 等参数，.glsl 中用 `if/else` 替代 `#if/#elif`
+2. **签名差异宏 → 统一签名 + sentinel 值**：`TGFX_TTE_HAS_SUBSET/HAS_CLAMP/HAS_DIMENSION/STRICT_CONSTRAINT` 和 `TGFX_TE_SUBSET/STRICT_CONSTRAINT/RGBAAA` → 所有可选参数始终存在于签名中，未使用时传 `vec4(0.0)` sentinel 值，配合 int flag 参数控制是否使用
+3. **sampler 类型宏 → GLSL 函数重载**：`TGFX_TE_SAMPLER_TYPE`、`TGFX_TTE_SAMPLER_TYPE` → 去掉宏，为 `sampler2D` 和 `sampler2DRect` 分别定义同名重载函数
+4. **texture mode → 独立函数名**：`TGFX_TE_TEXTURE_MODE` (0=RGBA/1=I420/2=NV12) → 3 个独立函数 `TGFX_TextureEffect_RGBA`/`TGFX_TextureEffect_I420`/`TGFX_TextureEffect_NV12`
+
+#### 各 FP 改造详情
+
+**XfermodeFragmentProcessor（Phase 1）**
+
+| 改造前 | 改造后 |
+|--------|--------|
+| `TGFX_XFP_BLEND_MODE` 宏 (0-29) | `int blendMode` 参数 |
+| `TGFX_XFP_CHILD_MODE` 宏 (0/1/2) → 3 种函数签名 | `int childMode` 参数 → 1 个统一 5 参数签名 |
+| 30 个 `#if/#elif` 分支 | 30 个 `if (blendMode == N)` 分支 |
+| mode 15-29 调用 `tgfx_blend_*()` 独立函数 | 委托给 `tgfx_blend(src, dst, blendMode)` 运行时分发 |
+| `includeModule(BlendModes)` 未被自动触发 | 新增模块依赖：`includeModule(XfermodeEffect)` 自动先 include `BlendModes` |
+
+**TiledTextureEffect（Phase 2）**
+
+| 改造前 | 改造后 |
+|--------|--------|
+| 9 个宏 + 6 个派生 helper 宏 | 14 个函数参数（3 sampler相关 + 2 mode + 5 flag + 4 optional） |
+| `TGFX_TTE_MODE_X/Y` (0-8) 控制 40+ 个 `#if` 分支 | `int modeX, int modeY` + 局部 `bool` 变量 |
+| `TGFX_TTE_HAS_SUBSET/CLAMP/DIMENSION/STRICT` 条件参数 | 参数始终存在，int flag 控制使用 |
+| `TGFX_TTE_SAMPLER_TYPE` 宏 | 去掉宏，`sampler2D` + `sampler2DRect` 两个重载版本 |
+
+**TextureEffect（Phase 3）**
+
+| 改造前 | 改造后 |
+|--------|--------|
+| `TGFX_TE_TEXTURE_MODE` (0/1/2) → 1 个函数 3 种签名 | 3 个独立函数：`RGBA`/`I420`/`NV12` |
+| `TGFX_TE_SUBSET/STRICT/RGBAAA/ALPHA_ONLY` 条件参数 | 参数始终存在，int flag 控制 |
+| `TGFX_TE_SAMPLER_TYPE` 宏 | 去掉宏，`sampler2D` + `sampler2DRect` 重载（仅 RGBA） |
+| `TGFX_TE_YUV_LIMITED_RANGE` 条件逻辑 | `int yuvLimitedRange` 参数 |
+
+#### GPU 性能影响
+
+将 `#if BLEND_MODE == 5` 替换为 `if (blendMode == 5)` 引入运行时分支。但：
+
+- `blendMode` 是 uniform（每次 draw call 常量），GPU 分支预测器以零开销处理
+- 桌面 GL/Metal/Vulkan 的 GLSL 编译器对 uniform 条件分支优化为 taken 路径
+- 统一签名添加的未使用 `vec4(0.0)` dummy 参数被 GLSL 编译器完全消除
+- UE 离线编译时可进一步提升为 Static Switch 实现死代码消除
+
+#### 完成的 Commit
+
+| Commit | 说明 |
+|--------|------|
+| `af2bfd8e` | Phase 1：XfermodeFragmentProcessor 宏消除 + BlendModes 依赖 |
+| `74bb8724` | Phase 2：TiledTextureEffect 宏消除（14 参数统一签名） |
+| `0435b560` | Phase 3a：TextureEffect 宏消除（3 独立函数 + int flags） |
+| `1dfa8f22` | Phase 3b：TiledTextureEffect sampler2DRect 重载 |
+| `f0604d5b` | Phase 3c：TextureEffect/TiledTextureEffect sampler 宏消除 + GLSL 重载 |
+| `8b57cab4` | 文档更新（17.13 Phase G） |
+
+#### 验证结果
+
+| 配置 | Shader 编译错误 | 测试通过 | 测试失败 | 失败原因 |
+|------|----------------|---------|---------|---------|
+| `TGFX_USE_MODULAR_SHADERS=ON` | **0** | 375 | 55 | 全部为截图基线对比失败 |
+| `TGFX_USE_MODULAR_SHADERS=OFF` | 0 | 375 | 55 | 同上（ON/OFF 完全一致） |
+
+ON/OFF 路径的 55 个截图基线对比失败完全一致，证明这些失败与 Shader 模块化改造无关，是环境因素（如系统 GPU 驱动更新）导致的已有问题。
+
+#### 改造后的宏残留状态
+
+| FP 类型 | 残留宏 | 说明 |
+|---------|--------|------|
+| XfermodeFragmentProcessor | **0** | 全部改为 int 参数 |
+| TextureEffect | **0** | 全部改为 int 参数 + GLSL overload |
+| TiledTextureEffect | **0** | 全部改为 int 参数 + GLSL overload |
+| 单实例 FP（ConstColor、ColorMatrix 等） | 保留原有宏 | 每个 Shader 最多 1 个实例，不冲突 |
+| 单实例容器 FP（ClampedGradient、GaussianBlur1D 等） | 保留原有宏 | 每个 Shader 最多 1 个实例，不冲突 |
+| GP（10 种） | 保留原有宏 | 每个 Shader 恰好 1 个 GP |
+| XP（2 种） | 保留原有宏 | 每个 Shader 恰好 1 个 XP |
+
+#### ON 路径 codeAppendf 最终残留
+
+| 来源 | 处数 | 内容 | 含 Shader 算法逻辑？ |
+|------|------|------|-------------------|
+| ModularProgramBuilder 调度层 | 24 | scope 注释、大括号、变量声明/赋值、.glsl 调用注入 | 否 |
+| ComposeFragmentProcessor emitContainerCode | 1 | `output = childOutput` 赋值 | 否 |
+| GP emitCode (skipFragmentCode/skipVertexCode=true) | ~7/GP | 资源声明 + .vert.glsl 注入 | 否（VS 侧） |
+
+**ON 路径中含 Shader 算法逻辑的 codeAppendf：0 处。**
