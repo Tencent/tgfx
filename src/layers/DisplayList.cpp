@@ -1022,7 +1022,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   bool fullScreen = drawRect == surfaceRect;
   if (!fullScreen) {
-    canvas->clipRect(drawRect);
+    canvas->clipRect(drawRect, false);
   }
   if (autoClear) {
     canvas->clear();

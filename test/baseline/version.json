@@ -2,7 +2,7 @@
     "BackgroundBlurTest": {
         "BackgroundBlurStyleTest1": "bf48e614",
         "BackgroundBlurStyleTest2": "bf48e614",
-        "BackgroundBlurStyleTest3": "2ce762fb",
+        "BackgroundBlurStyleTest3": "230a1f9f",
         "BackgroundBlurStyleTest4": "bf48e614",
         "BackgroundBlurStyleTest5": "bf48e614",
         "BackgroundBlurWithMask": "bf48e614",
@@ -195,7 +195,7 @@
         "DirtyRegionTest5": "bf48e614",
         "DirtyRegionTest6": "bf48e614",
         "DirtyRegionTest7": "bf48e614",
-        "DirtyRegionTest8": "d551b898",
+        "DirtyRegionTest8": "937ddada",
         "DirtyRegionTest9": "bf48e614",
         "LayerCacheWithEffects": "2ce762fb",
         "TileClear_PartialTile": "bf48e614",
