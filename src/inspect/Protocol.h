@@ -89,6 +89,7 @@ enum class OpTaskType : uint8_t {
   TextureFlattenTask,
   RenderTask,
   RenderTargetCopyTask,
+  TileCopyTask,
   RuntimeDrawTask,
   TextureResolveTask,
   OpsRenderTask,
