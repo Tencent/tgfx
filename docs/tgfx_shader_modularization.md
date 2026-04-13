@@ -5065,4 +5065,53 @@ ON/OFF 路径的 55 个截图基线对比失败完全一致，证明这些失败
 | ComposeFragmentProcessor emitContainerCode | 1 | `output = childOutput` 赋值 | 否 |
 | GP emitCode (skipFragmentCode/skipVertexCode=true) | ~7/GP | 资源声明 + .vert.glsl 注入 | 否（VS 侧） |
 
+### 17.15 Phase I 实施结果记录：嵌入字符串双源消除
+
+> 2026-04-13 完成，共 2 个 commit。
+
+#### 问题
+
+ON 路径运行时使用 `ShaderModuleRegistry.cpp` 中的 `R"GLSL(...)GLSL"` 嵌入字符串，而不是磁盘上的 `.glsl` 文件。两者**独立维护**，修改 `.glsl` 文件不影响编译和运行（因为根本没被读取）。
+
+实际发现 `ConstColorProcessor` 存在功能性不一致：
+- `.glsl` 文件：2 参数签名 + `#if TGFX_CC_MODE` 编译期宏
+- 嵌入字符串：3 参数签名 + `int mode` 运行时参数
+
+其余 23 个模块经逐一对比确认一致。
+
+#### 解决方案
+
+**单一真相源**：磁盘 `.glsl` 文件。
+
+新增 CMake 脚本 `embed_shaders.cmake`，用 `file(READ)` 读取 24 个 `.glsl` 文件，生成 `src/gpu/ShaderModuleEmbedded.inc`（C++ `R"GLSL()"` raw string literal 格式）。该 `.inc` 文件提交到仓库。`ShaderModuleRegistry.cpp` 通过 `#include "ShaderModuleEmbedded.inc"` 引用。
+
+**工作流程**：
+```
+修改 .glsl → 运行 cmake -P embed_shaders.cmake → 一起提交 .glsl + .inc
+```
+
+#### 改动
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `embed_shaders.cmake` | 新建 | CMake 脚本，内置 24 项映射表 |
+| `src/gpu/ShaderModuleEmbedded.inc` | 新建（生成） | 1737 行，24 个 `static const std::string k*` |
+| `src/gpu/ShaderModuleRegistry.cpp` | 1762→121 行 | 删除 1645 行手写嵌入字符串，改为 `#include` |
+| `.gitattributes` | 修改 | 标记 `.inc` 为 `linguist-generated` |
+| `src/gpu/shaders/fp/const_color.glsl` | 修改 | 同步为 int mode 参数版本 |
+
+#### 完成的 Commit
+
+| Commit | 说明 |
+|--------|------|
+| `eff19e95` | 同步 const_color.glsl 为 int mode 参数版本 |
+| `82462ce4` | 新增 embed_shaders.cmake，生成 .inc，ShaderModuleRegistry.cpp 改为 #include |
+
+#### 验证结果
+
+| 配置 | 测试数 | 结果 |
+|------|--------|------|
+| `TGFX_USE_MODULAR_SHADERS=ON` | 431 | 全部通过 |
+| `TGFX_USE_MODULAR_SHADERS=OFF` | 431 | 全部通过 |
+
 **ON 路径中含 Shader 算法逻辑的 codeAppendf：0 处。**
