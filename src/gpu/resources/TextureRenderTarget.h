@@ -36,6 +36,8 @@ class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
     return _externallyOwned;
   }
 
+  size_t memoryUsage() const override;
+
   std::shared_ptr<Texture> getRenderTexture() const override {
     return renderTexture ? renderTexture : _texture;
   }

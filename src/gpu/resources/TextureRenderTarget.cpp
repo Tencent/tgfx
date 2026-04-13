@@ -18,6 +18,7 @@
 
 #include "TextureRenderTarget.h"
 #include "core/utils/Log.h"
+#include "core/utils/PixelFormatUtil.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Texture.h"
@@ -127,5 +128,17 @@ std::shared_ptr<RenderTarget> TextureRenderTarget::MakeFrom(Context* context,
   auto renderTarget = new TextureRenderTarget(std::move(texture), std::move(renderTexture), origin,
                                               externallyOwned);
   return Resource::AddToCache(context, renderTarget, scratchKey);
+}
+
+size_t TextureRenderTarget::memoryUsage() const {
+  auto size = DefaultTextureView::memoryUsage();
+  if (renderTexture) {
+    auto msaaSize = static_cast<size_t>(renderTexture->width()) *
+                    static_cast<size_t>(renderTexture->height()) *
+                    PixelFormatBytesPerPixel(renderTexture->format()) *
+                    static_cast<size_t>(renderTexture->sampleCount());
+    size += msaaSize;
+  }
+  return size;
 }
 }  // namespace tgfx
