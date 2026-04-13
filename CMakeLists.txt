@@ -332,6 +332,22 @@ if (TGFX_USE_MODULAR_SHADERS)
     list(APPEND TGFX_DEFINES TGFX_USE_MODULAR_SHADERS)
 endif ()
 
+# Auto-generate ShaderModuleEmbedded.inc from .glsl source files when any .glsl changes.
+set(SHADER_EMBED_SCRIPT ${CMAKE_SOURCE_DIR}/embed_shaders.cmake)
+set(SHADER_EMBED_OUTPUT ${CMAKE_SOURCE_DIR}/src/gpu/ShaderModuleEmbedded.inc)
+set(SHADER_SOURCE_DIR ${CMAKE_SOURCE_DIR}/src/gpu/shaders)
+file(GLOB_RECURSE SHADER_GLSL_FILES ${SHADER_SOURCE_DIR}/*.glsl)
+add_custom_command(
+        OUTPUT ${SHADER_EMBED_OUTPUT}
+        COMMAND ${CMAKE_COMMAND}
+        -DSHADER_DIR=${SHADER_SOURCE_DIR}
+        -DOUTPUT_FILE=${SHADER_EMBED_OUTPUT}
+        -P ${SHADER_EMBED_SCRIPT}
+        DEPENDS ${SHADER_EMBED_SCRIPT} ${SHADER_GLSL_FILES}
+        COMMENT "Generating ShaderModuleEmbedded.inc from .glsl files"
+)
+add_custom_target(tgfx-embed-shaders DEPENDS ${SHADER_EMBED_OUTPUT})
+
 if (TGFX_USE_OPENGL)
     file(GLOB GFX_PLATFORM_FILES src/gpu/opengl/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
@@ -621,7 +637,7 @@ if (TGFX_EXCLUDE_FILES)
 endif ()
 
 add_library(tgfx STATIC ${TGFX_FILES})
-add_dependencies(tgfx tgfx-vendor)
+add_dependencies(tgfx tgfx-vendor tgfx-embed-shaders)
 target_compile_definitions(tgfx PRIVATE ${TGFX_DEFINES})
 target_compile_options(tgfx PRIVATE ${TGFX_COMPILE_OPTIONS})
 target_include_directories(tgfx PUBLIC include PRIVATE src)
