@@ -19,6 +19,7 @@
 #include "tgfx/core/ImageCodec.h"
 #include "BoxFilterDownsample.h"
 #include "core/PixelBuffer.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/USE.h"
 #include "core/utils/WeakMap.h"
 #include "tgfx/core/Buffer.h"
@@ -148,6 +149,11 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
   }
 #endif
   return nullptr;
+}
+
+std::pair<int, int> ImageCodec::getScaledDimensions(float scale) const {
+  return {FloatRoundToInt(static_cast<float>(width()) * scale),
+          FloatRoundToInt(static_cast<float>(height()) * scale)};
 }
 
 bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {

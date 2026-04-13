@@ -63,6 +63,7 @@ class EGLDevice : public GLDevice {
   EGLSurface oldEglReadSurface = nullptr;
   EGLSurface oldEglDrawSurface = nullptr;
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
+  unsigned graphicsResetStatus = 0;  // GL_NO_ERROR
 
   static std::shared_ptr<EGLDevice> MakeFrom(EGLNativeWindowType nativeWindow,
                                              EGLContext sharedContext = nullptr,
@@ -78,6 +79,10 @@ class EGLDevice : public GLDevice {
             std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   bool recreateSurfaceIfNeeded(EGLNativeWindowType nativeWindow);
+
+  void handleContextLost();
+
+  bool checkGraphicsResetStatus();
 
   friend class GLDevice;
 

@@ -169,8 +169,22 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix
   if (canAppend(PendingOpType::Shape, clip, brush) && pendingShape &&
       pendingShape->getUniqueKey() == shape->getUniqueKey() &&
       MatrixOnlyDiffersInTranslation(pendingShapeMatrix, matrix)) {
+    // Offset has two sources, both in device space:
+    // 1. Canvas matrix translation difference (already in device space).
+    // 2. Shape bounds difference (in local space, needs matrix linear transform to device space).
+    //    This occurs when tryAddSimplifiedMatrixShape encodes position into shape bounds
+    //    instead of the canvas matrix.
     auto dx = matrix.getTranslateX() - pendingShapeMatrix.getTranslateX();
     auto dy = matrix.getTranslateY() - pendingShapeMatrix.getTranslateY();
+    auto baseBounds = pendingShape->getBounds();
+    auto newBounds = shape->getBounds();
+    auto boundsDx = newBounds.left - baseBounds.left;
+    auto boundsDy = newBounds.top - baseBounds.top;
+    if (boundsDx != 0.0f || boundsDy != 0.0f) {
+      // Map local-space bounds offset to device space through the matrix linear part.
+      dx += matrix.getScaleX() * boundsDx + matrix.getSkewX() * boundsDy;
+      dy += matrix.getSkewY() * boundsDx + matrix.getScaleY() * boundsDy;
+    }
     pendingShapeOffsets.emplace_back(dx, dy);
     pendingShapeColors.emplace_back(brush.color);
     return;
@@ -825,13 +839,19 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
     DEBUG_ASSERT(element->isValid());
     const auto aaType = element->isAntiAlias() ? AAType::Coverage : AAType::None;
     auto clipBounds = Rect::MakeWH(width, height);
-    auto shape = Shape::MakeFrom(element->path());
+    auto path = element->path();
+    if (i > 0) {
+      // Modulate blend erases the mask when hasCoverage is true (source coefficient becomes zero).
+      // Use inverse fill + DstOut to erase areas outside each clip shape instead.
+      path.toggleInverseFillType();
+    }
+    auto shape = Shape::MakeFrom(path);
     shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
     auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
     if (i > 0) {
-      drawOp->setBlendMode(BlendMode::Modulate);
+      drawOp->setBlendMode(BlendMode::DstOut);
     }
     clipDrawOps.emplace_back(std::move(drawOp));
   }

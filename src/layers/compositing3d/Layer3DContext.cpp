@@ -86,7 +86,7 @@ Canvas* Layer3DContext::beginRecording(const Matrix3D& childTransform, bool anti
                      _renderRect.width() * invScale, _renderRect.height() * invScale);
   auto localClipRect = Matrix3DUtils::InverseMapRect(contextBounds, newTransform);
   if (!localClipRect.isEmpty()) {
-    canvas->clipRect(localClipRect);
+    canvas->clipRect(localClipRect, antialiasing);
   }
   return canvas;
 }

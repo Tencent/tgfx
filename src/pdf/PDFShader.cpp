@@ -18,6 +18,7 @@
 
 #include "PDFShader.h"
 #include "core/shaders/ImageShader.h"
+#include "core/shaders/MatrixShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/Types.h"
 #include "pdf/PDFDocumentImpl.h"
@@ -89,9 +90,9 @@ void FillColorFromBitmap(Canvas* canvas, float left, float top, float right, flo
   }
 }
 
-Color AdjustColor(const std::shared_ptr<Shader>& shader, Color paintColor) {
-  if (Types::Get(shader.get()) == Types::ShaderType::Image) {
-    const auto imageShader = static_cast<const ImageShader*>(shader.get());
+Color AdjustColor(const Shader* shader, Color paintColor) {
+  if (Types::Get(shader) == Types::ShaderType::Image) {
+    const auto imageShader = static_cast<const ImageShader*>(shader);
     const auto img = imageShader->image.get();
     if (img && img->isAlphaOnly()) {
       return paintColor;
@@ -113,6 +114,7 @@ Matrix ScaleTranslate(float sx, float sy, float tx, float ty) {
 Bitmap ExtractSubset(Bitmap src, Rect subset) {
   Bitmap destination(static_cast<int>(subset.width()), static_cast<int>(subset.height()), false,
                      true, src.colorSpace());
+  destination.clear();
   const auto srcPixels = src.lockPixels();
   destination.writePixels(src.info(), srcPixels, static_cast<int>(subset.left),
                           static_cast<int>(subset.top));
@@ -126,28 +128,40 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
                                      Color paintColor) {
   DEBUG_ASSERT(shader);
   DEBUG_ASSERT(doc);
-  if (Types::Get(shader.get()) == Types::ShaderType::Gradient) {
-    const auto gradientShader = static_cast<const GradientShader*>(shader.get());
-    return PDFGradientShader::Make(doc, gradientShader, canvasTransform, surfaceBBox);
+  // Unwrap MatrixShader layers to find the underlying shader and accumulate the matrix.
+  auto unwrappedShader = shader;
+  auto combinedTransform = canvasTransform;
+  while (Types::Get(unwrappedShader.get()) == Types::ShaderType::Matrix) {
+    const auto matrixShader = static_cast<const MatrixShader*>(unwrappedShader.get());
+    combinedTransform.preConcat(matrixShader->matrix);
+    unwrappedShader = matrixShader->source;
+  }
+  if (Types::Get(unwrappedShader.get()) == Types::ShaderType::Gradient) {
+    const auto gradientShader = static_cast<const GradientShader*>(unwrappedShader.get());
+    auto gradientType = gradientShader->asGradient(nullptr);
+    // Only Linear and Radial have native PDF Shading support.
+    // Conic and Diamond fall through to the bitmap tiling path.
+    if (gradientType == GradientType::Linear || gradientType == GradientType::Radial) {
+      return PDFGradientShader::Make(doc, gradientShader, combinedTransform, surfaceBBox);
+    }
   }
   if (surfaceBBox.isEmpty()) {
     return PDFIndirectReference();
   }
 
-  paintColor = AdjustColor(shader, paintColor);
-  TileMode imageTileModes[2];
+  paintColor = AdjustColor(unwrappedShader.get(), paintColor);
 
-  if (Types::Get(shader.get()) == Types::ShaderType::Image) {
-    const auto imageShader = static_cast<const ImageShader*>(shader.get());
+  if (Types::Get(unwrappedShader.get()) == Types::ShaderType::Image) {
+    const auto imageShader = static_cast<const ImageShader*>(unwrappedShader.get());
     auto shaderImage = imageShader->image;
     // TODO (YGaurora): Cache image shaders and remove duplicates
     PDFIndirectReference pdfShader =
-        MakeImageShader(doc, canvasTransform, imageTileModes[0], imageTileModes[1], surfaceBBox,
-                        shaderImage, paintColor);
+        MakeImageShader(doc, combinedTransform, imageShader->tileModeX, imageShader->tileModeY,
+                        surfaceBBox, shaderImage, paintColor);
     return pdfShader;
   }
   // Don't bother to de-dup fallback shader.
-  return MakeFallbackShader(doc, shader, canvasTransform, surfaceBBox, paintColor);
+  return MakeFallbackShader(doc, unwrappedShader, combinedTransform, surfaceBBox, paintColor);
 }
 
 PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix finalMatrix,

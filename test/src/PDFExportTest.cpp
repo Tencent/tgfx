@@ -30,6 +30,10 @@
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/core/WriteStream.h"
+#include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/pdf/PDFDocument.h"
 #include "tgfx/pdf/PDFMetadata.h"
 #include "tgfx/svg/SVGPathParser.h"
@@ -591,6 +595,308 @@ TGFX_TEST(PDFExportTest, DstAssignColorSpace) {
   document->close();
   PDFStream->flush();
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DstAssignColorSpace"));
+}
+
+TGFX_TEST(PDFExportTest, LayerLinearGradient) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto shapeLayer = ShapeLayer::Make();
+  Rect rect = Rect::MakeWH(2501.f, 1860.f);
+  Path path;
+  path.addRect(rect);
+  shapeLayer->setPath(path);
+  shapeLayer->removeFillStyles();
+
+  // Create vertical linear gradient with matrix wrapping
+  auto shader = Shader::MakeLinearGradient(
+      Point{0.f, 0.f}, Point{0.f, 1860.f},
+      {Color::FromRGBA(227, 136, 136), Color::FromRGBA(140, 210, 183)}, {});
+  shader = shader->makeWithMatrix(Matrix::MakeTrans(10.f, 10.f));
+  shapeLayer->addFillStyle(ShapeStyle::Make(shader));
+
+  auto layer = Layer::Make();
+  layer->addChild(shapeLayer);
+
+  // Draw layer directly to PDF canvas
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(2501.f, 1860.f);
+  layer->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/LayerLinearGradient"));
+}
+
+TGFX_TEST(PDFExportTest, LayerRadialGradient) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto shapeLayer = ShapeLayer::Make();
+  Rect rect = Rect::MakeWH(2501.f, 1860.f);
+  Path path;
+  path.addRect(rect);
+  shapeLayer->setPath(path);
+  shapeLayer->removeFillStyles();
+
+  auto shader = Shader::MakeRadialGradient(
+      Point{1250.5f, 930.f}, 930.f,
+      {Color::FromRGBA(227, 136, 136), Color::FromRGBA(140, 210, 183)}, {});
+  shader = shader->makeWithMatrix(Matrix::MakeTrans(10.f, 10.f));
+  shapeLayer->addFillStyle(ShapeStyle::Make(shader));
+
+  auto layer = Layer::Make();
+  layer->addChild(shapeLayer);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(2501.f, 1860.f);
+  layer->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/LayerRadialGradient"));
+}
+
+TGFX_TEST(PDFExportTest, LayerConicGradient) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto shapeLayer = ShapeLayer::Make();
+  Rect rect = Rect::MakeWH(2501.f, 1860.f);
+  Path path;
+  path.addRect(rect);
+  shapeLayer->setPath(path);
+  shapeLayer->removeFillStyles();
+
+  auto shader = Shader::MakeConicGradient(
+      Point{1250.5f, 930.f}, 0.f, 360.f,
+      {Color::FromRGBA(227, 136, 136), Color::FromRGBA(140, 210, 183)}, {});
+  shader = shader->makeWithMatrix(Matrix::MakeTrans(10.f, 10.f));
+  shapeLayer->addFillStyle(ShapeStyle::Make(shader));
+
+  auto layer = Layer::Make();
+  layer->addChild(shapeLayer);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(2501.f, 1860.f);
+  layer->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/LayerConicGradient"));
+}
+
+TGFX_TEST(PDFExportTest, LayerDiamondGradient) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto shapeLayer = ShapeLayer::Make();
+  Rect rect = Rect::MakeWH(2501.f, 1860.f);
+  Path path;
+  path.addRect(rect);
+  shapeLayer->setPath(path);
+  shapeLayer->removeFillStyles();
+
+  auto shader = Shader::MakeDiamondGradient(
+      Point{1250.5f, 930.f}, 930.f,
+      {Color::FromRGBA(227, 136, 136), Color::FromRGBA(140, 210, 183)}, {});
+  shader = shader->makeWithMatrix(Matrix::MakeTrans(10.f, 10.f));
+  shapeLayer->addFillStyle(ShapeStyle::Make(shader));
+
+  auto layer = Layer::Make();
+  layer->addChild(shapeLayer);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(2501.f, 1860.f);
+  layer->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/LayerDiamondGradient"));
+}
+
+TGFX_TEST(PDFExportTest, ImageShaderScaledDown) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  // Page size is much smaller than the source images.
+  auto canvas = document->beginPage(400.f, 250.f);
+  {
+    // JPEG image (1536x1536) rendered into a 150x150 area with shader matrix.
+    auto jpegImage = Image::MakeFromFile(ProjectPath::Absolute("resources/assets/bridge.jpg"));
+    EXPECT_TRUE(jpegImage != nullptr);
+    auto jpegShader = Shader::MakeImageShader(jpegImage);
+    float jpegScale = 150.f / 1536.f;
+    jpegShader = jpegShader->makeWithMatrix(Matrix::MakeScale(jpegScale));
+    Paint paint;
+    paint.setShader(jpegShader);
+    canvas->save();
+    canvas->translate(25.f, 50.f);
+    canvas->drawRect(Rect::MakeWH(150.f, 150.f), paint);
+    canvas->restore();
+
+    // PNG image (512x512) rendered into a 150x150 area with shader matrix.
+    auto pngImage = Image::MakeFromFile(ProjectPath::Absolute("resources/assets/tgfx.png"));
+    EXPECT_TRUE(pngImage != nullptr);
+    auto pngShader = Shader::MakeImageShader(pngImage);
+    float pngScale = 150.f / 512.f;
+    pngShader = pngShader->makeWithMatrix(Matrix::MakeScale(pngScale));
+    paint.setShader(pngShader);
+    canvas->save();
+    canvas->translate(225.f, 50.f);
+    canvas->drawRect(Rect::MakeWH(150.f, 150.f), paint);
+    canvas->restore();
+  }
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ImageShaderScaledDown"));
+}
+
+TGFX_TEST(PDFExportTest, BitmapMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  // Load a bitmap image with alpha to use as mask (not a PictureImage, so drawPathWithFilter
+  // will take the bitmap mask code path instead of the vector Picture path).
+  auto maskImage = Image::MakeFromFile(ProjectPath::Absolute("resources/assets/tgfx.png"));
+  EXPECT_TRUE(maskImage != nullptr);
+
+  // Create a MaskFilter from the bitmap image shader.
+  // Scale the 512x512 image down to 200x200 to fit the page.
+  float scale = 200.f / static_cast<float>(maskImage->width());
+  auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal);
+  maskShader = maskShader->makeWithMatrix(Matrix::MakeScale(scale));
+  auto maskFilter = MaskFilter::MakeShader(maskShader);
+
+  float pageW = 300.f;
+  float pageH = 300.f;
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(pageW, pageH);
+  canvas->drawColor(Color::White());
+  canvas->translate(50.f, 50.f);
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setMaskFilter(maskFilter);
+  canvas->drawRect(Rect::MakeWH(200.f, 200.f), paint);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/BitmapMask"));
+}
+
+TGFX_TEST(PDFExportTest, DropShadowLayer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto root = Layer::Make();
+
+  // Left: showBehindLayer=false
+  auto layerA = ShapeLayer::Make();
+  Path pathA;
+  pathA.addRect(Rect::MakeWH(200.f, 200.f));
+  layerA->setPath(pathA);
+  layerA->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 127)));
+  layerA->setPosition(Point{50.f, 50.f});
+  layerA->setLayerStyles({DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), false)});
+  root->addChild(layerA);
+
+  // Right: showBehindLayer=true
+  auto layerB = ShapeLayer::Make();
+  Path pathB;
+  pathB.addRect(Rect::MakeWH(200.f, 200.f));
+  layerB->setPath(pathB);
+  layerB->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 127)));
+  layerB->setPosition(Point{350.f, 50.f});
+  layerB->setLayerStyles({DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), true)});
+  root->addChild(layerB);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+
+  // Page 1: rectangles
+  auto canvas = document->beginPage(650.f, 350.f);
+  canvas->drawColor(Color::FromRGBA(200, 200, 200));
+  root->draw(canvas);
+  document->endPage();
+
+  // Page 2: circles with the same drop shadow configuration
+  auto circleRoot = Layer::Make();
+
+  auto circleA = ShapeLayer::Make();
+  Path circlePath1;
+  circlePath1.addOval(Rect::MakeWH(200.f, 200.f));
+  circleA->setPath(circlePath1);
+  circleA->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 127)));
+  circleA->setPosition(Point{50.f, 50.f});
+  circleA->setLayerStyles({DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), false),
+                           DropShadowStyle::Make(-20.f, -20.f, 10.f, 10.f, Color::Green(), false)});
+  circleRoot->addChild(circleA);
+
+  auto circleB = ShapeLayer::Make();
+  Path circlePath2;
+  circlePath2.addOval(Rect::MakeWH(200.f, 200.f));
+  circleB->setPath(circlePath2);
+  circleB->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 127)));
+  circleB->setPosition(Point{350.f, 50.f});
+  circleB->setLayerStyles({DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), true),
+                           DropShadowStyle::Make(-20.f, -20.f, 10.f, 10.f, Color::Green(), true)});
+  circleRoot->addChild(circleB);
+
+  canvas = document->beginPage(650.f, 350.f);
+  canvas->drawColor(Color::FromRGBA(200, 200, 200));
+  circleRoot->draw(canvas);
+  document->endPage();
+
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DropShadowLayer"));
+}
+
+TGFX_TEST(PDFExportTest, NonRegularBlendMode) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  ASSERT_TRUE(document != nullptr);
+
+  auto canvas = document->beginPage(200.f, 200.f);
+  ASSERT_TRUE(canvas != nullptr);
+
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setBlendMode(BlendMode::Src);
+  canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
+
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/NonRegularBlendMode"));
 }
 
 }  // namespace tgfx
