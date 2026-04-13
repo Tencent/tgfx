@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLCommandEncoder.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLRenderPass.h"
@@ -198,11 +199,11 @@ void GLCommandEncoder::resolveRenderTarget(RenderTarget* renderTarget, const Rec
   if (!rect.intersect(renderTarget->bounds())) {
     return;
   }
-  int x = static_cast<int>(rect.x());
-  int y = static_cast<int>(rect.y());
-  int w = static_cast<int>(rect.width());
-  int h = static_cast<int>(rect.height());
-  gl->blitFramebuffer(x, y, x + w, y + h, x, y, x + w, y + h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+  const auto l = FloatSaturateToInt(rect.x());
+  const auto b = FloatSaturateToInt(rect.y());
+  const auto r = FloatSaturateToInt(rect.right);
+  const auto t = FloatSaturateToInt(rect.bottom);
+  gl->blitFramebuffer(l, b, r, t, l, b, r, t, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }
 
 std::shared_ptr<CommandBuffer> GLCommandEncoder::onFinish() {
