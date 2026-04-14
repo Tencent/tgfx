@@ -956,8 +956,8 @@ void DisplayList::drawTileTaskMSAA(const DrawTask& task, const Surface* renderSu
 
   // Use a single-tile MSAA surface and copy to atlas after resolve.
   // This saves memory by reusing one tile-sized MSAA surface instead of a full atlas MSAA surface.
-  auto tileWidth = static_cast<int>(std::ceil(tileRect.width()));
-  auto tileHeight = static_cast<int>(std::ceil(tileRect.height()));
+  const auto tileWidth = FloatCeilToInt(tileRect.width());
+  const auto tileHeight = FloatCeilToInt(tileRect.height());
   auto tileSurface = getOrCreateMSAATileSurface(renderSurface, tileWidth, tileHeight);
   if (tileSurface == nullptr) {
     // Fallback to direct rendering if MSAA surface creation failed.
