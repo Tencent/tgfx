@@ -22,7 +22,6 @@
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/RenderContext.h"
 #include "inspect/InspectorMark.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"

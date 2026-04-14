@@ -107,7 +107,6 @@ class RenderContext : public DrawContext {
   void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTarget,
                            std::shared_ptr<Image> oldContent);
 
-  friend class DisplayList;
   friend class Surface;
 };
 }  // namespace tgfx
