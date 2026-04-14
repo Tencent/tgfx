@@ -48,8 +48,8 @@ std::shared_ptr<Picture> Opaque3DContext::onFinishRecording() {
   return picture;
 }
 
-void Opaque3DContext::onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                                   const Point&, int, bool) {
+void Opaque3DContext::onImageReady(Layer*, std::shared_ptr<Image> image,
+                                   const Matrix3D& imageTransform, const Point&, int, bool) {
   _opaqueImages.push_back({std::move(image), imageTransform});
 }
 

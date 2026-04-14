@@ -33,14 +33,16 @@ namespace tgfx {
 class BackgroundContext;
 class Context;
 class OpaqueContext;
+class Layer;
 
-struct TransformState {
-  TransformState(const Matrix3D& transform, bool antialiasing)
-      : transform(transform), antialiasing(antialiasing) {
+struct Context3DRecordState {
+  Context3DRecordState(const Matrix3D& transform, bool antialiasing, Layer* sourceLayer)
+      : transform(transform), antialiasing(antialiasing), sourceLayer(sourceLayer) {
   }
 
   Matrix3D transform = {};
   bool antialiasing = true;
+  Layer* sourceLayer = nullptr;
 };
 
 /**
@@ -62,9 +64,10 @@ class Layer3DContext {
    * Begins recording a new layer with the specified transform and antialiasing setting.
    * @param childTransform The 3D transform to apply to the layer content.
    * @param antialiasing Whether to enable edge antialiasing for this layer.
+   * @param sourceLayer The source layer being recorded. Must not be nullptr.
    * @return A canvas to draw the layer content on.
    */
-  Canvas* beginRecording(const Matrix3D& childTransform, bool antialiasing);
+  Canvas* beginRecording(const Matrix3D& childTransform, bool antialiasing, Layer* sourceLayer);
 
   /**
    * Ends recording the current layer.
@@ -99,13 +102,14 @@ class Layer3DContext {
 
   virtual Canvas* onBeginRecording() = 0;
   virtual std::shared_ptr<Picture> onFinishRecording() = 0;
-  virtual void onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                            const Point& pictureOffset, int depth, bool antialiasing) = 0;
+  virtual void onImageReady(Layer* sourceLayer, std::shared_ptr<Image> image,
+                            const Matrix3D& imageTransform, const Point& pictureOffset, int depth,
+                            bool antialiasing) = 0;
 
   Rect _renderRect = {};
   float _contentScale = 1.0f;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
-  std::stack<TransformState> _transformStack = {};
+  std::stack<Context3DRecordState> _transformStack = {};
 };
 
 }  // namespace tgfx

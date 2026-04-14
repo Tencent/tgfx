@@ -580,4 +580,136 @@ TGFX_TEST(BackgroundBlurTest, NestedFlat3DLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/NestedFlat3DLayer"));
 }
 
+TGFX_TEST(BackgroundBlurTest, 3DLayer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 250, 250);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // A: Full-canvas background image
+  auto backImage = MakeImage("resources/assets/HappyNewYear.png");
+  auto layerA = ImageLayer::Make();
+  layerA->setName("layerA");
+  layerA->setImage(backImage);
+  layerA->setMatrix(Matrix::MakeScale(250.f / 1024.f));
+  displayList->root()->addChild(layerA);
+
+  // B1: Semi-transparent image layer (glyph3.png) with 3D transform
+  auto layerB1Image = MakeImage("resources/assets/glyph3.png")->makeSubset(Rect::MakeWH(150, 150));
+  auto layerB1 = ImageLayer::Make();
+  layerB1->setName("layerB1");
+  layerB1->setImage(layerB1Image);
+  layerB1->setAlpha(0.8f);
+  {
+    auto size = Size::Make(150, 150);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, 25);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(50, 50, 0);
+    layerB1->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  displayList->root()->addChild(layerB1);
+
+  // B2: Green semi-transparent solid layer with backdrop blur
+  auto layerB2 = SolidLayer::Make();
+  layerB2->setName("layerB2");
+  layerB2->setColor(Color::Green());
+  layerB2->setAlpha(0.3f);
+  layerB2->setWidth(60);
+  layerB2->setHeight(80);
+  {
+    auto size = Size::Make(60, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({1, 0, 0}, 20);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(80, 150, 0);
+    layerB2->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  layerB2->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
+  displayList->root()->addChild(layerB2);
+
+  // C: Semi-transparent image layer (glyph2.png, 80x80) with 3D transform and BackgroundBlurStyle
+  auto layerCImage = MakeImage("resources/assets/glyph2.png")->makeSubset(Rect::MakeWH(80, 80));
+  auto layerC = ImageLayer::Make();
+  layerC->setName("layerC");
+  layerC->setImage(layerCImage);
+  layerC->setAlpha(0.6f);
+  {
+    auto size = Size::Make(80, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({1, 0, 0}, 20);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(35, 35, 0);
+    layerC->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  layerC->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
+  layerB1->addChild(layerC);
+
+  // D: Red semi-transparent solid layer as grandchild of layerC with 3D transform
+  auto layerD = SolidLayer::Make();
+  layerD->setName("layerD");
+  layerD->setColor(Color::Red());
+  layerD->setAlpha(0.6f);
+  layerD->setWidth(80);
+  layerD->setHeight(80);
+  {
+    auto size = Size::Make(80, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({1, 0, 0}, 20);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(40, 40, 0);
+    layerD->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  layerD->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
+  layerC->addChild(layerD);
+
+  // Case 1: B1.preserve3D=true, B1 has no layerStyles.
+  // B1.canPreserve3D()=true, C and D truly enter 3D context.
+  // Background blur is handled by drawBackgroundStyles in the compositor.
+  layerB1->setPreserve3D(true);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/3DLayer_Preserve3D"));
+
+  // Case 2: B1.preserve3D=false.
+  // All layers render in normal 2D path. Background blur works via drawLayerStyles.
+  layerB1->setPreserve3D(false);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/3DLayer_Flat"));
+
+  // Case 3: B1.preserve3D=true, B1 has backdrop blur.
+  // B1 has layerStyles so canPreserve3D()=false, preserve3D falls back to flat.
+  layerB1->setPreserve3D(true);
+  layerB1->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/3DLayer_Preserve3DFallback"));
+
+  // Case 4: Draw layerC directly via Layer::draw() to verify the draw() entry point handles
+  // 3D perspective layers with background blur correctly.
+  layerD->setAlpha(0.2f);
+  surface->getCanvas()->clear();
+  layerC->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/3DLayer_DirectDraw"));
+}
+
 }  // namespace tgfx

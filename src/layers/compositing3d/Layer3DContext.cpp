@@ -33,8 +33,8 @@ std::shared_ptr<Layer3DContext> Layer3DContext::Make(
     DEBUG_ASSERT(backgroundContext == nullptr);
     return std::make_shared<Opaque3DContext>(renderRect, contentScale, std::move(colorSpace));
   }
-  auto compositor = std::make_shared<Context3DCompositor>(
-      *context, static_cast<int>(renderRect.width()), static_cast<int>(renderRect.height()));
+  auto compositor = std::make_shared<Context3DCompositor>(*context, renderRect, contentScale,
+                                                          colorSpace, backgroundContext);
   return std::make_shared<Render3DContext>(std::move(compositor), renderRect, contentScale,
                                            std::move(colorSpace), std::move(backgroundContext));
 }
@@ -70,10 +70,12 @@ bool Layer3DContext::isFinished() const {
   return _transformStack.empty();
 }
 
-Canvas* Layer3DContext::beginRecording(const Matrix3D& childTransform, bool antialiasing) {
+Canvas* Layer3DContext::beginRecording(const Matrix3D& childTransform, bool antialiasing,
+                                       Layer* sourceLayer) {
+  DEBUG_ASSERT(sourceLayer != nullptr);
   auto newTransform = childTransform;
   newTransform.postConcat(currentTransform());
-  _transformStack.emplace(newTransform, antialiasing);
+  _transformStack.emplace(newTransform, antialiasing, sourceLayer);
 
   auto canvas = onBeginRecording();
   DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
@@ -112,7 +114,8 @@ void Layer3DContext::endRecording() {
   auto imageTransform = Matrix3DUtils::OriginAdaptedMatrix3D(state.transform, imageOrigin);
   imageTransform = Matrix3DUtils::ScaleAdaptedMatrix3D(imageTransform, _contentScale);
 
-  onImageReady(std::move(image), imageTransform, pictureOffset, depth, state.antialiasing);
+  onImageReady(state.sourceLayer, std::move(image), imageTransform, pictureOffset, depth,
+               state.antialiasing);
 }
 
 }  // namespace tgfx

@@ -26,6 +26,8 @@
 
 namespace tgfx {
 
+class Layer;
+
 /**
  * DrawPolygon3D represents a splittable 3D polygon for BSP tree processing.
  * It stores transformed 3D vertices in screen space and supports splitting by other polygons.
@@ -35,11 +37,14 @@ class DrawPolygon3D {
   /**
    * Constructs a polygon from an image's 2D bounds and a 3D transformation matrix.
    * The transform is applied immediately to convert vertices to screen space.
+   * @param sourceLayer The source layer this polygon was created from. Must not be nullptr.
+   * @param image The source image to draw.
+   * @param imageOffset The offset of the image in the layer's local coordinate space.
    * @param depth The depth level in the layer tree (used for sorting coplanar polygons).
    * @param sequenceIndex The sequence index within the same depth level.
    */
-  DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matrix, int depth, int sequenceIndex,
-                float alpha, bool antiAlias);
+  DrawPolygon3D(Layer* sourceLayer, std::shared_ptr<Image> image, const Point& imageOffset,
+                const Matrix3D& matrix, int depth, int sequenceIndex, float alpha, bool antiAlias);
 
   /**
    * Splits the given polygon by this polygon's plane.
@@ -57,6 +62,14 @@ class DrawPolygon3D {
    * Positive means in front (same side as normal), negative means behind.
    */
   float signedDistanceTo(const Vec3& point) const;
+
+  Layer* sourceLayer() const {
+    return _sourceLayer;
+  }
+
+  const Point& imageOffset() const {
+    return _imageOffset;
+  }
 
   const std::vector<Vec3>& points() const {
     return _points;
@@ -100,13 +113,24 @@ class DrawPolygon3D {
    */
   std::vector<Quad> toQuads() const;
 
+  /**
+   * Creates a variant of this polygon with a different image and alpha.
+   * All other properties (points, matrix, imageOffset, split state, etc.) are preserved.
+   * @param image The new source image to draw.
+   * @param alpha The new alpha transparency value.
+   */
+  DrawPolygon3D makeVariant(std::shared_ptr<Image> image, float alpha) const;
+
  private:
   // Constructs a polygon from already-transformed 3D points (used for split polygons).
-  DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matrix, std::vector<Vec3> points,
-                const Vec3& normal, int depth, int sequenceIndex, float alpha, bool antiAlias);
+  DrawPolygon3D(Layer* sourceLayer, std::shared_ptr<Image> image, const Point& imageOffset,
+                const Matrix3D& matrix, std::vector<Vec3> points, const Vec3& normal, int depth,
+                int sequenceIndex, float alpha, bool antiAlias);
 
   void constructNormal();
 
+  Layer* _sourceLayer = nullptr;
+  Point _imageOffset = {};
   std::vector<Vec3> _points = {};
   Vec3 _normal = {0.0f, 0.0f, 1.0f};
   int _depth = 0;

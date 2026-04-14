@@ -978,8 +978,10 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   if (clippedBounds.isEmpty()) {
     return;
   }
-  auto localToGlobalMatrix = getGlobalMatrix();
-  auto globalToLocalMatrix = Matrix3D::I();
+  // Inverse 3D matrices projected to 2D are not inverses of each other. Compute the 2D inverse
+  // from the 2D projection directly.
+  const auto localToGlobalMatrix = getGlobalMatrix().asMatrix();
+  auto globalToLocalMatrix = Matrix::I();
   bool canInvert = localToGlobalMatrix.invert(&globalToLocalMatrix);
 
   Rect renderRect = {};
@@ -1003,14 +1005,14 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     auto scale = canvas->getMatrix().getMaxScale();
     auto backgroundRect = clippedBounds;
     backgroundRect.scale(scale, scale);
-    auto backgroundMatrix = globalToLocalMatrix.asMatrix();
+    auto backgroundMatrix = globalToLocalMatrix;
     backgroundMatrix.postScale(scale, scale);
     if (auto backgroundContext =
             createBackgroundContext(context, backgroundRect, backgroundMatrix,
                                     bounds == clippedBounds, surface->colorSpace())) {
       auto backgroundCanvas = backgroundContext->getCanvas();
       auto actualMatrix = backgroundCanvas->getMatrix();
-      actualMatrix.preConcat(localToGlobalMatrix.asMatrix());
+      actualMatrix.preConcat(localToGlobalMatrix);
       backgroundCanvas->setMatrix(actualMatrix);
       Point offset = {};
       auto image = getBackgroundImage(args, scale, &offset);
@@ -1860,6 +1862,11 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
 
   bool skipBackground =
       !HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background);
+  // When the current layer is a 3D leaf node, its own background styles are handled by the 3D
+  // compositor, but child layers need background support for normal 2D rendering.
+  if (skipBackground && is3DContextLeafNode()) {
+    skipBackground = false;
+  }
 
   for (size_t i = 0; i < _children.size(); ++i) {
     auto& child = _children[i];
@@ -1907,7 +1914,7 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const 
   contextArgs.styleSourceTypes = StyleSourceTypesFor3DContext;
 
   const auto offscreenCanvas =
-      newContext->beginRecording(matrix3D, bitFields.allowsEdgeAntialiasing);
+      newContext->beginRecording(matrix3D, bitFields.allowsEdgeAntialiasing, this);
   contextArgs.opaqueContext = newContext->currentOpaqueContext();
   (this->*drawFunc)(contextArgs, offscreenCanvas, alpha, blendMode);
   newContext->endRecording();
@@ -1920,6 +1927,8 @@ std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* can
   if (skipBackground) {
     RemoveStyleSource(childArgs.styleSourceTypes, LayerStyleExtraSourceType::Background);
     childArgs.blurBackground = nullptr;
+  } else if (!HasStyleSource(childArgs.styleSourceTypes, LayerStyleExtraSourceType::Background)) {
+    childArgs.styleSourceTypes.push_back(LayerStyleExtraSourceType::Background);
   }
   // Handle 3D context state transitions:
   // - If parent has no 3D context and child can preserve 3D, child becomes the root of a new 3D
@@ -1942,6 +1951,10 @@ std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* can
     // background when drawing each layer. Therefore, background styles are disabled.
     childArgs.styleSourceTypes = StyleSourceTypesFor3DContext;
     childArgs.blurBackground = nullptr;
+  } else if (args.context && child->is3DContextLeafNode() && child->hasBackgroundStyle()) {
+    // Create a new background context for 3D context leaf nodes, so that descendant layers in
+    // this subtree can correctly apply background blur effects.
+    childArgs.blurBackground = CreateChildBackgroundContext(args, child);
   }
   return childArgs;
 }
@@ -1970,7 +1983,7 @@ bool Layer::drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, f
   auto drawArgs = childArgs;
   if (context3D) {
     targetCanvas =
-        context3D->beginRecording(childTransform3D, child->bitFields.allowsEdgeAntialiasing);
+        context3D->beginRecording(childTransform3D, child->bitFields.allowsEdgeAntialiasing, child);
     drawArgs.opaqueContext = context3D->currentOpaqueContext();
   }
   // If child cannot preserve 3D but has a 3D context, clear it so that child's internal rendering
@@ -2010,7 +2023,17 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
 std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& args,
                                                              const Matrix& matrix,
                                                              bool excludeContour) {
-  if (_layerStyles.empty() || args.excludeEffects) {
+  if (args.excludeEffects) {
+    return nullptr;
+  }
+  bool hasActiveStyle = false;
+  for (const auto& style : _layerStyles) {
+    if (HasStyleSource(args.styleSourceTypes, style->extraSourceType())) {
+      hasActiveStyle = true;
+      break;
+    }
+  }
+  if (!hasActiveStyle) {
     return nullptr;
   }
   auto contentScale = matrix.getMaxScale();
@@ -2467,6 +2490,32 @@ std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(
 bool Layer::canPreserve3D() const {
   return _preserve3D && _filters.empty() && _layerStyles.empty() && !hasValidMask() &&
          _scrollRect == nullptr;
+}
+
+bool Layer::is3DContextLeafNode() const {
+  return !canPreserve3D() && _parent && _parent->canPreserve3D();
+}
+
+std::shared_ptr<BackgroundContext> Layer::CreateChildBackgroundContext(const DrawArgs& args,
+                                                                       Layer* child) {
+  const auto childBounds = child->getBounds();
+  if (childBounds.isEmpty()) {
+    return nullptr;
+  }
+  const auto localToGlobal2D = child->getGlobalMatrix().asMatrix();
+  auto backgroundMatrix = Matrix::I();
+  if (!localToGlobal2D.invert(&backgroundMatrix)) {
+    return nullptr;
+  }
+  auto bgContext = child->createBackgroundContext(args.context, childBounds, backgroundMatrix, true,
+                                                  args.dstColorSpace);
+  if (bgContext) {
+    auto bgCanvas = bgContext->getCanvas();
+    auto bgMatrix = bgCanvas->getMatrix();
+    bgMatrix.preConcat(localToGlobal2D);
+    bgCanvas->setMatrix(bgMatrix);
+  }
+  return bgContext;
 }
 
 void Layer::invalidateSubtree() {

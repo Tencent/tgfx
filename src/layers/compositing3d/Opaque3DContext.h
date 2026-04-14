@@ -46,8 +46,9 @@ class Opaque3DContext : public Layer3DContext {
  protected:
   Canvas* onBeginRecording() override;
   std::shared_ptr<Picture> onFinishRecording() override;
-  void onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                    const Point& pictureOffset, int depth, bool antialiasing) override;
+  void onImageReady(Layer* sourceLayer, std::shared_ptr<Image> image,
+                    const Matrix3D& imageTransform, const Point& pictureOffset, int depth,
+                    bool antialiasing) override;
 
  private:
   std::stack<OpaqueContext> _opaqueStack = {};

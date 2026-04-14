@@ -1,5 +1,9 @@
 {
     "BackgroundBlurTest": {
+        "3DLayer_DirectDraw": "e6cdba7e",
+        "3DLayer_Flat": "e6cdba7e",
+        "3DLayer_Preserve3D": "e6cdba7e",
+        "3DLayer_Preserve3DFallback": "e6cdba7e",
         "BackgroundBlurStyleTest1": "bf48e614",
         "BackgroundBlurStyleTest2": "bf48e614",
         "BackgroundBlurStyleTest3": "2ce762fb",

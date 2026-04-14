@@ -720,6 +720,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool canPreserve3D() const;
 
+  bool is3DContextLeafNode() const;
+
+  static std::shared_ptr<BackgroundContext> CreateChildBackgroundContext(const DrawArgs& args,
+                                                                         Layer* child);
+
   void invalidateSubtree();
 
   void updateStaticSubtreeFlags();
@@ -766,5 +771,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   friend class DisplayList;
   friend class LayerProperty;
   friend class LayerSerialization;
+  friend class Context3DCompositor;
 };
 }  // namespace tgfx

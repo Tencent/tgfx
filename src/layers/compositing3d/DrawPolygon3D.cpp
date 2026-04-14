@@ -58,10 +58,13 @@ static void CollectSplitPoints(const std::vector<Vec3>& points, const Vec3& star
   }
 }
 
-DrawPolygon3D::DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matrix, int depth,
+DrawPolygon3D::DrawPolygon3D(Layer* sourceLayer, std::shared_ptr<Image> image,
+                             const Point& imageOffset, const Matrix3D& matrix, int depth,
                              int sequenceIndex, float alpha, bool antiAlias)
-    : _depth(depth), _sequenceIndex(sequenceIndex), _alpha(alpha), _antiAlias(antiAlias),
-      _image(std::move(image)), _matrix(matrix) {
+    : _sourceLayer(sourceLayer), _imageOffset(imageOffset), _depth(depth),
+      _sequenceIndex(sequenceIndex), _alpha(alpha), _antiAlias(antiAlias), _image(std::move(image)),
+      _matrix(matrix) {
+  DEBUG_ASSERT(_sourceLayer != nullptr);
   auto srcW = static_cast<float>(_image->width());
   auto srcH = static_cast<float>(_image->height());
 
@@ -81,12 +84,13 @@ DrawPolygon3D::DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matri
   constructNormal();
 }
 
-DrawPolygon3D::DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matrix,
+DrawPolygon3D::DrawPolygon3D(Layer* sourceLayer, std::shared_ptr<Image> image,
+                             const Point& imageOffset, const Matrix3D& matrix,
                              std::vector<Vec3> points, const Vec3& normal, int depth,
                              int sequenceIndex, float alpha, bool antiAlias)
-    : _points(std::move(points)), _normal(normal), _depth(depth), _sequenceIndex(sequenceIndex),
-      _isSplit(true), _alpha(alpha), _antiAlias(antiAlias), _image(std::move(image)),
-      _matrix(matrix) {
+    : _sourceLayer(sourceLayer), _imageOffset(imageOffset), _points(std::move(points)),
+      _normal(normal), _depth(depth), _sequenceIndex(sequenceIndex), _isSplit(true), _alpha(alpha),
+      _antiAlias(antiAlias), _image(std::move(image)), _matrix(matrix) {
 }
 
 // Computes the normal by averaging cross products of opposite vertex pairs from the first vertex.
@@ -199,12 +203,14 @@ void DrawPolygon3D::splitAnother(std::unique_ptr<DrawPolygon3D> polygon,
   CollectSplitPoints(polygon->_points, preNegIntersection, prePosIntersection, backBegin,
                      frontBegin, &backPoints);
 
-  *front = std::unique_ptr<DrawPolygon3D>(new DrawPolygon3D(
-      polygon->_image, polygon->_matrix, std::move(frontPoints), polygon->_normal, polygon->_depth,
-      polygon->_sequenceIndex, polygon->_alpha, polygon->_antiAlias));
-  *back = std::unique_ptr<DrawPolygon3D>(new DrawPolygon3D(
-      polygon->_image, polygon->_matrix, std::move(backPoints), polygon->_normal, polygon->_depth,
-      polygon->_sequenceIndex, polygon->_alpha, polygon->_antiAlias));
+  *front = std::unique_ptr<DrawPolygon3D>(
+      new DrawPolygon3D(polygon->_sourceLayer, polygon->_image, polygon->_imageOffset,
+                        polygon->_matrix, std::move(frontPoints), polygon->_normal, polygon->_depth,
+                        polygon->_sequenceIndex, polygon->_alpha, polygon->_antiAlias));
+  *back = std::unique_ptr<DrawPolygon3D>(
+      new DrawPolygon3D(polygon->_sourceLayer, polygon->_image, polygon->_imageOffset,
+                        polygon->_matrix, std::move(backPoints), polygon->_normal, polygon->_depth,
+                        polygon->_sequenceIndex, polygon->_alpha, polygon->_antiAlias));
 
   DEBUG_ASSERT((*front)->_points.size() >= 3);
   DEBUG_ASSERT((*back)->_points.size() >= 3);
@@ -256,6 +262,13 @@ std::vector<Quad> DrawPolygon3D::toQuads() const {
                                      localPoints[n - 1]));
   }
   return quads;
+}
+
+DrawPolygon3D DrawPolygon3D::makeVariant(std::shared_ptr<Image> image, float alpha) const {
+  auto copy = *this;
+  copy._image = std::move(image);
+  copy._alpha = alpha;
+  return copy;
 }
 
 }  // namespace tgfx

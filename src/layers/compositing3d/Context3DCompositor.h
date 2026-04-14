@@ -27,38 +27,47 @@
 
 namespace tgfx {
 
+class BackgroundContext;
+class LayerStyle;
+
 /**
  * Context3DCompositor handles compositing of 3D transformed images using BSP tree for correct
  * depth sorting. It splits intersecting regions to ensure correct occlusion and blending order.
  */
 class Context3DCompositor {
  public:
-  Context3DCompositor(const Context& context, int width, int height);
-
   /**
-   * Returns the width of the compositor in pixels.
+   * Constructs a compositor for 3D layer compositing.
+   * @param context The GPU context.
+   * @param renderRect The rendering area in the scaled canvas coordinate system.
+   * @param contentScale The scale factor applied to layer content.
+   * @param colorSpace The color space of the composited result.
+   * @param backgroundContext The background context for background styles, or nullptr.
    */
+  Context3DCompositor(const Context& context, const Rect& renderRect, float contentScale,
+                      std::shared_ptr<ColorSpace> colorSpace,
+                      std::shared_ptr<BackgroundContext> backgroundContext);
+
   int width() const {
-    return _width;
+    return static_cast<int>(_renderRect.width());
   }
 
-  /**
-   * Returns the height of the compositor in pixels.
-   */
   int height() const {
-    return _height;
+    return static_cast<int>(_renderRect.height());
   }
 
   /**
    * Adds an image with 3D transformation for compositing.
+   * @param sourceLayer The source layer this image was created from. Must not be nullptr.
    * @param image The source image to draw.
+   * @param imageOffset The offset of the image in the layer's local coordinate space.
    * @param matrix The 3D transformation matrix applied to the image.
    * @param depth The depth level in the layer tree (used for sorting coplanar polygons).
    * @param alpha The layer alpha for transparency.
    * @param antiAlias Whether to enable edge antialiasing when the render target does not support MSAA.
    */
-  void addImage(std::shared_ptr<Image> image, const Matrix3D& matrix, int depth, float alpha,
-                bool antiAlias);
+  void addImage(Layer* sourceLayer, std::shared_ptr<Image> image, const Point& imageOffset,
+                const Matrix3D& matrix, int depth, float alpha, bool antiAlias);
 
   /**
    * Draws all added images with correct depth ordering and blending.
@@ -69,10 +78,20 @@ class Context3DCompositor {
  private:
   void drawPolygon(const DrawPolygon3D* polygon);
   void drawQuads(const DrawPolygon3D* polygon, const std::vector<Quad>& subQuads);
+  void drawBackgroundStyles(const DrawPolygon3D* polygon);
+  void drawBackgroundStyle(const DrawPolygon3D* polygon, LayerStyle& style,
+                           const std::shared_ptr<Image>& contentImage, const Point& contentOffset,
+                           const std::shared_ptr<Image>& bgImage, const Point& bgOffset,
+                           const Rect& layerBounds);
+  void syncToBackgroundContext(const DrawPolygon3D* polygon) const;
+  std::shared_ptr<Image> getScaledBackgroundImage(Layer& layer, Point* offset) const;
+  std::shared_ptr<Image> getScaledOpaqueContentImage(Layer& layer, Point* offset) const;
 
-  int _width = 0;
-  int _height = 0;
+  Rect _renderRect = {};
+  float _contentScale = 1.0f;
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   std::shared_ptr<RenderTargetProxy> _targetColorProxy = nullptr;
+  std::shared_ptr<BackgroundContext> _backgroundContext = nullptr;
   std::deque<std::unique_ptr<DrawPolygon3D>> _polygons = {};
   std::vector<PlacementPtr<DrawOp>> _drawOps = {};
   std::unordered_map<int, int> _depthSequenceCounters = {};
