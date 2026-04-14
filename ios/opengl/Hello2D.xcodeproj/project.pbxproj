@@ -1,0 +1,442 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		E1BF1B702E44A64000F99C5E /* tgfx.png in Resources */ = {isa = PBXBuildFile; fileRef = E1BF1B6F2E44A64000F99C5E /* tgfx.png */; };
+		E61EC8172AF1FCAE00C82F9E /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = E61EC8162AF1FCAE00C82F9E /* AppDelegate.m */; };
+		E61EC81A2AF1FCAE00C82F9E /* SceneDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = E61EC8192AF1FCAE00C82F9E /* SceneDelegate.m */; };
+		E61EC81D2AF1FCAE00C82F9E /* ViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = E61EC81C2AF1FCAE00C82F9E /* ViewController.mm */; };
+		E61EC8202AF1FCAE00C82F9E /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = E61EC81E2AF1FCAE00C82F9E /* Main.storyboard */; };
+		E61EC8222AF1FCB000C82F9E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E61EC8212AF1FCB000C82F9E /* Assets.xcassets */; };
+		E61EC8252AF1FCB000C82F9E /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = E61EC8232AF1FCB000C82F9E /* LaunchScreen.storyboard */; };
+		E61EC8282AF1FCB000C82F9E /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = E61EC8272AF1FCB000C82F9E /* main.m */; };
+		F2272B672AF87D96004DEF8D /* tgfx.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F2272B662AF87D96004DEF8D /* tgfx.a */; };
+		F25AD0712AF90ECD0017339D /* bridge.jpg in Resources */ = {isa = PBXBuildFile; fileRef = F25AD0702AF90ECD0017339D /* bridge.jpg */; };
+		F276A9802AF8D42200E482B7 /* TGFXView.mm in Sources */ = {isa = PBXBuildFile; fileRef = F276A97F2AF8D42200E482B7 /* TGFXView.mm */; };
+		F2F2CEFA2B0B51CD0092BD3B /* tgfx-hello2d.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F2F2CEF92B0B51CD0092BD3B /* tgfx-hello2d.a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		E1BF1B6F2E44A64000F99C5E /* tgfx.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = tgfx.png; sourceTree = "<group>"; };
+		E61EC8122AF1FCAE00C82F9E /* Hello2D.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hello2D.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E61EC8152AF1FCAE00C82F9E /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
+		E61EC8162AF1FCAE00C82F9E /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
+		E61EC8182AF1FCAE00C82F9E /* SceneDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SceneDelegate.h; sourceTree = "<group>"; };
+		E61EC8192AF1FCAE00C82F9E /* SceneDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SceneDelegate.m; sourceTree = "<group>"; };
+		E61EC81B2AF1FCAE00C82F9E /* ViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViewController.h; sourceTree = "<group>"; };
+		E61EC81C2AF1FCAE00C82F9E /* ViewController.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ViewController.mm; sourceTree = "<group>"; };
+		E61EC81F2AF1FCAE00C82F9E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		E61EC8212AF1FCB000C82F9E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E61EC8242AF1FCB000C82F9E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		E61EC8262AF1FCB000C82F9E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		E61EC8272AF1FCB000C82F9E /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		F2272B662AF87D96004DEF8D /* tgfx.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = tgfx.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		F25AD0702AF90ECD0017339D /* bridge.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = bridge.jpg; sourceTree = "<group>"; };
+		F276A97E2AF8D3EB00E482B7 /* TGFXView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TGFXView.h; sourceTree = "<group>"; };
+		F276A97F2AF8D42200E482B7 /* TGFXView.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TGFXView.mm; sourceTree = "<group>"; };
+		F2F2CEF92B0B51CD0092BD3B /* tgfx-hello2d.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "tgfx-hello2d.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		E61EC80F2AF1FCAE00C82F9E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F2F2CEFA2B0B51CD0092BD3B /* tgfx-hello2d.a in Frameworks */,
+				F2272B672AF87D96004DEF8D /* tgfx.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		E61EC8092AF1FCAE00C82F9E = {
+			isa = PBXGroup;
+			children = (
+				E61EC8142AF1FCAE00C82F9E /* Hello2D */,
+				E61EC8132AF1FCAE00C82F9E /* Products */,
+				E61EC82E2AF1FEAE00C82F9E /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		E61EC8132AF1FCAE00C82F9E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E61EC8122AF1FCAE00C82F9E /* Hello2D.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		E61EC8142AF1FCAE00C82F9E /* Hello2D */ = {
+			isa = PBXGroup;
+			children = (
+				F25AD06F2AF90ECD0017339D /* assets */,
+				E61EC8152AF1FCAE00C82F9E /* AppDelegate.h */,
+				E61EC8162AF1FCAE00C82F9E /* AppDelegate.m */,
+				E61EC8182AF1FCAE00C82F9E /* SceneDelegate.h */,
+				E61EC8192AF1FCAE00C82F9E /* SceneDelegate.m */,
+				F276A97E2AF8D3EB00E482B7 /* TGFXView.h */,
+				F276A97F2AF8D42200E482B7 /* TGFXView.mm */,
+				E61EC81B2AF1FCAE00C82F9E /* ViewController.h */,
+				E61EC81C2AF1FCAE00C82F9E /* ViewController.mm */,
+				E61EC81E2AF1FCAE00C82F9E /* Main.storyboard */,
+				E61EC8212AF1FCB000C82F9E /* Assets.xcassets */,
+				E61EC8232AF1FCB000C82F9E /* LaunchScreen.storyboard */,
+				E61EC8262AF1FCB000C82F9E /* Info.plist */,
+				E61EC8272AF1FCB000C82F9E /* main.m */,
+			);
+			path = Hello2D;
+			sourceTree = "<group>";
+		};
+		E61EC82E2AF1FEAE00C82F9E /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F2F2CEF92B0B51CD0092BD3B /* tgfx-hello2d.a */,
+				F2272B662AF87D96004DEF8D /* tgfx.a */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		F25AD06F2AF90ECD0017339D /* assets */ = {
+			isa = PBXGroup;
+			children = (
+				E1BF1B6F2E44A64000F99C5E /* tgfx.png */,
+				F25AD0702AF90ECD0017339D /* bridge.jpg */,
+			);
+			name = assets;
+			path = ../../../resources/assets;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E61EC8112AF1FCAE00C82F9E /* Hello2D */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E61EC82B2AF1FCB000C82F9E /* Build configuration list for PBXNativeTarget "Hello2D" */;
+			buildPhases = (
+				E61EC80E2AF1FCAE00C82F9E /* Sources */,
+				E61EC80F2AF1FCAE00C82F9E /* Frameworks */,
+				E61EC8102AF1FCAE00C82F9E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Hello2D;
+			productName = Hello2D;
+			productReference = E61EC8122AF1FCAE00C82F9E /* Hello2D.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E61EC80A2AF1FCAE00C82F9E /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					E61EC8112AF1FCAE00C82F9E = {
+						CreatedOnToolsVersion = 15.0.1;
+					};
+				};
+			};
+			buildConfigurationList = E61EC80D2AF1FCAE00C82F9E /* Build configuration list for PBXProject "Hello2D" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = E61EC8092AF1FCAE00C82F9E;
+			productRefGroup = E61EC8132AF1FCAE00C82F9E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E61EC8112AF1FCAE00C82F9E /* Hello2D */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		E61EC8102AF1FCAE00C82F9E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E61EC8252AF1FCB000C82F9E /* LaunchScreen.storyboard in Resources */,
+				E1BF1B702E44A64000F99C5E /* tgfx.png in Resources */,
+				E61EC8222AF1FCB000C82F9E /* Assets.xcassets in Resources */,
+				F25AD0712AF90ECD0017339D /* bridge.jpg in Resources */,
+				E61EC8202AF1FCAE00C82F9E /* Main.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		E61EC80E2AF1FCAE00C82F9E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E61EC81D2AF1FCAE00C82F9E /* ViewController.mm in Sources */,
+				E61EC8172AF1FCAE00C82F9E /* AppDelegate.m in Sources */,
+				F276A9802AF8D42200E482B7 /* TGFXView.mm in Sources */,
+				E61EC8282AF1FCB000C82F9E /* main.m in Sources */,
+				E61EC81A2AF1FCAE00C82F9E /* SceneDelegate.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		E61EC81E2AF1FCAE00C82F9E /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				E61EC81F2AF1FCAE00C82F9E /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+		E61EC8232AF1FCB000C82F9E /* LaunchScreen.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				E61EC8242AF1FCB000C82F9E /* Base */,
+			);
+			name = LaunchScreen.storyboard;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		E61EC8292AF1FCB000C82F9E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				USER_HEADER_SEARCH_PATHS = "";
+			};
+			name = Debug;
+		};
+		E61EC82A2AF1FCB000C82F9E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				USER_HEADER_SEARCH_PATHS = "";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		E61EC82C2AF1FCB000C82F9E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 36588GHG2N;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"GLES_SILENCE_DEPRECATION=1",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "";
+				INFOPLIST_FILE = Hello2D/Info.plist;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIMainStoryboardFile = Main;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "";
+				MARKETING_VERSION = 1.0;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = org.tgfx.hello2d;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				USER_HEADER_SEARCH_PATHS = (
+					../../include,
+					../../hello2d/include,
+				);
+				USE_HEADERMAP = YES;
+			};
+			name = Debug;
+		};
+		E61EC82D2AF1FCB000C82F9E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 36588GHG2N;
+				GCC_PREPROCESSOR_DEFINITIONS = "GLES_SILENCE_DEPRECATION=1";
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "";
+				INFOPLIST_FILE = Hello2D/Info.plist;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIMainStoryboardFile = Main;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "";
+				MARKETING_VERSION = 1.0;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = org.tgfx.hello2d;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				USER_HEADER_SEARCH_PATHS = (
+					../../include,
+					../../hello2d/include,
+				);
+				USE_HEADERMAP = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		E61EC80D2AF1FCAE00C82F9E /* Build configuration list for PBXProject "Hello2D" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E61EC8292AF1FCB000C82F9E /* Debug */,
+				E61EC82A2AF1FCB000C82F9E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E61EC82B2AF1FCB000C82F9E /* Build configuration list for PBXNativeTarget "Hello2D" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E61EC82C2AF1FCB000C82F9E /* Debug */,
+				E61EC82D2AF1FCB000C82F9E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E61EC80A2AF1FCAE00C82F9E /* Project object */;
+}

@@ -384,134 +384,7 @@ void RadialCode(const GradientInfo& info, const Matrix& /*perspectiveRemover*/,
   function->writeText("}");
 }
 
-/**  
- * Conical gradient shader, based on the Canvas spec for radial gradients
- * See: http://www.w3.org/TR/2dcontext/#dom-context-2d-createradialgradient
- */
-void TwoPointConicalCode(const GradientInfo& info, const Matrix& /*perspectiveRemover*/,
-                         const std::shared_ptr<MemoryWriteStream>& function) {
-  float dx = info.points[1].x - info.points[0].x;
-  float dy = info.points[1].y - info.points[0].y;
-  float r0 = info.radiuses[0];
-  float dr = info.radiuses[1] - info.radiuses[0];
-  float a = (dx * dx) + (dy * dy) - (dr * dr);
-
-  // First compute t, if the pixel falls outside the cone, then we'll end
-  // with 'false' on the stack, otherwise we'll push 'true' with t below it
-
-  // We start with a stack of (x y), copy it and then consume one copy in
-  // order to calculate b and the other to calculate c.
-  function->writeText("{");
-
-  function->writeText("2 copy ");
-
-  // Calculate b and b^2; b = -2 * (y * dy + x * dx + r0 * dr).
-  PDFUtils::AppendFloat(dy, function);
-  function->writeText(" mul exch ");
-  PDFUtils::AppendFloat(dx, function);
-  function->writeText(" mul add ");
-  PDFUtils::AppendFloat(r0 * dr, function);
-  function->writeText(" add -2 mul dup dup mul\n");
-
-  // c = x^2 + y^2 + radius0^2
-  function->writeText("4 2 roll dup mul exch dup mul add ");
-  PDFUtils::AppendFloat(r0 * r0, function);
-  function->writeText(" sub dup 4 1 roll\n");
-
-  // Contents of the stack at this point: c, b, b^2, c
-  // if a = 0, then we collapse to a simpler linear case
-  if (a == 0) {
-
-    // t = -c/b
-    function->writeText("pop pop div neg dup ");
-
-    // compute radius(t)
-    PDFUtils::AppendFloat(dr, function);
-    function->writeText(" mul ");
-    PDFUtils::AppendFloat(r0, function);
-    function->writeText(" add\n");
-
-    // if r(t) < 0, then it's outside the cone
-    function->writeText("0 lt {pop false} {true} ifelse\n");
-
-  } else {
-
-    // quadratic case: the Canvas spec wants the largest
-    // root t for which radius(t) > 0
-
-    // compute the discriminant (b^2 - 4ac)
-    PDFUtils::AppendFloat(a * 4, function);
-    function->writeText(" mul sub dup\n");
-
-    // if d >= 0, proceed
-    function->writeText("0 ge {\n");
-
-    // an intermediate value we'll use to compute the roots:
-    // q = -0.5 * (b +/- sqrt(d))
-    function->writeText("sqrt exch dup 0 lt {exch -1 mul} if");
-    function->writeText(" add -0.5 mul dup\n");
-
-    // first root = q / a
-    PDFUtils::AppendFloat(a, function);
-    function->writeText(" div\n");
-
-    // second root = c / q
-    function->writeText("3 1 roll div\n");
-
-    // put the larger root on top of the stack
-    function->writeText("2 copy gt {exch} if\n");
-
-    // compute radius(t) for larger root
-    function->writeText("dup ");
-    PDFUtils::AppendFloat(dr, function);
-    function->writeText(" mul ");
-    PDFUtils::AppendFloat(r0, function);
-    function->writeText(" add\n");
-
-    // if r(t) > 0, we have our t, pop off the smaller root and we're done
-    function->writeText(" 0 gt {exch pop true}\n");
-
-    // otherwise, throw out the larger one and try the smaller root
-    function->writeText("{pop dup\n");
-    PDFUtils::AppendFloat(dr, function);
-    function->writeText(" mul ");
-    PDFUtils::AppendFloat(r0, function);
-    function->writeText(" add\n");
-
-    // if r(t) < 0, push false, otherwise the smaller root is our t
-    function->writeText("0 le {pop false} {true} ifelse\n");
-    function->writeText("} ifelse\n");
-
-    // d < 0, clear the stack and push false
-    function->writeText("} {pop pop pop false} ifelse\n");
-  }
-
-  // if the pixel is in the cone, proceed to compute a color
-  function->writeText("{");
-  TileModeCode(TileMode::Clamp, function);
-  GradientFunctionCode(info, function);
-
-  // otherwise, just write black
-  // The "gradients" gm works as falls into the 8.7.4.5.4 "Type 3 (Radial) Shadings" case.
-  function->writeText("} {0 0 0} ifelse }");
-}
-
 ///////////////////////////////////////////////////////////////////////////
-
-// catch cases where the inner just touches the outer circle
-// and make the inner circle just inside the outer one to match raster
-void FixUpRadius(const Point& p1, float& r1, const Point& p2, float& r2) {
-  // detect touching circles
-  auto distance = Point::Distance(p1, p2);
-  auto subtractRadii = fabs(r1 - r2);
-  if (fabs(distance - subtractRadii) < 0.002f) {
-    if (r1 > r2) {
-      r1 += 0.002f;
-    } else {
-      r2 += 0.002f;
-    }
-  }
-}
 
 PDFGradientShader::Key MakeKey(const GradientShader* gradientShader, const Matrix& canvasTransform,
                                const Rect& bbox) {
@@ -731,8 +604,7 @@ PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientS
   finalMatrix.preConcat(state.shaderTransform);
 
   bool doStitchFunctions =
-      (state.type == GradientType::Linear || state.type == GradientType::Radial ||
-       state.type == GradientType::Conic);
+      (state.type == GradientType::Linear || state.type == GradientType::Radial);
 
   enum class ShadingType : int32_t {
     Function = 1,
@@ -770,17 +642,6 @@ PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientS
         const Point& pt1 = info.points[0];
         coords = MakePDFArray(pt1.x, pt1.y, 0, pt1.x, pt1.y, info.radiuses[0]);
       } break;
-      case GradientType::Conic: {
-        shadingType = ShadingType::Radial;
-        float r1 = info.radiuses[0];
-        float r2 = info.radiuses[1];
-        Point pt1 = info.points[0];
-        Point pt2 = info.points[1];
-        FixUpRadius(pt1, r1, pt2, r2);
-
-        coords = MakePDFArray(pt1.x, pt1.y, r1, pt2.x, pt2.y, r2);
-        break;
-      }
       case GradientType::None:
       default:
         DEBUG_ASSERT(false);
@@ -800,11 +661,6 @@ PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientS
         transformPoints[1] = transformPoints[0];
         transformPoints[1].x += info.radiuses[0];
         break;
-      case GradientType::Conic: {
-        transformPoints[1] = transformPoints[0];
-        transformPoints[1].x += 1.0f;
-        break;
-      }
       case GradientType::None:
       default:
         return PDFIndirectReference();
@@ -839,23 +695,6 @@ PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientS
       case GradientType::Radial:
         RadialCode(info, perspectiveInverseOnly, functionCode);
         break;
-      case GradientType::Conic: {
-        // The two point radial gradient further references state.fInfo
-        // in translating from x, y coordinates to the t parameter. So, we have
-        // to transform the points and radii according to the calculated matrix.
-        GradientInfo infoCopy = info;
-        Matrix inverseMapperMatrix;
-        if (!mapperMatrix.invert(&inverseMapperMatrix)) {
-          return PDFIndirectReference();
-        }
-        inverseMapperMatrix.mapPoints(infoCopy.points.data(), 2);
-
-        infoCopy.radiuses[0] =
-            std::sqrt(inverseMapperMatrix.mapXY(info.radiuses[0], info.radiuses[0]).length());
-        infoCopy.radiuses[1] =
-            std::sqrt(inverseMapperMatrix.mapXY(info.radiuses[1], info.radiuses[1]).length());
-        TwoPointConicalCode(infoCopy, perspectiveInverseOnly, functionCode);
-      } break;
       default:
         DEBUG_ASSERT(false);
     }

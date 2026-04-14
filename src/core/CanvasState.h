@@ -18,10 +18,12 @@
 
 #pragma once
 
-#include "core/MCState.h"
+#include <memory>
+#include "core/DrawContext.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Paint.h"
 
 namespace tgfx {
-class DrawContext;
 
 class CanvasLayer {
  public:
@@ -34,11 +36,11 @@ class CanvasLayer {
 
 class CanvasState {
  public:
-  explicit CanvasState(MCState mcState, std::unique_ptr<CanvasLayer> savedLayer = nullptr)
-      : mcState(std::move(mcState)), savedLayer(std::move(savedLayer)) {
+  explicit CanvasState(const Matrix& matrix, std::unique_ptr<CanvasLayer> savedLayer = nullptr)
+      : matrix(matrix), savedLayer(std::move(savedLayer)) {
   }
 
-  MCState mcState = {};
+  Matrix matrix = Matrix::I();
   std::unique_ptr<CanvasLayer> savedLayer = nullptr;
 };
 }  // namespace tgfx

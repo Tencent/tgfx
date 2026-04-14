@@ -25,7 +25,7 @@ namespace tgfx {
 class PictureRecord;
 class Canvas;
 class DrawContext;
-class MCState;
+class ClipStack;
 class Image;
 class Brush;
 class BlockBuffer;
@@ -92,14 +92,14 @@ class Picture {
   Picture(std::unique_ptr<BlockBuffer> buffer, std::vector<PlacementPtr<PictureRecord>> records,
           size_t drawCount);
 
-  void playback(DrawContext* drawContext, const MCState& state,
+  void playback(DrawContext* drawContext, const Matrix& matrix, const ClipStack& clip,
                 AbortCallback* callback = nullptr) const;
 
   std::shared_ptr<Image> asImage(Point* offset, const Matrix* matrix = nullptr,
                                  const ISize* clipSize = nullptr) const;
 
-  const PictureRecord* getFirstDrawRecord(MCState* state = nullptr, Brush* brush = nullptr,
-                                          bool* hasStroke = nullptr) const;
+  const PictureRecord* getFirstDrawRecord(Matrix* matrix = nullptr, ClipStack* clip = nullptr,
+                                          Brush* brush = nullptr, bool* hasStroke = nullptr) const;
 
   friend class MeasureContext;
   friend class RenderContext;

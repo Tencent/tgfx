@@ -19,6 +19,9 @@
 #pragma once
 
 #include <Metal/Metal.h>
+#import <QuartzCore/QuartzCore.h>
+#include <atomic>
+#include <vector>
 #include "tgfx/gpu/CommandQueue.h"
 
 namespace tgfx {
@@ -41,6 +44,11 @@ class MetalCommandQueue : public CommandQueue {
     return commandQueue;
   }
 
+  std::chrono::steady_clock::time_point completedFrameTime() const override {
+    auto ticks = _completedFrameTime.load(std::memory_order_acquire);
+    return std::chrono::steady_clock::time_point(std::chrono::steady_clock::duration(ticks));
+  }
+
   void submit(std::shared_ptr<CommandBuffer> commandBuffer) override;
 
   void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
@@ -60,12 +68,19 @@ class MetalCommandQueue : public CommandQueue {
    */
   void encodePendingWait(id<MTLCommandBuffer> commandBuffer);
 
+  /**
+   * Schedules a drawable to be presented when the next command buffer is committed.
+   */
+  void schedulePresent(id<CAMetalDrawable> drawable);
+
  private:
   MetalGPU* gpu = nullptr;
   id<MTLCommandQueue> commandQueue = nil;
   id<MTLCommandBuffer> lastSubmittedCommandBuffer = nil;
   std::shared_ptr<MetalSemaphore> pendingSignalSemaphore = nullptr;
   std::shared_ptr<MetalSemaphore> pendingWaitSemaphore = nullptr;
+  std::vector<id<CAMetalDrawable>> pendingDrawables = {};
+  std::atomic<int64_t> _completedFrameTime = {0};
 };
 
 }  // namespace tgfx

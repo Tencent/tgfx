@@ -1065,13 +1065,16 @@ TGFX_TEST(StrokeTest, HairlineShaderProgramCacheReuse) {
     paint.setStyle(PaintStyle::Stroke);
 
     if (testCase.drawType == DrawType::Line) {
-      canvas->drawLine((10.0f + (i * 10)), (10.0f + (i * 10)), (100.0f + (i * 10)),
-                       (100.0f + (i * 10)), paint);
+      auto offset = static_cast<float>(i * 10);
+      canvas->drawLine((10.0f + offset), (10.0f + offset), (100.0f + offset), (100.0f + offset),
+                       paint);
     } else {
+      auto offset = static_cast<float>(i * 10);
+      auto halfOffset = static_cast<float>(i * 5);
       Path curvePath;
-      curvePath.moveTo((50.0f + (i * 10)), (50.0f + (i * 10)));
-      curvePath.quadTo((100.0f + (i * 5)), (20.0f + (i * 5)), (150.0f + (i * 10)),
-                       (50.0f + (i * 10)));
+      curvePath.moveTo((50.0f + offset), (50.0f + offset));
+      curvePath.quadTo((100.0f + halfOffset), (20.0f + halfOffset), (150.0f + offset),
+                       (50.0f + offset));
       canvas->drawPath(curvePath, paint);
     }
 

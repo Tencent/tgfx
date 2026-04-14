@@ -18,28 +18,22 @@
 
 #pragma once
 
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Paint.h"
-#include "tgfx/core/Path.h"
+#import <Cocoa/Cocoa.h>
+#include "tgfx/gpu/opengl/cgl/CGLWindow.h"
+#include "tgfx/layers/DisplayList.h"
 
-namespace tgfx {
-class MCState {
- public:
-  explicit MCState(const Matrix& matrix) : matrix(matrix) {
-    clip.toggleInverseFillType();
-  }
+@interface TGFXView : NSView
 
-  explicit MCState(Path initClip) : clip(std::move(initClip)) {
-  }
+@property(nonatomic) int drawIndex;
+@property(nonatomic) float zoomScale;
+@property(nonatomic) CGPoint contentOffset;
+@property(nonatomic) CVDisplayLinkRef cvDisplayLink;
+@property(nonatomic, strong) CADisplayLink* caDisplayLink API_AVAILABLE(macos(14.0));
 
-  MCState(const Matrix& matrix, Path clip) : matrix(matrix), clip(std::move(clip)) {
-  }
+- (void)draw;
+- (void)startDisplayLink;
+- (void)stopDisplayLink;
+- (void)updateLayerTree;
+- (void)updateZoomScaleAndOffset;
 
-  MCState() {
-    clip.toggleInverseFillType();
-  }
-
-  Matrix matrix = {};
-  Path clip = {};
-};
-}  // namespace tgfx
+@end

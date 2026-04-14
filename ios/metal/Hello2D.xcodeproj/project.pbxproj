@@ -19,6 +19,7 @@
 		F25AD0712AF90ECD0017339D /* bridge.jpg in Resources */ = {isa = PBXBuildFile; fileRef = F25AD0702AF90ECD0017339D /* bridge.jpg */; };
 		F276A9802AF8D42200E482B7 /* TGFXView.mm in Sources */ = {isa = PBXBuildFile; fileRef = F276A97F2AF8D42200E482B7 /* TGFXView.mm */; };
 		F2F2CEFA2B0B51CD0092BD3B /* tgfx-hello2d.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F2F2CEF92B0B51CD0092BD3B /* tgfx-hello2d.a */; };
+		A1000001000000000000000A /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A1000001000000000000000B /* MetalKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 		F276A97E2AF8D3EB00E482B7 /* TGFXView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TGFXView.h; sourceTree = "<group>"; };
 		F276A97F2AF8D42200E482B7 /* TGFXView.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TGFXView.mm; sourceTree = "<group>"; };
 		F2F2CEF92B0B51CD0092BD3B /* tgfx-hello2d.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "tgfx-hello2d.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000001000000000000000B /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -49,6 +51,7 @@
 			files = (
 				F2F2CEFA2B0B51CD0092BD3B /* tgfx-hello2d.a in Frameworks */,
 				F2272B672AF87D96004DEF8D /* tgfx.a in Frameworks */,
+				A1000001000000000000000A /* MetalKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -96,6 +99,7 @@
 		E61EC82E2AF1FEAE00C82F9E /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				A1000001000000000000000B /* MetalKit.framework */,
 				F2F2CEF92B0B51CD0092BD3B /* tgfx-hello2d.a */,
 				F2272B662AF87D96004DEF8D /* tgfx.a */,
 			);
@@ -109,7 +113,7 @@
 				F25AD0702AF90ECD0017339D /* bridge.jpg */,
 			);
 			name = assets;
-			path = ../../resources/assets;
+			path = ../../../resources/assets;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -266,7 +270,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -322,7 +326,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -342,10 +346,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 36588GHG2N;
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"$(inherited)",
-					"GLES_SILENCE_DEPRECATION=1",
-				);
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = Hello2D/Info.plist;
@@ -368,8 +368,8 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				USER_HEADER_SEARCH_PATHS = (
-					../include,
-					../hello2d/include,
+					../../include,
+					../../hello2d/include,
 				);
 				USE_HEADERMAP = YES;
 			};
@@ -385,7 +385,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 36588GHG2N;
-				GCC_PREPROCESSOR_DEFINITIONS = "GLES_SILENCE_DEPRECATION=1";
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = Hello2D/Info.plist;
@@ -408,8 +407,8 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				USER_HEADER_SEARCH_PATHS = (
-					../include,
-					../hello2d/include,
+					../../include,
+					../../hello2d/include,
 				);
 				USE_HEADERMAP = YES;
 			};

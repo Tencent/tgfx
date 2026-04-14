@@ -18,9 +18,10 @@
 
 #include "PDFExportContext.h"
 #include "core/AdvancedTypefaceInfo.h"
+#include "core/CanvasState.h"
+#include "core/ClipStack.h"
 #include "core/DrawContext.h"
 #include "core/GlyphTransform.h"
-#include "core/MCState.h"
 #include "core/MeasureContext.h"
 #include "core/PictureRecords.h"
 #include "core/RunRecord.h"
@@ -80,14 +81,19 @@ namespace tgfx {
 
 // A helper class to automatically finish a ContentEntry at the end of a
 // drawing method and maintain the state needed between set up and finish.
+// It manages both the drawn content and an optional shape mask for blend mode post-processing.
 class ScopedContentEntry {
  public:
-  ScopedContentEntry(PDFExportContext* device, const MCState& state, const Matrix& matrix,
-                     const Brush& brush, float textScale = 0)
-      : drawContext(device), state(state) {
+  /**
+   * @param matrix The current transform matrix, used for both content and shape.
+   * @param contentExtraMatrix Additional transform for the content only.
+   */
+  ScopedContentEntry(PDFExportContext* device, const Matrix& matrix, const ClipStack& clip,
+                     const Matrix& contentExtraMatrix, const Brush& brush, float textScale = 0)
+      : drawContext(device), matrix(matrix), clip(clip) {
     blendMode = brush.blendMode;
-    contentStream =
-        drawContext->setUpContentEntry(state, matrix, brush, textScale, &destFormXObject);
+    contentStream = drawContext->setUpContentEntry(matrix, clip, contentExtraMatrix, brush,
+                                                   textScale, &destFormXObject);
   }
 
   ~ScopedContentEntry() {
@@ -96,7 +102,7 @@ class ScopedContentEntry {
       if (shape->isEmpty()) {
         shape = nullptr;
       }
-      drawContext->finishContentEntry(state, blendMode, destFormXObject, shape);
+      drawContext->finishContentEntry(matrix, clip, blendMode, destFormXObject, shape);
     }
   }
 
@@ -145,7 +151,8 @@ class ScopedContentEntry {
   BlendMode blendMode = {};
   PDFIndirectReference destFormXObject = {};
   Path path;
-  const MCState& state;
+  Matrix matrix;
+  ClipStack clip;
 };
 
 PDFExportContext::PDFExportContext(ISize pageSize, PDFDocumentImpl* document,
@@ -153,65 +160,68 @@ PDFExportContext::PDFExportContext(ISize pageSize, PDFDocumentImpl* document,
     : _pageSize(pageSize), document(document), _initialTransform(transform) {
   DEBUG_ASSERT(!_pageSize.isEmpty());
   content = MemoryWriteStream::Make();
+  contentBuffer = MemoryWriteStream::Make();
 }
 
 PDFExportContext::~PDFExportContext() = default;
 
 void PDFExportContext::reset() {
-  content.reset();
+  content->reset();
 }
 
 void PDFExportContext::drawFill(const Brush& brush) {
   Path path;
   path.addRect(Rect::MakeSize(_pageSize));
-  onDrawPath(MCState(), path, brush);
+  onDrawPath(Matrix::I(), ClipStack(), path, brush);
 };
 
-void PDFExportContext::drawRect(const Rect& rect, const MCState& state, const Brush& brush,
-                                const Stroke* stroke) {
+void PDFExportContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
+                                const Brush& brush, const Stroke* stroke) {
   Path path;
   path.addRect(rect);
   if (stroke) {
     stroke->applyToPath(&path);
   }
-  onDrawPath(state, path, brush);
+  onDrawPath(matrix, clip, path, brush);
 }
 
-void PDFExportContext::drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
-                                 const Stroke* stroke) {
+void PDFExportContext::drawRRect(const RRect& rRect, const Matrix& matrix, const ClipStack& clip,
+                                 const Brush& brush, const Stroke* stroke) {
   Path path;
   path.addRRect(rRect);
   if (stroke) {
     stroke->applyToPath(&path);
   }
-  onDrawPath(state, path, brush);
+  onDrawPath(matrix, clip, path, brush);
 }
 
-void PDFExportContext::drawPath(const Path& path, const MCState& state, const Brush& brush) {
-  this->onDrawPath(state, path, brush);
+void PDFExportContext::drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
+                                const Brush& brush) {
+  this->onDrawPath(matrix, clip, path, brush);
 };
 
-void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const Brush& brush, const Stroke* stroke) {
+void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix,
+                                 const ClipStack& clip, const Brush& brush, const Stroke* stroke) {
   shape = Shape::ApplyStroke(std::move(shape), stroke);
-  auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix.getMaxScale());
-  this->onDrawPath(state, path, brush);
+  auto path = ShapeUtils::GetShapeRenderingPath(shape, matrix.getMaxScale());
+  this->onDrawPath(matrix, clip, path, brush);
 }
 
 void PDFExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                 const MCState& state, const Brush& brush) {
+                                 const Matrix& matrix, const ClipStack& clip, const Brush& brush) {
   auto rect = Rect::MakeWH(image->width(), image->height());
-  onDrawImageRect(image, rect, sampling, state, brush);
+  onDrawImageRect(image, rect, sampling, matrix, clip, brush);
 }
 
 void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                      const Rect& dstRect, const SamplingOptions& sampling,
-                                     const MCState& state, const Brush& brush, SrcRectConstraint) {
+                                     const Matrix& matrix, const ClipStack& clip,
+                                     const Brush& brush, SrcRectConstraint) {
   auto subsetImage = image->makeSubset(srcRect);
   if (subsetImage == nullptr) {
     return;
   }
-  onDrawImageRect(image, dstRect, sampling, state, brush);
+  onDrawImageRect(image, dstRect, sampling, matrix, clip, brush);
 }
 namespace {
 enum class BlendFastPath {
@@ -384,15 +394,17 @@ bool NeedsNewFont(PDFFont* font, GlyphID glyphID, AdvancedTypefaceInfo::FontType
 }
 }  // namespace
 
-void PDFExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
-                                    const Brush& brush, const Stroke* stroke) {
+void PDFExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
+                                    const ClipStack& clip, const Brush& brush,
+                                    const Stroke* stroke) {
   for (auto glyphRun : *textBlob) {
-    onDrawGlyphRun(glyphRun, state, brush, stroke);
+    onDrawGlyphRun(glyphRun, matrix, clip, brush, stroke);
   }
 }
 
-void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& state,
-                                      const Brush& brush, const Stroke* stroke) {
+void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const Matrix& matrix,
+                                      const ClipStack& clip, const Brush& brush,
+                                      const Stroke* stroke) {
 
   auto& font = glyphRun.font;
   auto typeface = font.getTypeface();
@@ -400,23 +412,23 @@ void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& s
   // per-glyph rotation/scale.
   if (!typeface->isCustom()) {
     if (font.hasColor()) {
-      exportGlyphRunAsImage(glyphRun, state, brush);
+      exportGlyphRunAsImage(glyphRun, matrix, clip, brush);
     } else if (HasComplexTransform(glyphRun) || brush.maskFilter || stroke) {
-      exportGlyphRunAsPath(glyphRun, state, brush, stroke);
+      exportGlyphRunAsPath(glyphRun, matrix, clip, brush, stroke);
     } else {
-      exportGlyphRunAsText(glyphRun, state, brush);
+      exportGlyphRunAsText(glyphRun, matrix, clip, brush);
     }
   } else {
     if (font.hasColor()) {
-      exportGlyphRunAsImage(glyphRun, state, brush);
+      exportGlyphRunAsImage(glyphRun, matrix, clip, brush);
     } else {
-      exportGlyphRunAsPath(glyphRun, state, brush, stroke);
+      exportGlyphRunAsPath(glyphRun, matrix, clip, brush, stroke);
     }
   }
 }
 
-void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCState& state,
-                                            const Brush& brush) {
+void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matrix& matrix,
+                                            const ClipStack& clip, const Brush& brush) {
   DEBUG_ASSERT(!HasComplexTransform(glyphRun));
   if (glyphRun.glyphCount == 0) {
     return;
@@ -437,6 +449,9 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
   }
 
   const auto& glyphToUnicode = PDFFont::GetUnicodeMap(*typeface, document);
+  if (glyphToUnicode.empty()) {
+    return;
+  }
 
   AdvancedTypefaceInfo::FontType initialFontType = PDFFont::FontType(*pdfStrike, *advancedInfo);
 
@@ -448,13 +463,13 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
   float textScaleX = advanceScale;
 
   const auto clipStackBounds =
-      state.clip.isEmpty() ? Rect::MakeSize(_pageSize) : state.clip.getBounds();
+      clip.state() == ClipState::WideOpen ? Rect::MakeSize(_pageSize) : clip.bounds();
 
   // Clear everything from the runPaint that will be applied by the strike.
   Brush brushPaint(brush);
   brushPaint.maskFilter = nullptr;
   auto paint = clean_paint(brushPaint);
-  ScopedContentEntry content(this, state, Matrix::I(), paint);
+  ScopedContentEntry content(this, matrix, clip, Matrix::I(), paint);
   if (!content) {
     return;
   }
@@ -464,7 +479,7 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
   {
     // Destinations are in absolute coordinates.
     // The glyphs bounds go through the localToDevice separately for clipping.
-    Matrix pageXform = state.matrix;
+    Matrix pageXform = matrix;
     pageXform.postConcat(document->currentPageTransform());
 
     const auto numGlyphs = typeface->glyphsCount();
@@ -490,7 +505,7 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
       auto glyphBounds = glyphRunFont.getBounds(glyphID);
       glyphBounds = Matrix::MakeScale(textScaleX, textScaleY).mapRect(glyphBounds);
       glyphBounds.offset(xy + offset);
-      state.matrix.mapRect(&glyphBounds);
+      matrix.mapRect(&glyphBounds);
 
       if (glyphBounds.isEmpty()) {
         if (!clipStackBounds.contains(glyphBounds.x(), glyphBounds.y())) {
@@ -526,8 +541,9 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
   out->writeText("ET\n");
 }
 
-void PDFExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCState& state,
-                                            const Brush& brush, const Stroke* stroke) {
+void PDFExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matrix& matrix,
+                                            const ClipStack& clip, const Brush& brush,
+                                            const Stroke* stroke) {
   const auto& glyphFont = glyphRun.font;
   Path path;
 
@@ -546,47 +562,50 @@ void PDFExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCSt
     return;
   }
   auto shape = Shape::MakeFrom(path);
-  drawShape(shape, state, brush, stroke);
+  drawShape(shape, matrix, clip, brush, stroke);
 
   //TODO (YGaurora): maybe hasPerspective()
   Brush transparentBrush = brush;
   transparentBrush.color = Color::Transparent();
-  exportGlyphRunAsText(glyphRun, state, transparentBrush);
+  exportGlyphRunAsText(glyphRun, matrix, clip, transparentBrush);
 }
 
-void PDFExportContext::exportGlyphRunAsImage(const GlyphRun& glyphRun, const MCState& state,
-                                             const Brush& brush) {
+void PDFExportContext::exportGlyphRunAsImage(const GlyphRun& glyphRun, const Matrix& matrix,
+                                             const ClipStack& clip, const Brush& brush) {
   const auto& glyphFont = glyphRun.font;
   for (size_t i = 0; i < glyphRun.glyphCount; ++i) {
     auto glyphID = glyphRun.glyphs[i];
     auto glyphMatrix = GetGlyphMatrix(glyphRun, i);
-    auto tempState = state;
-    Matrix matrix;
-    auto glyphImageCodec = glyphFont.getImage(glyphID, nullptr, &matrix);
+    auto tempMatrix = matrix;
+    Matrix imageMatrix;
+    auto glyphImageCodec = glyphFont.getImage(glyphID, nullptr, &imageMatrix);
     if (glyphImageCodec == nullptr) {
       continue;
     }
-    tempState.matrix.preConcat(matrix);
-    tempState.matrix.postConcat(glyphMatrix);
+    tempMatrix.preConcat(imageMatrix);
+    tempMatrix.postConcat(glyphMatrix);
 
     auto glyphImage = Image::MakeFrom(glyphImageCodec);
     auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-    drawImageRect(std::move(glyphImage), rect, rect, {}, tempState, brush, SrcRectConstraint::Fast);
+    drawImageRect(std::move(glyphImage), rect, rect, {}, tempMatrix, clip, brush,
+                  SrcRectConstraint::Fast);
   }
 
   //TODO (YGaurora): maybe hasPerspective()
   Brush transparentBrush = brush;
   transparentBrush.color = Color::Transparent();
-  exportGlyphRunAsText(glyphRun, state, transparentBrush);
+  exportGlyphRunAsText(glyphRun, matrix, clip, transparentBrush);
 }
 
-void PDFExportContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
-  picture->playback(this, state);
+void PDFExportContext::drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,
+                                   const ClipStack& clip) {
+  picture->playback(this, matrix, clip);
 }
 
 void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>& picture,
                                                  const DropShadowImageFilter* dropShadowFilter,
-                                                 const MCState& state, const Brush& brush) {
+                                                 const Matrix& matrix, const ClipStack& clip,
+                                                 const Brush& brush) {
   DEBUG_ASSERT(Types::Get(dropShadowFilter->blurFilter.get()) == Types::ImageFilterType::Blur);
   const auto blurFilter =
       static_cast<const GaussianBlurImageFilter*>(dropShadowFilter->blurFilter.get());
@@ -606,22 +625,24 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
   Paint picturePaint = {};
   picturePaint.setImageFilter(copyFilter);
 
-  auto matrix = Matrix::MakeTrans(-pictureBounds.x() + offset.x, -pictureBounds.y() + offset.y);
-  canvas->drawPicture(picture, &matrix, &picturePaint);
+  auto offsetMatrix =
+      Matrix::MakeTrans(-pictureBounds.x() + offset.x, -pictureBounds.y() + offset.y);
+  canvas->drawPicture(picture, &offsetMatrix, &picturePaint);
 
   auto image = surface->makeImageSnapshot();
   if (image) {
     image = image->makeTextureImage(document->context());
-    auto imageState = state;
-    imageState.matrix.postTranslate(pictureBounds.x() - offset.x + dropShadowFilter->dx,
-                                    pictureBounds.y() - offset.y + dropShadowFilter->dy);
-    drawImage(std::move(image), SamplingOptions(), imageState, brush);
+    auto imageMatrix = matrix;
+    imageMatrix.postTranslate(pictureBounds.x() - offset.x + dropShadowFilter->dx,
+                              pictureBounds.y() - offset.y + dropShadowFilter->dy);
+    drawImage(std::move(image), SamplingOptions(), imageMatrix, clip, brush);
   }
 }
 
 void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
                                                  const InnerShadowImageFilter* innerShadowFilter,
-                                                 const MCState& state) {
+                                                 const Matrix& matrix, const ClipStack& clip,
+                                                 const Matrix& currentMatrix) {
   MeasureContext measureContext;
   PlaybackContext playbackContext = {};
   record->playback(&measureContext, &playbackContext);
@@ -640,9 +661,22 @@ void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
   DEBUG_ASSERT(Types::Get(innerShadowFilter->blurFilter.get()) == Types::ImageFilterType::Blur);
   const auto blurFilter =
       static_cast<const GaussianBlurImageFilter*>(innerShadowFilter->blurFilter.get());
-  auto copyFilter = ImageFilter::InnerShadowOnly(innerShadowFilter->dx, innerShadowFilter->dy,
-                                                 blurFilter->blurrinessX, blurFilter->blurrinessY,
-                                                 innerShadowFilter->color);
+  // Transform (dx, dy) as a vector through the inverse matrix (ignoring translation)
+  Matrix invertedMatrix = Matrix::I();
+  currentMatrix.invert(&invertedMatrix);
+  auto correctedDx = (innerShadowFilter->dx * invertedMatrix.getScaleX()) +
+                     (innerShadowFilter->dy * invertedMatrix.getSkewX());
+  auto correctedDy = (innerShadowFilter->dx * invertedMatrix.getSkewY()) +
+                     (innerShadowFilter->dy * invertedMatrix.getScaleY());
+  // Scale blur values by inverse scale. Use getAxisScales() to correctly decompose the scale
+  // factors from a matrix that may contain rotation. getScaleX/Y would give wrong values for
+  // rotated matrices (e.g., cos(45°) instead of 1.0 for pure rotation).
+  auto scales = currentMatrix.getAxisScales();
+  auto invScaleX = scales.x != 0.0f ? 1.0f / scales.x : 1.0f;
+  auto invScaleY = scales.y != 0.0f ? 1.0f / scales.y : 1.0f;
+  auto copyFilter =
+      ImageFilter::InnerShadowOnly(correctedDx, correctedDy, blurFilter->blurrinessX * invScaleX,
+                                   blurFilter->blurrinessY * invScaleY, innerShadowFilter->color);
 
   Paint picturePaint = {};
   picturePaint.setImageFilter(copyFilter);
@@ -650,11 +684,9 @@ void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
   canvas->saveLayer(&picturePaint);
   {
     auto surfaceContext = canvas->drawContext;
-    auto matrix = Matrix::MakeTrans(-pictureBounds.x(), -pictureBounds.y());
-    PlaybackContext tempPlaybackContext = {};
-    tempPlaybackContext.setMatrix(matrix);
-    tempPlaybackContext.setClip(state.clip);
-    record->playback(surfaceContext, &playbackContext);
+    auto offsetMatrix = Matrix::MakeTrans(-pictureBounds.x(), -pictureBounds.y());
+    PlaybackContext tempPlaybackContext(offsetMatrix, clip);
+    record->playback(surfaceContext, &tempPlaybackContext);
   }
   canvas->restore();
 
@@ -663,7 +695,9 @@ void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
     auto imageShader = Shader::MakeImageShader(image);
     imageShader =
         imageShader->makeWithMatrix(Matrix::MakeTrans(pictureBounds.x(), pictureBounds.y()));
-    PlaybackContext tempPlaybackContext(state);
+    Matrix tempMatrix = matrix;
+    tempMatrix.preConcat(currentMatrix);
+    PlaybackContext tempPlaybackContext(tempMatrix, clip);
     Brush tempBrush;
     tempBrush.shader = imageShader;
     tempPlaybackContext.setBrush(tempBrush);
@@ -673,7 +707,8 @@ void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
 
 void PDFExportContext::drawBlurLayer(const std::shared_ptr<Picture>& picture,
                                      const std::shared_ptr<ImageFilter>& imageFilter,
-                                     const MCState& state, const Brush& brush) {
+                                     const Matrix& matrix, const ClipStack& clip,
+                                     const Brush& brush) {
   auto pictureBounds = picture->getBounds();
   auto blurBounds = imageFilter->filterBounds(pictureBounds);
   blurBounds = blurBounds.makeOutset(100, 100);
@@ -690,47 +725,54 @@ void PDFExportContext::drawBlurLayer(const std::shared_ptr<Picture>& picture,
   Paint picturePaint = {};
   picturePaint.setImageFilter(imageFilter);
 
-  auto matrix = state.matrix;
-  matrix.postTranslate(-pictureBounds.x() + offset.x, -pictureBounds.y() + offset.y);
-  canvas->drawPicture(picture, &matrix, &picturePaint);
+  auto pictureMatrix = matrix;
+  pictureMatrix.postTranslate(-pictureBounds.x() + offset.x, -pictureBounds.y() + offset.y);
+  canvas->drawPicture(picture, &pictureMatrix, &picturePaint);
 
   auto image = surface->makeImageSnapshot();
   if (image) {
     image = image->makeTextureImage(document->context());
-    auto imageState = state;
-    imageState.matrix.postTranslate(pictureBounds.x() - offset.x, pictureBounds.y() - offset.y);
-    drawImage(std::move(image), SamplingOptions(), imageState, brush);
+    auto imageMatrix = matrix;
+    imageMatrix.postTranslate(pictureBounds.x() - offset.x, pictureBounds.y() - offset.y);
+    drawImage(std::move(image), SamplingOptions(), imageMatrix, clip, brush);
   }
 }
 
 void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
-                                 std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
-                                 const Brush& brush) {
+                                 std::shared_ptr<ImageFilter> imageFilter, const Matrix& matrix,
+                                 const ClipStack& clip, const Brush& brush) {
 
   if (imageFilter) {
     if (Types::Get(imageFilter.get()) == Types::ImageFilterType::DropShadow) {
       const auto dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
-      drawDropShadowBeforeLayer(picture, dropShadowFilter, state, brush);
+      drawDropShadowBeforeLayer(picture, dropShadowFilter, matrix, clip, brush);
       if (!dropShadowFilter->shadowOnly) {
-        picture->playback(this, state);
+        picture->playback(this, matrix, clip);
       }
       return;
     }
     if (Types::Get(imageFilter.get()) == Types::ImageFilterType::InnerShadow) {
       const auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
       PlaybackContext playbackContext = {};
+      Matrix currentMatrix = Matrix::I();
       for (const auto& record : picture->records) {
-        record->playback(this, &playbackContext);
-        drawInnerShadowAfterLayer(record.get(), innerShadowFilter, state);
+        if (!innerShadowFilter->shadowOnly) {
+          record->playback(this, &playbackContext);
+        }
+        if (record->type() == PictureRecordType::SetMatrix) {
+          const auto setMatrix = static_cast<const SetMatrix*>(record.get());
+          currentMatrix = setMatrix->matrix;
+        }
+        drawInnerShadowAfterLayer(record.get(), innerShadowFilter, matrix, clip, currentMatrix);
       }
       return;
     }
     if (Types::Get(imageFilter.get()) == Types::ImageFilterType::Blur) {
-      drawBlurLayer(picture, imageFilter, state, brush);
+      drawBlurLayer(picture, imageFilter, matrix, clip, brush);
       return;
     }
   }
-  picture->playback(this, state);
+  picture->playback(this, matrix, clip);
 }
 
 std::shared_ptr<Data> PDFExportContext::getContent() {
@@ -752,14 +794,49 @@ std::shared_ptr<Data> PDFExportContext::getContent() {
   return buffer->readData();
 }
 
-void PDFExportContext::onDrawPath(const MCState& state, const Path& path, const Brush& brush) {
+void PDFExportContext::onDrawPath(const Matrix& matrix, const ClipStack& clip, const Path& path,
+                                  const Brush& brush) {
   if (brush.maskFilter) {
-    this->drawPathWithFilter(state, path, Matrix::I(), brush);
+    this->drawPathWithFilter(matrix, clip, path, Matrix::I(), brush);
     return;
   }
 
-  Matrix matrix = Matrix::I();
-  ScopedContentEntry scopedContent(this, state, matrix, brush);
+  // Fast path for simple ImageShader rectangle fills.
+  // Keep strict constraints to avoid changing non-rectangular/path-based shader behavior.
+  Rect pathRect;
+  if (!path.isInverseFillType() && path.isRect(&pathRect) && brush.shader) {
+    auto shader = brush.shader;
+    Matrix shaderMatrix = Matrix::I();
+    bool isSimpleImageShader = true;
+    while (Types::Get(shader.get()) == Types::ShaderType::Matrix) {
+      const auto matrixShader = static_cast<const MatrixShader*>(shader.get());
+      shaderMatrix.preConcat(matrixShader->matrix);
+      shader = matrixShader->source;
+    }
+    if (Types::Get(shader.get()) != Types::ShaderType::Image) {
+      isSimpleImageShader = false;
+    }
+    if (isSimpleImageShader) {
+      const auto imageShader = static_cast<const ImageShader*>(shader.get());
+      auto image = imageShader->image;
+      if (image && imageShader->tileModeX == TileMode::Clamp &&
+          imageShader->tileModeY == TileMode::Clamp) {
+        auto mappedImageRect = Rect::MakeWH(image->width(), image->height());
+        shaderMatrix.mapRect(&mappedImageRect);
+        auto sortedPathRect = pathRect.makeSorted();
+        auto sortedMappedImageRect = mappedImageRect.makeSorted();
+        if (sortedMappedImageRect == sortedPathRect) {
+          Brush imageBrush = brush;
+          imageBrush.shader = nullptr;
+          onDrawImageRect(image, sortedMappedImageRect, imageShader->sampling, matrix, clip,
+                          imageBrush);
+          return;
+        }
+      }
+    }
+  }
+
+  ScopedContentEntry scopedContent(this, matrix, clip, Matrix::I(), brush);
   if (!scopedContent) {
     return;
   }
@@ -769,8 +846,8 @@ void PDFExportContext::onDrawPath(const MCState& state, const Path& path, const 
 }
 
 void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                                       const SamplingOptions& sampling, const MCState& state,
-                                       const Brush& brush) {
+                                       const SamplingOptions& sampling, const Matrix& matrix,
+                                       const ClipStack& clip, const Brush& brush) {
   if (!image) {
     return;
   }
@@ -816,7 +893,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     {
       auto canvas = PDFDocumentImpl::MakeCanvas(&maskContext);
       // This clip prevents the mask image shader from covering entire device if unnecessary.
-      canvas->clipRect(state.clip.getBounds());
+      canvas->clipRect(clip.bounds());
       if (modifiedBrush.maskFilter) {
         Paint tmpPaint;
         auto imageShader =
@@ -832,7 +909,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     }
     // SkIRect maskDeviceBounds = maskDevice->cs().bounds(maskDevice->bounds()).roundOut();
     auto maskDeviceBounds = Rect::MakeSize(maskContext.pageSize());
-    ScopedContentEntry content(this, state, Matrix::I(), modifiedBrush);
+    ScopedContentEntry content(this, matrix, clip, Matrix::I(), modifiedBrush);
     if (!content) {
       return;
     }
@@ -853,11 +930,11 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
 
     Path path;
     path.addRect(rect);
-    this->onDrawPath(state, path, modifiedBrush);
+    this->onDrawPath(matrix, clip, path, modifiedBrush);
     return;
   }
 
-  auto matrix = transform;
+  const auto& mapMatrix = transform;
   Matrix scaled;
   // Adjust for origin flip.
   scaled.setScale(1.f, -1.f);
@@ -865,14 +942,14 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
   // Scale the image up from 1x1 to WxH.
   auto subset = Rect::MakeWH(image->width(), image->height());
   scaled.postScale(subset.width(), subset.height());
-  scaled.postConcat(matrix);
-  ScopedContentEntry content(this, state, scaled, modifiedBrush);
+  scaled.postConcat(mapMatrix);
+  ScopedContentEntry content(this, matrix, clip, scaled, modifiedBrush);
   if (!content) {
     return;
   }
   Path shape;
   shape.addRect(subset);
-  shape.transform(matrix);
+  shape.transform(mapMatrix);
   if (content.needShape()) {
     content.setShape(shape);
   }
@@ -953,13 +1030,12 @@ bool TreatAsRegularPDFBlendMode(BlendMode blendMode) {
 }
 
 void PopulateGraphicStateEntryFromPaint(
-    PDFDocumentImpl* document, const Matrix& matrix, const MCState& state, Rect deviceBounds,
-    const Brush& brush, const Matrix& initialTransform, float textScale,
-    const std::shared_ptr<ColorSpace>& colorSpace, PDFGraphicStackState::Entry* entry,
-    std::unordered_set<PDFIndirectReference>* shaderResources,
+    PDFDocumentImpl* document, const Matrix& matrix, Rect deviceBounds, const Brush& brush,
+    const Matrix& initialTransform, float textScale, const std::shared_ptr<ColorSpace>& colorSpace,
+    PDFGraphicStackState::Entry* entry, std::unordered_set<PDFIndirectReference>* shaderResources,
     std::unordered_set<PDFIndirectReference>* graphicStateResources) {
 
-  entry->matrix = state.matrix * matrix;
+  entry->matrix = matrix;
   auto color = brush.color;
   color.alpha = 1;
   entry->color = color;
@@ -1008,8 +1084,8 @@ void PopulateGraphicStateEntryFromPaint(
 }  // namespace
 
 std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
-    const MCState& state, const Matrix& matrix, const Brush& brush, float scale,
-    PDFIndirectReference* destination) {
+    const Matrix& matrix, const ClipStack& clip, const Matrix& contentExtraMatrix,
+    const Brush& brush, float scale, PDFIndirectReference* destination) {
   DEBUG_ASSERT(!*destination);
   BlendMode blendMode = brush.blendMode;
 
@@ -1027,44 +1103,46 @@ std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
   }
 
   if (TreatAsRegularPDFBlendMode(blendMode)) {
-    if (!fActiveStackState.contentStream) {
+    if (!activeStackState.contentStream) {
       if (content->bytesWritten() != 0) {
         content->writeText("Q\nq\n");
         needsExtraSave = true;
       }
-      fActiveStackState = PDFGraphicStackState(content);
+      activeStackState = PDFGraphicStackState(content);
     } else {
-      DEBUG_ASSERT(fActiveStackState.contentStream == content);
+      DEBUG_ASSERT(activeStackState.contentStream == content);
     }
   } else {
-    fActiveStackState.drainStack();
-    fActiveStackState = PDFGraphicStackState(contentBuffer);
+    activeStackState.drainStack();
+    activeStackState = PDFGraphicStackState(contentBuffer);
   }
 
-  DEBUG_ASSERT(fActiveStackState.contentStream);
+  DEBUG_ASSERT(activeStackState.contentStream);
+  auto contentMatrix = matrix * contentExtraMatrix;
   PDFGraphicStackState::Entry entry;
-  PopulateGraphicStateEntryFromPaint(document, matrix, state, Rect::MakeSize(_pageSize), brush,
+  PopulateGraphicStateEntryFromPaint(document, contentMatrix, Rect::MakeSize(_pageSize), brush,
                                      _initialTransform, scale, document->dstColorSpace(), &entry,
                                      &shaderResources, &graphicStateResources);
-  fActiveStackState.updateClip(state);
-  fActiveStackState.updateMatrix(entry.matrix);
-  fActiveStackState.updateDrawingState(entry, document->colorSpaceRef());
+  activeStackState.updateMatrixClip(matrix, clip);
+  activeStackState.updateEntryMatrix(entry.matrix);
+  activeStackState.updateDrawingState(entry, document->colorSpaceRef());
 
-  return fActiveStackState.contentStream;
+  return activeStackState.contentStream;
 }
 
-void PDFExportContext::finishContentEntry(const MCState& state, BlendMode blendMode,
-                                          PDFIndirectReference destination, Path* path) {
+void PDFExportContext::finishContentEntry(const Matrix& matrix, const ClipStack& clip,
+                                          BlendMode blendMode, PDFIndirectReference destination,
+                                          Path* path) {
   DEBUG_ASSERT(blendMode != BlendMode::Dst);
   if (TreatAsRegularPDFBlendMode(blendMode)) {
     DEBUG_ASSERT(!destination);
     return;
   }
 
-  DEBUG_ASSERT(fActiveStackState.contentStream);
+  DEBUG_ASSERT(activeStackState.contentStream);
 
-  fActiveStackState.drainStack();
-  fActiveStackState = PDFGraphicStackState();
+  activeStackState.drainStack();
+  activeStackState = PDFGraphicStackState();
 
   if (blendMode == BlendMode::DstOver) {
     DEBUG_ASSERT(!destination);
@@ -1104,7 +1182,7 @@ void PDFExportContext::finishContentEntry(const MCState& state, BlendMode blendM
     // restored for that to be true. If there is shape, then an empty source with Src, SrcIn,
     // SrcOut, DstIn, DstAtop or Modulate reduces to Clear and DstOut or SrcAtop reduces to Dst.
     if (path == nullptr || blendMode == BlendMode::DstOut || blendMode == BlendMode::SrcATop) {
-      ScopedContentEntry contentEntry(this, MCState(), Matrix::I(), stockBrush);
+      ScopedContentEntry contentEntry(this, Matrix::I(), ClipStack(), Matrix::I(), stockBrush);
       this->drawFormXObject(destination, contentEntry.stream(), nullptr);
       return;
     } else {
@@ -1124,9 +1202,8 @@ void PDFExportContext::finishContentEntry(const MCState& state, BlendMode blendM
       // Draw shape into a form-xobject.
       Brush filledBrush;
       filledBrush.color = Color::Black();
-      MCState empty;
       PDFExportContext shapeContext(_pageSize, document, _initialTransform);
-      shapeContext.onDrawPath(state, *path, filledBrush);
+      shapeContext.onDrawPath(matrix, clip, *path, filledBrush);
       xObject = destination;
       sMask = shapeContext.makeFormXObjectFromDevice();
     } else {
@@ -1139,7 +1216,7 @@ void PDFExportContext::finishContentEntry(const MCState& state, BlendMode blendM
   if (blendMode == BlendMode::Clear) {
     return;
   } else if (blendMode == BlendMode::Src || blendMode == BlendMode::DstATop) {
-    ScopedContentEntry content(this, MCState(), Matrix::I(), stockBrush);
+    ScopedContentEntry content(this, Matrix::I(), ClipStack(), Matrix::I(), stockBrush);
     if (content) {
       this->drawFormXObject(srcFormXObject, content.stream(), nullptr);
     }
@@ -1147,7 +1224,7 @@ void PDFExportContext::finishContentEntry(const MCState& state, BlendMode blendM
       return;
     }
   } else if (blendMode == BlendMode::SrcATop) {
-    ScopedContentEntry content(this, MCState(), Matrix::I(), stockBrush);
+    ScopedContentEntry content(this, Matrix::I(), ClipStack(), Matrix::I(), stockBrush);
     if (content) {
       this->drawFormXObject(destination, content.stream(), nullptr);
     }
@@ -1214,7 +1291,7 @@ void PDFExportContext::drawFormXObjectWithMask(PDFIndirectReference xObject,
   DEBUG_ASSERT(sMask);
   Brush brush;
   brush.blendMode = mode;
-  ScopedContentEntry content(this, MCState(), Matrix::I(), brush);
+  ScopedContentEntry content(this, Matrix::I(), ClipStack(), Matrix::I(), brush);
   if (!content) {
     return;
   }
@@ -1253,12 +1330,13 @@ std::tuple<std::shared_ptr<Picture>, Matrix> MaskFilterToPicture(
 
 }  // namespace
 
-void PDFExportContext::drawPathWithFilter(const MCState& state, const Path& originPath,
-                                          const Matrix& matrix, const Brush& originPaint) {
+void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack& clip,
+                                          const Path& originPath, const Matrix& pathExtraMatrix,
+                                          const Brush& originPaint) {
   DEBUG_ASSERT(originPaint.maskFilter);
 
   Path path(originPath);
-  path.transform(matrix);
+  path.transform(pathExtraMatrix);
   auto maskBound = path.getBounds();
 
   Brush paint(originPaint);
@@ -1268,15 +1346,24 @@ void PDFExportContext::drawPathWithFilter(const MCState& state, const Path& orig
   }
   const auto shaderMaskFilter = static_cast<const ShaderMaskFilter*>(originPaint.maskFilter.get());
   auto [picture, pictureMatrix] = MaskFilterToPicture(shaderMaskFilter);
+  // Inverted masks have no vector Picture representation — always rasterize as bitmap.
+  bool useBitmapMask = !picture || shaderMaskFilter->isInverted();
 
   auto maskContext = makeCongruentDevice();
-  if (!picture) {  //mask as image
+  if (useBitmapMask) {
     auto surface = Surface::Make(document->context(), static_cast<int>(maskBound.width()),
                                  static_cast<int>(maskBound.height()), false, 1, false, 0,
                                  document->dstColorSpace());
     Canvas* maskCanvas = surface->getCanvas();
     Paint maskPaint;
-    maskPaint.setShader(shaderMaskFilter->getShader());
+    // Compensate for maskBound offset: the mask shader's coordinates are in the path's
+    // coordinate space (which starts at maskBound.x/y), but the surface starts at (0,0).
+    // Apply an inverse translation to the shader so it samples from the correct region.
+    auto shader = shaderMaskFilter->getShader();
+    if (maskBound.x() != 0 || maskBound.y() != 0) {
+      shader = shader->makeWithMatrix(Matrix::MakeTrans(-maskBound.x(), -maskBound.y()));
+    }
+    maskPaint.setShader(shader);
     maskCanvas->drawPaint(maskPaint);
 
     auto grayscaleInfo = ImageInfo::Make(surface->width(), surface->height(), ColorType::ALPHA_8);
@@ -1286,11 +1373,29 @@ void PDFExportContext::drawPathWithFilter(const MCState& state, const Path& orig
       free(pixels);
       return;
     }
-    auto pixelData = Data::MakeAdopted(pixels, byteSize, Data::FreeProc);
-    // Convert alpha-8 to a grayscale image
-    grayscaleInfo = ImageInfo::Make(surface->width(), surface->height(), ColorType::Gray_8,
-                                    AlphaType::Premultiplied, 0, document->dstColorSpace());
-    auto maskImage = Image::MakeFrom(grayscaleInfo, pixelData);
+    // Convert ALPHA_8 pixels to RGBA to avoid GPU texture upload issues.
+    // Gray_8 and ALPHA_8 formats both trigger texture upload attempts, which fail for CPU-only data.
+    // Instead, convert to RGBA_8888 so PDF serialization can handle it without GPU.
+    int w = static_cast<int>(maskBound.width());
+    int h = static_cast<int>(maskBound.height());
+    auto rgbaInfo = ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Unpremultiplied);
+    auto rgbaSize = rgbaInfo.byteSize();
+    auto* rgbaPixels = static_cast<uint8_t*>(malloc(rgbaSize));
+    auto* alphaPixels = static_cast<const uint8_t*>(pixels);
+    for (int i = 0; i < w * h; ++i) {
+      // PDF SMask has no native inversion support, so we invert the pixel values directly.
+      uint8_t a = shaderMaskFilter->isInverted() ? static_cast<uint8_t>(255 - alphaPixels[i])
+                                                 : alphaPixels[i];
+      // Replicate alpha to RGB channels for luminosity blending in PDF
+      rgbaPixels[i * 4 + 0] = a;
+      rgbaPixels[i * 4 + 1] = a;
+      rgbaPixels[i * 4 + 2] = a;
+      rgbaPixels[i * 4 + 3] = 255;  // Full opacity
+    }
+    free(pixels);  // Release ALPHA_8 data
+
+    auto rgbaData = Data::MakeAdopted(rgbaPixels, rgbaSize, Data::FreeProc);
+    auto maskImage = Image::MakeFrom(rgbaInfo, rgbaData);
 
     // PDF doesn't seem to allow masking vector graphics with an Image XObject.
     // Must mask with a Form XObject.
@@ -1304,20 +1409,20 @@ void PDFExportContext::drawPathWithFilter(const MCState& state, const Path& orig
     canvas.drawPicture(picture);
   }
 
-  if (!state.matrix.isIdentity() && paint.shader) {
-    paint.shader = paint.shader->makeWithMatrix(matrix);
+  if (!matrix.isIdentity() && paint.shader) {
+    paint.shader = paint.shader->makeWithMatrix(pathExtraMatrix);
   }
-  ScopedContentEntry contentEntry(this, state, Matrix::I(), paint);
+  ScopedContentEntry contentEntry(this, matrix, clip, Matrix::I(), paint);
   if (!contentEntry) {
     return;
   }
 
-  setGraphicState(
-      PDFGraphicState::GetSMaskGraphicState(
-          maskContext->makeFormXObjectFromDevice(maskBound, true), false,
-          picture ? PDFGraphicState::SMaskMode::Alpha : PDFGraphicState::SMaskMode::Luminosity,
-          document),
-      contentEntry.stream());
+  setGraphicState(PDFGraphicState::GetSMaskGraphicState(
+                      maskContext->makeFormXObjectFromDevice(maskBound, true), false,
+                      useBitmapMask ? PDFGraphicState::SMaskMode::Luminosity
+                                    : PDFGraphicState::SMaskMode::Alpha,
+                      document),
+                  contentEntry.stream());
 
   PDFUtils::EmitPath(path, false, contentEntry.stream());
 

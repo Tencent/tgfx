@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include "tgfx/core/Rect.h"
 #include "tgfx/gpu/CommandBuffer.h"
@@ -78,5 +79,26 @@ class CommandQueue {
    * execution on the GPU.
    */
   virtual void waitUntilCompleted() = 0;
+
+ protected:
+  std::chrono::steady_clock::time_point frameTime() const {
+    return _frameTime;
+  }
+
+  virtual std::chrono::steady_clock::time_point completedFrameTime() const {
+    return _frameTime;
+  }
+
+  void advanceFrameTime() {
+    _frameTime = std::chrono::steady_clock::now();
+  }
+
+  std::chrono::steady_clock::time_point _frameTime = {};
+
+ private:
+  friend class Context;
+  friend class GlobalCache;
+  friend class GPU;
+  friend class ResourceCache;
 };
 }  // namespace tgfx

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
-#include "core/MCState.h"
+#include "core/ClipStack.h"
 #include "core/Matrix3DUtils.h"
 #include "core/PictureRecords.h"
 #include "core/images/SubsetImage.h"
@@ -52,12 +52,28 @@
 
 namespace tgfx {
 
+static Path MakePath(std::initializer_list<Point> points, bool close = true) {
+  Path path;
+  auto it = points.begin();
+  if (it != points.end()) {
+    path.moveTo(*it++);
+    while (it != points.end()) {
+      path.lineTo(*it++);
+    }
+    if (close) {
+      path.close();
+    }
+  }
+  return path;
+}
+
 // Creates a regular pentagon path centered at the origin with the given circumradius.
 static Path MakePentagonPath(float radius) {
   Path path = {};
   constexpr int sides = 5;
   for (int i = 0; i < sides; i++) {
-    float angle = -M_PI_F / 2.0f + i * 2.0f * M_PI_F / sides;
+    float angle =
+        -M_PI_F / 2.0f + static_cast<float>(i) * 2.0f * M_PI_F / static_cast<float>(sides);
     float x = radius * std::cos(angle);
     float y = radius * std::sin(angle);
     if (i == 0) {
@@ -70,32 +86,195 @@ static Path MakePentagonPath(float radius) {
   return path;
 }
 
-TGFX_TEST(CanvasTest, clip) {
+TGFX_TEST(CanvasTest, Clip) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto width = 1080;
-  auto height = 1776;
-  auto texture = context->gpu()->createTexture({width, height, PixelFormat::RGBA_8888});
-  ASSERT_TRUE(texture != nullptr);
-  auto surface = Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
+  auto surface = Surface::Make(context, 100, 100);
   auto canvas = surface->getCanvas();
-  canvas->clear();
-  canvas->setMatrix(Matrix::MakeScale(3));
-  auto clipPath = Path();
-  clipPath.addRect(Rect::MakeLTRB(0, 0, 200, 300));
-  auto paint = Paint();
-  paint.setColor(Color::FromRGBA(0, 0, 0));
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setStroke(Stroke(1));
-  canvas->drawPath(clipPath, paint);
-  canvas->clipPath(clipPath);
-  auto drawPath = Path();
-  drawPath.addRect(Rect::MakeLTRB(50, 295, 150, 590));
-  paint.setColor(Color::FromRGBA(255, 0, 0));
-  paint.setStyle(PaintStyle::Fill);
-  canvas->drawPath(drawPath, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Clip"));
+
+  // ========== 1. Initial state ==========
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::WideOpen);
+  EXPECT_TRUE(canvas->clipStack->elements().empty());
+
+  // ========== 2. Single rect clip ==========
+  canvas->clipRect(Rect::MakeXYWH(10, 20, 100, 80), true);
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
+  EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(10, 20, 100, 80));
+  EXPECT_TRUE(canvas->clipStack->elements()[0].isAntiAlias());
+
+  // ========== 3. Redundant clip elimination ==========
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 200, 200), true);
+  EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(10, 20, 100, 80));
+
+  // ========== 4. Merge: same AA, pixel-aligned ==========
+  auto elemCountBefore = canvas->clipStack->elements().size();
+  canvas->clipRect(Rect::MakeXYWH(50, 50, 100, 100), true);
+  EXPECT_EQ(canvas->clipStack->elements().size(), elemCountBefore);
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(50, 50, 60, 50));
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
+
+  // ========== 5. NoMerge: different AA, non-pixel-aligned ==========
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeXYWH(10.5f, 20.5f, 50.0f, 50.0f), true);
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
+  elemCountBefore = canvas->clipStack->elements().size();
+  canvas->clipRect(Rect::MakeXYWH(20.5f, 30.5f, 50.0f, 50.0f), false);
+  EXPECT_EQ(canvas->clipStack->elements().size(), elemCountBefore + 1);
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+
+  // ========== 6. Empty clip ==========
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 5, 5), true);
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Empty);
+  canvas->restore();
+
+  // ========== 7. Path clip -> Complex state ==========
+  canvas->save();
+  Path ovalPath;
+  ovalPath.addOval(Rect::MakeXYWH(20, 30, 60, 60));
+  canvas->clipPath(ovalPath, false);
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+  auto& lastElem = canvas->clipStack->elements().back();
+  EXPECT_FALSE(lastElem.isAntiAlias());
+  EXPECT_FALSE(lastElem.isRect());
+  canvas->restore();
+
+  // ========== 8. Deferred save ==========
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 100, 100), true);
+  auto uniqueIDBefore = canvas->clipStack->uniqueID();
+  EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
+  canvas->save();
+  canvas->save();
+  canvas->save();
+  EXPECT_EQ(canvas->clipStack->uniqueID(), uniqueIDBefore);
+  EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
+
+  // ========== 9. Materialize on modify ==========
+  canvas->clipRect(Rect::MakeXYWH(20, 20, 60, 60), true);
+  EXPECT_NE(canvas->clipStack->uniqueID(), uniqueIDBefore);
+  EXPECT_EQ(canvas->clipStack->_data->records.size(), 2u);
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(20, 20, 60, 60));
+
+  // ========== 10. Restore ==========
+  canvas->restore();
+  EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
+  canvas->restore();
+  canvas->restore();
+  EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
+  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(0, 0, 100, 100));
+
+  // ========== 11. getTotalClip and getTotalClipBounds ==========
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  auto totalClip1 = canvas->getTotalClip();
+  EXPECT_TRUE(totalClip1.isInverseFillType());
+  EXPECT_FALSE(canvas->getTotalClipBounds().has_value());
+  canvas->clipRect(Rect::MakeXYWH(10, 10, 80, 80), true);
+  auto totalClip2 = canvas->getTotalClip();
+  EXPECT_FALSE(totalClip2.isInverseFillType());
+  EXPECT_EQ(totalClip2.getBounds(), Rect::MakeXYWH(10, 10, 80, 80));
+  auto clipBound = canvas->getTotalClipBounds();
+  EXPECT_TRUE(clipBound.has_value());
+  EXPECT_EQ(clipBound.value(), Rect::MakeXYWH(10, 10, 80, 80));
+
+  // ========== 12. Transform ==========
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 100, 100), true);
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
+  canvas->clipStack->transform(Matrix::MakeRotate(45.0f));
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+
+  // ========== 13. Duplicate non-rect clipPath elimination ==========
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  Path rrectPath = {};
+  rrectPath.addRoundRect(Rect::MakeLTRB(10, 10, 90, 90), 10, 10);
+  canvas->clipPath(rrectPath);
+  EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+  canvas->clipPath(rrectPath);
+  EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
+  canvas->clipPath(rrectPath, false);
+  EXPECT_EQ(canvas->clipStack->elements().size(), 2u);
+
+  // ========== 14. Screenshot: AA vs non-AA ==========
+  // Note: When the path bounds are small, texture-based rasterization is used internally
+  // for performance reasons. In this case, setting antiAlias to false may not completely
+  // eliminate edge smoothing due to texture sampling characteristics.
+  surface = Surface::Make(context, 200, 200);
+  canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->scale(2.0f, 2.0f);
+  {
+    canvas->save();
+    auto path = MakePath({{50, 0}, {100, 0}, {75, 50}, {100, 100}, {50, 100}});
+    canvas->clipPath(path, true);
+    Paint paint;
+    paint.setColor(Color::Red());
+    canvas->drawRect(Rect::MakeWH(100, 100), paint);
+    canvas->restore();
+  }
+  {
+    canvas->save();
+    auto path = MakePath({{0, 0}, {50, 0}, {25, 50}, {50, 100}, {0, 100}});
+    canvas->clipPath(path, false);
+    Paint paint;
+    paint.setColor(Color::Blue());
+    canvas->drawRect(Rect::MakeWH(100, 100), paint);
+    canvas->restore();
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipAntiAlias"));
+
+  // ========== 15. Screenshot: duplicate non-rect clipPath rendering ==========
+  // Use two separately constructed paths with identical data to bypass isSame() elimination,
+  // ensuring the makeClipTexture inverse-fill + DstOut logic is exercised.
+  surface = Surface::Make(context, 200, 200);
+  canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  {
+    canvas->save();
+    Path rrPath1 = {};
+    rrPath1.addRoundRect(Rect::MakeLTRB(20, 20, 180, 180), 20, 20);
+    Path rrPath2 = {};
+    rrPath2.addRoundRect(Rect::MakeLTRB(20, 20, 180, 180), 20, 20);
+    canvas->clipPath(rrPath1);
+    canvas->clipPath(rrPath2);
+    Paint paint = {};
+    paint.setColor(Color::Blue());
+    canvas->drawRect(Rect::MakeWH(200, 200), paint);
+    canvas->restore();
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DuplicateClipPath"));
+
+  // Verify that ClipStack updates its uniqueID when transitioning to Empty state, preventing
+  // incorrect draw op batching due to stale uniqueID comparison.
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->clipRect(Rect::MakeWH(100, 100));
+  {
+    canvas->save();
+    Path nonIntersecting;
+    nonIntersecting.addRect(Rect::MakeXYWH(300, 300, 50, 50));
+    canvas->clipPath(nonIntersecting);
+    Paint paint;
+    paint.setColor(Color::Green());
+    canvas->drawRect(Rect::MakeXYWH(10, 10, 40, 40), paint);
+    canvas->restore();
+  }
+  {
+    Paint paint;
+    paint.setColor(Color::Green());
+    canvas->drawRect(Rect::MakeXYWH(25, 25, 50, 50), paint);
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/EmptyClipMerge"));
 }
 
 TGFX_TEST(CanvasTest, DiscardContent) {
@@ -653,7 +832,7 @@ TGFX_TEST(CanvasTest, BlendFormula) {
   texturePath.lineTo(100, 170);
   for (int i = 0; i < 100; ++i) {
     // make sure the path will be rasterized as coverage
-    texturePath.lineTo(90 + i, 50 + i);
+    texturePath.lineTo(90.0f + static_cast<float>(i), 50.0f + static_cast<float>(i));
   }
 
   Path trianglePath = {};
@@ -662,7 +841,7 @@ TGFX_TEST(CanvasTest, BlendFormula) {
 
   for (int i = 0; i < 100; ++i) {
     // make sure the path will be rasterized as coverage
-    texturePath.lineTo(90 + i, 50 + i);
+    texturePath.lineTo(90.0f + static_cast<float>(i), 50.0f + static_cast<float>(i));
   }
   Paint strokePaint = {};
   strokePaint.setColor(Color::FromRGBA(255, 0, 0, 128));
@@ -720,8 +899,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
   auto image = MakeImage("resources/assets/GenMesh.png");
   int meshNumH = 5;
   int meshNumV = 5;
-  float meshWidth = image->width() / meshNumH;
-  float meshHeight = image->height() / meshNumV;
+  auto meshWidth = static_cast<float>(image->width()) / static_cast<float>(meshNumH);
+  auto meshHeight = static_cast<float>(image->height()) / static_cast<float>(meshNumV);
   float scale = 0.9f;
   Paint paint;
   paint.setAntiAlias(false);
@@ -730,9 +909,11 @@ TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
   options.minFilterMode = FilterMode::Linear;
   for (int i = 0; i < meshNumH; i++) {
     for (int j = 0; j < meshNumV; j++) {
-      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
-      Rect dstRect = Rect::MakeXYWH(i * meshWidth * scale, j * meshHeight * scale,
-                                    meshWidth * scale, meshHeight * scale);
+      Rect srcRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth,
+                                    static_cast<float>(j) * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth * scale,
+                                    static_cast<float>(j) * meshHeight * scale, meshWidth * scale,
+                                    meshHeight * scale);
       canvas->drawImageRect(image, srcRect, dstRect, options, &paint, SrcRectConstraint::Fast);
     }
   }
@@ -786,8 +967,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
   paint.setAntiAlias(false);
   constexpr int meshNumH = 4;
   constexpr int meshNumV = 4;
-  float meshWidth = image->width() / meshNumH;
-  float meshHeight = image->height() / meshNumV;
+  auto meshWidth = static_cast<float>(image->width()) / static_cast<float>(meshNumH);
+  auto meshHeight = static_cast<float>(image->height()) / static_cast<float>(meshNumV);
   SamplingOptions options;
   options.magFilterMode = FilterMode::Linear;
   options.minFilterMode = FilterMode::Linear;
@@ -808,7 +989,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
        {meshWidth * 3, meshHeight * 3}}};
   for (int i = 0; i < meshNumH; i++)
     for (int j = 0; j < meshNumV; j++) {
-      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect srcRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth,
+                                    static_cast<float>(j) * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
                                     meshWidth * scale, meshHeight * scale);
       canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
@@ -819,7 +1001,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
   options.mipmapMode = MipmapMode::Linear;
   for (int i = 0; i < meshNumH; i++)
     for (int j = 0; j < meshNumV; j++) {
-      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect srcRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth,
+                                    static_cast<float>(j) * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
                                     meshWidth * scale, meshHeight * scale);
       canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
@@ -830,7 +1013,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
   options.mipmapMode = MipmapMode::Nearest;
   for (int i = 0; i < meshNumH; i++)
     for (int j = 0; j < meshNumV; j++) {
-      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect srcRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth,
+                                    static_cast<float>(j) * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
                                     meshWidth * scale, meshHeight * scale);
       canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
@@ -854,8 +1038,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   paint.setAntiAlias(false);
   constexpr int meshNumH = 4;
   constexpr int meshNumV = 4;
-  float meshWidth = image->width() / meshNumH;
-  float meshHeight = image->height() / meshNumV;
+  auto meshWidth = static_cast<float>(image->width()) / static_cast<float>(meshNumH);
+  auto meshHeight = static_cast<float>(image->height()) / static_cast<float>(meshNumV);
   SamplingOptions options;
   options.magFilterMode = FilterMode::Nearest;
   options.minFilterMode = FilterMode::Nearest;
@@ -876,7 +1060,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
        {meshWidth * 3, meshHeight * 3}}};
   for (int i = 0; i < meshNumH; i++)
     for (int j = 0; j < meshNumV; j++) {
-      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect srcRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth,
+                                    static_cast<float>(j) * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
       canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
                             SrcRectConstraint::Strict);
@@ -887,7 +1072,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   options.mipmapMode = MipmapMode::Linear;
   for (int i = 0; i < meshNumH; i++)
     for (int j = 0; j < meshNumV; j++) {
-      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect srcRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth,
+                                    static_cast<float>(j) * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
       canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
                             SrcRectConstraint::Strict);
@@ -898,7 +1084,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   options.mipmapMode = MipmapMode::Nearest;
   for (int i = 0; i < meshNumH; i++)
     for (int j = 0; j < meshNumV; j++) {
-      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect srcRect = Rect::MakeXYWH(static_cast<float>(i) * meshWidth,
+                                    static_cast<float>(j) * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
       canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
                             SrcRectConstraint::Strict);
@@ -2352,6 +2539,123 @@ TGFX_TEST(CanvasTest, DrawShapeAutoBatch_Stroke) {
   }
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_Stroke"));
+}
+
+/**
+ * Regression test for instanced batching bug in OpsCompositor::drawShape.
+ *
+ * When tryAddSimplifiedMatrixShape decomposes MatrixShape into base PathShape + MatrixContent,
+ * position differences are encoded in shape bounds rather than canvas matrix. The old batching
+ * code only computed offset from matrix translation difference, missing the bounds component.
+ *
+ * This test covers:
+ * 1. Same base shape with different translations via Shape::ApplyMatrix (bounds-only offset)
+ * 2. Stroke outlines at different positions (real-world multi-selection scenario)
+ * 3. Different scales + different positions (matrix + bounds offset)
+ * 4. Different rotations + different positions (matrix + bounds offset with skew)
+ * 5. Different skews + different positions (matrix + bounds offset with skew)
+ */
+TGFX_TEST(CanvasTest, DrawShapeAutoBatch_DifferentBounds) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 500, 600);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Row 1: Same base shape + Shape::ApplyMatrix with different translations (bounds-only offset)
+  {
+    Path rectPath;
+    rectPath.addRect(Rect::MakeWH(80, 80));
+    auto baseShape = Shape::MakeFrom(rectPath);
+    Paint paint;
+    paint.setColor(Color::Blue());
+    paint.setStyle(PaintStyle::Stroke);
+    paint.setStrokeWidth(3);
+    float xPositions[] = {20, 170, 320};
+    for (float x : xPositions) {
+      auto shape = Shape::ApplyMatrix(baseShape, Matrix::MakeTrans(x, 10));
+      canvas->drawShape(shape, paint);
+    }
+  }
+
+  // Row 2: Stroke outlines at different positions (multi-selection scenario)
+  {
+    Path rectPath;
+    rectPath.addRect(Rect::MakeWH(100, 80));
+    auto baseShape = Shape::MakeFrom(rectPath);
+    Paint paint;
+    paint.setColor(Color::FromRGBA(0, 120, 215, 255));
+    paint.setStyle(PaintStyle::Stroke);
+    paint.setStrokeWidth(2);
+    paint.setAntiAlias(true);
+    Point positions[] = {{20, 120}, {170, 120}, {320, 120}};
+    for (const auto& pos : positions) {
+      auto shape = Shape::ApplyMatrix(baseShape, Matrix::MakeTrans(pos.x, pos.y));
+      canvas->drawShape(shape, paint);
+    }
+  }
+
+  // Row 3: Different scales + different positions (matrix + bounds offset)
+  {
+    Path rectPath;
+    rectPath.addRect(Rect::MakeWH(40, 40));
+    auto baseShape = Shape::MakeFrom(rectPath);
+    Paint paint;
+    paint.setColor(Color::Green());
+    paint.setStyle(PaintStyle::Fill);
+    float scales[] = {1.0f, 1.5f, 2.0f};
+    float xPositions[] = {20, 170, 320};
+    for (size_t i = 0; i < 3; i++) {
+      auto shape = Shape::ApplyMatrix(baseShape, Matrix::MakeScale(scales[i], scales[i]));
+      canvas->save();
+      canvas->translate(xPositions[i], 240);
+      canvas->drawShape(shape, paint);
+      canvas->restore();
+    }
+  }
+
+  // Row 4: Different rotations + different positions
+  {
+    Path rectPath;
+    rectPath.addRect(Rect::MakeWH(50, 50));
+    auto baseShape = Shape::MakeFrom(rectPath);
+    Paint paint;
+    paint.setColor(Color::Red());
+    paint.setStyle(PaintStyle::Stroke);
+    paint.setStrokeWidth(2);
+    float rotations[] = {0.0f, 30.0f, 57.0f};
+    float xPositions[] = {50, 200, 350};
+    for (size_t i = 0; i < 3; i++) {
+      auto shape = Shape::ApplyMatrix(baseShape, Matrix::MakeRotate(rotations[i]));
+      canvas->save();
+      canvas->translate(xPositions[i], 380);
+      canvas->drawShape(shape, paint);
+      canvas->restore();
+    }
+  }
+
+  // Row 5: Different skews + different positions
+  {
+    Path rectPath;
+    rectPath.addRect(Rect::MakeWH(60, 40));
+    auto baseShape = Shape::MakeFrom(rectPath);
+    Paint paint;
+    paint.setColor(Color::FromRGBA(255, 255, 0, 255));
+    paint.setStyle(PaintStyle::Fill);
+    float skews[] = {0.0f, 0.3f, 0.6f};
+    float xPositions[] = {20, 170, 320};
+    for (size_t i = 0; i < 3; i++) {
+      auto shape = Shape::ApplyMatrix(baseShape, Matrix::MakeSkew(skews[i], 0.0f));
+      canvas->save();
+      canvas->translate(xPositions[i], 490);
+      canvas->drawShape(shape, paint);
+      canvas->restore();
+    }
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_DifferentBounds"));
 }
 
 }  // namespace tgfx

@@ -889,4 +889,56 @@ TGFX_TEST(LayerMaskTest, solidLayerWithTwoFillMask) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/SolidLayerWithTwoFillMask"));
 }
 
+TGFX_TEST(LayerMaskTest, MaskPathDrawCountThreshold) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 100, 100);
+  auto displayList = std::make_unique<DisplayList>();
+  auto root = displayList->root();
+
+  // Create a content layer to be masked.
+  auto contentLayer = SolidLayer::Make();
+  contentLayer->setWidth(100);
+  contentLayer->setHeight(100);
+  contentLayer->setColor(Color::Blue());
+  root->addChild(contentLayer);
+
+  // Create a mask container with 30 side-by-side rect children (at the threshold).
+  auto maskContainer = Layer::Make();
+  root->addChild(maskContainer);
+  for (int i = 0; i < 30; i++) {
+    auto rect = SolidLayer::Make();
+    rect->setWidth(10);
+    rect->setHeight(10);
+    rect->setMatrix(Matrix::MakeTrans(static_cast<float>(i * 12), 0.f));
+    rect->setColor(Color::White());
+    maskContainer->addChild(rect);
+  }
+  contentLayer->setMask(maskContainer);
+
+  // Render and verify it produces a valid result (mask path extraction should succeed).
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/MaskPathDrawCountThreshold_30"));
+
+  // Now replace with 31 rect children (exceeds the threshold).
+  contentLayer->setMask(nullptr);
+  maskContainer->removeFromParent();
+  auto maskContainer2 = Layer::Make();
+  root->addChild(maskContainer2);
+  for (int i = 0; i < 31; i++) {
+    auto rect = SolidLayer::Make();
+    rect->setWidth(10);
+    rect->setHeight(10);
+    rect->setMatrix(Matrix::MakeTrans(static_cast<float>(i * 12), 0.f));
+    rect->setColor(Color::White());
+    maskContainer2->addChild(rect);
+  }
+  contentLayer->setMask(maskContainer2);
+
+  // Render with 31 rects (should fallback to MaskFilter path).
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/MaskPathDrawCountThreshold_31"));
+}
+
 }  // namespace tgfx

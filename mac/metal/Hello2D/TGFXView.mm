@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,22 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "TGFXView.h"
-#import <QuartzCore/CADisplayLink.h>
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
-#include "tgfx/core/Point.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 
-static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
-                                      CVOptionFlags, CVOptionFlags*, void* userInfo) {
-  TGFXView* view = (__bridge TGFXView*)userInfo;
-  [view draw];
-  return kCVReturnSuccess;
-}
-
 @implementation TGFXView {
-  std::shared_ptr<tgfx::CGLWindow> tgfxWindow;
+  std::shared_ptr<tgfx::Window> tgfxWindow;
   std::shared_ptr<tgfx::Surface> surface;
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
@@ -85,9 +76,8 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     displayList.setAllowZoomBlur(true);
     displayList.setMaxTileCount(512);
   }
-  CGSize backingSize = [self convertSizeToBacking:self.bounds.size];
-  lastSurfaceWidth = static_cast<int>(backingSize.width);
-  lastSurfaceHeight = static_cast<int>(backingSize.height);
+  lastSurfaceWidth = static_cast<int>(self.drawableSize.width);
+  lastSurfaceHeight = static_cast<int>(self.drawableSize.height);
   [self applyCenteringTransform];
   if (tgfxWindow != nullptr) {
     surface = nullptr;
@@ -99,59 +89,21 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   [super viewDidMoveToWindow];
 
   if (self.window == nil) {
-    if (@available(macOS 14, *)) {
-      if (self.caDisplayLink) {
-        self.caDisplayLink.paused = YES;
-        [self.caDisplayLink invalidate];
-        self.caDisplayLink = nil;
-      }
-    } else {
-      if (self.cvDisplayLink) {
-        CVDisplayLinkStop(self.cvDisplayLink);
-        CVDisplayLinkRelease(self.cvDisplayLink);
-        _cvDisplayLink = NULL;
-      }
-    }
+    self.paused = YES;
     return;
   }
+
+  self.device = MTLCreateSystemDefaultDevice();
+  self.paused = NO;
 
   self.drawIndex = 0;
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
   [self.window makeFirstResponder:self];
 
-  if (@available(macOS 14, *)) {
-    self.caDisplayLink = [self displayLinkWithTarget:self selector:@selector(displayLinkCallback:)];
-    [self.caDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
-  } else {
-    CVDisplayLinkCreateWithActiveCGDisplays(&_cvDisplayLink);
-    CVDisplayLinkSetOutputCallback(_cvDisplayLink, &OnDisplayLinkCallback, (__bridge void*)self);
-    CVDisplayLinkStart(self.cvDisplayLink);
-  }
-
   [self updateSize];
   [self updateZoomScaleAndOffset];
   [self updateLayerTree];
-}
-
-- (void)dealloc {
-  if (@available(macOS 14, *)) {
-    if (self.caDisplayLink) {
-      self.caDisplayLink.paused = YES;
-      [self.caDisplayLink invalidate];
-      self.caDisplayLink = nil;
-    }
-  } else {
-    if (self.cvDisplayLink) {
-      CVDisplayLinkStop(self.cvDisplayLink);
-      CVDisplayLinkRelease(self.cvDisplayLink);
-      _cvDisplayLink = NULL;
-    }
-  }
-}
-
-- (void)displayLinkCallback:(CADisplayLink*)displayLink {
-  [self draw];
 }
 
 - (void)updateLayerTree {
@@ -189,13 +141,13 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return;
   }
   if (tgfxWindow == nullptr) {
-    tgfxWindow = tgfx::CGLWindow::MakeFrom(self);
+    tgfxWindow = tgfx::MetalWindow::MakeFrom(self);
   }
   if (tgfxWindow == nullptr) {
     return;
   }
 
-  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+  if (!presentImmediately && !displayList.hasContentChanged() && lastRecording == nullptr) {
     return;
   }
 
@@ -223,6 +175,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
   if (presentImmediately) {
     presentImmediately = false;
+    lastRecording = nullptr;
     if (recording) {
       context->submit(std::move(recording));
     }
@@ -238,27 +191,11 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 }
 
 - (void)startDisplayLink {
-  if (@available(macOS 14, *)) {
-    if (self.caDisplayLink) {
-      self.caDisplayLink.paused = NO;
-    }
-  } else {
-    if (self.cvDisplayLink && !CVDisplayLinkIsRunning(self.cvDisplayLink)) {
-      CVDisplayLinkStart(self.cvDisplayLink);
-    }
-  }
+  self.paused = NO;
 }
 
 - (void)stopDisplayLink {
-  if (@available(macOS 14, *)) {
-    if (self.caDisplayLink) {
-      self.caDisplayLink.paused = YES;
-    }
-  } else {
-    if (self.cvDisplayLink && CVDisplayLinkIsRunning(self.cvDisplayLink)) {
-      CVDisplayLinkStop(self.cvDisplayLink);
-    }
-  }
+  self.paused = YES;
 }
 
 - (void)mouseDown:(NSEvent*)event {
