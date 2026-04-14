@@ -28,11 +28,14 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Stroke.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/SolidLayer.h"
+#include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/pdf/PDFDocument.h"
 #include "tgfx/pdf/PDFMetadata.h"
@@ -897,6 +900,57 @@ TGFX_TEST(PDFExportTest, NonRegularBlendMode) {
   PDFStream->flush();
 
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/NonRegularBlendMode"));
+}
+
+TGFX_TEST(PDFExportTest, BackgroundBlurLayer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  ASSERT_TRUE(document != nullptr);
+
+  float pageW = 822.f;
+  float pageH = 1663.f;
+
+  auto rootLayer = Layer::Make();
+
+  auto background = SolidLayer::Make();
+  background->setColor(Color::White());
+  background->setWidth(static_cast<int>(pageW));
+  background->setHeight(static_cast<int>(pageH));
+  rootLayer->addChild(background);
+
+  auto redLayer = SolidLayer::Make();
+  redLayer->setColor(Color::Red());
+  redLayer->setWidth(624);
+  redLayer->setHeight(48);
+  redLayer->setPosition(Point{99.f, 381.f});
+  rootLayer->addChild(redLayer);
+
+  auto blurLayer = SolidLayer::Make();
+  blurLayer->setColor(Color::FromRGBA(139, 239, 200));
+  blurLayer->setWidth(822);
+  blurLayer->setHeight(300);
+  blurLayer->setPosition(Point{0.f, 469.f});
+  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(10.f, 10.f)});
+  rootLayer->addChild(blurLayer);
+
+  auto surface = Surface::Make(context, static_cast<int>(pageW), static_cast<int>(pageH));
+  auto surfaceCanvas = surface->getCanvas();
+  rootLayer->draw(surfaceCanvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFTest/BackgroundBlurLayer"));
+
+  auto canvas = document->beginPage(pageW, pageH);
+  ASSERT_TRUE(canvas != nullptr);
+  rootLayer->draw(canvas);
+  document->endPage();
+
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/BackgroundBlurLayer_pdf"));
 }
 
 }  // namespace tgfx

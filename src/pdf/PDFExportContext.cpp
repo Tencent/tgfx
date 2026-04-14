@@ -1412,6 +1412,16 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
   if (!matrix.isIdentity() && paint.shader) {
     paint.shader = paint.shader->makeWithMatrix(pathExtraMatrix);
   }
+  // A non-inverted ShaderMaskFilter produces fully transparent pixels outside the mask shape
+  // (TileMode::Decal). For those pixels, BlendMode::Src (write transparent) and SrcOver (keep
+  // destination) differ only in theory — visually identical when drawn on top of existing content.
+  // However, BlendMode::Src triggers the non-regular blend mode path in PDF export, which packages
+  // all previously drawn content into a Form XObject and may cause it to become invisible under the
+  // subsequent SMask compositing. Downgrading to SrcOver avoids this destructive packaging while
+  // preserving correct visual output.
+  if (paint.blendMode == BlendMode::Src && !shaderMaskFilter->isInverted()) {
+    paint.blendMode = BlendMode::SrcOver;
+  }
   ScopedContentEntry contentEntry(this, matrix, clip, Matrix::I(), paint);
   if (!contentEntry) {
     return;
