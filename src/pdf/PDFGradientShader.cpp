@@ -670,6 +670,16 @@ void WriteTriangleMeshVertex(MemoryWriteStream* stream, uint8_t flag, float x, f
   stream->write(&b, 1);
 }
 
+void WriteConicMeshSegment(MemoryWriteStream* stream, Point center, float radius, float fromAngle,
+                           float toAngle, const Color& fromColor, const Color& toColor, float minX,
+                           float maxX, float minY, float maxY) {
+  Point p1 = {center.x + radius * std::cos(fromAngle), center.y + radius * std::sin(fromAngle)};
+  Point p2 = {center.x + radius * std::cos(toAngle), center.y + radius * std::sin(toAngle)};
+  WriteTriangleMeshVertex(stream, 0, center.x, center.y, minX, maxX, minY, maxY, fromColor);
+  WriteTriangleMeshVertex(stream, 1, p1.x, p1.y, minX, maxX, minY, maxY, fromColor);
+  WriteTriangleMeshVertex(stream, 1, p2.x, p2.y, minX, maxX, minY, maxY, toColor);
+}
+
 PDFIndirectReference MakeConicTriangleMeshShader(PDFDocumentImpl* doc,
                                                  const PDFGradientShader::Key& state) {
   const GradientInfo& info = state.info;
@@ -703,30 +713,41 @@ PDFIndirectReference MakeConicTriangleMeshShader(PDFDocumentImpl* doc,
 
   auto meshStream = MemoryWriteStream::Make();
 
-  // Conic gradient convention: angle 0° = top (12 o'clock). Subtract PI/2 to convert from
-  // the standard math convention where angle 0 = right (3 o'clock).
-  float angleOffset = startAngleRad - static_cast<float>(M_PI) / 2.f;
+  Color firstColor = info.colors.front();
+  Color lastColor = info.colors.back();
+  float absSegAngle = std::abs(segmentAngle);
+  if (startAngleRad > absSegAngle * 0.5f) {
+    int preSegments = std::max(1, static_cast<int>(std::ceil(startAngleRad / absSegAngle)));
+    float preSegAngle = startAngleRad / static_cast<float>(preSegments);
+    for (int i = 0; i < preSegments; ++i) {
+      float a1 = static_cast<float>(i) * preSegAngle;
+      float a2 = static_cast<float>(i + 1) * preSegAngle;
+      WriteConicMeshSegment(meshStream.get(), center, maxRadius, a1, a2, firstColor, firstColor,
+                            minX, maxX, minY, maxY);
+    }
+  }
+  float postGap = static_cast<float>(2.f * M_PI) - endAngleRad;
+  if (postGap > absSegAngle * 0.5f) {
+    int postSegments = std::max(1, static_cast<int>(std::ceil(postGap / absSegAngle)));
+    float postSegAngle = postGap / static_cast<float>(postSegments);
+    for (int i = 0; i < postSegments; ++i) {
+      float a1 = endAngleRad + static_cast<float>(i) * postSegAngle;
+      float a2 = endAngleRad + static_cast<float>(i + 1) * postSegAngle;
+      WriteConicMeshSegment(meshStream.get(), center, maxRadius, a1, a2, lastColor, lastColor, minX,
+                            maxX, minY, maxY);
+    }
+  }
 
   for (int seg = 0; seg < numSegments; ++seg) {
-    float angle1 = angleOffset + static_cast<float>(seg) * segmentAngle;
-    float angle2 = angleOffset + static_cast<float>(seg + 1) * segmentAngle;
+    float angle1 = startAngleRad + static_cast<float>(seg) * segmentAngle;
+    float angle2 = startAngleRad + static_cast<float>(seg + 1) * segmentAngle;
     float t1 = static_cast<float>(seg) / static_cast<float>(numSegments);
     float t2 = static_cast<float>(seg + 1) / static_cast<float>(numSegments);
 
     Color color1 = InterpolateColorAtT(t1, info.colors, info.positions);
     Color color2 = InterpolateColorAtT(t2, info.colors, info.positions);
-
-    float cos1 = std::cos(angle1);
-    float sin1 = std::sin(angle1);
-    float cos2 = std::cos(angle2);
-    float sin2 = std::sin(angle2);
-
-    WriteTriangleMeshVertex(meshStream.get(), 0, center.x, center.y, minX, maxX, minY, maxY,
-                            color1);
-    Point edge1 = {center.x + maxRadius * cos1, center.y + maxRadius * sin1};
-    WriteTriangleMeshVertex(meshStream.get(), 1, edge1.x, edge1.y, minX, maxX, minY, maxY, color1);
-    Point edge2 = {center.x + maxRadius * cos2, center.y + maxRadius * sin2};
-    WriteTriangleMeshVertex(meshStream.get(), 1, edge2.x, edge2.y, minX, maxX, minY, maxY, color2);
+    WriteConicMeshSegment(meshStream.get(), center, maxRadius, angle1, angle2, color1, color2, minX,
+                          maxX, minY, maxY);
   }
 
   auto pdfShader = PDFDictionary::Make();
