@@ -231,6 +231,8 @@
         "MaskInvalidation_NoMask": "6d7f38ad",
         "MaskInvalidation_SwitchMask": "92ee56bb",
         "MaskInvalidation_WithMask": "c37a86c8",
+        "MaskPathDrawCountThreshold_30": "c57b724c0",
+        "MaskPathDrawCountThreshold_31": "c57b724c0",
         "MaskPathOptimization": "c37a86c8",
         "RoundRectMaskWithTiledRender": "c37a86c8",
         "SolidLayerWithTwoFillMask": "03743384c",
