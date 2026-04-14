@@ -110,6 +110,10 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("floorVal -= step(stitchData.xyxy, floorVal) * stitchData.xyxy;");
   }
 
+  // Wrap floorVal into [0, 256) so that permutation and noise texture lookups stay in range
+  // across octaves (where noiseVec doubles each iteration and can exceed 256).
+  fragBuilder->codeAppend("floorVal = mod(floorVal, 256.0);");
+
   // Look up permutation values. Permutations texture is 256x1 A8 (swizzled to RRRR).
   // Texel center: (i + 0.5) / 256.0
   fragBuilder->codeAppend("float permX = ");
@@ -206,9 +210,10 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("color = color * 0.5 + 0.5;");
   }
 
-  // Clamp and pre-multiply RGB by alpha.
+  // Clamp and output with alpha = 1.0 (opaque). The fourth noise channel is discarded to avoid
+  // premultiply artifacts when downstream filters interpret alpha as transparency.
   fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
-  fragBuilder->codeAppendf("%s = vec4(color.rgb * color.a, color.a);", args.outputColor.c_str());
+  fragBuilder->codeAppendf("%s = vec4(color.rgb, 1.0);", args.outputColor.c_str());
 }
 
 void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
