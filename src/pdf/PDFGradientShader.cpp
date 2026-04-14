@@ -18,6 +18,7 @@
 
 #include "PDFGradientShader.h"
 #include <algorithm>
+#include <cmath>
 #include "core/ColorSpaceXformSteps.h"
 #include "core/shaders/GradientShader.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -384,6 +385,26 @@ void RadialCode(const GradientInfo& info, const Matrix& /*perspectiveRemover*/,
   function->writeText("}");
 }
 
+void DiamondCode(const GradientInfo& info, const Matrix& /*perspectiveRemover*/,
+                 const std::shared_ptr<MemoryWriteStream>& function) {
+  function->writeText("{");
+
+  // Compute t = max(|x|, |y|) for diamond gradient.
+  function->writeText(
+      "abs "     // x |y|
+      "exch "    // |y| x
+      "abs "     // |y| |x|
+      "2 copy "  // |y| |x| |y| |x|
+      "lt "      // |y| |x| (|y| < |x|)
+      "{exch} "  // if |y| < |x|: swap to put max on top
+      "if "      // max(|x|, |y|) min(|x|, |y|)
+      "pop\n");  // max(|x|, |y|) = t
+
+  TileModeCode(TileMode::Clamp, function);
+  GradientFunctionCode(info, function);
+  function->writeText("}");
+}
+
 ///////////////////////////////////////////////////////////////////////////
 
 PDFGradientShader::Key MakeKey(const GradientShader* gradientShader, const Matrix& canvasTransform,
@@ -597,6 +618,137 @@ PDFIndirectReference MakePSFunction(std::unique_ptr<Stream> psCode,
   return PDFStreamOut(std::move(dict), std::move(psCode), document);
 }
 
+///////////////////////////////////////////////////////////////////////////
+// Conic Gradient Triangle Mesh (ShadingType 4) Implementation
+///////////////////////////////////////////////////////////////////////////
+
+constexpr int ConicSegmentCount = 64;
+
+Color InterpolateColorAtT(float t, const std::vector<Color>& colors,
+                          const std::vector<float>& positions) {
+  if (t <= positions.front()) {
+    return colors.front();
+  }
+  if (t >= positions.back()) {
+    return colors.back();
+  }
+  for (size_t i = 1; i < positions.size(); ++i) {
+    if (t <= positions[i]) {
+      float localT = (t - positions[i - 1]) / (positions[i] - positions[i - 1]);
+      Color c1 = colors[i - 1];
+      Color c2 = colors[i];
+      return {c1.red + (c2.red - c1.red) * localT, c1.green + (c2.green - c1.green) * localT,
+              c1.blue + (c2.blue - c1.blue) * localT, c1.alpha + (c2.alpha - c1.alpha) * localT};
+    }
+  }
+  return colors.back();
+}
+
+void WriteBigEndianUint32(MemoryWriteStream* stream, uint32_t value) {
+  uint8_t bytes[4];
+  bytes[0] = static_cast<uint8_t>((value >> 24) & 0xFF);
+  bytes[1] = static_cast<uint8_t>((value >> 16) & 0xFF);
+  bytes[2] = static_cast<uint8_t>((value >> 8) & 0xFF);
+  bytes[3] = static_cast<uint8_t>(value & 0xFF);
+  stream->write(bytes, 4);
+}
+
+void WriteTriangleMeshVertex(MemoryWriteStream* stream, uint8_t flag, float x, float y, float minX,
+                             float maxX, float minY, float maxY, const Color& color) {
+  stream->write(&flag, 1);
+  float normalizedX = (x - minX) / (maxX - minX);
+  float normalizedY = (y - minY) / (maxY - minY);
+  auto coordX = static_cast<uint32_t>(std::clamp(normalizedX, 0.f, 1.f) * 4294967295.f);
+  auto coordY = static_cast<uint32_t>(std::clamp(normalizedY, 0.f, 1.f) * 4294967295.f);
+  WriteBigEndianUint32(stream, coordX);
+  WriteBigEndianUint32(stream, coordY);
+  auto r = static_cast<uint8_t>(std::clamp(color.red, 0.f, 1.f) * 255.f);
+  auto g = static_cast<uint8_t>(std::clamp(color.green, 0.f, 1.f) * 255.f);
+  auto b = static_cast<uint8_t>(std::clamp(color.blue, 0.f, 1.f) * 255.f);
+  stream->write(&r, 1);
+  stream->write(&g, 1);
+  stream->write(&b, 1);
+}
+
+PDFIndirectReference MakeConicTriangleMeshShader(PDFDocumentImpl* doc,
+                                                 const PDFGradientShader::Key& state) {
+  const GradientInfo& info = state.info;
+  Point center = info.points[0];
+  float startAngleDeg = info.radiuses[0];
+  float endAngleDeg = info.radiuses[1];
+  float startAngleRad = startAngleDeg * static_cast<float>(M_PI) / 180.f;
+  float endAngleRad = endAngleDeg * static_cast<float>(M_PI) / 180.f;
+  float angleRange = endAngleRad - startAngleRad;
+  int numSegments = std::max(ConicSegmentCount,
+                             static_cast<int>(std::ceil(std::abs(angleRange) / (M_PI / 32.f))));
+  float segmentAngle = angleRange / static_cast<float>(numSegments);
+
+  Matrix finalMatrix = state.canvasTransform;
+  finalMatrix.preConcat(state.shaderTransform);
+
+  Rect bbox = state.boundBox;
+  if (!PDFUtils::InverseTransformBBox(finalMatrix, &bbox)) {
+    return PDFIndirectReference();
+  }
+  float maxRadius = std::max({Point::Distance(center, {bbox.left, bbox.top}),
+                              Point::Distance(center, {bbox.right, bbox.top}),
+                              Point::Distance(center, {bbox.left, bbox.bottom}),
+                              Point::Distance(center, {bbox.right, bbox.bottom})});
+  maxRadius *= 1.5f;
+
+  float minX = center.x - maxRadius;
+  float maxX = center.x + maxRadius;
+  float minY = center.y - maxRadius;
+  float maxY = center.y + maxRadius;
+
+  auto meshStream = MemoryWriteStream::Make();
+
+  for (int seg = 0; seg < numSegments; ++seg) {
+    float angle1 = startAngleRad + static_cast<float>(seg) * segmentAngle;
+    float angle2 = startAngleRad + static_cast<float>(seg + 1) * segmentAngle;
+    float t1 = static_cast<float>(seg) / static_cast<float>(numSegments);
+    float t2 = static_cast<float>(seg + 1) / static_cast<float>(numSegments);
+
+    Color color1 = InterpolateColorAtT(t1, info.colors, info.positions);
+    Color color2 = InterpolateColorAtT(t2, info.colors, info.positions);
+
+    float cos1 = std::cos(angle1);
+    float sin1 = std::sin(angle1);
+    float cos2 = std::cos(angle2);
+    float sin2 = std::sin(angle2);
+
+    WriteTriangleMeshVertex(meshStream.get(), 0, center.x, center.y, minX, maxX, minY, maxY,
+                            color1);
+    Point edge1 = {center.x + maxRadius * cos1, center.y + maxRadius * sin1};
+    WriteTriangleMeshVertex(meshStream.get(), 1, edge1.x, edge1.y, minX, maxX, minY, maxY, color1);
+    Point edge2 = {center.x + maxRadius * cos2, center.y + maxRadius * sin2};
+    WriteTriangleMeshVertex(meshStream.get(), 1, edge2.x, edge2.y, minX, maxX, minY, maxY, color2);
+  }
+
+  auto pdfShader = PDFDictionary::Make();
+  pdfShader->insertInt("ShadingType", 4);
+  auto ref = doc->colorSpaceRef();
+  if (ref) {
+    pdfShader->insertRef("ColorSpace", ref);
+  } else {
+    pdfShader->insertName("ColorSpace", "DeviceRGB");
+  }
+  pdfShader->insertInt("BitsPerCoordinate", 32);
+  pdfShader->insertInt("BitsPerComponent", 8);
+  pdfShader->insertInt("BitsPerFlag", 8);
+  auto decode = MakePDFArray(minX, maxX, minY, maxY, 0, 1, 0, 1, 0, 1);
+  pdfShader->insertObject("Decode", std::move(decode));
+
+  auto shadingRef =
+      PDFStreamOut(std::move(pdfShader), Stream::MakeFromData(meshStream->readData()), doc);
+
+  auto pdfPattern = PDFDictionary::Make("Pattern");
+  pdfPattern->insertInt("PatternType", 2);
+  pdfPattern->insertObject("Matrix", PDFUtils::MatrixToArray(finalMatrix));
+  pdfPattern->insertRef("Shading", shadingRef);
+  return doc->emit(*pdfPattern);
+}
+
 PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientShader::Key& state) {
   Point transformPoints[2];
   const GradientInfo& info = state.info;
@@ -661,6 +813,13 @@ PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientS
         transformPoints[1] = transformPoints[0];
         transformPoints[1].x += info.radiuses[0];
         break;
+      case GradientType::Diamond: {
+        // DiamondRadiusToUnitMatrix applies translate + scale(sqrt(2)/r) + rotate(45).
+        // UnitToPointsMatrix must produce its inverse: rotate(-45) + scale(r/sqrt(2)) + translate.
+        // Setting vec = (r/2, -r/2) gives |vec| = r/sqrt(2) and angle = -45°.
+        float halfR = info.radiuses[0] * 0.5f;
+        transformPoints[1] = {transformPoints[0].x + halfR, transformPoints[0].y - halfR};
+      } break;
       case GradientType::None:
       default:
         return PDFIndirectReference();
@@ -695,6 +854,9 @@ PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientS
       case GradientType::Radial:
         RadialCode(info, perspectiveInverseOnly, functionCode);
         break;
+      case GradientType::Diamond:
+        DiamondCode(info, perspectiveInverseOnly, functionCode);
+        break;
       default:
         DEBUG_ASSERT(false);
     }
@@ -726,7 +888,31 @@ PDFIndirectReference FindPDFShader(PDFDocumentImpl* doc, const PDFGradientShader
                                    bool keyHasAlpha) {
   DEBUG_ASSERT(GradientHasAlpha(key) == keyHasAlpha);
   PDFIndirectReference pdfShader;
-  if (keyHasAlpha) {
+  if (key.type == GradientType::Conic) {
+    if (keyHasAlpha) {
+      PDFGradientShader::Key opaqueState = CloneKey(key);
+      for (auto& color : opaqueState.info.colors) {
+        color.alpha = 1.0f;
+      }
+      opaqueState.hash = Hash(opaqueState);
+      auto bbox = key.boundBox;
+      PDFIndirectReference colorShader = MakeConicTriangleMeshShader(doc, opaqueState);
+      if (!colorShader) {
+        return PDFIndirectReference();
+      }
+      PDFIndirectReference alphaGsRef = CreateSmaskGraphicState(doc, key);
+      auto resourceDict = GetGradientResourceDictionary(colorShader, alphaGsRef);
+      auto colorStream = CreatePatternFillContent(alphaGsRef.value, colorShader.value, bbox);
+      auto alphaFunctionShader = PDFDictionary::Make();
+      PDFUtils::PopulateTilingPatternDict(alphaFunctionShader.get(), bbox, std::move(resourceDict),
+                                          Matrix::I());
+      auto colorData = colorStream->readData();
+      pdfShader =
+          PDFStreamOut(std::move(alphaFunctionShader), Stream::MakeFromData(colorData), doc);
+    } else {
+      pdfShader = MakeConicTriangleMeshShader(doc, key);
+    }
+  } else if (keyHasAlpha) {
     pdfShader = MakeAlphaFunctionShader(doc, key);
   } else {
     pdfShader = MakeFunctionShader(doc, key);
