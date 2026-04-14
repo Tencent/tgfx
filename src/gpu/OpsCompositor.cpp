@@ -824,9 +824,8 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
   const auto width = FloatSaturateToInt(bounds.width());
   const auto height = FloatSaturateToInt(bounds.height());
   const auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
-  auto clipRenderTarget =
-      RenderTargetProxy::Make(context, width, height, true, renderTarget->sampleCount(), false,
-                              ImageOrigin::TopLeft, BackingFit::Approx);
+  auto clipRenderTarget = RenderTargetProxy::Make(context, width, height, true, 1, false,
+                                                  ImageOrigin::TopLeft, BackingFit::Approx);
   if (clipRenderTarget == nullptr) {
     DEBUG_ASSERT(false);
     return nullptr;
@@ -858,11 +857,8 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
 
   auto opArray = drawingAllocator()->makeArray(std::move(clipDrawOps));
   auto textureProxy = clipRenderTarget->asTextureProxy();
-  // For clip mask RT, use immediate resolve mode since the texture will be used immediately
-  // as a shader input after rendering. This avoids the overhead of a separate ResolveMSAATask.
-  bool resolveImmediately = clipRenderTarget->sampleCount() > 1;
   context->drawingManager()->addOpsRenderTask(std::move(clipRenderTarget), std::move(opArray),
-                                              PMColor::Transparent(), resolveImmediately);
+                                              PMColor::Transparent());
   return textureProxy;
 }
 
