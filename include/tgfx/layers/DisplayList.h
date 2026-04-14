@@ -344,6 +344,10 @@ class DisplayList {
 
   void drawTileTask(const DrawTask& task, const Surface* renderSurface);
 
+  void drawTileTaskDirect(const DrawTask& task);
+
+  void drawTileTaskMSAA(const DrawTask& task, const Surface* renderSurface);
+
   Surface* getOrCreateMSAATileSurface(const Surface* renderSurface, int requiredWidth,
                                       int requiredHeight);
 

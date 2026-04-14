@@ -919,6 +919,14 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
 }
 
 void DisplayList::drawTileTask(const DrawTask& task, const Surface* renderSurface) {
+  if (renderSurface->sampleCount() > 1) {
+    drawTileTaskMSAA(task, renderSurface);
+  } else {
+    drawTileTaskDirect(task);
+  }
+}
+
+void DisplayList::drawTileTaskDirect(const DrawTask& task) {
   auto atlasSurface = surfaceCaches[task.sourceIndex()].get();
   DEBUG_ASSERT(atlasSurface != nullptr);
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
@@ -926,37 +934,6 @@ void DisplayList::drawTileTask(const DrawTask& task, const Surface* renderSurfac
   auto& tileRect = task.tileRect();
   auto& sourceRect = task.sourceRect();
 
-  // For MSAA surfaces, use a single-tile MSAA surface and copy to atlas after resolve.
-  // This saves memory by reusing one tile-sized MSAA surface instead of a full atlas MSAA surface.
-  auto tileWidth = static_cast<int>(std::ceil(tileRect.width()));
-  auto tileHeight = static_cast<int>(std::ceil(tileRect.height()));
-  auto tileSurface = getOrCreateMSAATileSurface(renderSurface, tileWidth, tileHeight);
-  if (tileSurface != nullptr) {
-    // Render to the MSAA tile surface.
-    auto viewMatrix = Matrix::MakeScale(currentZoomScale);
-    // The tile surface always renders from (0, 0), so offset the view matrix accordingly.
-    viewMatrix.postTranslate(-tileRect.left, -tileRect.top);
-    // Use the actual tile size (may be smaller than _tileSize for edge tiles).
-    auto tileClipRect = Rect::MakeWH(tileRect.width(), tileRect.height());
-    drawRootLayer(tileSurface, tileClipRect, viewMatrix, true);
-
-    // makeImageSnapshot() will flush and resolve MSAA internally.
-    auto image = tileSurface->makeImageSnapshot();
-    auto atlasCanvas = atlasSurface->getCanvas();
-    AutoCanvasRestore autoRestore(atlasCanvas);
-    atlasCanvas->resetMatrix();
-    Paint paint = {};
-    paint.setAntiAlias(false);
-    paint.setBlendMode(BlendMode::Src);
-    static SamplingOptions nearestSampling(FilterMode::Nearest, MipmapMode::None);
-    // Draw from tile surface (0, 0) to atlas at sourceRect position.
-    auto srcRect = Rect::MakeWH(tileRect.width(), tileRect.height());
-    atlasCanvas->drawImageRect(image, srcRect, sourceRect, nearestSampling, &paint,
-                               SrcRectConstraint::Strict);
-    return;
-  }
-
-  // Non-MSAA path: render directly to atlas.
   auto canvas = atlasSurface->getCanvas();
   AutoCanvasRestore autoRestore(canvas);
   auto viewMatrix = Matrix::MakeScale(currentZoomScale);
@@ -966,6 +943,47 @@ void DisplayList::drawTileTask(const DrawTask& task, const Surface* renderSurfac
   auto clipRect = tileRect;
   clipRect.offset(offsetX, offsetY);
   drawRootLayer(atlasSurface, clipRect, viewMatrix, true);
+}
+
+void DisplayList::drawTileTaskMSAA(const DrawTask& task, const Surface* renderSurface) {
+  auto atlasSurface = surfaceCaches[task.sourceIndex()].get();
+  DEBUG_ASSERT(atlasSurface != nullptr);
+  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  DEBUG_ASSERT(currentZoomScale != 0.0f);
+  auto& tileRect = task.tileRect();
+  auto& sourceRect = task.sourceRect();
+
+  // Use a single-tile MSAA surface and copy to atlas after resolve.
+  // This saves memory by reusing one tile-sized MSAA surface instead of a full atlas MSAA surface.
+  auto tileWidth = static_cast<int>(std::ceil(tileRect.width()));
+  auto tileHeight = static_cast<int>(std::ceil(tileRect.height()));
+  auto tileSurface = getOrCreateMSAATileSurface(renderSurface, tileWidth, tileHeight);
+  if (tileSurface == nullptr) {
+    // Fallback to direct rendering if MSAA surface creation failed.
+    drawTileTaskDirect(task);
+    return;
+  }
+  // Render to the MSAA tile surface.
+  auto viewMatrix = Matrix::MakeScale(currentZoomScale);
+  // The tile surface always renders from (0, 0), so offset the view matrix accordingly.
+  viewMatrix.postTranslate(-tileRect.left, -tileRect.top);
+  // Use the actual tile size (may be smaller than _tileSize for edge tiles).
+  auto tileClipRect = Rect::MakeWH(tileRect.width(), tileRect.height());
+  drawRootLayer(tileSurface, tileClipRect, viewMatrix, true);
+
+  // makeImageSnapshot() will flush and resolve MSAA internally.
+  auto image = tileSurface->makeImageSnapshot();
+  auto atlasCanvas = atlasSurface->getCanvas();
+  AutoCanvasRestore autoRestore(atlasCanvas);
+  atlasCanvas->resetMatrix();
+  Paint paint = {};
+  paint.setAntiAlias(false);
+  paint.setBlendMode(BlendMode::Src);
+  static SamplingOptions nearestSampling(FilterMode::Nearest, MipmapMode::None);
+  // Draw from tile surface (0, 0) to atlas at sourceRect position.
+  auto srcRect = Rect::MakeWH(tileRect.width(), tileRect.height());
+  atlasCanvas->drawImageRect(image, srcRect, sourceRect, nearestSampling, &paint,
+                             SrcRectConstraint::Strict);
 }
 
 Surface* DisplayList::getOrCreateMSAATileSurface(const Surface* renderSurface, int requiredWidth,
