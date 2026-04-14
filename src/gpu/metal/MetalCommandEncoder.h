@@ -25,7 +25,6 @@
 namespace tgfx {
 
 class MetalGPU;
-class RenderTarget;
 
 /**
  * Metal command encoder implementation.

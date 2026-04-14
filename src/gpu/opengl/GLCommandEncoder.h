@@ -22,7 +22,6 @@
 
 namespace tgfx {
 class GLGPU;
-class RenderTarget;
 
 class GLCommandEncoder : public CommandEncoder {
  public:
