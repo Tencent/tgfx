@@ -129,6 +129,9 @@ std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* lay
     case Types::LayerFilterType::InnerShadowFilter:
       SerializeInnerShadowFilterImpl(fbb, layerFilter, map);
       break;
+    case Types::LayerFilterType::NoiseFilter:
+      SerializeBasicLayerFilterImpl(fbb, layerFilter);
+      break;
   }
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
