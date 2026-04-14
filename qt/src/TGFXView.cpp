@@ -87,7 +87,7 @@ void TGFXView::applyCenteringTransform() {
 
 QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   if (!tgfxWindow) {
-    tgfxWindow = tgfx::QGLWindow::MakeFrom(this, true, nullptr, 4);
+    tgfxWindow = tgfx::QGLWindow::MakeFrom(this, true);
     connect(window(), SIGNAL(sceneGraphInvalidated()), this, SLOT(onSceneGraphInvalidated()),
             Qt::DirectConnection);
   }
