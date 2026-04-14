@@ -35,6 +35,10 @@ Device::~Device() {
 
 Context* Device::lockContext() {
   locker.lock();
+  if (_contextLost) {
+    locker.unlock();
+    return nullptr;
+  }
   contextLocked = onLockContext();
   if (!contextLocked) {
     locker.unlock();

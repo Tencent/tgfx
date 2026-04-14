@@ -61,7 +61,7 @@ class QGLWindow : public Window {
    * been presented yet. The returned QSGTexture is owned by this QGLWindow and should not be
    * deleted by the caller.
    */
-  QSGTexture* getQSGTexture() const;
+  QSGTexture* getQSGTexture();
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
@@ -80,6 +80,7 @@ class QGLWindow : public Window {
   std::vector<TextureSlot> textureSlots = {};
   QGLDeviceCreator* deviceCreator = nullptr;
   QSGTexture* presentedQSGTexture = nullptr;
+  std::shared_ptr<RenderTargetProxy> pendingProxy = nullptr;
   std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
   std::shared_ptr<RenderTargetProxy> presentingProxy = nullptr;
 
