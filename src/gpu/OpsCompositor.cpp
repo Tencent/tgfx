@@ -917,8 +917,6 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
     return dstTextureInfo;
   }
   submitDrawOps();
-  // For MSAA render targets, resolve before copying.
-  // Note: addRenderTargetCopyTask internally calls ensureMSAAResolved, so no need to call here.
   dstTextureInfo.offset = {bounds.x(), bounds.y()};
   textureProxy = proxyProvider()->createTextureProxy(
       {}, static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
