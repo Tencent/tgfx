@@ -63,7 +63,7 @@ bool GLRenderPass::begin() {
   // Disable scissor test by default.
   state->setEnabled(GL_SCISSOR_TEST, false);
   // Enable GL_MULTISAMPLE when rendering to a multisample texture.
-  if (renderTexture->sampleCount() > 1 && _gpu->caps()->multisampleDisableSupport) {
+  if (colorAttachment.resolveTexture && _gpu->caps()->multisampleDisableSupport) {
     state->setEnabled(GL_MULTISAMPLE, true);
   }
   if (colorAttachment.loadAction == LoadAction::Clear) {
