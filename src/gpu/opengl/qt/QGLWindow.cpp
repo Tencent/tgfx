@@ -149,35 +149,36 @@ void QGLWindow::moveToThread(QThread* thread) {
 }
 
 QSGTexture* QGLWindow::getQSGTexture() {
-  PendingTextureInfo localInfo = {};
+  std::shared_ptr<RenderTargetProxy> localProxy = nullptr;
   {
     std::lock_guard<std::mutex> autoLock(locker);
-    localInfo = std::move(pendingTextureInfo);
-    pendingTextureInfo = {};
+    localProxy = std::move(pendingProxy);
   }
-  if (localInfo.valid) {
-    auto nativeWindow = quickItem->window();
-    if (nativeWindow != nullptr) {
-      delete presentedQSGTexture;
-      presentedQSGTexture = nullptr;
+  if (localProxy != nullptr) {
+    auto textureView = localProxy->getTextureView();
+    GLTextureInfo info = {};
+    if (textureView != nullptr && textureView->getBackendTexture().getGLTextureInfo(&info)) {
+      auto nativeWindow = quickItem->window();
+      if (nativeWindow != nullptr) {
+        delete presentedQSGTexture;
+        presentedQSGTexture = nullptr;
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-      presentedQSGTexture = QNativeInterface::QSGOpenGLTexture::fromNative(
-          localInfo.textureId, nativeWindow, QSize(localInfo.width, localInfo.height),
-          QQuickWindow::TextureHasAlphaChannel);
+        presentedQSGTexture = QNativeInterface::QSGOpenGLTexture::fromNative(
+            info.id, nativeWindow, QSize(localProxy->width(), localProxy->height()),
+            QQuickWindow::TextureHasAlphaChannel);
 #elif (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
-      presentedQSGTexture = nativeWindow->createTextureFromNativeObject(
-          QQuickWindow::NativeObjectTexture, &localInfo.textureId, 0,
-          QSize(localInfo.width, localInfo.height), QQuickWindow::TextureHasAlphaChannel);
+        presentedQSGTexture = nativeWindow->createTextureFromNativeObject(
+            QQuickWindow::NativeObjectTexture, &info.id, 0,
+            QSize(localProxy->width(), localProxy->height()),
+            QQuickWindow::TextureHasAlphaChannel);
 #else
-      presentedQSGTexture = nativeWindow->createTextureFromId(
-          localInfo.textureId, QSize(localInfo.width, localInfo.height),
-          QQuickWindow::TextureHasAlphaChannel);
+        presentedQSGTexture = nativeWindow->createTextureFromId(
+            info.id, QSize(localProxy->width(), localProxy->height()),
+            QQuickWindow::TextureHasAlphaChannel);
 #endif
+      }
     }
-    // Release the texture back to the pool after QSGTexture has been created.
-    if (localInfo.proxy != nullptr) {
-      reuseTexture(localInfo.proxy);
-    }
+    reuseTexture(localProxy);
   }
   return presentedQSGTexture;
 }
@@ -205,31 +206,15 @@ void QGLWindow::onPresent(Context*) {
   }
   auto proxy = std::static_pointer_cast<QGLDrawableProxy>(presentingProxy);
   presentingProxy = nullptr;
-  auto textureView = proxy->getTextureView();
-  if (textureView == nullptr) {
-    proxy->releaseTexture();
-    return;
-  }
-  GLTextureInfo info = {};
-  if (!textureView->getBackendTexture().getGLTextureInfo(&info)) {
-    proxy->releaseTexture();
-    return;
-  }
-  auto nativeWindow = quickItem->window();
-  if (nativeWindow == nullptr) {
+  if (proxy->getTextureView() == nullptr) {
     proxy->releaseTexture();
     return;
   }
   std::shared_ptr<RenderTargetProxy> oldProxy = nullptr;
   {
     std::lock_guard<std::mutex> autoLock(locker);
-    // Take ownership of the previous pending proxy so we can release it outside the lock.
-    oldProxy = std::move(pendingTextureInfo.proxy);
-    pendingTextureInfo.textureId = info.id;
-    pendingTextureInfo.width = proxy->width();
-    pendingTextureInfo.height = proxy->height();
-    pendingTextureInfo.valid = true;
-    pendingTextureInfo.proxy = proxy->getTextureTargetProxy();
+    oldProxy = std::move(pendingProxy);
+    pendingProxy = proxy->getTextureTargetProxy();
   }
   // Release the proxy from the previous pending frame if it was not consumed.
   if (oldProxy != nullptr) {

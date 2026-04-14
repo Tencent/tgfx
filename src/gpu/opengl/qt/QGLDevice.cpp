@@ -94,7 +94,7 @@ std::shared_ptr<QGLDevice> QGLDevice::Wrap(QOpenGLContext* qtContext, QSurface* 
   }
   if (oldContext != qtContext) {
     qtContext->doneCurrent();
-    if (oldContext != nullptr && oldContext->thread() == QThread::currentThread()) {
+    if (oldContext != nullptr) {
       oldContext->makeCurrent(oldSurface);
     }
   }

@@ -68,14 +68,6 @@ class QGLWindow : public Window {
     bool available = true;
   };
 
-  struct PendingTextureInfo {
-    unsigned int textureId = 0;
-    int width = 0;
-    int height = 0;
-    bool valid = false;
-    std::shared_ptr<RenderTargetProxy> proxy = nullptr;
-  };
-
   std::weak_ptr<QGLWindow> weakThis;
   QQuickItem* quickItem = nullptr;
   int maxTextureCount = 2;
@@ -83,7 +75,7 @@ class QGLWindow : public Window {
   std::vector<TextureSlot> textureSlots = {};
   QGLDeviceCreator* deviceCreator = nullptr;
   QSGTexture* presentedQSGTexture = nullptr;
-  PendingTextureInfo pendingTextureInfo = {};
+  std::shared_ptr<RenderTargetProxy> pendingProxy = nullptr;
   std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
   std::shared_ptr<RenderTargetProxy> presentingProxy = nullptr;
 
