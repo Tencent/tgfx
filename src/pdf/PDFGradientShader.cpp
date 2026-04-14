@@ -703,9 +703,13 @@ PDFIndirectReference MakeConicTriangleMeshShader(PDFDocumentImpl* doc,
 
   auto meshStream = MemoryWriteStream::Make();
 
+  // Conic gradient convention: angle 0° = top (12 o'clock). Subtract PI/2 to convert from
+  // the standard math convention where angle 0 = right (3 o'clock).
+  float angleOffset = startAngleRad - static_cast<float>(M_PI) / 2.f;
+
   for (int seg = 0; seg < numSegments; ++seg) {
-    float angle1 = startAngleRad + static_cast<float>(seg) * segmentAngle;
-    float angle2 = startAngleRad + static_cast<float>(seg + 1) * segmentAngle;
+    float angle1 = angleOffset + static_cast<float>(seg) * segmentAngle;
+    float angle2 = angleOffset + static_cast<float>(seg + 1) * segmentAngle;
     float t1 = static_cast<float>(seg) / static_cast<float>(numSegments);
     float t2 = static_cast<float>(seg + 1) / static_cast<float>(numSegments);
 
