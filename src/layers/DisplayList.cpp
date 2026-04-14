@@ -838,10 +838,11 @@ std::vector<std::shared_ptr<Tile>> DisplayList::createContinuousTiles(const Surf
     countY = requestCountY;
     countX = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countY));
   }
-  // Use the same sampleCount as renderSurface for proper MSAA support.
-  auto surface = Surface::Make(context, countX * _tileSize, countY * _tileSize,
-                               ColorType::RGBA_8888, renderSurface->sampleCount(), false,
-                               renderSurface->renderFlags(), renderSurface->colorSpace());
+  // Atlas surfaces are always single-sampled. MSAA rendering is handled by msaaTileSurface,
+  // which resolves to single-sampled before copying to atlas.
+  auto surface =
+      Surface::Make(context, countX * _tileSize, countY * _tileSize, ColorType::RGBA_8888, 1, false,
+                    renderSurface->renderFlags(), renderSurface->colorSpace());
   if (surface == nullptr) {
     return {};
   }
@@ -876,10 +877,11 @@ bool DisplayList::createEmptyTiles(const Surface* renderSurface) {
   }
   int countX = FloatSaturateToInt(sqrtf(static_cast<float>(tileCount)));
   int countY = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countX));
-  // Use the same sampleCount as renderSurface for proper MSAA support.
-  auto surface = Surface::Make(context, countX * _tileSize, countY * _tileSize,
-                               ColorType::RGBA_8888, renderSurface->sampleCount(), false,
-                               renderSurface->renderFlags(), renderSurface->colorSpace());
+  // Atlas surfaces are always single-sampled. MSAA rendering is handled by msaaTileSurface,
+  // which resolves to single-sampled before copying to atlas.
+  auto surface =
+      Surface::Make(context, countX * _tileSize, countY * _tileSize, ColorType::RGBA_8888, 1, false,
+                    renderSurface->renderFlags(), renderSurface->colorSpace());
   if (surface == nullptr) {
     return false;
   }
