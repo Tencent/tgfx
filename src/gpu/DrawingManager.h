@@ -28,7 +28,6 @@
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
 #include "gpu/tasks/ResourceTask.h"
-#include "gpu/tasks/TileCopyTask.h"
 
 namespace tgfx {
 struct RuntimeInputTexture;
@@ -84,19 +83,6 @@ class DrawingManager {
 
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                                std::shared_ptr<TextureProxy> dest, int srcX = 0, int srcY = 0);
-
-  /**
-   * Adds a task to copy a tile-sized region from a source render target to a destination render
-   * target at a specified offset. The source content will be resolved before copying if it's an
-   * MSAA render target.
-   * @param source The source render target to copy from.
-   * @param dest The destination render target to copy to.
-   * @param tileSize The size of the tile to copy (width and height are both tileSize).
-   * @param dstX The x offset in the destination render target.
-   * @param dstY The y offset in the destination render target.
-   */
-  void addTileCopyTask(std::shared_ptr<RenderTargetProxy> source,
-                       std::shared_ptr<RenderTargetProxy> dest, int tileSize, int dstX, int dstY);
 
   void addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> source, const Rect& srcRect,
                              std::shared_ptr<GPUBufferProxy> dest);

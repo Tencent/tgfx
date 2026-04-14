@@ -135,20 +135,6 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   drawingBuffer->renderTasks.emplace_back(std::move(task));
 }
 
-void DrawingManager::addTileCopyTask(std::shared_ptr<RenderTargetProxy> source,
-                                     std::shared_ptr<RenderTargetProxy> dest, int tileSize,
-                                     int dstX, int dstY) {
-  if (source == nullptr || dest == nullptr || tileSize <= 0) {
-    return;
-  }
-  ensureMSAAResolved(source);
-  auto drawingBuffer = getDrawingBuffer();
-  auto allocator = &drawingBuffer->drawingAllocator;
-  auto task = allocator->make<TileCopyTask>(allocator, std::move(source), std::move(dest), tileSize,
-                                            dstX, dstY);
-  drawingBuffer->renderTasks.emplace_back(std::move(task));
-}
-
 void DrawingManager::addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> source,
                                            const Rect& srcRect,
                                            std::shared_ptr<GPUBufferProxy> dest) {

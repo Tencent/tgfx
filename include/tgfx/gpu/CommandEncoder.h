@@ -94,18 +94,6 @@ class CommandEncoder {
   virtual void resolveRenderTarget(RenderTarget* renderTarget, const Rect& resolveRect) = 0;
 
   /**
-   * Copies a rectangular region from a source render target to a destination render target at a
-   * specified offset. If the source is MSAA and the destination is single-sampled, this performs
-   * resolve and copy in one operation.
-   * @param srcRenderTarget The source render target to copy from.
-   * @param srcRect The rectangle region of the source to copy.
-   * @param dstRenderTarget The destination render target to copy to.
-   * @param dstOffset The offset in the destination where the copied region will be placed.
-   */
-  virtual void blitRenderTarget(RenderTarget* srcRenderTarget, const Rect& srcRect,
-                                RenderTarget* dstRenderTarget, const Point& dstOffset) = 0;
-
-  /**
    * Finalizes command encoding and returns a CommandBuffer with all recorded commands. You can then
    * submit the CommandBuffer to the GPU for execution using GPU::submit(). Returns nullptr if no
    * commands were recorded or if encoding failed, for example, if an active render pass was not

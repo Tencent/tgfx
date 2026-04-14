@@ -171,41 +171,6 @@ void MetalCommandEncoder::resolveRenderTarget(RenderTarget*, const Rect&) {
   // No explicit resolve call needed.
 }
 
-void MetalCommandEncoder::blitRenderTarget(RenderTarget* srcRenderTarget, const Rect& srcRect,
-                                           RenderTarget* dstRenderTarget, const Point& dstOffset) {
-  if (srcRenderTarget == nullptr || dstRenderTarget == nullptr || srcRect.isEmpty()) {
-    LOGE("MetalCommandEncoder::blitRenderTarget() invalid arguments!");
-    return;
-  }
-  auto srcTexture = srcRenderTarget->getRenderTexture();
-  auto dstTexture = dstRenderTarget->getRenderTexture();
-  if (srcTexture == nullptr || dstTexture == nullptr) {
-    LOGE("MetalCommandEncoder::blitRenderTarget() failed to get textures!");
-    return;
-  }
-  auto metalSrcTexture = std::static_pointer_cast<MetalTexture>(srcTexture);
-  auto metalDstTexture = std::static_pointer_cast<MetalTexture>(dstTexture);
-  id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
-  if (blitEncoder == nil) {
-    LOGE("MetalCommandEncoder::blitRenderTarget() failed to create blit command encoder!");
-    return;
-  }
-  auto sourceOrigin = MakeMTLOrigin(srcRect);
-  auto sourceSize = MakeMTLSize(srcRect);
-  MTLOrigin destinationOrigin =
-      MTLOriginMake(static_cast<NSUInteger>(dstOffset.x), static_cast<NSUInteger>(dstOffset.y), 0);
-  [blitEncoder copyFromTexture:metalSrcTexture->metalTexture()
-                   sourceSlice:0
-                   sourceLevel:0
-                  sourceOrigin:sourceOrigin
-                    sourceSize:sourceSize
-                     toTexture:metalDstTexture->metalTexture()
-              destinationSlice:0
-              destinationLevel:0
-             destinationOrigin:destinationOrigin];
-  [blitEncoder endEncoding];
-}
-
 std::shared_ptr<CommandBuffer> MetalCommandEncoder::onFinish() {
   return std::make_shared<MetalCommandBuffer>(commandBuffer);
 }

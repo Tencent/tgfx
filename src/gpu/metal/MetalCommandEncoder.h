@@ -57,9 +57,6 @@ class MetalCommandEncoder : public CommandEncoder, public MetalResource {
 
   void resolveRenderTarget(RenderTarget* renderTarget, const Rect& resolveRect) override;
 
-  void blitRenderTarget(RenderTarget* srcRenderTarget, const Rect& srcRect,
-                        RenderTarget* dstRenderTarget, const Point& dstOffset) override;
-
  protected:
   std::shared_ptr<CommandBuffer> onFinish() override;
   void onRelease(MetalGPU* gpu) override;
