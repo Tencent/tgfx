@@ -166,11 +166,6 @@ void MetalCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> tex
   [blitEncoder endEncoding];
 }
 
-void MetalCommandEncoder::resolveRenderTarget(RenderTarget*, const Rect&) {
-  // Metal resolves automatically via MTLStoreActionMultisampleResolve at RenderPass end.
-  // No explicit resolve call needed.
-}
-
 std::shared_ptr<CommandBuffer> MetalCommandEncoder::onFinish() {
   return std::make_shared<MetalCommandBuffer>(commandBuffer);
 }

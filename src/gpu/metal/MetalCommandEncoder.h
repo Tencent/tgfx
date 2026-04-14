@@ -54,7 +54,9 @@ class MetalCommandEncoder : public CommandEncoder, public MetalResource {
 
   void generateMipmapsForTexture(std::shared_ptr<Texture> texture) override;
 
-  void resolveRenderTarget(RenderTarget* renderTarget, const Rect& resolveRect) override;
+  // Metal resolves automatically via MTLStoreActionMultisampleResolve at RenderPass end.
+  void resolveRenderTarget(RenderTarget*, const Rect&) override {
+  }
 
  protected:
   std::shared_ptr<CommandBuffer> onFinish() override;
