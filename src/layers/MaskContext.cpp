@@ -22,8 +22,19 @@
 
 namespace tgfx {
 
+/**
+ * Maximum number of draw operations allowed for mask path extraction. When a picture's drawCount
+ * exceeds this threshold, MaskContext skips path extraction because the cost of multiple PathOp
+ * Union operations grows super-linearly and the resulting complex path becomes expensive to
+ * rasterize, making the MaskFilter fallback more efficient.
+ */
+static constexpr size_t MaxMaskPathDrawCount = 10;
+
 bool MaskContext::GetMaskPath(const std::shared_ptr<Picture>& picture, Path* result) {
   if (picture == nullptr || result == nullptr) {
+    return false;
+  }
+  if (picture->drawCount > MaxMaskPathDrawCount) {
     return false;
   }
   MaskContext maskContext;
