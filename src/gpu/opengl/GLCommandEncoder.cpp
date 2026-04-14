@@ -206,6 +206,49 @@ void GLCommandEncoder::resolveRenderTarget(RenderTarget* renderTarget, const Rec
   gl->blitFramebuffer(l, b, r, t, l, b, r, t, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }
 
+void GLCommandEncoder::blitRenderTarget(RenderTarget* srcRenderTarget, const Rect& srcRect,
+                                        RenderTarget* dstRenderTarget, const Point& dstOffset) {
+  if (srcRenderTarget == nullptr || dstRenderTarget == nullptr || srcRect.isEmpty()) {
+    LOGE("GLCommandEncoder::blitRenderTarget() invalid arguments!");
+    return;
+  }
+  auto srcTexture = srcRenderTarget->getRenderTexture();
+  auto dstTexture = dstRenderTarget->getRenderTexture();
+  if (srcTexture == nullptr || dstTexture == nullptr) {
+    LOGE("GLCommandEncoder::blitRenderTarget() failed to get textures!");
+    return;
+  }
+  auto glSrcTexture = static_cast<GLTexture*>(srcTexture.get());
+  auto glDstTexture = static_cast<GLTexture*>(dstTexture.get());
+  // For MSAA source, the framebuffer is already created with the renderbuffer attached.
+  // For non-MSAA textures, we need to ensure they have a framebuffer.
+  if (glSrcTexture->textureID() != 0 && !glSrcTexture->checkFrameBuffer(_gpu)) {
+    LOGE("GLCommandEncoder::blitRenderTarget() failed to create framebuffer for source texture!");
+    return;
+  }
+  if (glDstTexture->textureID() != 0 && !glDstTexture->checkFrameBuffer(_gpu)) {
+    LOGE(
+        "GLCommandEncoder::blitRenderTarget() failed to create framebuffer for destination "
+        "texture!");
+    return;
+  }
+  auto gl = _gpu->functions();
+  auto state = _gpu->state();
+  state->bindFramebuffer(glSrcTexture, FrameBufferTarget::Read);
+  state->bindFramebuffer(glDstTexture, FrameBufferTarget::Draw);
+  state->setEnabled(GL_SCISSOR_TEST, false);
+  const auto srcX0 = FloatSaturateToInt(srcRect.x());
+  const auto srcY0 = FloatSaturateToInt(srcRect.y());
+  const auto srcX1 = FloatSaturateToInt(srcRect.right);
+  const auto srcY1 = FloatSaturateToInt(srcRect.bottom);
+  const auto dstX0 = FloatSaturateToInt(dstOffset.x);
+  const auto dstY0 = FloatSaturateToInt(dstOffset.y);
+  const auto dstX1 = dstX0 + (srcX1 - srcX0);
+  const auto dstY1 = dstY0 + (srcY1 - srcY0);
+  gl->blitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, GL_COLOR_BUFFER_BIT,
+                      GL_NEAREST);
+}
+
 std::shared_ptr<CommandBuffer> GLCommandEncoder::onFinish() {
   // In OpenGL, we don't have a specific command buffer to return, so we just return an empty one.
   return std::make_shared<CommandBuffer>();

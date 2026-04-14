@@ -42,6 +42,9 @@ class GLCommandEncoder : public CommandEncoder {
 
   void resolveRenderTarget(RenderTarget* renderTarget, const Rect& resolveRect) override;
 
+  void blitRenderTarget(RenderTarget* srcRenderTarget, const Rect& srcRect,
+                        RenderTarget* dstRenderTarget, const Point& dstOffset) override;
+
  protected:
   std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;
 

@@ -40,15 +40,9 @@ void TileCopyTask::execute(CommandEncoder* encoder) {
     LOGE("TileCopyTask::execute() Failed to get the dest render target!");
     return;
   }
-  auto srcTexture = srcRenderTarget->getSampleTexture();
-  auto dstTexture = dstRenderTarget->getSampleTexture();
-  if (srcTexture == nullptr || dstTexture == nullptr) {
-    LOGE("TileCopyTask::execute() Failed to get textures!");
-    return;
-  }
   auto srcRect = Rect::MakeWH(tileSize, tileSize);
   auto dstOffset = Point::Make(static_cast<float>(dstX), static_cast<float>(dstY));
-  encoder->copyTextureToTexture(srcTexture, srcRect, dstTexture, dstOffset);
+  encoder->blitRenderTarget(srcRenderTarget.get(), srcRect, dstRenderTarget.get(), dstOffset);
 }
 
 }  // namespace tgfx

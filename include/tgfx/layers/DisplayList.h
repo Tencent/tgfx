@@ -296,7 +296,6 @@ class DisplayList {
   Point mousePosition = {};
   int totalTileCount = 0;
   std::vector<std::shared_ptr<Surface>> surfaceCaches = {};
-  std::shared_ptr<Surface> msaaTileSurface = nullptr;
   std::unordered_map<int64_t, TileCache*> tileCaches = {};
   std::vector<std::shared_ptr<Tile>> emptyTiles = {};
   std::deque<std::vector<Rect>> lastDirtyRegions = {};
@@ -342,11 +341,7 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  void drawTileTask(const DrawTask& task, const Surface* renderSurface);
-
-  void drawTileTaskMSAA(const DrawTask& task, Surface* atlasSurface, const Surface* renderSurface);
-
-  Surface* getOrCreateMSAATileSurface(const Surface* renderSurface);
+  void drawTileTask(const DrawTask& task) const;
 
   void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear) const;
 

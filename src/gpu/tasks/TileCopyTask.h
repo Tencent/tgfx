@@ -23,7 +23,7 @@
 
 namespace tgfx {
 /**
- * A RenderTask that copies a tile-sized region from a source render target to a destination
+ * A RenderTask that copies a rectangular region from a source render target to a destination
  * render target at a specified offset. Used for MSAA tile optimization in tiled rendering mode.
  */
 class TileCopyTask : public RenderTask {

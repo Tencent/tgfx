@@ -442,7 +442,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   for (auto& task : tileTasks) {
-    drawTileTask(task, surface);
+    drawTileTask(task);
     auto dirtyRect = task.tileRect();
     dirtyRect.offset(_contentOffset.x, _contentOffset.y);
     if (dirtyRect.intersect(surfaceRect)) {
@@ -838,10 +838,10 @@ std::vector<std::shared_ptr<Tile>> DisplayList::createContinuousTiles(const Surf
     countY = requestCountY;
     countX = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countY));
   }
-  // Use sampleCount=1 for surfaceCache (atlas). MSAA is applied on a temporary tile surface.
-  auto surface =
-      Surface::Make(context, countX * _tileSize, countY * _tileSize, ColorType::RGBA_8888, 1, false,
-                    renderSurface->renderFlags(), renderSurface->colorSpace());
+  // Use the same sampleCount as renderSurface for proper MSAA support.
+  auto surface = Surface::Make(context, countX * _tileSize, countY * _tileSize,
+                               ColorType::RGBA_8888, renderSurface->sampleCount(), false,
+                               renderSurface->renderFlags(), renderSurface->colorSpace());
   if (surface == nullptr) {
     return {};
   }
@@ -876,10 +876,10 @@ bool DisplayList::createEmptyTiles(const Surface* renderSurface) {
   }
   int countX = FloatSaturateToInt(sqrtf(static_cast<float>(tileCount)));
   int countY = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countX));
-  // Use sampleCount=1 for surfaceCache (atlas). MSAA is applied on a temporary tile surface.
-  auto surface =
-      Surface::Make(context, countX * _tileSize, countY * _tileSize, ColorType::RGBA_8888, 1, false,
-                    renderSurface->renderFlags(), renderSurface->colorSpace());
+  // Use the same sampleCount as renderSurface for proper MSAA support.
+  auto surface = Surface::Make(context, countX * _tileSize, countY * _tileSize,
+                               ColorType::RGBA_8888, renderSurface->sampleCount(), false,
+                               renderSurface->renderFlags(), renderSurface->colorSpace());
   if (surface == nullptr) {
     return false;
   }
@@ -918,85 +918,22 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
-void DisplayList::drawTileTask(const DrawTask& task, const Surface* renderSurface) {
-  auto atlasSurface = surfaceCaches[task.sourceIndex()].get();
-  DEBUG_ASSERT(atlasSurface != nullptr);
-  if (renderSurface->sampleCount() > 1) {
-    drawTileTaskMSAA(task, atlasSurface, renderSurface);
-  } else {
-    // Non-MSAA path: render directly to atlas surface (original logic).
-    auto canvas = atlasSurface->getCanvas();
-    AutoCanvasRestore autoRestore(canvas);
-    auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-    DEBUG_ASSERT(currentZoomScale != 0.0f);
-    auto viewMatrix = Matrix::MakeScale(currentZoomScale);
-    auto& tileRect = task.tileRect();
-    auto& sourceRect = task.sourceRect();
-    auto offsetX = sourceRect.left - tileRect.left;
-    auto offsetY = sourceRect.top - tileRect.top;
-    viewMatrix.postTranslate(offsetX, offsetY);
-    auto clipRect = tileRect;
-    clipRect.offset(offsetX, offsetY);
-    drawRootLayer(atlasSurface, clipRect, viewMatrix, true);
-  }
-}
-
-void DisplayList::drawTileTaskMSAA(const DrawTask& task, Surface* atlasSurface,
-                                   const Surface* renderSurface) {
-  // Get or create the reusable MSAA tile surface.
-  auto tileSurface = getOrCreateMSAATileSurface(renderSurface);
-  if (tileSurface == nullptr) {
-    LOGE("DisplayList::drawTileTaskMSAA() Failed to create MSAA tile surface, falling back.");
-    // Fallback to non-MSAA direct rendering.
-    auto canvas = atlasSurface->getCanvas();
-    AutoCanvasRestore autoRestore(canvas);
-    auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-    DEBUG_ASSERT(currentZoomScale != 0.0f);
-    auto viewMatrix = Matrix::MakeScale(currentZoomScale);
-    auto& tileRect = task.tileRect();
-    auto& sourceRect = task.sourceRect();
-    auto offsetX = sourceRect.left - tileRect.left;
-    auto offsetY = sourceRect.top - tileRect.top;
-    viewMatrix.postTranslate(offsetX, offsetY);
-    auto clipRect = tileRect;
-    clipRect.offset(offsetX, offsetY);
-    drawRootLayer(atlasSurface, clipRect, viewMatrix, true);
-    return;
-  }
-
-  // Render to the MSAA tile surface.
+void DisplayList::drawTileTask(const DrawTask& task) const {
+  auto surface = surfaceCaches[task.sourceIndex()].get();
+  DEBUG_ASSERT(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  AutoCanvasRestore autoRestore(canvas);
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
   auto viewMatrix = Matrix::MakeScale(currentZoomScale);
   auto& tileRect = task.tileRect();
-  // The tile surface always renders from (0, 0), so offset the view matrix accordingly.
-  viewMatrix.postTranslate(-tileRect.left, -tileRect.top);
-  auto tileClipRect = Rect::MakeWH(_tileSize, _tileSize);
-  drawRootLayer(tileSurface, tileClipRect, viewMatrix, true);
-
-  // Copy from tile surface to atlas at the correct position.
-  auto context = atlasSurface->getContext();
-  auto srcRenderTarget = tileSurface->renderContext->renderTarget;
-  auto dstRenderTarget = atlasSurface->renderContext->renderTarget;
-  context->drawingManager()->addTileCopyTask(srcRenderTarget, dstRenderTarget, _tileSize,
-                                             static_cast<int>(task.sourceRect().left),
-                                             static_cast<int>(task.sourceRect().top));
-}
-
-Surface* DisplayList::getOrCreateMSAATileSurface(const Surface* renderSurface) {
-  if (msaaTileSurface != nullptr && msaaTileSurface->getContext() == renderSurface->getContext() &&
-      msaaTileSurface->sampleCount() == renderSurface->sampleCount() &&
-      msaaTileSurface->width() >= _tileSize && msaaTileSurface->height() >= _tileSize &&
-      ColorSpace::Equals(msaaTileSurface->colorSpace().get(), renderSurface->colorSpace().get())) {
-    return msaaTileSurface.get();
-  }
-  msaaTileSurface = Surface::Make(renderSurface->getContext(), _tileSize, _tileSize,
-                                  ColorType::RGBA_8888, renderSurface->sampleCount(), false,
-                                  renderSurface->renderFlags(), renderSurface->colorSpace());
-  if (msaaTileSurface == nullptr) {
-    LOGE("DisplayList::getOrCreateMSAATileSurface() Failed to create MSAA tile surface!");
-  }
-  return msaaTileSurface.get();
+  auto& sourceRect = task.sourceRect();
+  auto offsetX = sourceRect.left - tileRect.left;
+  auto offsetY = sourceRect.top - tileRect.top;
+  viewMatrix.postTranslate(offsetX, offsetY);
+  auto clipRect = tileRect;
+  clipRect.offset(offsetX, offsetY);
+  drawRootLayer(surface, clipRect, viewMatrix, true);
 }
 
 void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface,
@@ -1078,7 +1015,6 @@ void DisplayList::resetCaches() {
   }
   tileCaches = {};
   surfaceCaches = {};
-  msaaTileSurface = nullptr;
   totalTileCount = 0;
   emptyTiles.clear();
 }
