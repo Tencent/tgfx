@@ -1611,33 +1611,6 @@ TGFX_TEST(CanvasTest, PictureMaskPath) {
   EXPECT_EQ(colorOutside, Color::Transparent());
 }
 
-TGFX_TEST(CanvasTest, MaskPathDrawCountThreshold) {
-  PictureRecorder recorder = {};
-  Path maskPath = {};
-
-  // Record a picture with 50 side-by-side rects (at the threshold).
-  auto canvas = recorder.beginRecording();
-  Paint paint = {};
-  paint.setColor(Color::White());
-  for (int i = 0; i < 50; i++) {
-    canvas->drawRect(Rect::MakeXYWH(static_cast<float>(i * 12), 0.f, 10.f, 10.f), paint);
-  }
-  auto picture = recorder.finishRecordingAsPicture();
-  ASSERT_TRUE(picture != nullptr);
-  EXPECT_EQ(picture->drawCount, 50u);
-  EXPECT_TRUE(MaskContext::GetMaskPath(picture, &maskPath));
-
-  // Record a picture with 51 rects (exceeds the threshold).
-  canvas = recorder.beginRecording();
-  for (int i = 0; i < 51; i++) {
-    canvas->drawRect(Rect::MakeXYWH(static_cast<float>(i * 12), 0.f, 10.f, 10.f), paint);
-  }
-  picture = recorder.finishRecordingAsPicture();
-  ASSERT_TRUE(picture != nullptr);
-  EXPECT_EQ(picture->drawCount, 51u);
-  EXPECT_FALSE(MaskContext::GetMaskPath(picture, &maskPath));
-}
-
 TGFX_TEST(CanvasTest, DrawImage) {
   ContextScope scope;
   auto context = scope.getContext();

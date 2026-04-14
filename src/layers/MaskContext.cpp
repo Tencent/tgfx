@@ -28,7 +28,7 @@ namespace tgfx {
  * Union operations grows super-linearly and the resulting complex path becomes expensive to
  * rasterize, making the MaskFilter fallback more efficient.
  */
-static constexpr size_t MaxMaskPathDrawCount = 50;
+static constexpr size_t MaxMaskPathDrawCount = 30;
 
 bool MaskContext::GetMaskPath(const std::shared_ptr<Picture>& picture, Path* result) {
   if (picture == nullptr || result == nullptr) {
