@@ -169,8 +169,7 @@ QSGTexture* QGLWindow::getQSGTexture() {
 #elif (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
         presentedQSGTexture = nativeWindow->createTextureFromNativeObject(
             QQuickWindow::NativeObjectTexture, &info.id, 0,
-            QSize(localProxy->width(), localProxy->height()),
-            QQuickWindow::TextureHasAlphaChannel);
+            QSize(localProxy->width(), localProxy->height()), QQuickWindow::TextureHasAlphaChannel);
 #else
         presentedQSGTexture = nativeWindow->createTextureFromId(
             info.id, QSize(localProxy->width(), localProxy->height()),
