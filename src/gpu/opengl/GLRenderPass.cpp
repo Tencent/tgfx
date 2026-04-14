@@ -62,7 +62,6 @@ bool GLRenderPass::begin() {
   state->setViewport(0, 0, renderTexture->width(), renderTexture->height());
   // Disable scissor test by default.
   state->setEnabled(GL_SCISSOR_TEST, false);
-  // Enable GL_MULTISAMPLE when rendering to a multisample texture.
   if (colorAttachment.resolveTexture && _gpu->caps()->multisampleDisableSupport) {
     state->setEnabled(GL_MULTISAMPLE, true);
   }
