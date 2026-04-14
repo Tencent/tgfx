@@ -18,11 +18,13 @@
 
 #pragma once
 
+#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/MapDirection.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/RuntimeEffect.h"
@@ -120,6 +122,16 @@ class ImageFilter {
    */
   static std::shared_ptr<ImageFilter> Runtime(std::shared_ptr<RuntimeEffect> effect);
 
+  /**
+   * Creates a filter that blends a shader with the input image using the specified blend mode.
+   * The input image serves as the background (dst), and the shader is evaluated per-pixel to
+   * produce the foreground (src). When clipToSource is true, the result is clipped to the source
+   * bounds.
+   */
+  static std::shared_ptr<ImageFilter> Blend(BlendMode blendMode,
+                                            std::shared_ptr<class Shader> shader,
+                                            bool clipToSource = false);
+
   virtual ~ImageFilter() = default;
 
   /**
@@ -132,7 +144,7 @@ class ImageFilter {
   Rect filterBounds(const Rect& rect, MapDirection mapDirection = MapDirection::Forward) const;
 
  protected:
-  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime };
+  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime, Blend };
 
   /**
    * Returns the type of this image filter.
@@ -180,6 +192,7 @@ class ImageFilter {
   friend class InnerShadowImageFilter;
   friend class ComposeImageFilter;
   friend class FilterImage;
+  friend class BlendImageFilter;
   friend class Types;
 };
 
