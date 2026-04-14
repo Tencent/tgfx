@@ -28,6 +28,7 @@
 #include "tgfx/layers/filters/InnerShadowFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
+#include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -465,6 +466,93 @@ TGFX_TEST(LayerFilterTest, ScaledRectWithInnerShadow) {
   displayList->root()->addChild(shapeLayer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/ScaledRectWithInnerShadow"));
+}
+
+TGFX_TEST(LayerFilterTest, MonoNoiseStyle) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 345, 304);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto layer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(345, 304));
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(217, 217, 217)));
+
+  auto noise = NoiseStyle::MakeMono(4, 0.51f, Color{0.0f, 0.0f, 0.0f, 0.25f}, 6903);
+  layer->setLayerStyles({noise});
+
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/MonoNoiseStyle"));
+}
+
+TGFX_TEST(LayerFilterTest, DuoNoiseStyle) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 345, 304);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto layer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(345, 304));
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(217, 217, 217)));
+
+  auto noise = NoiseStyle::MakeDuo(4, 0.51f, Color{0.0f, 0.0f, 0.0f, 0.25f},
+                                   Color{1.0f, 1.0f, 1.0f, 0.25f}, 6903);
+  layer->setLayerStyles({noise});
+
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/DuoNoiseStyle"));
+}
+
+TGFX_TEST(LayerFilterTest, MultiNoiseStyle) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 345, 304);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto layer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(345, 304));
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(217, 217, 217)));
+
+  auto noise = NoiseStyle::MakeMulti(4, 0.51f, 0.15f, 6903);
+  layer->setLayerStyles({noise});
+
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/MultiNoiseStyle"));
+}
+
+TGFX_TEST(LayerFilterTest, NoiseStyleBlendMode) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto layer = ShapeLayer::Make();
+  layer->setMatrix(Matrix::MakeTrans(50, 50));
+  Path path;
+  path.addRoundRect(Rect::MakeWH(200, 200), 20, 20);
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(100, 150, 200)));
+
+  auto noise = NoiseStyle::MakeMono(4, 0.5f, Color{0.0f, 0.0f, 0.0f, 0.5f}, 6903);
+  noise->setBlendMode(BlendMode::Overlay);
+  layer->setLayerStyles({noise});
+
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseStyleBlendMode"));
 }
 
 }  // namespace tgfx
