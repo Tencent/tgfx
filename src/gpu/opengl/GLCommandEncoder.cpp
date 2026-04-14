@@ -176,6 +176,11 @@ void GLCommandEncoder::resolveRenderTarget(RenderTarget* renderTarget, const Rec
   if (renderTarget == nullptr || renderTarget->sampleCount() <= 1) {
     return;
   }
+  Rect rect = resolveRect;
+  rect.roundOut();
+  if (!rect.intersect(renderTarget->bounds())) {
+    return;
+  }
   auto renderTexture = renderTarget->getRenderTexture();
   auto sampleTexture = renderTarget->getSampleTexture();
   if (renderTexture == sampleTexture) {
@@ -194,11 +199,6 @@ void GLCommandEncoder::resolveRenderTarget(RenderTarget* renderTarget, const Rec
   state->bindFramebuffer(glRenderTexture, FrameBufferTarget::Read);
   state->bindFramebuffer(glSampleTexture, FrameBufferTarget::Draw);
   state->setEnabled(GL_SCISSOR_TEST, false);
-  Rect rect = resolveRect;
-  rect.roundOut();
-  if (!rect.intersect(renderTarget->bounds())) {
-    return;
-  }
   const auto l = FloatSaturateToInt(rect.x());
   const auto b = FloatSaturateToInt(rect.y());
   const auto r = FloatSaturateToInt(rect.right);
