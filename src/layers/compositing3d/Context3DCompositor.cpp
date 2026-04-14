@@ -370,7 +370,11 @@ void Context3DCompositor::syncToBackgroundContext(const DrawPolygon3D* polygon) 
     Path clipPath = {};
     for (const auto& point : polygon->points()) {
       auto local = inverseMatrix.mapPoint(point);
-      clipPath.isEmpty() ? clipPath.moveTo(local.x, local.y) : clipPath.lineTo(local.x, local.y);
+      if (clipPath.isEmpty()) {
+        clipPath.moveTo(local.x, local.y);
+      } else {
+        clipPath.lineTo(local.x, local.y);
+      }
     }
     clipPath.close();
     bgCanvas->clipPath(clipPath);
