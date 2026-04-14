@@ -164,7 +164,6 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
   if (renderTarget == nullptr) {
     return false;
   }
-  auto context = renderTarget->getContext();
   RenderContext renderContext(renderTarget, renderFlags, true, nullptr, _colorSpace);
   Matrix totalMatrix = {};
   if (extraMatrix) {
@@ -177,6 +176,7 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
   renderContext.flush();
   // Ensure MSAA content is resolved before returning the texture proxy.
   // This is necessary because the texture proxy will be used immediately after this call.
+  auto context = renderTarget->getContext();
   context->drawingManager()->ensureMSAAResolved(std::move(renderTarget));
   return true;
 }
