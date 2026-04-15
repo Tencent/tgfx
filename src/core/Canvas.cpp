@@ -227,14 +227,28 @@ void Canvas::drawLine(const Point line[2], const Matrix& matrix, const ClipStack
   Matrix lineMatrix = {};
   Rect rect = {};
   if (StrokeLineToRect(stroke, line, &rect, &lineMatrix)) {
+    auto drawBrush = brush;
+    if (!lineMatrix.isIdentity()) {
+      Matrix inverse = {};
+      if (lineMatrix.invert(&inverse)) {
+        drawBrush = brush.makeWithMatrix(inverse);
+      }
+    }
     lineMatrix.postConcat(matrix);
-    drawContext->drawRect(rect, lineMatrix, clip, brush, nullptr);
+    drawContext->drawRect(rect, lineMatrix, clip, drawBrush, nullptr);
     return;
   }
   RRect rRect = {};
   if (StrokeLineToRRect(stroke, line, &rRect, &lineMatrix)) {
+    auto drawBrush = brush;
+    if (!lineMatrix.isIdentity()) {
+      Matrix inverse = {};
+      if (lineMatrix.invert(&inverse)) {
+        drawBrush = brush.makeWithMatrix(inverse);
+      }
+    }
     lineMatrix.postConcat(matrix);
-    drawContext->drawRRect(rRect, lineMatrix, clip, brush, nullptr);
+    drawContext->drawRRect(rRect, lineMatrix, clip, drawBrush, nullptr);
     return;
   }
   Path path = {};
