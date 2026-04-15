@@ -84,50 +84,93 @@ std::vector<float> SimplifyLineDashPattern(const std::vector<float>& pattern,
   return simplifiedDashes;
 }
 
-bool StrokeLineToRect(const Stroke& stroke, const Point line[2], Rect* rect) {
+bool StrokeLineToRect(const Stroke& stroke, const Point line[2], Rect* rect, Matrix* matrix) {
   if (stroke.cap == LineCap::Round || IsHairlineStroke(stroke)) {
     return false;
   }
-  if (line[0].x != line[1].x && line[0].y != line[1].y) {
-    return false;
-  }
-  auto left = std::min(line[0].x, line[1].x);
-  auto top = std::min(line[0].y, line[1].y);
-  auto right = std::max(line[0].x, line[1].x);
-  auto bottom = std::max(line[0].y, line[1].y);
+  auto dx = line[1].x - line[0].x;
+  auto dy = line[1].y - line[0].y;
   auto halfWidth = stroke.width / 2.0f;
-  if (stroke.cap == LineCap::Square) {
-    if (rect) {
-      rect->setLTRB(left - halfWidth, top - halfWidth, right + halfWidth, bottom + halfWidth);
-    }
-    return true;
-  }
-  if (rect) {
-    if (left == right) {
-      rect->setLTRB(left - halfWidth, top, right + halfWidth, bottom);
+  bool isAxisAligned = (dx == 0 || dy == 0);
+  if (isAxisAligned) {
+    auto left = std::min(line[0].x, line[1].x);
+    auto top = std::min(line[0].y, line[1].y);
+    auto right = std::max(line[0].x, line[1].x);
+    auto bottom = std::max(line[0].y, line[1].y);
+    if (stroke.cap == LineCap::Square) {
+      left -= halfWidth;
+      top -= halfWidth;
+      right += halfWidth;
+      bottom += halfWidth;
+    } else if (dx == 0) {
+      left -= halfWidth;
+      right += halfWidth;
     } else {
-      rect->setLTRB(left, top - halfWidth, right, bottom + halfWidth);
+      top -= halfWidth;
+      bottom += halfWidth;
+    }
+    if (rect) {
+      rect->setLTRB(left, top, right, bottom);
+    }
+    if (matrix) {
+      matrix->setIdentity();
+    }
+  } else {
+    auto length = std::sqrt(dx * dx + dy * dy);
+    auto halfLength = length / 2.0f;
+    if (stroke.cap == LineCap::Square) {
+      halfLength += halfWidth;
+    }
+    if (rect) {
+      rect->setLTRB(-halfLength, -halfWidth, halfLength, halfWidth);
+    }
+    if (matrix) {
+      auto centerX = (line[0].x + line[1].x) / 2.0f;
+      auto centerY = (line[0].y + line[1].y) / 2.0f;
+      float angle = std::atan2(dy, dx);
+      matrix->setRotate(RadiansToDegrees(angle), 0, 0);
+      matrix->postTranslate(centerX, centerY);
     }
   }
   return true;
 }
 
-bool StrokeLineToRRect(const Stroke& stroke, const Point line[2], RRect* rRect) {
+bool StrokeLineToRRect(const Stroke& stroke, const Point line[2], RRect* rRect, Matrix* matrix) {
   if (stroke.cap != LineCap::Round || IsHairlineStroke(stroke)) {
     return false;
   }
-  if (line[0].x != line[1].x && line[0].y != line[1].y) {
-    return false;
-  }
-  auto left = std::min(line[0].x, line[1].x);
-  auto top = std::min(line[0].y, line[1].y);
-  auto right = std::max(line[0].x, line[1].x);
-  auto bottom = std::max(line[0].y, line[1].y);
+  auto dx = line[1].x - line[0].x;
+  auto dy = line[1].y - line[0].y;
   auto halfWidth = stroke.width / 2.0f;
-  if (rRect) {
-    Rect rect = {};
-    rect.setLTRB(left - halfWidth, top - halfWidth, right + halfWidth, bottom + halfWidth);
-    rRect->setRectXY(rect, halfWidth, halfWidth);
+  bool isAxisAligned = (dx == 0 || dy == 0);
+  if (isAxisAligned) {
+    auto left = std::min(line[0].x, line[1].x) - halfWidth;
+    auto top = std::min(line[0].y, line[1].y) - halfWidth;
+    auto right = std::max(line[0].x, line[1].x) + halfWidth;
+    auto bottom = std::max(line[0].y, line[1].y) + halfWidth;
+    if (rRect) {
+      Rect rect = {};
+      rect.setLTRB(left, top, right, bottom);
+      rRect->setRectXY(rect, halfWidth, halfWidth);
+    }
+    if (matrix) {
+      matrix->setIdentity();
+    }
+  } else {
+    auto length = std::sqrt(dx * dx + dy * dy);
+    auto halfLength = length / 2.0f + halfWidth;
+    if (rRect) {
+      Rect rect = {};
+      rect.setLTRB(-halfLength, -halfWidth, halfLength, halfWidth);
+      rRect->setRectXY(rect, halfWidth, halfWidth);
+    }
+    if (matrix) {
+      auto centerX = (line[0].x + line[1].x) / 2.0f;
+      auto centerY = (line[0].y + line[1].y) / 2.0f;
+      float angle = std::atan2(dy, dx);
+      matrix->setRotate(RadiansToDegrees(angle), 0, 0);
+      matrix->postTranslate(centerX, centerY);
+    }
   }
   return true;
 }

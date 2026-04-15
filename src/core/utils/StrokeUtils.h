@@ -59,15 +59,17 @@ float GetHairlineAlphaFactor(const Stroke& stroke, const Matrix& matrix);
 std::vector<float> SimplifyLineDashPattern(const std::vector<float>& pattern, const Stroke& stroke);
 
 /**
- * Converts a stroked axis-aligned line to a filled rectangle. Returns true if the conversion is
- * possible (Butt or Square cap, non-hairline, axis-aligned line), and writes the result to rect.
+ * Converts a stroked line to a filled rectangle with a transformation matrix. Returns true if the
+ * conversion is possible (Butt or Square cap, non-hairline), and writes the result to rect and
+ * matrix. The rect is centered at origin and the matrix transforms it to the correct position.
  */
-bool StrokeLineToRect(const Stroke& stroke, const Point line[2], Rect* rect);
+bool StrokeLineToRect(const Stroke& stroke, const Point line[2], Rect* rect, Matrix* matrix);
 
 /**
- * Converts a stroked axis-aligned line to a filled round rectangle. Returns true if the conversion
- * is possible (Round cap, non-hairline, axis-aligned line), and writes the result to rRect.
+ * Converts a stroked line to a filled round rectangle with a transformation matrix. Returns true if
+ * the conversion is possible (Round cap, non-hairline), and writes the result to rRect and matrix.
+ * The rRect is centered at origin and the matrix transforms it to the correct position.
  */
-bool StrokeLineToRRect(const Stroke& stroke, const Point line[2], RRect* rRect);
+bool StrokeLineToRRect(const Stroke& stroke, const Point line[2], RRect* rRect, Matrix* matrix);
 
 }  // namespace tgfx

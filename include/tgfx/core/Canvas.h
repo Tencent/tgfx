@@ -480,6 +480,8 @@ class Canvas {
   std::unique_ptr<ClipStack> clipStack;
 
   explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
+  void drawLine(const Point line[2], const Matrix& matrix, const ClipStack& clip,
+                const Brush& brush, const Stroke& stroke) const;
   void drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip, const Brush& brush,
                 const Stroke* stroke = nullptr) const;
   void drawImage(std::shared_ptr<Image> image, const Brush& brush, const SamplingOptions& sampling,

@@ -181,14 +181,25 @@ bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& pai
   Point line[2] = {};
   if (path.isLine(line)) {
     if (paint.style != PaintStyle::Stroke) {
-      // A line cannot be filled.
       return true;
     }
+    Matrix lineMatrix = {};
     Rect rect = {};
-    if (StrokeLineToRect(paint.stroke, line, &rect)) {
+    if (StrokeLineToRect(paint.stroke, line, &rect, &lineMatrix)) {
       LayerPaint fillPaint = paint;
       fillPaint.style = PaintStyle::Fill;
-      addRect(rect, fillPaint, matrix);
+      Matrix combinedMatrix = lineMatrix;
+      combinedMatrix.postConcat(matrix);
+      addRect(rect, fillPaint, combinedMatrix);
+      return true;
+    }
+    RRect rRect = {};
+    if (StrokeLineToRRect(paint.stroke, line, &rRect, &lineMatrix)) {
+      LayerPaint fillPaint = paint;
+      fillPaint.style = PaintStyle::Fill;
+      Matrix combinedMatrix = lineMatrix;
+      combinedMatrix.postConcat(matrix);
+      addRRect(rRect, fillPaint, combinedMatrix);
       return true;
     }
   }
