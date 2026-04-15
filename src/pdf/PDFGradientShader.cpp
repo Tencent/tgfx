@@ -718,6 +718,10 @@ PDFIndirectReference MakeConicTriangleMeshShader(PDFDocumentImpl* doc,
       "numSegments=%d segAngle=%.4f maxRadius=%.1f",
       center.x, center.y, startAngleDeg, endAngleDeg, angleRange, numSegments, segmentAngle,
       maxRadius);
+  LOGI("ConicMesh: finalMatrix=[%.4f,%.4f,%.4f,%.4f,%.4f,%.4f] bbox=(%.1f,%.1f,%.1f,%.1f)",
+       finalMatrix.getScaleX(), finalMatrix.getSkewY(), finalMatrix.getSkewX(),
+       finalMatrix.getScaleY(), finalMatrix.getTranslateX(), finalMatrix.getTranslateY(), bbox.left,
+       bbox.top, bbox.right, bbox.bottom);
 
   int triIndex = 0;
   Color firstColor = info.colors.front();
