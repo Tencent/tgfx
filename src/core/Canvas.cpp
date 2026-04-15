@@ -311,6 +311,9 @@ static bool UseDrawPath(const Paint& paint, const Point& radii, const Matrix& vi
 }
 
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
+  if (rRect.rect.isEmpty()) {
+    return;
+  }
   auto& radii = rRect.radii;
   if (radii.x < 0.5f && radii.y < 0.5f) {
     drawRect(rRect.rect, paint);
@@ -320,9 +323,6 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
     Path path = {};
     path.addRRect(rRect);
     drawPath(path, paint);
-    return;
-  }
-  if (rRect.rect.isEmpty()) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
