@@ -92,9 +92,9 @@ std::shared_ptr<Shader> NoiseStyle::getNoiseShader(float contentScale) const {
   return Shader::MakeFractalNoise(freq, freq, 3, _seed);
 }
 
-// Density filter for dark pixels: Luma -> invert -> threshold.
+// Density filter for dark pixels: Luma -> invert alpha -> threshold.
 // Keeps pixels where luminance < density (dark noise), discards bright ones.
-static std::shared_ptr<ColorFilter> MakeMonoDensityFilter(float density) {
+static std::shared_ptr<ColorFilter> MakeDarkDensityFilter(float density) {
   auto lumaFilter = ColorFilter::Luma();
   // clang-format off
   std::array<float, 20> invertAlphaMatrix = {
@@ -118,37 +118,21 @@ static std::shared_ptr<ColorFilter> MakeBrightDensityFilter(float density) {
   return ColorFilter::Compose(lumaFilter, thresholdFilter);
 }
 
-// Draws a colored noise layer clipped to content alpha.
-// The noiseAlphaShader provides binary alpha (0 or 1) from density thresholding.
-// The color (with alpha) is applied via paint.setColor, then the noise shader acts as a mask.
-static void DrawColoredNoiseLayer(Canvas* canvas, std::shared_ptr<Image> content,
-                                  std::shared_ptr<Shader> noiseAlphaShader, const Color& color,
-                                  float layerAlpha, BlendMode blendMode) {
-  if (noiseAlphaShader == nullptr || content == nullptr) {
+// Draws a noise layer clipped to content alpha. The shader must already have color, density, and
+// alpha fully baked in.
+static void DrawNoiseLayer(Canvas* canvas, std::shared_ptr<Image> content,
+                           std::shared_ptr<Shader> coloredShader, BlendMode blendMode) {
+  if (coloredShader == nullptr || content == nullptr) {
     return;
   }
-  // Encode color RGB and alpha into a ColorFilter matrix applied to the noise alpha shader.
-  // Output: (color.r, color.g, color.b, noise_alpha * color.alpha * layerAlpha)
-  float finalAlpha = color.alpha * layerAlpha;
-  // clang-format off
-  std::array<float, 20> colorMatrix = {
-    0.0f, 0.0f, 0.0f, 0.0f, color.red,
-    0.0f, 0.0f, 0.0f, 0.0f, color.green,
-    0.0f, 0.0f, 0.0f, 0.0f, color.blue,
-    0.0f, 0.0f, 0.0f, finalAlpha, 0.0f,
-  };
-  // clang-format on
-  auto colorFilter = ColorFilter::Matrix(colorMatrix);
-  auto coloredShader = noiseAlphaShader->makeWithColorFilter(std::move(colorFilter));
-
-  Paint noisePaint = {};
-  noisePaint.setShader(std::move(coloredShader));
-  noisePaint.setMaskFilter(
+  Paint paint = {};
+  paint.setShader(std::move(coloredShader));
+  paint.setMaskFilter(
       MaskFilter::MakeShader(Shader::MakeImageShader(content, TileMode::Decal, TileMode::Decal)));
-  noisePaint.setBlendMode(blendMode);
+  paint.setBlendMode(blendMode);
   auto bounds =
       Rect::MakeWH(static_cast<float>(content->width()), static_cast<float>(content->height()));
-  canvas->drawRect(bounds, noisePaint);
+  canvas->drawRect(bounds, paint);
 }
 
 // --- MonoNoiseStyle ---
@@ -171,10 +155,21 @@ void MonoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, floa
   if (noiseShader == nullptr) {
     return;
   }
-  auto densityFilter = MakeMonoDensityFilter(_density);
+  auto densityFilter = MakeDarkDensityFilter(_density);
   auto alphaShader = noiseShader->makeWithColorFilter(std::move(densityFilter));
-  DrawColoredNoiseLayer(canvas, std::move(content), std::move(alphaShader), _color, alpha,
-                        blendMode);
+  // Encode color RGB and alpha into a ColorFilter matrix.
+  // Output: (color.r, color.g, color.b, noise_alpha * color.alpha * layerAlpha)
+  float finalAlpha = _color.alpha * alpha;
+  // clang-format off
+  std::array<float, 20> colorMatrix = {
+    0.0f, 0.0f, 0.0f, 0.0f, _color.red,
+    0.0f, 0.0f, 0.0f, 0.0f, _color.green,
+    0.0f, 0.0f, 0.0f, 0.0f, _color.blue,
+    0.0f, 0.0f, 0.0f, finalAlpha, 0.0f,
+  };
+  // clang-format on
+  auto coloredShader = alphaShader->makeWithColorFilter(ColorFilter::Matrix(colorMatrix));
+  DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode);
 }
 
 // --- DuoNoiseStyle ---
@@ -207,14 +202,34 @@ void DuoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float
     return;
   }
   {
-    auto densityFilter = MakeMonoDensityFilter(_density);
+    auto densityFilter = MakeDarkDensityFilter(_density);
     auto alphaShader = noiseShader->makeWithColorFilter(std::move(densityFilter));
-    DrawColoredNoiseLayer(canvas, content, std::move(alphaShader), _firstColor, alpha, blendMode);
+    float finalAlpha = _firstColor.alpha * alpha;
+    // clang-format off
+    std::array<float, 20> colorMatrix = {
+      0.0f, 0.0f, 0.0f, 0.0f, _firstColor.red,
+      0.0f, 0.0f, 0.0f, 0.0f, _firstColor.green,
+      0.0f, 0.0f, 0.0f, 0.0f, _firstColor.blue,
+      0.0f, 0.0f, 0.0f, finalAlpha, 0.0f,
+    };
+    // clang-format on
+    auto coloredShader = alphaShader->makeWithColorFilter(ColorFilter::Matrix(colorMatrix));
+    DrawNoiseLayer(canvas, content, std::move(coloredShader), blendMode);
   }
   {
     auto densityFilter = MakeBrightDensityFilter(_density);
     auto alphaShader = noiseShader->makeWithColorFilter(std::move(densityFilter));
-    DrawColoredNoiseLayer(canvas, content, std::move(alphaShader), _secondColor, alpha, blendMode);
+    float finalAlpha = _secondColor.alpha * alpha;
+    // clang-format off
+    std::array<float, 20> colorMatrix = {
+      0.0f, 0.0f, 0.0f, 0.0f, _secondColor.red,
+      0.0f, 0.0f, 0.0f, 0.0f, _secondColor.green,
+      0.0f, 0.0f, 0.0f, 0.0f, _secondColor.blue,
+      0.0f, 0.0f, 0.0f, finalAlpha, 0.0f,
+    };
+    // clang-format on
+    auto coloredShader = alphaShader->makeWithColorFilter(ColorFilter::Matrix(colorMatrix));
+    DrawNoiseLayer(canvas, content, std::move(coloredShader), blendMode);
   }
 }
 
@@ -239,7 +254,9 @@ void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
   if (noiseShader == nullptr) {
     return;
   }
-  // Step 1: Contrast enhance RGB + inverted luma to alpha for density thresholding.
+  // Contrast enhance RGB + inverted luma to alpha for density thresholding.
+  // Since PerlinNoise outputs alpha=1.0, we compute luma from the contrast-enhanced RGB and
+  // invert it into alpha for thresholding.
   // clang-format off
   std::array<float, 20> contrastLumaMatrix = {
      2.0f,    0.0f,    0.0f,   0.0f, -0.5f,
@@ -250,7 +267,7 @@ void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
   // clang-format on
   auto contrastLumaFilter = ColorFilter::Matrix(contrastLumaMatrix);
   auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - _density);
-  // Step 2: Scale alpha by opacity (encode into matrix to avoid paint.setAlpha issues).
+  // Scale alpha by opacity (encode into matrix to avoid paint.setAlpha issues).
   float finalAlpha = _opacity * alpha;
   // clang-format off
   std::array<float, 20> alphaScaleMatrix = {
@@ -264,15 +281,7 @@ void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
   auto composedFilter = ColorFilter::Compose(contrastLumaFilter, thresholdFilter);
   composedFilter = ColorFilter::Compose(composedFilter, alphaScaleFilter);
   auto coloredShader = noiseShader->makeWithColorFilter(std::move(composedFilter));
-
-  auto contentShader = Shader::MakeImageShader(content, TileMode::Decal, TileMode::Decal);
-  Paint paint = {};
-  paint.setShader(std::move(coloredShader));
-  paint.setMaskFilter(MaskFilter::MakeShader(std::move(contentShader)));
-  paint.setBlendMode(blendMode);
-  auto bounds =
-      Rect::MakeWH(static_cast<float>(content->width()), static_cast<float>(content->height()));
-  canvas->drawRect(bounds, paint);
+  DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode);
 }
 
 }  // namespace tgfx
