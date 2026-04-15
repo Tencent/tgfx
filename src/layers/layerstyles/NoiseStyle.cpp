@@ -18,7 +18,9 @@
 
 #include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/MaskFilter.h"
+#include "tgfx/core/PictureRecorder.h"
 
 namespace tgfx {
 
@@ -118,21 +120,43 @@ static std::shared_ptr<ColorFilter> MakeBrightDensityFilter(float density) {
   return ColorFilter::Compose(lumaFilter, thresholdFilter);
 }
 
+// Rasterizes a procedural noise shader into a fixed image at local coordinates (0,0).
+// This is needed because drawLayerStyles may use canvas->drawPicture() to replay the
+// recording, which would transform shader coordinates by the canvas matrix, causing the
+// noise pattern to shift with the layer position.
+static std::shared_ptr<Image> RasterizeNoiseShader(std::shared_ptr<Shader> shader, int width,
+                                                   int height) {
+  PictureRecorder recorder = {};
+  auto recordCanvas = recorder.beginRecording();
+  Paint paint = {};
+  paint.setShader(std::move(shader));
+  recordCanvas->drawRect(Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)),
+                         paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return nullptr;
+  }
+  return Image::MakeFrom(std::move(picture), width, height);
+}
+
 // Draws a noise layer clipped to content alpha. The shader must already have color, density, and
-// alpha fully baked in.
+// alpha fully baked in. The shader is first rasterized into a fixed image so that noise
+// coordinates stay local regardless of the canvas matrix during picture playback.
 static void DrawNoiseLayer(Canvas* canvas, std::shared_ptr<Image> content,
                            std::shared_ptr<Shader> coloredShader, BlendMode blendMode) {
   if (coloredShader == nullptr || content == nullptr) {
     return;
   }
+  auto noiseImage =
+      RasterizeNoiseShader(std::move(coloredShader), content->width(), content->height());
+  if (noiseImage == nullptr) {
+    return;
+  }
   Paint paint = {};
-  paint.setShader(std::move(coloredShader));
   paint.setMaskFilter(
       MaskFilter::MakeShader(Shader::MakeImageShader(content, TileMode::Decal, TileMode::Decal)));
   paint.setBlendMode(blendMode);
-  auto bounds =
-      Rect::MakeWH(static_cast<float>(content->width()), static_cast<float>(content->height()));
-  canvas->drawRect(bounds, paint);
+  canvas->drawImage(std::move(noiseImage), 0, 0, {}, &paint);
 }
 
 // --- MonoNoiseStyle ---
