@@ -224,31 +224,14 @@ void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint
 
 void Canvas::drawLine(const Point line[2], const Matrix& matrix, const ClipStack& clip,
                       const Brush& brush, const Stroke& stroke) const {
-  Matrix lineMatrix = {};
   Rect rect = {};
-  if (StrokeLineToRect(stroke, line, &rect, &lineMatrix)) {
-    auto drawBrush = brush;
-    if (!lineMatrix.isIdentity()) {
-      Matrix inverse = {};
-      if (lineMatrix.invert(&inverse)) {
-        drawBrush = brush.makeWithMatrix(inverse);
-      }
-    }
-    lineMatrix.postConcat(matrix);
-    drawContext->drawRect(rect, lineMatrix, clip, drawBrush, nullptr);
+  if (StrokeLineToRect(stroke, line, &rect)) {
+    drawContext->drawRect(rect, matrix, clip, brush, nullptr);
     return;
   }
   RRect rRect = {};
-  if (StrokeLineToRRect(stroke, line, &rRect, &lineMatrix)) {
-    auto drawBrush = brush;
-    if (!lineMatrix.isIdentity()) {
-      Matrix inverse = {};
-      if (lineMatrix.invert(&inverse)) {
-        drawBrush = brush.makeWithMatrix(inverse);
-      }
-    }
-    lineMatrix.postConcat(matrix);
-    drawContext->drawRRect(rRect, lineMatrix, clip, drawBrush, nullptr);
+  if (StrokeLineToRRect(stroke, line, &rRect)) {
+    drawContext->drawRRect(rRect, matrix, clip, brush, nullptr);
     return;
   }
   Path path = {};
