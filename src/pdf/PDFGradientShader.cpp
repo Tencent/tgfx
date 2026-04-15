@@ -658,8 +658,14 @@ void WriteTriangleMeshVertex(MemoryWriteStream* stream, uint8_t flag, float x, f
   stream->write(&flag, 1);
   float normalizedX = (x - minX) / (maxX - minX);
   float normalizedY = (y - minY) / (maxY - minY);
-  auto coordX = static_cast<uint32_t>(std::clamp(normalizedX, 0.f, 1.f) * 4294967295.f);
-  auto coordY = static_cast<uint32_t>(std::clamp(normalizedY, 0.f, 1.f) * 4294967295.f);
+  // Use double arithmetic to avoid float-to-uint32 overflow. In float32, 1.0f * 4294967295.0f
+  // rounds up to 4294967296.0f (exceeds UINT32_MAX), causing undefined behavior on cast.
+  // WASM's i32.trunc_f64_u traps on out-of-range values, so we clamp in double first.
+  static constexpr double COORD_MAX = 4294967295.0;
+  auto coordX = static_cast<uint32_t>(std::clamp(
+      static_cast<double>(std::clamp(normalizedX, 0.f, 1.f)) * COORD_MAX, 0.0, COORD_MAX));
+  auto coordY = static_cast<uint32_t>(std::clamp(
+      static_cast<double>(std::clamp(normalizedY, 0.f, 1.f)) * COORD_MAX, 0.0, COORD_MAX));
   WriteBigEndianUint32(stream, coordX);
   WriteBigEndianUint32(stream, coordY);
   auto r = static_cast<uint8_t>(std::clamp(color.red, 0.f, 1.f) * 255.f);
