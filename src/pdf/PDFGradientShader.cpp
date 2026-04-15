@@ -634,7 +634,8 @@ Color InterpolateColorAtT(float t, const std::vector<Color>& colors,
   }
   for (size_t i = 1; i < positions.size(); ++i) {
     if (t <= positions[i]) {
-      float localT = (t - positions[i - 1]) / (positions[i] - positions[i - 1]);
+      float range = positions[i] - positions[i - 1];
+      float localT = range > 0.f ? (t - positions[i - 1]) / range : 0.f;
       Color c1 = colors[i - 1];
       Color c2 = colors[i];
       return {c1.red + (c2.red - c1.red) * localT, c1.green + (c2.green - c1.green) * localT,
@@ -686,6 +687,7 @@ void WriteConicMeshSegment(MemoryWriteStream* stream, Point center, float radius
   WriteTriangleMeshVertex(stream, 1, p2.x, p2.y, minX, maxX, minY, maxY, toColor);
 }
 
+// Conic uses ShadingType 4 (Free-Form Gouraud-Shaded Triangle Mesh).
 PDFIndirectReference MakeConicTriangleMeshShader(PDFDocumentImpl* doc,
                                                  const PDFGradientShader::Key& state) {
   const GradientInfo& info = state.info;
@@ -792,6 +794,8 @@ PDFIndirectReference MakeConicTriangleMeshShader(PDFDocumentImpl* doc,
   return doc->emit(*pdfPattern);
 }
 
+// Linear and Radial use native PDF Shading support (ShadingType 2/3).
+// Diamond uses ShadingType 1 (Function-based) with PostScript code.
 PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientShader::Key& state) {
   Point transformPoints[2];
   const GradientInfo& info = state.info;
@@ -930,37 +934,13 @@ PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientS
 PDFIndirectReference FindPDFShader(PDFDocumentImpl* doc, const PDFGradientShader::Key& key,
                                    bool keyHasAlpha) {
   DEBUG_ASSERT(GradientHasAlpha(key) == keyHasAlpha);
-  PDFIndirectReference pdfShader;
-  if (key.type == GradientType::Conic) {
-    if (keyHasAlpha) {
-      PDFGradientShader::Key opaqueState = CloneKey(key);
-      for (auto& color : opaqueState.info.colors) {
-        color.alpha = 1.0f;
-      }
-      opaqueState.hash = Hash(opaqueState);
-      auto bbox = key.boundBox;
-      PDFIndirectReference colorShader = MakeConicTriangleMeshShader(doc, opaqueState);
-      if (!colorShader) {
-        return PDFIndirectReference();
-      }
-      PDFIndirectReference alphaGsRef = CreateSmaskGraphicState(doc, key);
-      auto resourceDict = GetGradientResourceDictionary(colorShader, alphaGsRef);
-      auto colorStream = CreatePatternFillContent(alphaGsRef.value, colorShader.value, bbox);
-      auto alphaFunctionShader = PDFDictionary::Make();
-      PDFUtils::PopulateTilingPatternDict(alphaFunctionShader.get(), bbox, std::move(resourceDict),
-                                          Matrix::I());
-      auto colorData = colorStream->readData();
-      pdfShader =
-          PDFStreamOut(std::move(alphaFunctionShader), Stream::MakeFromData(colorData), doc);
-    } else {
-      pdfShader = MakeConicTriangleMeshShader(doc, key);
-    }
-  } else if (keyHasAlpha) {
-    pdfShader = MakeAlphaFunctionShader(doc, key);
-  } else {
-    pdfShader = MakeFunctionShader(doc, key);
+  if (keyHasAlpha) {
+    return MakeAlphaFunctionShader(doc, key);
   }
-  return pdfShader;
+  if (key.type == GradientType::Conic) {
+    return MakeConicTriangleMeshShader(doc, key);
+  }
+  return MakeFunctionShader(doc, key);
 }
 
 }  // namespace

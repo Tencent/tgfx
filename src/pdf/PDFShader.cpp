@@ -138,14 +138,11 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
   }
   if (Types::Get(unwrappedShader.get()) == Types::ShaderType::Gradient) {
     const auto gradientShader = static_cast<const GradientShader*>(unwrappedShader.get());
-    auto gradientType = gradientShader->asGradient(nullptr);
-    // Linear and Radial have native PDF Shading support (ShadingType 2/3).
-    // Diamond uses ShadingType 1 (Function-based) with PostScript code.
-    // Conic uses ShadingType 4 (Free-Form Gouraud-Shaded Triangle Mesh).
-    if (gradientType == GradientType::Linear || gradientType == GradientType::Radial ||
-        gradientType == GradientType::Diamond || gradientType == GradientType::Conic) {
-      return PDFGradientShader::Make(doc, gradientShader, combinedTransform, surfaceBBox);
-    }
+    DEBUG_ASSERT(gradientShader->asGradient(nullptr) == GradientType::Linear ||
+                 gradientShader->asGradient(nullptr) == GradientType::Radial ||
+                 gradientShader->asGradient(nullptr) == GradientType::Diamond ||
+                 gradientShader->asGradient(nullptr) == GradientType::Conic);
+    return PDFGradientShader::Make(doc, gradientShader, combinedTransform, surfaceBBox);
   }
   if (surfaceBBox.isEmpty()) {
     return PDFIndirectReference();
