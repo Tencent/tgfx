@@ -713,28 +713,68 @@ PDFIndirectReference MakeConicTriangleMeshShader(PDFDocumentImpl* doc,
 
   auto meshStream = MemoryWriteStream::Make();
 
+  LOGI(
+      "ConicMesh: center=(%.1f,%.1f) startDeg=%.1f endDeg=%.1f angleRange=%.4f "
+      "numSegments=%d segAngle=%.4f maxRadius=%.1f",
+      center.x, center.y, startAngleDeg, endAngleDeg, angleRange, numSegments, segmentAngle,
+      maxRadius);
+
+  int triIndex = 0;
   Color firstColor = info.colors.front();
   Color lastColor = info.colors.back();
   float absSegAngle = std::abs(segmentAngle);
-  if (startAngleRad > absSegAngle * 0.5f) {
-    int preSegments = std::max(1, static_cast<int>(std::ceil(startAngleRad / absSegAngle)));
-    float preSegAngle = startAngleRad / static_cast<float>(preSegments);
-    for (int i = 0; i < preSegments; ++i) {
-      float a1 = static_cast<float>(i) * preSegAngle;
-      float a2 = static_cast<float>(i + 1) * preSegAngle;
-      WriteConicMeshSegment(meshStream.get(), center, maxRadius, a1, a2, firstColor, firstColor,
-                            minX, maxX, minY, maxY);
+  float twoPi = static_cast<float>(2.0 * M_PI);
+  float gapAngle = twoPi - std::abs(angleRange);
+  if (gapAngle > absSegAngle * 0.5f) {
+    float gapStart = endAngleRad;
+    float gapEnd = angleRange > 0 ? (startAngleRad + twoPi) : (startAngleRad - twoPi);
+    float hardEdge = angleRange > 0 ? twoPi : 0.f;
+    float lastColorStart = std::min(gapStart, hardEdge);
+    float lastColorEnd = std::max(gapStart, hardEdge);
+    float firstColorStart = std::min(hardEdge, gapEnd);
+    float firstColorEnd = std::max(hardEdge, gapEnd);
+    LOGI(
+        "ConicMesh gap: gapAngle=%.1f° gapStart=%.4f gapEnd=%.4f hardEdge=%.4f "
+        "lastColor=[%.4f,%.4f] firstColor=[%.4f,%.4f]",
+        gapAngle * 180.f / static_cast<float>(M_PI), gapStart, gapEnd, hardEdge, lastColorStart,
+        lastColorEnd, firstColorStart, firstColorEnd);
+    if (std::abs(lastColorEnd - lastColorStart) > absSegAngle * 0.5f) {
+      int segments = std::max(
+          1, static_cast<int>(std::ceil(std::abs(lastColorEnd - lastColorStart) / absSegAngle)));
+      float step = (lastColorEnd - lastColorStart) / static_cast<float>(segments);
+      for (int i = 0; i < segments; ++i) {
+        float a1 = lastColorStart + static_cast<float>(i) * step;
+        float a2 = lastColorStart + static_cast<float>(i + 1) * step;
+        float p1x = center.x + maxRadius * std::cos(a1);
+        float p1y = center.y + maxRadius * std::sin(a1);
+        float p2x = center.x + maxRadius * std::cos(a2);
+        float p2y = center.y + maxRadius * std::sin(a2);
+        LOGI("ConicMesh tri%d [lastColor]: a1=%.2f° a2=%.2f° p1=(%.1f,%.1f) p2=(%.1f,%.1f)",
+             triIndex, a1 * 180.f / static_cast<float>(M_PI), a2 * 180.f / static_cast<float>(M_PI),
+             p1x, p1y, p2x, p2y);
+        WriteConicMeshSegment(meshStream.get(), center, maxRadius, a1, a2, lastColor, lastColor,
+                              minX, maxX, minY, maxY);
+        triIndex++;
+      }
     }
-  }
-  float postGap = static_cast<float>(2.f * M_PI) - endAngleRad;
-  if (postGap > absSegAngle * 0.5f) {
-    int postSegments = std::max(1, static_cast<int>(std::ceil(postGap / absSegAngle)));
-    float postSegAngle = postGap / static_cast<float>(postSegments);
-    for (int i = 0; i < postSegments; ++i) {
-      float a1 = endAngleRad + static_cast<float>(i) * postSegAngle;
-      float a2 = endAngleRad + static_cast<float>(i + 1) * postSegAngle;
-      WriteConicMeshSegment(meshStream.get(), center, maxRadius, a1, a2, lastColor, lastColor, minX,
-                            maxX, minY, maxY);
+    if (std::abs(firstColorEnd - firstColorStart) > absSegAngle * 0.5f) {
+      int segments = std::max(
+          1, static_cast<int>(std::ceil(std::abs(firstColorEnd - firstColorStart) / absSegAngle)));
+      float step = (firstColorEnd - firstColorStart) / static_cast<float>(segments);
+      for (int i = 0; i < segments; ++i) {
+        float a1 = firstColorStart + static_cast<float>(i) * step;
+        float a2 = firstColorStart + static_cast<float>(i + 1) * step;
+        float p1x = center.x + maxRadius * std::cos(a1);
+        float p1y = center.y + maxRadius * std::sin(a1);
+        float p2x = center.x + maxRadius * std::cos(a2);
+        float p2y = center.y + maxRadius * std::sin(a2);
+        LOGI("ConicMesh tri%d [firstColor]: a1=%.2f° a2=%.2f° p1=(%.1f,%.1f) p2=(%.1f,%.1f)",
+             triIndex, a1 * 180.f / static_cast<float>(M_PI), a2 * 180.f / static_cast<float>(M_PI),
+             p1x, p1y, p2x, p2y);
+        WriteConicMeshSegment(meshStream.get(), center, maxRadius, a1, a2, firstColor, firstColor,
+                              minX, maxX, minY, maxY);
+        triIndex++;
+      }
     }
   }
 
@@ -746,9 +786,24 @@ PDFIndirectReference MakeConicTriangleMeshShader(PDFDocumentImpl* doc,
 
     Color color1 = InterpolateColorAtT(t1, info.colors, info.positions);
     Color color2 = InterpolateColorAtT(t2, info.colors, info.positions);
+    if (seg == 0 || seg == numSegments - 1) {
+      float p1x = center.x + maxRadius * std::cos(angle1);
+      float p1y = center.y + maxRadius * std::sin(angle1);
+      float p2x = center.x + maxRadius * std::cos(angle2);
+      float p2y = center.y + maxRadius * std::sin(angle2);
+      LOGI(
+          "ConicMesh tri%d [grad seg%d]: a1=%.2f° a2=%.2f° p1=(%.1f,%.1f) p2=(%.1f,%.1f) "
+          "c1=(%.0f,%.0f,%.0f) c2=(%.0f,%.0f,%.0f)",
+          triIndex, seg, angle1 * 180.f / static_cast<float>(M_PI),
+          angle2 * 180.f / static_cast<float>(M_PI), p1x, p1y, p2x, p2y, color1.red * 255,
+          color1.green * 255, color1.blue * 255, color2.red * 255, color2.green * 255,
+          color2.blue * 255);
+    }
     WriteConicMeshSegment(meshStream.get(), center, maxRadius, angle1, angle2, color1, color2, minX,
                           maxX, minY, maxY);
+    triIndex++;
   }
+  LOGI("ConicMesh: total %d triangles", triIndex);
 
   auto pdfShader = PDFDictionary::Make();
   pdfShader->insertInt("ShadingType", 4);
