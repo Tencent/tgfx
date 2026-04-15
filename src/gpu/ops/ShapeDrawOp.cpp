@@ -100,7 +100,11 @@ void ShapeDrawOp::onDraw(RenderPass* renderPass) {
 }
 
 bool ShapeDrawOp::hasCoverage() const {
-  return true;
+  // Return true only if we have actual dynamic coverage:
+  // - AAType::Coverage means we have per-vertex coverage
+  // - Having coverage FragmentProcessors also means dynamic coverage
+  // When aaType is None and no coverage FP, the coverage is constant vec4(1.0)
+  return aaType == AAType::Coverage || !coverages.empty();
 }
 
 }  // namespace tgfx
