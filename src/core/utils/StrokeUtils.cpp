@@ -88,30 +88,26 @@ bool StrokeLineToRect(const Stroke& stroke, const Point line[2], Rect* rect) {
   if (stroke.cap == LineCap::Round || IsHairlineStroke(stroke)) {
     return false;
   }
-  auto dx = line[1].x - line[0].x;
-  auto dy = line[1].y - line[0].y;
-  if (dx != 0 && dy != 0) {
+  if (line[0].x != line[1].x && line[0].y != line[1].y) {
     return false;
   }
-  auto halfWidth = stroke.width / 2.0f;
   auto left = std::min(line[0].x, line[1].x);
   auto top = std::min(line[0].y, line[1].y);
   auto right = std::max(line[0].x, line[1].x);
   auto bottom = std::max(line[0].y, line[1].y);
+  auto halfWidth = stroke.width / 2.0f;
   if (stroke.cap == LineCap::Square) {
-    left -= halfWidth;
-    top -= halfWidth;
-    right += halfWidth;
-    bottom += halfWidth;
-  } else if (dx == 0) {
-    left -= halfWidth;
-    right += halfWidth;
-  } else {
-    top -= halfWidth;
-    bottom += halfWidth;
+    if (rect) {
+      rect->setLTRB(left - halfWidth, top - halfWidth, right + halfWidth, bottom + halfWidth);
+    }
+    return true;
   }
   if (rect) {
-    rect->setLTRB(left, top, right, bottom);
+    if (left == right) {
+      rect->setLTRB(left - halfWidth, top, right + halfWidth, bottom);
+    } else {
+      rect->setLTRB(left, top - halfWidth, right, bottom + halfWidth);
+    }
   }
   return true;
 }
@@ -120,20 +116,18 @@ bool StrokeLineToRRect(const Stroke& stroke, const Point line[2], RRect* rRect) 
   if (stroke.cap != LineCap::Round || IsHairlineStroke(stroke)) {
     return false;
   }
-  auto dx = line[1].x - line[0].x;
-  auto dy = line[1].y - line[0].y;
-  if (dx != 0 && dy != 0) {
+  if (line[0].x != line[1].x && line[0].y != line[1].y) {
     return false;
   }
+  auto left = std::min(line[0].x, line[1].x);
+  auto top = std::min(line[0].y, line[1].y);
+  auto right = std::max(line[0].x, line[1].x);
+  auto bottom = std::max(line[0].y, line[1].y);
   auto halfWidth = stroke.width / 2.0f;
-  auto left = std::min(line[0].x, line[1].x) - halfWidth;
-  auto top = std::min(line[0].y, line[1].y) - halfWidth;
-  auto right = std::max(line[0].x, line[1].x) + halfWidth;
-  auto bottom = std::max(line[0].y, line[1].y) + halfWidth;
   if (rRect) {
-    Rect rect = {};
-    rect.setLTRB(left, top, right, bottom);
-    rRect->setRectXY(rect, halfWidth, halfWidth);
+    rRect->setRectXY(
+        Rect::MakeLTRB(left - halfWidth, top - halfWidth, right + halfWidth, bottom + halfWidth),
+        halfWidth, halfWidth);
   }
   return true;
 }
