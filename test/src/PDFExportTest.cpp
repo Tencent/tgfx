@@ -28,14 +28,11 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Stroke.h"
-#include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
-#include "tgfx/layers/SolidLayer.h"
-#include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/pdf/PDFDocument.h"
 #include "tgfx/pdf/PDFMetadata.h"
@@ -679,7 +676,7 @@ TGFX_TEST(PDFExportTest, LayerConicGradient) {
   shapeLayer->removeFillStyles();
 
   auto shader = Shader::MakeConicGradient(
-      Point{1250.5f, 930.f}, 90.f, 80.f,
+      Point{1250.5f, 930.f}, 0.f, 360.f,
       {Color::FromRGBA(227, 136, 136), Color::FromRGBA(140, 210, 183)}, {});
   shader = shader->makeWithMatrix(Matrix::MakeTrans(10.f, 10.f));
   shapeLayer->addFillStyle(ShapeStyle::Make(shader));
