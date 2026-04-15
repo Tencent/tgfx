@@ -187,7 +187,8 @@ void TextPath::apply(VectorContext* context) {
     auto availableLength = pathLength + _lastMargin - _firstMargin;
     float extraSpacingPerGap = 0.0f;
     if (glyphCount > 1 && totalAdvance > 0.0f) {
-      extraSpacingPerGap = (availableLength - totalAdvance) / static_cast<float>(glyphCount - 1);
+      auto gapCount = static_cast<float>(isClosed ? glyphCount : glyphCount - 1);
+      extraSpacingPerGap = (availableLength - totalAdvance) / gapCount;
     }
 
     size_t glyphIndex = 0;
