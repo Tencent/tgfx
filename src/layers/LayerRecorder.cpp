@@ -188,18 +188,28 @@ bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& pai
     if (StrokeLineToRect(paint.stroke, line, &rect, &lineMatrix)) {
       LayerPaint fillPaint = paint;
       fillPaint.style = PaintStyle::Fill;
-      Matrix combinedMatrix = lineMatrix;
-      combinedMatrix.postConcat(matrix);
-      addRect(rect, fillPaint, combinedMatrix);
+      if (!lineMatrix.isIdentity() && fillPaint.shader) {
+        Matrix inverse = {};
+        if (lineMatrix.invert(&inverse)) {
+          fillPaint.shader = fillPaint.shader->makeWithMatrix(inverse);
+        }
+      }
+      lineMatrix.postConcat(matrix);
+      addRect(rect, fillPaint, lineMatrix);
       return true;
     }
     RRect rRect = {};
     if (StrokeLineToRRect(paint.stroke, line, &rRect, &lineMatrix)) {
       LayerPaint fillPaint = paint;
       fillPaint.style = PaintStyle::Fill;
-      Matrix combinedMatrix = lineMatrix;
-      combinedMatrix.postConcat(matrix);
-      addRRect(rRect, fillPaint, combinedMatrix);
+      if (!lineMatrix.isIdentity() && fillPaint.shader) {
+        Matrix inverse = {};
+        if (lineMatrix.invert(&inverse)) {
+          fillPaint.shader = fillPaint.shader->makeWithMatrix(inverse);
+        }
+      }
+      lineMatrix.postConcat(matrix);
+      addRRect(rRect, fillPaint, lineMatrix);
       return true;
     }
   }
