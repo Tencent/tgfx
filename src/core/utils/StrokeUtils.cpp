@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include "core/utils/MathExtra.h"
+#include "tgfx/core/RRect.h"
 
 namespace tgfx {
 
@@ -107,6 +108,26 @@ bool StrokeLineToRect(const Stroke& stroke, const Point line[2], Rect* rect) {
     } else {
       rect->setLTRB(left, top - halfWidth, right, bottom + halfWidth);
     }
+  }
+  return true;
+}
+
+bool StrokeLineToRRect(const Stroke& stroke, const Point line[2], RRect* rRect) {
+  if (stroke.cap != LineCap::Round || IsHairlineStroke(stroke)) {
+    return false;
+  }
+  if (line[0].x != line[1].x && line[0].y != line[1].y) {
+    return false;
+  }
+  auto left = std::min(line[0].x, line[1].x);
+  auto top = std::min(line[0].y, line[1].y);
+  auto right = std::max(line[0].x, line[1].x);
+  auto bottom = std::max(line[0].y, line[1].y);
+  auto halfWidth = stroke.width / 2.0f;
+  if (rRect) {
+    Rect rect = {};
+    rect.setLTRB(left - halfWidth, top - halfWidth, right + halfWidth, bottom + halfWidth);
+    rRect->setRectXY(rect, halfWidth, halfWidth);
   }
   return true;
 }

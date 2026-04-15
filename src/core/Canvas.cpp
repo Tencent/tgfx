@@ -215,12 +215,27 @@ void Canvas::drawPaint(const Paint& paint) {
 }
 
 void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint) {
+  SaveLayerForImageFilter(paint.getImageFilter());
+  Stroke stroke(paint.getStrokeWidth(), paint.getLineCap(), paint.getLineJoin(),
+                paint.getMiterLimit());
+  Point line[2] = {{x0, y0}, {x1, y1}};
+  Rect rect = {};
+  if (StrokeLineToRect(stroke, line, &rect)) {
+    drawContext->drawRect(rect, _matrix, *clipStack, paint.getBrush(), nullptr);
+    return;
+  }
+  RRect rRect = {};
+  if (StrokeLineToRRect(stroke, line, &rRect)) {
+    drawContext->drawRRect(rRect, _matrix, *clipStack, paint.getBrush(), nullptr);
+    return;
+  }
   Path path = {};
   path.moveTo(x0, y0);
   path.lineTo(x1, y1);
-  auto realPaint = paint;
-  realPaint.setStyle(PaintStyle::Stroke);
-  drawPath(path, realPaint);
+  auto shape = Shape::MakeFrom(path);
+  if (shape) {
+    drawContext->drawShape(shape, _matrix, *clipStack, paint.getBrush(), &stroke);
+  }
 }
 
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
