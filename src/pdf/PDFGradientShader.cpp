@@ -786,7 +786,7 @@ PDFIndirectReference MakeConicTriangleMeshShader(PDFDocumentImpl* doc,
 
     Color color1 = InterpolateColorAtT(t1, info.colors, info.positions);
     Color color2 = InterpolateColorAtT(t2, info.colors, info.positions);
-    if (seg == 0 || seg == numSegments - 1) {
+    {
       float p1x = center.x + maxRadius * std::cos(angle1);
       float p1y = center.y + maxRadius * std::sin(angle1);
       float p2x = center.x + maxRadius * std::cos(angle2);
