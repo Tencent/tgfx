@@ -679,13 +679,20 @@ TGFX_TEST(PDFExportTest, LayerConicGradient) {
   shapeLayer->removeFillStyles();
 
   auto shader = Shader::MakeConicGradient(
-      Point{1250.5f, 930.f}, 0.f, 360.f,
+      Point{1250.5f, 930.f}, 90.f, 80.f,
       {Color::FromRGBA(227, 136, 136), Color::FromRGBA(140, 210, 183)}, {});
   shader = shader->makeWithMatrix(Matrix::MakeTrans(10.f, 10.f));
   shapeLayer->addFillStyle(ShapeStyle::Make(shader));
 
   auto layer = Layer::Make();
   layer->addChild(shapeLayer);
+
+  // Render to Surface for visual comparison
+  auto surface = Surface::Make(context, 500, 372);
+  auto surfaceCanvas = surface->getCanvas();
+  surfaceCanvas->scale(500.f / 2501.f, 372.f / 1860.f);
+  layer->draw(surfaceCanvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFTest/LayerConicGradient_Render"));
 
   auto PDFStream = MemoryWriteStream::Make();
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
@@ -718,6 +725,13 @@ TGFX_TEST(PDFExportTest, LayerDiamondGradient) {
 
   auto layer = Layer::Make();
   layer->addChild(shapeLayer);
+
+  // Render to Surface for visual comparison
+  auto surface = Surface::Make(context, 500, 372);
+  auto surfaceCanvas = surface->getCanvas();
+  surfaceCanvas->scale(500.f / 2501.f, 372.f / 1860.f);
+  layer->draw(surfaceCanvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "PDFTest/LayerDiamondGradient_Render"));
 
   auto PDFStream = MemoryWriteStream::Make();
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
