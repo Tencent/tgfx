@@ -2662,19 +2662,9 @@ TGFX_TEST(CanvasTest, DrawShapeAutoBatch_DifferentBounds) {
 TGFX_TEST(CanvasTest, PaintingDataCheck) {
   auto data =
       std::make_unique<PerlinNoiseShader::PaintingData>(6903.0f, 0.25f, 0.25f, ISize::MakeEmpty());
-  printf("baseFrequencyX: %f, baseFrequencyY: %f\n", data->baseFrequencyX, data->baseFrequencyY);
-  printf("First 16 latticeSelector: ");
-  for (int i = 0; i < 16; i++) {
-    printf("%d ", data->latticeSelector[i]);
-  }
-  printf("\n");
-  printf("noise[0][0]: (%d, %d)\n", data->noise[0][0][0], data->noise[0][0][1]);
-  printf("noise[0][1]: (%d, %d)\n", data->noise[0][1][0], data->noise[0][1][1]);
-  printf("noise[1][0]: (%d, %d)\n", data->noise[1][0][0], data->noise[1][0][1]);
   float gradX = (static_cast<float>(data->noise[0][0][0]) / 32767.5f) - 1.0f;
   float gradY = (static_cast<float>(data->noise[0][0][1]) / 32767.5f) - 1.0f;
   float len = std::sqrt(gradX * gradX + gradY * gradY);
-  printf("noise[0][0] decoded gradient: (%f, %f), length: %f\n", gradX, gradY, len);
   EXPECT_NEAR(len, 1.0f, 0.01f);
 }
 

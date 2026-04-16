@@ -28,10 +28,10 @@ static std::shared_ptr<PerlinNoiseShader> MakePerlinNoise(PerlinNoiseType noiseT
                                                           float baseFrequencyX,
                                                           float baseFrequencyY, int numOctaves,
                                                           float seed, const ISize* tileSize) {
-  if (baseFrequencyX < 0 || baseFrequencyY < 0) {
+  if (baseFrequencyX <= 0 || baseFrequencyY <= 0) {
     return nullptr;
   }
-  if (numOctaves < 0) {
+  if (numOctaves < 1) {
     return nullptr;
   }
   return std::make_shared<PerlinNoiseShader>(noiseType, baseFrequencyX, baseFrequencyY, numOctaves,

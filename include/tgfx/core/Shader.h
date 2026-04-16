@@ -126,7 +126,9 @@ class Shader {
 
   /**
    * Creates a shader that generates fractal noise using the Perlin noise algorithm. The noise is
-   * generated in all four RGBA channels independently. The output values are in the [0, 1] range.
+   * generated in all four RGBA channels independently, but the alpha channel is always set to 1.0
+   * (fully opaque) to avoid premultiplied-alpha artifacts. The output values are in the [0, 1]
+   * range.
    * @param baseFrequencyX  The noise frequency in the X direction, must be positive.
    * @param baseFrequencyY  The noise frequency in the Y direction, must be positive.
    * @param numOctaves      The number of octaves, clamped to [1, 255].
@@ -139,7 +141,8 @@ class Shader {
 
   /**
    * Creates a shader that generates turbulence using the Perlin noise algorithm. Turbulence is
-   * similar to fractal noise but takes the absolute value of each octave, producing sharper patterns.
+   * similar to fractal noise but takes the absolute value of each octave, producing sharper
+   * patterns. The alpha channel is always set to 1.0 (fully opaque).
    * @param baseFrequencyX  The noise frequency in the X direction, must be positive.
    * @param baseFrequencyY  The noise frequency in the Y direction, must be positive.
    * @param numOctaves      The number of octaves, clamped to [1, 255].
@@ -149,6 +152,7 @@ class Shader {
   static std::shared_ptr<Shader> MakeTurbulence(float baseFrequencyX, float baseFrequencyY,
                                                 int numOctaves, float seed,
                                                 const ISize* tileSize = nullptr);
+
   virtual ~Shader() = default;
 
   /**
