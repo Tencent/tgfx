@@ -310,7 +310,7 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
       pixelFormatMap[pixelFormat].colorSampleCounts.push_back(1);
     } else if (UsesInternalformatQuery(standard, info, version)) {
       int count = 0;
-      unsigned format = pixelFormatMap[pixelFormat].format.internalFormatRenderBuffer;
+      unsigned format = pixelFormatMap[pixelFormat].format.sizedFormat;
       info.getInternalformativ(GL_RENDERBUFFER, format, GL_NUM_SAMPLE_COUNTS, 1, &count);
       if (count) {
         int* temp = new int[static_cast<size_t>(count)];
