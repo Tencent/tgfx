@@ -84,6 +84,45 @@ TGFX_TEST(FilterTest, ModeColorFilter) {
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ModeColorFilter"));
 }
 
+TGFX_TEST(FilterTest, ExposureColorFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  float exposures[] = {-1.0f, -0.75f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
+  int count = 9;
+
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  auto colorTest = MakeImage("resources/apitest/color_test.png");
+  ASSERT_TRUE(colorTest != nullptr);
+
+  int colWidth = image->width() > colorTest->width() ? image->width() : colorTest->width();
+  auto totalWidth = colWidth * count + 50 * (count + 1);
+  auto totalHeight = image->height() + colorTest->height() + 150;
+  auto surface = Surface::Make(context, totalWidth, totalHeight);
+  auto canvas = surface->getCanvas();
+  Paint paint;
+
+  for (int i = 0; i < count; i++) {
+    canvas->save();
+    canvas->translate(50 + static_cast<float>(colWidth + 50) * i, 50);
+    paint.setColorFilter(ColorFilter::Exposure(exposures[i]));
+    canvas->drawImage(image, &paint);
+    canvas->restore();
+  }
+
+  for (int i = 0; i < count; i++) {
+    canvas->save();
+    canvas->translate(50 + static_cast<float>(colWidth + 50) * i,
+                      100 + static_cast<float>(image->height()));
+    paint.setColorFilter(ColorFilter::Exposure(exposures[i]));
+    canvas->drawImage(colorTest, &paint);
+    canvas->restore();
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ExposureColorFilter"));
+}
+
 TGFX_TEST(FilterTest, ComposeColorFilter) {
   ContextScope scope;
   auto context = scope.getContext();

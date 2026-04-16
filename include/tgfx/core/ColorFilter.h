@@ -86,6 +86,14 @@ class ColorFilter {
    */
   static std::shared_ptr<ColorFilter> Luma();
 
+  /**
+   * Creates a new ColorFilter that adjusts the exposure of the input color using a non-linear
+   * tone-mapped curve. Positive values brighten the image with highlight protection, and negative
+   * values darken it with shadow preservation.
+   * @param exposure The exposure adjustment value in the range of -1.0 to 1.0.
+   */
+  static std::shared_ptr<ColorFilter> Exposure(float exposure);
+
   virtual ~ColorFilter() = default;
 
   /**
@@ -105,7 +113,7 @@ class ColorFilter {
   }
 
  protected:
-  enum class Type { Blend, Matrix, AlphaThreshold, Compose, Luma };
+  enum class Type { Blend, Matrix, AlphaThreshold, Compose, Luma, Exposure };
 
   /**
    * Returns true if this color filter transforms transparent black into a non-transparent color.
