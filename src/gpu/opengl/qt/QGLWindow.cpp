@@ -226,9 +226,10 @@ void QGLWindow::onPresent(Context*) {
 std::shared_ptr<RenderTargetProxy> QGLWindow::acquireTexture(Context* context, int width,
                                                              int height) {
   std::lock_guard<std::mutex> autoLock(locker);
-  // If we have a pending frame that hasn't been consumed by getQSGTexture() yet, reclaim it now.
+  // In single buffer mode, reclaim the pending frame if it hasn't been consumed yet.
   // This handles the case where draw() is called before getQSGTexture() in singleBufferMode.
-  if (pendingProxy != nullptr) {
+  // In dual buffer mode, we have 2 slots available, so no need to reclaim the pending proxy.
+  if (maxTextureCount == 1 && pendingProxy != nullptr) {
     for (auto& slot : textureSlots) {
       if (slot.proxy == pendingProxy) {
         slot.available = true;
