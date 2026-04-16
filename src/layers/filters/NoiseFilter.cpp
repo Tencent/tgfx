@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/filters/NoiseFilter.h"
+#include "core/images/FilterImage.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Shader.h"
@@ -136,6 +137,21 @@ void NoiseFilter::setBlendMode(BlendMode blendMode) {
   invalidateFilter();
 }
 
+std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
+                                                  Point* offset) {
+  auto blendFilter = getImageFilter(scale);
+  if (!blendFilter) {
+    return input;
+  }
+  auto imageShader = Shader::MakeImageShader(input);
+  if (!imageShader) {
+    return input;
+  }
+  auto clipFilter = ImageFilter::Blend(BlendMode::DstIn, std::move(imageShader));
+  auto composedFilter = ImageFilter::Compose(std::move(blendFilter), std::move(clipFilter));
+  return FilterImage::MakeFrom(std::move(input), std::move(composedFilter), offset);
+}
+
 // --- MonoNoiseFilter ---
 
 MonoNoiseFilter::MonoNoiseFilter(float size, float density, const Color& color, float seed,
@@ -160,7 +176,7 @@ std::shared_ptr<ImageFilter> MonoNoiseFilter::onCreateImageFilter(float scale) {
   auto colorFilter = MakeColorMatrix(_color, _color.alpha);
   auto composedFilter = ColorFilter::Compose(densityFilter, colorFilter);
   auto coloredShader = noiseShader->makeWithColorFilter(std::move(composedFilter));
-  return ImageFilter::Blend(_blendMode, std::move(coloredShader), true);
+  return ImageFilter::Blend(_blendMode, std::move(coloredShader));
 }
 
 // --- DuoNoiseFilter ---
@@ -198,14 +214,14 @@ std::shared_ptr<ImageFilter> DuoNoiseFilter::onCreateImageFilter(float scale) {
   auto firstColorFilter = MakeColorMatrix(_firstColor, _firstColor.alpha);
   auto darkComposed = ColorFilter::Compose(darkDensity, firstColorFilter);
   auto darkShader = noiseShader->makeWithColorFilter(std::move(darkComposed));
-  auto firstFilter = ImageFilter::Blend(_blendMode, std::move(darkShader), true);
+  auto firstFilter = ImageFilter::Blend(_blendMode, std::move(darkShader));
 
   // Bright noise layer: keeps pixels where luminance >= density, filled with secondColor.
   auto brightDensity = MakeBrightDensityFilter(_density);
   auto secondColorFilter = MakeColorMatrix(_secondColor, _secondColor.alpha);
   auto brightComposed = ColorFilter::Compose(brightDensity, secondColorFilter);
   auto brightShader = noiseShader->makeWithColorFilter(std::move(brightComposed));
-  auto secondFilter = ImageFilter::Blend(_blendMode, std::move(brightShader), true);
+  auto secondFilter = ImageFilter::Blend(_blendMode, std::move(brightShader));
 
   return ImageFilter::Compose(std::move(firstFilter), std::move(secondFilter));
 }
@@ -259,7 +275,7 @@ std::shared_ptr<ImageFilter> MultiNoiseFilter::onCreateImageFilter(float scale) 
   composedFilter = ColorFilter::Compose(composedFilter, alphaScaleFilter);
   auto coloredShader = noiseShader->makeWithColorFilter(std::move(composedFilter));
 
-  return ImageFilter::Blend(_blendMode, std::move(coloredShader), true);
+  return ImageFilter::Blend(_blendMode, std::move(coloredShader));
 }
 
 }  // namespace tgfx

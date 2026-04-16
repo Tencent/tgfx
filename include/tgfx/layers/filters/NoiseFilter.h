@@ -132,6 +132,9 @@ class NoiseFilter : public LayerFilter {
     return Type::NoiseFilter;
   }
 
+  std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
+                                       Point* offset) override;
+
   float _size = 4.0f;
   float _density = 0.5f;
   float _seed = 0.0f;

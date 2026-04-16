@@ -1175,6 +1175,25 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
   return ImageFilter::Compose(filters);
 }
 
+std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float contentScale,
+                                           Point* offset) {
+  if (!image || _filters.empty()) {
+    return image;
+  }
+  for (const auto& layerFilter : _filters) {
+    DEBUG_ASSERT(layerFilter != nullptr);
+    Point filterOffset = {};
+    image = layerFilter->filterImage(std::move(image), contentScale, &filterOffset);
+    if (!image) {
+      return nullptr;
+    }
+    if (offset) {
+      offset->offset(filterOffset.x, filterOffset.y);
+    }
+  }
+  return image;
+}
+
 bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
   auto contentScale = canvas->getMatrix().getMaxScale();
@@ -1370,10 +1389,9 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs,
     return nullptr;
   }
 
-  auto imageFilter =
-      contentArgs.excludeEffects ? nullptr : getImageFilter(contentMatrix.getMaxScale());
+  auto hasFilters = !contentArgs.excludeEffects && !_filters.empty();
 
-  if (!imageFilter) {
+  if (!hasFilters) {
     PictureRecorder recorder = {};
     auto offscreenCanvas = recorder.beginRecording();
     auto mappedBounds = contentMatrix.mapRect(*inputBounds);
@@ -1410,16 +1428,8 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs,
   imageMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
   imageMatrix->preTranslate(offset.x, offset.y);
 
-  std::optional<Rect> filterClipBounds = std::nullopt;
-  if (clipBounds.has_value()) {
-    auto invertMatrix = Matrix::I();
-    imageMatrix->invert(&invertMatrix);
-    filterClipBounds = invertMatrix.mapRect(*clipBounds);
-    filterClipBounds->roundOut();
-  }
   Point filterOffset = {};
-  finalImage = finalImage->makeWithFilter(
-      imageFilter, &filterOffset, filterClipBounds.has_value() ? &*filterClipBounds : nullptr);
+  finalImage = applyFilters(std::move(finalImage), contentScale, &filterOffset);
   imageMatrix->preTranslate(filterOffset.x, filterOffset.y);
   return finalImage;
 }
@@ -1551,7 +1561,6 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 
   auto pictureBounds = layerBounds;
   pictureBounds.scale(contentScale, contentScale);
-  auto filterBounds = pictureBounds;
   auto filter = getImageFilter(contentScale);
   if (filter) {
     auto reverseBounds = filter->filterBounds(pictureBounds, MapDirection::Reverse);
@@ -1570,10 +1579,9 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
     return nullptr;
   }
 
-  if (filter) {
-    filterBounds.offset(-offset.x, -offset.y);
+  if (!_filters.empty()) {
     Point filterOffset = {};
-    image = image->makeWithFilter(std::move(filter), &filterOffset, &filterBounds);
+    image = applyFilters(std::move(image), contentScale, &filterOffset);
     offset += filterOffset;
   }
 

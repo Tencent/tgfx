@@ -22,6 +22,8 @@
 #include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
+class Image;
+
 /**
  * LayerFilter represents a filter that applies effects to a layer, such as blurs, shadows, or color
  * adjustments. It creates a new offscreen image that replaces the original layer content.
@@ -30,12 +32,16 @@ namespace tgfx {
 class LayerFilter : public LayerProperty {
  public:
   /**
-   * Returns the current image filter for the given scale factor. If the filter has not been
-   * created yet, it will be created and cached.
-   * @param scale The scale factor to apply to the filter.
-   * @return The current image filter.
+   * Applies this filter to the given input image at the specified scale factor. The offset stores
+   * the translation of the filtered image relative to the input image origin. Subclasses that need
+   * custom rendering should override onFilterImage().
+   * @param input The source image to filter.
+   * @param scale The scale factor to apply to scale-dependent filter parameters.
+   * @param offset If non-null, receives the (x, y) translation of the filtered image.
+   * @return The filtered image, or nullptr on failure.
    */
-  std::shared_ptr<ImageFilter> getImageFilter(float scale);
+  std::shared_ptr<Image> filterImage(std::shared_ptr<Image> input, float scale,
+                                     Point* offset = nullptr);
 
   /**
    * Returns the bounds of the layer filter after applying it to the scaled layer bounds.
@@ -60,18 +66,31 @@ class LayerFilter : public LayerProperty {
   virtual Type type() const {
     return Type::LayerFilter;
   }
+
   /**
-   * Creates a new image filter for the given scale factor. When it is necessary to recreate the
-   * ImageFilter, the onCreateImageFilter method will be called.
-   * @param scale The scale factor to apply to the filter.
-   * @return A new image filter.
+   * Creates a new image filter for the given scale factor. Subclasses that can express their effect
+   * as a single ImageFilter should override this method. The default implementation returns nullptr.
    */
-  virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) = 0;
+  virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale);
+
+  /**
+   * Applies this filter to the given input image. Subclasses that need custom rendering beyond
+   * what a single ImageFilter can express should override this method. The default implementation
+   * applies the ImageFilter from onCreateImageFilter() to the input image via FilterImage::MakeFrom.
+   */
+  virtual std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
+                                               Point* offset);
 
   /**
    * Marks the filter as dirty and invalidates the cached filter.
    */
   void invalidateFilter();
+
+  /**
+   * Returns the cached ImageFilter for the given scale, creating it via onCreateImageFilter() if
+   * needed. Available for subclasses that override onFilterImage() and need the internal ImageFilter.
+   */
+  std::shared_ptr<ImageFilter> getImageFilter(float scale);
 
  private:
   bool dirty = true;
@@ -79,6 +98,7 @@ class LayerFilter : public LayerProperty {
   std::unique_ptr<Rect> _clipBounds = nullptr;
   std::shared_ptr<ImageFilter> lastFilter;
 
+  friend class Layer;
   friend class Types;
 };
 }  // namespace tgfx
