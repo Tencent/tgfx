@@ -30,7 +30,6 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
-#include "core/images/FilterImage.h"
 #include "core/images/PictureImage.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/ImageShader.h"
