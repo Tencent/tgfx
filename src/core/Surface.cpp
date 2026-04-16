@@ -157,7 +157,6 @@ BackendTexture Surface::getBackendTexture() {
     return {};
   }
   renderContext->flush();
-  getContext()->drawingManager()->ensureMSAAResolved(renderTarget);
   getContext()->flushAndSubmit();
   auto textureView = textureProxy->getTextureView();
   if (textureView == nullptr) {
@@ -173,7 +172,6 @@ HardwareBufferRef Surface::getHardwareBuffer() {
     return {};
   }
   renderContext->flush();
-  getContext()->drawingManager()->ensureMSAAResolved(renderTarget);
   getContext()->flushAndSubmit(true);
   auto textureView = textureProxy->getTextureView();
   if (textureView == nullptr) {

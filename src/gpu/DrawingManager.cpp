@@ -87,8 +87,6 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
-  // Check for MSAA dependencies: if any input texture is a dirty MSAA RenderTarget,
-  // it must be resolved before being sampled.
   if (dirtyMSAACount > 0) {
     for (auto& op : drawOps) {
       op->collectTextureProxies([this](std::shared_ptr<TextureProxy> proxy) {
@@ -113,6 +111,13 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
                                         const Point& offset) {
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
+  }
+  if (dirtyMSAACount > 0) {
+    for (auto& input : inputs) {
+      if (auto rtProxy = input.textureProxy->asRenderTargetProxy()) {
+        ensureMSAAResolved(rtProxy);
+      }
+    }
   }
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;

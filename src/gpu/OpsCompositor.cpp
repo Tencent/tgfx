@@ -675,6 +675,13 @@ void OpsCompositor::makeClosed() {
   }
   flushPendingOps();
   submitDrawOps();
+  // Externally owned texture-backed MSAA RenderTargets (HardwareBuffer or BackendTexture) must be
+  // resolved before flush completes, as the user may use the underlying buffer/texture directly.
+  // DrawableProxy (Window) is excluded since it returns nullptr for asTextureProxy().
+  if (renderTarget->isMSAADirty() && renderTarget->externallyOwned() &&
+      renderTarget->asTextureProxy() != nullptr) {
+    context->drawingManager()->ensureMSAAResolved(renderTarget);
+  }
   renderTarget = nullptr;
   // Remove the compositor from the list, so it won't be flushed again.
   context->drawingManager()->compositors.erase(cachedPosition);
