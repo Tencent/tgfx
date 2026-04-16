@@ -2792,4 +2792,50 @@ TGFX_TEST(CanvasTest, AlphaDebug) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AlphaDebug"));
 }
 
+TGFX_TEST(CanvasTest, NoiseTileSize) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Left: fractal noise without tileSize (no tiling).
+  auto noiseShader = Shader::MakeFractalNoise(0.05f, 0.05f, 3, 6903);
+  Paint paint = {};
+  paint.setShader(std::move(noiseShader));
+  canvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), paint);
+
+  // Right: fractal noise with tileSize 75x75, pattern should tile.
+  auto tileSize = ISize::Make(75, 75);
+  auto tiledShader = Shader::MakeFractalNoise(0.05f, 0.05f, 3, 6903, &tileSize);
+  paint.setShader(std::move(tiledShader));
+  canvas->drawRect(Rect::MakeXYWH(225, 25, 150, 150), paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NoiseTileSize"));
+}
+
+TGFX_TEST(CanvasTest, TurbulenceTileSize) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Left: turbulence without tileSize.
+  auto turbShader = Shader::MakeTurbulence(0.05f, 0.05f, 3, 6903);
+  Paint paint = {};
+  paint.setShader(std::move(turbShader));
+  canvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), paint);
+
+  // Right: turbulence with tileSize 75x75.
+  auto tileSize = ISize::Make(75, 75);
+  auto tiledShader = Shader::MakeTurbulence(0.05f, 0.05f, 3, 6903, &tileSize);
+  paint.setShader(std::move(tiledShader));
+  canvas->drawRect(Rect::MakeXYWH(225, 25, 150, 150), paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/TurbulenceTileSize"));
+}
+
 }  // namespace tgfx
