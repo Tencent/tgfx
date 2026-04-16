@@ -23,13 +23,12 @@
 namespace tgfx {
 class BlendImageFilter : public ImageFilter {
  public:
-  BlendImageFilter(BlendMode blendMode, std::shared_ptr<class Shader> shader, bool clipToSource)
-      : blendMode(blendMode), shader(std::move(shader)), clipToSource(clipToSource) {
+  BlendImageFilter(BlendMode blendMode, std::shared_ptr<class Shader> shader)
+      : blendMode(blendMode), shader(std::move(shader)) {
   }
 
   BlendMode blendMode;
   std::shared_ptr<class Shader> shader;
-  bool clipToSource;
 
  protected:
   Type type() const override {

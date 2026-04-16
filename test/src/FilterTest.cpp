@@ -1142,11 +1142,11 @@ TGFX_TEST(FilterTest, BlendImageFilter) {
   canvas->drawImage(image, &paint);
   canvas->restore();
 
-  // Bottom-right: Multiply blend with a color shader, clipToSource enabled.
+  // Bottom-right: Multiply blend with a color shader.
   canvas->save();
   canvas->concat(Matrix::MakeTrans(imageWidth + padding * 2.f, imageHeight + padding * 2.f));
   auto whiteShader = Shader::MakeColorShader(Color{1.0f, 1.0f, 0.0f, 0.8f});
-  filter = ImageFilter::Blend(BlendMode::Multiply, whiteShader, true);
+  filter = ImageFilter::Blend(BlendMode::Multiply, whiteShader);
   paint.setImageFilter(filter);
   canvas->drawImage(image, &paint);
   canvas->restore();
@@ -1169,21 +1169,32 @@ TGFX_TEST(FilterTest, BlendImageFilterClipToSource) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::FromRGBA(217, 217, 217));
 
-  auto colorShader = Shader::MakeColorShader(Color{1.0f, 0.0f, 0.0f, 1.0f});
+  // Binarized noise: Luma -> AlphaThreshold(0.5) -> fill with semi-transparent black (0.25 alpha).
+  // Reproduces the SVG filter: feTurbulence -> luminanceToAlpha -> discrete threshold ->
+  // feComposite(in, shape) -> feFlood(rgba(0,0,0,0.25)) -> feComposite(in) -> feMerge(shape).
+  auto binarize = ColorFilter::Compose(ColorFilter::Luma(), ColorFilter::AlphaThreshold(0.5f));
+  binarize = ColorFilter::Compose(
+      binarize, ColorFilter::Blend(Color{0.0f, 0.0f, 0.0f, 0.25f}, BlendMode::SrcIn));
+  auto noiseShader =
+      Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903)->makeWithColorFilter(std::move(binarize));
 
-  // Left: clipToSource = false, shader extends beyond source bounds.
+  // Left: plain Blend with binarized noise, shader extends beyond source bounds.
   canvas->save();
   canvas->concat(Matrix::MakeTrans(padding, padding));
-  auto filter = ImageFilter::Blend(BlendMode::SrcOver, colorShader, false);
+  auto filter = ImageFilter::Blend(BlendMode::SrcOver, noiseShader);
   Paint paint = {};
   paint.setImageFilter(filter);
   canvas->drawImage(image, &paint);
   canvas->restore();
 
-  // Right: clipToSource = true, shader clipped to source bounds.
+  // Right: simulate clipToSource by composing Blend(noise) with Blend(DstIn, imageShader),
+  // clipping the result to the source content area.
   canvas->save();
   canvas->concat(Matrix::MakeTrans(imageWidth + padding * 2.f, padding));
-  filter = ImageFilter::Blend(BlendMode::SrcOver, colorShader, true);
+  auto blendFilter = ImageFilter::Blend(BlendMode::SrcOver, noiseShader);
+  auto imageShader = Shader::MakeImageShader(image);
+  auto clipFilter = ImageFilter::Blend(BlendMode::DstIn, imageShader);
+  filter = ImageFilter::Compose(blendFilter, clipFilter);
   paint.setImageFilter(filter);
   canvas->drawImage(image, &paint);
   canvas->restore();
