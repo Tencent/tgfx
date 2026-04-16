@@ -899,4 +899,34 @@ TGFX_TEST(PDFExportTest, NonRegularBlendMode) {
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/NonRegularBlendMode"));
 }
 
+TGFX_TEST(PDFExportTest, SrcBlendOverlap) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  ASSERT_TRUE(document != nullptr);
+  auto canvas = document->beginPage(300.f, 300.f);
+  ASSERT_TRUE(canvas != nullptr);
+
+  // Bottom rectangle: blue, drawn with default SrcOver blend mode.
+  Paint basePaint;
+  basePaint.setColor(Color::Blue());
+  canvas->drawRect(Rect::MakeXYWH(50, 50, 150, 150), basePaint);
+
+  // Top rectangle: semi-transparent red, drawn with Src blend mode.
+  // Src replaces the destination entirely, so the overlap region should show only the red color
+  // (including its alpha), with no blue bleed-through.
+  Paint srcPaint;
+  srcPaint.setColor(Color::FromRGBA(255, 0, 0, 128));
+  srcPaint.setBlendMode(BlendMode::Src);
+  canvas->drawRect(Rect::MakeXYWH(100, 100, 150, 150), srcPaint);
+
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/SrcBlendOverlap"));
+}
+
 }  // namespace tgfx
