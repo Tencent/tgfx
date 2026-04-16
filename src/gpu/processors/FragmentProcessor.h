@@ -26,6 +26,7 @@
 #include "gpu/UniformData.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
 #include "tgfx/core/Canvas.h"
@@ -135,6 +136,19 @@ class FragmentProcessor : public Processor {
 
   const FragmentProcessor* childProcessor(size_t index) const {
     return childProcessors[index].get();
+  }
+
+  /**
+   * Collects all TextureProxy instances referenced by this processor and its child processors.
+   * Used for MSAA dependency tracking - when a RenderTargetProxy is found, it may need to be
+   * resolved before being sampled.
+   * @param callback Called for each TextureProxy found.
+   */
+  virtual void collectTextureProxies(
+      const std::function<void(std::shared_ptr<TextureProxy>)>& callback) const {
+    for (const auto& child : childProcessors) {
+      child->collectTextureProxies(callback);
+    }
   }
 
   size_t numCoordTransforms() const {

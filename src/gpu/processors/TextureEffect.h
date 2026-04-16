@@ -43,6 +43,14 @@ class TextureEffect : public FragmentProcessor {
     return "TextureEffect";
   }
 
+  void collectTextureProxies(
+      const std::function<void(std::shared_ptr<TextureProxy>)>& callback) const override {
+    if (textureProxy) {
+      callback(textureProxy);
+    }
+    FragmentProcessor::collectTextureProxies(callback);
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

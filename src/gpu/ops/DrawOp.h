@@ -67,6 +67,20 @@ class DrawOp {
     return !coverages.empty();
   }
 
+  /**
+   * Collects all TextureProxy instances referenced by this DrawOp's fragment processors.
+   * Used for MSAA dependency tracking.
+   */
+  void collectTextureProxies(
+      const std::function<void(std::shared_ptr<TextureProxy>)>& callback) const {
+    for (const auto& colorFP : colors) {
+      colorFP->collectTextureProxies(callback);
+    }
+    for (const auto& coverageFP : coverages) {
+      coverageFP->collectTextureProxies(callback);
+    }
+  }
+
   void execute(RenderPass* renderPass, RenderTarget* renderTarget);
 
  protected:

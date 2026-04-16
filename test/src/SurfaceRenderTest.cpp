@@ -370,11 +370,18 @@ TGFX_TEST(SurfaceRenderTest, MSAADirtyRectTracking) {
   EXPECT_TRUE(expandedDirtyRect.contains(Rect::MakeLTRB(10, 10, 110, 110)));
   EXPECT_TRUE(expandedDirtyRect.contains(Rect::MakeLTRB(200, 200, 300, 300)));
 
-  // makeImageSnapshot triggers MSAA resolve, which should clear the dirty state.
+  // makeImageSnapshot returns a deferred image. MSAA resolve happens when the image is sampled,
+  // not at snapshot time.
   snapshot = surface->makeImageSnapshot();
   ASSERT_TRUE(snapshot != nullptr);
 
-  // After resolve, the MSAA content should no longer be dirty.
+  // Draw the snapshot to trigger MSAA resolve via dependency mechanism.
+  auto resolveSurface = Surface::Make(context, 1, 1);
+  ASSERT_TRUE(resolveSurface != nullptr);
+  resolveSurface->getCanvas()->drawImage(snapshot);
+  context->flushAndSubmit();
+
+  // After the snapshot is sampled, the MSAA content should be resolved and no longer dirty.
   EXPECT_FALSE(renderTarget->isMSAADirty());
   EXPECT_TRUE(renderTarget->msaaDirtyRect().isEmpty());
 }

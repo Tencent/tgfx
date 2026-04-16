@@ -31,6 +31,14 @@ class TextureGradientColorizer : public FragmentProcessor {
     return "TextureGradientColorizer";
   }
 
+  void collectTextureProxies(
+      const std::function<void(std::shared_ptr<TextureProxy>)>& callback) const override {
+    if (gradient) {
+      callback(gradient);
+    }
+    FragmentProcessor::collectTextureProxies(callback);
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 

@@ -174,10 +174,6 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
   }
   picture->playback(&renderContext, totalMatrix, ClipStack());
   renderContext.flush();
-  // Ensure MSAA content is resolved before returning the texture proxy.
-  // This is necessary because the texture proxy will be used immediately after this call.
-  auto context = renderTarget->getContext();
-  context->drawingManager()->ensureMSAAResolved(std::move(renderTarget));
   return true;
 }
 

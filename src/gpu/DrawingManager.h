@@ -117,6 +117,9 @@ class DrawingManager {
   std::deque<std::shared_ptr<DrawingBuffer>> bufferPool = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   std::unordered_map<TextureProxy*, AtlasUploadTask*> atlasTaskMap = {};
+  // Tracks the number of dirty MSAA render targets in this context. When zero,
+  // addOpsRenderTask() skips FP tree traversal for zero overhead in non-MSAA scenarios.
+  int dirtyMSAACount = 0;
 
   DrawingBuffer* getDrawingBuffer() {
     return currentBuffer ? currentBuffer.get() : createDrawingBuffer();

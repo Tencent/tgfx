@@ -60,8 +60,9 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   auto drawOps = allocator->makeArray<DrawOp>(&drawOp, 1);
   auto textureProxy = renderTarget->asTextureProxy();
   // Mark the entire render target as MSAA dirty if applicable.
-  if (renderTarget->sampleCount() > 1) {
+  if (renderTarget->sampleCount() > 1 && !renderTarget->isMSAADirty()) {
     renderTarget->markMSAADirty(bounds);
+    dirtyMSAACount++;
   }
   auto task = allocator->make<OpsRenderTask>(allocator, std::move(renderTarget), std::move(drawOps),
                                              std::nullopt);
@@ -85,6 +86,17 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
                                       std::optional<PMColor> clearColor, bool resolveImmediately) {
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
+  }
+  // Check for MSAA dependencies: if any input texture is a dirty MSAA RenderTarget,
+  // it must be resolved before being sampled.
+  if (dirtyMSAACount > 0) {
+    for (auto& op : drawOps) {
+      op->collectTextureProxies([this](std::shared_ptr<TextureProxy> proxy) {
+        if (auto rtProxy = proxy->asRenderTargetProxy()) {
+          ensureMSAAResolved(rtProxy);
+        }
+      });
+    }
   }
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
@@ -155,6 +167,7 @@ void DrawingManager::ensureMSAAResolved(std::shared_ptr<RenderTargetProxy> rende
   }
   addResolveMSAATask(renderTarget, renderTarget->msaaDirtyRect());
   renderTarget->markMSAAResolved();
+  dirtyMSAACount--;
 }
 
 void DrawingManager::addResolveMSAATask(std::shared_ptr<RenderTargetProxy> renderTarget,
