@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Point.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 
@@ -59,8 +60,14 @@ std::vector<float> SimplifyLineDashPattern(const std::vector<float>& pattern, co
 
 /**
  * Converts a stroked axis-aligned line to a filled rectangle. Returns true if the conversion is
- * possible (non-round cap, non-hairline, axis-aligned line), and writes the result to rect.
+ * possible (Butt or Square cap, non-hairline, axis-aligned line), and writes the result to rect.
  */
 bool StrokeLineToRect(const Stroke& stroke, const Point line[2], Rect* rect);
+
+/**
+ * Converts a stroked axis-aligned line to a filled round rectangle. Returns true if the conversion
+ * is possible (Round cap, non-hairline, axis-aligned line), and writes the result to rRect.
+ */
+bool StrokeLineToRRect(const Stroke& stroke, const Point line[2], RRect* rRect);
 
 }  // namespace tgfx

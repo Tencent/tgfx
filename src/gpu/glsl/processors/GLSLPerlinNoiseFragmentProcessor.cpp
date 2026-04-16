@@ -140,23 +140,18 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
   for (int ch = 0; ch < 4; ++ch) {
     fragBuilder->codeAppend("{");
 
-    // Helper: noise texture X coordinate with wrapping.
-    // bcoords values can exceed 256, so we wrap with mod.
-    auto makeCoord = [&](const char* bcoordsComp) -> std::string {
-      return std::string("vec2((bcoords.") + bcoordsComp + " + 0.5) / 256.0, " + chanCoords[ch] +
-             ")";
-    };
-
     // Corner A: gradient at (floor.x, floor.y), dot with fractVal
     fragBuilder->codeAppend("vec4 lattice = ");
-    fragBuilder->appendTextureLookup(noiseSampler, makeCoord("x"));
+    fragBuilder->appendTextureLookup(
+        noiseSampler, std::string("vec2((bcoords.x + 0.5) / 256.0, ") + chanCoords[ch] + ")");
     fragBuilder->codeAppend(";");
     fragBuilder->codeAppend(
         "float u = dot((lattice.ga + lattice.rb * 0.00390625) * 2.0 - vec2(1.0), fractVal);");
 
     // Corner B: gradient at (floor.x+1, floor.y), dot with (fractVal - (1,0))
     fragBuilder->codeAppend("lattice = ");
-    fragBuilder->appendTextureLookup(noiseSampler, makeCoord("y"));
+    fragBuilder->appendTextureLookup(
+        noiseSampler, std::string("vec2((bcoords.y + 0.5) / 256.0, ") + chanCoords[ch] + ")");
     fragBuilder->codeAppend(";");
     fragBuilder->codeAppend(
         "float v = dot((lattice.ga + lattice.rb * 0.00390625) * 2.0 - vec2(1.0),"
@@ -166,7 +161,8 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
 
     // Corner C: gradient at (floor.x+1, floor.y+1), dot with (fractVal - (1,1))
     fragBuilder->codeAppend("lattice = ");
-    fragBuilder->appendTextureLookup(noiseSampler, makeCoord("w"));
+    fragBuilder->appendTextureLookup(
+        noiseSampler, std::string("vec2((bcoords.w + 0.5) / 256.0, ") + chanCoords[ch] + ")");
     fragBuilder->codeAppend(";");
     fragBuilder->codeAppend(
         "v = dot((lattice.ga + lattice.rb * 0.00390625) * 2.0 - vec2(1.0),"
@@ -174,7 +170,8 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
 
     // Corner D: gradient at (floor.x, floor.y+1), dot with (fractVal - (0,1))
     fragBuilder->codeAppend("lattice = ");
-    fragBuilder->appendTextureLookup(noiseSampler, makeCoord("z"));
+    fragBuilder->appendTextureLookup(
+        noiseSampler, std::string("vec2((bcoords.z + 0.5) / 256.0, ") + chanCoords[ch] + ")");
     fragBuilder->codeAppend(";");
     fragBuilder->codeAppend(
         "u = dot((lattice.ga + lattice.rb * 0.00390625) * 2.0 - vec2(1.0),"

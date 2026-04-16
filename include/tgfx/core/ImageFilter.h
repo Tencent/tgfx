@@ -125,12 +125,9 @@ class ImageFilter {
   /**
    * Creates a filter that blends a shader with the input image using the specified blend mode.
    * The input image serves as the background (dst), and the shader is evaluated per-pixel to
-   * produce the foreground (src). When clipToSource is true, the result is clipped to the source
-   * bounds.
+   * produce the foreground (src). The shader output extends beyond the source bounds.
    */
-  static std::shared_ptr<ImageFilter> Blend(BlendMode blendMode,
-                                            std::shared_ptr<class Shader> shader,
-                                            bool clipToSource = false);
+  static std::shared_ptr<ImageFilter> Blend(BlendMode blendMode, std::shared_ptr<Shader> shader);
 
   virtual ~ImageFilter() = default;
 

@@ -23,12 +23,11 @@
 namespace tgfx {
 
 std::shared_ptr<ImageFilter> ImageFilter::Blend(BlendMode blendMode,
-                                                std::shared_ptr<class Shader> shader,
-                                                bool clipToSource) {
+                                                std::shared_ptr<class Shader> shader) {
   if (shader == nullptr) {
     return nullptr;
   }
-  return std::make_shared<BlendImageFilter>(blendMode, std::move(shader), clipToSource);
+  return std::make_shared<BlendImageFilter>(blendMode, std::move(shader));
 }
 
 PlacementPtr<FragmentProcessor> BlendImageFilter::asFragmentProcessor(
@@ -46,16 +45,8 @@ PlacementPtr<FragmentProcessor> BlendImageFilter::asFragmentProcessor(
   if (sourceFP == nullptr) {
     return shaderFP;
   }
-  auto blended = XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(shaderFP),
-                                                                  std::move(sourceFP), blendMode);
-  if (!clipToSource) {
-    return blended;
-  }
-  // Clip the blended result to the source image's alpha so the shader doesn't produce visible
-  // pixels outside the source content area.
-  auto alphaFP = FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
-  return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(blended),
-                                                          std::move(alphaFP), BlendMode::SrcIn);
+  return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(shaderFP),
+                                                          std::move(sourceFP), blendMode);
 }
 
 }  // namespace tgfx

@@ -1097,4 +1097,114 @@ TGFX_TEST(FilterTest, AlphaThresholdZero) {
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/AlphaThresholdZero"));
 }
 
+TGFX_TEST(FilterTest, BlendImageFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+  auto padding = 30.f;
+  auto surfaceWidth = static_cast<int>(imageWidth * 2.f + padding * 3.f);
+  auto surfaceHeight = static_cast<int>(imageHeight * 2.f + padding * 3.f);
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(217, 217, 217));
+
+  // Top-left: SrcOver blend with a color shader.
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(padding, padding));
+  auto colorShader = Shader::MakeColorShader(Color{1.0f, 0.0f, 0.0f, 0.5f});
+  auto filter = ImageFilter::Blend(BlendMode::SrcOver, colorShader);
+  Paint paint = {};
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  // Top-right: SrcOver blend with a noise shader.
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(imageWidth + padding * 2.f, padding));
+  auto noiseShader = Shader::MakeFractalNoise(0.05f, 0.05f, 3, 42);
+  filter = ImageFilter::Blend(BlendMode::SrcOver, noiseShader);
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  // Bottom-left: SrcIn blend with a gradient shader (clips to source alpha).
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(padding, imageHeight + padding * 2.f));
+  auto gradientShader = Shader::MakeLinearGradient(
+      Point::Make(0, 0), Point::Make(imageWidth, imageHeight),
+      {Color{0.0f, 0.0f, 1.0f, 1.0f}, Color{0.0f, 1.0f, 0.0f, 1.0f}}, {});
+  filter = ImageFilter::Blend(BlendMode::SrcIn, gradientShader);
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  // Bottom-right: Multiply blend with a color shader.
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(imageWidth + padding * 2.f, imageHeight + padding * 2.f));
+  auto whiteShader = Shader::MakeColorShader(Color{1.0f, 1.0f, 0.0f, 0.8f});
+  filter = ImageFilter::Blend(BlendMode::Multiply, whiteShader);
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/BlendImageFilter"));
+}
+
+TGFX_TEST(FilterTest, BlendImageFilterClipToSource) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+  auto padding = 30.f;
+  auto surfaceWidth = static_cast<int>(imageWidth * 2.f + padding * 3.f);
+  auto surfaceHeight = static_cast<int>(imageHeight + padding * 2.f);
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(217, 217, 217));
+
+  // Binarized noise: Luma -> AlphaThreshold(0.5) -> fill with semi-transparent black (0.25 alpha).
+  // Reproduces the SVG filter: feTurbulence -> luminanceToAlpha -> discrete threshold ->
+  // feComposite(in, shape) -> feFlood(rgba(0,0,0,0.25)) -> feComposite(in) -> feMerge(shape).
+  auto binarize = ColorFilter::Compose(ColorFilter::Luma(), ColorFilter::AlphaThreshold(0.5f));
+  binarize = ColorFilter::Compose(
+      binarize, ColorFilter::Blend(Color{0.0f, 0.0f, 0.0f, 0.25f}, BlendMode::SrcIn));
+  auto noiseShader =
+      Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903)->makeWithColorFilter(std::move(binarize));
+
+  // Left: plain Blend with binarized noise, shader extends beyond source bounds.
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(padding, padding));
+  auto filter = ImageFilter::Blend(BlendMode::SrcOver, noiseShader);
+  Paint paint = {};
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  // Right: simulate clipToSource by composing Blend(noise) with Blend(DstIn, imageShader),
+  // clipping the result to the source content area.
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(imageWidth + padding * 2.f, padding));
+  auto blendFilter = ImageFilter::Blend(BlendMode::SrcOver, noiseShader);
+  auto imageShader = Shader::MakeImageShader(image);
+  auto clipFilter = ImageFilter::Blend(BlendMode::DstIn, imageShader);
+  filter = ImageFilter::Compose(blendFilter, clipFilter);
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/BlendImageFilterClipToSource"));
+}
+
+TGFX_TEST(FilterTest, BlendImageFilterNullShader) {
+  auto filter = ImageFilter::Blend(BlendMode::SrcOver, nullptr);
+  EXPECT_EQ(filter, nullptr);
+}
+
 }  // namespace tgfx
