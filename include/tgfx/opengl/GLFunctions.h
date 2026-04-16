@@ -117,7 +117,6 @@ using GLGenTextures = void GL_FUNCTION_TYPE(int n, unsigned* textures);
 using GLGetBooleanv = void GL_FUNCTION_TYPE(unsigned pname, unsigned char* data);
 using GLGetBufferParameteriv = void GL_FUNCTION_TYPE(unsigned target, unsigned pname, int* params);
 using GLGetError = unsigned GL_FUNCTION_TYPE();
-using GLGetGraphicsResetStatus = unsigned GL_FUNCTION_TYPE();
 using GLGetFramebufferAttachmentParameteriv = void GL_FUNCTION_TYPE(unsigned target,
                                                                     unsigned attachment,
                                                                     unsigned pname, int* params);
@@ -291,7 +290,6 @@ class GLFunctions {
   GLGenVertexArrays* genVertexArrays = nullptr;
   GLGetBufferParameteriv* getBufferParameteriv = nullptr;
   GLGetError* getError = nullptr;
-  GLGetGraphicsResetStatus* getGraphicsResetStatus = nullptr;
   GLGetFramebufferAttachmentParameteriv* getFramebufferAttachmentParameteriv = nullptr;
   GLGetIntegerv* getIntegerv = nullptr;
   GLGetInternalformativ* getInternalformativ = nullptr;

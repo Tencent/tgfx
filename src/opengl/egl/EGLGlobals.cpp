@@ -18,8 +18,7 @@
 
 #include "tgfx/opengl/egl/EGLGlobals.h"
 #include <EGL/eglext.h>
-#include <atomic>
-#include <cstring>
+#include <mutex>
 #if defined(_WIN32)
 #include "EGLDisplayWrapper.h"
 #endif
@@ -42,10 +41,6 @@ EGLGlobals InitializeEGL() {
   globals.pbufferSurfaceAttributes = {EGL_WIDTH,           1,        EGL_HEIGHT, 1,
                                       EGL_LARGEST_PBUFFER, EGL_TRUE, EGL_NONE};
   eglBindAPI(EGL_OPENGL_ES_API);
-  auto extensions = eglQueryString(globals.display, EGL_EXTENSIONS);
-  if (extensions && strstr(extensions, "EGL_EXT_create_context_robustness")) {
-    globals.contextRobustnessSupported = true;
-  }
   EGLint numConfigs = 0;
   const EGLint configAttribs[] = {EGL_SURFACE_TYPE,
                                   EGL_WINDOW_BIT,
