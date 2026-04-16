@@ -1110,6 +1110,55 @@ TGFX_TEST(CanvasTest, RRectBlendMode) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RRectBlendMode"));
 }
 
+TGFX_TEST(CanvasTest, ShapeBlendMode) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Draw a green background rect on the left half
+  Paint bgPaint;
+  bgPaint.setColor(Color::Green());
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 150, 200), bgPaint);
+
+  // Draw a blue background rect on the right half
+  bgPaint.setColor(Color::Blue());
+  canvas->drawRect(Rect::MakeXYWH(150, 0, 150, 200), bgPaint);
+
+  // Create a complex path that will use ShapeDrawOp with coverage (antiAlias=true)
+  Path path;
+  path.moveTo(50, 30);
+  path.lineTo(100, 170);
+  path.lineTo(0, 70);
+  path.lineTo(100, 70);
+  path.lineTo(0, 170);
+  path.close();
+
+  // Left: Shape with BlendMode::Src and antiAlias (has coverage)
+  // BlendMode::Src uses different blend formula with/without coverage
+  auto shape = Shape::MakeFrom(path);
+  Paint paint;
+  paint.setColor(Color::FromRGBA(255, 0, 0, 200));
+  paint.setAntiAlias(true);
+  paint.setBlendMode(BlendMode::Src);
+  canvas->save();
+  canvas->translate(25, 15);
+  canvas->drawShape(shape, paint);
+  canvas->restore();
+
+  // Right: Shape with BlendMode::Src and antiAlias=false (no coverage)
+  paint.setAntiAlias(false);
+  canvas->save();
+  canvas->translate(175, 15);
+  canvas->drawShape(shape, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ShapeBlendMode"));
+}
+
 TGFX_TEST(CanvasTest, MatrixShapeStroke) {
   ContextScope scope;
   auto context = scope.getContext();
