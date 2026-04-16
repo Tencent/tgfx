@@ -67,12 +67,6 @@ class GLDevice : public Device {
 
   GLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle);
 
-  void releaseAll();
-
- private:
-  static void MarkAllContextsLost();
-
-  friend class EGLDevice;
   friend class GLContext;
 };
 }  // namespace tgfx
