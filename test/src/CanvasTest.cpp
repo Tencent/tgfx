@@ -2737,7 +2737,7 @@ TGFX_TEST(CanvasTest, NoiseWithThreshold) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NoiseWithThreshold"));
 }
 
-TGFX_TEST(CanvasTest, AlphaDebug) {
+TGFX_TEST(CanvasTest, NoiseShaderAlphaBlend) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2779,7 +2779,7 @@ TGFX_TEST(CanvasTest, AlphaDebug) {
     canvas->drawRect(Rect::MakeXYWH(210, 10, 80, 80), paint);
   }
 
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AlphaDebug"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NoiseShaderAlphaBlend"));
 }
 
 TGFX_TEST(CanvasTest, NoiseTileSize) {
