@@ -208,34 +208,8 @@ void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const Matrix& mat
   this->onDrawPath(matrix, clip, path, brush);
 }
 
-// BackgroundBlurStyle renders a blurred background image with BlendMode::Src and a non-inverted
-// ShaderMaskFilter (see BackgroundBlurStyle::onDrawWithExtraSource). The image itself is a
-// FilterImage produced by GaussianBlurImageFilter. PDF cannot correctly export this effect,
-// so we detect and skip it.
-static bool IsBackgroundBlurDraw(const Image* image, const Brush& brush) {
-  if (brush.blendMode != BlendMode::Src || !brush.maskFilter) {
-    return false;
-  }
-  if (Types::Get(brush.maskFilter.get()) != Types::MaskFilterType::Shader) {
-    return false;
-  }
-  if (static_cast<const ShaderMaskFilter*>(brush.maskFilter.get())->isInverted()) {
-    return false;
-  }
-  if (!image || Types::Get(image) != Types::ImageType::Filter) {
-    return false;
-  }
-  auto filterImage = static_cast<const FilterImage*>(image);
-  return filterImage->filter &&
-         Types::Get(filterImage->filter.get()) == Types::ImageFilterType::Blur;
-}
-
 void PDFExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                  const Matrix& matrix, const ClipStack& clip, const Brush& brush) {
-  // TODO(YGaurora): Implement background blur export for PDF instead of skipping it.
-  if (IsBackgroundBlurDraw(image.get(), brush)) {
-    return;
-  }
   auto rect = Rect::MakeWH(image->width(), image->height());
   onDrawImageRect(image, rect, sampling, matrix, clip, brush);
 }
