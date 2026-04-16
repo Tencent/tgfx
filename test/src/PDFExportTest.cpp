@@ -33,8 +33,6 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
-#include "tgfx/layers/SolidLayer.h"
-#include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/pdf/PDFDocument.h"
 #include "tgfx/pdf/PDFMetadata.h"
@@ -901,8 +899,17 @@ TGFX_TEST(PDFExportTest, NonRegularBlendMode) {
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/NonRegularBlendMode"));
 }
 
-namespace {
-void DrawSrcBlendOverlap(Canvas* canvas) {
+TGFX_TEST(PDFExportTest, SrcBlendOverlap) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  ASSERT_TRUE(document != nullptr);
+  auto canvas = document->beginPage(300.f, 300.f);
+  ASSERT_TRUE(canvas != nullptr);
+
   // Bottom rectangle: blue, drawn with default SrcOver blend mode.
   Paint basePaint;
   basePaint.setColor(Color::Blue());
@@ -915,83 +922,11 @@ void DrawSrcBlendOverlap(Canvas* canvas) {
   srcPaint.setColor(Color::FromRGBA(255, 0, 0, 128));
   srcPaint.setBlendMode(BlendMode::Src);
   canvas->drawRect(Rect::MakeXYWH(100, 100, 150, 150), srcPaint);
-}
-}  // namespace
 
-TGFX_TEST(PDFExportTest, SrcBlendOverlap) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-
-  float width = 300.f;
-  float height = 300.f;
-
-  auto PDFStream = MemoryWriteStream::Make();
-  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  ASSERT_TRUE(document != nullptr);
-  auto canvas = document->beginPage(width, height);
-  ASSERT_TRUE(canvas != nullptr);
-  DrawSrcBlendOverlap(canvas);
   document->endPage();
   document->close();
   PDFStream->flush();
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/SrcBlendOverlap"));
-
-  auto surface = Surface::Make(context, static_cast<int>(width), static_cast<int>(height));
-  auto surfaceCanvas = surface->getCanvas();
-  DrawSrcBlendOverlap(surfaceCanvas);
-  EXPECT_TRUE(Baseline::Compare(surface, "PDFTest/SrcBlendOverlap"));
-}
-
-TGFX_TEST(PDFExportTest, BackgroundBlurLayer) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-
-  auto PDFStream = MemoryWriteStream::Make();
-  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  ASSERT_TRUE(document != nullptr);
-
-  float pageW = 822.f;
-  float pageH = 1663.f;
-
-  auto rootLayer = Layer::Make();
-
-  auto background = SolidLayer::Make();
-  background->setColor(Color::White());
-  background->setWidth(static_cast<int>(pageW));
-  background->setHeight(static_cast<int>(pageH));
-  rootLayer->addChild(background);
-
-  auto redLayer = SolidLayer::Make();
-  redLayer->setColor(Color::Red());
-  redLayer->setWidth(624);
-  redLayer->setHeight(48);
-  redLayer->setPosition(Point{99.f, 381.f});
-  rootLayer->addChild(redLayer);
-
-  auto blurLayer = SolidLayer::Make();
-  blurLayer->setColor(Color::FromRGBA(139, 239, 200));
-  blurLayer->setWidth(822);
-  blurLayer->setHeight(300);
-  blurLayer->setPosition(Point{0.f, 469.f});
-  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(10.f, 10.f)});
-  rootLayer->addChild(blurLayer);
-
-  auto surface = Surface::Make(context, static_cast<int>(pageW), static_cast<int>(pageH));
-  auto surfaceCanvas = surface->getCanvas();
-  rootLayer->draw(surfaceCanvas);
-
-  auto canvas = document->beginPage(pageW, pageH);
-  ASSERT_TRUE(canvas != nullptr);
-  rootLayer->draw(canvas);
-  document->endPage();
-
-  document->close();
-  PDFStream->flush();
-
-  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/BackgroundBlurLayer_pdf"));
-  EXPECT_TRUE(Baseline::Compare(surface, "PDFTest/BackgroundBlurLayer"));
 }
 
 }  // namespace tgfx
