@@ -115,7 +115,7 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   if (dirtyMSAARTCount > 0) {
     for (auto& input : inputs) {
       if (auto rtProxy = input.textureProxy->asRenderTargetProxy()) {
-        ensureMSAAResolved(std::move(rtProxy));
+        ensureMSAAResolved(rtProxy);
       }
     }
   }
@@ -166,7 +166,7 @@ void DrawingManager::addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> so
   drawingBuffer->renderTasks.emplace_back(std::move(task));
 }
 
-void DrawingManager::ensureMSAAResolved(std::shared_ptr<RenderTargetProxy> renderTarget) {
+void DrawingManager::ensureMSAAResolved(const std::shared_ptr<RenderTargetProxy>& renderTarget) {
   if (renderTarget == nullptr || renderTarget->sampleCount() <= 1 || !renderTarget->isMSAADirty()) {
     return;
   }

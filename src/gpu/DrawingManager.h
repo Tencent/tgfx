@@ -92,7 +92,7 @@ class DrawingManager {
    * resolves if needed, and clears the dirty rect. Call this before any operation that reads from
    * the render target's sample texture.
    */
-  void ensureMSAAResolved(std::shared_ptr<RenderTargetProxy> renderTarget);
+  void ensureMSAAResolved(const std::shared_ptr<RenderTargetProxy>& renderTarget);
 
   void addResourceTask(PlacementPtr<ResourceTask> resourceTask);
 
