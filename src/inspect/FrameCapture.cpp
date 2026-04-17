@@ -36,7 +36,7 @@
 #include "core/ShapeRasterizer.h"
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
-#include "gpu/glsl/GLSLProgramBuilder.h"
+#include "gpu/ModularProgramBuilder.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "lz4.h"
 #include "tgfx/core/Clock.h"
@@ -387,7 +387,7 @@ void FrameCapture::captureProgramInfo(const BytesKey& programKey, Context* conte
     return;
   }
   programKeys.emplace(programKey);
-  GLSLProgramBuilder builder(context, programInfo);
+  ModularProgramBuilder builder(context, programInfo);
   if (!builder.emitAndInstallProcessors()) {
     return;
   }

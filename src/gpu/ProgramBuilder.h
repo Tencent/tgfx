@@ -63,6 +63,10 @@ class ProgramBuilder {
 
   virtual FragmentShaderBuilder* fragmentShaderBuilder() = 0;
 
+  virtual bool emitAndInstallProcessors() = 0;
+
+  void finalizeShaders();
+
  protected:
   Context* context = nullptr;
   const ProgramInfo* programInfo = nullptr;
@@ -70,15 +74,12 @@ class ProgramBuilder {
 
   ProgramBuilder(Context* context, const ProgramInfo* programInfo);
 
-  virtual bool emitAndInstallProcessors();
-
-  void finalizeShaders();
-
   virtual bool checkSamplerCounts() = 0;
 
-  virtual void emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage);
+  virtual void emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage) = 0;
 
-  virtual void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn);
+  virtual void emitAndInstallXferProc(const std::string& colorIn,
+                                      const std::string& coverageIn) = 0;
 
   SamplerHandle emitSampler(std::shared_ptr<Texture> texture, const std::string& name);
 
@@ -93,11 +94,6 @@ class ProgramBuilder {
    * Generates a possibly mangled name for a stage variable and writes it to the fragment shader.
    */
   void nameExpression(std::string* output, const std::string& baseName);
-
-  void emitAndInstallFragProcessors(std::string* color, std::string* coverage);
-
-  std::string emitAndInstallFragProc(const FragmentProcessor* processor,
-                                     size_t transformedCoordVarsIdx, const std::string& input);
 
   friend class FragmentShaderBuilder;
   friend class ProcessorGuard;

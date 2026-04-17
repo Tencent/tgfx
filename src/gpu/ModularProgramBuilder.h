@@ -46,7 +46,6 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
    */
   static bool CanUseModularPath(const ProgramInfo* programInfo);
 
- protected:
   bool emitAndInstallProcessors() override;
 
  private:
