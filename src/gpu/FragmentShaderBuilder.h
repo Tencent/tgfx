@@ -22,7 +22,6 @@
 #include "ShaderVar.h"
 
 namespace tgfx {
-class FragmentProcessor;
 
 static constexpr char CUSTOM_COLOR_OUTPUT_NAME[] = "tgfx_FragColor";
 
@@ -35,10 +34,6 @@ class FragmentShaderBuilder : public ShaderBuilder {
   }
 
   virtual std::string dstColor() = 0;
-
-  void onBeforeChildProcEmitCode(const FragmentProcessor* child) const;
-
-  void onAfterChildProcEmitCode() const;
 
   void declareCustomOutputColor();
 

@@ -37,14 +37,6 @@ void FragmentShaderBuilder::declareCustomOutputColor() {
   outputs.emplace_back(CUSTOM_COLOR_OUTPUT_NAME, SLType::Float4, typeModifier);
 }
 
-void FragmentShaderBuilder::onBeforeChildProcEmitCode(const FragmentProcessor* child) const {
-  programBuilder->currentProcessors.push_back(child);
-}
-
-void FragmentShaderBuilder::onAfterChildProcEmitCode() const {
-  programBuilder->currentProcessors.pop_back();
-}
-
 std::string FragmentShaderBuilder::emitPerspTextCoord(const ShaderVar& coordVar) {
   if (coordVar.type() == SLType::Float2) {
     return coordVar.name();

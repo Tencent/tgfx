@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <functional>
 #include "gpu/CoordTransform.h"
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/MangledResources.h"
