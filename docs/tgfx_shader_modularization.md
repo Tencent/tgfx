@@ -5180,3 +5180,55 @@ cmake -DSHADER_DIR=src/gpu/shaders -DOUTPUT_FILE=src/gpu/ShaderModuleEmbedded.in
 | `GLSLBlend.cpp` + `BlendFormula.cpp`（OFF 路径 blend 代码） | ~700 | 阶段 3 |
 | 各 Processor `emitCode()` 中 `!skipFragmentCode` 分支 | ~1500 | 阶段 2 |
 | **总计** | **~6300** | |
+
+### 17.17 Phase K 实施结果记录：GP emitCode() OFF 路径死代码清理
+
+> 2026-04-17 完成，共 1 个 commit。
+
+#### 背景
+
+Phase J 移除编译开关后，`CreateProgram()` 永久走 `ModularProgramBuilder`，GP 的 `emitCode()` 始终以 `skipVertexCode=true`、`skipFragmentCode=true` 被调用。以下代码成为死代码：
+- `if (args.skipVertexCode) { ... } else { ... }` 的 `else` 分支（传统内联 VS 代码）
+- `if (!args.skipFragmentCode) { ... }` 块（内联 FS 代码）
+
+#### 改动
+
+对全部 10 个 GP 的 `emitCode()` 方法执行统一清理：
+
+| 操作 | 说明 |
+|------|------|
+| 删除 `else { ... }` 分支 | 传统内联 VS 代码（每个 GP 5–15 行） |
+| 删除 `if (!args.skipFragmentCode) { ... }` | 内联 FS 代码（每个 GP 10–45 行） |
+| 去掉 `if (args.skipVertexCode)` 条件 | VS 函数注入始终执行，不再需要条件判断 |
+| 简化 `emitNormalizedPosition` 三元表达式 | 直接使用 `positionName` |
+| 删除未使用的 `fragBuilder` 变量 | 7 个文件 |
+
+涉及文件（均在 `src/gpu/glsl/processors/` 下）：
+
+| 文件 | 删除行数 |
+|------|---------|
+| GLSLDefaultGeometryProcessor.cpp | -17 |
+| GLSLEllipseGeometryProcessor.cpp | -46 |
+| GLSLQuadPerEdgeAAGeometryProcessor.cpp | -28 |
+| GLSLRoundStrokeRectGeometryProcessor.cpp | -38 |
+| GLSLNonAARRectGeometryProcessor.cpp | -57 |
+| GLSLHairlineLineGeometryProcessor.cpp | -22 |
+| GLSLHairlineQuadGeometryProcessor.cpp | -30 |
+| GLSLAtlasTextGeometryProcessor.cpp | -40 |
+| GLSLMeshGeometryProcessor.cpp | -34 |
+| GLSLShapeInstancedGeometryProcessor.cpp | -27 |
+| **合计** | **净减 342 行** |
+
+AtlasTextGeometryProcessor 的特殊处理：ON 路径中的纹理查询 + `gpUniforms` 注册代码被保留（去掉 `if (args.skipFragmentCode)` 条件，直接执行），仅删除 `else` 分支的 OFF 路径代码。
+
+#### 完成的 Commit
+
+| Commit | 说明 |
+|--------|------|
+| `8bf95e3d` | 删除 10 个 GP emitCode() 中的 OFF 路径死代码 |
+
+#### 验证结果
+
+| 构建命令 | 测试数 | 结果 |
+|---------|--------|------|
+| `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
