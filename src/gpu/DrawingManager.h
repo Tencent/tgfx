@@ -119,7 +119,7 @@ class DrawingManager {
   std::unordered_map<TextureProxy*, AtlasUploadTask*> atlasTaskMap = {};
   // Tracks the number of dirty MSAA render targets in this context. When zero,
   // addOpsRenderTask() skips FP tree traversal for zero overhead in non-MSAA scenarios.
-  int dirtyMSAACount = 0;
+  int dirtyMSAARTCount = 0;
 
   DrawingBuffer* getDrawingBuffer() {
     return currentBuffer ? currentBuffer.get() : createDrawingBuffer();

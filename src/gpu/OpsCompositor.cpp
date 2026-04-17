@@ -1034,7 +1034,7 @@ void OpsCompositor::flushPendingDirtyRect() {
   dirty.roundOut();
   if (dirty.intersect(renderTarget->bounds())) {
     if (!renderTarget->isMSAADirty()) {
-      context->drawingManager()->dirtyMSAACount++;
+      context->drawingManager()->dirtyMSAARTCount++;
     }
     renderTarget->markMSAADirty(dirty);
   }
