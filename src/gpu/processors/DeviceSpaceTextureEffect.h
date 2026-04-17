@@ -32,7 +32,7 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
   }
 
   void collectTextureProxies(
-      const std::function<void(std::shared_ptr<TextureProxy>)>& callback) const override {
+      const std::function<void(const std::shared_ptr<TextureProxy>&)>& callback) const override {
     if (textureProxy) {
       callback(textureProxy);
     }

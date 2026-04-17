@@ -145,7 +145,7 @@ class FragmentProcessor : public Processor {
    * @param callback Called for each TextureProxy found.
    */
   virtual void collectTextureProxies(
-      const std::function<void(std::shared_ptr<TextureProxy>)>& callback) const {
+      const std::function<void(const std::shared_ptr<TextureProxy>&)>& callback) const {
     for (const auto& child : childProcessors) {
       child->collectTextureProxies(callback);
     }
