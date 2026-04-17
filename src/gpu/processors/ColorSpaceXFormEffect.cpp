@@ -31,26 +31,6 @@ PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(
   return allocator->make<ColorSpaceXformEffect>(std::move(colorXform));
 }
 
-void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
-  auto uniformHandler = args.uniformHandler;
-  auto fragBuilder = args.fragBuilder;
-  ColorSpaceXformHelper helper{};
-  helper.emitCode(uniformHandler, colorSpaceXformSteps.get());
-  std::string outputColor;
-  fragBuilder->appendColorGamutXform(&outputColor, args.inputColor.c_str(), &helper);
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outputColor.c_str());
-}
-
-bool ColorSpaceXformEffect::emitContainerCode(FragmentShaderBuilder* /*fragBuilder*/,
-                                              UniformHandler* /*uniformHandler*/,
-                                              const std::string& /*input*/,
-                                              const std::string& /*output*/,
-                                              size_t /*transformedCoordVarsIdx*/,
-                                              const EmitChildFunc& /*emitChild*/) const {
-  // Return false to fall through to the modular leaf FP path (buildCallStatement).
-  return false;
-}
-
 void ColorSpaceXformEffect::onBuildShaderMacros(ShaderMacroSet& macros) const {
   auto* steps = colorSpaceXformSteps.get();
   if (steps->flags.unPremul) {

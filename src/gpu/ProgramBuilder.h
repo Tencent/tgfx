@@ -96,7 +96,6 @@ class ProgramBuilder {
   void nameExpression(std::string* output, const std::string& baseName);
 
   friend class FragmentShaderBuilder;
-  friend class ProcessorGuard;
   friend class ModularProgramBuilder;
 };
 }  // namespace tgfx

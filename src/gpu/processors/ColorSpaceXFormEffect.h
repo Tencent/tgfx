@@ -41,14 +41,10 @@ class ColorSpaceXformEffect : public FragmentProcessor {
     return colorSpaceXformSteps.get();
   }
 
-  void emitCode(EmitArgs& args) const override;
+  void emitCode(EmitArgs&) const override {
+  }
 
  protected:
-  bool emitContainerCode(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
-                         const std::string& input, const std::string& output,
-                         size_t transformedCoordVarsIdx,
-                         const EmitChildFunc& emitChild) const override;
-
   void onBuildShaderMacros(ShaderMacroSet& macros) const override;
 
   std::string shaderFunctionFile() const override {

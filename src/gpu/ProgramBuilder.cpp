@@ -19,19 +19,6 @@
 #include "ProgramBuilder.h"
 
 namespace tgfx {
-class ProcessorGuard {
- public:
-  ProcessorGuard(ProgramBuilder* builder, const Processor* processor) : builder(builder) {
-    builder->currentProcessors.push_back(processor);
-  }
-
-  ~ProcessorGuard() {
-    builder->currentProcessors.pop_back();
-  }
-
- private:
-  ProgramBuilder* builder = nullptr;
-};
 
 ProgramBuilder::ProgramBuilder(Context* context, const ProgramInfo* programInfo)
     : context(context), programInfo(programInfo) {
