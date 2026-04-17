@@ -5618,9 +5618,26 @@ XferProcessor 同步改造：`emitCode()` 从纯虚改为默认空实现。
 
 **仍保留（活代码）：**
 - `GeometryProcessor::EmitArgs` + `GeometryProcessor::emitCode()` — GP 仍走 emitCode 路径
-- `XferProcessor::EmitArgs` — XP 的 EmitArgs 类型声明保留（签名兼容）
 
 #### 验证结果
+
+| 构建命令 | 测试数 | 结果 |
+|---------|--------|------|
+| `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
+
+### 17.26 Phase S 补充：XferProcessor EmitArgs 清理
+
+> 2026-04-17 完成，共 1 个 commit。
+
+Phase S 保留了 `XferProcessor::EmitArgs`，经确认该结构体及其关联的 `emitCode(const EmitArgs&)` 已无外部调用者，可安全删除。
+
+| 文件 | 操作 | 删除行数 |
+|------|------|---------|
+| `src/gpu/processors/XferProcessor.h` | 删除 `EmitArgs` struct + `emitCode()` + 无用 include (`FragmentShaderBuilder.h`, `UniformHandler.h`) | -21 |
+
+| Commit | 说明 |
+|--------|------|
+| `9a52c5a3` | 删除 XferProcessor EmitArgs + emitCode + 无用 include |
 
 | 构建命令 | 测试数 | 结果 |
 |---------|--------|------|
