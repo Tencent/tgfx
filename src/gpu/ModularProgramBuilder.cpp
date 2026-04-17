@@ -30,7 +30,7 @@ ModularProgramBuilder::ModularProgramBuilder(Context* context, const ProgramInfo
 
 bool ModularProgramBuilder::CanUseModularPath(const ProgramInfo* programInfo) {
   // All processors are now supported by the modular builder: leaf FPs via modular .glsl modules,
-  // container/complex FPs via legacy emitCode() fallback, and GP/XP via explicit dispatch overrides.
+  // All FP dispatching is handled by emitModularFragProc (modular container + leaf paths).
   (void)programInfo;
   return true;
 }
@@ -134,7 +134,8 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
   }
 
   // Try legacy container dispatch via emitContainerCode().
-  // The emitChild callback now recursively calls emitModularFragProc for modular children.
+  // The emitChild callback recursively calls emitModularFragProc for leaf children,
+  // and falls back to emitCode() for non-leaf non-modular children.
   FragmentProcessor::TransformedCoordVars rootCoords(
       processor, transformedCoordVarsIdx < transformedCoordVars.size()
                      ? &transformedCoordVars[transformedCoordVarsIdx]
@@ -158,8 +159,7 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
     size_t childCoordOffset =
         processor->computeChildCoordOffset(transformedCoordVarsIdx, childIndex);
 
-    // Try modular path for child: recursively call emitModularFragProc.
-    // skipSamplerCollection=true because the parent already collected all samplers.
+    // Modular path for leaf children.
     auto childName = child->name();
     bool childIsLeaf =
         (child->numChildProcessors() == 0 && ShaderModuleRegistry::HasModule(childName));
@@ -167,7 +167,7 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
       return emitModularFragProc(child, childCoordOffset, childInput, std::move(coordFunc), true);
     }
 
-    // Legacy fallback for non-modular children: use EmitArgs + emitCode.
+    // Legacy fallback for non-leaf children: use EmitArgs + emitCode.
     auto fragBuilder = fragmentShaderBuilder();
     fragBuilder->onBeforeChildProcEmitCode(child);
     std::string inputName;
@@ -362,49 +362,34 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
 
   GeometryProcessor::FPCoordTransformHandler transformHandler(programInfo, &transformedCoordVars);
 
-  // All 10 GP types support modular FS path via buildColorCallExpr/buildCoverageCallExpr.
-  bool useModularFS = true;
-
-  if (useModularFS) {
-    // Emit GP shader macros to both VS and FS definitions BEFORE emitCode,
-    // so that .vert.glsl functions injected by emitCode can see the #define directives.
-    ShaderMacroSet macros;
-    geometryProcessor->onBuildShaderMacros(macros);
-    if (!macros.empty()) {
-      auto preamble = macros.toPreamble();
-      fragmentShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] += preamble;
-      vertexShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] += preamble;
-    }
-
-    // Modular path: call emitCode with skipFragmentCode=true and skipVertexCode=true.
-    MangledVaryings gpVaryings;
-    MangledUniforms gpUniforms;
-    GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(),
-                                     varyingHandler(), uniformHandler(), getContext()->shaderCaps(),
-                                     *outputColor, *outputCoverage, &transformHandler,
-                                     &subsetVarName, true);
-    args.skipVertexCode = true;
-    args.gpVaryings = &gpVaryings;
-    args.gpUniforms = &gpUniforms;
-    geometryProcessor->emitCode(args);
-
-    // Generate FS function calls.
-    auto colorResult = geometryProcessor->buildColorCallExpr(gpUniforms, gpVaryings);
-    auto coverageResult = geometryProcessor->buildCoverageCallExpr(gpUniforms, gpVaryings);
-    fragmentShaderBuilder()->codeAppend(colorResult.statement);
-    fragmentShaderBuilder()->codeAppendf("%s = %s;\n", outputColor->c_str(),
-                                         colorResult.outputVarName.c_str());
-    fragmentShaderBuilder()->codeAppend(coverageResult.statement);
-    fragmentShaderBuilder()->codeAppendf("%s = %s;\n", outputCoverage->c_str(),
-                                         coverageResult.outputVarName.c_str());
-  } else {
-    // Legacy path: call emitCode with full VS+FS generation.
-    GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(),
-                                     varyingHandler(), uniformHandler(), getContext()->shaderCaps(),
-                                     *outputColor, *outputCoverage, &transformHandler,
-                                     &subsetVarName);
-    geometryProcessor->emitCode(args);
+  // Emit GP shader macros to both VS and FS definitions BEFORE emitCode,
+  // so that .vert.glsl functions injected by emitCode can see the #define directives.
+  ShaderMacroSet macros;
+  geometryProcessor->onBuildShaderMacros(macros);
+  if (!macros.empty()) {
+    auto preamble = macros.toPreamble();
+    fragmentShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] += preamble;
+    vertexShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] += preamble;
   }
+
+  MangledVaryings gpVaryings;
+  MangledUniforms gpUniforms;
+  GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(),
+                                   uniformHandler(), getContext()->shaderCaps(), *outputColor,
+                                   *outputCoverage, &transformHandler, &subsetVarName, true);
+  args.skipVertexCode = true;
+  args.gpVaryings = &gpVaryings;
+  args.gpUniforms = &gpUniforms;
+  geometryProcessor->emitCode(args);
+
+  auto colorResult = geometryProcessor->buildColorCallExpr(gpUniforms, gpVaryings);
+  auto coverageResult = geometryProcessor->buildCoverageCallExpr(gpUniforms, gpVaryings);
+  fragmentShaderBuilder()->codeAppend(colorResult.statement);
+  fragmentShaderBuilder()->codeAppendf("%s = %s;\n", outputColor->c_str(),
+                                       colorResult.outputVarName.c_str());
+  fragmentShaderBuilder()->codeAppend(coverageResult.statement);
+  fragmentShaderBuilder()->codeAppendf("%s = %s;\n", outputCoverage->c_str(),
+                                       coverageResult.outputVarName.c_str());
 
   fragmentShaderBuilder()->codeAppend("}");
   currentProcessors.pop_back();
@@ -457,20 +442,13 @@ void ModularProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
 
   auto result = xferProcessor->buildXferCallStatement(inputColor, inputCoverage, outputColor,
                                                       dstColorExpr, uniforms, samplers);
-  if (!result.statement.empty()) {
-    // Include XP module and blend mode utility functions.
-    includeModule(ShaderModuleID::BlendModes);
-    auto xpName = xferProcessor->name();
-    if (ShaderModuleRegistry::HasModule(xpName)) {
-      includeModule(ShaderModuleRegistry::GetModuleID(xpName));
-    }
-    fragmentShaderBuilder()->codeAppend(result.statement);
-  } else {
-    // Fallback to legacy emitCode().
-    XferProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), inputColor,
-                                 inputCoverage, outputColor, dstTextureSamplerHandle);
-    xferProcessor->emitCode(args);
+  // Include XP module and blend mode utility functions.
+  includeModule(ShaderModuleID::BlendModes);
+  auto xpName = xferProcessor->name();
+  if (ShaderModuleRegistry::HasModule(xpName)) {
+    includeModule(ShaderModuleRegistry::GetModuleID(xpName));
   }
+  fragmentShaderBuilder()->codeAppend(result.statement);
 
   fragmentShaderBuilder()->codeAppend("}");
   currentProcessors.pop_back();
