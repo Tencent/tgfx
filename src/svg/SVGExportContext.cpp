@@ -186,8 +186,20 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
                          _assignColorSpace);
       resources = defs.addImageFilterResource(filter, bound, customWriter);
     }
+    auto clipPath = clip.getClipPath();
+    bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+    std::string clipID;
+    if (needsClip) {
+      clipID = defineClipPath(clipPath);
+    }
     {
+      auto savedClipPath = currentClipPath;
+      clipGroupElement = nullptr;
+      currentClipPath = {};
       auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+      if (needsClip) {
+        groupElement->addAttribute("clip-path", "url(#" + clipID + ")");
+      }
       if (!outer.isZero()) {
         groupElement->addAttribute(
             "transform", ToSVGTransform(Matrix::MakeTrans(outer.x - offset.x, outer.y - offset.y)));
@@ -195,7 +207,9 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       if (filter) {
         groupElement->addAttribute("filter", resources.filter);
       }
-      drawImage(filterImage->source, sampling, matrix, clip, brush);
+      drawImage(filterImage->source, sampling, matrix, needsClip ? ClipStack{} : clip, brush);
+      clipGroupElement = nullptr;
+      currentClipPath = savedClipPath;
     }
   } else if (type == Types::ImageType::Subset) {
     const auto subsetImage = static_cast<const SubsetImage*>(image.get());
@@ -381,19 +395,32 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
                                  const ClipStack& clip, const Brush&) {
   DEBUG_ASSERT(picture != nullptr);
   Resources resources;
+  auto bound = matrix.mapRect(picture->getBounds());
   if (imageFilter) {
     ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                        _assignColorSpace);
-    auto bound = picture->getBounds();
-    resources = defs.addImageFilterResource(imageFilter, bound, customWriter);
+    resources = defs.addImageFilterResource(imageFilter, picture->getBounds(), customWriter);
+  }
+  auto clipPath = clip.getClipPath();
+  bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+  std::string clipID;
+  if (needsClip) {
+    clipID = defineClipPath(clipPath);
   }
   {
-    applyClip(clip, matrix.mapRect(picture->getBounds()));
+    auto savedClipPath = currentClipPath;
+    clipGroupElement = nullptr;
+    currentClipPath = {};
     auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+    if (needsClip) {
+      groupElement->addAttribute("clip-path", "url(#" + clipID + ")");
+    }
     if (imageFilter) {
       groupElement->addAttribute("filter", resources.filter);
     }
-    picture->playback(this, matrix, clip);
+    picture->playback(this, matrix, needsClip ? ClipStack{} : clip);
+    clipGroupElement = nullptr;
+    currentClipPath = savedClipPath;
   }
 }
 
@@ -425,41 +452,41 @@ void SVGExportContext::applyClip(const ClipStack& clip, const Rect& contentBound
   applyClipPath(clipPath);
 }
 
-void SVGExportContext::applyClipPath(const Path& clipPath) {
-  auto defineClip = [this](const Path& clipPath) -> std::string {
-    std::string clipID = resourceBucket->addClip();
-    ElementWriter clipPathElement("clipPath", xmlWriter);
-    clipPathElement.addAttribute("id", clipID);
-    {
-      std::unique_ptr<ElementWriter> element;
-      Rect rect;
-      RRect rrect;
-      Rect ovalBound;
-      if (clipPath.isRect(&rect)) {
-        element = std::make_unique<ElementWriter>("rect", xmlWriter);
-        element->addRectAttributes(rect);
-      } else if (clipPath.isRRect(&rrect)) {
-        element = std::make_unique<ElementWriter>("rect", xmlWriter);
-        element->addRoundRectAttributes(rrect);
-      } else if (clipPath.isOval(&ovalBound)) {
-        if (FloatNearlyEqual(ovalBound.width(), ovalBound.height())) {
-          element = std::make_unique<ElementWriter>("circle", xmlWriter);
-          element->addCircleAttributes(ovalBound);
-        } else {
-          element = std::make_unique<ElementWriter>("ellipse", xmlWriter);
-          element->addEllipseAttributes(ovalBound);
-        }
+std::string SVGExportContext::defineClipPath(const Path& clipPath) {
+  std::string clipID = resourceBucket->addClip();
+  ElementWriter clipPathElement("clipPath", xmlWriter);
+  clipPathElement.addAttribute("id", clipID);
+  {
+    std::unique_ptr<ElementWriter> element;
+    Rect rect;
+    RRect rrect;
+    Rect ovalBound;
+    if (clipPath.isRect(&rect)) {
+      element = std::make_unique<ElementWriter>("rect", xmlWriter);
+      element->addRectAttributes(rect);
+    } else if (clipPath.isRRect(&rrect)) {
+      element = std::make_unique<ElementWriter>("rect", xmlWriter);
+      element->addRoundRectAttributes(rrect);
+    } else if (clipPath.isOval(&ovalBound)) {
+      if (FloatNearlyEqual(ovalBound.width(), ovalBound.height())) {
+        element = std::make_unique<ElementWriter>("circle", xmlWriter);
+        element->addCircleAttributes(ovalBound);
       } else {
-        element = std::make_unique<ElementWriter>("path", xmlWriter);
-        element->addPathAttributes(clipPath, tgfx::SVGExportContext::PathEncodingType());
-        if (clipPath.getFillType() == PathFillType::EvenOdd) {
-          element->addAttribute("clip-rule", "evenodd");
-        }
+        element = std::make_unique<ElementWriter>("ellipse", xmlWriter);
+        element->addEllipseAttributes(ovalBound);
+      }
+    } else {
+      element = std::make_unique<ElementWriter>("path", xmlWriter);
+      element->addPathAttributes(clipPath, tgfx::SVGExportContext::PathEncodingType());
+      if (clipPath.getFillType() == PathFillType::EvenOdd) {
+        element->addAttribute("clip-rule", "evenodd");
       }
     }
-    return clipID;
-  };
+  }
+  return clipID;
+}
 
+void SVGExportContext::applyClipPath(const Path& clipPath) {
   if (clipPath == currentClipPath) {
     return;
   }
@@ -468,7 +495,7 @@ void SVGExportContext::applyClipPath(const Path& clipPath) {
     return;
   }
   currentClipPath = clipPath;
-  auto clipID = defineClip(currentClipPath);
+  auto clipID = defineClipPath(currentClipPath);
   clipGroupElement = std::make_unique<ElementWriter>("g", xmlWriter);
   clipGroupElement->addAttribute("clip-path", "url(#" + clipID + ")");
 }
