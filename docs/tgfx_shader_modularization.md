@@ -5560,3 +5560,68 @@ Phase O 删除了 FP/XP 的 `emitCode()` 实现，Phase P 删除了 GLSLBlend。
 | 构建命令 | 测试数 | 结果 |
 |---------|--------|------|
 | `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
+
+### 17.25 Phase S 实施结果记录：FP/XP emitCode 纯虚消除 & legacy emit 基础设施清理
+
+> 2026-04-17 完成，共 2 个 commit。
+
+#### 背景
+
+Phase O 删除了所有 FP/XP 的 `emitCode()` 实现，但因 `emitCode()` 是纯虚函数，每个具体类仍需保留空 stub。同时 `FragmentProcessor` 中 `EmitArgs`、`BuilderInputProvider`、`emitChild()`、`internalEmitChild()` 等 legacy emit 基础设施已无外部调用者。
+
+#### Step 1：emitCode() 纯虚 → 默认空实现
+
+将 `FragmentProcessor::emitCode(EmitArgs&)` 和 `XferProcessor::emitCode(const EmitArgs&)` 从 `= 0` 改为默认空实现 `{}`，使具体类不再需要提供空 stub。
+
+随后删除 23 个 GLSL FP/XP header 中的空 `emitCode()` override（22 个 `src/gpu/glsl/processors/GLSL*.h` + 1 个 `src/gpu/processors/ColorSpaceXFormEffect.h`）。
+
+#### Step 2：删除 FP legacy emit 基础设施
+
+| 删除项 | 位置 | 行数 |
+|--------|------|------|
+| `BuilderInputProvider<T,COUNT>` 模板类 | `FragmentProcessor.h:186-205` | -20 |
+| `TransformedCoordVars` / `TextureSamplers` typedef | `FragmentProcessor.h:207-210` | -4 |
+| `EmitArgs` struct | `FragmentProcessor.h:212-248` | -37 |
+| `emitCode()` 默认空实现 | `FragmentProcessor.h:250-255` | -6 |
+| `emitChild()` 三个 overload | `FragmentProcessor.h:259-283` | -25 |
+| `internalEmitChild()` 声明 | `FragmentProcessor.h:426-427` | -2 |
+| `emitChild()` 两个实现 | `FragmentProcessor.cpp:145-158` | -14 |
+| `internalEmitChild()` 实现 | `FragmentProcessor.cpp:160-193` | -34 |
+| `BuilderInputProvider::childInputs()` 模板实现 | `FragmentProcessor.cpp:195-208` | -14 |
+| `GLSLTextureEffect.h` 残留死方法声明 | `emitDefaultTextureCode`、`emitYUVTextureCode`、`appendClamp` | -5 |
+| `GLSLTiledTextureEffect.h` 残留死方法声明 | `readColor`、`subsetCoord`、`clampCoord`×2、`initUniform` | -17 |
+
+XferProcessor 同步改造：`emitCode()` 从纯虚改为默认空实现。
+
+#### 改动汇总
+
+| Commit | 说明 | 行数变化 |
+|--------|------|---------|
+| `5dee0d43` | FP/XP emitCode 改默认空实现，删除 23 个空 stub | -70 |
+| `3bec4082` | 删除 FP legacy emit 基础设施 + 残留死方法声明 | -187 |
+| **合计** | | **-257** |
+
+#### 关键成果
+
+**FP 的整条 legacy shader emit 路径已完全消除：**
+
+| 组件 | 状态 |
+|------|------|
+| `FragmentProcessor::EmitArgs` | 已删除 |
+| `FragmentProcessor::emitCode()` | 已删除（非纯虚默认空实现也已删除） |
+| `FragmentProcessor::emitChild()` (3 overloads) | 已删除 |
+| `FragmentProcessor::internalEmitChild()` | 已删除 |
+| `FragmentProcessor::BuilderInputProvider` | 已删除 |
+| `FragmentProcessor::TransformedCoordVars` | 已删除 |
+| `FragmentProcessor::TextureSamplers` | 已删除 |
+| 23 个 GLSL FP/XP 空 `emitCode()` stub | 已删除 |
+
+**仍保留（活代码）：**
+- `GeometryProcessor::EmitArgs` + `GeometryProcessor::emitCode()` — GP 仍走 emitCode 路径
+- `XferProcessor::EmitArgs` — XP 的 EmitArgs 类型声明保留（签名兼容）
+
+#### 验证结果
+
+| 构建命令 | 测试数 | 结果 |
+|---------|--------|------|
+| `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
