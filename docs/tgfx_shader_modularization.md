@@ -5278,3 +5278,56 @@ XP 的 `emitCode()` 已无任何调用路径。
 | 构建命令 | 测试数 | 结果 |
 |---------|--------|------|
 | `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
+
+### 17.19 Phase M 实施结果记录：Sampler Offset 修复，彻底消除 FP emitCode() 依赖
+
+> 2026-04-17 完成，共 2 个 commit。
+
+#### 问题
+
+Phase L 中尝试将 `emitChildCallback` 中所有子 FP 递归改为 `emitModularFragProc()` 时，`CanvasTest.ColorSpace` 失败（`binding 3 not found`）。根因是 sampler offset 不匹配：
+
+- `currentTexSamplers` 在顶层 FP 的 `emitModularFragProc()` 中通过前序遍历整个子树一次性收集
+- `emitLeafFPCall()` 将 `currentTexSamplers` 的**全部内容**填入 `resources.samplers`
+- 子 FP 只应看到属于自己（子树）的 sampler 子集，而非整个数组
+
+#### 修复方案
+
+给 `emitModularFragProc()`、`emitModularContainerFP()`、`emitLeafFPCall()` 增加 `samplerOffset` 参数，在递归调用时传递正确的偏移量。
+
+**sampler offset 计算**：对父 FP 的前序遍历，累积目标子 FP 之前所有 FP 的 `numTextureSamplers()`——与 legacy 路径 `TextureSamplers::childInputs()` 的指针偏移逻辑完全一致。
+
+**sampler 范围区分**：
+- **Leaf FP**：使用 `processor->numTextureSamplers()` 个 sampler（自身的）
+- **容器 FP**：使用整个子树的 sampler 数量（`buildContainerCallStatement()` 可能引用子 FP 的 sampler，如 GaussianBlur1D 引用子 TextureEffect 的 sampler 构造 `TGFX_GB1D_SAMPLE` 宏）
+
+#### 改动
+
+| 文件 | 变更 |
+|------|------|
+| `ModularProgramBuilder.h` | 三个方法签名增加 `size_t samplerOffset` 参数 |
+| `ModularProgramBuilder.cpp` | 递归调用时计算并传递 `childSamplerOffset`；leaf FP 用 `samplerOffset + i` 索引；容器 FP 用子树 sampler 总数填充 |
+| `ModularProgramBuilder.cpp` | `emitChildCallback` 中所有子 FP 统一递归 `emitModularFragProc()`，不再 fallback 到 `emitCode()` |
+
+#### 关键成果
+
+**FP 和 XP 的 `emitCode()` 在 `ModularProgramBuilder` 中不再有任何调用路径。**
+
+| Processor 类型 | `emitCode()` 是否仍被调用 |
+|---------------|-------------------------|
+| GP | 是（仅 VS 注入，skipFragmentCode=true） |
+| FP（所有路径） | **否** |
+| XP | **否** |
+
+#### 完成的 Commit
+
+| Commit | 说明 |
+|--------|------|
+| `3f42a86b` | 修复 sampler offset，emitChildCallback 统一递归调度 |
+| `aaf0cf68` | 更新截图基线 |
+
+#### 验证结果
+
+| 构建命令 | 测试数 | 结果 |
+|---------|--------|------|
+| `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
