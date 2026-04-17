@@ -196,10 +196,12 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       auto savedClipPath = currentClipPath;
       clipGroupElement = nullptr;
       currentClipPath = {};
-      auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+      std::unique_ptr<ElementWriter> clipElement;
       if (needsClip) {
-        groupElement->addAttribute("clip-path", "url(#" + clipID + ")");
+        clipElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+        clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
       }
+      auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
       if (!outer.isZero()) {
         groupElement->addAttribute(
             "transform", ToSVGTransform(Matrix::MakeTrans(outer.x - offset.x, outer.y - offset.y)));
