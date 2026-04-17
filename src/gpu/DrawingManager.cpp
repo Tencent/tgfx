@@ -91,7 +91,7 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
     for (auto& op : drawOps) {
       op->collectTextureProxies([this](const std::shared_ptr<TextureProxy>& proxy) {
         if (auto rtProxy = proxy->asRenderTargetProxy()) {
-          ensureMSAAResolved(std::move(rtProxy));
+          ensureMSAAResolved(rtProxy);
         }
       });
     }
