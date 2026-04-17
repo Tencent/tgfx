@@ -68,8 +68,7 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   std::string positionName = "position";
-  if (args.skipVertexCode) {
-    static const std::string kEllipseGPVert = R"GLSL(
+  static const std::string kEllipseGPVert = R"GLSL(
 void TGFX_EllipseGP_VS(vec2 inPosition, vec2 inEllipseOffset, vec4 inEllipseRadii,
 #ifndef TGFX_GP_ELLIPSE_COMMON_COLOR
                         vec4 inColor, out vec4 vColor,
@@ -84,62 +83,20 @@ void TGFX_EllipseGP_VS(vec2 inPosition, vec2 inEllipseOffset, vec4 inEllipseRadi
     position = inPosition;
 }
 )GLSL";
-    vertBuilder->addFunction(kEllipseGPVert);
-    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-    std::string call = "TGFX_EllipseGP_VS(" + std::string(inPosition.name()) + ", " +
-                       std::string(inEllipseOffset.name()) + ", " +
-                       std::string(inEllipseRadii.name());
-    if (!commonColor.has_value()) {
-      call += ", " + std::string(inColor.name()) + ", " + colorVsOut;
-    }
-    call +=
-        ", " + ellipseOffsets.vsOut() + ", " + ellipseRadii.vsOut() + ", " + positionName + ");";
-    vertBuilder->codeAppend(call);
-  } else {
-    vertBuilder->codeAppendf("%s = %s;", ellipseOffsets.vsOut().c_str(),
-                             inEllipseOffset.name().c_str());
-    vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(),
-                             inEllipseRadii.name().c_str());
-    if (!commonColor.has_value()) {
-      vertBuilder->codeAppendf("%s = %s;", colorVsOut.c_str(), inColor.name().c_str());
-    }
+  vertBuilder->addFunction(kEllipseGPVert);
+  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+  std::string call = "TGFX_EllipseGP_VS(" + std::string(inPosition.name()) + ", " +
+                     std::string(inEllipseOffset.name()) + ", " +
+                     std::string(inEllipseRadii.name());
+  if (!commonColor.has_value()) {
+    call += ", " + std::string(inColor.name()) + ", " + colorVsOut;
   }
+  call += ", " + ellipseOffsets.vsOut() + ", " + ellipseRadii.vsOut() + ", " + positionName + ");";
+  vertBuilder->codeAppend(call);
 
   // Setup position
-  args.vertBuilder->emitNormalizedPosition(args.skipVertexCode ? positionName
-                                                               : std::string(inPosition.name()));
-  // emit transforms
+  args.vertBuilder->emitNormalizedPosition(positionName);
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(inPosition));
-
-  if (!args.skipFragmentCode) {
-    auto fragBuilder = args.fragBuilder;
-
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorFsIn.c_str());
-
-    fragBuilder->codeAppendf("vec2 offset = %s.xy;", ellipseOffsets.fsIn().c_str());
-    if (stroke) {
-      fragBuilder->codeAppendf("offset *= %s.xy;", ellipseRadii.fsIn().c_str());
-    }
-    fragBuilder->codeAppend("float test = dot(offset, offset) - 1.0;");
-    fragBuilder->codeAppendf("vec2 grad = 2.0*offset*%s.xy;", ellipseRadii.fsIn().c_str());
-    fragBuilder->codeAppend("float grad_dot = dot(grad, grad);");
-    fragBuilder->codeAppend("grad_dot = max(grad_dot, 1.1755e-38);");
-    fragBuilder->codeAppend("float invlen = inversesqrt(grad_dot);");
-    fragBuilder->codeAppend("float edgeAlpha = clamp(0.5-test*invlen, 0.0, 1.0);");
-
-    // for inner curve
-    if (stroke) {
-      fragBuilder->codeAppendf("offset = %s.xy*%s.zw;", ellipseOffsets.fsIn().c_str(),
-                               ellipseRadii.fsIn().c_str());
-      fragBuilder->codeAppend("test = dot(offset, offset) - 1.0;");
-      fragBuilder->codeAppendf("grad = 2.0*offset*%s.zw;", ellipseRadii.fsIn().c_str());
-      fragBuilder->codeAppend("grad_dot = dot(grad, grad);");
-      fragBuilder->codeAppend("invlen = inversesqrt(grad_dot);");
-      fragBuilder->codeAppend("edgeAlpha *= clamp(0.5+test*invlen, 0.0, 1.0);");
-    }
-
-    fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());
-  }
 }
 
 void GLSLEllipseGeometryProcessor::setData(UniformData* vertexUniformData,

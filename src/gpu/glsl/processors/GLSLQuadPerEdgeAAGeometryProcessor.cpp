@@ -34,7 +34,6 @@ GLSLQuadPerEdgeAAGeometryProcessor::GLSLQuadPerEdgeAAGeometryProcessor(
 
 void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -73,8 +72,7 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   std::string positionName = "position";
-  if (args.skipVertexCode) {
-    static const std::string kQuadAAGPVert = R"GLSL(
+  static const std::string kQuadAAGPVert = R"GLSL(
 void TGFX_QuadAAGP_VS(vec2 inPosition,
 #ifdef TGFX_GP_QUAD_COVERAGE_AA
                        float inCoverage, out float vCoverage,
@@ -92,42 +90,19 @@ void TGFX_QuadAAGP_VS(vec2 inPosition,
 #endif
 }
 )GLSL";
-    vertBuilder->addFunction(kQuadAAGPVert);
-    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-    std::string call = "TGFX_QuadAAGP_VS(" + std::string(position.name());
-    if (aa == AAType::Coverage) {
-      call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
-    }
-    if (!commonColor.has_value()) {
-      call += ", " + std::string(color.name()) + ", " + colorVsOut;
-    }
-    call += ", " + positionName + ");";
-    vertBuilder->codeAppend(call);
-  } else {
-    if (aa == AAType::Coverage) {
-      vertBuilder->codeAppendf("%s = %s;", coverageVsOut.c_str(), coverage.name().c_str());
-    }
-    if (!commonColor.has_value()) {
-      vertBuilder->codeAppendf("%s = %s;", colorVsOut.c_str(), color.name().c_str());
-    }
+  vertBuilder->addFunction(kQuadAAGPVert);
+  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+  std::string call = "TGFX_QuadAAGP_VS(" + std::string(position.name());
+  if (aa == AAType::Coverage) {
+    call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
   }
-
-  if (!args.skipFragmentCode) {
-    if (aa == AAType::Coverage) {
-      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverageFsIn.c_str());
-    } else {
-      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
-    }
-    if (commonColor.has_value()) {
-      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorFsIn.c_str());
-    } else {
-      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorFsIn.c_str());
-    }
+  if (!commonColor.has_value()) {
+    call += ", " + std::string(color.name()) + ", " + colorVsOut;
   }
+  call += ", " + positionName + ");";
+  vertBuilder->codeAppend(call);
 
-  // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(args.skipVertexCode ? positionName
-                                                               : std::string(position.name()));
+  args.vertBuilder->emitNormalizedPosition(positionName);
 }
 
 void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformData* vertexUniformData,

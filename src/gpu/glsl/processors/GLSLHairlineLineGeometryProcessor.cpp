@@ -37,7 +37,6 @@ GLSLHairlineLineGeometryProcessor::GLSLHairlineLineGeometryProcessor(const PMCol
 
 void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -55,25 +54,19 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   std::string positionName = "transformedPosition";
-  if (args.skipVertexCode) {
-    static const std::string kHairlineLineGPVert = R"GLSL(
+  static const std::string kHairlineLineGPVert = R"GLSL(
 void TGFX_HairlineLineGP_VS(vec2 inPosition, float inEdgeDistance, mat3 matrix,
                               out float vEdgeDistance, out vec2 position) {
     position = (matrix * vec3(inPosition, 1.0)).xy;
     vEdgeDistance = inEdgeDistance;
 }
 )GLSL";
-    vertBuilder->addFunction(kHairlineLineGPVert);
-    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-    std::string call = "TGFX_HairlineLineGP_VS(" + std::string(position.name()) + ", " +
-                       std::string(edgeDistance.name()) + ", " + matrixName + ", " +
-                       edgeVarying.vsOut() + ", " + positionName + ");";
-    vertBuilder->codeAppend(call);
-  } else {
-    vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
-                             matrixName.c_str(), position.name().c_str());
-    vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(), edgeDistance.name().c_str());
-  }
+  vertBuilder->addFunction(kHairlineLineGPVert);
+  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+  std::string call = "TGFX_HairlineLineGP_VS(" + std::string(position.name()) + ", " +
+                     std::string(edgeDistance.name()) + ", " + matrixName + ", " +
+                     edgeVarying.vsOut() + ", " + positionName + ");";
+  vertBuilder->codeAppend(call);
 
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
                  ShaderVar(positionName, SLType::Float2));
@@ -90,21 +83,6 @@ void TGFX_HairlineLineGP_VS(vec2 inPosition, float inEdgeDistance, mat3 matrix,
     args.gpUniforms->add("Coverage", coverageScale);
   }
 
-  if (!args.skipFragmentCode) {
-    // Fragment shader: calculate anti-aliasing based on edge distance
-    fragBuilder->codeAppendf("float edgeAlpha = abs(%s);", edgeVarying.fsIn().c_str());
-    fragBuilder->codeAppend("edgeAlpha = clamp(edgeAlpha, 0.0, 1.0);");
-    if (aaType != AAType::Coverage) {
-      // Non-coverage anti-aliasing
-      fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
-    }
-
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
-    fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
-                             coverageScale.c_str());
-  }
-
-  // Emit final vertex position
   vertBuilder->emitNormalizedPosition(positionName);
 }
 

@@ -32,7 +32,6 @@ GLSLRoundStrokeRectGeometryProcessor::GLSLRoundStrokeRectGeometryProcessor(
 
 void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -85,8 +84,7 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   std::string positionName = "position";
-  if (args.skipVertexCode) {
-    static const std::string kRoundStrokeRectGPVert = R"GLSL(
+  static const std::string kRoundStrokeRectGPVert = R"GLSL(
 void TGFX_RoundStrokeRectGP_VS(vec2 inPosition, vec2 inEllipseOffset,
 #ifdef TGFX_GP_RRECT_COVERAGE_AA
                                  float inCoverage, vec2 inEllipseRadii,
@@ -107,62 +105,21 @@ void TGFX_RoundStrokeRectGP_VS(vec2 inPosition, vec2 inEllipseOffset,
     position = inPosition;
 }
 )GLSL";
-    vertBuilder->addFunction(kRoundStrokeRectGPVert);
-    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-    std::string call = "TGFX_RoundStrokeRectGP_VS(" + std::string(inPosition.name()) + ", " +
-                       std::string(inEllipseOffset.name());
-    if (aaType == AAType::Coverage) {
-      call += ", " + std::string(inCoverage.name()) + ", " + std::string(inEllipseRadii.name()) +
-              ", " + coverageVsOut + ", " + ellipseRadiiVsOut;
-    }
-    if (!commonColor.has_value()) {
-      call += ", " + std::string(inColor.name()) + ", " + colorVsOut;
-    }
-    call += ", " + ellipseOffsets.vsOut() + ", " + positionName + ");";
-    vertBuilder->codeAppend(call);
-  } else {
-    if (aaType == AAType::Coverage) {
-      vertBuilder->codeAppendf("%s = %s;", coverageVsOut.c_str(), inCoverage.name().c_str());
-      vertBuilder->codeAppendf("%s = %s;", ellipseRadiiVsOut.c_str(),
-                               inEllipseRadii.name().c_str());
-    }
-    vertBuilder->codeAppendf("%s = %s;", ellipseOffsets.vsOut().c_str(),
-                             inEllipseOffset.name().c_str());
-    if (!commonColor.has_value()) {
-      vertBuilder->codeAppendf("%s = %s;", colorVsOut.c_str(), inColor.name().c_str());
-    }
+  vertBuilder->addFunction(kRoundStrokeRectGPVert);
+  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+  std::string call = "TGFX_RoundStrokeRectGP_VS(" + std::string(inPosition.name()) + ", " +
+                     std::string(inEllipseOffset.name());
+  if (aaType == AAType::Coverage) {
+    call += ", " + std::string(inCoverage.name()) + ", " + std::string(inEllipseRadii.name()) +
+            ", " + coverageVsOut + ", " + ellipseRadiiVsOut;
   }
-
-  if (!args.skipFragmentCode) {
-    if (aaType == AAType::Coverage) {
-      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverageFsIn.c_str());
-    } else {
-      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
-    }
-
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorFsIn.c_str());
-
-    fragBuilder->codeAppendf("vec2 offset = %s;", ellipseOffsets.fsIn().c_str());
-    if (aaType == AAType::Coverage) {
-      fragBuilder->codeAppend("float test = dot(offset, offset) - 1.0;");
-      fragBuilder->codeAppend("if (test > -0.5) {");
-      fragBuilder->codeAppendf("vec2 grad = 2.0 * offset * %s;", ellipseRadii.fsIn().c_str());
-      fragBuilder->codeAppend("float grad_dot = dot(grad, grad);");
-      fragBuilder->codeAppend("grad_dot = max(grad_dot, 1.1755e-38);");
-      fragBuilder->codeAppend("float invlen = inversesqrt(grad_dot);");
-      fragBuilder->codeAppend("float edgeAlpha = clamp(0.5 - test * invlen, 0.0, 1.0);");
-      fragBuilder->codeAppendf("%s *= edgeAlpha;", args.outputCoverage.c_str());
-      fragBuilder->codeAppendf("}");
-    } else {
-      fragBuilder->codeAppend("float test = dot(offset, offset);");
-      fragBuilder->codeAppend("float edgeAlpha = step(test, 1.0);");
-      fragBuilder->codeAppendf("%s *= edgeAlpha;", args.outputCoverage.c_str());
-    }
+  if (!commonColor.has_value()) {
+    call += ", " + std::string(inColor.name()) + ", " + colorVsOut;
   }
+  call += ", " + ellipseOffsets.vsOut() + ", " + positionName + ");";
+  vertBuilder->codeAppend(call);
 
-  // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(args.skipVertexCode ? positionName
-                                                               : std::string(inPosition.name()));
+  args.vertBuilder->emitNormalizedPosition(positionName);
 }
 
 void GLSLRoundStrokeRectGeometryProcessor::setData(UniformData* vertexUniformData,

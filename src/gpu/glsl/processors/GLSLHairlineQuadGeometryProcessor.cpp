@@ -37,7 +37,6 @@ GLSLHairlineQuadGeometryProcessor::GLSLHairlineQuadGeometryProcessor(const PMCol
 
 void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -55,25 +54,19 @@ void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   std::string positionName = "transformedPosition";
-  if (args.skipVertexCode) {
-    static const std::string kHairlineQuadGPVert = R"GLSL(
+  static const std::string kHairlineQuadGPVert = R"GLSL(
 void TGFX_HairlineQuadGP_VS(vec2 inPosition, vec4 inHairQuadEdge, mat3 matrix,
                               out vec4 vHairQuadEdge, out vec2 position) {
     position = (matrix * vec3(inPosition, 1.0)).xy;
     vHairQuadEdge = inHairQuadEdge;
 }
 )GLSL";
-    vertBuilder->addFunction(kHairlineQuadGPVert);
-    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-    std::string call = "TGFX_HairlineQuadGP_VS(" + std::string(position.name()) + ", " +
-                       std::string(hairQuadEdge.name()) + ", " + matrixName + ", " +
-                       edgeVarying.vsOut() + ", " + positionName + ");";
-    vertBuilder->codeAppend(call);
-  } else {
-    vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
-                             matrixName.c_str(), position.name().c_str());
-    vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(), hairQuadEdge.name().c_str());
-  }
+  vertBuilder->addFunction(kHairlineQuadGPVert);
+  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+  std::string call = "TGFX_HairlineQuadGP_VS(" + std::string(position.name()) + ", " +
+                     std::string(hairQuadEdge.name()) + ", " + matrixName + ", " +
+                     edgeVarying.vsOut() + ", " + positionName + ");";
+  vertBuilder->codeAppend(call);
 
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
                  ShaderVar(positionName, SLType::Float2));
@@ -90,29 +83,6 @@ void TGFX_HairlineQuadGP_VS(vec2 inPosition, vec4 inHairQuadEdge, mat3 matrix,
     args.gpUniforms->add("Coverage", coverageScale);
   }
 
-  if (!args.skipFragmentCode) {
-    // Fragment shader: Loop-Blinn quadratic curve anti-aliasing
-    const char* edge = edgeVarying.fsIn().c_str();
-    fragBuilder->codeAppendf("float edgeAlpha;");
-    fragBuilder->codeAppendf("vec2 duvdx = vec2(dFdx(%s.xy));", edge);
-    fragBuilder->codeAppendf("vec2 duvdy = vec2(dFdy(%s.xy));", edge);
-    fragBuilder->codeAppendf(
-        "vec2 gF = vec2(2.0 * %s.x * duvdx.x - duvdx.y,"
-        "               2.0 * %s.x * duvdy.x - duvdy.y);",
-        edge, edge);
-    fragBuilder->codeAppendf("edgeAlpha = float(%s.x * %s.x - %s.y);", edge, edge, edge);
-    fragBuilder->codeAppend("edgeAlpha = sqrt(edgeAlpha * edgeAlpha / dot(gF, gF));");
-    fragBuilder->codeAppend("edgeAlpha = max(1.0 - edgeAlpha, 0.0);");
-    if (aaType != AAType::Coverage) {
-      fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
-    }
-
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
-    fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
-                             coverageScale.c_str());
-  }
-
-  // Emit final vertex position
   vertBuilder->emitNormalizedPosition(positionName);
 }
 

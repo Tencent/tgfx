@@ -35,7 +35,6 @@ GLSLShapeInstancedGeometryProcessor::GLSLShapeInstancedGeometryProcessor(int wid
 
 void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -77,8 +76,7 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   std::string positionName = "position";
-  if (args.skipVertexCode) {
-    static const std::string kShapeInstancedGPVert = R"GLSL(
+  static const std::string kShapeInstancedGPVert = R"GLSL(
 void TGFX_ShapeInstancedGP_VS(vec2 inPosition, vec2 inOffset,
                                 mat3 uvMatrix, mat3 viewMatrix,
 #ifdef TGFX_GP_SHAPE_COVERAGE_AA
@@ -98,35 +96,20 @@ void TGFX_ShapeInstancedGP_VS(vec2 inPosition, vec2 inOffset,
 #endif
 }
 )GLSL";
-    vertBuilder->addFunction(kShapeInstancedGPVert);
-    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-    std::string call = "TGFX_ShapeInstancedGP_VS(" + std::string(position.name()) + ", " +
-                       std::string(offset.name()) + ", " + uvMatrixName + ", " + viewMatrixName;
-    if (aa == AAType::Coverage) {
-      call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
-    }
-    if (hasColors) {
-      call += ", " + std::string(instanceColor.name()) + ", " + colorVsOut;
-    }
-    call += ", " + positionName + ");";
-    vertBuilder->codeAppend(call);
-    // Compute local separately for emitTransforms (the GLSL function computes it internally but
-    // doesn't output it, so we replicate it here for the transform system to reference).
-    vertBuilder->codeAppendf("highp vec2 local = (%s * vec3(%s, 1.0)).xy;", uvMatrixName.c_str(),
-                             position.name().c_str());
-  } else {
-    vertBuilder->codeAppendf("highp vec2 local = (%s * vec3(%s, 1.0)).xy;", uvMatrixName.c_str(),
-                             position.name().c_str());
-    vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy + %s;", positionName.c_str(),
-                             viewMatrixName.c_str(), position.name().c_str(),
-                             offset.name().c_str());
-    if (aa == AAType::Coverage) {
-      vertBuilder->codeAppendf("%s = %s;", coverageVsOut.c_str(), coverage.name().c_str());
-    }
-    if (hasColors) {
-      vertBuilder->codeAppendf("%s = %s;", colorVsOut.c_str(), instanceColor.name().c_str());
-    }
+  vertBuilder->addFunction(kShapeInstancedGPVert);
+  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+  std::string call = "TGFX_ShapeInstancedGP_VS(" + std::string(position.name()) + ", " +
+                     std::string(offset.name()) + ", " + uvMatrixName + ", " + viewMatrixName;
+  if (aa == AAType::Coverage) {
+    call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
   }
+  if (hasColors) {
+    call += ", " + std::string(instanceColor.name()) + ", " + colorVsOut;
+  }
+  call += ", " + positionName + ");";
+  vertBuilder->codeAppend(call);
+  vertBuilder->codeAppendf("highp vec2 local = (%s * vec3(%s, 1.0)).xy;", uvMatrixName.c_str(),
+                           position.name().c_str());
 
   // Emit UV transforms using unshifted local coords. All FP coord transforms (both color shader
   // and mask coverage) use 'local' without offset, because: (1) mask texture is rasterized at a
@@ -135,21 +118,6 @@ void TGFX_ShapeInstancedGP_VS(vec2 inPosition, vec2 inOffset,
   ShaderVar localVar("local", SLType::Float2);
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, localVar);
 
-  if (!args.skipFragmentCode) {
-    if (aa == AAType::Coverage) {
-      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverageFsIn.c_str());
-    } else {
-      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
-    }
-
-    if (hasColors) {
-      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorFsIn.c_str());
-    } else {
-      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputColor.c_str());
-    }
-  }
-
-  // Emit the vertex position to NDC.
   vertBuilder->emitNormalizedPosition(positionName);
 }
 

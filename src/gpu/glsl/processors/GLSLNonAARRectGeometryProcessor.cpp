@@ -32,7 +32,6 @@ GLSLNonAARRectGeometryProcessor::GLSLNonAARRectGeometryProcessor(int width, int 
 
 void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -86,8 +85,7 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   std::string positionName = "position";
-  if (args.skipVertexCode) {
-    static const std::string kNonAARRectGPVert = R"GLSL(
+  static const std::string kNonAARRectGPVert = R"GLSL(
 void TGFX_NonAARRectGP_VS(vec2 inPosition, vec2 inLocalCoord, vec2 inRadii, vec4 inRectBounds,
 #ifndef TGFX_GP_NONAA_COMMON_COLOR
                            vec4 inColor, out vec4 vColor,
@@ -109,86 +107,27 @@ void TGFX_NonAARRectGP_VS(vec2 inPosition, vec2 inLocalCoord, vec2 inRadii, vec4
 #endif
 }
 )GLSL";
-    vertBuilder->addFunction(kNonAARRectGPVert);
-    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-    std::string call = "TGFX_NonAARRectGP_VS(" + std::string(inPosition.name()) + ", " +
-                       std::string(inLocalCoord.name()) + ", " + std::string(inRadii.name()) +
-                       ", " + std::string(inRectBounds.name());
-    if (!commonColor.has_value()) {
-      call += ", " + std::string(inColor.name()) + ", " + colorVsOut;
-    }
-    if (stroke) {
-      call += ", " + std::string(inStrokeWidth.name()) + ", " + strokeWidthVarying.vsOut();
-    }
-    call += ", " + localCoordVarying.vsOut() + ", " + radiiVarying.vsOut() + ", " +
-            boundsVarying.vsOut() + ", " + positionName + ");";
-    vertBuilder->codeAppend(call);
-  } else {
-    if (!commonColor.has_value()) {
-      vertBuilder->codeAppendf("%s = %s;", colorVsOut.c_str(), inColor.name().c_str());
-    }
-    vertBuilder->codeAppendf("%s = %s;", localCoordVarying.vsOut().c_str(),
-                             inLocalCoord.name().c_str());
-    vertBuilder->codeAppendf("%s = %s;", radiiVarying.vsOut().c_str(), inRadii.name().c_str());
-    vertBuilder->codeAppendf("%s = %s;", boundsVarying.vsOut().c_str(),
-                             inRectBounds.name().c_str());
-    if (stroke) {
-      vertBuilder->codeAppendf("%s = %s;", strokeWidthVarying.vsOut().c_str(),
-                               inStrokeWidth.name().c_str());
-    }
+  vertBuilder->addFunction(kNonAARRectGPVert);
+  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+  std::string call = "TGFX_NonAARRectGP_VS(" + std::string(inPosition.name()) + ", " +
+                     std::string(inLocalCoord.name()) + ", " + std::string(inRadii.name()) + ", " +
+                     std::string(inRectBounds.name());
+  if (!commonColor.has_value()) {
+    call += ", " + std::string(inColor.name()) + ", " + colorVsOut;
   }
+  if (stroke) {
+    call += ", " + std::string(inStrokeWidth.name()) + ", " + strokeWidthVarying.vsOut();
+  }
+  call += ", " + localCoordVarying.vsOut() + ", " + radiiVarying.vsOut() + ", " +
+          boundsVarying.vsOut() + ", " + positionName + ");";
+  vertBuilder->codeAppend(call);
 
   // Output position using RTAdjust uniform
-  vertBuilder->emitNormalizedPosition(args.skipVertexCode ? positionName
-                                                          : std::string(inPosition.name()));
+  vertBuilder->emitNormalizedPosition(positionName);
 
   // Emit transforms using position as UV coordinates.
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
                  ShaderVar(inPosition.name(), SLType::Float2));
-
-  if (!args.skipFragmentCode) {
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorFsIn.c_str());
-
-    // Fragment shader - evaluate round rect shape using SDF
-    fragBuilder->codeAppendf("vec2 localCoord = %s;", localCoordVarying.fsIn().c_str());
-    fragBuilder->codeAppendf("vec2 radii = %s;", radiiVarying.fsIn().c_str());
-    fragBuilder->codeAppendf("vec4 bounds = %s;", boundsVarying.fsIn().c_str());
-
-    // Calculate outer round rect coverage using SDF
-    fragBuilder->codeAppend("vec2 center = (bounds.xy + bounds.zw) * 0.5;");
-    fragBuilder->codeAppend("vec2 halfSize = (bounds.zw - bounds.xy) * 0.5;");
-    fragBuilder->codeAppend("vec2 q = abs(localCoord - center) - halfSize + radii;");
-    fragBuilder->codeAppend(
-        "float d = min(max(q.x / radii.x, q.y / radii.y), 0.0) + length(max(q / radii, 0.0)) - "
-        "1.0;");
-    fragBuilder->codeAppend("float outerCoverage = step(d, 0.0);");
-
-    if (stroke) {
-      // Stroke mode: also check inner round rect using SDF
-      fragBuilder->codeAppendf("vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
-      fragBuilder->codeAppend("vec2 innerHalfSize = halfSize - 2.0 * sw;");
-      fragBuilder->codeAppend("vec2 innerRadii = max(radii - 2.0 * sw, vec2(0.0));");
-      fragBuilder->codeAppend("float innerCoverage = 0.0;");
-      // Check if inner rect is valid (not degenerate)
-      fragBuilder->codeAppend("if (innerHalfSize.x > 0.0 && innerHalfSize.y > 0.0) {");
-      fragBuilder->codeAppend("  vec2 qi = abs(localCoord - center) - innerHalfSize + innerRadii;");
-      // Use safe division for inner radii (avoid division by zero)
-      fragBuilder->codeAppend("  vec2 safeInnerRadii = max(innerRadii, vec2(0.001));");
-      fragBuilder->codeAppend(
-          "  float di = min(max(qi.x / safeInnerRadii.x, qi.y / safeInnerRadii.y), 0.0) + "
-          "length(max(qi / safeInnerRadii, vec2(0.0))) - 1.0;");
-      fragBuilder->codeAppend("  innerCoverage = step(di, 0.0);");
-      fragBuilder->codeAppend("}");
-
-      // Final coverage: inside outer but outside inner
-      fragBuilder->codeAppend("float coverage = outerCoverage * (1.0 - innerCoverage);");
-    } else {
-      // Fill mode: just use outer coverage
-      fragBuilder->codeAppend("float coverage = outerCoverage;");
-    }
-
-    fragBuilder->codeAppendf("%s = vec4(coverage);", args.outputCoverage.c_str());
-  }
 }
 
 void GLSLNonAARRectGeometryProcessor::setData(UniformData* vertexUniformData,

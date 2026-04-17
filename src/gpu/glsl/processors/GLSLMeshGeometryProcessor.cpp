@@ -36,7 +36,6 @@ GLSLMeshGeometryProcessor::GLSLMeshGeometryProcessor(bool hasTexCoords, bool has
 
 void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -87,8 +86,7 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
 
   // Transform position by view matrix
   std::string positionName = "position";
-  if (args.skipVertexCode) {
-    static const std::string kMeshGPVert = R"GLSL(
+  static const std::string kMeshGPVert = R"GLSL(
 void TGFX_MeshGP_VS(vec2 inPosition, mat3 matrix,
 #ifdef TGFX_GP_MESH_TEX_COORDS
                      vec2 inTexCoord, out vec2 vTexCoord,
@@ -112,45 +110,20 @@ void TGFX_MeshGP_VS(vec2 inPosition, mat3 matrix,
 #endif
 }
 )GLSL";
-    vertBuilder->addFunction(kMeshGPVert);
-    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-    std::string call = "TGFX_MeshGP_VS(" + std::string(position.name()) + ", " + matrixName;
-    if (hasTexCoords) {
-      call += ", " + std::string(texCoord.name()) + ", " + texCoordVsOut;
-    }
-    if (hasColors) {
-      call += ", " + std::string(color.name()) + ", " + colorVsOut;
-    }
-    if (hasCoverage) {
-      call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
-    }
-    call += ", " + positionName + ");";
-    vertBuilder->codeAppend(call);
-  } else {
-    vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
-                             matrixName.c_str(), position.name().c_str());
-    if (hasTexCoords) {
-      vertBuilder->codeAppendf("%s = %s;", texCoordVsOut.c_str(), texCoord.name().c_str());
-    }
-    if (hasColors) {
-      vertBuilder->codeAppendf("%s = %s;", colorVsOut.c_str(), color.name().c_str());
-    }
-    if (hasCoverage) {
-      vertBuilder->codeAppendf("%s = %s;", coverageVsOut.c_str(), coverage.name().c_str());
-    }
+  vertBuilder->addFunction(kMeshGPVert);
+  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+  std::string call = "TGFX_MeshGP_VS(" + std::string(position.name()) + ", " + matrixName;
+  if (hasTexCoords) {
+    call += ", " + std::string(texCoord.name()) + ", " + texCoordVsOut;
   }
-
-  if (!args.skipFragmentCode) {
-    // Output vertex color (will be modulated by FragmentProcessor if texCoords present)
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorFsIn.c_str());
-
-    if (hasCoverage) {
-      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverageFsIn.c_str());
-    } else {
-      // No coverage for mesh (no anti-aliasing)
-      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
-    }
+  if (hasColors) {
+    call += ", " + std::string(color.name()) + ", " + colorVsOut;
   }
+  if (hasCoverage) {
+    call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
+  }
+  call += ", " + positionName + ");";
+  vertBuilder->codeAppend(call);
 
   vertBuilder->emitNormalizedPosition(positionName);
 }

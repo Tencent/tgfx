@@ -59,9 +59,7 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   std::string positionName = "position";
-  if (args.skipVertexCode) {
-    // Modular VS: inject .vert.glsl function and generate call.
-    static const std::string kDefaultGPVert = R"GLSL(
+  static const std::string kDefaultGPVert = R"GLSL(
 void TGFX_DefaultGP_VS(vec2 inPosition, mat3 matrix,
 #ifdef TGFX_GP_DEFAULT_COVERAGE_AA
                         float inCoverage, out float vCoverage,
@@ -73,22 +71,14 @@ void TGFX_DefaultGP_VS(vec2 inPosition, mat3 matrix,
 #endif
 }
 )GLSL";
-    // Emit GP macros to VS definitions (handled by ModularProgramBuilder).
-    vertBuilder->addFunction(kDefaultGPVert);
-    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-    std::string call = "TGFX_DefaultGP_VS(" + std::string(position.name()) + ", " + matrixName;
-    if (aa == AAType::Coverage) {
-      call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
-    }
-    call += ", " + positionName + ");";
-    vertBuilder->codeAppend(call);
-  } else {
-    vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
-                             matrixName.c_str(), position.name().c_str());
-    if (aa == AAType::Coverage) {
-      vertBuilder->codeAppendf("%s = %s;", coverageVsOut.c_str(), coverage.name().c_str());
-    }
+  vertBuilder->addFunction(kDefaultGPVert);
+  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+  std::string call = "TGFX_DefaultGP_VS(" + std::string(position.name()) + ", " + matrixName;
+  if (aa == AAType::Coverage) {
+    call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
   }
+  call += ", " + positionName + ");";
+  vertBuilder->codeAppend(call);
 
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
 
@@ -96,16 +86,6 @@ void TGFX_DefaultGP_VS(vec2 inPosition, mat3 matrix,
       args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   if (args.gpUniforms) {
     args.gpUniforms->add("Color", colorName);
-  }
-
-  if (!args.skipFragmentCode) {
-    auto fragBuilder = args.fragBuilder;
-    if (aa == AAType::Coverage) {
-      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverageFsIn.c_str());
-    } else {
-      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
-    }
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   }
 
   args.vertBuilder->emitNormalizedPosition(positionName);

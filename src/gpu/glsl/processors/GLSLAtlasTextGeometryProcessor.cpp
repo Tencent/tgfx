@@ -79,8 +79,7 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   std::string positionName = "position";
-  if (args.skipVertexCode) {
-    static const std::string kAtlasTextGPVert = R"GLSL(
+  static const std::string kAtlasTextGPVert = R"GLSL(
 void TGFX_AtlasTextGP_VS(vec2 inPosition, vec2 inMaskCoord, vec2 atlasSizeInv,
 #ifdef TGFX_GP_ATLAS_COVERAGE_AA
                           float inCoverage, out float vCoverage,
@@ -99,73 +98,35 @@ void TGFX_AtlasTextGP_VS(vec2 inPosition, vec2 inMaskCoord, vec2 atlasSizeInv,
     position = inPosition;
 }
 )GLSL";
-    vertBuilder->addFunction(kAtlasTextGPVert);
-    vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-    std::string call = "TGFX_AtlasTextGP_VS(" + std::string(position.name()) + ", " +
-                       std::string(maskCoord.name()) + ", " + atlasName;
-    if (aa == AAType::Coverage) {
-      call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
-    }
-    if (!commonColor.has_value()) {
-      call += ", " + std::string(color.name()) + ", " + colorVsOut;
-    }
-    call += ", " + samplerVarying.vsOut() + ", " + positionName + ");";
-    vertBuilder->codeAppend(call);
-  } else {
-    vertBuilder->codeAppendf("%s = %s * %s;", samplerVarying.vsOut().c_str(),
-                             maskCoord.name().c_str(), atlasName.c_str());
-    if (aa == AAType::Coverage) {
-      vertBuilder->codeAppendf("%s = %s;", coverageVsOut.c_str(), coverage.name().c_str());
-    }
-    if (!commonColor.has_value()) {
-      vertBuilder->codeAppendf("%s = %s;", colorVsOut.c_str(), color.name().c_str());
-    }
+  vertBuilder->addFunction(kAtlasTextGPVert);
+  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
+  std::string call = "TGFX_AtlasTextGP_VS(" + std::string(position.name()) + ", " +
+                     std::string(maskCoord.name()) + ", " + atlasName;
+  if (aa == AAType::Coverage) {
+    call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
   }
+  if (!commonColor.has_value()) {
+    call += ", " + std::string(color.name()) + ", " + colorVsOut;
+  }
+  call += ", " + samplerVarying.vsOut() + ", " + positionName + ");";
+  vertBuilder->codeAppend(call);
 
   auto textureView = textureProxy->getTextureView();
   DEBUG_ASSERT(textureView != nullptr);
   DEBUG_ASSERT(textureView->getTexture() != nullptr);
   auto samplerHandle = uniformHandler->addSampler(textureView->getTexture(), "TextureSampler");
 
-  if (args.skipFragmentCode) {
-    // Modular path: emit the texture lookup (with correct swizzle) as a shared FS variable,
-    // then record its name so buildColorCallExpr/buildCoverageCallExpr can reference it.
-    auto fragBuilder = args.fragBuilder;
-    fragBuilder->codeAppend("vec4 _atlasTexColor = ");
-    fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.fsIn());
-    fragBuilder->codeAppend(";\n");
-    if (args.gpUniforms) {
-      args.gpUniforms->add("atlasTexColor", "_atlasTexColor");
-      if (commonColor.has_value()) {
-        // Color uniform already registered above.
-      } else {
-        // Color varying already registered above.
-      }
-    }
-  } else {
-    if (aa == AAType::Coverage) {
-      fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverageFsIn.c_str());
-    } else {
-      fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
-    }
-
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorFsIn.c_str());
-
-    fragBuilder->codeAppend("vec4 color = ");
-    fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.vsOut());
-    fragBuilder->codeAppend(";");
-    if (textureView->isAlphaOnly()) {
-      fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
-    } else {
-      fragBuilder->codeAppendf("%s = clamp(vec4(color.rgb/color.a, 1.0), 0.0, 1.0);",
-                               args.outputColor.c_str());
-      fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
-    }
+  // Modular path: emit the texture lookup (with correct swizzle) as a shared FS variable,
+  // then record its name so buildColorCallExpr/buildCoverageCallExpr can reference it.
+  fragBuilder->codeAppend("vec4 _atlasTexColor = ");
+  fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.fsIn());
+  fragBuilder->codeAppend(";\n");
+  if (args.gpUniforms) {
+    args.gpUniforms->add("atlasTexColor", "_atlasTexColor");
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(args.skipVertexCode ? positionName
-                                                               : std::string(position.name()));
+  args.vertBuilder->emitNormalizedPosition(positionName);
 }
 
 void GLSLAtlasTextGeometryProcessor::setData(UniformData* vertexUniformData,
