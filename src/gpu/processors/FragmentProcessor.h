@@ -142,12 +142,12 @@ class FragmentProcessor : public Processor {
    * Collects all TextureProxy instances referenced by this processor and its child processors.
    * Used for MSAA dependency tracking - when a RenderTargetProxy is found, it may need to be
    * resolved before being sampled.
-   * @param callback Called for each TextureProxy found.
+   * @param visitor Called for each TextureProxy found.
    */
   virtual void collectTextureProxies(
-      const std::function<void(const std::shared_ptr<TextureProxy>&)>& callback) const {
+      const std::function<void(const std::shared_ptr<TextureProxy>&)>& visitor) const {
     for (const auto& child : childProcessors) {
-      child->collectTextureProxies(callback);
+      child->collectTextureProxies(visitor);
     }
   }
 

@@ -72,12 +72,12 @@ class DrawOp {
    * Used for MSAA dependency tracking.
    */
   void collectTextureProxies(
-      const std::function<void(const std::shared_ptr<TextureProxy>&)>& callback) const {
+      const std::function<void(const std::shared_ptr<TextureProxy>&)>& visitor) const {
     for (const auto& colorFP : colors) {
-      colorFP->collectTextureProxies(callback);
+      colorFP->collectTextureProxies(visitor);
     }
     for (const auto& coverageFP : coverages) {
-      coverageFP->collectTextureProxies(callback);
+      coverageFP->collectTextureProxies(visitor);
     }
   }
 

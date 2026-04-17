@@ -36,11 +36,11 @@ class TiledTextureEffect : public FragmentProcessor {
   }
 
   void collectTextureProxies(
-      const std::function<void(const std::shared_ptr<TextureProxy>&)>& callback) const override {
+      const std::function<void(const std::shared_ptr<TextureProxy>&)>& visitor) const override {
     if (textureProxy) {
-      callback(textureProxy);
+      visitor(textureProxy);
     }
-    FragmentProcessor::collectTextureProxies(callback);
+    FragmentProcessor::collectTextureProxies(visitor);
   }
 
  protected:
