@@ -193,7 +193,10 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       clipID = defineClipPath(clipPath);
     }
     {
-      auto savedClipPath = currentClipPath;
+      // Close any active clip group from prior draws so the local clip/transform/filter
+      // groups below sit at the correct parent level. On exit, leave both members cleared
+      // so the next applyClipPath rebuilds the clip group instead of short-circuiting on
+      // a matching currentClipPath.
       clipGroupElement = nullptr;
       currentClipPath = {};
       std::unique_ptr<ElementWriter> clipElement;
@@ -210,8 +213,6 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
         groupElement->addAttribute("filter", resources.filter);
       }
       drawImage(filterImage->source, sampling, matrix, needsClip ? ClipStack{} : clip, brush);
-      clipGroupElement = nullptr;
-      currentClipPath = savedClipPath;
     }
   } else if (type == Types::ImageType::Subset) {
     const auto subsetImage = static_cast<const SubsetImage*>(image.get());
@@ -410,7 +411,8 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
     clipID = defineClipPath(clipPath);
   }
   {
-    auto savedClipPath = currentClipPath;
+    // See drawImage FilterImage branch for why the active clip state is cleared here and
+    // left cleared on exit instead of being saved and restored.
     clipGroupElement = nullptr;
     currentClipPath = {};
     auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
@@ -421,8 +423,6 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
       groupElement->addAttribute("filter", resources.filter);
     }
     picture->playback(this, matrix, needsClip ? ClipStack{} : clip);
-    clipGroupElement = nullptr;
-    currentClipPath = savedClipPath;
   }
 }
 

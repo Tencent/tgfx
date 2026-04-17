@@ -921,7 +921,6 @@ TGFX_TEST(SVGExportTest, LayerMaskBlur) {
 
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/LayerMaskBlur"));
-
 }
 
 TGFX_TEST(SVGExportTest, ClipWithMatrixTransform) {
