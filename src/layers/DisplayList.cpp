@@ -995,7 +995,7 @@ Surface* DisplayList::getOrCreateMSAATileSurface(const Surface* renderSurface, i
   }
   if (msaaTileSurface != nullptr && msaaTileSurface->getContext() == renderSurface->getContext() &&
       msaaTileSurface->sampleCount() == renderSurface->sampleCount() &&
-      msaaTileSurface->width() >= requiredWidth && msaaTileSurface->height() >= requiredHeight &&
+      msaaTileSurface->width() == requiredWidth && msaaTileSurface->height() == requiredHeight &&
       ColorSpace::Equals(msaaTileSurface->colorSpace().get(), renderSurface->colorSpace().get())) {
     return msaaTileSurface.get();
   }
