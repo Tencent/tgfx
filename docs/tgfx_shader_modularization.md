@@ -5447,3 +5447,53 @@ Phase O 删除 FP/XP 的 `emitCode()` 后，`GLSLBlend.cpp` 中的 `AppendMode()
 | 构建命令 | 测试数 | 结果 |
 |---------|--------|------|
 | `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
+
+### 17.23 Phase Q 实施结果记录：emitContainerCode / ProcessorGuard 死代码清理
+
+> 2026-04-17 完成，共 1 个 commit。
+
+#### 背景
+
+Phase O 删除了 FP/XP 的 `emitCode()` 实现，Phase P 删除了 GLSLBlend。本轮继续清理因模块化路径全面生效而产生的剩余死代码。
+
+#### 清理项
+
+**1. 容器 FP 的死 `emitContainerCode()` 实现**
+
+以下容器/叶 FP 均有 `shaderFunctionFile()` + `buildContainerCallStatement()`（或 `buildCallStatement()`），`emitModularContainerFP()` 或 `emitLeafFPCall()` 成功处理，`emitContainerCode()` 不可达：
+
+| 文件 | 删除行数 | 原因 |
+|------|---------|------|
+| `ClampedGradientEffect.h` | -27 | 有模块化容器路径，emitContainerCode 不可达 |
+| `GaussianBlur1DFragmentProcessor.h` | -27 | 同上 |
+| `ColorSpaceXFormEffect.h` + `.cpp` | -26 | leaf FP（无子处理器），走 emitLeafFPCall；emitContainerCode 返回 false 且不可达；emitCode 同样不可达 |
+
+**未清理**：`ComposeFragmentProcessor::emitContainerCode()` — `shaderFunctionFile()` 返回空字符串，仍走 legacy fallback，是活代码。
+
+**2. ProcessorGuard 死代码**
+
+`ProgramBuilder.cpp` 中的 `ProcessorGuard` 类定义（13 行）及 `ProgramBuilder.h` 中的 `friend class ProcessorGuard` 声明。`ModularProgramBuilder` 直接操作 `currentProcessors.push_back/pop_back`，`ProcessorGuard` 无人使用。
+
+#### 改动汇总
+
+| 文件 | 操作 | 删除行数 |
+|------|------|---------|
+| `src/gpu/processors/ClampedGradientEffect.h` | 删除死 `emitContainerCode()` | -27 |
+| `src/gpu/processors/GaussianBlur1DFragmentProcessor.h` | 删除死 `emitContainerCode()` | -27 |
+| `src/gpu/processors/ColorSpaceXFormEffect.h` | 删除死 `emitCode()` 声明 + `emitContainerCode()` 声明，加空 stub | -6 |
+| `src/gpu/processors/ColorSpaceXFormEffect.cpp` | 删除死 `emitCode()` + `emitContainerCode()` 实现 | -20 |
+| `src/gpu/ProgramBuilder.cpp` | 删除 `ProcessorGuard` 类 | -13 |
+| `src/gpu/ProgramBuilder.h` | 删除 `friend class ProcessorGuard` | -1 |
+| **合计** | | **-96** |
+
+#### 完成的 Commit
+
+| Commit | 说明 |
+|--------|------|
+| `ca4bf171` | 删除死 emitContainerCode、emitCode、ProcessorGuard |
+
+#### 验证结果
+
+| 构建命令 | 测试数 | 结果 |
+|---------|--------|------|
+| `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
