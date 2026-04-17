@@ -660,7 +660,7 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const Matrix& matrix, const Cl
   drawOps.clear();
   // Clear is also a modification, need to mark the entire RenderTarget dirty.
   if (renderTarget->sampleCount() > 1) {
-    pendingDirtyRect = renderTarget->bounds();
+    pendingMSAADirtyRect = renderTarget->bounds();
   }
   auto format = renderTarget->format();
   auto writeSwizzle = Swizzle::ForWrite(format);
@@ -911,7 +911,7 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
   if (textureProxy != nullptr) {
     if (renderTarget->sampleCount() > 1) {
       // Submit draw ops immediately to ensure the MSAA render target is resolved.
-      // submitDrawOps() internally calls flushPendingDirtyRect() to mark the dirty region.
+      // submitDrawOps() internally calls flushPendingMSAADirtyRect() to mark the dirty region.
       submitDrawOps();
       // Trigger deferred MSAA resolve for the dirty region.
       context->drawingManager()->ensureMSAAResolved(renderTarget);
@@ -1000,7 +1000,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
                                                        std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
   }
-  addToPendingDirtyRect(clip, deviceBounds);
+  addToPendingMSAADirtyRect(clip, deviceBounds);
   drawOps.emplace_back(std::move(op));
 }
 
@@ -1020,17 +1020,17 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
 }
 
 void OpsCompositor::submitDrawOps() {
-  flushPendingDirtyRect();
+  flushPendingMSAADirtyRect();
   auto opArray = drawingAllocator()->makeArray(std::move(drawOps));
   context->drawingManager()->addOpsRenderTask(renderTarget, std::move(opArray), clearColor);
   clearColor.reset();
 }
 
-void OpsCompositor::flushPendingDirtyRect() {
-  if (renderTarget->sampleCount() <= 1 || pendingDirtyRect.isEmpty()) {
+void OpsCompositor::flushPendingMSAADirtyRect() {
+  if (renderTarget->sampleCount() <= 1 || pendingMSAADirtyRect.isEmpty()) {
     return;
   }
-  Rect dirty = pendingDirtyRect;
+  Rect dirty = pendingMSAADirtyRect;
   dirty.roundOut();
   if (dirty.intersect(renderTarget->bounds())) {
     if (!renderTarget->isMSAADirty()) {
@@ -1038,11 +1038,11 @@ void OpsCompositor::flushPendingDirtyRect() {
     }
     renderTarget->markMSAADirty(dirty);
   }
-  pendingDirtyRect.setEmpty();
+  pendingMSAADirtyRect.setEmpty();
 }
 
-void OpsCompositor::addToPendingDirtyRect(const ClipStack& clip,
-                                          const std::optional<Rect>& deviceBounds) {
+void OpsCompositor::addToPendingMSAADirtyRect(const ClipStack& clip,
+                                              const std::optional<Rect>& deviceBounds) {
   if (renderTarget->sampleCount() <= 1) {
     return;
   }
@@ -1050,10 +1050,10 @@ void OpsCompositor::addToPendingDirtyRect(const ClipStack& clip,
   if (deviceBounds.has_value() && !deviceBounds->isEmpty()) {
     Rect dirty = *deviceBounds;
     if (dirty.intersect(clipBounds)) {
-      pendingDirtyRect.join(dirty);
+      pendingMSAADirtyRect.join(dirty);
     }
   } else {
-    pendingDirtyRect.join(clipBounds);
+    pendingMSAADirtyRect.join(clipBounds);
   }
 }
 
