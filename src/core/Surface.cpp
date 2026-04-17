@@ -151,12 +151,10 @@ BackendRenderTarget Surface::getBackendRenderTarget() {
 }
 
 BackendTexture Surface::getBackendTexture() {
-  auto renderTarget = renderContext->renderTarget;
-  auto textureProxy = renderTarget->asTextureProxy();
+  auto textureProxy = renderContext->renderTarget->asTextureProxy();
   if (textureProxy == nullptr) {
     return {};
   }
-  renderContext->flush();
   getContext()->flushAndSubmit();
   auto textureView = textureProxy->getTextureView();
   if (textureView == nullptr) {
@@ -166,12 +164,10 @@ BackendTexture Surface::getBackendTexture() {
 }
 
 HardwareBufferRef Surface::getHardwareBuffer() {
-  auto renderTarget = renderContext->renderTarget;
-  auto textureProxy = renderTarget->asTextureProxy();
+  auto textureProxy = renderContext->renderTarget->asTextureProxy();
   if (textureProxy == nullptr) {
     return {};
   }
-  renderContext->flush();
   getContext()->flushAndSubmit(true);
   auto textureView = textureProxy->getTextureView();
   if (textureView == nullptr) {
