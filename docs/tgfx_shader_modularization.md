@@ -5331,3 +5331,48 @@ Phase L 中尝试将 `emitChildCallback` 中所有子 FP 递归改为 `emitModul
 | 构建命令 | 测试数 | 结果 |
 |---------|--------|------|
 | `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
+
+### 17.20 Phase N 实施结果记录：ProgramBuilder 框架层死代码清理
+
+> 2026-04-17 完成，共 1 个 commit。
+
+#### 背景
+
+Phase J 永久启用 `ModularProgramBuilder` 后，`ProgramBuilder` 基类中的 legacy `emitAndInstall*` 方法不再有任何调用路径——`ModularProgramBuilder::emitAndInstallProcessors()` 完全覆盖了 GP/FP/XP 的调度逻辑。基类实现成为死代码。
+
+#### 改动
+
+| 文件 | 变更 |
+|------|------|
+| `ProgramBuilder.cpp` | 删除 117 行：基类 `emitAndInstallProcessors`/`emitAndInstallGeoProc`/`emitAndInstallFragProcessors`/`emitAndInstallFragProc`/`emitAndInstallXferProc` 实现 + `GetPointer()` 辅助函数 |
+| `ProgramBuilder.h` | `emitAndInstallProcessors`/`emitAndInstallGeoProc`/`emitAndInstallXferProc` 改为纯虚（`= 0`）；删除 `emitAndInstallFragProcessors`/`emitAndInstallFragProc` 声明；`emitAndInstallProcessors`/`finalizeShaders` 移到 public section |
+| `ModularProgramBuilder.h` | `emitAndInstallProcessors()` 移到 public section |
+| `FrameCapture.cpp` | 从 `GLSLProgramBuilder` 改为 `ModularProgramBuilder`（inspect 路径也走模块化） |
+
+#### ProgramBuilder 改造后的成员概览
+
+| 成员 | 可见性 | 状态 |
+|------|--------|------|
+| `CreateProgram()` | public static | 保留（入口） |
+| `emitAndInstallProcessors()` | **public pure virtual** | 由 ModularProgramBuilder 实现 |
+| `finalizeShaders()` | **public** | 保留（FrameCapture 使用） |
+| `emitAndInstallGeoProc()` | **protected pure virtual** | 由 ModularProgramBuilder 实现 |
+| `emitAndInstallXferProc()` | **protected pure virtual** | 由 ModularProgramBuilder 实现 |
+| `emitSampler()` | protected | 保留（ModularProgramBuilder 使用） |
+| `emitFSOutputSwizzle()` | protected | 保留 |
+| `nameExpression()` | private | 保留（ModularProgramBuilder 通过 friend 访问） |
+| `currentProcessors` / `transformedCoordVars` / `subsetVarName` | private | 保留 |
+| ~~`emitAndInstallFragProcessors()`~~ | — | **已删除** |
+| ~~`emitAndInstallFragProc()`~~ | — | **已删除** |
+
+#### 完成的 Commit
+
+| Commit | 说明 |
+|--------|------|
+| `b9f802b1` | 删除 ProgramBuilder 死代码，virtual → pure virtual，FrameCapture 改用 ModularProgramBuilder |
+
+#### 验证结果
+
+| 构建命令 | 测试数 | 结果 |
+|---------|--------|------|
+| `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
