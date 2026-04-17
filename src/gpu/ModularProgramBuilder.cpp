@@ -95,11 +95,9 @@ void ModularProgramBuilder::emitModularFragProcessors(std::string* color, std::s
   }
 }
 
-std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* processor,
-                                                       size_t transformedCoordVarsIdx,
-                                                       const std::string& input,
-                                                       CoordTransformFunc coordTransformFunc,
-                                                       bool skipSamplerCollection) {
+std::string ModularProgramBuilder::emitModularFragProc(
+    const FragmentProcessor* processor, size_t transformedCoordVarsIdx, const std::string& input,
+    CoordTransformFunc coordTransformFunc, bool skipSamplerCollection, size_t samplerOffset) {
   // Use ProcessorGuard to push this processor for correct name mangling.
   currentProcessors.push_back(processor);
   std::string output;
@@ -127,22 +125,15 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
 
   // Try new modular container path: buildContainerCallStatement().
   // This recursively emits children via emitModularFragProc, then calls the container .glsl.
-  if (emitModularContainerFP(processor, transformedCoordVarsIdx, input, output)) {
+  if (emitModularContainerFP(processor, transformedCoordVarsIdx, input, output, samplerOffset)) {
     fragmentShaderBuilder()->codeAppend("}");
     currentProcessors.pop_back();
     return output;
   }
 
   // Try legacy container dispatch via emitContainerCode().
-  // The emitChild callback recursively calls emitModularFragProc for leaf children,
-  // and falls back to emitCode() for non-leaf non-modular children.
-  FragmentProcessor::TransformedCoordVars rootCoords(
-      processor, transformedCoordVarsIdx < transformedCoordVars.size()
-                     ? &transformedCoordVars[transformedCoordVarsIdx]
-                     : nullptr);
-  FragmentProcessor::TextureSamplers rootSamplers(
-      processor, currentTexSamplers.empty() ? nullptr : &currentTexSamplers[0]);
-  auto emitChildCallback = [this, processor, transformedCoordVarsIdx, &rootCoords, &rootSamplers](
+  // The emitChild callback recursively calls emitModularFragProc for ALL children.
+  auto emitChildCallback = [this, processor, transformedCoordVarsIdx, samplerOffset](
                                const FragmentProcessor* child, size_t /*childCoordIdx*/,
                                const std::string& childInput,
                                CoordTransformFunc coordFunc) -> std::string {
@@ -159,45 +150,22 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
     size_t childCoordOffset =
         processor->computeChildCoordOffset(transformedCoordVarsIdx, childIndex);
 
-    // Modular path for leaf children.
-    auto childName = child->name();
-    bool childIsLeaf =
-        (child->numChildProcessors() == 0 && ShaderModuleRegistry::HasModule(childName));
-    if (childIsLeaf) {
-      return emitModularFragProc(child, childCoordOffset, childInput, std::move(coordFunc), true);
+    // Compute the sampler offset for this child within currentTexSamplers.
+    // Walk the pre-order traversal from the parent processor until we reach this child,
+    // accumulating sampler counts of all visited processors.
+    size_t childSamplerOffset = samplerOffset;
+    FragmentProcessor::Iter iter(processor);
+    while (const auto fp = iter.next()) {
+      if (fp == child) {
+        break;
+      }
+      childSamplerOffset += fp->numTextureSamplers();
     }
 
-    // Legacy fallback for non-leaf children: use EmitArgs + emitCode.
-    auto fragBuilder = fragmentShaderBuilder();
-    fragBuilder->onBeforeChildProcEmitCode(child);
-    std::string inputName;
-    if (!childInput.empty() && childInput != "vec4(1.0)") {
-      inputName = "_childInput";
-      inputName += programInfo->getMangledSuffix(child);
-      fragBuilder->codeAppendf("vec4 %s = %s;", inputName.c_str(), childInput.c_str());
-    }
-    std::string childOutput;
-    currentProcessors.push_back(child);
-    nameExpression(&childOutput, "output");
-    fragBuilder->codeAppend("{\n");
-    fragBuilder->codeAppendf("// Processor%d : %s\n", programInfo->getProcessorIndex(child),
-                             child->name().c_str());
-    FragmentProcessor::TransformedCoordVars coordVars = rootCoords.childInputs(childIndex);
-    FragmentProcessor::TextureSamplers texSamplers = rootSamplers.childInputs(childIndex);
-    std::function<std::string(std::string_view)> legacyCoordFunc;
-    if (coordFunc) {
-      legacyCoordFunc = [cf = std::move(coordFunc)](std::string_view sv) -> std::string {
-        return cf(std::string(sv));
-      };
-    }
-    FragmentProcessor::EmitArgs childArgs(
-        fragBuilder, uniformHandler(), childOutput, inputName.empty() ? "vec4(1.0)" : inputName,
-        subsetVarName, &coordVars, &texSamplers, std::move(legacyCoordFunc));
-    child->emitCode(childArgs);
-    fragBuilder->codeAppend("}\n");
-    fragBuilder->onAfterChildProcEmitCode();
-    currentProcessors.pop_back();
-    return childOutput;
+    // Recursively dispatch all children (leaf and container) via emitModularFragProc.
+    // skipSamplerCollection=true because the parent already collected all samplers.
+    return emitModularFragProc(child, childCoordOffset, childInput, std::move(coordFunc), true,
+                               childSamplerOffset);
   };
   if (processor->emitContainerCode(fragmentShaderBuilder(), uniformHandler(), input, output,
                                    transformedCoordVarsIdx, emitChildCallback)) {
@@ -207,7 +175,8 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
   }
 
   // Leaf FP: dispatch via buildCallStatement() polymorphic path.
-  emitLeafFPCall(processor, transformedCoordVarsIdx, input, output, coordTransformFunc);
+  emitLeafFPCall(processor, transformedCoordVarsIdx, input, output, coordTransformFunc,
+                 samplerOffset);
 
   fragmentShaderBuilder()->codeAppend("}");
   currentProcessors.pop_back();
@@ -219,7 +188,8 @@ std::string ModularProgramBuilder::emitModularFragProc(const FragmentProcessor* 
 bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* processor,
                                                    size_t transformedCoordVarsIdx,
                                                    const std::string& input,
-                                                   const std::string& output) {
+                                                   const std::string& output,
+                                                   size_t samplerOffset) {
   // Check if the processor implements the new modular container interface.
   if (processor->numChildProcessors() == 0) {
     return false;
@@ -260,17 +230,35 @@ bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* proc
     } else {
       childInput = input.empty() ? std::string("vec4(1.0)") : input;
     }
-    childOutputs[info.childIndex] = emitModularFragProc(processor->childProcessor(info.childIndex),
-                                                        childCoordOffset, childInput, {}, true);
+    // Compute child sampler offset within currentTexSamplers.
+    size_t childSamplerOffset = samplerOffset;
+    FragmentProcessor::Iter childIter(processor);
+    while (const auto fp = childIter.next()) {
+      if (fp == processor->childProcessor(info.childIndex)) {
+        break;
+      }
+      childSamplerOffset += fp->numTextureSamplers();
+    }
+    childOutputs[info.childIndex] =
+        emitModularFragProc(processor->childProcessor(info.childIndex), childCoordOffset,
+                            childInput, {}, true, childSamplerOffset);
   }
 
   // Declare container's own uniforms.
   FPResources resources;
   processor->declareResources(uniformHandler(), resources.uniforms, resources.samplers);
 
-  // Populate sampler names from the already-collected currentTexSamplers.
-  for (size_t i = 0; i < currentTexSamplers.size(); ++i) {
-    auto samplerVar = uniformHandler()->getSamplerVariable(currentTexSamplers[i]);
+  // Populate sampler names from currentTexSamplers for this FP's entire subtree.
+  // Container FPs may reference child FP samplers in buildContainerCallStatement().
+  size_t subtreeSamplers = 0;
+  {
+    FragmentProcessor::Iter samplerIter(processor);
+    while (const auto fp = samplerIter.next()) {
+      subtreeSamplers += fp->numTextureSamplers();
+    }
+  }
+  for (size_t i = 0; i < subtreeSamplers; ++i) {
+    auto samplerVar = uniformHandler()->getSamplerVariable(currentTexSamplers[samplerOffset + i]);
     resources.samplers.add("TextureSampler_" + std::to_string(i), samplerVar.name());
   }
   // Populate coord transform varying.
@@ -307,7 +295,8 @@ bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* proc
 void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
                                            size_t transformedCoordVarsIdx, const std::string& input,
                                            const std::string& output,
-                                           const CoordTransformFunc& coordTransformFunc) {
+                                           const CoordTransformFunc& coordTransformFunc,
+                                           size_t samplerOffset) {
   auto name = processor->name();
   DEBUG_ASSERT(ShaderModuleRegistry::HasModule(name));
 
@@ -327,8 +316,10 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
   if (!subsetVarName.empty()) {
     resources.varyings.add("subsetVar", subsetVarName);
   }
-  for (size_t i = 0; i < currentTexSamplers.size(); ++i) {
-    auto samplerVar = uniformHandler()->getSamplerVariable(currentTexSamplers[i]);
+  // Populate sampler names from currentTexSamplers starting at this FP's offset.
+  size_t numSamplers = processor->numTextureSamplers();
+  for (size_t i = 0; i < numSamplers; ++i) {
+    auto samplerVar = uniformHandler()->getSamplerVariable(currentTexSamplers[samplerOffset + i]);
     resources.samplers.add("TextureSampler_" + std::to_string(i), samplerVar.name());
   }
   processor->declareResources(uniformHandler(), resources.uniforms, resources.samplers);
