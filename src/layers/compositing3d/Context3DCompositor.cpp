@@ -211,12 +211,12 @@ std::shared_ptr<Image> Context3DCompositor::finish() {
   }
 
   auto opArray = context->drawingAllocator()->makeArray(std::move(_drawOps));
-  // For 3D compositor output, use immediate resolve mode since the texture will be used
-  // immediately as an image source. This avoids the overhead of a separate ResolveMSAATask.
-  bool resolveImmediately = _targetColorProxy->sampleCount() > 1;
+  // For 3D compositor output, resolve MSAA on pass end since the texture will be used immediately
+  // as an image source. This avoids the overhead of a separate ResolveMSAATask.
+  bool resolveOnPassEnd = _targetColorProxy->sampleCount() > 1;
   auto textureProxy = _targetColorProxy->asTextureProxy();
   context->drawingManager()->addOpsRenderTask(std::move(_targetColorProxy), std::move(opArray),
-                                              PMColor::Transparent(), resolveImmediately);
+                                              PMColor::Transparent(), resolveOnPassEnd);
   auto image = TextureImage::Wrap(std::move(textureProxy), TargetColorSpace());
   _targetColorProxy = nullptr;
   return image;

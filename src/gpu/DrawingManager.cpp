@@ -83,7 +83,7 @@ std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
 
 void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                                       PlacementArray<DrawOp> drawOps,
-                                      std::optional<PMColor> clearColor, bool resolveImmediately) {
+                                      std::optional<PMColor> clearColor, bool resolveOnPassEnd) {
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
@@ -100,7 +100,7 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
   auto task = allocator->make<OpsRenderTask>(allocator, std::move(renderTarget), std::move(drawOps),
-                                             clearColor, resolveImmediately);
+                                             clearColor, resolveOnPassEnd);
   drawingBuffer->renderTasks.emplace_back(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
 }

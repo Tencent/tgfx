@@ -66,14 +66,14 @@ class DrawingManager {
    * @param drawOps The draw operations to execute.
    * @param clearColor The optional clear color. If set, the render target will be cleared before
    * drawing.
-   * @param resolveImmediately If true, MSAA content will be resolved immediately when the
-   * RenderPass ends. This should be used for auxiliary render targets (like clip masks) that will
-   * be used immediately after rendering. If false (default), MSAA resolve is deferred and will be
-   * triggered by ensureMSAAResolved() when the content needs to be read.
+   * @param resolveOnPassEnd If true, MSAA content will be resolved when the RenderPass ends. This
+   * should be used for auxiliary render targets (like clip masks) that will be used immediately
+   * after rendering. If false (default), MSAA resolve is deferred and will be triggered by
+   * ensureMSAAResolved() when the content needs to be read.
    */
   void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                         PlacementArray<DrawOp> drawOps, std::optional<PMColor> clearColor,
-                        bool resolveImmediately = false);
+                        bool resolveOnPassEnd = false);
 
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                           std::vector<RuntimeInputTexture> inputs,

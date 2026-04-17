@@ -31,12 +31,12 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
   }
   auto loadOp = clearColor.has_value() ? LoadAction::Clear : LoadAction::Load;
   auto renderTexture = renderTarget->getRenderTexture();
-  // Set resolveTexture based on resolveImmediately flag:
-  // - When resolveImmediately is true (e.g., for clip mask RT), resolve at RenderPass end.
-  // - When resolveImmediately is false (default, for main RT), defer resolve to ResolveMSAATask.
+  // Set resolveTexture based on resolveOnPassEnd flag:
+  // - When resolveOnPassEnd is true (e.g., for clip mask RT), resolve at RenderPass end.
+  // - When resolveOnPassEnd is false (default, for main RT), defer resolve to ResolveMSAATask.
   auto sampleTexture = renderTarget->getSampleTexture();
   std::shared_ptr<Texture> resolveTexture = nullptr;
-  if (resolveImmediately && renderTarget->sampleCount() > 1 && sampleTexture != renderTexture) {
+  if (resolveOnPassEnd && renderTarget->sampleCount() > 1 && sampleTexture != renderTexture) {
     resolveTexture = sampleTexture;
   }
   RenderPassDescriptor descriptor(renderTexture, loadOp, StoreAction::Store,
