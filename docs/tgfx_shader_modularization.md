@@ -5135,3 +5135,48 @@ cmake -DSHADER_DIR=src/gpu/shaders -DOUTPUT_FILE=src/gpu/ShaderModuleEmbedded.in
 | `TGFX_USE_MODULAR_SHADERS=OFF` | 431 | 全部通过 |
 
 **ON 路径中含 Shader 算法逻辑的 codeAppendf：0 处。**
+
+### 17.16 Phase J 实施结果记录：编译开关移除，永久启用模块化路径
+
+> 2026-04-17 完成，共 1 个 commit。
+
+#### 背景
+
+`TGFX_USE_MODULAR_SHADERS` 编译开关使得模块化路径（`ModularProgramBuilder`）和传统路径（`GLSLProgramBuilder`）共存。经过 Phase A–I 的改造和验证，模块化路径已覆盖全部 Processor 组合，`CanUseModularPath()` 固定返回 `true`。ON/OFF 路径均 431/431 测试通过，具备永久启用 ON 路径的条件。
+
+#### 改动
+
+移除 `TGFX_USE_MODULAR_SHADERS` 编译开关，`CreateProgram()` 永久走 `ModularProgramBuilder`，不再 fallback 到 `GLSLProgramBuilder`。
+
+| 文件 | 变更 |
+|------|------|
+| `CMakeLists.txt` | 删除 `option(TGFX_USE_MODULAR_SHADERS ...)` 及 `if/endif` 块 |
+| `src/gpu/glsl/GLSLProgramBuilder.cpp` | 去掉 `#ifdef` 条件编译，`CreateProgram()` 直接构造 `ModularProgramBuilder` |
+| `test/src/ModularShaderTest.cpp` | 去掉 `#ifdef/#endif` 包裹，测试始终编译 |
+
+构建时不再需要 `-DTGFX_USE_MODULAR_SHADERS=ON`，默认即走模块化路径。
+
+#### 完成的 Commit
+
+| Commit | 说明 |
+|--------|------|
+| `c125673d` | 移除编译开关，永久启用模块化路径 |
+
+#### 验证结果
+
+| 构建命令 | 测试数 | 结果 |
+|---------|--------|------|
+| `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
+
+#### 后续阶段（待推进）
+
+编译开关移除后，以下代码成为**死代码**（不再有任何代码路径到达），可在后续阶段逐步清理：
+
+| 死代码 | 估算行数 | 清理阶段 |
+|--------|---------|---------|
+| `GLSLProgramBuilder` 路径（`CreateProgram` 中已不可达） | ~130 | 阶段 4 |
+| `ProgramBuilder::emitAndInstallFragProc/GeoProc/XferProc`（OFF 路径入口） | ~200 | 阶段 4 |
+| 32 个 `src/gpu/glsl/processors/GLSL*.cpp`（`emitCode` 的 FS 实现） | ~3800 | 阶段 2–3 |
+| `GLSLBlend.cpp` + `BlendFormula.cpp`（OFF 路径 blend 代码） | ~700 | 阶段 3 |
+| 各 Processor `emitCode()` 中 `!skipFragmentCode` 分支 | ~1500 | 阶段 2 |
+| **总计** | **~6300** | |
