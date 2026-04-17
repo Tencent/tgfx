@@ -27,9 +27,6 @@ class GLSLColorMatrixFragmentProcessor : public ColorMatrixFragmentProcessor {
  public:
   explicit GLSLColorMatrixFragmentProcessor(const std::array<float, 20>& matrix);
 
-  void emitCode(EmitArgs&) const override {
-  }
-
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };

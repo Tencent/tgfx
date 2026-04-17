@@ -41,9 +41,6 @@ class ColorSpaceXformEffect : public FragmentProcessor {
     return colorSpaceXformSteps.get();
   }
 
-  void emitCode(EmitArgs&) const override {
-  }
-
  protected:
   void onBuildShaderMacros(ShaderMacroSet& macros) const override;
 

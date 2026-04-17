@@ -24,8 +24,5 @@ namespace tgfx {
 class GLSLLinearGradientLayout : public LinearGradientLayout {
  public:
   explicit GLSLLinearGradientLayout(Matrix matrix);
-
-  void emitCode(EmitArgs&) const override {
-  }
 };
 }  // namespace tgfx

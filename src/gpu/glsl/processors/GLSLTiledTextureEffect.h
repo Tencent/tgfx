@@ -28,9 +28,6 @@ class GLSLTiledTextureEffect : public TiledTextureEffect {
                          SrcRectConstraint constraint, const Matrix& uvMatrix,
                          const std::optional<Rect>& subset);
 
-  void emitCode(EmitArgs&) const override {
-  }
-
  private:
   struct UniformNames {
     std::string subsetName;

@@ -26,9 +26,6 @@ class GLSLDeviceSpaceTextureEffect : public DeviceSpaceTextureEffect {
  public:
   GLSLDeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix);
 
-  void emitCode(EmitArgs&) const override {
-  }
-
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };

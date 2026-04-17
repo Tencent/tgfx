@@ -26,9 +26,6 @@ class GLSLConicGradientLayout : public ConicGradientLayout {
  public:
   GLSLConicGradientLayout(Matrix matrix, float bias, float scale);
 
-  void emitCode(EmitArgs&) const override {
-  }
-
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };

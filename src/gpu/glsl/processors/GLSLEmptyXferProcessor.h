@@ -21,9 +21,5 @@
 #include "gpu/processors/EmptyXferProcessor.h"
 
 namespace tgfx {
-class GLSLEmptyXferProcessor : public EmptyXferProcessor {
- public:
-  void emitCode(const EmitArgs&) const override {
-  }
-};
+class GLSLEmptyXferProcessor : public EmptyXferProcessor {};
 }  // namespace tgfx

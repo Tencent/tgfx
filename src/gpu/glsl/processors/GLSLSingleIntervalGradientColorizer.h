@@ -27,9 +27,6 @@ class GLSLSingleIntervalGradientColorizer : public SingleIntervalGradientColoriz
  public:
   GLSLSingleIntervalGradientColorizer(Color start, Color end);
 
-  void emitCode(EmitArgs&) const override {
-  }
-
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
