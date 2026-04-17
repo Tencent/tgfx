@@ -16,8 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef TGFX_USE_MODULAR_SHADERS
-
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
@@ -122,5 +120,3 @@ TGFX_TEST(ModularShaderTest, BasicRenderSanity) {
 }
 
 }  // namespace tgfx
-
-#endif  // TGFX_USE_MODULAR_SHADERS

@@ -18,11 +18,9 @@
 
 #include "GLSLProgramBuilder.h"
 #include <string>
+#include "gpu/ModularProgramBuilder.h"
 #include "gpu/UniformData.h"
 #include "tgfx/gpu/GPU.h"
-#ifdef TGFX_USE_MODULAR_SHADERS
-#include "gpu/ModularProgramBuilder.h"
-#endif
 
 namespace tgfx {
 static std::string TypeModifierString(ShaderVar::TypeModifier t, ShaderStage stage) {
@@ -109,21 +107,12 @@ static std::string SLTypeString(SLType t) {
 
 std::shared_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
                                                        const ProgramInfo* programInfo) {
-#ifdef TGFX_USE_MODULAR_SHADERS
-  if (ModularProgramBuilder::CanUseModularPath(programInfo)) {
-    ModularProgramBuilder modularBuilder(context, programInfo);
-    ProgramBuilder& base = modularBuilder;
-    if (!base.emitAndInstallProcessors()) {
-      return nullptr;
-    }
-    return modularBuilder.finalize();
-  }
-#endif
-  GLSLProgramBuilder builder(context, programInfo);
-  if (!builder.emitAndInstallProcessors()) {
+  ModularProgramBuilder modularBuilder(context, programInfo);
+  ProgramBuilder& base = modularBuilder;
+  if (!base.emitAndInstallProcessors()) {
     return nullptr;
   }
-  return builder.finalize();
+  return modularBuilder.finalize();
 }
 
 GLSLProgramBuilder::GLSLProgramBuilder(Context* context, const ProgramInfo* programInfo)

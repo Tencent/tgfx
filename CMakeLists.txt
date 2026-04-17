@@ -327,11 +327,6 @@ if (TGFX_USE_TEXT_GAMMA_CORRECTION)
     list(APPEND TGFX_DEFINES TGFX_USE_TEXT_GAMMA_CORRECTION)
 endif ()
 
-option(TGFX_USE_MODULAR_SHADERS "Use modular shader generation for supported pipelines" OFF)
-if (TGFX_USE_MODULAR_SHADERS)
-    list(APPEND TGFX_DEFINES TGFX_USE_MODULAR_SHADERS)
-endif ()
-
 # Auto-generate ShaderModuleEmbedded.inc from .glsl source files when any .glsl changes.
 set(SHADER_EMBED_SCRIPT ${CMAKE_SOURCE_DIR}/embed_shaders.cmake)
 set(SHADER_EMBED_OUTPUT ${CMAKE_SOURCE_DIR}/src/gpu/ShaderModuleEmbedded.inc)
