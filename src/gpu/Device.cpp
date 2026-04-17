@@ -23,7 +23,7 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-Device::Device(std::unique_ptr<GPU> gpu) : _uniqueID(UniqueID::Next()), _gpu(gpu.release()) {
+Device::Device(std::unique_ptr<GPU> gpu) : _gpu(gpu.release()), _uniqueID(UniqueID::Next()) {
   DEBUG_ASSERT(_gpu != nullptr);
 }
 

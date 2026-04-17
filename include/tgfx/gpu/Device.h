@@ -65,6 +65,7 @@ class Device {
    * GPU reset). Once set to true, lockContext() will always return nullptr.
    */
   std::atomic<bool> _contextLost{false};
+  GPU* _gpu = nullptr;
 
   explicit Device(std::unique_ptr<GPU> gpu);
   void releaseAll();
@@ -73,7 +74,6 @@ class Device {
 
  private:
   uint32_t _uniqueID = 0;
-  GPU* _gpu = nullptr;
   bool contextLocked = false;
 
   friend class ResourceCache;

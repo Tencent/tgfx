@@ -18,10 +18,10 @@
 
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
 #include "core/utils/Log.h"
-#include "gpu/opengl/GLDefines.h"
-#include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/egl/EGLGPU.h"
+#include "tgfx/gpu/opengl/GLDefines.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "tgfx/gpu/opengl/egl/EGLGlobals.h"
 
 #ifndef EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_EXT
