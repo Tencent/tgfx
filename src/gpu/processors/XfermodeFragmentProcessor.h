@@ -81,10 +81,5 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
                                                const MangledVaryings& varyings) const override;
 
   std::vector<ChildEmitInfo> getChildEmitPlan(const std::string& parentInput) const override;
-
-  bool emitContainerCode(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
-                         const std::string& input, const std::string& output,
-                         size_t transformedCoordVarsIdx,
-                         const EmitChildFunc& emitChild) const override;
 };
 }  // namespace tgfx

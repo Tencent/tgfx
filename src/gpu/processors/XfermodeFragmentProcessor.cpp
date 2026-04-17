@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "XfermodeFragmentProcessor.h"
-#include "gpu/glsl/GLSLBlend.h"
 #include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
@@ -101,36 +100,5 @@ std::vector<FragmentProcessor::ChildEmitInfo> XfermodeFragmentProcessor::getChil
     return {{0, opaqueExpr}, {1, opaqueExpr}};
   }
   return {{0, ""}};
-}
-
-bool XfermodeFragmentProcessor::emitContainerCode(FragmentShaderBuilder* fragBuilder,
-                                                  UniformHandler* /*uniformHandler*/,
-                                                  const std::string& input,
-                                                  const std::string& output,
-                                                  size_t transformedCoordVarsIdx,
-                                                  const EmitChildFunc& emitChild) const {
-  std::string coverage = "vec4(1.0)";
-  auto inputRef = input.empty() ? std::string("vec4(1.0)") : input;
-  if (child == Child::TwoChild) {
-    std::string opaqueInput = output + "_opaque";
-    fragBuilder->codeAppendf("vec4 %s = vec4(%s.rgb, 1.0);", opaqueInput.c_str(), inputRef.c_str());
-    auto srcCoordIdx = computeChildCoordOffset(transformedCoordVarsIdx, 0);
-    auto srcColor = emitChild(childProcessor(0), srcCoordIdx, opaqueInput, {});
-    auto dstCoordIdx = computeChildCoordOffset(transformedCoordVarsIdx, 1);
-    auto dstColor = emitChild(childProcessor(1), dstCoordIdx, opaqueInput, {});
-    fragBuilder->codeAppendf("// Compose Xfer Mode: %s\n", BlendModeName(mode));
-    AppendMode(fragBuilder, srcColor, coverage, dstColor, output, mode, false);
-    fragBuilder->codeAppendf("%s *= %s.a;", output.c_str(), inputRef.c_str());
-  } else {
-    auto childCoordIdx = computeChildCoordOffset(transformedCoordVarsIdx, 0);
-    auto childColor = emitChild(childProcessor(0), childCoordIdx, "", {});
-    fragBuilder->codeAppendf("// Compose Xfer Mode: %s\n", BlendModeName(mode));
-    if (child == Child::DstChild) {
-      AppendMode(fragBuilder, inputRef, coverage, childColor, output, mode, false);
-    } else {
-      AppendMode(fragBuilder, childColor, coverage, inputRef, output, mode, false);
-    }
-  }
-  return true;
 }
 }  // namespace tgfx
