@@ -56,7 +56,8 @@ class XferProcessor : public Processor {
     return nullptr;
   }
 
-  virtual void emitCode(const EmitArgs& args) const = 0;
+  virtual void emitCode(const EmitArgs&) const {
+  }
 
   virtual void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const = 0;
 
