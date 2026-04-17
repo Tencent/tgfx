@@ -5497,3 +5497,66 @@ Phase O 删除了 FP/XP 的 `emitCode()` 实现，Phase P 删除了 GLSLBlend。
 | 构建命令 | 测试数 | 结果 |
 |---------|--------|------|
 | `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
+
+### 17.24 Phase R 实施结果记录：ComposeFragmentProcessor 模块化迁移 & emitContainerCode 机制消除
+
+> 2026-04-17 完成，共 1 个 commit。
+
+#### 背景
+
+`ComposeFragmentProcessor` 是最后一个通过 legacy `emitContainerCode()` fallback 处理的容器 FP。其逻辑是纯顺序流水线：child 0 → child 1 → … → child N，每个 child 的输出作为下一个 child 的输入，无自身 uniform、GLSL 函数或 sampler。
+
+#### 迁移方案
+
+**1. 放松 `emitModularContainerFP()` 入口检查**
+
+原有逻辑要求容器 FP 必须同时满足 `shaderFunctionFile()` 非空和 `ShaderModuleRegistry::HasModule()` 为 true，否则直接返回 false。ComposeFragmentProcessor 作为纯结构容器没有 `.glsl` 模块。
+
+改为统一由 probe 结果判断：直接调用 `buildContainerCallStatement()`，如果返回的 `outputVarName` 非空即认为支持模块化路径。后续 `includeModule()` 加条件保护，仅在 Registry 中有注册时才调用。
+
+**2. ComposeFragmentProcessor 提供模块化接口**
+
+| 方法 | 实现 |
+|------|------|
+| `getChildEmitPlan()` | child 0 使用父输入；child i (i>0) 使用 child i-1 的输出（管道式） |
+| `buildContainerCallStatement()` | `statement` 为空，`outputVarName` = 最后一个 child 的输出变量名（纯 passthrough） |
+| `shaderFunctionFile()` | 保持返回 `""`（无独立 GLSL 模块） |
+
+**3. 消除 `emitContainerCode` 机制**
+
+迁移完成后，`emitContainerCode()` 没有任何 override，整个机制可以安全删除：
+- `FragmentProcessor.h` 中 `EmitChildFunc` typedef + `emitContainerCode()` 虚方法
+- `ModularProgramBuilder.cpp` 中 42 行 legacy container dispatch（emitChildCallback lambda + 调用 `emitContainerCode()`）
+
+#### 改动汇总
+
+| 文件 | 操作 | 行数变化 |
+|------|------|---------|
+| `src/gpu/ModularProgramBuilder.cpp` | 放松入口检查；删除 legacy emitContainerCode dispatch | -34 |
+| `src/gpu/processors/ComposeFragmentProcessor.h` | 添加 `getChildEmitPlan()` + `buildContainerCallStatement()`，删除 `emitContainerCode()` | +2 |
+| `src/gpu/processors/FragmentProcessor.h` | 删除 `EmitChildFunc` + `emitContainerCode()` 虚方法 | -27 |
+| **合计** | | **-65** |
+
+#### 关键成果
+
+**`emitContainerCode()` 机制完全消除。** 所有 5 个容器 FP 现在统一走 `emitModularContainerFP()` 路径：
+
+| 容器 FP | 路径 |
+|---------|------|
+| XfermodeFragmentProcessor | `shaderFunctionFile()` + `buildContainerCallStatement()` |
+| ClampedGradientEffect | `shaderFunctionFile()` + `buildContainerCallStatement()` |
+| GaussianBlur1DFragmentProcessor | `shaderFunctionFile()` + `buildContainerCallStatement()` |
+| ComposeFragmentProcessor | `buildContainerCallStatement()` passthrough（无 `.glsl` 模块） |
+| ColorSpaceXformEffect | leaf FP，走 `emitLeafFPCall()` |
+
+#### 完成的 Commit
+
+| Commit | 说明 |
+|--------|------|
+| `386a29ae` | ComposeFragmentProcessor 模块化迁移 + emitContainerCode 机制消除 |
+
+#### 验证结果
+
+| 构建命令 | 测试数 | 结果 |
+|---------|--------|------|
+| `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
