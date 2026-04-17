@@ -18,12 +18,10 @@
 
 #include "tgfx/opengl/egl/EGLDevice.h"
 #include <tgfx/opengl/egl/EGLGlobals.h>
+#include "tgfx/opengl/GLDefines.h"
+#include "opengl/GLInterface.h"
 #include "opengl/egl/EGLProcGetter.h"
 #include "utils/Log.h"
-#include "core/utils/Log.h"
-#include "gpu/opengl/GLDefines.h"
-#include "gpu/opengl/GLFunctions.h"
-#include "gpu/opengl/GLGPU.h"
 
 #ifndef EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_EXT
 #define EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_EXT 0x3138
@@ -90,7 +88,7 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
     return nullptr;
   }
   auto eglShareContext = reinterpret_cast<EGLContext>(sharedContext);
-  auto eglContext = CreateContext(eglShareContext, eglGlobals->display, eglGlobals->pbufferConfig,
+  eglContext = CreateContext(eglShareContext, eglGlobals->display, eglGlobals->pbufferConfig,
                                   eglGlobals->contextRobustnessSupported);
   if (eglContext == nullptr) {
     eglDestroySurface(eglGlobals->display, eglSurface);
@@ -253,8 +251,11 @@ bool EGLDevice::checkGraphicsResetStatus() {
   if (graphicsResetStatus != GL_NO_ERROR) {
     return true;
   }
-  auto glGPU = static_cast<GLGPU*>(_gpu);
-  auto getGraphicsResetStatus = glGPU->functions()->getGraphicsResetStatus;
+  auto glInterface = GLInterface::GetNative();
+  if (glInterface == nullptr) {
+    return false;
+  }
+  auto getGraphicsResetStatus = glInterface->functions->getGraphicsResetStatus;
   if (getGraphicsResetStatus == nullptr) {
     return false;
   }

@@ -39,5 +39,6 @@ class GLInterface {
 
   friend class GLDevice;
   friend class GLContext;
+  friend class EGLDevice;
 };
 }  // namespace tgfx
