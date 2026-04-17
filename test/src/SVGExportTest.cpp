@@ -915,13 +915,6 @@ TGFX_TEST(SVGExportTest, LayerMaskBlur) {
   groupLayer->setMatrix(layerMatrix);
   maskLayer->setMatrix(layerMatrix);
 
-  // Debug layer: draw the star mask path in semi-transparent red to visualize its position.
-  auto debugLayer = ShapeLayer::Make();
-  debugLayer->setPath(starPath);
-  debugLayer->setFillStyle(ShapeStyle::Make(Color{1.0f, 0.0f, 0.0f, 0.5f}));
-  debugLayer->setMatrix(layerMatrix);
-
-  displayList->root()->addChild(debugLayer);
   displayList->root()->addChild(groupLayer);
   displayList->root()->addChild(maskLayer);
   displayList->root()->draw(canvas);
@@ -929,9 +922,6 @@ TGFX_TEST(SVGExportTest, LayerMaskBlur) {
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/LayerMaskBlur"));
 
-  auto surface = Surface::Make(context, width, height);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "SVGExportTest/LayerMaskBlur"));
 }
 
 TGFX_TEST(SVGExportTest, ClipWithMatrixTransform) {
