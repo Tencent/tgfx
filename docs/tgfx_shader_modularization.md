@@ -5232,3 +5232,49 @@ AtlasTextGeometryProcessor 的特殊处理：ON 路径中的纹理查询 + `gpUn
 | 构建命令 | 测试数 | 结果 |
 |---------|--------|------|
 | `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
+
+### 17.18 Phase L 实施结果记录：XP/GP legacy fallback 消除
+
+> 2026-04-17 完成，共 1 个 commit。
+
+#### 改动
+
+从 `ModularProgramBuilder.cpp` 中消除了 XP 和 GP 的 legacy `emitCode()` fallback 路径：
+
+| 消除项 | 原因 |
+|--------|------|
+| XP `emitCode()` fallback | `EmptyXferProcessor` 和 `PorterDuffXferProcessor` 的 `buildXferCallStatement()` 永远返回非空，fallback 不可达 |
+| GP `useModularFS=false` 分支 | `useModularFS` 固定为 `true`，else 分支不可达 |
+
+净减 22 行。
+
+#### 未能消除的路径：FP emitChildCallback 中非 leaf 子 FP
+
+尝试将 `emitChildCallback` 中所有子 FP 统一改为递归 `emitModularFragProc()`，但 `CanvasTest.ColorSpace` 失败：
+
+- **现象**：`GLRenderPipeline::setTexture: binding 3 not found`
+- **根因**：递归进入 `emitModularFragProc()` 时 `skipSamplerCollection=true`，全局 `currentTexSamplers` 的 offset 与子容器 FP 期望的 sampler 索引不匹配。legacy 路径通过 `rootSamplers.childInputs(childIndex)` 正确传递 sampler 子集，而模块化路径使用全局 sampler 数组直接索引
+- **结论**：需要专项重构 sampler 收集和传递机制，不适合在本阶段处理
+
+因此 `emitChildCallback` 中非 leaf 子 FP **保留** legacy `emitCode()` 路径。
+
+#### 当前 emitCode() 残留依赖
+
+| 调用位置 | 调用者 | 被调用的 Processor | 消除条件 |
+|---------|--------|-------------------|---------|
+| `emitAndInstallGeoProc` | ModularProgramBuilder | GP（仅 VS 注入） | 拆分 emitCode 为 emitVertexCode |
+| `emitChildCallback` | emitContainerCode 路径 | 非 leaf 子 FP | 重构 sampler 收集机制 |
+
+XP 的 `emitCode()` 已无任何调用路径。
+
+#### 完成的 Commit
+
+| Commit | 说明 |
+|--------|------|
+| `d1a42fb9` | 消除 XP emitCode fallback 和 GP legacy path |
+
+#### 验证结果
+
+| 构建命令 | 测试数 | 结果 |
+|---------|--------|------|
+| `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
