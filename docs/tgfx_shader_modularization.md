@@ -5376,3 +5376,44 @@ Phase J 永久启用 `ModularProgramBuilder` 后，`ProgramBuilder` 基类中的
 | 构建命令 | 测试数 | 结果 |
 |---------|--------|------|
 | `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
+
+### 17.21 Phase O 实施结果记录：FP/XP emitCode() 实现清理
+
+> 2026-04-17 完成，共 1 个 commit。
+
+#### 背景
+
+Phase M 后，FP 和 XP 的 `emitCode()` 在 `ModularProgramBuilder` 中已无任何调用路径。但 `src/gpu/glsl/processors/` 下 22 个 FP/XP 文件中仍保留着完整的 `emitCode()` 实现（总计约 951 行），这些代码已成为死代码。
+
+注意：这些文件中的 `setData()` 方法仍在运行时被 `ProgramInfo::setUniforms()` 调用（上传 uniform 数据到 GPU），不能删除。
+
+#### 改动
+
+对 22 个 FP/XP 的 GLSL Processor 文件执行清理：
+
+| 操作 | 文件数 | 说明 |
+|------|--------|------|
+| `.cpp` 中删除 `emitCode()` 方法体 | 22 | 保留 `setData()`、`buildCallStatement()`、`buildXferCallStatement()` |
+| `.h` 中 `emitCode()` 声明改为空内联存根 | 22 | `void emitCode(EmitArgs&) const override {}`（满足纯虚接口） |
+| 清理不再需要的 `#include` | 1 | 移除 `GLSLXfermodeFragmentProcessor.cpp` 中的 `#include "GLSLBlend.h"` |
+
+**净删除 951 行代码。**
+
+涉及的 FP 文件（20 个）：
+`GLSLTextureEffect`、`GLSLTiledTextureEffect`、`GLSLConstColorProcessor`、`GLSLLinearGradientLayout`、`GLSLRadialGradientLayout`、`GLSLConicGradientLayout`、`GLSLDiamondGradientLayout`、`GLSLSingleIntervalGradientColorizer`、`GLSLDualIntervalGradientColorizer`、`GLSLTextureGradientColorizer`、`GLSLUnrolledBinaryGradientColorizer`、`GLSLColorMatrixFragmentProcessor`、`GLSLLumaFragmentProcessor`、`GLSLAlphaThresholdFragmentProcessor`、`GLSLAARectEffect`、`GLSLDeviceSpaceTextureEffect`、`GLSLComposeFragmentProcessor`、`GLSLClampedGradientEffect`、`GLSLXfermodeFragmentProcessor`、`GLSLGaussianBlur1DFragmentProcessor`
+
+涉及的 XP 文件（2 个）：
+- `GLSLEmptyXferProcessor`：删除 `emitCode()`
+- `GLSLPorterDuffXferProcessor`：删除 `emitCode()`（约 45 行），保留 `setData()` + `buildXferCallStatement()` + 辅助函数
+
+#### 完成的 Commit
+
+| Commit | 说明 |
+|--------|------|
+| `189ccb4e` | 删除 22 个 FP/XP 文件中的 emitCode() 实现（-951 行） |
+
+#### 验证结果
+
+| 构建命令 | 测试数 | 结果 |
+|---------|--------|------|
+| `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
