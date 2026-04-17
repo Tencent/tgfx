@@ -26,20 +26,6 @@ PlacementPtr<AARectEffect> AARectEffect::Make(BlockAllocator* allocator, const R
 GLSLAARectEffect::GLSLAARectEffect(const Rect& rect) : AARectEffect(rect) {
 }
 
-void GLSLAARectEffect::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  auto uniformHandler = args.uniformHandler;
-
-  auto rectName = uniformHandler->addUniform("Rect", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->codeAppendf(
-      "vec4 dists4 = clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - %s), 0.0, 1.0);",
-      rectName.c_str());
-  fragBuilder->codeAppend("vec2 dists2 = dists4.xy + dists4.zw - 1.0;");
-  fragBuilder->codeAppend("float coverage = dists2.x * dists2.y;");
-  fragBuilder->codeAppendf("%s = %s * coverage;", args.outputColor.c_str(),
-                           args.inputColor.c_str());
-}
-
 void GLSLAARectEffect::onSetData(UniformData* /*vertexUniformData*/,
                                  UniformData* fragmentUniformData) const {
   // The AA math in the shader evaluates to 0 at the uploaded coordinates, so outset by 0.5

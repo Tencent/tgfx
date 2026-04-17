@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLXfermodeFragmentProcessor.h"
-#include "gpu/glsl/GLSLBlend.h"
 #include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
@@ -43,32 +42,5 @@ GLSLXfermodeFragmentProcessor::GLSLXfermodeFragmentProcessor(PlacementPtr<Fragme
                                                              PlacementPtr<FragmentProcessor> dst,
                                                              BlendMode mode)
     : XfermodeFragmentProcessor(std::move(src), std::move(dst), mode) {
-}
-
-void GLSLXfermodeFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  std::string coverage = "vec4(1.0)";
-  if (child == XfermodeFragmentProcessor::Child::TwoChild) {
-    std::string inputColor = "inputColor";
-    fragBuilder->codeAppendf("vec4 inputColor = vec4(%s.rgb, 1.0);", args.inputColor.c_str());
-    std::string srcColor = "xfer_src";
-    emitChild(0, inputColor, &srcColor, args);
-    std::string dstColor = "xfer_dst";
-    emitChild(1, inputColor, &dstColor, args);
-    fragBuilder->codeAppendf("// Compose Xfer Mode: %s\n", BlendModeName(mode));
-    AppendMode(fragBuilder, srcColor, coverage, dstColor, args.outputColor, mode, false);
-    // re-multiply the output color by the input color's alpha
-    fragBuilder->codeAppendf("%s *= %s.a;", args.outputColor.c_str(), args.inputColor.c_str());
-  } else {
-    std::string childColor = "child";
-    emitChild(0, &childColor, args);
-    // emit blend code
-    fragBuilder->codeAppendf("// Compose Xfer Mode: %s\n", BlendModeName(mode));
-    if (child == XfermodeFragmentProcessor::Child::DstChild) {
-      AppendMode(fragBuilder, args.inputColor, coverage, childColor, args.outputColor, mode, false);
-    } else {
-      AppendMode(fragBuilder, childColor, coverage, args.inputColor, args.outputColor, mode, false);
-    }
-  }
 }
 }  // namespace tgfx

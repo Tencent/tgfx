@@ -28,7 +28,8 @@ class GLSLDualIntervalGradientColorizer : public DualIntervalGradientColorizer {
   GLSLDualIntervalGradientColorizer(Color scale01, Color bias01, Color scale23, Color bias23,
                                     float threshold);
 
-  void emitCode(EmitArgs& args) const override;
+  void emitCode(EmitArgs&) const override {
+  }
 
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;

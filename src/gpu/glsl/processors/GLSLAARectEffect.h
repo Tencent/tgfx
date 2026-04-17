@@ -26,7 +26,8 @@ class GLSLAARectEffect : public AARectEffect {
  public:
   explicit GLSLAARectEffect(const Rect& rect);
 
-  void emitCode(EmitArgs& args) const override;
+  void emitCode(EmitArgs&) const override {
+  }
 
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;

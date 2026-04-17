@@ -24,17 +24,6 @@ PlacementPtr<FragmentProcessor> LumaFragmentProcessor::Make(
   return allocator->make<GLSLLumaFragmentProcessor>(std::move(colorSpace));
 }
 
-void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto uniformHandler = args.uniformHandler;
-  auto kr = uniformHandler->addUniform("Kr", UniformFormat::Float, ShaderStage::Fragment);
-  auto kg = uniformHandler->addUniform("Kg", UniformFormat::Float, ShaderStage::Fragment);
-  auto kb = uniformHandler->addUniform("Kb", UniformFormat::Float, ShaderStage::Fragment);
-
-  args.fragBuilder->codeAppendf("float luma = dot(%s.rgb, vec3(%s, %s, %s));\n",
-                                args.inputColor.c_str(), kr.c_str(), kg.c_str(), kb.c_str());
-  args.fragBuilder->codeAppendf("%s = vec4(luma);\n", args.outputColor.c_str());
-}
-
 void GLSLLumaFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
                                           UniformData* fragmentUniformData) const {
   fragmentUniformData->setData("Kr", _lumaFactor.kr);

@@ -23,6 +23,7 @@
 namespace tgfx {
 class GLSLEmptyXferProcessor : public EmptyXferProcessor {
  public:
-  void emitCode(const EmitArgs& args) const override;
+  void emitCode(const EmitArgs&) const override {
+  }
 };
 }  // namespace tgfx

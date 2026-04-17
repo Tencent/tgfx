@@ -25,6 +25,7 @@ class GLSLComposeFragmentProcessor : public ComposeFragmentProcessor {
  public:
   explicit GLSLComposeFragmentProcessor(std::vector<PlacementPtr<FragmentProcessor>> processors);
 
-  void emitCode(EmitArgs& args) const override;
+  void emitCode(EmitArgs&) const override {
+  }
 };
 }  // namespace tgfx

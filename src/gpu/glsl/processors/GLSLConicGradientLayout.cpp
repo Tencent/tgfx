@@ -29,19 +29,6 @@ GLSLConicGradientLayout::GLSLConicGradientLayout(Matrix matrix, float bias, floa
     : ConicGradientLayout(matrix, bias, scale) {
 }
 
-void GLSLConicGradientLayout::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  auto uniformHandler = args.uniformHandler;
-  auto biasName = uniformHandler->addUniform("Bias", UniformFormat::Float, ShaderStage::Fragment);
-  auto scaleName = uniformHandler->addUniform("Scale", UniformFormat::Float, ShaderStage::Fragment);
-  const auto coordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
-  fragBuilder->codeAppendf("float angle = atan(-%s.y, -%s.x);", coordName.c_str(),
-                           coordName.c_str());
-  fragBuilder->codeAppendf("float t = ((angle * 0.15915494309180001 + 0.5) + %s) * %s;",
-                           biasName.c_str(), scaleName.c_str());
-  fragBuilder->codeAppendf("%s = vec4(t, 1.0, 0.0, 0.0);", args.outputColor.c_str());
-}
-
 void GLSLConicGradientLayout::onSetData(UniformData* /*vertexUniformData*/,
                                         UniformData* fragmentUniformData) const {
   fragmentUniformData->setData("Bias", bias);

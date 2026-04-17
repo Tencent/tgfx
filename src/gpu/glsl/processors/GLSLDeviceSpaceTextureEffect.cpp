@@ -32,26 +32,6 @@ GLSLDeviceSpaceTextureEffect::GLSLDeviceSpaceTextureEffect(
     : DeviceSpaceTextureEffect(std::move(textureProxy), uvMatrix) {
 }
 
-void GLSLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  auto uniformHandler = args.uniformHandler;
-  auto deviceCoordMatrixName = uniformHandler->addUniform(
-      "DeviceCoordMatrix", UniformFormat::Float3x3, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("vec3 deviceCoord = %s * vec3(gl_FragCoord.xy, 1.0);",
-                           deviceCoordMatrixName.c_str());
-  std::string coordName = "deviceCoord.xy";
-  fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
-  fragBuilder->appendTextureLookup((*args.textureSamplers)[0], coordName);
-  fragBuilder->codeAppend(";");
-  if (textureProxy->isAlphaOnly()) {
-    fragBuilder->codeAppendf("%s = %s.a * %s;", args.outputColor.c_str(), args.outputColor.c_str(),
-                             args.inputColor.c_str());
-  } else {
-    fragBuilder->codeAppendf("%s = %s * %s.a;", args.outputColor.c_str(), args.outputColor.c_str(),
-                             args.inputColor.c_str());
-  }
-}
-
 void GLSLDeviceSpaceTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
                                              UniformData* fragmentUniformData) const {
   auto textureView = textureProxy->getTextureView();

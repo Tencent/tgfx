@@ -27,7 +27,8 @@ class GLSLAlphaThresholdFragmentProcessor : public AlphaThresholdFragmentProcess
       : AlphaThresholdFragmentProcessor(threshold) {
   }
 
-  void emitCode(EmitArgs& args) const override;
+  void emitCode(EmitArgs&) const override {
+  }
 
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };

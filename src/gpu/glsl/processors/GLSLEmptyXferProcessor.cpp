@@ -23,9 +23,4 @@ const EmptyXferProcessor* EmptyXferProcessor::GetInstance() {
   static auto& xferProcessor = *new GLSLEmptyXferProcessor();
   return &xferProcessor;
 }
-
-void GLSLEmptyXferProcessor::emitCode(const EmitArgs& args) const {
-  args.fragBuilder->codeAppendf("%s = %s * %s;", args.outputColor.c_str(), args.inputColor.c_str(),
-                                args.inputCoverage.c_str());
-}
 }  // namespace tgfx

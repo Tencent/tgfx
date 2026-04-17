@@ -41,7 +41,8 @@ class GLSLUnrolledBinaryGradientColorizer : public UnrolledBinaryGradientColoriz
   GLSLUnrolledBinaryGradientColorizer(int intervalCount, Color* scales, Color* biases,
                                       Rect thresholds1_7, Rect thresholds9_13);
 
-  void emitCode(EmitArgs& args) const override;
+  void emitCode(EmitArgs&) const override {
+  }
 
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;

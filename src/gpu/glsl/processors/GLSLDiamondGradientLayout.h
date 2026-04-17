@@ -25,6 +25,7 @@ class GLSLDiamondGradientLayout : public DiamondGradientLayout {
  public:
   explicit GLSLDiamondGradientLayout(Matrix matrix);
 
-  void emitCode(EmitArgs& args) const override;
+  void emitCode(EmitArgs&) const override {
+  }
 };
 }  // namespace tgfx

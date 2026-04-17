@@ -28,7 +28,8 @@ class GLSLTextureEffect : public TextureEffect {
                     const SamplingOptions& sampling, SrcRectConstraint constraint,
                     const Matrix& uvMatrix, const std::optional<Rect>& subset);
 
-  void emitCode(EmitArgs& args) const override;
+  void emitCode(EmitArgs&) const override {
+  }
 
  private:
   void emitDefaultTextureCode(EmitArgs& args) const;

@@ -30,12 +30,4 @@ PlacementPtr<TextureGradientColorizer> TextureGradientColorizer::Make(
 GLSLTextureGradientColorizer::GLSLTextureGradientColorizer(std::shared_ptr<TextureProxy> gradient)
     : TextureGradientColorizer(std::move(gradient)) {
 }
-
-void GLSLTextureGradientColorizer::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  fragBuilder->codeAppendf("vec2 coord = vec2(%s.x, 0.5);", args.inputColor.c_str());
-  fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
-  fragBuilder->appendTextureLookup((*args.textureSamplers)[0], "coord");
-  fragBuilder->codeAppend(";");
-}
 }  // namespace tgfx
