@@ -123,52 +123,9 @@ std::string ModularProgramBuilder::emitModularFragProc(
     }
   }
 
-  // Try new modular container path: buildContainerCallStatement().
+  // Try modular container path: buildContainerCallStatement().
   // This recursively emits children via emitModularFragProc, then calls the container .glsl.
   if (emitModularContainerFP(processor, transformedCoordVarsIdx, input, output, samplerOffset)) {
-    fragmentShaderBuilder()->codeAppend("}");
-    currentProcessors.pop_back();
-    return output;
-  }
-
-  // Try legacy container dispatch via emitContainerCode().
-  // The emitChild callback recursively calls emitModularFragProc for ALL children.
-  auto emitChildCallback = [this, processor, transformedCoordVarsIdx, samplerOffset](
-                               const FragmentProcessor* child, size_t /*childCoordIdx*/,
-                               const std::string& childInput,
-                               CoordTransformFunc coordFunc) -> std::string {
-    // Find child index within the container processor.
-    size_t childIndex = 0;
-    for (size_t i = 0; i < processor->numChildProcessors(); ++i) {
-      if (processor->childProcessor(i) == child) {
-        childIndex = i;
-        break;
-      }
-    }
-
-    // Compute the correct coord offset for this child.
-    size_t childCoordOffset =
-        processor->computeChildCoordOffset(transformedCoordVarsIdx, childIndex);
-
-    // Compute the sampler offset for this child within currentTexSamplers.
-    // Walk the pre-order traversal from the parent processor until we reach this child,
-    // accumulating sampler counts of all visited processors.
-    size_t childSamplerOffset = samplerOffset;
-    FragmentProcessor::Iter iter(processor);
-    while (const auto fp = iter.next()) {
-      if (fp == child) {
-        break;
-      }
-      childSamplerOffset += fp->numTextureSamplers();
-    }
-
-    // Recursively dispatch all children (leaf and container) via emitModularFragProc.
-    // skipSamplerCollection=true because the parent already collected all samplers.
-    return emitModularFragProc(child, childCoordOffset, childInput, std::move(coordFunc), true,
-                               childSamplerOffset);
-  };
-  if (processor->emitContainerCode(fragmentShaderBuilder(), uniformHandler(), input, output,
-                                   transformedCoordVarsIdx, emitChildCallback)) {
     fragmentShaderBuilder()->codeAppend("}");
     currentProcessors.pop_back();
     return output;
@@ -194,12 +151,9 @@ bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* proc
   if (processor->numChildProcessors() == 0) {
     return false;
   }
-  auto funcFile = processor->shaderFunctionFile();
-  if (funcFile.empty() || !ShaderModuleRegistry::HasModule(processor->name())) {
-    return false;
-  }
-  // Probe: try building with dummy args. If the result is empty, this container
-  // doesn't support the modular path yet.
+  // Probe: try building with dummy args to check if this container supports the modular path.
+  // Containers without a .glsl module (e.g. ComposeFragmentProcessor) can still work if they
+  // provide a valid buildContainerCallStatement() with a non-empty outputVarName.
   std::vector<std::string> dummyChildren(processor->numChildProcessors(), "vec4(0.0)");
   MangledUniforms dummyUniforms;
   MangledSamplers dummySamplers;
@@ -207,7 +161,7 @@ bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* proc
   auto probeResult =
       processor->buildContainerCallStatement(input.empty() ? "vec4(1.0)" : input, dummyChildren,
                                              dummyUniforms, dummySamplers, dummyVaryings);
-  if (probeResult.statement.empty()) {
+  if (probeResult.outputVarName.empty()) {
     return false;
   }
 
@@ -271,9 +225,11 @@ bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* proc
     resources.varyings.add("subsetVar", subsetVarName);
   }
 
-  // Emit macros and include module.
+  // Emit macros and include module (skip for pure structural containers with no .glsl module).
   emitProcessorDefines(processor);
-  includeModule(ShaderModuleRegistry::GetModuleID(processor->name()));
+  if (ShaderModuleRegistry::HasModule(processor->name())) {
+    includeModule(ShaderModuleRegistry::GetModuleID(processor->name()));
+  }
 
   // Build and emit the container function call.
   auto result = processor->buildContainerCallStatement(input.empty() ? "vec4(1.0)" : input,

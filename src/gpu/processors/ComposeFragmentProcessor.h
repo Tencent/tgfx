@@ -43,22 +43,28 @@ class ComposeFragmentProcessor : public FragmentProcessor {
     return "";
   }
 
-  bool emitContainerCode(FragmentShaderBuilder* fragBuilder, UniformHandler* /*uniformHandler*/,
-                         const std::string& input, const std::string& output,
-                         size_t transformedCoordVarsIdx,
-                         const EmitChildFunc& emitChild) const override {
-    auto numChildren = numChildProcessors();
-    std::string currentInput = input;
-    for (size_t i = 0; i < numChildren; ++i) {
-      size_t childCoordIdx = computeChildCoordOffset(transformedCoordVarsIdx, i);
-      auto childOutput = emitChild(childProcessor(i), childCoordIdx, currentInput, {});
-      if (i == numChildren - 1) {
-        fragBuilder->codeAppendf("%s = %s;", output.c_str(), childOutput.c_str());
+  std::vector<ChildEmitInfo> getChildEmitPlan(const std::string& /*parentInput*/) const override {
+    std::vector<ChildEmitInfo> plan;
+    for (size_t i = 0; i < numChildProcessors(); ++i) {
+      if (i == 0) {
+        plan.push_back({i, ""});
       } else {
-        currentInput = childOutput;
+        plan.push_back({i, "", static_cast<int>(i - 1)});
       }
     }
-    return true;
+    return plan;
+  }
+
+  ShaderCallResult buildContainerCallStatement(const std::string& /*inputColor*/,
+                                               const std::vector<std::string>& childOutputs,
+                                               const MangledUniforms& /*uniforms*/,
+                                               const MangledSamplers& /*samplers*/,
+                                               const MangledVaryings& /*varyings*/) const override {
+    ShaderCallResult result;
+    if (!childOutputs.empty()) {
+      result.outputVarName = childOutputs.back();
+    }
+    return result;
   }
 };
 }  // namespace tgfx
