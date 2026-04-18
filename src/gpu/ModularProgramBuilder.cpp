@@ -66,6 +66,14 @@ void ModularProgramBuilder::includeModule(ShaderModuleID id) {
   fragmentShaderBuilder()->addFunction(ShaderModuleRegistry::GetModule(id));
 }
 
+void ModularProgramBuilder::includeVSModule(ShaderModuleID id) {
+  if (includedVSModules.count(id) > 0) {
+    return;
+  }
+  includedVSModules.insert(id);
+  vertexShaderBuilder()->addFunction(ShaderModuleRegistry::GetModule(id));
+}
+
 // ---- Processor #define emission ----
 
 void ModularProgramBuilder::emitProcessorDefines(const FragmentProcessor* processor) {
@@ -327,7 +335,23 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
   args.skipVertexCode = true;
   args.gpVaryings = &gpVaryings;
   args.gpUniforms = &gpUniforms;
-  geometryProcessor->emitCode(args);
+
+  // Modular path: if the GP provides a .vert.glsl module and a VS call expression, include the
+  // module and emit the call statement. Legacy emitCode() path is the fallback used by all GPs
+  // that have not migrated yet. Both paths still invoke emitTransforms() for FP coord transforms;
+  // that refactor is deferred to Phase V-5 once all GPs are modularized.
+  auto vsFuncFile = geometryProcessor->shaderFunctionFile();
+  bool useModularVS =
+      !vsFuncFile.empty() && ShaderModuleRegistry::HasModule(geometryProcessor->name());
+  if (useModularVS) {
+    includeVSModule(ShaderModuleRegistry::GetModuleID(geometryProcessor->name()));
+    auto vsCallExpr = geometryProcessor->buildVSCallExpr(gpUniforms, gpVaryings);
+    if (!vsCallExpr.empty()) {
+      vertexShaderBuilder()->codeAppend(vsCallExpr);
+    }
+  } else {
+    geometryProcessor->emitCode(args);
+  }
 
   auto colorResult = geometryProcessor->buildColorCallExpr(gpUniforms, gpVaryings);
   auto coverageResult = geometryProcessor->buildCoverageCallExpr(gpUniforms, gpVaryings);

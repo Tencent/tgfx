@@ -88,6 +88,12 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
   void includeModule(ShaderModuleID id);
 
   /**
+   * Includes a module's function source into the VS Functions section (once per module).
+   * Used for GeometryProcessor vertex shader modules.
+   */
+  void includeVSModule(ShaderModuleID id);
+
+  /**
    * Emits #define directives for a processor's compile-time switches.
    */
   void emitProcessorDefines(const FragmentProcessor* processor);
@@ -104,6 +110,7 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
   };
 
   std::set<ShaderModuleID> includedModules;
+  std::set<ShaderModuleID> includedVSModules;
   // Sampler handles collected during emitModularFragProc, available for emitLeafFPCall.
   std::vector<SamplerHandle> currentTexSamplers;
 };
