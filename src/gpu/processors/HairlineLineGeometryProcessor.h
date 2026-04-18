@@ -77,8 +77,7 @@ class HairlineLineGeometryProcessor : public GeometryProcessor {
     auto edge = varyings.get("EdgeDistance");
     auto covScale = uniforms.get("Coverage");
     std::string code;
-    code += "float edgeAlpha = abs(" + edge + ");\n";
-    code += "edgeAlpha = clamp(edgeAlpha, 0.0, 1.0);\n";
+    code += "float edgeAlpha = TGFX_HairlineLineCoverage(" + edge + ");\n";
     if (aaType != AAType::Coverage) {
       code += "edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;\n";
     }

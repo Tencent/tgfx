@@ -404,6 +404,15 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
 
   auto colorResult = geometryProcessor->buildColorCallExpr(gpUniforms, gpVaryings);
   auto coverageResult = geometryProcessor->buildCoverageCallExpr(gpUniforms, gpVaryings);
+  // GPs whose coverage formula uses helpers from tgfx_gp_coverage.glsl must pull the module in.
+  // The set is closed and intentionally hard-coded: each entry corresponds to a TGFX_*Coverage
+  // call emitted by the respective GP's buildCoverageCallExpr.
+  const auto& gpName = geometryProcessor->name();
+  if (gpName == "EllipseGeometryProcessor" || gpName == "RoundStrokeRectGeometryProcessor" ||
+      gpName == "HairlineLineGeometryProcessor" || gpName == "HairlineQuadGeometryProcessor" ||
+      gpName == "NonAARRectGeometryProcessor") {
+    includeModule(ShaderModuleID::GPCoverage);
+  }
   fragmentShaderBuilder()->codeAppend(RenderManifest(colorResult));
   fragmentShaderBuilder()->codeAppendf("%s = %s;\n", outputColor->c_str(),
                                        colorResult.outputVarName.c_str());

@@ -28,6 +28,8 @@ enum class ShaderModuleID {
   VSBoilerplate,
   // Shared FS boilerplate helpers (TGFX_PerspDivide, etc.)
   FSBoilerplate,
+  // Shared GP coverage helpers (TGFX_EllipseOuterCoverage, TGFX_RRectOuterCoverage, etc.)
+  GPCoverage,
   ConstColor,
   LinearGradientLayout,
   SingleIntervalGradientColorizer,

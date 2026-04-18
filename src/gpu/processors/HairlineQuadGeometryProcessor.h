@@ -77,14 +77,7 @@ class HairlineQuadGeometryProcessor : public GeometryProcessor {
     auto edge = varyings.get("HairQuadEdge");
     auto covScale = uniforms.get("Coverage");
     std::string code;
-    code += "float edgeAlpha;\n";
-    code += "vec2 duvdx = vec2(dFdx(" + edge + ".xy));\n";
-    code += "vec2 duvdy = vec2(dFdy(" + edge + ".xy));\n";
-    code += "vec2 gF = vec2(2.0 * " + edge + ".x * duvdx.x - duvdx.y,";
-    code += "               2.0 * " + edge + ".x * duvdy.x - duvdy.y);\n";
-    code += "edgeAlpha = float(" + edge + ".x * " + edge + ".x - " + edge + ".y);\n";
-    code += "edgeAlpha = sqrt(edgeAlpha * edgeAlpha / dot(gF, gF));\n";
-    code += "edgeAlpha = max(1.0 - edgeAlpha, 0.0);\n";
+    code += "float edgeAlpha = TGFX_HairlineQuadCoverage(" + edge + ".xy);\n";
     if (aaType != AAType::Coverage) {
       code += "edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;\n";
     }

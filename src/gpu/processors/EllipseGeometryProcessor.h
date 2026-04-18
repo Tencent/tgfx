@@ -97,19 +97,9 @@ class EllipseGeometryProcessor : public GeometryProcessor {
     if (stroke) {
       code += "offset *= " + radii + ".xy;\n";
     }
-    code += "float test = dot(offset, offset) - 1.0;\n";
-    code += "vec2 grad = 2.0*offset*" + radii + ".xy;\n";
-    code += "float grad_dot = dot(grad, grad);\n";
-    code += "grad_dot = max(grad_dot, 1.1755e-38);\n";
-    code += "float invlen = inversesqrt(grad_dot);\n";
-    code += "float edgeAlpha = clamp(0.5-test*invlen, 0.0, 1.0);\n";
+    code += "float edgeAlpha = TGFX_EllipseOuterCoverage(offset, " + radii + ".xy);\n";
     if (stroke) {
-      code += "offset = " + offsets + ".xy*" + radii + ".zw;\n";
-      code += "test = dot(offset, offset) - 1.0;\n";
-      code += "grad = 2.0*offset*" + radii + ".zw;\n";
-      code += "grad_dot = dot(grad, grad);\n";
-      code += "invlen = inversesqrt(grad_dot);\n";
-      code += "edgeAlpha *= clamp(0.5+test*invlen, 0.0, 1.0);\n";
+      code += "edgeAlpha *= TGFX_EllipseInnerCoverage(" + offsets + ".xy, " + radii + ".zw);\n";
     }
     code += "vec4 gpCoverage = vec4(edgeAlpha);\n";
     result.statement = code;

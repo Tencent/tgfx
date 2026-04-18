@@ -73,6 +73,8 @@ const std::string& ShaderModuleRegistry::GetModule(ShaderModuleID id) {
       return kVSBoilerplate;
     case ShaderModuleID::FSBoilerplate:
       return kFSBoilerplate;
+    case ShaderModuleID::GPCoverage:
+      return kGPCoverage;
     case ShaderModuleID::ConstColor:
       return kConstColor;
     case ShaderModuleID::LinearGradientLayout:

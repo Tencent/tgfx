@@ -16,6 +16,7 @@ set(SHADER_MODULES
     "kTypesGLSL=backends/tgfx_types_glsl.glsl"
     "kVSBoilerplate=common/tgfx_vs_boilerplate.glsl"
     "kFSBoilerplate=common/tgfx_fs_boilerplate.glsl"
+    "kGPCoverage=common/tgfx_gp_coverage.glsl"
     "kConstColor=fp/const_color.glsl"
     "kLinearGradientLayout=fp/linear_gradient_layout.glsl"
     "kSingleIntervalGradientColorizer=fp/single_interval_gradient_colorizer.glsl"
