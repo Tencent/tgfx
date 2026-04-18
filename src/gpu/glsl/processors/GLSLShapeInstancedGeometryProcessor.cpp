@@ -96,8 +96,6 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   // are the same for all instances. The offset only affects device-space position.
   ShaderVar localVar("local", SLType::Float2);
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, localVar);
-
-  vertBuilder->codeAppendf("gl_Position = TGFX_NormalizePosition(%s);", positionName.c_str());
 }
 
 void GLSLShapeInstancedGeometryProcessor::setData(UniformData* vertexUniformData, UniformData*,
