@@ -42,67 +42,25 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   auto& uvCoordsVar = uvCoord.empty() ? position : uvCoord;
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
 
-  std::string coverageFsIn;
-  std::string coverageVsOut;
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    coverageVsOut = coverageVar.vsOut();
-    coverageFsIn = coverageVar.fsIn();
     if (args.gpVaryings) {
-      args.gpVaryings->add("Coverage", coverageFsIn);
+      args.gpVaryings->add("Coverage", coverageVar.fsIn());
     }
   }
 
-  std::string colorFsIn;
-  std::string colorVsOut;
   if (commonColor.has_value()) {
     auto colorName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
     if (args.gpUniforms) {
       args.gpUniforms->add("Color", colorName);
     }
-    colorFsIn = colorName;
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    colorVsOut = colorVar.vsOut();
-    colorFsIn = colorVar.fsIn();
     if (args.gpVaryings) {
-      args.gpVaryings->add("Color", colorFsIn);
+      args.gpVaryings->add("Color", colorVar.fsIn());
     }
   }
-
-  std::string positionName = "position";
-  static const std::string kQuadAAGPVert = R"GLSL(
-void TGFX_QuadAAGP_VS(vec2 inPosition,
-#ifdef TGFX_GP_QUAD_COVERAGE_AA
-                       float inCoverage, out float vCoverage,
-#endif
-#ifndef TGFX_GP_QUAD_COMMON_COLOR
-                       vec4 inColor, out vec4 vColor,
-#endif
-                       out vec2 position) {
-    position = inPosition;
-#ifdef TGFX_GP_QUAD_COVERAGE_AA
-    vCoverage = inCoverage;
-#endif
-#ifndef TGFX_GP_QUAD_COMMON_COLOR
-    vColor = inColor;
-#endif
-}
-)GLSL";
-  vertBuilder->addFunction(kQuadAAGPVert);
-  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-  std::string call = "TGFX_QuadAAGP_VS(" + std::string(position.name());
-  if (aa == AAType::Coverage) {
-    call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
-  }
-  if (!commonColor.has_value()) {
-    call += ", " + std::string(color.name()) + ", " + colorVsOut;
-  }
-  call += ", " + positionName + ");";
-  vertBuilder->codeAppend(call);
-
-  args.vertBuilder->emitNormalizedPosition(positionName);
 }
 
 void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformData* vertexUniformData,

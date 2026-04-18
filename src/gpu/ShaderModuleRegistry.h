@@ -56,6 +56,7 @@ enum class ShaderModuleID {
   // Geometry Processor vertex modules
   DefaultGeometry,
   MeshGeometry,
+  QuadAAGeometry,
 };
 
 /**
