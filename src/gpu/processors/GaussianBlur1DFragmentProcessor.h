@@ -72,18 +72,16 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
     // The child FP (TextureEffect) function is TGFX_TextureEffect(inputColor, coord, sampler).
     // For the common non-YUV single-sampler case, we construct the call directly.
     auto samplerName = samplers.getByIndex(0);
-    auto coordName = varyings.getCoordTransform(0);
     // The macro takes a coord parameter and calls texture() directly with the child's sampler.
     // This avoids needing to know the full child FP function signature.
-    std::string sampleMacro =
+    ShaderCallManifest manifest;
+    manifest.functionName = "TGFX_GaussianBlur1D";
+    manifest.outputVarName = "_gb1dResult";
+    manifest.argExpressions = {uniforms.get("Sigma"), uniforms.get("Step"),
+                               varyings.getCoordTransform(0)};
+    manifest.preamble =
         "#define TGFX_GB1D_SAMPLE(coord) texture(" + samplerName + ", coord)\n";
-
-    ShaderCallManifest result;
-    result.preamble = sampleMacro;
-    result.statement = "vec4 _gb1dResult = TGFX_GaussianBlur1D(" + uniforms.get("Sigma") + ", " +
-                       uniforms.get("Step") + ", " + coordName + ");\n";
-    result.outputVarName = "_gb1dResult";
-    return result;
+    return manifest;
   }
 
   float sigma = 0.f;

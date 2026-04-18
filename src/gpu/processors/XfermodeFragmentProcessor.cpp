@@ -67,7 +67,6 @@ ShaderCallManifest XfermodeFragmentProcessor::buildContainerCallStatement(
     const std::string& inputColor, const std::vector<std::string>& childOutputs,
     const MangledUniforms& /*uniforms*/, const MangledSamplers& /*samplers*/,
     const MangledVaryings& /*varyings*/) const {
-  ShaderCallManifest result;
   auto input = inputColor.empty() ? std::string("vec4(1.0)") : inputColor;
   int blendModeInt = static_cast<int>(mode);
   int childModeInt = static_cast<int>(child);
@@ -85,11 +84,12 @@ ShaderCallManifest XfermodeFragmentProcessor::buildContainerCallStatement(
     childDst = "vec4(0.0)";
   }
 
-  result.statement = "vec4 _xfpResult = TGFX_XfermodeFragmentProcessor(" + input + ", " + childSrc +
-                     ", " + childDst + ", " + std::to_string(blendModeInt) + ", " +
-                     std::to_string(childModeInt) + ");\n";
-  result.outputVarName = "_xfpResult";
-  return result;
+  ShaderCallManifest manifest;
+  manifest.functionName = "TGFX_XfermodeFragmentProcessor";
+  manifest.outputVarName = "_xfpResult";
+  manifest.argExpressions = {input, childSrc, childDst, std::to_string(blendModeInt),
+                             std::to_string(childModeInt)};
+  return manifest;
 }
 
 std::vector<FragmentProcessor::ChildEmitInfo> XfermodeFragmentProcessor::getChildEmitPlan(
