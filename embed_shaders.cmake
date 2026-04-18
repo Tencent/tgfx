@@ -43,6 +43,7 @@ set(SHADER_MODULES
     "kAtlasTextGeometryVert=geometry/atlas_text_geometry.vert.glsl"
     "kEllipseGeometryVert=geometry/ellipse_geometry.vert.glsl"
     "kRoundStrokeRectGeometryVert=geometry/round_stroke_rect_geometry.vert.glsl"
+    "kHairlineLineGeometryVert=geometry/hairline_line_geometry.vert.glsl"
 )
 
 if(NOT DEFINED SHADER_DIR)

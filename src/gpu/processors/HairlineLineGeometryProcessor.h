@@ -59,7 +59,7 @@ class HairlineLineGeometryProcessor : public GeometryProcessor {
   }
 
   std::string shaderFunctionFile() const override {
-    return "geometry/hairline_line_geometry";
+    return "geometry/hairline_line_geometry.vert";
   }
 
   ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,

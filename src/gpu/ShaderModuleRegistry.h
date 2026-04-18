@@ -60,6 +60,7 @@ enum class ShaderModuleID {
   AtlasTextGeometry,
   EllipseGeometry,
   RoundStrokeRectGeometry,
+  HairlineLineGeometry,
 };
 
 /**

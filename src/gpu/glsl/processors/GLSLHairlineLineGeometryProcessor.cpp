@@ -53,15 +53,11 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
     args.gpVaryings->add("EdgeDistance", edgeVarying.fsIn());
   }
 
+  // Half-migrated: VS function body lives in hairline_line_geometry.vert.glsl (injected by
+  // ModularProgramBuilder via includeVSModule based on shaderFunctionFile()). emitTransforms()
+  // needs to operate on the transformed position, so we emit the function call here rather
+  // than in buildVSCallExpr().
   std::string positionName = "transformedPosition";
-  static const std::string kHairlineLineGPVert = R"GLSL(
-void TGFX_HairlineLineGP_VS(vec2 inPosition, float inEdgeDistance, mat3 matrix,
-                              out float vEdgeDistance, out vec2 position) {
-    position = (matrix * vec3(inPosition, 1.0)).xy;
-    vEdgeDistance = inEdgeDistance;
-}
-)GLSL";
-  vertBuilder->addFunction(kHairlineLineGPVert);
   vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
   std::string call = "TGFX_HairlineLineGP_VS(" + std::string(position.name()) + ", " +
                      std::string(edgeDistance.name()) + ", " + matrixName + ", " +
