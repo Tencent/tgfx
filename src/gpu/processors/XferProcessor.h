@@ -20,7 +20,7 @@
 
 #include <memory>
 #include "gpu/MangledResources.h"
-#include "gpu/ShaderCallResult.h"
+#include "gpu/ShaderCallManifest.h"
 #include "gpu/ShaderMacroSet.h"
 #include "gpu/UniformData.h"
 #include "gpu/processors/Processor.h"
@@ -53,7 +53,7 @@ class XferProcessor : public Processor {
     return "";
   }
 
-  virtual ShaderCallResult buildXferCallStatement(const std::string& /*colorInVar*/,
+  virtual ShaderCallManifest buildXferCallStatement(const std::string& /*colorInVar*/,
                                                   const std::string& /*coverageInVar*/,
                                                   const std::string& /*outputVar*/,
                                                   const std::string& /*dstColorExpr*/,

@@ -74,7 +74,7 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
     return "fragment/xfermode.frag";
   }
 
-  ShaderCallResult buildContainerCallStatement(const std::string& inputColor,
+  ShaderCallManifest buildContainerCallStatement(const std::string& inputColor,
                                                const std::vector<std::string>& childOutputs,
                                                const MangledUniforms& uniforms,
                                                const MangledSamplers& samplers,

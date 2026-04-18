@@ -54,11 +54,11 @@ void GLSLPorterDuffXferProcessor::setData(UniformData* /*vertexUniformData*/,
   fragmentUniformData->setData("DstTextureCoordScale", scales);
 }
 
-ShaderCallResult PorterDuffXferProcessor::buildXferCallStatement(
+ShaderCallManifest PorterDuffXferProcessor::buildXferCallStatement(
     const std::string& colorInVar, const std::string& coverageInVar, const std::string& outputVar,
     const std::string& dstColorExpr, const MangledUniforms& uniforms,
     const MangledSamplers& samplers) const {
-  ShaderCallResult result;
+  ShaderCallManifest result;
   result.outputVarName = outputVar;
   std::string args = colorInVar + ", " + coverageInVar;
   if (dstTextureInfo.textureProxy) {

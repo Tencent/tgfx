@@ -94,7 +94,7 @@ void ColorSpaceXformEffect::declareResources(UniformHandler* uniformHandler,
   }
 }
 
-ShaderCallResult ColorSpaceXformEffect::buildCallStatement(
+ShaderCallManifest ColorSpaceXformEffect::buildCallStatement(
     const std::string& inputColorVar, int /*fpIndex*/, const MangledUniforms& uniforms,
     const MangledVaryings& /*varyings*/, const MangledSamplers& /*samplers*/) const {
   auto* steps = colorSpaceXformSteps.get();
@@ -107,7 +107,7 @@ ShaderCallResult ColorSpaceXformEffect::buildCallStatement(
   std::string dstTF0 = steps->flags.encode ? uniforms.get("DstTF0") : "vec4(0.0)";
   std::string dstTF1 = steps->flags.encode ? uniforms.get("DstTF1") : "vec4(0.0)";
 
-  ShaderCallResult result;
+  ShaderCallManifest result;
   result.statement = "vec4 _csxResult = TGFX_ColorSpaceXformEffect(" + input + ", " + srcTF0 +
                      ", " + srcTF1 + ", " + srcOOTF + ", " + colorXform + ", " + dstOOTF + ", " +
                      dstTF0 + ", " + dstTF1 + ");\n";

@@ -51,7 +51,7 @@ class ColorSpaceXformEffect : public FragmentProcessor {
   void declareResources(UniformHandler* uniformHandler, MangledUniforms& uniforms,
                         MangledSamplers& samplers) const override;
 
-  ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
+  ShaderCallManifest buildCallStatement(const std::string& inputColorVar, int fpIndex,
                                       const MangledUniforms& uniforms,
                                       const MangledVaryings& varyings,
                                       const MangledSamplers& samplers) const override;

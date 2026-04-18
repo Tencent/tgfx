@@ -62,17 +62,17 @@ class HairlineLineGeometryProcessor : public GeometryProcessor {
     return "geometry/hairline_line_geometry.vert";
   }
 
-  ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,
+  ShaderCallManifest buildColorCallExpr(const MangledUniforms& uniforms,
                                       const MangledVaryings& /*varyings*/) const override {
-    ShaderCallResult result;
+    ShaderCallManifest result;
     result.outputVarName = "gpColor";
     result.statement = "vec4 gpColor = " + uniforms.get("Color") + ";\n";
     return result;
   }
 
-  ShaderCallResult buildCoverageCallExpr(const MangledUniforms& uniforms,
+  ShaderCallManifest buildCoverageCallExpr(const MangledUniforms& uniforms,
                                          const MangledVaryings& varyings) const override {
-    ShaderCallResult result;
+    ShaderCallManifest result;
     result.outputVarName = "gpCoverage";
     auto edge = varyings.get("EdgeDistance");
     auto covScale = uniforms.get("Coverage");

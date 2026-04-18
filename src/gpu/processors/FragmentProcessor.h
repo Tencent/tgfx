@@ -23,7 +23,7 @@
 #include "gpu/MangledResources.h"
 #include "gpu/SamplerState.h"
 #include "gpu/SamplingArgs.h"
-#include "gpu/ShaderCallResult.h"
+#include "gpu/ShaderCallManifest.h"
 #include "gpu/ShaderMacroSet.h"
 #include "gpu/UniformData.h"
 #include "gpu/UniformHandler.h"
@@ -266,10 +266,10 @@ class FragmentProcessor : public Processor {
    * Generates the GLSL call statement for this Processor in the main() function body.
    * @param inputColorVar The input color variable name from the previous Processor.
    * @param fpIndex The index of this FP in the pipeline (for output variable naming).
-   * @return ShaderCallResult with the complete statement and output variable name.
+   * @return ShaderCallManifest with the complete statement and output variable name.
    * Default returns empty — subclasses that have .glsl files must override.
    */
-  virtual ShaderCallResult buildCallStatement(const std::string& /*inputColorVar*/, int /*fpIndex*/,
+  virtual ShaderCallManifest buildCallStatement(const std::string& /*inputColorVar*/, int /*fpIndex*/,
                                               const MangledUniforms& /*uniforms*/,
                                               const MangledVaryings& /*varyings*/,
                                               const MangledSamplers& /*samplers*/) const {
@@ -284,7 +284,7 @@ class FragmentProcessor : public Processor {
    * @param samplers Mangled sampler names collected from the FP subtree.
    * @param varyings Mangled varying names (coord transforms, subset var).
    */
-  virtual ShaderCallResult buildContainerCallStatement(
+  virtual ShaderCallManifest buildContainerCallStatement(
       const std::string& /*inputColor*/, const std::vector<std::string>& /*childOutputs*/,
       const MangledUniforms& /*uniforms*/, const MangledSamplers& /*samplers*/,
       const MangledVaryings& /*varyings*/) const {

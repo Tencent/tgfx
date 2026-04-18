@@ -55,12 +55,12 @@ class ComposeFragmentProcessor : public FragmentProcessor {
     return plan;
   }
 
-  ShaderCallResult buildContainerCallStatement(const std::string& /*inputColor*/,
+  ShaderCallManifest buildContainerCallStatement(const std::string& /*inputColor*/,
                                                const std::vector<std::string>& childOutputs,
                                                const MangledUniforms& /*uniforms*/,
                                                const MangledSamplers& /*samplers*/,
                                                const MangledVaryings& /*varyings*/) const override {
-    ShaderCallResult result;
+    ShaderCallManifest result;
     if (!childOutputs.empty()) {
       result.outputVarName = childOutputs.back();
     }

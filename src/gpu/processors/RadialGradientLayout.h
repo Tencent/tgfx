@@ -46,11 +46,11 @@ class RadialGradientLayout : public FragmentProcessor {
     return "fragment/radial_gradient.frag";
   }
 
-  ShaderCallResult buildCallStatement(const std::string& /*inputColorVar*/, int fpIndex,
+  ShaderCallManifest buildCallStatement(const std::string& /*inputColorVar*/, int fpIndex,
                                       const MangledUniforms& /*uniforms*/,
                                       const MangledVaryings& varyings,
                                       const MangledSamplers& /*samplers*/) const override {
-    ShaderCallResult result;
+    ShaderCallManifest result;
     result.outputVarName = "color_fp" + std::to_string(fpIndex);
     result.includeFiles = {shaderFunctionFile()};
     auto coord = varyings.getCoordTransform(0);

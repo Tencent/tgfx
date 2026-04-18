@@ -42,13 +42,13 @@ class EmptyXferProcessor : public XferProcessor {
     return "xfer/empty_xfer.frag";
   }
 
-  ShaderCallResult buildXferCallStatement(const std::string& colorInVar,
+  ShaderCallManifest buildXferCallStatement(const std::string& colorInVar,
                                           const std::string& coverageInVar,
                                           const std::string& outputVar,
                                           const std::string& /*dstColorExpr*/,
                                           const MangledUniforms& /*uniforms*/,
                                           const MangledSamplers& /*samplers*/) const override {
-    ShaderCallResult result;
+    ShaderCallManifest result;
     result.outputVarName = outputVar;
     result.statement =
         "TGFX_EmptyXP_FS(" + colorInVar + ", " + coverageInVar + ", " + outputVar + ");\n";

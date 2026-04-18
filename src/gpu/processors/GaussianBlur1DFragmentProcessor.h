@@ -63,7 +63,7 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
                  uniformHandler->addUniform("Step", UniformFormat::Float2, ShaderStage::Fragment));
   }
 
-  ShaderCallResult buildContainerCallStatement(const std::string& /*inputColor*/,
+  ShaderCallManifest buildContainerCallStatement(const std::string& /*inputColor*/,
                                                const std::vector<std::string>& /*childOutputs*/,
                                                const MangledUniforms& uniforms,
                                                const MangledSamplers& samplers,
@@ -78,7 +78,7 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
     std::string sampleMacro =
         "#define TGFX_GB1D_SAMPLE(coord) texture(" + samplerName + ", coord)\n";
 
-    ShaderCallResult result;
+    ShaderCallManifest result;
     result.preamble = sampleMacro;
     result.statement = "vec4 _gb1dResult = TGFX_GaussianBlur1D(" + uniforms.get("Sigma") + ", " +
                        uniforms.get("Step") + ", " + coordName + ");\n";

@@ -63,11 +63,11 @@ void XfermodeFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const 
   bytesKey->write(static_cast<uint32_t>(mode) | (static_cast<uint32_t>(child) << 16));
 }
 
-ShaderCallResult XfermodeFragmentProcessor::buildContainerCallStatement(
+ShaderCallManifest XfermodeFragmentProcessor::buildContainerCallStatement(
     const std::string& inputColor, const std::vector<std::string>& childOutputs,
     const MangledUniforms& /*uniforms*/, const MangledSamplers& /*samplers*/,
     const MangledVaryings& /*varyings*/) const {
-  ShaderCallResult result;
+  ShaderCallManifest result;
   auto input = inputColor.empty() ? std::string("vec4(1.0)") : inputColor;
   int blendModeInt = static_cast<int>(mode);
   int childModeInt = static_cast<int>(child);

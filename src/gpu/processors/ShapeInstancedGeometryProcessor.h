@@ -54,9 +54,9 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
     return "geometry/shape_instanced_geometry.vert";
   }
 
-  ShaderCallResult buildColorCallExpr(const MangledUniforms& /*uniforms*/,
+  ShaderCallManifest buildColorCallExpr(const MangledUniforms& /*uniforms*/,
                                       const MangledVaryings& varyings) const override {
-    ShaderCallResult result;
+    ShaderCallManifest result;
     result.outputVarName = "gpColor";
     if (hasColors) {
       result.statement = "vec4 gpColor = " + varyings.get("InstanceColor") + ";\n";
@@ -66,9 +66,9 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
     return result;
   }
 
-  ShaderCallResult buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
+  ShaderCallManifest buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
                                          const MangledVaryings& varyings) const override {
-    ShaderCallResult result;
+    ShaderCallManifest result;
     result.outputVarName = "gpCoverage";
     if (aa == AAType::Coverage) {
       result.statement = "vec4 gpCoverage = vec4(" + varyings.get("Coverage") + ");\n";

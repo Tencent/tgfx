@@ -78,9 +78,9 @@ class MeshGeometryProcessor : public GeometryProcessor {
     return code;
   }
 
-  ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,
+  ShaderCallManifest buildColorCallExpr(const MangledUniforms& uniforms,
                                       const MangledVaryings& varyings) const override {
-    ShaderCallResult result;
+    ShaderCallManifest result;
     result.outputVarName = "gpColor";
     if (hasColors) {
       result.statement = "vec4 gpColor = " + varyings.get("Color") + ";\n";
@@ -90,9 +90,9 @@ class MeshGeometryProcessor : public GeometryProcessor {
     return result;
   }
 
-  ShaderCallResult buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
+  ShaderCallManifest buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
                                          const MangledVaryings& varyings) const override {
-    ShaderCallResult result;
+    ShaderCallManifest result;
     result.outputVarName = "gpCoverage";
     if (hasCoverage) {
       result.statement = "vec4 gpCoverage = vec4(" + varyings.get("Coverage") + ");\n";

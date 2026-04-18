@@ -57,7 +57,7 @@ class PorterDuffXferProcessor : public XferProcessor {
     return "xfer/porter_duff_xfer.frag";
   }
 
-  ShaderCallResult buildXferCallStatement(const std::string& colorInVar,
+  ShaderCallManifest buildXferCallStatement(const std::string& colorInVar,
                                           const std::string& coverageInVar,
                                           const std::string& outputVar,
                                           const std::string& dstColorExpr,

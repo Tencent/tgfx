@@ -42,11 +42,11 @@ class TextureGradientColorizer : public FragmentProcessor {
     return "fragment/texture_gradient_colorizer.frag";
   }
 
-  ShaderCallResult buildCallStatement(const std::string& inputColorVar, int fpIndex,
+  ShaderCallManifest buildCallStatement(const std::string& inputColorVar, int fpIndex,
                                       const MangledUniforms& /*uniforms*/,
                                       const MangledVaryings& /*varyings*/,
                                       const MangledSamplers& samplers) const override {
-    ShaderCallResult result;
+    ShaderCallManifest result;
     result.outputVarName = "color_fp" + std::to_string(fpIndex);
     result.includeFiles = {shaderFunctionFile()};
     auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;

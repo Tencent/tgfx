@@ -21,7 +21,7 @@
 #include <vector>
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/MangledResources.h"
-#include "gpu/ShaderCallResult.h"
+#include "gpu/ShaderCallManifest.h"
 #include "gpu/ShaderMacroSet.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/UniformData.h"
@@ -152,12 +152,12 @@ class GeometryProcessor : public Processor {
     return "";
   }
 
-  virtual ShaderCallResult buildColorCallExpr(const MangledUniforms& /*uniforms*/,
+  virtual ShaderCallManifest buildColorCallExpr(const MangledUniforms& /*uniforms*/,
                                               const MangledVaryings& /*varyings*/) const {
     return {};
   }
 
-  virtual ShaderCallResult buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
+  virtual ShaderCallManifest buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
                                                  const MangledVaryings& /*varyings*/) const {
     return {};
   }

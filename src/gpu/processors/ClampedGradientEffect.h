@@ -67,7 +67,7 @@ class ClampedGradientEffect : public FragmentProcessor {
             {colorizerIndex, "", static_cast<int>(gradLayoutIndex)}};
   }
 
-  ShaderCallResult buildContainerCallStatement(const std::string& inputColor,
+  ShaderCallManifest buildContainerCallStatement(const std::string& inputColor,
                                                const std::vector<std::string>& childOutputs,
                                                const MangledUniforms& uniforms,
                                                const MangledSamplers& /*samplers*/,
@@ -75,7 +75,7 @@ class ClampedGradientEffect : public FragmentProcessor {
     auto input = inputColor.empty() ? std::string("vec4(1.0)") : inputColor;
     // childOutputs[gradLayoutIndex] = gradLayout result (t value)
     // childOutputs[colorizerIndex] = colorizer result (color at t)
-    ShaderCallResult result;
+    ShaderCallManifest result;
     result.statement = "vec4 _cgeResult = TGFX_ClampedGradientEffect(" + input + ", " +
                        childOutputs[gradLayoutIndex] + ", " + childOutputs[colorizerIndex] + ", " +
                        uniforms.get("leftBorderColor") + ", " + uniforms.get("rightBorderColor") +

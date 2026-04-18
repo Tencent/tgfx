@@ -74,9 +74,9 @@ class EllipseGeometryProcessor : public GeometryProcessor {
     return code;
   }
 
-  ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,
+  ShaderCallManifest buildColorCallExpr(const MangledUniforms& uniforms,
                                       const MangledVaryings& varyings) const override {
-    ShaderCallResult result;
+    ShaderCallManifest result;
     result.outputVarName = "gpColor";
     if (commonColor.has_value()) {
       result.statement = "vec4 gpColor = " + uniforms.get("Color") + ";\n";
@@ -86,9 +86,9 @@ class EllipseGeometryProcessor : public GeometryProcessor {
     return result;
   }
 
-  ShaderCallResult buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
+  ShaderCallManifest buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
                                          const MangledVaryings& varyings) const override {
-    ShaderCallResult result;
+    ShaderCallManifest result;
     result.outputVarName = "gpCoverage";
     auto offsets = varyings.get("EllipseOffsets");
     auto radii = varyings.get("EllipseRadii");
