@@ -97,7 +97,7 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   ShaderVar localVar("local", SLType::Float2);
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, localVar);
 
-  vertBuilder->emitNormalizedPosition(positionName);
+  vertBuilder->codeAppendf("gl_Position = TGFX_NormalizePosition(%s);", positionName.c_str());
 }
 
 void GLSLShapeInstancedGeometryProcessor::setData(UniformData* vertexUniformData, UniformData*,

@@ -69,6 +69,8 @@ const std::string& ShaderModuleRegistry::GetModule(ShaderModuleID id) {
   switch (id) {
     case ShaderModuleID::TypesGLSL:
       return kTypesGLSL;
+    case ShaderModuleID::VSBoilerplate:
+      return kVSBoilerplate;
     case ShaderModuleID::ConstColor:
       return kConstColor;
     case ShaderModuleID::LinearGradientLayout:

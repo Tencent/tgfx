@@ -96,6 +96,11 @@ void ModularProgramBuilder::includeVSModule(ShaderModuleID id) {
     return;
   }
   includedVSModules.insert(id);
+  // All GP vertex modules depend on TGFX_NormalizePosition() from tgfx_vs_boilerplate.glsl.
+  // Include it transitively exactly once.
+  if (id != ShaderModuleID::VSBoilerplate) {
+    includeVSModule(ShaderModuleID::VSBoilerplate);
+  }
   vertexShaderBuilder()->addFunction(ShaderModuleRegistry::GetModule(id));
 }
 

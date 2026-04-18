@@ -28,11 +28,11 @@ class VertexShaderBuilder : public ShaderBuilder {
   explicit VertexShaderBuilder(ProgramBuilder* program) : ShaderBuilder(program) {
   }
 
+  virtual ~VertexShaderBuilder() = default;
+
   ShaderStage shaderStage() const override {
     return ShaderStage::Vertex;
   }
-
-  virtual void emitNormalizedPosition(const std::string& devPos) = 0;
 
   /**
    * Emits GLSL code to transform a 2D point by a 3x3 matrix.

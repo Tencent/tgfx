@@ -30,11 +30,6 @@ GLSLVertexShaderBuilder::GLSLVertexShaderBuilder(ProgramBuilder* program)
   }
 }
 
-void GLSLVertexShaderBuilder::emitNormalizedPosition(const std::string& devPos) {
-  codeAppendf("gl_Position = vec4(%s.xy * %s.xz + %s.yw, 0, 1);", devPos.c_str(),
-              RTAdjustName.c_str(), RTAdjustName.c_str());
-}
-
 void GLSLVertexShaderBuilder::emitTransformedPoint(const std::string& dstPointName,
                                                    const std::string& srcPointName,
                                                    const std::string& transformName,

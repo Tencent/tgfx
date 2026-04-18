@@ -79,7 +79,7 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
     args.gpUniforms->add("Coverage", coverageScale);
   }
 
-  vertBuilder->emitNormalizedPosition(positionName);
+  vertBuilder->codeAppendf("gl_Position = TGFX_NormalizePosition(%s);", positionName.c_str());
 }
 
 void GLSLHairlineLineGeometryProcessor::setData(UniformData* vertexUniformData,

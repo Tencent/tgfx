@@ -69,7 +69,7 @@ class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
       code += ", " + std::string(inColor.name()) + ", " + varyings.get("Color");
     }
     code += ", " + varyings.get("EllipseOffsets") + ", position);\n";
-    code += "gl_Position = vec4(position.xy * tgfx_RTAdjust.xz + tgfx_RTAdjust.yw, 0, 1);\n";
+    code += "gl_Position = TGFX_NormalizePosition(position);\n";
     return code;
   }
 

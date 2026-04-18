@@ -24,6 +24,8 @@ namespace tgfx {
 
 enum class ShaderModuleID {
   TypesGLSL,
+  // Shared VS boilerplate helpers (TGFX_NormalizePosition, TGFX_TransformPoint, etc.)
+  VSBoilerplate,
   ConstColor,
   LinearGradientLayout,
   SingleIntervalGradientColorizer,

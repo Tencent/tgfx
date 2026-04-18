@@ -25,8 +25,6 @@ class GLSLVertexShaderBuilder : public VertexShaderBuilder {
  public:
   explicit GLSLVertexShaderBuilder(ProgramBuilder* program);
 
-  void emitNormalizedPosition(const std::string& devPos) override;
-
   void emitTransformedPoint(const std::string& dstPointName, const std::string& srcPointName,
                             const std::string& transformName, bool hasPerspective) override;
 };
