@@ -43,16 +43,19 @@ class EmptyXferProcessor : public XferProcessor {
   }
 
   ShaderCallManifest buildXferCallStatement(const std::string& colorInVar,
-                                          const std::string& coverageInVar,
-                                          const std::string& outputVar,
-                                          const std::string& /*dstColorExpr*/,
-                                          const MangledUniforms& /*uniforms*/,
-                                          const MangledSamplers& /*samplers*/) const override {
-    ShaderCallManifest result;
-    result.outputVarName = outputVar;
-    result.statement =
-        "TGFX_EmptyXP_FS(" + colorInVar + ", " + coverageInVar + ", " + outputVar + ");\n";
-    return result;
+                                            const std::string& coverageInVar,
+                                            const std::string& outputVar,
+                                            const std::string& /*dstColorExpr*/,
+                                            const MangledUniforms& /*uniforms*/,
+                                            const MangledSamplers& /*samplers*/) const override {
+    // XP functions write to an out-parameter (outputVar) instead of returning a value, so we
+    // use declareOutput=false and let RenderManifest emit `TGFX_EmptyXP_FS(args..., outputVar);`.
+    ShaderCallManifest manifest;
+    manifest.functionName = "TGFX_EmptyXP_FS";
+    manifest.outputVarName = outputVar;
+    manifest.declareOutput = false;
+    manifest.argExpressions = {colorInVar, coverageInVar};
+    return manifest;
   }
 
  private:

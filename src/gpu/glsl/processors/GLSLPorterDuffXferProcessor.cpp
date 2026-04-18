@@ -58,17 +58,20 @@ ShaderCallManifest PorterDuffXferProcessor::buildXferCallStatement(
     const std::string& colorInVar, const std::string& coverageInVar, const std::string& outputVar,
     const std::string& dstColorExpr, const MangledUniforms& uniforms,
     const MangledSamplers& samplers) const {
-  ShaderCallManifest result;
-  result.outputVarName = outputVar;
-  std::string args = colorInVar + ", " + coverageInVar;
+  // XP functions write to an out-parameter (outputVar) instead of returning a value, so we use
+  // declareOutput=false and let RenderManifest emit `TGFX_PorterDuffXP_FS(args..., outputVar);`.
+  ShaderCallManifest manifest;
+  manifest.functionName = "TGFX_PorterDuffXP_FS";
+  manifest.outputVarName = outputVar;
+  manifest.declareOutput = false;
+  manifest.argExpressions = {colorInVar, coverageInVar};
   if (dstTextureInfo.textureProxy) {
-    args += ", " + uniforms.get("DstTextureUpperLeft");
-    args += ", " + uniforms.get("DstTextureCoordScale");
-    args += ", " + samplers.get("DstTextureSampler");
+    manifest.argExpressions.push_back(uniforms.get("DstTextureUpperLeft"));
+    manifest.argExpressions.push_back(uniforms.get("DstTextureCoordScale"));
+    manifest.argExpressions.push_back(samplers.get("DstTextureSampler"));
   } else {
-    args += ", " + dstColorExpr;
+    manifest.argExpressions.push_back(dstColorExpr);
   }
-  result.statement = "TGFX_PorterDuffXP_FS(" + args + ", " + outputVar + ");\n";
-  return result;
+  return manifest;
 }
 }  // namespace tgfx
