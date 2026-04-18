@@ -19,7 +19,6 @@
 #pragma once
 
 #include <cstdint>
-#include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/SamplerHandle.h"
 #include "gpu/ShaderVar.h"
 #include "tgfx/gpu/ShaderStage.h"
@@ -55,8 +54,6 @@ class ShaderBuilder {
    */
   void appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName);
 
-  void appendColorGamutXform(std::string* out, const char* srcColor,
-                             ColorSpaceXformHelper* colorXformHelper);
   /**
    * Called by Processors to add code to one of the shaders.
    */

@@ -17,26 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <skcms.h>
 #include "UniformData.h"
-#include "UniformHandler.h"
 #include "core/ColorSpaceXformSteps.h"
-#include "gpu/ShaderVar.h"
 
 namespace tgfx {
 class ColorSpaceXformHelper {
  public:
   ColorSpaceXformHelper() = default;
 
-  void emitCode(UniformHandler* uniformHandler, const ColorSpaceXformSteps* colorSpaceXform,
-                ShaderStage shaderStage = ShaderStage::Fragment);
-
   void setData(UniformData* uniformData, const ColorSpaceXformSteps* colorSpaceXform);
 
-  bool isNoop() const {
-    return (0 == flags.mask());
-  }
-
+ private:
   bool applyUnpremul() const {
     return flags.unPremul;
   }
@@ -59,45 +50,6 @@ class ColorSpaceXformHelper {
     return flags.premul;
   }
 
-  gfx::skcms_TFType srcTFType() const {
-    return _srcTFType;
-  }
-  gfx::skcms_TFType dstTFType() const {
-    return _dstTFType;
-  }
-
-  const std::string& srcTFUniform0() const {
-    return srcTFVar0;
-  }
-  const std::string& srcTFUniform1() const {
-    return srcTFVar1;
-  }
-  const std::string& srcOOTFUniform() const {
-    return srcOOTFVar;
-  }
-  const std::string& gamutXformUniform() const {
-    return gamutXformVar;
-  }
-  const std::string& dstOOTFUniform() const {
-    return dstOOTFVar;
-  }
-  const std::string& dstTFUniform0() const {
-    return dstTFVar0;
-  }
-  const std::string& dstTFUniform1() const {
-    return dstTFVar1;
-  }
-
- private:
-  std::string srcTFVar0;
-  std::string srcTFVar1;
-  std::string srcOOTFVar;
-  std::string gamutXformVar;
-  std::string dstOOTFVar;
-  std::string dstTFVar0;
-  std::string dstTFVar1;
   ColorSpaceXformSteps::Flags flags;
-  gfx::skcms_TFType _srcTFType;
-  gfx::skcms_TFType _dstTFType;
 };
 }  // namespace tgfx
