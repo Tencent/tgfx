@@ -53,7 +53,24 @@ class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
   }
 
   std::string shaderFunctionFile() const override {
-    return "geometry/round_stroke_rect_geometry";
+    return "geometry/round_stroke_rect_geometry.vert";
+  }
+
+  std::string buildVSCallExpr(const MangledUniforms& /*uniforms*/,
+                              const MangledVaryings& varyings) const override {
+    std::string code = "highp vec2 position;\n";
+    code += "TGFX_RoundStrokeRectGP_VS(" + std::string(inPosition.name()) + ", " +
+            std::string(inEllipseOffset.name());
+    if (aaType == AAType::Coverage) {
+      code += ", " + std::string(inCoverage.name()) + ", " + std::string(inEllipseRadii.name()) +
+              ", " + varyings.get("Coverage") + ", " + varyings.get("EllipseRadii");
+    }
+    if (!commonColor.has_value()) {
+      code += ", " + std::string(inColor.name()) + ", " + varyings.get("Color");
+    }
+    code += ", " + varyings.get("EllipseOffsets") + ", position);\n";
+    code += "gl_Position = vec4(position.xy * tgfx_RTAdjust.xz + tgfx_RTAdjust.yw, 0, 1);\n";
+    return code;
   }
 
   ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,

@@ -59,6 +59,7 @@ enum class ShaderModuleID {
   QuadAAGeometry,
   AtlasTextGeometry,
   EllipseGeometry,
+  RoundStrokeRectGeometry,
 };
 
 /**

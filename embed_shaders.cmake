@@ -42,6 +42,7 @@ set(SHADER_MODULES
     "kQuadAAGeometryVert=geometry/quad_aa_geometry.vert.glsl"
     "kAtlasTextGeometryVert=geometry/atlas_text_geometry.vert.glsl"
     "kEllipseGeometryVert=geometry/ellipse_geometry.vert.glsl"
+    "kRoundStrokeRectGeometryVert=geometry/round_stroke_rect_geometry.vert.glsl"
 )
 
 if(NOT DEFINED SHADER_DIR)
