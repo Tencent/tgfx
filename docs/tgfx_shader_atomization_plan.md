@@ -407,3 +407,59 @@ struct ShaderCallManifest {
 - agent 初步估计 2-3 人日，实际因需要精确复刻 BlendFormula 的 9 个系数模式公式，耗时略多。
 
 （后续 Phase 依次追加）
+
+### Phase V-1 实施结果
+
+> 2026-04-17 完成，共 1 个 commit。
+
+#### 改动汇总
+
+| 文件 | 操作 | 行数变化 |
+|------|------|---------|
+| `src/gpu/ModularProgramBuilder.cpp` | `emitAndInstallGeoProc()` 增加 modular VS 分支（`shaderFunctionFile()` 非空 + Registry 已注册时，include VS 模块并 codeAppend `buildVSCallExpr` 返回的调用语句） | +14 |
+| `src/gpu/ModularProgramBuilder.h` | 新增 `includeVSModule()` 辅助方法 + `includedVSModules` 集合 | +7 |
+| **合计** | 框架准备，无行为变化 | **+21** |
+
+#### 完成的 Commit
+
+| Commit | 说明 |
+|--------|------|
+| `ff560ac0` | GP 模块化调度分支框架 |
+
+#### 验证结果
+
+431/431 测试全部通过（默认行为：所有 GP 的 `shaderFunctionFile()` 返回 `""` 或未在 Registry 注册，仍走 legacy `emitCode()`）。
+
+### Phase V-2 实施进度（1/3 完成）
+
+> 2026-04-17 启动，已迁移 1 个 GP。
+
+#### 已迁移 GP
+
+**DefaultGeometryProcessor**（Commit `5973cdc0`）
+
+| 改动 | 说明 |
+|------|------|
+| `src/gpu/shaders/geometry/default_geometry.vert.glsl` | 已有文件（未修改），保留 `TGFX_DefaultGP_VS` 函数 |
+| `src/gpu/processors/DefaultGeometryProcessor.h` | 添加 `buildVSCallExpr()` 覆写，返回 `"highp vec2 position; TGFX_DefaultGP_VS(...); gl_Position = vec4(...);"` 三行 |
+| `src/gpu/glsl/processors/GLSLDefaultGeometryProcessor.cpp` | `emitCode()` 删除 VS GLSL 发射代码（`addFunction` + `codeAppendf`），只保留 attribute/uniform/varying 注册 |
+| `src/gpu/ShaderModuleRegistry.{h,cpp}` | 新增 `DefaultGeometry` 枚举与 `"DefaultGeometryProcessor"` 映射 |
+| `embed_shaders.cmake` | 新增 `kDefaultGeometryVert=geometry/default_geometry.vert.glsl` 条目 |
+| `src/gpu/ShaderModuleEmbedded.inc` | 自动重新生成 |
+
+#### 架构决策
+
+- **`emitCode()` 保留**：不完全删除，因为仍承担 attribute/uniform/varying 的**注册职责**（非 GLSL 发射）。Modular 分支先调用 `emitCode()` 做注册，再调用 `buildVSCallExpr()` 拿调用语句。
+- **`emitNormalizedPosition` 暂内联**：其运行时拼装行为（`codeAppendf("gl_Position = vec4(...)")`）暂时内联到 `buildVSCallExpr()` 返回的字符串中，彻底消除推迟到 Phase W-2。
+- **FS 暂未迁移**：`buildColorCallExpr` / `buildCoverageCallExpr` 保持现状，在 C++ 中生成 `vec4 gpColor = Color;` 等薄封装。后续 V-5 或 W 阶段统一处理。
+- **`emitTransforms()` 保留**：coord transform 的 VS 代码循环生成仍由基类 `emitTransforms()` 负责，推迟到 V-5 用固定上限 `#if` 展开彻底消除。
+
+#### 完成的 Commit
+
+| Commit | 说明 |
+|--------|------|
+| `5973cdc0` | DefaultGeometryProcessor 迁移到 .vert.glsl |
+
+#### 验证结果
+
+431/431 测试全部通过。
