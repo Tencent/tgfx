@@ -47,16 +47,15 @@ class LinearGradientLayout : public FragmentProcessor {
   }
 
   ShaderCallManifest buildCallStatement(const std::string& /*inputColorVar*/, int fpIndex,
-                                      const MangledUniforms& /*uniforms*/,
-                                      const MangledVaryings& varyings,
-                                      const MangledSamplers& /*samplers*/) const override {
-    ShaderCallManifest result;
-    result.outputVarName = "color_fp" + std::to_string(fpIndex);
-    result.includeFiles = {shaderFunctionFile()};
-    auto coord = varyings.getCoordTransform(0);
-    result.statement =
-        "vec4 " + result.outputVarName + " = TGFX_LinearGradientLayout(" + coord + ");";
-    return result;
+                                        const MangledUniforms& /*uniforms*/,
+                                        const MangledVaryings& varyings,
+                                        const MangledSamplers& /*samplers*/) const override {
+    ShaderCallManifest manifest;
+    manifest.functionName = "TGFX_LinearGradientLayout";
+    manifest.outputVarName = "color_fp" + std::to_string(fpIndex);
+    manifest.includeFiles = {shaderFunctionFile()};
+    manifest.argExpressions = {varyings.getCoordTransform(0)};
+    return manifest;
   }
 
   CoordTransform coordTransform;

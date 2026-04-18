@@ -153,12 +153,12 @@ class GeometryProcessor : public Processor {
   }
 
   virtual ShaderCallManifest buildColorCallExpr(const MangledUniforms& /*uniforms*/,
-                                              const MangledVaryings& /*varyings*/) const {
+                                                const MangledVaryings& /*varyings*/) const {
     return {};
   }
 
   virtual ShaderCallManifest buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
-                                                 const MangledVaryings& /*varyings*/) const {
+                                                   const MangledVaryings& /*varyings*/) const {
     return {};
   }
 

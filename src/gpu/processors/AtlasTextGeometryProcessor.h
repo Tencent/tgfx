@@ -79,7 +79,7 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   }
 
   ShaderCallManifest buildColorCallExpr(const MangledUniforms& uniforms,
-                                      const MangledVaryings& varyings) const override {
+                                        const MangledVaryings& varyings) const override {
     ShaderCallManifest result;
     result.outputVarName = "gpColor";
     auto texColor = uniforms.get("atlasTexColor");
@@ -99,7 +99,7 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   }
 
   ShaderCallManifest buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
-                                         const MangledVaryings& varyings) const override {
+                                           const MangledVaryings& varyings) const override {
     ShaderCallManifest result;
     result.outputVarName = "gpCoverage";
     std::string code;

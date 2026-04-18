@@ -52,16 +52,16 @@ class SingleIntervalGradientColorizer : public FragmentProcessor {
   }
 
   ShaderCallManifest buildCallStatement(const std::string& inputColorVar, int fpIndex,
-                                      const MangledUniforms& uniforms,
-                                      const MangledVaryings& /*varyings*/,
-                                      const MangledSamplers& /*samplers*/) const override {
-    ShaderCallManifest result;
-    result.outputVarName = "color_fp" + std::to_string(fpIndex);
-    result.includeFiles = {shaderFunctionFile()};
-    auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
-    result.statement = "vec4 " + result.outputVarName + " = TGFX_SingleIntervalGradientColorizer(" +
-                       input + ", " + uniforms.get("start") + ", " + uniforms.get("end") + ");";
-    return result;
+                                        const MangledUniforms& uniforms,
+                                        const MangledVaryings& /*varyings*/,
+                                        const MangledSamplers& /*samplers*/) const override {
+    ShaderCallManifest manifest;
+    manifest.functionName = "TGFX_SingleIntervalGradientColorizer";
+    manifest.outputVarName = "color_fp" + std::to_string(fpIndex);
+    manifest.includeFiles = {shaderFunctionFile()};
+    manifest.argExpressions = {inputColorVar.empty() ? std::string("vec4(1.0)") : inputColorVar,
+                               uniforms.get("start"), uniforms.get("end")};
+    return manifest;
   }
 
   Color start;

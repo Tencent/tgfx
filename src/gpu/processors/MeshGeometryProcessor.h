@@ -79,7 +79,7 @@ class MeshGeometryProcessor : public GeometryProcessor {
   }
 
   ShaderCallManifest buildColorCallExpr(const MangledUniforms& uniforms,
-                                      const MangledVaryings& varyings) const override {
+                                        const MangledVaryings& varyings) const override {
     ShaderCallManifest result;
     result.outputVarName = "gpColor";
     if (hasColors) {
@@ -91,7 +91,7 @@ class MeshGeometryProcessor : public GeometryProcessor {
   }
 
   ShaderCallManifest buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
-                                         const MangledVaryings& varyings) const override {
+                                           const MangledVaryings& varyings) const override {
     ShaderCallManifest result;
     result.outputVarName = "gpCoverage";
     if (hasCoverage) {

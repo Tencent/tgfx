@@ -71,40 +71,48 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
   }
 
   ShaderCallManifest buildCallStatement(const std::string& inputColorVar, int fpIndex,
-                                      const MangledUniforms& uniforms,
-                                      const MangledVaryings& /*varyings*/,
-                                      const MangledSamplers& /*samplers*/) const override {
-    ShaderCallManifest result;
-    result.outputVarName = "color_fp" + std::to_string(fpIndex);
-    result.includeFiles = {shaderFunctionFile()};
-    auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
-    std::string args = input + ", " + uniforms.get("scale0_1") + ", " + uniforms.get("bias0_1") +
-                       ", " + uniforms.get("thresholds1_7");
+                                        const MangledUniforms& uniforms,
+                                        const MangledVaryings& /*varyings*/,
+                                        const MangledSamplers& /*samplers*/) const override {
+    ShaderCallManifest manifest;
+    manifest.functionName = "TGFX_UnrolledBinaryGradientColorizer";
+    manifest.outputVarName = "color_fp" + std::to_string(fpIndex);
+    manifest.includeFiles = {shaderFunctionFile()};
+    manifest.argExpressions.push_back(inputColorVar.empty() ? std::string("vec4(1.0)")
+                                                            : inputColorVar);
+    manifest.argExpressions.push_back(uniforms.get("scale0_1"));
+    manifest.argExpressions.push_back(uniforms.get("bias0_1"));
+    manifest.argExpressions.push_back(uniforms.get("thresholds1_7"));
     if (intervalCount > 1) {
-      args += ", " + uniforms.get("scale2_3") + ", " + uniforms.get("bias2_3");
+      manifest.argExpressions.push_back(uniforms.get("scale2_3"));
+      manifest.argExpressions.push_back(uniforms.get("bias2_3"));
     }
     if (intervalCount > 2) {
-      args += ", " + uniforms.get("scale4_5") + ", " + uniforms.get("bias4_5");
+      manifest.argExpressions.push_back(uniforms.get("scale4_5"));
+      manifest.argExpressions.push_back(uniforms.get("bias4_5"));
     }
     if (intervalCount > 3) {
-      args += ", " + uniforms.get("scale6_7") + ", " + uniforms.get("bias6_7");
+      manifest.argExpressions.push_back(uniforms.get("scale6_7"));
+      manifest.argExpressions.push_back(uniforms.get("bias6_7"));
     }
     if (intervalCount > 4) {
-      args += ", " + uniforms.get("scale8_9") + ", " + uniforms.get("bias8_9") + ", " +
-              uniforms.get("thresholds9_13");
+      manifest.argExpressions.push_back(uniforms.get("scale8_9"));
+      manifest.argExpressions.push_back(uniforms.get("bias8_9"));
+      manifest.argExpressions.push_back(uniforms.get("thresholds9_13"));
     }
     if (intervalCount > 5) {
-      args += ", " + uniforms.get("scale10_11") + ", " + uniforms.get("bias10_11");
+      manifest.argExpressions.push_back(uniforms.get("scale10_11"));
+      manifest.argExpressions.push_back(uniforms.get("bias10_11"));
     }
     if (intervalCount > 6) {
-      args += ", " + uniforms.get("scale12_13") + ", " + uniforms.get("bias12_13");
+      manifest.argExpressions.push_back(uniforms.get("scale12_13"));
+      manifest.argExpressions.push_back(uniforms.get("bias12_13"));
     }
     if (intervalCount > 7) {
-      args += ", " + uniforms.get("scale14_15") + ", " + uniforms.get("bias14_15");
+      manifest.argExpressions.push_back(uniforms.get("scale14_15"));
+      manifest.argExpressions.push_back(uniforms.get("bias14_15"));
     }
-    result.statement =
-        "vec4 " + result.outputVarName + " = TGFX_UnrolledBinaryGradientColorizer(" + args + ");";
-    return result;
+    return manifest;
   }
 
  protected:

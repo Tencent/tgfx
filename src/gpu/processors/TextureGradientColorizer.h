@@ -43,16 +43,16 @@ class TextureGradientColorizer : public FragmentProcessor {
   }
 
   ShaderCallManifest buildCallStatement(const std::string& inputColorVar, int fpIndex,
-                                      const MangledUniforms& /*uniforms*/,
-                                      const MangledVaryings& /*varyings*/,
-                                      const MangledSamplers& samplers) const override {
-    ShaderCallManifest result;
-    result.outputVarName = "color_fp" + std::to_string(fpIndex);
-    result.includeFiles = {shaderFunctionFile()};
-    auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
-    result.statement = "vec4 " + result.outputVarName + " = TGFX_TextureGradientColorizer(" +
-                       input + ", " + samplers.getByIndex(0) + ");";
-    return result;
+                                        const MangledUniforms& /*uniforms*/,
+                                        const MangledVaryings& /*varyings*/,
+                                        const MangledSamplers& samplers) const override {
+    ShaderCallManifest manifest;
+    manifest.functionName = "TGFX_TextureGradientColorizer";
+    manifest.outputVarName = "color_fp" + std::to_string(fpIndex);
+    manifest.includeFiles = {shaderFunctionFile()};
+    manifest.argExpressions = {inputColorVar.empty() ? std::string("vec4(1.0)") : inputColorVar,
+                               samplers.getByIndex(0)};
+    return manifest;
   }
 
   size_t onCountTextureSamplers() const override {

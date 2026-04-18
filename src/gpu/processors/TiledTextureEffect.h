@@ -124,13 +124,14 @@ class TiledTextureEffect : public FragmentProcessor {
   }
 
   ShaderCallManifest buildCallStatement(const std::string& inputColorVar, int fpIndex,
-                                      const MangledUniforms& uniforms,
-                                      const MangledVaryings& varyings,
-                                      const MangledSamplers& samplers) const override {
-    ShaderCallManifest result;
-    result.outputVarName = "color_fp" + std::to_string(fpIndex);
-    result.includeFiles = {shaderFunctionFile()};
-    auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
+                                        const MangledUniforms& uniforms,
+                                        const MangledVaryings& varyings,
+                                        const MangledSamplers& samplers) const override {
+    ShaderCallManifest manifest;
+    manifest.functionName = "TGFX_TiledTextureEffect";
+    manifest.outputVarName = "color_fp" + std::to_string(fpIndex);
+    manifest.includeFiles = {shaderFunctionFile()};
+    auto input = inputColorVar.empty() ? std::string("vec4(1.0)") : inputColorVar;
     auto coord = varyings.getCoordTransform(0);
     auto textureView = getTextureView();
     int modeXInt = 0;
@@ -168,15 +169,21 @@ class TiledTextureEffect : public FragmentProcessor {
     std::string clampArg = usesClamp ? uniforms.get("Clamp") : "vec4(0.0)";
     std::string dimArg = hasDim ? uniforms.get("Dimension") : "vec2(1.0)";
     std::string extraSubsetArg = hasStrictInt ? varyings.get("subsetVar") : "vec4(0.0)";
-    std::string call =
-        "vec4 " + result.outputVarName + " = TGFX_TiledTextureEffect(" + input + ", " + coord +
-        ", " + samplers.getByIndex(0) + ", " + subsetArg + ", " + clampArg + ", " + dimArg + ", " +
-        extraSubsetArg + ", " + std::to_string(modeXInt) + ", " + std::to_string(modeYInt) + ", " +
-        std::to_string(alphaOnlyInt) + ", " + std::to_string(hasDim ? 1 : 0) + ", " +
-        std::to_string(usesSubset ? 1 : 0) + ", " + std::to_string(usesClamp ? 1 : 0) + ", " +
-        std::to_string(hasStrictInt) + ");";
-    result.statement = call;
-    return result;
+    manifest.argExpressions = {input,
+                               coord,
+                               samplers.getByIndex(0),
+                               subsetArg,
+                               clampArg,
+                               dimArg,
+                               extraSubsetArg,
+                               std::to_string(modeXInt),
+                               std::to_string(modeYInt),
+                               std::to_string(alphaOnlyInt),
+                               std::to_string(hasDim ? 1 : 0),
+                               std::to_string(usesSubset ? 1 : 0),
+                               std::to_string(usesClamp ? 1 : 0),
+                               std::to_string(hasStrictInt)};
+    return manifest;
   }
 
   size_t onCountTextureSamplers() const override;

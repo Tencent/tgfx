@@ -85,13 +85,13 @@ class TextureEffect : public FragmentProcessor {
   }
 
   ShaderCallManifest buildCallStatement(const std::string& inputColorVar, int fpIndex,
-                                      const MangledUniforms& uniforms,
-                                      const MangledVaryings& varyings,
-                                      const MangledSamplers& samplers) const override {
-    ShaderCallManifest result;
-    result.outputVarName = "color_fp" + std::to_string(fpIndex);
-    result.includeFiles = {shaderFunctionFile()};
-    auto input = inputColorVar.empty() ? "vec4(1.0)" : inputColorVar;
+                                        const MangledUniforms& uniforms,
+                                        const MangledVaryings& varyings,
+                                        const MangledSamplers& samplers) const override {
+    ShaderCallManifest manifest;
+    manifest.outputVarName = "color_fp" + std::to_string(fpIndex);
+    manifest.includeFiles = {shaderFunctionFile()};
+    auto input = inputColorVar.empty() ? std::string("vec4(1.0)") : inputColorVar;
     auto coord = varyings.getCoordTransform(0);
     auto yuvTexture = getYUVTexture();
     int hasSubsetInt = needSubset() ? 1 : 0;
@@ -102,30 +102,51 @@ class TextureEffect : public FragmentProcessor {
     std::string subsetArg = hasSubsetInt ? uniforms.get("Subset") : "vec4(0.0)";
     std::string extraSubsetArg = hasStrictInt ? varyings.get("subsetVar") : "vec4(0.0)";
     std::string alphaStartArg = hasRGBAAInt ? uniforms.get("AlphaStart") : "vec2(0.0)";
-    std::string call = "vec4 " + result.outputVarName + " = ";
     if (yuvTexture) {
       if (yuvTexture->yuvFormat() == YUVFormat::I420) {
-        call += "TGFX_TextureEffect_I420(" + input + ", " + coord + ", " + samplers.getByIndex(0) +
-                ", " + samplers.getByIndex(1) + ", " + samplers.getByIndex(2) + ", " +
-                uniforms.get("Mat3ColorConversion") + ", " + subsetArg + ", " + extraSubsetArg +
-                ", " + alphaStartArg + ", " + std::to_string(hasSubsetInt) + ", " +
-                std::to_string(hasStrictInt) + ", " + std::to_string(hasRGBAAInt) + ", " +
-                std::to_string(yuvLimitedInt) + ");";
+        manifest.functionName = "TGFX_TextureEffect_I420";
+        manifest.argExpressions = {input,
+                                   coord,
+                                   samplers.getByIndex(0),
+                                   samplers.getByIndex(1),
+                                   samplers.getByIndex(2),
+                                   uniforms.get("Mat3ColorConversion"),
+                                   subsetArg,
+                                   extraSubsetArg,
+                                   alphaStartArg,
+                                   std::to_string(hasSubsetInt),
+                                   std::to_string(hasStrictInt),
+                                   std::to_string(hasRGBAAInt),
+                                   std::to_string(yuvLimitedInt)};
       } else {
-        call += "TGFX_TextureEffect_NV12(" + input + ", " + coord + ", " + samplers.getByIndex(0) +
-                ", " + samplers.getByIndex(1) + ", " + uniforms.get("Mat3ColorConversion") + ", " +
-                subsetArg + ", " + extraSubsetArg + ", " + alphaStartArg + ", " +
-                std::to_string(hasSubsetInt) + ", " + std::to_string(hasStrictInt) + ", " +
-                std::to_string(hasRGBAAInt) + ", " + std::to_string(yuvLimitedInt) + ");";
+        manifest.functionName = "TGFX_TextureEffect_NV12";
+        manifest.argExpressions = {input,
+                                   coord,
+                                   samplers.getByIndex(0),
+                                   samplers.getByIndex(1),
+                                   uniforms.get("Mat3ColorConversion"),
+                                   subsetArg,
+                                   extraSubsetArg,
+                                   alphaStartArg,
+                                   std::to_string(hasSubsetInt),
+                                   std::to_string(hasStrictInt),
+                                   std::to_string(hasRGBAAInt),
+                                   std::to_string(yuvLimitedInt)};
       }
     } else {
-      call += "TGFX_TextureEffect_RGBA(" + input + ", " + coord + ", " + samplers.getByIndex(0) +
-              ", " + subsetArg + ", " + extraSubsetArg + ", " + alphaStartArg + ", " +
-              std::to_string(hasSubsetInt) + ", " + std::to_string(hasStrictInt) + ", " +
-              std::to_string(hasRGBAAInt) + ", " + std::to_string(alphaOnlyInt) + ");";
+      manifest.functionName = "TGFX_TextureEffect_RGBA";
+      manifest.argExpressions = {input,
+                                 coord,
+                                 samplers.getByIndex(0),
+                                 subsetArg,
+                                 extraSubsetArg,
+                                 alphaStartArg,
+                                 std::to_string(hasSubsetInt),
+                                 std::to_string(hasStrictInt),
+                                 std::to_string(hasRGBAAInt),
+                                 std::to_string(alphaOnlyInt)};
     }
-    result.statement = call;
-    return result;
+    return manifest;
   }
 
   size_t onCountTextureSamplers() const override;

@@ -63,7 +63,7 @@ class HairlineQuadGeometryProcessor : public GeometryProcessor {
   }
 
   ShaderCallManifest buildColorCallExpr(const MangledUniforms& uniforms,
-                                      const MangledVaryings& /*varyings*/) const override {
+                                        const MangledVaryings& /*varyings*/) const override {
     ShaderCallManifest result;
     result.outputVarName = "gpColor";
     result.statement = "vec4 gpColor = " + uniforms.get("Color") + ";\n";
@@ -71,7 +71,7 @@ class HairlineQuadGeometryProcessor : public GeometryProcessor {
   }
 
   ShaderCallManifest buildCoverageCallExpr(const MangledUniforms& uniforms,
-                                         const MangledVaryings& varyings) const override {
+                                           const MangledVaryings& varyings) const override {
     ShaderCallManifest result;
     result.outputVarName = "gpCoverage";
     auto edge = varyings.get("HairQuadEdge");

@@ -269,10 +269,11 @@ class FragmentProcessor : public Processor {
    * @return ShaderCallManifest with the complete statement and output variable name.
    * Default returns empty — subclasses that have .glsl files must override.
    */
-  virtual ShaderCallManifest buildCallStatement(const std::string& /*inputColorVar*/, int /*fpIndex*/,
-                                              const MangledUniforms& /*uniforms*/,
-                                              const MangledVaryings& /*varyings*/,
-                                              const MangledSamplers& /*samplers*/) const {
+  virtual ShaderCallManifest buildCallStatement(const std::string& /*inputColorVar*/,
+                                                int /*fpIndex*/,
+                                                const MangledUniforms& /*uniforms*/,
+                                                const MangledVaryings& /*varyings*/,
+                                                const MangledSamplers& /*samplers*/) const {
     return {};
   }
 

@@ -64,10 +64,10 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
   }
 
   ShaderCallManifest buildContainerCallStatement(const std::string& /*inputColor*/,
-                                               const std::vector<std::string>& /*childOutputs*/,
-                                               const MangledUniforms& uniforms,
-                                               const MangledSamplers& samplers,
-                                               const MangledVaryings& varyings) const override {
+                                                 const std::vector<std::string>& /*childOutputs*/,
+                                                 const MangledUniforms& uniforms,
+                                                 const MangledSamplers& samplers,
+                                                 const MangledVaryings& varyings) const override {
     // Build TGFX_GB1D_SAMPLE(coord) macro that calls the child FP's texture sampling function.
     // The child FP (TextureEffect) function is TGFX_TextureEffect(inputColor, coord, sampler).
     // For the common non-YUV single-sampler case, we construct the call directly.

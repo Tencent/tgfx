@@ -52,9 +52,9 @@ class ColorSpaceXformEffect : public FragmentProcessor {
                         MangledSamplers& samplers) const override;
 
   ShaderCallManifest buildCallStatement(const std::string& inputColorVar, int fpIndex,
-                                      const MangledUniforms& uniforms,
-                                      const MangledVaryings& varyings,
-                                      const MangledSamplers& samplers) const override;
+                                        const MangledUniforms& uniforms,
+                                        const MangledVaryings& varyings,
+                                        const MangledSamplers& samplers) const override;
 
  private:
   DEFINE_PROCESSOR_CLASS_ID

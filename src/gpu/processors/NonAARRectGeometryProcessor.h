@@ -77,7 +77,7 @@ class NonAARRectGeometryProcessor : public GeometryProcessor {
   }
 
   ShaderCallManifest buildColorCallExpr(const MangledUniforms& uniforms,
-                                      const MangledVaryings& varyings) const override {
+                                        const MangledVaryings& varyings) const override {
     ShaderCallManifest result;
     result.outputVarName = "gpColor";
     if (commonColor.has_value()) {
@@ -89,7 +89,7 @@ class NonAARRectGeometryProcessor : public GeometryProcessor {
   }
 
   ShaderCallManifest buildCoverageCallExpr(const MangledUniforms& /*uniforms*/,
-                                         const MangledVaryings& varyings) const override {
+                                           const MangledVaryings& varyings) const override {
     ShaderCallManifest result;
     result.outputVarName = "gpCoverage";
     auto lc = varyings.get("localCoord");

@@ -107,12 +107,11 @@ ShaderCallManifest ColorSpaceXformEffect::buildCallStatement(
   std::string dstTF0 = steps->flags.encode ? uniforms.get("DstTF0") : "vec4(0.0)";
   std::string dstTF1 = steps->flags.encode ? uniforms.get("DstTF1") : "vec4(0.0)";
 
-  ShaderCallManifest result;
-  result.statement = "vec4 _csxResult = TGFX_ColorSpaceXformEffect(" + input + ", " + srcTF0 +
-                     ", " + srcTF1 + ", " + srcOOTF + ", " + colorXform + ", " + dstOOTF + ", " +
-                     dstTF0 + ", " + dstTF1 + ");\n";
-  result.outputVarName = "_csxResult";
-  return result;
+  ShaderCallManifest manifest;
+  manifest.functionName = "TGFX_ColorSpaceXformEffect";
+  manifest.outputVarName = "_csxResult";
+  manifest.argExpressions = {input, srcTF0, srcTF1, srcOOTF, colorXform, dstOOTF, dstTF0, dstTF1};
+  return manifest;
 }
 
 void ColorSpaceXformEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
