@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLFragmentShaderBuilder.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/glsl/GLSLProgramBuilder.h"
 
 namespace tgfx {

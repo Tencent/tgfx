@@ -19,6 +19,7 @@
 #include "GLSLProgramBuilder.h"
 #include <string>
 #include "gpu/ModularProgramBuilder.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/UniformData.h"
 #include "tgfx/gpu/GPU.h"
 

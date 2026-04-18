@@ -22,7 +22,6 @@
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/MangledResources.h"
 #include "gpu/ShaderCallResult.h"
-#include "gpu/ShaderCaps.h"
 #include "gpu/ShaderMacroSet.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/UniformData.h"
@@ -73,26 +72,18 @@ class GeometryProcessor : public Processor {
 
   struct EmitArgs {
     EmitArgs(VertexShaderBuilder* vertBuilder, FragmentShaderBuilder* fragBuilder,
-             VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const ShaderCaps* caps,
-             std::string outputColor, std::string outputCoverage,
-             FPCoordTransformHandler* transformHandler, std::string* outputSubset,
-             bool skipFragmentCode = false)
+             VaryingHandler* varyingHandler, UniformHandler* uniformHandler,
+             FPCoordTransformHandler* transformHandler, std::string* outputSubset)
         : vertBuilder(vertBuilder), fragBuilder(fragBuilder), varyingHandler(varyingHandler),
-          uniformHandler(uniformHandler), caps(caps), outputColor(std::move(outputColor)),
-          outputCoverage(std::move(outputCoverage)), fpCoordTransformHandler(transformHandler),
-          outputSubset(outputSubset), skipFragmentCode(skipFragmentCode) {
+          uniformHandler(uniformHandler), fpCoordTransformHandler(transformHandler),
+          outputSubset(outputSubset) {
     }
     VertexShaderBuilder* vertBuilder;
     FragmentShaderBuilder* fragBuilder;
     VaryingHandler* varyingHandler;
     UniformHandler* uniformHandler;
-    const ShaderCaps* caps;
-    const std::string outputColor;
-    const std::string outputCoverage;
     FPCoordTransformHandler* fpCoordTransformHandler;
     std::string* outputSubset = nullptr;
-    bool skipFragmentCode = false;
-    bool skipVertexCode = false;
     MangledVaryings* gpVaryings = nullptr;
     MangledUniforms* gpUniforms = nullptr;
   };

@@ -28,6 +28,7 @@
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/HairlineLineOp.h"
 #include "gpu/ops/HairlineQuadOp.h"

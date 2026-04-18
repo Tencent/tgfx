@@ -19,6 +19,7 @@
 #include "FragmentShaderBuilder.h"
 #include "ProgramBuilder.h"
 #include "SLType.h"
+#include "ShaderCaps.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {

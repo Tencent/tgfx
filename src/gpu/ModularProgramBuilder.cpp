@@ -330,24 +330,22 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
   MangledVaryings gpVaryings;
   MangledUniforms gpUniforms;
   GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(),
-                                   uniformHandler(), getContext()->shaderCaps(), *outputColor,
-                                   *outputCoverage, &transformHandler, &subsetVarName, true);
-  args.skipVertexCode = true;
+                                   uniformHandler(), &transformHandler, &subsetVarName);
   args.gpVaryings = &gpVaryings;
   args.gpUniforms = &gpUniforms;
 
-  // Always invoke emitCode() to register attributes / uniforms / varyings / coord transforms.
-  // Migrated GPs keep only the registration calls in emitCode() (no GLSL appends); the VS
-  // function body lives in the .vert.glsl module and is called via buildVSCallExpr() below.
-  // Legacy GPs that have not been migrated continue to emit GLSL directly inside emitCode().
+  // All GPs are now modular: emitCode() only registers attributes / uniforms / varyings /
+  // coord transforms and populates gpUniforms/gpVaryings. The VS function body lives in the
+  // .vert.glsl module and is injected via includeVSModule() below. Some GPs (half-migrated,
+  // e.g. HairlineLineGP, ShapeInstancedGP) still emit the function call site from emitCode()
+  // because their emitTransforms() input depends on VS-local variables.
   geometryProcessor->emitCode(args);
 
-  // Modular path: if the GP provides a .vert.glsl module, include it in the VS and emit the
-  // function call with the mangled resource names.
-  auto vsFuncFile = geometryProcessor->shaderFunctionFile();
-  bool useModularVS =
-      !vsFuncFile.empty() && ShaderModuleRegistry::HasModule(geometryProcessor->name());
-  if (useModularVS) {
+  // Include the GP's .vert.glsl module in the VS. If buildVSCallExpr() returns non-empty, emit
+  // the function call expression here (fully-migrated GPs); otherwise the GP has already emitted
+  // the call inside emitCode() (half-migrated GPs). HasModule() acts as a safety check for any
+  // GP that is added in the future before it is registered in ShaderModuleRegistry.
+  if (ShaderModuleRegistry::HasModule(geometryProcessor->name())) {
     includeVSModule(ShaderModuleRegistry::GetModuleID(geometryProcessor->name()));
     auto vsCallExpr = geometryProcessor->buildVSCallExpr(gpUniforms, gpVaryings);
     if (!vsCallExpr.empty()) {

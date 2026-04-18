@@ -21,6 +21,7 @@
 #include "gpu/BlendFormula.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/resources/RenderTarget.h"
 #include "inspect/InspectorMark.h"
 #include "tgfx/gpu/GPU.h"

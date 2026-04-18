@@ -18,6 +18,7 @@
 
 #include "ShaderBuilder.h"
 #include "ProgramBuilder.h"
+#include "ShaderCaps.h"
 #include "Swizzle.h"
 #include "stdarg.h"
 
