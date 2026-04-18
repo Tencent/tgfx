@@ -40,6 +40,7 @@ set(SHADER_MODULES
     "kDefaultGeometryVert=geometry/default_geometry.vert.glsl"
     "kMeshGeometryVert=geometry/mesh_geometry.vert.glsl"
     "kQuadAAGeometryVert=geometry/quad_aa_geometry.vert.glsl"
+    "kAtlasTextGeometryVert=geometry/atlas_text_geometry.vert.glsl"
 )
 
 if(NOT DEFINED SHADER_DIR)

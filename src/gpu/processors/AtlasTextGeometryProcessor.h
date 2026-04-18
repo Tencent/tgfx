@@ -59,7 +59,23 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   }
 
   std::string shaderFunctionFile() const override {
-    return "geometry/atlas_text_geometry";
+    return "geometry/atlas_text_geometry.vert";
+  }
+
+  std::string buildVSCallExpr(const MangledUniforms& uniforms,
+                              const MangledVaryings& varyings) const override {
+    std::string code = "highp vec2 position;\n";
+    code += "TGFX_AtlasTextGP_VS(" + std::string(position.name()) + ", " +
+            std::string(maskCoord.name()) + ", " + uniforms.get("atlasSizeInv");
+    if (aa == AAType::Coverage) {
+      code += ", " + std::string(coverage.name()) + ", " + varyings.get("Coverage");
+    }
+    if (!commonColor.has_value()) {
+      code += ", " + std::string(color.name()) + ", " + varyings.get("Color");
+    }
+    code += ", " + varyings.get("textureCoords") + ", position);\n";
+    code += "gl_Position = vec4(position.xy * tgfx_RTAdjust.xz + tgfx_RTAdjust.yw, 0, 1);\n";
+    return code;
   }
 
   ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,

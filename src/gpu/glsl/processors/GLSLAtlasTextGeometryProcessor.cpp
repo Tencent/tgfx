@@ -42,6 +42,9 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
 
   auto atlasName =
       uniformHandler->addUniform(atlasSizeUniformName, UniformFormat::Float2, ShaderStage::Vertex);
+  if (args.gpUniforms) {
+    args.gpUniforms->add("atlasSizeInv", atlasName);
+  }
 
   auto samplerVarying = varyingHandler->addVarying("textureCoords", SLType::Float2);
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
@@ -49,84 +52,41 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
     args.gpVaryings->add("textureCoords", samplerVarying.fsIn());
   }
 
-  std::string coverageFsIn;
-  std::string coverageVsOut;
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    coverageVsOut = coverageVar.vsOut();
-    coverageFsIn = coverageVar.fsIn();
     if (args.gpVaryings) {
-      args.gpVaryings->add("Coverage", coverageFsIn);
+      args.gpVaryings->add("Coverage", coverageVar.fsIn());
     }
   }
 
-  std::string colorFsIn;
-  std::string colorVsOut;
   if (commonColor.has_value()) {
     auto colorName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    colorFsIn = colorName;
     if (args.gpUniforms) {
       args.gpUniforms->add("Color", colorName);
     }
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    colorVsOut = colorVar.vsOut();
-    colorFsIn = colorVar.fsIn();
     if (args.gpVaryings) {
-      args.gpVaryings->add("Color", colorFsIn);
+      args.gpVaryings->add("Color", colorVar.fsIn());
     }
   }
-
-  std::string positionName = "position";
-  static const std::string kAtlasTextGPVert = R"GLSL(
-void TGFX_AtlasTextGP_VS(vec2 inPosition, vec2 inMaskCoord, vec2 atlasSizeInv,
-#ifdef TGFX_GP_ATLAS_COVERAGE_AA
-                          float inCoverage, out float vCoverage,
-#endif
-#ifndef TGFX_GP_ATLAS_COMMON_COLOR
-                          vec4 inColor, out vec4 vColor,
-#endif
-                          out vec2 vTextureCoords, out vec2 position) {
-    vTextureCoords = inMaskCoord * atlasSizeInv;
-#ifdef TGFX_GP_ATLAS_COVERAGE_AA
-    vCoverage = inCoverage;
-#endif
-#ifndef TGFX_GP_ATLAS_COMMON_COLOR
-    vColor = inColor;
-#endif
-    position = inPosition;
-}
-)GLSL";
-  vertBuilder->addFunction(kAtlasTextGPVert);
-  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-  std::string call = "TGFX_AtlasTextGP_VS(" + std::string(position.name()) + ", " +
-                     std::string(maskCoord.name()) + ", " + atlasName;
-  if (aa == AAType::Coverage) {
-    call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
-  }
-  if (!commonColor.has_value()) {
-    call += ", " + std::string(color.name()) + ", " + colorVsOut;
-  }
-  call += ", " + samplerVarying.vsOut() + ", " + positionName + ");";
-  vertBuilder->codeAppend(call);
 
   auto textureView = textureProxy->getTextureView();
   DEBUG_ASSERT(textureView != nullptr);
   DEBUG_ASSERT(textureView->getTexture() != nullptr);
   auto samplerHandle = uniformHandler->addSampler(textureView->getTexture(), "TextureSampler");
 
-  // Modular path: emit the texture lookup (with correct swizzle) as a shared FS variable,
-  // then record its name so buildColorCallExpr/buildCoverageCallExpr can reference it.
+  // Emit the atlas texture lookup (with correct swizzle) as a shared FS variable, so
+  // buildColorCallExpr/buildCoverageCallExpr can reference it via the `_atlasTexColor` name.
+  // The sampler type (sampler2D vs sampler2DRect) is backend-specific, so we rely on
+  // fragBuilder->appendTextureLookup() rather than embedding the call in a .glsl module.
   fragBuilder->codeAppend("vec4 _atlasTexColor = ");
   fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.fsIn());
   fragBuilder->codeAppend(";\n");
   if (args.gpUniforms) {
     args.gpUniforms->add("atlasTexColor", "_atlasTexColor");
   }
-
-  // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(positionName);
 }
 
 void GLSLAtlasTextGeometryProcessor::setData(UniformData* vertexUniformData,
