@@ -330,7 +330,36 @@ struct ShaderCallManifest {
 
 ### Phase U-1 实施结果
 
-_待填充_
+> 2026-04-17 完成，共 1 个 commit。
+
+#### 改动汇总
+
+| 文件 | 操作 | 行数变化 |
+|------|------|---------|
+| `src/gpu/ShaderBuilder.cpp` | 删除 `appendColorGamutXform()` 实现 | -163 |
+| `src/gpu/ShaderBuilder.h` | 删除声明 + `ColorSpaceXformHelper.h` include | -3 |
+| `src/gpu/ColorSpaceXformHelper.h` | 删除 `emitCode()`、`isNoop()`、TF Type/Uniform getter，把 `applyX()` 系列改为 private（仅 `setData` 内部使用） | -49 |
+| `src/gpu/ColorSpaceXformHelper.cpp` | 删除 `emitCode()` 实现 | -32 |
+| `src/core/shaders/GradientShader.cpp` | 补充 `#include "core/ColorSpaceXformSteps.h"`（原由 `ShaderBuilder.h` 间接传递） | +1 |
+| `src/gpu/processors/ColorSpaceXFormEffect.cpp` | 补充 `#include <skcms.h>`（同上） | +1 |
+| **合计** | | **-244** |
+
+#### 完成的 Commit
+
+| Commit | 说明 |
+|--------|------|
+| `698eef1a` | 删除 ColorGamutXform 死代码 |
+
+#### 验证结果
+
+| 构建命令 | 测试数 | 结果 |
+|---------|--------|------|
+| `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
+
+#### 经验总结
+
+- 死代码虽已确认无调用者，但其 header 通过 include 链为下游提供间接依赖。删除时需补齐下游的直接 include（2 处）。
+- `ColorSpaceXformHelper::setData()` 仍在 `ColorSpaceXFormEffect::onSetData()` 中使用，保留；但 `emitCode()` 和全部 shader-generation 相关 getter 已消除。
 
 ### Phase U-2 实施结果
 
