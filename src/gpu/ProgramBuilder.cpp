@@ -36,9 +36,14 @@ void ProgramBuilder::emitFSOutputSwizzle() {
   if (swizzle == Swizzle::RGBA()) {
     return;
   }
+  // Inject a #define so the TGFX_OutputSwizzle helper (from tgfx_fs_boilerplate.glsl) picks up
+  // the correct swizzle components. Callers that run through ModularProgramBuilder will
+  // additionally include the FSBoilerplate module; the legacy path constructs its own call site.
   auto fragBuilder = fragmentShaderBuilder();
+  fragBuilder->shaderStrings[ShaderBuilder::Type::Definitions] +=
+      "#undef TGFX_OUT_SWIZZLE\n#define TGFX_OUT_SWIZZLE " + std::string(swizzle.c_str()) + "\n";
   const auto& output = fragBuilder->colorOutputName();
-  fragBuilder->codeAppendf("%s = %s.%s;", output.c_str(), output.c_str(), swizzle.c_str());
+  fragBuilder->codeAppendf("%s = TGFX_OutputSwizzle(%s);", output.c_str(), output.c_str());
 }
 
 std::string ProgramBuilder::nameVariable(const std::string& name) const {

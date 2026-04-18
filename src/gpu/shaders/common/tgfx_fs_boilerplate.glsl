@@ -9,3 +9,19 @@
 vec2 TGFX_PerspDivide(vec3 c) {
     return c.xy / c.z;
 }
+
+// Output color swizzle macro. Defined by ModularProgramBuilder based on the render target's
+// pixel format (BGRA-vs-RGBA) and color space. If TGFX_OUT_SWIZZLE is not defined, no swizzle
+// is applied.
+#ifndef TGFX_OUT_SWIZZLE
+#define TGFX_OUT_SWIZZLE rgba
+#endif
+
+/**
+ * Applies the output swizzle to a vec4 color. The swizzle components (rgba/bgra/...) are
+ * selected via the TGFX_OUT_SWIZZLE macro.
+ */
+vec4 TGFX_OutputSwizzle(vec4 color) {
+    return color.TGFX_OUT_SWIZZLE;
+}
+

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ModularProgramBuilder.h"
+#include "Swizzle.h"
 #include "core/utils/Log.h"
 #include "gpu/MangledResources.h"
 #include "gpu/processors/FragmentProcessor.h"
@@ -70,6 +71,12 @@ bool ModularProgramBuilder::emitAndInstallProcessors() {
   emitModularFragProcessors(&inputColor, &inputCoverage);
   // XP emission via override with explicit dispatch.
   emitAndInstallXferProc(inputColor, inputCoverage);
+  // Output swizzle uses TGFX_OutputSwizzle() from tgfx_fs_boilerplate.glsl. Include it on the
+  // non-identity swizzle path so the helper is available when ProgramBuilder::emitFSOutputSwizzle
+  // emits the call. Includes are idempotent (no-op if already included for perspective divide).
+  if (programInfo->getOutputSwizzle() != Swizzle::RGBA()) {
+    includeModule(ShaderModuleID::FSBoilerplate);
+  }
   emitFSOutputSwizzle();
   return checkSamplerCounts();
 }
