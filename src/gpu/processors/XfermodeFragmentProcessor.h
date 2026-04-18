@@ -75,10 +75,10 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
   }
 
   ShaderCallManifest buildContainerCallStatement(const std::string& inputColor,
-                                               const std::vector<std::string>& childOutputs,
-                                               const MangledUniforms& uniforms,
-                                               const MangledSamplers& samplers,
-                                               const MangledVaryings& varyings) const override;
+                                                 const std::vector<std::string>& childOutputs,
+                                                 const MangledUniforms& uniforms,
+                                                 const MangledSamplers& samplers,
+                                                 const MangledVaryings& varyings) const override;
 
   std::vector<ChildEmitInfo> getChildEmitPlan(const std::string& parentInput) const override;
 };

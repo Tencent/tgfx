@@ -79,8 +79,7 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
     manifest.outputVarName = "_gb1dResult";
     manifest.argExpressions = {uniforms.get("Sigma"), uniforms.get("Step"),
                                varyings.getCoordTransform(0)};
-    manifest.preamble =
-        "#define TGFX_GB1D_SAMPLE(coord) texture(" + samplerName + ", coord)\n";
+    manifest.preamble = "#define TGFX_GB1D_SAMPLE(coord) texture(" + samplerName + ", coord)\n";
     return manifest;
   }
 

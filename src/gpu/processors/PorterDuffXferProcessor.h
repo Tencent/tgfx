@@ -58,11 +58,11 @@ class PorterDuffXferProcessor : public XferProcessor {
   }
 
   ShaderCallManifest buildXferCallStatement(const std::string& colorInVar,
-                                          const std::string& coverageInVar,
-                                          const std::string& outputVar,
-                                          const std::string& dstColorExpr,
-                                          const MangledUniforms& uniforms,
-                                          const MangledSamplers& samplers) const override;
+                                            const std::string& coverageInVar,
+                                            const std::string& outputVar,
+                                            const std::string& dstColorExpr,
+                                            const MangledUniforms& uniforms,
+                                            const MangledSamplers& samplers) const override;
 
   BlendMode blendMode = BlendMode::SrcOver;
   DstTextureInfo dstTextureInfo = {};

@@ -54,11 +54,11 @@ class XferProcessor : public Processor {
   }
 
   virtual ShaderCallManifest buildXferCallStatement(const std::string& /*colorInVar*/,
-                                                  const std::string& /*coverageInVar*/,
-                                                  const std::string& /*outputVar*/,
-                                                  const std::string& /*dstColorExpr*/,
-                                                  const MangledUniforms& /*uniforms*/,
-                                                  const MangledSamplers& /*samplers*/) const {
+                                                    const std::string& /*coverageInVar*/,
+                                                    const std::string& /*outputVar*/,
+                                                    const std::string& /*dstColorExpr*/,
+                                                    const MangledUniforms& /*uniforms*/,
+                                                    const MangledSamplers& /*samplers*/) const {
     return {};
   }
 
