@@ -60,6 +60,7 @@ static const std::unordered_map<std::string, ShaderModuleID> kProcessorModuleMap
     {"HairlineLineGeometryProcessor", ShaderModuleID::HairlineLineGeometry},
     {"HairlineQuadGeometryProcessor", ShaderModuleID::HairlineQuadGeometry},
     {"NonAARRectGeometryProcessor", ShaderModuleID::NonAARRectGeometry},
+    {"ShapeInstancedGeometryProcessor", ShaderModuleID::ShapeInstancedGeometry},
 };
 
 // ---- Public API implementation ----
@@ -132,6 +133,8 @@ const std::string& ShaderModuleRegistry::GetModule(ShaderModuleID id) {
       return kHairlineQuadGeometryVert;
     case ShaderModuleID::NonAARRectGeometry:
       return kNonAARRectGeometryVert;
+    case ShaderModuleID::ShapeInstancedGeometry:
+      return kShapeInstancedGeometryVert;
   }
   static const std::string kEmpty;
   return kEmpty;

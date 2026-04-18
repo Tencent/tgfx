@@ -51,7 +51,7 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
   }
 
   std::string shaderFunctionFile() const override {
-    return "geometry/shape_instanced_geometry";
+    return "geometry/shape_instanced_geometry.vert";
   }
 
   ShaderCallResult buildColorCallExpr(const MangledUniforms& /*uniforms*/,

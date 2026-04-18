@@ -52,54 +52,33 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
       uniformHandler->addUniform("ViewMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
 
   // Coverage varying for AA.
-  std::string coverageFsIn;
   std::string coverageVsOut;
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     coverageVsOut = coverageVar.vsOut();
-    coverageFsIn = coverageVar.fsIn();
     if (args.gpVaryings) {
-      args.gpVaryings->add("Coverage", coverageFsIn);
+      args.gpVaryings->add("Coverage", coverageVar.fsIn());
     }
   }
 
   // Color: per-instance color or opaque white (overridden by shader FP).
-  std::string colorFsIn;
   std::string colorVsOut;
   if (hasColors) {
     auto colorVar = varyingHandler->addVarying("InstanceColor", SLType::Float4);
     colorVsOut = colorVar.vsOut();
-    colorFsIn = colorVar.fsIn();
     if (args.gpVaryings) {
-      args.gpVaryings->add("InstanceColor", colorFsIn);
+      args.gpVaryings->add("InstanceColor", colorVar.fsIn());
     }
   }
 
+  // Half-migrated: VS function body lives in shape_instanced_geometry.vert.glsl (injected by
+  // ModularProgramBuilder via includeVSModule based on shaderFunctionFile()). We emit the call
+  // here because emitTransforms() depends on the `local` variable we compute below from uvMatrix
+  // and the attribute position.
   std::string positionName = "position";
-  static const std::string kShapeInstancedGPVert = R"GLSL(
-void TGFX_ShapeInstancedGP_VS(vec2 inPosition, vec2 inOffset,
-                                mat3 uvMatrix, mat3 viewMatrix,
-#ifdef TGFX_GP_SHAPE_COVERAGE_AA
-                                float inCoverage, out float vCoverage,
-#endif
-#ifdef TGFX_GP_SHAPE_VERTEX_COLORS
-                                vec4 inInstanceColor, out vec4 vInstanceColor,
-#endif
-                                out vec2 position) {
-    highp vec2 local = (uvMatrix * vec3(inPosition, 1.0)).xy;
-    position = (viewMatrix * vec3(inPosition, 1.0)).xy + inOffset;
-#ifdef TGFX_GP_SHAPE_COVERAGE_AA
-    vCoverage = inCoverage;
-#endif
-#ifdef TGFX_GP_SHAPE_VERTEX_COLORS
-    vInstanceColor = inInstanceColor;
-#endif
-}
-)GLSL";
-  vertBuilder->addFunction(kShapeInstancedGPVert);
   vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
   std::string call = "TGFX_ShapeInstancedGP_VS(" + std::string(position.name()) + ", " +
-                     std::string(offset.name()) + ", " + uvMatrixName + ", " + viewMatrixName;
+                     std::string(offset.name()) + ", " + viewMatrixName;
   if (aa == AAType::Coverage) {
     call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
   }

@@ -63,6 +63,7 @@ enum class ShaderModuleID {
   HairlineLineGeometry,
   HairlineQuadGeometry,
   NonAARRectGeometry,
+  ShapeInstancedGeometry,
 };
 
 /**
