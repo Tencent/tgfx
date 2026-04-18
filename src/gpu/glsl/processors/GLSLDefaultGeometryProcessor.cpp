@@ -47,14 +47,10 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
     args.gpUniforms->add("Matrix", matrixName);
   }
 
-  std::string coverageFsIn;
-  std::string coverageVsOut;
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    coverageFsIn = coverageVar.fsIn();
-    coverageVsOut = coverageVar.vsOut();
     if (args.gpVaryings) {
-      args.gpVaryings->add("Coverage", coverageFsIn);
+      args.gpVaryings->add("Coverage", coverageVar.fsIn());
     }
   }
 
