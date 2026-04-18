@@ -23,6 +23,7 @@
 #include <vector>
 #include "gpu/MangledResources.h"
 #include "gpu/SamplerHandle.h"
+#include "gpu/ShaderCallManifest.h"
 #include "gpu/ShaderModuleRegistry.h"
 #include "gpu/glsl/GLSLProgramBuilder.h"
 
@@ -97,6 +98,22 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
    * Emits #define directives for a processor's compile-time switches.
    */
   void emitProcessorDefines(const FragmentProcessor* processor);
+
+  /**
+   * Renders a ShaderCallManifest into a GLSL statement string. Supports both function-call mode
+   * (functionName non-empty) and raw-statement mode (functionName empty, statement used verbatim).
+   *
+   * Function-call mode produces either:
+   *   `outputType outputVarName = functionName(arg0, arg1, ...);`
+   *   (when declareOutput == true)
+   * or:
+   *   `functionName(arg0, arg1, ..., outputVarName);`
+   *   (when declareOutput == false — used by XPs with out-parameter signatures).
+   *
+   * The logic is deterministic string templating with no algorithmic branches, so UE's offline
+   * shader variant enumerator can replicate it exactly.
+   */
+  static std::string RenderManifest(const ShaderCallManifest& manifest);
 
   // ---- GP/XP override methods ----
 

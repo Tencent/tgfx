@@ -22,6 +22,31 @@
 
 namespace tgfx {
 
+// ---- Manifest rendering ----
+
+std::string ModularProgramBuilder::RenderManifest(const ShaderCallManifest& manifest) {
+  if (manifest.functionName.empty()) {
+    return manifest.statement;
+  }
+  std::string args;
+  for (size_t i = 0; i < manifest.argExpressions.size(); ++i) {
+    if (i != 0) {
+      args += ", ";
+    }
+    args += manifest.argExpressions[i];
+  }
+  if (manifest.declareOutput) {
+    return manifest.outputType + " " + manifest.outputVarName + " = " + manifest.functionName +
+           "(" + args + ");\n";
+  }
+  std::string call = manifest.functionName + "(";
+  if (!args.empty()) {
+    call += args + ", ";
+  }
+  call += manifest.outputVarName + ");\n";
+  return call;
+}
+
 // ---- Public API ----
 
 ModularProgramBuilder::ModularProgramBuilder(Context* context, const ProgramInfo* programInfo)
@@ -247,7 +272,7 @@ bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* proc
   if (!result.preamble.empty()) {
     fragmentShaderBuilder()->shaderStrings[ShaderBuilder::Type::Definitions] += result.preamble;
   }
-  fragmentShaderBuilder()->codeAppend(result.statement);
+  fragmentShaderBuilder()->codeAppend(RenderManifest(result));
   if (result.outputVarName != output) {
     fragmentShaderBuilder()->codeAppendf("%s = %s;", output.c_str(), result.outputVarName.c_str());
   }
@@ -292,7 +317,7 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
                                               resources.varyings, resources.samplers);
   emitProcessorDefines(processor);
   includeModule(ShaderModuleRegistry::GetModuleID(name));
-  fragmentShaderBuilder()->codeAppend(result.statement);
+  fragmentShaderBuilder()->codeAppend(RenderManifest(result));
   if (result.outputVarName != output) {
     fragmentShaderBuilder()->codeAppendf("%s = %s;", output.c_str(), result.outputVarName.c_str());
   }
@@ -355,10 +380,10 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
 
   auto colorResult = geometryProcessor->buildColorCallExpr(gpUniforms, gpVaryings);
   auto coverageResult = geometryProcessor->buildCoverageCallExpr(gpUniforms, gpVaryings);
-  fragmentShaderBuilder()->codeAppend(colorResult.statement);
+  fragmentShaderBuilder()->codeAppend(RenderManifest(colorResult));
   fragmentShaderBuilder()->codeAppendf("%s = %s;\n", outputColor->c_str(),
                                        colorResult.outputVarName.c_str());
-  fragmentShaderBuilder()->codeAppend(coverageResult.statement);
+  fragmentShaderBuilder()->codeAppend(RenderManifest(coverageResult));
   fragmentShaderBuilder()->codeAppendf("%s = %s;\n", outputCoverage->c_str(),
                                        coverageResult.outputVarName.c_str());
 
@@ -419,7 +444,7 @@ void ModularProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
   if (ShaderModuleRegistry::HasModule(xpName)) {
     includeModule(ShaderModuleRegistry::GetModuleID(xpName));
   }
-  fragmentShaderBuilder()->codeAppend(result.statement);
+  fragmentShaderBuilder()->codeAppend(RenderManifest(result));
 
   fragmentShaderBuilder()->codeAppend("}");
   currentProcessors.pop_back();
