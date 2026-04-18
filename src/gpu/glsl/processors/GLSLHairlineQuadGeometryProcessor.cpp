@@ -53,15 +53,11 @@ void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
     args.gpVaryings->add("HairQuadEdge", edgeVarying.fsIn());
   }
 
+  // Half-migrated: VS function body lives in hairline_quad_geometry.vert.glsl (injected by
+  // ModularProgramBuilder via includeVSModule based on shaderFunctionFile()). emitTransforms()
+  // needs the transformed position, so we emit the function call here rather than via
+  // buildVSCallExpr().
   std::string positionName = "transformedPosition";
-  static const std::string kHairlineQuadGPVert = R"GLSL(
-void TGFX_HairlineQuadGP_VS(vec2 inPosition, vec4 inHairQuadEdge, mat3 matrix,
-                              out vec4 vHairQuadEdge, out vec2 position) {
-    position = (matrix * vec3(inPosition, 1.0)).xy;
-    vHairQuadEdge = inHairQuadEdge;
-}
-)GLSL";
-  vertBuilder->addFunction(kHairlineQuadGPVert);
   vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
   std::string call = "TGFX_HairlineQuadGP_VS(" + std::string(position.name()) + ", " +
                      std::string(hairQuadEdge.name()) + ", " + matrixName + ", " +

@@ -59,7 +59,7 @@ class HairlineQuadGeometryProcessor : public GeometryProcessor {
   }
 
   std::string shaderFunctionFile() const override {
-    return "geometry/hairline_quad_geometry";
+    return "geometry/hairline_quad_geometry.vert";
   }
 
   ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,

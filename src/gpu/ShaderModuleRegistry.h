@@ -61,6 +61,7 @@ enum class ShaderModuleID {
   EllipseGeometry,
   RoundStrokeRectGeometry,
   HairlineLineGeometry,
+  HairlineQuadGeometry,
 };
 
 /**
