@@ -336,10 +336,14 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
   args.gpVaryings = &gpVaryings;
   args.gpUniforms = &gpUniforms;
 
-  // Modular path: if the GP provides a .vert.glsl module and a VS call expression, include the
-  // module and emit the call statement. Legacy emitCode() path is the fallback used by all GPs
-  // that have not migrated yet. Both paths still invoke emitTransforms() for FP coord transforms;
-  // that refactor is deferred to Phase V-5 once all GPs are modularized.
+  // Always invoke emitCode() to register attributes / uniforms / varyings / coord transforms.
+  // Migrated GPs keep only the registration calls in emitCode() (no GLSL appends); the VS
+  // function body lives in the .vert.glsl module and is called via buildVSCallExpr() below.
+  // Legacy GPs that have not been migrated continue to emit GLSL directly inside emitCode().
+  geometryProcessor->emitCode(args);
+
+  // Modular path: if the GP provides a .vert.glsl module, include it in the VS and emit the
+  // function call with the mangled resource names.
   auto vsFuncFile = geometryProcessor->shaderFunctionFile();
   bool useModularVS =
       !vsFuncFile.empty() && ShaderModuleRegistry::HasModule(geometryProcessor->name());
@@ -349,8 +353,6 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
     if (!vsCallExpr.empty()) {
       vertexShaderBuilder()->codeAppend(vsCallExpr);
     }
-  } else {
-    geometryProcessor->emitCode(args);
   }
 
   auto colorResult = geometryProcessor->buildColorCallExpr(gpUniforms, gpVaryings);

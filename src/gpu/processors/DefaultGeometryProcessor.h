@@ -48,7 +48,19 @@ class DefaultGeometryProcessor : public GeometryProcessor {
   }
 
   std::string shaderFunctionFile() const override {
-    return "geometry/default_geometry";
+    return "geometry/default_geometry.vert";
+  }
+
+  std::string buildVSCallExpr(const MangledUniforms& uniforms,
+                              const MangledVaryings& varyings) const override {
+    std::string code = "highp vec2 position;\n";
+    code += "TGFX_DefaultGP_VS(" + std::string(position.name()) + ", " + uniforms.get("Matrix");
+    if (aa == AAType::Coverage) {
+      code += ", " + std::string(coverage.name()) + ", " + varyings.get("Coverage");
+    }
+    code += ", position);\n";
+    code += "gl_Position = vec4(position.xy * tgfx_RTAdjust.xz + tgfx_RTAdjust.yw, 0, 1);\n";
+    return code;
   }
 
   ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,

@@ -53,6 +53,8 @@ enum class ShaderModuleID {
   GaussianBlur1D,
   // Reclassified leaf FP (was container)
   ColorSpaceXformEffect,
+  // Geometry Processor vertex modules
+  DefaultGeometry,
 };
 
 /**

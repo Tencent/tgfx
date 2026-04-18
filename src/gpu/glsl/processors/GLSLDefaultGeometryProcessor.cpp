@@ -58,28 +58,6 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
     }
   }
 
-  std::string positionName = "position";
-  static const std::string kDefaultGPVert = R"GLSL(
-void TGFX_DefaultGP_VS(vec2 inPosition, mat3 matrix,
-#ifdef TGFX_GP_DEFAULT_COVERAGE_AA
-                        float inCoverage, out float vCoverage,
-#endif
-                        out vec2 position) {
-    position = (matrix * vec3(inPosition, 1.0)).xy;
-#ifdef TGFX_GP_DEFAULT_COVERAGE_AA
-    vCoverage = inCoverage;
-#endif
-}
-)GLSL";
-  vertBuilder->addFunction(kDefaultGPVert);
-  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-  std::string call = "TGFX_DefaultGP_VS(" + std::string(position.name()) + ", " + matrixName;
-  if (aa == AAType::Coverage) {
-    call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
-  }
-  call += ", " + positionName + ");";
-  vertBuilder->codeAppend(call);
-
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
 
   auto colorName =
@@ -87,8 +65,6 @@ void TGFX_DefaultGP_VS(vec2 inPosition, mat3 matrix,
   if (args.gpUniforms) {
     args.gpUniforms->add("Color", colorName);
   }
-
-  args.vertBuilder->emitNormalizedPosition(positionName);
 }
 
 void GLSLDefaultGeometryProcessor::setData(UniformData* vertexUniformData,

@@ -51,6 +51,7 @@ static const std::unordered_map<std::string, ShaderModuleID> kProcessorModuleMap
     {"ClampedGradientEffect", ShaderModuleID::ClampedGradientEffect},
     {"GaussianBlur1DFragmentProcessor", ShaderModuleID::GaussianBlur1D},
     {"ColorSpaceXformEffect", ShaderModuleID::ColorSpaceXformEffect},
+    {"DefaultGeometryProcessor", ShaderModuleID::DefaultGeometry},
 };
 
 // ---- Public API implementation ----
@@ -105,6 +106,8 @@ const std::string& ShaderModuleRegistry::GetModule(ShaderModuleID id) {
       return kGaussianBlur1D;
     case ShaderModuleID::ColorSpaceXformEffect:
       return kColorSpaceXformEffect;
+    case ShaderModuleID::DefaultGeometry:
+      return kDefaultGeometryVert;
   }
   static const std::string kEmpty;
   return kEmpty;

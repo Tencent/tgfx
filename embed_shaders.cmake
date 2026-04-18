@@ -37,6 +37,7 @@ set(SHADER_MODULES
     "kClampedGradientEffect=fragment/clamped_gradient_effect.frag.glsl"
     "kGaussianBlur1D=fragment/gaussian_blur_1d.frag.glsl"
     "kColorSpaceXformEffect=fragment/color_space_xform.frag.glsl"
+    "kDefaultGeometryVert=geometry/default_geometry.vert.glsl"
 )
 
 if(NOT DEFINED SHADER_DIR)
