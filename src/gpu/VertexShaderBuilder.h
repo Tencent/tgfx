@@ -33,16 +33,5 @@ class VertexShaderBuilder : public ShaderBuilder {
   ShaderStage shaderStage() const override {
     return ShaderStage::Vertex;
   }
-
-  /**
-   * Emits GLSL code to transform a 2D point by a 3x3 matrix.
-   * @param dstPointName The name of the destination vec2 variable to store the result.
-   * @param srcPointName The name of the source point (vec2).
-   * @param transformName The name of the mat3 transform.
-   * @param hasPerspective If true, performs perspective division (divide by w).
-   */
-  virtual void emitTransformedPoint(const std::string& dstPointName,
-                                    const std::string& srcPointName,
-                                    const std::string& transformName, bool hasPerspective) = 0;
 };
 }  // namespace tgfx

@@ -29,19 +29,4 @@ GLSLVertexShaderBuilder::GLSLVertexShaderBuilder(ProgramBuilder* program)
     setPrecisionQualifier("precision mediump float;");
   }
 }
-
-void GLSLVertexShaderBuilder::emitTransformedPoint(const std::string& dstPointName,
-                                                   const std::string& srcPointName,
-                                                   const std::string& transformName,
-                                                   bool hasPerspective) {
-  if (hasPerspective) {
-    codeAppendf("vec3 %sTemp = %s * vec3(%s, 1.0);", dstPointName.c_str(), transformName.c_str(),
-                srcPointName.c_str());
-    codeAppendf("highp vec2 %s = %sTemp.xy / %sTemp.z;", dstPointName.c_str(), dstPointName.c_str(),
-                dstPointName.c_str());
-  } else {
-    codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", dstPointName.c_str(),
-                transformName.c_str(), srcPointName.c_str());
-  }
-}
 }  // namespace tgfx

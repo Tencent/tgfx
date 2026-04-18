@@ -100,8 +100,13 @@ void GLSLQuadPerEdgeAAGeometryProcessor::onEmitTransform(EmitArgs& args,
     const std::string perspRB = "perspRB";
     vertexBuilder->codeAppendf("highp vec2 %s = %s.xy;", srcLT.c_str(), subset.name().c_str());
     vertexBuilder->codeAppendf("highp vec2 %s = %s.zw;", srcRB.c_str(), subset.name().c_str());
-    vertexBuilder->emitTransformedPoint(perspLT, srcLT, subsetMatrixName, hasPerspective);
-    vertexBuilder->emitTransformedPoint(perspRB, srcRB, subsetMatrixName, hasPerspective);
+    // TGFX_TransformPoint/TGFX_TransformPointPersp live in tgfx_vs_boilerplate.glsl and are
+    // injected via includeVSModule(ShaderModuleID::VSBoilerplate) by ModularProgramBuilder.
+    const char* transformFn = hasPerspective ? "TGFX_TransformPointPersp" : "TGFX_TransformPoint";
+    vertexBuilder->codeAppendf("highp vec2 %s = %s(%s, %s);", perspLT.c_str(), transformFn,
+                               srcLT.c_str(), subsetMatrixName.c_str());
+    vertexBuilder->codeAppendf("highp vec2 %s = %s(%s, %s);", perspRB.c_str(), transformFn,
+                               srcRB.c_str(), subsetMatrixName.c_str());
     vertexBuilder->codeAppend("highp vec4 subset = vec4(" + perspLT + ", " + perspRB + ");");
     vertexBuilder->codeAppend("if (subset.x > subset.z) {");
     vertexBuilder->codeAppend("  highp float tmp = subset.x;");

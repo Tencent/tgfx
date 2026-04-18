@@ -24,8 +24,5 @@ namespace tgfx {
 class GLSLVertexShaderBuilder : public VertexShaderBuilder {
  public:
   explicit GLSLVertexShaderBuilder(ProgramBuilder* program);
-
-  void emitTransformedPoint(const std::string& dstPointName, const std::string& srcPointName,
-                            const std::string& transformName, bool hasPerspective) override;
 };
 }  // namespace tgfx
