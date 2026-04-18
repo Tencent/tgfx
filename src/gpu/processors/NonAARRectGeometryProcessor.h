@@ -55,7 +55,25 @@ class NonAARRectGeometryProcessor : public GeometryProcessor {
   }
 
   std::string shaderFunctionFile() const override {
-    return "geometry/non_aa_rrect_geometry";
+    return "geometry/non_aa_rrect_geometry.vert";
+  }
+
+  std::string buildVSCallExpr(const MangledUniforms& /*uniforms*/,
+                              const MangledVaryings& varyings) const override {
+    std::string code = "highp vec2 position;\n";
+    code += "TGFX_NonAARRectGP_VS(" + std::string(inPosition.name()) + ", " +
+            std::string(inLocalCoord.name()) + ", " + std::string(inRadii.name()) + ", " +
+            std::string(inRectBounds.name());
+    if (!commonColor.has_value()) {
+      code += ", " + std::string(inColor.name()) + ", " + varyings.get("Color");
+    }
+    if (stroke) {
+      code += ", " + std::string(inStrokeWidth.name()) + ", " + varyings.get("strokeWidth");
+    }
+    code += ", " + varyings.get("localCoord") + ", " + varyings.get("radii") + ", " +
+            varyings.get("rectBounds") + ", position);\n";
+    code += "gl_Position = vec4(position.xy * tgfx_RTAdjust.xz + tgfx_RTAdjust.yw, 0, 1);\n";
+    return code;
   }
 
   ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,

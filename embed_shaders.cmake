@@ -45,6 +45,7 @@ set(SHADER_MODULES
     "kRoundStrokeRectGeometryVert=geometry/round_stroke_rect_geometry.vert.glsl"
     "kHairlineLineGeometryVert=geometry/hairline_line_geometry.vert.glsl"
     "kHairlineQuadGeometryVert=geometry/hairline_quad_geometry.vert.glsl"
+    "kNonAARRectGeometryVert=geometry/non_aa_rrect_geometry.vert.glsl"
 )
 
 if(NOT DEFINED SHADER_DIR)

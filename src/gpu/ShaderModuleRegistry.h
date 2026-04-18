@@ -62,6 +62,7 @@ enum class ShaderModuleID {
   RoundStrokeRectGeometry,
   HairlineLineGeometry,
   HairlineQuadGeometry,
+  NonAARRectGeometry,
 };
 
 /**

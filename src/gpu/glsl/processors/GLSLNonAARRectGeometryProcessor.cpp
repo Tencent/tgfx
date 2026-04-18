@@ -39,21 +39,16 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   varyingHandler->emitAttributes(*this);
 
   // Setup color output
-  std::string colorFsIn;
-  std::string colorVsOut;
   if (commonColor.has_value()) {
     auto colorName =
         uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    colorFsIn = colorName;
     if (args.gpUniforms) {
       args.gpUniforms->add("Color", colorName);
     }
   } else {
     auto color = varyingHandler->addVarying("Color", SLType::Float4);
-    colorVsOut = color.vsOut();
-    colorFsIn = color.fsIn();
     if (args.gpVaryings) {
-      args.gpVaryings->add("Color", colorFsIn);
+      args.gpVaryings->add("Color", color.fsIn());
     }
   }
 
@@ -76,54 +71,12 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   // Pass stroke width to fragment shader (stroke mode only)
-  Varying strokeWidthVarying;
   if (stroke) {
-    strokeWidthVarying = varyingHandler->addVarying("strokeWidth", SLType::Float2);
+    auto strokeWidthVarying = varyingHandler->addVarying("strokeWidth", SLType::Float2);
     if (args.gpVaryings) {
       args.gpVaryings->add("strokeWidth", strokeWidthVarying.fsIn());
     }
   }
-
-  std::string positionName = "position";
-  static const std::string kNonAARRectGPVert = R"GLSL(
-void TGFX_NonAARRectGP_VS(vec2 inPosition, vec2 inLocalCoord, vec2 inRadii, vec4 inRectBounds,
-#ifndef TGFX_GP_NONAA_COMMON_COLOR
-                           vec4 inColor, out vec4 vColor,
-#endif
-#ifdef TGFX_GP_NONAA_STROKE
-                           vec2 inStrokeWidth, out vec2 vStrokeWidth,
-#endif
-                           out vec2 vLocalCoord, out vec2 vRadii, out vec4 vRectBounds,
-                           out vec2 position) {
-    position = inPosition;
-    vLocalCoord = inLocalCoord;
-    vRadii = inRadii;
-    vRectBounds = inRectBounds;
-#ifndef TGFX_GP_NONAA_COMMON_COLOR
-    vColor = inColor;
-#endif
-#ifdef TGFX_GP_NONAA_STROKE
-    vStrokeWidth = inStrokeWidth;
-#endif
-}
-)GLSL";
-  vertBuilder->addFunction(kNonAARRectGPVert);
-  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-  std::string call = "TGFX_NonAARRectGP_VS(" + std::string(inPosition.name()) + ", " +
-                     std::string(inLocalCoord.name()) + ", " + std::string(inRadii.name()) + ", " +
-                     std::string(inRectBounds.name());
-  if (!commonColor.has_value()) {
-    call += ", " + std::string(inColor.name()) + ", " + colorVsOut;
-  }
-  if (stroke) {
-    call += ", " + std::string(inStrokeWidth.name()) + ", " + strokeWidthVarying.vsOut();
-  }
-  call += ", " + localCoordVarying.vsOut() + ", " + radiiVarying.vsOut() + ", " +
-          boundsVarying.vsOut() + ", " + positionName + ");";
-  vertBuilder->codeAppend(call);
-
-  // Output position using RTAdjust uniform
-  vertBuilder->emitNormalizedPosition(positionName);
 
   // Emit transforms using position as UV coordinates.
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
