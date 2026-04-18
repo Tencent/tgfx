@@ -100,6 +100,13 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
   void emitProcessorDefines(const FragmentProcessor* processor);
 
   /**
+   * Returns the name of a 2D coordinate variable ready for texture sampling. If the coord
+   * varying is already vec2, returns its name unchanged. If vec3 (perspective), emits a call to
+   * TGFX_PerspDivide() (from tgfx_fs_boilerplate.glsl) and returns the resulting 2D name.
+   */
+  std::string emitPerspCoordDivide(const ShaderVar& coordVar);
+
+  /**
    * Renders a ShaderCallManifest into a GLSL statement string. Supports both function-call mode
    * (functionName non-empty) and raw-statement mode (functionName empty, statement used verbatim).
    *

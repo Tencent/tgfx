@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ModularProgramBuilder.h"
+#include "core/utils/Log.h"
 #include "gpu/MangledResources.h"
 #include "gpu/processors/FragmentProcessor.h"
 
@@ -89,6 +90,19 @@ void ModularProgramBuilder::includeModule(ShaderModuleID id) {
     includeModule(ShaderModuleID::BlendModes);
   }
   fragmentShaderBuilder()->addFunction(ShaderModuleRegistry::GetModule(id));
+}
+
+std::string ModularProgramBuilder::emitPerspCoordDivide(const ShaderVar& coordVar) {
+  if (coordVar.type() == SLType::Float2) {
+    return coordVar.name();
+  }
+  DEBUG_ASSERT(coordVar.type() == SLType::Float3);
+  // Inject TGFX_PerspDivide() from tgfx_fs_boilerplate.glsl on first use.
+  includeModule(ShaderModuleID::FSBoilerplate);
+  const std::string perspCoordName = "perspCoord2D";
+  fragmentShaderBuilder()->codeAppendf("highp vec2 %s = TGFX_PerspDivide(%s);",
+                                       perspCoordName.c_str(), coordVar.name().c_str());
+  return perspCoordName;
 }
 
 void ModularProgramBuilder::includeVSModule(ShaderModuleID id) {
@@ -255,8 +269,7 @@ bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* proc
   }
   // Populate coord transform varying.
   if (transformedCoordVarsIdx < transformedCoordVars.size()) {
-    auto texCoordName =
-        fragmentShaderBuilder()->emitPerspTextCoord(transformedCoordVars[transformedCoordVarsIdx]);
+    auto texCoordName = emitPerspCoordDivide(transformedCoordVars[transformedCoordVarsIdx]);
     resources.varyings.addCoordTransform(0, texCoordName);
   }
   if (!subsetVarName.empty()) {
@@ -297,8 +310,7 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
   FPResources resources;
   // Populate coord transform (emit perspective divide if needed).
   if (transformedCoordVarsIdx < transformedCoordVars.size()) {
-    auto texCoordName =
-        fragmentShaderBuilder()->emitPerspTextCoord(transformedCoordVars[transformedCoordVarsIdx]);
+    auto texCoordName = emitPerspCoordDivide(transformedCoordVars[transformedCoordVarsIdx]);
     if (coordTransformFunc) {
       fragmentShaderBuilder()->codeAppendf("highp vec2 transformedCoord = %s;",
                                            coordTransformFunc(texCoordName).c_str());

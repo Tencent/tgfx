@@ -37,18 +37,4 @@ void FragmentShaderBuilder::declareCustomOutputColor() {
 
   outputs.emplace_back(CUSTOM_COLOR_OUTPUT_NAME, SLType::Float4, typeModifier);
 }
-
-std::string FragmentShaderBuilder::emitPerspTextCoord(const ShaderVar& coordVar) {
-  if (coordVar.type() == SLType::Float2) {
-    return coordVar.name();
-  }
-  if (coordVar.type() == SLType::Float3) {
-    const std::string perspCoordName = "perspCoord2D";
-    codeAppendf("highp vec2 %s = %s.xy / %s.z;", perspCoordName.c_str(), coordVar.name().c_str(),
-                coordVar.name().c_str());
-    return perspCoordName;
-  }
-  DEBUG_ASSERT(false);
-  return "";
-}
 }  // namespace tgfx
