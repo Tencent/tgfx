@@ -363,6 +363,47 @@ struct ShaderCallManifest {
 
 ### Phase U-2 实施结果
 
-_待填充_
+> 2026-04-17 完成，共 1 个 commit。
+
+#### 改动汇总
+
+| 文件 | 操作 | 行数变化 |
+|------|------|---------|
+| `src/gpu/shaders/xfer/porter_duff_xfer.frag.glsl` | 重写为 `TGFX_PorterDuffXP_Blend()` + `TGFX_PorterDuffXP_FS()` 三重载（sampler2D、sampler2DRect、无 dst 纹理），覆盖全部 30 种 blend mode 的 coverage 处理 | +112 / -79 |
+| `src/gpu/glsl/processors/GLSLPorterDuffXferProcessor.cpp` | 删除 `OutputTypeExpr` / `CoeffExpr` / `OperationExpr` 三个辅助函数（~72 行）；`buildXferCallStatement()` 简化为生成单行 `TGFX_PorterDuffXP_FS(...)` 调用 | -95 |
+| `src/gpu/ShaderModuleEmbedded.inc` | CMake 自动重新生成 | 同步变化 |
+| **净变化** | | **-2 行（代码）/ +33 行（注释与文档）** |
+
+#### 设计要点
+
+1. **精确复刻 C++ `BlendFormula(hasCoverage=true)` 语义**：在 `.glsl` 中为 15 个系数模式（0-14）逐一写出考虑 coverage 的完整公式。复刻包括 C++ 原行为中 `primary=None` 时 `dstTerm = dst * (1 - 0.a) = dst` 的特殊情况（mode 2 Dst / mode 8 DstOut）。
+2. **sampler2D + sampler2DRect 重载**：参照 TextureEffect 的 Phase H 改造模式。将 blending 逻辑提取为 `TGFX_PorterDuffXP_Blend()` 辅助函数，`TGFX_PorterDuffXP_FS()` 为两种 sampler 类型各提供一个重载，GLSL 在链接时自动选择。矩形纹理（sampler2DRect）的非归一化坐标由 C++ 通过 `DstTextureCoordScale=(1,1)` 编码，`.glsl` 中无需感知。
+3. **C++ 仅保留调用语句拼装**：`buildXferCallStatement()` 只生成一行函数调用（含 uniform/sampler mangled 名），所有算法都在 `.glsl` 中。
+
+#### 完成的 Commit
+
+| Commit | 说明 |
+|--------|------|
+| `95d783a8` | PorterDuff 系数混合公式迁移到 .glsl，移除 3 个运行时 shader 生成辅助函数 |
+
+#### 验证结果
+
+| 构建命令 | 测试数 | 结果 |
+|---------|--------|------|
+| `cmake -G Ninja -DTGFX_BUILD_TESTS=ON` | 431 | 全部通过 |
+
+#### 关键成果
+
+**XferProcessor 的 C++ 运行时 shader 拼装完全消除**：
+- ✅ dst 纹理采样：`.glsl` 辅助函数（两个 sampler 类型重载）
+- ✅ coverage discard：`.glsl` 内
+- ✅ 15 个系数模式的 coverage-aware 公式：`.glsl` 内
+- ✅ 15 个高级模式 + coverage lerp：`.glsl` 内（沿用既有实现）
+- ✅ C++ 只发 macros（TGFX_BLEND_MODE、TGFX_PDXP_DST_TEXTURE_READ、TGFX_PDXP_NON_COEFF）+ 单行函数调用
+
+#### 经验总结
+
+- 初次在 `.glsl` 中实现时漏掉了 sampler2DRect 的重载（测试 `GLRenderTest.rectangleTextureAsBlendDst` 失败），按 TextureEffect 模式添加重载后通过。
+- agent 初步估计 2-3 人日，实际因需要精确复刻 BlendFormula 的 9 个系数模式公式，耗时略多。
 
 （后续 Phase 依次追加）
