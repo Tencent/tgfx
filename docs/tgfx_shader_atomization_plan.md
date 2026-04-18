@@ -197,15 +197,28 @@ struct ShaderCallManifest {
     std::string outputVarName;                   // "color_fp1"
     std::string outputType = "vec4";
     std::vector<std::string> argExpressions;     // ["input", "coord", "sampler_mangled"]
-    std::vector<std::string> includeModules;     // [".glsl" dependencies]
+    bool declareOutput = true;                   // false for XP out-parameter style
+    std::string statement;                       // raw-statement mode fallback (for GP exprs)
+    std::vector<std::string> includeFiles;       // [".glsl" dependencies]
     std::string preamble;                        // 额外 #define 指令
 };
 ```
 
-改造：
-1. 所有 FP/GP/XP 的 `buildCallStatement()` 返回 `ShaderCallManifest` 而非 `ShaderCallResult`
-2. `ModularProgramBuilder` 新增 `ManifestRenderer`：输入 Manifest，输出 GLSL 字符串（**确定性模板渲染，无算法分支**）
-3. `ManifestRenderer` 逻辑足够简单，可被 UE 离线工具完整复现
+**实施结果（2026-04-18）**：✅ 完成
+
+- **W-1a** (commit `5fee9c7a`)：重命名 `ShaderCallResult` → `ShaderCallManifest`，新增 `functionName`/`argExpressions`/`outputType`/`declareOutput` 字段，保留 `statement` 作为 raw-statement 回退。
+- **W-1b** (commit `079c580b`)：`ModularProgramBuilder::RenderManifest()` 静态方法，确定性模板渲染：
+  - 函数调用模式（`functionName` 非空）：`T out = func(a, b, ...);` 或 `func(a, b, ..., out);`（XP 风格）
+  - 表达式模式（`functionName` 空）：直接返回 `statement`
+- **W-1c** (commit `a2c00e20`)：16 个 leaf FP 全部迁移为结构化模式（AARectEffect, AlphaThreshold, ColorMatrix, Conic/Diamond/Linear/Radial/Conic GradientLayout, ConstColor, DeviceSpaceTextureEffect, Dual/Single/Texture/UnrolledBinaryGradientColorizer, Luma, TextureEffect, TiledTextureEffect, ColorSpaceXformEffect）。
+- **W-1d** (commit `04b52edc`)：3 个 container FP 迁移（ClampedGradientEffect, GaussianBlur1D 保留 preamble, XfermodeFragmentProcessor）。ComposeFragmentProcessor 是 passthrough，天然兼容。
+- **W-1e** (commit `b913ab41`)：2 个 XP 迁移（EmptyXP, PorterDuffXP），使用 `declareOutput=false` 表达 out-parameter 语义。
+- **W-1f**：GP 的 `buildColorCallExpr` / `buildCoverageCallExpr` / `buildVSCallExpr` **保留 raw-statement 模式**。这些是表达式赋值（`vec4 gpColor = uniform;`）而非函数调用，结构化后无法被 UE 离线工具作为"函数调用"识别，收益低。
+
+**最终能力**：
+- 所有函数调用式 shader call 都有结构化元数据（functionName + argExpressions）
+- UE 离线工具可遍历 Manifest 直接生成 `.usf` 函数调用，无需解析 GLSL 字符串
+- `RenderManifest()` 的模板逻辑足够简单，可被任意语言（Python/C#）完整复现
 
 ### Phase W-2：Boilerplate 消除（~1 周）
 
