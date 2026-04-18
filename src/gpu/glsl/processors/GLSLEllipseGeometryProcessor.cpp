@@ -49,53 +49,19 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   // setup pass through color
-  std::string colorFsIn;
-  std::string colorVsOut;
   if (commonColor.has_value()) {
     auto colorName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    colorFsIn = colorName;
     if (args.gpUniforms) {
       args.gpUniforms->add("Color", colorName);
     }
   } else {
     auto color = varyingHandler->addVarying("Color", SLType::Float4);
-    colorVsOut = color.vsOut();
-    colorFsIn = color.fsIn();
     if (args.gpVaryings) {
-      args.gpVaryings->add("Color", colorFsIn);
+      args.gpVaryings->add("Color", color.fsIn());
     }
   }
 
-  std::string positionName = "position";
-  static const std::string kEllipseGPVert = R"GLSL(
-void TGFX_EllipseGP_VS(vec2 inPosition, vec2 inEllipseOffset, vec4 inEllipseRadii,
-#ifndef TGFX_GP_ELLIPSE_COMMON_COLOR
-                        vec4 inColor, out vec4 vColor,
-#endif
-                        out vec2 vEllipseOffsets, out vec4 vEllipseRadii,
-                        out vec2 position) {
-    vEllipseOffsets = inEllipseOffset;
-    vEllipseRadii = inEllipseRadii;
-#ifndef TGFX_GP_ELLIPSE_COMMON_COLOR
-    vColor = inColor;
-#endif
-    position = inPosition;
-}
-)GLSL";
-  vertBuilder->addFunction(kEllipseGPVert);
-  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-  std::string call = "TGFX_EllipseGP_VS(" + std::string(inPosition.name()) + ", " +
-                     std::string(inEllipseOffset.name()) + ", " +
-                     std::string(inEllipseRadii.name());
-  if (!commonColor.has_value()) {
-    call += ", " + std::string(inColor.name()) + ", " + colorVsOut;
-  }
-  call += ", " + ellipseOffsets.vsOut() + ", " + ellipseRadii.vsOut() + ", " + positionName + ");";
-  vertBuilder->codeAppend(call);
-
-  // Setup position
-  args.vertBuilder->emitNormalizedPosition(positionName);
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(inPosition));
 }
 

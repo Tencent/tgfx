@@ -58,6 +58,7 @@ enum class ShaderModuleID {
   MeshGeometry,
   QuadAAGeometry,
   AtlasTextGeometry,
+  EllipseGeometry,
 };
 
 /**

@@ -57,7 +57,21 @@ class EllipseGeometryProcessor : public GeometryProcessor {
   }
 
   std::string shaderFunctionFile() const override {
-    return "geometry/ellipse_geometry";
+    return "geometry/ellipse_geometry.vert";
+  }
+
+  std::string buildVSCallExpr(const MangledUniforms& /*uniforms*/,
+                              const MangledVaryings& varyings) const override {
+    std::string code = "highp vec2 position;\n";
+    code += "TGFX_EllipseGP_VS(" + std::string(inPosition.name()) + ", " +
+            std::string(inEllipseOffset.name()) + ", " + std::string(inEllipseRadii.name());
+    if (!commonColor.has_value()) {
+      code += ", " + std::string(inColor.name()) + ", " + varyings.get("Color");
+    }
+    code += ", " + varyings.get("EllipseOffsets") + ", " + varyings.get("EllipseRadii") +
+            ", position);\n";
+    code += "gl_Position = vec4(position.xy * tgfx_RTAdjust.xz + tgfx_RTAdjust.yw, 0, 1);\n";
+    return code;
   }
 
   ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,

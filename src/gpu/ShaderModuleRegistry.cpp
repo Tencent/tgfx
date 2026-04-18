@@ -55,6 +55,7 @@ static const std::unordered_map<std::string, ShaderModuleID> kProcessorModuleMap
     {"MeshGeometryProcessor", ShaderModuleID::MeshGeometry},
     {"QuadPerEdgeAAGeometryProcessor", ShaderModuleID::QuadAAGeometry},
     {"AtlasTextGeometryProcessor", ShaderModuleID::AtlasTextGeometry},
+    {"EllipseGeometryProcessor", ShaderModuleID::EllipseGeometry},
 };
 
 // ---- Public API implementation ----
@@ -117,6 +118,8 @@ const std::string& ShaderModuleRegistry::GetModule(ShaderModuleID id) {
       return kQuadAAGeometryVert;
     case ShaderModuleID::AtlasTextGeometry:
       return kAtlasTextGeometryVert;
+    case ShaderModuleID::EllipseGeometry:
+      return kEllipseGeometryVert;
   }
   static const std::string kEmpty;
   return kEmpty;
