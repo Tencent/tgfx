@@ -57,7 +57,25 @@ class MeshGeometryProcessor : public GeometryProcessor {
   }
 
   std::string shaderFunctionFile() const override {
-    return "geometry/mesh_geometry";
+    return "geometry/mesh_geometry.vert";
+  }
+
+  std::string buildVSCallExpr(const MangledUniforms& uniforms,
+                              const MangledVaryings& varyings) const override {
+    std::string code = "highp vec2 position;\n";
+    code += "TGFX_MeshGP_VS(" + std::string(position.name()) + ", " + uniforms.get("Matrix");
+    if (hasTexCoords) {
+      code += ", " + std::string(texCoord.name()) + ", " + varyings.get("TexCoord");
+    }
+    if (hasColors) {
+      code += ", " + std::string(color.name()) + ", " + varyings.get("Color");
+    }
+    if (hasCoverage) {
+      code += ", " + std::string(coverage.name()) + ", " + varyings.get("Coverage");
+    }
+    code += ", position);\n";
+    code += "gl_Position = vec4(position.xy * tgfx_RTAdjust.xz + tgfx_RTAdjust.yw, 0, 1);\n";
+    return code;
   }
 
   ShaderCallResult buildColorCallExpr(const MangledUniforms& uniforms,

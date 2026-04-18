@@ -55,6 +55,7 @@ enum class ShaderModuleID {
   ColorSpaceXformEffect,
   // Geometry Processor vertex modules
   DefaultGeometry,
+  MeshGeometry,
 };
 
 /**

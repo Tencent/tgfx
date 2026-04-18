@@ -43,89 +43,41 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
 
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
+  if (args.gpUniforms) {
+    args.gpUniforms->add("Matrix", matrixName);
+  }
 
   // Handle texture coordinates for FragmentProcessor
-  std::string texCoordVsOut;
   if (hasTexCoords) {
     auto texCoordVar = varyingHandler->addVarying("TexCoord", SLType::Float2);
-    texCoordVsOut = texCoordVar.vsOut();
+    if (args.gpVaryings) {
+      args.gpVaryings->add("TexCoord", texCoordVar.fsIn());
+    }
     emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(texCoord));
   } else {
     emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
   }
 
-  std::string colorFsIn;
-  std::string colorVsOut;
   if (hasColors) {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    colorVsOut = colorVar.vsOut();
-    colorFsIn = colorVar.fsIn();
     if (args.gpVaryings) {
-      args.gpVaryings->add("Color", colorFsIn);
+      args.gpVaryings->add("Color", colorVar.fsIn());
     }
   } else {
     auto colorName =
         uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    colorFsIn = colorName;
     if (args.gpUniforms) {
       args.gpUniforms->add("Color", colorName);
     }
   }
 
   // Handle coverage for anti-aliasing
-  std::string coverageFsIn;
-  std::string coverageVsOut;
   if (hasCoverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    coverageVsOut = coverageVar.vsOut();
-    coverageFsIn = coverageVar.fsIn();
     if (args.gpVaryings) {
-      args.gpVaryings->add("Coverage", coverageFsIn);
+      args.gpVaryings->add("Coverage", coverageVar.fsIn());
     }
   }
-
-  // Transform position by view matrix
-  std::string positionName = "position";
-  static const std::string kMeshGPVert = R"GLSL(
-void TGFX_MeshGP_VS(vec2 inPosition, mat3 matrix,
-#ifdef TGFX_GP_MESH_TEX_COORDS
-                     vec2 inTexCoord, out vec2 vTexCoord,
-#endif
-#ifdef TGFX_GP_MESH_VERTEX_COLORS
-                     vec4 inColor, out vec4 vColor,
-#endif
-#ifdef TGFX_GP_MESH_VERTEX_COVERAGE
-                     float inCoverage, out float vCoverage,
-#endif
-                     out vec2 position) {
-    position = (matrix * vec3(inPosition, 1.0)).xy;
-#ifdef TGFX_GP_MESH_TEX_COORDS
-    vTexCoord = inTexCoord;
-#endif
-#ifdef TGFX_GP_MESH_VERTEX_COLORS
-    vColor = inColor;
-#endif
-#ifdef TGFX_GP_MESH_VERTEX_COVERAGE
-    vCoverage = inCoverage;
-#endif
-}
-)GLSL";
-  vertBuilder->addFunction(kMeshGPVert);
-  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-  std::string call = "TGFX_MeshGP_VS(" + std::string(position.name()) + ", " + matrixName;
-  if (hasTexCoords) {
-    call += ", " + std::string(texCoord.name()) + ", " + texCoordVsOut;
-  }
-  if (hasColors) {
-    call += ", " + std::string(color.name()) + ", " + colorVsOut;
-  }
-  if (hasCoverage) {
-    call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
-  }
-  call += ", " + positionName + ");";
-  vertBuilder->codeAppend(call);
-
-  vertBuilder->emitNormalizedPosition(positionName);
 }
 
 void GLSLMeshGeometryProcessor::setData(UniformData* vertexUniformData,

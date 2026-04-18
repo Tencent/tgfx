@@ -38,6 +38,7 @@ set(SHADER_MODULES
     "kGaussianBlur1D=fragment/gaussian_blur_1d.frag.glsl"
     "kColorSpaceXformEffect=fragment/color_space_xform.frag.glsl"
     "kDefaultGeometryVert=geometry/default_geometry.vert.glsl"
+    "kMeshGeometryVert=geometry/mesh_geometry.vert.glsl"
 )
 
 if(NOT DEFINED SHADER_DIR)
