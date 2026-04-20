@@ -4388,8 +4388,8 @@ TGFX_TEST(VectorLayerTest, StrokeDashAdaptive) {
 }
 
 /**
- * Test Line vector element: horizontal, vertical, diagonal segments with different stroke styles.
- * Also verifies that reversed property changes the trim direction visibly.
+ * Test Line vector element: horizontal, diagonal, and trimmed (forward and reversed) segments
+ * with different stroke styles.
  */
 TGFX_TEST(VectorLayerTest, Line) {
   ContextScope scope;
