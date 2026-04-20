@@ -27,6 +27,7 @@
 #include "tgfx/layers/vectors/FillStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
 #include "tgfx/layers/vectors/ImagePattern.h"
+#include "tgfx/layers/vectors/Line.h"
 #include "tgfx/layers/vectors/MergePath.h"
 #include "tgfx/layers/vectors/Polystar.h"
 #include "tgfx/layers/vectors/Rectangle.h"
@@ -4384,6 +4385,70 @@ TGFX_TEST(VectorLayerTest, StrokeDashAdaptive) {
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/StrokeDashAdaptive"));
+}
+
+/**
+ * Test Line vector element: horizontal, vertical, diagonal segments with different stroke styles.
+ * Also verifies that reversed property changes the trim direction visibly.
+ */
+TGFX_TEST(VectorLayerTest, Line) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 600, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  // Line 1: Horizontal line with solid red stroke.
+  auto line1 = Line::Make();
+  line1->setStartPoint({50, 54});
+  line1->setEndPoint({550, 54});
+  auto stroke1 = MakeStrokeStyle(Color::Red(), 8.0f);
+  auto group1 = std::make_shared<VectorGroup>();
+  group1->setElements({line1, stroke1});
+
+  // Line 2: Diagonal line with dashed blue stroke.
+  auto line2 = Line::Make();
+  line2->setStartPoint({50, 150});
+  line2->setEndPoint({550, 250});
+  auto stroke2 = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+  stroke2->setStrokeWidth(8.0f);
+  stroke2->setDashes({24.0f, 12.0f});
+  auto group2 = std::make_shared<VectorGroup>();
+  group2->setElements({line2, stroke2});
+
+  // Line 3: Forward line trimmed to the first half, stroked green.
+  auto line3 = Line::Make();
+  line3->setStartPoint({50, 346});
+  line3->setEndPoint({300, 346});
+  auto trim3 = std::make_shared<TrimPath>();
+  trim3->setStart(0.0f);
+  trim3->setEnd(0.5f);
+  auto stroke3 = MakeStrokeStyle(Color::Green(), 8.0f);
+  auto group3 = std::make_shared<VectorGroup>();
+  group3->setElements({line3, trim3, stroke3});
+
+  // Line 4: Reversed line with the same trim; the opposite half should be drawn.
+  auto line4 = Line::Make();
+  line4->setStartPoint({300, 346});
+  line4->setEndPoint({550, 346});
+  line4->setReversed(true);
+  auto trim4 = std::make_shared<TrimPath>();
+  trim4->setStart(0.0f);
+  trim4->setEnd(0.5f);
+  auto stroke4 = MakeStrokeStyle(Color::FromRGBA(255, 128, 0, 255), 8.0f);
+  auto group4 = std::make_shared<VectorGroup>();
+  group4->setElements({line4, trim4, stroke4});
+
+  vectorLayer->setContents({group1, group2, group3, group4});
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/Line"));
 }
 
 }  // namespace tgfx
