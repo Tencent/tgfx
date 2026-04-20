@@ -332,12 +332,13 @@
         "InnerShadowOnly_TranslateRotate": "e2a76e12b",
         "InnerShadow_Translate": "e2a76e12b",
         "InnerShadow_TranslateRotateScale": "e2a76e12b",
-        "LayerConicGradient": "3230001c6",
-        "LayerDiamondGradient": "3230001c6",
+        "LayerConicGradient": "87b290333",
+        "LayerDiamondGradient": "87b290333",
         "LayerLinearGradient": "23582ded6",
         "LayerRadialGradient": "23582ded6",
-        "NonRegularBlendMode": "3230001c6",
-        "SimpleText": "c13eac52"
+        "NonRegularBlendMode": "fb7474423",
+        "SimpleText": "c13eac52",
+        "SrcBlendOverlap": "fb7474423"
     },
     "PathShapeTest": {
         "AdaptiveDashEffect": "0448e0fe",
@@ -371,7 +372,7 @@
         "drawShape": "bf48e614",
         "inversePath_rect": "bf48e614",
         "inversePath_text": "c37a86c8",
-        "path": "bf48e614",
+        "path": "45fb9980",
         "roundRectRadii": "bf48e614",
         "roundRectRadiiStroke": "bf48e614",
         "shape": "cad4b77f"
@@ -473,7 +474,7 @@
         "complex3": "543054b5",
         "complex4": "5ff7fdca",
         "complex5": "880d5a6c",
-        "complex6": "cd158924",
+        "complex6": "45fb9980",
         "complex7": "cd158924",
         "jpg_image": "b1db872",
         "mask": "da364e8",
