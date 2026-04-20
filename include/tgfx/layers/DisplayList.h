@@ -296,6 +296,9 @@ class DisplayList {
   Point mousePosition = {};
   int totalTileCount = 0;
   std::vector<std::shared_ptr<Surface>> surfaceCaches = {};
+  // SSAA tile surface used for anti-aliasing via downsampling in Tiled mode. Its size is 2x
+  // _tileSize in both dimensions, rendered with NoAA, then drawn to atlas with linear sampling.
+  std::shared_ptr<Surface> ssaaTileSurface = nullptr;
   std::unordered_map<int64_t, TileCache*> tileCaches = {};
   std::vector<std::shared_ptr<Tile>> emptyTiles = {};
   std::deque<std::vector<Rect>> lastDirtyRegions = {};
@@ -341,7 +344,10 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  void drawTileTask(const DrawTask& task) const;
+  void drawTileTask(const DrawTask& task, const Surface* renderSurface);
+
+  Surface* getOrCreateSSAATileSurface(const Surface* renderSurface, int requiredWidth,
+                                      int requiredHeight);
 
   void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear) const;
 

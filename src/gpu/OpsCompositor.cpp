@@ -43,6 +43,10 @@
 
 namespace tgfx {
 
+// HACK: thread_local flag to force NoAA rendering for SSAA tile testing. When true, all draws will
+// skip coverage-based AA and rely on higher resolution rendering + downsampling for anti-aliasing.
+thread_local bool OpsCompositorForceNoAA = true;
+
 static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& rects) {
   if (rects.size() <= 1) {
     return false;
@@ -667,6 +671,9 @@ AAType OpsCompositor::getAAType(const Brush& brush) const {
 }
 
 AAType OpsCompositor::getAAType(bool antiAlias) const {
+  if (OpsCompositorForceNoAA) {
+    return AAType::None;
+  }
   if (renderTarget->sampleCount() > 1) {
     return AAType::MSAA;
   }

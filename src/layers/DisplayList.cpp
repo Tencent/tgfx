@@ -21,6 +21,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
+#include "gpu/OpsCompositor.h"
 #include "inspect/InspectorMark.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
@@ -437,7 +438,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   for (auto& task : tileTasks) {
-    drawTileTask(task);
+    drawTileTask(task, surface);
     auto dirtyRect = task.tileRect();
     dirtyRect.offset(_contentOffset.x, _contentOffset.y);
     if (dirtyRect.intersect(surfaceRect)) {
@@ -911,22 +912,75 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
-void DisplayList::drawTileTask(const DrawTask& task) const {
-  auto surface = surfaceCaches[task.sourceIndex()].get();
-  DEBUG_ASSERT(surface != nullptr);
-  auto canvas = surface->getCanvas();
-  AutoCanvasRestore autoRestore(canvas);
+void DisplayList::drawTileTask(const DrawTask& task, const Surface* renderSurface) {
+  auto atlasSurface = surfaceCaches[task.sourceIndex()].get();
+  DEBUG_ASSERT(atlasSurface != nullptr);
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
-  auto viewMatrix = Matrix::MakeScale(currentZoomScale);
   auto& tileRect = task.tileRect();
   auto& sourceRect = task.sourceRect();
+
+  // SSAA path for Tiled mode: render each tile at 2x resolution with NoAA into a reusable SSAA
+  // tile surface, then downsample to the atlas with linear sampling. This provides anti-aliasing
+  // via supersampling and avoids edge bleeding caused by coverage-based AA when layers stack.
+  constexpr int SSAAScale = 2;
+  auto tileWidthInt = static_cast<int>(std::ceil(tileRect.width()));
+  auto tileHeightInt = static_cast<int>(std::ceil(tileRect.height()));
+  auto ssaaWidth = tileWidthInt * SSAAScale;
+  auto ssaaHeight = tileHeightInt * SSAAScale;
+  auto tileSurface = getOrCreateSSAATileSurface(renderSurface, ssaaWidth, ssaaHeight);
+  if (tileSurface != nullptr) {
+    // Render to the SSAA tile surface at 2x scale starting from (0, 0).
+    auto viewMatrix = Matrix::MakeScale(currentZoomScale * SSAAScale);
+    viewMatrix.postTranslate(-tileRect.left * SSAAScale, -tileRect.top * SSAAScale);
+    auto tileClipRect = Rect::MakeWH(tileRect.width() * SSAAScale, tileRect.height() * SSAAScale);
+    // Force all draws to use NoAA; the flag must remain true through makeImageSnapshot(), which
+    // internally triggers renderContext->flush() where getAAType() is evaluated.
+    OpsCompositorForceNoAA = true;
+    drawRootLayer(tileSurface, tileClipRect, viewMatrix, true);
+    auto image = tileSurface->makeImageSnapshot();
+    OpsCompositorForceNoAA = false;
+
+    // Downsample to the atlas with linear sampling.
+    auto atlasCanvas = atlasSurface->getCanvas();
+    AutoCanvasRestore autoRestore(atlasCanvas);
+    atlasCanvas->resetMatrix();
+    Paint paint = {};
+    paint.setAntiAlias(false);
+    paint.setBlendMode(BlendMode::Src);
+    static SamplingOptions linearSampling(FilterMode::Linear, MipmapMode::None);
+    auto srcRect = Rect::MakeWH(tileRect.width() * SSAAScale, tileRect.height() * SSAAScale);
+    atlasCanvas->drawImageRect(image, srcRect, sourceRect, linearSampling, &paint,
+                               SrcRectConstraint::Strict);
+    return;
+  }
+
+  // Fallback: render directly to atlas (original path).
+  auto canvas = atlasSurface->getCanvas();
+  AutoCanvasRestore autoRestore(canvas);
+  auto viewMatrix = Matrix::MakeScale(currentZoomScale);
   auto offsetX = sourceRect.left - tileRect.left;
   auto offsetY = sourceRect.top - tileRect.top;
   viewMatrix.postTranslate(offsetX, offsetY);
   auto clipRect = tileRect;
   clipRect.offset(offsetX, offsetY);
-  drawRootLayer(surface, clipRect, viewMatrix, true);
+  drawRootLayer(atlasSurface, clipRect, viewMatrix, true);
+}
+
+Surface* DisplayList::getOrCreateSSAATileSurface(const Surface* renderSurface, int requiredWidth,
+                                                 int requiredHeight) {
+  if (ssaaTileSurface != nullptr && ssaaTileSurface->getContext() == renderSurface->getContext() &&
+      ssaaTileSurface->width() == requiredWidth && ssaaTileSurface->height() == requiredHeight &&
+      ColorSpace::Equals(ssaaTileSurface->colorSpace().get(), renderSurface->colorSpace().get())) {
+    return ssaaTileSurface.get();
+  }
+  ssaaTileSurface = Surface::Make(renderSurface->getContext(), requiredWidth, requiredHeight,
+                                  ColorType::RGBA_8888, 1, false, renderSurface->renderFlags(),
+                                  renderSurface->colorSpace());
+  if (ssaaTileSurface == nullptr) {
+    LOGE("DisplayList::getOrCreateSSAATileSurface() Failed to create SSAA tile surface!");
+  }
+  return ssaaTileSurface.get();
 }
 
 void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface,
@@ -1008,6 +1062,7 @@ void DisplayList::resetCaches() {
   }
   tileCaches = {};
   surfaceCaches = {};
+  ssaaTileSurface = nullptr;
   totalTileCount = 0;
   emptyTiles.clear();
 }

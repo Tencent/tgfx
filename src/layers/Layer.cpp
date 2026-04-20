@@ -47,7 +47,7 @@ namespace tgfx {
 // The minimum size (longest edge) for subtree cache. This prevents creating excessively small
 // mipmap levels that would be inefficient to cache.
 static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
-static std::atomic_bool AllowsEdgeAntialiasing = true;
+static std::atomic_bool AllowsEdgeAntialiasing = false;
 static std::atomic_bool AllowsGroupOpacity = false;
 static const std::vector<LayerStyleExtraSourceType> StyleSourceTypesFor3DContext = {
     LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour};

@@ -28,6 +28,11 @@
 
 namespace tgfx {
 
+// HACK: thread_local flag to force NoAA rendering for SSAA tile testing. When true, all draws on
+// the current thread will skip coverage-based AA and rely on higher resolution rendering plus
+// downsampling for anti-aliasing.
+extern thread_local bool OpsCompositorForceNoAA;
+
 /**
  * AppliedClipStatus represents the result of applying a clip to a draw operation.
  */
