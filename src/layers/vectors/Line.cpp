@@ -57,7 +57,7 @@ void Line::setReversed(bool value) {
 void Line::apply(VectorContext* context) {
   DEBUG_ASSERT(context != nullptr);
   if (_cachedShape == nullptr) {
-    Path path = {};
+    Path path;
     if (_reversed) {
       path.moveTo(_endPoint);
       path.lineTo(_startPoint);
