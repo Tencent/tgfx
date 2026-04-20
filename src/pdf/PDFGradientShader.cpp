@@ -677,14 +677,37 @@ void WriteTriangleMeshVertex(MemoryWriteStream* stream, uint8_t flag, float x, f
   stream->write(&b, 1);
 }
 
-void WriteConicMeshSegment(MemoryWriteStream* stream, Point center, float radius, float fromAngle,
-                           float toAngle, const Color& fromColor, const Color& toColor, float minX,
-                           float maxX, float minY, float maxY) {
-  Point p1 = {center.x + radius * std::cos(fromAngle), center.y + radius * std::sin(fromAngle)};
-  Point p2 = {center.x + radius * std::cos(toAngle), center.y + radius * std::sin(toAngle)};
-  WriteTriangleMeshVertex(stream, 0, center.x, center.y, minX, maxX, minY, maxY, fromColor);
-  WriteTriangleMeshVertex(stream, 1, p1.x, p1.y, minX, maxX, minY, maxY, fromColor);
-  WriteTriangleMeshVertex(stream, 1, p2.x, p2.y, minX, maxX, minY, maxY, toColor);
+// Writes a triangle fan as a connected strip using flag=1. Vertices alternate between center
+// (with per-segment color) and arc points, forming a triangle strip. Adjacent real fan triangles
+// share their arc edge through the strip, eliminating rendering seams. The interleaved center
+// vertices produce zero-area degenerate triangles that are invisible.
+//
+// Strip layout for N arc vertices (arc0..arcN):
+//   flag=0: center(c0), arc0(c0), center(c1)    → degenerate (center-to-center)
+//   flag=1: arc1(c1)                             → real: [arc0, center(c1), arc1]
+//   flag=1: center(c2)                           → degenerate
+//   flag=1: arc2(c2)                             → real: [arc1, center(c2), arc2]
+//   ...
+void WriteConicFanStrip(MemoryWriteStream* stream, Point center, float radius,
+                        const std::vector<float>& angles, const std::vector<Color>& colors,
+                        float minX, float maxX, float minY, float maxY) {
+  DEBUG_ASSERT(angles.size() == colors.size());
+  DEBUG_ASSERT(angles.size() >= 2);
+  Point p0 = {center.x + radius * std::cos(angles[0]), center.y + radius * std::sin(angles[0])};
+  // First triangle (degenerate): center(c0), arc0(c0), center(c1)
+  WriteTriangleMeshVertex(stream, 0, center.x, center.y, minX, maxX, minY, maxY, colors[0]);
+  WriteTriangleMeshVertex(stream, 0, p0.x, p0.y, minX, maxX, minY, maxY, colors[0]);
+  WriteTriangleMeshVertex(stream, 0, center.x, center.y, minX, maxX, minY, maxY, colors[1]);
+  for (size_t i = 1; i < angles.size(); ++i) {
+    Point p = {center.x + radius * std::cos(angles[i]), center.y + radius * std::sin(angles[i])};
+    // arc vertex → forms real fan triangle with previous center and arc
+    WriteTriangleMeshVertex(stream, 1, p.x, p.y, minX, maxX, minY, maxY, colors[i]);
+    if (i + 1 < angles.size()) {
+      // next center vertex → forms degenerate triangle (zero area)
+      WriteTriangleMeshVertex(stream, 1, center.x, center.y, minX, maxX, minY, maxY,
+                              colors[i + 1]);
+    }
+  }
 }
 
 // Conic uses ShadingType 4 (Free-Form Gouraud-Shaded Triangle Mesh).
@@ -738,36 +761,37 @@ PDFIndirectReference MakeConicTriangleMeshShader(PDFDocumentImpl* doc,
       int segments = std::max(
           1, static_cast<int>(std::ceil(std::abs(lastColorEnd - lastColorStart) / absSegAngle)));
       float step = (lastColorEnd - lastColorStart) / static_cast<float>(segments);
-      for (int i = 0; i < segments; ++i) {
-        float a1 = lastColorStart + static_cast<float>(i) * step;
-        float a2 = lastColorStart + static_cast<float>(i + 1) * step;
-        WriteConicMeshSegment(meshStream.get(), center, maxRadius, a1, a2, lastColor, lastColor,
-                              minX, maxX, minY, maxY);
+      std::vector<float> angles(static_cast<size_t>(segments) + 1);
+      std::vector<Color> colors(static_cast<size_t>(segments) + 1, lastColor);
+      for (size_t i = 0; i <= static_cast<size_t>(segments); ++i) {
+        angles[i] = lastColorStart + static_cast<float>(i) * step;
       }
+      WriteConicFanStrip(meshStream.get(), center, maxRadius, angles, colors, minX, maxX, minY,
+                         maxY);
     }
     if (std::abs(firstColorEnd - firstColorStart) > absSegAngle * 0.5f) {
       int segments = std::max(
           1, static_cast<int>(std::ceil(std::abs(firstColorEnd - firstColorStart) / absSegAngle)));
       float step = (firstColorEnd - firstColorStart) / static_cast<float>(segments);
-      for (int i = 0; i < segments; ++i) {
-        float a1 = firstColorStart + static_cast<float>(i) * step;
-        float a2 = firstColorStart + static_cast<float>(i + 1) * step;
-        WriteConicMeshSegment(meshStream.get(), center, maxRadius, a1, a2, firstColor, firstColor,
-                              minX, maxX, minY, maxY);
+      std::vector<float> angles(static_cast<size_t>(segments) + 1);
+      std::vector<Color> colors(static_cast<size_t>(segments) + 1, firstColor);
+      for (size_t i = 0; i <= static_cast<size_t>(segments); ++i) {
+        angles[i] = firstColorStart + static_cast<float>(i) * step;
       }
+      WriteConicFanStrip(meshStream.get(), center, maxRadius, angles, colors, minX, maxX, minY,
+                         maxY);
     }
   }
 
-  for (int seg = 0; seg < numSegments; ++seg) {
-    float angle1 = startAngleRad + static_cast<float>(seg) * segmentAngle;
-    float angle2 = startAngleRad + static_cast<float>(seg + 1) * segmentAngle;
-    float t1 = static_cast<float>(seg) / static_cast<float>(numSegments);
-    float t2 = static_cast<float>(seg + 1) / static_cast<float>(numSegments);
-
-    Color color1 = InterpolateColorAtT(t1, info.colors, info.positions);
-    Color color2 = InterpolateColorAtT(t2, info.colors, info.positions);
-    WriteConicMeshSegment(meshStream.get(), center, maxRadius, angle1, angle2, color1, color2, minX,
-                          maxX, minY, maxY);
+  {
+    std::vector<float> angles(static_cast<size_t>(numSegments) + 1);
+    std::vector<Color> colors(static_cast<size_t>(numSegments) + 1);
+    for (size_t seg = 0; seg <= static_cast<size_t>(numSegments); ++seg) {
+      angles[seg] = startAngleRad + static_cast<float>(seg) * segmentAngle;
+      float t = static_cast<float>(seg) / static_cast<float>(numSegments);
+      colors[seg] = InterpolateColorAtT(t, info.colors, info.positions);
+    }
+    WriteConicFanStrip(meshStream.get(), center, maxRadius, angles, colors, minX, maxX, minY, maxY);
   }
 
   auto pdfShader = PDFDictionary::Make();
