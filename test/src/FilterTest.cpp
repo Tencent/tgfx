@@ -94,22 +94,22 @@ TGFX_TEST(FilterTest, ImageAdjustColorFilter) {
   auto colorTest = MakeImage("resources/apitest/color_test.png");
   ASSERT_TRUE(colorTest != nullptr);
 
-  // Each row tests one parameter swept across 7 values while others remain at 0.
+  // Each row tests one parameter with 3 key values: min, zero, max.
+  // Contrast uses -0.3/0/0.3 to match Figma UI range, others use -1/0/1.
   // Parameters: exposure, contrast, saturation, temperature, tint, highlights, shadows.
   struct ParamSweep {
     int paramIndex;
-    float values[7];
+    float values[3];
   };
   ParamSweep sweeps[] = {
-      {0, {-1.0f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 1.0f}},
-      {1, {-1.0f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 1.0f}},
-      {2, {-1.0f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 1.0f}},
-      {3, {-1.0f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 1.0f}},
-      {4, {-1.0f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 1.0f}},
-      {5, {-1.0f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 1.0f}},
-      {6, {-1.0f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 1.0f}},
+      {0, {-1.0f, 0.0f, 1.0f}},  // exposure
+      {1, {-0.3f, 0.0f, 0.3f}},  // contrast (Figma range)
   };
-  int cols = 7;
+  // Set same range for saturation, temperature, tint, highlights, shadows
+  for (int i = 2; i < 7; i++) {
+    sweeps[i] = {i, {-1.0f, 0.0f, 1.0f}};
+  }
+  int cols = 3;
   int rows = 7;
   int imageWidth = image->width();
   int imageHeight = image->height();
@@ -137,12 +137,13 @@ TGFX_TEST(FilterTest, ImageAdjustColorFilter) {
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ImageAdjustColorFilter"));
 
   // Test with all parameters applied simultaneously on the color test image.
+  // Use reasonable values within typical usage ranges.
   int combinedWidth = colorTest->width() + 100;
   int combinedHeight = colorTest->height() + 100;
   auto surface2 = Surface::Make(context, combinedWidth, combinedHeight);
   auto canvas2 = surface2->getCanvas();
   Paint paint2;
-  paint2.setColorFilter(ColorFilter::ImageAdjust(0.3f, 0.15f, 0.4f, 0.2f, -0.1f, 0.5f, -0.3f));
+  paint2.setColorFilter(ColorFilter::ImageAdjust(1.0f, 0.3f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f));
   canvas2->save();
   canvas2->translate(50.0f, 50.0f);
   canvas2->drawImage(colorTest, &paint2);

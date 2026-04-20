@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/vectors/ImagePattern.h"
+#include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
 std::shared_ptr<ImagePattern> ImagePattern::Make(std::shared_ptr<Image> image, TileMode tileModeX,
@@ -42,12 +43,77 @@ void ImagePattern::setMatrix(const Matrix& matrix) {
   invalidateContent();
 }
 
+void ImagePattern::setExposure(float value) {
+  if (_exposure == value) {
+    return;
+  }
+  _exposure = value;
+  invalidateContent();
+}
+
+void ImagePattern::setContrast(float value) {
+  if (_contrast == value) {
+    return;
+  }
+  _contrast = value;
+  invalidateContent();
+}
+
+void ImagePattern::setSaturation(float value) {
+  if (_saturation == value) {
+    return;
+  }
+  _saturation = value;
+  invalidateContent();
+}
+
+void ImagePattern::setTemperature(float value) {
+  if (_temperature == value) {
+    return;
+  }
+  _temperature = value;
+  invalidateContent();
+}
+
+void ImagePattern::setTint(float value) {
+  if (_tint == value) {
+    return;
+  }
+  _tint = value;
+  invalidateContent();
+}
+
+void ImagePattern::setHighlights(float value) {
+  if (_highlights == value) {
+    return;
+  }
+  _highlights = value;
+  invalidateContent();
+}
+
+void ImagePattern::setShadows(float value) {
+  if (_shadows == value) {
+    return;
+  }
+  _shadows = value;
+  invalidateContent();
+}
+
 std::shared_ptr<Shader> ImagePattern::getShader() const {
   auto shader = Shader::MakeImageShader(_image, _tileModeX, _tileModeY, _sampling);
-  if (shader == nullptr || _matrix.isIdentity()) {
-    return shader;
+  if (shader == nullptr) {
+    return nullptr;
   }
-  return shader->makeWithMatrix(_matrix);
+  if (!_matrix.isIdentity()) {
+    shader = shader->makeWithMatrix(_matrix);
+  }
+  if (_exposure != 0.0f || _contrast != 0.0f || _saturation != 0.0f || _temperature != 0.0f ||
+      _tint != 0.0f || _highlights != 0.0f || _shadows != 0.0f) {
+    auto colorFilter = ColorFilter::ImageAdjust(_exposure, _contrast, _saturation, _temperature,
+                                                _tint, _highlights, _shadows);
+    shader = shader->makeWithColorFilter(std::move(colorFilter));
+  }
+  return shader;
 }
 
 }  // namespace tgfx

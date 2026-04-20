@@ -69,6 +69,93 @@ class ImagePattern : public ColorSource {
    */
   void setMatrix(const Matrix& matrix);
 
+  /**
+   * Returns the exposure adjustment value. The default value is 0 (no adjustment).
+   */
+  float exposure() const {
+    return _exposure;
+  }
+
+  /**
+   * Sets the exposure adjustment value in the range of -1.0 to 1.0. Positive values brighten the
+   * image with highlight protection, negative values darken it with shadow preservation.
+   */
+  void setExposure(float value);
+
+  /**
+   * Returns the contrast adjustment value. The default value is 0 (no adjustment).
+   */
+  float contrast() const {
+    return _contrast;
+  }
+
+  /**
+   * Sets the contrast adjustment value in the range of -1.0 to 1.0.
+   */
+  void setContrast(float value);
+
+  /**
+   * Returns the saturation adjustment value. The default value is 0 (no adjustment).
+   */
+  float saturation() const {
+    return _saturation;
+  }
+
+  /**
+   * Sets the saturation adjustment value in the range of -1.0 to 1.0.
+   */
+  void setSaturation(float value);
+
+  /**
+   * Returns the color temperature adjustment value. The default value is 0 (no adjustment).
+   */
+  float temperature() const {
+    return _temperature;
+  }
+
+  /**
+   * Sets the color temperature adjustment value in the range of -1.0 to 1.0. Positive values shift
+   * the image warmer (yellow), negative values shift it cooler (blue).
+   */
+  void setTemperature(float value);
+
+  /**
+   * Returns the tint adjustment value. The default value is 0 (no adjustment).
+   */
+  float tint() const {
+    return _tint;
+  }
+
+  /**
+   * Sets the tint adjustment value in the range of -1.0 to 1.0. Positive values shift the image
+   * toward magenta, negative values shift it toward green.
+   */
+  void setTint(float value);
+
+  /**
+   * Returns the highlights adjustment value. The default value is 0 (no adjustment).
+   */
+  float highlights() const {
+    return _highlights;
+  }
+
+  /**
+   * Sets the highlights adjustment value in the range of -1.0 to 1.0.
+   */
+  void setHighlights(float value);
+
+  /**
+   * Returns the shadows adjustment value. The default value is 0 (no adjustment).
+   */
+  float shadows() const {
+    return _shadows;
+  }
+
+  /**
+   * Sets the shadows adjustment value in the range of -1.0 to 1.0.
+   */
+  void setShadows(float value);
+
   std::shared_ptr<Shader> getShader() const override;
 
  protected:
@@ -82,6 +169,13 @@ class ImagePattern : public ColorSource {
   TileMode _tileModeY = TileMode::Clamp;
   SamplingOptions _sampling = {};
   Matrix _matrix = {};
+  float _exposure = 0.0f;
+  float _contrast = 0.0f;
+  float _saturation = 0.0f;
+  float _temperature = 0.0f;
+  float _tint = 0.0f;
+  float _highlights = 0.0f;
+  float _shadows = 0.0f;
 
   ImagePattern(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
                const SamplingOptions& sampling);

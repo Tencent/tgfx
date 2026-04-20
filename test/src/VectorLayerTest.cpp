@@ -2749,6 +2749,89 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
 }
 
 /**
+ * Test ImagePattern with image adjustment parameters (exposure, contrast, saturation, temperature,
+ * tint, highlights, shadows). Each row sweeps one parameter across 3 values (min, 0, max) while
+ * others stay at 0.
+ */
+TGFX_TEST(VectorLayerTest, ImagePatternAdjust) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+
+  // Each row tests one parameter. Contrast uses -0.3/0/0.3, others use -1/0/1.
+  struct ParamSweep {
+    int paramIndex;
+    float values[3];
+  };
+  ParamSweep sweeps[7] = {
+      {0, {-1.0f, 0.0f, 1.0f}},  // exposure
+      {1, {-0.3f, 0.0f, 0.3f}},  // contrast (Figma range)
+  };
+  for (int i = 2; i < 7; i++) {
+    sweeps[i] = {i, {-1.0f, 0.0f, 1.0f}};
+  }
+
+  int cellSize = 120;
+  int cols = 3;
+  int rows = 7;
+  int spacing = 20;
+  int totalWidth = cellSize * cols + spacing * (cols + 1);
+  int totalHeight = cellSize * rows + spacing * (rows + 1);
+  auto surface = Surface::Make(context, totalWidth, totalHeight);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+  std::vector<std::shared_ptr<VectorElement>> groups;
+
+  float scale = static_cast<float>(cellSize) / static_cast<float>(image->width());
+  for (int row = 0; row < rows; row++) {
+    auto& sweep = sweeps[row];
+    for (int col = 0; col < cols; col++) {
+      float params[7] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+      params[sweep.paramIndex] = sweep.values[col];
+
+      // Rectangle::setPosition sets the center point; compute top-left for image matrix.
+      float centerX = static_cast<float>(spacing + cellSize / 2 + (cellSize + spacing) * col);
+      float centerY = static_cast<float>(spacing + cellSize / 2 + (cellSize + spacing) * row);
+      float topLeftX = centerX - static_cast<float>(cellSize) / 2.0f;
+      float topLeftY = centerY - static_cast<float>(cellSize) / 2.0f;
+
+      auto group = std::make_shared<VectorGroup>();
+      auto rect = std::make_shared<Rectangle>();
+      rect->setPosition({centerX, centerY});
+      rect->setSize({static_cast<float>(cellSize), static_cast<float>(cellSize)});
+
+      auto pattern = ImagePattern::Make(image, TileMode::Clamp, TileMode::Clamp);
+      Matrix matrix = Matrix::MakeScale(scale);
+      matrix.postTranslate(topLeftX, topLeftY);
+      pattern->setMatrix(matrix);
+      pattern->setExposure(params[0]);
+      pattern->setContrast(params[1]);
+      pattern->setSaturation(params[2]);
+      pattern->setTemperature(params[3]);
+      pattern->setTint(params[4]);
+      pattern->setHighlights(params[5]);
+      pattern->setShadows(params[6]);
+
+      auto fill = FillStyle::Make(pattern);
+      group->setElements({rect, fill});
+      groups.push_back(group);
+    }
+  }
+
+  vectorLayer->setContents(groups);
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/ImagePatternAdjust"));
+}
+
+/**
  * Test ColorSource with stroke style and shared ColorSource.
  */
 TGFX_TEST(VectorLayerTest, ColorSourceAdvanced) {
