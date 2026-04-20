@@ -101,7 +101,7 @@ TGFX_TEST(FilterTest, ImageAdjustColorFilter) {
     int paramIndex;
     float values[3];
   };
-  ParamSweep sweeps[] = {
+  ParamSweep sweeps[7] = {
       {0, {-1.0f, 0.0f, 1.0f}},  // exposure
       {1, {-0.3f, 0.0f, 0.3f}},  // contrast (Figma range)
   };
