@@ -16,28 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ExposureColorFilter.h"
-#include "core/utils/Types.h"
-#include "gpu/processors/ExposureFragmentProcessor.h"
+#pragma once
+
+#include "gpu/processors/ImageAdjustFragmentProcessor.h"
 
 namespace tgfx {
-
-std::shared_ptr<ColorFilter> ColorFilter::Exposure(float exposure) {
-  return std::make_shared<ExposureColorFilter>(exposure);
-}
-
-bool ExposureColorFilter::isEqual(const ColorFilter* colorFilter) const {
-  auto type = Types::Get(colorFilter);
-  if (type != Types::ColorFilterType::Exposure) {
-    return false;
+class GLSLImageAdjustFragmentProcessor : public ImageAdjustFragmentProcessor {
+ public:
+  GLSLImageAdjustFragmentProcessor(float exposure, float contrast, float saturation,
+                                   float temperature, float tint, float highlights, float shadows)
+      : ImageAdjustFragmentProcessor(exposure, contrast, saturation, temperature, tint, highlights,
+                                     shadows) {
   }
-  auto other = static_cast<const ExposureColorFilter*>(colorFilter);
-  return exposure == other->exposure;
-}
 
-PlacementPtr<FragmentProcessor> ExposureColorFilter::asFragmentProcessor(
-    Context* context, const std::shared_ptr<ColorSpace>&) const {
-  return ExposureFragmentProcessor::Make(context->drawingAllocator(), exposure);
-}
+  void emitCode(EmitArgs& args) const override;
 
+  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
+};
 }  // namespace tgfx

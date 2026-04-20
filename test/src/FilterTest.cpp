@@ -84,43 +84,71 @@ TGFX_TEST(FilterTest, ModeColorFilter) {
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ModeColorFilter"));
 }
 
-TGFX_TEST(FilterTest, ExposureColorFilter) {
+TGFX_TEST(FilterTest, ImageAdjustColorFilter) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  float exposures[] = {-1.0f, -0.75f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
-  int count = 9;
 
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_TRUE(image != nullptr);
   auto colorTest = MakeImage("resources/apitest/color_test.png");
   ASSERT_TRUE(colorTest != nullptr);
 
-  int colWidth = image->width() > colorTest->width() ? image->width() : colorTest->width();
-  auto totalWidth = colWidth * count + 50 * (count + 1);
-  auto totalHeight = image->height() + colorTest->height() + 150;
+  // Each row tests one parameter swept across 7 values while others remain at 0.
+  // Parameters: exposure, contrast, saturation, temperature, tint, highlights, shadows.
+  struct ParamSweep {
+    int paramIndex;
+    float values[7];
+  };
+  ParamSweep sweeps[] = {
+      {0, {-1.0f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 1.0f}},
+      {1, {-1.0f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 1.0f}},
+      {2, {-1.0f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 1.0f}},
+      {3, {-1.0f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 1.0f}},
+      {4, {-1.0f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 1.0f}},
+      {5, {-1.0f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 1.0f}},
+      {6, {-1.0f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 1.0f}},
+  };
+  int cols = 7;
+  int rows = 7;
+  int imageWidth = image->width();
+  int imageHeight = image->height();
+  auto totalWidth = imageWidth * cols + 50 * (cols + 1);
+  auto totalHeight = imageHeight * rows + 50 * (rows + 1);
   auto surface = Surface::Make(context, totalWidth, totalHeight);
   auto canvas = surface->getCanvas();
   Paint paint;
 
-  for (int i = 0; i < count; i++) {
-    canvas->save();
-    canvas->translate(50 + static_cast<float>(colWidth + 50) * i, 50);
-    paint.setColorFilter(ColorFilter::Exposure(exposures[i]));
-    canvas->drawImage(image, &paint);
-    canvas->restore();
+  for (int row = 0; row < rows; row++) {
+    auto& sweep = sweeps[row];
+    for (int col = 0; col < cols; col++) {
+      float params[7] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+      params[sweep.paramIndex] = sweep.values[col];
+      canvas->save();
+      canvas->translate(50.0f + static_cast<float>(imageWidth + 50) * col,
+                        50.0f + static_cast<float>(imageHeight + 50) * row);
+      paint.setColorFilter(ColorFilter::ImageAdjust(params[0], params[1], params[2], params[3],
+                                                    params[4], params[5], params[6]));
+      canvas->drawImage(image, &paint);
+      canvas->restore();
+    }
   }
 
-  for (int i = 0; i < count; i++) {
-    canvas->save();
-    canvas->translate(50 + static_cast<float>(colWidth + 50) * i,
-                      100 + static_cast<float>(image->height()));
-    paint.setColorFilter(ColorFilter::Exposure(exposures[i]));
-    canvas->drawImage(colorTest, &paint);
-    canvas->restore();
-  }
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ImageAdjustColorFilter"));
 
-  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ExposureColorFilter"));
+  // Test with all parameters applied simultaneously on the color test image.
+  int combinedWidth = colorTest->width() + 100;
+  int combinedHeight = colorTest->height() + 100;
+  auto surface2 = Surface::Make(context, combinedWidth, combinedHeight);
+  auto canvas2 = surface2->getCanvas();
+  Paint paint2;
+  paint2.setColorFilter(ColorFilter::ImageAdjust(0.3f, 0.15f, 0.4f, 0.2f, -0.1f, 0.5f, -0.3f));
+  canvas2->save();
+  canvas2->translate(50.0f, 50.0f);
+  canvas2->drawImage(colorTest, &paint2);
+  canvas2->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface2, "FilterTest/ImageAdjustColorFilterCombined"));
 }
 
 TGFX_TEST(FilterTest, ComposeColorFilter) {

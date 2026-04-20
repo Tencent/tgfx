@@ -87,12 +87,31 @@ class ColorFilter {
   static std::shared_ptr<ColorFilter> Luma();
 
   /**
-   * Creates a new ColorFilter that adjusts the exposure of the input color using a non-linear
-   * tone-mapped curve. Positive values brighten the image with highlight protection, and negative
-   * values darken it with shadow preservation.
-   * @param exposure The exposure adjustment value in the range of -1.0 to 1.0.
+   * Creates a new ColorFilter that performs comprehensive image color adjustments in a single pass.
+   * All adjustments are applied in linear RGB space with a fixed processing order: highlights and
+   * shadows first compute an exposure compensation, then contrast, temperature, and tint are applied
+   * together in CIE Lab space, followed by exposure with Reinhard tone mapping, and finally
+   * saturation adjustment. This matches the standard photo editing pipeline used by professional
+   * design tools.
+   * @param exposure The exposure adjustment value in the range of -1.0 to 1.0. Positive values
+   * brighten the image with highlight protection, negative values darken it with shadow preservation.
+   * @param contrast The contrast adjustment value in the range of -1.0 to 1.0. Positive values
+   * increase contrast using an S-curve on the luminance channel, negative values reduce contrast by
+   * compressing the luminance range toward the midpoint.
+   * @param saturation The saturation adjustment value in the range of -1.0 to 1.0. Positive values
+   * boost color intensity with gamut-safe clamping, negative values desaturate toward grayscale.
+   * @param temperature The color temperature adjustment value in the range of -1.0 to 1.0. Positive
+   * values shift the image warmer (yellow), negative values shift it cooler (blue).
+   * @param tint The tint adjustment value in the range of -1.0 to 1.0. Positive values shift the
+   * image toward magenta, negative values shift it toward green.
+   * @param highlights The highlights adjustment value in the range of -1.0 to 1.0. Adjusts the
+   * brightness of the bright regions of the image by modulating exposure compensation.
+   * @param shadows The shadows adjustment value in the range of -1.0 to 1.0. Adjusts the brightness
+   * of the dark regions of the image by modulating exposure compensation.
    */
-  static std::shared_ptr<ColorFilter> Exposure(float exposure);
+  static std::shared_ptr<ColorFilter> ImageAdjust(float exposure, float contrast, float saturation,
+                                                  float temperature, float tint, float highlights,
+                                                  float shadows);
 
   virtual ~ColorFilter() = default;
 
@@ -113,7 +132,7 @@ class ColorFilter {
   }
 
  protected:
-  enum class Type { Blend, Matrix, AlphaThreshold, Compose, Luma, Exposure };
+  enum class Type { Blend, Matrix, AlphaThreshold, Compose, Luma, ImageAdjust };
 
   /**
    * Returns true if this color filter transforms transparent black into a non-transparent color.

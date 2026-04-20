@@ -21,9 +21,12 @@
 #include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
-class ExposureColorFilter : public ColorFilter {
+class ImageAdjustColorFilter : public ColorFilter {
  public:
-  explicit ExposureColorFilter(float exposure) : exposure(exposure) {
+  ImageAdjustColorFilter(float exposure, float contrast, float saturation, float temperature,
+                         float tint, float highlights, float shadows)
+      : exposure(exposure), contrast(contrast), saturation(saturation), temperature(temperature),
+        tint(tint), highlights(highlights), shadows(shadows) {
   }
 
   bool isAlphaUnchanged() const override {
@@ -31,10 +34,16 @@ class ExposureColorFilter : public ColorFilter {
   }
 
   float exposure = 0.0f;
+  float contrast = 0.0f;
+  float saturation = 0.0f;
+  float temperature = 0.0f;
+  float tint = 0.0f;
+  float highlights = 0.0f;
+  float shadows = 0.0f;
 
  protected:
   Type type() const override {
-    return Type::Exposure;
+    return Type::ImageAdjust;
   }
 
   bool isEqual(const ColorFilter* colorFilter) const override;
