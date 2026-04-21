@@ -207,10 +207,12 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("color = color * 0.5 + 0.5;");
   }
 
-  // Clamp and output with alpha = 1.0 (opaque). The fourth noise channel is discarded to avoid
-  // premultiply artifacts when downstream filters interpret alpha as transparency.
+  // Clamp each channel to [0, 1], then output premultiplied RGBA. The fourth noise channel
+  // serves as alpha and the RGB channels are premultiplied by it. Downstream filters consuming
+  // premultiplied inputs (e.g. ColorFilter::Matrix) will unpremultiply correctly; callers
+  // needing unpremultiplied noise should compose an appropriate color matrix.
   fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
-  fragBuilder->codeAppendf("%s = vec4(color.rgb, 1.0);", args.outputColor.c_str());
+  fragBuilder->codeAppendf("%s = vec4(color.rgb * color.aaa, color.a);", args.outputColor.c_str());
 }
 
 void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

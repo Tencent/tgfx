@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <array>
 #include <memory>
 #include <vector>
 #include "CornerPinEffect.h"
@@ -1169,10 +1170,19 @@ TGFX_TEST(FilterTest, BlendImageFilterClipToSource) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::FromRGBA(217, 217, 217));
 
-  // Binarized noise: Luma -> AlphaThreshold(0.5) -> fill with semi-transparent black (0.25 alpha).
-  // Reproduces the SVG filter: feTurbulence -> luminanceToAlpha -> discrete threshold ->
-  // feComposite(in, shape) -> feFlood(rgba(0,0,0,0.25)) -> feComposite(in) -> feMerge(shape).
-  auto binarize = ColorFilter::Compose(ColorFilter::Luma(), ColorFilter::AlphaThreshold(0.5f));
+  // Binarized noise: luminanceToAlpha -> AlphaThreshold(0.5) -> fill with semi-transparent black
+  // (0.25 alpha). Reproduces the SVG filter: feTurbulence -> luminanceToAlpha -> discrete threshold
+  // -> feComposite(in, shape) -> feFlood(rgba(0,0,0,0.25)) -> feComposite(in) -> feMerge(shape).
+  // ColorFilter::Matrix correctly handles the premultiplied noise output, producing a clean
+  // luminance value in alpha.
+  constexpr std::array<float, 20> luminanceToAlpha = {
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+  };
+  auto binarize = ColorFilter::Compose(ColorFilter::Matrix(luminanceToAlpha),
+                                       ColorFilter::AlphaThreshold(0.5f));
   binarize = ColorFilter::Compose(
       binarize, ColorFilter::Blend(Color{0.0f, 0.0f, 0.0f, 0.25f}, BlendMode::SrcIn));
   auto noiseShader =

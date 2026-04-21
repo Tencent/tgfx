@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <array>
 #include <cmath>
 #include <limits>
 #include "core/ClipStack.h"
@@ -2758,8 +2759,18 @@ TGFX_TEST(CanvasTest, NoiseWithThreshold) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
+  // SVG feColorMatrix type="luminanceToAlpha": output = {0, 0, 0, Kr*r + Kg*g + Kb*b}.
+  // ColorFilter::Matrix unpremultiplies the premultiplied noise input, applies the matrix, and
+  // re-premultiplies, so downstream consumers receive a clean luminance value in alpha.
+  constexpr std::array<float, 20> luminanceToAlpha = {
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+  };
+
   auto noiseShader1 = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
-  auto lumaShader = noiseShader1->makeWithColorFilter(ColorFilter::Luma());
+  auto lumaShader = noiseShader1->makeWithColorFilter(ColorFilter::Matrix(luminanceToAlpha));
   Paint paint1 = {};
   paint1.setShader(std::move(lumaShader));
   canvas->drawRect(Rect::MakeXYWH(10, 10, 130, 130), paint1);
@@ -2771,14 +2782,16 @@ TGFX_TEST(CanvasTest, NoiseWithThreshold) {
   canvas->drawRect(Rect::MakeXYWH(160, 10, 130, 130), paint2);
 
   auto noiseShader3 = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
-  auto composed = ColorFilter::Compose(ColorFilter::Luma(), ColorFilter::AlphaThreshold(0.5f));
+  auto composed = ColorFilter::Compose(ColorFilter::Matrix(luminanceToAlpha),
+                                       ColorFilter::AlphaThreshold(0.5f));
   auto composedShader = noiseShader3->makeWithColorFilter(std::move(composed));
   Paint paint3 = {};
   paint3.setShader(std::move(composedShader));
   canvas->drawRect(Rect::MakeXYWH(10, 160, 130, 130), paint3);
 
   auto noiseShader4 = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
-  auto full = ColorFilter::Compose(ColorFilter::Luma(), ColorFilter::AlphaThreshold(0.5f));
+  auto full = ColorFilter::Compose(ColorFilter::Matrix(luminanceToAlpha),
+                                   ColorFilter::AlphaThreshold(0.5f));
   full = ColorFilter::Compose(full,
                               ColorFilter::Blend(Color{0.0f, 0.0f, 0.0f, 1.0f}, BlendMode::SrcIn));
   auto fullShader = noiseShader4->makeWithColorFilter(std::move(full));
@@ -2819,7 +2832,13 @@ TGFX_TEST(CanvasTest, NoiseShaderAlphaBlend) {
 
   {
     auto shader = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
-    auto luma = ColorFilter::Luma();
+    constexpr std::array<float, 20> luminanceToAlpha = {
+        0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+        0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+        0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+        0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+    };
+    auto luma = ColorFilter::Matrix(luminanceToAlpha);
     auto thresh = ColorFilter::AlphaThreshold(0.51f);
     auto blend = ColorFilter::Blend(Color::White(), BlendMode::SrcIn);
     auto f = ColorFilter::Compose(luma, thresh);
