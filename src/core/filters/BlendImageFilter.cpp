@@ -64,6 +64,7 @@ PlacementPtr<FragmentProcessor> BlendImageFilter::asFragmentProcessor(
   if (sourceFP == nullptr) {
     return DstIsRequired(blendMode) ? nullptr : std::move(shaderFP);
   }
+  // The shader acts as the src operand and the source image as the dst operand of the blend.
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(shaderFP),
                                                           std::move(sourceFP), blendMode);
 }
