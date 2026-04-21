@@ -31,13 +31,14 @@ std::shared_ptr<ImageFilter> ImageFilter::Blend(BlendMode blendMode,
 }
 
 // When source is null (dst = transparent black), Porter-Duff reduces to srcFactor * src. For modes
-// whose srcFactor is Zero or depends on dstAlpha, the result is transparent black and the whole
-// filter can be skipped. Otherwise the result is simply the shader itself.
+// whose srcFactor collapses to zero in that condition, the result is transparent black and the
+// whole filter can be skipped. Otherwise the result is simply the shader itself.
 static bool DstIsRequired(BlendMode mode) {
   switch (mode) {
     case BlendMode::Src:
     case BlendMode::SrcOver:
     case BlendMode::DstOver:
+    case BlendMode::SrcOut:
     case BlendMode::DstATop:
     case BlendMode::Xor:
     case BlendMode::PlusLighter:
