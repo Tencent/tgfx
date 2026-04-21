@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
+#include <limits>
 #include "core/ClipStack.h"
 #include "core/Matrix3DUtils.h"
 #include "core/PictureRecords.h"
@@ -2662,10 +2663,61 @@ TGFX_TEST(CanvasTest, DrawShapeAutoBatch_DifferentBounds) {
 TGFX_TEST(CanvasTest, PaintingDataCheck) {
   auto data =
       std::make_unique<PerlinNoiseShader::PaintingData>(6903.0f, 0.25f, 0.25f, ISize::MakeEmpty());
-  float gradX = (static_cast<float>(data->noise[0][0][0]) / 32767.5f) - 1.0f;
-  float gradY = (static_cast<float>(data->noise[0][0][1]) / 32767.5f) - 1.0f;
-  float len = std::sqrt(gradX * gradX + gradY * gradY);
-  EXPECT_NEAR(len, 1.0f, 0.01f);
+  constexpr float kHalf = PerlinNoiseShader::HALF_MAX_16BITS;
+  // Sample a handful of lattice points across all four channels; every stored gradient must be a
+  // unit vector (length == 1 within a small tolerance).
+  const int indices[] = {0, 1, 42, 127, 200, 255};
+  for (int channel = 0; channel < 4; ++channel) {
+    for (int index : indices) {
+      float gradX = (static_cast<float>(data->noise[channel][index][0]) / kHalf) - 1.0f;
+      float gradY = (static_cast<float>(data->noise[channel][index][1]) / kHalf) - 1.0f;
+      float length = std::sqrt(gradX * gradX + gradY * gradY);
+      EXPECT_NEAR(length, 1.0f, 0.01f);
+    }
+  }
+  // latticeSelector must be a permutation of [0, 255].
+  bool seen[PerlinNoiseShader::BLOCK_SIZE] = {};
+  for (int i = 0; i < PerlinNoiseShader::BLOCK_SIZE; ++i) {
+    seen[data->latticeSelector[i]] = true;
+  }
+  for (int i = 0; i < PerlinNoiseShader::BLOCK_SIZE; ++i) {
+    EXPECT_TRUE(seen[i]);
+  }
+}
+
+TGFX_TEST(CanvasTest, NoiseShaderParameterValidation) {
+  // Non-positive or non-finite frequencies must be rejected.
+  EXPECT_EQ(Shader::MakeFractalNoise(0.0f, 0.1f, 3, 0), nullptr);
+  EXPECT_EQ(Shader::MakeFractalNoise(0.1f, -0.1f, 3, 0), nullptr);
+  EXPECT_EQ(Shader::MakeFractalNoise(std::numeric_limits<float>::infinity(), 0.1f, 3, 0), nullptr);
+  EXPECT_EQ(Shader::MakeFractalNoise(std::numeric_limits<float>::quiet_NaN(), 0.1f, 3, 0), nullptr);
+  // Non-finite seed must be rejected.
+  EXPECT_EQ(Shader::MakeFractalNoise(0.1f, 0.1f, 3, std::numeric_limits<float>::quiet_NaN()),
+            nullptr);
+  // numOctaves < 1 must be rejected.
+  EXPECT_EQ(Shader::MakeTurbulence(0.1f, 0.1f, 0, 0), nullptr);
+
+  // numOctaves above MAX_OCTAVES is silently clamped, not rejected.
+  auto clamped = Shader::MakeFractalNoise(0.1f, 0.1f, PerlinNoiseShader::MAX_OCTAVES + 32, 0);
+  ASSERT_TRUE(clamped != nullptr);
+  auto noiseShader = static_cast<PerlinNoiseShader*>(clamped.get());
+  EXPECT_EQ(noiseShader->numOctaves, PerlinNoiseShader::MAX_OCTAVES);
+}
+
+TGFX_TEST(CanvasTest, NoiseShaderIsEqual) {
+  auto a = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
+  auto b = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
+  ASSERT_TRUE(a != nullptr && b != nullptr);
+  EXPECT_TRUE(a->isEqual(b.get()));
+  // Different noise type.
+  auto turb = Shader::MakeTurbulence(0.25f, 0.25f, 3, 6903);
+  EXPECT_FALSE(a->isEqual(turb.get()));
+  // Different seed.
+  auto other = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 42);
+  EXPECT_FALSE(a->isEqual(other.get()));
+  // Different shader type must not be misinterpreted as a PerlinNoiseShader.
+  auto color = Shader::MakeColorShader(Color::Red());
+  EXPECT_FALSE(a->isEqual(color.get()));
 }
 
 TGFX_TEST(CanvasTest, RawNoiseShader) {

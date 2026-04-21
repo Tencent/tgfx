@@ -30,7 +30,7 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
  public:
   static PlacementPtr<PerlinNoiseFragmentProcessor> Make(
       BlockAllocator* allocator, Context* context, PerlinNoiseType noiseType, int numOctaves,
-      bool stitchTiles, std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
+      bool stitchTiles, const PerlinNoiseShader::PaintingData* paintingData,
       const Matrix* uvMatrix);
 
   std::string name() const override {
@@ -51,14 +51,15 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   PerlinNoiseFragmentProcessor(PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
-                               std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
+                               const PerlinNoiseShader::PaintingData* paintingData,
                                std::shared_ptr<Texture> permutationsTexture,
                                std::shared_ptr<Texture> noiseTexture, const Matrix* uvMatrix);
 
   PerlinNoiseType noiseType;
   int numOctaves;
   bool stitchTiles;
-  std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData;
+  // PaintingData is owned by the parent PerlinNoiseShader and outlives this fragment processor.
+  const PerlinNoiseShader::PaintingData* paintingData;
   std::shared_ptr<Texture> permutationsTexture;
   std::shared_ptr<Texture> noiseTexture;
   CoordTransform coordTransform;

@@ -1207,4 +1207,17 @@ TGFX_TEST(FilterTest, BlendImageFilterNullShader) {
   EXPECT_EQ(filter, nullptr);
 }
 
+TGFX_TEST(FilterTest, BlendImageFilterVariousModes) {
+  // Valid shader but caller passes a range of blend modes. All combinations must produce a
+  // non-null filter; the DstIsRequired short-circuit only takes effect at FP generation time when
+  // the source image is absent, which the rendering tests above already exercise.
+  auto shader = Shader::MakeColorShader(Color{0.0f, 0.0f, 0.0f, 0.5f});
+  ASSERT_TRUE(shader != nullptr);
+  const BlendMode modes[] = {BlendMode::Src,    BlendMode::SrcOver,  BlendMode::DstIn,
+                             BlendMode::DstOut, BlendMode::Modulate, BlendMode::Multiply};
+  for (auto mode : modes) {
+    EXPECT_NE(ImageFilter::Blend(mode, shader), nullptr);
+  }
+}
+
 }  // namespace tgfx

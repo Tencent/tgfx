@@ -19,16 +19,17 @@
 #pragma once
 
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Shader.h"
 
 namespace tgfx {
 class BlendImageFilter : public ImageFilter {
  public:
-  BlendImageFilter(BlendMode blendMode, std::shared_ptr<class Shader> shader)
+  BlendImageFilter(BlendMode blendMode, std::shared_ptr<Shader> shader)
       : blendMode(blendMode), shader(std::move(shader)) {
   }
 
   BlendMode blendMode;
-  std::shared_ptr<class Shader> shader;
+  std::shared_ptr<Shader> shader;
 
  protected:
   Type type() const override {

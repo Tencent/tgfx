@@ -24,12 +24,12 @@
 #include "tgfx/core/MapDirection.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
-#include "tgfx/core/Shader.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/RuntimeEffect.h"
 
 namespace tgfx {
+class Shader;
 class TextureProxy;
 enum class SrcRectConstraint;
 
@@ -124,8 +124,8 @@ class ImageFilter {
 
   /**
    * Creates a filter that blends a shader with the input image using the specified blend mode.
-   * The input image serves as the background (dst), and the shader is evaluated per-pixel to
-   * produce the foreground (src). The shader output extends beyond the source bounds.
+   * The input image serves as the destination (dst), and the shader is evaluated per-pixel to
+   * produce the source (src). The output bounds are the same as the input image.
    */
   static std::shared_ptr<ImageFilter> Blend(BlendMode blendMode, std::shared_ptr<Shader> shader);
 

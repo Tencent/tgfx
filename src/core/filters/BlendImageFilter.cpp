@@ -23,11 +23,29 @@
 namespace tgfx {
 
 std::shared_ptr<ImageFilter> ImageFilter::Blend(BlendMode blendMode,
-                                                std::shared_ptr<class Shader> shader) {
+                                                std::shared_ptr<Shader> shader) {
   if (shader == nullptr) {
     return nullptr;
   }
   return std::make_shared<BlendImageFilter>(blendMode, std::move(shader));
+}
+
+// When source is null (dst = transparent black), Porter-Duff reduces to srcFactor * src. For modes
+// whose srcFactor is Zero or depends on dstAlpha, the result is transparent black and the whole
+// filter can be skipped. Otherwise the result is simply the shader itself.
+static bool DstIsRequired(BlendMode mode) {
+  switch (mode) {
+    case BlendMode::Src:
+    case BlendMode::SrcOver:
+    case BlendMode::DstOver:
+    case BlendMode::DstATop:
+    case BlendMode::Xor:
+    case BlendMode::PlusLighter:
+    case BlendMode::Screen:
+      return false;
+    default:
+      return true;
+  }
 }
 
 PlacementPtr<FragmentProcessor> BlendImageFilter::asFragmentProcessor(
@@ -39,11 +57,11 @@ PlacementPtr<FragmentProcessor> BlendImageFilter::asFragmentProcessor(
     return nullptr;
   }
   if (source == nullptr) {
-    return shaderFP;
+    return DstIsRequired(blendMode) ? nullptr : std::move(shaderFP);
   }
   auto sourceFP = FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
   if (sourceFP == nullptr) {
-    return shaderFP;
+    return DstIsRequired(blendMode) ? nullptr : std::move(shaderFP);
   }
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(shaderFP),
                                                           std::move(sourceFP), blendMode);

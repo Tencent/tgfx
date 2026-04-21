@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Size.h"
 
@@ -31,8 +32,10 @@ enum class PerlinNoiseType { FractalNoise, Turbulence };
 class PerlinNoiseShader : public Shader {
  public:
   static constexpr int BLOCK_SIZE = 256;
-  static constexpr int BLOCK_MASK = BLOCK_SIZE - 1;
   static constexpr int MAX_OCTAVES = 255;
+  // Half of the largest possible value for an unsigned 16-bit int. Used to encode the normalized
+  // gradient vectors into the noise table as two uint16 values.
+  static constexpr float HALF_MAX_16BITS = 32767.5f;
 
   struct PaintingData {
     PaintingData(float seed, float baseFrequencyX, float baseFrequencyY, const ISize& tileSize);
@@ -43,10 +46,10 @@ class PerlinNoiseShader : public Shader {
     uint16_t noise[4][BLOCK_SIZE][2];
     float baseFrequencyX;
     float baseFrequencyY;
-    int stitchWidth;
-    int stitchWrapX;
-    int stitchHeight;
-    int stitchWrapY;
+    int stitchWidth = 0;
+    int stitchWrapX = 0;
+    int stitchHeight = 0;
+    int stitchWrapY = 0;
 
    private:
     static constexpr int PERLIN_NOISE = 4096;
@@ -55,7 +58,7 @@ class PerlinNoiseShader : public Shader {
     static constexpr int RAND_Q = 127773;            // m / a
     static constexpr int RAND_R = 2836;              // m % a
 
-    int currentSeed;
+    int currentSeed = 0;
 
     int random();
     void init(float seed);
@@ -65,7 +68,7 @@ class PerlinNoiseShader : public Shader {
   PerlinNoiseShader(PerlinNoiseType noiseType, float baseFrequencyX, float baseFrequencyY,
                     int numOctaves, float seed, const ISize* tileSize);
 
-  std::unique_ptr<PaintingData> getPaintingData() const;
+  const PaintingData* getPaintingData() const;
 
   PerlinNoiseType noiseType;
   float baseFrequencyX;
@@ -85,5 +88,13 @@ class PerlinNoiseShader : public Shader {
   PlacementPtr<FragmentProcessor> asFragmentProcessor(
       const FPArgs& args, const Matrix* uvMatrix,
       const std::shared_ptr<ColorSpace>& dstColorSpace) const override;
+
+ private:
+  // PaintingData is expensive to construct (Fisher-Yates shuffle plus 2048 sqrt/round operations).
+  // Cache it on first use so that repeated draws with the same shader instance reuse the result.
+  // Mutable is required because asFragmentProcessor() is const but the cache must be lazily
+  // initialized on the first GPU evaluation.
+  mutable std::once_flag paintingDataFlag;
+  mutable std::unique_ptr<PaintingData> cachedPaintingData;
 };
 }  // namespace tgfx

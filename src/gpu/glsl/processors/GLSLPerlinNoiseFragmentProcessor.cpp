@@ -24,8 +24,7 @@ namespace tgfx {
 
 PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::Make(
     BlockAllocator* allocator, Context* context, PerlinNoiseType noiseType, int numOctaves,
-    bool stitchTiles, std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
-    const Matrix* uvMatrix) {
+    bool stitchTiles, const PerlinNoiseShader::PaintingData* paintingData, const Matrix* uvMatrix) {
   if (paintingData == nullptr) {
     return nullptr;
   }
@@ -52,17 +51,17 @@ PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::Make(
 
   auto permTex = permutationsView->getTexture();
   auto noiseTex = noiseView->getTexture();
-  return allocator->make<GLSLPerlinNoiseFragmentProcessor>(
-      noiseType, numOctaves, stitchTiles, std::move(paintingData), std::move(permTex),
-      std::move(noiseTex), uvMatrix);
+  return allocator->make<GLSLPerlinNoiseFragmentProcessor>(noiseType, numOctaves, stitchTiles,
+                                                           paintingData, std::move(permTex),
+                                                           std::move(noiseTex), uvMatrix);
 }
 
 GLSLPerlinNoiseFragmentProcessor::GLSLPerlinNoiseFragmentProcessor(
     PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
-    std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
+    const PerlinNoiseShader::PaintingData* paintingData,
     std::shared_ptr<Texture> permutationsTexture, std::shared_ptr<Texture> noiseTexture,
     const Matrix* uvMatrix)
-    : PerlinNoiseFragmentProcessor(noiseType, numOctaves, stitchTiles, std::move(paintingData),
+    : PerlinNoiseFragmentProcessor(noiseType, numOctaves, stitchTiles, paintingData,
                                    std::move(permutationsTexture), std::move(noiseTexture),
                                    uvMatrix) {
 }

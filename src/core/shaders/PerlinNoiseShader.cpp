@@ -19,6 +19,7 @@
 #include "PerlinNoiseShader.h"
 #include <algorithm>
 #include <cmath>
+#include "core/utils/Types.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 
@@ -28,7 +29,10 @@ static std::shared_ptr<PerlinNoiseShader> MakePerlinNoise(PerlinNoiseType noiseT
                                                           float baseFrequencyX,
                                                           float baseFrequencyY, int numOctaves,
                                                           float seed, const ISize* tileSize) {
-  if (baseFrequencyX <= 0 || baseFrequencyY <= 0) {
+  if (!std::isfinite(baseFrequencyX) || !std::isfinite(baseFrequencyY) || !std::isfinite(seed)) {
+    return nullptr;
+  }
+  if (baseFrequencyX <= 0.0f || baseFrequencyY <= 0.0f) {
     return nullptr;
   }
   if (numOctaves < 1) {
@@ -63,16 +67,24 @@ PerlinNoiseShader::PerlinNoiseShader(PerlinNoiseType noiseType, float baseFreque
                                      float baseFrequencyY, int numOctaves, float seed,
                                      const ISize* tileSize)
     : noiseType(noiseType), baseFrequencyX(baseFrequencyX), baseFrequencyY(baseFrequencyY),
-      numOctaves(std::min(numOctaves, MAX_OCTAVES)), seed(seed),
+      numOctaves(std::clamp(numOctaves, 1, MAX_OCTAVES)), seed(seed),
       tileSize(tileSize ? *tileSize : ISize::MakeEmpty()),
       stitchTiles(tileSize != nullptr && !tileSize->isEmpty()) {
 }
 
-std::unique_ptr<PerlinNoiseShader::PaintingData> PerlinNoiseShader::getPaintingData() const {
-  return std::make_unique<PaintingData>(seed, baseFrequencyX, baseFrequencyY, tileSize);
+const PerlinNoiseShader::PaintingData* PerlinNoiseShader::getPaintingData() const {
+  std::call_once(paintingDataFlag, [this] {
+    cachedPaintingData =
+        std::make_unique<PaintingData>(seed, baseFrequencyX, baseFrequencyY, tileSize);
+  });
+  return cachedPaintingData.get();
 }
 
 bool PerlinNoiseShader::isEqual(const Shader* shader) const {
+  auto type = Types::Get(shader);
+  if (type != Types::ShaderType::PerlinNoise) {
+    return false;
+  }
   auto other = static_cast<const PerlinNoiseShader*>(shader);
   return noiseType == other->noiseType && baseFrequencyX == other->baseFrequencyX &&
          baseFrequencyY == other->baseFrequencyY && numOctaves == other->numOctaves &&
@@ -88,7 +100,7 @@ PlacementPtr<FragmentProcessor> PerlinNoiseShader::asFragmentProcessor(
   }
   auto allocator = args.context->drawingAllocator();
   return PerlinNoiseFragmentProcessor::Make(allocator, args.context, noiseType, numOctaves,
-                                            stitchTiles, std::move(data), uvMatrix);
+                                            stitchTiles, data, uvMatrix);
 }
 
 // --- PaintingData implementation ---
@@ -158,7 +170,6 @@ void PerlinNoiseShader::PaintingData::init(float seed) {
   }
 
   // Compute normalized gradients from permuted noise data
-  static constexpr float HALF_MAX_16BITS = 32767.5f;
   static constexpr float INV_BLOCK_SIZE = 1.0f / static_cast<float>(BLOCK_SIZE);
   for (int channel = 0; channel < 4; ++channel) {
     for (int i = 0; i < BLOCK_SIZE; ++i) {
