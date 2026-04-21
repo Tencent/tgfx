@@ -16,11 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <array>
 #include <cmath>
+#include <limits>
 #include "core/ClipStack.h"
 #include "core/Matrix3DUtils.h"
 #include "core/PictureRecords.h"
 #include "core/images/SubsetImage.h"
+#include "core/shaders/PerlinNoiseShader.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/RenderContext.h"
@@ -2656,6 +2659,244 @@ TGFX_TEST(CanvasTest, DrawShapeAutoBatch_DifferentBounds) {
   }
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawShapeAutoBatch_DifferentBounds"));
+}
+
+TGFX_TEST(CanvasTest, PaintingDataCheck) {
+  auto data =
+      std::make_unique<PerlinNoiseShader::PaintingData>(6903.0f, 0.25f, 0.25f, ISize::MakeEmpty());
+  constexpr float kHalf = PerlinNoiseShader::HALF_MAX_16BITS;
+  // Sample a handful of lattice points across all four channels; every stored gradient must be a
+  // unit vector (length == 1 within a small tolerance).
+  const int indices[] = {0, 1, 42, 127, 200, 255};
+  for (int channel = 0; channel < 4; ++channel) {
+    for (int index : indices) {
+      float gradX = (static_cast<float>(data->noise[channel][index][0]) / kHalf) - 1.0f;
+      float gradY = (static_cast<float>(data->noise[channel][index][1]) / kHalf) - 1.0f;
+      float length = std::sqrt(gradX * gradX + gradY * gradY);
+      EXPECT_NEAR(length, 1.0f, 0.01f);
+    }
+  }
+  // latticeSelector must be a permutation of [0, 255].
+  bool seen[PerlinNoiseShader::BLOCK_SIZE] = {};
+  for (int i = 0; i < PerlinNoiseShader::BLOCK_SIZE; ++i) {
+    seen[data->latticeSelector[i]] = true;
+  }
+  for (int i = 0; i < PerlinNoiseShader::BLOCK_SIZE; ++i) {
+    EXPECT_TRUE(seen[i]);
+  }
+}
+
+TGFX_TEST(CanvasTest, NoiseShaderParameterValidation) {
+  // Non-positive or non-finite frequencies must be rejected.
+  EXPECT_EQ(Shader::MakeFractalNoise(0.0f, 0.1f, 3, 0), nullptr);
+  EXPECT_EQ(Shader::MakeFractalNoise(0.1f, -0.1f, 3, 0), nullptr);
+  EXPECT_EQ(Shader::MakeFractalNoise(std::numeric_limits<float>::infinity(), 0.1f, 3, 0), nullptr);
+  EXPECT_EQ(Shader::MakeFractalNoise(std::numeric_limits<float>::quiet_NaN(), 0.1f, 3, 0), nullptr);
+  // Non-finite seed must be rejected.
+  EXPECT_EQ(Shader::MakeFractalNoise(0.1f, 0.1f, 3, std::numeric_limits<float>::quiet_NaN()),
+            nullptr);
+  // numOctaves < 1 must be rejected.
+  EXPECT_EQ(Shader::MakeTurbulence(0.1f, 0.1f, 0, 0), nullptr);
+
+  // numOctaves above MAX_OCTAVES is silently clamped, not rejected.
+  auto clamped = Shader::MakeFractalNoise(0.1f, 0.1f, PerlinNoiseShader::MAX_OCTAVES + 32, 0);
+  ASSERT_TRUE(clamped != nullptr);
+  auto noiseShader = static_cast<PerlinNoiseShader*>(clamped.get());
+  EXPECT_EQ(noiseShader->numOctaves, PerlinNoiseShader::MAX_OCTAVES);
+}
+
+TGFX_TEST(CanvasTest, NoiseShaderIsEqual) {
+  auto a = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
+  auto b = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
+  ASSERT_TRUE(a != nullptr && b != nullptr);
+  EXPECT_TRUE(a->isEqual(b.get()));
+  // Different noise type.
+  auto turb = Shader::MakeTurbulence(0.25f, 0.25f, 3, 6903);
+  EXPECT_FALSE(a->isEqual(turb.get()));
+  // Different seed.
+  auto other = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 42);
+  EXPECT_FALSE(a->isEqual(other.get()));
+  // Different shader type must not be misinterpreted as a PerlinNoiseShader.
+  auto color = Shader::MakeColorShader(Color::Red());
+  EXPECT_FALSE(a->isEqual(color.get()));
+}
+
+TGFX_TEST(CanvasTest, RawNoiseShader) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto noiseShader = Shader::MakeFractalNoise(0.02f, 0.02f, 3, 6903);
+  Paint paint = {};
+  paint.setShader(std::move(noiseShader));
+  canvas->drawRect(Rect::MakeXYWH(50, 50, 200, 200), paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RawNoiseShader"));
+}
+
+TGFX_TEST(CanvasTest, RawTurbulence) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto noiseShader = Shader::MakeTurbulence(0.25f, 0.25f, 3, 6903);
+  Paint paint = {};
+  paint.setShader(std::move(noiseShader));
+  canvas->drawRect(Rect::MakeXYWH(50, 50, 200, 200), paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RawTurbulence"));
+}
+
+TGFX_TEST(CanvasTest, NoiseWithThreshold) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // SVG feColorMatrix type="luminanceToAlpha": output = {0, 0, 0, Kr*r + Kg*g + Kb*b}.
+  // ColorFilter::Matrix unpremultiplies the premultiplied noise input, applies the matrix, and
+  // re-premultiplies, so downstream consumers receive a clean luminance value in alpha.
+  constexpr std::array<float, 20> luminanceToAlpha = {
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+  };
+
+  auto noiseShader1 = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
+  auto lumaShader = noiseShader1->makeWithColorFilter(ColorFilter::Matrix(luminanceToAlpha));
+  Paint paint1 = {};
+  paint1.setShader(std::move(lumaShader));
+  canvas->drawRect(Rect::MakeXYWH(10, 10, 130, 130), paint1);
+
+  auto noiseShader2 = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
+  auto threshShader = noiseShader2->makeWithColorFilter(ColorFilter::AlphaThreshold(0.5f));
+  Paint paint2 = {};
+  paint2.setShader(std::move(threshShader));
+  canvas->drawRect(Rect::MakeXYWH(160, 10, 130, 130), paint2);
+
+  auto noiseShader3 = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
+  auto composed = ColorFilter::Compose(ColorFilter::Matrix(luminanceToAlpha),
+                                       ColorFilter::AlphaThreshold(0.5f));
+  auto composedShader = noiseShader3->makeWithColorFilter(std::move(composed));
+  Paint paint3 = {};
+  paint3.setShader(std::move(composedShader));
+  canvas->drawRect(Rect::MakeXYWH(10, 160, 130, 130), paint3);
+
+  auto noiseShader4 = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
+  auto full = ColorFilter::Compose(ColorFilter::Matrix(luminanceToAlpha),
+                                   ColorFilter::AlphaThreshold(0.5f));
+  full = ColorFilter::Compose(full,
+                              ColorFilter::Blend(Color{0.0f, 0.0f, 0.0f, 1.0f}, BlendMode::SrcIn));
+  auto fullShader = noiseShader4->makeWithColorFilter(std::move(full));
+  Paint paint4 = {};
+  paint4.setShader(std::move(fullShader));
+  canvas->drawRect(Rect::MakeXYWH(160, 160, 130, 130), paint4);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NoiseWithThreshold"));
+}
+
+TGFX_TEST(CanvasTest, NoiseShaderAlphaBlend) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 100);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(217, 217, 217));
+
+  {
+    auto shader = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
+    auto filter = ColorFilter::Blend(Color::White(), BlendMode::Src);
+    auto colored = shader->makeWithColorFilter(std::move(filter));
+    Paint paint = {};
+    paint.setShader(std::move(colored));
+    paint.setAlpha(0.25f);
+    canvas->drawRect(Rect::MakeXYWH(10, 10, 80, 80), paint);
+  }
+
+  {
+    auto shader = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
+    auto filter = ColorFilter::Blend(Color::White(), BlendMode::SrcIn);
+    auto colored = shader->makeWithColorFilter(std::move(filter));
+    Paint paint = {};
+    paint.setShader(std::move(colored));
+    paint.setAlpha(0.25f);
+    canvas->drawRect(Rect::MakeXYWH(110, 10, 80, 80), paint);
+  }
+
+  {
+    auto shader = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
+    constexpr std::array<float, 20> luminanceToAlpha = {
+        0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+        0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+        0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+        0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+    };
+    auto luma = ColorFilter::Matrix(luminanceToAlpha);
+    auto thresh = ColorFilter::AlphaThreshold(0.51f);
+    auto blend = ColorFilter::Blend(Color::White(), BlendMode::SrcIn);
+    auto f = ColorFilter::Compose(luma, thresh);
+    f = ColorFilter::Compose(f, blend);
+    auto colored = shader->makeWithColorFilter(std::move(f));
+    Paint paint = {};
+    paint.setShader(std::move(colored));
+    paint.setAlpha(0.25f);
+    canvas->drawRect(Rect::MakeXYWH(210, 10, 80, 80), paint);
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NoiseShaderAlphaBlend"));
+}
+
+TGFX_TEST(CanvasTest, NoiseTileSize) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Left: fractal noise without tileSize (no tiling).
+  auto noiseShader = Shader::MakeFractalNoise(0.05f, 0.05f, 3, 6903);
+  Paint paint = {};
+  paint.setShader(std::move(noiseShader));
+  canvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), paint);
+
+  // Right: fractal noise with tileSize 75x75, pattern should tile.
+  auto tileSize = ISize::Make(75, 75);
+  auto tiledShader = Shader::MakeFractalNoise(0.05f, 0.05f, 3, 6903, &tileSize);
+  paint.setShader(std::move(tiledShader));
+  canvas->drawRect(Rect::MakeXYWH(225, 25, 150, 150), paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NoiseTileSize"));
+}
+
+TGFX_TEST(CanvasTest, TurbulenceTileSize) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // Left: turbulence without tileSize.
+  auto turbShader = Shader::MakeTurbulence(0.05f, 0.05f, 3, 6903);
+  Paint paint = {};
+  paint.setShader(std::move(turbShader));
+  canvas->drawRect(Rect::MakeXYWH(25, 25, 150, 150), paint);
+
+  // Right: turbulence with tileSize 75x75.
+  auto tileSize = ISize::Make(75, 75);
+  auto tiledShader = Shader::MakeTurbulence(0.05f, 0.05f, 3, 6903, &tileSize);
+  paint.setShader(std::move(tiledShader));
+  canvas->drawRect(Rect::MakeXYWH(225, 25, 150, 150), paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/TurbulenceTileSize"));
 }
 
 }  // namespace tgfx
