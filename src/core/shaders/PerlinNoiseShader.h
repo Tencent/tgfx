@@ -21,7 +21,6 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
-#include <mutex>
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Size.h"
 
@@ -68,7 +67,7 @@ class PerlinNoiseShader : public Shader {
   PerlinNoiseShader(PerlinNoiseType noiseType, float baseFrequencyX, float baseFrequencyY,
                     int numOctaves, float seed, const ISize* tileSize);
 
-  const PaintingData* getPaintingData() const;
+  std::unique_ptr<PaintingData> getPaintingData() const;
 
   PerlinNoiseType noiseType;
   float baseFrequencyX;
@@ -88,13 +87,5 @@ class PerlinNoiseShader : public Shader {
   PlacementPtr<FragmentProcessor> asFragmentProcessor(
       const FPArgs& args, const Matrix* uvMatrix,
       const std::shared_ptr<ColorSpace>& dstColorSpace) const override;
-
- private:
-  // PaintingData is expensive to construct (Fisher-Yates shuffle plus 2048 sqrt/round operations).
-  // Cache it on first use so that repeated draws with the same shader instance reuse the result.
-  // Mutable is required because asFragmentProcessor() is const but the cache must be lazily
-  // initialized on the first GPU evaluation.
-  mutable std::once_flag paintingDataFlag;
-  mutable std::unique_ptr<PaintingData> cachedPaintingData;
 };
 }  // namespace tgfx

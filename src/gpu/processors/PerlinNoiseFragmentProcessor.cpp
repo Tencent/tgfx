@@ -22,11 +22,11 @@ namespace tgfx {
 
 PerlinNoiseFragmentProcessor::PerlinNoiseFragmentProcessor(
     PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
-    const PerlinNoiseShader::PaintingData* paintingData,
+    std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
     std::shared_ptr<Texture> permutationsTexture, std::shared_ptr<Texture> noiseTexture,
     const Matrix* uvMatrix)
     : FragmentProcessor(ClassID()), noiseType(noiseType), numOctaves(numOctaves),
-      stitchTiles(stitchTiles), paintingData(paintingData),
+      stitchTiles(stitchTiles), paintingData(std::move(paintingData)),
       permutationsTexture(std::move(permutationsTexture)), noiseTexture(std::move(noiseTexture)) {
   if (uvMatrix) {
     coordTransform = CoordTransform(*uvMatrix);

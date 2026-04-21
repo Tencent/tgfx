@@ -24,7 +24,7 @@ namespace tgfx {
 class GLSLPerlinNoiseFragmentProcessor : public PerlinNoiseFragmentProcessor {
  public:
   GLSLPerlinNoiseFragmentProcessor(PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
-                                   const PerlinNoiseShader::PaintingData* paintingData,
+                                   std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
                                    std::shared_ptr<Texture> permutationsTexture,
                                    std::shared_ptr<Texture> noiseTexture, const Matrix* uvMatrix);
 

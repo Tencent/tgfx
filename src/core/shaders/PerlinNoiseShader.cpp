@@ -72,12 +72,8 @@ PerlinNoiseShader::PerlinNoiseShader(PerlinNoiseType noiseType, float baseFreque
       stitchTiles(tileSize != nullptr && !tileSize->isEmpty()) {
 }
 
-const PerlinNoiseShader::PaintingData* PerlinNoiseShader::getPaintingData() const {
-  std::call_once(paintingDataFlag, [this] {
-    cachedPaintingData =
-        std::make_unique<PaintingData>(seed, baseFrequencyX, baseFrequencyY, tileSize);
-  });
-  return cachedPaintingData.get();
+std::unique_ptr<PerlinNoiseShader::PaintingData> PerlinNoiseShader::getPaintingData() const {
+  return std::make_unique<PaintingData>(seed, baseFrequencyX, baseFrequencyY, tileSize);
 }
 
 bool PerlinNoiseShader::isEqual(const Shader* shader) const {
@@ -100,7 +96,7 @@ PlacementPtr<FragmentProcessor> PerlinNoiseShader::asFragmentProcessor(
   }
   auto allocator = args.context->drawingAllocator();
   return PerlinNoiseFragmentProcessor::Make(allocator, args.context, noiseType, numOctaves,
-                                            stitchTiles, data, uvMatrix);
+                                            stitchTiles, std::move(data), uvMatrix);
 }
 
 // --- PaintingData implementation ---
