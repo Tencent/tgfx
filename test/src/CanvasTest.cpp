@@ -256,6 +256,7 @@ TGFX_TEST(CanvasTest, Clip) {
   }
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DuplicateClipPath"));
 
+  // ========== 16. Screenshot: uniqueID update on Empty state transition ==========
   // Verify that ClipStack updates its uniqueID when transitioning to Empty state, preventing
   // incorrect draw op batching due to stale uniqueID comparison.
   surface = Surface::Make(context, 100, 100);
@@ -278,6 +279,24 @@ TGFX_TEST(CanvasTest, Clip) {
     canvas->drawRect(Rect::MakeXYWH(25, 25, 50, 50), paint);
   }
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/EmptyClipMerge"));
+
+  // ========== 17. Screenshot: Inverse-fill clip covering current clip bounds ==========
+  // An inverse-fill path's keep-region is the complement of its geometric shape.
+  // When the shape covers the current clip bounds, the combined clip should become empty.
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->clipRect(Rect::MakeWH(100, 100));
+  {
+    Path inverseCanvas = {};
+    inverseCanvas.addRect(Rect::MakeLTRB(-10, -10, 110, 110));
+    inverseCanvas.toggleInverseFillType();
+    canvas->clipPath(inverseCanvas);
+    Paint paint = {};
+    paint.setColor(Color::Red());
+    canvas->drawRect(Rect::MakeWH(100, 100), paint);
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/InverseFillClip"));
 }
 
 TGFX_TEST(CanvasTest, DiscardContent) {
