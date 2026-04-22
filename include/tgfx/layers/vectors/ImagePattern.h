@@ -101,7 +101,8 @@ class ImagePattern : public ColorSource {
 
   /**
    * Sets the rule used to scale the image into the shape's bounding box when the fill space is
-   * FillSpace::Relative. This property has no effect when fillSpace is FillSpace::Absolute.
+   * FillSpace::Relative. The scale mode only affects rendering when fillSpace is
+   * FillSpace::Relative; in Absolute mode the stored value is preserved but not used.
    */
   void setScaleMode(ScaleMode mode);
 
