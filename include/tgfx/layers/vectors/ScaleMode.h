@@ -21,8 +21,9 @@
 namespace tgfx {
 
 /**
- * ScaleMode specifies how an ImagePattern image is fitted into the target bounding box when the
- * ImagePattern uses FillSpace::Relative. It is ignored when FillSpace is Absolute.
+ * ScaleMode specifies how an ImagePattern image is fitted into the target bounding box. Only
+ * affects rendering when the ImagePattern uses FillSpace::Relative; in FillSpace::Absolute the
+ * stored value is preserved but not used.
  */
 enum class ScaleMode {
   /**

@@ -21,9 +21,10 @@
 namespace tgfx {
 
 /**
- * FillSpace specifies the coordinate space used by a ColorSource when applied to a shape. This
+ * FillSpace specifies the coordinate space used by a ColorSource when applied to a shape. It
  * controls whether the fill parameters (such as gradient stops or pattern size) are interpreted
- * in absolute layer coordinates or relative to each shape's bounding box.
+ * in the layer's coordinate space or in a normalized 0-1 space that maps to each shape's bounding
+ * box.
  */
 enum class FillSpace {
   /**
