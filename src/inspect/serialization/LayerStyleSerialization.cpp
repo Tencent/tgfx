@@ -103,6 +103,9 @@ std::shared_ptr<Data> LayerStyleSerialization::Serialize(const LayerStyle* layer
     case LayerStyleType::InnerShadow:
       SerializeInnerShadowStyleImpl(fbb, layerStyle, map);
       break;
+    case LayerStyleType::Noise:
+      SerializeBasicLayerStyleImpl(fbb, layerStyle);
+      break;
   }
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());

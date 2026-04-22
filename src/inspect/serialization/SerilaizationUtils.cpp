@@ -100,7 +100,8 @@ std::string SerializeUtils::LayerStyleTypeToString(LayerStyleType type) {
       {LayerStyleType::LayerStyle, "LayerStyle"},
       {LayerStyleType::BackgroundBlur, "BackgroundBlur"},
       {LayerStyleType::DropShadow, "DropShadow"},
-      {LayerStyleType::InnerShadow, "InnerShadow"}};
+      {LayerStyleType::InnerShadow, "InnerShadow"},
+      {LayerStyleType::Noise, "Noise"}};
   return m[type];
 }
 
