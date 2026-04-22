@@ -68,7 +68,7 @@ std::shared_ptr<Shader> ImagePattern::getShader() const {
 }
 
 Matrix ImagePattern::getRelativeMatrix(const Rect& bounds) const {
-  if (_fillSpace != FillSpace::Relative || bounds.isEmpty() || _image == nullptr) {
+  if (bounds.isEmpty()) {
     return Matrix::I();
   }
   auto imgW = static_cast<float>(_image->width());
