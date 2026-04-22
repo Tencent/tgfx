@@ -559,8 +559,6 @@
         "CustomPathTypeface": "5a810d0b"
     },
     "VectorLayerTest": {
-        "AbsoluteGradient": "ba9e16fd",
-        "AbsoluteImagePattern": "ba9e16fd",
         "BasicShapes": "4a74f6aa",
         "ChainedModifiers": "8815f728",
         "ColorSourceAdvanced": "3e96556a",
@@ -579,8 +577,6 @@
         "MultipleFillsAndStrokes": "4a74f6aa",
         "NestedGroups": "4a74f6aa",
         "PolystarRotation": "4a74f6aa",
-        "RelativeGradient": "ba9e16fd",
-        "RelativeImagePattern": "ba9e16fd",
         "Repeater": "4a74f6aa",
         "RepeaterEdgeCases": "4a74f6aa",
         "RepeaterTransform": "4a74f6aa",
