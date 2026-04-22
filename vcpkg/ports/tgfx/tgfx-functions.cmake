@@ -93,12 +93,6 @@ function(build_tgfx_single_config SOURCE_PATH NODEJS OUTPUT_DIR IS_DEBUG)
         endif()
     endif()
 
-    if("inspector" IN_LIST FEATURES)
-        list(APPEND BUILD_ARGS -DTGFX_USE_INSPECTOR=ON)
-    else()
-        list(APPEND BUILD_ARGS -DTGFX_USE_INSPECTOR=OFF)
-    endif()
-
     if("png-decode" IN_LIST FEATURES)
         list(APPEND BUILD_ARGS -DTGFX_USE_PNG_DECODE=ON)
     else()

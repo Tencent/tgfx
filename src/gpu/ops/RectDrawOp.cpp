@@ -23,7 +23,6 @@
 #include "gpu/Quad.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -35,7 +34,6 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   }
   auto allocator = context->drawingAllocator();
   auto drawOp = allocator->make<RectDrawOp>(allocator, provider.get());
-  CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 || provider->lineJoin()) {
     drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
         provider->aaType() == AAType::Coverage, provider->lineJoin());
@@ -64,11 +62,6 @@ RectDrawOp::RectDrawOp(BlockAllocator* allocator, RectsVertexProvider* provider)
 }
 
 PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
-  ATTRIBUTE_NAME("rectCount", static_cast<int>(rectCount));
-  ATTRIBUTE_NAME("commonColor", commonColor);
-  ATTRIBUTE_NAME("uvMatrix", uvMatrix);
-  ATTRIBUTE_NAME("hasSubset", hasSubset);
-  ATTRIBUTE_NAME("hasStroke", lineJoin.has_value());
   if (lineJoin == LineJoin::Round) {
     return RoundStrokeRectGeometryProcessor::Make(allocator, aaType, commonColor, uvMatrix);
   }

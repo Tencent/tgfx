@@ -22,7 +22,6 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -39,7 +38,6 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
   auto allocator = context->drawingAllocator();
   auto atlasTextOp =
       allocator->make<AtlasTextOp>(allocator, provider.get(), std::move(textureProxy), sampling);
-  CAPUTRE_RECT_MESH(atlasTextOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
     atlasTextOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
         provider->aaType() == AAType::Coverage, std::nullopt);
@@ -64,8 +62,6 @@ AtlasTextOp::AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provide
 }
 
 PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarget*) {
-  ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
-  ATTRIBUTE_NAME("commonColor", commonColor);
   return AtlasTextGeometryProcessor::Make(allocator, textureProxy, aaType, commonColor, sampling);
 }
 

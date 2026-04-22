@@ -32,18 +32,6 @@ if (NOT WEB OR EMSCRIPTEN_PTHREADS)
     option(TGFX_USE_THREADS "Enable support for multithreaded rendering" ON)
 endif ()
 
-if (CMAKE_BUILD_TYPE MATCHES "Debug")
-    option(TGFX_USE_INSPECTOR "Enable profiling support for the TGFX Inspector tool" ON)
-endif ()
-
-if (TGFX_USE_INSPECTOR)
-    option(TGFX_USE_JPEG_ENCODE "Enable embedded JPEG encoding support" ON)
-endif ()
-
-if (NOT TGFX_USE_THREADS)
-    set(TGFX_USE_INSPECTOR OFF)
-endif ()
-
 if (APPLE OR (WEB AND NOT TGFX_USE_THREADS))
     option(TGFX_USE_FREETYPE "Use Freetype as the vector backend" OFF)
 else ()
@@ -148,7 +136,6 @@ message("TGFX_USE_JPEG_ENCODE: ${TGFX_USE_JPEG_ENCODE}")
 message("TGFX_USE_WEBP_DECODE: ${TGFX_USE_WEBP_DECODE}")
 message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
-message("TGFX_USE_INSPECTOR: ${TGFX_USE_INSPECTOR}")
 message("TGFX_BUILD_FRAMEWORK: ${TGFX_BUILD_FRAMEWORK}")
 message("TGFX_USE_TEXT_GAMMA_CORRECTION: ${TGFX_USE_TEXT_GAMMA_CORRECTION}")
 
@@ -204,16 +191,6 @@ if (TGFX_BUILD_LAYERS)
     file(GLOB_RECURSE LAYERS_FILES
             src/layers/*.*)
     list(APPEND TGFX_FILES ${LAYERS_FILES})
-endif ()
-
-if (TGFX_USE_INSPECTOR)
-    list(APPEND LZ4File third_party/lz4/lib/lz4.c)
-    list(APPEND TGFX_INCLUDES third_party/lz4/lib)
-    file(GLOB_RECURSE INSPECTOR_FILES src/inspect/*.*)
-    list(APPEND TGFX_FILES ${INSPECTOR_FILES} ${LZ4File})
-    list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
-    list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
-    list(APPEND TGFX_STATIC_VENDORS flatbuffers)
 endif ()
 
 if (TGFX_BUILD_PDF)

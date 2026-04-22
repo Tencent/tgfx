@@ -23,7 +23,6 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -35,7 +34,6 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
   }
   auto allocator = context->drawingAllocator();
   auto drawOp = allocator->make<RRectDrawOp>(allocator, provider.get());
-  CAPUTRE_RRECT_MESH(drawOp.get(), provider.get());
   drawOp->indexBufferProxy =
       context->globalCache()->getRRectIndexBuffer(provider->hasStroke(), provider->aaType());
   if (provider->rectCount() <= 1) {
@@ -61,9 +59,6 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
 }
 
 PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
-  ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
-  ATTRIBUTE_NAME("hasStroke", hasStroke);
-  ATTRIBUTE_NAME("commonColor", commonColor);
   if (aaType == AAType::None) {
     return NonAARRectGeometryProcessor::Make(allocator, renderTarget->width(),
                                              renderTarget->height(), hasStroke, commonColor);
