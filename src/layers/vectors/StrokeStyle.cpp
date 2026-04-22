@@ -153,6 +153,9 @@ class StrokePainter : public Painter {
     Matrix finalOuter = outerMatrix;
     shape = prepareShape(std::move(shape), innerMatrix, &finalOuter);
     auto useRelative = colorSource->useRelativeSpace();
+    // Capture the pre-stroke fill bounds in the final outer space so every stroke-align branch
+    // evaluates the relative shader over the same region as a fill would.
+    auto relativeBounds = useRelative ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
 
     if (needsBooleanOp) {
       auto transformedOriginal = Shape::ApplyMatrix(originalShape, innerMatrix);
@@ -163,7 +166,7 @@ class StrokePainter : public Painter {
       shape = Shape::ApplyMatrix(shape, finalOuter);
       auto finalShader = shader;
       if (useRelative) {
-        finalShader = shader->makeWithMatrix(colorSource->getRelativeMatrix(shape->getBounds()));
+        finalShader = shader->makeWithMatrix(colorSource->getRelativeMatrix(relativeBounds));
       }
       LayerPaint paint(finalShader, alpha, blendMode);
       paint.placement = placement;
@@ -185,7 +188,7 @@ class StrokePainter : public Painter {
       shape = Shape::ApplyMatrix(shape, finalOuter);
     }
     if (useRelative) {
-      paint.shader = shader->makeWithMatrix(colorSource->getRelativeMatrix(shape->getBounds()));
+      paint.shader = shader->makeWithMatrix(colorSource->getRelativeMatrix(relativeBounds));
     }
     paint.placement = placement;
     recorder->addShape(std::move(shape), paint);
