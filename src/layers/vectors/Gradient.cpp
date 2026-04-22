@@ -89,7 +89,7 @@ std::shared_ptr<Shader> Gradient::getShader() const {
 }
 
 Matrix Gradient::getRelativeMatrix(const Rect& bounds) const {
-  if (_fillSpace != FillSpace::Relative || bounds.isEmpty()) {
+  if (bounds.isEmpty()) {
     return Matrix::I();
   }
   auto matrix = Matrix::MakeScale(bounds.width(), bounds.height());
