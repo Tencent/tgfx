@@ -37,9 +37,11 @@ class ColorSource : public LayerProperty {
   virtual std::shared_ptr<Shader> getShader() const = 0;
 
   /**
-   * Returns true when this ColorSource interprets its parameters relative to each shape's bounding
-   * box. Gradient and ImagePattern override this to return true when their fillSpace is
-   * FillSpace::Relative.
+   * Returns true when this ColorSource interprets its parameters in a normalized 0-1 coordinate
+   * space that maps to each shape's bounding box, rather than absolute layer coordinates.
+   * Subclasses that support such a normalized space should override this to return true when that
+   * mode is active. The default returns false, meaning parameters are interpreted in absolute
+   * layer space.
    */
   virtual bool useRelativeSpace() const {
     return false;
