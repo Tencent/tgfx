@@ -25,28 +25,36 @@
 
 namespace tgfx {
 
-// Density filter for dark pixels: Luma -> invert -> threshold.
-// Keeps pixels where luminance < density (dark noise), discards bright ones.
+// Density filter for dark pixels: luminance RGB -> inverted alpha -> threshold.
+// Keeps pixels where luminance < density (dark noise), discards bright ones. Uses a single
+// ColorFilter::Matrix to compute the inverted luminance directly into alpha, avoiding the
+// premultiplied handling difference of ColorFilter::Luma().
 static std::shared_ptr<ColorFilter> MakeDarkDensityFilter(float density) {
-  auto lumaFilter = ColorFilter::Luma();
   // clang-format off
-  std::array<float, 20> invertAlphaMatrix = {
-    0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, -1.0f, 1.0f,
+  std::array<float, 20> invertLumaMatrix = {
+    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
+    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
+    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
+    -0.2126f, -0.7152f, -0.0722f, 0.0f, 1.0f,
   };
   // clang-format on
-  auto invertFilter = ColorFilter::Matrix(invertAlphaMatrix);
+  auto invertFilter = ColorFilter::Matrix(invertLumaMatrix);
   auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - density);
-  auto composed = ColorFilter::Compose(lumaFilter, invertFilter);
-  return ColorFilter::Compose(composed, thresholdFilter);
+  return ColorFilter::Compose(invertFilter, thresholdFilter);
 }
 
-// Complementary density filter for bright pixels: Luma -> threshold at density.
+// Complementary density filter for bright pixels: luminance RGB -> alpha -> threshold at density.
 // Keeps pixels where luminance >= density (bright noise), discards dark ones.
 static std::shared_ptr<ColorFilter> MakeBrightDensityFilter(float density) {
-  auto lumaFilter = ColorFilter::Luma();
+  // clang-format off
+  std::array<float, 20> lumaMatrix = {
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+  };
+  // clang-format on
+  auto lumaFilter = ColorFilter::Matrix(lumaMatrix);
   auto thresholdFilter = ColorFilter::AlphaThreshold(density);
   return ColorFilter::Compose(lumaFilter, thresholdFilter);
 }
@@ -269,13 +277,13 @@ std::shared_ptr<ImageFilter> MultiNoiseFilter::onBuildNoiseImageFilter(float sca
     return nullptr;
   }
 
-  // Contrast enhance RGB + inverted luma to alpha for density thresholding.
+  // Contrast enhance RGB and compute inverted luminance to alpha for density thresholding.
   // clang-format off
   std::array<float, 20> contrastLumaMatrix = {
-     2.0f,    0.0f,    0.0f,   0.0f, -0.5f,
-     0.0f,    2.0f,    0.0f,   0.0f, -0.5f,
-     0.0f,    0.0f,    2.0f,   0.0f, -0.5f,
-    -0.2126f, -0.7152f, -0.0722f, 0.0f, 1.0f,
+     2.0f,     0.0f,     0.0f,     0.0f, -0.5f,
+     0.0f,     2.0f,     0.0f,     0.0f, -0.5f,
+     0.0f,     0.0f,     2.0f,     0.0f, -0.5f,
+    -0.2126f, -0.7152f, -0.0722f,  0.0f,  1.0f,
   };
   // clang-format on
   auto contrastLumaFilter = ColorFilter::Matrix(contrastLumaMatrix);
