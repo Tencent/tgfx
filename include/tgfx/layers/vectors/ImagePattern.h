@@ -27,6 +27,10 @@ namespace tgfx {
 /**
  * ImagePattern describes a pattern based on an image, which can be drawn on a shape layer. The
  * image can be repeated in both the x and y directions, and you can specify the sampling options.
+ * By default, ImagePattern samples the image in a normalized 0-1 space (FillSpace::Relative) that
+ * maps to each shape's bounding box, fitted according to scaleMode(). Call
+ * setFillSpace(FillSpace::Absolute) to place the image in the layer's coordinate space using the
+ * pattern's matrix instead.
  */
 class ImagePattern : public ColorSource {
  public:
