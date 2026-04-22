@@ -76,28 +76,38 @@ Matrix ImagePattern::getRelativeMatrix(const Rect& bounds) const {
   if (imgW <= 0 || imgH <= 0) {
     return Matrix::I();
   }
-  float sx = bounds.width() / imgW;
-  float sy = bounds.height() / imgH;
+  // ScaleMode operates on the image rect after _matrix has been applied, because the shader
+  // returned by getShader() already carries _matrix. Use the axis-aligned bounding box of the
+  // transformed image as the source rect for fitting into bounds.
+  auto imageRect = Rect::MakeWH(imgW, imgH);
+  _matrix.mapRect(&imageRect);
+  auto srcW = imageRect.width();
+  auto srcH = imageRect.height();
+  if (srcW <= 0 || srcH <= 0) {
+    return Matrix::I();
+  }
+  float sx = bounds.width() / srcW;
+  float sy = bounds.height() / srcH;
   switch (_scaleMode) {
     case ScaleMode::None:
-      return Matrix::MakeTrans(bounds.left, bounds.top);
+      return Matrix::MakeTrans(bounds.left - imageRect.left, bounds.top - imageRect.top);
     case ScaleMode::Stretch: {
       auto matrix = Matrix::MakeScale(sx, sy);
-      matrix.postTranslate(bounds.left, bounds.top);
+      matrix.postTranslate(bounds.left - imageRect.left * sx, bounds.top - imageRect.top * sy);
       return matrix;
     }
     case ScaleMode::LetterBox: {
       float scale = std::min(sx, sy);
-      float tx = bounds.left + (bounds.width() - imgW * scale) * 0.5f;
-      float ty = bounds.top + (bounds.height() - imgH * scale) * 0.5f;
+      float tx = bounds.left + (bounds.width() - srcW * scale) * 0.5f - imageRect.left * scale;
+      float ty = bounds.top + (bounds.height() - srcH * scale) * 0.5f - imageRect.top * scale;
       auto matrix = Matrix::MakeScale(scale);
       matrix.postTranslate(tx, ty);
       return matrix;
     }
     case ScaleMode::Zoom: {
       float scale = std::max(sx, sy);
-      float tx = bounds.left + (bounds.width() - imgW * scale) * 0.5f;
-      float ty = bounds.top + (bounds.height() - imgH * scale) * 0.5f;
+      float tx = bounds.left + (bounds.width() - srcW * scale) * 0.5f - imageRect.left * scale;
+      float ty = bounds.top + (bounds.height() - srcH * scale) * 0.5f - imageRect.top * scale;
       auto matrix = Matrix::MakeScale(scale);
       matrix.postTranslate(tx, ty);
       return matrix;
