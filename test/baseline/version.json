@@ -459,6 +459,8 @@
     "SVGExportTest": {
         "AssignColorSpace": "0d4409dd",
         "ClipWithMatrixTransform": "082ec7b6b",
+        "ColorFilterShaderWithImageShader": "be3fb417",
+        "ColorFilterShaderWithMatrixImageShader": "be3fb417",
         "DrawImageRect": "f8344be7",
         "DstAssignColorSpace": "0d4409dd",
         "DstColorSpace": "0d4409dd",
