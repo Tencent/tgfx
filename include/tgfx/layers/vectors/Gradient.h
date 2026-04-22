@@ -32,7 +32,10 @@ class ConicGradient;
 class DiamondGradient;
 
 /**
- * The base class for all gradient types that can be drawn on a shape layer.
+ * The base class for all gradient types that can be drawn on a shape layer. By default, gradient
+ * parameters are interpreted in a normalized 0-1 space (FillSpace::Relative) that maps to each
+ * shape's bounding box. Call setFillSpace(FillSpace::Absolute) to interpret them in the layer's
+ * coordinate space instead.
  */
 class Gradient : public ColorSource {
  public:
@@ -194,28 +197,33 @@ class LinearGradient : public Gradient {
   }
 
   /**
-   * Returns the start point of the gradient when drawn in the layer's coordinate space. The start
-   * point corresponds to the first stop of the gradient.
+   * Returns the start point of the gradient. The start point corresponds to the first stop of the
+   * gradient. It is interpreted in the coordinate space selected by fillSpace(): a normalized 0-1
+   * space relative to each shape's bounding box when FillSpace::Relative (the default), or the
+   * layer's coordinate space when FillSpace::Absolute.
    */
   const Point& startPoint() const {
     return _startPoint;
   }
 
   /**
-   * Sets the start point of the gradient when drawn in the layer's coordinate space.
+   * Sets the start point of the gradient. The point is interpreted in the coordinate space
+   * selected by fillSpace(); see startPoint() for details.
    */
   void setStartPoint(const Point& startPoint);
 
   /**
-   * Returns the end point of the gradient when drawn in the layer's coordinate space. The end point
-   * corresponds to the last stop of the gradient.
+   * Returns the end point of the gradient. The end point corresponds to the last stop of the
+   * gradient. It is interpreted in the coordinate space selected by fillSpace(); see startPoint()
+   * for details.
    */
   const Point& endPoint() const {
     return _endPoint;
   }
 
   /**
-   * Sets the end point of the gradient when drawn in the layer's coordinate space.
+   * Sets the end point of the gradient. The point is interpreted in the coordinate space selected
+   * by fillSpace(); see startPoint() for details.
    */
   void setEndPoint(const Point& endPoint);
 
@@ -245,27 +253,31 @@ class RadialGradient : public Gradient {
 
   /**
    * Returns the center of the circle for this gradient. The center point corresponds to the first
-   * stop of the gradient.
+   * stop of the gradient. It is interpreted in the coordinate space selected by fillSpace(): a
+   * normalized 0-1 space relative to each shape's bounding box when FillSpace::Relative (the
+   * default), or the layer's coordinate space when FillSpace::Absolute.
    */
   const Point& center() const {
     return _center;
   }
 
   /**
-   * Sets the center of the circle for this gradient.
+   * Sets the center of the circle for this gradient. The point is interpreted in the coordinate
+   * space selected by fillSpace(); see center() for details.
    */
   void setCenter(const Point& center);
 
   /**
    * Returns the radius of the circle for this gradient. The radius corresponds to the last stop of
-   * the gradient.
+   * the gradient. It is expressed in the coordinate space selected by fillSpace().
    */
   float radius() const {
     return _radius;
   }
 
   /**
-   * Sets the radius of the circle for this gradient. The radius must be positive.
+   * Sets the radius of the circle for this gradient. The radius must be positive and is expressed
+   * in the coordinate space selected by fillSpace().
    */
   void setRadius(float radius);
 
@@ -294,14 +306,17 @@ class ConicGradient : public Gradient {
   }
 
   /**
-   * Returns the center of the circle for this gradient.
+   * Returns the center of the circle for this gradient. It is interpreted in the coordinate space
+   * selected by fillSpace(): a normalized 0-1 space relative to each shape's bounding box when
+   * FillSpace::Relative (the default), or the layer's coordinate space when FillSpace::Absolute.
    */
   const Point& center() const {
     return _center;
   }
 
   /**
-   * Sets the center of the circle for this gradient.
+   * Sets the center of the circle for this gradient. The point is interpreted in the coordinate
+   * space selected by fillSpace(); see center() for details.
    */
   void setCenter(const Point& center);
 
@@ -358,27 +373,31 @@ class DiamondGradient : public Gradient {
 
   /**
    * Returns the center of the diamond for this gradient. The center point corresponds to the first
-   * stop of the gradient.
+   * stop of the gradient. It is interpreted in the coordinate space selected by fillSpace(): a
+   * normalized 0-1 space relative to each shape's bounding box when FillSpace::Relative (the
+   * default), or the layer's coordinate space when FillSpace::Absolute.
    */
   const Point& center() const {
     return _center;
   }
 
   /**
-   * Sets the center of the diamond for this gradient.
+   * Sets the center of the diamond for this gradient. The point is interpreted in the coordinate
+   * space selected by fillSpace(); see center() for details.
    */
   void setCenter(const Point& center);
 
   /**
    * Returns the radius of the diamond for this gradient. The distance from the center to a vertex
-   * of the diamond.
+   * of the diamond, expressed in the coordinate space selected by fillSpace().
    */
   float radius() const {
     return _radius;
   }
 
   /**
-   * Sets the radius of the diamond for this gradient. The value must be positive.
+   * Sets the radius of the diamond for this gradient. The value must be positive and is expressed
+   * in the coordinate space selected by fillSpace().
    */
   void setRadius(float radius);
 
