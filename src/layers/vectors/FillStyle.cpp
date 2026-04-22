@@ -77,8 +77,6 @@ class FillPainter : public Painter {
   void drawGlyphRun(LayerRecorder* recorder, const Matrix& geometryMatrix,
                     const StyledGlyphRun& run) {
     float blendFactor = run.style.fillColor.alpha;
-    // The shader's local matrix is computed in the text blob's local space (before geometryMatrix),
-    // since the recorder multiplies by geometryMatrix for drawing.
     auto adjustedShader = shader;
     if (colorSource->useRelativeSpace() && run.textBlob != nullptr) {
       adjustedShader =

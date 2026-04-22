@@ -50,10 +50,7 @@ class ColorSource : public LayerProperty {
   /**
    * Returns the transformation matrix that maps the ColorSource's definition space to the given
    * bounds. The returned matrix is intended to be applied to the shader returned by getShader().
-   * @param bounds The bounding box of the target shape, expressed in the coordinate space in which
-   * the shader will be evaluated. This is the layer's coordinate space for shape fills, and the
-   * text blob's local space for text runs (because the recorder applies the run's transform to the
-   * shader together with the geometry).
+   * @param bounds The bounding box of the target shape.
    */
   virtual Matrix getRelativeMatrix(const Rect&) const {
     return Matrix::I();
