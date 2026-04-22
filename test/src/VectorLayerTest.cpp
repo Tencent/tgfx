@@ -2653,7 +2653,8 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   // layer origin; the gradient spans from the left edge of the first rectangle to the right edge
   // of the last rectangle, so the endpoints are pinned at the outer rectangles.
   auto absoluteCompare =
-      Gradient::MakeLinear({rowStartX, 0}, {rowStartX + rowTotalWidth, 0}, compareColors);
+      Gradient::MakeLinear({rowCenters[0] - rowRectSize * 0.5f, 0},
+                           {rowCenters[2] + rowRectSize * 0.5f, 0}, compareColors);
   absoluteCompare->setFillSpace(FillSpace::Absolute);
   EXPECT_EQ(absoluteCompare->fillSpace(), FillSpace::Absolute);
   auto group8 = std::make_shared<VectorGroup>();
