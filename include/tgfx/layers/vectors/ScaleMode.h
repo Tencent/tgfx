@@ -30,25 +30,25 @@ enum class ScaleMode {
    * The image is not scaled. It is placed at the top-left corner of the bounding box and tiled
    * according to the pattern's tile modes.
    */
-  None = 0,
+  None,
 
   /**
    * The image is stretched to fill the bounding box, ignoring its original aspect ratio.
    */
-  Stretch = 1,
+  Stretch,
 
   /**
    * The image is scaled uniformly to fit entirely inside the bounding box while preserving its
    * aspect ratio. The image is centered and empty areas may appear along one axis. This is the
    * default value.
    */
-  LetterBox = 2,
+  LetterBox,
 
   /**
    * The image is scaled uniformly to cover the entire bounding box while preserving its aspect
    * ratio. The image is centered and may be cropped along one axis.
    */
-  Zoom = 3
+  Zoom
 };
 
 }  // namespace tgfx
