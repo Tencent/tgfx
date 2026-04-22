@@ -153,7 +153,6 @@ class StrokePainter : public Painter {
     Matrix finalOuter = outerMatrix;
     shape = prepareShape(std::move(shape), innerMatrix, &finalOuter);
     auto useRelative = colorSource->useRelativeSpace();
-    auto finalShader = shader;
 
     if (needsBooleanOp) {
       auto transformedOriginal = Shape::ApplyMatrix(originalShape, innerMatrix);
@@ -162,6 +161,7 @@ class StrokePainter : public Painter {
         return;
       }
       shape = Shape::ApplyMatrix(shape, finalOuter);
+      auto finalShader = shader;
       if (useRelative) {
         finalShader = shader->makeWithMatrix(colorSource->getRelativeMatrix(shape->getBounds()));
       }
