@@ -76,15 +76,7 @@ void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<
   // draw blurred background in the mask
   Paint paint = {};
   paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
-  // On WebGL, Src triggers a dst copy sized to the full render target (often a large tile
-  // atlas) instead of the device bounds, which is prohibitively expensive. Fall back to SrcOver
-  // here as a trick to avoid the copy.
-  // TODO(HParty): switch back to Src once the dst copy is shrunk to the device bounds.
-#ifdef __EMSCRIPTEN__
-  paint.setBlendMode(BlendMode::SrcOver);
-#else
   paint.setBlendMode(BlendMode::Src);
-#endif
   canvas->drawImage(blurBackground, backgroundOffset.x, backgroundOffset.y, &paint);
 }
 
