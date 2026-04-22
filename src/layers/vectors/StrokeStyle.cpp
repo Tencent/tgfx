@@ -231,6 +231,10 @@ class StrokePainter : public Painter {
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
     auto baseShader = shader;
+    auto useRelative = colorSource->useRelativeSpace();
+    // Capture the pre-stroke text-shape bounds in the final outer space so every stroke-align
+    // branch evaluates the relative shader over the same region.
+    auto relativeBounds = useRelative ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
 
     std::shared_ptr<Shape> finalShape = nullptr;
     LayerPaint basePaint = {};
@@ -256,8 +260,8 @@ class StrokePainter : public Painter {
       finalShape = Shape::ApplyMatrix(finalShape, finalOuter);
     }
 
-    if (colorSource->useRelativeSpace()) {
-      baseShader = shader->makeWithMatrix(colorSource->getRelativeMatrix(finalShape->getBounds()));
+    if (useRelative) {
+      baseShader = shader->makeWithMatrix(colorSource->getRelativeMatrix(relativeBounds));
     }
     auto paints = MakeBlendPaints(baseShader, alpha, blendMode, run.style);
 
