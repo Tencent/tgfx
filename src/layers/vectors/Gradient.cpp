@@ -72,12 +72,29 @@ void Gradient::setMatrix(const Matrix& matrix) {
   invalidateContent();
 }
 
+void Gradient::setFillSpace(FillSpace space) {
+  if (_fillSpace == space) {
+    return;
+  }
+  _fillSpace = space;
+  invalidateContent();
+}
+
 std::shared_ptr<Shader> Gradient::getShader() const {
   auto shader = onCreateShader();
   if (shader == nullptr || _matrix.isIdentity()) {
     return shader;
   }
   return shader->makeWithMatrix(_matrix);
+}
+
+Matrix Gradient::getRelativeMatrix(const Rect& bounds) const {
+  if (_fillSpace != FillSpace::Relative || bounds.isEmpty()) {
+    return Matrix::I();
+  }
+  auto matrix = Matrix::MakeScale(bounds.width(), bounds.height());
+  matrix.postTranslate(bounds.left, bounds.top);
+  return matrix;
 }
 
 void LinearGradient::setEndPoint(const Point& endPoint) {

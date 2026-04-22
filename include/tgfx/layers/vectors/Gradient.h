@@ -23,6 +23,7 @@
 #include "tgfx/core/GradientType.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/layers/vectors/ColorSource.h"
+#include "tgfx/layers/vectors/FillSpace.h"
 
 namespace tgfx {
 class LinearGradient;
@@ -140,7 +141,29 @@ class Gradient : public ColorSource {
    */
   void setMatrix(const Matrix& matrix);
 
+  /**
+   * Returns the coordinate space used to interpret this gradient's parameters. The default value is
+   * FillSpace::Relative.
+   */
+  FillSpace fillSpace() const {
+    return _fillSpace;
+  }
+
+  /**
+   * Sets the coordinate space used to interpret this gradient's parameters. When set to
+   * FillSpace::Relative, the gradient parameters are interpreted in a (0, 0)-(1, 1) coordinate
+   * space that maps to each shape's bounding box. When set to FillSpace::Absolute, the parameters
+   * are in the layer's coordinate space.
+   */
+  void setFillSpace(FillSpace space);
+
   std::shared_ptr<Shader> getShader() const override;
+
+  bool useRelativeSpace() const override {
+    return _fillSpace == FillSpace::Relative;
+  }
+
+  Matrix getRelativeMatrix(const Rect& bounds) const override;
 
  protected:
   Type getType() const override {
@@ -158,6 +181,7 @@ class Gradient : public ColorSource {
 
  private:
   Matrix _matrix = {};
+  FillSpace _fillSpace = FillSpace::Relative;
 };
 
 /**

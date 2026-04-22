@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/vectors/ImagePattern.h"
+#include <algorithm>
 
 namespace tgfx {
 std::shared_ptr<ImagePattern> ImagePattern::Make(std::shared_ptr<Image> image, TileMode tileModeX,
@@ -42,12 +43,67 @@ void ImagePattern::setMatrix(const Matrix& matrix) {
   invalidateContent();
 }
 
+void ImagePattern::setFillSpace(FillSpace space) {
+  if (_fillSpace == space) {
+    return;
+  }
+  _fillSpace = space;
+  invalidateContent();
+}
+
+void ImagePattern::setScaleMode(ScaleMode mode) {
+  if (_scaleMode == mode) {
+    return;
+  }
+  _scaleMode = mode;
+  invalidateContent();
+}
+
 std::shared_ptr<Shader> ImagePattern::getShader() const {
   auto shader = Shader::MakeImageShader(_image, _tileModeX, _tileModeY, _sampling);
   if (shader == nullptr || _matrix.isIdentity()) {
     return shader;
   }
   return shader->makeWithMatrix(_matrix);
+}
+
+Matrix ImagePattern::getRelativeMatrix(const Rect& bounds) const {
+  if (_fillSpace != FillSpace::Relative || bounds.isEmpty() || _image == nullptr) {
+    return Matrix::I();
+  }
+  auto imgW = static_cast<float>(_image->width());
+  auto imgH = static_cast<float>(_image->height());
+  if (imgW <= 0 || imgH <= 0) {
+    return Matrix::I();
+  }
+  float sx = bounds.width() / imgW;
+  float sy = bounds.height() / imgH;
+  switch (_scaleMode) {
+    case ScaleMode::None:
+      return Matrix::MakeTrans(bounds.left, bounds.top);
+    case ScaleMode::Stretch: {
+      auto matrix = Matrix::MakeScale(sx, sy);
+      matrix.postTranslate(bounds.left, bounds.top);
+      return matrix;
+    }
+    case ScaleMode::LetterBox: {
+      float scale = std::min(sx, sy);
+      float tx = bounds.left + (bounds.width() - imgW * scale) * 0.5f;
+      float ty = bounds.top + (bounds.height() - imgH * scale) * 0.5f;
+      auto matrix = Matrix::MakeScale(scale);
+      matrix.postTranslate(tx, ty);
+      return matrix;
+    }
+    case ScaleMode::Zoom: {
+      float scale = std::max(sx, sy);
+      float tx = bounds.left + (bounds.width() - imgW * scale) * 0.5f;
+      float ty = bounds.top + (bounds.height() - imgH * scale) * 0.5f;
+      auto matrix = Matrix::MakeScale(scale);
+      matrix.postTranslate(tx, ty);
+      return matrix;
+    }
+  }
+  return Matrix::I();
 }
 
 }  // namespace tgfx
