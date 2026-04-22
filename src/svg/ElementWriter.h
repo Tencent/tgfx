@@ -25,6 +25,7 @@
 #include "core/filters/MatrixColorFilter.h"
 #include "core/filters/ModeColorFilter.h"
 #include "core/images/PictureImage.h"
+#include "core/shaders/ColorFilterShader.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"

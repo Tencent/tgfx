@@ -577,6 +577,32 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
       addImageShaderResources(static_cast<const ImageShader*>(decomposedShader), matrix, context,
                               resources);
       break;
+    case Types::ShaderType::ColorFilter: {
+      auto* colorFilterShader = static_cast<const ColorFilterShader*>(decomposedShader);
+      bool handled = false;
+      if (colorFilterShader->colorFilter) {
+        // The inner shader may be wrapped by MatrixShader(s), so decompose it again.
+        auto [innerShader, innerMatrix] = shaderDecomposer(colorFilterShader->shader);
+        if (Types::Get(innerShader) == Types::ShaderType::Image) {
+          auto* imageShader = static_cast<const ImageShader*>(innerShader);
+          auto bakedImage = imageShader->image->makeWithFilter(
+              ImageFilter::ColorFilter(colorFilterShader->colorFilter));
+          if (bakedImage) {
+            auto newShader = Shader::MakeImageShader(bakedImage, imageShader->tileModeX,
+                                                     imageShader->tileModeY, imageShader->sampling);
+            if (newShader) {
+              addImageShaderResources(static_cast<const ImageShader*>(newShader.get()),
+                                      matrix * innerMatrix, context, resources);
+              handled = true;
+            }
+          }
+        }
+      }
+      if (!handled) {
+        reportUnsupportedElement("Unsupported ColorFilter shader");
+      }
+      break;
+    }
     default:
       // TODO(YGaurora):
       // Export color filter shaders as color filters.

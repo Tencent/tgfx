@@ -22,11 +22,14 @@
 #include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/WriteStream.h"
@@ -870,5 +873,67 @@ TGFX_TEST(SVGExportTest, ClipWithMatrixTransform) {
   exporter->close();
 
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ClipWithMatrixTransform"));
+}
+
+TGFX_TEST(SVGExportTest, ColorFilterShaderWithImageShader) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+
+  auto imageShader = Shader::MakeImageShader(image);
+  ASSERT_TRUE(imageShader != nullptr);
+
+  auto colorFilter = ColorFilter::ImageAdjust(0.5f, 0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+  ASSERT_TRUE(colorFilter != nullptr);
+
+  auto shader = imageShader->makeWithColorFilter(colorFilter);
+  ASSERT_TRUE(shader != nullptr);
+
+  Paint paint;
+  paint.setShader(shader);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+                                    SVGExportFlags::DisablePrettyXML);
+  auto canvas = exporter->getCanvas();
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 128, 128), paint);
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ColorFilterShaderWithImageShader"));
+}
+
+TGFX_TEST(SVGExportTest, ColorFilterShaderWithMatrixImageShader) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+
+  auto imageShader = Shader::MakeImageShader(image);
+  ASSERT_TRUE(imageShader != nullptr);
+
+  // Wrap with a scale matrix to simulate how ImagePattern produces its shader.
+  auto matrix = Matrix::MakeScale(0.5f);
+  matrix.postTranslate(20, 20);
+  auto matrixShader = imageShader->makeWithMatrix(matrix);
+  ASSERT_TRUE(matrixShader != nullptr);
+
+  auto colorFilter = ColorFilter::ImageAdjust(0.3f, 0.15f, 0.4f, 0.0f, 0.0f, 0.0f, 0.0f);
+  auto shader = matrixShader->makeWithColorFilter(colorFilter);
+  ASSERT_TRUE(shader != nullptr);
+
+  Paint paint;
+  paint.setShader(shader);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+                                    SVGExportFlags::DisablePrettyXML);
+  auto canvas = exporter->getCanvas();
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 200, 200), paint);
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ColorFilterShaderWithMatrixImageShader"));
 }
 }  // namespace tgfx
