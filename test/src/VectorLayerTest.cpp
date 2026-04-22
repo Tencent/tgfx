@@ -2541,7 +2541,7 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 670, 360);
+  auto surface = Surface::Make(context, 670, 460);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -2617,25 +2617,61 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   linear->setPositions({0.0f, 0.33f, 0.66f, 1.0f});
   EXPECT_EQ(linear->positions().size(), 4u);
 
-  // Row 2 (FillSpace::Absolute): two rectangles share one gradient anchored to the layer origin,
-  // so each rect reveals a different section of the same underlying gradient.
-  auto absoluteGradient = Gradient::MakeLinear({0, 0}, {670, 0}, {Color::Red(), Color::Blue()});
-  absoluteGradient->setFillSpace(FillSpace::Absolute);
-  EXPECT_EQ(absoluteGradient->fillSpace(), FillSpace::Absolute);
+  std::vector<Color> compareColors = {Color::Red(), Color::Blue()};
+  const float rowRectWidth = 120.0f;
+  const float rowRectHeight = 80.0f;
+  const float rowStartX = 155.0f;
+  const std::array<float, 3> rowCenters = {rowStartX + rowRectWidth * 0.5f,
+                                           rowStartX + rowRectWidth * 1.5f,
+                                           rowStartX + rowRectWidth * 2.5f};
 
+  // Row 2 (FillSpace::Relative): three contiguous rectangles share one gradient definition; each
+  // rectangle maps the same 0-1 gradient independently, so all three rectangles look identical.
+  auto relativeCompare = Gradient::MakeLinear({0, 0.5f}, {1, 0.5f}, compareColors);
+  EXPECT_EQ(relativeCompare->fillSpace(), FillSpace::Relative);
   auto group5 = std::make_shared<VectorGroup>();
   auto rect5 = std::make_shared<Rectangle>();
-  rect5->setPosition({200, 270});
-  rect5->setSize({120, 80});
-  group5->setElements({rect5, FillStyle::Make(absoluteGradient)});
+  rect5->setPosition({rowCenters[0], 230});
+  rect5->setSize({rowRectWidth, rowRectHeight});
+  group5->setElements({rect5, FillStyle::Make(relativeCompare)});
 
   auto group6 = std::make_shared<VectorGroup>();
   auto rect6 = std::make_shared<Rectangle>();
-  rect6->setPosition({470, 270});
-  rect6->setSize({120, 80});
-  group6->setElements({rect6, FillStyle::Make(absoluteGradient)});
+  rect6->setPosition({rowCenters[1], 230});
+  rect6->setSize({rowRectWidth, rowRectHeight});
+  group6->setElements({rect6, FillStyle::Make(relativeCompare)});
 
-  vectorLayer->setContents({group1, group2, group3, group4, group5, group6});
+  auto group7 = std::make_shared<VectorGroup>();
+  auto rect7 = std::make_shared<Rectangle>();
+  rect7->setPosition({rowCenters[2], 230});
+  rect7->setSize({rowRectWidth, rowRectHeight});
+  group7->setElements({rect7, FillStyle::Make(relativeCompare)});
+
+  // Row 3 (FillSpace::Absolute): three contiguous rectangles share one gradient anchored to the
+  // layer origin; each rectangle reveals a different section of the same underlying gradient.
+  auto absoluteCompare = Gradient::MakeLinear({0, 0}, {670, 0}, compareColors);
+  absoluteCompare->setFillSpace(FillSpace::Absolute);
+  EXPECT_EQ(absoluteCompare->fillSpace(), FillSpace::Absolute);
+  auto group8 = std::make_shared<VectorGroup>();
+  auto rect8 = std::make_shared<Rectangle>();
+  rect8->setPosition({rowCenters[0], 330});
+  rect8->setSize({rowRectWidth, rowRectHeight});
+  group8->setElements({rect8, FillStyle::Make(absoluteCompare)});
+
+  auto group9 = std::make_shared<VectorGroup>();
+  auto rect9 = std::make_shared<Rectangle>();
+  rect9->setPosition({rowCenters[1], 330});
+  rect9->setSize({rowRectWidth, rowRectHeight});
+  group9->setElements({rect9, FillStyle::Make(absoluteCompare)});
+
+  auto group10 = std::make_shared<VectorGroup>();
+  auto rect10 = std::make_shared<Rectangle>();
+  rect10->setPosition({rowCenters[2], 330});
+  rect10->setSize({rowRectWidth, rowRectHeight});
+  group10->setElements({rect10, FillStyle::Make(absoluteCompare)});
+
+  vectorLayer->setContents(
+      {group1, group2, group3, group4, group5, group6, group7, group8, group9, group10});
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
 
@@ -2705,7 +2741,7 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 480, 340);
+  auto surface = Surface::Make(context, 480, 470);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -2713,6 +2749,10 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   ASSERT_TRUE(image != nullptr);
   auto image2 = MakeImage("resources/assets/tgfx.png");
   ASSERT_TRUE(image2 != nullptr);
+
+  auto typeface = GetTestTypeface();
+  ASSERT_TRUE(typeface != nullptr);
+  Font labelFont(typeface, 16.0f);
 
   auto displayList = std::make_unique<DisplayList>();
   auto vectorLayer = VectorLayer::Make();
@@ -2764,27 +2804,72 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   auto fill3 = FillStyle::Make(pattern3);
   group3->setElements({rect3, fill3});
 
-  // Row 2 (FillSpace::Relative, default): representative ScaleMode values mapped to each rect.
-  auto group4 = std::make_shared<VectorGroup>();
-  auto rect4 = std::make_shared<Rectangle>();
-  rect4->setPosition({140, 250});
-  rect4->setSize({100, 80});
-  auto pattern4 = ImagePattern::Make(image);
-  EXPECT_EQ(pattern4->fillSpace(), FillSpace::Relative);
-  pattern4->setScaleMode(ScaleMode::Stretch);
-  EXPECT_EQ(pattern4->scaleMode(), ScaleMode::Stretch);
-  group4->setElements({rect4, FillStyle::Make(pattern4)});
+  // Row 2 (FillSpace::Relative): four ScaleMode values with borders and labels underneath.
+  struct ModeEntry {
+    float centerX;
+    ScaleMode mode;
+    const char* label;
+  };
+  const ModeEntry scaleEntries[] = {
+      {105.0f, ScaleMode::Stretch, "Stretch"},
+      {195.0f, ScaleMode::LetterBox, "LetterBox"},
+      {285.0f, ScaleMode::Zoom, "Zoom"},
+      {375.0f, ScaleMode::None, "None"},
+  };
+  const float scaleRowCenterY = 220.0f;
+  const float scaleRectWidth = 90.0f;
+  const float scaleRectHeight = 60.0f;
+  const float scaleLabelY = 275.0f;
+  const Color borderColor = Color::FromRGBA(96, 96, 96, 255);
+  const float borderWidth = 1.0f;
 
-  auto group5 = std::make_shared<VectorGroup>();
-  auto rect5 = std::make_shared<Rectangle>();
-  rect5->setPosition({340, 250});
-  rect5->setSize({100, 80});
-  auto pattern5 = ImagePattern::Make(image);
-  pattern5->setScaleMode(ScaleMode::LetterBox);
-  EXPECT_EQ(pattern5->scaleMode(), ScaleMode::LetterBox);
-  group5->setElements({rect5, FillStyle::Make(pattern5)});
+  std::vector<std::shared_ptr<VectorElement>> contents = {group1, group2, group3};
+  for (const auto& entry : scaleEntries) {
+    auto rectGroup = std::make_shared<VectorGroup>();
+    auto rect = std::make_shared<Rectangle>();
+    rect->setPosition({entry.centerX, scaleRowCenterY});
+    rect->setSize({scaleRectWidth, scaleRectHeight});
+    auto pattern = ImagePattern::Make(image);
+    EXPECT_EQ(pattern->fillSpace(), FillSpace::Relative);
+    pattern->setScaleMode(entry.mode);
+    EXPECT_EQ(pattern->scaleMode(), entry.mode);
+    auto border = MakeStrokeStyle(borderColor, borderWidth);
+    rectGroup->setElements({rect, FillStyle::Make(pattern), border});
+    contents.push_back(rectGroup);
 
-  vectorLayer->setContents({group1, group2, group3, group4, group5});
+    auto labelGroup = std::make_shared<VectorGroup>();
+    auto blob = TextBlob::MakeFrom(entry.label, labelFont);
+    auto text = Text::Make(blob);
+    auto labelBounds = blob->getTightBounds();
+    text->setPosition({entry.centerX - labelBounds.width() * 0.5f - labelBounds.left, scaleLabelY});
+    auto labelFill = MakeFillStyle(Color::Black());
+    labelGroup->setElements({text, labelFill});
+    contents.push_back(labelGroup);
+  }
+
+  // Row 3 (FillSpace::Absolute): three contiguous rectangles share one image pattern anchored to
+  // the layer origin. Each rectangle reveals a different region of the same underlying image, as
+  // if viewing one picture through separate windows.
+  auto windowPattern = ImagePattern::Make(image);
+  windowPattern->setFillSpace(FillSpace::Absolute);
+  auto windowMatrix = Matrix::MakeScale(300.0f / static_cast<float>(image->width()),
+                                        80.0f / static_cast<float>(image->height()));
+  windowMatrix.postTranslate(90, 340);
+  windowPattern->setMatrix(windowMatrix);
+  const float windowRowCenterY = 380.0f;
+  const float windowRectWidth = 100.0f;
+  const float windowRectHeight = 80.0f;
+  const std::array<float, 3> windowCenters = {140.0f, 240.0f, 340.0f};
+  for (float cx : windowCenters) {
+    auto rectGroup = std::make_shared<VectorGroup>();
+    auto rect = std::make_shared<Rectangle>();
+    rect->setPosition({cx, windowRowCenterY});
+    rect->setSize({windowRectWidth, windowRectHeight});
+    rectGroup->setElements({rect, FillStyle::Make(windowPattern)});
+    contents.push_back(rectGroup);
+  }
+
+  vectorLayer->setContents(contents);
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
 
