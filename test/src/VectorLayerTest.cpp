@@ -2617,7 +2617,8 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   linear->setPositions({0.0f, 0.33f, 0.66f, 1.0f});
   EXPECT_EQ(linear->positions().size(), 4u);
 
-  std::vector<Color> compareColors = {Color::Red(), Color::Blue()};
+  std::vector<Color> compareColors = {Color::Red(), Color::FromRGBA(128, 0, 128, 255),
+                                      Color::Blue()};
   const float rowRectSize = 80.0f;
   const float rowGap = 30.0f;
   const float rowTotalWidth = rowRectSize * 3.0f + rowGap * 2.0f;
