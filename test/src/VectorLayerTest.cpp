@@ -2869,7 +2869,7 @@ TGFX_TEST(VectorLayerTest, ImagePatternAdjust) {
   };
   ParamSweep sweeps[7] = {
       {0, {-1.0f, 0.0f, 1.0f}},  // exposure
-      {1, {-0.3f, 0.0f, 0.3f}},  // contrast (Figma range)
+      {1, {-0.3f, 0.0f, 0.3f}},  // contrast
   };
   for (int i = 2; i < 7; i++) {
     sweeps[i] = {i, {-1.0f, 0.0f, 1.0f}};

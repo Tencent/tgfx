@@ -96,7 +96,7 @@ TGFX_TEST(FilterTest, ColorCorrectionColorFilter) {
   ASSERT_TRUE(colorTest != nullptr);
 
   // Each row tests one parameter with 3 key values: min, zero, max.
-  // Contrast uses -0.3/0/0.3 to match Figma UI range, others use -1/0/1.
+  // Contrast uses -0.3/0/0.3 since it is more sensitive than the other parameters.
   // Parameters: exposure, contrast, saturation, temperature, tint, highlights, shadows.
   struct ParamSweep {
     int paramIndex;
@@ -104,7 +104,7 @@ TGFX_TEST(FilterTest, ColorCorrectionColorFilter) {
   };
   ParamSweep sweeps[7] = {
       {0, {-1.0f, 0.0f, 1.0f}},  // exposure
-      {1, {-0.3f, 0.0f, 0.3f}},  // contrast (Figma range)
+      {1, {-0.3f, 0.0f, 0.3f}},  // contrast
   };
   // Set same range for saturation, temperature, tint, highlights, shadows
   for (int i = 2; i < 7; i++) {
