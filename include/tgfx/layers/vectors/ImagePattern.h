@@ -20,17 +20,15 @@
 
 #include "tgfx/core/Image.h"
 #include "tgfx/layers/vectors/ColorSource.h"
-#include "tgfx/layers/vectors/FillSpace.h"
 #include "tgfx/layers/vectors/ScaleMode.h"
 
 namespace tgfx {
 /**
  * ImagePattern describes a pattern based on an image, which can be drawn on a shape layer. The
  * image can be repeated in both the x and y directions, and you can specify the sampling options.
- * By default, ImagePattern samples the image in a normalized 0-1 space (FillSpace::Relative) that
- * maps to each shape's bounding box, fitted according to scaleMode(). Call
- * setFillSpace(FillSpace::Absolute) to place the image in the layer's coordinate space using the
- * pattern's matrix instead.
+ * By default, ImagePattern fits the image into each shape's bounding box according to scaleMode()
+ * (ScaleMode::LetterBox by default). Set the scale mode to ScaleMode::None to place the image in
+ * the layer's coordinate space using the pattern's matrix instead, without per-shape fitting.
  */
 class ImagePattern : public ColorSource {
  public:
@@ -76,40 +74,25 @@ class ImagePattern : public ColorSource {
   void setMatrix(const Matrix& matrix);
 
   /**
-   * Returns the coordinate space used to interpret this pattern's parameters. The default value is
-   * FillSpace::Relative.
-   */
-  FillSpace fillSpace() const {
-    return _fillSpace;
-  }
-
-  /**
-   * Sets the coordinate space used to interpret this pattern's parameters. When set to
-   * FillSpace::Relative, the image is fitted to each shape's bounding box according to scaleMode().
-   * When set to FillSpace::Absolute, the image is placed in the layer's coordinate space using the
-   * pattern's matrix.
-   */
-  void setFillSpace(FillSpace space);
-
-  /**
-   * Returns the rule used to scale the image into the shape's bounding box when the fill space is
-   * FillSpace::Relative. The default value is ScaleMode::LetterBox.
+   * Returns the rule used to fit the image into each shape's bounding box. The default value is
+   * ScaleMode::LetterBox. When set to ScaleMode::None, the image is placed in the layer's
+   * coordinate space using the pattern's matrix, without per-shape fitting.
    */
   ScaleMode scaleMode() const {
     return _scaleMode;
   }
 
   /**
-   * Sets the rule used to scale the image into the shape's bounding box when the fill space is
-   * FillSpace::Relative. The scale mode only affects rendering when fillSpace is
-   * FillSpace::Relative; in Absolute mode the stored value is preserved but not used.
+   * Sets the rule used to fit the image into each shape's bounding box. Setting this to
+   * ScaleMode::None disables per-shape fitting and places the image in the layer's coordinate
+   * space using the pattern's matrix.
    */
   void setScaleMode(ScaleMode mode);
 
   std::shared_ptr<Shader> getShader() const override;
 
   bool useRelativeSpace() const override {
-    return _fillSpace == FillSpace::Relative;
+    return _scaleMode != ScaleMode::None;
   }
 
   Matrix getRelativeMatrix(const Rect& bounds) const override;
@@ -125,7 +108,6 @@ class ImagePattern : public ColorSource {
   TileMode _tileModeY = TileMode::Decal;
   SamplingOptions _sampling = {};
   Matrix _matrix = {};
-  FillSpace _fillSpace = FillSpace::Relative;
   ScaleMode _scaleMode = ScaleMode::LetterBox;
 
   ImagePattern(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,

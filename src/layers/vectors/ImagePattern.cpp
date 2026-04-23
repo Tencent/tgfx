@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/vectors/ImagePattern.h"
 #include <algorithm>
+#include "core/utils/Log.h"
 
 namespace tgfx {
 std::shared_ptr<ImagePattern> ImagePattern::Make(std::shared_ptr<Image> image, TileMode tileModeX,
@@ -43,14 +44,6 @@ void ImagePattern::setMatrix(const Matrix& matrix) {
   invalidateContent();
 }
 
-void ImagePattern::setFillSpace(FillSpace space) {
-  if (_fillSpace == space) {
-    return;
-  }
-  _fillSpace = space;
-  invalidateContent();
-}
-
 void ImagePattern::setScaleMode(ScaleMode mode) {
   if (_scaleMode == mode) {
     return;
@@ -68,6 +61,7 @@ std::shared_ptr<Shader> ImagePattern::getShader() const {
 }
 
 Matrix ImagePattern::getRelativeMatrix(const Rect& bounds) const {
+  DEBUG_ASSERT(_scaleMode != ScaleMode::None);
   if (bounds.isEmpty()) {
     return Matrix::I();
   }
@@ -89,8 +83,6 @@ Matrix ImagePattern::getRelativeMatrix(const Rect& bounds) const {
   float sx = bounds.width() / srcW;
   float sy = bounds.height() / srcH;
   switch (_scaleMode) {
-    case ScaleMode::None:
-      return Matrix::MakeTrans(bounds.left - imageRect.left, bounds.top - imageRect.top);
     case ScaleMode::Stretch: {
       auto matrix = Matrix::MakeScale(sx, sy);
       matrix.postTranslate(bounds.left - imageRect.left * sx, bounds.top - imageRect.top * sy);
@@ -112,6 +104,8 @@ Matrix ImagePattern::getRelativeMatrix(const Rect& bounds) const {
       matrix.postTranslate(tx, ty);
       return matrix;
     }
+    default:
+      break;
   }
   return Matrix::I();
 }

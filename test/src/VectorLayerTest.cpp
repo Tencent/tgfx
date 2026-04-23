@@ -2359,7 +2359,7 @@ TGFX_TEST(VectorLayerTest, RichText) {
   SamplingOptions nearestSampling(FilterMode::Nearest, MipmapMode::None);
   auto imagePattern =
       ImagePattern::Make(inlineImage, TileMode::Clamp, TileMode::Clamp, nearestSampling);
-  imagePattern->setFillSpace(FillSpace::Absolute);
+  imagePattern->setScaleMode(ScaleMode::None);
   Matrix imageMatrix = Matrix::MakeScale(0.125f);
   imageMatrix.postTranslate(50, 50);
   imagePattern->setMatrix(imageMatrix);
@@ -2758,14 +2758,14 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   auto displayList = std::make_unique<DisplayList>();
   auto vectorLayer = VectorLayer::Make();
 
-  // Row 1 (FillSpace::Absolute): three tile modes anchored to the layer origin.
+  // Row 1 (ScaleMode::None): three tile modes anchored to the layer origin.
   // Group 1: Clamp tile mode - rect larger than image to show edge clamping
   auto group1 = std::make_shared<VectorGroup>();
   auto rect1 = std::make_shared<Rectangle>();
   rect1->setPosition({100, 100});
   rect1->setSize({100, 100});  // Rect is 100x100, larger than 50x50 image
   auto pattern1 = ImagePattern::Make(image, TileMode::Clamp, TileMode::Clamp);
-  pattern1->setFillSpace(FillSpace::Absolute);
+  pattern1->setScaleMode(ScaleMode::None);
   ASSERT_TRUE(pattern1 != nullptr);
   EXPECT_EQ(pattern1->image(), image);
   EXPECT_EQ(pattern1->tileModeX(), TileMode::Clamp);
@@ -2783,7 +2783,7 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   rect2->setPosition({240, 100});
   rect2->setSize({100, 100});
   auto pattern2 = ImagePattern::Make(image2, TileMode::Repeat, TileMode::Repeat);
-  pattern2->setFillSpace(FillSpace::Absolute);
+  pattern2->setScaleMode(ScaleMode::None);
   Matrix matrix2 = Matrix::MakeScale(0.05f);
   matrix2.postTranslate(190, 50);
   pattern2->setMatrix(matrix2);
@@ -2796,7 +2796,7 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   rect3->setPosition({380, 100});
   rect3->setSize({100, 100});
   auto pattern3 = ImagePattern::Make(image2, TileMode::Mirror, TileMode::Mirror);
-  pattern3->setFillSpace(FillSpace::Absolute);
+  pattern3->setScaleMode(ScaleMode::None);
   Matrix matrix3 = Matrix::MakeScale(0.05f);
   matrix3.postRotate(30.0f, 12.8f, 12.8f);
   matrix3.postTranslate(330, 50);
@@ -2813,10 +2813,10 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
                                            rowStartX + rowRectSize * 1.5f + rowGap,
                                            rowStartX + rowRectSize * 2.5f + rowGap * 2.0f};
 
-  // Row 2 (FillSpace::Relative): three separated rectangles share one ImagePattern; each
+  // Row 2 (default ScaleMode::LetterBox): three separated rectangles share one ImagePattern; each
   // rectangle maps the same image independently, so all three rectangles look identical.
   auto relativePattern = ImagePattern::Make(image);
-  EXPECT_EQ(relativePattern->fillSpace(), FillSpace::Relative);
+  EXPECT_EQ(relativePattern->scaleMode(), ScaleMode::LetterBox);
   std::vector<std::shared_ptr<VectorElement>> contents = {group1, group2, group3};
   for (float cx : rowCenters) {
     auto rectGroup = std::make_shared<VectorGroup>();
@@ -2827,12 +2827,12 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
     contents.push_back(rectGroup);
   }
 
-  // Row 3 (FillSpace::Absolute): three separated rectangles share one image pattern anchored to
+  // Row 3 (ScaleMode::None): three separated rectangles share one image pattern anchored to
   // the layer origin. The image is drawn at its native resolution, so each rectangle reveals a
   // different region of the same underlying image as if viewing one picture through three
   // windows. This mirrors how Gradient row 3 spans an absolute gradient across the layer.
   auto windowPattern = ImagePattern::Make(image);
-  windowPattern->setFillSpace(FillSpace::Absolute);
+  windowPattern->setScaleMode(ScaleMode::None);
   for (float cx : rowCenters) {
     auto rectGroup = std::make_shared<VectorGroup>();
     auto rect = std::make_shared<Rectangle>();
@@ -2850,11 +2850,11 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
 }
 
 /**
- * Test ImagePattern ScaleMode values (Stretch, LetterBox, Zoom, None) under FillSpace::Relative
- * with visible borders and labels. Row 1 applies each ScaleMode to the original image. Row 2
- * first applies a user matrix (rotate 30 degrees and scale 0.5x) to the image, then applies
- * each ScaleMode. Row 2 verifies that ScaleMode fits the transformed image's bounding box into
- * the shape bounds, not the original image dimensions.
+ * Test ImagePattern ScaleMode values (Stretch, LetterBox, Zoom, None) with visible borders and
+ * labels. Row 1 applies each ScaleMode to the original image. Row 2 first applies a user matrix
+ * (rotate 30 degrees and scale 0.5x) to the image, then applies each ScaleMode. Row 2 verifies
+ * that ScaleMode fits the transformed image's bounding box into the shape bounds, not the
+ * original image dimensions.
  */
 TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
   ContextScope scope;
@@ -2906,7 +2906,7 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
     rect->setPosition({centerX, row1CenterY});
     rect->setSize({rectWidth, rectHeight});
     auto pattern = ImagePattern::Make(image);
-    EXPECT_EQ(pattern->fillSpace(), FillSpace::Relative);
+    EXPECT_EQ(pattern->scaleMode(), ScaleMode::LetterBox);
     pattern->setScaleMode(entries[i].mode);
     EXPECT_EQ(pattern->scaleMode(), entries[i].mode);
     auto border = MakeStrokeStyle(borderColor, borderWidth);
@@ -3044,7 +3044,7 @@ TGFX_TEST(VectorLayerTest, ImagePatternText) {
   textSpan->setPosition({50, 126});
 
   auto pattern = ImagePattern::Make(image, TileMode::Clamp, TileMode::Clamp);
-  pattern->setFillSpace(FillSpace::Absolute);
+  pattern->setScaleMode(ScaleMode::None);
   Matrix matrix = Matrix::MakeScale(0.5f);
   matrix.postTranslate(-180, -80);
   pattern->setMatrix(matrix);
@@ -4664,7 +4664,8 @@ TGFX_TEST(VectorLayerTest, Line) {
 }
 
 /**
- * Test switching FillSpace at runtime and verify the setter/getter work correctly.
+ * Test switching FillSpace on Gradient and ScaleMode on ImagePattern at runtime, verifying that
+ * setters/getters work correctly.
  */
 TGFX_TEST(VectorLayerTest, FillSpaceSwitch) {
   // Default fillSpace for Gradient is Relative
@@ -4679,11 +4680,10 @@ TGFX_TEST(VectorLayerTest, FillSpaceSwitch) {
   gradient->setFillSpace(FillSpace::Relative);
   EXPECT_EQ(gradient->fillSpace(), FillSpace::Relative);
 
-  // Default fillSpace for ImagePattern is Relative
+  // Default scaleMode for ImagePattern is LetterBox, with Decal tile modes
   auto image = MakeImage("resources/assets/bridge.jpg");
   ASSERT_TRUE(image != nullptr);
   auto pattern = ImagePattern::Make(image);
-  EXPECT_EQ(pattern->fillSpace(), FillSpace::Relative);
   EXPECT_EQ(pattern->scaleMode(), ScaleMode::LetterBox);
   EXPECT_EQ(pattern->tileModeX(), TileMode::Decal);
   EXPECT_EQ(pattern->tileModeY(), TileMode::Decal);
@@ -4692,9 +4692,9 @@ TGFX_TEST(VectorLayerTest, FillSpaceSwitch) {
   pattern->setScaleMode(ScaleMode::Zoom);
   EXPECT_EQ(pattern->scaleMode(), ScaleMode::Zoom);
 
-  // Switch to Absolute
-  pattern->setFillSpace(FillSpace::Absolute);
-  EXPECT_EQ(pattern->fillSpace(), FillSpace::Absolute);
+  // Switch to None (absolute layer space)
+  pattern->setScaleMode(ScaleMode::None);
+  EXPECT_EQ(pattern->scaleMode(), ScaleMode::None);
 }
 
 }  // namespace tgfx
