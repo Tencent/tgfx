@@ -75,6 +75,10 @@ class RRectsVertexProvider : public VertexProvider {
     return bitFields.hasStroke;
   }
 
+  bool isComplex() const {
+    return bitFields.isComplex;
+  }
+
   /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
@@ -98,13 +102,17 @@ class RRectsVertexProvider : public VertexProvider {
     uint8_t aaType : 2;
     bool hasColor : 1;
     bool hasStroke : 1;
+    bool isComplex : 1;
   } bitFields = {};
 
   RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
-                       PlacementArray<Stroke>&& strokes, std::shared_ptr<BlockAllocator> reference,
+                       bool hasComplex, PlacementArray<Stroke>&& strokes,
+                       std::shared_ptr<BlockAllocator> reference,
                        std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   void getAAVertices(float* vertices) const;
+
+  void getComplexAAVertices(float* vertices) const;
 
   void getNonAAVertices(float* vertices) const;
 

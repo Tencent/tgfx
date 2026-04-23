@@ -31,9 +31,9 @@ Rect RRectsContent::getTightBounds(const Matrix& matrix) const {
     strokedPath.transform(matrix);
     return strokedPath.getBounds();
   }
-  auto bounds = matrix.mapRect(rRects[0].rect);
+  auto bounds = matrix.mapRect(rRects[0].rect());
   for (size_t i = 1; i < rRects.size(); ++i) {
-    bounds.join(matrix.mapRect(rRects[i].rect));
+    bounds.join(matrix.mapRect(rRects[i].rect()));
   }
   return bounds;
 }
@@ -57,9 +57,9 @@ bool RRectsContent::hitTestPoint(float localX, float localY) const {
 }
 
 Rect RRectsContent::onGetBounds() const {
-  auto bounds = rRects[0].rect;
+  auto bounds = rRects[0].rect();
   for (size_t i = 1; i < rRects.size(); ++i) {
-    bounds.join(rRects[i].rect);
+    bounds.join(rRects[i].rect());
   }
   return bounds;
 }
@@ -76,7 +76,7 @@ bool RRectsContent::onHasSameGeometry(const GeometryContent* other) const {
     return false;
   }
   for (size_t i = 0; i < rRects.size(); ++i) {
-    if (rRects[i].rect != otherRRects[i].rect || rRects[i].radii != otherRRects[i].radii) {
+    if (rRects[i].rect() != otherRRects[i].rect() || rRects[i].radii() != otherRRects[i].radii()) {
       return false;
     }
   }

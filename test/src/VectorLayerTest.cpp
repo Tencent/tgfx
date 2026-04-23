@@ -64,7 +64,7 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 660, 463);
+  auto surface = Surface::Make(context, 660, 660);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -78,7 +78,7 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   auto rect = std::make_shared<Rectangle>();
   rect->setPosition({130, 130});
   rect->setSize({160, 160});
-  rect->setRoundness(20);
+  rect->setRoundness({20, 20, 20, 20});
   auto redFill = MakeFillStyle(Color::Red());
   group1->setElements({rect, redFill});
 
@@ -139,7 +139,18 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   auto purpleStroke = MakeStrokeStyle(Color::FromRGBA(128, 0, 128, 255), 6.0f);
   group6->setElements({polygon, purpleStroke});
 
-  vectorLayer->setContents({group1, group2, group3, group4, group5, group6});
+  // Row 3: Rectangle with per-corner roundness
+
+  // Group 7: Rectangle with four different corner radii (complex RRect path)
+  auto group7 = std::make_shared<VectorGroup>();
+  auto perCornerRect = std::make_shared<Rectangle>();
+  perCornerRect->setPosition({130, 530});
+  perCornerRect->setSize({200, 160});
+  perCornerRect->setRoundness({60, 30, 10, 40});
+  auto tealFill = MakeFillStyle(Color::FromRGBA(0, 160, 160, 255));
+  group7->setElements({perCornerRect, tealFill});
+
+  vectorLayer->setContents({group1, group2, group3, group4, group5, group6, group7});
 
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());

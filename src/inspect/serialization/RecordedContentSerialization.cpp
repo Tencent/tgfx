@@ -128,12 +128,17 @@ static void SerializeRRectContent(flexbuffers::Builder& fbb, const RRectContent*
   SerializeDrawContent(fbb, content);
   fbb.Key("rRect");
   auto rRectStart = fbb.StartMap();
-  SerializeRect(fbb, "rect", content->rRect.rect);
+  SerializeRect(fbb, "rect", content->rRect.rect());
+  SerializeUtils::SetFlexBufferMap(fbb, "type", static_cast<int>(content->rRect.type()));
   fbb.Key("radii");
-  auto radiiStart = fbb.StartMap();
-  SerializeUtils::SetFlexBufferMap(fbb, "x", content->rRect.radii.x);
-  SerializeUtils::SetFlexBufferMap(fbb, "y", content->rRect.radii.y);
-  fbb.EndMap(radiiStart);
+  auto radiiStart = fbb.StartVector();
+  for (const auto& radius : content->rRect.radii()) {
+    auto cornerStart = fbb.StartMap();
+    SerializeUtils::SetFlexBufferMap(fbb, "x", radius.x);
+    SerializeUtils::SetFlexBufferMap(fbb, "y", radius.y);
+    fbb.EndMap(cornerStart);
+  }
+  fbb.EndVector(radiiStart, false, false);
   fbb.EndMap(rRectStart);
 }
 

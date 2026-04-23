@@ -303,7 +303,15 @@ void OpaqueContext::flushPendingContour(const Contour& contour, const Matrix& ma
     if (pendingContour.type == Contour::Type::Rect) {
       mergeContourBound(globalBounds);
     } else if (pendingContour.type == Contour::Type::RRect) {
-      localBounds.inset(pendingContour.rRect.radii.x, pendingContour.rRect.radii.y);
+      // Use the maximum corner radius for inset to ensure the inscribed rectangle
+      // is fully inside all corner arcs.
+      auto maxRadiusX = pendingContour.rRect.radii()[0].x;
+      auto maxRadiusY = pendingContour.rRect.radii()[0].y;
+      for (size_t i = 1; i < 4; ++i) {
+        maxRadiusX = std::max(maxRadiusX, pendingContour.rRect.radii()[i].x);
+        maxRadiusY = std::max(maxRadiusY, pendingContour.rRect.radii()[i].y);
+      }
+      localBounds.inset(maxRadiusX, maxRadiusY);
       if (localBounds.isSorted()) {
         globalBounds = GetGlobalBounds(pendingMatrix, pendingClip, localBounds);
         if (hasAAClip) {
@@ -367,7 +375,7 @@ Rect OpaqueContext::Contour::getBounds() const {
       return rect;
     }
     case Type::RRect: {
-      return rRect.rect;
+      return rRect.rect();
     }
     case Type::Path: {
       return path.getBounds();
@@ -421,7 +429,7 @@ bool OpaqueContext::Contour::operator==(const Contour& other) const {
     case Type::Rect:
       return rect == other.rect;
     case Type::RRect:
-      return rRect.rect == other.rRect.rect && rRect.radii == other.rRect.radii;
+      return rRect.rect() == other.rRect.rect() && rRect.radii() == other.rRect.radii();
     case Type::Path:
       return path == other.path;
     case Type::Shape:

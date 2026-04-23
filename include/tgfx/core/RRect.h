@@ -18,26 +18,60 @@
 
 #pragma once
 
+#include <array>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
 /**
- * Round Rect.
+ * RRect describes a rounded rectangle defined by a bounding rect and per-corner radii.
  */
-struct RRect {
-  Rect rect = {};
-  Point radii = {};
+class RRect {
+ public:
+  /**
+   * Returns an RRect with the same radii for all four corners. See setRectXY() for details.
+   */
+  static RRect MakeRectXY(const Rect& rect, float radiusX, float radiusY) {
+    RRect rr = {};
+    rr.setRectXY(rect, radiusX, radiusY);
+    return rr;
+  }
 
   /**
-   * Returns true if the bounds are a simple rectangle.
+   * Returns an RRect with per-corner radii. See setRectRadii() for details.
    */
-  bool isRect() const;
+  static RRect MakeRectRadii(const Rect& rect, const std::array<Point, 4>& radii) {
+    RRect rr = {};
+    rr.setRectRadii(rect, radii);
+    return rr;
+  }
 
   /**
-   * Returns true if the bounds are an oval.
+   * Returns an oval RRect inscribed in the given bounds. See setOval() for details.
    */
-  bool isOval() const;
+  static RRect MakeOval(const Rect& oval) {
+    RRect rr = {};
+    rr.setOval(oval);
+    return rr;
+  }
+
+  enum class Type {
+    // All four corner radii are zero (or rect is empty).
+    Rect,
+    // All four corners have the same radii, each equal to half the corresponding edge length.
+    Oval,
+    // All four corners have the same radii.
+    Simple,
+    // Each corner can have an arbitrary independent radius.
+    Complex
+  };
+
+  /**
+   * Returns the type of this rounded rectangle.
+   */
+  Type type() const {
+    return _type;
+  }
 
   /**
    * Sets to rounded rectangle with the same radii for all four corners.
@@ -48,14 +82,46 @@ struct RRect {
   void setRectXY(const Rect& rect, float radiusX, float radiusY);
 
   /**
+   * Sets to rounded rectangle with per-corner radii. The radii are scaled down proportionally if
+   * adjacent corners overlap along any edge.
+   * @param rect  bounds of rounded rectangle
+   * @param radii  per-corner radii in the order [top-left, top-right, bottom-right, bottom-left]
+   */
+  void setRectRadii(const Rect& rect, const std::array<Point, 4>& radii);
+
+  /**
    * Sets bounds to oval, x-axis radii to half oval.width(), and all y-axis radii to half
    * oval.height().
    */
   void setOval(const Rect& oval);
 
   /**
-   * Scale the round rectangle by scaleX and scaleY.
+   * Scales the round rectangle by scaleX and scaleY.
    */
   void scale(float scaleX, float scaleY);
+
+  /**
+   * Translates the round rectangle by (dx, dy) without changing the radii or type.
+   */
+  void offset(float dx, float dy);
+
+  /**
+   * Returns the bounding rectangle.
+   */
+  const Rect& rect() const {
+    return _rect;
+  }
+
+  /**
+   * Returns the four corner radii in the order [top-left, top-right, bottom-right, bottom-left].
+   */
+  const std::array<Point, 4>& radii() const {
+    return _radii;
+  }
+
+ private:
+  Rect _rect = {};
+  std::array<Point, 4> _radii = {};
+  Type _type = Type::Rect;
 };
 }  // namespace tgfx

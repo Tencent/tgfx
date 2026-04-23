@@ -44,11 +44,11 @@ void Rectangle::setSize(const Size& value) {
   invalidateContent();
 }
 
-void Rectangle::setRoundness(float value) {
-  if (_roundness == value) {
+void Rectangle::setRoundness(const std::array<float, 4>& values) {
+  if (_roundness == values) {
     return;
   }
-  _roundness = value;
+  _roundness = values;
   _cachedShape = nullptr;
   invalidateContent();
 }
@@ -67,17 +67,16 @@ void Rectangle::apply(VectorContext* context) {
   if (_cachedShape == nullptr) {
     auto halfWidth = _size.width * 0.5f;
     auto halfHeight = _size.height * 0.5f;
-    auto radius = _roundness;
-    if (radius > halfWidth) {
-      radius = halfWidth;
-    }
-    if (radius > halfHeight) {
-      radius = halfHeight;
-    }
     auto rect = Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, _size.width,
                                _size.height);
+    std::array<Point, 4> radii = {{{_roundness[0], _roundness[0]},
+                                   {_roundness[1], _roundness[1]},
+                                   {_roundness[2], _roundness[2]},
+                                   {_roundness[3], _roundness[3]}}};
+    // MakeRectRadii scales the radii down proportionally if adjacent corners overflow any edge.
+    auto rRect = RRect::MakeRectRadii(rect, radii);
     Path path;
-    path.addRoundRect(rect, radius, radius, _reversed, 2);
+    path.addRRect(rRect, _reversed, 2);
     _cachedShape = Shape::MakeFrom(path);
   }
   if (_cachedShape) {

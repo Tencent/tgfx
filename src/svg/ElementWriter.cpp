@@ -34,6 +34,7 @@
 #include "tgfx/core/GradientType.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
@@ -252,12 +253,14 @@ void ElementWriter::addRectAttributes(const Rect& rect) {
 }
 
 void ElementWriter::addRoundRectAttributes(const RRect& roundRect) {
-  addRectAttributes(roundRect.rect);
-  if (FloatNearlyZero(roundRect.radii.x) && FloatNearlyZero(roundRect.radii.y)) {
+  // SVG <rect> only supports uniform rx/ry; complex RRects must be emitted as <path>.
+  DEBUG_ASSERT(roundRect.type() != RRect::Type::Complex);
+  addRectAttributes(roundRect.rect());
+  if (FloatNearlyZero(roundRect.radii()[0].x) && FloatNearlyZero(roundRect.radii()[0].y)) {
     return;
   }
-  addAttribute("rx", roundRect.radii.x);
-  addAttribute("ry", roundRect.radii.y);
+  addAttribute("rx", roundRect.radii()[0].x);
+  addAttribute("ry", roundRect.radii()[0].y);
 }
 
 void ElementWriter::addCircleAttributes(const Rect& bound) {

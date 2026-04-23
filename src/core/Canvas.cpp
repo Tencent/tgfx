@@ -252,9 +252,7 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
 }
 
 void Canvas::drawOval(const Rect& oval, const Paint& paint) {
-  RRect rRect = {};
-  rRect.setOval(oval);
-  drawRRect(rRect, paint);
+  drawRRect(RRect::MakeOval(oval), paint);
 }
 
 void Canvas::drawCircle(float centerX, float centerY, float radius, const Paint& paint) {
@@ -264,62 +262,78 @@ void Canvas::drawCircle(float centerX, float centerY, float radius, const Paint&
 }
 
 void Canvas::drawRoundRect(const Rect& rect, float radiusX, float radiusY, const Paint& paint) {
-  RRect rRect = {};
-  rRect.setRectXY(rect, radiusX, radiusY);
-  drawRRect(rRect, paint);
+  drawRRect(RRect::MakeRectXY(rect, radiusX, radiusY), paint);
 }
 
-static bool UseDrawPath(const Paint& paint, const Point& radii, const Matrix& viewMatrix) {
+/**
+ * The dedicated RRect op draws stroked rounded corners by offsetting the ellipse equation
+ * outward/inward, which assumes a concentric ellipse approximates the true stroke offset
+ * curve. The approximation breaks down when the stroke is too thick relative to the corner
+ * radii, or when the ellipse is too elongated (major/minor ratio too large). In those cases
+ * this function returns true so the caller falls back to drawPath for an accurate stroke.
+ */
+static bool UseDrawPath(const Paint& paint, const RRect& rRect, const Matrix& viewMatrix) {
   auto stroke = paint.getStroke();
   if (!stroke) {
     return false;
   }
-  float xRadius = std::fabs(viewMatrix.getScaleX() * radii.x + viewMatrix.getSkewY() * radii.y);
-  float yRadius = std::fabs(viewMatrix.getSkewX() * radii.x + viewMatrix.getScaleY() * radii.y);
-  Point scaledStroke = {};
-  scaledStroke.x = std::fabs(stroke->width * (viewMatrix.getScaleX() + viewMatrix.getSkewY()));
-  scaledStroke.y = std::fabs(stroke->width * (viewMatrix.getSkewX() + viewMatrix.getScaleY()));
 
-  // Half of strokewidth is greater than radius
-  if (scaledStroke.x * 0.5f > xRadius || scaledStroke.y * 0.5f > yRadius) {
-    return true;
-  }
-  // The matrix may have a rotation by an odd multiple of 90 degrees.
-  if (viewMatrix.getScaleX() == 0) {
-    std::swap(xRadius, yRadius);
-    std::swap(scaledStroke.x, scaledStroke.y);
-  }
-
-  if (FloatNearlyZero(scaledStroke.length())) {
-    scaledStroke.set(0.5f, 0.5f);
+  auto scales = viewMatrix.getAxisScales();
+  // Scaled half stroke width in local space; hairline (width == 0) falls back to half a pixel.
+  Point halfScaledStroke = {};
+  halfScaledStroke.x = scales.x * stroke->width;
+  halfScaledStroke.y = scales.y * stroke->width;
+  if (FloatNearlyZero(halfScaledStroke.length())) {
+    halfScaledStroke.set(0.5f, 0.5f);
   } else {
-    scaledStroke *= 0.5f;
+    halfScaledStroke *= 0.5f;
   }
+  auto halfScaledStrokeLen = halfScaledStroke.length();
 
-  // Handle thick strokes for near-circular ellipses
-  if (scaledStroke.length() > 0.5f && (0.5f * xRadius > yRadius || 0.5f * yRadius > xRadius)) {
-    return true;
-  }
-  // Curvature of the stroke is less than curvature of the ellipse
-  if (scaledStroke.x * yRadius * yRadius < scaledStroke.y * scaledStroke.y * xRadius) {
-    return true;
-  }
-  if (scaledStroke.y * xRadius * xRadius < scaledStroke.x * scaledStroke.x * yRadius) {
-    return true;
+  // Non-Complex types share identical radii across all four corners, so only the first needs check.
+  const auto cornerCount = rRect.type() == RRect::Type::Complex ? rRect.radii().size() : size_t{1};
+  for (size_t i = 0; i < cornerCount; ++i) {
+    const auto& r = rRect.radii()[i];
+    auto xRadius = scales.x * r.x;
+    auto yRadius = scales.y * r.y;
+    // Half of stroke width is greater than radius
+    if (halfScaledStroke.x > xRadius || halfScaledStroke.y > yRadius) {
+      return true;
+    }
+    // Handle thick strokes for non-circular ellipses
+    if (halfScaledStrokeLen > 0.5f && (0.5f * xRadius > yRadius || 0.5f * yRadius > xRadius)) {
+      return true;
+    }
+    // Curvature of the stroke is less than the curvature of the ellipse
+    if (halfScaledStroke.x * yRadius * yRadius <
+        halfScaledStroke.y * halfScaledStroke.y * xRadius) {
+      return true;
+    }
+    if (halfScaledStroke.y * xRadius * xRadius <
+        halfScaledStroke.x * halfScaledStroke.x * yRadius) {
+      return true;
+    }
   }
   return false;
 }
 
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
-  if (rRect.rect.isEmpty()) {
+  if (rRect.rect().isEmpty()) {
     return;
   }
-  auto& radii = rRect.radii;
-  if (radii.x < 0.5f && radii.y < 0.5f) {
-    drawRect(rRect.rect, paint);
+  // Check if all corner radii are too small, degenerate to rectangle.
+  auto allSmall = true;
+  for (const auto& r : rRect.radii()) {
+    if (r.x >= 0.5f || r.y >= 0.5f) {
+      allSmall = false;
+      break;
+    }
+  }
+  if (allSmall) {
+    drawRect(rRect.rect(), paint);
     return;
   }
-  if (UseDrawPath(paint, radii, _matrix)) {
+  if (UseDrawPath(paint, rRect, _matrix)) {
     Path path = {};
     path.addRRect(rRect);
     drawPath(path, paint);

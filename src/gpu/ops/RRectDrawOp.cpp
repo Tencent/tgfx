@@ -21,6 +21,8 @@
 #include "core/utils/ColorHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/processors/ComplexEllipseGeometryProcessor.h"
+#include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
 #include "inspect/InspectorMark.h"
@@ -53,6 +55,7 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
     commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
   hasStroke = provider->hasStroke();
+  _isComplex = provider->isComplex();
   if (aaType == AAType::None) {
     indicesPerRRect = IndicesPerNonAARRect;
   } else {
@@ -65,8 +68,16 @@ PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarge
   ATTRIBUTE_NAME("hasStroke", hasStroke);
   ATTRIBUTE_NAME("commonColor", commonColor);
   if (aaType == AAType::None) {
+    if (_isComplex) {
+      return ComplexNonAARRectGeometryProcessor::Make(
+          allocator, renderTarget->width(), renderTarget->height(), hasStroke, commonColor);
+    }
     return NonAARRectGeometryProcessor::Make(allocator, renderTarget->width(),
                                              renderTarget->height(), hasStroke, commonColor);
+  }
+  if (_isComplex) {
+    return ComplexEllipseGeometryProcessor::Make(allocator, renderTarget->width(),
+                                                 renderTarget->height(), hasStroke, commonColor);
   }
   return EllipseGeometryProcessor::Make(allocator, renderTarget->width(), renderTarget->height(),
                                         hasStroke, commonColor);

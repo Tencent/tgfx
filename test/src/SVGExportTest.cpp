@@ -737,9 +737,7 @@ TGFX_TEST(SVGExportTest, DstColorSpace) {
   Paint paint;
   paint.setColor(Color::Green());
   canvas->drawRect(Rect::MakeXYWH(20, 20, 100, 100), paint);
-  RRect rrect;
-  rrect.setOval(Rect::MakeXYWH(140, 20, 100, 100));
-  canvas->drawRRect(rrect, paint);
+  canvas->drawRRect(RRect::MakeOval(Rect::MakeXYWH(140, 20, 100, 100)), paint);
   canvas->drawImageRect(image, Rect::MakeXYWH(260, 20, 100, 100), {}, &paint);
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
@@ -775,9 +773,7 @@ TGFX_TEST(SVGExportTest, AssignColorSpace) {
   Paint paint;
   paint.setColor(Color::Green());
   canvas->drawRect(Rect::MakeXYWH(20, 20, 100, 100), paint);
-  RRect rrect;
-  rrect.setOval(Rect::MakeXYWH(140, 20, 100, 100));
-  canvas->drawRRect(rrect, paint);
+  canvas->drawRRect(RRect::MakeOval(Rect::MakeXYWH(140, 20, 100, 100)), paint);
   canvas->drawImageRect(image, Rect::MakeXYWH(260, 20, 100, 100), {}, &paint);
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
@@ -813,9 +809,7 @@ TGFX_TEST(SVGExportTest, DstAssignColorSpace) {
   Paint paint;
   paint.setColor(Color::Green());
   canvas->drawRect(Rect::MakeXYWH(20, 20, 100, 100), paint);
-  RRect rrect;
-  rrect.setOval(Rect::MakeXYWH(140, 20, 100, 100));
-  canvas->drawRRect(rrect, paint);
+  canvas->drawRRect(RRect::MakeOval(Rect::MakeXYWH(140, 20, 100, 100)), paint);
   canvas->drawImageRect(image, Rect::MakeXYWH(260, 20, 100, 100), {}, &paint);
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
@@ -870,5 +864,32 @@ TGFX_TEST(SVGExportTest, ClipWithMatrixTransform) {
   exporter->close();
 
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ClipWithMatrixTransform"));
+}
+
+/**
+ * Complex RRect (per-corner different radii) cannot be represented by SVG <rect> because
+ * <rect> only supports uniform rx/ry. Verify the exporter falls back to <path>.
+ */
+TGFX_TEST(SVGExportTest, ComplexRRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  tgfx::Paint paint;
+  paint.setColor(Color::Blue());
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+                                    SVGExportFlags::DisablePrettyXML);
+  auto canvas = exporter->getCanvas();
+
+  auto complexRRect = RRect::MakeRectRadii(Rect::MakeXYWH(20, 20, 160, 160),
+                                           {{{30, 30}, {10, 10}, {20, 20}, {5, 5}}});
+  ASSERT_EQ(complexRRect.type(), RRect::Type::Complex);
+  canvas->drawRRect(complexRRect, paint);
+
+  exporter->close();
+  auto SVGString = SVGStream->readString();
+  // Complex RRect must be exported as <path>, not <rect>.
+  ASSERT_NE(SVGString.find("<path"), std::string::npos);
+  ASSERT_EQ(SVGString.find("<rect"), std::string::npos);
 }
 }  // namespace tgfx

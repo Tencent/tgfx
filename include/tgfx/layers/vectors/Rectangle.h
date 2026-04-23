@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <array>
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/Size.h"
@@ -60,16 +61,18 @@ class Rectangle : public VectorElement {
   void setSize(const Size& value);
 
   /**
-   * Returns the corner roundness. A value of 0 means sharp corners.
+   * Returns the per-corner roundness in the order [top-left, top-right, bottom-right, bottom-left].
+   * A value of 0 means sharp corners.
    */
-  float roundness() const {
+  const std::array<float, 4>& roundness() const {
     return _roundness;
   }
 
   /**
-   * Sets the corner roundness.
+   * Sets the roundness for each corner individually. Values are scaled down proportionally if
+   * adjacent corners overlap along any edge.
    */
-  void setRoundness(float value);
+  void setRoundness(const std::array<float, 4>& values);
 
   /**
    * Returns whether the path direction is reversed (counter-clockwise).
@@ -96,7 +99,7 @@ class Rectangle : public VectorElement {
  private:
   Point _position = Point::Zero();
   Size _size = {100.0f, 100.0f};
-  float _roundness = 0.0f;
+  std::array<float, 4> _roundness = {0.f, 0.f, 0.f, 0.f};
   bool _reversed = false;
   std::shared_ptr<Shape> _cachedShape = nullptr;
 };
