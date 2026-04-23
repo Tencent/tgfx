@@ -695,6 +695,39 @@ TGFX_TEST(PDFExportTest, LayerConicGradient) {
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/LayerConicGradient"));
 }
 
+TGFX_TEST(PDFExportTest, LayerConicGradientRotated) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto shapeLayer = ShapeLayer::Make();
+  Rect rect = Rect::MakeWH(2501.f, 1860.f);
+  Path path;
+  path.addRect(rect);
+  shapeLayer->setPath(path);
+  shapeLayer->removeFillStyles();
+
+  auto shader = Shader::MakeConicGradient(
+      Point{1250.5f, 930.f}, 0.f, 360.f,
+      {Color::FromRGBA(227, 136, 136), Color::FromRGBA(140, 210, 183)}, {});
+  shapeLayer->addFillStyle(ShapeStyle::Make(shader));
+
+  auto layer = Layer::Make();
+  layer->addChild(shapeLayer);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(1860.f, 2501.f);
+  canvas->translate(1860.f, 0.f);
+  canvas->rotate(90.f);
+  layer->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/LayerConicGradientRotated"));
+}
+
 TGFX_TEST(PDFExportTest, LayerDiamondGradient) {
   ContextScope scope;
   auto context = scope.getContext();
