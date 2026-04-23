@@ -132,8 +132,8 @@ class Gradient : public ColorSource {
 
   /**
    * Returns the transformation matrix applied to the gradient. The matrix operates on the
-   * gradient's parameter space as selected by fitsToGeometry(): the (0, 0)-(1, 1) space when
-   * fitsToGeometry() is true (the default), or the layer's coordinate space when false.
+   * gradient's local coordinate space (the space in which startPoint, endPoint, center, radius,
+   * etc. are expressed).
    */
   const Matrix& matrix() const {
     return _matrix;

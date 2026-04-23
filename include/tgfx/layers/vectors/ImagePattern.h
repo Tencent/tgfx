@@ -63,8 +63,7 @@ class ImagePattern : public ColorSource {
 
   /**
    * Returns the transformation matrix applied to the image pattern. The matrix operates on the
-   * image's pixel space (with the origin at the top-left of the image and axes aligned with the
-   * image pixels) and is applied in every scale mode.
+   * image's local coordinate space (the original image rect with the origin at its top-left).
    */
   const Matrix& matrix() const {
     return _matrix;

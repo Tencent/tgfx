@@ -45,8 +45,8 @@ class ColorSource : public LayerProperty {
   virtual bool fitsToGeometry() const = 0;
 
   /**
-   * Returns the transformation matrix that maps the ColorSource's definition space to the given
-   * geometry bounding box. Only consulted when fitsToGeometry() returns true.
+   * Returns the transformation matrix that maps the ColorSource's local coordinate space into the
+   * given geometry bounding box. Only consulted when fitsToGeometry() returns true.
    * @param bounds The bounding box of the target geometry.
    */
   virtual Matrix getFitMatrix(const Rect& bounds) const = 0;
