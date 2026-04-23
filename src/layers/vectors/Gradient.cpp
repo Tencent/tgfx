@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/vectors/Gradient.h"
+#include "core/utils/Log.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
@@ -89,6 +90,7 @@ std::shared_ptr<Shader> Gradient::getShader() const {
 }
 
 Matrix Gradient::getFitMatrix(const Rect& bounds) const {
+  DEBUG_ASSERT(_fitsToGeometry);
   if (bounds.isEmpty()) {
     return Matrix::I();
   }

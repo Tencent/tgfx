@@ -79,6 +79,8 @@ Matrix ImagePattern::getFitMatrix(const Rect& bounds) const {
   float sx = bounds.width() / transformed.width();
   float sy = bounds.height() / transformed.height();
   switch (_scaleMode) {
+    case ScaleMode::None:
+      break;
     case ScaleMode::Stretch: {
       auto matrix = Matrix::MakeTrans(-transformed.left, -transformed.top);
       matrix.postScale(sx, sy);
@@ -103,8 +105,6 @@ Matrix ImagePattern::getFitMatrix(const Rect& bounds) const {
       matrix.postTranslate(tx, ty);
       return matrix;
     }
-    default:
-      break;
   }
   return Matrix::I();
 }

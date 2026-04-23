@@ -152,10 +152,11 @@ class StrokePainter : public Painter {
     }
     Matrix finalOuter = outerMatrix;
     shape = prepareShape(std::move(shape), innerMatrix, &finalOuter);
-    auto fits = colorSource->fitsToGeometry();
+    auto fitsToGeometry = colorSource->fitsToGeometry();
     // Capture the pre-stroke fill bounds in the final outer space so every stroke-align branch
     // evaluates the fit shader over the same region as a fill would.
-    auto fitBounds = fits ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
+    auto geometryBounds =
+        fitsToGeometry ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
 
     if (needsBooleanOp) {
       auto transformedOriginal = Shape::ApplyMatrix(originalShape, innerMatrix);
@@ -165,8 +166,8 @@ class StrokePainter : public Painter {
       }
       shape = Shape::ApplyMatrix(shape, finalOuter);
       auto finalShader = shader;
-      if (fits) {
-        finalShader = shader->makeWithMatrix(colorSource->getFitMatrix(fitBounds));
+      if (fitsToGeometry) {
+        finalShader = shader->makeWithMatrix(colorSource->getFitMatrix(geometryBounds));
       }
       LayerPaint paint(finalShader, alpha, blendMode);
       paint.placement = placement;
@@ -187,8 +188,8 @@ class StrokePainter : public Painter {
       }
       shape = Shape::ApplyMatrix(shape, finalOuter);
     }
-    if (fits) {
-      paint.shader = shader->makeWithMatrix(colorSource->getFitMatrix(fitBounds));
+    if (fitsToGeometry) {
+      paint.shader = shader->makeWithMatrix(colorSource->getFitMatrix(geometryBounds));
     }
     paint.placement = placement;
     recorder->addShape(std::move(shape), paint);
@@ -230,10 +231,11 @@ class StrokePainter : public Painter {
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
     auto baseShader = shader;
-    auto fits = colorSource->fitsToGeometry();
+    auto fitsToGeometry = colorSource->fitsToGeometry();
     // Capture the pre-stroke text-shape bounds in the final outer space so every stroke-align
     // branch evaluates the fit shader over the same region.
-    auto fitBounds = fits ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
+    auto geometryBounds =
+        fitsToGeometry ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
 
     std::shared_ptr<Shape> finalShape = nullptr;
     LayerPaint basePaint = {};
@@ -259,8 +261,8 @@ class StrokePainter : public Painter {
       finalShape = Shape::ApplyMatrix(finalShape, finalOuter);
     }
 
-    if (fits) {
-      baseShader = shader->makeWithMatrix(colorSource->getFitMatrix(fitBounds));
+    if (fitsToGeometry) {
+      baseShader = shader->makeWithMatrix(colorSource->getFitMatrix(geometryBounds));
     }
     auto paints = MakeBlendPaints(baseShader, alpha, blendMode, run.style);
 
