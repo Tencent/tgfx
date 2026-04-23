@@ -2870,7 +2870,6 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
   Font labelFont(typeface, 20.0f);
 
   auto displayList = std::make_unique<DisplayList>();
-  auto vectorLayer = VectorLayer::Make();
 
   struct ModeEntry {
     ScaleMode mode;
@@ -2894,22 +2893,27 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
   const Color borderColor = Color::FromRGBA(96, 96, 96, 255);
   const float borderWidth = 1.0f;
 
-  // Row 1: original image with each ScaleMode.
-  std::vector<std::shared_ptr<VectorElement>> contents;
+  // Row 1: original image with each ScaleMode. Each cell is an independent VectorLayer
+  // translated to the cell center with the rect placed at its own origin.
+  auto row1LabelLayer = VectorLayer::Make();
+  std::vector<std::shared_ptr<VectorElement>> row1Labels;
   for (size_t i = 0; i < 4; ++i) {
     const float centerX = startX + rectWidth * 0.5f + (rectWidth + gap) * static_cast<float>(i);
 
-    auto rectGroup = std::make_shared<VectorGroup>();
+    auto cellLayer = VectorLayer::Make();
+    cellLayer->setMatrix(Matrix::MakeTrans(centerX, row1CenterY));
+    auto cellGroup = std::make_shared<VectorGroup>();
     auto rect = std::make_shared<Rectangle>();
-    rect->setPosition({centerX, row1CenterY});
+    rect->setPosition({0.0f, 0.0f});
     rect->setSize({rectWidth, rectHeight});
     auto pattern = ImagePattern::Make(image);
     EXPECT_EQ(pattern->scaleMode(), ScaleMode::LetterBox);
     pattern->setScaleMode(entries[i].mode);
     EXPECT_EQ(pattern->scaleMode(), entries[i].mode);
     auto border = MakeStrokeStyle(borderColor, borderWidth);
-    rectGroup->setElements({rect, FillStyle::Make(pattern), border});
-    contents.push_back(rectGroup);
+    cellGroup->setElements({rect, FillStyle::Make(pattern), border});
+    cellLayer->setContents({cellGroup});
+    displayList->root()->addChild(cellLayer);
 
     auto labelGroup = std::make_shared<VectorGroup>();
     auto blob = TextBlob::MakeFrom(entries[i].label, labelFont);
@@ -2917,11 +2921,10 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
     auto labelBounds = blob->getTightBounds();
     text->setPosition({centerX - labelBounds.width() * 0.5f - labelBounds.left, row1LabelY});
     labelGroup->setElements({text, MakeFillStyle(Color::Black())});
-    contents.push_back(labelGroup);
+    row1Labels.push_back(labelGroup);
   }
-
-  vectorLayer->setContents(contents);
-  displayList->root()->addChild(vectorLayer);
+  row1LabelLayer->setContents(row1Labels);
+  displayList->root()->addChild(row1LabelLayer);
 
   // Row 2: scale the image so its longest edge equals 1.5x the rect's longest edge, then rotate
   // it around the image-local origin. Each cell is an independent VectorLayer translated to the
