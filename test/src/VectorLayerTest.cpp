@@ -2921,9 +2921,13 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
     contents.push_back(labelGroup);
   }
 
+  vectorLayer->setContents(contents);
+  displayList->root()->addChild(vectorLayer);
+
   // Row 2: shrink the image so its longest edge is 1.5x the rect's longest edge, then rotate it
-  // around the image center. The same user matrix is used for every cell so the only difference
-  // across cells is how each ScaleMode fits the transformed image into the rect.
+  // around the image center. Each cell is an independent VectorLayer translated to the cell
+  // center with the rect placed at its own origin, so the same user matrix produces identical
+  // local-space geometry for every cell and only the ScaleMode differs.
   auto imageCenterX = static_cast<float>(image->width()) * 0.5f;
   auto imageCenterY = static_cast<float>(image->height()) * 0.5f;
   float imageMaxEdge =
@@ -2933,19 +2937,24 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
   Matrix userMatrix = Matrix::MakeTrans(-imageCenterX, -imageCenterY);
   userMatrix.postScale(userScale, userScale);
   userMatrix.postRotate(30.0f);
+  auto row2LabelLayer = VectorLayer::Make();
+  std::vector<std::shared_ptr<VectorElement>> row2Labels;
   for (size_t i = 0; i < 4; ++i) {
     const float centerX = startX + rectWidth * 0.5f + (rectWidth + gap) * static_cast<float>(i);
 
-    auto rectGroup = std::make_shared<VectorGroup>();
+    auto cellLayer = VectorLayer::Make();
+    cellLayer->setMatrix(Matrix::MakeTrans(centerX, row2CenterY));
+    auto cellGroup = std::make_shared<VectorGroup>();
     auto rect = std::make_shared<Rectangle>();
-    rect->setPosition({centerX, row2CenterY});
+    rect->setPosition({0.0f, 0.0f});
     rect->setSize({rectWidth, rectHeight});
     auto pattern = ImagePattern::Make(image);
     pattern->setMatrix(userMatrix);
     pattern->setScaleMode(entries[i].mode);
     auto border = MakeStrokeStyle(borderColor, borderWidth);
-    rectGroup->setElements({rect, FillStyle::Make(pattern), border});
-    contents.push_back(rectGroup);
+    cellGroup->setElements({rect, FillStyle::Make(pattern), border});
+    cellLayer->setContents({cellGroup});
+    displayList->root()->addChild(cellLayer);
 
     auto labelGroup = std::make_shared<VectorGroup>();
     auto blob = TextBlob::MakeFrom(entries[i].label, labelFont);
@@ -2953,11 +2962,11 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
     auto labelBounds = blob->getTightBounds();
     text->setPosition({centerX - labelBounds.width() * 0.5f - labelBounds.left, row2LabelY});
     labelGroup->setElements({text, MakeFillStyle(Color::Black())});
-    contents.push_back(labelGroup);
+    row2Labels.push_back(labelGroup);
   }
+  row2LabelLayer->setContents(row2Labels);
+  displayList->root()->addChild(row2LabelLayer);
 
-  vectorLayer->setContents(contents);
-  displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/ImagePatternScaleMode"));
