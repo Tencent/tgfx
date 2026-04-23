@@ -2921,16 +2921,18 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
     contents.push_back(labelGroup);
   }
 
-  // Row 2: rotate and scale the image first, then apply each ScaleMode. Every cell additionally
-  // scales the image by 1.5x so the transformed image is larger than the rect in every scale
-  // mode. For ScaleMode::None the matrix also translates the image into the None cell so part of
-  // it is visible; the other scale modes fit the transformed image's bounding box into the rect.
+  // Row 2: shrink the image so its longest edge is 1.5x the rect's longest edge, then rotate it
+  // around the image center. The same user matrix is used for every cell so the only difference
+  // across cells is how each ScaleMode fits the transformed image into the rect.
   auto imageCenterX = static_cast<float>(image->width()) * 0.5f;
   auto imageCenterY = static_cast<float>(image->height()) * 0.5f;
+  float imageMaxEdge =
+      std::max(static_cast<float>(image->width()), static_cast<float>(image->height()));
+  float rectMaxEdge = std::max(rectWidth, rectHeight);
+  float userScale = rectMaxEdge * 1.5f / imageMaxEdge;
   Matrix userMatrix = Matrix::MakeTrans(-imageCenterX, -imageCenterY);
-  userMatrix.postScale(0.5f, 0.5f);
+  userMatrix.postScale(userScale, userScale);
   userMatrix.postRotate(30.0f);
-  userMatrix.postScale(1.5f, 1.5f);
   for (size_t i = 0; i < 4; ++i) {
     const float centerX = startX + rectWidth * 0.5f + (rectWidth + gap) * static_cast<float>(i);
 
@@ -2939,11 +2941,7 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
     rect->setPosition({centerX, row2CenterY});
     rect->setSize({rectWidth, rectHeight});
     auto pattern = ImagePattern::Make(image);
-    Matrix cellMatrix = userMatrix;
-    if (entries[i].mode == ScaleMode::None) {
-      cellMatrix.postTranslate(centerX, row2CenterY);
-    }
-    pattern->setMatrix(cellMatrix);
+    pattern->setMatrix(userMatrix);
     pattern->setScaleMode(entries[i].mode);
     auto border = MakeStrokeStyle(borderColor, borderWidth);
     rectGroup->setElements({rect, FillStyle::Make(pattern), border});
