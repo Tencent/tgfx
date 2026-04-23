@@ -2925,17 +2925,14 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
   displayList->root()->addChild(vectorLayer);
 
   // Row 2: shrink the image so its longest edge is 1.5x the rect's longest edge, then rotate it
-  // around the image center. Each cell is an independent VectorLayer translated to the cell
+  // around the image-local origin. Each cell is an independent VectorLayer translated to the cell
   // center with the rect placed at its own origin, so the same user matrix produces identical
   // local-space geometry for every cell and only the ScaleMode differs.
-  auto imageCenterX = static_cast<float>(image->width()) * 0.5f;
-  auto imageCenterY = static_cast<float>(image->height()) * 0.5f;
   float imageMaxEdge =
       std::max(static_cast<float>(image->width()), static_cast<float>(image->height()));
   float rectMaxEdge = std::max(rectWidth, rectHeight);
   float userScale = rectMaxEdge * 1.5f / imageMaxEdge;
-  Matrix userMatrix = Matrix::MakeTrans(-imageCenterX, -imageCenterY);
-  userMatrix.postScale(userScale, userScale);
+  Matrix userMatrix = Matrix::MakeScale(userScale, userScale);
   userMatrix.postRotate(30.0f);
   auto row2LabelLayer = VectorLayer::Make();
   std::vector<std::shared_ptr<VectorElement>> row2Labels;
