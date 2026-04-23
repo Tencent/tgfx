@@ -80,6 +80,9 @@ Matrix ImagePattern::getFitMatrix(const Rect& bounds) const {
   float sy = bounds.height() / transformed.height();
   switch (_scaleMode) {
     case ScaleMode::None:
+      // Unreachable in practice: fitsToGeometry() returns false for ScaleMode::None so callers
+      // skip getFitMatrix(), and the DEBUG_ASSERT above catches misuse in debug builds. Returning
+      // identity here is only a safe fallback for release builds.
       break;
     case ScaleMode::Stretch: {
       auto matrix = Matrix::MakeTrans(-transformed.left, -transformed.top);
