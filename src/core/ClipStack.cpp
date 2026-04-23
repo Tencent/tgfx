@@ -41,13 +41,13 @@ enum class ClipGeometry {
  * are equivalent.
  */
 static ClipGeometry ResolveClipGeometry(const ClipElement& a, const ClipElement& b) {
-  if (!a.cheapIntersects(b)) {
+  if (!a.looseIntersects(b)) {
     return ClipGeometry::Empty;
   }
-  if (b.cheapContains(a)) {
+  if (b.tightContains(a)) {
     return ClipGeometry::AOnly;
   }
-  if (a.cheapContains(b)) {
+  if (a.tightContains(b)) {
     return ClipGeometry::BOnly;
   }
   // Fallback for equivalent paths whose containment cannot be proven by bounds checks.
@@ -95,7 +95,7 @@ ClipElement::ClipElement(const Path& path, bool antiAlias) : _path(path), _antiA
   _isRect = path.isRect(nullptr);
 }
 
-bool ClipElement::cheapContains(const ClipElement& other) const {
+bool ClipElement::tightContains(const ClipElement& other) const {
   auto thisInverse = _path.isInverseFillType();
   auto otherInverse = other._path.isInverseFillType();
   if (thisInverse && otherInverse) {
@@ -117,7 +117,7 @@ bool ClipElement::cheapContains(const ClipElement& other) const {
   return _path.contains(other._bounds);
 }
 
-bool ClipElement::cheapIntersects(const ClipElement& other) const {
+bool ClipElement::looseIntersects(const ClipElement& other) const {
   auto thisInverse = _path.isInverseFillType();
   auto otherInverse = other._path.isInverseFillType();
   if (thisInverse && otherInverse) {
@@ -259,7 +259,7 @@ bool ClipStack::addElement(ClipElement&& toAdd) {
   // can handle containment and intersection against toAdd uniformly.
   Path curBoundsPath = {};
   curBoundsPath.addRect(cur.bounds);
-  ClipElement curElement(curBoundsPath, false);
+  const ClipElement curElement(curBoundsPath, false);
   switch (ResolveClipGeometry(curElement, toAdd)) {
     case ClipGeometry::Empty:
       cur.state = ClipState::Empty;

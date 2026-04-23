@@ -85,7 +85,7 @@ class ClipElement {
    * path such as an L shape and other's bounds fit entirely inside the L, the geometric
    * check cannot prove containment and returns false even though it does hold.
    */
-  bool cheapContains(const ClipElement& other) const;
+  bool tightContains(const ClipElement& other) const;
 
   /**
    * Returns whether this element's keep-region intersects the keep-region of other.
@@ -95,7 +95,7 @@ class ClipElement {
    * this is a concave path and other fits entirely inside a concave gap of this, the AABB
    * check still reports them as overlapping and returns true even though they are disjoint.
    */
-  bool cheapIntersects(const ClipElement& other) const;
+  bool looseIntersects(const ClipElement& other) const;
 
   void transform(const Matrix& matrix);
 
