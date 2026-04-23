@@ -47,6 +47,14 @@ class SolidColor : public ColorSource {
 
   std::shared_ptr<Shader> getShader() const override;
 
+  bool fitsToGeometry() const override {
+    return false;
+  }
+
+  Matrix getFitMatrix(const Rect&) const override {
+    return Matrix::I();
+  }
+
  protected:
   Type getType() const override {
     return Type::SolidColor;

@@ -25,7 +25,6 @@
 #include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/vectors/Ellipse.h"
-#include "tgfx/layers/vectors/FillSpace.h"
 #include "tgfx/layers/vectors/FillStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
 #include "tgfx/layers/vectors/ImagePattern.h"
@@ -2376,7 +2375,7 @@ TGFX_TEST(VectorLayerTest, RichText) {
 
   auto titleGradient = Gradient::MakeLinear(
       {0, 0}, {155, 0}, {Color::FromRGBA(255, 0, 0, 255), Color::FromRGBA(0, 0, 255, 255)});
-  titleGradient->setFillSpace(FillSpace::Absolute);
+  titleGradient->setFitsToGeometry(false);
   auto tgfxFill = FillStyle::Make(titleGradient);
   auto tgfxGroup = std::make_shared<VectorGroup>();
   tgfxGroup->setElements({tgfxSpan, tgfxFill});
@@ -2552,7 +2551,7 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   std::vector<Color> colors = {Color::Red(), Color::FromRGBA(255, 255, 0, 255), Color::Green(),
                                Color::Blue()};
 
-  // Row 1 (FillSpace::Relative, default): four gradient types each mapped to their own rect.
+  // Row 1 (fitsToGeometry default true): four gradient types each mapped to their own rect.
   // Linear gradient
   auto group1 = std::make_shared<VectorGroup>();
   auto rect1 = std::make_shared<Rectangle>();
@@ -2560,7 +2559,7 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   rect1->setSize({120, 120});
   auto linear = Gradient::MakeLinear({0, 0.5f}, {1, 0.5f}, colors);
   EXPECT_EQ(linear->type(), GradientType::Linear);
-  EXPECT_EQ(linear->fillSpace(), FillSpace::Relative);
+  EXPECT_EQ(linear->fitsToGeometry(), true);
   EXPECT_EQ(linear->startPoint(), Point::Make(0.0f, 0.5f));
   EXPECT_EQ(linear->endPoint(), Point::Make(1.0f, 0.5f));
   linear->setStartPoint({0, 0.5f});
@@ -2628,10 +2627,10 @@ TGFX_TEST(VectorLayerTest, Gradient) {
                                            rowStartX + rowRectSize * 1.5f + rowGap,
                                            rowStartX + rowRectSize * 2.5f + rowGap * 2.0f};
 
-  // Row 2 (FillSpace::Relative): three contiguous rectangles share one gradient definition; each
+  // Row 2 (fitsToGeometry=true): three contiguous rectangles share one gradient definition; each
   // rectangle maps the same 0-1 gradient independently, so all three rectangles look identical.
   auto relativeCompare = Gradient::MakeLinear({0, 0.5f}, {1, 0.5f}, compareColors);
-  EXPECT_EQ(relativeCompare->fillSpace(), FillSpace::Relative);
+  EXPECT_EQ(relativeCompare->fitsToGeometry(), true);
   auto group5 = std::make_shared<VectorGroup>();
   auto rect5 = std::make_shared<Rectangle>();
   rect5->setPosition({rowCenters[0], 240});
@@ -2650,14 +2649,14 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   rect7->setSize({rowRectSize, rowRectSize});
   group7->setElements({rect7, FillStyle::Make(relativeCompare)});
 
-  // Row 3 (FillSpace::Absolute): three separated rectangles share one gradient anchored to the
+  // Row 3 (fitsToGeometry=false): three separated rectangles share one gradient anchored to the
   // layer origin; the gradient spans from the left edge of the first rectangle to the right edge
   // of the last rectangle, so the endpoints are pinned at the outer rectangles.
   auto absoluteCompare =
       Gradient::MakeLinear({rowCenters[0] - rowRectSize * 0.5f, 0},
                            {rowCenters[2] + rowRectSize * 0.5f, 0}, compareColors);
-  absoluteCompare->setFillSpace(FillSpace::Absolute);
-  EXPECT_EQ(absoluteCompare->fillSpace(), FillSpace::Absolute);
+  absoluteCompare->setFitsToGeometry(false);
+  EXPECT_EQ(absoluteCompare->fitsToGeometry(), false);
   auto group8 = std::make_shared<VectorGroup>();
   auto rect8 = std::make_shared<Rectangle>();
   rect8->setPosition({rowCenters[0], 350});
@@ -4649,37 +4648,40 @@ TGFX_TEST(VectorLayerTest, Line) {
 }
 
 /**
- * Test switching FillSpace on Gradient and ScaleMode on ImagePattern at runtime, verifying that
- * setters/getters work correctly.
+ * Test switching fitsToGeometry on Gradient and ScaleMode on ImagePattern at runtime, verifying
+ * that setters/getters work correctly.
  */
-TGFX_TEST(VectorLayerTest, FillSpaceSwitch) {
-  // Default fillSpace for Gradient is Relative
+TGFX_TEST(VectorLayerTest, FitsToGeometrySwitch) {
+  // Default fitsToGeometry for Gradient is true
   auto gradient = Gradient::MakeLinear({0, 0}, {1, 1}, {Color::Red(), Color::Blue()});
-  EXPECT_EQ(gradient->fillSpace(), FillSpace::Relative);
+  EXPECT_EQ(gradient->fitsToGeometry(), true);
 
-  // Switch to Absolute
-  gradient->setFillSpace(FillSpace::Absolute);
-  EXPECT_EQ(gradient->fillSpace(), FillSpace::Absolute);
+  // Switch to layer coordinate space
+  gradient->setFitsToGeometry(false);
+  EXPECT_EQ(gradient->fitsToGeometry(), false);
 
-  // Switch back to Relative
-  gradient->setFillSpace(FillSpace::Relative);
-  EXPECT_EQ(gradient->fillSpace(), FillSpace::Relative);
+  // Switch back to fitting each geometry
+  gradient->setFitsToGeometry(true);
+  EXPECT_EQ(gradient->fitsToGeometry(), true);
 
   // Default scaleMode for ImagePattern is LetterBox, with Decal tile modes
   auto image = MakeImage("resources/assets/bridge.jpg");
   ASSERT_TRUE(image != nullptr);
   auto pattern = ImagePattern::Make(image);
   EXPECT_EQ(pattern->scaleMode(), ScaleMode::LetterBox);
+  EXPECT_EQ(pattern->fitsToGeometry(), true);
   EXPECT_EQ(pattern->tileModeX(), TileMode::Decal);
   EXPECT_EQ(pattern->tileModeY(), TileMode::Decal);
 
   // Switch scaleMode
   pattern->setScaleMode(ScaleMode::Zoom);
   EXPECT_EQ(pattern->scaleMode(), ScaleMode::Zoom);
+  EXPECT_EQ(pattern->fitsToGeometry(), true);
 
-  // Switch to None (absolute layer space)
+  // Switch to None (layer coordinate space)
   pattern->setScaleMode(ScaleMode::None);
   EXPECT_EQ(pattern->scaleMode(), ScaleMode::None);
+  EXPECT_EQ(pattern->fitsToGeometry(), false);
 }
 
 }  // namespace tgfx

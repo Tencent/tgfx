@@ -96,11 +96,11 @@ class ImagePattern : public ColorSource {
 
   std::shared_ptr<Shader> getShader() const override;
 
-  bool useRelativeSpace() const override {
+  bool fitsToGeometry() const override {
     return _scaleMode != ScaleMode::None;
   }
 
-  Matrix getRelativeMatrix(const Rect& bounds) const override;
+  Matrix getFitMatrix(const Rect& bounds) const override;
 
  protected:
   Type getType() const override {

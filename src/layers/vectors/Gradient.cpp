@@ -72,11 +72,11 @@ void Gradient::setMatrix(const Matrix& matrix) {
   invalidateContent();
 }
 
-void Gradient::setFillSpace(FillSpace space) {
-  if (_fillSpace == space) {
+void Gradient::setFitsToGeometry(bool value) {
+  if (_fitsToGeometry == value) {
     return;
   }
-  _fillSpace = space;
+  _fitsToGeometry = value;
   invalidateContent();
 }
 
@@ -88,7 +88,7 @@ std::shared_ptr<Shader> Gradient::getShader() const {
   return shader->makeWithMatrix(_matrix);
 }
 
-Matrix Gradient::getRelativeMatrix(const Rect& bounds) const {
+Matrix Gradient::getFitMatrix(const Rect& bounds) const {
   if (bounds.isEmpty()) {
     return Matrix::I();
   }

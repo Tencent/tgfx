@@ -23,7 +23,6 @@
 #include "tgfx/core/GradientType.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/layers/vectors/ColorSource.h"
-#include "tgfx/layers/vectors/FillSpace.h"
 
 namespace tgfx {
 class LinearGradient;
@@ -33,9 +32,8 @@ class DiamondGradient;
 
 /**
  * The base class for all gradient types that can be drawn on a vector layer. By default, gradient
- * parameters are interpreted in a normalized 0-1 space (FillSpace::Relative) that maps to each
- * geometry's bounding box. Call setFillSpace(FillSpace::Absolute) to interpret them in the layer's
- * coordinate space instead.
+ * parameters are interpreted in a normalized 0-1 space that maps to each geometry's bounding box.
+ * Call setFitsToGeometry(false) to interpret them in the layer's coordinate space instead.
  */
 class Gradient : public ColorSource {
  public:
@@ -145,28 +143,24 @@ class Gradient : public ColorSource {
   void setMatrix(const Matrix& matrix);
 
   /**
-   * Returns the coordinate space used to interpret this gradient's parameters. The default value is
-   * FillSpace::Relative.
+   * Returns whether the gradient parameters are interpreted relative to each geometry's bounding
+   * box. When true (the default), the parameters live in a (0, 0)-(1, 1) coordinate space that
+   * maps to each geometry's bounding box. When false, the parameters are in the layer's
+   * coordinate space.
    */
-  FillSpace fillSpace() const {
-    return _fillSpace;
+  bool fitsToGeometry() const override {
+    return _fitsToGeometry;
   }
 
   /**
-   * Sets the coordinate space used to interpret this gradient's parameters. When set to
-   * FillSpace::Relative, the gradient parameters are interpreted in a (0, 0)-(1, 1) coordinate
-   * space that maps to each geometry's bounding box. When set to FillSpace::Absolute, the
-   * parameters are in the layer's coordinate space.
+   * Sets whether the gradient parameters are interpreted relative to each geometry's bounding
+   * box. See fitsToGeometry() for details.
    */
-  void setFillSpace(FillSpace space);
+  void setFitsToGeometry(bool value);
 
   std::shared_ptr<Shader> getShader() const override;
 
-  bool useRelativeSpace() const override {
-    return _fillSpace == FillSpace::Relative;
-  }
-
-  Matrix getRelativeMatrix(const Rect& bounds) const override;
+  Matrix getFitMatrix(const Rect& bounds) const override;
 
  protected:
   Type getType() const override {
@@ -184,7 +178,7 @@ class Gradient : public ColorSource {
 
  private:
   Matrix _matrix = {};
-  FillSpace _fillSpace = FillSpace::Relative;
+  bool _fitsToGeometry = true;
 };
 
 /**
@@ -198,9 +192,9 @@ class LinearGradient : public Gradient {
 
   /**
    * Returns the start point of the gradient. The start point corresponds to the first stop of the
-   * gradient. It is interpreted in the coordinate space selected by fillSpace(): a normalized 0-1
-   * space relative to each geometry's bounding box when FillSpace::Relative (the default), or the
-   * layer's coordinate space when FillSpace::Absolute.
+   * gradient. It is interpreted in the coordinate space selected by fitsToGeometry(): a normalized
+   * 0-1 space relative to each geometry's bounding box when true (the default), or the layer's
+   * coordinate space when false.
    */
   const Point& startPoint() const {
     return _startPoint;
@@ -208,14 +202,14 @@ class LinearGradient : public Gradient {
 
   /**
    * Sets the start point of the gradient. The point is interpreted in the coordinate space
-   * selected by fillSpace(); see startPoint() for details.
+   * selected by fitsToGeometry(); see startPoint() for details.
    */
   void setStartPoint(const Point& startPoint);
 
   /**
    * Returns the end point of the gradient. The end point corresponds to the last stop of the
-   * gradient. It is interpreted in the coordinate space selected by fillSpace(); see startPoint()
-   * for details.
+   * gradient. It is interpreted in the coordinate space selected by fitsToGeometry(); see
+   * startPoint() for details.
    */
   const Point& endPoint() const {
     return _endPoint;
@@ -223,7 +217,7 @@ class LinearGradient : public Gradient {
 
   /**
    * Sets the end point of the gradient. The point is interpreted in the coordinate space selected
-   * by fillSpace(); see startPoint() for details.
+   * by fitsToGeometry(); see startPoint() for details.
    */
   void setEndPoint(const Point& endPoint);
 
@@ -253,9 +247,9 @@ class RadialGradient : public Gradient {
 
   /**
    * Returns the center of the circle for this gradient. The center point corresponds to the first
-   * stop of the gradient. It is interpreted in the coordinate space selected by fillSpace(): a
-   * normalized 0-1 space relative to each geometry's bounding box when FillSpace::Relative (the
-   * default), or the layer's coordinate space when FillSpace::Absolute.
+   * stop of the gradient. It is interpreted in the coordinate space selected by fitsToGeometry():
+   * a normalized 0-1 space relative to each geometry's bounding box when true (the default), or
+   * the layer's coordinate space when false.
    */
   const Point& center() const {
     return _center;
@@ -263,13 +257,13 @@ class RadialGradient : public Gradient {
 
   /**
    * Sets the center of the circle for this gradient. The point is interpreted in the coordinate
-   * space selected by fillSpace(); see center() for details.
+   * space selected by fitsToGeometry(); see center() for details.
    */
   void setCenter(const Point& center);
 
   /**
    * Returns the radius of the circle for this gradient. The radius corresponds to the last stop of
-   * the gradient. It is expressed in the coordinate space selected by fillSpace().
+   * the gradient. It is expressed in the coordinate space selected by fitsToGeometry().
    */
   float radius() const {
     return _radius;
@@ -277,7 +271,7 @@ class RadialGradient : public Gradient {
 
   /**
    * Sets the radius of the circle for this gradient. The radius must be positive and is expressed
-   * in the coordinate space selected by fillSpace().
+   * in the coordinate space selected by fitsToGeometry().
    */
   void setRadius(float radius);
 
@@ -307,8 +301,8 @@ class ConicGradient : public Gradient {
 
   /**
    * Returns the center of the circle for this gradient. It is interpreted in the coordinate space
-   * selected by fillSpace(): a normalized 0-1 space relative to each geometry's bounding box when
-   * FillSpace::Relative (the default), or the layer's coordinate space when FillSpace::Absolute.
+   * selected by fitsToGeometry(): a normalized 0-1 space relative to each geometry's bounding box
+   * when true (the default), or the layer's coordinate space when false.
    */
   const Point& center() const {
     return _center;
@@ -316,7 +310,7 @@ class ConicGradient : public Gradient {
 
   /**
    * Sets the center of the circle for this gradient. The point is interpreted in the coordinate
-   * space selected by fillSpace(); see center() for details.
+   * space selected by fitsToGeometry(); see center() for details.
    */
   void setCenter(const Point& center);
 
@@ -373,9 +367,9 @@ class DiamondGradient : public Gradient {
 
   /**
    * Returns the center of the diamond for this gradient. The center point corresponds to the first
-   * stop of the gradient. It is interpreted in the coordinate space selected by fillSpace(): a
-   * normalized 0-1 space relative to each geometry's bounding box when FillSpace::Relative (the
-   * default), or the layer's coordinate space when FillSpace::Absolute.
+   * stop of the gradient. It is interpreted in the coordinate space selected by fitsToGeometry():
+   * a normalized 0-1 space relative to each geometry's bounding box when true (the default), or
+   * the layer's coordinate space when false.
    */
   const Point& center() const {
     return _center;
@@ -383,13 +377,13 @@ class DiamondGradient : public Gradient {
 
   /**
    * Sets the center of the diamond for this gradient. The point is interpreted in the coordinate
-   * space selected by fillSpace(); see center() for details.
+   * space selected by fitsToGeometry(); see center() for details.
    */
   void setCenter(const Point& center);
 
   /**
    * Returns the radius of the diamond for this gradient. The distance from the center to a vertex
-   * of the diamond, expressed in the coordinate space selected by fillSpace().
+   * of the diamond, expressed in the coordinate space selected by fitsToGeometry().
    */
   float radius() const {
     return _radius;
@@ -397,7 +391,7 @@ class DiamondGradient : public Gradient {
 
   /**
    * Sets the radius of the diamond for this gradient. The value must be positive and is expressed
-   * in the coordinate space selected by fillSpace().
+   * in the coordinate space selected by fitsToGeometry().
    */
   void setRadius(float radius);
 
