@@ -622,8 +622,8 @@ PDFIndirectReference MakePSFunction(std::unique_ptr<Stream> psCode,
 // Conic Gradient Triangle Mesh (ShadingType 4) Implementation
 ///////////////////////////////////////////////////////////////////////////
 
-// Each angular segment spans ~5.54 degrees (same as Figma). More segments improve arc accuracy
-// but increase file size. 65 segments cover the full 360° range.
+// Each angular segment spans ~5.54 degrees. More segments improve arc accuracy but increase file
+// size. 65 segments cover the full 360° range.
 constexpr int ConicSegmentCount = 65;
 // Number of radial steps per segment for the rectangle strip. Fine subdivision is intentional:
 // fewer steps leave large triangles whose shared edges can produce sub-pixel white-line artifacts
@@ -684,10 +684,10 @@ void WriteTriangleMeshVertex(MemoryWriteStream* stream, uint8_t flag, float x, f
   stream->write(&b, 1);
 }
 
-// Writes one wedge-shaped segment as a radial rectangle strip, following the same structure as
-// Figma's PDF output. Instead of a fan triangle (center + two rim points), each segment expands
-// from the center outward using ConicRadialStepsPerSegment flag=1 vertex pairs. This eliminates
-// seam artifacts because all inter-segment boundaries are shared radial edges, not arc edges.
+// Writes one wedge-shaped segment as a radial rectangle strip. Instead of a fan triangle
+// (center + two rim points), each segment expands from the center outward using
+// ConicRadialStepsPerSegment flag=1 vertex pairs. This eliminates seam artifacts because all
+// inter-segment boundaries are shared radial edges, not arc edges.
 //
 // Vertex layout per segment:
 //   3 degenerate flag=0 triangles (center, center, center) to reset the color anchor, then
