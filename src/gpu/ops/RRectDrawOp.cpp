@@ -55,7 +55,7 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
     commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
   hasStroke = provider->hasStroke();
-  _isComplex = provider->isComplex();
+  isComplex = provider->isComplex();
   if (aaType == AAType::None) {
     indicesPerRRect = IndicesPerNonAARRect;
   } else {
@@ -68,14 +68,14 @@ PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarge
   ATTRIBUTE_NAME("hasStroke", hasStroke);
   ATTRIBUTE_NAME("commonColor", commonColor);
   if (aaType == AAType::None) {
-    if (_isComplex) {
+    if (isComplex) {
       return ComplexNonAARRectGeometryProcessor::Make(
           allocator, renderTarget->width(), renderTarget->height(), hasStroke, commonColor);
     }
     return NonAARRectGeometryProcessor::Make(allocator, renderTarget->width(),
                                              renderTarget->height(), hasStroke, commonColor);
   }
-  if (_isComplex) {
+  if (isComplex) {
     return ComplexEllipseGeometryProcessor::Make(allocator, renderTarget->width(),
                                                  renderTarget->height(), hasStroke, commonColor);
   }

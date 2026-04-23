@@ -278,24 +278,28 @@ static bool UseDrawPath(const Paint& paint, const RRect& rRect, const Matrix& vi
     return false;
   }
 
-  auto scales = viewMatrix.getAxisScales();
-  // Scaled half stroke width in local space; hairline (width == 0) falls back to half a pixel.
-  Point halfScaledStroke = {};
-  halfScaledStroke.x = scales.x * stroke->width;
-  halfScaledStroke.y = scales.y * stroke->width;
+  const auto scales = viewMatrix.getAxisScales();
+  // Scaled stroke width in local space; hairline (width == 0) falls back to half a pixel after
+  // the zero-length check below.
+  Point halfScaledStroke = {scales.x * stroke->width, scales.y * stroke->width};
   if (FloatNearlyZero(halfScaledStroke.length())) {
     halfScaledStroke.set(0.5f, 0.5f);
   } else {
     halfScaledStroke *= 0.5f;
   }
-  auto halfScaledStrokeLen = halfScaledStroke.length();
+  const auto halfScaledStrokeLen = halfScaledStroke.length();
 
   // Non-Complex types share identical radii across all four corners, so only the first needs check.
   const auto cornerCount = rRect.type() == RRect::Type::Complex ? rRect.radii().size() : size_t{1};
   for (size_t i = 0; i < cornerCount; ++i) {
     const auto& r = rRect.radii()[i];
-    auto xRadius = scales.x * r.x;
-    auto yRadius = scales.y * r.y;
+    // Skip sharp (zero-radius) corners so mixed sharp/rounded Complex rrects can still use the
+    // dedicated op.
+    if (r.x <= 0.0f || r.y <= 0.0f) {
+      continue;
+    }
+    const auto xRadius = scales.x * r.x;
+    const auto yRadius = scales.y * r.y;
     // Half of stroke width is greater than radius
     if (halfScaledStroke.x > xRadius || halfScaledStroke.y > yRadius) {
       return true;

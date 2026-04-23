@@ -24,9 +24,12 @@
 namespace tgfx {
 /**
  * ComplexEllipseGeometryProcessor renders complex round rects (per-corner independent radii) with
- * antialiasing. It extends the standard 9-patch ellipse approach by adding per-vertex edge
- * distances and using min(ellipseAlpha, edgeAlpha) to correctly blend elliptical corner coverage
- * with linear edge coverage, avoiding cross-corner interpolation artifacts.
+ * antialiasing. It extends the standard 9-patch ellipse approach by carrying per-vertex signed
+ * edge distances in addition to the ellipse offsets. The fragment shader then dispatches on the
+ * offset signs to pick a coverage formula per region: the ellipse SDF inside corner regions,
+ * linear edge distance along top/bottom/left/right edges, and full coverage in the interior.
+ * This avoids the cross-corner interpolation artifacts that would otherwise appear when corners
+ * have different radii.
  */
 class ComplexEllipseGeometryProcessor : public GeometryProcessor {
  public:
@@ -57,7 +60,7 @@ class ComplexEllipseGeometryProcessor : public GeometryProcessor {
 
   int width = 1;
   int height = 1;
-  bool stroke;
+  bool stroke = false;
   std::optional<PMColor> commonColor = std::nullopt;
 };
 }  // namespace tgfx

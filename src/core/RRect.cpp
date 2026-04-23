@@ -36,16 +36,16 @@ static inline void FlushToZero(float& a, float& b) {
 // smaller). Uses double so a small value is not absorbed by a much larger one, which would hide
 // the fact that their sum exceeds the limit.
 static inline void UpdateMinScale(float a, float b, double limit, double& scale) {
-  auto sum = static_cast<double>(a) + static_cast<double>(b);
+  const auto sum = static_cast<double>(a) + static_cast<double>(b);
   if (sum > 0 && limit / sum < scale) {
     scale = limit / sum;
   }
 }
 
 // Scales per-corner radii so that no two adjacent radii overflow the side they share.
-static void ScaleRadii(const Rect& rect, std::array<Point, 4>& radii) {
-  auto width = static_cast<double>(rect.width());
-  auto height = static_cast<double>(rect.height());
+static inline void ScaleRadii(const Rect& rect, std::array<Point, 4>& radii) {
+  const auto width = static_cast<double>(rect.width());
+  const auto height = static_cast<double>(rect.height());
 
   double scale = 1.0;
   UpdateMinScale(radii[0].x, radii[1].x, width, scale);
@@ -80,7 +80,7 @@ static void ScaleRadii(const Rect& rect, std::array<Point, 4>& radii) {
   }
 }
 
-static RRect::Type ComputeType(const Rect& rect, const std::array<Point, 4>& radii) {
+static inline RRect::Type ComputeType(const Rect& rect, const std::array<Point, 4>& radii) {
   if (rect.isEmpty()) {
     return RRect::Type::Rect;
   }
@@ -95,8 +95,8 @@ static RRect::Type ComputeType(const Rect& rect, const std::array<Point, 4>& rad
     return RRect::Type::Rect;
   }
   if (radii[0] == radii[1] && radii[1] == radii[2] && radii[2] == radii[3]) {
-    auto halfWidth = rect.width() * 0.5f;
-    auto halfHeight = rect.height() * 0.5f;
+    const auto halfWidth = rect.width() * 0.5f;
+    const auto halfHeight = rect.height() * 0.5f;
     // Use strict comparison instead of an epsilon tolerance: RRect lives in logical space that
     // may later be rescaled by an arbitrary transform, so any tolerance chosen here has no
     // stable pixel-level meaning after the transform.
@@ -119,7 +119,7 @@ void RRect::setRectXY(const Rect& rect, float radiusX, float radiusY) {
     radiusX *= scale;
     radiusY *= scale;
   }
-  auto radius = Point{radiusX, radiusY};
+  const auto radius = Point{radiusX, radiusY};
   _radii = {radius, radius, radius, radius};
   if (radiusX <= 0 || radiusY <= 0) {
     _type = Type::Rect;
@@ -147,7 +147,7 @@ void RRect::setRectRadii(const Rect& rect, const std::array<Point, 4>& radii) {
 
 void RRect::setOval(const Rect& oval) {
   _rect = oval.makeSorted();
-  auto radius = Point{_rect.width() / 2, _rect.height() / 2};
+  const auto radius = Point{_rect.width() / 2, _rect.height() / 2};
   _radii = {radius, radius, radius, radius};
   _type = Type::Oval;
 }

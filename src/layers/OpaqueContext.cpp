@@ -303,15 +303,15 @@ void OpaqueContext::flushPendingContour(const Contour& contour, const Matrix& ma
     if (pendingContour.type == Contour::Type::Rect) {
       mergeContourBound(globalBounds);
     } else if (pendingContour.type == Contour::Type::RRect) {
-      // Use the maximum corner radius for inset to ensure the inscribed rectangle
-      // is fully inside all corner arcs.
-      auto maxRadiusX = pendingContour.rRect.radii()[0].x;
-      auto maxRadiusY = pendingContour.rRect.radii()[0].y;
-      for (size_t i = 1; i < 4; ++i) {
-        maxRadiusX = std::max(maxRadiusX, pendingContour.rRect.radii()[i].x);
-        maxRadiusY = std::max(maxRadiusY, pendingContour.rRect.radii()[i].y);
-      }
-      localBounds.inset(maxRadiusX, maxRadiusY);
+      // Use per-edge max of adjacent corner radii so the inscribed rectangle stays fully inside
+      // all corner arcs on each side while producing a tighter inset than a single global max.
+      const auto& radii = pendingContour.rRect.radii();
+      const auto topY = std::max(radii[0].y, radii[1].y);
+      const auto bottomY = std::max(radii[2].y, radii[3].y);
+      const auto leftX = std::max(radii[0].x, radii[3].x);
+      const auto rightX = std::max(radii[1].x, radii[2].x);
+      localBounds.setLTRB(localBounds.left + leftX, localBounds.top + topY,
+                          localBounds.right - rightX, localBounds.bottom - bottomY);
       if (localBounds.isSorted()) {
         globalBounds = GetGlobalBounds(pendingMatrix, pendingClip, localBounds);
         if (hasAAClip) {

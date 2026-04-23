@@ -82,8 +82,9 @@ class RRect {
   void setRectXY(const Rect& rect, float radiusX, float radiusY);
 
   /**
-   * Sets to rounded rectangle with per-corner radii. The radii are scaled down proportionally if
-   * adjacent corners overlap along any edge.
+   * Sets to rounded rectangle with per-corner radii. Any radius component that is negative is
+   * first clamped to zero; the remaining radii are then scaled down proportionally if adjacent
+   * corners overlap along any edge.
    * @param rect  bounds of rounded rectangle
    * @param radii  per-corner radii in the order [top-left, top-right, bottom-right, bottom-left]
    */

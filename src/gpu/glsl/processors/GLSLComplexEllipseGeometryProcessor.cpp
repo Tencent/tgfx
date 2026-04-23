@@ -104,8 +104,8 @@ void GLSLComplexEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   }
   fragBuilder->codeAppend("  float test = dot(safeOffset, safeOffset) - 1.0;");
   fragBuilder->codeAppendf("  vec2 grad = 2.0*safeOffset*%s.xy;", ellipseRadii.fsIn().c_str());
-  fragBuilder->codeAppend("  float grad_dot = max(dot(grad, grad), 1.1755e-38);");
-  fragBuilder->codeAppend("  float invlen = inversesqrt(grad_dot);");
+  fragBuilder->codeAppend("  float gradDot = max(dot(grad, grad), 1.1755e-38);");
+  fragBuilder->codeAppend("  float invlen = inversesqrt(gradDot);");
   fragBuilder->codeAppend("  outerAlpha = clamp(0.5-test*invlen, 0.0, 1.0);");
   fragBuilder->codeAppend("} else if (hasYCurve) {");
   // Horizontal edge region (top/bottom): use vertical edge distance

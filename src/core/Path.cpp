@@ -178,10 +178,10 @@ bool Path::isRRect(RRect* rRect) const {
   }
   if (rRect) {
     const auto& skRect = skRRect.rect();
-    auto rect = Rect::MakeLTRB(skRect.fLeft, skRect.fTop, skRect.fRight, skRect.fBottom);
+    const auto rect = Rect::MakeLTRB(skRect.fLeft, skRect.fTop, skRect.fRight, skRect.fBottom);
     std::array<Point, 4> cornerRadii = {};
     for (size_t i = 0; i < 4; ++i) {
-      auto r = skRRect.radii(static_cast<SkRRect::Corner>(i));
+      const auto r = skRRect.radii(static_cast<SkRRect::Corner>(i));
       cornerRadii[i] = {r.fX, r.fY};
     }
     rRect->setRectRadii(rect, cornerRadii);

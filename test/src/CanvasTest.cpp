@@ -1908,7 +1908,7 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
   task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   auto* complexOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
   EXPECT_EQ(complexOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(complexOp->_isComplex);
+  EXPECT_TRUE(complexOp->isComplex);
   EXPECT_EQ(complexOp->rectCount, 1u);
 
   context->flushAndSubmit();
@@ -2006,7 +2006,7 @@ TGFX_TEST(CanvasTest, NonAARRectOpStroke) {
   auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   auto* complexOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
   EXPECT_EQ(complexOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(complexOp->_isComplex);
+  EXPECT_TRUE(complexOp->isComplex);
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpStroke"));
 }
@@ -2222,7 +2222,7 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
   EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(rrectOp->_isComplex);
+  EXPECT_TRUE(rrectOp->isComplex);
 
   // Batching boundary: Simple and Complex RRects cannot batch into the same Op because they use
   // different GeometryProcessors with different vertex layouts. Draw the probe RRect outside the
@@ -2233,7 +2233,7 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   surface->renderContext->flush();
   task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   auto* simpleOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_FALSE(simpleOp->_isComplex);
+  EXPECT_FALSE(simpleOp->isComplex);
   EXPECT_NE(simpleOp, rrectOp);
 
   // Case 2: Bail-out condition — halfStroke > radius at TL corner.
@@ -2299,7 +2299,7 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
   EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(rrectOp->_isComplex);
+  EXPECT_TRUE(rrectOp->isComplex);
 
   // Case 6: Same Complex stroked RRect as Case 5, with non-uniform scale (0.9, 0.8) + 15° rotation.
   // getAxisScales() extracts scale independently of rotation, so rotation does not
@@ -2319,7 +2319,7 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
   EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(rrectOp->_isComplex);
+  EXPECT_TRUE(rrectOp->isComplex);
 
   // Case 7: Same Complex stroked RRect as Case 6, rotated 90 degrees.
   // Verifies that after transposeRadii removal, 90-degree rotated RRects still render correctly.
@@ -2337,7 +2337,7 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
   EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(rrectOp->_isComplex);
+  EXPECT_TRUE(rrectOp->isComplex);
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AARRectOp"));
 }
