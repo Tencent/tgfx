@@ -55,7 +55,7 @@ void ImagePattern::setScaleMode(ScaleMode mode) {
 std::shared_ptr<Shader> ImagePattern::getShader() const {
   auto shader = Shader::MakeImageShader(_image, _tileModeX, _tileModeY, _sampling);
   // _matrix only applies when the pattern is placed in the layer's coordinate space. In any
-  // ScaleMode that fits the image into shape bounds, the fit matrix supplied by
+  // ScaleMode that fits the image into geometry bounds, the fit matrix supplied by
   // getRelativeMatrix() fully determines placement and _matrix must not be composed here.
   if (shader == nullptr || _scaleMode != ScaleMode::None || _matrix.isIdentity()) {
     return shader;

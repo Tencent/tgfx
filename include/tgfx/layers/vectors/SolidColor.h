@@ -24,7 +24,7 @@
 
 namespace tgfx {
 /**
- * SolidColor represents a solid color that can be drawn on a shape layer.
+ * SolidColor represents a solid color that can be drawn on a vector layer.
  */
 class SolidColor : public ColorSource {
  public:

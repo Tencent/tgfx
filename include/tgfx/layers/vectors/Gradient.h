@@ -32,9 +32,9 @@ class ConicGradient;
 class DiamondGradient;
 
 /**
- * The base class for all gradient types that can be drawn on a shape layer. By default, gradient
+ * The base class for all gradient types that can be drawn on a vector layer. By default, gradient
  * parameters are interpreted in a normalized 0-1 space (FillSpace::Relative) that maps to each
- * shape's bounding box. Call setFillSpace(FillSpace::Absolute) to interpret them in the layer's
+ * geometry's bounding box. Call setFillSpace(FillSpace::Absolute) to interpret them in the layer's
  * coordinate space instead.
  */
 class Gradient : public ColorSource {
@@ -155,8 +155,8 @@ class Gradient : public ColorSource {
   /**
    * Sets the coordinate space used to interpret this gradient's parameters. When set to
    * FillSpace::Relative, the gradient parameters are interpreted in a (0, 0)-(1, 1) coordinate
-   * space that maps to each shape's bounding box. When set to FillSpace::Absolute, the parameters
-   * are in the layer's coordinate space.
+   * space that maps to each geometry's bounding box. When set to FillSpace::Absolute, the
+   * parameters are in the layer's coordinate space.
    */
   void setFillSpace(FillSpace space);
 
@@ -188,7 +188,7 @@ class Gradient : public ColorSource {
 };
 
 /**
- * Represents a linear gradient that can be drawn on a shape layer.
+ * Represents a linear gradient that can be drawn on a vector layer.
  */
 class LinearGradient : public Gradient {
  public:
@@ -199,7 +199,7 @@ class LinearGradient : public Gradient {
   /**
    * Returns the start point of the gradient. The start point corresponds to the first stop of the
    * gradient. It is interpreted in the coordinate space selected by fillSpace(): a normalized 0-1
-   * space relative to each shape's bounding box when FillSpace::Relative (the default), or the
+   * space relative to each geometry's bounding box when FillSpace::Relative (the default), or the
    * layer's coordinate space when FillSpace::Absolute.
    */
   const Point& startPoint() const {
@@ -243,7 +243,7 @@ class LinearGradient : public Gradient {
 };
 
 /**
- * Represents a radial gradient that can be drawn on a shape layer.
+ * Represents a radial gradient that can be drawn on a vector layer.
  */
 class RadialGradient : public Gradient {
  public:
@@ -254,7 +254,7 @@ class RadialGradient : public Gradient {
   /**
    * Returns the center of the circle for this gradient. The center point corresponds to the first
    * stop of the gradient. It is interpreted in the coordinate space selected by fillSpace(): a
-   * normalized 0-1 space relative to each shape's bounding box when FillSpace::Relative (the
+   * normalized 0-1 space relative to each geometry's bounding box when FillSpace::Relative (the
    * default), or the layer's coordinate space when FillSpace::Absolute.
    */
   const Point& center() const {
@@ -297,7 +297,7 @@ class RadialGradient : public Gradient {
 };
 
 /**
- * Represents a conic gradient that can be drawn on a shape layer.
+ * Represents a conic gradient that can be drawn on a vector layer.
  */
 class ConicGradient : public Gradient {
  public:
@@ -307,7 +307,7 @@ class ConicGradient : public Gradient {
 
   /**
    * Returns the center of the circle for this gradient. It is interpreted in the coordinate space
-   * selected by fillSpace(): a normalized 0-1 space relative to each shape's bounding box when
+   * selected by fillSpace(): a normalized 0-1 space relative to each geometry's bounding box when
    * FillSpace::Relative (the default), or the layer's coordinate space when FillSpace::Absolute.
    */
   const Point& center() const {
@@ -363,7 +363,7 @@ class ConicGradient : public Gradient {
 };
 
 /**
- * Represents a diamond gradient that can be drawn on a shape layer.
+ * Represents a diamond gradient that can be drawn on a vector layer.
  */
 class DiamondGradient : public Gradient {
  public:
@@ -374,7 +374,7 @@ class DiamondGradient : public Gradient {
   /**
    * Returns the center of the diamond for this gradient. The center point corresponds to the first
    * stop of the gradient. It is interpreted in the coordinate space selected by fillSpace(): a
-   * normalized 0-1 space relative to each shape's bounding box when FillSpace::Relative (the
+   * normalized 0-1 space relative to each geometry's bounding box when FillSpace::Relative (the
    * default), or the layer's coordinate space when FillSpace::Absolute.
    */
   const Point& center() const {

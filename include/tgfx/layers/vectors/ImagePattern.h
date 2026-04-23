@@ -24,11 +24,12 @@
 
 namespace tgfx {
 /**
- * ImagePattern describes a pattern based on an image, which can be drawn on a shape layer. The
+ * ImagePattern describes a pattern based on an image, which can be drawn on a vector layer. The
  * image can be repeated in both the x and y directions, and you can specify the sampling options.
- * By default, ImagePattern fits the image into each shape's bounding box according to scaleMode()
- * (ScaleMode::LetterBox by default). Set the scale mode to ScaleMode::None to place the image in
- * the layer's coordinate space using the pattern's matrix instead, without per-shape fitting.
+ * By default, ImagePattern fits the image into each geometry's bounding box according to
+ * scaleMode() (ScaleMode::LetterBox by default). Set the scale mode to ScaleMode::None to place
+ * the image in the layer's coordinate space using the pattern's matrix instead, without
+ * per-geometry fitting.
  */
 class ImagePattern : public ColorSource {
  public:
@@ -63,7 +64,7 @@ class ImagePattern : public ColorSource {
 
   /**
    * Returns the transformation matrix applied to the image pattern. Only takes effect when
-   * scaleMode() is ScaleMode::None; in other scale modes the image is fitted to each shape's
+   * scaleMode() is ScaleMode::None; in other scale modes the image is fitted to each geometry's
    * bounding box and the matrix is ignored.
    */
   const Matrix& matrix() const {
@@ -72,23 +73,23 @@ class ImagePattern : public ColorSource {
 
   /**
    * Sets the transformation matrix applied to the image pattern. Only takes effect when
-   * scaleMode() is ScaleMode::None; in other scale modes the image is fitted to each shape's
+   * scaleMode() is ScaleMode::None; in other scale modes the image is fitted to each geometry's
    * bounding box and the matrix is ignored.
    */
   void setMatrix(const Matrix& matrix);
 
   /**
-   * Returns the rule used to fit the image into each shape's bounding box. The default value is
+   * Returns the rule used to fit the image into each geometry's bounding box. The default value is
    * ScaleMode::LetterBox. When set to ScaleMode::None, the image is placed in the layer's
-   * coordinate space using the pattern's matrix, without per-shape fitting.
+   * coordinate space using the pattern's matrix, without per-geometry fitting.
    */
   ScaleMode scaleMode() const {
     return _scaleMode;
   }
 
   /**
-   * Sets the rule used to fit the image into each shape's bounding box. Setting this to
-   * ScaleMode::None disables per-shape fitting and places the image in the layer's coordinate
+   * Sets the rule used to fit the image into each geometry's bounding box. Setting this to
+   * ScaleMode::None disables per-geometry fitting and places the image in the layer's coordinate
    * space using the pattern's matrix.
    */
   void setScaleMode(ScaleMode mode);

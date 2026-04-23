@@ -21,14 +21,14 @@
 namespace tgfx {
 
 /**
- * ScaleMode specifies how an ImagePattern image is fitted into each shape's bounding box.
+ * ScaleMode specifies how an ImagePattern image is fitted into each geometry's bounding box.
  */
 enum class ScaleMode {
   /**
-   * The image is not fitted to the shape's bounding box. It is placed in the layer's coordinate
+   * The image is not fitted to the geometry's bounding box. It is placed in the layer's coordinate
    * space using the pattern's matrix and tiled according to the pattern's tile modes. Use this
-   * mode when multiple shapes should share a single continuous image layout rather than each
-   * shape receiving its own fitted copy.
+   * mode when multiple geometries should share a single continuous image layout rather than each
+   * one receiving its own fitted copy.
    */
   None,
 

@@ -25,7 +25,7 @@
 
 namespace tgfx {
 /**
- * ColorSource specifies the source color(s) for what is being drawn in a shape layer. There are
+ * ColorSource specifies the source color(s) for what is being drawn in a vector layer. There are
  * three types of ColorSource: SolidColor, Gradient, and ImagePattern. Note: All ColorSource objects
  * are not thread-safe and should only be accessed from a single thread.
  */
@@ -38,7 +38,7 @@ class ColorSource : public LayerProperty {
 
   /**
    * Returns true when this ColorSource interprets its parameters in a normalized 0-1 coordinate
-   * space that maps to each shape's bounding box, rather than absolute layer coordinates.
+   * space that maps to each geometry's bounding box, rather than absolute layer coordinates.
    * Subclasses that support such a normalized space should override this to return true when that
    * mode is active. The default returns false, meaning parameters are interpreted in absolute
    * layer space.
@@ -50,7 +50,7 @@ class ColorSource : public LayerProperty {
   /**
    * Returns the transformation matrix that maps the ColorSource's definition space to the given
    * bounds. The returned matrix is intended to be applied to the shader returned by getShader().
-   * @param bounds The bounding box of the target shape.
+   * @param bounds The bounding box of the target geometry.
    */
   virtual Matrix getRelativeMatrix(const Rect&) const {
     return Matrix::I();
