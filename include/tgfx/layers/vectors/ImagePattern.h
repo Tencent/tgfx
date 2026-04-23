@@ -62,14 +62,18 @@ class ImagePattern : public ColorSource {
   }
 
   /**
-   * Returns the transformation matrix applied to the image pattern.
+   * Returns the transformation matrix applied to the image pattern. Only takes effect when
+   * scaleMode() is ScaleMode::None; in other scale modes the image is fitted to each shape's
+   * bounding box and the matrix is ignored.
    */
   const Matrix& matrix() const {
     return _matrix;
   }
 
   /**
-   * Sets the transformation matrix applied to the image pattern.
+   * Sets the transformation matrix applied to the image pattern. Only takes effect when
+   * scaleMode() is ScaleMode::None; in other scale modes the image is fitted to each shape's
+   * bounding box and the matrix is ignored.
    */
   void setMatrix(const Matrix& matrix);
 

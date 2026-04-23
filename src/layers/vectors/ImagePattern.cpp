@@ -54,7 +54,10 @@ void ImagePattern::setScaleMode(ScaleMode mode) {
 
 std::shared_ptr<Shader> ImagePattern::getShader() const {
   auto shader = Shader::MakeImageShader(_image, _tileModeX, _tileModeY, _sampling);
-  if (shader == nullptr || _matrix.isIdentity()) {
+  // _matrix only applies when the pattern is placed in the layer's coordinate space. In any
+  // ScaleMode that fits the image into shape bounds, the fit matrix supplied by
+  // getRelativeMatrix() fully determines placement and _matrix must not be composed here.
+  if (shader == nullptr || _scaleMode != ScaleMode::None || _matrix.isIdentity()) {
     return shader;
   }
   return shader->makeWithMatrix(_matrix);
@@ -70,36 +73,26 @@ Matrix ImagePattern::getRelativeMatrix(const Rect& bounds) const {
   if (imgW <= 0 || imgH <= 0) {
     return Matrix::I();
   }
-  // ScaleMode operates on the image rect after _matrix has been applied, because the shader
-  // returned by getShader() already carries _matrix. Use the axis-aligned bounding box of the
-  // transformed image as the source rect for fitting into bounds.
-  auto imageRect = Rect::MakeWH(imgW, imgH);
-  _matrix.mapRect(&imageRect);
-  auto srcW = imageRect.width();
-  auto srcH = imageRect.height();
-  if (srcW <= 0 || srcH <= 0) {
-    return Matrix::I();
-  }
-  float sx = bounds.width() / srcW;
-  float sy = bounds.height() / srcH;
+  float sx = bounds.width() / imgW;
+  float sy = bounds.height() / imgH;
   switch (_scaleMode) {
     case ScaleMode::Stretch: {
       auto matrix = Matrix::MakeScale(sx, sy);
-      matrix.postTranslate(bounds.left - imageRect.left * sx, bounds.top - imageRect.top * sy);
+      matrix.postTranslate(bounds.left, bounds.top);
       return matrix;
     }
     case ScaleMode::LetterBox: {
       float scale = std::min(sx, sy);
-      float tx = bounds.left + (bounds.width() - srcW * scale) * 0.5f - imageRect.left * scale;
-      float ty = bounds.top + (bounds.height() - srcH * scale) * 0.5f - imageRect.top * scale;
+      float tx = bounds.left + (bounds.width() - imgW * scale) * 0.5f;
+      float ty = bounds.top + (bounds.height() - imgH * scale) * 0.5f;
       auto matrix = Matrix::MakeScale(scale);
       matrix.postTranslate(tx, ty);
       return matrix;
     }
     case ScaleMode::Zoom: {
       float scale = std::max(sx, sy);
-      float tx = bounds.left + (bounds.width() - srcW * scale) * 0.5f - imageRect.left * scale;
-      float ty = bounds.top + (bounds.height() - srcH * scale) * 0.5f - imageRect.top * scale;
+      float tx = bounds.left + (bounds.width() - imgW * scale) * 0.5f;
+      float ty = bounds.top + (bounds.height() - imgH * scale) * 0.5f;
       auto matrix = Matrix::MakeScale(scale);
       matrix.postTranslate(tx, ty);
       return matrix;

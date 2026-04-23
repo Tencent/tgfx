@@ -2851,16 +2851,15 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
 
 /**
  * Test ImagePattern ScaleMode values (Stretch, LetterBox, Zoom, None) with visible borders and
- * labels. Row 1 applies each ScaleMode to the original image. Row 2 first applies a user matrix
- * (rotate 30 degrees and scale 0.5x) to the image, then applies each ScaleMode. Row 2 verifies
- * that ScaleMode fits the transformed image's bounding box into the shape bounds, not the
- * original image dimensions.
+ * labels. Each ScaleMode is rendered in its own rectangle. The trailing None rectangle also
+ * carries a user matrix (rotate 30 degrees and scale 0.5x) to demonstrate that the pattern's
+ * matrix only takes effect under ScaleMode::None.
  */
 TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 720, 490);
+  auto surface = Surface::Make(context, 720, 230);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -2889,26 +2888,36 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
   const float gap = 16.0f;
   const float totalWidth = rectWidth * 4.0f + gap * 3.0f;
   const float startX = (720.0f - totalWidth) * 0.5f;
-  const float row1CenterY = 110.0f;
-  const float row1LabelY = 205.0f;
-  const float row2CenterY = 340.0f;
-  const float row2LabelY = 435.0f;
+  const float rowCenterY = 110.0f;
+  const float labelY = 205.0f;
   const Color borderColor = Color::FromRGBA(96, 96, 96, 255);
   const float borderWidth = 1.0f;
 
-  // Row 1: original image with each ScaleMode.
+  auto imageCenterX = static_cast<float>(image->width()) * 0.5f;
+  auto imageCenterY = static_cast<float>(image->height()) * 0.5f;
+  // User matrix used only for the None cell: rotate 30 degrees around the image center and scale
+  // down by 0.5x, then anchor the transformed image to the None cell's center.
+  Matrix noneMatrix = Matrix::MakeTrans(-imageCenterX, -imageCenterY);
+  noneMatrix.postScale(0.5f, 0.5f);
+  noneMatrix.postRotate(30.0f);
+  const float noneCellCenterX = startX + rectWidth * 3.5f + gap * 3.0f;
+  noneMatrix.postTranslate(noneCellCenterX, rowCenterY);
+
   std::vector<std::shared_ptr<VectorElement>> contents;
   for (size_t i = 0; i < 4; ++i) {
     const float centerX = startX + rectWidth * 0.5f + (rectWidth + gap) * static_cast<float>(i);
 
     auto rectGroup = std::make_shared<VectorGroup>();
     auto rect = std::make_shared<Rectangle>();
-    rect->setPosition({centerX, row1CenterY});
+    rect->setPosition({centerX, rowCenterY});
     rect->setSize({rectWidth, rectHeight});
     auto pattern = ImagePattern::Make(image);
     EXPECT_EQ(pattern->scaleMode(), ScaleMode::LetterBox);
     pattern->setScaleMode(entries[i].mode);
     EXPECT_EQ(pattern->scaleMode(), entries[i].mode);
+    if (entries[i].mode == ScaleMode::None) {
+      pattern->setMatrix(noneMatrix);
+    }
     auto border = MakeStrokeStyle(borderColor, borderWidth);
     rectGroup->setElements({rect, FillStyle::Make(pattern), border});
     contents.push_back(rectGroup);
@@ -2917,38 +2926,7 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
     auto blob = TextBlob::MakeFrom(entries[i].label, labelFont);
     auto text = Text::Make(blob);
     auto labelBounds = blob->getTightBounds();
-    text->setPosition({centerX - labelBounds.width() * 0.5f - labelBounds.left, row1LabelY});
-    labelGroup->setElements({text, MakeFillStyle(Color::Black())});
-    contents.push_back(labelGroup);
-  }
-
-  // Row 2: rotate and scale the image first, then apply each ScaleMode. The ScaleMode must fit
-  // the rotated-and-scaled image's bounding box into the rect, so the image appears centered
-  // regardless of the user matrix.
-  auto imageCenterX = static_cast<float>(image->width()) * 0.5f;
-  auto imageCenterY = static_cast<float>(image->height()) * 0.5f;
-  Matrix userMatrix = Matrix::MakeTrans(-imageCenterX, -imageCenterY);
-  userMatrix.postScale(0.5f, 0.5f);
-  userMatrix.postRotate(30.0f);
-  for (size_t i = 0; i < 4; ++i) {
-    const float centerX = startX + rectWidth * 0.5f + (rectWidth + gap) * static_cast<float>(i);
-
-    auto rectGroup = std::make_shared<VectorGroup>();
-    auto rect = std::make_shared<Rectangle>();
-    rect->setPosition({centerX, row2CenterY});
-    rect->setSize({rectWidth, rectHeight});
-    auto pattern = ImagePattern::Make(image);
-    pattern->setMatrix(userMatrix);
-    pattern->setScaleMode(entries[i].mode);
-    auto border = MakeStrokeStyle(borderColor, borderWidth);
-    rectGroup->setElements({rect, FillStyle::Make(pattern), border});
-    contents.push_back(rectGroup);
-
-    auto labelGroup = std::make_shared<VectorGroup>();
-    auto blob = TextBlob::MakeFrom(entries[i].label, labelFont);
-    auto text = Text::Make(blob);
-    auto labelBounds = blob->getTightBounds();
-    text->setPosition({centerX - labelBounds.width() * 0.5f - labelBounds.left, row2LabelY});
+    text->setPosition({centerX - labelBounds.width() * 0.5f - labelBounds.left, labelY});
     labelGroup->setElements({text, MakeFillStyle(Color::Black())});
     contents.push_back(labelGroup);
   }
