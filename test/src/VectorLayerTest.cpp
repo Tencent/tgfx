@@ -2893,9 +2893,9 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
   const Color borderColor = Color::FromRGBA(96, 96, 96, 255);
   const float borderWidth = 1.0f;
 
-  // Row 1: original image with each ScaleMode. Each cell is an independent VectorLayer
-  // translated to the cell's top-left corner with the rect centered inside the layer's local
-  // space.
+  // Row 1: image with each ScaleMode and no user matrix, showing how the default fit places the
+  // original image into the rect. Each cell is an independent VectorLayer whose origin is aligned
+  // with the cell's top-left corner.
   auto row1LabelLayer = VectorLayer::Make();
   std::vector<std::shared_ptr<VectorElement>> row1Labels;
   for (size_t i = 0; i < 4; ++i) {
@@ -2928,11 +2928,10 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
   row1LabelLayer->setContents(row1Labels);
   displayList->root()->addChild(row1LabelLayer);
 
-  // Row 2: scale the image so its longest edge equals 1.5x the rect's longest edge, then rotate
-  // it around the image-local origin. Each cell is an independent VectorLayer translated to the
-  // cell's top-left corner with the rect centered inside the layer's local space, so the same
-  // user matrix produces identical local-space geometry for every cell and only the ScaleMode
-  // differs.
+  // Row 2: apply the same user matrix (scale so the longest edge equals 1.5x the rect's longest
+  // edge, then rotate 30 degrees around the image-local origin) to every cell, so only the
+  // ScaleMode's fit behavior varies across the row. Each cell is an independent VectorLayer
+  // whose origin is aligned with the cell's top-left corner.
   float imageMaxEdge =
       std::max(static_cast<float>(image->width()), static_cast<float>(image->height()));
   float rectMaxEdge = std::max(rectWidth, rectHeight);

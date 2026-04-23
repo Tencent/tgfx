@@ -153,8 +153,8 @@ class StrokePainter : public Painter {
     Matrix finalOuter = outerMatrix;
     shape = prepareShape(std::move(shape), innerMatrix, &finalOuter);
     auto fitsToGeometry = colorSource->fitsToGeometry();
-    // Capture the pre-stroke fill bounds in the final outer space so every stroke-align branch
-    // evaluates the fit shader over the same region as a fill would.
+    // Capture the pre-stroke geometry bounds in the final outer space so every stroke-align
+    // branch evaluates the fit shader over the same region as a fill would.
     auto geometryBounds =
         fitsToGeometry ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
 
@@ -232,8 +232,8 @@ class StrokePainter : public Painter {
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
     auto baseShader = shader;
     auto fitsToGeometry = colorSource->fitsToGeometry();
-    // Capture the pre-stroke text-shape bounds in the final outer space so every stroke-align
-    // branch evaluates the fit shader over the same region.
+    // Capture the pre-stroke text geometry bounds in the final outer space so every stroke-align
+    // branch evaluates the fit shader over the same region as a fill would.
     auto geometryBounds =
         fitsToGeometry ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
 

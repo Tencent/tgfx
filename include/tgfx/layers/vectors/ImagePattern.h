@@ -26,9 +26,11 @@ namespace tgfx {
 /**
  * ImagePattern describes a pattern based on an image, which can be drawn on a vector layer. The
  * image can be repeated in both the x and y directions, and you can specify the sampling options.
- * By default, ImagePattern fits the image into each geometry's bounding box according to
- * scaleMode() (ScaleMode::LetterBox by default). Set the scale mode to ScaleMode::None to skip
- * per-geometry fitting and place the image directly in the layer's coordinate space.
+ * The transformation matrix set via setMatrix() is applied to the image's local coordinate space
+ * first. When scaleMode() is not ScaleMode::None, the transformed image is then fitted into each
+ * geometry's bounding box according to the scale mode (ScaleMode::LetterBox by default). When
+ * scaleMode() is ScaleMode::None, the transformed image is placed directly in the layer's
+ * coordinate space without per-geometry fitting.
  */
 class ImagePattern : public ColorSource {
  public:
@@ -76,17 +78,17 @@ class ImagePattern : public ColorSource {
   void setMatrix(const Matrix& matrix);
 
   /**
-   * Returns the rule used to fit the image into each geometry's bounding box. The default value
-   * is ScaleMode::LetterBox. When set to ScaleMode::None, the image is placed directly in the
-   * layer's coordinate space without per-geometry fitting.
+   * Returns the rule used to fit the transformed image into each geometry's bounding box. The
+   * default value is ScaleMode::LetterBox. When set to ScaleMode::None, the image is placed
+   * directly in the layer's coordinate space without per-geometry fitting.
    */
   ScaleMode scaleMode() const {
     return _scaleMode;
   }
 
   /**
-   * Sets the rule used to fit the image into each geometry's bounding box. Setting this to
-   * ScaleMode::None disables per-geometry fitting.
+   * Sets the rule used to fit the transformed image into each geometry's bounding box. Setting
+   * this to ScaleMode::None disables per-geometry fitting.
    */
   void setScaleMode(ScaleMode mode);
 
