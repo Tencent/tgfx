@@ -37,25 +37,26 @@ ImagePattern::ImagePattern(std::shared_ptr<Image> image, TileMode tileModeX, Til
 }
 
 void ImagePattern::setMatrix(const Matrix& matrix) {
-  if (_matrix == matrix && _scaleMode == ScaleMode::None) {
+  if (_matrix == matrix) {
     return;
   }
   _matrix = matrix;
-  _scaleMode = ScaleMode::None;
   invalidateContent();
 }
 
 void ImagePattern::setScaleMode(ScaleMode mode) {
-  if (_scaleMode == mode && _matrix.isIdentity()) {
+  if (_scaleMode == mode) {
     return;
   }
   _scaleMode = mode;
-  _matrix = Matrix::I();
   invalidateContent();
 }
 
 std::shared_ptr<Shader> ImagePattern::getShader() const {
   auto shader = Shader::MakeImageShader(_image, _tileModeX, _tileModeY, _sampling);
+  // _matrix only applies when the pattern is placed in the layer's coordinate space. In any
+  // ScaleMode that fits the image into geometry bounds, the fit matrix supplied by
+  // getFitMatrix() fully determines placement and _matrix must not be composed here.
   if (shader == nullptr || _scaleMode != ScaleMode::None || _matrix.isIdentity()) {
     return shader;
   }

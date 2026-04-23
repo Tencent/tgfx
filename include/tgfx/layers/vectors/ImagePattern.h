@@ -63,33 +63,34 @@ class ImagePattern : public ColorSource {
   }
 
   /**
-   * Returns the transformation matrix applied to the image pattern. The matrix is only meaningful
-   * when scaleMode() is ScaleMode::None.
+   * Returns the transformation matrix applied to the image pattern. Only takes effect when
+   * scaleMode() is ScaleMode::None; in other scale modes the image is fitted to each geometry's
+   * bounding box and the matrix is ignored.
    */
   const Matrix& matrix() const {
     return _matrix;
   }
 
   /**
-   * Sets the transformation matrix applied to the image pattern and switches scaleMode() to
-   * ScaleMode::None so the matrix takes effect immediately. Call setScaleMode() afterwards to
-   * discard the matrix and return to per-geometry fitting.
+   * Sets the transformation matrix applied to the image pattern. Only takes effect when
+   * scaleMode() is ScaleMode::None; in other scale modes the image is fitted to each geometry's
+   * bounding box and the matrix is ignored.
    */
   void setMatrix(const Matrix& matrix);
 
   /**
    * Returns the rule used to fit the image into each geometry's bounding box. The default value is
-   * ScaleMode::LetterBox. When ScaleMode::None, the image is placed in the layer's coordinate
-   * space using matrix(), without per-geometry fitting.
+   * ScaleMode::LetterBox. When set to ScaleMode::None, the image is placed in the layer's
+   * coordinate space using the pattern's matrix, without per-geometry fitting.
    */
   ScaleMode scaleMode() const {
     return _scaleMode;
   }
 
   /**
-   * Sets the rule used to fit the image into each geometry's bounding box and resets matrix() to
-   * the identity. Setting this to ScaleMode::None disables per-geometry fitting; call setMatrix()
-   * afterwards to place the image in the layer's coordinate space.
+   * Sets the rule used to fit the image into each geometry's bounding box. Setting this to
+   * ScaleMode::None disables per-geometry fitting and places the image in the layer's coordinate
+   * space using the pattern's matrix.
    */
   void setScaleMode(ScaleMode mode);
 
