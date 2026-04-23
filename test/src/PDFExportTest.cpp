@@ -700,10 +700,6 @@ TGFX_TEST(PDFExportTest, LayerConicGradientRotated) {
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
-  // Reproduces the web-side rendering artifact: a conic gradient drawn on a canvas that has
-  // been rotated 90 degrees with non-uniform scaling. Before the fix, the Pattern Matrix
-  // contained the rotation, causing Gouraud triangle band seams to become diagonal in page
-  // space, which produced white-line artifacts in Chrome's PDF renderer.
   auto shapeLayer = ShapeLayer::Make();
   Rect rect = Rect::MakeWH(2501.f, 1860.f);
   Path path;
@@ -722,7 +718,6 @@ TGFX_TEST(PDFExportTest, LayerConicGradientRotated) {
   auto PDFStream = MemoryWriteStream::Make();
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   auto canvas = document->beginPage(1860.f, 2501.f);
-  // Apply 90-degree rotation with non-uniform scaling, matching the web-side transform.
   canvas->translate(1860.f, 0.f);
   canvas->rotate(90.f);
   layer->draw(canvas);
