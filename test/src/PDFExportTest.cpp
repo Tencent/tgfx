@@ -721,10 +721,8 @@ TGFX_TEST(PDFExportTest, LayerConicGradientRotated) {
 
   auto PDFStream = MemoryWriteStream::Make();
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  // auto canvas = document->beginPage(5000.f, 5000.f);
   auto canvas = document->beginPage(1860.f, 2501.f);
   // Apply 90-degree rotation with non-uniform scaling, matching the web-side transform.
-  // canvas->translate(2500.f, 2500.f);
   canvas->translate(1860.f, 0.f);
   canvas->rotate(90.f);
   layer->draw(canvas);

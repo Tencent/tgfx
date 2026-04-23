@@ -622,11 +622,13 @@ PDFIndirectReference MakePSFunction(std::unique_ptr<Stream> psCode,
 // Conic Gradient Triangle Mesh (ShadingType 4) Implementation
 ///////////////////////////////////////////////////////////////////////////
 
-// Each angular segment spans ~5.55 degrees (same as Figma). More segments improve arc accuracy
+// Each angular segment spans ~5.54 degrees (same as Figma). More segments improve arc accuracy
 // but increase file size. 65 segments cover the full 360° range.
 constexpr int ConicSegmentCount = 65;
-// Number of radial steps per segment for the rectangle strip. More steps reduce the visible
-// "staircase" on the arc edges but increase vertex count significantly.
+// Number of radial steps per segment for the rectangle strip. Fine subdivision is intentional:
+// fewer steps leave large triangles whose shared edges can produce sub-pixel white-line artifacts
+// in Chrome's Gouraud renderer, the same problem the rectangle strip was designed to fix.
+// The trade-off is file size: 65 segments × 500 steps × 2 vertices ≈ 65K vertices per gradient.
 constexpr int ConicRadialStepsPerSegment = 500;
 
 Color InterpolateColorAtT(float t, const std::vector<Color>& colors,
