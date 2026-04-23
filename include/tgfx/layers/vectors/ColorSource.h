@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/layers/LayerProperty.h"
 
@@ -33,6 +35,26 @@ class ColorSource : public LayerProperty {
    * Returns the shader that generates colors for drawing.
    */
   virtual std::shared_ptr<Shader> getShader() const = 0;
+
+  /**
+   * Returns true when this ColorSource interprets its parameters in a normalized 0-1 coordinate
+   * space that maps to each shape's bounding box, rather than absolute layer coordinates.
+   * Subclasses that support such a normalized space should override this to return true when that
+   * mode is active. The default returns false, meaning parameters are interpreted in absolute
+   * layer space.
+   */
+  virtual bool useRelativeSpace() const {
+    return false;
+  }
+
+  /**
+   * Returns the transformation matrix that maps the ColorSource's definition space to the given
+   * bounds. The returned matrix is intended to be applied to the shader returned by getShader().
+   * @param bounds The bounding box of the target shape.
+   */
+  virtual Matrix getRelativeMatrix(const Rect&) const {
+    return Matrix::I();
+  }
 
  protected:
   enum class Type { Gradient, ImagePattern, SolidColor };

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/MapDirection.h"
@@ -28,6 +29,7 @@
 #include "tgfx/gpu/RuntimeEffect.h"
 
 namespace tgfx {
+class Shader;
 class TextureProxy;
 enum class SrcRectConstraint;
 
@@ -120,6 +122,13 @@ class ImageFilter {
    */
   static std::shared_ptr<ImageFilter> Runtime(std::shared_ptr<RuntimeEffect> effect);
 
+  /**
+   * Creates a filter that blends a shader with the input image using the specified blend mode.
+   * The input image serves as the destination (dst), and the shader is evaluated per-pixel to
+   * produce the source (src). The output bounds are the same as the input image.
+   */
+  static std::shared_ptr<ImageFilter> Blend(BlendMode blendMode, std::shared_ptr<Shader> shader);
+
   virtual ~ImageFilter() = default;
 
   /**
@@ -132,7 +141,7 @@ class ImageFilter {
   Rect filterBounds(const Rect& rect, MapDirection mapDirection = MapDirection::Forward) const;
 
  protected:
-  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime };
+  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime, Blend };
 
   /**
    * Returns the type of this image filter.
@@ -180,6 +189,7 @@ class ImageFilter {
   friend class InnerShadowImageFilter;
   friend class ComposeImageFilter;
   friend class FilterImage;
+  friend class BlendImageFilter;
   friend class Types;
 };
 

@@ -72,6 +72,7 @@ class StrokePainter : public Painter {
   std::vector<Matrix> innerMatrices = {};
   StrokeAlign strokeAlign = StrokeAlign::Center;
   std::vector<std::shared_ptr<Shape>> originalShapes = {};
+  std::shared_ptr<ColorSource> colorSource = nullptr;
 
   std::unique_ptr<Painter> clone() const override {
     return std::make_unique<StrokePainter>(*this);
@@ -151,7 +152,10 @@ class StrokePainter : public Painter {
     }
     Matrix finalOuter = outerMatrix;
     shape = prepareShape(std::move(shape), innerMatrix, &finalOuter);
-    LayerPaint paint(shader, alpha, blendMode);
+    auto useRelative = colorSource->useRelativeSpace();
+    // Capture the pre-stroke fill bounds in the final outer space so every stroke-align branch
+    // evaluates the relative shader over the same region as a fill would.
+    auto relativeBounds = useRelative ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
 
     if (needsBooleanOp) {
       auto transformedOriginal = Shape::ApplyMatrix(originalShape, innerMatrix);
@@ -160,7 +164,18 @@ class StrokePainter : public Painter {
         return;
       }
       shape = Shape::ApplyMatrix(shape, finalOuter);
-    } else if (uniformScale) {
+      auto finalShader = shader;
+      if (useRelative) {
+        finalShader = shader->makeWithMatrix(colorSource->getRelativeMatrix(relativeBounds));
+      }
+      LayerPaint paint(finalShader, alpha, blendMode);
+      paint.placement = placement;
+      recorder->addShape(std::move(shape), paint);
+      return;
+    }
+
+    LayerPaint paint(shader, alpha, blendMode);
+    if (uniformScale) {
       shape = Shape::ApplyMatrix(shape, finalOuter);
       paint.style = PaintStyle::Stroke;
       paint.stroke = stroke;
@@ -172,6 +187,9 @@ class StrokePainter : public Painter {
       }
       shape = Shape::ApplyMatrix(shape, finalOuter);
     }
+    if (useRelative) {
+      paint.shader = shader->makeWithMatrix(colorSource->getRelativeMatrix(relativeBounds));
+    }
     paint.placement = placement;
     recorder->addShape(std::move(shape), paint);
   }
@@ -180,7 +198,12 @@ class StrokePainter : public Painter {
                               const Matrix& matrix, float scale) {
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style) * scale;
-    auto paints = MakeBlendPaints(shader, alpha, blendMode, run.style);
+    auto baseShader = shader;
+    if (colorSource->useRelativeSpace() && run.textBlob != nullptr) {
+      baseShader =
+          shader->makeWithMatrix(colorSource->getRelativeMatrix(run.textBlob->getBounds()));
+    }
+    auto paints = MakeBlendPaints(baseShader, alpha, blendMode, run.style);
 
     recorder->setMatrix(matrix);
     for (const auto& info : paints) {
@@ -207,7 +230,11 @@ class StrokePainter : public Painter {
     shape = prepareShape(std::move(shape), innerMatrix, &finalOuter);
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
-    auto paints = MakeBlendPaints(shader, alpha, blendMode, run.style);
+    auto baseShader = shader;
+    auto useRelative = colorSource->useRelativeSpace();
+    // Capture the pre-stroke text-shape bounds in the final outer space so every stroke-align
+    // branch evaluates the relative shader over the same region.
+    auto relativeBounds = useRelative ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
 
     std::shared_ptr<Shape> finalShape = nullptr;
     LayerPaint basePaint = {};
@@ -232,6 +259,11 @@ class StrokePainter : public Painter {
       }
       finalShape = Shape::ApplyMatrix(finalShape, finalOuter);
     }
+
+    if (useRelative) {
+      baseShader = shader->makeWithMatrix(colorSource->getRelativeMatrix(relativeBounds));
+    }
+    auto paints = MakeBlendPaints(baseShader, alpha, blendMode, run.style);
 
     for (const auto& info : paints) {
       if (info.shader == nullptr) {
@@ -370,6 +402,7 @@ void StrokeStyle::apply(VectorContext* context) {
 
   auto painter = std::make_unique<StrokePainter>();
   painter->shader = std::move(shader);
+  painter->colorSource = _colorSource;
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
   painter->placement = _placement;

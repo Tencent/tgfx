@@ -20,11 +20,17 @@
 
 #include "tgfx/core/Image.h"
 #include "tgfx/layers/vectors/ColorSource.h"
+#include "tgfx/layers/vectors/FillSpace.h"
+#include "tgfx/layers/vectors/ScaleMode.h"
 
 namespace tgfx {
 /**
  * ImagePattern describes a pattern based on an image, which can be drawn on a shape layer. The
  * image can be repeated in both the x and y directions, and you can specify the sampling options.
+ * By default, ImagePattern samples the image in a normalized 0-1 space (FillSpace::Relative) that
+ * maps to each shape's bounding box, fitted according to scaleMode(). Call
+ * setFillSpace(FillSpace::Absolute) to place the image in the layer's coordinate space using the
+ * pattern's matrix instead.
  */
 class ImagePattern : public ColorSource {
  public:
@@ -37,8 +43,8 @@ class ImagePattern : public ColorSource {
     * @return A new ImagePattern, nullptr if the image is nullptr.
     */
   static std::shared_ptr<ImagePattern> Make(std::shared_ptr<Image> image,
-                                            TileMode tileModeX = TileMode::Clamp,
-                                            TileMode tileModeY = TileMode::Clamp,
+                                            TileMode tileModeX = TileMode::Decal,
+                                            TileMode tileModeY = TileMode::Decal,
                                             const SamplingOptions& sampling = {});
 
   std::shared_ptr<Image> image() const {
@@ -68,6 +74,37 @@ class ImagePattern : public ColorSource {
    * Sets the transformation matrix applied to the image pattern.
    */
   void setMatrix(const Matrix& matrix);
+
+  /**
+   * Returns the coordinate space used to interpret this pattern's parameters. The default value is
+   * FillSpace::Relative.
+   */
+  FillSpace fillSpace() const {
+    return _fillSpace;
+  }
+
+  /**
+   * Sets the coordinate space used to interpret this pattern's parameters. When set to
+   * FillSpace::Relative, the image is fitted to each shape's bounding box according to scaleMode().
+   * When set to FillSpace::Absolute, the image is placed in the layer's coordinate space using the
+   * pattern's matrix.
+   */
+  void setFillSpace(FillSpace space);
+
+  /**
+   * Returns the rule used to scale the image into the shape's bounding box when the fill space is
+   * FillSpace::Relative. The default value is ScaleMode::LetterBox.
+   */
+  ScaleMode scaleMode() const {
+    return _scaleMode;
+  }
+
+  /**
+   * Sets the rule used to scale the image into the shape's bounding box when the fill space is
+   * FillSpace::Relative. The scale mode only affects rendering when fillSpace is
+   * FillSpace::Relative; in Absolute mode the stored value is preserved but not used.
+   */
+  void setScaleMode(ScaleMode mode);
 
   /**
    * Returns the exposure adjustment value. The default value is 0 (no adjustment).
@@ -158,6 +195,12 @@ class ImagePattern : public ColorSource {
 
   std::shared_ptr<Shader> getShader() const override;
 
+  bool useRelativeSpace() const override {
+    return _fillSpace == FillSpace::Relative;
+  }
+
+  Matrix getRelativeMatrix(const Rect& bounds) const override;
+
  protected:
   Type getType() const override {
     return Type::ImagePattern;
@@ -165,10 +208,12 @@ class ImagePattern : public ColorSource {
 
  private:
   std::shared_ptr<Image> _image = nullptr;
-  TileMode _tileModeX = TileMode::Clamp;
-  TileMode _tileModeY = TileMode::Clamp;
+  TileMode _tileModeX = TileMode::Decal;
+  TileMode _tileModeY = TileMode::Decal;
   SamplingOptions _sampling = {};
   Matrix _matrix = {};
+  FillSpace _fillSpace = FillSpace::Relative;
+  ScaleMode _scaleMode = ScaleMode::LetterBox;
   float _exposure = 0.0f;
   float _contrast = 0.0f;
   float _saturation = 0.0f;

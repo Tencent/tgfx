@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/vectors/ImagePattern.h"
+#include <algorithm>
 #include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
@@ -40,6 +41,22 @@ void ImagePattern::setMatrix(const Matrix& matrix) {
     return;
   }
   _matrix = matrix;
+  invalidateContent();
+}
+
+void ImagePattern::setFillSpace(FillSpace space) {
+  if (_fillSpace == space) {
+    return;
+  }
+  _fillSpace = space;
+  invalidateContent();
+}
+
+void ImagePattern::setScaleMode(ScaleMode mode) {
+  if (_scaleMode == mode) {
+    return;
+  }
+  _scaleMode = mode;
   invalidateContent();
 }
 
@@ -114,6 +131,55 @@ std::shared_ptr<Shader> ImagePattern::getShader() const {
     shader = shader->makeWithColorFilter(std::move(colorFilter));
   }
   return shader;
+}
+
+Matrix ImagePattern::getRelativeMatrix(const Rect& bounds) const {
+  if (bounds.isEmpty()) {
+    return Matrix::I();
+  }
+  auto imgW = static_cast<float>(_image->width());
+  auto imgH = static_cast<float>(_image->height());
+  if (imgW <= 0 || imgH <= 0) {
+    return Matrix::I();
+  }
+  // ScaleMode operates on the image rect after _matrix has been applied, because the shader
+  // returned by getShader() already carries _matrix. Use the axis-aligned bounding box of the
+  // transformed image as the source rect for fitting into bounds.
+  auto imageRect = Rect::MakeWH(imgW, imgH);
+  _matrix.mapRect(&imageRect);
+  auto srcW = imageRect.width();
+  auto srcH = imageRect.height();
+  if (srcW <= 0 || srcH <= 0) {
+    return Matrix::I();
+  }
+  float sx = bounds.width() / srcW;
+  float sy = bounds.height() / srcH;
+  switch (_scaleMode) {
+    case ScaleMode::None:
+      return Matrix::MakeTrans(bounds.left - imageRect.left, bounds.top - imageRect.top);
+    case ScaleMode::Stretch: {
+      auto matrix = Matrix::MakeScale(sx, sy);
+      matrix.postTranslate(bounds.left - imageRect.left * sx, bounds.top - imageRect.top * sy);
+      return matrix;
+    }
+    case ScaleMode::LetterBox: {
+      float scale = std::min(sx, sy);
+      float tx = bounds.left + (bounds.width() - srcW * scale) * 0.5f - imageRect.left * scale;
+      float ty = bounds.top + (bounds.height() - srcH * scale) * 0.5f - imageRect.top * scale;
+      auto matrix = Matrix::MakeScale(scale);
+      matrix.postTranslate(tx, ty);
+      return matrix;
+    }
+    case ScaleMode::Zoom: {
+      float scale = std::max(sx, sy);
+      float tx = bounds.left + (bounds.width() - srcW * scale) * 0.5f - imageRect.left * scale;
+      float ty = bounds.top + (bounds.height() - srcH * scale) * 0.5f - imageRect.top * scale;
+      auto matrix = Matrix::MakeScale(scale);
+      matrix.postTranslate(tx, ty);
+      return matrix;
+    }
+  }
+  return Matrix::I();
 }
 
 }  // namespace tgfx
