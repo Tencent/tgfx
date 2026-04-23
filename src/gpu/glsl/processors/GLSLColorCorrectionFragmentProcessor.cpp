@@ -16,17 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLSLImageAdjustFragmentProcessor.h"
+#include "GLSLColorCorrectionFragmentProcessor.h"
 
 namespace tgfx {
-PlacementPtr<ImageAdjustFragmentProcessor> ImageAdjustFragmentProcessor::Make(
+PlacementPtr<ColorCorrectionFragmentProcessor> ColorCorrectionFragmentProcessor::Make(
     BlockAllocator* allocator, float exposure, float contrast, float saturation, float temperature,
     float tint, float highlights, float shadows) {
-  return allocator->make<GLSLImageAdjustFragmentProcessor>(exposure, contrast, saturation,
-                                                           temperature, tint, highlights, shadows);
+  return allocator->make<GLSLColorCorrectionFragmentProcessor>(
+      exposure, contrast, saturation, temperature, tint, highlights, shadows);
 }
 
-void GLSLImageAdjustFragmentProcessor::emitCode(EmitArgs& args) const {
+void GLSLColorCorrectionFragmentProcessor::emitCode(EmitArgs& args) const {
   auto uniformHandler = args.uniformHandler;
   auto exposureUniform =
       uniformHandler->addUniform("Exposure", UniformFormat::Float, ShaderStage::Fragment);
@@ -189,8 +189,8 @@ void GLSLImageAdjustFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(result * alpha, alpha);", args.outputColor.c_str());
 }
 
-void GLSLImageAdjustFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
-                                                 UniformData* fragmentUniformData) const {
+void GLSLColorCorrectionFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
+                                                     UniformData* fragmentUniformData) const {
   fragmentUniformData->setData("Exposure", exposure);
   fragmentUniformData->setData("Contrast", contrast);
   fragmentUniformData->setData("Saturation", saturation);

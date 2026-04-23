@@ -126,8 +126,8 @@ std::shared_ptr<Shader> ImagePattern::getShader() const {
   }
   if (_exposure != 0.0f || _contrast != 0.0f || _saturation != 0.0f || _temperature != 0.0f ||
       _tint != 0.0f || _highlights != 0.0f || _shadows != 0.0f) {
-    auto colorFilter = ColorFilter::ImageAdjust(_exposure, _contrast, _saturation, _temperature,
-                                                _tint, _highlights, _shadows);
+    auto colorFilter = ColorFilter::ColorCorrection(_exposure, _contrast, _saturation, _temperature,
+                                                    _tint, _highlights, _shadows);
     shader = shader->makeWithColorFilter(std::move(colorFilter));
   }
   return shader;

@@ -16,34 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ImageAdjustColorFilter.h"
+#include "ColorCorrectionColorFilter.h"
 #include "core/utils/Types.h"
-#include "gpu/processors/ImageAdjustFragmentProcessor.h"
+#include "gpu/processors/ColorCorrectionFragmentProcessor.h"
 
 namespace tgfx {
 
-std::shared_ptr<ColorFilter> ColorFilter::ImageAdjust(float exposure, float contrast,
-                                                      float saturation, float temperature,
-                                                      float tint, float highlights, float shadows) {
-  return std::make_shared<ImageAdjustColorFilter>(exposure, contrast, saturation, temperature, tint,
-                                                  highlights, shadows);
+std::shared_ptr<ColorFilter> ColorFilter::ColorCorrection(float exposure, float contrast,
+                                                          float saturation, float temperature,
+                                                          float tint, float highlights,
+                                                          float shadows) {
+  return std::make_shared<ColorCorrectionColorFilter>(exposure, contrast, saturation, temperature,
+                                                      tint, highlights, shadows);
 }
 
-bool ImageAdjustColorFilter::isEqual(const ColorFilter* colorFilter) const {
+bool ColorCorrectionColorFilter::isEqual(const ColorFilter* colorFilter) const {
   auto type = Types::Get(colorFilter);
-  if (type != Types::ColorFilterType::ImageAdjust) {
+  if (type != Types::ColorFilterType::ColorCorrection) {
     return false;
   }
-  auto other = static_cast<const ImageAdjustColorFilter*>(colorFilter);
+  auto other = static_cast<const ColorCorrectionColorFilter*>(colorFilter);
   return exposure == other->exposure && contrast == other->contrast &&
          saturation == other->saturation && temperature == other->temperature &&
          tint == other->tint && highlights == other->highlights && shadows == other->shadows;
 }
 
-PlacementPtr<FragmentProcessor> ImageAdjustColorFilter::asFragmentProcessor(
+PlacementPtr<FragmentProcessor> ColorCorrectionColorFilter::asFragmentProcessor(
     Context* context, const std::shared_ptr<ColorSpace>&) const {
-  return ImageAdjustFragmentProcessor::Make(context->drawingAllocator(), exposure, contrast,
-                                            saturation, temperature, tint, highlights, shadows);
+  return ColorCorrectionFragmentProcessor::Make(context->drawingAllocator(), exposure, contrast,
+                                                saturation, temperature, tint, highlights, shadows);
 }
 
 }  // namespace tgfx

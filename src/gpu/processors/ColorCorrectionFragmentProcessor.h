@@ -21,22 +21,23 @@
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-class ImageAdjustFragmentProcessor : public FragmentProcessor {
+class ColorCorrectionFragmentProcessor : public FragmentProcessor {
  public:
-  static PlacementPtr<ImageAdjustFragmentProcessor> Make(BlockAllocator* allocator, float exposure,
-                                                         float contrast, float saturation,
-                                                         float temperature, float tint,
-                                                         float highlights, float shadows);
+  static PlacementPtr<ColorCorrectionFragmentProcessor> Make(BlockAllocator* allocator,
+                                                             float exposure, float contrast,
+                                                             float saturation, float temperature,
+                                                             float tint, float highlights,
+                                                             float shadows);
 
   std::string name() const override {
-    return "ImageAdjustFragmentProcessor";
+    return "ColorCorrectionFragmentProcessor";
   }
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  ImageAdjustFragmentProcessor(float exposure, float contrast, float saturation, float temperature,
-                               float tint, float highlights, float shadows)
+  ColorCorrectionFragmentProcessor(float exposure, float contrast, float saturation,
+                                   float temperature, float tint, float highlights, float shadows)
       : FragmentProcessor(ClassID()), exposure(exposure), contrast(contrast),
         saturation(saturation), temperature(temperature), tint(tint), highlights(highlights),
         shadows(shadows) {

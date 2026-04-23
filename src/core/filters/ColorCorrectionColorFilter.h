@@ -21,10 +21,10 @@
 #include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
-class ImageAdjustColorFilter : public ColorFilter {
+class ColorCorrectionColorFilter : public ColorFilter {
  public:
-  ImageAdjustColorFilter(float exposure, float contrast, float saturation, float temperature,
-                         float tint, float highlights, float shadows)
+  ColorCorrectionColorFilter(float exposure, float contrast, float saturation, float temperature,
+                             float tint, float highlights, float shadows)
       : exposure(exposure), contrast(contrast), saturation(saturation), temperature(temperature),
         tint(tint), highlights(highlights), shadows(shadows) {
   }
@@ -43,7 +43,7 @@ class ImageAdjustColorFilter : public ColorFilter {
 
  protected:
   Type type() const override {
-    return Type::ImageAdjust;
+    return Type::ColorCorrection;
   }
 
   bool isEqual(const ColorFilter* colorFilter) const override;

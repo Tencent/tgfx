@@ -85,7 +85,7 @@ TGFX_TEST(FilterTest, ModeColorFilter) {
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ModeColorFilter"));
 }
 
-TGFX_TEST(FilterTest, ImageAdjustColorFilter) {
+TGFX_TEST(FilterTest, ColorCorrectionColorFilter) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -128,14 +128,14 @@ TGFX_TEST(FilterTest, ImageAdjustColorFilter) {
       canvas->save();
       canvas->translate(50.0f + static_cast<float>(imageWidth + 50) * col,
                         50.0f + static_cast<float>(imageHeight + 50) * row);
-      paint.setColorFilter(ColorFilter::ImageAdjust(params[0], params[1], params[2], params[3],
-                                                    params[4], params[5], params[6]));
+      paint.setColorFilter(ColorFilter::ColorCorrection(params[0], params[1], params[2], params[3],
+                                                        params[4], params[5], params[6]));
       canvas->drawImage(image, &paint);
       canvas->restore();
     }
   }
 
-  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ImageAdjustColorFilter"));
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ColorCorrectionColorFilter"));
 
   // Test with all parameters applied simultaneously on the color test image.
   // Use reasonable values within typical usage ranges.
@@ -144,13 +144,13 @@ TGFX_TEST(FilterTest, ImageAdjustColorFilter) {
   auto surface2 = Surface::Make(context, combinedWidth, combinedHeight);
   auto canvas2 = surface2->getCanvas();
   Paint paint2;
-  paint2.setColorFilter(ColorFilter::ImageAdjust(1.0f, 0.3f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f));
+  paint2.setColorFilter(ColorFilter::ColorCorrection(1.0f, 0.3f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f));
   canvas2->save();
   canvas2->translate(50.0f, 50.0f);
   canvas2->drawImage(colorTest, &paint2);
   canvas2->restore();
 
-  EXPECT_TRUE(Baseline::Compare(surface2, "FilterTest/ImageAdjustColorFilterCombined"));
+  EXPECT_TRUE(Baseline::Compare(surface2, "FilterTest/ColorCorrectionColorFilterCombined"));
 }
 
 TGFX_TEST(FilterTest, ComposeColorFilter) {

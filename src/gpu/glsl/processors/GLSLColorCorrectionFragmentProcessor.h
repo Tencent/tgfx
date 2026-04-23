@@ -18,15 +18,16 @@
 
 #pragma once
 
-#include "gpu/processors/ImageAdjustFragmentProcessor.h"
+#include "gpu/processors/ColorCorrectionFragmentProcessor.h"
 
 namespace tgfx {
-class GLSLImageAdjustFragmentProcessor : public ImageAdjustFragmentProcessor {
+class GLSLColorCorrectionFragmentProcessor : public ColorCorrectionFragmentProcessor {
  public:
-  GLSLImageAdjustFragmentProcessor(float exposure, float contrast, float saturation,
-                                   float temperature, float tint, float highlights, float shadows)
-      : ImageAdjustFragmentProcessor(exposure, contrast, saturation, temperature, tint, highlights,
-                                     shadows) {
+  GLSLColorCorrectionFragmentProcessor(float exposure, float contrast, float saturation,
+                                       float temperature, float tint, float highlights,
+                                       float shadows)
+      : ColorCorrectionFragmentProcessor(exposure, contrast, saturation, temperature, tint,
+                                         highlights, shadows) {
   }
 
   void emitCode(EmitArgs& args) const override;

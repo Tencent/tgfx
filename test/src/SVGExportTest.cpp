@@ -886,7 +886,7 @@ TGFX_TEST(SVGExportTest, ColorFilterShaderWithImageShader) {
   auto imageShader = Shader::MakeImageShader(image);
   ASSERT_TRUE(imageShader != nullptr);
 
-  auto colorFilter = ColorFilter::ImageAdjust(0.5f, 0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+  auto colorFilter = ColorFilter::ColorCorrection(0.5f, 0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
   ASSERT_TRUE(colorFilter != nullptr);
 
   auto shader = imageShader->makeWithColorFilter(colorFilter);
@@ -921,7 +921,7 @@ TGFX_TEST(SVGExportTest, ColorFilterShaderWithMatrixImageShader) {
   auto matrixShader = imageShader->makeWithMatrix(matrix);
   ASSERT_TRUE(matrixShader != nullptr);
 
-  auto colorFilter = ColorFilter::ImageAdjust(0.3f, 0.15f, 0.4f, 0.0f, 0.0f, 0.0f, 0.0f);
+  auto colorFilter = ColorFilter::ColorCorrection(0.3f, 0.15f, 0.4f, 0.0f, 0.0f, 0.0f, 0.0f);
   auto shader = matrixShader->makeWithColorFilter(colorFilter);
   ASSERT_TRUE(shader != nullptr);
 

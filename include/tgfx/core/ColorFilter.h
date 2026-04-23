@@ -87,12 +87,12 @@ class ColorFilter {
   static std::shared_ptr<ColorFilter> Luma();
 
   /**
-   * Creates a new ColorFilter that performs comprehensive image color adjustments in a single pass.
-   * All adjustments are applied in linear RGB space with a fixed processing order: highlights and
-   * shadows first compute an exposure compensation, then contrast, temperature, and tint are applied
-   * together in CIE Lab space, followed by exposure with Reinhard tone mapping, and finally
-   * saturation adjustment. This matches the standard photo editing pipeline used by professional
-   * design tools.
+   * Creates a new ColorFilter that performs comprehensive color correction in a single pass. All
+   * adjustments are applied in linear RGB space with a fixed processing order: highlights and
+   * shadows first compute an exposure compensation, then contrast, temperature, and tint are
+   * applied together in CIE Lab space, followed by exposure with Reinhard tone mapping, and
+   * finally saturation adjustment. This matches the standard photo editing pipeline used by
+   * professional design tools.
    * @param exposure The exposure adjustment value in the range of -1.0 to 1.0. Positive values
    * brighten the image with highlight protection, negative values darken it with shadow preservation.
    * @param contrast The contrast adjustment value in the range of -1.0 to 1.0. Positive values
@@ -109,9 +109,9 @@ class ColorFilter {
    * @param shadows The shadows adjustment value in the range of -1.0 to 1.0. Adjusts the brightness
    * of the dark regions of the image by modulating exposure compensation.
    */
-  static std::shared_ptr<ColorFilter> ImageAdjust(float exposure, float contrast, float saturation,
-                                                  float temperature, float tint, float highlights,
-                                                  float shadows);
+  static std::shared_ptr<ColorFilter> ColorCorrection(float exposure, float contrast,
+                                                      float saturation, float temperature,
+                                                      float tint, float highlights, float shadows);
 
   virtual ~ColorFilter() = default;
 
@@ -132,7 +132,7 @@ class ColorFilter {
   }
 
  protected:
-  enum class Type { Blend, Matrix, AlphaThreshold, Compose, Luma, ImageAdjust };
+  enum class Type { Blend, Matrix, AlphaThreshold, Compose, Luma, ColorCorrection };
 
   /**
    * Returns true if this color filter transforms transparent black into a non-transparent color.
