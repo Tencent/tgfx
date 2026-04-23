@@ -2243,8 +2243,8 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   stroke2.setStyle(PaintStyle::Stroke);
   stroke2.setColor(Color::Red());
   stroke2.setStroke(Stroke(10));
-  auto rrect2 =
-      RRect::MakeRectRadii(Rect::MakeXYWH(160, 30, 100, 80), {{{3, 7}, {20, 18}, {15, 11}, {9, 13}}});
+  auto rrect2 = RRect::MakeRectRadii(Rect::MakeXYWH(160, 30, 100, 80),
+                                     {{{3, 7}, {20, 18}, {15, 11}, {9, 13}}});
   EXPECT_EQ(rrect2.type(), RRect::Type::Complex);
   canvas->drawRRect(rrect2, stroke2);
   surface->renderContext->flush();
