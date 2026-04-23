@@ -131,14 +131,17 @@ class Gradient : public ColorSource {
   void setPositions(std::vector<float> positions);
 
   /**
-   * Returns the transformation matrix applied to the gradient.
+   * Returns the transformation matrix applied to the gradient. The matrix operates on the
+   * gradient's parameter space as selected by fitsToGeometry(): the (0, 0)-(1, 1) space when
+   * fitsToGeometry() is true (the default), or the layer's coordinate space when false.
    */
   const Matrix& matrix() const {
     return _matrix;
   }
 
   /**
-   * Sets the transformation matrix applied to the gradient.
+   * Sets the transformation matrix applied to the gradient. See matrix() for details on the
+   * coordinate space this matrix operates in.
    */
   void setMatrix(const Matrix& matrix);
 
