@@ -297,6 +297,89 @@ TGFX_TEST(CanvasTest, Clip) {
     canvas->drawRect(Rect::MakeWH(100, 100), paint);
   }
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/InverseFillClip"));
+
+  // ========== 18. Inverse + inverse clip absorption ==========
+  // Two inverse-fill clips whose shapes are nested: the outer shape's keep-region
+  // (= everything outside outer) is a subset of the inner shape's keep-region
+  // (= everything outside inner). So the inner-shape element is redundant and
+  // gets invalidated, while the outer-shape element and the original clipRect
+  // remain valid.
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeWH(100, 100));
+  {
+    Path innerInverse = {};
+    innerInverse.addRect(Rect::MakeLTRB(40, 40, 60, 60));
+    innerInverse.toggleInverseFillType();
+    canvas->clipPath(innerInverse);
+    Path outerInverse = {};
+    outerInverse.addRect(Rect::MakeLTRB(20, 20, 80, 80));
+    outerInverse.toggleInverseFillType();
+    canvas->clipPath(outerInverse);
+  }
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+  {
+    const auto& elems = canvas->clipStack->elements();
+    ASSERT_EQ(elems.size(), 2u);
+    // [0] is the initial clipRect, untouched.
+    EXPECT_TRUE(elems[0].isValid());
+    EXPECT_FALSE(elems[0].path().isInverseFillType());
+    EXPECT_EQ(elems[0].bounds(), Rect::MakeWH(100, 100));
+    // [1] was innerInverse originally; outerInverse's BOnly verdict invalidated
+    // innerInverse, and appendElement reused the freed slot for outerInverse.
+    EXPECT_TRUE(elems[1].isValid());
+    EXPECT_TRUE(elems[1].path().isInverseFillType());
+    EXPECT_EQ(elems[1].path().getBounds(), Rect::MakeLTRB(20, 20, 80, 80));
+  }
+
+  // ========== 19. Non-inverse clip falls entirely inside inverse-fill's removed shape ==========
+  // The new clipRect's keep-region lies entirely inside the inverse-fill clip's
+  // removed shape, so the two keep-regions are disjoint and the combined clip
+  // becomes empty.
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeWH(100, 100));
+  {
+    Path inverseHole = {};
+    inverseHole.addRect(Rect::MakeLTRB(20, 20, 80, 80));
+    inverseHole.toggleInverseFillType();
+    canvas->clipPath(inverseHole);
+  }
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+  canvas->clipRect(Rect::MakeLTRB(30, 30, 70, 70));
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Empty);
+
+  // ========== 20. Inverse clip partially overlapping non-inverse rect ==========
+  // The non-inverse clipRect's bounds partially overlap the inverse-fill's
+  // removed shape. Neither side contains the other's keep-region, so both
+  // clips must be retained. This exercises tightContains's "this inverse,
+  // other non-inverse" branch returning false, without short-circuiting to
+  // Empty via looseIntersects.
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeWH(100, 100));
+  {
+    Path inverseHole = {};
+    inverseHole.addRect(Rect::MakeLTRB(20, 20, 80, 80));
+    inverseHole.toggleInverseFillType();
+    canvas->clipPath(inverseHole);
+  }
+  canvas->clipRect(Rect::MakeLTRB(10, 10, 40, 40));
+  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+  {
+    const auto& elems = canvas->clipStack->elements();
+    ASSERT_EQ(elems.size(), 2u);
+    // [0] is the initial rect after tryCombine absorbs the new clipRect into it.
+    EXPECT_TRUE(elems[0].isValid());
+    EXPECT_FALSE(elems[0].path().isInverseFillType());
+    EXPECT_EQ(elems[0].bounds(), Rect::MakeLTRB(10, 10, 40, 40));
+    // [1] is inverseHole. Both clips survive because neither side's keep-region
+    // contains the other: the rect's bounds straddle the hole's boundary, and
+    // the hole's shape does not cover the rect's bounds.
+    EXPECT_TRUE(elems[1].isValid());
+    EXPECT_TRUE(elems[1].path().isInverseFillType());
+    EXPECT_EQ(elems[1].path().getBounds(), Rect::MakeLTRB(20, 20, 80, 80));
+  }
 }
 
 TGFX_TEST(CanvasTest, DiscardContent) {

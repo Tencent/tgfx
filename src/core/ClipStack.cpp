@@ -269,10 +269,9 @@ bool ClipStack::addElement(ClipElement&& toAdd) {
       // toAdd's keep-region already covers cur.bounds entirely, so toAdd is redundant.
       return false;
     case ClipGeometry::BOnly:
-      // cur.bounds is only an optimistic envelope: some area inside it may have
-      // been carved out by existing elements and not actually kept. So "toAdd
-      // contains cur.bounds" does not guarantee toAdd contains the real keep-region,
-      // and existing elements cannot be dropped. Fall through to per-element handling.
+      // cur.bounds is only an optimistic envelope of existing elements: some area
+      // inside it may have been carved out and not actually kept. Existing elements
+      // cannot be dropped here. Fall through to per-element handling.
     case ClipGeometry::Both:
       return appendElement(std::move(toAdd));
   }
