@@ -152,10 +152,11 @@ class StrokePainter : public Painter {
     }
     Matrix finalOuter = outerMatrix;
     shape = prepareShape(std::move(shape), innerMatrix, &finalOuter);
-    auto useRelative = colorSource->useRelativeSpace();
-    // Capture the pre-stroke fill bounds in the final outer space so every stroke-align branch
-    // evaluates the relative shader over the same region as a fill would.
-    auto relativeBounds = useRelative ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
+    auto fitsToGeometry = colorSource->fitsToGeometry();
+    // Capture the pre-stroke geometry bounds in the final outer space so every stroke-align
+    // branch evaluates the fit shader over the same region as a fill would.
+    auto geometryBounds =
+        fitsToGeometry ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
 
     if (needsBooleanOp) {
       auto transformedOriginal = Shape::ApplyMatrix(originalShape, innerMatrix);
@@ -165,8 +166,8 @@ class StrokePainter : public Painter {
       }
       shape = Shape::ApplyMatrix(shape, finalOuter);
       auto finalShader = shader;
-      if (useRelative) {
-        finalShader = shader->makeWithMatrix(colorSource->getRelativeMatrix(relativeBounds));
+      if (fitsToGeometry) {
+        finalShader = shader->makeWithMatrix(colorSource->getFitMatrix(geometryBounds));
       }
       LayerPaint paint(finalShader, alpha, blendMode);
       paint.placement = placement;
@@ -187,8 +188,8 @@ class StrokePainter : public Painter {
       }
       shape = Shape::ApplyMatrix(shape, finalOuter);
     }
-    if (useRelative) {
-      paint.shader = shader->makeWithMatrix(colorSource->getRelativeMatrix(relativeBounds));
+    if (fitsToGeometry) {
+      paint.shader = shader->makeWithMatrix(colorSource->getFitMatrix(geometryBounds));
     }
     paint.placement = placement;
     recorder->addShape(std::move(shape), paint);
@@ -199,9 +200,8 @@ class StrokePainter : public Painter {
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style) * scale;
     auto baseShader = shader;
-    if (colorSource->useRelativeSpace() && run.textBlob != nullptr) {
-      baseShader =
-          shader->makeWithMatrix(colorSource->getRelativeMatrix(run.textBlob->getBounds()));
+    if (colorSource->fitsToGeometry() && run.textBlob != nullptr) {
+      baseShader = shader->makeWithMatrix(colorSource->getFitMatrix(run.textBlob->getBounds()));
     }
     auto paints = MakeBlendPaints(baseShader, alpha, blendMode, run.style);
 
@@ -231,10 +231,11 @@ class StrokePainter : public Painter {
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
     auto baseShader = shader;
-    auto useRelative = colorSource->useRelativeSpace();
-    // Capture the pre-stroke text-shape bounds in the final outer space so every stroke-align
-    // branch evaluates the relative shader over the same region.
-    auto relativeBounds = useRelative ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
+    auto fitsToGeometry = colorSource->fitsToGeometry();
+    // Capture the pre-stroke text geometry bounds in the final outer space so every stroke-align
+    // branch evaluates the fit shader over the same region as a fill would.
+    auto geometryBounds =
+        fitsToGeometry ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
 
     std::shared_ptr<Shape> finalShape = nullptr;
     LayerPaint basePaint = {};
@@ -260,8 +261,8 @@ class StrokePainter : public Painter {
       finalShape = Shape::ApplyMatrix(finalShape, finalOuter);
     }
 
-    if (useRelative) {
-      baseShader = shader->makeWithMatrix(colorSource->getRelativeMatrix(relativeBounds));
+    if (fitsToGeometry) {
+      baseShader = shader->makeWithMatrix(colorSource->getFitMatrix(geometryBounds));
     }
     auto paints = MakeBlendPaints(baseShader, alpha, blendMode, run.style);
 

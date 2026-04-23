@@ -64,8 +64,8 @@ class FillPainter : public Painter {
       }
       shape = Shape::ApplyMatrix(shape, geometry->matrix);
       auto finalShader = shader;
-      if (colorSource->useRelativeSpace()) {
-        finalShader = shader->makeWithMatrix(colorSource->getRelativeMatrix(shape->getBounds()));
+      if (colorSource->fitsToGeometry()) {
+        finalShader = shader->makeWithMatrix(colorSource->getFitMatrix(shape->getBounds()));
       }
       LayerPaint paint(finalShader, alpha, blendMode);
       paint.placement = placement;
@@ -78,9 +78,8 @@ class FillPainter : public Painter {
                     const StyledGlyphRun& run) {
     float blendFactor = run.style.fillColor.alpha;
     auto adjustedShader = shader;
-    if (colorSource->useRelativeSpace() && run.textBlob != nullptr) {
-      adjustedShader =
-          shader->makeWithMatrix(colorSource->getRelativeMatrix(run.textBlob->getBounds()));
+    if (colorSource->fitsToGeometry() && run.textBlob != nullptr) {
+      adjustedShader = shader->makeWithMatrix(colorSource->getFitMatrix(run.textBlob->getBounds()));
     }
 
     recorder->setMatrix(geometryMatrix);
