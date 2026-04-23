@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "core/utils/MathExtra.h"
 #include "tgfx/core/PathMeasure.h"
 #include "tgfx/core/RSXform.h"
 #include "tgfx/core/TextBlobBuilder.h"
@@ -2893,15 +2894,19 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
   const Color borderColor = Color::FromRGBA(96, 96, 96, 255);
   const float borderWidth = 1.0f;
 
+  auto imageHeight = static_cast<float>(image->height());
   auto imageCenterX = static_cast<float>(image->width()) * 0.5f;
-  auto imageCenterY = static_cast<float>(image->height()) * 0.5f;
-  // User matrix used only for the None cell: scale the image down enough to leave visible margin
-  // inside the rect, rotate 30 degrees around the image center, then anchor it to the cell center.
-  // A small scale factor is needed because the source image is much larger than the rect, so a
-  // modest shrink would still fill the rect and hide the rotation.
+  auto imageCenterY = imageHeight * 0.5f;
+  // User matrix used only for the None cell: scale the image so its 30-degree-rotated bounding
+  // box exactly touches the rect's top and bottom edges, then rotate around the image center and
+  // anchor it to the cell center. This makes the rotation clearly visible.
+  const float noneRotation = 30.0f;
+  const float radians = DegreesToRadians(noneRotation);
+  const float rotatedHeightFactor = std::abs(std::sin(radians)) + std::abs(std::cos(radians));
+  const float noneScale = rectHeight / (imageHeight * rotatedHeightFactor);
   Matrix noneMatrix = Matrix::MakeTrans(-imageCenterX, -imageCenterY);
-  noneMatrix.postScale(0.05f, 0.05f);
-  noneMatrix.postRotate(30.0f);
+  noneMatrix.postScale(noneScale, noneScale);
+  noneMatrix.postRotate(noneRotation);
   const float noneCellCenterX = startX + rectWidth * 3.5f + gap * 3.0f;
   noneMatrix.postTranslate(noneCellCenterX, rowCenterY);
 
