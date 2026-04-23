@@ -2895,10 +2895,12 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
 
   auto imageCenterX = static_cast<float>(image->width()) * 0.5f;
   auto imageCenterY = static_cast<float>(image->height()) * 0.5f;
-  // User matrix used only for the None cell: rotate 30 degrees around the image center and scale
-  // down by 0.5x, then anchor the transformed image to the None cell's center.
+  // User matrix used only for the None cell: scale the image down enough to leave visible margin
+  // inside the rect, rotate 30 degrees around the image center, then anchor it to the cell center.
+  // A small scale factor is needed because the source image is much larger than the rect, so a
+  // modest shrink would still fill the rect and hide the rotation.
   Matrix noneMatrix = Matrix::MakeTrans(-imageCenterX, -imageCenterY);
-  noneMatrix.postScale(0.5f, 0.5f);
+  noneMatrix.postScale(0.05f, 0.05f);
   noneMatrix.postRotate(30.0f);
   const float noneCellCenterX = startX + rectWidth * 3.5f + gap * 3.0f;
   noneMatrix.postTranslate(noneCellCenterX, rowCenterY);
