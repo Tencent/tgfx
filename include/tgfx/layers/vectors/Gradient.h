@@ -31,7 +31,9 @@ class ConicGradient;
 class DiamondGradient;
 
 /**
- * The base class for all gradient types that can be drawn on a shape layer.
+ * The base class for all gradient types that can be drawn on a vector layer. By default, gradient
+ * parameters are interpreted in a normalized 0-1 space that maps to each geometry's bounding box.
+ * Call setFitsToGeometry(false) to interpret them in the layer's coordinate space instead.
  */
 class Gradient : public ColorSource {
  public:
@@ -129,18 +131,39 @@ class Gradient : public ColorSource {
   void setPositions(std::vector<float> positions);
 
   /**
-   * Returns the transformation matrix applied to the gradient.
+   * Returns the transformation matrix applied to the gradient. The matrix operates on the
+   * gradient's local coordinate space (the space in which startPoint, endPoint, center, radius,
+   * etc. are expressed).
    */
   const Matrix& matrix() const {
     return _matrix;
   }
 
   /**
-   * Sets the transformation matrix applied to the gradient.
+   * Sets the transformation matrix applied to the gradient. See matrix() for details on the
+   * coordinate space this matrix operates in.
    */
   void setMatrix(const Matrix& matrix);
 
+  /**
+   * Returns whether the gradient parameters are interpreted relative to each geometry's bounding
+   * box. When true (the default), the parameters live in a (0, 0)-(1, 1) coordinate space that
+   * maps to each geometry's bounding box. When false, the parameters are in the layer's
+   * coordinate space.
+   */
+  bool fitsToGeometry() const override {
+    return _fitsToGeometry;
+  }
+
+  /**
+   * Sets whether the gradient parameters are interpreted relative to each geometry's bounding
+   * box. See fitsToGeometry() for details.
+   */
+  void setFitsToGeometry(bool value);
+
   std::shared_ptr<Shader> getShader() const override;
+
+  Matrix getFitMatrix(const Rect& bounds) const override;
 
  protected:
   Type getType() const override {
@@ -158,10 +181,11 @@ class Gradient : public ColorSource {
 
  private:
   Matrix _matrix = {};
+  bool _fitsToGeometry = true;
 };
 
 /**
- * Represents a linear gradient that can be drawn on a shape layer.
+ * Represents a linear gradient that can be drawn on a vector layer.
  */
 class LinearGradient : public Gradient {
  public:
@@ -170,28 +194,33 @@ class LinearGradient : public Gradient {
   }
 
   /**
-   * Returns the start point of the gradient when drawn in the layer's coordinate space. The start
-   * point corresponds to the first stop of the gradient.
+   * Returns the start point of the gradient. The start point corresponds to the first stop of the
+   * gradient. It is interpreted in the coordinate space selected by fitsToGeometry(): a normalized
+   * 0-1 space relative to each geometry's bounding box when true (the default), or the layer's
+   * coordinate space when false.
    */
   const Point& startPoint() const {
     return _startPoint;
   }
 
   /**
-   * Sets the start point of the gradient when drawn in the layer's coordinate space.
+   * Sets the start point of the gradient. The point is interpreted in the coordinate space
+   * selected by fitsToGeometry(); see startPoint() for details.
    */
   void setStartPoint(const Point& startPoint);
 
   /**
-   * Returns the end point of the gradient when drawn in the layer's coordinate space. The end point
-   * corresponds to the last stop of the gradient.
+   * Returns the end point of the gradient. The end point corresponds to the last stop of the
+   * gradient. It is interpreted in the coordinate space selected by fitsToGeometry(); see
+   * startPoint() for details.
    */
   const Point& endPoint() const {
     return _endPoint;
   }
 
   /**
-   * Sets the end point of the gradient when drawn in the layer's coordinate space.
+   * Sets the end point of the gradient. The point is interpreted in the coordinate space selected
+   * by fitsToGeometry(); see startPoint() for details.
    */
   void setEndPoint(const Point& endPoint);
 
@@ -211,7 +240,7 @@ class LinearGradient : public Gradient {
 };
 
 /**
- * Represents a radial gradient that can be drawn on a shape layer.
+ * Represents a radial gradient that can be drawn on a vector layer.
  */
 class RadialGradient : public Gradient {
  public:
@@ -221,27 +250,31 @@ class RadialGradient : public Gradient {
 
   /**
    * Returns the center of the circle for this gradient. The center point corresponds to the first
-   * stop of the gradient.
+   * stop of the gradient. It is interpreted in the coordinate space selected by fitsToGeometry():
+   * a normalized 0-1 space relative to each geometry's bounding box when true (the default), or
+   * the layer's coordinate space when false.
    */
   const Point& center() const {
     return _center;
   }
 
   /**
-   * Sets the center of the circle for this gradient.
+   * Sets the center of the circle for this gradient. The point is interpreted in the coordinate
+   * space selected by fitsToGeometry(); see center() for details.
    */
   void setCenter(const Point& center);
 
   /**
    * Returns the radius of the circle for this gradient. The radius corresponds to the last stop of
-   * the gradient.
+   * the gradient. It is expressed in the coordinate space selected by fitsToGeometry().
    */
   float radius() const {
     return _radius;
   }
 
   /**
-   * Sets the radius of the circle for this gradient. The radius must be positive.
+   * Sets the radius of the circle for this gradient. The radius must be positive and is expressed
+   * in the coordinate space selected by fitsToGeometry().
    */
   void setRadius(float radius);
 
@@ -261,7 +294,7 @@ class RadialGradient : public Gradient {
 };
 
 /**
- * Represents a conic gradient that can be drawn on a shape layer.
+ * Represents a conic gradient that can be drawn on a vector layer.
  */
 class ConicGradient : public Gradient {
  public:
@@ -270,14 +303,17 @@ class ConicGradient : public Gradient {
   }
 
   /**
-   * Returns the center of the circle for this gradient.
+   * Returns the center of the circle for this gradient. It is interpreted in the coordinate space
+   * selected by fitsToGeometry(): a normalized 0-1 space relative to each geometry's bounding box
+   * when true (the default), or the layer's coordinate space when false.
    */
   const Point& center() const {
     return _center;
   }
 
   /**
-   * Sets the center of the circle for this gradient.
+   * Sets the center of the circle for this gradient. The point is interpreted in the coordinate
+   * space selected by fitsToGeometry(); see center() for details.
    */
   void setCenter(const Point& center);
 
@@ -324,7 +360,7 @@ class ConicGradient : public Gradient {
 };
 
 /**
- * Represents a diamond gradient that can be drawn on a shape layer.
+ * Represents a diamond gradient that can be drawn on a vector layer.
  */
 class DiamondGradient : public Gradient {
  public:
@@ -334,27 +370,31 @@ class DiamondGradient : public Gradient {
 
   /**
    * Returns the center of the diamond for this gradient. The center point corresponds to the first
-   * stop of the gradient.
+   * stop of the gradient. It is interpreted in the coordinate space selected by fitsToGeometry():
+   * a normalized 0-1 space relative to each geometry's bounding box when true (the default), or
+   * the layer's coordinate space when false.
    */
   const Point& center() const {
     return _center;
   }
 
   /**
-   * Sets the center of the diamond for this gradient.
+   * Sets the center of the diamond for this gradient. The point is interpreted in the coordinate
+   * space selected by fitsToGeometry(); see center() for details.
    */
   void setCenter(const Point& center);
 
   /**
    * Returns the radius of the diamond for this gradient. The distance from the center to a vertex
-   * of the diamond.
+   * of the diamond, expressed in the coordinate space selected by fitsToGeometry().
    */
   float radius() const {
     return _radius;
   }
 
   /**
-   * Sets the radius of the diamond for this gradient. The value must be positive.
+   * Sets the radius of the diamond for this gradient. The value must be positive and is expressed
+   * in the coordinate space selected by fitsToGeometry().
    */
   void setRadius(float radius);
 

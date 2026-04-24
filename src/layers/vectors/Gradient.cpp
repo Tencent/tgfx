@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/vectors/Gradient.h"
+#include "core/utils/Log.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
@@ -72,12 +73,30 @@ void Gradient::setMatrix(const Matrix& matrix) {
   invalidateContent();
 }
 
+void Gradient::setFitsToGeometry(bool value) {
+  if (_fitsToGeometry == value) {
+    return;
+  }
+  _fitsToGeometry = value;
+  invalidateContent();
+}
+
 std::shared_ptr<Shader> Gradient::getShader() const {
   auto shader = onCreateShader();
   if (shader == nullptr || _matrix.isIdentity()) {
     return shader;
   }
   return shader->makeWithMatrix(_matrix);
+}
+
+Matrix Gradient::getFitMatrix(const Rect& bounds) const {
+  DEBUG_ASSERT(_fitsToGeometry);
+  if (bounds.isEmpty()) {
+    return Matrix::I();
+  }
+  auto matrix = Matrix::MakeScale(bounds.width(), bounds.height());
+  matrix.postTranslate(bounds.left, bounds.top);
+  return matrix;
 }
 
 void LinearGradient::setEndPoint(const Point& endPoint) {

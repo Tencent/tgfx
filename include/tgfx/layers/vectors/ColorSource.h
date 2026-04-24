@@ -18,12 +18,14 @@
 
 #pragma once
 
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
 /**
- * ColorSource specifies the source color(s) for what is being drawn in a shape layer. There are
+ * ColorSource specifies the source color(s) for what is being drawn in a vector layer. There are
  * three types of ColorSource: SolidColor, Gradient, and ImagePattern. Note: All ColorSource objects
  * are not thread-safe and should only be accessed from a single thread.
  */
@@ -33,6 +35,21 @@ class ColorSource : public LayerProperty {
    * Returns the shader that generates colors for drawing.
    */
   virtual std::shared_ptr<Shader> getShader() const = 0;
+
+  /**
+   * Returns true when this ColorSource's parameters are interpreted relative to each geometry's
+   * bounding box. When true, FillStyle/StrokeStyle supplies the shader with a per-geometry fit
+   * matrix obtained from getFitMatrix(). When false, the shader is used as-is in the layer's
+   * coordinate space.
+   */
+  virtual bool fitsToGeometry() const = 0;
+
+  /**
+   * Returns the transformation matrix that maps the ColorSource's local coordinate space into the
+   * given geometry bounding box. Only consulted when fitsToGeometry() returns true.
+   * @param bounds The bounding box of the target geometry.
+   */
+  virtual Matrix getFitMatrix(const Rect& bounds) const = 0;
 
  protected:
   enum class Type { Gradient, ImagePattern, SolidColor };
