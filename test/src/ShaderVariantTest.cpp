@@ -1,0 +1,140 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include <unordered_set>
+#include "gpu/ShaderMacroSet.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
+#include "gtest/gtest.h"
+#include "tgfx/core/BlendMode.h"
+
+namespace tgfx {
+
+// Matches the kBlendModeCount constant in PorterDuffXferProcessor.cpp. Duplicated here so the
+// test catches any drift between the enum and the enumerator.
+static constexpr int kExpectedBlendModeCount = static_cast<int>(BlendMode::PlusDarker) + 1;
+static constexpr int kExpectedVariantCount = kExpectedBlendModeCount * 2;
+
+// 1) Variant count matches (BlendMode count) x (hasDstTexture in {false, true}).
+TEST(ShaderVariantTest, PorterDuffXP_Count) {
+  auto variants = PorterDuffXferProcessor::EnumerateVariants();
+  EXPECT_EQ(variants.size(), static_cast<size_t>(kExpectedVariantCount));
+  EXPECT_EQ(kExpectedBlendModeCount, 30)
+      << "BlendMode count changed — update kBlendModeCount in PorterDuffXferProcessor.cpp and "
+         "this test.";
+}
+
+// 2) Each variant's preamble matches what BuildMacros produces for the same configuration.
+//    This is the "single source of truth" invariant: runtime onBuildShaderMacros() and offline
+//    EnumerateVariants() must agree, since both delegate to BuildMacros.
+TEST(ShaderVariantTest, PorterDuffXP_PreambleEquivalence) {
+  auto variants = PorterDuffXferProcessor::EnumerateVariants();
+  int variantIdx = 0;
+  for (int modeInt = 0; modeInt < kExpectedBlendModeCount; ++modeInt) {
+    for (int hasDstInt = 0; hasDstInt < 2; ++hasDstInt) {
+      auto mode = static_cast<BlendMode>(modeInt);
+      bool hasDstTexture = (hasDstInt != 0);
+      ShaderMacroSet macros;
+      PorterDuffXferProcessor::BuildMacros(mode, hasDstTexture, macros);
+      auto expectedPreamble = macros.toPreamble();
+      ASSERT_LT(static_cast<size_t>(variantIdx), variants.size());
+      EXPECT_EQ(variants[static_cast<size_t>(variantIdx)].preamble, expectedPreamble)
+          << "Preamble mismatch at variant index " << variantIdx << " (mode=" << modeInt
+          << ", hasDst=" << hasDstInt << ")";
+      ++variantIdx;
+    }
+  }
+}
+
+// 3) All variants have unique preamble hashes — different configurations must produce different
+//    shader source.
+TEST(ShaderVariantTest, PorterDuffXP_HashUniqueness) {
+  auto variants = PorterDuffXferProcessor::EnumerateVariants();
+  std::unordered_set<uint64_t> seenHashes;
+  seenHashes.reserve(variants.size());
+  for (const auto& variant : variants) {
+    auto inserted = seenHashes.insert(variant.runtimeKeyHash).second;
+    EXPECT_TRUE(inserted) << "Duplicate runtimeKeyHash for variant " << variant.name
+                          << " (index=" << variant.index << ")";
+  }
+  EXPECT_EQ(seenHashes.size(), variants.size());
+}
+
+// 4) Every variant has a non-empty preamble, non-empty name, and the expected index.
+TEST(ShaderVariantTest, PorterDuffXP_StructuralInvariants) {
+  auto variants = PorterDuffXferProcessor::EnumerateVariants();
+  for (size_t i = 0; i < variants.size(); ++i) {
+    const auto& variant = variants[i];
+    EXPECT_EQ(variant.index, static_cast<int>(i));
+    EXPECT_FALSE(variant.name.empty()) << "index=" << i;
+    EXPECT_FALSE(variant.preamble.empty()) << "index=" << i;
+    // Every PorterDuffXP variant always defines TGFX_BLEND_MODE, so the preamble cannot be empty.
+    EXPECT_NE(variant.preamble.find("TGFX_BLEND_MODE"), std::string::npos)
+        << "index=" << i << " preamble missing TGFX_BLEND_MODE: " << variant.preamble;
+  }
+}
+
+// 5) Non-coeff blend modes (Overlay..PlusDarker, i.e. index > Screen) must have the
+//    TGFX_PDXP_NON_COEFF macro defined, regardless of hasDstTexture. Coeff modes must not.
+TEST(ShaderVariantTest, PorterDuffXP_NonCoeffMacroCorrectness) {
+  auto variants = PorterDuffXferProcessor::EnumerateVariants();
+  const auto nonCoeffMarker = std::string("#define TGFX_PDXP_NON_COEFF");
+  for (const auto& variant : variants) {
+    // Index layout: variant.index = modeInt * 2 + hasDstInt, per BuildMacros iteration order.
+    int modeInt = variant.index / 2;
+    bool isNonCoeff = modeInt > static_cast<int>(BlendMode::Screen);
+    bool preambleHasMarker = variant.preamble.find(nonCoeffMarker) != std::string::npos;
+    EXPECT_EQ(preambleHasMarker, isNonCoeff) << "mode=" << modeInt << " (isNonCoeff=" << isNonCoeff
+                                             << "), preamble=\"" << variant.preamble << "\"";
+  }
+}
+
+// 6) hasDstTexture == true ⇔ TGFX_PDXP_DST_TEXTURE_READ present.
+TEST(ShaderVariantTest, PorterDuffXP_DstTextureMacroCorrectness) {
+  auto variants = PorterDuffXferProcessor::EnumerateVariants();
+  const auto dstMarker = std::string("#define TGFX_PDXP_DST_TEXTURE_READ");
+  for (const auto& variant : variants) {
+    bool hasDstTexture = (variant.index % 2) != 0;  // hasDstInt is the low bit of the index.
+    bool preambleHasMarker = variant.preamble.find(dstMarker) != std::string::npos;
+    EXPECT_EQ(preambleHasMarker, hasDstTexture)
+        << "index=" << variant.index << " preamble=\"" << variant.preamble << "\"";
+  }
+}
+
+// 7) Spot-check representative variants' preamble contents so regressions in BuildMacros (or in
+//    ShaderMacroSet::toPreamble's deterministic ordering) are caught with a clear diff instead
+//    of only failing the equivalence loop above.
+TEST(ShaderVariantTest, PorterDuffXP_PreambleSpotCheck) {
+  auto variants = PorterDuffXferProcessor::EnumerateVariants();
+  // Index 6 = SrcOver (mode=3) with hasDst=0 — the hot-path variant for most draws.
+  // BuildMacros only emits TGFX_BLEND_MODE for coeff modes without dst. Preamble ordering is
+  // alphabetical by macro name, from std::map.
+  const auto& srcOverNoDst = variants[static_cast<size_t>(BlendMode::SrcOver) * 2 + 0];
+  EXPECT_EQ(srcOverNoDst.name, "PorterDuffXP[mode=SrcOver,dst=0]");
+  EXPECT_EQ(srcOverNoDst.preamble, "#define TGFX_BLEND_MODE 3\n");
+
+  // Overlay with dst texture — non-coeff + dst + mode, all three macros present.
+  const auto& overlayWithDst = variants[static_cast<size_t>(BlendMode::Overlay) * 2 + 1];
+  EXPECT_EQ(overlayWithDst.name, "PorterDuffXP[mode=Overlay,dst=1]");
+  EXPECT_EQ(overlayWithDst.preamble,
+            "#define TGFX_BLEND_MODE 15\n"
+            "#define TGFX_PDXP_DST_TEXTURE_READ 1\n"
+            "#define TGFX_PDXP_NON_COEFF 1\n");
+}
+
+}  // namespace tgfx

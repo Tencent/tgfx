@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include <vector>
 #include "gpu/BlendFormula.h"
 #include "gpu/processors/XferProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 #include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
@@ -36,6 +38,25 @@ class PorterDuffXferProcessor : public XferProcessor {
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
 
+  /**
+   * Populates the given ShaderMacroSet with the preprocessor defines this processor would emit
+   * for the specified (blendMode, hasDstTexture) configuration. This is the single source of
+   * truth for both the runtime path (onBuildShaderMacros) and the offline variant enumerator
+   * (EnumerateVariants). Extracted as static so variant tooling can call it without constructing
+   * a PorterDuffXferProcessor instance.
+   */
+  static void BuildMacros(BlendMode blendMode, bool hasDstTexture, ShaderMacroSet& macros);
+
+  /**
+   * Returns the full set of shader variants this processor can produce. The result is the
+   * Cartesian product (30 BlendMode values) x (hasDstTexture in {false, true}) = 60 variants.
+   * Illegal combinations (e.g. non-coeff modes without dst texture on backends that lack
+   * framebuffer fetch) are still emitted — callers/offline tooling can filter as needed. Each
+   * variant carries a preamble string that, prefixed to porter_duff_xfer.frag.glsl, yields the
+   * exact shader source the runtime would compile for that configuration.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants();
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
@@ -44,13 +65,7 @@ class PorterDuffXferProcessor : public XferProcessor {
   }
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    if (dstTextureInfo.textureProxy) {
-      macros.define("TGFX_PDXP_DST_TEXTURE_READ");
-    }
-    if (!BlendModeAsCoeff(blendMode, true)) {
-      macros.define("TGFX_PDXP_NON_COEFF");
-    }
-    macros.define("TGFX_BLEND_MODE", static_cast<int>(blendMode));
+    BuildMacros(blendMode, dstTextureInfo.textureProxy != nullptr, macros);
   }
 
   std::string shaderFunctionFile() const override {
