@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include <vector>
 #include "GeometryProcessor.h"
 #include "gpu/AAType.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class DefaultGeometryProcessor : public GeometryProcessor {
@@ -33,6 +35,20 @@ class DefaultGeometryProcessor : public GeometryProcessor {
     return "DefaultGeometryProcessor";
   }
 
+  /**
+   * Populates the given ShaderMacroSet with the preprocessor defines this processor would emit
+   * for the specified AA mode. Single source of truth for both the runtime path
+   * (onBuildShaderMacros) and the offline variant enumerator (EnumerateVariants).
+   */
+  static void BuildMacros(AAType aa, ShaderMacroSet& macros);
+
+  /**
+   * Returns the full set of shader variants this processor can produce:
+   *   (aa in {None/MSAA, Coverage}) = 2 variants.
+   * Iteration order is stable: variant.index = (aa == Coverage) ? 1 : 0.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants();
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
@@ -42,9 +58,7 @@ class DefaultGeometryProcessor : public GeometryProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    if (aa == AAType::Coverage) {
-      macros.define("TGFX_GP_DEFAULT_COVERAGE_AA");
-    }
+    BuildMacros(aa, macros);
   }
 
   std::string shaderFunctionFile() const override {

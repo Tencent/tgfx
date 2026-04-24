@@ -19,8 +19,10 @@
 #pragma once
 
 #include <optional>
+#include <vector>
 #include "GeometryProcessor.h"
 #include "gpu/AAType.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
@@ -34,6 +36,19 @@ class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
     return "RoundStrokeRectGeometryProcessor";
   }
 
+  /**
+   * Populates the given ShaderMacroSet with the preprocessor defines this processor emits for
+   * the specified configuration.
+   */
+  static void BuildMacros(bool coverageAA, bool commonColor, bool hasUvMatrix,
+                          ShaderMacroSet& macros);
+
+  /**
+   * Returns the full set of shader variants:
+   *   (coverageAA) x (commonColor) x (hasUvMatrix) = 8 variants.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants();
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
   RoundStrokeRectGeometryProcessor(AAType aa, std::optional<PMColor> commonColor,
@@ -41,15 +56,7 @@ class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    if (aaType == AAType::Coverage) {
-      macros.define("TGFX_GP_RRECT_COVERAGE_AA");
-    }
-    if (commonColor.has_value()) {
-      macros.define("TGFX_GP_RRECT_COMMON_COLOR");
-    }
-    if (uvMatrix.has_value()) {
-      macros.define("TGFX_GP_RRECT_UV_MATRIX");
-    }
+    BuildMacros(aaType == AAType::Coverage, commonColor.has_value(), uvMatrix.has_value(), macros);
   }
 
   std::string shaderFunctionFile() const override {

@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "QuadPerEdgeAAGeometryProcessor.h"
+#include <functional>
+#include "gpu/ShaderMacroSet.h"
 
 namespace tgfx {
 QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
@@ -49,5 +51,51 @@ void QuadPerEdgeAAGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) c
   bool hasSubsetMatrix = hasSubset && uvMatrix.has_value();
   flags |= hasSubsetMatrix ? 16 : 0;
   bytesKey->write(flags);
+}
+
+void QuadPerEdgeAAGeometryProcessor::BuildMacros(bool coverageAA, bool commonColor,
+                                                 bool hasUvMatrix, bool hasSubset,
+                                                 ShaderMacroSet& macros) {
+  if (coverageAA) {
+    macros.define("TGFX_GP_QUAD_COVERAGE_AA");
+  }
+  if (commonColor) {
+    macros.define("TGFX_GP_QUAD_COMMON_COLOR");
+  }
+  if (hasUvMatrix) {
+    macros.define("TGFX_GP_QUAD_UV_MATRIX");
+  }
+  if (hasSubset) {
+    macros.define("TGFX_GP_QUAD_SUBSET");
+    if (hasUvMatrix) {
+      macros.define("TGFX_GP_QUAD_SUBSET_MATRIX");
+    }
+  }
+}
+
+std::vector<ShaderVariant> QuadPerEdgeAAGeometryProcessor::EnumerateVariants() {
+  std::vector<ShaderVariant> variants;
+  variants.reserve(16);
+  std::hash<std::string> hasher;
+  int index = 0;
+  for (int aa = 0; aa < 2; ++aa) {
+    for (int cc = 0; cc < 2; ++cc) {
+      for (int uv = 0; uv < 2; ++uv) {
+        for (int subset = 0; subset < 2; ++subset) {
+          ShaderMacroSet macros;
+          BuildMacros(aa != 0, cc != 0, uv != 0, subset != 0, macros);
+          ShaderVariant variant;
+          variant.index = index++;
+          variant.name = std::string("QuadPerEdgeAAGP[coverageAA=") + (aa ? "1" : "0") +
+                         ",commonColor=" + (cc ? "1" : "0") + ",uvMatrix=" + (uv ? "1" : "0") +
+                         ",subset=" + (subset ? "1" : "0") + "]";
+          variant.preamble = macros.toPreamble();
+          variant.runtimeKeyHash = static_cast<uint64_t>(hasher(variant.preamble));
+          variants.emplace_back(std::move(variant));
+        }
+      }
+    }
+  }
+  return variants;
 }
 }  // namespace tgfx

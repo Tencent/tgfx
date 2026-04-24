@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeshGeometryProcessor.h"
+#include <functional>
+#include "gpu/ShaderMacroSet.h"
 
 namespace tgfx {
 
@@ -49,6 +51,43 @@ void MeshGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
     flags |= 4;
   }
   bytesKey->write(flags);
+}
+
+void MeshGeometryProcessor::BuildMacros(bool hasTexCoords, bool hasColors, bool hasCoverage,
+                                        ShaderMacroSet& macros) {
+  if (hasTexCoords) {
+    macros.define("TGFX_GP_MESH_TEX_COORDS");
+  }
+  if (hasColors) {
+    macros.define("TGFX_GP_MESH_VERTEX_COLORS");
+  }
+  if (hasCoverage) {
+    macros.define("TGFX_GP_MESH_VERTEX_COVERAGE");
+  }
+}
+
+std::vector<ShaderVariant> MeshGeometryProcessor::EnumerateVariants() {
+  std::vector<ShaderVariant> variants;
+  variants.reserve(8);
+  std::hash<std::string> hasher;
+  int index = 0;
+  for (int tc = 0; tc < 2; ++tc) {
+    for (int colors = 0; colors < 2; ++colors) {
+      for (int coverage = 0; coverage < 2; ++coverage) {
+        ShaderMacroSet macros;
+        BuildMacros(tc != 0, colors != 0, coverage != 0, macros);
+        ShaderVariant variant;
+        variant.index = index++;
+        variant.name = std::string("MeshGP[texCoords=") + (tc ? "1" : "0") +
+                       ",colors=" + (colors ? "1" : "0") + ",coverage=" + (coverage ? "1" : "0") +
+                       "]";
+        variant.preamble = macros.toPreamble();
+        variant.runtimeKeyHash = static_cast<uint64_t>(hasher(variant.preamble));
+        variants.emplace_back(std::move(variant));
+      }
+    }
+  }
+  return variants;
 }
 
 }  // namespace tgfx

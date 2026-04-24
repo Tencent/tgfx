@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EllipseGeometryProcessor.h"
+#include <functional>
+#include "gpu/ShaderMacroSet.h"
 
 namespace tgfx {
 EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool stroke,
@@ -36,5 +38,35 @@ void EllipseGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = stroke ? 1 : 0;
   flags |= commonColor.has_value() ? 2 : 0;
   bytesKey->write(flags);
+}
+
+void EllipseGeometryProcessor::BuildMacros(bool stroke, bool commonColor, ShaderMacroSet& macros) {
+  if (stroke) {
+    macros.define("TGFX_GP_ELLIPSE_STROKE");
+  }
+  if (commonColor) {
+    macros.define("TGFX_GP_ELLIPSE_COMMON_COLOR");
+  }
+}
+
+std::vector<ShaderVariant> EllipseGeometryProcessor::EnumerateVariants() {
+  std::vector<ShaderVariant> variants;
+  variants.reserve(4);
+  std::hash<std::string> hasher;
+  int index = 0;
+  for (int strokeInt = 0; strokeInt < 2; ++strokeInt) {
+    for (int commonColorInt = 0; commonColorInt < 2; ++commonColorInt) {
+      ShaderMacroSet macros;
+      BuildMacros(strokeInt != 0, commonColorInt != 0, macros);
+      ShaderVariant variant;
+      variant.index = index++;
+      variant.name = std::string("EllipseGP[stroke=") + (strokeInt ? "1" : "0") +
+                     ",commonColor=" + (commonColorInt ? "1" : "0") + "]";
+      variant.preamble = macros.toPreamble();
+      variant.runtimeKeyHash = static_cast<uint64_t>(hasher(variant.preamble));
+      variants.emplace_back(std::move(variant));
+    }
+  }
+  return variants;
 }
 }  // namespace tgfx

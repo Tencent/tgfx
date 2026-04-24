@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HairlineQuadGeometryProcessor.h"
+#include <functional>
+#include "gpu/ShaderMacroSet.h"
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
@@ -35,6 +37,30 @@ HairlineQuadGeometryProcessor::HairlineQuadGeometryProcessor(const PMColor& colo
 void HairlineQuadGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = aaType == AAType::Coverage ? 1 : 0;
   bytesKey->write(flags);
+}
+
+void HairlineQuadGeometryProcessor::BuildMacros(AAType aaType, ShaderMacroSet& macros) {
+  if (aaType == AAType::Coverage) {
+    macros.define("TGFX_GP_HQUAD_COVERAGE_AA");
+  }
+}
+
+std::vector<ShaderVariant> HairlineQuadGeometryProcessor::EnumerateVariants() {
+  std::vector<ShaderVariant> variants;
+  variants.reserve(2);
+  std::hash<std::string> hasher;
+  const AAType aaValues[2] = {AAType::None, AAType::Coverage};
+  for (int i = 0; i < 2; ++i) {
+    ShaderMacroSet macros;
+    BuildMacros(aaValues[i], macros);
+    ShaderVariant variant;
+    variant.index = i;
+    variant.name = std::string("HairlineQuadGP[coverageAA=") + (i == 1 ? "1" : "0") + "]";
+    variant.preamble = macros.toPreamble();
+    variant.runtimeKeyHash = static_cast<uint64_t>(hasher(variant.preamble));
+    variants.emplace_back(std::move(variant));
+  }
+  return variants;
 }
 
 }  // namespace tgfx

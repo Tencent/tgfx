@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RoundStrokeRectGeometryProcessor.h"
+#include <functional>
+#include "gpu/ShaderMacroSet.h"
 
 namespace tgfx {
 RoundStrokeRectGeometryProcessor::RoundStrokeRectGeometryProcessor(
@@ -44,6 +46,42 @@ void RoundStrokeRectGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey)
   flags |= commonColor.has_value() ? 2 : 0;
   flags |= uvMatrix.has_value() ? 4 : 0;
   bytesKey->write(flags);
+}
+
+void RoundStrokeRectGeometryProcessor::BuildMacros(bool coverageAA, bool commonColor,
+                                                   bool hasUvMatrix, ShaderMacroSet& macros) {
+  if (coverageAA) {
+    macros.define("TGFX_GP_RRECT_COVERAGE_AA");
+  }
+  if (commonColor) {
+    macros.define("TGFX_GP_RRECT_COMMON_COLOR");
+  }
+  if (hasUvMatrix) {
+    macros.define("TGFX_GP_RRECT_UV_MATRIX");
+  }
+}
+
+std::vector<ShaderVariant> RoundStrokeRectGeometryProcessor::EnumerateVariants() {
+  std::vector<ShaderVariant> variants;
+  variants.reserve(8);
+  std::hash<std::string> hasher;
+  int index = 0;
+  for (int aa = 0; aa < 2; ++aa) {
+    for (int cc = 0; cc < 2; ++cc) {
+      for (int uv = 0; uv < 2; ++uv) {
+        ShaderMacroSet macros;
+        BuildMacros(aa != 0, cc != 0, uv != 0, macros);
+        ShaderVariant variant;
+        variant.index = index++;
+        variant.name = std::string("RoundStrokeRectGP[coverageAA=") + (aa ? "1" : "0") +
+                       ",commonColor=" + (cc ? "1" : "0") + ",uvMatrix=" + (uv ? "1" : "0") + "]";
+        variant.preamble = macros.toPreamble();
+        variant.runtimeKeyHash = static_cast<uint64_t>(hasher(variant.preamble));
+        variants.emplace_back(std::move(variant));
+      }
+    }
+  }
+  return variants;
 }
 
 }  // namespace tgfx

@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <vector>
 #include "GeometryProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
@@ -36,6 +38,20 @@ class MeshGeometryProcessor : public GeometryProcessor {
     return "MeshGeometryProcessor";
   }
 
+  /**
+   * Populates the given ShaderMacroSet with the preprocessor defines this processor emits for
+   * the specified (hasTexCoords, hasColors, hasCoverage) configuration.
+   */
+  static void BuildMacros(bool hasTexCoords, bool hasColors, bool hasCoverage,
+                          ShaderMacroSet& macros);
+
+  /**
+   * Returns the full set of shader variants:
+   *   (hasTexCoords) x (hasColors) x (hasCoverage) = 8 variants.
+   * Stable index: (texCoords << 2) | (colors << 1) | coverage.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants();
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
@@ -45,15 +61,7 @@ class MeshGeometryProcessor : public GeometryProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    if (hasTexCoords) {
-      macros.define("TGFX_GP_MESH_TEX_COORDS");
-    }
-    if (hasColors) {
-      macros.define("TGFX_GP_MESH_VERTEX_COLORS");
-    }
-    if (hasCoverage) {
-      macros.define("TGFX_GP_MESH_VERTEX_COVERAGE");
-    }
+    BuildMacros(hasTexCoords, hasColors, hasCoverage, macros);
   }
 
   std::string shaderFunctionFile() const override {

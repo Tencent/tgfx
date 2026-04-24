@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeInstancedGeometryProcessor.h"
+#include <functional>
+#include "gpu/ShaderMacroSet.h"
 
 namespace tgfx {
 ShapeInstancedGeometryProcessor::ShapeInstancedGeometryProcessor(int width, int height, AAType aa,
@@ -43,5 +45,36 @@ void ShapeInstancedGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) 
   if (hasColors) flags |= 1;
   if (aa == AAType::Coverage) flags |= 2;
   bytesKey->write(flags);
+}
+
+void ShapeInstancedGeometryProcessor::BuildMacros(bool coverageAA, bool hasColors,
+                                                  ShaderMacroSet& macros) {
+  if (coverageAA) {
+    macros.define("TGFX_GP_SHAPE_COVERAGE_AA");
+  }
+  if (hasColors) {
+    macros.define("TGFX_GP_SHAPE_VERTEX_COLORS");
+  }
+}
+
+std::vector<ShaderVariant> ShapeInstancedGeometryProcessor::EnumerateVariants() {
+  std::vector<ShaderVariant> variants;
+  variants.reserve(4);
+  std::hash<std::string> hasher;
+  int index = 0;
+  for (int aa = 0; aa < 2; ++aa) {
+    for (int colors = 0; colors < 2; ++colors) {
+      ShaderMacroSet macros;
+      BuildMacros(aa != 0, colors != 0, macros);
+      ShaderVariant variant;
+      variant.index = index++;
+      variant.name = std::string("ShapeInstancedGP[coverageAA=") + (aa ? "1" : "0") +
+                     ",colors=" + (colors ? "1" : "0") + "]";
+      variant.preamble = macros.toPreamble();
+      variant.runtimeKeyHash = static_cast<uint64_t>(hasher(variant.preamble));
+      variants.emplace_back(std::move(variant));
+    }
+  }
+  return variants;
 }
 }  // namespace tgfx

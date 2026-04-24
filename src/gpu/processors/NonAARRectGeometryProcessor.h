@@ -19,7 +19,9 @@
 #pragma once
 
 #include <optional>
+#include <vector>
 #include "GeometryProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 /**
@@ -37,6 +39,19 @@ class NonAARRectGeometryProcessor : public GeometryProcessor {
     return "NonAARRectGeometryProcessor";
   }
 
+  /**
+   * Populates the given ShaderMacroSet with the preprocessor defines this processor emits for
+   * the specified (commonColor, stroke) configuration.
+   */
+  static void BuildMacros(bool commonColor, bool stroke, ShaderMacroSet& macros);
+
+  /**
+   * Returns the full set of shader variants:
+   *   (commonColor) x (stroke) = 4 variants.
+   * Stable index: commonColor * 2 + stroke.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants();
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
@@ -46,12 +61,7 @@ class NonAARRectGeometryProcessor : public GeometryProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    if (commonColor.has_value()) {
-      macros.define("TGFX_GP_NONAA_COMMON_COLOR");
-    }
-    if (stroke) {
-      macros.define("TGFX_GP_NONAA_STROKE");
-    }
+    BuildMacros(commonColor.has_value(), stroke, macros);
   }
 
   std::string shaderFunctionFile() const override {

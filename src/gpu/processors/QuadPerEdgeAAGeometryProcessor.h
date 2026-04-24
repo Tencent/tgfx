@@ -19,8 +19,10 @@
 #pragma once
 
 #include <optional>
+#include <vector>
 #include "GeometryProcessor.h"
 #include "gpu/AAType.h"
+#include "gpu/variants/ShaderVariant.h"
 #include "tgfx/core/Paint.h"
 
 namespace tgfx {
@@ -35,6 +37,23 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
     return "QuadPerEdgeAAGeometryProcessor";
   }
 
+  /**
+   * Populates the given ShaderMacroSet with the preprocessor defines this processor emits for
+   * the specified configuration. TGFX_GP_QUAD_SUBSET_MATRIX is derived — it is defined if and
+   * only if both hasSubset and hasUvMatrix are true.
+   */
+  static void BuildMacros(bool coverageAA, bool commonColor, bool hasUvMatrix, bool hasSubset,
+                          ShaderMacroSet& macros);
+
+  /**
+   * Returns the full set of shader variants. The macro space has 4 independent boolean
+   * dimensions (coverageAA, commonColor, hasUvMatrix, hasSubset), producing 16 variants. The
+   * SUBSET_MATRIX macro is a derived flag driven by (hasSubset && hasUvMatrix) and does not add
+   * to the variant count.
+   * Stable index: coverageAA << 3 | commonColor << 2 | hasUvMatrix << 1 | hasSubset.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants();
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
   QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
@@ -44,21 +63,8 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    if (aa == AAType::Coverage) {
-      macros.define("TGFX_GP_QUAD_COVERAGE_AA");
-    }
-    if (commonColor.has_value()) {
-      macros.define("TGFX_GP_QUAD_COMMON_COLOR");
-    }
-    if (uvMatrix.has_value()) {
-      macros.define("TGFX_GP_QUAD_UV_MATRIX");
-    }
-    if (hasSubset) {
-      macros.define("TGFX_GP_QUAD_SUBSET");
-      if (uvMatrix.has_value()) {
-        macros.define("TGFX_GP_QUAD_SUBSET_MATRIX");
-      }
-    }
+    BuildMacros(aa == AAType::Coverage, commonColor.has_value(), uvMatrix.has_value(), hasSubset,
+                macros);
   }
 
   std::string shaderFunctionFile() const override {

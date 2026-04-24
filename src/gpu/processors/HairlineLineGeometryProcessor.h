@@ -20,8 +20,10 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 #include "GeometryProcessor.h"
 #include "gpu/AAType.h"
+#include "gpu/variants/ShaderVariant.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
@@ -44,6 +46,17 @@ class HairlineLineGeometryProcessor : public GeometryProcessor {
     return "HairlineLineGeometryProcessor";
   }
 
+  /**
+   * Populates the given ShaderMacroSet with the preprocessor defines this processor emits for
+   * the specified AA mode.
+   */
+  static void BuildMacros(AAType aaType, ShaderMacroSet& macros);
+
+  /**
+   * Returns the full set of shader variants: (aa in {None/MSAA, Coverage}) = 2 variants.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants();
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
@@ -53,9 +66,7 @@ class HairlineLineGeometryProcessor : public GeometryProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    if (aaType == AAType::Coverage) {
-      macros.define("TGFX_GP_HLINE_COVERAGE_AA");
-    }
+    BuildMacros(aaType, macros);
   }
 
   std::string shaderFunctionFile() const override {

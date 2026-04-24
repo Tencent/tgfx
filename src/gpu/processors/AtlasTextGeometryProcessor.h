@@ -19,8 +19,10 @@
 #pragma once
 
 #include <optional>
+#include <vector>
 #include "GeometryProcessor.h"
 #include "gpu/AAType.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class AtlasTextGeometryProcessor : public GeometryProcessor {
@@ -33,6 +35,19 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   std::string name() const override {
     return "AtlasTextGeometryProcessor";
   }
+
+  /**
+   * Populates the given ShaderMacroSet with the preprocessor defines this processor emits for
+   * the specified configuration.
+   */
+  static void BuildMacros(bool coverageAA, bool commonColor, bool alphaOnly,
+                          ShaderMacroSet& macros);
+
+  /**
+   * Returns the full set of shader variants:
+   *   (coverageAA) x (commonColor) x (alphaOnly) = 8 variants.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants();
 
   SamplerState onSamplerStateAt(size_t) const override {
     return samplerState;
@@ -47,15 +62,8 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    if (aa == AAType::Coverage) {
-      macros.define("TGFX_GP_ATLAS_COVERAGE_AA");
-    }
-    if (commonColor.has_value()) {
-      macros.define("TGFX_GP_ATLAS_COMMON_COLOR");
-    }
-    if (textureProxy->isAlphaOnly()) {
-      macros.define("TGFX_GP_ATLAS_ALPHA_ONLY");
-    }
+    BuildMacros(aa == AAType::Coverage, commonColor.has_value(), textureProxy->isAlphaOnly(),
+                macros);
   }
 
   std::string shaderFunctionFile() const override {

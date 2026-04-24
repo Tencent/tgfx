@@ -19,7 +19,9 @@
 #pragma once
 
 #include <optional>
+#include <vector>
 #include "GeometryProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 /**
@@ -40,6 +42,19 @@ class EllipseGeometryProcessor : public GeometryProcessor {
     return "EllipseGeometryProcessor";
   }
 
+  /**
+   * Populates the given ShaderMacroSet with the preprocessor defines this processor would emit
+   * for the specified (stroke, commonColor) configuration.
+   */
+  static void BuildMacros(bool stroke, bool commonColor, ShaderMacroSet& macros);
+
+  /**
+   * Returns the full set of shader variants:
+   *   (stroke in {0,1}) x (commonColor in {0,1}) = 4 variants.
+   * Stable index: stroke * 2 + commonColor.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants();
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
@@ -48,12 +63,7 @@ class EllipseGeometryProcessor : public GeometryProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    if (stroke) {
-      macros.define("TGFX_GP_ELLIPSE_STROKE");
-    }
-    if (commonColor.has_value()) {
-      macros.define("TGFX_GP_ELLIPSE_COMMON_COLOR");
-    }
+    BuildMacros(stroke, commonColor.has_value(), macros);
   }
 
   std::string shaderFunctionFile() const override {

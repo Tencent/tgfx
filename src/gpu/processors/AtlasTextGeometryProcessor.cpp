@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AtlasTextGeometryProcessor.h"
+#include <functional>
+#include "gpu/ShaderMacroSet.h"
 
 namespace tgfx {
 AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
@@ -42,5 +44,42 @@ void AtlasTextGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const
   flags |= commonColor.has_value() ? 2 : 0;
   flags |= textureProxy->isAlphaOnly() ? 4 : 0;
   bytesKey->write(flags);
+}
+
+void AtlasTextGeometryProcessor::BuildMacros(bool coverageAA, bool commonColor, bool alphaOnly,
+                                             ShaderMacroSet& macros) {
+  if (coverageAA) {
+    macros.define("TGFX_GP_ATLAS_COVERAGE_AA");
+  }
+  if (commonColor) {
+    macros.define("TGFX_GP_ATLAS_COMMON_COLOR");
+  }
+  if (alphaOnly) {
+    macros.define("TGFX_GP_ATLAS_ALPHA_ONLY");
+  }
+}
+
+std::vector<ShaderVariant> AtlasTextGeometryProcessor::EnumerateVariants() {
+  std::vector<ShaderVariant> variants;
+  variants.reserve(8);
+  std::hash<std::string> hasher;
+  int index = 0;
+  for (int aa = 0; aa < 2; ++aa) {
+    for (int cc = 0; cc < 2; ++cc) {
+      for (int alpha = 0; alpha < 2; ++alpha) {
+        ShaderMacroSet macros;
+        BuildMacros(aa != 0, cc != 0, alpha != 0, macros);
+        ShaderVariant variant;
+        variant.index = index++;
+        variant.name = std::string("AtlasTextGP[coverageAA=") + (aa ? "1" : "0") +
+                       ",commonColor=" + (cc ? "1" : "0") + ",alphaOnly=" + (alpha ? "1" : "0") +
+                       "]";
+        variant.preamble = macros.toPreamble();
+        variant.runtimeKeyHash = static_cast<uint64_t>(hasher(variant.preamble));
+        variants.emplace_back(std::move(variant));
+      }
+    }
+  }
+  return variants;
 }
 }  // namespace tgfx

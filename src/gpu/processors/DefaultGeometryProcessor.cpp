@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DefaultGeometryProcessor.h"
+#include <functional>
+#include "gpu/ShaderMacroSet.h"
 
 namespace tgfx {
 DefaultGeometryProcessor::DefaultGeometryProcessor(PMColor color, int width, int height, AAType aa,
@@ -33,5 +35,31 @@ DefaultGeometryProcessor::DefaultGeometryProcessor(PMColor color, int width, int
 void DefaultGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = aa == AAType::Coverage ? 1 : 0;
   bytesKey->write(flags);
+}
+
+void DefaultGeometryProcessor::BuildMacros(AAType aa, ShaderMacroSet& macros) {
+  if (aa == AAType::Coverage) {
+    macros.define("TGFX_GP_DEFAULT_COVERAGE_AA");
+  }
+}
+
+std::vector<ShaderVariant> DefaultGeometryProcessor::EnumerateVariants() {
+  std::vector<ShaderVariant> variants;
+  variants.reserve(2);
+  std::hash<std::string> hasher;
+  // Iteration order: coverage-off at index 0, coverage-on at index 1. MSAA/None collapse to the
+  // same shader (no coverage varying).
+  const AAType aaValues[2] = {AAType::None, AAType::Coverage};
+  for (int i = 0; i < 2; ++i) {
+    ShaderMacroSet macros;
+    BuildMacros(aaValues[i], macros);
+    ShaderVariant variant;
+    variant.index = i;
+    variant.name = std::string("DefaultGP[coverageAA=") + (i == 1 ? "1" : "0") + "]";
+    variant.preamble = macros.toPreamble();
+    variant.runtimeKeyHash = static_cast<uint64_t>(hasher(variant.preamble));
+    variants.emplace_back(std::move(variant));
+  }
+  return variants;
 }
 }  // namespace tgfx

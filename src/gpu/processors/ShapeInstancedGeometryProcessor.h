@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include <vector>
 #include "GeometryProcessor.h"
 #include "gpu/AAType.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class ShapeInstancedGeometryProcessor : public GeometryProcessor {
@@ -33,6 +35,18 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
     return "ShapeInstancedGeometryProcessor";
   }
 
+  /**
+   * Populates the given ShaderMacroSet with the preprocessor defines this processor emits for
+   * the specified configuration.
+   */
+  static void BuildMacros(bool coverageAA, bool hasColors, ShaderMacroSet& macros);
+
+  /**
+   * Returns the full set of shader variants:
+   *   (coverageAA) x (hasColors) = 4 variants.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants();
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
@@ -42,12 +56,7 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    if (aa == AAType::Coverage) {
-      macros.define("TGFX_GP_SHAPE_COVERAGE_AA");
-    }
-    if (hasColors) {
-      macros.define("TGFX_GP_SHAPE_VERTEX_COLORS");
-    }
+    BuildMacros(aa == AAType::Coverage, hasColors, macros);
   }
 
   std::string shaderFunctionFile() const override {
