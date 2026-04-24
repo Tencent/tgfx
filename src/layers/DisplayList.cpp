@@ -954,7 +954,6 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
                           SrcRectConstraint::Strict);
     tileRect.join(task.tileRect());
   }
-  tileRect.roundOut();
 
   auto screenRect = Rect::MakeWH(surface->width(), surface->height());
   screenRect.offset(-_contentOffset.x, -_contentOffset.y);
