@@ -213,6 +213,8 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
         groupElement->addAttribute("filter", resources.filter);
       }
       drawImage(filterImage->source, sampling, matrix, needsClip ? ClipStack{} : clip, brush);
+      clipGroupElement = nullptr;
+      currentClipPath = {};
     }
   } else if (type == Types::ImageType::Subset) {
     const auto subsetImage = static_cast<const SubsetImage*>(image.get());
@@ -423,6 +425,8 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
       groupElement->addAttribute("filter", resources.filter);
     }
     picture->playback(this, matrix, needsClip ? ClipStack{} : clip);
+    clipGroupElement = nullptr;
+    currentClipPath = {};
   }
 }
 
