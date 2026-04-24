@@ -916,7 +916,6 @@ TGFX_TEST(SVGExportTest, LayerMaskBlur) {
   maskLayer->setMatrix(layerMatrix);
 
   displayList->root()->addChild(groupLayer);
-  displayList->root()->addChild(maskLayer);
   displayList->root()->draw(canvas);
 
   exporter->close();
