@@ -36,7 +36,6 @@ GLSLHairlineQuadGeometryProcessor::GLSLHairlineQuadGeometryProcessor(const PMCol
 }
 
 void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto vertBuilder = args.vertBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -46,26 +45,25 @@ void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
   // Transform vertex position by view matrix
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
+  if (args.gpUniforms) {
+    args.gpUniforms->add("Matrix", matrixName);
+  }
 
-  // Pass quad edge UV coordinates to fragment shader for curve evaluation
+  // Pass quad edge UV coordinates to fragment shader for curve evaluation.
   auto edgeVarying = varyingHandler->addVarying("HairQuadEdge", SLType::Float4);
   if (args.gpVaryings) {
     args.gpVaryings->add("HairQuadEdge", edgeVarying.fsIn());
   }
 
-  // Half-migrated: VS function body lives in hairline_quad_geometry.vert.glsl (injected by
-  // ModularProgramBuilder via includeVSModule based on shaderFunctionFile()). emitTransforms()
-  // needs the transformed position, so we emit the function call here rather than via
-  // buildVSCallExpr().
-  std::string positionName = "transformedPosition";
-  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-  std::string call = "TGFX_HairlineQuadGP_VS(" + std::string(position.name()) + ", " +
-                     std::string(hairQuadEdge.name()) + ", " + matrixName + ", " +
-                     edgeVarying.vsOut() + ", " + positionName + ");";
-  vertBuilder->codeAppend(call);
+  // Device-space position (matrix * attribute position). Written by TGFX_HairlineQuadGP_VS and
+  // consumed by emitCoordTransformCode as the uv input for FP coord transforms.
+  auto transformedPositionVarying =
+      varyingHandler->addVarying("TransformedPosition", SLType::Float2);
+  if (args.gpVaryings) {
+    args.gpVaryings->add("TransformedPosition", transformedPositionVarying.vsOut());
+  }
 
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
-                 ShaderVar(positionName, SLType::Float2));
+  registerCoordTransforms(args, varyingHandler, uniformHandler);
 
   // Output color and coverage uniforms
   auto colorName =

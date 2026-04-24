@@ -2168,8 +2168,9 @@ void TGFX_HairlineLineGP_VS(vec2 inPosition, float inEdgeDistance, mat3 matrix,
 static const std::string kHairlineQuadGeometryVert = R"GLSL(
 // Copyright (C) 2026 Tencent. All rights reserved.
 // hairline_quad_geometry.vert.glsl - HairlineQuadGeometryProcessor vertex shader.
-// Transforms position by matrix, writes gl_Position, and passes hairQuadEdge as a varying
-// for Loop-Blinn evaluation.
+// Transforms position by matrix, writes gl_Position, and passes hairQuadEdge plus the
+// device-space (post-matrix) position as varyings for Loop-Blinn evaluation and FP coord
+// transforms respectively.
 //
 // Attributes: position (vec2), hairQuadEdge (vec4)
 // Uniforms: Matrix (mat3)
@@ -2177,10 +2178,10 @@ static const std::string kHairlineQuadGeometryVert = R"GLSL(
 // Depends on: tgfx_vs_boilerplate.glsl (TGFX_NormalizePosition).
 
 void TGFX_HairlineQuadGP_VS(vec2 inPosition, vec4 inHairQuadEdge, mat3 matrix,
-                              out vec4 vHairQuadEdge, out vec2 position) {
-    position = (matrix * vec3(inPosition, 1.0)).xy;
+                              out vec4 vHairQuadEdge, out vec2 vTransformedPosition) {
+    vTransformedPosition = (matrix * vec3(inPosition, 1.0)).xy;
     vHairQuadEdge = inHairQuadEdge;
-    gl_Position = TGFX_NormalizePosition(position);
+    gl_Position = TGFX_NormalizePosition(vTransformedPosition);
 }
 )GLSL";
 
@@ -2221,33 +2222,34 @@ void TGFX_NonAARRectGP_VS(vec2 inPosition, vec2 inLocalCoord, vec2 inRadii, vec4
 static const std::string kShapeInstancedGeometryVert = R"GLSL(
 // Copyright (C) 2026 Tencent. All rights reserved.
 // shape_instanced_geometry.vert.glsl - ShapeInstancedGeometryProcessor vertex shader.
-// Transforms position by ViewMatrix + offset for screen position, writes gl_Position, and
-// passes optional per-instance color and coverage varyings. UVMatrix is applied in C++
-// emitCode() to compute `local` (the FP coord-transform input).
+// Transforms position by ViewMatrix + offset for device-space position (used to write
+// gl_Position) and in parallel computes the local-space coordinate vLocal = uvMatrix * position
+// as a varying, which is the uv input to FP coord transforms.
 //
 // Attributes: position (vec2), offset (vec2), coverage (float, optional),
 //             instanceColor (vec4, optional)
-// Uniforms: ViewMatrix (mat3)
+// Uniforms: ViewMatrix (mat3), UVMatrix (mat3)
 //
 // Depends on: tgfx_vs_boilerplate.glsl (TGFX_NormalizePosition).
 
 void TGFX_ShapeInstancedGP_VS(vec2 inPosition, vec2 inOffset,
-                                mat3 viewMatrix,
+                                mat3 viewMatrix, mat3 uvMatrix,
 #ifdef TGFX_GP_SHAPE_COVERAGE_AA
                                 float inCoverage, out float vCoverage,
 #endif
 #ifdef TGFX_GP_SHAPE_VERTEX_COLORS
                                 vec4 inInstanceColor, out vec4 vInstanceColor,
 #endif
-                                out vec2 position) {
-    position = (viewMatrix * vec3(inPosition, 1.0)).xy + inOffset;
+                                out vec2 vLocal) {
+    vec2 devicePosition = (viewMatrix * vec3(inPosition, 1.0)).xy + inOffset;
+    vLocal = (uvMatrix * vec3(inPosition, 1.0)).xy;
 #ifdef TGFX_GP_SHAPE_COVERAGE_AA
     vCoverage = inCoverage;
 #endif
 #ifdef TGFX_GP_SHAPE_VERTEX_COLORS
     vInstanceColor = inInstanceColor;
 #endif
-    gl_Position = TGFX_NormalizePosition(position);
+    gl_Position = TGFX_NormalizePosition(devicePosition);
 }
 )GLSL";
 

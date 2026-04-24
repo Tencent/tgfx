@@ -33,14 +33,12 @@ GLSLQuadPerEdgeAAGeometryProcessor::GLSLQuadPerEdgeAAGeometryProcessor(
 }
 
 void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto vertBuilder = args.vertBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
   varyingHandler->emitAttributes(*this);
 
-  auto& uvCoordsVar = uvCoord.empty() ? position : uvCoord;
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
+  registerCoordTransforms(args, varyingHandler, uniformHandler);
 
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);

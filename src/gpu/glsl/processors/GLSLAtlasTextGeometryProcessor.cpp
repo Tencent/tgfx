@@ -33,7 +33,6 @@ GLSLAtlasTextGeometryProcessor::GLSLAtlasTextGeometryProcessor(
 }
 
 void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto vertBuilder = args.vertBuilder;
   auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
@@ -47,7 +46,7 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   auto samplerVarying = varyingHandler->addVarying("textureCoords", SLType::Float2);
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
+  registerCoordTransforms(args, varyingHandler, uniformHandler);
   if (args.gpVaryings) {
     args.gpVaryings->add("textureCoords", samplerVarying.fsIn());
   }

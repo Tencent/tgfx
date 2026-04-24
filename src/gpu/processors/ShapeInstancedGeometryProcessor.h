@@ -54,6 +54,28 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
     return "geometry/shape_instanced_geometry.vert";
   }
 
+  std::string buildVSCallExpr(const MangledUniforms& uniforms,
+                              const MangledVaryings& varyings) const override {
+    std::string code = "TGFX_ShapeInstancedGP_VS(";
+    code += std::string(position.name()) + ", ";
+    code += std::string(offset.name()) + ", ";
+    code += uniforms.get("ViewMatrix") + ", ";
+    code += uniforms.get("UVMatrix");
+    if (aa == AAType::Coverage) {
+      code += ", " + std::string(coverage.name()) + ", " + varyings.get("Coverage");
+    }
+    if (hasColors) {
+      code += ", " + std::string(instanceColor.name()) + ", " + varyings.get("InstanceColor");
+    }
+    code += ", " + varyings.get("LocalCoord") + ");\n";
+    return code;
+  }
+
+  std::string coordTransformInputExpr(const MangledUniforms& /*uniforms*/,
+                                      const MangledVaryings& varyings) const override {
+    return varyings.get("LocalCoord");
+  }
+
   ShaderCallManifest buildColorCallExpr(const MangledUniforms& /*uniforms*/,
                                         const MangledVaryings& varyings) const override {
     ShaderCallManifest result;

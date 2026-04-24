@@ -34,7 +34,6 @@ GLSLShapeInstancedGeometryProcessor::GLSLShapeInstancedGeometryProcessor(int wid
 }
 
 void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto vertBuilder = args.vertBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -43,6 +42,9 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   // Step 1: uvMatrix transforms tessellation-space position back to local space.
   auto uvMatrixName =
       uniformHandler->addUniform("UVMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
+  if (args.gpUniforms) {
+    args.gpUniforms->add("UVMatrix", uvMatrixName);
+  }
 
   // Step 2: transform tessellation-space position directly to device space, then add per-instance
   // offset. viewMatrix = stateMatrix * uvMatrix, which maps tessellation space to device space in
@@ -50,52 +52,38 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   // positions), so it must be applied after the viewMatrix transform.
   auto viewMatrixName =
       uniformHandler->addUniform("ViewMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
+  if (args.gpUniforms) {
+    args.gpUniforms->add("ViewMatrix", viewMatrixName);
+  }
 
   // Coverage varying for AA.
-  std::string coverageVsOut;
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    coverageVsOut = coverageVar.vsOut();
     if (args.gpVaryings) {
       args.gpVaryings->add("Coverage", coverageVar.fsIn());
     }
   }
 
   // Color: per-instance color or opaque white (overridden by shader FP).
-  std::string colorVsOut;
   if (hasColors) {
     auto colorVar = varyingHandler->addVarying("InstanceColor", SLType::Float4);
-    colorVsOut = colorVar.vsOut();
     if (args.gpVaryings) {
       args.gpVaryings->add("InstanceColor", colorVar.fsIn());
     }
   }
 
-  // Half-migrated: VS function body lives in shape_instanced_geometry.vert.glsl (injected by
-  // ModularProgramBuilder via includeVSModule based on shaderFunctionFile()). We emit the call
-  // here because emitTransforms() depends on the `local` variable we compute below from uvMatrix
-  // and the attribute position.
-  std::string positionName = "position";
-  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-  std::string call = "TGFX_ShapeInstancedGP_VS(" + std::string(position.name()) + ", " +
-                     std::string(offset.name()) + ", " + viewMatrixName;
-  if (aa == AAType::Coverage) {
-    call += ", " + std::string(coverage.name()) + ", " + coverageVsOut;
+  // Local-space coord varying (uvMatrix * position). Written by TGFX_ShapeInstancedGP_VS and
+  // consumed by emitCoordTransformCode as the uv input for FP coord transforms. All FP coord
+  // transforms (both color shader and mask coverage) use local coords without offset, because:
+  // (1) mask texture is rasterized at a fixed position shared by all instances, (2) shader
+  // patterns are defined in local space and are the same for all instances. The offset only
+  // affects device-space position.
+  auto localCoordVarying = varyingHandler->addVarying("LocalCoord", SLType::Float2);
+  if (args.gpVaryings) {
+    args.gpVaryings->add("LocalCoord", localCoordVarying.vsOut());
   }
-  if (hasColors) {
-    call += ", " + std::string(instanceColor.name()) + ", " + colorVsOut;
-  }
-  call += ", " + positionName + ");";
-  vertBuilder->codeAppend(call);
-  vertBuilder->codeAppendf("highp vec2 local = (%s * vec3(%s, 1.0)).xy;", uvMatrixName.c_str(),
-                           position.name().c_str());
 
-  // Emit UV transforms using unshifted local coords. All FP coord transforms (both color shader
-  // and mask coverage) use 'local' without offset, because: (1) mask texture is rasterized at a
-  // fixed position shared by all instances, (2) shader patterns are defined in local space and
-  // are the same for all instances. The offset only affects device-space position.
-  ShaderVar localVar("local", SLType::Float2);
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, localVar);
+  registerCoordTransforms(args, varyingHandler, uniformHandler);
 }
 
 void GLSLShapeInstancedGeometryProcessor::setData(UniformData* vertexUniformData, UniformData*,

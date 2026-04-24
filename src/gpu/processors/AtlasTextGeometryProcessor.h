@@ -78,6 +78,11 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
     return code;
   }
 
+  std::string coordTransformInputExpr(const MangledUniforms& /*uniforms*/,
+                                      const MangledVaryings& /*varyings*/) const override {
+    return position.name();
+  }
+
   ShaderCallManifest buildColorCallExpr(const MangledUniforms& uniforms,
                                         const MangledVaryings& varyings) const override {
     ShaderCallManifest result;
