@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <vector>
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class DeviceSpaceTextureEffect : public FragmentProcessor {
@@ -30,6 +32,9 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
   std::string name() const override {
     return "DeviceSpaceTextureEffect";
   }
+
+  static void BuildMacros(bool alphaOnly, ShaderMacroSet& macros);
+  static std::vector<ShaderVariant> EnumerateVariants();
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID
@@ -46,9 +51,7 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
   Matrix uvMatrix = {};
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    if (textureProxy->isAlphaOnly()) {
-      macros.define("TGFX_DSTE_ALPHA_ONLY");
-    }
+    BuildMacros(textureProxy->isAlphaOnly(), macros);
   }
 
   std::string shaderFunctionFile() const override {

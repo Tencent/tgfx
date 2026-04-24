@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DeviceSpaceTextureEffect.h"
+#include <functional>
+#include "gpu/ShaderMacroSet.h"
 
 namespace tgfx {
 DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy,
@@ -27,5 +29,28 @@ DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy>
 std::shared_ptr<Texture> DeviceSpaceTextureEffect::onTextureAt(size_t) const {
   auto textureView = textureProxy->getTextureView();
   return textureView == nullptr ? nullptr : textureView->getTexture();
+}
+
+void DeviceSpaceTextureEffect::BuildMacros(bool alphaOnly, ShaderMacroSet& macros) {
+  if (alphaOnly) {
+    macros.define("TGFX_DSTE_ALPHA_ONLY");
+  }
+}
+
+std::vector<ShaderVariant> DeviceSpaceTextureEffect::EnumerateVariants() {
+  std::vector<ShaderVariant> variants;
+  variants.reserve(2);
+  std::hash<std::string> hasher;
+  for (int i = 0; i < 2; ++i) {
+    ShaderMacroSet macros;
+    BuildMacros(i != 0, macros);
+    ShaderVariant variant;
+    variant.index = i;
+    variant.name = std::string("DeviceSpaceTextureEffect[alphaOnly=") + (i ? "1" : "0") + "]";
+    variant.preamble = macros.toPreamble();
+    variant.runtimeKeyHash = static_cast<uint64_t>(hasher(variant.preamble));
+    variants.emplace_back(std::move(variant));
+  }
+  return variants;
 }
 }  // namespace tgfx

@@ -18,6 +18,8 @@
 
 #include "ColorSpaceXFormEffect.h"
 #include <skcms.h>
+#include <functional>
+#include "gpu/ShaderMacroSet.h"
 
 namespace tgfx {
 
@@ -32,36 +34,90 @@ PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(
   return allocator->make<ColorSpaceXformEffect>(std::move(colorXform));
 }
 
-void ColorSpaceXformEffect::onBuildShaderMacros(ShaderMacroSet& macros) const {
-  auto* steps = colorSpaceXformSteps.get();
-  if (steps->flags.unPremul) {
+void ColorSpaceXformEffect::BuildMacros(bool unPremul, bool srcTF, int srcTFType, bool srcOOTF,
+                                        bool gamutXform, bool dstOOTF, bool dstTF, int dstTFType,
+                                        bool premul, ShaderMacroSet& macros) {
+  if (unPremul) {
     macros.define("TGFX_CSX_UNPREMUL");
   }
-  if (steps->flags.linearize) {
+  if (srcTF) {
     macros.define("TGFX_CSX_SRC_TF");
-    macros.define(
-        "TGFX_CSX_SRC_TF_TYPE",
-        static_cast<int>(gfx::skcms_TransferFunction_getType(
-            reinterpret_cast<const gfx::skcms_TransferFunction*>(&steps->srcTransferFunction))));
+    macros.define("TGFX_CSX_SRC_TF_TYPE", srcTFType);
   }
-  if (steps->flags.srcOOTF) {
+  if (srcOOTF) {
     macros.define("TGFX_CSX_SRC_OOTF");
   }
-  if (steps->flags.gamutTransform) {
+  if (gamutXform) {
     macros.define("TGFX_CSX_GAMUT_XFORM");
   }
-  if (steps->flags.dstOOTF) {
+  if (dstOOTF) {
     macros.define("TGFX_CSX_DST_OOTF");
   }
-  if (steps->flags.encode) {
+  if (dstTF) {
     macros.define("TGFX_CSX_DST_TF");
-    macros.define("TGFX_CSX_DST_TF_TYPE", static_cast<int>(gfx::skcms_TransferFunction_getType(
-                                              reinterpret_cast<const gfx::skcms_TransferFunction*>(
-                                                  &steps->dstTransferFunctionInverse))));
+    macros.define("TGFX_CSX_DST_TF_TYPE", dstTFType);
   }
-  if (steps->flags.premul) {
+  if (premul) {
     macros.define("TGFX_CSX_PREMUL");
   }
+}
+
+void ColorSpaceXformEffect::onBuildShaderMacros(ShaderMacroSet& macros) const {
+  auto* steps = colorSpaceXformSteps.get();
+  int srcTFType = 0;
+  int dstTFType = 0;
+  if (steps->flags.linearize) {
+    srcTFType = static_cast<int>(gfx::skcms_TransferFunction_getType(
+        reinterpret_cast<const gfx::skcms_TransferFunction*>(&steps->srcTransferFunction)));
+  }
+  if (steps->flags.encode) {
+    dstTFType = static_cast<int>(gfx::skcms_TransferFunction_getType(
+        reinterpret_cast<const gfx::skcms_TransferFunction*>(&steps->dstTransferFunctionInverse)));
+  }
+  BuildMacros(steps->flags.unPremul, steps->flags.linearize, srcTFType, steps->flags.srcOOTF,
+              steps->flags.gamutTransform, steps->flags.dstOOTF, steps->flags.encode, dstTFType,
+              steps->flags.premul, macros);
+}
+
+std::vector<ShaderVariant> ColorSpaceXformEffect::EnumerateVariants() {
+  std::vector<ShaderVariant> variants;
+  variants.reserve(static_cast<size_t>(kVariantCount));
+  std::hash<std::string> hasher;
+  int index = 0;
+  // Iteration order matches the bit layout documented in the header.
+  for (int dstTFBits = 0; dstTFBits < kTFValueCount; ++dstTFBits) {
+    for (int srcTFBits = 0; srcTFBits < kTFValueCount; ++srcTFBits) {
+      for (int premul = 0; premul < 2; ++premul) {
+        for (int dstOOTF = 0; dstOOTF < 2; ++dstOOTF) {
+          for (int gamut = 0; gamut < 2; ++gamut) {
+            for (int srcOOTF = 0; srcOOTF < 2; ++srcOOTF) {
+              for (int unPremul = 0; unPremul < 2; ++unPremul) {
+                bool srcTF = srcTFBits != 0;
+                bool dstTF = dstTFBits != 0;
+                int srcTFType = srcTFBits > 0 ? srcTFBits - 1 : 0;
+                int dstTFType = dstTFBits > 0 ? dstTFBits - 1 : 0;
+                ShaderMacroSet macros;
+                BuildMacros(unPremul != 0, srcTF, srcTFType, srcOOTF != 0, gamut != 0, dstOOTF != 0,
+                            dstTF, dstTFType, premul != 0, macros);
+                ShaderVariant variant;
+                variant.index = index++;
+                variant.name =
+                    "ColorSpaceXformEffect[unPremul=" + std::to_string(unPremul) +
+                    ",srcTF=" + std::to_string(srcTFBits) + ",srcOOTF=" + std::to_string(srcOOTF) +
+                    ",gamut=" + std::to_string(gamut) + ",dstOOTF=" + std::to_string(dstOOTF) +
+                    ",dstTF=" + std::to_string(dstTFBits) + ",premul=" + std::to_string(premul) +
+                    "]";
+                variant.preamble = macros.toPreamble();
+                variant.runtimeKeyHash = static_cast<uint64_t>(hasher(variant.preamble));
+                variants.emplace_back(std::move(variant));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return variants;
 }
 
 void ColorSpaceXformEffect::declareResources(UniformHandler* uniformHandler,

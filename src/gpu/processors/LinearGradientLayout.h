@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <vector>
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class LinearGradientLayout : public FragmentProcessor {
@@ -29,6 +31,17 @@ class LinearGradientLayout : public FragmentProcessor {
     return "LinearGradientLayout";
   }
 
+  /**
+   * Populates the given ShaderMacroSet with the preprocessor defines this FP emits for the
+   * specified perspective configuration.
+   */
+  static void BuildMacros(bool hasPerspective, ShaderMacroSet& macros);
+
+  /**
+   * Returns the full set of shader variants: (hasPerspective) = 2 variants.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants();
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
@@ -37,9 +50,7 @@ class LinearGradientLayout : public FragmentProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    if (coordTransform.matrix.hasPerspective()) {
-      macros.define("TGFX_LGRAD_PERSPECTIVE");
-    }
+    BuildMacros(coordTransform.matrix.hasPerspective(), macros);
   }
 
   std::string shaderFunctionFile() const override {

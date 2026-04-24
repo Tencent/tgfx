@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <vector>
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class ConicGradientLayout : public FragmentProcessor {
@@ -30,6 +32,9 @@ class ConicGradientLayout : public FragmentProcessor {
     return "ConicGradientLayout";
   }
 
+  static void BuildMacros(bool hasPerspective, ShaderMacroSet& macros);
+  static std::vector<ShaderVariant> EnumerateVariants();
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
@@ -38,9 +43,7 @@ class ConicGradientLayout : public FragmentProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    if (coordTransform.matrix.hasPerspective()) {
-      macros.define("TGFX_CGRAD_PERSPECTIVE");
-    }
+    BuildMacros(coordTransform.matrix.hasPerspective(), macros);
   }
 
   std::string shaderFunctionFile() const override {

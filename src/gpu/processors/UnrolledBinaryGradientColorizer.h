@@ -18,13 +18,21 @@
 
 #pragma once
 
+#include <vector>
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
 class UnrolledBinaryGradientColorizer : public FragmentProcessor {
  public:
   static constexpr int MaxColorCount = 16;
+  /**
+   * Maximum number of color intervals this FP can shader-unroll. Matches the MaxIntervals
+   * constant used by GLSLUnrolledBinaryGradientColorizer. Variants are enumerated for all
+   * intervalCount values in [1, MaxIntervalCount].
+   */
+  static constexpr int MaxIntervalCount = 8;
 
   static PlacementPtr<UnrolledBinaryGradientColorizer> Make(BlockAllocator* allocator,
                                                             const Color* colors,
@@ -34,10 +42,18 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
     return "UnrolledBinaryGradientColorizer";
   }
 
+  static void BuildMacros(int intervalCount, ShaderMacroSet& macros);
+
+  /**
+   * Returns MaxIntervalCount variants, one per intervalCount in [1, MaxIntervalCount].
+   * variant.index == intervalCount - 1 for stable lookup.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants();
+
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    macros.define("TGFX_UBGC_INTERVAL_COUNT", intervalCount);
+    BuildMacros(intervalCount, macros);
   }
 
   std::string shaderFunctionFile() const override {

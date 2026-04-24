@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DiamondGradientLayout.h"
+#include <functional>
+#include "gpu/ShaderMacroSet.h"
 
 namespace tgfx {
 DiamondGradientLayout::DiamondGradientLayout(Matrix matrix)
@@ -27,5 +29,28 @@ DiamondGradientLayout::DiamondGradientLayout(Matrix matrix)
 void DiamondGradientLayout::onComputeProcessorKey(BytesKey* bytesKey) const {
   const uint32_t flags = coordTransform.matrix.hasPerspective() ? 1 : 0;
   bytesKey->write(flags);
+}
+
+void DiamondGradientLayout::BuildMacros(bool hasPerspective, ShaderMacroSet& macros) {
+  if (hasPerspective) {
+    macros.define("TGFX_DGRAD_PERSPECTIVE");
+  }
+}
+
+std::vector<ShaderVariant> DiamondGradientLayout::EnumerateVariants() {
+  std::vector<ShaderVariant> variants;
+  variants.reserve(2);
+  std::hash<std::string> hasher;
+  for (int i = 0; i < 2; ++i) {
+    ShaderMacroSet macros;
+    BuildMacros(i != 0, macros);
+    ShaderVariant variant;
+    variant.index = i;
+    variant.name = std::string("DiamondGradientLayout[perspective=") + (i ? "1" : "0") + "]";
+    variant.preamble = macros.toPreamble();
+    variant.runtimeKeyHash = static_cast<uint64_t>(hasher(variant.preamble));
+    variants.emplace_back(std::move(variant));
+  }
+  return variants;
 }
 }  // namespace tgfx

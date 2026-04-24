@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <vector>
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 
@@ -26,6 +28,14 @@ enum class GaussianBlurDirection { Horizontal, Vertical };
 
 class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
  public:
+  /**
+   * Maximum maxSigma value the enumerator will emit. Matches MAX_BLUR_SIGMA used by
+   * GaussianBlurImageFilter (which is 10 after ceil). Offline tools should compile variants for
+   * maxSigma in [1, MaxSupportedMaxSigma]; a runtime request outside this range will fall back
+   * to GPU shader compilation.
+   */
+  static constexpr int MaxSupportedMaxSigma = 10;
+
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               PlacementPtr<FragmentProcessor> processor,
                                               float sigma, GaussianBlurDirection direction,
@@ -34,6 +44,14 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
   std::string name() const override {
     return "GaussianBlur1DFragmentProcessor";
   }
+
+  static void BuildMacros(int maxSigma, ShaderMacroSet& macros);
+
+  /**
+   * Returns MaxSupportedMaxSigma variants, one per maxSigma in [1, MaxSupportedMaxSigma].
+   * variant.index == maxSigma - 1.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants();
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID
@@ -44,7 +62,7 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
   void onComputeProcessorKey(BytesKey*) const override;
 
   void onBuildShaderMacros(ShaderMacroSet& macros) const override {
-    macros.define("TGFX_BLUR_LOOP_LIMIT", 4 * maxSigma);
+    BuildMacros(maxSigma, macros);
   }
 
   std::string shaderFunctionFile() const override {

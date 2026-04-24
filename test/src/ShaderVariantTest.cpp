@@ -19,16 +19,24 @@
 #include <unordered_set>
 #include "gpu/ShaderMacroSet.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
+#include "gpu/processors/ColorSpaceXFormEffect.h"
+#include "gpu/processors/ConicGradientLayout.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/DiamondGradientLayout.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
+#include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
 #include "gpu/processors/HairlineLineGeometryProcessor.h"
 #include "gpu/processors/HairlineQuadGeometryProcessor.h"
+#include "gpu/processors/LinearGradientLayout.h"
 #include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/processors/RadialGradientLayout.h"
 #include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
+#include "gpu/processors/UnrolledBinaryGradientColorizer.h"
 #include "gpu/variants/ShaderVariant.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/BlendMode.h"
@@ -276,6 +284,101 @@ TEST(ShaderVariantTest, AllGPsAggregateCount) {
   total += AtlasTextGeometryProcessor::EnumerateVariants().size();
   // 2 + 4 + 2 + 2 + 8 + 4 + 16 + 8 + 4 + 8 = 58.
   EXPECT_EQ(total, 58u);
+}
+
+// ---- Fragment Processor variants ----
+
+TEST(ShaderVariantTest, LinearGradientLayout) {
+  auto variants = LinearGradientLayout::EnumerateVariants();
+  CheckVariantListInvariants(variants, 2, "LinearGradientLayout");
+  EXPECT_EQ(variants[0].preamble, "");
+  EXPECT_EQ(variants[1].preamble, "#define TGFX_LGRAD_PERSPECTIVE 1\n");
+}
+
+TEST(ShaderVariantTest, RadialGradientLayout) {
+  auto variants = RadialGradientLayout::EnumerateVariants();
+  CheckVariantListInvariants(variants, 2, "RadialGradientLayout");
+  EXPECT_EQ(variants[1].preamble, "#define TGFX_RGRAD_PERSPECTIVE 1\n");
+}
+
+TEST(ShaderVariantTest, ConicGradientLayout) {
+  auto variants = ConicGradientLayout::EnumerateVariants();
+  CheckVariantListInvariants(variants, 2, "ConicGradientLayout");
+  EXPECT_EQ(variants[1].preamble, "#define TGFX_CGRAD_PERSPECTIVE 1\n");
+}
+
+TEST(ShaderVariantTest, DiamondGradientLayout) {
+  auto variants = DiamondGradientLayout::EnumerateVariants();
+  CheckVariantListInvariants(variants, 2, "DiamondGradientLayout");
+  EXPECT_EQ(variants[1].preamble, "#define TGFX_DGRAD_PERSPECTIVE 1\n");
+}
+
+TEST(ShaderVariantTest, DeviceSpaceTextureEffect) {
+  auto variants = DeviceSpaceTextureEffect::EnumerateVariants();
+  CheckVariantListInvariants(variants, 2, "DeviceSpaceTextureEffect");
+  EXPECT_EQ(variants[1].preamble, "#define TGFX_DSTE_ALPHA_ONLY 1\n");
+}
+
+TEST(ShaderVariantTest, UnrolledBinaryGradientColorizer) {
+  auto variants = UnrolledBinaryGradientColorizer::EnumerateVariants();
+  CheckVariantListInvariants(variants,
+                             static_cast<size_t>(UnrolledBinaryGradientColorizer::MaxIntervalCount),
+                             "UnrolledBinaryGradientColorizer");
+  // Index 0 corresponds to intervalCount=1.
+  EXPECT_EQ(variants[0].preamble, "#define TGFX_UBGC_INTERVAL_COUNT 1\n");
+  // Last index covers the maximum supported intervalCount.
+  EXPECT_EQ(variants.back().preamble, "#define TGFX_UBGC_INTERVAL_COUNT 8\n");
+}
+
+TEST(ShaderVariantTest, GaussianBlur1D) {
+  auto variants = GaussianBlur1DFragmentProcessor::EnumerateVariants();
+  CheckVariantListInvariants(
+      variants, static_cast<size_t>(GaussianBlur1DFragmentProcessor::MaxSupportedMaxSigma),
+      "GaussianBlur1D");
+  // Index 0 -> maxSigma=1 -> TGFX_BLUR_LOOP_LIMIT = 4*1 = 4.
+  EXPECT_EQ(variants[0].preamble, "#define TGFX_BLUR_LOOP_LIMIT 4\n");
+  // Last index -> maxSigma=10 -> 40.
+  EXPECT_EQ(variants.back().preamble, "#define TGFX_BLUR_LOOP_LIMIT 40\n");
+}
+
+TEST(ShaderVariantTest, ColorSpaceXformEffect_Count) {
+  auto variants = ColorSpaceXformEffect::EnumerateVariants();
+  // 2^5 bool dims (unPremul, srcOOTF, gamut, dstOOTF, premul) x 8 srcTF x 8 dstTF = 2048.
+  EXPECT_EQ(variants.size(), static_cast<size_t>(ColorSpaceXformEffect::kVariantCount));
+  EXPECT_EQ(variants.size(), 2048u);
+}
+
+TEST(ShaderVariantTest, ColorSpaceXformEffect_BaseCaseEmpty) {
+  auto variants = ColorSpaceXformEffect::EnumerateVariants();
+  // Index 0: all bits zero -> no macros defined -> empty preamble.
+  EXPECT_EQ(variants[0].preamble, "");
+  EXPECT_EQ(variants[0].index, 0);
+}
+
+TEST(ShaderVariantTest, ColorSpaceXformEffect_HashUniqueness) {
+  auto variants = ColorSpaceXformEffect::EnumerateVariants();
+  std::unordered_set<uint64_t> seen;
+  seen.reserve(variants.size());
+  for (const auto& v : variants) {
+    auto inserted = seen.insert(v.runtimeKeyHash).second;
+    EXPECT_TRUE(inserted) << "Duplicate hash at " << v.name;
+  }
+  EXPECT_EQ(seen.size(), variants.size());
+}
+
+// Aggregate sanity check: total variant count across all FPs matches expectations.
+TEST(ShaderVariantTest, AllFPsAggregateCount) {
+  size_t total = 0;
+  total += LinearGradientLayout::EnumerateVariants().size();
+  total += RadialGradientLayout::EnumerateVariants().size();
+  total += ConicGradientLayout::EnumerateVariants().size();
+  total += DiamondGradientLayout::EnumerateVariants().size();
+  total += DeviceSpaceTextureEffect::EnumerateVariants().size();
+  total += UnrolledBinaryGradientColorizer::EnumerateVariants().size();
+  total += GaussianBlur1DFragmentProcessor::EnumerateVariants().size();
+  total += ColorSpaceXformEffect::EnumerateVariants().size();
+  // 2 + 2 + 2 + 2 + 2 + 8 + 10 + 2048 = 2076.
+  EXPECT_EQ(total, 2076u);
 }
 
 }  // namespace tgfx

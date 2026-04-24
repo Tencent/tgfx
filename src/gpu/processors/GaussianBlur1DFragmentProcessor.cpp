@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GaussianBlur1DFragmentProcessor.h"
+#include <functional>
+#include "gpu/ShaderMacroSet.h"
 
 namespace tgfx {
 
@@ -30,6 +32,28 @@ GaussianBlur1DFragmentProcessor::GaussianBlur1DFragmentProcessor(
 
 void GaussianBlur1DFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
   key->write(maxSigma);
+}
+
+void GaussianBlur1DFragmentProcessor::BuildMacros(int maxSigma, ShaderMacroSet& macros) {
+  macros.define("TGFX_BLUR_LOOP_LIMIT", 4 * maxSigma);
+}
+
+std::vector<ShaderVariant> GaussianBlur1DFragmentProcessor::EnumerateVariants() {
+  std::vector<ShaderVariant> variants;
+  variants.reserve(static_cast<size_t>(MaxSupportedMaxSigma));
+  std::hash<std::string> hasher;
+  for (int i = 0; i < MaxSupportedMaxSigma; ++i) {
+    int maxSigma = i + 1;
+    ShaderMacroSet macros;
+    BuildMacros(maxSigma, macros);
+    ShaderVariant variant;
+    variant.index = i;
+    variant.name = std::string("GaussianBlur1D[maxSigma=") + std::to_string(maxSigma) + "]";
+    variant.preamble = macros.toPreamble();
+    variant.runtimeKeyHash = static_cast<uint64_t>(hasher(variant.preamble));
+    variants.emplace_back(std::move(variant));
+  }
+  return variants;
 }
 
 }  // namespace tgfx

@@ -17,9 +17,34 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "UnrolledBinaryGradientColorizer.h"
+#include <functional>
+#include "gpu/ShaderMacroSet.h"
 
 namespace tgfx {
 void UnrolledBinaryGradientColorizer::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(intervalCount));
+}
+
+void UnrolledBinaryGradientColorizer::BuildMacros(int intervalCount, ShaderMacroSet& macros) {
+  macros.define("TGFX_UBGC_INTERVAL_COUNT", intervalCount);
+}
+
+std::vector<ShaderVariant> UnrolledBinaryGradientColorizer::EnumerateVariants() {
+  std::vector<ShaderVariant> variants;
+  variants.reserve(static_cast<size_t>(MaxIntervalCount));
+  std::hash<std::string> hasher;
+  for (int i = 0; i < MaxIntervalCount; ++i) {
+    int intervalCount = i + 1;
+    ShaderMacroSet macros;
+    BuildMacros(intervalCount, macros);
+    ShaderVariant variant;
+    variant.index = i;
+    variant.name = std::string("UnrolledBinaryGradientColorizer[intervals=") +
+                   std::to_string(intervalCount) + "]";
+    variant.preamble = macros.toPreamble();
+    variant.runtimeKeyHash = static_cast<uint64_t>(hasher(variant.preamble));
+    variants.emplace_back(std::move(variant));
+  }
+  return variants;
 }
 }  // namespace tgfx
