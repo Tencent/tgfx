@@ -35,7 +35,6 @@ GLSLMeshGeometryProcessor::GLSLMeshGeometryProcessor(bool hasTexCoords, bool has
 }
 
 void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto vertBuilder = args.vertBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -53,10 +52,8 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
     if (args.gpVaryings) {
       args.gpVaryings->add("TexCoord", texCoordVar.fsIn());
     }
-    emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(texCoord));
-  } else {
-    emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
   }
+  registerCoordTransforms(args, varyingHandler, uniformHandler);
 
   if (hasColors) {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);

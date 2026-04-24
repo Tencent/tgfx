@@ -78,6 +78,11 @@ class MeshGeometryProcessor : public GeometryProcessor {
     return code;
   }
 
+  std::string coordTransformInputExpr(const MangledUniforms& /*uniforms*/,
+                                      const MangledVaryings& /*varyings*/) const override {
+    return hasTexCoords ? texCoord.name() : position.name();
+  }
+
   ShaderCallManifest buildColorCallExpr(const MangledUniforms& uniforms,
                                         const MangledVaryings& varyings) const override {
     ShaderCallManifest result;

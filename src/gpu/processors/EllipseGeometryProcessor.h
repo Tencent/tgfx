@@ -74,6 +74,11 @@ class EllipseGeometryProcessor : public GeometryProcessor {
     return code;
   }
 
+  std::string coordTransformInputExpr(const MangledUniforms& /*uniforms*/,
+                                      const MangledVaryings& /*varyings*/) const override {
+    return inPosition.name();
+  }
+
   ShaderCallManifest buildColorCallExpr(const MangledUniforms& uniforms,
                                         const MangledVaryings& varyings) const override {
     ShaderCallManifest result;

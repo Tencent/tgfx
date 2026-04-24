@@ -35,7 +35,6 @@ GLSLDefaultGeometryProcessor::GLSLDefaultGeometryProcessor(PMColor color, int wi
 }
 
 void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto vertBuilder = args.vertBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -54,7 +53,7 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
     }
   }
 
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
+  registerCoordTransforms(args, varyingHandler, uniformHandler);
 
   auto colorName =
       args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);

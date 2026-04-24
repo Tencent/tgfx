@@ -31,7 +31,6 @@ GLSLEllipseGeometryProcessor::GLSLEllipseGeometryProcessor(int width, int height
 }
 
 void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto vertBuilder = args.vertBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -62,7 +61,7 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
     }
   }
 
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(inPosition));
+  registerCoordTransforms(args, varyingHandler, uniformHandler);
 }
 
 void GLSLEllipseGeometryProcessor::setData(UniformData* vertexUniformData,

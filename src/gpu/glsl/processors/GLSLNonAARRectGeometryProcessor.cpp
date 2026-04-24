@@ -31,7 +31,6 @@ GLSLNonAARRectGeometryProcessor::GLSLNonAARRectGeometryProcessor(int width, int 
 }
 
 void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto vertBuilder = args.vertBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -78,9 +77,9 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
     }
   }
 
-  // Emit transforms using position as UV coordinates.
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
-                 ShaderVar(inPosition.name(), SLType::Float2));
+  // Register coord transforms (VS code emitted later by ModularProgramBuilder via
+  // emitCoordTransformCode, after the VS call expression is appended).
+  registerCoordTransforms(args, varyingHandler, uniformHandler);
 }
 
 void GLSLNonAARRectGeometryProcessor::setData(UniformData* vertexUniformData,

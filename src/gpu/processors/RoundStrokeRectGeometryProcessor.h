@@ -73,6 +73,11 @@ class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
     return code;
   }
 
+  std::string coordTransformInputExpr(const MangledUniforms& /*uniforms*/,
+                                      const MangledVaryings& /*varyings*/) const override {
+    return inUVCoord.empty() ? inPosition.name() : inUVCoord.name();
+  }
+
   ShaderCallManifest buildColorCallExpr(const MangledUniforms& uniforms,
                                         const MangledVaryings& varyings) const override {
     ShaderCallManifest result;
