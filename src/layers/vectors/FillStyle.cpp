@@ -38,6 +38,7 @@ static PathFillType ToPathFillType(FillRule fillRule) {
 class FillPainter : public Painter {
  public:
   PathFillType fillRule = PathFillType::Winding;
+  std::shared_ptr<ColorSource> colorSource = nullptr;
 
   std::unique_ptr<Painter> clone() const override {
     return std::make_unique<FillPainter>(*this);
@@ -62,7 +63,11 @@ class FillPainter : public Painter {
         shape = Shape::ApplyFillType(shape, fillRule);
       }
       shape = Shape::ApplyMatrix(shape, geometry->matrix);
-      LayerPaint paint(shader, alpha, blendMode);
+      auto finalShader = shader;
+      if (colorSource->fitsToGeometry()) {
+        finalShader = shader->makeWithMatrix(colorSource->getFitMatrix(shape->getBounds()));
+      }
+      LayerPaint paint(finalShader, alpha, blendMode);
       paint.placement = placement;
       recorder->addShape(std::move(shape), paint);
     }
@@ -72,9 +77,14 @@ class FillPainter : public Painter {
   void drawGlyphRun(LayerRecorder* recorder, const Matrix& geometryMatrix,
                     const StyledGlyphRun& run) {
     float blendFactor = run.style.fillColor.alpha;
+    auto adjustedShader = shader;
+    if (colorSource->fitsToGeometry() && run.textBlob != nullptr) {
+      adjustedShader = shader->makeWithMatrix(colorSource->getFitMatrix(run.textBlob->getBounds()));
+    }
+
     recorder->setMatrix(geometryMatrix);
     if (blendFactor < 1.0f) {
-      LayerPaint paint(shader, alpha * run.style.alpha, blendMode);
+      LayerPaint paint(adjustedShader, alpha * run.style.alpha, blendMode);
       paint.placement = placement;
       recorder->addTextBlob(run.textBlob, paint);
     }
@@ -156,6 +166,7 @@ void FillStyle::apply(VectorContext* context) {
 
   auto painter = std::make_unique<FillPainter>();
   painter->shader = std::move(shader);
+  painter->colorSource = _colorSource;
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
   painter->fillRule = ToPathFillType(_fillRule);

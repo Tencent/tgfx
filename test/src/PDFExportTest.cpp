@@ -695,6 +695,39 @@ TGFX_TEST(PDFExportTest, LayerConicGradient) {
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/LayerConicGradient"));
 }
 
+TGFX_TEST(PDFExportTest, LayerConicGradientRotated) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto shapeLayer = ShapeLayer::Make();
+  Rect rect = Rect::MakeWH(2501.f, 1860.f);
+  Path path;
+  path.addRect(rect);
+  shapeLayer->setPath(path);
+  shapeLayer->removeFillStyles();
+
+  auto shader = Shader::MakeConicGradient(
+      Point{1250.5f, 930.f}, 0.f, 360.f,
+      {Color::FromRGBA(227, 136, 136), Color::FromRGBA(140, 210, 183)}, {});
+  shapeLayer->addFillStyle(ShapeStyle::Make(shader));
+
+  auto layer = Layer::Make();
+  layer->addChild(shapeLayer);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(1860.f, 2501.f);
+  canvas->translate(1860.f, 0.f);
+  canvas->rotate(90.f);
+  layer->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/LayerConicGradientRotated"));
+}
+
 TGFX_TEST(PDFExportTest, LayerDiamondGradient) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -897,6 +930,36 @@ TGFX_TEST(PDFExportTest, NonRegularBlendMode) {
   PDFStream->flush();
 
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/NonRegularBlendMode"));
+}
+
+TGFX_TEST(PDFExportTest, SrcBlendOverlap) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  ASSERT_TRUE(document != nullptr);
+  auto canvas = document->beginPage(300.f, 300.f);
+  ASSERT_TRUE(canvas != nullptr);
+
+  // Bottom rectangle: blue, drawn with default SrcOver blend mode.
+  Paint basePaint;
+  basePaint.setColor(Color::Blue());
+  canvas->drawRect(Rect::MakeXYWH(50, 50, 150, 150), basePaint);
+
+  // Top rectangle: semi-transparent red, drawn with Src blend mode.
+  // Src replaces the destination entirely, so the overlap region should show only the red color
+  // (including its alpha), with no blue bleed-through.
+  Paint srcPaint;
+  srcPaint.setColor(Color::FromRGBA(255, 0, 0, 128));
+  srcPaint.setBlendMode(BlendMode::Src);
+  canvas->drawRect(Rect::MakeXYWH(100, 100, 150, 150), srcPaint);
+
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/SrcBlendOverlap"));
 }
 
 }  // namespace tgfx

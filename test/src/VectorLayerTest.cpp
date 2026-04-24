@@ -27,6 +27,7 @@
 #include "tgfx/layers/vectors/FillStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
 #include "tgfx/layers/vectors/ImagePattern.h"
+#include "tgfx/layers/vectors/Line.h"
 #include "tgfx/layers/vectors/MergePath.h"
 #include "tgfx/layers/vectors/Polystar.h"
 #include "tgfx/layers/vectors/Rectangle.h"
@@ -2357,6 +2358,7 @@ TGFX_TEST(VectorLayerTest, RichText) {
   SamplingOptions nearestSampling(FilterMode::Nearest, MipmapMode::None);
   auto imagePattern =
       ImagePattern::Make(inlineImage, TileMode::Clamp, TileMode::Clamp, nearestSampling);
+  imagePattern->setScaleMode(ScaleMode::None);
   Matrix imageMatrix = Matrix::MakeScale(0.125f);
   imageMatrix.postTranslate(50, 50);
   imagePattern->setMatrix(imageMatrix);
@@ -2372,6 +2374,7 @@ TGFX_TEST(VectorLayerTest, RichText) {
 
   auto titleGradient = Gradient::MakeLinear(
       {0, 0}, {155, 0}, {Color::FromRGBA(255, 0, 0, 255), Color::FromRGBA(0, 0, 255, 255)});
+  titleGradient->setFitsToGeometry(false);
   auto tgfxFill = FillStyle::Make(titleGradient);
   auto tgfxGroup = std::make_shared<VectorGroup>();
   tgfxGroup->setElements({tgfxSpan, tgfxFill});
@@ -2537,7 +2540,7 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 670, 220);
+  auto surface = Surface::Make(context, 670, 440);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -2547,17 +2550,19 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   std::vector<Color> colors = {Color::Red(), Color::FromRGBA(255, 255, 0, 255), Color::Green(),
                                Color::Blue()};
 
+  // Row 1 (fitsToGeometry default true): four gradient types each mapped to their own rect.
   // Linear gradient
   auto group1 = std::make_shared<VectorGroup>();
   auto rect1 = std::make_shared<Rectangle>();
   rect1->setPosition({110, 110});
   rect1->setSize({120, 120});
-  auto linear = Gradient::MakeLinear({50, 110}, {170, 110}, colors);
+  auto linear = Gradient::MakeLinear({0, 0.5f}, {1, 0.5f}, colors);
   EXPECT_EQ(linear->type(), GradientType::Linear);
-  EXPECT_EQ(linear->startPoint(), Point::Make(50, 110));
-  EXPECT_EQ(linear->endPoint(), Point::Make(170, 110));
-  linear->setStartPoint({50, 110});
-  linear->setEndPoint({170, 110});
+  EXPECT_EQ(linear->fitsToGeometry(), true);
+  EXPECT_EQ(linear->startPoint(), Point::Make(0.0f, 0.5f));
+  EXPECT_EQ(linear->endPoint(), Point::Make(1.0f, 0.5f));
+  linear->setStartPoint({0, 0.5f});
+  linear->setEndPoint({1, 0.5f});
   auto fill1 = FillStyle::Make(linear);
   group1->setElements({rect1, fill1});
 
@@ -2566,12 +2571,12 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   auto rect2 = std::make_shared<Rectangle>();
   rect2->setPosition({260, 110});
   rect2->setSize({120, 120});
-  auto radial = Gradient::MakeRadial({260, 110}, 85, colors);
+  auto radial = Gradient::MakeRadial({0.5f, 0.5f}, 0.71f, colors);
   EXPECT_EQ(radial->type(), GradientType::Radial);
-  EXPECT_EQ(radial->center(), Point::Make(260, 110));
-  EXPECT_EQ(radial->radius(), 85.0f);
-  radial->setCenter({260, 110});
-  radial->setRadius(85.0f);
+  EXPECT_EQ(radial->center(), Point::Make(0.5f, 0.5f));
+  EXPECT_EQ(radial->radius(), 0.71f);
+  radial->setCenter({0.5f, 0.5f});
+  radial->setRadius(0.71f);
   auto fill2 = FillStyle::Make(radial);
   group2->setElements({rect2, fill2});
 
@@ -2580,12 +2585,12 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   auto rect3 = std::make_shared<Rectangle>();
   rect3->setPosition({410, 110});
   rect3->setSize({120, 120});
-  auto conic = Gradient::MakeConic({410, 110}, 0, 360, colors);
+  auto conic = Gradient::MakeConic({0.5f, 0.5f}, 0, 360, colors);
   EXPECT_EQ(conic->type(), GradientType::Conic);
-  EXPECT_EQ(conic->center(), Point::Make(410, 110));
+  EXPECT_EQ(conic->center(), Point::Make(0.5f, 0.5f));
   EXPECT_EQ(conic->startAngle(), 0.0f);
   EXPECT_EQ(conic->endAngle(), 360.0f);
-  conic->setCenter({410, 110});
+  conic->setCenter({0.5f, 0.5f});
   conic->setStartAngle(0.0f);
   conic->setEndAngle(360.0f);
   auto fill3 = FillStyle::Make(conic);
@@ -2596,12 +2601,12 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   auto rect4 = std::make_shared<Rectangle>();
   rect4->setPosition({560, 110});
   rect4->setSize({120, 120});
-  auto diamond = Gradient::MakeDiamond({560, 110}, 85, colors);
+  auto diamond = Gradient::MakeDiamond({0.5f, 0.5f}, 0.71f, colors);
   EXPECT_EQ(diamond->type(), GradientType::Diamond);
-  EXPECT_EQ(diamond->center(), Point::Make(560, 110));
-  EXPECT_EQ(diamond->radius(), 85.0f);
-  diamond->setCenter({560, 110});
-  diamond->setRadius(85.0f);
+  EXPECT_EQ(diamond->center(), Point::Make(0.5f, 0.5f));
+  EXPECT_EQ(diamond->radius(), 0.71f);
+  diamond->setCenter({0.5f, 0.5f});
+  diamond->setRadius(0.71f);
   auto fill4 = FillStyle::Make(diamond);
   group4->setElements({rect4, fill4});
 
@@ -2611,7 +2616,66 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   linear->setPositions({0.0f, 0.33f, 0.66f, 1.0f});
   EXPECT_EQ(linear->positions().size(), 4u);
 
-  vectorLayer->setContents({group1, group2, group3, group4});
+  std::vector<Color> compareColors = {Color::Red(), Color::FromRGBA(255, 255, 0, 255),
+                                      Color::Blue()};
+  const float rowRectSize = 80.0f;
+  const float rowGap = 30.0f;
+  const float rowTotalWidth = rowRectSize * 3.0f + rowGap * 2.0f;
+  const float rowStartX = (670.0f - rowTotalWidth) * 0.5f;
+  const std::array<float, 3> rowCenters = {rowStartX + rowRectSize * 0.5f,
+                                           rowStartX + rowRectSize * 1.5f + rowGap,
+                                           rowStartX + rowRectSize * 2.5f + rowGap * 2.0f};
+
+  // Row 2 (fitsToGeometry=true): three contiguous rectangles share one gradient definition; each
+  // rectangle maps the same 0-1 gradient independently, so all three rectangles look identical.
+  auto relativeCompare = Gradient::MakeLinear({0, 0.5f}, {1, 0.5f}, compareColors);
+  EXPECT_EQ(relativeCompare->fitsToGeometry(), true);
+  auto group5 = std::make_shared<VectorGroup>();
+  auto rect5 = std::make_shared<Rectangle>();
+  rect5->setPosition({rowCenters[0], 240});
+  rect5->setSize({rowRectSize, rowRectSize});
+  group5->setElements({rect5, FillStyle::Make(relativeCompare)});
+
+  auto group6 = std::make_shared<VectorGroup>();
+  auto rect6 = std::make_shared<Rectangle>();
+  rect6->setPosition({rowCenters[1], 240});
+  rect6->setSize({rowRectSize, rowRectSize});
+  group6->setElements({rect6, FillStyle::Make(relativeCompare)});
+
+  auto group7 = std::make_shared<VectorGroup>();
+  auto rect7 = std::make_shared<Rectangle>();
+  rect7->setPosition({rowCenters[2], 240});
+  rect7->setSize({rowRectSize, rowRectSize});
+  group7->setElements({rect7, FillStyle::Make(relativeCompare)});
+
+  // Row 3 (fitsToGeometry=false): three separated rectangles share one gradient anchored to the
+  // layer origin; the gradient spans from the left edge of the first rectangle to the right edge
+  // of the last rectangle, so the endpoints are pinned at the outer rectangles.
+  auto absoluteCompare =
+      Gradient::MakeLinear({rowCenters[0] - rowRectSize * 0.5f, 0},
+                           {rowCenters[2] + rowRectSize * 0.5f, 0}, compareColors);
+  absoluteCompare->setFitsToGeometry(false);
+  EXPECT_EQ(absoluteCompare->fitsToGeometry(), false);
+  auto group8 = std::make_shared<VectorGroup>();
+  auto rect8 = std::make_shared<Rectangle>();
+  rect8->setPosition({rowCenters[0], 350});
+  rect8->setSize({rowRectSize, rowRectSize});
+  group8->setElements({rect8, FillStyle::Make(absoluteCompare)});
+
+  auto group9 = std::make_shared<VectorGroup>();
+  auto rect9 = std::make_shared<Rectangle>();
+  rect9->setPosition({rowCenters[1], 350});
+  rect9->setSize({rowRectSize, rowRectSize});
+  group9->setElements({rect9, FillStyle::Make(absoluteCompare)});
+
+  auto group10 = std::make_shared<VectorGroup>();
+  auto rect10 = std::make_shared<Rectangle>();
+  rect10->setPosition({rowCenters[2], 350});
+  rect10->setSize({rowRectSize, rowRectSize});
+  group10->setElements({rect10, FillStyle::Make(absoluteCompare)});
+
+  vectorLayer->setContents(
+      {group1, group2, group3, group4, group5, group6, group7, group8, group9, group10});
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
 
@@ -2637,7 +2701,7 @@ TGFX_TEST(VectorLayerTest, GradientEdgeCases) {
   auto rect1 = std::make_shared<Rectangle>();
   rect1->setPosition({101, 101});
   rect1->setSize({100, 100});
-  auto emptyGradient = Gradient::MakeLinear({51, 101}, {151, 101}, {});
+  auto emptyGradient = Gradient::MakeLinear({0, 0.5f}, {1, 0.5f}, {});
   EXPECT_TRUE(emptyGradient->colors().empty());
   auto fill1 = FillStyle::Make(emptyGradient);
   auto stroke1 = MakeStrokeStyle(Color::FromRGBA(128, 128, 128, 255), 2.0f);
@@ -2648,7 +2712,7 @@ TGFX_TEST(VectorLayerTest, GradientEdgeCases) {
   auto rect2 = std::make_shared<Rectangle>();
   rect2->setPosition({241, 101});
   rect2->setSize({100, 100});
-  auto singleGradient = Gradient::MakeLinear({191, 101}, {291, 101}, {Color::Red()});
+  auto singleGradient = Gradient::MakeLinear({0, 0.5f}, {1, 0.5f}, {Color::Red()});
   EXPECT_EQ(singleGradient->colors().size(), 1u);
   auto fill2 = FillStyle::Make(singleGradient);
   group2->setElements({rect2, fill2});
@@ -2659,7 +2723,7 @@ TGFX_TEST(VectorLayerTest, GradientEdgeCases) {
   rect3->setPosition({381, 101});
   rect3->setSize({100, 100});
   // Create a gradient from top-left to bottom-right of the rect
-  auto matrixGradient = Gradient::MakeLinear({331, 51}, {431, 151}, {Color::Red(), Color::Blue()});
+  auto matrixGradient = Gradient::MakeLinear({0, 0}, {1, 1}, {Color::Red(), Color::Blue()});
   auto fill3 = FillStyle::Make(matrixGradient);
   group3->setElements({rect3, fill3});
 
@@ -2671,7 +2735,7 @@ TGFX_TEST(VectorLayerTest, GradientEdgeCases) {
 }
 
 /**
- * Test ImagePattern: tile modes, null image, and matrix transformation.
+ * Test ImagePattern: tile modes, Relative/Absolute contiguous rows, and null image.
  */
 TGFX_TEST(VectorLayerTest, ImagePattern) {
   // Test null image returns nullptr
@@ -2681,7 +2745,7 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 480, 200);
+  auto surface = Surface::Make(context, 480, 440);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -2693,19 +2757,18 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   auto displayList = std::make_unique<DisplayList>();
   auto vectorLayer = VectorLayer::Make();
 
+  // Row 1 (ScaleMode::None): three tile modes anchored to the layer origin.
   // Group 1: Clamp tile mode - rect larger than image to show edge clamping
   auto group1 = std::make_shared<VectorGroup>();
   auto rect1 = std::make_shared<Rectangle>();
   rect1->setPosition({100, 100});
   rect1->setSize({100, 100});  // Rect is 100x100, larger than 50x50 image
   auto pattern1 = ImagePattern::Make(image, TileMode::Clamp, TileMode::Clamp);
+  pattern1->setScaleMode(ScaleMode::None);
   ASSERT_TRUE(pattern1 != nullptr);
   EXPECT_EQ(pattern1->image(), image);
   EXPECT_EQ(pattern1->tileModeX(), TileMode::Clamp);
   EXPECT_EQ(pattern1->tileModeY(), TileMode::Clamp);
-  // Scale image to 50x50 and position at rect center (75,75)
-  // Rect bounds: (50,50) to (150,150), image at (75,75) to (125,125)
-  // This leaves margins on all sides for clamping effect
   auto scale1 = 50.0f / static_cast<float>(image->width());
   Matrix matrix1 = Matrix::MakeScale(scale1);
   matrix1.postTranslate(75, 75);
@@ -2719,7 +2782,7 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   rect2->setPosition({240, 100});
   rect2->setSize({100, 100});
   auto pattern2 = ImagePattern::Make(image2, TileMode::Repeat, TileMode::Repeat);
-  // Scale image to ~25x25 pixels to show tiling, position at rect's top-left (190, 50)
+  pattern2->setScaleMode(ScaleMode::None);
   Matrix matrix2 = Matrix::MakeScale(0.05f);
   matrix2.postTranslate(190, 50);
   pattern2->setMatrix(matrix2);
@@ -2732,20 +2795,183 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   rect3->setPosition({380, 100});
   rect3->setSize({100, 100});
   auto pattern3 = ImagePattern::Make(image2, TileMode::Mirror, TileMode::Mirror);
-  // Scale image to ~25x25 pixels, rotate, and position at rect's top-left (330, 50)
+  pattern3->setScaleMode(ScaleMode::None);
   Matrix matrix3 = Matrix::MakeScale(0.05f);
-  matrix3.postRotate(30.0f, 12.8f, 12.8f);  // Rotate around center of scaled image
+  matrix3.postRotate(30.0f, 12.8f, 12.8f);
   matrix3.postTranslate(330, 50);
   pattern3->setMatrix(matrix3);
   EXPECT_EQ(pattern3->matrix(), matrix3);
   auto fill3 = FillStyle::Make(pattern3);
   group3->setElements({rect3, fill3});
 
-  vectorLayer->setContents({group1, group2, group3});
+  const float rowRectSize = 80.0f;
+  const float rowGap = 30.0f;
+  const float rowTotalWidth = rowRectSize * 3.0f + rowGap * 2.0f;
+  const float rowStartX = (480.0f - rowTotalWidth) * 0.5f;
+  const std::array<float, 3> rowCenters = {rowStartX + rowRectSize * 0.5f,
+                                           rowStartX + rowRectSize * 1.5f + rowGap,
+                                           rowStartX + rowRectSize * 2.5f + rowGap * 2.0f};
+
+  // Row 2 (default ScaleMode::LetterBox): three separated rectangles share one ImagePattern; each
+  // rectangle maps the same image independently, so all three rectangles look identical.
+  auto relativePattern = ImagePattern::Make(image);
+  EXPECT_EQ(relativePattern->scaleMode(), ScaleMode::LetterBox);
+  std::vector<std::shared_ptr<VectorElement>> contents = {group1, group2, group3};
+  for (float cx : rowCenters) {
+    auto rectGroup = std::make_shared<VectorGroup>();
+    auto rect = std::make_shared<Rectangle>();
+    rect->setPosition({cx, 240});
+    rect->setSize({rowRectSize, rowRectSize});
+    rectGroup->setElements({rect, FillStyle::Make(relativePattern)});
+    contents.push_back(rectGroup);
+  }
+
+  // Row 3 (ScaleMode::None): three separated rectangles share one image pattern anchored to
+  // the layer origin. The image is drawn at its native resolution, so each rectangle reveals a
+  // different region of the same underlying image as if viewing one picture through three
+  // windows. This mirrors how Gradient row 3 spans an absolute gradient across the layer.
+  auto windowPattern = ImagePattern::Make(image);
+  windowPattern->setScaleMode(ScaleMode::None);
+  for (float cx : rowCenters) {
+    auto rectGroup = std::make_shared<VectorGroup>();
+    auto rect = std::make_shared<Rectangle>();
+    rect->setPosition({cx, 350});
+    rect->setSize({rowRectSize, rowRectSize});
+    rectGroup->setElements({rect, FillStyle::Make(windowPattern)});
+    contents.push_back(rectGroup);
+  }
+
+  vectorLayer->setContents(contents);
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/ImagePattern"));
+}
+
+/**
+ * Test ImagePattern ScaleMode values (Stretch, LetterBox, Zoom, None) with visible borders and
+ * labels. Each ScaleMode is rendered in its own rectangle. The trailing None rectangle also
+ * carries a user matrix (rotate 30 degrees and scale 0.5x) to demonstrate that the pattern's
+ * matrix only takes effect under ScaleMode::None.
+ */
+TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 720, 490);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+
+  auto typeface = GetTestTypeface();
+  ASSERT_TRUE(typeface != nullptr);
+  Font labelFont(typeface, 20.0f);
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  struct ModeEntry {
+    ScaleMode mode;
+    const char* label;
+  };
+  const ModeEntry entries[] = {
+      {ScaleMode::Stretch, "Stretch"},
+      {ScaleMode::LetterBox, "LetterBox"},
+      {ScaleMode::Zoom, "Zoom"},
+      {ScaleMode::None, "None"},
+  };
+  const float rectWidth = 160.0f;
+  const float rectHeight = 120.0f;
+  const float gap = 16.0f;
+  const float totalWidth = rectWidth * 4.0f + gap * 3.0f;
+  const float startX = (720.0f - totalWidth) * 0.5f;
+  const float row1CenterY = 110.0f;
+  const float row1LabelY = 205.0f;
+  const float row2CenterY = 340.0f;
+  const float row2LabelY = 435.0f;
+  const Color borderColor = Color::FromRGBA(96, 96, 96, 255);
+  const float borderWidth = 1.0f;
+
+  // Row 1: image with each ScaleMode and no user matrix, showing how the default fit places the
+  // original image into the rect. Each cell is an independent VectorLayer whose origin is aligned
+  // with the cell's top-left corner.
+  auto row1LabelLayer = VectorLayer::Make();
+  std::vector<std::shared_ptr<VectorElement>> row1Labels;
+  for (size_t i = 0; i < 4; ++i) {
+    const float centerX = startX + rectWidth * 0.5f + (rectWidth + gap) * static_cast<float>(i);
+
+    auto cellLayer = VectorLayer::Make();
+    cellLayer->setMatrix(
+        Matrix::MakeTrans(centerX - rectWidth * 0.5f, row1CenterY - rectHeight * 0.5f));
+    auto cellGroup = std::make_shared<VectorGroup>();
+    auto rect = std::make_shared<Rectangle>();
+    rect->setPosition({rectWidth * 0.5f, rectHeight * 0.5f});
+    rect->setSize({rectWidth, rectHeight});
+    auto pattern = ImagePattern::Make(image);
+    EXPECT_EQ(pattern->scaleMode(), ScaleMode::LetterBox);
+    pattern->setScaleMode(entries[i].mode);
+    EXPECT_EQ(pattern->scaleMode(), entries[i].mode);
+    auto border = MakeStrokeStyle(borderColor, borderWidth);
+    cellGroup->setElements({rect, FillStyle::Make(pattern), border});
+    cellLayer->setContents({cellGroup});
+    displayList->root()->addChild(cellLayer);
+
+    auto labelGroup = std::make_shared<VectorGroup>();
+    auto blob = TextBlob::MakeFrom(entries[i].label, labelFont);
+    auto text = Text::Make(blob);
+    auto labelBounds = blob->getTightBounds();
+    text->setPosition({centerX - labelBounds.width() * 0.5f - labelBounds.left, row1LabelY});
+    labelGroup->setElements({text, MakeFillStyle(Color::Black())});
+    row1Labels.push_back(labelGroup);
+  }
+  row1LabelLayer->setContents(row1Labels);
+  displayList->root()->addChild(row1LabelLayer);
+
+  // Row 2: apply the same user matrix (scale so the longest edge equals 1.5x the rect's longest
+  // edge, then rotate 30 degrees around the image-local origin) to every cell, so only the
+  // ScaleMode's fit behavior varies across the row. Each cell is an independent VectorLayer
+  // whose origin is aligned with the cell's top-left corner.
+  float imageMaxEdge =
+      std::max(static_cast<float>(image->width()), static_cast<float>(image->height()));
+  float rectMaxEdge = std::max(rectWidth, rectHeight);
+  float userScale = rectMaxEdge * 1.5f / imageMaxEdge;
+  Matrix userMatrix = Matrix::MakeScale(userScale, userScale);
+  userMatrix.postRotate(30.0f);
+  auto row2LabelLayer = VectorLayer::Make();
+  std::vector<std::shared_ptr<VectorElement>> row2Labels;
+  for (size_t i = 0; i < 4; ++i) {
+    const float centerX = startX + rectWidth * 0.5f + (rectWidth + gap) * static_cast<float>(i);
+
+    auto cellLayer = VectorLayer::Make();
+    cellLayer->setMatrix(
+        Matrix::MakeTrans(centerX - rectWidth * 0.5f, row2CenterY - rectHeight * 0.5f));
+    auto cellGroup = std::make_shared<VectorGroup>();
+    auto rect = std::make_shared<Rectangle>();
+    rect->setPosition({rectWidth * 0.5f, rectHeight * 0.5f});
+    rect->setSize({rectWidth, rectHeight});
+    auto pattern = ImagePattern::Make(image);
+    pattern->setMatrix(userMatrix);
+    pattern->setScaleMode(entries[i].mode);
+    auto border = MakeStrokeStyle(borderColor, borderWidth);
+    cellGroup->setElements({rect, FillStyle::Make(pattern), border});
+    cellLayer->setContents({cellGroup});
+    displayList->root()->addChild(cellLayer);
+
+    auto labelGroup = std::make_shared<VectorGroup>();
+    auto blob = TextBlob::MakeFrom(entries[i].label, labelFont);
+    auto text = Text::Make(blob);
+    auto labelBounds = blob->getTightBounds();
+    text->setPosition({centerX - labelBounds.width() * 0.5f - labelBounds.left, row2LabelY});
+    labelGroup->setElements({text, MakeFillStyle(Color::Black())});
+    row2Labels.push_back(labelGroup);
+  }
+  row2LabelLayer->setContents(row2Labels);
+  displayList->root()->addChild(row2LabelLayer);
+
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/ImagePatternScaleMode"));
 }
 
 /**
@@ -2776,14 +3002,14 @@ TGFX_TEST(VectorLayerTest, ColorSourceAdvanced) {
   auto rect2 = std::make_shared<Rectangle>();
   rect2->setPosition({244, 104});
   rect2->setSize({100, 100});
-  auto stroke2 = StrokeStyle::Make(
-      Gradient::MakeLinear({194, 54}, {294, 154}, {Color::Blue(), Color::Green()}));
+  auto strokeGradient = Gradient::MakeLinear({0, 0}, {1, 1}, {Color::Blue(), Color::Green()});
+  auto stroke2 = StrokeStyle::Make(strokeGradient);
   stroke2->setStrokeWidth(8.0f);
   group2->setElements({rect2, stroke2});
 
   // Group 3: Shared ColorSource (two shapes share the same gradient)
   auto sharedGradient = Gradient::MakeRadial(
-      {384, 104}, 70, {Color::FromRGBA(255, 255, 0, 255), Color::FromRGBA(255, 0, 255, 255)});
+      {0.5f, 0.5f}, 0.7f, {Color::FromRGBA(255, 255, 0, 255), Color::FromRGBA(255, 0, 255, 255)});
   auto group3 = std::make_shared<VectorGroup>();
   auto rect3 = std::make_shared<Rectangle>();
   rect3->setPosition({384, 104});
@@ -2832,6 +3058,7 @@ TGFX_TEST(VectorLayerTest, ImagePatternText) {
   textSpan->setPosition({50, 126});
 
   auto pattern = ImagePattern::Make(image, TileMode::Clamp, TileMode::Clamp);
+  pattern->setScaleMode(ScaleMode::None);
   Matrix matrix = Matrix::MakeScale(0.5f);
   matrix.postTranslate(-180, -80);
   pattern->setMatrix(matrix);
@@ -4384,6 +4611,107 @@ TGFX_TEST(VectorLayerTest, StrokeDashAdaptive) {
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/StrokeDashAdaptive"));
+}
+
+/**
+ * Test Line vector element: horizontal, diagonal, and trimmed (forward and reversed) segments
+ * with different stroke styles.
+ */
+TGFX_TEST(VectorLayerTest, Line) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 600, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  // Line 1: Horizontal line with solid red stroke.
+  auto line1 = Line::Make();
+  line1->setStartPoint({50, 54});
+  line1->setEndPoint({550, 54});
+  auto stroke1 = MakeStrokeStyle(Color::Red(), 8.0f);
+  auto group1 = std::make_shared<VectorGroup>();
+  group1->setElements({line1, stroke1});
+
+  // Line 2: Diagonal line with dashed blue stroke.
+  auto line2 = Line::Make();
+  line2->setStartPoint({50, 150});
+  line2->setEndPoint({550, 250});
+  auto stroke2 = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+  stroke2->setStrokeWidth(8.0f);
+  stroke2->setDashes({24.0f, 12.0f});
+  auto group2 = std::make_shared<VectorGroup>();
+  group2->setElements({line2, stroke2});
+
+  // Line 3: Forward line trimmed to the first half, stroked green.
+  auto line3 = Line::Make();
+  line3->setStartPoint({50, 346});
+  line3->setEndPoint({300, 346});
+  auto trim3 = std::make_shared<TrimPath>();
+  trim3->setStart(0.0f);
+  trim3->setEnd(0.5f);
+  auto stroke3 = MakeStrokeStyle(Color::Green(), 8.0f);
+  auto group3 = std::make_shared<VectorGroup>();
+  group3->setElements({line3, trim3, stroke3});
+
+  // Line 4: Reversed line with the same trim; the opposite half should be drawn.
+  auto line4 = Line::Make();
+  line4->setStartPoint({300, 346});
+  line4->setEndPoint({550, 346});
+  line4->setReversed(true);
+  auto trim4 = std::make_shared<TrimPath>();
+  trim4->setStart(0.0f);
+  trim4->setEnd(0.5f);
+  auto stroke4 = MakeStrokeStyle(Color::FromRGBA(255, 128, 0, 255), 8.0f);
+  auto group4 = std::make_shared<VectorGroup>();
+  group4->setElements({line4, trim4, stroke4});
+
+  vectorLayer->setContents({group1, group2, group3, group4});
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/Line"));
+}
+
+/**
+ * Test switching fitsToGeometry on Gradient and ScaleMode on ImagePattern at runtime, verifying
+ * that setters/getters work correctly.
+ */
+TGFX_TEST(VectorLayerTest, FitsToGeometrySwitch) {
+  // Default fitsToGeometry for Gradient is true
+  auto gradient = Gradient::MakeLinear({0, 0}, {1, 1}, {Color::Red(), Color::Blue()});
+  EXPECT_EQ(gradient->fitsToGeometry(), true);
+
+  // Switch to layer coordinate space
+  gradient->setFitsToGeometry(false);
+  EXPECT_EQ(gradient->fitsToGeometry(), false);
+
+  // Switch back to fitting each geometry
+  gradient->setFitsToGeometry(true);
+  EXPECT_EQ(gradient->fitsToGeometry(), true);
+
+  // Default scaleMode for ImagePattern is LetterBox, with Decal tile modes
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto pattern = ImagePattern::Make(image);
+  EXPECT_EQ(pattern->scaleMode(), ScaleMode::LetterBox);
+  EXPECT_EQ(pattern->fitsToGeometry(), true);
+  EXPECT_EQ(pattern->tileModeX(), TileMode::Decal);
+  EXPECT_EQ(pattern->tileModeY(), TileMode::Decal);
+
+  // Switch scaleMode
+  pattern->setScaleMode(ScaleMode::Zoom);
+  EXPECT_EQ(pattern->scaleMode(), ScaleMode::Zoom);
+  EXPECT_EQ(pattern->fitsToGeometry(), true);
+
+  // Switch to None (layer coordinate space)
+  pattern->setScaleMode(ScaleMode::None);
+  EXPECT_EQ(pattern->scaleMode(), ScaleMode::None);
+  EXPECT_EQ(pattern->fitsToGeometry(), false);
 }
 
 }  // namespace tgfx

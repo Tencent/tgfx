@@ -77,6 +77,26 @@ class ClipElement {
 
   bool tryCombine(const ClipElement& other);
 
+  /**
+   * Returns whether this element's keep-region fully contains the keep-region of other.
+   *
+   * A true result guarantees containment; a false result means containment could not be
+   * cheaply proven, so it may or may not actually hold. For example, when this is a concave
+   * path such as an L shape and other's bounds fit entirely inside the L, the geometric
+   * check cannot prove containment and returns false even though it does hold.
+   */
+  bool tightContains(const ClipElement& other) const;
+
+  /**
+   * Returns whether this element's keep-region intersects the keep-region of other.
+   *
+   * A false result guarantees disjointness; a true result means disjointness could not be
+   * cheaply proven, so the two regions may or may not actually overlap. For example, when
+   * this is a concave path and other fits entirely inside a concave gap of this, the AABB
+   * check still reports them as overlapping and returns true even though they are disjoint.
+   */
+  bool looseIntersects(const ClipElement& other) const;
+
   void transform(const Matrix& matrix);
 
   void markInvalid(int byIndex) {

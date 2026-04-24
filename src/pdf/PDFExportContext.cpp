@@ -841,8 +841,15 @@ void PDFExportContext::onDrawPath(const Matrix& matrix, const ClipStack& clip, c
     return;
   }
 
-  PDFUtils::EmitPath(path, false, content);
-  PDFUtils::PaintPath(path.getFillType(), content);
+  if (scopedContent.needShape()) {
+    Path shape(path);
+    shape.transform(matrix);
+    scopedContent.setShape(shape);
+  }
+
+  auto stream = scopedContent.stream();
+  PDFUtils::EmitPath(path, false, stream);
+  PDFUtils::PaintPath(path.getFillType(), stream);
 }
 
 void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect& rect,
@@ -1095,6 +1102,8 @@ std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
 
   if (!TreatAsRegularPDFBlendMode(blendMode) && blendMode != BlendMode::DstOver) {
     if (!isContentEmpty()) {
+      activeStackState.drainStack();
+      activeStackState = PDFGraphicStackState();
       *destination = this->makeFormXObjectFromDevice();
       DEBUG_ASSERT(isContentEmpty());
     } else if (blendMode != BlendMode::Src && blendMode != BlendMode::SrcOut) {
@@ -1267,7 +1276,7 @@ void PDFExportContext::drawFormXObject(PDFIndirectReference xObject,
 
   DEBUG_ASSERT(xObject);
   PDFWriteResourceName(stream, PDFResourceType::XObject, add_resource(xObjectResources, xObject));
-  content->writeText(" Do\n");
+  stream->writeText(" Do\n");
 }
 
 void PDFExportContext::clearMaskOnGraphicState(const std::shared_ptr<MemoryWriteStream>& stream) {

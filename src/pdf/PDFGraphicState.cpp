@@ -21,6 +21,8 @@
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUtils.h"
 #include "tgfx/core/BlendMode.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/Stream.h"
 
 namespace tgfx {
 
@@ -57,8 +59,8 @@ PDFIndirectReference PDFGraphicState::GetGraphicStateForPaint(PDFDocumentImpl* d
   return reference;
 }
 
-PDFIndirectReference PDFGraphicState::GetSMaskGraphicState(PDFIndirectReference sMask,
-                                                           bool /*invert*/, SMaskMode sMaskMode,
+PDFIndirectReference PDFGraphicState::GetSMaskGraphicState(PDFIndirectReference sMask, bool invert,
+                                                           SMaskMode sMaskMode,
                                                            PDFDocumentImpl* doc) {
   // The practical chances of using the same mask more than once are unlikely
   // enough that it's not worth canonicalizing.
@@ -69,6 +71,18 @@ PDFIndirectReference PDFGraphicState::GetSMaskGraphicState(PDFIndirectReference 
     sMaskDict->insertName("S", "Luminosity");
   }
   sMaskDict->insertRef("G", sMask);
+  if (invert) {
+    // PDF Type 4 (PostScript Calculator) function: f(x) = 1 - x
+    auto fnDict = PDFDictionary::Make();
+    fnDict->insertInt("FunctionType", 4);
+    fnDict->insertObject("Domain", MakePDFArray(0.f, 1.f));
+    fnDict->insertObject("Range", MakePDFArray(0.f, 1.f));
+    std::string fnBody = "{ 1 exch sub }";
+    auto fnStream = Stream::MakeFromData(Data::MakeWithCopy(fnBody.data(), fnBody.size()));
+    auto fnRef =
+        PDFStreamOut(std::move(fnDict), std::move(fnStream), doc, PDFSteamCompressionEnabled::No);
+    sMaskDict->insertRef("TR", fnRef);
+  }
   auto result = PDFDictionary::Make("ExtGState");
   result->insertObject("SMask", std::move(sMaskDict));
   return doc->emit(*result);

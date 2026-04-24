@@ -25,8 +25,8 @@ namespace tgfx {
 class VectorContext;
 
 /**
- * VectorElement is the base class for all vector elements in a shape layer. It includes shapes
- * (rect, ellipse, path, etc.), modifiers (fill, stroke, trim path, etc.), and groups.
+ * VectorElement is the base class for all elements in a VectorLayer. It includes geometries
+ * (shapes and text), modifiers (fill, stroke, trim path, etc.), and groups.
  */
 class VectorElement : public LayerProperty {
  public:
@@ -48,6 +48,7 @@ class VectorElement : public LayerProperty {
     Ellipse,
     Polystar,
     ShapePath,
+    Line,
     FillStyle,
     StrokeStyle,
     TrimPath,
