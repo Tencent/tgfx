@@ -71,7 +71,7 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
     return "geometry/quad_aa_geometry.vert";
   }
 
-  std::string buildVSCallExpr(const MangledUniforms& /*uniforms*/,
+  std::string buildVSCallExpr(const MangledUniforms& uniforms,
                               const MangledVaryings& varyings) const override {
     std::string code = "highp vec2 position;\n";
     code += "TGFX_QuadAAGP_VS(" + std::string(position.name());
@@ -80,6 +80,17 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
     }
     if (!commonColor.has_value()) {
       code += ", " + std::string(color.name()) + ", " + varyings.get("Color");
+    }
+    if (hasSubset) {
+      // Subset matrix comes from two possible channels:
+      // - When the GP owns its own uvMatrix, a dedicated "texSubsetMatrix" uniform is
+      //   registered in emitCode (phase 1).
+      // - Otherwise the GP borrows the first FP coord transform's matrix, which is registered
+      //   by registerCoordTransforms under the stable key "CoordTransformMatrix_0".
+      std::string subsetMatrix = uvMatrix.has_value() ? uniforms.get("texSubsetMatrix")
+                                                      : uniforms.get("CoordTransformMatrix_0");
+      code += ", " + std::string(subset.name()) + ", " + subsetMatrix + ", " +
+              varyings.get("vTexSubset");
     }
     code += ", position);\n";
     code += "gl_Position = TGFX_NormalizePosition(position);\n";

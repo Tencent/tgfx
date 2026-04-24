@@ -387,7 +387,7 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
 
   // Phase 1 (resource registration): emitCode should register attributes / uniforms / varyings
   // and call registerCoordTransforms. It must not append any VS code — all VS code emission is
-  // now driven by buildVSCallExpr() in phase 2 and emitCoordTransformCode() in phase 3.
+  // now driven by buildVSCallExpr() in phase 2 and buildCoordTransformCode() in phase 3.
   geometryProcessor->emitCode(args);
 
   // AtlasTextGeometryProcessor samples its atlas during emitCode via the helper function
@@ -412,7 +412,8 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
   // Phase 3 (coord transform code): emit the `TransformedCoords_i = M * vec3(uv, 1)` statements,
   // consuming the uv expression (attribute or varying) now that it is defined by phase 2.
   auto coordInputExpr = geometryProcessor->coordTransformInputExpr(gpUniforms, gpVaryings);
-  geometryProcessor->emitCoordTransformCode(args, vertexShaderBuilder(), coordInputExpr);
+  vertexShaderBuilder()->codeAppend(
+      geometryProcessor->buildCoordTransformCode(args, coordInputExpr));
 
   auto colorResult = geometryProcessor->buildColorCallExpr(gpUniforms, gpVaryings);
   auto coverageResult = geometryProcessor->buildCoverageCallExpr(gpUniforms, gpVaryings);

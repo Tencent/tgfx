@@ -72,7 +72,7 @@ class GeometryProcessor : public Processor {
 
   /**
    * Metadata for a single FP coord transform registration, produced by registerCoordTransforms
-   * and consumed by emitCoordTransformCode to emit the "TransformedCoords_i = M * vec3(uv, 1)"
+   * and consumed by buildCoordTransformCode to emit the "TransformedCoords_i = M * vec3(uv, 1)"
    * statement after the VS call expression has been appended.
    */
   struct CoordTransformRecord {
@@ -146,7 +146,9 @@ class GeometryProcessor : public Processor {
   /**
    * Phase 1 (called from emitCode): register uniform matrices and varyings for every FP coord
    * transform, and specify the coord varying for each FP via specifyCoordsForCurrCoordTransform.
-   * Populates args.coordTransformRecords with metadata used later by emitCoordTransformCode.
+   * Populates args.coordTransformRecords with metadata used later by buildCoordTransformCode,
+   * and mirrors each CoordTransformMatrix_i uniform into args.gpUniforms so that subclasses'
+   * buildVSCallExpr overrides can reference them by the stable key "CoordTransformMatrix_i".
    * Emits no VS code — that is deferred so ModularProgramBuilder can append the VS call
    * expression (which produces the uv varying value) before the coord transform statements that
    * consume it.
@@ -155,13 +157,15 @@ class GeometryProcessor : public Processor {
                                UniformHandler* uniformHandler) const;
 
   /**
-   * Phase 2 (called from ModularProgramBuilder after buildVSCallExpr has been appended): emits
-   * `TransformedCoords_i = CoordTransformMatrix_i * vec3(uvCoordsExpr, 1.0);` VS statements for
-   * every record registered by registerCoordTransforms. uvCoordsExpr is a VS-scope expression
-   * evaluating to a vec2 (attribute name, varying vsOut name, or literal).
+   * Phase 3 (called from ModularProgramBuilder after buildVSCallExpr has been appended): returns
+   * the VS statements `TransformedCoords_i = CoordTransformMatrix_i * vec3(uvCoordsExpr, 1.0);`
+   * for every record registered by registerCoordTransforms. The caller is responsible for
+   * appending the returned string to the vertex shader body. Pure function: no builder side
+   * effects, making the emission rule replayable by offline shader generation tools.
+   * uvCoordsExpr is a VS-scope expression evaluating to a vec2 (attribute name, varying vsOut
+   * name, or literal).
    */
-  void emitCoordTransformCode(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
-                              const std::string& uvCoordsExpr) const;
+  std::string buildCoordTransformCode(EmitArgs& args, const std::string& uvCoordsExpr) const;
 
   // ---- Modular shader virtual methods (for ModularProgramBuilder) ----
 
@@ -178,10 +182,10 @@ class GeometryProcessor : public Processor {
   }
 
   /**
-   * Returns the VS-scope expression that should be fed to emitCoordTransformCode as the uvCoords
-   * source. This is typically an attribute name (when coord transforms operate on the input
-   * position directly) or the vsOut name of a varying written by the VS call expression (when
-   * coord transforms operate on a VS-computed value such as viewMatrix * position).
+   * Returns the VS-scope expression that should be fed to buildCoordTransformCode as the
+   * uvCoords source. This is typically an attribute name (when coord transforms operate on the
+   * input position directly) or the vsOut name of a varying written by the VS call expression
+   * (when coord transforms operate on a VS-computed value such as viewMatrix * position).
    *
    * All GeometryProcessor subclasses must return a non-empty, valid VS-scope expression.
    */
@@ -208,10 +212,6 @@ class GeometryProcessor : public Processor {
 
   virtual SamplerState onSamplerStateAt(size_t) const {
     return {};
-  }
-
-  virtual void onEmitTransform(EmitArgs&, VertexShaderBuilder*, VaryingHandler*, UniformHandler*,
-                               const std::string&, bool, int) const {
   }
 
   virtual void onSetTransformData(UniformData*, const CoordTransform*, int) const {

@@ -61,23 +61,22 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   // Subset support: when a subset attribute is present, register the subset varying and the
-  // (optional) subset transform uniform here, in phase 1, so that phase 2 (buildVSCallExpr) and
-  // phase 3 (emitCoordTransformCode + onEmitTransform) never register new resources. The
-  // `vTexSubset` varying is always written by onEmitTransform at coord-transform index 0, but it
-  // must be declared up front because uniform/varying layout is finalized before the code phases
-  // run.
+  // (optional) subset transform uniform here, in phase 1. Phase 2 (buildVSCallExpr) then
+  // consumes both via gpVaryings / gpUniforms, so the subset computation is emitted entirely
+  // inside TGFX_QuadAAGP_VS from quad_aa_geometry.vert.glsl — no VS code is appended from C++.
   if (!subset.empty()) {
     auto subsetVarying = varyingHandler->addVarying("vTexSubset", SLType::Float4, true);
     // Stash the subset varying's fsIn name into EmitArgs::outputSubset so the TextureEffect FP can
     // reference it from the fragment shader. This channel is the GP->FP contract for subset.
     *args.outputSubset = subsetVarying.fsIn();
-    // Remember the vsOut name for phase 3 code emission.
+    // Remember the vsOut name for phase 2 VS call generation.
     if (args.gpVaryings) {
       args.gpVaryings->add("vTexSubset", subsetVarying.vsOut());
     }
     // When no FP coord transform is available for the subset (i.e. the GP owns its own uvMatrix),
-    // register a dedicated texSubsetMatrix uniform. Otherwise phase 3 will reuse
-    // CoordTransformMatrix_0, which is registered by registerCoordTransforms() above.
+    // register a dedicated texSubsetMatrix uniform. Otherwise buildVSCallExpr will reuse
+    // CoordTransformMatrix_0, which is registered by registerCoordTransforms() above and mirrored
+    // into gpUniforms under the stable key "CoordTransformMatrix_0".
     if (uvCoord.empty()) {
       auto subsetMatrixName = uniformHandler->addUniform("texSubsetMatrix", UniformFormat::Float3x3,
                                                          ShaderStage::Vertex);
@@ -104,29 +103,6 @@ void GLSLQuadPerEdgeAAGeometryProcessor::onSetTransformData(UniformData* uniform
     // Subset only applies to the first image in ProgramInfo.
     uniformData->setData("texSubsetMatrix", coordTransform->getTotalMatrix());
   }
-}
-
-void GLSLQuadPerEdgeAAGeometryProcessor::onEmitTransform(EmitArgs& args,
-                                                         VertexShaderBuilder* vertexBuilder,
-                                                         VaryingHandler* /*varyingHandler*/,
-                                                         UniformHandler* /*uniformHandler*/,
-                                                         const std::string& transformUniformName,
-                                                         bool hasPerspective, int index) const {
-  if (index != 0 || subset.empty()) {
-    return;
-  }
-  // Emit a single call to either TGFX_QuadAA_ComputeSubset or the perspective variant. Both
-  // helpers live in quad_aa_geometry.vert.glsl and perform the full axis-aligned bounds
-  // computation, so no GLSL logic is assembled here — only the function name is selected by
-  // C++ based on whether the subset matrix may contain a perspective row. This matches the
-  // existing program-key encoding (perspective vs. affine produce different cached programs).
-  auto subsetMatrixName =
-      uvCoord.empty() ? args.gpUniforms->get("texSubsetMatrix") : transformUniformName;
-  auto subsetVaryingVsOut = args.gpVaryings->get("vTexSubset");
-  const char* computeFn =
-      hasPerspective ? "TGFX_QuadAA_ComputeSubsetPersp" : "TGFX_QuadAA_ComputeSubset";
-  vertexBuilder->codeAppendf("%s = %s(%s, %s);", subsetVaryingVsOut.c_str(), computeFn,
-                             subset.name().c_str(), subsetMatrixName.c_str());
 }
 
 }  // namespace tgfx

@@ -1,16 +1,19 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 // quad_aa_geometry.vert.glsl - QuadPerEdgeAAGeometryProcessor vertex shader.
-// Passes position directly (pre-transformed), with optional coverage and color varyings.
+// Passes position directly (pre-transformed), with optional coverage and color varyings, and
+// an optional subset rect computed in target space when TGFX_GP_QUAD_SUBSET is defined.
 //
 // Attributes: position (vec2), uvCoord (vec2, optional), coverage (float, optional),
-//             color (vec4, optional)
+//             color (vec4, optional), subset (vec4, optional)
 //
 // Optional macros:
 //   TGFX_GP_QUAD_COVERAGE_AA - defined if AA coverage attribute is present
 //   TGFX_GP_QUAD_COMMON_COLOR - defined if using uniform color instead of per-vertex color
+//   TGFX_GP_QUAD_SUBSET - defined if this draw carries a texture subset rect
 //
-// Depends on: tgfx_vs_boilerplate.glsl (TGFX_TransformPoint / TGFX_TransformPointPersp)
-//             when subset computation is used.
+// Depends on: tgfx_vs_boilerplate.glsl (TGFX_TransformPointPersp is used for the subset even
+//             when the matrix is affine; the extra divide-by-1 is negligible on modern GPUs
+//             and lets us drop a perspective-vs-affine variant axis).
 
 void TGFX_QuadAAGP_VS(vec2 inPosition,
 #ifdef TGFX_GP_QUAD_COVERAGE_AA
@@ -18,6 +21,9 @@ void TGFX_QuadAAGP_VS(vec2 inPosition,
 #endif
 #ifndef TGFX_GP_QUAD_COMMON_COLOR
                        vec4 inColor, out vec4 vColor,
+#endif
+#ifdef TGFX_GP_QUAD_SUBSET
+                       vec4 inSubset, mat3 subsetMatrix, out vec4 vSubset,
 #endif
                        out vec2 position) {
     position = inPosition;
@@ -27,46 +33,24 @@ void TGFX_QuadAAGP_VS(vec2 inPosition,
 #ifndef TGFX_GP_QUAD_COMMON_COLOR
     vColor = inColor;
 #endif
-}
-
-// Computes the texture subset in target space given a pre-packed subset vec4 (srcLT.xy, srcRB.zw)
-// and an affine transform matrix. Returns an axis-aligned vec4(minX, minY, maxX, maxY) with the
-// bounds sorted so that xy <= zw element-wise, matching what the FS subset constraint expects.
-vec4 TGFX_QuadAA_ComputeSubset(vec4 srcSubset, mat3 matrix) {
-    vec2 srcLT = srcSubset.xy;
-    vec2 srcRB = srcSubset.zw;
-    vec2 dstLT = TGFX_TransformPoint(srcLT, matrix);
-    vec2 dstRB = TGFX_TransformPoint(srcRB, matrix);
-    vec4 result = vec4(dstLT, dstRB);
-    if (result.x > result.z) {
-        float tmp = result.x;
-        result.x = result.z;
-        result.z = tmp;
+#ifdef TGFX_GP_QUAD_SUBSET
+    // Transform the src-space subset corners into target space, then sort into
+    // axis-aligned vec4(minX, minY, maxX, maxY). Use the perspective helper unconditionally
+    // so this file has zero perspective/affine branching — for affine matrices the helper
+    // degenerates to a divide-by-1.0 which is a free op on any modern shader compiler path.
+    vec2 dstLT = TGFX_TransformPointPersp(inSubset.xy, subsetMatrix);
+    vec2 dstRB = TGFX_TransformPointPersp(inSubset.zw, subsetMatrix);
+    vec4 r = vec4(dstLT, dstRB);
+    if (r.x > r.z) {
+        float t = r.x;
+        r.x = r.z;
+        r.z = t;
     }
-    if (result.y > result.w) {
-        float tmp = result.y;
-        result.y = result.w;
-        result.w = tmp;
+    if (r.y > r.w) {
+        float t = r.y;
+        r.y = r.w;
+        r.w = t;
     }
-    return result;
-}
-
-// Perspective variant used when the subset transform matrix may contain a perspective row.
-vec4 TGFX_QuadAA_ComputeSubsetPersp(vec4 srcSubset, mat3 matrix) {
-    vec2 srcLT = srcSubset.xy;
-    vec2 srcRB = srcSubset.zw;
-    vec2 dstLT = TGFX_TransformPointPersp(srcLT, matrix);
-    vec2 dstRB = TGFX_TransformPointPersp(srcRB, matrix);
-    vec4 result = vec4(dstLT, dstRB);
-    if (result.x > result.z) {
-        float tmp = result.x;
-        result.x = result.z;
-        result.z = tmp;
-    }
-    if (result.y > result.w) {
-        float tmp = result.y;
-        result.y = result.w;
-        result.w = tmp;
-    }
-    return result;
+    vSubset = r;
+#endif
 }

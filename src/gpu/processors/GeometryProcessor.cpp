@@ -79,6 +79,13 @@ void GeometryProcessor::registerCoordTransforms(EmitArgs& args, VaryingHandler* 
     strUniName += std::to_string(i);
     auto uniName =
         uniformHandler->addUniform(strUniName, UniformFormat::Float3x3, ShaderStage::Vertex);
+    // Mirror the mangled uniform name into gpUniforms under the stable key
+    // "CoordTransformMatrix_i" so that subclasses' buildVSCallExpr overrides can reference it
+    // by a deterministic, variant-independent key. This is how QuadPerEdgeAA resolves its
+    // subset matrix when it reuses the first FP coord transform.
+    if (args.gpUniforms != nullptr) {
+      args.gpUniforms->add(strUniName, uniName);
+    }
     std::string strVaryingName = "TransformedCoords_";
     strVaryingName += std::to_string(i);
     const bool hasPerspective = hasUVPerspective() || coordTransform->matrix.hasPerspective();
@@ -92,27 +99,24 @@ void GeometryProcessor::registerCoordTransforms(EmitArgs& args, VaryingHandler* 
   }
 }
 
-void GeometryProcessor::emitCoordTransformCode(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
-                                               const std::string& uvCoordsExpr) const {
+std::string GeometryProcessor::buildCoordTransformCode(EmitArgs& args,
+                                                       const std::string& uvCoordsExpr) const {
   auto* records = args.coordTransformRecords;
-  if (records == nullptr) {
-    return;
+  if (records == nullptr || records->empty()) {
+    return "";
   }
   std::string uvCoords = "vec3(" + uvCoordsExpr + ", 1.0)";
+  std::string code;
   for (const auto& record : *records) {
+    code += record.varyingVsOut;
+    code += " = ";
     if (record.hasPerspective) {
-      vertexBuilder->codeAppendf("%s = %s * %s;", record.varyingVsOut.c_str(),
-                                 record.uniformName.c_str(), uvCoords.c_str());
+      code += record.uniformName + " * " + uvCoords + ";\n";
     } else {
-      vertexBuilder->codeAppendf("%s = (%s * %s).xy;", record.varyingVsOut.c_str(),
-                                 record.uniformName.c_str(), uvCoords.c_str());
+      code += "(" + record.uniformName + " * " + uvCoords + ").xy;\n";
     }
-    // Phase-3 hook: onEmitTransform may append additional VS statements for a given coord
-    // transform, but must not register new uniforms or varyings — all resources must be
-    // declared in phase 1 (emitCode). nullptr is passed to enforce that contract.
-    onEmitTransform(args, vertexBuilder, nullptr, nullptr, record.uniformName,
-                    record.hasPerspective, record.index);
   }
+  return code;
 }
 
 }  // namespace tgfx
