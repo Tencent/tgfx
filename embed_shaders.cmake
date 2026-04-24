@@ -44,6 +44,7 @@ set(SHADER_MODULES
     "kMeshGeometryVert=geometry/mesh_geometry.vert.glsl"
     "kQuadAAGeometryVert=geometry/quad_aa_geometry.vert.glsl"
     "kAtlasTextGeometryVert=geometry/atlas_text_geometry.vert.glsl"
+    "kAtlasTextGeometryFrag=geometry/atlas_text_geometry.frag.glsl"
     "kEllipseGeometryVert=geometry/ellipse_geometry.vert.glsl"
     "kRoundStrokeRectGeometryVert=geometry/round_stroke_rect_geometry.vert.glsl"
     "kHairlineLineGeometryVert=geometry/hairline_line_geometry.vert.glsl"

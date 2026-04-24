@@ -129,6 +129,8 @@ const std::string& ShaderModuleRegistry::GetModule(ShaderModuleID id) {
       return kQuadAAGeometryVert;
     case ShaderModuleID::AtlasTextGeometry:
       return kAtlasTextGeometryVert;
+    case ShaderModuleID::AtlasTextGeometryFrag:
+      return kAtlasTextGeometryFrag;
     case ShaderModuleID::EllipseGeometry:
       return kEllipseGeometryVert;
     case ShaderModuleID::RoundStrokeRectGeometry:

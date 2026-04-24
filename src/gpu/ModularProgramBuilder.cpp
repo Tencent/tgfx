@@ -390,6 +390,15 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
   // now driven by buildVSCallExpr() in phase 2 and emitCoordTransformCode() in phase 3.
   geometryProcessor->emitCode(args);
 
+  // AtlasTextGeometryProcessor samples its atlas during emitCode via the helper function
+  // TGFX_AtlasText_SampleAtlas (defined in atlas_text_geometry.frag.glsl). Inject that FS
+  // module so the function body is available when the FS is compiled. The set is intentionally
+  // hard-coded (same pattern as the GPCoverage whitelist below): AtlasText is currently the
+  // only GP that needs an auxiliary FS helper for sampling.
+  if (geometryProcessor->name() == "AtlasTextGeometryProcessor") {
+    includeModule(ShaderModuleID::AtlasTextGeometryFrag);
+  }
+
   // Phase 2 (VS call): append the GP's VS function call so that any varying it writes
   // (transformedPosition / vLocal / etc.) is defined before phase 3 reads it.
   if (ShaderModuleRegistry::HasModule(geometryProcessor->name())) {

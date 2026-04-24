@@ -64,6 +64,8 @@ enum class ShaderModuleID {
   MeshGeometry,
   QuadAAGeometry,
   AtlasTextGeometry,
+  // AtlasText FS helpers (sampler2D/sampler2DRect overloads for atlas sampling)
+  AtlasTextGeometryFrag,
   EllipseGeometry,
   RoundStrokeRectGeometry,
   HairlineLineGeometry,

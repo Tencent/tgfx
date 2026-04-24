@@ -19,7 +19,6 @@
 #pragma once
 
 #include <cstdint>
-#include "gpu/SamplerHandle.h"
 #include "gpu/ShaderVar.h"
 #include "tgfx/gpu/ShaderStage.h"
 
@@ -47,12 +46,6 @@ class ShaderBuilder {
   virtual ShaderStage shaderStage() const = 0;
 
   void setPrecisionQualifier(const std::string& precision);
-
-  /**
-   * Appends a 2D texture sampler. The vec length and swizzle order of the result depends on the
-   * Texture associated with the SamplerHandle.
-   */
-  void appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName);
 
   /**
    * Called by Processors to add code to one of the shaders.

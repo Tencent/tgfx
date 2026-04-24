@@ -19,7 +19,6 @@
 #include "ShaderBuilder.h"
 #include "ProgramBuilder.h"
 #include "ShaderCaps.h"
-#include "Swizzle.h"
 #include "stdarg.h"
 
 namespace tgfx {
@@ -80,22 +79,6 @@ void ShaderBuilder::addFunction(const std::string& str) {
 
 std::string ShaderBuilder::getMangledFunctionName(const char* baseName) {
   return programBuilder->nameVariable(baseName);
-}
-
-static std::string TextureSwizzleString(const Swizzle& swizzle) {
-  if (swizzle == Swizzle::RGBA()) {
-    return "";
-  }
-  std::string ret = ".";
-  ret.append(swizzle.c_str());
-  return ret;
-}
-
-void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName) {
-  auto uniformHandler = programBuilder->uniformHandler();
-  auto sampler = uniformHandler->getSamplerVariable(samplerHandle);
-  codeAppendf("texture(%s, %s)", sampler.name().c_str(), coordName.c_str());
-  codeAppend(TextureSwizzleString(uniformHandler->getSamplerSwizzle(samplerHandle)));
 }
 
 void ShaderBuilder::addFeature(uint32_t featureBit, const std::string& extensionName) {
