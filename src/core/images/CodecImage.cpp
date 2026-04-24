@@ -33,6 +33,10 @@ std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
 }
 
 float CodecImage::getRasterizedScale(float drawScale) const {
+  // CPU mipmap (per-scale-level caching) is redundant when GPU mipmap is enabled.
+  if (mipmapped) {
+    return 1.0f;
+  }
   return NextCacheScaleLevel(drawScale);
 }
 
