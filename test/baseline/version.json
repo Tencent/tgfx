@@ -473,6 +473,7 @@
         "ImageMask": "f8344be7",
         "InvertPictureImageMask": "9a80633b",
         "LayerDropShadow": "a99262da",
+        "LayerMaskBlur": "cd3ccd97b",
         "PictureImageMask": "9a80633b"
     },
     "SVGTest": {
