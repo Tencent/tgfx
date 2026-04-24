@@ -62,6 +62,22 @@ class HairlineLineGeometryProcessor : public GeometryProcessor {
     return "geometry/hairline_line_geometry.vert";
   }
 
+  std::string buildVSCallExpr(const MangledUniforms& uniforms,
+                              const MangledVaryings& varyings) const override {
+    std::string code = "TGFX_HairlineLineGP_VS(";
+    code += std::string(position.name()) + ", ";
+    code += std::string(edgeDistance.name()) + ", ";
+    code += uniforms.get("Matrix") + ", ";
+    code += varyings.get("EdgeDistance") + ", ";
+    code += varyings.get("TransformedPosition") + ");\n";
+    return code;
+  }
+
+  std::string coordTransformInputExpr(const MangledUniforms& /*uniforms*/,
+                                      const MangledVaryings& varyings) const override {
+    return varyings.get("TransformedPosition");
+  }
+
   ShaderCallManifest buildColorCallExpr(const MangledUniforms& uniforms,
                                         const MangledVaryings& /*varyings*/) const override {
     ShaderCallManifest result;

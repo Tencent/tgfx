@@ -36,7 +36,6 @@ GLSLHairlineLineGeometryProcessor::GLSLHairlineLineGeometryProcessor(const PMCol
 }
 
 void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto vertBuilder = args.vertBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -46,28 +45,30 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   // Transform vertex position by view matrix
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
+  if (args.gpUniforms) {
+    args.gpUniforms->add("Matrix", matrixName);
+  }
 
-  // Pass edge distance to fragment shader for anti-aliasing
+  // Pass edge distance to fragment shader for anti-aliasing.
   auto edgeVarying = varyingHandler->addVarying("EdgeDistance", SLType::Float);
   if (args.gpVaryings) {
     args.gpVaryings->add("EdgeDistance", edgeVarying.fsIn());
   }
 
-  // Half-migrated: VS function body lives in hairline_line_geometry.vert.glsl (injected by
-  // ModularProgramBuilder via includeVSModule based on shaderFunctionFile()). emitTransforms()
-  // needs to operate on the transformed position, so we emit the function call here rather
-  // than in buildVSCallExpr().
-  std::string positionName = "transformedPosition";
-  vertBuilder->codeAppendf("highp vec2 %s;", positionName.c_str());
-  std::string call = "TGFX_HairlineLineGP_VS(" + std::string(position.name()) + ", " +
-                     std::string(edgeDistance.name()) + ", " + matrixName + ", " +
-                     edgeVarying.vsOut() + ", " + positionName + ");";
-  vertBuilder->codeAppend(call);
+  // Device-space position (matrix * attribute position). Written by TGFX_HairlineLineGP_VS and
+  // consumed by emitCoordTransformCode as the uv input for FP coord transforms.
+  auto transformedPositionVarying =
+      varyingHandler->addVarying("TransformedPosition", SLType::Float2);
+  if (args.gpVaryings) {
+    args.gpVaryings->add("TransformedPosition", transformedPositionVarying.vsOut());
+  }
 
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
-                 ShaderVar(positionName, SLType::Float2));
+  // Register coord transforms. The actual "TransformedCoords_i = M * vec3(uv, 1)" statements are
+  // emitted later by ModularProgramBuilder via emitCoordTransformCode, after the VS call
+  // expression has defined vTransformedPosition.
+  registerCoordTransforms(args, varyingHandler, uniformHandler);
 
-  // Output color and coverage
+  // Output color and coverage uniforms
   auto colorName =
       uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   if (args.gpUniforms) {
