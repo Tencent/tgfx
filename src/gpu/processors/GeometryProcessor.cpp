@@ -107,12 +107,11 @@ void GeometryProcessor::emitCoordTransformCode(EmitArgs& args, VertexShaderBuild
       vertexBuilder->codeAppendf("%s = (%s * %s).xy;", record.varyingVsOut.c_str(),
                                  record.uniformName.c_str(), uvCoords.c_str());
     }
-    // Pass args.varyingHandler/uniformHandler so that GPs whose onEmitTransform still registers
-    // resources (QuadPerEdgeAA's subset varying/uniform in particular) keep working. Moving that
-    // registration into emitCode and tightening this contract to forbid phase-2 registration is
-    // tracked as a follow-up cleanup.
-    onEmitTransform(args, vertexBuilder, args.varyingHandler, args.uniformHandler,
-                    record.uniformName, record.hasPerspective, record.index);
+    // Phase-3 hook: onEmitTransform may append additional VS statements for a given coord
+    // transform, but must not register new uniforms or varyings — all resources must be
+    // declared in phase 1 (emitCode). nullptr is passed to enforce that contract.
+    onEmitTransform(args, vertexBuilder, nullptr, nullptr, record.uniformName,
+                    record.hasPerspective, record.index);
   }
 }
 

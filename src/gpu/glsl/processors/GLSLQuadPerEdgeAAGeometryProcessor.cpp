@@ -59,6 +59,33 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
       args.gpVaryings->add("Color", colorVar.fsIn());
     }
   }
+
+  // Subset support: when a subset attribute is present, register the subset varying and the
+  // (optional) subset transform uniform here, in phase 1, so that phase 2 (buildVSCallExpr) and
+  // phase 3 (emitCoordTransformCode + onEmitTransform) never register new resources. The
+  // `vTexSubset` varying is always written by onEmitTransform at coord-transform index 0, but it
+  // must be declared up front because uniform/varying layout is finalized before the code phases
+  // run.
+  if (!subset.empty()) {
+    auto subsetVarying = varyingHandler->addVarying("vTexSubset", SLType::Float4, true);
+    // Stash the subset varying's fsIn name into EmitArgs::outputSubset so the TextureEffect FP can
+    // reference it from the fragment shader. This channel is the GP->FP contract for subset.
+    *args.outputSubset = subsetVarying.fsIn();
+    // Remember the vsOut name for phase 3 code emission.
+    if (args.gpVaryings) {
+      args.gpVaryings->add("vTexSubset", subsetVarying.vsOut());
+    }
+    // When no FP coord transform is available for the subset (i.e. the GP owns its own uvMatrix),
+    // register a dedicated texSubsetMatrix uniform. Otherwise phase 3 will reuse
+    // CoordTransformMatrix_0, which is registered by registerCoordTransforms() above.
+    if (uvCoord.empty()) {
+      auto subsetMatrixName = uniformHandler->addUniform("texSubsetMatrix", UniformFormat::Float3x3,
+                                                         ShaderStage::Vertex);
+      if (args.gpUniforms) {
+        args.gpUniforms->add("texSubsetMatrix", subsetMatrixName);
+      }
+    }
+  }
 }
 
 void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformData* vertexUniformData,
@@ -81,44 +108,25 @@ void GLSLQuadPerEdgeAAGeometryProcessor::onSetTransformData(UniformData* uniform
 
 void GLSLQuadPerEdgeAAGeometryProcessor::onEmitTransform(EmitArgs& args,
                                                          VertexShaderBuilder* vertexBuilder,
-                                                         VaryingHandler* varyingHandler,
-                                                         UniformHandler* uniformHandler,
+                                                         VaryingHandler* /*varyingHandler*/,
+                                                         UniformHandler* /*uniformHandler*/,
                                                          const std::string& transformUniformName,
                                                          bool hasPerspective, int index) const {
-  if (index == 0 && !subset.empty()) {
-    auto varying = varyingHandler->addVarying("vTexSubset", SLType::Float4, true);
-    std::string subsetMatrixName = transformUniformName;
-    if (uvCoord.empty()) {
-      subsetMatrixName = uniformHandler->addUniform("texSubsetMatrix", UniformFormat::Float3x3,
-                                                    ShaderStage::Vertex);
-    }
-    const std::string srcLT = "srcLT";
-    const std::string srcRB = "srcRB";
-    const std::string perspLT = "perspLT";
-    const std::string perspRB = "perspRB";
-    vertexBuilder->codeAppendf("highp vec2 %s = %s.xy;", srcLT.c_str(), subset.name().c_str());
-    vertexBuilder->codeAppendf("highp vec2 %s = %s.zw;", srcRB.c_str(), subset.name().c_str());
-    // TGFX_TransformPoint/TGFX_TransformPointPersp live in tgfx_vs_boilerplate.glsl and are
-    // injected via includeVSModule(ShaderModuleID::VSBoilerplate) by ModularProgramBuilder.
-    const char* transformFn = hasPerspective ? "TGFX_TransformPointPersp" : "TGFX_TransformPoint";
-    vertexBuilder->codeAppendf("highp vec2 %s = %s(%s, %s);", perspLT.c_str(), transformFn,
-                               srcLT.c_str(), subsetMatrixName.c_str());
-    vertexBuilder->codeAppendf("highp vec2 %s = %s(%s, %s);", perspRB.c_str(), transformFn,
-                               srcRB.c_str(), subsetMatrixName.c_str());
-    vertexBuilder->codeAppend("highp vec4 subset = vec4(" + perspLT + ", " + perspRB + ");");
-    vertexBuilder->codeAppend("if (subset.x > subset.z) {");
-    vertexBuilder->codeAppend("  highp float tmp = subset.x;");
-    vertexBuilder->codeAppend("  subset.x = subset.z;");
-    vertexBuilder->codeAppend("  subset.z = tmp;");
-    vertexBuilder->codeAppend("}");
-    vertexBuilder->codeAppend("if (subset.y > subset.w) {");
-    vertexBuilder->codeAppend("  highp float tmp = subset.y;");
-    vertexBuilder->codeAppend("  subset.y = subset.w;");
-    vertexBuilder->codeAppend("  subset.w = tmp;");
-    vertexBuilder->codeAppend("}");
-    vertexBuilder->codeAppendf("%s = subset;", varying.vsOut().c_str());
-    *args.outputSubset = varying.fsIn();
+  if (index != 0 || subset.empty()) {
+    return;
   }
+  // Emit a single call to either TGFX_QuadAA_ComputeSubset or the perspective variant. Both
+  // helpers live in quad_aa_geometry.vert.glsl and perform the full axis-aligned bounds
+  // computation, so no GLSL logic is assembled here — only the function name is selected by
+  // C++ based on whether the subset matrix may contain a perspective row. This matches the
+  // existing program-key encoding (perspective vs. affine produce different cached programs).
+  auto subsetMatrixName =
+      uvCoord.empty() ? args.gpUniforms->get("texSubsetMatrix") : transformUniformName;
+  auto subsetVaryingVsOut = args.gpVaryings->get("vTexSubset");
+  const char* computeFn =
+      hasPerspective ? "TGFX_QuadAA_ComputeSubsetPersp" : "TGFX_QuadAA_ComputeSubset";
+  vertexBuilder->codeAppendf("%s = %s(%s, %s);", subsetVaryingVsOut.c_str(), computeFn,
+                             subset.name().c_str(), subsetMatrixName.c_str());
 }
 
 }  // namespace tgfx
