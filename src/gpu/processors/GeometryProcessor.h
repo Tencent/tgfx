@@ -144,18 +144,6 @@ class GeometryProcessor : public Processor {
                               FPCoordTransformIter* transformIter) const;
 
   /**
-   * Emit transformed uv coords from the vertex shader as a uniform matrix and varying per
-   * coord-transform. uvCoordsVar must be a 2-component vector.
-   *
-   * Legacy single-phase API. ModularProgramBuilder now drives GP code emission via the two-phase
-   * pair registerCoordTransforms / emitCoordTransformCode, so new GP implementations should not
-   * call this. Kept only for transitional compatibility while GPs are being migrated.
-   */
-  void emitTransforms(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
-                      VaryingHandler* varyingHandler, UniformHandler* uniformHandler,
-                      const ShaderVar& uvCoordsVar) const;
-
-  /**
    * Phase 1 (called from emitCode): register uniform matrices and varyings for every FP coord
    * transform, and specify the coord varying for each FP via specifyCoordsForCurrCoordTransform.
    * Populates args.coordTransformRecords with metadata used later by emitCoordTransformCode.
@@ -191,20 +179,14 @@ class GeometryProcessor : public Processor {
 
   /**
    * Returns the VS-scope expression that should be fed to emitCoordTransformCode as the uvCoords
-   * source. For fully-modular GPs this is typically an attribute name (if coord transforms
-   * operate on the input position directly) or the vsOut name of a varying written by the VS
-   * call expression (if coord transforms operate on a VS-computed value such as
-   * viewMatrix * position).
+   * source. This is typically an attribute name (when coord transforms operate on the input
+   * position directly) or the vsOut name of a varying written by the VS call expression (when
+   * coord transforms operate on a VS-computed value such as viewMatrix * position).
    *
-   * Returning an empty string selects the legacy path: the GP is expected to have called
-   * emitTransforms itself inside emitCode, and ModularProgramBuilder will skip the phase-3 call
-   * to emitCoordTransformCode. This escape hatch exists only during the migration window and
-   * will be removed once all GPs are modular (node 5 makes this pure virtual).
+   * All GeometryProcessor subclasses must return a non-empty, valid VS-scope expression.
    */
-  virtual std::string coordTransformInputExpr(const MangledUniforms& /*uniforms*/,
-                                              const MangledVaryings& /*varyings*/) const {
-    return "";
-  }
+  virtual std::string coordTransformInputExpr(const MangledUniforms& uniforms,
+                                              const MangledVaryings& varyings) const = 0;
 
   virtual ShaderCallManifest buildColorCallExpr(const MangledUniforms& /*uniforms*/,
                                                 const MangledVaryings& /*varyings*/) const {

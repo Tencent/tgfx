@@ -69,43 +69,6 @@ void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix, UniformDa
   }
 }
 
-void GeometryProcessor::emitTransforms(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
-                                       VaryingHandler* varyingHandler,
-                                       UniformHandler* uniformHandler,
-                                       const ShaderVar& uvCoordsVar) const {
-  std::string uvCoords = "vec3(";
-  uvCoords += uvCoordsVar.name();
-  uvCoords += ", 1)";
-  int i = 0;
-  auto transformHandler = args.fpCoordTransformHandler;
-  while (const CoordTransform* coordTransform = transformHandler->nextCoordTransform()) {
-    std::string strUniName = TRANSFORM_UNIFORM_PREFIX;
-    strUniName += std::to_string(i);
-    auto uniName =
-        uniformHandler->addUniform(strUniName, UniformFormat::Float3x3, ShaderStage::Vertex);
-    std::string strVaryingName = "TransformedCoords_";
-    strVaryingName += std::to_string(i);
-    // The final UV transform combines GP's uvMatrix and FP's coordTransform->getTotalMatrix().
-    // We use coordTransform->matrix here because getTotalMatrix() preserves its perspective property.
-    const bool hasPerspective = hasUVPerspective() || coordTransform->matrix.hasPerspective();
-    const SLType varyingType = hasPerspective ? SLType::Float3 : SLType::Float2;
-    auto varying = varyingHandler->addVarying(strVaryingName, varyingType);
-    transformHandler->specifyCoordsForCurrCoordTransform(varying.name(), varyingType);
-    // For perspective: pass vec3 directly, division happens in fragment shader.
-    // For non-perspective: compute vec2 directly as an optimization.
-    if (hasPerspective) {
-      vertexBuilder->codeAppendf("%s = %s * %s;", varying.vsOut().c_str(), uniName.c_str(),
-                                 uvCoords.c_str());
-    } else {
-      vertexBuilder->codeAppendf("%s = (%s * %s).xy;", varying.vsOut().c_str(), uniName.c_str(),
-                                 uvCoords.c_str());
-    }
-    onEmitTransform(args, vertexBuilder, varyingHandler, uniformHandler, uniName, hasPerspective,
-                    i);
-    ++i;
-  }
-}
-
 void GeometryProcessor::registerCoordTransforms(EmitArgs& args, VaryingHandler* varyingHandler,
                                                 UniformHandler* uniformHandler) const {
   int i = 0;
@@ -144,10 +107,10 @@ void GeometryProcessor::emitCoordTransformCode(EmitArgs& args, VertexShaderBuild
       vertexBuilder->codeAppendf("%s = (%s * %s).xy;", record.varyingVsOut.c_str(),
                                  record.uniformName.c_str(), uvCoords.c_str());
     }
-    // Pass args.varyingHandler/uniformHandler so that half-migrated GPs whose onEmitTransform
-    // still registers resources (e.g. QuadPerEdgeAA's subset varying/uniform) keep working
-    // during the migration window. Once all GPs move their resource registration into emitCode,
-    // these handlers can be set to nullptr here to enforce the phase-1/phase-2 contract.
+    // Pass args.varyingHandler/uniformHandler so that GPs whose onEmitTransform still registers
+    // resources (QuadPerEdgeAA's subset varying/uniform in particular) keep working. Moving that
+    // registration into emitCode and tightening this contract to forbid phase-2 registration is
+    // tracked as a follow-up cleanup.
     onEmitTransform(args, vertexBuilder, args.varyingHandler, args.uniformHandler,
                     record.uniformName, record.hasPerspective, record.index);
   }

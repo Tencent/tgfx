@@ -386,8 +386,8 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
   args.coordTransformRecords = &coordRecords;
 
   // Phase 1 (resource registration): emitCode should register attributes / uniforms / varyings
-  // and call registerCoordTransforms (or, for legacy GPs still pending migration, call
-  // emitTransforms which performs both registration and VS code emission in one go).
+  // and call registerCoordTransforms. It must not append any VS code — all VS code emission is
+  // now driven by buildVSCallExpr() in phase 2 and emitCoordTransformCode() in phase 3.
   geometryProcessor->emitCode(args);
 
   // Phase 2 (VS call): append the GP's VS function call so that any varying it writes
@@ -400,15 +400,10 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
     }
   }
 
-  // Phase 3 (coord transform code): for GPs that opted into the two-phase path via
-  // coordTransformInputExpr(), emit the `TransformedCoords_i = M * vec3(uv, 1)` statements
-  // here, consuming the uv expression (attribute or varying) now that it is defined.
-  // Legacy GPs return an empty expression and are expected to have already emitted this code
-  // inside emitCode via the one-shot emitTransforms helper.
+  // Phase 3 (coord transform code): emit the `TransformedCoords_i = M * vec3(uv, 1)` statements,
+  // consuming the uv expression (attribute or varying) now that it is defined by phase 2.
   auto coordInputExpr = geometryProcessor->coordTransformInputExpr(gpUniforms, gpVaryings);
-  if (!coordInputExpr.empty()) {
-    geometryProcessor->emitCoordTransformCode(args, vertexShaderBuilder(), coordInputExpr);
-  }
+  geometryProcessor->emitCoordTransformCode(args, vertexShaderBuilder(), coordInputExpr);
 
   auto colorResult = geometryProcessor->buildColorCallExpr(gpUniforms, gpVaryings);
   auto coverageResult = geometryProcessor->buildCoverageCallExpr(gpUniforms, gpVaryings);
