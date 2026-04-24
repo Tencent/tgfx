@@ -70,6 +70,18 @@ class GeometryProcessor : public Processor {
     std::vector<ShaderVar>* transformedCoordVars;
   };
 
+  /**
+   * Metadata for a single FP coord transform registration, produced by registerCoordTransforms
+   * and consumed by emitCoordTransformCode to emit the "TransformedCoords_i = M * vec3(uv, 1)"
+   * statement after the VS call expression has been appended.
+   */
+  struct CoordTransformRecord {
+    std::string uniformName;
+    std::string varyingVsOut;
+    bool hasPerspective;
+    int index;
+  };
+
   struct EmitArgs {
     EmitArgs(VertexShaderBuilder* vertBuilder, FragmentShaderBuilder* fragBuilder,
              VaryingHandler* varyingHandler, UniformHandler* uniformHandler,
@@ -86,6 +98,7 @@ class GeometryProcessor : public Processor {
     std::string* outputSubset = nullptr;
     MangledVaryings* gpVaryings = nullptr;
     MangledUniforms* gpUniforms = nullptr;
+    std::vector<CoordTransformRecord>* coordTransformRecords = nullptr;
   };
 
   virtual void emitCode(EmitArgs&) const = 0;
@@ -133,10 +146,34 @@ class GeometryProcessor : public Processor {
   /**
    * Emit transformed uv coords from the vertex shader as a uniform matrix and varying per
    * coord-transform. uvCoordsVar must be a 2-component vector.
+   *
+   * Legacy single-phase API. ModularProgramBuilder now drives GP code emission via the two-phase
+   * pair registerCoordTransforms / emitCoordTransformCode, so new GP implementations should not
+   * call this. Kept only for transitional compatibility while GPs are being migrated.
    */
   void emitTransforms(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
                       VaryingHandler* varyingHandler, UniformHandler* uniformHandler,
                       const ShaderVar& uvCoordsVar) const;
+
+  /**
+   * Phase 1 (called from emitCode): register uniform matrices and varyings for every FP coord
+   * transform, and specify the coord varying for each FP via specifyCoordsForCurrCoordTransform.
+   * Populates args.coordTransformRecords with metadata used later by emitCoordTransformCode.
+   * Emits no VS code — that is deferred so ModularProgramBuilder can append the VS call
+   * expression (which produces the uv varying value) before the coord transform statements that
+   * consume it.
+   */
+  void registerCoordTransforms(EmitArgs& args, VaryingHandler* varyingHandler,
+                               UniformHandler* uniformHandler) const;
+
+  /**
+   * Phase 2 (called from ModularProgramBuilder after buildVSCallExpr has been appended): emits
+   * `TransformedCoords_i = CoordTransformMatrix_i * vec3(uvCoordsExpr, 1.0);` VS statements for
+   * every record registered by registerCoordTransforms. uvCoordsExpr is a VS-scope expression
+   * evaluating to a vec2 (attribute name, varying vsOut name, or literal).
+   */
+  void emitCoordTransformCode(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
+                              const std::string& uvCoordsExpr) const;
 
   // ---- Modular shader virtual methods (for ModularProgramBuilder) ----
 
@@ -149,6 +186,23 @@ class GeometryProcessor : public Processor {
 
   virtual std::string buildVSCallExpr(const MangledUniforms& /*uniforms*/,
                                       const MangledVaryings& /*varyings*/) const {
+    return "";
+  }
+
+  /**
+   * Returns the VS-scope expression that should be fed to emitCoordTransformCode as the uvCoords
+   * source. For fully-modular GPs this is typically an attribute name (if coord transforms
+   * operate on the input position directly) or the vsOut name of a varying written by the VS
+   * call expression (if coord transforms operate on a VS-computed value such as
+   * viewMatrix * position).
+   *
+   * Returning an empty string selects the legacy path: the GP is expected to have called
+   * emitTransforms itself inside emitCode, and ModularProgramBuilder will skip the phase-3 call
+   * to emitCoordTransformCode. This escape hatch exists only during the migration window and
+   * will be removed once all GPs are modular (node 5 makes this pure virtual).
+   */
+  virtual std::string coordTransformInputExpr(const MangledUniforms& /*uniforms*/,
+                                              const MangledVaryings& /*varyings*/) const {
     return "";
   }
 

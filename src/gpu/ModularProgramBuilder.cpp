@@ -378,28 +378,36 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
 
   MangledVaryings gpVaryings;
   MangledUniforms gpUniforms;
+  std::vector<GeometryProcessor::CoordTransformRecord> coordRecords;
   GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(),
                                    uniformHandler(), &transformHandler, &subsetVarName);
   args.gpVaryings = &gpVaryings;
   args.gpUniforms = &gpUniforms;
+  args.coordTransformRecords = &coordRecords;
 
-  // All GPs are now modular: emitCode() only registers attributes / uniforms / varyings /
-  // coord transforms and populates gpUniforms/gpVaryings. The VS function body lives in the
-  // .vert.glsl module and is injected via includeVSModule() below. Some GPs (half-migrated,
-  // e.g. HairlineLineGP, ShapeInstancedGP) still emit the function call site from emitCode()
-  // because their emitTransforms() input depends on VS-local variables.
+  // Phase 1 (resource registration): emitCode should register attributes / uniforms / varyings
+  // and call registerCoordTransforms (or, for legacy GPs still pending migration, call
+  // emitTransforms which performs both registration and VS code emission in one go).
   geometryProcessor->emitCode(args);
 
-  // Include the GP's .vert.glsl module in the VS. If buildVSCallExpr() returns non-empty, emit
-  // the function call expression here (fully-migrated GPs); otherwise the GP has already emitted
-  // the call inside emitCode() (half-migrated GPs). HasModule() acts as a safety check for any
-  // GP that is added in the future before it is registered in ShaderModuleRegistry.
+  // Phase 2 (VS call): append the GP's VS function call so that any varying it writes
+  // (transformedPosition / vLocal / etc.) is defined before phase 3 reads it.
   if (ShaderModuleRegistry::HasModule(geometryProcessor->name())) {
     includeVSModule(ShaderModuleRegistry::GetModuleID(geometryProcessor->name()));
     auto vsCallExpr = geometryProcessor->buildVSCallExpr(gpUniforms, gpVaryings);
     if (!vsCallExpr.empty()) {
       vertexShaderBuilder()->codeAppend(vsCallExpr);
     }
+  }
+
+  // Phase 3 (coord transform code): for GPs that opted into the two-phase path via
+  // coordTransformInputExpr(), emit the `TransformedCoords_i = M * vec3(uv, 1)` statements
+  // here, consuming the uv expression (attribute or varying) now that it is defined.
+  // Legacy GPs return an empty expression and are expected to have already emitted this code
+  // inside emitCode via the one-shot emitTransforms helper.
+  auto coordInputExpr = geometryProcessor->coordTransformInputExpr(gpUniforms, gpVaryings);
+  if (!coordInputExpr.empty()) {
+    geometryProcessor->emitCoordTransformCode(args, vertexShaderBuilder(), coordInputExpr);
   }
 
   auto colorResult = geometryProcessor->buildColorCallExpr(gpUniforms, gpVaryings);

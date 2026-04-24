@@ -106,4 +106,51 @@ void GeometryProcessor::emitTransforms(EmitArgs& args, VertexShaderBuilder* vert
   }
 }
 
+void GeometryProcessor::registerCoordTransforms(EmitArgs& args, VaryingHandler* varyingHandler,
+                                                UniformHandler* uniformHandler) const {
+  int i = 0;
+  auto transformHandler = args.fpCoordTransformHandler;
+  auto* records = args.coordTransformRecords;
+  while (const CoordTransform* coordTransform = transformHandler->nextCoordTransform()) {
+    std::string strUniName = TRANSFORM_UNIFORM_PREFIX;
+    strUniName += std::to_string(i);
+    auto uniName =
+        uniformHandler->addUniform(strUniName, UniformFormat::Float3x3, ShaderStage::Vertex);
+    std::string strVaryingName = "TransformedCoords_";
+    strVaryingName += std::to_string(i);
+    const bool hasPerspective = hasUVPerspective() || coordTransform->matrix.hasPerspective();
+    const SLType varyingType = hasPerspective ? SLType::Float3 : SLType::Float2;
+    auto varying = varyingHandler->addVarying(strVaryingName, varyingType);
+    transformHandler->specifyCoordsForCurrCoordTransform(varying.name(), varyingType);
+    if (records != nullptr) {
+      records->push_back({uniName, varying.vsOut(), hasPerspective, i});
+    }
+    ++i;
+  }
+}
+
+void GeometryProcessor::emitCoordTransformCode(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
+                                               const std::string& uvCoordsExpr) const {
+  auto* records = args.coordTransformRecords;
+  if (records == nullptr) {
+    return;
+  }
+  std::string uvCoords = "vec3(" + uvCoordsExpr + ", 1.0)";
+  for (const auto& record : *records) {
+    if (record.hasPerspective) {
+      vertexBuilder->codeAppendf("%s = %s * %s;", record.varyingVsOut.c_str(),
+                                 record.uniformName.c_str(), uvCoords.c_str());
+    } else {
+      vertexBuilder->codeAppendf("%s = (%s * %s).xy;", record.varyingVsOut.c_str(),
+                                 record.uniformName.c_str(), uvCoords.c_str());
+    }
+    // Pass args.varyingHandler/uniformHandler so that half-migrated GPs whose onEmitTransform
+    // still registers resources (e.g. QuadPerEdgeAA's subset varying/uniform) keep working
+    // during the migration window. Once all GPs move their resource registration into emitCode,
+    // these handlers can be set to nullptr here to enforce the phase-1/phase-2 contract.
+    onEmitTransform(args, vertexBuilder, args.varyingHandler, args.uniformHandler,
+                    record.uniformName, record.hasPerspective, record.index);
+  }
+}
+
 }  // namespace tgfx
