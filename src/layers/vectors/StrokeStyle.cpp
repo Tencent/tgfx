@@ -20,7 +20,6 @@
 #include "Painter.h"
 #include "VectorContext.h"
 #include "core/utils/Log.h"
-#include "core/utils/StrokeUtils.h"
 #include "layers/DashEffect.h"
 #include "tgfx/layers/LayerRecorder.h"
 
@@ -34,6 +33,24 @@ static float BlendStrokeWidth(float base, const GlyphStyle& style) {
     return style.strokeWidth;
   }
   return base + (style.strokeWidth - base) * style.strokeWidthFactor;
+}
+
+// Expands the supplied pre-stroke bounds into the bounds that the stroked shape will actually
+// occupy. The computation follows the stroke alignment semantics directly instead of relying on
+// post-stroke or boolean-op shape bounds, which are conservative and may drift far from reality
+// for degenerate shapes or merge operations. Miter spikes are intentionally ignored so the fit
+// region tracks the main stroke band rather than stretching along theoretical sharp corners.
+static void ExpandBoundsForStroke(Rect* bounds, const Stroke& stroke, StrokeAlign align) {
+  if (bounds == nullptr) {
+    return;
+  }
+  if (align == StrokeAlign::Inside) {
+    // Inside stroke lives entirely within the original shape; the fit region is the shape itself.
+    return;
+  }
+  auto factor = align == StrokeAlign::Outside ? 1.0f : 0.5f;
+  auto expand = ceilf(stroke.width * factor);
+  bounds->outset(expand, expand);
 }
 
 class StrokePainter : public Painter {
@@ -56,17 +73,20 @@ class StrokePainter : public Painter {
         return nullptr;
       }
     }
-    Rect fitBounds = {};
+    // The fit region must describe the visible stroked area, which cannot be read back from the
+    // post-stroke (or boolean-op) shape bounds: stroke expansion and merge operations both yield
+    // shape objects whose reported bounds are conservative approximations. Compute the region
+    // directly from the pre-stroke bounds and the stroke parameters per alignment.
+    auto fitBounds = innerShape->getBounds();
+    ExpandBoundsForStroke(&fitBounds, stroke, strokeAlign);
+
     if (strokeAlign != StrokeAlign::Center) {
       auto originalShape = Shape::ApplyMatrix(originalShapes[index], innerMatrices[index]);
       innerShape = applyStrokeAndAlign(std::move(innerShape), std::move(originalShape), stroke);
       if (innerShape == nullptr) {
         return nullptr;
       }
-      fitBounds = innerShape->getBounds();
     } else {
-      fitBounds = innerShape->getBounds();
-      ApplyStrokeToBounds(stroke, &fitBounds, Matrix::I(), true);
       paint->style = PaintStyle::Stroke;
       paint->stroke = stroke;
     }
@@ -83,7 +103,7 @@ class StrokePainter : public Painter {
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
 
     Rect fitBounds = run.textBlob->getBounds();
-    ApplyStrokeToBounds(runStroke, &fitBounds, Matrix::I(), true);
+    ExpandBoundsForStroke(&fitBounds, runStroke, strokeAlign);
     auto baseShader = wrapShaderWithFit(fitBounds);
 
     // Non-center stroke alignment or an active path effect (e.g. dashing) both require expanding
