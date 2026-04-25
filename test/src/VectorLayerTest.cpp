@@ -4801,12 +4801,21 @@ static std::vector<std::shared_ptr<VectorElement>> MakeRadialCellContents(
   return {rect, FillStyle::Make(colorSource)};
 }
 
-// Every ImagePattern ScaleMode under the same outer transform.
+// Every ImagePattern ScaleMode under the same outer transform. The rectangle is deliberately
+// non-square so the three ScaleMode variants produce visually distinct cells (the source image
+// is square). A light-gray backdrop rect is painted first in its own subgroup so the LetterBox
+// letterbox bars show up against a non-white color.
 static std::vector<std::shared_ptr<VectorElement>> MakePatternScaleCellContents(
     float cx, float cy, int column, float cellSize, const std::shared_ptr<Image>& image) {
-  auto rect = std::make_shared<Rectangle>();
-  rect->setPosition({cx, cy});
-  rect->setSize({cellSize * 0.7f, cellSize * 0.7f});
+  auto backdropRect = std::make_shared<Rectangle>();
+  backdropRect->setPosition({cx, cy});
+  backdropRect->setSize({cellSize * 0.85f, cellSize * 0.5f});
+  auto backdropGroup = std::make_shared<VectorGroup>();
+  backdropGroup->setElements({backdropRect, MakeFillStyle(Color::FromRGBA(220, 220, 220, 255))});
+
+  auto patternRect = std::make_shared<Rectangle>();
+  patternRect->setPosition({cx, cy});
+  patternRect->setSize({cellSize * 0.85f, cellSize * 0.5f});
   auto pattern = ImagePattern::Make(image);
   if (column == 0) {
     pattern->setScaleMode(ScaleMode::LetterBox);
@@ -4815,7 +4824,10 @@ static std::vector<std::shared_ptr<VectorElement>> MakePatternScaleCellContents(
   } else {
     pattern->setScaleMode(ScaleMode::Zoom);
   }
-  return {rect, FillStyle::Make(pattern)};
+  auto patternGroup = std::make_shared<VectorGroup>();
+  patternGroup->setElements({patternRect, FillStyle::Make(pattern)});
+
+  return {backdropGroup, patternGroup};
 }
 
 // Absolute-space color sources (fit disabled); shader should still ride with the outer CTM.
@@ -5013,7 +5025,7 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
     float cy = cellCenterY(2);
     auto innerGroup = std::make_shared<VectorGroup>();
     innerGroup->setElements(MakePatternScaleCellContents(cx, cy, col, cellSize, image));
-    contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 0.0f, {1.3f, 0.7f}));
+    contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 20.0f, {1.0f, 1.0f}));
   }
   // Row 3, cols 3-5: Absolute-space color sources (fit disabled) under outer rotation.
   for (int col = 0; col < 3; col++) {
