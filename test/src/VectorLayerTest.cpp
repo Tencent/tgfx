@@ -4690,8 +4690,7 @@ TGFX_TEST(VectorLayerTest, Line) {
   auto degenerateRect = std::make_shared<Rectangle>();
   degenerateRect->setPosition({300, 430});
   degenerateRect->setSize({500, 0});
-  auto gradient5 =
-      Gradient::MakeLinear({0.5f, 0.0f}, {0.5f, 1.0f}, {Color::Red(), Color::Blue()});
+  auto gradient5 = Gradient::MakeLinear({0.5f, 0.0f}, {0.5f, 1.0f}, {Color::Red(), Color::Blue()});
   auto stroke5 = StrokeStyle::Make(gradient5);
   stroke5->setStrokeWidth(24.0f);
   stroke5->setStrokeAlign(StrokeAlign::Outside);
@@ -4997,47 +4996,54 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
   }
   // Row 1, cols 3-5: same rectangle content nested inside two transformed VectorGroups so the
   // painter's captured innerMatrix travels through more than one layer before the fit stage.
-  const std::array<float, 3> rectOuterRotations = {30.0f, 0.0f, 25.0f};
-  const std::array<Point, 3> rectOuterScales = {Point{1.0f, 1.0f}, Point{1.3f, 0.7f},
-                                                Point{1.0f, 1.0f}};
-  const std::array<float, 3> rectMiddleRotations = {15.0f, 0.0f, 10.0f};
-  const std::array<Point, 3> rectMiddleScales = {Point{1.0f, 1.0f}, Point{1.0f, 1.0f},
-                                                 Point{1.2f, 1.0f}};
+  struct NestedTransform {
+    float outerRotation;
+    Point outerScale;
+    float middleRotation;
+    Point middleScale;
+  };
+  const std::array<NestedTransform, 3> rectNested = {
+      NestedTransform{30.0f, {1.0f, 1.0f}, 15.0f, {1.0f, 1.0f}},
+      NestedTransform{0.0f, {1.3f, 0.7f}, 0.0f, {1.0f, 1.0f}},
+      NestedTransform{25.0f, {1.0f, 1.0f}, 10.0f, {1.2f, 1.0f}},
+  };
   for (int col = 0; col < 3; col++) {
     float cx = cellCenterX(col + 3);
     float cy = cellCenterY(0);
+    const auto& config = rectNested[static_cast<size_t>(col)];
     auto innerGroup = std::make_shared<VectorGroup>();
     innerGroup->setElements(MakeRectFitCellContents(cx, cy, col, cellSize, gradientColors, image));
     auto middleGroup = std::make_shared<VectorGroup>();
     middleGroup->setAnchor({cx, cy});
     middleGroup->setPosition({cx, cy});
-    middleGroup->setRotation(rectMiddleRotations[static_cast<size_t>(col)]);
-    middleGroup->setScale(rectMiddleScales[static_cast<size_t>(col)]);
+    middleGroup->setRotation(config.middleRotation);
+    middleGroup->setScale(config.middleScale);
     middleGroup->setElements({innerGroup});
-    contents.push_back(WrapInOuterGroup(middleGroup, {cx, cy},
-                                        rectOuterRotations[static_cast<size_t>(col)],
-                                        rectOuterScales[static_cast<size_t>(col)]));
+    contents.push_back(
+        WrapInOuterGroup(middleGroup, {cx, cy}, config.outerRotation, config.outerScale));
   }
 
   // Row 2, cols 0-2: Polystar fit color sources with nested outer transforms (complex-path branch).
-  const std::array<float, 3> starOuterRotations = {20.0f, 15.0f, 25.0f};
-  const std::array<float, 3> starMiddleRotations = {10.0f, 0.0f, 15.0f};
-  const std::array<Point, 3> starMiddleScales = {Point{1.0f, 1.0f}, Point{1.3f, 0.8f},
-                                                 Point{1.0f, 1.0f}};
+  const std::array<NestedTransform, 3> starNested = {
+      NestedTransform{20.0f, {1.0f, 1.0f}, 10.0f, {1.0f, 1.0f}},
+      NestedTransform{15.0f, {1.0f, 1.0f}, 0.0f, {1.3f, 0.8f}},
+      NestedTransform{25.0f, {1.0f, 1.0f}, 15.0f, {1.0f, 1.0f}},
+  };
   for (int col = 0; col < 3; col++) {
     float cx = cellCenterX(col);
     float cy = cellCenterY(1);
+    const auto& config = starNested[static_cast<size_t>(col)];
     auto innerGroup = std::make_shared<VectorGroup>();
     innerGroup->setElements(
         MakeComplexFitCellContents(cx, cy, col, cellSize, gradientColors, image));
     auto middleGroup = std::make_shared<VectorGroup>();
     middleGroup->setAnchor({cx, cy});
     middleGroup->setPosition({cx, cy});
-    middleGroup->setRotation(starMiddleRotations[static_cast<size_t>(col)]);
-    middleGroup->setScale(starMiddleScales[static_cast<size_t>(col)]);
+    middleGroup->setRotation(config.middleRotation);
+    middleGroup->setScale(config.middleScale);
     middleGroup->setElements({innerGroup});
-    contents.push_back(WrapInOuterGroup(
-        middleGroup, {cx, cy}, starOuterRotations[static_cast<size_t>(col)], {1.0f, 1.0f}));
+    contents.push_back(
+        WrapInOuterGroup(middleGroup, {cx, cy}, config.outerRotation, config.outerScale));
   }
   // Row 2, cols 3-5: Non-linear gradient variants (radial/conic/diamond) under outer rotation.
   for (int col = 0; col < 3; col++) {

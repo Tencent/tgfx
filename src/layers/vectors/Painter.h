@@ -77,7 +77,9 @@ class Painter {
  protected:
   /**
    * Subclass hook for shape geometries. The supplied innerShape has already been mapped into the
-   * enclosing group space (i.e. Shape::ApplyMatrix(originalShape, innerMatrices[index])).
+   * enclosing group space (i.e. Shape::ApplyMatrix(originalShape, innerMatrices[index])), so any
+   * bounds read from it are in that space. outerMatrix is applied as CTM around the emit, and the
+   * shader wrapped via wrapShaderWithFit lives in the same inner-group space as the bounds.
    * Subclasses may further modify the shape and must populate paint.shader; style and stroke may
    * be set when applicable. Return nullptr to skip emission.
    */
@@ -85,16 +87,19 @@ class Painter {
                                               LayerPaint* paint) = 0;
 
   /**
-   * Subclass hook for glyph runs. Subclasses produce one or more emit items per run (e.g. base +
-   * colored overlay). Each item carries either a text blob or a stroke-expanded shape; the base
-   * installs runLocalMatrix * outerMatrix as the recorder CTM around all items.
+   * Subclass hook for glyph runs. Unlike prepareShape, the TextBlob stays in run-local space:
+   * run.matrix, innerMatrix, and outerMatrix are all folded into the recorder CTM, so bounds read
+   * from run.textBlob (e.g. getTightBounds()) are in run-local space and the shader returned by
+   * wrapShaderWithFit must use the same space. A run always emits a single drawable (either a
+   * TextBlob or a stroke-expanded Shape), but may carry multiple paints (e.g. a base paint plus a
+   * fill-color overlay). Return with empty paints to skip emission.
    */
-  struct GlyphEmit {
+  struct GlyphRunEmit {
     std::shared_ptr<TextBlob> textBlob = nullptr;
     std::shared_ptr<Shape> shape = nullptr;
-    LayerPaint paint = {};
+    std::vector<LayerPaint> paints = {};
   };
-  virtual std::vector<GlyphEmit> prepareGlyphRun(const StyledGlyphRun& run, size_t index) = 0;
+  virtual GlyphRunEmit prepareGlyphRun(const StyledGlyphRun& run, size_t index) = 0;
 
   /**
    * Wraps the painter's shader with a fit matrix derived from the supplied inner-space bounds.

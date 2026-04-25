@@ -53,34 +53,31 @@ class FillPainter : public Painter {
     return innerShape;
   }
 
-  std::vector<GlyphEmit> prepareGlyphRun(const StyledGlyphRun& run, size_t /*index*/) override {
-    std::vector<GlyphEmit> emits = {};
+  GlyphRunEmit prepareGlyphRun(const StyledGlyphRun& run, size_t /*index*/) override {
+    GlyphRunEmit emit = {};
     if (run.textBlob == nullptr) {
-      return emits;
+      return emit;
     }
+    emit.textBlob = run.textBlob;
     auto baseShader = wrapShaderWithFit(run.textBlob->getTightBounds());
     float blendFactor = run.style.fillColor.alpha;
     float runAlpha = alpha * run.style.alpha;
     if (blendFactor < 1.0f) {
-      GlyphEmit emit = {};
-      emit.textBlob = run.textBlob;
-      emit.paint = makeBasePaint();
-      emit.paint.color.alpha = runAlpha;
-      emit.paint.shader = baseShader;
-      emits.push_back(std::move(emit));
+      auto paint = makeBasePaint();
+      paint.color.alpha = runAlpha;
+      paint.shader = baseShader;
+      emit.paints.push_back(std::move(paint));
     }
     if (blendFactor > 0.0f) {
       const auto& fillColor = run.style.fillColor;
       auto overlayColor = Color{fillColor.red, fillColor.green, fillColor.blue, blendFactor};
-      GlyphEmit emit = {};
-      emit.textBlob = run.textBlob;
-      emit.paint.blendMode = BlendMode::SrcOver;
-      emit.paint.placement = placement;
-      emit.paint.shader = Shader::MakeColorShader(overlayColor);
-      emit.paint.color.alpha = runAlpha;
-      emits.push_back(std::move(emit));
+      auto paint = makeBasePaint();
+      paint.blendMode = BlendMode::SrcOver;
+      paint.shader = Shader::MakeColorShader(overlayColor);
+      paint.color.alpha = runAlpha;
+      emit.paints.push_back(std::move(paint));
     }
-    return emits;
+    return emit;
   }
 };
 

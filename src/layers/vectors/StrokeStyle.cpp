@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/vectors/StrokeStyle.h"
+#include <cmath>
 #include "Painter.h"
 #include "VectorContext.h"
 #include "core/utils/Log.h"
@@ -57,6 +58,10 @@ class StrokePainter : public Painter {
     }
     const Stroke* paintStroke = nullptr;
     if (strokeAlign != StrokeAlign::Center) {
+      // prepareShape is only invoked for non-text geometries. StrokeStyle::apply fills
+      // originalShapes with geometry->getShape() for those entries when strokeAlign is not
+      // Center (text geometries push a null placeholder, but prepareGlyphRun handles text).
+      DEBUG_ASSERT(originalShapes[index] != nullptr);
       auto originalShape = Shape::ApplyMatrix(originalShapes[index], innerMatrices[index]);
       innerShape = applyStrokeAndAlign(std::move(innerShape), std::move(originalShape), stroke);
       if (innerShape == nullptr) {
@@ -71,10 +76,10 @@ class StrokePainter : public Painter {
     return innerShape;
   }
 
-  std::vector<GlyphEmit> prepareGlyphRun(const StyledGlyphRun& run, size_t /*index*/) override {
-    std::vector<GlyphEmit> emits = {};
+  GlyphRunEmit prepareGlyphRun(const StyledGlyphRun& run, size_t /*index*/) override {
+    GlyphRunEmit emit = {};
     if (run.textBlob == nullptr) {
-      return emits;
+      return emit;
     }
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
@@ -95,20 +100,22 @@ class StrokePainter : public Painter {
         runShape = applyStrokeAndAlign(std::move(runShape), std::move(originalShape), runStroke);
       }
       if (runShape == nullptr) {
-        return emits;
+        return emit;
       }
     }
     // Non-center alignment has already baked the stroke into the shape, so the shape-based fit
-    // helper does not need an extra stroke. Center alignment keeps the stroke on the paint, so
-    // the fit helper adds it back via ApplyStroke on the shape path, or via a manual width/2
-    // outset on the text blob's tight bounds (the single sanctioned manual expansion, used only
-    // to avoid turning a TextBlob into a Shape purely for measurement).
-    bool emitsAsFill = needsBooleanOp;
-    const Stroke* shapePaintStroke = emitsAsFill ? nullptr : &runStroke;
+    // helper does not need an extra stroke and the emit uses a fill paint. Center alignment
+    // keeps the stroke on the paint, so the fit helper adds it back via ApplyStroke on the shape
+    // path, or via a manual width/2 outset on the text blob's tight bounds (the single
+    // sanctioned manual expansion, used only to avoid turning a TextBlob into a Shape purely for
+    // measurement).
+    const Stroke* shapePaintStroke = needsBooleanOp ? nullptr : &runStroke;
     std::shared_ptr<Shader> baseShader = shader;
     if (runShape != nullptr) {
+      emit.shape = runShape;
       baseShader = buildShapeFitShader(runShape, shapePaintStroke);
     } else {
+      emit.textBlob = run.textBlob;
       baseShader = buildBlobFitShader(run.textBlob, &runStroke);
     }
 
@@ -118,48 +125,34 @@ class StrokePainter : public Painter {
       auto paint = makeBasePaint();
       paint.color.alpha = runAlpha;
       paint.shader = baseShader;
-      if (!emitsAsFill) {
+      if (!needsBooleanOp) {
         paint.style = PaintStyle::Stroke;
         paint.stroke = runStroke;
       }
-      GlyphEmit emit = {};
-      emit.paint = paint;
-      if (runShape != nullptr) {
-        emit.shape = runShape;
-      } else {
-        emit.textBlob = run.textBlob;
-      }
-      emits.push_back(std::move(emit));
+      emit.paints.push_back(std::move(paint));
     }
     if (blendFactor > 0.0f) {
       const auto& strokeColor = run.style.strokeColor;
       auto overlayColor = Color{strokeColor.red, strokeColor.green, strokeColor.blue, blendFactor};
-      LayerPaint overlay = {};
-      overlay.blendMode = BlendMode::SrcOver;
-      overlay.placement = placement;
-      overlay.shader = Shader::MakeColorShader(overlayColor);
-      overlay.color.alpha = runAlpha;
-      if (!emitsAsFill) {
-        overlay.style = PaintStyle::Stroke;
-        overlay.stroke = runStroke;
+      auto paint = makeBasePaint();
+      paint.blendMode = BlendMode::SrcOver;
+      paint.shader = Shader::MakeColorShader(overlayColor);
+      paint.color.alpha = runAlpha;
+      if (!needsBooleanOp) {
+        paint.style = PaintStyle::Stroke;
+        paint.stroke = runStroke;
       }
-      GlyphEmit emit = {};
-      emit.paint = overlay;
-      if (runShape != nullptr) {
-        emit.shape = runShape;
-      } else {
-        emit.textBlob = run.textBlob;
-      }
-      emits.push_back(std::move(emit));
+      emit.paints.push_back(std::move(paint));
     }
-    return emits;
+    return emit;
   }
 
  private:
-  // Fit helper for emits whose primary drawable is a Shape. The fit region is read directly
-  // from the shape that the recorder will see; if paint.stroke is active (Center alignment, or
-  // dashed Center text) the stroke is reapplied via ApplyStroke so the path bounds can include
-  // the stroked outline without changing the emitted shape itself.
+  // Computes the fit-shader region for an emit whose primary drawable is a Shape. If paint.stroke
+  // is active (Center alignment, or dashed Center text) the stroke is reapplied via ApplyStroke
+  // so the path bounds include the stroked outline without changing the emitted shape itself.
+  // Returns the original shader unchanged when the color source does not opt into fit, or when
+  // the bounds shape cannot be produced.
   std::shared_ptr<Shader> buildShapeFitShader(const std::shared_ptr<Shape>& finalShape,
                                               const Stroke* paintStroke) const {
     if (colorSource == nullptr || !colorSource->fitsToGeometry() || finalShape == nullptr) {
@@ -172,16 +165,15 @@ class StrokePainter : public Painter {
         return shader;
       }
     }
-    auto fitBounds = boundsShape->getPath().getBounds();
-    return shader->makeWithMatrix(colorSource->getFitMatrix(fitBounds));
+    return wrapShaderWithFit(boundsShape->getPath().getBounds());
   }
 
-  // Fit helper for emits whose primary drawable is a TextBlob. The fit region is the blob's
-  // tight bounds, optionally outset by paintStroke->width / 2 when a paint stroke is active.
-  // This is the only place where bounds are expanded manually instead of being read from a
-  // stroke-expanded shape: text fills cannot be converted into a shape without dropping color
-  // glyphs (e.g. emoji), and a paint stroke on text does not produce the miter spikes that
-  // justify a conservative multiplier.
+  // Computes the fit-shader region for an emit whose primary drawable is a TextBlob. The fit
+  // region is the blob's tight bounds, optionally outset by paintStroke->width / 2 when a paint
+  // stroke is active. This is the only place where bounds are expanded manually instead of being
+  // read from a stroke-expanded shape: text fills cannot be converted into a shape without
+  // dropping color glyphs (e.g. emoji), and a paint stroke on text does not produce the miter
+  // spikes that justify a conservative multiplier.
   std::shared_ptr<Shader> buildBlobFitShader(const std::shared_ptr<TextBlob>& textBlob,
                                              const Stroke* paintStroke) const {
     if (colorSource == nullptr || !colorSource->fitsToGeometry() || textBlob == nullptr) {
@@ -192,7 +184,7 @@ class StrokePainter : public Painter {
       auto expand = ceilf(paintStroke->width * 0.5f);
       fitBounds.outset(expand, expand);
     }
-    return shader->makeWithMatrix(colorSource->getFitMatrix(fitBounds));
+    return wrapShaderWithFit(fitBounds);
   }
 
   std::shared_ptr<Shape> applyStrokeAndAlign(std::shared_ptr<Shape> shape,

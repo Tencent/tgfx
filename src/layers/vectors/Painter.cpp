@@ -39,19 +39,19 @@ void Painter::draw(LayerRecorder* recorder) {
 
     if (geometry->hasText()) {
       for (const auto& run : geometry->getGlyphRuns()) {
-        auto emits = prepareGlyphRun(run, i);
-        if (emits.empty()) {
+        auto emit = prepareGlyphRun(run, i);
+        if (emit.paints.empty()) {
           continue;
         }
         auto runMatrix = run.matrix;
         runMatrix.postConcat(innerMatrix);
         runMatrix.postConcat(outerMatrix);
         recorder->setMatrix(runMatrix);
-        for (auto& emit : emits) {
+        for (const auto& paint : emit.paints) {
           if (emit.shape != nullptr) {
-            recorder->addShape(std::move(emit.shape), emit.paint);
+            recorder->addShape(emit.shape, paint);
           } else if (emit.textBlob != nullptr) {
-            recorder->addTextBlob(std::move(emit.textBlob), emit.paint);
+            recorder->addTextBlob(emit.textBlob, paint);
           }
         }
         recorder->resetMatrix();
