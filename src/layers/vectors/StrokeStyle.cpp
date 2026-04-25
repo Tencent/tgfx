@@ -169,11 +169,12 @@ class StrokePainter : public Painter {
   }
 
   // Computes the fit-shader region for an emit whose primary drawable is a TextBlob. The fit
-  // region is the blob's tight bounds, optionally outset by paintStroke->width / 2 when a paint
-  // stroke is active. This is the only place where bounds are expanded manually instead of being
-  // read from a stroke-expanded shape: text fills cannot be converted into a shape without
-  // dropping color glyphs (e.g. emoji), and a paint stroke on text does not produce the miter
-  // spikes that justify a conservative multiplier.
+  // region is the blob's tight bounds, optionally outset by ceil(paintStroke->width / 2) so the
+  // fit region snaps to whole pixels and stays a conservative cover of the stroked outline. This
+  // is the only place where bounds are expanded manually instead of being read from a
+  // stroke-expanded shape: text fills cannot be converted into a shape without dropping color
+  // glyphs (e.g. emoji), and a paint stroke on text does not produce the miter spikes that
+  // justify a conservative multiplier.
   std::shared_ptr<Shader> buildBlobFitShader(const std::shared_ptr<TextBlob>& textBlob,
                                              const Stroke* paintStroke) const {
     if (colorSource == nullptr || !colorSource->fitsToGeometry() || textBlob == nullptr) {
