@@ -26,17 +26,16 @@
 
 namespace tgfx {
 
-std::shared_ptr<Layer3DContext> Layer3DContext::Make(
-    bool opaqueMode, Context* context, const Rect& renderRect, float contentScale,
-    std::shared_ptr<ColorSpace> colorSpace, std::shared_ptr<BackgroundContext> backgroundContext) {
+std::shared_ptr<Layer3DContext> Layer3DContext::Make(bool opaqueMode, Context* context,
+                                                     const Rect& renderRect, float contentScale,
+                                                     std::shared_ptr<ColorSpace> colorSpace) {
   if (opaqueMode) {
-    DEBUG_ASSERT(backgroundContext == nullptr);
     return std::make_shared<Opaque3DContext>(renderRect, contentScale, std::move(colorSpace));
   }
   auto compositor = std::make_shared<Context3DCompositor>(
       *context, static_cast<int>(renderRect.width()), static_cast<int>(renderRect.height()));
   return std::make_shared<Render3DContext>(std::move(compositor), renderRect, contentScale,
-                                           std::move(colorSpace), std::move(backgroundContext));
+                                           std::move(colorSpace));
 }
 
 Layer3DContext::Layer3DContext(const Rect& renderRect, float contentScale,
@@ -91,7 +90,6 @@ Canvas* Layer3DContext::beginRecording(const Matrix3D& childTransform, bool anti
 
 void Layer3DContext::endRecording() {
   auto picture = onFinishRecording();
-
   if (_transformStack.empty()) {
     return;
   }

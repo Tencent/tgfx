@@ -41,8 +41,8 @@ class RootLayer;
 class OpaqueContext;
 struct LayerStyleSource;
 struct MaskData;
-class BackgroundContext;
-enum class DrawMode;
+class BackgroundSource;
+class OffscreenRenderer;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
@@ -52,6 +52,8 @@ enum class DrawMode;
  * blendMode, position, matrix, visible, scrollRect, and mask.
  */
 class Layer : public std::enable_shared_from_this<Layer> {
+  friend class OffscreenRenderer;
+
  public:
   /**
    * Returns the default value for the allowsEdgeAntialiasing property for new Layer instances. The
@@ -647,37 +649,33 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const Matrix3D& matrix3D,
                                LayerDrawFunc drawFunc, float alpha, BlendMode blendMode);
 
-  std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child,
-                                          bool skipBackground);
+  std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child);
 
   bool drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, float alpha,
                  LayerDrawFunc drawFunc);
 
-  float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
-
   std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix,
                                                         bool excludeContour = false);
 
-  std::shared_ptr<Image> getBackgroundImage(const DrawArgs& args, float contentScale,
-                                            Point* offset);
-
-  void drawBackgroundImage(const DrawArgs& args, Canvas& canvas);
-
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position);
+
+  void drawLayerStyleDefault(const DrawArgs& args, Canvas* canvas, float alpha, LayerStyle* style,
+                             const LayerStyleSource* source);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
   bool prepareMask(const DrawArgs& args, Canvas* canvas, std::shared_ptr<MaskFilter>* maskFilter);
 
   MaskData getMaskData(const DrawArgs& args, float scale,
-                       const std::optional<Rect>& layerClipBounds);
+                       const std::optional<Rect>& layerClipBounds, Canvas* canvas);
 
   std::shared_ptr<Picture> getMaskPicture(const DrawArgs& args, bool isContourMode, float scale,
-                                          const Matrix3D& relativeMatrix3D);
+                                          const Matrix3D& relativeMatrix3D, Canvas* canvas);
 
   std::shared_ptr<Image> getContentContourImage(const DrawArgs& args, float contentScale,
-                                                Point* offset, bool* contourMatchesContent);
+                                                Point* offset, bool* contourMatchesContent,
+                                                Canvas* canvas);
 
   bool hasValidMask() const;
 
@@ -692,12 +690,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasBackgroundStyle();
 
-  /**
-   * Returns true when any descendant (excluding this layer itself) has a background-sourced style.
-   */
+  // Returns true when any descendant (excluding this layer itself) has a background-sourced style.
   bool hasDescendantBackgroundStyle();
 
-  std::shared_ptr<BackgroundContext> createBackgroundContext(
+  std::shared_ptr<BackgroundSource> createBackgroundSource(
       Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
       std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
 
@@ -705,21 +701,15 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode);
 
-  SubtreeCache* getValidSubtreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds);
+  SubtreeCache* getValidSubtreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds,
+                                     Canvas* canvas);
 
   std::shared_ptr<Image> createSubtreeCacheImage(const DrawArgs& args, float contentScale,
-                                                 const Rect& scaledBounds, Matrix* drawingMatrix);
+                                                 const Rect& scaledBounds, Matrix* drawingMatrix,
+                                                 Canvas* canvas);
 
   bool drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                             const std::shared_ptr<MaskFilter>& maskFilter);
-
-  std::shared_ptr<Image> getContentImage(const DrawArgs& args, const Matrix& contentMatrix,
-                                         const std::optional<Rect>& clipBounds,
-                                         Matrix* imageMatrix);
-
-  std::shared_ptr<Image> getPassThroughContentImage(const DrawArgs& args, Canvas* canvas,
-                                                    const std::optional<Rect>& clipBounds,
-                                                    Matrix* imageMatrix);
 
   std::optional<Rect> computeContentBounds(const std::optional<Rect>& clipBounds,
                                            bool excludeEffects);
@@ -770,6 +760,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   friend class RootLayer;
   friend class DisplayList;
+  friend class BackgroundCapturer;
+  friend class BackgroundConsumer;
   friend class LayerProperty;
   friend class LayerSerialization;
 };
