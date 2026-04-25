@@ -86,19 +86,30 @@ class StrokePainter : public Painter {
     ApplyStrokeToBounds(runStroke, &fitBounds, Matrix::I(), true);
     auto baseShader = wrapShaderWithFit(fitBounds);
 
-    // When a path effect (e.g. dashing) is active, expand the text blob into a shape so the
-    // effect can be applied to its outline; otherwise keep the blob intact to preserve color
-    // glyphs (e.g. emoji) that cannot be reduced to a path.
+    // Non-center stroke alignment or an active path effect (e.g. dashing) both require expanding
+    // the text blob into a shape: alignment needs a boolean op against the original outline, and
+    // path effects operate on path geometry. When neither applies keep the blob intact to
+    // preserve color glyphs (e.g. emoji) that cannot be reduced to a path.
     std::shared_ptr<Shape> runShape = nullptr;
-    if (pathEffect != nullptr) {
+    bool needsBooleanOp = strokeAlign != StrokeAlign::Center;
+    if (pathEffect != nullptr || needsBooleanOp) {
       runShape = Shape::MakeFrom(run.textBlob);
-      if (runShape != nullptr) {
+      if (runShape != nullptr && pathEffect != nullptr) {
         runShape = Shape::ApplyEffect(runShape, pathEffect);
+      }
+      if (runShape != nullptr && needsBooleanOp) {
+        auto originalShape = Shape::MakeFrom(run.textBlob);
+        runShape = applyStrokeAndAlign(std::move(runShape), std::move(originalShape), runStroke);
       }
       if (runShape == nullptr) {
         return emits;
       }
     }
+
+    // When boolean-op stroke alignment has already produced a filled outline, emit it as a fill;
+    // otherwise the paint keeps the stroke so the stroker (or path-effected shape stroker) draws
+    // it at render time.
+    bool emitsAsFill = needsBooleanOp;
 
     float blendFactor = run.style.strokeColor.alpha;
     float runAlpha = alpha * run.style.alpha;
@@ -106,8 +117,10 @@ class StrokePainter : public Painter {
       auto paint = makeBasePaint();
       paint.color.alpha = runAlpha;
       paint.shader = baseShader;
-      paint.style = PaintStyle::Stroke;
-      paint.stroke = runStroke;
+      if (!emitsAsFill) {
+        paint.style = PaintStyle::Stroke;
+        paint.stroke = runStroke;
+      }
       GlyphEmit emit = {};
       emit.paint = paint;
       if (runShape != nullptr) {
@@ -125,8 +138,10 @@ class StrokePainter : public Painter {
       overlay.placement = placement;
       overlay.shader = Shader::MakeColorShader(overlayColor);
       overlay.color.alpha = runAlpha;
-      overlay.style = PaintStyle::Stroke;
-      overlay.stroke = runStroke;
+      if (!emitsAsFill) {
+        overlay.style = PaintStyle::Stroke;
+        overlay.stroke = runStroke;
+      }
       GlyphEmit emit = {};
       emit.paint = overlay;
       if (runShape != nullptr) {
