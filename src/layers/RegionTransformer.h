@@ -86,6 +86,8 @@ class RegionTransformer {
    */
   std::optional<Matrix3D> getConsecutiveMatrix3D() const;
 
+  void getTotalMatrix(Matrix* matrix) const;
+
  protected:
   virtual void onTransform(Rect* bounds) const = 0;
 
@@ -100,8 +102,6 @@ class RegionTransformer {
   virtual bool isMatrix3D() const {
     return false;
   }
-
-  void getTotalMatrix(Matrix* matrix) const;
 
  private:
   std::shared_ptr<RegionTransformer> outer = nullptr;

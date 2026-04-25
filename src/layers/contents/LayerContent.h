@@ -82,6 +82,14 @@ class LayerContent {
    */
   virtual void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const = 0;
 
+  /**
+   * Returns the largest axis-aligned rectangle that is fully covered by this content in its local
+   * coordinate space. Returns an empty rect if no cover region can be determined.
+   */
+  virtual Rect getCoverRect() const {
+    return Rect::MakeEmpty();
+  }
+
  protected:
   enum class Type {
     Rect,

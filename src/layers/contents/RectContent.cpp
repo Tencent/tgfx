@@ -43,6 +43,13 @@ bool RectContent::hitTestPoint(float localX, float localY) const {
   return rect.contains(localX, localY);
 }
 
+Rect RectContent::getCoverRect() const {
+  if (stroke) {
+    return Rect::MakeEmpty();
+  }
+  return rect;
+}
+
 Rect RectContent::onGetBounds() const {
   return rect;
 }

@@ -29,6 +29,7 @@ class RectContent : public DrawContent {
 
   Rect getTightBounds(const Matrix& matrix) const override;
   bool hitTestPoint(float localX, float localY) const override;
+  Rect getCoverRect() const override;
 
   Rect rect = {};
 

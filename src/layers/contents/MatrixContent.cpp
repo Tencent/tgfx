@@ -71,6 +71,14 @@ bool MatrixContent::hasBlendMode() const {
   return content->hasBlendMode();
 }
 
+Rect MatrixContent::getCoverRect() const {
+  auto innerCoverRect = content->getCoverRect();
+  if (innerCoverRect.isEmpty() || !matrix.isScaleTranslate()) {
+    return Rect::MakeEmpty();
+  }
+  return matrix.mapRect(innerCoverRect);
+}
+
 bool MatrixContent::hasSameGeometry(const GeometryContent* other) const {
   if (other == nullptr || Types::Get(this) != Types::Get(other)) {
     return false;

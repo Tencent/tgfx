@@ -30,6 +30,7 @@ class RRectsContent : public DrawContent {
 
   Rect getTightBounds(const Matrix& matrix) const override;
   bool hitTestPoint(float localX, float localY) const override;
+  Rect getCoverRect() const override;
 
   std::vector<RRect> rRects = {};
 

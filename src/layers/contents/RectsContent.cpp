@@ -62,6 +62,22 @@ bool RectsContent::hitTestPoint(float localX, float localY) const {
   return false;
 }
 
+Rect RectsContent::getCoverRect() const {
+  if (stroke) {
+    return Rect::MakeEmpty();
+  }
+  auto largest = Rect::MakeEmpty();
+  auto largestArea = 0.0f;
+  for (const auto& r : rects) {
+    auto area = r.width() * r.height();
+    if (area > largestArea) {
+      largestArea = area;
+      largest = r;
+    }
+  }
+  return largest;
+}
+
 Rect RectsContent::onGetBounds() const {
   auto bounds = rects[0];
   for (size_t i = 1; i < rects.size(); ++i) {

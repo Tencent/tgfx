@@ -31,6 +31,7 @@
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
+class ContentRegion;
 class LayerContent;
 class SubtreeCache;
 class DisplayList;
@@ -685,11 +686,16 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer);
 
-  void updateBackgroundBounds(float contentScale);
+  void updateBackgroundBounds(float contentScale, bool contentChanged);
 
   void propagateLayerState();
 
   bool hasBackgroundStyle();
+
+  /**
+   * Returns true when any descendant (excluding this layer itself) has a background-sourced style.
+   */
+  bool hasDescendantBackgroundStyle();
 
   std::shared_ptr<BackgroundContext> createBackgroundContext(
       Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
@@ -754,8 +760,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
   std::unique_ptr<SubtreeCache> subtreeCache;
   std::shared_ptr<LayerContent> layerContent = nullptr;
-  Rect renderBounds = {};                       // in global coordinates
-  Rect* contentBounds = nullptr;                //  in global coordinates
+  Rect renderBounds = {};  // in global coordinates
+  std::unique_ptr<ContentRegion> contentRegion = nullptr;
   std::unique_ptr<Rect> localBounds = nullptr;  // in local coordinates
 
   // if > 0, means the layer or any of its descendants has a background style

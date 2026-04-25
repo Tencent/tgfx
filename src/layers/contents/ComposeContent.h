@@ -42,6 +42,7 @@ class ComposeContent : public LayerContent {
   bool hasBlendMode() const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
+  Rect getCoverRect() const override;
 
  protected:
   Type type() const override {

@@ -20,6 +20,7 @@
 #include <limits>
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
+#include "layers/ContentRegion.h"
 #include "layers/DrawArgs.h"
 
 namespace tgfx {
@@ -81,7 +82,7 @@ bool RootLayer::mergeDirtyList(bool forceMerge) {
 }
 
 bool RootLayer::invalidateBackground(const Rect& drawRect, LayerStyle* layerStyle,
-                                     float contentScale) {
+                                     float contentScale, const ContentRegion* coverRegion) {
   if (dirtyRects.empty()) {
     return false;
   }
@@ -89,6 +90,11 @@ bool RootLayer::invalidateBackground(const Rect& drawRect, LayerStyle* layerStyl
   std::vector<Rect> dirtyBackgrounds = {};
   dirtyBackgrounds.reserve(dirtySize);
   for (size_t i = 0; i < dirtySize; i++) {
+    // If the dirtyRect is fully contained within the layer's content cover region, the layer's
+    // own content covers this area and the background result is invisible there. Skip it.
+    if (coverRegion != nullptr && coverRegion->contains(dirtyRects[i])) {
+      continue;
+    }
     auto background = dirtyRects[i];
     if (background.intersect(drawRect)) {
       if (layerStyle == nullptr) {

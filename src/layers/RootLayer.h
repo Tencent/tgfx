@@ -48,9 +48,12 @@ class RootLayer : public Layer {
 
   /**
    * Returns true if any existing dirty rectangle overlaps the given drawRect for the specified
-   * LayerStyle, and applies LayerStyle::filterBackground() to the dirty rectangles.
+   * LayerStyle, and applies LayerStyle::filterBackground() to the dirty rectangles. If
+   * coverRegion is provided, any dirtyRect fully contained within the cover region is skipped,
+   * because the layer's own content covers that area and the background result is invisible there.
    */
-  bool invalidateBackground(const Rect& drawRect, LayerStyle* layerStyle, float contentScale);
+  bool invalidateBackground(const Rect& drawRect, LayerStyle* layerStyle, float contentScale,
+                            const ContentRegion* coverRegion = nullptr);
 
   /**
    * Returns true if there are any dirty rectangles in the root layer.

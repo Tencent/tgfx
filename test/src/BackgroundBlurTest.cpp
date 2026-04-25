@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "layers/RootLayer.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -578,6 +579,56 @@ TGFX_TEST(BackgroundBlurTest, NestedFlat3DLayer) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/NestedFlat3DLayer"));
+}
+
+/**
+ * Test that when a child's dirty region is fully covered by the parent's contentBounds,
+ * the background blur dirty expansion is skipped, since the parent's own content covers the area
+ * and makes the background blur result invisible there.
+ */
+TGFX_TEST(BackgroundBlurTest, ChildCoveredByParentContent) {
+  auto displayList = std::make_unique<DisplayList>();
+  auto root = static_cast<RootLayer*>(displayList->root());
+
+  // Parent layer: SolidLayer 200x200, with BackgroundBlurStyle.
+  // contentBounds = (50,50)-(250,250).
+  auto parentLayer = SolidLayer::Make();
+  parentLayer->setColor(Color::FromRGBA(200, 200, 200, 255));
+  parentLayer->setWidth(200);
+  parentLayer->setHeight(200);
+  parentLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  parentLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  root->addChild(parentLayer);
+
+  // Child layer: SolidLayer 50x50, fully inside parent contentBounds.
+  // Position (75,75) -> bounds = (75,75)-(125,125), inside (50,50)-(250,250).
+  auto childLayer = SolidLayer::Make();
+  childLayer->setColor(Color::Red());
+  childLayer->setWidth(50);
+  childLayer->setHeight(50);
+  childLayer->setMatrix(Matrix::MakeTrans(25, 25));
+  parentLayer->addChild(childLayer);
+
+  // First pass: clear all dirty state.
+  root->updateDirtyRegions();
+
+  // Now move child to a new position still fully inside parent contentBounds.
+  // New position (100,100) -> bounds = (100,100)-(150,150), inside (50,50)-(250,250).
+  childLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  auto dirtyRegions = root->updateDirtyRegions();
+
+  // Without optimization: background blur would expand dirty rects by the blur radius,
+  // producing more / larger dirty regions. With our optimization, the child's dirty rects
+  // are fully contained in parentLayer's contentBounds, so no background expansion occurs.
+  // Verify only the child's old and new positions are dirty (no blur-expanded rects).
+  auto totalArea = 0.f;
+  for (auto& rect : dirtyRegions) {
+    totalArea += rect.width() * rect.height();
+  }
+  // Child old bounds (50x50) + new bounds (50x50) = 5000 max.
+  // With blur expansion the area would be significantly larger (blur radius = 10 -> extra 20px
+  // each side).  Ensure the total dirty area stays within a reasonable bound.
+  EXPECT_LE(totalArea, 6000.f);
 }
 
 }  // namespace tgfx

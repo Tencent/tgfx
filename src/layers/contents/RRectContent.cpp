@@ -41,6 +41,15 @@ bool RRectContent::hitTestPoint(float localX, float localY) const {
   return getFilledPath().contains(localX, localY);
 }
 
+Rect RRectContent::getCoverRect() const {
+  if (stroke) {
+    return Rect::MakeEmpty();
+  }
+  auto insetRect = rRect.rect;
+  insetRect.inset(rRect.radii.x, rRect.radii.y);
+  return insetRect;
+}
+
 Rect RRectContent::onGetBounds() const {
   return rRect.rect;
 }

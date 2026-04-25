@@ -30,6 +30,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
+#include "layers/ContentRegion.h"
 #include "layers/DrawArgs.h"
 #include "layers/MaskContext.h"
 #include "layers/OpaqueContext.h"
@@ -334,7 +335,6 @@ Layer::~Layer() {
     _mask->maskOwner = nullptr;
   }
   removeChildren();
-  delete contentBounds;
 }
 
 Layer::Layer() {
@@ -2277,25 +2277,21 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     transformer = RegionTransformer::MakeFromStyles(_layerStyles, 1.0f, std::move(transformer));
   }
   auto content = getContent();
-  if (bitFields.dirtyContentBounds || (forceDirty && content)) {
-    if (contentBounds) {
-      _root->invalidateRect(*contentBounds);
-    } else {
-      contentBounds = new Rect();
+  auto contentChanged = bitFields.dirtyContentBounds || (forceDirty && content);
+  if (contentChanged) {
+    if (contentRegion) {
+      _root->invalidateRect(contentRegion->bounds());
     }
     if (content) {
-      *contentBounds = content->getBounds();
-      if (transformer) {
-        transformer->transform(contentBounds);
-      }
-      _root->invalidateRect(*contentBounds);
+      contentRegion = ContentRegion::Make(content, transformer.get());
+      _root->invalidateRect(contentRegion->bounds());
     } else {
-      contentBounds->setEmpty();
+      contentRegion = nullptr;
     }
     bitFields.dirtyContentBounds = false;
   }
-  if (contentBounds) {
-    renderBounds = *contentBounds;
+  if (contentRegion) {
+    renderBounds = contentRegion->bounds();
   } else {
     renderBounds.setEmpty();
   }
@@ -2375,7 +2371,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   if (backOutset > 0) {
     maxBackgroundOutset = std::max(backOutset, maxBackgroundOutset);
     minBackgroundOutset = std::min(backOutset, minBackgroundOutset);
-    updateBackgroundBounds(contentScale);
+    updateBackgroundBounds(contentScale, contentChanged);
   }
   if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver) ||
       (content && content->hasBlendMode())) {
@@ -2394,18 +2390,20 @@ void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer
     auto childTransformer = RegionTransformer::MakeFromMatrix(childMatrix.asMatrix(), transformer);
     child->checkBackgroundStyles(childTransformer);
   }
-  updateBackgroundBounds(transformer ? transformer->getMaxScale() : 1.0f);
+  // In the fast path, the node's own content has not changed, so contentChanged is false.
+  updateBackgroundBounds(transformer ? transformer->getMaxScale() : 1.0f, false);
 }
 
-void Layer::updateBackgroundBounds(float contentScale) {
+void Layer::updateBackgroundBounds(float contentScale, bool contentChanged) {
+  auto* coverRegion = (!contentChanged && contentRegion) ? contentRegion.get() : nullptr;
   for (auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
     if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
-      _root->invalidateBackground(renderBounds, style.get(), contentScale);
+      _root->invalidateBackground(renderBounds, style.get(), contentScale, coverRegion);
     }
   }
   if (bitFields.hasBlendMode) {
-    _root->invalidateBackground(renderBounds, nullptr, contentScale);
+    _root->invalidateBackground(renderBounds, nullptr, contentScale, coverRegion);
   }
 }
 
@@ -2443,6 +2441,15 @@ bool Layer::hasBackgroundStyle() {
       return true;
     }
   }
+  for (const auto& child : _children) {
+    if (child->hasBackgroundStyle()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool Layer::hasDescendantBackgroundStyle() {
   for (const auto& child : _children) {
     if (child->hasBackgroundStyle()) {
       return true;

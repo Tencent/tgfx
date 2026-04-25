@@ -93,6 +93,23 @@ bool ComposeContent::hasBlendMode() const {
   return false;
 }
 
+Rect ComposeContent::getCoverRect() const {
+  auto largest = Rect::MakeEmpty();
+  auto largestArea = 0.0f;
+  for (const auto& content : contents) {
+    auto coverRect = content->getCoverRect();
+    if (coverRect.isEmpty()) {
+      continue;
+    }
+    auto area = coverRect.width() * coverRect.height();
+    if (area > largestArea) {
+      largestArea = area;
+      largest = coverRect;
+    }
+  }
+  return largest;
+}
+
 bool ComposeContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
   for (size_t i = 0; i < foregroundStartIndex; ++i) {
     contents[i]->drawDefault(canvas, alpha, antiAlias);
