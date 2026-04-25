@@ -17,11 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/vectors/StrokeStyle.h"
-#include <array>
+#include <cmath>
 #include "Painter.h"
 #include "VectorContext.h"
 #include "core/utils/Log.h"
-#include "core/utils/MathExtra.h"
 #include "layers/DashEffect.h"
 #include "tgfx/layers/LayerRecorder.h"
 
@@ -37,245 +36,179 @@ static float BlendStrokeWidth(float base, const GlyphStyle& style) {
   return base + (style.strokeWidth - base) * style.strokeWidthFactor;
 }
 
-struct BlendPaintInfo {
-  std::shared_ptr<Shader> shader = nullptr;
-  float alpha = 1.0f;
-  BlendMode blendMode = BlendMode::SrcOver;
-};
-
-static std::array<BlendPaintInfo, 2> MakeBlendPaints(const std::shared_ptr<Shader>& baseShader,
-                                                     float baseAlpha, BlendMode baseBlendMode,
-                                                     const GlyphStyle& style) {
-  std::array<BlendPaintInfo, 2> paints = {};
-  float blendFactor = style.strokeColor.alpha;
-  float runAlpha = baseAlpha * style.alpha;
-
-  if (blendFactor < 1.0f) {
-    paints[0].shader = baseShader;
-    paints[0].alpha = runAlpha;
-    paints[0].blendMode = baseBlendMode;
-  }
-  if (blendFactor > 0.0f) {
-    auto color =
-        Color{style.strokeColor.red, style.strokeColor.green, style.strokeColor.blue, blendFactor};
-    paints[1].shader = Shader::MakeColorShader(color);
-    paints[1].alpha = runAlpha;
-    paints[1].blendMode = BlendMode::SrcOver;
-  }
-  return paints;
-}
-
 class StrokePainter : public Painter {
  public:
   Stroke stroke = {};
   std::shared_ptr<PathEffect> pathEffect = nullptr;
-  std::vector<Matrix> innerMatrices = {};
   StrokeAlign strokeAlign = StrokeAlign::Center;
   std::vector<std::shared_ptr<Shape>> originalShapes = {};
-  std::shared_ptr<ColorSource> colorSource = nullptr;
 
   std::unique_ptr<Painter> clone() const override {
     return std::make_unique<StrokePainter>(*this);
   }
 
-  void draw(LayerRecorder* recorder) override {
-    for (size_t i = 0; i < geometries.size(); i++) {
-      auto* geometry = geometries[i];
-      const auto& innerMatrix = innerMatrices[i];
+ protected:
+  std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t index,
+                                      LayerPaint* paint) override {
+    // Derive the fit shader from the pre-effect, pre-align-bake shape. Dash and stroke alignment
+    // only subset the pixels that the stroke band covers, so extending the original path bounds
+    // by the stroke width is an exact upper bound for every effect/align combination. Reading
+    // getPath() here also primes Shape::getPath()'s atomic cache for the recorder's later use.
+    paint->shader = buildFitShader(innerShape, stroke.width);
 
-      Matrix invertedInner = Matrix::I();
-      Matrix outerMatrix = Matrix::I();
-      if (innerMatrix.invert(&invertedInner)) {
-        outerMatrix = invertedInner;
-        outerMatrix.postConcat(geometry->matrix);
-      }
-      auto scales = outerMatrix.getAxisScales();
-      bool uniformScale = FloatNearlyEqual(scales.x, scales.y);
-      bool needsBooleanOp = strokeAlign != StrokeAlign::Center;
-
-      if (geometry->hasText()) {
-        for (const auto& run : geometry->getGlyphRuns()) {
-          auto runMatrix = run.matrix;
-          runMatrix.postConcat(geometry->matrix);
-          if (uniformScale && pathEffect == nullptr && !needsBooleanOp) {
-            drawGlyphRunAsTextBlob(recorder, run, runMatrix, scales.x);
-          } else {
-            auto runInnerMatrix = run.matrix;
-            runInnerMatrix.postConcat(innerMatrix);
-            drawGlyphRunAsShape(recorder, run, runInnerMatrix, outerMatrix, scales, uniformScale,
-                                needsBooleanOp);
-          }
-        }
-      } else {
-        auto originalShape = needsBooleanOp ? originalShapes[i] : nullptr;
-        drawShape(recorder, geometry->getShape(), std::move(originalShape), innerMatrix,
-                  outerMatrix, scales, uniformScale, needsBooleanOp);
+    if (pathEffect) {
+      innerShape = Shape::ApplyEffect(innerShape, pathEffect);
+      if (innerShape == nullptr) {
+        return nullptr;
       }
     }
+    if (strokeAlign != StrokeAlign::Center) {
+      // prepareShape is only invoked for non-text geometries. StrokeStyle::apply fills
+      // originalShapes with geometry->getShape() for those entries when strokeAlign is not
+      // Center (text geometries push a null placeholder, but prepareGlyphRun handles text).
+      DEBUG_ASSERT(originalShapes[index] != nullptr);
+      auto originalShape = Shape::ApplyMatrix(originalShapes[index], innerMatrices[index]);
+      innerShape = applyStrokeAndAlign(std::move(innerShape), std::move(originalShape), stroke);
+      if (innerShape == nullptr) {
+        return nullptr;
+      }
+    } else {
+      paint->style = PaintStyle::Stroke;
+      paint->stroke = stroke;
+    }
+    return innerShape;
+  }
+
+  GlyphRunEmit prepareGlyphRun(const StyledGlyphRun& run, size_t /*index*/) override {
+    GlyphRunEmit emit = {};
+    if (run.textBlob == nullptr) {
+      return emit;
+    }
+    Stroke runStroke = stroke;
+    runStroke.width = BlendStrokeWidth(stroke.width, run.style);
+
+    // Fit bounds come from the original TextBlob plus stroke width + align, matching the Shape
+    // branch above. Dash and non-center alignment only choose which subset of the stroke band
+    // is emitted; they do not enlarge it.
+    auto baseShader = buildFitShader(run.textBlob, runStroke.width);
+
+    // Emit path: non-center alignment or an active path effect require expanding the text blob
+    // into a shape (alignment needs a boolean op against the original outline, path effects
+    // operate on path geometry). When neither applies keep the blob intact to preserve color
+    // glyphs (e.g. emoji) that cannot be reduced to a path.
+    std::shared_ptr<Shape> runShape = nullptr;
+    bool needsBooleanOp = strokeAlign != StrokeAlign::Center;
+    if (pathEffect != nullptr || needsBooleanOp) {
+      runShape = Shape::MakeFrom(run.textBlob);
+      // Snapshot the un-effected outline for the boolean-op step. Shape is immutable, so the
+      // pre-effect shape remains a valid "original outline" and sharing it lets Shape::getPath()'s
+      // atomic cache serve both the boolean op and any subsequent path consumer.
+      auto originalShape = runShape;
+      if (runShape != nullptr && pathEffect != nullptr) {
+        runShape = Shape::ApplyEffect(runShape, pathEffect);
+      }
+      if (runShape != nullptr && needsBooleanOp) {
+        runShape = applyStrokeAndAlign(std::move(runShape), std::move(originalShape), runStroke);
+      }
+      if (runShape == nullptr) {
+        return emit;
+      }
+    }
+    if (runShape != nullptr) {
+      emit.shape = runShape;
+    } else {
+      emit.textBlob = run.textBlob;
+    }
+
+    float blendFactor = run.style.strokeColor.alpha;
+    float runAlpha = alpha * run.style.alpha;
+    if (blendFactor < 1.0f) {
+      auto paint = makeBasePaint();
+      paint.color.alpha = runAlpha;
+      paint.shader = baseShader;
+      if (!needsBooleanOp) {
+        paint.style = PaintStyle::Stroke;
+        paint.stroke = runStroke;
+      }
+      emit.paints.push_back(std::move(paint));
+    }
+    if (blendFactor > 0.0f) {
+      const auto& strokeColor = run.style.strokeColor;
+      auto overlayColor = Color{strokeColor.red, strokeColor.green, strokeColor.blue, blendFactor};
+      auto paint = makeBasePaint();
+      paint.blendMode = BlendMode::SrcOver;
+      paint.shader = Shader::MakeColorShader(overlayColor);
+      paint.color.alpha = runAlpha;
+      if (!needsBooleanOp) {
+        paint.style = PaintStyle::Stroke;
+        paint.stroke = runStroke;
+      }
+      emit.paints.push_back(std::move(paint));
+    }
+    return emit;
   }
 
  private:
-  std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> shape, const Matrix& innerMatrix,
-                                      Matrix* finalOuter) {
-    if (innerMatrix.isTranslate()) {
-      finalOuter->preTranslate(innerMatrix.getTranslateX(), innerMatrix.getTranslateY());
-    } else {
-      shape = Shape::ApplyMatrix(shape, innerMatrix);
+  // Builds the fit shader for a Shape drawable. The fit region is the pre-stroke path bounds
+  // expanded by the stroke width according to strokeAlign. getPath().getBounds() returns tight
+  // bounds for every Shape flavor (including MergeShape where onGetBounds is conservative) and
+  // shares its atomic cache with the later rasterization path.
+  //
+  // miter spikes from miterLimit are ignored so the Shape and TextBlob paths follow the same
+  // formula; on sharp miter joins the fit region may clip the tip colors by a fraction of a
+  // pixel. This is a deliberate trade-off to avoid synthesizing a stroke-expanded Shape just
+  // for measurement.
+  std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<Shape>& shape,
+                                         float strokeWidth) const {
+    if (colorSource == nullptr || !colorSource->fitsToGeometry() || shape == nullptr) {
+      return shader;
     }
-    if (pathEffect) {
-      shape = Shape::ApplyEffect(shape, pathEffect);
+    auto bounds = shape->getPath().getBounds();
+    expandByStrokeAlign(&bounds, strokeWidth);
+    return wrapShaderWithFit(bounds);
+  }
+
+  // Same contract as the Shape overload, sourced from the blob's tight glyph bounds so color
+  // glyphs stay intact (no text-to-shape conversion for measurement).
+  std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<TextBlob>& textBlob,
+                                         float strokeWidth) const {
+    if (colorSource == nullptr || !colorSource->fitsToGeometry() || textBlob == nullptr) {
+      return shader;
     }
-    return shape;
+    auto bounds = textBlob->getTightBounds();
+    expandByStrokeAlign(&bounds, strokeWidth);
+    return wrapShaderWithFit(bounds);
+  }
+
+  // Outset per side for each stroke alignment (miter spikes ignored): Inside keeps the bounds,
+  // Center grows by half the width, Outside grows by the full width. ceilf snaps the outset to
+  // whole pixels so gradient stops land on pixel boundaries.
+  void expandByStrokeAlign(Rect* bounds, float strokeWidth) const {
+    float outset = 0.0f;
+    switch (strokeAlign) {
+      case StrokeAlign::Inside:
+        return;
+      case StrokeAlign::Center:
+        outset = ceilf(strokeWidth * 0.5f);
+        break;
+      case StrokeAlign::Outside:
+        outset = ceilf(strokeWidth);
+        break;
+    }
+    bounds->outset(outset, outset);
   }
 
   std::shared_ptr<Shape> applyStrokeAndAlign(std::shared_ptr<Shape> shape,
                                              std::shared_ptr<Shape> originalShape,
-                                             const Stroke& strokeToApply) {
-    Stroke tempStroke = strokeToApply;
-    tempStroke.width *= 2;
-    shape = Shape::ApplyStroke(shape, &tempStroke);
+                                             const Stroke& strokeToApply) const {
+    Stroke doubled = strokeToApply;
+    doubled.width *= 2;
+    shape = Shape::ApplyStroke(shape, &doubled);
     if (shape == nullptr) {
       return nullptr;
     }
-    if (strokeAlign == StrokeAlign::Inside) {
-      return Shape::Merge(std::move(shape), std::move(originalShape), PathOp::Intersect);
-    }
-    return Shape::Merge(std::move(shape), std::move(originalShape), PathOp::Difference);
-  }
-
-  void drawShape(LayerRecorder* recorder, std::shared_ptr<Shape> shape,
-                 std::shared_ptr<Shape> originalShape, const Matrix& innerMatrix,
-                 const Matrix& outerMatrix, const Point& scales, bool uniformScale,
-                 bool needsBooleanOp) {
-    if (shape == nullptr) {
-      return;
-    }
-    Matrix finalOuter = outerMatrix;
-    shape = prepareShape(std::move(shape), innerMatrix, &finalOuter);
-    auto fitsToGeometry = colorSource->fitsToGeometry();
-    // Capture the pre-stroke geometry bounds in the final outer space so every stroke-align
-    // branch evaluates the fit shader over the same region as a fill would.
-    auto geometryBounds =
-        fitsToGeometry ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
-
-    if (needsBooleanOp) {
-      auto transformedOriginal = Shape::ApplyMatrix(originalShape, innerMatrix);
-      shape = applyStrokeAndAlign(std::move(shape), std::move(transformedOriginal), stroke);
-      if (shape == nullptr) {
-        return;
-      }
-      shape = Shape::ApplyMatrix(shape, finalOuter);
-      auto finalShader = shader;
-      if (fitsToGeometry) {
-        finalShader = shader->makeWithMatrix(colorSource->getFitMatrix(geometryBounds));
-      }
-      LayerPaint paint(finalShader, alpha, blendMode);
-      paint.placement = placement;
-      recorder->addShape(std::move(shape), paint);
-      return;
-    }
-
-    LayerPaint paint(shader, alpha, blendMode);
-    if (uniformScale) {
-      shape = Shape::ApplyMatrix(shape, finalOuter);
-      paint.style = PaintStyle::Stroke;
-      paint.stroke = stroke;
-      paint.stroke.width *= scales.x;
-    } else {
-      shape = Shape::ApplyStroke(shape, &stroke);
-      if (shape == nullptr) {
-        return;
-      }
-      shape = Shape::ApplyMatrix(shape, finalOuter);
-    }
-    if (fitsToGeometry) {
-      paint.shader = shader->makeWithMatrix(colorSource->getFitMatrix(geometryBounds));
-    }
-    paint.placement = placement;
-    recorder->addShape(std::move(shape), paint);
-  }
-
-  void drawGlyphRunAsTextBlob(LayerRecorder* recorder, const StyledGlyphRun& run,
-                              const Matrix& matrix, float scale) {
-    Stroke runStroke = stroke;
-    runStroke.width = BlendStrokeWidth(stroke.width, run.style) * scale;
-    auto baseShader = shader;
-    if (colorSource->fitsToGeometry() && run.textBlob != nullptr) {
-      baseShader = shader->makeWithMatrix(colorSource->getFitMatrix(run.textBlob->getBounds()));
-    }
-    auto paints = MakeBlendPaints(baseShader, alpha, blendMode, run.style);
-
-    recorder->setMatrix(matrix);
-    for (const auto& info : paints) {
-      if (info.shader == nullptr) {
-        continue;
-      }
-      LayerPaint paint(info.shader, info.alpha, info.blendMode);
-      paint.style = PaintStyle::Stroke;
-      paint.stroke = runStroke;
-      paint.placement = placement;
-      recorder->addTextBlob(run.textBlob, paint);
-    }
-    recorder->resetMatrix();
-  }
-
-  void drawGlyphRunAsShape(LayerRecorder* recorder, const StyledGlyphRun& run,
-                           const Matrix& innerMatrix, const Matrix& outerMatrix,
-                           const Point& scales, bool uniformScale, bool needsBooleanOp) {
-    auto shape = Shape::MakeFrom(run.textBlob);
-    if (shape == nullptr) {
-      return;
-    }
-    Matrix finalOuter = outerMatrix;
-    shape = prepareShape(std::move(shape), innerMatrix, &finalOuter);
-    Stroke runStroke = stroke;
-    runStroke.width = BlendStrokeWidth(stroke.width, run.style);
-    auto baseShader = shader;
-    auto fitsToGeometry = colorSource->fitsToGeometry();
-    // Capture the pre-stroke text geometry bounds in the final outer space so every stroke-align
-    // branch evaluates the fit shader over the same region as a fill would.
-    auto geometryBounds =
-        fitsToGeometry ? finalOuter.mapRect(shape->getBounds()) : Rect::MakeEmpty();
-
-    std::shared_ptr<Shape> finalShape = nullptr;
-    LayerPaint basePaint = {};
-
-    if (needsBooleanOp) {
-      auto originalTextShape = Shape::MakeFrom(run.textBlob);
-      originalTextShape = Shape::ApplyMatrix(originalTextShape, innerMatrix);
-      finalShape = applyStrokeAndAlign(shape, std::move(originalTextShape), runStroke);
-      if (finalShape == nullptr) {
-        return;
-      }
-      finalShape = Shape::ApplyMatrix(finalShape, finalOuter);
-    } else if (uniformScale) {
-      finalShape = Shape::ApplyMatrix(shape, finalOuter);
-      basePaint.style = PaintStyle::Stroke;
-      basePaint.stroke = runStroke;
-      basePaint.stroke.width *= scales.x;
-    } else {
-      finalShape = Shape::ApplyStroke(shape, &runStroke);
-      if (finalShape == nullptr) {
-        return;
-      }
-      finalShape = Shape::ApplyMatrix(finalShape, finalOuter);
-    }
-
-    if (fitsToGeometry) {
-      baseShader = shader->makeWithMatrix(colorSource->getFitMatrix(geometryBounds));
-    }
-    auto paints = MakeBlendPaints(baseShader, alpha, blendMode, run.style);
-
-    for (const auto& info : paints) {
-      if (info.shader == nullptr) {
-        continue;
-      }
-      LayerPaint paint(info.shader, info.alpha, info.blendMode);
-      paint.style = basePaint.style;
-      paint.stroke = basePaint.stroke;
-      paint.placement = placement;
-      recorder->addShape(finalShape, paint);
-    }
+    auto op = strokeAlign == StrokeAlign::Inside ? PathOp::Intersect : PathOp::Difference;
+    return Shape::Merge(std::move(shape), std::move(originalShape), op);
   }
 };
 
@@ -407,25 +340,27 @@ void StrokeStyle::apply(VectorContext* context) {
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
   painter->placement = _placement;
-  painter->geometries.reserve(context->geometries.size());
-  painter->innerMatrices.reserve(context->geometries.size());
-  bool needsOriginalShapes = _strokeAlign != StrokeAlign::Center;
-  if (needsOriginalShapes) {
-    painter->originalShapes.reserve(context->geometries.size());
-  }
-  for (auto& geometry : context->geometries) {
-    painter->geometries.push_back(geometry.get());
-    painter->innerMatrices.push_back(geometry->matrix);
-    if (needsOriginalShapes) {
-      painter->originalShapes.push_back(geometry->getShape());
-    }
-  }
   painter->stroke = _stroke;
   painter->strokeAlign = _strokeAlign;
   if (_cachedDashEffect == nullptr && !_dashes.empty()) {
     _cachedDashEffect = CreateDashPathEffect(_dashes, _dashOffset, _dashAdaptive, _stroke);
   }
   painter->pathEffect = _cachedDashEffect;
+  painter->captureGeometries(context);
+  if (_strokeAlign != StrokeAlign::Center) {
+    painter->originalShapes.reserve(context->geometries.size());
+    for (auto& geometry : context->geometries) {
+      // Text geometries are handled entirely by prepareGlyphRun, which rebuilds the original
+      // outline from the run's textBlob. Push a null placeholder to keep index alignment with
+      // geometries while avoiding an eager text-to-shape conversion that would also pollute
+      // Geometry::shape cache.
+      if (geometry->hasText()) {
+        painter->originalShapes.push_back(nullptr);
+        continue;
+      }
+      painter->originalShapes.push_back(geometry->getShape());
+    }
+  }
   context->painters.push_back(std::move(painter));
 }
 

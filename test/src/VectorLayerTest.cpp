@@ -1185,11 +1185,20 @@ TGFX_TEST(VectorLayerTest, StrokeNestedScale) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+
   auto displayList = std::make_unique<DisplayList>();
   auto vectorLayer = VectorLayer::Make();
 
-  // Group 1: Non-uniform scale at inner group level
-  // Stroke sees accumulated matrix (2,1), converts to fill with uniform stroke width
+  std::vector<Color> gradientColors = {Color::Red(), Color::FromRGBA(255, 255, 0, 255),
+                                       Color::Blue()};
+
+  // Each group uses a fit-to-geometry gradient or image pattern stroke so the shader coordinate
+  // system is visible: if the nested scales are not combined correctly, the fit region (and the
+  // stroke width it implies) would differ between groups that should look identical.
+
+  // Group 1: Non-uniform scale at inner group level. Stroke sees accumulated matrix (2,1).
   // Final size: 60*2 x 60*1 = 120x60
   auto outerGroup1 = std::make_shared<VectorGroup>();
 
@@ -1200,13 +1209,13 @@ TGFX_TEST(VectorLayerTest, StrokeNestedScale) {
   rect1->setSize({60, 60});
   innerGroup1->setElements({rect1});
 
-  auto stroke1 = MakeStrokeStyle(Color::Red(), 8.0f);
+  auto gradient1 = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+  auto stroke1 = StrokeStyle::Make(gradient1);
+  stroke1->setStrokeWidth(8.0f);
   outerGroup1->setElements({innerGroup1, stroke1});
 
-  // Group 2: Non-uniform scale at outer group only
-  // Stroke sees accumulated matrix (2,1), converts to fill with uniform stroke width
-  // Final size: 60*2 x 60*1 = 120x60
-  // Should look identical to Group 1
+  // Group 2: Non-uniform scale at outer group only. Stroke sees the same accumulated matrix as
+  // group 1, so the fit region and the rendered stroke must match it visually.
   auto outerGroup2 = std::make_shared<VectorGroup>();
   outerGroup2->setScale({2.0f, 1.0f});
 
@@ -1217,12 +1226,14 @@ TGFX_TEST(VectorLayerTest, StrokeNestedScale) {
   rect2->setSize({60, 60});
   innerGroup2->setElements({rect2});
 
-  auto stroke2 = MakeStrokeStyle(Color::Blue(), 8.0f);
+  auto gradient2 = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+  auto stroke2 = StrokeStyle::Make(gradient2);
+  stroke2->setStrokeWidth(8.0f);
   outerGroup2->setElements({innerGroup2, stroke2});
 
-  // Group 3: Inner and outer scales cancel out to uniform
+  // Group 3: Inner and outer scales cancel out to uniform. Uses an image pattern so the shader
+  // coordinate layout (fit region and pattern orientation) is easy to compare visually.
   // Inner: (0.5, 2), Outer: (2, 0.5), Combined: (1, 1)
-  // Stroke sees uniform matrix, applies normal 8px stroke
   // Final size: 60*0.5*2 x 60*2*0.5 = 60x60
   auto outerGroup3 = std::make_shared<VectorGroup>();
   outerGroup3->setScale({2.0f, 0.5f});
@@ -1234,7 +1245,10 @@ TGFX_TEST(VectorLayerTest, StrokeNestedScale) {
   rect3->setSize({60, 60});
   innerGroup3->setElements({rect3});
 
-  auto stroke3 = MakeStrokeStyle(Color::Green(), 8.0f);
+  auto pattern3 = ImagePattern::Make(image);
+  pattern3->setScaleMode(ScaleMode::Zoom);
+  auto stroke3 = StrokeStyle::Make(pattern3);
+  stroke3->setStrokeWidth(8.0f);
   outerGroup3->setElements({innerGroup3, stroke3});
 
   vectorLayer->setContents({outerGroup1, outerGroup2, outerGroup3});
@@ -4621,7 +4635,7 @@ TGFX_TEST(VectorLayerTest, Line) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 600, 400);
+  auto surface = Surface::Make(context, 600, 504);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -4669,7 +4683,21 @@ TGFX_TEST(VectorLayerTest, Line) {
   auto group4 = std::make_shared<VectorGroup>();
   group4->setElements({line4, trim4, stroke4});
 
-  vectorLayer->setContents({group1, group2, group3, group4});
+  // Line 5: Zero-height rectangle with a wide, vertically-oriented fit gradient Outside stroke.
+  // The rectangle collapses to a horizontal segment, so Outside stroke should expand it into a
+  // band whose gradient direction shows that the fit region tracks the stroked geometry rather
+  // than the degenerate original rect.
+  auto degenerateRect = std::make_shared<Rectangle>();
+  degenerateRect->setPosition({300, 430});
+  degenerateRect->setSize({500, 0});
+  auto gradient5 = Gradient::MakeLinear({0.5f, 0.0f}, {0.5f, 1.0f}, {Color::Red(), Color::Blue()});
+  auto stroke5 = StrokeStyle::Make(gradient5);
+  stroke5->setStrokeWidth(24.0f);
+  stroke5->setStrokeAlign(StrokeAlign::Outside);
+  auto group5 = std::make_shared<VectorGroup>();
+  group5->setElements({degenerateRect, stroke5});
+
+  vectorLayer->setContents({group1, group2, group3, group4, group5});
 
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
@@ -4712,6 +4740,361 @@ TGFX_TEST(VectorLayerTest, FitsToGeometrySwitch) {
   pattern->setScaleMode(ScaleMode::None);
   EXPECT_EQ(pattern->scaleMode(), ScaleMode::None);
   EXPECT_EQ(pattern->fitsToGeometry(), false);
+}
+
+static std::shared_ptr<VectorGroup> WrapInOuterGroup(std::shared_ptr<VectorGroup> inner,
+                                                     const Point& center, float rotation,
+                                                     const Point& scale) {
+  auto outer = std::make_shared<VectorGroup>();
+  outer->setAnchor(center);
+  outer->setPosition(center);
+  outer->setRotation(rotation);
+  outer->setScale(scale);
+  outer->setElements({std::move(inner)});
+  return outer;
+}
+
+static std::vector<std::shared_ptr<VectorElement>> MakeRectFitCellContents(
+    float cx, float cy, int column, float cellSize, const std::vector<Color>& gradientColors,
+    const std::shared_ptr<Image>& image) {
+  auto rect = std::make_shared<Rectangle>();
+  rect->setPosition({cx, cy});
+  rect->setSize({cellSize * 0.7f, cellSize * 0.7f});
+  std::vector<std::shared_ptr<VectorElement>> elements = {rect};
+  if (column == 0) {
+    auto gradient = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+    elements.push_back(FillStyle::Make(gradient));
+  } else if (column == 1) {
+    auto pattern = ImagePattern::Make(image);
+    pattern->setScaleMode(ScaleMode::LetterBox);
+    elements.push_back(FillStyle::Make(pattern));
+  } else {
+    auto gradient = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+    auto stroke = StrokeStyle::Make(gradient);
+    stroke->setStrokeWidth(10.0f);
+    elements.push_back(stroke);
+  }
+  return elements;
+}
+
+// Polystar produces non-simple paths, forcing the ShapeContent rendering branch rather than the
+// rect/rrect optimization so both code paths in LayerRecorder get exercised.
+static std::vector<std::shared_ptr<VectorElement>> MakeComplexFitCellContents(
+    float cx, float cy, int column, float cellSize, const std::vector<Color>& gradientColors,
+    const std::shared_ptr<Image>& image) {
+  auto star = std::make_shared<Polystar>();
+  star->setPolystarType(PolystarType::Star);
+  star->setPosition({cx, cy});
+  star->setOuterRadius(cellSize * 0.4f);
+  std::vector<std::shared_ptr<VectorElement>> elements = {};
+  if (column == 0) {
+    star->setPointCount(5);
+    star->setInnerRadius(cellSize * 0.18f);
+    elements.push_back(star);
+    auto gradient = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+    elements.push_back(FillStyle::Make(gradient));
+  } else if (column == 1) {
+    star->setPointCount(6);
+    star->setInnerRadius(cellSize * 0.2f);
+    elements.push_back(star);
+    auto pattern = ImagePattern::Make(image);
+    pattern->setScaleMode(ScaleMode::LetterBox);
+    elements.push_back(FillStyle::Make(pattern));
+  } else {
+    star->setPointCount(5);
+    star->setInnerRadius(cellSize * 0.2f);
+    elements.push_back(star);
+    auto gradient = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+    auto stroke = StrokeStyle::Make(gradient);
+    stroke->setStrokeWidth(8.0f);
+    elements.push_back(stroke);
+  }
+  return elements;
+}
+
+// Non-linear gradient variants: radial, conic, diamond.
+static std::vector<std::shared_ptr<VectorElement>> MakeRadialCellContents(
+    float cx, float cy, int column, float cellSize, const std::vector<Color>& gradientColors) {
+  auto rect = std::make_shared<Rectangle>();
+  rect->setPosition({cx, cy});
+  rect->setSize({cellSize * 0.7f, cellSize * 0.7f});
+  std::shared_ptr<ColorSource> colorSource = nullptr;
+  if (column == 0) {
+    colorSource = Gradient::MakeRadial({0.5f, 0.5f}, 0.5f, gradientColors);
+  } else if (column == 1) {
+    colorSource = Gradient::MakeConic({0.5f, 0.5f}, 0.0f, 360.0f, gradientColors);
+  } else {
+    colorSource = Gradient::MakeDiamond({0.5f, 0.5f}, 0.5f, gradientColors);
+  }
+  return {rect, FillStyle::Make(colorSource)};
+}
+
+// Every ImagePattern ScaleMode under the same outer transform. The rectangle is deliberately
+// non-square so the three ScaleMode variants produce visually distinct cells (the source image
+// is square). A light-gray backdrop rect is painted first in its own subgroup so the LetterBox
+// letterbox bars show up against a non-white color.
+static std::vector<std::shared_ptr<VectorElement>> MakePatternScaleCellContents(
+    float cx, float cy, int column, float cellSize, const std::shared_ptr<Image>& image) {
+  auto backdropRect = std::make_shared<Rectangle>();
+  backdropRect->setPosition({cx, cy});
+  backdropRect->setSize({cellSize * 0.85f, cellSize * 0.5f});
+  auto backdropGroup = std::make_shared<VectorGroup>();
+  backdropGroup->setElements({backdropRect, MakeFillStyle(Color::FromRGBA(220, 220, 220, 255))});
+
+  auto patternRect = std::make_shared<Rectangle>();
+  patternRect->setPosition({cx, cy});
+  patternRect->setSize({cellSize * 0.85f, cellSize * 0.5f});
+  auto pattern = ImagePattern::Make(image);
+  if (column == 0) {
+    pattern->setScaleMode(ScaleMode::LetterBox);
+  } else if (column == 1) {
+    pattern->setScaleMode(ScaleMode::Stretch);
+  } else {
+    pattern->setScaleMode(ScaleMode::Zoom);
+  }
+  auto patternGroup = std::make_shared<VectorGroup>();
+  patternGroup->setElements({patternRect, FillStyle::Make(pattern)});
+
+  return {backdropGroup, patternGroup};
+}
+
+// Absolute-space color sources (fit disabled); shader should still ride with the outer CTM.
+static std::vector<std::shared_ptr<VectorElement>> MakeAbsoluteCellContents(
+    float cx, float cy, int column, float cellSize, const std::vector<Color>& gradientColors,
+    const std::shared_ptr<Image>& image) {
+  auto rect = std::make_shared<Rectangle>();
+  rect->setPosition({cx, cy});
+  rect->setSize({cellSize * 0.7f, cellSize * 0.7f});
+  std::vector<std::shared_ptr<VectorElement>> elements = {rect};
+  if (column == 0) {
+    auto gradient = Gradient::MakeLinear({cx - cellSize * 0.35f, cy}, {cx + cellSize * 0.35f, cy},
+                                         gradientColors);
+    gradient->setFitsToGeometry(false);
+    elements.push_back(FillStyle::Make(gradient));
+  } else if (column == 1) {
+    auto pattern = ImagePattern::Make(image);
+    pattern->setScaleMode(ScaleMode::None);
+    Matrix patternMatrix = Matrix::I();
+    patternMatrix.postScale(cellSize * 0.7f / static_cast<float>(image->width()),
+                            cellSize * 0.7f / static_cast<float>(image->height()));
+    patternMatrix.postTranslate(cx - cellSize * 0.35f, cy - cellSize * 0.35f);
+    pattern->setMatrix(patternMatrix);
+    elements.push_back(FillStyle::Make(pattern));
+  } else {
+    auto gradient = Gradient::MakeLinear({cx - cellSize * 0.35f, cy}, {cx + cellSize * 0.35f, cy},
+                                         gradientColors);
+    gradient->setFitsToGeometry(false);
+    auto stroke = StrokeStyle::Make(gradient);
+    stroke->setStrokeWidth(10.0f);
+    elements.push_back(stroke);
+  }
+  return elements;
+}
+
+// Non-center stroke alignment with fit color sources exercises the boolean-op branch of
+// StrokeStyle::prepareShape combined with an outer transform.
+static std::vector<std::shared_ptr<VectorElement>> MakeStrokeAlignCellContents(
+    float cx, float cy, int column, float cellSize, const std::vector<Color>& gradientColors,
+    const std::shared_ptr<Image>& image) {
+  auto rect = std::make_shared<Rectangle>();
+  rect->setPosition({cx, cy});
+  rect->setSize({cellSize * 0.7f, cellSize * 0.7f});
+  std::shared_ptr<ColorSource> source = nullptr;
+  StrokeAlign align = StrokeAlign::Inside;
+  if (column == 0) {
+    source = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+    align = StrokeAlign::Inside;
+  } else if (column == 1) {
+    auto pattern = ImagePattern::Make(image);
+    pattern->setScaleMode(ScaleMode::LetterBox);
+    source = pattern;
+    align = StrokeAlign::Outside;
+  } else {
+    source = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+    align = StrokeAlign::Outside;
+  }
+  auto fill = MakeFillStyle(Color::FromRGBA(230, 230, 230, 255));
+  auto stroke = StrokeStyle::Make(source);
+  stroke->setStrokeWidth(12.0f);
+  stroke->setStrokeAlign(align);
+  return {rect, fill, stroke};
+}
+
+// Glyph-run fill / (pattern fill + Inside stroke) / Outside stroke under an outer rotation.
+static std::vector<std::shared_ptr<VectorElement>> MakeTextCellContents(
+    int column, const Font& textFont, const std::vector<Color>& gradientColors,
+    const std::shared_ptr<Image>& image) {
+  auto blob = TextBlob::MakeFrom("Aa", textFont);
+  auto textSpan = Text::Make(blob);
+  std::vector<std::shared_ptr<VectorElement>> elements = {textSpan};
+  if (column == 0) {
+    auto gradient = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+    elements.push_back(FillStyle::Make(gradient));
+  } else if (column == 1) {
+    auto pattern = ImagePattern::Make(image);
+    pattern->setScaleMode(ScaleMode::LetterBox);
+    elements.push_back(FillStyle::Make(pattern));
+    auto strokeGradient = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+    auto stroke = StrokeStyle::Make(strokeGradient);
+    stroke->setStrokeWidth(3.0f);
+    stroke->setStrokeAlign(StrokeAlign::Inside);
+    elements.push_back(stroke);
+  } else {
+    auto gradient = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+    auto stroke = StrokeStyle::Make(gradient);
+    stroke->setStrokeWidth(3.0f);
+    stroke->setStrokeAlign(StrokeAlign::Outside);
+    elements.push_back(stroke);
+  }
+  return elements;
+}
+
+TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  const float cellSize = 90.0f;
+  const float columnGap = 30.0f;
+  const float rowGap = 30.0f;
+  const float margin = 50.0f;
+  const int columns = 6;
+  const int rows = 4;
+  const auto cellCenterX = [&](int col) {
+    return margin + cellSize * 0.5f + static_cast<float>(col) * (cellSize + columnGap);
+  };
+  const auto cellCenterY = [&](int row) {
+    return margin + cellSize * 0.5f + static_cast<float>(row) * (cellSize + rowGap);
+  };
+  const int width = static_cast<int>(margin * 2 + cellSize * columns + columnGap * (columns - 1));
+  const int height = static_cast<int>(margin * 2 + cellSize * rows + rowGap * (rows - 1));
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto typeface = GetTestTypeface();
+  ASSERT_TRUE(typeface != nullptr);
+  Font textFont(typeface, 36.0f);
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  std::vector<Color> gradientColors = {Color::Red(), Color::FromRGBA(255, 255, 0, 255),
+                                       Color::Blue()};
+
+  std::vector<std::shared_ptr<VectorElement>> contents = {};
+
+  // Row 1, cols 0-2: Baseline rectangle + fit color sources without any outer group transform.
+  for (int col = 0; col < 3; col++) {
+    float cx = cellCenterX(col);
+    float cy = cellCenterY(0);
+    auto cellGroup = std::make_shared<VectorGroup>();
+    cellGroup->setElements(MakeRectFitCellContents(cx, cy, col, cellSize, gradientColors, image));
+    contents.push_back(cellGroup);
+  }
+  // Row 1, cols 3-5: same rectangle content nested inside two transformed VectorGroups so the
+  // painter's captured innerMatrix travels through more than one layer before the fit stage.
+  struct NestedTransform {
+    float outerRotation;
+    Point outerScale;
+    float middleRotation;
+    Point middleScale;
+  };
+  const std::array<NestedTransform, 3> rectNested = {
+      NestedTransform{30.0f, {1.0f, 1.0f}, 15.0f, {1.0f, 1.0f}},
+      NestedTransform{0.0f, {1.3f, 0.7f}, 0.0f, {1.0f, 1.0f}},
+      NestedTransform{25.0f, {1.0f, 1.0f}, 10.0f, {1.2f, 1.0f}},
+  };
+  for (int col = 0; col < 3; col++) {
+    float cx = cellCenterX(col + 3);
+    float cy = cellCenterY(0);
+    const auto& config = rectNested[static_cast<size_t>(col)];
+    auto innerGroup = std::make_shared<VectorGroup>();
+    innerGroup->setElements(MakeRectFitCellContents(cx, cy, col, cellSize, gradientColors, image));
+    auto middleGroup = std::make_shared<VectorGroup>();
+    middleGroup->setAnchor({cx, cy});
+    middleGroup->setPosition({cx, cy});
+    middleGroup->setRotation(config.middleRotation);
+    middleGroup->setScale(config.middleScale);
+    middleGroup->setElements({innerGroup});
+    contents.push_back(
+        WrapInOuterGroup(middleGroup, {cx, cy}, config.outerRotation, config.outerScale));
+  }
+
+  // Row 2, cols 0-2: Polystar fit color sources with nested outer transforms (complex-path branch).
+  const std::array<NestedTransform, 3> starNested = {
+      NestedTransform{20.0f, {1.0f, 1.0f}, 10.0f, {1.0f, 1.0f}},
+      NestedTransform{15.0f, {1.0f, 1.0f}, 0.0f, {1.3f, 0.8f}},
+      NestedTransform{25.0f, {1.0f, 1.0f}, 15.0f, {1.0f, 1.0f}},
+  };
+  for (int col = 0; col < 3; col++) {
+    float cx = cellCenterX(col);
+    float cy = cellCenterY(1);
+    const auto& config = starNested[static_cast<size_t>(col)];
+    auto innerGroup = std::make_shared<VectorGroup>();
+    innerGroup->setElements(
+        MakeComplexFitCellContents(cx, cy, col, cellSize, gradientColors, image));
+    auto middleGroup = std::make_shared<VectorGroup>();
+    middleGroup->setAnchor({cx, cy});
+    middleGroup->setPosition({cx, cy});
+    middleGroup->setRotation(config.middleRotation);
+    middleGroup->setScale(config.middleScale);
+    middleGroup->setElements({innerGroup});
+    contents.push_back(
+        WrapInOuterGroup(middleGroup, {cx, cy}, config.outerRotation, config.outerScale));
+  }
+  // Row 2, cols 3-5: Non-linear gradient variants (radial/conic/diamond) under outer rotation.
+  for (int col = 0; col < 3; col++) {
+    float cx = cellCenterX(col + 3);
+    float cy = cellCenterY(1);
+    auto innerGroup = std::make_shared<VectorGroup>();
+    innerGroup->setElements(MakeRadialCellContents(cx, cy, col, cellSize, gradientColors));
+    contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 30.0f, {1.0f, 1.0f}));
+  }
+
+  // Row 3, cols 0-2: Every ImagePattern ScaleMode under a non-uniform outer scale.
+  for (int col = 0; col < 3; col++) {
+    float cx = cellCenterX(col);
+    float cy = cellCenterY(2);
+    auto innerGroup = std::make_shared<VectorGroup>();
+    innerGroup->setElements(MakePatternScaleCellContents(cx, cy, col, cellSize, image));
+    contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 20.0f, {1.0f, 1.0f}));
+  }
+  // Row 3, cols 3-5: Absolute-space color sources (fit disabled) under outer rotation.
+  for (int col = 0; col < 3; col++) {
+    float cx = cellCenterX(col + 3);
+    float cy = cellCenterY(2);
+    auto innerGroup = std::make_shared<VectorGroup>();
+    innerGroup->setElements(MakeAbsoluteCellContents(cx, cy, col, cellSize, gradientColors, image));
+    contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 30.0f, {1.0f, 1.0f}));
+  }
+
+  // Row 4, cols 0-2: StrokeAlign Inside/Outside with fit color sources under outer rotation.
+  for (int col = 0; col < 3; col++) {
+    float cx = cellCenterX(col);
+    float cy = cellCenterY(3);
+    auto innerGroup = std::make_shared<VectorGroup>();
+    innerGroup->setElements(
+        MakeStrokeAlignCellContents(cx, cy, col, cellSize, gradientColors, image));
+    contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 25.0f, {1.0f, 1.0f}));
+  }
+  // Row 4, cols 3-5: Glyph-run styles under outer rotation.
+  for (int col = 0; col < 3; col++) {
+    float cx = cellCenterX(col + 3);
+    float cy = cellCenterY(3);
+    auto innerGroup = std::make_shared<VectorGroup>();
+    innerGroup->setPosition({cx - 22.0f, cy + 12.0f});
+    innerGroup->setElements(MakeTextCellContents(col, textFont, gradientColors, image));
+    contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 20.0f, {1.0f, 1.0f}));
+  }
+
+  vectorLayer->setContents(contents);
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/FillInTransformedGroup"));
 }
 
 }  // namespace tgfx

@@ -38,66 +38,48 @@ static PathFillType ToPathFillType(FillRule fillRule) {
 class FillPainter : public Painter {
  public:
   PathFillType fillRule = PathFillType::Winding;
-  std::shared_ptr<ColorSource> colorSource = nullptr;
 
   std::unique_ptr<Painter> clone() const override {
     return std::make_unique<FillPainter>(*this);
   }
 
-  void draw(LayerRecorder* recorder) override {
-    for (auto* geometry : geometries) {
-      if (geometry->hasText()) {
-        for (const auto& run : geometry->getGlyphRuns()) {
-          auto runMatrix = run.matrix;
-          runMatrix.postConcat(geometry->matrix);
-          drawGlyphRun(recorder, runMatrix, run);
-        }
-        continue;
-      }
-
-      auto shape = geometry->getShape();
-      if (shape == nullptr) {
-        continue;
-      }
-      if (shape->fillType() == PathFillType::Winding) {
-        shape = Shape::ApplyFillType(shape, fillRule);
-      }
-      shape = Shape::ApplyMatrix(shape, geometry->matrix);
-      auto finalShader = shader;
-      if (colorSource->fitsToGeometry()) {
-        finalShader = shader->makeWithMatrix(colorSource->getFitMatrix(shape->getBounds()));
-      }
-      LayerPaint paint(finalShader, alpha, blendMode);
-      paint.placement = placement;
-      recorder->addShape(std::move(shape), paint);
+ protected:
+  std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t /*index*/,
+                                      LayerPaint* paint) override {
+    if (innerShape->fillType() == PathFillType::Winding) {
+      innerShape = Shape::ApplyFillType(innerShape, fillRule);
     }
+    // Use the resolved path bounds so the fit region matches the actual fill footprint rather than the conservative cover.
+    paint->shader = wrapShaderWithFit(innerShape->getPath().getBounds());
+    return innerShape;
   }
 
- private:
-  void drawGlyphRun(LayerRecorder* recorder, const Matrix& geometryMatrix,
-                    const StyledGlyphRun& run) {
+  GlyphRunEmit prepareGlyphRun(const StyledGlyphRun& run, size_t /*index*/) override {
+    GlyphRunEmit emit = {};
+    if (run.textBlob == nullptr) {
+      return emit;
+    }
+    emit.textBlob = run.textBlob;
+    // Tight bounds keep the fit region in step with the visible glyph extents instead of the conservative blob cover.
+    auto baseShader = wrapShaderWithFit(run.textBlob->getTightBounds());
     float blendFactor = run.style.fillColor.alpha;
-    auto adjustedShader = shader;
-    if (colorSource->fitsToGeometry() && run.textBlob != nullptr) {
-      adjustedShader = shader->makeWithMatrix(colorSource->getFitMatrix(run.textBlob->getBounds()));
-    }
-
-    recorder->setMatrix(geometryMatrix);
+    float runAlpha = alpha * run.style.alpha;
     if (blendFactor < 1.0f) {
-      LayerPaint paint(adjustedShader, alpha * run.style.alpha, blendMode);
-      paint.placement = placement;
-      recorder->addTextBlob(run.textBlob, paint);
+      auto paint = makeBasePaint();
+      paint.color.alpha = runAlpha;
+      paint.shader = baseShader;
+      emit.paints.push_back(std::move(paint));
     }
-
     if (blendFactor > 0.0f) {
       const auto& fillColor = run.style.fillColor;
       auto overlayColor = Color{fillColor.red, fillColor.green, fillColor.blue, blendFactor};
-      auto colorShader = Shader::MakeColorShader(overlayColor);
-      LayerPaint paint(colorShader, alpha * run.style.alpha, BlendMode::SrcOver);
-      paint.placement = placement;
-      recorder->addTextBlob(run.textBlob, paint);
+      auto paint = makeBasePaint();
+      paint.blendMode = BlendMode::SrcOver;
+      paint.shader = Shader::MakeColorShader(overlayColor);
+      paint.color.alpha = runAlpha;
+      emit.paints.push_back(std::move(paint));
     }
-    recorder->resetMatrix();
+    return emit;
   }
 };
 
@@ -169,12 +151,9 @@ void FillStyle::apply(VectorContext* context) {
   painter->colorSource = _colorSource;
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
-  painter->fillRule = ToPathFillType(_fillRule);
   painter->placement = _placement;
-  painter->geometries.reserve(context->geometries.size());
-  for (auto& geometry : context->geometries) {
-    painter->geometries.push_back(geometry.get());
-  }
+  painter->fillRule = ToPathFillType(_fillRule);
+  painter->captureGeometries(context);
   context->painters.push_back(std::move(painter));
 }
 
