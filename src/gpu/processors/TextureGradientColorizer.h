@@ -20,6 +20,7 @@
 
 #include <utility>
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class TextureGradientColorizer : public FragmentProcessor {
@@ -29,6 +30,11 @@ class TextureGradientColorizer : public FragmentProcessor {
 
   std::string name() const override {
     return "TextureGradientColorizer";
+  }
+
+  /** Returns the single trivial shader variant (no compile-time macros). */
+  static std::vector<ShaderVariant> EnumerateVariants() {
+    return MakeTrivialShaderVariantList("TextureGradientColorizer");
   }
 
  protected:

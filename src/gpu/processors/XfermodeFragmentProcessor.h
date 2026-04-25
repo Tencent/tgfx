@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 #include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
@@ -53,6 +54,15 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
   std::string name() const override;
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
+
+  /**
+   * Returns the single trivial shader variant. Xfermode has no compile-time macros — blend mode
+   * and child mode are passed as runtime function parameters so all three child configurations
+   * (TwoChild/DstChild/SrcChild) share the same xfermode.frag.glsl source.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants() {
+    return MakeTrivialShaderVariantList("XfermodeFragmentProcessor");
+  }
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID

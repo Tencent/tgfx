@@ -25,6 +25,7 @@
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/YUVTextureView.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class TextureEffect : public FragmentProcessor {
@@ -43,6 +44,15 @@ class TextureEffect : public FragmentProcessor {
 
   std::string name() const override {
     return "TextureEffect";
+  }
+
+  /**
+   * Returns the single trivial shader variant. TextureEffect emits no compile-time macros —
+   * sampler2D vs sampler2DRect is selected via GLSL function overloading inside
+   * texture_effect.frag.glsl — so offline enumeration collapses to one variant.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants() {
+    return MakeTrivialShaderVariantList("TextureEffect");
   }
 
  protected:

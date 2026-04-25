@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class AlphaThresholdFragmentProcessor : public FragmentProcessor {
@@ -28,6 +29,11 @@ class AlphaThresholdFragmentProcessor : public FragmentProcessor {
 
   std::string name() const override {
     return "AlphaStepFragmentProcessor";
+  }
+
+  /** Returns the single trivial shader variant (no compile-time macros). */
+  static std::vector<ShaderVariant> EnumerateVariants() {
+    return MakeTrivialShaderVariantList("AlphaThresholdFragmentProcessor");
   }
 
  protected:

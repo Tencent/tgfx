@@ -20,6 +20,7 @@
 
 #include <array>
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class ColorMatrixFragmentProcessor : public FragmentProcessor {
@@ -29,6 +30,11 @@ class ColorMatrixFragmentProcessor : public FragmentProcessor {
 
   std::string name() const override {
     return "ColorMatrixFragmentProcessor";
+  }
+
+  /** Returns the single trivial shader variant (no compile-time macros). */
+  static std::vector<ShaderVariant> EnumerateVariants() {
+    return MakeTrivialShaderVariantList("ColorMatrixFragmentProcessor");
   }
 
  protected:

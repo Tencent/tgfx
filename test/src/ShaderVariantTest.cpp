@@ -18,17 +18,26 @@
 
 #include <unordered_set>
 #include "gpu/ShaderMacroSet.h"
+#include "gpu/processors/AARectEffect.h"
+#include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
+#include "gpu/processors/ClampedGradientEffect.h"
+#include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
+#include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/ConicGradientLayout.h"
+#include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/DiamondGradientLayout.h"
+#include "gpu/processors/DualIntervalGradientColorizer.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
+#include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
 #include "gpu/processors/HairlineLineGeometryProcessor.h"
 #include "gpu/processors/HairlineQuadGeometryProcessor.h"
 #include "gpu/processors/LinearGradientLayout.h"
+#include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
@@ -36,7 +45,12 @@
 #include "gpu/processors/RadialGradientLayout.h"
 #include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
+#include "gpu/processors/SingleIntervalGradientColorizer.h"
+#include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TextureGradientColorizer.h"
+#include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
+#include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "gpu/variants/ShaderVariant.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/BlendMode.h"
@@ -377,8 +391,116 @@ TEST(ShaderVariantTest, AllFPsAggregateCount) {
   total += UnrolledBinaryGradientColorizer::EnumerateVariants().size();
   total += GaussianBlur1DFragmentProcessor::EnumerateVariants().size();
   total += ColorSpaceXformEffect::EnumerateVariants().size();
-  // 2 + 2 + 2 + 2 + 2 + 8 + 10 + 2048 = 2076.
-  EXPECT_EQ(total, 2076u);
+  // Trivial FPs (1 variant each): TextureEffect, TiledTextureEffect, ConstColorProcessor,
+  // XfermodeFragmentProcessor, ComposeFragmentProcessor, ClampedGradientEffect, AARectEffect,
+  // AlphaThresholdFragmentProcessor, ColorMatrixFragmentProcessor, LumaFragmentProcessor,
+  // DualIntervalGradientColorizer, SingleIntervalGradientColorizer, TextureGradientColorizer.
+  total += TextureEffect::EnumerateVariants().size();
+  total += TiledTextureEffect::EnumerateVariants().size();
+  total += ConstColorProcessor::EnumerateVariants().size();
+  total += XfermodeFragmentProcessor::EnumerateVariants().size();
+  total += ComposeFragmentProcessor::EnumerateVariants().size();
+  total += ClampedGradientEffect::EnumerateVariants().size();
+  total += AARectEffect::EnumerateVariants().size();
+  total += AlphaThresholdFragmentProcessor::EnumerateVariants().size();
+  total += ColorMatrixFragmentProcessor::EnumerateVariants().size();
+  total += LumaFragmentProcessor::EnumerateVariants().size();
+  total += DualIntervalGradientColorizer::EnumerateVariants().size();
+  total += SingleIntervalGradientColorizer::EnumerateVariants().size();
+  total += TextureGradientColorizer::EnumerateVariants().size();
+  // 2 + 2 + 2 + 2 + 2 + 8 + 10 + 2048 + 13 trivial = 2089.
+  EXPECT_EQ(total, 2089u);
+}
+
+// ---- Trivial single-variant Fragment Processors (no compile-time macros) ----
+//
+// These processors emit no #define directives; their shader source has zero #ifdef branches.
+// Offline enumeration therefore collapses to a single empty-preamble variant whose index=0.
+
+TEST(ShaderVariantTest, TextureEffect) {
+  auto variants = TextureEffect::EnumerateVariants();
+  CheckVariantListInvariants(variants, 1, "TextureEffect");
+  EXPECT_EQ(variants[0].preamble, "");
+}
+
+TEST(ShaderVariantTest, TiledTextureEffect) {
+  auto variants = TiledTextureEffect::EnumerateVariants();
+  CheckVariantListInvariants(variants, 1, "TiledTextureEffect");
+  EXPECT_EQ(variants[0].preamble, "");
+}
+
+TEST(ShaderVariantTest, ConstColorProcessor) {
+  auto variants = ConstColorProcessor::EnumerateVariants();
+  CheckVariantListInvariants(variants, 1, "ConstColorProcessor");
+  EXPECT_EQ(variants[0].preamble, "");
+}
+
+TEST(ShaderVariantTest, XfermodeFragmentProcessor) {
+  auto variants = XfermodeFragmentProcessor::EnumerateVariants();
+  CheckVariantListInvariants(variants, 1, "XfermodeFragmentProcessor");
+  EXPECT_EQ(variants[0].preamble, "");
+}
+
+TEST(ShaderVariantTest, ComposeFragmentProcessor) {
+  auto variants = ComposeFragmentProcessor::EnumerateVariants();
+  CheckVariantListInvariants(variants, 1, "ComposeFragmentProcessor");
+  EXPECT_EQ(variants[0].preamble, "");
+}
+
+TEST(ShaderVariantTest, ClampedGradientEffect) {
+  auto variants = ClampedGradientEffect::EnumerateVariants();
+  CheckVariantListInvariants(variants, 1, "ClampedGradientEffect");
+  EXPECT_EQ(variants[0].preamble, "");
+}
+
+TEST(ShaderVariantTest, AARectEffect) {
+  auto variants = AARectEffect::EnumerateVariants();
+  CheckVariantListInvariants(variants, 1, "AARectEffect");
+  EXPECT_EQ(variants[0].preamble, "");
+}
+
+TEST(ShaderVariantTest, AlphaThresholdFragmentProcessor) {
+  auto variants = AlphaThresholdFragmentProcessor::EnumerateVariants();
+  CheckVariantListInvariants(variants, 1, "AlphaThresholdFragmentProcessor");
+  EXPECT_EQ(variants[0].preamble, "");
+}
+
+TEST(ShaderVariantTest, ColorMatrixFragmentProcessor) {
+  auto variants = ColorMatrixFragmentProcessor::EnumerateVariants();
+  CheckVariantListInvariants(variants, 1, "ColorMatrixFragmentProcessor");
+  EXPECT_EQ(variants[0].preamble, "");
+}
+
+TEST(ShaderVariantTest, LumaFragmentProcessor) {
+  auto variants = LumaFragmentProcessor::EnumerateVariants();
+  CheckVariantListInvariants(variants, 1, "LumaFragmentProcessor");
+  EXPECT_EQ(variants[0].preamble, "");
+}
+
+TEST(ShaderVariantTest, DualIntervalGradientColorizer) {
+  auto variants = DualIntervalGradientColorizer::EnumerateVariants();
+  CheckVariantListInvariants(variants, 1, "DualIntervalGradientColorizer");
+  EXPECT_EQ(variants[0].preamble, "");
+}
+
+TEST(ShaderVariantTest, SingleIntervalGradientColorizer) {
+  auto variants = SingleIntervalGradientColorizer::EnumerateVariants();
+  CheckVariantListInvariants(variants, 1, "SingleIntervalGradientColorizer");
+  EXPECT_EQ(variants[0].preamble, "");
+}
+
+TEST(ShaderVariantTest, TextureGradientColorizer) {
+  auto variants = TextureGradientColorizer::EnumerateVariants();
+  CheckVariantListInvariants(variants, 1, "TextureGradientColorizer");
+  EXPECT_EQ(variants[0].preamble, "");
+}
+
+// ---- Trivial single-variant Xfer Processor ----
+
+TEST(ShaderVariantTest, EmptyXferProcessor) {
+  auto variants = EmptyXferProcessor::EnumerateVariants();
+  CheckVariantListInvariants(variants, 1, "EmptyXferProcessor");
+  EXPECT_EQ(variants[0].preamble, "");
 }
 
 }  // namespace tgfx

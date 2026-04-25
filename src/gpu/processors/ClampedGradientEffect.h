@@ -20,6 +20,7 @@
 
 #include <climits>
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
@@ -32,6 +33,11 @@ class ClampedGradientEffect : public FragmentProcessor {
 
   std::string name() const override {
     return "ClampedGradientEffect";
+  }
+
+  /** Returns the single trivial shader variant (no compile-time macros). */
+  static std::vector<ShaderVariant> EnumerateVariants() {
+    return MakeTrivialShaderVariantList("ClampedGradientEffect");
   }
 
  protected:

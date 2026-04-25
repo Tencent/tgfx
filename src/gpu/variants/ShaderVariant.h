@@ -19,7 +19,9 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
+#include <vector>
 
 namespace tgfx {
 
@@ -61,5 +63,20 @@ struct ShaderVariant {
    */
   uint64_t runtimeKeyHash = 0;
 };
+
+/**
+ * Helper for processors whose variant space is trivial (a single variant with an empty preamble).
+ * Such processors emit no compile-time macros — their .glsl module contains no #ifdef branches —
+ * so offline enumeration degenerates to returning one ShaderVariant with index=0 and an empty
+ * preamble. The name follows the convention "<ProcessorName>[default]" for consistency.
+ */
+inline std::vector<ShaderVariant> MakeTrivialShaderVariantList(const std::string& processorName) {
+  ShaderVariant variant;
+  variant.index = 0;
+  variant.name = processorName + "[default]";
+  variant.preamble = "";
+  variant.runtimeKeyHash = std::hash<std::string>{}(variant.preamble);
+  return {std::move(variant)};
+}
 
 }  // namespace tgfx

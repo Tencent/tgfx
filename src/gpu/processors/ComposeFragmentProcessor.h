@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class ComposeFragmentProcessor : public FragmentProcessor {
@@ -32,6 +33,14 @@ class ComposeFragmentProcessor : public FragmentProcessor {
 
   std::string name() const override {
     return "ComposeFragmentProcessor";
+  }
+
+  /**
+   * Pure structural container — contributes no .glsl function source of its own, so offline
+   * enumeration returns a single empty-preamble variant purely for API symmetry with other FPs.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants() {
+    return MakeTrivialShaderVariantList("ComposeFragmentProcessor");
   }
 
  protected:

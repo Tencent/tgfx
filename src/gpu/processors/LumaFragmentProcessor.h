@@ -18,6 +18,7 @@
 
 #pragma once
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class LumaFragmentProcessor : public FragmentProcessor {
@@ -30,6 +31,11 @@ class LumaFragmentProcessor : public FragmentProcessor {
   }
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
+
+  /** Returns the single trivial shader variant (no compile-time macros). */
+  static std::vector<ShaderVariant> EnumerateVariants() {
+    return MakeTrivialShaderVariantList("LumaFragmentProcessor");
+  }
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID

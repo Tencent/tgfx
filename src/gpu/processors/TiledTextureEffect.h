@@ -23,6 +23,7 @@
 #include "gpu/ShaderCallManifest.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class TiledTextureEffect : public FragmentProcessor {
@@ -35,6 +36,15 @@ class TiledTextureEffect : public FragmentProcessor {
 
   std::string name() const override {
     return "TiledTextureEffect";
+  }
+
+  /**
+   * Returns the single trivial shader variant. TiledTextureEffect emits no compile-time macros —
+   * sampler2D vs sampler2DRect is selected via GLSL function overloading inside
+   * tiled_texture_effect.frag.glsl — so offline enumeration collapses to one variant.
+   */
+  static std::vector<ShaderVariant> EnumerateVariants() {
+    return MakeTrivialShaderVariantList("TiledTextureEffect");
   }
 
  protected:

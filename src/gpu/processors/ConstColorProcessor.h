@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
@@ -34,6 +35,11 @@ class ConstColorProcessor : public FragmentProcessor {
   }
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
+
+  /** Returns the single trivial shader variant (no compile-time macros). */
+  static std::vector<ShaderVariant> EnumerateVariants() {
+    return MakeTrivialShaderVariantList("ConstColorProcessor");
+  }
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID

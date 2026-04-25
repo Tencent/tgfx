@@ -19,6 +19,7 @@
 #pragma once
 
 #include "XferProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 
 namespace tgfx {
 class EmptyXferProcessor : public XferProcessor {
@@ -33,6 +34,11 @@ class EmptyXferProcessor : public XferProcessor {
   }
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
+
+  /** Returns the single trivial shader variant (no compile-time macros). */
+  static std::vector<ShaderVariant> EnumerateVariants() {
+    return MakeTrivialShaderVariantList("EmptyXferProcessor");
+  }
 
  protected:
   EmptyXferProcessor() : XferProcessor(ClassID()) {

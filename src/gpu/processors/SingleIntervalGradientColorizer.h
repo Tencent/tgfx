@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/variants/ShaderVariant.h"
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
@@ -29,6 +30,11 @@ class SingleIntervalGradientColorizer : public FragmentProcessor {
 
   std::string name() const override {
     return "SingleIntervalGradientColorizer";
+  }
+
+  /** Returns the single trivial shader variant (no compile-time macros). */
+  static std::vector<ShaderVariant> EnumerateVariants() {
+    return MakeTrivialShaderVariantList("SingleIntervalGradientColorizer");
   }
 
  protected:
