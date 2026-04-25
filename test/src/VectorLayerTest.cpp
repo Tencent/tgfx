@@ -4635,7 +4635,7 @@ TGFX_TEST(VectorLayerTest, Line) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 600, 480);
+  auto surface = Surface::Make(context, 600, 504);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -4690,9 +4690,8 @@ TGFX_TEST(VectorLayerTest, Line) {
   auto degenerateRect = std::make_shared<Rectangle>();
   degenerateRect->setPosition({300, 430});
   degenerateRect->setSize({500, 0});
-  auto gradient5 = Gradient::MakeLinear({0.5f, 0.0f}, {0.5f, 1.0f},
-                                        {Color::Red(), Color::FromRGBA(255, 255, 255, 255),
-                                         Color::Blue()});
+  auto gradient5 =
+      Gradient::MakeLinear({0.5f, 0.0f}, {0.5f, 1.0f}, {Color::Red(), Color::Blue()});
   auto stroke5 = StrokeStyle::Make(gradient5);
   stroke5->setStrokeWidth(24.0f);
   stroke5->setStrokeAlign(StrokeAlign::Outside);
