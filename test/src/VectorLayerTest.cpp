@@ -4714,7 +4714,7 @@ TGFX_TEST(VectorLayerTest, FitsToGeometrySwitch) {
   EXPECT_EQ(pattern->fitsToGeometry(), false);
 }
 
-TGFX_TEST(VectorLayerTest, RelativeFillInsideTransformedGroup) {
+TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -4842,7 +4842,7 @@ TGFX_TEST(VectorLayerTest, RelativeFillInsideTransformedGroup) {
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
 
-  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/RelativeFillInsideTransformedGroup"));
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/FillInTransformedGroup"));
 }
 
 }  // namespace tgfx
