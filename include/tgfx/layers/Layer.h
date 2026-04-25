@@ -685,7 +685,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer);
 
-  void updateBackgroundBounds(float contentScale);
+  void updateBackgroundBounds(float contentScale, const std::vector<Rect>& sourceRects);
+
+  bool hasBackgroundExtraSource() const;
 
   void propagateLayerState();
 

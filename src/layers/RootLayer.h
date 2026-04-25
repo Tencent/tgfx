@@ -47,16 +47,32 @@ class RootLayer : public Layer {
   void invalidateRect(const Rect& rect);
 
   /**
-   * Returns true if any existing dirty rectangle overlaps the given drawRect for the specified
-   * LayerStyle, and applies LayerStyle::filterBackground() to the dirty rectangles.
+   * Iterates sourceRects, intersects each with drawRect, then expands via LayerStyle::
+   * filterBackground() (or skips expansion if layerStyle is null, e.g. the hasBlendMode path)
+   * and adds the expanded rects back into the root dirty list. Only rects inside sourceRects
+   * are considered, so callers can pass a snapshot of dirty rects taken before descending into
+   * a background-blur layer to exclude dirty rects produced by that layer's own content and
+   * descendants (which paint above the blur result and are not part of the blur input).
+   * Returns true if any dirty rect intersects drawRect when layerStyle is null, or if any
+   * expanded rect was added back to the dirty list.
    */
-  bool invalidateBackground(const Rect& drawRect, LayerStyle* layerStyle, float contentScale);
+  bool invalidateBackground(const Rect& drawRect, LayerStyle* layerStyle, float contentScale,
+                            const std::vector<Rect>& sourceRects);
 
   /**
    * Returns true if there are any dirty rectangles in the root layer.
    */
   bool hasDirtyRegions() const {
     return !dirtyRects.empty();
+  }
+
+  /**
+   * Returns the current dirty rect list. Used by layers that need to snapshot the list before
+   * entering a background-blur subtree, or to pass the current list directly on the fast path
+   * where no new rects are produced mid-traversal.
+   */
+  const std::vector<Rect>& currentDirtyRects() const {
+    return dirtyRects;
   }
 
   /**
