@@ -4714,4 +4714,135 @@ TGFX_TEST(VectorLayerTest, FitsToGeometrySwitch) {
   EXPECT_EQ(pattern->fitsToGeometry(), false);
 }
 
+TGFX_TEST(VectorLayerTest, RelativeFillInsideTransformedGroup) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 480, 470);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  const float cellSize = 120.0f;
+  const float cellGap = 20.0f;
+  const std::array<float, 3> cellCentersX = {80.0f, 80.0f + cellSize + cellGap,
+                                             80.0f + (cellSize + cellGap) * 2.0f};
+  const std::array<float, 3> cellCentersY = {90.0f, 90.0f + cellSize + cellGap,
+                                             90.0f + (cellSize + cellGap) * 2.0f};
+
+  std::vector<Color> gradientColors = {Color::Red(), Color::FromRGBA(255, 255, 0, 255),
+                                       Color::Blue()};
+
+  auto makeRectCellContents = [&](float cx, float cy, int column) {
+    auto rect = std::make_shared<Rectangle>();
+    rect->setPosition({cx, cy});
+    rect->setSize({cellSize * 0.7f, cellSize * 0.7f});
+    std::vector<std::shared_ptr<VectorElement>> elements = {rect};
+    if (column == 0) {
+      auto gradient = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+      elements.push_back(FillStyle::Make(gradient));
+    } else if (column == 1) {
+      auto pattern = ImagePattern::Make(image);
+      pattern->setScaleMode(ScaleMode::LetterBox);
+      elements.push_back(FillStyle::Make(pattern));
+    } else {
+      auto gradient = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+      auto stroke = StrokeStyle::Make(gradient);
+      stroke->setStrokeWidth(16.0f);
+      elements.push_back(stroke);
+    }
+    return elements;
+  };
+
+  // Star polygons produce non-simple paths, so the LayerRecorder takes the ShapeContent path
+  // rather than the rect/rrect optimization; this validates the fix along that code path too.
+  auto makeComplexCellContents = [&](float cx, float cy, int column) {
+    std::vector<std::shared_ptr<VectorElement>> elements = {};
+    auto star = std::make_shared<Polystar>();
+    star->setPolystarType(PolystarType::Star);
+    star->setPosition({cx, cy});
+    star->setOuterRadius(cellSize * 0.4f);
+    if (column == 0) {
+      star->setPointCount(5);
+      star->setInnerRadius(cellSize * 0.18f);
+      elements.push_back(star);
+      auto gradient = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+      elements.push_back(FillStyle::Make(gradient));
+    } else if (column == 1) {
+      star->setPointCount(6);
+      star->setInnerRadius(cellSize * 0.2f);
+      elements.push_back(star);
+      auto pattern = ImagePattern::Make(image);
+      pattern->setScaleMode(ScaleMode::LetterBox);
+      elements.push_back(FillStyle::Make(pattern));
+    } else {
+      star->setPointCount(5);
+      star->setInnerRadius(cellSize * 0.2f);
+      elements.push_back(star);
+      auto gradient = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+      auto stroke = StrokeStyle::Make(gradient);
+      stroke->setStrokeWidth(12.0f);
+      elements.push_back(stroke);
+    }
+    return elements;
+  };
+
+  std::vector<std::shared_ptr<VectorElement>> contents = {};
+
+  // Row 1: baseline cells without any outer group transform.
+  for (int col = 0; col < 3; col++) {
+    auto cellGroup = std::make_shared<VectorGroup>();
+    cellGroup->setElements(
+        makeRectCellContents(cellCentersX[static_cast<size_t>(col)], cellCentersY[0], col));
+    contents.push_back(cellGroup);
+  }
+
+  // Row 2: same rect content wrapped in a transformed outer VectorGroup. The inner group builds
+  // the shape at the target position; the outer group rotates/scales around the cell center so
+  // the fit region should follow the shape into the transformed frame.
+  const std::array<float, 3> rowTwoRotations = {45.0f, 0.0f, 30.0f};
+  const std::array<Point, 3> rowTwoScales = {Point{1.0f, 1.0f}, Point{1.6f, 0.6f},
+                                             Point{1.0f, 1.0f}};
+  for (int col = 0; col < 3; col++) {
+    float cx = cellCentersX[static_cast<size_t>(col)];
+    float cy = cellCentersY[1];
+    auto innerGroup = std::make_shared<VectorGroup>();
+    innerGroup->setElements(makeRectCellContents(cx, cy, col));
+    auto outerGroup = std::make_shared<VectorGroup>();
+    outerGroup->setAnchor({cx, cy});
+    outerGroup->setPosition({cx, cy});
+    outerGroup->setRotation(rowTwoRotations[static_cast<size_t>(col)]);
+    outerGroup->setScale(rowTwoScales[static_cast<size_t>(col)]);
+    outerGroup->setElements({innerGroup});
+    contents.push_back(outerGroup);
+  }
+
+  // Row 3: complex-path shapes wrapped in a rotated outer VectorGroup to exercise the
+  // non-simple-path rendering path (ShapeContent) rather than the rect/rrect optimization.
+  const std::array<float, 3> rowThreeRotations = {30.0f, 20.0f, 25.0f};
+  for (int col = 0; col < 3; col++) {
+    float cx = cellCentersX[static_cast<size_t>(col)];
+    float cy = cellCentersY[2];
+    auto innerGroup = std::make_shared<VectorGroup>();
+    innerGroup->setElements(makeComplexCellContents(cx, cy, col));
+    auto outerGroup = std::make_shared<VectorGroup>();
+    outerGroup->setAnchor({cx, cy});
+    outerGroup->setPosition({cx, cy});
+    outerGroup->setRotation(rowThreeRotations[static_cast<size_t>(col)]);
+    outerGroup->setElements({innerGroup});
+    contents.push_back(outerGroup);
+  }
+
+  vectorLayer->setContents(contents);
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/RelativeFillInsideTransformedGroup"));
+}
+
 }  // namespace tgfx
