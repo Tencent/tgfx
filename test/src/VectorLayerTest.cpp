@@ -4826,15 +4826,15 @@ static std::vector<std::shared_ptr<VectorElement>> MakePatternCellContents(
 // outer group, and the gradient/pattern should ride along with that transform because it is
 // expressed in the painter's enclosing group space, not fit to the shape's bounds.
 static std::vector<std::shared_ptr<VectorElement>> MakeAbsoluteCellContents(
-    int column, float cellSize, const std::vector<Color>& gradientColors,
+    float cx, float cy, int column, float cellSize, const std::vector<Color>& gradientColors,
     const std::shared_ptr<Image>& image) {
   auto rect = std::make_shared<Rectangle>();
   rect->setSize({cellSize * 0.7f, cellSize * 0.7f});
-  rect->setPosition({-cellSize * 0.35f, -cellSize * 0.35f});
+  rect->setPosition({cx, cy});
   std::vector<std::shared_ptr<VectorElement>> elements = {rect};
   if (column == 0) {
-    auto gradient =
-        Gradient::MakeLinear({-cellSize * 0.35f, 0.0f}, {cellSize * 0.35f, 0.0f}, gradientColors);
+    auto gradient = Gradient::MakeLinear({cx - cellSize * 0.35f, cy}, {cx + cellSize * 0.35f, cy},
+                                         gradientColors);
     gradient->setFitsToGeometry(false);
     elements.push_back(FillStyle::Make(gradient));
   } else if (column == 1) {
@@ -4843,12 +4843,12 @@ static std::vector<std::shared_ptr<VectorElement>> MakeAbsoluteCellContents(
     Matrix patternMatrix = Matrix::I();
     patternMatrix.postScale(cellSize * 0.7f / static_cast<float>(image->width()),
                             cellSize * 0.7f / static_cast<float>(image->height()));
-    patternMatrix.postTranslate(-cellSize * 0.35f, -cellSize * 0.35f);
+    patternMatrix.postTranslate(cx - cellSize * 0.35f, cy - cellSize * 0.35f);
     pattern->setMatrix(patternMatrix);
     elements.push_back(FillStyle::Make(pattern));
   } else {
-    auto gradient =
-        Gradient::MakeLinear({-cellSize * 0.35f, 0.0f}, {cellSize * 0.35f, 0.0f}, gradientColors);
+    auto gradient = Gradient::MakeLinear({cx - cellSize * 0.35f, cy}, {cx + cellSize * 0.35f, cy},
+                                         gradientColors);
     gradient->setFitsToGeometry(false);
     auto stroke = StrokeStyle::Make(gradient);
     stroke->setStrokeWidth(16.0f);
@@ -4861,11 +4861,11 @@ static std::vector<std::shared_ptr<VectorElement>> MakeAbsoluteCellContents(
 // The fit region is derived from the stroke-aligned outline, so this exercises the boolean-op
 // branch of StrokeStyle::prepareShape together with the outer CTM.
 static std::vector<std::shared_ptr<VectorElement>> MakeStrokeAlignCellContents(
-    int column, float cellSize, const std::vector<Color>& gradientColors,
+    float cx, float cy, int column, float cellSize, const std::vector<Color>& gradientColors,
     const std::shared_ptr<Image>& image) {
   auto rect = std::make_shared<Rectangle>();
   rect->setSize({cellSize * 0.7f, cellSize * 0.7f});
-  rect->setPosition({-cellSize * 0.35f, -cellSize * 0.35f});
+  rect->setPosition({cx, cy});
   std::shared_ptr<ColorSource> source = nullptr;
   StrokeAlign align = StrokeAlign::Inside;
   if (column == 0) {
@@ -5034,7 +5034,7 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
     float cx = cellCentersX[static_cast<size_t>(col)];
     float cy = cellCentersY[5];
     auto innerGroup = std::make_shared<VectorGroup>();
-    innerGroup->setElements(MakeAbsoluteCellContents(col, cellSize, gradientColors, image));
+    innerGroup->setElements(MakeAbsoluteCellContents(cx, cy, col, cellSize, gradientColors, image));
     contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 30.0f, {1.0f, 1.0f}));
   }
 
@@ -5043,7 +5043,8 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
     float cx = cellCentersX[static_cast<size_t>(col)];
     float cy = cellCentersY[6];
     auto innerGroup = std::make_shared<VectorGroup>();
-    innerGroup->setElements(MakeStrokeAlignCellContents(col, cellSize, gradientColors, image));
+    innerGroup->setElements(
+        MakeStrokeAlignCellContents(cx, cy, col, cellSize, gradientColors, image));
     contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 25.0f, {1.0f, 1.0f}));
   }
 
