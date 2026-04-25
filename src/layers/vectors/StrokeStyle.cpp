@@ -55,21 +55,19 @@ class StrokePainter : public Painter {
         return nullptr;
       }
     }
-    // Snapshot the pre-stroke shape so the tight fit bounds below can always be derived from a
-    // stroke-expanded path rather than from a post-boolean-op shape whose reported bounds are
-    // only a conservative approximation.
-    auto preStrokeShape = innerShape;
+    bool strokeBaked = false;
     if (strokeAlign != StrokeAlign::Center) {
       auto originalShape = Shape::ApplyMatrix(originalShapes[index], innerMatrices[index]);
       innerShape = applyStrokeAndAlign(std::move(innerShape), std::move(originalShape), stroke);
       if (innerShape == nullptr) {
         return nullptr;
       }
+      strokeBaked = true;
     } else {
       paint->style = PaintStyle::Stroke;
       paint->stroke = stroke;
     }
-    paint->shader = buildFitShader(preStrokeShape, stroke, strokeAlign);
+    paint->shader = buildFitShader(innerShape, stroke, strokeBaked);
     return innerShape;
   }
 
@@ -86,14 +84,13 @@ class StrokePainter : public Painter {
     // path effects operate on path geometry. When neither applies keep the blob intact to
     // preserve color glyphs (e.g. emoji) that cannot be reduced to a path.
     std::shared_ptr<Shape> runShape = nullptr;
-    std::shared_ptr<Shape> preStrokeShape = nullptr;
+    std::shared_ptr<Shape> fitShape = nullptr;
     bool needsBooleanOp = strokeAlign != StrokeAlign::Center;
     if (pathEffect != nullptr || needsBooleanOp) {
       runShape = Shape::MakeFrom(run.textBlob);
       if (runShape != nullptr && pathEffect != nullptr) {
         runShape = Shape::ApplyEffect(runShape, pathEffect);
       }
-      preStrokeShape = runShape;
       if (runShape != nullptr && needsBooleanOp) {
         auto originalShape = Shape::MakeFrom(run.textBlob);
         runShape = applyStrokeAndAlign(std::move(runShape), std::move(originalShape), runStroke);
@@ -101,10 +98,11 @@ class StrokePainter : public Painter {
       if (runShape == nullptr) {
         return emits;
       }
+      fitShape = runShape;
     } else {
-      preStrokeShape = Shape::MakeFrom(run.textBlob);
+      fitShape = Shape::MakeFrom(run.textBlob);
     }
-    auto baseShader = buildFitShader(preStrokeShape, runStroke, strokeAlign);
+    auto baseShader = buildFitShader(fitShape, runStroke, /*strokeBaked=*/needsBooleanOp);
 
     // When boolean-op stroke alignment has already produced a filled outline, emit it as a fill;
     // otherwise the paint keeps the stroke so the stroker (or path-effected shape stroker) draws
@@ -155,27 +153,19 @@ class StrokePainter : public Painter {
   }
 
  private:
-  // Builds the shader for a stroked emit. When fit mode is active the fit region must cover the
-  // visible stroked outline, which Shape::getBounds() can only approximate once stroke expansion
-  // or boolean-op merges are involved. Compute the tight bounds from a path that has been grown
-  // by the alignment-appropriate amount:
-  //   * Inside keeps the stroke within the original shape, so the original bounds suffice.
-  //   * Center expands uniformly by stroke.width / 2 on each side, matching ApplyStroke's default
-  //     (centered) semantics.
-  //   * Outside expands fully by stroke.width on each side, achieved by applying a doubled stroke
-  //     under centered semantics so the resulting path's tight bounds match the Outside ring.
-  std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<Shape>& preStrokeShape,
-                                         const Stroke& strokeToApply, StrokeAlign align) const {
-    if (colorSource == nullptr || !colorSource->fitsToGeometry() || preStrokeShape == nullptr) {
+  // Builds the shader for a stroked emit. When fit mode is active, the fit region is the tight
+  // path bounds of the final visible shape. If the caller has already baked the stroke into the
+  // shape (Inside/Outside paths that went through applyStrokeAndAlign), the shape already
+  // represents the rendered outline. Otherwise (Center), apply the stroke here so the tight
+  // bounds cover the stroked shape that the GPU will rasterize.
+  std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<Shape>& finalShape,
+                                         const Stroke& strokeToApply, bool strokeBaked) const {
+    if (colorSource == nullptr || !colorSource->fitsToGeometry() || finalShape == nullptr) {
       return shader;
     }
-    std::shared_ptr<Shape> boundsShape = preStrokeShape;
-    if (align != StrokeAlign::Inside) {
-      auto centeredStroke = strokeToApply;
-      if (align == StrokeAlign::Outside) {
-        centeredStroke.width *= 2.0f;
-      }
-      boundsShape = Shape::ApplyStroke(preStrokeShape, &centeredStroke);
+    auto boundsShape = finalShape;
+    if (!strokeBaked) {
+      boundsShape = Shape::ApplyStroke(finalShape, &strokeToApply);
       if (boundsShape == nullptr) {
         return shader;
       }
