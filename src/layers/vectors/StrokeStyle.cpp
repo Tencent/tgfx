@@ -92,14 +92,11 @@ class StrokePainter : public Painter {
     bool needsBooleanOp = strokeAlign != StrokeAlign::Center;
     if (pathEffect != nullptr || needsBooleanOp) {
       runShape = Shape::MakeFrom(run.textBlob);
-      // Reuse the same TextShape as the original outline for the boolean op: ApplyEffect does
-      // not mutate runShape (Shape is immutable), and sharing lets Shape::getPath()'s atomic
-      // cache hit for the unmodified outline path.
-      auto originalShape = runShape;
       if (runShape != nullptr && pathEffect != nullptr) {
         runShape = Shape::ApplyEffect(runShape, pathEffect);
       }
       if (runShape != nullptr && needsBooleanOp) {
+        auto originalShape = Shape::MakeFrom(run.textBlob);
         runShape = applyStrokeAndAlign(std::move(runShape), std::move(originalShape), runStroke);
       }
       if (runShape == nullptr) {
