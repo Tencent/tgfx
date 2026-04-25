@@ -378,11 +378,13 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
 
   MangledVaryings gpVaryings;
   MangledUniforms gpUniforms;
+  MangledSamplers gpSamplers;
   std::vector<GeometryProcessor::CoordTransformRecord> coordRecords;
   GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(),
                                    uniformHandler(), &transformHandler, &subsetVarName);
   args.gpVaryings = &gpVaryings;
   args.gpUniforms = &gpUniforms;
+  args.gpSamplers = &gpSamplers;
   args.coordTransformRecords = &coordRecords;
 
   // Phase 1 (resource registration): emitCode should register attributes / uniforms / varyings
@@ -414,6 +416,14 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
   auto coordInputExpr = geometryProcessor->coordTransformInputExpr(gpUniforms, gpVaryings);
   vertexShaderBuilder()->codeAppend(
       geometryProcessor->buildCoordTransformCode(args, coordInputExpr));
+
+  // FS preamble (optional): GPs that need to precompute a shared FS local (e.g. AtlasText's
+  // atlas sample) emit it here, BEFORE buildColorCallExpr / buildCoverageCallExpr manifests so
+  // that their statements can reference the local by name.
+  auto fsPreamble = geometryProcessor->buildFSPreamble(gpUniforms, gpVaryings, gpSamplers);
+  if (!fsPreamble.empty()) {
+    fragmentShaderBuilder()->codeAppend(fsPreamble);
+  }
 
   auto colorResult = geometryProcessor->buildColorCallExpr(gpUniforms, gpVaryings);
   auto coverageResult = geometryProcessor->buildCoverageCallExpr(gpUniforms, gpVaryings);

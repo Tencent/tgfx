@@ -91,6 +91,16 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
     return position.name();
   }
 
+  std::string buildFSPreamble(const MangledUniforms& /*uniforms*/, const MangledVaryings& varyings,
+                              const MangledSamplers& samplers) const override {
+    // Sample the atlas into a shared FS local so buildColorCallExpr / buildCoverageCallExpr can
+    // reference it as `_atlasTexColor`. sampler2D vs sampler2DRect is resolved by GLSL function
+    // overloading inside TGFX_AtlasText_SampleAtlas (atlas_text_geometry.frag.glsl); the RRRR
+    // vs RGBA swizzle is selected at compile time via TGFX_GP_ATLAS_ALPHA_ONLY.
+    return "vec4 _atlasTexColor = TGFX_AtlasText_SampleAtlas(" + samplers.get("TextureSampler") +
+           ", " + varyings.get("textureCoords") + ");\n";
+  }
+
   ShaderCallManifest buildColorCallExpr(const MangledUniforms& uniforms,
                                         const MangledVaryings& varyings) const override {
     ShaderCallManifest result;

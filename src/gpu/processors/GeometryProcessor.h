@@ -98,6 +98,7 @@ class GeometryProcessor : public Processor {
     std::string* outputSubset = nullptr;
     MangledVaryings* gpVaryings = nullptr;
     MangledUniforms* gpUniforms = nullptr;
+    MangledSamplers* gpSamplers = nullptr;
     std::vector<CoordTransformRecord>* coordTransformRecords = nullptr;
   };
 
@@ -178,6 +179,21 @@ class GeometryProcessor : public Processor {
 
   virtual std::string buildVSCallExpr(const MangledUniforms& /*uniforms*/,
                                       const MangledVaryings& /*varyings*/) const {
+    return "";
+  }
+
+  /**
+   * Returns an optional FS code block that is appended at the top of the GP's FS section, before
+   * buildColorCallExpr / buildCoverageCallExpr results. Used by GPs that need to precompute a
+   * shared FS value (such as AtlasText sampling its atlas into a local `_atlasTexColor`) that
+   * both the color and coverage manifests reference. Default returns an empty string.
+   *
+   * This is the FS counterpart of buildVSCallExpr: a pure function returning a text fragment,
+   * no builder side effects, so the emission rule is fully replayable by offline tools.
+   */
+  virtual std::string buildFSPreamble(const MangledUniforms& /*uniforms*/,
+                                      const MangledVaryings& /*varyings*/,
+                                      const MangledSamplers& /*samplers*/) const {
     return "";
   }
 

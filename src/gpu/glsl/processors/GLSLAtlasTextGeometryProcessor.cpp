@@ -33,7 +33,6 @@ GLSLAtlasTextGeometryProcessor::GLSLAtlasTextGeometryProcessor(
 }
 
 void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -76,16 +75,15 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   DEBUG_ASSERT(textureView->getTexture() != nullptr);
   auto samplerHandle = uniformHandler->addSampler(textureView->getTexture(), "TextureSampler");
   auto samplerName = uniformHandler->getSamplerVariable(samplerHandle).name();
-
-  // Sample the atlas into a shared FS local so that buildColorCallExpr / buildCoverageCallExpr
-  // can reference it via `_atlasTexColor`. The actual swizzle (RRRR for ALPHA_8 atlases, RGBA
-  // otherwise) and sampler-type overload (sampler2D vs sampler2DRect on macOS Rectangle
-  // textures) are resolved inside TGFX_AtlasText_SampleAtlas — defined in
-  // atlas_text_geometry.frag.glsl and injected into the FS by ModularProgramBuilder. The only
-  // runtime string assembly here is the single formatted call site, because the sampler name
-  // carries the name-mangling suffix assigned by the uniform handler.
-  fragBuilder->codeAppendf("vec4 _atlasTexColor = TGFX_AtlasText_SampleAtlas(%s, %s);",
-                           samplerName.c_str(), samplerVarying.fsIn().c_str());
+  // Publish the mangled sampler name for the FS preamble (buildFSPreamble). The atlas sampler
+  // is exposed under the stable key "TextureSampler"; sampler2D vs sampler2DRect is resolved
+  // inside TGFX_AtlasText_SampleAtlas via GLSL function overloading, so no macro or type
+  // alias is needed here. The FS preamble (appended by ModularProgramBuilder right before the
+  // color/coverage manifests) emits the call that populates `_atlasTexColor`, which the
+  // buildColorCallExpr / buildCoverageCallExpr manifests then reference by name.
+  if (args.gpSamplers) {
+    args.gpSamplers->add("TextureSampler", samplerName);
+  }
   if (args.gpUniforms) {
     args.gpUniforms->add("atlasTexColor", "_atlasTexColor");
   }
