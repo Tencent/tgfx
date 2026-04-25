@@ -703,6 +703,12 @@ if (TGFX_BUILD_TESTS)
         list(REMOVE_ITEM TGFX_TEST_FILES ${TGFX_TEST_WEBGL_FILES})
     endif ()
 
+    # Include the shader_variant_dump library sources (everything except main.cpp) so the
+    # companion gtest target (ShaderVariantDumpTest) can exercise VariantDumper in-process.
+    list(APPEND TGFX_TEST_FILES
+            tools/shader_variant_dump/VariantDumper.cpp
+            tools/shader_variant_dump/JsonWriter.cpp)
+
     list(APPEND TGFX_TEST_LIBS tgfx-hello2d tgfx ${TGFX_SHARED_LIBS})
     list(APPEND TGFX_TEST_INCLUDES src test/src hello2d/include third_party/json/include)
 
@@ -750,6 +756,16 @@ if (TGFX_BUILD_TESTS)
     target_include_directories(TGFXFullTest PRIVATE ${TGFX_INCLUDES})
     target_link_options(TGFXFullTest PRIVATE ${TGFX_TEST_LINK_OPTIONS})
     target_link_libraries(TGFXFullTest ${TGFX_TEST_LIBS})
+
+    # Offline developer tool: shader_variant_dump. Reuses the tests' link context because it
+    # depends on the same static tgfx library and runs purely on the host (no GPU runtime).
+    file(GLOB TGFX_SHADER_VARIANT_DUMP_FILES tools/shader_variant_dump/*.cpp)
+    add_executable(shader_variant_dump ${TGFX_SHADER_VARIANT_DUMP_FILES})
+    target_compile_options(shader_variant_dump PRIVATE ${TGFX_TEST_COMPILE_OPTIONS})
+    target_include_directories(shader_variant_dump PRIVATE ${TGFX_TEST_INCLUDES})
+    target_include_directories(shader_variant_dump PRIVATE ${TGFX_INCLUDES})
+    target_link_options(shader_variant_dump PRIVATE ${TGFX_TEST_LINK_OPTIONS})
+    target_link_libraries(shader_variant_dump ${TGFX_TEST_LIBS})
 endif ()
 
 # Export TGFX_INCLUDES to the parent scope for external test targets (e.g., web/test).
