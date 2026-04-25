@@ -35,24 +35,6 @@ static float BlendStrokeWidth(float base, const GlyphStyle& style) {
   return base + (style.strokeWidth - base) * style.strokeWidthFactor;
 }
 
-// Expands the supplied pre-stroke bounds into the bounds that the stroked shape will actually
-// occupy. The computation follows the stroke alignment semantics directly instead of relying on
-// post-stroke or boolean-op shape bounds, which are conservative and may drift far from reality
-// for degenerate shapes or merge operations. Miter spikes are intentionally ignored so the fit
-// region tracks the main stroke band rather than stretching along theoretical sharp corners.
-static void ExpandBoundsForStroke(Rect* bounds, const Stroke& stroke, StrokeAlign align) {
-  if (bounds == nullptr) {
-    return;
-  }
-  if (align == StrokeAlign::Inside) {
-    // Inside stroke lives entirely within the original shape; the fit region is the shape itself.
-    return;
-  }
-  auto factor = align == StrokeAlign::Outside ? 1.0f : 0.5f;
-  auto expand = ceilf(stroke.width * factor);
-  bounds->outset(expand, expand);
-}
-
 class StrokePainter : public Painter {
  public:
   Stroke stroke = {};
@@ -73,13 +55,10 @@ class StrokePainter : public Painter {
         return nullptr;
       }
     }
-    // The fit region must describe the visible stroked area, which cannot be read back from the
-    // post-stroke (or boolean-op) shape bounds: stroke expansion and merge operations both yield
-    // shape objects whose reported bounds are conservative approximations. Compute the region
-    // directly from the pre-stroke bounds and the stroke parameters per alignment.
-    auto fitBounds = innerShape->getBounds();
-    ExpandBoundsForStroke(&fitBounds, stroke, strokeAlign);
-
+    // Snapshot the pre-stroke shape so the tight fit bounds below can always be derived from a
+    // stroke-expanded path rather than from a post-boolean-op shape whose reported bounds are
+    // only a conservative approximation.
+    auto preStrokeShape = innerShape;
     if (strokeAlign != StrokeAlign::Center) {
       auto originalShape = Shape::ApplyMatrix(originalShapes[index], innerMatrices[index]);
       innerShape = applyStrokeAndAlign(std::move(innerShape), std::move(originalShape), stroke);
@@ -90,7 +69,7 @@ class StrokePainter : public Painter {
       paint->style = PaintStyle::Stroke;
       paint->stroke = stroke;
     }
-    paint->shader = wrapShaderWithFit(fitBounds);
+    paint->shader = buildFitShader(preStrokeShape, stroke, strokeAlign);
     return innerShape;
   }
 
@@ -102,21 +81,19 @@ class StrokePainter : public Painter {
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
 
-    Rect fitBounds = run.textBlob->getBounds();
-    ExpandBoundsForStroke(&fitBounds, runStroke, strokeAlign);
-    auto baseShader = wrapShaderWithFit(fitBounds);
-
     // Non-center stroke alignment or an active path effect (e.g. dashing) both require expanding
     // the text blob into a shape: alignment needs a boolean op against the original outline, and
     // path effects operate on path geometry. When neither applies keep the blob intact to
     // preserve color glyphs (e.g. emoji) that cannot be reduced to a path.
     std::shared_ptr<Shape> runShape = nullptr;
+    std::shared_ptr<Shape> preStrokeShape = nullptr;
     bool needsBooleanOp = strokeAlign != StrokeAlign::Center;
     if (pathEffect != nullptr || needsBooleanOp) {
       runShape = Shape::MakeFrom(run.textBlob);
       if (runShape != nullptr && pathEffect != nullptr) {
         runShape = Shape::ApplyEffect(runShape, pathEffect);
       }
+      preStrokeShape = runShape;
       if (runShape != nullptr && needsBooleanOp) {
         auto originalShape = Shape::MakeFrom(run.textBlob);
         runShape = applyStrokeAndAlign(std::move(runShape), std::move(originalShape), runStroke);
@@ -124,7 +101,10 @@ class StrokePainter : public Painter {
       if (runShape == nullptr) {
         return emits;
       }
+    } else {
+      preStrokeShape = Shape::MakeFrom(run.textBlob);
     }
+    auto baseShader = buildFitShader(preStrokeShape, runStroke, strokeAlign);
 
     // When boolean-op stroke alignment has already produced a filled outline, emit it as a fill;
     // otherwise the paint keeps the stroke so the stroker (or path-effected shape stroker) draws
@@ -175,6 +155,27 @@ class StrokePainter : public Painter {
   }
 
  private:
+  // Builds the shader for a stroked emit. When fit mode is active, the fit region is derived
+  // from the tight path bounds of the stroked shape (using Shape::getBounds() would only give a
+  // conservative approximation once stroke expansion or boolean-op merges are involved). For
+  // Inside alignment the stroke stays within the original outline, so the shape bounds already
+  // describe the visible region.
+  std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<Shape>& preStrokeShape,
+                                         const Stroke& strokeToApply, StrokeAlign align) const {
+    if (colorSource == nullptr || !colorSource->fitsToGeometry() || preStrokeShape == nullptr) {
+      return shader;
+    }
+    std::shared_ptr<Shape> boundsShape = preStrokeShape;
+    if (align != StrokeAlign::Inside) {
+      boundsShape = Shape::ApplyStroke(preStrokeShape, &strokeToApply);
+      if (boundsShape == nullptr) {
+        return shader;
+      }
+    }
+    auto fitBounds = boundsShape->getPath().getBounds();
+    return shader->makeWithMatrix(colorSource->getFitMatrix(fitBounds));
+  }
+
   std::shared_ptr<Shape> applyStrokeAndAlign(std::shared_ptr<Shape> shape,
                                              std::shared_ptr<Shape> originalShape,
                                              const Stroke& strokeToApply) const {
