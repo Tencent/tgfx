@@ -49,6 +49,7 @@ class FillPainter : public Painter {
     if (innerShape->fillType() == PathFillType::Winding) {
       innerShape = Shape::ApplyFillType(innerShape, fillRule);
     }
+    // Use the resolved path bounds so the fit region matches the actual fill footprint rather than the conservative cover.
     paint->shader = wrapShaderWithFit(innerShape->getPath().getBounds());
     return innerShape;
   }
@@ -59,6 +60,7 @@ class FillPainter : public Painter {
       return emit;
     }
     emit.textBlob = run.textBlob;
+    // Tight bounds keep the fit region in step with the visible glyph extents instead of the conservative blob cover.
     auto baseShader = wrapShaderWithFit(run.textBlob->getTightBounds());
     float blendFactor = run.style.fillColor.alpha;
     float runAlpha = alpha * run.style.alpha;

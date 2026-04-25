@@ -165,6 +165,7 @@ class StrokePainter : public Painter {
         return shader;
       }
     }
+    // Use the resolved path bounds so the fit region matches the stroked outline rather than the conservative cover.
     return wrapShaderWithFit(boundsShape->getPath().getBounds());
   }
 
