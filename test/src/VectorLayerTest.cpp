@@ -1185,11 +1185,20 @@ TGFX_TEST(VectorLayerTest, StrokeNestedScale) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+
   auto displayList = std::make_unique<DisplayList>();
   auto vectorLayer = VectorLayer::Make();
 
-  // Group 1: Non-uniform scale at inner group level
-  // Stroke sees accumulated matrix (2,1), converts to fill with uniform stroke width
+  std::vector<Color> gradientColors = {Color::Red(), Color::FromRGBA(255, 255, 0, 255),
+                                       Color::Blue()};
+
+  // Each group uses a fit-to-geometry gradient or image pattern stroke so the shader coordinate
+  // system is visible: if the nested scales are not combined correctly, the fit region (and the
+  // stroke width it implies) would differ between groups that should look identical.
+
+  // Group 1: Non-uniform scale at inner group level. Stroke sees accumulated matrix (2,1).
   // Final size: 60*2 x 60*1 = 120x60
   auto outerGroup1 = std::make_shared<VectorGroup>();
 
@@ -1200,13 +1209,13 @@ TGFX_TEST(VectorLayerTest, StrokeNestedScale) {
   rect1->setSize({60, 60});
   innerGroup1->setElements({rect1});
 
-  auto stroke1 = MakeStrokeStyle(Color::Red(), 8.0f);
+  auto gradient1 = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+  auto stroke1 = StrokeStyle::Make(gradient1);
+  stroke1->setStrokeWidth(8.0f);
   outerGroup1->setElements({innerGroup1, stroke1});
 
-  // Group 2: Non-uniform scale at outer group only
-  // Stroke sees accumulated matrix (2,1), converts to fill with uniform stroke width
-  // Final size: 60*2 x 60*1 = 120x60
-  // Should look identical to Group 1
+  // Group 2: Non-uniform scale at outer group only. Stroke sees the same accumulated matrix as
+  // group 1, so the fit region and the rendered stroke must match it visually.
   auto outerGroup2 = std::make_shared<VectorGroup>();
   outerGroup2->setScale({2.0f, 1.0f});
 
@@ -1217,12 +1226,14 @@ TGFX_TEST(VectorLayerTest, StrokeNestedScale) {
   rect2->setSize({60, 60});
   innerGroup2->setElements({rect2});
 
-  auto stroke2 = MakeStrokeStyle(Color::Blue(), 8.0f);
+  auto gradient2 = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
+  auto stroke2 = StrokeStyle::Make(gradient2);
+  stroke2->setStrokeWidth(8.0f);
   outerGroup2->setElements({innerGroup2, stroke2});
 
-  // Group 3: Inner and outer scales cancel out to uniform
+  // Group 3: Inner and outer scales cancel out to uniform. Uses an image pattern so the shader
+  // coordinate layout (fit region and pattern orientation) is easy to compare visually.
   // Inner: (0.5, 2), Outer: (2, 0.5), Combined: (1, 1)
-  // Stroke sees uniform matrix, applies normal 8px stroke
   // Final size: 60*0.5*2 x 60*2*0.5 = 60x60
   auto outerGroup3 = std::make_shared<VectorGroup>();
   outerGroup3->setScale({2.0f, 0.5f});
@@ -1234,7 +1245,10 @@ TGFX_TEST(VectorLayerTest, StrokeNestedScale) {
   rect3->setSize({60, 60});
   innerGroup3->setElements({rect3});
 
-  auto stroke3 = MakeStrokeStyle(Color::Green(), 8.0f);
+  auto pattern3 = ImagePattern::Make(image);
+  pattern3->setScaleMode(ScaleMode::LetterBox);
+  auto stroke3 = StrokeStyle::Make(pattern3);
+  stroke3->setStrokeWidth(8.0f);
   outerGroup3->setElements({innerGroup3, stroke3});
 
   vectorLayer->setContents({outerGroup1, outerGroup2, outerGroup3});
