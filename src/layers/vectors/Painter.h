@@ -90,9 +90,10 @@ class Painter {
    * Subclass hook for glyph runs. Unlike prepareShape, the TextBlob stays in run-local space:
    * run.matrix, innerMatrix, and outerMatrix are all folded into the recorder CTM, so bounds read
    * from run.textBlob (e.g. getTightBounds()) are in run-local space and the shader returned by
-   * wrapShaderWithFit must use the same space. A run always emits a single drawable (either a
-   * TextBlob or a stroke-expanded Shape), but may carry multiple paints (e.g. a base paint plus a
-   * fill-color overlay). Return with empty paints to skip emission.
+   * wrapShaderWithFit must use the same space. A run emits at most one drawable kind — when
+   * neither `textBlob` nor `shape` is set, populated paints are skipped; otherwise either the
+   * TextBlob or the stroke-expanded Shape is emitted, possibly with multiple paints (e.g. a base
+   * paint plus a fill-color overlay). Return with empty paints to skip emission explicitly.
    */
   struct GlyphRunEmit {
     std::shared_ptr<TextBlob> textBlob = nullptr;
