@@ -20,6 +20,16 @@
 
 namespace tgfx {
 
+// ---- Offline-replayable text builders ----
+
+std::string ProgramBuilder::BuildOutputSwizzleCall(const std::string& outputName) {
+  return outputName + " = TGFX_OutputSwizzle(" + outputName + ");";
+}
+
+std::string ProgramBuilder::BuildVec4Decl(const std::string& name) {
+  return "vec4 " + name + ";";
+}
+
 ProgramBuilder::ProgramBuilder(Context* context, const ProgramInfo* programInfo)
     : context(context), programInfo(programInfo) {
 }
@@ -43,7 +53,7 @@ void ProgramBuilder::emitFSOutputSwizzle() {
   fragBuilder->shaderStrings[ShaderBuilder::Type::Definitions] +=
       "#undef TGFX_OUT_SWIZZLE\n#define TGFX_OUT_SWIZZLE " + std::string(swizzle.c_str()) + "\n";
   const auto& output = fragBuilder->colorOutputName();
-  fragBuilder->codeAppendf("%s = TGFX_OutputSwizzle(%s);", output.c_str(), output.c_str());
+  fragBuilder->codeAppend(BuildOutputSwizzleCall(output));
 }
 
 std::string ProgramBuilder::nameVariable(const std::string& name) const {
@@ -64,7 +74,7 @@ void ProgramBuilder::nameExpression(std::string* output, const std::string& base
   } else {
     outName = nameVariable(baseName);
   }
-  fragmentShaderBuilder()->codeAppendf("vec4 %s;", outName.c_str());
+  fragmentShaderBuilder()->codeAppend(BuildVec4Decl(outName));
   *output = outName;
 }
 

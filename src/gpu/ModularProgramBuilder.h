@@ -122,6 +122,36 @@ class ModularProgramBuilder : public GLSLProgramBuilder {
    */
   static std::string RenderManifest(const ShaderCallManifest& manifest);
 
+  // ---- Offline-replayable text builders ----
+  //
+  // The following pure functions are the canonical text-construction rules for the main()-body
+  // boilerplate emitted by the modular builder. They are stateless (static, take only string /
+  // int arguments) so that offline shader variant tools can call them directly to replay the
+  // exact bytes produced at runtime, without needing to run the C++ orchestration control flow.
+  //
+  // Every call site inside ModularProgramBuilder that would otherwise format a string via
+  // codeAppendf() should route through one of these functions — see the replacement audit in
+  // plans/stellar-cascade-lovelace.md.
+
+  /** `"{ // Processor<idx> : <name>\n"` — FS processor block opener. */
+  static std::string BuildProcessorHeader(int processorIndex, const std::string& processorName);
+
+  /** `"}"` — FS processor block closer. Kept as a function so call sites are uniform. */
+  static std::string BuildProcessorFooter();
+
+  /** `"// Processor<idx> : <name>\n"` — VS processor separator comment. */
+  static std::string BuildVSProcessorComment(int processorIndex, const std::string& processorName);
+
+  /** `"<type> <name> = <rhs>;"` — single-line local variable declaration with initializer. */
+  static std::string BuildTempVar(const std::string& type, const std::string& name,
+                                  const std::string& rhs);
+
+  /** `"<lhs> = <rhs>;\n"` — plain assignment bridging processor output to section output. */
+  static std::string BuildAssignment(const std::string& lhs, const std::string& rhs);
+
+  /** `"highp vec2 <dst> = TGFX_PerspDivide(<src>);"` — perspective divide call emission. */
+  static std::string BuildPerspDivideDecl(const std::string& dstName, const std::string& srcName);
+
   // ---- GP/XP override methods ----
 
   void emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage) override;

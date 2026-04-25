@@ -24,6 +24,36 @@
 
 namespace tgfx {
 
+// ---- Offline-replayable text builders ----
+
+std::string ModularProgramBuilder::BuildProcessorHeader(int processorIndex,
+                                                        const std::string& processorName) {
+  return "{ // Processor" + std::to_string(processorIndex) + " : " + processorName + "\n";
+}
+
+std::string ModularProgramBuilder::BuildProcessorFooter() {
+  return "}";
+}
+
+std::string ModularProgramBuilder::BuildVSProcessorComment(int processorIndex,
+                                                           const std::string& processorName) {
+  return "// Processor" + std::to_string(processorIndex) + " : " + processorName + "\n";
+}
+
+std::string ModularProgramBuilder::BuildTempVar(const std::string& type, const std::string& name,
+                                                const std::string& rhs) {
+  return type + " " + name + " = " + rhs + ";";
+}
+
+std::string ModularProgramBuilder::BuildAssignment(const std::string& lhs, const std::string& rhs) {
+  return lhs + " = " + rhs + ";\n";
+}
+
+std::string ModularProgramBuilder::BuildPerspDivideDecl(const std::string& dstName,
+                                                        const std::string& srcName) {
+  return "highp vec2 " + dstName + " = TGFX_PerspDivide(" + srcName + ");";
+}
+
 // ---- Manifest rendering ----
 
 std::string ModularProgramBuilder::RenderManifest(const ShaderCallManifest& manifest) {
@@ -107,8 +137,7 @@ std::string ModularProgramBuilder::emitPerspCoordDivide(const ShaderVar& coordVa
   // Inject TGFX_PerspDivide() from tgfx_fs_boilerplate.glsl on first use.
   includeModule(ShaderModuleID::FSBoilerplate);
   const std::string perspCoordName = "perspCoord2D";
-  fragmentShaderBuilder()->codeAppendf("highp vec2 %s = TGFX_PerspDivide(%s);",
-                                       perspCoordName.c_str(), coordVar.name().c_str());
+  fragmentShaderBuilder()->codeAppend(BuildPerspDivideDecl(perspCoordName, coordVar.name()));
   return perspCoordName;
 }
 
@@ -163,8 +192,7 @@ std::string ModularProgramBuilder::emitModularFragProc(
   nameExpression(&output, "output");
 
   auto processorIndex = programInfo->getProcessorIndex(processor);
-  fragmentShaderBuilder()->codeAppendf("{ // Processor%d : %s\n", processorIndex,
-                                       processor->name().c_str());
+  fragmentShaderBuilder()->codeAppend(BuildProcessorHeader(processorIndex, processor->name()));
 
   // Collect texture samplers from this FP's entire subtree FIRST (before any dispatch).
   // Skip when called recursively from a container FP (parent already collected all samplers).
@@ -185,7 +213,7 @@ std::string ModularProgramBuilder::emitModularFragProc(
   // Try modular container path: buildContainerCallStatement().
   // This recursively emits children via emitModularFragProc, then calls the container .glsl.
   if (emitModularContainerFP(processor, transformedCoordVarsIdx, input, output, samplerOffset)) {
-    fragmentShaderBuilder()->codeAppend("}");
+    fragmentShaderBuilder()->codeAppend(BuildProcessorFooter());
     currentProcessors.pop_back();
     return output;
   }
@@ -194,7 +222,7 @@ std::string ModularProgramBuilder::emitModularFragProc(
   emitLeafFPCall(processor, transformedCoordVarsIdx, input, output, coordTransformFunc,
                  samplerOffset);
 
-  fragmentShaderBuilder()->codeAppend("}");
+  fragmentShaderBuilder()->codeAppend(BuildProcessorFooter());
   currentProcessors.pop_back();
   return output;
 }
@@ -237,8 +265,7 @@ bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* proc
     } else if (!info.inputOverride.empty()) {
       // Use a static expression as input override.
       std::string overrideName = "_containerChildInput_" + std::to_string(info.childIndex);
-      fragmentShaderBuilder()->codeAppendf("vec4 %s = %s;", overrideName.c_str(),
-                                           info.inputOverride.c_str());
+      fragmentShaderBuilder()->codeAppend(BuildTempVar("vec4", overrideName, info.inputOverride));
       childInput = overrideName;
     } else {
       childInput = input.empty() ? std::string("vec4(1.0)") : input;
@@ -299,7 +326,7 @@ bool ModularProgramBuilder::emitModularContainerFP(const FragmentProcessor* proc
   }
   fragmentShaderBuilder()->codeAppend(RenderManifest(result));
   if (result.outputVarName != output) {
-    fragmentShaderBuilder()->codeAppendf("%s = %s;", output.c_str(), result.outputVarName.c_str());
+    fragmentShaderBuilder()->codeAppend(BuildAssignment(output, result.outputVarName));
   }
   return true;
 }
@@ -319,8 +346,8 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
   if (transformedCoordVarsIdx < transformedCoordVars.size()) {
     auto texCoordName = emitPerspCoordDivide(transformedCoordVars[transformedCoordVarsIdx]);
     if (coordTransformFunc) {
-      fragmentShaderBuilder()->codeAppendf("highp vec2 transformedCoord = %s;",
-                                           coordTransformFunc(texCoordName).c_str());
+      fragmentShaderBuilder()->codeAppend(
+          BuildTempVar("highp vec2", "transformedCoord", coordTransformFunc(texCoordName)));
       texCoordName = "transformedCoord";
     }
     resources.varyings.addCoordTransform(0, texCoordName);
@@ -343,7 +370,7 @@ void ModularProgramBuilder::emitLeafFPCall(const FragmentProcessor* processor,
   includeModule(ShaderModuleRegistry::GetModuleID(name));
   fragmentShaderBuilder()->codeAppend(RenderManifest(result));
   if (result.outputVarName != output) {
-    fragmentShaderBuilder()->codeAppendf("%s = %s;", output.c_str(), result.outputVarName.c_str());
+    fragmentShaderBuilder()->codeAppend(BuildAssignment(output, result.outputVarName));
   }
 }
 
@@ -359,10 +386,10 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
   nameExpression(outputCoverage, "outputCoverage");
 
   auto processorIndex = programInfo->getProcessorIndex(geometryProcessor);
-  fragmentShaderBuilder()->codeAppendf("{ // Processor%d : %s\n", processorIndex,
-                                       geometryProcessor->name().c_str());
-  vertexShaderBuilder()->codeAppendf("// Processor%d : %s\n", processorIndex,
-                                     geometryProcessor->name().c_str());
+  fragmentShaderBuilder()->codeAppend(
+      BuildProcessorHeader(processorIndex, geometryProcessor->name()));
+  vertexShaderBuilder()->codeAppend(
+      BuildVSProcessorComment(processorIndex, geometryProcessor->name()));
 
   GeometryProcessor::FPCoordTransformHandler transformHandler(programInfo, &transformedCoordVars);
 
@@ -437,13 +464,12 @@ void ModularProgramBuilder::emitAndInstallGeoProc(std::string* outputColor,
     includeModule(ShaderModuleID::GPCoverage);
   }
   fragmentShaderBuilder()->codeAppend(RenderManifest(colorResult));
-  fragmentShaderBuilder()->codeAppendf("%s = %s;\n", outputColor->c_str(),
-                                       colorResult.outputVarName.c_str());
+  fragmentShaderBuilder()->codeAppend(BuildAssignment(*outputColor, colorResult.outputVarName));
   fragmentShaderBuilder()->codeAppend(RenderManifest(coverageResult));
-  fragmentShaderBuilder()->codeAppendf("%s = %s;\n", outputCoverage->c_str(),
-                                       coverageResult.outputVarName.c_str());
+  fragmentShaderBuilder()->codeAppend(
+      BuildAssignment(*outputCoverage, coverageResult.outputVarName));
 
-  fragmentShaderBuilder()->codeAppend("}");
+  fragmentShaderBuilder()->codeAppend(BuildProcessorFooter());
   currentProcessors.pop_back();
 }
 
@@ -453,9 +479,8 @@ void ModularProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
                                                    const std::string& coverageIn) {
   auto xferProcessor = programInfo->getXferProcessor();
   currentProcessors.push_back(xferProcessor);
-  fragmentShaderBuilder()->codeAppendf("{ // Processor%d : %s\n",
-                                       programInfo->getProcessorIndex(xferProcessor),
-                                       xferProcessor->name().c_str());
+  fragmentShaderBuilder()->codeAppend(
+      BuildProcessorHeader(programInfo->getProcessorIndex(xferProcessor), xferProcessor->name()));
 
   std::string inputColor = !colorIn.empty() ? colorIn : "vec4(1.0)";
   std::string inputCoverage = !coverageIn.empty() ? coverageIn : "vec4(1.0)";
@@ -502,7 +527,7 @@ void ModularProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
   }
   fragmentShaderBuilder()->codeAppend(RenderManifest(result));
 
-  fragmentShaderBuilder()->codeAppend("}");
+  fragmentShaderBuilder()->codeAppend(BuildProcessorFooter());
   currentProcessors.pop_back();
 }
 

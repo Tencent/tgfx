@@ -67,6 +67,18 @@ class ProgramBuilder {
 
   void finalizeShaders();
 
+  // ---- Offline-replayable text builders ----
+  //
+  // Pure functions that encapsulate the text-construction rules for main()-body boilerplate
+  // shared by the legacy and modular program builders. Stateless so that offline shader variant
+  // tools can call them directly to replay the exact bytes produced at runtime.
+
+  /** `"<name> = TGFX_OutputSwizzle(<name>);"` — final output swizzle call. */
+  static std::string BuildOutputSwizzleCall(const std::string& outputName);
+
+  /** `"vec4 <name>;"` — bare vec4 declaration used by nameExpression(). */
+  static std::string BuildVec4Decl(const std::string& name);
+
  protected:
   Context* context = nullptr;
   const ProgramInfo* programInfo = nullptr;
