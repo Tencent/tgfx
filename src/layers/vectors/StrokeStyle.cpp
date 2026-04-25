@@ -307,6 +307,14 @@ void StrokeStyle::apply(VectorContext* context) {
   if (_strokeAlign != StrokeAlign::Center) {
     painter->originalShapes.reserve(context->geometries.size());
     for (auto& geometry : context->geometries) {
+      // Text geometries are handled entirely by prepareGlyphRun, which rebuilds the original
+      // outline from the run's textBlob. Push a null placeholder to keep index alignment with
+      // geometries while avoiding an eager text-to-shape conversion that would also pollute
+      // Geometry::shape cache.
+      if (geometry->hasText()) {
+        painter->originalShapes.push_back(nullptr);
+        continue;
+      }
       painter->originalShapes.push_back(geometry->getShape());
     }
   }
