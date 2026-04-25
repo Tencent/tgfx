@@ -86,6 +86,20 @@ class StrokePainter : public Painter {
     ApplyStrokeToBounds(runStroke, &fitBounds, Matrix::I(), true);
     auto baseShader = wrapShaderWithFit(fitBounds);
 
+    // When a path effect (e.g. dashing) is active, expand the text blob into a shape so the
+    // effect can be applied to its outline; otherwise keep the blob intact to preserve color
+    // glyphs (e.g. emoji) that cannot be reduced to a path.
+    std::shared_ptr<Shape> runShape = nullptr;
+    if (pathEffect != nullptr) {
+      runShape = Shape::MakeFrom(run.textBlob);
+      if (runShape != nullptr) {
+        runShape = Shape::ApplyEffect(runShape, pathEffect);
+      }
+      if (runShape == nullptr) {
+        return emits;
+      }
+    }
+
     float blendFactor = run.style.strokeColor.alpha;
     float runAlpha = alpha * run.style.alpha;
     if (blendFactor < 1.0f) {
@@ -94,7 +108,14 @@ class StrokePainter : public Painter {
       paint.shader = baseShader;
       paint.style = PaintStyle::Stroke;
       paint.stroke = runStroke;
-      emits.push_back({run.textBlob, paint});
+      GlyphEmit emit = {};
+      emit.paint = paint;
+      if (runShape != nullptr) {
+        emit.shape = runShape;
+      } else {
+        emit.textBlob = run.textBlob;
+      }
+      emits.push_back(std::move(emit));
     }
     if (blendFactor > 0.0f) {
       const auto& strokeColor = run.style.strokeColor;
@@ -106,7 +127,14 @@ class StrokePainter : public Painter {
       overlay.color.alpha = runAlpha;
       overlay.style = PaintStyle::Stroke;
       overlay.stroke = runStroke;
-      emits.push_back({run.textBlob, overlay});
+      GlyphEmit emit = {};
+      emit.paint = overlay;
+      if (runShape != nullptr) {
+        emit.shape = runShape;
+      } else {
+        emit.textBlob = run.textBlob;
+      }
+      emits.push_back(std::move(emit));
     }
     return emits;
   }

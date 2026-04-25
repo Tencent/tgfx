@@ -62,20 +62,23 @@ class FillPainter : public Painter {
     float blendFactor = run.style.fillColor.alpha;
     float runAlpha = alpha * run.style.alpha;
     if (blendFactor < 1.0f) {
-      auto paint = makeBasePaint();
-      paint.color.alpha = runAlpha;
-      paint.shader = baseShader;
-      emits.push_back({run.textBlob, paint});
+      GlyphEmit emit = {};
+      emit.textBlob = run.textBlob;
+      emit.paint = makeBasePaint();
+      emit.paint.color.alpha = runAlpha;
+      emit.paint.shader = baseShader;
+      emits.push_back(std::move(emit));
     }
     if (blendFactor > 0.0f) {
       const auto& fillColor = run.style.fillColor;
       auto overlayColor = Color{fillColor.red, fillColor.green, fillColor.blue, blendFactor};
-      LayerPaint overlay = {};
-      overlay.blendMode = BlendMode::SrcOver;
-      overlay.placement = placement;
-      overlay.shader = Shader::MakeColorShader(overlayColor);
-      overlay.color.alpha = runAlpha;
-      emits.push_back({run.textBlob, overlay});
+      GlyphEmit emit = {};
+      emit.textBlob = run.textBlob;
+      emit.paint.blendMode = BlendMode::SrcOver;
+      emit.paint.placement = placement;
+      emit.paint.shader = Shader::MakeColorShader(overlayColor);
+      emit.paint.color.alpha = runAlpha;
+      emits.push_back(std::move(emit));
     }
     return emits;
   }

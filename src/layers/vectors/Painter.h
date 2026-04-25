@@ -85,12 +85,13 @@ class Painter {
                                               LayerPaint* paint) = 0;
 
   /**
-   * Subclass hook for glyph runs. Subclasses produce one or more (textBlob, paint) pairs to emit
-   * (e.g. base + colored overlay). The base will install runLocalMatrix * outerMatrix as the
-   * recorder CTM around all returned blobs.
+   * Subclass hook for glyph runs. Subclasses produce one or more emit items per run (e.g. base +
+   * colored overlay). Each item carries either a text blob or a stroke-expanded shape; the base
+   * installs runLocalMatrix * outerMatrix as the recorder CTM around all items.
    */
   struct GlyphEmit {
     std::shared_ptr<TextBlob> textBlob = nullptr;
+    std::shared_ptr<Shape> shape = nullptr;
     LayerPaint paint = {};
   };
   virtual std::vector<GlyphEmit> prepareGlyphRun(const StyledGlyphRun& run, size_t index) = 0;

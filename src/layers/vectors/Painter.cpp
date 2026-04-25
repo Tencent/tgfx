@@ -48,10 +48,11 @@ void Painter::draw(LayerRecorder* recorder) {
         runMatrix.postConcat(outerMatrix);
         recorder->setMatrix(runMatrix);
         for (auto& emit : emits) {
-          if (emit.textBlob == nullptr) {
-            continue;
+          if (emit.shape != nullptr) {
+            recorder->addShape(std::move(emit.shape), emit.paint);
+          } else if (emit.textBlob != nullptr) {
+            recorder->addTextBlob(std::move(emit.textBlob), emit.paint);
           }
-          recorder->addTextBlob(std::move(emit.textBlob), emit.paint);
         }
         recorder->resetMatrix();
       }
