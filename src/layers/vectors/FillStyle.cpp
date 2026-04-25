@@ -49,7 +49,7 @@ class FillPainter : public Painter {
     if (innerShape->fillType() == PathFillType::Winding) {
       innerShape = Shape::ApplyFillType(innerShape, fillRule);
     }
-    paint->shader = wrapShaderWithFit(innerShape->getBounds());
+    paint->shader = wrapShaderWithFit(innerShape->getPath().getBounds());
     return innerShape;
   }
 
