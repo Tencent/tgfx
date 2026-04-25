@@ -1246,7 +1246,7 @@ TGFX_TEST(VectorLayerTest, StrokeNestedScale) {
   innerGroup3->setElements({rect3});
 
   auto pattern3 = ImagePattern::Make(image);
-  pattern3->setScaleMode(ScaleMode::LetterBox);
+  pattern3->setScaleMode(ScaleMode::Zoom);
   auto stroke3 = StrokeStyle::Make(pattern3);
   stroke3->setStrokeWidth(8.0f);
   outerGroup3->setElements({innerGroup3, stroke3});
