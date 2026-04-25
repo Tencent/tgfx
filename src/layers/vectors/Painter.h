@@ -104,7 +104,8 @@ class Painter {
   /**
    * Wraps the painter's shader with a fit matrix derived from the supplied inner-space bounds.
    * Returns the original shader unchanged when the color source does not opt into per-geometry
-   * fit.
+   * fit. Callers must ensure `shader` is non-null whenever `colorSource->fitsToGeometry()` is
+   * true; the fit branch dereferences the shader pointer.
    */
   std::shared_ptr<Shader> wrapShaderWithFit(const Rect& innerBounds) const;
 
