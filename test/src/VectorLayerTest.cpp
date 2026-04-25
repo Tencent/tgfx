@@ -4683,12 +4683,18 @@ TGFX_TEST(VectorLayerTest, Line) {
   auto group4 = std::make_shared<VectorGroup>();
   group4->setElements({line4, trim4, stroke4});
 
-  // Line 5: Zero-height rectangle with an Outside stroke. The rectangle collapses to a horizontal
-  // segment, so Outside stroke should still produce a visible band expanded by the stroke width.
+  // Line 5: Zero-height rectangle with a wide, vertically-oriented fit gradient Outside stroke.
+  // The rectangle collapses to a horizontal segment, so Outside stroke should expand it into a
+  // band whose gradient direction shows that the fit region tracks the stroked geometry rather
+  // than the degenerate original rect.
   auto degenerateRect = std::make_shared<Rectangle>();
   degenerateRect->setPosition({300, 430});
   degenerateRect->setSize({500, 0});
-  auto stroke5 = MakeStrokeStyle(Color::FromRGBA(128, 0, 255, 255), 8.0f);
+  auto gradient5 = Gradient::MakeLinear(
+      {0.5f, 0.0f}, {0.5f, 1.0f},
+      {Color::FromRGBA(255, 120, 0, 255), Color::FromRGBA(80, 0, 180, 255)});
+  auto stroke5 = StrokeStyle::Make(gradient5);
+  stroke5->setStrokeWidth(24.0f);
   stroke5->setStrokeAlign(StrokeAlign::Outside);
   auto group5 = std::make_shared<VectorGroup>();
   group5->setElements({degenerateRect, stroke5});
