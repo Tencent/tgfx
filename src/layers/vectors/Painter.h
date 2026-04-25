@@ -78,8 +78,8 @@ class Painter {
   /**
    * Subclass hook for shape geometries. The supplied innerShape has already been mapped into the
    * enclosing group space (i.e. Shape::ApplyMatrix(originalShape, innerMatrices[index])).
-   * Subclasses may further modify the shape and must populate paint.shader/style/stroke. Return
-   * nullptr to skip emission.
+   * Subclasses may further modify the shape and must populate paint.shader; style and stroke may
+   * be set when applicable. Return nullptr to skip emission.
    */
   virtual std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t index,
                                               LayerPaint* paint) = 0;
