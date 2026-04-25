@@ -4915,18 +4915,19 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
   ASSERT_TRUE(context != nullptr);
 
   const float cellSize = 90.0f;
-  const float cellGap = 15.0f;
+  const float columnGap = 15.0f;
+  const float rowGap = 30.0f;
   const float margin = 50.0f;
   const int columns = 6;
   const int rows = 4;
   const auto cellCenterX = [&](int col) {
-    return margin + cellSize * 0.5f + static_cast<float>(col) * (cellSize + cellGap);
+    return margin + cellSize * 0.5f + static_cast<float>(col) * (cellSize + columnGap);
   };
   const auto cellCenterY = [&](int row) {
-    return margin + cellSize * 0.5f + static_cast<float>(row) * (cellSize + cellGap);
+    return margin + cellSize * 0.5f + static_cast<float>(row) * (cellSize + rowGap);
   };
-  const int width = static_cast<int>(margin * 2 + cellSize * columns + cellGap * (columns - 1));
-  const int height = static_cast<int>(margin * 2 + cellSize * rows + cellGap * (rows - 1));
+  const int width = static_cast<int>(margin * 2 + cellSize * columns + columnGap * (columns - 1));
+  const int height = static_cast<int>(margin * 2 + cellSize * rows + rowGap * (rows - 1));
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
