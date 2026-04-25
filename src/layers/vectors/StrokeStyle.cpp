@@ -98,18 +98,14 @@ class StrokePainter : public Painter {
         return emits;
       }
     }
-    // When the glyph run is emitted as a stroke-expanded shape the shape already represents the
-    // rendered outline, so reuse the shared shape-based fit helper. Otherwise the text blob is
-    // handed to the renderer intact (to preserve color glyphs), and the fit region falls back to
-    // TextBlob::getTightBounds() which is the natural tight bounds for a glyph run geometry.
+    // The fit region of a glyph run geometry is always the text blob's tight bounds, regardless
+    // of whether we end up emitting the run as a text blob or as a stroke-expanded shape: the
+    // color source is anchored to the glyph run geometry, and converting the blob into a shape
+    // only to measure bounds would strip color glyphs (e.g. emoji) from the measurement.
     std::shared_ptr<Shader> baseShader = shader;
     if (colorSource != nullptr && colorSource->fitsToGeometry()) {
-      if (runShape != nullptr) {
-        baseShader = buildFitShader(runShape, runStroke, /*strokeBaked=*/needsBooleanOp);
-      } else {
-        baseShader = shader->makeWithMatrix(
-            colorSource->getFitMatrix(run.textBlob->getTightBounds()));
-      }
+      baseShader =
+          shader->makeWithMatrix(colorSource->getFitMatrix(run.textBlob->getTightBounds()));
     }
 
     // When boolean-op stroke alignment has already produced a filled outline, emit it as a fill;
