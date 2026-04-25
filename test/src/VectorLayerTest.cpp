@@ -4927,7 +4927,7 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
   ASSERT_TRUE(context != nullptr);
 
   const float cellSize = 90.0f;
-  const float columnGap = 15.0f;
+  const float columnGap = 30.0f;
   const float rowGap = 30.0f;
   const float margin = 50.0f;
   const int columns = 6;
