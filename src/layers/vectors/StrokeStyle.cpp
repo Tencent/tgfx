@@ -50,13 +50,18 @@ class StrokePainter : public Painter {
  protected:
   std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t index,
                                       LayerPaint* paint) override {
+    // Derive the fit shader from the pre-effect, pre-align-bake shape. Dash and stroke alignment
+    // only subset the pixels that the stroke band covers, so extending the original path bounds
+    // by the stroke width is an exact upper bound for every effect/align combination. Reading
+    // getPath() here also primes Shape::getPath()'s atomic cache for the recorder's later use.
+    paint->shader = buildFitShader(innerShape, stroke.width);
+
     if (pathEffect) {
       innerShape = Shape::ApplyEffect(innerShape, pathEffect);
       if (innerShape == nullptr) {
         return nullptr;
       }
     }
-    const Stroke* paintStroke = nullptr;
     if (strokeAlign != StrokeAlign::Center) {
       // prepareShape is only invoked for non-text geometries. StrokeStyle::apply fills
       // originalShapes with geometry->getShape() for those entries when strokeAlign is not
@@ -70,9 +75,7 @@ class StrokePainter : public Painter {
     } else {
       paint->style = PaintStyle::Stroke;
       paint->stroke = stroke;
-      paintStroke = &stroke;
     }
-    paint->shader = buildShapeFitShader(innerShape, paintStroke);
     return innerShape;
   }
 
@@ -84,39 +87,37 @@ class StrokePainter : public Painter {
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
 
-    // Non-center stroke alignment or an active path effect (e.g. dashing) both require expanding
-    // the text blob into a shape: alignment needs a boolean op against the original outline, and
-    // path effects operate on path geometry. When neither applies keep the blob intact to
-    // preserve color glyphs (e.g. emoji) that cannot be reduced to a path.
+    // Fit bounds come from the original TextBlob plus stroke width + align, matching the Shape
+    // branch above. Dash and non-center alignment only choose which subset of the stroke band
+    // is emitted; they do not enlarge it.
+    auto baseShader = buildFitShader(run.textBlob, runStroke.width);
+
+    // Emit path: non-center alignment or an active path effect require expanding the text blob
+    // into a shape (alignment needs a boolean op against the original outline, path effects
+    // operate on path geometry). When neither applies keep the blob intact to preserve color
+    // glyphs (e.g. emoji) that cannot be reduced to a path.
     std::shared_ptr<Shape> runShape = nullptr;
     bool needsBooleanOp = strokeAlign != StrokeAlign::Center;
     if (pathEffect != nullptr || needsBooleanOp) {
       runShape = Shape::MakeFrom(run.textBlob);
+      // Snapshot the un-effected outline for the boolean-op step. Shape is immutable, so the
+      // pre-effect shape remains a valid "original outline" and sharing it lets Shape::getPath()'s
+      // atomic cache serve both the boolean op and any subsequent path consumer.
+      auto originalShape = runShape;
       if (runShape != nullptr && pathEffect != nullptr) {
         runShape = Shape::ApplyEffect(runShape, pathEffect);
       }
       if (runShape != nullptr && needsBooleanOp) {
-        auto originalShape = Shape::MakeFrom(run.textBlob);
         runShape = applyStrokeAndAlign(std::move(runShape), std::move(originalShape), runStroke);
       }
       if (runShape == nullptr) {
         return emit;
       }
     }
-    // Non-center alignment has already baked the stroke into the shape, so the shape-based fit
-    // helper does not need an extra stroke and the emit uses a fill paint. Center alignment
-    // keeps the stroke on the paint, so the fit helper adds it back via ApplyStroke on the shape
-    // path, or via a manual width/2 outset on the text blob's tight bounds (the single
-    // sanctioned manual expansion, used only to avoid turning a TextBlob into a Shape purely for
-    // measurement).
-    const Stroke* shapePaintStroke = needsBooleanOp ? nullptr : &runStroke;
-    std::shared_ptr<Shader> baseShader = shader;
     if (runShape != nullptr) {
       emit.shape = runShape;
-      baseShader = buildShapeFitShader(runShape, shapePaintStroke);
     } else {
       emit.textBlob = run.textBlob;
-      baseShader = buildBlobFitShader(run.textBlob, &runStroke);
     }
 
     float blendFactor = run.style.strokeColor.alpha;
@@ -148,45 +149,53 @@ class StrokePainter : public Painter {
   }
 
  private:
-  // Computes the fit-shader region for an emit whose primary drawable is a Shape. If paint.stroke
-  // is active (Center alignment, or dashed Center text) the stroke is reapplied via ApplyStroke
-  // so the path bounds include the stroked outline without changing the emitted shape itself.
-  // Returns the original shader unchanged when the color source does not opt into fit, or when
-  // the bounds shape cannot be produced.
-  std::shared_ptr<Shader> buildShapeFitShader(const std::shared_ptr<Shape>& finalShape,
-                                              const Stroke* paintStroke) const {
-    if (colorSource == nullptr || !colorSource->fitsToGeometry() || finalShape == nullptr) {
+  // Builds the fit shader for a Shape drawable. The fit region is the pre-stroke path bounds
+  // expanded by the stroke width according to strokeAlign. getPath().getBounds() returns tight
+  // bounds for every Shape flavor (including MergeShape where onGetBounds is conservative) and
+  // shares its atomic cache with the later rasterization path.
+  //
+  // miter spikes from miterLimit are ignored so the Shape and TextBlob paths follow the same
+  // formula; on sharp miter joins the fit region may clip the tip colors by a fraction of a
+  // pixel. This is a deliberate trade-off to avoid synthesizing a stroke-expanded Shape just
+  // for measurement.
+  std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<Shape>& shape,
+                                         float strokeWidth) const {
+    if (colorSource == nullptr || !colorSource->fitsToGeometry() || shape == nullptr) {
       return shader;
     }
-    auto boundsShape = finalShape;
-    if (paintStroke != nullptr) {
-      boundsShape = Shape::ApplyStroke(finalShape, paintStroke);
-      if (boundsShape == nullptr) {
-        return shader;
-      }
-    }
-    // Use the resolved path bounds so the fit region matches the stroked outline rather than the conservative cover.
-    return wrapShaderWithFit(boundsShape->getPath().getBounds());
+    auto bounds = shape->getPath().getBounds();
+    expandByStrokeAlign(&bounds, strokeWidth);
+    return wrapShaderWithFit(bounds);
   }
 
-  // Computes the fit-shader region for an emit whose primary drawable is a TextBlob. The fit
-  // region is the blob's tight bounds, optionally outset by ceil(paintStroke->width / 2) so the
-  // fit region snaps to whole pixels and stays a conservative cover of the stroked outline. This
-  // is the only place where bounds are expanded manually instead of being read from a
-  // stroke-expanded shape: text fills cannot be converted into a shape without dropping color
-  // glyphs (e.g. emoji), and a paint stroke on text does not produce the miter spikes that
-  // justify a conservative multiplier.
-  std::shared_ptr<Shader> buildBlobFitShader(const std::shared_ptr<TextBlob>& textBlob,
-                                             const Stroke* paintStroke) const {
+  // Same contract as the Shape overload, sourced from the blob's tight glyph bounds so color
+  // glyphs stay intact (no text-to-shape conversion for measurement).
+  std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<TextBlob>& textBlob,
+                                         float strokeWidth) const {
     if (colorSource == nullptr || !colorSource->fitsToGeometry() || textBlob == nullptr) {
       return shader;
     }
-    auto fitBounds = textBlob->getTightBounds();
-    if (paintStroke != nullptr) {
-      auto expand = ceilf(paintStroke->width * 0.5f);
-      fitBounds.outset(expand, expand);
+    auto bounds = textBlob->getTightBounds();
+    expandByStrokeAlign(&bounds, strokeWidth);
+    return wrapShaderWithFit(bounds);
+  }
+
+  // Outset per side for each stroke alignment (miter spikes ignored): Inside keeps the bounds,
+  // Center grows by half the width, Outside grows by the full width. ceilf snaps the outset to
+  // whole pixels so gradient stops land on pixel boundaries.
+  void expandByStrokeAlign(Rect* bounds, float strokeWidth) const {
+    float outset = 0.0f;
+    switch (strokeAlign) {
+      case StrokeAlign::Inside:
+        return;
+      case StrokeAlign::Center:
+        outset = ceilf(strokeWidth * 0.5f);
+        break;
+      case StrokeAlign::Outside:
+        outset = ceilf(strokeWidth);
+        break;
     }
-    return wrapShaderWithFit(fitBounds);
+    bounds->outset(outset, outset);
   }
 
   std::shared_ptr<Shape> applyStrokeAndAlign(std::shared_ptr<Shape> shape,
