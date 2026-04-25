@@ -64,6 +64,11 @@ void Painter::draw(LayerRecorder* recorder) {
       continue;
     }
     shape = Shape::ApplyMatrix(shape, innerMatrix);
+    if (shape == nullptr) {
+      // innerMatrix is non-invertible (e.g. a degenerate scale); skip to avoid handing a null
+      // shape to prepareShape, which subclasses are allowed to dereference.
+      continue;
+    }
     auto paint = makeBasePaint();
     shape = prepareShape(std::move(shape), i, &paint);
     if (shape == nullptr) {

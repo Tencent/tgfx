@@ -78,10 +78,12 @@ class Painter {
   /**
    * Subclass hook for shape geometries. The supplied innerShape has already been mapped into the
    * enclosing group space (i.e. Shape::ApplyMatrix(originalShape, innerMatrices[index])), so any
-   * bounds read from it are in that space. outerMatrix is applied as CTM around the emit, and the
-   * shader wrapped via wrapShaderWithFit lives in the same inner-group space as the bounds.
-   * Subclasses may further modify the shape and must populate paint.shader; style and stroke may
-   * be set when applicable. Return nullptr to skip emission.
+   * bounds read from it are in that space. innerShape is guaranteed non-null; the base `draw`
+   * skips geometries whose ApplyMatrix result is null (degenerate innerMatrix). outerMatrix is
+   * applied as CTM around the emit, and the shader wrapped via wrapShaderWithFit lives in the
+   * same inner-group space as the bounds. Subclasses may further modify the shape and must
+   * populate paint.shader; style and stroke may be set when applicable. Return nullptr to skip
+   * emission.
    */
   virtual std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t index,
                                               LayerPaint* paint) = 0;
