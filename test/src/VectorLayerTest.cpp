@@ -4635,7 +4635,7 @@ TGFX_TEST(VectorLayerTest, Line) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 600, 400);
+  auto surface = Surface::Make(context, 600, 480);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -4683,7 +4683,17 @@ TGFX_TEST(VectorLayerTest, Line) {
   auto group4 = std::make_shared<VectorGroup>();
   group4->setElements({line4, trim4, stroke4});
 
-  vectorLayer->setContents({group1, group2, group3, group4});
+  // Line 5: Zero-height rectangle with an Outside stroke. The rectangle collapses to a horizontal
+  // segment, so Outside stroke should still produce a visible band expanded by the stroke width.
+  auto degenerateRect = std::make_shared<Rectangle>();
+  degenerateRect->setPosition({300, 430});
+  degenerateRect->setSize({500, 0});
+  auto stroke5 = MakeStrokeStyle(Color::FromRGBA(128, 0, 255, 255), 8.0f);
+  stroke5->setStrokeAlign(StrokeAlign::Outside);
+  auto group5 = std::make_shared<VectorGroup>();
+  group5->setElements({degenerateRect, stroke5});
+
+  vectorLayer->setContents({group1, group2, group3, group4, group5});
 
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
