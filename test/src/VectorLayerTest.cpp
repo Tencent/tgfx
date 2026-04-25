@@ -4690,9 +4690,9 @@ TGFX_TEST(VectorLayerTest, Line) {
   auto degenerateRect = std::make_shared<Rectangle>();
   degenerateRect->setPosition({300, 430});
   degenerateRect->setSize({500, 0});
-  auto gradient5 = Gradient::MakeLinear(
-      {0.5f, 0.0f}, {0.5f, 1.0f},
-      {Color::FromRGBA(255, 120, 0, 255), Color::FromRGBA(80, 0, 180, 255)});
+  auto gradient5 = Gradient::MakeLinear({0.5f, 0.0f}, {0.5f, 1.0f},
+                                        {Color::Red(), Color::FromRGBA(255, 255, 255, 255),
+                                         Color::Blue()});
   auto stroke5 = StrokeStyle::Make(gradient5);
   stroke5->setStrokeWidth(24.0f);
   stroke5->setStrokeAlign(StrokeAlign::Outside);
