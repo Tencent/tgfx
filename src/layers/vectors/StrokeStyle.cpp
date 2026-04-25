@@ -84,7 +84,6 @@ class StrokePainter : public Painter {
     // path effects operate on path geometry. When neither applies keep the blob intact to
     // preserve color glyphs (e.g. emoji) that cannot be reduced to a path.
     std::shared_ptr<Shape> runShape = nullptr;
-    std::shared_ptr<Shape> fitShape = nullptr;
     bool needsBooleanOp = strokeAlign != StrokeAlign::Center;
     if (pathEffect != nullptr || needsBooleanOp) {
       runShape = Shape::MakeFrom(run.textBlob);
@@ -98,11 +97,20 @@ class StrokePainter : public Painter {
       if (runShape == nullptr) {
         return emits;
       }
-      fitShape = runShape;
-    } else {
-      fitShape = Shape::MakeFrom(run.textBlob);
     }
-    auto baseShader = buildFitShader(fitShape, runStroke, /*strokeBaked=*/needsBooleanOp);
+    // When the glyph run is emitted as a stroke-expanded shape the shape already represents the
+    // rendered outline, so reuse the shared shape-based fit helper. Otherwise the text blob is
+    // handed to the renderer intact (to preserve color glyphs), and the fit region falls back to
+    // TextBlob::getTightBounds() which is the natural tight bounds for a glyph run geometry.
+    std::shared_ptr<Shader> baseShader = shader;
+    if (colorSource != nullptr && colorSource->fitsToGeometry()) {
+      if (runShape != nullptr) {
+        baseShader = buildFitShader(runShape, runStroke, /*strokeBaked=*/needsBooleanOp);
+      } else {
+        baseShader = shader->makeWithMatrix(
+            colorSource->getFitMatrix(run.textBlob->getTightBounds()));
+      }
+    }
 
     // When boolean-op stroke alignment has already produced a filled outline, emit it as a fill;
     // otherwise the paint keeps the stroke so the stroker (or path-effected shape stroker) draws

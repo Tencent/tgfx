@@ -58,7 +58,7 @@ class FillPainter : public Painter {
     if (run.textBlob == nullptr) {
       return emits;
     }
-    auto baseShader = wrapShaderWithFit(run.textBlob->getBounds());
+    auto baseShader = wrapShaderWithFit(run.textBlob->getTightBounds());
     float blendFactor = run.style.fillColor.alpha;
     float runAlpha = alpha * run.style.alpha;
     if (blendFactor < 1.0f) {
