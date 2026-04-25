@@ -28,6 +28,7 @@ class RootLayer;
 class Tile;
 class TileCache;
 class DrawTask;
+struct BackgroundSnapshotMap;
 
 /**
  * RenderMode defines the different modes of rendering a DisplayList.
@@ -341,7 +342,7 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  void drawTileTask(const DrawTask& task) const;
+  void drawTileTask(const DrawTask& task, const BackgroundSnapshotMap* snapshots) const;
 
   void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear) const;
 
@@ -352,7 +353,10 @@ class DisplayList {
   void resetCaches();
 
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                     bool autoClear) const;
+                     bool autoClear, const BackgroundSnapshotMap* snapshots) const;
+
+  std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(Surface* surface,
+                                                            const Rect& drawRect) const;
 
   void updateMousePosition();
 };

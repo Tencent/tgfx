@@ -166,8 +166,8 @@ TGFX_TEST(BackgroundBlurTest, BackgroundBlurStyleTest) {
 }
 
 /**
- * Test case where subBackgroundContext is larger than parent->backgroundContext.
- * The blurLayer's blur expansion area exceeds the parent's backgroundContext bounds.
+ * Test case where the sub BackgroundSource is larger than the parent BackgroundSource.
+ * The blurLayer's blur expansion area exceeds the parent's BackgroundSource bounds.
  */
 TGFX_TEST(BackgroundBlurTest, SimpleBackgroundBlur) {
   ContextScope scope;

@@ -22,6 +22,9 @@
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
 #include "inspect/InspectorMark.h"
+#include "layers/BackgroundHandler.h"
+#include "layers/BackgroundSnapshotMap.h"
+#include "layers/BackgroundSource.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
@@ -330,6 +333,8 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     }
     return;
   }
+  // The capture pass is invoked inside each render path (Direct / Partial / Tiled) after it
+  // computes the actual draw region, so bg snapshots only cover the pixels about to be refreshed.
   switch (_renderMode) {
     case RenderMode::Direct:
       dirtyRegions = renderDirect(surface, autoClear);
@@ -349,7 +354,8 @@ void DisplayList::render(Surface* surface, bool autoClear) {
 
 std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) const {
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
-  drawRootLayer(surface, surfaceRect, getViewMatrix(), autoClear);
+  auto snapshotMap = captureBackgrounds(surface, surfaceRect);
+  drawRootLayer(surface, surfaceRect, getViewMatrix(), autoClear, snapshotMap.get());
   return {Rect::MakeEmpty()};
 }
 
@@ -404,9 +410,16 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   } else {
     drawRects = MapDirtyRegions(dirtyRegions, viewMatrix, true, &surfaceRect);
   }
+  // Union drawRects in surface space to bound capture to the enclosing refreshed area for this
+  // partial render.
+  Rect captureRect = Rect::MakeEmpty();
+  for (auto& drawRect : drawRects) {
+    captureRect.join(drawRect);
+  }
+  auto snapshotMap = captureBackgrounds(surface, captureRect);
   auto canvas = surface->getCanvas();
   for (auto& drawRect : drawRects) {
-    drawRootLayer(partialCache.get(), drawRect, viewMatrix, true);
+    drawRootLayer(partialCache.get(), drawRect, viewMatrix, true, snapshotMap.get());
   }
   AutoCanvasRestore restore(canvas);
   canvas->resetMatrix();
@@ -434,10 +447,20 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
   }
+  // Union every tileTask's drawRect (surface / render space) so the capture pass's renderRect
+  // matches the pixels to be refreshed. tileRect is in zoom space; offset by contentOffset
+  // lines it up with surface pixel coords.
+  Rect captureRect = Rect::MakeEmpty();
+  for (auto& task : tileTasks) {
+    auto r = task.tileRect();
+    r.offset(_contentOffset.x, _contentOffset.y);
+    captureRect.join(r);
+  }
+  auto snapshotMap = captureBackgrounds(surface, captureRect);
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   for (auto& task : tileTasks) {
-    drawTileTask(task);
+    drawTileTask(task, snapshotMap.get());
     auto dirtyRect = task.tileRect();
     dirtyRect.offset(_contentOffset.x, _contentOffset.y);
     if (dirtyRect.intersect(surfaceRect)) {
@@ -911,7 +934,7 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
-void DisplayList::drawTileTask(const DrawTask& task) const {
+void DisplayList::drawTileTask(const DrawTask& task, const BackgroundSnapshotMap* snapshots) const {
   auto surface = surfaceCaches[task.sourceIndex()].get();
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
@@ -926,7 +949,7 @@ void DisplayList::drawTileTask(const DrawTask& task) const {
   viewMatrix.postTranslate(offsetX, offsetY);
   auto clipRect = tileRect;
   clipRect.offset(offsetX, offsetY);
-  drawRootLayer(surface, clipRect, viewMatrix, true);
+  drawRootLayer(surface, clipRect, viewMatrix, true, snapshots);
 }
 
 void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface,
@@ -1013,7 +1036,7 @@ void DisplayList::resetCaches() {
 }
 
 void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                                bool autoClear) const {
+                                bool autoClear, const BackgroundSnapshotMap* snapshots) const {
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   auto context = surface->getContext();
@@ -1034,11 +1057,57 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   auto renderRect = inverse.mapRect(drawRect);
   renderRect.roundOut();
   args.renderRect = &renderRect;
-  args.blurBackground =
-      _root->createBackgroundContext(context, drawRect, viewMatrix, false, args.dstColorSpace);
   args.dstColorSpace = surface->colorSpace();
   args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
-  _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
+  // Consume pass: replay snapshots produced by the capture pass. When the tree has no
+  // background-sourced styles, snapshots is null and we fall back to NoOp, which makes
+  // background-sourced styles (if any show up unexpectedly) silently no-op — matching the
+  // contour / 3D subtree semantics.
+  BackgroundConsumer consumer(snapshots);
+  args.background.handler =
+      snapshots ? static_cast<BackgroundHandler*>(&consumer) : BackgroundHandler::NoOp();
+  _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
+}
+
+std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(Surface* surface,
+                                                                       const Rect& drawRect) const {
+  DEBUG_ASSERT(surface != nullptr);
+  if (!_root->hasBackgroundStyle()) {
+    return nullptr;
+  }
+  if (drawRect.isEmpty()) {
+    return nullptr;
+  }
+  auto context = surface->getContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto viewMatrix = getViewMatrix();
+  DEBUG_ASSERT(viewMatrix.invertible());
+  auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
+  // The capture pass replays the entire layer tree onto the bg source's surface. Every
+  // Background-sourced LayerStyle is intercepted by BackgroundCapturer, which samples the surface
+  // at that point and stores a snapshot in snapshotMap; the style itself is skipped so that its
+  // output does not contaminate later background samples.
+  DrawArgs args(context);
+  args.dstColorSpace = surface->colorSpace();
+  args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
+  auto bgSource =
+      _root->createBackgroundSource(context, surfaceRect, viewMatrix, false, args.dstColorSpace);
+  if (bgSource == nullptr) {
+    return nullptr;
+  }
+  // drawRect is in surface pixel space (the region the consume pass will refresh). Project it
+  // back into world coords so it matches the renderRect semantics consumed by drawLayer.
+  Matrix inverse = Matrix::I();
+  viewMatrix.invert(&inverse);
+  auto renderRect = inverse.mapRect(drawRect);
+  renderRect.roundOut();
+  args.renderRect = &renderRect;
+  auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
+  BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), viewMatrix.getMaxScale(),
+                          snapshotMap.get());
+  return snapshotMap;
 }
 
 void DisplayList::updateMousePosition() {
