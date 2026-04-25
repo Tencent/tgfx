@@ -911,7 +911,8 @@ TGFX_TEST(SVGExportTest, LayerMaskBlur) {
   // Apply uniform transform: scale 8x, then center in the surface.
   // Content center ~(8, 5.5). Offset = surface_center - content_center * scale.
   auto layerMatrix = Matrix::MakeScale(8);
-  layerMatrix.postTranslate(width / 2 - 8 * 8, height / 2 - 5.5f * 8);
+  layerMatrix.postTranslate(static_cast<float>(width) / 2 - 8 * 8,
+                            static_cast<float>(height) / 2 - 5.5f * 8);
   groupLayer->setMatrix(layerMatrix);
   maskLayer->setMatrix(layerMatrix);
 
