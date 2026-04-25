@@ -88,3 +88,6 @@ ios/*/TGFX
 mac/TGFX
 mac/*/TGFX
 /TGFX
+
+# Session transcript dumps dropped by assistant tooling into the repo root
+/conversation-*.txt
