@@ -155,11 +155,15 @@ class StrokePainter : public Painter {
   }
 
  private:
-  // Builds the shader for a stroked emit. When fit mode is active, the fit region is derived
-  // from the tight path bounds of the stroked shape (using Shape::getBounds() would only give a
-  // conservative approximation once stroke expansion or boolean-op merges are involved). For
-  // Inside alignment the stroke stays within the original outline, so the shape bounds already
-  // describe the visible region.
+  // Builds the shader for a stroked emit. When fit mode is active the fit region must cover the
+  // visible stroked outline, which Shape::getBounds() can only approximate once stroke expansion
+  // or boolean-op merges are involved. Compute the tight bounds from a path that has been grown
+  // by the alignment-appropriate amount:
+  //   * Inside keeps the stroke within the original shape, so the original bounds suffice.
+  //   * Center expands uniformly by stroke.width / 2 on each side, matching ApplyStroke's default
+  //     (centered) semantics.
+  //   * Outside expands fully by stroke.width on each side, achieved by applying a doubled stroke
+  //     under centered semantics so the resulting path's tight bounds match the Outside ring.
   std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<Shape>& preStrokeShape,
                                          const Stroke& strokeToApply, StrokeAlign align) const {
     if (colorSource == nullptr || !colorSource->fitsToGeometry() || preStrokeShape == nullptr) {
@@ -167,7 +171,11 @@ class StrokePainter : public Painter {
     }
     std::shared_ptr<Shape> boundsShape = preStrokeShape;
     if (align != StrokeAlign::Inside) {
-      boundsShape = Shape::ApplyStroke(preStrokeShape, &strokeToApply);
+      auto centeredStroke = strokeToApply;
+      if (align == StrokeAlign::Outside) {
+        centeredStroke.width *= 2.0f;
+      }
+      boundsShape = Shape::ApplyStroke(preStrokeShape, &centeredStroke);
       if (boundsShape == nullptr) {
         return shader;
       }
