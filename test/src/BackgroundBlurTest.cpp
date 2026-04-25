@@ -17,7 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <algorithm>
+#include "layers/BackgroundSource.h"
 #include "layers/RootLayer.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -166,8 +169,8 @@ TGFX_TEST(BackgroundBlurTest, BackgroundBlurStyleTest) {
 }
 
 /**
- * Test case where subBackgroundContext is larger than parent->backgroundContext.
- * The blurLayer's blur expansion area exceeds the parent's backgroundContext bounds.
+ * Test case where the sub BackgroundSource is larger than the parent BackgroundSource.
+ * The blurLayer's blur expansion area exceeds the parent's BackgroundSource bounds.
  */
 TGFX_TEST(BackgroundBlurTest, SimpleBackgroundBlur) {
   ContextScope scope;
@@ -796,6 +799,184 @@ TGFX_TEST(BackgroundBlurTest, FastPathBackgroundChangeExpandsInsideBlur) {
     totalArea += r.width() * r.height();
   }
   EXPECT_GT(totalArea, rawArea);
+}
+
+// Exercises the picture-backed sub BackgroundSource flush path. On flush, onGetOwnContents
+// finishes the carrier recorder's current segment, reopens a new recording, replays the segment,
+// then restores the caller's canvas state so follow-on drawing keeps working. If the replay
+// baseline is wrong, a draw made AFTER the flush lands at a different pixel than the same draw
+// made BEFORE the flush. This test detects that divergence end-to-end via pixel readback.
+TGFX_TEST(BackgroundBlurTest, PictureSubFlushPreservesCarrierMatrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Top-level picture-backed source with a non-trivial world matrix so any accidental
+  // matrix doubling on flush would shift pixels visibly.
+  auto topSource =
+      BackgroundSource::Make(/*context=*/nullptr, Rect::MakeWH(200, 200), /*maxOutset=*/0,
+                             /*minOutset=*/0, Matrix::I(), ColorSpace::SRGB());
+  ASSERT_TRUE(topSource != nullptr);
+
+  PictureRecorder carrier;
+  auto* carrierCanvas = carrier.beginRecording();
+  // Carrier local origin maps to world (100, 50).
+  auto carrierMatrix = Matrix::MakeTrans(100, 50);
+  carrierCanvas->setMatrix(carrierMatrix);
+
+  auto subSource = topSource->createSubPicture(&carrier, Rect::MakeWH(100, 100),
+                                               /*localToWorld=*/carrierMatrix,
+                                               /*localToSurface=*/carrierMatrix);
+  ASSERT_TRUE(subSource != nullptr);
+
+  Paint redPaint;
+  redPaint.setColor(Color::Red());
+  // Marker A at local (10, 10) -> world (110, 60).
+  carrierCanvas->drawRect(Rect::MakeXYWH(10, 10, 4, 4), redPaint);
+
+  // Force a segment flush mid-recording.
+  auto flushed = subSource->getBackgroundImage();
+  EXPECT_TRUE(flushed != nullptr);
+
+  // Canvas pointer may have been swapped by the reopen.
+  carrierCanvas = carrier.getRecordingCanvas();
+  ASSERT_TRUE(carrierCanvas != nullptr);
+
+  Paint greenPaint;
+  greenPaint.setColor(Color::Green());
+  // Marker B at local (20, 20) -> world (120, 70). If the flush doubled the baseline
+  // matrix we would instead see it near (220, 120).
+  carrierCanvas->drawRect(Rect::MakeXYWH(20, 20, 4, 4), greenPaint);
+
+  auto carrierPicture = carrier.finishRecordingAsPicture();
+  ASSERT_TRUE(carrierPicture != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto* surfaceCanvas = surface->getCanvas();
+  surfaceCanvas->clear();
+  surfaceCanvas->drawPicture(carrierPicture);
+
+  Bitmap bitmap = {};
+  bitmap.allocPixels(200, 200);
+  auto pixels = bitmap.lockPixels();
+  ASSERT_TRUE(surface->readPixels(bitmap.info(), pixels));
+  bitmap.unlockPixels();
+
+  auto markerA = bitmap.getColor(112, 62);
+  auto markerB = bitmap.getColor(122, 72);
+  EXPECT_EQ(markerA.red, 1.0f);
+  EXPECT_EQ(markerA.green, 0.0f);
+  EXPECT_EQ(markerA.blue, 0.0f);
+  EXPECT_EQ(markerB.red, 0.0f);
+  EXPECT_EQ(markerB.green, 1.0f);
+  EXPECT_EQ(markerB.blue, 0.0f);
+
+  // If the replay doubled the baseline matrix, marker B would end up near (220, 120); verify
+  // that region is clear so a stray fallback cannot mask the bug.
+  auto wrongSpot = bitmap.getColor(198, 122);
+  EXPECT_EQ(wrongSpot.alpha, 0.0f);
+}
+
+// Regression: when a container layer has alpha < 1 and allowsGroupOpacity = true, it creates an
+// offscreen carrier whose pixel origin differs from the root surface. A BackgroundBlurStyle child
+// nested inside that container must still produce the correct background image without a visible
+// shift at the top-left corner.
+TGFX_TEST(BackgroundBlurTest, GroupOpacityNestedBackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto oldGroupOpacity = Layer::DefaultAllowsGroupOpacity();
+  Layer::SetDefaultAllowsGroupOpacity(true);
+  DisplayList displayList;
+
+  // Use an image background so any pixel offset is clearly visible in the blur result.
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  background->setMatrix(Matrix::MakeScale(2));
+
+  // Container with alpha < 1 triggers offscreen carrier under groupOpacity.
+  auto container = Layer::Make();
+  container->setAlpha(0.8f);
+  container->setMatrix(Matrix::MakeTrans(50, 50) * Matrix::MakeScale(1.5f));
+
+  // The blur child sits inside the container. Its surface-to-world path exercises
+  // createSubSurface with a non-zero carrier origin offset.
+  auto blurChild = SolidLayer::Make();
+  blurChild->setColor(Color::FromRGBA(255, 255, 255, 60));
+  blurChild->setWidth(100);
+  blurChild->setHeight(80);
+  blurChild->setMatrix(Matrix::MakeTrans(15, 15));
+  blurChild->setLayerStyles({BackgroundBlurStyle::Make(8, 8)});
+  container->addChild(blurChild);
+
+  auto rootLayer = displayList.root();
+  rootLayer->addChild(background);
+  rootLayer->addChild(container);
+
+  displayList.setZoomScale(1.5);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/GroupOpacityNestedBackgroundBlur"));
+
+  Layer::SetDefaultAllowsGroupOpacity(oldGroupOpacity);
+}
+
+// Regression: when Layer::draw is invoked against a canvas that has no backing Surface (e.g. a
+// PictureRecorder canvas used for PDF/SVG export), args.context is nullptr and the capture pass
+// creates a Picture-backed top-level BackgroundSource. Nested group-opacity carriers inside the
+// capture tree then walk RenderContentOnPicture(wantsSubBackground=true) — a path that must
+// still stamp the sub's ownImage at the carrier's imageClip top-left, not at segment (0,0).
+TGFX_TEST(BackgroundBlurTest, GroupOpacityNestedBackgroundBlurPicturePath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto oldGroupOpacity = Layer::DefaultAllowsGroupOpacity();
+  Layer::SetDefaultAllowsGroupOpacity(true);
+
+  // Same layer hierarchy as GroupOpacityNestedBackgroundBlur. Zoom is set on the recording canvas
+  // rather than baked into layer matrices so that Layer::draw computes the correct backgroundMatrix.
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  background->setMatrix(Matrix::MakeScale(2));
+
+  auto container = Layer::Make();
+  container->setAlpha(0.8f);
+  container->setMatrix(Matrix::MakeTrans(50, 50) * Matrix::MakeScale(1.5f));
+
+  auto blurChild = SolidLayer::Make();
+  blurChild->setColor(Color::FromRGBA(255, 255, 255, 60));
+  blurChild->setWidth(100);
+  blurChild->setHeight(80);
+  blurChild->setMatrix(Matrix::MakeTrans(15, 15));
+  blurChild->setLayerStyles({BackgroundBlurStyle::Make(8, 8)});
+  container->addChild(blurChild);
+
+  auto rootLayer = Layer::Make();
+  rootLayer->addChild(background);
+  rootLayer->addChild(container);
+
+  // Recorder canvas has no backing Surface; Layer::draw will walk the capture pass against a
+  // Picture-backed top-level BackgroundSource because context stays nullptr. Set the zoom scale
+  // on the canvas so Layer::draw sees the correct viewMatrix for background source creation.
+  PictureRecorder recorder;
+  auto* recordingCanvas = recorder.beginRecording();
+  recordingCanvas->scale(1.5f, 1.5f);
+  rootLayer->draw(recordingCanvas);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  // Replay the picture onto a real GPU surface for pixel comparison.
+  auto surface = Surface::Make(context, 300, 300);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->drawPicture(picture);
+
+  EXPECT_TRUE(
+      Baseline::Compare(surface, "BackgroundBlurTest/GroupOpacityNestedBackgroundBlurPicturePath"));
+
+  Layer::SetDefaultAllowsGroupOpacity(oldGroupOpacity);
 }
 
 }  // namespace tgfx

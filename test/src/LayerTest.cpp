@@ -3109,8 +3109,7 @@ TGFX_TEST(LayerTest, Layer3DContextAPI) {
   auto colorSpace = ColorSpace::SRGB();
 
   // Test Render3DContext creation (opaqueMode = false)
-  auto render3DContext =
-      Layer3DContext::Make(false, context, renderRect, contentScale, colorSpace, nullptr);
+  auto render3DContext = Layer3DContext::Make(false, context, renderRect, contentScale, colorSpace);
   ASSERT_TRUE(render3DContext != nullptr);
   EXPECT_TRUE(render3DContext->isFinished());
 
@@ -3129,8 +3128,7 @@ TGFX_TEST(LayerTest, Layer3DContextAPI) {
   EXPECT_TRUE(render3DContext->isFinished());
 
   // Test Opaque3DContext creation (opaqueMode = true)
-  auto opaque3DContext =
-      Layer3DContext::Make(true, context, renderRect, contentScale, colorSpace, nullptr);
+  auto opaque3DContext = Layer3DContext::Make(true, context, renderRect, contentScale, colorSpace);
   ASSERT_TRUE(opaque3DContext != nullptr);
   EXPECT_TRUE(opaque3DContext->isFinished());
 
@@ -3329,7 +3327,7 @@ TGFX_TEST(LayerTest, RootLayerBackgroundColorWithBlurBackground) {
 
   displayList->root()->addChild(shapeLayer);
 
-  // Render the display list - this will internally create BackgroundContext and call
+  // Render the display list - this will internally create BackgroundSource and call
   // RootLayer::drawLayer with args.blurBackground set, testing our new code path
   displayList->render(surface.get());
 
