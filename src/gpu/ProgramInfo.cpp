@@ -146,7 +146,7 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
     }
     context->globalCache()->addProgram(programKey, program);
     if (capturePtr != nullptr) {
-      ShaderDumpSink::Record(programKey, this, capture.vertexShader, capture.fragmentShader);
+      ShaderDumpSink::Record(programKey, this, capture);
     }
   }
   return program;

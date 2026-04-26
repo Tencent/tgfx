@@ -49,6 +49,22 @@ class UniformHandler {
   }
 
   /**
+   * Returns all vertex-stage uniforms registered so far. Each Uniform's name() is the final
+   * mangled name as it appears in the generated shader text.
+   */
+  const std::vector<Uniform>& getVertexUniforms() const {
+    return vertexUniforms;
+  }
+
+  /**
+   * Returns all fragment-stage uniforms registered so far. Each Uniform's name() is the final
+   * mangled name as it appears in the generated shader text.
+   */
+  const std::vector<Uniform>& getFragmentUniforms() const {
+    return fragmentUniforms;
+  }
+
+  /**
    * Adds a sampler to the current program.
    */
   SamplerHandle addSampler(std::shared_ptr<Texture> texture, const std::string& name);

@@ -23,18 +23,42 @@
 #include "UniformHandler.h"
 #include "VaryingHandler.h"
 #include "VertexShaderBuilder.h"
+#include "gpu/Uniform.h"
 #include "gpu/processors/GeometryProcessor.h"
+#include "tgfx/gpu/Attribute.h"
 
 namespace tgfx {
 /**
+ * Structured description of a shader input/output entry captured at finalize time. The `name` is
+ * the exact identifier used in the generated shader text (already mangled); `format` is carried
+ * through as the raw enum value so offline tools can map it back to GLSL/HLSL types without
+ * needing access to the full tgfx type system.
+ */
+struct CaptureUniform {
+  std::string name;
+  int format = 0;  // UniformFormat enum value
+};
+
+struct CaptureAttribute {
+  std::string name;
+  int format = 0;             // VertexFormat enum value
+  bool instanceStep = false;  // true for instance-rate attributes, false for vertex-rate
+};
+
+/**
  * Optional output capture for ProgramBuilder::CreateProgram. When a caller passes a non-null
- * pointer, the builder fills the final VS/FS shader source text into it so that offline tools can
- * persist the exact bytes handed to the GPU driver. The capture is purely observational — it does
- * not affect program creation.
+ * pointer, the builder fills:
+ *   - the final VS/FS shader source text (as handed to the GPU driver);
+ *   - the uniform / sampler / attribute layout the shader text depends on.
+ * The capture is purely observational — it does not affect program creation.
  */
 struct ShaderTextCapture {
   std::string vertexShader;
   std::string fragmentShader;
+  std::vector<CaptureUniform> vertexUniforms;
+  std::vector<CaptureUniform> fragmentUniforms;
+  std::vector<CaptureUniform> samplers;
+  std::vector<CaptureAttribute> attributes;
 };
 
 class ProgramBuilder {

@@ -23,6 +23,7 @@
 
 namespace tgfx {
 class ProgramInfo;
+struct ShaderTextCapture;
 
 /**
  * Runtime shader collection sink. When the environment variable TGFX_SHADER_DUMP_DIR is set to a
@@ -30,11 +31,19 @@ class ProgramInfo;
  * persisted to:
  *   <dir>/shaders/<keyHex>.vert.glsl
  *   <dir>/shaders/<keyHex>.frag.glsl
- *   <dir>/programs.jsonl  (one JSON object per line: key, files, processor-tuple metadata)
+ *   <dir>/programs.jsonl  (one JSON object per line: key, files, processor-tuple metadata,
+ *                          and uniform/sampler/attribute layouts)
  *
- * The sink is deduplicating by <keyHex>. Writing is best-effort and failures are silently ignored
- * so draw traffic is never blocked. This is intentionally a runtime observation tool: it does not
+ * The sink is deduplicating by <keyHex>. Writing is best-effort: file write failures are silently
+ * ignored and the JSONL line is only appended once both shader files are on disk, so the index
+ * never references missing files. This is intentionally a runtime observation tool: it does not
  * modify the produced program or the shader text.
+ *
+ * IMPORTANT: <keyHex> is NOT stable across process invocations. It encodes Processor::classID
+ * values, which are assigned via UniqueID::Next() at first use and therefore depend on process
+ * initialization order. The shader text itself IS stable per pipeline structure, so offline
+ * consumers that need a cross-process logical identifier should hash the shader text (or use the
+ * tuple metadata) instead of keyHex.
  */
 class ShaderDumpSink {
  public:
@@ -48,10 +57,9 @@ class ShaderDumpSink {
    *
    * @param programKey  The GlobalCache key — encoded as hex in the output filenames.
    * @param programInfo The pipeline descriptor (used to emit the processor-tuple metadata).
-   * @param vertexText  The finalized VS source (as would be handed to the GPU driver).
-   * @param fragmentText The finalized FS source.
+   * @param capture     The shader text and layout captured by ProgramBuilder::CreateProgram.
    */
   static void Record(const BytesKey& programKey, const ProgramInfo* programInfo,
-                     const std::string& vertexText, const std::string& fragmentText);
+                     const ShaderTextCapture& capture);
 };
 }  // namespace tgfx

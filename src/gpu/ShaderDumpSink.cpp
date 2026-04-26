@@ -23,10 +23,13 @@
 #include <cstring>
 #include <mutex>
 #include <unordered_set>
+#include "gpu/ProgramBuilder.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/Uniform.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
 #include "gpu/processors/XferProcessor.h"
+#include "tgfx/gpu/Attribute.h"
 
 namespace tgfx {
 namespace {
@@ -111,6 +114,111 @@ void WriteFileOnce(const std::string& path, const std::string& text, bool* writt
   if (writtenOut) *writtenOut = (written == text.size());
 }
 
+// Map UniformFormat enum values (see gpu/Uniform.h) to stable string names. Keep this in sync
+// with the enum — out-of-range inputs fall through to "unknown" so the JSON remains parseable.
+const char* UniformFormatName(int format) {
+  switch (format) {
+    case 0:
+      return "Float";
+    case 1:
+      return "Float2";
+    case 2:
+      return "Float3";
+    case 3:
+      return "Float4";
+    case 4:
+      return "Float2x2";
+    case 5:
+      return "Float3x3";
+    case 6:
+      return "Float4x4";
+    case 7:
+      return "Int";
+    case 8:
+      return "Int2";
+    case 9:
+      return "Int3";
+    case 10:
+      return "Int4";
+    case 11:
+      return "Texture2DSampler";
+    case 12:
+      return "TextureExternalSampler";
+    case 13:
+      return "Texture2DRectSampler";
+    default:
+      return "unknown";
+  }
+}
+
+// Map VertexFormat enum values (see include/tgfx/gpu/Attribute.h) to stable string names.
+const char* VertexFormatName(int format) {
+  switch (format) {
+    case 0:
+      return "Float";
+    case 1:
+      return "Float2";
+    case 2:
+      return "Float3";
+    case 3:
+      return "Float4";
+    case 4:
+      return "Half";
+    case 5:
+      return "Half2";
+    case 6:
+      return "Half3";
+    case 7:
+      return "Half4";
+    case 8:
+      return "Int";
+    case 9:
+      return "Int2";
+    case 10:
+      return "Int3";
+    case 11:
+      return "Int4";
+    case 12:
+      return "UByteNormalized";
+    case 13:
+      return "UByte2Normalized";
+    case 14:
+      return "UByte3Normalized";
+    case 15:
+      return "UByte4Normalized";
+    default:
+      return "unknown";
+  }
+}
+
+void AppendUniformArray(std::string& out, const std::vector<CaptureUniform>& items) {
+  out += "[";
+  for (size_t i = 0; i < items.size(); ++i) {
+    if (i > 0) out += ",";
+    out += "{\"name\":\"";
+    out += JsonEscape(items[i].name);
+    out += "\",\"format\":\"";
+    out += UniformFormatName(items[i].format);
+    out += "\"}";
+  }
+  out += "]";
+}
+
+void AppendAttributeArray(std::string& out, const std::vector<CaptureAttribute>& items) {
+  out += "[";
+  for (size_t i = 0; i < items.size(); ++i) {
+    if (i > 0) out += ",";
+    out += "{\"name\":\"";
+    out += JsonEscape(items[i].name);
+    out += "\",\"format\":\"";
+    out += VertexFormatName(items[i].format);
+    out += "\",\"stepMode\":\"";
+    out += items[i].instanceStep ? "instance" : "vertex";
+    out += "\"}";
+  }
+  out += "]";
+}
+
 std::string BuildTupleJson(const ProgramInfo* info) {
   std::string j;
   j += "\"tuple\":{";
@@ -131,7 +239,8 @@ std::string BuildTupleJson(const ProgramInfo* info) {
   return j;
 }
 
-void AppendJsonlLine(const std::string& dir, const std::string& keyHex, const ProgramInfo* info) {
+void AppendJsonlLine(const std::string& dir, const std::string& keyHex, const ProgramInfo* info,
+                     const ShaderTextCapture& capture) {
   std::string line = "{\"keyHex\":\"";
   line += keyHex;
   line += "\",\"vsFile\":\"shaders/";
@@ -140,7 +249,15 @@ void AppendJsonlLine(const std::string& dir, const std::string& keyHex, const Pr
   line += keyHex;
   line += ".frag.glsl\",";
   line += BuildTupleJson(info);
-  line += "}\n";
+  line += ",\"layout\":{\"vertexUniforms\":";
+  AppendUniformArray(line, capture.vertexUniforms);
+  line += ",\"fragmentUniforms\":";
+  AppendUniformArray(line, capture.fragmentUniforms);
+  line += ",\"samplers\":";
+  AppendUniformArray(line, capture.samplers);
+  line += ",\"attributes\":";
+  AppendAttributeArray(line, capture.attributes);
+  line += "}}\n";
   auto* f = std::fopen((dir + "/programs.jsonl").c_str(), "a");
   if (!f) return;
   std::fwrite(line.data(), 1, line.size(), f);
@@ -164,7 +281,7 @@ bool ShaderDumpSink::Enabled() {
 }
 
 void ShaderDumpSink::Record(const BytesKey& programKey, const ProgramInfo* programInfo,
-                            const std::string& vertexText, const std::string& fragmentText) {
+                            const ShaderTextCapture& capture) {
   if (!Enabled() || programInfo == nullptr) {
     return;
   }
@@ -180,15 +297,15 @@ void ShaderDumpSink::Record(const BytesKey& programKey, const ProgramInfo* progr
   EnsureDirs(dir);
   bool vsOk = false;
   bool fsOk = false;
-  WriteFileOnce(dir + "/shaders/" + keyHex + ".vert.glsl", vertexText, &vsOk);
-  WriteFileOnce(dir + "/shaders/" + keyHex + ".frag.glsl", fragmentText, &fsOk);
+  WriteFileOnce(dir + "/shaders/" + keyHex + ".vert.glsl", capture.vertexShader, &vsOk);
+  WriteFileOnce(dir + "/shaders/" + keyHex + ".frag.glsl", capture.fragmentShader, &fsOk);
   if (!vsOk || !fsOk) {
     // File write failed — omit the JSONL line to keep index/file consistency. Un-insert from
     // SeenKeys so a future attempt can retry.
     seen.erase(keyHex);
     return;
   }
-  AppendJsonlLine(dir, keyHex, programInfo);
+  AppendJsonlLine(dir, keyHex, programInfo, capture);
 }
 
 }  // namespace tgfx

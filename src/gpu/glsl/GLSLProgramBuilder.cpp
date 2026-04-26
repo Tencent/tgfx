@@ -120,6 +120,27 @@ std::shared_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
     // concatenation cached, so reading it again has no observable side effects on the driver.
     capture->vertexShader = modularBuilder.vertexShaderBuilder()->shaderString();
     capture->fragmentShader = modularBuilder.fragmentShaderBuilder()->shaderString();
+    // Layout capture: every entry here references an identifier that appears verbatim in the
+    // shader text above. Offline tools (UE RHI, cross-compilers) use this to bind uniform blocks
+    // and vertex streams without re-parsing the shader source.
+    auto* uniformHandler = modularBuilder.uniformHandler();
+    for (const auto& u : uniformHandler->getVertexUniforms()) {
+      capture->vertexUniforms.push_back({u.name(), static_cast<int>(u.format())});
+    }
+    for (const auto& u : uniformHandler->getFragmentUniforms()) {
+      capture->fragmentUniforms.push_back({u.name(), static_cast<int>(u.format())});
+    }
+    for (const auto& s : uniformHandler->getSamplers()) {
+      capture->samplers.push_back({s.name(), static_cast<int>(s.format())});
+    }
+    for (const auto& a : programInfo->getVertexAttributes()) {
+      capture->attributes.push_back(
+          {a.name(), static_cast<int>(a.format()), /*instanceStep=*/false});
+    }
+    for (const auto& a : programInfo->getInstanceAttributes()) {
+      capture->attributes.push_back(
+          {a.name(), static_cast<int>(a.format()), /*instanceStep=*/true});
+    }
   }
   return program;
 }
