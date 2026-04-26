@@ -623,6 +623,15 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
+  /**
+   * Applies all layer filters to the given image in order. contentBounds describes the content
+   * region inside the input image, expressed in the image's pixel coordinates, and is used by
+   * filters that need to anchor transforms at the content center. The optional offset receives the
+   * total translation of the filtered image relative to the input image origin.
+   */
+  std::shared_ptr<Image> applyFilters(std::shared_ptr<Image> image, Rect contentBounds,
+                                      float contentScale, Point* offset = nullptr);
+
   virtual bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,

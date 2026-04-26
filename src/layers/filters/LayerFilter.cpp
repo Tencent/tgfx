@@ -17,8 +17,31 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
+
+std::shared_ptr<ImageFilter> LayerFilter::onCreateImageFilter(float) {
+  return nullptr;
+}
+
+std::shared_ptr<Image> LayerFilter::onFilterImage(std::shared_ptr<Image> input, const Rect&,
+                                                  float scale, Point* offset) {
+  auto filter = getImageFilter(scale);
+  if (!filter) {
+    return input;
+  }
+  return input->makeWithFilter(std::move(filter), offset);
+}
+
+std::shared_ptr<Image> LayerFilter::filterImage(std::shared_ptr<Image> input,
+                                                const Rect& contentBounds, float scale,
+                                                Point* offset) {
+  if (!input) {
+    return nullptr;
+  }
+  return onFilterImage(std::move(input), contentBounds, scale, offset);
+}
 
 std::shared_ptr<ImageFilter> LayerFilter::getImageFilter(float scale) {
   if (lastScale != scale || dirty) {
