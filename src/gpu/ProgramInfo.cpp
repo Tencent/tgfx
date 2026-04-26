@@ -22,6 +22,7 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/ShaderCaps.h"
+#include "gpu/ShaderDumpSink.h"
 #include "gpu/resources/RenderTarget.h"
 #include "inspect/InspectorMark.h"
 #include "tgfx/gpu/GPU.h"
@@ -136,12 +137,17 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   CAPUTRE_PROGRAM_INFO(programKey, context, this);
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
-    program = ProgramBuilder::CreateProgram(context, this);
+    ShaderTextCapture capture;
+    ShaderTextCapture* capturePtr = ShaderDumpSink::Enabled() ? &capture : nullptr;
+    program = ProgramBuilder::CreateProgram(context, this, capturePtr);
     if (program == nullptr) {
       LOGE("ProgramInfo::getProgram() Failed to create the program!");
       return nullptr;
     }
     context->globalCache()->addProgram(programKey, program);
+    if (capturePtr != nullptr) {
+      ShaderDumpSink::Record(programKey, this, capture.vertexShader, capture.fragmentShader);
+    }
   }
   return program;
 }

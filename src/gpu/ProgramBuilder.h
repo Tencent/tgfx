@@ -26,12 +26,24 @@
 #include "gpu/processors/GeometryProcessor.h"
 
 namespace tgfx {
+/**
+ * Optional output capture for ProgramBuilder::CreateProgram. When a caller passes a non-null
+ * pointer, the builder fills the final VS/FS shader source text into it so that offline tools can
+ * persist the exact bytes handed to the GPU driver. The capture is purely observational — it does
+ * not affect program creation.
+ */
+struct ShaderTextCapture {
+  std::string vertexShader;
+  std::string fragmentShader;
+};
+
 class ProgramBuilder {
  public:
   /**
    * Generates a shader program.
    */
-  static std::shared_ptr<Program> CreateProgram(Context* context, const ProgramInfo* programInfo);
+  static std::shared_ptr<Program> CreateProgram(Context* context, const ProgramInfo* programInfo,
+                                                ShaderTextCapture* capture = nullptr);
 
   virtual ~ProgramBuilder() = default;
 

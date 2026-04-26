@@ -107,13 +107,21 @@ static std::string SLTypeString(SLType t) {
 }
 
 std::shared_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
-                                                       const ProgramInfo* programInfo) {
+                                                       const ProgramInfo* programInfo,
+                                                       ShaderTextCapture* capture) {
   ModularProgramBuilder modularBuilder(context, programInfo);
   ProgramBuilder& base = modularBuilder;
   if (!base.emitAndInstallProcessors()) {
     return nullptr;
   }
-  return modularBuilder.finalize();
+  auto program = modularBuilder.finalize();
+  if (capture != nullptr && program != nullptr) {
+    // shaderString() is idempotent once finalize() has run — the builders keep the finalized
+    // concatenation cached, so reading it again has no observable side effects on the driver.
+    capture->vertexShader = modularBuilder.vertexShaderBuilder()->shaderString();
+    capture->fragmentShader = modularBuilder.fragmentShaderBuilder()->shaderString();
+  }
+  return program;
 }
 
 GLSLProgramBuilder::GLSLProgramBuilder(Context* context, const ProgramInfo* programInfo)
