@@ -107,10 +107,18 @@ std::shared_ptr<Shader> NoiseStyle::getNoiseShader(float contentScale, int conte
   return shader->makeWithMatrix(Matrix::MakeTrans(-halfW, -halfH));
 }
 
-// Dark noise mask: Luma -> invert alpha -> threshold. Keeps luminance < density.
+// Dark noise mask: luminance -> alpha via a color matrix that writes dot(rgb, lumaCoeffs) into the
+// alpha channel, then invert alpha, then threshold. Using ColorFilter::Matrix instead of
+// ColorFilter::Luma() avoids computing luma on premultiplied RGB, which would otherwise scale by
+// the source alpha and produce a biased mask. Keeps luminance < density.
 static std::shared_ptr<ColorFilter> MakeDarkDensityFilter(float density) {
-  auto lumaFilter = ColorFilter::Luma();
   // clang-format off
+  std::array<float, 20> luminanceToAlphaMatrix = {
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+  };
   std::array<float, 20> invertAlphaMatrix = {
     0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
     0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
@@ -118,15 +126,25 @@ static std::shared_ptr<ColorFilter> MakeDarkDensityFilter(float density) {
     0.0f, 0.0f, 0.0f, -1.0f, 1.0f,
   };
   // clang-format on
+  auto lumaFilter = ColorFilter::Matrix(luminanceToAlphaMatrix);
   auto invertFilter = ColorFilter::Matrix(invertAlphaMatrix);
   auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - density);
   auto composed = ColorFilter::Compose(lumaFilter, invertFilter);
   return ColorFilter::Compose(composed, thresholdFilter);
 }
 
-// Bright noise mask: Luma -> threshold at density. Keeps luminance >= density.
+// Bright noise mask: luminance -> alpha via color matrix, then threshold at density. Keeps
+// luminance >= density. See MakeDarkDensityFilter for the rationale on Matrix vs. Luma.
 static std::shared_ptr<ColorFilter> MakeBrightDensityFilter(float density) {
-  auto lumaFilter = ColorFilter::Luma();
+  // clang-format off
+  std::array<float, 20> luminanceToAlphaMatrix = {
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+  };
+  // clang-format on
+  auto lumaFilter = ColorFilter::Matrix(luminanceToAlphaMatrix);
   auto thresholdFilter = ColorFilter::AlphaThreshold(density);
   return ColorFilter::Compose(lumaFilter, thresholdFilter);
 }
