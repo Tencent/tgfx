@@ -127,7 +127,7 @@ void NoiseFilter::setSize(float size) {
     return;
   }
   _size = size;
-  invalidateFilter();
+  invalidateTransform();
 }
 
 void NoiseFilter::setDensity(float density) {
@@ -136,7 +136,7 @@ void NoiseFilter::setDensity(float density) {
     return;
   }
   _density = density;
-  invalidateFilter();
+  invalidateTransform();
 }
 
 void NoiseFilter::setSeed(float seed) {
@@ -144,7 +144,7 @@ void NoiseFilter::setSeed(float seed) {
     return;
   }
   _seed = seed;
-  invalidateFilter();
+  invalidateTransform();
 }
 
 void NoiseFilter::setBlendMode(BlendMode blendMode) {
@@ -152,7 +152,7 @@ void NoiseFilter::setBlendMode(BlendMode blendMode) {
     return;
   }
   _blendMode = blendMode;
-  invalidateFilter();
+  invalidateTransform();
 }
 
 std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input,
@@ -162,11 +162,12 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input,
   if (noiseShader == nullptr) {
     return input;
   }
-  // Translate the shader so its origin lands at the content center inside the input image. The
-  // view matrix on the output side uses (-cx, -cy) because makeWithMatrix composes as
-  // output -> shader-local, so pixel (cx, cy) maps back to shader origin (0, 0).
-  auto centeredShader = noiseShader->makeWithMatrix(
-      Matrix::MakeTrans(-contentBounds.centerX(), -contentBounds.centerY()));
+  // contentBounds is in layer-local (unscaled) coordinates. Multiply by scale to get the image
+  // pixel-space center where the noise origin should be anchored. Negated because makeWithMatrix
+  // composes as output -> shader-local, so pixel (cx, cy) maps back to shader origin (0, 0).
+  float cx = contentBounds.centerX() * scale;
+  float cy = contentBounds.centerY() * scale;
+  auto centeredShader = noiseShader->makeWithMatrix(Matrix::MakeTrans(-cx, -cy));
   auto blendFilter = ImageFilter::Blend(_blendMode, std::move(centeredShader));
   if (blendFilter == nullptr) {
     return input;
@@ -195,7 +196,7 @@ void MonoNoiseFilter::setColor(const Color& color) {
     return;
   }
   _color = color;
-  invalidateFilter();
+  invalidateTransform();
 }
 
 std::shared_ptr<Shader> MonoNoiseFilter::onBuildNoiseShader(float scale) const {
@@ -229,7 +230,7 @@ void DuoNoiseFilter::setFirstColor(const Color& color) {
     return;
   }
   _firstColor = color;
-  invalidateFilter();
+  invalidateTransform();
 }
 
 void DuoNoiseFilter::setSecondColor(const Color& color) {
@@ -237,7 +238,7 @@ void DuoNoiseFilter::setSecondColor(const Color& color) {
     return;
   }
   _secondColor = color;
-  invalidateFilter();
+  invalidateTransform();
 }
 
 std::shared_ptr<Shader> DuoNoiseFilter::onBuildNoiseShader(float scale) const {
@@ -280,7 +281,7 @@ void MultiNoiseFilter::setOpacity(float opacity) {
     return;
   }
   _opacity = opacity;
-  invalidateFilter();
+  invalidateTransform();
 }
 
 std::shared_ptr<Shader> MultiNoiseFilter::onBuildNoiseShader(float scale) const {

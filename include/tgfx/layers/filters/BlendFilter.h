@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/ImageLayerFilter.h"
 
 namespace tgfx {
 
@@ -26,7 +26,7 @@ namespace tgfx {
  * A filter that applies blends between the constant color (src) and input color (dst) based on the
  * BlendMode.
  */
-class BlendFilter : public LayerFilter {
+class BlendFilter : public ImageLayerFilter {
  public:
   /**
    * Creates a new ColorFilter that applies blends between the constant color (src) and input color

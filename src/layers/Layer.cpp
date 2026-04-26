@@ -41,6 +41,7 @@
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/filters/ImageLayerFilter.h"
 
 namespace tgfx {
 
@@ -1168,7 +1169,14 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
   std::vector<std::shared_ptr<ImageFilter>> filters;
   for (const auto& layerFilter : _filters) {
     DEBUG_ASSERT(layerFilter != nullptr);
-    if (auto filter = layerFilter->getImageFilter(contentScale)) {
+    // Only filters that can be expressed as a single ImageFilter contribute here. Filters that
+    // implement a custom onFilterImage pipeline (e.g. NoiseFilter) return nullptr from
+    // asImageLayerFilter() and are applied via applyFilters() instead.
+    auto imageLayerFilter = layerFilter->asImageLayerFilter();
+    if (imageLayerFilter == nullptr) {
+      continue;
+    }
+    if (auto filter = imageLayerFilter->getImageFilter(contentScale)) {
       filters.push_back(filter);
     }
   }
@@ -1187,9 +1195,10 @@ std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, Rect co
     if (!image) {
       return nullptr;
     }
-    // The filtered image origin moved by filterOffset in the previous image's coordinate space, so
-    // the content bounds must shift by the opposite amount to stay anchored to the same pixels.
-    contentBounds.offset(-filterOffset.x, -filterOffset.y);
+    // filterOffset is measured in image pixels; contentBounds is layer-local. Convert by dividing
+    // by contentScale so the layer-local content region stays anchored to the same pixels after
+    // each filter shifts the image origin.
+    contentBounds.offset(-filterOffset.x / contentScale, -filterOffset.y / contentScale);
     if (offset) {
       offset->offset(filterOffset.x, filterOffset.y);
     }
@@ -1435,14 +1444,8 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs,
   imageMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
   imageMatrix->preTranslate(offset.x, offset.y);
 
-  // Content bounds inside finalImage, in image pixels. mappedBounds is in the same scaled space;
-  // offset is the finalImage origin in that scaled space, so subtract to translate into image px.
-  auto contentBoundsInImage = mappedBounds;
-  contentBoundsInImage.offset(-offset.x, -offset.y);
-
   Point filterOffset = {};
-  finalImage =
-      applyFilters(std::move(finalImage), contentBoundsInImage, contentScale, &filterOffset);
+  finalImage = applyFilters(std::move(finalImage), *inputBounds, contentScale, &filterOffset);
   if (!finalImage) {
     return nullptr;
   }
@@ -1577,7 +1580,6 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 
   auto pictureBounds = layerBounds;
   pictureBounds.scale(contentScale, contentScale);
-  auto contentBoundsInImage = pictureBounds;
   auto filter = getImageFilter(contentScale);
   if (filter) {
     auto reverseBounds = filter->filterBounds(pictureBounds, MapDirection::Reverse);
@@ -1597,9 +1599,8 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
   }
 
   if (!_filters.empty()) {
-    contentBoundsInImage.offset(-offset.x, -offset.y);
     Point filterOffset = {};
-    image = applyFilters(std::move(image), contentBoundsInImage, contentScale, &filterOffset);
+    image = applyFilters(std::move(image), layerBounds, contentScale, &filterOffset);
     if (!image) {
       return nullptr;
     }

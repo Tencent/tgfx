@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 
 namespace tgfx {
