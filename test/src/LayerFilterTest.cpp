@@ -26,8 +26,10 @@
 #include "tgfx/layers/filters/ColorMatrixFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/filters/InnerShadowFilter.h"
+#include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
+#include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -465,6 +467,84 @@ TGFX_TEST(LayerFilterTest, ScaledRectWithInnerShadow) {
   displayList->root()->addChild(shapeLayer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/ScaledRectWithInnerShadow"));
+}
+
+// Test NoiseFilter in Mono, Duo, and Multi modes. The shape is a 100x100 square centered in a
+// 200x200 surface so there is a 50px margin on each side per project conventions.
+TGFX_TEST(LayerFilterTest, NoiseFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+  auto back = SolidLayer::Make();
+  back->setColor(Color::White());
+  back->setWidth(200);
+  back->setHeight(200);
+
+  auto mono = NoiseFilter::MakeMono(4.0f, 0.5f, Color::FromRGBA(0, 0, 0, 204), 1.0f);
+  auto layer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(200, 80, 40, 255)));
+  layer->setMatrix(Matrix::MakeTrans(50, 50));
+  layer->setFilters({mono});
+
+  back->addChild(layer);
+  displayList->root()->addChild(back);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseFilterMono"));
+
+  auto duo = NoiseFilter::MakeDuo(6.0f, 0.5f, Color::FromRGBA(0, 0, 0, 204),
+                                  Color::FromRGBA(255, 255, 255, 204), 1.0f);
+  layer->setFilters({duo});
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseFilterDuo"));
+
+  auto multi = NoiseFilter::MakeMulti(4.0f, 0.4f, 0.6f, 1.0f);
+  layer->setFilters({multi});
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseFilterMulti"));
+}
+
+// Test NoiseStyle in Mono, Duo, and Multi modes. Same 200x200 surface with a 100x100 centered
+// shape. NoiseStyle draws the noise overlay above the content, clipped to content alpha.
+TGFX_TEST(LayerFilterTest, NoiseStyle) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+  auto back = SolidLayer::Make();
+  back->setColor(Color::White());
+  back->setWidth(200);
+  back->setHeight(200);
+
+  auto mono = NoiseStyle::MakeMono(4.0f, 0.5f, Color::FromRGBA(0, 0, 0, 204), 1.0f);
+  auto layer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(200, 80, 40, 255)));
+  layer->setMatrix(Matrix::MakeTrans(50, 50));
+  layer->setLayerStyles({mono});
+
+  back->addChild(layer);
+  displayList->root()->addChild(back);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseStyleMono"));
+
+  auto duo = NoiseStyle::MakeDuo(6.0f, 0.5f, Color::FromRGBA(0, 0, 0, 204),
+                                 Color::FromRGBA(255, 255, 255, 204), 1.0f);
+  layer->setLayerStyles({duo});
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseStyleDuo"));
+
+  auto multi = NoiseStyle::MakeMulti(4.0f, 0.4f, 0.6f, 1.0f);
+  layer->setLayerStyles({multi});
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseStyleMulti"));
 }
 
 }  // namespace tgfx
