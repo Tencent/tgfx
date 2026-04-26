@@ -65,7 +65,11 @@ class NoiseStyle : public LayerStyle {
    * Creates a multi-color noise style that preserves the original Perlin noise RGB values with
    * enhanced contrast.
    * @param size     The noise grain size. Larger values produce coarser grains. Must be positive.
-   * @param density  The noise density in [0, 1]. Controls the proportion of visible noise pixels.
+   * @param density  The noise density in [0, 1]. Directly used as the alpha threshold on the
+   *                 Perlin noise alpha channel: higher density retains more noise pixels (the kept
+   *                 pixels are those whose noise alpha is less than or equal to density). UI-driven
+   *                 clients that need a non-linear density curve should apply the mapping at their
+   *                 own layer.
    * @param opacity  The overall noise opacity in [0, 1].
    * @param seed     The random seed for the noise pattern.
    */

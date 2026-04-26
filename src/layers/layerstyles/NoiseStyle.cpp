@@ -304,31 +304,49 @@ void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
   if (noiseShader == nullptr) {
     return;
   }
-  // Contrast enhance RGB and write inverted luma into alpha for density thresholding. PerlinNoise
-  // outputs alpha=1.0, so we compute luma from the contrast-enhanced RGB and invert it to alpha.
+  // Step 1: RGB contrast enhancement (2x - 0.5). The alpha row keeps the fourth noise channel
+  // intact, matching SVG's feTurbulence output where noise alpha is independent of RGB luma.
   // clang-format off
-  std::array<float, 20> contrastLumaMatrix = {
-     2.0f,     0.0f,     0.0f,     0.0f, -0.5f,
-     0.0f,     2.0f,     0.0f,     0.0f, -0.5f,
-     0.0f,     0.0f,     2.0f,     0.0f, -0.5f,
-    -0.2126f, -0.7152f, -0.0722f,  0.0f,  1.0f,
+  std::array<float, 20> contrastMatrix = {
+    2.0f, 0.0f, 0.0f, 0.0f, -0.5f,
+    0.0f, 2.0f, 0.0f, 0.0f, -0.5f,
+    0.0f, 0.0f, 2.0f, 0.0f, -0.5f,
+    0.0f, 0.0f, 0.0f, 1.0f,  0.0f,
   };
   // clang-format on
-  auto contrastLumaFilter = ColorFilter::Matrix(contrastLumaMatrix);
+  auto contrastFilter = ColorFilter::Matrix(contrastMatrix);
+
+  // Step 2: density threshold on the noise alpha channel. SVG feFuncA discrete keeps pixels whose
+  // noise-alpha < threshold. AlphaThresholdColorFilter implements the opposite ("alpha >= threshold
+  // passes"), so we first invert the alpha channel, then threshold against (1 - density). The net
+  // effect is "noise-alpha <= density passes". Higher density -> more noise pixels retained.
+  // clang-format off
+  std::array<float, 20> invertAlphaMatrix = {
+    1.0f, 0.0f, 0.0f,  0.0f, 0.0f,
+    0.0f, 1.0f, 0.0f,  0.0f, 0.0f,
+    0.0f, 0.0f, 1.0f,  0.0f, 0.0f,
+    0.0f, 0.0f, 0.0f, -1.0f, 1.0f,
+  };
+  // clang-format on
+  auto invertAlphaFilter = ColorFilter::Matrix(invertAlphaMatrix);
   auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - _density);
+
+  // Step 3: scale final alpha by opacity * layerAlpha.
   float finalAlpha = _opacity * alpha;
   // clang-format off
   std::array<float, 20> alphaScaleMatrix = {
-    1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+    1.0f, 0.0f, 0.0f, 0.0f,       0.0f,
+    0.0f, 1.0f, 0.0f, 0.0f,       0.0f,
+    0.0f, 0.0f, 1.0f, 0.0f,       0.0f,
     0.0f, 0.0f, 0.0f, finalAlpha, 0.0f,
   };
   // clang-format on
   auto alphaScaleFilter = ColorFilter::Matrix(alphaScaleMatrix);
-  auto composedFilter = ColorFilter::Compose(contrastLumaFilter, thresholdFilter);
-  composedFilter = ColorFilter::Compose(composedFilter, alphaScaleFilter);
-  auto coloredShader = noiseShader->makeWithColorFilter(std::move(composedFilter));
+
+  auto composed = ColorFilter::Compose(contrastFilter, invertAlphaFilter);
+  composed = ColorFilter::Compose(composed, thresholdFilter);
+  composed = ColorFilter::Compose(composed, alphaScaleFilter);
+  auto coloredShader = noiseShader->makeWithColorFilter(std::move(composed));
   DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode);
 }
 

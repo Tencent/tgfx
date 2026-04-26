@@ -502,7 +502,7 @@ TGFX_TEST(LayerFilterTest, NoiseFilter) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseFilterDuo"));
 
-  auto multi = NoiseFilter::MakeMulti(4.0f, 0.4f, 0.6f, 1.0f);
+  auto multi = NoiseFilter::MakeMulti(1.1f, 0.51f, 0.41f, 1.0f);
   layer->setFilters({multi});
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseFilterMulti"));
@@ -541,7 +541,7 @@ TGFX_TEST(LayerFilterTest, NoiseStyle) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseStyleDuo"));
 
-  auto multi = NoiseStyle::MakeMulti(4.0f, 0.4f, 0.6f, 1.0f);
+  auto multi = NoiseStyle::MakeMulti(1.1f, 0.51f, 0.41f, 1.0f);
   layer->setLayerStyles({multi});
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseStyleMulti"));
