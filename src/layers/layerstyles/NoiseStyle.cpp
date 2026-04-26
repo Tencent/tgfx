@@ -107,11 +107,13 @@ std::shared_ptr<Shader> NoiseStyle::getNoiseShader(float contentScale, int conte
   return shader->makeWithMatrix(Matrix::MakeTrans(-halfW, -halfH));
 }
 
-// Dark noise mask: luminance -> alpha via a color matrix that writes dot(rgb, lumaCoeffs) into the
-// alpha channel, then invert alpha, then threshold. Using ColorFilter::Matrix instead of
-// ColorFilter::Luma() avoids computing luma on premultiplied RGB, which would otherwise scale by
-// the source alpha and produce a biased mask. Keeps luminance < density.
-static std::shared_ptr<ColorFilter> MakeDarkDensityFilter(float density) {
+// Alpha band center used by all three noise modes, matching Figma's SVG export where the
+// luminanceToAlpha discrete table is always centered at bucket 25 out of 100.
+static constexpr float kBandCenter = 0.25f;
+
+// Writes dot(rgb, lumaCoeffs) into the alpha channel (RGB zeroed). Equivalent to SVG's
+// feColorMatrix type="luminanceToAlpha".
+static std::shared_ptr<ColorFilter> MakeLuminanceToAlphaFilter() {
   // clang-format off
   std::array<float, 20> luminanceToAlphaMatrix = {
     0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
@@ -119,34 +121,24 @@ static std::shared_ptr<ColorFilter> MakeDarkDensityFilter(float density) {
     0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
     0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
   };
-  std::array<float, 20> invertAlphaMatrix = {
-    0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, -1.0f, 1.0f,
-  };
   // clang-format on
-  auto lumaFilter = ColorFilter::Matrix(luminanceToAlphaMatrix);
-  auto invertFilter = ColorFilter::Matrix(invertAlphaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - density);
-  auto composed = ColorFilter::Compose(lumaFilter, invertFilter);
-  return ColorFilter::Compose(composed, thresholdFilter);
+  return ColorFilter::Matrix(luminanceToAlphaMatrix);
 }
 
-// Bright noise mask: luminance -> alpha via color matrix, then threshold at density. Keeps
-// luminance >= density. See MakeDarkDensityFilter for the rationale on Matrix vs. Luma.
-static std::shared_ptr<ColorFilter> MakeBrightDensityFilter(float density) {
-  // clang-format off
-  std::array<float, 20> luminanceToAlphaMatrix = {
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
-  };
-  // clang-format on
-  auto lumaFilter = ColorFilter::Matrix(luminanceToAlphaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(density);
-  return ColorFilter::Compose(lumaFilter, thresholdFilter);
+// Given a shader whose alpha channel is the signal to band-pass, returns a shader whose alpha is 1
+// when the input alpha lies in [lo, hi) and 0 otherwise. Implementation: take two alpha-threshold
+// mask shaders (at lo and hi) and subtract via Shader::MakeBlend(SrcOut).
+static std::shared_ptr<Shader> MakeBandPassShader(std::shared_ptr<Shader> alphaShader, float lo,
+                                                  float hi) {
+  if (alphaShader == nullptr || hi <= lo) {
+    return nullptr;
+  }
+  auto aboveLo = alphaShader->makeWithColorFilter(ColorFilter::AlphaThreshold(lo));
+  auto aboveHi = alphaShader->makeWithColorFilter(ColorFilter::AlphaThreshold(hi));
+  if (aboveLo == nullptr || aboveHi == nullptr) {
+    return nullptr;
+  }
+  return Shader::MakeBlend(BlendMode::SrcOut, std::move(aboveHi), std::move(aboveLo));
 }
 
 // Rasterizes a procedural noise shader into a fixed image at local coordinates. Needed because
@@ -207,8 +199,15 @@ void MonoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, floa
   if (noiseShader == nullptr) {
     return;
   }
-  auto densityFilter = MakeDarkDensityFilter(_density);
-  auto alphaShader = noiseShader->makeWithColorFilter(std::move(densityFilter));
+  // SVG pipeline for Mono: luminanceToAlpha -> discrete band-pass centered at kBandCenter, then
+  // fill with the requested color whose alpha is multiplied by the layer alpha.
+  auto alphaShader = noiseShader->makeWithColorFilter(MakeLuminanceToAlphaFilter());
+  float halfWidth = _density * 0.5f;
+  auto maskShader =
+      MakeBandPassShader(std::move(alphaShader), kBandCenter - halfWidth, kBandCenter + halfWidth);
+  if (maskShader == nullptr) {
+    return;
+  }
   float finalAlpha = _color.alpha * alpha;
   // clang-format off
   std::array<float, 20> colorMatrix = {
@@ -218,7 +217,7 @@ void MonoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, floa
     0.0f, 0.0f, 0.0f, finalAlpha, 0.0f,
   };
   // clang-format on
-  auto coloredShader = alphaShader->makeWithColorFilter(ColorFilter::Matrix(colorMatrix));
+  auto coloredShader = maskShader->makeWithColorFilter(ColorFilter::Matrix(colorMatrix));
   DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode);
 }
 
@@ -251,36 +250,37 @@ void DuoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float
   if (noiseShader == nullptr) {
     return;
   }
-  {
-    auto densityFilter = MakeDarkDensityFilter(_density);
-    auto alphaShader = noiseShader->makeWithColorFilter(std::move(densityFilter));
-    float finalAlpha = _firstColor.alpha * alpha;
+  // SVG pipeline for Duo: luminanceToAlpha -> two mirrored band-passes at kBandCenter and
+  // 1 - kBandCenter, each filled with its own color, merged with SrcOver.
+  auto alphaShader = noiseShader->makeWithColorFilter(MakeLuminanceToAlphaFilter());
+  float halfWidth = _density * 0.5f;
+  auto secondCenter = 1.0f - kBandCenter;
+
+  auto fillBand = [alpha, &alphaShader](float center, float halfW, const Color& color) {
+    auto mask = MakeBandPassShader(alphaShader, center - halfW, center + halfW);
+    if (mask == nullptr) {
+      return std::shared_ptr<Shader>{};
+    }
+    float finalAlpha = color.alpha * alpha;
     // clang-format off
     std::array<float, 20> colorMatrix = {
-      0.0f, 0.0f, 0.0f, 0.0f, _firstColor.red,
-      0.0f, 0.0f, 0.0f, 0.0f, _firstColor.green,
-      0.0f, 0.0f, 0.0f, 0.0f, _firstColor.blue,
+      0.0f, 0.0f, 0.0f, 0.0f, color.red,
+      0.0f, 0.0f, 0.0f, 0.0f, color.green,
+      0.0f, 0.0f, 0.0f, 0.0f, color.blue,
       0.0f, 0.0f, 0.0f, finalAlpha, 0.0f,
     };
     // clang-format on
-    auto coloredShader = alphaShader->makeWithColorFilter(ColorFilter::Matrix(colorMatrix));
-    DrawNoiseLayer(canvas, content, std::move(coloredShader), blendMode);
+    return mask->makeWithColorFilter(ColorFilter::Matrix(colorMatrix));
+  };
+
+  auto firstShader = fillBand(kBandCenter, halfWidth, _firstColor);
+  auto secondShader = fillBand(secondCenter, halfWidth, _secondColor);
+  if (firstShader == nullptr || secondShader == nullptr) {
+    return;
   }
-  {
-    auto densityFilter = MakeBrightDensityFilter(_density);
-    auto alphaShader = noiseShader->makeWithColorFilter(std::move(densityFilter));
-    float finalAlpha = _secondColor.alpha * alpha;
-    // clang-format off
-    std::array<float, 20> colorMatrix = {
-      0.0f, 0.0f, 0.0f, 0.0f, _secondColor.red,
-      0.0f, 0.0f, 0.0f, 0.0f, _secondColor.green,
-      0.0f, 0.0f, 0.0f, 0.0f, _secondColor.blue,
-      0.0f, 0.0f, 0.0f, finalAlpha, 0.0f,
-    };
-    // clang-format on
-    auto coloredShader = alphaShader->makeWithColorFilter(ColorFilter::Matrix(colorMatrix));
-    DrawNoiseLayer(canvas, content, std::move(coloredShader), blendMode);
-  }
+  auto combinedShader =
+      Shader::MakeBlend(BlendMode::SrcOver, std::move(firstShader), std::move(secondShader));
+  DrawNoiseLayer(canvas, std::move(content), std::move(combinedShader), blendMode);
 }
 
 // --- MultiNoiseStyle ---
@@ -304,8 +304,8 @@ void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
   if (noiseShader == nullptr) {
     return;
   }
-  // Step 1: RGB contrast enhancement (2x - 0.5). The alpha row keeps the fourth noise channel
-  // intact, matching SVG's feTurbulence output where noise alpha is independent of RGB luma.
+  // SVG pipeline for Multi: RGB contrast 2x - 0.5 (alpha untouched), then band-pass mask from the
+  // noise alpha channel, then scale final alpha by opacity * layerAlpha.
   // clang-format off
   std::array<float, 20> contrastMatrix = {
     2.0f, 0.0f, 0.0f, 0.0f, -0.5f,
@@ -314,24 +314,23 @@ void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
     0.0f, 0.0f, 0.0f, 1.0f,  0.0f,
   };
   // clang-format on
-  auto contrastFilter = ColorFilter::Matrix(contrastMatrix);
+  auto colorShader = noiseShader->makeWithColorFilter(ColorFilter::Matrix(contrastMatrix));
+  if (colorShader == nullptr) {
+    return;
+  }
 
-  // Step 2: density threshold on the noise alpha channel. SVG feFuncA discrete keeps pixels whose
-  // noise-alpha < threshold. AlphaThresholdColorFilter implements the opposite ("alpha >= threshold
-  // passes"), so we first invert the alpha channel, then threshold against (1 - density). The net
-  // effect is "noise-alpha <= density passes". Higher density -> more noise pixels retained.
-  // clang-format off
-  std::array<float, 20> invertAlphaMatrix = {
-    1.0f, 0.0f, 0.0f,  0.0f, 0.0f,
-    0.0f, 1.0f, 0.0f,  0.0f, 0.0f,
-    0.0f, 0.0f, 1.0f,  0.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, -1.0f, 1.0f,
-  };
-  // clang-format on
-  auto invertAlphaFilter = ColorFilter::Matrix(invertAlphaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - _density);
+  float halfWidth = _density * 0.5f;
+  auto maskShader =
+      MakeBandPassShader(noiseShader, kBandCenter - halfWidth, kBandCenter + halfWidth);
+  if (maskShader == nullptr) {
+    return;
+  }
+  auto bandedColorShader =
+      Shader::MakeBlend(BlendMode::SrcIn, std::move(maskShader), std::move(colorShader));
+  if (bandedColorShader == nullptr) {
+    return;
+  }
 
-  // Step 3: scale final alpha by opacity * layerAlpha.
   float finalAlpha = _opacity * alpha;
   // clang-format off
   std::array<float, 20> alphaScaleMatrix = {
@@ -341,12 +340,8 @@ void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
     0.0f, 0.0f, 0.0f, finalAlpha, 0.0f,
   };
   // clang-format on
-  auto alphaScaleFilter = ColorFilter::Matrix(alphaScaleMatrix);
-
-  auto composed = ColorFilter::Compose(contrastFilter, invertAlphaFilter);
-  composed = ColorFilter::Compose(composed, thresholdFilter);
-  composed = ColorFilter::Compose(composed, alphaScaleFilter);
-  auto coloredShader = noiseShader->makeWithColorFilter(std::move(composed));
+  auto coloredShader =
+      bandedColorShader->makeWithColorFilter(ColorFilter::Matrix(alphaScaleMatrix));
   DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode);
 }
 

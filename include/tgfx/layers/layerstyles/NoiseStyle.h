@@ -30,17 +30,20 @@ class MultiNoiseStyle;
 
 /**
  * NoiseStyle adds a procedural Perlin noise overlay above the layer content, clipped to the
- * content's alpha. The noise pattern is anchored at the center of the content region so it stays
- * stable across layer resizes and picture replays. Three noise modes are available: Mono (single
- * color), Duo (two complementary colors), and Multi (preserving the Perlin RGB values).
+ * content's alpha. All three modes (Mono / Duo / Multi) apply a band-pass mask on the noise
+ * signal centered at luma (or noise alpha for Multi) = 0.25, with the `density` parameter
+ * controlling the band width. The noise pattern is anchored at the center of the content region
+ * so it stays stable across layer resizes and picture replays.
  */
 class NoiseStyle : public LayerStyle {
  public:
   /**
-   * Creates a single-color noise style. Noise pixels are filled with the specified color, and the
-   * color's alpha serves as the noise opacity.
+   * Creates a single-color noise style. A band-pass mask is applied on the luminance of the noise
+   * centered at 0.25, with width controlled by density. Matching pixels are filled with color.
    * @param size     The noise grain size. Larger values produce coarser grains. Must be positive.
-   * @param density  The noise density in [0, 1]. Controls the proportion of visible noise pixels.
+   * @param density  The band width in [0, 1]. Larger values widen the band so more noise pixels
+   *                 pass. UI-driven clients that need a non-linear density curve (for example to
+   *                 match a specific design tool) should apply the mapping at their own layer.
    * @param color    The noise color. The alpha component controls the noise opacity.
    * @param seed     The random seed for the noise pattern.
    */
@@ -48,28 +51,26 @@ class NoiseStyle : public LayerStyle {
                                                   float seed = 0.0f);
 
   /**
-   * Creates a dual-color noise style. The noise source is split into two complementary regions,
-   * each filled with a different color.
+   * Creates a dual-color noise style. Two mirrored band-pass masks are applied on the luminance
+   * of the noise: one centered at 0.25 filled with firstColor, one centered at 0.75 filled with
+   * secondColor. Both bands share the same width controlled by density.
    * @param size         The noise grain size. Larger values produce coarser grains. Must be
    *                     positive.
-   * @param density      The noise density in [0, 1]. Controls the proportion of visible noise
-   *                     pixels.
-   * @param firstColor   The first noise color. The alpha component controls its opacity.
-   * @param secondColor  The second noise color. The alpha component controls its opacity.
+   * @param density      The band width in [0, 1]. Larger values widen both bands so more noise
+   *                     pixels pass.
+   * @param firstColor   The color filled into the first band (luma around 0.25).
+   * @param secondColor  The color filled into the second band (luma around 0.75).
    * @param seed         The random seed for the noise pattern.
    */
   static std::shared_ptr<DuoNoiseStyle> MakeDuo(float size, float density, const Color& firstColor,
                                                 const Color& secondColor, float seed = 0.0f);
 
   /**
-   * Creates a multi-color noise style that preserves the original Perlin noise RGB values with
-   * enhanced contrast.
+   * Creates a multi-color noise style that preserves the Perlin noise RGB (with 2x contrast
+   * enhancement). A band-pass mask is applied on the noise's own alpha channel centered at 0.25.
    * @param size     The noise grain size. Larger values produce coarser grains. Must be positive.
-   * @param density  The noise density in [0, 1]. Directly used as the alpha threshold on the
-   *                 Perlin noise alpha channel: higher density retains more noise pixels (the kept
-   *                 pixels are those whose noise alpha is less than or equal to density). UI-driven
-   *                 clients that need a non-linear density curve should apply the mapping at their
-   *                 own layer.
+   * @param density  The band width in [0, 1]. Larger values widen the band so more noise pixels
+   *                 pass.
    * @param opacity  The overall noise opacity in [0, 1].
    * @param seed     The random seed for the noise pattern.
    */

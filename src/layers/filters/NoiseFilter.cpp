@@ -27,11 +27,17 @@
 
 namespace tgfx {
 
-// Dark noise mask: luminance -> alpha via a color matrix that writes dot(rgb, lumaCoeffs) into the
-// alpha channel, then invert alpha, then threshold. Using ColorFilter::Matrix instead of
-// ColorFilter::Luma() avoids computing luma on premultiplied RGB, which would otherwise scale by
-// the source alpha and produce a biased mask. Keeps pixels where luminance < density.
-static std::shared_ptr<ColorFilter> MakeDarkDensityFilter(float density) {
+// Alpha band center used by all three noise modes, matching Figma's SVG export where the
+// luminanceToAlpha discrete table is always centered at bucket 25 out of 100. This is the empirical
+// default from Figma; callers map their UI density parameter to our `density` input which is then
+// treated as the band width.
+static constexpr float kBandCenter = 0.25f;
+
+// Writes dot(rgb, lumaCoeffs) into the alpha channel (RGB zeroed). Equivalent to SVG's
+// feColorMatrix type="luminanceToAlpha". Using Matrix instead of ColorFilter::Luma() avoids
+// computing luma on premultiplied RGB, which would scale by the source alpha and produce a biased
+// mask.
+static std::shared_ptr<ColorFilter> MakeLuminanceToAlphaFilter() {
   // clang-format off
   std::array<float, 20> luminanceToAlphaMatrix = {
     0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
@@ -39,34 +45,25 @@ static std::shared_ptr<ColorFilter> MakeDarkDensityFilter(float density) {
     0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
     0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
   };
-  std::array<float, 20> invertAlphaMatrix = {
-    0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, -1.0f, 1.0f,
-  };
   // clang-format on
-  auto lumaFilter = ColorFilter::Matrix(luminanceToAlphaMatrix);
-  auto invertFilter = ColorFilter::Matrix(invertAlphaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - density);
-  auto composed = ColorFilter::Compose(lumaFilter, invertFilter);
-  return ColorFilter::Compose(composed, thresholdFilter);
+  return ColorFilter::Matrix(luminanceToAlphaMatrix);
 }
 
-// Bright noise mask: luminance -> alpha via color matrix, then threshold at density. Keeps pixels
-// where luminance >= density. See MakeDarkDensityFilter for the rationale on Matrix vs. Luma.
-static std::shared_ptr<ColorFilter> MakeBrightDensityFilter(float density) {
-  // clang-format off
-  std::array<float, 20> luminanceToAlphaMatrix = {
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
-  };
-  // clang-format on
-  auto lumaFilter = ColorFilter::Matrix(luminanceToAlphaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(density);
-  return ColorFilter::Compose(lumaFilter, thresholdFilter);
+// Given a shader whose alpha channel is the signal to band-pass, returns a shader whose alpha is 1
+// when the input alpha lies in [lo, hi) and 0 otherwise. Implementation: take two alpha-threshold
+// mask shaders (at lo and hi) and subtract via Shader::MakeBlend(SrcOut). SrcOut computes
+// src * (1 - dst.a), so by setting src = mask(lo) and dst = mask(hi) we get "passes lo but not hi".
+static std::shared_ptr<Shader> MakeBandPassShader(std::shared_ptr<Shader> alphaShader, float lo,
+                                                  float hi) {
+  if (alphaShader == nullptr || hi <= lo) {
+    return nullptr;
+  }
+  auto aboveLo = alphaShader->makeWithColorFilter(ColorFilter::AlphaThreshold(lo));
+  auto aboveHi = alphaShader->makeWithColorFilter(ColorFilter::AlphaThreshold(hi));
+  if (aboveLo == nullptr || aboveHi == nullptr) {
+    return nullptr;
+  }
+  return Shader::MakeBlend(BlendMode::SrcOut, std::move(aboveHi), std::move(aboveLo));
 }
 
 static std::shared_ptr<ColorFilter> MakeColorMatrix(const Color& color, float alpha) {
@@ -206,10 +203,17 @@ std::shared_ptr<Shader> MonoNoiseFilter::onBuildNoiseShader(float scale) const {
   if (noiseShader == nullptr) {
     return nullptr;
   }
-  auto densityFilter = MakeDarkDensityFilter(_density);
+  // SVG pipeline for Mono: luminanceToAlpha -> discrete band-pass centered at kBandCenter.
+  auto alphaShader = noiseShader->makeWithColorFilter(MakeLuminanceToAlphaFilter());
+  float halfWidth = _density * 0.5f;
+  auto maskShader =
+      MakeBandPassShader(std::move(alphaShader), kBandCenter - halfWidth, kBandCenter + halfWidth);
+  if (maskShader == nullptr) {
+    return nullptr;
+  }
+  // Replace RGB with the requested color and scale alpha by color.alpha.
   auto colorFilter = MakeColorMatrix(_color, _color.alpha);
-  auto composedFilter = ColorFilter::Compose(densityFilter, colorFilter);
-  return noiseShader->makeWithColorFilter(std::move(composedFilter));
+  return maskShader->makeWithColorFilter(std::move(colorFilter));
 }
 
 // --- DuoNoiseFilter ---
@@ -241,22 +245,25 @@ std::shared_ptr<Shader> DuoNoiseFilter::onBuildNoiseShader(float scale) const {
   if (noiseShader == nullptr) {
     return nullptr;
   }
-  // Dark layer keeps pixels where luminance < density, filled with firstColor.
-  auto darkDensity = MakeDarkDensityFilter(_density);
-  auto firstColorFilter = MakeColorMatrix(_firstColor, _firstColor.alpha);
-  auto darkComposed = ColorFilter::Compose(darkDensity, firstColorFilter);
-  auto darkShader = noiseShader->makeWithColorFilter(std::move(darkComposed));
+  // SVG pipeline for Duo: luminanceToAlpha -> two mirrored band-passes, one at kBandCenter filled
+  // with firstColor, the other at 1 - kBandCenter filled with secondColor, merged with SrcOver.
+  auto alphaShader = noiseShader->makeWithColorFilter(MakeLuminanceToAlphaFilter());
+  float halfWidth = _density * 0.5f;
 
-  // Bright layer keeps pixels where luminance >= density, filled with secondColor.
-  auto brightDensity = MakeBrightDensityFilter(_density);
-  auto secondColorFilter = MakeColorMatrix(_secondColor, _secondColor.alpha);
-  auto brightComposed = ColorFilter::Compose(brightDensity, secondColorFilter);
-  auto brightShader = noiseShader->makeWithColorFilter(std::move(brightComposed));
+  auto firstMask =
+      MakeBandPassShader(alphaShader, kBandCenter - halfWidth, kBandCenter + halfWidth);
+  auto secondCenter = 1.0f - kBandCenter;
+  auto secondMask =
+      MakeBandPassShader(alphaShader, secondCenter - halfWidth, secondCenter + halfWidth);
+  if (firstMask == nullptr || secondMask == nullptr) {
+    return nullptr;
+  }
+  auto firstShader =
+      firstMask->makeWithColorFilter(MakeColorMatrix(_firstColor, _firstColor.alpha));
+  auto secondShader =
+      secondMask->makeWithColorFilter(MakeColorMatrix(_secondColor, _secondColor.alpha));
 
-  // Both layers sample the same underlying noise. Thresholds are complementary (< density vs.
-  // >= density), so each pixel keeps exactly one of firstColor or secondColor. SrcOver on top of
-  // the dark layer yields the dual-color composite in a single shader.
-  return Shader::MakeBlend(BlendMode::SrcOver, std::move(darkShader), std::move(brightShader));
+  return Shader::MakeBlend(BlendMode::SrcOver, std::move(firstShader), std::move(secondShader));
 }
 
 // --- MultiNoiseFilter ---
@@ -281,8 +288,14 @@ std::shared_ptr<Shader> MultiNoiseFilter::onBuildNoiseShader(float scale) const 
   if (noiseShader == nullptr) {
     return nullptr;
   }
-  // Step 1: RGB contrast enhancement (2x - 0.5). The alpha row keeps the fourth noise channel
-  // intact, matching SVG's feTurbulence output where noise alpha is independent of RGB luma.
+  // SVG pipeline for Multi:
+  //   feFuncR/G/B linear slope=2 intercept=-0.5  (RGB contrast 2x - 0.5, alpha untouched)
+  //   feFuncA discrete tableValues=...           (band-pass on noise's own alpha channel)
+  //   feFuncA table="0 opacity"                  (scale final alpha by opacity)
+  // Steps here translate that to ColorFilter + Shader primitives.
+
+  // Step A: RGB contrast enhancement. Alpha row preserves the fourth noise channel untouched
+  // because SVG feTurbulence's alpha is independent of RGB.
   // clang-format off
   std::array<float, 20> contrastMatrix = {
     2.0f, 0.0f, 0.0f, 0.0f, -0.5f,
@@ -291,25 +304,28 @@ std::shared_ptr<Shader> MultiNoiseFilter::onBuildNoiseShader(float scale) const 
     0.0f, 0.0f, 0.0f, 1.0f,  0.0f,
   };
   // clang-format on
-  auto contrastFilter = ColorFilter::Matrix(contrastMatrix);
+  auto colorShader = noiseShader->makeWithColorFilter(ColorFilter::Matrix(contrastMatrix));
+  if (colorShader == nullptr) {
+    return nullptr;
+  }
 
-  // Step 2: density threshold on the noise alpha channel. SVG feFuncA discrete keeps pixels whose
-  // noise-alpha < threshold. AlphaThresholdColorFilter implements the opposite ("alpha >= threshold
-  // passes"), so we first invert the alpha channel, then threshold against (1 - density). The net
-  // effect is "noise-alpha <= density passes". Higher density -> more noise pixels retained, which
-  // matches the convention used by Mono/Duo.
-  // clang-format off
-  std::array<float, 20> invertAlphaMatrix = {
-    1.0f, 0.0f, 0.0f,  0.0f, 0.0f,
-    0.0f, 1.0f, 0.0f,  0.0f, 0.0f,
-    0.0f, 0.0f, 1.0f,  0.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, -1.0f, 1.0f,
-  };
-  // clang-format on
-  auto invertAlphaFilter = ColorFilter::Matrix(invertAlphaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - _density);
+  // Step B: build a band-pass mask from the same noise alpha, then SrcIn the mask onto colorShader
+  // so the contrast-enhanced RGB only shows through where the mask passes. Using the noise shader
+  // directly as the alpha source keeps Multi aligned with Figma (where the discrete table is fed
+  // by feTurbulence alpha, not luma).
+  float halfWidth = _density * 0.5f;
+  auto maskShader =
+      MakeBandPassShader(noiseShader, kBandCenter - halfWidth, kBandCenter + halfWidth);
+  if (maskShader == nullptr) {
+    return nullptr;
+  }
+  auto bandedColorShader =
+      Shader::MakeBlend(BlendMode::SrcIn, std::move(maskShader), std::move(colorShader));
+  if (bandedColorShader == nullptr) {
+    return nullptr;
+  }
 
-  // Step 3: scale the final alpha by opacity for overall visibility control.
+  // Step C: scale the final alpha by opacity.
   // clang-format off
   std::array<float, 20> alphaScaleMatrix = {
     1.0f, 0.0f, 0.0f, 0.0f,     0.0f,
@@ -318,12 +334,7 @@ std::shared_ptr<Shader> MultiNoiseFilter::onBuildNoiseShader(float scale) const 
     0.0f, 0.0f, 0.0f, _opacity, 0.0f,
   };
   // clang-format on
-  auto alphaScaleFilter = ColorFilter::Matrix(alphaScaleMatrix);
-
-  auto composed = ColorFilter::Compose(contrastFilter, invertAlphaFilter);
-  composed = ColorFilter::Compose(composed, thresholdFilter);
-  composed = ColorFilter::Compose(composed, alphaScaleFilter);
-  return noiseShader->makeWithColorFilter(std::move(composed));
+  return bandedColorShader->makeWithColorFilter(ColorFilter::Matrix(alphaScaleMatrix));
 }
 
 }  // namespace tgfx
