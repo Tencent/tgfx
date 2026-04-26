@@ -23,6 +23,7 @@
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
+#include "tgfx/layers/layerstyles/NoiseStyle.h"
 
 namespace tgfx {
 
@@ -81,6 +82,14 @@ static void SerializeInnerShadowStyleImpl(flexbuffers::Builder& fbb, const Layer
   SerializeUtils::FillComplexObjSerMap(color, colorID, map);
 }
 
+static void SerializeNoiseStyleImpl(flexbuffers::Builder& fbb, const LayerStyle* layerStyle) {
+  SerializeBasicLayerStyleImpl(fbb, layerStyle);
+  const NoiseStyle* noiseStyle = static_cast<const NoiseStyle*>(layerStyle);
+  SerializeUtils::SetFlexBufferMap(fbb, "size", noiseStyle->size());
+  SerializeUtils::SetFlexBufferMap(fbb, "density", noiseStyle->density());
+  SerializeUtils::SetFlexBufferMap(fbb, "seed", noiseStyle->seed());
+}
+
 std::shared_ptr<Data> LayerStyleSerialization::Serialize(const LayerStyle* layerStyle,
                                                          SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(layerStyle != nullptr)
@@ -102,6 +111,9 @@ std::shared_ptr<Data> LayerStyleSerialization::Serialize(const LayerStyle* layer
       break;
     case LayerStyleType::InnerShadow:
       SerializeInnerShadowStyleImpl(fbb, layerStyle, map);
+      break;
+    case LayerStyleType::Noise:
+      SerializeNoiseStyleImpl(fbb, layerStyle);
       break;
   }
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
