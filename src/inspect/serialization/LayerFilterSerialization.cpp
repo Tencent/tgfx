@@ -24,6 +24,7 @@
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/filters/InnerShadowFilter.h"
 #include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/NoiseFilter.h"
 
 namespace tgfx {
 
@@ -97,8 +98,17 @@ static void SerializeInnerShadowFilterImpl(flexbuffers::Builder& fbb,
   auto color = innerShadowFilter->color();
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true, colorID);
   SerializeUtils::FillComplexObjSerMap(color, colorID, map);
-
   SerializeUtils::SetFlexBufferMap(fbb, "innerShadowOnly", innerShadowFilter->innerShadowOnly());
+}
+
+static void SerializeNoiseFilterImpl(flexbuffers::Builder& fbb, const LayerFilter* layerFilter) {
+  SerializeBasicLayerFilterImpl(fbb, layerFilter);
+  const NoiseFilter* noiseFilter = static_cast<const NoiseFilter*>(layerFilter);
+  SerializeUtils::SetFlexBufferMap(fbb, "size", noiseFilter->size());
+  SerializeUtils::SetFlexBufferMap(fbb, "density", noiseFilter->density());
+  SerializeUtils::SetFlexBufferMap(fbb, "seed", noiseFilter->seed());
+  SerializeUtils::SetFlexBufferMap(fbb, "blendMode",
+                                   SerializeUtils::BlendModeToString(noiseFilter->blendMode()));
 }
 
 std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* layerFilter,
@@ -128,6 +138,9 @@ std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* lay
       break;
     case Types::LayerFilterType::InnerShadowFilter:
       SerializeInnerShadowFilterImpl(fbb, layerFilter, map);
+      break;
+    case Types::LayerFilterType::NoiseFilter:
+      SerializeNoiseFilterImpl(fbb, layerFilter);
       break;
   }
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);

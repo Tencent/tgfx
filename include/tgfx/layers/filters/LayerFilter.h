@@ -74,7 +74,8 @@ class LayerFilter : public LayerProperty {
     BlurFilter,
     ColorMatrixFilter,
     DropShadowFilter,
-    InnerShadowFilter
+    InnerShadowFilter,
+    NoiseFilter
   };
 
   virtual Type type() const {

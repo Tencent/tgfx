@@ -91,7 +91,8 @@ std::string SerializeUtils::LayerFilterTypeToString(Types::LayerFilterType type)
       {Types::LayerFilterType::BlurFilter, "BlurFilter"},
       {Types::LayerFilterType::ColorMatrixFilter, "ColorMatrixFilter"},
       {Types::LayerFilterType::DropShadowFilter, "DropShadowFilter"},
-      {Types::LayerFilterType::InnerShadowFilter, "InnerShadowFilter"}};
+      {Types::LayerFilterType::InnerShadowFilter, "InnerShadowFilter"},
+      {Types::LayerFilterType::NoiseFilter, "NoiseFilter"}};
   return m[type];
 }
 
