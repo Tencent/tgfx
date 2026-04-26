@@ -1394,8 +1394,11 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs,
 
   auto imageFilter =
       contentArgs.excludeEffects ? nullptr : getImageFilter(contentMatrix.getMaxScale());
+  // A subclass may implement its effect purely through onFilterImage() without exposing an
+  // ImageFilter, so we must also take the fast path only when there are no filters at all.
+  bool hasFilters = !contentArgs.excludeEffects && !_filters.empty();
 
-  if (!imageFilter) {
+  if (!hasFilters) {
     PictureRecorder recorder = {};
     auto offscreenCanvas = recorder.beginRecording();
     auto mappedBounds = contentMatrix.mapRect(*inputBounds);

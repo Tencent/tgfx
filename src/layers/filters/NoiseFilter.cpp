@@ -153,7 +153,12 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input,
   auto centeredShader = noiseShader->makeWithMatrix(
       Matrix::MakeTrans(-contentBounds.centerX(), -contentBounds.centerY()));
   auto blendFilter = ImageFilter::Blend(_blendMode, std::move(centeredShader));
-  // Clip the blended output by the input image alpha: DstIn keeps only pixels originally opaque.
+  if (blendFilter == nullptr) {
+    return input;
+  }
+  // Clip the blended output to the input image alpha via Blend(DstIn, imageShader). Composing
+  // blendFilter with clipFilter reproduces the BlendImageFilterClipToSource pattern used in
+  // FilterTest: noise replaces the source, then DstIn restores the original alpha coverage.
   auto inputShader = Shader::MakeImageShader(input);
   if (inputShader == nullptr) {
     return input;
