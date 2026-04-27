@@ -39,8 +39,8 @@ class ColorSource : public LayerProperty {
   /**
    * Returns true when this ColorSource's parameters are interpreted relative to each geometry's
    * bounding box. When true, FillStyle/StrokeStyle supplies the shader with a per-geometry fit
-   * matrix obtained from getFitMatrix(). When false, the shader is used as-is in the layer's
-   * coordinate space.
+   * matrix obtained from getFitMatrix(). When false, the shader is used as-is in the parent
+   * container's (VectorLayer or VectorGroup) coordinate space.
    */
   virtual bool fitsToGeometry() const = 0;
 

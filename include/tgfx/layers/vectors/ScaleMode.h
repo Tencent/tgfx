@@ -25,10 +25,10 @@ namespace tgfx {
  */
 enum class ScaleMode {
   /**
-   * The image is not fitted to each geometry's bounding box. It is placed directly in the layer's
-   * coordinate space and tiled according to the pattern's tile modes. Use this mode when multiple
-   * geometries should share a single continuous image layout rather than each one receiving its
-   * own fitted copy.
+   * The image is not fitted to each geometry's bounding box. It is placed in the parent
+   * container's (VectorLayer or VectorGroup) coordinate space and tiled according to the
+   * pattern's tile modes. Use this mode when multiple geometries should share a single
+   * continuous image layout rather than each one receiving its own fitted copy.
    */
   None,
 
