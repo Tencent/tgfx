@@ -766,6 +766,31 @@ if (TGFX_BUILD_TESTS)
     target_include_directories(shader_variant_dump PRIVATE ${TGFX_INCLUDES})
     target_link_options(shader_variant_dump PRIVATE ${TGFX_TEST_LINK_OPTIONS})
     target_link_libraries(shader_variant_dump ${TGFX_TEST_LIBS})
+
+    # Offline UE adaptation tool: glsl_to_usf. Consumes the runtime ShaderDumpSink output
+    # (programs.jsonl + shaders/*.glsl), runs it through shaderc + SPIRV-Cross::CompilerHLSL,
+    # and emits .usf + manifest.json suitable for UE global shader integration.
+    # Only built when shaderc / SPIRV-Cross are already wired in by the Metal path.
+    if (TGFX_USE_METAL)
+        file(GLOB TGFX_GLSL_TO_USF_FILES tools/glsl_to_usf/*.cpp)
+        # The prebuilt SPIRV-Cross vendor archive only ships the core+glsl+msl slices; compile
+        # spirv_hlsl.cpp directly into this tool so CompilerHLSL is available.
+        set(TGFX_SPIRV_CROSS_HLSL_SOURCE third_party/SPIRV-Cross/spirv_hlsl.cpp)
+        # The upstream SPIRV-Cross sources intentionally take implicit sign conversions; relax the
+        # warning-as-error gate only for that one file so it compiles cleanly in our strict build.
+        set_source_files_properties(${TGFX_SPIRV_CROSS_HLSL_SOURCE}
+                PROPERTIES COMPILE_FLAGS "-Wno-sign-conversion -Wno-effc++")
+        list(APPEND TGFX_GLSL_TO_USF_FILES ${TGFX_SPIRV_CROSS_HLSL_SOURCE})
+        add_executable(glsl_to_usf ${TGFX_GLSL_TO_USF_FILES})
+        target_compile_options(glsl_to_usf PRIVATE ${TGFX_TEST_COMPILE_OPTIONS})
+        target_compile_definitions(glsl_to_usf PRIVATE SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS)
+        target_include_directories(glsl_to_usf PRIVATE ${TGFX_TEST_INCLUDES})
+        target_include_directories(glsl_to_usf PRIVATE ${TGFX_INCLUDES})
+        target_include_directories(glsl_to_usf PRIVATE third_party/shaderc/libshaderc/include)
+        target_include_directories(glsl_to_usf PRIVATE third_party/SPIRV-Cross)
+        target_link_options(glsl_to_usf PRIVATE ${TGFX_TEST_LINK_OPTIONS})
+        target_link_libraries(glsl_to_usf ${TGFX_TEST_LIBS})
+    endif ()
 endif ()
 
 # Export TGFX_INCLUDES to the parent scope for external test targets (e.g., web/test).
