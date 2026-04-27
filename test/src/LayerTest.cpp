@@ -176,13 +176,17 @@ TGFX_TEST(LayerTest, LayerTreeCircle) {
 
   EXPECT_FALSE(grandChild->addChild(parent));
 
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   EXPECT_FALSE(parent->addChild(displayList->_root));
 
   EXPECT_FALSE(parent->contains(displayList->_root));
+#endif
 
   EXPECT_FALSE(child->contains(parent));
 
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   EXPECT_EQ(displayList->_root, displayList->_root);
+#endif
 
   EXPECT_FALSE(grandChild->contains(parent));
 
@@ -252,6 +256,7 @@ TGFX_TEST(LayerTest, imageLayer) {
 }
 
 TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   auto parent = Layer::Make();
   // Should have no effect on the total matrix since it has no parent.
   parent->setMatrix(Matrix::MakeTrans(10, 10));
@@ -285,6 +290,7 @@ TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
   EXPECT_FLOAT_EQ(greatGrandsonTotalMatrix.getTranslateX(), grandChildTotalMatrix.getTranslateX());
   EXPECT_FLOAT_EQ(greatGrandsonTotalMatrix.getTranslateY(),
                   grandChildTotalMatrix.getTranslateX() + 10.0f * std::sqrt(2.0f));
+#endif
 }
 
 /**
@@ -331,7 +337,9 @@ TGFX_TEST(LayerTest, Layer_localToGlobal) {
   auto layerA2 = Layer::Make();
   layerA2->setMatrix(Matrix::MakeTrans(10, 10) * Matrix::MakeRotate(45.0f));
   layerA1->addChild(layerA2);
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   auto layer2GlobalMat = layerA2->getGlobalMatrix();
+#endif
 
   auto layerA3 = Layer::Make();
   layerA3->setMatrix(Matrix::MakeTrans(10 * std::sqrt(2.0f), 10 * std::sqrt(2.0f)) *
@@ -345,8 +353,10 @@ TGFX_TEST(LayerTest, Layer_localToGlobal) {
 
   auto pointEInLayer2 = Point::Make(8, 8);
   auto pointEInGlobal = layerA2->localToGlobal(pointEInLayer2);
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   EXPECT_EQ(pointEInGlobal, Point::Make(layer2GlobalMat.getTranslateX(),
                                         layer2GlobalMat.getTranslateY() + 8.0f * std::sqrt(2.0f)));
+#endif
 
   auto layer4 = Layer::Make();
   layer4->setMatrix(Matrix::MakeTrans(5, -5) * Matrix::MakeRotate(-60.0f));
@@ -1032,7 +1042,9 @@ TGFX_TEST(LayerTest, hitTestPoint) {
   shaperLayer1->setMatrix(Matrix::MakeTrans(100.0f, 50.0f));
   rootLayer->addChild(shaperLayer1);
   auto shaperLayer1Bounds = shaperLayer1->getBounds();
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   shaperLayer1->getGlobalMatrix().mapRect(&shaperLayer1Bounds);
+#endif
   printf("shaperLayer1Bounds: (%f, %f, %f, %f)\n", shaperLayer1Bounds.left, shaperLayer1Bounds.top,
          shaperLayer1Bounds.right, shaperLayer1Bounds.bottom);
 
@@ -1047,7 +1059,9 @@ TGFX_TEST(LayerTest, hitTestPoint) {
   shaperLayer2->setFillStyle(fillStyle2);
   rootLayer->addChild(shaperLayer2);
   auto shaperLayer2Bounds = shaperLayer2->getBounds();
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   shaperLayer2->getGlobalMatrix().mapRect(&shaperLayer2Bounds);
+#endif
   printf("shaperLayer2Bounds: (%f, %f, %f, %f)\n", shaperLayer2Bounds.left, shaperLayer2Bounds.top,
          shaperLayer2Bounds.right, shaperLayer2Bounds.bottom);
 
@@ -1613,7 +1627,11 @@ TGFX_TEST(LayerTest, BottomLeftSurface) {
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   auto proxy = RenderTargetProxy::Make(context, 200, 200, false, 1, false, ImageOrigin::BottomLeft);
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   auto surface = Surface::MakeFrom(std::move(proxy), 0, true);
+#else
+  auto surface = Surface::Make(context, 200, 200);
+#endif
 
   // parent
   auto parentFrame = tgfx::Rect::MakeXYWH(60, 110, 40, 40);
@@ -1714,6 +1732,7 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
 }
 
 TGFX_TEST(LayerTest, ContourTest) {
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1829,9 +1848,11 @@ TGFX_TEST(LayerTest, ContourTest) {
   canvas->clear();
   canvas->drawPicture(allPicture);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ContourTest"));
+#endif
 }
 
 TGFX_TEST(LayerTest, ContourMatchesContent) {
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1912,9 +1933,11 @@ TGFX_TEST(LayerTest, ContourMatchesContent) {
   gradientContext.finishRecordingAsPicture();
   // Gradient with opaque colors should match.
   EXPECT_TRUE(gradientMatch);
+#endif
 }
 
 TGFX_TEST(LayerTest, ContourContainsOpaqueBounds) {
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1964,9 +1987,11 @@ TGFX_TEST(LayerTest, ContourContainsOpaqueBounds) {
   auto picture2 = contourContext2.finishRecordingAsPicture();
   // Both parent and child contours should be drawn.
   EXPECT_EQ(picture2->drawCount, 2u);
+#endif
 }
 
 TGFX_TEST(LayerTest, GetContourImage) {
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1997,9 +2022,11 @@ TGFX_TEST(LayerTest, GetContourImage) {
   canvas->clear();
   canvas->drawImage(contourImage, offset.x, offset.y);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GetContourImage"));
+#endif
 }
 
 TGFX_TEST(LayerTest, ContourWithMask) {
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -2036,6 +2063,7 @@ TGFX_TEST(LayerTest, ContourWithMask) {
   drawCanvas->clear();
   drawCanvas->drawPicture(picture);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ContourWithMask"));
+#endif
 }
 
 TGFX_TEST(LayerTest, DiffFilterModeImagePattern) {
@@ -2450,6 +2478,7 @@ TGFX_TEST(LayerTest, DisplayListBackground) {
 }
 
 TGFX_TEST(LayerTest, LayerRecorder) {
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2653,9 +2682,11 @@ TGFX_TEST(LayerTest, LayerRecorder) {
     ASSERT_TRUE(content != nullptr);
     EXPECT_EQ(content->type(), LayerContent::Type::Rect);
   }
+#endif
 }
 
 TGFX_TEST(LayerTest, LayerRecorderMatrix) {
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2764,6 +2795,7 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
   canvas2->concat(Matrix::MakeTrans(150, 0));
   content7->drawDefault(canvas2, 1.0f, true);
   EXPECT_TRUE(Baseline::Compare(surface2, "LayerTest/LayerRecorderMatrixStroke"));
+#endif
 }
 
 TGFX_TEST(LayerTest, GetRotateBounds) {
@@ -2936,6 +2968,7 @@ TGFX_TEST(LayerTest, SetChildrenOptimization) {
   EXPECT_EQ(grandChildLayer->children().size(), 0u);
 
   // Test Case 10: Root layer as child (should be prevented)
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   auto rootLayer = RootLayer::Make();
   rootLayer->_root = rootLayer.get();
 
@@ -2947,6 +2980,7 @@ TGFX_TEST(LayerTest, SetChildrenOptimization) {
   EXPECT_EQ(parent->children()[0], layerA);
   EXPECT_EQ(parent->children()[1], layerB);
   EXPECT_FALSE(parent->contains(rootLayer));
+#endif
 
   // Test Case 11: Self as child (should be prevented)
   std::vector<std::shared_ptr<Layer>> selfAsChild = {layerA, parent, layerB};
@@ -2993,6 +3027,7 @@ TGFX_TEST(LayerTest, SetChildrenOptimization) {
 }
 
 TGFX_TEST(LayerTest, SetChildrenLISValidation) {
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   // Test that the LIS algorithm correctly identifies which layers need to be marked dirty
   // by verifying that layers maintaining relative order are not unnecessarily invalidated
 
@@ -3112,6 +3147,7 @@ TGFX_TEST(LayerTest, SetChildrenLISValidation) {
   singleParent->setChildren(single);
   EXPECT_EQ(singleParent->children().size(), 1u);
   EXPECT_FALSE(singleLayer->bitFields.dirtyTransform);
+#endif
 }
 
 TGFX_TEST(LayerTest, Layer3DContextAPI) {

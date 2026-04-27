@@ -35,6 +35,7 @@ namespace tgfx {
 
 TGFX_TEST(ResourceTest, TaskRelease) {
   Task::ReleaseThreads();
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   auto group = TaskGroup::GetInstance();
   std::thread* thead = nullptr;
   group->threads->try_dequeue(thead);
@@ -46,6 +47,7 @@ TGFX_TEST(ResourceTest, TaskRelease) {
     queue->try_dequeue(task);
     EXPECT_EQ(task, nullptr);
   }
+#endif
 }
 
 // ==================== Resource Cache Tests ====================

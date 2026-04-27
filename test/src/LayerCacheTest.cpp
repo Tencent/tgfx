@@ -29,6 +29,8 @@
 
 namespace tgfx {
 
+#ifdef TGFX_TEST_ACCESS_PRIVATE
+
 TGFX_TEST(LayerCacheTest, LayerCache) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -910,5 +912,7 @@ TGFX_TEST(LayerCacheTest, OverlappingDirtyRegions) {
   auto emptyTilesAfter = displayList->emptyTiles.size();
   EXPECT_EQ(9lu, emptyTilesAfter);
 }
+
+#endif  // TGFX_TEST_ACCESS_PRIVATE
 
 }  // namespace tgfx

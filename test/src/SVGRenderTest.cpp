@@ -681,6 +681,7 @@ TGFX_TEST(SVGRenderTest, ProtocolFilterReadWrite) {
   for (const auto& [_, filter] : protocolSetter->filterMap) {
     if (filter) {
       auto type = Types::Get(filter.get());
+#ifdef TGFX_TEST_ACCESS_PRIVATE
       if (type == Types::ImageFilterType::Blur) {
         auto blur1 = std::static_pointer_cast<GaussianBlurImageFilter>(filter);
         auto blur2 = std::static_pointer_cast<GaussianBlurImageFilter>(blurFilter);
@@ -712,6 +713,9 @@ TGFX_TEST(SVGRenderTest, ProtocolFilterReadWrite) {
         EXPECT_EQ(blur1->blurrinessY, blur2->blurrinessY);
         EXPECT_EQ(blur1->tileMode, blur2->tileMode);
       }
+#else
+      (void)type;
+#endif
     }
   }
 }

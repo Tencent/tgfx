@@ -449,6 +449,7 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
 }
 
 TGFX_TEST(ReadPixelsTest, NativeCodec) {
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   auto rgbaCodec = MakeNativeCodec("resources/apitest/imageReplacement.png");
   auto colorSpace = rgbaCodec->colorSpace();
   ASSERT_TRUE(rgbaCodec != nullptr);
@@ -483,6 +484,7 @@ TGFX_TEST(ReadPixelsTest, NativeCodec) {
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "NativeCodec_Encode_Alpha8");
+#endif
 }
 
 TGFX_TEST(ReadPixelsTest, ReadScaleCodec) {

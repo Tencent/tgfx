@@ -370,6 +370,7 @@ TGFX_TEST(LayerMaskTest, textMask) {
 }
 
 TGFX_TEST(LayerMaskTest, MaskOnwer) {
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -408,6 +409,7 @@ TGFX_TEST(LayerMaskTest, MaskOnwer) {
   layer2->setMask(nullptr);
   EXPECT_EQ(layer->mask(), nullptr);
   EXPECT_EQ(mask->maskOwner, nullptr);
+#endif
 }
 
 TGFX_TEST(LayerMaskTest, MaskAlpha) {
@@ -527,7 +529,11 @@ TGFX_TEST(LayerMaskTest, HighZoomWithMask) {
   ASSERT_TRUE(context != nullptr);
   auto proxy =
       RenderTargetProxy::Make(context, 1622, 1436, false, 1, false, ImageOrigin::BottomLeft);
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   auto surface = Surface::MakeFrom(std::move(proxy), 0, true);
+#else
+  auto surface = Surface::Make(context, 1622, 1436);
+#endif
   auto displayList = std::make_unique<DisplayList>();
 
   // Root layer with matrix3D transform
@@ -601,7 +607,11 @@ TGFX_TEST(LayerMaskTest, HighZoomWithMask) {
   // Test Tiled mode
   auto proxy2 =
       RenderTargetProxy::Make(context, 1622, 1436, false, 1, false, ImageOrigin::BottomLeft);
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   auto surface2 = Surface::MakeFrom(std::move(proxy2), 0, true);
+#else
+  auto surface2 = Surface::Make(context, 1622, 1436);
+#endif
   auto displayList2 = std::make_unique<DisplayList>();
   displayList2->root()->addChild(root);
   displayList2->setRenderMode(RenderMode::Tiled);
@@ -753,6 +763,7 @@ TGFX_TEST(LayerMaskTest, RoundRectMaskWithTiledRender) {
 }
 
 TGFX_TEST(LayerMaskTest, MaskInvalidation) {
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -851,6 +862,7 @@ TGFX_TEST(LayerMaskTest, MaskInvalidation) {
   EXPECT_FALSE(child->bitFields.dirtyTransform);
   EXPECT_FALSE(maskLayer->bitFields.dirtyTransform);
   EXPECT_FALSE(root->bitFields.dirtyDescendents);
+#endif
 }
 
 TGFX_TEST(LayerMaskTest, solidLayerWithTwoFillMask) {

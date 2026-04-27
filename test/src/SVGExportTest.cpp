@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
 #include <filesystem>
 #include <string>
 #include "base/TGFXTest.h"
@@ -100,21 +101,25 @@ TGFX_TEST(SVGExportTest, PureColorFile) {
   tgfx::Paint paint;
   paint.setColor(Color::Blue());
 
-  auto SVGStream = WriteStream::MakeFromFile(path);
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportFlags::DisablePrettyXML);
-  auto canvas = exporter->getCanvas();
+  {
+    auto SVGStream = WriteStream::MakeFromFile(path);
+    auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+                                      SVGExportFlags::DisablePrettyXML);
+    auto canvas = exporter->getCanvas();
 
-  canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
+    canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
 
-  exporter->close();
+    exporter->close();
+  }
 
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  EXPECT_EQ(readStream->size(), 211U);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+  {
+    auto readStream = Stream::MakeFromFile(path);
+    EXPECT_TRUE(readStream != nullptr);
+    EXPECT_EQ(readStream->size(), 211U);
+    Buffer buffer(readStream->size());
+    readStream->read(buffer.data(), buffer.size());
+    EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+  }
 
   std::filesystem::remove(path);
 }
@@ -163,21 +168,25 @@ TGFX_TEST(SVGExportTest, OpacityColorFile) {
   paint.setColor(Color::Blue());
   paint.setAlpha(0.5f);
 
-  auto SVGStream = WriteStream::MakeFromFile(path);
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportFlags::DisablePrettyXML);
-  auto canvas = exporter->getCanvas();
+  {
+    auto SVGStream = WriteStream::MakeFromFile(path);
+    auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+                                      SVGExportFlags::DisablePrettyXML);
+    auto canvas = exporter->getCanvas();
 
-  canvas->drawCircle(100, 100, 100, paint);
+    canvas->drawCircle(100, 100, 100, paint);
 
-  exporter->close();
+    exporter->close();
+  }
 
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  EXPECT_EQ(readStream->size(), 219U);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+  {
+    auto readStream = Stream::MakeFromFile(path);
+    EXPECT_TRUE(readStream != nullptr);
+    EXPECT_EQ(readStream->size(), 219U);
+    Buffer buffer(readStream->size());
+    readStream->read(buffer.data(), buffer.size());
+    EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+  }
 
   std::filesystem::remove(path);
 }
@@ -450,21 +459,25 @@ TGFX_TEST(SVGExportTest, EmojiTextFile) {
   Paint paint;
   paint.setColor(Color::Red());
 
-  auto SVGStream = WriteStream::MakeFromFile(path);
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
-                                    SVGExportFlags::DisablePrettyXML);
-  auto canvas = exporter->getCanvas();
+  {
+    auto SVGStream = WriteStream::MakeFromFile(path);
+    auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
+                                      SVGExportFlags::DisablePrettyXML);
+    auto canvas = exporter->getCanvas();
 
-  canvas->drawSimpleText("🤡👻🐠🤩😃🤪", 0, 80, font, paint);
+    canvas->drawSimpleText("🤡👻🐠🤩😃🤪", 0, 80, font, paint);
 
-  exporter->close();
+    exporter->close();
+  }
 
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  EXPECT_EQ(readStream->size(), 346U);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+  {
+    auto readStream = Stream::MakeFromFile(path);
+    EXPECT_TRUE(readStream != nullptr);
+    EXPECT_EQ(readStream->size(), 346U);
+    Buffer buffer(readStream->size());
+    readStream->read(buffer.data(), buffer.size());
+    EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+  }
 
   std::filesystem::remove(path);
 }
@@ -547,8 +560,11 @@ TGFX_TEST(SVGExportTest, GradientMask) {
   Buffer buffer(readStream->size());
   readStream->read(buffer.data(), buffer.size());
   auto compareString = std::string(static_cast<char*>(buffer.data()), buffer.size());
+  // Remove '\r' to handle Windows line endings from Git checkout.
+  compareString.erase(std::remove(compareString.begin(), compareString.end(), '\r'),
+                      compareString.end());
 
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+  EXPECT_EQ(compareString, SVGString);
 }
 
 TGFX_TEST(SVGExportTest, ImageMask) {

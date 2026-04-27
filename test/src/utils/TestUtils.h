@@ -34,7 +34,9 @@ namespace tgfx {
 
 std::shared_ptr<ImageCodec> MakeImageCodec(const std::string& path);
 
+#ifdef TGFX_TEST_ACCESS_PRIVATE
 std::shared_ptr<ImageCodec> MakeNativeCodec(const std::string& path);
+#endif
 
 std::shared_ptr<Image> MakeImage(const std::string& path);
 

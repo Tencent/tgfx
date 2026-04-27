@@ -117,20 +117,24 @@ TGFX_TEST(DataViewTest, FileWriteStream) {
   std::filesystem::path filePath = path;
   std::filesystem::create_directories(filePath.parent_path());
 
-  auto writeStream = WriteStream::MakeFromFile(path);
-  EXPECT_TRUE(writeStream != nullptr);
-  writeStream->writeText("Hello");
-  writeStream->writeText("\n");
-  const char* text = "TGFX";
-  writeStream->write(text, std::strlen(text));
-  writeStream->flush();
+  {
+    auto writeStream = WriteStream::MakeFromFile(path);
+    EXPECT_TRUE(writeStream != nullptr);
+    writeStream->writeText("Hello");
+    writeStream->writeText("\n");
+    const char* text = "TGFX";
+    writeStream->write(text, std::strlen(text));
+    writeStream->flush();
+  }
 
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  EXPECT_EQ(readStream->size(), 10U);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), "Hello\nTGFX");
+  {
+    auto readStream = Stream::MakeFromFile(path);
+    EXPECT_TRUE(readStream != nullptr);
+    EXPECT_EQ(readStream->size(), 10U);
+    Buffer buffer(readStream->size());
+    readStream->read(buffer.data(), buffer.size());
+    EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), "Hello\nTGFX");
+  }
 
   std::filesystem::remove(path);
 }

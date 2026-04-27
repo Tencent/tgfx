@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TestUtils.h"
-#include <dirent.h>
+#include <filesystem>
 #include <fstream>
 #include "ProjectPath.h"
 #include "core/utils/Log.h"
@@ -36,9 +36,11 @@ std::shared_ptr<ImageCodec> MakeImageCodec(const std::string& path) {
   return ImageCodec::MakeFrom(ProjectPath::Absolute(path));
 }
 
+#ifdef TGFX_TEST_ACCESS_PRIVATE
 std::shared_ptr<ImageCodec> MakeNativeCodec(const std::string& path) {
   return ImageCodec::MakeNativeCodec(ProjectPath::Absolute(path));
 }
+#endif
 
 std::shared_ptr<Image> MakeImage(const std::string& path) {
   return Image::MakeFromFile(ProjectPath::Absolute(path));
