@@ -39,7 +39,8 @@ enum class RepeaterOrder {
 };
 
 /**
- * Repeater duplicates shapes in the same group with transformation applied to each copy.
+ * Repeater duplicates the geometry (shapes and text) accumulated in the same group, applying a
+ * transformation to each copy.
  */
 class Repeater : public VectorElement {
  public:
