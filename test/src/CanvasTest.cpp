@@ -353,6 +353,7 @@ TGFX_TEST(CanvasTest, Clip) {
     outerInverse.toggleInverseFillType();
     canvas->clipPath(outerInverse);
   }
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
   {
     const auto& elems = canvas->clipStack->elements();
@@ -367,6 +368,7 @@ TGFX_TEST(CanvasTest, Clip) {
     EXPECT_TRUE(elems[1].path().isInverseFillType());
     EXPECT_EQ(elems[1].path().getBounds(), Rect::MakeLTRB(20, 20, 80, 80));
   }
+#endif
 
   // ========== 19. Non-inverse clip falls entirely inside inverse-fill's removed shape ==========
   // The new clipRect's keep-region lies entirely inside the inverse-fill clip's
@@ -381,9 +383,13 @@ TGFX_TEST(CanvasTest, Clip) {
     inverseHole.toggleInverseFillType();
     canvas->clipPath(inverseHole);
   }
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+#endif
   canvas->clipRect(Rect::MakeLTRB(30, 30, 70, 70));
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   EXPECT_EQ(canvas->clipStack->state(), ClipState::Empty);
+#endif
 
   // ========== 20. Inverse clip partially overlapping non-inverse rect ==========
   // The non-inverse clipRect's bounds partially overlap the inverse-fill's
@@ -401,6 +407,7 @@ TGFX_TEST(CanvasTest, Clip) {
     canvas->clipPath(inverseHole);
   }
   canvas->clipRect(Rect::MakeLTRB(10, 10, 40, 40));
+#ifdef TGFX_TEST_ACCESS_PRIVATE
   EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
   {
     const auto& elems = canvas->clipStack->elements();
@@ -416,6 +423,7 @@ TGFX_TEST(CanvasTest, Clip) {
     EXPECT_TRUE(elems[1].path().isInverseFillType());
     EXPECT_EQ(elems[1].path().getBounds(), Rect::MakeLTRB(20, 20, 80, 80));
   }
+#endif
 }
 
 TGFX_TEST(CanvasTest, DiscardContent) {
@@ -2889,6 +2897,7 @@ TGFX_TEST(CanvasTest, NoiseShaderParameterValidation) {
   EXPECT_EQ(noiseShader->numOctaves, PerlinNoiseShader::MAX_OCTAVES);
 }
 
+#ifdef TGFX_TEST_ACCESS_PRIVATE
 TGFX_TEST(CanvasTest, NoiseShaderIsEqual) {
   auto a = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
   auto b = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
@@ -2904,6 +2913,7 @@ TGFX_TEST(CanvasTest, NoiseShaderIsEqual) {
   auto color = Shader::MakeColorShader(Color::Red());
   EXPECT_FALSE(a->isEqual(color.get()));
 }
+#endif
 
 TGFX_TEST(CanvasTest, RawNoiseShader) {
   ContextScope scope;

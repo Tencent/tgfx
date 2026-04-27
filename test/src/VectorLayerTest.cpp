@@ -2644,20 +2644,20 @@ TGFX_TEST(VectorLayerTest, Gradient) {
   // rectangle maps the same 0-1 gradient independently, so all three rectangles look identical.
   auto relativeCompare = Gradient::MakeLinear({0, 0.5f}, {1, 0.5f}, compareColors);
   EXPECT_EQ(relativeCompare->fitsToGeometry(), true);
-  auto group5 = std::make_shared<VectorGroup>();
-  auto rect5 = std::make_shared<Rectangle>();
+  auto group5 = VectorGroup::Make();
+  auto rect5 = Rectangle::Make();
   rect5->setPosition({rowCenters[0], 240});
   rect5->setSize({rowRectSize, rowRectSize});
   group5->setElements({rect5, FillStyle::Make(relativeCompare)});
 
-  auto group6 = std::make_shared<VectorGroup>();
-  auto rect6 = std::make_shared<Rectangle>();
+  auto group6 = VectorGroup::Make();
+  auto rect6 = Rectangle::Make();
   rect6->setPosition({rowCenters[1], 240});
   rect6->setSize({rowRectSize, rowRectSize});
   group6->setElements({rect6, FillStyle::Make(relativeCompare)});
 
-  auto group7 = std::make_shared<VectorGroup>();
-  auto rect7 = std::make_shared<Rectangle>();
+  auto group7 = VectorGroup::Make();
+  auto rect7 = Rectangle::Make();
   rect7->setPosition({rowCenters[2], 240});
   rect7->setSize({rowRectSize, rowRectSize});
   group7->setElements({rect7, FillStyle::Make(relativeCompare)});
@@ -2670,20 +2670,20 @@ TGFX_TEST(VectorLayerTest, Gradient) {
                            {rowCenters[2] + rowRectSize * 0.5f, 0}, compareColors);
   absoluteCompare->setFitsToGeometry(false);
   EXPECT_EQ(absoluteCompare->fitsToGeometry(), false);
-  auto group8 = std::make_shared<VectorGroup>();
-  auto rect8 = std::make_shared<Rectangle>();
+  auto group8 = VectorGroup::Make();
+  auto rect8 = Rectangle::Make();
   rect8->setPosition({rowCenters[0], 350});
   rect8->setSize({rowRectSize, rowRectSize});
   group8->setElements({rect8, FillStyle::Make(absoluteCompare)});
 
-  auto group9 = std::make_shared<VectorGroup>();
-  auto rect9 = std::make_shared<Rectangle>();
+  auto group9 = VectorGroup::Make();
+  auto rect9 = Rectangle::Make();
   rect9->setPosition({rowCenters[1], 350});
   rect9->setSize({rowRectSize, rowRectSize});
   group9->setElements({rect9, FillStyle::Make(absoluteCompare)});
 
-  auto group10 = std::make_shared<VectorGroup>();
-  auto rect10 = std::make_shared<Rectangle>();
+  auto group10 = VectorGroup::Make();
+  auto rect10 = Rectangle::Make();
   rect10->setPosition({rowCenters[2], 350});
   rect10->setSize({rowRectSize, rowRectSize});
   group10->setElements({rect10, FillStyle::Make(absoluteCompare)});
@@ -2832,8 +2832,8 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   EXPECT_EQ(relativePattern->scaleMode(), ScaleMode::LetterBox);
   std::vector<std::shared_ptr<VectorElement>> contents = {group1, group2, group3};
   for (float cx : rowCenters) {
-    auto rectGroup = std::make_shared<VectorGroup>();
-    auto rect = std::make_shared<Rectangle>();
+    auto rectGroup = VectorGroup::Make();
+    auto rect = Rectangle::Make();
     rect->setPosition({cx, 240});
     rect->setSize({rowRectSize, rowRectSize});
     rectGroup->setElements({rect, FillStyle::Make(relativePattern)});
@@ -2847,8 +2847,8 @@ TGFX_TEST(VectorLayerTest, ImagePattern) {
   auto windowPattern = ImagePattern::Make(image);
   windowPattern->setScaleMode(ScaleMode::None);
   for (float cx : rowCenters) {
-    auto rectGroup = std::make_shared<VectorGroup>();
-    auto rect = std::make_shared<Rectangle>();
+    auto rectGroup = VectorGroup::Make();
+    auto rect = Rectangle::Make();
     rect->setPosition({cx, 350});
     rect->setSize({rowRectSize, rowRectSize});
     rectGroup->setElements({rect, FillStyle::Make(windowPattern)});
@@ -2918,8 +2918,8 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
     auto cellLayer = VectorLayer::Make();
     cellLayer->setMatrix(
         Matrix::MakeTrans(centerX - rectWidth * 0.5f, row1CenterY - rectHeight * 0.5f));
-    auto cellGroup = std::make_shared<VectorGroup>();
-    auto rect = std::make_shared<Rectangle>();
+    auto cellGroup = VectorGroup::Make();
+    auto rect = Rectangle::Make();
     rect->setPosition({rectWidth * 0.5f, rectHeight * 0.5f});
     rect->setSize({rectWidth, rectHeight});
     auto pattern = ImagePattern::Make(image);
@@ -2931,7 +2931,7 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
     cellLayer->setContents({cellGroup});
     displayList->root()->addChild(cellLayer);
 
-    auto labelGroup = std::make_shared<VectorGroup>();
+    auto labelGroup = VectorGroup::Make();
     auto blob = TextBlob::MakeFrom(entries[i].label, labelFont);
     auto text = Text::Make(blob);
     auto labelBounds = blob->getTightBounds();
@@ -2960,8 +2960,8 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
     auto cellLayer = VectorLayer::Make();
     cellLayer->setMatrix(
         Matrix::MakeTrans(centerX - rectWidth * 0.5f, row2CenterY - rectHeight * 0.5f));
-    auto cellGroup = std::make_shared<VectorGroup>();
-    auto rect = std::make_shared<Rectangle>();
+    auto cellGroup = VectorGroup::Make();
+    auto rect = Rectangle::Make();
     rect->setPosition({rectWidth * 0.5f, rectHeight * 0.5f});
     rect->setSize({rectWidth, rectHeight});
     auto pattern = ImagePattern::Make(image);
@@ -2972,7 +2972,7 @@ TGFX_TEST(VectorLayerTest, ImagePatternScaleMode) {
     cellLayer->setContents({cellGroup});
     displayList->root()->addChild(cellLayer);
 
-    auto labelGroup = std::make_shared<VectorGroup>();
+    auto labelGroup = VectorGroup::Make();
     auto blob = TextBlob::MakeFrom(entries[i].label, labelFont);
     auto text = Text::Make(blob);
     auto labelBounds = blob->getTightBounds();
@@ -4647,7 +4647,7 @@ TGFX_TEST(VectorLayerTest, Line) {
   line1->setStartPoint({50, 54});
   line1->setEndPoint({550, 54});
   auto stroke1 = MakeStrokeStyle(Color::Red(), 8.0f);
-  auto group1 = std::make_shared<VectorGroup>();
+  auto group1 = VectorGroup::Make();
   group1->setElements({line1, stroke1});
 
   // Line 2: Diagonal line with dashed blue stroke.
@@ -4657,18 +4657,18 @@ TGFX_TEST(VectorLayerTest, Line) {
   auto stroke2 = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
   stroke2->setStrokeWidth(8.0f);
   stroke2->setDashes({24.0f, 12.0f});
-  auto group2 = std::make_shared<VectorGroup>();
+  auto group2 = VectorGroup::Make();
   group2->setElements({line2, stroke2});
 
   // Line 3: Forward line trimmed to the first half, stroked green.
   auto line3 = Line::Make();
   line3->setStartPoint({50, 346});
   line3->setEndPoint({300, 346});
-  auto trim3 = std::make_shared<TrimPath>();
+  auto trim3 = TrimPath::Make();
   trim3->setStart(0.0f);
   trim3->setEnd(0.5f);
   auto stroke3 = MakeStrokeStyle(Color::Green(), 8.0f);
-  auto group3 = std::make_shared<VectorGroup>();
+  auto group3 = VectorGroup::Make();
   group3->setElements({line3, trim3, stroke3});
 
   // Line 4: Reversed line with the same trim; the opposite half should be drawn.
@@ -4676,25 +4676,25 @@ TGFX_TEST(VectorLayerTest, Line) {
   line4->setStartPoint({300, 346});
   line4->setEndPoint({550, 346});
   line4->setReversed(true);
-  auto trim4 = std::make_shared<TrimPath>();
+  auto trim4 = TrimPath::Make();
   trim4->setStart(0.0f);
   trim4->setEnd(0.5f);
   auto stroke4 = MakeStrokeStyle(Color::FromRGBA(255, 128, 0, 255), 8.0f);
-  auto group4 = std::make_shared<VectorGroup>();
+  auto group4 = VectorGroup::Make();
   group4->setElements({line4, trim4, stroke4});
 
   // Line 5: Zero-height rectangle with a wide, vertically-oriented fit gradient Outside stroke.
   // The rectangle collapses to a horizontal segment, so Outside stroke should expand it into a
   // band whose gradient direction shows that the fit region tracks the stroked geometry rather
   // than the degenerate original rect.
-  auto degenerateRect = std::make_shared<Rectangle>();
+  auto degenerateRect = Rectangle::Make();
   degenerateRect->setPosition({300, 430});
   degenerateRect->setSize({500, 0});
   auto gradient5 = Gradient::MakeLinear({0.5f, 0.0f}, {0.5f, 1.0f}, {Color::Red(), Color::Blue()});
   auto stroke5 = StrokeStyle::Make(gradient5);
   stroke5->setStrokeWidth(24.0f);
   stroke5->setStrokeAlign(StrokeAlign::Outside);
-  auto group5 = std::make_shared<VectorGroup>();
+  auto group5 = VectorGroup::Make();
   group5->setElements({degenerateRect, stroke5});
 
   vectorLayer->setContents({group1, group2, group3, group4, group5});
@@ -4745,7 +4745,7 @@ TGFX_TEST(VectorLayerTest, FitsToGeometrySwitch) {
 static std::shared_ptr<VectorGroup> WrapInOuterGroup(std::shared_ptr<VectorGroup> inner,
                                                      const Point& center, float rotation,
                                                      const Point& scale) {
-  auto outer = std::make_shared<VectorGroup>();
+  auto outer = VectorGroup::Make();
   outer->setAnchor(center);
   outer->setPosition(center);
   outer->setRotation(rotation);
@@ -4757,7 +4757,7 @@ static std::shared_ptr<VectorGroup> WrapInOuterGroup(std::shared_ptr<VectorGroup
 static std::vector<std::shared_ptr<VectorElement>> MakeRectFitCellContents(
     float cx, float cy, int column, float cellSize, const std::vector<Color>& gradientColors,
     const std::shared_ptr<Image>& image) {
-  auto rect = std::make_shared<Rectangle>();
+  auto rect = Rectangle::Make();
   rect->setPosition({cx, cy});
   rect->setSize({cellSize * 0.7f, cellSize * 0.7f});
   std::vector<std::shared_ptr<VectorElement>> elements = {rect};
@@ -4782,7 +4782,7 @@ static std::vector<std::shared_ptr<VectorElement>> MakeRectFitCellContents(
 static std::vector<std::shared_ptr<VectorElement>> MakeComplexFitCellContents(
     float cx, float cy, int column, float cellSize, const std::vector<Color>& gradientColors,
     const std::shared_ptr<Image>& image) {
-  auto star = std::make_shared<Polystar>();
+  auto star = Polystar::Make();
   star->setPolystarType(PolystarType::Star);
   star->setPosition({cx, cy});
   star->setOuterRadius(cellSize * 0.4f);
@@ -4814,8 +4814,8 @@ static std::vector<std::shared_ptr<VectorElement>> MakeComplexFitCellContents(
 
 // Non-linear gradient variants: radial, conic, diamond.
 static std::vector<std::shared_ptr<VectorElement>> MakeRadialCellContents(
-    float cx, float cy, int column, float cellSize, const std::vector<Color>& gradientColors) {
-  auto rect = std::make_shared<Rectangle>();
+    float cx, float cy, int column, float cellSize,     const std::vector<Color>& gradientColors) {
+  auto rect = Rectangle::Make();
   rect->setPosition({cx, cy});
   rect->setSize({cellSize * 0.7f, cellSize * 0.7f});
   std::shared_ptr<ColorSource> colorSource = nullptr;
@@ -4835,13 +4835,13 @@ static std::vector<std::shared_ptr<VectorElement>> MakeRadialCellContents(
 // letterbox bars show up against a non-white color.
 static std::vector<std::shared_ptr<VectorElement>> MakePatternScaleCellContents(
     float cx, float cy, int column, float cellSize, const std::shared_ptr<Image>& image) {
-  auto backdropRect = std::make_shared<Rectangle>();
+  auto backdropRect = Rectangle::Make();
   backdropRect->setPosition({cx, cy});
   backdropRect->setSize({cellSize * 0.85f, cellSize * 0.5f});
-  auto backdropGroup = std::make_shared<VectorGroup>();
+  auto backdropGroup = VectorGroup::Make();
   backdropGroup->setElements({backdropRect, MakeFillStyle(Color::FromRGBA(220, 220, 220, 255))});
 
-  auto patternRect = std::make_shared<Rectangle>();
+  auto patternRect = Rectangle::Make();
   patternRect->setPosition({cx, cy});
   patternRect->setSize({cellSize * 0.85f, cellSize * 0.5f});
   auto pattern = ImagePattern::Make(image);
@@ -4852,7 +4852,7 @@ static std::vector<std::shared_ptr<VectorElement>> MakePatternScaleCellContents(
   } else {
     pattern->setScaleMode(ScaleMode::Zoom);
   }
-  auto patternGroup = std::make_shared<VectorGroup>();
+  auto patternGroup = VectorGroup::Make();
   patternGroup->setElements({patternRect, FillStyle::Make(pattern)});
 
   return {backdropGroup, patternGroup};
@@ -4862,7 +4862,7 @@ static std::vector<std::shared_ptr<VectorElement>> MakePatternScaleCellContents(
 static std::vector<std::shared_ptr<VectorElement>> MakeAbsoluteCellContents(
     float cx, float cy, int column, float cellSize, const std::vector<Color>& gradientColors,
     const std::shared_ptr<Image>& image) {
-  auto rect = std::make_shared<Rectangle>();
+  auto rect = Rectangle::Make();
   rect->setPosition({cx, cy});
   rect->setSize({cellSize * 0.7f, cellSize * 0.7f});
   std::vector<std::shared_ptr<VectorElement>> elements = {rect};
@@ -4896,7 +4896,7 @@ static std::vector<std::shared_ptr<VectorElement>> MakeAbsoluteCellContents(
 static std::vector<std::shared_ptr<VectorElement>> MakeStrokeAlignCellContents(
     float cx, float cy, int column, float cellSize, const std::vector<Color>& gradientColors,
     const std::shared_ptr<Image>& image) {
-  auto rect = std::make_shared<Rectangle>();
+  auto rect = Rectangle::Make();
   rect->setPosition({cx, cy});
   rect->setSize({cellSize * 0.7f, cellSize * 0.7f});
   std::shared_ptr<ColorSource> source = nullptr;
@@ -4990,7 +4990,7 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
   for (int col = 0; col < 3; col++) {
     float cx = cellCenterX(col);
     float cy = cellCenterY(0);
-    auto cellGroup = std::make_shared<VectorGroup>();
+    auto cellGroup = VectorGroup::Make();
     cellGroup->setElements(MakeRectFitCellContents(cx, cy, col, cellSize, gradientColors, image));
     contents.push_back(cellGroup);
   }
@@ -5011,9 +5011,9 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
     float cx = cellCenterX(col + 3);
     float cy = cellCenterY(0);
     const auto& config = rectNested[static_cast<size_t>(col)];
-    auto innerGroup = std::make_shared<VectorGroup>();
+    auto innerGroup = VectorGroup::Make();
     innerGroup->setElements(MakeRectFitCellContents(cx, cy, col, cellSize, gradientColors, image));
-    auto middleGroup = std::make_shared<VectorGroup>();
+    auto middleGroup = VectorGroup::Make();
     middleGroup->setAnchor({cx, cy});
     middleGroup->setPosition({cx, cy});
     middleGroup->setRotation(config.middleRotation);
@@ -5033,10 +5033,10 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
     float cx = cellCenterX(col);
     float cy = cellCenterY(1);
     const auto& config = starNested[static_cast<size_t>(col)];
-    auto innerGroup = std::make_shared<VectorGroup>();
+    auto innerGroup = VectorGroup::Make();
     innerGroup->setElements(
         MakeComplexFitCellContents(cx, cy, col, cellSize, gradientColors, image));
-    auto middleGroup = std::make_shared<VectorGroup>();
+    auto middleGroup = VectorGroup::Make();
     middleGroup->setAnchor({cx, cy});
     middleGroup->setPosition({cx, cy});
     middleGroup->setRotation(config.middleRotation);
@@ -5049,7 +5049,7 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
   for (int col = 0; col < 3; col++) {
     float cx = cellCenterX(col + 3);
     float cy = cellCenterY(1);
-    auto innerGroup = std::make_shared<VectorGroup>();
+    auto innerGroup = VectorGroup::Make();
     innerGroup->setElements(MakeRadialCellContents(cx, cy, col, cellSize, gradientColors));
     contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 30.0f, {1.0f, 1.0f}));
   }
@@ -5058,7 +5058,7 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
   for (int col = 0; col < 3; col++) {
     float cx = cellCenterX(col);
     float cy = cellCenterY(2);
-    auto innerGroup = std::make_shared<VectorGroup>();
+    auto innerGroup = VectorGroup::Make();
     innerGroup->setElements(MakePatternScaleCellContents(cx, cy, col, cellSize, image));
     contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 20.0f, {1.0f, 1.0f}));
   }
@@ -5066,7 +5066,7 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
   for (int col = 0; col < 3; col++) {
     float cx = cellCenterX(col + 3);
     float cy = cellCenterY(2);
-    auto innerGroup = std::make_shared<VectorGroup>();
+    auto innerGroup = VectorGroup::Make();
     innerGroup->setElements(MakeAbsoluteCellContents(cx, cy, col, cellSize, gradientColors, image));
     contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 30.0f, {1.0f, 1.0f}));
   }
@@ -5075,7 +5075,7 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
   for (int col = 0; col < 3; col++) {
     float cx = cellCenterX(col);
     float cy = cellCenterY(3);
-    auto innerGroup = std::make_shared<VectorGroup>();
+    auto innerGroup = VectorGroup::Make();
     innerGroup->setElements(
         MakeStrokeAlignCellContents(cx, cy, col, cellSize, gradientColors, image));
     contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 25.0f, {1.0f, 1.0f}));
@@ -5084,7 +5084,7 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
   for (int col = 0; col < 3; col++) {
     float cx = cellCenterX(col + 3);
     float cy = cellCenterY(3);
-    auto innerGroup = std::make_shared<VectorGroup>();
+    auto innerGroup = VectorGroup::Make();
     innerGroup->setPosition({cx - 22.0f, cy + 12.0f});
     innerGroup->setElements(MakeTextCellContents(col, textFont, gradientColors, image));
     contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 20.0f, {1.0f, 1.0f}));
