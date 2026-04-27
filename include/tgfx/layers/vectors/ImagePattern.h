@@ -29,8 +29,8 @@ namespace tgfx {
  * The transformation matrix set via setMatrix() is applied to the image's local coordinate space
  * first. When scaleMode() is not ScaleMode::None, the transformed image is then fitted into each
  * geometry's bounding box according to the scale mode (ScaleMode::LetterBox by default). When
- * scaleMode() is ScaleMode::None, the transformed image is placed directly in the layer's
- * coordinate space without per-geometry fitting.
+ * scaleMode() is ScaleMode::None, the transformed image is placed in the parent container's
+ * (VectorLayer or VectorGroup) coordinate space without per-geometry fitting.
  */
 class ImagePattern : public ColorSource {
  public:
@@ -79,8 +79,9 @@ class ImagePattern : public ColorSource {
 
   /**
    * Returns the rule used to fit the transformed image into each geometry's bounding box. The
-   * default value is ScaleMode::LetterBox. When set to ScaleMode::None, the image is placed
-   * directly in the layer's coordinate space without per-geometry fitting.
+   * default value is ScaleMode::LetterBox. When set to ScaleMode::None, the image is placed in
+   * the parent container's (VectorLayer or VectorGroup) coordinate space without per-geometry
+   * fitting.
    */
   ScaleMode scaleMode() const {
     return _scaleMode;

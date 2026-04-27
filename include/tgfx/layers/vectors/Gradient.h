@@ -33,7 +33,8 @@ class DiamondGradient;
 /**
  * The base class for all gradient types that can be drawn on a vector layer. By default, gradient
  * parameters are interpreted in a normalized 0-1 space that maps to each geometry's bounding box.
- * Call setFitsToGeometry(false) to interpret them in the layer's coordinate space instead.
+ * Call setFitsToGeometry(false) to interpret them in the parent container's (VectorLayer or
+ * VectorGroup) coordinate space instead.
  */
 class Gradient : public ColorSource {
  public:
@@ -148,8 +149,8 @@ class Gradient : public ColorSource {
   /**
    * Returns whether the gradient parameters are interpreted relative to each geometry's bounding
    * box. When true (the default), the parameters live in a (0, 0)-(1, 1) coordinate space that
-   * maps to each geometry's bounding box. When false, the parameters are in the layer's
-   * coordinate space.
+   * maps to each geometry's bounding box. When false, the parameters are in the parent
+   * container's (VectorLayer or VectorGroup) coordinate space.
    */
   bool fitsToGeometry() const override {
     return _fitsToGeometry;
@@ -196,8 +197,8 @@ class LinearGradient : public Gradient {
   /**
    * Returns the start point of the gradient. The start point corresponds to the first stop of the
    * gradient. It is interpreted in the coordinate space selected by fitsToGeometry(): a normalized
-   * 0-1 space relative to each geometry's bounding box when true (the default), or the layer's
-   * coordinate space when false.
+   * 0-1 space relative to each geometry's bounding box when true (the default), or the parent
+   * container's (VectorLayer or VectorGroup) coordinate space when false.
    */
   const Point& startPoint() const {
     return _startPoint;
@@ -252,7 +253,7 @@ class RadialGradient : public Gradient {
    * Returns the center of the circle for this gradient. The center point corresponds to the first
    * stop of the gradient. It is interpreted in the coordinate space selected by fitsToGeometry():
    * a normalized 0-1 space relative to each geometry's bounding box when true (the default), or
-   * the layer's coordinate space when false.
+   * the parent container's (VectorLayer or VectorGroup) coordinate space when false.
    */
   const Point& center() const {
     return _center;
@@ -305,7 +306,8 @@ class ConicGradient : public Gradient {
   /**
    * Returns the center of the circle for this gradient. It is interpreted in the coordinate space
    * selected by fitsToGeometry(): a normalized 0-1 space relative to each geometry's bounding box
-   * when true (the default), or the layer's coordinate space when false.
+   * when true (the default), or the parent container's (VectorLayer or VectorGroup) coordinate
+   * space when false.
    */
   const Point& center() const {
     return _center;
@@ -372,7 +374,7 @@ class DiamondGradient : public Gradient {
    * Returns the center of the diamond for this gradient. The center point corresponds to the first
    * stop of the gradient. It is interpreted in the coordinate space selected by fitsToGeometry():
    * a normalized 0-1 space relative to each geometry's bounding box when true (the default), or
-   * the layer's coordinate space when false.
+   * the parent container's (VectorLayer or VectorGroup) coordinate space when false.
    */
   const Point& center() const {
     return _center;
