@@ -100,6 +100,20 @@ void ManifestWriter::appendEntry(const ManifestEntry& entry) {
     WriteAttribute(out_, entry.attributes[i], i == 0);
   out_ << "]";
   out_ << "}";
+  if (!entry.rectSamplers.empty()) {
+    out_ << ",\"rectSamplers\":[";
+    for (size_t i = 0; i < entry.rectSamplers.size(); ++i) {
+      if (i > 0) out_ << ",";
+      out_ << "{\"name\":\"" << JsonEscape(entry.rectSamplers[i].name) << "\""
+           << ",\"invSizeUniform\":\"" << JsonEscape(entry.rectSamplers[i].invSizeUniform) << "\"}";
+    }
+    out_ << "]";
+    out_ << ",\"notes\":{\"rectSamplerHint\":\"UE must upload 1/(width,height) into each "
+            "listed invSizeUniform. For any sampler whose original GLSL type was sampler2DRect "
+            "and whose role is a PorterDuffXP dst-texture (DstTextureSampler_Pn), also set the "
+            "sibling DstTextureCoordScale_Pn cbuffer member to 1/(width,height) instead of "
+            "(1,1).\"}";
+  }
   out_ << "}";
   ++entriesWritten_;
 }

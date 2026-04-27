@@ -707,7 +707,8 @@ if (TGFX_BUILD_TESTS)
     # companion gtest target (ShaderVariantDumpTest) can exercise VariantDumper in-process.
     list(APPEND TGFX_TEST_FILES
             tools/shader_variant_dump/VariantDumper.cpp
-            tools/shader_variant_dump/JsonWriter.cpp)
+            tools/shader_variant_dump/JsonWriter.cpp
+            tools/glsl_to_usf/GlslRectNormalizer.cpp)
 
     list(APPEND TGFX_TEST_LIBS tgfx-hello2d tgfx ${TGFX_SHARED_LIBS})
     list(APPEND TGFX_TEST_INCLUDES src test/src hello2d/include third_party/json/include)

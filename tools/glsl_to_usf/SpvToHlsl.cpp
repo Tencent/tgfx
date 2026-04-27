@@ -88,18 +88,23 @@ SpvToHlslResult ConvertSpvToHlsl(const std::vector<uint32_t>& spirv, GlslStage s
   }
 
   // Walk SPIR-V resources. UBOs get b-registers in order, sampled images get paired t/s
-  // registers. SPIRV-Cross picks up our register declarations via add_hlsl_resource_binding
-  // so the final HLSL contains `register(bN)` / `register(tN)` / `register(sN)`.
+  // registers. To force SPIRV-Cross to emit unique `register(bN)` / `register(tN)` values even
+  // when the upstream SPIR-V assigns conflicting descriptor-set/binding pairs across stages or
+  // UBOs, we overwrite each resource's DescriptorSet/Binding decorations in place before
+  // installing the matching HLSL register hint. SPIRV-Cross's HLSL backend keys its
+  // add_hlsl_resource_binding lookup on (desc_set, binding), so rewriting both sides in
+  // lock-step guarantees the hint is always honoured and two resources never collide on the
+  // same b-register.
   auto resources = compiler.get_shader_resources();
   uint32_t cbvIndex = 0;
   uint32_t srvIndex = 0;
   for (auto& ubo : resources.uniform_buffers) {
-    auto descSet = compiler.get_decoration(ubo.id, spv::DecorationDescriptorSet);
-    auto binding = compiler.get_decoration(ubo.id, spv::DecorationBinding);
+    compiler.set_decoration(ubo.id, spv::DecorationDescriptorSet, 0);
+    compiler.set_decoration(ubo.id, spv::DecorationBinding, cbvIndex);
     spirv_cross::HLSLResourceBinding b{};
     b.stage = StageToExecutionModel(stage);
-    b.desc_set = descSet;
-    b.binding = binding;
+    b.desc_set = 0;
+    b.binding = cbvIndex;
     b.cbv.register_space = 0;
     b.cbv.register_binding = cbvIndex;
     compiler.add_hlsl_resource_binding(b);
@@ -107,12 +112,12 @@ SpvToHlslResult ConvertSpvToHlsl(const std::vector<uint32_t>& spirv, GlslStage s
     ++cbvIndex;
   }
   for (auto& img : resources.sampled_images) {
-    auto descSet = compiler.get_decoration(img.id, spv::DecorationDescriptorSet);
-    auto binding = compiler.get_decoration(img.id, spv::DecorationBinding);
+    compiler.set_decoration(img.id, spv::DecorationDescriptorSet, 0);
+    compiler.set_decoration(img.id, spv::DecorationBinding, srvIndex + 1024);
     spirv_cross::HLSLResourceBinding b{};
     b.stage = StageToExecutionModel(stage);
-    b.desc_set = descSet;
-    b.binding = binding;
+    b.desc_set = 0;
+    b.binding = srvIndex + 1024;
     b.srv.register_space = 0;
     b.srv.register_binding = srvIndex;
     b.sampler.register_space = 0;

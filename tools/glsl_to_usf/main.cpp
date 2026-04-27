@@ -41,7 +41,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-
+#include "GlslRectNormalizer.h"
 #include "GlslToSpv.h"
 #include "ManifestWriter.h"
 #include "SpvToHlsl.h"
@@ -187,17 +187,22 @@ bool ConvertOneProgram(const std::string& inputDir, const std::string& outputDir
     return false;
   }
 
-  // UE / D3D has no concept of rectangle textures. TGFX's Metal path uses them opportunistically
-  // for unnormalized sampling on certain macOS textures, but SPIRV-Cross's HLSL backend does not
-  // support the SampledRect capability. Skip these programs cleanly; they need a dedicated
-  // "rect -> 2D with coord normalization" conversion step that is out of scope for this first
-  // cut. Record as a recoverable skip so the index reflects the gap without aborting the run.
-  if (fsGlsl.find("sampler2DRect") != std::string::npos ||
-      vsGlsl.find("sampler2DRect") != std::string::npos) {
-    errorOut = "skipped: contains sampler2DRect (unsupported on D3D/HLSL)";
-    skipped = true;
+  // Phase D: rewrite sampler2DRect uniforms to sampler2D + inverse-size companion uniforms so
+  // SPIRV-Cross's HLSL backend (which does not support the SampledRect capability) accepts the
+  // shader. Macro-based rect sampling (GaussianBlur1D's TGFX_GB1D_SAMPLE) and helper call-site
+  // coord wrapping are handled inside the normalizer. Structural surprises surface as errors.
+  auto fsNorm = NormalizeRectSamplers(fsGlsl, GlslStage::Fragment);
+  if (!fsNorm.errorMessage.empty()) {
+    errorOut = "FS rect-normalize: " + fsNorm.errorMessage;
     return false;
   }
+  fsGlsl = std::move(fsNorm.glsl);
+  auto vsNorm = NormalizeRectSamplers(vsGlsl, GlslStage::Vertex);
+  if (!vsNorm.errorMessage.empty()) {
+    errorOut = "VS rect-normalize: " + vsNorm.errorMessage;
+    return false;
+  }
+  vsGlsl = std::move(vsNorm.glsl);
 
   auto vsSpv = CompileGlslToSpv(vsGlsl, GlslStage::Vertex);
   if (!vsSpv.errorMessage.empty()) {
@@ -210,8 +215,8 @@ bool ConvertOneProgram(const std::string& inputDir, const std::string& outputDir
     return false;
   }
 
-  auto vsHlsl = ConvertSpvToHlsl(vsSpv.spirv, GlslStage::Vertex,
-                                 static_cast<uint32_t>(entry.attributeCount));
+  auto vsHlsl =
+      ConvertSpvToHlsl(vsSpv.spirv, GlslStage::Vertex, static_cast<uint32_t>(entry.attributeCount));
   if (!vsHlsl.errorMessage.empty()) {
     errorOut = "VS SPV->HLSL: " + vsHlsl.errorMessage;
     return false;
@@ -252,6 +257,8 @@ bool ConvertOneProgram(const std::string& inputDir, const std::string& outputDir
   me.samplers.insert(me.samplers.end(), fsHlsl.samplerBindings.begin(),
                      fsHlsl.samplerBindings.end());
   me.attributes = vsHlsl.attributes;
+  me.rectSamplers = fsNorm.rects;
+  me.rectSamplers.insert(me.rectSamplers.end(), vsNorm.rects.begin(), vsNorm.rects.end());
   manifest.appendEntry(me);
   return true;
 }

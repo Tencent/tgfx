@@ -21,7 +21,7 @@
 #include <ostream>
 #include <string>
 #include <vector>
-
+#include "GlslRectNormalizer.h"
 #include "SpvToHlsl.h"
 
 namespace tgfx {
@@ -46,6 +46,10 @@ struct ManifestEntry {
   std::vector<HlslResourceBinding> srvs;
   std::vector<HlslResourceBinding> samplers;
   std::vector<HlslAttributeRemap> attributes;  // vertex input semantics in order
+  // Rect samplers the normalizer rewrote to sampler2D. UE must supply an inverse-size vec2
+  // uniform per entry, and for any DstTextureSampler_Pn listed here must also set the sibling
+  // DstTextureCoordScale_Pn cbuffer member to (1/width, 1/height).
+  std::vector<RectSamplerInfo> rectSamplers;
 };
 
 class ManifestWriter {
