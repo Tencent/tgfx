@@ -45,6 +45,12 @@ std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& ar
   auto newArgs = args;
   newArgs.backingFit = BackingFit::Exact;
   newArgs.drawScale = newScale;
+  if (hasMipmaps()) {
+    // The cache key carries a MipmapFlag whenever the source has mipmaps, so upgrade the proxy
+    // request to match. Otherwise a later mipmapped draw could reuse a non-mipmapped proxy cached
+    // under the same key.
+    newArgs.mipmapped = true;
+  }
   textureProxy = source->lockTextureProxy(newArgs);
   if (textureProxy == nullptr) {
     return nullptr;
