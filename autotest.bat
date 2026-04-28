@@ -35,7 +35,9 @@ mkdir build
 cd build
 
 :: Configure CMake with Ninja
-cmake -G Ninja -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ..
+set "USE_SWIFTSHADER_FLAG="
+if "%1"=="USE_SWIFTSHADER" set "USE_SWIFTSHADER_FLAG=-DTGFX_USE_SWIFTSHADER=ON"
+cmake -G Ninja %USE_SWIFTSHADER_FLAG% -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ..
 if %errorlevel% equ 0 (
     echo ~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~
 ) else (
@@ -50,6 +52,11 @@ if %errorlevel% equ 0 (
 ) else (
     echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest make error~~~~~~~~~~~~~~~~~~
     exit /b 1
+)
+
+:: Copy SwiftShader DLLs to build directory if needed
+if "%1"=="USE_SWIFTSHADER" (
+    copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\*.dll" "%WORKSPACE%\build\" >nul 2>&1
 )
 
 :: Run tests

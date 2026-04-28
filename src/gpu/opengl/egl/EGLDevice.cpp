@@ -82,7 +82,7 @@ static EGLContext CreateContext(EGLContext sharedContext, EGLDisplay eglDisplay,
   return eglContext;
 }
 
-#if defined(_WIN32)
+#if defined(TGFX_USE_ANGLE)
 // Create a fixed-size window surface for ANGLE, as ANGLE can only detect resizes during a swap.
 // https://groups.google.com/g/angleproject/c/j3SF7nVIpD8
 static EGLSurface CreateFixedSizeSurfaceForAngle(EGLNativeWindowType nativeWindow,
@@ -151,7 +151,7 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
                                                EGLContext sharedContext,
                                                std::shared_ptr<ColorSpace> colorSpace) {
   auto eglGlobals = EGLGlobals::Get();
-#if defined(_WIN32)
+#if defined(TGFX_USE_ANGLE)
   auto eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, eglGlobals);
   if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
     LOGE(
@@ -343,7 +343,7 @@ bool EGLDevice::checkGraphicsResetStatus() {
 }
 
 bool EGLDevice::recreateSurfaceIfNeeded(EGLNativeWindowType nativeWindow) {
-#if defined(_WIN32)
+#if defined(TGFX_USE_ANGLE)
   if (nativeWindow == nullptr) {
     return true;
   }

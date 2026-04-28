@@ -18,7 +18,7 @@
 
 #pragma once
 
-#if defined(_WIN32)
+#if defined(TGFX_USE_ANGLE)
 #include <EGL/egl.h>
 
 namespace tgfx {

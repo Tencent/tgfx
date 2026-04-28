@@ -116,7 +116,7 @@ jobs:
         shell: cmd
 
       - name: Run Autotest
-        run: autotest.bat
+        run: autotest.bat USE_SWIFTSHADER
         shell: cmd
         env:
           TRACY_NO_INVARIANT_CHECK: 1
