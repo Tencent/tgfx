@@ -214,6 +214,7 @@ void QGLWindow::onPresent(Context*) {
     std::lock_guard<std::mutex> autoLock(locker);
     oldProxy = std::move(pendingProxy);
     pendingProxy = proxy->getTextureTargetProxy();
+    proxy->textureRTProxy = nullptr;
   }
   // Release the proxy from the previous pending frame if it was not consumed.
   if (oldProxy != nullptr) {
@@ -225,20 +226,30 @@ void QGLWindow::onPresent(Context*) {
 std::shared_ptr<RenderTargetProxy> QGLWindow::acquireTexture(Context* context, int width,
                                                              int height) {
   std::lock_guard<std::mutex> autoLock(locker);
-  for (auto& slot : textureSlots) {
-    if (slot.available && slot.proxy->width() == width && slot.proxy->height() == height) {
-      slot.available = false;
-      return slot.proxy;
+  // In single buffer mode, reclaim the pending frame if it hasn't been consumed yet.
+  // This handles the case where draw() is called before getQSGTexture() in singleBufferMode.
+  // In dual buffer mode, we have 2 slots available, so no need to reclaim the pending proxy.
+  if (maxTextureCount == 1 && pendingProxy != nullptr) {
+    for (auto& slot : textureSlots) {
+      if (slot.proxy == pendingProxy) {
+        slot.available = true;
+        break;
+      }
     }
+    pendingProxy = nullptr;
   }
-  // Remove stale available slots whose size no longer matches.
+  // Find an available slot with matching size, and remove stale slots with mismatched size.
   auto it = textureSlots.begin();
   while (it != textureSlots.end()) {
-    if (it->available && (it->proxy->width() != width || it->proxy->height() != height)) {
-      it = textureSlots.erase(it);
-    } else {
+    if (!it->available) {
       ++it;
+      continue;
     }
+    if (it->proxy->width() == width && it->proxy->height() == height) {
+      it->available = false;
+      return it->proxy;
+    }
+    it = textureSlots.erase(it);
   }
   if (static_cast<int>(textureSlots.size()) >= maxTextureCount) {
     LOGE("QGLWindow::acquireTexture() All textures are in use. No available texture in the pool.");

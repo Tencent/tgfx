@@ -156,24 +156,32 @@ bool LayerRecorder::tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& sh
   if (matrixShape == nullptr || !matrixShape->shape->isSimplePath()) {
     return false;
   }
-  auto combinedMatrix = matrixShape->matrix;
-  combinedMatrix.postConcat(matrix);
-  if (paint.style == PaintStyle::Stroke) {
+  // Pulling matrixShape->matrix out of the shape and folding it into the combined CTM affects how
+  // the paint is sampled. The shader is supplied in the original shape's local space, so apply the
+  // inverse to keep its appearance unchanged. The stroke is also specified in that local space,
+  // and uniform scales need to be canceled out so the visual stroke width stays as the caller
+  // intended; non-uniform scales would distort the stroke and are not safe to fold into the CTM.
+  Matrix inverseInner = {};
+  if (!matrixShape->matrix.invert(&inverseInner)) {
+    return false;
+  }
+  LayerPaint adjustedPaint = paint;
+  if (adjustedPaint.shader != nullptr) {
+    adjustedPaint.shader = adjustedPaint.shader->makeWithMatrix(inverseInner);
+  }
+  if (adjustedPaint.style == PaintStyle::Stroke) {
     auto scales = matrixShape->matrix.getAxisScales();
-    // Skip tryAddSimplifiedPath for stroke with non-uniform scale in shape's matrix, as this
-    // optimization would cause the stroke to be scaled non-uniformly.
     if (!FloatNearlyEqual(scales.x, scales.y)) {
       return false;
     }
-    // Compensate stroke width for uniform scale to keep stroke width constant.
     if (!FloatNearlyEqual(scales.x, 1.0f)) {
       DEBUG_ASSERT(scales.x != 0);
-      auto compensatedPaint = paint;
-      compensatedPaint.stroke.width = paint.stroke.width / scales.x;
-      return tryAddSimplifiedPath(matrixShape->shape->getPath(), compensatedPaint, combinedMatrix);
+      adjustedPaint.stroke.width = paint.stroke.width / scales.x;
     }
   }
-  return tryAddSimplifiedPath(matrixShape->shape->getPath(), paint, combinedMatrix);
+  auto combinedMatrix = matrixShape->matrix;
+  combinedMatrix.postConcat(matrix);
+  return tryAddSimplifiedPath(matrixShape->shape->getPath(), adjustedPaint, combinedMatrix);
 }
 
 bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& paint,
@@ -181,7 +189,6 @@ bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& pai
   Point line[2] = {};
   if (path.isLine(line)) {
     if (paint.style != PaintStyle::Stroke) {
-      // A line cannot be filled.
       return true;
     }
     Rect rect = {};
@@ -189,6 +196,13 @@ bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& pai
       LayerPaint fillPaint = paint;
       fillPaint.style = PaintStyle::Fill;
       addRect(rect, fillPaint, matrix);
+      return true;
+    }
+    RRect rRect = {};
+    if (StrokeLineToRRect(paint.stroke, line, &rRect)) {
+      LayerPaint fillPaint = paint;
+      fillPaint.style = PaintStyle::Fill;
+      addRRect(rRect, fillPaint, matrix);
       return true;
     }
   }

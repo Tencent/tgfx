@@ -216,6 +216,9 @@ void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const Matrix& matrix,
 
   if (needDeviceBounds) {
     deviceBounds = matrix.mapRect(meshBounds);
+    if (!deviceBounds->intersect(clipBounds)) {
+      deviceBounds->setEmpty();
+    }
   }
 
   // Determine if mesh has vertex colors (only VertexMesh can have these)
@@ -286,6 +289,9 @@ void OpsCompositor::drawHairlineShape(std::shared_ptr<Shape> shape, const Matrix
   }
   if (needDeviceBounds) {
     deviceBounds = shape->getBounds();
+    if (!deviceBounds->intersect(clipBounds)) {
+      deviceBounds->setEmpty();
+    }
   }
 
   bool hasCap =
@@ -426,8 +432,10 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
       needComputeBounds(pendingBrush, hasCoverage, hasImageFill);
   auto aaType = getAAType(pendingBrush);
   Rect clipBounds = {};
-  if (needLocalBounds) {
+  if (needLocalBounds || needDeviceBounds) {
     clipBounds = getClipBounds(pendingClip);
+  }
+  if (needLocalBounds) {
     localBounds = Rect::MakeEmpty();
     drawScale = 0.0f;
   }
@@ -439,6 +447,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
         auto rect = record->viewMatrix.mapRect(record->rRect.rect);
         deviceBounds->join(rect);
         drawScale = std::max(*drawScale, record->viewMatrix.getMaxScale());
+      }
+      if (!deviceBounds->intersect(clipBounds)) {
+        deviceBounds->setEmpty();
       }
       localBounds = deviceBounds;
       if (!localBounds->intersect(clipBounds)) {
@@ -465,6 +476,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
         for (auto& record : pendingRects) {
           auto rect = record->viewMatrix.mapRect(record->rect);
           deviceBounds->join(rect);
+        }
+        if (!deviceBounds->intersect(clipBounds)) {
+          deviceBounds->setEmpty();
         }
       }
     }
@@ -581,6 +595,9 @@ void OpsCompositor::flushPendingShapeOps() {
   }
   if (needDeviceBounds) {
     deviceBounds = shape->isInverseFillType() ? clipBounds : shapeMatrix.mapRect(shapeBounds);
+    if (!shape->isInverseFillType() && !deviceBounds->intersect(clipBounds)) {
+      deviceBounds->setEmpty();
+    }
   }
 
   shape = Shape::ApplyMatrix(std::move(shape), shapeMatrix);

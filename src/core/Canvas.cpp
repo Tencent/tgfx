@@ -215,12 +215,32 @@ void Canvas::drawPaint(const Paint& paint) {
 }
 
 void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint) {
+  SaveLayerForImageFilter(paint.getImageFilter());
+  Stroke stroke(paint.getStrokeWidth(), paint.getLineCap(), paint.getLineJoin(),
+                paint.getMiterLimit());
+  Point line[2] = {{x0, y0}, {x1, y1}};
+  drawLine(line, _matrix, *clipStack, paint.getBrush(), stroke);
+}
+
+void Canvas::drawLine(const Point line[2], const Matrix& matrix, const ClipStack& clip,
+                      const Brush& brush, const Stroke& stroke) const {
+  Rect rect = {};
+  if (StrokeLineToRect(stroke, line, &rect)) {
+    drawContext->drawRect(rect, matrix, clip, brush, nullptr);
+    return;
+  }
+  RRect rRect = {};
+  if (StrokeLineToRRect(stroke, line, &rRect)) {
+    drawContext->drawRRect(rRect, matrix, clip, brush, nullptr);
+    return;
+  }
   Path path = {};
-  path.moveTo(x0, y0);
-  path.lineTo(x1, y1);
-  auto realPaint = paint;
-  realPaint.setStyle(PaintStyle::Stroke);
-  drawPath(path, realPaint);
+  path.moveTo(line[0].x, line[0].y);
+  path.lineTo(line[1].x, line[1].y);
+  auto shape = Shape::MakeFrom(path);
+  if (shape) {
+    drawContext->drawShape(shape, matrix, clip, brush, &stroke);
+  }
 }
 
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
@@ -291,6 +311,9 @@ static bool UseDrawPath(const Paint& paint, const Point& radii, const Matrix& vi
 }
 
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
+  if (rRect.rect.isEmpty()) {
+    return;
+  }
   auto& radii = rRect.radii;
   if (radii.x < 0.5f && radii.y < 0.5f) {
     drawRect(rRect.rect, paint);
@@ -300,9 +323,6 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
     Path path = {};
     path.addRRect(rRect);
     drawPath(path, paint);
-    return;
-  }
-  if (rRect.rect.isEmpty()) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
@@ -321,23 +341,18 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   drawPath(path, _matrix, *clipStack, paint.getBrush(), paint.getStroke());
 }
 
-// Checks if the line is axis-aligned and not a hairline stroke, allowing it to be converted to a
-// rect.
 void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
                       const Brush& brush, const Stroke* stroke) const {
   DEBUG_ASSERT(!path.isEmpty());
-  Rect rect = {};
   Point line[2] = {};
   if (path.isLine(line)) {
     if (!stroke) {
-      // a line has no fill to draw.
       return;
     }
-    if (StrokeLineToRect(*stroke, line, &rect)) {
-      drawContext->drawRect(rect, matrix, clip, brush, nullptr);
-      return;
-    }
+    drawLine(line, matrix, clip, brush, *stroke);
+    return;
   }
+  Rect rect = {};
   if (stroke == nullptr) {
     if (path.isRect(&rect)) {
       drawContext->drawRect(rect, matrix, clip, brush, nullptr);
