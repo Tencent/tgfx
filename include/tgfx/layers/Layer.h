@@ -687,8 +687,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void updateBackgroundBounds(float contentScale, const std::vector<Rect>& sourceRects);
 
-  bool hasBackgroundExtraSource() const;
-
   void propagateLayerState();
 
   bool hasBackgroundStyle();

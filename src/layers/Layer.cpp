@@ -2282,9 +2282,11 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   // descendants) paints above the blur result and must not participate in blur dirty expansion.
   // The snapshot costs O(MAX_DIRTY_REGIONS) = O(1) per blur-capable layer.
   std::vector<Rect> backgroundSourceRects = {};
-  bool needsBackgroundSnapshot = hasBackgroundExtraSource() || bitFields.hasBlendMode;
-  if (needsBackgroundSnapshot) {
-    backgroundSourceRects = _root->currentDirtyRects();
+  for (const auto& style : _layerStyles) {
+    if (style && style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+      backgroundSourceRects = _root->currentDirtyRects();
+      break;
+    }
   }
   auto content = getContent();
   if (bitFields.dirtyContentBounds || (forceDirty && content)) {
@@ -2421,15 +2423,6 @@ void Layer::updateBackgroundBounds(float contentScale, const std::vector<Rect>& 
   if (bitFields.hasBlendMode) {
     _root->invalidateBackground(renderBounds, nullptr, contentScale, sourceRects);
   }
-}
-
-bool Layer::hasBackgroundExtraSource() const {
-  for (auto& style : _layerStyles) {
-    if (style && style->extraSourceType() == LayerStyleExtraSourceType::Background) {
-      return true;
-    }
-  }
-  return false;
 }
 
 void Layer::propagateLayerState() {
