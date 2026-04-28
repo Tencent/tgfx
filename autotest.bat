@@ -10,12 +10,24 @@ echo %cd%
 where cl >nul 2>&1
 if %errorlevel% neq 0 (
     echo ----Setting up MSVC environment----
-    for %%v in (2022 2019) do (
-        for %%e in (Enterprise Professional Community BuildTools) do (
-            set "VCVARS=C:\Program Files\Microsoft Visual Studio\%%v\%%e\VC\Auxiliary\Build\vcvars64.bat"
+    set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+    if exist "!VSWHERE!" (
+        for /f "usebackq delims=" %%i in (`"!VSWHERE!" -latest -property installationPath`) do (
+            set "VCVARS=%%i\VC\Auxiliary\Build\vcvars64.bat"
             if exist "!VCVARS!" (
                 call "!VCVARS!"
                 goto :env_ready
+            )
+        )
+    )
+    for %%p in ("%ProgramFiles%" "%ProgramFiles(x86)%") do (
+        for %%v in (2022 2019) do (
+            for %%e in (Enterprise Professional Community BuildTools) do (
+                set "VCVARS=%%~p\Microsoft Visual Studio\%%v\%%e\VC\Auxiliary\Build\vcvars64.bat"
+                if exist "!VCVARS!" (
+                    call "!VCVARS!"
+                    goto :env_ready
+                )
             )
         )
     )
