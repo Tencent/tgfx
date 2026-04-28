@@ -566,9 +566,10 @@ TGFX_TEST(SVGExportTest, GradientMask) {
   Buffer buffer(readStream->size());
   readStream->read(buffer.data(), buffer.size());
   auto compareString = std::string(static_cast<char*>(buffer.data()), buffer.size());
-  // The baseline SVG file from resources/ may contain '\r\n' line endings on Windows due to Git
-  // checkout CRLF conversion. Runtime-generated SVG strings use '\n' only, so strip '\r' before
-  // comparison. Other SVG tests compare against in-memory strings and are not affected.
+  // Only this code path reads a baseline SVG file from disk, which may contain '\r\n' line endings
+  // on Windows due to Git checkout CRLF conversion. Strip '\r' so it matches the runtime-generated
+  // SVG string that uses '\n' only. Other SVG tests compare against in-memory strings and are not
+  // affected by CRLF conversion.
   compareString.erase(std::remove(compareString.begin(), compareString.end(), '\r'),
                       compareString.end());
 
