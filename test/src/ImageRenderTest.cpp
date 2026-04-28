@@ -110,18 +110,16 @@ TGFX_TEST(ImageRenderTest, rasterizedImage) {
   auto canvas = surface->getCanvas();
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "ImageRenderTest/rasterized"));
-  TGFX_PRIVATE_ACCESS(
-      auto rasterImageUniqueKey =
-          std::static_pointer_cast<RasterizedImage>(rasterImage)->getTextureKey();
-      auto textureView = Resource::Find<TextureView>(context, rasterImageUniqueKey);
-      ASSERT_TRUE(textureView != nullptr);
-      EXPECT_TRUE(textureView != nullptr);
-      EXPECT_EQ(textureView->width(), 454);
-      EXPECT_EQ(textureView->height(), 605);
-      auto source = std::static_pointer_cast<TransformImage>(image)->source;
-      auto imageUniqueKey = std::static_pointer_cast<RasterizedImage>(source)->getTextureKey();
-      textureView = Resource::Find<TextureView>(context, imageUniqueKey);
-      EXPECT_TRUE(textureView == nullptr));
+  TGFX_PRIVATE_ACCESS(auto rasterImageUniqueKey =
+                          std::static_pointer_cast<RasterizedImage>(rasterImage)->getTextureKey();
+                      auto textureView = Resource::Find<TextureView>(context, rasterImageUniqueKey);
+                      ASSERT_TRUE(textureView != nullptr); EXPECT_TRUE(textureView != nullptr);
+                      EXPECT_EQ(textureView->width(), 454); EXPECT_EQ(textureView->height(), 605);
+                      auto source = std::static_pointer_cast<TransformImage>(image)->source;
+                      auto imageUniqueKey =
+                          std::static_pointer_cast<RasterizedImage>(source)->getTextureKey();
+                      textureView = Resource::Find<TextureView>(context, imageUniqueKey);
+                      EXPECT_TRUE(textureView == nullptr));
   canvas->clear();
   image = image->makeMipmapped(true);
   EXPECT_TRUE(image->hasMipmaps());
@@ -131,12 +129,12 @@ TGFX_TEST(ImageRenderTest, rasterizedImage) {
   EXPECT_TRUE(rasterImage->hasMipmaps());
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "ImageRenderTest/rasterized_mipmap"));
-  TGFX_PRIVATE_ACCESS(
-      textureView = Resource::Find<TextureView>(context, rasterImageUniqueKey);
-      EXPECT_TRUE(textureView == nullptr);
-      rasterImageUniqueKey = std::static_pointer_cast<RasterizedImage>(rasterImage)->getTextureKey();
-      textureView = Resource::Find<TextureView>(context, rasterImageUniqueKey);
-      EXPECT_TRUE(textureView != nullptr));
+  TGFX_PRIVATE_ACCESS(textureView = Resource::Find<TextureView>(context, rasterImageUniqueKey);
+                      EXPECT_TRUE(textureView == nullptr);
+                      rasterImageUniqueKey =
+                          std::static_pointer_cast<RasterizedImage>(rasterImage)->getTextureKey();
+                      textureView = Resource::Find<TextureView>(context, rasterImageUniqueKey);
+                      EXPECT_TRUE(textureView != nullptr));
   canvas->clear();
   scaledImage = scaledImage->makeMipmapped(false);
   EXPECT_FALSE(scaledImage->hasMipmaps());
@@ -537,9 +535,8 @@ TGFX_TEST(ImageRenderTest, RasterizedMipmapImage) {
   auto canvas = surface->getCanvas();
   canvas->drawImage(image);
   context->flushAndSubmit();
-  TGFX_PRIVATE_ACCESS(
-      textureProxy = context->proxyProvider()->findOrWrapTextureProxy(originKey);
-      EXPECT_TRUE(textureProxy != nullptr));
+  TGFX_PRIVATE_ACCESS(textureProxy = context->proxyProvider()->findOrWrapTextureProxy(originKey);
+                      EXPECT_TRUE(textureProxy != nullptr));
 
   image = image->makeMipmapped(true);
   EXPECT_TRUE(image->hasMipmaps());
@@ -550,9 +547,8 @@ TGFX_TEST(ImageRenderTest, RasterizedMipmapImage) {
       EXPECT_TRUE(mipmapTexture == nullptr));
   canvas->drawImage(image);
   context->flushAndSubmit();
-  TGFX_PRIVATE_ACCESS(
-      mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
-      EXPECT_TRUE(mipmapTexture != nullptr));
+  TGFX_PRIVATE_ACCESS(mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
+                      EXPECT_TRUE(mipmapTexture != nullptr));
 
   image = image->makeMipmapped(false);
   EXPECT_FALSE(image->hasMipmaps());

@@ -269,7 +269,8 @@ TGFX_TEST_PRIVATE(StrokeTest, HairlineUniqueKey) {
 
   auto normalStrokeShape1 = Shape::ApplyStroke(shape, &hairlineStroke1);
   auto normalStrokeShape2 = Shape::ApplyStroke(shape, &hairlineStroke2);
-  TGFX_PRIVATE_ACCESS(EXPECT_NE(normalStrokeShape1->getUniqueKey(), normalStrokeShape2->getUniqueKey());)
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_NE(normalStrokeShape1->getUniqueKey(), normalStrokeShape2->getUniqueKey());)
 }
 
 TGFX_TEST(StrokeTest, LineRenderAsHairline) {
@@ -313,10 +314,9 @@ TGFX_TEST(StrokeTest, SquareCapDashStrokeAsSolidStroke) {
   auto matrix = Matrix::MakeTrans(100, 100);
   shapeLayer1->setMatrix(matrix);
 
-  TGFX_PRIVATE_ACCESS(
-      auto simplifiedDashes1 =
-          SimplifyLineDashPattern(shapeLayer1->_lineDashPattern, shapeLayer1->stroke);
-      EXPECT_EQ(simplifiedDashes1.size(), 0u));
+  TGFX_PRIVATE_ACCESS(auto simplifiedDashes1 = SimplifyLineDashPattern(
+                          shapeLayer1->_lineDashPattern, shapeLayer1->stroke);
+                      EXPECT_EQ(simplifiedDashes1.size(), 0u));
 
   Path path2 = {};
   path2.addRect(-90, -90, 90, 90);
@@ -331,12 +331,10 @@ TGFX_TEST(StrokeTest, SquareCapDashStrokeAsSolidStroke) {
   shapeLayer2->setLineCap(LineCap::Square);
   shapeLayer2->setMatrix(Matrix::MakeTrans(100, 100));
 
-  TGFX_PRIVATE_ACCESS(
-      auto simplifiedDashes2 =
-          SimplifyLineDashPattern(shapeLayer2->_lineDashPattern, shapeLayer2->stroke);
-      EXPECT_EQ(simplifiedDashes2.size(), 2u);
-      EXPECT_EQ(simplifiedDashes2[0], 6.f);
-      EXPECT_EQ(simplifiedDashes2[1], 4.f));
+  TGFX_PRIVATE_ACCESS(auto simplifiedDashes2 = SimplifyLineDashPattern(
+                          shapeLayer2->_lineDashPattern, shapeLayer2->stroke);
+                      EXPECT_EQ(simplifiedDashes2.size(), 2u); EXPECT_EQ(simplifiedDashes2[0], 6.f);
+                      EXPECT_EQ(simplifiedDashes2[1], 4.f));
 
   DisplayList displayList;
   displayList.root()->addChild(shapeLayer1);

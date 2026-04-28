@@ -36,11 +36,9 @@ std::shared_ptr<ImageCodec> MakeImageCodec(const std::string& path) {
   return ImageCodec::MakeFrom(ProjectPath::Absolute(path));
 }
 
-TGFX_PRIVATE_ACCESS(
-std::shared_ptr<ImageCodec> MakeNativeCodec(const std::string& path) {
+TGFX_PRIVATE_ACCESS(std::shared_ptr<ImageCodec> MakeNativeCodec(const std::string& path) {
   return ImageCodec::MakeNativeCodec(ProjectPath::Absolute(path));
-}
-)
+})
 
 std::shared_ptr<Image> MakeImage(const std::string& path) {
   return Image::MakeFromFile(ProjectPath::Absolute(path));

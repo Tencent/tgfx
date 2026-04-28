@@ -600,7 +600,8 @@ TGFX_TEST(LayerMaskTest, HighZoomWithMask) {
   // Test Tiled mode
   auto texture2 = context->gpu()->createTexture({1622, 1436, PixelFormat::RGBA_8888});
   ASSERT_TRUE(texture2 != nullptr);
-  auto surface2 = Surface::MakeFrom(context, texture2->getBackendTexture(), ImageOrigin::BottomLeft);
+  auto surface2 =
+      Surface::MakeFrom(context, texture2->getBackendTexture(), ImageOrigin::BottomLeft);
   auto displayList2 = std::make_unique<DisplayList>();
   displayList2->root()->addChild(root);
   displayList2->setRenderMode(RenderMode::Tiled);
@@ -783,14 +784,14 @@ TGFX_TEST_PRIVATE(LayerMaskTest, MaskInvalidation) {
 
   // Verify all dirty flags are cleared after render.
   TGFX_PRIVATE_ACCESS(EXPECT_FALSE(child->bitFields.dirtyTransform);
-                       EXPECT_FALSE(maskLayer->bitFields.dirtyTransform);
-                       EXPECT_FALSE(root->bitFields.dirtyDescendents));
+                      EXPECT_FALSE(maskLayer->bitFields.dirtyTransform);
+                      EXPECT_FALSE(root->bitFields.dirtyDescendents));
 
   // Set mask, both child and maskLayer should be marked dirty.
   child->setMask(maskLayer);
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(child->bitFields.dirtyTransform);
-                       EXPECT_TRUE(maskLayer->bitFields.dirtyTransform);
-                       EXPECT_TRUE(root->bitFields.dirtyDescendents));
+                      EXPECT_TRUE(maskLayer->bitFields.dirtyTransform);
+                      EXPECT_TRUE(root->bitFields.dirtyDescendents));
 
   // Second render with mask. maskLayer should be hidden (used as mask, skipped via maskOwner).
   displayList->render(surface.get());
@@ -798,14 +799,14 @@ TGFX_TEST_PRIVATE(LayerMaskTest, MaskInvalidation) {
 
   // Verify dirty flags are cleared again.
   TGFX_PRIVATE_ACCESS(EXPECT_FALSE(child->bitFields.dirtyTransform);
-                       EXPECT_FALSE(maskLayer->bitFields.dirtyTransform);
-                       EXPECT_FALSE(root->bitFields.dirtyDescendents));
+                      EXPECT_FALSE(maskLayer->bitFields.dirtyTransform);
+                      EXPECT_FALSE(root->bitFields.dirtyDescendents));
 
   // Remove mask, both child and old maskLayer should be marked dirty.
   child->setMask(nullptr);
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(child->bitFields.dirtyTransform);
-                       EXPECT_TRUE(maskLayer->bitFields.dirtyTransform);
-                       EXPECT_TRUE(root->bitFields.dirtyDescendents));
+                      EXPECT_TRUE(maskLayer->bitFields.dirtyTransform);
+                      EXPECT_TRUE(root->bitFields.dirtyDescendents));
 
   // Third render without mask. Both child and maskLayer should be visible again.
   displayList->render(surface.get());
@@ -813,8 +814,8 @@ TGFX_TEST_PRIVATE(LayerMaskTest, MaskInvalidation) {
 
   // Verify dirty flags are cleared.
   TGFX_PRIVATE_ACCESS(EXPECT_FALSE(child->bitFields.dirtyTransform);
-                       EXPECT_FALSE(maskLayer->bitFields.dirtyTransform);
-                       EXPECT_FALSE(root->bitFields.dirtyDescendents));
+                      EXPECT_FALSE(maskLayer->bitFields.dirtyTransform);
+                      EXPECT_FALSE(root->bitFields.dirtyDescendents));
 
   // Create a second mask and set it on child.
   Path maskPath2;
@@ -830,15 +831,15 @@ TGFX_TEST_PRIVATE(LayerMaskTest, MaskInvalidation) {
 
   // Verify dirty flags are cleared.
   TGFX_PRIVATE_ACCESS(EXPECT_FALSE(child->bitFields.dirtyTransform);
-                       EXPECT_FALSE(maskLayer2->bitFields.dirtyTransform);
-                       EXPECT_FALSE(root->bitFields.dirtyDescendents));
+                      EXPECT_FALSE(maskLayer2->bitFields.dirtyTransform);
+                      EXPECT_FALSE(root->bitFields.dirtyDescendents));
 
   // Switch mask from maskLayer2 to maskLayer. Both old and new mask should be marked dirty.
   child->setMask(maskLayer);
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(child->bitFields.dirtyTransform);
-                       EXPECT_TRUE(maskLayer->bitFields.dirtyTransform);
-                       EXPECT_TRUE(maskLayer2->bitFields.dirtyTransform);
-                       EXPECT_TRUE(root->bitFields.dirtyDescendents));
+                      EXPECT_TRUE(maskLayer->bitFields.dirtyTransform);
+                      EXPECT_TRUE(maskLayer2->bitFields.dirtyTransform);
+                      EXPECT_TRUE(root->bitFields.dirtyDescendents));
 
   // Remove maskLayer2 so it won't render as a normal child.
   maskLayer2->removeFromParent();
@@ -848,8 +849,8 @@ TGFX_TEST_PRIVATE(LayerMaskTest, MaskInvalidation) {
 
   // Verify dirty flags are cleared.
   TGFX_PRIVATE_ACCESS(EXPECT_FALSE(child->bitFields.dirtyTransform);
-                       EXPECT_FALSE(maskLayer->bitFields.dirtyTransform);
-                       EXPECT_FALSE(root->bitFields.dirtyDescendents));
+                      EXPECT_FALSE(maskLayer->bitFields.dirtyTransform);
+                      EXPECT_FALSE(root->bitFields.dirtyDescendents));
 }
 
 TGFX_TEST(LayerMaskTest, solidLayerWithTwoFillMask) {

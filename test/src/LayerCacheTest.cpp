@@ -314,7 +314,7 @@ TGFX_TEST_PRIVATE(LayerCacheTest, LayerCacheContentScale) {
   // At zoom 0.1, longEdge < minLongEdge, cache should be 50
   int expectedLongEdge0_1 = 50;
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache->cacheEntries.size() == 3);
-                       EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge0_1)));
+                      EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge0_1)));
 }
 
 TGFX_TEST_PRIVATE(LayerCacheTest, StaticSubtree) {
@@ -334,44 +334,44 @@ TGFX_TEST_PRIVATE(LayerCacheTest, StaticSubtree) {
 
   displayList->root()->addChild(rootLayer);
   TGFX_PRIVATE_ACCESS(EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
-                       EXPECT_FALSE(childLayer->bitFields.staticSubtree));
+                      EXPECT_FALSE(childLayer->bitFields.staticSubtree));
 
   // After first render, staticSubtree should be true
   displayList->render(surface.get());
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
-                       EXPECT_TRUE(childLayer->bitFields.staticSubtree));
+                      EXPECT_TRUE(childLayer->bitFields.staticSubtree));
 
   // After adding filter, both should be false
   auto filter = BlurFilter::Make(10.f, 10.f);
   childLayer->setFilters({filter});
   TGFX_PRIVATE_ACCESS(EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
-                       EXPECT_FALSE(childLayer->bitFields.staticSubtree));
+                      EXPECT_FALSE(childLayer->bitFields.staticSubtree));
 
   // After render, both should be true again
   displayList->render(surface.get());
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
-                       EXPECT_TRUE(childLayer->bitFields.staticSubtree));
+                      EXPECT_TRUE(childLayer->bitFields.staticSubtree));
 
   // After adding layer style, both should be false
   auto style = DropShadowStyle::Make(5, 5, 0, 0, Color::Black(), false);
   childLayer->setLayerStyles({style});
   TGFX_PRIVATE_ACCESS(EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
-                       EXPECT_FALSE(childLayer->bitFields.staticSubtree));
+                      EXPECT_FALSE(childLayer->bitFields.staticSubtree));
 
   // After render, both should be true again
   displayList->render(surface.get());
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
-                       EXPECT_TRUE(childLayer->bitFields.staticSubtree));
+                      EXPECT_TRUE(childLayer->bitFields.staticSubtree));
 
   // After invalidating descendents, both should be false
   TGFX_PRIVATE_ACCESS(rootLayer->invalidateDescendents());
   TGFX_PRIVATE_ACCESS(EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
-                       EXPECT_TRUE(childLayer->bitFields.staticSubtree));
+                      EXPECT_TRUE(childLayer->bitFields.staticSubtree));
 
   // After render, both should be true again
   displayList->render(surface.get());
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
-                       EXPECT_TRUE(childLayer->bitFields.staticSubtree));
+                      EXPECT_TRUE(childLayer->bitFields.staticSubtree));
 }
 
 /**
@@ -787,11 +787,10 @@ TGFX_TEST_PRIVATE(LayerCacheTest, TileClearWhenAllLayersRemoved) {
   rootLayer->addChild(blueRect);
   displayList->render(surface.get());
 
-  TGFX_PRIVATE_ACCESS(
-      EXPECT_EQ(displayList->tileCaches.size(), 1u);
-      auto result = displayList->tileCaches.find(1000);
-      EXPECT_TRUE(result != displayList->tileCaches.end());
-      EXPECT_EQ(result->second->tileMap.size(), 4u));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tileCaches.size(), 1u);
+                      auto result = displayList->tileCaches.find(1000);
+                      EXPECT_TRUE(result != displayList->tileCaches.end());
+                      EXPECT_EQ(result->second->tileMap.size(), 4u));
 
   blueRect->removeFromParent();
   displayList->render(surface.get());
@@ -859,12 +858,12 @@ TGFX_TEST_PRIVATE(LayerCacheTest, ContentBlendModeDisablesCache) {
   // First render
   displayList->render(surface.get());
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(blendLayer->subtreeCache == nullptr);
-                       EXPECT_TRUE(blendLayer->bitFields.hasBlendMode));
+                      EXPECT_TRUE(blendLayer->bitFields.hasBlendMode));
 
   // Second render - should still not create cache due to content blend mode
   displayList->render(surface.get());
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(blendLayer->subtreeCache == nullptr);
-                       EXPECT_TRUE(blendLayer->bitFields.hasBlendMode));
+                      EXPECT_TRUE(blendLayer->bitFields.hasBlendMode));
 
   // Compare the rendering result to ensure blend mode works correctly
   EXPECT_TRUE(Baseline::Compare(surface, "LayerCacheTest/ContentBlendModeDisablesCache"));
@@ -913,7 +912,7 @@ TGFX_TEST_PRIVATE(LayerCacheTest, OverlappingDirtyRegions) {
   TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tileCaches.size(), 0lu));
 
   TGFX_PRIVATE_ACCESS(auto emptyTilesAfter = displayList->emptyTiles.size();
-                       EXPECT_EQ(9lu, emptyTilesAfter));
+                      EXPECT_EQ(9lu, emptyTilesAfter));
 }
 
 }  // namespace tgfx

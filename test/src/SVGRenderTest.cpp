@@ -682,38 +682,39 @@ TGFX_TEST(SVGRenderTest, ProtocolFilterReadWrite) {
     if (filter) {
       auto type = Types::Get(filter.get());
       TGFX_PRIVATE_ACCESS(
-        if (type == Types::ImageFilterType::Blur) {
-          auto blur1 = std::static_pointer_cast<GaussianBlurImageFilter>(filter);
-          auto blur2 = std::static_pointer_cast<GaussianBlurImageFilter>(blurFilter);
-          EXPECT_EQ(blur1->blurrinessX, blur2->blurrinessX);
-          EXPECT_EQ(blur1->blurrinessY, blur2->blurrinessY);
-          EXPECT_EQ(blur1->tileMode, blur2->tileMode);
-        } else if (type == Types::ImageFilterType::DropShadow) {
-          auto dropShadow1 = std::static_pointer_cast<DropShadowImageFilter>(filter);
-          auto dropShadow2 = std::static_pointer_cast<DropShadowImageFilter>(dropShadowFilter);
-          EXPECT_EQ(dropShadow1->dx, dropShadow2->dx);
-          EXPECT_EQ(dropShadow1->dy, dropShadow2->dy);
-          EXPECT_EQ(dropShadow1->color, dropShadow2->color);
-          EXPECT_EQ(dropShadow1->shadowOnly, dropShadow2->shadowOnly);
-          auto blur1 = std::static_pointer_cast<GaussianBlurImageFilter>(dropShadow1->blurFilter);
-          auto blur2 = std::static_pointer_cast<GaussianBlurImageFilter>(dropShadow2->blurFilter);
-          EXPECT_EQ(blur1->blurrinessX, blur2->blurrinessX);
-          EXPECT_EQ(blur1->blurrinessY, blur2->blurrinessY);
-          EXPECT_EQ(blur1->tileMode, blur2->tileMode);
-        } else if (type == Types::ImageFilterType::InnerShadow) {
-          auto innerShadow1 = std::static_pointer_cast<InnerShadowImageFilter>(filter);
-          auto innerShadow2 = std::static_pointer_cast<InnerShadowImageFilter>(innerShadowFilter);
-          EXPECT_EQ(innerShadow1->dx, innerShadow2->dx);
-          EXPECT_EQ(innerShadow1->dy, innerShadow2->dy);
-          EXPECT_EQ(innerShadow1->color, innerShadow2->color);
-          EXPECT_EQ(innerShadow1->shadowOnly, innerShadow2->shadowOnly);
-          auto blur1 = std::static_pointer_cast<GaussianBlurImageFilter>(innerShadow1->blurFilter);
-          auto blur2 = std::static_pointer_cast<GaussianBlurImageFilter>(innerShadow2->blurFilter);
-          EXPECT_EQ(blur1->blurrinessX, blur2->blurrinessX);
-          EXPECT_EQ(blur1->blurrinessY, blur2->blurrinessY);
-          EXPECT_EQ(blur1->tileMode, blur2->tileMode);
-        }
-      )
+          if (type == Types::ImageFilterType::Blur) {
+            auto blur1 = std::static_pointer_cast<GaussianBlurImageFilter>(filter);
+            auto blur2 = std::static_pointer_cast<GaussianBlurImageFilter>(blurFilter);
+            EXPECT_EQ(blur1->blurrinessX, blur2->blurrinessX);
+            EXPECT_EQ(blur1->blurrinessY, blur2->blurrinessY);
+            EXPECT_EQ(blur1->tileMode, blur2->tileMode);
+          } else if (type == Types::ImageFilterType::DropShadow) {
+            auto dropShadow1 = std::static_pointer_cast<DropShadowImageFilter>(filter);
+            auto dropShadow2 = std::static_pointer_cast<DropShadowImageFilter>(dropShadowFilter);
+            EXPECT_EQ(dropShadow1->dx, dropShadow2->dx);
+            EXPECT_EQ(dropShadow1->dy, dropShadow2->dy);
+            EXPECT_EQ(dropShadow1->color, dropShadow2->color);
+            EXPECT_EQ(dropShadow1->shadowOnly, dropShadow2->shadowOnly);
+            auto blur1 = std::static_pointer_cast<GaussianBlurImageFilter>(dropShadow1->blurFilter);
+            auto blur2 = std::static_pointer_cast<GaussianBlurImageFilter>(dropShadow2->blurFilter);
+            EXPECT_EQ(blur1->blurrinessX, blur2->blurrinessX);
+            EXPECT_EQ(blur1->blurrinessY, blur2->blurrinessY);
+            EXPECT_EQ(blur1->tileMode, blur2->tileMode);
+          } else if (type == Types::ImageFilterType::InnerShadow) {
+            auto innerShadow1 = std::static_pointer_cast<InnerShadowImageFilter>(filter);
+            auto innerShadow2 = std::static_pointer_cast<InnerShadowImageFilter>(innerShadowFilter);
+            EXPECT_EQ(innerShadow1->dx, innerShadow2->dx);
+            EXPECT_EQ(innerShadow1->dy, innerShadow2->dy);
+            EXPECT_EQ(innerShadow1->color, innerShadow2->color);
+            EXPECT_EQ(innerShadow1->shadowOnly, innerShadow2->shadowOnly);
+            auto blur1 =
+                std::static_pointer_cast<GaussianBlurImageFilter>(innerShadow1->blurFilter);
+            auto blur2 =
+                std::static_pointer_cast<GaussianBlurImageFilter>(innerShadow2->blurFilter);
+            EXPECT_EQ(blur1->blurrinessX, blur2->blurrinessX);
+            EXPECT_EQ(blur1->blurrinessY, blur2->blurrinessY);
+            EXPECT_EQ(blur1->tileMode, blur2->tileMode);
+          })
       (void)type;
     }
   }

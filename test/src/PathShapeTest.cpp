@@ -195,18 +195,18 @@ TGFX_TEST(PathShapeTest, simpleShape) {
   EXPECT_TRUE(Baseline::Compare(surface, "PathShapeTest/shape"));
 }
 
-TGFX_PRIVATE_ACCESS(
-    static std::vector<Resource*> FindResourceByDomainID(Context* context, uint32_t domainID) {
-      std::vector<Resource*> resources = {};
-      auto resourceCache = context->resourceCache();
-      for (auto& item : resourceCache->uniqueKeyMap) {
-        auto resource = item.second;
-        if (resource->uniqueKey.domainID() == domainID) {
-          resources.push_back(resource);
-        }
-      }
-      return resources;
-    })
+TGFX_PRIVATE_ACCESS(static std::vector<Resource*> FindResourceByDomainID(Context* context,
+                                                                         uint32_t domainID) {
+  std::vector<Resource*> resources = {};
+  auto resourceCache = context->resourceCache();
+  for (auto& item : resourceCache->uniqueKeyMap) {
+    auto resource = item.second;
+    if (resource->uniqueKey.domainID() == domainID) {
+      resources.push_back(resource);
+    }
+  }
+  return resources;
+})
 
 TGFX_TEST(PathShapeTest, inversePath) {
   ContextScope scope;
@@ -253,10 +253,9 @@ TGFX_TEST(PathShapeTest, inversePath) {
   canvas->drawPath(path, paint);
   canvas->restore();
   EXPECT_TRUE(Baseline::Compare(surface, "PathShapeTest/inversePath_rect"));
-  TGFX_PRIVATE_ACCESS(
-      auto uniqueKey = PathRef::GetUniqueKey(path);
-      auto cachesBefore = FindResourceByDomainID(context, uniqueKey.domainID());
-      EXPECT_EQ(cachesBefore.size(), 1u));
+  TGFX_PRIVATE_ACCESS(auto uniqueKey = PathRef::GetUniqueKey(path);
+                      auto cachesBefore = FindResourceByDomainID(context, uniqueKey.domainID());
+                      EXPECT_EQ(cachesBefore.size(), 1u));
   canvas->clear();
   canvas->clipPath(clipPath);
   auto shape = Shape::MakeFrom(path);
@@ -264,10 +263,9 @@ TGFX_TEST(PathShapeTest, inversePath) {
   canvas->translate(-50, -50);
   canvas->drawShape(shape, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "PathShapeTest/inversePath_rect"));
-  TGFX_PRIVATE_ACCESS(
-      auto cachesAfter = FindResourceByDomainID(context, uniqueKey.domainID());
-      EXPECT_EQ(cachesAfter.size(), 1u);
-      EXPECT_TRUE(cachesBefore.front() == cachesAfter.front()));
+  TGFX_PRIVATE_ACCESS(auto cachesAfter = FindResourceByDomainID(context, uniqueKey.domainID());
+                      EXPECT_EQ(cachesAfter.size(), 1u);
+                      EXPECT_TRUE(cachesBefore.front() == cachesAfter.front()));
 }
 
 TGFX_TEST_PRIVATE(PathShapeTest, drawShape) {
