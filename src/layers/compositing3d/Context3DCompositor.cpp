@@ -28,10 +28,8 @@
 #include "gpu/ops/Quads3DDrawOp.h"
 #include "gpu/processors/TextureEffect.h"
 #include "layers/BackgroundContext.h"
-#include "layers/contents/LayerContent.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PictureRecorder.h"
-#include "tgfx/layers/Layer.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
@@ -155,12 +153,10 @@ Context3DCompositor::Context3DCompositor(const Context& context, const Rect& ren
   DEBUG_ASSERT(_targetColorProxy != nullptr);
 }
 
-void Context3DCompositor::addImage(Layer* sourceLayer, std::shared_ptr<Image> image,
-                                   const Point& imageOffset, const Matrix3D& matrix, int depth,
-                                   float alpha, bool antiAlias) {
-  const auto sequenceIndex = _depthSequenceCounters[depth]++;
-  auto polygon = std::make_unique<DrawPolygon3D>(sourceLayer, std::move(image), imageOffset, matrix,
-                                                 depth, sequenceIndex, alpha, antiAlias);
+void Context3DCompositor::addDrawRect(std::unique_ptr<DrawableRect> drawRect) {
+  auto rectPtr = drawRect.get();
+  _drawRects.push_back(std::move(drawRect));
+  auto polygon = std::make_unique<DrawPolygon3D>(rectPtr);
   _polygons.push_back(std::move(polygon));
 }
 
@@ -177,16 +173,17 @@ void Context3DCompositor::drawQuads(const DrawPolygon3D* polygon,
   DEBUG_ASSERT(_targetColorProxy != nullptr);
   auto context = _targetColorProxy->getContext();
   DEBUG_ASSERT(context != nullptr);
-  auto aaType = GetAAType(_targetColorProxy->sampleCount(), polygon->antiAlias());
-  const auto& image = polygon->image();
+  auto drawRect = polygon->drawRect();
+  auto aaType = GetAAType(_targetColorProxy->sampleCount(), drawRect->antiAlias);
+  const auto& image = drawRect->image;
   auto srcW = static_cast<float>(image->width());
   auto srcH = static_cast<float>(image->height());
   Rect originalRect = Rect::MakeWH(srcW, srcH);
 
   auto allocator = context->drawingAllocator();
-  // Wrap alpha as vertex color to enable semi-transparent pixel blending.
-  Color vertexColor(1, 1, 1, polygon->alpha());
-  auto matrix = polygon->matrix().asMatrix();
+  // Layer alpha is already baked into the image; use opaque white to skip modulation.
+  Color vertexColor = Color::White();
+  auto matrix = drawRect->matrix.asMatrix();
   std::vector<PlacementPtr<QuadRecord>> quadRecords;
   if (subQuads.empty()) {
     auto [quad, aaFlags] = GetQuadAndAAFlags(originalRect, aaType, nullptr);
@@ -247,36 +244,31 @@ std::shared_ptr<Image> Context3DCompositor::finish() {
   return image;
 }
 
-std::shared_ptr<Image> Context3DCompositor::getScaledBackgroundImage(Layer& layer,
-                                                                     Point* offset) const {
-  const auto localToGlobalMatrix = layer.getGlobalMatrix().asMatrix();
+std::shared_ptr<Image> Context3DCompositor::getBackgroundImage(const DrawableRect& drawRect,
+                                                               Point* offset) const {
+  DEBUG_ASSERT(drawRect.background.has_value());
+  const auto& background = *drawRect.background;
+  DEBUG_ASSERT(background.mask != nullptr);
   Matrix globalToLocalMatrix = {};
-  if (!localToGlobalMatrix.invert(&globalToLocalMatrix)) {
+  if (!background.globalMatrix.invert(&globalToLocalMatrix)) {
     return nullptr;
+  }
+  auto backgroundBounds = Rect::MakeXYWH(background.maskOffset.x, background.maskOffset.y,
+                                         static_cast<float>(background.mask->width()),
+                                         static_cast<float>(background.mask->height()));
+  // Some styles sample beyond the region they paint, so union each style's required sampling area.
+  auto sampleBounds = backgroundBounds;
+  for (const auto& style : background.styles) {
+    DEBUG_ASSERT(style != nullptr);
+    sampleBounds.join(style->filterBackground(backgroundBounds, _contentScale));
   }
   PictureRecorder recorder = {};
   auto canvas = recorder.beginRecording();
-  canvas->scale(_contentScale, _contentScale);
-  // Clip to the layer's local bounds before applying the coordinate transform. This must be done
-  // after scale (so the clip is in scaled space) and before concat (so the clip is not affected
-  // by the global-to-local matrix).
-  canvas->clipRect(layer.getBounds());
+  // Draw the background only within the sampling region.
+  canvas->clipRect(sampleBounds);
   canvas->concat(globalToLocalMatrix);
   canvas->concat(_backgroundContext->backgroundMatrix());
   canvas->drawImage(_backgroundContext->getBackgroundImage());
-  return ToImageWithOffset(recorder.finishRecordingAsPicture(), _colorSpace, offset);
-}
-
-std::shared_ptr<Image> Context3DCompositor::getScaledOpaqueContentImage(Layer& layer,
-                                                                        Point* offset) const {
-  auto content = layer.getContent();
-  if (content == nullptr) {
-    return nullptr;
-  }
-  PictureRecorder recorder = {};
-  auto canvas = recorder.beginRecording();
-  canvas->scale(_contentScale, _contentScale);
-  content->drawDefault(canvas, 1.0f, layer.bitFields.allowsEdgeAntialiasing);
   return ToImageWithOffset(recorder.finishRecordingAsPicture(), _colorSpace, offset);
 }
 
@@ -284,69 +276,60 @@ void Context3DCompositor::drawBackgroundStyles(const DrawPolygon3D* polygon) {
   if (_backgroundContext == nullptr) {
     return;
   }
-  const auto layer = polygon->sourceLayer();
-  bool hasBackground = false;
-  for (const auto& style : layer->layerStyles()) {
-    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
-      hasBackground = true;
-      break;
-    }
-  }
-  if (!hasBackground) {
+  auto drawRect = polygon->drawRect();
+  if (!drawRect->background.has_value()) {
     return;
   }
-
-  // The offset of the background image in scaled local space.
+  const auto& background = *drawRect->background;
+  // The offset of the background image in the Rect local space.
   Point bgImageOffset = {};
-  const auto bgImage = getScaledBackgroundImage(*layer, &bgImageOffset);
+  const auto bgImage = getBackgroundImage(*drawRect, &bgImageOffset);
   if (bgImage == nullptr) {
     return;
   }
-  Point contentImageOffset = {};
-  const auto contentImage = getScaledOpaqueContentImage(*layer, &contentImageOffset);
-  if (contentImage == nullptr) {
-    return;
-  }
 
-  auto layerBounds = layer->getBounds();
-  layerBounds.scale(_contentScale, _contentScale);
-  layerBounds.roundOut();
-  for (const auto& style : layer->layerStyles()) {
+  for (const auto& style : background.styles) {
     DEBUG_ASSERT(style != nullptr);
-    if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
-      continue;
-    }
-    drawBackgroundStyle(polygon, *style, contentImage, contentImageOffset, bgImage, bgImageOffset,
-                        layerBounds);
+    DEBUG_ASSERT(style->extraSourceType() == LayerStyleExtraSourceType::Background);
+    drawBackgroundStyle(polygon, *style, background.mask, background.maskOffset, bgImage,
+                        bgImageOffset);
   }
 }
 
 void Context3DCompositor::drawBackgroundStyle(const DrawPolygon3D* polygon, LayerStyle& style,
-                                              const std::shared_ptr<Image>& contentImage,
-                                              const Point& contentOffset,
+                                              const std::shared_ptr<Image>& mask,
+                                              const Point& maskOffset,
                                               const std::shared_ptr<Image>& bgImage,
-                                              const Point& bgOffset, const Rect& layerBounds) {
+                                              const Point& bgOffset) {
+  auto drawRect = polygon->drawRect();
+  DEBUG_ASSERT(drawRect->image != nullptr);
+  auto imageWidth = static_cast<float>(drawRect->image->width());
+  auto imageHeight = static_cast<float>(drawRect->image->height());
   PictureRecorder recorder = {};
   auto pictureCanvas = recorder.beginRecording();
-  pictureCanvas->clipRect(layerBounds);
-  auto relativeOffset = bgOffset - contentOffset;
-  style.drawWithExtraSource(pictureCanvas, contentImage, _contentScale, bgImage, relativeOffset,
-                            polygon->alpha());
-  // Extract the result image from the same origin and with the same size as the polygon's
-  // original image, so the polygon's matrix and points can be reused without adjustment.
-  const auto& originalImage = polygon->image();
-  auto scaledOrigin = polygon->imageOffset() * _contentScale;
-  auto imageBounds =
-      Rect::MakeXYWH(scaledOrigin.x, scaledOrigin.y, static_cast<float>(originalImage->width()),
-                     static_cast<float>(originalImage->height()));
+  // The style result will replace the rect's fill texture, so keep its bounds equal to the
+  // original image.
+  pictureCanvas->clipRect(Rect::MakeWH(imageWidth, imageHeight));
+  // Align the canvas origin with the mask's position in the rect local space.
+  pictureCanvas->translate(maskOffset.x, maskOffset.y);
+  auto relativeOffset = bgOffset - maskOffset;
+  style.drawWithExtraSource(pictureCanvas, mask, _contentScale, bgImage, relativeOffset, 1.0f);
+  // Extract the result image aligned with the original image (same origin, same size), so the
+  // polygon's matrix and points can be reused without adjustment.
+  auto imageBounds = Rect::MakeWH(imageWidth, imageHeight);
   auto resultImage =
       ToImageWithOffset(recorder.finishRecordingAsPicture(), _colorSpace, nullptr, &imageBounds);
   if (resultImage == nullptr) {
     return;
   }
-  // Replace the sampled texture of the clipped polygon to draw only the current fragment's
-  // background.
-  auto resultPolygon = polygon->makeVariant(std::move(resultImage), 1.0f);
+  // Create a variant of the rect with the style result baked in. The background is cleared to
+  // reflect that this rect no longer has pending background styles.
+  auto resultRect = std::make_unique<DrawableRect>(*drawRect);
+  resultRect->image = std::move(resultImage);
+  resultRect->background = std::nullopt;
+  auto resultRectPtr = resultRect.get();
+  _drawRects.push_back(std::move(resultRect));
+  auto resultPolygon = polygon->makeVariant(resultRectPtr);
   drawPolygon(&resultPolygon);
 }
 
@@ -354,16 +337,17 @@ void Context3DCompositor::syncToBackgroundContext(const DrawPolygon3D* polygon) 
   if (_backgroundContext == nullptr) {
     return;
   }
+  auto drawRect = polygon->drawRect();
   auto bgCanvas = _backgroundContext->getCanvas();
   AutoCanvasRestore autoRestore(bgCanvas);
   // The polygon's matrix is relative to the 3D context's coordinate system. Translate to the
   // global canvas coordinate system used by the background context.
   bgCanvas->translate(_renderRect.x(), _renderRect.y());
-  bgCanvas->concat(polygon->matrix().asMatrix());
+  bgCanvas->concat(drawRect->matrix.asMatrix());
   if (polygon->isSplit()) {
     // Clip to the split fragment so only its portion is drawn, not the entire layer image.
     auto inverseMatrix = Matrix3D::I();
-    if (!polygon->matrix().invert(&inverseMatrix)) {
+    if (!drawRect->matrix.invert(&inverseMatrix)) {
       DEBUG_ASSERT(false);
       return;
     }
@@ -379,7 +363,7 @@ void Context3DCompositor::syncToBackgroundContext(const DrawPolygon3D* polygon) 
     clipPath.close();
     bgCanvas->clipPath(clipPath);
   }
-  bgCanvas->drawImage(polygon->image());
+  bgCanvas->drawImage(drawRect->image);
 }
 
 }  // namespace tgfx

@@ -20,13 +20,10 @@
 
 #include <memory>
 #include <vector>
+#include "DrawableRect.h"
 #include "gpu/Quad.h"
-#include "tgfx/core/Image.h"
-#include "tgfx/core/Matrix3D.h"
 
 namespace tgfx {
-
-class Layer;
 
 /**
  * DrawPolygon3D represents a splittable 3D polygon for BSP tree processing.
@@ -35,16 +32,12 @@ class Layer;
 class DrawPolygon3D {
  public:
   /**
-   * Constructs a polygon from an image's 2D bounds and a 3D transformation matrix.
+   * Constructs a polygon from a DrawableRect's image bounds and its 3D transformation matrix.
    * The transform is applied immediately to convert vertices to screen space.
-   * @param sourceLayer The source layer this polygon was created from. Must not be nullptr.
-   * @param image The source image to draw.
-   * @param imageOffset The offset of the image in the layer's local coordinate space.
-   * @param depth The depth level in the layer tree (used for sorting coplanar polygons).
-   * @param sequenceIndex The sequence index within the same depth level.
+   * @param drawRect The draw data for this polygon. Must not be nullptr. Ownership is NOT
+   * taken.
    */
-  DrawPolygon3D(Layer* sourceLayer, std::shared_ptr<Image> image, const Point& imageOffset,
-                const Matrix3D& matrix, int depth, int sequenceIndex, float alpha, bool antiAlias);
+  explicit DrawPolygon3D(DrawableRect* drawRect);
 
   /**
    * Splits the given polygon by this polygon's plane.
@@ -63,12 +56,8 @@ class DrawPolygon3D {
    */
   float signedDistanceTo(const Vec3& point) const;
 
-  Layer* sourceLayer() const {
-    return _sourceLayer;
-  }
-
-  const Point& imageOffset() const {
-    return _imageOffset;
+  DrawableRect* drawRect() const {
+    return _drawRect;
   }
 
   const std::vector<Vec3>& points() const {
@@ -79,31 +68,7 @@ class DrawPolygon3D {
     return _isSplit;
   }
 
-  float alpha() const {
-    return _alpha;
-  }
-
-  const std::shared_ptr<Image>& image() const {
-    return _image;
-  }
-
-  const Matrix3D& matrix() const {
-    return _matrix;
-  }
-
-  bool antiAlias() const {
-    return _antiAlias;
-  }
-
   bool isFacingPositiveZ() const;
-
-  int sequenceIndex() const {
-    return _sequenceIndex;
-  }
-
-  int depth() const {
-    return _depth;
-  }
 
   /**
    * Converts this polygon to a list of quads for rendering.
@@ -114,46 +79,32 @@ class DrawPolygon3D {
   std::vector<Quad> toQuads() const;
 
   /**
-   * Creates a variant of this polygon with a different image and alpha.
-   * All other properties (points, matrix, imageOffset, split state, etc.) are preserved.
-   * @param image The new source image to draw.
-   * @param alpha The new alpha transparency value.
+   * Creates a variant of this polygon that shares the same geometry but uses a different
+   * DrawableRect.
+   * @param drawRect The draw data for the variant. Must not be nullptr.
    */
-  DrawPolygon3D makeVariant(std::shared_ptr<Image> image, float alpha) const;
+  DrawPolygon3D makeVariant(DrawableRect* drawRect) const;
 
  private:
   // Constructs a polygon from already-transformed 3D points (used for split polygons).
-  DrawPolygon3D(Layer* sourceLayer, std::shared_ptr<Image> image, const Point& imageOffset,
-                const Matrix3D& matrix, std::vector<Vec3> points, const Vec3& normal, int depth,
-                int sequenceIndex, float alpha, bool antiAlias);
+  DrawPolygon3D(DrawableRect* drawRect, std::vector<Vec3> points, const Vec3& normal);
 
   void constructNormal();
 
-  Layer* _sourceLayer = nullptr;
-  Point _imageOffset = {};
+  DrawableRect* _drawRect = nullptr;
   std::vector<Vec3> _points = {};
   Vec3 _normal = {0.0f, 0.0f, 1.0f};
-  int _depth = 0;
-  int _sequenceIndex = 0;
   // Whether this polygon was split from another polygon.
   bool _isSplit = false;
-  float _alpha = 1.0f;
-  bool _antiAlias = true;
-  std::shared_ptr<Image> _image = nullptr;
-  Matrix3D _matrix = {};
 };
 
 /**
  * Comparator for sorting DrawPolygon3D by paint order.
- * Smaller depth (parent layers) should be drawn first (at bottom).
- * Within the same depth, smaller sequenceIndex should be drawn first.
+ * Smaller order (parent layers) should be drawn first (at bottom).
  */
 static inline bool DrawPolygon3DOrder(const std::unique_ptr<DrawPolygon3D>& x,
                                       const std::unique_ptr<DrawPolygon3D>& y) {
-  if (x->depth() != y->depth()) {
-    return x->depth() < y->depth();
-  }
-  return x->sequenceIndex() < y->sequenceIndex();
+  return x->drawRect()->paintOrder < y->drawRect()->paintOrder;
 }
 
 }  // namespace tgfx

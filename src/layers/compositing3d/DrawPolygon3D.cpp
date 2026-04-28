@@ -58,15 +58,11 @@ static void CollectSplitPoints(const std::vector<Vec3>& points, const Vec3& star
   }
 }
 
-DrawPolygon3D::DrawPolygon3D(Layer* sourceLayer, std::shared_ptr<Image> image,
-                             const Point& imageOffset, const Matrix3D& matrix, int depth,
-                             int sequenceIndex, float alpha, bool antiAlias)
-    : _sourceLayer(sourceLayer), _imageOffset(imageOffset), _depth(depth),
-      _sequenceIndex(sequenceIndex), _alpha(alpha), _antiAlias(antiAlias), _image(std::move(image)),
-      _matrix(matrix) {
-  DEBUG_ASSERT(_sourceLayer != nullptr);
-  auto srcW = static_cast<float>(_image->width());
-  auto srcH = static_cast<float>(_image->height());
+DrawPolygon3D::DrawPolygon3D(DrawableRect* drawRect) : _drawRect(drawRect) {
+  DEBUG_ASSERT(_drawRect != nullptr);
+  DEBUG_ASSERT(_drawRect->image != nullptr);
+  auto srcW = static_cast<float>(_drawRect->image->width());
+  auto srcH = static_cast<float>(_drawRect->image->height());
 
   Vec3 corners[4] = {
       Vec3(0.0f, 0.0f, 0.0f),
@@ -78,19 +74,14 @@ DrawPolygon3D::DrawPolygon3D(Layer* sourceLayer, std::shared_ptr<Image> image,
   // Caller guarantees that vertices after transformation do not intersect the observer's z-plane.
   _points.reserve(4);
   for (const auto& corner : corners) {
-    _points.push_back(matrix.mapPoint(corner));
+    _points.push_back(_drawRect->matrix.mapPoint(corner));
   }
 
   constructNormal();
 }
 
-DrawPolygon3D::DrawPolygon3D(Layer* sourceLayer, std::shared_ptr<Image> image,
-                             const Point& imageOffset, const Matrix3D& matrix,
-                             std::vector<Vec3> points, const Vec3& normal, int depth,
-                             int sequenceIndex, float alpha, bool antiAlias)
-    : _sourceLayer(sourceLayer), _imageOffset(imageOffset), _points(std::move(points)),
-      _normal(normal), _depth(depth), _sequenceIndex(sequenceIndex), _isSplit(true), _alpha(alpha),
-      _antiAlias(antiAlias), _image(std::move(image)), _matrix(matrix) {
+DrawPolygon3D::DrawPolygon3D(DrawableRect* drawRect, std::vector<Vec3> points, const Vec3& normal)
+    : _drawRect(drawRect), _points(std::move(points)), _normal(normal), _isSplit(true) {
 }
 
 // Computes the normal by averaging cross products of opposite vertex pairs from the first vertex.
@@ -140,11 +131,8 @@ void DrawPolygon3D::splitAnother(std::unique_ptr<DrawPolygon3D> polygon,
   // The polygon is coplanar with this polygon.
   if (posCount == 0 && negCount == 0) {
     *isCoplanar = true;
-    // Compare by (depth, sequenceIndex) to determine paint order.
-    // Larger values should be drawn later (on top), so they go to front.
-    bool polygonIsLater = (polygon->_depth > _depth) ||
-                          (polygon->_depth == _depth && polygon->_sequenceIndex >= _sequenceIndex);
-    if (polygonIsLater) {
+    // Compare by paint order. Larger values should be drawn later (on top), so they go to front.
+    if (polygon->_drawRect->paintOrder >= _drawRect->paintOrder) {
       *front = std::move(polygon);
     } else {
       *back = std::move(polygon);
@@ -204,13 +192,9 @@ void DrawPolygon3D::splitAnother(std::unique_ptr<DrawPolygon3D> polygon,
                      frontBegin, &backPoints);
 
   *front = std::unique_ptr<DrawPolygon3D>(
-      new DrawPolygon3D(polygon->_sourceLayer, polygon->_image, polygon->_imageOffset,
-                        polygon->_matrix, std::move(frontPoints), polygon->_normal, polygon->_depth,
-                        polygon->_sequenceIndex, polygon->_alpha, polygon->_antiAlias));
+      new DrawPolygon3D(polygon->_drawRect, std::move(frontPoints), polygon->_normal));
   *back = std::unique_ptr<DrawPolygon3D>(
-      new DrawPolygon3D(polygon->_sourceLayer, polygon->_image, polygon->_imageOffset,
-                        polygon->_matrix, std::move(backPoints), polygon->_normal, polygon->_depth,
-                        polygon->_sequenceIndex, polygon->_alpha, polygon->_antiAlias));
+      new DrawPolygon3D(polygon->_drawRect, std::move(backPoints), polygon->_normal));
 
   DEBUG_ASSERT((*front)->_points.size() >= 3);
   DEBUG_ASSERT((*back)->_points.size() >= 3);
@@ -228,7 +212,7 @@ std::vector<Quad> DrawPolygon3D::toQuads() const {
     return quads;
   }
   Matrix3D inverseMatrix;
-  if (!_matrix.invert(&inverseMatrix)) {
+  if (!_drawRect->matrix.invert(&inverseMatrix)) {
     DEBUG_ASSERT(false);
     return quads;
   }
@@ -264,10 +248,9 @@ std::vector<Quad> DrawPolygon3D::toQuads() const {
   return quads;
 }
 
-DrawPolygon3D DrawPolygon3D::makeVariant(std::shared_ptr<Image> image, float alpha) const {
+DrawPolygon3D DrawPolygon3D::makeVariant(DrawableRect* drawRect) const {
   auto copy = *this;
-  copy._image = std::move(image);
-  copy._alpha = alpha;
+  copy._drawRect = drawRect;
   return copy;
 }
 

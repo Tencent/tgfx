@@ -19,8 +19,8 @@
 #pragma once
 
 #include <deque>
-#include <unordered_map>
 #include "DrawPolygon3D.h"
+#include "DrawableRect.h"
 #include "core/utils/PlacementPtr.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -28,7 +28,6 @@
 namespace tgfx {
 
 class BackgroundContext;
-class LayerStyle;
 
 /**
  * Context3DCompositor handles compositing of 3D transformed images using BSP tree for correct
@@ -57,20 +56,13 @@ class Context3DCompositor {
   }
 
   /**
-   * Adds an image with 3D transformation for compositing.
-   * @param sourceLayer The source layer this image was created from. Must not be nullptr.
-   * @param image The source image to draw.
-   * @param imageOffset The offset of the image in the layer's local coordinate space.
-   * @param matrix The 3D transformation matrix applied to the image.
-   * @param depth The depth level in the layer tree (used for sorting coplanar polygons).
-   * @param alpha The layer alpha for transparency.
-   * @param antiAlias Whether to enable edge antialiasing when the render target does not support MSAA.
+   * Adds a DrawableRect for compositing. The compositor takes ownership of the rect's lifecycle.
+   * @param drawRect The draw data to add. Must have a valid image.
    */
-  void addImage(Layer* sourceLayer, std::shared_ptr<Image> image, const Point& imageOffset,
-                const Matrix3D& matrix, int depth, float alpha, bool antiAlias);
+  void addDrawRect(std::unique_ptr<DrawableRect> drawRect);
 
   /**
-   * Draws all added images with correct depth ordering and blending.
+   * Draws all added rects with correct depth ordering and blending.
    * @return The composited image.
    */
   std::shared_ptr<Image> finish();
@@ -80,21 +72,19 @@ class Context3DCompositor {
   void drawQuads(const DrawPolygon3D* polygon, const std::vector<Quad>& subQuads);
   void drawBackgroundStyles(const DrawPolygon3D* polygon);
   void drawBackgroundStyle(const DrawPolygon3D* polygon, LayerStyle& style,
-                           const std::shared_ptr<Image>& contentImage, const Point& contentOffset,
-                           const std::shared_ptr<Image>& bgImage, const Point& bgOffset,
-                           const Rect& layerBounds);
+                           const std::shared_ptr<Image>& mask, const Point& maskOffset,
+                           const std::shared_ptr<Image>& bgImage, const Point& bgOffset);
   void syncToBackgroundContext(const DrawPolygon3D* polygon) const;
-  std::shared_ptr<Image> getScaledBackgroundImage(Layer& layer, Point* offset) const;
-  std::shared_ptr<Image> getScaledOpaqueContentImage(Layer& layer, Point* offset) const;
+  std::shared_ptr<Image> getBackgroundImage(const DrawableRect& drawRect, Point* offset) const;
 
   Rect _renderRect = {};
   float _contentScale = 1.0f;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   std::shared_ptr<RenderTargetProxy> _targetColorProxy = nullptr;
   std::shared_ptr<BackgroundContext> _backgroundContext = nullptr;
+  std::vector<std::unique_ptr<DrawableRect>> _drawRects = {};
   std::deque<std::unique_ptr<DrawPolygon3D>> _polygons = {};
   std::vector<PlacementPtr<DrawOp>> _drawOps = {};
-  std::unordered_map<int, int> _depthSequenceCounters = {};
 };
 
 }  // namespace tgfx

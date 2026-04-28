@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <stack>
+#include <unordered_map>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Image.h"
@@ -32,6 +33,8 @@ namespace tgfx {
 
 class BackgroundContext;
 class Context;
+struct DrawableRect;
+class LayerContent;
 class OpaqueContext;
 class Layer;
 
@@ -98,18 +101,23 @@ class Layer3DContext {
   static std::shared_ptr<Image> PictureToImage(std::shared_ptr<Picture> picture, Point* offset,
                                                std::shared_ptr<ColorSpace> colorSpace);
 
+  static std::shared_ptr<Image> MakeContentImage(LayerContent* content, float contentScale,
+                                                 bool antiAlias,
+                                                 std::shared_ptr<ColorSpace> colorSpace,
+                                                 Point* offset);
+
   Matrix3D currentTransform() const;
 
   virtual Canvas* onBeginRecording() = 0;
   virtual std::shared_ptr<Picture> onFinishRecording() = 0;
-  virtual void onImageReady(Layer* sourceLayer, std::shared_ptr<Image> image,
-                            const Matrix3D& imageTransform, const Point& pictureOffset, int depth,
-                            bool antialiasing) = 0;
+  virtual void onDrawableRectReady(std::unique_ptr<DrawableRect> drawRect,
+                                   const Point& pictureOffset) = 0;
 
   Rect _renderRect = {};
   float _contentScale = 1.0f;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   std::stack<Context3DRecordState> _transformStack = {};
+  std::unordered_map<int, int> _depthSequenceCounters = {};
 };
 
 }  // namespace tgfx

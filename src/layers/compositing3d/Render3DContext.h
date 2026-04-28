@@ -42,9 +42,8 @@ class Render3DContext : public Layer3DContext {
  protected:
   Canvas* onBeginRecording() override;
   std::shared_ptr<Picture> onFinishRecording() override;
-  void onImageReady(Layer* sourceLayer, std::shared_ptr<Image> image,
-                    const Matrix3D& imageTransform, const Point& pictureOffset, int depth,
-                    bool antialiasing) override;
+  void onDrawableRectReady(std::unique_ptr<DrawableRect> drawRect,
+                           const Point& pictureOffset) override;
 
  private:
   std::shared_ptr<Context3DCompositor> _compositor = nullptr;

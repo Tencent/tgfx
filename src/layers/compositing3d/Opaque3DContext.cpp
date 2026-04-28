@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Opaque3DContext.h"
+#include "DrawableRect.h"
 #include "core/Matrix3DUtils.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -48,9 +49,8 @@ std::shared_ptr<Picture> Opaque3DContext::onFinishRecording() {
   return picture;
 }
 
-void Opaque3DContext::onImageReady(Layer*, std::shared_ptr<Image> image,
-                                   const Matrix3D& imageTransform, const Point&, int, bool) {
-  _opaqueImages.push_back({std::move(image), imageTransform});
+void Opaque3DContext::onDrawableRectReady(std::unique_ptr<DrawableRect> drawRect, const Point&) {
+  _opaqueImages.push_back({std::move(drawRect->image), drawRect->matrix});
 }
 
 void Opaque3DContext::finishAndDrawTo(Canvas* canvas, bool antialiasing) {

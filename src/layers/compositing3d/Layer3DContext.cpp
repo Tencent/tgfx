@@ -17,12 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Layer3DContext.h"
+#include "DrawableRect.h"
 #include "Opaque3DContext.h"
 #include "Render3DContext.h"
 #include "core/Matrix3DUtils.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/compositing3d/Context3DCompositor.h"
+#include "layers/contents/LayerContent.h"
+#include "tgfx/core/PictureRecorder.h"
+#include "tgfx/layers/Layer.h"
+#include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
 
@@ -60,6 +65,20 @@ std::shared_ptr<Image> Layer3DContext::PictureToImage(std::shared_ptr<Picture> p
     offset->y = bounds.top;
   }
   return image;
+}
+
+std::shared_ptr<Image> Layer3DContext::MakeContentImage(LayerContent* content, float contentScale,
+                                                        bool antiAlias,
+                                                        std::shared_ptr<ColorSpace> colorSpace,
+                                                        Point* offset) {
+  if (content == nullptr) {
+    return nullptr;
+  }
+  PictureRecorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  canvas->scale(contentScale, contentScale);
+  content->drawDefault(canvas, 1.0f, antiAlias);
+  return PictureToImage(recorder.finishRecordingAsPicture(), offset, std::move(colorSpace));
 }
 
 Matrix3D Layer3DContext::currentTransform() const {
@@ -100,8 +119,8 @@ void Layer3DContext::endRecording() {
   auto state = _transformStack.top();
   _transformStack.pop();
 
-  Point pictureOffset = {};
-  auto image = PictureToImage(std::move(picture), &pictureOffset, _colorSpace);
+  Point pictureOffsetInLocal = {};
+  auto image = PictureToImage(std::move(picture), &pictureOffsetInLocal, _colorSpace);
   if (image == nullptr) {
     return;
   }
@@ -110,12 +129,46 @@ void Layer3DContext::endRecording() {
   auto depth = static_cast<int>(_transformStack.size());
   DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
   auto invScale = 1.0f / _contentScale;
-  auto imageOrigin = Point::Make(pictureOffset.x * invScale, pictureOffset.y * invScale);
+  auto imageOrigin =
+      Point::Make(pictureOffsetInLocal.x * invScale, pictureOffsetInLocal.y * invScale);
+  // Rebase state.transform so the image's top-left corner (not the layer origin) is the anchor
+  // point, matching DrawableRect's rect local space convention. Then switch the matrix from
+  // layer local units to scaled pixel units.
   auto imageTransform = Matrix3DUtils::OriginAdaptedMatrix3D(state.transform, imageOrigin);
   imageTransform = Matrix3DUtils::ScaleAdaptedMatrix3D(imageTransform, _contentScale);
 
-  onImageReady(state.sourceLayer, std::move(image), imageTransform, pictureOffset, depth,
-               state.antialiasing);
+  // Build DrawableRect from the recorded image and source Layer data.
+  auto drawRect = std::make_unique<DrawableRect>();
+  drawRect->image = std::move(image);
+  drawRect->matrix = imageTransform;
+  drawRect->antiAlias = state.antialiasing;
+  drawRect->paintOrder.depth = depth;
+  drawRect->paintOrder.sequenceIndex = _depthSequenceCounters[depth]++;
+
+  auto* layer = state.sourceLayer;
+  DrawableRectBackground background = {};
+  for (const auto& style : layer->layerStyles()) {
+    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+      background.styles.push_back(style);
+    }
+  }
+  if (!background.styles.empty()) {
+    Point maskOffsetInLocal = {};
+    background.mask =
+        MakeContentImage(layer->getContent(), _contentScale, layer->allowsEdgeAntialiasing(),
+                         _colorSpace, &maskOffsetInLocal);
+    if (background.mask != nullptr) {
+      background.maskOffset = maskOffsetInLocal - pictureOffsetInLocal;
+      // Compute the matrix from the rect local space to the global DisplayList space.
+      auto globalMatrix = layer->getGlobalMatrix().asMatrix();
+      globalMatrix.preScale(invScale, invScale);
+      globalMatrix.preTranslate(pictureOffsetInLocal.x, pictureOffsetInLocal.y);
+      background.globalMatrix = globalMatrix;
+      drawRect->background = std::move(background);
+    }
+  }
+
+  onDrawableRectReady(std::move(drawRect), pictureOffsetInLocal);
 }
 
 }  // namespace tgfx

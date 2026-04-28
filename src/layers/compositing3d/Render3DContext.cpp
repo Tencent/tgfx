@@ -18,7 +18,7 @@
 
 #include "Render3DContext.h"
 #include "Context3DCompositor.h"
-#include "core/utils/MathExtra.h"
+#include "DrawableRect.h"
 #include "layers/BackgroundContext.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Paint.h"
@@ -47,17 +47,13 @@ std::shared_ptr<Picture> Render3DContext::onFinishRecording() {
   return picture;
 }
 
-void Render3DContext::onImageReady(Layer* sourceLayer, std::shared_ptr<Image> image,
-                                   const Matrix3D& imageTransform, const Point& pictureOffset,
-                                   int depth, bool antialiasing) {
-  auto finalTransform = imageTransform;
-  finalTransform.postTranslate(pictureOffset.x - _renderRect.left,
-                               pictureOffset.y - _renderRect.top, 0);
-  DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
-  auto invScale = 1.0f / _contentScale;
-  auto unscaledOffset = pictureOffset * invScale;
-  _compositor->addImage(sourceLayer, std::move(image), unscaledOffset, finalTransform, depth, 1.0f,
-                        antialiasing);
+void Render3DContext::onDrawableRectReady(std::unique_ptr<DrawableRect> drawRect,
+                                          const Point& pictureOffset) {
+  // Shift the rect origin by pictureOffset into the root scaled local space, then into the
+  // render target's interior space by subtracting renderRect's origin.
+  drawRect->matrix.postTranslate(pictureOffset.x - _renderRect.left,
+                                 pictureOffset.y - _renderRect.top, 0);
+  _compositor->addDrawRect(std::move(drawRect));
 }
 
 void Render3DContext::finishAndDrawTo(Canvas* canvas, bool antialiasing) {
