@@ -18,11 +18,12 @@
 
 import {TGFXModule} from '../tgfx-module';
 import {ctor} from '../types';
-import {getCanvas2D, releaseCanvas2D} from '../utils/canvas';
+import {getCanvasProvider} from './canvas-provider';
 
 export class PathRasterizer {
     public static readPixels(width: number, height: number, path: Path2D, fillType: ctor) {
-        let canvas = getCanvas2D(width, height);
+        const provider = getCanvasProvider();
+        let canvas = provider.getCanvas2D(width, height);
         if (canvas == null) {
             return null;
         }
@@ -36,7 +37,7 @@ export class PathRasterizer {
             context.fill(path, fillType === TGFXModule.TGFXPathFillType.EvenOdd ? 'evenodd' : 'nonzero');
         }
         const {data} = context.getImageData(0, 0, width, height);
-        releaseCanvas2D(canvas);
+        provider.releaseCanvas2D(canvas);
         if (data.length === 0) {
             return null;
         }
