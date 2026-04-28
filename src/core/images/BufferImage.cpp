@@ -40,10 +40,6 @@ BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped)
 }
 
 float BufferImage::getRasterizedScale(float drawScale) const {
-  // CPU mipmap (per-scale-level caching) is redundant when GPU mipmap is enabled.
-  if (mipmapped) {
-    return 1.0f;
-  }
   if (imageBuffer->isPixelBuffer()) {
     return NextCacheScaleLevel(drawScale);
   }
