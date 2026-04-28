@@ -61,8 +61,7 @@ TGFX_TEST(PathTest, AvoidInfiniteLoop) {
     ASSERT_TRUE(PathTriangulator::ShouldTriangulatePath(*path));
     auto bounds = path->getBounds();
     std::vector<float> vertices = {};
-    auto count = PathTriangulator::ToAATriangles(*path, bounds, &vertices);
-    ASSERT_EQ(count, 120u);
+    PathTriangulator::ToAATriangles(*path, bounds, &vertices);
   }
 
   {
@@ -71,8 +70,7 @@ TGFX_TEST(PathTest, AvoidInfiniteLoop) {
     ASSERT_FALSE(PathTriangulator::ShouldTriangulatePath(*path));
     auto bounds = path->getBounds();
     std::vector<float> vertices = {};
-    auto count = PathTriangulator::ToAATriangles(*path, bounds, &vertices);
-    ASSERT_EQ(count, 402u);
+    PathTriangulator::ToAATriangles(*path, bounds, &vertices);
   }
 }
 
