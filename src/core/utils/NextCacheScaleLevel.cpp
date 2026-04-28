@@ -24,6 +24,13 @@
 namespace tgfx {
 
 float NextCacheScaleLevel(float scale) {
+#ifndef TGFX_USE_THREADS
+  // In single-threaded builds, on-demand codec downscaling runs on the main thread and offers no
+  // latency benefit, while multi-level caching multiplies total decode time across draws. Keep a
+  // single full-size texture and rely on GPU sampling for downscaling instead.
+  (void)scale;
+  return 1.0f;
+#else
   constexpr float MinAllowedImageScale = 1.0f / 8.0f;
   if (scale <= MinAllowedImageScale) {
     return MinAllowedImageScale;
@@ -34,6 +41,7 @@ float NextCacheScaleLevel(float scale) {
   float exactLevel = std::log2(1.0f / scale);
   auto scaleLevel = static_cast<uint32_t>(std::floor(exactLevel));
   return 1.0f / static_cast<float>(1 << scaleLevel);
+#endif
 }
 
 }  // namespace tgfx
