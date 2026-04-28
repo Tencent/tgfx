@@ -21,7 +21,6 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
-#include "gpu/proxies/RenderTargetProxy.h"
 #include "layers/DrawArgs.h"
 #include "layers/OpaqueContext.h"
 #include "layers/RootLayer.h"
@@ -176,13 +175,12 @@ TGFX_TEST(LayerTest, LayerTreeCircle) {
 
   EXPECT_FALSE(grandChild->addChild(parent));
 
-  EXPECT_FALSE(parent->addChild(displayList->_root));
-
-  EXPECT_FALSE(parent->contains(displayList->_root));
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(parent->addChild(displayList->_root));
+                      EXPECT_FALSE(parent->contains(displayList->_root));)
 
   EXPECT_FALSE(child->contains(parent));
 
-  EXPECT_EQ(displayList->_root, displayList->_root);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->_root, displayList->_root);)
 
   EXPECT_FALSE(grandChild->contains(parent));
 
@@ -251,7 +249,7 @@ TGFX_TEST(LayerTest, imageLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/imageLayer"));
 }
 
-TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
+TGFX_TEST_PRIVATE(LayerTest, Layer_getTotalMatrix) {
   auto parent = Layer::Make();
   // Should have no effect on the total matrix since it has no parent.
   parent->setMatrix(Matrix::MakeTrans(10, 10));
@@ -269,8 +267,8 @@ TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
   child->addChild(grandChild);
   grandChild->addChild(greatGrandson);
 
-  auto greatGrandsonTotalMatrix = greatGrandson->getGlobalMatrix();
-  EXPECT_EQ(greatGrandsonTotalMatrix, Matrix3D::MakeTranslate(30, 30, 0));
+  TGFX_PRIVATE_ACCESS(auto greatGrandsonTotalMatrix = greatGrandson->getGlobalMatrix();
+                      EXPECT_EQ(greatGrandsonTotalMatrix, Matrix3D::MakeTranslate(30, 30, 0)));
 
   EXPECT_EQ(greatGrandson->matrix(), Matrix::MakeTrans(10, 10));
   EXPECT_EQ(grandChild->matrix(), Matrix::MakeTrans(10, 10));
@@ -280,11 +278,12 @@ TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
   auto rotateMat = Matrix::MakeRotate(45);
   greatGrandson->setMatrix(rotateMat * greatGrandson->matrix());
 
-  greatGrandsonTotalMatrix = greatGrandson->getGlobalMatrix();
-  auto grandChildTotalMatrix = grandChild->getGlobalMatrix();
-  EXPECT_FLOAT_EQ(greatGrandsonTotalMatrix.getTranslateX(), grandChildTotalMatrix.getTranslateX());
-  EXPECT_FLOAT_EQ(greatGrandsonTotalMatrix.getTranslateY(),
-                  grandChildTotalMatrix.getTranslateX() + 10.0f * std::sqrt(2.0f));
+  TGFX_PRIVATE_ACCESS(
+      auto greatGrandsonTotalMatrix2 = greatGrandson->getGlobalMatrix();
+      auto grandChildTotalMatrix = grandChild->getGlobalMatrix(); EXPECT_FLOAT_EQ(
+          greatGrandsonTotalMatrix2.getTranslateX(), grandChildTotalMatrix.getTranslateX());
+      EXPECT_FLOAT_EQ(greatGrandsonTotalMatrix2.getTranslateY(),
+                      grandChildTotalMatrix.getTranslateX() + 10.0f * std::sqrt(2.0f)));
 }
 
 /**
@@ -331,7 +330,7 @@ TGFX_TEST(LayerTest, Layer_localToGlobal) {
   auto layerA2 = Layer::Make();
   layerA2->setMatrix(Matrix::MakeTrans(10, 10) * Matrix::MakeRotate(45.0f));
   layerA1->addChild(layerA2);
-  auto layer2GlobalMat = layerA2->getGlobalMatrix();
+  TGFX_PRIVATE_ACCESS(auto layer2GlobalMat = layerA2->getGlobalMatrix();)
 
   auto layerA3 = Layer::Make();
   layerA3->setMatrix(Matrix::MakeTrans(10 * std::sqrt(2.0f), 10 * std::sqrt(2.0f)) *
@@ -345,8 +344,9 @@ TGFX_TEST(LayerTest, Layer_localToGlobal) {
 
   auto pointEInLayer2 = Point::Make(8, 8);
   auto pointEInGlobal = layerA2->localToGlobal(pointEInLayer2);
-  EXPECT_EQ(pointEInGlobal, Point::Make(layer2GlobalMat.getTranslateX(),
-                                        layer2GlobalMat.getTranslateY() + 8.0f * std::sqrt(2.0f)));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(pointEInGlobal, Point::Make(layer2GlobalMat.getTranslateX(),
+                                                            layer2GlobalMat.getTranslateY() +
+                                                                8.0f * std::sqrt(2.0f)));)
 
   auto layer4 = Layer::Make();
   layer4->setMatrix(Matrix::MakeTrans(5, -5) * Matrix::MakeRotate(-60.0f));
@@ -1032,7 +1032,7 @@ TGFX_TEST(LayerTest, hitTestPoint) {
   shaperLayer1->setMatrix(Matrix::MakeTrans(100.0f, 50.0f));
   rootLayer->addChild(shaperLayer1);
   auto shaperLayer1Bounds = shaperLayer1->getBounds();
-  shaperLayer1->getGlobalMatrix().mapRect(&shaperLayer1Bounds);
+  TGFX_PRIVATE_ACCESS(shaperLayer1->getGlobalMatrix().mapRect(&shaperLayer1Bounds);)
   printf("shaperLayer1Bounds: (%f, %f, %f, %f)\n", shaperLayer1Bounds.left, shaperLayer1Bounds.top,
          shaperLayer1Bounds.right, shaperLayer1Bounds.bottom);
 
@@ -1047,7 +1047,7 @@ TGFX_TEST(LayerTest, hitTestPoint) {
   shaperLayer2->setFillStyle(fillStyle2);
   rootLayer->addChild(shaperLayer2);
   auto shaperLayer2Bounds = shaperLayer2->getBounds();
-  shaperLayer2->getGlobalMatrix().mapRect(&shaperLayer2Bounds);
+  TGFX_PRIVATE_ACCESS(shaperLayer2->getGlobalMatrix().mapRect(&shaperLayer2Bounds);)
   printf("shaperLayer2Bounds: (%f, %f, %f, %f)\n", shaperLayer2Bounds.left, shaperLayer2Bounds.top,
          shaperLayer2Bounds.right, shaperLayer2Bounds.bottom);
 
@@ -1612,8 +1612,9 @@ TGFX_TEST(LayerTest, BottomLeftSurface) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto proxy = RenderTargetProxy::Make(context, 200, 200, false, 1, false, ImageOrigin::BottomLeft);
-  auto surface = Surface::MakeFrom(std::move(proxy), 0, true);
+  auto texture = context->gpu()->createTexture({200, 200, PixelFormat::RGBA_8888});
+  ASSERT_TRUE(texture != nullptr);
+  auto surface = Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
 
   // parent
   auto parentFrame = tgfx::Rect::MakeXYWH(60, 110, 40, 40);
@@ -1713,7 +1714,7 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialDrawLayer_shapeLayer"));
 }
 
-TGFX_TEST(LayerTest, ContourTest) {
+TGFX_TEST_PRIVATE(LayerTest, ContourTest) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1736,10 +1737,11 @@ TGFX_TEST(LayerTest, ContourTest) {
   allSolidLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
   allSolidLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
   OpaqueContext allSolidContext;
-  auto allSolidCanvas = allSolidContext.beginRecording();
-  allSolidLayer->drawContour(drawArgs, allSolidCanvas, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(
+      auto allSolidCanvas = allSolidContext.beginRecording();
+      allSolidLayer->drawContour(drawArgs, allSolidCanvas, 1.0f, BlendMode::SrcOver));
   auto allSolidPicture = allSolidContext.finishRecordingAsPicture();
-  EXPECT_EQ(allSolidPicture->drawCount, 1u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(allSolidPicture->drawCount, 1u));
 
   // Case 2: Same geometry with all image shader fills should collect all (no dedup).
   auto allImageLayer = ShapeLayer::Make();
@@ -1749,10 +1751,11 @@ TGFX_TEST(LayerTest, ContourTest) {
   allImageLayer->addFillStyle(imageStyle1);
   allImageLayer->addFillStyle(imageStyle2);
   OpaqueContext allImageContext;
-  auto allImageCanvas = allImageContext.beginRecording();
-  allImageLayer->drawContour(drawArgs, allImageCanvas, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(
+      auto allImageCanvas = allImageContext.beginRecording();
+      allImageLayer->drawContour(drawArgs, allImageCanvas, 1.0f, BlendMode::SrcOver));
   auto allImagePicture = allImageContext.finishRecordingAsPicture();
-  EXPECT_EQ(allImagePicture->drawCount, 2u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(allImagePicture->drawCount, 2u));
 
   // Case 3: Same geometry with image-image-solid order should dedup to 1 contour.
   // This exposes the bug where single-pass logic collects both image shaders first,
@@ -1766,10 +1769,11 @@ TGFX_TEST(LayerTest, ContourTest) {
   mixedFillsLayer->addFillStyle(ShapeStyle::Make(Color::Green()));
   OpaqueContext mixedFillsContext;
   auto mixedFillsCanvas = mixedFillsContext.beginRecording();
-  mixedFillsLayer->drawContour(drawArgs, mixedFillsCanvas, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(
+      mixedFillsLayer->drawContour(drawArgs, mixedFillsCanvas, 1.0f, BlendMode::SrcOver));
   auto mixedFillsPicture = mixedFillsContext.finishRecordingAsPicture();
   // Should be 1 (only first collected). Buggy single-pass would return 2.
-  EXPECT_EQ(mixedFillsPicture->drawCount, 1u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(mixedFillsPicture->drawCount, 1u));
 
   // Case 4: Multiple groups with different dedup requirements.
   // Group 1 (image-image): collect all (2). Group 2 (solid-solid): dedup to 1.
@@ -1788,10 +1792,11 @@ TGFX_TEST(LayerTest, ContourTest) {
   twoGroupsLayer->addChild(childLayer);
   OpaqueContext twoGroupsContext;
   auto twoGroupsCanvas = twoGroupsContext.beginRecording();
-  twoGroupsLayer->drawContour(drawArgs, twoGroupsCanvas, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(
+      twoGroupsLayer->drawContour(drawArgs, twoGroupsCanvas, 1.0f, BlendMode::SrcOver));
   auto twoGroupsPicture = twoGroupsContext.finishRecordingAsPicture();
   // Group 1: 2 (all image shaders), Group 2: 1 (deduped) = 3 total.
-  EXPECT_EQ(twoGroupsPicture->drawCount, 3u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(twoGroupsPicture->drawCount, 3u));
 
   // Case 5: Stroke contour test - same geometry with same stroke should dedup.
   // ShapeLayer without fillStyle adds a transparent fill content (no stroke),
@@ -1805,10 +1810,11 @@ TGFX_TEST(LayerTest, ContourTest) {
   strokeTestLayer->addStrokeStyle(ShapeStyle::Make(Color::Blue()));
   OpaqueContext strokeTestContext;
   auto strokeTestCanvas = strokeTestContext.beginRecording();
-  strokeTestLayer->drawContour(drawArgs, strokeTestCanvas, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(
+      strokeTestLayer->drawContour(drawArgs, strokeTestCanvas, 1.0f, BlendMode::SrcOver));
   auto strokeTestPicture = strokeTestContext.finishRecordingAsPicture();
   // 1 (transparent fill) + 1 (strokes deduped) = 2 contours.
-  EXPECT_EQ(strokeTestPicture->drawCount, 2u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(strokeTestPicture->drawCount, 2u));
 
   // Draw all to canvas for baseline comparison.
   auto rootLayer = ShapeLayer::Make();
@@ -1819,10 +1825,10 @@ TGFX_TEST(LayerTest, ContourTest) {
   rootLayer->addChild(strokeTestLayer);
   OpaqueContext allContext;
   auto allCanvas = allContext.beginRecording();
-  rootLayer->drawContour(drawArgs, allCanvas, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(rootLayer->drawContour(drawArgs, allCanvas, 1.0f, BlendMode::SrcOver));
   auto allPicture = allContext.finishRecordingAsPicture();
   // 1 + 2 + 1 + 3 + 2 = 9
-  EXPECT_EQ(allPicture->drawCount, 9u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(allPicture->drawCount, 9u));
 
   surface = Surface::Make(context, 200, 300);
   auto canvas = surface->getCanvas();
@@ -1831,7 +1837,7 @@ TGFX_TEST(LayerTest, ContourTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ContourTest"));
 }
 
-TGFX_TEST(LayerTest, ContourMatchesContent) {
+TGFX_TEST_PRIVATE(LayerTest, ContourMatchesContent) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1846,9 +1852,10 @@ TGFX_TEST(LayerTest, ContourMatchesContent) {
   opaqueLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
   OpaqueContext opaqueContext;
   auto opaqueCanvas = opaqueContext.beginRecording();
-  bool opaqueMatch = opaqueLayer->drawContour(drawArgs, opaqueCanvas, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(
+      bool opaqueMatch = opaqueLayer->drawContour(drawArgs, opaqueCanvas, 1.0f, BlendMode::SrcOver);
+      EXPECT_TRUE(opaqueMatch));
   opaqueContext.finishRecordingAsPicture();
-  EXPECT_TRUE(opaqueMatch);
 
   // Case 2: Transparent fill (alpha = 0) should not match content.
   auto transparentLayer = ShapeLayer::Make();
@@ -1856,10 +1863,10 @@ TGFX_TEST(LayerTest, ContourMatchesContent) {
   transparentLayer->addFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 0)));
   OpaqueContext transparentContext;
   auto transparentCanvas = transparentContext.beginRecording();
-  bool transparentMatch =
-      transparentLayer->drawContour(drawArgs, transparentCanvas, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(bool transparentMatch = transparentLayer->drawContour(
+                          drawArgs, transparentCanvas, 1.0f, BlendMode::SrcOver);
+                      EXPECT_FALSE(transparentMatch));
   transparentContext.finishRecordingAsPicture();
-  EXPECT_FALSE(transparentMatch);
 
   // Case 3: Image shader fill should match content.
   auto image = MakeImage("resources/apitest/imageReplacement.png");
@@ -1869,9 +1876,10 @@ TGFX_TEST(LayerTest, ContourMatchesContent) {
   imageLayer->addFillStyle(ShapeStyle::Make(imageShader));
   OpaqueContext imageContext;
   auto imageCanvas = imageContext.beginRecording();
-  bool imageMatch = imageLayer->drawContour(drawArgs, imageCanvas, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(bool imageMatch =
+                          imageLayer->drawContour(drawArgs, imageCanvas, 1.0f, BlendMode::SrcOver);
+                      EXPECT_TRUE(imageMatch));
   imageContext.finishRecordingAsPicture();
-  EXPECT_TRUE(imageMatch);
 
   // Case 4: Layer with filter should not match content (child layer check).
   auto parentLayer = Layer::Make();
@@ -1882,9 +1890,10 @@ TGFX_TEST(LayerTest, ContourMatchesContent) {
   parentLayer->addChild(filterLayer);
   OpaqueContext filterContext;
   auto filterCanvas = filterContext.beginRecording();
-  bool filterMatch = parentLayer->drawContour(drawArgs, filterCanvas, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(
+      bool filterMatch = parentLayer->drawContour(drawArgs, filterCanvas, 1.0f, BlendMode::SrcOver);
+      EXPECT_FALSE(filterMatch));
   filterContext.finishRecordingAsPicture();
-  EXPECT_FALSE(filterMatch);
 
   // Case 5: Layer with layerStyle should not match content (child layer check).
   auto parentLayer2 = Layer::Make();
@@ -1895,9 +1904,10 @@ TGFX_TEST(LayerTest, ContourMatchesContent) {
   parentLayer2->addChild(styleLayer);
   OpaqueContext styleContext;
   auto styleCanvas = styleContext.beginRecording();
-  bool styleMatch = parentLayer2->drawContour(drawArgs, styleCanvas, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(
+      bool styleMatch = parentLayer2->drawContour(drawArgs, styleCanvas, 1.0f, BlendMode::SrcOver);
+      EXPECT_FALSE(styleMatch));
   styleContext.finishRecordingAsPicture();
-  EXPECT_FALSE(styleMatch);
 
   // Case 6: Gradient shader should check isOpaque().
   auto gradientShader = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(100, 100),
@@ -1907,14 +1917,14 @@ TGFX_TEST(LayerTest, ContourMatchesContent) {
   gradientLayer->addFillStyle(ShapeStyle::Make(gradientShader));
   OpaqueContext gradientContext;
   auto gradientCanvas = gradientContext.beginRecording();
-  bool gradientMatch =
-      gradientLayer->drawContour(drawArgs, gradientCanvas, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(bool gradientMatch = gradientLayer->drawContour(drawArgs, gradientCanvas,
+                                                                      1.0f, BlendMode::SrcOver);
+                      // Gradient with opaque colors should match.
+                      EXPECT_TRUE(gradientMatch));
   gradientContext.finishRecordingAsPicture();
-  // Gradient with opaque colors should match.
-  EXPECT_TRUE(gradientMatch);
 }
 
-TGFX_TEST(LayerTest, ContourContainsOpaqueBounds) {
+TGFX_TEST_PRIVATE(LayerTest, ContourContainsOpaqueBounds) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1938,11 +1948,11 @@ TGFX_TEST(LayerTest, ContourContainsOpaqueBounds) {
 
   OpaqueContext contourContext;
   auto canvas = contourContext.beginRecording();
-  parentLayer->drawContour(drawArgs, canvas, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(parentLayer->drawContour(drawArgs, canvas, 1.0f, BlendMode::SrcOver));
   auto picture = contourContext.finishRecordingAsPicture();
   // Parent contour drawn, child skipped due to containsOpaqueBounds optimization.
   // Only 1 draw call for parent.
-  EXPECT_EQ(picture->drawCount, 1u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(picture->drawCount, 1u));
 
   // Now test with child not covered (partially outside).
   auto parentLayer2 = ShapeLayer::Make();
@@ -1960,13 +1970,13 @@ TGFX_TEST(LayerTest, ContourContainsOpaqueBounds) {
 
   OpaqueContext contourContext2;
   auto canvas2 = contourContext2.beginRecording();
-  parentLayer2->drawContour(drawArgs, canvas2, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(parentLayer2->drawContour(drawArgs, canvas2, 1.0f, BlendMode::SrcOver));
   auto picture2 = contourContext2.finishRecordingAsPicture();
   // Both parent and child contours should be drawn.
-  EXPECT_EQ(picture2->drawCount, 2u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(picture2->drawCount, 2u));
 }
 
-TGFX_TEST(LayerTest, GetContourImage) {
+TGFX_TEST_PRIVATE(LayerTest, GetContourImage) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1983,23 +1993,18 @@ TGFX_TEST(LayerTest, GetContourImage) {
   DrawArgs drawArgs = DrawArgs(context);
   Point offset = {};
   bool contourMatchesContent = false;
-  auto contourImage =
-      shapeLayer->getContentContourImage(drawArgs, 1.0f, &offset, &contourMatchesContent);
-  EXPECT_TRUE(contourImage != nullptr);
-  EXPECT_EQ(offset.x, 10.0f);
-  EXPECT_EQ(offset.y, 10.0f);
-  EXPECT_EQ(contourImage->width(), 80);
-  EXPECT_EQ(contourImage->height(), 80);
-  EXPECT_TRUE(contourMatchesContent);
-
-  // Draw the contour image to verify.
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-  canvas->drawImage(contourImage, offset.x, offset.y);
+  TGFX_PRIVATE_ACCESS(auto contourImage = shapeLayer->getContentContourImage(
+                          drawArgs, 1.0f, &offset, &contourMatchesContent);
+                      EXPECT_TRUE(contourImage != nullptr); EXPECT_EQ(offset.x, 10.0f);
+                      EXPECT_EQ(offset.y, 10.0f); EXPECT_EQ(contourImage->width(), 80);
+                      EXPECT_EQ(contourImage->height(), 80); EXPECT_TRUE(contourMatchesContent);
+                      // Draw the contour image to verify.
+                      auto canvas = surface->getCanvas();
+                      canvas->clear(); canvas->drawImage(contourImage, offset.x, offset.y));
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GetContourImage"));
 }
 
-TGFX_TEST(LayerTest, ContourWithMask) {
+TGFX_TEST_PRIVATE(LayerTest, ContourWithMask) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -2025,10 +2030,10 @@ TGFX_TEST(LayerTest, ContourWithMask) {
 
   OpaqueContext contourContext;
   auto canvas = contourContext.beginRecording();
-  shapeLayer->drawContour(drawArgs, canvas, 1.0f, BlendMode::SrcOver);
+  TGFX_PRIVATE_ACCESS(shapeLayer->drawContour(drawArgs, canvas, 1.0f, BlendMode::SrcOver));
   auto picture = contourContext.finishRecordingAsPicture();
   // The mask clips the shape, so we should have 1 contour (the masked shape).
-  EXPECT_EQ(picture->drawCount, 1u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(picture->drawCount, 1u));
 
   // Draw to surface for visual verification.
   surface = Surface::Make(context, 200, 200);
@@ -2449,7 +2454,7 @@ TGFX_TEST(LayerTest, DisplayListBackground) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_TiledRender"));
 }
 
-TGFX_TEST(LayerTest, LayerRecorder) {
+TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2473,17 +2478,17 @@ TGFX_TEST(LayerTest, LayerRecorder) {
     recorder.addRect(Rect::MakeXYWH(70, 10, 50, 50), redPaint);
     recorder.addRect(Rect::MakeXYWH(130, 10, 50, 50), redPaint);
     recorder.addRect(Rect::MakeXYWH(10, 70, 50, 50), bluePaint);
-    auto content = recorder.finishRecording();
-    ASSERT_TRUE(content != nullptr);
-    // Should be ComposeContent with 2 items: RectsContent (3 rects) + RectContent (1 rect)
-    EXPECT_EQ(content->type(), LayerContent::Type::Compose);
-    auto composeContent = static_cast<ComposeContent*>(content.get());
-    EXPECT_EQ(composeContent->contents.size(), 2u);
-    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Rects);
-    auto rectsContent = static_cast<RectsContent*>(composeContent->contents[0].get());
-    EXPECT_EQ(rectsContent->rects.size(), 3u);
-    EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::Rect);
-    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    TGFX_PRIVATE_ACCESS(
+        auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
+        // Should be ComposeContent with 2 items: RectsContent (3 rects) + RectContent (1 rect)
+        EXPECT_EQ(content->type(), LayerContent::Type::Compose);
+        auto composeContent = static_cast<ComposeContent*>(content.get());
+        EXPECT_EQ(composeContent->contents.size(), 2u);
+        EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Rects);
+        auto rectsContent = static_cast<RectsContent*>(composeContent->contents[0].get());
+        EXPECT_EQ(rectsContent->rects.size(), 3u);
+        EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::Rect);
+        content->drawDefault(surface->getCanvas(), 1.0f, true));
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MultipleRects"));
   }
 
@@ -2503,17 +2508,17 @@ TGFX_TEST(LayerTest, LayerRecorder) {
     recorder.addRRect(rRect2, redPaint);
     recorder.addRRect(rRect3, redPaint);
     recorder.addRRect(rRect4, bluePaint);
-    auto content = recorder.finishRecording();
-    ASSERT_TRUE(content != nullptr);
-    // Should be ComposeContent with 2 items: RRectsContent (3 rrects) + RRectContent (1 rrect)
-    EXPECT_EQ(content->type(), LayerContent::Type::Compose);
-    auto composeContent = static_cast<ComposeContent*>(content.get());
-    EXPECT_EQ(composeContent->contents.size(), 2u);
-    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::RRects);
-    auto rrectsContent = static_cast<RRectsContent*>(composeContent->contents[0].get());
-    EXPECT_EQ(rrectsContent->rRects.size(), 3u);
-    EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::RRect);
-    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    TGFX_PRIVATE_ACCESS(
+        auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
+        // Should be ComposeContent with 2 items: RRectsContent (3 rrects) + RRectContent (1 rrect)
+        EXPECT_EQ(content->type(), LayerContent::Type::Compose);
+        auto composeContent = static_cast<ComposeContent*>(content.get());
+        EXPECT_EQ(composeContent->contents.size(), 2u);
+        EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::RRects);
+        auto rrectsContent = static_cast<RRectsContent*>(composeContent->contents[0].get());
+        EXPECT_EQ(rrectsContent->rRects.size(), 3u);
+        EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::RRect);
+        content->drawDefault(surface->getCanvas(), 1.0f, true));
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MultipleRRects"));
   }
 
@@ -2533,17 +2538,17 @@ TGFX_TEST(LayerTest, LayerRecorder) {
     recorder.addPath(path2, redPaint);
     recorder.addPath(path3, redPaint);
     recorder.addPath(path4, bluePaint);
-    auto content = recorder.finishRecording();
-    ASSERT_TRUE(content != nullptr);
-    // Should be ComposeContent with 2 items: ShapeContent (merged paths) + PathContent
-    EXPECT_EQ(content->type(), LayerContent::Type::Compose);
-    auto composeContent = static_cast<ComposeContent*>(content.get());
-    ASSERT_TRUE(composeContent->contents.size() == 4u);
-    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Path);
-    EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::Path);
-    EXPECT_EQ(composeContent->contents[2]->type(), LayerContent::Type::Path);
-    EXPECT_EQ(composeContent->contents[3]->type(), LayerContent::Type::Path);
-    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    TGFX_PRIVATE_ACCESS(
+        auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
+        // Should be ComposeContent with 2 items: ShapeContent (merged paths) + PathContent
+        EXPECT_EQ(content->type(), LayerContent::Type::Compose);
+        auto composeContent = static_cast<ComposeContent*>(content.get());
+        ASSERT_TRUE(composeContent->contents.size() == 4u);
+        EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Path);
+        EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::Path);
+        EXPECT_EQ(composeContent->contents[2]->type(), LayerContent::Type::Path);
+        EXPECT_EQ(composeContent->contents[3]->type(), LayerContent::Type::Path);
+        content->drawDefault(surface->getCanvas(), 1.0f, true));
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MultiplePaths"));
   }
 
@@ -2558,16 +2563,16 @@ TGFX_TEST(LayerTest, LayerRecorder) {
     Path path = {};
     path.addOval(Rect::MakeXYWH(130, 10, 50, 50));
     recorder.addPath(path, redPaint);
-    auto content = recorder.finishRecording();
-    ASSERT_TRUE(content != nullptr);
-    // Should be ComposeContent with 3 items: RectContent + RRectContent + PathContent
-    EXPECT_EQ(content->type(), LayerContent::Type::Compose);
-    auto composeContent = static_cast<ComposeContent*>(content.get());
-    EXPECT_EQ(composeContent->contents.size(), 3u);
-    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Rect);
-    EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::RRect);
-    EXPECT_EQ(composeContent->contents[2]->type(), LayerContent::Type::Path);
-    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    TGFX_PRIVATE_ACCESS(
+        auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
+        // Should be ComposeContent with 3 items: RectContent + RRectContent + PathContent
+        EXPECT_EQ(content->type(), LayerContent::Type::Compose);
+        auto composeContent = static_cast<ComposeContent*>(content.get());
+        EXPECT_EQ(composeContent->contents.size(), 3u);
+        EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Rect);
+        EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::RRect);
+        EXPECT_EQ(composeContent->contents[2]->type(), LayerContent::Type::Path);
+        content->drawDefault(surface->getCanvas(), 1.0f, true));
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MixedShapes"));
   }
 
@@ -2580,13 +2585,12 @@ TGFX_TEST(LayerTest, LayerRecorder) {
     auto font = Font(typeface, 24);
     auto textBlob = TextBlob::MakeFrom("Hello", font);
     recorder.addTextBlob(textBlob, redPaint, 50, 100);
-    auto content = recorder.finishRecording();
-    ASSERT_TRUE(content != nullptr);
-    // Should be single TextContent
-    EXPECT_EQ(content->type(), LayerContent::Type::Text);
-    auto textContent = static_cast<TextContent*>(content.get());
-    EXPECT_EQ(textContent->offset, Point::Make(50, 100));
-    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
+                        // Should be single TextContent
+                        EXPECT_EQ(content->type(), LayerContent::Type::Text);
+                        auto textContent = static_cast<TextContent*>(content.get());
+                        EXPECT_EQ(textContent->offset, Point::Make(50, 100));
+                        content->drawDefault(surface->getCanvas(), 1.0f, true));
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_TextBlobWithOffset"));
   }
 
@@ -2599,11 +2603,10 @@ TGFX_TEST(LayerTest, LayerRecorder) {
     linePath.lineTo(100, 100);
     recorder.addPath(linePath, redPaint);  // Fill style, should be ignored
     recorder.addRect(Rect::MakeXYWH(10, 70, 50, 50), bluePaint);
-    auto content = recorder.finishRecording();
-    ASSERT_TRUE(content != nullptr);
-    // Should be single RectContent (line path ignored)
-    EXPECT_EQ(content->type(), LayerContent::Type::Rect);
-    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
+                        // Should be single RectContent (line path ignored)
+                        EXPECT_EQ(content->type(), LayerContent::Type::Rect);
+                        content->drawDefault(surface->getCanvas(), 1.0f, true));
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_LinePathFill"));
   }
 
@@ -2615,11 +2618,10 @@ TGFX_TEST(LayerTest, LayerRecorder) {
     linePath.moveTo(10, 50);
     linePath.lineTo(190, 50);
     recorder.addPath(linePath, strokePaint);
-    auto content = recorder.finishRecording();
-    ASSERT_TRUE(content != nullptr);
-    // Should be single RectContent (line converted to rect)
-    EXPECT_EQ(content->type(), LayerContent::Type::Rect);
-    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
+                        // Should be single RectContent (line converted to rect)
+                        EXPECT_EQ(content->type(), LayerContent::Type::Rect);
+                        content->drawDefault(surface->getCanvas(), 1.0f, true));
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_LinePathStroke"));
   }
 
@@ -2627,9 +2629,8 @@ TGFX_TEST(LayerTest, LayerRecorder) {
   {
     LayerRecorder recorder = {};
     recorder.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint);
-    auto content = recorder.finishRecording();
-    ASSERT_TRUE(content != nullptr);
-    EXPECT_EQ(content->type(), LayerContent::Type::Rect);
+    TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
+                        EXPECT_EQ(content->type(), LayerContent::Type::Rect));
   }
 
   // Test 9: Single rrect should be RRectContent, not RRectsContent
@@ -2638,9 +2639,8 @@ TGFX_TEST(LayerTest, LayerRecorder) {
     RRect rRect = {};
     rRect.setRectXY(Rect::MakeXYWH(10, 10, 50, 50), 10, 10);
     recorder.addRRect(rRect, redPaint);
-    auto content = recorder.finishRecording();
-    ASSERT_TRUE(content != nullptr);
-    EXPECT_EQ(content->type(), LayerContent::Type::RRect);
+    TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
+                        EXPECT_EQ(content->type(), LayerContent::Type::RRect));
   }
 
   // Test 10: RRect with zero radius should be converted to Rect
@@ -2649,13 +2649,12 @@ TGFX_TEST(LayerTest, LayerRecorder) {
     RRect rRect = {};
     rRect.setRectXY(Rect::MakeXYWH(10, 10, 50, 50), 0, 0);
     recorder.addRRect(rRect, redPaint);
-    auto content = recorder.finishRecording();
-    ASSERT_TRUE(content != nullptr);
-    EXPECT_EQ(content->type(), LayerContent::Type::Rect);
+    TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
+                        EXPECT_EQ(content->type(), LayerContent::Type::Rect));
   }
 }
 
-TGFX_TEST(LayerTest, LayerRecorderMatrix) {
+TGFX_TEST_PRIVATE(LayerTest, LayerRecorderMatrix) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2677,10 +2676,11 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
   recorder1.setMatrix(matrix1);
   recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), redFill);
   recorder1.addRect(Rect::MakeXYWH(80, 10, 50, 50), redFill);
-  auto content1 = recorder1.finishRecording();
-  EXPECT_EQ(content1->type(), LayerContent::Type::Matrix);
-  auto matrixContent = static_cast<MatrixContent*>(content1.get());
-  EXPECT_EQ(matrixContent->content->type(), LayerContent::Type::Rects);
+  std::unique_ptr<LayerContent> content1;
+  TGFX_PRIVATE_ACCESS(content1 = recorder1.finishRecording();
+                      EXPECT_EQ(content1->type(), LayerContent::Type::Matrix);
+                      auto matrixContent = static_cast<MatrixContent*>(content1.get());
+                      EXPECT_EQ(matrixContent->content->type(), LayerContent::Type::Rects));
 
   // Test 2: Different matrices create Compose
   auto matrix2 = Matrix::MakeRotate(60, 50, 50);
@@ -2689,25 +2689,28 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
   recorder2.addRect(Rect::MakeXYWH(10, 10, 50, 50), blueStroke);
   recorder2.setMatrix(matrix2);
   recorder2.addRect(Rect::MakeXYWH(80, 10, 50, 50), blueStroke);
-  auto content2 = recorder2.finishRecording();
-  EXPECT_EQ(content2->type(), LayerContent::Type::Compose);
-  auto composeContent = static_cast<ComposeContent*>(content2.get());
-  EXPECT_EQ(composeContent->contents.size(), 2u);
-  EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Matrix);
-  EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::Matrix);
+  std::unique_ptr<LayerContent> content2;
+  TGFX_PRIVATE_ACCESS(content2 = recorder2.finishRecording();
+                      EXPECT_EQ(content2->type(), LayerContent::Type::Compose);
+                      auto composeContent = static_cast<ComposeContent*>(content2.get());
+                      EXPECT_EQ(composeContent->contents.size(), 2u);
+                      EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Matrix);
+                      EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::Matrix));
 
   // Test 3: Nullopt matrix should not create MatrixContent
   LayerRecorder recorder3 = {};
   recorder3.addRect(Rect::MakeXYWH(10, 10, 50, 50), greenFill);
-  auto content3 = recorder3.finishRecording();
-  EXPECT_EQ(content3->type(), LayerContent::Type::Rect);
+  std::unique_ptr<LayerContent> content3;
+  TGFX_PRIVATE_ACCESS(content3 = recorder3.finishRecording();
+                      EXPECT_EQ(content3->type(), LayerContent::Type::Rect));
 
   // Test 4: Identity matrix should not create MatrixContent
   LayerRecorder recorder4 = {};
   recorder4.setMatrix(Matrix::I());
   recorder4.addRect(Rect::MakeXYWH(10, 10, 50, 50), blueStroke);
-  auto content4 = recorder4.finishRecording();
-  EXPECT_EQ(content4->type(), LayerContent::Type::Rect);
+  std::unique_ptr<LayerContent> content4;
+  TGFX_PRIVATE_ACCESS(content4 = recorder4.finishRecording();
+                      EXPECT_EQ(content4->type(), LayerContent::Type::Rect));
 
   // Test 5: getTightBounds with transformed content
   auto bounds = content1->getTightBounds(Matrix::I());
@@ -2718,7 +2721,8 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
   LayerRecorder recorder5 = {};
   recorder5.setMatrix(Matrix::MakeRotate(45, 50, 50));
   recorder5.addRect(Rect::MakeXYWH(0, 0, 100, 100), greenFill);
-  auto content5 = recorder5.finishRecording();
+  std::unique_ptr<LayerContent> content5;
+  TGFX_PRIVATE_ACCESS(content5 = recorder5.finishRecording());
   EXPECT_TRUE(content5->hitTestPoint(50, 50));
   EXPECT_FALSE(content5->hitTestPoint(0, 0));
   EXPECT_TRUE(content5->hitTestPoint(50, -15));
@@ -2751,11 +2755,13 @@ TGFX_TEST(LayerTest, LayerRecorderMatrix) {
   auto scaledShape = Shape::ApplyMatrix(Shape::MakeFrom(rectPath), Matrix::MakeScale(2.0f));
   LayerRecorder recorder6 = {};
   recorder6.addShape(scaledShape, strokePaint);
-  auto content6 = recorder6.finishRecording();
+  std::unique_ptr<LayerContent> content6;
+  TGFX_PRIVATE_ACCESS(content6 = recorder6.finishRecording());
 
   LayerRecorder recorder7 = {};
   recorder7.addRect(Rect::MakeWH(100, 100), strokePaint);
-  auto content7 = recorder7.finishRecording();
+  std::unique_ptr<LayerContent> content7;
+  TGFX_PRIVATE_ACCESS(content7 = recorder7.finishRecording());
 
   auto surface2 = Surface::Make(context, 350, 200);
   auto canvas2 = surface2->getCanvas();
@@ -2936,17 +2942,15 @@ TGFX_TEST(LayerTest, SetChildrenOptimization) {
   EXPECT_EQ(grandChildLayer->children().size(), 0u);
 
   // Test Case 10: Root layer as child (should be prevented)
-  auto rootLayer = RootLayer::Make();
-  rootLayer->_root = rootLayer.get();
+  TGFX_PRIVATE_ACCESS(
+      auto rootLayer = RootLayer::Make(); rootLayer->_root = rootLayer.get();
 
-  std::vector<std::shared_ptr<Layer>> withRoot = {layerA, rootLayer, layerB};
-  parent->setChildren(withRoot);
+      std::vector<std::shared_ptr<Layer>> withRoot = {layerA, rootLayer, layerB};
+      parent->setChildren(withRoot);
 
-  // Root layer should be rejected, only layerA and layerB should be added
-  EXPECT_EQ(parent->children().size(), 2u);
-  EXPECT_EQ(parent->children()[0], layerA);
-  EXPECT_EQ(parent->children()[1], layerB);
-  EXPECT_FALSE(parent->contains(rootLayer));
+      // Root layer should be rejected, only layerA and layerB should be added
+      EXPECT_EQ(parent->children().size(), 2u); EXPECT_EQ(parent->children()[0], layerA);
+      EXPECT_EQ(parent->children()[1], layerB); EXPECT_FALSE(parent->contains(rootLayer));)
 
   // Test Case 11: Self as child (should be prevented)
   std::vector<std::shared_ptr<Layer>> selfAsChild = {layerA, parent, layerB};
@@ -2992,7 +2996,7 @@ TGFX_TEST(LayerTest, SetChildrenOptimization) {
   EXPECT_EQ(parent->children()[2], layerB);
 }
 
-TGFX_TEST(LayerTest, SetChildrenLISValidation) {
+TGFX_TEST_PRIVATE(LayerTest, SetChildrenLISValidation) {
   // Test that the LIS algorithm correctly identifies which layers need to be marked dirty
   // by verifying that layers maintaining relative order are not unnecessarily invalidated
 
@@ -3024,10 +3028,10 @@ TGFX_TEST(LayerTest, SetChildrenLISValidation) {
   EXPECT_EQ(root->children()[1], layerA);
   EXPECT_EQ(root->children()[2], layerB);
   EXPECT_EQ(root->children()[3], layerC);
-  EXPECT_TRUE(layerD->bitFields.dirtyTransform);
-  EXPECT_FALSE(layerA->bitFields.dirtyTransform);
-  EXPECT_FALSE(layerB->bitFields.dirtyTransform);
-  EXPECT_FALSE(layerC->bitFields.dirtyTransform);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(layerD->bitFields.dirtyTransform);
+                      EXPECT_FALSE(layerA->bitFields.dirtyTransform);
+                      EXPECT_FALSE(layerB->bitFields.dirtyTransform);
+                      EXPECT_FALSE(layerC->bitFields.dirtyTransform));
 
   root->updateDirtyRegions();
 
@@ -3043,10 +3047,10 @@ TGFX_TEST(LayerTest, SetChildrenLISValidation) {
   EXPECT_EQ(root->children()[1], layerB);
   EXPECT_EQ(root->children()[2], layerC);
   EXPECT_EQ(root->children()[3], layerA);
-  EXPECT_FALSE(layerD->bitFields.dirtyTransform);
-  EXPECT_FALSE(layerB->bitFields.dirtyTransform);
-  EXPECT_FALSE(layerC->bitFields.dirtyTransform);
-  EXPECT_TRUE(layerA->bitFields.dirtyTransform);
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(layerD->bitFields.dirtyTransform);
+                      EXPECT_FALSE(layerB->bitFields.dirtyTransform);
+                      EXPECT_FALSE(layerC->bitFields.dirtyTransform);
+                      EXPECT_TRUE(layerA->bitFields.dirtyTransform));
 
   root->updateDirtyRegions();
 
@@ -3063,18 +3067,14 @@ TGFX_TEST(LayerTest, SetChildrenLISValidation) {
   EXPECT_EQ(root->children()[2], layerB);
   EXPECT_EQ(root->children()[3], layerD);
   int dirtyCount = 0;
-  if (layerA->bitFields.dirtyTransform) {
-    dirtyCount++;
-  }
-  if (layerC->bitFields.dirtyTransform) {
-    dirtyCount++;
-  }
-  if (layerB->bitFields.dirtyTransform) {
-    dirtyCount++;
-  }
-  if (layerD->bitFields.dirtyTransform) {
-    dirtyCount++;
-  }
+  TGFX_PRIVATE_ACCESS(
+      if (layerA->bitFields.dirtyTransform) {
+        dirtyCount++;
+      } if (layerC->bitFields.dirtyTransform) {
+        dirtyCount++;
+      } if (layerB->bitFields.dirtyTransform) {
+        dirtyCount++;
+      } if (layerD->bitFields.dirtyTransform) { dirtyCount++; });
   EXPECT_EQ(dirtyCount, 3);
 
   root->updateDirtyRegions();
@@ -3088,10 +3088,10 @@ TGFX_TEST(LayerTest, SetChildrenLISValidation) {
   EXPECT_EQ(root->children()[1], layerC);
   EXPECT_EQ(root->children()[2], layerB);
   EXPECT_EQ(root->children()[3], layerD);
-  EXPECT_FALSE(layerA->bitFields.dirtyTransform);
-  EXPECT_FALSE(layerC->bitFields.dirtyTransform);
-  EXPECT_FALSE(layerB->bitFields.dirtyTransform);
-  EXPECT_FALSE(layerD->bitFields.dirtyTransform);
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(layerA->bitFields.dirtyTransform);
+                      EXPECT_FALSE(layerC->bitFields.dirtyTransform);
+                      EXPECT_FALSE(layerB->bitFields.dirtyTransform);
+                      EXPECT_FALSE(layerD->bitFields.dirtyTransform));
 
   // Scenario 5: Single element - edge case
   auto displayList2 = std::make_unique<DisplayList>();
@@ -3104,14 +3104,14 @@ TGFX_TEST(LayerTest, SetChildrenLISValidation) {
 
   EXPECT_EQ(singleParent->children().size(), 1u);
   EXPECT_EQ(singleParent->children()[0], singleLayer);
-  EXPECT_TRUE(singleLayer->bitFields.dirtyTransform);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(singleLayer->bitFields.dirtyTransform));
 
   singleParent->updateDirtyRegions();
 
   // Reorder with same single element - no change, not dirty
   singleParent->setChildren(single);
   EXPECT_EQ(singleParent->children().size(), 1u);
-  EXPECT_FALSE(singleLayer->bitFields.dirtyTransform);
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(singleLayer->bitFields.dirtyTransform));
 }
 
 TGFX_TEST(LayerTest, Layer3DContextAPI) {

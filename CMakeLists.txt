@@ -226,11 +226,14 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     list(APPEND TGFX_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-unused-command-line-argument)
 endif ()
 
+if (WIN32)
+    list(APPEND TGFX_DEFINES NOMINMAX _USE_MATH_DEFINES)
+endif ()
+
 if (MSVC)
     list(APPEND TGFX_COMPILE_OPTIONS "/utf-8")
     list(APPEND TGFX_COMPILE_OPTIONS /w44251 /w44275)
     list(APPEND TGFX_COMPILE_OPTIONS /W4)
-    list(APPEND TGFX_DEFINES NOMINMAX _USE_MATH_DEFINES)
 endif (MSVC)
 
 # Sets flags
@@ -697,7 +700,11 @@ if (TGFX_BUILD_TESTS)
             third_party/googletest/googletest
             third_party/googletest/googletest/include)
 
-    list(APPEND TGFX_TEST_COMPILE_OPTIONS ${TGFX_COMPILE_OPTIONS} -fno-access-control)
+    list(APPEND TGFX_TEST_COMPILE_OPTIONS ${TGFX_COMPILE_OPTIONS})
+    if (NOT MSVC)
+        list(APPEND TGFX_TEST_COMPILE_OPTIONS -fno-access-control)
+        list(APPEND TGFX_TEST_DEFINES TGFX_TEST_ACCESS_PRIVATE)
+    endif ()
     list(APPEND TGFX_TEST_DEFINES ${TGFX_DEFINES})
 
     foreach (FILE_PATH ${TGFX_TEST_FILES})

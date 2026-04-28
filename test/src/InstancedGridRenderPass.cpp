@@ -76,7 +76,7 @@ static std::string GetFinalShaderCode(const char* codeSnippet, bool isDesktop) {
 
 std::shared_ptr<InstancedGridRenderPass> InstancedGridRenderPass::Make(uint32_t rows,
                                                                        uint32_t columns) {
-  return std::make_shared<InstancedGridRenderPass>(rows, columns);
+  return std::shared_ptr<InstancedGridRenderPass>(new InstancedGridRenderPass(rows, columns));
 }
 
 InstancedGridRenderPass::InstancedGridRenderPass(uint32_t rows, uint32_t columns)
