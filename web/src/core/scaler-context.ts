@@ -174,10 +174,20 @@ export class ScalerContext {
         stroke ?: { width: number; cap: ctor; join: ctor; miterLimit: number }
     ) {
         const width = bounds.right - bounds.left;
-        const height = bounds.bottom - bounds.top
+        const height = bounds.bottom - bounds.top;
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
         const provider = getCanvasProvider();
         const canvas = provider.getCanvas2D(width, height);
-        const context = canvas.getContext('2d',{willReadFrequently: true}) as CanvasRenderingContext2D;
+        const context = canvas.getContext('2d', {willReadFrequently: true}) as
+            | CanvasRenderingContext2D
+            | OffscreenCanvasRenderingContext2D
+            | null;
+        if (!context) {
+            provider.releaseCanvas2D(canvas);
+            return null;
+        }
         context.clearRect(0, 0, width, height);
         context.font = this.fontString(fauxBold, false);
         if (stroke){
@@ -191,9 +201,6 @@ export class ScalerContext {
         }
         const {data} = context.getImageData(0, 0, width, height);
         provider.releaseCanvas2D(canvas);
-        if (data.length === 0) {
-            return null;
-        }
         return new Uint8Array(data);
     }
 
@@ -211,8 +218,17 @@ export class ScalerContext {
         }
         const width = glyphWidth + 2 * padding;
         const height = glyphHeight + 2 * padding;
-        const canvas = getCanvasProvider().getCanvas2D(width, height);
-        const context = canvas.getContext('2d') as CanvasRenderingContext2D;
+        const provider = getCanvasProvider();
+        const canvas = provider.getCanvas2D(width, height);
+        const context = canvas.getContext('2d') as
+            | CanvasRenderingContext2D
+            | OffscreenCanvasRenderingContext2D
+            | null;
+        if (!context) {
+            // Return the unusable canvas back to the pool to avoid leaking it.
+            provider.releaseCanvas2D(canvas);
+            return null;
+        }
         context.clearRect(0, 0, width, height);
         context.font = this.fontString(fauxBold, false);
         if (stroke) {
@@ -231,13 +247,17 @@ export class ScalerContext {
 
     protected loadCanvas() {
         if (!ScalerContext.canvas) {
-            ScalerContext.setCanvas(getCanvasProvider().getCanvas2D(10, 10));
+            const canvas = getCanvasProvider().getCanvas2D(10, 10);
+            ScalerContext.setCanvas(canvas);
             // https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently
-            ScalerContext.setContext(
-                (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).getContext('2d', {willReadFrequently: true}) as
-                    | CanvasRenderingContext2D
-                    | OffscreenCanvasRenderingContext2D,
-            );
+            const context = canvas.getContext('2d', {willReadFrequently: true}) as
+                | CanvasRenderingContext2D
+                | OffscreenCanvasRenderingContext2D
+                | null;
+            if (!context) {
+                throw new Error('[tgfx] Failed to acquire a 2D context for the shared ScalerContext canvas.');
+            }
+            ScalerContext.setContext(context);
         }
     }
 

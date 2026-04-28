@@ -40,8 +40,18 @@ export const TGFXBind = (module: TGFX) => {
   setCanvasProvider({
     getCanvas2D,
     releaseCanvas2D: (canvas: HTMLCanvasElement | OffscreenCanvas) => {
-      if (canvas instanceof OffscreenCanvas) {
-        releaseCanvas2D(canvas);
+      // In the WeChat mini-program environment, HTMLCanvasElement does not
+      // exist at runtime, so receiving a non-OffscreenCanvas here would only
+      // happen via a misuse from core code. We feature-detect the global
+      // OffscreenCanvas first to stay safe in WebView variants that lack it,
+      // and fall back to duck-typing on transferToImageBitmap, which wx's
+      // offscreen canvas also implements but may not share the browser's
+      // prototype chain.
+      const isOffscreen =
+          (typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas) ||
+          typeof (canvas as OffscreenCanvas).transferToImageBitmap === 'function';
+      if (isOffscreen) {
+        releaseCanvas2D(canvas as OffscreenCanvas);
       }
     },
   });

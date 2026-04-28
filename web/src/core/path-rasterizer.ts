@@ -22,6 +22,9 @@ import {getCanvasProvider} from './canvas-provider';
 
 export class PathRasterizer {
     public static readPixels(width: number, height: number, path: Path2D, fillType: ctor) {
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
         const provider = getCanvasProvider();
         const canvas = provider.getCanvas2D(width, height);
         const context = canvas.getContext('2d', {willReadFrequently: true}) as
@@ -42,9 +45,6 @@ export class PathRasterizer {
         }
         const {data} = context.getImageData(0, 0, width, height);
         provider.releaseCanvas2D(canvas);
-        if (data.length === 0) {
-            return null;
-        }
         return new Uint8Array(data);
     }
 }

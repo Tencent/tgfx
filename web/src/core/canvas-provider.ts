@@ -45,10 +45,7 @@ let canvasProvider: CanvasProvider = {
 export function setCanvasProvider(provider: CanvasProvider) {
     // Shallow-copy so that later mutations on the caller's object cannot
     // silently change the active provider behind setCanvasProvider's back.
-    canvasProvider = {
-        getCanvas2D: provider.getCanvas2D,
-        releaseCanvas2D: provider.releaseCanvas2D,
-    };
+    canvasProvider = { ...provider };
 }
 
 /**
