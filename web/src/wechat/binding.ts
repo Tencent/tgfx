@@ -20,12 +20,19 @@ import { TGFX } from '../types';
 import { setTGFXModule } from '../tgfx-module';
 import * as tgfx from './tgfx';
 import { Matrix } from '../core/matrix';
-import { ScalerContext } from './scaler-context';
+import { ScalerContext } from '../core/scaler-context';
 import { PathRasterizer } from './path-rasterizer';
+import { getCanvas2D, releaseCanvas2D } from './canvas';
 
 export const TGFXBind = (module: TGFX) => {
   setTGFXModule(module);
   module.module = module;
+  // Inject the WeChat-specific canvas provider so that ScalerContext reuses the
+  // wx.createOffscreenCanvas-based pool instead of the browser canvas utilities.
+  ScalerContext.setCanvasProvider({
+    getCanvas2D,
+    releaseCanvas2D: releaseCanvas2D as (canvas: HTMLCanvasElement | OffscreenCanvas) => void,
+  });
   module.ScalerContext = ScalerContext;
   module.PathRasterizer = PathRasterizer;
   module.Matrix = Matrix;

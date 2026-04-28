@@ -18,14 +18,27 @@
 
 import {measureText} from '../utils/measure-text';
 import {defaultFontNames, getFontFamilies} from '../utils/font-family';
-import {getCanvas2D, releaseCanvas2D} from '../utils/canvas';
+import {getCanvas2D as defaultGetCanvas2D, releaseCanvas2D as defaultReleaseCanvas2D} from '../utils/canvas';
 import {TGFXModule} from '../tgfx-module';
 import {ctor, Rect} from '../types';
+
+export interface CanvasProvider {
+    getCanvas2D: (width: number, height: number) => HTMLCanvasElement | OffscreenCanvas;
+    releaseCanvas2D: (canvas: HTMLCanvasElement | OffscreenCanvas) => void;
+}
 
 export class ScalerContext {
     public static canvas: HTMLCanvasElement | OffscreenCanvas;
     public static context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
     private static hasMeasureBoundsAPI: boolean | undefined = undefined;
+    private static canvasProvider: CanvasProvider = {
+        getCanvas2D: defaultGetCanvas2D,
+        releaseCanvas2D: defaultReleaseCanvas2D,
+    };
+
+    public static setCanvasProvider(provider: CanvasProvider) {
+        ScalerContext.canvasProvider = provider;
+    }
 
     public static getLineCap(cap: ctor): CanvasLineCap {
         switch (cap) {
@@ -175,7 +188,7 @@ export class ScalerContext {
     ) {
         const width = bounds.right - bounds.left;
         const height = bounds.bottom - bounds.top
-        const canvas = getCanvas2D(width, height);
+        const canvas = ScalerContext.canvasProvider.getCanvas2D(width, height);
         const context = canvas.getContext('2d',{willReadFrequently: true}) as CanvasRenderingContext2D;
         context.clearRect(0, 0, width, height);
         context.font = this.fontString(fauxBold, false);
@@ -189,7 +202,7 @@ export class ScalerContext {
             context.fillText(text, -bounds.left, -bounds.top);
         }
         const {data} = context.getImageData(0, 0, width, height);
-        releaseCanvas2D(canvas);
+        ScalerContext.canvasProvider.releaseCanvas2D(canvas);
         if (data.length === 0) {
             return null;
         }
@@ -210,7 +223,7 @@ export class ScalerContext {
         }
         const width = glyphWidth + 2 * padding;
         const height = glyphHeight + 2 * padding;
-        const canvas = getCanvas2D(width, height);
+        const canvas = ScalerContext.canvasProvider.getCanvas2D(width, height);
         const context = canvas.getContext('2d') as CanvasRenderingContext2D;
         context.clearRect(0, 0, width, height);
         context.font = this.fontString(fauxBold, false);
@@ -230,7 +243,7 @@ export class ScalerContext {
 
     protected loadCanvas() {
         if (!ScalerContext.canvas) {
-            ScalerContext.setCanvas(getCanvas2D(10, 10));
+            ScalerContext.setCanvas(ScalerContext.canvasProvider.getCanvas2D(10, 10));
             // https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently
             ScalerContext.setContext(
                 (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).getContext('2d', {willReadFrequently: true}) as
