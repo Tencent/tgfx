@@ -23,6 +23,11 @@ import {TGFXModule} from '../tgfx-module';
 import {ctor, Rect} from '../types';
 
 export class ScalerContext {
+    // Shared lazily-initialized canvas/context slots. loadCanvas() is invoked
+    // from every constructor, so any instance method reaching these fields
+    // will see valid values. Declared as non-optional because the strict TS
+    // mode forbids definite-assignment assertions on static fields; callers
+    // must not touch these before an instance has been constructed.
     public static canvas: HTMLCanvasElement | OffscreenCanvas;
     public static context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
     private static hasMeasureBoundsAPI: boolean | undefined = undefined;
@@ -59,10 +64,12 @@ export class ScalerContext {
 
     public static isUnicodePropertyEscapeSupported(): boolean {
         try {
+            // Probe Unicode property escape support; the RegExp constructor
+            // throws on engines that do not implement the \p{} syntax.
             // eslint-disable-next-line prefer-regex-literals
-            const regex = new RegExp("\\p{L}", "u");
+            new RegExp("\\p{L}", "u");
             return true;
-        } catch (e) {
+        } catch {
             return false;
         }
     }
@@ -95,7 +102,7 @@ export class ScalerContext {
         capHeight: number;
     };
 
-    private fontBoundingBoxMap: { key: string; value: Rect }[] = [];
+    private fontBoundingBoxMap: Map<string, Rect> = new Map();
 
     public constructor(fontName: string, fontStyle: string, size: number) {
         this.fontName = fontName;
@@ -213,11 +220,13 @@ export class ScalerContext {
     ): HTMLCanvasElement | OffscreenCanvas | null {
         const glyphWidth = bounds.right - bounds.left;
         const glyphHeight = bounds.bottom - bounds.top;
-        if (glyphWidth <= 0 || glyphHeight <= 0) {
-            return null;
-        }
         const width = glyphWidth + 2 * padding;
         const height = glyphHeight + 2 * padding;
+        // Guard on the final canvas size rather than the glyph-only size so
+        // that a negative padding does not produce an invalid canvas request.
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
         const provider = getCanvasProvider();
         const canvas = provider.getCanvas2D(width, height);
         const context = canvas.getContext('2d') as
@@ -265,26 +274,38 @@ export class ScalerContext {
         if (ScalerContext.measureDirectly(ctx)) {
             return ctx.measureText(text);
         }
-        ctx.canvas.width = this.size * 1.5;
-        ctx.canvas.height = this.size * 1.5;
-        const pos = [0, this.size];
-        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-        ctx.fillText(text, pos[0], pos[1]);
-        const imageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
-        const {left, top, right, bottom} = measureText(imageData);
-        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-        let fontMeasure: Rect;
-        const fontBoundingBox = this.fontBoundingBoxMap.find((item) => item.key === this.fontName);
-        if (fontBoundingBox) {
-            fontMeasure = fontBoundingBox.value;
-        } else {
-            ctx.fillText('测', pos[0], pos[1]);
-            const fontImageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
-            fontMeasure = measureText(fontImageData);
-            this.fontBoundingBoxMap.push({key: this.fontName, value: fontMeasure});
-            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        // Fallback path: the engine does not expose actualBoundingBox* metrics,
+        // so we render into a dedicated temp canvas and recover the bounds from
+        // pixel data. A temp canvas avoids mutating the shared ScalerContext
+        // canvas, which would otherwise corrupt concurrent measurements and
+        // incur a resize on every call.
+        const side = this.size * 1.5;
+        const provider = getCanvasProvider();
+        const tmpCanvas = provider.getCanvas2D(side, side);
+        const tmpCtx = tmpCanvas.getContext('2d', {willReadFrequently: true}) as
+            | CanvasRenderingContext2D
+            | OffscreenCanvasRenderingContext2D
+            | null;
+        if (!tmpCtx) {
+            provider.releaseCanvas2D(tmpCanvas);
+            return ctx.measureText(text);
         }
+        tmpCtx.font = ctx.font;
+        const pos = [0, this.size];
+        tmpCtx.clearRect(0, 0, side, side);
+        tmpCtx.fillText(text, pos[0], pos[1]);
+        const imageData = tmpCtx.getImageData(0, 0, side, side);
+        const {left, top, right, bottom} = measureText(imageData);
+
+        let fontMeasure = this.fontBoundingBoxMap.get(this.fontName);
+        if (!fontMeasure) {
+            tmpCtx.clearRect(0, 0, side, side);
+            tmpCtx.fillText('测', pos[0], pos[1]);
+            const fontImageData = tmpCtx.getImageData(0, 0, side, side);
+            fontMeasure = measureText(fontImageData);
+            this.fontBoundingBoxMap.set(this.fontName, fontMeasure);
+        }
+        provider.releaseCanvas2D(tmpCanvas);
 
         return {
             actualBoundingBoxAscent: pos[1] - top,
