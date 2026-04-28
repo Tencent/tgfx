@@ -102,7 +102,10 @@ export class ScalerContext {
         capHeight: number;
     };
 
-    private fontBoundingBoxMap: Map<string, Rect> = new Map();
+    // Cache of the font-specific bounding box probed lazily in the fallback
+    // measureText path. Since fontName is readonly on each instance, this is
+    // effectively a one-slot memoization and does not need a Map keyed by name.
+    private fontMeasureCache: Rect | undefined = undefined;
 
     public constructor(fontName: string, fontStyle: string, size: number) {
         this.fontName = fontName;
@@ -254,6 +257,14 @@ export class ScalerContext {
         return canvas;
     }
 
+    /**
+     * Lazily initializes the shared canvas and 2D context used for font
+     * metrics probing. Called from the constructor, so the first
+     * `new ScalerContext(...)` in an environment without a working 2D context
+     * will throw and propagate to the WASM bridge. Callers that embed
+     * ScalerContext in a host without JS exception handling should ensure the
+     * canvas provider is correctly injected before any instance is created.
+     */
     protected loadCanvas() {
         if (!ScalerContext.canvas) {
             const canvas = getCanvasProvider().getCanvas2D(10, 10);
@@ -278,8 +289,10 @@ export class ScalerContext {
         // so we render into a dedicated temp canvas and recover the bounds from
         // pixel data. A temp canvas avoids mutating the shared ScalerContext
         // canvas, which would otherwise corrupt concurrent measurements and
-        // incur a resize on every call.
-        const side = this.size * 1.5;
+        // incur a resize on every call. The canvas side is ceiled to an
+        // integer because both canvas.width/height and getImageData(sw, sh)
+        // require integer arguments.
+        const side = Math.ceil(this.size * 1.5);
         const provider = getCanvasProvider();
         const tmpCanvas = provider.getCanvas2D(side, side);
         const tmpCtx = tmpCanvas.getContext('2d', {willReadFrequently: true}) as
@@ -288,30 +301,46 @@ export class ScalerContext {
             | null;
         if (!tmpCtx) {
             provider.releaseCanvas2D(tmpCanvas);
-            return ctx.measureText(text);
+            // ctx.measureText was already known not to return valid bounds
+            // (that is why we took the fallback path). Return a zero-sized
+            // metrics object instead so that upstream collapse checks in
+            // getBounds / getFontMetrics see empty geometry rather than
+            // silently using stale or bogus values.
+            return {
+                actualBoundingBoxAscent: 0,
+                actualBoundingBoxRight: 0,
+                actualBoundingBoxDescent: 0,
+                actualBoundingBoxLeft: 0,
+                fontBoundingBoxAscent: 0,
+                fontBoundingBoxDescent: 0,
+                width: 0,
+            };
         }
         tmpCtx.font = ctx.font;
-        const pos = [0, this.size];
+        // Baseline origin: drawing starts at x=0, with y=size so the glyph
+        // can extend both upwards (ascent) and downwards (descent) inside
+        // the temp canvas without clipping.
+        const baselineY = this.size;
         tmpCtx.clearRect(0, 0, side, side);
-        tmpCtx.fillText(text, pos[0], pos[1]);
+        tmpCtx.fillText(text, 0, baselineY);
         const imageData = tmpCtx.getImageData(0, 0, side, side);
         const {left, top, right, bottom} = measureText(imageData);
 
-        let fontMeasure = this.fontBoundingBoxMap.get(this.fontName);
+        let fontMeasure = this.fontMeasureCache;
         if (!fontMeasure) {
             tmpCtx.clearRect(0, 0, side, side);
-            tmpCtx.fillText('测', pos[0], pos[1]);
+            tmpCtx.fillText('测', 0, baselineY);
             const fontImageData = tmpCtx.getImageData(0, 0, side, side);
             fontMeasure = measureText(fontImageData);
-            this.fontBoundingBoxMap.set(this.fontName, fontMeasure);
+            this.fontMeasureCache = fontMeasure;
         }
         provider.releaseCanvas2D(tmpCanvas);
 
         return {
-            actualBoundingBoxAscent: pos[1] - top,
-            actualBoundingBoxRight: right - pos[0],
-            actualBoundingBoxDescent: bottom - pos[1],
-            actualBoundingBoxLeft: pos[0] - left,
+            actualBoundingBoxAscent: baselineY - top,
+            actualBoundingBoxRight: right,
+            actualBoundingBoxDescent: bottom - baselineY,
+            actualBoundingBoxLeft: -left,
             fontBoundingBoxAscent: fontMeasure.bottom - fontMeasure.top,
             fontBoundingBoxDescent: 0,
             width: fontMeasure.right - fontMeasure.left,
