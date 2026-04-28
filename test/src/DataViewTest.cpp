@@ -117,6 +117,8 @@ TGFX_TEST(DataViewTest, FileWriteStream) {
   std::filesystem::path filePath = path;
   std::filesystem::create_directories(filePath.parent_path());
 
+  // The writer must be destroyed before reading. On Windows, fopen() holds an exclusive file lock
+  // that prevents a second fopen() on the same path until fclose() is called in the destructor.
   {
     auto writeStream = WriteStream::MakeFromFile(path);
     EXPECT_TRUE(writeStream != nullptr);

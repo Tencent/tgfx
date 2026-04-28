@@ -448,43 +448,43 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
   CHECK_PIXELS(RGB565Info, pixels, "JpegCodec_Encode_RGB565");
 }
 
-TGFX_TEST(ReadPixelsTest, NativeCodec) {
-#ifdef TGFX_TEST_ACCESS_PRIVATE
-  auto rgbaCodec = MakeNativeCodec("resources/apitest/imageReplacement.png");
-  auto colorSpace = rgbaCodec->colorSpace();
-  ASSERT_TRUE(rgbaCodec != nullptr);
-  EXPECT_EQ(rgbaCodec->width(), 110);
-  EXPECT_EQ(rgbaCodec->height(), 110);
-  EXPECT_EQ(rgbaCodec->orientation(), Orientation::TopLeft);
-  auto RGBAInfo = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::RGBA_8888,
-                                  AlphaType::Premultiplied, 0, colorSpace);
-  Buffer buffer(RGBAInfo.byteSize());
-  auto pixels = buffer.data();
-  ASSERT_TRUE(pixels);
-  EXPECT_TRUE(rgbaCodec->readPixels(RGBAInfo, pixels));
-  CHECK_PIXELS(RGBAInfo, pixels, "NativeCodec_Decode_RGBA");
-  auto bytes = ImageCodec::Encode(Pixmap(RGBAInfo, pixels), EncodedFormat::PNG, 100);
-  auto codec = ImageCodec::MakeNativeCodec(bytes);
-  ASSERT_TRUE(codec != nullptr);
-  ASSERT_EQ(codec->width(), 110);
-  ASSERT_EQ(codec->height(), 110);
-  ASSERT_EQ(codec->orientation(), Orientation::TopLeft);
-  buffer.clear();
-  EXPECT_TRUE(codec->readPixels(RGBAInfo, pixels));
-  CHECK_PIXELS(RGBAInfo, pixels, "NativeCodec_Encode_RGBA");
+TGFX_TEST_PRIVATE(ReadPixelsTest, NativeCodec) {
+  TGFX_PRIVATE_ACCESS({
+    auto rgbaCodec = MakeNativeCodec("resources/apitest/imageReplacement.png");
+    auto colorSpace = rgbaCodec->colorSpace();
+    ASSERT_TRUE(rgbaCodec != nullptr);
+    EXPECT_EQ(rgbaCodec->width(), 110);
+    EXPECT_EQ(rgbaCodec->height(), 110);
+    EXPECT_EQ(rgbaCodec->orientation(), Orientation::TopLeft);
+    auto RGBAInfo = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::RGBA_8888,
+                                    AlphaType::Premultiplied, 0, colorSpace);
+    Buffer buffer(RGBAInfo.byteSize());
+    auto pixels = buffer.data();
+    ASSERT_TRUE(pixels);
+    EXPECT_TRUE(rgbaCodec->readPixels(RGBAInfo, pixels));
+    CHECK_PIXELS(RGBAInfo, pixels, "NativeCodec_Decode_RGBA");
+    auto bytes = ImageCodec::Encode(Pixmap(RGBAInfo, pixels), EncodedFormat::PNG, 100);
+    auto codec = ImageCodec::MakeNativeCodec(bytes);
+    ASSERT_TRUE(codec != nullptr);
+    ASSERT_EQ(codec->width(), 110);
+    ASSERT_EQ(codec->height(), 110);
+    ASSERT_EQ(codec->orientation(), Orientation::TopLeft);
+    buffer.clear();
+    EXPECT_TRUE(codec->readPixels(RGBAInfo, pixels));
+    CHECK_PIXELS(RGBAInfo, pixels, "NativeCodec_Encode_RGBA");
 
-  auto A8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::ALPHA_8,
-                                AlphaType::Premultiplied, 0, colorSpace);
-  buffer.clear();
-  EXPECT_TRUE(rgbaCodec->readPixels(A8Info, pixels));
-  CHECK_PIXELS(A8Info, pixels, "NativeCodec_Decode_Alpha8");
-  bytes = ImageCodec::Encode(Pixmap(A8Info, pixels), EncodedFormat::PNG, 100);
-  codec = ImageCodec::MakeNativeCodec(bytes);
-  ASSERT_TRUE(codec != nullptr);
-  buffer.clear();
-  EXPECT_TRUE(codec->readPixels(A8Info, pixels));
-  CHECK_PIXELS(A8Info, pixels, "NativeCodec_Encode_Alpha8");
-#endif
+    auto A8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::ALPHA_8,
+                                  AlphaType::Premultiplied, 0, colorSpace);
+    buffer.clear();
+    EXPECT_TRUE(rgbaCodec->readPixels(A8Info, pixels));
+    CHECK_PIXELS(A8Info, pixels, "NativeCodec_Decode_Alpha8");
+    bytes = ImageCodec::Encode(Pixmap(A8Info, pixels), EncodedFormat::PNG, 100);
+    codec = ImageCodec::MakeNativeCodec(bytes);
+    ASSERT_TRUE(codec != nullptr);
+    buffer.clear();
+    EXPECT_TRUE(codec->readPixels(A8Info, pixels));
+    CHECK_PIXELS(A8Info, pixels, "NativeCodec_Encode_Alpha8");
+  })
 }
 
 TGFX_TEST(ReadPixelsTest, ReadScaleCodec) {

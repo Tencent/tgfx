@@ -296,9 +296,7 @@ TGFX_TEST(BackgroundBlurTest, PartialBackgroundBlur) {
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/PartialBackgroundBlur"));
   solidLayer2->removeFromParent();
   rootLayer->addChild(solidLayer2);
-#ifdef TGFX_TEST_ACCESS_PRIVATE
-  EXPECT_TRUE(displayList.root()->bitFields.dirtyDescendents);
-#endif
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList.root()->bitFields.dirtyDescendents);)
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/PartialBackgroundBlur_partial"));
   solidLayer2->setMatrix(Matrix::MakeTrans(120, 120));

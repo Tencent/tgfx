@@ -32,11 +32,17 @@
 
 namespace tgfx {
 
+#ifdef TGFX_TEST_ACCESS_PRIVATE
+#define TGFX_TEST_PRIVATE(suite, name) TGFX_TEST(suite, name)
+#define TGFX_PRIVATE_ACCESS(...) __VA_ARGS__
+#else
+#define TGFX_TEST_PRIVATE(suite, name) static void Disabled_##suite##_##name()
+#define TGFX_PRIVATE_ACCESS(...) /* skipped on MSVC */
+#endif
+
 std::shared_ptr<ImageCodec> MakeImageCodec(const std::string& path);
 
-#ifdef TGFX_TEST_ACCESS_PRIVATE
-std::shared_ptr<ImageCodec> MakeNativeCodec(const std::string& path);
-#endif
+TGFX_PRIVATE_ACCESS(std::shared_ptr<ImageCodec> MakeNativeCodec(const std::string& path);)
 
 std::shared_ptr<Image> MakeImage(const std::string& path);
 

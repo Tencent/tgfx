@@ -101,6 +101,8 @@ TGFX_TEST(SVGExportTest, PureColorFile) {
   tgfx::Paint paint;
   paint.setColor(Color::Blue());
 
+  // The writer must be destroyed before reading. On Windows, fopen() holds an exclusive file lock
+  // that prevents a second fopen() on the same path until fclose() is called in the destructor.
   {
     auto SVGStream = WriteStream::MakeFromFile(path);
     auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
@@ -168,6 +170,8 @@ TGFX_TEST(SVGExportTest, OpacityColorFile) {
   paint.setColor(Color::Blue());
   paint.setAlpha(0.5f);
 
+  // The writer must be destroyed before reading. On Windows, fopen() holds an exclusive file lock
+  // that prevents a second fopen() on the same path until fclose() is called in the destructor.
   {
     auto SVGStream = WriteStream::MakeFromFile(path);
     auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
@@ -459,6 +463,8 @@ TGFX_TEST(SVGExportTest, EmojiTextFile) {
   Paint paint;
   paint.setColor(Color::Red());
 
+  // The writer must be destroyed before reading. On Windows, fopen() holds an exclusive file lock
+  // that prevents a second fopen() on the same path until fclose() is called in the destructor.
   {
     auto SVGStream = WriteStream::MakeFromFile(path);
     auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
@@ -560,7 +566,9 @@ TGFX_TEST(SVGExportTest, GradientMask) {
   Buffer buffer(readStream->size());
   readStream->read(buffer.data(), buffer.size());
   auto compareString = std::string(static_cast<char*>(buffer.data()), buffer.size());
-  // Remove '\r' to handle Windows line endings from Git checkout.
+  // The baseline SVG file from resources/ may contain '\r\n' line endings on Windows due to Git
+  // checkout CRLF conversion. Runtime-generated SVG strings use '\n' only, so strip '\r' before
+  // comparison. Other SVG tests compare against in-memory strings and are not affected.
   compareString.erase(std::remove(compareString.begin(), compareString.end(), '\r'),
                       compareString.end());
 

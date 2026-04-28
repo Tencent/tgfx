@@ -247,8 +247,7 @@ TGFX_TEST(StrokeTest, ExtremelyThinStrokeLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/ExtremelyThinStrokeLayer"));
 }
 
-TGFX_TEST(StrokeTest, HairlineUniqueKey) {
-#ifdef TGFX_TEST_ACCESS_PRIVATE
+TGFX_TEST_PRIVATE(StrokeTest, HairlineUniqueKey) {
   Stroke hairlineStroke1(0.f);
   hairlineStroke1.cap = LineCap::Round;
   hairlineStroke1.join = LineJoin::Miter;
@@ -263,15 +262,14 @@ TGFX_TEST(StrokeTest, HairlineUniqueKey) {
   auto shape = Shape::MakeFrom(path);
   auto strokeShape1 = Shape::ApplyStroke(shape, &hairlineStroke1);
   auto strokeShape2 = Shape::ApplyStroke(shape, &hairlineStroke2);
-  EXPECT_EQ(strokeShape1->getUniqueKey(), strokeShape2->getUniqueKey());
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(strokeShape1->getUniqueKey(), strokeShape2->getUniqueKey());)
 
   hairlineStroke1.width = 1.f;
   hairlineStroke2.width = 1.f;
 
   auto normalStrokeShape1 = Shape::ApplyStroke(shape, &hairlineStroke1);
   auto normalStrokeShape2 = Shape::ApplyStroke(shape, &hairlineStroke2);
-  EXPECT_NE(normalStrokeShape1->getUniqueKey(), normalStrokeShape2->getUniqueKey());
-#endif
+  TGFX_PRIVATE_ACCESS(EXPECT_NE(normalStrokeShape1->getUniqueKey(), normalStrokeShape2->getUniqueKey());)
 }
 
 TGFX_TEST(StrokeTest, LineRenderAsHairline) {
@@ -315,11 +313,10 @@ TGFX_TEST(StrokeTest, SquareCapDashStrokeAsSolidStroke) {
   auto matrix = Matrix::MakeTrans(100, 100);
   shapeLayer1->setMatrix(matrix);
 
-#ifdef TGFX_TEST_ACCESS_PRIVATE
-  auto simplifiedDashes1 =
-      SimplifyLineDashPattern(shapeLayer1->_lineDashPattern, shapeLayer1->stroke);
-  EXPECT_EQ(simplifiedDashes1.size(), 0u);
-#endif
+  TGFX_PRIVATE_ACCESS(
+      auto simplifiedDashes1 =
+          SimplifyLineDashPattern(shapeLayer1->_lineDashPattern, shapeLayer1->stroke);
+      EXPECT_EQ(simplifiedDashes1.size(), 0u));
 
   Path path2 = {};
   path2.addRect(-90, -90, 90, 90);
@@ -334,13 +331,12 @@ TGFX_TEST(StrokeTest, SquareCapDashStrokeAsSolidStroke) {
   shapeLayer2->setLineCap(LineCap::Square);
   shapeLayer2->setMatrix(Matrix::MakeTrans(100, 100));
 
-#ifdef TGFX_TEST_ACCESS_PRIVATE
-  auto simplifiedDashes2 =
-      SimplifyLineDashPattern(shapeLayer2->_lineDashPattern, shapeLayer2->stroke);
-  EXPECT_EQ(simplifiedDashes2.size(), 2u);
-  EXPECT_EQ(simplifiedDashes2[0], 6.f);
-  EXPECT_EQ(simplifiedDashes2[1], 4.f);
-#endif
+  TGFX_PRIVATE_ACCESS(
+      auto simplifiedDashes2 =
+          SimplifyLineDashPattern(shapeLayer2->_lineDashPattern, shapeLayer2->stroke);
+      EXPECT_EQ(simplifiedDashes2.size(), 2u);
+      EXPECT_EQ(simplifiedDashes2[0], 6.f);
+      EXPECT_EQ(simplifiedDashes2[1], 4.f));
 
   DisplayList displayList;
   displayList.root()->addChild(shapeLayer1);
@@ -933,8 +929,7 @@ TGFX_TEST(StrokeTest, HairlineQuadOnly) {
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineQuadOnly"));
 }
 
-TGFX_TEST(StrokeTest, HairlineBufferCacheReuse) {
-#ifdef TGFX_TEST_ACCESS_PRIVATE
+TGFX_TEST_PRIVATE(StrokeTest, HairlineBufferCacheReuse) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -951,7 +946,7 @@ TGFX_TEST(StrokeTest, HairlineBufferCacheReuse) {
   };
 
   // Test 1: Verify proxyMap size changes
-  {
+  TGFX_PRIVATE_ACCESS({
     auto& proxyMap = proxyProvider->proxyMap;
     proxyProvider->purgeExpiredProxies();
     size_t initialSize = proxyMap.size();
@@ -972,7 +967,7 @@ TGFX_TEST(StrokeTest, HairlineBufferCacheReuse) {
     proxyProvider->purgeExpiredProxies();
     size_t sizeAfterPurge = proxyMap.size();
     EXPECT_LE(sizeAfterPurge, initialSize + 4);
-  }
+  })
 
   // Test 2: Same shape and hasCap should reuse buffer proxies
   {
@@ -1020,11 +1015,9 @@ TGFX_TEST(StrokeTest, HairlineBufferCacheReuse) {
     ASSERT_TRUE(proxy1 != nullptr);
     ASSERT_TRUE(proxy2 != nullptr);
   }
-#endif
 }
 
-TGFX_TEST(StrokeTest, HairlineShaderProgramCacheReuse) {
-#ifdef TGFX_TEST_ACCESS_PRIVATE
+TGFX_TEST_PRIVATE(StrokeTest, HairlineShaderProgramCacheReuse) {
   ContextScope scope;
   auto context = scope.getContext();
   auto surface = Surface::Make(context, 512, 512);
@@ -1061,7 +1054,8 @@ TGFX_TEST(StrokeTest, HairlineShaderProgramCacheReuse) {
   };
 
   auto globalCache = context->globalCache();
-  auto initialCount = globalCache->programMap.size();
+  size_t initialCount = 0;
+  TGFX_PRIVATE_ACCESS(initialCount = globalCache->programMap.size();)
   size_t lastProgramCount = initialCount;
 
   for (size_t i = 0; i < testCases.size(); ++i) {
@@ -1089,13 +1083,13 @@ TGFX_TEST(StrokeTest, HairlineShaderProgramCacheReuse) {
 
     context->flushAndSubmit();
 
-    auto currentCount = globalCache->programMap.size();
+    size_t currentCount = 0;
+    TGFX_PRIVATE_ACCESS(currentCount = globalCache->programMap.size();)
 
     if (testCase.shouldReuseProgram) {
       EXPECT_EQ(currentCount, lastProgramCount);
     }
   }
-#endif
 }
 
 TGFX_TEST(StrokeTest, HairlineComplexPathRendering) {

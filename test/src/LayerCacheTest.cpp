@@ -29,9 +29,7 @@
 
 namespace tgfx {
 
-#ifdef TGFX_TEST_ACCESS_PRIVATE
-
-TGFX_TEST(LayerCacheTest, LayerCache) {
+TGFX_TEST_PRIVATE(LayerCacheTest, LayerCache) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -72,16 +70,16 @@ TGFX_TEST(LayerCacheTest, LayerCache) {
   // First render - staticSubtree flag is not set yet
   displayList->render(surface.get());
   auto root = displayList->root();
-  EXPECT_TRUE(root->subtreeCache == nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache == nullptr));
 
   // Second render - creates subtreeCache
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache != nullptr));
   int expectedLongEdge = 64;
-  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge));
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge)));
 }
 
-TGFX_TEST(LayerCacheTest, LayerCacheInvalidation) {
+TGFX_TEST_PRIVATE(LayerCacheTest, LayerCacheInvalidation) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -107,11 +105,11 @@ TGFX_TEST(LayerCacheTest, LayerCacheInvalidation) {
 
   // First render - staticSubtree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache == nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache == nullptr));
 
   // Second render - creates subtreeCache
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache != nullptr));
 
   // Adding a new child - should invalidate root's cache
   auto newChild = ShapeLayer::Make();
@@ -123,27 +121,27 @@ TGFX_TEST(LayerCacheTest, LayerCacheInvalidation) {
   parent->addChild(newChild);
 
   // Cache should be invalidated after adding child
-  EXPECT_TRUE(root->subtreeCache == nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache == nullptr));
 
   // First render after modification - staticSubtree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache == nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache == nullptr));
 
   // Second render - creates subtreeCache again
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache != nullptr));
 
   // Modifying child transform - should invalidate cache
   child->setMatrix(Matrix::MakeTrans(10, 10));
-  EXPECT_TRUE(root->subtreeCache == nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache == nullptr));
 
   // Render twice to recreate cache
   displayList->render(surface.get());
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache != nullptr));
 }
 
-TGFX_TEST(LayerCacheTest, LayerCacheWithEffects) {
+TGFX_TEST_PRIVATE(LayerCacheTest, LayerCacheWithEffects) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -187,16 +185,16 @@ TGFX_TEST(LayerCacheTest, LayerCacheWithEffects) {
 
   // First render - staticSubtree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache == nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache == nullptr));
 
   // Second render - creates subtreeCache
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache != nullptr));
 
   EXPECT_TRUE(Baseline::Compare(surface, "LayerCacheTest/LayerCacheWithEffects"));
 }
 
-TGFX_TEST(LayerCacheTest, LayerCacheWithTransform) {
+TGFX_TEST_PRIVATE(LayerCacheTest, LayerCacheWithTransform) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -222,31 +220,31 @@ TGFX_TEST(LayerCacheTest, LayerCacheWithTransform) {
 
   // First render - staticSubtree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache == nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache == nullptr));
 
   // Second render - creates subtreeCache
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache != nullptr));
 
   // Change zoomScale - cache should still be valid (just uses different mipmap level)
   displayList->setZoomScale(1.5f);
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache != nullptr));
 
   // Change parent's transform - should invalidate root's cache
   parent->setMatrix(Matrix::MakeTrans(10, 10));
-  EXPECT_TRUE(root->subtreeCache == nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache == nullptr));
 
   // First render after modification - staticSubtree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache == nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache == nullptr));
 
   // Second render - recreate cache
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache != nullptr));
 }
 
-TGFX_TEST(LayerCacheTest, LayerCacheContentScale) {
+TGFX_TEST_PRIVATE(LayerCacheTest, LayerCacheContentScale) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -272,54 +270,54 @@ TGFX_TEST(LayerCacheTest, LayerCacheContentScale) {
 
   // First render - staticSubtree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache == nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache == nullptr));
 
   // Second render - creates subtreeCache
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache != nullptr));
 
   // At zoom 1.0, longEdge should be 100
   int expectedLongEdge1_0 = 100;
-  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge1_0));
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge1_0)));
 
   // Render at zoom 0.5 - cache should still exist
   displayList->setZoomScale(0.5f);
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache != nullptr));
 
   // At zoom 0.5, longEdge should be 50
   int expectedLongEdge0_5 = 50;
-  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge0_5));
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge0_5)));
 
   // Render at zoom 2.0
   displayList->setZoomScale(2.0f);
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache != nullptr));
 
   // At zoom 2.0, longEdge should be 200
   int expectedLongEdge2_0 = 200;
-  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge2_0));
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge2_0)));
 
   // Render at zoom 1.0 again
   displayList->setZoomScale(1.0f);
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache != nullptr));
 
   // At zoom 1.0 again, cache should still be valid for longEdge 100
-  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge1_0));
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge1_0)));
 
   // Render at extreme zoom out
   displayList->setZoomScale(0.1f);
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache != nullptr));
 
   // At zoom 0.1, longEdge < minLongEdge, cache should be 50
   int expectedLongEdge0_1 = 50;
-  EXPECT_TRUE(root->subtreeCache->cacheEntries.size() == 3);
-  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge0_1));
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(root->subtreeCache->cacheEntries.size() == 3);
+                       EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge0_1)));
 }
 
-TGFX_TEST(LayerCacheTest, StaticSubtree) {
+TGFX_TEST_PRIVATE(LayerCacheTest, StaticSubtree) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -335,51 +333,51 @@ TGFX_TEST(LayerCacheTest, StaticSubtree) {
   rootLayer->addChild(childLayer);
 
   displayList->root()->addChild(rootLayer);
-  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
-  EXPECT_FALSE(childLayer->bitFields.staticSubtree);
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+                       EXPECT_FALSE(childLayer->bitFields.staticSubtree));
 
   // After first render, staticSubtree should be true
   displayList->render(surface.get());
-  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
-  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+                       EXPECT_TRUE(childLayer->bitFields.staticSubtree));
 
   // After adding filter, both should be false
   auto filter = BlurFilter::Make(10.f, 10.f);
   childLayer->setFilters({filter});
-  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
-  EXPECT_FALSE(childLayer->bitFields.staticSubtree);
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+                       EXPECT_FALSE(childLayer->bitFields.staticSubtree));
 
   // After render, both should be true again
   displayList->render(surface.get());
-  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
-  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+                       EXPECT_TRUE(childLayer->bitFields.staticSubtree));
 
   // After adding layer style, both should be false
   auto style = DropShadowStyle::Make(5, 5, 0, 0, Color::Black(), false);
   childLayer->setLayerStyles({style});
-  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
-  EXPECT_FALSE(childLayer->bitFields.staticSubtree);
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+                       EXPECT_FALSE(childLayer->bitFields.staticSubtree));
 
   // After render, both should be true again
   displayList->render(surface.get());
-  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
-  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+                       EXPECT_TRUE(childLayer->bitFields.staticSubtree));
 
   // After invalidating descendents, both should be false
-  rootLayer->invalidateDescendents();
-  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
-  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
+  TGFX_PRIVATE_ACCESS(rootLayer->invalidateDescendents());
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+                       EXPECT_TRUE(childLayer->bitFields.staticSubtree));
 
   // After render, both should be true again
   displayList->render(surface.get());
-  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
-  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+                       EXPECT_TRUE(childLayer->bitFields.staticSubtree));
 }
 
 /**
  * Test that simple Rect/RRect leaf nodes skip subtree caching.
  */
-TGFX_TEST(LayerCacheTest, SimpleShapeSkipsCache) {
+TGFX_TEST_PRIVATE(LayerCacheTest, SimpleShapeSkipsCache) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -404,7 +402,7 @@ TGFX_TEST(LayerCacheTest, SimpleShapeSkipsCache) {
   displayList->render(surface.get());
 
   // Simple Rect layer should not have subtree cache
-  EXPECT_TRUE(rectLayer->subtreeCache == nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(rectLayer->subtreeCache == nullptr));
 
   // Test 2: Simple SolidLayer (RRect) - should NOT create subtree cache
   auto rrectLayer = SolidLayer::Make();
@@ -420,7 +418,7 @@ TGFX_TEST(LayerCacheTest, SimpleShapeSkipsCache) {
   displayList->render(surface.get());
 
   // Simple RRect layer should not have subtree cache
-  EXPECT_TRUE(rrectLayer->subtreeCache == nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(rrectLayer->subtreeCache == nullptr));
 
   // Test 3: ShapeLayer with Path (not Rect/RRect) - SHOULD create subtree cache
   auto pathLayer = ShapeLayer::Make();
@@ -435,7 +433,7 @@ TGFX_TEST(LayerCacheTest, SimpleShapeSkipsCache) {
   displayList->render(surface.get());
 
   // Path layer (not Rect/RRect) should have subtree cache
-  EXPECT_TRUE(pathLayer->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(pathLayer->subtreeCache != nullptr));
 
   // Test 4: SolidLayer with filter - SHOULD create subtree cache
   auto rectWithFilter = SolidLayer::Make();
@@ -450,7 +448,7 @@ TGFX_TEST(LayerCacheTest, SimpleShapeSkipsCache) {
   displayList->render(surface.get());
 
   // Rect with filter should have subtree cache
-  EXPECT_TRUE(rectWithFilter->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(rectWithFilter->subtreeCache != nullptr));
 
   // Test 5: SolidLayer with layer style - SHOULD create subtree cache
   auto rectWithStyle = SolidLayer::Make();
@@ -465,7 +463,7 @@ TGFX_TEST(LayerCacheTest, SimpleShapeSkipsCache) {
   displayList->render(surface.get());
 
   // Rect with layer style should have subtree cache
-  EXPECT_TRUE(rectWithStyle->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(rectWithStyle->subtreeCache != nullptr));
 
   // Test 6: Layer with Rect child - SHOULD create subtree cache (not a leaf node)
   auto parentLayer = Layer::Make();
@@ -481,12 +479,12 @@ TGFX_TEST(LayerCacheTest, SimpleShapeSkipsCache) {
   displayList->render(surface.get());
 
   // Parent layer with children should have subtree cache
-  EXPECT_TRUE(parentLayer->subtreeCache != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(parentLayer->subtreeCache != nullptr));
   // Child rect should not have subtree cache (simple leaf)
-  EXPECT_TRUE(childRect->subtreeCache == nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(childRect->subtreeCache == nullptr));
 }
 
-TGFX_TEST(LayerCacheTest, DirtyFlag) {
+TGFX_TEST_PRIVATE(LayerCacheTest, DirtyFlag) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -510,31 +508,35 @@ TGFX_TEST(LayerCacheTest, DirtyFlag) {
   displayList->render(surface.get());
 
   auto root = displayList->root();
-  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents);
-  EXPECT_TRUE(grandChild->layerContent == nullptr && grandChild->bitFields.dirtyContent);
-  EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
-  EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_TRUE(grandChild->bitFields.dirtyDescendents);
+      EXPECT_TRUE(grandChild->layerContent == nullptr && grandChild->bitFields.dirtyContent);
+      EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
+      EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent));
 
   grandChild->setVisible(true);
-  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents);
-  EXPECT_TRUE(grandChild->layerContent == nullptr && grandChild->bitFields.dirtyContent);
-  EXPECT_TRUE(child->bitFields.dirtyDescendents);
-  EXPECT_TRUE(root->bitFields.dirtyDescendents);
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_TRUE(grandChild->bitFields.dirtyDescendents);
+      EXPECT_TRUE(grandChild->layerContent == nullptr && grandChild->bitFields.dirtyContent);
+      EXPECT_TRUE(child->bitFields.dirtyDescendents);
+      EXPECT_TRUE(root->bitFields.dirtyDescendents));
   displayList->render(surface.get());
 
-  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
-  EXPECT_TRUE(grandChild->layerContent != nullptr);
-  EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
-  EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
+      EXPECT_TRUE(grandChild->layerContent != nullptr);
+      EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
+      EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent));
 
   child->setVisible(false);
-  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
-  EXPECT_TRUE(grandChild->layerContent != nullptr);
-  EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
-  EXPECT_TRUE(root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
+      EXPECT_TRUE(grandChild->layerContent != nullptr);
+      EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
+      EXPECT_TRUE(root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent));
 }
 
-TGFX_TEST(LayerCacheTest, DirtyRegionTest) {
+TGFX_TEST_PRIVATE(LayerCacheTest, DirtyRegionTest) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -551,7 +553,7 @@ TGFX_TEST(LayerCacheTest, DirtyRegionTest) {
   shapeLayer1->setPath(path1);
   // rootLayer->addChild(shapeLayer1);
   auto bounds1 = shapeLayer1->getBounds();
-  shapeLayer1->getGlobalMatrix().mapRect(&bounds1);
+  TGFX_PRIVATE_ACCESS(shapeLayer1->getGlobalMatrix().mapRect(&bounds1));
 
   auto shapeLayer2 = ShapeLayer::Make();
   shapeLayer2->setStrokeStyle(ShapeStyle::Make(Color::Black()));
@@ -560,7 +562,7 @@ TGFX_TEST(LayerCacheTest, DirtyRegionTest) {
   shapeLayer2->setPath(path2);
   // rootLayer->addChild(shapeLayer2);
   auto bounds2 = shapeLayer2->getBounds();
-  shapeLayer2->getGlobalMatrix().mapRect(&bounds2);
+  TGFX_PRIVATE_ACCESS(shapeLayer2->getGlobalMatrix().mapRect(&bounds2));
 
   auto shapeLayer3 = ShapeLayer::Make();
   shapeLayer3->setStrokeStyle(ShapeStyle::Make(Color::Black()));
@@ -569,7 +571,7 @@ TGFX_TEST(LayerCacheTest, DirtyRegionTest) {
   shapeLayer3->setPath(path3);
   // rootLayer->addChild(shapeLayer3);
   auto bounds3 = shapeLayer3->getBounds();
-  shapeLayer3->getGlobalMatrix().mapRect(&bounds3);
+  TGFX_PRIVATE_ACCESS(shapeLayer3->getGlobalMatrix().mapRect(&bounds3));
 
   auto shapeLayer4 = ShapeLayer::Make();
   shapeLayer4->setStrokeStyle(ShapeStyle::Make(Color::Black()));
@@ -578,7 +580,7 @@ TGFX_TEST(LayerCacheTest, DirtyRegionTest) {
   shapeLayer4->setPath(path4);
   // rootLayer->addChild(shapeLayer4);
   auto bounds4 = shapeLayer4->getBounds();
-  shapeLayer4->getGlobalMatrix().mapRect(&bounds4);
+  TGFX_PRIVATE_ACCESS(shapeLayer4->getGlobalMatrix().mapRect(&bounds4));
 
   auto shapeLayer5 = ShapeLayer::Make();
   shapeLayer5->setStrokeStyle(ShapeStyle::Make(Color::Black()));
@@ -587,7 +589,7 @@ TGFX_TEST(LayerCacheTest, DirtyRegionTest) {
   shapeLayer5->setPath(path5);
   // rootLayer->addChild(shapeLayer5);
   auto bounds5 = shapeLayer5->getBounds();
-  shapeLayer5->getGlobalMatrix().mapRect(&bounds5);
+  TGFX_PRIVATE_ACCESS(shapeLayer5->getGlobalMatrix().mapRect(&bounds5));
 
   auto shapeLayer6 = ShapeLayer::Make();
   shapeLayer6->setStrokeStyle(ShapeStyle::Make(Color::Black()));
@@ -596,7 +598,7 @@ TGFX_TEST(LayerCacheTest, DirtyRegionTest) {
   shapeLayer6->setPath(path6);
   // rootLayer->addChild(shapeLayer6);
   auto bounds6 = shapeLayer6->getBounds();
-  shapeLayer6->getGlobalMatrix().mapRect(&bounds6);
+  TGFX_PRIVATE_ACCESS(shapeLayer6->getGlobalMatrix().mapRect(&bounds6));
 
   auto shapeLayer7 = ShapeLayer::Make();
   shapeLayer7->setStrokeStyle(ShapeStyle::Make(Color::Black()));
@@ -605,7 +607,7 @@ TGFX_TEST(LayerCacheTest, DirtyRegionTest) {
   shapeLayer7->setPath(path7);
   // rootLayer->addChild(shapeLayer7);
   auto bounds7 = shapeLayer7->getBounds();
-  shapeLayer7->getGlobalMatrix().mapRect(&bounds7);
+  TGFX_PRIVATE_ACCESS(shapeLayer7->getGlobalMatrix().mapRect(&bounds7));
 
   auto shapeLayer8 = ShapeLayer::Make();
   shapeLayer8->setStrokeStyle(ShapeStyle::Make(Color::Black()));
@@ -614,7 +616,7 @@ TGFX_TEST(LayerCacheTest, DirtyRegionTest) {
   shapeLayer8->setPath(path8);
   // rootLayer->addChild(shapeLayer8);
   auto bounds8 = shapeLayer8->getBounds();
-  shapeLayer8->getGlobalMatrix().mapRect(&bounds8);
+  TGFX_PRIVATE_ACCESS(shapeLayer8->getGlobalMatrix().mapRect(&bounds8));
 
   auto shapeLayer9 = ShapeLayer::Make();
   shapeLayer9->setStrokeStyle(ShapeStyle::Make(Color::Black()));
@@ -623,7 +625,7 @@ TGFX_TEST(LayerCacheTest, DirtyRegionTest) {
   shapeLayer9->setPath(path9);
   // rootLayer->addChild(shapeLayer9);
   auto bounds9 = shapeLayer9->getBounds();
-  shapeLayer9->getGlobalMatrix().mapRect(&bounds9);
+  TGFX_PRIVATE_ACCESS(shapeLayer9->getGlobalMatrix().mapRect(&bounds9));
 
   auto shapeLayer10 = ShapeLayer::Make();
   shapeLayer10->setStrokeStyle(ShapeStyle::Make(Color::Black()));
@@ -632,7 +634,7 @@ TGFX_TEST(LayerCacheTest, DirtyRegionTest) {
   shapeLayer10->setPath(path10);
   // rootLayer->addChild(shapeLayer10);
   auto bounds10 = shapeLayer10->getBounds();
-  shapeLayer10->getGlobalMatrix().mapRect(&bounds10);
+  TGFX_PRIVATE_ACCESS(shapeLayer10->getGlobalMatrix().mapRect(&bounds10));
 
   auto shapeLayer11 = ShapeLayer::Make();
   shapeLayer11->setStrokeStyle(ShapeStyle::Make(Color::Black()));
@@ -641,7 +643,7 @@ TGFX_TEST(LayerCacheTest, DirtyRegionTest) {
   shapeLayer11->setPath(path11);
   // rootLayer->addChild(shapeLayer11);
   auto bounds11 = shapeLayer11->getBounds();
-  shapeLayer11->getGlobalMatrix().mapRect(&bounds11);
+  TGFX_PRIVATE_ACCESS(shapeLayer11->getGlobalMatrix().mapRect(&bounds11));
 
   displayList->render(surface.get());
   displayList->showDirtyRegions(true);
@@ -763,7 +765,7 @@ TGFX_TEST(LayerCacheTest, DirtyRegionTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerCacheTest/DirtyRegionTest11"));
 }
 
-TGFX_TEST(LayerCacheTest, TileClearWhenAllLayersRemoved) {
+TGFX_TEST_PRIVATE(LayerCacheTest, TileClearWhenAllLayersRemoved) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -785,15 +787,16 @@ TGFX_TEST(LayerCacheTest, TileClearWhenAllLayersRemoved) {
   rootLayer->addChild(blueRect);
   displayList->render(surface.get());
 
-  EXPECT_EQ(displayList->tileCaches.size(), 1u);
-  auto result = displayList->tileCaches.find(1000);
-  EXPECT_TRUE(result != displayList->tileCaches.end());
-  EXPECT_EQ(result->second->tileMap.size(), 4u);
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_EQ(displayList->tileCaches.size(), 1u);
+      auto result = displayList->tileCaches.find(1000);
+      EXPECT_TRUE(result != displayList->tileCaches.end());
+      EXPECT_EQ(result->second->tileMap.size(), 4u));
 
   blueRect->removeFromParent();
   displayList->render(surface.get());
 
-  EXPECT_TRUE(displayList->tileCaches.empty());
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->tileCaches.empty()));
 
   // Test 1: Add a layer that only covers part of tile(0,0)
   // Red rectangle at (20,20) with size 60x60, only covers (20,20)-(80,80) in tile(0,0)
@@ -824,7 +827,7 @@ TGFX_TEST(LayerCacheTest, TileClearWhenAllLayersRemoved) {
  * When a shape layer uses a blend mode other than SrcOver, the layer needs pass-through background
  * mode to composite correctly, which is incompatible with subtree caching.
  */
-TGFX_TEST(LayerCacheTest, ContentBlendModeDisablesCache) {
+TGFX_TEST_PRIVATE(LayerCacheTest, ContentBlendModeDisablesCache) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -855,13 +858,13 @@ TGFX_TEST(LayerCacheTest, ContentBlendModeDisablesCache) {
 
   // First render
   displayList->render(surface.get());
-  EXPECT_TRUE(blendLayer->subtreeCache == nullptr);
-  EXPECT_TRUE(blendLayer->bitFields.hasBlendMode);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(blendLayer->subtreeCache == nullptr);
+                       EXPECT_TRUE(blendLayer->bitFields.hasBlendMode));
 
   // Second render - should still not create cache due to content blend mode
   displayList->render(surface.get());
-  EXPECT_TRUE(blendLayer->subtreeCache == nullptr);
-  EXPECT_TRUE(blendLayer->bitFields.hasBlendMode);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(blendLayer->subtreeCache == nullptr);
+                       EXPECT_TRUE(blendLayer->bitFields.hasBlendMode));
 
   // Compare the rendering result to ensure blend mode works correctly
   EXPECT_TRUE(Baseline::Compare(surface, "LayerCacheTest/ContentBlendModeDisablesCache"));
@@ -872,7 +875,7 @@ TGFX_TEST(LayerCacheTest, ContentBlendModeDisablesCache) {
  * When two layers overlap and both are modified, their dirty regions may cover the same tiles.
  * The tile should only be recycled once, not multiple times.
  */
-TGFX_TEST(LayerCacheTest, OverlappingDirtyRegions) {
+TGFX_TEST_PRIVATE(LayerCacheTest, OverlappingDirtyRegions) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -900,19 +903,17 @@ TGFX_TEST(LayerCacheTest, OverlappingDirtyRegions) {
   rootLayer->addChild(blueRect);
 
   displayList->render(surface.get());
-  EXPECT_EQ(displayList->tileCaches.size(), 1u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tileCaches.size(), 1u));
 
   redRect->removeFromParent();
   blueRect->removeFromParent();
 
   displayList->render(surface.get());
 
-  EXPECT_EQ(displayList->tileCaches.size(), 0lu);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tileCaches.size(), 0lu));
 
-  auto emptyTilesAfter = displayList->emptyTiles.size();
-  EXPECT_EQ(9lu, emptyTilesAfter);
+  TGFX_PRIVATE_ACCESS(auto emptyTilesAfter = displayList->emptyTiles.size();
+                       EXPECT_EQ(9lu, emptyTilesAfter));
 }
-
-#endif  // TGFX_TEST_ACCESS_PRIVATE
 
 }  // namespace tgfx
