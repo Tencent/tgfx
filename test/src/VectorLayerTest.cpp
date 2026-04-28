@@ -4814,7 +4814,7 @@ static std::vector<std::shared_ptr<VectorElement>> MakeComplexFitCellContents(
 
 // Non-linear gradient variants: radial, conic, diamond.
 static std::vector<std::shared_ptr<VectorElement>> MakeRadialCellContents(
-    float cx, float cy, int column, float cellSize,     const std::vector<Color>& gradientColors) {
+    float cx, float cy, int column, float cellSize, const std::vector<Color>& gradientColors) {
   auto rect = Rectangle::Make();
   rect->setPosition({cx, cy});
   rect->setSize({cellSize * 0.7f, cellSize * 0.7f});
