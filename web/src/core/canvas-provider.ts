@@ -22,6 +22,10 @@ import {getCanvas2D as defaultGetCanvas2D, releaseCanvas2D as defaultReleaseCanv
  * Abstraction over the underlying 2D canvas pool so that platform-specific
  * implementations (e.g. the WeChat mini program) can supply their own canvas
  * creation and recycling routines without duplicating rasterization logic.
+ *
+ * Implementations MUST always return a valid canvas from getCanvas2D; they
+ * should throw or fall back internally rather than returning null, so that
+ * callers of getCanvasProvider() do not need to scatter null checks.
  */
 export interface CanvasProvider {
     getCanvas2D: (width: number, height: number) => HTMLCanvasElement | OffscreenCanvas;
@@ -39,12 +43,19 @@ let canvasProvider: CanvasProvider = {
  * its first canvas, otherwise the browser-based default will be used.
  */
 export function setCanvasProvider(provider: CanvasProvider) {
-    canvasProvider = provider;
+    // Shallow-copy so that later mutations on the caller's object cannot
+    // silently change the active provider behind setCanvasProvider's back.
+    canvasProvider = {
+        getCanvas2D: provider.getCanvas2D,
+        releaseCanvas2D: provider.releaseCanvas2D,
+    };
 }
 
 /**
- * Returns the currently active canvas provider.
+ * Returns the currently active canvas provider. The returned reference is
+ * marked Readonly to discourage callers from mutating the internal state;
+ * use setCanvasProvider to change the active provider.
  */
-export function getCanvasProvider(): CanvasProvider {
+export function getCanvasProvider(): Readonly<CanvasProvider> {
     return canvasProvider;
 }

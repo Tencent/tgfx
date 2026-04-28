@@ -175,7 +175,8 @@ export class ScalerContext {
     ) {
         const width = bounds.right - bounds.left;
         const height = bounds.bottom - bounds.top
-        const canvas = getCanvasProvider().getCanvas2D(width, height);
+        const provider = getCanvasProvider();
+        const canvas = provider.getCanvas2D(width, height);
         const context = canvas.getContext('2d',{willReadFrequently: true}) as CanvasRenderingContext2D;
         context.clearRect(0, 0, width, height);
         context.font = this.fontString(fauxBold, false);
@@ -189,7 +190,7 @@ export class ScalerContext {
             context.fillText(text, -bounds.left, -bounds.top);
         }
         const {data} = context.getImageData(0, 0, width, height);
-        getCanvasProvider().releaseCanvas2D(canvas);
+        provider.releaseCanvas2D(canvas);
         if (data.length === 0) {
             return null;
         }

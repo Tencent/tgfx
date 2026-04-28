@@ -23,11 +23,15 @@ import {getCanvasProvider} from './canvas-provider';
 export class PathRasterizer {
     public static readPixels(width: number, height: number, path: Path2D, fillType: ctor) {
         const provider = getCanvasProvider();
-        let canvas = provider.getCanvas2D(width, height);
-        if (canvas == null) {
+        const canvas = provider.getCanvas2D(width, height);
+        const context = canvas.getContext('2d', {willReadFrequently: true}) as
+            | CanvasRenderingContext2D
+            | OffscreenCanvasRenderingContext2D
+            | null;
+        if (!context) {
+            provider.releaseCanvas2D(canvas);
             return null;
         }
-        let context = canvas.getContext('2d', {willReadFrequently: true}) as CanvasRenderingContext2D;
         context.setTransform(1, 0, 0, 1, 0, 0);
         if (fillType === TGFXModule.TGFXPathFillType.InverseWinding ||
             fillType === TGFXModule.TGFXPathFillType.InverseEvenOdd) {
