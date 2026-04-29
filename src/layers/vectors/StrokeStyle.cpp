@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/vectors/StrokeStyle.h"
-#include <cmath>
 #include "Painter.h"
 #include "VectorContext.h"
 #include "core/utils/Log.h"
@@ -50,11 +49,11 @@ class StrokePainter : public Painter {
  protected:
   std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t index,
                                       LayerPaint* paint) override {
-    // Derive the fit shader from the pre-effect, pre-align-bake shape. Dash and stroke alignment
-    // only subset the pixels that the stroke band covers, so extending the original path bounds
-    // by the stroke width is an exact upper bound for every effect/align combination. Reading
-    // getPath() here also primes Shape::getPath()'s atomic cache for the recorder's later use.
-    paint->shader = buildFitShader(innerShape, stroke.width);
+    // Derive the fit shader from the pre-stroke geometry bounds. SVG and Figma both compute
+    // gradient fit boxes from the fill geometry only and ignore stroke width, so dash, stroke
+    // alignment and stroke width never affect the fit region. Reading getPath() here also
+    // primes Shape::getPath()'s atomic cache for the recorder's later use.
+    paint->shader = buildFitShader(innerShape);
 
     if (pathEffect) {
       innerShape = Shape::ApplyEffect(innerShape, pathEffect);
@@ -87,10 +86,9 @@ class StrokePainter : public Painter {
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
 
-    // Fit bounds come from the original TextBlob plus stroke width + align, matching the Shape
-    // branch above. Dash and non-center alignment only choose which subset of the stroke band
-    // is emitted; they do not enlarge it.
-    auto baseShader = buildFitShader(run.textBlob, runStroke.width);
+    // Fit bounds come from the original TextBlob's tight glyph bounds, matching the Shape branch
+    // above (geometry-only, stroke width ignored).
+    auto baseShader = buildFitShader(run.textBlob);
 
     // Emit path: non-center alignment or an active path effect require expanding the text blob
     // into a shape (alignment needs a boolean op against the original outline, path effects
@@ -149,92 +147,25 @@ class StrokePainter : public Painter {
   }
 
  private:
-  // Builds the fit shader for a Shape drawable. The fit region is the pre-stroke path bounds
-  // expanded by the stroke width according to strokeAlign. getPath().getBounds() returns tight
-  // bounds for every Shape flavor (including MergeShape where onGetBounds is conservative) and
-  // shares its atomic cache with the later rasterization path.
-  //
-  // miter spikes from miterLimit are ignored so the Shape and TextBlob paths follow the same
-  // formula; on sharp miter joins the fit region may clip the tip colors by a fraction of a
-  // pixel. This is a deliberate trade-off to avoid synthesizing a stroke-expanded Shape just
-  // for measurement.
-  //
-  // Line-segment paths (e.g. degenerate Rectangles or hand-built ShapePath lineTo) use a
-  // line-aware expansion so the fit band hugs the actual stroked pixels rather than the
-  // axis-symmetric outset that area shapes need.
-  std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<Shape>& shape,
-                                         float strokeWidth) const {
+  // Builds the fit shader for a Shape drawable using the pre-stroke geometry bounds.
+  // getPath().getBounds() returns tight bounds for every Shape flavor (including MergeShape where
+  // onGetBounds is conservative) and shares its atomic cache with the later rasterization path.
+  // Stroke width is intentionally ignored to match SVG objectBoundingBox semantics (which exclude
+  // stroke-width) and Figma's gradient fit behavior.
+  std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<Shape>& shape) const {
     if (colorSource == nullptr || !colorSource->fitsToGeometry() || shape == nullptr) {
       return shader;
     }
-    const auto& path = shape->getPath();
-    auto bounds = path.getBounds();
-    Point linePoints[2] = {};
-    if (path.isLine(linePoints)) {
-      expandFitForLine(&bounds, strokeWidth, linePoints);
-    } else {
-      expandFitForArea(&bounds, strokeWidth);
-    }
-    return wrapShaderWithFit(bounds);
+    return wrapShaderWithFit(shape->getPath().getBounds());
   }
 
   // Same contract as the Shape overload, sourced from the blob's tight glyph bounds so color
-  // glyphs stay intact (no text-to-shape conversion for measurement). Text never collapses to
-  // a single line segment so the area expansion always applies here.
-  std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<TextBlob>& textBlob,
-                                         float strokeWidth) const {
+  // glyphs stay intact (no text-to-shape conversion for measurement).
+  std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<TextBlob>& textBlob) const {
     if (colorSource == nullptr || !colorSource->fitsToGeometry() || textBlob == nullptr) {
       return shader;
     }
-    auto bounds = textBlob->getTightBounds();
-    expandFitForArea(&bounds, strokeWidth);
-    return wrapShaderWithFit(bounds);
-  }
-
-  // Outset per side for each stroke alignment (miter spikes ignored): Inside keeps the bounds,
-  // Center grows by half the width, Outside grows by the full width. ceilf snaps the outset to
-  // whole pixels so gradient stops land on pixel boundaries.
-  void expandFitForArea(Rect* bounds, float strokeWidth) const {
-    float outset = 0.0f;
-    switch (strokeAlign) {
-      case StrokeAlign::Inside:
-        return;
-      case StrokeAlign::Center:
-        outset = ceilf(strokeWidth * 0.5f);
-        break;
-      case StrokeAlign::Outside:
-        outset = ceilf(strokeWidth);
-        break;
-    }
-    bounds->outset(outset, outset);
-  }
-
-  // Line-segment fit expansion. Perpendicular to the segment we mirror the area rule
-  // (Center=half, Outside=full, Inside=zero since a line has no interior). Along the segment
-  // we only extend when LineCap actually pushes pixels past the endpoints (Round/Square add
-  // strokeWidth/2 regardless of strokeAlign; Butt adds nothing). Axis-aligned segments take
-  // the precise per-axis outset; oblique segments (only reachable via ShapePath, since
-  // Rectangle never produces them) use the conservative max so the band always covers the
-  // rotated stroke without solving the projected envelope analytically.
-  void expandFitForLine(Rect* bounds, float strokeWidth, const Point points[2]) const {
-    if (strokeAlign == StrokeAlign::Inside) {
-      return;
-    }
-    float perp =
-        (strokeAlign == StrokeAlign::Outside) ? ceilf(strokeWidth) : ceilf(strokeWidth * 0.5f);
-    float along = (stroke.cap == LineCap::Round || stroke.cap == LineCap::Square)
-                      ? ceilf(strokeWidth * 0.5f)
-                      : 0.0f;
-    float dx = std::fabs(points[1].x - points[0].x);
-    float dy = std::fabs(points[1].y - points[0].y);
-    if (dy == 0.0f) {
-      bounds->outset(along, perp);  // horizontal segment
-    } else if (dx == 0.0f) {
-      bounds->outset(perp, along);  // vertical segment
-    } else {
-      float m = std::max(perp, along);
-      bounds->outset(m, m);  // oblique fallback (conservative)
-    }
+    return wrapShaderWithFit(textBlob->getTightBounds());
   }
 
   std::shared_ptr<Shape> applyStrokeAndAlign(std::shared_ptr<Shape> shape,
