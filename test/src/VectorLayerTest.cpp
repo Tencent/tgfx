@@ -4705,23 +4705,22 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto group5 = VectorGroup::Make();
   group5->setElements({rect5, stroke5});
 
-  // Row 6: Three Center-aligned 96px stroke samples. Round and Square sit on a double-zero
-  // Rectangle (collapses to a moveTo+lineTo with overlapping endpoints) and rely on the
-  // epsilon fit-axis fallback: Round splits diagonally red/blue, Square splits horizontally
-  // red/blue. The third sample uses a real 50x10 Rectangle filled by a radial fit gradient so
-  // the inner red / outer blue ring expands across the stroked band where the geometry has
-  // actual extent.
+  // Row 6: Three Center-aligned 96px stroke samples sharing a fit linear gradient. Round and
+  // Square sit on a double-zero Rectangle (collapses to a moveTo+lineTo with overlapping
+  // endpoints) and rely on the epsilon fit-axis fallback: Round splits diagonally red/blue,
+  // Square splits horizontally red/blue. The third sample uses a real 50x10 Rectangle so the
+  // vertical gradient fills the stroked band continuously inside the geometry's height and
+  // clamps to the end colors above and below.
   struct DotConfig {
     float cx;
     LineCap cap;
     Size size;
     Point gradEnd;
-    bool radial;
   };
   const std::array<DotConfig, 3> dotConfigs = {{
-      {110.0f, LineCap::Round, {0.0f, 0.0f}, {1.0f, 1.0f}, false},
-      {270.0f, LineCap::Square, {0.0f, 0.0f}, {0.0f, 1.0f}, false},
-      {470.0f, LineCap::Butt, {50.0f, 10.0f}, {0.0f, 0.0f}, true},
+      {110.0f, LineCap::Round, {0.0f, 0.0f}, {1.0f, 1.0f}},
+      {270.0f, LineCap::Square, {0.0f, 0.0f}, {0.0f, 1.0f}},
+      {470.0f, LineCap::Butt, {50.0f, 10.0f}, {0.0f, 1.0f}},
   }};
   std::vector<std::shared_ptr<VectorGroup>> dotGroups;
   dotGroups.reserve(dotConfigs.size());
@@ -4729,13 +4728,8 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
     auto dotRect = Rectangle::Make();
     dotRect->setPosition({config.cx, 498});
     dotRect->setSize(config.size);
-    std::shared_ptr<ColorSource> dotGradient;
-    if (config.radial) {
-      dotGradient = Gradient::MakeRadial({0.5f, 0.5f}, 0.5f, {Color::Red(), Color::Blue()});
-    } else {
-      dotGradient =
-          Gradient::MakeLinear({0.0f, 0.0f}, config.gradEnd, {Color::Red(), Color::Blue()});
-    }
+    auto dotGradient =
+        Gradient::MakeLinear({0.0f, 0.0f}, config.gradEnd, {Color::Red(), Color::Blue()});
     auto dotStroke = StrokeStyle::Make(dotGradient);
     dotStroke->setStrokeWidth(96.0f);
     dotStroke->setLineCap(config.cap);
