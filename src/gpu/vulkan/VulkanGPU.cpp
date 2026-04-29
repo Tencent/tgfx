@@ -26,6 +26,7 @@
 #include "gpu/vulkan/VulkanRenderPipeline.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "gpu/vulkan/VulkanSampler.h"
+#include "gpu/vulkan/VulkanSemaphore.h"
 #include "gpu/vulkan/VulkanShaderModule.h"
 #include "gpu/vulkan/VulkanTexture.h"
 #include "gpu/vulkan/VulkanUtil.h"
@@ -341,14 +342,22 @@ std::shared_ptr<Texture> VulkanGPU::importBackendRenderTarget(
                                  TextureUsage::RENDER_ATTACHMENT, false);
 }
 
-std::shared_ptr<Semaphore> VulkanGPU::importBackendSemaphore(const BackendSemaphore&) {
-  // TODO: Implement in Phase 3F (VulkanSemaphore).
-  return nullptr;
+std::shared_ptr<Semaphore> VulkanGPU::importBackendSemaphore(const BackendSemaphore& semaphore) {
+  if (semaphore.backend() != Backend::Vulkan) {
+    return nullptr;
+  }
+  VulkanSyncInfo vulkanInfo = {};
+  if (!semaphore.getVulkanSync(&vulkanInfo) || vulkanInfo.semaphore == nullptr) {
+    return nullptr;
+  }
+  return VulkanSemaphore::MakeFrom(this, vulkanInfo.semaphore, vulkanInfo.value);
 }
 
-BackendSemaphore VulkanGPU::stealBackendSemaphore(std::shared_ptr<Semaphore>) {
-  // TODO: Implement in Phase 3F (VulkanSemaphore).
-  return {};
+BackendSemaphore VulkanGPU::stealBackendSemaphore(std::shared_ptr<Semaphore> semaphore) {
+  if (semaphore == nullptr || semaphore.use_count() > 2) {
+    return {};
+  }
+  return semaphore->getBackendSemaphore();
 }
 
 uint32_t VulkanGPU::MakeSamplerKey(const SamplerDescriptor& descriptor) {
