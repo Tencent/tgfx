@@ -27,7 +27,6 @@
 #include "tgfx/layers/vectors/FillStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
 #include "tgfx/layers/vectors/ImagePattern.h"
-#include "tgfx/layers/vectors/Line.h"
 #include "tgfx/layers/vectors/MergePath.h"
 #include "tgfx/layers/vectors/Polystar.h"
 #include "tgfx/layers/vectors/Rectangle.h"
@@ -4639,81 +4638,108 @@ TGFX_TEST(VectorLayerTest, StrokeDashAdaptive) {
 }
 
 /**
- * Test Line vector element: horizontal, diagonal, and trimmed (forward and reversed) segments
- * with different stroke styles.
+ * Test Rectangle collapsing to a line segment when one side is zero: horizontal stroke,
+ * trimmed (forward and reversed) segments, along-axis fit gradients that prove the stroke
+ * fit bounds expand only perpendicular to the segment (not along it), and a double-zero
+ * Rectangle that must keep its area-shape semantics (round-cap stroked dot with a
+ * symmetric two-axis fit gradient).
  */
-TGFX_TEST(VectorLayerTest, Line) {
+TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 600, 504);
+  auto surface = Surface::Make(context, 600, 600);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
   auto displayList = std::make_unique<DisplayList>();
   auto vectorLayer = VectorLayer::Make();
 
-  // Line 1: Horizontal line with solid red stroke.
-  auto line1 = Line::Make();
-  line1->setStartPoint({50, 54});
-  line1->setEndPoint({550, 54});
+  // Row 1: Horizontal degenerate Rectangle with solid red stroke.
+  auto rect1 = Rectangle::Make();
+  rect1->setPosition({300, 54});
+  rect1->setSize({500, 0});
   auto stroke1 = MakeStrokeStyle(Color::Red(), 8.0f);
   auto group1 = VectorGroup::Make();
-  group1->setElements({line1, stroke1});
+  group1->setElements({rect1, stroke1});
 
-  // Line 2: Diagonal line with dashed blue stroke.
-  auto line2 = Line::Make();
-  line2->setStartPoint({50, 150});
-  line2->setEndPoint({550, 250});
-  auto stroke2 = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
-  stroke2->setStrokeWidth(8.0f);
-  stroke2->setDashes({24.0f, 12.0f});
+  // Row 2: Horizontal degenerate Rectangle trimmed to the first half, stroked green.
+  auto rect2 = Rectangle::Make();
+  rect2->setPosition({175, 150});
+  rect2->setSize({250, 0});
+  auto trim2 = TrimPath::Make();
+  trim2->setStart(0.0f);
+  trim2->setEnd(0.5f);
+  auto stroke2 = MakeStrokeStyle(Color::Green(), 8.0f);
   auto group2 = VectorGroup::Make();
-  group2->setElements({line2, stroke2});
+  group2->setElements({rect2, trim2, stroke2});
 
-  // Line 3: Forward line trimmed to the first half, stroked green.
-  auto line3 = Line::Make();
-  line3->setStartPoint({50, 346});
-  line3->setEndPoint({300, 346});
+  // Row 3: Reversed horizontal degenerate Rectangle with the same trim; the opposite half
+  // should be drawn.
+  auto rect3 = Rectangle::Make();
+  rect3->setPosition({425, 246});
+  rect3->setSize({250, 0});
+  rect3->setReversed(true);
   auto trim3 = TrimPath::Make();
   trim3->setStart(0.0f);
   trim3->setEnd(0.5f);
-  auto stroke3 = MakeStrokeStyle(Color::Green(), 8.0f);
+  auto stroke3 = MakeStrokeStyle(Color::FromRGBA(255, 128, 0, 255), 8.0f);
   auto group3 = VectorGroup::Make();
-  group3->setElements({line3, trim3, stroke3});
+  group3->setElements({rect3, trim3, stroke3});
 
-  // Line 4: Reversed line with the same trim; the opposite half should be drawn.
-  auto line4 = Line::Make();
-  line4->setStartPoint({300, 346});
-  line4->setEndPoint({550, 346});
-  line4->setReversed(true);
-  auto trim4 = TrimPath::Make();
-  trim4->setStart(0.0f);
-  trim4->setEnd(0.5f);
-  auto stroke4 = MakeStrokeStyle(Color::FromRGBA(255, 128, 0, 255), 8.0f);
+  // Row 4: Center-aligned stroke with an along-segment fit gradient. The gradient runs from
+  // red (left) to blue (right) in fit space; with line-aware single-axis expansion the fit
+  // bounds do not pad along the segment, so the leftmost stroke pixels are pure red and the
+  // rightmost are pure blue. A regression to the symmetric area outset would inset both
+  // ends by strokeWidth/2 in fit space, washing the endpoints toward purple.
+  auto rect4 = Rectangle::Make();
+  rect4->setPosition({300, 354});
+  rect4->setSize({500, 0});
+  auto gradient4 = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, {Color::Red(), Color::Blue()});
+  auto stroke4 = StrokeStyle::Make(gradient4);
+  stroke4->setStrokeWidth(24.0f);
+  stroke4->setStrokeAlign(StrokeAlign::Center);
   auto group4 = VectorGroup::Make();
-  group4->setElements({line4, trim4, stroke4});
+  group4->setElements({rect4, stroke4});
 
-  // Line 5: Zero-height rectangle with a wide, vertically-oriented fit gradient Outside stroke.
-  // The rectangle collapses to a horizontal segment, so Outside stroke should expand it into a
-  // band whose gradient direction shows that the fit region tracks the stroked geometry rather
-  // than the degenerate original rect.
-  auto degenerateRect = Rectangle::Make();
-  degenerateRect->setPosition({300, 430});
-  degenerateRect->setSize({500, 0});
+  // Row 5: Outside-aligned stroke with a perpendicular fit gradient. The gradient runs from
+  // red (top) to blue (bottom) across the 24px Outside band; line-aware perpendicular
+  // expansion produces a fit height of exactly 2*strokeWidth so the band shows pure red at
+  // the top edge and pure blue at the bottom edge with no horizontal padding.
+  auto rect5 = Rectangle::Make();
+  rect5->setPosition({300, 450});
+  rect5->setSize({500, 0});
   auto gradient5 = Gradient::MakeLinear({0.5f, 0.0f}, {0.5f, 1.0f}, {Color::Red(), Color::Blue()});
   auto stroke5 = StrokeStyle::Make(gradient5);
   stroke5->setStrokeWidth(24.0f);
   stroke5->setStrokeAlign(StrokeAlign::Outside);
   auto group5 = VectorGroup::Make();
-  group5->setElements({degenerateRect, stroke5});
+  group5->setElements({rect5, stroke5});
 
-  vectorLayer->setContents({group1, group2, group3, group4, group5});
+  // Row 6: Double-zero Rectangle (width=0 AND height=0) keeps area-shape semantics: the path
+  // is the original closed zero-rect (not collapsed to a line segment), and the fit bounds
+  // expand symmetrically on both axes. With Round cap + Center align + a diagonal fit
+  // gradient, the result is a 24px-radius dot showing the full red->blue gradient across its
+  // own bounding square. A regression that forwarded double-zero rects to the line branch
+  // would either emit nothing (Butt cap on a zero-length line) or produce an asymmetric
+  // single-axis fit band.
+  auto rect6 = Rectangle::Make();
+  rect6->setPosition({300, 546});
+  rect6->setSize({0, 0});
+  auto gradient6 = Gradient::MakeLinear({0.0f, 0.0f}, {1.0f, 1.0f}, {Color::Red(), Color::Blue()});
+  auto stroke6 = StrokeStyle::Make(gradient6);
+  stroke6->setStrokeWidth(48.0f);
+  stroke6->setLineCap(LineCap::Round);
+  stroke6->setStrokeAlign(StrokeAlign::Center);
+  auto group6 = VectorGroup::Make();
+  group6->setElements({rect6, stroke6});
+
+  vectorLayer->setContents({group1, group2, group3, group4, group5, group6});
 
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
 
-  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/Line"));
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/RectangleAsLine"));
 }
 
 /**
