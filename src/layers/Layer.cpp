@@ -916,12 +916,8 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     }
   }
 
-  // Capture pass — runs only when this layer or its descendants have Background-sourced styles.
-  // Background styles are disabled for 3D subtrees because depth-based compositing order conflicts
-  // with the requirement to draw background content first. A GPU context is *not* required:
-  // without one, the capture-time bg surface falls back to a PictureRecorder-backed
-  // BackgroundSource so picture-only render paths (PDF / SVG export, offline recording) still
-  // capture snapshots correctly.
+  // Capture pass — only when this layer or descendants have Background-sourced styles. Disabled
+  // in 3D subtrees. Works without a GPU context via PictureRecorder-backed BackgroundSource.
   BackgroundSnapshotMap snapshotMap = {};
   bool needBackground = canInvert && !canPreserve3D() && hasBackgroundStyle();
   if (needBackground) {
@@ -934,23 +930,20 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     if (auto bgSource =
             createBackgroundSource(context, backgroundRect, backgroundMatrix,
                                    bounds == clippedBounds, std::move(captureColorSpace))) {
-      // The capture pass replays the tree to populate bg surface pixels for sampling by
-      // Background-sourced styles. Normal path replays from _root so every ancestor matrix is
-      // applied; orphan layers (_root == nullptr) replay from this layer directly.
+      // Replay from _root so ancestor matrices apply; orphan layers replay from themselves.
       Layer* captureRoot = _root ? _root : this;
-      BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), scale, &snapshotMap);
+      BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), &snapshotMap);
     }
   }
 
-  // Consume pass — normal render over the user-supplied canvas. When there is no background
-  // style in the tree, we use NoOp so background-sourced styles (if any) silently no-op — the
-  // same behaviour as contour / 3D subtrees.
+  // Consume pass — normal render. NoOp when there's no background style so stray ones silently
+  // skip (same as contour / 3D subtrees).
   AutoCanvasRestore autoRestore(canvas);
   BackgroundConsumer consumer(&snapshotMap);
   BackgroundHandler* handler =
       needBackground ? static_cast<BackgroundHandler*>(&consumer) : BackgroundHandler::NoOp();
   DrawArgs drawArgs = args;
-  drawArgs.background.handler = handler;
+  drawArgs.backgroundHandler = handler;
   // Check if the current layer needs to start a 3D context. Since Layer::draw is called directly
   // without going through a parent layer's drawChildren, 3D context handling must be done here.
   if (canPreserve3D()) {
@@ -1165,7 +1158,7 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   // extracting maskPath from the picture, resulting in incorrect clip regions.
   DrawArgs maskArgs = args;
   maskArgs.excludeEffects |= isContourMode;
-  maskArgs.background.resetToIntermediateArtifact();
+  maskArgs.backgroundHandler = BackgroundHandler::NoOp();
   auto maskCanPreserve3D = _mask->canPreserve3D();
   // When mask enables 3D context, the full 3D relative matrix is handled by the 3D context.
   // Otherwise, use the 2D projection of the relative matrix on canvas.
@@ -1258,9 +1251,8 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
   contourCanvas->scale(contentScale, contentScale);
   auto contourArgs = args;
   contourArgs.opaqueContext = &opaqueContext;
-  // Contour recording is an isolated intermediate-artifact path: it must not participate in
-  // background capture / consumption.
-  contourArgs.background.resetToIntermediateArtifact();
+  // Contour recording is an intermediate artifact — skip background capture / consume.
+  contourArgs.backgroundHandler = BackgroundHandler::NoOp();
   if (!drawContourInternal(contourArgs, contourCanvas, true)) {
     allMatch = false;
   }
@@ -1363,7 +1355,7 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
   drawArgs.renderRect = nullptr;
   // Cache content should be rendered to a regular texture, not to 3D compositor.
   drawArgs.render3DContext = nullptr;
-  drawArgs.background.resetToIntermediateArtifact();
+  drawArgs.backgroundHandler = BackgroundHandler::NoOp();
 
   auto pictureBounds = layerBounds;
   pictureBounds.scale(contentScale, contentScale);
@@ -1650,7 +1642,7 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const 
   // Layers inside a 3D rendering context need to maintain independent 3D state. This means layers
   // drawn later may become the background, making it impossible to know the final background when
   // drawing each layer. Therefore, background styles are disabled.
-  contextArgs.background.resetToIntermediateArtifact();
+  contextArgs.backgroundHandler = BackgroundHandler::NoOp();
 
   auto* offscreenCanvas = newContext->beginRecording(matrix3D, bitFields.allowsEdgeAntialiasing);
   contextArgs.opaqueContext = newContext->currentOpaqueContext();
@@ -1680,7 +1672,7 @@ std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* can
     // Layers inside a 3D rendering context need to maintain independent 3D state. This means
     // layers drawn later may become the background, making it impossible to know the final
     // background when drawing each layer. Therefore, background styles are disabled.
-    childArgs.background.resetToIntermediateArtifact();
+    childArgs.backgroundHandler = BackgroundHandler::NoOp();
   }
   return childArgs;
 }
@@ -1752,9 +1744,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
   DrawArgs drawArgs = args;
   drawArgs.render3DContext = nullptr;
-  // Layer style source content is an isolated intermediate artifact — its contents must not
-  // participate in background capture / consumption even if an outer capture phase is in progress.
-  drawArgs.background.resetToIntermediateArtifact();
+  // Layer style source content is an intermediate artifact — skip background capture / consume.
+  drawArgs.backgroundHandler = BackgroundHandler::NoOp();
 
   for (int i = 0; i < 2; i++) {
     if (!needContent[i] && !needContour[i]) {

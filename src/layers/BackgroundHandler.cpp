@@ -51,14 +51,14 @@ BackgroundHandler* BackgroundHandler::NoOp() {
 void BackgroundHandler::DispatchOrSkip(const DrawArgs& args, Canvas* canvas, Layer* layer,
                                        float alpha, LayerStyle* style,
                                        const LayerStyleSource* source) {
-  auto* handler = args.background.handler ? args.background.handler : BackgroundHandler::NoOp();
+  auto* handler = args.backgroundHandler ? args.backgroundHandler : BackgroundHandler::NoOp();
   handler->drawBackgroundStyle(args, canvas, layer, alpha, style, source);
 }
 
 void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* /*canvas*/, Layer* layer,
                                              float /*alpha*/, LayerStyle* style,
                                              const LayerStyleSource* source) {
-  if (snapshots == nullptr || bgSource == nullptr) {
+  if (snapshots == nullptr || bgSource == nullptr || source == nullptr) {
     return;
   }
   // The consumer computes source->contentScale from `canvas.matrix.getMaxScale()` on the final
@@ -66,7 +66,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* /*can
   // `viewMatrix * surfaceScale`, so the LayerStyleSource built during capture has contentScale
   // reduced by surfaceScale. Divide it out so the snapshot lands at the consumer's expected scale.
   auto surfaceScale = bgSource->surfaceScale();
-  auto contentScale = source != nullptr ? source->contentScale : baseCaptureScale;
+  auto contentScale = source->contentScale;
   if (!FloatNearlyZero(surfaceScale) && surfaceScale != 1.0f) {
     contentScale /= surfaceScale;
   }
@@ -110,7 +110,7 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::cloneWithSource(
     return nullptr;
   }
   return std::unique_ptr<BackgroundHandler>(
-      new BackgroundCapturer(snapshots, baseCaptureScale, std::move(newSource)));
+      new BackgroundCapturer(snapshots, std::move(newSource)));
 }
 
 void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& /*args*/, Canvas* canvas, Layer* layer,
@@ -140,21 +140,17 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& /*args*/, Canvas* c
 }
 
 void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
-                             std::shared_ptr<BackgroundSource> bgSource, float captureScale,
+                             std::shared_ptr<BackgroundSource> bgSource,
                              BackgroundSnapshotMap* snapshots) {
   DEBUG_ASSERT(captureRoot != nullptr);
   DEBUG_ASSERT(bgSource != nullptr);
   DEBUG_ASSERT(snapshots != nullptr);
   auto* bgCanvas = bgSource->getCanvas();
   AutoCanvasRestore autoRestore(bgCanvas);
-  BackgroundCapturer capturer(snapshots, captureScale, std::move(bgSource));
+  BackgroundCapturer capturer(snapshots, std::move(bgSource));
   DrawArgs captureArgs = baseArgs;
-  captureArgs.background.handler = &capturer;
+  captureArgs.backgroundHandler = &capturer;
   captureRoot->drawLayer(captureArgs, bgCanvas, 1.0f, BlendMode::SrcOver);
-}
-
-void BackgroundState::resetToIntermediateArtifact() {
-  handler = BackgroundHandler::NoOp();
 }
 
 }  // namespace tgfx

@@ -28,28 +28,6 @@ class BackgroundHandler;
 class OpaqueContext;
 
 /**
- * BackgroundState carries the handler strategy for background-sourced layer style rendering.
- * BackgroundCapturer owns its own BackgroundSource internally; BackgroundConsumer / NoOp don't
- * need one. Handler transitions happen at well-defined entry points (top-level render, offscreen
- * descent, intermediate-artifact paths); descendants inherit the handler pointer as-is.
- */
-struct BackgroundState {
-  // The active background handler. Non-null during real rendering (capture, consume, or NoOp for
-  // intermediate-artifact paths). Offscreen descent may install a child handler derived via
-  // BackgroundHandler::cloneWithSource; the child lives on the stack in the caller, this field
-  // temporarily points at it.
-  BackgroundHandler* handler = nullptr;
-
-  /**
-   * Switches this state into "intermediate-artifact" mode: background-sourced styles in the
-   * descendant tree silently no-op. Used by mask prep, contour recording, subtree cache, layer
-   * style source recording, and 3D subtree entry — any path whose produced pixels are not the
-   * final on-screen output.
-   */
-  void resetToIntermediateArtifact();
-};
-
-/**
  * DrawArgs represents the arguments passed to the draw method of a Layer.
  */
 class DrawArgs {
@@ -87,6 +65,9 @@ class DrawArgs {
   // The opaque context to be used during opaque content/contour recording. Note: this could be nullptr.
   OpaqueContext* opaqueContext = nullptr;
 
-  BackgroundState background;
+  // Active background handler: BackgroundCapturer / BackgroundConsumer / NoOp(). Set to
+  // BackgroundHandler::NoOp() on intermediate-artifact paths (mask prep, contour, subtree cache,
+  // layer style source, 3D entry). nullptr falls back to NoOp in DispatchOrSkip.
+  BackgroundHandler* backgroundHandler = nullptr;
 };
 }  // namespace tgfx

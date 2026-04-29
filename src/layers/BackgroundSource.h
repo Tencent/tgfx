@@ -23,28 +23,14 @@
 namespace tgfx {
 
 /**
- * BackgroundSource is a read-only query handle that lets Background-sourced layer styles
- * sample the already-rendered backdrop during the capture pass. It is *not* a drawing
- * destination on its own — callers render into `getCanvas()` (which points at either a GPU
- * Surface canvas or a PictureRecorder recording canvas) and later call `getBackgroundImage()`
- * to obtain a read-back Image covering "parent backdrop + everything drawn through getCanvas()
- * so far".
- *
- * Two concrete variants exist:
- *   - SurfaceBackgroundSource: backed by a real GPU Surface; readback is a cheap snapshot.
- *     Used whenever a GPU Context is available.
- *   - PictureBackgroundSource: backed by a PictureRecorder; readback finishes the current
- *     segment, flattens it into an Image, then transparently re-opens a new recording segment
- *     with the prior canvas state (matrix / clip / saveCount) restored. Used when no GPU
- *     Context is available (e.g. PDF / SVG export, or picture-only render paths).
+ * Read-only query handle that lets Background-sourced LayerStyles sample the already-rendered
+ * backdrop. Callers render into getCanvas() and later call getBackgroundImage() to read it back.
+ * Two variants: SurfaceBackgroundSource (GPU, cheap snapshot) and PictureBackgroundSource
+ * (no GPU context, re-records segments on readback — used for PDF / SVG / picture-only paths).
  */
 class BackgroundSource {
  public:
-  /**
-   * Creates the top-level BackgroundSource for a render pass. When `context` is non-null the
-   * result is a SurfaceBackgroundSource; when `context` is null the result is a
-   * PictureBackgroundSource and all subsequent rendering happens into picture recorders.
-   */
+  // Creates the top-level source. Context null → PictureBackgroundSource.
   static std::shared_ptr<BackgroundSource> Make(Context* context, const Rect& drawRect,
                                                 float maxOutset, float minOutset,
                                                 const Matrix& matrix,
@@ -52,72 +38,40 @@ class BackgroundSource {
 
   virtual ~BackgroundSource() = default;
 
-  /**
-   * Returns the canvas callers draw into to contribute pixels to this BackgroundSource. The
-   * returned pointer is stable across getBackgroundImage() calls (PictureRecorder reuses the
-   * canvas object across finish / begin cycles), so callers may cache it safely for the lifetime
-   * of this BackgroundSource.
-   */
+  // Canvas callers draw into. Pointer is stable across getBackgroundImage() calls.
   virtual Canvas* getCanvas() = 0;
 
-  /**
-   * Returns the matrix mapping image-pixel coordinates (of the image returned by
-   * getBackgroundImage) to world coordinates.
-   */
+  // image pixel → world, where image pixel is the coord space of getBackgroundImage()'s result.
   Matrix backgroundMatrix() const {
     return imageMatrix;
   }
 
-  /**
-   * Returns an Image that represents "parent backdrop + everything drawn through getCanvas() so
-   * far", in this source's image-pixel coordinate space. Safe to call repeatedly — in the
-   * Picture-backed variant each call flattens a new segment, then transparently re-opens a new
-   * recording segment with the prior canvas state restored.
-   */
+  // Returns "parent backdrop + everything drawn through getCanvas() so far". Safe to call
+  // repeatedly — the Picture variant flushes and reopens a segment each time.
   std::shared_ptr<Image> getBackgroundImage();
 
-  /**
-   * Derives a sub BackgroundSource whose backing store is an externally-owned Surface (belonging
-   * to the caller's offscreen carrier). Draws done through the sub's getCanvas() go to that same
-   * Surface. `renderBounds` is in world coords; `localToWorld` / `localToSurface` describe how
-   * the sub's local coord system maps to world and to the sub surface's pixel grid respectively.
-   */
+  // Derives a sub source backed by an externally-owned Surface (the offscreen carrier's surface).
+  // renderBounds is in world coords; localToWorld / localToSurface map the sub's local coords.
   std::shared_ptr<BackgroundSource> createSubSurface(Surface* subSurface, const Rect& renderBounds,
                                                      const Matrix& localToWorld,
                                                      const Matrix& localToSurface);
 
-  /**
-   * Derives a sub BackgroundSource whose backing store is an externally-owned PictureRecorder.
-   * Draws done through the sub's getCanvas() go to `subRecorder`'s recording canvas. The caller
-   * must keep `subRecorder` alive for the lifetime of the returned sub source; getCanvas() on
-   * the sub transparently re-queries the recorder so canvas swaps (from segment flushes on
-   * getBackgroundImage) are absorbed.
-   */
+  // Derives a sub source backed by an externally-owned PictureRecorder. Caller must keep the
+  // recorder alive for the sub's lifetime.
   std::shared_ptr<BackgroundSource> createSubPicture(PictureRecorder* subRecorder,
                                                      const Rect& renderBounds,
                                                      const Matrix& localToWorld,
                                                      const Matrix& localToSurface);
 
-  /**
-   * Returns the matrix mapping the physical surface-pixel coordinates of this source (the pixel
-   * grid of the image returned by onGetOwnContents — the bg surface for top-level, or the borrowed
-   * offscreen carrier for subs) to world coordinates. Coincides with backgroundMatrix() for
-   * top-level sources; differs for subs whose surface pixel grid does not match the parent-aligned
-   * image pixel grid. Callers mapping layer-local coords through a capture canvas (whose matrix is
-   * `local → this source's surface pixel`) compose with this matrix to reach world.
-   */
+  // surface pixel → world. Same as backgroundMatrix() for top-level; differs for subs whose
+  // surface pixel grid doesn't match the parent-aligned image grid. Used when composing with a
+  // capture canvas whose matrix targets surface pixels.
   Matrix surfaceToWorldMatrix() const {
     return surfaceToWorld;
   }
 
-  /**
-   * Returns the physical surface-pixel downsampling factor (<=1) applied when the top-level
-   * source was created for extreme blur outsets. The capture pass needs this to align the
-   * snapshot's contentScale with the consume pass — because the capture pass walks the layer
-   * tree on the bg canvas (whose matrix.maxScale = world-scale * surfaceScale) while the
-   * consume pass walks on the caller's canvas (whose matrix.maxScale = world-scale). Sub
-   * sources return 1 because sub surfaces are sized to local coordinates without the down-scale.
-   */
+  // Down-sample factor (<=1) applied to the top-level bg surface for extreme blur outsets.
+  // Sub sources return 1. The capture pass divides out this factor when sizing snapshots.
   float surfaceScale() const {
     return _surfaceScale;
   }
@@ -129,27 +83,18 @@ class BackgroundSource {
         _surfaceScale(surfaceScale), colorSpace(std::move(colorSpace)) {
   }
 
-  // Subclasses return an Image representing only *this* source's own accumulated contents (no
-  // parent merge). The shared getBackgroundImage() composes it with `parent->getBackgroundImage`.
+  // Subclass hook: returns an Image of only this source's own contents. The shared
+  // getBackgroundImage() composes it with parent->getBackgroundImage() when a parent exists.
   virtual std::shared_ptr<Image> onGetOwnContents() = 0;
 
-  // `imageMatrix` maps image pixel (what getBackgroundImage returns) → world.
-  Matrix imageMatrix = Matrix::I();
-  // `surfaceToWorld` maps physical surface pixel (what onGetOwnContents returns) → world. Equals
-  // imageMatrix for top-level sources and for 2D sub sources where surface and image share the
-  // same pixel grid; kept as a separate field so the parent-merge step can warp a sub's own
-  // content into the sub's image-pixel space without assuming the two coincide.
-  Matrix surfaceToWorld = Matrix::I();
-  // Axis-aligned bounding box covered by this source, in image-pixel space.
+  Matrix imageMatrix = Matrix::I();     // image pixel → world
+  Matrix surfaceToWorld = Matrix::I();  // surface pixel → world (== imageMatrix for top-level)
   Rect backgroundRect = Rect::MakeEmpty();
-  // 1.0 for sub sources; <= 1.0 for top-level sources that had to down-scale to fit extreme
-  // blur outsets into a single-pass blur budget.
   float _surfaceScale = 1.0f;
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   BackgroundSource* parent = nullptr;
-  // Offset of this source's surface origin in parent image-pixel coords. Populated by
-  // createSubSurface() / createSubPicture() for sub sources.
+  // Origin of this source's surface in parent image-pixel coords. Set by createSub* for subs.
   Point surfaceOffset = Point::Zero();
 };
 

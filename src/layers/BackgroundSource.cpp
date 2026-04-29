@@ -118,11 +118,7 @@ static SubGeometry ComputeSubGeometry(const Matrix& parentImageMatrix, const Rec
   out.childSurfaceMatrix = localToSurface;
   out.childSurfaceMatrix.postTranslate(-childSurfaceRect.x(), -childSurfaceRect.y());
 
-  // childSurfaceToWorld: sub surface pixel → world. Reached by inverting childSurfaceMatrix to
-  // get (sub surface pixel → local) then composing with localToWorld. For the common 2D case
-  // where the sub surface stores pixels aligned with world, childSurfaceToWorld differs from
-  // parentImageMatrix only by translate — but keeping the explicit composition makes future 3D /
-  // non-uniform sub surfaces work without further changes.
+  // childSurfaceToWorld: sub surface pixel → local → world.
   Matrix childSurfaceToLocal = Matrix::I();
   if (!out.childSurfaceMatrix.invert(&childSurfaceToLocal)) {
     return out;
@@ -130,9 +126,7 @@ static SubGeometry ComputeSubGeometry(const Matrix& parentImageMatrix, const Rec
   out.childSurfaceToWorld = localToWorld;
   out.childSurfaceToWorld.preConcat(childSurfaceToLocal);
 
-  // `surfaceOffset` lives in parent *image* pixel coordinates — that is the space of the image
-  // returned by parent->getBackgroundImage(), which getBackgroundImage() subsets at this offset
-  // when composing with the sub's own content. The name mirrors its role in getBackgroundImage().
+  // surfaceOffset is in parent image-pixel space — the subset space getBackgroundImage() uses.
   Matrix worldToParentImage = Matrix::I();
   if (!parentImageMatrix.invert(&worldToParentImage)) {
     return out;
@@ -338,12 +332,7 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
     return ownImage;
   }
 
-  // Warp own image (in sub's surface pixel space) into the sub's image-pixel space and stack it
-  // on top of the subset of parent.
-  // surface pixel → world           : surfaceToWorld
-  // world → parent-image pixel      : inverse(parent.imageMatrix) (== worldToParentImage)
-  // parent-image pixel → sub image  : translate(-surfaceOffset) (sub image shares parent's grid,
-  //                                   offset so its origin aligns with the subset we just drew)
+  // Warp own (in sub surface pixel) to sub image pixel: surface → world → parent image → sub image.
   Matrix ownToSubImage = worldToParentImage;
   ownToSubImage.preConcat(surfaceToWorld);
   ownToSubImage.postTranslate(-surfaceOffset.x, -surfaceOffset.y);

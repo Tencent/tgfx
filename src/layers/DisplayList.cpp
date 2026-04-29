@@ -1064,7 +1064,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   // background-sourced styles (if any show up unexpectedly) silently no-op — matching the
   // contour / 3D subtree semantics.
   BackgroundConsumer consumer(snapshots);
-  args.background.handler =
+  args.backgroundHandler =
       snapshots ? static_cast<BackgroundHandler*>(&consumer) : BackgroundHandler::NoOp();
   _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
 }
@@ -1105,8 +1105,7 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(Surface* 
   renderRect.roundOut();
   args.renderRect = &renderRect;
   auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
-  BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), viewMatrix.getMaxScale(),
-                          snapshotMap.get());
+  BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get());
   return snapshotMap;
 }
 
