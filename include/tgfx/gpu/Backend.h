@@ -21,6 +21,7 @@
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/gpu/metal/MetalTypes.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
+#include "tgfx/gpu/vulkan/VulkanTypes.h"
 
 namespace tgfx {
 /**
@@ -51,6 +52,13 @@ class BackendTexture {
    */
   BackendTexture(const MetalTextureInfo& metalInfo, int width, int height)
       : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
+  }
+
+  /**
+   * Creates a Vulkan backend texture.
+   */
+  BackendTexture(const VulkanTextureInfo& vulkanInfo, int width, int height)
+      : _backend(Backend::Vulkan), _width(width), _height(height), vulkanInfo(vulkanInfo) {
   }
 
   BackendTexture(const BackendTexture& that) {
@@ -104,6 +112,12 @@ class BackendTexture {
    */
   bool getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const;
 
+  /**
+   * If the backend API is Vulkan, copies a snapshot of the VulkanTextureInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
+   */
+  bool getVulkanTextureInfo(VulkanTextureInfo* vulkanTextureInfo) const;
+
  private:
   Backend _backend = Backend::Unknown;
   int _width = 0;
@@ -112,6 +126,7 @@ class BackendTexture {
   union {
     GLTextureInfo glInfo;
     MetalTextureInfo metalInfo;
+    VulkanTextureInfo vulkanInfo;
   };
 };
 
@@ -138,6 +153,13 @@ class BackendRenderTarget {
    */
   BackendRenderTarget(const MetalTextureInfo& metalInfo, int width, int height)
       : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
+  }
+
+  /**
+   * Creates a Vulkan backend render target.
+   */
+  BackendRenderTarget(const VulkanImageInfo& vulkanInfo, int width, int height)
+      : _backend(Backend::Vulkan), _width(width), _height(height), vulkanInfo(vulkanInfo) {
   }
 
   BackendRenderTarget(const BackendRenderTarget& that) {
@@ -191,6 +213,12 @@ class BackendRenderTarget {
    */
   bool getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const;
 
+  /**
+   * If the backend API is Vulkan, copies a snapshot of the VulkanImageInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
+   */
+  bool getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) const;
+
  private:
   Backend _backend = Backend::Unknown;
   int _width = 0;
@@ -198,6 +226,7 @@ class BackendRenderTarget {
   union {
     GLFrameBufferInfo glInfo;
     MetalTextureInfo metalInfo;
+    VulkanImageInfo vulkanInfo;
   };
 };
 
@@ -223,6 +252,13 @@ class BackendSemaphore {
    */
   BackendSemaphore(const MetalSyncInfo& metalInfo)
       : _backend(Backend::Metal), metalSyncInfo(metalInfo) {
+  }
+
+  /**
+   * Creates a Vulkan backend semaphore.
+   */
+  BackendSemaphore(const VulkanSyncInfo& vulkanInfo)
+      : _backend(Backend::Vulkan), vulkanSyncInfo(vulkanInfo) {
   }
 
   BackendSemaphore(const BackendSemaphore& that) {
@@ -255,11 +291,18 @@ class BackendSemaphore {
    */
   bool getMetalSync(MetalSyncInfo* metalInfo) const;
 
+  /**
+   * If the backend API is Vulkan, copies a snapshot of the VulkanSyncInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
+   */
+  bool getVulkanSync(VulkanSyncInfo* vulkanSyncInfo) const;
+
  private:
   Backend _backend = Backend::Unknown;
   union {
     GLSyncInfo glSyncInfo;
     MetalSyncInfo metalSyncInfo;
+    VulkanSyncInfo vulkanSyncInfo;
   };
 };
 }  // namespace tgfx
