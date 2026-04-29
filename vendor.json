@@ -337,6 +337,37 @@
           "ios"
         ]
       }
+    },
+    {
+      "name": "shaderc",
+      "cmake": {
+        "targets": [
+          "shaderc_combined"
+        ],
+        "arguments": [
+          "-DSHADERC_SKIP_TESTS=ON",
+          "-DSHADERC_SKIP_EXAMPLES=ON",
+          "-DSHADERC_SKIP_INSTALL=ON"
+        ],
+        "platforms": [
+          "win"
+        ]
+      }
+    },
+    {
+      "name": "SPIRV-Cross",
+      "cmake": {
+        "targets": [
+          "spirv-cross-core",
+          "spirv-cross-glsl"
+        ],
+        "arguments": [
+          "-DSPIRV_CROSS_ENABLE_TESTS=OFF"
+        ],
+        "platforms": [
+          "win"
+        ]
+      }
     }
   ]
 }
