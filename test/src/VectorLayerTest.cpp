@@ -4676,11 +4676,11 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto group3 = VectorGroup::Make();
   group3->setElements({rect3, trim3, stroke3});
 
-  // Row 4: Center-aligned stroke with an along-segment fit gradient. The gradient runs from
-  // red (left) to blue (right) in fit space; with line-aware single-axis expansion the fit
-  // bounds do not pad along the segment, so the leftmost stroke pixels are pure red and the
-  // rightmost are pure blue. A regression to the symmetric area outset would inset both
-  // ends by strokeWidth/2 in fit space, washing the endpoints toward purple.
+  // Row 4: Center-aligned stroke with an along-segment fit gradient. The fit bounds come from
+  // the path geometry (a horizontal zero-height segment) so the gradient runs from red (left)
+  // to blue (right) across the full stroked length and the perpendicular axis falls into the
+  // epsilon fallback. A regression that padded the fit bounds by stroke width would inset both
+  // ends in fit space, washing the endpoints toward purple.
   auto rect4 = Rectangle::Make();
   rect4->setPosition({300, 258});
   rect4->setSize({500, 0});
@@ -4691,10 +4691,10 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto group4 = VectorGroup::Make();
   group4->setElements({rect4, stroke4});
 
-  // Row 5: Outside-aligned stroke with a perpendicular fit gradient. The gradient runs from
-  // red (top) to blue (bottom) across the 24px Outside band; line-aware perpendicular
-  // expansion produces a fit height of exactly 2*strokeWidth so the band shows pure red at
-  // the top edge and pure blue at the bottom edge with no horizontal padding.
+  // Row 5: Outside-aligned stroke with a perpendicular fit gradient. The fit bounds collapse
+  // along y so the epsilon fallback turns the perpendicular axis into a sharp red/blue split:
+  // the upper half of the Outside band is pure red and the lower half is pure blue, with no
+  // horizontal padding from the fit.
   auto rect5 = Rectangle::Make();
   rect5->setPosition({300, 354});
   rect5->setSize({500, 0});
