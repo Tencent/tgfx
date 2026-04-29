@@ -158,32 +158,43 @@ class StrokePainter : public Painter {
   // formula; on sharp miter joins the fit region may clip the tip colors by a fraction of a
   // pixel. This is a deliberate trade-off to avoid synthesizing a stroke-expanded Shape just
   // for measurement.
+  //
+  // Line-segment paths (e.g. degenerate Rectangles or hand-built ShapePath lineTo) use a
+  // line-aware expansion so the fit band hugs the actual stroked pixels rather than the
+  // axis-symmetric outset that area shapes need.
   std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<Shape>& shape,
                                          float strokeWidth) const {
     if (colorSource == nullptr || !colorSource->fitsToGeometry() || shape == nullptr) {
       return shader;
     }
-    auto bounds = shape->getPath().getBounds();
-    expandByStrokeAlign(&bounds, strokeWidth);
+    const auto& path = shape->getPath();
+    auto bounds = path.getBounds();
+    Point linePoints[2] = {};
+    if (path.isLine(linePoints)) {
+      expandFitForLine(&bounds, strokeWidth, linePoints);
+    } else {
+      expandFitForArea(&bounds, strokeWidth);
+    }
     return wrapShaderWithFit(bounds);
   }
 
   // Same contract as the Shape overload, sourced from the blob's tight glyph bounds so color
-  // glyphs stay intact (no text-to-shape conversion for measurement).
+  // glyphs stay intact (no text-to-shape conversion for measurement). Text never collapses to
+  // a single line segment so the area expansion always applies here.
   std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<TextBlob>& textBlob,
                                          float strokeWidth) const {
     if (colorSource == nullptr || !colorSource->fitsToGeometry() || textBlob == nullptr) {
       return shader;
     }
     auto bounds = textBlob->getTightBounds();
-    expandByStrokeAlign(&bounds, strokeWidth);
+    expandFitForArea(&bounds, strokeWidth);
     return wrapShaderWithFit(bounds);
   }
 
   // Outset per side for each stroke alignment (miter spikes ignored): Inside keeps the bounds,
   // Center grows by half the width, Outside grows by the full width. ceilf snaps the outset to
   // whole pixels so gradient stops land on pixel boundaries.
-  void expandByStrokeAlign(Rect* bounds, float strokeWidth) const {
+  void expandFitForArea(Rect* bounds, float strokeWidth) const {
     float outset = 0.0f;
     switch (strokeAlign) {
       case StrokeAlign::Inside:
@@ -196,6 +207,34 @@ class StrokePainter : public Painter {
         break;
     }
     bounds->outset(outset, outset);
+  }
+
+  // Line-segment fit expansion. Perpendicular to the segment we mirror the area rule
+  // (Center=half, Outside=full, Inside=zero since a line has no interior). Along the segment
+  // we only extend when LineCap actually pushes pixels past the endpoints (Round/Square add
+  // strokeWidth/2 regardless of strokeAlign; Butt adds nothing). Axis-aligned segments take
+  // the precise per-axis outset; oblique segments (only reachable via ShapePath, since
+  // Rectangle never produces them) use the conservative max so the band always covers the
+  // rotated stroke without solving the projected envelope analytically.
+  void expandFitForLine(Rect* bounds, float strokeWidth, const Point points[2]) const {
+    if (strokeAlign == StrokeAlign::Inside) {
+      return;
+    }
+    float perp =
+        (strokeAlign == StrokeAlign::Outside) ? ceilf(strokeWidth) : ceilf(strokeWidth * 0.5f);
+    float along = (stroke.cap == LineCap::Round || stroke.cap == LineCap::Square)
+                      ? ceilf(strokeWidth * 0.5f)
+                      : 0.0f;
+    float dx = std::fabs(points[1].x - points[0].x);
+    float dy = std::fabs(points[1].y - points[0].y);
+    if (dy == 0.0f) {
+      bounds->outset(along, perp);  // horizontal segment
+    } else if (dx == 0.0f) {
+      bounds->outset(perp, along);  // vertical segment
+    } else {
+      float m = std::max(perp, along);
+      bounds->outset(m, m);  // oblique fallback (conservative)
+    }
   }
 
   std::shared_ptr<Shape> applyStrokeAndAlign(std::shared_ptr<Shape> shape,

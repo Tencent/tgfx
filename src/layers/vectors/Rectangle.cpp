@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/vectors/Rectangle.h"
+#include <algorithm>
 #include "VectorContext.h"
 #include "core/utils/Log.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
 
@@ -67,17 +69,32 @@ void Rectangle::apply(VectorContext* context) {
   if (_cachedShape == nullptr) {
     auto halfWidth = _size.width * 0.5f;
     auto halfHeight = _size.height * 0.5f;
-    auto radius = _roundness;
-    if (radius > halfWidth) {
-      radius = halfWidth;
-    }
-    if (radius > halfHeight) {
-      radius = halfHeight;
-    }
-    auto rect = Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, _size.width,
-                               _size.height);
     Path path;
-    path.addRoundRect(rect, radius, radius, _reversed, 2);
+    // When exactly one side is zero the rectangle collapses to a single line segment.
+    // Emitting a moveTo+lineTo avoids the duplicate overlapping edges that an addRoundRect
+    // would produce on a zero-width/height rect, and lets downstream stroking treat it as a
+    // proper line (single stroke band, line-aware fit bounds).
+    bool degenerate = (_size.width == 0.0f) != (_size.height == 0.0f);
+    if (degenerate) {
+      Point p0 = {_position.x - halfWidth, _position.y - halfHeight};
+      Point p1 = {_position.x + halfWidth, _position.y + halfHeight};
+      if (_reversed) {
+        std::swap(p0, p1);
+      }
+      path.moveTo(p0);
+      path.lineTo(p1);
+    } else {
+      auto radius = _roundness;
+      if (radius > halfWidth) {
+        radius = halfWidth;
+      }
+      if (radius > halfHeight) {
+        radius = halfHeight;
+      }
+      auto rect = Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, _size.width,
+                                 _size.height);
+      path.addRoundRect(rect, radius, radius, _reversed, 2);
+    }
     _cachedShape = Shape::MakeFrom(path);
   }
   if (_cachedShape) {
