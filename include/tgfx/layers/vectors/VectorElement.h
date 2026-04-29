@@ -49,7 +49,6 @@ class VectorElement : public LayerProperty {
     Ellipse,
     Polystar,
     ShapePath,
-    Line,
     FillStyle,
     StrokeStyle,
     TrimPath,
