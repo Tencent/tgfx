@@ -27,8 +27,8 @@ export class ScalerContext {
     // from every constructor, guaranteeing both fields are set before any
     // instance method can reach them. Callers must not touch these before an
     // instance has been constructed.
-    public static canvas!: HTMLCanvasElement | OffscreenCanvas;
-    public static context!: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+    public static canvas: HTMLCanvasElement | OffscreenCanvas;
+    public static context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
     private static hasMeasureBoundsAPI: boolean | undefined = undefined;
 
     public static getLineCap(cap: ctor): CanvasLineCap {
