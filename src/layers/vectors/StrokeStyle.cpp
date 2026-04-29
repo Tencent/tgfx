@@ -53,7 +53,7 @@ class StrokePainter : public Painter {
     // gradient fit boxes from the fill geometry only and ignore stroke width, so dash, stroke
     // alignment and stroke width never affect the fit region. Reading getPath() here also
     // primes Shape::getPath()'s atomic cache for the recorder's later use.
-    paint->shader = buildFitShader(innerShape);
+    paint->shader = wrapShaderWithFit(innerShape->getPath().getBounds());
 
     if (pathEffect) {
       innerShape = Shape::ApplyEffect(innerShape, pathEffect);
@@ -86,9 +86,8 @@ class StrokePainter : public Painter {
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
 
-    // Fit bounds come from the original TextBlob's tight glyph bounds, matching the Shape branch
-    // above (geometry-only, stroke width ignored).
-    auto baseShader = buildFitShader(run.textBlob);
+    // Tight glyph bounds keep color glyphs intact (no text-to-shape conversion for measurement).
+    auto baseShader = wrapShaderWithFit(run.textBlob->getTightBounds());
 
     // Emit path: non-center alignment or an active path effect require expanding the text blob
     // into a shape (alignment needs a boolean op against the original outline, path effects
@@ -147,27 +146,6 @@ class StrokePainter : public Painter {
   }
 
  private:
-  // Builds the fit shader for a Shape drawable using the pre-stroke geometry bounds.
-  // getPath().getBounds() returns tight bounds for every Shape flavor (including MergeShape where
-  // onGetBounds is conservative) and shares its atomic cache with the later rasterization path.
-  // Stroke width is intentionally ignored to match SVG objectBoundingBox semantics (which exclude
-  // stroke-width) and Figma's gradient fit behavior.
-  std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<Shape>& shape) const {
-    if (colorSource == nullptr || !colorSource->fitsToGeometry() || shape == nullptr) {
-      return shader;
-    }
-    return wrapShaderWithFit(shape->getPath().getBounds());
-  }
-
-  // Same contract as the Shape overload, sourced from the blob's tight glyph bounds so color
-  // glyphs stay intact (no text-to-shape conversion for measurement).
-  std::shared_ptr<Shader> buildFitShader(const std::shared_ptr<TextBlob>& textBlob) const {
-    if (colorSource == nullptr || !colorSource->fitsToGeometry() || textBlob == nullptr) {
-      return shader;
-    }
-    return wrapShaderWithFit(textBlob->getTightBounds());
-  }
-
   std::shared_ptr<Shape> applyStrokeAndAlign(std::shared_ptr<Shape> shape,
                                              std::shared_ptr<Shape> originalShape,
                                              const Stroke& strokeToApply) const {
