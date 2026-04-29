@@ -211,7 +211,16 @@ bool VulkanRenderPipeline::createDescriptorSetLayout(VulkanGPU* gpu,
     binding.binding = entry.binding;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     binding.descriptorCount = 1;
-    binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    binding.stageFlags = 0;
+    if (entry.visibility & ShaderVisibility::Vertex) {
+      binding.stageFlags |= VK_SHADER_STAGE_VERTEX_BIT;
+    }
+    if (entry.visibility & ShaderVisibility::Fragment) {
+      binding.stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+    }
+    if (binding.stageFlags == 0) {
+      binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    }
     bindings.push_back(binding);
   }
 
