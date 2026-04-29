@@ -4666,7 +4666,7 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   // Row 3: Reversed horizontal degenerate Rectangle with the same trim; the opposite half
   // should be drawn.
   auto rect3 = Rectangle::Make();
-  rect3->setPosition({425, 246});
+  rect3->setPosition({425, 150});
   rect3->setSize({250, 0});
   rect3->setReversed(true);
   auto trim3 = TrimPath::Make();
@@ -4682,7 +4682,7 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   // rightmost are pure blue. A regression to the symmetric area outset would inset both
   // ends by strokeWidth/2 in fit space, washing the endpoints toward purple.
   auto rect4 = Rectangle::Make();
-  rect4->setPosition({300, 354});
+  rect4->setPosition({300, 258});
   rect4->setSize({500, 0});
   auto gradient4 = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, {Color::Red(), Color::Blue()});
   auto stroke4 = StrokeStyle::Make(gradient4);
@@ -4696,7 +4696,7 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   // expansion produces a fit height of exactly 2*strokeWidth so the band shows pure red at
   // the top edge and pure blue at the bottom edge with no horizontal padding.
   auto rect5 = Rectangle::Make();
-  rect5->setPosition({300, 450});
+  rect5->setPosition({300, 354});
   rect5->setSize({500, 0});
   auto gradient5 = Gradient::MakeLinear({0.5f, 0.0f}, {0.5f, 1.0f}, {Color::Red(), Color::Blue()});
   auto stroke5 = StrokeStyle::Make(gradient5);
@@ -4705,10 +4705,10 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto group5 = VectorGroup::Make();
   group5->setElements({rect5, stroke5});
 
-  // Row 6: Three Center-aligned 48px stroke samples on a double-zero Rectangle (collapses to a
+  // Row 6: Three Center-aligned 96px stroke samples on a double-zero Rectangle (collapses to a
   // moveTo+lineTo with overlapping endpoints, so LineCap drives whether anything renders): Butt
-  // produces no pixels on a zero-length segment, Round paints a 48px-diameter disk, and Square
-  // paints a 48px filled square. Each cap pairs with a fit linear gradient (Round: diagonal,
+  // produces no pixels on a zero-length segment, Round paints a 96px-diameter disk, and Square
+  // paints a 96px filled square. Each cap pairs with a fit linear gradient (Round: diagonal,
   // Square: vertical) so the epsilon fit-axis fallback turns the zero-extent bounds into a
   // sharp two-color split exactly along the gradient's perpendicular.
   const std::array<std::pair<float, LineCap>, 3> dotCaps = {{
@@ -4720,13 +4720,13 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   dotGroups.reserve(dotCaps.size());
   for (const auto& [cx, cap] : dotCaps) {
     auto dotRect = Rectangle::Make();
-    dotRect->setPosition({cx, 546});
+    dotRect->setPosition({cx, 450});
     dotRect->setSize({0, 0});
     Point gradStart = {0.0f, 0.0f};
     Point gradEnd = (cap == LineCap::Square) ? Point{0.0f, 1.0f} : Point{1.0f, 1.0f};
     auto dotGradient = Gradient::MakeLinear(gradStart, gradEnd, {Color::Red(), Color::Blue()});
     auto dotStroke = StrokeStyle::Make(dotGradient);
-    dotStroke->setStrokeWidth(48.0f);
+    dotStroke->setStrokeWidth(96.0f);
     dotStroke->setLineCap(cap);
     dotStroke->setStrokeAlign(StrokeAlign::Center);
     auto dotGroup = VectorGroup::Make();
