@@ -58,8 +58,12 @@ struct BackgroundSnapshotKeyHash {
     auto h1 = std::hash<const void*>{}(key.layer);
     auto h2 = std::hash<const void*>{}(key.style);
     // boost::hash_combine style mix: avoids the trivial collisions of h1 ^ (h2 << 1) when the
-    // two pointers share low bits (common for pool-allocated objects).
-    return h1 ^ (h2 + 0x9e3779b97f4a7c15ULL + (h1 << 6) + (h1 >> 2));
+    // two pointers share low bits (common for pool-allocated objects). Pick a platform-sized
+    // golden ratio so 32-bit builds do not warn about a 64-bit literal narrowing into size_t.
+    constexpr std::size_t GoldenRatio = sizeof(std::size_t) >= 8
+                                            ? static_cast<std::size_t>(0x9e3779b97f4a7c15ULL)
+                                            : static_cast<std::size_t>(0x9e3779b9UL);
+    return h1 ^ (h2 + GoldenRatio + (h1 << 6) + (h1 >> 2));
   }
 };
 
