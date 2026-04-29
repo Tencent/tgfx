@@ -42,6 +42,26 @@ class VulkanWindow : public Window {
    */
   static std::shared_ptr<VulkanWindow> MakeFrom(HWND hwnd, std::shared_ptr<Device> device);
 #endif
+
+  ~VulkanWindow() override;
+
+ protected:
+  std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
+  void onPresent(Context* context) override;
+
+ private:
+  VulkanWindow(std::shared_ptr<Device> device, void* surface, void* swapchain, void* imageViews,
+               void* images, unsigned format, int width, int height, int imageCount);
+
+  void* _surface = nullptr;
+  void* _swapchain = nullptr;
+  void* _imageViews = nullptr;
+  void* _images = nullptr;
+  unsigned _format = 0;
+  int _width = 0;
+  int _height = 0;
+  int _imageCount = 0;
+  std::shared_ptr<RenderTargetProxy> swapchainProxy = nullptr;
 };
 
 }  // namespace tgfx
