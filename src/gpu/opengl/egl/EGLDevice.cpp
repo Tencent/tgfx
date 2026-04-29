@@ -37,6 +37,18 @@
 #define EGL_LOSE_CONTEXT_ON_RESET_EXT 0x31BF
 #endif
 
+#ifndef GL_GUILTY_CONTEXT_RESET
+#define GL_GUILTY_CONTEXT_RESET 0x8253
+#endif
+
+#ifndef GL_INNOCENT_CONTEXT_RESET
+#define GL_INNOCENT_CONTEXT_RESET 0x8254
+#endif
+
+#ifndef GL_UNKNOWN_CONTEXT_RESET
+#define GL_UNKNOWN_CONTEXT_RESET 0x8255
+#endif
+
 namespace tgfx {
 static std::vector<EGLint> GetValidAttributes(const std::vector<EGLint>& attributes) {
   if (!attributes.empty() && attributes.back() == EGL_NONE) {
@@ -333,13 +345,22 @@ bool EGLDevice::checkGraphicsResetStatus() {
     return false;
   }
   auto status = getGraphicsResetStatus();
-  if (status != GL_NO_ERROR) {
-    graphicsResetStatus = status;
-    LOGE("EGLDevice::checkGraphicsResetStatus() GPU reset detected: status=0x%x", status);
-    handleContextLost();
-    return true;
+  if (status == GL_NO_ERROR) {
+    return false;
   }
-  return false;
+  // The GL_KHR_robustness/GL_EXT_robustness spec restricts the return value to one of the four
+  // constants below. Some drivers (notably Android emulator GPU stubs) return out-of-spec values
+  // such as uninitialized memory, which would otherwise trigger a false context-lost. Treat any
+  // non-spec value as no reset to avoid taking down all contexts on broken drivers.
+  if (status != GL_GUILTY_CONTEXT_RESET && status != GL_INNOCENT_CONTEXT_RESET &&
+      status != GL_UNKNOWN_CONTEXT_RESET) {
+    LOGE("EGLDevice::checkGraphicsResetStatus() ignored out-of-spec status=0x%x", status);
+    return false;
+  }
+  graphicsResetStatus = status;
+  LOGE("EGLDevice::checkGraphicsResetStatus() GPU reset detected: status=0x%x", status);
+  handleContextLost();
+  return true;
 }
 
 bool EGLDevice::recreateSurfaceIfNeeded(EGLNativeWindowType nativeWindow) {
