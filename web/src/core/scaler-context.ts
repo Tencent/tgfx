@@ -24,12 +24,11 @@ import {ctor, Rect} from '../types';
 
 export class ScalerContext {
     // Shared lazily-initialized canvas/context slots. loadCanvas() is invoked
-    // from every constructor, so any instance method reaching these fields
-    // will see valid values. Declared as non-optional because the strict TS
-    // mode forbids definite-assignment assertions on static fields; callers
-    // must not touch these before an instance has been constructed.
-    public static canvas: HTMLCanvasElement | OffscreenCanvas;
-    public static context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+    // from every constructor, guaranteeing both fields are set before any
+    // instance method can reach them. Callers must not touch these before an
+    // instance has been constructed.
+    public static canvas!: HTMLCanvasElement | OffscreenCanvas;
+    public static context!: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
     private static hasMeasureBoundsAPI: boolean | undefined = undefined;
 
     public static getLineCap(cap: ctor): CanvasLineCap {
@@ -268,15 +267,16 @@ export class ScalerContext {
     protected loadCanvas() {
         if (!ScalerContext.canvas) {
             const canvas = getCanvasProvider().getCanvas2D(10, 10);
-            ScalerContext.setCanvas(canvas);
             // https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently
             const context = canvas.getContext('2d', {willReadFrequently: true}) as
                 | CanvasRenderingContext2D
                 | OffscreenCanvasRenderingContext2D
                 | null;
             if (!context) {
+                getCanvasProvider().releaseCanvas2D(canvas);
                 throw new Error('[tgfx] Failed to acquire a 2D context for the shared ScalerContext canvas.');
             }
+            ScalerContext.setCanvas(canvas);
             ScalerContext.setContext(context);
         }
     }
