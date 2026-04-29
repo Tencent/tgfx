@@ -4720,14 +4720,14 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   };
   const std::array<DotConfig, 3> dotConfigs = {{
       {110.0f, LineCap::Round, {0.0f, 0.0f}, {1.0f, 1.0f}, false},
-      {290.0f, LineCap::Square, {0.0f, 0.0f}, {0.0f, 1.0f}, false},
+      {270.0f, LineCap::Square, {0.0f, 0.0f}, {0.0f, 1.0f}, false},
       {470.0f, LineCap::Butt, {50.0f, 10.0f}, {0.0f, 0.0f}, true},
   }};
   std::vector<std::shared_ptr<VectorGroup>> dotGroups;
   dotGroups.reserve(dotConfigs.size());
   for (const auto& config : dotConfigs) {
     auto dotRect = Rectangle::Make();
-    dotRect->setPosition({config.cx, 450});
+    dotRect->setPosition({config.cx, 498});
     dotRect->setSize(config.size);
     std::shared_ptr<ColorSource> dotGradient;
     if (config.radial) {
