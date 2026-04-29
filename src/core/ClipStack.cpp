@@ -41,40 +41,19 @@ enum class ClipGeometry {
  * are equivalent.
  */
 static ClipGeometry ResolveClipGeometry(const ClipElement& a, const ClipElement& b) {
-  const auto boundsA = a.bounds();
-  const auto boundsB = b.bounds();
-  if (!Rect::Intersects(boundsA, boundsB)) {
+  if (!a.looseIntersects(b)) {
     return ClipGeometry::Empty;
   }
-
-  if (a.isRect() && b.isRect()) {
-    if (boundsB.contains(boundsA)) {
-      return ClipGeometry::AOnly;
-    }
-    if (boundsA.contains(boundsB)) {
-      return ClipGeometry::BOnly;
-    }
-    return ClipGeometry::Both;
+  if (b.tightContains(a)) {
+    return ClipGeometry::AOnly;
   }
-
-  // Complex paths cannot be simplified, keep both.
-  if (!a.isRect() && !b.isRect()) {
-    if (a.path().isSame(b.path()) && a.isAntiAlias() == b.isAntiAlias()) {
-      return ClipGeometry::BOnly;
-    }
-    return ClipGeometry::Both;
+  if (a.tightContains(b)) {
+    return ClipGeometry::BOnly;
   }
-
-  if (a.isRect()) {
-    if (b.path().contains(boundsA)) {
-      return ClipGeometry::AOnly;
-    }
-  } else {
-    if (a.path().contains(boundsB)) {
-      return ClipGeometry::BOnly;
-    }
+  // Fallback for equivalent paths whose containment cannot be proven by bounds checks.
+  if (a.path().isSame(b.path()) && a.isAntiAlias() == b.isAntiAlias()) {
+    return ClipGeometry::BOnly;
   }
-
   return ClipGeometry::Both;
 }
 
@@ -114,6 +93,45 @@ ClipElement::ClipElement(const Path& path, bool antiAlias) : _path(path), _antiA
 
   _bounds = path.getBounds();
   _isRect = path.isRect(nullptr);
+}
+
+bool ClipElement::tightContains(const ClipElement& other) const {
+  auto thisInverse = _path.isInverseFillType();
+  auto otherInverse = other._path.isInverseFillType();
+  if (thisInverse && otherInverse) {
+    // Containment of complements flips direction: this contains other when
+    // this's shape is inside other's shape.
+    return other._path.contains(_path.getBounds());
+  }
+  if (thisInverse) {
+    // This's complement contains other only when this's shape is disjoint from other's bounds.
+    return !Rect::Intersects(_path.getBounds(), other._bounds);
+  }
+  if (otherInverse) {
+    // A bounded region cannot contain a near-full-plane region.
+    return false;
+  }
+  if (_isRect) {
+    return _bounds.contains(other._bounds);
+  }
+  return _path.contains(other._bounds);
+}
+
+bool ClipElement::looseIntersects(const ClipElement& other) const {
+  auto thisInverse = _path.isInverseFillType();
+  auto otherInverse = other._path.isInverseFillType();
+  if (thisInverse && otherInverse) {
+    // Two near-full-plane regions always overlap.
+    return true;
+  }
+  if (!thisInverse && !otherInverse) {
+    return Rect::Intersects(_bounds, other._bounds);
+  }
+  // Exactly one is inverse: the two regions are disjoint only when the non-inverse
+  // side lies entirely inside the inverse side's removed shape.
+  const auto& inversePath = thisInverse ? _path : other._path;
+  const auto& boundedRect = thisInverse ? other._bounds : _bounds;
+  return !inversePath.contains(boundedRect);
 }
 
 bool ClipElement::tryCombine(const ClipElement& other) {
@@ -233,22 +251,31 @@ bool ClipStack::addElement(ClipElement&& toAdd) {
     cur.uniqueID = UniqueID::Next();
     return true;
   }
-  if (!Rect::Intersects(toAdd.bounds(), cur.bounds)) {
-    cur.state = ClipState::Empty;
-    cur.uniqueID = UniqueID::Next();
-    return true;
-  }
-  // The new element completely contains current clip, so it's redundant.
-  auto curIsContained =
-      toAdd.isRect() ? toAdd.bounds().contains(cur.bounds) : toAdd.path().contains(cur.bounds);
-  if (curIsContained) {
-    return false;
-  }
   if (cur.state == ClipState::WideOpen) {
     replaceWithElement(std::move(toAdd));
     return true;
   }
-  return appendElement(std::move(toAdd));
+  // Wrap cur.bounds as a non-inverse rect ClipElement so ResolveClipGeometry
+  // can handle containment and intersection against toAdd uniformly.
+  Path curBoundsPath = {};
+  curBoundsPath.addRect(cur.bounds);
+  const ClipElement curElement(curBoundsPath, false);
+  switch (ResolveClipGeometry(curElement, toAdd)) {
+    case ClipGeometry::Empty:
+      cur.state = ClipState::Empty;
+      cur.uniqueID = UniqueID::Next();
+      return true;
+    case ClipGeometry::AOnly:
+      // toAdd's keep-region already covers cur.bounds entirely, so toAdd is redundant.
+      return false;
+    case ClipGeometry::BOnly:
+      // cur.bounds is only an optimistic envelope of existing elements: some area
+      // inside it may have been carved out and not actually kept. Existing elements
+      // cannot be dropped here. Fall through to per-element handling.
+    case ClipGeometry::Both:
+      return appendElement(std::move(toAdd));
+  }
+  return false;
 }
 
 void ClipStack::replaceWithElement(ClipElement&& toAdd) {

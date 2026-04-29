@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
+#include "layers/RootLayer.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -296,7 +298,7 @@ TGFX_TEST(BackgroundBlurTest, PartialBackgroundBlur) {
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/PartialBackgroundBlur"));
   solidLayer2->removeFromParent();
   rootLayer->addChild(solidLayer2);
-  EXPECT_TRUE(displayList.root()->bitFields.dirtyDescendents);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList.root()->bitFields.dirtyDescendents);)
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/PartialBackgroundBlur_partial"));
   solidLayer2->setMatrix(Matrix::MakeTrans(120, 120));
@@ -578,6 +580,222 @@ TGFX_TEST(BackgroundBlurTest, NestedFlat3DLayer) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/NestedFlat3DLayer"));
+}
+
+namespace {
+bool DirtyRectLess(const Rect& a, const Rect& b) {
+  if (a.top != b.top) return a.top < b.top;
+  if (a.left != b.left) return a.left < b.left;
+  if (a.bottom != b.bottom) return a.bottom < b.bottom;
+  return a.right < b.right;
+}
+
+std::vector<Rect> SortedDirtyRects(RootLayer* root) {
+  auto regions = root->updateDirtyRegions();
+  std::sort(regions.begin(), regions.end(), DirtyRectLess);
+  return regions;
+}
+}  // namespace
+
+/**
+ * Verify that moving a child inside a background-blur parent that has no content of its own
+ * (a pure container) only dirties the child footprints. The child paints above the blur
+ * result, so its movement must not trigger blur-radius expansion of the dirty rects.
+ */
+TGFX_TEST(BackgroundBlurTest, ContainerBlurChildMoveSkipsExpansion) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto displayList = std::make_unique<DisplayList>();
+  auto root = static_cast<RootLayer*>(displayList->root());
+
+  auto background = SolidLayer::Make();
+  background->setColor(Color::FromRGBA(100, 100, 100, 255));
+  background->setWidth(300);
+  background->setHeight(300);
+  root->addChild(background);
+
+  // Pure container blur layer: no content of its own, just groups children. The blur parent's
+  // renderBounds come entirely from the child subtree.
+  auto blurContainer = Layer::Make();
+  blurContainer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  blurContainer->setMatrix(Matrix::MakeTrans(50, 50));
+  root->addChild(blurContainer);
+
+  auto child = SolidLayer::Make();
+  child->setColor(Color::Red());
+  child->setWidth(40);
+  child->setHeight(40);
+  child->setMatrix(Matrix::MakeTrans(50, 50));
+  blurContainer->addChild(child);
+
+  displayList->render(surface.get());
+
+  // Move child within the blur container. The child's old and new footprints are the only
+  // things that change; the blur background itself has not changed, so no blur-radius
+  // expansion should occur.
+  child->setMatrix(Matrix::MakeTrans(80, 80));
+  auto dirty = SortedDirtyRects(root);
+  // Old footprint (100,100)-(140,140) joined with new (130,130)-(170,170) gives a union whose
+  // bounding box is (100,100)-(170,170). DecomposeRects may split the union into multiple
+  // non-overlapping rects with a small amount of redundant coverage, but the bounding box must
+  // match and the total area must stay well below what blur-radius expansion would produce.
+  Rect unionRect = Rect::MakeEmpty();
+  auto totalArea = 0.f;
+  for (auto& r : dirty) {
+    totalArea += r.width() * r.height();
+    if (unionRect.isEmpty()) {
+      unionRect = r;
+    } else {
+      unionRect.join(r);
+    }
+  }
+  EXPECT_EQ(unionRect, Rect::MakeLTRB(100, 100, 170, 170));
+  // Without expansion, total area is bounded by the union bounding box 70 * 70 = 4900. With
+  // blur-radius 10 expansion, each 40x40 footprint would grow to roughly 60x60 and the union
+  // bounding box would grow past 90x90 = 8100. We pick 5000 as a conservative upper bound.
+  EXPECT_LE(totalArea, 5000.f);
+}
+
+/**
+ * Verify that a dirty rect produced OUTSIDE the blur subtree (e.g. a sibling painted BEFORE
+ * the blur layer) still triggers blur-radius expansion when it intersects the blur bounds,
+ * because such a rect changes the blur sampling input.
+ */
+TGFX_TEST(BackgroundBlurTest, BackgroundSiblingChangeExpandsInsideBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto displayList = std::make_unique<DisplayList>();
+  auto root = static_cast<RootLayer*>(displayList->root());
+
+  // Background sibling painted first.
+  auto backgroundSibling = SolidLayer::Make();
+  backgroundSibling->setColor(Color::FromRGBA(100, 100, 100, 255));
+  backgroundSibling->setWidth(80);
+  backgroundSibling->setHeight(80);
+  backgroundSibling->setMatrix(Matrix::MakeTrans(60, 60));
+  root->addChild(backgroundSibling);
+
+  // Pure container blur layer positioned so the sibling's dirty area lies well inside it.
+  auto blurContainer = Layer::Make();
+  blurContainer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  root->addChild(blurContainer);
+
+  auto blurChild = SolidLayer::Make();
+  blurChild->setColor(Color::FromRGBA(0, 0, 0, 1));
+  blurChild->setWidth(300);
+  blurChild->setHeight(300);
+  blurContainer->addChild(blurChild);
+
+  displayList->render(surface.get());
+
+  // Move the background sibling. This is a dirty rect that existed before the blur layer's
+  // subtree ran (part of the snapshot), so blur expansion must apply on BOTH the old and new
+  // footprints because both intersect the blur bounds.
+  backgroundSibling->setMatrix(Matrix::MakeTrans(100, 100));
+  auto dirty = SortedDirtyRects(root);
+  // Expansion by blur radius 10 (which filterBackground expands by blur-dependent amount,
+  // but at minimum one blur radius per side). Rather than hard-code the exact blur kernel
+  // extent we verify the dirty area exceeds the raw footprint sum.
+  auto rawArea = 80.f * 80.f * 2.f;  // two 80x80 footprints, the raw minimum
+  auto totalArea = 0.f;
+  for (auto& r : dirty) {
+    totalArea += r.width() * r.height();
+  }
+  EXPECT_GT(totalArea, rawArea);
+}
+
+/**
+ * Verify that changing the blur layer's OWN content bounds does not trigger blur-radius
+ * expansion either. The layer's own content paints above the blur result, not into it.
+ */
+TGFX_TEST(BackgroundBlurTest, BlurOwnContentChangeSkipsExpansion) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto displayList = std::make_unique<DisplayList>();
+  auto root = static_cast<RootLayer*>(displayList->root());
+
+  auto backgroundFill = SolidLayer::Make();
+  backgroundFill->setColor(Color::FromRGBA(200, 200, 200, 255));
+  backgroundFill->setWidth(300);
+  backgroundFill->setHeight(300);
+  root->addChild(backgroundFill);
+
+  // Blur layer WITH its own content.
+  auto blurLayer = SolidLayer::Make();
+  blurLayer->setColor(Color::Red());
+  blurLayer->setWidth(100);
+  blurLayer->setHeight(100);
+  blurLayer->setMatrix(Matrix::MakeTrans(80, 80));
+  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  root->addChild(blurLayer);
+
+  displayList->render(surface.get());
+
+  // Grow the blur layer's own content. Its old and new bounds go into the dirty list, but
+  // because they appear AFTER the snapshot is taken, blur expansion must not apply.
+  blurLayer->setWidth(160);
+  auto dirty = SortedDirtyRects(root);
+  ASSERT_EQ(dirty.size(), 1u);
+  // Old content bounds (80,80)-(180,180) joined with new (80,80)-(240,180).
+  EXPECT_EQ(dirty[0], Rect::MakeLTRB(80, 80, 240, 180));
+}
+
+/**
+ * Verify the fast path: when the blur subtree itself has no pending dirtiness but an ancestor
+ * or sibling upstream produced a dirty rect, checkBackgroundStyles() still applies blur
+ * expansion to that rect, using the current dirty list directly. This reuses the existing
+ * propagateLayerState-driven fast path and must keep working after the snapshot refactor.
+ */
+TGFX_TEST(BackgroundBlurTest, FastPathBackgroundChangeExpandsInsideBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto displayList = std::make_unique<DisplayList>();
+  auto root = static_cast<RootLayer*>(displayList->root());
+
+  auto backgroundSibling = SolidLayer::Make();
+  backgroundSibling->setColor(Color::FromRGBA(100, 100, 100, 255));
+  backgroundSibling->setWidth(60);
+  backgroundSibling->setHeight(60);
+  backgroundSibling->setMatrix(Matrix::MakeTrans(40, 40));
+  root->addChild(backgroundSibling);
+
+  // Grandparent container. Blur layer lives two levels down, so when only the sibling
+  // changes, the grandparent enters updateRenderBounds via the fast path (dirtyDescendents
+  // stays false within its subtree, but maxBackgroundOutset triggers checkBackgroundStyles).
+  auto grandparent = Layer::Make();
+  root->addChild(grandparent);
+  auto parent = Layer::Make();
+  grandparent->addChild(parent);
+
+  auto blurLayer = Layer::Make();
+  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  parent->addChild(blurLayer);
+
+  auto blurContent = SolidLayer::Make();
+  blurContent->setColor(Color::FromRGBA(0, 0, 0, 1));
+  blurContent->setWidth(300);
+  blurContent->setHeight(300);
+  blurLayer->addChild(blurContent);
+
+  displayList->render(surface.get());
+
+  // The blur subtree stays entirely untouched. Only the background sibling moves.
+  backgroundSibling->setMatrix(Matrix::MakeTrans(80, 80));
+  auto dirty = SortedDirtyRects(root);
+  auto rawArea = 60.f * 60.f * 2.f;
+  auto totalArea = 0.f;
+  for (auto& r : dirty) {
+    totalArea += r.width() * r.height();
+  }
+  EXPECT_GT(totalArea, rawArea);
 }
 
 }  // namespace tgfx

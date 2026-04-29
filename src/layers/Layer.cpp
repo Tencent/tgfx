@@ -2276,6 +2276,18 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     transformer = RegionTransformer::MakeFromFilters(_filters, 1.0f, std::move(transformer));
     transformer = RegionTransformer::MakeFromStyles(_layerStyles, 1.0f, std::move(transformer));
   }
+  // Snapshot the root dirty list before touching this layer's own content or descending into
+  // children. Only rects that existed before this layer's subtree ran contribute to this layer's
+  // background-blur sampling input; anything produced below (this layer's own content or its
+  // descendants) paints above the blur result and must not participate in blur dirty expansion.
+  // The snapshot costs O(MAX_DIRTY_REGIONS) = O(1) per blur-capable layer.
+  std::vector<Rect> backgroundSourceRects = {};
+  for (const auto& style : _layerStyles) {
+    if (style && style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+      backgroundSourceRects = _root->currentDirtyRects();
+      break;
+    }
+  }
   auto content = getContent();
   if (bitFields.dirtyContentBounds || (forceDirty && content)) {
     if (contentBounds) {
@@ -2375,7 +2387,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   if (backOutset > 0) {
     maxBackgroundOutset = std::max(backOutset, maxBackgroundOutset);
     minBackgroundOutset = std::min(backOutset, minBackgroundOutset);
-    updateBackgroundBounds(contentScale);
+    updateBackgroundBounds(contentScale, backgroundSourceRects);
   }
   if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver) ||
       (content && content->hasBlendMode())) {
@@ -2394,18 +2406,22 @@ void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer
     auto childTransformer = RegionTransformer::MakeFromMatrix(childMatrix.asMatrix(), transformer);
     child->checkBackgroundStyles(childTransformer);
   }
-  updateBackgroundBounds(transformer ? transformer->getMaxScale() : 1.0f);
+  // Fast path: this layer's subtree did not change, so every current dirty rect originates from
+  // outside this subtree and is a legitimate blur input candidate. Passing the live list is safe
+  // because invalidateBackground collects all expanded rects locally before re-appending them.
+  updateBackgroundBounds(transformer ? transformer->getMaxScale() : 1.0f,
+                         _root->currentDirtyRects());
 }
 
-void Layer::updateBackgroundBounds(float contentScale) {
+void Layer::updateBackgroundBounds(float contentScale, const std::vector<Rect>& sourceRects) {
   for (auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
     if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
-      _root->invalidateBackground(renderBounds, style.get(), contentScale);
+      _root->invalidateBackground(renderBounds, style.get(), contentScale, sourceRects);
     }
   }
   if (bitFields.hasBlendMode) {
-    _root->invalidateBackground(renderBounds, nullptr, contentScale);
+    _root->invalidateBackground(renderBounds, nullptr, contentScale, sourceRects);
   }
 }
 

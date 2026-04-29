@@ -57,7 +57,8 @@ std::shared_ptr<CornerPinEffect> CornerPinEffect::Make(EffectCache* cache, const
                                                        const Point& upperRight,
                                                        const Point& lowerRight,
                                                        const Point& lowerLeft) {
-  return std::make_shared<CornerPinEffect>(cache, upperLeft, upperRight, lowerRight, lowerLeft);
+  return std::shared_ptr<CornerPinEffect>(
+      new CornerPinEffect(cache, upperLeft, upperRight, lowerRight, lowerLeft));
 }
 
 CornerPinEffect::CornerPinEffect(EffectCache* cache, const Point& upperLeft,

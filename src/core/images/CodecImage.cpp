@@ -46,6 +46,12 @@ std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
   return PixelImage::onMakeScaled(newWidth, newHeight, sampling);
 }
 
+std::shared_ptr<Image> CodecImage::onMakeMipmapped(bool enabled) const {
+  auto image = std::make_shared<CodecImage>(getCodec(), _width, _height, enabled);
+  image->weakThis = image;
+  return image;
+}
+
 std::shared_ptr<TextureProxy> CodecImage::lockTextureProxy(const TPArgs& args) const {
   auto tempGenerator = generator;
   auto codec = getCodec();

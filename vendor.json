@@ -224,6 +224,9 @@
         "targets": [
           "gtest"
         ],
+        "arguments": [
+          "-Dgtest_force_shared_crt=ON"
+        ],
         "platforms": [
           "mac",
           "win",

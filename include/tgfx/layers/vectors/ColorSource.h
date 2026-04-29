@@ -25,7 +25,7 @@
 
 namespace tgfx {
 /**
- * ColorSource specifies the source color(s) for what is being drawn in a shape layer. There are
+ * ColorSource specifies the source color(s) for what is being drawn in a vector layer. There are
  * three types of ColorSource: SolidColor, Gradient, and ImagePattern. Note: All ColorSource objects
  * are not thread-safe and should only be accessed from a single thread.
  */
@@ -37,24 +37,19 @@ class ColorSource : public LayerProperty {
   virtual std::shared_ptr<Shader> getShader() const = 0;
 
   /**
-   * Returns true when this ColorSource interprets its parameters in a normalized 0-1 coordinate
-   * space that maps to each shape's bounding box, rather than absolute layer coordinates.
-   * Subclasses that support such a normalized space should override this to return true when that
-   * mode is active. The default returns false, meaning parameters are interpreted in absolute
-   * layer space.
+   * Returns true when this ColorSource's parameters are interpreted relative to each geometry's
+   * bounding box. When true, FillStyle/StrokeStyle supplies the shader with a per-geometry fit
+   * matrix obtained from getFitMatrix(). When false, the shader is used as-is in the parent
+   * container's (VectorLayer or VectorGroup) coordinate space.
    */
-  virtual bool useRelativeSpace() const {
-    return false;
-  }
+  virtual bool fitsToGeometry() const = 0;
 
   /**
-   * Returns the transformation matrix that maps the ColorSource's definition space to the given
-   * bounds. The returned matrix is intended to be applied to the shader returned by getShader().
-   * @param bounds The bounding box of the target shape.
+   * Returns the transformation matrix that maps the ColorSource's local coordinate space into the
+   * given geometry bounding box. Only consulted when fitsToGeometry() returns true.
+   * @param bounds The bounding box of the target geometry.
    */
-  virtual Matrix getRelativeMatrix(const Rect&) const {
-    return Matrix::I();
-  }
+  virtual Matrix getFitMatrix(const Rect& bounds) const = 0;
 
  protected:
   enum class Type { Gradient, ImagePattern, SolidColor };

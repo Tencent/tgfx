@@ -18,15 +18,23 @@
 
 import {TGFXModule} from '../tgfx-module';
 import {ctor} from '../types';
-import {getCanvas2D, releaseCanvas2D} from '../utils/canvas';
+import {getCanvasProvider} from './canvas-provider';
 
 export class PathRasterizer {
     public static readPixels(width: number, height: number, path: Path2D, fillType: ctor) {
-        let canvas = getCanvas2D(width, height);
-        if (canvas == null) {
+        if (width <= 0 || height <= 0) {
             return null;
         }
-        let context = canvas.getContext('2d', {willReadFrequently: true}) as CanvasRenderingContext2D;
+        const provider = getCanvasProvider();
+        const canvas = provider.getCanvas2D(width, height);
+        const context = canvas.getContext('2d', {willReadFrequently: true}) as
+            | CanvasRenderingContext2D
+            | OffscreenCanvasRenderingContext2D
+            | null;
+        if (!context) {
+            provider.releaseCanvas2D(canvas);
+            return null;
+        }
         context.setTransform(1, 0, 0, 1, 0, 0);
         if (fillType === TGFXModule.TGFXPathFillType.InverseWinding ||
             fillType === TGFXModule.TGFXPathFillType.InverseEvenOdd) {
@@ -36,10 +44,7 @@ export class PathRasterizer {
             context.fill(path, fillType === TGFXModule.TGFXPathFillType.EvenOdd ? 'evenodd' : 'nonzero');
         }
         const {data} = context.getImageData(0, 0, width, height);
-        releaseCanvas2D(canvas);
-        if (data.length === 0) {
-            return null;
-        }
+        provider.releaseCanvas2D(canvas);
         return new Uint8Array(data);
     }
 }

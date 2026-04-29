@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
 #include <filesystem>
 #include <string>
 #include "base/TGFXTest.h"
@@ -33,9 +34,11 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/svg/SVGExporter.h"
+#include "tgfx/svg/SVGPathParser.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -98,21 +101,27 @@ TGFX_TEST(SVGExportTest, PureColorFile) {
   tgfx::Paint paint;
   paint.setColor(Color::Blue());
 
-  auto SVGStream = WriteStream::MakeFromFile(path);
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportFlags::DisablePrettyXML);
-  auto canvas = exporter->getCanvas();
+  // The writer must be destroyed before reading. On Windows, fopen() holds an exclusive file lock
+  // that prevents a second fopen() on the same path until fclose() is called in the destructor.
+  {
+    auto SVGStream = WriteStream::MakeFromFile(path);
+    auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+                                      SVGExportFlags::DisablePrettyXML);
+    auto canvas = exporter->getCanvas();
 
-  canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
+    canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
 
-  exporter->close();
+    exporter->close();
+  }
 
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  EXPECT_EQ(readStream->size(), 211U);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+  {
+    auto readStream = Stream::MakeFromFile(path);
+    EXPECT_TRUE(readStream != nullptr);
+    EXPECT_EQ(readStream->size(), 211U);
+    Buffer buffer(readStream->size());
+    readStream->read(buffer.data(), buffer.size());
+    EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+  }
 
   std::filesystem::remove(path);
 }
@@ -161,21 +170,27 @@ TGFX_TEST(SVGExportTest, OpacityColorFile) {
   paint.setColor(Color::Blue());
   paint.setAlpha(0.5f);
 
-  auto SVGStream = WriteStream::MakeFromFile(path);
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportFlags::DisablePrettyXML);
-  auto canvas = exporter->getCanvas();
+  // The writer must be destroyed before reading. On Windows, fopen() holds an exclusive file lock
+  // that prevents a second fopen() on the same path until fclose() is called in the destructor.
+  {
+    auto SVGStream = WriteStream::MakeFromFile(path);
+    auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+                                      SVGExportFlags::DisablePrettyXML);
+    auto canvas = exporter->getCanvas();
 
-  canvas->drawCircle(100, 100, 100, paint);
+    canvas->drawCircle(100, 100, 100, paint);
 
-  exporter->close();
+    exporter->close();
+  }
 
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  EXPECT_EQ(readStream->size(), 219U);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+  {
+    auto readStream = Stream::MakeFromFile(path);
+    EXPECT_TRUE(readStream != nullptr);
+    EXPECT_EQ(readStream->size(), 219U);
+    Buffer buffer(readStream->size());
+    readStream->read(buffer.data(), buffer.size());
+    EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+  }
 
   std::filesystem::remove(path);
 }
@@ -448,21 +463,27 @@ TGFX_TEST(SVGExportTest, EmojiTextFile) {
   Paint paint;
   paint.setColor(Color::Red());
 
-  auto SVGStream = WriteStream::MakeFromFile(path);
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
-                                    SVGExportFlags::DisablePrettyXML);
-  auto canvas = exporter->getCanvas();
+  // The writer must be destroyed before reading. On Windows, fopen() holds an exclusive file lock
+  // that prevents a second fopen() on the same path until fclose() is called in the destructor.
+  {
+    auto SVGStream = WriteStream::MakeFromFile(path);
+    auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
+                                      SVGExportFlags::DisablePrettyXML);
+    auto canvas = exporter->getCanvas();
 
-  canvas->drawSimpleText("🤡👻🐠🤩😃🤪", 0, 80, font, paint);
+    canvas->drawSimpleText("🤡👻🐠🤩😃🤪", 0, 80, font, paint);
 
-  exporter->close();
+    exporter->close();
+  }
 
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  EXPECT_EQ(readStream->size(), 346U);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+  {
+    auto readStream = Stream::MakeFromFile(path);
+    EXPECT_TRUE(readStream != nullptr);
+    EXPECT_EQ(readStream->size(), 346U);
+    Buffer buffer(readStream->size());
+    readStream->read(buffer.data(), buffer.size());
+    EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+  }
 
   std::filesystem::remove(path);
 }
@@ -545,8 +566,14 @@ TGFX_TEST(SVGExportTest, GradientMask) {
   Buffer buffer(readStream->size());
   readStream->read(buffer.data(), buffer.size());
   auto compareString = std::string(static_cast<char*>(buffer.data()), buffer.size());
+  // Only this code path reads a baseline SVG file from disk, which may contain '\r\n' line endings
+  // on Windows due to Git checkout CRLF conversion. Strip '\r' so it matches the runtime-generated
+  // SVG string that uses '\n' only. Other SVG tests compare against in-memory strings and are not
+  // affected by CRLF conversion.
+  compareString.erase(std::remove(compareString.begin(), compareString.end(), '\r'),
+                      compareString.end());
 
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+  EXPECT_EQ(compareString, SVGString);
 }
 
 TGFX_TEST(SVGExportTest, ImageMask) {
@@ -830,6 +857,89 @@ TGFX_TEST(SVGExportTest, DstAssignColorSpace) {
   canvas->drawRect(Rect::MakeXYWH(400, 140, 100, 100), paint);
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DstAssignColorSpace"));
+}
+
+TGFX_TEST(SVGExportTest, LayerMaskBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Original SVG content bounds: x[-7.18, 23], y[-12.13, 23]. Width ~30, height ~35.
+  // Scale 8x → 240x280. Surface 340x380 gives ~50px margin on each side.
+  int width = 340;
+  int height = 380;
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(width, height));
+  auto canvas = exporter->getCanvas();
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Parse the star path from the reference SVG (Mask group.svg).
+  auto starPathPtr = SVGPathParser::FromSVGString(
+      "M-1.7841 -11.6211C-1.5051 -12.1263 -0.7648 -12.1263 -0.6313 -11.6211"
+      "L-0.1258 -9.7081C0.0372 -9.0911 0.4725 -8.6028 1.0762 -8.3595"
+      "L2.9484 -7.605C3.4427 -7.4058 3.3396 -6.6908 2.7878 -6.4916"
+      "L0.6983 -5.7371C0.0245 -5.4938 -0.5515 -5.0055 -0.8924 -4.3885"
+      "L-1.9493 -2.4755C-2.2283 -1.9703 -2.9686 -1.9703 -3.1021 -2.4755"
+      "L-3.6077 -4.3885C-3.7707 -5.0055 -4.206 -5.4938 -4.8097 -5.7371"
+      "L-6.6817 -6.4916C-7.1761 -6.6908 -7.0731 -7.4058 -6.5213 -7.605"
+      "L-4.4318 -8.3595C-3.7579 -8.6028 -3.1819 -9.0911 -2.8411 -9.7081"
+      "L-1.7841 -11.6211Z"
+      "M9.7681 -7.4933C9.6346 -7.9985 8.8944 -7.9985 8.6152 -7.4933"
+      "L5.9887 -2.7391C5.1367 -1.1969 3.6967 0.024 2.0121 0.6323"
+      "L-3.1806 2.5072C-3.7324 2.7064 -3.8354 3.4213 -3.341 3.6207"
+      "L1.3112 5.4956C2.8205 6.1039 3.9087 7.3248 4.3163 8.8671"
+      "L5.5726 13.6211C5.7061 14.1263 6.4464 14.1263 6.7255 13.6211"
+      "L9.3519 8.8671C10.204 7.3248 11.6441 6.1039 13.3286 5.4956"
+      "L18.5212 3.6207C19.0731 3.4213 19.1761 2.7064 18.6818 2.5072"
+      "L14.0294 0.6323C12.5202 0.024 11.432 -1.1969 11.0244 -2.7391"
+      "L9.7681 -7.4933Z");
+  ASSERT_TRUE(starPathPtr != nullptr);
+  auto starPath = *starPathPtr;
+  starPath.setFillType(PathFillType::EvenOdd);
+
+  // Mask layer: a ShapeLayer with the star path (in original SVG coordinates).
+  auto maskLayer = ShapeLayer::Make();
+  maskLayer->setPath(starPath);
+  maskLayer->setFillStyle(ShapeStyle::Make(Color::Black()));
+
+  // Group layer that will be masked.
+  auto groupLayer = Layer::Make();
+  groupLayer->setMask(maskLayer);
+
+  // Circle 1: cyan (#07D6DD), cx=11.5 cy=11.5 r=11.5 in original SVG coordinates.
+  auto circle1 = ShapeLayer::Make();
+  Path circlePath1;
+  circlePath1.addOval(Rect::MakeXYWH(0, 0, 23, 23));
+  circle1->setPath(circlePath1);
+  circle1->setFillStyle(ShapeStyle::Make(Color{0.027f, 0.839f, 0.867f, 1.0f}));
+  circle1->setFilters({BlurFilter::Make(3, 3)});
+  groupLayer->addChild(circle1);
+
+  // Circle 2: blue (#24A2F7) with 80% opacity, translate(2,5) cx=9 cy=9 r=9.
+  auto circle2 = ShapeLayer::Make();
+  Path circlePath2;
+  circlePath2.addOval(Rect::MakeXYWH(2, 5, 18, 18));
+  circle2->setPath(circlePath2);
+  circle2->setFillStyle(ShapeStyle::Make(Color{0.141f, 0.635f, 0.969f, 1.0f}));
+  circle2->setAlpha(0.8f);
+  circle2->setFilters({BlurFilter::Make(3, 3)});
+  groupLayer->addChild(circle2);
+
+  // Apply uniform transform: scale 8x, then center in the surface.
+  // Content center ~(8, 5.5). Offset = surface_center - content_center * scale.
+  auto layerMatrix = Matrix::MakeScale(8);
+  layerMatrix.postTranslate(static_cast<float>(width) / 2 - 8 * 8,
+                            static_cast<float>(height) / 2 - 5.5f * 8);
+  groupLayer->setMatrix(layerMatrix);
+  maskLayer->setMatrix(layerMatrix);
+
+  displayList->root()->addChild(groupLayer);
+  displayList->root()->draw(canvas);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/LayerMaskBlur"));
 }
 
 TGFX_TEST(SVGExportTest, ClipWithMatrixTransform) {

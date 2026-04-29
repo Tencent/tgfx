@@ -98,42 +98,42 @@ TGFX_TEST(CanvasTest, Clip) {
   auto canvas = surface->getCanvas();
 
   // ========== 1. Initial state ==========
-  EXPECT_EQ(canvas->clipStack->state(), ClipState::WideOpen);
-  EXPECT_TRUE(canvas->clipStack->elements().empty());
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->state(), ClipState::WideOpen);
+                      EXPECT_TRUE(canvas->clipStack->elements().empty()));
 
   // ========== 2. Single rect clip ==========
   canvas->clipRect(Rect::MakeXYWH(10, 20, 100, 80), true);
-  EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
-  EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
-  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(10, 20, 100, 80));
-  EXPECT_TRUE(canvas->clipStack->elements()[0].isAntiAlias());
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
+                      EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
+                      EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(10, 20, 100, 80));
+                      EXPECT_TRUE(canvas->clipStack->elements()[0].isAntiAlias()));
 
   // ========== 3. Redundant clip elimination ==========
   canvas->clipRect(Rect::MakeXYWH(0, 0, 200, 200), true);
-  EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
-  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(10, 20, 100, 80));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
+                      EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(10, 20, 100, 80)));
 
   // ========== 4. Merge: same AA, pixel-aligned ==========
-  auto elemCountBefore = canvas->clipStack->elements().size();
+  TGFX_PRIVATE_ACCESS(auto elemCountBefore = canvas->clipStack->elements().size());
   canvas->clipRect(Rect::MakeXYWH(50, 50, 100, 100), true);
-  EXPECT_EQ(canvas->clipStack->elements().size(), elemCountBefore);
-  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(50, 50, 60, 50));
-  EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->elements().size(), elemCountBefore);
+                      EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(50, 50, 60, 50));
+                      EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect));
 
   // ========== 5. NoMerge: different AA, non-pixel-aligned ==========
   surface = Surface::Make(context, 100, 100);
   canvas = surface->getCanvas();
   canvas->clipRect(Rect::MakeXYWH(10.5f, 20.5f, 50.0f, 50.0f), true);
-  EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
-  elemCountBefore = canvas->clipStack->elements().size();
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
+                      auto elemCountBefore2 = canvas->clipStack->elements().size());
   canvas->clipRect(Rect::MakeXYWH(20.5f, 30.5f, 50.0f, 50.0f), false);
-  EXPECT_EQ(canvas->clipStack->elements().size(), elemCountBefore + 1);
-  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->elements().size(), elemCountBefore2 + 1);
+                      EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex));
 
   // ========== 6. Empty clip ==========
   canvas->save();
   canvas->clipRect(Rect::MakeXYWH(0, 0, 5, 5), true);
-  EXPECT_EQ(canvas->clipStack->state(), ClipState::Empty);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->state(), ClipState::Empty));
   canvas->restore();
 
   // ========== 7. Path clip -> Complex state ==========
@@ -141,37 +141,36 @@ TGFX_TEST(CanvasTest, Clip) {
   Path ovalPath;
   ovalPath.addOval(Rect::MakeXYWH(20, 30, 60, 60));
   canvas->clipPath(ovalPath, false);
-  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
-  auto& lastElem = canvas->clipStack->elements().back();
-  EXPECT_FALSE(lastElem.isAntiAlias());
-  EXPECT_FALSE(lastElem.isRect());
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+                      auto& lastElem = canvas->clipStack->elements().back();
+                      EXPECT_FALSE(lastElem.isAntiAlias()); EXPECT_FALSE(lastElem.isRect()));
   canvas->restore();
 
   // ========== 8. Deferred save ==========
   surface = Surface::Make(context, 100, 100);
   canvas = surface->getCanvas();
   canvas->clipRect(Rect::MakeXYWH(0, 0, 100, 100), true);
-  auto uniqueIDBefore = canvas->clipStack->uniqueID();
-  EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
+  TGFX_PRIVATE_ACCESS(auto uniqueIDBefore = canvas->clipStack->uniqueID();
+                      EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u));
   canvas->save();
   canvas->save();
   canvas->save();
-  EXPECT_EQ(canvas->clipStack->uniqueID(), uniqueIDBefore);
-  EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->uniqueID(), uniqueIDBefore);
+                      EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u));
 
   // ========== 9. Materialize on modify ==========
   canvas->clipRect(Rect::MakeXYWH(20, 20, 60, 60), true);
-  EXPECT_NE(canvas->clipStack->uniqueID(), uniqueIDBefore);
-  EXPECT_EQ(canvas->clipStack->_data->records.size(), 2u);
-  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(20, 20, 60, 60));
+  TGFX_PRIVATE_ACCESS(EXPECT_NE(canvas->clipStack->uniqueID(), uniqueIDBefore);
+                      EXPECT_EQ(canvas->clipStack->_data->records.size(), 2u);
+                      EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(20, 20, 60, 60)));
 
   // ========== 10. Restore ==========
   canvas->restore();
-  EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u));
   canvas->restore();
   canvas->restore();
-  EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
-  EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(0, 0, 100, 100));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->_data->records.size(), 1u);
+                      EXPECT_EQ(canvas->clipStack->bounds(), Rect::MakeXYWH(0, 0, 100, 100)));
 
   // ========== 11. getTotalClip and getTotalClipBounds ==========
   surface = Surface::Make(context, 100, 100);
@@ -191,9 +190,9 @@ TGFX_TEST(CanvasTest, Clip) {
   surface = Surface::Make(context, 100, 100);
   canvas = surface->getCanvas();
   canvas->clipRect(Rect::MakeXYWH(0, 0, 100, 100), true);
-  EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
-  canvas->clipStack->transform(Matrix::MakeRotate(45.0f));
-  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->state(), ClipState::Rect);
+                      canvas->clipStack->transform(Matrix::MakeRotate(45.0f));
+                      EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex));
 
   // ========== 13. Duplicate non-rect clipPath elimination ==========
   surface = Surface::Make(context, 100, 100);
@@ -201,12 +200,12 @@ TGFX_TEST(CanvasTest, Clip) {
   Path rrectPath = {};
   rrectPath.addRoundRect(Rect::MakeLTRB(10, 10, 90, 90), 10, 10);
   canvas->clipPath(rrectPath);
-  EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
-  EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
+                      EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex));
   canvas->clipPath(rrectPath);
-  EXPECT_EQ(canvas->clipStack->elements().size(), 1u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->elements().size(), 1u));
   canvas->clipPath(rrectPath, false);
-  EXPECT_EQ(canvas->clipStack->elements().size(), 2u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->elements().size(), 2u));
 
   // ========== 14. Screenshot: AA vs non-AA ==========
   // Note: When the path bounds are small, texture-based rasterization is used internally
@@ -257,6 +256,7 @@ TGFX_TEST(CanvasTest, Clip) {
   }
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DuplicateClipPath"));
 
+  // ========== 16. Screenshot: uniqueID update on Empty state transition ==========
   // Verify that ClipStack updates its uniqueID when transitioning to Empty state, preventing
   // incorrect draw op batching due to stale uniqueID comparison.
   surface = Surface::Make(context, 100, 100);
@@ -279,6 +279,105 @@ TGFX_TEST(CanvasTest, Clip) {
     canvas->drawRect(Rect::MakeXYWH(25, 25, 50, 50), paint);
   }
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/EmptyClipMerge"));
+
+  // ========== 17. Screenshot: Inverse-fill clip covering current clip bounds ==========
+  // An inverse-fill path's keep-region is the complement of its geometric shape.
+  // When the shape covers the current clip bounds, the combined clip should become empty.
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->clipRect(Rect::MakeWH(100, 100));
+  {
+    Path inverseCanvas = {};
+    inverseCanvas.addRect(Rect::MakeLTRB(-10, -10, 110, 110));
+    inverseCanvas.toggleInverseFillType();
+    canvas->clipPath(inverseCanvas);
+    Paint paint = {};
+    paint.setColor(Color::Red());
+    canvas->drawRect(Rect::MakeWH(100, 100), paint);
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/InverseFillClip"));
+
+  // ========== 18. Inverse + inverse clip absorption ==========
+  // Two inverse-fill clips whose shapes are nested: the outer shape's keep-region
+  // (= everything outside outer) is a subset of the inner shape's keep-region
+  // (= everything outside inner). So the inner-shape element is redundant and
+  // gets invalidated, while the outer-shape element and the original clipRect
+  // remain valid.
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeWH(100, 100));
+  {
+    Path innerInverse = {};
+    innerInverse.addRect(Rect::MakeLTRB(40, 40, 60, 60));
+    innerInverse.toggleInverseFillType();
+    canvas->clipPath(innerInverse);
+    Path outerInverse = {};
+    outerInverse.addRect(Rect::MakeLTRB(20, 20, 80, 80));
+    outerInverse.toggleInverseFillType();
+    canvas->clipPath(outerInverse);
+  }
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex); {
+    const auto& elems = canvas->clipStack->elements();
+    ASSERT_EQ(elems.size(), 2u);
+    // [0] is the initial clipRect, untouched.
+    EXPECT_TRUE(elems[0].isValid());
+    EXPECT_FALSE(elems[0].path().isInverseFillType());
+    EXPECT_EQ(elems[0].bounds(), Rect::MakeWH(100, 100));
+    // [1] was innerInverse originally; outerInverse's BOnly verdict invalidated
+    // innerInverse, and appendElement reused the freed slot for outerInverse.
+    EXPECT_TRUE(elems[1].isValid());
+    EXPECT_TRUE(elems[1].path().isInverseFillType());
+    EXPECT_EQ(elems[1].path().getBounds(), Rect::MakeLTRB(20, 20, 80, 80));
+  });
+
+  // ========== 19. Non-inverse clip falls entirely inside inverse-fill's removed shape ==========
+  // The new clipRect's keep-region lies entirely inside the inverse-fill clip's
+  // removed shape, so the two keep-regions are disjoint and the combined clip
+  // becomes empty.
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeWH(100, 100));
+  {
+    Path inverseHole = {};
+    inverseHole.addRect(Rect::MakeLTRB(20, 20, 80, 80));
+    inverseHole.toggleInverseFillType();
+    canvas->clipPath(inverseHole);
+  }
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex));
+  canvas->clipRect(Rect::MakeLTRB(30, 30, 70, 70));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->state(), ClipState::Empty));
+
+  // ========== 20. Inverse clip partially overlapping non-inverse rect ==========
+  // The non-inverse clipRect's bounds partially overlap the inverse-fill's
+  // removed shape. Neither side contains the other's keep-region, so both
+  // clips must be retained. This exercises tightContains's "this inverse,
+  // other non-inverse" branch returning false, without short-circuiting to
+  // Empty via looseIntersects.
+  surface = Surface::Make(context, 100, 100);
+  canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeWH(100, 100));
+  {
+    Path inverseHole = {};
+    inverseHole.addRect(Rect::MakeLTRB(20, 20, 80, 80));
+    inverseHole.toggleInverseFillType();
+    canvas->clipPath(inverseHole);
+  }
+  canvas->clipRect(Rect::MakeLTRB(10, 10, 40, 40));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(canvas->clipStack->state(), ClipState::Complex); {
+    const auto& elems = canvas->clipStack->elements();
+    ASSERT_EQ(elems.size(), 2u);
+    // [0] is the initial rect after tryCombine absorbs the new clipRect into it.
+    EXPECT_TRUE(elems[0].isValid());
+    EXPECT_FALSE(elems[0].path().isInverseFillType());
+    EXPECT_EQ(elems[0].bounds(), Rect::MakeLTRB(10, 10, 40, 40));
+    // [1] is inverseHole. Both clips survive because neither side's keep-region
+    // contains the other: the rect's bounds straddle the hole's boundary, and
+    // the hole's shape does not cover the rect's bounds.
+    EXPECT_TRUE(elems[1].isValid());
+    EXPECT_TRUE(elems[1].path().isInverseFillType());
+    EXPECT_EQ(elems[1].path().getBounds(), Rect::MakeLTRB(20, 20, 80, 80));
+  });
 }
 
 TGFX_TEST(CanvasTest, DiscardContent) {
@@ -290,21 +389,22 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
-  surface->renderContext->flush();
-  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
-  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
-  EXPECT_TRUE(task->drawOps.size() == 0);
+  TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                      ASSERT_TRUE(drawingBuffer->renderTasks.size() == 1);
+                      auto task =
+                          static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
+                      EXPECT_TRUE(task->drawOps.size() == 0));
 
   Paint paint;
   paint.setColor(Color{0.8f, 0.8f, 0.8f, 0.8f});
   canvas->drawRect(Rect::MakeWH(50, 50), paint);
   paint.setBlendMode(BlendMode::Src);
   canvas->drawRect(Rect::MakeWH(width, height), paint);
-  surface->renderContext->flush();
-  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 2);
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  EXPECT_TRUE(task->drawOps.size() == 0);
+  TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                      ASSERT_TRUE(drawingBuffer->renderTasks.size() == 2);
+                      task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                      EXPECT_TRUE(task->drawOps.size() == 0));
 
   paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
   canvas->drawRect(Rect::MakeWH(50, 50), paint);
@@ -313,10 +413,10 @@ TGFX_TEST(CanvasTest, DiscardContent) {
       Point{0.f, 0.f}, Point{static_cast<float>(width), static_cast<float>(height)},
       {Color{0.f, 1.f, 0.f, 1.f}, Color{0.f, 0.f, 0.f, 1.f}}, {}));
   canvas->drawPaint(paint);
-  surface->renderContext->flush();
-  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 3);
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  EXPECT_TRUE(task->drawOps.size() == 1);
+  TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                      ASSERT_TRUE(drawingBuffer->renderTasks.size() == 3);
+                      task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                      EXPECT_TRUE(task->drawOps.size() == 1));
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DiscardContent"));
 }
@@ -348,12 +448,13 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
       draw = !draw;
     }
   }
-  surface->renderContext->flush();
-  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
-  EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
-  ASSERT_TRUE(task->drawOps.size() == 1);
-  EXPECT_EQ(static_cast<RectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount);
+  TGFX_PRIVATE_ACCESS(
+      surface->renderContext->flush();
+      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+      EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
+      auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
+      ASSERT_TRUE(task->drawOps.size() == 1);
+      EXPECT_EQ(static_cast<RectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount));
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rect"));
 }
@@ -388,13 +489,14 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
       draw = !draw;
     }
   }
-  surface->renderContext->flush();
-  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
-  EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
-  ASSERT_TRUE(task->drawOps.size() == 1);
-  // AA RRects use RRectDrawOp (EllipseGeometryProcessor).
-  EXPECT_EQ(static_cast<RRectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount);
+  TGFX_PRIVATE_ACCESS(
+      surface->renderContext->flush();
+      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+      EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
+      auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
+      ASSERT_TRUE(task->drawOps.size() == 1);
+      // AA RRects use RRectDrawOp (EllipseGeometryProcessor).
+      EXPECT_EQ(static_cast<RRectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount));
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
 }
@@ -607,8 +709,9 @@ TGFX_TEST(CanvasTest, Picture) {
   paint.setImageFilter(nullptr);
   auto imagePicture = recorder.finishRecordingAsPicture();
   ASSERT_TRUE(imagePicture != nullptr);
-  ASSERT_TRUE(imagePicture->drawCount == 1);
-  EXPECT_EQ(imagePicture->getFirstDrawRecord()->type(), PictureRecordType::DrawImage);
+  TGFX_PRIVATE_ACCESS(
+      ASSERT_TRUE(imagePicture->drawCount == 1);
+      EXPECT_EQ(imagePicture->getFirstDrawRecord()->type(), PictureRecordType::DrawImage));
 
   surface = Surface::Make(context, image->width() - 200, image->height() - 200);
   canvas = surface->getCanvas();
@@ -620,8 +723,8 @@ TGFX_TEST(CanvasTest, Picture) {
   pictureImage =
       Image::MakeFrom(singleImageRecord, image->width() - 200, image->height() - 200, &matrix);
   ASSERT_TRUE(pictureImage != nullptr);
-  auto subsetImage = std::static_pointer_cast<SubsetImage>(pictureImage);
-  EXPECT_TRUE(subsetImage->source == image);
+  TGFX_PRIVATE_ACCESS(auto subsetImage = std::static_pointer_cast<SubsetImage>(pictureImage);
+                      EXPECT_TRUE(subsetImage->source == image));
   EXPECT_EQ(singleImageRecord.use_count(), 1);
   pictureImage =
       Image::MakeFrom(singleImageRecord, image->width() - 100, image->height() - 100, &matrix);
@@ -698,15 +801,13 @@ TGFX_TEST(CanvasTest, PictureImageShaderOptimization) {
   canvas->drawRect(rect, paint);
   auto shaderPicture = recorder.finishRecordingAsPicture();
   ASSERT_TRUE(shaderPicture != nullptr);
-  EXPECT_EQ(shaderPicture->drawCount, 1u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(shaderPicture->drawCount, 1u));
 
   // Should be optimized to return the original image
   Point offset = {};
-  auto extractedImage = shaderPicture->asImage(&offset);
-  ASSERT_TRUE(extractedImage != nullptr);
-  EXPECT_TRUE(extractedImage == image);
-  EXPECT_EQ(offset.x, 0.0f);
-  EXPECT_EQ(offset.y, 0.0f);
+  TGFX_PRIVATE_ACCESS(auto extractedImage = shaderPicture->asImage(&offset);
+                      ASSERT_TRUE(extractedImage != nullptr); EXPECT_TRUE(extractedImage == image);
+                      EXPECT_EQ(offset.x, 0.0f); EXPECT_EQ(offset.y, 0.0f));
 
   // Test 2: Rect with ImageShader but different size (should fail optimization)
   canvas = recorder.beginRecording();
@@ -714,8 +815,8 @@ TGFX_TEST(CanvasTest, PictureImageShaderOptimization) {
   rect = Rect::MakeWH(image->width() / 2, image->height() / 2);
   canvas->drawRect(rect, paint);
   shaderPicture = recorder.finishRecordingAsPicture();
-  extractedImage = shaderPicture->asImage(&offset);
-  EXPECT_TRUE(extractedImage == nullptr);
+  TGFX_PRIVATE_ACCESS(extractedImage = shaderPicture->asImage(&offset);
+                      EXPECT_TRUE(extractedImage == nullptr));
 
   // Test 3: Rect with ImageShader but non-zero origin (should fail optimization)
   canvas = recorder.beginRecording();
@@ -723,8 +824,8 @@ TGFX_TEST(CanvasTest, PictureImageShaderOptimization) {
   rect = Rect::MakeXYWH(10, 10, image->width(), image->height());
   canvas->drawRect(rect, paint);
   shaderPicture = recorder.finishRecordingAsPicture();
-  extractedImage = shaderPicture->asImage(&offset);
-  EXPECT_TRUE(extractedImage == nullptr);
+  TGFX_PRIVATE_ACCESS(extractedImage = shaderPicture->asImage(&offset);
+                      EXPECT_TRUE(extractedImage == nullptr));
 
   // Test 4: Rect with ImageShader that has TileMode::Repeat (should fail optimization)
   canvas = recorder.beginRecording();
@@ -733,8 +834,8 @@ TGFX_TEST(CanvasTest, PictureImageShaderOptimization) {
   rect = Rect::MakeWH(image->width(), image->height());
   canvas->drawRect(rect, paint);
   shaderPicture = recorder.finishRecordingAsPicture();
-  extractedImage = shaderPicture->asImage(&offset);
-  EXPECT_TRUE(extractedImage == nullptr);
+  TGFX_PRIVATE_ACCESS(extractedImage = shaderPicture->asImage(&offset);
+                      EXPECT_TRUE(extractedImage == nullptr));
 
   // Test 5: Rect with ImageShader and clip (should be optimized with subset)
   canvas = recorder.beginRecording();
@@ -746,10 +847,10 @@ TGFX_TEST(CanvasTest, PictureImageShaderOptimization) {
   shaderPicture = recorder.finishRecordingAsPicture();
   auto matrix = Matrix::MakeTrans(-100, -100);
   ISize clipSize = {image->width() - 200, image->height() - 200};
-  extractedImage = shaderPicture->asImage(&offset, &matrix, &clipSize);
-  ASSERT_TRUE(extractedImage != nullptr);
-  auto subsetImage = std::static_pointer_cast<SubsetImage>(extractedImage);
-  EXPECT_TRUE(subsetImage->source == image);
+  TGFX_PRIVATE_ACCESS(extractedImage = shaderPicture->asImage(&offset, &matrix, &clipSize);
+                      ASSERT_TRUE(extractedImage != nullptr);
+                      auto subsetImage = std::static_pointer_cast<SubsetImage>(extractedImage);
+                      EXPECT_TRUE(subsetImage->source == image));
   EXPECT_EQ(offset.x, 0.0f);
   EXPECT_EQ(offset.y, 0.0f);
 }
@@ -1153,7 +1254,7 @@ TGFX_TEST(CanvasTest, uninvertibleStateMatrix) {
   paint.setStroke(Stroke(0.f));
 
   auto matrix = Matrix::MakeScale(1E-8f, 1E-8f);
-  EXPECT_TRUE(matrix.invertNonIdentity(nullptr));
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(matrix.invertNonIdentity(nullptr)));
   EXPECT_FALSE(matrix.invertible());
 
   canvas->concat(matrix);
@@ -1442,11 +1543,11 @@ TGFX_TEST(CanvasTest, ScaleTest) {
   EXPECT_TRUE(subsetImage != nullptr);
   auto scaledImage = ScaleImage(subsetImage, 0.9f);
   EXPECT_TRUE(scaledImage != nullptr);
-  EXPECT_TRUE(scaledImage->type() == Image::Type::Subset);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(scaledImage->type() == Image::Type::Subset));
   canvas->drawImage(scaledImage, 10, 10);
   scaledImage = ScaleImage(subsetImage, 0.51f);
   EXPECT_TRUE(scaledImage != nullptr);
-  EXPECT_TRUE(scaledImage->type() == Image::Type::Scaled);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(scaledImage->type() == Image::Type::Scaled));
   canvas->drawImage(scaledImage, 70, 10);
   image = MakeImage("resources/apitest/rgbaaa.png");
   EXPECT_TRUE(image != nullptr);
@@ -1455,11 +1556,11 @@ TGFX_TEST(CanvasTest, ScaleTest) {
   EXPECT_TRUE(image != nullptr);
   auto scaledImage2 = ScaleImage(image, 0.25f);
   EXPECT_TRUE(scaledImage2 != nullptr);
-  EXPECT_TRUE(scaledImage2->type() == Image::Type::RGBAAA);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(scaledImage2->type() == Image::Type::RGBAAA));
   canvas->drawImage(scaledImage2, 10, 100);
   scaledImage2 = ScaleImage(image, 0.3f);
   EXPECT_TRUE(scaledImage2 != nullptr);
-  EXPECT_TRUE(scaledImage2->type() == Image::Type::Scaled);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(scaledImage2->type() == Image::Type::Scaled));
   canvas->drawImage(scaledImage2, 150, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ScaleTest"));
 }
@@ -1887,15 +1988,15 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
   canvas->restore();
 
   // Verify RRectDrawOp with non-AA is used by checking the Op type.
-  surface->renderContext->flush();
-  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
-  EXPECT_EQ(drawingBuffer->renderTasks.size(), 1u);
-  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
-  EXPECT_EQ(task->drawOps.size(), 1u);
-  // All 6 non-AA filled RRects should be batched into a single RRectDrawOp.
-  auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_EQ(rrectOp->rectCount, 6u);
+  TGFX_PRIVATE_ACCESS(
+      surface->renderContext->flush();
+      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+      EXPECT_EQ(drawingBuffer->renderTasks.size(), 1u);
+      auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
+      EXPECT_EQ(task->drawOps.size(), 1u);
+      // All 6 non-AA filled RRects should be batched into a single RRectDrawOp.
+      auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+      EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp); EXPECT_EQ(rrectOp->rectCount, 6u));
 
   // Complex RRect fill: per-corner independent radii.
   // Simple and Complex cannot batch together (different GP and vertex layout).
@@ -2140,13 +2241,14 @@ TGFX_TEST(CanvasTest, NonAARRectOpColorStroke) {
   paint.setColor(Color::Blue());
   canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(200, 50, 120, 80), 20, 20), paint);
 
-  surface->renderContext->flush();
-  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
-  ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
-  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  ASSERT_EQ(task->drawOps.size(), 1u);
-  auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_EQ(rrectOp->rectCount, 2u);
+  TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                      ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
+                      auto task =
+                          static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                      ASSERT_EQ(task->drawOps.size(), 1u);
+                      auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+                      EXPECT_EQ(rrectOp->rectCount, 2u));
   context->flushAndSubmit();
 
   // Row 2: !hasColor + hasStroke (same color batched together)
@@ -2157,13 +2259,13 @@ TGFX_TEST(CanvasTest, NonAARRectOpColorStroke) {
 
   canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(200, 170, 120, 80), 15, 15), paint);
 
-  surface->renderContext->flush();
-  drawingBuffer = context->drawingManager()->getDrawingBuffer();
-  ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  ASSERT_EQ(task->drawOps.size(), 1u);
-  rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_EQ(rrectOp->rectCount, 2u);
+  TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                      drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                      ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
+                      task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                      ASSERT_EQ(task->drawOps.size(), 1u);
+                      rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+                      EXPECT_EQ(rrectOp->rectCount, 2u));
   context->flushAndSubmit();
 
   // Row 3: hasColor + !hasStroke (different colors, fill mode)
@@ -2174,13 +2276,13 @@ TGFX_TEST(CanvasTest, NonAARRectOpColorStroke) {
   paint.setColor(Color::FromRGBA(128, 0, 255));
   canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(200, 300, 120, 80), 20, 20), paint);
 
-  surface->renderContext->flush();
-  drawingBuffer = context->drawingManager()->getDrawingBuffer();
-  ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  ASSERT_EQ(task->drawOps.size(), 1u);
-  rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_EQ(rrectOp->rectCount, 2u);
+  TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                      drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                      ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
+                      task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                      ASSERT_EQ(task->drawOps.size(), 1u);
+                      rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+                      EXPECT_EQ(rrectOp->rectCount, 2u));
   context->flushAndSubmit();
 
   // Row 4: !hasColor + !hasStroke (same color batched together)
@@ -2189,13 +2291,13 @@ TGFX_TEST(CanvasTest, NonAARRectOpColorStroke) {
 
   canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(200, 420, 120, 40), 10, 10), paint);
 
-  surface->renderContext->flush();
-  drawingBuffer = context->drawingManager()->getDrawingBuffer();
-  ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  ASSERT_EQ(task->drawOps.size(), 1u);
-  rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_EQ(rrectOp->rectCount, 2u);
+  TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                      drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                      ASSERT_EQ(drawingBuffer->renderTasks.size(), 1u);
+                      task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                      ASSERT_EQ(task->drawOps.size(), 1u);
+                      rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+                      EXPECT_EQ(rrectOp->rectCount, 2u));
   context->flushAndSubmit();
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpColorStroke"));
@@ -2846,20 +2948,20 @@ TGFX_TEST(CanvasTest, NoiseShaderParameterValidation) {
   EXPECT_EQ(noiseShader->numOctaves, PerlinNoiseShader::MAX_OCTAVES);
 }
 
-TGFX_TEST(CanvasTest, NoiseShaderIsEqual) {
+TGFX_TEST_PRIVATE(CanvasTest, NoiseShaderIsEqual) {
   auto a = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
   auto b = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
   ASSERT_TRUE(a != nullptr && b != nullptr);
-  EXPECT_TRUE(a->isEqual(b.get()));
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(a->isEqual(b.get())));
   // Different noise type.
   auto turb = Shader::MakeTurbulence(0.25f, 0.25f, 3, 6903);
-  EXPECT_FALSE(a->isEqual(turb.get()));
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(a->isEqual(turb.get())));
   // Different seed.
   auto other = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 42);
-  EXPECT_FALSE(a->isEqual(other.get()));
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(a->isEqual(other.get())));
   // Different shader type must not be misinterpreted as a PerlinNoiseShader.
   auto color = Shader::MakeColorShader(Color::Red());
-  EXPECT_FALSE(a->isEqual(color.get()));
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(a->isEqual(color.get())));
 }
 
 TGFX_TEST(CanvasTest, RawNoiseShader) {

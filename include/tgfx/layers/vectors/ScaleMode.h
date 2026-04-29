@@ -21,14 +21,14 @@
 namespace tgfx {
 
 /**
- * ScaleMode specifies how an ImagePattern image is fitted into the target bounding box. Only
- * affects rendering when the ImagePattern uses FillSpace::Relative; in FillSpace::Absolute the
- * stored value is preserved but not used.
+ * ScaleMode specifies how an ImagePattern image is fitted into each geometry's bounding box.
  */
 enum class ScaleMode {
   /**
-   * The image is not scaled. It is placed at the top-left corner of the bounding box and tiled
-   * according to the pattern's tile modes.
+   * The image is not fitted to each geometry's bounding box. It is placed in the parent
+   * container's (VectorLayer or VectorGroup) coordinate space and tiled according to the
+   * pattern's tile modes. Use this mode when multiple geometries should share a single
+   * continuous image layout rather than each one receiving its own fitted copy.
    */
   None,
 

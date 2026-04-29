@@ -120,6 +120,8 @@ class SVGExportContext : public DrawContext {
 
   void applyClipPath(const Path& clipPath);
 
+  std::string defineClipPath(const Path& clipPath);
+
   static SVGPathParser::PathEncoding PathEncodingType();
 
   uint32_t exportFlags = {};
