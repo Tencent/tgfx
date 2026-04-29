@@ -184,6 +184,7 @@ bool Path::isRRect(RRect* rRect) const {
       const auto r = skRRect.radii(static_cast<SkRRect::Corner>(i));
       cornerRadii[i] = {r.fX, r.fY};
     }
+    // Re-normalize to stay within RRect's invariants.
     rRect->setRectRadii(rect, cornerRadii);
   }
   return true;

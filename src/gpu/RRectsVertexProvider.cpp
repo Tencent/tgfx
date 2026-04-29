@@ -81,6 +81,8 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
                                                std::move(colorSpace));
 }
 
+// Returns 1/value, or a large sentinel when value is exactly zero, to avoid division by zero in
+// shaders.
 static float FloatInvert(float value) {
   return value == 0.0f ? 1e6f : 1 / value;
 }
@@ -90,6 +92,8 @@ struct StrokeParams {
   float halfStrokeY = 0.0f;
 };
 
+// Applies viewMatrix axis scales to the rrect's local radii and stroke, and reduces viewMatrix to
+// the residual rotation/translation.
 static StrokeParams ApplyScales(RRect* rRect, Matrix* viewMatrix, const Point& scales,
                                 const Stroke* stroke) {
   rRect->scale(scales.x, scales.y);
@@ -103,6 +107,8 @@ static StrokeParams ApplyScales(RRect* rRect, Matrix* viewMatrix, const Point& s
   return params;
 }
 
+// Returns a ColorSpaceXformSteps that converts from sRGB to dstColorSpace, or nullptr when
+// per-vertex colors are absent or conversion is unnecessary.
 static std::unique_ptr<ColorSpaceXformSteps> MakeColorSpaceXformStepsIfNeeded(
     bool hasColor, const std::shared_ptr<ColorSpace>& dstColorSpace) {
   if (!hasColor || !NeedConvertColorSpace(ColorSpace::SRGB(), dstColorSpace)) {
@@ -400,6 +406,7 @@ void RRectsVertexProvider::getComplexAAVertices(float* vertices) const {
   auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
 
   for (auto& record : rects) {
+    DEBUG_ASSERT(record->rRect.type() == RRect::Type::Complex);
     auto viewMatrix = record->viewMatrix;
     auto rRect = record->rRect;
     auto scales = viewMatrix.getAxisScales();
@@ -419,6 +426,7 @@ void RRectsVertexProvider::getComplexAAVertices(float* vertices) const {
                                                    outerXRadii, outerYRadii, recipRadii);
     // Overstroke RRects (inner radius <= 0) are not supported here and must be filtered
     // out by callers.
+    DEBUG_ASSERT(!isOverstroked || !stroke);
     bool stroked = stroke != nullptr && !isOverstroked;
     auto rectBounds = rRect.rect();
     if (stroke) {

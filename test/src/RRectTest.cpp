@@ -31,15 +31,15 @@ TGFX_TEST(RRectTest, SetRectXY) {
   EXPECT_EQ(rRect.radii()[2], (Point{10, 15}));
   EXPECT_EQ(rRect.radii()[3], (Point{10, 15}));
 
-  // Zero radii → Rect type.
+  // Zero radii -> Rect type.
   rRect.setRectXY(Rect::MakeWH(100, 80), 0, 0);
   EXPECT_EQ(rRect.type(), RRect::Type::Rect);
 
-  // Radii filling the rect → Oval type.
+  // Radii filling the rect -> Oval type.
   rRect.setRectXY(Rect::MakeWH(100, 80), 50, 40);
   EXPECT_EQ(rRect.type(), RRect::Type::Oval);
 
-  // Radii exceeding rect size → clamped proportionally. The clamped x radius (40) is less than
+  // Radii exceeding rect size -> clamped proportionally. The clamped x radius (40) is less than
   // halfWidth (50), so the result is still Simple rather than Oval.
   rRect.setRectXY(Rect::MakeWH(100, 80), 200, 200);
   EXPECT_EQ(rRect.type(), RRect::Type::Simple);
@@ -55,19 +55,19 @@ TGFX_TEST(RRectTest, SetOval) {
 }
 
 TGFX_TEST(RRectTest, SetRectRadii_Complex) {
-  // Different corners → Complex type.
+  // Different corners -> Complex type.
   auto rRect =
-      RRect::MakeRectRadii(Rect::MakeWH(100, 80), {{{20, 20}, {10, 10}, {0, 0}, {30, 30}}});
+      RRect::MakeRectRadii(Rect::MakeWH(100, 80), {{{20, 20}, {10, 10}, {5, 5}, {30, 30}}});
   EXPECT_EQ(rRect.type(), RRect::Type::Complex);
   EXPECT_EQ(rRect.radii()[0], (Point{20, 20}));
   EXPECT_EQ(rRect.radii()[1], (Point{10, 10}));
-  EXPECT_EQ(rRect.radii()[2], (Point{0, 0}));
+  EXPECT_EQ(rRect.radii()[2], (Point{5, 5}));
   EXPECT_EQ(rRect.radii()[3], (Point{30, 30}));
 }
 
 TGFX_TEST(RRectTest, RadiiScaling) {
   // Adjacent corner radii that exceed the edge length should be scaled down proportionally.
-  // Top edge: TL.x + TR.x = 60 + 60 = 120 > 100 → scale factor = 100/120 ≈ 0.833
+  // Top edge: TL.x + TR.x = 60 + 60 = 120 > 100, so scale factor = 100/120 ~= 0.833.
   auto rRect =
       RRect::MakeRectRadii(Rect::MakeWH(100, 100), {{{60, 10}, {60, 10}, {10, 10}, {10, 10}}});
   // All radii should be scaled by the same factor.

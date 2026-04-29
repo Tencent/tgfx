@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLComplexNonAARRectGeometryProcessor.h"
-#include "gpu/glsl/GLSLRRect.h"
 
 namespace tgfx {
 PlacementPtr<ComplexNonAARRectGeometryProcessor> ComplexNonAARRectGeometryProcessor::Make(
@@ -88,24 +87,57 @@ void GLSLComplexNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("vec4 yR = %s;", yRadiiVarying.fsIn().c_str());
   fragBuilder->codeAppendf("vec4 bounds = %s;", boundsVarying.fsIn().c_str());
 
-  // Select the corner radii based on which quadrant the pixel is in.
-  // xR/yR order: [TL, TR, BR, BL]
-  fragBuilder->codeAppend("vec2 center = (bounds.xy + bounds.zw) * 0.5;");
-  fragBuilder->codeAppend("vec2 p = localCoord - center;");
-  fragBuilder->codeAppend("float rx, ry;");
-  fragBuilder->codeAppend("if (p.x < 0.0) {");
-  fragBuilder->codeAppend("  rx = (p.y < 0.0) ? xR.x : xR.w;");
-  fragBuilder->codeAppend("  ry = (p.y < 0.0) ? yR.x : yR.w;");
-  fragBuilder->codeAppend("} else {");
-  fragBuilder->codeAppend("  rx = (p.y < 0.0) ? xR.y : xR.z;");
-  fragBuilder->codeAppend("  ry = (p.y < 0.0) ? yR.y : yR.z;");
-  fragBuilder->codeAppend("}");
-  fragBuilder->codeAppend("vec2 radii = vec2(rx, ry);");
+  // For each corner, test whether the fragment lies in the axis-aligned box spanning
+  // from the rect corner to that corner's arc center; ScaleRadii guarantees the four boxes
+  // do not overlap, so at most one test fires. Inside a corner box we evaluate that
+  // corner's local ellipse; outside all of them the fragment sits on an edge or in the
+  // center and is always inside the rect (fill) or needs an inner-rect test (stroke).
+  // xR/yR order: [TL, TR, BR, BL].
+  fragBuilder->codeAppend("vec4 cornersX = vec4(bounds.x, bounds.z, bounds.z, bounds.x);");
+  fragBuilder->codeAppend("vec4 cornersY = vec4(bounds.y, bounds.y, bounds.w, bounds.w);");
+  fragBuilder->codeAppend("vec4 signsX = vec4(1.0, -1.0, -1.0, 1.0);");
+  fragBuilder->codeAppend("vec4 signsY = vec4(1.0, 1.0, -1.0, -1.0);");
+  fragBuilder->codeAppend("vec4 dx = (vec4(localCoord.x) - cornersX) * signsX;");
+  fragBuilder->codeAppend("vec4 dy = (vec4(localCoord.y) - cornersY) * signsY;");
+  // dx and dy are always non-negative because the quad covers exactly the (possibly
+  // stroke-outset) rect, so the lower bound checks are omitted.
+  fragBuilder->codeAppend("vec4 inBox = step(dx, xR) * step(dy, yR);");
+  fragBuilder->codeAppend("float inAnyCorner = clamp(dot(inBox, vec4(1.0)), 0.0, 1.0);");
+  // Selected corner's arc center and radii (in local coordinates).
+  fragBuilder->codeAppend("vec4 arcCentersX = cornersX + signsX * xR;");
+  fragBuilder->codeAppend("vec4 arcCentersY = cornersY + signsY * yR;");
+  fragBuilder->codeAppend(
+      "vec2 arcCenter = vec2(dot(inBox, arcCentersX), dot(inBox, arcCentersY));");
+  fragBuilder->codeAppend("vec2 radii = max(vec2(dot(inBox, xR), dot(inBox, yR)), vec2(1e-6));");
 
-  // Calculate outer round rect coverage using SDF
-  fragBuilder->codeAppend("vec2 halfSize = (bounds.zw - bounds.xy) * 0.5;");
-  EmitRRectSDFCoverage(fragBuilder, "p", stroke,
-                       stroke ? strokeWidthVarying.fsIn().c_str() : nullptr);
+  // Outer coverage: inside the owning corner ellipse, or anywhere outside all corner boxes
+  // (edge/center region).
+  fragBuilder->codeAppend("vec2 ellipseOffset = (localCoord - arcCenter) / radii;");
+  fragBuilder->codeAppend("float insideEllipse = step(dot(ellipseOffset, ellipseOffset), 1.0);");
+  fragBuilder->codeAppend("float outerCoverage = mix(1.0, insideEllipse, inAnyCorner);");
+
+  if (stroke) {
+    fragBuilder->codeAppendf("vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
+    // Inner coverage: for corner fragments, test the inner ellipse (same center, radii
+    // shrunk by the full stroke width); for edge/center fragments, test the inner rect
+    // (rect shrunk by the full stroke width on each side).
+    fragBuilder->codeAppend("vec2 innerRadii = max(radii - 2.0 * sw, vec2(1e-6));");
+    fragBuilder->codeAppend("vec2 innerEllipseOffset = (localCoord - arcCenter) / innerRadii;");
+    fragBuilder->codeAppend(
+        "float insideInnerEllipse = step(dot(innerEllipseOffset, innerEllipseOffset), 1.0);");
+    fragBuilder->codeAppend("vec2 center = (bounds.xy + bounds.zw) * 0.5;");
+    fragBuilder->codeAppend("vec2 halfSize = (bounds.zw - bounds.xy) * 0.5;");
+    fragBuilder->codeAppend("vec2 innerHalfSize = halfSize - 2.0 * sw;");
+    fragBuilder->codeAppend("vec2 p = abs(localCoord - center);");
+    fragBuilder->codeAppend(
+        "float insideInnerRect = step(0.0, innerHalfSize.x) * step(0.0, innerHalfSize.y)"
+        " * step(p.x, innerHalfSize.x) * step(p.y, innerHalfSize.y);");
+    fragBuilder->codeAppend(
+        "float innerCoverage = mix(insideInnerRect, insideInnerEllipse, inAnyCorner);");
+    fragBuilder->codeAppend("float coverage = outerCoverage * (1.0 - innerCoverage);");
+  } else {
+    fragBuilder->codeAppend("float coverage = outerCoverage;");
+  }
 
   fragBuilder->codeAppendf("%s = vec4(coverage);", args.outputCoverage.c_str());
 }

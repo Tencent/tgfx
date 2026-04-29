@@ -283,9 +283,10 @@ static bool HasSharpCorner(const RRect& rRect) {
  */
 static bool UseDrawPath(const Paint& paint, const RRect& rRect, bool hasSharpCorner,
                         const Matrix& viewMatrix) {
-  // Sharp (sub-half-pixel) corners make the ellipse implicit equation degenerate: at zero
-  // radius the equation is undefined, and under stroke the inner ellipse radius would become
-  // negative. Fall back to drawPath so the sharp geometry renders correctly.
+  // Sharp corners (sub-half-unit local radius on either axis) make the ellipse implicit
+  // equation degenerate: at zero radius the equation is undefined, and under stroke the
+  // inner ellipse radius would become negative. Fall back to drawPath so the sharp
+  // geometry renders correctly.
   if (hasSharpCorner) {
     return true;
   }
@@ -297,12 +298,13 @@ static bool UseDrawPath(const Paint& paint, const RRect& rRect, bool hasSharpCor
   const auto scales = viewMatrix.getAxisScales();
   // Per-axis scaled stroke width: local width multiplied by the x/y axis scale factors
   // extracted from the view matrix.
-  Point halfScaledStroke = {scales.x * stroke->width, scales.y * stroke->width};
-  if (FloatNearlyZero(halfScaledStroke.length())) {
+  const Point scaledStroke = {scales.x * stroke->width, scales.y * stroke->width};
+  Point halfScaledStroke = {};
+  if (FloatNearlyZero(scaledStroke.length())) {
     // Hairline stroke (width == 0) falls back to half a pixel on each axis.
-    halfScaledStroke.set(0.5f, 0.5f);
+    halfScaledStroke = {0.5f, 0.5f};
   } else {
-    halfScaledStroke *= 0.5f;
+    halfScaledStroke = scaledStroke * 0.5f;
   }
   const auto halfScaledStrokeLen = halfScaledStroke.length();
 
@@ -313,7 +315,9 @@ static bool UseDrawPath(const Paint& paint, const RRect& rRect, bool hasSharpCor
     const auto& r = rRect.radii()[i];
     const auto xRadius = scales.x * r.x;
     const auto yRadius = scales.y * r.y;
-    // Half of stroke width is greater than radius.
+    // Half stroke width exceeds corner radius: the inner offset ellipse collapses
+    // (inner radius would be non-positive), so the concentric-ellipse approximation
+    // cannot be constructed.
     if (halfScaledStroke.x > xRadius || halfScaledStroke.y > yRadius) {
       return true;
     }
@@ -322,7 +326,9 @@ static bool UseDrawPath(const Paint& paint, const RRect& rRect, bool hasSharpCor
     if (halfScaledStrokeLen > 0.5f && (0.5f * xRadius > yRadius || 0.5f * yRadius > xRadius)) {
       return true;
     }
-    // Curvature of the stroke is less than the curvature of the ellipse along either axis.
+    // Stroke width exceeds the ellipse's local curvature radius at a short-axis endpoint
+    // (b*b/a on x-axis, a*a/b on y-axis). The inner offset curve would self-intersect,
+    // so the concentric-ellipse approximation breaks down.
     if (halfScaledStroke.x * yRadius * yRadius <
         halfScaledStroke.y * halfScaledStroke.y * xRadius) {
       return true;

@@ -1988,15 +1988,17 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
   canvas->restore();
 
   // Verify RRectDrawOp with non-AA is used by checking the Op type.
-  TGFX_PRIVATE_ACCESS(
-      surface->renderContext->flush();
-      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
-      EXPECT_EQ(drawingBuffer->renderTasks.size(), 1u);
-      auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
-      EXPECT_EQ(task->drawOps.size(), 1u);
-      // All 6 non-AA filled RRects should be batched into a single RRectDrawOp.
-      auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-      EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp); EXPECT_EQ(rrectOp->rectCount, 6u));
+  {
+    TGFX_PRIVATE_ACCESS(
+        surface->renderContext->flush();
+        auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+        EXPECT_EQ(drawingBuffer->renderTasks.size(), 1u);
+        auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
+        EXPECT_EQ(task->drawOps.size(), 1u);
+        // All 6 non-AA filled RRects should be batched into a single RRectDrawOp.
+        auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+        EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp); EXPECT_EQ(rrectOp->rectCount, 6u));
+  }
 
   // Complex RRect fill: per-corner independent radii.
   // Simple and Complex cannot batch together (different GP and vertex layout).
@@ -2005,12 +2007,22 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
                                           {{{30, 30}, {10, 10}, {5, 5}, {20, 20}}});
   EXPECT_EQ(complexFill.type(), RRect::Type::Complex);
   canvas->drawRRect(complexFill, paint);
-  surface->renderContext->flush();
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  auto* complexOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_EQ(complexOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(complexOp->isComplex);
-  EXPECT_EQ(complexOp->rectCount, 1u);
+
+  // Complex RRect with a corner x-radius greater than halfWidth.
+  paint.setColor(Color::FromRGBA(50, 50, 200, 255));
+  auto oversizedRRect = RRect::MakeRectRadii(Rect::MakeXYWH(220, 380, 100, 100),
+                                             {{{80, 30}, {20, 30}, {20, 30}, {80, 30}}});
+  EXPECT_EQ(oversizedRRect.type(), RRect::Type::Complex);
+  canvas->drawRRect(oversizedRRect, paint);
+  TGFX_PRIVATE_ACCESS({
+    surface->renderContext->flush();
+    auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+    auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+    auto* complexOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+    EXPECT_EQ(complexOp->type(), DrawOp::Type::RRectDrawOp);
+    EXPECT_TRUE(complexOp->isComplex);
+    EXPECT_EQ(complexOp->rectCount, 2u);
+  });
 
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOp"));
@@ -2104,12 +2116,23 @@ TGFX_TEST(CanvasTest, NonAARRectOpStroke) {
                                             {{{15, 11}, {20, 13}, {18, 16}, {12, 9}}});
   EXPECT_EQ(complexStroke.type(), RRect::Type::Complex);
   canvas->drawRRect(complexStroke, paint);
-  surface->renderContext->flush();
-  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
-  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  auto* complexOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_EQ(complexOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(complexOp->isComplex);
+
+  // Fourth row, column 2: Complex stroke with a corner radius greater than halfWidth
+  // and halfHeight.
+  paint.setColor(Color::FromRGBA(0, 80, 200, 255));
+  auto oversizedRRect = RRect::MakeRectRadii(Rect::MakeXYWH(180, 400, 100, 60),
+                                             {{{70, 35}, {20, 15}, {20, 15}, {30, 25}}});
+  EXPECT_EQ(oversizedRRect.type(), RRect::Type::Complex);
+  canvas->drawRRect(oversizedRRect, paint);
+  TGFX_PRIVATE_ACCESS({
+    surface->renderContext->flush();
+    auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+    auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+    auto* complexOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+    EXPECT_EQ(complexOp->type(), DrawOp::Type::RRectDrawOp);
+    EXPECT_TRUE(complexOp->isComplex);
+    EXPECT_EQ(complexOp->rectCount, 2u);
+  });
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOpStroke"));
 }
@@ -2307,7 +2330,7 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  constexpr int margin = 30;
+  constexpr int margin = 50;
   constexpr int gap = 30;
   constexpr int cellWidth = 100;
   constexpr int cellHeight = 80;
@@ -2324,7 +2347,6 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   Paint strokePaint;
   strokePaint.setStyle(PaintStyle::Stroke);
   const auto rect = Rect::MakeXYWH(0, 0, cellWidth, cellHeight);
-  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
 
   // Case 1: Complex filled RRect drawing and RRect batching strategy.
   canvas->save();
@@ -2338,15 +2360,18 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   EXPECT_EQ(rRect1B.type(), RRect::Type::Simple);
   canvas->drawRRect(rRect1B, fillPaint);
   canvas->restore();
-  surface->renderContext->flush();
-  auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  // Complex and Simple RRects cannot batch into the same Op, so each stays as its own DrawOp.
-  ASSERT_EQ(task->drawOps.size(), 2u);
-  auto* complexOp = static_cast<RRectDrawOp*>(task->drawOps.front().get());
-  EXPECT_EQ(complexOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(complexOp->isComplex);
-  auto* simpleOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_FALSE(simpleOp->isComplex);
+  {
+    TGFX_PRIVATE_ACCESS(
+        surface->renderContext->flush();
+        auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+        auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+        // Complex and Simple RRects cannot batch into the same Op, so each stays as its own DrawOp.
+        ASSERT_EQ(task->drawOps.size(), 2u);
+        auto* complexOp = static_cast<RRectDrawOp*>(task->drawOps.front().get());
+        EXPECT_EQ(complexOp->type(), DrawOp::Type::RRectDrawOp); EXPECT_TRUE(complexOp->isComplex);
+        auto* simpleOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+        EXPECT_FALSE(simpleOp->isComplex));
+  }
 
   // Case 2: Stroked RRect fallback when halfStroke exceeds a corner radius.
   canvas->save();
@@ -2357,9 +2382,13 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   EXPECT_EQ(rRect2.type(), RRect::Type::Complex);
   canvas->drawRRect(rRect2, strokePaint);
   canvas->restore();
-  surface->renderContext->flush();
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
+  {
+    TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                        auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                        auto* task =
+                            static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                        EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp));
+  }
 
   // Case 3: Stroked RRect fallback when a corner ellipse is too elongated.
   canvas->save();
@@ -2370,9 +2399,13 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   EXPECT_EQ(rRect3.type(), RRect::Type::Complex);
   canvas->drawRRect(rRect3, strokePaint);
   canvas->restore();
-  surface->renderContext->flush();
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
+  {
+    TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                        auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                        auto* task =
+                            static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                        EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp));
+  }
 
   // Case 4: Stroked RRect fallback from the anisotropic stroke curvature check.
   canvas->save();
@@ -2383,9 +2416,13 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   EXPECT_EQ(rRect4.type(), RRect::Type::Complex);
   canvas->drawRRect(rRect4, strokePaint);
   canvas->restore();
-  surface->renderContext->flush();
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
+  {
+    TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                        auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                        auto* task =
+                            static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                        EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp));
+  }
 
   // Case 5: Complex stroked RRect that passes all fallback checks.
   const auto rRect5Radii = std::array<Point, 4>{{{10, 10}, {25, 15}, {15, 20}, {20, 25}}};
@@ -2397,11 +2434,14 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   EXPECT_EQ(rRect5.type(), RRect::Type::Complex);
   canvas->drawRRect(rRect5, strokePaint);
   canvas->restore();
-  surface->renderContext->flush();
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  auto* op5 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_EQ(op5->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(op5->isComplex);
+  {
+    TGFX_PRIVATE_ACCESS(
+        surface->renderContext->flush();
+        auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+        auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+        auto* op5 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+        EXPECT_EQ(op5->type(), DrawOp::Type::RRectDrawOp); EXPECT_TRUE(op5->isComplex));
+  }
 
   // Case 6: Case 5 under non-uniform scale and rotation, verifying the RRect draw path still
   // works correctly.
@@ -2415,11 +2455,14 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   EXPECT_EQ(rRect6.type(), RRect::Type::Complex);
   canvas->drawRRect(rRect6, strokePaint);
   canvas->restore();
-  surface->renderContext->flush();
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  auto* op6 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_EQ(op6->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(op6->isComplex);
+  {
+    TGFX_PRIVATE_ACCESS(
+        surface->renderContext->flush();
+        auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+        auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+        auto* op6 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+        EXPECT_EQ(op6->type(), DrawOp::Type::RRectDrawOp); EXPECT_TRUE(op6->isComplex));
+  }
 
   // Case 7: Case 5 rotated by the special 90-degree angle, verifying the RRect draw path still
   // works correctly.
@@ -2431,11 +2474,14 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   EXPECT_EQ(rRect7.type(), RRect::Type::Complex);
   canvas->drawRRect(rRect7, strokePaint);
   canvas->restore();
-  surface->renderContext->flush();
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  auto* op7 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_EQ(op7->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(op7->isComplex);
+  {
+    TGFX_PRIVATE_ACCESS(
+        surface->renderContext->flush();
+        auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+        auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+        auto* op7 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+        EXPECT_EQ(op7->type(), DrawOp::Type::RRectDrawOp); EXPECT_TRUE(op7->isComplex));
+  }
 
   // Case 8: Filled RRect fallback triggered by a sharp (zero-radius) corner.
   canvas->save();
@@ -2445,9 +2491,13 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   EXPECT_EQ(rRect8.type(), RRect::Type::Complex);
   canvas->drawRRect(rRect8, fillPaint);
   canvas->restore();
-  surface->renderContext->flush();
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
+  {
+    TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                        auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                        auto* task =
+                            static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                        EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp));
+  }
 
   // Case 9: Stroked RRect fallback triggered by a sharp (zero-radius) corner.
   canvas->save();
@@ -2458,9 +2508,13 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   EXPECT_EQ(rRect9.type(), RRect::Type::Complex);
   canvas->drawRRect(rRect9, strokePaint);
   canvas->restore();
-  surface->renderContext->flush();
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
+  {
+    TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                        auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                        auto* task =
+                            static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                        EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp));
+  }
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AARRectOp"));
 }

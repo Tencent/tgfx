@@ -142,8 +142,8 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   // Row 3: Rectangle with per-corner roundness
 
   // Group 7: Rectangle with four different corner radii (complex RRect path)
-  auto group7 = std::make_shared<VectorGroup>();
-  auto perCornerRect = std::make_shared<Rectangle>();
+  auto group7 = VectorGroup::Make();
+  auto perCornerRect = Rectangle::Make();
   perCornerRect->setPosition({130, 530});
   perCornerRect->setSize({200, 160});
   perCornerRect->setRoundness({60, 30, 10, 40});

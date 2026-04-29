@@ -62,15 +62,22 @@ class Rectangle : public VectorElement {
 
   /**
    * Returns the per-corner roundness in the order [top-left, top-right, bottom-right, bottom-left].
-   * A value of 0 means sharp corners.
+   * A value of 0 means sharp corners. Values are the raw inputs passed to setRoundness(), not the
+   * effective post-scaling radii: negative-value clamping and proportional scale-down for adjacent
+   * radii that exceed an edge length are applied at render time.
    */
   const std::array<float, 4>& roundness() const {
     return _roundness;
   }
 
   /**
-   * Sets the roundness for each corner individually. Values are scaled down proportionally if
-   * adjacent corners overlap along any edge.
+   * Sets the same roundness for all four corners.
+   * @param value  roundness applied uniformly to all corners
+   */
+  void setRoundness(float value);
+
+  /**
+   * Sets the per-corner roundness.
    * @param values  per-corner roundness in the order [top-left, top-right, bottom-right,
    *                bottom-left]
    */

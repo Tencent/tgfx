@@ -44,6 +44,10 @@ void Rectangle::setSize(const Size& value) {
   invalidateContent();
 }
 
+void Rectangle::setRoundness(float value) {
+  setRoundness(std::array<float, 4>{value, value, value, value});
+}
+
 void Rectangle::setRoundness(const std::array<float, 4>& values) {
   if (_roundness == values) {
     return;

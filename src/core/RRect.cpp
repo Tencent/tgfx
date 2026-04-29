@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/RRect.h"
-#include <algorithm>
 
 namespace tgfx {
 
@@ -109,29 +108,11 @@ static inline RRect::Type ComputeType(const Rect& rect, const std::array<Point, 
 }
 
 void RRect::setRectXY(const Rect& rect, float radiusX, float radiusY) {
-  _rect = rect.makeSorted();
   if (radiusX < 0 || radiusY < 0) {
     radiusX = radiusY = 0;
   }
-  if (_rect.width() < radiusX + radiusX || _rect.height() < radiusY + radiusY) {
-    float scale =
-        std::min(_rect.width() / (radiusX + radiusX), _rect.height() / (radiusY + radiusY));
-    radiusX *= scale;
-    radiusY *= scale;
-  }
   const auto radius = Point{radiusX, radiusY};
-  _radii = {radius, radius, radius, radius};
-  if (radiusX <= 0 || radiusY <= 0) {
-    _radii = {};
-    _type = Type::Rect;
-  } else if (radiusX >= _rect.width() * 0.5f && radiusY >= _rect.height() * 0.5f) {
-    // Use strict comparison instead of an epsilon tolerance: RRect lives in logical space that
-    // may later be rescaled by an arbitrary transform, so any tolerance chosen here has no
-    // stable pixel-level meaning after the transform.
-    _type = Type::Oval;
-  } else {
-    _type = Type::Simple;
-  }
+  setRectRadii(rect, {radius, radius, radius, radius});
 }
 
 void RRect::setRectRadii(const Rect& rect, const std::array<Point, 4>& radii) {

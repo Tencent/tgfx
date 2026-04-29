@@ -93,16 +93,21 @@ class RRect {
   /**
    * Sets bounds to oval, x-axis radii to half oval.width(), and all y-axis radii to half
    * oval.height().
+   * @param oval  bounds of the oval
    */
   void setOval(const Rect& oval);
 
   /**
    * Scales the round rectangle by scaleX and scaleY.
+   * @param scaleX  horizontal scale factor
+   * @param scaleY  vertical scale factor
    */
   void scale(float scaleX, float scaleY);
 
   /**
    * Translates the round rectangle by (dx, dy) without changing the radii or type.
+   * @param dx  horizontal offset
+   * @param dy  vertical offset
    */
   void offset(float dx, float dy);
 

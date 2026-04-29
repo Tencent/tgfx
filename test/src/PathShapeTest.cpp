@@ -1159,7 +1159,7 @@ TGFX_TEST(PathShapeTest, RoundRectRadii) {
 }
 
 /**
- * Verifies that addRRect() → isRRect() round-trip preserves per-corner radii.
+ * Verifies that addRRect() -> isRRect() round-trip preserves per-corner radii.
  */
 TGFX_TEST(PathShapeTest, RRectPathRoundTrip) {
   auto rect = Rect::MakeWH(200, 120);
@@ -1173,7 +1173,7 @@ TGFX_TEST(PathShapeTest, RRectPathRoundTrip) {
   EXPECT_EQ(simpleOut.radii()[0], simpleIn.radii()[0]);
 
   // Complex RRect round-trip.
-  auto complexIn = RRect::MakeRectRadii(rect, {{{30, 30}, {10, 10}, {20, 20}, {0, 0}}});
+  auto complexIn = RRect::MakeRectRadii(rect, {{{30, 30}, {10, 10}, {20, 20}, {5, 5}}});
   Path complexPath = {};
   complexPath.addRRect(complexIn);
   RRect complexOut = {};

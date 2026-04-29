@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLNonAARRectGeometryProcessor.h"
-#include "gpu/glsl/GLSLRRect.h"
 
 namespace tgfx {
 PlacementPtr<NonAARRectGeometryProcessor> NonAARRectGeometryProcessor::Make(
@@ -84,11 +83,34 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("vec2 radii = %s;", radiiVarying.fsIn().c_str());
   fragBuilder->codeAppendf("vec4 bounds = %s;", boundsVarying.fsIn().c_str());
 
-  // Calculate outer round rect coverage using SDF
+  // Calculate outer round rect coverage using the symmetric rounded-box SDF.
+  // The abs(p) fold is valid here because all four corners share the same radii.
   fragBuilder->codeAppend("vec2 center = (bounds.xy + bounds.zw) * 0.5;");
   fragBuilder->codeAppend("vec2 halfSize = (bounds.zw - bounds.xy) * 0.5;");
-  EmitRRectSDFCoverage(fragBuilder, "localCoord - center", stroke,
-                       stroke ? strokeWidthVarying.fsIn().c_str() : nullptr);
+  fragBuilder->codeAppend("vec2 p = localCoord - center;");
+  fragBuilder->codeAppend("vec2 q = abs(p) - halfSize + radii;");
+  fragBuilder->codeAppend(
+      "float d = min(max(q.x / radii.x, q.y / radii.y), 0.0) + length(max(q / radii, 0.0)) - 1.0;");
+  fragBuilder->codeAppend("float outerCoverage = step(d, 0.0);");
+
+  if (stroke) {
+    fragBuilder->codeAppendf("vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
+    fragBuilder->codeAppend("vec2 innerHalfSize = halfSize - 2.0 * sw;");
+    fragBuilder->codeAppend("vec2 innerRadii = max(radii - 2.0 * sw, vec2(0.0));");
+    fragBuilder->codeAppend("float innerCoverage = 0.0;");
+    // Skip the inner test when the stroke devours the rect.
+    fragBuilder->codeAppend("if (innerHalfSize.x > 0.0 && innerHalfSize.y > 0.0) {");
+    fragBuilder->codeAppend("  vec2 qi = abs(p) - innerHalfSize + innerRadii;");
+    fragBuilder->codeAppend("  vec2 safeInnerRadii = max(innerRadii, vec2(0.001));");
+    fragBuilder->codeAppend(
+        "  float di = min(max(qi.x / safeInnerRadii.x, qi.y / safeInnerRadii.y), 0.0) + "
+        "length(max(qi / safeInnerRadii, vec2(0.0))) - 1.0;");
+    fragBuilder->codeAppend("  innerCoverage = step(di, 0.0);");
+    fragBuilder->codeAppend("}");
+    fragBuilder->codeAppend("float coverage = outerCoverage * (1.0 - innerCoverage);");
+  } else {
+    fragBuilder->codeAppend("float coverage = outerCoverage;");
+  }
 
   fragBuilder->codeAppendf("%s = vec4(coverage);", args.outputCoverage.c_str());
 }
