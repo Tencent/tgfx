@@ -4931,7 +4931,7 @@ static std::vector<std::shared_ptr<VectorElement>> MakeStrokeAlignCellContents(
     source = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
     align = StrokeAlign::Inside;
   } else if (column == 1) {
-    auto pattern = ImagePattern::Make(image, TileMode::Repeat, TileMode::Repeat);
+    auto pattern = ImagePattern::Make(image, TileMode::Mirror, TileMode::Mirror);
     pattern->setScaleMode(ScaleMode::LetterBox);
     source = pattern;
     align = StrokeAlign::Center;
@@ -4941,7 +4941,7 @@ static std::vector<std::shared_ptr<VectorElement>> MakeStrokeAlignCellContents(
   }
   auto fill = MakeFillStyle(Color::FromRGBA(230, 230, 230, 255));
   auto stroke = StrokeStyle::Make(source);
-  stroke->setStrokeWidth(12.0f);
+  stroke->setStrokeWidth(18.0f);
   stroke->setStrokeAlign(align);
   return {rect, fill, stroke};
 }
