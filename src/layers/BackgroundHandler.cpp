@@ -55,10 +55,10 @@ void BackgroundHandler::DispatchOrSkip(const DrawArgs& args, Canvas* canvas, Lay
   handler->drawBackgroundStyle(args, canvas, layer, alpha, style, source);
 }
 
-void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* /*canvas*/, Layer* layer,
+void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
                                              float /*alpha*/, LayerStyle* style,
                                              const LayerStyleSource* source) {
-  if (snapshots == nullptr || bgSource == nullptr || source == nullptr) {
+  if (snapshots == nullptr || bgSource == nullptr || source == nullptr || canvas == nullptr) {
     return;
   }
   // The consumer computes source->contentScale from `canvas.matrix.getMaxScale()` on the final
@@ -76,9 +76,17 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* /*can
   auto bounds = layer->getBounds();
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
-  auto localToGlobal = layer->getGlobalMatrix().asMatrix();
-  Matrix globalToLocal = Matrix::I();
-  if (!localToGlobal.invert(&globalToLocal)) {
+  // Build layer-local → world from the RUNTIME canvas chain: the capture canvas matrix maps
+  // layer-local → current surface pixel, and the current bgSource's surfaceToWorldMatrix() maps
+  // surface pixel → world. Using the canvas chain keeps capture and consume in the same frame of
+  // reference — an ancestor offscreen carrier that flattens a perspective matrix to pure scale is
+  // seen the same way by both sides. Do NOT fall back to getGlobalMatrix() here: that walks the
+  // static layer tree with per-step z-flattening and diverges from the runtime concat chain when
+  // multiple non-preserve3D perspective matrices stack up.
+  auto localToWorld = bgSource->surfaceToWorldMatrix();
+  localToWorld.preConcat(canvas->getMatrix());
+  Matrix worldToLocal = Matrix::I();
+  if (!localToWorld.invert(&worldToLocal)) {
     return;
   }
   auto bgImage = bgSource->getBackgroundImage();
@@ -88,7 +96,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* /*can
   PictureRecorder recorder = {};
   auto* recording = recorder.beginRecording();
   recording->scale(contentScale, contentScale);
-  recording->concat(globalToLocal);
+  recording->concat(worldToLocal);
   recording->concat(bgSource->backgroundMatrix());
   recording->drawImage(bgImage);
   auto picture = recorder.finishRecordingAsPicture();
