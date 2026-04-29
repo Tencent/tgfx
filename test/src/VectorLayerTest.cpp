@@ -4705,25 +4705,36 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto group5 = VectorGroup::Make();
   group5->setElements({rect5, stroke5});
 
-  // Row 6: Double-zero Rectangle (width=0 AND height=0) keeps area-shape semantics: the path
-  // is the original closed zero-rect (not collapsed to a line segment), and the fit bounds
-  // expand symmetrically on both axes. With Round cap + Center align + a diagonal fit
-  // gradient, the result is a 24px-radius dot showing the full red->blue gradient across its
-  // own bounding square. A regression that forwarded double-zero rects to the line branch
-  // would either emit nothing (Butt cap on a zero-length line) or produce an asymmetric
-  // single-axis fit band.
-  auto rect6 = Rectangle::Make();
-  rect6->setPosition({300, 546});
-  rect6->setSize({0, 0});
-  auto gradient6 = Gradient::MakeLinear({0.0f, 0.0f}, {1.0f, 1.0f}, {Color::Red(), Color::Blue()});
-  auto stroke6 = StrokeStyle::Make(gradient6);
-  stroke6->setStrokeWidth(48.0f);
-  stroke6->setLineCap(LineCap::Round);
-  stroke6->setStrokeAlign(StrokeAlign::Center);
-  auto group6 = VectorGroup::Make();
-  group6->setElements({rect6, stroke6});
+  // Row 6: Double-zero Rectangle (width=0 AND height=0) collapses to a degenerate moveTo+lineTo
+  // with both endpoints overlapping; it stays an open path so LineCap drives whether any pixels
+  // get emitted. Three dots side by side exercise each cap: Butt produces no output on a
+  // zero-length segment, Round renders a 48px-diameter disk, and Square renders a 48px filled
+  // square. All three share the same Center-aligned 48px stroke and a diagonal red->blue fit
+  // gradient so the visible caps show the full gradient across their bounding square.
+  const std::array<std::pair<float, LineCap>, 3> dotCaps = {{
+      {120.0f, LineCap::Butt},
+      {300.0f, LineCap::Round},
+      {480.0f, LineCap::Square},
+  }};
+  std::vector<std::shared_ptr<VectorGroup>> dotGroups;
+  dotGroups.reserve(dotCaps.size());
+  for (const auto& [cx, cap] : dotCaps) {
+    auto dotRect = Rectangle::Make();
+    dotRect->setPosition({cx, 546});
+    dotRect->setSize({0, 0});
+    auto dotGradient =
+        Gradient::MakeLinear({0.0f, 0.0f}, {1.0f, 1.0f}, {Color::Red(), Color::Blue()});
+    auto dotStroke = StrokeStyle::Make(dotGradient);
+    dotStroke->setStrokeWidth(48.0f);
+    dotStroke->setLineCap(cap);
+    dotStroke->setStrokeAlign(StrokeAlign::Center);
+    auto dotGroup = VectorGroup::Make();
+    dotGroup->setElements({dotRect, dotStroke});
+    dotGroups.push_back(dotGroup);
+  }
 
-  vectorLayer->setContents({group1, group2, group3, group4, group5, group6});
+  vectorLayer->setContents(
+      {group1, group2, group3, group4, group5, dotGroups[0], dotGroups[1], dotGroups[2]});
 
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
