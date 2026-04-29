@@ -21,6 +21,7 @@
 #include <cstring>
 #include <vector>
 #include "gpu/vulkan/VulkanBuffer.h"
+#include "gpu/vulkan/VulkanCommandEncoder.h"
 #include "gpu/vulkan/VulkanCommandQueue.h"
 #include "gpu/vulkan/VulkanRenderPipeline.h"
 #include "gpu/vulkan/VulkanResource.h"
@@ -304,8 +305,7 @@ std::shared_ptr<RenderPipeline> VulkanGPU::createRenderPipeline(
 
 std::shared_ptr<CommandEncoder> VulkanGPU::createCommandEncoder() {
   processUnreferencedResources();
-  // TODO: Implement in Phase 3E (VulkanCommandEncoder).
-  return nullptr;
+  return VulkanCommandEncoder::Make(this);
 }
 
 std::vector<std::shared_ptr<Texture>> VulkanGPU::importHardwareTextures(HardwareBufferRef,
