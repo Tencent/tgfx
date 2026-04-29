@@ -334,7 +334,14 @@ void TGFXWindow::applyCenteringTransform() {
 
 void TGFXWindow::draw() {
   if (!tgfxWindow) {
+#ifdef TGFX_USE_VULKAN
+    auto device = tgfx::VulkanDevice::Make();
+    if (device) {
+      tgfxWindow = tgfx::VulkanWindow::MakeFrom(windowHandle, device);
+    }
+#else
     tgfxWindow = tgfx::WGLWindow::MakeFrom(windowHandle);
+#endif
   }
   if (tgfxWindow == nullptr) {
     return;

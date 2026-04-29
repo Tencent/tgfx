@@ -33,7 +33,12 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
+#ifdef TGFX_USE_VULKAN
+#include "tgfx/gpu/vulkan/VulkanDevice.h"
+#include "tgfx/gpu/vulkan/VulkanWindow.h"
+#else
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
+#endif
 #include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {
@@ -51,7 +56,11 @@ class TGFXWindow {
   double lastZoomArgument = 0.0;
   float zoomScale = 1.0f;
   tgfx::Point contentOffset = {0.0f, 0.0f};
+#ifdef TGFX_USE_VULKAN
+  std::shared_ptr<tgfx::VulkanWindow> tgfxWindow = nullptr;
+#else
   std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
+#endif
   std::shared_ptr<tgfx::Surface> surface = nullptr;
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
   tgfx::DisplayList displayList = {};
