@@ -16,30 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <memory>
-#include "tgfx/gpu/Device.h"
+#include "VulkanDevice.h"
+#include "VulkanGPU.h"
 
 namespace tgfx {
 
-/**
- * VulkanDevice manages a VkInstance, VkPhysicalDevice, VkDevice, and VkQueue. It serves as the
- * primary entry point for creating a Vulkan rendering context.
- */
-class VulkanDevice : public Device {
- public:
-  /**
-   * Creates a new VulkanDevice with default settings. Returns nullptr if Vulkan is not available on
-   * the system (e.g., no Vulkan driver installed or required extensions are not supported), allowing
-   * the caller to gracefully fall back to another GPU backend.
-   */
-  static std::shared_ptr<VulkanDevice> Make();
+std::shared_ptr<VulkanDevice> VulkanDevice::Make() {
+  auto gpu = VulkanGPU::Make();
+  if (!gpu) {
+    return nullptr;
+  }
+  auto device = std::shared_ptr<VulkanDevice>(new VulkanDevice(std::move(gpu)));
+  device->weakThis = device;
+  return device;
+}
 
-  ~VulkanDevice() override;
+VulkanDevice::VulkanDevice(std::unique_ptr<VulkanGPU> gpu) : Device(std::move(gpu)) {
+}
 
- private:
-  explicit VulkanDevice(std::unique_ptr<class VulkanGPU> gpu);
-};
+VulkanDevice::~VulkanDevice() {
+  static_cast<VulkanGPU*>(_gpu)->releaseAll(true);
+}
 
 }  // namespace tgfx

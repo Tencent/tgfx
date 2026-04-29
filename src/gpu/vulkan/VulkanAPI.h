@@ -23,4 +23,11 @@
 // loaded dynamically at runtime via volk (volkInitialize → volkLoadInstance → volkLoadDevice).
 
 #define VK_NO_PROTOTYPES
+
+#ifdef _WIN32
+#define VK_USE_PLATFORM_WIN32_KHR
+#elif defined(__ANDROID__)
+#define VK_USE_PLATFORM_ANDROID_KHR
+#endif
+
 #include "volk.h"

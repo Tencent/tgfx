@@ -19,27 +19,38 @@
 #pragma once
 
 #include <memory>
-#include "tgfx/gpu/Device.h"
+#include "gpu/vulkan/VulkanAPI.h"
+#include "tgfx/gpu/CommandQueue.h"
 
 namespace tgfx {
 
-/**
- * VulkanDevice manages a VkInstance, VkPhysicalDevice, VkDevice, and VkQueue. It serves as the
- * primary entry point for creating a Vulkan rendering context.
- */
-class VulkanDevice : public Device {
- public:
-  /**
-   * Creates a new VulkanDevice with default settings. Returns nullptr if Vulkan is not available on
-   * the system (e.g., no Vulkan driver installed or required extensions are not supported), allowing
-   * the caller to gracefully fall back to another GPU backend.
-   */
-  static std::shared_ptr<VulkanDevice> Make();
+class VulkanGPU;
 
-  ~VulkanDevice() override;
+/**
+ * Vulkan command queue implementation.
+ */
+class VulkanCommandQueue : public CommandQueue {
+ public:
+  explicit VulkanCommandQueue(VulkanGPU* gpu);
+
+  ~VulkanCommandQueue() override;
+
+  void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
+                   size_t size) override;
+
+  void writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, const void* pixels,
+                    size_t rowBytes) override;
+
+  void submit(std::shared_ptr<CommandBuffer> commandBuffer) override;
+
+  std::shared_ptr<Semaphore> insertSemaphore() override;
+
+  void waitSemaphore(std::shared_ptr<Semaphore> semaphore) override;
+
+  void waitUntilCompleted() override;
 
  private:
-  explicit VulkanDevice(std::unique_ptr<class VulkanGPU> gpu);
+  VulkanGPU* gpu = nullptr;
 };
 
 }  // namespace tgfx
