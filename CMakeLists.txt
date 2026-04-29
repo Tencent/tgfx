@@ -205,6 +205,13 @@ file(GLOB PLATFORM_COMMON_FILES
         src/platform/*.*)
 list(APPEND TGFX_FILES ${PLATFORM_COMMON_FILES})
 
+if (NOT TGFX_USE_METAL AND NOT TGFX_USE_VULKAN)
+    file(GLOB SHADER_COMPILER_FILES src/gpu/ShaderCompiler.*)
+    if (SHADER_COMPILER_FILES)
+        list(REMOVE_ITEM TGFX_FILES ${SHADER_COMPILER_FILES})
+    endif ()
+endif ()
+
 if (TGFX_BUILD_SVG)
     file(GLOB_RECURSE SVG_FILES
             src/svg/*.*)

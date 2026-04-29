@@ -20,13 +20,11 @@
 
 #include <cstdint>
 
-// When building with Vulkan backend enabled, include the official Vulkan header to get the real
-// type definitions. Otherwise, provide lightweight forward declarations so external code can use
-// VulkanTypes.h without depending on the Vulkan SDK.
-#ifdef TGFX_USE_VULKAN
-#define VK_NO_PROTOTYPES
-#include <vulkan/vulkan_core.h>
-#else
+// These forward declarations use uint32_t to match the ABI of the Vulkan C enums, allowing
+// external users to use VulkanTypes.h without depending on the Vulkan SDK. Internal Vulkan
+// implementation files include vulkan_core.h via VulkanAPI.h before this header, so the guard
+// below prevents duplicate definitions.
+#ifndef VULKAN_CORE_H_
 typedef struct VkImage_T* VkImage;
 typedef struct VkSemaphore_T* VkSemaphore;
 typedef uint32_t VkFormat;
