@@ -20,8 +20,11 @@
 #include <shaderc/shaderc.hpp>
 #include <cstring>
 #include <vector>
+#include "gpu/vulkan/VulkanBuffer.h"
 #include "gpu/vulkan/VulkanCommandQueue.h"
 #include "gpu/vulkan/VulkanResource.h"
+#include "gpu/vulkan/VulkanSampler.h"
+#include "gpu/vulkan/VulkanTexture.h"
 #include "gpu/vulkan/VulkanUtil.h"
 #include "core/utils/Log.h"
 
@@ -253,19 +256,38 @@ int VulkanGPU::getSampleCount(int requestedCount, PixelFormat pixelFormat) const
   return caps->getSampleCount(requestedCount, pixelFormat);
 }
 
-std::shared_ptr<GPUBuffer> VulkanGPU::createBuffer(size_t, uint32_t) {
-  // TODO: Implement in Phase 3C (VulkanBuffer).
-  return nullptr;
+std::shared_ptr<GPUBuffer> VulkanGPU::createBuffer(size_t size, uint32_t usage) {
+  if (size == 0) {
+    return nullptr;
+  }
+  return VulkanBuffer::Make(this, size, usage);
 }
 
-std::shared_ptr<Texture> VulkanGPU::createTexture(const TextureDescriptor&) {
-  // TODO: Implement in Phase 3C (VulkanTexture).
-  return nullptr;
+std::shared_ptr<Texture> VulkanGPU::createTexture(const TextureDescriptor& descriptor) {
+  if (descriptor.width <= 0 || descriptor.height <= 0) {
+    LOGE("VulkanGPU::createTexture() invalid dimensions: %dx%d", descriptor.width,
+         descriptor.height);
+    return nullptr;
+  }
+  if (!isFormatRenderable(descriptor.format) &&
+      (descriptor.usage & TextureUsage::RENDER_ATTACHMENT)) {
+    LOGE("VulkanGPU::createTexture() format not renderable for render attachment");
+    return nullptr;
+  }
+  return VulkanTexture::Make(this, descriptor);
 }
 
-std::shared_ptr<Sampler> VulkanGPU::createSampler(const SamplerDescriptor&) {
-  // TODO: Implement in Phase 3C (VulkanSampler).
-  return nullptr;
+std::shared_ptr<Sampler> VulkanGPU::createSampler(const SamplerDescriptor& descriptor) {
+  auto key = MakeSamplerKey(descriptor);
+  auto iter = samplerCache.find(key);
+  if (iter != samplerCache.end()) {
+    return iter->second;
+  }
+  auto sampler = VulkanSampler::Make(this, descriptor);
+  if (sampler != nullptr) {
+    samplerCache[key] = sampler;
+  }
+  return sampler;
 }
 
 std::shared_ptr<ShaderModule> VulkanGPU::createShaderModule(const ShaderModuleDescriptor&) {
@@ -290,14 +312,32 @@ std::vector<std::shared_ptr<Texture>> VulkanGPU::importHardwareTextures(Hardware
   return {};
 }
 
-std::shared_ptr<Texture> VulkanGPU::importBackendTexture(const BackendTexture&, uint32_t, bool) {
-  // TODO: Implement in Phase 3C (VulkanTexture).
-  return nullptr;
+std::shared_ptr<Texture> VulkanGPU::importBackendTexture(const BackendTexture& backendTexture,
+                                                        uint32_t usage, bool adopted) {
+  if (backendTexture.backend() != Backend::Vulkan) {
+    return nullptr;
+  }
+  VulkanTextureInfo vulkanInfo = {};
+  if (!backendTexture.getVulkanTextureInfo(&vulkanInfo) || vulkanInfo.image == nullptr) {
+    return nullptr;
+  }
+  return VulkanTexture::MakeFrom(this, vulkanInfo.image, vulkanInfo.format,
+                                 backendTexture.width(), backendTexture.height(), usage, adopted);
 }
 
-std::shared_ptr<Texture> VulkanGPU::importBackendRenderTarget(const BackendRenderTarget&) {
-  // TODO: Implement in Phase 3C (VulkanTexture).
-  return nullptr;
+std::shared_ptr<Texture> VulkanGPU::importBackendRenderTarget(
+    const BackendRenderTarget& backendRenderTarget) {
+  VulkanImageInfo vulkanInfo = {};
+  if (!backendRenderTarget.getVulkanImageInfo(&vulkanInfo)) {
+    return nullptr;
+  }
+  auto format = backendRenderTarget.format();
+  if (!isFormatRenderable(format)) {
+    return nullptr;
+  }
+  return VulkanTexture::MakeFrom(this, vulkanInfo.image, vulkanInfo.format,
+                                 backendRenderTarget.width(), backendRenderTarget.height(),
+                                 TextureUsage::RENDER_ATTACHMENT, false);
 }
 
 std::shared_ptr<Semaphore> VulkanGPU::importBackendSemaphore(const BackendSemaphore&) {
