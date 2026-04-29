@@ -17,7 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <algorithm>
+#include "layers/BackgroundSource.h"
 #include "layers/RootLayer.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -796,6 +799,83 @@ TGFX_TEST(BackgroundBlurTest, FastPathBackgroundChangeExpandsInsideBlur) {
     totalArea += r.width() * r.height();
   }
   EXPECT_GT(totalArea, rawArea);
+}
+
+// Exercises the picture-backed sub BackgroundSource flush path. On flush, onGetOwnContents
+// finishes the carrier recorder's current segment, reopens a new recording, replays the segment,
+// then restores the caller's canvas state so follow-on drawing keeps working. If the replay
+// baseline is wrong, a draw made AFTER the flush lands at a different pixel than the same draw
+// made BEFORE the flush. This test detects that divergence end-to-end via pixel readback.
+TGFX_TEST(BackgroundBlurTest, PictureSubFlushPreservesCarrierMatrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Top-level picture-backed source with a non-trivial world matrix so any accidental
+  // matrix doubling on flush would shift pixels visibly.
+  auto topSource =
+      BackgroundSource::Make(/*context=*/nullptr, Rect::MakeWH(200, 200), /*maxOutset=*/0,
+                             /*minOutset=*/0, Matrix::I(), ColorSpace::SRGB());
+  ASSERT_TRUE(topSource != nullptr);
+
+  PictureRecorder carrier;
+  auto* carrierCanvas = carrier.beginRecording();
+  // Carrier local origin maps to world (100, 50).
+  auto carrierMatrix = Matrix::MakeTrans(100, 50);
+  carrierCanvas->setMatrix(carrierMatrix);
+
+  auto subSource = topSource->createSubPicture(&carrier, Rect::MakeWH(100, 100),
+                                               /*localToWorld=*/carrierMatrix,
+                                               /*localToSurface=*/carrierMatrix);
+  ASSERT_TRUE(subSource != nullptr);
+
+  Paint redPaint;
+  redPaint.setColor(Color::Red());
+  // Marker A at local (10, 10) -> world (110, 60).
+  carrierCanvas->drawRect(Rect::MakeXYWH(10, 10, 4, 4), redPaint);
+
+  // Force a segment flush mid-recording.
+  auto flushed = subSource->getBackgroundImage();
+  EXPECT_TRUE(flushed != nullptr);
+
+  // Canvas pointer may have been swapped by the reopen.
+  carrierCanvas = carrier.getRecordingCanvas();
+  ASSERT_TRUE(carrierCanvas != nullptr);
+
+  Paint greenPaint;
+  greenPaint.setColor(Color::Green());
+  // Marker B at local (20, 20) -> world (120, 70). If the flush doubled the baseline
+  // matrix we would instead see it near (220, 120).
+  carrierCanvas->drawRect(Rect::MakeXYWH(20, 20, 4, 4), greenPaint);
+
+  auto carrierPicture = carrier.finishRecordingAsPicture();
+  ASSERT_TRUE(carrierPicture != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto* surfaceCanvas = surface->getCanvas();
+  surfaceCanvas->clear();
+  surfaceCanvas->drawPicture(carrierPicture);
+
+  Bitmap bitmap = {};
+  bitmap.allocPixels(200, 200);
+  auto pixels = bitmap.lockPixels();
+  ASSERT_TRUE(surface->readPixels(bitmap.info(), pixels));
+  bitmap.unlockPixels();
+
+  auto markerA = bitmap.getColor(112, 62);
+  auto markerB = bitmap.getColor(122, 72);
+  EXPECT_EQ(markerA.red, 1.0f);
+  EXPECT_EQ(markerA.green, 0.0f);
+  EXPECT_EQ(markerA.blue, 0.0f);
+  EXPECT_EQ(markerB.red, 0.0f);
+  EXPECT_EQ(markerB.green, 1.0f);
+  EXPECT_EQ(markerB.blue, 0.0f);
+
+  // If the replay doubled the baseline matrix, marker B would end up near (220, 120); verify
+  // that region is clear so a stray fallback cannot mask the bug.
+  auto wrongSpot = bitmap.getColor(198, 122);
+  EXPECT_EQ(wrongSpot.alpha, 0.0f);
 }
 
 }  // namespace tgfx

@@ -188,22 +188,20 @@ class PictureBackgroundSource : public BackgroundSource {
                           int width, int height, float surfaceScale,
                           std::shared_ptr<ColorSpace> colorSpace)
       : BackgroundSource(imageMatrix, rect, surfaceScale, std::move(colorSpace)),
-        initialSurfaceMatrix(surfaceMatrix), pixelWidth(width), pixelHeight(height) {
+        pixelWidth(width), pixelHeight(height) {
     recorder = &ownedRecorder;
     auto* canvas = recorder->beginRecording();
-    canvas->setMatrix(initialSurfaceMatrix);
+    canvas->setMatrix(surfaceMatrix);
   }
 
   // Sub: references a caller-owned PictureRecorder. The carrier owns the recorder and has
   // already configured its canvas (matrix / clip / seeded backdrop); we only record the geometry
-  // linking the sub to its parent. Segment flushes (getBackgroundImage) still need
-  // initialSurfaceMatrix as the baseline matrix for each freshly re-opened segment.
-  PictureBackgroundSource(PictureRecorder* borrowedRecorder, const Matrix& surfaceMatrix,
-                          const Matrix& imageMatrix, const Rect& rect, int width, int height,
+  // linking the sub to its parent.
+  PictureBackgroundSource(PictureRecorder* borrowedRecorder, const Matrix& imageMatrix,
+                          const Rect& rect, int width, int height,
                           std::shared_ptr<ColorSpace> colorSpace)
       : BackgroundSource(imageMatrix, rect, /*surfaceScale=*/1.0f, std::move(colorSpace)),
-        initialSurfaceMatrix(surfaceMatrix), pixelWidth(width), pixelHeight(height),
-        recorder(borrowedRecorder) {
+        pixelWidth(width), pixelHeight(height), recorder(borrowedRecorder) {
     DEBUG_ASSERT(recorder->getRecordingCanvas() != nullptr);
   }
 
@@ -227,10 +225,11 @@ class PictureBackgroundSource : public BackgroundSource {
     auto segment = recorder->finishRecordingAsPicture();
 
     auto* resumed = recorder->beginRecording();
-    // Establish the baseline the caller started from, then replay prior content so follow-on
-    // flushes still include everything drawn so far. drawPicture's internal save/restore leaves
-    // `resumed` back at this baseline after replay, regardless of saves recorded inside segment.
-    resumed->setMatrix(initialSurfaceMatrix);
+    // Replay prior content under an identity baseline. PlaybackContext composes the outer canvas
+    // matrix onto each recorded SetMatrix op (postConcat), so any non-identity baseline would
+    // double the carrier's matrix during replay. An identity baseline lets segment's own
+    // SetMatrix ops install the exact absolute matrices they recorded.
+    resumed->resetMatrix();
     if (segment != nullptr) {
       resumed->drawPicture(segment);
     }
@@ -253,7 +252,6 @@ class PictureBackgroundSource : public BackgroundSource {
   }
 
  private:
-  Matrix initialSurfaceMatrix = Matrix::I();
   int pixelWidth = 0;
   int pixelHeight = 0;
   PictureRecorder ownedRecorder;
@@ -386,9 +384,9 @@ std::shared_ptr<BackgroundSource> BackgroundSource::createSubPicture(PictureReco
   if (!geometry.valid) {
     return nullptr;
   }
-  auto sub = std::make_shared<PictureBackgroundSource>(
-      subRecorder, geometry.childSurfaceMatrix, geometry.childImageMatrix, geometry.childWorldRect,
-      geometry.width, geometry.height, colorSpace);
+  auto sub = std::make_shared<PictureBackgroundSource>(subRecorder, geometry.childImageMatrix,
+                                                       geometry.childWorldRect, geometry.width,
+                                                       geometry.height, colorSpace);
   sub->parent = this;
   sub->surfaceOffset = geometry.childSurfaceOffset;
   sub->surfaceToWorld = geometry.childSurfaceToWorld;
