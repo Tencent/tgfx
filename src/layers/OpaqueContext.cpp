@@ -303,8 +303,8 @@ void OpaqueContext::flushPendingContour(const Contour& contour, const Matrix& ma
     if (pendingContour.type == Contour::Type::Rect) {
       mergeContourBound(globalBounds);
     } else if (pendingContour.type == Contour::Type::RRect) {
-      // Use per-edge max of adjacent corner radii so the inscribed rectangle stays fully inside
-      // all corner arcs on each side while producing a tighter inset than a single global max.
+      // Compute the largest axis-aligned rectangle inscribed in the RRect: inset each edge by
+      // the max of its two adjacent corner radii so the result stays fully inside all corner arcs.
       const auto& radii = pendingContour.rRect.radii();
       const auto topY = std::max(radii[0].y, radii[1].y);
       const auto bottomY = std::max(radii[2].y, radii[3].y);

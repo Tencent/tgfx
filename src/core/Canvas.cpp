@@ -265,6 +265,15 @@ void Canvas::drawRoundRect(const Rect& rect, float radiusX, float radiusY, const
   drawRRect(RRect::MakeRectXY(rect, radiusX, radiusY), paint);
 }
 
+static bool HasSharpCorner(const RRect& rRect) {
+  for (const auto& r : rRect.radii()) {
+    if (r.x < 0.5f || r.y < 0.5f) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * The dedicated RRect op draws stroked rounded corners by offsetting the ellipse equation
  * outward/inward, which assumes a concentric ellipse approximates the true stroke offset
@@ -272,43 +281,48 @@ void Canvas::drawRoundRect(const Rect& rect, float radiusX, float radiusY, const
  * radii, or when the ellipse is too elongated (major/minor ratio too large). In those cases
  * this function returns true so the caller falls back to drawPath for an accurate stroke.
  */
-static bool UseDrawPath(const Paint& paint, const RRect& rRect, const Matrix& viewMatrix) {
+static bool UseDrawPath(const Paint& paint, const RRect& rRect, bool hasSharpCorner,
+                        const Matrix& viewMatrix) {
+  // Sharp (sub-half-pixel) corners make the ellipse implicit equation degenerate: at zero
+  // radius the equation is undefined, and under stroke the inner ellipse radius would become
+  // negative. Fall back to drawPath so the sharp geometry renders correctly.
+  if (hasSharpCorner) {
+    return true;
+  }
   auto stroke = paint.getStroke();
   if (!stroke) {
     return false;
   }
 
   const auto scales = viewMatrix.getAxisScales();
-  // Scaled stroke width in local space; hairline (width == 0) falls back to half a pixel after
-  // the zero-length check below.
+  // Per-axis scaled stroke width: local width multiplied by the x/y axis scale factors
+  // extracted from the view matrix.
   Point halfScaledStroke = {scales.x * stroke->width, scales.y * stroke->width};
   if (FloatNearlyZero(halfScaledStroke.length())) {
+    // Hairline stroke (width == 0) falls back to half a pixel on each axis.
     halfScaledStroke.set(0.5f, 0.5f);
   } else {
     halfScaledStroke *= 0.5f;
   }
   const auto halfScaledStrokeLen = halfScaledStroke.length();
 
-  // Non-Complex types share identical radii across all four corners, so only the first needs check.
+  // Non-Complex types have identical radii across all four corners (zero for Rect, equal
+  // per-corner for Simple/Oval), so only the first needs check.
   const auto cornerCount = rRect.type() == RRect::Type::Complex ? rRect.radii().size() : size_t{1};
   for (size_t i = 0; i < cornerCount; ++i) {
     const auto& r = rRect.radii()[i];
-    // Skip sharp (zero-radius) corners so mixed sharp/rounded Complex rrects can still use the
-    // dedicated op.
-    if (r.x <= 0.0f || r.y <= 0.0f) {
-      continue;
-    }
     const auto xRadius = scales.x * r.x;
     const auto yRadius = scales.y * r.y;
-    // Half of stroke width is greater than radius
+    // Half of stroke width is greater than radius.
     if (halfScaledStroke.x > xRadius || halfScaledStroke.y > yRadius) {
       return true;
     }
-    // Handle thick strokes for non-circular ellipses
+    // Thick stroke on an elongated ellipse (major/minor axis ratio > 2): the concentric-ellipse
+    // approximation visibly diverges from the true offset curve.
     if (halfScaledStrokeLen > 0.5f && (0.5f * xRadius > yRadius || 0.5f * yRadius > xRadius)) {
       return true;
     }
-    // Curvature of the stroke is less than the curvature of the ellipse
+    // Curvature of the stroke is less than the curvature of the ellipse along either axis.
     if (halfScaledStroke.x * yRadius * yRadius <
         halfScaledStroke.y * halfScaledStroke.y * xRadius) {
       return true;
@@ -325,19 +339,22 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
   if (rRect.rect().isEmpty()) {
     return;
   }
-  // Check if all corner radii are too small, degenerate to rectangle.
+  // Classify corner radii in a single pass so both the allSmall degenerate check and the
+  // anySmall op-capability check share one traversal.
   auto allSmall = true;
+  auto anySmall = false;
   for (const auto& r : rRect.radii()) {
-    if (r.x >= 0.5f || r.y >= 0.5f) {
+    if (r.x < 0.5f || r.y < 0.5f) {
+      anySmall = true;
+    } else {
       allSmall = false;
-      break;
     }
   }
   if (allSmall) {
     drawRect(rRect.rect(), paint);
     return;
   }
-  if (UseDrawPath(paint, rRect, _matrix)) {
+  if (UseDrawPath(paint, rRect, anySmall, _matrix)) {
     Path path = {};
     path.addRRect(rRect);
     drawPath(path, paint);
@@ -382,7 +399,8 @@ void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& c
       drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
       return;
     }
-    if (path.isRRect(&rRect)) {
+    // RRects with sharp corners cannot be rendered by the RRect op; fall through to drawPath.
+    if (path.isRRect(&rRect) && !HasSharpCorner(rRect)) {
       drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
       return;
     }

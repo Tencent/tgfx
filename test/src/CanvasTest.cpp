@@ -1901,7 +1901,7 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
   // Simple and Complex cannot batch together (different GP and vertex layout).
   paint.setColor(Color::FromRGBA(200, 50, 50, 255));
   auto complexFill = RRect::MakeRectRadii(Rect::MakeXYWH(50, 420, 120, 70),
-                                          {{{30, 30}, {10, 10}, {0, 0}, {20, 20}}});
+                                          {{{30, 30}, {10, 10}, {5, 5}, {20, 20}}});
   EXPECT_EQ(complexFill.type(), RRect::Type::Complex);
   canvas->drawRRect(complexFill, paint);
   surface->renderContext->flush();
@@ -1949,10 +1949,12 @@ TGFX_TEST(CanvasTest, NonAARRectOpStroke) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 500, 500);
+  auto surface = Surface::Make(context, 504, 520);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
+  // Shift the whole scene so all content sits with ~50px margins on all four sides.
+  canvas->translate(3, 3);
 
   Paint paint;
   paint.setAntiAlias(false);
@@ -2203,141 +2205,160 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 420, 360);
+  constexpr int margin = 30;
+  constexpr int gap = 30;
+  constexpr int cellWidth = 100;
+  constexpr int cellHeight = 80;
+  constexpr int columns = 3;
+  constexpr int rows = 3;
+  constexpr int surfaceWidth = margin * 2 + cellWidth * columns + gap * (columns - 1);
+  constexpr int surfaceHeight = margin * 2 + cellHeight * rows + gap * (rows - 1);
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
-  // Case 1: Complex filled RRect with four different corner radii.
-  // Fill mode never triggers UseDrawPathForComplex.
-  // Expected: RRectDrawOp with isComplex=true (ComplexEllipseGeometryProcessor).
-  Paint paint;
-  paint.setColor(Color::Blue());
-  auto complexFill = RRect::MakeRectRadii(Rect::MakeXYWH(30, 30, 100, 80),
-                                          {{{5, 8}, {15, 10}, {35, 25}, {20, 15}}});
-  EXPECT_EQ(complexFill.type(), RRect::Type::Complex);
-  canvas->drawRRect(complexFill, paint);
-  surface->renderContext->flush();
+  Paint fillPaint;
+  Paint strokePaint;
+  strokePaint.setStyle(PaintStyle::Stroke);
+  const auto rect = Rect::MakeXYWH(0, 0, cellWidth, cellHeight);
   auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
-  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  auto* rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(rrectOp->isComplex);
 
-  // Batching boundary: Simple and Complex RRects cannot batch into the same Op because they use
-  // different GeometryProcessors with different vertex layouts. Draw the probe RRect outside the
-  // surface so it does not affect the baseline image.
-  auto simpleProbe = RRect::MakeRectXY(Rect::MakeXYWH(500, 500, 50, 50), 10, 10);
-  EXPECT_EQ(simpleProbe.type(), RRect::Type::Simple);
-  canvas->drawRRect(simpleProbe, paint);
+  // Case 1: Complex filled RRect drawing and RRect batching strategy.
+  canvas->save();
+  canvas->translate(margin, margin);
+  fillPaint.setColor(Color::Blue());
+  auto rRect1A = RRect::MakeRectRadii(rect, {{{5, 8}, {15, 10}, {35, 25}, {20, 15}}});
+  EXPECT_EQ(rRect1A.type(), RRect::Type::Complex);
+  canvas->drawRRect(rRect1A, fillPaint);
+  fillPaint.setColor(Color::White());
+  auto rRect1B = RRect::MakeRectXY(Rect::MakeXYWH(25, 25, 30, 20), 5, 5);
+  EXPECT_EQ(rRect1B.type(), RRect::Type::Simple);
+  canvas->drawRRect(rRect1B, fillPaint);
+  canvas->restore();
   surface->renderContext->flush();
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  // Complex and Simple RRects cannot batch into the same Op, so each stays as its own DrawOp.
+  ASSERT_EQ(task->drawOps.size(), 2u);
+  auto* complexOp = static_cast<RRectDrawOp*>(task->drawOps.front().get());
+  EXPECT_EQ(complexOp->type(), DrawOp::Type::RRectDrawOp);
+  EXPECT_TRUE(complexOp->isComplex);
   auto* simpleOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
   EXPECT_FALSE(simpleOp->isComplex);
-  EXPECT_NE(simpleOp, rrectOp);
 
-  // Case 2: Bail-out condition — halfStroke > radius at TL corner.
-  // TL corner radii (3,7): scaledStroke.x * 0.5 = 5 > xRadius = 3.
-  // Expected: ShapeDrawOp (Path fallback).
-  Paint stroke2;
-  stroke2.setStyle(PaintStyle::Stroke);
-  stroke2.setColor(Color::Red());
-  stroke2.setStroke(Stroke(10));
-  auto rrect2 = RRect::MakeRectRadii(Rect::MakeXYWH(160, 30, 100, 80),
-                                     {{{3, 7}, {20, 18}, {15, 11}, {9, 13}}});
-  EXPECT_EQ(rrect2.type(), RRect::Type::Complex);
-  canvas->drawRRect(rrect2, stroke2);
-  surface->renderContext->flush();
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
-
-  // Case 3: Bail-out condition — thick stroke + non-circular ellipse at TL corner.
-  // TL corner radii (28,11): halfStrokeLen = 2*sqrt(2) ≈ 2.83 > 0.5, and 0.5*28 = 14 > 11.
-  // All radii > halfStroke = 2, so Case 2 condition is NOT triggered.
-  // Expected: ShapeDrawOp (Path fallback).
-  Paint stroke3;
-  stroke3.setStyle(PaintStyle::Stroke);
-  stroke3.setColor(Color::Green());
-  stroke3.setStroke(Stroke(4));
-  auto rrect3 = RRect::MakeRectRadii(Rect::MakeXYWH(290, 30, 100, 80),
-                                     {{{28, 11}, {16, 19}, {14, 23}, {8, 17}}});
-  EXPECT_EQ(rrect3.type(), RRect::Type::Complex);
-  canvas->drawRRect(rrect3, stroke3);
-  surface->renderContext->flush();
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
-
-  // Case 4: Bail-out condition — anisotropic stroke curvature check at TL corner.
-  // TL corner radii (22,11): halfStroke = 6, yR² = 121 < halfStroke * xR = 6*22 = 132.
-  // Ratio 22:11 = 2:1, so 0.5*22 = 11 == yR, Case 3 NOT triggered (need strictly >).
-  // All radii > halfStroke = 6, so Case 2 NOT triggered.
-  // Expected: ShapeDrawOp (Path fallback).
-  Paint stroke4;
-  stroke4.setStyle(PaintStyle::Stroke);
-  stroke4.setColor(Color::FromRGBA(255, 128, 0));
-  stroke4.setStroke(Stroke(12));
-  auto rrect4 = RRect::MakeRectRadii(Rect::MakeXYWH(30, 140, 100, 80),
-                                     {{{22, 11}, {17, 13}, {19, 15}, {14, 9}}});
-  EXPECT_EQ(rrect4.type(), RRect::Type::Complex);
-  canvas->drawRRect(rrect4, stroke4);
-  surface->renderContext->flush();
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
-
-  // Case 5: Complex stroked RRect that passes all UseDrawPathForComplex checks.
-  // All corners have moderate radii (ratio < 2:1) and radii > halfStroke = 2.
-  // Expected: RRectDrawOp with isComplex=true (ComplexEllipseGeometryProcessor).
-  Paint stroke5;
-  stroke5.setStyle(PaintStyle::Stroke);
-  stroke5.setColor(Color::FromRGBA(128, 0, 255));
-  stroke5.setStroke(Stroke(4));
-  auto rrect5 = RRect::MakeRectRadii(Rect::MakeXYWH(160, 140, 100, 80),
-                                     {{{15, 11}, {20, 13}, {18, 16}, {12, 9}}});
-  EXPECT_EQ(rrect5.type(), RRect::Type::Complex);
-  canvas->drawRRect(rrect5, stroke5);
-  surface->renderContext->flush();
-  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(rrectOp->isComplex);
-
-  // Case 6: Same Complex stroked RRect as Case 5, with non-uniform scale (0.9, 0.8) + 15° rotation.
-  // getAxisScales() extracts scale independently of rotation, so rotation does not
-  // affect the bail-out decision. All corners should still pass.
-  // Center aligned with row 2, col 3 (center at 340, 180).
-  // Expected: RRectDrawOp with isComplex=true (ComplexEllipseGeometryProcessor).
+  // Case 2: Stroked RRect fallback when halfStroke exceeds a corner radius.
   canvas->save();
-  canvas->concat(Matrix::MakeTrans(340, 180));
-  canvas->concat(Matrix::MakeScale(0.9f, 0.8f));
-  canvas->concat(Matrix::MakeRotate(15));
-  auto rrect6 = RRect::MakeRectRadii(Rect::MakeXYWH(-50, -40, 100, 80),
-                                     {{{15, 11}, {20, 13}, {18, 16}, {12, 9}}});
-  EXPECT_EQ(rrect6.type(), RRect::Type::Complex);
-  canvas->drawRRect(rrect6, stroke5);
+  canvas->translate(margin + cellWidth + gap, margin);
+  strokePaint.setStroke(Stroke(10));
+  strokePaint.setColor(Color::Red());
+  auto rRect2 = RRect::MakeRectRadii(rect, {{{2, 4}, {25, 18}, {30, 20}, {22, 15}}});
+  EXPECT_EQ(rRect2.type(), RRect::Type::Complex);
+  canvas->drawRRect(rRect2, strokePaint);
   canvas->restore();
   surface->renderContext->flush();
   task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(rrectOp->isComplex);
+  EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
 
-  // Case 7: Same Complex stroked RRect as Case 6, rotated 90 degrees.
-  // Verifies that after transposeRadii removal, 90-degree rotated RRects still render correctly.
-  // Center aligned with row 3, col 1 (center at 80, 290).
-  // Expected: RRectDrawOp with isComplex=true (ComplexEllipseGeometryProcessor).
+  // Case 3: Stroked RRect fallback when a corner ellipse is too elongated.
   canvas->save();
-  canvas->concat(Matrix::MakeTrans(80, 290));
-  canvas->concat(Matrix::MakeRotate(90));
-  auto rrect7 = RRect::MakeRectRadii(Rect::MakeXYWH(-50, -40, 100, 80),
-                                     {{{15, 11}, {20, 13}, {18, 16}, {12, 9}}});
-  EXPECT_EQ(rrect7.type(), RRect::Type::Complex);
-  canvas->drawRRect(rrect7, stroke5);
+  canvas->translate(margin + 2 * (cellWidth + gap), margin);
+  strokePaint.setStroke(Stroke(4));
+  strokePaint.setColor(Color::Green());
+  auto rRect3 = RRect::MakeRectRadii(rect, {{{30, 12}, {18, 22}, {15, 25}, {10, 20}}});
+  EXPECT_EQ(rRect3.type(), RRect::Type::Complex);
+  canvas->drawRRect(rRect3, strokePaint);
   canvas->restore();
   surface->renderContext->flush();
   task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-  rrectOp = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-  EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp);
-  EXPECT_TRUE(rrectOp->isComplex);
+  EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
+
+  // Case 4: Stroked RRect fallback from the anisotropic stroke curvature check.
+  canvas->save();
+  canvas->translate(margin, margin + cellHeight + gap);
+  strokePaint.setStroke(Stroke(12));
+  strokePaint.setColor(Color::FromRGBA(255, 128, 0));
+  auto rRect4 = RRect::MakeRectRadii(rect, {{{22, 11}, {17, 13}, {19, 15}, {14, 9}}});
+  EXPECT_EQ(rRect4.type(), RRect::Type::Complex);
+  canvas->drawRRect(rRect4, strokePaint);
+  canvas->restore();
+  surface->renderContext->flush();
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
+
+  // Case 5: Complex stroked RRect that passes all fallback checks.
+  const auto rRect5Radii = std::array<Point, 4>{{{10, 10}, {25, 15}, {15, 20}, {20, 25}}};
+  canvas->save();
+  canvas->translate(margin + cellWidth + gap, margin + cellHeight + gap);
+  strokePaint.setStroke(Stroke(4));
+  strokePaint.setColor(Color::FromRGBA(128, 0, 255));
+  auto rRect5 = RRect::MakeRectRadii(rect, rRect5Radii);
+  EXPECT_EQ(rRect5.type(), RRect::Type::Complex);
+  canvas->drawRRect(rRect5, strokePaint);
+  canvas->restore();
+  surface->renderContext->flush();
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  auto* op5 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(op5->type(), DrawOp::Type::RRectDrawOp);
+  EXPECT_TRUE(op5->isComplex);
+
+  // Case 6: Case 5 under non-uniform scale and rotation, verifying the RRect draw path still
+  // works correctly.
+  canvas->save();
+  canvas->translate(margin + 2 * (cellWidth + gap) + cellWidth / 2,
+                    margin + cellHeight + gap + cellHeight / 2);
+  canvas->scale(0.9f, 0.8f);
+  canvas->rotate(15);
+  canvas->translate(-cellWidth / 2, -cellHeight / 2);
+  auto rRect6 = RRect::MakeRectRadii(rect, rRect5Radii);
+  EXPECT_EQ(rRect6.type(), RRect::Type::Complex);
+  canvas->drawRRect(rRect6, strokePaint);
+  canvas->restore();
+  surface->renderContext->flush();
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  auto* op6 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(op6->type(), DrawOp::Type::RRectDrawOp);
+  EXPECT_TRUE(op6->isComplex);
+
+  // Case 7: Case 5 rotated by the special 90-degree angle, verifying the RRect draw path still
+  // works correctly.
+  canvas->save();
+  canvas->translate(margin + cellWidth / 2, margin + 2 * (cellHeight + gap) + cellHeight / 2);
+  canvas->rotate(90);
+  canvas->translate(-cellWidth / 2, -cellHeight / 2);
+  auto rRect7 = RRect::MakeRectRadii(rect, rRect5Radii);
+  EXPECT_EQ(rRect7.type(), RRect::Type::Complex);
+  canvas->drawRRect(rRect7, strokePaint);
+  canvas->restore();
+  surface->renderContext->flush();
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  auto* op7 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+  EXPECT_EQ(op7->type(), DrawOp::Type::RRectDrawOp);
+  EXPECT_TRUE(op7->isComplex);
+
+  // Case 8: Filled RRect fallback triggered by a sharp (zero-radius) corner.
+  canvas->save();
+  canvas->translate(margin + cellWidth + gap, margin + 2 * (cellHeight + gap));
+  fillPaint.setColor(Color::FromRGBA(0, 160, 160));
+  auto rRect8 = RRect::MakeRectRadii(rect, {{{0, 0}, {20, 13}, {18, 16}, {12, 9}}});
+  EXPECT_EQ(rRect8.type(), RRect::Type::Complex);
+  canvas->drawRRect(rRect8, fillPaint);
+  canvas->restore();
+  surface->renderContext->flush();
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
+
+  // Case 9: Stroked RRect fallback triggered by a sharp (zero-radius) corner.
+  canvas->save();
+  canvas->translate(margin + 2 * (cellWidth + gap), margin + 2 * (cellHeight + gap));
+  strokePaint.setStroke(Stroke(4));
+  strokePaint.setColor(Color::FromRGBA(160, 80, 0));
+  auto rRect9 = RRect::MakeRectRadii(rect, {{{20, 13}, {18, 16}, {0, 0}, {12, 9}}});
+  EXPECT_EQ(rRect9.type(), RRect::Type::Complex);
+  canvas->drawRRect(rRect9, strokePaint);
+  canvas->restore();
+  surface->renderContext->flush();
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+  EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AARRectOp"));
 }

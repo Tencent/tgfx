@@ -122,6 +122,7 @@ void RRect::setRectXY(const Rect& rect, float radiusX, float radiusY) {
   const auto radius = Point{radiusX, radiusY};
   _radii = {radius, radius, radius, radius};
   if (radiusX <= 0 || radiusY <= 0) {
+    _radii = {};
     _type = Type::Rect;
   } else if (radiusX >= _rect.width() * 0.5f && radiusY >= _rect.height() * 0.5f) {
     // Use strict comparison instead of an epsilon tolerance: RRect lives in logical space that
@@ -147,11 +148,20 @@ void RRect::setRectRadii(const Rect& rect, const std::array<Point, 4>& radii) {
 
 void RRect::setOval(const Rect& oval) {
   _rect = oval.makeSorted();
+  if (_rect.isEmpty()) {
+    _radii = {};
+    _type = Type::Rect;
+    return;
+  }
+
   const auto radius = Point{_rect.width() / 2, _rect.height() / 2};
   _radii = {radius, radius, radius, radius};
   _type = Type::Oval;
 }
 
+// Positive scaling preserves all RRect classification invariants (adjacent-radii fit,
+// Oval/Simple/Complex/Rect thresholds), so ScaleRadii and ComputeType are intentionally
+// skipped here. Non-positive factors are out of contract.
 void RRect::scale(float scaleX, float scaleY) {
   _rect.scale(scaleX, scaleY);
   for (auto& r : _radii) {

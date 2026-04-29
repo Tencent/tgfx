@@ -26,8 +26,8 @@ namespace tgfx {
  * outer coverage and, when stroke is true, the inner coverage, leaving a local `float coverage`
  * declared for the caller to consume. The caller must declare `vec2 halfSize` and `vec2 radii`
  * before invoking this helper. When stroke is true, strokeWidthFsIn must point to the fragment
- * stage input name of the stroke width varying; the helper emits the `vec2 sw = ...;` declaration
- * itself so the emitted GLSL ordering matches the original inline code.
+ * stage input name of the stroke width varying; the helper emits the `vec2 sw = <strokeWidthFsIn>;`
+ * declaration itself, so the caller must not pre-declare `sw` in the emitted GLSL.
  *
  * @param fragBuilder the fragment shader builder to emit into.
  * @param centeredPos a GLSL expression evaluating to (localCoord - center).

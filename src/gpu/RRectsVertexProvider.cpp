@@ -19,6 +19,7 @@
 #include "RRectsVertexProvider.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
@@ -61,21 +62,17 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
   }
   auto hasColor = false;
   auto hasComplex = false;
-  if (rects.size() > 1) {
-    auto& firstColor = rects.front()->color;
-    for (auto& record : rects) {
-      if (record->color != firstColor) {
-        hasColor = true;
-      }
-      if (record->rRect.type() == RRect::Type::Complex) {
-        hasComplex = true;
-      }
-      if (hasColor && hasComplex) {
-        break;
-      }
+  auto& firstColor = rects.front()->color;
+  for (auto& record : rects) {
+    if (record->color != firstColor) {
+      hasColor = true;
     }
-  } else if (rects.front()->rRect.type() == RRect::Type::Complex) {
-    hasComplex = true;
+    if (record->rRect.type() == RRect::Type::Complex) {
+      hasComplex = true;
+    }
+    if (hasColor && hasComplex) {
+      break;
+    }
   }
   auto array = allocator->makeArray(std::move(rects));
   auto strokeArray = allocator->makeArray(std::move(strokes));
@@ -144,8 +141,9 @@ static bool ComputeComplexCornerRadii(const std::array<Point, 4>& radii,
       outerYRadii[c] = radii[c].y;
       recipRadii[c][0] = FloatInvert(outerXRadii[c]);
       recipRadii[c][1] = FloatInvert(outerYRadii[c]);
-      // recipRadii[c][2..3] (inner radii reciprocals) are not read by the fill shader,
-      // left untouched.
+      // Keep every element of recipRadii defined on return.
+      recipRadii[c][2] = 0.0f;
+      recipRadii[c][3] = 0.0f;
     }
   }
   return isOverstroked;
@@ -278,6 +276,7 @@ void RRectsVertexProvider::getAAVertices(float* vertices) const {
   auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
 
   for (auto& record : rects) {
+    DEBUG_ASSERT(record->rRect.type() != RRect::Type::Complex);
     auto viewMatrix = record->viewMatrix;
     auto rRect = record->rRect;
     auto scales = viewMatrix.getAxisScales();
@@ -415,7 +414,7 @@ void RRectsVertexProvider::getComplexAAVertices(float* vertices) const {
 
     std::array<float, 4> outerXRadii = {};
     std::array<float, 4> outerYRadii = {};
-    std::array<std::array<float, 4>, 4> recipRadii = {};
+    std::array<std::array<float, 4>, 4> recipRadii;
     auto isOverstroked = ComputeComplexCornerRadii(rRect.radii(), strokeParams, stroke != nullptr,
                                                    outerXRadii, outerYRadii, recipRadii);
     // Overstroke RRects (inner radius <= 0) are not supported here and must be filtered
@@ -489,6 +488,7 @@ void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
 
   size_t currentIndex = 0;
   for (auto& record : rects) {
+    DEBUG_ASSERT(bitFields.isComplex || record->rRect.type() != RRect::Type::Complex);
     auto viewMatrix = record->viewMatrix;
     auto rRect = record->rRect;
     float compressedColor = 0.f;
@@ -502,14 +502,14 @@ void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
     auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
 
     auto rect = rRect.rect();
-    auto radii = rRect.radii();
+    auto outerRadii = rRect.radii();
     if (stroke) {
       rect.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
       // Simple RRects have identical radii across all four corners, so only the first needs update.
       size_t endIndex = bitFields.isComplex ? 4 : 1;
       for (size_t i = 0; i < endIndex; ++i) {
-        radii[i].x += strokeParams.halfStrokeX;
-        radii[i].y += strokeParams.halfStrokeY;
+        outerRadii[i].x += strokeParams.halfStrokeX;
+        outerRadii[i].y += strokeParams.halfStrokeY;
       }
     }
 
@@ -533,22 +533,22 @@ void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
       // localCoord (2 floats) - coordinates within the rect for shape evaluation
       vertices[index++] = localX;
       vertices[index++] = localY;
-      // Per-corner radii for complex RRects, uniform radii (radii[0]) for simple.
+      // Per-corner radii for complex RRects, uniform radii (outerRadii[0]) for simple.
       if (bitFields.isComplex) {
         // xRadii (4 floats) - per-corner x radii [TL, TR, BR, BL]
-        vertices[index++] = radii[0].x;
-        vertices[index++] = radii[1].x;
-        vertices[index++] = radii[2].x;
-        vertices[index++] = radii[3].x;
+        vertices[index++] = outerRadii[0].x;
+        vertices[index++] = outerRadii[1].x;
+        vertices[index++] = outerRadii[2].x;
+        vertices[index++] = outerRadii[3].x;
         // yRadii (4 floats) - per-corner y radii [TL, TR, BR, BL]
-        vertices[index++] = radii[0].y;
-        vertices[index++] = radii[1].y;
-        vertices[index++] = radii[2].y;
-        vertices[index++] = radii[3].y;
+        vertices[index++] = outerRadii[0].y;
+        vertices[index++] = outerRadii[1].y;
+        vertices[index++] = outerRadii[2].y;
+        vertices[index++] = outerRadii[3].y;
       } else {
         // radii (2 floats) - uniform outer radii
-        vertices[index++] = radii[0].x;
-        vertices[index++] = radii[0].y;
+        vertices[index++] = outerRadii[0].x;
+        vertices[index++] = outerRadii[0].y;
       }
       // rectBounds (4 floats)
       vertices[index++] = rect.left;

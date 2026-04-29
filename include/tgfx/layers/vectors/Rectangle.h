@@ -71,6 +71,8 @@ class Rectangle : public VectorElement {
   /**
    * Sets the roundness for each corner individually. Values are scaled down proportionally if
    * adjacent corners overlap along any edge.
+   * @param values  per-corner roundness in the order [top-left, top-right, bottom-right,
+   *                bottom-left]
    */
   void setRoundness(const std::array<float, 4>& values);
 

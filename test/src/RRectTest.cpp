@@ -74,6 +74,17 @@ TGFX_TEST(RRectTest, RadiiScaling) {
   EXPECT_LE(rRect.radii()[0].x + rRect.radii()[1].x, 100.f + 1e-5f);
   // The original ratio between corners should be preserved.
   EXPECT_NEAR(rRect.radii()[0].x, rRect.radii()[1].x, 1e-5f);
+  // ScaleRadii applies the single minimum scale factor (5/6) to every corner uniformly,
+  // preserving the overall shape proportions.
+  constexpr float kScale = 100.f / 120.f;
+  EXPECT_NEAR(rRect.radii()[0].x, 60.f * kScale, 1e-5f);
+  EXPECT_NEAR(rRect.radii()[0].y, 10.f * kScale, 1e-5f);
+  EXPECT_NEAR(rRect.radii()[1].x, 60.f * kScale, 1e-5f);
+  EXPECT_NEAR(rRect.radii()[1].y, 10.f * kScale, 1e-5f);
+  EXPECT_NEAR(rRect.radii()[2].x, 10.f * kScale, 1e-5f);
+  EXPECT_NEAR(rRect.radii()[2].y, 10.f * kScale, 1e-5f);
+  EXPECT_NEAR(rRect.radii()[3].x, 10.f * kScale, 1e-5f);
+  EXPECT_NEAR(rRect.radii()[3].y, 10.f * kScale, 1e-5f);
 }
 
 TGFX_TEST(RRectTest, NegativeRadii) {
