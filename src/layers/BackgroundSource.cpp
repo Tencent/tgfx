@@ -130,14 +130,16 @@ static SubGeometry ComputeSubGeometry(const Matrix& parentImageMatrix, const Rec
   out.childSurfaceToWorld = localToWorld;
   out.childSurfaceToWorld.preConcat(childSurfaceToLocal);
 
-  Matrix parentSurfaceMatrix = Matrix::I();
-  if (!parentImageMatrix.invert(&parentSurfaceMatrix)) {
+  // `surfaceOffset` lives in parent *image* pixel coordinates — that is the space of the image
+  // returned by parent->getBackgroundImage(), which getBackgroundImage() subsets at this offset
+  // when composing with the sub's own content. The name mirrors its role in getBackgroundImage().
+  Matrix worldToParentImage = Matrix::I();
+  if (!parentImageMatrix.invert(&worldToParentImage)) {
     return out;
   }
-  auto childWorldRectInParentImage = parentSurfaceMatrix.mapRect(childWorldRect);
-  childWorldRectInParentImage.roundOut();
-  out.childSurfaceOffset =
-      Point::Make(childWorldRectInParentImage.x(), childWorldRectInParentImage.y());
+  auto childRectInParentImage = worldToParentImage.mapRect(childWorldRect);
+  childRectInParentImage.roundOut();
+  out.childSurfaceOffset = Point::Make(childRectInParentImage.x(), childRectInParentImage.y());
 
   out.childImageMatrix = parentImageMatrix;
   out.childImageMatrix.preTranslate(out.childSurfaceOffset.x, out.childSurfaceOffset.y);
@@ -312,12 +314,12 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
   // Sub: compose parent image (in parent image-pixel coords) with own content by subsetting
   // parent to the sub's footprint and stacking own on top. Sub's image-pixel space is aligned
   // with parent's, offset by surfaceOffset (set at createSubSurface / createSubPicture time).
-  Matrix parentSurfaceMatrix = Matrix::I();
-  if (!parent->imageMatrix.invert(&parentSurfaceMatrix)) {
+  Matrix worldToParentImage = Matrix::I();
+  if (!parent->imageMatrix.invert(&worldToParentImage)) {
     return ownImage;
   }
-  int width = FloatCeilToInt(backgroundRect.width() * parentSurfaceMatrix.getMaxScale());
-  int height = FloatCeilToInt(backgroundRect.height() * parentSurfaceMatrix.getMaxScale());
+  int width = FloatCeilToInt(backgroundRect.width() * worldToParentImage.getMaxScale());
+  int height = FloatCeilToInt(backgroundRect.height() * worldToParentImage.getMaxScale());
   if (width <= 0 || height <= 0) {
     return ownImage;
   }
@@ -339,10 +341,10 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
   // Warp own image (in sub's surface pixel space) into the sub's image-pixel space and stack it
   // on top of the subset of parent.
   // surface pixel → world           : surfaceToWorld
-  // world → parent-image pixel      : inverse(parent.imageMatrix) (== parentSurfaceMatrix)
+  // world → parent-image pixel      : inverse(parent.imageMatrix) (== worldToParentImage)
   // parent-image pixel → sub image  : translate(-surfaceOffset) (sub image shares parent's grid,
   //                                   offset so its origin aligns with the subset we just drew)
-  Matrix ownToSubImage = parentSurfaceMatrix;
+  Matrix ownToSubImage = worldToParentImage;
   ownToSubImage.preConcat(surfaceToWorld);
   ownToSubImage.postTranslate(-surfaceOffset.x, -surfaceOffset.y);
 

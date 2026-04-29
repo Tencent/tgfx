@@ -99,6 +99,18 @@ class BackgroundSource {
                                                      const Matrix& localToSurface);
 
   /**
+   * Returns the matrix mapping the physical surface-pixel coordinates of this source (the pixel
+   * grid of the image returned by onGetOwnContents — the bg surface for top-level, or the borrowed
+   * offscreen carrier for subs) to world coordinates. Coincides with backgroundMatrix() for
+   * top-level sources; differs for subs whose surface pixel grid does not match the parent-aligned
+   * image pixel grid. Callers mapping layer-local coords through a capture canvas (whose matrix is
+   * `local → this source's surface pixel`) compose with this matrix to reach world.
+   */
+  Matrix surfaceToWorldMatrix() const {
+    return surfaceToWorld;
+  }
+
+  /**
    * Returns the physical surface-pixel downsampling factor (<=1) applied when the top-level
    * source was created for extreme blur outsets. The capture pass needs this to align the
    * snapshot's contentScale with the consume pass — because the capture pass walks the layer

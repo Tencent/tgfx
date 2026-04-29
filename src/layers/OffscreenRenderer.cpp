@@ -71,6 +71,12 @@ std::shared_ptr<Image> ApplyImageFilterIfNeeded(std::shared_ptr<Image> image,
 // Recorder. Returns nullptr when the current handler has no source (BackgroundConsumer / NoOp),
 // when the parent can't form a sub (e.g. out-of-bounds), or when the handler refuses to clone.
 // `surface` and `recorder` are mutually exclusive (exactly one must be non-null).
+//
+// `contentMatrix` maps layer-local coords to the parent source's *surface pixel* space (that is
+// the matrix installed on the capture canvas by BackgroundCapturer::Run or an outer
+// OffscreenRenderer, not `local → world`). Composing with surfaceToWorldMatrix() therefore
+// yields a correct `local → world` matrix even when the parent source is itself a sub whose
+// image pixel grid differs from its surface pixel grid.
 std::unique_ptr<BackgroundHandler> DeriveSubHandler(const DrawArgs& args, Surface* surface,
                                                     PictureRecorder* recorder,
                                                     const Rect& localBounds,
@@ -83,7 +89,7 @@ std::unique_ptr<BackgroundHandler> DeriveSubHandler(const DrawArgs& args, Surfac
   if (parentSource == nullptr) {
     return nullptr;
   }
-  auto localToWorld = parentSource->backgroundMatrix();
+  auto localToWorld = parentSource->surfaceToWorldMatrix();
   localToWorld.preConcat(contentMatrix);
   auto worldBounds = localToWorld.mapRect(localBounds);
   worldBounds.roundOut();
