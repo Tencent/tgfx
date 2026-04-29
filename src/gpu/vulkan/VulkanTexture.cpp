@@ -92,7 +92,7 @@ std::shared_ptr<VulkanTexture> VulkanTexture::Make(VulkanGPU* gpu,
   viewInfo.format = vkFormat;
   viewInfo.subresourceRange.aspectMask = FormatToAspectFlags(vkFormat);
   viewInfo.subresourceRange.baseMipLevel = 0;
-  viewInfo.subresourceRange.levelCount = static_cast<uint32_t>(descriptor.mipLevelCount);
+  viewInfo.subresourceRange.levelCount = 1;
   viewInfo.subresourceRange.baseArrayLayer = 0;
   viewInfo.subresourceRange.layerCount = 1;
 
