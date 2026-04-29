@@ -1994,7 +1994,7 @@ TGFX_TEST_PRIVATE(LayerTest, GetContourImage) {
   Point offset = {};
   bool contourMatchesContent = false;
   TGFX_PRIVATE_ACCESS(auto contourImage = shapeLayer->getContentContourImage(
-                          drawArgs, 1.0f, &offset, &contourMatchesContent, surface->getCanvas());
+                          drawArgs, 1.0f, &offset, &contourMatchesContent);
                       EXPECT_TRUE(contourImage != nullptr); EXPECT_EQ(offset.x, 10.0f);
                       EXPECT_EQ(offset.y, 10.0f); EXPECT_EQ(contourImage->width(), 80);
                       EXPECT_EQ(contourImage->height(), 80); EXPECT_TRUE(contourMatchesContent);

@@ -667,14 +667,13 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool prepareMask(const DrawArgs& args, Canvas* canvas, std::shared_ptr<MaskFilter>* maskFilter);
 
   MaskData getMaskData(const DrawArgs& args, float scale,
-                       const std::optional<Rect>& layerClipBounds, Canvas* canvas);
+                       const std::optional<Rect>& layerClipBounds);
 
   std::shared_ptr<Picture> getMaskPicture(const DrawArgs& args, bool isContourMode, float scale,
-                                          const Matrix3D& relativeMatrix3D, Canvas* canvas);
+                                          const Matrix3D& relativeMatrix3D);
 
   std::shared_ptr<Image> getContentContourImage(const DrawArgs& args, float contentScale,
-                                                Point* offset, bool* contourMatchesContent,
-                                                Canvas* canvas);
+                                                Point* offset, bool* contourMatchesContent);
 
   bool hasValidMask() const;
 
@@ -700,12 +699,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode);
 
-  SubtreeCache* getValidSubtreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds,
-                                     Canvas* canvas);
+  SubtreeCache* getValidSubtreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds);
 
   std::shared_ptr<Image> createSubtreeCacheImage(const DrawArgs& args, float contentScale,
-                                                 const Rect& scaledBounds, Matrix* drawingMatrix,
-                                                 Canvas* canvas);
+                                                 const Rect& scaledBounds, Matrix* drawingMatrix);
 
   bool drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                             const std::shared_ptr<MaskFilter>& maskFilter);
@@ -760,7 +757,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   friend class RootLayer;
   friend class DisplayList;
   friend class BackgroundCapturer;
-  friend class BackgroundConsumer;
   friend class LayerProperty;
   friend class LayerSerialization;
 };

@@ -347,9 +347,7 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
 
   PictureRecorder recorder;
   auto canvas = recorder.beginRecording();
-  if (subsetImage) {
-    canvas->drawImage(subsetImage, childOffsetX, childOffsetY);
-  }
+  canvas->drawImage(subsetImage, childOffsetX, childOffsetY);
   if (ownImage) {
     canvas->concat(ownToSubImage);
     canvas->drawImage(ownImage);

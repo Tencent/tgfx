@@ -42,7 +42,6 @@
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
 #include "layers/contents/LayerContent.h"
-#include "layers/contents/RRectContent.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
@@ -1146,7 +1145,7 @@ bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
   }
   auto clipBounds = GetClipBounds(canvas);
   auto contentScale = canvas->getMatrix().getMaxScale();
-  auto maskData = getMaskData(args, contentScale, clipBounds, canvas);
+  auto maskData = getMaskData(args, contentScale, clipBounds);
   if (maskData.maskFilter == nullptr) {
     if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
       return false;
@@ -1161,8 +1160,7 @@ bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
 }
 
 std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isContourMode,
-                                               float scale, const Matrix3D& relativeMatrix3D,
-                                               Canvas* /*canvas*/) {
+                                               float scale, const Matrix3D& relativeMatrix3D) {
   // Note: Does not use layerClipBounds here. Using clipBounds may cause PathOp errors when
   // extracting maskPath from the picture, resulting in incorrect clip regions.
   DrawArgs maskArgs = args;
@@ -1200,14 +1198,14 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
 }
 
 MaskData Layer::getMaskData(const DrawArgs& args, float scale,
-                            const std::optional<Rect>& layerClipBounds, Canvas* canvas) {
+                            const std::optional<Rect>& layerClipBounds) {
   DEBUG_ASSERT(_mask != nullptr);
   DEBUG_ASSERT(args.render3DContext == nullptr);
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   auto isContourMode = maskType == LayerMaskType::Contour;
 
   auto relativeMatrix3D = _mask->getRelativeMatrix3D(this);
-  auto maskPicture = getMaskPicture(args, isContourMode, scale, relativeMatrix3D, canvas);
+  auto maskPicture = getMaskPicture(args, isContourMode, scale, relativeMatrix3D);
   if (maskPicture == nullptr) {
     return {};
   }
@@ -1250,8 +1248,7 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
 }
 
 std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float contentScale,
-                                                     Point* offset, bool* contourMatchesContent,
-                                                     Canvas* /*canvas*/) {
+                                                     Point* offset, bool* contourMatchesContent) {
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
@@ -1355,7 +1352,7 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
 
 std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, float contentScale,
                                                       const Rect& layerBounds,
-                                                      Matrix* drawingMatrix, Canvas* /*canvas*/) {
+                                                      Matrix* drawingMatrix) {
   DEBUG_ASSERT(drawingMatrix != nullptr);
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
@@ -1406,7 +1403,7 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 }
 
 SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
-                                          const Rect& layerBounds, Canvas* canvas) {
+                                          const Rect& layerBounds) {
   if (subtreeCache->hasCache(args.context, longEdge)) {
     return subtreeCache.get();
   }
@@ -1419,7 +1416,7 @@ SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
   }
   auto cacheScale = static_cast<float>(longEdge) / maxBoundsSize;
   auto imageMatrix = Matrix::I();
-  auto image = createSubtreeCacheImage(args, cacheScale, layerBounds, &imageMatrix, canvas);
+  auto image = createSubtreeCacheImage(args, cacheScale, layerBounds, &imageMatrix);
   if (image == nullptr) {
     return nullptr;
   }
@@ -1436,7 +1433,7 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
   auto layerBounds = getBounds();
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto longEdge = GetMipmapCacheLongEdge(args.subtreeCacheMaxSize, contentScale, layerBounds);
-  auto cache = getValidSubtreeCache(args, longEdge, layerBounds, canvas);
+  auto cache = getValidSubtreeCache(args, longEdge, layerBounds);
   if (cache == nullptr) {
     return false;
   }
@@ -1556,7 +1553,7 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
   if (!contentOnly && hasValidMask()) {
     auto contentScale = canvas->getMatrix().getMaxScale();
     auto clipBounds = GetClipBounds(canvas);
-    auto maskData = getMaskData(args, contentScale, clipBounds, canvas);
+    auto maskData = getMaskData(args, contentScale, clipBounds);
     if (maskData.maskFilter == nullptr) {
       if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
         return allMatch;
@@ -1572,8 +1569,7 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
     auto contentScale = canvas->getMatrix().getMaxScale();
     auto offset = Point::Zero();
     bool contourMatchesContent = true;
-    auto image =
-        getContentContourImage(args, contentScale, &offset, &contourMatchesContent, canvas);
+    auto image = getContentContourImage(args, contentScale, &offset, &contourMatchesContent);
     if (image == nullptr) {
       return allMatch;
     }
@@ -1770,8 +1766,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     bool allContourMatch = false;
     if (needContour[i]) {
       LayerStyleSourceEntry contourEntry = {};
-      contourEntry.image = getContentContourImage(drawArgs, contentScale, &contourEntry.offset,
-                                                  &allContourMatch, nullptr);
+      contourEntry.image =
+          getContentContourImage(drawArgs, contentScale, &contourEntry.offset, &allContourMatch);
       if (contourEntry.image == nullptr) {
         return nullptr;
       }
