@@ -4705,12 +4705,12 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto group5 = VectorGroup::Make();
   group5->setElements({rect5, stroke5});
 
-  // Row 6: Double-zero Rectangle (width=0 AND height=0) collapses to a degenerate moveTo+lineTo
-  // with both endpoints overlapping; it stays an open path so LineCap drives whether any pixels
-  // get emitted. Three dots side by side exercise each cap: Butt produces no output on a
-  // zero-length segment, Round renders a 48px-diameter disk, and Square renders a 48px filled
-  // square. All three share the same Center-aligned 48px stroke and a diagonal red->blue fit
-  // gradient so the visible caps show the full gradient across their bounding square.
+  // Row 6: Three Center-aligned 48px stroke samples on a double-zero Rectangle (collapses to a
+  // moveTo+lineTo with overlapping endpoints, so LineCap drives whether anything renders): Butt
+  // produces no pixels on a zero-length segment, Round paints a 48px-diameter disk, and Square
+  // paints a 48px filled square. Each cap pairs with a fit linear gradient (Round: diagonal,
+  // Square: vertical) so the epsilon fit-axis fallback turns the zero-extent bounds into a
+  // sharp two-color split exactly along the gradient's perpendicular.
   const std::array<std::pair<float, LineCap>, 3> dotCaps = {{
       {120.0f, LineCap::Butt},
       {300.0f, LineCap::Round},
@@ -4722,8 +4722,9 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
     auto dotRect = Rectangle::Make();
     dotRect->setPosition({cx, 546});
     dotRect->setSize({0, 0});
-    auto dotGradient =
-        Gradient::MakeLinear({0.0f, 0.0f}, {1.0f, 1.0f}, {Color::Red(), Color::Blue()});
+    Point gradStart = {0.0f, 0.0f};
+    Point gradEnd = (cap == LineCap::Square) ? Point{0.0f, 1.0f} : Point{1.0f, 1.0f};
+    auto dotGradient = Gradient::MakeLinear(gradStart, gradEnd, {Color::Red(), Color::Blue()});
     auto dotStroke = StrokeStyle::Make(dotGradient);
     dotStroke->setStrokeWidth(48.0f);
     dotStroke->setLineCap(cap);
