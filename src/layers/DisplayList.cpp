@@ -1084,7 +1084,10 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(Surface* 
   }
   auto viewMatrix = getViewMatrix();
   DEBUG_ASSERT(viewMatrix.invertible());
+  // Grow the bg source to also cover tile regions that extend past the screen edge, so blur
+  // footprints in those out-of-screen tile portions still find backdrop pixels.
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
+  surfaceRect.join(drawRect);
   // The capture pass replays the entire layer tree onto the bg source's surface. Every
   // Background-sourced LayerStyle is intercepted by BackgroundCapturer, which samples the surface
   // at that point and stores a snapshot in snapshotMap; the style itself is skipped so that its
