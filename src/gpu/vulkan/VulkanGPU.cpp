@@ -22,8 +22,10 @@
 #include <vector>
 #include "gpu/vulkan/VulkanBuffer.h"
 #include "gpu/vulkan/VulkanCommandQueue.h"
+#include "gpu/vulkan/VulkanRenderPipeline.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "gpu/vulkan/VulkanSampler.h"
+#include "gpu/vulkan/VulkanShaderModule.h"
 #include "gpu/vulkan/VulkanTexture.h"
 #include "gpu/vulkan/VulkanUtil.h"
 #include "core/utils/Log.h"
@@ -290,15 +292,14 @@ std::shared_ptr<Sampler> VulkanGPU::createSampler(const SamplerDescriptor& descr
   return sampler;
 }
 
-std::shared_ptr<ShaderModule> VulkanGPU::createShaderModule(const ShaderModuleDescriptor&) {
-  // TODO: Implement in Phase 3D (VulkanShaderModule).
-  return nullptr;
+std::shared_ptr<ShaderModule> VulkanGPU::createShaderModule(
+    const ShaderModuleDescriptor& descriptor) {
+  return VulkanShaderModule::Make(this, descriptor);
 }
 
 std::shared_ptr<RenderPipeline> VulkanGPU::createRenderPipeline(
-    const RenderPipelineDescriptor&) {
-  // TODO: Implement in Phase 3D (VulkanRenderPipeline).
-  return nullptr;
+    const RenderPipelineDescriptor& descriptor) {
+  return VulkanRenderPipeline::Make(this, descriptor);
 }
 
 std::shared_ptr<CommandEncoder> VulkanGPU::createCommandEncoder() {
