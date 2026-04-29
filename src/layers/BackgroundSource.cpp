@@ -316,10 +316,11 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
   if (!parent->imageMatrix.invert(&parentSurfaceMatrix)) {
     return ownImage;
   }
-  int width = static_cast<int>(
-      std::max(1, FloatCeilToInt(backgroundRect.width() * parentSurfaceMatrix.getMaxScale())));
-  int height = static_cast<int>(
-      std::max(1, FloatCeilToInt(backgroundRect.height() * parentSurfaceMatrix.getMaxScale())));
+  int width = FloatCeilToInt(backgroundRect.width() * parentSurfaceMatrix.getMaxScale());
+  int height = FloatCeilToInt(backgroundRect.height() * parentSurfaceMatrix.getMaxScale());
+  if (width <= 0 || height <= 0) {
+    return ownImage;
+  }
 
   auto subsetRect = Rect::MakeXYWH(surfaceOffset.x, surfaceOffset.y, static_cast<float>(width),
                                    static_cast<float>(height));
