@@ -4934,7 +4934,7 @@ static std::vector<std::shared_ptr<VectorElement>> MakeStrokeAlignCellContents(
     auto pattern = ImagePattern::Make(image);
     pattern->setScaleMode(ScaleMode::LetterBox);
     source = pattern;
-    align = StrokeAlign::Outside;
+    align = StrokeAlign::Center;
   } else {
     source = Gradient::MakeLinear({0.0f, 0.5f}, {1.0f, 0.5f}, gradientColors);
     align = StrokeAlign::Outside;
@@ -5097,7 +5097,7 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
     contents.push_back(WrapInOuterGroup(innerGroup, {cx, cy}, 30.0f, {1.0f, 1.0f}));
   }
 
-  // Row 4, cols 0-2: StrokeAlign Inside/Outside with fit color sources under outer rotation.
+  // Row 4, cols 0-2: StrokeAlign Inside/Center/Outside with fit color sources under outer rotation.
   for (int col = 0; col < 3; col++) {
     float cx = cellCenterX(col);
     float cy = cellCenterY(3);
