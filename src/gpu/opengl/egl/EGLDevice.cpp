@@ -37,18 +37,6 @@
 #define EGL_LOSE_CONTEXT_ON_RESET_EXT 0x31BF
 #endif
 
-#ifndef GL_GUILTY_CONTEXT_RESET
-#define GL_GUILTY_CONTEXT_RESET 0x8253
-#endif
-
-#ifndef GL_INNOCENT_CONTEXT_RESET
-#define GL_INNOCENT_CONTEXT_RESET 0x8254
-#endif
-
-#ifndef GL_UNKNOWN_CONTEXT_RESET
-#define GL_UNKNOWN_CONTEXT_RESET 0x8255
-#endif
-
 namespace tgfx {
 static std::vector<EGLint> GetValidAttributes(const std::vector<EGLint>& attributes) {
   if (!attributes.empty() && attributes.back() == EGL_NONE) {
