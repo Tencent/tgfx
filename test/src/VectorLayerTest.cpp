@@ -4705,29 +4705,34 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto group5 = VectorGroup::Make();
   group5->setElements({rect5, stroke5});
 
-  // Row 6: Three Center-aligned 96px stroke samples on a double-zero Rectangle (collapses to a
-  // moveTo+lineTo with overlapping endpoints, so LineCap drives whether anything renders): Butt
-  // produces no pixels on a zero-length segment, Round paints a 96px-diameter disk, and Square
-  // paints a 96px filled square. Each cap pairs with a fit linear gradient (Round: diagonal,
-  // Square: vertical) so the epsilon fit-axis fallback turns the zero-extent bounds into a
-  // sharp two-color split exactly along the gradient's perpendicular.
-  const std::array<std::pair<float, LineCap>, 3> dotCaps = {{
-      {120.0f, LineCap::Butt},
-      {300.0f, LineCap::Round},
-      {480.0f, LineCap::Square},
+  // Row 6: Three Center-aligned 96px stroke samples sharing a fit linear gradient. Round and
+  // Square sit on a double-zero Rectangle (collapses to a moveTo+lineTo with overlapping
+  // endpoints): Round paints a 96px-diameter disk split diagonally red/blue, Square paints a
+  // 96px filled square split horizontally red/blue. The third sample uses a real 50x10
+  // Rectangle so the same vertical gradient fills the stroked band continuously instead of
+  // collapsing to the epsilon-driven hard split.
+  struct DotConfig {
+    float cx;
+    LineCap cap;
+    Size size;
+    Point gradEnd;
+  };
+  const std::array<DotConfig, 3> dotConfigs = {{
+      {110.0f, LineCap::Round, {0.0f, 0.0f}, {1.0f, 1.0f}},
+      {290.0f, LineCap::Square, {0.0f, 0.0f}, {0.0f, 1.0f}},
+      {470.0f, LineCap::Butt, {50.0f, 10.0f}, {0.0f, 1.0f}},
   }};
   std::vector<std::shared_ptr<VectorGroup>> dotGroups;
-  dotGroups.reserve(dotCaps.size());
-  for (const auto& [cx, cap] : dotCaps) {
+  dotGroups.reserve(dotConfigs.size());
+  for (const auto& config : dotConfigs) {
     auto dotRect = Rectangle::Make();
-    dotRect->setPosition({cx, 450});
-    dotRect->setSize({0, 0});
-    Point gradStart = {0.0f, 0.0f};
-    Point gradEnd = (cap == LineCap::Square) ? Point{0.0f, 1.0f} : Point{1.0f, 1.0f};
-    auto dotGradient = Gradient::MakeLinear(gradStart, gradEnd, {Color::Red(), Color::Blue()});
+    dotRect->setPosition({config.cx, 450});
+    dotRect->setSize(config.size);
+    auto dotGradient =
+        Gradient::MakeLinear({0.0f, 0.0f}, config.gradEnd, {Color::Red(), Color::Blue()});
     auto dotStroke = StrokeStyle::Make(dotGradient);
     dotStroke->setStrokeWidth(96.0f);
-    dotStroke->setLineCap(cap);
+    dotStroke->setLineCap(config.cap);
     dotStroke->setStrokeAlign(StrokeAlign::Center);
     auto dotGroup = VectorGroup::Make();
     dotGroup->setElements({dotRect, dotStroke});
