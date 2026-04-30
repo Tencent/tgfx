@@ -3002,7 +3002,6 @@ TGFX_TEST(CanvasTest, TurbulenceTileSize) {
 }
 
 TGFX_TEST(CanvasTest, EmptyRectStroke) {
-  // Mirrors the Skia fiddle that probes drawRect(emptyRect, strokePaint) behaviour.
   // Layout (256x256 canvas):
   //   Row 0 (y=60):  double-zero rect  (w=0, h=0)
   //   Row 1 (y=170): single-zero rect  (w=60, h=0)
