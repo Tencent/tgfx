@@ -3001,4 +3001,78 @@ TGFX_TEST(CanvasTest, TurbulenceTileSize) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/TurbulenceTileSize"));
 }
 
+TGFX_TEST(CanvasTest, EmptyRectStroke) {
+  // Compares drawRect(emptyRect) against drawRRect(emptyRect with non-zero radii).
+  // Layout (256x256 canvas):
+  //   Top half  (y=30):  drawRect  - row 0 double-zero (0x0), row 1 single-zero (60x0)
+  //   Bottom half (y=150): drawRRect with radii=10 - row 0 double-zero (0x0),
+  //                                                  row 1 single-zero vertical (0x60)
+  //   Columns: Butt / Square / Round
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 256, 256);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  const float strokeWidth = 16.0f;
+  const float rrectRadius = 10.0f;
+  const float colSpacing = 76.0f;
+  const float originX = 40.0f;
+
+  LineCap caps[3] = {LineCap::Butt, LineCap::Square, LineCap::Round};
+
+  Paint stroke = {};
+  stroke.setStyle(PaintStyle::Stroke);
+  stroke.setColor(Color::FromRGBA(0, 0, 255, 255));
+  stroke.setAntiAlias(true);
+
+  Paint mark = {};
+  mark.setColor(Color::FromRGBA(255, 0, 0, 255));
+  mark.setAntiAlias(true);
+
+  auto drawCell = [&](float cx, float cy, LineCap cap, bool useRRect, bool doubleZero,
+                      bool vertical) {
+    canvas->drawCircle(cx, cy, 1.5f, mark);
+    Stroke s(strokeWidth);
+    s.cap = cap;
+    stroke.setStroke(s);
+    Rect rect;
+    if (doubleZero) {
+      rect = Rect::MakeXYWH(cx, cy, 0.0f, 0.0f);
+    } else if (vertical) {
+      rect = Rect::MakeXYWH(cx, cy - 30.0f, 0.0f, 60.0f);
+    } else {
+      rect = Rect::MakeXYWH(cx - 30.0f, cy, 60.0f, 0.0f);
+    }
+    if (useRRect) {
+      RRect rRect = {};
+      rRect.setRectXY(rect, rrectRadius, rrectRadius);
+      canvas->drawRRect(rRect, stroke);
+    } else {
+      canvas->drawRect(rect, stroke);
+    }
+  };
+
+  // Top half: drawRect
+  float y = 30.0f;
+  for (int col = 0; col < 3; ++col) {
+    float cx = originX + static_cast<float>(col) * colSpacing;
+    drawCell(cx, y, caps[col], false, true, false);
+    drawCell(cx, y + 50.0f, caps[col], false, false, false);
+  }
+
+  // Bottom half: drawRRect with non-zero radii. Second row uses a vertical 0x60 rect to
+  // exercise the orthogonal single-zero orientation.
+  y = 150.0f;
+  for (int col = 0; col < 3; ++col) {
+    float cx = originX + static_cast<float>(col) * colSpacing;
+    drawCell(cx, y, caps[col], true, true, false);
+    drawCell(cx, y + 50.0f, caps[col], true, false, true);
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/EmptyRectStroke"));
+}
+
 }  // namespace tgfx

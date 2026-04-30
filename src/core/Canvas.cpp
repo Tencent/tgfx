@@ -245,6 +245,28 @@ void Canvas::drawLine(const Point line[2], const Matrix& matrix, const ClipStack
 
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   if (rect.isEmpty()) {
+    auto stroke = paint.getStroke();
+    if (stroke == nullptr || stroke->width <= 0.0f) {
+      return;
+    }
+    bool zeroWidth = rect.width() == 0.0f;
+    bool zeroHeight = rect.height() == 0.0f;
+    // Double-zero rect with Butt cap produces no geometry.
+    if (zeroWidth && zeroHeight && stroke->cap == LineCap::Butt) {
+      return;
+    }
+    float halfWidth = stroke->width * 0.5f;
+    Rect outset = rect;
+    outset.outset(zeroWidth ? halfWidth : 0.0f, zeroHeight ? halfWidth : 0.0f);
+    SaveLayerForImageFilter(paint.getImageFilter());
+    auto brush = paint.getBrush();
+    if (zeroWidth && zeroHeight && stroke->cap == LineCap::Round) {
+      RRect oval = {};
+      oval.setOval(outset);
+      drawContext->drawRRect(oval, _matrix, *clipStack, brush, nullptr);
+    } else {
+      drawContext->drawRect(outset, _matrix, *clipStack, brush, nullptr);
+    }
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
@@ -312,6 +334,7 @@ static bool UseDrawPath(const Paint& paint, const Point& radii, const Matrix& vi
 
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
   if (rRect.rect.isEmpty()) {
+    drawRect(rRect.rect, paint);
     return;
   }
   auto& radii = rRect.radii;

@@ -70,10 +70,8 @@ void Rectangle::apply(VectorContext* context) {
     auto halfWidth = _size.width * 0.5f;
     auto halfHeight = _size.height * 0.5f;
     Path path;
-    // When either side is zero the rectangle collapses to a single line segment (or a single
-    // point when both sides are zero). Emitting a moveTo+lineTo keeps the path open so LineCap
-    // can render the stroke; a closed degenerate addRoundRect would swallow caps and produce
-    // no pixels for non-Round/Square caps.
+    // A degenerate rectangle is treated as an open line segment (or a single point when both
+    // sides are zero).
     bool degenerate = _size.width == 0.0f || _size.height == 0.0f;
     if (degenerate) {
       Point p0 = {_position.x - halfWidth, _position.y - halfHeight};
