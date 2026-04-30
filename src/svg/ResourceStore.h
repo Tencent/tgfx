@@ -136,7 +136,7 @@ class ResourceStore {
   std::unordered_map<std::string, std::string> filterCache;
   std::unordered_map<std::string, std::string> clipCache;
   std::unordered_map<std::string, std::string> maskCache;
-  
+
   uint32_t gradientCount = 0;
   uint32_t pathCount = 0;
   uint32_t imageCount = 0;
