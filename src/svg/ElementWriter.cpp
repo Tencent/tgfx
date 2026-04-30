@@ -613,11 +613,11 @@ void ElementWriter::addGradientShaderResources(const GradientShader* shader, con
 
   DEBUG_ASSERT(info.colors.size() == info.positions.size());
   if (type == GradientType::Linear) {
-    resources->paintColor = "url(#" + addLinearGradientDef(info, matrix) + ")";
+    resources->paintColor = "url(#" + addLinearGradientDef(info, matrix, type) + ")";
   } else if (type == GradientType::Radial) {
-    resources->paintColor = "url(#" + addRadialGradientDef(info, matrix) + ")";
+    resources->paintColor = "url(#" + addRadialGradientDef(info, matrix, type) + ")";
   } else {
-    resources->paintColor = "url(#" + addUnsupportedGradientDef(info, matrix) + ")";
+    resources->paintColor = "url(#" + addUnsupportedGradientDef(info, matrix, type) + ")";
     reportUnsupportedElement("Unsupported gradient type");
   }
 }
@@ -649,9 +649,9 @@ void ElementWriter::addGradientColors(const GradientInfo& info) {
   }
 }
 
-std::string ElementWriter::addLinearGradientDef(const GradientInfo& info, const Matrix& matrix) {
+std::string ElementWriter::addLinearGradientDef(const GradientInfo& info, const Matrix& matrix, GradientType type) {
   DEBUG_ASSERT(resourceStore);
-  std::string key = "linear_" + std::to_string(info.type) + "_" +
+  std::string key = "linear_" + std::to_string(static_cast<int>(type)) + "_" +
                     std::to_string(info.points[0].x) + "_" +
                     std::to_string(info.points[0].y) + "_" +
                     std::to_string(info.points[1].x) + "_" +
@@ -677,9 +677,9 @@ std::string ElementWriter::addLinearGradientDef(const GradientInfo& info, const 
   return id;
 }
 
-std::string ElementWriter::addRadialGradientDef(const GradientInfo& info, const Matrix& matrix) {
+std::string ElementWriter::addRadialGradientDef(const GradientInfo& info, const Matrix& matrix, GradientType type) {
   DEBUG_ASSERT(resourceStore);
-  std::string key = "radial_" + std::to_string(info.type) + "_" +
+  std::string key = "radial_" + std::to_string(static_cast<int>(type)) + "_" +
                     std::to_string(info.points[0].x) + "_" +
                     std::to_string(info.points[0].y) + "_" +
                     std::to_string(info.points[1].x) + "_" +
@@ -705,9 +705,9 @@ std::string ElementWriter::addRadialGradientDef(const GradientInfo& info, const 
 }
 
 std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info,
-                                                     const Matrix& matrix) {
+                                                     const Matrix& matrix, GradientType type) {
   DEBUG_ASSERT(resourceStore);
-  std::string key = "unsupported_" + std::to_string(info.type) + "_" +
+  std::string key = "unsupported_" + std::to_string(static_cast<int>(type)) + "_" +
                     std::to_string(info.points[0].x) + "_" +
                     std::to_string(info.points[0].y) + "_" +
                     std::to_string(info.points[1].x) + "_" +
