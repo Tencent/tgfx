@@ -149,16 +149,27 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& /*args*/, Canvas* c
 
 void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
                              std::shared_ptr<BackgroundSource> bgSource,
-                             BackgroundSnapshotMap* snapshots) {
+                             BackgroundSnapshotMap* snapshots, const std::vector<Rect>& drawRects) {
   DEBUG_ASSERT(captureRoot != nullptr);
   DEBUG_ASSERT(bgSource != nullptr);
   DEBUG_ASSERT(snapshots != nullptr);
+  if (drawRects.empty()) {
+    return;
+  }
   auto* bgCanvas = bgSource->getCanvas();
   AutoCanvasRestore autoRestore(bgCanvas);
   BackgroundCapturer capturer(snapshots, std::move(bgSource));
   DrawArgs captureArgs = baseArgs;
   captureArgs.backgroundHandler = &capturer;
-  captureRoot->drawLayer(captureArgs, bgCanvas, 1.0f, BlendMode::SrcOver);
+  // Replay the capture pass once per rect with renderRect scoped to that rect. This avoids
+  // visiting Layers that fall in the gaps between scattered dirty regions when the caller passes
+  // more than one rect. snapshots->emplace is first-wins, so if a layer's snapshot was already
+  // captured in an earlier rect pass it is not overwritten by a later one.
+  for (const auto& rect : drawRects) {
+    Rect renderRect = rect;
+    captureArgs.renderRect = &renderRect;
+    captureRoot->drawLayer(captureArgs, bgCanvas, 1.0f, BlendMode::SrcOver);
+  }
 }
 
 }  // namespace tgfx

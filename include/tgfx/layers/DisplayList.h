@@ -355,8 +355,8 @@ class DisplayList {
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear, const BackgroundSnapshotMap* snapshots) const;
 
-  std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(Surface* surface,
-                                                            const Rect& drawRect) const;
+  std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(
+      Surface* surface, const std::vector<Rect>& drawRects) const;
 
   void updateMousePosition();
 };

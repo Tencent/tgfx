@@ -931,8 +931,11 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
             createBackgroundSource(context, backgroundRect, backgroundMatrix,
                                    bounds == clippedBounds, std::move(captureColorSpace))) {
       // Replay from _root so ancestor matrices apply; orphan layers replay from themselves.
+      // The capture rect is in the captureRoot's local coordinate space: world (root-local) when
+      // rooted, or this layer's local bounds when orphan.
       Layer* captureRoot = _root ? _root : this;
-      BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), &snapshotMap);
+      Rect captureRect = _root ? renderRect : clippedBounds;
+      BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), &snapshotMap, {captureRect});
     }
   }
 
@@ -2116,8 +2119,7 @@ void Layer::collectBackgroundOutsets(float contentScale, float* maxOutset, float
   }
   float nodeOutset = 0.0f;
   for (const auto& style : _layerStyles) {
-    if (style == nullptr ||
-        style->extraSourceType() != LayerStyleExtraSourceType::Background) {
+    if (style == nullptr || style->extraSourceType() != LayerStyleExtraSourceType::Background) {
       continue;
     }
     auto outset = style->filterBackground(Rect::MakeEmpty(), contentScale);
@@ -2161,8 +2163,8 @@ std::shared_ptr<BackgroundSource> Layer::createBackgroundSource(
     return nullptr;
   }
   auto scale = viewMatrix.getMaxScale();
-  return BackgroundSource::Make(context, drawRect, maxOutset * scale, minOutset * scale,
-                                viewMatrix, colorSpace);
+  return BackgroundSource::Make(context, drawRect, maxOutset * scale, minOutset * scale, viewMatrix,
+                                colorSpace);
 }
 
 bool Layer::canPreserve3D() const {

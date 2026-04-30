@@ -204,8 +204,8 @@ class PictureBackgroundSource : public BackgroundSource {
   PictureBackgroundSource(PictureRecorder* borrowedRecorder, const Matrix& imageMatrix,
                           const Rect& rect, int width, int height, float surfaceScale,
                           std::shared_ptr<ColorSpace> colorSpace)
-      : BackgroundSource(imageMatrix, rect, surfaceScale, std::move(colorSpace)),
-        pixelWidth(width), pixelHeight(height), recorder(borrowedRecorder) {
+      : BackgroundSource(imageMatrix, rect, surfaceScale, std::move(colorSpace)), pixelWidth(width),
+        pixelHeight(height), recorder(borrowedRecorder) {
     DEBUG_ASSERT(recorder->getRecordingCanvas() != nullptr);
   }
 
@@ -395,9 +395,9 @@ std::shared_ptr<BackgroundSource> BackgroundSource::createSubPicture(PictureReco
   if (!geometry.valid) {
     return nullptr;
   }
-  auto sub = std::make_shared<PictureBackgroundSource>(
-      subRecorder, geometry.childImageMatrix, geometry.childWorldRect, geometry.width,
-      geometry.height, _surfaceScale, colorSpace);
+  auto sub = std::make_shared<PictureBackgroundSource>(subRecorder, geometry.childImageMatrix,
+                                                       geometry.childWorldRect, geometry.width,
+                                                       geometry.height, _surfaceScale, colorSpace);
   sub->parent = this;
   sub->surfaceOffset = geometry.childSurfaceOffset;
   sub->surfaceToWorld = geometry.childSurfaceToWorld;

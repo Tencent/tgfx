@@ -19,6 +19,8 @@
 #pragma once
 
 #include <memory>
+#include <vector>
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 
@@ -80,9 +82,14 @@ class BackgroundCapturer : public BackgroundHandler {
   std::unique_ptr<BackgroundHandler> cloneWithSource(
       std::shared_ptr<BackgroundSource> newSource) const override;
 
-  // Runs a capture pass: replays captureRoot onto bgSource's canvas, populating snapshots.
+  // Runs a capture pass: replays captureRoot onto bgSource's canvas, populating snapshots. When
+  // drawRects contains more than one entry, the replay is invoked once per rect with that rect
+  // as the renderRect — that avoids replaying Layers that fall in the bounding gaps between
+  // dirty regions. The bg source itself is still a single rectangle (sized to the rects' union)
+  // because it is backed by a real Surface or Picture; only the cull window varies per pass.
   static void Run(Layer* captureRoot, const DrawArgs& baseArgs,
-                  std::shared_ptr<BackgroundSource> bgSource, BackgroundSnapshotMap* snapshots);
+                  std::shared_ptr<BackgroundSource> bgSource, BackgroundSnapshotMap* snapshots,
+                  const std::vector<Rect>& drawRects);
 
  private:
   BackgroundSnapshotMap* snapshots = nullptr;
