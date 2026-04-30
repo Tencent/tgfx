@@ -187,8 +187,8 @@ class PictureBackgroundSource : public BackgroundSource {
   PictureBackgroundSource(const Matrix& surfaceMatrix, const Matrix& imageMatrix, const Rect& rect,
                           int width, int height, float surfaceScale,
                           std::shared_ptr<ColorSpace> colorSpace)
-      : BackgroundSource(imageMatrix, rect, surfaceScale, std::move(colorSpace)),
-        pixelWidth(width), pixelHeight(height) {
+      : BackgroundSource(imageMatrix, rect, surfaceScale, std::move(colorSpace)), pixelWidth(width),
+        pixelHeight(height) {
     recorder = &ownedRecorder;
     auto* canvas = recorder->beginRecording();
     canvas->setMatrix(surfaceMatrix);
@@ -362,14 +362,21 @@ std::shared_ptr<BackgroundSource> BackgroundSource::createSubSurface(Surface* su
   if (!geometry.valid) {
     return nullptr;
   }
+  // For a borrowed surface, pixel (0,0) of the carrier corresponds to localToSurface^{-1}(0,0) in
+  // local space. Compute surfaceToWorld from localToWorld and localToSurface directly rather than
+  // using geometry.childSurfaceToWorld, which assumes a dedicated sub surface whose origin aligns
+  // with childSurfaceRect.topLeft. The Picture variant does not share this issue because its image
+  // is explicitly sized to childSurfaceRect dimensions with a matching origin.
+  Matrix surfaceToLocal = Matrix::I();
+  if (!localToSurface.invert(&surfaceToLocal)) {
+    return nullptr;
+  }
   auto sub = std::make_shared<SurfaceBackgroundSource>(subSurface, geometry.childImageMatrix,
                                                        geometry.childWorldRect, colorSpace);
-  // Do not touch the sub surface or its canvas here — the carrier owns it and has already
-  // seeded/cleared/setMatrix as part of its own lifecycle. The sub bg source is a pure query
-  // handle that records the geometry linking the sub to the parent.
   sub->parent = this;
   sub->surfaceOffset = geometry.childSurfaceOffset;
-  sub->surfaceToWorld = geometry.childSurfaceToWorld;
+  sub->surfaceToWorld = localToWorld;
+  sub->surfaceToWorld.preConcat(surfaceToLocal);
   return sub;
 }
 

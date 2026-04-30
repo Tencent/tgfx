@@ -878,4 +878,47 @@ TGFX_TEST(BackgroundBlurTest, PictureSubFlushPreservesCarrierMatrix) {
   EXPECT_EQ(wrongSpot.alpha, 0.0f);
 }
 
+// Regression: when a container layer has alpha < 1 and allowsGroupOpacity = true, it creates an
+// offscreen carrier whose pixel origin differs from the root surface. A BackgroundBlurStyle child
+// nested inside that container must still produce the correct background image without a visible
+// shift at the top-left corner.
+TGFX_TEST(BackgroundBlurTest, GroupOpacityNestedBackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto oldGroupOpacity = Layer::DefaultAllowsGroupOpacity();
+  Layer::SetDefaultAllowsGroupOpacity(true);
+  DisplayList displayList;
+
+  // Use an image background so any pixel offset is clearly visible in the blur result.
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  background->setMatrix(Matrix::MakeScale(2));
+
+  // Container with alpha < 1 triggers offscreen carrier under groupOpacity.
+  auto container = Layer::Make();
+  container->setAlpha(0.8f);
+  container->setMatrix(Matrix::MakeTrans(50, 50));
+
+  // The blur child sits inside the container. Its surface-to-world path exercises
+  // createSubSurface with a non-zero carrier origin offset.
+  auto blurChild = SolidLayer::Make();
+  blurChild->setColor(Color::FromRGBA(255, 255, 255, 60));
+  blurChild->setWidth(150);
+  blurChild->setHeight(100);
+  blurChild->setMatrix(Matrix::MakeTrans(25, 25));
+  blurChild->setLayerStyles({BackgroundBlurStyle::Make(8, 8)});
+  container->addChild(blurChild);
+
+  auto rootLayer = displayList.root();
+  rootLayer->addChild(background);
+  rootLayer->addChild(container);
+
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/GroupOpacityNestedBackgroundBlur"));
+
+  Layer::SetDefaultAllowsGroupOpacity(oldGroupOpacity);
+}
+
 }  // namespace tgfx
