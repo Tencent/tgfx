@@ -691,6 +691,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
   // Returns true when any descendant (excluding this layer itself) has a background-sourced style.
   bool hasDescendantBackgroundStyle();
 
+  // Recursively sums this subtree's Background-sourced style outsets (+ the outer imageFilter
+  // sampling outset when a node has both). Writes the maximum and minimum observed outsets.
+  // Used by createBackgroundSource when the cached {max,min}BackgroundOutset cannot be trusted
+  // (orphan Layers skip updateRenderBounds and therefore never populate the cache).
+  void collectBackgroundOutsets(float contentScale, float* maxOutset, float* minOutset);
+
   std::shared_ptr<BackgroundSource> createBackgroundSource(
       Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
       std::shared_ptr<ColorSpace> colorSpace = nullptr) const;

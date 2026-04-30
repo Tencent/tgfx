@@ -2104,18 +2104,65 @@ bool Layer::hasDescendantBackgroundStyle() {
   return false;
 }
 
+// Walks `this` subtree and folds every Background-sourced style's filter outset (plus the
+// outer imageFilter's sampling outset when both coexist on the same node) into max/min trackers.
+// Mirrors the per-node branch in updateRenderBounds — except it does not rely on the cached
+// {max,min}BackgroundOutset fields, which are only populated after updateRenderBounds actually
+// runs. Orphan Layers invoked via Layer::draw never run updateRenderBounds, so createBackground-
+// Source computes outsets on the fly instead of reading the stale cache.
+void Layer::collectBackgroundOutsets(float contentScale, float* maxOutset, float* minOutset) {
+  if (!bitFields.visible || _alpha <= 0.0f) {
+    return;
+  }
+  float nodeOutset = 0.0f;
+  for (const auto& style : _layerStyles) {
+    if (style == nullptr ||
+        style->extraSourceType() != LayerStyleExtraSourceType::Background) {
+      continue;
+    }
+    auto outset = style->filterBackground(Rect::MakeEmpty(), contentScale);
+    nodeOutset = std::max(nodeOutset, outset.right);
+    nodeOutset = std::max(nodeOutset, outset.bottom);
+  }
+  if (nodeOutset > 0.0f && !_filters.empty()) {
+    auto imageFilter = getImageFilter(contentScale);
+    if (imageFilter) {
+      auto baseBounds = imageFilter->filterBounds(Rect::MakeEmpty(), MapDirection::Reverse);
+      if (!baseBounds.isEmpty()) {
+        nodeOutset +=
+            std::max({-baseBounds.left, -baseBounds.top, baseBounds.right, baseBounds.bottom});
+      }
+    }
+  }
+  if (nodeOutset > 0.0f) {
+    *maxOutset = std::max(*maxOutset, nodeOutset);
+    *minOutset = std::min(*minOutset, nodeOutset);
+  }
+  // Accumulate the local matrix scale so descendants see the same contentScale that
+  // updateRenderBounds threads through its RegionTransformer chain. Without this, a layer with a
+  // scaled ancestor would compute its filterBackground outset in an unscaled frame and the bg
+  // source would come out at the wrong size.
+  for (const auto& child : _children) {
+    auto childScale = contentScale * child->getMatrixWithScrollRect().asMatrix().getMaxScale();
+    child->collectBackgroundOutsets(childScale, maxOutset, minOutset);
+  }
+}
+
 std::shared_ptr<BackgroundSource> Layer::createBackgroundSource(
     Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer,
     std::shared_ptr<ColorSpace> colorSpace) const {
-  if (maxBackgroundOutset <= 0.0f) {
-    return nullptr;
-  }
   if (fullLayer) {
     return BackgroundSource::Make(context, drawRect, 0, 0, viewMatrix, colorSpace);
   }
+  float maxOutset = 0.0f;
+  float minOutset = std::numeric_limits<float>::max();
+  const_cast<Layer*>(this)->collectBackgroundOutsets(1.0f, &maxOutset, &minOutset);
+  if (maxOutset <= 0.0f) {
+    return nullptr;
+  }
   auto scale = viewMatrix.getMaxScale();
-  return BackgroundSource::Make(context, drawRect, maxBackgroundOutset * scale,
-                                minBackgroundOutset * scale, viewMatrix, colorSpace);
+  return BackgroundSource::Make(context, drawRect, maxOutset * scale, minOutset * scale,
+                                viewMatrix, colorSpace);
 }
 
 bool Layer::canPreserve3D() const {

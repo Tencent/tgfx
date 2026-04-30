@@ -922,4 +922,58 @@ TGFX_TEST(BackgroundBlurTest, GroupOpacityNestedBackgroundBlur) {
   Layer::SetDefaultAllowsGroupOpacity(oldGroupOpacity);
 }
 
+// Regression: when Layer::draw is invoked against a canvas that has no backing Surface (e.g. a
+// PictureRecorder canvas used for PDF/SVG export), args.context is nullptr and the capture pass
+// creates a Picture-backed top-level BackgroundSource. Nested group-opacity carriers inside the
+// capture tree then walk RenderContentOnPicture(wantsSubBackground=true) — a path that must
+// still stamp the sub's ownImage at the carrier's imageClip top-left, not at segment (0,0).
+TGFX_TEST(BackgroundBlurTest, GroupOpacityNestedBackgroundBlurPicturePath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto oldGroupOpacity = Layer::DefaultAllowsGroupOpacity();
+  Layer::SetDefaultAllowsGroupOpacity(true);
+
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  background->setMatrix(Matrix::MakeScale(3));  // bake the DisplayList-level zoom into the tree
+
+  auto container = Layer::Make();
+  container->setAlpha(0.8f);
+  // trans(50,50) * scale(2.25) — equivalent to trans(50,50)*scale(1.5) under a zoom of 1.5.
+  container->setMatrix(Matrix::MakeTrans(50, 50) * Matrix::MakeScale(2.25f));
+
+  auto blurChild = SolidLayer::Make();
+  blurChild->setColor(Color::FromRGBA(255, 255, 255, 60));
+  blurChild->setWidth(100);
+  blurChild->setHeight(80);
+  blurChild->setMatrix(Matrix::MakeTrans(15, 15));
+  blurChild->setLayerStyles({BackgroundBlurStyle::Make(8, 8)});
+  container->addChild(blurChild);
+
+  auto rootLayer = Layer::Make();
+  rootLayer->addChild(background);
+  rootLayer->addChild(container);
+
+  // Recorder canvas has no backing Surface; Layer::draw will walk the capture pass against a
+  // Picture-backed top-level BackgroundSource because context stays nullptr.
+  PictureRecorder recorder;
+  auto* recordingCanvas = recorder.beginRecording();
+  rootLayer->draw(recordingCanvas);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  // Replay the picture onto a real GPU surface for pixel comparison.
+  auto surface = Surface::Make(context, 300, 300);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->drawPicture(picture);
+
+  EXPECT_TRUE(
+      Baseline::Compare(surface, "BackgroundBlurTest/GroupOpacityNestedBackgroundBlurPicturePath"));
+
+  Layer::SetDefaultAllowsGroupOpacity(oldGroupOpacity);
+}
+
 }  // namespace tgfx
