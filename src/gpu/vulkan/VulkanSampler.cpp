@@ -80,8 +80,7 @@ std::shared_ptr<VulkanSampler> VulkanSampler::Make(VulkanGPU* gpu,
   samplerInfo.minLod = 0.0f;
   // When mipmap is disabled, clamp maxLod to 0 to prevent sampling uninitialized mip levels.
   // Textures may be created with multiple mip levels but only have level 0 data uploaded.
-  samplerInfo.maxLod =
-      (descriptor.mipmapMode == MipmapMode::None) ? 0.0f : VK_LOD_CLAMP_NONE;
+  samplerInfo.maxLod = (descriptor.mipmapMode == MipmapMode::None) ? 0.0f : VK_LOD_CLAMP_NONE;
   samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
   samplerInfo.unnormalizedCoordinates = VK_FALSE;
 

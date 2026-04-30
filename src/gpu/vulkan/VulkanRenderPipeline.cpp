@@ -440,8 +440,7 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
     attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     attachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
     attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-    colorRefs.push_back(
-        {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_GENERAL});
+    colorRefs.push_back({static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_GENERAL});
     attachments.push_back(attachment);
   }
 

@@ -19,8 +19,8 @@
 #pragma once
 
 #include <vector>
-#include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/vulkan/VulkanAPI.h"
 
 namespace tgfx {
 

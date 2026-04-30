@@ -215,8 +215,7 @@ bool VulkanGPU::createDevice() {
   timelineFeatures.timelineSemaphore = hasTimelineSemaphore ? VK_TRUE : VK_FALSE;
 
   VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extDynStateFeatures = {};
-  extDynStateFeatures.sType =
-      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+  extDynStateFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
   extDynStateFeatures.extendedDynamicState = hasExtendedDynamicState ? VK_TRUE : VK_FALSE;
 
   VkPhysicalDeviceFeatures2 deviceFeatures2 = {};

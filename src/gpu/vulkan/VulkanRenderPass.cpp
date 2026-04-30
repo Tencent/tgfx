@@ -128,8 +128,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
 
     vulkanTexture->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
 
-    colorRefs.push_back(
-        {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_GENERAL});
+    colorRefs.push_back({static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_GENERAL});
     attachments.push_back(attachment);
     fbAttachments.push_back(vulkanTexture->vulkanImageView());
 
@@ -399,8 +398,8 @@ void VulkanRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
 }
 
 void VulkanRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCount,
-                                   uint32_t instanceCount, uint32_t firstIndex,
-                                   int32_t baseVertex, uint32_t firstInstance) {
+                                   uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
+                                   uint32_t firstInstance) {
   if (!currentPipeline) {
     return;
   }

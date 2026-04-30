@@ -120,8 +120,8 @@ void VulkanCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Re
   barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
   barrier.srcAccessMask = 0;
   barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-                       0, nullptr, 0, nullptr, 1, &barrier);
+  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
+                       nullptr, 0, nullptr, 1, &barrier);
 
   VkBufferImageCopy region = {};
   region.bufferOffset = 0;
@@ -142,10 +142,10 @@ void VulkanCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Re
   // Ensure the transfer write is visible to subsequent fragment shader reads and color attachment
   // operations. This runs in an isolated command buffer with vkQueueWaitIdle, so the texture is
   // ready for sampling by the time the next command buffer is submitted.
-  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                       0, 0, nullptr, 0, nullptr, 1, &barrier);
+  vkCmdPipelineBarrier(
+      cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
+      nullptr, 0, nullptr, 1, &barrier);
 
   vkEndCommandBuffer(cmd);
 
