@@ -3002,10 +3002,11 @@ TGFX_TEST(CanvasTest, TurbulenceTileSize) {
 }
 
 TGFX_TEST(CanvasTest, EmptyRectStroke) {
+  // Compares drawRect(emptyRect) against drawRRect(emptyRect with non-zero radii).
   // Layout (256x256 canvas):
-  //   Row 0 (y=60):  double-zero rect  (w=0, h=0)
-  //   Row 1 (y=170): single-zero rect  (w=60, h=0)
-  // Columns: Butt / Square / Round
+  //   Top half  (y=30):  drawRect  - row 0 double-zero (0x0), row 1 single-zero (60x0)
+  //   Bottom half (y=150): drawRRect with radii=10 - same two rows
+  //   Columns: Butt / Square / Round
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -3015,10 +3016,9 @@ TGFX_TEST(CanvasTest, EmptyRectStroke) {
   canvas->clear(Color::White());
 
   const float strokeWidth = 16.0f;
+  const float rrectRadius = 10.0f;
   const float colSpacing = 76.0f;
-  const float rowSpacing = 110.0f;
   const float originX = 40.0f;
-  const float originY = 60.0f;
 
   LineCap caps[3] = {LineCap::Butt, LineCap::Square, LineCap::Round};
 
@@ -3031,21 +3031,36 @@ TGFX_TEST(CanvasTest, EmptyRectStroke) {
   mark.setColor(Color::FromRGBA(255, 0, 0, 255));
   mark.setAntiAlias(true);
 
-  for (int row = 0; row < 2; ++row) {
-    for (int col = 0; col < 3; ++col) {
-      float cx = originX + static_cast<float>(col) * colSpacing;
-      float cy = originY + static_cast<float>(row) * rowSpacing;
-
-      canvas->drawCircle(cx, cy, 1.5f, mark);
-
-      Stroke s(strokeWidth);
-      s.cap = caps[col];
-      stroke.setStroke(s);
-
-      Rect rect = (row == 0) ? Rect::MakeXYWH(cx, cy, 0.0f, 0.0f)
-                             : Rect::MakeXYWH(cx - 30.0f, cy, 60.0f, 0.0f);
+  auto drawCell = [&](float cx, float cy, LineCap cap, bool useRRect, bool doubleZero) {
+    canvas->drawCircle(cx, cy, 1.5f, mark);
+    Stroke s(strokeWidth);
+    s.cap = cap;
+    stroke.setStroke(s);
+    Rect rect = doubleZero ? Rect::MakeXYWH(cx, cy, 0.0f, 0.0f)
+                           : Rect::MakeXYWH(cx - 30.0f, cy, 60.0f, 0.0f);
+    if (useRRect) {
+      RRect rRect = {};
+      rRect.setRectXY(rect, rrectRadius, rrectRadius);
+      canvas->drawRRect(rRect, stroke);
+    } else {
       canvas->drawRect(rect, stroke);
     }
+  };
+
+  // Top half: drawRect
+  float y = 30.0f;
+  for (int col = 0; col < 3; ++col) {
+    float cx = originX + static_cast<float>(col) * colSpacing;
+    drawCell(cx, y, caps[col], false, true);
+    drawCell(cx, y + 50.0f, caps[col], false, false);
+  }
+
+  // Bottom half: drawRRect with non-zero radii
+  y = 150.0f;
+  for (int col = 0; col < 3; ++col) {
+    float cx = originX + static_cast<float>(col) * colSpacing;
+    drawCell(cx, y, caps[col], true, true);
+    drawCell(cx, y + 50.0f, caps[col], true, false);
   }
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/EmptyRectStroke"));
