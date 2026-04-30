@@ -116,20 +116,25 @@ void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
 
 void SVGExportContext::drawRRect(const RRect& roundRect, const Matrix& matrix,
                                  const ClipStack& clip, const Brush& brush, const Stroke*) {
-  applyClip(clip, matrix.mapRect(roundRect.rect));
+  applyClip(clip, matrix.mapRect(roundRect.rect()));
   if (roundRect.isOval()) {
-    if (roundRect.rect.width() == roundRect.rect.height()) {
+    if (roundRect.rect().width() == roundRect.rect().height()) {
       ElementWriter circleElement("circle", context, this, xmlWriter.get(), resourceBucket.get(),
                                   exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
                                   nullptr, _targetColorSpace, _assignColorSpace);
-      circleElement.addCircleAttributes(roundRect.rect);
+      circleElement.addCircleAttributes(roundRect.rect());
       return;
     } else {
       ElementWriter ovalElement("ellipse", context, this, xmlWriter.get(), resourceBucket.get(),
                                 exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
                                 nullptr, _targetColorSpace, _assignColorSpace);
-      ovalElement.addEllipseAttributes(roundRect.rect);
+      ovalElement.addEllipseAttributes(roundRect.rect());
     }
+  } else if (roundRect.isComplex()) {
+    // SVG <rect> only supports uniform rx/ry. Complex RRects must be exported as <path>.
+    Path path = {};
+    path.addRRect(roundRect);
+    drawPath(path, matrix, clip, brush);
   } else {
     ElementWriter rrectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
                                exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
@@ -470,7 +475,7 @@ std::string SVGExportContext::defineClipPath(const Path& clipPath) {
     if (clipPath.isRect(&rect)) {
       element = std::make_unique<ElementWriter>("rect", xmlWriter);
       element->addRectAttributes(rect);
-    } else if (clipPath.isRRect(&rrect)) {
+    } else if (clipPath.isRRect(&rrect) && !rrect.isComplex()) {
       element = std::make_unique<ElementWriter>("rect", xmlWriter);
       element->addRoundRectAttributes(rrect);
     } else if (clipPath.isOval(&ovalBound)) {

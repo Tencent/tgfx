@@ -65,6 +65,11 @@ class ElementWriter {
   void addText(const std::string& text);
   void addFontAttributes(const Font& font);
   void addRectAttributes(const Rect& rect);
+  /**
+   * Writes rx/ry attributes for a <rect> element. The caller must ensure the RRect is not
+   * Complex, since SVG <rect> only supports uniform corner radii; complex RRects should be
+   * emitted as <path> instead.
+   */
   void addRoundRectAttributes(const RRect& roundRect);
   void addCircleAttributes(const Rect& bound);
   void addEllipseAttributes(const Rect& bound);

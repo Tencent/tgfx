@@ -111,6 +111,16 @@ static bool ShouldFlushRectOps(const std::vector<PlacementPtr<Stroke>>& pendingS
   return stroke == nullptr || pendingStrokes.front()->join != stroke->join;
 }
 
+// Returns true when the new RRect's complexity (Complex vs non-Complex) disagrees with the
+// RRects already queued.
+static bool ComplexMismatch(const RRect& newRRect,
+                            const std::vector<PlacementPtr<RRectRecord>>& pending) {
+  if (pending.empty()) {
+    return false;
+  }
+  return newRRect.isComplex() != pending.front()->rRect.isComplex();
+}
+
 void OpsCompositor::fillRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
                              const Brush& brush, const Stroke* stroke) {
   DEBUG_ASSERT(!rect.isEmpty());
@@ -128,10 +138,12 @@ void OpsCompositor::fillRect(const Rect& rect, const Matrix& matrix, const ClipS
 
 void OpsCompositor::drawRRect(const RRect& rRect, const Matrix& matrix, const ClipStack& clip,
                               const Brush& brush, const Stroke* stroke) {
-  DEBUG_ASSERT(!rRect.rect.isEmpty());
+  DEBUG_ASSERT(!rRect.rect().isEmpty());
   auto rectBrush = brush.makeWithMatrix(matrix);
+  // Complex and non-Complex RRects use different GPs and vertex layouts, so they cannot be
+  // batched into the same op; flush if the incoming RRect's complexity disagrees with pending.
   if (!canAppend(PendingOpType::RRect, clip, rectBrush) ||
-      ShouldFlushRectOps(pendingStrokes, stroke)) {
+      ShouldFlushRectOps(pendingStrokes, stroke) || ComplexMismatch(rRect, pendingRRects)) {
     flushPendingOps(PendingOpType::RRect, clip, rectBrush);
   }
   auto record = drawingAllocator()->make<RRectRecord>(rRect, matrix, rectBrush.color);
@@ -444,7 +456,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
     if (pendingType == PendingOpType::RRect) {
       deviceBounds = Rect::MakeEmpty();
       for (auto& record : pendingRRects) {
-        auto rect = record->viewMatrix.mapRect(record->rRect.rect);
+        auto rect = record->viewMatrix.mapRect(record->rRect.rect());
         deviceBounds->join(rect);
         drawScale = std::max(*drawScale, record->viewMatrix.getMaxScale());
       }

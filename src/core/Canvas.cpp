@@ -252,9 +252,7 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
 }
 
 void Canvas::drawOval(const Rect& oval, const Paint& paint) {
-  RRect rRect = {};
-  rRect.setOval(oval);
-  drawRRect(rRect, paint);
+  drawRRect(RRect::MakeOval(oval), paint);
 }
 
 void Canvas::drawCircle(float centerX, float centerY, float radius, const Paint& paint) {
@@ -264,62 +262,125 @@ void Canvas::drawCircle(float centerX, float centerY, float radius, const Paint&
 }
 
 void Canvas::drawRoundRect(const Rect& rect, float radiusX, float radiusY, const Paint& paint) {
-  RRect rRect = {};
-  rRect.setRectXY(rect, radiusX, radiusY);
-  drawRRect(rRect, paint);
+  drawRRect(RRect::MakeRectXY(rect, radiusX, radiusY), paint);
 }
 
-static bool UseDrawPath(const Paint& paint, const Point& radii, const Matrix& viewMatrix) {
+static bool HasSharpCorner(const RRect& rRect) {
+  for (const auto& r : rRect.radii()) {
+    if (r.x < 0.5f || r.y < 0.5f) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Returns true when either diagonal corner pair has overlapping arc-center boxes on at least
+// one axis, i.e. its x-radii or y-radii sum exceeds the corresponding side length.
+static bool HasDiagonalCornerAxisOverlap(const RRect& rRect) {
+  if (!rRect.isComplex()) {
+    return false;
+  }
+  const auto& r = rRect.radii();
+  const auto w = rRect.rect().width();
+  const auto h = rRect.rect().height();
+  return r[0].x + r[2].x > w || r[0].y + r[2].y > h || r[1].x + r[3].x > w || r[1].y + r[3].y > h;
+}
+
+/**
+ * The dedicated RRect op draws stroked rounded corners by offsetting the ellipse equation
+ * outward/inward, which assumes a concentric ellipse approximates the true stroke offset
+ * curve. The approximation breaks down when the stroke is too thick relative to the corner
+ * radii, or when the ellipse is too elongated (major/minor ratio too large). In those cases
+ * this function returns true so the caller falls back to drawPath for an accurate stroke.
+ */
+static bool UseDrawPath(const Paint& paint, const RRect& rRect, bool hasSharpCorner,
+                        const Matrix& viewMatrix) {
+  // Sharp corners (sub-half-unit local radius on either axis) make the ellipse implicit
+  // equation degenerate: at zero radius the equation is undefined, and under stroke the
+  // inner ellipse radius would become negative. Fall back to drawPath so the sharp
+  // geometry renders correctly.
+  if (hasSharpCorner) {
+    return true;
+  }
+  // The AA path partitions the RRect into a 4x4 grid of quads; a diagonal corner pair
+  // overlapping on either axis makes those quads self-intersect. The NonAA path is free of
+  // that mesh constraint but its shader still miscomputes coverage when diagonal corner
+  // boxes truly overlap. We cannot tell here which path the op will take, so apply the
+  // stricter AA rule and fall back to drawPath whenever any axis is crossed.
+  if (HasDiagonalCornerAxisOverlap(rRect)) {
+    return true;
+  }
   auto stroke = paint.getStroke();
   if (!stroke) {
     return false;
   }
-  float xRadius = std::fabs(viewMatrix.getScaleX() * radii.x + viewMatrix.getSkewY() * radii.y);
-  float yRadius = std::fabs(viewMatrix.getSkewX() * radii.x + viewMatrix.getScaleY() * radii.y);
-  Point scaledStroke = {};
-  scaledStroke.x = std::fabs(stroke->width * (viewMatrix.getScaleX() + viewMatrix.getSkewY()));
-  scaledStroke.y = std::fabs(stroke->width * (viewMatrix.getSkewX() + viewMatrix.getScaleY()));
 
-  // Half of strokewidth is greater than radius
-  if (scaledStroke.x * 0.5f > xRadius || scaledStroke.y * 0.5f > yRadius) {
-    return true;
-  }
-  // The matrix may have a rotation by an odd multiple of 90 degrees.
-  if (viewMatrix.getScaleX() == 0) {
-    std::swap(xRadius, yRadius);
-    std::swap(scaledStroke.x, scaledStroke.y);
-  }
-
+  const auto scales = viewMatrix.getAxisScales();
+  // Per-axis scaled stroke width: local width multiplied by the x/y axis scale factors
+  // extracted from the view matrix.
+  const Point scaledStroke = {scales.x * stroke->width, scales.y * stroke->width};
+  Point halfScaledStroke = {};
   if (FloatNearlyZero(scaledStroke.length())) {
-    scaledStroke.set(0.5f, 0.5f);
+    // Hairline stroke (width == 0) falls back to half a pixel on each axis.
+    halfScaledStroke = {0.5f, 0.5f};
   } else {
-    scaledStroke *= 0.5f;
+    halfScaledStroke = scaledStroke * 0.5f;
   }
+  const auto halfScaledStrokeLen = halfScaledStroke.length();
 
-  // Handle thick strokes for near-circular ellipses
-  if (scaledStroke.length() > 0.5f && (0.5f * xRadius > yRadius || 0.5f * yRadius > xRadius)) {
-    return true;
-  }
-  // Curvature of the stroke is less than curvature of the ellipse
-  if (scaledStroke.x * yRadius * yRadius < scaledStroke.y * scaledStroke.y * xRadius) {
-    return true;
-  }
-  if (scaledStroke.y * xRadius * xRadius < scaledStroke.x * scaledStroke.x * yRadius) {
-    return true;
+  // Non-Complex types have identical radii across all four corners (zero for Rect, equal
+  // per-corner for Simple/Oval), so only the first needs check.
+  const auto cornerCount = rRect.isComplex() ? rRect.radii().size() : size_t{1};
+  for (size_t i = 0; i < cornerCount; ++i) {
+    const auto& r = rRect.radii()[i];
+    const auto xRadius = scales.x * r.x;
+    const auto yRadius = scales.y * r.y;
+    // Half stroke width exceeds corner radius: the inner offset ellipse collapses
+    // (inner radius would be non-positive), so the concentric-ellipse approximation
+    // cannot be constructed.
+    if (halfScaledStroke.x > xRadius || halfScaledStroke.y > yRadius) {
+      return true;
+    }
+    // Thick stroke on an elongated ellipse (major/minor axis ratio > 2): the concentric-ellipse
+    // approximation visibly diverges from the true offset curve.
+    if (halfScaledStrokeLen > 0.5f && (0.5f * xRadius > yRadius || 0.5f * yRadius > xRadius)) {
+      return true;
+    }
+    // Stroke width exceeds the ellipse's local curvature radius at a short-axis endpoint
+    // (b*b/a on x-axis, a*a/b on y-axis). The inner offset curve would self-intersect,
+    // so the concentric-ellipse approximation breaks down.
+    if (halfScaledStroke.x * yRadius * yRadius <
+        halfScaledStroke.y * halfScaledStroke.y * xRadius) {
+      return true;
+    }
+    if (halfScaledStroke.y * xRadius * xRadius <
+        halfScaledStroke.x * halfScaledStroke.x * yRadius) {
+      return true;
+    }
   }
   return false;
 }
 
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
-  if (rRect.rect.isEmpty()) {
+  if (rRect.rect().isEmpty()) {
     return;
   }
-  auto& radii = rRect.radii;
-  if (radii.x < 0.5f && radii.y < 0.5f) {
-    drawRect(rRect.rect, paint);
+  // Classify corner radii in a single pass so both the allSmall degenerate check and the
+  // anySmall op-capability check share one traversal.
+  auto allSmall = true;
+  auto anySmall = false;
+  for (const auto& r : rRect.radii()) {
+    if (r.x < 0.5f || r.y < 0.5f) {
+      anySmall = true;
+    } else {
+      allSmall = false;
+    }
+  }
+  if (allSmall) {
+    drawRect(rRect.rect(), paint);
     return;
   }
-  if (UseDrawPath(paint, radii, _matrix)) {
+  if (UseDrawPath(paint, rRect, anySmall, _matrix)) {
     Path path = {};
     path.addRRect(rRect);
     drawPath(path, paint);
@@ -364,7 +425,9 @@ void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& c
       drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
       return;
     }
-    if (path.isRRect(&rRect)) {
+    // RRects with sharp corners or diagonally overlapping corner boxes cannot be rendered by
+    // the RRect op; fall through to drawPath.
+    if (path.isRRect(&rRect) && !HasSharpCorner(rRect) && !HasDiagonalCornerAxisOverlap(rRect)) {
       drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
       return;
     }
