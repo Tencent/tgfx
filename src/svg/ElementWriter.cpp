@@ -650,8 +650,9 @@ std::string ElementWriter::addLinearGradientDef(const GradientInfo& info, const 
   DEBUG_ASSERT(resourceStore);
   std::string key = "linear_" + std::to_string(static_cast<int>(type)) + "_" +
                     std::to_string(info.points[0].x) + "_" + std::to_string(info.points[0].y) +
-                    "_" + std::to_string(info.points[1].x) + "_" + std::to_string(info.points[1].y) +
-                    "_" + std::to_string(matrix.getScaleX()) + "_" + std::to_string(matrix.getScaleY());
+                    "_" + std::to_string(info.points[1].x) + "_" +
+                    std::to_string(info.points[1].y) + "_" + std::to_string(matrix.getScaleX()) +
+                    "_" + std::to_string(matrix.getScaleY());
   auto id = resourceStore->addGradient(key);
 
   {
@@ -676,8 +677,9 @@ std::string ElementWriter::addRadialGradientDef(const GradientInfo& info, const 
   DEBUG_ASSERT(resourceStore);
   std::string key = "radial_" + std::to_string(static_cast<int>(type)) + "_" +
                     std::to_string(info.points[0].x) + "_" + std::to_string(info.points[0].y) +
-                    "_" + std::to_string(info.points[1].x) + "_" + std::to_string(info.points[1].y) +
-                    "_" + std::to_string(matrix.getScaleX()) + "_" + std::to_string(matrix.getScaleY());
+                    "_" + std::to_string(info.points[1].x) + "_" +
+                    std::to_string(info.points[1].y) + "_" + std::to_string(matrix.getScaleX()) +
+                    "_" + std::to_string(matrix.getScaleY());
   auto id = resourceStore->addGradient(key);
 
   {
@@ -701,8 +703,9 @@ std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info, c
   DEBUG_ASSERT(resourceStore);
   std::string key = "unsupported_" + std::to_string(static_cast<int>(type)) + "_" +
                     std::to_string(info.points[0].x) + "_" + std::to_string(info.points[0].y) +
-                    "_" + std::to_string(info.points[1].x) + "_" + std::to_string(info.points[1].y) +
-                    "_" + std::to_string(matrix.getScaleX()) + "_" + std::to_string(matrix.getScaleY());
+                    "_" + std::to_string(info.points[1].x) + "_" +
+                    std::to_string(info.points[1].y) + "_" + std::to_string(matrix.getScaleX()) +
+                    "_" + std::to_string(matrix.getScaleY());
   auto id = resourceStore->addGradient(key);
 
   {
