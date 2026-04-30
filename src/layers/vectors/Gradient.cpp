@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/vectors/Gradient.h"
+#include <algorithm>
 #include "core/utils/Log.h"
 #include "tgfx/layers/Layer.h"
 
@@ -91,10 +92,15 @@ std::shared_ptr<Shader> Gradient::getShader() const {
 
 Matrix Gradient::getFitMatrix(const Rect& bounds) const {
   DEBUG_ASSERT(_fitsToGeometry);
-  if (bounds.isEmpty()) {
-    return Matrix::I();
-  }
-  auto matrix = Matrix::MakeScale(bounds.width(), bounds.height());
+  // Replace zero-width/height axes with a sub-pixel epsilon so the resulting matrix stays
+  // invertible. The 1e-3 px transition band is far below any sampling grid (GPUs sample at
+  // 1/16 px or coarser), so a zero-extent axis still renders as a clean Clamp split between
+  // the first and last colors of the gradient instead of degenerating to a constant fill.
+  // 1/epsilon = 1e3 stays well within fp32 precision for the inverse used during shading.
+  constexpr float kMinScale = 1e-3f;
+  float sx = std::max(bounds.width(), kMinScale);
+  float sy = std::max(bounds.height(), kMinScale);
+  auto matrix = Matrix::MakeScale(sx, sy);
   matrix.postTranslate(bounds.left, bounds.top);
   return matrix;
 }
