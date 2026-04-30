@@ -422,4 +422,95 @@ TGFX_TEST(PathTest, IteratorPerformance) {
   printf("\n");
 }
 
+/**
+ * Verifies how Path::isRect behaves when a rectangle path is transformed by various matrices.
+ * This drives the clip-element design: to know whether a transformed rect still reports isRect()
+ * after the matrix is baked into the path (as Canvas::clipPath does today).
+ */
+TGFX_TEST(PathTest, IsRectUnderTransforms) {
+  const auto srcRect = Rect::MakeXYWH(10, 20, 100, 50);
+
+  // Baseline: untransformed rect is a Rect.
+  {
+    Path path = {};
+    path.addRect(srcRect);
+    Rect out = {};
+    EXPECT_TRUE(path.isRect(&out));
+    EXPECT_EQ(out, srcRect);
+  }
+
+  // Pure translation: still axis-aligned, expected true.
+  {
+    Path path = {};
+    path.addRect(srcRect);
+    path.transform(Matrix::MakeTrans(30, 40));
+    Rect out = {};
+    EXPECT_TRUE(path.isRect(&out));
+    EXPECT_EQ(out, Rect::MakeXYWH(40, 60, 100, 50));
+  }
+
+  // Positive uniform scale: still axis-aligned, expected true.
+  {
+    Path path = {};
+    path.addRect(srcRect);
+    path.transform(Matrix::MakeScale(2.0f, 3.0f));
+    Rect out = {};
+    EXPECT_TRUE(path.isRect(&out));
+    EXPECT_EQ(out, Rect::MakeXYWH(20, 60, 200, 150));
+  }
+
+  // Negative scale (mirror): still axis-aligned; probe whether SkPath accepts it.
+  {
+    Path path = {};
+    path.addRect(srcRect);
+    path.transform(Matrix::MakeScale(-1.0f, 1.0f));
+    Rect out = {};
+    bool isRect = path.isRect(&out);
+    printf("[isRect] negative scale -> %d, rect=(%f,%f,%f,%f)\n", isRect, out.left, out.top,
+           out.right, out.bottom);
+  }
+
+  // 45-degree rotation: no longer axis-aligned, expected false.
+  {
+    Path path = {};
+    path.addRect(srcRect);
+    Matrix rotate = {};
+    rotate.setRotate(45);
+    path.transform(rotate);
+    EXPECT_FALSE(path.isRect(nullptr));
+  }
+
+  // 90-degree rotation: axes swap but remain axis-aligned; probe actual result.
+  {
+    Path path = {};
+    path.addRect(srcRect);
+    Matrix rotate = {};
+    rotate.setRotate(90);
+    path.transform(rotate);
+    Rect out = {};
+    bool isRect = path.isRect(&out);
+    printf("[isRect] 90-deg rotation -> %d, rect=(%f,%f,%f,%f)\n", isRect, out.left, out.top,
+           out.right, out.bottom);
+  }
+
+  // Skew: no longer axis-aligned, expected false.
+  {
+    Path path = {};
+    path.addRect(srcRect);
+    Matrix skew = {};
+    skew.setSkew(0.5f, 0);
+    path.transform(skew);
+    EXPECT_FALSE(path.isRect(nullptr));
+  }
+
+  // Perspective: no longer axis-aligned, expected false.
+  {
+    Path path = {};
+    path.addRect(srcRect);
+    auto persp = Matrix::MakeAll(1, 0, 0, 0, 1, 0, 0.001f, 0, 1);
+    path.transform(persp);
+    EXPECT_FALSE(path.isRect(nullptr));
+  }
+}
+
 }  // namespace tgfx
