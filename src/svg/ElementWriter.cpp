@@ -294,10 +294,8 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
     case Types::ImageFilterType::Blur: {
       const auto blurFilter = static_cast<const GaussianBlurImageFilter*>(imageFilter.get());
       bound = blurFilter->filterBounds(bound);
-      std::string key = "blur_" + std::to_string(bound.x()) + "_" +
-                        std::to_string(bound.y()) + "_" +
-                        std::to_string(bound.width()) + "_" +
-                        std::to_string(bound.height());
+      std::string key = "blur_" + std::to_string(bound.x()) + "_" + std::to_string(bound.y()) +
+                        "_" + std::to_string(bound.width()) + "_" + std::to_string(bound.height());
       std::string filterID = resourceStore->addFilter(key);
       ElementWriter filterElement("filter", writer);
       filterElement.addAttribute("id", filterID);
@@ -313,10 +311,8 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
     case Types::ImageFilterType::DropShadow: {
       const auto dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
       bound = dropShadowFilter->filterBounds(bound);
-      std::string key = "dropshadow_" + std::to_string(bound.x()) + "_" +
-                        std::to_string(bound.y()) + "_" +
-                        std::to_string(bound.width()) + "_" +
-                        std::to_string(bound.height());
+      std::string key = "dropshadow_" + std::to_string(bound.x()) + "_" + std::to_string(bound.y()) +
+                        "_" + std::to_string(bound.width()) + "_" + std::to_string(bound.height());
       std::string filterID = resourceStore->addFilter(key);
       ElementWriter filterElement("filter", writer);
       filterElement.addAttribute("id", filterID);
@@ -332,10 +328,8 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
     case Types::ImageFilterType::InnerShadow: {
       const auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
       bound = innerShadowFilter->filterBounds(bound);
-      std::string key = "innershadow_" + std::to_string(bound.x()) + "_" +
-                        std::to_string(bound.y()) + "_" +
-                        std::to_string(bound.width()) + "_" +
-                        std::to_string(bound.height());
+      std::string key = "innershadow_" + std::to_string(bound.x()) + "_" + std::to_string(bound.y()) +
+                        "_" + std::to_string(bound.width()) + "_" + std::to_string(bound.height());
       std::string filterID = resourceStore->addFilter(key);
       ElementWriter filterElement("filter", writer);
       filterElement.addAttribute("id", filterID);
@@ -652,12 +646,9 @@ void ElementWriter::addGradientColors(const GradientInfo& info) {
 std::string ElementWriter::addLinearGradientDef(const GradientInfo& info, const Matrix& matrix, GradientType type) {
   DEBUG_ASSERT(resourceStore);
   std::string key = "linear_" + std::to_string(static_cast<int>(type)) + "_" +
-                    std::to_string(info.points[0].x) + "_" +
-                    std::to_string(info.points[0].y) + "_" +
-                    std::to_string(info.points[1].x) + "_" +
-                    std::to_string(info.points[1].y) + "_" +
-                    std::to_string(matrix.getScaleX()) + "_" +
-                    std::to_string(matrix.getScaleY());
+                    std::to_string(info.points[0].x) + "_" + std::to_string(info.points[0].y) + "_" +
+                    std::to_string(info.points[1].x) + "_" + std::to_string(info.points[1].y) + "_" +
+                    std::to_string(matrix.getScaleX()) + "_" + std::to_string(matrix.getScaleY());
   auto id = resourceStore->addGradient(key);
 
   {
@@ -680,12 +671,9 @@ std::string ElementWriter::addLinearGradientDef(const GradientInfo& info, const 
 std::string ElementWriter::addRadialGradientDef(const GradientInfo& info, const Matrix& matrix, GradientType type) {
   DEBUG_ASSERT(resourceStore);
   std::string key = "radial_" + std::to_string(static_cast<int>(type)) + "_" +
-                    std::to_string(info.points[0].x) + "_" +
-                    std::to_string(info.points[0].y) + "_" +
-                    std::to_string(info.points[1].x) + "_" +
-                    std::to_string(info.points[1].y) + "_" +
-                    std::to_string(matrix.getScaleX()) + "_" +
-                    std::to_string(matrix.getScaleY());
+                    std::to_string(info.points[0].x) + "_" + std::to_string(info.points[0].y) + "_" +
+                    std::to_string(info.points[1].x) + "_" + std::to_string(info.points[1].y) + "_" +
+                    std::to_string(matrix.getScaleX()) + "_" + std::to_string(matrix.getScaleY());
   auto id = resourceStore->addGradient(key);
 
   {
@@ -704,16 +692,12 @@ std::string ElementWriter::addRadialGradientDef(const GradientInfo& info, const 
   return id;
 }
 
-std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info,
-                                                     const Matrix& matrix, GradientType type) {
+std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info, const Matrix& matrix, GradientType type) {
   DEBUG_ASSERT(resourceStore);
   std::string key = "unsupported_" + std::to_string(static_cast<int>(type)) + "_" +
-                    std::to_string(info.points[0].x) + "_" +
-                    std::to_string(info.points[0].y) + "_" +
-                    std::to_string(info.points[1].x) + "_" +
-                    std::to_string(info.points[1].y) + "_" +
-                    std::to_string(matrix.getScaleX()) + "_" +
-                    std::to_string(matrix.getScaleY());
+                    std::to_string(info.points[0].x) + "_" + std::to_string(info.points[0].y) + "_" +
+                    std::to_string(info.points[1].x) + "_" + std::to_string(info.points[1].y) + "_" +
+                    std::to_string(matrix.getScaleX()) + "_" + std::to_string(matrix.getScaleY());
   auto id = resourceStore->addGradient(key);
 
   {
