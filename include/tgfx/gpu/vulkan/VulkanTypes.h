@@ -20,10 +20,10 @@
 
 #include <cstdint>
 
-// These forward declarations use uint32_t to match the ABI of the Vulkan C enums, allowing
-// external users to use VulkanTypes.h without depending on the Vulkan SDK. Internal Vulkan
-// implementation files include vulkan_core.h via VulkanAPI.h before this header, so the guard
-// below prevents duplicate definitions.
+// When vulkan_core.h has already been included (via VulkanAPI.h in internal files), its include
+// guard VULKAN_CORE_H_ is defined and we skip the lightweight forward declarations below to avoid
+// type conflicts. External consumers or translation units that have not included vulkan_core.h
+// get ABI-compatible typedefs instead.
 #ifndef VULKAN_CORE_H_
 typedef struct VkImage_T* VkImage;
 typedef struct VkSemaphore_T* VkSemaphore;

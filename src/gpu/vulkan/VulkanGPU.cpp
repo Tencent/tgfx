@@ -17,9 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VulkanGPU.h"
-#include <shaderc/shaderc.hpp>
 #include <cstring>
+#include <shaderc/shaderc.hpp>
 #include <vector>
+#include "core/utils/Log.h"
 #include "gpu/vulkan/VulkanBuffer.h"
 #include "gpu/vulkan/VulkanCommandEncoder.h"
 #include "gpu/vulkan/VulkanCommandQueue.h"
@@ -30,7 +31,6 @@
 #include "gpu/vulkan/VulkanShaderModule.h"
 #include "gpu/vulkan/VulkanTexture.h"
 #include "gpu/vulkan/VulkanUtil.h"
-#include "core/utils/Log.h"
 
 #define VMA_IMPLEMENTATION
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
@@ -134,9 +134,11 @@ bool VulkanGPU::pickPhysicalDevice() {
   for (auto& dev : devices) {
     VkPhysicalDeviceProperties props = {};
     vkGetPhysicalDeviceProperties(dev, &props);
-    if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && discreteDevice == VK_NULL_HANDLE) {
+    if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
+        discreteDevice == VK_NULL_HANDLE) {
       discreteDevice = dev;
-    } else if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU && integratedDevice == VK_NULL_HANDLE) {
+    } else if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU &&
+               integratedDevice == VK_NULL_HANDLE) {
       integratedDevice = dev;
     }
   }
@@ -190,24 +192,40 @@ bool VulkanGPU::createDevice() {
   vkEnumerateDeviceExtensionProperties(vulkanPhysicalDevice, nullptr, &extCount,
                                        availableExtensions.data());
   bool hasTimelineSemaphore = false;
+  bool hasExtendedDynamicState = false;
   for (const auto& ext : availableExtensions) {
     if (strcmp(ext.extensionName, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
       hasTimelineSemaphore = true;
-      break;
+    }
+    if (strcmp(ext.extensionName, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) == 0) {
+      hasExtendedDynamicState = true;
     }
   }
   if (hasTimelineSemaphore) {
     deviceExtensions.push_back(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
+  }
+  // Required for dynamic primitive topology (VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT), which
+  // allows draw calls to switch between TriangleList and TriangleStrip without separate pipelines.
+  if (hasExtendedDynamicState) {
+    deviceExtensions.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
   }
 
   VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures = {};
   timelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
   timelineFeatures.timelineSemaphore = hasTimelineSemaphore ? VK_TRUE : VK_FALSE;
 
+  VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extDynStateFeatures = {};
+  extDynStateFeatures.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+  extDynStateFeatures.extendedDynamicState = hasExtendedDynamicState ? VK_TRUE : VK_FALSE;
+
   VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
   deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   if (hasTimelineSemaphore) {
+    timelineFeatures.pNext = hasExtendedDynamicState ? &extDynStateFeatures : nullptr;
     deviceFeatures2.pNext = &timelineFeatures;
+  } else if (hasExtendedDynamicState) {
+    deviceFeatures2.pNext = &extDynStateFeatures;
   }
 
   VkDeviceCreateInfo deviceCreateInfo = {};
@@ -315,7 +333,7 @@ std::vector<std::shared_ptr<Texture>> VulkanGPU::importHardwareTextures(Hardware
 }
 
 std::shared_ptr<Texture> VulkanGPU::importBackendTexture(const BackendTexture& backendTexture,
-                                                        uint32_t usage, bool adopted) {
+                                                         uint32_t usage, bool adopted) {
   if (backendTexture.backend() != Backend::Vulkan) {
     return nullptr;
   }
@@ -323,8 +341,8 @@ std::shared_ptr<Texture> VulkanGPU::importBackendTexture(const BackendTexture& b
   if (!backendTexture.getVulkanTextureInfo(&vulkanInfo) || vulkanInfo.image == nullptr) {
     return nullptr;
   }
-  return VulkanTexture::MakeFrom(this, vulkanInfo.image, vulkanInfo.format,
-                                 backendTexture.width(), backendTexture.height(), usage, adopted);
+  return VulkanTexture::MakeFrom(this, vulkanInfo.image, vulkanInfo.format, backendTexture.width(),
+                                 backendTexture.height(), usage, adopted);
 }
 
 std::shared_ptr<Texture> VulkanGPU::importBackendRenderTarget(

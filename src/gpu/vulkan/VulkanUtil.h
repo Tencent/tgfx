@@ -43,22 +43,22 @@ bool VkFormatIsStencil(VkFormat format);
 int VkFormatBytesPerPixel(VkFormat format);
 
 // Error checking macro that logs the VkResult string on failure.
-#define VK_CHECK(result)                                                              \
-  do {                                                                                \
-    VkResult _vk_result = (result);                                                   \
-    if (_vk_result != VK_SUCCESS) {                                                   \
+#define VK_CHECK(result)                                                                   \
+  do {                                                                                     \
+    VkResult _vk_result = (result);                                                        \
+    if (_vk_result != VK_SUCCESS) {                                                        \
       LOGE("Vulkan error: %s at %s:%d", VkResultToString(_vk_result), __FILE__, __LINE__); \
-    }                                                                                 \
+    }                                                                                      \
   } while (0)
 
 // Error checking macro that returns false on failure.
-#define VK_CHECK_RESULT(result)                                                       \
-  do {                                                                                \
-    VkResult _vk_result = (result);                                                   \
-    if (_vk_result != VK_SUCCESS) {                                                   \
+#define VK_CHECK_RESULT(result)                                                            \
+  do {                                                                                     \
+    VkResult _vk_result = (result);                                                        \
+    if (_vk_result != VK_SUCCESS) {                                                        \
       LOGE("Vulkan error: %s at %s:%d", VkResultToString(_vk_result), __FILE__, __LINE__); \
-      return false;                                                                   \
-    }                                                                                 \
+      return false;                                                                        \
+    }                                                                                      \
   } while (0)
 
 }  // namespace tgfx

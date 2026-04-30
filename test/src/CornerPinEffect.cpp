@@ -113,7 +113,7 @@ std::shared_ptr<RenderPipeline> CornerPinEffect::createPipeline(GPU* gpu) const 
   descriptor.fragment.module = fragmentShader;
   descriptor.fragment.colorAttachments.push_back({});
   descriptor.multisample.count = MSAA_SAMPLE_COUNT;
-  BindingEntry textureBinding = {"sTexture", 0};
+  BindingEntry textureBinding = {"sTexture", 2};
   descriptor.layout.textureSamplers.push_back(textureBinding);
   return gpu->createRenderPipeline(descriptor);
 }
@@ -163,7 +163,7 @@ bool CornerPinEffect::onDraw(CommandEncoder* encoder,
   SamplerDescriptor samplerDesc(AddressMode::ClampToEdge, AddressMode::ClampToEdge,
                                 FilterMode::Linear, FilterMode::Linear, MipmapMode::None);
   auto sampler = gpu->createSampler(samplerDesc);
-  renderPass->setTexture(0, inputTexture, sampler);
+  renderPass->setTexture(2, inputTexture, sampler);
   renderPass->draw(PrimitiveType::TriangleStrip, 4);
   renderPass->end();
   return true;

@@ -27,6 +27,24 @@
 
 namespace tgfx {
 
+// Inserts a full pipeline barrier to transition an image between layouts. Uses broad stage and
+// access masks to ensure correctness without fine-grained synchronization tracking.
+static void TransitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout,
+                                  VkImageLayout newLayout) {
+  VkImageMemoryBarrier barrier = {};
+  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.oldLayout = oldLayout;
+  barrier.newLayout = newLayout;
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.image = image;
+  barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+  barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+  barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                       0, 0, nullptr, 0, nullptr, 1, &barrier);
+}
+
 std::shared_ptr<VulkanCommandEncoder> VulkanCommandEncoder::Make(VulkanGPU* gpu) {
   if (!gpu) {
     return nullptr;
@@ -72,8 +90,21 @@ VulkanCommandEncoder::VulkanCommandEncoder(VulkanGPU* gpu, VkCommandBuffer comma
 }
 
 void VulkanCommandEncoder::onRelease(VulkanGPU* gpu) {
+  auto device = gpu->device();
+  for (auto& d : deferredDestroys) {
+    if (d.descriptorPool != VK_NULL_HANDLE) {
+      vkDestroyDescriptorPool(device, d.descriptorPool, nullptr);
+    }
+    if (d.framebuffer != VK_NULL_HANDLE) {
+      vkDestroyFramebuffer(device, d.framebuffer, nullptr);
+    }
+    if (d.renderPass != VK_NULL_HANDLE) {
+      vkDestroyRenderPass(device, d.renderPass, nullptr);
+    }
+  }
+  deferredDestroys.clear();
   if (commandPool != VK_NULL_HANDLE) {
-    vkDestroyCommandPool(gpu->device(), commandPool, nullptr);
+    vkDestroyCommandPool(device, commandPool, nullptr);
     commandPool = VK_NULL_HANDLE;
     commandBuffer = VK_NULL_HANDLE;
   }
@@ -98,16 +129,51 @@ void VulkanCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcText
   auto vulkanSrc = std::static_pointer_cast<VulkanTexture>(srcTexture);
   auto vulkanDst = std::static_pointer_cast<VulkanTexture>(dstTexture);
 
+  // Clamp copy region to source image bounds.
+  auto srcX = static_cast<int32_t>(srcRect.x());
+  auto srcY = static_cast<int32_t>(srcRect.y());
+  auto copyWidth = static_cast<uint32_t>(srcRect.width());
+  auto copyHeight = static_cast<uint32_t>(srcRect.height());
+  auto srcW = static_cast<uint32_t>(srcTexture->width());
+  auto srcH = static_cast<uint32_t>(srcTexture->height());
+  if (srcX + copyWidth > srcW) {
+    copyWidth = srcW > static_cast<uint32_t>(srcX) ? srcW - static_cast<uint32_t>(srcX) : 0;
+  }
+  if (srcY + copyHeight > srcH) {
+    copyHeight = srcH > static_cast<uint32_t>(srcY) ? srcH - static_cast<uint32_t>(srcY) : 0;
+  }
+  if (copyWidth == 0 || copyHeight == 0) {
+    // Even if nothing is copied, ensure dst layout is valid for subsequent use.
+    if (vulkanDst->currentLayout() == VK_IMAGE_LAYOUT_UNDEFINED) {
+      TransitionImageLayout(commandBuffer, vulkanDst->vulkanImage(), VK_IMAGE_LAYOUT_UNDEFINED,
+                            VK_IMAGE_LAYOUT_GENERAL);
+      vulkanDst->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
+    }
+    return;
+  }
+
+  TransitionImageLayout(commandBuffer, vulkanSrc->vulkanImage(), vulkanSrc->currentLayout(),
+                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  TransitionImageLayout(commandBuffer, vulkanDst->vulkanImage(), vulkanDst->currentLayout(),
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
   VkImageCopy region = {};
   region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-  region.srcOffset = {static_cast<int32_t>(srcRect.x()), static_cast<int32_t>(srcRect.y()), 0};
+  region.srcOffset = {srcX, srcY, 0};
   region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
   region.dstOffset = {static_cast<int32_t>(dstOffset.x), static_cast<int32_t>(dstOffset.y), 0};
-  region.extent = {static_cast<uint32_t>(srcRect.width()), static_cast<uint32_t>(srcRect.height()),
-                   1};
+  region.extent = {copyWidth, copyHeight, 1};
 
   vkCmdCopyImage(commandBuffer, vulkanSrc->vulkanImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                  vulkanDst->vulkanImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+  TransitionImageLayout(commandBuffer, vulkanSrc->vulkanImage(),
+                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+  TransitionImageLayout(commandBuffer, vulkanDst->vulkanImage(),
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+
+  vulkanSrc->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
+  vulkanDst->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTexture,
@@ -119,6 +185,9 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   }
   auto vulkanSrc = std::static_pointer_cast<VulkanTexture>(srcTexture);
   auto vulkanDst = std::static_pointer_cast<VulkanBuffer>(dstBuffer);
+
+  TransitionImageLayout(commandBuffer, vulkanSrc->vulkanImage(), vulkanSrc->currentLayout(),
+                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
   auto bytesPerPixel = VkFormatBytesPerPixel(vulkanSrc->vulkanFormat());
   uint32_t rowBytes = dstRowBytes > 0 ? static_cast<uint32_t>(dstRowBytes)
@@ -136,6 +205,10 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   vkCmdCopyImageToBuffer(commandBuffer, vulkanSrc->vulkanImage(),
                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, vulkanDst->vulkanBuffer(), 1,
                          &region);
+
+  TransitionImageLayout(commandBuffer, vulkanSrc->vulkanImage(),
+                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+  vulkanSrc->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void VulkanCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture>) {
@@ -144,7 +217,12 @@ void VulkanCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture>) {
 
 std::shared_ptr<CommandBuffer> VulkanCommandEncoder::onFinish() {
   vkEndCommandBuffer(commandBuffer);
-  return std::make_shared<VulkanCommandBuffer>(commandBuffer, commandPool);
+  auto result = std::make_shared<VulkanCommandBuffer>(commandBuffer, commandPool);
+  // Transfer ownership of the command pool to the command buffer so that onRelease() does not
+  // destroy it while the command buffer is still pending submission.
+  commandPool = VK_NULL_HANDLE;
+  commandBuffer = VK_NULL_HANDLE;
+  return result;
 }
 
 }  // namespace tgfx

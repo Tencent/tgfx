@@ -48,7 +48,7 @@ std::shared_ptr<VulkanSemaphore> VulkanSemaphore::Make(VulkanGPU* gpu) {
 }
 
 std::shared_ptr<VulkanSemaphore> VulkanSemaphore::MakeFrom(VulkanGPU* gpu, VkSemaphore semaphore,
-                                                            uint64_t value) {
+                                                           uint64_t value) {
   if (!gpu || semaphore == VK_NULL_HANDLE) {
     return nullptr;
   }

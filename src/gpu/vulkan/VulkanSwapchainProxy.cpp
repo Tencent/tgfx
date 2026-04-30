@@ -26,8 +26,7 @@ namespace tgfx {
 
 VulkanSwapchainProxy::VulkanSwapchainProxy(Context* context, VulkanGPU* gpu,
                                            VkSwapchainKHR swapchain, VkFormat format, int width,
-                                           int height,
-                                           const std::vector<VkImageView>& imageViews,
+                                           int height, const std::vector<VkImageView>& imageViews,
                                            const std::vector<VkImage>& images)
     : _context(context), _gpu(gpu), _swapchain(swapchain), _format(format), _width(width),
       _height(height), _imageViews(imageViews), _images(images) {

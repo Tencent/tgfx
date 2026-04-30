@@ -19,10 +19,10 @@
 #include "gpu/vulkan/VulkanAPI.h"
 #include "tgfx/gpu/vulkan/VulkanWindow.h"
 #include <vector>
+#include "core/utils/Log.h"
 #include "gpu/vulkan/VulkanGPU.h"
 #include "gpu/vulkan/VulkanSwapchainProxy.h"
 #include "gpu/vulkan/VulkanUtil.h"
-#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -98,8 +98,7 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
   swapchainInfo.imageColorSpace = chosenFormat.colorSpace;
   swapchainInfo.imageExtent = extent;
   swapchainInfo.imageArrayLayers = 1;
-  swapchainInfo.imageUsage =
-      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   swapchainInfo.preTransform = capabilities.currentTransform;
   swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -133,11 +132,11 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
 
   device->unlock();
 
-  auto window = std::shared_ptr<VulkanWindow>(new VulkanWindow(
-      device, reinterpret_cast<void*>(surface), reinterpret_cast<void*>(swapchain),
-      reinterpret_cast<void*>(imageViews), reinterpret_cast<void*>(images),
-      static_cast<unsigned>(chosenFormat.format), static_cast<int>(extent.width),
-      static_cast<int>(extent.height), static_cast<int>(swapImageCount)));
+  auto window = std::shared_ptr<VulkanWindow>(
+      new VulkanWindow(device, reinterpret_cast<void*>(surface), reinterpret_cast<void*>(swapchain),
+                       reinterpret_cast<void*>(imageViews), reinterpret_cast<void*>(images),
+                       static_cast<unsigned>(chosenFormat.format), static_cast<int>(extent.width),
+                       static_cast<int>(extent.height), static_cast<int>(swapImageCount)));
   return window;
 }
 
@@ -181,9 +180,9 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
   auto* imageViews = reinterpret_cast<std::vector<VkImageView>*>(_imageViews);
   auto* images = reinterpret_cast<std::vector<VkImage>*>(_images);
 
-  swapchainProxy = std::make_shared<VulkanSwapchainProxy>(
-      context, vulkanGPU, swapchain, static_cast<VkFormat>(_format), _width, _height, *imageViews,
-      *images);
+  swapchainProxy = std::make_shared<VulkanSwapchainProxy>(context, vulkanGPU, swapchain,
+                                                          static_cast<VkFormat>(_format), _width,
+                                                          _height, *imageViews, *images);
   return swapchainProxy;
 }
 

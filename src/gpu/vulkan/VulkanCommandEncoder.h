@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <vector>
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "tgfx/gpu/CommandEncoder.h"
@@ -35,6 +36,10 @@ class VulkanCommandEncoder : public CommandEncoder, public VulkanResource {
 
   VkCommandBuffer vulkanCommandBuffer() const {
     return commandBuffer;
+  }
+
+  void addDeferredDestroy(VkRenderPass rp, VkFramebuffer fb, VkDescriptorPool dp) {
+    deferredDestroys.push_back({rp, fb, dp});
   }
 
   GPU* gpu() const override;
@@ -61,6 +66,13 @@ class VulkanCommandEncoder : public CommandEncoder, public VulkanResource {
   VulkanGPU* _gpu = nullptr;
   VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
   VkCommandPool commandPool = VK_NULL_HANDLE;
+
+  struct DeferredDestroy {
+    VkRenderPass renderPass = VK_NULL_HANDLE;
+    VkFramebuffer framebuffer = VK_NULL_HANDLE;
+    VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+  };
+  std::vector<DeferredDestroy> deferredDestroys;
 
   friend class VulkanGPU;
 };

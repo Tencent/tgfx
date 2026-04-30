@@ -19,6 +19,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <unordered_set>
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "tgfx/gpu/RenderPipeline.h"
@@ -51,6 +52,14 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
 
   uint32_t getUniformBlockVisibility(unsigned binding) const;
 
+  bool hasUniformBinding(unsigned binding) const {
+    return uniformBindingSet.count(binding) > 0;
+  }
+
+  bool hasTextureBinding(unsigned binding) const {
+    return textureBindingSet.count(binding) > 0;
+  }
+
   VkCullModeFlags vulkanCullMode() const {
     return cullMode;
   }
@@ -75,6 +84,8 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
   VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
   std::unordered_map<unsigned, uint32_t> uniformBlockVisibility = {};
+  std::unordered_set<unsigned> uniformBindingSet = {};
+  std::unordered_set<unsigned> textureBindingSet = {};
   VkCullModeFlags cullMode = VK_CULL_MODE_NONE;
   VkFrontFace frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 

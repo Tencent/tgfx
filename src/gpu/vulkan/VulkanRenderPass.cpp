@@ -48,23 +48,56 @@ static VkAttachmentStoreOp ToVkStoreOp(StoreAction action) {
   }
 }
 
+static void TransitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout,
+                                  VkImageLayout newLayout, VkImageAspectFlags aspectMask) {
+  VkImageMemoryBarrier barrier = {};
+  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.oldLayout = oldLayout;
+  barrier.newLayout = newLayout;
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.image = image;
+  barrier.subresourceRange.aspectMask = aspectMask;
+  barrier.subresourceRange.baseMipLevel = 0;
+  barrier.subresourceRange.levelCount = 1;
+  barrier.subresourceRange.baseArrayLayer = 0;
+  barrier.subresourceRange.layerCount = 1;
+  barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+  barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                       0, 0, nullptr, 0, nullptr, 1, &barrier);
+}
+
 std::shared_ptr<VulkanRenderPass> VulkanRenderPass::Make(VulkanCommandEncoder* encoder,
                                                          const RenderPassDescriptor& descriptor) {
   if (!encoder) {
     return nullptr;
   }
-  return std::shared_ptr<VulkanRenderPass>(new VulkanRenderPass(encoder, descriptor));
+  auto vulkanGPU = static_cast<VulkanGPU*>(encoder->gpu());
+  return std::shared_ptr<VulkanRenderPass>(new VulkanRenderPass(encoder, vulkanGPU, descriptor));
 }
 
-VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder,
+VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu,
                                    const RenderPassDescriptor& passDescriptor)
-    : RenderPass(passDescriptor), encoder(encoder),
+    : RenderPass(passDescriptor), encoder(encoder), vulkanGPU(gpu),
       commandBuffer(encoder->vulkanCommandBuffer()) {
 
-  auto vulkanGPU = static_cast<VulkanGPU*>(encoder->gpu());
   auto device = vulkanGPU->device();
 
-  // Build render pass and framebuffer from the descriptor.
+  uniformBindings.resize(16);
+  textureBindings.resize(16);
+
+  VkDescriptorPoolSize poolSizes[] = {
+      {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_UNIFORM_BUFFERS},
+      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_COMBINED_SAMPLERS},
+  };
+  VkDescriptorPoolCreateInfo poolInfo = {};
+  poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  poolInfo.maxSets = MAX_DESCRIPTOR_SETS;
+  poolInfo.poolSizeCount = 2;
+  poolInfo.pPoolSizes = poolSizes;
+  vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool);
+
   std::vector<VkAttachmentDescription> attachments;
   std::vector<VkAttachmentReference> colorRefs;
   std::vector<VkImageView> fbAttachments;
@@ -77,22 +110,32 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder,
       continue;
     }
     auto vulkanTexture = std::static_pointer_cast<VulkanTexture>(ca.texture);
+
+    // Transition color attachment to GENERAL layout before render pass begins. We use GENERAL for
+    // all color attachments to maintain a uniform layout across the backend, avoiding the
+    // complexity of tracking per-image optimal layouts.
+    TransitionImageLayout(commandBuffer, vulkanTexture->vulkanImage(),
+                          vulkanTexture->currentLayout(), VK_IMAGE_LAYOUT_GENERAL,
+                          VK_IMAGE_ASPECT_COLOR_BIT);
+
     VkAttachmentDescription attachment = {};
     attachment.format = vulkanTexture->vulkanFormat();
     attachment.samples = static_cast<VkSampleCountFlagBits>(ca.texture->sampleCount());
     attachment.loadOp = ToVkLoadOp(ca.loadAction);
     attachment.storeOp = ToVkStoreOp(ca.storeAction);
-    attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+    attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    vulkanTexture->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
 
     colorRefs.push_back(
-        {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
+        {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_GENERAL});
     attachments.push_back(attachment);
     fbAttachments.push_back(vulkanTexture->vulkanImageView());
 
     VkClearValue clearValue = {};
-    clearValue.color = {{ca.clearValue.red, ca.clearValue.green, ca.clearValue.blue,
-                         ca.clearValue.alpha}};
+    clearValue.color = {
+        {ca.clearValue.red, ca.clearValue.green, ca.clearValue.blue, ca.clearValue.alpha}};
     clearValues.push_back(clearValue);
 
     fbWidth = static_cast<uint32_t>(ca.texture->width());
@@ -102,8 +145,13 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder,
   VkAttachmentReference depthRef = {};
   bool hasDepth = (passDescriptor.depthStencilAttachment.texture != nullptr);
   if (hasDepth) {
-    auto dsTexture = std::static_pointer_cast<VulkanTexture>(
-        passDescriptor.depthStencilAttachment.texture);
+    auto dsTexture =
+        std::static_pointer_cast<VulkanTexture>(passDescriptor.depthStencilAttachment.texture);
+
+    TransitionImageLayout(commandBuffer, dsTexture->vulkanImage(), dsTexture->currentLayout(),
+                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                          VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+
     VkAttachmentDescription depthAttachment = {};
     depthAttachment.format = dsTexture->vulkanFormat();
     depthAttachment.samples = static_cast<VkSampleCountFlagBits>(dsTexture->sampleCount());
@@ -113,6 +161,8 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder,
     depthAttachment.stencilStoreOp = ToVkStoreOp(passDescriptor.depthStencilAttachment.storeAction);
     depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    dsTexture->setCurrentLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     depthRef = {static_cast<uint32_t>(attachments.size()),
                 VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
     attachments.push_back(depthAttachment);
@@ -159,13 +209,27 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder,
   beginInfo.pClearValues = clearValues.data();
 
   vkCmdBeginRenderPass(commandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+  VkViewport viewport = {};
+  viewport.x = 0.0f;
+  viewport.y = 0.0f;
+  viewport.width = static_cast<float>(fbWidth);
+  viewport.height = static_cast<float>(fbHeight);
+  viewport.minDepth = 0.0f;
+  viewport.maxDepth = 1.0f;
+  vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+  VkRect2D scissor = {};
+  scissor.offset = {0, 0};
+  scissor.extent = {fbWidth, fbHeight};
+  vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 }
 
 VulkanRenderPass::~VulkanRenderPass() {
 }
 
 GPU* VulkanRenderPass::gpu() const {
-  return encoder->gpu();
+  return vulkanGPU;
 }
 
 void VulkanRenderPass::setViewport(int x, int y, int width, int height) {
@@ -187,17 +251,113 @@ void VulkanRenderPass::setScissorRect(int x, int y, int width, int height) {
 }
 
 void VulkanRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
+  if (!pipeline) {
+    return;
+  }
   currentPipeline = std::static_pointer_cast<VulkanRenderPipeline>(pipeline);
+  if (currentPipeline->vulkanPipeline() == VK_NULL_HANDLE) {
+    currentPipeline = nullptr;
+    return;
+  }
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     currentPipeline->vulkanPipeline());
+  descriptorDirty = true;
 }
 
-void VulkanRenderPass::setUniformBuffer(unsigned, std::shared_ptr<GPUBuffer>, size_t, size_t) {
-  // TODO: Implement descriptor set update and binding for uniform buffers.
+void VulkanRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer,
+                                        size_t offset, size_t size) {
+  if (!buffer || binding >= uniformBindings.size()) {
+    return;
+  }
+  auto vulkanBuffer = std::static_pointer_cast<VulkanBuffer>(buffer);
+  uniformBindings[binding] = {vulkanBuffer->vulkanBuffer(), offset, size};
+  descriptorDirty = true;
 }
 
-void VulkanRenderPass::setTexture(unsigned, std::shared_ptr<Texture>, std::shared_ptr<Sampler>) {
-  // TODO: Implement descriptor set update and binding for combined image samplers.
+void VulkanRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> texture,
+                                  std::shared_ptr<Sampler> sampler) {
+  if (!texture || !sampler || binding >= textureBindings.size()) {
+    return;
+  }
+  auto vulkanTexture = std::static_pointer_cast<VulkanTexture>(texture);
+  auto vulkanSampler = std::static_pointer_cast<VulkanSampler>(sampler);
+  textureBindings[binding] = {vulkanTexture->vulkanImageView(), vulkanSampler->vulkanSampler()};
+  descriptorDirty = true;
+}
+
+void VulkanRenderPass::bindDescriptorSetIfDirty() {
+  if (!descriptorDirty || !currentPipeline || descriptorPool == VK_NULL_HANDLE) {
+    return;
+  }
+  descriptorDirty = false;
+
+  auto device = vulkanGPU->device();
+  auto setLayout = currentPipeline->vulkanDescriptorSetLayout();
+  if (setLayout == VK_NULL_HANDLE) {
+    return;
+  }
+
+  VkDescriptorSetAllocateInfo allocInfo = {};
+  allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  allocInfo.descriptorPool = descriptorPool;
+  allocInfo.descriptorSetCount = 1;
+  allocInfo.pSetLayouts = &setLayout;
+
+  VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+  auto result = vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet);
+  if (result != VK_SUCCESS) {
+    LOGE("VulkanRenderPass: vkAllocateDescriptorSets failed (result=%d). Pool may be exhausted.",
+         static_cast<int>(result));
+    return;
+  }
+
+  std::vector<VkWriteDescriptorSet> writes;
+  std::vector<VkDescriptorBufferInfo> bufferInfos;
+  std::vector<VkDescriptorImageInfo> imageInfos;
+  bufferInfos.reserve(uniformBindings.size());
+  imageInfos.reserve(textureBindings.size());
+
+  for (unsigned i = 0; i < static_cast<unsigned>(uniformBindings.size()); i++) {
+    auto& ub = uniformBindings[i];
+    if (ub.buffer == VK_NULL_HANDLE || !currentPipeline->hasUniformBinding(i)) {
+      continue;
+    }
+    bufferInfos.push_back({ub.buffer, ub.offset, ub.size});
+    VkWriteDescriptorSet write = {};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = descriptorSet;
+    write.dstBinding = i;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    write.pBufferInfo = &bufferInfos.back();
+    writes.push_back(write);
+  }
+
+  for (unsigned i = 0; i < static_cast<unsigned>(textureBindings.size()); i++) {
+    auto& tb = textureBindings[i];
+    if (tb.imageView == VK_NULL_HANDLE || tb.sampler == VK_NULL_HANDLE ||
+        !currentPipeline->hasTextureBinding(i)) {
+      continue;
+    }
+    // All sampled textures use GENERAL layout, consistent with the layout set by writeTexture().
+    imageInfos.push_back({tb.sampler, tb.imageView, VK_IMAGE_LAYOUT_GENERAL});
+    VkWriteDescriptorSet write = {};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = descriptorSet;
+    write.dstBinding = i;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.pImageInfo = &imageInfos.back();
+    writes.push_back(write);
+  }
+
+  if (!writes.empty()) {
+    vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+  }
+
+  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          currentPipeline->vulkanPipelineLayout(), 0, 1, &descriptorSet, 0,
+                          nullptr);
 }
 
 void VulkanRenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer,
@@ -225,30 +385,39 @@ void VulkanRenderPass::setStencilReference(uint32_t reference) {
   vkCmdSetStencilReference(commandBuffer, VK_STENCIL_FACE_FRONT_AND_BACK, reference);
 }
 
-void VulkanRenderPass::draw(PrimitiveType, uint32_t vertexCount, uint32_t instanceCount,
-                            uint32_t firstVertex, uint32_t firstInstance) {
+void VulkanRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
+                            uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
+  if (!currentPipeline) {
+    return;
+  }
+  bindDescriptorSetIfDirty();
+  auto vkTopology = primitiveType == PrimitiveType::TriangleStrip
+                        ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
+                        : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  vkCmdSetPrimitiveTopologyEXT(commandBuffer, vkTopology);
   vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
-void VulkanRenderPass::drawIndexed(PrimitiveType, uint32_t indexCount, uint32_t instanceCount,
-                                   uint32_t firstIndex, int32_t baseVertex,
-                                   uint32_t firstInstance) {
+void VulkanRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCount,
+                                   uint32_t instanceCount, uint32_t firstIndex,
+                                   int32_t baseVertex, uint32_t firstInstance) {
+  if (!currentPipeline) {
+    return;
+  }
+  bindDescriptorSetIfDirty();
+  auto vkTopology = primitiveType == PrimitiveType::TriangleStrip
+                        ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
+                        : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  vkCmdSetPrimitiveTopologyEXT(commandBuffer, vkTopology);
   vkCmdDrawIndexed(commandBuffer, indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
 }
 
 void VulkanRenderPass::onEnd() {
   vkCmdEndRenderPass(commandBuffer);
-
-  auto vulkanGPU = static_cast<VulkanGPU*>(encoder->gpu());
-  auto device = vulkanGPU->device();
-  if (framebuffer != VK_NULL_HANDLE) {
-    vkDestroyFramebuffer(device, framebuffer, nullptr);
-    framebuffer = VK_NULL_HANDLE;
-  }
-  if (renderPass != VK_NULL_HANDLE) {
-    vkDestroyRenderPass(device, renderPass, nullptr);
-    renderPass = VK_NULL_HANDLE;
-  }
+  encoder->addDeferredDestroy(renderPass, framebuffer, descriptorPool);
+  renderPass = VK_NULL_HANDLE;
+  framebuffer = VK_NULL_HANDLE;
+  descriptorPool = VK_NULL_HANDLE;
 }
 
 }  // namespace tgfx

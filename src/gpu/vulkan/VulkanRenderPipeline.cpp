@@ -164,9 +164,11 @@ VulkanRenderPipeline::VulkanRenderPipeline(VulkanGPU* gpu,
   unsigned textureUnit = 0;
   for (auto& entry : descriptor.layout.textureSamplers) {
     textureUnits[entry.binding] = textureUnit++;
+    textureBindingSet.insert(entry.binding);
   }
   for (auto& entry : descriptor.layout.uniformBlocks) {
     uniformBlockVisibility[entry.binding] = entry.visibility;
+    uniformBindingSet.insert(entry.binding);
   }
 }
 
@@ -211,16 +213,7 @@ bool VulkanRenderPipeline::createDescriptorSetLayout(VulkanGPU* gpu,
     binding.binding = entry.binding;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     binding.descriptorCount = 1;
-    binding.stageFlags = 0;
-    if (entry.visibility & ShaderVisibility::Vertex) {
-      binding.stageFlags |= VK_SHADER_STAGE_VERTEX_BIT;
-    }
-    if (entry.visibility & ShaderVisibility::Fragment) {
-      binding.stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
-    }
-    if (binding.stageFlags == 0) {
-      binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    }
+    binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     bindings.push_back(binding);
   }
 
@@ -304,8 +297,9 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
     VkVertexInputBindingDescription binding = {};
     binding.binding = i;
     binding.stride = static_cast<uint32_t>(layout.stride);
-    binding.inputRate = (layout.stepMode == VertexStepMode::Instance) ? VK_VERTEX_INPUT_RATE_INSTANCE
-                                                                     : VK_VERTEX_INPUT_RATE_VERTEX;
+    binding.inputRate = (layout.stepMode == VertexStepMode::Instance)
+                            ? VK_VERTEX_INPUT_RATE_INSTANCE
+                            : VK_VERTEX_INPUT_RATE_VERTEX;
     vertexBindings.push_back(binding);
 
     uint32_t offset = 0;
@@ -360,7 +354,8 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
   multisampling.rasterizationSamples =
       static_cast<VkSampleCountFlagBits>(descriptor.multisample.count);
   multisampling.sampleShadingEnable = VK_FALSE;
-  multisampling.alphaToCoverageEnable = descriptor.multisample.alphaToCoverageEnabled ? VK_TRUE : VK_FALSE;
+  multisampling.alphaToCoverageEnable =
+      descriptor.multisample.alphaToCoverageEnabled ? VK_TRUE : VK_FALSE;
   VkSampleMask sampleMask = descriptor.multisample.mask;
   if (sampleMask != 0xFFFFFFFF) {
     multisampling.pSampleMask = &sampleMask;
@@ -378,10 +373,14 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
     attachment.dstAlphaBlendFactor = ToVkBlendFactor(ca.dstAlphaBlendFactor);
     attachment.alphaBlendOp = ToVkBlendOp(ca.alphaBlendOp);
     attachment.colorWriteMask = 0;
-    if (ca.colorWriteMask & ColorWriteMask::RED) attachment.colorWriteMask |= VK_COLOR_COMPONENT_R_BIT;
-    if (ca.colorWriteMask & ColorWriteMask::GREEN) attachment.colorWriteMask |= VK_COLOR_COMPONENT_G_BIT;
-    if (ca.colorWriteMask & ColorWriteMask::BLUE) attachment.colorWriteMask |= VK_COLOR_COMPONENT_B_BIT;
-    if (ca.colorWriteMask & ColorWriteMask::ALPHA) attachment.colorWriteMask |= VK_COLOR_COMPONENT_A_BIT;
+    if (ca.colorWriteMask & ColorWriteMask::RED)
+      attachment.colorWriteMask |= VK_COLOR_COMPONENT_R_BIT;
+    if (ca.colorWriteMask & ColorWriteMask::GREEN)
+      attachment.colorWriteMask |= VK_COLOR_COMPONENT_G_BIT;
+    if (ca.colorWriteMask & ColorWriteMask::BLUE)
+      attachment.colorWriteMask |= VK_COLOR_COMPONENT_B_BIT;
+    if (ca.colorWriteMask & ColorWriteMask::ALPHA)
+      attachment.colorWriteMask |= VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachments.push_back(attachment);
   }
 
@@ -394,11 +393,10 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
   // Depth stencil
   VkPipelineDepthStencilStateCreateInfo depthStencil = {};
   depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depthStencil.depthTestEnable =
-      (descriptor.depthStencil.depthCompare != CompareFunction::Always ||
-       descriptor.depthStencil.depthWriteEnabled)
-          ? VK_TRUE
-          : VK_FALSE;
+  depthStencil.depthTestEnable = (descriptor.depthStencil.depthCompare != CompareFunction::Always ||
+                                  descriptor.depthStencil.depthWriteEnabled)
+                                     ? VK_TRUE
+                                     : VK_FALSE;
   depthStencil.depthWriteEnable = descriptor.depthStencil.depthWriteEnabled ? VK_TRUE : VK_FALSE;
   depthStencil.depthCompareOp = ToVkCompareOp(descriptor.depthStencil.depthCompare);
   depthStencil.stencilTestEnable =
@@ -420,7 +418,10 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
   depthStencil.back.writeMask = descriptor.depthStencil.stencilWriteMask;
 
   // Dynamic states
-  std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+  // Primitive topology must be dynamic because draw calls may use either TriangleList or
+  // TriangleStrip (e.g., shape mask quad rendering uses TriangleStrip).
+  std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
+                                               VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT};
   VkPipelineDynamicStateCreateInfo dynamicState = {};
   dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
   dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
@@ -437,10 +438,10 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
     attachment.samples = static_cast<VkSampleCountFlagBits>(descriptor.multisample.count);
     attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+    attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
     colorRefs.push_back(
-        {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
+        {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_GENERAL});
     attachments.push_back(attachment);
   }
 
@@ -498,8 +499,8 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
   pipelineInfo.renderPass = renderPass;
   pipelineInfo.subpass = 0;
 
-  result =
-      vkCreateGraphicsPipelines(gpu->device(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline);
+  result = vkCreateGraphicsPipelines(gpu->device(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
+                                     &pipeline);
 
   // The render pass object used for pipeline creation can be destroyed immediately since Vulkan
   // only requires render pass compatibility (not identity) at draw time.

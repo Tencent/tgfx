@@ -24,12 +24,10 @@
 namespace tgfx {
 
 static VkImageUsageFlags ToVkImageUsage(uint32_t usage) {
-  VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   if (usage & TextureUsage::TEXTURE_BINDING) {
     flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
-  }
-  if (usage & TextureUsage::RENDER_ATTACHMENT) {
-    flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   }
   return flags;
 }
@@ -92,7 +90,7 @@ std::shared_ptr<VulkanTexture> VulkanTexture::Make(VulkanGPU* gpu,
   viewInfo.format = vkFormat;
   viewInfo.subresourceRange.aspectMask = FormatToAspectFlags(vkFormat);
   viewInfo.subresourceRange.baseMipLevel = 0;
-  viewInfo.subresourceRange.levelCount = static_cast<uint32_t>(descriptor.mipLevelCount);
+  viewInfo.subresourceRange.levelCount = 1;
   viewInfo.subresourceRange.baseArrayLayer = 0;
   viewInfo.subresourceRange.layerCount = 1;
 

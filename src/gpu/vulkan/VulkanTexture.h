@@ -21,7 +21,6 @@
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "tgfx/gpu/Texture.h"
-
 #include "vk_mem_alloc.h"
 
 namespace tgfx {
@@ -51,6 +50,14 @@ class VulkanTexture : public Texture, public VulkanResource {
     return format;
   }
 
+  VkImageLayout currentLayout() const {
+    return layout;
+  }
+
+  void setCurrentLayout(VkImageLayout newLayout) {
+    layout = newLayout;
+  }
+
   BackendTexture getBackendTexture() const override;
   BackendRenderTarget getBackendRenderTarget() const override;
 
@@ -66,6 +73,7 @@ class VulkanTexture : public Texture, public VulkanResource {
   VkImageView imageView = VK_NULL_HANDLE;
   VmaAllocation allocation = VK_NULL_HANDLE;
   VkFormat format = VK_FORMAT_UNDEFINED;
+  VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
   bool adopted = true;
 
   friend class VulkanGPU;

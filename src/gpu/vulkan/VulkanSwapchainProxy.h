@@ -28,9 +28,8 @@ class VulkanGPU;
 
 class VulkanSwapchainProxy : public RenderTargetProxy {
  public:
-  VulkanSwapchainProxy(Context* context, VulkanGPU* gpu, VkSwapchainKHR swapchain,
-                       VkFormat format, int width, int height,
-                       const std::vector<VkImageView>& imageViews,
+  VulkanSwapchainProxy(Context* context, VulkanGPU* gpu, VkSwapchainKHR swapchain, VkFormat format,
+                       int width, int height, const std::vector<VkImageView>& imageViews,
                        const std::vector<VkImage>& images);
 
   Context* getContext() const override;

@@ -88,7 +88,8 @@ void VulkanCaps::initFeatures(VkPhysicalDevice physicalDevice) {
 
   _features.semaphore = timelineSemaphoreSupported;
   _features.clampToBorder = true;
-  _features.textureBarrier = true;
+  // Vulkan has no glTextureBarrier() equivalent. Disable to force the copy path for dst reads.
+  _features.textureBarrier = false;
 
   // Check for framebuffer fetch support via rasterization order attachment access.
   frameBufferFetchSupported = false;
@@ -108,8 +109,7 @@ void VulkanCaps::initLimits(VkPhysicalDevice physicalDevice) {
   _limits.maxTextureDimension2D = static_cast<int>(properties.limits.maxImageDimension2D);
   _limits.maxSamplersPerShaderStage =
       static_cast<int>(properties.limits.maxPerStageDescriptorSamplers);
-  _limits.maxUniformBufferBindingSize =
-      static_cast<int>(properties.limits.maxUniformBufferRange);
+  _limits.maxUniformBufferBindingSize = static_cast<int>(properties.limits.maxUniformBufferRange);
   _limits.minUniformBufferOffsetAlignment =
       static_cast<int>(properties.limits.minUniformBufferOffsetAlignment);
 }

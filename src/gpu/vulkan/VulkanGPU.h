@@ -21,9 +21,9 @@
 #include <list>
 #include <memory>
 #include <unordered_map>
+#include "core/utils/ReturnQueue.h"
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanCaps.h"
-#include "core/utils/ReturnQueue.h"
 #include "tgfx/gpu/GPU.h"
 
 VK_DEFINE_HANDLE(VmaAllocator)

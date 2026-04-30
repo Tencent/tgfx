@@ -51,7 +51,7 @@ std::shared_ptr<VulkanBuffer> VulkanBuffer::Make(VulkanGPU* gpu, size_t size, ui
   VmaAllocationCreateInfo allocInfo = {};
   allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
   if (usage & GPUBufferUsage::READBACK) {
-    allocInfo.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
+    allocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
   } else {
     allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
   }

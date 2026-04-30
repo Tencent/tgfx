@@ -19,6 +19,7 @@
 #include "ShaderCompiler.h"
 #include <regex>
 #include <shaderc/shaderc.hpp>
+#include "UniformData.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -80,11 +81,11 @@ static std::string replaceSamplerBinding(const std::smatch& match, int& counter)
          match[2].str() + ";";
 }
 
-// Add binding to sampler uniforms sequentially from 0.
-// The RenderPipeline maintains a mapping from logical binding to actual texture index.
+// Add binding to sampler uniforms sequentially from TEXTURE_BINDING_POINT_START.
+// This aligns with the descriptor set layout where bindings 0 and 1 are reserved for UBOs.
 static std::string assignSamplerBindings(const std::string& source) {
   static std::regex samplerRegex(R"(uniform\s+(sampler\w+)\s+(\w+);)");
-  int binding = 0;
+  int binding = TEXTURE_BINDING_POINT_START;
   return replaceAllMatches(source, samplerRegex, replaceSamplerBinding, binding);
 }
 

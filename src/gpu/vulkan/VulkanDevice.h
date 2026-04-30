@@ -21,5 +21,4 @@
 #include "gpu/vulkan/VulkanGPU.h"
 #include "tgfx/gpu/vulkan/VulkanDevice.h"
 
-namespace tgfx {
-}  // namespace tgfx
+namespace tgfx {}  // namespace tgfx
