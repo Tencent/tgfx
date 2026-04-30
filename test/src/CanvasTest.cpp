@@ -3002,11 +3002,13 @@ TGFX_TEST(CanvasTest, TurbulenceTileSize) {
 }
 
 TGFX_TEST(CanvasTest, EmptyRectStroke) {
-  // Compares drawRect(emptyRect) against drawRRect(emptyRect with non-zero radii).
-  // Layout (256x256 canvas):
-  //   Top half  (y=30):  drawRect  - row 0 double-zero (0x0), row 1 single-zero (60x0)
-  //   Bottom half (y=150): drawRRect with radii=10 - row 0 double-zero (0x0),
-  //                                                  row 1 single-zero vertical (0x60)
+  // Verifies that all four entry points (drawRect / drawRRect / drawPath / drawShape) forward
+  // empty rectangles into the same stroke geometry.
+  // Layout (256x256 canvas, 8 rows x 3 cap columns):
+  //   Rows 0..1  drawRect  : double-zero (0x0), horizontal single-zero (60x0)
+  //   Rows 2..3  drawRRect : double-zero (0x0), vertical   single-zero (0x60), radii=10
+  //   Rows 4..5  drawPath  : double-zero (0x0), horizontal single-zero (60x0)
+  //   Rows 6..7  drawShape : double-zero (0x0), horizontal single-zero (60x0)
   //   Columns: Butt / Square / Round
   ContextScope scope;
   auto context = scope.getContext();
@@ -3019,9 +3021,13 @@ TGFX_TEST(CanvasTest, EmptyRectStroke) {
   const float strokeWidth = 16.0f;
   const float rrectRadius = 10.0f;
   const float colSpacing = 76.0f;
+  const float rowSpacing = 28.0f;
   const float originX = 40.0f;
+  const float originY = 22.0f;
 
   LineCap caps[3] = {LineCap::Butt, LineCap::Square, LineCap::Round};
+
+  enum class DrawApi { Rect, RRect, Path, Shape };
 
   Paint stroke = {};
   stroke.setStyle(PaintStyle::Stroke);
@@ -3032,7 +3038,7 @@ TGFX_TEST(CanvasTest, EmptyRectStroke) {
   mark.setColor(Color::FromRGBA(255, 0, 0, 255));
   mark.setAntiAlias(true);
 
-  auto drawCell = [&](float cx, float cy, LineCap cap, bool useRRect, bool doubleZero,
+  auto drawCell = [&](float cx, float cy, LineCap cap, DrawApi api, bool doubleZero,
                       bool vertical) {
     canvas->drawCircle(cx, cy, 1.5f, mark);
     Stroke s(strokeWidth);
@@ -3046,30 +3052,54 @@ TGFX_TEST(CanvasTest, EmptyRectStroke) {
     } else {
       rect = Rect::MakeXYWH(cx - 30.0f, cy, 60.0f, 0.0f);
     }
-    if (useRRect) {
-      RRect rRect = {};
-      rRect.setRectXY(rect, rrectRadius, rrectRadius);
-      canvas->drawRRect(rRect, stroke);
-    } else {
-      canvas->drawRect(rect, stroke);
+    switch (api) {
+      case DrawApi::Rect:
+        canvas->drawRect(rect, stroke);
+        break;
+      case DrawApi::RRect: {
+        RRect rRect = {};
+        rRect.setRectXY(rect, rrectRadius, rrectRadius);
+        canvas->drawRRect(rRect, stroke);
+        break;
+      }
+      case DrawApi::Path: {
+        Path path = {};
+        path.addRect(rect);
+        canvas->drawPath(path, stroke);
+        break;
+      }
+      case DrawApi::Shape: {
+        Path path = {};
+        path.addRect(rect);
+        auto shape = Shape::MakeFrom(path);
+        canvas->drawShape(shape, stroke);
+        break;
+      }
     }
   };
 
-  // Top half: drawRect
-  float y = 30.0f;
-  for (int col = 0; col < 3; ++col) {
-    float cx = originX + static_cast<float>(col) * colSpacing;
-    drawCell(cx, y, caps[col], false, true, false);
-    drawCell(cx, y + 50.0f, caps[col], false, false, false);
-  }
+  struct RowConfig {
+    DrawApi api;
+    bool doubleZero;
+    bool vertical;
+  };
+  const std::array<RowConfig, 8> rows = {{
+      {DrawApi::Rect, true, false},
+      {DrawApi::Rect, false, false},
+      {DrawApi::RRect, true, false},
+      {DrawApi::RRect, false, true},
+      {DrawApi::Path, true, false},
+      {DrawApi::Path, false, false},
+      {DrawApi::Shape, true, false},
+      {DrawApi::Shape, false, false},
+  }};
 
-  // Bottom half: drawRRect with non-zero radii. Second row uses a vertical 0x60 rect to
-  // exercise the orthogonal single-zero orientation.
-  y = 150.0f;
-  for (int col = 0; col < 3; ++col) {
-    float cx = originX + static_cast<float>(col) * colSpacing;
-    drawCell(cx, y, caps[col], true, true, false);
-    drawCell(cx, y + 50.0f, caps[col], true, false, true);
+  for (size_t row = 0; row < rows.size(); ++row) {
+    float cy = originY + static_cast<float>(row) * rowSpacing;
+    for (int col = 0; col < 3; ++col) {
+      float cx = originX + static_cast<float>(col) * colSpacing;
+      drawCell(cx, cy, caps[col], rows[row].api, rows[row].doubleZero, rows[row].vertical);
+    }
   }
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/EmptyRectStroke"));

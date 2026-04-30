@@ -205,12 +205,25 @@ bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& pai
       addRRect(rRect, fillPaint, matrix);
       return true;
     }
+    return false;
   }
-  if (Rect rect = {}; path.isRect(&rect)) {
+  Rect rect = {};
+  bool closed = false;
+  // isRect can match an open 4-segment polyline whose stroke (open contour with caps) differs
+  // from a closed rectangle stroke, so only forward when the path is closed or there is no
+  // stroke (closedness does not affect fill).
+  if (path.isRect(&rect, &closed) && (paint.style != PaintStyle::Stroke || closed)) {
     addRect(rect, paint, matrix);
     return true;
   }
-  if (RRect rRect = {}; path.isRRect(&rRect)) {
+  RRect rRect = {};
+  // isRRect returns false for oval/circle paths, so check isOval explicitly.
+  if (path.isOval(&rect)) {
+    rRect.setOval(rect);
+    addRRect(rRect, paint, matrix);
+    return true;
+  }
+  if (path.isRRect(&rRect)) {
     addRRect(rRect, paint, matrix);
     return true;
   }

@@ -245,28 +245,12 @@ void Canvas::drawLine(const Point line[2], const Matrix& matrix, const ClipStack
 
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   if (rect.isEmpty()) {
-    auto stroke = paint.getStroke();
-    if (stroke == nullptr || stroke->width <= 0.0f) {
+    if (paint.getStyle() != PaintStyle::Stroke) {
       return;
     }
-    bool zeroWidth = rect.width() == 0.0f;
-    bool zeroHeight = rect.height() == 0.0f;
-    // Double-zero rect with Butt cap produces no geometry.
-    if (zeroWidth && zeroHeight && stroke->cap == LineCap::Butt) {
-      return;
-    }
-    float halfWidth = stroke->width * 0.5f;
-    Rect outset = rect;
-    outset.outset(zeroWidth ? halfWidth : 0.0f, zeroHeight ? halfWidth : 0.0f);
-    SaveLayerForImageFilter(paint.getImageFilter());
-    auto brush = paint.getBrush();
-    if (zeroWidth && zeroHeight && stroke->cap == LineCap::Round) {
-      RRect oval = {};
-      oval.setOval(outset);
-      drawContext->drawRRect(oval, _matrix, *clipStack, brush, nullptr);
-    } else {
-      drawContext->drawRect(outset, _matrix, *clipStack, brush, nullptr);
-    }
+    Path path = {};
+    path.addRect(rect);
+    drawPath(path, paint);
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
@@ -376,29 +360,35 @@ void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& c
     return;
   }
   Rect rect = {};
-  if (stroke == nullptr) {
-    if (path.isRect(&rect)) {
-      drawContext->drawRect(rect, matrix, clip, brush, nullptr);
-      return;
-    }
-    RRect rRect = {};
-    if (path.isOval(&rect)) {
-      rRect.setOval(rect);
-      drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
-      return;
-    }
-    if (path.isRRect(&rRect)) {
-      drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
-      return;
-    }
-    drawContext->drawPath(path, matrix, clip, brush);
-  } else {
-    auto shape = Shape::MakeFrom(path);
-    if (shape == nullptr) {
-      return;
-    }
-    drawContext->drawShape(shape, matrix, clip, brush, stroke);
+  bool closed = false;
+  // isRect can match an open 4-segment polyline whose stroke (open contour with caps) differs
+  // from a closed rectangle stroke, so only forward when the path is closed or there is no
+  // stroke (closedness does not affect fill).
+  if (path.isRect(&rect, &closed) && !rect.isEmpty() && (stroke == nullptr || closed)) {
+    drawContext->drawRect(rect, matrix, clip, brush, stroke);
+    return;
   }
+  RRect rRect = {};
+  // SkPath::addOval does not filter empty bounds, so guard against an empty oval reaching the
+  // backend (which asserts on empty rrects).
+  if (path.isOval(&rect) && !rect.isEmpty()) {
+    rRect.setOval(rect);
+    drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
+    return;
+  }
+  if (path.isRRect(&rRect) && !rRect.rect.isEmpty()) {
+    drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
+    return;
+  }
+  if (stroke == nullptr) {
+    drawContext->drawPath(path, matrix, clip, brush);
+    return;
+  }
+  auto shape = Shape::MakeFrom(path);
+  if (shape == nullptr) {
+    return;
+  }
+  drawContext->drawShape(shape, matrix, clip, brush, stroke);
 }
 
 void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
