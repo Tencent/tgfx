@@ -245,6 +245,11 @@ void Canvas::drawLine(const Point line[2], const Matrix& matrix, const ClipStack
 
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   if (rect.isEmpty()) {
+    // Forward to the path renderer so the stroker handles cap behaviour for zero-length
+    // segments identically to Skia.
+    Path path = {};
+    path.addRect(rect);
+    drawPath(path, paint);
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
@@ -312,6 +317,10 @@ static bool UseDrawPath(const Paint& paint, const Point& radii, const Matrix& vi
 
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
   if (rRect.rect.isEmpty()) {
+    // Forward to the path renderer for the same reason as drawRect.
+    Path path = {};
+    path.addRRect(rRect);
+    drawPath(path, paint);
     return;
   }
   auto& radii = rRect.radii;

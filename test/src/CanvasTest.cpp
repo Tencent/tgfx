@@ -3001,4 +3001,55 @@ TGFX_TEST(CanvasTest, TurbulenceTileSize) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/TurbulenceTileSize"));
 }
 
+TGFX_TEST(CanvasTest, EmptyRectStroke) {
+  // Mirrors the Skia fiddle that probes drawRect(emptyRect, strokePaint) behaviour.
+  // Layout (256x256 canvas):
+  //   Row 0 (y=60):  double-zero rect  (w=0, h=0)
+  //   Row 1 (y=170): single-zero rect  (w=60, h=0)
+  // Columns: Butt / Square / Round
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 256, 256);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  const float strokeWidth = 16.0f;
+  const float colSpacing = 76.0f;
+  const float rowSpacing = 110.0f;
+  const float originX = 40.0f;
+  const float originY = 60.0f;
+
+  LineCap caps[3] = {LineCap::Butt, LineCap::Square, LineCap::Round};
+
+  Paint stroke = {};
+  stroke.setStyle(PaintStyle::Stroke);
+  stroke.setColor(Color::FromRGBA(0, 0, 255, 255));
+  stroke.setAntiAlias(true);
+
+  Paint mark = {};
+  mark.setColor(Color::FromRGBA(255, 0, 0, 255));
+  mark.setAntiAlias(true);
+
+  for (int row = 0; row < 2; ++row) {
+    for (int col = 0; col < 3; ++col) {
+      float cx = originX + static_cast<float>(col) * colSpacing;
+      float cy = originY + static_cast<float>(row) * rowSpacing;
+
+      canvas->drawCircle(cx, cy, 1.5f, mark);
+
+      Stroke s(strokeWidth);
+      s.cap = caps[col];
+      stroke.setStroke(s);
+
+      Rect rect = (row == 0) ? Rect::MakeXYWH(cx, cy, 0.0f, 0.0f)
+                             : Rect::MakeXYWH(cx - 30.0f, cy, 60.0f, 0.0f);
+      canvas->drawRect(rect, stroke);
+    }
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/EmptyRectStroke"));
+}
+
 }  // namespace tgfx
