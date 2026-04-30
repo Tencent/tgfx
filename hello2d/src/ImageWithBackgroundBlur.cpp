@@ -55,9 +55,11 @@ std::shared_ptr<tgfx::Layer> ImageWithBackgroundBlur::onBuildLayerTree(
   pill->setLayerStyles({tgfx::BackgroundBlurStyle::Make(24, 24)});
   root->addChild(pill);
 
-  // A small tinted square nested one level deeper to exercise the sub BackgroundSource path (an
-  // offscreen carrier is triggered by the parent's filter-equivalent setup below).
+  // A container with alpha < 1 to trigger group-opacity offscreen carrier, exercising the
+  // sub BackgroundSource surface path with a non-zero carrier origin.
   auto stack = tgfx::Layer::Make();
+  stack->setAlpha(0.9f);
+  stack->setAllowsGroupOpacity(true);
   stack->setMatrix(tgfx::Matrix::MakeTrans(kPadding + 200, kPadding + 430));
 
   auto swatch = tgfx::SolidLayer::Make();

@@ -899,15 +899,15 @@ TGFX_TEST(BackgroundBlurTest, GroupOpacityNestedBackgroundBlur) {
   // Container with alpha < 1 triggers offscreen carrier under groupOpacity.
   auto container = Layer::Make();
   container->setAlpha(0.8f);
-  container->setMatrix(Matrix::MakeTrans(50, 50));
+  container->setMatrix(Matrix::MakeTrans(50, 50) * Matrix::MakeScale(1.5f));
 
   // The blur child sits inside the container. Its surface-to-world path exercises
   // createSubSurface with a non-zero carrier origin offset.
   auto blurChild = SolidLayer::Make();
   blurChild->setColor(Color::FromRGBA(255, 255, 255, 60));
-  blurChild->setWidth(150);
-  blurChild->setHeight(100);
-  blurChild->setMatrix(Matrix::MakeTrans(25, 25));
+  blurChild->setWidth(100);
+  blurChild->setHeight(80);
+  blurChild->setMatrix(Matrix::MakeTrans(15, 15));
   blurChild->setLayerStyles({BackgroundBlurStyle::Make(8, 8)});
   container->addChild(blurChild);
 
@@ -915,6 +915,7 @@ TGFX_TEST(BackgroundBlurTest, GroupOpacityNestedBackgroundBlur) {
   rootLayer->addChild(background);
   rootLayer->addChild(container);
 
+  displayList.setZoomScale(1.5);
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/GroupOpacityNestedBackgroundBlur"));
 

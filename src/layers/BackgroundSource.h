@@ -70,8 +70,10 @@ class BackgroundSource {
     return surfaceToWorld;
   }
 
-  // Down-sample factor (<=1) applied to the top-level bg surface for extreme blur outsets.
-  // Sub sources return 1. The capture pass divides out this factor when sizing snapshots.
+  // Down-sample factor (<=1) applied to the top-level bg surface for extreme blur outsets. Sub
+  // sources inherit the top-level's value so capturers can divide it out uniformly — the sub's
+  // own canvas already carries every ancestor's density, but the top-level down-sample factor is
+  // the only scale a consumer's render canvas does NOT see, so it must be removed at capture.
   float surfaceScale() const {
     return _surfaceScale;
   }
