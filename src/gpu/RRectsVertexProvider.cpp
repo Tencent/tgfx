@@ -197,11 +197,15 @@ static inline float ComplexCornerEdgeDistanceY(size_t corner, float y, const Rec
 class AARRectsVertexProvider final : public RRectsVertexProvider {
  public:
   AARRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
-                         bool hasComplex, PlacementArray<Stroke>&& strokes,
+                         PlacementArray<Stroke>&& strokes,
                          std::shared_ptr<BlockAllocator> reference,
                          std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : RRectsVertexProvider(std::move(rects), aaType, hasColor, hasComplex, std::move(strokes),
+      : RRectsVertexProvider(std::move(rects), aaType, hasColor, std::move(strokes),
                              std::move(reference), std::move(colorSpace)) {
+  }
+
+  bool isComplex() const override {
+    return false;
   }
 
   size_t vertexCount() const override {
@@ -222,7 +226,7 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
     auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
 
     for (auto& record : rects) {
-      DEBUG_ASSERT(record->rRect.type() != RRect::Type::Complex);
+      DEBUG_ASSERT(!record->rRect.isComplex());
       auto viewMatrix = record->viewMatrix;
       auto rRect = record->rRect;
       auto scales = viewMatrix.getAxisScales();
@@ -343,11 +347,15 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
 class NonAARRectsVertexProvider final : public RRectsVertexProvider {
  public:
   NonAARRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
-                            bool hasComplex, PlacementArray<Stroke>&& strokes,
+                            PlacementArray<Stroke>&& strokes,
                             std::shared_ptr<BlockAllocator> reference,
                             std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : RRectsVertexProvider(std::move(rects), aaType, hasColor, hasComplex, std::move(strokes),
+      : RRectsVertexProvider(std::move(rects), aaType, hasColor, std::move(strokes),
                              std::move(reference), std::move(colorSpace)) {
+  }
+
+  bool isComplex() const override {
+    return false;
   }
 
   size_t vertexCount() const override {
@@ -370,7 +378,7 @@ class NonAARRectsVertexProvider final : public RRectsVertexProvider {
 
     size_t currentIndex = 0;
     for (auto& record : rects) {
-      DEBUG_ASSERT(record->rRect.type() != RRect::Type::Complex);
+      DEBUG_ASSERT(!record->rRect.isComplex());
       auto viewMatrix = record->viewMatrix;
       auto rRect = record->rRect;
       float compressedColor = 0.f;
@@ -439,11 +447,15 @@ class NonAARRectsVertexProvider final : public RRectsVertexProvider {
 class AAComplexRRectsVertexProvider final : public RRectsVertexProvider {
  public:
   AAComplexRRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
-                                bool hasComplex, PlacementArray<Stroke>&& strokes,
+                                PlacementArray<Stroke>&& strokes,
                                 std::shared_ptr<BlockAllocator> reference,
                                 std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : RRectsVertexProvider(std::move(rects), aaType, hasColor, hasComplex, std::move(strokes),
+      : RRectsVertexProvider(std::move(rects), aaType, hasColor, std::move(strokes),
                              std::move(reference), std::move(colorSpace)) {
+  }
+
+  bool isComplex() const override {
+    return true;
   }
 
   size_t vertexCount() const override {
@@ -467,7 +479,7 @@ class AAComplexRRectsVertexProvider final : public RRectsVertexProvider {
     auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
 
     for (auto& record : rects) {
-      DEBUG_ASSERT(record->rRect.type() == RRect::Type::Complex);
+      DEBUG_ASSERT(record->rRect.isComplex());
       auto viewMatrix = record->viewMatrix;
       auto rRect = record->rRect;
       auto scales = viewMatrix.getAxisScales();
@@ -555,11 +567,15 @@ class AAComplexRRectsVertexProvider final : public RRectsVertexProvider {
 class NonAAComplexRRectsVertexProvider final : public RRectsVertexProvider {
  public:
   NonAAComplexRRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
-                                   bool hasColor, bool hasComplex, PlacementArray<Stroke>&& strokes,
+                                   bool hasColor, PlacementArray<Stroke>&& strokes,
                                    std::shared_ptr<BlockAllocator> reference,
                                    std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : RRectsVertexProvider(std::move(rects), aaType, hasColor, hasComplex, std::move(strokes),
+      : RRectsVertexProvider(std::move(rects), aaType, hasColor, std::move(strokes),
                              std::move(reference), std::move(colorSpace)) {
+  }
+
+  bool isComplex() const override {
+    return true;
   }
 
   size_t vertexCount() const override {
@@ -667,7 +683,7 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
     if (record->color != firstColor) {
       hasColor = true;
     }
-    if (record->rRect.type() == RRect::Type::Complex) {
+    if (record->rRect.isComplex()) {
       hasComplex = true;
     }
     if (hasColor && hasComplex) {
@@ -679,26 +695,25 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
   if (aaType == AAType::None) {
     if (hasComplex) {
       return allocator->make<NonAAComplexRRectsVertexProvider>(
-          std::move(array), aaType, hasColor, hasComplex, std::move(strokeArray),
-          allocator->addReference(), std::move(colorSpace));
+          std::move(array), aaType, hasColor, std::move(strokeArray), allocator->addReference(),
+          std::move(colorSpace));
     }
     return allocator->make<NonAARRectsVertexProvider>(
-        std::move(array), aaType, hasColor, hasComplex, std::move(strokeArray),
-        allocator->addReference(), std::move(colorSpace));
+        std::move(array), aaType, hasColor, std::move(strokeArray), allocator->addReference(),
+        std::move(colorSpace));
   }
   if (hasComplex) {
     return allocator->make<AAComplexRRectsVertexProvider>(
-        std::move(array), aaType, hasColor, hasComplex, std::move(strokeArray),
-        allocator->addReference(), std::move(colorSpace));
+        std::move(array), aaType, hasColor, std::move(strokeArray), allocator->addReference(),
+        std::move(colorSpace));
   }
-  return allocator->make<AARRectsVertexProvider>(std::move(array), aaType, hasColor, hasComplex,
+  return allocator->make<AARRectsVertexProvider>(std::move(array), aaType, hasColor,
                                                  std::move(strokeArray), allocator->addReference(),
                                                  std::move(colorSpace));
 }
 
 RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
-                                           bool hasColor, bool hasComplex,
-                                           PlacementArray<Stroke>&& strokes,
+                                           bool hasColor, PlacementArray<Stroke>&& strokes,
                                            std::shared_ptr<BlockAllocator> reference,
                                            std::shared_ptr<ColorSpace> colorSpace)
     : VertexProvider(std::move(reference)), rects(std::move(rects)), strokes(std::move(strokes)),
@@ -706,6 +721,5 @@ RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, 
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.hasColor = hasColor;
   bitFields.hasStroke = !this->strokes.empty();
-  bitFields.isComplex = hasComplex;
 }
 }  // namespace tgfx

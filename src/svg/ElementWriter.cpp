@@ -254,7 +254,7 @@ void ElementWriter::addRectAttributes(const Rect& rect) {
 
 void ElementWriter::addRoundRectAttributes(const RRect& roundRect) {
   // SVG <rect> only supports uniform rx/ry; complex RRects must be emitted as <path>.
-  DEBUG_ASSERT(roundRect.type() != RRect::Type::Complex);
+  DEBUG_ASSERT(!roundRect.isComplex());
   addRectAttributes(roundRect.rect());
   if (FloatNearlyZero(roundRect.radii()[0].x) && FloatNearlyZero(roundRect.radii()[0].y)) {
     return;

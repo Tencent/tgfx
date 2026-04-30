@@ -277,7 +277,7 @@ static bool HasSharpCorner(const RRect& rRect) {
 // Returns true when either diagonal corner pair has overlapping arc-center boxes on at least
 // one axis, i.e. its x-radii or y-radii sum exceeds the corresponding side length.
 static bool HasDiagonalCornerAxisOverlap(const RRect& rRect) {
-  if (rRect.type() != RRect::Type::Complex) {
+  if (!rRect.isComplex()) {
     return false;
   }
   const auto& r = rRect.radii();
@@ -330,7 +330,7 @@ static bool UseDrawPath(const Paint& paint, const RRect& rRect, bool hasSharpCor
 
   // Non-Complex types have identical radii across all four corners (zero for Rect, equal
   // per-corner for Simple/Oval), so only the first needs check.
-  const auto cornerCount = rRect.type() == RRect::Type::Complex ? rRect.radii().size() : size_t{1};
+  const auto cornerCount = rRect.isComplex() ? rRect.radii().size() : size_t{1};
   for (size_t i = 0; i < cornerCount; ++i) {
     const auto& r = rRect.radii()[i];
     const auto xRadius = scales.x * r.x;

@@ -118,8 +118,7 @@ static bool ComplexMismatch(const RRect& newRRect,
   if (pending.empty()) {
     return false;
   }
-  return (newRRect.type() == RRect::Type::Complex) !=
-         (pending.front()->rRect.type() == RRect::Type::Complex);
+  return newRRect.isComplex() != pending.front()->rRect.isComplex();
 }
 
 void OpsCompositor::fillRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,

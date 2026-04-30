@@ -113,7 +113,7 @@ void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint, const 
   if (rRect.rect().isEmpty()) {
     return;
   }
-  if (rRect.type() == RRect::Type::Rect) {
+  if (rRect.isRect()) {
     addRect(rRect.rect(), paint, matrix);
     return;
   }

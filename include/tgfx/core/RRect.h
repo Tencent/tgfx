@@ -88,6 +88,13 @@ class RRect {
   }
 
   /**
+   * Returns true if each corner may have an independent radius.
+   */
+  bool isComplex() const {
+    return _type == Type::Complex;
+  }
+
+  /**
    * Sets to rounded rectangle with the same radii for all four corners.
    * @param rect  bounds of rounded rectangle
    * @param radiusX  x-axis radius of corners

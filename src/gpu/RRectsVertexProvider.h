@@ -75,9 +75,10 @@ class RRectsVertexProvider : public VertexProvider {
     return bitFields.hasStroke;
   }
 
-  bool isComplex() const {
-    return bitFields.isComplex;
-  }
+  /**
+   * Returns true if the provider holds complex RRects with per-corner radii.
+   */
+  virtual bool isComplex() const = 0;
 
   /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
@@ -98,12 +99,10 @@ class RRectsVertexProvider : public VertexProvider {
     uint8_t aaType : 2;
     bool hasColor : 1;
     bool hasStroke : 1;
-    bool isComplex : 1;
   } bitFields = {};
 
   RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
-                       bool hasComplex, PlacementArray<Stroke>&& strokes,
-                       std::shared_ptr<BlockAllocator> reference,
+                       PlacementArray<Stroke>&& strokes, std::shared_ptr<BlockAllocator> reference,
                        std::shared_ptr<ColorSpace> colorSpace = nullptr);
 };
 }  // namespace tgfx
