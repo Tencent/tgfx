@@ -3005,7 +3005,8 @@ TGFX_TEST(CanvasTest, EmptyRectStroke) {
   // Compares drawRect(emptyRect) against drawRRect(emptyRect with non-zero radii).
   // Layout (256x256 canvas):
   //   Top half  (y=30):  drawRect  - row 0 double-zero (0x0), row 1 single-zero (60x0)
-  //   Bottom half (y=150): drawRRect with radii=10 - same two rows
+  //   Bottom half (y=150): drawRRect with radii=10 - row 0 double-zero (0x0),
+  //                                                  row 1 single-zero vertical (0x60)
   //   Columns: Butt / Square / Round
   ContextScope scope;
   auto context = scope.getContext();
@@ -3031,13 +3032,20 @@ TGFX_TEST(CanvasTest, EmptyRectStroke) {
   mark.setColor(Color::FromRGBA(255, 0, 0, 255));
   mark.setAntiAlias(true);
 
-  auto drawCell = [&](float cx, float cy, LineCap cap, bool useRRect, bool doubleZero) {
+  auto drawCell = [&](float cx, float cy, LineCap cap, bool useRRect, bool doubleZero,
+                      bool vertical) {
     canvas->drawCircle(cx, cy, 1.5f, mark);
     Stroke s(strokeWidth);
     s.cap = cap;
     stroke.setStroke(s);
-    Rect rect = doubleZero ? Rect::MakeXYWH(cx, cy, 0.0f, 0.0f)
-                           : Rect::MakeXYWH(cx - 30.0f, cy, 60.0f, 0.0f);
+    Rect rect;
+    if (doubleZero) {
+      rect = Rect::MakeXYWH(cx, cy, 0.0f, 0.0f);
+    } else if (vertical) {
+      rect = Rect::MakeXYWH(cx, cy - 30.0f, 0.0f, 60.0f);
+    } else {
+      rect = Rect::MakeXYWH(cx - 30.0f, cy, 60.0f, 0.0f);
+    }
     if (useRRect) {
       RRect rRect = {};
       rRect.setRectXY(rect, rrectRadius, rrectRadius);
@@ -3051,16 +3059,17 @@ TGFX_TEST(CanvasTest, EmptyRectStroke) {
   float y = 30.0f;
   for (int col = 0; col < 3; ++col) {
     float cx = originX + static_cast<float>(col) * colSpacing;
-    drawCell(cx, y, caps[col], false, true);
-    drawCell(cx, y + 50.0f, caps[col], false, false);
+    drawCell(cx, y, caps[col], false, true, false);
+    drawCell(cx, y + 50.0f, caps[col], false, false, false);
   }
 
-  // Bottom half: drawRRect with non-zero radii
+  // Bottom half: drawRRect with non-zero radii. Second row uses a vertical 0x60 rect to
+  // exercise the orthogonal single-zero orientation.
   y = 150.0f;
   for (int col = 0; col < 3; ++col) {
     float cx = originX + static_cast<float>(col) * colSpacing;
-    drawCell(cx, y, caps[col], true, true);
-    drawCell(cx, y + 50.0f, caps[col], true, false);
+    drawCell(cx, y, caps[col], true, true, false);
+    drawCell(cx, y + 50.0f, caps[col], true, false, true);
   }
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/EmptyRectStroke"));
