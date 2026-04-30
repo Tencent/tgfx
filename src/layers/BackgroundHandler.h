@@ -68,8 +68,9 @@ class BackgroundHandler {
 
 class BackgroundCapturer : public BackgroundHandler {
  public:
-  BackgroundCapturer(BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source)
-      : snapshots(snapshots), bgSource(std::move(source)) {
+  BackgroundCapturer(BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source,
+                     const std::vector<Rect>* drawRects = nullptr)
+      : snapshots(snapshots), bgSource(std::move(source)), drawRects(drawRects) {
   }
 
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
@@ -82,11 +83,12 @@ class BackgroundCapturer : public BackgroundHandler {
   std::unique_ptr<BackgroundHandler> cloneWithSource(
       std::shared_ptr<BackgroundSource> newSource) const override;
 
-  // Runs a capture pass: replays captureRoot onto bgSource's canvas, populating snapshots. When
-  // drawRects contains more than one entry, the replay is invoked once per rect with that rect
-  // as the renderRect — that avoids replaying Layers that fall in the bounding gaps between
-  // dirty regions. The bg source itself is still a single rectangle (sized to the rects' union)
-  // because it is backed by a real Surface or Picture; only the cull window varies per pass.
+  // Runs a capture pass: replays captureRoot onto bgSource's canvas, populating snapshots. The
+  // replay walks the tree exactly once with renderRect set to drawRects' union; when drawRects
+  // has more than one entry, per-rect culling happens inside drawBackgroundStyle so snapshots
+  // are only produced for layers that actually intersect one of the refreshed regions. That
+  // avoids wasting snapshots on Layers sitting in the bounding gaps between scattered dirty
+  // rects, without paying the cost of re-walking the tree per rect.
   static void Run(Layer* captureRoot, const DrawArgs& baseArgs,
                   std::shared_ptr<BackgroundSource> bgSource, BackgroundSnapshotMap* snapshots,
                   const std::vector<Rect>& drawRects);
@@ -94,6 +96,9 @@ class BackgroundCapturer : public BackgroundHandler {
  private:
   BackgroundSnapshotMap* snapshots = nullptr;
   std::shared_ptr<BackgroundSource> bgSource = nullptr;
+  // World-space list of rects the consume pass will actually refresh. Non-null only when Run
+  // received more than one rect; otherwise the renderRect union already handles culling.
+  const std::vector<Rect>* drawRects = nullptr;
 };
 
 class BackgroundConsumer : public BackgroundHandler {

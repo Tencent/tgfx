@@ -89,6 +89,23 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (!localToWorld.invert(&worldToLocal)) {
     return;
   }
+  // Per-rect cull: skip layers that don't fall within any of the consumer's refreshed regions.
+  // Only runs when Run() got more than one rect; single-rect case is fully handled by the
+  // renderRect union passed to drawLayer. Done just before the expensive getBackgroundImage()
+  // call so we don't build snapshots for gap layers.
+  if (drawRects != nullptr) {
+    auto worldBounds = localToWorld.mapRect(layer->getBounds());
+    bool intersectsAny = false;
+    for (const auto& rect : *drawRects) {
+      if (Rect::Intersects(rect, worldBounds)) {
+        intersectsAny = true;
+        break;
+      }
+    }
+    if (!intersectsAny) {
+      return;
+    }
+  }
   auto bgImage = bgSource->getBackgroundImage();
   if (bgImage == nullptr) {
     return;
@@ -118,7 +135,7 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::cloneWithSource(
     return nullptr;
   }
   return std::unique_ptr<BackgroundHandler>(
-      new BackgroundCapturer(snapshots, std::move(newSource)));
+      new BackgroundCapturer(snapshots, std::move(newSource), drawRects));
 }
 
 void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& /*args*/, Canvas* canvas, Layer* layer,
@@ -156,20 +173,22 @@ void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
   if (drawRects.empty()) {
     return;
   }
+  // Compute the union and set it as renderRect so drawLayer does a single tree walk with a
+  // conservative cull window. The per-rect intersection check happens inside
+  // drawBackgroundStyle — only pay for it when the caller actually has more than one rect
+  // (scattered dirty regions).
+  Rect unionRect = drawRects.front();
+  for (size_t i = 1; i < drawRects.size(); ++i) {
+    unionRect.join(drawRects[i]);
+  }
   auto* bgCanvas = bgSource->getCanvas();
   AutoCanvasRestore autoRestore(bgCanvas);
-  BackgroundCapturer capturer(snapshots, std::move(bgSource));
+  const std::vector<Rect>* rectsForFiltering = drawRects.size() > 1 ? &drawRects : nullptr;
+  BackgroundCapturer capturer(snapshots, std::move(bgSource), rectsForFiltering);
   DrawArgs captureArgs = baseArgs;
   captureArgs.backgroundHandler = &capturer;
-  // Replay the capture pass once per rect with renderRect scoped to that rect. This avoids
-  // visiting Layers that fall in the gaps between scattered dirty regions when the caller passes
-  // more than one rect. snapshots->emplace is first-wins, so if a layer's snapshot was already
-  // captured in an earlier rect pass it is not overwritten by a later one.
-  for (const auto& rect : drawRects) {
-    Rect renderRect = rect;
-    captureArgs.renderRect = &renderRect;
-    captureRoot->drawLayer(captureArgs, bgCanvas, 1.0f, BlendMode::SrcOver);
-  }
+  captureArgs.renderRect = &unionRect;
+  captureRoot->drawLayer(captureArgs, bgCanvas, 1.0f, BlendMode::SrcOver);
 }
 
 }  // namespace tgfx
