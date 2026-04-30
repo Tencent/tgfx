@@ -4705,22 +4705,25 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto group5 = VectorGroup::Make();
   group5->setElements({rect5, stroke5});
 
-  // Row 6: Three Center-aligned 96px stroke samples sharing a fit linear gradient. Round and
+  // Row 6: Four Center-aligned 72px stroke samples sharing a fit linear gradient. Round and
   // Square sit on a double-zero Rectangle (collapses to a moveTo+lineTo with overlapping
   // endpoints) and rely on the epsilon fit-axis fallback: Round splits diagonally red/blue,
-  // Square splits horizontally red/blue. The third sample uses a real 50x10 Rectangle so the
-  // vertical gradient fills the stroked band continuously inside the geometry's height and
-  // clamps to the end colors above and below.
+  // Square splits horizontally red/blue. The third sample is a 50x0 Rectangle stroked with a
+  // Butt cap, so the band only extends vertically along the stroke width while the vertical
+  // gradient runs through it. The fourth sample uses a real 50x10 Rectangle so the vertical
+  // gradient fills the stroked band continuously inside the geometry's height and clamps to
+  // the end colors above and below.
   struct DotConfig {
     float cx;
     LineCap cap;
     Size size;
     Point gradEnd;
   };
-  const std::array<DotConfig, 3> dotConfigs = {{
-      {110.0f, LineCap::Round, {0.0f, 0.0f}, {1.0f, 1.0f}},
-      {270.0f, LineCap::Square, {0.0f, 0.0f}, {0.0f, 1.0f}},
-      {470.0f, LineCap::Butt, {50.0f, 10.0f}, {0.0f, 1.0f}},
+  const std::array<DotConfig, 4> dotConfigs = {{
+      {86.0f, LineCap::Round, {0.0f, 0.0f}, {1.0f, 1.0f}},
+      {219.0f, LineCap::Square, {0.0f, 0.0f}, {0.0f, 1.0f}},
+      {341.0f, LineCap::Butt, {50.0f, 0.0f}, {0.0f, 1.0f}},
+      {489.0f, LineCap::Butt, {50.0f, 10.0f}, {0.0f, 1.0f}},
   }};
   std::vector<std::shared_ptr<VectorGroup>> dotGroups;
   dotGroups.reserve(dotConfigs.size());
@@ -4731,7 +4734,7 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
     auto dotGradient =
         Gradient::MakeLinear({0.0f, 0.0f}, config.gradEnd, {Color::Red(), Color::Blue()});
     auto dotStroke = StrokeStyle::Make(dotGradient);
-    dotStroke->setStrokeWidth(96.0f);
+    dotStroke->setStrokeWidth(72.0f);
     dotStroke->setLineCap(config.cap);
     dotStroke->setStrokeAlign(StrokeAlign::Center);
     auto dotGroup = VectorGroup::Make();
@@ -4739,8 +4742,8 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
     dotGroups.push_back(dotGroup);
   }
 
-  vectorLayer->setContents(
-      {group1, group2, group3, group4, group5, dotGroups[0], dotGroups[1], dotGroups[2]});
+  vectorLayer->setContents({group1, group2, group3, group4, group5, dotGroups[0], dotGroups[1],
+                            dotGroups[2], dotGroups[3]});
 
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
