@@ -125,16 +125,9 @@ void RRect::setRectRadii(const Rect& rect, const std::array<Point, 4>& radii) {
 }
 
 void RRect::setOval(const Rect& oval) {
-  _rect = oval.makeSorted();
-  if (_rect.isEmpty()) {
-    _radii = {};
-    _type = Type::Rect;
-    return;
-  }
-
-  const auto radius = Point{_rect.width() / 2, _rect.height() / 2};
-  _radii = {radius, radius, radius, radius};
-  _type = Type::Oval;
+  const auto sorted = oval.makeSorted();
+  const auto radius = Point{sorted.width() / 2, sorted.height() / 2};
+  setRectRadii(sorted, {radius, radius, radius, radius});
 }
 
 // Positive scaling preserves all RRect classification invariants (adjacent-radii fit,

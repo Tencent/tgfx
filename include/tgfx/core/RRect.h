@@ -74,6 +74,20 @@ class RRect {
   }
 
   /**
+   * Returns true if the bounds are a simple rectangle.
+   */
+  bool isRect() const {
+    return _type == Type::Rect;
+  }
+
+  /**
+   * Returns true if the bounds are an oval.
+   */
+  bool isOval() const {
+    return _type == Type::Oval;
+  }
+
+  /**
    * Sets to rounded rectangle with the same radii for all four corners.
    * @param rect  bounds of rounded rectangle
    * @param radiusX  x-axis radius of corners
@@ -82,9 +96,9 @@ class RRect {
   void setRectXY(const Rect& rect, float radiusX, float radiusY);
 
   /**
-   * Sets to rounded rectangle with per-corner radii. Any radius component that is negative is
-   * first clamped to zero; the remaining radii are then scaled down proportionally if adjacent
-   * corners overlap along any edge.
+   * Sets to rounded rectangle with per-corner radii. If either component of a corner radius is
+   * negative, that entire corner is forced to (0, 0) (producing a sharp corner). The remaining
+   * radii are then scaled down proportionally if adjacent corners would overlap along any edge.
    * @param rect  bounds of rounded rectangle
    * @param radii  per-corner radii in the order [top-left, top-right, bottom-right, bottom-left]
    */

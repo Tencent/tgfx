@@ -54,33 +54,6 @@ namespace tgfx {
 // geometry but make the inner rect degenerate (either a point or a horizontal or
 // vertical line).
 
-PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
-    BlockAllocator* allocator, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
-    std::vector<PlacementPtr<Stroke>>&& strokes, std::shared_ptr<ColorSpace> colorSpace) {
-  if (rects.empty()) {
-    return nullptr;
-  }
-  auto hasColor = false;
-  auto hasComplex = false;
-  auto& firstColor = rects.front()->color;
-  for (auto& record : rects) {
-    if (record->color != firstColor) {
-      hasColor = true;
-    }
-    if (record->rRect.type() == RRect::Type::Complex) {
-      hasComplex = true;
-    }
-    if (hasColor && hasComplex) {
-      break;
-    }
-  }
-  auto array = allocator->makeArray(std::move(rects));
-  auto strokeArray = allocator->makeArray(std::move(strokes));
-  return allocator->make<RRectsVertexProvider>(std::move(array), aaType, hasColor, hasComplex,
-                                               std::move(strokeArray), allocator->addReference(),
-                                               std::move(colorSpace));
-}
-
 // Returns 1/value, or a large sentinel when value is exactly zero, to avoid division by zero in
 // shaders.
 static float FloatInvert(float value) {
@@ -221,6 +194,508 @@ static inline float ComplexCornerEdgeDistanceY(size_t corner, float y, const Rec
   return (corner == 0 || corner == 1) ? (y - rectBounds.top) : (rectBounds.bottom - y);
 }
 
+class AARRectsVertexProvider final : public RRectsVertexProvider {
+ public:
+  AARRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
+                         bool hasComplex, PlacementArray<Stroke>&& strokes,
+                         std::shared_ptr<BlockAllocator> reference,
+                         std::shared_ptr<ColorSpace> colorSpace = nullptr)
+      : RRectsVertexProvider(std::move(rects), aaType, hasColor, hasComplex, std::move(strokes),
+                             std::move(reference), std::move(colorSpace)) {
+  }
+
+  size_t vertexCount() const override {
+    // AA simple: 16 vertices per RRect.
+    //   position(2) + ellipseOffset(2) + ellipseRadii(4) = 8
+    //   Optional: color(1).
+    size_t floatsPerVertex = 8;
+    if (bitFields.hasColor) {
+      floatsPerVertex += 1;
+    }
+    return rects.size() * 16 * floatsPerVertex;
+  }
+
+  void getVertices(float* vertices) const override {
+    size_t index = 0;
+    auto currentAAType = aaType();
+    size_t currentIndex = 0;
+    auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
+
+    for (auto& record : rects) {
+      DEBUG_ASSERT(record->rRect.type() != RRect::Type::Complex);
+      auto viewMatrix = record->viewMatrix;
+      auto rRect = record->rRect;
+      auto scales = viewMatrix.getAxisScales();
+      float compressedColor = 0.f;
+      if (bitFields.hasColor) {
+        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
+        compressedColor = *reinterpret_cast<float*>(&uintColor);
+      }
+
+      auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
+      auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
+
+      bool stroked = false;
+      float xRadius = rRect.radii()[0].x;
+      float yRadius = rRect.radii()[0].y;
+      float innerXRadius = 0;
+      float innerYRadius = 0;
+      auto rectBounds = rRect.rect();
+      if (stroke) {
+        innerXRadius = xRadius - strokeParams.halfStrokeX;
+        innerYRadius = yRadius - strokeParams.halfStrokeY;
+        stroked = innerXRadius > 0.0f && innerYRadius > 0.0f;
+        xRadius += strokeParams.halfStrokeX;
+        yRadius += strokeParams.halfStrokeY;
+        rectBounds.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
+      }
+
+      float reciprocalRadii[4] = {FloatInvert(xRadius), FloatInvert(yRadius),
+                                  FloatInvert(innerXRadius), FloatInvert(innerYRadius)};
+      // If the stroke width is exactly double the radius, the inner radii will be zero.
+      // Pin to a large value, to avoid infinities in the shader. crbug.com/1139750
+      reciprocalRadii[2] = std::min(reciprocalRadii[2], 1e6f);
+      reciprocalRadii[3] = std::min(reciprocalRadii[3], 1e6f);
+      // On MSAA, bloat enough to guarantee any pixel that might be touched by the rRect has
+      // full sample coverage.
+      float aaBloat = currentAAType == AAType::MSAA ? FLOAT_SQRT2 : .5f;
+      // Extend out the radii to antialias.
+      float aaOuterXRadius = xRadius + aaBloat;
+      float aaOuterYRadius = yRadius + aaBloat;
+
+      float xMaxOffset = aaOuterXRadius;
+      float yMaxOffset = aaOuterYRadius;
+      if (!stroked) {
+        // For filled RRectRecords we map a unit circle in the vertex attributes rather than
+        // computing an ellipse and modifying that distance, so we normalize to 1.
+        xMaxOffset /= xRadius;
+        yMaxOffset /= yRadius;
+      }
+      auto aaBounds = rectBounds.makeOutset(aaBloat, aaBloat);
+      float yCoords[4] = {aaBounds.top, aaBounds.top + aaOuterYRadius,
+                          aaBounds.bottom - aaOuterYRadius, aaBounds.bottom};
+      float yOuterOffsets[4] = {
+          yMaxOffset,
+          FLOAT_NEARLY_ZERO,  // we're using inversesqrt() in shader, so can't be exactly 0
+          FLOAT_NEARLY_ZERO, yMaxOffset};
+      for (int i = 0; i < 4; ++i) {
+        auto point = Point::Make(aaBounds.left, yCoords[i]);
+        viewMatrix.mapPoints(&point, 1);
+        vertices[index++] = point.x;
+        vertices[index++] = point.y;
+        if (bitFields.hasColor) {
+          vertices[index++] = compressedColor;
+        }
+        vertices[index++] = xMaxOffset;
+        vertices[index++] = yOuterOffsets[i];
+        vertices[index++] = reciprocalRadii[0];
+        vertices[index++] = reciprocalRadii[1];
+        vertices[index++] = reciprocalRadii[2];
+        vertices[index++] = reciprocalRadii[3];
+
+        point = Point::Make(aaBounds.left + aaOuterXRadius, yCoords[i]);
+        viewMatrix.mapPoints(&point, 1);
+        vertices[index++] = point.x;
+        vertices[index++] = point.y;
+        if (bitFields.hasColor) {
+          vertices[index++] = compressedColor;
+        }
+        vertices[index++] = FLOAT_NEARLY_ZERO;
+        vertices[index++] = yOuterOffsets[i];
+        vertices[index++] = reciprocalRadii[0];
+        vertices[index++] = reciprocalRadii[1];
+        vertices[index++] = reciprocalRadii[2];
+        vertices[index++] = reciprocalRadii[3];
+
+        point = Point::Make(aaBounds.right - aaOuterXRadius, yCoords[i]);
+        viewMatrix.mapPoints(&point, 1);
+        vertices[index++] = point.x;
+        vertices[index++] = point.y;
+        if (bitFields.hasColor) {
+          vertices[index++] = compressedColor;
+        }
+        vertices[index++] = FLOAT_NEARLY_ZERO;
+        vertices[index++] = yOuterOffsets[i];
+        vertices[index++] = reciprocalRadii[0];
+        vertices[index++] = reciprocalRadii[1];
+        vertices[index++] = reciprocalRadii[2];
+        vertices[index++] = reciprocalRadii[3];
+
+        point = Point::Make(aaBounds.right, yCoords[i]);
+        viewMatrix.mapPoints(&point, 1);
+        vertices[index++] = point.x;
+        vertices[index++] = point.y;
+        if (bitFields.hasColor) {
+          vertices[index++] = compressedColor;
+        }
+        vertices[index++] = xMaxOffset;
+        vertices[index++] = yOuterOffsets[i];
+        vertices[index++] = reciprocalRadii[0];
+        vertices[index++] = reciprocalRadii[1];
+        vertices[index++] = reciprocalRadii[2];
+        vertices[index++] = reciprocalRadii[3];
+      }
+      currentIndex++;
+    }
+  }
+};
+
+class NonAARRectsVertexProvider final : public RRectsVertexProvider {
+ public:
+  NonAARRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
+                            bool hasComplex, PlacementArray<Stroke>&& strokes,
+                            std::shared_ptr<BlockAllocator> reference,
+                            std::shared_ptr<ColorSpace> colorSpace = nullptr)
+      : RRectsVertexProvider(std::move(rects), aaType, hasColor, hasComplex, std::move(strokes),
+                             std::move(reference), std::move(colorSpace)) {
+  }
+
+  size_t vertexCount() const override {
+    // Non-AA simple: 4 vertices per RRect.
+    //   position(2) + localCoord(2) + radii(2) + rectBounds(4) = 10
+    //   Optional: color(1), halfStrokeWidth(2)
+    size_t floatsPerVertex = 10;
+    if (bitFields.hasStroke) {
+      floatsPerVertex += 2;
+    }
+    if (bitFields.hasColor) {
+      floatsPerVertex += 1;
+    }
+    return rects.size() * 4 * floatsPerVertex;
+  }
+
+  void getVertices(float* vertices) const override {
+    size_t index = 0;
+    auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
+
+    size_t currentIndex = 0;
+    for (auto& record : rects) {
+      DEBUG_ASSERT(record->rRect.type() != RRect::Type::Complex);
+      auto viewMatrix = record->viewMatrix;
+      auto rRect = record->rRect;
+      float compressedColor = 0.f;
+      if (bitFields.hasColor) {
+        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
+        compressedColor = *reinterpret_cast<float*>(&uintColor);
+      }
+
+      auto scales = viewMatrix.getAxisScales();
+      auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
+      auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
+
+      auto rect = rRect.rect();
+      auto outerRadii = rRect.radii();
+      if (stroke) {
+        rect.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
+        // Simple RRects have identical radii across all four corners, so only the first needs
+        // update.
+        outerRadii[0].x += strokeParams.halfStrokeX;
+        outerRadii[0].y += strokeParams.halfStrokeY;
+      }
+
+      // Corner positions for a quad: TL, TR, BR, BL
+      const Point corners[] = {
+          {rect.left, rect.top},
+          {rect.right, rect.top},
+          {rect.right, rect.bottom},
+          {rect.left, rect.bottom},
+      };
+
+      // Write 4 vertices for the quad
+      for (int v = 0; v < 4; ++v) {
+        auto localX = corners[v].x;
+        auto localY = corners[v].y;
+        auto point = Point::Make(localX, localY);
+        viewMatrix.mapPoints(&point, 1);
+        // position (2 floats)
+        vertices[index++] = point.x;
+        vertices[index++] = point.y;
+        // localCoord (2 floats) - coordinates within the rect for shape evaluation
+        vertices[index++] = localX;
+        vertices[index++] = localY;
+        // radii (2 floats) - uniform outer radii
+        vertices[index++] = outerRadii[0].x;
+        vertices[index++] = outerRadii[0].y;
+        // rectBounds (4 floats)
+        vertices[index++] = rect.left;
+        vertices[index++] = rect.top;
+        vertices[index++] = rect.right;
+        vertices[index++] = rect.bottom;
+        // Optional color
+        if (bitFields.hasColor) {
+          vertices[index++] = compressedColor;
+        }
+        // strokeWidth (2 floats) - only for stroke mode
+        if (bitFields.hasStroke) {
+          vertices[index++] = strokeParams.halfStrokeX;
+          vertices[index++] = strokeParams.halfStrokeY;
+        }
+      }
+      currentIndex++;
+    }
+  }
+};
+
+class AAComplexRRectsVertexProvider final : public RRectsVertexProvider {
+ public:
+  AAComplexRRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
+                                bool hasComplex, PlacementArray<Stroke>&& strokes,
+                                std::shared_ptr<BlockAllocator> reference,
+                                std::shared_ptr<ColorSpace> colorSpace = nullptr)
+      : RRectsVertexProvider(std::move(rects), aaType, hasColor, hasComplex, std::move(strokes),
+                             std::move(reference), std::move(colorSpace)) {
+  }
+
+  size_t vertexCount() const override {
+    // AA complex: 16 vertices per RRect.
+    //   position(2) + ellipseOffset(2) + ellipseRadii(4) + edgeDist(2) = 10
+    //   Optional: color(1), halfStrokeWidth(2).
+    size_t floatsPerVertex = 10;
+    if (bitFields.hasStroke) {
+      floatsPerVertex += 2;
+    }
+    if (bitFields.hasColor) {
+      floatsPerVertex += 1;
+    }
+    return rects.size() * 16 * floatsPerVertex;
+  }
+
+  void getVertices(float* vertices) const override {
+    size_t index = 0;
+    auto currentAAType = aaType();
+    size_t currentIndex = 0;
+    auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
+
+    for (auto& record : rects) {
+      DEBUG_ASSERT(record->rRect.type() == RRect::Type::Complex);
+      auto viewMatrix = record->viewMatrix;
+      auto rRect = record->rRect;
+      auto scales = viewMatrix.getAxisScales();
+      float compressedColor = 0.f;
+      if (bitFields.hasColor) {
+        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
+        compressedColor = *reinterpret_cast<float*>(&uintColor);
+      }
+
+      auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
+      auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
+
+      std::array<float, 4> outerXRadii = {};
+      std::array<float, 4> outerYRadii = {};
+      std::array<std::array<float, 4>, 4> recipRadii;
+      auto isOverstroked = ComputeComplexCornerRadii(rRect.radii(), strokeParams, stroke != nullptr,
+                                                     outerXRadii, outerYRadii, recipRadii);
+      // Overstroke RRects (inner radius <= 0) are not supported here and must be filtered
+      // out by callers.
+      DEBUG_ASSERT(!isOverstroked || !stroke);
+      bool stroked = stroke != nullptr && !isOverstroked;
+      auto rectBounds = rRect.rect();
+      if (stroke) {
+        rectBounds.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
+      }
+
+      float aaBloat = currentAAType == AAType::MSAA ? FLOAT_SQRT2 : .5f;
+      auto aaBounds = rectBounds.makeOutset(aaBloat, aaBloat);
+      std::array<float, 4> aaOuterXRadii = {};
+      std::array<float, 4> aaOuterYRadii = {};
+      for (size_t c = 0; c < 4; ++c) {
+        aaOuterXRadii[c] = outerXRadii[c] + aaBloat;
+        aaOuterYRadii[c] = outerYRadii[c] + aaBloat;
+      }
+      std::array<std::array<float, 2>, 4> xPos = {};
+      std::array<std::array<float, 2>, 4> yPos = {};
+      ComputeComplexCornerGridPositions(aaBounds, aaOuterXRadii, aaOuterYRadii, xPos, yPos);
+
+      for (size_t row = 0; row < 4; ++row) {
+        for (size_t column = 0; column < 4; ++column) {
+          auto corner = ComplexCornerIndex(row, column);
+          auto cornerXRadius = outerXRadii[corner];
+          auto cornerYRadius = outerYRadii[corner];
+
+          // Compute EllipseOffset — fill: normalized ellipse-space coordinate; stroke: raw offset
+          // in pixels (normalized later in the fragment shader). 0.0 for directions not on an arc.
+          auto xOffset = 0.0f;
+          auto yOffset = 0.0f;
+          if ((column == 0 || column == 3) && cornerXRadius > 0) {
+            xOffset = stroked ? aaOuterXRadii[corner] : (aaOuterXRadii[corner] / cornerXRadius);
+          }
+          if ((row == 0 || row == 3) && cornerYRadius > 0) {
+            yOffset = stroked ? aaOuterYRadii[corner] : (aaOuterYRadii[corner] / cornerYRadius);
+          }
+
+          // Vertex position uses per-corner coordinates
+          auto localX = ComplexCornerCoordX(corner, column, xPos);
+          auto localY = ComplexCornerCoordY(corner, row, yPos);
+          auto point = Point::Make(localX, localY);
+          viewMatrix.mapPoints(&point, 1);
+          vertices[index++] = point.x;
+          vertices[index++] = point.y;
+          if (bitFields.hasColor) {
+            vertices[index++] = compressedColor;
+          }
+          vertices[index++] = xOffset;
+          vertices[index++] = yOffset;
+          vertices[index++] = recipRadii[corner][0];
+          vertices[index++] = recipRadii[corner][1];
+          vertices[index++] = recipRadii[corner][2];
+          vertices[index++] = recipRadii[corner][3];
+          vertices[index++] = ComplexCornerEdgeDistanceX(corner, localX, rectBounds);
+          vertices[index++] = ComplexCornerEdgeDistanceY(corner, localY, rectBounds);
+          if (bitFields.hasStroke) {
+            vertices[index++] = strokeParams.halfStrokeX;
+            vertices[index++] = strokeParams.halfStrokeY;
+          }
+        }
+      }
+      currentIndex++;
+    }
+  }
+};
+
+class NonAAComplexRRectsVertexProvider final : public RRectsVertexProvider {
+ public:
+  NonAAComplexRRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
+                                   bool hasColor, bool hasComplex, PlacementArray<Stroke>&& strokes,
+                                   std::shared_ptr<BlockAllocator> reference,
+                                   std::shared_ptr<ColorSpace> colorSpace = nullptr)
+      : RRectsVertexProvider(std::move(rects), aaType, hasColor, hasComplex, std::move(strokes),
+                             std::move(reference), std::move(colorSpace)) {
+  }
+
+  size_t vertexCount() const override {
+    // Non-AA complex: 4 vertices per RRect.
+    //   position(2) + localCoord(2) + xRadii(4) + yRadii(4) + rectBounds(4) = 16
+    //   Optional: color(1), halfStrokeWidth(2)
+    size_t floatsPerVertex = 16;
+    if (bitFields.hasStroke) {
+      floatsPerVertex += 2;
+    }
+    if (bitFields.hasColor) {
+      floatsPerVertex += 1;
+    }
+    return rects.size() * 4 * floatsPerVertex;
+  }
+
+  void getVertices(float* vertices) const override {
+    size_t index = 0;
+    auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
+
+    size_t currentIndex = 0;
+    for (auto& record : rects) {
+      auto viewMatrix = record->viewMatrix;
+      auto rRect = record->rRect;
+      float compressedColor = 0.f;
+      if (bitFields.hasColor) {
+        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
+        compressedColor = *reinterpret_cast<float*>(&uintColor);
+      }
+
+      auto scales = viewMatrix.getAxisScales();
+      auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
+      auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
+
+      auto rect = rRect.rect();
+      auto outerRadii = rRect.radii();
+      if (stroke) {
+        rect.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
+        for (size_t i = 0; i < 4; ++i) {
+          outerRadii[i].x += strokeParams.halfStrokeX;
+          outerRadii[i].y += strokeParams.halfStrokeY;
+        }
+      }
+
+      // Corner positions for a quad: TL, TR, BR, BL
+      const Point corners[] = {
+          {rect.left, rect.top},
+          {rect.right, rect.top},
+          {rect.right, rect.bottom},
+          {rect.left, rect.bottom},
+      };
+
+      // Write 4 vertices for the quad
+      for (int v = 0; v < 4; ++v) {
+        auto localX = corners[v].x;
+        auto localY = corners[v].y;
+        auto point = Point::Make(localX, localY);
+        viewMatrix.mapPoints(&point, 1);
+        // position (2 floats)
+        vertices[index++] = point.x;
+        vertices[index++] = point.y;
+        // localCoord (2 floats) - coordinates within the rect for shape evaluation
+        vertices[index++] = localX;
+        vertices[index++] = localY;
+        // xRadii (4 floats) - per-corner x radii [TL, TR, BR, BL]
+        vertices[index++] = outerRadii[0].x;
+        vertices[index++] = outerRadii[1].x;
+        vertices[index++] = outerRadii[2].x;
+        vertices[index++] = outerRadii[3].x;
+        // yRadii (4 floats) - per-corner y radii [TL, TR, BR, BL]
+        vertices[index++] = outerRadii[0].y;
+        vertices[index++] = outerRadii[1].y;
+        vertices[index++] = outerRadii[2].y;
+        vertices[index++] = outerRadii[3].y;
+        // rectBounds (4 floats)
+        vertices[index++] = rect.left;
+        vertices[index++] = rect.top;
+        vertices[index++] = rect.right;
+        vertices[index++] = rect.bottom;
+        // Optional color
+        if (bitFields.hasColor) {
+          vertices[index++] = compressedColor;
+        }
+        // strokeWidth (2 floats) - only for stroke mode
+        if (bitFields.hasStroke) {
+          vertices[index++] = strokeParams.halfStrokeX;
+          vertices[index++] = strokeParams.halfStrokeY;
+        }
+      }
+      currentIndex++;
+    }
+  }
+};
+
+PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
+    BlockAllocator* allocator, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
+    std::vector<PlacementPtr<Stroke>>&& strokes, std::shared_ptr<ColorSpace> colorSpace) {
+  if (rects.empty()) {
+    return nullptr;
+  }
+  auto hasColor = false;
+  auto hasComplex = false;
+  auto& firstColor = rects.front()->color;
+  for (auto& record : rects) {
+    if (record->color != firstColor) {
+      hasColor = true;
+    }
+    if (record->rRect.type() == RRect::Type::Complex) {
+      hasComplex = true;
+    }
+    if (hasColor && hasComplex) {
+      break;
+    }
+  }
+  auto array = allocator->makeArray(std::move(rects));
+  auto strokeArray = allocator->makeArray(std::move(strokes));
+  if (aaType == AAType::None) {
+    if (hasComplex) {
+      return allocator->make<NonAAComplexRRectsVertexProvider>(
+          std::move(array), aaType, hasColor, hasComplex, std::move(strokeArray),
+          allocator->addReference(), std::move(colorSpace));
+    }
+    return allocator->make<NonAARRectsVertexProvider>(
+        std::move(array), aaType, hasColor, hasComplex, std::move(strokeArray),
+        allocator->addReference(), std::move(colorSpace));
+  }
+  if (hasComplex) {
+    return allocator->make<AAComplexRRectsVertexProvider>(
+        std::move(array), aaType, hasColor, hasComplex, std::move(strokeArray),
+        allocator->addReference(), std::move(colorSpace));
+  }
+  return allocator->make<AARRectsVertexProvider>(std::move(array), aaType, hasColor, hasComplex,
+                                                 std::move(strokeArray), allocator->addReference(),
+                                                 std::move(colorSpace));
+}
+
 RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
                                            bool hasColor, bool hasComplex,
                                            PlacementArray<Stroke>&& strokes,
@@ -232,348 +707,5 @@ RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, 
   bitFields.hasColor = hasColor;
   bitFields.hasStroke = !this->strokes.empty();
   bitFields.isComplex = hasComplex;
-}
-
-size_t RRectsVertexProvider::vertexCount() const {
-  if (aaType() == AAType::None) {
-    // Non-AA mode: 4 vertices per RRect.
-    //   Simple: position(2) + localCoord(2) + radii(2) + rectBounds(4) = 10
-    //   Complex: position(2) + localCoord(2) + xRadii(4) + yRadii(4) + rectBounds(4) = 16
-    //   Optional: color(1), halfStrokeWidth(2)
-    size_t floatsPerVertex = bitFields.isComplex ? 16 : 10;
-    if (bitFields.hasStroke) {
-      floatsPerVertex += 2;
-    }
-    if (bitFields.hasColor) {
-      floatsPerVertex += 1;
-    }
-    return rects.size() * 4 * floatsPerVertex;
-  }
-
-  // AA mode: 16 vertices per RRect.
-  //   Simple: position(2) + ellipseOffset(2) + ellipseRadii(4) = 8
-  //   Complex: position(2) + ellipseOffset(2) + ellipseRadii(4) + edgeDist(2) = 10
-  //   Optional: color(1).
-  //   Optional halfStrokeWidth(2): only for Complex mode.
-  size_t floatsPerVertex = bitFields.isComplex ? 10 : 8;
-  if (bitFields.isComplex && bitFields.hasStroke) {
-    floatsPerVertex += 2;
-  }
-  if (bitFields.hasColor) {
-    floatsPerVertex += 1;
-  }
-  return rects.size() * 16 * floatsPerVertex;
-}
-
-void RRectsVertexProvider::getVertices(float* vertices) const {
-  if (aaType() == AAType::None) {
-    getNonAAVertices(vertices);
-  } else if (bitFields.isComplex) {
-    getComplexAAVertices(vertices);
-  } else {
-    getAAVertices(vertices);
-  }
-}
-
-void RRectsVertexProvider::getAAVertices(float* vertices) const {
-  size_t index = 0;
-  auto currentAAType = aaType();
-  size_t currentIndex = 0;
-  auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
-
-  for (auto& record : rects) {
-    DEBUG_ASSERT(record->rRect.type() != RRect::Type::Complex);
-    auto viewMatrix = record->viewMatrix;
-    auto rRect = record->rRect;
-    auto scales = viewMatrix.getAxisScales();
-    float compressedColor = 0.f;
-    if (bitFields.hasColor) {
-      uint32_t uintColor = ToUintPMColor(record->color, steps.get());
-      compressedColor = *reinterpret_cast<float*>(&uintColor);
-    }
-
-    auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
-    auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
-
-    bool stroked = false;
-    float xRadius = rRect.radii()[0].x;
-    float yRadius = rRect.radii()[0].y;
-    float innerXRadius = 0;
-    float innerYRadius = 0;
-    auto rectBounds = rRect.rect();
-    if (stroke) {
-      innerXRadius = xRadius - strokeParams.halfStrokeX;
-      innerYRadius = yRadius - strokeParams.halfStrokeY;
-      stroked = innerXRadius > 0.0f && innerYRadius > 0.0f;
-      xRadius += strokeParams.halfStrokeX;
-      yRadius += strokeParams.halfStrokeY;
-      rectBounds.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
-    }
-
-    float reciprocalRadii[4] = {FloatInvert(xRadius), FloatInvert(yRadius),
-                                FloatInvert(innerXRadius), FloatInvert(innerYRadius)};
-    // If the stroke width is exactly double the radius, the inner radii will be zero.
-    // Pin to a large value, to avoid infinities in the shader. crbug.com/1139750
-    reciprocalRadii[2] = std::min(reciprocalRadii[2], 1e6f);
-    reciprocalRadii[3] = std::min(reciprocalRadii[3], 1e6f);
-    // On MSAA, bloat enough to guarantee any pixel that might be touched by the rRect has
-    // full sample coverage.
-    float aaBloat = currentAAType == AAType::MSAA ? FLOAT_SQRT2 : .5f;
-    // Extend out the radii to antialias.
-    float aaOuterXRadius = xRadius + aaBloat;
-    float aaOuterYRadius = yRadius + aaBloat;
-
-    float xMaxOffset = aaOuterXRadius;
-    float yMaxOffset = aaOuterYRadius;
-    if (!stroked) {
-      // For filled RRectRecords we map a unit circle in the vertex attributes rather than
-      // computing an ellipse and modifying that distance, so we normalize to 1.
-      xMaxOffset /= xRadius;
-      yMaxOffset /= yRadius;
-    }
-    auto aaBounds = rectBounds.makeOutset(aaBloat, aaBloat);
-    float yCoords[4] = {aaBounds.top, aaBounds.top + aaOuterYRadius,
-                        aaBounds.bottom - aaOuterYRadius, aaBounds.bottom};
-    float yOuterOffsets[4] = {
-        yMaxOffset,
-        FLOAT_NEARLY_ZERO,  // we're using inversesqrt() in shader, so can't be exactly 0
-        FLOAT_NEARLY_ZERO, yMaxOffset};
-    for (int i = 0; i < 4; ++i) {
-      auto point = Point::Make(aaBounds.left, yCoords[i]);
-      viewMatrix.mapPoints(&point, 1);
-      vertices[index++] = point.x;
-      vertices[index++] = point.y;
-      if (bitFields.hasColor) {
-        vertices[index++] = compressedColor;
-      }
-      vertices[index++] = xMaxOffset;
-      vertices[index++] = yOuterOffsets[i];
-      vertices[index++] = reciprocalRadii[0];
-      vertices[index++] = reciprocalRadii[1];
-      vertices[index++] = reciprocalRadii[2];
-      vertices[index++] = reciprocalRadii[3];
-
-      point = Point::Make(aaBounds.left + aaOuterXRadius, yCoords[i]);
-      viewMatrix.mapPoints(&point, 1);
-      vertices[index++] = point.x;
-      vertices[index++] = point.y;
-      if (bitFields.hasColor) {
-        vertices[index++] = compressedColor;
-      }
-      vertices[index++] = FLOAT_NEARLY_ZERO;
-      vertices[index++] = yOuterOffsets[i];
-      vertices[index++] = reciprocalRadii[0];
-      vertices[index++] = reciprocalRadii[1];
-      vertices[index++] = reciprocalRadii[2];
-      vertices[index++] = reciprocalRadii[3];
-
-      point = Point::Make(aaBounds.right - aaOuterXRadius, yCoords[i]);
-      viewMatrix.mapPoints(&point, 1);
-      vertices[index++] = point.x;
-      vertices[index++] = point.y;
-      if (bitFields.hasColor) {
-        vertices[index++] = compressedColor;
-      }
-      vertices[index++] = FLOAT_NEARLY_ZERO;
-      vertices[index++] = yOuterOffsets[i];
-      vertices[index++] = reciprocalRadii[0];
-      vertices[index++] = reciprocalRadii[1];
-      vertices[index++] = reciprocalRadii[2];
-      vertices[index++] = reciprocalRadii[3];
-
-      point = Point::Make(aaBounds.right, yCoords[i]);
-      viewMatrix.mapPoints(&point, 1);
-      vertices[index++] = point.x;
-      vertices[index++] = point.y;
-      if (bitFields.hasColor) {
-        vertices[index++] = compressedColor;
-      }
-      vertices[index++] = xMaxOffset;
-      vertices[index++] = yOuterOffsets[i];
-      vertices[index++] = reciprocalRadii[0];
-      vertices[index++] = reciprocalRadii[1];
-      vertices[index++] = reciprocalRadii[2];
-      vertices[index++] = reciprocalRadii[3];
-    }
-    currentIndex++;
-  }
-}
-
-void RRectsVertexProvider::getComplexAAVertices(float* vertices) const {
-  size_t index = 0;
-  auto currentAAType = aaType();
-  size_t currentIndex = 0;
-  auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
-
-  for (auto& record : rects) {
-    DEBUG_ASSERT(record->rRect.type() == RRect::Type::Complex);
-    auto viewMatrix = record->viewMatrix;
-    auto rRect = record->rRect;
-    auto scales = viewMatrix.getAxisScales();
-    float compressedColor = 0.f;
-    if (bitFields.hasColor) {
-      uint32_t uintColor = ToUintPMColor(record->color, steps.get());
-      compressedColor = *reinterpret_cast<float*>(&uintColor);
-    }
-
-    auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
-    auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
-
-    std::array<float, 4> outerXRadii = {};
-    std::array<float, 4> outerYRadii = {};
-    std::array<std::array<float, 4>, 4> recipRadii;
-    auto isOverstroked = ComputeComplexCornerRadii(rRect.radii(), strokeParams, stroke != nullptr,
-                                                   outerXRadii, outerYRadii, recipRadii);
-    // Overstroke RRects (inner radius <= 0) are not supported here and must be filtered
-    // out by callers.
-    DEBUG_ASSERT(!isOverstroked || !stroke);
-    bool stroked = stroke != nullptr && !isOverstroked;
-    auto rectBounds = rRect.rect();
-    if (stroke) {
-      rectBounds.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
-    }
-
-    float aaBloat = currentAAType == AAType::MSAA ? FLOAT_SQRT2 : .5f;
-    auto aaBounds = rectBounds.makeOutset(aaBloat, aaBloat);
-    std::array<float, 4> aaOuterXRadii = {};
-    std::array<float, 4> aaOuterYRadii = {};
-    for (size_t c = 0; c < 4; ++c) {
-      aaOuterXRadii[c] = outerXRadii[c] + aaBloat;
-      aaOuterYRadii[c] = outerYRadii[c] + aaBloat;
-    }
-    std::array<std::array<float, 2>, 4> xPos = {};
-    std::array<std::array<float, 2>, 4> yPos = {};
-    ComputeComplexCornerGridPositions(aaBounds, aaOuterXRadii, aaOuterYRadii, xPos, yPos);
-
-    for (size_t row = 0; row < 4; ++row) {
-      for (size_t column = 0; column < 4; ++column) {
-        auto corner = ComplexCornerIndex(row, column);
-        auto cornerXRadius = outerXRadii[corner];
-        auto cornerYRadius = outerYRadii[corner];
-
-        // Compute EllipseOffset — fill: normalized ellipse-space coordinate; stroke: raw offset
-        // in pixels (normalized later in the fragment shader). 0.0 for directions not on an arc.
-        auto xOffset = 0.0f;
-        auto yOffset = 0.0f;
-        if ((column == 0 || column == 3) && cornerXRadius > 0) {
-          xOffset = stroked ? aaOuterXRadii[corner] : (aaOuterXRadii[corner] / cornerXRadius);
-        }
-        if ((row == 0 || row == 3) && cornerYRadius > 0) {
-          yOffset = stroked ? aaOuterYRadii[corner] : (aaOuterYRadii[corner] / cornerYRadius);
-        }
-
-        // Vertex position uses per-corner coordinates
-        auto localX = ComplexCornerCoordX(corner, column, xPos);
-        auto localY = ComplexCornerCoordY(corner, row, yPos);
-        auto point = Point::Make(localX, localY);
-        viewMatrix.mapPoints(&point, 1);
-        vertices[index++] = point.x;
-        vertices[index++] = point.y;
-        if (bitFields.hasColor) {
-          vertices[index++] = compressedColor;
-        }
-        vertices[index++] = xOffset;
-        vertices[index++] = yOffset;
-        vertices[index++] = recipRadii[corner][0];
-        vertices[index++] = recipRadii[corner][1];
-        vertices[index++] = recipRadii[corner][2];
-        vertices[index++] = recipRadii[corner][3];
-        vertices[index++] = ComplexCornerEdgeDistanceX(corner, localX, rectBounds);
-        vertices[index++] = ComplexCornerEdgeDistanceY(corner, localY, rectBounds);
-        if (bitFields.hasStroke) {
-          vertices[index++] = strokeParams.halfStrokeX;
-          vertices[index++] = strokeParams.halfStrokeY;
-        }
-      }
-    }
-    currentIndex++;
-  }
-}
-
-void RRectsVertexProvider::getNonAAVertices(float* vertices) const {
-  size_t index = 0;
-  auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
-
-  size_t currentIndex = 0;
-  for (auto& record : rects) {
-    DEBUG_ASSERT(bitFields.isComplex || record->rRect.type() != RRect::Type::Complex);
-    auto viewMatrix = record->viewMatrix;
-    auto rRect = record->rRect;
-    float compressedColor = 0.f;
-    if (bitFields.hasColor) {
-      uint32_t uintColor = ToUintPMColor(record->color, steps.get());
-      compressedColor = *reinterpret_cast<float*>(&uintColor);
-    }
-
-    auto scales = viewMatrix.getAxisScales();
-    auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
-    auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
-
-    auto rect = rRect.rect();
-    auto outerRadii = rRect.radii();
-    if (stroke) {
-      rect.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
-      // Simple RRects have identical radii across all four corners, so only the first needs update.
-      size_t endIndex = bitFields.isComplex ? 4 : 1;
-      for (size_t i = 0; i < endIndex; ++i) {
-        outerRadii[i].x += strokeParams.halfStrokeX;
-        outerRadii[i].y += strokeParams.halfStrokeY;
-      }
-    }
-
-    // Corner positions for a quad: TL, TR, BR, BL
-    const Point corners[] = {
-        {rect.left, rect.top},
-        {rect.right, rect.top},
-        {rect.right, rect.bottom},
-        {rect.left, rect.bottom},
-    };
-
-    // Write 4 vertices for the quad
-    for (int v = 0; v < 4; ++v) {
-      auto localX = corners[v].x;
-      auto localY = corners[v].y;
-      auto point = Point::Make(localX, localY);
-      viewMatrix.mapPoints(&point, 1);
-      // position (2 floats)
-      vertices[index++] = point.x;
-      vertices[index++] = point.y;
-      // localCoord (2 floats) - coordinates within the rect for shape evaluation
-      vertices[index++] = localX;
-      vertices[index++] = localY;
-      // Per-corner radii for complex RRects, uniform radii (outerRadii[0]) for simple.
-      if (bitFields.isComplex) {
-        // xRadii (4 floats) - per-corner x radii [TL, TR, BR, BL]
-        vertices[index++] = outerRadii[0].x;
-        vertices[index++] = outerRadii[1].x;
-        vertices[index++] = outerRadii[2].x;
-        vertices[index++] = outerRadii[3].x;
-        // yRadii (4 floats) - per-corner y radii [TL, TR, BR, BL]
-        vertices[index++] = outerRadii[0].y;
-        vertices[index++] = outerRadii[1].y;
-        vertices[index++] = outerRadii[2].y;
-        vertices[index++] = outerRadii[3].y;
-      } else {
-        // radii (2 floats) - uniform outer radii
-        vertices[index++] = outerRadii[0].x;
-        vertices[index++] = outerRadii[0].y;
-      }
-      // rectBounds (4 floats)
-      vertices[index++] = rect.left;
-      vertices[index++] = rect.top;
-      vertices[index++] = rect.right;
-      vertices[index++] = rect.bottom;
-      // Optional color
-      if (bitFields.hasColor) {
-        vertices[index++] = compressedColor;
-      }
-      // strokeWidth (2 floats) - only for stroke mode
-      if (bitFields.hasStroke) {
-        vertices[index++] = strokeParams.halfStrokeX;
-        vertices[index++] = strokeParams.halfStrokeY;
-      }
-    }
-    currentIndex++;
-  }
 }
 }  // namespace tgfx
