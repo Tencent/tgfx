@@ -19,7 +19,7 @@
         "backgroundLayerBlur": "bf48e614"
     },
     "CanvasTest": {
-        "AARRectOp": "be147cbca",
+        "AARRectOp": "33f56a231",
         "BlendFormula": "543054b5",
         "CMYKWithoutICCProfile": "29dde9e0",
         "ClipAntiAlias": "c37a86c8",
@@ -68,10 +68,10 @@
         "NoiseShaderAlphaBlend": "df6af7a53",
         "NoiseTileSize": "df6af7a53",
         "NoiseWithThreshold": "df6af7a53",
-        "NonAARRectOp": "be147cbca",
+        "NonAARRectOp": "33f56a231",
         "NonAARRectOpColorStroke": "e1d126b7",
-        "NonAARRectOpStroke": "be147cbca",
-        "NonAARRectOpStrokeScale": "19c349629",
+        "NonAARRectOpStroke": "33f56a231",
+        "NonAARRectOpStrokeScale": "33f56a231",
         "NonAARRectOpTransform": "e1d126b7",
         "NonAARRectOpWithShader": "add41042",
         "NothingToDraw": "d010fb8",
@@ -382,7 +382,7 @@
         "inversePath_rect": "bf48e614",
         "inversePath_text": "c37a86c8",
         "path": "45fb9980",
-        "roundRectRadii": "be147cbca",
+        "roundRectRadii": "bf48e614",
         "roundRectRadiiStroke": "bf48e614",
         "shape": "cad4b77f"
     },
@@ -563,7 +563,7 @@
         "CustomPathTypeface": "5a810d0b"
     },
     "VectorLayerTest": {
-        "BasicShapes": "be147cbca",
+        "BasicShapes": "33f56a231",
         "ChainedModifiers": "8815f728",
         "ColorSourceAdvanced": "6200a569",
         "ComplexComposition": "8815f728",

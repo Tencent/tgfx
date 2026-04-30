@@ -108,9 +108,6 @@ static inline RRect::Type ComputeType(const Rect& rect, const std::array<Point, 
 }
 
 void RRect::setRectXY(const Rect& rect, float radiusX, float radiusY) {
-  if (radiusX < 0 || radiusY < 0) {
-    radiusX = radiusY = 0;
-  }
   const auto radius = Point{radiusX, radiusY};
   setRectRadii(rect, {radius, radius, radius, radius});
 }

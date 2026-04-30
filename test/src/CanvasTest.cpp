@@ -2062,12 +2062,10 @@ TGFX_TEST(CanvasTest, NonAARRectOpStroke) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 504, 520);
+  auto surface = Surface::Make(context, 500, 520);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
-  // Shift the whole scene so all content sits with ~50px margins on all four sides.
-  canvas->translate(3, 3);
 
   Paint paint;
   paint.setAntiAlias(false);
