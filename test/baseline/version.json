@@ -19,7 +19,7 @@
         "backgroundLayerBlur": "bf48e614"
     },
     "CanvasTest": {
-        "AARRectOp": "33f56a231",
+        "AARRectOp": "f377f9d5d",
         "BlendFormula": "543054b5",
         "CMYKWithoutICCProfile": "29dde9e0",
         "ClipAntiAlias": "c37a86c8",
@@ -68,7 +68,7 @@
         "NoiseShaderAlphaBlend": "df6af7a53",
         "NoiseTileSize": "df6af7a53",
         "NoiseWithThreshold": "df6af7a53",
-        "NonAARRectOp": "33f56a231",
+        "NonAARRectOp": "f377f9d5d",
         "NonAARRectOpColorStroke": "e1d126b7",
         "NonAARRectOpStroke": "33f56a231",
         "NonAARRectOpStrokeScale": "33f56a231",

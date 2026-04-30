@@ -1946,7 +1946,7 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 500);
+  auto surface = Surface::Make(context, 500, 500);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
@@ -2023,6 +2023,20 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
     EXPECT_TRUE(complexOp->isComplex);
     EXPECT_EQ(complexOp->rectCount, 2u);
   });
+
+  // Complex RRect with diagonally overlapping corner boxes.
+  paint.setColor(Color::FromRGBA(100, 150, 50, 255));
+  auto diagonalOverlapRRect = RRect::MakeRectRadii(Rect::MakeXYWH(370, 50, 100, 80),
+                                                   {{{60, 50}, {40, 10}, {55, 45}, {20, 20}}});
+  EXPECT_EQ(diagonalOverlapRRect.type(), RRect::Type::Complex);
+  canvas->drawRRect(diagonalOverlapRRect, paint);
+
+  // Complex RRect whose TL arc center is pushed close to the rect's BR corner.
+  paint.setColor(Color::FromRGBA(0, 120, 180, 255));
+  auto tlHeavyRRect = RRect::MakeRectRadii(Rect::MakeXYWH(370, 160, 100, 80),
+                                           {{{90, 70}, {10, 10}, {10, 10}, {10, 10}}});
+  EXPECT_EQ(tlHeavyRRect.type(), RRect::Type::Complex);
+  canvas->drawRRect(tlHeavyRRect, paint);
 
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOp"));
@@ -2333,7 +2347,7 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   constexpr int cellWidth = 100;
   constexpr int cellHeight = 80;
   constexpr int columns = 3;
-  constexpr int rows = 3;
+  constexpr int rows = 4;
   constexpr int surfaceWidth = margin * 2 + cellWidth * columns + gap * (columns - 1);
   constexpr int surfaceHeight = margin * 2 + cellHeight * rows + gap * (rows - 1);
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
@@ -2512,6 +2526,42 @@ TGFX_TEST(CanvasTest, AARRectOp) {
                         auto* task =
                             static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
                         EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp));
+  }
+
+  // Case 10: Filled Complex RRect fallback triggered by diagonal corner-box overlap.
+  canvas->save();
+  canvas->translate(margin, margin + 3 * (cellHeight + gap));
+  fillPaint.setColor(Color::FromRGBA(100, 150, 50));
+  auto rRect10 = RRect::MakeRectRadii(rect, {{{80, 65}, {20, 15}, {80, 65}, {15, 10}}});
+  EXPECT_EQ(rRect10.type(), RRect::Type::Complex);
+  canvas->drawRRect(rRect10, fillPaint);
+  canvas->restore();
+  {
+    TGFX_PRIVATE_ACCESS({
+      surface->renderContext->flush();
+      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+      auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+      EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
+    });
+  }
+
+  // Case 11: Filled Complex RRect whose TL arc center is pushed close to the rect's BR corner.
+  canvas->save();
+  canvas->translate(margin + cellWidth + gap, margin + 3 * (cellHeight + gap));
+  fillPaint.setColor(Color::FromRGBA(0, 120, 180));
+  auto rRect11 = RRect::MakeRectRadii(rect, {{{90, 70}, {10, 10}, {10, 10}, {10, 10}}});
+  EXPECT_EQ(rRect11.type(), RRect::Type::Complex);
+  canvas->drawRRect(rRect11, fillPaint);
+  canvas->restore();
+  {
+    TGFX_PRIVATE_ACCESS({
+      surface->renderContext->flush();
+      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+      auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+      auto* op11 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+      EXPECT_EQ(op11->type(), DrawOp::Type::RRectDrawOp);
+      EXPECT_TRUE(op11->isComplex);
+    });
   }
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AARRectOp"));

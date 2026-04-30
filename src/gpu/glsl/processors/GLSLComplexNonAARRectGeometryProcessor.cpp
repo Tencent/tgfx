@@ -87,11 +87,11 @@ void GLSLComplexNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("vec4 yR = %s;", yRadiiVarying.fsIn().c_str());
   fragBuilder->codeAppendf("vec4 bounds = %s;", boundsVarying.fsIn().c_str());
 
-  // For each corner, test whether the fragment lies in the axis-aligned box spanning
-  // from the rect corner to that corner's arc center; ScaleRadii guarantees the four boxes
-  // do not overlap, so at most one test fires. Inside a corner box we evaluate that
-  // corner's local ellipse; outside all of them the fragment sits on an edge or in the
-  // center and is always inside the rect (fill) or needs an inner-rect test (stroke).
+  // For each corner, test whether the fragment lies in the axis-aligned box spanning from the
+  // rect corner to that corner's arc center. Adjacent boxes can touch on a seam when two radii
+  // sum exactly to the side length, so a boundary pixel may hit more than one box; the caller
+  // must guarantee that diagonal corner boxes do not overlap. Collapse inBox to one-hot so the
+  // downstream dot() products read a single corner's center and radii.
   // xR/yR order: [TL, TR, BR, BL].
   fragBuilder->codeAppend("vec4 cornersX = vec4(bounds.x, bounds.z, bounds.z, bounds.x);");
   fragBuilder->codeAppend("vec4 cornersY = vec4(bounds.y, bounds.y, bounds.w, bounds.w);");
@@ -102,7 +102,12 @@ void GLSLComplexNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   // dx and dy are always non-negative because the quad covers exactly the (possibly
   // stroke-outset) rect, so the lower bound checks are omitted.
   fragBuilder->codeAppend("vec4 inBox = step(dx, xR) * step(dy, yR);");
-  fragBuilder->codeAppend("float inAnyCorner = clamp(dot(inBox, vec4(1.0)), 0.0, 1.0);");
+  // One-hot collapse: keep the first 1 in inBox and zero the rest. A slot stays 1 only when
+  // the prefix sum of previous slots is still 0.
+  fragBuilder->codeAppend(
+      "vec4 prefixSum = vec4(0.0, inBox.x, inBox.x + inBox.y, inBox.x + inBox.y + inBox.z);");
+  fragBuilder->codeAppend("inBox *= step(prefixSum, vec4(0.5));");
+  fragBuilder->codeAppend("float inAnyCorner = dot(inBox, vec4(1.0));");
   // Selected corner's arc center and radii (in local coordinates).
   fragBuilder->codeAppend("vec4 arcCentersX = cornersX + signsX * xR;");
   fragBuilder->codeAppend("vec4 arcCentersY = cornersY + signsY * yR;");

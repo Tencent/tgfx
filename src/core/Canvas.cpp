@@ -274,6 +274,18 @@ static bool HasSharpCorner(const RRect& rRect) {
   return false;
 }
 
+// Returns true when either diagonal corner pair has overlapping arc-center boxes on at least
+// one axis, i.e. its x-radii or y-radii sum exceeds the corresponding side length.
+static bool HasDiagonalCornerAxisOverlap(const RRect& rRect) {
+  if (rRect.type() != RRect::Type::Complex) {
+    return false;
+  }
+  const auto& r = rRect.radii();
+  const auto w = rRect.rect().width();
+  const auto h = rRect.rect().height();
+  return r[0].x + r[2].x > w || r[0].y + r[2].y > h || r[1].x + r[3].x > w || r[1].y + r[3].y > h;
+}
+
 /**
  * The dedicated RRect op draws stroked rounded corners by offsetting the ellipse equation
  * outward/inward, which assumes a concentric ellipse approximates the true stroke offset
@@ -288,6 +300,14 @@ static bool UseDrawPath(const Paint& paint, const RRect& rRect, bool hasSharpCor
   // inner ellipse radius would become negative. Fall back to drawPath so the sharp
   // geometry renders correctly.
   if (hasSharpCorner) {
+    return true;
+  }
+  // The AA path partitions the RRect into a 4x4 grid of quads; a diagonal corner pair
+  // overlapping on either axis makes those quads self-intersect. The NonAA path is free of
+  // that mesh constraint but its shader still miscomputes coverage when diagonal corner
+  // boxes truly overlap. We cannot tell here which path the op will take, so apply the
+  // stricter AA rule and fall back to drawPath whenever any axis is crossed.
+  if (HasDiagonalCornerAxisOverlap(rRect)) {
     return true;
   }
   auto stroke = paint.getStroke();
@@ -405,8 +425,9 @@ void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& c
       drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
       return;
     }
-    // RRects with sharp corners cannot be rendered by the RRect op; fall through to drawPath.
-    if (path.isRRect(&rRect) && !HasSharpCorner(rRect)) {
+    // RRects with sharp corners or diagonally overlapping corner boxes cannot be rendered by
+    // the RRect op; fall through to drawPath.
+    if (path.isRRect(&rRect) && !HasSharpCorner(rRect) && !HasDiagonalCornerAxisOverlap(rRect)) {
       drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
       return;
     }

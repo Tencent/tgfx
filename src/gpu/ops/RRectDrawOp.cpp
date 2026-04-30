@@ -56,6 +56,9 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
   }
   hasStroke = provider->hasStroke();
   isComplex = provider->isComplex();
+  // MSAA shares the AA-coverage vertex layout: the quad covers more than the rounded shape,
+  // so the arc boundary is evaluated inside the shader and hardware MSAA cannot provide
+  // edge coverage on its own.
   if (aaType == AAType::None) {
     indicesPerRRect = IndicesPerNonAARRect;
   } else {
