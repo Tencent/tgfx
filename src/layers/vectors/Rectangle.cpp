@@ -71,9 +71,7 @@ void Rectangle::apply(VectorContext* context) {
     auto halfHeight = _size.height * 0.5f;
     Path path;
     // A degenerate rectangle is treated as an open line segment (or a single point when both
-    // sides are zero). The open contour lets Square caps extend it into a filled band along
-    // both axes, and keeps trim/dash effects acting on a single segment instead of two
-    // overlapping edges of a closed zero-area rect.
+    // sides are zero).
     bool degenerate = _size.width == 0.0f || _size.height == 0.0f;
     if (degenerate) {
       Point p0 = {_position.x - halfWidth, _position.y - halfHeight};
