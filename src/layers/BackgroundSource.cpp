@@ -158,10 +158,15 @@ class SurfaceBackgroundSource : public BackgroundSource {
     surface = this->ownedSurface.get();
   }
 
-  // Sub: references a caller-owned Surface (e.g. the offscreen carrier's surface).
+  // Sub: references a caller-owned Surface (e.g. the offscreen carrier's surface). Inherits the
+  // parent's surfaceScale so BackgroundCapturer's `contentScale /= bgSource->surfaceScale()`
+  // normalisation produces the consumer-expected density regardless of nesting depth. Sub does
+  // not introduce its own down-sampling: its canvas matrix already carries every ancestor's
+  // density, and any top-level down-sample factor (for extreme blur outsets) must still be
+  // divided out when consumers sample this sub's snapshot.
   SurfaceBackgroundSource(Surface* borrowedSurface, const Matrix& imageMatrix, const Rect& rect,
-                          std::shared_ptr<ColorSpace> colorSpace)
-      : BackgroundSource(imageMatrix, rect, /*surfaceScale=*/1.0f, std::move(colorSpace)),
+                          float surfaceScale, std::shared_ptr<ColorSpace> colorSpace)
+      : BackgroundSource(imageMatrix, rect, surfaceScale, std::move(colorSpace)),
         surface(borrowedSurface) {
   }
 
@@ -194,13 +199,12 @@ class PictureBackgroundSource : public BackgroundSource {
     canvas->setMatrix(surfaceMatrix);
   }
 
-  // Sub: references a caller-owned PictureRecorder. The carrier owns the recorder and has
-  // already configured its canvas (matrix / clip / seeded backdrop); we only record the geometry
-  // linking the sub to its parent.
+  // Sub: references a caller-owned PictureRecorder. Inherits the parent's surfaceScale for the
+  // same reason as SurfaceBackgroundSource — see that constructor for the rationale.
   PictureBackgroundSource(PictureRecorder* borrowedRecorder, const Matrix& imageMatrix,
-                          const Rect& rect, int width, int height,
+                          const Rect& rect, int width, int height, float surfaceScale,
                           std::shared_ptr<ColorSpace> colorSpace)
-      : BackgroundSource(imageMatrix, rect, /*surfaceScale=*/1.0f, std::move(colorSpace)),
+      : BackgroundSource(imageMatrix, rect, surfaceScale, std::move(colorSpace)),
         pixelWidth(width), pixelHeight(height), recorder(borrowedRecorder) {
     DEBUG_ASSERT(recorder->getRecordingCanvas() != nullptr);
   }
@@ -371,8 +375,8 @@ std::shared_ptr<BackgroundSource> BackgroundSource::createSubSurface(Surface* su
   if (!localToSurface.invert(&surfaceToLocal)) {
     return nullptr;
   }
-  auto sub = std::make_shared<SurfaceBackgroundSource>(subSurface, geometry.childImageMatrix,
-                                                       geometry.childWorldRect, colorSpace);
+  auto sub = std::make_shared<SurfaceBackgroundSource>(
+      subSurface, geometry.childImageMatrix, geometry.childWorldRect, _surfaceScale, colorSpace);
   sub->parent = this;
   sub->surfaceOffset = geometry.childSurfaceOffset;
   sub->surfaceToWorld = localToWorld;
@@ -391,9 +395,9 @@ std::shared_ptr<BackgroundSource> BackgroundSource::createSubPicture(PictureReco
   if (!geometry.valid) {
     return nullptr;
   }
-  auto sub = std::make_shared<PictureBackgroundSource>(subRecorder, geometry.childImageMatrix,
-                                                       geometry.childWorldRect, geometry.width,
-                                                       geometry.height, colorSpace);
+  auto sub = std::make_shared<PictureBackgroundSource>(
+      subRecorder, geometry.childImageMatrix, geometry.childWorldRect, geometry.width,
+      geometry.height, _surfaceScale, colorSpace);
   sub->parent = this;
   sub->surfaceOffset = geometry.childSurfaceOffset;
   sub->surfaceToWorld = geometry.childSurfaceToWorld;
