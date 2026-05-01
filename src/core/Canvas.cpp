@@ -275,8 +275,7 @@ void Canvas::drawRoundRect(const Rect& rect, float radiusX, float radiusY, const
   drawRRect(rRect, paint);
 }
 
-static bool UseDrawPath(const Paint& paint, const Point& radii, const Matrix& viewMatrix) {
-  auto stroke = paint.getStroke();
+static bool UseDrawPath(const Stroke* stroke, const Point& radii, const Matrix& viewMatrix) {
   if (!stroke) {
     return false;
   }
@@ -322,7 +321,7 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
     drawRect(rRect.rect, paint);
     return;
   }
-  if (UseDrawPath(paint, radii, _matrix)) {
+  if (UseDrawPath(paint.getStroke(), radii, _matrix)) {
     Path path = {};
     path.addRRect(rRect);
     drawPath(path, paint);
@@ -366,15 +365,19 @@ void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& c
   }
   RRect rRect = {};
   // SkPath::addOval does not filter empty bounds, so guard against an empty oval reaching the
-  // backend (which asserts on empty rrects).
+  // backend (which asserts on empty rrects). UseDrawPath also forces complex stroke/radius
+  // combinations through the generic stroker, matching the drawRRect entry point.
   if (path.isOval(&rect) && !rect.isEmpty()) {
     rRect.setOval(rect);
-    drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
-    return;
-  }
-  if (path.isRRect(&rRect) && !rRect.rect.isEmpty()) {
-    drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
-    return;
+    if (!UseDrawPath(stroke, rRect.radii, matrix)) {
+      drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
+      return;
+    }
+  } else if (path.isRRect(&rRect) && !rRect.rect.isEmpty()) {
+    if (!UseDrawPath(stroke, rRect.radii, matrix)) {
+      drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
+      return;
+    }
   }
   if (stroke == nullptr) {
     drawContext->drawPath(path, matrix, clip, brush);
