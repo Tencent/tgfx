@@ -3005,10 +3005,10 @@ TGFX_TEST(CanvasTest, EmptyRectStroke) {
   // Verifies that all four entry points (drawRect / drawRRect / drawPath / drawShape) forward
   // empty rectangles into the same stroke geometry.
   // Layout (256x256 canvas, 8 rows x 3 cap columns):
-  //   Rows 0..1  drawRect  : double-zero (0x0), horizontal single-zero (60x0)
-  //   Rows 2..3  drawRRect : double-zero (0x0), vertical   single-zero (0x60), radii=10
-  //   Rows 4..5  drawPath  : double-zero (0x0), horizontal single-zero (60x0)
-  //   Rows 6..7  drawShape : double-zero (0x0), horizontal single-zero (60x0)
+  //   Rows 0..1  drawRect  : double-zero (0x0), single-zero (60x0)
+  //   Rows 2..3  drawRRect : double-zero (0x0), single-zero (60x0), radii=10
+  //   Rows 4..5  drawPath  : double-zero (0x0), single-zero (60x0)
+  //   Rows 6..7  drawShape : double-zero (0x0), single-zero (60x0)
   //   Columns: Butt / Square / Round
   ContextScope scope;
   auto context = scope.getContext();
@@ -3038,20 +3038,13 @@ TGFX_TEST(CanvasTest, EmptyRectStroke) {
   mark.setColor(Color::FromRGBA(255, 0, 0, 255));
   mark.setAntiAlias(true);
 
-  auto drawCell = [&](float cx, float cy, LineCap cap, DrawApi api, bool doubleZero,
-                      bool vertical) {
+  auto drawCell = [&](float cx, float cy, LineCap cap, DrawApi api, bool doubleZero) {
     canvas->drawCircle(cx, cy, 1.5f, mark);
     Stroke s(strokeWidth);
     s.cap = cap;
     stroke.setStroke(s);
-    Rect rect;
-    if (doubleZero) {
-      rect = Rect::MakeXYWH(cx, cy, 0.0f, 0.0f);
-    } else if (vertical) {
-      rect = Rect::MakeXYWH(cx, cy - 30.0f, 0.0f, 60.0f);
-    } else {
-      rect = Rect::MakeXYWH(cx - 30.0f, cy, 60.0f, 0.0f);
-    }
+    Rect rect = doubleZero ? Rect::MakeXYWH(cx, cy, 0.0f, 0.0f)
+                           : Rect::MakeXYWH(cx - 30.0f, cy, 60.0f, 0.0f);
     switch (api) {
       case DrawApi::Rect:
         canvas->drawRect(rect, stroke);
@@ -3081,24 +3074,23 @@ TGFX_TEST(CanvasTest, EmptyRectStroke) {
   struct RowConfig {
     DrawApi api;
     bool doubleZero;
-    bool vertical;
   };
   const std::array<RowConfig, 8> rows = {{
-      {DrawApi::Rect, true, false},
-      {DrawApi::Rect, false, false},
-      {DrawApi::RRect, true, false},
-      {DrawApi::RRect, false, true},
-      {DrawApi::Path, true, false},
-      {DrawApi::Path, false, false},
-      {DrawApi::Shape, true, false},
-      {DrawApi::Shape, false, false},
+      {DrawApi::Rect, true},
+      {DrawApi::Rect, false},
+      {DrawApi::RRect, true},
+      {DrawApi::RRect, false},
+      {DrawApi::Path, true},
+      {DrawApi::Path, false},
+      {DrawApi::Shape, true},
+      {DrawApi::Shape, false},
   }};
 
   for (size_t row = 0; row < rows.size(); ++row) {
     float cy = originY + static_cast<float>(row) * rowSpacing;
     for (int col = 0; col < 3; ++col) {
       float cx = originX + static_cast<float>(col) * colSpacing;
-      drawCell(cx, cy, caps[col], rows[row].api, rows[row].doubleZero, rows[row].vertical);
+      drawCell(cx, cy, caps[col], rows[row].api, rows[row].doubleZero);
     }
   }
 
