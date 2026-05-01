@@ -365,8 +365,8 @@ void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& c
   }
   RRect rRect = {};
   bool hasRRect = false;
-  // SkPath::addOval does not filter empty bounds, so guard against an empty oval reaching the
-  // backend (which asserts on empty rrects).
+  // Path::isOval can return true with empty bounds because addOval does not filter them, so
+  // guard against an empty oval reaching the backend (which asserts on empty rrects).
   if (path.isOval(&rect) && !rect.isEmpty()) {
     rRect.setOval(rect);
     hasRRect = true;
