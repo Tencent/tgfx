@@ -33,6 +33,10 @@ class HairlineBufferUploadTask : public ResourceTask {
                            std::shared_ptr<ResourceProxy> quadVertexProxy,
                            std::unique_ptr<DataSource<HairlineBuffer>> source);
 
+  ResourceTaskType type() const override {
+    return ResourceTaskType::Hairline;
+  }
+
  protected:
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 

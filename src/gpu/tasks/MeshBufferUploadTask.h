@@ -34,6 +34,10 @@ class VertexMeshBufferUploadTask : public ResourceTask {
                              std::shared_ptr<GPUMeshProxy> meshProxy,
                              std::shared_ptr<ColorSpace> dstColorSpace);
 
+  ResourceTaskType type() const override {
+    return ResourceTaskType::VertexMesh;
+  }
+
  protected:
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
@@ -49,6 +53,10 @@ class MeshIndexBufferUploadTask : public ResourceTask {
  public:
   MeshIndexBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
                             std::shared_ptr<GPUMeshProxy> meshProxy);
+
+  ResourceTaskType type() const override {
+    return ResourceTaskType::MeshIndex;
+  }
 
  protected:
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
@@ -66,6 +74,10 @@ class ShapeMeshBufferUploadTask : public ResourceTask {
   ShapeMeshBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
                             std::unique_ptr<DataSource<Data>> dataSource,
                             std::shared_ptr<GPUMeshProxy> meshProxy);
+
+  ResourceTaskType type() const override {
+    return ResourceTaskType::ShapeMesh;
+  }
 
  protected:
   std::shared_ptr<Resource> onMakeResource(Context* context) override;

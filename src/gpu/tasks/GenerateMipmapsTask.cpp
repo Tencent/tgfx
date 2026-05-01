@@ -17,9 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GenerateMipmapsTask.h"
+#include "tgfx/core/Clock.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
+// Single-threaded WASM profiling accumulator. See TextureUploadTask.cpp for rationale.
+static GenerateMipmapsTask::ProfileSnapshot gProfileSnapshot = {};
+
+GenerateMipmapsTask::ProfileSnapshot GenerateMipmapsTask::FetchProfileAndReset() {
+  auto snapshot = gProfileSnapshot;
+  gProfileSnapshot = {};
+  return snapshot;
+}
+
 GenerateMipmapsTask::GenerateMipmapsTask(BlockAllocator* allocator,
                                          std::shared_ptr<TextureProxy> textureProxy)
     : RenderTask(allocator), textureProxy(std::move(textureProxy)) {
@@ -31,6 +41,10 @@ void GenerateMipmapsTask::execute(CommandEncoder* encoder) {
     LOGE("GenerateMipmapsTask::execute() Failed to get texture view!");
     return;
   }
+  int64_t startUs = Clock::Now();
   encoder->generateMipmapsForTexture(textureView->getTexture());
+  int64_t endUs = Clock::Now();
+  gProfileSnapshot.totalUs += (endUs - startUs);
+  gProfileSnapshot.count++;
 }
 }  // namespace tgfx

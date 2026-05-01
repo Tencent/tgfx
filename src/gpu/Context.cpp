@@ -119,15 +119,31 @@ std::shared_ptr<DrawingBuffer> Context::getDrawingBuffer(const Recording* record
 
 void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
   ASSERT_OWNER_THREAD;
+  // Debug-only: break down the wall-clock cost of the various stages inside Context::submit().
+  // The outer [PAGXView] submit timer observed > 1s stalls whose encode() breakdown only
+  // accounted for ~700ms, so the remaining time has to live in processUnreferencedResources(),
+  // queue->submit() (the WebGL command submission), or presentWindows(). We log a single line
+  // summing each stage whenever total wall time exceeds the same threshold used by the encode
+  // breakdown so the two logs line up. Remove along with the other diagnostic loggers once the
+  // WeChat scaling stall is understood.
+  constexpr int64_t SUBMIT_SLOW_THRESHOLD_US = 100 * 1000;
+  int64_t submitStartUs = Clock::Now();
   _resourceCache->processUnreferencedResources();
+  int64_t preUnrefEndUs = Clock::Now();
   auto queue = gpu()->queue();
   auto targetBuffer = getDrawingBuffer(recording.get());
+  int64_t encodeTotalUs = 0;
+  int64_t queueSubmitTotalUs = 0;
+  int64_t presentTotalUs = 0;
+  int commandBufferCount = 0;
   if (targetBuffer != nullptr) {
     while (!pendingDrawingBuffers.empty()) {
       auto drawingBuffer = pendingDrawingBuffers.front();
       queue->advanceFrameTime();
       _resourceCache->syncFrameTime();
+      int64_t encodeStartUs = Clock::Now();
       auto commandBuffer = drawingBuffer->encode();
+      encodeTotalUs += Clock::Now() - encodeStartUs;
       _resourceCache->recordFrameAndPurge();
       bool isLast = (drawingBuffer == targetBuffer);
       if (!isLast) {
@@ -139,16 +155,36 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
           queue->waitSemaphore(std::move(semaphore));
         }
       }
+      int64_t queueSubmitStartUs = Clock::Now();
       queue->submit(std::move(commandBuffer));
+      queueSubmitTotalUs += Clock::Now() - queueSubmitStartUs;
+      int64_t presentStartUs = Clock::Now();
       drawingBuffer->presentWindows(this);
+      presentTotalUs += Clock::Now() - presentStartUs;
+      commandBufferCount++;
       pendingDrawingBuffers.pop_front();
       if (isLast) {
         break;
       }
     }
   }
+  int64_t syncCpuStartUs = Clock::Now();
   if (syncCpu) {
     queue->waitUntilCompleted();
+  }
+  int64_t syncCpuUs = Clock::Now() - syncCpuStartUs;
+  int64_t submitEndUs = Clock::Now();
+  int64_t totalUs = submitEndUs - submitStartUs;
+  if (totalUs > SUBMIT_SLOW_THRESHOLD_US) {
+    int64_t preUnrefUs = preUnrefEndUs - submitStartUs;
+    LOGI(
+        "[Context] slow submit: total=%.2fms preUnref=%.2fms buffers=%d encode=%.2fms "
+        "queueSubmit=%.2fms present=%.2fms syncCpu=%.2fms(%s)",
+        static_cast<double>(totalUs) / 1000.0, static_cast<double>(preUnrefUs) / 1000.0,
+        commandBufferCount, static_cast<double>(encodeTotalUs) / 1000.0,
+        static_cast<double>(queueSubmitTotalUs) / 1000.0,
+        static_cast<double>(presentTotalUs) / 1000.0, static_cast<double>(syncCpuUs) / 1000.0,
+        syncCpu ? "on" : "off");
   }
 }
 

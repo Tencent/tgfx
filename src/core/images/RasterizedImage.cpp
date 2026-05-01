@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RasterizedImage.h"
+#include "core/utils/Log.h"
+#include "core/utils/RasterizedImageCacheProbe.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
@@ -34,23 +36,26 @@ std::shared_ptr<Image> RasterizedImage::makeRasterized() const {
 
 std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& args) const {
   auto proxyProvider = args.context->proxyProvider();
-  // If the source has mipmaps, cache the texture at the original scale to stay consistent with the
-  // mipmap branch in getTextureKey().
-  auto newScale = source->hasMipmaps() ? 1.0f : source->getRasterizedScale(args.drawScale);
+  // If the image is mipmapped, we always cache the texture at the original scale.
+  auto newScale = args.mipmapped ? 1.0f : source->getRasterizedScale(args.drawScale);
   auto textureKey = getTextureKey(newScale);
   auto textureProxy = proxyProvider->findOrWrapTextureProxy(textureKey);
   if (textureProxy != nullptr) {
     return textureProxy;
   }
+  // Cache miss: classify it so we can tell first-seen vs. scale-change vs. LRU rebuild. The
+  // classifier uses the image's UniqueKey domainID as stable identity; the per-frame counters are
+  // drained from DrawingBuffer::encode(). We only print the per-miss detail line for REBUILDs,
+  // because those are the cases that contradict "image was decoded before, why are we paying the
+  // cost again?"; FIRST and NEW_SCALE are expected and would only add noise to the log.
+  auto missReason = RecordCacheMiss(uniqueKey.domainID(), newScale, args.mipmapped);
+  if (missReason == CacheMissReason::Rebuild) {
+    LOGI("[CacheProbe] rebuild domain=%u scale=%.3f mipmapped=%d", uniqueKey.domainID(), newScale,
+         args.mipmapped ? 1 : 0);
+  }
   auto newArgs = args;
   newArgs.backingFit = BackingFit::Exact;
   newArgs.drawScale = newScale;
-  if (hasMipmaps()) {
-    // The cache key carries a MipmapFlag whenever the source has mipmaps, so upgrade the proxy
-    // request to match. Otherwise a later mipmapped draw could reuse a non-mipmapped proxy cached
-    // under the same key.
-    newArgs.mipmapped = true;
-  }
   textureProxy = source->lockTextureProxy(newArgs);
   if (textureProxy == nullptr) {
     return nullptr;

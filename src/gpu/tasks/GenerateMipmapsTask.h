@@ -18,12 +18,27 @@
 
 #pragma once
 
+#include <cstdint>
 #include "RenderTask.h"
 #include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
 class GenerateMipmapsTask : public RenderTask {
  public:
+  /**
+   * Per-frame profiling counters accumulated by GenerateMipmapsTask. Fetched and reset from
+   * DrawingBuffer::encode() when emitting slow-frame diagnostics.
+   */
+  struct ProfileSnapshot {
+    int64_t totalUs = 0;
+    uint32_t count = 0;
+  };
+
+  /**
+   * Returns the accumulated profiling counters and resets them to zero.
+   */
+  static ProfileSnapshot FetchProfileAndReset();
+
   GenerateMipmapsTask(BlockAllocator* allocator, std::shared_ptr<TextureProxy> textureProxy);
 
   void execute(CommandEncoder* encoder) override;

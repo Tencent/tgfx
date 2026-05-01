@@ -219,4 +219,11 @@ class Context {
 #endif
 };
 
+// Debug-only knob: force the next `count` calls to DrawingBuffer::encode() to emit their full
+// [DrawingBuffer] breakdown even if they finish below the slow threshold. Decrements internally
+// on every logged encode. Intended to pair with the libpag-side slow-frame logger so that after
+// a slow frame we can capture the following N frames on both sides for comparison. Remove along
+// with the other diagnostic logging once the scaling regression is understood.
+void ForceLogNextEncodes(int count);
+
 }  // namespace tgfx
