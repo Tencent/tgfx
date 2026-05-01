@@ -364,20 +364,20 @@ void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& c
     return;
   }
   RRect rRect = {};
+  bool hasRRect = false;
   // SkPath::addOval does not filter empty bounds, so guard against an empty oval reaching the
-  // backend (which asserts on empty rrects). UseDrawPath also forces complex stroke/radius
-  // combinations through the generic stroker, matching the drawRRect entry point.
+  // backend (which asserts on empty rrects).
   if (path.isOval(&rect) && !rect.isEmpty()) {
     rRect.setOval(rect);
-    if (!UseDrawPath(stroke, rRect.radii, matrix)) {
-      drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
-      return;
-    }
+    hasRRect = true;
   } else if (path.isRRect(&rRect) && !rRect.rect.isEmpty()) {
-    if (!UseDrawPath(stroke, rRect.radii, matrix)) {
-      drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
-      return;
-    }
+    hasRRect = true;
+  }
+  // UseDrawPath forces complex stroke/radius combinations through the generic stroker, matching
+  // the drawRRect entry point.
+  if (hasRRect && !UseDrawPath(stroke, rRect.radii, matrix)) {
+    drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
+    return;
   }
   if (stroke == nullptr) {
     drawContext->drawPath(path, matrix, clip, brush);
