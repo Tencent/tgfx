@@ -2522,7 +2522,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MultipleRRects"));
   }
 
-  // Test 3: Multiple paths with same paint should merge into single Shape
+  // Test 3: Merge ovals with the same paint into RRectsContent and emit a separate RRectContent for the differing paint.
   {
     auto surface = Surface::Make(context, 200, 150);
     LayerRecorder recorder = {};
@@ -2540,14 +2540,13 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
     recorder.addPath(path4, bluePaint);
     TGFX_PRIVATE_ACCESS(
         auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
-        // Should be ComposeContent with 2 items: ShapeContent (merged paths) + PathContent
+        // Should be ComposeContent with 2 items: RRectsContent (3 red ovals) + RRectContent
+        // (1 blue oval)
         EXPECT_EQ(content->type(), LayerContent::Type::Compose);
         auto composeContent = static_cast<ComposeContent*>(content.get());
-        ASSERT_TRUE(composeContent->contents.size() == 4u);
-        EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Path);
-        EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::Path);
-        EXPECT_EQ(composeContent->contents[2]->type(), LayerContent::Type::Path);
-        EXPECT_EQ(composeContent->contents[3]->type(), LayerContent::Type::Path);
+        ASSERT_TRUE(composeContent->contents.size() == 2u);
+        EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::RRects);
+        EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::RRect);
         content->drawDefault(surface->getCanvas(), 1.0f, true));
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MultiplePaths"));
   }
@@ -2565,13 +2564,12 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
     recorder.addPath(path, redPaint);
     TGFX_PRIVATE_ACCESS(
         auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
-        // Should be ComposeContent with 3 items: RectContent + RRectContent + PathContent
+        // Should be ComposeContent with 2 items: RectContent + RRectsContent (rrect+oval merged)
         EXPECT_EQ(content->type(), LayerContent::Type::Compose);
         auto composeContent = static_cast<ComposeContent*>(content.get());
-        EXPECT_EQ(composeContent->contents.size(), 3u);
+        EXPECT_EQ(composeContent->contents.size(), 2u);
         EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Rect);
-        EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::RRect);
-        EXPECT_EQ(composeContent->contents[2]->type(), LayerContent::Type::Path);
+        EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::RRects);
         content->drawDefault(surface->getCanvas(), 1.0f, true));
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MixedShapes"));
   }
