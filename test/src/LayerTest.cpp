@@ -2522,7 +2522,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MultipleRRects"));
   }
 
-  // Test 3: Multiple oval paths with same paint should merge into a single RRectContent
+  // Test 3: Merge ovals with the same paint into RRectsContent and emit a separate RRectContent for the differing paint.
   {
     auto surface = Surface::Make(context, 200, 150);
     LayerRecorder recorder = {};
