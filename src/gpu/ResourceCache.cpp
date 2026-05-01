@@ -112,6 +112,17 @@ void ResourceCache::purgeResourcesByLRU(bool scratchResourceOnly,
       item++;
       continue;
     }
+    // A resource still tracked by a UniqueKey is a live cache entry that callers expect to
+    // look up by key, not an anonymous scratch buffer. Skip it during the scratch-expiration
+    // sweep so a brief drop in external references (e.g. the owning Path is rebuilt between
+    // two draws) does not silently drop its uniqueKeyMap entry after only
+    // SCRATCH_EXPIRATION_FRAMES frames and force the next lookup to re-rasterize. The
+    // byte-capacity pass (scratchResourceOnly == false) still reclaims these resources via
+    // the downgrade branch below or outright deletion when memory pressure demands it.
+    if (scratchResourceOnly && !resource->uniqueKey.empty()) {
+      item++;
+      continue;
+    }
     // Expired UniqueKey resources with ScratchKey are downgraded to scratch resources.
     if (!scratchResourceOnly && resource->hasExternalReferences() &&
         !resource->scratchKey.empty()) {
