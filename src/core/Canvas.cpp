@@ -317,12 +317,8 @@ static bool UseDrawPath(const Paint& paint, const Point& radii, const Matrix& vi
 }
 
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
-  if (rRect.rect.isEmpty()) {
-    drawRect(rRect.rect, paint);
-    return;
-  }
   auto& radii = rRect.radii;
-  if (radii.x < 0.5f && radii.y < 0.5f) {
+  if (rRect.rect.isEmpty() || (radii.x < 0.5f && radii.y < 0.5f)) {
     drawRect(rRect.rect, paint);
     return;
   }
