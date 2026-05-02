@@ -613,21 +613,34 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   auto sortedCaches = getSortedTileCaches();
   auto fallbackTileCaches = getFallbackTileCaches(sortedCaches);
   auto sortedTiles = GetSortedTiles(startX, endX, startY, endY, _tileSize, mousePosition);
+  // Diagnostic counters for the [DisplayList] tile log at the end of this function. Remove once
+  // the tile-refinement story for WeChat mini-program scaling is settled.
+  int hitCount = 0;             // tiles already cached at the current scale (no CPU work)
+  int fallbackCount = 0;        // tiles painted with another scale's cache (blurry, no refine)
+  int refinedFallbackCount = 0; // tiles that had a fallback available but still got queued for refine
+  int dirtyNoFallbackCount = 0; // tiles with no fallback at all, must be rasterized from scratch
+  int skippedCount = 0;         // dirtyNoFallback tiles skipped by maxDirtyCount throttling
+  bool viewportMoved = (maxRefinedCount == 0);
   for (const auto& [tileX, tileY] : sortedTiles) {
     auto tile = currentTileCache->getTile(tileX, tileY);
     if (tile != nullptr) {
       auto tileRect = tile->getTileRect(_tileSize, &renderRect);
       screenTasks.emplace_back(tile, _tileSize, tileRect);
+      hitCount++;
     } else {
+      bool hadFallback = false;
       if (_allowZoomBlur) {
         auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
         if (!fallbackTasks.empty()) {
+          hadFallback = true;
           if (maxRefinedCount <= 0) {
             screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
             hasZoomBlurTiles = true;
+            fallbackCount++;
             continue;
           }
           maxRefinedCount--;
+          refinedFallbackCount++;
         }
       }
       if (maxDirtyCount > 0 && static_cast<int>(dirtyGrids.size()) >= maxDirtyCount) {
@@ -641,7 +654,13 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
           skippedRects->push_back(skippedRect);
         }
         hasZoomBlurTiles = true;
+        if (!hadFallback) {
+          skippedCount++;
+        }
         continue;
+      }
+      if (!hadFallback) {
+        dirtyNoFallbackCount++;
       }
       dirtyGrids.emplace_back(tileX, tileY);
     }
@@ -681,6 +700,15 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     for (auto& tile : taskTiles) {
       tileTasks->emplace_back(tile, _tileSize);
     }
+  }
+  // Print when any tile had to be produced or skipped this frame. Keeps the log quiet during
+  // steady-state frames where everything is served from the current-scale cache.
+  if (!dirtyGrids.empty() || skippedCount > 0) {
+    LOGI(
+        "[DisplayList] tiles: viewport=%dx%d total=%d hit=%d fallback=%d "
+        "refinedFallback=%d dirtyNoFallback=%d skipped=%d viewportMoved=%d",
+        endX - startX, endY - startY, static_cast<int>(tileCount), hitCount, fallbackCount,
+        refinedFallbackCount, dirtyNoFallbackCount, skippedCount, viewportMoved ? 1 : 0);
   }
   return screenTasks;
 }
