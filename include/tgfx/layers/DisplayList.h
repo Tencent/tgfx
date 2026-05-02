@@ -224,6 +224,28 @@ class DisplayList {
   }
 
   /**
+   * Returns the maximum number of dirty tiles (without fallback) drawn per frame in tiled
+   * rendering mode. This setting is ignored in other render modes. When the number of dirty
+   * tiles without fallback exceeds this limit, the extra tiles are skipped in the current frame
+   * (showing the background color) and will be drawn in subsequent frames. This caps per-frame
+   * workload to keep both interactive frames (zoom/pan) and post-interaction catch-up frames
+   * smooth. The limit is bypassed on the first render when no cached tiles exist yet, so the
+   * initial full-screen render completes in one frame. The default is 5. Set to 0 to disable
+   * the limit.
+   */
+  int maxDirtyTilesPerFrame() const {
+    return _maxDirtyTilesPerFrame;
+  }
+
+  /**
+   * Sets the maximum number of dirty tiles (without fallback) drawn per frame in tiled rendering
+   * mode.
+   */
+  void setMaxDirtyTilesPerFrame(int count) {
+    _maxDirtyTilesPerFrame = count < 0 ? 0 : count;
+  }
+
+  /**
    * Returns the background color of the root layer. The background is an infinite rectangle that
    * covers the entire display area and is drawn using the SrcOver blend mode.
    * The default value is transparent.
@@ -287,6 +309,7 @@ class DisplayList {
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
   int _maxTilesRefinedPerFrame = 5;
+  int _maxDirtyTilesPerFrame = 5;
   int _subtreeCacheMaxSize = 0;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
@@ -318,7 +341,8 @@ class DisplayList {
   void recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks);
 
   std::vector<DrawTask> collectScreenTasks(const Surface* surface,
-                                           std::vector<DrawTask>* tileTasks);
+                                           std::vector<DrawTask>* tileTasks,
+                                           std::vector<Rect>* skippedRects);
 
   std::vector<std::pair<float, TileCache*>> getSortedTileCaches() const;
 
@@ -343,7 +367,8 @@ class DisplayList {
 
   void drawTileTask(const DrawTask& task) const;
 
-  void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear) const;
+  void drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
+                       Surface* surface, bool autoClear) const;
 
   void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
 

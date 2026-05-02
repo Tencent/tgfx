@@ -429,7 +429,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   }
   checkTileCount(surface);
   auto tileTasks = invalidateTileCaches(dirtyRegions);
-  auto screenTasks = collectScreenTasks(surface, &tileTasks);
+  std::vector<Rect> skippedRects = {};
+  auto screenTasks = collectScreenTasks(surface, &tileTasks, &skippedRects);
   if (screenTasks.empty()) {
     recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
@@ -444,7 +445,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       dirtyRects.emplace_back(dirtyRect);
     }
   }
-  drawScreenTasks(std::move(screenTasks), surface, autoClear);
+  drawScreenTasks(std::move(screenTasks), std::move(skippedRects), surface, autoClear);
   return dirtyRects;
 }
 
@@ -553,7 +554,8 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
 }
 
 std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
-                                                      std::vector<DrawTask>* tileTasks) {
+                                                      std::vector<DrawTask>* tileTasks,
+                                                      std::vector<Rect>* skippedRects) {
   auto maxRefinedCount = _maxTilesRefinedPerFrame;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
     updateMousePosition();
@@ -571,6 +573,17 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   } else {
     currentTileCache = new TileCache(_tileSize);
     tileCaches[_zoomScaleInt] = currentTileCache;
+  }
+  // Compute dirty-tile throttling limit. Enabled on all frames except the very first render
+  // (when no cached tiles exist at any scale), so the initial full-screen render isn't split.
+  int maxDirtyCount = 0;
+  if (_maxDirtyTilesPerFrame > 0) {
+    for (const auto& item : tileCaches) {
+      if (!item.second->empty()) {
+        maxDirtyCount = _maxDirtyTilesPerFrame;
+        break;
+      }
+    }
   }
   auto renderRect = Rect::MakeWH(surface->width(), surface->height());
   renderRect.offset(-_contentOffset.x, -_contentOffset.y);
@@ -617,12 +630,25 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
           maxRefinedCount--;
         }
       }
+      if (maxDirtyCount > 0 && static_cast<int>(dirtyGrids.size()) >= maxDirtyCount) {
+        // Skip this tile to cap per-frame workload. Record its rect so drawScreenTasks can
+        // fill the region with the background color, matching the "non-covered screen area"
+        // handling already used for the outer border.
+        auto skippedRect = Rect::MakeXYWH(
+            static_cast<float>(tileX * _tileSize), static_cast<float>(tileY * _tileSize),
+            static_cast<float>(_tileSize), static_cast<float>(_tileSize));
+        if (skippedRect.intersect(renderRect)) {
+          skippedRects->push_back(skippedRect);
+        }
+        hasZoomBlurTiles = true;
+        continue;
+      }
       dirtyGrids.emplace_back(tileX, tileY);
     }
   }
   std::vector<std::shared_ptr<Tile>> freeTiles = {};
   bool continuous = false;
-  if (screenTasks.empty()) {
+  if (screenTasks.empty() && maxDirtyCount == 0) {
     freeTiles = createContinuousTiles(surface, endX - startX, endY - startY);
     continuous = !freeTiles.empty();
     dirtyGrids = GenerateGridTiles(startX, endX, startY, endY);
@@ -929,7 +955,8 @@ void DisplayList::drawTileTask(const DrawTask& task) const {
   drawRootLayer(surface, clipRect, viewMatrix, true);
 }
 
-void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface,
+void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks,
+                                  std::vector<Rect> skippedRects, Surface* surface,
                                   bool autoClear) const {
   // Sort tasks by surface index to ensure they are drawn in batches.
   std::sort(screenTasks.begin(), screenTasks.end(),
@@ -953,6 +980,17 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
     canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
                           SrcRectConstraint::Strict);
     tileRect.join(task.tileRect());
+  }
+
+  // Fill skipped-tile regions with background color using the same Src-mode approach as the
+  // outer-border fill below. Must happen before the `contains` short-circuit since the
+  // bounding-box `tileRect` may "contain" screenRect while still having holes in the middle
+  // from skipped tiles.
+  if (!skippedRects.empty()) {
+    paint.setColor(_root->backgroundColor());
+    for (auto& rect : skippedRects) {
+      canvas->drawRect(rect, paint);
+    }
   }
 
   auto screenRect = Rect::MakeWH(surface->width(), surface->height());
