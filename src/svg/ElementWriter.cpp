@@ -294,7 +294,9 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
     case Types::ImageFilterType::Blur: {
       const auto blurFilter = static_cast<const GaussianBlurImageFilter*>(imageFilter.get());
       bound = blurFilter->filterBounds(bound);
-      std::string filterID = resourceStore->addFilter();
+      std::string key = "blur_" + std::to_string(bound.x()) + "_" + std::to_string(bound.y()) +
+                        "_" + std::to_string(bound.width()) + "_" + std::to_string(bound.height());
+      std::string filterID = resourceStore->addFilter(key);
       ElementWriter filterElement("filter", writer);
       filterElement.addAttribute("id", filterID);
       filterElement.addAttribute("x", bound.x());
@@ -309,7 +311,10 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
     case Types::ImageFilterType::DropShadow: {
       const auto dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
       bound = dropShadowFilter->filterBounds(bound);
-      std::string filterID = resourceStore->addFilter();
+      std::string key = "dropshadow_" + std::to_string(bound.x()) + "_" +
+                        std::to_string(bound.y()) + "_" + std::to_string(bound.width()) + "_" +
+                        std::to_string(bound.height());
+      std::string filterID = resourceStore->addFilter(key);
       ElementWriter filterElement("filter", writer);
       filterElement.addAttribute("id", filterID);
       filterElement.addAttribute("x", bound.x());
@@ -324,7 +329,10 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
     case Types::ImageFilterType::InnerShadow: {
       const auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
       bound = innerShadowFilter->filterBounds(bound);
-      std::string filterID = resourceStore->addFilter();
+      std::string key = "innershadow_" + std::to_string(bound.x()) + "_" +
+                        std::to_string(bound.y()) + "_" + std::to_string(bound.width()) + "_" +
+                        std::to_string(bound.height());
+      std::string filterID = resourceStore->addFilter(key);
       ElementWriter filterElement("filter", writer);
       filterElement.addAttribute("id", filterID);
       filterElement.addAttribute("x", bound.x());
@@ -601,11 +609,11 @@ void ElementWriter::addGradientShaderResources(const GradientShader* shader, con
 
   DEBUG_ASSERT(info.colors.size() == info.positions.size());
   if (type == GradientType::Linear) {
-    resources->paintColor = "url(#" + addLinearGradientDef(info, matrix) + ")";
+    resources->paintColor = "url(#" + addLinearGradientDef(info, matrix, type) + ")";
   } else if (type == GradientType::Radial) {
-    resources->paintColor = "url(#" + addRadialGradientDef(info, matrix) + ")";
+    resources->paintColor = "url(#" + addRadialGradientDef(info, matrix, type) + ")";
   } else {
-    resources->paintColor = "url(#" + addUnsupportedGradientDef(info, matrix) + ")";
+    resources->paintColor = "url(#" + addUnsupportedGradientDef(info, matrix, type) + ")";
     reportUnsupportedElement("Unsupported gradient type");
   }
 }
@@ -637,9 +645,15 @@ void ElementWriter::addGradientColors(const GradientInfo& info) {
   }
 }
 
-std::string ElementWriter::addLinearGradientDef(const GradientInfo& info, const Matrix& matrix) {
+std::string ElementWriter::addLinearGradientDef(const GradientInfo& info, const Matrix& matrix,
+                                                GradientType type) {
   DEBUG_ASSERT(resourceStore);
-  auto id = resourceStore->addGradient();
+  std::string key = "linear_" + std::to_string(static_cast<int>(type)) + "_" +
+                    std::to_string(info.points[0].x) + "_" + std::to_string(info.points[0].y) +
+                    "_" + std::to_string(info.points[1].x) + "_" +
+                    std::to_string(info.points[1].y) + "_" + std::to_string(matrix.getScaleX()) +
+                    "_" + std::to_string(matrix.getScaleY());
+  auto id = resourceStore->addGradient(key);
 
   {
     ElementWriter gradient("linearGradient", writer);
@@ -658,9 +672,15 @@ std::string ElementWriter::addLinearGradientDef(const GradientInfo& info, const 
   return id;
 }
 
-std::string ElementWriter::addRadialGradientDef(const GradientInfo& info, const Matrix& matrix) {
+std::string ElementWriter::addRadialGradientDef(const GradientInfo& info, const Matrix& matrix,
+                                                GradientType type) {
   DEBUG_ASSERT(resourceStore);
-  auto id = resourceStore->addGradient();
+  std::string key = "radial_" + std::to_string(static_cast<int>(type)) + "_" +
+                    std::to_string(info.points[0].x) + "_" + std::to_string(info.points[0].y) +
+                    "_" + std::to_string(info.points[1].x) + "_" +
+                    std::to_string(info.points[1].y) + "_" + std::to_string(matrix.getScaleX()) +
+                    "_" + std::to_string(matrix.getScaleY());
+  auto id = resourceStore->addGradient(key);
 
   {
     ElementWriter gradient("radialGradient", writer);
@@ -678,10 +698,15 @@ std::string ElementWriter::addRadialGradientDef(const GradientInfo& info, const 
   return id;
 }
 
-std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info,
-                                                     const Matrix& matrix) {
+std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info, const Matrix& matrix,
+                                                     GradientType type) {
   DEBUG_ASSERT(resourceStore);
-  auto id = resourceStore->addGradient();
+  std::string key = "unsupported_" + std::to_string(static_cast<int>(type)) + "_" +
+                    std::to_string(info.points[0].x) + "_" + std::to_string(info.points[0].y) +
+                    "_" + std::to_string(info.points[1].x) + "_" +
+                    std::to_string(info.points[1].y) + "_" + std::to_string(matrix.getScaleX()) +
+                    "_" + std::to_string(matrix.getScaleY());
+  auto id = resourceStore->addGradient(key);
 
   {
     ElementWriter gradient("radialGradient", writer);
@@ -733,8 +758,13 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, const Mat
   std::string widthValue = transDimension(shader->tileModeX, imageWidth);
   std::string heightValue = transDimension(shader->tileModeY, imageHeight);
 
-  std::string patternID = resourceStore->addPattern();
-  std::string imageID = resourceStore->addImage();
+  std::string patternKey = "pattern_" + std::to_string(imageWidth) + "_" +
+                           std::to_string(imageHeight) + "_" +
+                           std::to_string(static_cast<int>(shader->tileModeX)) + "_" +
+                           std::to_string(static_cast<int>(shader->tileModeY));
+  std::string imageKey = "image_" + std::to_string(imageWidth) + "_" + std::to_string(imageHeight);
+  std::string patternID = resourceStore->addPattern(patternKey);
+  std::string imageID = resourceStore->addImage(imageKey);
   {
     ElementWriter pattern("pattern", writer);
     pattern.addAttribute("id", patternID);
