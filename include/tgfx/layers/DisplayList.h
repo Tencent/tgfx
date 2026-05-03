@@ -224,25 +224,25 @@ class DisplayList {
   }
 
   /**
-   * Returns the maximum number of dirty tiles (without fallback) drawn per frame in tiled
-   * rendering mode. This setting is ignored in other render modes. When the number of dirty
-   * tiles without fallback exceeds this limit, the extra tiles are skipped in the current frame
-   * (showing the background color) and will be drawn in subsequent frames. This caps per-frame
-   * workload to keep both interactive frames (zoom/pan) and post-interaction catch-up frames
-   * smooth. The limit is bypassed on the first render when no cached tiles exist yet, so the
-   * initial full-screen render completes in one frame. The default is 5. Set to 0 to disable
-   * the limit.
+   * Returns the per-frame throttle for tiles that need to be rasterized from scratch (no
+   * fallback available) in tiled rendering mode. This setting is ignored in other render modes.
+   * When the number of such tiles in a frame exceeds this limit, the excess is deferred to
+   * subsequent frames and meanwhile shows the background color. The throttle caps per-frame
+   * rasterization cost to keep interactive frames (zoom/pan) and post-interaction catch-up
+   * frames smooth, at the price of transient blank tiles. It is bypassed on the very first
+   * render (no cache at any scale yet) so the initial full-screen render always completes in
+   * a single frame. The default is 0 (disabled); set to a positive value to enable throttling.
    */
-  int maxDirtyTilesPerFrame() const {
-    return _maxDirtyTilesPerFrame;
+  int tileThrottlePerFrame() const {
+    return _tileThrottlePerFrame;
   }
 
   /**
-   * Sets the maximum number of dirty tiles (without fallback) drawn per frame in tiled rendering
-   * mode.
+   * Sets the per-frame throttle for tiles that need to be rasterized from scratch (no fallback
+   * available) in tiled rendering mode. See tileThrottlePerFrame() for the full contract.
    */
-  void setMaxDirtyTilesPerFrame(int count) {
-    _maxDirtyTilesPerFrame = count < 0 ? 0 : count;
+  void setTileThrottlePerFrame(int count) {
+    _tileThrottlePerFrame = count < 0 ? 0 : count;
   }
 
   /**
@@ -309,7 +309,7 @@ class DisplayList {
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
   int _maxTilesRefinedPerFrame = 5;
-  int _maxDirtyTilesPerFrame = 5;
+  int _tileThrottlePerFrame = 0;
   int _subtreeCacheMaxSize = 0;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
@@ -340,9 +340,9 @@ class DisplayList {
 
   void recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks);
 
-  std::vector<DrawTask> collectScreenTasks(const Surface* surface,
-                                           std::vector<DrawTask>* tileTasks,
-                                           std::vector<Rect>* skippedRects);
+  std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
+                                           std::vector<Rect>* skippedRects,
+                                           const std::vector<Rect>& dirtyRegions);
 
   std::vector<std::pair<float, TileCache*>> getSortedTileCaches() const;
 
@@ -352,9 +352,33 @@ class DisplayList {
   std::vector<DrawTask> getFallbackDrawTasks(
       int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const;
 
+  // Tile-level fallback used only by the throttling branch in collectScreenTasks. Unlike
+  // getFallbackDrawTasks (which requires every 64x64 sub-grid of the tile to be fully covered
+  // by a single cache), this one treats the whole tile as one unit, accepts partial coverage,
+  // and stacks contributions across scales. It is intentionally more permissive so that a
+  // throttled tile stays visually covered instead of showing the clear background.
+  std::vector<DrawTask> getThrottleFallbackTasks(
+      int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const;
+
+  // Protects fallback-worthy tiles from being harvested by getFreeTiles.
+  //
+  // During post-zoom throttling, getFreeTiles() recycles tiles from non-current-scale caches to
+  // use as blank canvases for dirty tiles. The recycling order (farthest-scale first, then
+  // farthest-from-viewport-center within each scale) happens to pick exactly the tiles that
+  // would otherwise serve as fallback coverage for the current viewport's edges, causing blank
+  // rectangles to appear along viewport boundaries a few frames after the zoom stops.
+  //
+  // To avoid that, protection is applied only to the single closest non-current scale -- that
+  // cache yields the highest-quality fallback and is the one getFallbackDrawTasks /
+  // getThrottleFallbackTasks prefer. Its tiles that intersect the current viewport (projected
+  // via scale ratio) are deferred; other scales keep the legacy harvesting behavior so the
+  // free-tile pool stays healthy. If protection still leaves fewer free tiles than requested,
+  // getFreeTiles drains the deferred list so rendering never stalls -- blank tiles are worse
+  // than losing a bit of fallback coverage on the nearest scale.
   std::vector<std::shared_ptr<Tile>> getFreeTiles(
       const Surface* renderSurface, size_t tileCount,
-      const std::vector<std::pair<float, TileCache*>>& sortedCaches);
+      const std::vector<std::pair<float, TileCache*>>& sortedCaches,
+      const Rect& viewportAtCurrentScale);
 
   std::vector<std::shared_ptr<Tile>> createContinuousTiles(const Surface* renderSurface,
                                                            int requestCountX, int requestCountY);

@@ -17,6 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
+#include <algorithm>
+#include <cstdio>
+#include <limits>
+#include <string>
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -430,7 +434,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   checkTileCount(surface);
   auto tileTasks = invalidateTileCaches(dirtyRegions);
   std::vector<Rect> skippedRects = {};
-  auto screenTasks = collectScreenTasks(surface, &tileTasks, &skippedRects);
+  auto screenTasks = collectScreenTasks(surface, &tileTasks, &skippedRects, dirtyRegions);
   if (screenTasks.empty()) {
     recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
@@ -463,6 +467,7 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
     }
     resetCaches();
   }
+  int requestedMax = _maxTileCount;
   totalTileCount = std::max(minTileCount, _maxTileCount);
   auto maxTileCountPerAtlas = getMaxTileCountPerAtlas(renderSurface->getContext());
   if (maxTileCountPerAtlas <= 0) {
@@ -473,6 +478,14 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
   auto width = FloatSaturateToInt(sqrtf(static_cast<float>(remainingTileCount)));
   int height = FloatCeilToInt(static_cast<float>(remainingTileCount) / static_cast<float>(width));
   totalTileCount += width * height;
+  // One-shot: how large is the tile budget on this device, and how many atlases will it take
+  // to house it. Helps answer "is _maxTileCount actually respected, or capped by the GPU limit".
+  LOGI(
+      "[TilePool] setup: surface=%dx%d tile=%d minTileCount=%d requestedMax=%d totalTileCount=%d "
+      "maxTileCountPerAtlas=%d atlasNeeded=%d",
+      renderSurface->width(), renderSurface->height(), _tileSize, minTileCount, requestedMax,
+      totalTileCount, maxTileCountPerAtlas,
+      (totalTileCount + maxTileCountPerAtlas - 1) / maxTileCountPerAtlas);
 }
 
 std::vector<DrawTask> DisplayList::invalidateTileCaches(const std::vector<Rect>& dirtyRegions) {
@@ -555,8 +568,13 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
 
 std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks,
-                                                      std::vector<Rect>* skippedRects) {
+                                                      std::vector<Rect>* skippedRects,
+                                                      const std::vector<Rect>& dirtyRegions) {
   auto maxRefinedCount = _maxTilesRefinedPerFrame;
+  // Snapshot the previous zoom scale before it gets updated below, so later throttling logic
+  // can tell whether this frame is zooming in. _zoomScaleInt ordering matches the actual scale
+  // order (negative encodes 1/scale, so -3000 < -2000 < 1000 < 2000 maps to 0.33 < 0.5 < 1 < 2).
+  auto previousZoomScaleInt = lastZoomScaleInt;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
     updateMousePosition();
     lastContentOffset = _contentOffset;
@@ -574,14 +592,22 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     currentTileCache = new TileCache(_tileSize);
     tileCaches[_zoomScaleInt] = currentTileCache;
   }
-  // Compute dirty-tile throttling limit. Enabled on all frames except the very first render
-  // (when no cached tiles exist at any scale), so the initial full-screen render isn't split.
+  // Compute per-frame throttle for tiles that need to be rasterized from scratch.
+  //  - Bypassed on the very first render (no cache at any scale yet) so the initial full-screen
+  //    render completes in one frame.
+  //  - Bypassed when zooming in: zoom-in frames already have dense fallback coverage and each
+  //    new tile is lightweight (fewer shapes per tile at larger scales), so throttling would
+  //    only cause avoidable blank tiles near the user's focus point without real performance
+  //    benefit. Zoom-out and pan still throttle, mirroring figma's behavior.
   int maxDirtyCount = 0;
-  if (_maxDirtyTilesPerFrame > 0) {
-    for (const auto& item : tileCaches) {
-      if (!item.second->empty()) {
-        maxDirtyCount = _maxDirtyTilesPerFrame;
-        break;
+  bool zoomingIn = _zoomScaleInt > previousZoomScaleInt;
+  if (_tileThrottlePerFrame > 0) {
+    if (!zoomingIn) {
+      for (const auto& item : tileCaches) {
+        if (!item.second->empty()) {
+          maxDirtyCount = _tileThrottlePerFrame;
+          break;
+        }
       }
     }
   }
@@ -613,13 +639,27 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   auto sortedCaches = getSortedTileCaches();
   auto fallbackTileCaches = getFallbackTileCaches(sortedCaches);
   auto sortedTiles = GetSortedTiles(startX, endX, startY, endY, _tileSize, mousePosition);
+  // Map dirtyRegions to current-scale pixel coordinates. Tiles whose rectangles intersect any
+  // of these rects are "content-dirty" for this frame: invalidateTileCaches has just removed
+  // their counterparts from every non-current scale (destroying their fallback sources), so
+  // they MUST be rasterized this frame and must NOT be deferred by maxDirtyCount throttling.
+  // Leaving them for a later frame would show blank holes, which is strictly worse than a
+  // slightly slower frame on content-change boundaries.
+  std::vector<Rect> dirtyRectsAtCurrentScale = {};
+  if (!dirtyRegions.empty()) {
+    auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+    dirtyRectsAtCurrentScale.reserve(dirtyRegions.size());
+    auto zoomMatrix = Matrix::MakeScale(currentZoomScale);
+    dirtyRectsAtCurrentScale = MapDirtyRegions(dirtyRegions, zoomMatrix, true);
+  }
   // Diagnostic counters for the [DisplayList] tile log at the end of this function. Remove once
   // the tile-refinement story for WeChat mini-program scaling is settled.
-  int hitCount = 0;             // tiles already cached at the current scale (no CPU work)
-  int fallbackCount = 0;        // tiles painted with another scale's cache (blurry, no refine)
-  int refinedFallbackCount = 0; // tiles that had a fallback available but still got queued for refine
-  int dirtyNoFallbackCount = 0; // tiles with no fallback at all, must be rasterized from scratch
-  int skippedCount = 0;         // dirtyNoFallback tiles skipped by maxDirtyCount throttling
+  int hitCount = 0;       // tiles already cached at the current scale (no CPU work)
+  int fallbackCount = 0;  // tiles painted with another scale's cache (blurry, no refine)
+  int refinedFallbackCount =
+      0;  // tiles that had a fallback available but still got queued for refine
+  int dirtyNoFallbackCount = 0;  // tiles with no fallback at all, must be rasterized from scratch
+  int skippedCount = 0;          // dirtyNoFallback tiles skipped by maxDirtyCount throttling
   bool viewportMoved = (maxRefinedCount == 0);
   for (const auto& [tileX, tileY] : sortedTiles) {
     auto tile = currentTileCache->getTile(tileX, tileY);
@@ -643,19 +683,50 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
           refinedFallbackCount++;
         }
       }
-      if (maxDirtyCount > 0 && static_cast<int>(dirtyGrids.size()) >= maxDirtyCount) {
-        // Skip this tile to cap per-frame workload. Record its rect so drawScreenTasks can
-        // fill the region with the background color, matching the "non-covered screen area"
-        // handling already used for the outer border.
-        auto skippedRect = Rect::MakeXYWH(
+      // Tiles whose rectangles intersect a content-change dirty region must be rasterized this
+      // frame: invalidateTileCaches has just removed matching tiles from all non-current
+      // scales, so fallback lookups will find nothing for them. Deferring them via maxDirty
+      // throttling would produce blank holes. These "must-refine" tiles still enter dirtyGrids
+      // but are exempt from the maxDirtyCount cap.
+      bool mustRefine = false;
+      if (!dirtyRectsAtCurrentScale.empty()) {
+        auto tileRect = Rect::MakeXYWH(
             static_cast<float>(tileX * _tileSize), static_cast<float>(tileY * _tileSize),
             static_cast<float>(_tileSize), static_cast<float>(_tileSize));
-        if (skippedRect.intersect(renderRect)) {
-          skippedRects->push_back(skippedRect);
+        for (auto& dirtyRect : dirtyRectsAtCurrentScale) {
+          if (Rect::Intersects(tileRect, dirtyRect)) {
+            mustRefine = true;
+            break;
+          }
         }
-        hasZoomBlurTiles = true;
-        if (!hadFallback) {
-          skippedCount++;
+      }
+      if (!mustRefine && maxDirtyCount > 0 &&
+          static_cast<int>(dirtyGrids.size()) >= maxDirtyCount) {
+        // Throttled: the tile's refinement is deferred. Before leaving the pixels blank,
+        // try a relaxed tile-level fallback lookup to visually cover the tile. This lookup
+        // accepts partial coverage and stacks across scales, so it succeeds in cases where
+        // the strict getFallbackDrawTasks would have returned empty (which is the root
+        // cause of blank tiles during post-zoom throttling).
+        auto throttleFallback = getThrottleFallbackTasks(tileX, tileY, fallbackTileCaches);
+        if (!throttleFallback.empty()) {
+          screenTasks.insert(screenTasks.end(), throttleFallback.begin(), throttleFallback.end());
+          hasZoomBlurTiles = true;
+        } else {
+          // Diagnostic: log why throttle fallback returned empty so we can tell whether
+          // it's an out-of-bounds tile (harmless, painted background) or a real miss
+          // (possibly a visual blank hole).
+          LOGI("[DisplayList] throttleFallback empty: tileXY=(%d,%d) hadFallback=%d caches=%d",
+               tileX, tileY, hadFallback ? 1 : 0, static_cast<int>(fallbackTileCaches.size()));
+          auto skippedRect = Rect::MakeXYWH(
+              static_cast<float>(tileX * _tileSize), static_cast<float>(tileY * _tileSize),
+              static_cast<float>(_tileSize), static_cast<float>(_tileSize));
+          if (skippedRect.intersect(renderRect)) {
+            skippedRects->push_back(skippedRect);
+          }
+          hasZoomBlurTiles = true;
+          if (!hadFallback) {
+            skippedCount++;
+          }
         }
         continue;
       }
@@ -673,7 +744,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     dirtyGrids = GenerateGridTiles(startX, endX, startY, endY);
   }
   if (freeTiles.empty()) {
-    freeTiles = getFreeTiles(surface, dirtyGrids.size(), sortedCaches);
+    freeTiles = getFreeTiles(surface, dirtyGrids.size(), sortedCaches, renderRect);
   }
   if (dirtyGrids.size() != freeTiles.size()) {
     DEBUG_ASSERT(freeTiles.size() < dirtyGrids.size());
@@ -701,14 +772,19 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       tileTasks->emplace_back(tile, _tileSize);
     }
   }
-  // Print when any tile had to be produced or skipped this frame. Keeps the log quiet during
-  // steady-state frames where everything is served from the current-scale cache.
-  if (!dirtyGrids.empty() || skippedCount > 0) {
+  // Print during viewport changes to capture interaction frames. Include throttling inputs
+  // (prevZoom / curZoom / zoomingIn / maxDirty) so we can bisect blank-tile cases.
+  if (viewportMoved) {
+    auto prevZoom = ToZoomScaleFloat(previousZoomScaleInt, _zoomScalePrecision);
+    auto curZoom = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
     LOGI(
         "[DisplayList] tiles: viewport=%dx%d total=%d hit=%d fallback=%d "
-        "refinedFallback=%d dirtyNoFallback=%d skipped=%d viewportMoved=%d",
+        "refinedFallback=%d dirtyNoFallback=%d skipped=%d dirtyGrids=%d "
+        "prevZoom=%.4f curZoom=%.4f zoomingIn=%d maxDirty=%d viewportMoved=%d",
         endX - startX, endY - startY, static_cast<int>(tileCount), hitCount, fallbackCount,
-        refinedFallbackCount, dirtyNoFallbackCount, skippedCount, viewportMoved ? 1 : 0);
+        refinedFallbackCount, dirtyNoFallbackCount, skippedCount,
+        static_cast<int>(dirtyGrids.size()), prevZoom, curZoom, zoomingIn ? 1 : 0, maxDirtyCount,
+        viewportMoved ? 1 : 0);
   }
   return screenTasks;
 }
@@ -810,9 +886,73 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
   return tasks;
 }
 
+std::vector<DrawTask> DisplayList::getThrottleFallbackTasks(
+    int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const {
+  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  DEBUG_ASSERT(currentZoomScale != 0.0f);
+  auto tileRect =
+      Rect::MakeXYWH(static_cast<float>(tileX * _tileSize), static_cast<float>(tileY * _tileSize),
+                     static_cast<float>(_tileSize), static_cast<float>(_tileSize));
+  auto renderBounds = _root->renderBounds;
+  renderBounds.scale(currentZoomScale, currentZoomScale);
+  renderBounds.roundOut();
+  if (!tileRect.intersect(renderBounds)) {
+    LOGI("[Throttle] tile=(%d,%d) outOfRenderBounds curScale=%.4f", tileX, tileY, currentZoomScale);
+    return {};
+  }
+  // Sort fallback caches strictly by distance from currentZoomScale using ScaleRatio, so the
+  // "nearest-first + break on full coverage" logic picks the visually closest scale first.
+  auto orderedCaches = fallbackCaches;
+  std::sort(orderedCaches.begin(), orderedCaches.end(),
+            [currentZoomScale](const std::pair<float, TileCache*>& a,
+                               const std::pair<float, TileCache*>& b) {
+              return ScaleRatio(a.first, currentZoomScale) < ScaleRatio(b.first, currentZoomScale);
+            });
+  std::vector<DrawTask> tasks = {};
+  int triedScales = 0;
+  int scalesWithHits = 0;
+  for (auto& [scale, tileCache] : orderedCaches) {
+    if (scale == currentZoomScale || tileCache->empty()) {
+      continue;
+    }
+    triedScales++;
+    auto scaleRatio = scale / currentZoomScale;
+    DEBUG_ASSERT(scaleRatio != 0.0f);
+    auto zoomedRect = tileRect;
+    zoomedRect.scale(scaleRatio, scaleRatio);
+    auto covering = tileCache->getTilesUnderRect(zoomedRect, true);
+    bool fullyCovered = !covering.empty();
+    if (!fullyCovered) {
+      covering = tileCache->getTilesUnderRect(zoomedRect, false);
+    }
+    if (covering.empty()) {
+      continue;
+    }
+    scalesWithHits++;
+    for (auto& t : covering) {
+      auto drawRect = t->getTileRect(_tileSize);
+      if (drawRect.intersect(zoomedRect)) {
+        tasks.emplace_back(t, _tileSize, drawRect, 1.0f / scaleRatio);
+      }
+    }
+    if (fullyCovered) {
+      break;
+    }
+  }
+  if (tasks.empty()) {
+    LOGI(
+        "[Throttle] tile=(%d,%d) noMatch curScale=%.4f tileRect=[%.0f,%.0f,%.0f,%.0f] "
+        "orderedCaches=%d triedScales=%d scalesWithHits=%d",
+        tileX, tileY, currentZoomScale, tileRect.left, tileRect.top, tileRect.right,
+        tileRect.bottom, static_cast<int>(orderedCaches.size()), triedScales, scalesWithHits);
+  }
+  return tasks;
+}
+
 std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
     const Surface* renderSurface, size_t tileCount,
-    const std::vector<std::pair<float, TileCache*>>& sortedCaches) {
+    const std::vector<std::pair<float, TileCache*>>& sortedCaches,
+    const Rect& viewportAtCurrentScale) {
   std::vector<std::shared_ptr<Tile>> tiles = {};
   tiles.reserve(tileCount);
   while (emptyTiles.size() < tileCount) {
@@ -829,8 +969,32 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
   emptyTiles.clear();
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
+  // Identify the single closest non-current scale. Only this cache gets viewport protection;
+  // every other (farther) scale is harvested with the legacy behavior. Rationale: the nearest
+  // scale is the visually best fallback source and the most reused by getFallbackDrawTasks /
+  // getThrottleFallbackTasks, while farther scales produce blurry fallback anyway, so
+  // over-protecting them would needlessly shrink the free-tile pool.
+  TileCache* protectedCache = nullptr;
+  {
+    float bestRatio = 0.0f;
+    for (const auto& [scale, tileCache] : sortedCaches) {
+      if (scale == currentZoomScale || tileCache->empty()) {
+        continue;
+      }
+      auto ratio = ScaleRatio(scale, currentZoomScale);
+      if (protectedCache == nullptr || ratio < bestRatio) {
+        bestRatio = ratio;
+        protectedCache = tileCache;
+      }
+    }
+  }
+  // Tiles skipped by the viewport-protection filter in the first pass. They are still valid
+  // reuse candidates; we just prefer not to touch them because they may serve as fallback
+  // coverage for current-viewport edges. If the first pass doesn't collect enough tiles, we
+  // drain this list in a second pass to guarantee rendering progresses.
+  std::vector<std::pair<TileCache*, std::shared_ptr<Tile>>> deferred = {};
   // Reverse iterate through sorted caches to get the farest tiles first.
-  for (size_t i = 0, j = sortedCaches.size(); i < j;) {
+  for (size_t i = 0, j = sortedCaches.size(); i < j && tiles.size() < tileCount;) {
     auto& [scaleS, tileCacheS] = sortedCaches.at(i);
     auto& [scaleL, tileCacheL] = sortedCaches.at(j - 1);
     auto scale = scaleS;
@@ -846,17 +1010,39 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
     auto centerY = static_cast<float>(renderSurface->height()) * 0.5f - _contentOffset.y;
     centerX *= scale / currentZoomScale;
     centerY *= scale / currentZoomScale;
+    // Only the nearest non-current scale gets viewport protection. Farther scales skip the
+    // intersection test and are harvested directly.
+    bool applyProtection = (tileCache == protectedCache);
+    Rect protectedRect = {};
+    if (applyProtection) {
+      auto scaleRatio = scale / currentZoomScale;
+      protectedRect = viewportAtCurrentScale;
+      protectedRect.scale(scaleRatio, scaleRatio);
+    }
     auto reusableTiles = tileCache->getReusableTiles(centerX, centerY);
     for (auto& tile : reusableTiles) {
+      if (applyProtection) {
+        auto tileRect = tile->getTileRect(_tileSize);
+        if (Rect::Intersects(tileRect, protectedRect)) {
+          deferred.emplace_back(tileCache, std::move(tile));
+          continue;
+        }
+      }
       tileCache->removeTile(tile->tileX, tile->tileY);
       tiles.push_back(std::move(tile));
       if (tiles.size() >= tileCount) {
         break;
       }
     }
+  }
+  // Second pass: if viewport protection starved us, drain the deferred list so rendering
+  // never stalls. Blank holes are worse than giving up a bit of fallback coverage.
+  for (auto& [tileCache, tile] : deferred) {
     if (tiles.size() >= tileCount) {
       break;
     }
+    tileCache->removeTile(tile->tileX, tile->tileY);
+    tiles.push_back(std::move(tile));
   }
   if (tiles.size() < tileCount) {
     emptyTiles = std::move(tiles);
@@ -942,6 +1128,17 @@ bool DisplayList::createEmptyTiles(const Surface* renderSurface) {
       emptyTiles.push_back(std::move(tile));
     }
   }
+  // Track how many atlases end up being allocated and how large each one is, so we can tell
+  // whether a bumped-up _maxTileCount is actually being respected by the GPU.
+  int allocatedTileCount = 0;
+  for (auto& s : surfaceCaches) {
+    allocatedTileCount += (s->width() / _tileSize) * (s->height() / _tileSize);
+  }
+  LOGI(
+      "[TilePool] createAtlas: index=%d size=%dx%d tiles=%dx%d(%d) totalAtlases=%d "
+      "allocatedTileCount=%d totalTileCount=%d",
+      static_cast<int>(surfaceIndex), countX * _tileSize, countY * _tileSize, countX, countY,
+      countX * countY, static_cast<int>(surfaceCaches.size()), allocatedTileCount, totalTileCount);
   return !emptyTiles.empty();
 }
 
@@ -983,9 +1180,8 @@ void DisplayList::drawTileTask(const DrawTask& task) const {
   drawRootLayer(surface, clipRect, viewMatrix, true);
 }
 
-void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks,
-                                  std::vector<Rect> skippedRects, Surface* surface,
-                                  bool autoClear) const {
+void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
+                                  Surface* surface, bool autoClear) const {
   // Sort tasks by surface index to ensure they are drawn in batches.
   std::sort(screenTasks.begin(), screenTasks.end(),
             [](const DrawTask& a, const DrawTask& b) { return a.sourceIndex() < b.sourceIndex(); });
@@ -1000,6 +1196,11 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks,
   static SamplingOptions linearSampling(FilterMode::Linear, MipmapMode::None);
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
   Rect tileRect = {};
+  // Diagnostic: sum per-task areas so we can detect holes between tasks inside tileRect.
+  // If sumArea < tileRect.area(), tasks leave gaps → visible blank regions.
+  float sumTaskArea = 0.0f;
+  float minTaskArea = std::numeric_limits<float>::max();
+  float maxTaskArea = 0.0f;
   for (auto& task : screenTasks) {
     auto surfaceCache = surfaceCaches[task.sourceIndex()];
     DEBUG_ASSERT(surfaceCache != nullptr);
@@ -1007,6 +1208,10 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks,
     auto& sampling = task.identityScale() ? nearestSampling : linearSampling;
     canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
                           SrcRectConstraint::Strict);
+    auto area = task.tileRect().width() * task.tileRect().height();
+    sumTaskArea += area;
+    minTaskArea = std::min(minTaskArea, area);
+    maxTaskArea = std::max(maxTaskArea, area);
     tileRect.join(task.tileRect());
   }
 
@@ -1023,7 +1228,23 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks,
 
   auto screenRect = Rect::MakeWH(surface->width(), surface->height());
   screenRect.offset(-_contentOffset.x, -_contentOffset.y);
-  if (tileRect.contains(screenRect)) {
+  // Diagnostic: report whether background fill will touch the tile area, to confirm/refute
+  // the "blank tiles come from background rects" hypothesis.
+  auto tileRectBeforeClip = tileRect;
+  float boundingArea = tileRect.width() * tileRect.height();
+  // coverage ratio tells us whether tasks leave internal gaps; < 1.0 means blank holes.
+  float coverageRatio = boundingArea > 0.0f ? sumTaskArea / boundingArea : 0.0f;
+  bool tileCoversScreen = tileRect.contains(screenRect);
+  if (tileCoversScreen) {
+    LOGI(
+        "[DisplayList] draw: tasks=%d skipped=%d autoClear=%d tile=[%.0f,%.0f,%.0f,%.0f] "
+        "screen=[%.0f,%.0f,%.0f,%.0f] sumArea=%.0f boundArea=%.0f cov=%.3f "
+        "minTask=%.0f maxTask=%.0f bgFills=0 (covered)",
+        static_cast<int>(screenTasks.size()), static_cast<int>(skippedRects.size()),
+        autoClear ? 1 : 0, tileRectBeforeClip.left, tileRectBeforeClip.top,
+        tileRectBeforeClip.right, tileRectBeforeClip.bottom, screenRect.left, screenRect.top,
+        screenRect.right, screenRect.bottom, sumTaskArea, boundingArea, coverageRatio,
+        screenTasks.empty() ? 0.0f : minTaskArea, maxTaskArea);
     return;
   }
 
@@ -1036,9 +1257,22 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks,
 
   paint.setColor(_root->backgroundColor());
   auto backgroundRect = GetNonIntersectingRects(screenRect, tileRect);
+  float bgArea = 0.0f;
   for (auto& rect : backgroundRect) {
+    bgArea += rect.width() * rect.height();
     canvas->drawRect(rect, paint);
   }
+  LOGI(
+      "[DisplayList] draw: tasks=%d skipped=%d autoClear=%d "
+      "tile=[%.0f,%.0f,%.0f,%.0f] tileClipped=[%.0f,%.0f,%.0f,%.0f] "
+      "screen=[%.0f,%.0f,%.0f,%.0f] sumArea=%.0f boundArea=%.0f cov=%.3f "
+      "minTask=%.0f maxTask=%.0f bgFills=%d bgArea=%.0f",
+      static_cast<int>(screenTasks.size()), static_cast<int>(skippedRects.size()),
+      autoClear ? 1 : 0, tileRectBeforeClip.left, tileRectBeforeClip.top, tileRectBeforeClip.right,
+      tileRectBeforeClip.bottom, tileRect.left, tileRect.top, tileRect.right, tileRect.bottom,
+      screenRect.left, screenRect.top, screenRect.right, screenRect.bottom, sumTaskArea,
+      boundingArea, coverageRatio, screenTasks.empty() ? 0.0f : minTaskArea, maxTaskArea,
+      static_cast<int>(backgroundRect.size()), bgArea);
 }
 
 void DisplayList::renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions) {
