@@ -33,16 +33,6 @@
 
 namespace tgfx {
 
-// Debug-only counter paired with ForceLogNextEncodes(). Not thread-safe; acceptable because the
-// WeChat Mini Program WASM build is single-threaded and this knob only exists for diagnostics.
-static int gForceLogEncodeFrames = 0;
-
-void ForceLogNextEncodes(int count) {
-  if (count > gForceLogEncodeFrames) {
-    gForceLogEncodeFrames = count;
-  }
-}
-
 // We set the maxBlockSize to 2MB because allocating blocks that are too large can cause memory
 // fragmentation and slow down allocation. It may also increase the application's memory usage due
 // to pre-allocation optimizations on some platforms.
@@ -118,11 +108,7 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   auto textureProfile = TextureUploadTask::FetchProfileAndReset();
   auto mipmapProfile = GenerateMipmapsTask::FetchProfileAndReset();
   auto cacheProbe = FetchAndResetCacheProbeStats();
-  bool forcedLog = gForceLogEncodeFrames > 0;
-  if (totalUs > ENCODE_SLOW_THRESHOLD_US || forcedLog) {
-    if (forcedLog) {
-      gForceLogEncodeFrames--;
-    }
+  if (totalUs > ENCODE_SLOW_THRESHOLD_US) {
     int64_t resourceUs = resourceEndUs - resourceStartUs;
     int64_t renderUs = renderEndUs - atlasEndUs;
     int64_t finishUs = encodeEndUs - renderEndUs;
