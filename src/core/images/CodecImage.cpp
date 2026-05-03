@@ -47,11 +47,6 @@ std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
 }
 
 std::shared_ptr<Image> CodecImage::onMakeMipmapped(bool enabled) const {
-  // Preserve CodecImage identity instead of falling back to GeneratorImage::onMakeMipmapped.
-  // The base-class version constructs a plain GeneratorImage, which discards the declared
-  // (possibly downscaled) size and the codec-aware lockTextureProxy path. That causes any later
-  // makeScaled() to decode at full codec resolution through ScaledImage wrapping, defeating both
-  // memory-constraining and scaled-decode optimizations.
   auto image = std::make_shared<CodecImage>(getCodec(), _width, _height, enabled);
   image->weakThis = image;
   return image;
