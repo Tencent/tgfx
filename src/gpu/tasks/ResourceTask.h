@@ -18,30 +18,11 @@
 
 #pragma once
 
-#include <cstdint>
 #include "core/utils/Log.h"
 #include "gpu/proxies/ResourceProxy.h"
 #include "gpu/resources/Resource.h"
 
 namespace tgfx {
-/**
- * Identifies the concrete subclass of a ResourceTask. Used for diagnostics such as per-type
- * latency aggregation. Keep this enum in sync with the ResourceTask subclasses. When adding a
- * new subclass, append a new value before Count and override ResourceTask::type() in the subclass.
- */
-enum class ResourceTaskType : uint8_t {
-  Unknown,
-  Shape,
-  Texture,
-  Hairline,
-  VertexMesh,
-  MeshIndex,
-  ShapeMesh,
-  GPUBuffer,
-  Readback,
-  Count,
-};
-
 /**
  * The base class for all resource creation tasks.
  */
@@ -50,14 +31,6 @@ class ResourceTask {
   explicit ResourceTask(std::shared_ptr<ResourceProxy> proxy);
 
   virtual ~ResourceTask() = default;
-
-  /**
-   * Returns the concrete subclass identifier for diagnostics. Subclasses should override this to
-   * return their matching ResourceTaskType value.
-   */
-  virtual ResourceTaskType type() const {
-    return ResourceTaskType::Unknown;
-  }
 
   /**
    * Returns false if the resource creation is failed.

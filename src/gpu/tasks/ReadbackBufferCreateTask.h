@@ -26,10 +26,6 @@ class ReadbackBufferCreateTask : public ResourceTask {
  public:
   ReadbackBufferCreateTask(std::shared_ptr<GPUBufferProxy> proxy, size_t size);
 
-  ResourceTaskType type() const override {
-    return ResourceTaskType::Readback;
-  }
-
  protected:
   std::shared_ptr<Resource> onMakeResource(Context*) override;
 

@@ -29,10 +29,6 @@ class ShapeBufferUploadTask : public ResourceTask {
                         std::shared_ptr<ResourceProxy> textureProxy,
                         std::unique_ptr<DataSource<ShapeBuffer>> source);
 
-  ResourceTaskType type() const override {
-    return ResourceTaskType::Shape;
-  }
-
  protected:
   std::shared_ptr<Resource> onMakeResource(Context*) override;
 

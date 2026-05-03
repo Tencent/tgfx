@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RasterizedImage.h"
-#include "core/utils/Log.h"
-#include "core/utils/RasterizedImageCacheProbe.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
@@ -42,16 +40,6 @@ std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& ar
   auto textureProxy = proxyProvider->findOrWrapTextureProxy(textureKey);
   if (textureProxy != nullptr) {
     return textureProxy;
-  }
-  // Cache miss: classify it so we can tell first-seen vs. scale-change vs. LRU rebuild. The
-  // classifier uses the image's UniqueKey domainID as stable identity; the per-frame counters are
-  // drained from DrawingBuffer::encode(). We only print the per-miss detail line for REBUILDs,
-  // because those are the cases that contradict "image was decoded before, why are we paying the
-  // cost again?"; FIRST and NEW_SCALE are expected and would only add noise to the log.
-  auto missReason = RecordCacheMiss(uniqueKey.domainID(), newScale, args.mipmapped);
-  if (missReason == CacheMissReason::Rebuild) {
-    LOGI("[CacheProbe] rebuild domain=%u scale=%.3f mipmapped=%d", uniqueKey.domainID(), newScale,
-         args.mipmapped ? 1 : 0);
   }
   auto newArgs = args;
   newArgs.backingFit = BackingFit::Exact;

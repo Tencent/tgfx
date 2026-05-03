@@ -33,10 +33,6 @@ class GPUBufferUploadTask : public ResourceTask {
   GPUBufferUploadTask(std::shared_ptr<ResourceProxy> proxy, BufferType bufferType,
                       std::unique_ptr<DataSource<Data>> source);
 
-  ResourceTaskType type() const override {
-    return ResourceTaskType::GPUBuffer;
-  }
-
  protected:
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
