@@ -34,8 +34,9 @@ std::shared_ptr<Image> RasterizedImage::makeRasterized() const {
 
 std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& args) const {
   auto proxyProvider = args.context->proxyProvider();
-  // If the image is mipmapped, we always cache the texture at the original scale.
-  auto newScale = args.mipmapped ? 1.0f : source->getRasterizedScale(args.drawScale);
+  // If the source has mipmaps, cache the texture at the original scale to stay consistent with the
+  // mipmap branch in getTextureKey().
+  auto newScale = source->hasMipmaps() ? 1.0f : source->getRasterizedScale(args.drawScale);
   auto textureKey = getTextureKey(newScale);
   auto textureProxy = proxyProvider->findOrWrapTextureProxy(textureKey);
   if (textureProxy != nullptr) {
@@ -44,6 +45,12 @@ std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& ar
   auto newArgs = args;
   newArgs.backingFit = BackingFit::Exact;
   newArgs.drawScale = newScale;
+  if (hasMipmaps()) {
+    // The cache key carries a MipmapFlag whenever the source has mipmaps, so upgrade the proxy
+    // request to match. Otherwise a later mipmapped draw could reuse a non-mipmapped proxy cached
+    // under the same key.
+    newArgs.mipmapped = true;
+  }
   textureProxy = source->lockTextureProxy(newArgs);
   if (textureProxy == nullptr) {
     return nullptr;

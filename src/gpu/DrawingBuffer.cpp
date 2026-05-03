@@ -17,17 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingBuffer.h"
-#include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/tasks/ResourceTask.h"
 #include "inspect/InspectorMark.h"
-#include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
-
 // We set the maxBlockSize to 2MB because allocating blocks that are too large can cause memory
 // fragmentation and slow down allocation. It may also increase the application's memory usage due
 // to pre-allocation optimizations on some platforms.
@@ -40,7 +36,6 @@ DrawingBuffer::DrawingBuffer(Context* context)
 std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   DEBUG_ASSERT(!empty());
   TASK_MARK(tgfx::inspect::OpTaskType::Flush);
-
   {
     TASK_MARK(tgfx::inspect::OpTaskType::ResourceTask);
     for (auto& task : resourceTasks) {
@@ -48,12 +43,10 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
       task = nullptr;
     }
   }
-
   for (auto& task : atlasTasks) {
     task->upload(context);
     task = nullptr;
   }
-
   auto commandEncoder = context->gpu()->createCommandEncoder();
   {
     TASK_MARK(tgfx::inspect::OpTaskType::RenderTask);
@@ -62,13 +55,11 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
       task = nullptr;
     }
   }
-
   vertexMaxValueTracker.addValue(vertexAllocator.size());
   instanceMaxValueTracker.addValue(instanceAllocator.size());
   drawingMaxValueTracker.addValue(drawingAllocator.size());
   auto commandBuffer = commandEncoder->finish();
   context->globalCache()->resetUniformBuffer();
-
   return commandBuffer;
 }
 
