@@ -55,16 +55,14 @@ RRect SVGRect::resolve(const SVGLengthContext& lengthContext) const {
   //        then the used value of ry is half of the used height.
   //     3. Otherwise, the used values of rx and ry are the absolute values computed previously.
 
-  RRect rrect;
-  rrect.setRectXY(rect, std::min(rx, rect.width() / 2), std::min(ry, rect.height() / 2));
-  return rrect;
+  return RRect::MakeRectXY(rect, std::min(rx, rect.width() / 2), std::min(ry, rect.height() / 2));
 }
 
 void SVGRect::onDrawFill(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
                          PathFillType) const {
   auto rrect = this->resolve(lengthContext);
-  auto offset = Point::Make(rrect.rect.left, rrect.rect.top);
-  rrect.rect = rrect.rect.makeOffset(-offset.x, -offset.y);
+  auto offset = Point::Make(rrect.rect().left, rrect.rect().top);
+  rrect.offset(-offset.x, -offset.y);
   canvas->save();
   canvas->translate(offset.x, offset.y);
   canvas->drawRRect(rrect, paint);
@@ -79,8 +77,8 @@ void SVGRect::onDrawStroke(Canvas* canvas, const SVGLengthContext& lengthContext
   }
 
   auto rrect = this->resolve(lengthContext);
-  auto offset = Point::Make(rrect.rect.left, rrect.rect.top);
-  rrect.rect = rrect.rect.makeOffset(-offset.x, -offset.y);
+  auto offset = Point::Make(rrect.rect().left, rrect.rect().top);
+  rrect.offset(-offset.x, -offset.y);
   Path path;
   path.addRRect(rrect);
   if (pathEffect->filterPath(&path)) {

@@ -25,6 +25,7 @@
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Shape.h"
@@ -740,9 +741,7 @@ TGFX_TEST(PathShapeTest, AdaptiveDashEffect) {
 
   // Test large path dash effect - should apply dash correctly, not draw as continuous line
   Path largePath = {};
-  RRect rRect;
-  rRect.rect = Rect::MakeXYWH(10, 10, 432, 400);
-  rRect.radii = Point(6, 6);
+  auto rRect = RRect::MakeRectXY(Rect::MakeXYWH(10, 10, 432, 400), 6, 6);
   largePath.addRRect(rRect);
   float largeDashList[] = {2.f, 2.f};
   auto largeEffect = PathEffect::MakeDash(largeDashList, 2, 0.0f, true);
@@ -1157,6 +1156,41 @@ TGFX_TEST(PathShapeTest, RoundRectRadii) {
   canvas->clear();
   canvas->drawPath(path2, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "PathShapeTest/roundRectRadiiStroke"));
+}
+
+/**
+ * Verifies that addRRect() -> isRRect() round-trip preserves per-corner radii.
+ */
+TGFX_TEST(PathShapeTest, RRectPathRoundTrip) {
+  auto rect = Rect::MakeWH(200, 120);
+  // Simple RRect round-trip.
+  auto simpleIn = RRect::MakeRectXY(rect, 15, 15);
+  Path simplePath = {};
+  simplePath.addRRect(simpleIn);
+  RRect simpleOut = {};
+  EXPECT_TRUE(simplePath.isRRect(&simpleOut));
+  EXPECT_EQ(simpleOut.type(), RRect::Type::Simple);
+  EXPECT_EQ(simpleOut.radii()[0], simpleIn.radii()[0]);
+
+  // Complex RRect round-trip.
+  auto complexIn = RRect::MakeRectRadii(rect, {{{30, 30}, {10, 10}, {20, 20}, {5, 5}}});
+  Path complexPath = {};
+  complexPath.addRRect(complexIn);
+  RRect complexOut = {};
+  EXPECT_TRUE(complexPath.isRRect(&complexOut));
+  EXPECT_EQ(complexOut.type(), RRect::Type::Complex);
+  for (size_t i = 0; i < 4; ++i) {
+    EXPECT_NEAR(complexOut.radii()[i].x, complexIn.radii()[i].x, 0.01f);
+    EXPECT_NEAR(complexOut.radii()[i].y, complexIn.radii()[i].y, 0.01f);
+  }
+
+  // Oval RRects added via addRRect are classified as ovals in the underlying path, so
+  // isRRect() returns false while isOval() returns true. This is expected behavior.
+  auto ovalIn = RRect::MakeOval(rect);
+  Path ovalPath = {};
+  ovalPath.addRRect(ovalIn);
+  EXPECT_FALSE(ovalPath.isRRect(nullptr));
+  EXPECT_TRUE(ovalPath.isOval(nullptr));
 }
 
 }  // namespace tgfx
