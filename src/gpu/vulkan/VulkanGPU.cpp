@@ -340,7 +340,8 @@ std::shared_ptr<Texture> VulkanGPU::importBackendTexture(const BackendTexture& b
   if (!backendTexture.getVulkanTextureInfo(&vulkanInfo) || vulkanInfo.image == nullptr) {
     return nullptr;
   }
-  return VulkanTexture::MakeFrom(this, vulkanInfo.image, vulkanInfo.format, backendTexture.width(),
+  return VulkanTexture::MakeFrom(this, static_cast<VkImage>(vulkanInfo.image),
+                                 static_cast<VkFormat>(vulkanInfo.format), backendTexture.width(),
                                  backendTexture.height(), usage, adopted);
 }
 
@@ -354,7 +355,8 @@ std::shared_ptr<Texture> VulkanGPU::importBackendRenderTarget(
   if (!isFormatRenderable(format)) {
     return nullptr;
   }
-  return VulkanTexture::MakeFrom(this, vulkanInfo.image, vulkanInfo.format,
+  return VulkanTexture::MakeFrom(this, static_cast<VkImage>(vulkanInfo.image),
+                                 static_cast<VkFormat>(vulkanInfo.format),
                                  backendRenderTarget.width(), backendRenderTarget.height(),
                                  TextureUsage::RENDER_ATTACHMENT, false);
 }
@@ -367,7 +369,8 @@ std::shared_ptr<Semaphore> VulkanGPU::importBackendSemaphore(const BackendSemaph
   if (!semaphore.getVulkanSync(&vulkanInfo) || vulkanInfo.semaphore == nullptr) {
     return nullptr;
   }
-  return VulkanSemaphore::MakeFrom(this, vulkanInfo.semaphore, vulkanInfo.value);
+  return VulkanSemaphore::MakeFrom(this, static_cast<VkSemaphore>(vulkanInfo.semaphore),
+                                   vulkanInfo.value);
 }
 
 BackendSemaphore VulkanGPU::stealBackendSemaphore(std::shared_ptr<Semaphore> semaphore) {
@@ -403,8 +406,55 @@ void VulkanGPU::processUnreferencedResources() {
   }
 }
 
+// Pool capacity constants for per-frame descriptor set allocation.
+// Reference values from industry 2D/3D engines:
+//   Skia Graphite: dynamic pool chain (no fixed cap)
+//   Filament: 4096 sets per frame
+//   bgfx: 2048 sets per frame
+//   Godot 4: 4096 sets per frame
+//   wgpu/Dawn: 8192 sets per frame
+static constexpr uint32_t POOL_MAX_DESCRIPTOR_SETS = 8192;
+static constexpr uint32_t POOL_MAX_UNIFORM_BUFFERS = 16384;
+static constexpr uint32_t POOL_MAX_COMBINED_SAMPLERS = 8192;
+
+VkDescriptorPool VulkanGPU::acquireDescriptorPool() {
+  if (!descriptorPoolCache.empty()) {
+    auto pool = descriptorPoolCache.back();
+    descriptorPoolCache.pop_back();
+    return pool;
+  }
+  VkDescriptorPoolSize poolSizes[] = {
+      {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, POOL_MAX_UNIFORM_BUFFERS},
+      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, POOL_MAX_COMBINED_SAMPLERS},
+  };
+  VkDescriptorPoolCreateInfo poolInfo = {};
+  poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  poolInfo.maxSets = POOL_MAX_DESCRIPTOR_SETS;
+  poolInfo.poolSizeCount = 2;
+  poolInfo.pPoolSizes = poolSizes;
+  VkDescriptorPool pool = VK_NULL_HANDLE;
+  auto result = vkCreateDescriptorPool(vulkanDevice, &poolInfo, nullptr, &pool);
+  if (result != VK_SUCCESS) {
+    LOGE("VulkanGPU::acquireDescriptorPool() vkCreateDescriptorPool failed.");
+    return VK_NULL_HANDLE;
+  }
+  return pool;
+}
+
+void VulkanGPU::releaseDescriptorPool(VkDescriptorPool pool) {
+  if (pool == VK_NULL_HANDLE) {
+    return;
+  }
+  vkResetDescriptorPool(vulkanDevice, pool, 0);
+  descriptorPoolCache.push_back(pool);
+}
+
 void VulkanGPU::releaseAll(bool releaseGPU) {
   samplerCache.clear();
+  for (auto pool : descriptorPoolCache) {
+    vkDestroyDescriptorPool(vulkanDevice, pool, nullptr);
+  }
+  descriptorPoolCache.clear();
   if (releaseGPU) {
     for (auto& resource : resources) {
       resource->onRelease(this);

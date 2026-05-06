@@ -72,9 +72,9 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
       return nullptr;
     }
     VulkanImageInfo vulkanInfo = {};
-    vulkanInfo.image = _images[_currentImageIndex];
-    vulkanInfo.format = _format;
-    vulkanInfo.layout = static_cast<VkImageLayout>(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    vulkanInfo.image = reinterpret_cast<void*>(_images[_currentImageIndex]);
+    vulkanInfo.format = static_cast<uint32_t>(_format);
+    vulkanInfo.layout = static_cast<uint32_t>(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     BackendRenderTarget backendRT(vulkanInfo, _width, _height);
     _renderTarget = RenderTarget::MakeFrom(_context, backendRT, ImageOrigin::TopLeft);
   }

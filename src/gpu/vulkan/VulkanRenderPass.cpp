@@ -87,17 +87,6 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
   uniformBindings.resize(16);
   textureBindings.resize(16);
 
-  VkDescriptorPoolSize poolSizes[] = {
-      {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_UNIFORM_BUFFERS},
-      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_COMBINED_SAMPLERS},
-  };
-  VkDescriptorPoolCreateInfo poolInfo = {};
-  poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  poolInfo.maxSets = MAX_DESCRIPTOR_SETS;
-  poolInfo.poolSizeCount = 2;
-  poolInfo.pPoolSizes = poolSizes;
-  vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool);
-
   std::vector<VkAttachmentDescription> attachments;
   std::vector<VkAttachmentReference> colorRefs;
   std::vector<VkImageView> fbAttachments;
@@ -285,7 +274,7 @@ void VulkanRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> tex
 }
 
 void VulkanRenderPass::bindDescriptorSetIfDirty() {
-  if (!descriptorDirty || !currentPipeline || descriptorPool == VK_NULL_HANDLE) {
+  if (!descriptorDirty || !currentPipeline) {
     return;
   }
   descriptorDirty = false;
@@ -296,9 +285,14 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
     return;
   }
 
+  auto pool = encoder->vulkanDescriptorPool();
+  if (pool == VK_NULL_HANDLE) {
+    return;
+  }
+
   VkDescriptorSetAllocateInfo allocInfo = {};
   allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  allocInfo.descriptorPool = descriptorPool;
+  allocInfo.descriptorPool = pool;
   allocInfo.descriptorSetCount = 1;
   allocInfo.pSetLayouts = &setLayout;
 
@@ -413,10 +407,9 @@ void VulkanRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCo
 
 void VulkanRenderPass::onEnd() {
   vkCmdEndRenderPass(commandBuffer);
-  encoder->addDeferredDestroy(renderPass, framebuffer, descriptorPool);
+  encoder->addDeferredDestroy(renderPass, framebuffer);
   renderPass = VK_NULL_HANDLE;
   framebuffer = VK_NULL_HANDLE;
-  descriptorPool = VK_NULL_HANDLE;
 }
 
 }  // namespace tgfx

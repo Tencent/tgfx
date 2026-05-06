@@ -81,7 +81,9 @@ std::shared_ptr<VulkanCommandEncoder> VulkanCommandEncoder::Make(VulkanGPU* gpu)
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   vkBeginCommandBuffer(cmdBuffer, &beginInfo);
 
-  return gpu->makeResource<VulkanCommandEncoder>(gpu, cmdBuffer, pool);
+  auto encoder = gpu->makeResource<VulkanCommandEncoder>(gpu, cmdBuffer, pool);
+  encoder->descriptorPool = gpu->acquireDescriptorPool();
+  return encoder;
 }
 
 VulkanCommandEncoder::VulkanCommandEncoder(VulkanGPU* gpu, VkCommandBuffer commandBuffer,
@@ -92,9 +94,6 @@ VulkanCommandEncoder::VulkanCommandEncoder(VulkanGPU* gpu, VkCommandBuffer comma
 void VulkanCommandEncoder::onRelease(VulkanGPU* gpu) {
   auto device = gpu->device();
   for (auto& d : deferredDestroys) {
-    if (d.descriptorPool != VK_NULL_HANDLE) {
-      vkDestroyDescriptorPool(device, d.descriptorPool, nullptr);
-    }
     if (d.framebuffer != VK_NULL_HANDLE) {
       vkDestroyFramebuffer(device, d.framebuffer, nullptr);
     }
@@ -103,6 +102,9 @@ void VulkanCommandEncoder::onRelease(VulkanGPU* gpu) {
     }
   }
   deferredDestroys.clear();
+  // Return descriptor pool to GPU for reuse (reset + recycle) instead of destroying it.
+  gpu->releaseDescriptorPool(descriptorPool);
+  descriptorPool = VK_NULL_HANDLE;
   if (commandPool != VK_NULL_HANDLE) {
     vkDestroyCommandPool(device, commandPool, nullptr);
     commandPool = VK_NULL_HANDLE;

@@ -21,6 +21,7 @@
 #include <list>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 #include "core/utils/ReturnQueue.h"
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanCaps.h"
@@ -138,6 +139,10 @@ class VulkanGPU : public GPU {
 
   void releaseAll(bool releaseGPU);
 
+  VkDescriptorPool acquireDescriptorPool();
+
+  void releaseDescriptorPool(VkDescriptorPool pool);
+
  private:
   VulkanGPU();
 
@@ -164,6 +169,7 @@ class VulkanGPU : public GPU {
   std::list<VulkanResource*> resources = {};
   std::shared_ptr<ReturnQueue> returnQueue = ReturnQueue::Make();
   std::unordered_map<uint32_t, std::shared_ptr<Sampler>> samplerCache = {};
+  std::vector<VkDescriptorPool> descriptorPoolCache = {};
 };
 
 }  // namespace tgfx

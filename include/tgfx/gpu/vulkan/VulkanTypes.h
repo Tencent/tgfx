@@ -20,18 +20,6 @@
 
 #include <cstdint>
 
-// When vulkan_core.h has already been included (via VulkanAPI.h in internal files), its include
-// guard VULKAN_CORE_H_ is defined and we skip the lightweight forward declarations below to avoid
-// type conflicts. External consumers or translation units that have not included vulkan_core.h
-// get ABI-compatible typedefs instead.
-#ifndef VULKAN_CORE_H_
-typedef struct VkImage_T* VkImage;
-typedef struct VkSemaphore_T* VkSemaphore;
-typedef uint32_t VkFormat;
-typedef uint32_t VkImageLayout;
-typedef uint32_t VkImageUsageFlags;
-#endif
-
 namespace tgfx {
 
 /**
@@ -41,22 +29,22 @@ struct VulkanTextureInfo {
   /**
    * The VkImage handle.
    */
-  VkImage image = nullptr;
+  void* image = nullptr;
 
   /**
    * The VkFormat of the image (VK_FORMAT_UNDEFINED = 0).
    */
-  VkFormat format = static_cast<VkFormat>(0);
+  uint32_t format = 0;
 
   /**
    * The current VkImageLayout (VK_IMAGE_LAYOUT_UNDEFINED = 0).
    */
-  VkImageLayout layout = static_cast<VkImageLayout>(0);
+  uint32_t layout = 0;
 
   /**
    * The VkImageUsageFlags describing how the image is used.
    */
-  VkImageUsageFlags usage = 0;
+  uint32_t usage = 0;
 };
 
 /**
@@ -66,17 +54,17 @@ struct VulkanImageInfo {
   /**
    * The VkImage handle.
    */
-  VkImage image = nullptr;
+  void* image = nullptr;
 
   /**
    * The VkFormat of the image (VK_FORMAT_UNDEFINED = 0).
    */
-  VkFormat format = static_cast<VkFormat>(0);
+  uint32_t format = 0;
 
   /**
    * The current VkImageLayout (VK_IMAGE_LAYOUT_UNDEFINED = 0).
    */
-  VkImageLayout layout = static_cast<VkImageLayout>(0);
+  uint32_t layout = 0;
 };
 
 /**
@@ -86,7 +74,7 @@ struct VulkanSyncInfo {
   /**
    * The VkSemaphore handle for a timeline semaphore.
    */
-  VkSemaphore semaphore = nullptr;
+  void* semaphore = nullptr;
 
   /**
    * The timeline value to signal or wait on.

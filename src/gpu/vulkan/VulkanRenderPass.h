@@ -71,14 +71,9 @@ class VulkanRenderPass : public RenderPass {
   VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
   VkRenderPass renderPass = VK_NULL_HANDLE;
   VkFramebuffer framebuffer = VK_NULL_HANDLE;
-  VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
   std::shared_ptr<VulkanRenderPipeline> currentPipeline = nullptr;
   std::shared_ptr<GPUBuffer> currentIndexBuffer = nullptr;
   VkIndexType currentIndexType = VK_INDEX_TYPE_UINT16;
-
-  static constexpr uint32_t MAX_DESCRIPTOR_SETS = 1024;
-  static constexpr uint32_t MAX_UNIFORM_BUFFERS = 2048;
-  static constexpr uint32_t MAX_COMBINED_SAMPLERS = 2048;
 
   struct UniformBinding {
     VkBuffer buffer = VK_NULL_HANDLE;

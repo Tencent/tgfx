@@ -169,9 +169,9 @@ BackendTexture VulkanTexture::getBackendTexture() const {
     return {};
   }
   VulkanTextureInfo vulkanInfo;
-  vulkanInfo.image = image;
-  vulkanInfo.format = static_cast<VkFormat>(format);
-  vulkanInfo.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  vulkanInfo.image = reinterpret_cast<void*>(image);
+  vulkanInfo.format = static_cast<uint32_t>(format);
+  vulkanInfo.layout = static_cast<uint32_t>(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   return BackendTexture(vulkanInfo, descriptor.width, descriptor.height);
 }
 
@@ -180,9 +180,9 @@ BackendRenderTarget VulkanTexture::getBackendRenderTarget() const {
     return {};
   }
   VulkanImageInfo vulkanInfo;
-  vulkanInfo.image = image;
-  vulkanInfo.format = static_cast<VkFormat>(format);
-  vulkanInfo.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  vulkanInfo.image = reinterpret_cast<void*>(image);
+  vulkanInfo.format = static_cast<uint32_t>(format);
+  vulkanInfo.layout = static_cast<uint32_t>(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
   return BackendRenderTarget(vulkanInfo, descriptor.width, descriptor.height);
 }
 

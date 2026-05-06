@@ -22,32 +22,31 @@
 
 namespace tgfx {
 
-// VkFormat values (from Vulkan spec). These are duplicated here so that Backend.cpp can perform
-// format conversion without depending on vulkan.h or volk.h.
-#define TGFX_VK_FORMAT_UNDEFINED 0
-#define TGFX_VK_FORMAT_R8_UNORM 9
-#define TGFX_VK_FORMAT_R8G8_UNORM 16
-#define TGFX_VK_FORMAT_R8G8B8A8_UNORM 37
-#define TGFX_VK_FORMAT_R8G8B8A8_SRGB 43
-#define TGFX_VK_FORMAT_B8G8R8A8_UNORM 44
-#define TGFX_VK_FORMAT_B8G8R8A8_SRGB 50
-#define TGFX_VK_FORMAT_D24_UNORM_S8_UINT 129
-#define TGFX_VK_FORMAT_D32_SFLOAT_S8_UINT 130
+// VkFormat values from the Vulkan spec. Duplicated here so that Backend.cpp can perform format
+// conversion without depending on vulkan.h or volk.h.
+static constexpr unsigned VK_FORMAT_R8_UNORM_VALUE = 9;
+static constexpr unsigned VK_FORMAT_R8G8_UNORM_VALUE = 16;
+static constexpr unsigned VK_FORMAT_R8G8B8A8_UNORM_VALUE = 37;
+static constexpr unsigned VK_FORMAT_R8G8B8A8_SRGB_VALUE = 43;
+static constexpr unsigned VK_FORMAT_B8G8R8A8_UNORM_VALUE = 44;
+static constexpr unsigned VK_FORMAT_B8G8R8A8_SRGB_VALUE = 50;
+static constexpr unsigned VK_FORMAT_D24_UNORM_S8_UINT_VALUE = 129;
+static constexpr unsigned VK_FORMAT_D32_SFLOAT_S8_UINT_VALUE = 130;
 
 inline PixelFormat VulkanFormatToPixelFormat(unsigned vulkanFormat) {
   switch (vulkanFormat) {
-    case TGFX_VK_FORMAT_R8_UNORM:
+    case VK_FORMAT_R8_UNORM_VALUE:
       return PixelFormat::ALPHA_8;
-    case TGFX_VK_FORMAT_R8G8_UNORM:
+    case VK_FORMAT_R8G8_UNORM_VALUE:
       return PixelFormat::RG_88;
-    case TGFX_VK_FORMAT_B8G8R8A8_UNORM:
-    case TGFX_VK_FORMAT_B8G8R8A8_SRGB:
+    case VK_FORMAT_B8G8R8A8_UNORM_VALUE:
+    case VK_FORMAT_B8G8R8A8_SRGB_VALUE:
       return PixelFormat::BGRA_8888;
-    case TGFX_VK_FORMAT_D24_UNORM_S8_UINT:
-    case TGFX_VK_FORMAT_D32_SFLOAT_S8_UINT:
+    case VK_FORMAT_D24_UNORM_S8_UINT_VALUE:
+    case VK_FORMAT_D32_SFLOAT_S8_UINT_VALUE:
       return PixelFormat::DEPTH24_STENCIL8;
-    case TGFX_VK_FORMAT_R8G8B8A8_UNORM:
-    case TGFX_VK_FORMAT_R8G8B8A8_SRGB:
+    case VK_FORMAT_R8G8B8A8_UNORM_VALUE:
+    case VK_FORMAT_R8G8B8A8_SRGB_VALUE:
     default:
       return PixelFormat::RGBA_8888;
   }

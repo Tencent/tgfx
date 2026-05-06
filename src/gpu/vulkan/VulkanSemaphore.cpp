@@ -64,7 +64,7 @@ BackendSemaphore VulkanSemaphore::getBackendSemaphore() const {
     return {};
   }
   VulkanSyncInfo vulkanInfo = {};
-  vulkanInfo.semaphore = _semaphore;
+  vulkanInfo.semaphore = reinterpret_cast<void*>(_semaphore);
   vulkanInfo.value = _value;
   return BackendSemaphore(vulkanInfo);
 }

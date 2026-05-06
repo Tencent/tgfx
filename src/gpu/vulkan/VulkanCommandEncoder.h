@@ -38,8 +38,12 @@ class VulkanCommandEncoder : public CommandEncoder, public VulkanResource {
     return commandBuffer;
   }
 
-  void addDeferredDestroy(VkRenderPass rp, VkFramebuffer fb, VkDescriptorPool dp) {
-    deferredDestroys.push_back({rp, fb, dp});
+  VkDescriptorPool vulkanDescriptorPool() const {
+    return descriptorPool;
+  }
+
+  void addDeferredDestroy(VkRenderPass rp, VkFramebuffer fb) {
+    deferredDestroys.push_back({rp, fb});
   }
 
   GPU* gpu() const override;
@@ -66,11 +70,11 @@ class VulkanCommandEncoder : public CommandEncoder, public VulkanResource {
   VulkanGPU* _gpu = nullptr;
   VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
   VkCommandPool commandPool = VK_NULL_HANDLE;
+  VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 
   struct DeferredDestroy {
     VkRenderPass renderPass = VK_NULL_HANDLE;
     VkFramebuffer framebuffer = VK_NULL_HANDLE;
-    VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
   };
   std::vector<DeferredDestroy> deferredDestroys;
 
