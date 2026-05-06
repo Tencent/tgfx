@@ -340,9 +340,10 @@ class DisplayList {
 
   void recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks);
 
-  std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
-                                           std::vector<Rect>* skippedRects,
-                                           const std::vector<Rect>& dirtyRegions);
+  std::vector<DrawTask> collectScreenTasks(const Surface* surface,
+                                           const std::vector<Rect>& dirtyRegions,
+                                           std::vector<DrawTask>* tileTasks,
+                                           std::vector<Rect>* skippedRects);
 
   std::vector<std::pair<float, TileCache*>> getSortedTileCaches() const;
 
@@ -360,25 +361,12 @@ class DisplayList {
   std::vector<DrawTask> getThrottleFallbackTasks(
       int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const;
 
-  // Protects fallback-worthy tiles from being harvested by getFreeTiles.
-  //
-  // During post-zoom throttling, getFreeTiles() recycles tiles from non-current-scale caches to
-  // use as blank canvases for dirty tiles. The recycling order (farthest-scale first, then
-  // farthest-from-viewport-center within each scale) happens to pick exactly the tiles that
-  // would otherwise serve as fallback coverage for the current viewport's edges, causing blank
-  // rectangles to appear along viewport boundaries a few frames after the zoom stops.
-  //
-  // To avoid that, protection is applied only to the single closest non-current scale -- that
-  // cache yields the highest-quality fallback and is the one getFallbackDrawTasks /
-  // getThrottleFallbackTasks prefer. Its tiles that intersect the current viewport (projected
-  // via scale ratio) are deferred; other scales keep the legacy harvesting behavior so the
-  // free-tile pool stays healthy. If protection still leaves fewer free tiles than requested,
-  // getFreeTiles drains the deferred list so rendering never stalls -- blank tiles are worse
-  // than losing a bit of fallback coverage on the nearest scale.
+  // Recycles tiles from non-current-scale caches to use as blank canvases for dirty tiles.
+  // Tiles are harvested farthest-scale-first, then farthest-from-viewport-center within each
+  // scale, so the most stale tiles are reused first.
   std::vector<std::shared_ptr<Tile>> getFreeTiles(
       const Surface* renderSurface, size_t tileCount,
-      const std::vector<std::pair<float, TileCache*>>& sortedCaches,
-      const Rect& viewportAtCurrentScale);
+      const std::vector<std::pair<float, TileCache*>>& sortedCaches);
 
   std::vector<std::shared_ptr<Tile>> createContinuousTiles(const Surface* renderSurface,
                                                            int requestCountX, int requestCountY);
