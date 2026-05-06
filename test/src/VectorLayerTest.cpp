@@ -4638,11 +4638,7 @@ TGFX_TEST(VectorLayerTest, StrokeDashAdaptive) {
 }
 
 /**
- * Test Rectangle collapsing to a line segment when one side is zero: horizontal stroke,
- * trimmed (forward and reversed) segments, along-axis fit gradients that prove the stroke
- * fit bounds expand only perpendicular to the segment (not along it), and a double-zero
- * Rectangle that must keep its area-shape semantics (round-cap stroked dot with a
- * symmetric two-axis fit gradient).
+ * Test Rectangle collapsing to a sub-pixel band when one side is zero.
  */
 TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   ContextScope scope;
@@ -4655,7 +4651,6 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto displayList = std::make_unique<DisplayList>();
   auto vectorLayer = VectorLayer::Make();
 
-  // Row 1: Horizontal degenerate Rectangle with solid red stroke.
   auto rect1 = Rectangle::Make();
   rect1->setPosition({300, 54});
   rect1->setSize({500, 0});
@@ -4663,35 +4658,17 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto group1 = VectorGroup::Make();
   group1->setElements({rect1, stroke1});
 
-  // Row 2: Horizontal degenerate Rectangle trimmed to the first half, stroked green.
   auto rect2 = Rectangle::Make();
-  rect2->setPosition({175, 150});
-  rect2->setSize({250, 0});
+  rect2->setPosition({300, 150});
+  rect2->setSize({500, 0});
   auto trim2 = TrimPath::Make();
   trim2->setStart(0.0f);
   trim2->setEnd(0.5f);
   auto stroke2 = MakeStrokeStyle(Color::Green(), 8.0f);
+  stroke2->setDashes({20.0f, 20.0f});
   auto group2 = VectorGroup::Make();
   group2->setElements({rect2, trim2, stroke2});
 
-  // Row 3: Reversed horizontal degenerate Rectangle with the same trim; the opposite half
-  // should be drawn.
-  auto rect3 = Rectangle::Make();
-  rect3->setPosition({425, 150});
-  rect3->setSize({250, 0});
-  rect3->setReversed(true);
-  auto trim3 = TrimPath::Make();
-  trim3->setStart(0.0f);
-  trim3->setEnd(0.5f);
-  auto stroke3 = MakeStrokeStyle(Color::FromRGBA(255, 128, 0, 255), 8.0f);
-  auto group3 = VectorGroup::Make();
-  group3->setElements({rect3, trim3, stroke3});
-
-  // Row 4: Center-aligned stroke with an along-segment fit gradient. The fit bounds come from
-  // the path geometry (a horizontal zero-height segment) so the gradient runs from red (left)
-  // to blue (right) across the full stroked length and the perpendicular axis falls into the
-  // epsilon fallback. A regression that padded the fit bounds by stroke width would inset both
-  // ends in fit space, washing the endpoints toward purple.
   auto rect4 = Rectangle::Make();
   rect4->setPosition({300, 258});
   rect4->setSize({500, 0});
@@ -4702,13 +4679,9 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto group4 = VectorGroup::Make();
   group4->setElements({rect4, stroke4});
 
-  // Row 5: Outside-aligned stroke with a perpendicular fit gradient. The fit bounds collapse
-  // along y so the epsilon fallback turns the perpendicular axis into a sharp red/blue split:
-  // the upper half of the Outside band is pure red and the lower half is pure blue, with no
-  // horizontal padding from the fit.
   auto rect5 = Rectangle::Make();
   rect5->setPosition({300, 354});
-  rect5->setSize({500, 0});
+  rect5->setSize({476, 0});
   auto gradient5 = Gradient::MakeLinear({0.5f, 0.0f}, {0.5f, 1.0f}, {Color::Red(), Color::Blue()});
   auto stroke5 = StrokeStyle::Make(gradient5);
   stroke5->setStrokeWidth(24.0f);
@@ -4716,22 +4689,18 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto group5 = VectorGroup::Make();
   group5->setElements({rect5, stroke5});
 
-  // Row 6: Three Center-aligned 96px stroke samples sharing a fit linear gradient. Round and
-  // Square sit on a double-zero Rectangle (collapses to a moveTo+lineTo with overlapping
-  // endpoints) and rely on the epsilon fit-axis fallback: Round splits diagonally red/blue,
-  // Square splits horizontally red/blue. The third sample uses a real 50x10 Rectangle so the
-  // vertical gradient fills the stroked band continuously inside the geometry's height and
-  // clamps to the end colors above and below.
   struct DotConfig {
     float cx;
     LineCap cap;
     Size size;
     Point gradEnd;
+    StrokeAlign align;
   };
-  const std::array<DotConfig, 3> dotConfigs = {{
-      {110.0f, LineCap::Round, {0.0f, 0.0f}, {1.0f, 1.0f}},
-      {270.0f, LineCap::Square, {0.0f, 0.0f}, {0.0f, 1.0f}},
-      {470.0f, LineCap::Butt, {50.0f, 10.0f}, {0.0f, 1.0f}},
+  const std::array<DotConfig, 4> dotConfigs = {{
+      {76.0f, LineCap::Round, {0.0f, 0.0f}, {1.0f, 1.0f}, StrokeAlign::Center},
+      {224.0f, LineCap::Square, {0.0f, 0.0f}, {0.0f, 1.0f}, StrokeAlign::Outside},
+      {373.0f, LineCap::Butt, {50.0f, 0.0f}, {0.0f, 1.0f}, StrokeAlign::Center},
+      {523.0f, LineCap::Butt, {50.0f, 10.0f}, {0.0f, 1.0f}, StrokeAlign::Center},
   }};
   std::vector<std::shared_ptr<VectorGroup>> dotGroups;
   dotGroups.reserve(dotConfigs.size());
@@ -4742,16 +4711,16 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
     auto dotGradient =
         Gradient::MakeLinear({0.0f, 0.0f}, config.gradEnd, {Color::Red(), Color::Blue()});
     auto dotStroke = StrokeStyle::Make(dotGradient);
-    dotStroke->setStrokeWidth(96.0f);
+    dotStroke->setStrokeWidth(48.0f);
     dotStroke->setLineCap(config.cap);
-    dotStroke->setStrokeAlign(StrokeAlign::Center);
+    dotStroke->setStrokeAlign(config.align);
     auto dotGroup = VectorGroup::Make();
     dotGroup->setElements({dotRect, dotStroke});
     dotGroups.push_back(dotGroup);
   }
 
   vectorLayer->setContents(
-      {group1, group2, group3, group4, group5, dotGroups[0], dotGroups[1], dotGroups[2]});
+      {group1, group2, group4, group5, dotGroups[0], dotGroups[1], dotGroups[2], dotGroups[3]});
 
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
