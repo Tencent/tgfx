@@ -99,8 +99,8 @@ void GLRenderPipeline::setTexture(GLGPU* gpu, unsigned binding, GLTexture* textu
   if (result == textureUnits.end()) {
     // The GL driver may have optimized this sampler away when the compiled program does not
     // actually read it (getUniformLocation returns -1 for dead samplers, see the loop in
-    // onInit()). The CPU side still tries to bind every sampler declared in the pipeline
-    // descriptor, so silently skip bindings we never registered.
+    // setPipelineDescriptor()). The CPU side still tries to bind every sampler declared in the
+    // pipeline descriptor, so silently skip bindings we never registered.
     return;
   }
   auto state = gpu->state();
