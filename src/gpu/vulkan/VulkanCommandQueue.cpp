@@ -24,7 +24,6 @@
 #include "VulkanTexture.h"
 #include "VulkanUtil.h"
 #include "core/utils/Log.h"
-#include "vk_mem_alloc.h"
 
 namespace tgfx {
 
@@ -32,6 +31,7 @@ VulkanCommandQueue::VulkanCommandQueue(VulkanGPU* gpu) : gpu(gpu) {
 }
 
 VulkanCommandQueue::~VulkanCommandQueue() {
+  cleanupPendingUploads();
 }
 
 void VulkanCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset,
@@ -53,7 +53,6 @@ void VulkanCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Re
     return;
   }
   auto vulkanTexture = std::static_pointer_cast<VulkanTexture>(texture);
-  auto device = gpu->device();
 
   auto width = static_cast<uint32_t>(rect.width());
   auto height = static_cast<uint32_t>(rect.height());
@@ -61,6 +60,8 @@ void VulkanCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Re
   size_t tightRowBytes = width * bytesPerPixel;
   size_t stagingSize = tightRowBytes * height;
 
+  // Allocate a staging buffer and snapshot the pixel data immediately. The actual GPU copy is
+  // deferred until submit(), following the WebGPU-style "snapshot now, execute later" semantics.
   VkBufferCreateInfo bufferInfo = {};
   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferInfo.size = stagingSize;
@@ -81,6 +82,7 @@ void VulkanCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Re
     return;
   }
 
+  // Snapshot pixel data into the staging buffer (CPU-only operation).
   auto srcRowBytes = rowBytes > 0 ? rowBytes : tightRowBytes;
   auto dst = static_cast<uint8_t*>(stagingAllocInfo.pMappedData);
   auto src = static_cast<const uint8_t*>(pixels);
@@ -88,41 +90,8 @@ void VulkanCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Re
     memcpy(dst + row * tightRowBytes, src + row * srcRowBytes, tightRowBytes);
   }
 
-  VkCommandPoolCreateInfo poolInfo = {};
-  poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-  poolInfo.queueFamilyIndex = gpu->graphicsQueueIndex();
-
-  VkCommandPool cmdPool = VK_NULL_HANDLE;
-  vkCreateCommandPool(device, &poolInfo, nullptr, &cmdPool);
-
-  VkCommandBufferAllocateInfo cmdAllocInfo = {};
-  cmdAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cmdAllocInfo.commandPool = cmdPool;
-  cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  cmdAllocInfo.commandBufferCount = 1;
-
-  VkCommandBuffer cmd = VK_NULL_HANDLE;
-  vkAllocateCommandBuffers(device, &cmdAllocInfo, &cmd);
-
-  VkCommandBufferBeginInfo beginInfo = {};
-  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  vkBeginCommandBuffer(cmd, &beginInfo);
-
-  VkImageMemoryBarrier barrier = {};
-  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  barrier.oldLayout = vulkanTexture->currentLayout();
-  barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = vulkanTexture->vulkanImage();
-  barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-  barrier.srcAccessMask = 0;
-  barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
-                       nullptr, 0, nullptr, 1, &barrier);
-
+  // Record the pending upload. The GPU copy command will be recorded into the command buffer
+  // at submit() time, batched with all other pending uploads using barrier coalescing.
   VkBufferImageCopy region = {};
   region.bufferOffset = 0;
   region.bufferRowLength = 0;
@@ -131,36 +100,71 @@ void VulkanCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Re
   region.imageOffset = {static_cast<int32_t>(rect.x()), static_cast<int32_t>(rect.y()), 0};
   region.imageExtent = {width, height, 1};
 
-  vkCmdCopyBufferToImage(cmd, stagingBuffer, vulkanTexture->vulkanImage(),
-                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+  pendingUploads.push_back({stagingBuffer, stagingAlloc, vulkanTexture, region});
+}
 
-  barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-  barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-  barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-  barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                          VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-  // Ensure the transfer write is visible to subsequent fragment shader reads and color attachment
-  // operations. This runs in an isolated command buffer with vkQueueWaitIdle, so the texture is
-  // ready for sampling by the time the next command buffer is submitted.
+void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
+  if (pendingUploads.empty()) {
+    return;
+  }
+
+  // Barrier coalescing: transition all target images to TRANSFER_DST in a single barrier call.
+  // This minimizes GPU pipeline stalls compared to per-upload individual barriers.
+  std::vector<VkImageMemoryBarrier> preCopyBarriers;
+  preCopyBarriers.reserve(pendingUploads.size());
+  for (auto& upload : pendingUploads) {
+    VkImageMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = upload.texture->currentLayout();
+    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = upload.texture->vulkanImage();
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    preCopyBarriers.push_back(barrier);
+  }
+  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                       VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
+                       static_cast<uint32_t>(preCopyBarriers.size()), preCopyBarriers.data());
+
+  // Record all buffer-to-image copy commands.
+  for (auto& upload : pendingUploads) {
+    vkCmdCopyBufferToImage(commandBuffer, upload.stagingBuffer, upload.texture->vulkanImage(),
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &upload.region);
+  }
+
+  // Barrier coalescing: transition all images from TRANSFER_DST to GENERAL in a single call.
+  // This ensures the copy results are visible to subsequent fragment shader reads.
+  std::vector<VkImageMemoryBarrier> postCopyBarriers;
+  postCopyBarriers.reserve(pendingUploads.size());
+  for (auto& upload : pendingUploads) {
+    VkImageMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = upload.texture->vulkanImage();
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    postCopyBarriers.push_back(barrier);
+    upload.texture->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
+  }
   vkCmdPipelineBarrier(
-      cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+      commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
-      nullptr, 0, nullptr, 1, &barrier);
+      nullptr, 0, nullptr, static_cast<uint32_t>(postCopyBarriers.size()), postCopyBarriers.data());
+}
 
-  vkEndCommandBuffer(cmd);
-
-  VkSubmitInfo submitInfo = {};
-  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &cmd;
-
-  vkQueueSubmit(gpu->graphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(gpu->graphicsQueue());
-
-  vulkanTexture->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
-
-  vkDestroyCommandPool(device, cmdPool, nullptr);
-  vmaDestroyBuffer(gpu->allocator(), stagingBuffer, stagingAlloc);
+void VulkanCommandQueue::cleanupPendingUploads() {
+  for (auto& upload : pendingUploads) {
+    vmaDestroyBuffer(gpu->allocator(), upload.stagingBuffer, upload.stagingAlloc);
+  }
+  pendingUploads.clear();
 }
 
 void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
@@ -173,13 +177,52 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
     return;
   }
 
+  // If there are pending texture uploads, we need to prepend them to the submission. Since the
+  // render command buffer is already recorded and ended, we create a separate upload command buffer
+  // and submit both in order. The Vulkan spec guarantees that command buffers within a single
+  // vkQueueSubmit execute in array order.
+  VkCommandBuffer uploadCmd = VK_NULL_HANDLE;
+  VkCommandPool uploadPool = VK_NULL_HANDLE;
+  if (!pendingUploads.empty()) {
+    auto transferPool = gpu->getTransferCommandPool();
+    if (transferPool != VK_NULL_HANDLE) {
+      VkCommandBufferAllocateInfo cmdAllocInfo = {};
+      cmdAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+      cmdAllocInfo.commandPool = transferPool;
+      cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+      cmdAllocInfo.commandBufferCount = 1;
+      auto result = vkAllocateCommandBuffers(gpu->device(), &cmdAllocInfo, &uploadCmd);
+      if (result == VK_SUCCESS) {
+        VkCommandBufferBeginInfo beginInfo = {};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        vkBeginCommandBuffer(uploadCmd, &beginInfo);
+        flushPendingUploads(uploadCmd);
+        vkEndCommandBuffer(uploadCmd);
+        uploadPool = transferPool;
+      }
+    }
+  }
+
+  // Submit upload + render command buffers in a single vkQueueSubmit call. Vulkan guarantees
+  // command buffers execute in array order within the same submit, so uploads complete before
+  // render passes begin.
+  std::vector<VkCommandBuffer> cmdBuffers;
+  if (uploadCmd != VK_NULL_HANDLE) {
+    cmdBuffers.push_back(uploadCmd);
+  }
+  cmdBuffers.push_back(cmd);
+
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &cmd;
+  submitInfo.commandBufferCount = static_cast<uint32_t>(cmdBuffers.size());
+  submitInfo.pCommandBuffers = cmdBuffers.data();
 
   vkQueueSubmit(gpu->graphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
   vkQueueWaitIdle(gpu->graphicsQueue());
+
+  // Cleanup: staging buffers can now be safely destroyed since GPU execution is complete.
+  cleanupPendingUploads();
 
   auto pool = vulkanCmdBuffer->vulkanCommandPool();
   if (pool != VK_NULL_HANDLE) {
@@ -203,6 +246,8 @@ void VulkanCommandQueue::waitUntilCompleted() {
   if (device != VK_NULL_HANDLE) {
     vkDeviceWaitIdle(device);
   }
+  // Flush any pending uploads that haven't been submitted yet.
+  cleanupPendingUploads();
 }
 
 }  // namespace tgfx

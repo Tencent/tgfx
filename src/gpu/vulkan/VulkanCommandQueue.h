@@ -19,15 +19,23 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 #include "gpu/vulkan/VulkanAPI.h"
 #include "tgfx/gpu/CommandQueue.h"
+#include "vk_mem_alloc.h"
 
 namespace tgfx {
 
 class VulkanGPU;
+class VulkanTexture;
 
 /**
  * Vulkan command queue implementation.
+ *
+ * writeTexture() follows deferred semantics: pixel data is immediately snapshot into a staging
+ * buffer, but the GPU copy is deferred until the next submit(). This avoids per-upload
+ * synchronization overhead and allows all uploads to be batched into a single command buffer
+ * submission alongside render commands.
  */
 class VulkanCommandQueue : public CommandQueue {
  public:
@@ -50,7 +58,18 @@ class VulkanCommandQueue : public CommandQueue {
   void waitUntilCompleted() override;
 
  private:
+  struct PendingUpload {
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VmaAllocation stagingAlloc = VK_NULL_HANDLE;
+    std::shared_ptr<VulkanTexture> texture;
+    VkBufferImageCopy region = {};
+  };
+
+  void flushPendingUploads(VkCommandBuffer commandBuffer);
+  void cleanupPendingUploads();
+
   VulkanGPU* gpu = nullptr;
+  std::vector<PendingUpload> pendingUploads;
 };
 
 }  // namespace tgfx
