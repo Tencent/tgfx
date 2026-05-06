@@ -872,7 +872,7 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
   // Reverse iterate through sorted caches to get the farest tiles first.
-  for (size_t i = 0, j = sortedCaches.size(); i < j && tiles.size() < tileCount;) {
+  for (size_t i = 0, j = sortedCaches.size(); i < j;) {
     auto& [scaleS, tileCacheS] = sortedCaches.at(i);
     auto& [scaleL, tileCacheL] = sortedCaches.at(j - 1);
     auto scale = scaleS;
@@ -895,6 +895,9 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
       if (tiles.size() >= tileCount) {
         break;
       }
+    }
+    if (tiles.size() >= tileCount) {
+      break;
     }
   }
   if (tiles.size() < tileCount) {
