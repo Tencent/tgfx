@@ -114,9 +114,11 @@ void VulkanBuffer::unmap() {
   if (mappedPointer == nullptr) {
     return;
   }
-  // Flush the written range to ensure CPU writes are visible to the GPU. This is required for
-  // non-coherent memory (VMA_MEMORY_USAGE_CPU_TO_GPU may allocate from non-coherent heap).
-  vmaFlushAllocation(vmaAllocator, allocation, mappedOffset, mappedSize);
+  // Only flush for CPU-to-GPU buffers (vertex, index, uniform). Readback buffers (GPU-to-CPU)
+  // do not need flushing since the CPU is the reader, not the writer.
+  if (!(_usage & GPUBufferUsage::READBACK)) {
+    vmaFlushAllocation(vmaAllocator, allocation, mappedOffset, mappedSize);
+  }
   mappedPointer = nullptr;
   mappedOffset = 0;
   mappedSize = 0;
