@@ -92,21 +92,19 @@ VulkanCommandEncoder::VulkanCommandEncoder(VulkanGPU* gpu, VkCommandBuffer comma
 }
 
 void VulkanCommandEncoder::onRelease(VulkanGPU* gpu) {
-  auto device = gpu->device();
+  // Defer destruction of framebuffers and render passes to the inflight submission's fence signal.
+  // These objects are referenced by the command buffer that was recorded from this encoder, and the
+  // GPU may still be executing that command buffer at this point.
   for (auto& d : deferredDestroys) {
-    if (d.framebuffer != VK_NULL_HANDLE) {
-      vkDestroyFramebuffer(device, d.framebuffer, nullptr);
-    }
-    if (d.renderPass != VK_NULL_HANDLE) {
-      vkDestroyRenderPass(device, d.renderPass, nullptr);
-    }
+    gpu->deferFramebufferDestroy(d.framebuffer);
+    gpu->deferRenderPassDestroy(d.renderPass);
   }
   deferredDestroys.clear();
-  // Return descriptor pool to GPU for reuse (reset + recycle) instead of destroying it.
-  gpu->releaseDescriptorPool(descriptorPool);
+  // Defer descriptor pool release (reset + recycle) until the GPU is done with it.
+  gpu->deferDescriptorPoolRelease(descriptorPool);
   descriptorPool = VK_NULL_HANDLE;
   if (commandPool != VK_NULL_HANDLE) {
-    vkDestroyCommandPool(device, commandPool, nullptr);
+    vkDestroyCommandPool(gpu->device(), commandPool, nullptr);
     commandPool = VK_NULL_HANDLE;
     commandBuffer = VK_NULL_HANDLE;
   }

@@ -85,6 +85,10 @@ class VulkanCommandQueue : public CommandQueue {
     std::chrono::steady_clock::time_point frameTime = {};
     VkCommandPool commandPool = VK_NULL_HANDLE;
     std::vector<PendingUpload> uploads;
+    // Deferred destroys: objects created during encoding that must outlive GPU execution.
+    std::vector<VkFramebuffer> deferredFramebuffers;
+    std::vector<VkRenderPass> deferredRenderPasses;
+    std::vector<VkDescriptorPool> deferredDescriptorPools;
   };
 
   // Maximum number of submissions that may be in-flight simultaneously. Acts as backpressure to

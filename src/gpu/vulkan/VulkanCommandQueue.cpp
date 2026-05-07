@@ -62,7 +62,6 @@ void VulkanCommandQueue::recycleFence(VkFence fence) {
 }
 
 void VulkanCommandQueue::pollCompletedSubmissions() {
-  bool anyCompleted = false;
   while (!inflightSubmissions.empty()) {
     auto& oldest = inflightSubmissions.front();
     if (vkGetFenceStatus(gpu->device(), oldest.fence) != VK_SUCCESS) {
@@ -76,16 +75,19 @@ void VulkanCommandQueue::pollCompletedSubmissions() {
     if (oldest.commandPool != VK_NULL_HANDLE) {
       vkDestroyCommandPool(gpu->device(), oldest.commandPool, nullptr);
     }
+    for (auto fb : oldest.deferredFramebuffers) {
+      vkDestroyFramebuffer(gpu->device(), fb, nullptr);
+    }
+    for (auto rp : oldest.deferredRenderPasses) {
+      vkDestroyRenderPass(gpu->device(), rp, nullptr);
+    }
+    for (auto pool : oldest.deferredDescriptorPools) {
+      gpu->releaseDescriptorPool(pool);
+    }
     recycleFence(oldest.fence);
     inflightSubmissions.pop_front();
-    anyCompleted = true;
   }
-  // Release VulkanResources (encoders, framebuffers, render passes, descriptor pools) that have
-  // become unreferenced. This is safe only after fence confirmation because these resources may
-  // still be in use by the GPU until their associated submission completes.
-  if (anyCompleted) {
-    gpu->processUnreferencedResources();
-  }
+  gpu->processUnreferencedResources();
 }
 
 void VulkanCommandQueue::waitAllInflightSubmissions() {
@@ -98,6 +100,15 @@ void VulkanCommandQueue::waitAllInflightSubmissions() {
     }
     if (submission.commandPool != VK_NULL_HANDLE) {
       vkDestroyCommandPool(gpu->device(), submission.commandPool, nullptr);
+    }
+    for (auto fb : submission.deferredFramebuffers) {
+      vkDestroyFramebuffer(gpu->device(), fb, nullptr);
+    }
+    for (auto rp : submission.deferredRenderPasses) {
+      vkDestroyRenderPass(gpu->device(), rp, nullptr);
+    }
+    for (auto pool : submission.deferredDescriptorPools) {
+      gpu->releaseDescriptorPool(pool);
     }
     recycleFence(submission.fence);
   }
@@ -299,7 +310,12 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
 
   // Transfer ownership of per-frame resources to the inflight record. These will be reclaimed
   // once the fence signals (either via pollCompletedSubmissions or waitAllInflightSubmissions).
-  inflightSubmissions.push_back({fence, _frameTime, renderPool, std::move(pendingUploads)});
+  InflightSubmission submission = {fence, _frameTime, renderPool, std::move(pendingUploads),
+                                   {}, {}, {}};
+  gpu->takeDeferredFramebuffers(submission.deferredFramebuffers);
+  gpu->takeDeferredRenderPasses(submission.deferredRenderPasses);
+  gpu->takeDeferredDescriptorPools(submission.deferredDescriptorPools);
+  inflightSubmissions.push_back(std::move(submission));
   pendingUploads.clear();
 }
 

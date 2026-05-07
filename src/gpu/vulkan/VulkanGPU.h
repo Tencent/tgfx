@@ -143,6 +143,16 @@ class VulkanGPU : public GPU {
 
   void releaseDescriptorPool(VkDescriptorPool pool);
 
+  // Defers destruction of objects until the current in-flight submission's fence signals.
+  void deferFramebufferDestroy(VkFramebuffer framebuffer);
+  void deferRenderPassDestroy(VkRenderPass renderPass);
+  void deferDescriptorPoolRelease(VkDescriptorPool pool);
+
+  // Collects all deferred destroys accumulated since the last call and clears the pending list.
+  void takeDeferredFramebuffers(std::vector<VkFramebuffer>& out);
+  void takeDeferredRenderPasses(std::vector<VkRenderPass>& out);
+  void takeDeferredDescriptorPools(std::vector<VkDescriptorPool>& out);
+
   VkCommandPool getTransferCommandPool();
 
  private:
@@ -173,6 +183,9 @@ class VulkanGPU : public GPU {
   std::unordered_map<uint32_t, std::shared_ptr<Sampler>> samplerCache = {};
   std::vector<VkDescriptorPool> descriptorPoolCache = {};
   VkCommandPool transferCommandPool = VK_NULL_HANDLE;
+  std::vector<VkFramebuffer> pendingFramebufferDestroys = {};
+  std::vector<VkRenderPass> pendingRenderPassDestroys = {};
+  std::vector<VkDescriptorPool> pendingDescriptorPoolReleases = {};
 };
 
 }  // namespace tgfx
