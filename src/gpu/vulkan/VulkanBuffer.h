@@ -46,14 +46,17 @@ class VulkanBuffer : public GPUBuffer, public VulkanResource {
   void onRelease(VulkanGPU* gpu) override;
 
  private:
-  VulkanBuffer(size_t size, uint32_t usage, VkBuffer buffer, VmaAllocation allocation,
-               void* mappedData);
+  VulkanBuffer(VmaAllocator allocator, size_t size, uint32_t usage, VkBuffer buffer,
+               VmaAllocation allocation, void* mappedData);
   ~VulkanBuffer() override = default;
 
+  VmaAllocator vmaAllocator = VK_NULL_HANDLE;
   VkBuffer buffer = VK_NULL_HANDLE;
   VmaAllocation allocation = VK_NULL_HANDLE;
   void* persistentlyMapped = nullptr;
   void* mappedPointer = nullptr;
+  VkDeviceSize mappedOffset = 0;
+  VkDeviceSize mappedSize = 0;
 
   friend class VulkanGPU;
 };

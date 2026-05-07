@@ -384,10 +384,12 @@ void VulkanRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
     return;
   }
   bindDescriptorSetIfDirty();
-  auto vkTopology = primitiveType == PrimitiveType::TriangleStrip
-                        ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
-                        : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-  vkCmdSetPrimitiveTopologyEXT(commandBuffer, vkTopology);
+  if (vulkanGPU->vulkanCaps()->extendedDynamicStateSupport()) {
+    auto vkTopology = primitiveType == PrimitiveType::TriangleStrip
+                          ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
+                          : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    vkCmdSetPrimitiveTopologyEXT(commandBuffer, vkTopology);
+  }
   vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
@@ -398,10 +400,12 @@ void VulkanRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCo
     return;
   }
   bindDescriptorSetIfDirty();
-  auto vkTopology = primitiveType == PrimitiveType::TriangleStrip
-                        ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
-                        : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-  vkCmdSetPrimitiveTopologyEXT(commandBuffer, vkTopology);
+  if (vulkanGPU->vulkanCaps()->extendedDynamicStateSupport()) {
+    auto vkTopology = primitiveType == PrimitiveType::TriangleStrip
+                          ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
+                          : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    vkCmdSetPrimitiveTopologyEXT(commandBuffer, vkTopology);
+  }
   vkCmdDrawIndexed(commandBuffer, indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
 }
 

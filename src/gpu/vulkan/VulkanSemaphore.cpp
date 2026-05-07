@@ -27,6 +27,9 @@ std::shared_ptr<VulkanSemaphore> VulkanSemaphore::Make(VulkanGPU* gpu) {
   if (!gpu) {
     return nullptr;
   }
+  if (!gpu->vulkanCaps()->semaphoreSupport()) {
+    return nullptr;
+  }
 
   VkSemaphoreTypeCreateInfo timelineInfo = {};
   timelineInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;

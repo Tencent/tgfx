@@ -418,10 +418,11 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
   depthStencil.back.writeMask = descriptor.depthStencil.stencilWriteMask;
 
   // Dynamic states
-  // Primitive topology must be dynamic because draw calls may use either TriangleList or
-  // TriangleStrip (e.g., shape mask quad rendering uses TriangleStrip).
   std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
-                                               VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT};
+                                               VK_DYNAMIC_STATE_STENCIL_REFERENCE};
+  if (gpu->vulkanCaps()->extendedDynamicStateSupport()) {
+    dynamicStates.push_back(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT);
+  }
   VkPipelineDynamicStateCreateInfo dynamicState = {};
   dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
   dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());

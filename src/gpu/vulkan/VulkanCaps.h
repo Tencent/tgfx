@@ -84,6 +84,10 @@ class VulkanCaps {
     return timelineSemaphoreSupported;
   }
 
+  bool extendedDynamicStateSupport() const {
+    return extendedDynamicStateSupported;
+  }
+
   bool bufferMapSupport() const {
     return true;
   }
@@ -110,6 +114,7 @@ class VulkanCaps {
   GPULimits _limits = {};
 
   bool timelineSemaphoreSupported = false;
+  bool extendedDynamicStateSupported = false;
   bool frameBufferFetchSupported = false;
   std::unordered_map<PixelFormat, FormatInfo, EnumHasher> formatTable = {};
 };

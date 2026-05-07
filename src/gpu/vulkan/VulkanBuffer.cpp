@@ -66,13 +66,13 @@ std::shared_ptr<VulkanBuffer> VulkanBuffer::Make(VulkanGPU* gpu, size_t size, ui
     return nullptr;
   }
 
-  return gpu->makeResource<VulkanBuffer>(size, usage, vkBuffer, vmaAllocation,
+  return gpu->makeResource<VulkanBuffer>(gpu->allocator(), size, usage, vkBuffer, vmaAllocation,
                                          vmaAllocInfo.pMappedData);
 }
 
-VulkanBuffer::VulkanBuffer(size_t size, uint32_t usage, VkBuffer buffer, VmaAllocation allocation,
-                           void* mappedData)
-    : GPUBuffer(size, usage), buffer(buffer), allocation(allocation),
+VulkanBuffer::VulkanBuffer(VmaAllocator allocator, size_t size, uint32_t usage, VkBuffer buffer,
+                           VmaAllocation allocation, void* mappedData)
+    : GPUBuffer(size, usage), vmaAllocator(allocator), buffer(buffer), allocation(allocation),
       persistentlyMapped(mappedData) {
 }
 
@@ -104,12 +104,22 @@ void* VulkanBuffer::map(size_t offset, size_t size) {
     LOGE("VulkanBuffer::map() buffer is not host-visible!");
     return nullptr;
   }
+  mappedOffset = static_cast<VkDeviceSize>(offset);
+  mappedSize = static_cast<VkDeviceSize>(size);
   mappedPointer = static_cast<uint8_t*>(persistentlyMapped) + offset;
   return mappedPointer;
 }
 
 void VulkanBuffer::unmap() {
+  if (mappedPointer == nullptr) {
+    return;
+  }
+  // Flush the written range to ensure CPU writes are visible to the GPU. This is required for
+  // non-coherent memory (VMA_MEMORY_USAGE_CPU_TO_GPU may allocate from non-coherent heap).
+  vmaFlushAllocation(vmaAllocator, allocation, mappedOffset, mappedSize);
   mappedPointer = nullptr;
+  mappedOffset = 0;
+  mappedSize = 0;
 }
 
 bool VulkanBuffer::isReady() const {

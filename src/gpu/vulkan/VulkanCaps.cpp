@@ -84,6 +84,9 @@ void VulkanCaps::initFeatures(VkPhysicalDevice physicalDevice) {
     if (strcmp(ext.extensionName, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
       timelineSemaphoreSupported = true;
     }
+    if (strcmp(ext.extensionName, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) == 0) {
+      extendedDynamicStateSupported = true;
+    }
   }
 
   _features.semaphore = timelineSemaphoreSupported;
