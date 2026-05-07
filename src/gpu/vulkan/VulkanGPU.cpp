@@ -322,7 +322,10 @@ std::shared_ptr<RenderPipeline> VulkanGPU::createRenderPipeline(
 }
 
 std::shared_ptr<CommandEncoder> VulkanGPU::createCommandEncoder() {
-  processUnreferencedResources();
+  // Do NOT call processUnreferencedResources() here — under async submission, VulkanResources
+  // (e.g., encoders holding framebuffers, render passes, descriptor pools) may have refcount=0
+  // on the CPU side but still be in use by the GPU. Resource release is deferred until
+  // pollCompletedSubmissions() confirms the associated fence has signaled.
   return VulkanCommandEncoder::Make(this);
 }
 
@@ -467,6 +470,11 @@ VkCommandPool VulkanGPU::getTransferCommandPool() {
 }
 
 void VulkanGPU::releaseAll(bool releaseGPU) {
+  // Destroy the command queue first to wait for all in-flight GPU submissions and release their
+  // resources (staging buffers, command pools, fences). This must happen before destroying the
+  // VkDevice and VMA allocator, otherwise the queue's destructor would access destroyed objects.
+  commandQueue.reset();
+
   samplerCache.clear();
   for (auto pool : descriptorPoolCache) {
     vkDestroyDescriptorPool(vulkanDevice, pool, nullptr);

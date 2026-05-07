@@ -31,7 +31,78 @@ VulkanCommandQueue::VulkanCommandQueue(VulkanGPU* gpu) : gpu(gpu) {
 }
 
 VulkanCommandQueue::~VulkanCommandQueue() {
+  waitAllInflightSubmissions();
   cleanupPendingUploads();
+  for (auto fence : fencePool) {
+    vkDestroyFence(gpu->device(), fence, nullptr);
+  }
+}
+
+std::chrono::steady_clock::time_point VulkanCommandQueue::completedFrameTime() const {
+  auto ticks = _completedFrameTime.load(std::memory_order_acquire);
+  return std::chrono::steady_clock::time_point(std::chrono::steady_clock::duration(ticks));
+}
+
+VkFence VulkanCommandQueue::acquireFence() {
+  if (!fencePool.empty()) {
+    auto fence = fencePool.back();
+    fencePool.pop_back();
+    vkResetFences(gpu->device(), 1, &fence);
+    return fence;
+  }
+  VkFenceCreateInfo fenceInfo = {};
+  fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  VkFence fence = VK_NULL_HANDLE;
+  vkCreateFence(gpu->device(), &fenceInfo, nullptr, &fence);
+  return fence;
+}
+
+void VulkanCommandQueue::recycleFence(VkFence fence) {
+  fencePool.push_back(fence);
+}
+
+void VulkanCommandQueue::pollCompletedSubmissions() {
+  bool anyCompleted = false;
+  while (!inflightSubmissions.empty()) {
+    auto& oldest = inflightSubmissions.front();
+    if (vkGetFenceStatus(gpu->device(), oldest.fence) != VK_SUCCESS) {
+      break;
+    }
+    auto ticks = oldest.frameTime.time_since_epoch().count();
+    _completedFrameTime.store(ticks, std::memory_order_release);
+    for (auto& upload : oldest.uploads) {
+      vmaDestroyBuffer(gpu->allocator(), upload.stagingBuffer, upload.stagingAlloc);
+    }
+    if (oldest.commandPool != VK_NULL_HANDLE) {
+      vkDestroyCommandPool(gpu->device(), oldest.commandPool, nullptr);
+    }
+    recycleFence(oldest.fence);
+    inflightSubmissions.pop_front();
+    anyCompleted = true;
+  }
+  // Release VulkanResources (encoders, framebuffers, render passes, descriptor pools) that have
+  // become unreferenced. This is safe only after fence confirmation because these resources may
+  // still be in use by the GPU until their associated submission completes.
+  if (anyCompleted) {
+    gpu->processUnreferencedResources();
+  }
+}
+
+void VulkanCommandQueue::waitAllInflightSubmissions() {
+  for (auto& submission : inflightSubmissions) {
+    vkWaitForFences(gpu->device(), 1, &submission.fence, VK_TRUE, UINT64_MAX);
+    auto ticks = submission.frameTime.time_since_epoch().count();
+    _completedFrameTime.store(ticks, std::memory_order_release);
+    for (auto& upload : submission.uploads) {
+      vmaDestroyBuffer(gpu->allocator(), upload.stagingBuffer, upload.stagingAlloc);
+    }
+    if (submission.commandPool != VK_NULL_HANDLE) {
+      vkDestroyCommandPool(gpu->device(), submission.commandPool, nullptr);
+    }
+    recycleFence(submission.fence);
+  }
+  inflightSubmissions.clear();
+  gpu->processUnreferencedResources();
 }
 
 void VulkanCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset,
@@ -177,57 +248,59 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
     return;
   }
 
-  // If there are pending texture uploads, we need to prepend them to the submission. Since the
-  // render command buffer is already recorded and ended, we create a separate upload command buffer
-  // and submit both in order. The Vulkan spec guarantees that command buffers within a single
-  // vkQueueSubmit execute in array order.
+  // Reclaim resources from any submissions that the GPU has already completed (non-blocking).
+  pollCompletedSubmissions();
+
+  // Backpressure: if we have reached the maximum allowed in-flight submissions, block until the
+  // oldest one completes. This bounds memory usage when GPU is slower than CPU.
+  if (inflightSubmissions.size() >= MAX_FRAMES_IN_FLIGHT) {
+    auto& oldest = inflightSubmissions.front();
+    vkWaitForFences(gpu->device(), 1, &oldest.fence, VK_TRUE, UINT64_MAX);
+    pollCompletedSubmissions();
+  }
+
+  // Allocate the upload command buffer from the render command pool so that both are destroyed
+  // together after the fence signals. This avoids the race condition of resetting a shared
+  // transfer pool while its command buffers are still executing on the GPU.
+  auto renderPool = vulkanCmdBuffer->vulkanCommandPool();
   VkCommandBuffer uploadCmd = VK_NULL_HANDLE;
-  VkCommandPool uploadPool = VK_NULL_HANDLE;
-  if (!pendingUploads.empty()) {
-    auto transferPool = gpu->getTransferCommandPool();
-    if (transferPool != VK_NULL_HANDLE) {
-      VkCommandBufferAllocateInfo cmdAllocInfo = {};
-      cmdAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-      cmdAllocInfo.commandPool = transferPool;
-      cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-      cmdAllocInfo.commandBufferCount = 1;
-      auto result = vkAllocateCommandBuffers(gpu->device(), &cmdAllocInfo, &uploadCmd);
-      if (result == VK_SUCCESS) {
-        VkCommandBufferBeginInfo beginInfo = {};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        vkBeginCommandBuffer(uploadCmd, &beginInfo);
-        flushPendingUploads(uploadCmd);
-        vkEndCommandBuffer(uploadCmd);
-        uploadPool = transferPool;
-      }
+  if (!pendingUploads.empty() && renderPool != VK_NULL_HANDLE) {
+    VkCommandBufferAllocateInfo cmdAllocInfo = {};
+    cmdAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmdAllocInfo.commandPool = renderPool;
+    cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmdAllocInfo.commandBufferCount = 1;
+    auto result = vkAllocateCommandBuffers(gpu->device(), &cmdAllocInfo, &uploadCmd);
+    if (result == VK_SUCCESS) {
+      VkCommandBufferBeginInfo beginInfo = {};
+      beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+      beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+      vkBeginCommandBuffer(uploadCmd, &beginInfo);
+      flushPendingUploads(uploadCmd);
+      vkEndCommandBuffer(uploadCmd);
     }
   }
 
-  // Submit upload + render command buffers in a single vkQueueSubmit call. Vulkan guarantees
-  // command buffers execute in array order within the same submit, so uploads complete before
-  // render passes begin.
+  // Submit upload + render command buffers with a fence for async completion tracking.
   std::vector<VkCommandBuffer> cmdBuffers;
   if (uploadCmd != VK_NULL_HANDLE) {
     cmdBuffers.push_back(uploadCmd);
   }
   cmdBuffers.push_back(cmd);
 
+  VkFence fence = acquireFence();
+
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.commandBufferCount = static_cast<uint32_t>(cmdBuffers.size());
   submitInfo.pCommandBuffers = cmdBuffers.data();
 
-  vkQueueSubmit(gpu->graphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(gpu->graphicsQueue());
+  vkQueueSubmit(gpu->graphicsQueue(), 1, &submitInfo, fence);
 
-  // Cleanup: staging buffers can now be safely destroyed since GPU execution is complete.
-  cleanupPendingUploads();
-
-  auto pool = vulkanCmdBuffer->vulkanCommandPool();
-  if (pool != VK_NULL_HANDLE) {
-    vkDestroyCommandPool(gpu->device(), pool, nullptr);
-  }
+  // Transfer ownership of per-frame resources to the inflight record. These will be reclaimed
+  // once the fence signals (either via pollCompletedSubmissions or waitAllInflightSubmissions).
+  inflightSubmissions.push_back({fence, _frameTime, renderPool, std::move(pendingUploads)});
+  pendingUploads.clear();
 }
 
 std::shared_ptr<Semaphore> VulkanCommandQueue::insertSemaphore() {
@@ -242,11 +315,7 @@ void VulkanCommandQueue::waitUntilCompleted() {
   if (gpu == nullptr) {
     return;
   }
-  auto device = gpu->device();
-  if (device != VK_NULL_HANDLE) {
-    vkDeviceWaitIdle(device);
-  }
-  // Flush any pending uploads that haven't been submitted yet.
+  waitAllInflightSubmissions();
   cleanupPendingUploads();
 }
 
