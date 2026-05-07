@@ -18,11 +18,14 @@
 
 #include "BackgroundHandler.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/PictureRecorder.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
@@ -40,6 +43,54 @@ class NoOpImpl : public BackgroundHandler {
     // Background styles deliberately produce no output in NoOp contexts.
   }
 };
+
+// Copy the region of bgImage that this layer actually consumes into a private small surface,
+// so the downstream PictureImage references the returned image instead of bgImage.
+//
+// Why: bgImage IS bgSource->surface's cachedImage. If the recorded picture holds a reference to
+// bgImage, the resulting PictureImage keeps cachedImage's external use_count elevated, and every
+// subsequent write to bgCanvas during the same capture pass triggers Surface::aboutToDraw's
+// copy-on-write path — a full RT reallocation plus blit. Capture runs once per background-style
+// layer, so the COW cost scales with layer count × RT size and dominates GPU submit time.
+// Routing through an independent copy breaks the reference back to cachedImage and avoids COW.
+//
+// Size the small surface in bgImage pixel space, clipped to bgImage's own extent. This is
+// bounded by bgImage regardless of contentScale, so it cannot exceed maxTextureSize for a
+// bgSource that itself already fits. Layer regions lying outside bgImage are transparent, no
+// point copying them.
+//
+// Returns nullptr if the surface cannot be created (missing context, over-budget, or a non-
+// invertible transform). Callers should fall back to the original bgImage on null return.
+std::shared_ptr<Image> MakeDetachedBgCopy(Context* context, const std::shared_ptr<Image>& bgImage,
+                                          const Matrix& bgPixelToLocal, const Rect& layerBounds,
+                                          Point* offset, std::shared_ptr<ColorSpace> colorSpace) {
+  Matrix localToBgPixel = Matrix::I();
+  if (!bgPixelToLocal.invert(&localToBgPixel)) {
+    return nullptr;
+  }
+  auto bgPixelBounds = layerBounds;
+  localToBgPixel.mapRect(&bgPixelBounds);
+  if (!bgPixelBounds.intersect(Rect::MakeWH(bgImage->width(), bgImage->height()))) {
+    return nullptr;
+  }
+  bgPixelBounds.roundOut();
+  auto width = FloatCeilToInt(bgPixelBounds.width());
+  auto height = FloatCeilToInt(bgPixelBounds.height());
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  auto surface = Surface::Make(context, width, height, false, 1, false, 0, std::move(colorSpace));
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto* canvas = surface->getCanvas();
+  canvas->translate(-bgPixelBounds.left, -bgPixelBounds.top);
+  canvas->drawImage(bgImage);
+  if (offset != nullptr) {
+    *offset = {bgPixelBounds.left, bgPixelBounds.top};
+  }
+  return surface->makeImageSnapshot();
+}
 
 }  // namespace
 
@@ -106,12 +157,26 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (bgImage == nullptr) {
     return;
   }
+  Matrix bgPixelToLocal = worldToLocal;
+  bgPixelToLocal.preConcat(bgSource->backgroundMatrix());
+  Point smallBgOffset = {};
+  auto smallBgImage = MakeDetachedBgCopy(args.context, bgImage, bgPixelToLocal, layer->getBounds(),
+                                         &smallBgOffset, args.dstColorSpace);
   PictureRecorder recorder = {};
   auto* recording = recorder.beginRecording();
   recording->scale(contentScale, contentScale);
   recording->concat(worldToLocal);
   recording->concat(bgSource->backgroundMatrix());
-  recording->drawImage(bgImage);
+  if (smallBgImage != nullptr) {
+    // smallBgImage is the (smallBgOffset-origin) slice of bgImage; re-anchor it so the composite
+    // picture has the exact same geometry as drawImage(bgImage).
+    recording->translate(smallBgOffset.x, smallBgOffset.y);
+    recording->drawImage(std::move(smallBgImage));
+  } else {
+    // Fallback: detached copy unavailable (no context, over budget, or non-invertible matrix).
+    // Keep the original path — COW may trigger, but the snapshot still renders correctly.
+    recording->drawImage(bgImage);
+  }
   auto picture = recorder.finishRecordingAsPicture();
   if (picture == nullptr) {
     return;
@@ -132,6 +197,61 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::cloneWithSource(
   }
   return std::unique_ptr<BackgroundHandler>(
       new BackgroundCapturer(snapshots, std::move(newSource)));
+}
+
+const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* layer) const {
+  if (snapshots == nullptr) {
+    return nullptr;
+  }
+  auto it = snapshots->layerStyleSources.find(layer);
+  if (it == snapshots->layerStyleSources.end()) {
+    return nullptr;
+  }
+  return it->second.get();
+}
+
+const LayerStyleSource* BackgroundCapturer::tryCacheLayerStyleSource(
+    Layer* layer, std::unique_ptr<LayerStyleSource>& source) const {
+  if (snapshots == nullptr || source == nullptr) {
+    return nullptr;
+  }
+  // Capture canvas matrix carries an extra surfaceScale relative to consume canvas matrix when
+  // the bg source was down-sampled (extreme blur outsets). In that rare case, the source's
+  // contentScale differs between passes so the cached image cannot be reused. Skip caching so
+  // each pass builds its own source at the right density.
+  if (bgSource != nullptr && bgSource->surfaceScale() != 1.0f) {
+    return nullptr;
+  }
+  // Capture and consume passes both rasterize the same picture-backed images at the same scale.
+  // Wrap them in a RasterizedImage so the first draw uploads a cached GPU texture and the second
+  // pass reuses it instead of replaying the picture. Calling makeRasterized() on an already-
+  // rasterized image is a no-op (returns weakThis), so we don't need to special-case the
+  // content/contour aliasing — wrapping each field independently still lands on the same cache.
+  for (auto& group : source->groups) {
+    if (group == nullptr) {
+      continue;
+    }
+    if (group->content.image != nullptr) {
+      group->content.image = group->content.image->makeRasterized();
+    }
+    if (group->contour.has_value() && group->contour->image != nullptr) {
+      group->contour->image = group->contour->image->makeRasterized();
+    }
+  }
+  auto* raw = source.get();
+  snapshots->layerStyleSources.emplace(layer, std::move(source));
+  return raw;
+}
+
+const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* layer) const {
+  if (snapshots == nullptr) {
+    return nullptr;
+  }
+  auto it = snapshots->layerStyleSources.find(layer);
+  if (it == snapshots->layerStyleSources.end()) {
+    return nullptr;
+  }
+  return it->second.get();
 }
 
 void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& /*args*/, Canvas* canvas, Layer* layer,

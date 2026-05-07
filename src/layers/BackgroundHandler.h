@@ -71,6 +71,23 @@ class BackgroundHandler {
     return nullptr;
   }
 
+  // Returns a previously cached LayerStyleSource for the given layer, or nullptr if none. Capture
+  // and consume passes walk the same tree, so the source built in capture is reused in consume —
+  // avoiding redundant content/contour image renders. Default implementation returns nullptr so
+  // NoOp handlers don't engage caching.
+  virtual const LayerStyleSource* getCachedLayerStyleSource(Layer* /*layer*/) const {
+    return nullptr;
+  }
+
+  // Tries to take ownership of `source` and cache it under `layer`. On success, returns the raw
+  // pointer to the cached source and leaves `source` empty. On failure (e.g. NoOp handler or
+  // capturer with non-1 surfaceScale where capture/consume densities diverge), returns nullptr
+  // and leaves `source` untouched so the caller keeps managing its lifetime.
+  virtual const LayerStyleSource* tryCacheLayerStyleSource(
+      Layer* /*layer*/, std::unique_ptr<LayerStyleSource>& /*source*/) const {
+    return nullptr;
+  }
+
   // During the capture pass, a subtree that sits before a later bg-style sibling must draw
   // all descendants so their content appears on the bg source surface. beginForcedCapture() /
   // endForcedCapture() manage a nesting depth counter so recursive drawChildren calls don't
@@ -107,6 +124,11 @@ class BackgroundCapturer : public BackgroundHandler {
   std::unique_ptr<BackgroundHandler> cloneWithSource(
       std::shared_ptr<BackgroundSource> newSource) const override;
 
+  const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
+
+  const LayerStyleSource* tryCacheLayerStyleSource(
+      Layer* layer, std::unique_ptr<LayerStyleSource>& source) const override;
+
   // Runs a capture pass: replays captureRoot onto bgSource's canvas, populating snapshots. The
   // replay walks the tree exactly once with renderRects set to the pre-outset world-space dirty
   // rects. drawLayer culls each layer whose renderBounds does not intersect any of these rects.
@@ -126,6 +148,8 @@ class BackgroundConsumer : public BackgroundHandler {
 
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                            LayerStyle* style, const LayerStyleSource* source) override;
+
+  const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
 
  private:
   const BackgroundSnapshotMap* snapshots = nullptr;

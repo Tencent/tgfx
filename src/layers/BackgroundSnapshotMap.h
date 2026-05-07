@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include "layers/LayerStyleSource.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Point.h"
 
@@ -72,9 +73,15 @@ struct BackgroundSnapshotKeyHash {
  * pass. Declared as a named struct (instead of a using-alias over std::unordered_map) so that
  * callers which only need a pointer or reference can forward-declare the type in public headers
  * without pulling in this internal header.
+ *
+ * Also caches LayerStyleSource per layer: capture and consume passes walk the same tree, so
+ * each layer's content/contour images are identical between passes. Building the source once in
+ * capture and reusing it in consume avoids redundant intermediate renders.
  */
 struct BackgroundSnapshotMap
     : public std::unordered_map<BackgroundSnapshotKey, BackgroundSnapshotEntry,
-                                BackgroundSnapshotKeyHash> {};
+                                BackgroundSnapshotKeyHash> {
+  std::unordered_map<Layer*, std::unique_ptr<LayerStyleSource>> layerStyleSources = {};
+};
 
 }  // namespace tgfx

@@ -1517,8 +1517,23 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
-  auto layerStyleSource = getLayerStyleSource(args, canvas->getMatrix());
-  drawContents(args, canvas, alpha, layerStyleSource.get());
+  // Capture and consume passes share the same per-layer LayerStyleSource via the active handler,
+  // so the content/contour intermediate renders happen once per frame instead of twice.
+  const LayerStyleSource* sourcePtr = nullptr;
+  if (args.backgroundHandler != nullptr) {
+    sourcePtr = args.backgroundHandler->getCachedLayerStyleSource(this);
+  }
+  std::unique_ptr<LayerStyleSource> ownedSource;
+  if (sourcePtr == nullptr) {
+    ownedSource = getLayerStyleSource(args, canvas->getMatrix());
+    if (ownedSource != nullptr && args.backgroundHandler != nullptr) {
+      sourcePtr = args.backgroundHandler->tryCacheLayerStyleSource(this, ownedSource);
+    }
+    if (sourcePtr == nullptr) {
+      sourcePtr = ownedSource.get();
+    }
+  }
+  drawContents(args, canvas, alpha, sourcePtr);
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
