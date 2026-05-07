@@ -81,6 +81,9 @@ class VulkanCommandQueue : public CommandQueue {
   };
 
   // Represents a single vkQueueSubmit whose GPU completion has not yet been confirmed.
+  // This struct is the "ownership container" for everything submitted in one batch. It exists
+  // because we need a single entity (independent of any GPU object) to hold all per-submission
+  // resources, including the command buffer itself. The fence determines when to release them.
   struct InflightSubmission {
     VkFence fence = VK_NULL_HANDLE;
     std::chrono::steady_clock::time_point frameTime = {};
@@ -91,7 +94,9 @@ class VulkanCommandQueue : public CommandQueue {
     std::vector<VkRenderPass> deferredRenderPasses;
     std::vector<VkDescriptorPool> deferredDescriptorPools;
     // Retained resources: shared_ptr references that prevent VulkanResource destruction until
-    // the GPU has finished executing the command buffer.
+    // the GPU has finished executing the command buffer. When the fence signals and this struct
+    // is destroyed, shared_ptr refcounts decrement. If any reach zero, the resource enters the
+    // ReturnQueue and is safely destroyed during the next processUnreferencedResources() call.
     std::vector<std::shared_ptr<VulkanResource>> retainedResources;
   };
 
@@ -103,6 +108,10 @@ class VulkanCommandQueue : public CommandQueue {
   void cleanupPendingUploads();
 
   // Non-blocking: polls all pending fences and reclaims resources from completed submissions.
+  // Uses vkGetFenceStatus (non-blocking) instead of vkWaitForFences to avoid stalling the CPU.
+  // Called at the start of each new submit() so resources are reclaimed "just in time" before
+  // the next frame needs them. After releasing InflightSubmission, any resource whose refcount
+  // hits zero enters the ReturnQueue; processUnreferencedResources() then safely destroys them.
   void pollCompletedSubmissions();
 
   // Blocking: waits for all in-flight submissions to complete and reclaims their resources.

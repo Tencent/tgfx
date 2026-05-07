@@ -25,12 +25,9 @@ VulkanCommandBuffer::VulkanCommandBuffer(VkCommandBuffer commandBuffer, VkComman
                                          std::vector<VkFramebuffer> framebuffers,
                                          std::vector<VkRenderPass> renderPasses,
                                          std::vector<std::shared_ptr<VulkanResource>> retained)
-    : commandBuffer(commandBuffer),
-      commandPool(commandPool),
-      _descriptorPool(descriptorPool),
+    : commandBuffer(commandBuffer), commandPool(commandPool), _descriptorPool(descriptorPool),
       _deferredFramebuffers(std::move(framebuffers)),
-      _deferredRenderPasses(std::move(renderPasses)),
-      _retainedResources(std::move(retained)) {
+      _deferredRenderPasses(std::move(renderPasses)), _retainedResources(std::move(retained)) {
 }
 
 }  // namespace tgfx

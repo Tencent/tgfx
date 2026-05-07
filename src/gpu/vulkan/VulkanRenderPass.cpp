@@ -81,6 +81,9 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
                                    const RenderPassDescriptor& passDescriptor)
     : RenderPass(passDescriptor), encoder(encoder), vulkanGPU(gpu),
       commandBuffer(encoder->vulkanCommandBuffer()) {
+  // Every resource bound during this render pass is retained via encoder->retainResource().
+  // This ensures the resource's shared_ptr refcount stays >0 until GPU execution completes,
+  // even if the application releases its own reference before the fence signals.
 
   auto device = vulkanGPU->device();
 

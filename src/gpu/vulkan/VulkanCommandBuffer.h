@@ -27,8 +27,12 @@
 namespace tgfx {
 
 /**
- * Vulkan command buffer implementation. Owns the command pool, deferred GPU objects, and retained
- * resource references that must outlive command buffer execution on the GPU.
+ * Immutable record of a finished command encoding session. Created by VulkanCommandEncoder::onFinish
+ * which transfers all ownership here. Acts as the transport container between encoding and
+ * submission: VulkanCommandQueue::submit() moves everything from here into an InflightSubmission
+ * tied to a fence, after which this object is no longer referenced.
+ *
+ * Ownership chain: Encoder -> CommandBuffer -> InflightSubmission -> (fence signals) -> released.
  */
 class VulkanCommandBuffer : public CommandBuffer {
  public:
@@ -66,8 +70,11 @@ class VulkanCommandBuffer : public CommandBuffer {
   VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
   VkCommandPool commandPool = VK_NULL_HANDLE;
   VkDescriptorPool _descriptorPool = VK_NULL_HANDLE;
+  // Vulkan objects created per-frame (RenderPass/Framebuffer) that cannot be destroyed until GPU
+  // execution completes. These are moved to InflightSubmission and destroyed after fence signals.
   std::vector<VkFramebuffer> _deferredFramebuffers;
   std::vector<VkRenderPass> _deferredRenderPasses;
+  // Strong references preventing VulkanResource destruction while GPU is still executing.
   std::vector<std::shared_ptr<VulkanResource>> _retainedResources;
 };
 

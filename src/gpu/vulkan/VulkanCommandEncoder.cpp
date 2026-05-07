@@ -221,6 +221,10 @@ void VulkanCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture>) {
 }
 
 std::shared_ptr<CommandBuffer> VulkanCommandEncoder::onFinish() {
+  // Transfer all retained resources and deferred objects to VulkanCommandBuffer. The encoder is a
+  // reusable temporary object; the command buffer is the one-shot submission unit that represents
+  // "this batch of commands needs these resources alive." Clearing the encoder allows it to be
+  // cleanly released without accidentally destroying in-flight resources.
   vkEndCommandBuffer(commandBuffer);
   std::vector<VkFramebuffer> framebuffers;
   std::vector<VkRenderPass> renderPasses;

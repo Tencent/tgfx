@@ -29,7 +29,17 @@ namespace tgfx {
 class VulkanGPU;
 
 /**
- * Vulkan command encoder implementation.
+ * Records GPU commands into a VkCommandBuffer and tracks resource references.
+ *
+ * Vulkan command buffers are deferred: they execute on the GPU long after recording finishes. If a
+ * resource's shared_ptr refcount drops to zero before the GPU completes execution, the underlying
+ * Vulkan object would be destroyed while still in use. To prevent this, the encoder collects
+ * shared_ptr references to every resource bound during recording (via retainResource()). These
+ * references are transferred to VulkanCommandBuffer on finish(), then to InflightSubmission on
+ * submit(), and finally released only after the fence signals GPU completion.
+ *
+ * Unlike Metal (which automatically retains encoded resources) or OpenGL (whose driver internally
+ * reference-counts objects), Vulkan requires the application to manage this explicitly.
  */
 class VulkanCommandEncoder : public CommandEncoder, public VulkanResource {
  public:
@@ -47,6 +57,9 @@ class VulkanCommandEncoder : public CommandEncoder, public VulkanResource {
     deferredDestroys.push_back({rp, fb});
   }
 
+  /// Keeps a strong reference to a resource that the command buffer will access on the GPU.
+  /// Called at bind time (setPipeline, setTexture, setVertexBuffer, etc.) to ensure the resource
+  /// survives until GPU execution completes.
   void retainResource(std::shared_ptr<VulkanResource> resource) {
     retainedResources.push_back(std::move(resource));
   }
