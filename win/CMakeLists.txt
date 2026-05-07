@@ -45,5 +45,6 @@ endif ()
 
 file(GLOB_RECURSE HELLO_2D_SOURCE_FILES src/*.*)
 add_executable(Hello2D WIN32 ${HELLO_2D_SOURCE_FILES} app.rc)
+target_compile_definitions(Hello2D PRIVATE ${TGFX_DEFINES})
 target_include_directories(Hello2D PRIVATE ${HELLO_2D_INCLUDES} src)
 target_link_libraries(Hello2D tgfx-hello2d tgfx ${HELLO_2D_LIBS})
