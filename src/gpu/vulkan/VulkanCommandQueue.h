@@ -23,6 +23,7 @@
 #include <memory>
 #include <vector>
 #include "gpu/vulkan/VulkanAPI.h"
+#include "gpu/vulkan/VulkanResource.h"
 #include "tgfx/gpu/CommandQueue.h"
 #include "vk_mem_alloc.h"
 
@@ -89,6 +90,9 @@ class VulkanCommandQueue : public CommandQueue {
     std::vector<VkFramebuffer> deferredFramebuffers;
     std::vector<VkRenderPass> deferredRenderPasses;
     std::vector<VkDescriptorPool> deferredDescriptorPools;
+    // Retained resources: shared_ptr references that prevent VulkanResource destruction until
+    // the GPU has finished executing the command buffer.
+    std::vector<std::shared_ptr<VulkanResource>> retainedResources;
   };
 
   // Maximum number of submissions that may be in-flight simultaneously. Acts as backpressure to

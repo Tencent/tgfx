@@ -99,13 +99,16 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
       continue;
     }
     auto vulkanTexture = std::static_pointer_cast<VulkanTexture>(ca.texture);
+    encoder->retainResource(vulkanTexture);
 
-    // Transition color attachment to GENERAL layout before render pass begins. We use GENERAL for
-    // all color attachments to maintain a uniform layout across the backend, avoiding the
-    // complexity of tracking per-image optimal layouts.
-    TransitionImageLayout(commandBuffer, vulkanTexture->vulkanImage(),
-                          vulkanTexture->currentLayout(), VK_IMAGE_LAYOUT_GENERAL,
-                          VK_IMAGE_ASPECT_COLOR_BIT);
+    // Transition color attachment to GENERAL layout. For Clear/DontCare loadOp, using UNDEFINED as
+    // oldLayout avoids cross-submission layout tracking issues. For Load, we must preserve contents
+    // so we use the tracked layout (the previous submit that wrote this image will have completed
+    // on the same queue before this command buffer executes).
+    auto oldLayout = (ca.loadAction == LoadAction::Load) ? vulkanTexture->currentLayout()
+                                                         : VK_IMAGE_LAYOUT_UNDEFINED;
+    TransitionImageLayout(commandBuffer, vulkanTexture->vulkanImage(), oldLayout,
+                          VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
 
     VkAttachmentDescription attachment = {};
     attachment.format = vulkanTexture->vulkanFormat();
@@ -135,6 +138,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
   if (hasDepth) {
     auto dsTexture =
         std::static_pointer_cast<VulkanTexture>(passDescriptor.depthStencilAttachment.texture);
+    encoder->retainResource(dsTexture);
 
     TransitionImageLayout(commandBuffer, dsTexture->vulkanImage(), dsTexture->currentLayout(),
                           VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
@@ -247,6 +251,7 @@ void VulkanRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
     currentPipeline = nullptr;
     return;
   }
+  encoder->retainResource(std::static_pointer_cast<VulkanResource>(currentPipeline));
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     currentPipeline->vulkanPipeline());
   descriptorDirty = true;
@@ -258,6 +263,7 @@ void VulkanRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuf
     return;
   }
   auto vulkanBuffer = std::static_pointer_cast<VulkanBuffer>(buffer);
+  encoder->retainResource(vulkanBuffer);
   uniformBindings[binding] = {vulkanBuffer->vulkanBuffer(), offset, size};
   descriptorDirty = true;
 }
@@ -269,6 +275,8 @@ void VulkanRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> tex
   }
   auto vulkanTexture = std::static_pointer_cast<VulkanTexture>(texture);
   auto vulkanSampler = std::static_pointer_cast<VulkanSampler>(sampler);
+  encoder->retainResource(vulkanTexture);
+  encoder->retainResource(vulkanSampler);
   textureBindings[binding] = {vulkanTexture->vulkanImageView(), vulkanSampler->vulkanSampler()};
   descriptorDirty = true;
 }
@@ -359,6 +367,7 @@ void VulkanRenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer>
     return;
   }
   auto vulkanBuffer = std::static_pointer_cast<VulkanBuffer>(buffer);
+  encoder->retainResource(vulkanBuffer);
   VkBuffer vkBuf = vulkanBuffer->vulkanBuffer();
   VkDeviceSize vkOffset = offset;
   vkCmdBindVertexBuffers(commandBuffer, slot, 1, &vkBuf, &vkOffset);
@@ -368,6 +377,7 @@ void VulkanRenderPass::setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFo
   if (!buffer) {
     return;
   }
+  encoder->retainResource(std::static_pointer_cast<VulkanBuffer>(buffer));
   currentIndexBuffer = buffer;
   currentIndexType = (format == IndexFormat::UInt32) ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
   auto vulkanBuffer = std::static_pointer_cast<VulkanBuffer>(buffer);

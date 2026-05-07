@@ -32,6 +32,12 @@ VulkanSwapchainProxy::VulkanSwapchainProxy(Context* context, VulkanGPU* gpu,
       _height(height), _imageViews(imageViews), _images(images) {
 }
 
+VulkanSwapchainProxy::~VulkanSwapchainProxy() {
+  if (_acquireFence != VK_NULL_HANDLE) {
+    vkDestroyFence(_gpu->device(), _acquireFence, nullptr);
+  }
+}
+
 Context* VulkanSwapchainProxy::getContext() const {
   return _context;
 }
@@ -66,11 +72,19 @@ std::shared_ptr<TextureView> VulkanSwapchainProxy::getTextureView() const {
 
 std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
+    if (_acquireFence == VK_NULL_HANDLE) {
+      VkFenceCreateInfo fenceInfo = {};
+      fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+      vkCreateFence(_gpu->device(), &fenceInfo, nullptr, &_acquireFence);
+    } else {
+      vkResetFences(_gpu->device(), 1, &_acquireFence);
+    }
     auto result = vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX, VK_NULL_HANDLE,
-                                        VK_NULL_HANDLE, &_currentImageIndex);
+                                        _acquireFence, &_currentImageIndex);
     if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
       return nullptr;
     }
+    vkWaitForFences(_gpu->device(), 1, &_acquireFence, VK_TRUE, UINT64_MAX);
     VulkanImageInfo vulkanInfo = {};
     vulkanInfo.image = reinterpret_cast<void*>(_images[_currentImageIndex]);
     vulkanInfo.format = static_cast<uint32_t>(_format);

@@ -18,17 +18,24 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
 #include "gpu/vulkan/VulkanAPI.h"
+#include "gpu/vulkan/VulkanResource.h"
 #include "tgfx/gpu/CommandBuffer.h"
 
 namespace tgfx {
 
 /**
- * Vulkan command buffer implementation.
+ * Vulkan command buffer implementation. Owns the command pool, deferred GPU objects, and retained
+ * resource references that must outlive command buffer execution on the GPU.
  */
 class VulkanCommandBuffer : public CommandBuffer {
  public:
-  explicit VulkanCommandBuffer(VkCommandBuffer commandBuffer, VkCommandPool commandPool);
+  VulkanCommandBuffer(VkCommandBuffer commandBuffer, VkCommandPool commandPool,
+                      VkDescriptorPool descriptorPool, std::vector<VkFramebuffer> framebuffers,
+                      std::vector<VkRenderPass> renderPasses,
+                      std::vector<std::shared_ptr<VulkanResource>> retainedResources);
   ~VulkanCommandBuffer() override = default;
 
   VkCommandBuffer vulkanCommandBuffer() const {
@@ -39,9 +46,29 @@ class VulkanCommandBuffer : public CommandBuffer {
     return commandPool;
   }
 
+  VkDescriptorPool descriptorPool() const {
+    return _descriptorPool;
+  }
+
+  std::vector<VkFramebuffer>& deferredFramebuffers() {
+    return _deferredFramebuffers;
+  }
+
+  std::vector<VkRenderPass>& deferredRenderPasses() {
+    return _deferredRenderPasses;
+  }
+
+  std::vector<std::shared_ptr<VulkanResource>>& retainedResources() {
+    return _retainedResources;
+  }
+
  private:
   VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
   VkCommandPool commandPool = VK_NULL_HANDLE;
+  VkDescriptorPool _descriptorPool = VK_NULL_HANDLE;
+  std::vector<VkFramebuffer> _deferredFramebuffers;
+  std::vector<VkRenderPass> _deferredRenderPasses;
+  std::vector<std::shared_ptr<VulkanResource>> _retainedResources;
 };
 
 }  // namespace tgfx

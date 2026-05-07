@@ -190,19 +190,30 @@ void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
     return;
   }
 
-  // Barrier coalescing: transition all target images to TRANSFER_DST in a single barrier call.
-  // This minimizes GPU pipeline stalls compared to per-upload individual barriers.
+  // Deduplicate images: each unique image gets exactly one pre-copy and one post-copy barrier.
   std::vector<VkImageMemoryBarrier> preCopyBarriers;
-  preCopyBarriers.reserve(pendingUploads.size());
+  std::vector<VkImage> transitionedImages;
   for (auto& upload : pendingUploads) {
+    auto image = upload.texture->vulkanImage();
+    bool alreadyTransitioned = false;
+    for (auto img : transitionedImages) {
+      if (img == image) {
+        alreadyTransitioned = true;
+        break;
+      }
+    }
+    if (alreadyTransitioned) {
+      continue;
+    }
+    transitionedImages.push_back(image);
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = upload.texture->currentLayout();
+    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = upload.texture->vulkanImage();
-    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier.image = image;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0, 1};
     barrier.srcAccessMask = 0;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     preCopyBarriers.push_back(barrier);
@@ -217,23 +228,24 @@ void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &upload.region);
   }
 
-  // Barrier coalescing: transition all images from TRANSFER_DST to GENERAL in a single call.
-  // This ensures the copy results are visible to subsequent fragment shader reads.
+  // Post-copy: transition each unique image from TRANSFER_DST to GENERAL.
   std::vector<VkImageMemoryBarrier> postCopyBarriers;
-  postCopyBarriers.reserve(pendingUploads.size());
-  for (auto& upload : pendingUploads) {
+  postCopyBarriers.reserve(transitionedImages.size());
+  for (auto image : transitionedImages) {
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = upload.texture->vulkanImage();
-    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier.image = image;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0, 1};
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
                             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     postCopyBarriers.push_back(barrier);
+  }
+  for (auto& upload : pendingUploads) {
     upload.texture->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
   }
   vkCmdPipelineBarrier(
@@ -310,11 +322,17 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
 
   // Transfer ownership of per-frame resources to the inflight record. These will be reclaimed
   // once the fence signals (either via pollCompletedSubmissions or waitAllInflightSubmissions).
-  InflightSubmission submission = {fence, _frameTime, renderPool, std::move(pendingUploads),
-                                   {}, {}, {}};
-  gpu->takeDeferredFramebuffers(submission.deferredFramebuffers);
-  gpu->takeDeferredRenderPasses(submission.deferredRenderPasses);
-  gpu->takeDeferredDescriptorPools(submission.deferredDescriptorPools);
+  InflightSubmission submission = {};
+  submission.fence = fence;
+  submission.frameTime = _frameTime;
+  submission.commandPool = vulkanCmdBuffer->vulkanCommandPool();
+  submission.uploads = std::move(pendingUploads);
+  submission.deferredFramebuffers = std::move(vulkanCmdBuffer->deferredFramebuffers());
+  submission.deferredRenderPasses = std::move(vulkanCmdBuffer->deferredRenderPasses());
+  if (vulkanCmdBuffer->descriptorPool() != VK_NULL_HANDLE) {
+    submission.deferredDescriptorPools.push_back(vulkanCmdBuffer->descriptorPool());
+  }
+  submission.retainedResources = std::move(vulkanCmdBuffer->retainedResources());
   inflightSubmissions.push_back(std::move(submission));
   pendingUploads.clear();
 }

@@ -92,17 +92,18 @@ VulkanCommandEncoder::VulkanCommandEncoder(VulkanGPU* gpu, VkCommandBuffer comma
 }
 
 void VulkanCommandEncoder::onRelease(VulkanGPU* gpu) {
-  // Defer destruction of framebuffers and render passes to the inflight submission's fence signal.
-  // These objects are referenced by the command buffer that was recorded from this encoder, and the
-  // GPU may still be executing that command buffer at this point.
+  // If onFinish() was called, all fields below are already transferred to VulkanCommandBuffer.
+  // This path only handles abandoned encoders (encoding was started but never finished).
   for (auto& d : deferredDestroys) {
-    gpu->deferFramebufferDestroy(d.framebuffer);
-    gpu->deferRenderPassDestroy(d.renderPass);
+    vkDestroyFramebuffer(gpu->device(), d.framebuffer, nullptr);
+    vkDestroyRenderPass(gpu->device(), d.renderPass, nullptr);
   }
   deferredDestroys.clear();
-  // Defer descriptor pool release (reset + recycle) until the GPU is done with it.
-  gpu->deferDescriptorPoolRelease(descriptorPool);
-  descriptorPool = VK_NULL_HANDLE;
+  retainedResources.clear();
+  if (descriptorPool != VK_NULL_HANDLE) {
+    gpu->releaseDescriptorPool(descriptorPool);
+    descriptorPool = VK_NULL_HANDLE;
+  }
   if (commandPool != VK_NULL_HANDLE) {
     vkDestroyCommandPool(gpu->device(), commandPool, nullptr);
     commandPool = VK_NULL_HANDLE;
@@ -128,6 +129,8 @@ void VulkanCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcText
   }
   auto vulkanSrc = std::static_pointer_cast<VulkanTexture>(srcTexture);
   auto vulkanDst = std::static_pointer_cast<VulkanTexture>(dstTexture);
+  retainResource(vulkanSrc);
+  retainResource(vulkanDst);
 
   // Clamp copy region to source image bounds.
   auto srcX = static_cast<int32_t>(srcRect.x());
@@ -185,6 +188,8 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   }
   auto vulkanSrc = std::static_pointer_cast<VulkanTexture>(srcTexture);
   auto vulkanDst = std::static_pointer_cast<VulkanBuffer>(dstBuffer);
+  retainResource(vulkanSrc);
+  retainResource(vulkanDst);
 
   TransitionImageLayout(commandBuffer, vulkanSrc->vulkanImage(), vulkanSrc->currentLayout(),
                         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -217,11 +222,21 @@ void VulkanCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture>) {
 
 std::shared_ptr<CommandBuffer> VulkanCommandEncoder::onFinish() {
   vkEndCommandBuffer(commandBuffer);
-  auto result = std::make_shared<VulkanCommandBuffer>(commandBuffer, commandPool);
-  // Transfer ownership of the command pool to the command buffer so that onRelease() does not
-  // destroy it while the command buffer is still pending submission.
+  std::vector<VkFramebuffer> framebuffers;
+  std::vector<VkRenderPass> renderPasses;
+  framebuffers.reserve(deferredDestroys.size());
+  renderPasses.reserve(deferredDestroys.size());
+  for (auto& d : deferredDestroys) {
+    framebuffers.push_back(d.framebuffer);
+    renderPasses.push_back(d.renderPass);
+  }
+  deferredDestroys.clear();
+  auto result = std::make_shared<VulkanCommandBuffer>(
+      commandBuffer, commandPool, descriptorPool, std::move(framebuffers), std::move(renderPasses),
+      std::move(retainedResources));
   commandPool = VK_NULL_HANDLE;
   commandBuffer = VK_NULL_HANDLE;
+  descriptorPool = VK_NULL_HANDLE;
   return result;
 }
 

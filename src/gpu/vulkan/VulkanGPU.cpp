@@ -322,10 +322,7 @@ std::shared_ptr<RenderPipeline> VulkanGPU::createRenderPipeline(
 }
 
 std::shared_ptr<CommandEncoder> VulkanGPU::createCommandEncoder() {
-  // Do NOT call processUnreferencedResources() here — under async submission, VulkanResources
-  // (e.g., encoders holding framebuffers, render passes, descriptor pools) may have refcount=0
-  // on the CPU side but still be in use by the GPU. Resource release is deferred until
-  // pollCompletedSubmissions() confirms the associated fence has signaled.
+  processUnreferencedResources();
   return VulkanCommandEncoder::Make(this);
 }
 
@@ -467,39 +464,6 @@ VkCommandPool VulkanGPU::getTransferCommandPool() {
     vkResetCommandPool(vulkanDevice, transferCommandPool, 0);
   }
   return transferCommandPool;
-}
-
-void VulkanGPU::deferFramebufferDestroy(VkFramebuffer framebuffer) {
-  if (framebuffer != VK_NULL_HANDLE) {
-    pendingFramebufferDestroys.push_back(framebuffer);
-  }
-}
-
-void VulkanGPU::deferRenderPassDestroy(VkRenderPass renderPass) {
-  if (renderPass != VK_NULL_HANDLE) {
-    pendingRenderPassDestroys.push_back(renderPass);
-  }
-}
-
-void VulkanGPU::deferDescriptorPoolRelease(VkDescriptorPool pool) {
-  if (pool != VK_NULL_HANDLE) {
-    pendingDescriptorPoolReleases.push_back(pool);
-  }
-}
-
-void VulkanGPU::takeDeferredFramebuffers(std::vector<VkFramebuffer>& out) {
-  out.insert(out.end(), pendingFramebufferDestroys.begin(), pendingFramebufferDestroys.end());
-  pendingFramebufferDestroys.clear();
-}
-
-void VulkanGPU::takeDeferredRenderPasses(std::vector<VkRenderPass>& out) {
-  out.insert(out.end(), pendingRenderPassDestroys.begin(), pendingRenderPassDestroys.end());
-  pendingRenderPassDestroys.clear();
-}
-
-void VulkanGPU::takeDeferredDescriptorPools(std::vector<VkDescriptorPool>& out) {
-  out.insert(out.end(), pendingDescriptorPoolReleases.begin(), pendingDescriptorPoolReleases.end());
-  pendingDescriptorPoolReleases.clear();
 }
 
 void VulkanGPU::releaseAll(bool releaseGPU) {
