@@ -31,11 +31,31 @@ VulkanSwapchainProxy::VulkanSwapchainProxy(Context* context, VulkanGPU* gpu,
                                            const std::vector<VkImage>& images)
     : _context(context), _gpu(gpu), _swapchain(swapchain), _format(format), _width(width),
       _height(height), _imageViews(imageViews), _images(images) {
+  // Create per-frame synchronization primitives once at construction.
+  VkSemaphoreCreateInfo semInfo = {};
+  semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+  vkCreateSemaphore(_gpu->device(), &semInfo, nullptr, &_imageAvailableSemaphore);
+  vkCreateSemaphore(_gpu->device(), &semInfo, nullptr, &_renderFinishedSemaphore);
+
+  VkFenceCreateInfo fenceInfo = {};
+  fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  // Start signaled so the first frame doesn't block waiting for a non-existent previous frame.
+  fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+  vkCreateFence(_gpu->device(), &fenceInfo, nullptr, &_inFlightFence);
 }
 
 VulkanSwapchainProxy::~VulkanSwapchainProxy() {
-  if (_acquireFence != VK_NULL_HANDLE) {
-    vkDestroyFence(_gpu->device(), _acquireFence, nullptr);
+  auto vkDevice = _gpu->device();
+  // Wait for any pending GPU work before destroying sync objects.
+  if (_inFlightFence != VK_NULL_HANDLE) {
+    vkWaitForFences(vkDevice, 1, &_inFlightFence, VK_TRUE, UINT64_MAX);
+    vkDestroyFence(vkDevice, _inFlightFence, nullptr);
+  }
+  if (_imageAvailableSemaphore != VK_NULL_HANDLE) {
+    vkDestroySemaphore(vkDevice, _imageAvailableSemaphore, nullptr);
+  }
+  if (_renderFinishedSemaphore != VK_NULL_HANDLE) {
+    vkDestroySemaphore(vkDevice, _renderFinishedSemaphore, nullptr);
   }
 }
 
@@ -73,30 +93,26 @@ std::shared_ptr<TextureView> VulkanSwapchainProxy::getTextureView() const {
 
 std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
-    if (_acquireFence == VK_NULL_HANDLE) {
-      VkFenceCreateInfo fenceInfo = {};
-      fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-      vkCreateFence(_gpu->device(), &fenceInfo, nullptr, &_acquireFence);
-    } else {
-      vkResetFences(_gpu->device(), 1, &_acquireFence);
-    }
-    auto result = vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX, VK_NULL_HANDLE,
-                                        _acquireFence, &_currentImageIndex);
+    // CPU backpressure: wait for the previous frame's submit to complete before reusing sync
+    // objects. The fence starts signaled, so the first frame passes through immediately.
+    vkWaitForFences(_gpu->device(), 1, &_inFlightFence, VK_TRUE, UINT64_MAX);
+    vkResetFences(_gpu->device(), 1, &_inFlightFence);
+
+    // Acquire the next swapchain image. Signals _imageAvailableSemaphore on the GPU timeline —
+    // no CPU wait needed. The render submit will wait on this semaphore before writing pixels.
+    auto result = vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX,
+                                        _imageAvailableSemaphore, VK_NULL_HANDLE,
+                                        &_currentImageIndex);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-      // Swapchain is incompatible with the surface (e.g. window resized). The fence may not have
-      // been signaled, so attempt a non-blocking wait to consume it before any future reset.
-      // TODO: Rebuild swapchain and retry acquire.
       LOGE("VulkanSwapchainProxy: swapchain out of date, needs rebuild.");
-      vkWaitForFences(_gpu->device(), 1, &_acquireFence, VK_TRUE, 0);
       return nullptr;
     }
     if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
       LOGE("VulkanSwapchainProxy: vkAcquireNextImageKHR failed (result=%d).",
            static_cast<int>(result));
-      vkWaitForFences(_gpu->device(), 1, &_acquireFence, VK_TRUE, 0);
       return nullptr;
     }
-    vkWaitForFences(_gpu->device(), 1, &_acquireFence, VK_TRUE, UINT64_MAX);
+
     VulkanImageInfo vulkanInfo = {};
     vulkanInfo.image = reinterpret_cast<void*>(_images[_currentImageIndex]);
     vulkanInfo.format = static_cast<uint32_t>(_format);

@@ -26,6 +26,15 @@ namespace tgfx {
 
 class VulkanGPU;
 
+/**
+ * Manages swapchain image acquisition and per-frame synchronization for window presentation.
+ *
+ * Synchronization model (replaces the previous vkQueueWaitIdle approach):
+ *   - acquire: signals imageAvailableSemaphore (GPU-side, no CPU block)
+ *   - render submit: waits imageAvailableSemaphore, signals renderFinishedSemaphore
+ *   - present: waits renderFinishedSemaphore
+ *   - per-frame fence: CPU backpressure to prevent acquiring more than MAX_FRAMES_IN_FLIGHT
+ */
 class VulkanSwapchainProxy : public RenderTargetProxy {
  public:
   VulkanSwapchainProxy(Context* context, VulkanGPU* gpu, VkSwapchainKHR swapchain, VkFormat format,
@@ -47,6 +56,28 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
     return _currentImageIndex;
   }
 
+  VkImage currentImage() const {
+    return _images[_currentImageIndex];
+  }
+
+  /// Returns the semaphore signaled by vkAcquireNextImageKHR. The render submit must wait on this
+  /// at VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT before writing to the swapchain image.
+  VkSemaphore imageAvailableSemaphore() const {
+    return _imageAvailableSemaphore;
+  }
+
+  /// Returns the semaphore that the render submit should signal upon completion.
+  /// vkQueuePresentKHR waits on this to ensure rendering finishes before presentation.
+  VkSemaphore renderFinishedSemaphore() const {
+    return _renderFinishedSemaphore;
+  }
+
+  /// Returns the fence used for CPU backpressure. The present submit signals this fence;
+  /// the next frame's acquire waits on it to prevent overwriting in-flight resources.
+  VkFence inFlightFence() const {
+    return _inFlightFence;
+  }
+
   void releaseFrame();
 
  private:
@@ -58,7 +89,11 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   int _height = 0;
   std::vector<VkImageView> _imageViews;
   std::vector<VkImage> _images;
-  mutable VkFence _acquireFence = VK_NULL_HANDLE;
+
+  // Per-frame synchronization primitives.
+  mutable VkSemaphore _imageAvailableSemaphore = VK_NULL_HANDLE;
+  mutable VkSemaphore _renderFinishedSemaphore = VK_NULL_HANDLE;
+  mutable VkFence _inFlightFence = VK_NULL_HANDLE;
   mutable uint32_t _currentImageIndex = 0;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
 };
