@@ -238,7 +238,7 @@ class BackendSemaphore {
   /**
    * Creates an uninitialized backend semaphore.
    */
-  BackendSemaphore() : _backend(Backend::Unknown) {
+  BackendSemaphore() : _backend(Backend::Unknown), glSyncInfo{} {
   }
 
   /**

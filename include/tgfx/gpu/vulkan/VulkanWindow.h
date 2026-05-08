@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/Window.h"
 
 #ifdef _WIN32
@@ -40,7 +41,8 @@ class VulkanWindow : public Window {
    * Creates a VulkanWindow from a Win32 window handle. The device must be a VulkanDevice. Returns
    * nullptr if the Vulkan surface or swapchain cannot be created.
    */
-  static std::shared_ptr<VulkanWindow> MakeFrom(HWND hwnd, std::shared_ptr<Device> device);
+  static std::shared_ptr<VulkanWindow> MakeFrom(HWND hwnd, std::shared_ptr<Device> device,
+                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 #endif
 
   ~VulkanWindow() override;
@@ -55,7 +57,8 @@ class VulkanWindow : public Window {
   // non-dispatchable Vulkan handles (uint64_t) cannot safely round-trip through void*.
   struct PlatformState;
 
-  explicit VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<PlatformState> state);
+  explicit VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<PlatformState> state,
+                        std::shared_ptr<ColorSpace> colorSpace);
 
   std::unique_ptr<PlatformState> _platformState;
 };

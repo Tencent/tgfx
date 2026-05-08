@@ -41,7 +41,8 @@ struct VulkanWindow::PlatformState {
 
 #ifdef _WIN32
 
-std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<Device> device) {
+std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<Device> device,
+                                                     std::shared_ptr<ColorSpace> colorSpace) {
   if (hwnd == nullptr || device == nullptr) {
     return nullptr;
   }
@@ -154,13 +155,14 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
   state->width = static_cast<int>(extent.width);
   state->height = static_cast<int>(extent.height);
 
-  return std::shared_ptr<VulkanWindow>(new VulkanWindow(device, std::move(state)));
+  return std::shared_ptr<VulkanWindow>(new VulkanWindow(device, std::move(state), colorSpace));
 }
 
 #endif
 
-VulkanWindow::VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<PlatformState> state)
-    : Window(std::move(device)), _platformState(std::move(state)) {
+VulkanWindow::VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<PlatformState> state,
+                           std::shared_ptr<ColorSpace> colorSpace)
+    : Window(std::move(device), std::move(colorSpace)), _platformState(std::move(state)) {
 }
 
 VulkanWindow::~VulkanWindow() {
