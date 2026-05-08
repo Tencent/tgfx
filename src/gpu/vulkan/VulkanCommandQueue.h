@@ -79,6 +79,7 @@ class VulkanCommandQueue : public CommandQueue {
     VmaAllocation stagingAlloc = VK_NULL_HANDLE;
     std::shared_ptr<VulkanTexture> texture;
     VkBufferImageCopy region = {};
+    VkImageLayout originalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   };
 
   // Represents a single vkQueueSubmit whose GPU completion has not yet been confirmed.

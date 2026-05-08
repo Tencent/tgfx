@@ -177,7 +177,12 @@ void VulkanCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Re
   region.imageOffset = {static_cast<int32_t>(rect.x()), static_cast<int32_t>(rect.y()), 0};
   region.imageExtent = {width, height, 1};
 
-  pendingUploads.push_back({stagingBuffer, stagingAlloc, vulkanTexture, region});
+  auto originalLayout = vulkanTexture->currentLayout();
+  pendingUploads.push_back({stagingBuffer, stagingAlloc, vulkanTexture, region, originalLayout});
+  // Mark layout as GENERAL now so that subsequent encoder operations (e.g., generateMipmapsForTexture)
+  // use the correct oldLayout. The actual GPU transition from originalLayout to TRANSFER_DST then
+  // GENERAL happens in flushPendingUploads(), which reads originalLayout from the PendingUpload.
+  vulkanTexture->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
@@ -203,9 +208,9 @@ void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
     transitionedImages.push_back(image);
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    // Use tracked layout to preserve existing contents outside the upload region.
-    // UNDEFINED would discard the entire image, corrupting previously uploaded sub-rects.
-    barrier.oldLayout = upload.texture->currentLayout();
+    // Use the layout captured at writeTexture() time. For first uploads this is UNDEFINED (discards
+    // content, which is correct). For subsequent uploads it preserves the prior GENERAL layout.
+    barrier.oldLayout = upload.originalLayout;
     barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -383,8 +388,9 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
 
   auto submitResult = vkQueueSubmit(gpu->graphicsQueue(), 1, &submitInfo, fence);
 
-  // Clear pending semaphores regardless of submit success — they were either consumed or the
-  // submission failed (in which case retrying with stale semaphore state would be wrong).
+  // Retain semaphores in the submission so they outlive GPU execution. Must capture before clearing.
+  auto retainedWaitSem = std::move(pendingWaitSemaphore);
+  auto retainedSignalSem = std::move(pendingSignalSemaphore);
   pendingWaitSemaphore = nullptr;
   pendingSignalSemaphore = nullptr;
 
@@ -421,6 +427,12 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
     submission.deferredDescriptorPools.push_back(vulkanCmdBuffer->descriptorPool());
   }
   submission.retainedResources = std::move(vulkanCmdBuffer->retainedResources());
+  if (retainedWaitSem) {
+    submission.retainedResources.push_back(std::move(retainedWaitSem));
+  }
+  if (retainedSignalSem) {
+    submission.retainedResources.push_back(std::move(retainedSignalSem));
+  }
   inflightSubmissions.push_back(std::move(submission));
   pendingUploads.clear();
 
