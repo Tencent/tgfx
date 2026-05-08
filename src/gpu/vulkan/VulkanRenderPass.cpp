@@ -346,7 +346,8 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
   VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
   auto result = vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet);
   if (result != VK_SUCCESS) {
-    LOGE("VulkanRenderPass: vkAllocateDescriptorSets failed (result=%d). Pool may be exhausted.",
+    LOGE("VulkanRenderPass: vkAllocateDescriptorSets failed (result=%d). "
+         "Per-frame descriptor pool exhausted, subsequent draws in this frame will be dropped.",
          static_cast<int>(result));
     return;
   }

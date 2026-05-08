@@ -76,10 +76,23 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
   }
 
   VkSurfaceCapabilitiesKHR capabilities = {};
-  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities);
+  result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities);
+  if (result != VK_SUCCESS) {
+    LOGE("VulkanWindow: vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed: %s",
+         VkResultToString(result));
+    vkDestroySurfaceKHR(vkInstance, surface, nullptr);
+    device->unlock();
+    return nullptr;
+  }
 
   uint32_t formatCount = 0;
   vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
+  if (formatCount == 0) {
+    LOGE("VulkanWindow: no surface formats available.");
+    vkDestroySurfaceKHR(vkInstance, surface, nullptr);
+    device->unlock();
+    return nullptr;
+  }
   std::vector<VkSurfaceFormatKHR> formats(formatCount);
   vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, formats.data());
 
@@ -104,6 +117,18 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
     imageCount = capabilities.maxImageCount;
   }
 
+  // Intersect desired usage with what the surface actually supports. TRANSFER_DST is optional
+  // (some Android drivers don't advertise it), but COLOR_ATTACHMENT is mandatory for rendering.
+  VkImageUsageFlags desiredUsage =
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  VkImageUsageFlags imageUsage = desiredUsage & capabilities.supportedUsageFlags;
+  if (!(imageUsage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) {
+    LOGE("VulkanWindow: surface does not support COLOR_ATTACHMENT usage.");
+    vkDestroySurfaceKHR(vkInstance, surface, nullptr);
+    device->unlock();
+    return nullptr;
+  }
+
   VkSwapchainCreateInfoKHR swapchainInfo = {};
   swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   swapchainInfo.surface = surface;
@@ -112,7 +137,7 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
   swapchainInfo.imageColorSpace = chosenFormat.colorSpace;
   swapchainInfo.imageExtent = extent;
   swapchainInfo.imageArrayLayers = 1;
-  swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  swapchainInfo.imageUsage = imageUsage;
   swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   swapchainInfo.preTransform = capabilities.currentTransform;
   swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -168,6 +193,9 @@ VulkanWindow::VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<Platf
 VulkanWindow::~VulkanWindow() {
   auto vulkanGPU = static_cast<VulkanGPU*>(device->lockContext()->gpu());
   auto vkDevice = vulkanGPU->device();
+  // Ensure all in-flight submissions referencing swapchain images have completed before
+  // destroying the swapchain and its image views.
+  vkDeviceWaitIdle(vkDevice);
 
   for (auto view : _platformState->imageViews) {
     vkDestroyImageView(vkDevice, view, nullptr);
