@@ -37,9 +37,6 @@ struct VulkanWindow::PlatformState {
   int width = 0;
   int height = 0;
   std::shared_ptr<RenderTargetProxy> swapchainProxy;
-  // Reusable command pool for the present layout transition. Reset each frame after the in-flight
-  // fence signals (guaranteeing the previous frame's command buffer has finished executing).
-  VkCommandPool presentCmdPool = VK_NULL_HANDLE;
 };
 
 #ifdef _WIN32
@@ -170,9 +167,6 @@ VulkanWindow::~VulkanWindow() {
   auto vulkanGPU = static_cast<VulkanGPU*>(device->lockContext()->gpu());
   auto vkDevice = vulkanGPU->device();
 
-  if (_platformState->presentCmdPool != VK_NULL_HANDLE) {
-    vkDestroyCommandPool(vkDevice, _platformState->presentCmdPool, nullptr);
-  }
   for (auto view : _platformState->imageViews) {
     vkDestroyImageView(vkDevice, view, nullptr);
   }
@@ -193,86 +187,11 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
   return _platformState->swapchainProxy;
 }
 
-void VulkanWindow::onPresent(Context* context) {
+void VulkanWindow::onPresent(Context*) {
   if (!_platformState->swapchainProxy) {
     return;
   }
   auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(_platformState->swapchainProxy);
-  auto vulkanGPU = static_cast<VulkanGPU*>(context->gpu());
-  uint32_t imageIndex = proxy->currentImageIndex();
-
-  // Record the GENERAL → PRESENT_SRC_KHR layout transition into a one-shot command buffer.
-  // The presentCmdPool is reused each frame — safe because getRenderTarget() already waited on the
-  // in-flight fence, guaranteeing the previous frame's command buffer has finished executing.
-  if (_platformState->presentCmdPool == VK_NULL_HANDLE) {
-    VkCommandPoolCreateInfo poolInfo = {};
-    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolInfo.queueFamilyIndex = vulkanGPU->graphicsQueueIndex();
-    vkCreateCommandPool(vulkanGPU->device(), &poolInfo, nullptr, &_platformState->presentCmdPool);
-  } else {
-    vkResetCommandPool(vulkanGPU->device(), _platformState->presentCmdPool, 0);
-  }
-
-  VkCommandBufferAllocateInfo allocInfo = {};
-  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  allocInfo.commandPool = _platformState->presentCmdPool;
-  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandBufferCount = 1;
-  VkCommandBuffer cmd = VK_NULL_HANDLE;
-  vkAllocateCommandBuffers(vulkanGPU->device(), &allocInfo, &cmd);
-
-  VkCommandBufferBeginInfo beginInfo = {};
-  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  vkBeginCommandBuffer(cmd, &beginInfo);
-
-  VkImageMemoryBarrier barrier = {};
-  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-  barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = proxy->currentImage();
-  barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-  barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-  barrier.dstAccessMask = 0;
-  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                       &barrier);
-  vkEndCommandBuffer(cmd);
-
-  // Submit the transition command buffer with semaphore synchronization:
-  //   wait: imageAvailableSemaphore (GPU waits for acquire to finish before writing)
-  //   signal: renderFinishedSemaphore (presentation waits for this before displaying)
-  //   fence: inFlightFence (CPU backpressure for next frame's acquire)
-  VkSemaphore waitSemaphore = proxy->imageAvailableSemaphore();
-  VkSemaphore signalSemaphore = proxy->renderFinishedSemaphore();
-  VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-
-  VkSubmitInfo submitInfo = {};
-  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submitInfo.waitSemaphoreCount = 1;
-  submitInfo.pWaitSemaphores = &waitSemaphore;
-  submitInfo.pWaitDstStageMask = &waitStage;
-  submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &cmd;
-  submitInfo.signalSemaphoreCount = 1;
-  submitInfo.pSignalSemaphores = &signalSemaphore;
-
-  vkQueueSubmit(vulkanGPU->graphicsQueue(), 1, &submitInfo, proxy->inFlightFence());
-
-  // Present the swapchain image, waiting for rendering to complete via renderFinishedSemaphore.
-  VkPresentInfoKHR presentInfo = {};
-  presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-  presentInfo.waitSemaphoreCount = 1;
-  presentInfo.pWaitSemaphores = &signalSemaphore;
-  presentInfo.swapchainCount = 1;
-  presentInfo.pSwapchains = &_platformState->swapchain;
-  presentInfo.pImageIndices = &imageIndex;
-
-  vkQueuePresentKHR(vulkanGPU->graphicsQueue(), &presentInfo);
-
   proxy->releaseFrame();
 }
 

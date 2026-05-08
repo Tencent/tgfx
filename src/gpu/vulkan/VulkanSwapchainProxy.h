@@ -27,13 +27,15 @@ namespace tgfx {
 class VulkanGPU;
 
 /**
- * Manages swapchain image acquisition and per-frame synchronization for window presentation.
+ * Manages swapchain image acquisition and per-frame presentation for window rendering.
  *
- * Synchronization model (replaces the previous vkQueueWaitIdle approach):
- *   - acquire: signals imageAvailableSemaphore (GPU-side, no CPU block)
- *   - render submit: waits imageAvailableSemaphore, signals renderFinishedSemaphore
- *   - present: waits renderFinishedSemaphore
- *   - per-frame fence: CPU backpressure to prevent acquiring more than MAX_FRAMES_IN_FLIGHT
+ * Synchronization model:
+ *   - acquire: vkAcquireNextImageKHR signals a fence, CPU waits on it. This guarantees the image
+ *     is fully available before command recording begins (no GPU-GPU semaphore needed).
+ *   - present: scheduled via VulkanCommandQueue::schedulePresent() during acquire. The queue
+ *     appends a GENERAL→PRESENT_SRC layout transition to the render batch and calls
+ *     vkQueuePresentKHR after submit. Same-queue ordering guarantees correctness.
+ *   - CPU backpressure: handled by VulkanCommandQueue's MAX_FRAMES_IN_FLIGHT fence mechanism.
  */
 class VulkanSwapchainProxy : public RenderTargetProxy {
  public:
@@ -56,28 +58,6 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
     return _currentImageIndex;
   }
 
-  VkImage currentImage() const {
-    return _images[_currentImageIndex];
-  }
-
-  /// Returns the semaphore signaled by vkAcquireNextImageKHR. The render submit must wait on this
-  /// at VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT before writing to the swapchain image.
-  VkSemaphore imageAvailableSemaphore() const {
-    return _imageAvailableSemaphore;
-  }
-
-  /// Returns the semaphore that the render submit should signal upon completion.
-  /// vkQueuePresentKHR waits on this to ensure rendering finishes before presentation.
-  VkSemaphore renderFinishedSemaphore() const {
-    return _renderFinishedSemaphore;
-  }
-
-  /// Returns the fence used for CPU backpressure. The present submit signals this fence;
-  /// the next frame's acquire waits on it to prevent overwriting in-flight resources.
-  VkFence inFlightFence() const {
-    return _inFlightFence;
-  }
-
   void releaseFrame();
 
  private:
@@ -90,10 +70,7 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   std::vector<VkImageView> _imageViews;
   std::vector<VkImage> _images;
 
-  // Per-frame synchronization primitives.
-  mutable VkSemaphore _imageAvailableSemaphore = VK_NULL_HANDLE;
-  mutable VkSemaphore _renderFinishedSemaphore = VK_NULL_HANDLE;
-  mutable VkFence _inFlightFence = VK_NULL_HANDLE;
+  mutable VkFence _acquireFence = VK_NULL_HANDLE;
   mutable uint32_t _currentImageIndex = 0;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
 };

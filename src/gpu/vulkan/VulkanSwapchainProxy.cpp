@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VulkanSwapchainProxy.h"
+#include "VulkanCommandQueue.h"
 #include "VulkanGPU.h"
 #include "VulkanUtil.h"
 #include "core/utils/Log.h"
@@ -31,31 +32,14 @@ VulkanSwapchainProxy::VulkanSwapchainProxy(Context* context, VulkanGPU* gpu,
                                            const std::vector<VkImage>& images)
     : _context(context), _gpu(gpu), _swapchain(swapchain), _format(format), _width(width),
       _height(height), _imageViews(imageViews), _images(images) {
-  // Create per-frame synchronization primitives once at construction.
-  VkSemaphoreCreateInfo semInfo = {};
-  semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  vkCreateSemaphore(_gpu->device(), &semInfo, nullptr, &_imageAvailableSemaphore);
-  vkCreateSemaphore(_gpu->device(), &semInfo, nullptr, &_renderFinishedSemaphore);
-
   VkFenceCreateInfo fenceInfo = {};
   fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-  // Start signaled so the first frame doesn't block waiting for a non-existent previous frame.
-  fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-  vkCreateFence(_gpu->device(), &fenceInfo, nullptr, &_inFlightFence);
+  vkCreateFence(_gpu->device(), &fenceInfo, nullptr, &_acquireFence);
 }
 
 VulkanSwapchainProxy::~VulkanSwapchainProxy() {
-  auto vkDevice = _gpu->device();
-  // Wait for any pending GPU work before destroying sync objects.
-  if (_inFlightFence != VK_NULL_HANDLE) {
-    vkWaitForFences(vkDevice, 1, &_inFlightFence, VK_TRUE, UINT64_MAX);
-    vkDestroyFence(vkDevice, _inFlightFence, nullptr);
-  }
-  if (_imageAvailableSemaphore != VK_NULL_HANDLE) {
-    vkDestroySemaphore(vkDevice, _imageAvailableSemaphore, nullptr);
-  }
-  if (_renderFinishedSemaphore != VK_NULL_HANDLE) {
-    vkDestroySemaphore(vkDevice, _renderFinishedSemaphore, nullptr);
+  if (_acquireFence != VK_NULL_HANDLE) {
+    vkDestroyFence(_gpu->device(), _acquireFence, nullptr);
   }
 }
 
@@ -93,16 +77,10 @@ std::shared_ptr<TextureView> VulkanSwapchainProxy::getTextureView() const {
 
 std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
-    // CPU backpressure: wait for the previous frame's submit to complete before reusing sync
-    // objects. The fence starts signaled, so the first frame passes through immediately.
-    vkWaitForFences(_gpu->device(), 1, &_inFlightFence, VK_TRUE, UINT64_MAX);
-    vkResetFences(_gpu->device(), 1, &_inFlightFence);
-
-    // Acquire the next swapchain image. Signals _imageAvailableSemaphore on the GPU timeline —
-    // no CPU wait needed. The render submit will wait on this semaphore before writing pixels.
-    auto result = vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX,
-                                        _imageAvailableSemaphore, VK_NULL_HANDLE,
-                                        &_currentImageIndex);
+    // Acquire the next swapchain image. CPU blocks on the fence until the image is available.
+    vkResetFences(_gpu->device(), 1, &_acquireFence);
+    auto result = vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX, VK_NULL_HANDLE,
+                                        _acquireFence, &_currentImageIndex);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
       LOGE("VulkanSwapchainProxy: swapchain out of date, needs rebuild.");
       return nullptr;
@@ -112,6 +90,12 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
            static_cast<int>(result));
       return nullptr;
     }
+    vkWaitForFences(_gpu->device(), 1, &_acquireFence, VK_TRUE, UINT64_MAX);
+
+    // Schedule the present to happen at the end of the next submit(), mirroring Metal's
+    // [commandBuffer presentDrawable:] pattern. The layout transition is also handled there.
+    auto queue = static_cast<VulkanCommandQueue*>(_context->gpu()->queue());
+    queue->schedulePresent(_swapchain, _currentImageIndex, _images[_currentImageIndex]);
 
     VulkanImageInfo vulkanInfo = {};
     vulkanInfo.image = reinterpret_cast<void*>(_images[_currentImageIndex]);
