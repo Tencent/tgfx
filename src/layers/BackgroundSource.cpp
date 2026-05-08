@@ -39,14 +39,14 @@ struct TopLevelGeometry {
   bool valid = false;
 };
 
-static float MaxBlurOutset() {
-  static float MaxOutset = 0;
-  if (MaxOutset != 0) {
-    return MaxOutset;
-  }
+static float ComputeMaxBlurOutset() {
   auto filter =
       ImageFilter::Blur(GaussianBlurImageFilter::MaxSigma(), GaussianBlurImageFilter::MaxSigma());
-  MaxOutset = filter->filterBounds(Rect::MakeEmpty()).right;
+  return filter->filterBounds(Rect::MakeEmpty()).right;
+}
+
+static float MaxBlurOutset() {
+  static const float MaxOutset = ComputeMaxBlurOutset();
   return MaxOutset;
 }
 

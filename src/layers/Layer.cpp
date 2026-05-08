@@ -929,7 +929,6 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     auto canvasMatrix = canvas->getMatrix();
     auto backgroundRect = canvasMatrix.mapRect(clippedBounds);
     auto backgroundMatrix = canvasMatrix;
-    auto captureColorSpace = args.dstColorSpace;
     // Orphan layers never run updateRenderBounds, so their cached outsets are stale.
     // Compute them on the fly before createBackgroundSource reads maxBackgroundOutset.
     if (_root == nullptr) {
@@ -938,7 +937,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       collectBackgroundOutsets(1.0f, &maxBackgroundOutset, &minBackgroundOutset);
     }
     if (auto bgSource = createBackgroundSource(context, backgroundRect, backgroundMatrix, false,
-                                               std::move(captureColorSpace))) {
+                                               args.dstColorSpace)) {
       // Replay from _root so ancestor matrices apply; orphan layers replay from themselves.
       // The capture rect is in the captureRoot's local coordinate space: world (root-local) when
       // rooted, or this layer's local bounds when orphan.
@@ -1669,7 +1668,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
       continue;
     }
     if (args.backgroundHandler != nullptr && i < maxIndex &&
-        !args.backgroundHandler->isForcedCapture()) {
+        args.backgroundHandler->source() != nullptr && !args.backgroundHandler->isForcedCapture()) {
       args.backgroundHandler->beginForcedCapture();
       drawChild(*childArgsOpt, canvas, child.get(), alpha, &Layer::drawLayer);
       args.backgroundHandler->endForcedCapture();
@@ -1772,8 +1771,7 @@ bool Layer::drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, f
 }
 
 std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& args,
-                                                             const Matrix& matrix,
-                                                             bool excludeContour) {
+                                                             const Matrix& matrix) {
   if (_layerStyles.empty() || args.excludeEffects) {
     return nullptr;
   }
@@ -1788,7 +1786,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
     needContent[index] = true;
-    if (!excludeContour && layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour) {
+    if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour) {
       needContour[index] = true;
     }
   }

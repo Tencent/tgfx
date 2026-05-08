@@ -172,8 +172,8 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
   auto parentMatrix = parentCanvas->getMatrix();
   auto surfaceRect = parentMatrix.mapRect(*inputBounds);
   surfaceRect.roundOut();
-  surfaceRect.intersect(Rect::MakeWH(backdrop->width(), backdrop->height()));
-  if (surfaceRect.isEmpty()) {
+  if (!surfaceRect.intersect(Rect::MakeWH(backdrop->width(), backdrop->height())) ||
+      surfaceRect.isEmpty()) {
     return {};
   }
 

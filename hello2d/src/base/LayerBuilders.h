@@ -32,7 +32,6 @@ namespace hello2d {
   }
 
 DEFINE_LAYER_BUILDER(ConicGradient);
-DEFINE_LAYER_BUILDER(ImageWithBackgroundBlur);
 DEFINE_LAYER_BUILDER(ImageWithMipmap);
 DEFINE_LAYER_BUILDER(ImageWithShadow);
 DEFINE_LAYER_BUILDER(Layer3DTree);

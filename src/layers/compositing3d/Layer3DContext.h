@@ -48,7 +48,16 @@ struct TransformState {
  */
 class Layer3DContext {
  public:
-  static std::shared_ptr<Layer3DContext> Make(bool contourMode, Context* context,
+  /**
+   * Creates a Layer3DContext implementation for compositing layer content with 3D transforms.
+   * @param opaqueMode If true, returns an Opaque3DContext that renders opaque/contour content;
+   * if false, returns the default Render3DContext implementation.
+   * @param context The GPU Context used for offscreen compositing.
+   * @param renderRect The destination rectangle in the target canvas's coordinate space.
+   * @param contentScale The scale factor applied to recorded content.
+   * @param colorSpace The color space used for intermediate images.
+   */
+  static std::shared_ptr<Layer3DContext> Make(bool opaqueMode, Context* context,
                                               const Rect& renderRect, float contentScale,
                                               std::shared_ptr<ColorSpace> colorSpace);
 

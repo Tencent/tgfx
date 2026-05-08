@@ -1106,10 +1106,8 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   }
   // Expand worldRects by the max blur outset so the capture pass keeps layers whose bounds sit
   // just outside the dirty rects but still contribute pixels to the blur sampling region.
-  if (_root->maxBackgroundOutset > 0.f) {
-    for (auto& rect : worldRects) {
-      rect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
-    }
+  for (auto& rect : worldRects) {
+    rect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
   }
   // The capture pass replays the entire layer tree onto the bg source's surface. Every
   // Background-sourced LayerStyle is intercepted by BackgroundCapturer, which samples the surface

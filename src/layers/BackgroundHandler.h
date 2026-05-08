@@ -95,15 +95,15 @@ class BackgroundHandler {
   bool isForcedCapture() const {
     return _forcedCaptureDepth > 0;
   }
-  void beginForcedCapture() const {
+  void beginForcedCapture() {
     ++_forcedCaptureDepth;
   }
-  void endForcedCapture() const {
+  void endForcedCapture() {
     --_forcedCaptureDepth;
   }
 
  private:
-  mutable int _forcedCaptureDepth = 0;
+  int _forcedCaptureDepth = 0;
 };
 
 class BackgroundCapturer : public BackgroundHandler {

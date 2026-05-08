@@ -38,7 +38,9 @@ class BackgroundSource {
 
   virtual ~BackgroundSource() = default;
 
-  // Canvas callers draw into. Pointer is stable across getBackgroundImage() calls.
+  // Canvas callers draw into. The pointer is stable across getBackgroundImage() calls, but the
+  // Picture variant resets the canvas state stack on each readback — re-query saved matrices/clips
+  // after a getBackgroundImage() call rather than caching them.
   virtual Canvas* getCanvas() = 0;
 
   // image pixel → world, where image pixel is the coord space of getBackgroundImage()'s result.
@@ -70,7 +72,9 @@ class BackgroundSource {
     return surfaceToWorld;
   }
 
-  // The world-space rect this source's surface covers (includes blur outset).
+  // Returns the world-space rect this source covers. For top-level sources the rect is
+  // `drawRect.outset(maxOutset, maxOutset)` (i.e. with blur outset baked in). For sub sources it
+  // is the caller-supplied renderBounds rounded out (no extra outset added).
   Rect getBackgroundRect() const {
     return backgroundRect;
   }

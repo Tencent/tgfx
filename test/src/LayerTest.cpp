@@ -3312,7 +3312,7 @@ TGFX_TEST(LayerTest, RootLayerBackgroundColorWithBlurBackground) {
       ShapeStyle::Make(Color::FromRGBA(0, 0, 255, 255)));  // Blue background content
   displayList->root()->addChild(bottomLayer);
 
-  // Add a shape layer with background blur to trigger the blurBackground code path
+  // Add a shape layer with background blur to exercise the BackgroundCapturer / BackgroundConsumer pipeline.
   // Position it so part covers bottomLayer and part covers pure background
   auto shapeLayer = ShapeLayer::Make();
   Path path = {};
@@ -3328,7 +3328,7 @@ TGFX_TEST(LayerTest, RootLayerBackgroundColorWithBlurBackground) {
   displayList->root()->addChild(shapeLayer);
 
   // Render the display list - this will internally create BackgroundSource and call
-  // RootLayer::drawLayer with args.blurBackground set, testing our new code path
+  // RootLayer::drawLayer feeds the background-blur capture pass via DisplayList::captureBackgrounds.
   displayList->render(surface.get());
 
   // Compare with baseline to verify the background color is correctly drawn

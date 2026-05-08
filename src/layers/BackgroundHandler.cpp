@@ -139,7 +139,8 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (FloatNearlyZero(contentScale)) {
     return;
   }
-  auto bounds = layer->getBounds();
+  auto layerBounds = layer->getBounds();
+  auto bounds = layerBounds;
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
   // Build layer-local → world from the RUNTIME canvas chain: the capture canvas matrix maps
@@ -160,7 +161,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   Matrix bgPixelToLocal = worldToLocal;
   bgPixelToLocal.preConcat(bgSource->backgroundMatrix());
   Point smallBgOffset = {};
-  auto smallBgImage = MakeDetachedBgCopy(args.context, bgImage, bgPixelToLocal, layer->getBounds(),
+  auto smallBgImage = MakeDetachedBgCopy(args.context, bgImage, bgPixelToLocal, layerBounds,
                                          &smallBgOffset, args.dstColorSpace);
   PictureRecorder recorder = {};
   auto* recording = recorder.beginRecording();
@@ -195,8 +196,14 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::cloneWithSource(
   if (newSource == nullptr) {
     return nullptr;
   }
-  return std::unique_ptr<BackgroundHandler>(
-      new BackgroundCapturer(snapshots, std::move(newSource)));
+  auto clone =
+      std::unique_ptr<BackgroundHandler>(new BackgroundCapturer(snapshots, std::move(newSource)));
+  // Inherit the forced-capture state so subtrees inside pass-through offscreen containers
+  // are not culled by lastCaptureChildIndex — they still contribute to the parent bgSource.
+  if (isForcedCapture()) {
+    clone->beginForcedCapture();
+  }
+  return clone;
 }
 
 const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* layer) const {
