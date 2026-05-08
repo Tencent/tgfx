@@ -79,7 +79,12 @@ std::shared_ptr<VulkanCommandEncoder> VulkanCommandEncoder::Make(VulkanGPU* gpu)
   VkCommandBufferBeginInfo beginInfo = {};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  vkBeginCommandBuffer(cmdBuffer, &beginInfo);
+  result = vkBeginCommandBuffer(cmdBuffer, &beginInfo);
+  if (result != VK_SUCCESS) {
+    LOGE("VulkanCommandEncoder: vkBeginCommandBuffer failed.");
+    vkDestroyCommandPool(gpu->device(), pool, nullptr);
+    return nullptr;
+  }
 
   auto encoder = gpu->makeResource<VulkanCommandEncoder>(gpu, cmdBuffer, pool);
   encoder->descriptorPool = gpu->acquireDescriptorPool();
