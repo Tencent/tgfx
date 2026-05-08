@@ -24,10 +24,12 @@
 namespace tgfx {
 
 static VkImageUsageFlags ToVkImageUsage(uint32_t usage) {
-  VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   if (usage & TextureUsage::TEXTURE_BINDING) {
     flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+  }
+  if (usage & TextureUsage::RENDER_ATTACHMENT) {
+    flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   }
   return flags;
 }
