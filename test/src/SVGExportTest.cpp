@@ -23,6 +23,7 @@
 #include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -974,6 +975,81 @@ TGFX_TEST(SVGExportTest, ClipWithMatrixTransform) {
   exporter->close();
 
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ClipWithMatrixTransform"));
+}
+
+TGFX_TEST(SVGExportTest, PictureImageWithAlpha) {
+  // Covers the alpha-only branch of SVGExportContext::drawImage for PictureImage: when a
+  // PictureImage is drawn with paint.alpha < 1 and no shader/mask/color filter, the exporter
+  // should wrap the playback in a <g opacity="..."> while preserving vector output inside.
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  PictureRecorder recorder;
+  auto pictureCanvas = recorder.beginRecording();
+  {
+    Paint redPaint;
+    redPaint.setColor(Color::Red());
+    pictureCanvas->drawRect(Rect::MakeWH(100, 100), redPaint);
+
+    Paint bluePaint;
+    bluePaint.setColor(Color::Blue());
+    pictureCanvas->drawCircle(65, 65, 35, bluePaint);
+  }
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+  auto image = Image::MakeFrom(picture, 100, 100);
+  ASSERT_TRUE(image != nullptr);
+
+  Paint paint;
+  paint.setAlpha(0.5f);
+  canvas->drawImage(image, 50, 50, &paint);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PictureImageWithAlpha"));
+}
+
+TGFX_TEST(SVGExportTest, PictureImageWithColorFilter) {
+  // Covers the rasterization branch of SVGExportContext::drawImage for PictureImage: when the
+  // brush carries a non-identity effect (here a ColorFilter), the exporter must fall back to
+  // rasterizing the picture image so the effect is fully honored. The resulting SVG should
+  // embed the content as an <image> rather than replaying the picture as vectors.
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  PictureRecorder recorder;
+  auto pictureCanvas = recorder.beginRecording();
+  {
+    Paint redPaint;
+    redPaint.setColor(Color::Red());
+    pictureCanvas->drawRect(Rect::MakeWH(100, 100), redPaint);
+
+    Paint bluePaint;
+    bluePaint.setColor(Color::Blue());
+    pictureCanvas->drawCircle(65, 65, 35, bluePaint);
+  }
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+  auto image = Image::MakeFrom(picture, 100, 100);
+  ASSERT_TRUE(image != nullptr);
+
+  Paint paint;
+  paint.setColorFilter(ColorFilter::Blend(Color::White(), BlendMode::Difference));
+  canvas->drawImage(image, 50, 50, &paint);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PictureImageWithColorFilter"));
 }
 
 /**

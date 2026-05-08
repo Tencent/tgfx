@@ -168,12 +168,48 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
   DEBUG_ASSERT(image != nullptr);
   auto type = Types::Get(image.get());
   if (type == Types::ImageType::Picture) {
-    const auto pictureImage = static_cast<const PictureImage*>(image.get());
-    auto newMatrix = matrix;
-    if (pictureImage->matrix) {
-      newMatrix.preConcat(*pictureImage->matrix);
+    if (brush.nothingToDraw()) {
+      return;
     }
-    drawPicture(pictureImage->picture, newMatrix, clip);
+    // SVG has no single attribute that applies "per-element alpha multiply" to a playback stream.
+    // Classify the brush into three buckets so playback can still preserve vector output whenever
+    // possible:
+    //   identity        -> replay directly (current behavior)
+    //   alpha-only < 1  -> wrap in <g opacity=...> then replay
+    //   anything else   -> rasterize the picture image and route through exportPixmap so the
+    //                      brush (shader/colorFilter/maskFilter/blendMode) is fully honored
+    bool brushIsIdentityExceptAlpha = brush.shader == nullptr && brush.maskFilter == nullptr &&
+                                      brush.colorFilter == nullptr &&
+                                      brush.blendMode == BlendMode::SrcOver;
+    if (brushIsIdentityExceptAlpha) {
+      const auto pictureImage = static_cast<const PictureImage*>(image.get());
+      auto newMatrix = matrix;
+      if (pictureImage->matrix) {
+        newMatrix.preConcat(*pictureImage->matrix);
+      }
+      if (brush.color.alpha < 1.0f) {
+        // Close any active clip group so the <g opacity> wraps at the right parent level.
+        // Clear the members on exit so subsequent applyClipPath rebuilds the clip group
+        // instead of short-circuiting on a matching currentClipPath.
+        clipGroupElement = nullptr;
+        currentClipPath = {};
+        {
+          ElementWriter opacityGroup("g", xmlWriter, resourceBucket.get());
+          opacityGroup.addAttribute("opacity", brush.color.alpha);
+          drawPicture(pictureImage->picture, newMatrix, clip);
+        }
+        clipGroupElement = nullptr;
+        currentClipPath = {};
+      } else {
+        drawPicture(pictureImage->picture, newMatrix, clip);
+      }
+      return;
+    }
+    auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
+    Bitmap bitmap = ImageExportToBitmap(context, modifyImage);
+    if (!bitmap.isEmpty()) {
+      exportPixmap(Pixmap(bitmap), matrix, brush);
+    }
   } else if (type == Types::ImageType::Filter) {
     const auto filterImage = static_cast<const FilterImage*>(image.get());
     auto filter = filterImage->filter;

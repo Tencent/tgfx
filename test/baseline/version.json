@@ -474,9 +474,11 @@
         "DstColorSpace": "0d4409dd",
         "ImageMask": "f8344be7",
         "InvertPictureImageMask": "9a80633b",
-        "LayerDropShadow": "a99262da",
+        "LayerDropShadow": "743efde6",
         "LayerMaskBlur": "cd3ccd97b",
-        "PictureImageMask": "9a80633b"
+        "PictureImageMask": "9a80633b",
+        "PictureImageWithAlpha": "743efde6",
+        "PictureImageWithColorFilter": "743efde6"
     },
     "SVGTest": {
         "blur": "b1db872",
