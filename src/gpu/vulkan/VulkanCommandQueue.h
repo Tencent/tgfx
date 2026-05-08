@@ -107,6 +107,11 @@ class VulkanCommandQueue : public CommandQueue {
   void flushPendingUploads(VkCommandBuffer commandBuffer);
   void cleanupPendingUploads();
 
+  // Destroys all Vulkan objects and releases all resource references held by a single submission.
+  // Called in three scenarios: (1) fence signaled (normal completion), (2) vkWaitForFences returned
+  // (forced wait), (3) vkQueueSubmit failed (immediate cleanup without GPU execution).
+  void reclaimSubmission(InflightSubmission& submission);
+
   // Non-blocking: polls all pending fences and reclaims resources from completed submissions.
   // Uses vkGetFenceStatus (non-blocking) instead of vkWaitForFences to avoid stalling the CPU.
   // Called at the start of each new submit() so resources are reclaimed "just in time" before

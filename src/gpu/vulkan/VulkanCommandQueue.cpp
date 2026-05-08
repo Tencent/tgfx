@@ -61,6 +61,26 @@ void VulkanCommandQueue::recycleFence(VkFence fence) {
   fencePool.push_back(fence);
 }
 
+void VulkanCommandQueue::reclaimSubmission(InflightSubmission& submission) {
+  for (auto& upload : submission.uploads) {
+    vmaDestroyBuffer(gpu->allocator(), upload.stagingBuffer, upload.stagingAlloc);
+  }
+  if (submission.commandPool != VK_NULL_HANDLE) {
+    vkDestroyCommandPool(gpu->device(), submission.commandPool, nullptr);
+  }
+  for (auto fb : submission.deferredFramebuffers) {
+    vkDestroyFramebuffer(gpu->device(), fb, nullptr);
+  }
+  for (auto rp : submission.deferredRenderPasses) {
+    vkDestroyRenderPass(gpu->device(), rp, nullptr);
+  }
+  for (auto pool : submission.deferredDescriptorPools) {
+    gpu->releaseDescriptorPool(pool);
+  }
+  submission.retainedResources.clear();
+  recycleFence(submission.fence);
+}
+
 void VulkanCommandQueue::pollCompletedSubmissions() {
   while (!inflightSubmissions.empty()) {
     auto& oldest = inflightSubmissions.front();
@@ -69,22 +89,7 @@ void VulkanCommandQueue::pollCompletedSubmissions() {
     }
     auto ticks = oldest.frameTime.time_since_epoch().count();
     _completedFrameTime.store(ticks, std::memory_order_release);
-    for (auto& upload : oldest.uploads) {
-      vmaDestroyBuffer(gpu->allocator(), upload.stagingBuffer, upload.stagingAlloc);
-    }
-    if (oldest.commandPool != VK_NULL_HANDLE) {
-      vkDestroyCommandPool(gpu->device(), oldest.commandPool, nullptr);
-    }
-    for (auto fb : oldest.deferredFramebuffers) {
-      vkDestroyFramebuffer(gpu->device(), fb, nullptr);
-    }
-    for (auto rp : oldest.deferredRenderPasses) {
-      vkDestroyRenderPass(gpu->device(), rp, nullptr);
-    }
-    for (auto pool : oldest.deferredDescriptorPools) {
-      gpu->releaseDescriptorPool(pool);
-    }
-    recycleFence(oldest.fence);
+    reclaimSubmission(oldest);
     inflightSubmissions.pop_front();
   }
   gpu->processUnreferencedResources();
@@ -95,22 +100,7 @@ void VulkanCommandQueue::waitAllInflightSubmissions() {
     vkWaitForFences(gpu->device(), 1, &submission.fence, VK_TRUE, UINT64_MAX);
     auto ticks = submission.frameTime.time_since_epoch().count();
     _completedFrameTime.store(ticks, std::memory_order_release);
-    for (auto& upload : submission.uploads) {
-      vmaDestroyBuffer(gpu->allocator(), upload.stagingBuffer, upload.stagingAlloc);
-    }
-    if (submission.commandPool != VK_NULL_HANDLE) {
-      vkDestroyCommandPool(gpu->device(), submission.commandPool, nullptr);
-    }
-    for (auto fb : submission.deferredFramebuffers) {
-      vkDestroyFramebuffer(gpu->device(), fb, nullptr);
-    }
-    for (auto rp : submission.deferredRenderPasses) {
-      vkDestroyRenderPass(gpu->device(), rp, nullptr);
-    }
-    for (auto pool : submission.deferredDescriptorPools) {
-      gpu->releaseDescriptorPool(pool);
-    }
-    recycleFence(submission.fence);
+    reclaimSubmission(submission);
   }
   inflightSubmissions.clear();
   gpu->processUnreferencedResources();
@@ -318,7 +308,26 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   submitInfo.commandBufferCount = static_cast<uint32_t>(cmdBuffers.size());
   submitInfo.pCommandBuffers = cmdBuffers.data();
 
-  vkQueueSubmit(gpu->graphicsQueue(), 1, &submitInfo, fence);
+  auto submitResult = vkQueueSubmit(gpu->graphicsQueue(), 1, &submitInfo, fence);
+  if (submitResult != VK_SUCCESS) {
+    LOGE("VulkanCommandQueue::submit: vkQueueSubmit failed (result=%d).",
+         static_cast<int>(submitResult));
+    // Submit failed — fence was never signaled. Pack all resources into a temporary
+    // InflightSubmission and reclaim immediately to avoid leaks or future deadlocks.
+    InflightSubmission failed = {};
+    failed.fence = fence;
+    failed.commandPool = vulkanCmdBuffer->vulkanCommandPool();
+    failed.uploads = std::move(pendingUploads);
+    failed.deferredFramebuffers = std::move(vulkanCmdBuffer->deferredFramebuffers());
+    failed.deferredRenderPasses = std::move(vulkanCmdBuffer->deferredRenderPasses());
+    if (vulkanCmdBuffer->descriptorPool() != VK_NULL_HANDLE) {
+      failed.deferredDescriptorPools.push_back(vulkanCmdBuffer->descriptorPool());
+    }
+    failed.retainedResources = std::move(vulkanCmdBuffer->retainedResources());
+    reclaimSubmission(failed);
+    pendingUploads.clear();
+    return;
+  }
 
   // Transfer ownership of per-frame resources to the inflight record. These will be reclaimed
   // once the fence signals (either via pollCompletedSubmissions or waitAllInflightSubmissions).
