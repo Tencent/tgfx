@@ -382,11 +382,11 @@ BackendSemaphore VulkanGPU::stealBackendSemaphore(std::shared_ptr<Semaphore> sem
 
 uint32_t VulkanGPU::MakeSamplerKey(const SamplerDescriptor& descriptor) {
   uint32_t key = 0;
-  key |= static_cast<uint32_t>(descriptor.addressModeX);
-  key |= static_cast<uint32_t>(descriptor.addressModeY) << 3;
-  key |= static_cast<uint32_t>(descriptor.minFilter) << 6;
-  key |= static_cast<uint32_t>(descriptor.magFilter) << 8;
-  key |= static_cast<uint32_t>(descriptor.mipmapMode) << 10;
+  key |= static_cast<uint32_t>(descriptor.addressModeX);        // bits 0-2
+  key |= static_cast<uint32_t>(descriptor.addressModeY) << 3;   // bits 3-5
+  key |= static_cast<uint32_t>(descriptor.minFilter) << 6;      // bits 6-7
+  key |= static_cast<uint32_t>(descriptor.magFilter) << 8;      // bits 8-9
+  key |= static_cast<uint32_t>(descriptor.mipmapMode) << 10;    // bits 10-11
   return key;
 }
 

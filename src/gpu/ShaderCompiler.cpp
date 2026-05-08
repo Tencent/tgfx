@@ -155,7 +155,7 @@ std::vector<uint32_t> CompileGLSLToSPIRV(const shaderc::Compiler* compiler,
 
   if (spvResult.GetCompilationStatus() != shaderc_compilation_status_success) {
     LOGE("GLSL to SPIR-V compilation error: %s", spvResult.GetErrorMessage().c_str());
-    LOGE("GLSL:\n%s", glslCode.c_str());
+    LOGE("GLSL (first 512 chars):\n%.512s", glslCode.c_str());
     return {};
   }
 

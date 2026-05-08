@@ -110,20 +110,22 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
     // oldLayout avoids cross-submission layout tracking issues. For Load, we must preserve contents
     // so we use the tracked layout (the previous submit that wrote this image will have completed
     // on the same queue before this command buffer executes).
-    auto oldLayout = (ca.loadAction == LoadAction::Load) ? vulkanTexture->currentLayout()
-                                                         : VK_IMAGE_LAYOUT_UNDEFINED;
-    if (ca.loadAction == LoadAction::Load &&
+    auto loadAction = ca.loadAction;
+    if (loadAction == LoadAction::Load &&
         vulkanTexture->currentLayout() == VK_IMAGE_LAYOUT_UNDEFINED) {
-      LOGE("VulkanRenderPass: LoadAction::Load on texture with UNDEFINED layout. "
-           "Contents are uninitialized and will not be preserved.");
+      // Texture has never been written — there is nothing to preserve. Silently downgrade to
+      // DontCare which is equivalent to UNDEFINED→GENERAL with loadOp=DONT_CARE.
+      loadAction = LoadAction::DontCare;
     }
+    auto oldLayout = (loadAction == LoadAction::Load) ? vulkanTexture->currentLayout()
+                                                      : VK_IMAGE_LAYOUT_UNDEFINED;
     TransitionImageLayout(commandBuffer, vulkanTexture->vulkanImage(), oldLayout,
                           VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
 
     VkAttachmentDescription attachment = {};
     attachment.format = vulkanTexture->vulkanFormat();
     attachment.samples = static_cast<VkSampleCountFlagBits>(ca.texture->sampleCount());
-    attachment.loadOp = ToVkLoadOp(ca.loadAction);
+    attachment.loadOp = ToVkLoadOp(loadAction);
     attachment.storeOp = ToVkStoreOp(ca.storeAction);
     attachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
     attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;

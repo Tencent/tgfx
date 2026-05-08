@@ -23,7 +23,8 @@
 #include "tgfx/gpu/Window.h"
 
 #ifdef _WIN32
-#include <windows.h>
+struct HWND__;
+typedef HWND__* HWND;
 #endif
 
 namespace tgfx {

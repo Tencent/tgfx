@@ -58,6 +58,10 @@ VkFence VulkanCommandQueue::acquireFence() {
 }
 
 void VulkanCommandQueue::recycleFence(VkFence fence) {
+  if (fencePool.size() >= MAX_FRAMES_IN_FLIGHT + 1) {
+    vkDestroyFence(gpu->device(), fence, nullptr);
+    return;
+  }
   fencePool.push_back(fence);
 }
 
