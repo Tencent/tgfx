@@ -53,17 +53,6 @@ class VulkanCommandEncoder : public CommandEncoder, public VulkanResource {
     return descriptorPool;
   }
 
-  void addDeferredDestroy(VkRenderPass rp, VkFramebuffer fb) {
-    deferredDestroys.push_back({rp, fb});
-  }
-
-  /// Keeps a strong reference to a resource that the command buffer will access on the GPU.
-  /// Called at bind time (setPipeline, setTexture, setVertexBuffer, etc.) to ensure the resource
-  /// survives until GPU execution completes.
-  void retainResource(std::shared_ptr<VulkanResource> resource) {
-    retainedResources.push_back(std::move(resource));
-  }
-
   GPU* gpu() const override;
 
   std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;
@@ -97,7 +86,16 @@ class VulkanCommandEncoder : public CommandEncoder, public VulkanResource {
   std::vector<DeferredDestroy> deferredDestroys;
   std::vector<std::shared_ptr<VulkanResource>> retainedResources;
 
+  void addDeferredDestroy(VkRenderPass rp, VkFramebuffer fb) {
+    deferredDestroys.push_back({rp, fb});
+  }
+
+  void retainResource(std::shared_ptr<VulkanResource> resource) {
+    retainedResources.push_back(std::move(resource));
+  }
+
   friend class VulkanGPU;
+  friend class VulkanRenderPass;
 };
 
 }  // namespace tgfx
