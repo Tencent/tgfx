@@ -221,8 +221,90 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   vulkanSrc->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
 }
 
-void VulkanCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture>) {
-  // TODO: Implement mipmap generation via vkCmdBlitImage chain.
+void VulkanCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> texture) {
+  if (!texture) {
+    return;
+  }
+  auto vulkanTexture = std::static_pointer_cast<VulkanTexture>(texture);
+  if (vulkanTexture->mipLevelCount() <= 1) {
+    return;
+  }
+  retainResource(vulkanTexture);
+
+  auto image = vulkanTexture->vulkanImage();
+  auto mipLevels = static_cast<uint32_t>(vulkanTexture->mipLevelCount());
+  auto mipWidth = static_cast<int32_t>(vulkanTexture->width());
+  auto mipHeight = static_cast<int32_t>(vulkanTexture->height());
+
+  // Transition mip level 0 to TRANSFER_SRC (it contains the source data).
+  VkImageMemoryBarrier barrier = {};
+  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.image = image;
+  barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  barrier.subresourceRange.baseArrayLayer = 0;
+  barrier.subresourceRange.layerCount = 1;
+  barrier.subresourceRange.levelCount = 1;
+
+  barrier.subresourceRange.baseMipLevel = 0;
+  barrier.oldLayout = vulkanTexture->currentLayout();
+  barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+  barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+  barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                       VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+  for (uint32_t i = 1; i < mipLevels; i++) {
+    int32_t nextWidth = mipWidth > 1 ? mipWidth / 2 : 1;
+    int32_t nextHeight = mipHeight > 1 ? mipHeight / 2 : 1;
+
+    // Transition mip level i to TRANSFER_DST.
+    barrier.subresourceRange.baseMipLevel = i;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+    // Blit from mip level (i-1) to mip level i.
+    VkImageBlit blit = {};
+    blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, i - 1, 0, 1};
+    blit.srcOffsets[0] = {0, 0, 0};
+    blit.srcOffsets[1] = {mipWidth, mipHeight, 1};
+    blit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, i, 0, 1};
+    blit.dstOffsets[0] = {0, 0, 0};
+    blit.dstOffsets[1] = {nextWidth, nextHeight, 1};
+
+    vkCmdBlitImage(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+
+    // Transition mip level i from TRANSFER_DST to TRANSFER_SRC for the next iteration.
+    barrier.subresourceRange.baseMipLevel = i;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+    mipWidth = nextWidth;
+    mipHeight = nextHeight;
+  }
+
+  // Transition all mip levels to GENERAL for subsequent shader reads.
+  barrier.subresourceRange.baseMipLevel = 0;
+  barrier.subresourceRange.levelCount = mipLevels;
+  barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+  barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+  barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+  barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                       &barrier);
+
+  vulkanTexture->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
 }
 
 std::shared_ptr<CommandBuffer> VulkanCommandEncoder::onFinish() {

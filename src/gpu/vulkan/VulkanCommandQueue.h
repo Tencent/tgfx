@@ -21,6 +21,7 @@
 #include <atomic>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <vector>
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanResource.h"
@@ -30,6 +31,7 @@
 namespace tgfx {
 
 class VulkanGPU;
+class VulkanSemaphore;
 class VulkanTexture;
 
 /**
@@ -40,10 +42,9 @@ class VulkanTexture;
  *   2. If the number of in-flight submissions reaches MAX_FRAMES_IN_FLIGHT, block until the oldest
  *      fence signals (backpressure to prevent unbounded memory growth).
  *   3. Allocate a fence, submit the command buffer(s), and record the submission as in-flight.
- *
- * This design mirrors Metal's completion handler semantics: submit never blocks under normal load,
- * completedFrameTime is updated as soon as a fence is detected signaled, and ResourceCache uses
- * completedFrameTime to determine when scratch resources are safe to reuse.
+ *   4. If a present was scheduled (via schedulePresent()), append a GENERAL→PRESENT_SRC layout
+ *      transition to the submit batch, then call vkQueuePresentKHR. Same-queue ordering guarantees
+ *      the transition completes before presentation. This mirrors Metal's presentDrawable pattern.
  *
  * writeTexture() follows deferred semantics: pixel data is immediately snapshot into a staging
  * buffer, but the GPU copy is deferred until the next submit(). This avoids per-upload
@@ -130,6 +131,22 @@ class VulkanCommandQueue : public CommandQueue {
   std::deque<InflightSubmission> inflightSubmissions;
   std::vector<VkFence> fencePool;
   std::atomic<int64_t> _completedFrameTime = {0};
+  // Pending semaphore operations to be chained into the next submit().
+  std::shared_ptr<VulkanSemaphore> pendingSignalSemaphore;
+  std::shared_ptr<VulkanSemaphore> pendingWaitSemaphore;
+
+  // Pending present scheduled by VulkanSwapchainProxy, executed at the end of submit().
+  struct PendingPresent {
+    VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+    uint32_t imageIndex = 0;
+    VkImage image = VK_NULL_HANDLE;
+  };
+  std::optional<PendingPresent> pendingPresent;
+
+ public:
+  /// Schedules a swapchain image to be presented at the end of the next submit(). The layout
+  /// transition (GENERAL → PRESENT_SRC_KHR) is automatically appended to the render command batch.
+  void schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image);
 };
 
 }  // namespace tgfx

@@ -92,10 +92,12 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
 
   std::vector<VkAttachmentDescription> attachments;
   std::vector<VkAttachmentReference> colorRefs;
+  std::vector<VkAttachmentReference> resolveRefs;
   std::vector<VkImageView> fbAttachments;
   uint32_t fbWidth = 0;
   uint32_t fbHeight = 0;
   std::vector<VkClearValue> clearValues;
+  bool hasResolve = false;
 
   for (auto& ca : passDescriptor.colorAttachments) {
     if (!ca.texture) {
@@ -131,6 +133,35 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
     clearValue.color = {
         {ca.clearValue.red, ca.clearValue.green, ca.clearValue.blue, ca.clearValue.alpha}};
     clearValues.push_back(clearValue);
+
+    // Configure MSAA resolve attachment if present.
+    if (ca.resolveTexture) {
+      hasResolve = true;
+      auto resolveVulkanTexture = std::static_pointer_cast<VulkanTexture>(ca.resolveTexture);
+      encoder->retainResource(resolveVulkanTexture);
+
+      TransitionImageLayout(commandBuffer, resolveVulkanTexture->vulkanImage(),
+                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+                            VK_IMAGE_ASPECT_COLOR_BIT);
+
+      VkAttachmentDescription resolveAttachment = {};
+      resolveAttachment.format = resolveVulkanTexture->vulkanFormat();
+      resolveAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+      resolveAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+      resolveAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+      resolveAttachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+      resolveAttachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+      resolveVulkanTexture->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
+
+      resolveRefs.push_back(
+          {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_GENERAL});
+      attachments.push_back(resolveAttachment);
+      fbAttachments.push_back(resolveVulkanTexture->vulkanImageView());
+      clearValues.push_back({});
+    } else {
+      resolveRefs.push_back({VK_ATTACHMENT_UNUSED, VK_IMAGE_LAYOUT_UNDEFINED});
+    }
 
     fbWidth = static_cast<uint32_t>(ca.texture->width());
     fbHeight = static_cast<uint32_t>(ca.texture->height());
@@ -173,6 +204,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
   subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
   subpass.colorAttachmentCount = static_cast<uint32_t>(colorRefs.size());
   subpass.pColorAttachments = colorRefs.data();
+  subpass.pResolveAttachments = hasResolve ? resolveRefs.data() : nullptr;
   subpass.pDepthStencilAttachment = hasDepth ? &depthRef : nullptr;
 
   VkRenderPassCreateInfo rpInfo = {};

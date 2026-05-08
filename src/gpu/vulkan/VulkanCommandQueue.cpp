@@ -305,6 +305,38 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   }
   cmdBuffers.push_back(cmd);
 
+  // If a present is scheduled, append the GENERAL → PRESENT_SRC layout transition to this batch.
+  VkCommandBuffer presentCmd = VK_NULL_HANDLE;
+  if (pendingPresent.has_value() && renderPool != VK_NULL_HANDLE) {
+    VkCommandBufferAllocateInfo presentAllocInfo = {};
+    presentAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    presentAllocInfo.commandPool = renderPool;
+    presentAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    presentAllocInfo.commandBufferCount = 1;
+    if (vkAllocateCommandBuffers(gpu->device(), &presentAllocInfo, &presentCmd) == VK_SUCCESS) {
+      VkCommandBufferBeginInfo presentBeginInfo = {};
+      presentBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+      presentBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+      vkBeginCommandBuffer(presentCmd, &presentBeginInfo);
+
+      VkImageMemoryBarrier barrier = {};
+      barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+      barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+      barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+      barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier.image = pendingPresent->image;
+      barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+      barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+      barrier.dstAccessMask = 0;
+      vkCmdPipelineBarrier(presentCmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                           &barrier);
+      vkEndCommandBuffer(presentCmd);
+      cmdBuffers.push_back(presentCmd);
+    }
+  }
+
   VkFence fence = acquireFence();
 
   VkSubmitInfo submitInfo = {};
@@ -312,7 +344,43 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   submitInfo.commandBufferCount = static_cast<uint32_t>(cmdBuffers.size());
   submitInfo.pCommandBuffers = cmdBuffers.data();
 
+  // Chain pending timeline semaphore operations into this submission.
+  VkTimelineSemaphoreSubmitInfo timelineInfo = {};
+  timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+  VkSemaphore waitSem = VK_NULL_HANDLE;
+  VkSemaphore signalSem = VK_NULL_HANDLE;
+  uint64_t waitValue = 0;
+  uint64_t signalValue = 0;
+  VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+
+  if (pendingWaitSemaphore) {
+    waitSem = pendingWaitSemaphore->vulkanSemaphore();
+    waitValue = pendingWaitSemaphore->signalValue();
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = &waitSem;
+    submitInfo.pWaitDstStageMask = &waitStage;
+    timelineInfo.waitSemaphoreValueCount = 1;
+    timelineInfo.pWaitSemaphoreValues = &waitValue;
+  }
+  if (pendingSignalSemaphore) {
+    signalValue = pendingSignalSemaphore->nextSignalValue();
+    signalSem = pendingSignalSemaphore->vulkanSemaphore();
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &signalSem;
+    timelineInfo.signalSemaphoreValueCount = 1;
+    timelineInfo.pSignalSemaphoreValues = &signalValue;
+  }
+  if (pendingWaitSemaphore || pendingSignalSemaphore) {
+    submitInfo.pNext = &timelineInfo;
+  }
+
   auto submitResult = vkQueueSubmit(gpu->graphicsQueue(), 1, &submitInfo, fence);
+
+  // Clear pending semaphores regardless of submit success — they were either consumed or the
+  // submission failed (in which case retrying with stale semaphore state would be wrong).
+  pendingWaitSemaphore = nullptr;
+  pendingSignalSemaphore = nullptr;
+
   if (submitResult != VK_SUCCESS) {
     LOGE("VulkanCommandQueue::submit: vkQueueSubmit failed (result=%d).",
          static_cast<int>(submitResult));
@@ -348,14 +416,39 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   submission.retainedResources = std::move(vulkanCmdBuffer->retainedResources());
   inflightSubmissions.push_back(std::move(submission));
   pendingUploads.clear();
+
+  // Execute pending present after the submit. Same-queue ordering guarantees the layout
+  // transition (included in this submit batch) completes before the presentation engine reads.
+  if (pendingPresent.has_value()) {
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &pendingPresent->swapchain;
+    presentInfo.pImageIndices = &pendingPresent->imageIndex;
+    vkQueuePresentKHR(gpu->graphicsQueue(), &presentInfo);
+    pendingPresent.reset();
+  }
 }
 
 std::shared_ptr<Semaphore> VulkanCommandQueue::insertSemaphore() {
-  return VulkanSemaphore::Make(gpu);
+  auto semaphore = VulkanSemaphore::Make(gpu);
+  if (semaphore == nullptr) {
+    return nullptr;
+  }
+  pendingSignalSemaphore = semaphore;
+  return semaphore;
 }
 
-void VulkanCommandQueue::waitSemaphore(std::shared_ptr<Semaphore>) {
-  // TODO: Implement GPU wait on semaphore.
+void VulkanCommandQueue::waitSemaphore(std::shared_ptr<Semaphore> semaphore) {
+  if (semaphore == nullptr) {
+    return;
+  }
+  pendingWaitSemaphore = std::static_pointer_cast<VulkanSemaphore>(semaphore);
+}
+
+void VulkanCommandQueue::schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex,
+                                         VkImage image) {
+  pendingPresent = {swapchain, imageIndex, image};
 }
 
 void VulkanCommandQueue::waitUntilCompleted() {
