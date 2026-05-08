@@ -459,7 +459,8 @@ void VulkanCommandQueue::waitUntilCompleted() {
     return;
   }
   waitAllInflightSubmissions();
-  cleanupPendingUploads();
+  // Pending uploads are intentionally preserved: they will be executed on the next submit().
+  // This matches Metal/GL semantics where waitUntilCompleted only waits for already-submitted work.
 }
 
 }  // namespace tgfx

@@ -28,7 +28,11 @@ std::shared_ptr<VulkanShaderModule> VulkanShaderModule::Make(
   if (!gpu) {
     return nullptr;
   }
-  return gpu->makeResource<VulkanShaderModule>(gpu, descriptor);
+  auto module = gpu->makeResource<VulkanShaderModule>(gpu, descriptor);
+  if (module->vulkanShaderModule() == VK_NULL_HANDLE) {
+    return nullptr;
+  }
+  return module;
 }
 
 VulkanShaderModule::VulkanShaderModule(VulkanGPU* gpu, const ShaderModuleDescriptor& descriptor)

@@ -67,6 +67,8 @@ std::shared_ptr<VulkanTexture> VulkanTexture::Make(VulkanGPU* gpu,
                       static_cast<uint32_t>(descriptor.height), 1};
   imageInfo.mipLevels = static_cast<uint32_t>(descriptor.mipLevelCount);
   imageInfo.arrayLayers = 1;
+  DEBUG_ASSERT(descriptor.sampleCount >= 1 &&
+               (descriptor.sampleCount & (descriptor.sampleCount - 1)) == 0);
   imageInfo.samples = static_cast<VkSampleCountFlagBits>(descriptor.sampleCount);
   imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
   imageInfo.usage = usageFlags;
@@ -105,7 +107,7 @@ std::shared_ptr<VulkanTexture> VulkanTexture::Make(VulkanGPU* gpu,
   }
 
   return gpu->makeResource<VulkanTexture>(descriptor, vkImage, vkImageView, vmaAllocation,
-                                          vkFormat);
+                                          vkFormat, false);
 }
 
 std::shared_ptr<VulkanTexture> VulkanTexture::MakeFrom(VulkanGPU* gpu, VkImage image,
@@ -139,16 +141,15 @@ std::shared_ptr<VulkanTexture> VulkanTexture::MakeFrom(VulkanGPU* gpu, VkImage i
     return nullptr;
   }
 
-  auto texture =
-      gpu->makeResource<VulkanTexture>(descriptor, image, imageView, VK_NULL_HANDLE, format);
-  texture->adopted = adopted;
-  return texture;
+  return gpu->makeResource<VulkanTexture>(descriptor, image, imageView, VK_NULL_HANDLE, format,
+                                          adopted);
 }
 
 VulkanTexture::VulkanTexture(const TextureDescriptor& descriptor, VkImage image,
-                             VkImageView imageView, VmaAllocation allocation, VkFormat format)
+                             VkImageView imageView, VmaAllocation allocation, VkFormat format,
+                             bool adopted)
     : Texture(descriptor), image(image), imageView(imageView), allocation(allocation),
-      format(format) {
+      format(format), adopted(adopted) {
 }
 
 void VulkanTexture::onRelease(VulkanGPU* gpu) {

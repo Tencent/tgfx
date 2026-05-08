@@ -66,7 +66,7 @@ class VulkanTexture : public Texture, public VulkanResource {
 
  private:
   VulkanTexture(const TextureDescriptor& descriptor, VkImage image, VkImageView imageView,
-                VmaAllocation allocation, VkFormat format);
+                VmaAllocation allocation, VkFormat format, bool adopted);
   ~VulkanTexture() override = default;
 
   VkImage image = VK_NULL_HANDLE;

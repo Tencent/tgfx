@@ -143,8 +143,6 @@ class VulkanGPU : public GPU {
 
   void releaseDescriptorPool(VkDescriptorPool pool);
 
-  VkCommandPool getTransferCommandPool();
-
  private:
   VulkanGPU();
 
@@ -172,7 +170,6 @@ class VulkanGPU : public GPU {
   std::shared_ptr<ReturnQueue> returnQueue = ReturnQueue::Make();
   std::unordered_map<uint32_t, std::shared_ptr<Sampler>> samplerCache = {};
   std::vector<VkDescriptorPool> descriptorPoolCache = {};
-  VkCommandPool transferCommandPool = VK_NULL_HANDLE;
 };
 
 }  // namespace tgfx

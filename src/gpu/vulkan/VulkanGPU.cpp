@@ -449,23 +449,6 @@ void VulkanGPU::releaseDescriptorPool(VkDescriptorPool pool) {
   descriptorPoolCache.push_back(pool);
 }
 
-VkCommandPool VulkanGPU::getTransferCommandPool() {
-  if (transferCommandPool == VK_NULL_HANDLE) {
-    VkCommandPoolCreateInfo poolInfo = {};
-    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolInfo.queueFamilyIndex = queueFamilyIndex;
-    auto result = vkCreateCommandPool(vulkanDevice, &poolInfo, nullptr, &transferCommandPool);
-    if (result != VK_SUCCESS) {
-      LOGE("VulkanGPU::getTransferCommandPool() vkCreateCommandPool failed.");
-      return VK_NULL_HANDLE;
-    }
-  } else {
-    vkResetCommandPool(vulkanDevice, transferCommandPool, 0);
-  }
-  return transferCommandPool;
-}
-
 void VulkanGPU::releaseAll(bool releaseGPU) {
   // Destroy the command queue first to wait for all in-flight GPU submissions and release their
   // resources (staging buffers, command pools, fences). This must happen before destroying the
@@ -477,10 +460,6 @@ void VulkanGPU::releaseAll(bool releaseGPU) {
     vkDestroyDescriptorPool(vulkanDevice, pool, nullptr);
   }
   descriptorPoolCache.clear();
-  if (transferCommandPool != VK_NULL_HANDLE) {
-    vkDestroyCommandPool(vulkanDevice, transferCommandPool, nullptr);
-    transferCommandPool = VK_NULL_HANDLE;
-  }
   if (releaseGPU) {
     for (auto& resource : resources) {
       resource->onRelease(this);

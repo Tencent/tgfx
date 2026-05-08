@@ -106,6 +106,10 @@ void* VulkanBuffer::map(size_t offset, size_t size) {
   }
   mappedOffset = static_cast<VkDeviceSize>(offset);
   mappedSize = static_cast<VkDeviceSize>(size);
+  // For readback buffers (GPU→CPU), invalidate the CPU cache to ensure we see the latest GPU writes.
+  if (_usage & GPUBufferUsage::READBACK) {
+    vmaInvalidateAllocation(vmaAllocator, allocation, mappedOffset, mappedSize);
+  }
   mappedPointer = static_cast<uint8_t*>(persistentlyMapped) + offset;
   return mappedPointer;
 }
