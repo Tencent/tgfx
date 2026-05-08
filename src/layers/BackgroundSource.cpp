@@ -89,6 +89,11 @@ struct SubGeometry {
   Matrix childImageMatrix = Matrix::I();     // sub image pixel → world
   Rect childWorldRect = Rect::MakeEmpty();   // sub's bounds in world coords
   Point childSurfaceOffset = Point::Zero();  // sub surface origin in parent image-pixel coords
+  // Top-left of childSurfaceRect in carrier-surface-pixel coords (i.e. in the borrowed
+  // PictureRecorder's drawing space). Differs from childSurfaceOffset, which is in parent
+  // image-pixel coords. Used by the picture sub variant to translate its image origin to the
+  // slice the layer actually drew into.
+  Point childSurfaceTopLeft = Point::Zero();
   int width = 0;
   int height = 0;
   bool valid = false;
@@ -117,6 +122,7 @@ static SubGeometry ComputeSubGeometry(const Matrix& parentImageMatrix, const Rec
 
   out.childSurfaceMatrix = localToSurface;
   out.childSurfaceMatrix.postTranslate(-childSurfaceRect.x(), -childSurfaceRect.y());
+  out.childSurfaceTopLeft = Point::Make(childSurfaceRect.x(), childSurfaceRect.y());
 
   // childSurfaceToWorld: sub surface pixel → local → world.
   Matrix childSurfaceToLocal = Matrix::I();
@@ -201,11 +207,16 @@ class PictureBackgroundSource : public BackgroundSource {
 
   // Sub: references a caller-owned PictureRecorder. Inherits the parent's surfaceScale for the
   // same reason as SurfaceBackgroundSource — see that constructor for the rationale.
+  // ownOriginOffset is childSurfaceRect.topLeft in carrier-surface-pixel coords; the borrowed
+  // recorder's canvas matrix is the parent localToSurface (without the postTranslate that aligns
+  // a dedicated sub surface to its own origin), so picture-(0,0) corresponds to carrier-(0,0)
+  // rather than the slice the layer drew to. We keep this offset and translate the image origin
+  // at readback.
   PictureBackgroundSource(PictureRecorder* borrowedRecorder, const Matrix& imageMatrix,
                           const Rect& rect, int width, int height, float surfaceScale,
-                          std::shared_ptr<ColorSpace> colorSpace)
+                          std::shared_ptr<ColorSpace> colorSpace, Point ownOriginOffset)
       : BackgroundSource(imageMatrix, rect, surfaceScale, std::move(colorSpace)), pixelWidth(width),
-        pixelHeight(height), recorder(borrowedRecorder) {
+        pixelHeight(height), recorder(borrowedRecorder), ownImageOriginOffset(ownOriginOffset) {
     DEBUG_ASSERT(recorder->getRecordingCanvas() != nullptr);
   }
 
@@ -241,18 +252,44 @@ class PictureBackgroundSource : public BackgroundSource {
     // matrix + total clip at the top save level. Any outer AutoCanvasRestore will pop back to
     // its remembered saveCount, discarding the empty saves and leaving the canvas at the pre-
     // capture baseline — exactly the same lifecycle as before the flush.
+    //
+    // LIMITATION: only the TOP save-stack frame is preserved across this flush. Intermediate
+    // frames (matrix/clip per save level) are lost because Canvas's public API exposes only the
+    // current matrix, total clip, and save count — there is no way to enumerate per-frame state.
+    // A partial Canvas::restore() between this readback and the outer AutoCanvasRestore would
+    // therefore land on identity matrix / wide-open clip (the empty saves' baseline) instead of
+    // the caller's frame N-1 state, producing wrong output.
+    //
+    // Current callers (BackgroundCapturer + LayerStyle pipeline) do not partial-restore across
+    // getBackgroundImage(); they wrap the whole readback in an outer AutoCanvasRestore that pops
+    // straight back to the pre-capture saveCount. Future callers wanting partial restores must
+    // either re-architect this resume path or extend Canvas with a public per-frame accessor.
     for (int i = 0; i < savedSaveCount; ++i) {
       resumed->save();
     }
-    resumed->setMatrix(savedMatrix);
+    // savedClip is in device coords because Canvas::clipPath stores `path.transform(_matrix)`
+    // before merging — i.e. getTotalClip() is already pre-multiplied by the source matrix. Apply
+    // it under identity first, then install savedMatrix, so subsequent clipPath calls go through
+    // savedMatrix as expected. Reversing this order would multiply savedMatrix onto an already-
+    // transformed clip, producing a double-transform.
     if (!savedClip.isEmpty()) {
       resumed->clipPath(savedClip);
     }
+    resumed->setMatrix(savedMatrix);
 
     if (segment == nullptr) {
       return nullptr;
     }
-    return Image::MakeFrom(std::move(segment), pixelWidth, pixelHeight);
+    // PictureImage's matrix maps picture-coords → image-pixel space. For top-level the borrowed
+    // recorder's canvas already records into picture-(0,0)..picture-(pixelWidth, pixelHeight),
+    // so a null matrix (identity) is correct. For sub the borrowed recorder records the layer
+    // at picture-(childSurfaceRect.topLeft + (0..w, 0..h)), so we must translate by the negative
+    // top-left to make image-pixel (0,0) sample picture-(childSurfaceRect.x, childSurfaceRect.y).
+    if (ownImageOriginOffset.x == 0.0f && ownImageOriginOffset.y == 0.0f) {
+      return Image::MakeFrom(std::move(segment), pixelWidth, pixelHeight);
+    }
+    auto matrix = Matrix::MakeTrans(-ownImageOriginOffset.x, -ownImageOriginOffset.y);
+    return Image::MakeFrom(std::move(segment), pixelWidth, pixelHeight, &matrix);
   }
 
  private:
@@ -260,6 +297,10 @@ class PictureBackgroundSource : public BackgroundSource {
   int pixelHeight = 0;
   PictureRecorder ownedRecorder;
   PictureRecorder* recorder = nullptr;  // points at ownedRecorder or a borrowed one
+  // Top-left of the layer's slice in the borrowed recorder's picture coords. Zero for top-level
+  // (image origin already aligns with picture origin) and non-zero for sub when the layer is
+  // offset within the carrier.
+  Point ownImageOriginOffset = Point::Zero();
 };
 
 }  // namespace
@@ -302,9 +343,19 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
     return ownImage;
   }
 
+  // Sub-source fallbacks below normally return nullptr rather than ownImage. Reason: ownImage is
+  // in sub-surface-pixel space, while consumers interpret getBackgroundImage()'s result through
+  // backgroundMatrix(), which maps parent-image-pixel → world. Returning ownImage on a fallback
+  // would feed the consumer pixels in the wrong coord space when a sub introduces its own density
+  // relative to the parent image. Exception: when the sub did NOT introduce its own density
+  // (imageMatrix == surfaceToWorld), sub-surface-pixel and sub-image-pixel coincide and ownImage
+  // is consumable directly — drop it only when the spaces actually differ. The capturer
+  // (BackgroundCapturer::drawBackgroundStyle) null-checks the result and skips the snapshot when
+  // null, so returning nullptr degrades gracefully instead of producing wrongly-sampled output.
+  auto subFallback = (imageMatrix == surfaceToWorld) ? ownImage : nullptr;
   auto parentImage = parent->getBackgroundImage();
   if (parentImage == nullptr) {
-    return ownImage;
+    return subFallback;
   }
 
   // Sub: compose parent image (in parent image-pixel coords) with own content by subsetting
@@ -312,12 +363,12 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
   // with parent's, offset by surfaceOffset (set at createSubSurface / createSubPicture time).
   Matrix worldToParentImage = Matrix::I();
   if (!parent->imageMatrix.invert(&worldToParentImage)) {
-    return ownImage;
+    return subFallback;
   }
   int width = FloatCeilToInt(backgroundRect.width() * worldToParentImage.getMaxScale());
   int height = FloatCeilToInt(backgroundRect.height() * worldToParentImage.getMaxScale());
   if (width <= 0 || height <= 0) {
-    return ownImage;
+    return subFallback;
   }
 
   auto subsetRect = Rect::MakeXYWH(surfaceOffset.x, surfaceOffset.y, static_cast<float>(width),
@@ -325,13 +376,13 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
   auto parentBounds = Rect::MakeWH(parentImage->width(), parentImage->height());
   auto validRect = subsetRect;
   if (!validRect.intersect(parentBounds)) {
-    return ownImage;
+    return subFallback;
   }
   auto childOffsetX = validRect.left - subsetRect.left;
   auto childOffsetY = validRect.top - subsetRect.top;
   auto subsetImage = parentImage->makeSubset(validRect);
   if (!subsetImage) {
-    return ownImage;
+    return subFallback;
   }
 
   // Warp own (in sub surface pixel) to sub image pixel: surface → world → parent image → sub image.
@@ -348,7 +399,7 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
   }
   auto picture = recorder.finishRecordingAsPicture();
   if (picture == nullptr) {
-    return ownImage;
+    return subFallback;
   }
   return Image::MakeFrom(std::move(picture), width, height);
 }
@@ -395,9 +446,9 @@ std::shared_ptr<BackgroundSource> BackgroundSource::createSubPicture(PictureReco
   if (!geometry.valid) {
     return nullptr;
   }
-  auto sub = std::make_shared<PictureBackgroundSource>(subRecorder, geometry.childImageMatrix,
-                                                       geometry.childWorldRect, geometry.width,
-                                                       geometry.height, _surfaceScale, colorSpace);
+  auto sub = std::make_shared<PictureBackgroundSource>(
+      subRecorder, geometry.childImageMatrix, geometry.childWorldRect, geometry.width,
+      geometry.height, _surfaceScale, colorSpace, geometry.childSurfaceTopLeft);
   sub->parent = this;
   sub->surfaceOffset = geometry.childSurfaceOffset;
   // Compute surfaceToWorld from localToWorld and localToSurface directly, same as createSubSurface.

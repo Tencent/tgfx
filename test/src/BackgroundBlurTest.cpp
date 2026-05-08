@@ -979,4 +979,153 @@ TGFX_TEST(BackgroundBlurTest, GroupOpacityNestedBackgroundBlurPicturePath) {
   Layer::SetDefaultAllowsGroupOpacity(oldGroupOpacity);
 }
 
+// Regression for M2#1 (createSubPicture pixel slice misaligned when childSurfaceRect.topLeft is
+// not at carrier origin). When a layer with BackgroundBlurStyle is nested inside an offscreen
+// group-opacity carrier and is offset from the carrier's origin, the picture-only path must
+// sample the carrier slice at the layer's origin — not at carrier (0, 0). With the bug the
+// blur backdrop samples the wrong slice and produces visibly wrong pixels.
+//
+// Note (M2#4): the save-stack-only-restores-top-frame fix is documentation-only because the
+// project lacks a Canvas API to enumerate intermediate save frames. No runtime regression test
+// is added for M2#4.
+TGFX_TEST(BackgroundBlurTest, SubPictureBgSliceAlignment) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto oldGroupOpacity = Layer::DefaultAllowsGroupOpacity();
+  Layer::SetDefaultAllowsGroupOpacity(true);
+
+  // Solid red 200x200 backdrop so any wrong-slice sampling is visible.
+  auto solidLayer = SolidLayer::Make();
+  solidLayer->setColor(Color::Red());
+  solidLayer->setWidth(200);
+  solidLayer->setHeight(200);
+
+  // Container forces a group-opacity offscreen carrier and is offset from the root origin so
+  // the carrier surface starts at a non-zero world position.
+  auto container = Layer::Make();
+  container->setAlpha(0.7f);
+  container->setAllowsGroupOpacity(true);
+  container->setMatrix(Matrix::MakeTrans(60, 60));
+
+  // Child sits at a non-zero offset within the container, so childSurfaceRect.topLeft is not at
+  // the carrier's (0, 0). This is the geometry that exposes the pixel-slice misalignment.
+  auto blurChild = ShapeLayer::Make();
+  Path childPath;
+  childPath.addRect(Rect::MakeWH(60, 60));
+  blurChild->setPath(childPath);
+  blurChild->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 102)));
+  blurChild->setMatrix(Matrix::MakeTrans(40, 40));
+  blurChild->setLayerStyles({BackgroundBlurStyle::Make(8, 8)});
+  container->addChild(blurChild);
+
+  auto rootLayer = Layer::Make();
+  rootLayer->addChild(solidLayer);
+  rootLayer->addChild(container);
+
+  // Recorder canvas has no backing Surface, so Layer::draw walks the picture-only path.
+  PictureRecorder recorder;
+  auto* recordingCanvas = recorder.beginRecording();
+  rootLayer->draw(recordingCanvas);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->drawPicture(picture);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/SubPictureBgSliceAlignment"));
+
+  Layer::SetDefaultAllowsGroupOpacity(oldGroupOpacity);
+}
+
+// Regression for M2#3 (clip double-transform on PictureBackgroundSource resume). When
+// onGetOwnContents flushes mid-recording and reopens the segment, it must apply the saved
+// device-coords clip under identity FIRST, then install the saved matrix. With the bug the
+// order was reversed and the clip ended up at savedMatrix · device-coords-clip — drawing
+// performed AFTER getBackgroundImage() would land outside the resumed clip even at positions
+// the original clip allows.
+//
+// Reaches the resume() path by creating a Picture-backed sub source on a caller-owned
+// PictureRecorder whose canvas has a non-identity matrix and a non-empty clip, calling
+// getBackgroundImage() mid-recording to force the flush + resume, then drawing a marker on
+// the resumed canvas and verifying the marker is visible after replay.
+TGFX_TEST(BackgroundBlurTest, PictureSubResumeClipNotDoubled) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto topSource =
+      BackgroundSource::Make(/*context=*/nullptr, Rect::MakeWH(200, 200), /*maxOutset=*/0,
+                             /*minOutset=*/0, Matrix::I(), ColorSpace::SRGB());
+  ASSERT_TRUE(topSource != nullptr);
+
+  PictureRecorder carrier;
+  auto* carrierCanvas = carrier.beginRecording();
+  // Non-identity carrier matrix and a non-empty clip in local coords. The clip's device-coords
+  // form is (100, 50, 200, 150). With the pre-fix order (matrix then clipPath), savedClip is
+  // re-applied under savedMatrix and ends up shifted to roughly (200, 100, 300, 200) in device
+  // coords, which would cull the marker drawn after resume.
+  auto carrierMatrix = Matrix::MakeTrans(100, 50);
+  carrierCanvas->setMatrix(carrierMatrix);
+  carrierCanvas->clipRect(Rect::MakeWH(100, 100));
+
+  auto subSource = topSource->createSubPicture(&carrier, Rect::MakeWH(100, 100),
+                                               /*localToWorld=*/carrierMatrix,
+                                               /*localToSurface=*/carrierMatrix);
+  ASSERT_TRUE(subSource != nullptr);
+
+  Paint redPaint;
+  redPaint.setColor(Color::Red());
+  // Marker A drawn BEFORE the flush, at local (10, 10) -> world (110, 60). Inside both the
+  // correct and the (wrongly-shifted) clip, so it survives either way; serves as a positive
+  // control that recording actually happened.
+  carrierCanvas->drawRect(Rect::MakeXYWH(10, 10, 6, 6), redPaint);
+
+  // Force flush + resume.
+  auto flushed = subSource->getBackgroundImage();
+  EXPECT_TRUE(flushed != nullptr);
+
+  // Canvas pointer may have been swapped by the reopen.
+  carrierCanvas = carrier.getRecordingCanvas();
+  ASSERT_TRUE(carrierCanvas != nullptr);
+
+  Paint greenPaint;
+  greenPaint.setColor(Color::Green());
+  // Marker B drawn AFTER resume at local (20, 20) -> world (120, 70). With the correct clip
+  // this is well inside the clip and renders. With the doubled clip the device clip moves to
+  // around (200, 100, 300, 200), so world (120, 70) is OUTSIDE the doubled clip and the green
+  // marker disappears.
+  carrierCanvas->drawRect(Rect::MakeXYWH(20, 20, 6, 6), greenPaint);
+
+  auto carrierPicture = carrier.finishRecordingAsPicture();
+  ASSERT_TRUE(carrierPicture != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto* surfaceCanvas = surface->getCanvas();
+  surfaceCanvas->clear();
+  surfaceCanvas->drawPicture(carrierPicture);
+
+  Bitmap bitmap = {};
+  bitmap.allocPixels(200, 200);
+  auto* pixels = bitmap.lockPixels();
+  ASSERT_TRUE(surface->readPixels(bitmap.info(), pixels));
+  bitmap.unlockPixels();
+
+  // Marker A center at world (113, 63).
+  auto markerA = bitmap.getColor(113, 63);
+  EXPECT_EQ(markerA.red, 1.0f);
+  EXPECT_EQ(markerA.green, 0.0f);
+  EXPECT_EQ(markerA.blue, 0.0f);
+  // Marker B center at world (123, 73). With the bug this pixel is outside the doubled clip
+  // and stays clear; with the fix it is green.
+  auto markerB = bitmap.getColor(123, 73);
+  EXPECT_EQ(markerB.red, 0.0f);
+  EXPECT_EQ(markerB.green, 1.0f);
+  EXPECT_EQ(markerB.blue, 0.0f);
+}
+
 }  // namespace tgfx
