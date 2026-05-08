@@ -291,6 +291,10 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
       vkBeginCommandBuffer(uploadCmd, &beginInfo);
       flushPendingUploads(uploadCmd);
       vkEndCommandBuffer(uploadCmd);
+    } else {
+      LOGE("VulkanCommandQueue::submit: failed to allocate upload command buffer (result=%d).",
+           static_cast<int>(result));
+      return;
     }
   }
 
