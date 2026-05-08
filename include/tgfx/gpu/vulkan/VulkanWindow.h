@@ -50,18 +50,14 @@ class VulkanWindow : public Window {
   void onPresent(Context* context) override;
 
  private:
-  VulkanWindow(std::shared_ptr<Device> device, void* surface, void* swapchain, void* imageViews,
-               void* images, unsigned format, int width, int height, int imageCount);
+  // PImpl: all Vulkan handles and swapchain state live in PlatformState (defined in .cpp) to avoid
+  // exposing vulkan.h in this public header. This also sidesteps the 32-bit portability issue where
+  // non-dispatchable Vulkan handles (uint64_t) cannot safely round-trip through void*.
+  struct PlatformState;
 
-  void* _surface = nullptr;
-  void* _swapchain = nullptr;
-  void* _imageViews = nullptr;
-  void* _images = nullptr;
-  unsigned _format = 0;
-  int _width = 0;
-  int _height = 0;
-  int _imageCount = 0;
-  std::shared_ptr<RenderTargetProxy> swapchainProxy = nullptr;
+  explicit VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<PlatformState> state);
+
+  std::unique_ptr<PlatformState> _platformState;
 };
 
 }  // namespace tgfx

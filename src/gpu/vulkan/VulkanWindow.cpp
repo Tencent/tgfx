@@ -26,6 +26,19 @@
 
 namespace tgfx {
 
+// Holds all Vulkan-specific handles and swapchain resources. Defined here (not in the header) so
+// that vulkan.h is never required by downstream translation units that include VulkanWindow.h.
+struct VulkanWindow::PlatformState {
+  VkSurfaceKHR surface = VK_NULL_HANDLE;
+  VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+  std::vector<VkImage> images;
+  std::vector<VkImageView> imageViews;
+  VkFormat format = VK_FORMAT_UNDEFINED;
+  int width = 0;
+  int height = 0;
+  std::shared_ptr<RenderTargetProxy> swapchainProxy;
+};
+
 #ifdef _WIN32
 
 std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<Device> device) {
@@ -116,85 +129,71 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
 
   uint32_t swapImageCount = 0;
   vkGetSwapchainImagesKHR(vkDevice, swapchain, &swapImageCount, nullptr);
-  auto* images = new std::vector<VkImage>(swapImageCount);
-  vkGetSwapchainImagesKHR(vkDevice, swapchain, &swapImageCount, images->data());
+  std::vector<VkImage> images(swapImageCount);
+  vkGetSwapchainImagesKHR(vkDevice, swapchain, &swapImageCount, images.data());
 
-  auto* imageViews = new std::vector<VkImageView>(swapImageCount);
+  std::vector<VkImageView> imageViews(swapImageCount);
   for (uint32_t i = 0; i < swapImageCount; i++) {
     VkImageViewCreateInfo viewInfo = {};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = (*images)[i];
+    viewInfo.image = images[i];
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = chosenFormat.format;
     viewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vkCreateImageView(vkDevice, &viewInfo, nullptr, &(*imageViews)[i]);
+    vkCreateImageView(vkDevice, &viewInfo, nullptr, &imageViews[i]);
   }
 
   device->unlock();
 
-  auto window = std::shared_ptr<VulkanWindow>(
-      new VulkanWindow(device, reinterpret_cast<void*>(surface), reinterpret_cast<void*>(swapchain),
-                       reinterpret_cast<void*>(imageViews), reinterpret_cast<void*>(images),
-                       static_cast<unsigned>(chosenFormat.format), static_cast<int>(extent.width),
-                       static_cast<int>(extent.height), static_cast<int>(swapImageCount)));
-  return window;
+  auto state = std::make_unique<PlatformState>();
+  state->surface = surface;
+  state->swapchain = swapchain;
+  state->images = std::move(images);
+  state->imageViews = std::move(imageViews);
+  state->format = chosenFormat.format;
+  state->width = static_cast<int>(extent.width);
+  state->height = static_cast<int>(extent.height);
+
+  return std::shared_ptr<VulkanWindow>(new VulkanWindow(device, std::move(state)));
 }
 
 #endif
 
-VulkanWindow::VulkanWindow(std::shared_ptr<Device> device, void* surface, void* swapchain,
-                           void* imageViews, void* images, unsigned format, int width, int height,
-                           int imageCount)
-    : Window(std::move(device)), _surface(surface), _swapchain(swapchain), _imageViews(imageViews),
-      _images(images), _format(format), _width(width), _height(height), _imageCount(imageCount) {
+VulkanWindow::VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<PlatformState> state)
+    : Window(std::move(device)), _platformState(std::move(state)) {
 }
 
 VulkanWindow::~VulkanWindow() {
   auto vulkanGPU = static_cast<VulkanGPU*>(device->lockContext()->gpu());
   auto vkDevice = vulkanGPU->device();
 
-  auto* imageViews = reinterpret_cast<std::vector<VkImageView>*>(_imageViews);
-  if (imageViews) {
-    for (auto& view : *imageViews) {
-      vkDestroyImageView(vkDevice, view, nullptr);
-    }
-    delete imageViews;
+  for (auto view : _platformState->imageViews) {
+    vkDestroyImageView(vkDevice, view, nullptr);
   }
-  auto* images = reinterpret_cast<std::vector<VkImage>*>(_images);
-  delete images;
-
-  auto swapchain = reinterpret_cast<VkSwapchainKHR>(_swapchain);
-  if (swapchain != VK_NULL_HANDLE) {
-    vkDestroySwapchainKHR(vkDevice, swapchain, nullptr);
+  if (_platformState->swapchain != VK_NULL_HANDLE) {
+    vkDestroySwapchainKHR(vkDevice, _platformState->swapchain, nullptr);
   }
-  auto surface = reinterpret_cast<VkSurfaceKHR>(_surface);
-  if (surface != VK_NULL_HANDLE) {
-    vkDestroySurfaceKHR(vulkanGPU->instance(), surface, nullptr);
+  if (_platformState->surface != VK_NULL_HANDLE) {
+    vkDestroySurfaceKHR(vulkanGPU->instance(), _platformState->surface, nullptr);
   }
   device->unlock();
 }
 
 std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* context) {
   auto vulkanGPU = static_cast<VulkanGPU*>(context->gpu());
-  auto swapchain = reinterpret_cast<VkSwapchainKHR>(_swapchain);
-  auto* imageViews = reinterpret_cast<std::vector<VkImageView>*>(_imageViews);
-  auto* images = reinterpret_cast<std::vector<VkImage>*>(_images);
-
-  swapchainProxy = std::make_shared<VulkanSwapchainProxy>(context, vulkanGPU, swapchain,
-                                                          static_cast<VkFormat>(_format), _width,
-                                                          _height, *imageViews, *images);
-  return swapchainProxy;
+  _platformState->swapchainProxy = std::make_shared<VulkanSwapchainProxy>(
+      context, vulkanGPU, _platformState->swapchain, _platformState->format, _platformState->width,
+      _platformState->height, _platformState->imageViews, _platformState->images);
+  return _platformState->swapchainProxy;
 }
 
 void VulkanWindow::onPresent(Context* context) {
-  if (swapchainProxy == nullptr) {
+  if (!_platformState->swapchainProxy) {
     return;
   }
-  auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(swapchainProxy);
+  auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(_platformState->swapchainProxy);
   auto vulkanGPU = static_cast<VulkanGPU*>(context->gpu());
-  auto swapchain = reinterpret_cast<VkSwapchainKHR>(_swapchain);
   uint32_t imageIndex = proxy->currentImageIndex();
-  auto* images = reinterpret_cast<std::vector<VkImage>*>(_images);
 
   // Transition swapchain image from GENERAL to PRESENT_SRC_KHR before presenting.
   auto transferPool = vulkanGPU->getTransferCommandPool();
@@ -216,7 +215,7 @@ void VulkanWindow::onPresent(Context* context) {
   barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = (*images)[imageIndex];
+  barrier.image = _platformState->images[imageIndex];
   barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
   barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
   barrier.dstAccessMask = 0;
@@ -235,7 +234,7 @@ void VulkanWindow::onPresent(Context* context) {
   VkPresentInfoKHR presentInfo = {};
   presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
   presentInfo.swapchainCount = 1;
-  presentInfo.pSwapchains = &swapchain;
+  presentInfo.pSwapchains = &_platformState->swapchain;
   presentInfo.pImageIndices = &imageIndex;
 
   vkQueuePresentKHR(vulkanGPU->graphicsQueue(), &presentInfo);
