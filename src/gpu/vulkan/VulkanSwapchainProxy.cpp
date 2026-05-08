@@ -19,6 +19,7 @@
 #include "VulkanSwapchainProxy.h"
 #include "VulkanGPU.h"
 #include "VulkanUtil.h"
+#include "core/utils/Log.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
 
@@ -81,7 +82,18 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
     }
     auto result = vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX, VK_NULL_HANDLE,
                                         _acquireFence, &_currentImageIndex);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+      // Swapchain is incompatible with the surface (e.g. window resized). The fence may not have
+      // been signaled, so attempt a non-blocking wait to consume it before any future reset.
+      // TODO: Rebuild swapchain and retry acquire.
+      LOGE("VulkanSwapchainProxy: swapchain out of date, needs rebuild.");
+      vkWaitForFences(_gpu->device(), 1, &_acquireFence, VK_TRUE, 0);
+      return nullptr;
+    }
     if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+      LOGE("VulkanSwapchainProxy: vkAcquireNextImageKHR failed (result=%d).",
+           static_cast<int>(result));
+      vkWaitForFences(_gpu->device(), 1, &_acquireFence, VK_TRUE, 0);
       return nullptr;
     }
     vkWaitForFences(_gpu->device(), 1, &_acquireFence, VK_TRUE, UINT64_MAX);
