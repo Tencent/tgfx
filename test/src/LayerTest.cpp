@@ -3441,4 +3441,159 @@ TGFX_TEST(LayerTest, BackgroundBlurWithFilter) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurWithFilter_Partial"));
 }
 
+TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_DefaultNoDirectionTracking) {
+  auto displayList = std::make_unique<DisplayList>();
+  EXPECT_EQ(displayList->zoomOutTileThrottlePerFrame(), 0);
+
+  // With throttle disabled (default 0), repeated zoom changes must not touch direction state.
+  for (int i = 1; i <= 20; ++i) {
+    displayList->setZoomScale(1.0f + static_cast<float>(i) * 0.005f);
+    TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->_accumulatedZoomDeltaInt, 0));
+    TGFX_PRIVATE_ACCESS(EXPECT_FALSE(displayList->_isZoomingIn));
+  }
+}
+
+TGFX_TEST(LayerTest, ZoomOutThrottle_SetterPreservesValue) {
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setZoomOutTileThrottlePerFrame(3);
+  EXPECT_EQ(displayList->zoomOutTileThrottlePerFrame(), 3);
+
+  // The setter is a plain assignment; consumers treat any non-positive value as disabled.
+  displayList->setZoomOutTileThrottlePerFrame(-7);
+  EXPECT_EQ(displayList->zoomOutTileThrottlePerFrame(), -7);
+
+  displayList->setZoomOutTileThrottlePerFrame(10);
+  EXPECT_EQ(displayList->zoomOutTileThrottlePerFrame(), 10);
+}
+
+TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_InitialStateAfterEnable) {
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setZoomOutTileThrottlePerFrame(3);
+
+  // Enabling the feature must not pre-set any direction; the next setZoomScale call decides.
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(displayList->_isZoomingIn));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->_accumulatedZoomDeltaInt, 0));
+}
+
+TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_ConfirmedZoomIn) {
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setZoomOutTileThrottlePerFrame(3);
+
+  // Default precision is 1000, so deadband = max(1000/100, 1) = 10 (= 0.01 in scale units).
+  // Each +0.005 step is +5 in integer space; the third step pushes the accumulator past
+  // the deadband and confirms zoom-in.
+  displayList->setZoomScale(1.005f);  // accum = 5
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(displayList->_isZoomingIn));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->_accumulatedZoomDeltaInt, 5));
+
+  displayList->setZoomScale(1.010f);  // accum = 10 (not yet > 10)
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(displayList->_isZoomingIn));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->_accumulatedZoomDeltaInt, 10));
+
+  displayList->setZoomScale(1.015f);  // accum = 15 -> flip to true, reset to 0
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->_isZoomingIn));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->_accumulatedZoomDeltaInt, 0));
+}
+
+TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_ConfirmedZoomOut) {
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setZoomOutTileThrottlePerFrame(3);
+
+  // Jump to scale 2.0 first; this single large positive delta confirms zoom-in and resets
+  // the accumulator (so the sign-change baseline below is clean).
+  displayList->setZoomScale(2.000f);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->_isZoomingIn));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->_accumulatedZoomDeltaInt, 0));
+
+  // Three zoom-out steps of -5 each: -5, -10, -15. The third step crosses the deadband
+  // and flips _isZoomingIn from true to false.
+  displayList->setZoomScale(1.995f);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->_isZoomingIn));
+  displayList->setZoomScale(1.990f);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->_isZoomingIn));
+  displayList->setZoomScale(1.985f);
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(displayList->_isZoomingIn));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->_accumulatedZoomDeltaInt, 0));
+}
+
+TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_JitterIgnored) {
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setZoomOutTileThrottlePerFrame(3);
+
+  // Tiny back-and-forth deltas whose running sum never exceeds the deadband must not flip
+  // direction. Each step is +/-3 in integer space, well below the +/-10 deadband.
+  float zoom = 1.000f;
+  for (int i = 0; i < 30; ++i) {
+    zoom += (i % 2 == 0) ? 0.003f : -0.003f;
+    displayList->setZoomScale(zoom);
+    TGFX_PRIVATE_ACCESS(EXPECT_LE(std::abs(displayList->_accumulatedZoomDeltaInt), 10));
+  }
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(displayList->_isZoomingIn));
+}
+
+TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_FlipResetAccumulator) {
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setZoomOutTileThrottlePerFrame(3);
+
+  // Confirm zoom-in first.
+  displayList->setZoomScale(1.005f);
+  displayList->setZoomScale(1.010f);
+  displayList->setZoomScale(1.015f);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->_isZoomingIn));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->_accumulatedZoomDeltaInt, 0));
+
+  // After the flip the accumulator is zero, so reverse direction must be detected from
+  // scratch (no need to first cancel out a stale +N before going negative).
+  displayList->setZoomScale(1.010f);                            // accum = -5
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->_isZoomingIn));  // not yet flipped
+  displayList->setZoomScale(1.005f);                            // accum = -10
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->_isZoomingIn));
+  displayList->setZoomScale(1.000f);  // accum = -15 -> flip to false, reset
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(displayList->_isZoomingIn));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->_accumulatedZoomDeltaInt, 0));
+}
+
+TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_PrecisionChange) {
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setZoomOutTileThrottlePerFrame(3);
+
+  // Build up some accumulator at the default precision (1000).
+  displayList->setZoomScale(1.005f);  // accum = 5
+  displayList->setZoomScale(1.010f);  // accum = 10
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->_accumulatedZoomDeltaInt, 10));
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(displayList->_isZoomingIn));
+
+  // Halve the precision to 500. Internal integer values must scale by new/old = 0.5.
+  displayList->setZoomScalePrecision(500);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->_accumulatedZoomDeltaInt, 5));
+  // New deadband = max(500/100, 1) = 5; previous accumulator (5) is exactly the threshold,
+  // not strictly greater, so direction stays unflipped until the next forward delta.
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(displayList->_isZoomingIn));
+
+  // One more zoom-in step should flip direction at the new precision.
+  displayList->setZoomScale(1.020f);  // delta in new precision = +5 -> accum = 10 -> flip
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->_isZoomingIn));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->_accumulatedZoomDeltaInt, 0));
+}
+
+TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_DisableAfterEnable) {
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setZoomOutTileThrottlePerFrame(3);
+  // Confirm zoom-in.
+  displayList->setZoomScale(1.005f);
+  displayList->setZoomScale(1.010f);
+  displayList->setZoomScale(1.015f);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->_isZoomingIn));
+
+  // Disable the feature; subsequent zoom changes must not touch the accumulator anymore.
+  // The existing _isZoomingIn flag is left as is (it just becomes irrelevant for throttling).
+  displayList->setZoomOutTileThrottlePerFrame(0);
+  EXPECT_EQ(displayList->zoomOutTileThrottlePerFrame(), 0);
+
+  for (int i = 1; i <= 20; ++i) {
+    displayList->setZoomScale(2.0f + static_cast<float>(i) * 0.01f);
+    TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->_accumulatedZoomDeltaInt, 0));
+  }
+}
+
 }  // namespace tgfx

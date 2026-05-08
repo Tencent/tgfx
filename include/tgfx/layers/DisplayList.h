@@ -224,25 +224,22 @@ class DisplayList {
   }
 
   /**
-   * Returns the per-frame throttle for tiles that need to be rasterized from scratch (no
-   * fallback available) in tiled rendering mode. This setting is ignored in other render modes.
-   * When the number of such tiles in a frame exceeds this limit, the excess is deferred to
-   * subsequent frames and meanwhile shows the background color. The throttle caps per-frame
-   * rasterization cost to keep interactive frames (zoom/pan) and post-interaction catch-up
-   * frames smooth, at the price of transient blank tiles. It is bypassed on the very first
-   * render (no cache at any scale yet) so the initial full-screen render always completes in
-   * a single frame. The default is 0 (disabled); set to a positive value to enable throttling.
+   * Returns the per-frame tile rasterization throttle that applies during zoom-out and idle
+   * frames in tiled rendering mode. This setting is ignored in other render modes. When set to
+   * a positive value, that many dirty tiles are rasterized per frame; remaining tiles use
+   * fallback content from other zoom scales (requires setAllowZoomBlur(true)). The default is
+   * 0 (disabled).
    */
-  int tileThrottlePerFrame() const {
-    return _tileThrottlePerFrame;
+  int zoomOutTileThrottlePerFrame() const {
+    return _zoomOutTileThrottlePerFrame;
   }
 
   /**
-   * Sets the per-frame throttle for tiles that need to be rasterized from scratch (no fallback
-   * available) in tiled rendering mode. See tileThrottlePerFrame() for the full contract.
+   * Sets the per-frame tile rasterization throttle for zoom-out frames. See
+   * zoomOutTileThrottlePerFrame() for the full contract.
    */
-  void setTileThrottlePerFrame(int count) {
-    _tileThrottlePerFrame = count < 0 ? 0 : count;
+  void setZoomOutTileThrottlePerFrame(int count) {
+    _zoomOutTileThrottlePerFrame = count;
   }
 
   /**
@@ -309,11 +306,13 @@ class DisplayList {
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
   int _maxTilesRefinedPerFrame = 5;
-  int _tileThrottlePerFrame = 0;
+  int _zoomOutTileThrottlePerFrame = 0;
   int _subtreeCacheMaxSize = 0;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;
+  bool _isZoomingIn = false;
+  int64_t _accumulatedZoomDeltaInt = 0;
   int64_t lastZoomScaleInt = 1000;
   Point lastContentOffset = {};
   Point mousePosition = {};

@@ -198,6 +198,15 @@ void DisplayList::setZoomScale(float zoomScale) {
     return;
   }
   _hasContentChanged = true;
+  if (_zoomOutTileThrottlePerFrame > 0) {
+    _accumulatedZoomDeltaInt += (zoomScaleInt - _zoomScaleInt);
+    int64_t deadband = std::max<int64_t>(_zoomScalePrecision / 100, 1);
+    if (std::abs(_accumulatedZoomDeltaInt) > deadband) {
+      _isZoomingIn = _accumulatedZoomDeltaInt > 0;
+      // Reset on every confirmed flip so the accumulator never grows unbounded.
+      _accumulatedZoomDeltaInt = 0;
+    }
+  }
   _zoomScaleInt = zoomScaleInt;
 }
 
@@ -212,6 +221,10 @@ void DisplayList::setZoomScalePrecision(int precision) {
   _zoomScalePrecision = precision;
   _zoomScaleInt = ChangeZoomScalePrecision(_zoomScaleInt, oldPrecision, precision);
   lastZoomScaleInt = ChangeZoomScalePrecision(lastZoomScaleInt, oldPrecision, precision);
+  if (_zoomOutTileThrottlePerFrame > 0) {
+    _accumulatedZoomDeltaInt =
+        ChangeZoomScalePrecision(_accumulatedZoomDeltaInt, oldPrecision, precision);
+  }
   if (!tileCaches.empty()) {
     std::unordered_map<int64_t, TileCache*> newCaches = {};
     for (auto& item : tileCaches) {
@@ -569,8 +582,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   }
   hasZoomBlurTiles = false;
   int maxDirtyCount = 0;
-  if (_allowZoomBlur && _tileThrottlePerFrame > 0 && !tileCaches.empty()) {
-    maxDirtyCount = _tileThrottlePerFrame;
+  if (_zoomOutTileThrottlePerFrame > 0 && _allowZoomBlur && !_isZoomingIn && !tileCaches.empty()) {
+    maxDirtyCount = _zoomOutTileThrottlePerFrame;
   }
   TileCache* currentTileCache = nullptr;
   auto result = tileCaches.find(_zoomScaleInt);
@@ -639,12 +652,10 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       // the maxDirtyCount cap.
       bool mustRefine = false;
       if (!dirtyRectsAtCurrentScale.empty()) {
-        auto tileRect =
-            Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
-        mustRefine = std::any_of(dirtyRectsAtCurrentScale.begin(), dirtyRectsAtCurrentScale.end(),
-                                 [&tileRect](const Rect& dirtyRect) {
-                                   return Rect::Intersects(tileRect, dirtyRect);
-                                 });
+        auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
+        mustRefine = std::any_of(
+            dirtyRectsAtCurrentScale.begin(), dirtyRectsAtCurrentScale.end(),
+            [&tileRect](const Rect& dirtyRect) { return Rect::Intersects(tileRect, dirtyRect); });
       }
       if (maxDirtyCount > 0 && !mustRefine &&
           static_cast<int>(dirtyGrids.size()) >= maxDirtyCount) {
@@ -806,8 +817,7 @@ std::vector<DrawTask> DisplayList::getThrottleFallbackTasks(
     int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const {
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
-  auto tileRect =
-      Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
+  auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
   auto renderBounds = _root->renderBounds;
   renderBounds.scale(currentZoomScale, currentZoomScale);
   renderBounds.roundOut();
