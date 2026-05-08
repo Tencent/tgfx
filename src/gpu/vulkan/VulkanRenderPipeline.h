@@ -90,7 +90,6 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
   VkFrontFace frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
   friend class VulkanGPU;
-  friend class VulkanRenderPass;
 };
 
 }  // namespace tgfx

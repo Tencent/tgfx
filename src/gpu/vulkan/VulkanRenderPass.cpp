@@ -218,7 +218,11 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
   rpInfo.subpassCount = 1;
   rpInfo.pSubpasses = &subpass;
 
-  vkCreateRenderPass(device, &rpInfo, nullptr, &renderPass);
+  auto rpResult = vkCreateRenderPass(device, &rpInfo, nullptr, &renderPass);
+  if (rpResult != VK_SUCCESS) {
+    LOGE("VulkanRenderPass: vkCreateRenderPass failed: %s", VkResultToString(rpResult));
+    return;
+  }
 
   VkFramebufferCreateInfo fbInfo = {};
   fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -229,7 +233,13 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
   fbInfo.height = fbHeight;
   fbInfo.layers = 1;
 
-  vkCreateFramebuffer(device, &fbInfo, nullptr, &framebuffer);
+  auto fbResult = vkCreateFramebuffer(device, &fbInfo, nullptr, &framebuffer);
+  if (fbResult != VK_SUCCESS) {
+    LOGE("VulkanRenderPass: vkCreateFramebuffer failed: %s", VkResultToString(fbResult));
+    vkDestroyRenderPass(device, renderPass, nullptr);
+    renderPass = VK_NULL_HANDLE;
+    return;
+  }
 
   VkRenderPassBeginInfo beginInfo = {};
   beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -418,7 +428,6 @@ void VulkanRenderPass::setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFo
     return;
   }
   encoder->retainResource(std::static_pointer_cast<VulkanBuffer>(buffer));
-  currentIndexBuffer = buffer;
   currentIndexType = (format == IndexFormat::UInt32) ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
   auto vulkanBuffer = std::static_pointer_cast<VulkanBuffer>(buffer);
   vkCmdBindIndexBuffer(commandBuffer, vulkanBuffer->vulkanBuffer(), 0, currentIndexType);

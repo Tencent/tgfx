@@ -72,7 +72,6 @@ class VulkanRenderPass : public RenderPass {
   VkRenderPass renderPass = VK_NULL_HANDLE;
   VkFramebuffer framebuffer = VK_NULL_HANDLE;
   std::shared_ptr<VulkanRenderPipeline> currentPipeline = nullptr;
-  std::shared_ptr<GPUBuffer> currentIndexBuffer = nullptr;
   VkIndexType currentIndexType = VK_INDEX_TYPE_UINT16;
 
   struct UniformBinding {

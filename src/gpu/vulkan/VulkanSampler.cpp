@@ -19,6 +19,7 @@
 #include "VulkanSampler.h"
 #include "VulkanGPU.h"
 #include "VulkanUtil.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -87,6 +88,7 @@ std::shared_ptr<VulkanSampler> VulkanSampler::Make(VulkanGPU* gpu,
   VkSampler vkSampler = VK_NULL_HANDLE;
   auto result = vkCreateSampler(gpu->device(), &samplerInfo, nullptr, &vkSampler);
   if (result != VK_SUCCESS) {
+    LOGE("VulkanSampler::Make() vkCreateSampler failed: %s", VkResultToString(result));
     return nullptr;
   }
 

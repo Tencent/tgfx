@@ -47,8 +47,9 @@ inline PixelFormat VulkanFormatToPixelFormat(unsigned vulkanFormat) {
       return PixelFormat::DEPTH24_STENCIL8;
     case VK_FORMAT_R8G8B8A8_UNORM_VALUE:
     case VK_FORMAT_R8G8B8A8_SRGB_VALUE:
-    default:
       return PixelFormat::RGBA_8888;
+    default:
+      return PixelFormat::Unknown;
   }
 }
 

@@ -67,6 +67,12 @@ const char* VkResultToString(VkResult result) {
       return "VK_SUBOPTIMAL_KHR";
     case VK_ERROR_OUT_OF_DATE_KHR:
       return "VK_ERROR_OUT_OF_DATE_KHR";
+    case VK_ERROR_OUT_OF_POOL_MEMORY:
+      return "VK_ERROR_OUT_OF_POOL_MEMORY";
+    case VK_ERROR_INVALID_EXTERNAL_HANDLE:
+      return "VK_ERROR_INVALID_EXTERNAL_HANDLE";
+    case VK_ERROR_UNKNOWN:
+      return "VK_ERROR_UNKNOWN";
     default:
       return "VK_UNKNOWN_ERROR";
   }

@@ -88,6 +88,9 @@ std::shared_ptr<VulkanCommandEncoder> VulkanCommandEncoder::Make(VulkanGPU* gpu)
 
   auto encoder = gpu->makeResource<VulkanCommandEncoder>(gpu, cmdBuffer, pool);
   encoder->descriptorPool = gpu->acquireDescriptorPool();
+  if (encoder->descriptorPool == VK_NULL_HANDLE) {
+    LOGE("VulkanCommandEncoder: failed to acquire descriptor pool.");
+  }
   return encoder;
 }
 
