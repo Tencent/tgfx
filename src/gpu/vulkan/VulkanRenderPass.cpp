@@ -154,8 +154,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
 
       resolveVulkanTexture->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
 
-      resolveRefs.push_back(
-          {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_GENERAL});
+      resolveRefs.push_back({static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_GENERAL});
       attachments.push_back(resolveAttachment);
       fbAttachments.push_back(resolveVulkanTexture->vulkanImageView());
       clearValues.push_back({});
