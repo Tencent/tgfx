@@ -401,7 +401,13 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
   depthStencil.depthCompareOp = ToVkCompareOp(descriptor.depthStencil.depthCompare);
   depthStencil.stencilTestEnable =
       (descriptor.depthStencil.stencilFront.compare != CompareFunction::Always ||
-       descriptor.depthStencil.stencilBack.compare != CompareFunction::Always)
+       descriptor.depthStencil.stencilBack.compare != CompareFunction::Always ||
+       descriptor.depthStencil.stencilFront.failOp != StencilOperation::Keep ||
+       descriptor.depthStencil.stencilFront.passOp != StencilOperation::Keep ||
+       descriptor.depthStencil.stencilFront.depthFailOp != StencilOperation::Keep ||
+       descriptor.depthStencil.stencilBack.failOp != StencilOperation::Keep ||
+       descriptor.depthStencil.stencilBack.passOp != StencilOperation::Keep ||
+       descriptor.depthStencil.stencilBack.depthFailOp != StencilOperation::Keep)
           ? VK_TRUE
           : VK_FALSE;
   depthStencil.front.compareOp = ToVkCompareOp(descriptor.depthStencil.stencilFront.compare);

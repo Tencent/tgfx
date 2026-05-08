@@ -133,7 +133,7 @@ int VkFormatBytesPerPixel(VkFormat format) {
     case VK_FORMAT_D24_UNORM_S8_UINT:
       return 4;
     case VK_FORMAT_D32_SFLOAT_S8_UINT:
-      return 5;
+      return 8;
     default:
       return 0;
   }

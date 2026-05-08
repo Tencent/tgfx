@@ -92,7 +92,7 @@ std::shared_ptr<VulkanTexture> VulkanTexture::Make(VulkanGPU* gpu,
   viewInfo.format = vkFormat;
   viewInfo.subresourceRange.aspectMask = FormatToAspectFlags(vkFormat);
   viewInfo.subresourceRange.baseMipLevel = 0;
-  viewInfo.subresourceRange.levelCount = 1;
+  viewInfo.subresourceRange.levelCount = static_cast<uint32_t>(descriptor.mipLevelCount);
   viewInfo.subresourceRange.baseArrayLayer = 0;
   viewInfo.subresourceRange.layerCount = 1;
 
@@ -173,7 +173,7 @@ BackendTexture VulkanTexture::getBackendTexture() const {
   VulkanTextureInfo vulkanInfo;
   vulkanInfo.image = reinterpret_cast<void*>(image);
   vulkanInfo.format = static_cast<uint32_t>(format);
-  vulkanInfo.layout = static_cast<uint32_t>(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  vulkanInfo.layout = static_cast<uint32_t>(layout);
   return BackendTexture(vulkanInfo, descriptor.width, descriptor.height);
 }
 
@@ -184,7 +184,7 @@ BackendRenderTarget VulkanTexture::getBackendRenderTarget() const {
   VulkanImageInfo vulkanInfo;
   vulkanInfo.image = reinterpret_cast<void*>(image);
   vulkanInfo.format = static_cast<uint32_t>(format);
-  vulkanInfo.layout = static_cast<uint32_t>(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  vulkanInfo.layout = static_cast<uint32_t>(layout);
   return BackendRenderTarget(vulkanInfo, descriptor.width, descriptor.height);
 }
 

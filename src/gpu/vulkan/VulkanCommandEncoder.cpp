@@ -200,6 +200,7 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
                         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
   auto bytesPerPixel = VkFormatBytesPerPixel(vulkanSrc->vulkanFormat());
+  DEBUG_ASSERT(dstRowBytes == 0 || dstRowBytes % bytesPerPixel == 0);
   uint32_t rowBytes = dstRowBytes > 0 ? static_cast<uint32_t>(dstRowBytes)
                                       : static_cast<uint32_t>(srcRect.width()) * bytesPerPixel;
 

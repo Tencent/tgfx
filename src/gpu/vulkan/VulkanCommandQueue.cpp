@@ -141,8 +141,9 @@ void VulkanCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Re
   bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
   VmaAllocationCreateInfo allocInfo = {};
-  allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-  allocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+  allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT |
+                    VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+  allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
 
   VkBuffer stagingBuffer = VK_NULL_HANDLE;
   VmaAllocation stagingAlloc = VK_NULL_HANDLE;
@@ -198,7 +199,9 @@ void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
     transitionedImages.push_back(image);
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    // Use tracked layout to preserve existing contents outside the upload region.
+    // UNDEFINED would discard the entire image, corrupting previously uploaded sub-rects.
+    barrier.oldLayout = upload.texture->currentLayout();
     barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
