@@ -171,38 +171,32 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     if (brush.nothingToDraw()) {
       return;
     }
-    // SVG has no single attribute that applies "per-element alpha multiply" to a playback stream.
-    // Classify the brush into three buckets so playback can still preserve vector output whenever
-    // possible:
-    //   identity        -> replay directly (current behavior)
-    //   alpha-only < 1  -> wrap in <g opacity=...> then replay
-    //   anything else   -> rasterize the picture image and route through exportPixmap so the
-    //                      brush (shader/colorFilter/maskFilter/blendMode) is fully honored
-    bool brushIsIdentityExceptAlpha = brush.shader == nullptr && brush.maskFilter == nullptr &&
-                                      brush.colorFilter == nullptr &&
-                                      brush.blendMode == BlendMode::SrcOver;
-    if (brushIsIdentityExceptAlpha) {
+    // Honor non-identity brushes on PictureImage: alpha-only goes through <g opacity>
+    // to preserve vectors; any shader/filter/blend forces rasterization via exportPixmap.
+    bool canExportAsVector = brush.shader == nullptr && brush.maskFilter == nullptr &&
+                             brush.colorFilter == nullptr &&
+                             brush.blendMode == BlendMode::SrcOver;
+    if (canExportAsVector) {
       const auto pictureImage = static_cast<const PictureImage*>(image.get());
       auto newMatrix = matrix;
       if (pictureImage->matrix) {
         newMatrix.preConcat(*pictureImage->matrix);
       }
-      if (brush.color.alpha < 1.0f) {
-        // Close any active clip group so the <g opacity> wraps at the right parent level.
-        // Clear the members on exit so subsequent applyClipPath rebuilds the clip group
-        // instead of short-circuiting on a matching currentClipPath.
-        clipGroupElement = nullptr;
-        currentClipPath = {};
-        {
-          ElementWriter opacityGroup("g", xmlWriter, resourceBucket.get());
-          opacityGroup.addAttribute("opacity", brush.color.alpha);
-          drawPicture(pictureImage->picture, newMatrix, clip);
-        }
-        clipGroupElement = nullptr;
-        currentClipPath = {};
-      } else {
+      if (FloatNearlyEqual(brush.color.alpha, 1.0f)) {
+        drawPicture(pictureImage->picture, newMatrix, clip);
+        return;
+      }
+      // Reset clip state around the <g opacity> so nested playback ops rebuild their own
+      // clip groups under the correct parent instead of short-circuiting on currentClipPath.
+      clipGroupElement = nullptr;
+      currentClipPath = {};
+      {
+        ElementWriter opacityGroup("g", xmlWriter, resourceBucket.get());
+        opacityGroup.addAttribute("opacity", brush.color.alpha);
         drawPicture(pictureImage->picture, newMatrix, clip);
       }
+      clipGroupElement = nullptr;
+      currentClipPath = {};
       return;
     }
     auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
