@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VulkanCommandQueue.h"
+#include <unordered_set>
 #include "VulkanBuffer.h"
 #include "VulkanCommandBuffer.h"
 #include "VulkanSemaphore.h"
@@ -110,20 +111,13 @@ void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
   }
 
   std::vector<VkImageMemoryBarrier> preCopyBarriers;
-  std::vector<VkImage> transitionedImages;
+  std::unordered_set<VkImage> transitionedImages;
   for (auto& upload : pendingUploads) {
     auto image = upload.texture->vulkanImage();
-    bool alreadyTransitioned = false;
-    for (auto img : transitionedImages) {
-      if (img == image) {
-        alreadyTransitioned = true;
-        break;
-      }
-    }
-    if (alreadyTransitioned) {
+    if (transitionedImages.count(image)) {
       continue;
     }
-    transitionedImages.push_back(image);
+    transitionedImages.insert(image);
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout = upload.originalLayout;

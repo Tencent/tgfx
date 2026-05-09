@@ -22,7 +22,9 @@
 // Defines VK_NO_PROTOTYPES to prevent static linking to vulkan-1.lib. All Vulkan functions are
 // loaded dynamically at runtime via volk (volkInitialize → volkLoadInstance → volkLoadDevice).
 
+#ifndef VK_NO_PROTOTYPES
 #define VK_NO_PROTOTYPES
+#endif
 
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR

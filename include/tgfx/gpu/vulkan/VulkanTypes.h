@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <type_traits>
 
 namespace tgfx {
 
@@ -81,5 +82,9 @@ struct VulkanSyncInfo {
    */
   uint64_t value = 0;
 };
+
+static_assert(std::is_trivially_copyable_v<VulkanTextureInfo>);
+static_assert(std::is_trivially_copyable_v<VulkanImageInfo>);
+static_assert(std::is_trivially_copyable_v<VulkanSyncInfo>);
 
 }  // namespace tgfx
