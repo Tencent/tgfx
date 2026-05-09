@@ -286,6 +286,46 @@ void VulkanCommandQueue::waitUntilCompleted() {
   if (gpu == nullptr) {
     return;
   }
+  if (!pendingUploads.empty()) {
+    VkCommandPool pool = VK_NULL_HANDLE;
+    VkCommandPoolCreateInfo poolInfo = {};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    poolInfo.queueFamilyIndex = gpu->graphicsQueueIndex();
+    if (vkCreateCommandPool(gpu->device(), &poolInfo, nullptr, &pool) != VK_SUCCESS) {
+      LOGE("VulkanCommandQueue::waitUntilCompleted: failed to create command pool for flush.");
+      cleanupPendingUploads();
+      gpu->waitAllInflightSubmissions();
+      return;
+    }
+    VkCommandBufferAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = pool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = 1;
+    VkCommandBuffer cmd = VK_NULL_HANDLE;
+    if (vkAllocateCommandBuffers(gpu->device(), &allocInfo, &cmd) != VK_SUCCESS) {
+      LOGE("VulkanCommandQueue::waitUntilCompleted: failed to allocate command buffer for flush.");
+      vkDestroyCommandPool(gpu->device(), pool, nullptr);
+      cleanupPendingUploads();
+      gpu->waitAllInflightSubmissions();
+      return;
+    }
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(cmd, &beginInfo);
+    flushPendingUploads(cmd);
+    vkEndCommandBuffer(cmd);
+
+    VulkanGPU::SubmitRequest request = {};
+    request.session.commandPool = pool;
+    request.commandBuffers = {cmd};
+    request.uploads = std::move(pendingUploads);
+    request.frameTime = _frameTime;
+    pendingUploads.clear();
+    gpu->executeSubmission(std::move(request));
+  }
   gpu->waitAllInflightSubmissions();
 }
 
