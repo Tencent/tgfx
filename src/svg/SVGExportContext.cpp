@@ -174,8 +174,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     // Honor non-identity brushes on PictureImage: alpha-only goes through <g opacity>
     // to preserve vectors; any shader/filter/blend forces rasterization via exportPixmap.
     bool canExportAsVector = brush.shader == nullptr && brush.maskFilter == nullptr &&
-                             brush.colorFilter == nullptr &&
-                             brush.blendMode == BlendMode::SrcOver;
+                             brush.colorFilter == nullptr && brush.blendMode == BlendMode::SrcOver;
     if (canExportAsVector) {
       const auto pictureImage = static_cast<const PictureImage*>(image.get());
       auto newMatrix = matrix;
