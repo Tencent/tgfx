@@ -921,12 +921,12 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   if (needBackground) {
     // Use the canvas matrix as the viewMatrix (world → surface pixel mapping), consistent with
     // how DisplayList::captureBackgrounds passes getViewMatrix() to createBackgroundSource.
-    // Map clippedBounds through the canvas matrix to get the draw rect in surface pixel space.
     auto canvasMatrix = canvas->getMatrix();
-    auto backgroundRect = canvasMatrix.mapRect(clippedBounds);
+    auto rectForDraw = maxBackgroundOutset > 0.0f ? clippedBounds : bounds;
+    auto drawRect = canvasMatrix.mapRect(rectForDraw);
     auto backgroundMatrix = canvasMatrix;
-    if (auto bgSource = createBackgroundSource(context, backgroundRect, backgroundMatrix, true,
-                                               args.dstColorSpace)) {
+    if (auto bgSource = createBackgroundSource(context, drawRect, backgroundMatrix,
+                                               rectForDraw == bounds, args.dstColorSpace)) {
       // Replay from _root so ancestor matrices apply; orphan layers replay from themselves.
       // The capture rect is in the captureRoot's local coordinate space: world (root-local) when
       // rooted, or this layer's local bounds when orphan.
