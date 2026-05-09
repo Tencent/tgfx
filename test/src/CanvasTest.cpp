@@ -1714,6 +1714,83 @@ TGFX_TEST(CanvasTest, PictureMaskPath) {
   EXPECT_EQ(colorOutside, Color::Transparent());
 }
 
+/**
+ * Verifies the complexity guards in MaskContext that protect against runaway PathOp::Union cost
+ * when the source picture is too large or contains very dense paths. All three guards must abort
+ * extraction so callers can fall back to the MaskFilter shader path.
+ */
+TGFX_TEST(CanvasTest, PictureMaskPathComplexAbort) {
+  auto getMaskPath = [](const std::shared_ptr<Picture>& picture, Path* maskPath) -> bool {
+    return MaskContext::GetMaskPath(picture, maskPath);
+  };
+  Paint paint = {};
+  paint.setColor(Color::Black());
+
+  // Guard 1: drawCount budget at the top level. 31 draws exceeds the 30-op cap.
+  {
+    PictureRecorder recorder = {};
+    auto* canvas = recorder.beginRecording();
+    for (int i = 0; i < 31; ++i) {
+      canvas->drawRect(Rect::MakeXYWH(static_cast<float>(i), 0.f, 1.f, 1.f), paint);
+    }
+    auto picture = recorder.finishRecordingAsPicture();
+    ASSERT_TRUE(picture != nullptr);
+    Path maskPath = {};
+    EXPECT_FALSE(getMaskPath(picture, &maskPath));
+  }
+
+  // Guard 2: accumulated-verb circuit breaker. A single drawPath with thousands of segments
+  // stays under the drawCount budget but blows past the projected-verb cap before Union runs.
+  {
+    Path densePath = {};
+    densePath.moveTo(0.f, 0.f);
+    for (int i = 1; i < 4000; ++i) {
+      densePath.lineTo(static_cast<float>(i), static_cast<float>(i & 1));
+    }
+    densePath.close();
+    PictureRecorder recorder = {};
+    auto* canvas = recorder.beginRecording();
+    canvas->drawPath(densePath, paint);
+    auto picture = recorder.finishRecordingAsPicture();
+    ASSERT_TRUE(picture != nullptr);
+    TGFX_PRIVATE_ACCESS(EXPECT_LE(picture->drawCount, 30u));
+    Path maskPath = {};
+    EXPECT_FALSE(getMaskPath(picture, &maskPath));
+  }
+
+  // Guard 3: drawCount budget propagates into nested pictures. A small outer picture that
+  // embeds an oversized inner picture must abort, otherwise the inner replay would bypass the
+  // top-level cap.
+  {
+    PictureRecorder innerRecorder = {};
+    auto* innerCanvas = innerRecorder.beginRecording();
+    for (int i = 0; i < 31; ++i) {
+      innerCanvas->drawRect(Rect::MakeXYWH(static_cast<float>(i), 0.f, 1.f, 1.f), paint);
+    }
+    auto innerPicture = innerRecorder.finishRecordingAsPicture();
+    ASSERT_TRUE(innerPicture != nullptr);
+
+    PictureRecorder outerRecorder = {};
+    auto* outerCanvas = outerRecorder.beginRecording();
+    outerCanvas->drawPicture(innerPicture);
+    auto outerPicture = outerRecorder.finishRecordingAsPicture();
+    ASSERT_TRUE(outerPicture != nullptr);
+    Path maskPath = {};
+    EXPECT_FALSE(getMaskPath(outerPicture, &maskPath));
+  }
+
+  // Sanity: a small simple picture still succeeds, ensuring the new guards don't over-trigger.
+  {
+    PictureRecorder recorder = {};
+    auto* canvas = recorder.beginRecording();
+    canvas->drawRect(Rect::MakeWH(50.f, 50.f), paint);
+    auto picture = recorder.finishRecordingAsPicture();
+    ASSERT_TRUE(picture != nullptr);
+    Path maskPath = {};
+    EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  }
+}
+
 TGFX_TEST(CanvasTest, DrawImage) {
   ContextScope scope;
   auto context = scope.getContext();
