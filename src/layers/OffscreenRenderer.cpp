@@ -27,8 +27,6 @@ namespace tgfx {
 
 namespace {
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────────────────────
-
 std::shared_ptr<Image> SnapshotOf(Canvas* canvas) {
   auto surface = canvas->getSurface();
   if (surface == nullptr) {
@@ -37,7 +35,6 @@ std::shared_ptr<Image> SnapshotOf(Canvas* canvas) {
   return surface->makeImageSnapshot();
 }
 
-// Pre-paints the parent backdrop into a pass-through carrier so the subtree draws on top.
 void SeedBackdrop(Canvas* canvas, const std::shared_ptr<Image>& backdrop, const Rect& surfaceRect) {
   canvas->save();
   canvas->setMatrix(Matrix::MakeTrans(-surfaceRect.x(), -surfaceRect.y()));
@@ -68,8 +65,6 @@ std::shared_ptr<Image> ApplyImageFilterIfNeeded(std::shared_ptr<Image> image,
 
 }  // namespace
 
-// ─── Entry points ─────────────────────────────────────────────────────────────────────────────
-
 OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& args,
                                                  const Matrix& contentMatrix,
                                                  const std::optional<Rect>& clipBounds) {
@@ -78,9 +73,8 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
     return {};
   }
 
-  // density: local → surface-pixel. With an image filter, force an isotropic scale so blur /
-  // drop-shadow etc. operate in pixel space; without a filter keep the full contentMatrix so
-  // rotation/skew fidelity is preserved.
+  // With an image filter, force an isotropic scale so blur / drop-shadow operate in pixel space;
+  // without a filter keep the full contentMatrix to preserve rotation/skew fidelity.
   auto imageFilter =
       args.excludeEffects ? nullptr : layer->getImageFilter(contentMatrix.getMaxScale());
   Matrix density = imageFilter
@@ -89,8 +83,8 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
   auto imageClip = density.mapRect(*inputBounds);
   imageClip.roundOut();
 
-  // A Surface backing is only needed when a descendant Background-sourced style will read back
-  // through this subtree. Otherwise a PictureRecorder is cheaper.
+  // Need a Surface backing only when a descendant Background-sourced style will read back
+  // through this subtree; otherwise a PictureRecorder is cheaper.
   bool wantsSubBackground =
       args.backgroundHandler != nullptr && args.backgroundHandler->needsSurface(layer);
   if (wantsSubBackground && args.context != nullptr) {
@@ -138,15 +132,13 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
   return RenderPassThroughOnPicture(layer, args, backdrop, parentMatrix, surfaceRect, *inputBounds);
 }
 
-// ─── renderContent backings ───────────────────────────────────────────────────────────────────
-
 OffscreenResult OffscreenRenderer::RenderContentOnSurface(
     Layer* layer, const DrawArgs& args, std::shared_ptr<Surface> surface, const Matrix& density,
     const Rect& imageClip, const std::shared_ptr<ImageFilter>& imageFilter,
     const std::optional<Rect>& clipBounds, const Rect& inputBounds, const Matrix& contentMatrix,
     bool wantsSubBackground) {
-  // Surface normalises the basis so (0,0) maps to imageClip.topLeft, giving the allocated pixel
-  // grid a canonical origin.
+  // Translate the basis so (0,0) maps to imageClip.topLeft, giving the allocated pixel grid a
+  // canonical origin.
   auto localToSurface = density;
   localToSurface.postTranslate(-imageClip.x(), -imageClip.y());
   auto* canvas = surface->getCanvas();
@@ -162,6 +154,10 @@ OffscreenResult OffscreenRenderer::RenderContentOnSurface(
       if (auto* rects = subHandler->renderRects()) {
         drawArgs.renderRects = rects;
       }
+    } else {
+      // Parent handler's localToWorld is tied to the parent surface; on this offscreen canvas it
+      // would sample at wrong coordinates.
+      drawArgs.backgroundHandler = BackgroundHandler::NoOp();
     }
   }
 
@@ -199,6 +195,8 @@ OffscreenResult OffscreenRenderer::RenderContentOnPicture(
       if (auto* rects = subHandler->renderRects()) {
         drawArgs.renderRects = rects;
       }
+    } else {
+      drawArgs.backgroundHandler = BackgroundHandler::NoOp();
     }
   }
 
@@ -218,8 +216,6 @@ OffscreenResult OffscreenRenderer::RenderContentOnPicture(
       ApplyImageFilterIfNeeded(result.image, imageFilter, clipBounds, &result.imageMatrix);
   return result;
 }
-
-// ─── renderPassThrough backings ───────────────────────────────────────────────────────────────
 
 OffscreenResult OffscreenRenderer::RenderPassThroughOnSurface(
     Layer* layer, const DrawArgs& args, std::shared_ptr<Surface> surface,
@@ -242,6 +238,8 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnSurface(
       if (auto* rects = subHandler->renderRects()) {
         drawArgs.renderRects = rects;
       }
+    } else {
+      drawArgs.backgroundHandler = BackgroundHandler::NoOp();
     }
   }
 
@@ -264,6 +262,7 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnPicture(
 
   PictureRecorder recorder;
   auto* canvas = recorder.beginRecording();
+  canvas->clipRect(Rect::MakeWH(surfaceRect.width(), surfaceRect.height()));
   SeedBackdrop(canvas, backdrop, surfaceRect);
   canvas->setMatrix(localToSurface);
 
@@ -277,6 +276,8 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnPicture(
       if (auto* rects = subHandler->renderRects()) {
         drawArgs.renderRects = rects;
       }
+    } else {
+      drawArgs.backgroundHandler = BackgroundHandler::NoOp();
     }
   }
 

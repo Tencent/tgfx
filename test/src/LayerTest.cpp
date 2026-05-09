@@ -3327,8 +3327,8 @@ TGFX_TEST(LayerTest, RootLayerBackgroundColorWithBlurBackground) {
 
   displayList->root()->addChild(shapeLayer);
 
-  // Render the display list - this will internally create BackgroundSource and call
-  // RootLayer::drawLayer feeds the background-blur capture pass via DisplayList::captureBackgrounds.
+  // Render the display list. RootLayer::drawLayer feeds the background-blur capture pass via
+  // DisplayList::captureBackgrounds, which internally creates a BackgroundSource.
   displayList->render(surface.get());
 
   // Compare with baseline to verify the background color is correctly drawn

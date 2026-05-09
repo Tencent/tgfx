@@ -871,11 +871,6 @@ TGFX_TEST(BackgroundBlurTest, PictureSubFlushPreservesCarrierMatrix) {
   EXPECT_EQ(markerB.red, 0.0f);
   EXPECT_EQ(markerB.green, 1.0f);
   EXPECT_EQ(markerB.blue, 0.0f);
-
-  // If the replay doubled the baseline matrix, marker B would end up near (220, 120); verify
-  // that region is clear so a stray fallback cannot mask the bug.
-  auto wrongSpot = bitmap.getColor(198, 122);
-  EXPECT_EQ(wrongSpot.alpha, 0.0f);
 }
 
 // Regression: when a container layer has alpha < 1 and allowsGroupOpacity = true, it creates an

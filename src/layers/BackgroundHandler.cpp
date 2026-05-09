@@ -33,34 +33,21 @@ namespace tgfx {
 
 namespace {
 
-// A handler that does nothing for background-sourced styles. Reused for intermediate artifacts
-// and 3D / contour paths where background styles must not produce output.
+// A handler that does nothing for background-sourced styles. Used for intermediate artifacts and
+// 3D / contour paths where background styles must not produce output.
 class NoOpImpl : public BackgroundHandler {
  public:
   void drawBackgroundStyle(const DrawArgs& /*args*/, Canvas* /*canvas*/, Layer* /*layer*/,
                            float /*alpha*/, LayerStyle* /*style*/,
                            const LayerStyleSource* /*source*/) override {
-    // Background styles deliberately produce no output in NoOp contexts.
   }
 };
 
-// Copy the region of bgImage that this layer actually consumes into a private small surface,
-// so the downstream PictureImage references the returned image instead of bgImage.
-//
-// Why: bgImage IS bgSource->surface's cachedImage. If the recorded picture holds a reference to
-// bgImage, the resulting PictureImage keeps cachedImage's external use_count elevated, and every
-// subsequent write to bgCanvas during the same capture pass triggers Surface::aboutToDraw's
-// copy-on-write path — a full RT reallocation plus blit. Capture runs once per background-style
-// layer, so the COW cost scales with layer count × RT size and dominates GPU submit time.
-// Routing through an independent copy breaks the reference back to cachedImage and avoids COW.
-//
-// Size the small surface in bgImage pixel space, clipped to bgImage's own extent. This is
-// bounded by bgImage regardless of contentScale, so it cannot exceed maxTextureSize for a
-// bgSource that itself already fits. Layer regions lying outside bgImage are transparent, no
-// point copying them.
-//
-// Returns nullptr if the surface cannot be created (missing context, over-budget, or a non-
-// invertible transform). Callers should fall back to the original bgImage on null return.
+// Copy the slice of bgImage this layer consumes into a private surface, so the recorded picture
+// references the copy rather than bgImage. bgImage IS bgSource->surface's cachedImage; holding a
+// reference to it during capture would trigger Surface::aboutToDraw's copy-on-write path on every
+// subsequent write to bgCanvas — a full RT reallocation plus blit that dominates GPU submit time.
+// Returns nullptr on failure (no context, over-budget, or non-invertible matrix).
 std::shared_ptr<Image> MakeDetachedBgCopy(Context* context, const std::shared_ptr<Image>& bgImage,
                                           const Matrix& bgPixelToLocal, const Rect& layerBounds,
                                           Point* offset, std::shared_ptr<ColorSpace> colorSpace) {
@@ -90,6 +77,37 @@ std::shared_ptr<Image> MakeDetachedBgCopy(Context* context, const std::shared_pt
     *offset = {bgPixelBounds.left, bgPixelBounds.top};
   }
   return surface->makeImageSnapshot();
+}
+
+// Intersects the sub background's rect with parentArgs.renderRects to produce a narrowed cull
+// list for the offscreen's child draw pass. If parentArgs.renderRects is null/empty (no cull),
+// falls back to the full bgRect.
+void NarrowRenderRects(const DrawArgs& parentArgs, const Rect& bgRect,
+                       std::vector<Rect>* outRects) {
+  if (parentArgs.renderRects != nullptr && !parentArgs.renderRects->empty()) {
+    for (const auto& r : *parentArgs.renderRects) {
+      auto clipped = r;
+      if (clipped.intersect(bgRect)) {
+        outRects->push_back(clipped);
+      }
+    }
+  } else {
+    outRects->push_back(bgRect);
+  }
+}
+
+// Builds the world-space rect and localToWorld matrix for a sub source nested under bgSource.
+// Returns false if bgSource is missing.
+bool ComputeSubGeometry(BackgroundSource* parentSource, const Rect& localBounds,
+                        const Matrix& contentMatrix, Matrix* localToWorld, Rect* worldBounds) {
+  if (parentSource == nullptr) {
+    return false;
+  }
+  *localToWorld = parentSource->surfaceToWorldMatrix();
+  localToWorld->preConcat(contentMatrix);
+  *worldBounds = localToWorld->mapRect(localBounds);
+  worldBounds->roundOut();
+  return true;
 }
 
 }  // namespace
@@ -127,36 +145,19 @@ bool BackgroundCapturer::needsSurface(Layer* layer) const {
   return layer != nullptr && layer->hasDescendantBackgroundStyle();
 }
 
-// Intersects the sub background's rect with parentArgs.renderRects to produce a narrowed cull
-// list for the offscreen's child draw pass. If parentArgs.renderRects is null/empty (no cull),
-// falls back to the full bgRect.
-static void NarrowRenderRects(const DrawArgs& parentArgs, const Rect& bgRect,
-                              std::vector<Rect>* outRects) {
-  if (parentArgs.renderRects != nullptr && !parentArgs.renderRects->empty()) {
-    for (const auto& r : *parentArgs.renderRects) {
-      auto clipped = r;
-      if (clipped.intersect(bgRect)) {
-        outRects->push_back(clipped);
-      }
-    }
-  } else {
-    outRects->push_back(bgRect);
+std::unique_ptr<BackgroundCapturer> BackgroundCapturer::buildSubCapturer(
+    const DrawArgs& parentArgs, std::shared_ptr<BackgroundSource> subSource) const {
+  if (subSource == nullptr) {
+    return nullptr;
   }
-}
-
-// Builds the world-space rect and localToWorld matrix for a sub source nested under bgSource.
-// Returns false if bgSource is missing.
-static bool ComputeSubGeometry(BackgroundSource* parentSource, const Rect& localBounds,
-                               const Matrix& contentMatrix, Matrix* localToWorld,
-                               Rect* worldBounds) {
-  if (parentSource == nullptr) {
-    return false;
+  auto subRect = subSource->getBackgroundRect();
+  auto clone = std::make_unique<BackgroundCapturer>(snapshots, std::move(subSource));
+  NarrowRenderRects(parentArgs, subRect, &clone->_renderRects);
+  // Forced-capture state must propagate so pass-through subtrees still feed the parent bgSource.
+  if (isForcedCapture()) {
+    clone->beginForceDrawChildren();
   }
-  *localToWorld = parentSource->surfaceToWorldMatrix();
-  localToWorld->preConcat(contentMatrix);
-  *worldBounds = localToWorld->mapRect(localBounds);
-  worldBounds->roundOut();
-  return true;
+  return clone;
 }
 
 std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
@@ -169,19 +170,7 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
     return nullptr;
   }
   auto subSource = bgSource->createFromSurface(surface, worldBounds, localToWorld, localToSurface);
-  if (subSource == nullptr) {
-    return nullptr;
-  }
-  auto subRect = subSource->getBackgroundRect();
-  auto clone =
-      std::unique_ptr<BackgroundCapturer>(new BackgroundCapturer(snapshots, std::move(subSource)));
-  NarrowRenderRects(parentArgs, subRect, &clone->_renderRects);
-  // Inherit the forced-capture state so subtrees inside pass-through offscreen containers
-  // are not culled by lastCaptureChildIndex — they still contribute to the parent bgSource.
-  if (isForcedCapture()) {
-    clone->beginForceDrawChildren();
-  }
-  return clone;
+  return buildSubCapturer(parentArgs, std::move(subSource));
 }
 
 std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
@@ -194,18 +183,11 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
     return nullptr;
   }
   auto subSource = bgSource->createFromPicture(recorder, worldBounds, localToWorld, localToSurface);
-  if (subSource == nullptr) {
+  auto clone = buildSubCapturer(parentArgs, std::move(subSource));
+  if (clone == nullptr) {
     return nullptr;
   }
-  auto subRect = subSource->getBackgroundRect();
-  auto clone =
-      std::unique_ptr<BackgroundCapturer>(new BackgroundCapturer(snapshots, std::move(subSource)));
-  NarrowRenderRects(parentArgs, subRect, &clone->_renderRects);
-  if (isForcedCapture()) {
-    clone->beginForceDrawChildren();
-  }
-  // createFromPicture may have flushed a recording segment, so the recorder's current canvas
-  // pointer may have changed.
+  // createFromPicture may have flushed a recording segment; re-fetch the current canvas.
   if (outCanvas != nullptr) {
     *outCanvas = recorder->getRecordingCanvas();
   }
@@ -232,13 +214,10 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   auto bounds = layerBounds;
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
-  // Build layer-local → world from the RUNTIME canvas chain: the capture canvas matrix maps
-  // layer-local → current surface pixel, and the current bgSource's surfaceToWorldMatrix() maps
-  // surface pixel → world. Using the canvas chain keeps capture and consume in the same frame of
-  // reference — an ancestor offscreen carrier that flattens a perspective matrix to pure scale is
-  // seen the same way by both sides. Do NOT fall back to getGlobalMatrix() here: that walks the
-  // static layer tree with per-step z-flattening and diverges from the runtime concat chain when
-  // multiple non-preserve3D perspective matrices stack up.
+  // Use the runtime canvas chain (capture canvas matrix · bgSource->surfaceToWorldMatrix) so
+  // capture and consume share the same frame of reference. Do NOT use getGlobalMatrix(): it walks
+  // the static layer tree with per-step z-flattening and diverges from the runtime concat chain
+  // when multiple non-preserve3D perspective matrices stack up.
   Matrix worldToLocal = Matrix::I();
   if (!localToWorld.invert(&worldToLocal)) {
     return;
@@ -258,13 +237,10 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   recording->concat(worldToLocal);
   recording->concat(bgSource->backgroundMatrix());
   if (smallBgImage != nullptr) {
-    // smallBgImage is the (smallBgOffset-origin) slice of bgImage; re-anchor it so the composite
-    // picture has the exact same geometry as drawImage(bgImage).
     recording->translate(smallBgOffset.x, smallBgOffset.y);
     recording->drawImage(std::move(smallBgImage));
   } else {
-    // Fallback: detached copy unavailable (no context, over budget, or non-invertible matrix).
-    // Keep the original path — COW may trigger, but the snapshot still renders correctly.
+    // Fallback when detached copy is unavailable; original path may trigger COW.
     recording->drawImage(bgImage);
   }
   auto picture = recorder.finishRecordingAsPicture();
@@ -292,22 +268,18 @@ const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* lay
 }
 
 const LayerStyleSource* BackgroundCapturer::tryCacheLayerStyleSource(
-    Layer* layer, std::unique_ptr<LayerStyleSource>& source) const {
+    Layer* layer, std::unique_ptr<LayerStyleSource>& source) {
   if (snapshots == nullptr || source == nullptr) {
     return nullptr;
   }
-  // Capture canvas matrix carries an extra surfaceScale relative to consume canvas matrix when
-  // the bg source was down-sampled (extreme blur outsets). In that rare case, the source's
-  // contentScale differs between passes so the cached image cannot be reused. Skip caching so
-  // each pass builds its own source at the right density.
+  // When the bg source was down-sampled (extreme blur outset), capture and consume run at
+  // different densities, so a cached source built in capture cannot be reused in consume.
   if (bgSource != nullptr && bgSource->surfaceScale() != 1.0f) {
     return nullptr;
   }
-  // Capture and consume passes both rasterize the same picture-backed images at the same scale.
-  // Wrap them in a RasterizedImage so the first draw uploads a cached GPU texture and the second
-  // pass reuses it instead of replaying the picture. Calling makeRasterized() on an already-
-  // rasterized image is a no-op (returns weakThis), so we don't need to special-case the
-  // content/contour aliasing — wrapping each field independently still lands on the same cache.
+  // Wrap each picture-backed image as Rasterized so the first draw uploads a GPU texture and the
+  // second pass reuses it instead of replaying the picture. makeRasterized() on an already-
+  // rasterized image is a no-op, so wrapping content/contour independently still hits one cache.
   for (auto& group : source->groups) {
     if (group == nullptr) {
       continue;

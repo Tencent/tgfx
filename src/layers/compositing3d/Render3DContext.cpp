@@ -19,7 +19,6 @@
 #include "Render3DContext.h"
 #include "Context3DCompositor.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Paint.h"
 
 namespace tgfx {
 

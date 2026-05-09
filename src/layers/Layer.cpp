@@ -55,10 +55,6 @@ static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
 
-// When canvasScale equals backgroundScale, most pixels at the same resolution are valuable,
-// so rasterization is meaningful. Otherwise, skip rasterization to avoid generating oversized
-// textures.
-
 /**
  * Clips the canvas using the scroll rect. If the sublayer's Matrix contains 3D transformations or
  * projection transformations, because this matrix has been merged into the Canvas, it can be
@@ -929,14 +925,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     auto canvasMatrix = canvas->getMatrix();
     auto backgroundRect = canvasMatrix.mapRect(clippedBounds);
     auto backgroundMatrix = canvasMatrix;
-    // Orphan layers never run updateRenderBounds, so their cached outsets are stale.
-    // Compute them on the fly before createBackgroundSource reads maxBackgroundOutset.
-    if (_root == nullptr) {
-      maxBackgroundOutset = 0.f;
-      minBackgroundOutset = std::numeric_limits<float>::max();
-      collectBackgroundOutsets(1.0f, &maxBackgroundOutset, &minBackgroundOutset);
-    }
-    if (auto bgSource = createBackgroundSource(context, backgroundRect, backgroundMatrix, false,
+    if (auto bgSource = createBackgroundSource(context, backgroundRect, backgroundMatrix, true,
                                                args.dstColorSpace)) {
       // Replay from _root so ancestor matrices apply; orphan layers replay from themselves.
       // The capture rect is in the captureRoot's local coordinate space: world (root-local) when
@@ -1536,7 +1525,7 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
-                         const LayerStyleSource* layerStyleSource, const Layer* stopChild) {
+                         const LayerStyleSource* layerStyleSource) {
   if (layerStyleSource) {
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below);
   }
@@ -1545,7 +1534,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   if (content) {
     hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
   }
-  if (!drawChildren(args, canvas, alpha, stopChild)) {
+  if (!drawChildren(args, canvas, alpha)) {
     return;
   }
   if (layerStyleSource) {
@@ -1642,8 +1631,7 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
   return allMatch;
 }
 
-bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
-                         const Layer* stopChild) {
+bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha) {
   auto childCount = static_cast<int>(_children.size());
   int maxIndex = childCount - 1;
   if (args.backgroundHandler != nullptr) {
@@ -1657,9 +1645,6 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
   }
   for (int i = 0; i <= maxIndex; ++i) {
     auto& child = _children[static_cast<size_t>(i)];
-    if (child.get() == stopChild) {
-      return false;
-    }
     if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
       continue;
     }
@@ -1721,9 +1706,7 @@ std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* can
     if (childArgs.render3DContext == nullptr) {
       return std::nullopt;
     }
-    // Layers inside a 3D rendering context need to maintain independent 3D state. This means
-    // layers drawn later may become the background, making it impossible to know the final
-    // background when drawing each layer. Therefore, background styles are disabled.
+    // 3D subtree disables Background styles — see drawByStarting3DContext.
     childArgs.backgroundHandler = BackgroundHandler::NoOp();
   }
   return childArgs;
@@ -2153,49 +2136,6 @@ bool Layer::hasDescendantBackgroundStyle() {
     }
   }
   return false;
-}
-
-// Walks `this` subtree and folds every Background-sourced style's filter outset (plus the
-// outer imageFilter's sampling outset when both coexist on the same node) into max/min trackers.
-// Mirrors the per-node branch in updateRenderBounds — except it does not rely on the cached
-// {max,min}BackgroundOutset fields, which are only populated after updateRenderBounds actually
-// runs. Orphan Layers invoked via Layer::draw never run updateRenderBounds, so createBackground-
-// Source computes outsets on the fly instead of reading the stale cache.
-void Layer::collectBackgroundOutsets(float contentScale, float* maxOutset, float* minOutset) {
-  if (!bitFields.visible || _alpha <= 0.0f) {
-    return;
-  }
-  float nodeOutset = 0.0f;
-  for (const auto& style : _layerStyles) {
-    if (style == nullptr || style->extraSourceType() != LayerStyleExtraSourceType::Background) {
-      continue;
-    }
-    auto outset = style->filterBackground(Rect::MakeEmpty(), contentScale);
-    nodeOutset = std::max(nodeOutset, outset.right);
-    nodeOutset = std::max(nodeOutset, outset.bottom);
-  }
-  if (nodeOutset > 0.0f && !_filters.empty()) {
-    auto imageFilter = getImageFilter(contentScale);
-    if (imageFilter) {
-      auto baseBounds = imageFilter->filterBounds(Rect::MakeEmpty(), MapDirection::Reverse);
-      if (!baseBounds.isEmpty()) {
-        nodeOutset +=
-            std::max({-baseBounds.left, -baseBounds.top, baseBounds.right, baseBounds.bottom});
-      }
-    }
-  }
-  if (nodeOutset > 0.0f) {
-    *maxOutset = std::max(*maxOutset, nodeOutset);
-    *minOutset = std::min(*minOutset, nodeOutset);
-  }
-  // Accumulate the local matrix scale so descendants see the same contentScale that
-  // updateRenderBounds threads through its RegionTransformer chain. Without this, a layer with a
-  // scaled ancestor would compute its filterBackground outset in an unscaled frame and the bg
-  // source would come out at the wrong size.
-  for (const auto& child : _children) {
-    auto childScale = contentScale * child->getMatrixWithScrollRect().asMatrix().getMaxScale();
-    child->collectBackgroundOutsets(childScale, maxOutset, minOutset);
-  }
 }
 
 std::shared_ptr<BackgroundSource> Layer::createBackgroundSource(

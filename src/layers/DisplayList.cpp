@@ -333,8 +333,6 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     }
     return;
   }
-  // The capture pass is invoked inside each render path (Direct / Partial / Tiled) after it
-  // computes the actual draw region, so bg snapshots only cover the pixels about to be refreshed.
   switch (_renderMode) {
     case RenderMode::Direct:
       dirtyRegions = renderDirect(surface, autoClear);
@@ -354,7 +352,10 @@ void DisplayList::render(Surface* surface, bool autoClear) {
 
 std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) const {
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
-  auto snapshotMap = captureBackgrounds(surface, {surfaceRect});
+  std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
+  if (_root->hasBackgroundStyle()) {
+    snapshotMap = captureBackgrounds(surface, {surfaceRect});
+  }
   drawRootLayer(surface, surfaceRect, getViewMatrix(), autoClear, snapshotMap.get());
   return {Rect::MakeEmpty()};
 }
@@ -410,9 +411,12 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   } else {
     renderRects = MapDirtyRegions(dirtyRegions, viewMatrix, true, &surfaceRect);
   }
-  // Forward the full renderRects list to the capture pass — the capturer scopes each replay to one
-  // rect, which skips Layers that fall in the bounding gaps between scattered dirty regions.
-  auto snapshotMap = captureBackgrounds(surface, renderRects);
+  // Pass the full rect list so each replay is scoped to a single rect; otherwise Layers in the
+  // gaps between scattered dirty regions get skipped.
+  std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
+  if (_root->hasBackgroundStyle()) {
+    snapshotMap = captureBackgrounds(surface, renderRects);
+  }
   auto canvas = surface->getCanvas();
   for (auto& drawRect : renderRects) {
     drawRootLayer(partialCache.get(), drawRect, viewMatrix, true, snapshotMap.get());
@@ -443,18 +447,18 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
   }
-  // Collect every tileTask's drawRect (surface / render space) as an individual capture rect.
   // tileRect is in zoom space; offset by contentOffset to line it up with surface pixel coords.
-  // The capturer scopes renderRect to each tile separately, avoiding Layers in the gaps between
-  // scattered tiles.
-  std::vector<Rect> captureRects = {};
-  captureRects.reserve(tileTasks.size());
-  for (auto& task : tileTasks) {
-    auto r = task.tileRect();
-    r.offset(_contentOffset.x, _contentOffset.y);
-    captureRects.push_back(r);
+  std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
+  if (_root->hasBackgroundStyle()) {
+    std::vector<Rect> captureRects = {};
+    captureRects.reserve(tileTasks.size());
+    for (auto& task : tileTasks) {
+      auto captureRect = task.tileRect();
+      captureRect.offset(_contentOffset.x, _contentOffset.y);
+      captureRects.push_back(captureRect);
+    }
+    snapshotMap = captureBackgrounds(surface, captureRects);
   }
-  auto snapshotMap = captureBackgrounds(surface, captureRects);
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   for (auto& task : tileTasks) {
@@ -1063,8 +1067,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   // background-sourced styles (if any show up unexpectedly) silently no-op — matching the
   // contour / 3D subtree semantics.
   BackgroundConsumer consumer(snapshots);
-  args.backgroundHandler =
-      snapshots ? static_cast<BackgroundHandler*>(&consumer) : BackgroundHandler::NoOp();
+  args.backgroundHandler = snapshots ? &consumer : BackgroundHandler::NoOp();
   _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
 }
 
@@ -1083,10 +1086,8 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   }
   auto viewMatrix = getViewMatrix();
   DEBUG_ASSERT(viewMatrix.invertible());
-  // Two coord spaces are involved:
-  //  - createBackgroundSource() takes a surface-pixel-space rect sizing the bg source.
-  //  - BackgroundCapturer::Run takes world-space renderRects (pre-outset by blur sampling range),
-  //    used by drawLayer for per-rect culling.
+  // createBackgroundSource takes a surface-pixel-space rect for sizing; BackgroundCapturer::Run
+  // takes world-space renderRects (pre-outset by blur sampling range) for per-rect culling.
   Matrix inverse = Matrix::I();
   viewMatrix.invert(&inverse);
   Rect surfaceUnion = Rect::MakeEmpty();
@@ -1104,15 +1105,11 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   if (worldRects.empty()) {
     return nullptr;
   }
-  // Expand worldRects by the max blur outset so the capture pass keeps layers whose bounds sit
-  // just outside the dirty rects but still contribute pixels to the blur sampling region.
+  // Expand by the max blur outset so layers whose bounds sit just outside the dirty rects but
+  // still contribute pixels to the blur sampling region are not culled by the capture pass.
   for (auto& rect : worldRects) {
     rect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
   }
-  // The capture pass replays the entire layer tree onto the bg source's surface. Every
-  // Background-sourced LayerStyle is intercepted by BackgroundCapturer, which samples the surface
-  // at that point and stores a snapshot in snapshotMap; the style itself is skipped so that its
-  // output does not contaminate later background samples.
   DrawArgs args(context);
   args.dstColorSpace = surface->colorSpace();
   args.subtreeCacheMaxSize = _subtreeCacheMaxSize;

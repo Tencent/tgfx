@@ -51,8 +51,6 @@ class OffscreenRenderer;
  * blendMode, position, matrix, visible, scrollRect, and mask.
  */
 class Layer : public std::enable_shared_from_this<Layer> {
-  friend class OffscreenRenderer;
-
  public:
   /**
    * Returns the default value for the allowsEdgeAntialiasing property for new Layer instances. The
@@ -633,15 +631,13 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const LayerStyleSource* layerStyleSource = nullptr,
-                    const Layer* stopChild = nullptr);
+                    const LayerStyleSource* layerStyleSource = nullptr);
 
   bool drawContour(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   bool drawContourInternal(const DrawArgs& args, Canvas* canvas, bool contentOnly);
 
-  bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const Layer* stopChild = nullptr);
+  bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha);
 
   using LayerDrawFunc = bool (Layer::*)(const DrawArgs&, Canvas*, float, BlendMode);
 
@@ -687,14 +683,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasBackgroundStyle();
 
-  // Returns true when any descendant (excluding this layer itself) has a background-sourced style.
   bool hasDescendantBackgroundStyle();
-
-  // Recursively sums this subtree's Background-sourced style outsets (+ the outer imageFilter
-  // sampling outset when a node has both). Writes the maximum and minimum observed outsets.
-  // Used by createBackgroundSource when the cached {max,min}BackgroundOutset cannot be trusted
-  // (orphan Layers skip updateRenderBounds and therefore never populate the cache).
-  void collectBackgroundOutsets(float contentScale, float* maxOutset, float* minOutset);
 
   std::shared_ptr<BackgroundSource> createBackgroundSource(
       Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
@@ -770,5 +759,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   friend class BackgroundCapturer;
   friend class LayerProperty;
   friend class LayerSerialization;
+  friend class OffscreenRenderer;
 };
 }  // namespace tgfx

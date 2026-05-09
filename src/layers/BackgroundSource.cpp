@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -27,10 +27,9 @@ namespace tgfx {
 
 namespace {
 
-// Geometry shared by top-level Make of both Surface and Picture variants. Produces the two
-// matrices (world → surface pixel, and image → world) plus the surface/image dimensions.
+// Geometry shared by top-level Make of both Surface and Picture variants.
 struct TopLevelGeometry {
-  Matrix surfaceMatrix = Matrix::I();  // world → surface pixel
+  Matrix surfaceMatrix = Matrix::I();  // local → device pixel (applied to the canvas)
   Matrix imageMatrix = Matrix::I();    // image pixel → world
   Rect imageRect = Rect::MakeEmpty();  // world-space rect the image covers
   int width = 0;
@@ -56,8 +55,7 @@ static TopLevelGeometry ComputeTopLevelGeometry(const Rect& drawRect, float maxO
   auto rect = drawRect;
   rect.outset(maxOutset, maxOutset);
   rect.roundOut();
-  // Scale-down when extreme blur outsets would balloon the surface past the single-pass blur
-  // budget. Applied uniformly to both axes so the sub image pixel grid remains isotropic.
+  // Down-sample uniformly when blur outset would push the surface past the single-pass budget.
   out.surfaceScale = 1.0f;
   auto maxBlurOutset = MaxBlurOutset();
   if (minOutset > maxBlurOutset) {
@@ -80,19 +78,12 @@ static TopLevelGeometry ComputeTopLevelGeometry(const Rect& drawRect, float maxO
 }
 
 // Geometry shared by createFromSurface() / createFromPicture() of both variants.
-// `localToWorld`/`localToSurface` describe how the sub's local coords map to world and to the sub
-// surface's pixel grid; the parent's imageMatrix is used to compute the sub's image-pixel space
-// relative to the parent.
 struct SubGeometry {
-  Matrix childSurfaceMatrix = Matrix::I();   // local → sub surface pixel
-  Matrix childSurfaceToWorld = Matrix::I();  // sub surface pixel → world
   Matrix childImageMatrix = Matrix::I();     // sub image pixel → world
   Rect childWorldRect = Rect::MakeEmpty();   // sub's bounds in world coords
   Point childSurfaceOffset = Point::Zero();  // sub surface origin in parent image-pixel coords
-  // Top-left of childSurfaceRect in carrier-surface-pixel coords (i.e. in the borrowed
-  // PictureRecorder's drawing space). Differs from childSurfaceOffset, which is in parent
-  // image-pixel coords. Used by the picture sub variant to translate its image origin to the
-  // slice the layer actually drew into.
+  // Sub surface origin in carrier-surface-pixel coords (the borrowed PictureRecorder's drawing
+  // space). Picture-backed sub uses this to translate its image origin to the layer's slice.
   Point childSurfaceTopLeft = Point::Zero();
   int width = 0;
   int height = 0;
@@ -120,19 +111,8 @@ static SubGeometry ComputeSubGeometry(const Matrix& parentImageMatrix, const Rec
     return out;
   }
 
-  out.childSurfaceMatrix = localToSurface;
-  out.childSurfaceMatrix.postTranslate(-childSurfaceRect.x(), -childSurfaceRect.y());
   out.childSurfaceTopLeft = Point::Make(childSurfaceRect.x(), childSurfaceRect.y());
 
-  // childSurfaceToWorld: sub surface pixel → local → world.
-  Matrix childSurfaceToLocal = Matrix::I();
-  if (!out.childSurfaceMatrix.invert(&childSurfaceToLocal)) {
-    return out;
-  }
-  out.childSurfaceToWorld = localToWorld;
-  out.childSurfaceToWorld.preConcat(childSurfaceToLocal);
-
-  // surfaceOffset is in parent image-pixel space — the subset space getBackgroundImage() uses.
   Matrix worldToParentImage = Matrix::I();
   if (!parentImageMatrix.invert(&worldToParentImage)) {
     return out;
@@ -155,7 +135,6 @@ static SubGeometry ComputeSubGeometry(const Matrix& parentImageMatrix, const Rec
 
 class SurfaceBackgroundSource : public BackgroundSource {
  public:
-  // Top-level: owns a freshly allocated Surface.
   SurfaceBackgroundSource(std::shared_ptr<Surface> ownedSurface, const Matrix& imageMatrix,
                           const Rect& rect, float surfaceScale,
                           std::shared_ptr<ColorSpace> colorSpace)
@@ -164,12 +143,9 @@ class SurfaceBackgroundSource : public BackgroundSource {
     surface = this->ownedSurface.get();
   }
 
-  // Sub: references a caller-owned Surface (e.g. the offscreen carrier's surface). Inherits the
-  // parent's surfaceScale so BackgroundCapturer's `contentScale /= bgSource->surfaceScale()`
-  // normalisation produces the consumer-expected density regardless of nesting depth. Sub does
-  // not introduce its own down-sampling: its canvas matrix already carries every ancestor's
-  // density, and any top-level down-sample factor (for extreme blur outsets) must still be
-  // divided out when consumers sample this sub's snapshot.
+  // Sub variant references a caller-owned Surface and inherits the parent's surfaceScale, so
+  // BackgroundCapturer's `contentScale /= bgSource->surfaceScale()` yields the consumer-expected
+  // density regardless of nesting depth.
   SurfaceBackgroundSource(Surface* borrowedSurface, const Matrix& imageMatrix, const Rect& rect,
                           float surfaceScale, std::shared_ptr<ColorSpace> colorSpace)
       : BackgroundSource(imageMatrix, rect, surfaceScale, std::move(colorSpace)),
@@ -194,7 +170,6 @@ class SurfaceBackgroundSource : public BackgroundSource {
 
 class PictureBackgroundSource : public BackgroundSource {
  public:
-  // Top-level: owns a PictureRecorder.
   PictureBackgroundSource(const Matrix& surfaceMatrix, const Matrix& imageMatrix, const Rect& rect,
                           int width, int height, float surfaceScale,
                           std::shared_ptr<ColorSpace> colorSpace)
@@ -205,13 +180,9 @@ class PictureBackgroundSource : public BackgroundSource {
     canvas->setMatrix(surfaceMatrix);
   }
 
-  // Sub: references a caller-owned PictureRecorder. Inherits the parent's surfaceScale for the
-  // same reason as SurfaceBackgroundSource — see that constructor for the rationale.
-  // ownOriginOffset is childSurfaceRect.topLeft in carrier-surface-pixel coords; the borrowed
-  // recorder's canvas matrix is the parent localToSurface (without the postTranslate that aligns
-  // a dedicated sub surface to its own origin), so picture-(0,0) corresponds to carrier-(0,0)
-  // rather than the slice the layer drew to. We keep this offset and translate the image origin
-  // at readback.
+  // Sub variant references a caller-owned PictureRecorder. ownOriginOffset is the layer slice's
+  // top-left in carrier-surface-pixel coords; readback translates the image origin by it so
+  // image-pixel (0,0) aligns with the slice rather than the carrier's (0,0).
   PictureBackgroundSource(PictureRecorder* borrowedRecorder, const Matrix& imageMatrix,
                           const Rect& rect, int width, int height, float surfaceScale,
                           std::shared_ptr<ColorSpace> colorSpace, Point ownOriginOffset)
@@ -230,48 +201,38 @@ class PictureBackgroundSource : public BackgroundSource {
     if (oldCanvas == nullptr) {
       return nullptr;
     }
-    // Capture the caller's live canvas state before finishing the segment, so we can restore it
-    // verbatim on the new recording. Canvas::drawPicture is documented to save/restore around the
-    // playback, so it does NOT carry the source canvas state across — we have to do it manually.
+    // Capture the live canvas state before finishing; Canvas::drawPicture saves/restores around
+    // playback and does NOT carry source canvas state across, so we restore manually.
     auto savedMatrix = oldCanvas->getMatrix();
     auto savedClip = oldCanvas->getTotalClip();
     auto savedSaveCount = oldCanvas->getSaveCount();
+    DEBUG_ASSERT(savedSaveCount >= 0);
 
     auto segment = recorder->finishRecordingAsPicture();
 
     auto* resumed = recorder->beginRecording();
-    // Replay prior content under an identity baseline. PlaybackContext composes the outer canvas
-    // matrix onto each recorded SetMatrix op (postConcat), so any non-identity baseline would
-    // double the carrier's matrix during replay. An identity baseline lets segment's own
-    // SetMatrix ops install the exact absolute matrices they recorded.
+    // Replay under identity baseline. PlaybackContext postConcats the outer matrix onto each
+    // recorded SetMatrix, so any non-identity baseline would double the carrier's matrix.
     resumed->resetMatrix();
     if (segment != nullptr) {
       resumed->drawPicture(segment);
     }
-    // Rebuild the caller's save depth by pushing empty saves, then install their top-level
-    // matrix + total clip at the top save level. Any outer AutoCanvasRestore will pop back to
-    // its remembered saveCount, discarding the empty saves and leaving the canvas at the pre-
-    // capture baseline — exactly the same lifecycle as before the flush.
+    // Rebuild the caller's save depth, then install matrix + clip at the top frame. The outer
+    // AutoCanvasRestore pops back to its saveCount and discards the empty saves.
     //
-    // LIMITATION: only the TOP save-stack frame is preserved across this flush. Intermediate
-    // frames (matrix/clip per save level) are lost because Canvas's public API exposes only the
-    // current matrix, total clip, and save count — there is no way to enumerate per-frame state.
-    // A partial Canvas::restore() between this readback and the outer AutoCanvasRestore would
-    // therefore land on identity matrix / wide-open clip (the empty saves' baseline) instead of
-    // the caller's frame N-1 state, producing wrong output.
-    //
-    // Current callers (BackgroundCapturer + LayerStyle pipeline) do not partial-restore across
-    // getBackgroundImage(); they wrap the whole readback in an outer AutoCanvasRestore that pops
-    // straight back to the pre-capture saveCount. Future callers wanting partial restores must
-    // either re-architect this resume path or extend Canvas with a public per-frame accessor.
+    // LIMITATION: only the TOP save-stack frame is preserved across this flush. Canvas's public
+    // API exposes only the current matrix, total clip, and save count — there is no per-frame
+    // accessor. A partial Canvas::restore() between this readback and the outer
+    // AutoCanvasRestore would land on identity / wide-open clip instead of the caller's frame
+    // N-1 state. Current callers (BackgroundCapturer + LayerStyle pipeline) do not partial-
+    // restore across getBackgroundImage(); future callers wanting partial restores must extend
+    // this resume path or expose per-frame state on Canvas.
     for (int i = 0; i < savedSaveCount; ++i) {
       resumed->save();
     }
-    // savedClip is in device coords because Canvas::clipPath stores `path.transform(_matrix)`
-    // before merging — i.e. getTotalClip() is already pre-multiplied by the source matrix. Apply
-    // it under identity first, then install savedMatrix, so subsequent clipPath calls go through
-    // savedMatrix as expected. Reversing this order would multiply savedMatrix onto an already-
-    // transformed clip, producing a double-transform.
+    // savedClip is in device coords (Canvas::clipPath stores `path.transform(_matrix)` before
+    // merging). Apply it under identity first, then install savedMatrix, otherwise savedMatrix
+    // would re-multiply onto an already-transformed clip.
     if (!savedClip.isEmpty()) {
       resumed->clipPath(savedClip);
     }
@@ -280,11 +241,6 @@ class PictureBackgroundSource : public BackgroundSource {
     if (segment == nullptr) {
       return nullptr;
     }
-    // PictureImage's matrix maps picture-coords → image-pixel space. For top-level the borrowed
-    // recorder's canvas already records into picture-(0,0)..picture-(pixelWidth, pixelHeight),
-    // so a null matrix (identity) is correct. For sub the borrowed recorder records the layer
-    // at picture-(childSurfaceRect.topLeft + (0..w, 0..h)), so we must translate by the negative
-    // top-left to make image-pixel (0,0) sample picture-(childSurfaceRect.x, childSurfaceRect.y).
     if (ownImageOriginOffset.x == 0.0f && ownImageOriginOffset.y == 0.0f) {
       return Image::MakeFrom(std::move(segment), pixelWidth, pixelHeight);
     }
@@ -297,9 +253,8 @@ class PictureBackgroundSource : public BackgroundSource {
   int pixelHeight = 0;
   PictureRecorder ownedRecorder;
   PictureRecorder* recorder = nullptr;  // points at ownedRecorder or a borrowed one
-  // Top-left of the layer's slice in the borrowed recorder's picture coords. Zero for top-level
-  // (image origin already aligns with picture origin) and non-zero for sub when the layer is
-  // offset within the carrier.
+  // Layer slice top-left in the borrowed recorder's picture coords. Zero for top-level; non-zero
+  // for sub when the layer is offset within the carrier.
   Point ownImageOriginOffset = Point::Zero();
 };
 
@@ -343,24 +298,17 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
     return ownImage;
   }
 
-  // Sub-source fallbacks below normally return nullptr rather than ownImage. Reason: ownImage is
-  // in sub-surface-pixel space, while consumers interpret getBackgroundImage()'s result through
-  // backgroundMatrix(), which maps parent-image-pixel → world. Returning ownImage on a fallback
-  // would feed the consumer pixels in the wrong coord space when a sub introduces its own density
-  // relative to the parent image. Exception: when the sub did NOT introduce its own density
-  // (imageMatrix == surfaceToWorld), sub-surface-pixel and sub-image-pixel coincide and ownImage
-  // is consumable directly — drop it only when the spaces actually differ. The capturer
-  // (BackgroundCapturer::drawBackgroundStyle) null-checks the result and skips the snapshot when
-  // null, so returning nullptr degrades gracefully instead of producing wrongly-sampled output.
+  // Sub-source: when coord spaces differ (sub introduces its own density), ownImage is in sub-
+  // surface-pixel space while consumers expect parent-image-pixel space. Returning ownImage on
+  // fallback would feed wrong-coord pixels; nullptr lets the capturer skip the snapshot. Only
+  // when imageMatrix == surfaceToWorld (no extra density) is ownImage directly consumable.
   auto subFallback = (imageMatrix == surfaceToWorld) ? ownImage : nullptr;
   auto parentImage = parent->getBackgroundImage();
   if (parentImage == nullptr) {
     return subFallback;
   }
 
-  // Sub: compose parent image (in parent image-pixel coords) with own content by subsetting
-  // parent to the sub's footprint and stacking own on top. Sub's image-pixel space is aligned
-  // with parent's, offset by surfaceOffset (set at createFromSurface / createFromPicture time).
+  // Compose parent (subset to sub's footprint, in parent image-pixel coords) with own content.
   Matrix worldToParentImage = Matrix::I();
   if (!parent->imageMatrix.invert(&worldToParentImage)) {
     return subFallback;
@@ -416,11 +364,7 @@ std::shared_ptr<BackgroundSource> BackgroundSource::createFromSurface(
   if (!geometry.valid) {
     return nullptr;
   }
-  // For a borrowed surface, pixel (0,0) of the carrier corresponds to localToSurface^{-1}(0,0) in
-  // local space. Compute surfaceToWorld from localToWorld and localToSurface directly rather than
-  // using geometry.childSurfaceToWorld, which assumes a dedicated sub surface whose origin aligns
-  // with childSurfaceRect.topLeft. The Picture variant does not share this issue because its image
-  // is explicitly sized to childSurfaceRect dimensions with a matching origin.
+  // The borrowed surface's pixel (0,0) is at localToSurface^{-1}(0,0) in local space.
   Matrix surfaceToLocal = Matrix::I();
   if (!localToSurface.invert(&surfaceToLocal)) {
     return nullptr;
@@ -449,11 +393,6 @@ std::shared_ptr<BackgroundSource> BackgroundSource::createFromPicture(
       geometry.height, _surfaceScale, colorSpace, geometry.childSurfaceTopLeft);
   sub->parent = this;
   sub->surfaceOffset = geometry.childSurfaceOffset;
-  // Compute surfaceToWorld from localToWorld and localToSurface directly, same as createFromSurface.
-  // geometry.childSurfaceToWorld assumes a dedicated sub surface whose origin aligns with
-  // childSurfaceRect.topLeft, but the borrowed PictureRecorder's canvas matrix is localToSurface
-  // (without the postTranslate to childSurfaceRect.topLeft), so we must use the runtime canvas
-  // chain instead.
   Matrix surfaceToLocal = Matrix::I();
   if (!localToSurface.invert(&surfaceToLocal)) {
     return nullptr;

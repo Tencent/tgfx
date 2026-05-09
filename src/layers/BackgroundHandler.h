@@ -108,7 +108,7 @@ class BackgroundHandler {
   // capturer with non-1 surfaceScale where capture/consume densities diverge), returns nullptr
   // and leaves `source` untouched so the caller keeps managing its lifetime.
   virtual const LayerStyleSource* tryCacheLayerStyleSource(
-      Layer* /*layer*/, std::unique_ptr<LayerStyleSource>& /*source*/) const {
+      Layer* /*layer*/, std::unique_ptr<LayerStyleSource>& /*source*/) {
     return nullptr;
   }
 
@@ -151,7 +151,7 @@ class BackgroundCapturer : public BackgroundHandler {
   const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
 
   const LayerStyleSource* tryCacheLayerStyleSource(
-      Layer* layer, std::unique_ptr<LayerStyleSource>& source) const override;
+      Layer* layer, std::unique_ptr<LayerStyleSource>& source) override;
 
   void beginForceDrawChildren() override {
     ++_forcedCaptureDepth;
@@ -171,6 +171,9 @@ class BackgroundCapturer : public BackgroundHandler {
   bool isForcedCapture() const {
     return _forcedCaptureDepth > 0;
   }
+
+  std::unique_ptr<BackgroundCapturer> buildSubCapturer(
+      const DrawArgs& parentArgs, std::shared_ptr<BackgroundSource> subSource) const;
 
   BackgroundSnapshotMap* snapshots = nullptr;
   std::shared_ptr<BackgroundSource> bgSource = nullptr;
