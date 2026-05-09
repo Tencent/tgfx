@@ -18,38 +18,33 @@
 
 #pragma once
 
-#include <atomic>
-#include <deque>
 #include <memory>
 #include <optional>
 #include <vector>
-#include "gpu/vulkan/VulkanAPI.h"
-#include "gpu/vulkan/VulkanResource.h"
+#include "gpu/vulkan/VulkanGPU.h"
 #include "tgfx/gpu/CommandQueue.h"
-#include "vk_mem_alloc.h"
 
 namespace tgfx {
 
-class VulkanGPU;
 class VulkanSemaphore;
 class VulkanTexture;
 
 /**
- * Vulkan command queue implementation with asynchronous fence-based submission.
+ * Thin coordination layer satisfying the public CommandQueue interface. Does NOT own any GPU
+ * synchronization primitives (fences, inflight tracking) — those belong to VulkanGPU.
  *
- * Submit flow:
- *   1. Poll completed fences and reclaim resources from finished submissions.
- *   2. If the number of in-flight submissions reaches MAX_FRAMES_IN_FLIGHT, block until the oldest
- *      fence signals (backpressure to prevent unbounded memory growth).
- *   3. Allocate a fence, submit the command buffer(s), and record the submission as in-flight.
- *   4. If a present was scheduled (via schedulePresent()), append a GENERAL→PRESENT_SRC layout
- *      transition to the submit batch, then call vkQueuePresentKHR. Same-queue ordering guarantees
- *      the transition completes before presentation. This mirrors Metal's presentDrawable pattern.
+ * Holds only the data accumulated between two consecutive submit() calls:
+ *   - pendingUploads: staging buffers from writeTexture(), consumed by submit().
+ *   - pendingPresent: swapchain info from schedulePresent(), consumed by submit().
+ *   - pendingSignal/WaitSemaphore: from insertSemaphore()/waitSemaphore(), consumed by submit().
  *
- * writeTexture() follows deferred semantics: pixel data is immediately snapshot into a staging
- * buffer, but the GPU copy is deferred until the next submit(). This avoids per-upload
- * synchronization overhead and allows all uploads to be batched into a single command buffer
- * submission alongside render commands.
+ * On submit(), this class assembles the upload/render/present command buffers and the SubmitRequest
+ * struct, then delegates everything to VulkanGPU::submit() which handles fence allocation,
+ * backpressure, vkQueueSubmit, inflight tracking, and vkQueuePresentKHR.
+ *
+ * writeTexture() uses deferred semantics: pixel data is immediately copied into a staging buffer
+ * (CPU-only operation), but the GPU-side copy command is recorded at the next submit() time. This
+ * allows multiple uploads to be batched into one command buffer alongside render commands.
  */
 class VulkanCommandQueue : public CommandQueue {
  public:
@@ -73,81 +68,31 @@ class VulkanCommandQueue : public CommandQueue {
 
   void waitUntilCompleted() override;
 
+  /// Schedules a swapchain image to be presented at the end of the next submit(). The layout
+  /// transition (GENERAL -> PRESENT_SRC_KHR) is automatically appended to the render command batch.
+  void schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image);
+
  private:
-  struct PendingUpload {
-    VkBuffer stagingBuffer = VK_NULL_HANDLE;
-    VmaAllocation stagingAlloc = VK_NULL_HANDLE;
-    std::shared_ptr<VulkanTexture> texture;
-    VkBufferImageCopy region = {};
-    VkImageLayout originalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  };
-
-  // Represents a single vkQueueSubmit whose GPU completion has not yet been confirmed.
-  // This struct is the "ownership container" for everything submitted in one batch. It exists
-  // because we need a single entity (independent of any GPU object) to hold all per-submission
-  // resources, including the command buffer itself. The fence determines when to release them.
-  struct InflightSubmission {
-    VkFence fence = VK_NULL_HANDLE;
-    std::chrono::steady_clock::time_point frameTime = {};
-    VkCommandPool commandPool = VK_NULL_HANDLE;
-    std::vector<PendingUpload> uploads;
-    // Deferred destroys: objects created during encoding that must outlive GPU execution.
-    std::vector<VkFramebuffer> deferredFramebuffers;
-    std::vector<VkRenderPass> deferredRenderPasses;
-    std::vector<VkDescriptorPool> deferredDescriptorPools;
-    // Retained resources: shared_ptr references that prevent VulkanResource destruction until
-    // the GPU has finished executing the command buffer. When the fence signals and this struct
-    // is destroyed, shared_ptr refcounts decrement. If any reach zero, the resource enters the
-    // ReturnQueue and is safely destroyed during the next processUnreferencedResources() call.
-    std::vector<std::shared_ptr<VulkanResource>> retainedResources;
-  };
-
-  // Maximum number of submissions that may be in-flight simultaneously. Acts as backpressure to
-  // bound memory usage when GPU is slower than CPU. Matches Metal's typical drawable count.
-  static constexpr size_t MAX_FRAMES_IN_FLIGHT = 2;
-
   void flushPendingUploads(VkCommandBuffer commandBuffer);
   void cleanupPendingUploads();
 
-  // Destroys all Vulkan objects and releases all resource references held by a single submission.
-  // Called in three scenarios: (1) fence signaled (normal completion), (2) vkWaitForFences returned
-  // (forced wait), (3) vkQueueSubmit failed (immediate cleanup without GPU execution).
-  void reclaimSubmission(InflightSubmission& submission);
-
-  // Non-blocking: polls all pending fences and reclaims resources from completed submissions.
-  // Uses vkGetFenceStatus (non-blocking) instead of vkWaitForFences to avoid stalling the CPU.
-  // Called at the start of each new submit() so resources are reclaimed "just in time" before
-  // the next frame needs them. After releasing InflightSubmission, any resource whose refcount
-  // hits zero enters the ReturnQueue; processUnreferencedResources() then safely destroys them.
-  void pollCompletedSubmissions();
-
-  // Blocking: waits for all in-flight submissions to complete and reclaims their resources.
-  void waitAllInflightSubmissions();
-
-  VkFence acquireFence();
-  void recycleFence(VkFence fence);
-
   VulkanGPU* gpu = nullptr;
-  std::vector<PendingUpload> pendingUploads;
-  std::deque<InflightSubmission> inflightSubmissions;
-  std::vector<VkFence> fencePool;
-  std::atomic<int64_t> _completedFrameTime = {0};
-  // Pending semaphore operations to be chained into the next submit().
+
+  // Produced by writeTexture(), consumed by submit() which records copy commands into the
+  // command buffer and then moves staging buffers into InflightSubmission for deferred cleanup.
+  std::vector<VulkanGPU::PendingUpload> pendingUploads;
+
+  // Produced by insertSemaphore()/waitSemaphore(), consumed by submit().
   std::shared_ptr<VulkanSemaphore> pendingSignalSemaphore;
   std::shared_ptr<VulkanSemaphore> pendingWaitSemaphore;
 
-  // Pending present scheduled by VulkanSwapchainProxy, executed at the end of submit().
+  // Produced by schedulePresent(), consumed by submit().
   struct PendingPresent {
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     uint32_t imageIndex = 0;
     VkImage image = VK_NULL_HANDLE;
   };
   std::optional<PendingPresent> pendingPresent;
-
- public:
-  /// Schedules a swapchain image to be presented at the end of the next submit(). The layout
-  /// transition (GENERAL → PRESENT_SRC_KHR) is automatically appended to the render command batch.
-  void schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image);
 };
 
 }  // namespace tgfx

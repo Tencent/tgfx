@@ -19,15 +19,5 @@
 #include "VulkanCommandBuffer.h"
 
 namespace tgfx {
-
-VulkanCommandBuffer::VulkanCommandBuffer(VkCommandBuffer commandBuffer, VkCommandPool commandPool,
-                                         VkDescriptorPool descriptorPool,
-                                         std::vector<VkFramebuffer> framebuffers,
-                                         std::vector<VkRenderPass> renderPasses,
-                                         std::vector<std::shared_ptr<VulkanResource>> retained)
-    : commandBuffer(commandBuffer), commandPool(commandPool), _descriptorPool(descriptorPool),
-      _deferredFramebuffers(std::move(framebuffers)),
-      _deferredRenderPasses(std::move(renderPasses)), _retainedResources(std::move(retained)) {
-}
-
+// Constructor is inline in the header (explicit VulkanCommandBuffer(FrameSession session)).
 }  // namespace tgfx

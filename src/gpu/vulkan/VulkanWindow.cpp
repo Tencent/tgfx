@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/vulkan/VulkanWindow.h"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <vector>
 #include "core/utils/Log.h"
 #include "gpu/vulkan/VulkanAPI.h"
@@ -31,6 +34,7 @@ namespace tgfx {
 struct VulkanWindow::PlatformState {
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+  VkFence acquireFence = VK_NULL_HANDLE;
   std::vector<VkImage> images;
   std::vector<VkImageView> imageViews;
   VkFormat format = VK_FORMAT_UNDEFINED;
@@ -169,11 +173,17 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
     vkCreateImageView(vkDevice, &viewInfo, nullptr, &imageViews[i]);
   }
 
+  VkFenceCreateInfo fenceInfo = {};
+  fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  VkFence acquireFence = VK_NULL_HANDLE;
+  vkCreateFence(vkDevice, &fenceInfo, nullptr, &acquireFence);
+
   device->unlock();
 
   auto state = std::make_unique<PlatformState>();
   state->surface = surface;
   state->swapchain = swapchain;
+  state->acquireFence = acquireFence;
   state->images = std::move(images);
   state->imageViews = std::move(imageViews);
   state->format = chosenFormat.format;
@@ -197,6 +207,9 @@ VulkanWindow::~VulkanWindow() {
   // destroying the swapchain and its image views.
   vkDeviceWaitIdle(vkDevice);
 
+  if (_platformState->acquireFence != VK_NULL_HANDLE) {
+    vkDestroyFence(vkDevice, _platformState->acquireFence, nullptr);
+  }
   for (auto view : _platformState->imageViews) {
     vkDestroyImageView(vkDevice, view, nullptr);
   }
@@ -213,7 +226,8 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
   auto vulkanGPU = static_cast<VulkanGPU*>(context->gpu());
   _platformState->swapchainProxy = std::make_shared<VulkanSwapchainProxy>(
       context, vulkanGPU, _platformState->swapchain, _platformState->format, _platformState->width,
-      _platformState->height, _platformState->imageViews, _platformState->images);
+      _platformState->height, _platformState->imageViews, _platformState->images,
+      _platformState->acquireFence);
   return _platformState->swapchainProxy;
 }
 

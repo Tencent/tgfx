@@ -358,9 +358,10 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
   VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
   auto result = vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet);
   if (result != VK_SUCCESS) {
-    LOGE("VulkanRenderPass: vkAllocateDescriptorSets failed (result=%d). "
-         "Per-frame descriptor pool exhausted, subsequent draws in this frame will be dropped.",
-         static_cast<int>(result));
+    LOGE(
+        "VulkanRenderPass: vkAllocateDescriptorSets failed (result=%d). "
+        "Per-frame descriptor pool exhausted, subsequent draws in this frame will be dropped.",
+        static_cast<int>(result));
     return;
   }
 
@@ -451,8 +452,9 @@ void VulkanRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
                           : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     vkCmdSetPrimitiveTopologyEXT(commandBuffer, vkTopology);
   } else if (primitiveType == PrimitiveType::TriangleStrip) {
-    LOGE("VulkanRenderPass::draw: TriangleStrip requested but extendedDynamicState is unavailable. "
-         "Falling back to TriangleList (incorrect rendering).");
+    LOGE(
+        "VulkanRenderPass::draw: TriangleStrip requested but extendedDynamicState is unavailable. "
+        "Falling back to TriangleList (incorrect rendering).");
   }
   vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 }
@@ -470,8 +472,9 @@ void VulkanRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCo
                           : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     vkCmdSetPrimitiveTopologyEXT(commandBuffer, vkTopology);
   } else if (primitiveType == PrimitiveType::TriangleStrip) {
-    LOGE("VulkanRenderPass::drawIndexed: TriangleStrip requested but extendedDynamicState is "
-         "unavailable. Falling back to TriangleList (incorrect rendering).");
+    LOGE(
+        "VulkanRenderPass::drawIndexed: TriangleStrip requested but extendedDynamicState is "
+        "unavailable. Falling back to TriangleList (incorrect rendering).");
   }
   vkCmdDrawIndexed(commandBuffer, indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
 }

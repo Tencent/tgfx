@@ -41,8 +41,8 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
  public:
   VulkanSwapchainProxy(Context* context, VulkanGPU* gpu, VkSwapchainKHR swapchain, VkFormat format,
                        int width, int height, const std::vector<VkImageView>& imageViews,
-                       const std::vector<VkImage>& images);
-  ~VulkanSwapchainProxy() override;
+                       const std::vector<VkImage>& images, VkFence acquireFence);
+  ~VulkanSwapchainProxy() override = default;
 
   Context* getContext() const override;
   int width() const override;
@@ -70,7 +70,7 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   std::vector<VkImageView> _imageViews;
   std::vector<VkImage> _images;
 
-  mutable VkFence _acquireFence = VK_NULL_HANDLE;
+  VkFence _acquireFence = VK_NULL_HANDLE;
   mutable uint32_t _currentImageIndex = 0;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
 };

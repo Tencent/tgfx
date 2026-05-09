@@ -29,18 +29,9 @@ namespace tgfx {
 VulkanSwapchainProxy::VulkanSwapchainProxy(Context* context, VulkanGPU* gpu,
                                            VkSwapchainKHR swapchain, VkFormat format, int width,
                                            int height, const std::vector<VkImageView>& imageViews,
-                                           const std::vector<VkImage>& images)
+                                           const std::vector<VkImage>& images, VkFence acquireFence)
     : _context(context), _gpu(gpu), _swapchain(swapchain), _format(format), _width(width),
-      _height(height), _imageViews(imageViews), _images(images) {
-  VkFenceCreateInfo fenceInfo = {};
-  fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-  vkCreateFence(_gpu->device(), &fenceInfo, nullptr, &_acquireFence);
-}
-
-VulkanSwapchainProxy::~VulkanSwapchainProxy() {
-  if (_acquireFence != VK_NULL_HANDLE) {
-    vkDestroyFence(_gpu->device(), _acquireFence, nullptr);
-  }
+      _height(height), _imageViews(imageViews), _images(images), _acquireFence(acquireFence) {
 }
 
 Context* VulkanSwapchainProxy::getContext() const {

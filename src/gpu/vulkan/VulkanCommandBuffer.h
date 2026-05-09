@@ -20,62 +20,41 @@
 
 #include <memory>
 #include <vector>
-#include "gpu/vulkan/VulkanAPI.h"
-#include "gpu/vulkan/VulkanResource.h"
+#include "gpu/vulkan/VulkanFrameSession.h"
 #include "tgfx/gpu/CommandBuffer.h"
 
 namespace tgfx {
 
 /**
- * Immutable record of a finished command encoding session. Created by VulkanCommandEncoder::onFinish
- * which transfers all ownership here. Acts as the transport container between encoding and
- * submission: VulkanCommandQueue::submit() moves everything from here into an InflightSubmission
- * tied to a fence, after which this object is no longer referenced.
+ * Transport container that carries a FrameSession from encoding to submission.
  *
- * Ownership chain: Encoder -> CommandBuffer -> InflightSubmission -> (fence signals) -> released.
+ * Created by VulkanCommandEncoder::onFinish() which moves its FrameSession here. Consumed by
+ * VulkanCommandQueue::submit() which moves the session into VulkanGPU's InflightSubmission.
+ * After submit(), this object is empty and may be discarded. Destructor does NOT call any Vulkan
+ * API — if the CommandBuffer is abandoned (never submitted), the FrameSession's vectors of
+ * shared_ptr will decrement refcounts naturally, and deferred Vulkan objects will leak (debug
+ * assert can catch this misuse).
  */
 class VulkanCommandBuffer : public CommandBuffer {
  public:
-  VulkanCommandBuffer(VkCommandBuffer commandBuffer, VkCommandPool commandPool,
-                      VkDescriptorPool descriptorPool, std::vector<VkFramebuffer> framebuffers,
-                      std::vector<VkRenderPass> renderPasses,
-                      std::vector<std::shared_ptr<VulkanResource>> retainedResources);
+  explicit VulkanCommandBuffer(FrameSession session) : session(std::move(session)) {
+  }
   ~VulkanCommandBuffer() override = default;
 
+  FrameSession& frameSession() {
+    return session;
+  }
+
   VkCommandBuffer vulkanCommandBuffer() const {
-    return commandBuffer;
+    return session.commandBuffer;
   }
 
   VkCommandPool vulkanCommandPool() const {
-    return commandPool;
-  }
-
-  VkDescriptorPool descriptorPool() const {
-    return _descriptorPool;
-  }
-
-  std::vector<VkFramebuffer>& deferredFramebuffers() {
-    return _deferredFramebuffers;
-  }
-
-  std::vector<VkRenderPass>& deferredRenderPasses() {
-    return _deferredRenderPasses;
-  }
-
-  std::vector<std::shared_ptr<VulkanResource>>& retainedResources() {
-    return _retainedResources;
+    return session.commandPool;
   }
 
  private:
-  VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-  VkCommandPool commandPool = VK_NULL_HANDLE;
-  VkDescriptorPool _descriptorPool = VK_NULL_HANDLE;
-  // Vulkan objects created per-frame (RenderPass/Framebuffer) that cannot be destroyed until GPU
-  // execution completes. These are moved to InflightSubmission and destroyed after fence signals.
-  std::vector<VkFramebuffer> _deferredFramebuffers;
-  std::vector<VkRenderPass> _deferredRenderPasses;
-  // Strong references preventing VulkanResource destruction while GPU is still executing.
-  std::vector<std::shared_ptr<VulkanResource>> _retainedResources;
+  FrameSession session;
 };
 
 }  // namespace tgfx

@@ -16,6 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#define VMA_IMPLEMENTATION
+#define VMA_STATIC_VULKAN_FUNCTIONS 0
+#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
+
 #include "VulkanGPU.h"
 #include <cstring>
 #include <shaderc/shaderc.hpp>
@@ -31,11 +35,6 @@
 #include "gpu/vulkan/VulkanShaderModule.h"
 #include "gpu/vulkan/VulkanTexture.h"
 #include "gpu/vulkan/VulkanUtil.h"
-
-#define VMA_IMPLEMENTATION
-#define VMA_STATIC_VULKAN_FUNCTIONS 0
-#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
-#include "vk_mem_alloc.h"
 
 namespace tgfx {
 
@@ -382,11 +381,11 @@ BackendSemaphore VulkanGPU::stealBackendSemaphore(std::shared_ptr<Semaphore> sem
 
 uint32_t VulkanGPU::MakeSamplerKey(const SamplerDescriptor& descriptor) {
   uint32_t key = 0;
-  key |= static_cast<uint32_t>(descriptor.addressModeX);        // bits 0-2
-  key |= static_cast<uint32_t>(descriptor.addressModeY) << 3;   // bits 3-5
-  key |= static_cast<uint32_t>(descriptor.minFilter) << 6;      // bits 6-7
-  key |= static_cast<uint32_t>(descriptor.magFilter) << 8;      // bits 8-9
-  key |= static_cast<uint32_t>(descriptor.mipmapMode) << 10;    // bits 10-11
+  key |= static_cast<uint32_t>(descriptor.addressModeX);       // bits 0-2
+  key |= static_cast<uint32_t>(descriptor.addressModeY) << 3;  // bits 3-5
+  key |= static_cast<uint32_t>(descriptor.minFilter) << 6;     // bits 6-7
+  key |= static_cast<uint32_t>(descriptor.magFilter) << 8;     // bits 8-9
+  key |= static_cast<uint32_t>(descriptor.mipmapMode) << 10;   // bits 10-11
   return key;
 }
 
@@ -449,17 +448,204 @@ void VulkanGPU::releaseDescriptorPool(VkDescriptorPool pool) {
   descriptorPoolCache.push_back(pool);
 }
 
+std::chrono::steady_clock::time_point VulkanGPU::completedFrameTime() const {
+  auto ticks = _completedFrameTime.load(std::memory_order_acquire);
+  return std::chrono::steady_clock::time_point(std::chrono::steady_clock::duration(ticks));
+}
+
+VkFence VulkanGPU::acquireFence() {
+  if (!fencePool.empty()) {
+    auto fence = fencePool.back();
+    fencePool.pop_back();
+    vkResetFences(vulkanDevice, 1, &fence);
+    return fence;
+  }
+  VkFenceCreateInfo fenceInfo = {};
+  fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  VkFence fence = VK_NULL_HANDLE;
+  vkCreateFence(vulkanDevice, &fenceInfo, nullptr, &fence);
+  return fence;
+}
+
+void VulkanGPU::recycleFence(VkFence fence) {
+  if (fencePool.size() >= MAX_FRAMES_IN_FLIGHT + 1) {
+    vkDestroyFence(vulkanDevice, fence, nullptr);
+    return;
+  }
+  fencePool.push_back(fence);
+}
+
+void VulkanGPU::reclaimSubmission(InflightSubmission& submission) {
+  auto& s = submission.session;
+  // Staging buffers are owned by the queue (not the encoder), so they are stored in uploads
+  // rather than in the FrameSession. Destroyed here after the fence confirms GPU completion.
+  for (auto& upload : submission.uploads) {
+    vmaDestroyBuffer(vmaAllocator, upload.stagingBuffer, upload.stagingAlloc);
+  }
+  // Command pool destruction implicitly frees all command buffers allocated from it.
+  if (s.commandPool != VK_NULL_HANDLE) {
+    vkDestroyCommandPool(vulkanDevice, s.commandPool, nullptr);
+  }
+  for (auto fb : s.deferredFramebuffers) {
+    vkDestroyFramebuffer(vulkanDevice, fb, nullptr);
+  }
+  for (auto rp : s.deferredRenderPasses) {
+    vkDestroyRenderPass(vulkanDevice, rp, nullptr);
+  }
+  // Descriptor pool is reset and recycled (not destroyed) to avoid allocation overhead.
+  if (s.descriptorPool != VK_NULL_HANDLE) {
+    releaseDescriptorPool(s.descriptorPool);
+  }
+  // Clearing retainedResources decrements refcounts. Resources reaching zero will enter the
+  // ReturnQueue and be destroyed during the next processUnreferencedResources() call.
+  s.retainedResources.clear();
+  recycleFence(submission.fence);
+}
+
+void VulkanGPU::pollCompletedSubmissions() {
+  while (!inflightSubmissions.empty()) {
+    auto& oldest = inflightSubmissions.front();
+    if (vkGetFenceStatus(vulkanDevice, oldest.fence) != VK_SUCCESS) {
+      break;
+    }
+    auto ticks = oldest.frameTime.time_since_epoch().count();
+    _completedFrameTime.store(ticks, std::memory_order_release);
+    reclaimSubmission(oldest);
+    inflightSubmissions.pop_front();
+  }
+  processUnreferencedResources();
+}
+
+void VulkanGPU::waitAllInflightSubmissions() {
+  for (auto& submission : inflightSubmissions) {
+    vkWaitForFences(vulkanDevice, 1, &submission.fence, VK_TRUE, UINT64_MAX);
+    auto ticks = submission.frameTime.time_since_epoch().count();
+    _completedFrameTime.store(ticks, std::memory_order_release);
+    reclaimSubmission(submission);
+  }
+  inflightSubmissions.clear();
+  processUnreferencedResources();
+}
+
+void VulkanGPU::submit(SubmitRequest request) {
+  // Step 1: Non-blocking reclaim of any submissions whose fences have already signaled.
+  pollCompletedSubmissions();
+
+  // Step 2: Backpressure — if we've reached MAX_FRAMES_IN_FLIGHT, block until the oldest
+  // submission completes. This bounds memory usage when CPU outpaces GPU.
+  if (inflightSubmissions.size() >= MAX_FRAMES_IN_FLIGHT) {
+    auto& oldest = inflightSubmissions.front();
+    vkWaitForFences(vulkanDevice, 1, &oldest.fence, VK_TRUE, UINT64_MAX);
+    pollCompletedSubmissions();
+  }
+
+  // Step 3: Acquire a fence for this submission.
+  VkFence fence = acquireFence();
+
+  // Step 4: Build VkSubmitInfo with optional timeline semaphore operations.
+  VkSubmitInfo submitInfo = {};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.commandBufferCount = static_cast<uint32_t>(request.commandBuffers.size());
+  submitInfo.pCommandBuffers = request.commandBuffers.data();
+
+  VkTimelineSemaphoreSubmitInfo timelineInfo = {};
+  timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+  VkSemaphore waitSem = VK_NULL_HANDLE;
+  VkSemaphore signalSem = VK_NULL_HANDLE;
+  uint64_t waitValue = 0;
+  uint64_t signalValue = 0;
+  VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+
+  if (request.waitSemaphore) {
+    waitSem = request.waitSemaphore->vulkanSemaphore();
+    waitValue = request.waitSemaphore->signalValue();
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = &waitSem;
+    submitInfo.pWaitDstStageMask = &waitStage;
+    timelineInfo.waitSemaphoreValueCount = 1;
+    timelineInfo.pWaitSemaphoreValues = &waitValue;
+  }
+  if (request.signalSemaphore) {
+    signalValue = request.signalSemaphore->nextSignalValue();
+    signalSem = request.signalSemaphore->vulkanSemaphore();
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &signalSem;
+    timelineInfo.signalSemaphoreValueCount = 1;
+    timelineInfo.pSignalSemaphoreValues = &signalValue;
+  }
+  if (request.waitSemaphore || request.signalSemaphore) {
+    submitInfo.pNext = &timelineInfo;
+  }
+
+  // Step 5: Submit to the GPU queue.
+  auto submitResult = vkQueueSubmit(vulkanQueue, 1, &submitInfo, fence);
+
+  // Step 6a: On failure — fence was never signaled, so immediately reclaim all resources
+  // through the same path as normal completion to avoid leaks.
+  if (submitResult != VK_SUCCESS) {
+    LOGE("VulkanGPU::submit: vkQueueSubmit failed (result=%d).", static_cast<int>(submitResult));
+    InflightSubmission failed = {};
+    failed.fence = fence;
+    failed.session = std::move(request.session);
+    failed.uploads = std::move(request.uploads);
+    reclaimSubmission(failed);
+    return;
+  }
+
+  // Step 6b: On success — record the submission as in-flight. Resources will be reclaimed
+  // when pollCompletedSubmissions() or waitAllInflightSubmissions() observes the fence signal.
+  InflightSubmission submission = {};
+  submission.fence = fence;
+  submission.frameTime = request.frameTime;
+  submission.session = std::move(request.session);
+  submission.uploads = std::move(request.uploads);
+  // Retain semaphores in the submission so they outlive GPU execution.
+  if (request.waitSemaphore) {
+    submission.session.retainedResources.push_back(std::move(request.waitSemaphore));
+  }
+  if (request.signalSemaphore) {
+    submission.session.retainedResources.push_back(std::move(request.signalSemaphore));
+  }
+  inflightSubmissions.push_back(std::move(submission));
+
+  // Step 7: Execute pending present. Same-queue ordering guarantees the layout transition
+  // (included in the submit batch) completes before the presentation engine reads the image.
+  if (request.presentSwapchain != VK_NULL_HANDLE) {
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &request.presentSwapchain;
+    presentInfo.pImageIndices = &request.presentImageIndex;
+    vkQueuePresentKHR(vulkanQueue, &presentInfo);
+  }
+}
+
 void VulkanGPU::releaseAll(bool releaseGPU) {
-  // Destroy the command queue first to wait for all in-flight GPU submissions and release their
-  // resources (staging buffers, command pools, fences). This must happen before destroying the
-  // VkDevice and VMA allocator, otherwise the queue's destructor would access destroyed objects.
+  // Shutdown sequence must follow strict ordering to prevent use-after-free:
+  //   waitAll -> queue -> fences -> caches -> resources -> VMA -> Device -> Instance
+  // Each step depends on the subsequent resources still being valid.
+
+  // 1. Wait for all in-flight submissions and release their retained resources. This must happen
+  //    first so that retained shared_ptrs are decremented before we destroy the ReturnQueue.
+  waitAllInflightSubmissions();
+
+  // 2. Destroy the command queue (cleans up any pending uploads that were never submitted).
   commandQueue.reset();
 
+  // 3. Destroy fence pool. Fences are no longer needed after all submissions are reclaimed.
+  for (auto fence : fencePool) {
+    vkDestroyFence(vulkanDevice, fence, nullptr);
+  }
+  fencePool.clear();
+
+  // 4. Clear caches. Sampler cache holds shared_ptrs that may trigger ReturnQueue on release.
   samplerCache.clear();
   for (auto pool : descriptorPoolCache) {
     vkDestroyDescriptorPool(vulkanDevice, pool, nullptr);
   }
   descriptorPoolCache.clear();
+
+  // 5. Release all remaining resources via onRelease(). After this, no VulkanResource exists.
   if (releaseGPU) {
     for (auto& resource : resources) {
       resource->onRelease(this);
@@ -468,6 +654,7 @@ void VulkanGPU::releaseAll(bool releaseGPU) {
   resources.clear();
   returnQueue = nullptr;
 
+  // 6. Destroy device-level objects in reverse creation order.
   if (vmaAllocator != VK_NULL_HANDLE) {
     vmaDestroyAllocator(vmaAllocator);
     vmaAllocator = VK_NULL_HANDLE;

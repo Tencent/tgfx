@@ -21,6 +21,7 @@
 #include <memory>
 #include <vector>
 #include "gpu/vulkan/VulkanAPI.h"
+#include "gpu/vulkan/VulkanFrameSession.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "tgfx/gpu/CommandEncoder.h"
 
@@ -29,28 +30,27 @@ namespace tgfx {
 class VulkanGPU;
 
 /**
- * Records GPU commands into a VkCommandBuffer and tracks resource references.
+ * Records GPU commands into a VkCommandBuffer and collects resource references into a FrameSession.
  *
- * Vulkan command buffers are deferred: they execute on the GPU long after recording finishes. If a
- * resource's shared_ptr refcount drops to zero before the GPU completes execution, the underlying
- * Vulkan object would be destroyed while still in use. To prevent this, the encoder collects
- * shared_ptr references to every resource bound during recording (via retainResource()). These
- * references are transferred to VulkanCommandBuffer on finish(), then to InflightSubmission on
- * submit(), and finally released only after the fence signals GPU completion.
+ * During recording, VulkanRenderPass calls retainResource() and addDeferredDestroy() to register
+ * resources that the command buffer will reference on the GPU. These are stored locally in the
+ * encoder's FrameSession — not pushed to any external container — so that abandon (encoder
+ * destroyed without calling finish()) can clean up without coordinating with other classes.
  *
- * Unlike Metal (which automatically retains encoded resources) or OpenGL (whose driver internally
- * reference-counts objects), Vulkan requires the application to manage this explicitly.
+ * On finish(), the entire FrameSession is moved to VulkanCommandBuffer in a single O(1) operation.
+ * On abandon (onRelease()), the encoder destroys deferred objects and releases retained references
+ * directly — safe because the command buffer was never submitted to the GPU.
  */
 class VulkanCommandEncoder : public CommandEncoder, public VulkanResource {
  public:
   static std::shared_ptr<VulkanCommandEncoder> Make(VulkanGPU* gpu);
 
   VkCommandBuffer vulkanCommandBuffer() const {
-    return commandBuffer;
+    return session.commandBuffer;
   }
 
   VkDescriptorPool vulkanDescriptorPool() const {
-    return descriptorPool;
+    return session.descriptorPool;
   }
 
   GPU* gpu() const override;
@@ -75,23 +75,19 @@ class VulkanCommandEncoder : public CommandEncoder, public VulkanResource {
   ~VulkanCommandEncoder() override = default;
 
   VulkanGPU* _gpu = nullptr;
-  VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-  VkCommandPool commandPool = VK_NULL_HANDLE;
-  VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+  FrameSession session;
 
-  struct DeferredDestroy {
-    VkRenderPass renderPass = VK_NULL_HANDLE;
-    VkFramebuffer framebuffer = VK_NULL_HANDLE;
-  };
-  std::vector<DeferredDestroy> deferredDestroys;
-  std::vector<std::shared_ptr<VulkanResource>> retainedResources;
-
+  // Produced by VulkanRenderPass (via addDeferredDestroy()), consumed by onFinish() which moves
+  // the session to VulkanCommandBuffer. Destroyed after fence signals GPU completion.
   void addDeferredDestroy(VkRenderPass rp, VkFramebuffer fb) {
-    deferredDestroys.push_back({rp, fb});
+    session.deferredRenderPasses.push_back(rp);
+    session.deferredFramebuffers.push_back(fb);
   }
 
+  // Produced by VulkanRenderPass (via retainResource()), consumed by onFinish() which moves
+  // the session to VulkanCommandBuffer. Prevents resource destruction while GPU is executing.
   void retainResource(std::shared_ptr<VulkanResource> resource) {
-    retainedResources.push_back(std::move(resource));
+    session.retainedResources.push_back(std::move(resource));
   }
 
   friend class VulkanGPU;

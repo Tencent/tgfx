@@ -87,8 +87,8 @@ std::shared_ptr<VulkanCommandEncoder> VulkanCommandEncoder::Make(VulkanGPU* gpu)
   }
 
   auto encoder = gpu->makeResource<VulkanCommandEncoder>(gpu, cmdBuffer, pool);
-  encoder->descriptorPool = gpu->acquireDescriptorPool();
-  if (encoder->descriptorPool == VK_NULL_HANDLE) {
+  encoder->session.descriptorPool = gpu->acquireDescriptorPool();
+  if (encoder->session.descriptorPool == VK_NULL_HANDLE) {
     LOGE("VulkanCommandEncoder: failed to acquire descriptor pool.");
   }
   return encoder;
@@ -96,26 +96,31 @@ std::shared_ptr<VulkanCommandEncoder> VulkanCommandEncoder::Make(VulkanGPU* gpu)
 
 VulkanCommandEncoder::VulkanCommandEncoder(VulkanGPU* gpu, VkCommandBuffer commandBuffer,
                                            VkCommandPool commandPool)
-    : _gpu(gpu), commandBuffer(commandBuffer), commandPool(commandPool) {
+    : _gpu(gpu) {
+  session.commandBuffer = commandBuffer;
+  session.commandPool = commandPool;
 }
 
 void VulkanCommandEncoder::onRelease(VulkanGPU* gpu) {
-  // If onFinish() was called, all fields below are already transferred to VulkanCommandBuffer.
+  // If onFinish() was called, the session has already been moved to VulkanCommandBuffer.
   // This path only handles abandoned encoders (encoding was started but never finished).
-  for (auto& d : deferredDestroys) {
-    vkDestroyFramebuffer(gpu->device(), d.framebuffer, nullptr);
-    vkDestroyRenderPass(gpu->device(), d.renderPass, nullptr);
+  for (auto fb : session.deferredFramebuffers) {
+    vkDestroyFramebuffer(gpu->device(), fb, nullptr);
   }
-  deferredDestroys.clear();
-  retainedResources.clear();
-  if (descriptorPool != VK_NULL_HANDLE) {
-    gpu->releaseDescriptorPool(descriptorPool);
-    descriptorPool = VK_NULL_HANDLE;
+  for (auto rp : session.deferredRenderPasses) {
+    vkDestroyRenderPass(gpu->device(), rp, nullptr);
   }
-  if (commandPool != VK_NULL_HANDLE) {
-    vkDestroyCommandPool(gpu->device(), commandPool, nullptr);
-    commandPool = VK_NULL_HANDLE;
-    commandBuffer = VK_NULL_HANDLE;
+  session.deferredFramebuffers.clear();
+  session.deferredRenderPasses.clear();
+  session.retainedResources.clear();
+  if (session.descriptorPool != VK_NULL_HANDLE) {
+    gpu->releaseDescriptorPool(session.descriptorPool);
+    session.descriptorPool = VK_NULL_HANDLE;
+  }
+  if (session.commandPool != VK_NULL_HANDLE) {
+    vkDestroyCommandPool(gpu->device(), session.commandPool, nullptr);
+    session.commandPool = VK_NULL_HANDLE;
+    session.commandBuffer = VK_NULL_HANDLE;
   }
 }
 
@@ -135,6 +140,7 @@ void VulkanCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcText
   if (!srcTexture || !dstTexture) {
     return;
   }
+  auto commandBuffer = session.commandBuffer;
   auto vulkanSrc = std::static_pointer_cast<VulkanTexture>(srcTexture);
   auto vulkanDst = std::static_pointer_cast<VulkanTexture>(dstTexture);
   retainResource(vulkanSrc);
@@ -194,6 +200,7 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   if (!srcTexture || !dstBuffer) {
     return;
   }
+  auto commandBuffer = session.commandBuffer;
   auto vulkanSrc = std::static_pointer_cast<VulkanTexture>(srcTexture);
   auto vulkanDst = std::static_pointer_cast<VulkanBuffer>(dstBuffer);
   retainResource(vulkanSrc);
@@ -235,6 +242,7 @@ void VulkanCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> te
   }
   retainResource(vulkanTexture);
 
+  auto commandBuffer = session.commandBuffer;
   auto image = vulkanTexture->vulkanImage();
   auto mipLevels = static_cast<uint32_t>(vulkanTexture->mipLevelCount());
   auto mipWidth = static_cast<int32_t>(vulkanTexture->width());
@@ -312,27 +320,8 @@ void VulkanCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> te
 }
 
 std::shared_ptr<CommandBuffer> VulkanCommandEncoder::onFinish() {
-  // Transfer all retained resources and deferred objects to VulkanCommandBuffer. The encoder is a
-  // reusable temporary object; the command buffer is the one-shot submission unit that represents
-  // "this batch of commands needs these resources alive." Clearing the encoder allows it to be
-  // cleanly released without accidentally destroying in-flight resources.
-  vkEndCommandBuffer(commandBuffer);
-  std::vector<VkFramebuffer> framebuffers;
-  std::vector<VkRenderPass> renderPasses;
-  framebuffers.reserve(deferredDestroys.size());
-  renderPasses.reserve(deferredDestroys.size());
-  for (auto& d : deferredDestroys) {
-    framebuffers.push_back(d.framebuffer);
-    renderPasses.push_back(d.renderPass);
-  }
-  deferredDestroys.clear();
-  auto result = std::make_shared<VulkanCommandBuffer>(
-      commandBuffer, commandPool, descriptorPool, std::move(framebuffers), std::move(renderPasses),
-      std::move(retainedResources));
-  commandPool = VK_NULL_HANDLE;
-  commandBuffer = VK_NULL_HANDLE;
-  descriptorPool = VK_NULL_HANDLE;
-  return result;
+  vkEndCommandBuffer(session.commandBuffer);
+  return std::make_shared<VulkanCommandBuffer>(std::move(session));
 }
 
 }  // namespace tgfx
