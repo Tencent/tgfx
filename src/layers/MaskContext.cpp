@@ -30,6 +30,15 @@ namespace tgfx {
  */
 static constexpr size_t MaxMaskPathDrawCount = 30;
 
+/**
+ * Hard cap on the verb count of the accumulated mask path. PathOp::Union cost is dominated by the
+ * size of its left operand, so when the running mask grows past this size each additional Union
+ * gets prohibitively expensive — drawCount alone cannot bound it because a single record may
+ * contribute thousands of verbs (dense SVG paths, stroke-applied curves, etc). Once exceeded,
+ * abort path extraction so the caller falls back to the MaskFilter shader path.
+ */
+static constexpr int MaxAccumulatedMaskVerbs = 2000;
+
 bool MaskContext::GetMaskPath(const std::shared_ptr<Picture>& picture, Path* result) {
   if (picture == nullptr || result == nullptr) {
     return false;
@@ -72,6 +81,20 @@ bool MaskContext::finish(Path* result) {
       return false;
     }
     record.path.transform(record.matrix);
+    // Pre-Union circuit breaker: PathOp::Union cost is dominated by the combined verb count of
+    // both operands, and grows super-linearly. Cut off BEFORE paying the next Union when the
+    // projected size already exceeds the cap. The caller falls back to the MaskFilter shader
+    // path, which scales much better with complex masks.
+    auto projected = maskPath.countVerbs() + record.path.countVerbs();
+    if (record.clip.state() == ClipState::Complex ||
+        record.clip.state() == ClipState::Rect) {
+      // Complex / partial-rect clip will run an extra Intersect on the clip path, which inflates
+      // the right operand. Account for the clip path verbs too.
+      projected += record.clip.getClipPath().countVerbs();
+    }
+    if (projected > MaxAccumulatedMaskVerbs) {
+      return false;
+    }
     switch (record.clip.state()) {
       case ClipState::Empty:
         // Already filtered out in addPath().
@@ -177,6 +200,12 @@ void MaskContext::drawTextBlob(std::shared_ptr<TextBlob>, const Matrix&, const C
 void MaskContext::drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,
                               const ClipStack& clip) {
   if (_aborted || picture == nullptr) {
+    return;
+  }
+  // Apply the same drawCount budget as the top-level entry: nested pictures with too many ops
+  // would otherwise bypass the outer guard and blow up the union accumulation in finish().
+  if (picture->drawCount > MaxMaskPathDrawCount) {
+    _aborted = true;
     return;
   }
   MaskContext subContext;
