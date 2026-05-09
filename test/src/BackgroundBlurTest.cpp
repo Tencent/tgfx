@@ -824,9 +824,9 @@ TGFX_TEST(BackgroundBlurTest, PictureSubFlushPreservesCarrierMatrix) {
   auto carrierMatrix = Matrix::MakeTrans(100, 50);
   carrierCanvas->setMatrix(carrierMatrix);
 
-  auto subSource = topSource->createSubPicture(&carrier, Rect::MakeWH(100, 100),
-                                               /*localToWorld=*/carrierMatrix,
-                                               /*localToSurface=*/carrierMatrix);
+  auto subSource = topSource->createFromPicture(&carrier, Rect::MakeWH(100, 100),
+                                                /*localToWorld=*/carrierMatrix,
+                                                /*localToSurface=*/carrierMatrix);
   ASSERT_TRUE(subSource != nullptr);
 
   Paint redPaint;
@@ -902,7 +902,7 @@ TGFX_TEST(BackgroundBlurTest, GroupOpacityNestedBackgroundBlur) {
   container->setMatrix(Matrix::MakeTrans(50, 50) * Matrix::MakeScale(1.5f));
 
   // The blur child sits inside the container. Its surface-to-world path exercises
-  // createSubSurface with a non-zero carrier origin offset.
+  // createFromSurface with a non-zero carrier origin offset.
   auto blurChild = SolidLayer::Make();
   blurChild->setColor(Color::FromRGBA(255, 255, 255, 60));
   blurChild->setWidth(100);
@@ -979,67 +979,13 @@ TGFX_TEST(BackgroundBlurTest, GroupOpacityNestedBackgroundBlurPicturePath) {
   Layer::SetDefaultAllowsGroupOpacity(oldGroupOpacity);
 }
 
-// Regression for M2#1 (createSubPicture pixel slice misaligned when childSurfaceRect.topLeft is
-// not at carrier origin). When a layer with BackgroundBlurStyle is nested inside an offscreen
-// group-opacity carrier and is offset from the carrier's origin, the picture-only path must
-// sample the carrier slice at the layer's origin — not at carrier (0, 0). With the bug the
-// blur backdrop samples the wrong slice and produces visibly wrong pixels.
+// Note (M2#1): pixel-slice misalignment for picture-only sub backgrounds is covered by
+// GroupOpacityNestedBackgroundBlurPicturePath above (image backdrop + offset carrier already
+// exercises the same wrong-slice path). No standalone regression test is needed.
 //
 // Note (M2#4): the save-stack-only-restores-top-frame fix is documentation-only because the
 // project lacks a Canvas API to enumerate intermediate save frames. No runtime regression test
 // is added for M2#4.
-TGFX_TEST(BackgroundBlurTest, SubPictureBgSliceAlignment) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto oldGroupOpacity = Layer::DefaultAllowsGroupOpacity();
-  Layer::SetDefaultAllowsGroupOpacity(true);
-
-  // Solid red 200x200 backdrop so any wrong-slice sampling is visible.
-  auto solidLayer = SolidLayer::Make();
-  solidLayer->setColor(Color::Red());
-  solidLayer->setWidth(200);
-  solidLayer->setHeight(200);
-
-  // Container forces a group-opacity offscreen carrier and is offset from the root origin so
-  // the carrier surface starts at a non-zero world position.
-  auto container = Layer::Make();
-  container->setAlpha(0.7f);
-  container->setAllowsGroupOpacity(true);
-  container->setMatrix(Matrix::MakeTrans(60, 60));
-
-  // Child sits at a non-zero offset within the container, so childSurfaceRect.topLeft is not at
-  // the carrier's (0, 0). This is the geometry that exposes the pixel-slice misalignment.
-  auto blurChild = ShapeLayer::Make();
-  Path childPath;
-  childPath.addRect(Rect::MakeWH(60, 60));
-  blurChild->setPath(childPath);
-  blurChild->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 102)));
-  blurChild->setMatrix(Matrix::MakeTrans(40, 40));
-  blurChild->setLayerStyles({BackgroundBlurStyle::Make(8, 8)});
-  container->addChild(blurChild);
-
-  auto rootLayer = Layer::Make();
-  rootLayer->addChild(solidLayer);
-  rootLayer->addChild(container);
-
-  // Recorder canvas has no backing Surface, so Layer::draw walks the picture-only path.
-  PictureRecorder recorder;
-  auto* recordingCanvas = recorder.beginRecording();
-  rootLayer->draw(recordingCanvas);
-  auto picture = recorder.finishRecordingAsPicture();
-  ASSERT_TRUE(picture != nullptr);
-
-  auto surface = Surface::Make(context, 200, 200);
-  ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
-  canvas->clear();
-  canvas->drawPicture(picture);
-
-  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/SubPictureBgSliceAlignment"));
-
-  Layer::SetDefaultAllowsGroupOpacity(oldGroupOpacity);
-}
 
 // Regression for M2#3 (clip double-transform on PictureBackgroundSource resume). When
 // onGetOwnContents flushes mid-recording and reopens the segment, it must apply the saved
@@ -1072,9 +1018,9 @@ TGFX_TEST(BackgroundBlurTest, PictureSubResumeClipNotDoubled) {
   carrierCanvas->setMatrix(carrierMatrix);
   carrierCanvas->clipRect(Rect::MakeWH(100, 100));
 
-  auto subSource = topSource->createSubPicture(&carrier, Rect::MakeWH(100, 100),
-                                               /*localToWorld=*/carrierMatrix,
-                                               /*localToSurface=*/carrierMatrix);
+  auto subSource = topSource->createFromPicture(&carrier, Rect::MakeWH(100, 100),
+                                                /*localToWorld=*/carrierMatrix,
+                                                /*localToSurface=*/carrierMatrix);
   ASSERT_TRUE(subSource != nullptr);
 
   Paint redPaint;

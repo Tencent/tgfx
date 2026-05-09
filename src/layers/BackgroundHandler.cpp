@@ -123,6 +123,95 @@ int BackgroundCapturer::lastCaptureChildIndex(const Layer* parent) const {
   return -1;
 }
 
+bool BackgroundCapturer::needsSurface(Layer* layer) const {
+  return layer != nullptr && layer->hasDescendantBackgroundStyle();
+}
+
+// Intersects the sub background's rect with parentArgs.renderRects to produce a narrowed cull
+// list for the offscreen's child draw pass. If parentArgs.renderRects is null/empty (no cull),
+// falls back to the full bgRect.
+static void NarrowRenderRects(const DrawArgs& parentArgs, const Rect& bgRect,
+                              std::vector<Rect>* outRects) {
+  if (parentArgs.renderRects != nullptr && !parentArgs.renderRects->empty()) {
+    for (const auto& r : *parentArgs.renderRects) {
+      auto clipped = r;
+      if (clipped.intersect(bgRect)) {
+        outRects->push_back(clipped);
+      }
+    }
+  } else {
+    outRects->push_back(bgRect);
+  }
+}
+
+// Builds the world-space rect and localToWorld matrix for a sub source nested under bgSource.
+// Returns false if bgSource is missing.
+static bool ComputeSubGeometry(BackgroundSource* parentSource, const Rect& localBounds,
+                               const Matrix& contentMatrix, Matrix* localToWorld,
+                               Rect* worldBounds) {
+  if (parentSource == nullptr) {
+    return false;
+  }
+  *localToWorld = parentSource->surfaceToWorldMatrix();
+  localToWorld->preConcat(contentMatrix);
+  *worldBounds = localToWorld->mapRect(localBounds);
+  worldBounds->roundOut();
+  return true;
+}
+
+std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
+    Surface* surface, const DrawArgs& parentArgs, const Rect& localBounds,
+    const Matrix& contentMatrix, const Matrix& localToSurface) const {
+  Matrix localToWorld = Matrix::I();
+  Rect worldBounds = Rect::MakeEmpty();
+  if (!ComputeSubGeometry(bgSource.get(), localBounds, contentMatrix, &localToWorld,
+                          &worldBounds)) {
+    return nullptr;
+  }
+  auto subSource = bgSource->createFromSurface(surface, worldBounds, localToWorld, localToSurface);
+  if (subSource == nullptr) {
+    return nullptr;
+  }
+  auto subRect = subSource->getBackgroundRect();
+  auto clone =
+      std::unique_ptr<BackgroundCapturer>(new BackgroundCapturer(snapshots, std::move(subSource)));
+  NarrowRenderRects(parentArgs, subRect, &clone->_renderRects);
+  // Inherit the forced-capture state so subtrees inside pass-through offscreen containers
+  // are not culled by lastCaptureChildIndex — they still contribute to the parent bgSource.
+  if (isForcedCapture()) {
+    clone->beginForceDrawChildren();
+  }
+  return clone;
+}
+
+std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
+    PictureRecorder* recorder, const DrawArgs& parentArgs, const Rect& localBounds,
+    const Matrix& contentMatrix, const Matrix& localToSurface, Canvas** outCanvas) const {
+  Matrix localToWorld = Matrix::I();
+  Rect worldBounds = Rect::MakeEmpty();
+  if (!ComputeSubGeometry(bgSource.get(), localBounds, contentMatrix, &localToWorld,
+                          &worldBounds)) {
+    return nullptr;
+  }
+  auto subSource = bgSource->createFromPicture(recorder, worldBounds, localToWorld, localToSurface);
+  if (subSource == nullptr) {
+    return nullptr;
+  }
+  auto subRect = subSource->getBackgroundRect();
+  auto clone =
+      std::unique_ptr<BackgroundCapturer>(new BackgroundCapturer(snapshots, std::move(subSource)));
+  NarrowRenderRects(parentArgs, subRect, &clone->_renderRects);
+  if (isForcedCapture()) {
+    clone->beginForceDrawChildren();
+  }
+  // createFromPicture may have flushed a recording segment, so the recorder's current canvas
+  // pointer may have changed.
+  if (outCanvas != nullptr) {
+    *outCanvas = recorder->getRecordingCanvas();
+  }
+  return clone;
+}
+
 void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
                                              float /*alpha*/, LayerStyle* style,
                                              const LayerStyleSource* source) {
@@ -189,21 +278,6 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   }
   snapshots->emplace(BackgroundSnapshotKey{layer, style},
                      BackgroundSnapshotEntry{std::move(image), offset});
-}
-
-std::unique_ptr<BackgroundHandler> BackgroundCapturer::cloneWithSource(
-    std::shared_ptr<BackgroundSource> newSource) const {
-  if (newSource == nullptr) {
-    return nullptr;
-  }
-  auto clone =
-      std::unique_ptr<BackgroundHandler>(new BackgroundCapturer(snapshots, std::move(newSource)));
-  // Inherit the forced-capture state so subtrees inside pass-through offscreen containers
-  // are not culled by lastCaptureChildIndex — they still contribute to the parent bgSource.
-  if (isForcedCapture()) {
-    clone->beginForcedCapture();
-  }
-  return clone;
 }
 
 const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* layer) const {

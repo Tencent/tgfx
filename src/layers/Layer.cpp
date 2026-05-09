@@ -1646,7 +1646,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                          const Layer* stopChild) {
   auto childCount = static_cast<int>(_children.size());
   int maxIndex = childCount - 1;
-  if (args.backgroundHandler != nullptr && !args.backgroundHandler->isForcedCapture()) {
+  if (args.backgroundHandler != nullptr) {
     int lastCaptureIndex = args.backgroundHandler->lastCaptureChildIndex(this);
     if (lastCaptureIndex < 0) {
       return true;
@@ -1667,11 +1667,10 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     if (!childArgsOpt.has_value()) {
       continue;
     }
-    if (args.backgroundHandler != nullptr && i < maxIndex &&
-        args.backgroundHandler->source() != nullptr && !args.backgroundHandler->isForcedCapture()) {
-      args.backgroundHandler->beginForcedCapture();
+    if (args.backgroundHandler != nullptr && i < maxIndex) {
+      args.backgroundHandler->beginForceDrawChildren();
       drawChild(*childArgsOpt, canvas, child.get(), alpha, &Layer::drawLayer);
-      args.backgroundHandler->endForcedCapture();
+      args.backgroundHandler->endForceDrawChildren();
     } else {
       drawChild(*childArgsOpt, canvas, child.get(), alpha, &Layer::drawLayer);
     }

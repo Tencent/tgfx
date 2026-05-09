@@ -18,7 +18,6 @@
 
 #include "layers/OffscreenRenderer.h"
 #include "layers/BackgroundHandler.h"
-#include "layers/BackgroundSource.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
@@ -29,23 +28,6 @@ namespace tgfx {
 namespace {
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────────────────────
-
-// Intersects the sub-background's rect with the incoming renderRects to produce a narrowed cull
-// list for the offscreen's child draw pass. If incoming renderRects is null/empty (no cull),
-// falls back to the full backgroundRect.
-static void NarrowRenderRects(const DrawArgs& parentArgs, const Rect& bgRect,
-                              std::vector<Rect>* outRects) {
-  if (parentArgs.renderRects != nullptr && !parentArgs.renderRects->empty()) {
-    for (const auto& r : *parentArgs.renderRects) {
-      auto clipped = r;
-      if (clipped.intersect(bgRect)) {
-        outRects->push_back(clipped);
-      }
-    }
-  } else {
-    outRects->push_back(bgRect);
-  }
-}
 
 std::shared_ptr<Image> SnapshotOf(Canvas* canvas) {
   auto surface = canvas->getSurface();
@@ -84,38 +66,6 @@ std::shared_ptr<Image> ApplyImageFilterIfNeeded(std::shared_ptr<Image> image,
   return image;
 }
 
-// Derives a child handler sampling from a sub source built off `surface` or `recorder` (exactly
-// one must be non-null). contentMatrix is `local → parent surface pixel`; composing with
-// surfaceToWorldMatrix() yields local → world.
-std::unique_ptr<BackgroundHandler> DeriveSubHandler(const DrawArgs& args, Surface* surface,
-                                                    PictureRecorder* recorder,
-                                                    const Rect& localBounds,
-                                                    const Matrix& contentMatrix,
-                                                    const Matrix& localToSurface) {
-  if (args.backgroundHandler == nullptr) {
-    return nullptr;
-  }
-  auto* parentSource = args.backgroundHandler->source();
-  if (parentSource == nullptr) {
-    return nullptr;
-  }
-  auto localToWorld = parentSource->surfaceToWorldMatrix();
-  localToWorld.preConcat(contentMatrix);
-  auto worldBounds = localToWorld.mapRect(localBounds);
-  worldBounds.roundOut();
-
-  std::shared_ptr<BackgroundSource> subSource;
-  if (surface != nullptr) {
-    subSource = parentSource->createSubSurface(surface, worldBounds, localToWorld, localToSurface);
-  } else if (recorder != nullptr) {
-    subSource = parentSource->createSubPicture(recorder, worldBounds, localToWorld, localToSurface);
-  }
-  if (subSource == nullptr) {
-    return nullptr;
-  }
-  return args.backgroundHandler->cloneWithSource(std::move(subSource));
-}
-
 }  // namespace
 
 // ─── Entry points ─────────────────────────────────────────────────────────────────────────────
@@ -141,9 +91,8 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
 
   // A Surface backing is only needed when a descendant Background-sourced style will read back
   // through this subtree. Otherwise a PictureRecorder is cheaper.
-  bool wantsSubBackground = args.backgroundHandler != nullptr &&
-                            args.backgroundHandler->source() != nullptr &&
-                            layer->hasDescendantBackgroundStyle();
+  bool wantsSubBackground =
+      args.backgroundHandler != nullptr && args.backgroundHandler->needsSurface(layer);
   if (wantsSubBackground && args.context != nullptr) {
     auto surface =
         Surface::Make(args.context, static_cast<int>(imageClip.width()),
@@ -205,15 +154,13 @@ OffscreenResult OffscreenRenderer::RenderContentOnSurface(
 
   auto drawArgs = args;
   std::unique_ptr<BackgroundHandler> subHandler;
-  std::vector<Rect> subDrawRects;
-  if (wantsSubBackground) {
-    subHandler = DeriveSubHandler(args, surface.get(), /*recorder=*/nullptr, inputBounds,
-                                  contentMatrix, localToSurface);
-    if (subHandler) {
+  if (wantsSubBackground && args.backgroundHandler != nullptr) {
+    subHandler = args.backgroundHandler->createSubHandler(surface.get(), args, inputBounds,
+                                                          contentMatrix, localToSurface);
+    if (subHandler != nullptr) {
       drawArgs.backgroundHandler = subHandler.get();
-      if (auto* src = subHandler->source()) {
-        NarrowRenderRects(args, src->getBackgroundRect(), &subDrawRects);
-        drawArgs.renderRects = &subDrawRects;
+      if (auto* rects = subHandler->renderRects()) {
+        drawArgs.renderRects = rects;
       }
     }
   }
@@ -244,19 +191,14 @@ OffscreenResult OffscreenRenderer::RenderContentOnPicture(
 
   auto drawArgs = args;
   std::unique_ptr<BackgroundHandler> subHandler;
-  std::vector<Rect> subDrawRects;
-  if (wantsSubBackground) {
-    subHandler =
-        DeriveSubHandler(args, /*surface=*/nullptr, &recorder, inputBounds, contentMatrix, density);
-    if (subHandler) {
+  if (wantsSubBackground && args.backgroundHandler != nullptr) {
+    subHandler = args.backgroundHandler->createSubHandler(&recorder, args, inputBounds,
+                                                          contentMatrix, density, &canvas);
+    if (subHandler != nullptr) {
       drawArgs.backgroundHandler = subHandler.get();
-      if (auto* src = subHandler->source()) {
-        NarrowRenderRects(args, src->getBackgroundRect(), &subDrawRects);
-        drawArgs.renderRects = &subDrawRects;
+      if (auto* rects = subHandler->renderRects()) {
+        drawArgs.renderRects = rects;
       }
-      // If the sub-bg flushed a segment, the recording canvas pointer may have been swapped.
-      // Re-query so follow-on drawing never goes through a stale pointer.
-      canvas = recorder.getRecordingCanvas();
     }
   }
 
@@ -291,14 +233,15 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnSurface(
   canvas->setMatrix(localToSurface);
 
   auto drawArgs = args;
-  std::vector<Rect> subDrawRects;
-  auto subHandler = DeriveSubHandler(args, surface.get(), /*recorder=*/nullptr, inputBounds,
-                                     parentMatrix, localToSurface);
-  if (subHandler) {
-    drawArgs.backgroundHandler = subHandler.get();
-    if (auto* src = subHandler->source()) {
-      NarrowRenderRects(args, src->getBackgroundRect(), &subDrawRects);
-      drawArgs.renderRects = &subDrawRects;
+  std::unique_ptr<BackgroundHandler> subHandler;
+  if (args.backgroundHandler != nullptr) {
+    subHandler = args.backgroundHandler->createSubHandler(surface.get(), args, inputBounds,
+                                                          parentMatrix, localToSurface);
+    if (subHandler != nullptr) {
+      drawArgs.backgroundHandler = subHandler.get();
+      if (auto* rects = subHandler->renderRects()) {
+        drawArgs.renderRects = rects;
+      }
     }
   }
 
@@ -325,16 +268,16 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnPicture(
   canvas->setMatrix(localToSurface);
 
   auto drawArgs = args;
-  std::vector<Rect> subDrawRects;
-  auto subHandler = DeriveSubHandler(args, /*surface=*/nullptr, &recorder, inputBounds,
-                                     parentMatrix, localToSurface);
-  if (subHandler) {
-    drawArgs.backgroundHandler = subHandler.get();
-    if (auto* src = subHandler->source()) {
-      NarrowRenderRects(args, src->getBackgroundRect(), &subDrawRects);
-      drawArgs.renderRects = &subDrawRects;
+  std::unique_ptr<BackgroundHandler> subHandler;
+  if (args.backgroundHandler != nullptr) {
+    subHandler = args.backgroundHandler->createSubHandler(&recorder, args, inputBounds,
+                                                          parentMatrix, localToSurface, &canvas);
+    if (subHandler != nullptr) {
+      drawArgs.backgroundHandler = subHandler.get();
+      if (auto* rects = subHandler->renderRects()) {
+        drawArgs.renderRects = rects;
+      }
     }
-    canvas = recorder.getRecordingCanvas();
   }
 
   layer->drawDirectly(drawArgs, canvas, 1.0f);

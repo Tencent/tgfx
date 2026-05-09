@@ -54,16 +54,16 @@ class BackgroundSource {
 
   // Derives a sub source backed by an externally-owned Surface (the offscreen carrier's surface).
   // renderBounds is in world coords; localToWorld / localToSurface map the sub's local coords.
-  std::shared_ptr<BackgroundSource> createSubSurface(Surface* subSurface, const Rect& renderBounds,
-                                                     const Matrix& localToWorld,
-                                                     const Matrix& localToSurface);
+  std::shared_ptr<BackgroundSource> createFromSurface(Surface* subSurface, const Rect& renderBounds,
+                                                      const Matrix& localToWorld,
+                                                      const Matrix& localToSurface);
 
   // Derives a sub source backed by an externally-owned PictureRecorder. Caller must keep the
   // recorder alive for the sub's lifetime.
-  std::shared_ptr<BackgroundSource> createSubPicture(PictureRecorder* subRecorder,
-                                                     const Rect& renderBounds,
-                                                     const Matrix& localToWorld,
-                                                     const Matrix& localToSurface);
+  std::shared_ptr<BackgroundSource> createFromPicture(PictureRecorder* subRecorder,
+                                                      const Rect& renderBounds,
+                                                      const Matrix& localToWorld,
+                                                      const Matrix& localToSurface);
 
   // surface pixel → world. Same as backgroundMatrix() for top-level; differs for subs whose
   // surface pixel grid doesn't match the parent-aligned image grid. Used when composing with a
@@ -105,7 +105,7 @@ class BackgroundSource {
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   BackgroundSource* parent = nullptr;
-  // Origin of this source's surface in parent image-pixel coords. Set by createSub* for subs.
+  // Origin of this source's surface in parent image-pixel coords. Set by createFrom* for subs.
   Point surfaceOffset = Point::Zero();
 };
 

@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <vector>
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -29,6 +30,8 @@ class Canvas;
 class DrawArgs;
 class Layer;
 class LayerStyle;
+class PictureRecorder;
+class Surface;
 struct BackgroundSnapshotMap;
 struct LayerStyleSource;
 
@@ -52,24 +55,45 @@ class BackgroundHandler {
   virtual void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                                    LayerStyle* style, const LayerStyleSource* source) = 0;
 
-  // Returns the source this handler samples from (BackgroundCapturer), or nullptr otherwise.
-  virtual BackgroundSource* source() const {
+  // Returns true when this handler needs descendants of `layer` to render onto a real Surface
+  // (so they can be sampled back through a sub background source). Capturer returns true only
+  // when `layer` actually has descendant background-sourced styles. Other handlers default to
+  // false, letting OffscreenRenderer take the cheaper PictureRecorder path.
+  virtual bool needsSurface(Layer* /*layer*/) const {
+    return false;
+  }
+
+  // Builds a sub-handler that samples from a Surface-backed sub background source. On success,
+  // returns the new handler with its own narrowed renderRects (queryable via renderRects()).
+  // Non-sampling handlers return nullptr so the caller keeps the parent handler in effect.
+  virtual std::unique_ptr<BackgroundHandler> createSubHandler(
+      Surface* /*surface*/, const DrawArgs& /*parentArgs*/, const Rect& /*localBounds*/,
+      const Matrix& /*contentMatrix*/, const Matrix& /*localToSurface*/) const {
+    return nullptr;
+  }
+
+  // PictureRecorder variant of createSubHandler. createFromPicture may flush a recording
+  // segment, so on success this re-fetches the recorder's current canvas through `*outCanvas`.
+  virtual std::unique_ptr<BackgroundHandler> createSubHandler(PictureRecorder* /*recorder*/,
+                                                              const DrawArgs& /*parentArgs*/,
+                                                              const Rect& /*localBounds*/,
+                                                              const Matrix& /*contentMatrix*/,
+                                                              const Matrix& /*localToSurface*/,
+                                                              Canvas** /*outCanvas*/) const {
+    return nullptr;
+  }
+
+  // Returns the narrowed renderRects this sub-handler should use, or nullptr when the caller
+  // should keep the parent's renderRects. Only meaningful on handlers produced by
+  // createSubHandler; the base class default returns nullptr.
+  virtual const std::vector<Rect>* renderRects() const {
     return nullptr;
   }
 
   // Returns the index of the last child in parent's children list that should be traversed
   // during the capture pass, or -1 if no children need traversal. BackgroundCapturer overrides
-  // this to skip children after the last one with background styles; when isForcedCapture() is
-  // true it returns the last index so all children are drawn.
+  // this to skip children after the last one with background styles.
   virtual int lastCaptureChildIndex(const Layer* /*parent*/) const;
-
-  // Returns a handler of the same type sampling from newSource, or nullptr for non-sampling
-  // handlers so the caller keeps the current handler. Used by OffscreenRenderer to stack a child
-  // handler when descending into an offscreen subtree.
-  virtual std::unique_ptr<BackgroundHandler> cloneWithSource(
-      std::shared_ptr<BackgroundSource> /*newSource*/) const {
-    return nullptr;
-  }
 
   // Returns a previously cached LayerStyleSource for the given layer, or nullptr if none. Capture
   // and consume passes walk the same tree, so the source built in capture is reused in consume —
@@ -88,22 +112,14 @@ class BackgroundHandler {
     return nullptr;
   }
 
-  // During the capture pass, a subtree that sits before a later bg-style sibling must draw
-  // all descendants so their content appears on the bg source surface. beginForcedCapture() /
-  // endForcedCapture() manage a nesting depth counter so recursive drawChildren calls don't
-  // clobber the forced state.
-  bool isForcedCapture() const {
-    return _forcedCaptureDepth > 0;
+  // During the capture pass, a subtree that sits before a later bg-style sibling must draw all
+  // descendants so their content appears on the bg source surface. drawChildren wraps each such
+  // child draw in begin/endForceDrawChildren. Non-capturing handlers default to no-ops, so
+  // callers can invoke these unconditionally.
+  virtual void beginForceDrawChildren() {
   }
-  void beginForcedCapture() {
-    ++_forcedCaptureDepth;
+  virtual void endForceDrawChildren() {
   }
-  void endForcedCapture() {
-    --_forcedCaptureDepth;
-  }
-
- private:
-  int _forcedCaptureDepth = 0;
 };
 
 class BackgroundCapturer : public BackgroundHandler {
@@ -115,19 +131,34 @@ class BackgroundCapturer : public BackgroundHandler {
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                            LayerStyle* style, const LayerStyleSource* source) override;
 
-  BackgroundSource* source() const override {
-    return bgSource.get();
+  bool needsSurface(Layer* layer) const override;
+
+  std::unique_ptr<BackgroundHandler> createSubHandler(Surface* surface, const DrawArgs& parentArgs,
+                                                      const Rect& localBounds,
+                                                      const Matrix& contentMatrix,
+                                                      const Matrix& localToSurface) const override;
+
+  std::unique_ptr<BackgroundHandler> createSubHandler(
+      PictureRecorder* recorder, const DrawArgs& parentArgs, const Rect& localBounds,
+      const Matrix& contentMatrix, const Matrix& localToSurface, Canvas** outCanvas) const override;
+
+  const std::vector<Rect>* renderRects() const override {
+    return _renderRects.empty() ? nullptr : &_renderRects;
   }
 
   int lastCaptureChildIndex(const Layer* parent) const override;
-
-  std::unique_ptr<BackgroundHandler> cloneWithSource(
-      std::shared_ptr<BackgroundSource> newSource) const override;
 
   const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
 
   const LayerStyleSource* tryCacheLayerStyleSource(
       Layer* layer, std::unique_ptr<LayerStyleSource>& source) const override;
+
+  void beginForceDrawChildren() override {
+    ++_forcedCaptureDepth;
+  }
+  void endForceDrawChildren() override {
+    --_forcedCaptureDepth;
+  }
 
   // Runs a capture pass: replays captureRoot onto bgSource's canvas, populating snapshots. The
   // replay walks the tree exactly once with renderRects set to the pre-outset world-space dirty
@@ -137,8 +168,14 @@ class BackgroundCapturer : public BackgroundHandler {
                   const std::vector<Rect>& renderRects);
 
  private:
+  bool isForcedCapture() const {
+    return _forcedCaptureDepth > 0;
+  }
+
   BackgroundSnapshotMap* snapshots = nullptr;
   std::shared_ptr<BackgroundSource> bgSource = nullptr;
+  std::vector<Rect> _renderRects;
+  int _forcedCaptureDepth = 0;
 };
 
 class BackgroundConsumer : public BackgroundHandler {

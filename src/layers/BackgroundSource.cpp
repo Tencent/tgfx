@@ -79,7 +79,7 @@ static TopLevelGeometry ComputeTopLevelGeometry(const Rect& drawRect, float maxO
   return out;
 }
 
-// Geometry shared by createSubSurface() / createSubPicture() of both variants.
+// Geometry shared by createFromSurface() / createFromPicture() of both variants.
 // `localToWorld`/`localToSurface` describe how the sub's local coords map to world and to the sub
 // surface's pixel grid; the parent's imageMatrix is used to compute the sub's image-pixel space
 // relative to the parent.
@@ -360,7 +360,7 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
 
   // Sub: compose parent image (in parent image-pixel coords) with own content by subsetting
   // parent to the sub's footprint and stacking own on top. Sub's image-pixel space is aligned
-  // with parent's, offset by surfaceOffset (set at createSubSurface / createSubPicture time).
+  // with parent's, offset by surfaceOffset (set at createFromSurface / createFromPicture time).
   Matrix worldToParentImage = Matrix::I();
   if (!parent->imageMatrix.invert(&worldToParentImage)) {
     return subFallback;
@@ -406,10 +406,9 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
 
 // ─── Sub-source factories ─────────────────────────────────────────────────────────────────────
 
-std::shared_ptr<BackgroundSource> BackgroundSource::createSubSurface(Surface* subSurface,
-                                                                     const Rect& renderBounds,
-                                                                     const Matrix& localToWorld,
-                                                                     const Matrix& localToSurface) {
+std::shared_ptr<BackgroundSource> BackgroundSource::createFromSurface(
+    Surface* subSurface, const Rect& renderBounds, const Matrix& localToWorld,
+    const Matrix& localToSurface) {
   if (subSurface == nullptr) {
     return nullptr;
   }
@@ -435,10 +434,9 @@ std::shared_ptr<BackgroundSource> BackgroundSource::createSubSurface(Surface* su
   return sub;
 }
 
-std::shared_ptr<BackgroundSource> BackgroundSource::createSubPicture(PictureRecorder* subRecorder,
-                                                                     const Rect& renderBounds,
-                                                                     const Matrix& localToWorld,
-                                                                     const Matrix& localToSurface) {
+std::shared_ptr<BackgroundSource> BackgroundSource::createFromPicture(
+    PictureRecorder* subRecorder, const Rect& renderBounds, const Matrix& localToWorld,
+    const Matrix& localToSurface) {
   if (subRecorder == nullptr || subRecorder->getRecordingCanvas() == nullptr) {
     return nullptr;
   }
@@ -451,7 +449,7 @@ std::shared_ptr<BackgroundSource> BackgroundSource::createSubPicture(PictureReco
       geometry.height, _surfaceScale, colorSpace, geometry.childSurfaceTopLeft);
   sub->parent = this;
   sub->surfaceOffset = geometry.childSurfaceOffset;
-  // Compute surfaceToWorld from localToWorld and localToSurface directly, same as createSubSurface.
+  // Compute surfaceToWorld from localToWorld and localToSurface directly, same as createFromSurface.
   // geometry.childSurfaceToWorld assumes a dedicated sub surface whose origin aligns with
   // childSurfaceRect.topLeft, but the borrowed PictureRecorder's canvas matrix is localToSurface
   // (without the postTranslate to childSurfaceRect.topLeft), so we must use the runtime canvas
