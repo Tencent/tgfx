@@ -86,8 +86,7 @@ bool MaskContext::finish(Path* result) {
     // projected size already exceeds the cap. The caller falls back to the MaskFilter shader
     // path, which scales much better with complex masks.
     auto projected = maskPath.countVerbs() + record.path.countVerbs();
-    if (record.clip.state() == ClipState::Complex ||
-        record.clip.state() == ClipState::Rect) {
+    if (record.clip.state() == ClipState::Complex || record.clip.state() == ClipState::Rect) {
       // Complex / partial-rect clip will run an extra Intersect on the clip path, which inflates
       // the right operand. Account for the clip path verbs too.
       projected += record.clip.getClipPath().countVerbs();
