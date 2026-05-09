@@ -34,7 +34,7 @@ VulkanCommandQueue::~VulkanCommandQueue() {
 }
 
 std::chrono::steady_clock::time_point VulkanCommandQueue::completedFrameTime() const {
-  return gpu->completedFrameTime();
+  return gpu->lastFenceSignalTime();
 }
 
 void VulkanCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset,
@@ -264,7 +264,7 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   pendingWaitSemaphore = nullptr;
   pendingPresent.reset();
 
-  gpu->submit(std::move(request));
+  gpu->executeSubmission(std::move(request));
 }
 
 std::shared_ptr<Semaphore> VulkanCommandQueue::insertSemaphore() {

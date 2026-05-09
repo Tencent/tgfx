@@ -169,10 +169,15 @@ class VulkanGPU : public GPU {
 
   void releaseDescriptorPool(VkDescriptorPool pool);
 
-  /// Returns the time point at which the most recently completed GPU submission finished. Used by
-  /// ResourceCache to determine when a cached resource can be safely reused (its lastUsedTime must
-  /// be <= completedFrameTime).
-  std::chrono::steady_clock::time_point completedFrameTime() const;
+  /// Destroys all Vulkan objects in a FrameSession that was never submitted to the GPU. Called
+  /// when a CommandBuffer or CommandEncoder is abandoned (destroyed without reaching submit()).
+  /// Safe to call because the GPU never executed commands referencing these resources.
+  void reclaimAbandonedSession(FrameSession session);
+
+  /// Returns the time point at which the most recently completed GPU submission finished, as
+  /// determined by the corresponding fence signal. Used by ResourceCache to determine when a cached
+  /// resource can be safely reused (its lastUsedTime must be <= lastFenceSignalTime).
+  std::chrono::steady_clock::time_point lastFenceSignalTime() const;
 
   /// Snapshot of a single writeTexture() call. The staging buffer holds a CPU-side copy of the
   /// pixel data; the actual GPU copy is recorded at submit() time. After the fence signals, the
@@ -188,8 +193,8 @@ class VulkanGPU : public GPU {
   };
 
   /// All parameters needed for a single vkQueueSubmit + optional vkQueuePresentKHR. Assembled by
-  /// VulkanCommandQueue::submit() and consumed by VulkanGPU::submit(). After consumption, all
-  /// move-only fields (session, uploads, semaphores) have been transferred to InflightSubmission.
+  /// VulkanCommandQueue::submit() and consumed by VulkanGPU::executeSubmission(). After consumption,
+  /// all move-only fields (session, uploads, semaphores) have been transferred to InflightSubmission.
   struct SubmitRequest {
     /// Per-frame resources collected during encoding (command pool, descriptor pool, framebuffers,
     /// render passes, retained resource references). Moved into InflightSubmission on success.
@@ -204,7 +209,7 @@ class VulkanGPU : public GPU {
     /// Timeline semaphore to wait on before executing this submission (from waitSemaphore()).
     std::shared_ptr<VulkanSemaphore> waitSemaphore;
     /// Snapshot of CommandQueue::_frameTime at the time of submit, stored in InflightSubmission
-    /// and used to update completedFrameTime when the fence signals.
+    /// and used to update lastFenceSignalTime when the fence signals.
     std::chrono::steady_clock::time_point frameTime = {};
     /// If non-null, vkQueuePresentKHR is called after the submit with this swapchain.
     VkSwapchainKHR presentSwapchain = VK_NULL_HANDLE;
@@ -219,7 +224,7 @@ class VulkanGPU : public GPU {
   ///   5. On failure: immediately reclaims all resources via reclaimSubmission().
   ///   6. If presentSwapchain is set, calls vkQueuePresentKHR (same-queue ordering guarantees
   ///      the layout transition in the submit batch completes before presentation reads).
-  void submit(SubmitRequest request);
+  void executeSubmission(SubmitRequest request);
 
   /// Blocks until all in-flight GPU submissions complete and reclaims their resources. Called by
   /// VulkanCommandQueue::waitUntilCompleted() and during releaseAll() shutdown sequence.
@@ -274,7 +279,7 @@ class VulkanGPU : public GPU {
   // Frame submission lifecycle state (fence-driven asynchronous reclamation).
   std::deque<InflightSubmission> inflightSubmissions;
   std::vector<VkFence> fencePool;
-  std::atomic<int64_t> _completedFrameTime = {0};
+  std::atomic<int64_t> _lastFenceSignalTime = {0};
 };
 
 }  // namespace tgfx

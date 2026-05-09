@@ -39,8 +39,8 @@ class VulkanTexture;
  *   - pendingSignal/WaitSemaphore: from insertSemaphore()/waitSemaphore(), consumed by submit().
  *
  * On submit(), this class assembles the upload/render/present command buffers and the SubmitRequest
- * struct, then delegates everything to VulkanGPU::submit() which handles fence allocation,
- * backpressure, vkQueueSubmit, inflight tracking, and vkQueuePresentKHR.
+ * struct, then delegates everything to VulkanGPU::executeSubmission() which handles fence
+ * allocation, backpressure, vkQueueSubmit, inflight tracking, and vkQueuePresentKHR.
  *
  * writeTexture() uses deferred semantics: pixel data is immediately copied into a staging buffer
  * (CPU-only operation), but the GPU-side copy command is recorded at the next submit() time. This

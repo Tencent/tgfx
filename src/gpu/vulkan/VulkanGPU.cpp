@@ -448,8 +448,8 @@ void VulkanGPU::releaseDescriptorPool(VkDescriptorPool pool) {
   descriptorPoolCache.push_back(pool);
 }
 
-std::chrono::steady_clock::time_point VulkanGPU::completedFrameTime() const {
-  auto ticks = _completedFrameTime.load(std::memory_order_acquire);
+std::chrono::steady_clock::time_point VulkanGPU::lastFenceSignalTime() const {
+  auto ticks = _lastFenceSignalTime.load(std::memory_order_acquire);
   return std::chrono::steady_clock::time_point(std::chrono::steady_clock::duration(ticks));
 }
 
@@ -468,11 +468,22 @@ VkFence VulkanGPU::acquireFence() {
 }
 
 void VulkanGPU::recycleFence(VkFence fence) {
+  if (fence == VK_NULL_HANDLE) {
+    return;
+  }
   if (fencePool.size() >= MAX_FRAMES_IN_FLIGHT + 1) {
     vkDestroyFence(vulkanDevice, fence, nullptr);
     return;
   }
   fencePool.push_back(fence);
+}
+
+void VulkanGPU::reclaimAbandonedSession(FrameSession session) {
+  // Reuse reclaimSubmission with a dummy InflightSubmission (no fence, no uploads).
+  // This is the same cleanup path as submit failure and fence-signal reclamation.
+  InflightSubmission abandoned = {};
+  abandoned.session = std::move(session);
+  reclaimSubmission(abandoned);
 }
 
 void VulkanGPU::reclaimSubmission(InflightSubmission& submission) {
@@ -509,7 +520,7 @@ void VulkanGPU::pollCompletedSubmissions() {
       break;
     }
     auto ticks = oldest.frameTime.time_since_epoch().count();
-    _completedFrameTime.store(ticks, std::memory_order_release);
+    _lastFenceSignalTime.store(ticks, std::memory_order_release);
     reclaimSubmission(oldest);
     inflightSubmissions.pop_front();
   }
@@ -520,14 +531,14 @@ void VulkanGPU::waitAllInflightSubmissions() {
   for (auto& submission : inflightSubmissions) {
     vkWaitForFences(vulkanDevice, 1, &submission.fence, VK_TRUE, UINT64_MAX);
     auto ticks = submission.frameTime.time_since_epoch().count();
-    _completedFrameTime.store(ticks, std::memory_order_release);
+    _lastFenceSignalTime.store(ticks, std::memory_order_release);
     reclaimSubmission(submission);
   }
   inflightSubmissions.clear();
   processUnreferencedResources();
 }
 
-void VulkanGPU::submit(SubmitRequest request) {
+void VulkanGPU::executeSubmission(SubmitRequest request) {
   // Step 1: Non-blocking reclaim of any submissions whose fences have already signaled.
   pollCompletedSubmissions();
 
