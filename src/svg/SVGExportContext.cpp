@@ -53,6 +53,16 @@
 
 namespace tgfx {
 
+namespace {
+// Returns true when the brush carries no effect that requires compositing, so a draw can be
+// emitted as SVG vector elements instead of being rasterized. Only the alpha channel of the
+// brush color can be honored in this mode by wrapping the output in a <g opacity="..."> group.
+bool CanExportAsVector(const Brush& brush) {
+  return brush.shader == nullptr && brush.maskFilter == nullptr && brush.colorFilter == nullptr &&
+         brush.blendMode == BlendMode::SrcOver;
+}
+}  // namespace
+
 SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
                                    std::unique_ptr<XMLWriter> inputXmlWriter, uint32_t exportFlags,
                                    std::shared_ptr<SVGCustomWriter> customWriter,
@@ -173,26 +183,38 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     }
     // Honor non-identity brushes on PictureImage: alpha-only goes through <g opacity>
     // to preserve vectors; any shader/filter/blend forces rasterization via exportPixmap.
-    bool canExportAsVector = brush.shader == nullptr && brush.maskFilter == nullptr &&
-                             brush.colorFilter == nullptr && brush.blendMode == BlendMode::SrcOver;
-    if (canExportAsVector) {
+    if (CanExportAsVector(brush)) {
       const auto pictureImage = static_cast<const PictureImage*>(image.get());
       auto newMatrix = matrix;
       if (pictureImage->matrix) {
         newMatrix.preConcat(*pictureImage->matrix);
       }
-      if (FloatNearlyEqual(brush.color.alpha, 1.0f)) {
+      if (brush.color.alpha == 1.0f) {
         drawPicture(pictureImage->picture, newMatrix, clip);
         return;
       }
-      // Reset clip state around the <g opacity> so nested playback ops rebuild their own
-      // clip groups under the correct parent instead of short-circuiting on currentClipPath.
+      // Lift the outer clip to a single <g clip-path> wrapper around <g opacity> so nested
+      // playback ops do not redefine identical clipPath resources. See drawLayer for the same
+      // structure. Inside the opacity group the clip stack is cleared, letting internal draws
+      // rebuild clips only when the picture itself introduces new ones.
+      auto clipPath = clip.getClipPath();
+      auto bound = newMatrix.mapRect(pictureImage->picture->getBounds());
+      bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+      std::string clipID;
+      if (needsClip) {
+        clipID = defineClipPath(clipPath);
+      }
       clipGroupElement = nullptr;
       currentClipPath = {};
       {
+        std::unique_ptr<ElementWriter> clipElement;
+        if (needsClip) {
+          clipElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+          clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
+        }
         ElementWriter opacityGroup("g", xmlWriter, resourceBucket.get());
         opacityGroup.addAttribute("opacity", brush.color.alpha);
-        drawPicture(pictureImage->picture, newMatrix, clip);
+        drawPicture(pictureImage->picture, newMatrix, needsClip ? ClipStack{} : clip);
       }
       clipGroupElement = nullptr;
       currentClipPath = {};

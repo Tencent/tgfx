@@ -1052,6 +1052,51 @@ TGFX_TEST(SVGExportTest, PictureImageWithColorFilter) {
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PictureImageWithColorFilter"));
 }
 
+TGFX_TEST(SVGExportTest, PictureImageWithAlphaAndClip) {
+  // Covers the alpha-only branch of SVGExportContext::drawImage for PictureImage under an
+  // active outer clip. The exporter must close the outer clip group before opening the
+  // <g opacity="..."> wrapper and let nested playback ops rebuild their own clip groups
+  // inside it, instead of short-circuiting on a stale currentClipPath that no longer
+  // corresponds to the current parent element.
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  Paint backgroundPaint;
+  backgroundPaint.setColor(Color::White());
+  canvas->drawRect(Rect::MakeWH(200, 200), backgroundPaint);
+
+  PictureRecorder recorder;
+  auto pictureCanvas = recorder.beginRecording();
+  {
+    Paint redPaint;
+    redPaint.setColor(Color::Red());
+    pictureCanvas->drawRect(Rect::MakeWH(100, 100), redPaint);
+
+    Paint bluePaint;
+    bluePaint.setColor(Color::Blue());
+    pictureCanvas->drawCircle(65, 65, 35, bluePaint);
+  }
+  auto picture = recorder.finishRecordingAsPicture();
+  auto image = Image::MakeFrom(picture, 100, 100);
+
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(70, 70, 100, 100));
+
+  Paint paint;
+  paint.setAlpha(0.5f);
+  canvas->drawImage(image, 50, 50, &paint);
+  canvas->restore();
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PictureImageWithAlphaAndClip"));
+}
+
 /**
  * Complex RRect (per-corner different radii) cannot be represented by SVG <rect> because
  * <rect> only supports uniform rx/ry. Verify the exporter falls back to <path>.
