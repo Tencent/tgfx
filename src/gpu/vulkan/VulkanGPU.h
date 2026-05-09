@@ -71,6 +71,10 @@ class VulkanGPU : public GPU {
  public:
   static std::unique_ptr<VulkanGPU> Make();
 
+  static std::unique_ptr<VulkanGPU> MakeFrom(VkInstance instance, VkPhysicalDevice physicalDevice,
+                                             VkDevice device, VkQueue queue,
+                                             uint32_t queueFamilyIndex);
+
   ~VulkanGPU() override;
 
   VkInstance instance() const {
@@ -267,6 +271,7 @@ class VulkanGPU : public GPU {
   VkQueue vulkanQueue = VK_NULL_HANDLE;
   uint32_t queueFamilyIndex = 0;
   VmaAllocator vmaAllocator = VK_NULL_HANDLE;
+  bool adopted = false;
 
   std::unique_ptr<VulkanCaps> caps = nullptr;
   std::unique_ptr<VulkanCommandQueue> commandQueue = nullptr;

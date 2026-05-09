@@ -31,6 +31,21 @@ std::shared_ptr<VulkanDevice> VulkanDevice::Make() {
   return device;
 }
 
+std::shared_ptr<VulkanDevice> VulkanDevice::MakeFrom(void* instance, void* physicalDevice,
+                                                     void* device, void* queue,
+                                                     uint32_t queueFamilyIndex) {
+  auto gpu = VulkanGPU::MakeFrom(reinterpret_cast<VkInstance>(instance),
+                                 reinterpret_cast<VkPhysicalDevice>(physicalDevice),
+                                 reinterpret_cast<VkDevice>(device),
+                                 reinterpret_cast<VkQueue>(queue), queueFamilyIndex);
+  if (!gpu) {
+    return nullptr;
+  }
+  auto vulkanDevice = std::shared_ptr<VulkanDevice>(new VulkanDevice(std::move(gpu)));
+  vulkanDevice->weakThis = vulkanDevice;
+  return vulkanDevice;
+}
+
 VulkanDevice::VulkanDevice(std::unique_ptr<VulkanGPU> gpu) : Device(std::move(gpu)) {
 }
 

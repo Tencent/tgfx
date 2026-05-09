@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include "tgfx/gpu/Device.h"
 
@@ -35,6 +36,22 @@ class VulkanDevice : public Device {
    * the caller to gracefully fall back to another GPU backend.
    */
   static std::shared_ptr<VulkanDevice> Make();
+
+  /**
+   * Creates a VulkanDevice that wraps externally created Vulkan handles. This enables interop
+   * scenarios where the host application (e.g., XR runtimes, game engines) owns the Vulkan context.
+   * The caller retains ownership of all passed handles and must keep them alive for the lifetime of
+   * the returned VulkanDevice. tgfx will NOT destroy the instance, device, or queue on shutdown.
+   * Returns nullptr if the handles are invalid or required extensions are not available.
+   *
+   * @param instance         A valid VkInstance (cast to void*).
+   * @param physicalDevice   A valid VkPhysicalDevice (cast to void*).
+   * @param device           A valid VkDevice (cast to void*).
+   * @param queue            A valid VkQueue (cast to void*).
+   * @param queueFamilyIndex The queue family index that the queue belongs to.
+   */
+  static std::shared_ptr<VulkanDevice> MakeFrom(void* instance, void* physicalDevice, void* device,
+                                                void* queue, uint32_t queueFamilyIndex);
 
   ~VulkanDevice() override;
 

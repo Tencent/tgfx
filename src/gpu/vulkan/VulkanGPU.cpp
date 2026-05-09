@@ -50,6 +50,36 @@ std::unique_ptr<VulkanGPU> VulkanGPU::Make() {
   return gpu;
 }
 
+std::unique_ptr<VulkanGPU> VulkanGPU::MakeFrom(VkInstance instance, VkPhysicalDevice physicalDevice,
+                                               VkDevice device, VkQueue queue,
+                                               uint32_t queueFamilyIndex) {
+  if (instance == VK_NULL_HANDLE || physicalDevice == VK_NULL_HANDLE ||
+      device == VK_NULL_HANDLE || queue == VK_NULL_HANDLE) {
+    LOGE("VulkanGPU::MakeFrom() received null handle.");
+    return nullptr;
+  }
+  if (volkInitialize() != VK_SUCCESS) {
+    LOGE("VulkanGPU::MakeFrom() volkInitialize failed.");
+    return nullptr;
+  }
+  auto gpu = std::unique_ptr<VulkanGPU>(new VulkanGPU());
+  gpu->vulkanInstance = instance;
+  gpu->vulkanPhysicalDevice = physicalDevice;
+  gpu->vulkanDevice = device;
+  gpu->vulkanQueue = queue;
+  gpu->queueFamilyIndex = queueFamilyIndex;
+  gpu->adopted = true;
+  volkLoadInstance(instance);
+  volkLoadDevice(device);
+  if (!gpu->createAllocator()) {
+    return nullptr;
+  }
+  gpu->caps = std::make_unique<VulkanCaps>(physicalDevice);
+  gpu->commandQueue = std::make_unique<VulkanCommandQueue>(gpu.get());
+  gpu->compiler = std::make_unique<shaderc::Compiler>();
+  return gpu;
+}
+
 VulkanGPU::VulkanGPU() {
 }
 
@@ -670,13 +700,16 @@ void VulkanGPU::releaseAll(bool releaseGPU) {
     vmaDestroyAllocator(vmaAllocator);
     vmaAllocator = VK_NULL_HANDLE;
   }
-  if (vulkanDevice != VK_NULL_HANDLE) {
-    vkDestroyDevice(vulkanDevice, nullptr);
-    vulkanDevice = VK_NULL_HANDLE;
-  }
-  if (vulkanInstance != VK_NULL_HANDLE) {
-    vkDestroyInstance(vulkanInstance, nullptr);
-    vulkanInstance = VK_NULL_HANDLE;
+  // When adopted, the caller owns the device and instance — do not destroy them.
+  if (!adopted) {
+    if (vulkanDevice != VK_NULL_HANDLE) {
+      vkDestroyDevice(vulkanDevice, nullptr);
+      vulkanDevice = VK_NULL_HANDLE;
+    }
+    if (vulkanInstance != VK_NULL_HANDLE) {
+      vkDestroyInstance(vulkanInstance, nullptr);
+      vulkanInstance = VK_NULL_HANDLE;
+    }
   }
 }
 
