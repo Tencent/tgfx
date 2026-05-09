@@ -104,24 +104,10 @@ VulkanCommandEncoder::VulkanCommandEncoder(VulkanGPU* gpu, VkCommandBuffer comma
 void VulkanCommandEncoder::onRelease(VulkanGPU* gpu) {
   // If onFinish() was called, the session has already been moved to VulkanCommandBuffer.
   // This path only handles abandoned encoders (encoding was started but never finished).
-  for (auto fb : session.deferredFramebuffers) {
-    vkDestroyFramebuffer(gpu->device(), fb, nullptr);
+  if (session.commandPool == VK_NULL_HANDLE) {
+    return;
   }
-  for (auto rp : session.deferredRenderPasses) {
-    vkDestroyRenderPass(gpu->device(), rp, nullptr);
-  }
-  session.deferredFramebuffers.clear();
-  session.deferredRenderPasses.clear();
-  session.retainedResources.clear();
-  if (session.descriptorPool != VK_NULL_HANDLE) {
-    gpu->releaseDescriptorPool(session.descriptorPool);
-    session.descriptorPool = VK_NULL_HANDLE;
-  }
-  if (session.commandPool != VK_NULL_HANDLE) {
-    vkDestroyCommandPool(gpu->device(), session.commandPool, nullptr);
-    session.commandPool = VK_NULL_HANDLE;
-    session.commandBuffer = VK_NULL_HANDLE;
-  }
+  gpu->reclaimAbandonedSession(std::move(session));
 }
 
 GPU* VulkanCommandEncoder::gpu() const {
@@ -321,7 +307,7 @@ void VulkanCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> te
 
 std::shared_ptr<CommandBuffer> VulkanCommandEncoder::onFinish() {
   vkEndCommandBuffer(session.commandBuffer);
-  return std::make_shared<VulkanCommandBuffer>(std::move(session));
+  return std::make_shared<VulkanCommandBuffer>(_gpu, std::move(session));
 }
 
 }  // namespace tgfx

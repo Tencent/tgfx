@@ -25,21 +25,28 @@
 
 namespace tgfx {
 
+class VulkanGPU;
+
 /**
  * Transport container that carries a FrameSession from encoding to submission.
  *
  * Created by VulkanCommandEncoder::onFinish() which moves its FrameSession here. Consumed by
  * VulkanCommandQueue::submit() which moves the session into VulkanGPU's InflightSubmission.
- * After submit(), this object is empty and may be discarded. Destructor does NOT call any Vulkan
- * API — if the CommandBuffer is abandoned (never submitted), the FrameSession's vectors of
- * shared_ptr will decrement refcounts naturally, and deferred Vulkan objects will leak (debug
- * assert can catch this misuse).
+ * After submit(), this object is empty and may be discarded.
+ *
+ * If the CommandBuffer is abandoned (created but never submitted), the destructor reclaims all
+ * session resources via VulkanGPU::reclaimAbandonedSession(). This matches the abandon safety
+ * guarantee provided by VulkanCommandEncoder::onRelease() — both use the same unified cleanup
+ * path in VulkanGPU, ensuring no Vulkan objects are leaked regardless of where the pipeline is
+ * interrupted.
  */
 class VulkanCommandBuffer : public CommandBuffer {
  public:
-  explicit VulkanCommandBuffer(FrameSession session) : session(std::move(session)) {
+  VulkanCommandBuffer(VulkanGPU* gpu, FrameSession session)
+      : _gpu(gpu), session(std::move(session)) {
   }
-  ~VulkanCommandBuffer() override = default;
+
+  ~VulkanCommandBuffer() override;
 
   FrameSession& frameSession() {
     return session;
@@ -54,6 +61,7 @@ class VulkanCommandBuffer : public CommandBuffer {
   }
 
  private:
+  VulkanGPU* _gpu = nullptr;
   FrameSession session;
 };
 

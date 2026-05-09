@@ -17,7 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VulkanCommandBuffer.h"
+#include "VulkanGPU.h"
 
 namespace tgfx {
-// Constructor is inline in the header (explicit VulkanCommandBuffer(FrameSession session)).
+
+VulkanCommandBuffer::~VulkanCommandBuffer() {
+  if (session.commandPool == VK_NULL_HANDLE) {
+    // Session was already moved out by submit(). Normal path — nothing to clean up.
+    return;
+  }
+  // Abandon path: CommandBuffer was created (finish() succeeded) but never submitted.
+  // Reclaim all session resources through the same unified path used by reclaimSubmission().
+  _gpu->reclaimAbandonedSession(std::move(session));
+}
+
 }  // namespace tgfx
