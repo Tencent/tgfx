@@ -182,7 +182,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       if (svgBlendMode.empty() || svgBlendMode == "normal") {
         canVectorize = false;
       } else {
-        blendModeStyle = "mix-blend-mode:" + svgBlendMode;
+        blendModeStyle = "mix-blend-mode: " + svgBlendMode;
       }
     }
     std::string filterUrl;
@@ -207,6 +207,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
     Bitmap bitmap = ImageExportToBitmap(context, modifyImage);
     if (!bitmap.isEmpty()) {
+      applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
       exportPixmap(Pixmap(bitmap), matrix, brush);
     }
   } else if (type == Types::ImageType::Filter) {
@@ -453,9 +454,9 @@ void SVGExportContext::exportPictureImageAsVector(const PictureImage* pictureIma
   if (needsClip) {
     clipID = defineClipPath(clipPath);
   }
-  clipGroupElement = nullptr;
-  currentClipPath = {};
   {
+    clipGroupElement = nullptr;
+    currentClipPath = {};
     std::unique_ptr<ElementWriter> clipElement;
     if (needsClip) {
       clipElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
@@ -472,9 +473,9 @@ void SVGExportContext::exportPictureImageAsVector(const PictureImage* pictureIma
       brushGroup.addAttribute("opacity", alpha);
     }
     drawPicture(pictureImage->picture, matrix, needsClip ? ClipStack{} : clip);
+    clipGroupElement = nullptr;
+    currentClipPath = {};
   }
-  clipGroupElement = nullptr;
-  currentClipPath = {};
 }
 
 void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,

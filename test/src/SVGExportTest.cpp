@@ -1123,7 +1123,9 @@ TGFX_TEST(SVGExportTest, PictureImageWithAlphaAndClip) {
     pictureCanvas->drawCircle(65, 65, 35, bluePaint);
   }
   auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
   auto image = Image::MakeFrom(picture, 100, 100);
+  ASSERT_TRUE(image != nullptr);
 
   canvas->save();
   canvas->clipRect(Rect::MakeXYWH(70, 70, 100, 100));
