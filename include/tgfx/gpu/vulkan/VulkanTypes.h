@@ -30,7 +30,7 @@ struct VulkanTextureInfo {
   /**
    * The VkImage handle.
    */
-  void* image = nullptr;
+  uint64_t image = 0;
 
   /**
    * The VkFormat of the image (VK_FORMAT_UNDEFINED = 0).
@@ -55,7 +55,7 @@ struct VulkanImageInfo {
   /**
    * The VkImage handle.
    */
-  void* image = nullptr;
+  uint64_t image = 0;
 
   /**
    * The VkFormat of the image (VK_FORMAT_UNDEFINED = 0).
@@ -75,7 +75,7 @@ struct VulkanSyncInfo {
   /**
    * The VkSemaphore handle for a timeline semaphore.
    */
-  void* semaphore = nullptr;
+  uint64_t semaphore = 0;
 
   /**
    * The timeline value to signal or wait on.

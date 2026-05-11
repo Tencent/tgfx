@@ -89,7 +89,7 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
     queue->schedulePresent(_swapchain, _currentImageIndex, _images[_currentImageIndex]);
 
     VulkanImageInfo vulkanInfo = {};
-    vulkanInfo.image = reinterpret_cast<void*>(_images[_currentImageIndex]);
+    vulkanInfo.image = reinterpret_cast<uint64_t>(_images[_currentImageIndex]);
     vulkanInfo.format = static_cast<uint32_t>(_format);
     vulkanInfo.layout = static_cast<uint32_t>(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     BackendRenderTarget backendRT(vulkanInfo, _width, _height);

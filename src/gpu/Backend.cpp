@@ -200,7 +200,7 @@ bool BackendSemaphore::isInitialized() const {
     case Backend::Metal:
       return metalSyncInfo.event != nullptr;
     case Backend::Vulkan:
-      return vulkanSyncInfo.semaphore != nullptr;
+      return vulkanSyncInfo.semaphore != 0;
     default:
       break;
   }
@@ -224,7 +224,7 @@ bool BackendSemaphore::getMetalSync(MetalSyncInfo* metalInfo) const {
 }
 
 bool BackendSemaphore::getVulkanSync(VulkanSyncInfo* vulkanSyncInfo) const {
-  if (_backend != Backend::Vulkan || this->vulkanSyncInfo.semaphore == nullptr) {
+  if (_backend != Backend::Vulkan || this->vulkanSyncInfo.semaphore == 0) {
     return false;
   }
   *vulkanSyncInfo = this->vulkanSyncInfo;

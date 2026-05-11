@@ -175,7 +175,7 @@ BackendTexture VulkanTexture::getBackendTexture() const {
     return {};
   }
   VulkanTextureInfo vulkanInfo;
-  vulkanInfo.image = reinterpret_cast<void*>(image);
+  vulkanInfo.image = reinterpret_cast<uint64_t>(image);
   vulkanInfo.format = static_cast<uint32_t>(format);
   vulkanInfo.layout = static_cast<uint32_t>(layout);
   return BackendTexture(vulkanInfo, descriptor.width, descriptor.height);
@@ -186,7 +186,7 @@ BackendRenderTarget VulkanTexture::getBackendRenderTarget() const {
     return {};
   }
   VulkanImageInfo vulkanInfo;
-  vulkanInfo.image = reinterpret_cast<void*>(image);
+  vulkanInfo.image = reinterpret_cast<uint64_t>(image);
   vulkanInfo.format = static_cast<uint32_t>(format);
   vulkanInfo.layout = static_cast<uint32_t>(layout);
   return BackendRenderTarget(vulkanInfo, descriptor.width, descriptor.height);

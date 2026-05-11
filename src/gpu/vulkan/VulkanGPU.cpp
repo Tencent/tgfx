@@ -366,10 +366,10 @@ std::shared_ptr<Texture> VulkanGPU::importBackendTexture(const BackendTexture& b
     return nullptr;
   }
   VulkanTextureInfo vulkanInfo = {};
-  if (!backendTexture.getVulkanTextureInfo(&vulkanInfo) || vulkanInfo.image == nullptr) {
+  if (!backendTexture.getVulkanTextureInfo(&vulkanInfo) || vulkanInfo.image == 0) {
     return nullptr;
   }
-  return VulkanTexture::MakeFrom(this, static_cast<VkImage>(vulkanInfo.image),
+  return VulkanTexture::MakeFrom(this, reinterpret_cast<VkImage>(vulkanInfo.image),
                                  static_cast<VkFormat>(vulkanInfo.format), backendTexture.width(),
                                  backendTexture.height(), usage, adopted);
 }
@@ -384,7 +384,7 @@ std::shared_ptr<Texture> VulkanGPU::importBackendRenderTarget(
   if (!isFormatRenderable(format)) {
     return nullptr;
   }
-  return VulkanTexture::MakeFrom(this, static_cast<VkImage>(vulkanInfo.image),
+  return VulkanTexture::MakeFrom(this, reinterpret_cast<VkImage>(vulkanInfo.image),
                                  static_cast<VkFormat>(vulkanInfo.format),
                                  backendRenderTarget.width(), backendRenderTarget.height(),
                                  TextureUsage::RENDER_ATTACHMENT, false);
@@ -395,10 +395,10 @@ std::shared_ptr<Semaphore> VulkanGPU::importBackendSemaphore(const BackendSemaph
     return nullptr;
   }
   VulkanSyncInfo vulkanInfo = {};
-  if (!semaphore.getVulkanSync(&vulkanInfo) || vulkanInfo.semaphore == nullptr) {
+  if (!semaphore.getVulkanSync(&vulkanInfo) || vulkanInfo.semaphore == 0) {
     return nullptr;
   }
-  return VulkanSemaphore::MakeFrom(this, static_cast<VkSemaphore>(vulkanInfo.semaphore),
+  return VulkanSemaphore::MakeFrom(this, reinterpret_cast<VkSemaphore>(vulkanInfo.semaphore),
                                    vulkanInfo.value);
 }
 
