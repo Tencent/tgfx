@@ -218,15 +218,8 @@ class PictureBackgroundSource : public BackgroundSource {
       resumed->drawPicture(segment);
     }
     // Rebuild the caller's save depth, then install matrix + clip at the top frame. The outer
-    // AutoCanvasRestore pops back to its saveCount and discards the empty saves.
-    //
-    // LIMITATION: only the TOP save-stack frame is preserved across this flush. Canvas's public
-    // API exposes only the current matrix, total clip, and save count — there is no per-frame
-    // accessor. A partial Canvas::restore() between this readback and the outer
-    // AutoCanvasRestore would land on identity / wide-open clip instead of the caller's frame
-    // N-1 state. Current callers (BackgroundCapturer + LayerStyle pipeline) do not partial-
-    // restore across getBackgroundImage(); future callers wanting partial restores must extend
-    // this resume path or expose per-frame state on Canvas.
+    // AutoCanvasRestore pops back to its saveCount and discards the empty saves. See
+    // BackgroundSource::getBackgroundImage() in the header for the top-frame-only limitation.
     for (int i = 0; i < savedSaveCount; ++i) {
       resumed->save();
     }

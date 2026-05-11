@@ -50,6 +50,15 @@ class BackgroundSource {
 
   // Returns "parent backdrop + everything drawn through getCanvas() so far". Safe to call
   // repeatedly — the Picture variant flushes and reopens a segment each time.
+  //
+  // LIMITATION (Picture variant only): the resume path after the segment flush only restores
+  // the TOP save-stack frame's matrix and clip on the canvas. Canvas exposes only the current
+  // matrix, total clip, and save count — there is no per-frame accessor — so a partial
+  // Canvas::restore() between getBackgroundImage() and the outer AutoCanvasRestore would land
+  // on identity matrix / wide-open clip instead of the caller's frame N-1 state. Current
+  // callers (BackgroundCapturer + LayerStyle pipeline) do not partial-restore across this
+  // call; future callers wanting to must extend the resume path or expose per-frame state on
+  // Canvas.
   std::shared_ptr<Image> getBackgroundImage();
 
   // Derives a sub source backed by an externally-owned Surface (the offscreen carrier's surface).
