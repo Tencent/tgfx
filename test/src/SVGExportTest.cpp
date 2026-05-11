@@ -23,6 +23,7 @@
 #include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -974,6 +975,168 @@ TGFX_TEST(SVGExportTest, ClipWithMatrixTransform) {
   exporter->close();
 
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ClipWithMatrixTransform"));
+}
+
+TGFX_TEST(SVGExportTest, PictureImageWithAlpha) {
+  // Covers the alpha-only branch of SVGExportContext::drawImage for PictureImage: when a
+  // PictureImage is drawn with paint.alpha < 1 and no shader/mask/color filter, the exporter
+  // should wrap the playback in a <g opacity="..."> while preserving vector output inside.
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  PictureRecorder recorder;
+  auto pictureCanvas = recorder.beginRecording();
+  {
+    Paint redPaint;
+    redPaint.setColor(Color::Red());
+    pictureCanvas->drawRect(Rect::MakeWH(100, 100), redPaint);
+
+    Paint bluePaint;
+    bluePaint.setColor(Color::Blue());
+    pictureCanvas->drawCircle(65, 65, 35, bluePaint);
+  }
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+  auto image = Image::MakeFrom(picture, 100, 100);
+  ASSERT_TRUE(image != nullptr);
+
+  Paint paint;
+  paint.setAlpha(0.5f);
+  canvas->drawImage(image, 50, 50, &paint);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PictureImageWithAlpha"));
+}
+
+TGFX_TEST(SVGExportTest, PictureImageWithColorFilter) {
+  // Covers the colorFilter-only branch of SVGExportContext::drawImage for PictureImage:
+  // when the brush carries a Blend or Matrix ColorFilter, the exporter should emit a
+  // <g filter="url(...)"> wrapping a vector replay of the picture, not a rasterized image.
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  PictureRecorder recorder;
+  auto pictureCanvas = recorder.beginRecording();
+  {
+    Paint redPaint;
+    redPaint.setColor(Color::Red());
+    pictureCanvas->drawRect(Rect::MakeWH(100, 100), redPaint);
+
+    Paint bluePaint;
+    bluePaint.setColor(Color::Blue());
+    pictureCanvas->drawCircle(65, 65, 35, bluePaint);
+  }
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+  auto image = Image::MakeFrom(picture, 100, 100);
+  ASSERT_TRUE(image != nullptr);
+
+  Paint paint;
+  paint.setColorFilter(ColorFilter::Blend(Color::White(), BlendMode::Difference));
+  canvas->drawImage(image, 50, 50, &paint);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PictureImageWithColorFilter"));
+}
+
+TGFX_TEST(SVGExportTest, PictureImageWithBlendMode) {
+  // Covers the blend-mode branch of SVGExportContext::drawImage for PictureImage: when the
+  // brush carries a separable blend mode (Multiply here), the exporter should wrap the
+  // vector replay in a <g style="mix-blend-mode: ..."> rather than rasterizing.
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  Paint backgroundPaint;
+  backgroundPaint.setColor(Color::FromRGBA(255, 200, 0));
+  canvas->drawRect(Rect::MakeWH(200, 200), backgroundPaint);
+
+  PictureRecorder recorder;
+  auto pictureCanvas = recorder.beginRecording();
+  {
+    Paint redPaint;
+    redPaint.setColor(Color::Red());
+    pictureCanvas->drawRect(Rect::MakeWH(100, 100), redPaint);
+
+    Paint bluePaint;
+    bluePaint.setColor(Color::Blue());
+    pictureCanvas->drawCircle(65, 65, 35, bluePaint);
+  }
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+  auto image = Image::MakeFrom(picture, 100, 100);
+  ASSERT_TRUE(image != nullptr);
+
+  Paint paint;
+  paint.setBlendMode(BlendMode::Multiply);
+  canvas->drawImage(image, 50, 50, &paint);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PictureImageWithBlendMode"));
+}
+
+TGFX_TEST(SVGExportTest, PictureImageWithAlphaAndClip) {
+  // Covers the alpha-only branch of SVGExportContext::drawImage for PictureImage under an
+  // active outer clip. The exporter must close the outer clip group before opening the
+  // <g opacity="..."> wrapper and let nested playback ops rebuild their own clip groups
+  // inside it, instead of short-circuiting on a stale currentClipPath that no longer
+  // corresponds to the current parent element.
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  Paint backgroundPaint;
+  backgroundPaint.setColor(Color::White());
+  canvas->drawRect(Rect::MakeWH(200, 200), backgroundPaint);
+
+  PictureRecorder recorder;
+  auto pictureCanvas = recorder.beginRecording();
+  {
+    Paint redPaint;
+    redPaint.setColor(Color::Red());
+    pictureCanvas->drawRect(Rect::MakeWH(100, 100), redPaint);
+
+    Paint bluePaint;
+    bluePaint.setColor(Color::Blue());
+    pictureCanvas->drawCircle(65, 65, 35, bluePaint);
+  }
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+  auto image = Image::MakeFrom(picture, 100, 100);
+  ASSERT_TRUE(image != nullptr);
+
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(70, 70, 100, 100));
+
+  Paint paint;
+  paint.setAlpha(0.5f);
+  canvas->drawImage(image, 50, 50, &paint);
+  canvas->restore();
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PictureImageWithAlphaAndClip"));
 }
 
 /**

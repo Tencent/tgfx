@@ -168,12 +168,56 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
   DEBUG_ASSERT(image != nullptr);
   auto type = Types::Get(image.get());
   if (type == Types::ImageType::Picture) {
-    const auto pictureImage = static_cast<const PictureImage*>(image.get());
-    auto newMatrix = matrix;
-    if (pictureImage->matrix) {
-      newMatrix.preConcat(*pictureImage->matrix);
+    if (brush.nothingToDraw()) {
+      return;
     }
-    drawPicture(pictureImage->picture, newMatrix, clip);
+    // Keep PictureImage vectorized when the brush only carries effects SVG <g> can express:
+    // alpha as opacity, Blend/Matrix colorFilter as a <filter> resource, and a separable blend
+    // mode as mix-blend-mode. Anything else (shader, maskFilter, Porter-Duff blend without an
+    // SVG mapping, or unsupported colorFilter subtype) rasterizes.
+    bool canVectorize = brush.shader == nullptr && brush.maskFilter == nullptr;
+    std::string blendModeStyle;
+    if (canVectorize && brush.blendMode != BlendMode::SrcOver) {
+      auto svgBlendMode = ToSVGBlendMode(brush.blendMode);
+      if (svgBlendMode.empty() || svgBlendMode == "normal") {
+        canVectorize = false;
+      } else {
+        blendModeStyle = "mix-blend-mode: " + svgBlendMode;
+      }
+    }
+    std::shared_ptr<ColorFilter> vectorColorFilter;
+    if (canVectorize && brush.colorFilter) {
+      auto colorFilterType = Types::Get(brush.colorFilter.get());
+      // Decide expressibility WITHOUT writing <defs> yet; the actual <defs>/<filter> emission is
+      // deferred to exportPictureImageAsVector so it lands AFTER the outer clip wrapper has been
+      // closed and at the same XML level as the brush <g> that consumes it.
+      bool expressible =
+          colorFilterType == Types::ColorFilterType::Matrix ||
+          (colorFilterType == Types::ColorFilterType::Blend &&
+           !ToSVGBlendMode(static_cast<const ModeColorFilter*>(brush.colorFilter.get())->mode)
+                .empty());
+      if (!expressible) {
+        canVectorize = false;
+      } else {
+        vectorColorFilter = brush.colorFilter;
+      }
+    }
+    if (canVectorize) {
+      const auto pictureImage = static_cast<const PictureImage*>(image.get());
+      auto newMatrix = matrix;
+      if (pictureImage->matrix) {
+        newMatrix.preConcat(*pictureImage->matrix);
+      }
+      exportPictureImageAsVector(pictureImage, newMatrix, clip, vectorColorFilter, blendModeStyle,
+                                 brush.color.alpha);
+      return;
+    }
+    auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
+    Bitmap bitmap = ImageExportToBitmap(context, modifyImage);
+    if (!bitmap.isEmpty()) {
+      applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
+      exportPixmap(Pixmap(bitmap), matrix, brush);
+    }
   } else if (type == Types::ImageType::Filter) {
     const auto filterImage = static_cast<const FilterImage*>(image.get());
     auto filter = filterImage->filter;
@@ -398,6 +442,60 @@ void SVGExportContext::drawPicture(std::shared_ptr<Picture> picture, const Matri
                                    const ClipStack& clip) {
   DEBUG_ASSERT(picture != nullptr);
   picture->playback(this, matrix, clip);
+}
+
+void SVGExportContext::exportPictureImageAsVector(const PictureImage* pictureImage,
+                                                  const Matrix& matrix, const ClipStack& clip,
+                                                  const std::shared_ptr<ColorFilter>& colorFilter,
+                                                  const std::string& blendModeStyle, float alpha) {
+  // Skip the wrapper when there is nothing to attach to it.
+  if (!colorFilter && blendModeStyle.empty() && alpha == 1.0f) {
+    drawPicture(pictureImage->picture, matrix, clip);
+    return;
+  }
+  // Lift the outer clip to a single <g clip-path> wrapping the brush group so nested playback
+  // ops do not redefine identical clipPath resources. See drawLayer for the same pattern.
+  // Use the PictureImage's logical output rect (not the raw picture bounds) so the contains()
+  // check matches what is actually painted into the SVG.
+  auto clipPath = clip.getClipPath();
+  auto bound = matrix.mapRect(Rect::MakeWH(static_cast<float>(pictureImage->width()),
+                                           static_cast<float>(pictureImage->height())));
+  bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+  {
+    // Close any clip wrapper opened by previous draws BEFORE emitting our <clipPath>, <defs>
+    // and brush <g>. Otherwise these resources would be nested inside a stale <g clip-path>
+    // that does not belong to this draw, leaving them at the wrong XML depth.
+    clipGroupElement = nullptr;
+    currentClipPath = {};
+    std::string clipID;
+    if (needsClip) {
+      clipID = defineClipPath(clipPath);
+    }
+    std::string filterUrl;
+    if (colorFilter) {
+      ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
+                         _assignColorSpace);
+      filterUrl = defs.addColorFilterResource(colorFilter).filter;
+    }
+    std::unique_ptr<ElementWriter> clipElement;
+    if (needsClip) {
+      clipElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+      clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
+    }
+    ElementWriter brushGroup("g", xmlWriter, resourceBucket.get());
+    if (!filterUrl.empty()) {
+      brushGroup.addAttribute("filter", filterUrl);
+    }
+    if (!blendModeStyle.empty()) {
+      brushGroup.addAttribute("style", blendModeStyle);
+    }
+    if (alpha != 1.0f) {
+      brushGroup.addAttribute("opacity", alpha);
+    }
+    drawPicture(pictureImage->picture, matrix, needsClip ? ClipStack{} : clip);
+    clipGroupElement = nullptr;
+    currentClipPath = {};
+  }
 }
 
 void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
