@@ -1514,8 +1514,9 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
   std::unique_ptr<LayerStyleSource> ownedSource;
   if (sourcePtr == nullptr) {
     ownedSource = getLayerStyleSource(args, canvas->getMatrix());
-    if (ownedSource != nullptr && args.backgroundHandler != nullptr) {
-      sourcePtr = args.backgroundHandler->tryCacheLayerStyleSource(this, ownedSource);
+    if (ownedSource != nullptr && args.backgroundHandler != nullptr &&
+        args.backgroundHandler->canCacheLayerStyleSource(this)) {
+      sourcePtr = args.backgroundHandler->cacheLayerStyleSource(this, std::move(ownedSource));
     }
     if (sourcePtr == nullptr) {
       sourcePtr = ownedSource.get();

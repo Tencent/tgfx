@@ -162,30 +162,28 @@ std::unique_ptr<BackgroundCapturer> BackgroundCapturer::buildSubCapturer(
 
 std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
     Surface* surface, const DrawArgs& parentArgs, const Rect& localBounds,
-    const Matrix& contentMatrix, const Matrix& localToSurface) const {
-  Matrix localToWorld = Matrix::I();
+    const Matrix& localToWorld, const Matrix& localToSurface) const {
+  Matrix toWorld = Matrix::I();
   Rect worldBounds = Rect::MakeEmpty();
-  if (!ComputeSubGeometry(bgSource.get(), localBounds, contentMatrix, &localToWorld,
-                          &worldBounds)) {
+  if (!ComputeSubGeometry(bgSource.get(), localBounds, localToWorld, &toWorld, &worldBounds)) {
     DEBUG_ASSERT(false);
     return nullptr;
   }
-  auto subSource = bgSource->createFromSurface(surface, worldBounds, localToWorld, localToSurface);
+  auto subSource = bgSource->createFromSurface(surface, worldBounds, toWorld, localToSurface);
   DEBUG_ASSERT(subSource != nullptr);
   return buildSubCapturer(parentArgs, std::move(subSource));
 }
 
 std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
     PictureRecorder* recorder, const DrawArgs& parentArgs, const Rect& localBounds,
-    const Matrix& contentMatrix, const Matrix& localToSurface, Canvas** outCanvas) const {
-  Matrix localToWorld = Matrix::I();
+    const Matrix& localToWorld, const Matrix& localToSurface, Canvas** outCanvas) const {
+  Matrix toWorld = Matrix::I();
   Rect worldBounds = Rect::MakeEmpty();
-  if (!ComputeSubGeometry(bgSource.get(), localBounds, contentMatrix, &localToWorld,
-                          &worldBounds)) {
+  if (!ComputeSubGeometry(bgSource.get(), localBounds, localToWorld, &toWorld, &worldBounds)) {
     DEBUG_ASSERT(false);
     return nullptr;
   }
-  auto subSource = bgSource->createFromPicture(recorder, worldBounds, localToWorld, localToSurface);
+  auto subSource = bgSource->createFromPicture(recorder, worldBounds, toWorld, localToSurface);
   DEBUG_ASSERT(subSource != nullptr);
   auto clone = buildSubCapturer(parentArgs, std::move(subSource));
   if (clone == nullptr) {
@@ -271,14 +269,16 @@ const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* lay
   return it->second.get();
 }
 
-const LayerStyleSource* BackgroundCapturer::tryCacheLayerStyleSource(
-    Layer* layer, std::unique_ptr<LayerStyleSource>& source) {
-  if (snapshots == nullptr || source == nullptr) {
-    return nullptr;
-  }
+bool BackgroundCapturer::canCacheLayerStyleSource(Layer* /*layer*/) const {
   // When the bg source was down-sampled (extreme blur outset), capture and consume run at
   // different densities, so a cached source built in capture cannot be reused in consume.
-  if (bgSource != nullptr && bgSource->surfaceScale() != 1.0f) {
+  return snapshots != nullptr && (bgSource == nullptr || bgSource->surfaceScale() == 1.0f);
+}
+
+const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
+    Layer* layer, std::unique_ptr<LayerStyleSource> source) {
+  DEBUG_ASSERT(canCacheLayerStyleSource(layer));
+  if (source == nullptr) {
     return nullptr;
   }
   // Wrap each picture-backed image as Rasterized so the first draw uploads a GPU texture and the

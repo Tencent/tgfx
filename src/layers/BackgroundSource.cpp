@@ -298,56 +298,59 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
     return ownImage;
   }
 
-  // Sub-source: when coord spaces differ (sub introduces its own density), ownImage is in sub-
-  // surface-pixel space while consumers expect parent-image-pixel space. Returning ownImage on
-  // fallback would feed wrong-coord pixels; nullptr lets the capturer skip the snapshot. Only
-  // when imageMatrix == surfaceToWorld (no extra density) is ownImage directly consumable.
-  auto subFallback = (imageMatrix == surfaceToWorld) ? ownImage : nullptr;
-  auto parentImage = parent->getBackgroundImage();
-  if (parentImage == nullptr) {
-    return subFallback;
-  }
-
-  // Compose parent (subset to sub's footprint, in parent image-pixel coords) with own content.
+  // Sub-source: compose parent backdrop with own contents in sub image-pixel space. ownImage is
+  // in sub-surface-pixel space and must be warped via: sub surface → world → parent image → sub
+  // image (translate by -surfaceOffset). Parent image may legitimately be absent (e.g. top
+  // picture-backed source not yet flushed) or sub may fall outside the parent footprint; in
+  // both cases parent is treated as transparent and only own contents contribute.
   Matrix worldToParentImage = Matrix::I();
   if (!parent->imageMatrix.invert(&worldToParentImage)) {
-    return subFallback;
+    DEBUG_ASSERT(false);
+    return nullptr;
   }
   int width = FloatCeilToInt(backgroundRect.width() * worldToParentImage.getMaxScale());
   int height = FloatCeilToInt(backgroundRect.height() * worldToParentImage.getMaxScale());
   if (width <= 0 || height <= 0) {
-    return subFallback;
+    return nullptr;
   }
 
-  auto subsetRect = Rect::MakeXYWH(surfaceOffset.x, surfaceOffset.y, static_cast<float>(width),
-                                   static_cast<float>(height));
-  auto parentBounds = Rect::MakeWH(parentImage->width(), parentImage->height());
-  auto validRect = subsetRect;
-  if (!validRect.intersect(parentBounds)) {
-    return subFallback;
-  }
-  auto childOffsetX = validRect.left - subsetRect.left;
-  auto childOffsetY = validRect.top - subsetRect.top;
-  auto subsetImage = parentImage->makeSubset(validRect);
-  if (!subsetImage) {
-    return subFallback;
-  }
-
-  // Warp own (in sub surface pixel) to sub image pixel: surface → world → parent image → sub image.
   Matrix ownToSubImage = worldToParentImage;
   ownToSubImage.preConcat(surfaceToWorld);
   ownToSubImage.postTranslate(-surfaceOffset.x, -surfaceOffset.y);
 
+  std::shared_ptr<Image> subsetImage = nullptr;
+  float subsetOffsetX = 0.0f;
+  float subsetOffsetY = 0.0f;
+  if (auto parentImage = parent->getBackgroundImage()) {
+    auto subsetRect = Rect::MakeXYWH(surfaceOffset.x, surfaceOffset.y, static_cast<float>(width),
+                                     static_cast<float>(height));
+    auto parentBounds = Rect::MakeWH(parentImage->width(), parentImage->height());
+    auto validRect = subsetRect;
+    if (validRect.intersect(parentBounds)) {
+      subsetOffsetX = validRect.left - subsetRect.left;
+      subsetOffsetY = validRect.top - subsetRect.top;
+      subsetImage = parentImage->makeSubset(validRect);
+      DEBUG_ASSERT(subsetImage != nullptr);
+    }
+  }
+
+  if (subsetImage == nullptr && ownImage == nullptr) {
+    return nullptr;
+  }
+
   PictureRecorder recorder;
   auto canvas = recorder.beginRecording();
-  canvas->drawImage(subsetImage, childOffsetX, childOffsetY);
+  if (subsetImage) {
+    canvas->drawImage(subsetImage, subsetOffsetX, subsetOffsetY);
+  }
   if (ownImage) {
     canvas->concat(ownToSubImage);
     canvas->drawImage(ownImage);
   }
   auto picture = recorder.finishRecordingAsPicture();
   if (picture == nullptr) {
-    return subFallback;
+    DEBUG_ASSERT(false);
+    return nullptr;
   }
   return Image::MakeFrom(std::move(picture), width, height);
 }

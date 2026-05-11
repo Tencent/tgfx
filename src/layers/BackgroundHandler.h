@@ -63,23 +63,22 @@ class BackgroundHandler {
     return false;
   }
 
-  // Builds a sub-handler that samples from a Surface-backed sub background source. On success,
-  // returns the new handler with its own narrowed renderRects (queryable via renderRects()).
+  // Builds a sub-handler bound to a Surface-backed sub bg source. `localToWorld` maps the
+  // layer's local space to root device; `localToSurface` maps it to the sub surface's pixels.
   // Returns nullptr when the parent handler does not need rebinding for this offscreen subtree
-  // (e.g. Consumer keys snapshots by Layer*/Style* and is canvas-matrix independent), in which
-  // case OffscreenRenderer keeps the parent handler in effect.
+  // (e.g. Consumer, which is canvas-matrix independent), letting the caller keep the parent.
   virtual std::unique_ptr<BackgroundHandler> createSubHandler(
       Surface* /*surface*/, const DrawArgs& /*parentArgs*/, const Rect& /*localBounds*/,
-      const Matrix& /*contentMatrix*/, const Matrix& /*localToSurface*/) const {
+      const Matrix& /*localToWorld*/, const Matrix& /*localToSurface*/) const {
     return nullptr;
   }
 
-  // PictureRecorder variant of createSubHandler. createFromPicture may flush a recording
-  // segment, so on success this re-fetches the recorder's current canvas through `*outCanvas`.
+  // PictureRecorder variant. Same semantics as the Surface variant; on success re-fetches the
+  // recorder's current canvas via `*outCanvas` since createFromPicture may flush a segment.
   virtual std::unique_ptr<BackgroundHandler> createSubHandler(PictureRecorder* /*recorder*/,
                                                               const DrawArgs& /*parentArgs*/,
                                                               const Rect& /*localBounds*/,
-                                                              const Matrix& /*contentMatrix*/,
+                                                              const Matrix& /*localToWorld*/,
                                                               const Matrix& /*localToSurface*/,
                                                               Canvas** /*outCanvas*/) const {
     return nullptr;
@@ -105,12 +104,16 @@ class BackgroundHandler {
     return nullptr;
   }
 
-  // Tries to take ownership of `source` and cache it under `layer`. On success, returns the raw
-  // pointer to the cached source and leaves `source` empty. On failure (e.g. NoOp handler or
-  // capturer with non-1 surfaceScale where capture/consume densities diverge), returns nullptr
-  // and leaves `source` untouched so the caller keeps managing its lifetime.
-  virtual const LayerStyleSource* tryCacheLayerStyleSource(
-      Layer* /*layer*/, std::unique_ptr<LayerStyleSource>& /*source*/) {
+  // Whether this handler will cache a LayerStyleSource for `layer`. Used by Layer::drawDirectly
+  // to decide if `cacheLayerStyleSource` should be called.
+  virtual bool canCacheLayerStyleSource(Layer* /*layer*/) const {
+    return false;
+  }
+
+  // Takes ownership of `source` and caches it under `layer`, returning the raw pointer to the
+  // cached entry. Precondition: canCacheLayerStyleSource(layer) returned true.
+  virtual const LayerStyleSource* cacheLayerStyleSource(
+      Layer* /*layer*/, std::unique_ptr<LayerStyleSource> /*source*/) {
     return nullptr;
   }
 
@@ -137,12 +140,12 @@ class BackgroundCapturer : public BackgroundHandler {
 
   std::unique_ptr<BackgroundHandler> createSubHandler(Surface* surface, const DrawArgs& parentArgs,
                                                       const Rect& localBounds,
-                                                      const Matrix& contentMatrix,
+                                                      const Matrix& localToWorld,
                                                       const Matrix& localToSurface) const override;
 
   std::unique_ptr<BackgroundHandler> createSubHandler(
       PictureRecorder* recorder, const DrawArgs& parentArgs, const Rect& localBounds,
-      const Matrix& contentMatrix, const Matrix& localToSurface, Canvas** outCanvas) const override;
+      const Matrix& localToWorld, const Matrix& localToSurface, Canvas** outCanvas) const override;
 
   const std::vector<Rect>* renderRects() const override {
     return _renderRects.empty() ? nullptr : &_renderRects;
@@ -152,8 +155,10 @@ class BackgroundCapturer : public BackgroundHandler {
 
   const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
 
-  const LayerStyleSource* tryCacheLayerStyleSource(
-      Layer* layer, std::unique_ptr<LayerStyleSource>& source) override;
+  bool canCacheLayerStyleSource(Layer* layer) const override;
+
+  const LayerStyleSource* cacheLayerStyleSource(Layer* layer,
+                                                std::unique_ptr<LayerStyleSource> source) override;
 
   void beginForceDrawChildren() override {
     ++_forcedCaptureDepth;
