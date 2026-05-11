@@ -153,14 +153,6 @@ VulkanRenderPipeline::VulkanRenderPipeline(VulkanGPU* gpu,
   }
   createPipeline(gpu, descriptor);
 
-  if (descriptor.primitive.cullMode == CullMode::Front) {
-    cullMode = VK_CULL_MODE_FRONT_BIT;
-  } else if (descriptor.primitive.cullMode == CullMode::Back) {
-    cullMode = VK_CULL_MODE_BACK_BIT;
-  }
-  frontFace = (descriptor.primitive.frontFace == FrontFace::CW) ? VK_FRONT_FACE_CLOCKWISE
-                                                                : VK_FRONT_FACE_COUNTER_CLOCKWISE;
-
   unsigned textureUnit = 0;
   for (auto& entry : descriptor.layout.textureSamplers) {
     textureUnits[entry.binding] = textureUnit++;

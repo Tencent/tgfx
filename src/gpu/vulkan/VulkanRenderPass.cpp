@@ -74,7 +74,12 @@ std::shared_ptr<VulkanRenderPass> VulkanRenderPass::Make(VulkanCommandEncoder* e
     return nullptr;
   }
   auto vulkanGPU = static_cast<VulkanGPU*>(encoder->gpu());
-  return std::shared_ptr<VulkanRenderPass>(new VulkanRenderPass(encoder, vulkanGPU, descriptor));
+  auto pass =
+      std::shared_ptr<VulkanRenderPass>(new VulkanRenderPass(encoder, vulkanGPU, descriptor));
+  if (pass->renderPass == VK_NULL_HANDLE) {
+    return nullptr;
+  }
+  return pass;
 }
 
 VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu,

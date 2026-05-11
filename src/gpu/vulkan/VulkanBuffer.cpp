@@ -49,12 +49,12 @@ std::shared_ptr<VulkanBuffer> VulkanBuffer::Make(VulkanGPU* gpu, size_t size, ui
   bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
   VmaAllocationCreateInfo allocInfo = {};
-  allocInfo.flags =
-      VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+  allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+  allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
   if (usage & GPUBufferUsage::READBACK) {
-    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    allocInfo.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
   } else {
-    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    allocInfo.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
   }
 
   VkBuffer vkBuffer = VK_NULL_HANDLE;

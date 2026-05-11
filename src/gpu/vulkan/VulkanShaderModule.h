@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "tgfx/gpu/ShaderModule.h"
@@ -41,18 +39,6 @@ class VulkanShaderModule : public ShaderModule, public VulkanResource {
     return shaderModule;
   }
 
-  ShaderStage stage() const {
-    return _stage;
-  }
-
-  const std::vector<uint32_t>& spirvBinary() const {
-    return _spirvBinary;
-  }
-
-  const std::string& glslCode() const {
-    return _glslCode;
-  }
-
  protected:
   void onRelease(VulkanGPU* gpu) override;
 
@@ -61,9 +47,6 @@ class VulkanShaderModule : public ShaderModule, public VulkanResource {
   ~VulkanShaderModule() override = default;
 
   VkShaderModule shaderModule = VK_NULL_HANDLE;
-  ShaderStage _stage = ShaderStage::Vertex;
-  std::vector<uint32_t> _spirvBinary;
-  std::string _glslCode;
 
   friend class VulkanGPU;
 };

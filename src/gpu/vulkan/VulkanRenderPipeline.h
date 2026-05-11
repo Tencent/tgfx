@@ -60,14 +60,6 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
     return textureBindingSet.count(binding) > 0;
   }
 
-  VkCullModeFlags vulkanCullMode() const {
-    return cullMode;
-  }
-
-  VkFrontFace vulkanFrontFace() const {
-    return frontFace;
-  }
-
  protected:
   void onRelease(VulkanGPU* gpu) override;
 
@@ -86,8 +78,6 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
   std::unordered_map<unsigned, uint32_t> uniformBlockVisibility = {};
   std::unordered_set<unsigned> uniformBindingSet = {};
   std::unordered_set<unsigned> textureBindingSet = {};
-  VkCullModeFlags cullMode = VK_CULL_MODE_NONE;
-  VkFrontFace frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
   friend class VulkanGPU;
 };
