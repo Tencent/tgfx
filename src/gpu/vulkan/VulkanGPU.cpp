@@ -493,7 +493,11 @@ VkFence VulkanGPU::acquireFence() {
   VkFenceCreateInfo fenceInfo = {};
   fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
   VkFence fence = VK_NULL_HANDLE;
-  vkCreateFence(vulkanDevice, &fenceInfo, nullptr, &fence);
+  auto result = vkCreateFence(vulkanDevice, &fenceInfo, nullptr, &fence);
+  if (result != VK_SUCCESS) {
+    LOGE("VulkanGPU::acquireFence: vkCreateFence failed: %s", VkResultToString(result));
+    return VK_NULL_HANDLE;
+  }
   return fence;
 }
 
@@ -582,6 +586,14 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
 
   // Step 3: Acquire a fence for this submission.
   VkFence fence = acquireFence();
+  if (fence == VK_NULL_HANDLE) {
+    LOGE("VulkanGPU::executeSubmission: fence allocation failed, reclaiming session.");
+    reclaimAbandonedSession(std::move(request.session));
+    for (auto& upload : request.uploads) {
+      vmaDestroyBuffer(vmaAllocator, upload.stagingBuffer, upload.stagingAlloc);
+    }
+    return;
+  }
 
   // Step 4: Build VkSubmitInfo with optional timeline semaphore operations.
   VkSubmitInfo submitInfo = {};

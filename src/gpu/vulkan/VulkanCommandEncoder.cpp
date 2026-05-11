@@ -306,7 +306,12 @@ void VulkanCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> te
 }
 
 std::shared_ptr<CommandBuffer> VulkanCommandEncoder::onFinish() {
-  vkEndCommandBuffer(session.commandBuffer);
+  auto result = vkEndCommandBuffer(session.commandBuffer);
+  if (result != VK_SUCCESS) {
+    LOGE("VulkanCommandEncoder: vkEndCommandBuffer failed: %s", VkResultToString(result));
+    _gpu->reclaimAbandonedSession(std::move(session));
+    return nullptr;
+  }
   return std::make_shared<VulkanCommandBuffer>(_gpu, std::move(session));
 }
 

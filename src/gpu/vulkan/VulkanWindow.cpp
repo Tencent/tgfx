@@ -29,6 +29,25 @@
 
 namespace tgfx {
 
+static void DestroySwapchainResources(VkDevice device, VkInstance instance, VkSurfaceKHR surface,
+                                      VkSwapchainKHR swapchain, VkFence fence,
+                                      const std::vector<VkImageView>& imageViews) {
+  if (fence != VK_NULL_HANDLE) {
+    vkDestroyFence(device, fence, nullptr);
+  }
+  for (auto view : imageViews) {
+    if (view != VK_NULL_HANDLE) {
+      vkDestroyImageView(device, view, nullptr);
+    }
+  }
+  if (swapchain != VK_NULL_HANDLE) {
+    vkDestroySwapchainKHR(device, swapchain, nullptr);
+  }
+  if (surface != VK_NULL_HANDLE) {
+    vkDestroySurfaceKHR(instance, surface, nullptr);
+  }
+}
+
 // Holds all Vulkan-specific handles and swapchain resources. Defined here (not in the header) so
 // that vulkan.h is never required by downstream translation units that include VulkanWindow.h.
 struct VulkanWindow::PlatformState {
@@ -170,13 +189,27 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = chosenFormat.format;
     viewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vkCreateImageView(vkDevice, &viewInfo, nullptr, &imageViews[i]);
+    auto viewResult = vkCreateImageView(vkDevice, &viewInfo, nullptr, &imageViews[i]);
+    if (viewResult != VK_SUCCESS) {
+      LOGE("VulkanWindow: vkCreateImageView failed for image %u: %s", i,
+           VkResultToString(viewResult));
+      DestroySwapchainResources(vkDevice, vkInstance, surface, swapchain, VK_NULL_HANDLE,
+                                imageViews);
+      device->unlock();
+      return nullptr;
+    }
   }
 
   VkFenceCreateInfo fenceInfo = {};
   fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
   VkFence acquireFence = VK_NULL_HANDLE;
-  vkCreateFence(vkDevice, &fenceInfo, nullptr, &acquireFence);
+  auto fenceResult = vkCreateFence(vkDevice, &fenceInfo, nullptr, &acquireFence);
+  if (fenceResult != VK_SUCCESS) {
+    LOGE("VulkanWindow: vkCreateFence failed: %s", VkResultToString(fenceResult));
+    DestroySwapchainResources(vkDevice, vkInstance, surface, swapchain, VK_NULL_HANDLE, imageViews);
+    device->unlock();
+    return nullptr;
+  }
 
   device->unlock();
 
@@ -207,18 +240,9 @@ VulkanWindow::~VulkanWindow() {
   // destroying the swapchain and its image views.
   vkDeviceWaitIdle(vkDevice);
 
-  if (_platformState->acquireFence != VK_NULL_HANDLE) {
-    vkDestroyFence(vkDevice, _platformState->acquireFence, nullptr);
-  }
-  for (auto view : _platformState->imageViews) {
-    vkDestroyImageView(vkDevice, view, nullptr);
-  }
-  if (_platformState->swapchain != VK_NULL_HANDLE) {
-    vkDestroySwapchainKHR(vkDevice, _platformState->swapchain, nullptr);
-  }
-  if (_platformState->surface != VK_NULL_HANDLE) {
-    vkDestroySurfaceKHR(vulkanGPU->instance(), _platformState->surface, nullptr);
-  }
+  DestroySwapchainResources(vkDevice, vulkanGPU->instance(), _platformState->surface,
+                            _platformState->swapchain, _platformState->acquireFence,
+                            _platformState->imageViews);
   device->unlock();
 }
 
