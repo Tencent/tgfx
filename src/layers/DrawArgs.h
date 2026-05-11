@@ -21,8 +21,8 @@
 #include <memory>
 #include <vector>
 #include "layers/compositing3d/Layer3DContext.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
 class BackgroundHandler;
