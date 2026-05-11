@@ -55,10 +55,12 @@ class BackgroundHandler {
   virtual void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                                    LayerStyle* style, const LayerStyleSource* source) = 0;
 
-  // Returns true when this handler needs descendants of `layer` to render onto a real Surface
-  // (so they can be sampled back through a sub background source). Capturer returns true only
-  // when `layer` actually has descendant background-sourced styles. Other handlers default to
-  // false, letting OffscreenRenderer take the cheaper PictureRecorder path.
+  // Returns true when descendants of `layer` should render onto a real Surface so a sub
+  // background source can sample them back. The Surface path is preferred but not required: if
+  // no GPU context is available (PDF / SVG / picture-only export), OffscreenRenderer falls back
+  // to a PictureRecorder and the Picture variant of createSubHandler still satisfies the
+  // contract via segment flush. Capturer returns true only when `layer` actually has descendant
+  // background-sourced styles; Consumer / NoOp always return false.
   virtual bool needsSurface(Layer* /*layer*/) const {
     return false;
   }
