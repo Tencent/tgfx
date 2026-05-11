@@ -57,8 +57,7 @@ class OffscreenRenderer {
   static OffscreenResult RenderContentOnSurface(
       Layer* layer, const DrawArgs& args, std::shared_ptr<Surface> surface, const Matrix& density,
       const Rect& imageClip, const std::shared_ptr<ImageFilter>& imageFilter,
-      const std::optional<Rect>& clipBounds, const Rect& inputBounds, const Matrix& contentMatrix,
-      bool wantsSubBackground);
+      const std::optional<Rect>& clipBounds, const Rect& inputBounds, const Matrix& contentMatrix);
   static OffscreenResult RenderContentOnPicture(
       Layer* layer, const DrawArgs& args, const Matrix& density, const Rect& imageClip,
       const std::shared_ptr<ImageFilter>& imageFilter, const std::optional<Rect>& clipBounds,

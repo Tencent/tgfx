@@ -93,8 +93,7 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
                       static_cast<int>(imageClip.height()), false, 1, false, 0, args.dstColorSpace);
     if (surface != nullptr) {
       return RenderContentOnSurface(layer, args, std::move(surface), density, imageClip,
-                                    imageFilter, clipBounds, *inputBounds, contentMatrix,
-                                    /*wantsSubBackground=*/true);
+                                    imageFilter, clipBounds, *inputBounds, contentMatrix);
     }
   }
   return RenderContentOnPicture(layer, args, density, imageClip, imageFilter, clipBounds,
@@ -135,8 +134,7 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
 OffscreenResult OffscreenRenderer::RenderContentOnSurface(
     Layer* layer, const DrawArgs& args, std::shared_ptr<Surface> surface, const Matrix& density,
     const Rect& imageClip, const std::shared_ptr<ImageFilter>& imageFilter,
-    const std::optional<Rect>& clipBounds, const Rect& inputBounds, const Matrix& contentMatrix,
-    bool wantsSubBackground) {
+    const std::optional<Rect>& clipBounds, const Rect& inputBounds, const Matrix& contentMatrix) {
   // Translate the basis so (0,0) maps to imageClip.topLeft, giving the allocated pixel grid a
   // canonical origin.
   auto localToSurface = density;
@@ -146,7 +144,7 @@ OffscreenResult OffscreenRenderer::RenderContentOnSurface(
 
   auto drawArgs = args;
   std::unique_ptr<BackgroundHandler> subHandler;
-  if (wantsSubBackground && args.backgroundHandler != nullptr) {
+  if (args.backgroundHandler != nullptr) {
     subHandler = args.backgroundHandler->createSubHandler(surface.get(), args, inputBounds,
                                                           contentMatrix, localToSurface);
     if (subHandler != nullptr) {
