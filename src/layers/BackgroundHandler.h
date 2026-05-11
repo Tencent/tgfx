@@ -30,7 +30,6 @@ class Canvas;
 class DrawArgs;
 class Layer;
 class LayerStyle;
-class PictureRecorder;
 class Surface;
 struct BackgroundSnapshotMap;
 struct LayerStyleSource;
@@ -56,11 +55,9 @@ class BackgroundHandler {
                                    LayerStyle* style, const LayerStyleSource* source) = 0;
 
   // Returns true when descendants of `layer` should render onto a real Surface so a sub
-  // background source can sample them back. The Surface path is preferred but not required: if
-  // no GPU context is available (PDF / SVG / picture-only export), OffscreenRenderer falls back
-  // to a PictureRecorder and the Picture variant of createSubHandler still satisfies the
-  // contract via segment flush. Capturer returns true only when `layer` actually has descendant
-  // background-sourced styles; Consumer / NoOp always return false.
+  // background source can sample them back. Capturer returns true only when `layer` actually has
+  // descendant background-sourced styles AND a GPU context is available; Consumer / NoOp always
+  // return false.
   virtual bool needsSurface(Layer* /*layer*/) const {
     return false;
   }
@@ -72,19 +69,6 @@ class BackgroundHandler {
   virtual std::unique_ptr<BackgroundHandler> createSubHandler(
       Surface* /*surface*/, const DrawArgs& /*parentArgs*/, const Rect& /*localBounds*/,
       const Matrix& /*localToWorld*/, const Matrix& /*localToSurface*/) const {
-    return nullptr;
-  }
-
-  // PictureRecorder variant. Same semantics as the Surface variant; on success re-fetches the
-  // recorder's current canvas via `outCanvas` since createFromPicture may flush a segment, which
-  // invalidates the prior canvas pointer. Passing a reference (rather than an optional pointer)
-  // makes that contract impossible to ignore.
-  virtual std::unique_ptr<BackgroundHandler> createSubHandler(PictureRecorder* /*recorder*/,
-                                                              const DrawArgs& /*parentArgs*/,
-                                                              const Rect& /*localBounds*/,
-                                                              const Matrix& /*localToWorld*/,
-                                                              const Matrix& /*localToSurface*/,
-                                                              Canvas*& /*outCanvas*/) const {
     return nullptr;
   }
 
@@ -146,10 +130,6 @@ class BackgroundCapturer : public BackgroundHandler {
                                                       const Rect& localBounds,
                                                       const Matrix& localToWorld,
                                                       const Matrix& localToSurface) const override;
-
-  std::unique_ptr<BackgroundHandler> createSubHandler(
-      PictureRecorder* recorder, const DrawArgs& parentArgs, const Rect& localBounds,
-      const Matrix& localToWorld, const Matrix& localToSurface, Canvas*& outCanvas) const override;
 
   const std::vector<Rect>* renderRects() const override {
     return _renderRects.empty() ? nullptr : &_renderRects;

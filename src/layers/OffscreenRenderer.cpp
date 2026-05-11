@@ -97,8 +97,7 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
                                     imageFilter, clipBounds, *inputBounds, contentMatrix);
     }
   }
-  return RenderContentOnPicture(layer, args, density, imageClip, imageFilter, clipBounds,
-                                *inputBounds, contentMatrix);
+  return RenderContentOnPicture(layer, args, density, imageClip, imageFilter, clipBounds);
 }
 
 OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArgs& args,
@@ -129,7 +128,7 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
                                         surfaceRect, *inputBounds);
     }
   }
-  return RenderPassThroughOnPicture(layer, args, backdrop, parentMatrix, surfaceRect, *inputBounds);
+  return RenderPassThroughOnPicture(layer, args, backdrop, parentMatrix, surfaceRect);
 }
 
 OffscreenResult OffscreenRenderer::RenderContentOnSurface(
@@ -175,8 +174,7 @@ OffscreenResult OffscreenRenderer::RenderContentOnSurface(
 
 OffscreenResult OffscreenRenderer::RenderContentOnPicture(
     Layer* layer, const DrawArgs& args, const Matrix& density, const Rect& imageClip,
-    const std::shared_ptr<ImageFilter>& imageFilter, const std::optional<Rect>& clipBounds,
-    const Rect& inputBounds, const Matrix& contentMatrix) {
+    const std::shared_ptr<ImageFilter>& imageFilter, const std::optional<Rect>& clipBounds) {
   PictureRecorder recorder;
   auto* canvas = recorder.beginRecording();
   if (!imageClip.isEmpty()) {
@@ -184,20 +182,7 @@ OffscreenResult OffscreenRenderer::RenderContentOnPicture(
   }
   canvas->setMatrix(density);
 
-  auto drawArgs = args;
-  std::unique_ptr<BackgroundHandler> subHandler;
-  if (args.backgroundHandler != nullptr && args.backgroundHandler->needsSurface(layer)) {
-    subHandler = args.backgroundHandler->createSubHandler(&recorder, args, inputBounds,
-                                                          contentMatrix, density, canvas);
-    if (subHandler != nullptr) {
-      drawArgs.backgroundHandler = subHandler.get();
-      if (auto* rects = subHandler->renderRects()) {
-        drawArgs.renderRects = rects;
-      }
-    }
-  }
-
-  layer->drawDirectly(drawArgs, canvas, 1.0f);
+  layer->drawDirectly(args, canvas, 1.0f);
 
   OffscreenResult result;
   Point offset = {};
@@ -255,7 +240,7 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnSurface(
 
 OffscreenResult OffscreenRenderer::RenderPassThroughOnPicture(
     Layer* layer, const DrawArgs& args, const std::shared_ptr<Image>& backdrop,
-    const Matrix& parentMatrix, const Rect& surfaceRect, const Rect& inputBounds) {
+    const Matrix& parentMatrix, const Rect& surfaceRect) {
   auto localToSurface = parentMatrix;
   localToSurface.postTranslate(-surfaceRect.x(), -surfaceRect.y());
 
@@ -265,20 +250,7 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnPicture(
   SeedBackdrop(canvas, backdrop, surfaceRect);
   canvas->setMatrix(localToSurface);
 
-  auto drawArgs = args;
-  std::unique_ptr<BackgroundHandler> subHandler;
-  if (args.backgroundHandler != nullptr) {
-    subHandler = args.backgroundHandler->createSubHandler(&recorder, args, inputBounds,
-                                                          parentMatrix, localToSurface, canvas);
-    if (subHandler != nullptr) {
-      drawArgs.backgroundHandler = subHandler.get();
-      if (auto* rects = subHandler->renderRects()) {
-        drawArgs.renderRects = rects;
-      }
-    }
-  }
-
-  layer->drawDirectly(drawArgs, canvas, 1.0f);
+  layer->drawDirectly(args, canvas, 1.0f);
 
   OffscreenResult result;
   Point offset = {};

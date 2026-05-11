@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
@@ -25,12 +24,13 @@ namespace tgfx {
 /**
  * Read-only query handle that lets Background-sourced LayerStyles sample the already-rendered
  * backdrop. Callers render into getCanvas() and later call getBackgroundImage() to read it back.
- * Two variants: SurfaceBackgroundSource (GPU, cheap snapshot) and PictureBackgroundSource
- * (no GPU context, re-records segments on readback — used for PDF / SVG / picture-only paths).
+ * Backed by a GPU Surface; the picture-only variant has been removed since picture-canvas
+ * targets (PDF / SVG / picture-only export) skip backdrop styles entirely.
  */
 class BackgroundSource {
  public:
-  // Creates the top-level source. Context null → PictureBackgroundSource.
+  // Creates the top-level source. Returns nullptr when context is null (picture-only target —
+  // the caller should skip backdrop styles in that case).
   static std::shared_ptr<BackgroundSource> Make(Context* context, const Rect& drawRect,
                                                 float maxOutset, float minOutset,
                                                 const Matrix& matrix,
@@ -38,9 +38,7 @@ class BackgroundSource {
 
   virtual ~BackgroundSource() = default;
 
-  // Canvas callers draw into. The pointer is stable across getBackgroundImage() calls, but the
-  // Picture variant resets the canvas state stack on each readback — re-query saved matrices/clips
-  // after a getBackgroundImage() call rather than caching them.
+  // Canvas callers draw into.
   virtual Canvas* getCanvas() = 0;
 
   // image pixel → world, where image pixel is the coord space of getBackgroundImage()'s result.
@@ -49,28 +47,12 @@ class BackgroundSource {
   }
 
   // Returns "parent backdrop + everything drawn through getCanvas() so far". Safe to call
-  // repeatedly — the Picture variant flushes and reopens a segment each time.
-  //
-  // LIMITATION (Picture variant only): the resume path after the segment flush only restores
-  // the TOP save-stack frame's matrix and clip on the canvas. Canvas exposes only the current
-  // matrix, total clip, and save count — there is no per-frame accessor — so a partial
-  // Canvas::restore() between getBackgroundImage() and the outer AutoCanvasRestore would land
-  // on identity matrix / wide-open clip instead of the caller's frame N-1 state. Current
-  // callers (BackgroundCapturer + LayerStyle pipeline) do not partial-restore across this
-  // call; future callers wanting to must extend the resume path or expose per-frame state on
-  // Canvas.
+  // repeatedly.
   std::shared_ptr<Image> getBackgroundImage();
 
   // Derives a sub source backed by an externally-owned Surface (the offscreen carrier's surface).
   // renderBounds is in world coords; localToWorld / localToSurface map the sub's local coords.
   std::shared_ptr<BackgroundSource> createFromSurface(Surface* subSurface, const Rect& renderBounds,
-                                                      const Matrix& localToWorld,
-                                                      const Matrix& localToSurface);
-
-  // Derives a sub source backed by an externally-owned PictureRecorder. Caller must keep the
-  // recorder alive for the sub's lifetime.
-  std::shared_ptr<BackgroundSource> createFromPicture(PictureRecorder* subRecorder,
-                                                      const Rect& renderBounds,
                                                       const Matrix& localToWorld,
                                                       const Matrix& localToSurface);
 
@@ -114,7 +96,8 @@ class BackgroundSource {
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   BackgroundSource* parent = nullptr;
-  // Origin of this source's surface in parent image-pixel coords. Set by createFrom* for subs.
+  // Origin of this source's surface in parent image-pixel coords. Set by createFromSurface for
+  // subs.
   Point surfaceOffset = Point::Zero();
 };
 
