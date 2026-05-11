@@ -188,16 +188,19 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     std::string filterUrl;
     if (canVectorize && brush.colorFilter) {
       auto colorFilterType = Types::Get(brush.colorFilter.get());
-      if (colorFilterType != Types::ColorFilterType::Blend &&
-          colorFilterType != Types::ColorFilterType::Matrix) {
+      // Blend ColorFilter is only expressible when its blend mode has an SVG mapping; checking
+      // before opening <defs> avoids an empty <defs></defs> when addColorFilterResource bails out.
+      bool expressible =
+          colorFilterType == Types::ColorFilterType::Matrix ||
+          (colorFilterType == Types::ColorFilterType::Blend &&
+           !ToSVGBlendMode(static_cast<const ModeColorFilter*>(brush.colorFilter.get())->mode)
+                .empty());
+      if (!expressible) {
         canVectorize = false;
       } else {
         ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                            _assignColorSpace);
         filterUrl = defs.addColorFilterResource(brush.colorFilter).filter;
-        if (filterUrl.empty()) {
-          canVectorize = false;
-        }
       }
     }
     if (canVectorize) {
