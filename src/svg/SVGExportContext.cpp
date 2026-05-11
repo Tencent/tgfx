@@ -187,11 +187,17 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     }
     std::string filterUrl;
     if (canVectorize && brush.colorFilter) {
-      ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
-                         _assignColorSpace);
-      filterUrl = defs.addColorFilterResource(brush.colorFilter).filter;
-      if (filterUrl.empty()) {
+      auto colorFilterType = Types::Get(brush.colorFilter.get());
+      if (colorFilterType != Types::ColorFilterType::Blend &&
+          colorFilterType != Types::ColorFilterType::Matrix) {
         canVectorize = false;
+      } else {
+        ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
+                           _assignColorSpace);
+        filterUrl = defs.addColorFilterResource(brush.colorFilter).filter;
+        if (filterUrl.empty()) {
+          canVectorize = false;
+        }
       }
     }
     if (canVectorize) {
