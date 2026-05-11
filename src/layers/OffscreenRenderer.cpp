@@ -85,9 +85,8 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
 
   // Need a Surface backing only when a descendant Background-sourced style will read back
   // through this subtree; otherwise a PictureRecorder is cheaper.
-  bool wantsSubBackground =
-      args.backgroundHandler != nullptr && args.backgroundHandler->needsSurface(layer);
-  if (wantsSubBackground && args.context != nullptr) {
+  if (args.backgroundHandler != nullptr && args.backgroundHandler->needsSurface(layer) &&
+      args.context != nullptr) {
     auto surface =
         Surface::Make(args.context, static_cast<int>(imageClip.width()),
                       static_cast<int>(imageClip.height()), false, 1, false, 0, args.dstColorSpace);
@@ -97,7 +96,7 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
     }
   }
   return RenderContentOnPicture(layer, args, density, imageClip, imageFilter, clipBounds,
-                                *inputBounds, contentMatrix, wantsSubBackground);
+                                *inputBounds, contentMatrix);
 }
 
 OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArgs& args,
@@ -173,7 +172,7 @@ OffscreenResult OffscreenRenderer::RenderContentOnSurface(
 OffscreenResult OffscreenRenderer::RenderContentOnPicture(
     Layer* layer, const DrawArgs& args, const Matrix& density, const Rect& imageClip,
     const std::shared_ptr<ImageFilter>& imageFilter, const std::optional<Rect>& clipBounds,
-    const Rect& inputBounds, const Matrix& contentMatrix, bool wantsSubBackground) {
+    const Rect& inputBounds, const Matrix& contentMatrix) {
   PictureRecorder recorder;
   auto* canvas = recorder.beginRecording();
   if (!imageClip.isEmpty()) {
@@ -183,7 +182,7 @@ OffscreenResult OffscreenRenderer::RenderContentOnPicture(
 
   auto drawArgs = args;
   std::unique_ptr<BackgroundHandler> subHandler;
-  if (wantsSubBackground && args.backgroundHandler != nullptr) {
+  if (args.backgroundHandler != nullptr && args.backgroundHandler->needsSurface(layer)) {
     subHandler = args.backgroundHandler->createSubHandler(&recorder, args, inputBounds,
                                                           contentMatrix, density, &canvas);
     if (subHandler != nullptr) {

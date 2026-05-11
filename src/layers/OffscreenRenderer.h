@@ -58,10 +58,12 @@ class OffscreenRenderer {
       Layer* layer, const DrawArgs& args, std::shared_ptr<Surface> surface, const Matrix& density,
       const Rect& imageClip, const std::shared_ptr<ImageFilter>& imageFilter,
       const std::optional<Rect>& clipBounds, const Rect& inputBounds, const Matrix& contentMatrix);
-  static OffscreenResult RenderContentOnPicture(
-      Layer* layer, const DrawArgs& args, const Matrix& density, const Rect& imageClip,
-      const std::shared_ptr<ImageFilter>& imageFilter, const std::optional<Rect>& clipBounds,
-      const Rect& inputBounds, const Matrix& contentMatrix, bool wantsSubBackground);
+  static OffscreenResult RenderContentOnPicture(Layer* layer, const DrawArgs& args,
+                                                const Matrix& density, const Rect& imageClip,
+                                                const std::shared_ptr<ImageFilter>& imageFilter,
+                                                const std::optional<Rect>& clipBounds,
+                                                const Rect& inputBounds,
+                                                const Matrix& contentMatrix);
 
   // Two backing variants for renderPassThrough. Same split rationale as renderContent; both
   // seed the parent backdrop first so the pass-through subtree composes on top.
