@@ -289,6 +289,26 @@ Resources ElementWriter::addImageFilterResource(
   return resources;
 }
 
+Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilter>& colorFilter) {
+  Resources resources;
+  if (!colorFilter) {
+    return resources;
+  }
+  switch (Types::Get(colorFilter.get())) {
+    case Types::ColorFilterType::Blend:
+      addBlendColorFilterResources(static_cast<const ModeColorFilter*>(colorFilter.get()),
+                                   &resources);
+      break;
+    case Types::ColorFilterType::Matrix:
+      addMatrixColorFilterResources(static_cast<const MatrixColorFilter*>(colorFilter.get()),
+                                    &resources);
+      break;
+    default:
+      break;
+  }
+  return resources;
+}
+
 std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter,
                                           Rect bound,
                                           const std::shared_ptr<SVGCustomWriter>& exportWriter) {
