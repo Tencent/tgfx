@@ -185,11 +185,12 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
         blendModeStyle = "mix-blend-mode: " + svgBlendMode;
       }
     }
-    std::string filterUrl;
+    std::shared_ptr<ColorFilter> vectorColorFilter;
     if (canVectorize && brush.colorFilter) {
       auto colorFilterType = Types::Get(brush.colorFilter.get());
-      // Blend ColorFilter is only expressible when its blend mode has an SVG mapping; checking
-      // before opening <defs> avoids an empty <defs></defs> when addColorFilterResource bails out.
+      // Decide expressibility WITHOUT writing <defs> yet; the actual <defs>/<filter> emission is
+      // deferred to exportPictureImageAsVector so it lands AFTER the outer clip wrapper has been
+      // closed and at the same XML level as the brush <g> that consumes it.
       bool expressible =
           colorFilterType == Types::ColorFilterType::Matrix ||
           (colorFilterType == Types::ColorFilterType::Blend &&
@@ -198,9 +199,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       if (!expressible) {
         canVectorize = false;
       } else {
-        ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
-                           _assignColorSpace);
-        filterUrl = defs.addColorFilterResource(brush.colorFilter).filter;
+        vectorColorFilter = brush.colorFilter;
       }
     }
     if (canVectorize) {
@@ -209,7 +208,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       if (pictureImage->matrix) {
         newMatrix.preConcat(*pictureImage->matrix);
       }
-      exportPictureImageAsVector(pictureImage, newMatrix, clip, filterUrl, blendModeStyle,
+      exportPictureImageAsVector(pictureImage, newMatrix, clip, vectorColorFilter, blendModeStyle,
                                  brush.color.alpha);
       return;
     }
@@ -447,25 +446,37 @@ void SVGExportContext::drawPicture(std::shared_ptr<Picture> picture, const Matri
 
 void SVGExportContext::exportPictureImageAsVector(const PictureImage* pictureImage,
                                                   const Matrix& matrix, const ClipStack& clip,
-                                                  const std::string& filterUrl,
+                                                  const std::shared_ptr<ColorFilter>& colorFilter,
                                                   const std::string& blendModeStyle, float alpha) {
   // Skip the wrapper when there is nothing to attach to it.
-  if (filterUrl.empty() && blendModeStyle.empty() && alpha == 1.0f) {
+  if (!colorFilter && blendModeStyle.empty() && alpha == 1.0f) {
     drawPicture(pictureImage->picture, matrix, clip);
     return;
   }
   // Lift the outer clip to a single <g clip-path> wrapping the brush group so nested playback
   // ops do not redefine identical clipPath resources. See drawLayer for the same pattern.
+  // Use the PictureImage's logical output rect (not the raw picture bounds) so the contains()
+  // check matches what is actually painted into the SVG.
   auto clipPath = clip.getClipPath();
-  auto bound = matrix.mapRect(pictureImage->picture->getBounds());
+  auto bound = matrix.mapRect(Rect::MakeWH(static_cast<float>(pictureImage->width()),
+                                           static_cast<float>(pictureImage->height())));
   bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
-  std::string clipID;
-  if (needsClip) {
-    clipID = defineClipPath(clipPath);
-  }
   {
+    // Close any clip wrapper opened by previous draws BEFORE emitting our <clipPath>, <defs>
+    // and brush <g>. Otherwise these resources would be nested inside a stale <g clip-path>
+    // that does not belong to this draw, leaving them at the wrong XML depth.
     clipGroupElement = nullptr;
     currentClipPath = {};
+    std::string clipID;
+    if (needsClip) {
+      clipID = defineClipPath(clipPath);
+    }
+    std::string filterUrl;
+    if (colorFilter) {
+      ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
+                         _assignColorSpace);
+      filterUrl = defs.addColorFilterResource(colorFilter).filter;
+    }
     std::unique_ptr<ElementWriter> clipElement;
     if (needsClip) {
       clipElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());

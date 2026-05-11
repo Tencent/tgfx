@@ -38,6 +38,7 @@ namespace tgfx {
 class ResourceStore;
 class ElementWriter;
 class PictureImage;
+class ColorFilter;
 
 class SVGExportContext : public DrawContext {
  public:
@@ -110,12 +111,16 @@ class SVGExportContext : public DrawContext {
 
   /**
    * Replays a PictureImage as SVG vector elements, wrapped in a single <g> carrying any
-   * non-empty filterUrl, any non-empty blendModeStyle (as a CSS mix-blend-mode), and any
-   * alpha < 1. All three empty/identity skip the corresponding attributes; the wrapper is
-   * elided when none apply.
+   * colorFilter as a <filter> resource, any non-empty blendModeStyle (as a CSS mix-blend-mode),
+   * and any alpha < 1. All three empty/identity skip the corresponding attributes; the wrapper
+   * is elided when none apply. The colorFilter must be one of the SVG-expressible types (Matrix
+   * or Blend with a mappable BlendMode); the caller is responsible for filtering out the rest.
+   * The associated <defs>/<filter> is emitted from inside this function, AFTER the active clip
+   * group is closed, so it is placed at the same level as the brush <g> that consumes it.
    */
   void exportPictureImageAsVector(const PictureImage* pictureImage, const Matrix& matrix,
-                                  const ClipStack& clip, const std::string& filterUrl,
+                                  const ClipStack& clip,
+                                  const std::shared_ptr<ColorFilter>& colorFilter,
                                   const std::string& blendModeStyle, float alpha);
 
   void exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matrix& matrix, const Brush& brush,
