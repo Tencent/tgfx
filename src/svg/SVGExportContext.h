@@ -37,6 +37,7 @@ namespace tgfx {
 
 class ResourceStore;
 class ElementWriter;
+class PictureImage;
 
 class SVGExportContext : public DrawContext {
  public:
@@ -106,6 +107,16 @@ class SVGExportContext : public DrawContext {
   static bool RequiresViewportReset(const Brush& brush);
 
   void exportPixmap(const Pixmap& pixmap, const Matrix& matrix, const Brush& brush);
+
+  /**
+   * Replays a PictureImage as SVG vector elements, wrapped in a single <g> carrying any
+   * non-empty filterUrl, any non-empty blendModeStyle (as a CSS mix-blend-mode), and any
+   * alpha < 1. All three empty/identity skip the corresponding attributes; the wrapper is
+   * elided when none apply.
+   */
+  void exportPictureImageAsVector(const PictureImage* pictureImage, const Matrix& matrix,
+                                  const ClipStack& clip, const std::string& filterUrl,
+                                  const std::string& blendModeStyle, float alpha);
 
   void exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matrix& matrix, const Brush& brush,
                             const Stroke* stroke);

@@ -53,16 +53,6 @@
 
 namespace tgfx {
 
-namespace {
-// Returns true when the brush carries no effect that requires compositing, so a draw can be
-// emitted as SVG vector elements instead of being rasterized. Only the alpha channel of the
-// brush color can be honored in this mode by wrapping the output in a <g opacity="..."> group.
-bool CanExportAsVector(const Brush& brush) {
-  return brush.shader == nullptr && brush.maskFilter == nullptr && brush.colorFilter == nullptr &&
-         brush.blendMode == BlendMode::SrcOver;
-}
-}  // namespace
-
 SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
                                    std::unique_ptr<XMLWriter> inputXmlWriter, uint32_t exportFlags,
                                    std::shared_ptr<SVGCustomWriter> customWriter,
@@ -181,43 +171,37 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     if (brush.nothingToDraw()) {
       return;
     }
-    // Honor non-identity brushes on PictureImage: alpha-only goes through <g opacity>
-    // to preserve vectors; any shader/filter/blend forces rasterization via exportPixmap.
-    if (CanExportAsVector(brush)) {
+    // Keep PictureImage vectorized when the brush only carries effects SVG <g> can express:
+    // alpha as opacity, Blend/Matrix colorFilter as a <filter> resource, and a separable blend
+    // mode as mix-blend-mode. Anything else (shader, maskFilter, Porter-Duff blend without an
+    // SVG mapping, or unsupported colorFilter subtype) rasterizes.
+    bool canVectorize = brush.shader == nullptr && brush.maskFilter == nullptr;
+    std::string blendModeStyle;
+    if (canVectorize && brush.blendMode != BlendMode::SrcOver) {
+      auto svgBlendMode = ToSVGBlendMode(brush.blendMode);
+      if (svgBlendMode.empty() || svgBlendMode == "normal") {
+        canVectorize = false;
+      } else {
+        blendModeStyle = "mix-blend-mode:" + svgBlendMode;
+      }
+    }
+    std::string filterUrl;
+    if (canVectorize && brush.colorFilter) {
+      ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
+                         _assignColorSpace);
+      filterUrl = defs.addColorFilterResource(brush.colorFilter).filter;
+      if (filterUrl.empty()) {
+        canVectorize = false;
+      }
+    }
+    if (canVectorize) {
       const auto pictureImage = static_cast<const PictureImage*>(image.get());
       auto newMatrix = matrix;
       if (pictureImage->matrix) {
         newMatrix.preConcat(*pictureImage->matrix);
       }
-      if (brush.color.alpha == 1.0f) {
-        drawPicture(pictureImage->picture, newMatrix, clip);
-        return;
-      }
-      // Lift the outer clip to a single <g clip-path> wrapper around <g opacity> so nested
-      // playback ops do not redefine identical clipPath resources. See drawLayer for the same
-      // structure. Inside the opacity group the clip stack is cleared, letting internal draws
-      // rebuild clips only when the picture itself introduces new ones.
-      auto clipPath = clip.getClipPath();
-      auto bound = newMatrix.mapRect(pictureImage->picture->getBounds());
-      bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
-      std::string clipID;
-      if (needsClip) {
-        clipID = defineClipPath(clipPath);
-      }
-      clipGroupElement = nullptr;
-      currentClipPath = {};
-      {
-        std::unique_ptr<ElementWriter> clipElement;
-        if (needsClip) {
-          clipElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-          clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
-        }
-        ElementWriter opacityGroup("g", xmlWriter, resourceBucket.get());
-        opacityGroup.addAttribute("opacity", brush.color.alpha);
-        drawPicture(pictureImage->picture, newMatrix, needsClip ? ClipStack{} : clip);
-      }
-      clipGroupElement = nullptr;
-      currentClipPath = {};
+      exportPictureImageAsVector(pictureImage, newMatrix, clip, filterUrl, blendModeStyle,
+                                 brush.color.alpha);
       return;
     }
     auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
@@ -449,6 +433,48 @@ void SVGExportContext::drawPicture(std::shared_ptr<Picture> picture, const Matri
                                    const ClipStack& clip) {
   DEBUG_ASSERT(picture != nullptr);
   picture->playback(this, matrix, clip);
+}
+
+void SVGExportContext::exportPictureImageAsVector(const PictureImage* pictureImage,
+                                                  const Matrix& matrix, const ClipStack& clip,
+                                                  const std::string& filterUrl,
+                                                  const std::string& blendModeStyle, float alpha) {
+  // Skip the wrapper when there is nothing to attach to it.
+  if (filterUrl.empty() && blendModeStyle.empty() && alpha == 1.0f) {
+    drawPicture(pictureImage->picture, matrix, clip);
+    return;
+  }
+  // Lift the outer clip to a single <g clip-path> wrapping the brush group so nested playback
+  // ops do not redefine identical clipPath resources. See drawLayer for the same pattern.
+  auto clipPath = clip.getClipPath();
+  auto bound = matrix.mapRect(pictureImage->picture->getBounds());
+  bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+  std::string clipID;
+  if (needsClip) {
+    clipID = defineClipPath(clipPath);
+  }
+  clipGroupElement = nullptr;
+  currentClipPath = {};
+  {
+    std::unique_ptr<ElementWriter> clipElement;
+    if (needsClip) {
+      clipElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+      clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
+    }
+    ElementWriter brushGroup("g", xmlWriter, resourceBucket.get());
+    if (!filterUrl.empty()) {
+      brushGroup.addAttribute("filter", filterUrl);
+    }
+    if (!blendModeStyle.empty()) {
+      brushGroup.addAttribute("style", blendModeStyle);
+    }
+    if (alpha != 1.0f) {
+      brushGroup.addAttribute("opacity", alpha);
+    }
+    drawPicture(pictureImage->picture, matrix, needsClip ? ClipStack{} : clip);
+  }
+  clipGroupElement = nullptr;
+  currentClipPath = {};
 }
 
 void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
