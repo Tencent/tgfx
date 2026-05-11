@@ -53,8 +53,8 @@ std::unique_ptr<VulkanGPU> VulkanGPU::Make() {
 std::unique_ptr<VulkanGPU> VulkanGPU::MakeFrom(VkInstance instance, VkPhysicalDevice physicalDevice,
                                                VkDevice device, VkQueue queue,
                                                uint32_t queueFamilyIndex) {
-  if (instance == VK_NULL_HANDLE || physicalDevice == VK_NULL_HANDLE ||
-      device == VK_NULL_HANDLE || queue == VK_NULL_HANDLE) {
+  if (instance == VK_NULL_HANDLE || physicalDevice == VK_NULL_HANDLE || device == VK_NULL_HANDLE ||
+      queue == VK_NULL_HANDLE) {
     LOGE("VulkanGPU::MakeFrom() received null handle.");
     return nullptr;
   }

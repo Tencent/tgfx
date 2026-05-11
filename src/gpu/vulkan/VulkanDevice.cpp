@@ -34,10 +34,9 @@ std::shared_ptr<VulkanDevice> VulkanDevice::Make() {
 std::shared_ptr<VulkanDevice> VulkanDevice::MakeFrom(void* instance, void* physicalDevice,
                                                      void* device, void* queue,
                                                      uint32_t queueFamilyIndex) {
-  auto gpu = VulkanGPU::MakeFrom(reinterpret_cast<VkInstance>(instance),
-                                 reinterpret_cast<VkPhysicalDevice>(physicalDevice),
-                                 reinterpret_cast<VkDevice>(device),
-                                 reinterpret_cast<VkQueue>(queue), queueFamilyIndex);
+  auto gpu = VulkanGPU::MakeFrom(
+      reinterpret_cast<VkInstance>(instance), reinterpret_cast<VkPhysicalDevice>(physicalDevice),
+      reinterpret_cast<VkDevice>(device), reinterpret_cast<VkQueue>(queue), queueFamilyIndex);
   if (!gpu) {
     return nullptr;
   }
