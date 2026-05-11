@@ -744,14 +744,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
   Rect* contentBounds = nullptr;                //  in global coordinates
   std::unique_ptr<Rect> localBounds = nullptr;  // in local coordinates
 
-  // Max background-sourced filter outset (in local units at contentScale=1) accumulated across
-  // this layer and its descendants. Doubles as a presence flag (>0 means at least one background
-  // style exists somewhere in this subtree) and as a magnitude when sizing the background source
-  // surface and outsetting world rects in the capture pass.
+  // Max/min background-sourced filter outset (local units at contentScale=1) across this subtree.
+  // max>0 doubles as a presence flag for background styles; min is used to decide bg surface
+  // down-sampling when the outset exceeds the single-pass blur budget.
   float maxBackgroundOutset = 0.f;
-  // Min background-sourced filter outset across this subtree (no entries → numeric_limits::max()).
-  // Used only to decide whether the background source must be down-sampled to keep the GPU blur
-  // within the single-pass budget.
   float minBackgroundOutset = std::numeric_limits<float>::max();
 
   friend class RootLayer;
