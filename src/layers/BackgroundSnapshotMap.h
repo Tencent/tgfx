@@ -40,17 +40,9 @@ struct BackgroundSnapshotEntry {
 };
 
 /**
- * Identifies which background snapshot belongs to which layer style.
- *
- * SAFETY: Layer* and LayerStyle* are stored as raw pointers because both are owned by shared_ptr
- * in the layer tree elsewhere and outlive a single render invocation. The map is populated during
- * the capture pass and discarded at the end of the render, so the keys are valid for the entire
- * lifetime of the map under these invariants:
- *   1. The layer tree is single-threaded and not mutated mid-render (no add/remove/destroy of
- *      layers or layer styles between capture and consume).
- *   2. No render-time code path destroys a Layer / LayerStyle before the capture map is dropped.
- * Violating either invariant turns these keys into use-after-free; weak_ptr keying or invalidating
- * the map from Layer::invalidate* would be required to lift the constraint.
+ * Identifies which background snapshot belongs to which layer style. Layer* and LayerStyle* are
+ * raw pointers; both are owned by shared_ptr in the layer tree and the map is built and consumed
+ * within a single render invocation, so the keys are valid for the map's entire lifetime.
  */
 struct BackgroundSnapshotKey {
   Layer* layer = nullptr;
