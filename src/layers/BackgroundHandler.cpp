@@ -167,9 +167,11 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
   Rect worldBounds = Rect::MakeEmpty();
   if (!ComputeSubGeometry(bgSource.get(), localBounds, contentMatrix, &localToWorld,
                           &worldBounds)) {
+    DEBUG_ASSERT(false);
     return nullptr;
   }
   auto subSource = bgSource->createFromSurface(surface, worldBounds, localToWorld, localToSurface);
+  DEBUG_ASSERT(subSource != nullptr);
   return buildSubCapturer(parentArgs, std::move(subSource));
 }
 
@@ -180,9 +182,11 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
   Rect worldBounds = Rect::MakeEmpty();
   if (!ComputeSubGeometry(bgSource.get(), localBounds, contentMatrix, &localToWorld,
                           &worldBounds)) {
+    DEBUG_ASSERT(false);
     return nullptr;
   }
   auto subSource = bgSource->createFromPicture(recorder, worldBounds, localToWorld, localToSurface);
+  DEBUG_ASSERT(subSource != nullptr);
   auto clone = buildSubCapturer(parentArgs, std::move(subSource));
   if (clone == nullptr) {
     return nullptr;

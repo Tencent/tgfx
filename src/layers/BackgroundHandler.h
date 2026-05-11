@@ -65,7 +65,9 @@ class BackgroundHandler {
 
   // Builds a sub-handler that samples from a Surface-backed sub background source. On success,
   // returns the new handler with its own narrowed renderRects (queryable via renderRects()).
-  // Non-sampling handlers return nullptr so the caller keeps the parent handler in effect.
+  // Returns nullptr when the parent handler does not need rebinding for this offscreen subtree
+  // (e.g. Consumer keys snapshots by Layer*/Style* and is canvas-matrix independent), in which
+  // case OffscreenRenderer keeps the parent handler in effect.
   virtual std::unique_ptr<BackgroundHandler> createSubHandler(
       Surface* /*surface*/, const DrawArgs& /*parentArgs*/, const Rect& /*localBounds*/,
       const Matrix& /*contentMatrix*/, const Matrix& /*localToSurface*/) const {

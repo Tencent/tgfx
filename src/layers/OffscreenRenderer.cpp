@@ -154,11 +154,9 @@ OffscreenResult OffscreenRenderer::RenderContentOnSurface(
       if (auto* rects = subHandler->renderRects()) {
         drawArgs.renderRects = rects;
       }
-    } else {
-      // Parent handler's localToWorld is tied to the parent surface; on this offscreen canvas it
-      // would sample at wrong coordinates.
-      drawArgs.backgroundHandler = BackgroundHandler::NoOp();
     }
+    // Null sub-handler means the parent handler does not need rebinding for this offscreen
+    // subtree (e.g. Consumer keys snapshots by Layer*/Style*, independent of canvas matrix).
   }
 
   layer->drawDirectly(drawArgs, canvas, 1.0f);
@@ -195,8 +193,6 @@ OffscreenResult OffscreenRenderer::RenderContentOnPicture(
       if (auto* rects = subHandler->renderRects()) {
         drawArgs.renderRects = rects;
       }
-    } else {
-      drawArgs.backgroundHandler = BackgroundHandler::NoOp();
     }
   }
 
@@ -238,8 +234,6 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnSurface(
       if (auto* rects = subHandler->renderRects()) {
         drawArgs.renderRects = rects;
       }
-    } else {
-      drawArgs.backgroundHandler = BackgroundHandler::NoOp();
     }
   }
 
@@ -276,8 +270,6 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnPicture(
       if (auto* rects = subHandler->renderRects()) {
         drawArgs.renderRects = rects;
       }
-    } else {
-      drawArgs.backgroundHandler = BackgroundHandler::NoOp();
     }
   }
 
