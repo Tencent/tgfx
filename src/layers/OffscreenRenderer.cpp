@@ -52,7 +52,9 @@ std::shared_ptr<Image> ApplyImageFilterIfNeeded(std::shared_ptr<Image> image,
   std::optional<Rect> filterClipBounds = std::nullopt;
   if (clipBounds.has_value()) {
     Matrix invertMatrix = Matrix::I();
-    imageMatrix->invert(&invertMatrix);
+    if (!imageMatrix->invert(&invertMatrix)) {
+      return nullptr;
+    }
     filterClipBounds = invertMatrix.mapRect(*clipBounds);
     filterClipBounds->roundOut();
   }
@@ -163,7 +165,9 @@ OffscreenResult OffscreenRenderer::RenderContentOnSurface(
   if (result.image == nullptr) {
     return {};
   }
-  localToSurface.invert(&result.imageMatrix);
+  if (!localToSurface.invert(&result.imageMatrix)) {
+    return {};
+  }
   result.image =
       ApplyImageFilterIfNeeded(result.image, imageFilter, clipBounds, &result.imageMatrix);
   return result;
@@ -203,7 +207,9 @@ OffscreenResult OffscreenRenderer::RenderContentOnPicture(
   if (result.image == nullptr) {
     return {};
   }
-  density.invert(&result.imageMatrix);
+  if (!density.invert(&result.imageMatrix)) {
+    return {};
+  }
   result.imageMatrix.preTranslate(offset.x, offset.y);
   result.image =
       ApplyImageFilterIfNeeded(result.image, imageFilter, clipBounds, &result.imageMatrix);
@@ -241,7 +247,9 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnSurface(
   if (result.image == nullptr) {
     return {};
   }
-  localToSurface.invert(&result.imageMatrix);
+  if (!localToSurface.invert(&result.imageMatrix)) {
+    return {};
+  }
   return result;
 }
 
@@ -280,7 +288,9 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnPicture(
   if (result.image == nullptr) {
     return {};
   }
-  localToSurface.invert(&result.imageMatrix);
+  if (!localToSurface.invert(&result.imageMatrix)) {
+    return {};
+  }
   result.imageMatrix.preTranslate(offset.x, offset.y);
   return result;
 }
