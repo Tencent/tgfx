@@ -915,10 +915,12 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   }
 
   // Capture pass — only when this layer or descendants have Background-sourced styles. Disabled
-  // in 3D subtrees. Works without a GPU context via PictureRecorder-backed BackgroundSource.
+  // in 3D subtrees. Requires a GPU context; on picture-canvas paths the capture is skipped and
+  // the consumer falls back to on-the-fly synthesis (signalled by passing a null snapshot map).
   BackgroundSnapshotMap snapshotMap = {};
+  BackgroundSnapshotMap* snapshotsPtr = nullptr;
   bool needBackground = canInvert && !canPreserve3D() && hasBackgroundStyle();
-  if (needBackground) {
+  if (needBackground && context != nullptr) {
     // Use the canvas matrix as the viewMatrix (world → surface pixel mapping), consistent with
     // how DisplayList::captureBackgrounds passes getViewMatrix() to createBackgroundSource.
     auto canvasMatrix = canvas->getMatrix();
@@ -933,13 +935,15 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       Layer* captureRoot = _root ? _root : this;
       Rect captureRect = _root ? renderRect : clippedBounds;
       BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), &snapshotMap, {captureRect});
+      snapshotsPtr = &snapshotMap;
     }
   }
 
   // Consume pass — normal render. NoOp when there's no background style so stray ones silently
-  // skip (same as contour / 3D subtrees).
+  // skip (same as contour / 3D subtrees). A null snapshot map signals the picture-canvas path,
+  // which makes the consumer synthesize backdrops on the fly via PictureRecorder.
   AutoCanvasRestore autoRestore(canvas);
-  BackgroundConsumer consumer(&snapshotMap);
+  BackgroundConsumer consumer(snapshotsPtr);
   BackgroundHandler* handler =
       needBackground ? static_cast<BackgroundHandler*>(&consumer) : BackgroundHandler::NoOp();
   DrawArgs drawArgs = args;
@@ -1526,7 +1530,7 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
-                         const LayerStyleSource* layerStyleSource) {
+                         const LayerStyleSource* layerStyleSource, const Layer* stopChild) {
   if (layerStyleSource) {
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below);
   }
@@ -1535,7 +1539,12 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   if (content) {
     hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
   }
-  if (!drawChildren(args, canvas, alpha)) {
+  if (!drawChildren(args, canvas, alpha, stopChild)) {
+    return;
+  }
+  if (stopChild != nullptr) {
+    // Background-walk path: skip Above styles and foreground for this layer; the caller is only
+    // interested in the portion that contributes to the synthesized backdrop.
     return;
   }
   if (layerStyleSource) {
@@ -1632,7 +1641,8 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
   return allMatch;
 }
 
-bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha) {
+bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
+                         const Layer* stopChild) {
   auto childCount = static_cast<int>(_children.size());
   int maxIndex = childCount - 1;
   if (args.backgroundHandler != nullptr) {
@@ -1646,6 +1656,10 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha) {
   }
   for (int i = 0; i <= maxIndex; ++i) {
     auto& child = _children[static_cast<size_t>(i)];
+    if (stopChild != nullptr && child.get() == stopChild) {
+      // Background-walk truncation: the caller only wants prior siblings of stopChild.
+      break;
+    }
     if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
       continue;
     }
@@ -1837,6 +1851,68 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
     }
     drawLayerStyleDefault(args, canvas, alpha, layerStyle.get(), source);
   }
+}
+
+float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
+  if (!_parent) {
+    return _alpha;
+  }
+  // Bottom-up recursion grounds at the root, then unwinds painting in this order per frame:
+  // parent's background -> parent's Below styles -> parent content -> siblings of `this` that
+  // come before `this`. The current frame's `this` is the parent's stopChild, so siblings at or
+  // after `this` are skipped.
+  auto currentAlpha = _parent->drawBackgroundLayers(args, canvas);
+  auto parentSource = _parent->getLayerStyleSource(args, canvas->getMatrix());
+  _parent->drawContents(args, canvas, currentAlpha, parentSource.get(), this);
+  canvas->concat(getMatrixWithScrollRect().asMatrix());
+  if (_scrollRect) {
+    canvas->clipRect(*_scrollRect, bitFields.allowsEdgeAntialiasing);
+  }
+  return currentAlpha * _alpha;
+}
+
+std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, float contentScale,
+                                                        Point* offset) {
+  if (FloatNearlyZero(contentScale)) {
+    return nullptr;
+  }
+  auto bounds = getBounds();
+  bounds.scale(contentScale, contentScale);
+  bounds.roundOut();
+  if (bounds.isEmpty()) {
+    return nullptr;
+  }
+  auto localToGlobalMatrix = getGlobalMatrix().asMatrix();
+  Matrix globalToLocalMatrix = Matrix::I();
+  if (!localToGlobalMatrix.invert(&globalToLocalMatrix)) {
+    return nullptr;
+  }
+
+  PictureRecorder recorder = {};
+  auto* recordingCanvas = recorder.beginRecording();
+  recordingCanvas->scale(contentScale, contentScale);
+  recordingCanvas->concat(globalToLocalMatrix);
+
+  // Sub-walk must not re-enter the consumer's fallback (which would recurse forever on layers
+  // with their own background-sourced styles up the chain). Hand it a NoOp handler instead — that
+  // also short-circuits Below style dispatch for backdrop styles encountered along the way, which
+  // matches the semantics of drawing pure backdrop content.
+  DrawArgs subArgs = args;
+  subArgs.backgroundHandler = BackgroundHandler::NoOp();
+  subArgs.excludeEffects = false;
+
+  auto currentAlpha = drawBackgroundLayers(subArgs, recordingCanvas);
+  auto belowSource = getLayerStyleSource(subArgs, recordingCanvas->getMatrix());
+  if (belowSource) {
+    drawLayerStyles(subArgs, recordingCanvas, currentAlpha, belowSource.get(),
+                    LayerStylePosition::Below);
+  }
+
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return nullptr;
+  }
+  return ToImageWithOffset(std::move(picture), offset, &bounds, args.dstColorSpace);
 }
 
 void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, float alpha,

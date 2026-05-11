@@ -631,13 +631,15 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const LayerStyleSource* layerStyleSource = nullptr);
+                    const LayerStyleSource* layerStyleSource = nullptr,
+                    const Layer* stopChild = nullptr);
 
   bool drawContour(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   bool drawContourInternal(const DrawArgs& args, Canvas* canvas, bool contentOnly);
 
-  bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha);
+  bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
+                    const Layer* stopChild = nullptr);
 
   using LayerDrawFunc = bool (Layer::*)(const DrawArgs&, Canvas*, float, BlendMode);
 
@@ -656,6 +658,19 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void drawLayerStyleDefault(const DrawArgs& args, Canvas* canvas, float alpha, LayerStyle* style,
                              const LayerStyleSource* source);
+
+  // Walks ancestors and prior siblings, painting their content + Below styles into canvas. Used
+  // by synthesizeBackgroundImage for the picture-canvas fallback. Returns the cumulative alpha
+  // after the parent chain. Each frame passes its `this` to the parent as stopChild so siblings
+  // at or after the current layer are excluded.
+  float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
+
+  // Synthesize a picture-backed backdrop image by walking ancestors and prior siblings via
+  // drawBackgroundLayers and composing this layer's Below styles. Returns nullptr when bounds
+  // collapse to empty or recording produces no picture. Used by BackgroundConsumer fallback when
+  // the snapshot map is empty (picture-canvas draw path).
+  std::shared_ptr<Image> synthesizeBackgroundImage(const DrawArgs& args, float contentScale,
+                                                   Point* offset);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
@@ -753,6 +768,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   friend class RootLayer;
   friend class DisplayList;
   friend class BackgroundCapturer;
+  friend class BackgroundConsumer;
   friend class LayerProperty;
   friend class LayerSerialization;
   friend class OffscreenRenderer;

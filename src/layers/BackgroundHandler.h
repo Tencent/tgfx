@@ -174,6 +174,11 @@ class BackgroundCapturer : public BackgroundHandler {
 
 class BackgroundConsumer : public BackgroundHandler {
  public:
+  // A null snapshots pointer means the capture pass was skipped (picture-canvas path, no GPU
+  // context). In that case the consumer synthesizes backdrops on the fly via
+  // Layer::synthesizeBackgroundImage. When snapshots is non-null (surface path) the map is
+  // authoritative — a miss there indicates a capture-side coverage bug, so we silently skip
+  // rather than masking it with synthesis.
   explicit BackgroundConsumer(const BackgroundSnapshotMap* snapshots) : snapshots(snapshots) {
   }
 

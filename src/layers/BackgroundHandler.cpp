@@ -289,29 +289,43 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
   return it->second.get();
 }
 
-void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& /*args*/, Canvas* canvas, Layer* layer,
+void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
                                              float alpha, LayerStyle* style,
                                              const LayerStyleSource* source) {
-  if (snapshots == nullptr || source == nullptr || FloatNearlyZero(source->contentScale)) {
+  if (source == nullptr || FloatNearlyZero(source->contentScale)) {
     return;
   }
-  auto it = snapshots->find(BackgroundSnapshotKey{layer, style});
-  if (it == snapshots->end()) {
-    return;
-  }
-  const auto& snapshot = it->second;
   auto groupIndex = static_cast<int>(style->excludeChildEffects());
   auto* group = source->groups[groupIndex].get();
   if (group == nullptr) {
     return;
   }
   const auto& contentEntry = group->content;
+  std::shared_ptr<Image> bgImage = nullptr;
+  Point bgOffset = {};
+  if (snapshots != nullptr) {
+    auto it = snapshots->find(BackgroundSnapshotKey{layer, style});
+    if (it == snapshots->end()) {
+      // Surface path: the map is authoritative, so a miss is a capture-side coverage bug.
+      // Silently skip rather than masking the bug with on-the-fly synthesis.
+      return;
+    }
+    bgImage = it->second.image;
+    bgOffset = it->second.offset;
+  } else {
+    // Picture-canvas path: capture was skipped because there is no GPU context. Synthesize the
+    // backdrop on the fly by walking ancestors and prior siblings via PictureRecorder.
+    bgImage = layer->synthesizeBackgroundImage(args, source->contentScale, &bgOffset);
+    if (bgImage == nullptr) {
+      return;
+    }
+  }
   AutoCanvasRestore restoreCanvas(canvas);
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
   matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
   canvas->concat(matrix);
-  auto backgroundOffset = snapshot.offset - contentEntry.offset;
-  style->drawWithExtraSource(canvas, contentEntry.image, source->contentScale, snapshot.image,
+  auto backgroundOffset = bgOffset - contentEntry.offset;
+  style->drawWithExtraSource(canvas, contentEntry.image, source->contentScale, std::move(bgImage),
                              backgroundOffset, alpha);
 }
 
