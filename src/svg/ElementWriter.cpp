@@ -547,21 +547,12 @@ Resources ElementWriter::addResources(const Brush& brush, Context* context,
     addShaderResources(shader, context, &resources);
   }
 
-  if (auto colorFilter = brush.colorFilter) {
-    auto type = Types::Get(colorFilter.get());
-    switch (type) {
-      case Types::ColorFilterType::Blend:
-        addBlendColorFilterResources(static_cast<const ModeColorFilter*>(colorFilter.get()),
-                                     &resources);
-        break;
-      case Types::ColorFilterType::Matrix: {
-        addMatrixColorFilterResources(static_cast<const MatrixColorFilter*>(colorFilter.get()),
-                                      &resources);
-        break;
-      }
-      default:
-        reportUnsupportedElement("Unsupported color filter");
+  if (brush.colorFilter) {
+    auto filterResources = addColorFilterResource(brush.colorFilter);
+    if (filterResources.filter.empty()) {
+      reportUnsupportedElement("Unsupported color filter");
     }
+    resources.filter = filterResources.filter;
   }
 
   if (auto maskFilter = brush.maskFilter) {
