@@ -176,7 +176,7 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
 
 std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
     PictureRecorder* recorder, const DrawArgs& parentArgs, const Rect& localBounds,
-    const Matrix& localToWorld, const Matrix& localToSurface, Canvas** outCanvas) const {
+    const Matrix& localToWorld, const Matrix& localToSurface, Canvas*& outCanvas) const {
   Matrix toWorld = Matrix::I();
   Rect worldBounds = Rect::MakeEmpty();
   if (!ComputeSubGeometry(bgSource.get(), localBounds, localToWorld, &toWorld, &worldBounds)) {
@@ -190,9 +190,7 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
     return nullptr;
   }
   // createFromPicture may have flushed a recording segment; re-fetch the current canvas.
-  if (outCanvas != nullptr) {
-    *outCanvas = recorder->getRecordingCanvas();
-  }
+  outCanvas = recorder->getRecordingCanvas();
   return clone;
 }
 

@@ -74,13 +74,15 @@ class BackgroundHandler {
   }
 
   // PictureRecorder variant. Same semantics as the Surface variant; on success re-fetches the
-  // recorder's current canvas via `*outCanvas` since createFromPicture may flush a segment.
+  // recorder's current canvas via `outCanvas` since createFromPicture may flush a segment, which
+  // invalidates the prior canvas pointer. Passing a reference (rather than an optional pointer)
+  // makes that contract impossible to ignore.
   virtual std::unique_ptr<BackgroundHandler> createSubHandler(PictureRecorder* /*recorder*/,
                                                               const DrawArgs& /*parentArgs*/,
                                                               const Rect& /*localBounds*/,
                                                               const Matrix& /*localToWorld*/,
                                                               const Matrix& /*localToSurface*/,
-                                                              Canvas** /*outCanvas*/) const {
+                                                              Canvas*& /*outCanvas*/) const {
     return nullptr;
   }
 
@@ -145,7 +147,7 @@ class BackgroundCapturer : public BackgroundHandler {
 
   std::unique_ptr<BackgroundHandler> createSubHandler(
       PictureRecorder* recorder, const DrawArgs& parentArgs, const Rect& localBounds,
-      const Matrix& localToWorld, const Matrix& localToSurface, Canvas** outCanvas) const override;
+      const Matrix& localToWorld, const Matrix& localToSurface, Canvas*& outCanvas) const override;
 
   const std::vector<Rect>* renderRects() const override {
     return _renderRects.empty() ? nullptr : &_renderRects;

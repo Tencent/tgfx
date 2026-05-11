@@ -188,7 +188,7 @@ OffscreenResult OffscreenRenderer::RenderContentOnPicture(
   std::unique_ptr<BackgroundHandler> subHandler;
   if (args.backgroundHandler != nullptr && args.backgroundHandler->needsSurface(layer)) {
     subHandler = args.backgroundHandler->createSubHandler(&recorder, args, inputBounds,
-                                                          contentMatrix, density, &canvas);
+                                                          contentMatrix, density, canvas);
     if (subHandler != nullptr) {
       drawArgs.backgroundHandler = subHandler.get();
       if (auto* rects = subHandler->renderRects()) {
@@ -269,7 +269,7 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnPicture(
   std::unique_ptr<BackgroundHandler> subHandler;
   if (args.backgroundHandler != nullptr) {
     subHandler = args.backgroundHandler->createSubHandler(&recorder, args, inputBounds,
-                                                          parentMatrix, localToSurface, &canvas);
+                                                          parentMatrix, localToSurface, canvas);
     if (subHandler != nullptr) {
       drawArgs.backgroundHandler = subHandler.get();
       if (auto* rects = subHandler->renderRects()) {
