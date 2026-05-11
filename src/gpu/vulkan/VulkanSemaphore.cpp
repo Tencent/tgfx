@@ -55,11 +55,11 @@ std::shared_ptr<VulkanSemaphore> VulkanSemaphore::MakeFrom(VulkanGPU* gpu, VkSem
   if (!gpu || semaphore == VK_NULL_HANDLE) {
     return nullptr;
   }
-  return gpu->makeResource<VulkanSemaphore>(semaphore, value);
+  return gpu->makeResource<VulkanSemaphore>(semaphore, value, true);
 }
 
-VulkanSemaphore::VulkanSemaphore(VkSemaphore semaphore, uint64_t value)
-    : _semaphore(semaphore), _value(value) {
+VulkanSemaphore::VulkanSemaphore(VkSemaphore semaphore, uint64_t value, bool adopted)
+    : _semaphore(semaphore), _value(value), _adopted(adopted) {
 }
 
 BackendSemaphore VulkanSemaphore::getBackendSemaphore() const {
@@ -73,7 +73,7 @@ BackendSemaphore VulkanSemaphore::getBackendSemaphore() const {
 }
 
 void VulkanSemaphore::onRelease(VulkanGPU* gpu) {
-  if (_semaphore != VK_NULL_HANDLE) {
+  if (_semaphore != VK_NULL_HANDLE && !_adopted) {
     vkDestroySemaphore(gpu->device(), _semaphore, nullptr);
     _semaphore = VK_NULL_HANDLE;
   }

@@ -36,7 +36,7 @@ class VulkanSemaphore : public Semaphore, public VulkanResource {
   static std::shared_ptr<VulkanSemaphore> MakeFrom(VulkanGPU* gpu, VkSemaphore semaphore,
                                                    uint64_t value);
 
-  VulkanSemaphore(VkSemaphore semaphore, uint64_t value);
+  VulkanSemaphore(VkSemaphore semaphore, uint64_t value, bool adopted = false);
   ~VulkanSemaphore() override = default;
 
   VkSemaphore vulkanSemaphore() const {
@@ -59,6 +59,7 @@ class VulkanSemaphore : public Semaphore, public VulkanResource {
  private:
   VkSemaphore _semaphore = VK_NULL_HANDLE;
   uint64_t _value = 0;
+  bool _adopted = false;
 
   friend class VulkanGPU;
 };
