@@ -86,7 +86,8 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
 
   VkWin32SurfaceCreateInfoKHR surfaceInfo = {};
   surfaceInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-  surfaceInfo.hinstance = GetModuleHandle(nullptr);
+  surfaceInfo.hinstance =
+      reinterpret_cast<HINSTANCE>(GetWindowLongPtrW(hwnd, GWLP_HINSTANCE));
   surfaceInfo.hwnd = hwnd;
 
   VkSurfaceKHR surface = VK_NULL_HANDLE;
@@ -131,11 +132,17 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
   // TODO: The colorSpace parameter is currently unused. Swapchain format is hardcoded to
   // B8G8R8A8_UNORM + SRGB_NONLINEAR, consistent with Metal and OpenGL backends which also default
   // to sRGB. HDR / Display-P3 support would require a ColorSpace → VkColorSpaceKHR mapping here.
+  // Spec allows a single {VK_FORMAT_UNDEFINED, SRGB_NONLINEAR} entry meaning "any format".
   VkSurfaceFormatKHR chosenFormat = formats[0];
-  for (auto& f : formats) {
-    if (f.format == VK_FORMAT_B8G8R8A8_UNORM && f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-      chosenFormat = f;
-      break;
+  if (formats.size() == 1 && formats[0].format == VK_FORMAT_UNDEFINED) {
+    chosenFormat = {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+  } else {
+    for (auto& f : formats) {
+      if (f.format == VK_FORMAT_B8G8R8A8_UNORM &&
+          f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+        chosenFormat = f;
+        break;
+      }
     }
   }
 

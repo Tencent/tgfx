@@ -43,21 +43,21 @@ class BackendTexture {
   /**
    * Creates an OpenGL backend texture.
    */
-  BackendTexture(const GLTextureInfo& glInfo, int width, int height)
+  explicit BackendTexture(const GLTextureInfo& glInfo, int width, int height)
       : _backend(Backend::OpenGL), _width(width), _height(height), glInfo(glInfo) {
   }
 
   /**
    * Creates a Metal backend texture.
    */
-  BackendTexture(const MetalTextureInfo& metalInfo, int width, int height)
+  explicit BackendTexture(const MetalTextureInfo& metalInfo, int width, int height)
       : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
   }
 
   /**
    * Creates a Vulkan backend texture.
    */
-  BackendTexture(const VulkanTextureInfo& vulkanInfo, int width, int height)
+  explicit BackendTexture(const VulkanTextureInfo& vulkanInfo, int width, int height)
       : _backend(Backend::Vulkan), _width(width), _height(height), vulkanInfo(vulkanInfo) {
   }
 
@@ -144,21 +144,21 @@ class BackendRenderTarget {
   /**
    * Creates an OpenGL backend render target.
    */
-  BackendRenderTarget(const GLFrameBufferInfo& glInfo, int width, int height)
+  explicit BackendRenderTarget(const GLFrameBufferInfo& glInfo, int width, int height)
       : _backend(Backend::OpenGL), _width(width), _height(height), glInfo(glInfo) {
   }
 
   /**
    * Creates a Metal backend render target.
    */
-  BackendRenderTarget(const MetalTextureInfo& metalInfo, int width, int height)
+  explicit BackendRenderTarget(const MetalTextureInfo& metalInfo, int width, int height)
       : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
   }
 
   /**
    * Creates a Vulkan backend render target.
    */
-  BackendRenderTarget(const VulkanImageInfo& vulkanInfo, int width, int height)
+  explicit BackendRenderTarget(const VulkanImageInfo& vulkanInfo, int width, int height)
       : _backend(Backend::Vulkan), _width(width), _height(height), vulkanInfo(vulkanInfo) {
   }
 
@@ -244,20 +244,21 @@ class BackendSemaphore {
   /**
    * Creates an OpenGL backend semaphore.
    */
-  BackendSemaphore(const GLSyncInfo& syncInfo) : _backend(Backend::OpenGL), glSyncInfo(syncInfo) {
+  explicit BackendSemaphore(const GLSyncInfo& syncInfo)
+      : _backend(Backend::OpenGL), glSyncInfo(syncInfo) {
   }
 
   /**
    * Creates a Metal backend semaphore.
    */
-  BackendSemaphore(const MetalSyncInfo& metalInfo)
+  explicit BackendSemaphore(const MetalSyncInfo& metalInfo)
       : _backend(Backend::Metal), metalSyncInfo(metalInfo) {
   }
 
   /**
    * Creates a Vulkan backend semaphore.
    */
-  BackendSemaphore(const VulkanSyncInfo& vulkanInfo)
+  explicit BackendSemaphore(const VulkanSyncInfo& vulkanInfo)
       : _backend(Backend::Vulkan), vulkanSyncInfo(vulkanInfo) {
   }
 
