@@ -72,8 +72,9 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
 
   auto device = vulkanGPU->device();
 
-  uniformBindings.resize(16);
-  textureBindings.resize(16);
+  lastBound.uniformBindings.resize(16);
+  lastBound.textureBindings.resize(16);
+  lastBound.vertexBindings.resize(4);
 
   std::vector<VkAttachmentDescription> attachments;
   std::vector<VkAttachmentReference> colorRefs;
@@ -298,6 +299,14 @@ void VulkanRenderPass::setViewport(int x, int y, int width, int height) {
 }
 
 void VulkanRenderPass::setScissorRect(int x, int y, int width, int height) {
+  if (x == lastBound.scissorX && y == lastBound.scissorY && width == lastBound.scissorWidth &&
+      height == lastBound.scissorHeight) {
+    return;
+  }
+  lastBound.scissorX = x;
+  lastBound.scissorY = y;
+  lastBound.scissorWidth = width;
+  lastBound.scissorHeight = height;
   VkRect2D scissor = {};
   scissor.offset = {x, y};
   scissor.extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
@@ -308,49 +317,64 @@ void VulkanRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   if (!pipeline) {
     return;
   }
-  currentPipeline = std::static_pointer_cast<VulkanRenderPipeline>(pipeline);
-  if (currentPipeline->vulkanPipeline() == VK_NULL_HANDLE) {
-    currentPipeline = nullptr;
+  auto vulkanPipeline = std::static_pointer_cast<VulkanRenderPipeline>(pipeline);
+  if (vulkanPipeline == lastBound.pipeline) {
     return;
   }
-  encoder->retainResource(std::static_pointer_cast<VulkanResource>(currentPipeline));
+  lastBound.pipeline = vulkanPipeline;
+  if (lastBound.pipeline->vulkanPipeline() == VK_NULL_HANDLE) {
+    lastBound.pipeline = nullptr;
+    return;
+  }
+  encoder->retainResource(std::static_pointer_cast<VulkanResource>(lastBound.pipeline));
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    currentPipeline->vulkanPipeline());
-  descriptorDirty = true;
+                    lastBound.pipeline->vulkanPipeline());
+  lastBound.descriptorDirty = true;
 }
 
 void VulkanRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer,
                                         size_t offset, size_t size) {
-  if (!buffer || binding >= uniformBindings.size()) {
+  if (!buffer || binding >= lastBound.uniformBindings.size()) {
     return;
   }
   auto vulkanBuffer = std::static_pointer_cast<VulkanBuffer>(buffer);
+  auto vkBuf = vulkanBuffer->vulkanBuffer();
+  auto& ub = lastBound.uniformBindings[binding];
+  if (ub.buffer == vkBuf && ub.offset == offset && ub.size == size) {
+    return;
+  }
   encoder->retainResource(vulkanBuffer);
-  uniformBindings[binding] = {vulkanBuffer->vulkanBuffer(), offset, size};
-  descriptorDirty = true;
+  ub = {vkBuf, offset, size};
+  lastBound.descriptorDirty = true;
 }
 
 void VulkanRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> texture,
                                   std::shared_ptr<Sampler> sampler) {
-  if (!texture || !sampler || binding >= textureBindings.size()) {
+  if (!texture || !sampler || binding >= lastBound.textureBindings.size()) {
     return;
   }
   auto vulkanTexture = std::static_pointer_cast<VulkanTexture>(texture);
   auto vulkanSampler = std::static_pointer_cast<VulkanSampler>(sampler);
+  auto view = vulkanTexture->vulkanImageView();
+  auto samp = vulkanSampler->vulkanSampler();
+  auto& tb = lastBound.textureBindings[binding];
+  if (tb.imageView == view && tb.sampler == samp) {
+    return;
+  }
   encoder->retainResource(vulkanTexture);
   encoder->retainResource(vulkanSampler);
-  textureBindings[binding] = {vulkanTexture->vulkanImageView(), vulkanSampler->vulkanSampler()};
-  descriptorDirty = true;
+  tb = {view, samp};
+  lastBound.descriptorDirty = true;
 }
 
 void VulkanRenderPass::bindDescriptorSetIfDirty() {
-  if (!descriptorDirty || !currentPipeline) {
+  if (!lastBound.descriptorDirty || !lastBound.pipeline) {
     return;
   }
-  descriptorDirty = false;
+  lastBound.descriptorDirty = false;
 
   auto device = vulkanGPU->device();
-  auto setLayout = currentPipeline->vulkanDescriptorSetLayout();
+  auto setLayout = lastBound.pipeline->vulkanDescriptorSetLayout();
   if (setLayout == VK_NULL_HANDLE) {
     return;
   }
@@ -364,12 +388,12 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
   std::vector<VkWriteDescriptorSet> writes;
   std::vector<VkDescriptorBufferInfo> bufferInfos;
   std::vector<VkDescriptorImageInfo> imageInfos;
-  bufferInfos.reserve(uniformBindings.size());
-  imageInfos.reserve(textureBindings.size());
+  bufferInfos.reserve(lastBound.uniformBindings.size());
+  imageInfos.reserve(lastBound.textureBindings.size());
 
-  for (unsigned i = 0; i < static_cast<unsigned>(uniformBindings.size()); i++) {
-    auto& ub = uniformBindings[i];
-    if (ub.buffer == VK_NULL_HANDLE || !currentPipeline->hasUniformBinding(i)) {
+  for (unsigned i = 0; i < static_cast<unsigned>(lastBound.uniformBindings.size()); i++) {
+    auto& ub = lastBound.uniformBindings[i];
+    if (ub.buffer == VK_NULL_HANDLE || !lastBound.pipeline->hasUniformBinding(i)) {
       continue;
     }
     bufferInfos.push_back({ub.buffer, ub.offset, ub.size});
@@ -383,10 +407,10 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
     writes.push_back(write);
   }
 
-  for (unsigned i = 0; i < static_cast<unsigned>(textureBindings.size()); i++) {
-    auto& tb = textureBindings[i];
+  for (unsigned i = 0; i < static_cast<unsigned>(lastBound.textureBindings.size()); i++) {
+    auto& tb = lastBound.textureBindings[i];
     if (tb.imageView == VK_NULL_HANDLE || tb.sampler == VK_NULL_HANDLE ||
-        !currentPipeline->hasTextureBinding(i)) {
+        !lastBound.pipeline->hasTextureBinding(i)) {
       continue;
     }
     // All sampled textures use GENERAL layout, consistent with the layout set by writeTexture().
@@ -406,7 +430,7 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
   }
 
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          currentPipeline->vulkanPipelineLayout(), 0, 1, &descriptorSet, 0,
+                          lastBound.pipeline->vulkanPipelineLayout(), 0, 1, &descriptorSet, 0,
                           nullptr);
 }
 
@@ -416,9 +440,16 @@ void VulkanRenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer>
     return;
   }
   auto vulkanBuffer = std::static_pointer_cast<VulkanBuffer>(buffer);
-  encoder->retainResource(vulkanBuffer);
   VkBuffer vkBuf = vulkanBuffer->vulkanBuffer();
   VkDeviceSize vkOffset = offset;
+  if (slot < lastBound.vertexBindings.size()) {
+    auto& last = lastBound.vertexBindings[slot];
+    if (last.buffer == vkBuf && last.offset == vkOffset) {
+      return;
+    }
+    last = {vkBuf, vkOffset};
+  }
+  encoder->retainResource(vulkanBuffer);
   vkCmdBindVertexBuffers(commandBuffer, slot, 1, &vkBuf, &vkOffset);
 }
 
@@ -426,10 +457,16 @@ void VulkanRenderPass::setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFo
   if (!buffer) {
     return;
   }
-  encoder->retainResource(std::static_pointer_cast<VulkanBuffer>(buffer));
-  currentIndexType = (format == IndexFormat::UInt32) ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
   auto vulkanBuffer = std::static_pointer_cast<VulkanBuffer>(buffer);
-  vkCmdBindIndexBuffer(commandBuffer, vulkanBuffer->vulkanBuffer(), 0, currentIndexType);
+  auto vkBuf = vulkanBuffer->vulkanBuffer();
+  auto indexType = (format == IndexFormat::UInt32) ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
+  if (vkBuf == lastBound.indexBuffer && indexType == lastBound.indexType) {
+    return;
+  }
+  lastBound.indexBuffer = vkBuf;
+  lastBound.indexType = indexType;
+  encoder->retainResource(vulkanBuffer);
+  vkCmdBindIndexBuffer(commandBuffer, vkBuf, 0, indexType);
 }
 
 void VulkanRenderPass::setStencilReference(uint32_t reference) {
@@ -438,7 +475,7 @@ void VulkanRenderPass::setStencilReference(uint32_t reference) {
 
 void VulkanRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
                             uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
-  if (!currentPipeline) {
+  if (!lastBound.pipeline) {
     return;
   }
   bindDescriptorSetIfDirty();
@@ -458,7 +495,7 @@ void VulkanRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
 void VulkanRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCount,
                                    uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
                                    uint32_t firstInstance) {
-  if (!currentPipeline) {
+  if (!lastBound.pipeline) {
     return;
   }
   bindDescriptorSetIfDirty();

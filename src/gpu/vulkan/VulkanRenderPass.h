@@ -71,8 +71,6 @@ class VulkanRenderPass : public RenderPass {
   VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
   VkRenderPass renderPass = VK_NULL_HANDLE;
   VkFramebuffer framebuffer = VK_NULL_HANDLE;
-  std::shared_ptr<VulkanRenderPipeline> currentPipeline = nullptr;
-  VkIndexType currentIndexType = VK_INDEX_TYPE_UINT16;
 
   struct UniformBinding {
     VkBuffer buffer = VK_NULL_HANDLE;
@@ -85,9 +83,28 @@ class VulkanRenderPass : public RenderPass {
     VkSampler sampler = VK_NULL_HANDLE;
   };
 
-  std::vector<UniformBinding> uniformBindings;
-  std::vector<TextureBinding> textureBindings;
-  bool descriptorDirty = false;
+  struct VertexBinding {
+    VkBuffer buffer = VK_NULL_HANDLE;
+    VkDeviceSize offset = 0;
+  };
+
+  // Tracks the most recently bound state to skip redundant Vulkan commands when consecutive
+  // draws use the same pipeline, buffers, textures, or scissor rect.
+  struct BoundState {
+    std::shared_ptr<VulkanRenderPipeline> pipeline = nullptr;
+    std::vector<UniformBinding> uniformBindings;
+    std::vector<TextureBinding> textureBindings;
+    std::vector<VertexBinding> vertexBindings;
+    VkBuffer indexBuffer = VK_NULL_HANDLE;
+    VkIndexType indexType = VK_INDEX_TYPE_UINT16;
+    int scissorX = 0;
+    int scissorY = 0;
+    int scissorWidth = -1;
+    int scissorHeight = -1;
+    bool descriptorDirty = false;
+  };
+
+  BoundState lastBound;
 };
 
 }  // namespace tgfx
