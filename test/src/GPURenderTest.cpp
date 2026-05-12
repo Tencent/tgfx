@@ -20,6 +20,7 @@
 #include <vector>
 #include "InstancedGridRenderPass.h"
 #include "MultisampleTestEffect.h"
+#include "StencilWriteReadPass.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/RenderPass.h"
@@ -192,6 +193,51 @@ TGFX_TEST(GPURenderTest, AlphaToCoverage) {
   canvas->clear();
   canvas->drawImage(std::move(imageOn));
   EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/AlphaToCoverage_On"));
+}
+
+// ==================== Stencil Tests ====================
+
+// Verifies that the GPU backend honors stencil writes when the compare function is Always.
+// StencilWriteReadPass writes a stencil value in pass 1 and gates a red color draw on it in
+// pass 2. If the backend incorrectly treats compare = Always as a stencil no-op (an earlier bug
+// in GLRenderPipeline::MakeStencilState), pass 1 leaves stencil at 0 and the output stays black.
+TGFX_TEST(GPURenderTest, StencilWriteRead) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto gpu = context->gpu();
+
+  constexpr int width = 16;
+  constexpr int height = 16;
+  TextureDescriptor colorDesc(width, height, PixelFormat::RGBA_8888, false, 1,
+                              TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
+  auto colorTexture = gpu->createTexture(colorDesc);
+  ASSERT_TRUE(colorTexture != nullptr);
+
+  auto commandEncoder = gpu->createCommandEncoder();
+  ASSERT_TRUE(commandEncoder != nullptr);
+  auto pass = StencilWriteReadPass::Make();
+  ASSERT_TRUE(pass->onDraw(commandEncoder.get(), colorTexture));
+
+  auto commandBuffer = commandEncoder->finish();
+  ASSERT_TRUE(commandBuffer != nullptr);
+  gpu->queue()->submit(commandBuffer);
+  gpu->queue()->waitUntilCompleted();
+
+  auto surface =
+      Surface::MakeFrom(context, colorTexture->getBackendTexture(), ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  Bitmap bitmap(width, height, false, false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
+  ASSERT_TRUE(surface->readPixels(pixmap.info(), pixmap.writablePixels()));
+
+  auto pixels = static_cast<const uint8_t*>(pixmap.pixels());
+  auto offset = (height / 2) * pixmap.rowBytes() + (width / 2) * 4;
+  EXPECT_EQ(pixels[offset + 0], 255);  // R
+  EXPECT_EQ(pixels[offset + 1], 0);    // G
+  EXPECT_EQ(pixels[offset + 2], 0);    // B
+  EXPECT_EQ(pixels[offset + 3], 255);  // A
 }
 
 }  // namespace tgfx

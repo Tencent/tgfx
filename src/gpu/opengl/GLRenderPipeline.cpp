@@ -217,11 +217,18 @@ static GLStencil MakeGLStencil(const StencilDescriptor& descriptor) {
   return stencil;
 }
 
+static bool IsStencilNoOp(const StencilDescriptor& descriptor) {
+  return descriptor.failOp == StencilOperation::Keep &&
+         descriptor.passOp == StencilOperation::Keep &&
+         descriptor.depthFailOp == StencilOperation::Keep;
+}
+
 static std::unique_ptr<GLStencilState> MakeStencilState(const DepthStencilDescriptor& descriptor) {
   auto& stencilFront = descriptor.stencilFront;
   auto& stencilBack = descriptor.stencilBack;
-  if (stencilFront.compare == CompareFunction::Always &&
-      stencilBack.compare == CompareFunction::Always) {
+  // Skip stencil state only when neither face writes to the stencil buffer. The compare function
+  // alone is not sufficient: e.g. compare=Always with passOp=Invert still mutates the buffer.
+  if (IsStencilNoOp(stencilFront) && IsStencilNoOp(stencilBack)) {
     return nullptr;
   }
   auto stencilState = std::make_unique<GLStencilState>();
