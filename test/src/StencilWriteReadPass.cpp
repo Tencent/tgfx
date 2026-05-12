@@ -133,7 +133,6 @@ static std::shared_ptr<GPUBuffer> MakeFullscreenTriangle(GPU* gpu) {
 }
 
 static std::shared_ptr<GPUBuffer> MakeColorUniform(GPU* gpu, const Color& color) {
-  // The std140 layout requires alignment to 16 bytes.
   auto buffer = gpu->createBuffer(sizeof(UniformData), GPUBufferUsage::UNIFORM);
   if (buffer == nullptr) {
     return nullptr;
