@@ -1,4 +1,3 @@
-// win/src/TGFXWindow.cpp
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
@@ -334,14 +333,7 @@ void TGFXWindow::applyCenteringTransform() {
 
 void TGFXWindow::draw() {
   if (!tgfxWindow) {
-#ifdef TGFX_USE_VULKAN
-    auto device = tgfx::VulkanDevice::Make();
-    if (device) {
-      tgfxWindow = tgfx::VulkanWindow::MakeFrom(windowHandle, device);
-    }
-#else
     tgfxWindow = tgfx::WGLWindow::MakeFrom(windowHandle);
-#endif
   }
   if (tgfxWindow == nullptr) {
     return;
@@ -368,9 +360,6 @@ void TGFXWindow::draw() {
     return;
   }
   if (surface == nullptr) {
-    // Submit any pending recording from a previous frame before rebuilding the swapchain. This
-    // ensures that drawing buffers referencing the old swapchain are executed while it is still
-    // valid, preventing use-after-free when onCreateRenderTarget() destroys the old swapchain.
     if (lastRecording) {
       context->submit(std::move(lastRecording));
     }
