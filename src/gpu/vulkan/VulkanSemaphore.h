@@ -47,8 +47,12 @@ class VulkanSemaphore : public Semaphore, public VulkanResource {
     return _value;
   }
 
-  uint64_t nextSignalValue() {
-    return ++_value;
+  uint64_t nextSignalValue() const {
+    return _value + 1;
+  }
+
+  void commitSignalValue() {
+    ++_value;
   }
 
   BackendSemaphore getBackendSemaphore() const override;

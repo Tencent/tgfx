@@ -723,6 +723,9 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     submission.session.retainedResources.push_back(std::move(request.waitSemaphore));
   }
   if (request.signalSemaphore) {
+    // Advance the timeline value only after a successful submit. If submit had failed, the value
+    // stays unchanged so future waits on the uncommitted value don't deadlock.
+    request.signalSemaphore->commitSignalValue();
     submission.session.retainedResources.push_back(std::move(request.signalSemaphore));
   }
   inflightSubmissions.push_back(std::move(submission));
