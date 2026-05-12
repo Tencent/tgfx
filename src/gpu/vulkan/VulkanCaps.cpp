@@ -82,10 +82,12 @@ void VulkanCaps::initFeatures(VkPhysicalDevice physicalDevice) {
   for (const auto& ext : extensions) {
     _info.extensions.emplace_back(ext.extensionName);
     if (strcmp(ext.extensionName, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
-      timelineSemaphoreSupported = true;
+      // Also verify the function pointer to guard against MakeFrom where the host app may not
+      // have enabled this extension on the VkDevice (volk loads NULL for disabled extensions).
+      timelineSemaphoreSupported = (vkGetSemaphoreCounterValueKHR != nullptr);
     }
     if (strcmp(ext.extensionName, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) == 0) {
-      extendedDynamicStateSupported = true;
+      extendedDynamicStateSupported = (vkCmdSetPrimitiveTopologyEXT != nullptr);
     }
   }
 
