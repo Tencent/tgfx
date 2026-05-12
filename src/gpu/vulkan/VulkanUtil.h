@@ -42,6 +42,12 @@ bool VkFormatIsStencil(VkFormat format);
 /// Returns the bytes per pixel for the given VkFormat.
 int VkFormatBytesPerPixel(VkFormat format);
 
+/// Inserts a pipeline barrier to transition an image between layouts with precise stage/access
+/// masks derived from the source and destination layouts. Avoids ALL_COMMANDS_BIT stalls.
+void TransitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout,
+                           VkImageLayout newLayout,
+                           VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT);
+
 // Error checking macro that logs the VkResult string on failure.
 #define VK_CHECK(result)                                                                   \
   do {                                                                                     \

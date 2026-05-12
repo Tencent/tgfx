@@ -437,9 +437,10 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
     attachment.samples = static_cast<VkSampleCountFlagBits>(descriptor.multisample.count);
     attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+    attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-    colorRefs.push_back({static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_GENERAL});
+    colorRefs.push_back(
+        {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
     attachments.push_back(attachment);
   }
 
@@ -466,12 +467,33 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
   subpass.pColorAttachments = colorRefs.data();
   subpass.pDepthStencilAttachment = hasDepth ? &depthRef : nullptr;
 
+  // Subpass dependencies and attachment layouts must match VulkanRenderPass to ensure render pass
+  // compatibility (Vulkan spec §8.2). See VulkanRenderPass constructor for detailed rationale.
+  VkSubpassDependency dependencies[2] = {};
+  dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+  dependencies[0].dstSubpass = 0;
+  dependencies[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependencies[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  dependencies[0].dstAccessMask =
+      VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  dependencies[1].srcSubpass = 0;
+  dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+  dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependencies[1].dstStageMask =
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  dependencies[1].dstAccessMask =
+      VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+
   VkRenderPassCreateInfo renderPassInfo = {};
   renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
   renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
   renderPassInfo.pAttachments = attachments.data();
   renderPassInfo.subpassCount = 1;
   renderPassInfo.pSubpasses = &subpass;
+  renderPassInfo.dependencyCount = 2;
+  renderPassInfo.pDependencies = dependencies;
 
   VkRenderPass renderPass = VK_NULL_HANDLE;
   auto result = vkCreateRenderPass(gpu->device(), &renderPassInfo, nullptr, &renderPass);

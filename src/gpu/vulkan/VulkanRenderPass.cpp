@@ -48,26 +48,6 @@ static VkAttachmentStoreOp ToVkStoreOp(StoreAction action) {
   }
 }
 
-static void TransitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout,
-                                  VkImageLayout newLayout, VkImageAspectFlags aspectMask) {
-  VkImageMemoryBarrier barrier = {};
-  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  barrier.oldLayout = oldLayout;
-  barrier.newLayout = newLayout;
-  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = image;
-  barrier.subresourceRange.aspectMask = aspectMask;
-  barrier.subresourceRange.baseMipLevel = 0;
-  barrier.subresourceRange.levelCount = 1;
-  barrier.subresourceRange.baseArrayLayer = 0;
-  barrier.subresourceRange.layerCount = 1;
-  barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
-  barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                       0, 0, nullptr, 0, nullptr, 1, &barrier);
-}
-
 std::shared_ptr<VulkanRenderPass> VulkanRenderPass::Make(VulkanCommandEncoder* encoder,
                                                          const RenderPassDescriptor& descriptor) {
   if (!encoder) {
@@ -125,19 +105,20 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
     auto oldLayout = (loadAction == LoadAction::Load) ? vulkanTexture->currentLayout()
                                                       : VK_IMAGE_LAYOUT_UNDEFINED;
     TransitionImageLayout(commandBuffer, vulkanTexture->vulkanImage(), oldLayout,
-                          VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
 
     VkAttachmentDescription attachment = {};
     attachment.format = vulkanTexture->vulkanFormat();
     attachment.samples = static_cast<VkSampleCountFlagBits>(ca.texture->sampleCount());
     attachment.loadOp = ToVkLoadOp(loadAction);
     attachment.storeOp = ToVkStoreOp(ca.storeAction);
-    attachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+    attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     vulkanTexture->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
 
-    colorRefs.push_back({static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_GENERAL});
+    colorRefs.push_back(
+        {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
     attachments.push_back(attachment);
     fbAttachments.push_back(vulkanTexture->vulkanImageView());
 
@@ -153,7 +134,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
       encoder->retainResource(resolveVulkanTexture);
 
       TransitionImageLayout(commandBuffer, resolveVulkanTexture->vulkanImage(),
-                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                             VK_IMAGE_ASPECT_COLOR_BIT);
 
       VkAttachmentDescription resolveAttachment = {};
@@ -161,12 +142,13 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
       resolveAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
       resolveAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
       resolveAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-      resolveAttachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+      resolveAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
       resolveAttachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
 
       resolveVulkanTexture->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
 
-      resolveRefs.push_back({static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_GENERAL});
+      resolveRefs.push_back({static_cast<uint32_t>(attachments.size()),
+                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
       attachments.push_back(resolveAttachment);
       fbAttachments.push_back(resolveVulkanTexture->vulkanImageView());
       clearValues.push_back({});
@@ -218,12 +200,36 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
   subpass.pResolveAttachments = hasResolve ? resolveRefs.data() : nullptr;
   subpass.pDepthStencilAttachment = hasDepth ? &depthRef : nullptr;
 
+  // Explicit subpass dependencies replace the implicit default (TOP_OF_PIPE↔ALL_COMMANDS).
+  // EXTERNAL→0: ensures prior color attachment writes (from a previous render pass) or transfers
+  // are visible before this subpass starts writing.
+  // 0→EXTERNAL: ensures this subpass's color attachment writes are visible to subsequent operations
+  // (shader reads, transfers, or presentation layout transitions).
+  VkSubpassDependency dependencies[2] = {};
+  dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+  dependencies[0].dstSubpass = 0;
+  dependencies[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependencies[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  dependencies[0].dstAccessMask =
+      VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  dependencies[1].srcSubpass = 0;
+  dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+  dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependencies[1].dstStageMask =
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  dependencies[1].dstAccessMask =
+      VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+
   VkRenderPassCreateInfo rpInfo = {};
   rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
   rpInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
   rpInfo.pAttachments = attachments.data();
   rpInfo.subpassCount = 1;
   rpInfo.pSubpasses = &subpass;
+  rpInfo.dependencyCount = 2;
+  rpInfo.pDependencies = dependencies;
 
   auto rpResult = vkCreateRenderPass(device, &rpInfo, nullptr, &renderPass);
   if (rpResult != VK_SUCCESS) {
