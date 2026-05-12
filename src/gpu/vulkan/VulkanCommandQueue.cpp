@@ -91,6 +91,8 @@ void VulkanCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Re
   for (uint32_t row = 0; row < height; row++) {
     memcpy(dst + row * tightRowBytes, src + row * srcRowBytes, tightRowBytes);
   }
+  // Flush is required for non-coherent memory; VMA turns it into a no-op for coherent memory.
+  vmaFlushAllocation(gpu->allocator(), stagingAlloc, 0, stagingSize);
 
   VkBufferImageCopy region = {};
   region.bufferOffset = 0;
