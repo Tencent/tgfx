@@ -148,8 +148,8 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
 
       resolveVulkanTexture->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
 
-      resolveRefs.push_back({static_cast<uint32_t>(attachments.size()),
-                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
+      resolveRefs.push_back(
+          {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
       attachments.push_back(resolveAttachment);
       fbAttachments.push_back(resolveVulkanTexture->vulkanImageView());
       clearValues.push_back({});
@@ -220,8 +220,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
   dependencies[1].dstStageMask =
       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-  dependencies[1].dstAccessMask =
-      VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+  dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
 
   VkRenderPassCreateInfo rpInfo = {};
   rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;

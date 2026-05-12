@@ -28,7 +28,6 @@
 #include "gpu/vulkan/VulkanBuffer.h"
 #include "gpu/vulkan/VulkanCommandEncoder.h"
 #include "gpu/vulkan/VulkanCommandQueue.h"
-#include "vk_mem_alloc.h"
 #include "gpu/vulkan/VulkanRenderPipeline.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "gpu/vulkan/VulkanSampler.h"
@@ -36,6 +35,7 @@
 #include "gpu/vulkan/VulkanShaderModule.h"
 #include "gpu/vulkan/VulkanTexture.h"
 #include "gpu/vulkan/VulkanUtil.h"
+#include "vk_mem_alloc.h"
 
 namespace tgfx {
 
@@ -418,11 +418,10 @@ std::shared_ptr<Texture> VulkanGPU::importBackendRenderTarget(
   if (!isFormatRenderable(format)) {
     return nullptr;
   }
-  return VulkanTexture::MakeFrom(this, reinterpret_cast<VkImage>(vulkanInfo.image),
-                                 static_cast<VkFormat>(vulkanInfo.format),
-                                 backendRenderTarget.width(), backendRenderTarget.height(),
-                                 TextureUsage::RENDER_ATTACHMENT, false,
-                                 static_cast<VkImageLayout>(vulkanInfo.layout));
+  return VulkanTexture::MakeFrom(
+      this, reinterpret_cast<VkImage>(vulkanInfo.image), static_cast<VkFormat>(vulkanInfo.format),
+      backendRenderTarget.width(), backendRenderTarget.height(), TextureUsage::RENDER_ATTACHMENT,
+      false, static_cast<VkImageLayout>(vulkanInfo.layout));
 }
 
 std::shared_ptr<Semaphore> VulkanGPU::importBackendSemaphore(const BackendSemaphore& semaphore) {
@@ -599,9 +598,10 @@ void VulkanGPU::pollCompletedSubmissions() {
     // VK_ERROR_DEVICE_LOST or other fatal error: the fence will never signal. Force-reclaim all
     // remaining inflight submissions to avoid resource leaks and prevent infinite blocking in
     // waitAllInflightSubmissions(). After this, lockContext() will return nullptr (contextLost).
-    LOGE("VulkanGPU::pollCompletedSubmissions: vkGetFenceStatus returned %d, reclaiming all "
-         "inflight submissions.",
-         static_cast<int>(status));
+    LOGE(
+        "VulkanGPU::pollCompletedSubmissions: vkGetFenceStatus returned %d, reclaiming all "
+        "inflight submissions.",
+        static_cast<int>(status));
     while (!inflightSubmissions.empty()) {
       reclaimSubmission(inflightSubmissions.front());
       inflightSubmissions.pop_front();

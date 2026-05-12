@@ -74,9 +74,9 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
     // Acquire the next swapchain image. The imageAvailable semaphore is signaled when the
     // presentation engine releases the image; the GPU waits on it at COLOR_ATTACHMENT_OUTPUT.
-    auto result = vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX,
-                                        _imageAvailableSemaphore, VK_NULL_HANDLE,
-                                        &_currentImageIndex);
+    auto result =
+        vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX, _imageAvailableSemaphore,
+                              VK_NULL_HANDLE, &_currentImageIndex);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
       LOGE("VulkanSwapchainProxy: swapchain out of date, needs rebuild.");
       return nullptr;

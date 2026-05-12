@@ -72,8 +72,7 @@ VkFormat VulkanCaps::getVkFormat(PixelFormat format) const {
   return VK_FORMAT_UNDEFINED;
 }
 
-void VulkanCaps::initFeatures(VkPhysicalDevice physicalDevice,
-                              const VulkanExtensions& extensions) {
+void VulkanCaps::initFeatures(VkPhysicalDevice physicalDevice, const VulkanExtensions& extensions) {
   uint32_t extensionCount = 0;
   vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr);
   std::vector<VkExtensionProperties> availableExtensions(extensionCount);

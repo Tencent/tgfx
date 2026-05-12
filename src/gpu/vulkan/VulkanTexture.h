@@ -36,11 +36,9 @@ class VulkanTexture : public Texture, public VulkanResource {
  public:
   static std::shared_ptr<VulkanTexture> Make(VulkanGPU* gpu, const TextureDescriptor& descriptor);
 
-  static std::shared_ptr<VulkanTexture> MakeFrom(VulkanGPU* gpu, VkImage image, VkFormat format,
-                                                 int width, int height, uint32_t usage,
-                                                 bool adopted,
-                                                 VkImageLayout initialLayout =
-                                                     VK_IMAGE_LAYOUT_UNDEFINED);
+  static std::shared_ptr<VulkanTexture> MakeFrom(
+      VulkanGPU* gpu, VkImage image, VkFormat format, int width, int height, uint32_t usage,
+      bool adopted, VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED);
 
   VkImage vulkanImage() const {
     return image;

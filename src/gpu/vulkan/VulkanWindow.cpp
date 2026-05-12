@@ -30,8 +30,7 @@
 namespace tgfx {
 
 static void DestroySwapchainResources(VkDevice device, VkInstance instance, VkSurfaceKHR surface,
-                                      VkSwapchainKHR swapchain,
-                                      VkSemaphore imageAvailableSemaphore,
+                                      VkSwapchainKHR swapchain, VkSemaphore imageAvailableSemaphore,
                                       VkSemaphore renderFinishedSemaphore,
                                       const std::vector<VkImageView>& imageViews) {
   if (renderFinishedSemaphore != VK_NULL_HANDLE) {
@@ -86,8 +85,7 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
 
   VkWin32SurfaceCreateInfoKHR surfaceInfo = {};
   surfaceInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-  surfaceInfo.hinstance =
-      reinterpret_cast<HINSTANCE>(GetWindowLongPtrW(hwnd, GWLP_HINSTANCE));
+  surfaceInfo.hinstance = reinterpret_cast<HINSTANCE>(GetWindowLongPtrW(hwnd, GWLP_HINSTANCE));
   surfaceInfo.hwnd = hwnd;
 
   VkSurfaceKHR surface = VK_NULL_HANDLE;
@@ -273,10 +271,8 @@ VulkanWindow::~VulkanWindow() {
   vkDeviceWaitIdle(vkDevice);
 
   DestroySwapchainResources(vkDevice, vulkanGPU->instance(), _platformState->surface,
-                            _platformState->swapchain,
-                            _platformState->imageAvailableSemaphore,
-                            _platformState->renderFinishedSemaphore,
-                            _platformState->imageViews);
+                            _platformState->swapchain, _platformState->imageAvailableSemaphore,
+                            _platformState->renderFinishedSemaphore, _platformState->imageViews);
   device->unlock();
 }
 

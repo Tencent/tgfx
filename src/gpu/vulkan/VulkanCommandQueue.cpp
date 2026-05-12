@@ -160,9 +160,9 @@ void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
   if (combinedSrcStage == 0) {
     combinedSrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
   }
-  vkCmdPipelineBarrier(commandBuffer, combinedSrcStage,
-                       VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
-                       static_cast<uint32_t>(preCopyBarriers.size()), preCopyBarriers.data());
+  vkCmdPipelineBarrier(commandBuffer, combinedSrcStage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
+                       nullptr, 0, nullptr, static_cast<uint32_t>(preCopyBarriers.size()),
+                       preCopyBarriers.data());
 
   for (auto& upload : pendingUploads) {
     vkCmdCopyBufferToImage(commandBuffer, upload.stagingBuffer, upload.texture->vulkanImage(),
@@ -313,8 +313,7 @@ void VulkanCommandQueue::waitSemaphore(std::shared_ptr<Semaphore> semaphore) {
 void VulkanCommandQueue::schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex,
                                          VkImage image, VkSemaphore imageAvailableSemaphore,
                                          VkSemaphore renderFinishedSemaphore) {
-  pendingPresent = {swapchain, imageIndex, image, imageAvailableSemaphore,
-                    renderFinishedSemaphore};
+  pendingPresent = {swapchain, imageIndex, image, imageAvailableSemaphore, renderFinishedSemaphore};
 }
 
 void VulkanCommandQueue::waitUntilCompleted() {
