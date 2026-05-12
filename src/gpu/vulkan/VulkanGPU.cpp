@@ -39,6 +39,21 @@
 
 namespace tgfx {
 
+#ifdef DEBUG
+// Validation layer callback that routes Vulkan errors and warnings to the tgfx logging system.
+// Registered only in Debug builds when VK_LAYER_KHRONOS_validation is available.
+static VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
+    const VkDebugUtilsMessengerCallbackDataEXT* callbackData, void*) {
+  if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+    LOGE("Vulkan Validation: %s", callbackData->pMessage);
+  } else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+    LOGE("Vulkan Warning: %s", callbackData->pMessage);
+  }
+  return VK_FALSE;
+}
+#endif
+
 bool HardwareBufferAvailable() {
   return false;
 }
@@ -99,6 +114,7 @@ bool VulkanGPU::initVulkan() {
     return false;
   }
   volkLoadInstance(vulkanInstance);
+  installDebugMessenger();
   if (!pickPhysicalDevice()) {
     return false;
   }
@@ -113,6 +129,23 @@ bool VulkanGPU::initVulkan() {
   commandQueue = std::make_unique<VulkanCommandQueue>(this);
   compiler = std::make_unique<shaderc::Compiler>();
   return true;
+}
+
+void VulkanGPU::installDebugMessenger() {
+#ifdef DEBUG
+  if (vkCreateDebugUtilsMessengerEXT == nullptr) {
+    return;
+  }
+  VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
+  createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+  createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
+  createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+  createInfo.pfnUserCallback = DebugMessengerCallback;
+  vkCreateDebugUtilsMessengerEXT(vulkanInstance, &createInfo, nullptr, &debugMessenger);
+#endif
 }
 
 bool VulkanGPU::createInstance() {
@@ -134,11 +167,41 @@ bool VulkanGPU::createInstance() {
       VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
   };
 
+  // In Debug builds, enable VK_LAYER_KHRONOS_validation and VK_EXT_debug_utils if available.
+  // This catches spec violations (e.g. missing barriers, layout mismatches) during development.
+  std::vector<const char*> enabledLayers;
+
+#ifdef DEBUG
+  uint32_t layerCount = 0;
+  vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+  std::vector<VkLayerProperties> availableLayers(layerCount);
+  vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+  for (auto& layer : availableLayers) {
+    if (strcmp(layer.layerName, "VK_LAYER_KHRONOS_validation") == 0) {
+      enabledLayers.push_back("VK_LAYER_KHRONOS_validation");
+      break;
+    }
+  }
+
+  uint32_t extCount = 0;
+  vkEnumerateInstanceExtensionProperties(nullptr, &extCount, nullptr);
+  std::vector<VkExtensionProperties> availableExts(extCount);
+  vkEnumerateInstanceExtensionProperties(nullptr, &extCount, availableExts.data());
+  for (auto& ext : availableExts) {
+    if (strcmp(ext.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0) {
+      instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+      break;
+    }
+  }
+#endif
+
   VkInstanceCreateInfo createInfo = {};
   createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   createInfo.pApplicationInfo = &appInfo;
   createInfo.enabledExtensionCount = static_cast<uint32_t>(instanceExtensions.size());
   createInfo.ppEnabledExtensionNames = instanceExtensions.data();
+  createInfo.enabledLayerCount = static_cast<uint32_t>(enabledLayers.size());
+  createInfo.ppEnabledLayerNames = enabledLayers.data();
 
   auto result = vkCreateInstance(&createInfo, nullptr, &vulkanInstance);
   if (result != VK_SUCCESS) {
@@ -755,6 +818,10 @@ void VulkanGPU::releaseAll(bool releaseGPU) {
       vulkanDevice = VK_NULL_HANDLE;
     }
     if (vulkanInstance != VK_NULL_HANDLE) {
+      if (debugMessenger != VK_NULL_HANDLE && vkDestroyDebugUtilsMessengerEXT != nullptr) {
+        vkDestroyDebugUtilsMessengerEXT(vulkanInstance, debugMessenger, nullptr);
+        debugMessenger = VK_NULL_HANDLE;
+      }
       vkDestroyInstance(vulkanInstance, nullptr);
       vulkanInstance = VK_NULL_HANDLE;
     }

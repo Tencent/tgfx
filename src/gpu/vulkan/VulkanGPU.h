@@ -250,6 +250,7 @@ class VulkanGPU : public GPU {
 
   bool initVulkan();
   bool createInstance();
+  void installDebugMessenger();
   bool pickPhysicalDevice();
   bool createDevice();
   bool createAllocator();
@@ -277,6 +278,7 @@ class VulkanGPU : public GPU {
   void recycleFence(VkFence fence);
 
   VkInstance vulkanInstance = VK_NULL_HANDLE;
+  VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
   VkPhysicalDevice vulkanPhysicalDevice = VK_NULL_HANDLE;
   VkDevice vulkanDevice = VK_NULL_HANDLE;
   VkQueue vulkanQueue = VK_NULL_HANDLE;
