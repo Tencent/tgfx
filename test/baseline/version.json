@@ -362,6 +362,7 @@
         "CornerShapeDouble": "bf48e614",
         "CornerShapeTriple": "bf48e614",
         "DrawPathProvider": "bf48e614",
+        "InverseFillFastPath": "906401c2",
         "OpenConicShape": "bf48e614",
         "OpenConicShapeCorner": "bf48e614",
         "OpenQuadShape": "bf48e614",

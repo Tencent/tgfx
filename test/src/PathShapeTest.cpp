@@ -269,6 +269,58 @@ TGFX_TEST(PathShapeTest, inversePath) {
                       EXPECT_TRUE(cachesBefore.front() == cachesAfter.front()));
 }
 
+// Regression: a path that is geometrically a single rect/oval/rrect must still honor its
+// inverse fill type when drawn. Canvas::drawPath used to forward such paths to the rect/rrect
+// fast-paths, which take Rect/RRect values and silently dropped the fill type, painting a
+// regular fill instead of the geometry's complement. The baseline image lays out three
+// geometries (rect / oval / rrect) in two rows: top row fills, bottom row strokes. Each cell
+// shows red everywhere outside the geometry (or its stroked outline).
+TGFX_TEST(PathShapeTest, InverseFillFastPath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 360, 240);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color{0.f, 0.f, 0.f, 1.f});
+
+  Paint fillPaint;
+  fillPaint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+
+  Paint strokePaint = fillPaint;
+  strokePaint.setStyle(PaintStyle::Stroke);
+  strokePaint.setStrokeWidth(4.f);
+
+  // Each cell is 120x120; geometry sits at [20, 100) inside its cell.
+  Path rectPath = {};
+  rectPath.addRect(Rect::MakeXYWH(20, 20, 80, 80));
+  rectPath.setFillType(PathFillType::InverseWinding);
+
+  Path ovalPath = {};
+  ovalPath.addOval(Rect::MakeXYWH(20, 20, 80, 80));
+  ovalPath.setFillType(PathFillType::InverseEvenOdd);
+
+  RRect rRect = {};
+  rRect.setRectXY(Rect::MakeXYWH(20, 20, 80, 80), 16, 16);
+  Path rRectPath = {};
+  rRectPath.addRRect(rRect);
+  rRectPath.setFillType(PathFillType::InverseWinding);
+
+  const Path* paths[] = {&rectPath, &ovalPath, &rRectPath};
+  for (int row = 0; row < 2; ++row) {
+    const Paint& paint = row == 0 ? fillPaint : strokePaint;
+    for (int col = 0; col < 3; ++col) {
+      canvas->save();
+      canvas->translate(static_cast<float>(col * 120), static_cast<float>(row * 120));
+      canvas->clipRect(Rect::MakeWH(120, 120));
+      canvas->drawPath(*paths[col], paint);
+      canvas->restore();
+    }
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PathShapeTest/InverseFillFastPath"));
+}
+
 TGFX_TEST_PRIVATE(PathShapeTest, drawShape) {
   ContextScope scope;
   auto context = scope.getContext();

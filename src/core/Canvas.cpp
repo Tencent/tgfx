@@ -411,8 +411,18 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
 void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
                       const Brush& brush, const Stroke* stroke) const {
   DEBUG_ASSERT(!path.isEmpty());
+  // Inverse-fill paths must go through the generic path/shape pipeline, which preserves the
+  // fill type. The drawRect/drawRRect fast-paths take plain Rect/RRect and would silently drop
+  // the inverse semantics, regardless of whether a stroke is supplied: stroke + inverse means
+  // "everything outside the stroked outline", which the generic path routes through StrokeShape
+  // and OpsCompositor correctly (StrokeShape forwards fillType, OpsCompositor swaps in
+  // clipBounds when inverse).
+  const bool inverseFill = path.isInverseFillType();
+  // Skip the line fast-path under inverse fill: the early `return` for fill mode would silently
+  // discard the "paint everything except a zero-area line" (i.e. paint the whole clip)
+  // semantics. Falling through to the generic path lets Shape/OpsCompositor handle it.
   Point line[2] = {};
-  if (path.isLine(line)) {
+  if (!inverseFill && path.isLine(line)) {
     if (!stroke) {
       return;
     }
@@ -424,7 +434,8 @@ void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& c
   // isRect can match an open 4-segment polyline whose stroke (open contour with caps) differs
   // from a closed rectangle stroke, so only forward when the path is closed or there is no
   // stroke (closedness does not affect fill).
-  if (path.isRect(&rect, &closed) && !rect.isEmpty() && (stroke == nullptr || closed)) {
+  if (!inverseFill && path.isRect(&rect, &closed) && !rect.isEmpty() &&
+      (stroke == nullptr || closed)) {
     drawContext->drawRect(rect, matrix, clip, brush, stroke);
     return;
   }
@@ -432,10 +443,10 @@ void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& c
   bool hasRRect = false;
   // Path::isOval can return true with empty bounds because addOval does not filter them, so
   // guard against an empty oval reaching the backend (which asserts on empty rrects).
-  if (path.isOval(&rect) && !rect.isEmpty()) {
+  if (!inverseFill && path.isOval(&rect) && !rect.isEmpty()) {
     rRect.setOval(rect);
     hasRRect = true;
-  } else if (path.isRRect(&rRect) && !rRect.rect().isEmpty()) {
+  } else if (!inverseFill && path.isRRect(&rRect) && !rRect.rect().isEmpty()) {
     hasRRect = true;
   }
   // UseDrawPath forces complex stroke/radius combinations through the generic stroker, matching
