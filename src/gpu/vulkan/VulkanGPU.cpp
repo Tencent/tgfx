@@ -597,28 +597,39 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     return;
   }
 
-  // Step 4: Build VkSubmitInfo with optional timeline semaphore and present synchronization.
-  // Wait semaphores: [timeline (cross-context sync), imageAvailable (swapchain acquire)].
-  // Signal semaphores: [timeline (cross-context sync), renderFinished (for present)].
+  // Step 4: Build VkSubmitInfo. Two independent semaphore mechanisms may be active:
+  //
+  //   (a) Timeline semaphore — cross-Surface synchronization. When multiple Surfaces share a
+  //       Context, Surface A's render result may be sampled as a texture by Surface B. The timeline
+  //       semaphore ensures A's submission completes before B's fragment shader reads it.
+  //       Wait stage: FRAGMENT_SHADER (vertex work can proceed in parallel).
+  //
+  //   (b) Binary semaphore pair — standard Vulkan presentation sync (acquire → render → present).
+  //       imageAvailable: signaled by vkAcquireNextImageKHR, waited at COLOR_ATTACHMENT_OUTPUT.
+  //       renderFinished: signaled by this submit, waited by vkQueuePresentKHR.
+  //
   std::vector<VkSemaphore> waitSemaphores;
   std::vector<VkPipelineStageFlags> waitStages;
   std::vector<uint64_t> waitValues;
   std::vector<VkSemaphore> signalSemaphores;
   std::vector<uint64_t> signalValues;
 
+  // (a) Timeline semaphore wait/signal for cross-Surface dependency.
   if (request.waitSemaphore) {
     waitSemaphores.push_back(request.waitSemaphore->vulkanSemaphore());
-    waitStages.push_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    waitStages.push_back(VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
     waitValues.push_back(request.waitSemaphore->signalValue());
-  }
-  if (request.imageAvailableSemaphore != VK_NULL_HANDLE) {
-    waitSemaphores.push_back(request.imageAvailableSemaphore);
-    waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-    waitValues.push_back(0);
   }
   if (request.signalSemaphore) {
     signalSemaphores.push_back(request.signalSemaphore->vulkanSemaphore());
     signalValues.push_back(request.signalSemaphore->nextSignalValue());
+  }
+
+  // (b) Binary semaphore pair for presentation sync.
+  if (request.imageAvailableSemaphore != VK_NULL_HANDLE) {
+    waitSemaphores.push_back(request.imageAvailableSemaphore);
+    waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+    waitValues.push_back(0);
   }
   if (request.renderFinishedSemaphore != VK_NULL_HANDLE) {
     signalSemaphores.push_back(request.renderFinishedSemaphore);
