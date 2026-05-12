@@ -40,8 +40,8 @@ class RootLayer;
 class OpaqueContext;
 struct LayerStyleSource;
 struct MaskData;
-class BackgroundContext;
-enum class DrawMode;
+class BackgroundSource;
+class OffscreenRenderer;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
@@ -646,24 +646,31 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const Matrix3D& matrix3D,
                                LayerDrawFunc drawFunc, float alpha, BlendMode blendMode);
 
-  std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child,
-                                          bool skipBackground);
+  std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child);
 
   bool drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, float alpha,
                  LayerDrawFunc drawFunc);
 
-  float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
-
-  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix,
-                                                        bool excludeContour = false);
-
-  std::shared_ptr<Image> getBackgroundImage(const DrawArgs& args, float contentScale,
-                                            Point* offset);
-
-  void drawBackgroundImage(const DrawArgs& args, Canvas& canvas);
+  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
 
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position);
+
+  void drawLayerStyleDefault(const DrawArgs& args, Canvas* canvas, float alpha, LayerStyle* style,
+                             const LayerStyleSource* source);
+
+  // Walks ancestors and prior siblings, painting their content + Below styles into canvas. Used
+  // by synthesizeBackgroundImage for the picture-canvas fallback. Returns the cumulative alpha
+  // after the parent chain. Each frame passes its `this` to the parent as stopChild so siblings
+  // at or after the current layer are excluded.
+  float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
+
+  // Synthesize a picture-backed backdrop image by walking ancestors and prior siblings via
+  // drawBackgroundLayers and composing this layer's Below styles. Returns nullptr when bounds
+  // collapse to empty or recording produces no picture. Used by BackgroundConsumer fallback when
+  // the snapshot map is empty (picture-canvas draw path).
+  std::shared_ptr<Image> synthesizeBackgroundImage(const DrawArgs& args, float contentScale,
+                                                   Point* offset);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
@@ -691,7 +698,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasBackgroundStyle();
 
-  std::shared_ptr<BackgroundContext> createBackgroundContext(
+  bool hasDescendantBackgroundStyle();
+
+  std::shared_ptr<BackgroundSource> createBackgroundSource(
       Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
       std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
 
@@ -706,14 +715,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                             const std::shared_ptr<MaskFilter>& maskFilter);
-
-  std::shared_ptr<Image> getContentImage(const DrawArgs& args, const Matrix& contentMatrix,
-                                         const std::optional<Rect>& clipBounds,
-                                         Matrix* imageMatrix);
-
-  std::shared_ptr<Image> getPassThroughContentImage(const DrawArgs& args, Canvas* canvas,
-                                                    const std::optional<Rect>& clipBounds,
-                                                    Matrix* imageMatrix);
 
   std::optional<Rect> computeContentBounds(const std::optional<Rect>& clipBounds,
                                            bool excludeEffects);
@@ -758,13 +759,18 @@ class Layer : public std::enable_shared_from_this<Layer> {
   Rect* contentBounds = nullptr;                //  in global coordinates
   std::unique_ptr<Rect> localBounds = nullptr;  // in local coordinates
 
-  // if > 0, means the layer or any of its descendants has a background style
+  // Max/min background-sourced filter outset (local units at contentScale=1) across this subtree.
+  // max>0 doubles as a presence flag for background styles; min is used to decide bg surface
+  // down-sampling when the outset exceeds the single-pass blur budget.
   float maxBackgroundOutset = 0.f;
   float minBackgroundOutset = std::numeric_limits<float>::max();
 
   friend class RootLayer;
   friend class DisplayList;
+  friend class BackgroundCapturer;
+  friend class BackgroundConsumer;
   friend class LayerProperty;
   friend class LayerSerialization;
+  friend class OffscreenRenderer;
 };
 }  // namespace tgfx

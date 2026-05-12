@@ -3109,8 +3109,7 @@ TGFX_TEST(LayerTest, Layer3DContextAPI) {
   auto colorSpace = ColorSpace::SRGB();
 
   // Test Render3DContext creation (opaqueMode = false)
-  auto render3DContext =
-      Layer3DContext::Make(false, context, renderRect, contentScale, colorSpace, nullptr);
+  auto render3DContext = Layer3DContext::Make(false, context, renderRect, contentScale, colorSpace);
   ASSERT_TRUE(render3DContext != nullptr);
   EXPECT_TRUE(render3DContext->isFinished());
 
@@ -3129,8 +3128,7 @@ TGFX_TEST(LayerTest, Layer3DContextAPI) {
   EXPECT_TRUE(render3DContext->isFinished());
 
   // Test Opaque3DContext creation (opaqueMode = true)
-  auto opaque3DContext =
-      Layer3DContext::Make(true, context, renderRect, contentScale, colorSpace, nullptr);
+  auto opaque3DContext = Layer3DContext::Make(true, context, renderRect, contentScale, colorSpace);
   ASSERT_TRUE(opaque3DContext != nullptr);
   EXPECT_TRUE(opaque3DContext->isFinished());
 
@@ -3314,7 +3312,7 @@ TGFX_TEST(LayerTest, RootLayerBackgroundColorWithBlurBackground) {
       ShapeStyle::Make(Color::FromRGBA(0, 0, 255, 255)));  // Blue background content
   displayList->root()->addChild(bottomLayer);
 
-  // Add a shape layer with background blur to trigger the blurBackground code path
+  // Add a shape layer with background blur to exercise the BackgroundCapturer / BackgroundConsumer pipeline.
   // Position it so part covers bottomLayer and part covers pure background
   auto shapeLayer = ShapeLayer::Make();
   Path path = {};
@@ -3329,8 +3327,8 @@ TGFX_TEST(LayerTest, RootLayerBackgroundColorWithBlurBackground) {
 
   displayList->root()->addChild(shapeLayer);
 
-  // Render the display list - this will internally create BackgroundContext and call
-  // RootLayer::drawLayer with args.blurBackground set, testing our new code path
+  // Render the display list. RootLayer::drawLayer feeds the background-blur capture pass via
+  // DisplayList::captureBackgrounds, which internally creates a BackgroundSource.
   displayList->render(surface.get());
 
   // Compare with baseline to verify the background color is correctly drawn

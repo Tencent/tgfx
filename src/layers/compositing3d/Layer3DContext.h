@@ -30,7 +30,6 @@
 
 namespace tgfx {
 
-class BackgroundContext;
 class Context;
 class OpaqueContext;
 
@@ -49,10 +48,18 @@ struct TransformState {
  */
 class Layer3DContext {
  public:
-  static std::shared_ptr<Layer3DContext> Make(bool contourMode, Context* context,
+  /**
+   * Creates a Layer3DContext implementation for compositing layer content with 3D transforms.
+   * @param opaqueMode If true, returns an Opaque3DContext that renders opaque/contour content;
+   * if false, returns the default Render3DContext implementation.
+   * @param context The GPU Context used for offscreen compositing.
+   * @param renderRect The destination rectangle in the target canvas's coordinate space.
+   * @param contentScale The scale factor applied to recorded content.
+   * @param colorSpace The color space used for intermediate images.
+   */
+  static std::shared_ptr<Layer3DContext> Make(bool opaqueMode, Context* context,
                                               const Rect& renderRect, float contentScale,
-                                              std::shared_ptr<ColorSpace> colorSpace,
-                                              std::shared_ptr<BackgroundContext> backgroundContext);
+                                              std::shared_ptr<ColorSpace> colorSpace);
 
   Layer3DContext(const Rect& renderRect, float contentScale,
                  std::shared_ptr<ColorSpace> colorSpace);
@@ -62,7 +69,8 @@ class Layer3DContext {
    * Begins recording a new layer with the specified transform and antialiasing setting.
    * @param childTransform The 3D transform to apply to the layer content.
    * @param antialiasing Whether to enable edge antialiasing for this layer.
-   * @return A canvas to draw the layer content on.
+   * @return A Canvas on which Layer subtree content should be drawn. The returned pointer is
+   * owned by this Layer3DContext and remains valid until endRecording() is called.
    */
   Canvas* beginRecording(const Matrix3D& childTransform, bool antialiasing);
 
@@ -86,7 +94,7 @@ class Layer3DContext {
 
   /**
    * Finishes the 3D rendering and draws the result to the target canvas.
-   * @param canvas The target canvas to draw the composited result on.
+   * @param canvas The target Canvas to draw the composited result on.
    * @param antialiasing Whether to enable antialiasing when drawing.
    */
   virtual void finishAndDrawTo(Canvas* canvas, bool antialiasing) = 0;

@@ -18,18 +18,15 @@
 
 #include "Render3DContext.h"
 #include "Context3DCompositor.h"
-#include "layers/BackgroundContext.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Paint.h"
 
 namespace tgfx {
 
 Render3DContext::Render3DContext(std::shared_ptr<Context3DCompositor> compositor,
                                  const Rect& renderRect, float contentScale,
-                                 std::shared_ptr<ColorSpace> colorSpace,
-                                 std::shared_ptr<BackgroundContext> backgroundContext)
+                                 std::shared_ptr<ColorSpace> colorSpace)
     : Layer3DContext(renderRect, contentScale, std::move(colorSpace)),
-      _compositor(std::move(compositor)), _backgroundContext(std::move(backgroundContext)) {
+      _compositor(std::move(compositor)) {
 }
 
 Canvas* Render3DContext::onBeginRecording() {
@@ -54,22 +51,13 @@ void Render3DContext::onImageReady(std::shared_ptr<Image> image, const Matrix3D&
   _compositor->addImage(std::move(image), finalTransform, depth, 1.0f, antialiasing);
 }
 
-void Render3DContext::finishAndDrawTo(Canvas* canvas, bool antialiasing) {
+void Render3DContext::finishAndDrawTo(Canvas* canvas, bool /*antialiasing*/) {
   auto context3DImage = _compositor->finish();
   AutoCanvasRestore autoRestore(canvas);
   auto imageMatrix = Matrix::MakeScale(1.0f / _contentScale, 1.0f / _contentScale);
   imageMatrix.preTranslate(_renderRect.left, _renderRect.top);
   canvas->concat(imageMatrix);
   canvas->drawImage(context3DImage);
-
-  if (_backgroundContext) {
-    Paint paint = {};
-    paint.setAntiAlias(antialiasing);
-    auto backgroundCanvas = _backgroundContext->getCanvas();
-    AutoCanvasRestore autoRestoreBg(backgroundCanvas);
-    backgroundCanvas->concat(imageMatrix);
-    backgroundCanvas->drawImage(context3DImage, &paint);
-  }
 }
 
 }  // namespace tgfx
