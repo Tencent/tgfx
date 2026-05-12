@@ -128,6 +128,9 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
   std::vector<VkSurfaceFormatKHR> formats(formatCount);
   vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, formats.data());
 
+  // TODO: The colorSpace parameter is currently unused. Swapchain format is hardcoded to
+  // B8G8R8A8_UNORM + SRGB_NONLINEAR, consistent with Metal and OpenGL backends which also default
+  // to sRGB. HDR / Display-P3 support would require a ColorSpace → VkColorSpaceKHR mapping here.
   VkSurfaceFormatKHR chosenFormat = formats[0];
   for (auto& f : formats) {
     if (f.format == VK_FORMAT_B8G8R8A8_UNORM && f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
