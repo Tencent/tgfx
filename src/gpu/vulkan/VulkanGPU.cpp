@@ -230,23 +230,37 @@ bool VulkanGPU::createDevice() {
       hasExtendedDynamicState = true;
     }
   }
+
+  // Query actual feature support. An extension being available does not guarantee its feature
+  // flag is TRUE (spec allows extension present + feature FALSE).
+  VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures = {};
+  timelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+
+  VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extDynStateFeatures = {};
+  extDynStateFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+
+  VkPhysicalDeviceFeatures2 queryFeatures = {};
+  queryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  if (hasTimelineSemaphore) {
+    timelineFeatures.pNext = hasExtendedDynamicState ? &extDynStateFeatures : nullptr;
+    queryFeatures.pNext = &timelineFeatures;
+  } else if (hasExtendedDynamicState) {
+    queryFeatures.pNext = &extDynStateFeatures;
+  }
+  vkGetPhysicalDeviceFeatures2(vulkanPhysicalDevice, &queryFeatures);
+
+  // Only enable extensions whose features are confirmed by the physical device.
+  hasTimelineSemaphore = hasTimelineSemaphore && timelineFeatures.timelineSemaphore;
+  hasExtendedDynamicState = hasExtendedDynamicState && extDynStateFeatures.extendedDynamicState;
+
   if (hasTimelineSemaphore) {
     deviceExtensions.push_back(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
   }
-  // Required for dynamic primitive topology (VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT), which
-  // allows draw calls to switch between TriangleList and TriangleStrip without separate pipelines.
   if (hasExtendedDynamicState) {
     deviceExtensions.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
   }
 
-  VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures = {};
-  timelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
-  timelineFeatures.timelineSemaphore = hasTimelineSemaphore ? VK_TRUE : VK_FALSE;
-
-  VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extDynStateFeatures = {};
-  extDynStateFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
-  extDynStateFeatures.extendedDynamicState = hasExtendedDynamicState ? VK_TRUE : VK_FALSE;
-
+  // Build the feature chain for vkCreateDevice with only verified features.
   VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
   deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   if (hasTimelineSemaphore) {
