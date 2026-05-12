@@ -49,9 +49,7 @@ class VulkanCommandEncoder : public CommandEncoder, public VulkanResource {
     return session.commandBuffer;
   }
 
-  VkDescriptorPool vulkanDescriptorPool() const {
-    return session.descriptorPool;
-  }
+  VkDescriptorSet allocateDescriptorSet(VkDescriptorSetLayout layout);
 
   GPU* gpu() const override;
 

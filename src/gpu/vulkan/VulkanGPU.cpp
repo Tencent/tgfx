@@ -437,16 +437,13 @@ void VulkanGPU::processUnreferencedResources() {
   }
 }
 
-// Pool capacity constants for per-frame descriptor set allocation.
-// Reference values from industry 2D/3D engines:
-//   Skia Graphite: dynamic pool chain (no fixed cap)
-//   Filament: 4096 sets per frame
-//   bgfx: 2048 sets per frame
-//   Godot 4: 4096 sets per frame
-//   wgpu/Dawn: 8192 sets per frame
-static constexpr uint32_t POOL_MAX_DESCRIPTOR_SETS = 8192;
-static constexpr uint32_t POOL_MAX_UNIFORM_BUFFERS = 16384;
-static constexpr uint32_t POOL_MAX_COMBINED_SAMPLERS = 8192;
+// Per-pool capacity for descriptor set allocation. Pools are chained on demand when exhausted
+// (see VulkanCommandEncoder::allocateDescriptorSet), so this value controls granularity rather
+// than a hard per-frame limit. 1024 covers most 2D frames in a single pool; complex scenes
+// transparently chain additional pools as needed.
+static constexpr uint32_t POOL_MAX_DESCRIPTOR_SETS = 1024;
+static constexpr uint32_t POOL_MAX_UNIFORM_BUFFERS = 2048;
+static constexpr uint32_t POOL_MAX_COMBINED_SAMPLERS = 1024;
 
 VkDescriptorPool VulkanGPU::acquireDescriptorPool() {
   if (!descriptorPoolCache.empty()) {
@@ -539,9 +536,11 @@ void VulkanGPU::reclaimSubmission(InflightSubmission& submission) {
   for (auto rp : s.deferredRenderPasses) {
     vkDestroyRenderPass(vulkanDevice, rp, nullptr);
   }
-  // Descriptor pool is reset and recycled (not destroyed) to avoid allocation overhead.
-  if (s.descriptorPool != VK_NULL_HANDLE) {
-    releaseDescriptorPool(s.descriptorPool);
+  // Descriptor pools are reset and recycled (not destroyed) to avoid allocation overhead.
+  for (auto pool : s.descriptorPools) {
+    if (pool != VK_NULL_HANDLE) {
+      releaseDescriptorPool(pool);
+    }
   }
   // Clearing retainedResources decrements refcounts. Resources reaching zero will enter the
   // ReturnQueue and be destroyed during the next processUnreferencedResources() call.

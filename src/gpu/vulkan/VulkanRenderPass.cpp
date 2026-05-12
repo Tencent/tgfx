@@ -349,24 +349,9 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
     return;
   }
 
-  auto pool = encoder->vulkanDescriptorPool();
-  if (pool == VK_NULL_HANDLE) {
-    return;
-  }
-
-  VkDescriptorSetAllocateInfo allocInfo = {};
-  allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  allocInfo.descriptorPool = pool;
-  allocInfo.descriptorSetCount = 1;
-  allocInfo.pSetLayouts = &setLayout;
-
-  VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
-  auto result = vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet);
-  if (result != VK_SUCCESS) {
-    LOGE(
-        "VulkanRenderPass: vkAllocateDescriptorSets failed (result=%d). "
-        "Per-frame descriptor pool exhausted, subsequent draws in this frame will be dropped.",
-        static_cast<int>(result));
+  auto descriptorSet = encoder->allocateDescriptorSet(setLayout);
+  if (descriptorSet == VK_NULL_HANDLE) {
+    LOGE("VulkanRenderPass: descriptor set allocation failed, draw will be dropped.");
     return;
   }
 

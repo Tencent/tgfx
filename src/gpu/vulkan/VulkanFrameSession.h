@@ -50,7 +50,9 @@ namespace tgfx {
 struct FrameSession {
   VkCommandPool commandPool = VK_NULL_HANDLE;
   VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-  VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+  // Chain of descriptor pools used this frame. Normally only one; additional pools are acquired
+  // on demand when the current pool is exhausted (see VulkanCommandEncoder::allocateDescriptorSet).
+  std::vector<VkDescriptorPool> descriptorPools;
   // Vulkan objects created per-frame that must outlive GPU execution. Destroyed after fence signals.
   std::vector<VkFramebuffer> deferredFramebuffers;
   std::vector<VkRenderPass> deferredRenderPasses;
@@ -64,13 +66,12 @@ struct FrameSession {
   // Move constructor zeroes source handles to prevent double-destroy. Vectors are naturally emptied.
   FrameSession(FrameSession&& other) noexcept
       : commandPool(other.commandPool), commandBuffer(other.commandBuffer),
-        descriptorPool(other.descriptorPool),
+        descriptorPools(std::move(other.descriptorPools)),
         deferredFramebuffers(std::move(other.deferredFramebuffers)),
         deferredRenderPasses(std::move(other.deferredRenderPasses)),
         retainedResources(std::move(other.retainedResources)) {
     other.commandPool = VK_NULL_HANDLE;
     other.commandBuffer = VK_NULL_HANDLE;
-    other.descriptorPool = VK_NULL_HANDLE;
   }
 
   // Move assignment zeroes source handles to prevent double-destroy.
@@ -78,13 +79,12 @@ struct FrameSession {
     if (this != &other) {
       commandPool = other.commandPool;
       commandBuffer = other.commandBuffer;
-      descriptorPool = other.descriptorPool;
+      descriptorPools = std::move(other.descriptorPools);
       deferredFramebuffers = std::move(other.deferredFramebuffers);
       deferredRenderPasses = std::move(other.deferredRenderPasses);
       retainedResources = std::move(other.retainedResources);
       other.commandPool = VK_NULL_HANDLE;
       other.commandBuffer = VK_NULL_HANDLE;
-      other.descriptorPool = VK_NULL_HANDLE;
     }
     return *this;
   }

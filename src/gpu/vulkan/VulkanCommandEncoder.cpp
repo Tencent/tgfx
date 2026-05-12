@@ -87,9 +87,11 @@ std::shared_ptr<VulkanCommandEncoder> VulkanCommandEncoder::Make(VulkanGPU* gpu)
   }
 
   auto encoder = gpu->makeResource<VulkanCommandEncoder>(gpu, cmdBuffer, pool);
-  encoder->session.descriptorPool = gpu->acquireDescriptorPool();
-  if (encoder->session.descriptorPool == VK_NULL_HANDLE) {
+  auto descriptorPool = gpu->acquireDescriptorPool();
+  if (descriptorPool == VK_NULL_HANDLE) {
     LOGE("VulkanCommandEncoder: failed to acquire descriptor pool.");
+  } else {
+    encoder->session.descriptorPools.push_back(descriptorPool);
   }
   return encoder;
 }
@@ -99,6 +101,40 @@ VulkanCommandEncoder::VulkanCommandEncoder(VulkanGPU* gpu, VkCommandBuffer comma
     : _gpu(gpu) {
   session.commandBuffer = commandBuffer;
   session.commandPool = commandPool;
+}
+
+VkDescriptorSet VulkanCommandEncoder::allocateDescriptorSet(VkDescriptorSetLayout layout) {
+  if (session.descriptorPools.empty()) {
+    return VK_NULL_HANDLE;
+  }
+  auto device = _gpu->device();
+  VkDescriptorSetAllocateInfo allocInfo = {};
+  allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  allocInfo.descriptorPool = session.descriptorPools.back();
+  allocInfo.descriptorSetCount = 1;
+  allocInfo.pSetLayouts = &layout;
+
+  VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+  auto result = vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet);
+  if (result == VK_SUCCESS) {
+    return descriptorSet;
+  }
+
+  // Current pool exhausted — chain a new one and retry.
+  auto newPool = _gpu->acquireDescriptorPool();
+  if (newPool == VK_NULL_HANDLE) {
+    LOGE("VulkanCommandEncoder: failed to acquire a new descriptor pool for chaining.");
+    return VK_NULL_HANDLE;
+  }
+  session.descriptorPools.push_back(newPool);
+  allocInfo.descriptorPool = newPool;
+  result = vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet);
+  if (result != VK_SUCCESS) {
+    LOGE("VulkanCommandEncoder: vkAllocateDescriptorSets failed after chaining (result=%d).",
+         static_cast<int>(result));
+    return VK_NULL_HANDLE;
+  }
+  return descriptorSet;
 }
 
 void VulkanCommandEncoder::onRelease(VulkanGPU* gpu) {
