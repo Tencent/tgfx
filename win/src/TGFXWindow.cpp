@@ -368,6 +368,12 @@ void TGFXWindow::draw() {
     return;
   }
   if (surface == nullptr) {
+    // Submit any pending recording from a previous frame before rebuilding the swapchain. This
+    // ensures that drawing buffers referencing the old swapchain are executed while it is still
+    // valid, preventing use-after-free when onCreateRenderTarget() destroys the old swapchain.
+    if (lastRecording) {
+      context->submit(std::move(lastRecording));
+    }
     surface = tgfx::Surface::MakeFrom(context, tgfxWindow);
   }
   if (surface == nullptr) {
