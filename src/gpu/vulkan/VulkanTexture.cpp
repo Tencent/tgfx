@@ -77,7 +77,7 @@ std::shared_ptr<VulkanTexture> VulkanTexture::Make(VulkanGPU* gpu,
   imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   VmaAllocationCreateInfo allocInfo = {};
-  allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+  allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 
   VkImage vkImage = VK_NULL_HANDLE;
   VmaAllocation vmaAllocation = VK_NULL_HANDLE;
