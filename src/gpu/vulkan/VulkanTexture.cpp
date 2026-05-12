@@ -110,12 +110,13 @@ std::shared_ptr<VulkanTexture> VulkanTexture::Make(VulkanGPU* gpu,
   }
 
   return gpu->makeResource<VulkanTexture>(descriptor, vkImage, vkImageView, vmaAllocation, vkFormat,
-                                          false);
+                                          false, VK_IMAGE_LAYOUT_UNDEFINED);
 }
 
 std::shared_ptr<VulkanTexture> VulkanTexture::MakeFrom(VulkanGPU* gpu, VkImage image,
                                                        VkFormat format, int width, int height,
-                                                       uint32_t usage, bool adopted) {
+                                                       uint32_t usage, bool adopted,
+                                                       VkImageLayout initialLayout) {
   if (!gpu || image == VK_NULL_HANDLE) {
     return nullptr;
   }
@@ -145,14 +146,15 @@ std::shared_ptr<VulkanTexture> VulkanTexture::MakeFrom(VulkanGPU* gpu, VkImage i
   }
 
   return gpu->makeResource<VulkanTexture>(descriptor, image, imageView, VK_NULL_HANDLE, format,
-                                          adopted);
+                                          adopted, initialLayout);
 }
 
 VulkanTexture::VulkanTexture(const TextureDescriptor& descriptor, VkImage image,
                              VkImageView imageView, VmaAllocation allocation, VkFormat format,
-                             bool adopted)
+                             bool adopted, VkImageLayout initialLayout)
     : Texture(descriptor), image(image), imageView(imageView), allocation(allocation),
       format(format), adopted(adopted) {
+  layout = initialLayout;
 }
 
 void VulkanTexture::onRelease(VulkanGPU* gpu) {

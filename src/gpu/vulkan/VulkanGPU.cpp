@@ -371,7 +371,8 @@ std::shared_ptr<Texture> VulkanGPU::importBackendTexture(const BackendTexture& b
   }
   return VulkanTexture::MakeFrom(this, reinterpret_cast<VkImage>(vulkanInfo.image),
                                  static_cast<VkFormat>(vulkanInfo.format), backendTexture.width(),
-                                 backendTexture.height(), usage, adopted);
+                                 backendTexture.height(), usage, adopted,
+                                 static_cast<VkImageLayout>(vulkanInfo.layout));
 }
 
 std::shared_ptr<Texture> VulkanGPU::importBackendRenderTarget(
@@ -387,7 +388,8 @@ std::shared_ptr<Texture> VulkanGPU::importBackendRenderTarget(
   return VulkanTexture::MakeFrom(this, reinterpret_cast<VkImage>(vulkanInfo.image),
                                  static_cast<VkFormat>(vulkanInfo.format),
                                  backendRenderTarget.width(), backendRenderTarget.height(),
-                                 TextureUsage::RENDER_ATTACHMENT, false);
+                                 TextureUsage::RENDER_ATTACHMENT, false,
+                                 static_cast<VkImageLayout>(vulkanInfo.layout));
 }
 
 std::shared_ptr<Semaphore> VulkanGPU::importBackendSemaphore(const BackendSemaphore& semaphore) {
