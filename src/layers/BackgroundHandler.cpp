@@ -190,10 +190,6 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (FloatNearlyZero(contentScale)) {
     return;
   }
-  auto layerBounds = layer->getBounds();
-  auto bounds = layerBounds;
-  bounds.scale(contentScale, contentScale);
-  bounds.roundOut();
   // Use the runtime canvas chain (capture canvas matrix · bgSource->surfaceToWorldMatrix) so
   // capture and consume share the same frame of reference. Do NOT use getGlobalMatrix(): it walks
   // the static layer tree with per-step z-flattening and diverges from the runtime concat chain
@@ -202,6 +198,15 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (!localToWorld.invert(&worldToLocal)) {
     return;
   }
+  // renderBounds is the layer's final on-screen extent in world space, already clipped by
+  // ancestor scrollRect/mask and including this layer's own filter/style outsets. Use it as the
+  // capture region so background-sourced styles never sample outside the visible area. Fall back
+  // to getBounds() when renderBounds is empty (layer not yet laid out).
+  auto layerBounds = layer->renderBounds.isEmpty() ? layer->getBounds()
+                                                   : worldToLocal.mapRect(layer->renderBounds);
+  auto bounds = layerBounds;
+  bounds.scale(contentScale, contentScale);
+  bounds.roundOut();
   auto bgImage = bgSource->getBackgroundImage();
   if (bgImage == nullptr) {
     return;
