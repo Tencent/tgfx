@@ -27,7 +27,7 @@ BackendSemaphore GLSemaphore::getBackendSemaphore() const {
   }
   GLSyncInfo glSyncInfo = {};
   glSyncInfo.sync = _glSync;
-  return {glSyncInfo};
+  return BackendSemaphore(glSyncInfo);
 }
 
 void GLSemaphore::onRelease(GLGPU* gpu) {
