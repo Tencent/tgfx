@@ -112,7 +112,7 @@ void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
 
   std::vector<VkImageMemoryBarrier> preCopyBarriers;
   std::unordered_set<VkImage> transitionedImages;
-  VkPipelineStageFlags combinedSrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+  VkPipelineStageFlags combinedSrcStage = 0;
   for (auto& upload : pendingUploads) {
     auto image = upload.texture->vulkanImage();
     if (transitionedImages.count(image)) {
@@ -153,6 +153,9 @@ void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
     barrier.srcAccessMask = srcAccess;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     preCopyBarriers.push_back(barrier);
+  }
+  if (combinedSrcStage == 0) {
+    combinedSrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
   }
   vkCmdPipelineBarrier(commandBuffer, combinedSrcStage,
                        VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
