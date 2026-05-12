@@ -519,7 +519,7 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
   pipelineInfo.renderPass = renderPass;
   pipelineInfo.subpass = 0;
 
-  result = vkCreateGraphicsPipelines(gpu->device(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
+  result = vkCreateGraphicsPipelines(gpu->device(), gpu->pipelineCache(), 1, &pipelineInfo, nullptr,
                                      &pipeline);
 
   // The render pass object used for pipeline creation can be destroyed immediately since Vulkan

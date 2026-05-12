@@ -91,6 +91,9 @@ std::unique_ptr<VulkanGPU> VulkanGPU::MakeFrom(VkInstance instance, VkPhysicalDe
   if (!gpu->createAllocator()) {
     return nullptr;
   }
+  VkPipelineCacheCreateInfo cacheInfo = {};
+  cacheInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+  vkCreatePipelineCache(device, &cacheInfo, nullptr, &gpu->vulkanPipelineCache);
   gpu->caps = std::make_unique<VulkanCaps>(physicalDevice, gpu->_extensions);
   gpu->commandQueue = std::make_unique<VulkanCommandQueue>(gpu.get());
   gpu->compiler = std::make_unique<shaderc::Compiler>();
@@ -125,6 +128,9 @@ bool VulkanGPU::initVulkan() {
   if (!createAllocator()) {
     return false;
   }
+  VkPipelineCacheCreateInfo cacheInfo = {};
+  cacheInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+  vkCreatePipelineCache(vulkanDevice, &cacheInfo, nullptr, &vulkanPipelineCache);
   caps = std::make_unique<VulkanCaps>(vulkanPhysicalDevice, _extensions);
   commandQueue = std::make_unique<VulkanCommandQueue>(this);
   compiler = std::make_unique<shaderc::Compiler>();
@@ -807,6 +813,10 @@ void VulkanGPU::releaseAll(bool releaseGPU) {
   returnQueue = nullptr;
 
   // 6. Destroy device-level objects in reverse creation order.
+  if (vulkanPipelineCache != VK_NULL_HANDLE) {
+    vkDestroyPipelineCache(vulkanDevice, vulkanPipelineCache, nullptr);
+    vulkanPipelineCache = VK_NULL_HANDLE;
+  }
   if (vmaAllocator != VK_NULL_HANDLE) {
     vmaDestroyAllocator(vmaAllocator);
     vmaAllocator = VK_NULL_HANDLE;

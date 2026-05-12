@@ -102,6 +102,10 @@ class VulkanGPU : public GPU {
     return vmaAllocator;
   }
 
+  VkPipelineCache pipelineCache() const {
+    return vulkanPipelineCache;
+  }
+
   const VulkanCaps* vulkanCaps() const {
     return caps.get();
   }
@@ -284,6 +288,7 @@ class VulkanGPU : public GPU {
   VkQueue vulkanQueue = VK_NULL_HANDLE;
   uint32_t queueFamilyIndex = 0;
   VmaAllocator vmaAllocator = VK_NULL_HANDLE;
+  VkPipelineCache vulkanPipelineCache = VK_NULL_HANDLE;
   bool adopted = false;
 
   VulkanExtensions _extensions;
