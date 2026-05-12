@@ -246,6 +246,85 @@ VulkanWindow::~VulkanWindow() {
   device->unlock();
 }
 
+static bool RecreateSwapchain(VulkanWindow::PlatformState* state, VkDevice device,
+                              const VkSurfaceCapabilitiesKHR& capabilities,
+                              const VkExtent2D& extent) {
+  vkDeviceWaitIdle(device);
+
+  uint32_t imageCount = capabilities.minImageCount + 1;
+  if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount) {
+    imageCount = capabilities.maxImageCount;
+  }
+
+  VkImageUsageFlags desiredUsage =
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  VkImageUsageFlags imageUsage = desiredUsage & capabilities.supportedUsageFlags;
+  if (!(imageUsage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) {
+    LOGE("VulkanWindow: surface does not support COLOR_ATTACHMENT usage.");
+    return false;
+  }
+
+  VkSwapchainCreateInfoKHR swapchainInfo = {};
+  swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+  swapchainInfo.surface = state->surface;
+  swapchainInfo.minImageCount = imageCount;
+  swapchainInfo.imageFormat = state->format;
+  swapchainInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+  swapchainInfo.imageExtent = extent;
+  swapchainInfo.imageArrayLayers = 1;
+  swapchainInfo.imageUsage = imageUsage;
+  swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  swapchainInfo.preTransform = capabilities.currentTransform;
+  swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  swapchainInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  swapchainInfo.clipped = VK_TRUE;
+  swapchainInfo.oldSwapchain = state->swapchain;
+
+  VkSwapchainKHR newSwapchain = VK_NULL_HANDLE;
+  auto result = vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &newSwapchain);
+  if (result != VK_SUCCESS) {
+    LOGE("VulkanWindow: swapchain rebuild failed: %s", VkResultToString(result));
+    return false;
+  }
+
+  // Destroy old imageViews and swapchain.
+  for (auto view : state->imageViews) {
+    if (view != VK_NULL_HANDLE) {
+      vkDestroyImageView(device, view, nullptr);
+    }
+  }
+  if (state->swapchain != VK_NULL_HANDLE) {
+    vkDestroySwapchainKHR(device, state->swapchain, nullptr);
+  }
+  state->swapchain = newSwapchain;
+
+  uint32_t swapImageCount = 0;
+  vkGetSwapchainImagesKHR(device, newSwapchain, &swapImageCount, nullptr);
+  state->images.resize(swapImageCount);
+  vkGetSwapchainImagesKHR(device, newSwapchain, &swapImageCount, state->images.data());
+
+  // Recreate imageViews for the new swapchain images.
+  state->imageViews.resize(swapImageCount);
+  for (uint32_t i = 0; i < swapImageCount; i++) {
+    VkImageViewCreateInfo viewInfo = {};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = state->images[i];
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = state->format;
+    viewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    auto viewResult = vkCreateImageView(device, &viewInfo, nullptr, &state->imageViews[i]);
+    if (viewResult != VK_SUCCESS) {
+      LOGE("VulkanWindow: vkCreateImageView failed during rebuild for image %u: %s", i,
+           VkResultToString(viewResult));
+      return false;
+    }
+  }
+
+  state->width = static_cast<int>(extent.width);
+  state->height = static_cast<int>(extent.height);
+  return true;
+}
+
 std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* context) {
   auto vulkanGPU = static_cast<VulkanGPU*>(context->gpu());
   auto vkDevice = vulkanGPU->device();
@@ -256,7 +335,6 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, _platformState->surface, &capabilities);
   auto extent = capabilities.currentExtent;
   if (extent.width == 0xFFFFFFFF) {
-    // Surface doesn't report size; keep current.
     extent.width = static_cast<uint32_t>(_platformState->width);
     extent.height = static_cast<uint32_t>(_platformState->height);
   }
@@ -269,82 +347,9 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
     if (extent.width == 0 || extent.height == 0) {
       return nullptr;
     }
-
-    // Wait for all in-flight submissions before destroying the old swapchain.
-    vkDeviceWaitIdle(vkDevice);
-
-    uint32_t imageCount = capabilities.minImageCount + 1;
-    if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount) {
-      imageCount = capabilities.maxImageCount;
-    }
-
-    VkImageUsageFlags desiredUsage =
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    VkImageUsageFlags imageUsage = desiredUsage & capabilities.supportedUsageFlags;
-    if (!(imageUsage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) {
-      LOGE("VulkanWindow: surface does not support COLOR_ATTACHMENT usage.");
+    if (!RecreateSwapchain(_platformState.get(), vkDevice, capabilities, extent)) {
       return nullptr;
     }
-
-    VkSwapchainCreateInfoKHR swapchainInfo = {};
-    swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    swapchainInfo.surface = _platformState->surface;
-    swapchainInfo.minImageCount = imageCount;
-    swapchainInfo.imageFormat = _platformState->format;
-    swapchainInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-    swapchainInfo.imageExtent = extent;
-    swapchainInfo.imageArrayLayers = 1;
-    swapchainInfo.imageUsage = imageUsage;
-    swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    swapchainInfo.preTransform = capabilities.currentTransform;
-    swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    swapchainInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-    swapchainInfo.clipped = VK_TRUE;
-    swapchainInfo.oldSwapchain = _platformState->swapchain;
-
-    VkSwapchainKHR newSwapchain = VK_NULL_HANDLE;
-    auto result = vkCreateSwapchainKHR(vkDevice, &swapchainInfo, nullptr, &newSwapchain);
-    if (result != VK_SUCCESS) {
-      LOGE("VulkanWindow: swapchain rebuild failed: %s", VkResultToString(result));
-      return nullptr;
-    }
-
-    // Destroy old imageViews and swapchain.
-    for (auto view : _platformState->imageViews) {
-      if (view != VK_NULL_HANDLE) {
-        vkDestroyImageView(vkDevice, view, nullptr);
-      }
-    }
-    if (_platformState->swapchain != VK_NULL_HANDLE) {
-      vkDestroySwapchainKHR(vkDevice, _platformState->swapchain, nullptr);
-    }
-    _platformState->swapchain = newSwapchain;
-
-    uint32_t swapImageCount = 0;
-    vkGetSwapchainImagesKHR(vkDevice, newSwapchain, &swapImageCount, nullptr);
-    _platformState->images.resize(swapImageCount);
-    vkGetSwapchainImagesKHR(vkDevice, newSwapchain, &swapImageCount,
-                            _platformState->images.data());
-
-    // Recreate imageViews for the new swapchain images.
-    _platformState->imageViews.resize(swapImageCount);
-    for (uint32_t i = 0; i < swapImageCount; i++) {
-      VkImageViewCreateInfo viewInfo = {};
-      viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-      viewInfo.image = _platformState->images[i];
-      viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-      viewInfo.format = _platformState->format;
-      viewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-      auto viewResult = vkCreateImageView(vkDevice, &viewInfo, nullptr, &_platformState->imageViews[i]);
-      if (viewResult != VK_SUCCESS) {
-        LOGE("VulkanWindow: vkCreateImageView failed during rebuild for image %u: %s", i,
-             VkResultToString(viewResult));
-        return nullptr;
-      }
-    }
-
-    _platformState->width = static_cast<int>(extent.width);
-    _platformState->height = static_cast<int>(extent.height);
   }
 
   _platformState->swapchainProxy = std::make_shared<VulkanSwapchainProxy>(
