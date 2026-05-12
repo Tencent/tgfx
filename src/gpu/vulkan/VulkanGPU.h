@@ -291,6 +291,10 @@ class VulkanGPU : public GPU {
   std::deque<InflightSubmission> inflightSubmissions;
   std::vector<VkFence> fencePool;
   std::atomic<int64_t> _lastFenceSignalTime = {0};
+
+  // Set to true when a fatal Vulkan error (e.g. VK_ERROR_DEVICE_LOST) is detected. Once set,
+  // executeSubmission() skips all GPU work and reclaims resources immediately.
+  bool contextLost = false;
 };
 
 }  // namespace tgfx

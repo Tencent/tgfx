@@ -552,20 +552,43 @@ void VulkanGPU::reclaimSubmission(InflightSubmission& submission) {
 void VulkanGPU::pollCompletedSubmissions() {
   while (!inflightSubmissions.empty()) {
     auto& oldest = inflightSubmissions.front();
-    if (vkGetFenceStatus(vulkanDevice, oldest.fence) != VK_SUCCESS) {
+    auto status = vkGetFenceStatus(vulkanDevice, oldest.fence);
+    if (status == VK_SUCCESS) {
+      auto ticks = oldest.frameTime.time_since_epoch().count();
+      _lastFenceSignalTime.store(ticks, std::memory_order_release);
+      reclaimSubmission(oldest);
+      inflightSubmissions.pop_front();
+      continue;
+    }
+    if (status == VK_NOT_READY) {
+      // Fence not yet signaled — stop polling; remaining submissions are still in flight.
       break;
     }
-    auto ticks = oldest.frameTime.time_since_epoch().count();
-    _lastFenceSignalTime.store(ticks, std::memory_order_release);
-    reclaimSubmission(oldest);
-    inflightSubmissions.pop_front();
+    // VK_ERROR_DEVICE_LOST or other fatal error: the fence will never signal. Force-reclaim all
+    // remaining inflight submissions to avoid resource leaks and prevent infinite blocking in
+    // waitAllInflightSubmissions(). After this, lockContext() will return nullptr (contextLost).
+    LOGE("VulkanGPU::pollCompletedSubmissions: vkGetFenceStatus returned %d, reclaiming all "
+         "inflight submissions.",
+         static_cast<int>(status));
+    while (!inflightSubmissions.empty()) {
+      reclaimSubmission(inflightSubmissions.front());
+      inflightSubmissions.pop_front();
+    }
+    contextLost = true;
+    break;
   }
   processUnreferencedResources();
 }
 
 void VulkanGPU::waitAllInflightSubmissions() {
   for (auto& submission : inflightSubmissions) {
-    vkWaitForFences(vulkanDevice, 1, &submission.fence, VK_TRUE, UINT64_MAX);
+    auto result = vkWaitForFences(vulkanDevice, 1, &submission.fence, VK_TRUE, UINT64_MAX);
+    if (result != VK_SUCCESS) {
+      // VK_ERROR_DEVICE_LOST or timeout: fence will never signal. Log and force-reclaim.
+      LOGE("VulkanGPU::waitAllInflightSubmissions: vkWaitForFences returned %d, force-reclaiming.",
+           static_cast<int>(result));
+      contextLost = true;
+    }
     auto ticks = submission.frameTime.time_since_epoch().count();
     _lastFenceSignalTime.store(ticks, std::memory_order_release);
     reclaimSubmission(submission);
@@ -575,6 +598,16 @@ void VulkanGPU::waitAllInflightSubmissions() {
 }
 
 void VulkanGPU::executeSubmission(SubmitRequest request) {
+  // Early out if a previous fatal error (e.g. DEVICE_LOST) was detected. Reclaim resources
+  // immediately to prevent leaks; all subsequent Vulkan calls would fail anyway.
+  if (contextLost) {
+    reclaimAbandonedSession(std::move(request.session));
+    for (auto& upload : request.uploads) {
+      vmaDestroyBuffer(vmaAllocator, upload.stagingBuffer, upload.stagingAlloc);
+    }
+    return;
+  }
+
   // Step 1: Non-blocking reclaim of any submissions whose fences have already signaled.
   pollCompletedSubmissions();
 
@@ -667,6 +700,9 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
   // through the same path as normal completion to avoid leaks.
   if (submitResult != VK_SUCCESS) {
     LOGE("VulkanGPU::submit: vkQueueSubmit failed (result=%d).", static_cast<int>(submitResult));
+    if (submitResult == VK_ERROR_DEVICE_LOST) {
+      contextLost = true;
+    }
     InflightSubmission failed = {};
     failed.fence = fence;
     failed.session = std::move(request.session);
