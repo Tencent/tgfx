@@ -218,7 +218,8 @@ static GLStencil MakeGLStencil(const StencilDescriptor& descriptor) {
 }
 
 static bool IsStencilNoOp(const StencilDescriptor& descriptor) {
-  return descriptor.failOp == StencilOperation::Keep &&
+  return descriptor.compare == CompareFunction::Always &&
+         descriptor.failOp == StencilOperation::Keep &&
          descriptor.passOp == StencilOperation::Keep &&
          descriptor.depthFailOp == StencilOperation::Keep;
 }
@@ -226,8 +227,9 @@ static bool IsStencilNoOp(const StencilDescriptor& descriptor) {
 static std::unique_ptr<GLStencilState> MakeStencilState(const DepthStencilDescriptor& descriptor) {
   auto& stencilFront = descriptor.stencilFront;
   auto& stencilBack = descriptor.stencilBack;
-  // Skip stencil state only when neither face writes to the stencil buffer. The compare function
-  // alone is not sufficient: e.g. compare=Always with passOp=Invert still mutates the buffer.
+  // Skip stencil state only when neither face mutates the buffer AND neither face uses the compare
+  // function to gate fragments. compare != Always with all ops = Keep is a valid read-only stencil
+  // test that must keep GL_STENCIL_TEST enabled.
   if (IsStencilNoOp(stencilFront) && IsStencilNoOp(stencilBack)) {
     return nullptr;
   }
