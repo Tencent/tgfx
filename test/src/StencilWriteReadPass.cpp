@@ -178,8 +178,9 @@ bool StencilWriteReadPass::onDraw(CommandEncoder* encoder,
     return false;
   }
 
-  // Pass 1: stencil-only write. Replace the stencil buffer with STENCIL_REFERENCE everywhere the
-  // fullscreen triangle is rasterized. Color writes are disabled by the pipeline.
+  // Pass 1: stencil-only write. Replace the stencil buffer with STENCIL_REFERENCE on the left half
+  // of the attachment via a scissor rect; the right half stays at the cleared value 0. Color writes
+  // are disabled by the pipeline.
   RenderPassDescriptor writePassDesc(renderTexture, LoadAction::Clear, StoreAction::Store,
                                      PMColor::Transparent());
   writePassDesc.depthStencilAttachment =
@@ -191,6 +192,7 @@ bool StencilWriteReadPass::onDraw(CommandEncoder* encoder,
     return false;
   }
   writePass->setPipeline(std::move(writePipeline));
+  writePass->setScissorRect(0, 0, renderTexture->width() / 2, renderTexture->height());
   writePass->setStencilReference(STENCIL_REFERENCE);
   writePass->setVertexBuffer(0, vertexBuffer);
   writePass->setUniformBuffer(0, writeColor, 0, writeColor->size());

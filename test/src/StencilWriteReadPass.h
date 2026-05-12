@@ -22,12 +22,14 @@
 
 namespace tgfx {
 /**
- * A two-pass test helper used to verify that the GPU backend honors stencil write operations even
- * when the stencil compare function is Always. The first pass writes a constant value into the
- * stencil buffer using compare = Always, passOp = Replace. The second pass clears the color
- * attachment to black and then draws red only where the stencil equals the reference value. If the
- * backend correctly applies the stencil state during the first pass, the resulting color
- * attachment is fully red; otherwise it remains black.
+ * A two-pass test helper used to verify that the GPU backend honors stencil writes and stencil
+ * compares. The first pass uses a scissor rect to write a constant value into the stencil buffer
+ * on the left half of the attachment (compare = Always, passOp = Replace); the right half stays at
+ * the cleared value 0. The second pass clears the color attachment to black and then draws red
+ * over the entire viewport, gated by the stencil compare = Equal. If the backend correctly applies
+ * stencil state in both passes, the resulting color attachment is red on the left half and black
+ * on the right half; if either side of the stencil pipeline (write or compare) is silently
+ * skipped, both halves are either red or black, which the test catches.
  */
 class StencilWriteReadPass {
  public:

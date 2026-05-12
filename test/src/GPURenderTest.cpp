@@ -197,10 +197,13 @@ TGFX_TEST(GPURenderTest, AlphaToCoverage) {
 
 // ==================== Stencil Tests ====================
 
-// Verifies that the GPU backend honors stencil writes when the compare function is Always.
-// StencilWriteReadPass writes a stencil value in pass 1 and gates a red color draw on it in
-// pass 2. If the backend incorrectly treats compare = Always as a stencil no-op (an earlier bug
-// in GLRenderPipeline::MakeStencilState), pass 1 leaves stencil at 0 and the output stays black.
+// Verifies that the GPU backend honors both stencil writes and stencil compares. Pass 1 writes
+// STENCIL_REFERENCE into the left half of the stencil buffer (compare = Always, passOp = Replace,
+// scissored to the left half); pass 2 clears the color attachment to black and draws red over the
+// full viewport gated by compare = Equal. The expected output is red on the left and black on the
+// right. A backend that silently disables stencil state in either pass would either leave the
+// whole framebuffer black (write side broken) or paint it entirely red (compare side broken),
+// both of which this test catches.
 TGFX_TEST(GPURenderTest, StencilWriteRead) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -233,11 +236,16 @@ TGFX_TEST(GPURenderTest, StencilWriteRead) {
   ASSERT_TRUE(surface->readPixels(pixmap.info(), pixmap.writablePixels()));
 
   auto pixels = static_cast<const uint8_t*>(pixmap.pixels());
-  auto offset = (height / 2) * pixmap.rowBytes() + (width / 2) * 4;
-  EXPECT_EQ(pixels[offset + 0], 255);  // R
-  EXPECT_EQ(pixels[offset + 1], 0);    // G
-  EXPECT_EQ(pixels[offset + 2], 0);    // B
-  EXPECT_EQ(pixels[offset + 3], 255);  // A
+  auto leftOffset = (height / 2) * pixmap.rowBytes() + (width / 4) * 4;
+  EXPECT_EQ(pixels[leftOffset + 0], 255);  // R
+  EXPECT_EQ(pixels[leftOffset + 1], 0);    // G
+  EXPECT_EQ(pixels[leftOffset + 2], 0);    // B
+  EXPECT_EQ(pixels[leftOffset + 3], 255);  // A
+  auto rightOffset = (height / 2) * pixmap.rowBytes() + ((3 * width) / 4) * 4;
+  EXPECT_EQ(pixels[rightOffset + 0], 0);    // R
+  EXPECT_EQ(pixels[rightOffset + 1], 0);    // G
+  EXPECT_EQ(pixels[rightOffset + 2], 0);    // B
+  EXPECT_EQ(pixels[rightOffset + 3], 255);  // A
 }
 
 }  // namespace tgfx
