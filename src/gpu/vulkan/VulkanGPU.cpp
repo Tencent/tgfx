@@ -71,10 +71,11 @@ std::unique_ptr<VulkanGPU> VulkanGPU::MakeFrom(VkInstance instance, VkPhysicalDe
   gpu->adopted = true;
   volkLoadInstance(instance);
   volkLoadDevice(device);
+  gpu->_extensions.detectFromDevice();
   if (!gpu->createAllocator()) {
     return nullptr;
   }
-  gpu->caps = std::make_unique<VulkanCaps>(physicalDevice);
+  gpu->caps = std::make_unique<VulkanCaps>(physicalDevice, gpu->_extensions);
   gpu->commandQueue = std::make_unique<VulkanCommandQueue>(gpu.get());
   gpu->compiler = std::make_unique<shaderc::Compiler>();
   return gpu;
@@ -107,7 +108,7 @@ bool VulkanGPU::initVulkan() {
   if (!createAllocator()) {
     return false;
   }
-  caps = std::make_unique<VulkanCaps>(vulkanPhysicalDevice);
+  caps = std::make_unique<VulkanCaps>(vulkanPhysicalDevice, _extensions);
   commandQueue = std::make_unique<VulkanCommandQueue>(this);
   compiler = std::make_unique<shaderc::Compiler>();
   return true;
@@ -210,65 +211,13 @@ bool VulkanGPU::createDevice() {
   queueCreateInfo.queueCount = 1;
   queueCreateInfo.pQueuePriorities = &queuePriority;
 
-  std::vector<const char*> deviceExtensions = {
-      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-  };
+  _extensions.query(vulkanPhysicalDevice);
+  auto deviceExtensions = _extensions.getEnabledNames();
 
-  // Enable timeline semaphore if available.
-  uint32_t extCount = 0;
-  vkEnumerateDeviceExtensionProperties(vulkanPhysicalDevice, nullptr, &extCount, nullptr);
-  std::vector<VkExtensionProperties> availableExtensions(extCount);
-  vkEnumerateDeviceExtensionProperties(vulkanPhysicalDevice, nullptr, &extCount,
-                                       availableExtensions.data());
-  bool hasTimelineSemaphore = false;
-  bool hasExtendedDynamicState = false;
-  for (const auto& ext : availableExtensions) {
-    if (strcmp(ext.extensionName, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
-      hasTimelineSemaphore = true;
-    }
-    if (strcmp(ext.extensionName, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) == 0) {
-      hasExtendedDynamicState = true;
-    }
-  }
-
-  // Query actual feature support. An extension being available does not guarantee its feature
-  // flag is TRUE (spec allows extension present + feature FALSE).
-  VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures = {};
-  timelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
-
-  VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extDynStateFeatures = {};
-  extDynStateFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
-
-  VkPhysicalDeviceFeatures2 queryFeatures = {};
-  queryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  if (hasTimelineSemaphore) {
-    timelineFeatures.pNext = hasExtendedDynamicState ? &extDynStateFeatures : nullptr;
-    queryFeatures.pNext = &timelineFeatures;
-  } else if (hasExtendedDynamicState) {
-    queryFeatures.pNext = &extDynStateFeatures;
-  }
-  vkGetPhysicalDeviceFeatures2(vulkanPhysicalDevice, &queryFeatures);
-
-  // Only enable extensions whose features are confirmed by the physical device.
-  hasTimelineSemaphore = hasTimelineSemaphore && timelineFeatures.timelineSemaphore;
-  hasExtendedDynamicState = hasExtendedDynamicState && extDynStateFeatures.extendedDynamicState;
-
-  if (hasTimelineSemaphore) {
-    deviceExtensions.push_back(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
-  }
-  if (hasExtendedDynamicState) {
-    deviceExtensions.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
-  }
-
-  // Build the feature chain for vkCreateDevice with only verified features.
   VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
-  deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  if (hasTimelineSemaphore) {
-    timelineFeatures.pNext = hasExtendedDynamicState ? &extDynStateFeatures : nullptr;
-    deviceFeatures2.pNext = &timelineFeatures;
-  } else if (hasExtendedDynamicState) {
-    deviceFeatures2.pNext = &extDynStateFeatures;
-  }
+  VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures = {};
+  VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extDynStateFeatures = {};
+  _extensions.buildFeatureChain(deviceFeatures2, timelineFeatures, extDynStateFeatures);
 
   VkDeviceCreateInfo deviceCreateInfo = {};
   deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

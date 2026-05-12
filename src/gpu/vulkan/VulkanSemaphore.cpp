@@ -27,7 +27,7 @@ std::shared_ptr<VulkanSemaphore> VulkanSemaphore::Make(VulkanGPU* gpu) {
   if (!gpu) {
     return nullptr;
   }
-  if (!gpu->vulkanCaps()->semaphoreSupport()) {
+  if (!gpu->extensions().timelineSemaphore) {
     return nullptr;
   }
 

@@ -22,6 +22,7 @@
 #include <vector>
 #include "core/utils/EnumHasher.h"
 #include "gpu/vulkan/VulkanAPI.h"
+#include "gpu/vulkan/VulkanExtensions.h"
 #include "tgfx/gpu/GPUFeatures.h"
 #include "tgfx/gpu/GPUInfo.h"
 #include "tgfx/gpu/GPULimits.h"
@@ -30,11 +31,12 @@
 namespace tgfx {
 
 /**
- * Vulkan GPU capabilities and limits.
+ * Vulkan GPU capabilities and limits. Extension-related queries are handled by VulkanExtensions;
+ * this class focuses on format support, sample counts, and hardware limits.
  */
 class VulkanCaps {
  public:
-  explicit VulkanCaps(VkPhysicalDevice physicalDevice);
+  VulkanCaps(VkPhysicalDevice physicalDevice, const VulkanExtensions& extensions);
 
   const GPUInfo* info() const {
     return &_info;
@@ -80,14 +82,6 @@ class VulkanCaps {
     return true;
   }
 
-  bool semaphoreSupport() const {
-    return timelineSemaphoreSupported;
-  }
-
-  bool extendedDynamicStateSupport() const {
-    return extendedDynamicStateSupported;
-  }
-
   bool bufferMapSupport() const {
     return true;
   }
@@ -104,7 +98,7 @@ class VulkanCaps {
     std::vector<int> sampleCounts = {};
   };
 
-  void initFeatures(VkPhysicalDevice physicalDevice);
+  void initFeatures(VkPhysicalDevice physicalDevice, const VulkanExtensions& extensions);
   void initLimits(VkPhysicalDevice physicalDevice);
   void initFormatTable(VkPhysicalDevice physicalDevice);
   FormatInfo checkFormat(VkPhysicalDevice physicalDevice, VkFormat vulkanFormat) const;
@@ -113,8 +107,6 @@ class VulkanCaps {
   GPUFeatures _features = {};
   GPULimits _limits = {};
 
-  bool timelineSemaphoreSupported = false;
-  bool extendedDynamicStateSupported = false;
   bool frameBufferFetchSupported = false;
   std::unordered_map<PixelFormat, FormatInfo, EnumHasher> formatTable = {};
 };

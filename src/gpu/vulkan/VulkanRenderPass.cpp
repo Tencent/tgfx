@@ -436,7 +436,7 @@ void VulkanRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
     return;
   }
   bindDescriptorSetIfDirty();
-  if (vulkanGPU->vulkanCaps()->extendedDynamicStateSupport()) {
+  if (vulkanGPU->extensions().extendedDynamicState) {
     auto vkTopology = primitiveType == PrimitiveType::TriangleStrip
                           ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
                           : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -456,7 +456,7 @@ void VulkanRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCo
     return;
   }
   bindDescriptorSetIfDirty();
-  if (vulkanGPU->vulkanCaps()->extendedDynamicStateSupport()) {
+  if (vulkanGPU->extensions().extendedDynamicState) {
     auto vkTopology = primitiveType == PrimitiveType::TriangleStrip
                           ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
                           : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;

@@ -24,6 +24,7 @@
 #include <list>
 #include <memory>
 #include <unordered_map>
+#include "gpu/vulkan/VulkanExtensions.h"
 #include <vector>
 #include "core/utils/ReturnQueue.h"
 #include "gpu/vulkan/VulkanAPI.h"
@@ -103,6 +104,10 @@ class VulkanGPU : public GPU {
 
   const VulkanCaps* vulkanCaps() const {
     return caps.get();
+  }
+
+  const VulkanExtensions& extensions() const {
+    return _extensions;
   }
 
   const shaderc::Compiler* shaderCompiler() const;
@@ -279,6 +284,7 @@ class VulkanGPU : public GPU {
   VmaAllocator vmaAllocator = VK_NULL_HANDLE;
   bool adopted = false;
 
+  VulkanExtensions _extensions;
   std::unique_ptr<VulkanCaps> caps = nullptr;
   std::unique_ptr<VulkanCommandQueue> commandQueue = nullptr;
   std::unique_ptr<shaderc::Compiler> compiler = nullptr;

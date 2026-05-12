@@ -418,7 +418,7 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
   // Dynamic states
   std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
                                                VK_DYNAMIC_STATE_STENCIL_REFERENCE};
-  if (gpu->vulkanCaps()->extendedDynamicStateSupport()) {
+  if (gpu->extensions().extendedDynamicState) {
     dynamicStates.push_back(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT);
   }
   VkPipelineDynamicStateCreateInfo dynamicState = {};

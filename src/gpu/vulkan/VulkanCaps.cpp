@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-VulkanCaps::VulkanCaps(VkPhysicalDevice physicalDevice) {
+VulkanCaps::VulkanCaps(VkPhysicalDevice physicalDevice, const VulkanExtensions& extensions) {
   VkPhysicalDeviceProperties properties = {};
   vkGetPhysicalDeviceProperties(physicalDevice, &properties);
 
@@ -33,7 +33,7 @@ VulkanCaps::VulkanCaps(VkPhysicalDevice physicalDevice) {
                   std::to_string(VK_API_VERSION_MINOR(properties.apiVersion)) + "." +
                   std::to_string(VK_API_VERSION_PATCH(properties.apiVersion));
 
-  initFeatures(physicalDevice);
+  initFeatures(physicalDevice, extensions);
   initLimits(physicalDevice);
   initFormatTable(physicalDevice);
 }
@@ -72,33 +72,25 @@ VkFormat VulkanCaps::getVkFormat(PixelFormat format) const {
   return VK_FORMAT_UNDEFINED;
 }
 
-void VulkanCaps::initFeatures(VkPhysicalDevice physicalDevice) {
-  // Query device extensions to detect timeline semaphore support.
+void VulkanCaps::initFeatures(VkPhysicalDevice physicalDevice,
+                              const VulkanExtensions& extensions) {
   uint32_t extensionCount = 0;
   vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr);
-  std::vector<VkExtensionProperties> extensions(extensionCount);
-  vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, extensions.data());
-
-  for (const auto& ext : extensions) {
+  std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+  vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount,
+                                       availableExtensions.data());
+  for (const auto& ext : availableExtensions) {
     _info.extensions.emplace_back(ext.extensionName);
-    if (strcmp(ext.extensionName, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
-      // Also verify the function pointer to guard against MakeFrom where the host app may not
-      // have enabled this extension on the VkDevice (volk loads NULL for disabled extensions).
-      timelineSemaphoreSupported = (vkGetSemaphoreCounterValueKHR != nullptr);
-    }
-    if (strcmp(ext.extensionName, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) == 0) {
-      extendedDynamicStateSupported = (vkCmdSetPrimitiveTopologyEXT != nullptr);
-    }
   }
 
-  _features.semaphore = timelineSemaphoreSupported;
+  _features.semaphore = extensions.timelineSemaphore;
   _features.clampToBorder = true;
   // Vulkan has no glTextureBarrier() equivalent. Disable to force the copy path for dst reads.
   _features.textureBarrier = false;
 
   // Check for framebuffer fetch support via rasterization order attachment access.
   frameBufferFetchSupported = false;
-  for (const auto& ext : extensions) {
+  for (const auto& ext : availableExtensions) {
     if (strcmp(ext.extensionName, "VK_EXT_rasterization_order_attachment_access") == 0 ||
         strcmp(ext.extensionName, "VK_ARM_rasterization_order_attachment_access") == 0) {
       frameBufferFetchSupported = true;
