@@ -112,12 +112,36 @@ void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
 
   std::vector<VkImageMemoryBarrier> preCopyBarriers;
   std::unordered_set<VkImage> transitionedImages;
+  VkPipelineStageFlags combinedSrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
   for (auto& upload : pendingUploads) {
     auto image = upload.texture->vulkanImage();
     if (transitionedImages.count(image)) {
       continue;
     }
     transitionedImages.insert(image);
+
+    // Derive srcStage/srcAccess from the layout to ensure prior writes are visible to the copy.
+    VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    VkAccessFlags srcAccess = 0;
+    switch (upload.originalLayout) {
+      case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+      case VK_IMAGE_LAYOUT_GENERAL:
+        srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        srcAccess = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        break;
+      case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+        srcStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        srcAccess = VK_ACCESS_SHADER_READ_BIT;
+        break;
+      case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+        srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        srcAccess = VK_ACCESS_TRANSFER_WRITE_BIT;
+        break;
+      default:
+        break;
+    }
+    combinedSrcStage |= srcStage;
+
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout = upload.originalLayout;
@@ -126,11 +150,11 @@ void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image;
     barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0, 1};
-    barrier.srcAccessMask = 0;
+    barrier.srcAccessMask = srcAccess;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     preCopyBarriers.push_back(barrier);
   }
-  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+  vkCmdPipelineBarrier(commandBuffer, combinedSrcStage,
                        VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
                        static_cast<uint32_t>(preCopyBarriers.size()), preCopyBarriers.data());
 
