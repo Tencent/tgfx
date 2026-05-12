@@ -21,7 +21,9 @@
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "tgfx/gpu/GPUBuffer.h"
-#include "vk_mem_alloc.h"
+
+VK_DEFINE_HANDLE(VmaAllocator)
+VK_DEFINE_HANDLE(VmaAllocation)
 
 namespace tgfx {
 

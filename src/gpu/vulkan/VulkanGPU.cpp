@@ -28,6 +28,7 @@
 #include "gpu/vulkan/VulkanBuffer.h"
 #include "gpu/vulkan/VulkanCommandEncoder.h"
 #include "gpu/vulkan/VulkanCommandQueue.h"
+#include "vk_mem_alloc.h"
 #include "gpu/vulkan/VulkanRenderPipeline.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "gpu/vulkan/VulkanSampler.h"

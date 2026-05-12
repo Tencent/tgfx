@@ -20,6 +20,7 @@
 #include "VulkanGPU.h"
 #include "VulkanUtil.h"
 #include "core/utils/Log.h"
+#include "vk_mem_alloc.h"
 
 namespace tgfx {
 
