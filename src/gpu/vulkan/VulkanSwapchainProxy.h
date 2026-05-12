@@ -30,18 +30,20 @@ class VulkanGPU;
  * Manages swapchain image acquisition and per-frame presentation for window rendering.
  *
  * Synchronization model:
- *   - acquire: vkAcquireNextImageKHR signals a fence, CPU waits on it. This guarantees the image
- *     is fully available before command recording begins (no GPU-GPU semaphore needed).
+ *   - acquire: vkAcquireNextImageKHR signals imageAvailable semaphore. CPU returns immediately
+ *     without blocking; the GPU waits on it at COLOR_ATTACHMENT_OUTPUT before rendering.
+ *   - submit: waits on imageAvailable, signals renderFinished after rendering completes.
  *   - present: scheduled via VulkanCommandQueue::schedulePresent() during acquire. The queue
  *     appends a GENERAL→PRESENT_SRC layout transition to the render batch and calls
- *     vkQueuePresentKHR after submit. Same-queue ordering guarantees correctness.
- *   - CPU backpressure: handled by VulkanCommandQueue's MAX_FRAMES_IN_FLIGHT fence mechanism.
+ *     vkQueuePresentKHR after submit, waiting on renderFinished.
+ *   - CPU backpressure: handled by VulkanGPU's MAX_FRAMES_IN_FLIGHT fence mechanism.
  */
 class VulkanSwapchainProxy : public RenderTargetProxy {
  public:
   VulkanSwapchainProxy(Context* context, VulkanGPU* gpu, VkSwapchainKHR swapchain, VkFormat format,
                        int width, int height, const std::vector<VkImageView>& imageViews,
-                       const std::vector<VkImage>& images, VkFence acquireFence);
+                       const std::vector<VkImage>& images, VkSemaphore imageAvailableSemaphore,
+                       VkSemaphore renderFinishedSemaphore);
   ~VulkanSwapchainProxy() override = default;
 
   Context* getContext() const override;
@@ -70,7 +72,8 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   std::vector<VkImageView> _imageViews;
   std::vector<VkImage> _images;
 
-  VkFence _acquireFence = VK_NULL_HANDLE;
+  VkSemaphore _imageAvailableSemaphore = VK_NULL_HANDLE;
+  VkSemaphore _renderFinishedSemaphore = VK_NULL_HANDLE;
   mutable uint32_t _currentImageIndex = 0;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
 };

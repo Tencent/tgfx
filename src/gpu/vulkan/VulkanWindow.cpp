@@ -30,10 +30,15 @@
 namespace tgfx {
 
 static void DestroySwapchainResources(VkDevice device, VkInstance instance, VkSurfaceKHR surface,
-                                      VkSwapchainKHR swapchain, VkFence fence,
+                                      VkSwapchainKHR swapchain,
+                                      VkSemaphore imageAvailableSemaphore,
+                                      VkSemaphore renderFinishedSemaphore,
                                       const std::vector<VkImageView>& imageViews) {
-  if (fence != VK_NULL_HANDLE) {
-    vkDestroyFence(device, fence, nullptr);
+  if (renderFinishedSemaphore != VK_NULL_HANDLE) {
+    vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
+  }
+  if (imageAvailableSemaphore != VK_NULL_HANDLE) {
+    vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
   }
   for (auto view : imageViews) {
     if (view != VK_NULL_HANDLE) {
@@ -53,13 +58,17 @@ static void DestroySwapchainResources(VkDevice device, VkInstance instance, VkSu
 struct VulkanWindow::PlatformState {
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-  VkFence acquireFence = VK_NULL_HANDLE;
+  VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+  VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
   std::vector<VkImage> images;
   std::vector<VkImageView> imageViews;
   VkFormat format = VK_FORMAT_UNDEFINED;
   int width = 0;
   int height = 0;
   std::shared_ptr<RenderTargetProxy> swapchainProxy;
+
+  bool recreateSwapchain(VkDevice device, const VkSurfaceCapabilitiesKHR& capabilities,
+                         const VkExtent2D& extent);
 };
 
 #ifdef _WIN32
@@ -194,19 +203,31 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
       LOGE("VulkanWindow: vkCreateImageView failed for image %u: %s", i,
            VkResultToString(viewResult));
       DestroySwapchainResources(vkDevice, vkInstance, surface, swapchain, VK_NULL_HANDLE,
-                                imageViews);
+                                VK_NULL_HANDLE, imageViews);
       device->unlock();
       return nullptr;
     }
   }
 
-  VkFenceCreateInfo fenceInfo = {};
-  fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-  VkFence acquireFence = VK_NULL_HANDLE;
-  auto fenceResult = vkCreateFence(vkDevice, &fenceInfo, nullptr, &acquireFence);
-  if (fenceResult != VK_SUCCESS) {
-    LOGE("VulkanWindow: vkCreateFence failed: %s", VkResultToString(fenceResult));
-    DestroySwapchainResources(vkDevice, vkInstance, surface, swapchain, VK_NULL_HANDLE, imageViews);
+  VkSemaphoreCreateInfo semaphoreInfo = {};
+  semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+  VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+  VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
+  auto semResult = vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &imageAvailableSemaphore);
+  if (semResult != VK_SUCCESS) {
+    LOGE("VulkanWindow: vkCreateSemaphore (imageAvailable) failed: %s",
+         VkResultToString(semResult));
+    DestroySwapchainResources(vkDevice, vkInstance, surface, swapchain, VK_NULL_HANDLE,
+                              VK_NULL_HANDLE, imageViews);
+    device->unlock();
+    return nullptr;
+  }
+  semResult = vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &renderFinishedSemaphore);
+  if (semResult != VK_SUCCESS) {
+    LOGE("VulkanWindow: vkCreateSemaphore (renderFinished) failed: %s",
+         VkResultToString(semResult));
+    DestroySwapchainResources(vkDevice, vkInstance, surface, swapchain, imageAvailableSemaphore,
+                              VK_NULL_HANDLE, imageViews);
     device->unlock();
     return nullptr;
   }
@@ -216,7 +237,8 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
   auto state = std::make_unique<PlatformState>();
   state->surface = surface;
   state->swapchain = swapchain;
-  state->acquireFence = acquireFence;
+  state->imageAvailableSemaphore = imageAvailableSemaphore;
+  state->renderFinishedSemaphore = renderFinishedSemaphore;
   state->images = std::move(images);
   state->imageViews = std::move(imageViews);
   state->format = chosenFormat.format;
@@ -241,14 +263,16 @@ VulkanWindow::~VulkanWindow() {
   vkDeviceWaitIdle(vkDevice);
 
   DestroySwapchainResources(vkDevice, vulkanGPU->instance(), _platformState->surface,
-                            _platformState->swapchain, _platformState->acquireFence,
+                            _platformState->swapchain,
+                            _platformState->imageAvailableSemaphore,
+                            _platformState->renderFinishedSemaphore,
                             _platformState->imageViews);
   device->unlock();
 }
 
-static bool RecreateSwapchain(VulkanWindow::PlatformState* state, VkDevice device,
-                              const VkSurfaceCapabilitiesKHR& capabilities,
-                              const VkExtent2D& extent) {
+bool VulkanWindow::PlatformState::recreateSwapchain(VkDevice device,
+                                                    const VkSurfaceCapabilitiesKHR& capabilities,
+                                                    const VkExtent2D& extent) {
   vkDeviceWaitIdle(device);
 
   uint32_t imageCount = capabilities.minImageCount + 1;
@@ -266,9 +290,9 @@ static bool RecreateSwapchain(VulkanWindow::PlatformState* state, VkDevice devic
 
   VkSwapchainCreateInfoKHR swapchainInfo = {};
   swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-  swapchainInfo.surface = state->surface;
+  swapchainInfo.surface = surface;
   swapchainInfo.minImageCount = imageCount;
-  swapchainInfo.imageFormat = state->format;
+  swapchainInfo.imageFormat = format;
   swapchainInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
   swapchainInfo.imageExtent = extent;
   swapchainInfo.imageArrayLayers = 1;
@@ -278,7 +302,7 @@ static bool RecreateSwapchain(VulkanWindow::PlatformState* state, VkDevice devic
   swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   swapchainInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
   swapchainInfo.clipped = VK_TRUE;
-  swapchainInfo.oldSwapchain = state->swapchain;
+  swapchainInfo.oldSwapchain = swapchain;
 
   VkSwapchainKHR newSwapchain = VK_NULL_HANDLE;
   auto result = vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &newSwapchain);
@@ -288,31 +312,31 @@ static bool RecreateSwapchain(VulkanWindow::PlatformState* state, VkDevice devic
   }
 
   // Destroy old imageViews and swapchain.
-  for (auto view : state->imageViews) {
+  for (auto view : imageViews) {
     if (view != VK_NULL_HANDLE) {
       vkDestroyImageView(device, view, nullptr);
     }
   }
-  if (state->swapchain != VK_NULL_HANDLE) {
-    vkDestroySwapchainKHR(device, state->swapchain, nullptr);
+  if (swapchain != VK_NULL_HANDLE) {
+    vkDestroySwapchainKHR(device, swapchain, nullptr);
   }
-  state->swapchain = newSwapchain;
+  swapchain = newSwapchain;
 
   uint32_t swapImageCount = 0;
   vkGetSwapchainImagesKHR(device, newSwapchain, &swapImageCount, nullptr);
-  state->images.resize(swapImageCount);
-  vkGetSwapchainImagesKHR(device, newSwapchain, &swapImageCount, state->images.data());
+  images.resize(swapImageCount);
+  vkGetSwapchainImagesKHR(device, newSwapchain, &swapImageCount, images.data());
 
   // Recreate imageViews for the new swapchain images.
-  state->imageViews.resize(swapImageCount);
+  imageViews.resize(swapImageCount);
   for (uint32_t i = 0; i < swapImageCount; i++) {
     VkImageViewCreateInfo viewInfo = {};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = state->images[i];
+    viewInfo.image = images[i];
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = state->format;
+    viewInfo.format = format;
     viewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    auto viewResult = vkCreateImageView(device, &viewInfo, nullptr, &state->imageViews[i]);
+    auto viewResult = vkCreateImageView(device, &viewInfo, nullptr, &imageViews[i]);
     if (viewResult != VK_SUCCESS) {
       LOGE("VulkanWindow: vkCreateImageView failed during rebuild for image %u: %s", i,
            VkResultToString(viewResult));
@@ -320,8 +344,8 @@ static bool RecreateSwapchain(VulkanWindow::PlatformState* state, VkDevice devic
     }
   }
 
-  state->width = static_cast<int>(extent.width);
-  state->height = static_cast<int>(extent.height);
+  width = static_cast<int>(extent.width);
+  height = static_cast<int>(extent.height);
   return true;
 }
 
@@ -347,7 +371,7 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
     if (extent.width == 0 || extent.height == 0) {
       return nullptr;
     }
-    if (!RecreateSwapchain(_platformState.get(), vkDevice, capabilities, extent)) {
+    if (!_platformState->recreateSwapchain(vkDevice, capabilities, extent)) {
       return nullptr;
     }
   }
@@ -355,7 +379,7 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
   _platformState->swapchainProxy = std::make_shared<VulkanSwapchainProxy>(
       context, vulkanGPU, _platformState->swapchain, _platformState->format, _platformState->width,
       _platformState->height, _platformState->imageViews, _platformState->images,
-      _platformState->acquireFence);
+      _platformState->imageAvailableSemaphore, _platformState->renderFinishedSemaphore);
   return _platformState->swapchainProxy;
 }
 

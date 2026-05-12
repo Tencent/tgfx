@@ -70,7 +70,8 @@ class VulkanCommandQueue : public CommandQueue {
 
   /// Schedules a swapchain image to be presented at the end of the next submit(). The layout
   /// transition (GENERAL -> PRESENT_SRC_KHR) is automatically appended to the render command batch.
-  void schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image);
+  void schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image,
+                       VkSemaphore imageAvailableSemaphore, VkSemaphore renderFinishedSemaphore);
 
  private:
   void flushPendingUploads(VkCommandBuffer commandBuffer);
@@ -91,6 +92,8 @@ class VulkanCommandQueue : public CommandQueue {
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     uint32_t imageIndex = 0;
     VkImage image = VK_NULL_HANDLE;
+    VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+    VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
   };
   std::optional<PendingPresent> pendingPresent;
 };

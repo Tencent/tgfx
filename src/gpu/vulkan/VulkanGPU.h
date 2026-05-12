@@ -218,6 +218,12 @@ class VulkanGPU : public GPU {
     /// If non-null, vkQueuePresentKHR is called after the submit with this swapchain.
     VkSwapchainKHR presentSwapchain = VK_NULL_HANDLE;
     uint32_t presentImageIndex = 0;
+    /// Binary semaphore signaled by vkAcquireNextImageKHR when the image is available. The submit
+    /// waits on this at COLOR_ATTACHMENT_OUTPUT before writing to the swapchain image.
+    VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+    /// Binary semaphore signaled by the submit when rendering is complete. vkQueuePresentKHR
+    /// waits on this before displaying the image.
+    VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
   };
 
   /// Submits a completed frame to the GPU. Performs the following steps in order:

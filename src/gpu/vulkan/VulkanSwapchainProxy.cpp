@@ -29,9 +29,13 @@ namespace tgfx {
 VulkanSwapchainProxy::VulkanSwapchainProxy(Context* context, VulkanGPU* gpu,
                                            VkSwapchainKHR swapchain, VkFormat format, int width,
                                            int height, const std::vector<VkImageView>& imageViews,
-                                           const std::vector<VkImage>& images, VkFence acquireFence)
+                                           const std::vector<VkImage>& images,
+                                           VkSemaphore imageAvailableSemaphore,
+                                           VkSemaphore renderFinishedSemaphore)
     : _context(context), _gpu(gpu), _swapchain(swapchain), _format(format), _width(width),
-      _height(height), _imageViews(imageViews), _images(images), _acquireFence(acquireFence) {
+      _height(height), _imageViews(imageViews), _images(images),
+      _imageAvailableSemaphore(imageAvailableSemaphore),
+      _renderFinishedSemaphore(renderFinishedSemaphore) {
 }
 
 Context* VulkanSwapchainProxy::getContext() const {
@@ -68,10 +72,11 @@ std::shared_ptr<TextureView> VulkanSwapchainProxy::getTextureView() const {
 
 std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
-    // Acquire the next swapchain image. CPU blocks on the fence until the image is available.
-    vkResetFences(_gpu->device(), 1, &_acquireFence);
-    auto result = vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX, VK_NULL_HANDLE,
-                                        _acquireFence, &_currentImageIndex);
+    // Acquire the next swapchain image. The imageAvailable semaphore is signaled when the
+    // presentation engine releases the image; the GPU waits on it at COLOR_ATTACHMENT_OUTPUT.
+    auto result = vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX,
+                                        _imageAvailableSemaphore, VK_NULL_HANDLE,
+                                        &_currentImageIndex);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
       LOGE("VulkanSwapchainProxy: swapchain out of date, needs rebuild.");
       return nullptr;
@@ -81,12 +86,12 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
            static_cast<int>(result));
       return nullptr;
     }
-    vkWaitForFences(_gpu->device(), 1, &_acquireFence, VK_TRUE, UINT64_MAX);
 
-    // Schedule the present to happen at the end of the next submit(), mirroring Metal's
-    // [commandBuffer presentDrawable:] pattern. The layout transition is also handled there.
+    // Schedule the present to happen at the end of the next submit(). The submit will wait on
+    // imageAvailable and signal renderFinished; present will wait on renderFinished.
     auto queue = static_cast<VulkanCommandQueue*>(_context->gpu()->queue());
-    queue->schedulePresent(_swapchain, _currentImageIndex, _images[_currentImageIndex]);
+    queue->schedulePresent(_swapchain, _currentImageIndex, _images[_currentImageIndex],
+                           _imageAvailableSemaphore, _renderFinishedSemaphore);
 
     VulkanImageInfo vulkanInfo = {};
     vulkanInfo.image = reinterpret_cast<uint64_t>(_images[_currentImageIndex]);

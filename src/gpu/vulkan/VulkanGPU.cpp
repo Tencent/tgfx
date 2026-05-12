@@ -597,38 +597,55 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     return;
   }
 
-  // Step 4: Build VkSubmitInfo with optional timeline semaphore operations.
+  // Step 4: Build VkSubmitInfo with optional timeline semaphore and present synchronization.
+  // Wait semaphores: [timeline (cross-context sync), imageAvailable (swapchain acquire)].
+  // Signal semaphores: [timeline (cross-context sync), renderFinished (for present)].
+  std::vector<VkSemaphore> waitSemaphores;
+  std::vector<VkPipelineStageFlags> waitStages;
+  std::vector<uint64_t> waitValues;
+  std::vector<VkSemaphore> signalSemaphores;
+  std::vector<uint64_t> signalValues;
+
+  if (request.waitSemaphore) {
+    waitSemaphores.push_back(request.waitSemaphore->vulkanSemaphore());
+    waitStages.push_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    waitValues.push_back(request.waitSemaphore->signalValue());
+  }
+  if (request.imageAvailableSemaphore != VK_NULL_HANDLE) {
+    waitSemaphores.push_back(request.imageAvailableSemaphore);
+    waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+    waitValues.push_back(0);
+  }
+  if (request.signalSemaphore) {
+    signalSemaphores.push_back(request.signalSemaphore->vulkanSemaphore());
+    signalValues.push_back(request.signalSemaphore->nextSignalValue());
+  }
+  if (request.renderFinishedSemaphore != VK_NULL_HANDLE) {
+    signalSemaphores.push_back(request.renderFinishedSemaphore);
+    signalValues.push_back(0);
+  }
+
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.commandBufferCount = static_cast<uint32_t>(request.commandBuffers.size());
   submitInfo.pCommandBuffers = request.commandBuffers.data();
+  if (!waitSemaphores.empty()) {
+    submitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
+    submitInfo.pWaitSemaphores = waitSemaphores.data();
+    submitInfo.pWaitDstStageMask = waitStages.data();
+  }
+  if (!signalSemaphores.empty()) {
+    submitInfo.signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size());
+    submitInfo.pSignalSemaphores = signalSemaphores.data();
+  }
 
   VkTimelineSemaphoreSubmitInfo timelineInfo = {};
   timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-  VkSemaphore waitSem = VK_NULL_HANDLE;
-  VkSemaphore signalSem = VK_NULL_HANDLE;
-  uint64_t waitValue = 0;
-  uint64_t signalValue = 0;
-  VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-
-  if (request.waitSemaphore) {
-    waitSem = request.waitSemaphore->vulkanSemaphore();
-    waitValue = request.waitSemaphore->signalValue();
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = &waitSem;
-    submitInfo.pWaitDstStageMask = &waitStage;
-    timelineInfo.waitSemaphoreValueCount = 1;
-    timelineInfo.pWaitSemaphoreValues = &waitValue;
-  }
-  if (request.signalSemaphore) {
-    signalValue = request.signalSemaphore->nextSignalValue();
-    signalSem = request.signalSemaphore->vulkanSemaphore();
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &signalSem;
-    timelineInfo.signalSemaphoreValueCount = 1;
-    timelineInfo.pSignalSemaphoreValues = &signalValue;
-  }
   if (request.waitSemaphore || request.signalSemaphore) {
+    timelineInfo.waitSemaphoreValueCount = static_cast<uint32_t>(waitValues.size());
+    timelineInfo.pWaitSemaphoreValues = waitValues.data();
+    timelineInfo.signalSemaphoreValueCount = static_cast<uint32_t>(signalValues.size());
+    timelineInfo.pSignalSemaphoreValues = signalValues.data();
     submitInfo.pNext = &timelineInfo;
   }
 
@@ -663,14 +680,18 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
   }
   inflightSubmissions.push_back(std::move(submission));
 
-  // Step 7: Execute pending present. Same-queue ordering guarantees the layout transition
-  // (included in the submit batch) completes before the presentation engine reads the image.
+  // Step 7: Execute pending present. The renderFinished semaphore ensures the presentation
+  // engine waits for rendering to complete before displaying the image.
   if (request.presentSwapchain != VK_NULL_HANDLE) {
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = &request.presentSwapchain;
     presentInfo.pImageIndices = &request.presentImageIndex;
+    if (request.renderFinishedSemaphore != VK_NULL_HANDLE) {
+      presentInfo.waitSemaphoreCount = 1;
+      presentInfo.pWaitSemaphores = &request.renderFinishedSemaphore;
+    }
     vkQueuePresentKHR(vulkanQueue, &presentInfo);
   }
 }

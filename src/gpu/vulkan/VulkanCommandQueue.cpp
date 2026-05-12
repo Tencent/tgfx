@@ -251,6 +251,8 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   if (pendingPresent.has_value()) {
     request.presentSwapchain = pendingPresent->swapchain;
     request.presentImageIndex = pendingPresent->imageIndex;
+    request.imageAvailableSemaphore = pendingPresent->imageAvailableSemaphore;
+    request.renderFinishedSemaphore = pendingPresent->renderFinishedSemaphore;
   }
 
   pendingUploads.clear();
@@ -278,8 +280,10 @@ void VulkanCommandQueue::waitSemaphore(std::shared_ptr<Semaphore> semaphore) {
 }
 
 void VulkanCommandQueue::schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex,
-                                         VkImage image) {
-  pendingPresent = {swapchain, imageIndex, image};
+                                         VkImage image, VkSemaphore imageAvailableSemaphore,
+                                         VkSemaphore renderFinishedSemaphore) {
+  pendingPresent = {swapchain, imageIndex, image, imageAvailableSemaphore,
+                    renderFinishedSemaphore};
 }
 
 void VulkanCommandQueue::waitUntilCompleted() {
