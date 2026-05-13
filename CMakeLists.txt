@@ -391,26 +391,15 @@ elseif (APPLE)
         list(APPEND TGFX_INCLUDES third_party/shaderc/libshaderc/include)
         list(APPEND TGFX_INCLUDES third_party/SPIRV-Cross)
         list(APPEND TGFX_DEFINES SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS)
-        # Auto-sync shaderc's sub-dependencies (glslang, SPIRV-Tools, etc.) if not present.
-        if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc/third_party/glslang)
-            find_package(Python3 COMPONENTS Interpreter REQUIRED)
-            message(STATUS "Syncing shaderc sub-dependencies...")
-            execute_process(
-                    COMMAND ${Python3_EXECUTABLE}
-                    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc/utils/git-sync-deps
-                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc
-                    RESULT_VARIABLE SYNC_RESULT)
-            if (NOT SYNC_RESULT EQUAL 0)
-                message(FATAL_ERROR "Failed to sync shaderc sub-dependencies.")
-            endif ()
-        endif ()
     endif ()
 endif ()
 
-# Auto-sync shaderc's sub-dependencies for Vulkan backend (outside the Apple/Metal block).
-if (TGFX_USE_VULKAN)
-    if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc/third_party/glslang)
-        find_package(Python3 COMPONENTS Interpreter REQUIRED)
+# Auto-sync shaderc sub-dependencies (glslang, SPIRV-Tools, etc.) if any backend needs shaderc.
+# This runs at configure time; for offline builds, run manually before cmake:
+#   python third_party/shaderc/utils/git-sync-deps
+if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc/third_party/glslang)
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if (Python3_FOUND)
         message(STATUS "Syncing shaderc sub-dependencies...")
         execute_process(
                 COMMAND ${Python3_EXECUTABLE}
@@ -418,8 +407,10 @@ if (TGFX_USE_VULKAN)
                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc
                 RESULT_VARIABLE SYNC_RESULT)
         if (NOT SYNC_RESULT EQUAL 0)
-            message(FATAL_ERROR "Failed to sync shaderc sub-dependencies.")
+            message(FATAL_ERROR "Failed to sync shaderc sub-dependencies. For offline builds, run: python third_party/shaderc/utils/git-sync-deps")
         endif ()
+    else ()
+        message(FATAL_ERROR "shaderc sub-dependencies missing and Python3 not found. Run manually: python third_party/shaderc/utils/git-sync-deps")
     endif ()
 endif ()
 
