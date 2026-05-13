@@ -19,39 +19,34 @@
 #pragma once
 
 #include <memory>
-#include <stack>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorSpace.h"
-#include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix3D.h"
-#include "tgfx/core/Picture.h"
-#include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
 
 class Context;
-class OpaqueContext;
-
-struct TransformState {
-  TransformState(const Matrix3D& transform, bool antialiasing)
-      : transform(transform), antialiasing(antialiasing) {
-  }
-
-  Matrix3D transform = {};
-  bool antialiasing = true;
-};
+class Layer;
+class DrawArgs;
 
 /**
- * Abstract base class for 3D context rendering. Handles recording, transformation
- * accumulation, and compositing of layer content with perspective effects.
+ * Abstract base class for 3D context rendering. The contract is two-phase:
+ *  - Build phase: drawByStarting3DContext calls addLayer(rootLayer, ...). The context recursively
+ *    expands the preserve3D subtree internally and accumulates per-node geometry. No pixel work
+ *    happens during build.
+ *  - Composite phase: finishAndDrawTo() rasterizes each registered node by invoking the standard
+ *    Layer::drawLayer / Layer::drawContour entry points and composites the results onto the
+ *    target canvas. preserve3D middle nodes are kept apart from their descendants because
+ *    Layer::drawChildren detects args.render3DContext != nullptr and stops descending — the
+ *    descendants are independently registered nodes.
  */
-class Layer3DContext {
+class Layer3DContext : public std::enable_shared_from_this<Layer3DContext> {
  public:
   /**
    * Creates a Layer3DContext implementation for compositing layer content with 3D transforms.
-   * @param opaqueMode If true, returns an Opaque3DContext that renders opaque/contour content;
-   * if false, returns the default Render3DContext implementation.
+   * @param opaqueMode If true, returns an Opaque3DContext that renders contour content;
+   * if false, returns a Render3DContext implementation.
    * @param context The GPU Context used for offscreen compositing.
    * @param renderRect The destination rectangle in the target canvas's coordinate space.
    * @param contentScale The scale factor applied to recorded content.
@@ -66,54 +61,38 @@ class Layer3DContext {
   virtual ~Layer3DContext() = default;
 
   /**
-   * Begins recording a new layer with the specified transform and antialiasing setting.
-   * @param childTransform The 3D transform to apply to the layer content.
-   * @param antialiasing Whether to enable edge antialiasing for this layer.
-   * @return A Canvas on which Layer subtree content should be drawn. The returned pointer is
-   * owned by this Layer3DContext and remains valid until endRecording() is called.
+   * Type of pointer-to-member function used to rasterize a registered node. Mirrors
+   * Layer::LayerDrawFunc — typically &Layer::drawLayer or &Layer::drawContour.
    */
-  Canvas* beginRecording(const Matrix3D& childTransform, bool antialiasing);
+  using LayerDrawFunc = bool (Layer::*)(const DrawArgs&, Canvas*, float, BlendMode);
 
   /**
-   * Ends recording the current layer.
+   * Build phase: registers the root of a 3D subtree. The context internally walks the subtree
+   * (recursing through preserve3D descendants and stopping at non-preserve3D leaves) and records
+   * a node descriptor for each layer that should participate in 3D compositing. No raster work
+   * happens here.
+   * @param layer The 3D subtree root.
+   * @param transform Accumulated 3D transform from outside the subtree down to this layer.
+   * @param alpha Accumulated alpha along the path from outside the subtree.
+   * @param drawFunc The Layer member function used to rasterize each registered node. Typically
+   * &Layer::drawLayer for normal compositing or &Layer::drawContour when the 3D subtree is being
+   * recorded as a contour source.
    */
-  void endRecording();
+  virtual void addLayer(Layer* layer, const Matrix3D& transform, float alpha,
+                        LayerDrawFunc drawFunc) = 0;
 
   /**
-   * Returns true if all layers have been recorded and the context is ready to finish.
+   * Composite phase: rasterizes registered nodes and draws the composited result onto canvas.
+   * Each node is rasterized by invoking Layer::drawLayer (or Layer::drawContour for opaque mode)
+   * with args.render3DContext pointing at this context, so drawChildren can detect the 3D
+   * raster context and avoid double-drawing descendants that are themselves registered nodes.
    */
-  bool isFinished() const;
-
-  /**
-   * Returns the current OpaqueContext for opaque content/contour rendering, or nullptr for normal
-   * rendering. Must be called after beginRecording.
-   */
-  virtual OpaqueContext* currentOpaqueContext() {
-    return nullptr;
-  }
-
-  /**
-   * Finishes the 3D rendering and draws the result to the target canvas.
-   * @param canvas The target Canvas to draw the composited result on.
-   * @param antialiasing Whether to enable antialiasing when drawing.
-   */
-  virtual void finishAndDrawTo(Canvas* canvas, bool antialiasing) = 0;
+  virtual void finishAndDrawTo(const DrawArgs& args, Canvas* canvas) = 0;
 
  protected:
-  static std::shared_ptr<Image> PictureToImage(std::shared_ptr<Picture> picture, Point* offset,
-                                               std::shared_ptr<ColorSpace> colorSpace);
-
-  Matrix3D currentTransform() const;
-
-  virtual Canvas* onBeginRecording() = 0;
-  virtual std::shared_ptr<Picture> onFinishRecording() = 0;
-  virtual void onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                            const Point& pictureOffset, int depth, bool antialiasing) = 0;
-
   Rect _renderRect = {};
   float _contentScale = 1.0f;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
-  std::stack<TransformState> _transformStack = {};
 };
 
 }  // namespace tgfx

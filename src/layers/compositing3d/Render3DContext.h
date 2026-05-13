@@ -18,34 +18,49 @@
 
 #pragma once
 
-#include <stack>
+#include <memory>
+#include <vector>
 #include "Layer3DContext.h"
-#include "tgfx/core/PictureRecorder.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
 
 class Context3DCompositor;
+class DrawArgs;
 
 /**
- * Manages the rendering state for layers in a 3D context, handling recording, transformation
- * accumulation, and compositing of layer content with perspective effects.
+ * Render3DContext composites layers using BSP-based depth sorting. addLayer recursively expands
+ * the preserve3D subtree, collecting one node per registered layer. finishAndDrawTo builds a BSP
+ * tree, rasterizes each layer (once per Layer* on demand) by invoking Layer::drawLayer, then
+ * composites fragments back-to-front.
  */
 class Render3DContext : public Layer3DContext {
  public:
   Render3DContext(std::shared_ptr<Context3DCompositor> compositor, const Rect& renderRect,
                   float contentScale, std::shared_ptr<ColorSpace> colorSpace);
 
-  void finishAndDrawTo(Canvas* canvas, bool antialiasing) override;
+  void addLayer(Layer* layer, const Matrix3D& transform, float alpha,
+                LayerDrawFunc drawFunc) override;
 
- protected:
-  Canvas* onBeginRecording() override;
-  std::shared_ptr<Picture> onFinishRecording() override;
-  void onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                    const Point& pictureOffset, int depth, bool antialiasing) override;
+  void finishAndDrawTo(const DrawArgs& args, Canvas* canvas) override;
 
  private:
+  struct PendingNode {
+    Layer* layer = nullptr;
+    Matrix3D transform = {};
+    Rect localBounds = {};
+    int depth = 0;
+    float alpha = 1.0f;
+    bool antialiasing = true;
+  };
+
+  void collectNodes(Layer* layer, const Matrix3D& transform, float alpha, int depth);
+  std::shared_ptr<Image> rasterLayer(Layer* layer, const Rect& localBounds, float alpha,
+                                     DrawArgs& leafArgs);
+
   std::shared_ptr<Context3DCompositor> _compositor = nullptr;
-  std::stack<PictureRecorder> _recorderStack = {};
+  std::vector<PendingNode> _pendingNodes = {};
+  LayerDrawFunc _drawFunc = nullptr;
 };
 
 }  // namespace tgfx

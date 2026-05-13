@@ -18,40 +18,41 @@
 
 #pragma once
 
-#include <stack>
 #include <vector>
 #include "Layer3DContext.h"
-#include "layers/OpaqueContext.h"
 
 namespace tgfx {
 
-struct OpaqueImageEntry {
-  std::shared_ptr<Image> image = nullptr;
-  Matrix3D transform = {};
-};
+class DrawArgs;
 
 /**
- * Simplified 3D context for opaque content/contour rendering. Unlike Render3DContext, this class
- * does not perform complex depth sorting or clipping. It simply applies 3D transforms to each
- * layer and draws them in order.
+ * Simplified 3D context for contour rendering. Unlike Render3DContext, this class does not run
+ * BSP depth sorting; nodes are rasterized in registration order (layer-tree pre-order) and drawn
+ * sequentially with their accumulated 3D transform applied directly. Contour output is always
+ * single-channel alpha so paint order alone yields the correct result.
  */
 class Opaque3DContext : public Layer3DContext {
  public:
   Opaque3DContext(const Rect& renderRect, float contentScale,
                   std::shared_ptr<ColorSpace> colorSpace);
 
-  OpaqueContext* currentOpaqueContext() override;
-  void finishAndDrawTo(Canvas* canvas, bool antialiasing) override;
+  void addLayer(Layer* layer, const Matrix3D& transform, float alpha,
+                LayerDrawFunc drawFunc) override;
 
- protected:
-  Canvas* onBeginRecording() override;
-  std::shared_ptr<Picture> onFinishRecording() override;
-  void onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                    const Point& pictureOffset, int depth, bool antialiasing) override;
+  void finishAndDrawTo(const DrawArgs& args, Canvas* canvas) override;
 
  private:
-  std::stack<OpaqueContext> _opaqueStack = {};
-  std::vector<OpaqueImageEntry> _opaqueImages = {};
+  struct PendingNode {
+    Layer* layer = nullptr;
+    Matrix3D transform = {};
+    Rect localBounds = {};
+    float alpha = 1.0f;
+  };
+
+  void collectNodes(Layer* layer, const Matrix3D& transform, float alpha);
+
+  std::vector<PendingNode> _pendingNodes = {};
+  LayerDrawFunc _drawFunc = nullptr;
 };
 
 }  // namespace tgfx

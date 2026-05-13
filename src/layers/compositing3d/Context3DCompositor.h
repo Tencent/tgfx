@@ -19,61 +19,80 @@
 #pragma once
 
 #include <deque>
+#include <memory>
 #include <unordered_map>
+#include <vector>
+#include "BspTree.h"
 #include "DrawPolygon3D.h"
 #include "core/utils/PlacementPtr.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
+
+class Layer;
 
 /**
  * Context3DCompositor handles compositing of 3D transformed images using BSP tree for correct
  * depth sorting. It splits intersecting regions to ensure correct occlusion and blending order.
+ *
+ * Usage: addPolygon for each registered node, then prepareTraversal to build the BSP tree and
+ * obtain fragments in back-to-front order. Caller rasterizes images on demand and feeds them via
+ * drawPolygon. Finally flushToImage produces the composited image.
  */
 class Context3DCompositor {
  public:
   Context3DCompositor(const Context& context, int width, int height);
 
-  /**
-   * Returns the width of the compositor in pixels.
-   */
   int width() const {
     return _width;
   }
 
-  /**
-   * Returns the height of the compositor in pixels.
-   */
   int height() const {
     return _height;
   }
 
   /**
-   * Adds an image with 3D transformation for compositing.
-   * @param image The source image to draw.
-   * @param matrix The 3D transformation matrix applied to the image.
+   * Adds a polygon for compositing. Geometry only — the layer's image is not produced here.
+   * @param layer The layer this polygon represents (used as image cache key during traversal).
+   * @param localBounds Layer-local bounds used to derive the polygon's corners.
+   * @param matrix The 3D transformation applied to the local-space corners.
    * @param depth The depth level in the layer tree (used for sorting coplanar polygons).
    * @param alpha The layer alpha for transparency.
-   * @param antiAlias Whether to enable edge antialiasing when the render target does not support MSAA.
+   * @param antiAlias Whether to enable edge antialiasing when MSAA is unavailable.
    */
-  void addImage(std::shared_ptr<Image> image, const Matrix3D& matrix, int depth, float alpha,
-                bool antiAlias);
+  void addPolygon(Layer* layer, const Rect& localBounds, const Matrix3D& matrix, int depth,
+                  float alpha, bool antiAlias);
 
   /**
-   * Draws all added images with correct depth ordering and blending.
-   * @return The composited image.
+   * Builds the BSP tree from added polygons and returns fragments in back-to-front paint order.
+   * The returned vector is owned by the compositor; pointers stay valid until flushToImage.
+   * Each fragment carries a Layer* identifying which layer's raster image should be sampled when
+   * passed back via drawPolygon.
    */
-  std::shared_ptr<Image> finish();
+  const std::vector<DrawPolygon3D*>& prepareTraversal();
+
+  /**
+   * Draws a single fragment (returned by prepareTraversal) with its supplied raster image.
+   */
+  void drawPolygon(const DrawPolygon3D* polygon, const std::shared_ptr<Image>& image);
+
+  /**
+   * Flushes accumulated draw ops to the offscreen target and returns the composited image.
+   */
+  std::shared_ptr<Image> flushToImage();
 
  private:
-  void drawPolygon(const DrawPolygon3D* polygon);
-  void drawQuads(const DrawPolygon3D* polygon, const std::vector<Quad>& subQuads);
+  void drawQuads(const DrawPolygon3D* polygon, const std::shared_ptr<Image>& image,
+                 const std::vector<Quad>& subQuads);
 
   int _width = 0;
   int _height = 0;
   std::shared_ptr<RenderTargetProxy> _targetColorProxy = nullptr;
   std::deque<std::unique_ptr<DrawPolygon3D>> _polygons = {};
+  std::unique_ptr<BspTree> _bspTree = nullptr;
+  std::vector<DrawPolygon3D*> _orderedFragments = {};
   std::vector<PlacementPtr<DrawOp>> _drawOps = {};
   std::unordered_map<int, int> _depthSequenceCounters = {};
 };

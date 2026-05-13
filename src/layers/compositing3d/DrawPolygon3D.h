@@ -21,25 +21,32 @@
 #include <memory>
 #include <vector>
 #include "gpu/Quad.h"
-#include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix3D.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
+
+class Layer;
 
 /**
  * DrawPolygon3D represents a splittable 3D polygon for BSP tree processing.
  * It stores transformed 3D vertices in screen space and supports splitting by other polygons.
+ * The polygon references a Layer* whose rasterized image is supplied externally during compositing
+ * — the polygon itself does not own the image.
  */
 class DrawPolygon3D {
  public:
   /**
-   * Constructs a polygon from an image's 2D bounds and a 3D transformation matrix.
+   * Constructs a polygon from a layer's local bounds and a 3D transformation matrix.
    * The transform is applied immediately to convert vertices to screen space.
+   * @param layer The source layer; rasterized lazily during compositing.
+   * @param localBounds Layer-local bounds used to derive 3D polygon corners and quad UVs.
+   * @param matrix The 3D transformation applied to the local-space corners.
    * @param depth The depth level in the layer tree (used for sorting coplanar polygons).
    * @param sequenceIndex The sequence index within the same depth level.
    */
-  DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matrix, int depth, int sequenceIndex,
-                float alpha, bool antiAlias);
+  DrawPolygon3D(Layer* layer, const Rect& localBounds, const Matrix3D& matrix, int depth,
+                int sequenceIndex, float alpha, bool antiAlias);
 
   /**
    * Splits the given polygon by this polygon's plane.
@@ -70,8 +77,12 @@ class DrawPolygon3D {
     return _alpha;
   }
 
-  const std::shared_ptr<Image>& image() const {
-    return _image;
+  Layer* layer() const {
+    return _layer;
+  }
+
+  const Rect& localBounds() const {
+    return _localBounds;
   }
 
   const Matrix3D& matrix() const {
@@ -102,8 +113,9 @@ class DrawPolygon3D {
 
  private:
   // Constructs a polygon from already-transformed 3D points (used for split polygons).
-  DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matrix, std::vector<Vec3> points,
-                const Vec3& normal, int depth, int sequenceIndex, float alpha, bool antiAlias);
+  DrawPolygon3D(Layer* layer, const Rect& localBounds, const Matrix3D& matrix,
+                std::vector<Vec3> points, const Vec3& normal, int depth, int sequenceIndex,
+                float alpha, bool antiAlias);
 
   void constructNormal();
 
@@ -115,7 +127,8 @@ class DrawPolygon3D {
   bool _isSplit = false;
   float _alpha = 1.0f;
   bool _antiAlias = true;
-  std::shared_ptr<Image> _image = nullptr;
+  Layer* _layer = nullptr;
+  Rect _localBounds = {};
   Matrix3D _matrix = {};
 };
 

@@ -19,9 +19,6 @@
 #include "Layer3DContext.h"
 #include "Opaque3DContext.h"
 #include "Render3DContext.h"
-#include "core/Matrix3DUtils.h"
-#include "core/utils/Log.h"
-#include "core/utils/MathExtra.h"
 #include "layers/compositing3d/Context3DCompositor.h"
 
 namespace tgfx {
@@ -41,76 +38,6 @@ std::shared_ptr<Layer3DContext> Layer3DContext::Make(bool opaqueMode, Context* c
 Layer3DContext::Layer3DContext(const Rect& renderRect, float contentScale,
                                std::shared_ptr<ColorSpace> colorSpace)
     : _renderRect(renderRect), _contentScale(contentScale), _colorSpace(std::move(colorSpace)) {
-}
-
-std::shared_ptr<Image> Layer3DContext::PictureToImage(std::shared_ptr<Picture> picture,
-                                                      Point* offset,
-                                                      std::shared_ptr<ColorSpace> colorSpace) {
-  if (picture == nullptr) {
-    return nullptr;
-  }
-  auto bounds = picture->getBounds();
-  bounds.roundOut();
-  auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
-  auto image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height()), &matrix, std::move(colorSpace));
-  if (offset) {
-    offset->x = bounds.left;
-    offset->y = bounds.top;
-  }
-  return image;
-}
-
-Matrix3D Layer3DContext::currentTransform() const {
-  return _transformStack.empty() ? Matrix3D::I() : _transformStack.top().transform;
-}
-
-bool Layer3DContext::isFinished() const {
-  return _transformStack.empty();
-}
-
-Canvas* Layer3DContext::beginRecording(const Matrix3D& childTransform, bool antialiasing) {
-  auto newTransform = childTransform;
-  newTransform.postConcat(currentTransform());
-  _transformStack.emplace(newTransform, antialiasing);
-
-  auto canvas = onBeginRecording();
-  DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
-  canvas->scale(_contentScale, _contentScale);
-  auto invScale = 1.0f / _contentScale;
-  auto contextBounds =
-      Rect::MakeXYWH(_renderRect.x() * invScale, _renderRect.y() * invScale,
-                     _renderRect.width() * invScale, _renderRect.height() * invScale);
-  auto localClipRect = Matrix3DUtils::InverseMapRect(contextBounds, newTransform);
-  if (!localClipRect.isEmpty()) {
-    canvas->clipRect(localClipRect, antialiasing);
-  }
-  return canvas;
-}
-
-void Layer3DContext::endRecording() {
-  auto picture = onFinishRecording();
-  if (_transformStack.empty()) {
-    return;
-  }
-  auto state = _transformStack.top();
-  _transformStack.pop();
-
-  Point pictureOffset = {};
-  auto image = PictureToImage(std::move(picture), &pictureOffset, _colorSpace);
-  if (image == nullptr) {
-    return;
-  }
-
-  // Get depth after pop: represents the number of ancestor layers (0 for root layer)
-  auto depth = static_cast<int>(_transformStack.size());
-  DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
-  auto invScale = 1.0f / _contentScale;
-  auto imageOrigin = Point::Make(pictureOffset.x * invScale, pictureOffset.y * invScale);
-  auto imageTransform = Matrix3DUtils::OriginAdaptedMatrix3D(state.transform, imageOrigin);
-  imageTransform = Matrix3DUtils::ScaleAdaptedMatrix3D(imageTransform, _contentScale);
-
-  onImageReady(std::move(image), imageTransform, pictureOffset, depth, state.antialiasing);
 }
 
 }  // namespace tgfx

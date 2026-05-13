@@ -951,8 +951,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   // Check if the current layer needs to start a 3D context. Since Layer::draw is called directly
   // without going through a parent layer's drawChildren, 3D context handling must be done here.
   if (canPreserve3D()) {
-    drawByStarting3DContext(drawArgs, canvas, getMatrixWithScrollRect(), &Layer::drawLayer, alpha,
-                            blendMode);
+    drawByStarting3DContext(drawArgs, canvas, getMatrixWithScrollRect(), &Layer::drawLayer, alpha);
   } else {
     drawLayer(drawArgs, canvas, alpha, blendMode);
   }
@@ -1183,7 +1182,7 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
     maskArgs.opaqueContext = &opaqueContext;
     if (maskCanPreserve3D) {
       _mask->drawByStarting3DContext(maskArgs, contourCanvas, relativeMatrix3D, &Layer::drawContour,
-                                     _mask->_alpha, BlendMode::SrcOver);
+                                     _mask->_alpha);
     } else {
       contourCanvas->concat(canvasMatrix);
       _mask->drawContour(maskArgs, contourCanvas, _mask->_alpha, BlendMode::SrcOver);
@@ -1195,7 +1194,7 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   recordingCanvas->scale(scale, scale);
   if (maskCanPreserve3D) {
     _mask->drawByStarting3DContext(maskArgs, recordingCanvas, relativeMatrix3D, &Layer::drawLayer,
-                                   _mask->_alpha, BlendMode::SrcOver);
+                                   _mask->_alpha);
   } else {
     recordingCanvas->concat(canvasMatrix);
     _mask->drawLayer(maskArgs, recordingCanvas, _mask->_alpha, BlendMode::SrcOver);
@@ -1266,6 +1265,11 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
   contourArgs.opaqueContext = &opaqueContext;
   // Contour recording is an intermediate artifact — skip background capture / consume.
   contourArgs.backgroundHandler = BackgroundHandler::NoOp();
+  // Detach from any active 3D rendering context: the contour image we are about to record is the
+  // merged self + descendants outline used as a layerStyle / mask source, not a node within the
+  // 3D BSP. Without this clear, drawContourInternal's "skip children when rasterizing a
+  // preserve3D middle node" guard would prune descendants and produce an incomplete contour.
+  contourArgs.render3DContext = nullptr;
   if (!drawContourInternal(contourArgs, contourCanvas, true)) {
     allMatch = false;
   }
@@ -1455,8 +1459,10 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                           const std::shared_ptr<MaskFilter>& maskFilter) {
-  // Non-leaf layers in a 3D rendering context layer tree never require offscreen rendering.
-  DEBUG_ASSERT(args.render3DContext == nullptr);
+  // preserve3D layers never require offscreen rendering; their effects (filters, group opacity,
+  // mask filter, non-SrcOver blend) are intentionally not supported because each preserve3D
+  // middle node is rasterized as a flat quad before BSP compositing. Non-preserve3D leaves may
+  // still invoke this path inside a 3D context — that's fine, render3DContext is irrelevant here.
   DEBUG_ASSERT(!canPreserve3D());
 
   auto clipBounds = GetClipBounds(canvas);
@@ -1624,17 +1630,18 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
     content->drawContour(canvas, bitFields.allowsEdgeAntialiasing);
   }
 
+  // 3D middle node: descendants are independently registered with the active Layer3DContext, so
+  // we must not recurse into them here. Same gate as drawChildren below.
+  if (canPreserve3D() && args.render3DContext != nullptr) {
+    return allMatch;
+  }
+
   // Draw children's contour directly (not using drawChildren to avoid background logic)
-  auto childArgs = args;
   for (auto& child : _children) {
     if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
       continue;
     }
-    auto childArgsOpt = createChildArgs(childArgs, canvas, child.get());
-    if (!childArgsOpt.has_value()) {
-      continue;
-    }
-    if (!drawChild(*childArgsOpt, canvas, child.get(), 1.0f, &Layer::drawContour)) {
+    if (!drawChild(args, canvas, child.get(), 1.0f, &Layer::drawContour)) {
       allMatch = false;
     }
   }
@@ -1643,6 +1650,11 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
 
 bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                          const Layer* stopChild) {
+  // 3D middle node: descendants are independently registered with the active Layer3DContext and
+  // composited via BSP. Do not recurse here, otherwise we would double-draw them.
+  if (canPreserve3D() && args.render3DContext != nullptr) {
+    return true;
+  }
   auto childCount = static_cast<int>(_children.size());
   int maxIndex = childCount - 1;
   if (args.backgroundHandler != nullptr) {
@@ -1663,25 +1675,23 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
       continue;
     }
-    auto childArgsOpt = createChildArgs(args, canvas, child.get());
-    if (!childArgsOpt.has_value()) {
-      continue;
-    }
     if (args.backgroundHandler != nullptr && i < maxIndex) {
       args.backgroundHandler->beginForceDrawChildren();
-      drawChild(*childArgsOpt, canvas, child.get(), alpha, &Layer::drawLayer);
+      drawChild(args, canvas, child.get(), alpha, &Layer::drawLayer);
       args.backgroundHandler->endForceDrawChildren();
     } else {
-      drawChild(*childArgsOpt, canvas, child.get(), alpha, &Layer::drawLayer);
+      drawChild(args, canvas, child.get(), alpha, &Layer::drawLayer);
     }
   }
   return true;
 }
 
 void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const Matrix3D& matrix3D,
-                                    LayerDrawFunc drawFunc, float alpha, BlendMode blendMode) {
+                                    LayerDrawFunc drawFunc, float alpha) {
   DEBUG_ASSERT(canPreserve3D());
-  DEBUG_ASSERT(args.render3DContext == nullptr);
+  // args.render3DContext may be non-null when this preserve3D layer is nested inside a
+  // non-preserve3D leaf that is being rasterized in an outer 3D context. The nested context is
+  // independent from the outer one — it builds and composites on its own surface.
 
   const auto bounds = getBoundsInternal(matrix3D, false);
   const auto newContext = Create3DContext(args, canvas, bounds);
@@ -1689,82 +1699,25 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const 
     return;
   }
 
-  auto contextArgs = args;
-  contextArgs.render3DContext = newContext;
-  // Layers inside a 3D rendering context need to maintain independent 3D state. This means layers
-  // drawn later may become the background, making it impossible to know the final background when
-  // drawing each layer. Therefore, background styles are disabled.
-  contextArgs.backgroundHandler = BackgroundHandler::NoOp();
-
-  auto* offscreenCanvas = newContext->beginRecording(matrix3D, bitFields.allowsEdgeAntialiasing);
-  contextArgs.opaqueContext = newContext->currentOpaqueContext();
-  (this->*drawFunc)(contextArgs, offscreenCanvas, alpha, blendMode);
-  newContext->endRecording();
-  newContext->finishAndDrawTo(canvas, bitFields.allowsEdgeAntialiasing);
+  newContext->addLayer(this, matrix3D, alpha, drawFunc);
+  newContext->finishAndDrawTo(args, canvas);
 }
 
-std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child) {
-  auto childArgs = args;
-  // Handle 3D context state transitions:
-  // - If parent has no 3D context and child can preserve 3D, child becomes the root of a new 3D
-  //   subtree, so create a new context.
-  // - If parent has 3D context but child cannot preserve 3D, child is a leaf node in the 3D
-  //   subtree. Clear render3DContext to prevent child layers from participating in 3D compositing.
-  //   The entire subtree is rendered as a flat image with this layer's 3D transform applied.
-  auto childCanPreserve3D = child->canPreserve3D();
-  if (!args.render3DContext && childCanPreserve3D) {
-    auto childBounds = child->getBounds(this);
-    if (childBounds.isEmpty()) {
-      return std::nullopt;
-    }
-    childArgs.render3DContext = Create3DContext(childArgs, canvas, childBounds);
-    if (childArgs.render3DContext == nullptr) {
-      return std::nullopt;
-    }
-    // 3D subtree disables Background styles — see drawByStarting3DContext.
-    childArgs.backgroundHandler = BackgroundHandler::NoOp();
-  }
-  return childArgs;
-}
-
-bool Layer::drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, float alpha,
+bool Layer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float alpha,
                       LayerDrawFunc drawFunc) {
+  // 2D → 3D switch: hand off to drawByStarting3DContext, which expands the 3D subtree internally.
+  if (child->canPreserve3D()) {
+    auto matrix3D = child->getMatrixWithScrollRect();
+    child->drawByStarting3DContext(args, canvas, matrix3D, drawFunc, child->_alpha * alpha);
+    return true;
+  }
+
   AutoCanvasRestore autoRestore(canvas);
-
-  auto childTransform3D = child->getMatrixWithScrollRect();
-  auto context3D = childArgs.render3DContext.get();
-  // For layers outside a 3D context, matrices are applied to the canvas directly.
-  // For layers inside a 3D context, matrices are handled by render3DContext.
-  const auto canvasMatrix = context3D == nullptr ? childTransform3D.asMatrix() : Matrix::I();
-  const auto* scrollRectTransform = context3D == nullptr ? nullptr : &childTransform3D;
-  canvas->concat(canvasMatrix);
-  auto scrollRectAA = child->bitFields.allowsEdgeAntialiasing;
-  ClipScrollRect(canvas, child->_scrollRect.get(), scrollRectTransform, scrollRectAA);
-
-  Canvas* targetCanvas = canvas;
-  auto drawArgs = childArgs;
-  if (context3D) {
-    targetCanvas =
-        context3D->beginRecording(childTransform3D, child->bitFields.allowsEdgeAntialiasing);
-    drawArgs.opaqueContext = context3D->currentOpaqueContext();
-  }
-  // If child cannot preserve 3D but has a 3D context, clear it so that child's internal rendering
-  // (e.g., drawOffscreen) doesn't see it. The child is still recorded into the 3D context via
-  // beginRecording/endRecording above.
-  if (context3D && !child->canPreserve3D()) {
-    drawArgs.render3DContext = nullptr;
-  }
-
+  canvas->concat(child->getMatrixWithScrollRect().asMatrix());
+  ClipScrollRect(canvas, child->_scrollRect.get(), nullptr,
+                 child->bitFields.allowsEdgeAntialiasing);
   auto blendMode = static_cast<BlendMode>(child->bitFields.blendMode);
-  bool result = (child->*drawFunc)(drawArgs, targetCanvas, child->_alpha * alpha, blendMode);
-
-  if (context3D) {
-    context3D->endRecording();
-    if (context3D->isFinished()) {
-      context3D->finishAndDrawTo(canvas, child->bitFields.allowsEdgeAntialiasing);
-    }
-  }
-  return result;
+  return (child->*drawFunc)(args, canvas, child->_alpha * alpha, blendMode);
 }
 
 std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& args,

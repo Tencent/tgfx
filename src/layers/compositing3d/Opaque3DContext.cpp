@@ -17,11 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Opaque3DContext.h"
-#include "core/Matrix3DUtils.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "layers/BackgroundHandler.h"
+#include "layers/DrawArgs.h"
+#include "layers/OpaqueContext.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/Paint.h"
+#include "tgfx/core/Picture.h"
+#include "tgfx/layers/Layer.h"
 
 namespace tgfx {
 
@@ -30,40 +35,109 @@ Opaque3DContext::Opaque3DContext(const Rect& renderRect, float contentScale,
     : Layer3DContext(renderRect, contentScale, std::move(colorSpace)) {
 }
 
-OpaqueContext* Opaque3DContext::currentOpaqueContext() {
-  return _opaqueStack.empty() ? nullptr : &_opaqueStack.top();
+void Opaque3DContext::addLayer(Layer* layer, const Matrix3D& transform, float alpha,
+                               LayerDrawFunc drawFunc) {
+  _drawFunc = drawFunc;
+  collectNodes(layer, transform, alpha);
 }
 
-Canvas* Opaque3DContext::onBeginRecording() {
-  _opaqueStack.emplace();
-  return _opaqueStack.top().beginRecording();
-}
-
-std::shared_ptr<Picture> Opaque3DContext::onFinishRecording() {
-  if (_opaqueStack.empty()) {
-    return nullptr;
+void Opaque3DContext::collectNodes(Layer* layer, const Matrix3D& transform, float alpha) {
+  if (layer == nullptr) {
+    return;
   }
-  auto picture = _opaqueStack.top().finishRecordingAsPicture();
-  _opaqueStack.pop();
-  return picture;
+  Rect bounds = {};
+  if (layer->canPreserve3D()) {
+    auto contentBounds = layer->computeContentBounds({}, false);
+    if (contentBounds.has_value()) {
+      bounds = *contentBounds;
+    }
+  } else {
+    bounds = layer->getBounds();
+  }
+  if (!bounds.isEmpty()) {
+    PendingNode node;
+    node.layer = layer;
+    node.transform = transform;
+    node.localBounds = bounds;
+    node.alpha = alpha;
+    _pendingNodes.push_back(node);
+  }
+  if (!layer->canPreserve3D()) {
+    return;
+  }
+  for (auto& child : layer->_children) {
+    if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
+      continue;
+    }
+    auto childTransform = child->getMatrixWithScrollRect();
+    childTransform.postConcat(transform);
+    collectNodes(child.get(), childTransform, alpha * child->_alpha);
+  }
 }
 
-void Opaque3DContext::onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
-                                   const Point&, int, bool) {
-  _opaqueImages.push_back({std::move(image), imageTransform});
-}
-
-void Opaque3DContext::finishAndDrawTo(Canvas* canvas, bool antialiasing) {
-  Paint paint = {};
-  paint.setAntiAlias(antialiasing);
-  AutoCanvasRestore outerRestore(canvas);
-  // The imageMatrix already contains the scale needed for drawing the image to the canvas.
-  // Apply inverse scale to cancel out the canvas's existing scale transformation.
+void Opaque3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
   DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
-  canvas->concat(Matrix::MakeScale(1.0f / _contentScale, 1.0f / _contentScale));
-  for (const auto& entry : _opaqueImages) {
+  if (_pendingNodes.empty()) {
+    return;
+  }
+
+  // Rasterize each node's contour into an opaque picture, then convert to image so it can be
+  // composited with a 3D transform. drawChildren detects render3DContext != nullptr and stops
+  // descending on preserve3D middle nodes; non-preserve3D leaves draw their full subtree.
+  struct OpaqueImage {
+    std::shared_ptr<Image> image = nullptr;
+    Matrix3D transform = {};
+    Point pictureOffset = {};
+  };
+  std::vector<OpaqueImage> opaqueImages;
+  opaqueImages.reserve(_pendingNodes.size());
+
+  DrawArgs leafArgs = args;
+  leafArgs.opaqueContext = nullptr;
+  leafArgs.backgroundHandler = BackgroundHandler::NoOp();
+
+  for (const auto& node : _pendingNodes) {
+    OpaqueContext opaqueContext;
+    auto* leafCanvas = opaqueContext.beginRecording();
+    leafCanvas->scale(_contentScale, _contentScale);
+    DrawArgs nodeArgs = leafArgs;
+    nodeArgs.opaqueContext = &opaqueContext;
+    nodeArgs.render3DContext = shared_from_this();
+    (node.layer->*_drawFunc)(nodeArgs, leafCanvas, node.alpha, BlendMode::SrcOver);
+    auto picture = opaqueContext.finishRecordingAsPicture();
+    if (picture == nullptr) {
+      continue;
+    }
+    auto bounds = picture->getBounds();
+    bounds.roundOut();
+    if (bounds.isEmpty()) {
+      continue;
+    }
+    auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
+    auto image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
+                                 static_cast<int>(bounds.height()), &matrix, _colorSpace);
+    if (image == nullptr) {
+      continue;
+    }
+    opaqueImages.push_back({std::move(image), node.transform, {bounds.left, bounds.top}});
+  }
+
+  if (opaqueImages.empty()) {
+    return;
+  }
+
+  Paint paint = {};
+  AutoCanvasRestore outerRestore(canvas);
+  // The caller's canvas is already scaled by contentScale (see getContentContourImage / mask
+  // recording paths), so polygon vertices computed below stay in layer-local coordinates and the
+  // existing canvas scale takes them to scaled-canvas pixels.
+  for (const auto& entry : opaqueImages) {
     AutoCanvasRestore autoRestore(canvas);
-    canvas->concat(entry.transform.asMatrix());
+    auto matrix = entry.transform.asMatrix();
+    matrix.preTranslate(entry.pictureOffset.x / _contentScale,
+                        entry.pictureOffset.y / _contentScale);
+    matrix.preScale(1.0f / _contentScale, 1.0f / _contentScale);
+    canvas->concat(matrix);
     canvas->drawImage(entry.image, &paint);
   }
 }
