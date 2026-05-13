@@ -74,8 +74,9 @@ class VulkanCommandQueue : public CommandQueue {
                        VkSemaphore imageAvailableSemaphore, VkSemaphore renderFinishedSemaphore);
 
  private:
-  void flushPendingUploads(VkCommandBuffer commandBuffer);
+  void flushUploads(VkCommandBuffer commandBuffer, std::vector<VulkanGPU::PendingUpload>& uploads);
   void cleanupPendingUploads();
+  void abandonSubmit(FrameSession session, std::vector<VulkanGPU::PendingUpload> uploads);
 
   VulkanGPU* gpu = nullptr;
 

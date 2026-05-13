@@ -108,15 +108,16 @@ void VulkanCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Re
   vulkanTexture->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
 }
 
-void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
-  if (pendingUploads.empty()) {
+void VulkanCommandQueue::flushUploads(VkCommandBuffer commandBuffer,
+                                      std::vector<VulkanGPU::PendingUpload>& uploads) {
+  if (uploads.empty()) {
     return;
   }
 
   std::vector<VkImageMemoryBarrier> preCopyBarriers;
   std::unordered_set<VkImage> transitionedImages;
   VkPipelineStageFlags combinedSrcStage = 0;
-  for (auto& upload : pendingUploads) {
+  for (auto& upload : uploads) {
     auto image = upload.texture->vulkanImage();
     if (transitionedImages.count(image)) {
       continue;
@@ -164,7 +165,7 @@ void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
                        nullptr, 0, nullptr, static_cast<uint32_t>(preCopyBarriers.size()),
                        preCopyBarriers.data());
 
-  for (auto& upload : pendingUploads) {
+  for (auto& upload : uploads) {
     vkCmdCopyBufferToImage(commandBuffer, upload.stagingBuffer, upload.texture->vulkanImage(),
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &upload.region);
   }
@@ -185,7 +186,7 @@ void VulkanCommandQueue::flushPendingUploads(VkCommandBuffer commandBuffer) {
                             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     postCopyBarriers.push_back(barrier);
   }
-  for (auto& upload : pendingUploads) {
+  for (auto& upload : uploads) {
     upload.texture->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
   }
   vkCmdPipelineBarrier(
@@ -201,6 +202,14 @@ void VulkanCommandQueue::cleanupPendingUploads() {
   pendingUploads.clear();
 }
 
+void VulkanCommandQueue::abandonSubmit(FrameSession session,
+                                       std::vector<VulkanGPU::PendingUpload> uploads) {
+  gpu->reclaimAbandonedSession(std::move(session));
+  for (auto& upload : uploads) {
+    vmaDestroyBuffer(gpu->allocator(), upload.stagingBuffer, upload.stagingAlloc);
+  }
+}
+
 void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   if (!commandBuffer) {
     return;
@@ -211,9 +220,22 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
     return;
   }
 
+  // Capture the command pool before moving the session, since vulkanCommandPool() reads from it.
   auto renderPool = vulkanCmdBuffer->vulkanCommandPool();
+
+  // Move all pending state to local scope so that any early return leaves the queue clean.
+  auto session = std::move(vulkanCmdBuffer->frameSession());
+  auto uploads = std::move(pendingUploads);
+  auto signalSem = std::move(pendingSignalSemaphore);
+  auto waitSem = std::move(pendingWaitSemaphore);
+  auto present = std::move(pendingPresent);
+  pendingUploads.clear();
+  pendingSignalSemaphore = nullptr;
+  pendingWaitSemaphore = nullptr;
+  pendingPresent.reset();
+
   VkCommandBuffer uploadCmd = VK_NULL_HANDLE;
-  if (!pendingUploads.empty() && renderPool != VK_NULL_HANDLE) {
+  if (!uploads.empty() && renderPool != VK_NULL_HANDLE) {
     VkCommandBufferAllocateInfo cmdAllocInfo = {};
     cmdAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     cmdAllocInfo.commandPool = renderPool;
@@ -225,12 +247,12 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
       beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
       beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
       vkBeginCommandBuffer(uploadCmd, &beginInfo);
-      flushPendingUploads(uploadCmd);
+      flushUploads(uploadCmd, uploads);
       vkEndCommandBuffer(uploadCmd);
     } else {
       LOGE("VulkanCommandQueue::submit: failed to allocate upload command buffer (result=%d).",
            static_cast<int>(result));
-      cleanupPendingUploads();
+      abandonSubmit(std::move(session), std::move(uploads));
       return;
     }
   }
@@ -242,7 +264,7 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   cmdBuffers.push_back(cmd);
 
   VkCommandBuffer presentCmd = VK_NULL_HANDLE;
-  if (pendingPresent.has_value() && renderPool != VK_NULL_HANDLE) {
+  if (present.has_value() && renderPool != VK_NULL_HANDLE) {
     VkCommandBufferAllocateInfo presentAllocInfo = {};
     presentAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     presentAllocInfo.commandPool = renderPool;
@@ -260,7 +282,7 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
       barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
       barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
       barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      barrier.image = pendingPresent->image;
+      barrier.image = present->image;
       barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
       barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
       barrier.dstAccessMask = 0;
@@ -269,26 +291,24 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
                            &barrier);
       vkEndCommandBuffer(presentCmd);
       cmdBuffers.push_back(presentCmd);
+    } else {
+      LOGE("VulkanCommandQueue::submit: failed to allocate present command buffer, skipping present.");
+      present.reset();
     }
   }
 
   VulkanGPU::SubmitRequest request = {};
-  request.session = std::move(vulkanCmdBuffer->frameSession());
-  request.uploads = std::move(pendingUploads);
+  request.session = std::move(session);
+  request.uploads = std::move(uploads);
   request.commandBuffers = std::move(cmdBuffers);
-  request.signalSemaphore = std::move(pendingSignalSemaphore);
-  request.waitSemaphore = std::move(pendingWaitSemaphore);
+  request.signalSemaphore = std::move(signalSem);
+  request.waitSemaphore = std::move(waitSem);
   request.frameTime = _frameTime;
-  if (pendingPresent.has_value()) {
+  if (present.has_value()) {
     request.present = VulkanGPU::SubmitRequest::PresentInfo{
-        pendingPresent->swapchain, pendingPresent->imageIndex,
-        pendingPresent->imageAvailableSemaphore, pendingPresent->renderFinishedSemaphore};
+        present->swapchain, present->imageIndex, present->imageAvailableSemaphore,
+        present->renderFinishedSemaphore};
   }
-
-  pendingUploads.clear();
-  pendingSignalSemaphore = nullptr;
-  pendingWaitSemaphore = nullptr;
-  pendingPresent.reset();
 
   gpu->executeSubmission(std::move(request));
 }
@@ -348,7 +368,7 @@ void VulkanCommandQueue::waitUntilCompleted() {
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(cmd, &beginInfo);
-    flushPendingUploads(cmd);
+    flushUploads(cmd, pendingUploads);
     vkEndCommandBuffer(cmd);
 
     VulkanGPU::SubmitRequest request = {};
