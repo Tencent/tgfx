@@ -97,6 +97,9 @@ std::unique_ptr<VulkanGPU> VulkanGPU::MakeFrom(VkInstance instance, VkPhysicalDe
   gpu->caps = std::make_unique<VulkanCaps>(physicalDevice, gpu->_extensions);
   gpu->commandQueue = std::make_unique<VulkanCommandQueue>(gpu.get());
   gpu->compiler = std::make_unique<shaderc::Compiler>();
+  if (!gpu->createPresentationSlots()) {
+    return nullptr;
+  }
   return gpu;
 }
 
@@ -134,6 +137,9 @@ bool VulkanGPU::initVulkan() {
   caps = std::make_unique<VulkanCaps>(vulkanPhysicalDevice, _extensions);
   commandQueue = std::make_unique<VulkanCommandQueue>(this);
   compiler = std::make_unique<shaderc::Compiler>();
+  if (!createPresentationSlots()) {
+    return false;
+  }
   return true;
 }
 
@@ -629,6 +635,34 @@ void VulkanGPU::waitAllInflightSubmissions() {
   processUnreferencedResources();
 }
 
+bool VulkanGPU::createPresentationSlots() {
+  VkSemaphoreCreateInfo semInfo = {};
+  semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+  for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    if (vkCreateSemaphore(vulkanDevice, &semInfo, nullptr,
+                          &presentationSlots[i].imageAvailable) != VK_SUCCESS ||
+        vkCreateSemaphore(vulkanDevice, &semInfo, nullptr,
+                          &presentationSlots[i].renderFinished) != VK_SUCCESS) {
+      LOGE("VulkanGPU::createPresentationSlots: failed at slot %zu.", i);
+      return false;
+    }
+  }
+  presentationSlotsCreated = true;
+  return true;
+}
+
+const VulkanGPU::PresentationSlot& VulkanGPU::acquirePresentationSlot() {
+  pollCompletedSubmissions();
+  if (inflightSubmissions.size() >= MAX_FRAMES_IN_FLIGHT) {
+    auto& oldest = inflightSubmissions.front();
+    vkWaitForFences(vulkanDevice, 1, &oldest.fence, VK_TRUE, UINT64_MAX);
+    pollCompletedSubmissions();
+  }
+  auto& slot = presentationSlots[presentationSlotIndex];
+  presentationSlotIndex = (presentationSlotIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+  return slot;
+}
+
 void VulkanGPU::executeSubmission(SubmitRequest request) {
   // Early out if a previous fatal error (e.g. DEVICE_LOST) was detected. Reclaim resources
   // immediately to prevent leaks; all subsequent Vulkan calls would fail anyway.
@@ -795,6 +829,21 @@ void VulkanGPU::releaseAll(bool releaseGPU) {
     vkDestroyFence(vulkanDevice, fence, nullptr);
   }
   fencePool.clear();
+
+  // 3b. Destroy presentation semaphore slots.
+  if (presentationSlotsCreated) {
+    for (auto& slot : presentationSlots) {
+      if (slot.imageAvailable != VK_NULL_HANDLE) {
+        vkDestroySemaphore(vulkanDevice, slot.imageAvailable, nullptr);
+        slot.imageAvailable = VK_NULL_HANDLE;
+      }
+      if (slot.renderFinished != VK_NULL_HANDLE) {
+        vkDestroySemaphore(vulkanDevice, slot.renderFinished, nullptr);
+        slot.renderFinished = VK_NULL_HANDLE;
+      }
+    }
+    presentationSlotsCreated = false;
+  }
 
   // 4. Clear caches. Sampler cache holds shared_ptrs that may trigger ReturnQueue on release.
   samplerCache.clear();

@@ -20,30 +20,29 @@
 
 #include <vector>
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "gpu/vulkan/VulkanAPI.h"
+#include "gpu/vulkan/VulkanGPU.h"
 
 namespace tgfx {
-
-class VulkanGPU;
 
 /**
  * Manages swapchain image acquisition and per-frame presentation for window rendering.
  *
  * Synchronization model:
+ *   - backpressure: VulkanGPU::acquirePresentationSlot() blocks if MAX_FRAMES_IN_FLIGHT
+ *     submissions are in flight, ensuring the returned semaphore pair is safe to reuse.
  *   - acquire: vkAcquireNextImageKHR signals imageAvailable semaphore. CPU returns immediately
  *     without blocking; the GPU waits on it at COLOR_ATTACHMENT_OUTPUT before rendering.
  *   - submit: waits on imageAvailable, signals renderFinished after rendering completes.
  *   - present: scheduled via VulkanCommandQueue::schedulePresent() during acquire. The queue
- *     appends a GENERAL→PRESENT_SRC layout transition to the render batch and calls
+ *     appends a GENERAL to PRESENT_SRC layout transition to the render batch and calls
  *     vkQueuePresentKHR after submit, waiting on renderFinished.
- *   - CPU backpressure: handled by VulkanGPU's MAX_FRAMES_IN_FLIGHT fence mechanism.
  */
 class VulkanSwapchainProxy : public RenderTargetProxy {
  public:
   VulkanSwapchainProxy(Context* context, VulkanGPU* gpu, VkSwapchainKHR swapchain, VkFormat format,
                        int width, int height, const std::vector<VkImageView>& imageViews,
-                       const std::vector<VkImage>& images, VkSemaphore imageAvailableSemaphore,
-                       VkSemaphore renderFinishedSemaphore);
+                       const std::vector<VkImage>& images,
+                       const VulkanGPU::PresentationSlot& slot);
   ~VulkanSwapchainProxy() override = default;
 
   Context* getContext() const override;

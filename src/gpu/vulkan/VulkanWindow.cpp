@@ -30,15 +30,8 @@
 namespace tgfx {
 
 static void DestroySwapchainResources(VkDevice device, VkInstance instance, VkSurfaceKHR surface,
-                                      VkSwapchainKHR swapchain, VkSemaphore imageAvailableSemaphore,
-                                      VkSemaphore renderFinishedSemaphore,
+                                      VkSwapchainKHR swapchain,
                                       const std::vector<VkImageView>& imageViews) {
-  if (renderFinishedSemaphore != VK_NULL_HANDLE) {
-    vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
-  }
-  if (imageAvailableSemaphore != VK_NULL_HANDLE) {
-    vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
-  }
   for (auto view : imageViews) {
     if (view != VK_NULL_HANDLE) {
       vkDestroyImageView(device, view, nullptr);
@@ -57,8 +50,6 @@ static void DestroySwapchainResources(VkDevice device, VkInstance instance, VkSu
 struct VulkanWindow::PlatformState {
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-  VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
-  VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
   std::vector<VkImage> images;
   std::vector<VkImageView> imageViews;
   VkFormat format = VK_FORMAT_UNDEFINED;
@@ -210,34 +201,10 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
     if (viewResult != VK_SUCCESS) {
       LOGE("VulkanWindow: vkCreateImageView failed for image %u: %s", i,
            VkResultToString(viewResult));
-      DestroySwapchainResources(vkDevice, vkInstance, surface, swapchain, VK_NULL_HANDLE,
-                                VK_NULL_HANDLE, imageViews);
+      DestroySwapchainResources(vkDevice, vkInstance, surface, swapchain, imageViews);
       device->unlock();
       return nullptr;
     }
-  }
-
-  VkSemaphoreCreateInfo semaphoreInfo = {};
-  semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
-  VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
-  auto semResult = vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &imageAvailableSemaphore);
-  if (semResult != VK_SUCCESS) {
-    LOGE("VulkanWindow: vkCreateSemaphore (imageAvailable) failed: %s",
-         VkResultToString(semResult));
-    DestroySwapchainResources(vkDevice, vkInstance, surface, swapchain, VK_NULL_HANDLE,
-                              VK_NULL_HANDLE, imageViews);
-    device->unlock();
-    return nullptr;
-  }
-  semResult = vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &renderFinishedSemaphore);
-  if (semResult != VK_SUCCESS) {
-    LOGE("VulkanWindow: vkCreateSemaphore (renderFinished) failed: %s",
-         VkResultToString(semResult));
-    DestroySwapchainResources(vkDevice, vkInstance, surface, swapchain, imageAvailableSemaphore,
-                              VK_NULL_HANDLE, imageViews);
-    device->unlock();
-    return nullptr;
   }
 
   device->unlock();
@@ -245,8 +212,6 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<
   auto state = std::make_unique<PlatformState>();
   state->surface = surface;
   state->swapchain = swapchain;
-  state->imageAvailableSemaphore = imageAvailableSemaphore;
-  state->renderFinishedSemaphore = renderFinishedSemaphore;
   state->images = std::move(images);
   state->imageViews = std::move(imageViews);
   state->format = chosenFormat.format;
@@ -271,8 +236,7 @@ VulkanWindow::~VulkanWindow() {
   vkDeviceWaitIdle(vkDevice);
 
   DestroySwapchainResources(vkDevice, vulkanGPU->instance(), _platformState->surface,
-                            _platformState->swapchain, _platformState->imageAvailableSemaphore,
-                            _platformState->renderFinishedSemaphore, _platformState->imageViews);
+                            _platformState->swapchain, _platformState->imageViews);
   device->unlock();
 }
 
@@ -385,7 +349,7 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
   _platformState->swapchainProxy = std::make_shared<VulkanSwapchainProxy>(
       context, vulkanGPU, _platformState->swapchain, _platformState->format, _platformState->width,
       _platformState->height, _platformState->imageViews, _platformState->images,
-      _platformState->imageAvailableSemaphore, _platformState->renderFinishedSemaphore);
+      vulkanGPU->acquirePresentationSlot());
   return _platformState->swapchainProxy;
 }
 

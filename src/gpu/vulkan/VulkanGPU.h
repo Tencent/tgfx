@@ -235,6 +235,18 @@ class VulkanGPU : public GPU {
     VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
   };
 
+  /// A semaphore pair used for swapchain acquire/present synchronization. Managed by VulkanGPU
+  /// and indexed by frame-in-flight slot to prevent binary semaphore reuse while still in flight.
+  struct PresentationSlot {
+    VkSemaphore imageAvailable = VK_NULL_HANDLE;
+    VkSemaphore renderFinished = VK_NULL_HANDLE;
+  };
+
+  /// Acquires a presentation semaphore pair for the current frame. Blocks if necessary to ensure
+  /// the previous submission using this slot has completed, satisfying
+  /// VUID-vkAcquireNextImageKHR-semaphore-01779 (semaphore must have no pending signal/wait ops).
+  const PresentationSlot& acquirePresentationSlot();
+
   /// Submits a completed frame to the GPU. Performs the following steps in order:
   ///   1. pollCompletedSubmissions() — non-blocking reclaim of finished frames.
   ///   2. Backpressure — if MAX_FRAMES_IN_FLIGHT reached, blocks until oldest fence signals.
@@ -258,6 +270,7 @@ class VulkanGPU : public GPU {
   bool pickPhysicalDevice();
   bool createDevice();
   bool createAllocator();
+  bool createPresentationSlots();
 
   std::shared_ptr<VulkanResource> addResource(VulkanResource* resource);
 
@@ -304,6 +317,13 @@ class VulkanGPU : public GPU {
   std::deque<InflightSubmission> inflightSubmissions;
   std::vector<VkFence> fencePool;
   std::atomic<int64_t> _lastFenceSignalTime = {0};
+
+  // Presentation semaphore slots — one pair per frame in flight. Created during initVulkan()
+  // or MakeFrom(), destroyed in releaseAll(). Indexed by presentationSlotIndex which advances
+  // each time acquirePresentationSlot() is called.
+  PresentationSlot presentationSlots[MAX_FRAMES_IN_FLIGHT] = {};
+  uint32_t presentationSlotIndex = 0;
+  bool presentationSlotsCreated = false;
 
   // Set to true when a fatal Vulkan error (e.g. VK_ERROR_DEVICE_LOST) is detected. Once set,
   // executeSubmission() skips all GPU work and reclaims resources immediately.

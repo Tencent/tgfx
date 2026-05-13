@@ -30,12 +30,11 @@ VulkanSwapchainProxy::VulkanSwapchainProxy(Context* context, VulkanGPU* gpu,
                                            VkSwapchainKHR swapchain, VkFormat format, int width,
                                            int height, const std::vector<VkImageView>& imageViews,
                                            const std::vector<VkImage>& images,
-                                           VkSemaphore imageAvailableSemaphore,
-                                           VkSemaphore renderFinishedSemaphore)
+                                           const VulkanGPU::PresentationSlot& slot)
     : _context(context), _gpu(gpu), _swapchain(swapchain), _format(format), _width(width),
       _height(height), _imageViews(imageViews), _images(images),
-      _imageAvailableSemaphore(imageAvailableSemaphore),
-      _renderFinishedSemaphore(renderFinishedSemaphore) {
+      _imageAvailableSemaphore(slot.imageAvailable),
+      _renderFinishedSemaphore(slot.renderFinished) {
 }
 
 Context* VulkanSwapchainProxy::getContext() const {
