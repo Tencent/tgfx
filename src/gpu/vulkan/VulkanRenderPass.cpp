@@ -352,14 +352,18 @@ void VulkanRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuf
 
 void VulkanRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> texture,
                                   std::shared_ptr<Sampler> sampler) {
-  if (!texture || !sampler || binding >= lastBound.textureBindings.size()) {
+  if (!texture || !sampler || !lastBound.pipeline) {
+    return;
+  }
+  auto unitIndex = lastBound.pipeline->getTextureIndex(binding);
+  if (unitIndex >= lastBound.textureBindings.size()) {
     return;
   }
   auto vulkanTexture = std::static_pointer_cast<VulkanTexture>(texture);
   auto vulkanSampler = std::static_pointer_cast<VulkanSampler>(sampler);
   auto view = vulkanTexture->vulkanImageView();
   auto samp = vulkanSampler->vulkanSampler();
-  auto& tb = lastBound.textureBindings[binding];
+  auto& tb = lastBound.textureBindings[unitIndex];
   if (tb.imageView == view && tb.sampler == samp) {
     return;
   }
@@ -409,10 +413,13 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
     writes.push_back(write);
   }
 
-  for (unsigned i = 0; i < static_cast<unsigned>(lastBound.textureBindings.size()); i++) {
-    auto& tb = lastBound.textureBindings[i];
-    if (tb.imageView == VK_NULL_HANDLE || tb.sampler == VK_NULL_HANDLE ||
-        !lastBound.pipeline->hasTextureBinding(i)) {
+  for (auto userBinding : lastBound.pipeline->getTextureBindings()) {
+    auto unitIndex = lastBound.pipeline->getTextureIndex(userBinding);
+    if (unitIndex >= lastBound.textureBindings.size()) {
+      continue;
+    }
+    auto& tb = lastBound.textureBindings[unitIndex];
+    if (tb.imageView == VK_NULL_HANDLE || tb.sampler == VK_NULL_HANDLE) {
       continue;
     }
     // All sampled textures use GENERAL layout, consistent with the layout set by writeTexture().
@@ -420,7 +427,7 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
     VkWriteDescriptorSet write = {};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write.dstSet = descriptorSet;
-    write.dstBinding = i;
+    write.dstBinding = lastBound.pipeline->getDescriptorBinding(userBinding);
     write.descriptorCount = 1;
     write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     write.pImageInfo = &imageInfos.back();

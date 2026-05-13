@@ -50,6 +50,8 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
 
   unsigned getTextureIndex(unsigned binding) const;
 
+  unsigned getDescriptorBinding(unsigned binding) const;
+
   uint32_t getUniformBlockVisibility(unsigned binding) const;
 
   bool hasUniformBinding(unsigned binding) const {
@@ -58,6 +60,10 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
 
   bool hasTextureBinding(unsigned binding) const {
     return textureBindingSet.count(binding) > 0;
+  }
+
+  const std::unordered_set<unsigned>& getTextureBindings() const {
+    return textureBindingSet;
   }
 
  protected:
@@ -75,6 +81,7 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
   VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
   VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
+  std::unordered_map<unsigned, unsigned> textureDescriptorBindings = {};
   std::unordered_map<unsigned, uint32_t> uniformBlockVisibility = {};
   std::unordered_set<unsigned> uniformBindingSet = {};
   std::unordered_set<unsigned> textureBindingSet = {};

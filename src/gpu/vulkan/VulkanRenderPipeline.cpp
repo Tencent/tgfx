@@ -21,6 +21,7 @@
 #include "VulkanShaderModule.h"
 #include "VulkanUtil.h"
 #include "core/utils/Log.h"
+#include "gpu/UniformData.h"
 
 namespace tgfx {
 
@@ -155,7 +156,9 @@ VulkanRenderPipeline::VulkanRenderPipeline(VulkanGPU* gpu,
 
   unsigned textureUnit = 0;
   for (auto& entry : descriptor.layout.textureSamplers) {
+    auto spirvBinding = static_cast<unsigned>(TEXTURE_BINDING_POINT_START) + textureUnit;
     textureUnits[entry.binding] = textureUnit++;
+    textureDescriptorBindings[entry.binding] = spirvBinding;
     textureBindingSet.insert(entry.binding);
   }
   for (auto& entry : descriptor.layout.uniformBlocks) {
@@ -188,6 +191,14 @@ unsigned VulkanRenderPipeline::getTextureIndex(unsigned binding) const {
   return binding;
 }
 
+unsigned VulkanRenderPipeline::getDescriptorBinding(unsigned binding) const {
+  auto result = textureDescriptorBindings.find(binding);
+  if (result != textureDescriptorBindings.end()) {
+    return result->second;
+  }
+  return binding;
+}
+
 uint32_t VulkanRenderPipeline::getUniformBlockVisibility(unsigned binding) const {
   auto result = uniformBlockVisibility.find(binding);
   if (result != uniformBlockVisibility.end()) {
@@ -209,9 +220,10 @@ bool VulkanRenderPipeline::createDescriptorSetLayout(VulkanGPU* gpu,
     bindings.push_back(binding);
   }
 
+  unsigned texUnit = 0;
   for (auto& entry : descriptor.layout.textureSamplers) {
     VkDescriptorSetLayoutBinding binding = {};
-    binding.binding = entry.binding;
+    binding.binding = static_cast<unsigned>(TEXTURE_BINDING_POINT_START) + texUnit++;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     binding.descriptorCount = 1;
     binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;

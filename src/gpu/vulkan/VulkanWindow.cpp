@@ -71,7 +71,7 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd,
   }
 
   if (colorSpace && !colorSpace->isSRGB()) {
-    LOGW(
+    LOGI(
         "VulkanWindow::MakeFrom(): non-sRGB colorSpace is not yet supported and will be ignored. "
         "Only sRGB output is currently available.");
   }
