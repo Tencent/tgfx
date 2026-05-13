@@ -128,6 +128,11 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
 
     // Configure MSAA resolve attachment if present.
     if (ca.resolveTexture) {
+      DEBUG_ASSERT(ca.resolveTexture->sampleCount() == 1);
+      if (ca.resolveTexture->sampleCount() != 1) {
+        LOGE("VulkanRenderPass: resolve texture must have sampleCount == 1.");
+        return;
+      }
       hasResolve = true;
       auto resolveVulkanTexture = std::static_pointer_cast<VulkanTexture>(ca.resolveTexture);
       encoder->retainResource(resolveVulkanTexture);
