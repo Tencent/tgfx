@@ -79,7 +79,9 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
       _outOfDate = true;
       return nullptr;
     }
-    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    if (result == VK_SUBOPTIMAL_KHR) {
+      _outOfDate = true;
+    } else if (result != VK_SUCCESS) {
       LOGE("VulkanSwapchainProxy: vkAcquireNextImageKHR failed (result=%d).",
            static_cast<int>(result));
       return nullptr;

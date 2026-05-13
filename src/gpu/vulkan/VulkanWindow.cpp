@@ -230,7 +230,11 @@ VulkanWindow::VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<Platf
 }
 
 VulkanWindow::~VulkanWindow() {
-  auto vulkanGPU = static_cast<VulkanGPU*>(device->lockContext()->gpu());
+  auto context = device->lockContext();
+  if (context == nullptr) {
+    return;
+  }
+  auto vulkanGPU = static_cast<VulkanGPU*>(context->gpu());
   auto vkDevice = vulkanGPU->device();
   // Ensure all in-flight submissions referencing swapchain images have completed before
   // destroying the swapchain and its image views.

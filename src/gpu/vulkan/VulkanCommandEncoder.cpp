@@ -212,6 +212,23 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   retainResource(vulkanSrc);
   retainResource(vulkanDst);
 
+  // Clamp copy region to source image bounds.
+  auto srcX = static_cast<int32_t>(srcRect.x());
+  auto srcY = static_cast<int32_t>(srcRect.y());
+  auto copyWidth = static_cast<uint32_t>(srcRect.width());
+  auto copyHeight = static_cast<uint32_t>(srcRect.height());
+  auto srcW = static_cast<uint32_t>(srcTexture->width());
+  auto srcH = static_cast<uint32_t>(srcTexture->height());
+  if (srcX + copyWidth > srcW) {
+    copyWidth = srcW > static_cast<uint32_t>(srcX) ? srcW - static_cast<uint32_t>(srcX) : 0;
+  }
+  if (srcY + copyHeight > srcH) {
+    copyHeight = srcH > static_cast<uint32_t>(srcY) ? srcH - static_cast<uint32_t>(srcY) : 0;
+  }
+  if (copyWidth == 0 || copyHeight == 0) {
+    return;
+  }
+
   auto aspectMask = VkFormatToAspectFlags(vulkanSrc->vulkanFormat());
 
   TransitionImageLayout(commandBuffer, vulkanSrc->vulkanImage(), vulkanSrc->currentLayout(),
@@ -220,16 +237,15 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   auto bytesPerPixel = VkFormatBytesPerPixel(vulkanSrc->vulkanFormat());
   DEBUG_ASSERT(dstRowBytes == 0 || dstRowBytes % bytesPerPixel == 0);
   uint32_t rowBytes = dstRowBytes > 0 ? static_cast<uint32_t>(dstRowBytes)
-                                      : static_cast<uint32_t>(srcRect.width()) * bytesPerPixel;
+                                      : copyWidth * bytesPerPixel;
 
   VkBufferImageCopy region = {};
   region.bufferOffset = dstOffset;
   region.bufferRowLength = rowBytes / bytesPerPixel;
-  region.bufferImageHeight = static_cast<uint32_t>(srcRect.height());
+  region.bufferImageHeight = copyHeight;
   region.imageSubresource = {aspectMask, 0, 0, 1};
-  region.imageOffset = {static_cast<int32_t>(srcRect.x()), static_cast<int32_t>(srcRect.y()), 0};
-  region.imageExtent = {static_cast<uint32_t>(srcRect.width()),
-                        static_cast<uint32_t>(srcRect.height()), 1};
+  region.imageOffset = {srcX, srcY, 0};
+  region.imageExtent = {copyWidth, copyHeight, 1};
 
   vkCmdCopyImageToBuffer(commandBuffer, vulkanSrc->vulkanImage(),
                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, vulkanDst->vulkanBuffer(), 1,
