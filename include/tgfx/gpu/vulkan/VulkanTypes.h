@@ -45,16 +45,18 @@ struct VulkanImageInfo {
 };
 
 /**
- * Describes a Vulkan timeline semaphore for synchronization.
+ * Describes a Vulkan semaphore for synchronization. Supports both binary and timeline semaphores.
  */
 struct VulkanSyncInfo {
   /**
-   * The VkSemaphore handle for a timeline semaphore.
+   * The VkSemaphore handle (cast to uint64_t). Can be either a binary or timeline semaphore.
    */
   uint64_t semaphore = 0;
 
   /**
-   * The timeline value to signal or wait on.
+   * For timeline semaphores, the value to signal or wait on (must be > 0). For binary semaphores,
+   * set to 0. When value is 0, the semaphore is treated as binary; when > 0, it is treated as a
+   * timeline semaphore.
    */
   uint64_t value = 0;
 };
