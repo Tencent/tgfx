@@ -99,9 +99,10 @@ class VulkanCaps {
   };
 
   void initFeatures(VkPhysicalDevice physicalDevice, const VulkanExtensions& extensions);
-  void initLimits(VkPhysicalDevice physicalDevice);
-  void initFormatTable(VkPhysicalDevice physicalDevice);
-  FormatInfo checkFormat(VkPhysicalDevice physicalDevice, VkFormat vulkanFormat) const;
+  void initLimits(const VkPhysicalDeviceProperties& properties);
+  void initFormatTable(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceProperties& properties);
+  FormatInfo checkFormat(VkPhysicalDevice physicalDevice, VkFormat vulkanFormat,
+                         const VkPhysicalDeviceProperties& properties) const;
 
   GPUInfo _info = {};
   GPUFeatures _features = {};

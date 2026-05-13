@@ -33,8 +33,8 @@ VulkanCaps::VulkanCaps(VkPhysicalDevice physicalDevice, const VulkanExtensions& 
                   std::to_string(VK_API_VERSION_PATCH(properties.apiVersion));
 
   initFeatures(physicalDevice, extensions);
-  initLimits(physicalDevice);
-  initFormatTable(physicalDevice);
+  initLimits(properties);
+  initFormatTable(physicalDevice, properties);
 }
 
 bool VulkanCaps::isFormatRenderable(PixelFormat format) const {
@@ -84,10 +84,7 @@ void VulkanCaps::initFeatures(VkPhysicalDevice, const VulkanExtensions& extensio
   frameBufferFetchSupported = extensions.rasterizationOrderAttachmentAccess;
 }
 
-void VulkanCaps::initLimits(VkPhysicalDevice physicalDevice) {
-  VkPhysicalDeviceProperties properties = {};
-  vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-
+void VulkanCaps::initLimits(const VkPhysicalDeviceProperties& properties) {
   _limits.maxTextureDimension2D = static_cast<int>(properties.limits.maxImageDimension2D);
   _limits.maxSamplersPerShaderStage =
       static_cast<int>(properties.limits.maxPerStageDescriptorSamplers);
@@ -97,7 +94,8 @@ void VulkanCaps::initLimits(VkPhysicalDevice physicalDevice) {
 }
 
 VulkanCaps::FormatInfo VulkanCaps::checkFormat(VkPhysicalDevice physicalDevice,
-                                               VkFormat vulkanFormat) const {
+                                               VkFormat vulkanFormat,
+                                               const VkPhysicalDeviceProperties& properties) const {
   FormatInfo info = {};
   info.vulkanFormat = vulkanFormat;
 
@@ -116,9 +114,6 @@ VulkanCaps::FormatInfo VulkanCaps::checkFormat(VkPhysicalDevice physicalDevice,
 
   if (info.renderable) {
     // Query supported MSAA sample counts from device limits.
-    VkPhysicalDeviceProperties properties = {};
-    vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-
     VkSampleCountFlags sampleCountFlags;
     if (info.colorAttachment) {
       sampleCountFlags = properties.limits.framebufferColorSampleCounts;
@@ -139,17 +134,20 @@ VulkanCaps::FormatInfo VulkanCaps::checkFormat(VkPhysicalDevice physicalDevice,
   return info;
 }
 
-void VulkanCaps::initFormatTable(VkPhysicalDevice physicalDevice) {
-  formatTable[PixelFormat::ALPHA_8] = checkFormat(physicalDevice, VK_FORMAT_R8_UNORM);
-  formatTable[PixelFormat::GRAY_8] = checkFormat(physicalDevice, VK_FORMAT_R8_UNORM);
-  formatTable[PixelFormat::RG_88] = checkFormat(physicalDevice, VK_FORMAT_R8G8_UNORM);
-  formatTable[PixelFormat::RGBA_8888] = checkFormat(physicalDevice, VK_FORMAT_R8G8B8A8_UNORM);
-  formatTable[PixelFormat::BGRA_8888] = checkFormat(physicalDevice, VK_FORMAT_B8G8R8A8_UNORM);
+void VulkanCaps::initFormatTable(VkPhysicalDevice physicalDevice,
+                                 const VkPhysicalDeviceProperties& properties) {
+  formatTable[PixelFormat::ALPHA_8] = checkFormat(physicalDevice, VK_FORMAT_R8_UNORM, properties);
+  formatTable[PixelFormat::GRAY_8] = checkFormat(physicalDevice, VK_FORMAT_R8_UNORM, properties);
+  formatTable[PixelFormat::RG_88] = checkFormat(physicalDevice, VK_FORMAT_R8G8_UNORM, properties);
+  formatTable[PixelFormat::RGBA_8888] =
+      checkFormat(physicalDevice, VK_FORMAT_R8G8B8A8_UNORM, properties);
+  formatTable[PixelFormat::BGRA_8888] =
+      checkFormat(physicalDevice, VK_FORMAT_B8G8R8A8_UNORM, properties);
 
   // Prefer D24_UNORM_S8_UINT, fall back to D32_SFLOAT_S8_UINT if not supported.
-  auto depthInfo = checkFormat(physicalDevice, VK_FORMAT_D24_UNORM_S8_UINT);
+  auto depthInfo = checkFormat(physicalDevice, VK_FORMAT_D24_UNORM_S8_UINT, properties);
   if (!depthInfo.renderable) {
-    depthInfo = checkFormat(physicalDevice, VK_FORMAT_D32_SFLOAT_S8_UINT);
+    depthInfo = checkFormat(physicalDevice, VK_FORMAT_D32_SFLOAT_S8_UINT, properties);
   }
   formatTable[PixelFormat::DEPTH24_STENCIL8] = depthInfo;
 }
