@@ -145,6 +145,13 @@ int VkFormatBytesPerPixel(VkFormat format) {
   }
 }
 
+VkImageAspectFlags VkFormatToAspectFlags(VkFormat format) {
+  if (VkFormatIsDepthStencil(format)) {
+    return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+  }
+  return VK_IMAGE_ASPECT_COLOR_BIT;
+}
+
 void TransitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout,
                            VkImageLayout newLayout, VkImageAspectFlags aspectMask) {
   VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;

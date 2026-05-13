@@ -35,13 +35,6 @@ static VkImageUsageFlags ToVkImageUsage(uint32_t usage) {
   return flags;
 }
 
-static VkImageAspectFlags FormatToAspectFlags(VkFormat format) {
-  if (VkFormatIsDepthStencil(format)) {
-    return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-  }
-  return VK_IMAGE_ASPECT_COLOR_BIT;
-}
-
 std::shared_ptr<VulkanTexture> VulkanTexture::Make(VulkanGPU* gpu,
                                                    const TextureDescriptor& descriptor) {
   if (!gpu || descriptor.width <= 0 || descriptor.height <= 0) {
@@ -93,7 +86,7 @@ std::shared_ptr<VulkanTexture> VulkanTexture::Make(VulkanGPU* gpu,
   viewInfo.image = vkImage;
   viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
   viewInfo.format = vkFormat;
-  viewInfo.subresourceRange.aspectMask = FormatToAspectFlags(vkFormat);
+  viewInfo.subresourceRange.aspectMask = VkFormatToAspectFlags(vkFormat);
   viewInfo.subresourceRange.baseMipLevel = 0;
   // Framebuffer attachments require levelCount=1. Use full mip chain only for pure sampling views.
   viewInfo.subresourceRange.levelCount = (descriptor.usage & TextureUsage::RENDER_ATTACHMENT)
@@ -133,7 +126,7 @@ std::shared_ptr<VulkanTexture> VulkanTexture::MakeFrom(VulkanGPU* gpu, VkImage i
   viewInfo.image = image;
   viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
   viewInfo.format = format;
-  viewInfo.subresourceRange.aspectMask = FormatToAspectFlags(format);
+  viewInfo.subresourceRange.aspectMask = VkFormatToAspectFlags(format);
   viewInfo.subresourceRange.baseMipLevel = 0;
   viewInfo.subresourceRange.levelCount = 1;
   viewInfo.subresourceRange.baseArrayLayer = 0;

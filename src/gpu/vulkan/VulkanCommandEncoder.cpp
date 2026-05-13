@@ -173,15 +173,17 @@ void VulkanCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcText
     return;
   }
 
+  auto aspectMask = VkFormatToAspectFlags(vulkanSrc->vulkanFormat());
+
   TransitionImageLayout(commandBuffer, vulkanSrc->vulkanImage(), vulkanSrc->currentLayout(),
-                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, aspectMask);
   TransitionImageLayout(commandBuffer, vulkanDst->vulkanImage(), vulkanDst->currentLayout(),
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, aspectMask);
 
   VkImageCopy region = {};
-  region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+  region.srcSubresource = {aspectMask, 0, 0, 1};
   region.srcOffset = {srcX, srcY, 0};
-  region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+  region.dstSubresource = {aspectMask, 0, 0, 1};
   region.dstOffset = {static_cast<int32_t>(dstOffset.x), static_cast<int32_t>(dstOffset.y), 0};
   region.extent = {copyWidth, copyHeight, 1};
 
@@ -189,9 +191,9 @@ void VulkanCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcText
                  vulkanDst->vulkanImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
   TransitionImageLayout(commandBuffer, vulkanSrc->vulkanImage(),
-                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, aspectMask);
   TransitionImageLayout(commandBuffer, vulkanDst->vulkanImage(),
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, aspectMask);
 
   vulkanSrc->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
   vulkanDst->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
@@ -210,8 +212,10 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   retainResource(vulkanSrc);
   retainResource(vulkanDst);
 
+  auto aspectMask = VkFormatToAspectFlags(vulkanSrc->vulkanFormat());
+
   TransitionImageLayout(commandBuffer, vulkanSrc->vulkanImage(), vulkanSrc->currentLayout(),
-                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, aspectMask);
 
   auto bytesPerPixel = VkFormatBytesPerPixel(vulkanSrc->vulkanFormat());
   DEBUG_ASSERT(dstRowBytes == 0 || dstRowBytes % bytesPerPixel == 0);
@@ -222,7 +226,7 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   region.bufferOffset = dstOffset;
   region.bufferRowLength = rowBytes / bytesPerPixel;
   region.bufferImageHeight = static_cast<uint32_t>(srcRect.height());
-  region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+  region.imageSubresource = {aspectMask, 0, 0, 1};
   region.imageOffset = {static_cast<int32_t>(srcRect.x()), static_cast<int32_t>(srcRect.y()), 0};
   region.imageExtent = {static_cast<uint32_t>(srcRect.width()),
                         static_cast<uint32_t>(srcRect.height()), 1};
@@ -232,7 +236,7 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
                          &region);
 
   TransitionImageLayout(commandBuffer, vulkanSrc->vulkanImage(),
-                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, aspectMask);
   vulkanSrc->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
 }
 
