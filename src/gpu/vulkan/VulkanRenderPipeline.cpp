@@ -443,6 +443,9 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
   std::vector<VkAttachmentDescription> attachments;
   std::vector<VkAttachmentReference> colorRefs;
   std::vector<VkAttachmentReference> resolveRefs;
+  // OpsRenderTask always sets resolveTexture when sampleCount > 1 (via getSampleTexture()), so
+  // the pipeline render pass layout matches the runtime VulkanRenderPass layout. If MSAA without
+  // resolve is ever needed, this must be driven by a per-color-attachment flag instead.
   bool hasResolve = (descriptor.multisample.count > 1);
 
   for (auto& ca : descriptor.fragment.colorAttachments) {
