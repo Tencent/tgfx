@@ -144,11 +144,6 @@ void VulkanCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcText
   if (!srcTexture || !dstTexture) {
     return;
   }
-  auto commandBuffer = session.commandBuffer;
-  auto vulkanSrc = std::static_pointer_cast<VulkanTexture>(srcTexture);
-  auto vulkanDst = std::static_pointer_cast<VulkanTexture>(dstTexture);
-  retainResource(vulkanSrc);
-  retainResource(vulkanDst);
 
   // Clamp copy region to source image bounds.
   auto srcX = static_cast<int32_t>(srcRect.x());
@@ -165,13 +160,21 @@ void VulkanCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcText
   }
   if (copyWidth == 0 || copyHeight == 0) {
     // Even if nothing is copied, ensure dst layout is valid for subsequent use.
+    auto vulkanDst = std::static_pointer_cast<VulkanTexture>(dstTexture);
     if (vulkanDst->currentLayout() == VK_IMAGE_LAYOUT_UNDEFINED) {
-      TransitionImageLayout(commandBuffer, vulkanDst->vulkanImage(), VK_IMAGE_LAYOUT_UNDEFINED,
-                            VK_IMAGE_LAYOUT_GENERAL);
+      retainResource(vulkanDst);
+      TransitionImageLayout(session.commandBuffer, vulkanDst->vulkanImage(),
+                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
       vulkanDst->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
     }
     return;
   }
+
+  auto commandBuffer = session.commandBuffer;
+  auto vulkanSrc = std::static_pointer_cast<VulkanTexture>(srcTexture);
+  auto vulkanDst = std::static_pointer_cast<VulkanTexture>(dstTexture);
+  retainResource(vulkanSrc);
+  retainResource(vulkanDst);
 
   auto aspectMask = VkFormatToAspectFlags(vulkanSrc->vulkanFormat());
 
@@ -206,11 +209,6 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   if (!srcTexture || !dstBuffer) {
     return;
   }
-  auto commandBuffer = session.commandBuffer;
-  auto vulkanSrc = std::static_pointer_cast<VulkanTexture>(srcTexture);
-  auto vulkanDst = std::static_pointer_cast<VulkanBuffer>(dstBuffer);
-  retainResource(vulkanSrc);
-  retainResource(vulkanDst);
 
   // Clamp copy region to source image bounds.
   auto srcX = static_cast<int32_t>(srcRect.x());
@@ -228,6 +226,12 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   if (copyWidth == 0 || copyHeight == 0) {
     return;
   }
+
+  auto commandBuffer = session.commandBuffer;
+  auto vulkanSrc = std::static_pointer_cast<VulkanTexture>(srcTexture);
+  auto vulkanDst = std::static_pointer_cast<VulkanBuffer>(dstBuffer);
+  retainResource(vulkanSrc);
+  retainResource(vulkanDst);
 
   auto aspectMask = VkFormatToAspectFlags(vulkanSrc->vulkanFormat());
 
