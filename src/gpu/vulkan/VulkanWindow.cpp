@@ -329,8 +329,9 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, _platformState->surface, &capabilities);
   auto extent = capabilities.currentExtent;
   if (extent.width == 0xFFFFFFFF) {
-    extent.width = static_cast<uint32_t>(_platformState->width);
-    extent.height = static_cast<uint32_t>(_platformState->height);
+    // The surface does not report a fixed extent (e.g. Wayland). Skip this frame and let the
+    // next onCreateRenderTarget call re-query the capabilities for an updated extent.
+    return nullptr;
   }
 
   auto lastProxy =
