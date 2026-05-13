@@ -57,7 +57,7 @@ class BackendTexture {
   /**
    * Creates a Vulkan backend texture.
    */
-  explicit BackendTexture(const VulkanTextureInfo& vulkanInfo, int width, int height)
+  explicit BackendTexture(const VulkanImageInfo& vulkanInfo, int width, int height)
       : _backend(Backend::Vulkan), _width(width), _height(height), vulkanInfo(vulkanInfo) {
   }
 
@@ -113,10 +113,10 @@ class BackendTexture {
   bool getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const;
 
   /**
-   * If the backend API is Vulkan, copies a snapshot of the VulkanTextureInfo struct into the passed
+   * If the backend API is Vulkan, copies a snapshot of the VulkanImageInfo struct into the passed
    * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
    */
-  bool getVulkanTextureInfo(VulkanTextureInfo* vulkanTextureInfo) const;
+  bool getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) const;
 
  private:
   Backend _backend = Backend::Unknown;
@@ -126,7 +126,7 @@ class BackendTexture {
   union {
     GLTextureInfo glInfo;
     MetalTextureInfo metalInfo;
-    VulkanTextureInfo vulkanInfo;
+    VulkanImageInfo vulkanInfo;
   };
 };
 

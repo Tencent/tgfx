@@ -24,32 +24,8 @@
 namespace tgfx {
 
 /**
- * Describes a Vulkan texture for external import/export.
- */
-struct VulkanTextureInfo {
-  /**
-   * The VkImage handle.
-   */
-  uint64_t image = 0;
-
-  /**
-   * The VkFormat of the image (VK_FORMAT_UNDEFINED = 0).
-   */
-  uint32_t format = 0;
-
-  /**
-   * The current VkImageLayout (VK_IMAGE_LAYOUT_UNDEFINED = 0).
-   */
-  uint32_t layout = 0;
-
-  /**
-   * The VkImageUsageFlags describing how the image is used.
-   */
-  uint32_t usage = 0;
-};
-
-/**
- * Describes a Vulkan image used as a render target.
+ * Describes a Vulkan image for external import/export. Used by both BackendTexture and
+ * BackendRenderTarget, following the same unified pattern as MetalTextureInfo.
  */
 struct VulkanImageInfo {
   /**
@@ -83,7 +59,6 @@ struct VulkanSyncInfo {
   uint64_t value = 0;
 };
 
-static_assert(std::is_trivially_copyable_v<VulkanTextureInfo>);
 static_assert(std::is_trivially_copyable_v<VulkanImageInfo>);
 static_assert(std::is_trivially_copyable_v<VulkanSyncInfo>);
 

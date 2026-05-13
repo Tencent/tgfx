@@ -177,7 +177,7 @@ BackendTexture VulkanTexture::getBackendTexture() const {
   if (image == VK_NULL_HANDLE || !(descriptor.usage & TextureUsage::TEXTURE_BINDING)) {
     return {};
   }
-  VulkanTextureInfo vulkanInfo;
+  VulkanImageInfo vulkanInfo;
   vulkanInfo.image = reinterpret_cast<uint64_t>(image);
   vulkanInfo.format = static_cast<uint32_t>(format);
   vulkanInfo.layout = static_cast<uint32_t>(layout);

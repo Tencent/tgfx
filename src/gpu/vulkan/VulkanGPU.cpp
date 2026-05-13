@@ -404,8 +404,8 @@ std::shared_ptr<Texture> VulkanGPU::importBackendTexture(const BackendTexture& b
   if (backendTexture.backend() != Backend::Vulkan) {
     return nullptr;
   }
-  VulkanTextureInfo vulkanInfo = {};
-  if (!backendTexture.getVulkanTextureInfo(&vulkanInfo) || vulkanInfo.image == 0) {
+  VulkanImageInfo vulkanInfo = {};
+  if (!backendTexture.getVulkanImageInfo(&vulkanInfo) || vulkanInfo.image == 0) {
     return nullptr;
   }
   return VulkanTexture::MakeFrom(this, reinterpret_cast<VkImage>(vulkanInfo.image),

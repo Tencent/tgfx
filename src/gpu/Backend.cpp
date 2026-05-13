@@ -102,11 +102,11 @@ bool BackendTexture::getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) con
   return true;
 }
 
-bool BackendTexture::getVulkanTextureInfo(VulkanTextureInfo* vulkanTextureInfo) const {
+bool BackendTexture::getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) const {
   if (!isValid() || _backend != Backend::Vulkan) {
     return false;
   }
-  *vulkanTextureInfo = vulkanInfo;
+  *vulkanImageInfo = vulkanInfo;
   return true;
 }
 
