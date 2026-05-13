@@ -99,6 +99,10 @@ void VulkanCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Re
   region.bufferOffset = 0;
   region.bufferRowLength = 0;
   region.bufferImageHeight = 0;
+  // Currently only mip level 0 is supported. flushUploads() deduplicates barriers by image handle
+  // alone and uses VK_REMAINING_MIP_LEVELS, which is correct only when all uploads target mip 0.
+  // If a mipLevel parameter is added to writeTexture, both the dedup key and the barrier range must
+  // be updated to track per-mip state.
   region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
   region.imageOffset = {static_cast<int32_t>(rect.x()), static_cast<int32_t>(rect.y()), 0};
   region.imageExtent = {width, height, 1};
@@ -118,6 +122,8 @@ void VulkanCommandQueue::flushUploads(VkCommandBuffer commandBuffer,
   std::unordered_set<VkImage> transitionedImages;
   VkPipelineStageFlags combinedSrcStage = 0;
   for (auto& upload : uploads) {
+    // The dedup map keys on image only, assuming all uploads target mip level 0.
+    DEBUG_ASSERT(upload.region.imageSubresource.mipLevel == 0);
     auto image = upload.texture->vulkanImage();
     if (transitionedImages.count(image)) {
       continue;
