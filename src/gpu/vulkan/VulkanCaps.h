@@ -100,7 +100,8 @@ class VulkanCaps {
 
   void initFeatures(VkPhysicalDevice physicalDevice, const VulkanExtensions& extensions);
   void initLimits(const VkPhysicalDeviceProperties& properties);
-  void initFormatTable(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceProperties& properties);
+  void initFormatTable(VkPhysicalDevice physicalDevice,
+                       const VkPhysicalDeviceProperties& properties);
   FormatInfo checkFormat(VkPhysicalDevice physicalDevice, VkFormat vulkanFormat,
                          const VkPhysicalDeviceProperties& properties) const;
 
