@@ -87,6 +87,8 @@ std::unique_ptr<VulkanGPU> VulkanGPU::MakeFrom(VkInstance instance, VkPhysicalDe
   gpu->adopted = true;
   volkLoadInstance(instance);
   volkLoadDevice(device);
+  gpu->debugUtilsEnabled = (vkCreateDebugUtilsMessengerEXT != nullptr);
+  gpu->installDebugMessenger();
   gpu->_extensions.detectFromDevice();
   if (!gpu->createAllocator()) {
     return nullptr;
@@ -145,7 +147,7 @@ bool VulkanGPU::initVulkan() {
 
 void VulkanGPU::installDebugMessenger() {
 #ifdef DEBUG
-  if (vkCreateDebugUtilsMessengerEXT == nullptr) {
+  if (!debugUtilsEnabled || vkCreateDebugUtilsMessengerEXT == nullptr) {
     return;
   }
   VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
@@ -202,6 +204,7 @@ bool VulkanGPU::createInstance() {
   for (auto& ext : availableExts) {
     if (strcmp(ext.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0) {
       instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+      debugUtilsEnabled = true;
       break;
     }
   }

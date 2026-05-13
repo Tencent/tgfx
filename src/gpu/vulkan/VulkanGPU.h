@@ -245,6 +245,7 @@ class VulkanGPU : public GPU {
   VkQueue vulkanQueue = VK_NULL_HANDLE;
   uint32_t queueFamilyIndex = 0;
   VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
+  bool debugUtilsEnabled = false;
   VmaAllocator vmaAllocator = VK_NULL_HANDLE;
   VkPipelineCache vulkanPipelineCache = VK_NULL_HANDLE;
   VulkanExtensions _extensions;
