@@ -176,17 +176,18 @@ void VulkanCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcText
   retainResource(vulkanSrc);
   retainResource(vulkanDst);
 
-  auto aspectMask = VkFormatToAspectFlags(vulkanSrc->vulkanFormat());
+  auto srcAspect = VkFormatToAspectFlags(vulkanSrc->vulkanFormat());
+  auto dstAspect = VkFormatToAspectFlags(vulkanDst->vulkanFormat());
 
   TransitionImageLayout(commandBuffer, vulkanSrc->vulkanImage(), vulkanSrc->currentLayout(),
-                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, aspectMask);
+                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, srcAspect);
   TransitionImageLayout(commandBuffer, vulkanDst->vulkanImage(), vulkanDst->currentLayout(),
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, aspectMask);
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, dstAspect);
 
   VkImageCopy region = {};
-  region.srcSubresource = {aspectMask, 0, 0, 1};
+  region.srcSubresource = {srcAspect, 0, 0, 1};
   region.srcOffset = {srcX, srcY, 0};
-  region.dstSubresource = {aspectMask, 0, 0, 1};
+  region.dstSubresource = {dstAspect, 0, 0, 1};
   region.dstOffset = {static_cast<int32_t>(dstOffset.x), static_cast<int32_t>(dstOffset.y), 0};
   region.extent = {copyWidth, copyHeight, 1};
 
@@ -194,9 +195,9 @@ void VulkanCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcText
                  vulkanDst->vulkanImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
   TransitionImageLayout(commandBuffer, vulkanSrc->vulkanImage(),
-                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, aspectMask);
+                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, srcAspect);
   TransitionImageLayout(commandBuffer, vulkanDst->vulkanImage(),
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, aspectMask);
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, dstAspect);
 
   vulkanSrc->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
   vulkanDst->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
