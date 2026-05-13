@@ -33,8 +33,7 @@ VulkanSwapchainProxy::VulkanSwapchainProxy(Context* context, VulkanGPU* gpu,
                                            const VulkanGPU::PresentationSlot& slot)
     : _context(context), _gpu(gpu), _swapchain(swapchain), _format(format), _width(width),
       _height(height), _imageViews(imageViews), _images(images),
-      _imageAvailableSemaphore(slot.imageAvailable),
-      _renderFinishedSemaphore(slot.renderFinished) {
+      _imageAvailableSemaphore(slot.imageAvailable), _renderFinishedSemaphore(slot.renderFinished) {
 }
 
 Context* VulkanSwapchainProxy::getContext() const {

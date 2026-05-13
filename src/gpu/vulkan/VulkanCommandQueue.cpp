@@ -292,7 +292,9 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
       vkEndCommandBuffer(presentCmd);
       cmdBuffers.push_back(presentCmd);
     } else {
-      LOGE("VulkanCommandQueue::submit: failed to allocate present command buffer, skipping present.");
+      LOGE(
+          "VulkanCommandQueue::submit: failed to allocate present command buffer, skipping "
+          "present.");
       present.reset();
     }
   }
@@ -305,9 +307,9 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   request.waitSemaphore = std::move(waitSem);
   request.frameTime = _frameTime;
   if (present.has_value()) {
-    request.present = VulkanGPU::SubmitRequest::PresentInfo{
-        present->swapchain, present->imageIndex, present->imageAvailableSemaphore,
-        present->renderFinishedSemaphore};
+    request.present = VulkanGPU::SubmitRequest::PresentInfo{present->swapchain, present->imageIndex,
+                                                            present->imageAvailableSemaphore,
+                                                            present->renderFinishedSemaphore};
   }
 
   gpu->executeSubmission(std::move(request));

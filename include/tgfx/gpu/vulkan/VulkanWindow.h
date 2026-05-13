@@ -20,8 +20,8 @@
 
 #include <memory>
 #include "tgfx/core/ColorSpace.h"
-#include "tgfx/gpu/vulkan/VulkanDevice.h"
 #include "tgfx/gpu/Window.h"
+#include "tgfx/gpu/vulkan/VulkanDevice.h"
 
 #ifdef _WIN32
 struct HWND__;

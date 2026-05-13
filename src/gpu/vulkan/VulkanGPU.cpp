@@ -642,10 +642,10 @@ bool VulkanGPU::createPresentationSlots() {
   VkSemaphoreCreateInfo semInfo = {};
   semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    if (vkCreateSemaphore(vulkanDevice, &semInfo, nullptr,
-                          &presentationSlots[i].imageAvailable) != VK_SUCCESS ||
-        vkCreateSemaphore(vulkanDevice, &semInfo, nullptr,
-                          &presentationSlots[i].renderFinished) != VK_SUCCESS) {
+    if (vkCreateSemaphore(vulkanDevice, &semInfo, nullptr, &presentationSlots[i].imageAvailable) !=
+            VK_SUCCESS ||
+        vkCreateSemaphore(vulkanDevice, &semInfo, nullptr, &presentationSlots[i].renderFinished) !=
+            VK_SUCCESS) {
       LOGE("VulkanGPU::createPresentationSlots: failed at slot %zu.", i);
       return false;
     }

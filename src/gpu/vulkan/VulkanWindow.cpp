@@ -335,8 +335,7 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
     return nullptr;
   }
 
-  auto lastProxy =
-      std::dynamic_pointer_cast<VulkanSwapchainProxy>(_platformState->swapchainProxy);
+  auto lastProxy = std::dynamic_pointer_cast<VulkanSwapchainProxy>(_platformState->swapchainProxy);
   bool needsRebuild = (_platformState->swapchain == VK_NULL_HANDLE) ||
                       (lastProxy && lastProxy->isOutOfDate()) ||
                       (static_cast<int>(extent.width) != _platformState->width) ||
