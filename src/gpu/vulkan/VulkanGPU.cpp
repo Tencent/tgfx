@@ -869,6 +869,11 @@ void VulkanGPU::releaseAll(bool releaseGPU) {
     vmaDestroyAllocator(vmaAllocator);
     vmaAllocator = VK_NULL_HANDLE;
   }
+  // Always destroy our own debug messenger, regardless of whether the instance is adopted.
+  if (debugMessenger != VK_NULL_HANDLE && vkDestroyDebugUtilsMessengerEXT != nullptr) {
+    vkDestroyDebugUtilsMessengerEXT(vulkanInstance, debugMessenger, nullptr);
+    debugMessenger = VK_NULL_HANDLE;
+  }
   // When adopted, the caller owns the device and instance — do not destroy them.
   if (!adopted) {
     if (vulkanDevice != VK_NULL_HANDLE) {
@@ -876,10 +881,6 @@ void VulkanGPU::releaseAll(bool releaseGPU) {
       vulkanDevice = VK_NULL_HANDLE;
     }
     if (vulkanInstance != VK_NULL_HANDLE) {
-      if (debugMessenger != VK_NULL_HANDLE && vkDestroyDebugUtilsMessengerEXT != nullptr) {
-        vkDestroyDebugUtilsMessengerEXT(vulkanInstance, debugMessenger, nullptr);
-        debugMessenger = VK_NULL_HANDLE;
-      }
       vkDestroyInstance(vulkanInstance, nullptr);
       vulkanInstance = VK_NULL_HANDLE;
     }
