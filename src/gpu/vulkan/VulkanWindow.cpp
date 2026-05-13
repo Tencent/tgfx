@@ -344,6 +344,9 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
     if (extent.width == 0 || extent.height == 0) {
       return nullptr;
     }
+    // Release the old proxy before rebuilding the swapchain, since recreateSwapchain() destroys
+    // the old swapchain images that the proxy references.
+    _platformState->swapchainProxy.reset();
     if (!_platformState->recreateSwapchain(vkDevice, capabilities, extent)) {
       return nullptr;
     }
