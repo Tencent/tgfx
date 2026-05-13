@@ -48,6 +48,8 @@ static void DestroySwapchainResources(VkDevice device, VkInstance instance, VkSu
 // Holds all Vulkan-specific handles and swapchain resources. Defined here (not in the header) so
 // that vulkan.h is never required by downstream translation units that include VulkanWindow.h.
 struct VulkanWindow::PlatformState {
+  VkDevice cachedDevice = VK_NULL_HANDLE;
+  VkInstance cachedInstance = VK_NULL_HANDLE;
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   VkSwapchainKHR swapchain = VK_NULL_HANDLE;
   std::vector<VkImage> images;
@@ -217,6 +219,8 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd,
   device->unlock();
 
   auto state = std::make_unique<PlatformState>();
+  state->cachedDevice = vkDevice;
+  state->cachedInstance = vkInstance;
   state->surface = surface;
   state->swapchain = swapchain;
   state->images = std::move(images);
@@ -237,18 +241,20 @@ VulkanWindow::VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<Platf
 
 VulkanWindow::~VulkanWindow() {
   auto context = device->lockContext();
-  if (context == nullptr) {
-    return;
+  if (context != nullptr) {
+    auto vulkanGPU = static_cast<VulkanGPU*>(context->gpu());
+    auto vkDevice = vulkanGPU->device();
+    // Ensure all in-flight submissions referencing swapchain images have completed before
+    // destroying the swapchain and its image views.
+    vkDeviceWaitIdle(vkDevice);
+    DestroySwapchainResources(vkDevice, vulkanGPU->instance(), _platformState->surface,
+                              _platformState->swapchain, _platformState->imageViews);
+    device->unlock();
+  } else {
+    DestroySwapchainResources(_platformState->cachedDevice, _platformState->cachedInstance,
+                              _platformState->surface, _platformState->swapchain,
+                              _platformState->imageViews);
   }
-  auto vulkanGPU = static_cast<VulkanGPU*>(context->gpu());
-  auto vkDevice = vulkanGPU->device();
-  // Ensure all in-flight submissions referencing swapchain images have completed before
-  // destroying the swapchain and its image views.
-  vkDeviceWaitIdle(vkDevice);
-
-  DestroySwapchainResources(vkDevice, vulkanGPU->instance(), _platformState->surface,
-                            _platformState->swapchain, _platformState->imageViews);
-  device->unlock();
 }
 
 bool VulkanWindow::PlatformState::recreateSwapchain(VkDevice device,
