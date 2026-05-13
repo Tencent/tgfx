@@ -99,8 +99,7 @@ VulkanRenderPass::VulkanRenderPass(VulkanCommandEncoder* encoder, VulkanGPU* gpu
     auto loadAction = ca.loadAction;
     if (loadAction == LoadAction::Load &&
         vulkanTexture->currentLayout() == VK_IMAGE_LAYOUT_UNDEFINED) {
-      // Texture has never been written — there is nothing to preserve. Silently downgrade to
-      // DontCare which is equivalent to UNDEFINED→GENERAL with loadOp=DONT_CARE.
+      LOGE("VulkanRenderPass: LoadAction::Load with UNDEFINED layout, content will be discarded.");
       loadAction = LoadAction::DontCare;
     }
     auto oldLayout = (loadAction == LoadAction::Load) ? vulkanTexture->currentLayout()
