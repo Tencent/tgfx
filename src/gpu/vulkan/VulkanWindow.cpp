@@ -63,7 +63,8 @@ struct VulkanWindow::PlatformState {
 
 #ifdef _WIN32
 
-std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd, std::shared_ptr<Device> device,
+std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd,
+                                                     std::shared_ptr<VulkanDevice> device,
                                                      std::shared_ptr<ColorSpace> colorSpace) {
   if (hwnd == nullptr || device == nullptr) {
     return nullptr;

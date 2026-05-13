@@ -20,6 +20,7 @@
 
 #include <memory>
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/gpu/vulkan/VulkanDevice.h"
 #include "tgfx/gpu/Window.h"
 
 #ifdef _WIN32
@@ -29,8 +30,6 @@ typedef HWND__* HWND;
 
 namespace tgfx {
 
-class Device;
-
 /**
  * VulkanWindow manages a VkSurfaceKHR and VkSwapchainKHR for presenting rendered content to a
  * platform window.
@@ -39,10 +38,10 @@ class VulkanWindow : public Window {
  public:
 #ifdef _WIN32
   /**
-   * Creates a VulkanWindow from a Win32 window handle. The device must be a VulkanDevice. Returns
-   * nullptr if the Vulkan surface or swapchain cannot be created.
+   * Creates a VulkanWindow from a Win32 window handle. Returns nullptr if the Vulkan surface or
+   * swapchain cannot be created.
    */
-  static std::shared_ptr<VulkanWindow> MakeFrom(HWND hwnd, std::shared_ptr<Device> device,
+  static std::shared_ptr<VulkanWindow> MakeFrom(HWND hwnd, std::shared_ptr<VulkanDevice> device,
                                                 std::shared_ptr<ColorSpace> colorSpace = nullptr);
 #endif
 

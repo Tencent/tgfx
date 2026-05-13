@@ -47,13 +47,12 @@ class CommandQueue {
                            size_t size) = 0;
 
   /**
-   * Writes pixel data to the texture within the specified rectangle. The pixel data is snapshot
-   * immediately — the caller does not need to keep the pixels pointer valid after this call
-   * returns. The actual GPU upload may happen immediately or be deferred to the next submit(),
-   * depending on the backend. The pixel data must match the texture's pixel format, and the
-   * rectangle must be fully contained within the texture's dimensions. If the texture has mipmaps,
-   * you should call CommandEncoder's generateMipmapsForTexture() method after writing the pixels,
-   * as mipmaps will not be generated automatically.
+   * Writes pixel data to the texture within the specified rectangle. The pixel data is copied
+   * before this call returns — the caller does not need to keep the pixels pointer valid
+   * afterwards. The pixel data must match the texture's pixel format, and the rectangle must be
+   * fully contained within the texture's dimensions. If the texture has mipmaps, you should call
+   * CommandEncoder's generateMipmapsForTexture() method after writing the pixels, as mipmaps will
+   * not be generated automatically.
    */
   virtual void writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, const void* pixels,
                             size_t rowBytes) = 0;
