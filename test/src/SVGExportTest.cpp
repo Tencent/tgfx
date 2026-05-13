@@ -1165,4 +1165,49 @@ TGFX_TEST(SVGExportTest, ComplexRRect) {
   ASSERT_NE(SVGString.find("<path"), std::string::npos);
   ASSERT_EQ(SVGString.find("<rect"), std::string::npos);
 }
+
+/**
+ * Reproduces a bug where a draw whose bounds lie fully inside an outer clip
+ * gets short-circuited (no clip emitted), but is then incorrectly written into
+ * a stale <g clip-path> wrapper opened by a previous draw with a different,
+ * smaller clip. Sequence:
+ *   1. Outer clipRect(0,0,300,300)  - big enough to contain all draws
+ *   2. Inner clipRect(0,0,100,100)  - small clip
+ *      drawRect(0,0,200,200)         -> escapes the small clip, opens
+ *                                       <g clip-path="url(#clip_0)">
+ *      restore()                      -> pops the inner clip
+ *   3. drawRect(150,150,100,100)     -> bounds fully inside the outer clip,
+ *                                       so applyClip short-circuits and the
+ *                                       rect ends up inside the still-open
+ *                                       <g clip-path="url(#clip_0)">, which
+ *                                       wrongly clips it away.
+ */
+TGFX_TEST(SVGExportTest, ClipShortCircuitWithStaleGroup) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
+  auto canvas = exporter->getCanvas();
+
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 300, 300));
+
+  Paint redPaint;
+  redPaint.setColor(Color::Red());
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 100, 100));
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 200, 200), redPaint);
+  canvas->restore();
+
+  Paint bluePaint;
+  bluePaint.setColor(Color::Blue());
+  canvas->drawRect(Rect::MakeXYWH(150, 150, 100, 100), bluePaint);
+
+  canvas->restore();
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ClipShortCircuitWithStaleGroup"));
+}
 }  // namespace tgfx
