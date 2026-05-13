@@ -59,6 +59,10 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
     return _currentImageIndex;
   }
 
+  bool isOutOfDate() const {
+    return _outOfDate;
+  }
+
   void releaseFrame();
 
  private:
@@ -74,6 +78,7 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   VkSemaphore _imageAvailableSemaphore = VK_NULL_HANDLE;
   VkSemaphore _renderFinishedSemaphore = VK_NULL_HANDLE;
   mutable uint32_t _currentImageIndex = 0;
+  mutable bool _outOfDate = false;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
 };
 

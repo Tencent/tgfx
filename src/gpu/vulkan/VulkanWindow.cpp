@@ -333,7 +333,10 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
     extent.height = static_cast<uint32_t>(_platformState->height);
   }
 
+  auto lastProxy =
+      std::dynamic_pointer_cast<VulkanSwapchainProxy>(_platformState->swapchainProxy);
   bool needsRebuild = (_platformState->swapchain == VK_NULL_HANDLE) ||
+                      (lastProxy && lastProxy->isOutOfDate()) ||
                       (static_cast<int>(extent.width) != _platformState->width) ||
                       (static_cast<int>(extent.height) != _platformState->height);
 

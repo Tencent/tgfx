@@ -77,7 +77,7 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
         vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX, _imageAvailableSemaphore,
                               VK_NULL_HANDLE, &_currentImageIndex);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-      LOGE("VulkanSwapchainProxy: swapchain out of date, needs rebuild.");
+      _outOfDate = true;
       return nullptr;
     }
     if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
