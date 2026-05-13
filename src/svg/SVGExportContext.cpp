@@ -556,8 +556,9 @@ void SVGExportContext::applyClip(const ClipStack& clip, const Rect& contentBound
   // Per-element anti-alias info is lost; the merged path's AA is left to the SVG renderer.
   auto clipPath = clip.getClipPath();
   if (clipPath.contains(contentBound)) {
-    // Close any stale <g clip-path> wrapper from a previous draw so this draw is not
-    // wrongly clipped by a different clip path.
+    // No clip needed for this draw, but a previous draw may have left a <g clip-path>
+    // wrapper open. Only close it when the active wrapper's clip differs from ours;
+    // matching wrappers are kept so consecutive same-clip draws keep sharing one group.
     if (clipPath != currentClipPath) {
       clipGroupElement = nullptr;
       currentClipPath = {};

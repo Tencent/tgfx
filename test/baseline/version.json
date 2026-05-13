@@ -470,7 +470,7 @@
     },
     "SVGExportTest": {
         "AssignColorSpace": "0d4409dd",
-        "ClipShortCircuitWithStaleGroup": "906401c2",
+        "ClipShortCircuitWithStaleGroup": "28f84e48",
         "ClipWithMatrixTransform": "082ec7b6b",
         "DrawImageRect": "f8344be7",
         "DstAssignColorSpace": "0d4409dd",

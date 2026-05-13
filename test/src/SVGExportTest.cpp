@@ -1171,16 +1171,20 @@ TGFX_TEST(SVGExportTest, ComplexRRect) {
  * gets short-circuited (no clip emitted), but is then incorrectly written into
  * a stale <g clip-path> wrapper opened by a previous draw with a different,
  * smaller clip. Sequence:
- *   1. Outer clipRect(0,0,300,300)  - big enough to contain all draws
+ *   1. Outer clipRect(0,0,300,300)  - must stay a convex rect so that
+ *                                     conservativelyContainsRect returns true
+ *                                     for steps 3/4 and triggers the
+ *                                     short-circuit.
  *   2. Inner clipRect(0,0,100,100)  - small clip
  *      drawRect(0,0,200,200)         -> escapes the small clip, opens
  *                                       <g clip-path="url(#clip_0)">
  *      restore()                      -> pops the inner clip
  *   3. drawRect(150,150,100,100)     -> bounds fully inside the outer clip,
  *                                       so applyClip short-circuits and the
- *                                       rect ends up inside the still-open
- *                                       <g clip-path="url(#clip_0)">, which
- *                                       wrongly clips it away.
+ *                                       rect must not stay inside the still-
+ *                                       open <g clip-path="url(#clip_0)">.
+ *   4. drawPath bounds (180,180,100,100) covers the real-world failure shape:
+ *      a <path> draw must escape the stale group on the same code path.
  */
 TGFX_TEST(SVGExportTest, ClipShortCircuitWithStaleGroup) {
   ContextScope scope;
@@ -1194,6 +1198,7 @@ TGFX_TEST(SVGExportTest, ClipShortCircuitWithStaleGroup) {
   canvas->save();
   canvas->clipRect(Rect::MakeXYWH(0, 0, 300, 300));
 
+  // First draw escapes the small clip and opens a <g clip-path> wrapper.
   Paint redPaint;
   redPaint.setColor(Color::Red());
   canvas->save();
@@ -1201,9 +1206,24 @@ TGFX_TEST(SVGExportTest, ClipShortCircuitWithStaleGroup) {
   canvas->drawRect(Rect::MakeXYWH(0, 0, 200, 200), redPaint);
   canvas->restore();
 
+  // Second draw (rect) is fully inside the outer clip - short-circuits and must
+  // NOT inherit the small clip group.
   Paint bluePaint;
   bluePaint.setColor(Color::Blue());
   canvas->drawRect(Rect::MakeXYWH(150, 150, 100, 100), bluePaint);
+
+  // Third draw (path) reproduces the real-world failure shape: a path whose
+  // bounds lie fully inside the outer clip must also escape the stale group.
+  // Use a triangle so Canvas cannot forward to drawRect/drawRRect; this
+  // exercises SVGExportContext::drawPath directly and emits a <path>.
+  Paint greenPaint;
+  greenPaint.setColor(Color::Green());
+  Path path;
+  path.moveTo(180, 280);
+  path.lineTo(230, 180);
+  path.lineTo(280, 280);
+  path.close();
+  canvas->drawPath(path, greenPaint);
 
   canvas->restore();
 
