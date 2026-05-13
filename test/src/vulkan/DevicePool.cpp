@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,26 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLSemaphore.h"
-#include "gpu/opengl/GLFunctions.h"
-#include "gpu/opengl/GLGPU.h"
+#include "utils/DevicePool.h"
+#include "tgfx/gpu/vulkan/VulkanDevice.h"
 
 namespace tgfx {
-BackendSemaphore GLSemaphore::getBackendSemaphore() const {
-  if (_glSync == nullptr) {
-    return {};
-  }
-  GLSyncInfo glSyncInfo = {};
-  glSyncInfo.sync = _glSync;
-  return BackendSemaphore(glSyncInfo);
-}
+thread_local std::shared_ptr<Device> cachedDevice = nullptr;
 
-void GLSemaphore::onRelease(GLGPU* gpu) {
-  if (_glSync != nullptr) {
-    auto gl = gpu->functions();
-    gl->deleteSync(_glSync);
-    _glSync = nullptr;
+std::shared_ptr<Device> DevicePool::Make() {
+  if (cachedDevice == nullptr) {
+    cachedDevice = VulkanDevice::Make();
   }
+  return cachedDevice;
 }
-
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,26 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLSemaphore.h"
-#include "gpu/opengl/GLFunctions.h"
-#include "gpu/opengl/GLGPU.h"
+#pragma once
+
+#include <cstdint>
+#include <string>
+#include <vector>
+#include "tgfx/gpu/ShaderStage.h"
+
+namespace shaderc {
+class Compiler;
+}
 
 namespace tgfx {
-BackendSemaphore GLSemaphore::getBackendSemaphore() const {
-  if (_glSync == nullptr) {
-    return {};
-  }
-  GLSyncInfo glSyncInfo = {};
-  glSyncInfo.sync = _glSync;
-  return BackendSemaphore(glSyncInfo);
-}
 
-void GLSemaphore::onRelease(GLGPU* gpu) {
-  if (_glSync != nullptr) {
-    auto gl = gpu->functions();
-    gl->deleteSync(_glSync);
-    _glSync = nullptr;
-  }
-}
+/// Preprocesses OpenGL-style GLSL source code to Vulkan-compatible GLSL 450 with explicit
+/// binding/location qualifiers. This includes upgrading the #version directive, assigning UBO and
+/// sampler bindings, adding input/output location qualifiers, and removing precision declarations.
+std::string PreprocessGLSL(const std::string& glslCode);
+
+/// Compiles preprocessed GLSL 450 source to SPIR-V binary using shaderc. Returns an empty vector
+/// on failure.
+std::vector<uint32_t> CompileGLSLToSPIRV(const shaderc::Compiler* compiler,
+                                         const std::string& vulkanGLSL, ShaderStage stage);
 
 }  // namespace tgfx

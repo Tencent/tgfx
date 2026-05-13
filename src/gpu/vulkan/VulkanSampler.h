@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,26 +16,37 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLSemaphore.h"
-#include "gpu/opengl/GLFunctions.h"
-#include "gpu/opengl/GLGPU.h"
+#pragma once
+
+#include "gpu/vulkan/VulkanAPI.h"
+#include "gpu/vulkan/VulkanResource.h"
+#include "tgfx/gpu/Sampler.h"
 
 namespace tgfx {
-BackendSemaphore GLSemaphore::getBackendSemaphore() const {
-  if (_glSync == nullptr) {
-    return {};
-  }
-  GLSyncInfo glSyncInfo = {};
-  glSyncInfo.sync = _glSync;
-  return BackendSemaphore(glSyncInfo);
-}
 
-void GLSemaphore::onRelease(GLGPU* gpu) {
-  if (_glSync != nullptr) {
-    auto gl = gpu->functions();
-    gl->deleteSync(_glSync);
-    _glSync = nullptr;
+class VulkanGPU;
+
+/**
+ * Vulkan sampler implementation.
+ */
+class VulkanSampler : public Sampler, public VulkanResource {
+ public:
+  static std::shared_ptr<VulkanSampler> Make(VulkanGPU* gpu, const SamplerDescriptor& descriptor);
+
+  VkSampler vulkanSampler() const {
+    return sampler;
   }
-}
+
+ protected:
+  void onRelease(VulkanGPU* gpu) override;
+
+ private:
+  explicit VulkanSampler(VkSampler sampler);
+  ~VulkanSampler() override = default;
+
+  VkSampler sampler = VK_NULL_HANDLE;
+
+  friend class VulkanGPU;
+};
 
 }  // namespace tgfx
