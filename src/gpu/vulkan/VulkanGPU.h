@@ -23,6 +23,7 @@
 #include <deque>
 #include <list>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 #include "core/utils/ReturnQueue.h"
@@ -197,10 +198,14 @@ class VulkanGPU : public GPU {
     std::shared_ptr<VulkanSemaphore> signalSemaphore;
     std::shared_ptr<VulkanSemaphore> waitSemaphore;
     std::chrono::steady_clock::time_point frameTime = {};
-    VkSwapchainKHR presentSwapchain = VK_NULL_HANDLE;
-    uint32_t presentImageIndex = 0;
-    VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
-    VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
+
+    struct PresentInfo {
+      VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+      uint32_t imageIndex = 0;
+      VkSemaphore imageAvailable = VK_NULL_HANDLE;
+      VkSemaphore renderFinished = VK_NULL_HANDLE;
+    };
+    std::optional<PresentInfo> present;
   };
 
   void executeSubmission(SubmitRequest request);

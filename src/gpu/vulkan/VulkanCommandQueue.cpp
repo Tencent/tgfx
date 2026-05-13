@@ -280,10 +280,9 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   request.waitSemaphore = std::move(pendingWaitSemaphore);
   request.frameTime = _frameTime;
   if (pendingPresent.has_value()) {
-    request.presentSwapchain = pendingPresent->swapchain;
-    request.presentImageIndex = pendingPresent->imageIndex;
-    request.imageAvailableSemaphore = pendingPresent->imageAvailableSemaphore;
-    request.renderFinishedSemaphore = pendingPresent->renderFinishedSemaphore;
+    request.present = VulkanGPU::SubmitRequest::PresentInfo{
+        pendingPresent->swapchain, pendingPresent->imageIndex,
+        pendingPresent->imageAvailableSemaphore, pendingPresent->renderFinishedSemaphore};
   }
 
   pendingUploads.clear();

@@ -725,13 +725,11 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
   }
 
   // (b) Binary semaphore pair for presentation sync.
-  if (request.imageAvailableSemaphore != VK_NULL_HANDLE) {
-    waitSemaphores.push_back(request.imageAvailableSemaphore);
+  if (request.present.has_value()) {
+    waitSemaphores.push_back(request.present->imageAvailable);
     waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
     waitValues.push_back(0);
-  }
-  if (request.renderFinishedSemaphore != VK_NULL_HANDLE) {
-    signalSemaphores.push_back(request.renderFinishedSemaphore);
+    signalSemaphores.push_back(request.present->renderFinished);
     signalValues.push_back(0);
   }
 
@@ -798,16 +796,14 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
 
   // Step 7: Execute pending present. The renderFinished semaphore ensures the presentation
   // engine waits for rendering to complete before displaying the image.
-  if (request.presentSwapchain != VK_NULL_HANDLE) {
+  if (request.present.has_value()) {
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = &request.presentSwapchain;
-    presentInfo.pImageIndices = &request.presentImageIndex;
-    if (request.renderFinishedSemaphore != VK_NULL_HANDLE) {
-      presentInfo.waitSemaphoreCount = 1;
-      presentInfo.pWaitSemaphores = &request.renderFinishedSemaphore;
-    }
+    presentInfo.pSwapchains = &request.present->swapchain;
+    presentInfo.pImageIndices = &request.present->imageIndex;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = &request.present->renderFinished;
     vkQueuePresentKHR(vulkanQueue, &presentInfo);
   }
 }
