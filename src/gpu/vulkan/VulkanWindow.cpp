@@ -251,6 +251,7 @@ VulkanWindow::~VulkanWindow() {
                               _platformState->swapchain, _platformState->imageViews);
     device->unlock();
   } else {
+    vkDeviceWaitIdle(_platformState->cachedDevice);
     DestroySwapchainResources(_platformState->cachedDevice, _platformState->cachedInstance,
                               _platformState->surface, _platformState->swapchain,
                               _platformState->imageViews);

@@ -165,6 +165,11 @@ VulkanRenderPipeline::VulkanRenderPipeline(VulkanGPU* gpu,
     uniformBlockVisibility[entry.binding] = entry.visibility;
     uniformBindingSet.insert(entry.binding);
   }
+
+  // Verify uniform and texture descriptor bindings do not overlap in the same descriptor set.
+  for (auto& [userBinding, descriptorBinding] : textureDescriptorBindings) {
+    DEBUG_ASSERT(uniformBindingSet.count(descriptorBinding) == 0);
+  }
 }
 
 void VulkanRenderPipeline::onRelease(VulkanGPU* gpu) {
