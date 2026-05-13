@@ -430,6 +430,8 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
   // For now we need color attachment formats and depth format.
   std::vector<VkAttachmentDescription> attachments;
   std::vector<VkAttachmentReference> colorRefs;
+  std::vector<VkAttachmentReference> resolveRefs;
+  bool hasResolve = (descriptor.multisample.count > 1);
 
   for (auto& ca : descriptor.fragment.colorAttachments) {
     VkAttachmentDescription attachment = {};
@@ -442,6 +444,21 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
     colorRefs.push_back(
         {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
     attachments.push_back(attachment);
+
+    // When MSAA is enabled, assume a resolve attachment per color attachment to match the runtime
+    // VulkanRenderPass layout (which adds one whenever resolveTexture is set).
+    if (hasResolve) {
+      VkAttachmentDescription resolveAttachment = {};
+      resolveAttachment.format = attachment.format;
+      resolveAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+      resolveAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+      resolveAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+      resolveAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      resolveAttachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+      resolveRefs.push_back(
+          {static_cast<uint32_t>(attachments.size()), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
+      attachments.push_back(resolveAttachment);
+    }
   }
 
   VkAttachmentReference depthRef = {};
@@ -465,6 +482,7 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
   subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
   subpass.colorAttachmentCount = static_cast<uint32_t>(colorRefs.size());
   subpass.pColorAttachments = colorRefs.data();
+  subpass.pResolveAttachments = hasResolve ? resolveRefs.data() : nullptr;
   subpass.pDepthStencilAttachment = hasDepth ? &depthRef : nullptr;
 
   // Subpass dependencies and attachment layouts must match VulkanRenderPass to ensure render pass
