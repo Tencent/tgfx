@@ -39,7 +39,9 @@ class VulkanWindow : public Window {
 #ifdef _WIN32
   /**
    * Creates a VulkanWindow from a Win32 window handle. Returns nullptr if the Vulkan surface or
-   * swapchain cannot be created.
+   * swapchain cannot be created. Note: only sRGB output is currently supported. The colorSpace
+   * parameter is accepted for forward compatibility but non-sRGB values are ignored with a warning.
+   * HDR / Display-P3 support will be added in a follow-up.
    */
   static std::shared_ptr<VulkanWindow> MakeFrom(HWND hwnd, std::shared_ptr<VulkanDevice> device,
                                                 std::shared_ptr<ColorSpace> colorSpace = nullptr);

@@ -61,5 +61,7 @@ struct VulkanSyncInfo {
 
 static_assert(std::is_trivially_copyable_v<VulkanImageInfo>);
 static_assert(std::is_trivially_copyable_v<VulkanSyncInfo>);
+static_assert(std::is_standard_layout_v<VulkanImageInfo>);
+static_assert(std::is_standard_layout_v<VulkanSyncInfo>);
 
 }  // namespace tgfx

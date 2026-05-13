@@ -70,6 +70,12 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd,
     return nullptr;
   }
 
+  if (colorSpace && !colorSpace->isSRGB()) {
+    LOGW(
+        "VulkanWindow::MakeFrom(): non-sRGB colorSpace is not yet supported and will be ignored. "
+        "Only sRGB output is currently available.");
+  }
+
   auto vulkanGPU = static_cast<VulkanGPU*>(device->lockContext()->gpu());
   auto vkInstance = vulkanGPU->instance();
   auto vkDevice = vulkanGPU->device();
