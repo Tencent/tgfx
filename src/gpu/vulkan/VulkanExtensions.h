@@ -42,6 +42,7 @@ namespace tgfx {
 struct VulkanExtensions {
   bool timelineSemaphore = false;
   bool extendedDynamicState = false;
+  bool rasterizationOrderAttachmentAccess = false;
 
   /// Queries extension availability and feature support from a physical device. Used when tgfx
   /// creates its own VkDevice.
@@ -53,12 +54,17 @@ struct VulkanExtensions {
 
     bool hasTimeline = false;
     bool hasDynState = false;
+    bool hasROAA = false;
     for (const auto& ext : available) {
       if (strcmp(ext.extensionName, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
         hasTimeline = true;
       }
       if (strcmp(ext.extensionName, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) == 0) {
         hasDynState = true;
+      }
+      if (strcmp(ext.extensionName, "VK_EXT_rasterization_order_attachment_access") == 0 ||
+          strcmp(ext.extensionName, "VK_ARM_rasterization_order_attachment_access") == 0) {
+        hasROAA = true;
       }
     }
 
@@ -81,6 +87,7 @@ struct VulkanExtensions {
 
     timelineSemaphore = hasTimeline && timelineFeature.timelineSemaphore;
     extendedDynamicState = hasDynState && dynStateFeature.extendedDynamicState;
+    rasterizationOrderAttachmentAccess = hasROAA;
   }
 
   /// Infers enabled extensions from volk function pointers. Used for externally created VkDevices
@@ -88,6 +95,8 @@ struct VulkanExtensions {
   void detectFromDevice() {
     timelineSemaphore = (vkGetSemaphoreCounterValueKHR != nullptr);
     extendedDynamicState = (vkCmdSetPrimitiveTopologyEXT != nullptr);
+    // ROAA has no unique entry points; cannot be inferred from function pointers.
+    rasterizationOrderAttachmentAccess = false;
   }
 
   /// Returns the list of extension names to pass to VkDeviceCreateInfo::ppEnabledExtensionNames.
@@ -99,6 +108,9 @@ struct VulkanExtensions {
     }
     if (extendedDynamicState) {
       names.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    }
+    if (rasterizationOrderAttachmentAccess) {
+      names.push_back("VK_EXT_rasterization_order_attachment_access");
     }
     return names;
   }

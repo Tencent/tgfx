@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VulkanCaps.h"
-#include <cstring>
 #include "gpu/vulkan/VulkanUtil.h"
 
 namespace tgfx {
@@ -72,14 +71,9 @@ VkFormat VulkanCaps::getVkFormat(PixelFormat format) const {
   return VK_FORMAT_UNDEFINED;
 }
 
-void VulkanCaps::initFeatures(VkPhysicalDevice physicalDevice, const VulkanExtensions& extensions) {
-  uint32_t extensionCount = 0;
-  vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr);
-  std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-  vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount,
-                                       availableExtensions.data());
-  for (const auto& ext : availableExtensions) {
-    _info.extensions.emplace_back(ext.extensionName);
+void VulkanCaps::initFeatures(VkPhysicalDevice, const VulkanExtensions& extensions) {
+  for (const auto& name : extensions.getEnabledNames()) {
+    _info.extensions.emplace_back(name);
   }
 
   _features.semaphore = extensions.timelineSemaphore;
@@ -87,15 +81,7 @@ void VulkanCaps::initFeatures(VkPhysicalDevice physicalDevice, const VulkanExten
   // Vulkan has no glTextureBarrier() equivalent. Disable to force the copy path for dst reads.
   _features.textureBarrier = false;
 
-  // Check for framebuffer fetch support via rasterization order attachment access.
-  frameBufferFetchSupported = false;
-  for (const auto& ext : availableExtensions) {
-    if (strcmp(ext.extensionName, "VK_EXT_rasterization_order_attachment_access") == 0 ||
-        strcmp(ext.extensionName, "VK_ARM_rasterization_order_attachment_access") == 0) {
-      frameBufferFetchSupported = true;
-      break;
-    }
-  }
+  frameBufferFetchSupported = extensions.rasterizationOrderAttachmentAccess;
 }
 
 void VulkanCaps::initLimits(VkPhysicalDevice physicalDevice) {
