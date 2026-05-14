@@ -66,11 +66,6 @@
         "dir": "third_party/expat"
       },
       {
-        "url": "https://github.com/google/flatbuffers.git",
-        "commit": "1c514626e83c20fffa8557e75641848e1e15cd5e",
-        "dir": "third_party/flatbuffers"
-      },
-      {
          "url": "https://github.com/cameron314/concurrentqueue.git",
          "commit": "6dd38b8a1dbaa7863aa907045f32308a56a6ff5d",
          "dir": "third_party/concurrentqueue"
@@ -79,11 +74,6 @@
         "url": "https://github.com/google/highway.git",
         "commit": "a523516d35e22a4ba8e2e70a319062cb87352de6",
         "dir": "third_party/highway"
-      },
-      {
-        "url": "https://github.com/lz4/lz4.git",
-        "commit": "cacca37747572717ceb1f156eb9840644205ca4f",
-        "dir": "third_party/lz4"
       },
       {
         "url": "https://github.com/google/shaderc.git",
