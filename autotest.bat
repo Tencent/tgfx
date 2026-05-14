@@ -74,6 +74,9 @@ if "%1"=="USE_SWIFTSHADER" (
 :: SwiftShader exports vkGetInstanceProcAddr, so it can serve as a drop-in replacement for the
 :: Vulkan Loader (vulkan-1.dll). Renaming it avoids the need for a real Vulkan SDK installation
 :: or VK_ICD_FILENAMES — volk's LoadLibraryA("vulkan-1.dll") picks it up from the exe directory.
+:: NOTE: This bypasses the real Vulkan Loader, so layer support (e.g.
+:: VK_LAYER_KHRONOS_validation) is unavailable. Developers needing validation should install
+:: the Vulkan SDK locally and use the loader + ICD path instead.
 if "%1"=="USE_VULKAN_SWIFTSHADER" copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\vk_swiftshader.dll" "%WORKSPACE%\build\vulkan-1.dll" >nul 2>&1
 
 :: Run tests

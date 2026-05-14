@@ -20,6 +20,7 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include "core/utils/Log.h"
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanResource.h"
 #include "tgfx/gpu/RenderPass.h"
@@ -44,7 +45,8 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
   /// Returns the VkPipeline matching the given primitive type. When extendedDynamicState is
   /// unavailable, a separate TriangleStrip pipeline variant is created at construction time.
   VkPipeline vulkanPipeline(PrimitiveType type) const {
-    if (type == PrimitiveType::TriangleStrip && stripPipeline != VK_NULL_HANDLE) {
+    if (type == PrimitiveType::TriangleStrip) {
+      DEBUG_ASSERT(stripPipeline != VK_NULL_HANDLE);
       return stripPipeline;
     }
     return pipeline;
