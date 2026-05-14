@@ -172,6 +172,15 @@ class D3D12GPU : public GPU {
     return _lastSignalledFenceValue;
   }
 
+  /**
+   * Returns true once the GPU has reported a fatal error (e.g. DXGI_ERROR_DEVICE_REMOVED) or a
+   * fence wait has timed out. After the flag is set, every executeSubmission() / wait* call
+   * short-circuits and the device is considered unusable for the remainder of the process.
+   */
+  bool isContextLost() const {
+    return contextLost;
+  }
+
  private:
   explicit D3D12GPU(ComPtr<ID3D12Device> device, ComPtr<IDXGIAdapter1> adapter);
 
@@ -212,6 +221,11 @@ class D3D12GPU : public GPU {
   HANDLE _frameFenceEvent = nullptr;
   uint64_t _lastSignalledFenceValue = 0;
   std::deque<InflightSubmission> inflightSubmissions;
+  // Sticky flag set when the device returns DXGI_ERROR_DEVICE_REMOVED or another fatal error.
+  // Once set, executeSubmission and waitAllInflightSubmissions stop blocking on the fence — the
+  // GPU will never signal again, and waiting INFINITE would hang the process. Submissions
+  // continue to clean up their resources locally so destruction terminates promptly.
+  bool contextLost = false;
 };
 
 }  // namespace tgfx

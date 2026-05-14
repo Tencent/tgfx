@@ -383,18 +383,55 @@ void D3D12GPU::reclaimAbandonedSession(D3D12FrameSession session) {
 }
 
 void D3D12GPU::executeSubmission(SubmitRequest request) {
+  // If the GPU has already reported a fatal error, drop the submission without waiting on the
+  // fence — DXGI_ERROR_DEVICE_REMOVED is sticky and the fence will never advance. Local cleanup
+  // still runs because session/uploads destructors release their D3D12 references.
+  if (contextLost) {
+    reclaimAbandonedSession(std::move(request.session));
+    request.uploads.clear();
+    return;
+  }
+
   // Step 1: Non-blocking reclaim of any submissions whose fence values have already signalled.
   pollCompletedSubmissions();
 
   // Step 2: Backpressure — block until the oldest inflight submission completes if we have
-  // already filled the in-flight pipeline.
+  // already filled the in-flight pipeline. A bounded timeout protects against TDR scenarios
+  // where the GPU never advances; on timeout we mark the context lost and stop tracking it.
   if (inflightSubmissions.size() >= MAX_FRAMES_IN_FLIGHT) {
     auto& oldest = inflightSubmissions.front();
     if (_frameFence->GetCompletedValue() < oldest.fenceValue) {
       _frameFence->SetEventOnCompletion(oldest.fenceValue, _frameFenceEvent);
-      WaitForSingleObject(_frameFenceEvent, INFINITE);
+      auto waitResult = WaitForSingleObject(_frameFenceEvent, 5000);
+      if (waitResult != WAIT_OBJECT_0) {
+        LOGE("D3D12GPU::executeSubmission: backpressure wait timed out (target=%llu), "
+             "marking context lost.",
+             static_cast<unsigned long long>(oldest.fenceValue));
+        contextLost = true;
+        reclaimAbandonedSession(std::move(request.session));
+        request.uploads.clear();
+        while (!inflightSubmissions.empty()) {
+          reclaimSubmission(inflightSubmissions.front());
+          inflightSubmissions.pop_front();
+        }
+        return;
+      }
     }
     pollCompletedSubmissions();
+    // Re-check device removal after the wait — if the GPU TDR'd while we were blocked, the
+    // event would have been signalled but no work has actually completed. Detect this and exit
+    // the inflight queue cleanup path immediately.
+    if (FAILED(d3d12Device->GetDeviceRemovedReason())) {
+      contextLost = true;
+      reclaimAbandonedSession(std::move(request.session));
+      request.uploads.clear();
+      // Drop every still-tracked submission since the GPU will never signal again.
+      while (!inflightSubmissions.empty()) {
+        reclaimSubmission(inflightSubmissions.front());
+        inflightSubmissions.pop_front();
+      }
+      return;
+    }
   }
 
   auto cmdQueue = commandQueue->d3d12CommandQueue();
@@ -451,9 +488,25 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
   }
 
   // Step 6: Signal the GPU's internal frame fence so we can later detect completion of this
-  // submission and reclaim its session.
+  // submission and reclaim its session. If the Signal call itself fails (it can return
+  // DXGI_ERROR_DEVICE_REMOVED if the GPU TDR'd while the previous ExecuteCommandLists was
+  // executing), trip the contextLost flag so subsequent calls don't block on a fence that will
+  // never advance.
   ++_lastSignalledFenceValue;
-  cmdQueue->Signal(_frameFence.Get(), _lastSignalledFenceValue);
+  auto signalHr = cmdQueue->Signal(_frameFence.Get(), _lastSignalledFenceValue);
+  if (FAILED(signalHr) || FAILED(d3d12Device->GetDeviceRemovedReason())) {
+    LOGE("D3D12GPU::executeSubmission: Signal failed (HRESULT=0x%08X) or device removed; "
+         "marking context lost.",
+         static_cast<unsigned>(signalHr));
+    contextLost = true;
+    reclaimAbandonedSession(std::move(request.session));
+    request.uploads.clear();
+    while (!inflightSubmissions.empty()) {
+      reclaimSubmission(inflightSubmissions.front());
+      inflightSubmissions.pop_front();
+    }
+    return;
+  }
 
   InflightSubmission inflight = {};
   inflight.fenceValue = _lastSignalledFenceValue;
@@ -466,11 +519,37 @@ void D3D12GPU::waitAllInflightSubmissions() {
   if (_frameFence == nullptr) {
     return;
   }
+  if (contextLost || FAILED(d3d12Device->GetDeviceRemovedReason())) {
+    // Device is gone — fence will never advance again. Drop everything synchronously.
+    contextLost = true;
+    while (!inflightSubmissions.empty()) {
+      reclaimSubmission(inflightSubmissions.front());
+      inflightSubmissions.pop_front();
+    }
+    processUnreferencedResources();
+    return;
+  }
   if (!inflightSubmissions.empty()) {
     auto& last = inflightSubmissions.back();
     if (_frameFence->GetCompletedValue() < last.fenceValue) {
+      // Use a finite timeout instead of INFINITE so we never hang the application even if some
+      // earlier submission had a corrupted command list that prevents the GPU from advancing.
+      // 5 seconds is well past any sensible draw frame budget; if it expires we fall through to
+      // the device-removal check below.
       _frameFence->SetEventOnCompletion(last.fenceValue, _frameFenceEvent);
-      WaitForSingleObject(_frameFenceEvent, INFINITE);
+      auto waitResult = WaitForSingleObject(_frameFenceEvent, 5000);
+      if (waitResult != WAIT_OBJECT_0) {
+        LOGE("D3D12GPU::waitAllInflightSubmissions: fence wait timed out (target=%llu), "
+             "marking context lost.",
+             static_cast<unsigned long long>(last.fenceValue));
+        contextLost = true;
+        while (!inflightSubmissions.empty()) {
+          reclaimSubmission(inflightSubmissions.front());
+          inflightSubmissions.pop_front();
+        }
+        processUnreferencedResources();
+        return;
+      }
     }
   }
   pollCompletedSubmissions();

@@ -90,6 +90,16 @@ void* D3D12Device::d3d12Device() const {
 }
 
 bool D3D12Device::onLockContext() {
+  // The base Device::lockContext() acquires the device mutex before calling us. If the GPU has
+  // been removed (e.g. DXGI_ERROR_DEVICE_REMOVED on a previous Signal), every subsequent
+  // operation on the device would either return failure immediately or, worse, leave the
+  // application waiting on a mutex it owns from a path that already encountered the loss but
+  // did not unwind cleanly. We surface the loss here so the base class unlocks the mutex and
+  // returns nullptr, matching the OpenGL backend's CONTEXT_LOST handling.
+  auto* gpu = static_cast<D3D12GPU*>(_gpu);
+  if (gpu->isContextLost()) {
+    return false;
+  }
   return true;
 }
 
