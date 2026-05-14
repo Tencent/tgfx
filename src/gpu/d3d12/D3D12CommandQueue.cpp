@@ -18,6 +18,7 @@
 
 #include "D3D12CommandQueue.h"
 #include "D3D12GPU.h"
+#include "D3D12Semaphore.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -79,12 +80,19 @@ void D3D12CommandQueue::writeTexture(std::shared_ptr<Texture>, const Rect&, cons
 }
 
 std::shared_ptr<Semaphore> D3D12CommandQueue::insertSemaphore() {
-  // Will be implemented when D3D12Semaphore is available (sub-task 6).
-  return nullptr;
+  auto semaphore = D3D12Semaphore::Make(gpu);
+  if (semaphore == nullptr) {
+    return nullptr;
+  }
+  pendingSignalSemaphore = semaphore;
+  return semaphore;
 }
 
-void D3D12CommandQueue::waitSemaphore(std::shared_ptr<Semaphore>) {
-  // Will be implemented when D3D12Semaphore is available (sub-task 6).
+void D3D12CommandQueue::waitSemaphore(std::shared_ptr<Semaphore> semaphore) {
+  if (semaphore == nullptr) {
+    return;
+  }
+  pendingWaitSemaphore = std::static_pointer_cast<D3D12Semaphore>(semaphore);
 }
 
 void D3D12CommandQueue::waitForFence(uint64_t targetValue) {

@@ -24,6 +24,7 @@
 #include "D3D12CommandQueue.h"
 #include "D3D12Resource.h"
 #include "D3D12Sampler.h"
+#include "D3D12Semaphore.h"
 #include "D3D12Texture.h"
 #include "core/utils/Log.h"
 
@@ -292,9 +293,21 @@ std::shared_ptr<Texture> D3D12GPU::importBackendRenderTarget(
                                 TextureUsage::RENDER_ATTACHMENT, false);
 }
 
-std::shared_ptr<Semaphore> D3D12GPU::importBackendSemaphore(const BackendSemaphore&) {
-  // Will be implemented in sub-task 6 (D3D12Semaphore).
-  return nullptr;
+std::shared_ptr<Semaphore> D3D12GPU::importBackendSemaphore(const BackendSemaphore& semaphore) {
+  if (semaphore.backend() != Backend::D3D12) {
+    return nullptr;
+  }
+  D3D12SyncInfo info = {};
+  if (!semaphore.getD3D12Sync(&info) || info.fence == nullptr) {
+    return nullptr;
+  }
+  auto rawFence = const_cast<ID3D12Fence*>(static_cast<const ID3D12Fence*>(info.fence));
+  ComPtr<ID3D12Fence> fence = nullptr;
+  rawFence->QueryInterface(IID_PPV_ARGS(&fence));
+  if (fence == nullptr) {
+    return nullptr;
+  }
+  return D3D12Semaphore::MakeFrom(this, std::move(fence), info.value);
 }
 
 BackendSemaphore D3D12GPU::stealBackendSemaphore(std::shared_ptr<Semaphore> semaphore) {
