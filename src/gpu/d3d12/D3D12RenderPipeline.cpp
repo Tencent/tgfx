@@ -1,0 +1,344 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "D3D12RenderPipeline.h"
+#include <d3dcompiler.h>
+#include <array>
+#include <vector>
+#include "D3D12GPU.h"
+#include "D3D12ShaderModule.h"
+#include "core/utils/Log.h"
+#include "gpu/UniformData.h"
+#include "tgfx/gpu/ColorWriteMask.h"
+#include "tgfx/gpu/ShaderVisibility.h"
+
+namespace tgfx {
+
+// Map a TGFX ShaderVisibility bitmask to the D3D12 single-stage enum used by root parameters.
+// D3D12 only allows a single visibility per root parameter; combinations fall back to ALL.
+static D3D12_SHADER_VISIBILITY ToD3D12ShaderVisibility(uint32_t visibility) {
+  if (visibility == ShaderVisibility::Vertex) {
+    return D3D12_SHADER_VISIBILITY_VERTEX;
+  }
+  if (visibility == ShaderVisibility::Fragment) {
+    return D3D12_SHADER_VISIBILITY_PIXEL;
+  }
+  return D3D12_SHADER_VISIBILITY_ALL;
+}
+
+static UINT8 ToD3D12RenderTargetWriteMask(uint32_t mask) {
+  UINT8 result = 0;
+  if (mask & ColorWriteMask::RED) result |= D3D12_COLOR_WRITE_ENABLE_RED;
+  if (mask & ColorWriteMask::GREEN) result |= D3D12_COLOR_WRITE_ENABLE_GREEN;
+  if (mask & ColorWriteMask::BLUE) result |= D3D12_COLOR_WRITE_ENABLE_BLUE;
+  if (mask & ColorWriteMask::ALPHA) result |= D3D12_COLOR_WRITE_ENABLE_ALPHA;
+  return result;
+}
+
+// True when the descriptor declares any non-default stencil state, matching the same predicate
+// used by the Vulkan backend so that pipeline state is consistent across backends.
+static bool HasNonTrivialStencilState(const DepthStencilDescriptor& ds) {
+  return ds.stencilFront.compare != CompareFunction::Always ||
+         ds.stencilBack.compare != CompareFunction::Always ||
+         ds.stencilFront.failOp != StencilOperation::Keep ||
+         ds.stencilFront.passOp != StencilOperation::Keep ||
+         ds.stencilFront.depthFailOp != StencilOperation::Keep ||
+         ds.stencilBack.failOp != StencilOperation::Keep ||
+         ds.stencilBack.passOp != StencilOperation::Keep ||
+         ds.stencilBack.depthFailOp != StencilOperation::Keep;
+}
+
+std::shared_ptr<D3D12RenderPipeline> D3D12RenderPipeline::Make(
+    D3D12GPU* gpu, const RenderPipelineDescriptor& descriptor) {
+  if (gpu == nullptr) {
+    return nullptr;
+  }
+  auto pipeline = gpu->makeResource<D3D12RenderPipeline>(gpu, descriptor);
+  if (pipeline->pipelineState == nullptr) {
+    return nullptr;
+  }
+  return pipeline;
+}
+
+D3D12RenderPipeline::D3D12RenderPipeline(D3D12GPU* gpu,
+                                         const RenderPipelineDescriptor& descriptor) {
+  if (!createRootSignature(gpu, descriptor)) {
+    return;
+  }
+  if (!createPipelineState(gpu, descriptor)) {
+    return;
+  }
+}
+
+void D3D12RenderPipeline::onRelease(D3D12GPU*) {
+  pipelineState = nullptr;
+  rootSignature = nullptr;
+}
+
+uint32_t D3D12RenderPipeline::getUniformRootParameterIndex(unsigned binding) const {
+  auto it = uniformRootParameterIndex.find(binding);
+  return it != uniformRootParameterIndex.end() ? it->second : UINT32_MAX;
+}
+
+uint32_t D3D12RenderPipeline::getTextureRootParameterIndex(unsigned binding) const {
+  auto it = textureRootParameterIndex.find(binding);
+  return it != textureRootParameterIndex.end() ? it->second : UINT32_MAX;
+}
+
+unsigned D3D12RenderPipeline::getTextureIndex(unsigned binding) const {
+  auto it = textureUnits.find(binding);
+  return it != textureUnits.end() ? it->second : binding;
+}
+
+uint32_t D3D12RenderPipeline::getUniformBlockVisibility(unsigned binding) const {
+  auto it = uniformBlockVisibility.find(binding);
+  return it != uniformBlockVisibility.end() ? it->second : ShaderVisibility::VertexFragment;
+}
+
+bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
+                                              const RenderPipelineDescriptor& descriptor) {
+  std::vector<D3D12_ROOT_PARAMETER> rootParameters;
+  // Each texture binding contributes one descriptor table containing two ranges (SRV + Sampler).
+  // The ranges array is referenced by pointer inside D3D12_ROOT_PARAMETER, so it must outlive
+  // the serialization call. We reserve up-front to keep pointers stable across emplace_back().
+  std::vector<std::array<D3D12_DESCRIPTOR_RANGE, 2>> textureRanges;
+  textureRanges.reserve(descriptor.layout.textureSamplers.size());
+
+  for (const auto& entry : descriptor.layout.uniformBlocks) {
+    uint32_t paramIndex = static_cast<uint32_t>(rootParameters.size());
+    D3D12_ROOT_PARAMETER param = {};
+    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    param.ShaderVisibility = ToD3D12ShaderVisibility(entry.visibility);
+    // SPIR-V binding K (0 for vertex UBO, 1 for fragment UBO) is mapped to HLSL register b0 in the
+    // matching shader stage by D3D12ShaderModule, so use ShaderRegister=0 here irrespective of K.
+    param.Descriptor.ShaderRegister = 0;
+    param.Descriptor.RegisterSpace = 0;
+    rootParameters.push_back(param);
+
+    uniformRootParameterIndex[entry.binding] = paramIndex;
+    uniformBlockVisibility[entry.binding] = entry.visibility;
+    uniformBindingSet.insert(entry.binding);
+  }
+
+  unsigned textureUnit = 0;
+  for (const auto& entry : descriptor.layout.textureSamplers) {
+    auto& ranges = textureRanges.emplace_back();
+    ranges[0] = {};
+    ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    ranges[0].NumDescriptors = 1;
+    ranges[0].BaseShaderRegister = textureUnit;
+    ranges[0].RegisterSpace = 0;
+    ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    ranges[1] = {};
+    ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+    ranges[1].NumDescriptors = 1;
+    ranges[1].BaseShaderRegister = textureUnit;
+    ranges[1].RegisterSpace = 0;
+    ranges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    uint32_t paramIndex = static_cast<uint32_t>(rootParameters.size());
+    D3D12_ROOT_PARAMETER param = {};
+    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    param.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(ranges.size());
+    param.DescriptorTable.pDescriptorRanges = ranges.data();
+    rootParameters.push_back(param);
+
+    textureRootParameterIndex[entry.binding] = paramIndex;
+    textureUnits[entry.binding] = textureUnit++;
+    textureBindingSet.insert(entry.binding);
+  }
+
+  D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
+  rootSigDesc.NumParameters = static_cast<UINT>(rootParameters.size());
+  rootSigDesc.pParameters = rootParameters.empty() ? nullptr : rootParameters.data();
+  rootSigDesc.NumStaticSamplers = 0;
+  rootSigDesc.pStaticSamplers = nullptr;
+  rootSigDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+  ComPtr<ID3DBlob> blob = nullptr;
+  ComPtr<ID3DBlob> errorBlob = nullptr;
+  auto hr =
+      D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &errorBlob);
+  if (FAILED(hr)) {
+    if (errorBlob != nullptr) {
+      LOGE("D3D12RenderPipeline: D3D12SerializeRootSignature failed (HRESULT=0x%08X): %s",
+           static_cast<unsigned>(hr), static_cast<const char*>(errorBlob->GetBufferPointer()));
+    } else {
+      LOGE("D3D12RenderPipeline: D3D12SerializeRootSignature failed (HRESULT=0x%08X).",
+           static_cast<unsigned>(hr));
+    }
+    return false;
+  }
+
+  hr = gpu->device()->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(),
+                                          IID_PPV_ARGS(&rootSignature));
+  if (FAILED(hr)) {
+    LOGE("D3D12RenderPipeline: CreateRootSignature failed (HRESULT=0x%08X).",
+         static_cast<unsigned>(hr));
+    rootSignature = nullptr;
+    return false;
+  }
+  return true;
+}
+
+bool D3D12RenderPipeline::createPipelineState(D3D12GPU* gpu,
+                                              const RenderPipelineDescriptor& descriptor) {
+  if (!descriptor.vertex.module || !descriptor.fragment.module) {
+    LOGE("D3D12RenderPipeline: vertex or fragment shader module is missing.");
+    return false;
+  }
+  auto vertexShader = std::static_pointer_cast<D3D12ShaderModule>(descriptor.vertex.module);
+  auto fragmentShader = std::static_pointer_cast<D3D12ShaderModule>(descriptor.fragment.module);
+  auto vsBytecode = vertexShader->shaderBytecode();
+  auto psBytecode = fragmentShader->shaderBytecode();
+  if (vsBytecode.pShaderBytecode == nullptr || psBytecode.pShaderBytecode == nullptr) {
+    LOGE("D3D12RenderPipeline: shader module produced empty bytecode.");
+    return false;
+  }
+
+  // Vertex input layout. Semantic names match the SPIRV-Cross HLSL convention of TEXCOORD{N},
+  // where N is the SPIR-V input location assigned by ShaderCompiler::PreprocessGLSL().
+  std::vector<D3D12_INPUT_ELEMENT_DESC> inputElements;
+  uint32_t globalLocation = 0;
+  for (uint32_t i = 0; i < static_cast<uint32_t>(descriptor.vertex.bufferLayouts.size()); i++) {
+    const auto& layout = descriptor.vertex.bufferLayouts[i];
+    uint32_t offset = 0;
+    for (const auto& attr : layout.attributes) {
+      D3D12_INPUT_ELEMENT_DESC element = {};
+      element.SemanticName = "TEXCOORD";
+      element.SemanticIndex = globalLocation++;
+      element.Format = ToD3D12VertexFormat(attr.format());
+      element.InputSlot = i;
+      element.AlignedByteOffset = offset;
+      element.InputSlotClass = (layout.stepMode == VertexStepMode::Instance)
+                                   ? D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA
+                                   : D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+      element.InstanceDataStepRate = (layout.stepMode == VertexStepMode::Instance) ? 1 : 0;
+      inputElements.push_back(element);
+      offset += static_cast<uint32_t>(attr.size());
+    }
+  }
+
+  D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+  psoDesc.pRootSignature = rootSignature.Get();
+  psoDesc.VS = vsBytecode;
+  psoDesc.PS = psBytecode;
+
+  // Blend state — one entry per color attachment.
+  psoDesc.BlendState.AlphaToCoverageEnable =
+      descriptor.multisample.alphaToCoverageEnabled ? TRUE : FALSE;
+  psoDesc.BlendState.IndependentBlendEnable =
+      (descriptor.fragment.colorAttachments.size() > 1) ? TRUE : FALSE;
+  for (size_t i = 0; i < descriptor.fragment.colorAttachments.size() &&
+                     i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT;
+       i++) {
+    const auto& ca = descriptor.fragment.colorAttachments[i];
+    auto& rt = psoDesc.BlendState.RenderTarget[i];
+    rt.BlendEnable = ca.blendEnable ? TRUE : FALSE;
+    rt.LogicOpEnable = FALSE;
+    rt.SrcBlend = ToD3D12BlendFactor(ca.srcColorBlendFactor);
+    rt.DestBlend = ToD3D12BlendFactor(ca.dstColorBlendFactor);
+    rt.BlendOp = ToD3D12BlendOperation(ca.colorBlendOp);
+    rt.SrcBlendAlpha = ToD3D12BlendFactor(ca.srcAlphaBlendFactor);
+    rt.DestBlendAlpha = ToD3D12BlendFactor(ca.dstAlphaBlendFactor);
+    rt.BlendOpAlpha = ToD3D12BlendOperation(ca.alphaBlendOp);
+    rt.LogicOp = D3D12_LOGIC_OP_NOOP;
+    rt.RenderTargetWriteMask = ToD3D12RenderTargetWriteMask(ca.colorWriteMask);
+  }
+
+  psoDesc.SampleMask = descriptor.multisample.mask;
+
+  // Rasterizer.
+  psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+  psoDesc.RasterizerState.CullMode = ToD3D12CullMode(descriptor.primitive.cullMode);
+  psoDesc.RasterizerState.FrontCounterClockwise =
+      ToD3D12FrontCounterClockwise(descriptor.primitive.frontFace) ? TRUE : FALSE;
+  psoDesc.RasterizerState.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+  psoDesc.RasterizerState.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+  psoDesc.RasterizerState.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+  psoDesc.RasterizerState.DepthClipEnable = TRUE;
+  psoDesc.RasterizerState.MultisampleEnable = (descriptor.multisample.count > 1) ? TRUE : FALSE;
+  psoDesc.RasterizerState.AntialiasedLineEnable = FALSE;
+  psoDesc.RasterizerState.ForcedSampleCount = 0;
+  psoDesc.RasterizerState.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+  // Depth-stencil. Depth test follows the same enable predicate as VulkanRenderPipeline.
+  bool depthTestEnable = (descriptor.depthStencil.depthCompare != CompareFunction::Always) ||
+                         descriptor.depthStencil.depthWriteEnabled;
+  psoDesc.DepthStencilState.DepthEnable = depthTestEnable ? TRUE : FALSE;
+  psoDesc.DepthStencilState.DepthWriteMask = descriptor.depthStencil.depthWriteEnabled
+                                                 ? D3D12_DEPTH_WRITE_MASK_ALL
+                                                 : D3D12_DEPTH_WRITE_MASK_ZERO;
+  psoDesc.DepthStencilState.DepthFunc =
+      ToD3D12CompareFunction(descriptor.depthStencil.depthCompare);
+  psoDesc.DepthStencilState.StencilEnable =
+      HasNonTrivialStencilState(descriptor.depthStencil) ? TRUE : FALSE;
+  psoDesc.DepthStencilState.StencilReadMask =
+      static_cast<UINT8>(descriptor.depthStencil.stencilReadMask);
+  psoDesc.DepthStencilState.StencilWriteMask =
+      static_cast<UINT8>(descriptor.depthStencil.stencilWriteMask);
+  psoDesc.DepthStencilState.FrontFace.StencilFailOp =
+      ToD3D12StencilOperation(descriptor.depthStencil.stencilFront.failOp);
+  psoDesc.DepthStencilState.FrontFace.StencilDepthFailOp =
+      ToD3D12StencilOperation(descriptor.depthStencil.stencilFront.depthFailOp);
+  psoDesc.DepthStencilState.FrontFace.StencilPassOp =
+      ToD3D12StencilOperation(descriptor.depthStencil.stencilFront.passOp);
+  psoDesc.DepthStencilState.FrontFace.StencilFunc =
+      ToD3D12CompareFunction(descriptor.depthStencil.stencilFront.compare);
+  psoDesc.DepthStencilState.BackFace.StencilFailOp =
+      ToD3D12StencilOperation(descriptor.depthStencil.stencilBack.failOp);
+  psoDesc.DepthStencilState.BackFace.StencilDepthFailOp =
+      ToD3D12StencilOperation(descriptor.depthStencil.stencilBack.depthFailOp);
+  psoDesc.DepthStencilState.BackFace.StencilPassOp =
+      ToD3D12StencilOperation(descriptor.depthStencil.stencilBack.passOp);
+  psoDesc.DepthStencilState.BackFace.StencilFunc =
+      ToD3D12CompareFunction(descriptor.depthStencil.stencilBack.compare);
+
+  psoDesc.InputLayout.pInputElementDescs = inputElements.empty() ? nullptr : inputElements.data();
+  psoDesc.InputLayout.NumElements = static_cast<UINT>(inputElements.size());
+  psoDesc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
+  psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+  psoDesc.NumRenderTargets = static_cast<UINT>(descriptor.fragment.colorAttachments.size());
+  for (size_t i = 0; i < descriptor.fragment.colorAttachments.size() &&
+                     i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT;
+       i++) {
+    psoDesc.RTVFormats[i] = static_cast<DXGI_FORMAT>(
+        gpu->getDXGIFormat(descriptor.fragment.colorAttachments[i].format));
+  }
+  psoDesc.DSVFormat =
+      (descriptor.depthStencil.format != PixelFormat::Unknown)
+          ? static_cast<DXGI_FORMAT>(gpu->getDXGIFormat(descriptor.depthStencil.format))
+          : static_cast<DXGI_FORMAT>(DXGI_FORMAT_UNKNOWN);
+  psoDesc.SampleDesc.Count = static_cast<UINT>(descriptor.multisample.count);
+  psoDesc.SampleDesc.Quality = 0;
+  psoDesc.NodeMask = 0;
+  psoDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+
+  auto hr = gpu->device()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState));
+  if (FAILED(hr)) {
+    LOGE("D3D12RenderPipeline: CreateGraphicsPipelineState failed (HRESULT=0x%08X).",
+         static_cast<unsigned>(hr));
+    pipelineState = nullptr;
+    return false;
+  }
+  return true;
+}
+
+}  // namespace tgfx

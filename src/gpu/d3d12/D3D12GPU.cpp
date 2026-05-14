@@ -22,6 +22,7 @@
 #include <string>
 #include "D3D12Buffer.h"
 #include "D3D12CommandQueue.h"
+#include "D3D12RenderPipeline.h"
 #include "D3D12Resource.h"
 #include "D3D12Sampler.h"
 #include "D3D12Semaphore.h"
@@ -214,9 +215,9 @@ std::shared_ptr<ShaderModule> D3D12GPU::createShaderModule(
   return D3D12ShaderModule::Make(this, descriptor);
 }
 
-std::shared_ptr<RenderPipeline> D3D12GPU::createRenderPipeline(const RenderPipelineDescriptor&) {
-  // Will be implemented in sub-task 5 (D3D12RenderPipeline).
-  return nullptr;
+std::shared_ptr<RenderPipeline> D3D12GPU::createRenderPipeline(
+    const RenderPipelineDescriptor& descriptor) {
+  return D3D12RenderPipeline::Make(this, descriptor);
 }
 
 std::shared_ptr<CommandEncoder> D3D12GPU::createCommandEncoder() {
