@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 #include "Layer3DContext.h"
 #include "tgfx/core/Image.h"
@@ -31,8 +32,10 @@ class DrawArgs;
 /**
  * Render3DContext composites layers using BSP-based depth sorting. addLayer recursively expands
  * the preserve3D subtree, collecting one node per registered layer. finishAndDrawTo builds a BSP
- * tree, rasterizes each layer (once per Layer* on demand) by invoking Layer::drawLayer, then
- * composites fragments back-to-front.
+ * tree, rasterizes each layer (per-fragment when the subtree contains BackgroundBlur, otherwise
+ * once per layer), then composites the fragments back-to-front into the compositor target. When
+ * BackgroundBlur is present, the target is primed with the outer canvas snapshot so any
+ * dispatch sees both "behind 3D" and "BSP-accumulated" pixels as its backdrop.
  */
 class Render3DContext : public Layer3DContext {
  public:
@@ -57,6 +60,9 @@ class Render3DContext : public Layer3DContext {
   void collectNodes(Layer* layer, const Matrix3D& transform, float alpha, int depth);
   std::shared_ptr<Image> rasterLayer(Layer* layer, const Rect& localBounds, float alpha,
                                      DrawArgs& leafArgs);
+  // Whether `layer` itself or any descendant carries a Background-sourced layer style. Reads the
+  // cached presence flag (maxBackgroundOutset > 0) directly via friend access from Layer.
+  static bool SubtreeHasBackgroundStyle(Layer* layer);
 
   std::shared_ptr<Context3DCompositor> _compositor = nullptr;
   std::vector<PendingNode> _pendingNodes = {};

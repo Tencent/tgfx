@@ -766,6 +766,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   friend class DisplayList;
   friend class BackgroundCapturer;
   friend class BackgroundConsumer;
+  friend class Compositor3DCapturer;
   friend class LayerProperty;
   friend class LayerSerialization;
   friend class OffscreenRenderer;

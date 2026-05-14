@@ -21,12 +21,16 @@
 #include "BspTree.h"
 #include "core/Matrix3DUtils.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/QuadRecord.h"
 #include "gpu/QuadsVertexProvider.h"
 #include "gpu/ops/Quads3DDrawOp.h"
 #include "gpu/processors/TextureEffect.h"
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/layers/Layer.h"
 
 namespace tgfx {
 
@@ -173,8 +177,14 @@ void Context3DCompositor::drawQuads(const DrawPolygon3D* polygon,
   Rect originalRect = localBounds;
 
   auto allocator = context->drawingAllocator();
-  // Wrap alpha as vertex color to enable semi-transparent pixel blending.
-  Color vertexColor(1, 1, 1, polygon->alpha());
+  // Decide whether the polygon's alpha is applied here (group opacity) or has already been baked
+  // into `image` by Layer::drawLayer's recursive raster pass:
+  //   - allowsGroupOpacity=true  -> raster uses alpha=1, multiply by polygon.alpha here.
+  //   - allowsGroupOpacity=false -> raster bakes polygon.alpha into `image`, leave vertex at 1.
+  auto* polygonLayer = polygon->layer();
+  float vertexAlpha =
+      (polygonLayer != nullptr && polygonLayer->allowsGroupOpacity()) ? polygon->alpha() : 1.0f;
+  Color vertexColor(1, 1, 1, vertexAlpha);
   auto matrix = polygon->matrix().asMatrix();
   std::vector<PlacementPtr<QuadRecord>> quadRecords;
   if (subQuads.empty()) {
@@ -225,16 +235,58 @@ const std::vector<DrawPolygon3D*>& Context3DCompositor::prepareTraversal() {
   return _orderedFragments;
 }
 
+std::shared_ptr<Image> Context3DCompositor::snapshotTarget() {
+  DEBUG_ASSERT(_targetColorProxy != nullptr);
+  auto context = _targetColorProxy->getContext();
+  DEBUG_ASSERT(context != nullptr);
+  // Submit accumulated ops; first submission also clears the target.
+  if (!_drawOps.empty() || !_targetCleared) {
+    auto opArray = context->drawingAllocator()->makeArray(std::move(_drawOps));
+    auto clearColor =
+        _targetCleared ? std::optional<PMColor>{} : std::optional<PMColor>(PMColor::Transparent());
+    context->drawingManager()->addOpsRenderTask(_targetColorProxy, std::move(opArray), clearColor);
+    _targetCleared = true;
+  }
+  // Make an immutable copy so subsequent draws to _targetColorProxy do not mutate this snapshot.
+  auto copyProxy = _targetColorProxy->makeTextureProxy();
+  context->drawingManager()->addRenderTargetCopyTask(_targetColorProxy, copyProxy);
+  return TextureImage::Wrap(std::move(copyProxy), TargetColorSpace());
+}
+
+void Context3DCompositor::primeWithImage(const std::shared_ptr<Image>& image) {
+  if (image == nullptr || _targetColorProxy == nullptr) {
+    return;
+  }
+  auto width = static_cast<float>(_targetColorProxy->width());
+  auto height = static_cast<float>(_targetColorProxy->height());
+  if (width <= 0 || height <= 0) {
+    return;
+  }
+  // Construct a full-target polygon with identity transform so the image lands one-to-one in
+  // compositor pixel space. Layer pointer is unused here (drawQuads only reads localBounds /
+  // matrix / alpha / antiAlias), but DrawPolygon3D's constructor asserts on null — pass the
+  // raw image as a placeholder image, since drawQuads ignores polygon->image() in favour of
+  // the explicit `image` parameter.
+  auto fullRect = Rect::MakeWH(width, height);
+  auto identity3D = Matrix3D::I();
+  auto polygon = std::make_unique<DrawPolygon3D>(/*layer=*/nullptr, fullRect, identity3D,
+                                                 /*depth=*/0, /*sequenceIndex=*/0,
+                                                 /*alpha=*/1.0f, /*antiAlias=*/false);
+  drawQuads(polygon.get(), image, {});
+}
+
 std::shared_ptr<Image> Context3DCompositor::flushToImage() {
   auto context = _targetColorProxy->getContext();
   DEBUG_ASSERT(context != nullptr);
   auto opArray = context->drawingAllocator()->makeArray(std::move(_drawOps));
-  context->drawingManager()->addOpsRenderTask(_targetColorProxy, std::move(opArray),
-                                              PMColor::Transparent());
+  auto clearColor =
+      _targetCleared ? std::optional<PMColor>{} : std::optional<PMColor>(PMColor::Transparent());
+  context->drawingManager()->addOpsRenderTask(_targetColorProxy, std::move(opArray), clearColor);
   auto image = TextureImage::Wrap(_targetColorProxy->asTextureProxy(), TargetColorSpace());
   _targetColorProxy = nullptr;
   _orderedFragments.clear();
   _bspTree.reset();
+  _targetCleared = false;
   return image;
 }
 

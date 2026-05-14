@@ -936,7 +936,7 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
-void DisplayList::drawTileTask(const DrawTask& task, const BackgroundSnapshotMap* snapshots) const {
+void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots) const {
   auto surface = surfaceCaches[task.sourceIndex()].get();
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
@@ -1038,7 +1038,7 @@ void DisplayList::resetCaches() {
 }
 
 void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                                bool autoClear, const BackgroundSnapshotMap* snapshots) const {
+                                bool autoClear, BackgroundSnapshotMap* snapshots) const {
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   auto context = surface->getContext();

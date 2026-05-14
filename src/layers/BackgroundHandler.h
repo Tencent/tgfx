@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <vector>
+#include "layers/BackgroundSnapshotMap.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 
@@ -27,6 +28,7 @@ namespace tgfx {
 
 class BackgroundSource;
 class Canvas;
+class Context3DCompositor;
 class DrawArgs;
 class Layer;
 class LayerStyle;
@@ -53,6 +55,14 @@ class BackgroundHandler {
 
   virtual void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                                    LayerStyle* style, const LayerStyleSource* source) = 0;
+
+  // Returns true when this handler participates in the capture pass (i.e. writes snapshots into
+  // the BackgroundSnapshotMap). 3D subtrees consult this to decide whether their per-fragment
+  // raster should bind a sub-handler that writes the composed backdrop into the same snapshot
+  // map. Default false; BackgroundCapturer (and its derivatives) override to true.
+  virtual bool isCapturer() const {
+    return false;
+  }
 
   // Returns true when descendants of `layer` should render onto a real Surface so a sub
   // background source can sample them back. Capturer returns true only when `layer` actually has
@@ -124,6 +134,10 @@ class BackgroundCapturer : public BackgroundHandler {
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                            LayerStyle* style, const LayerStyleSource* source) override;
 
+  bool isCapturer() const override {
+    return true;
+  }
+
   bool needsSurface(Layer* layer) const override;
 
   std::unique_ptr<BackgroundHandler> createSubHandler(Surface* surface, const DrawArgs& parentArgs,
@@ -158,6 +172,13 @@ class BackgroundCapturer : public BackgroundHandler {
                   std::shared_ptr<BackgroundSource> bgSource, BackgroundSnapshotMap* snapshots,
                   const std::vector<Rect>& renderRects);
 
+  // Exposes the snapshot map this capturer writes into, so per-fragment Sub3DCapturers spawned
+  // by 3D subtrees can append their composed-backdrop entries to the same map under the same
+  // (Layer, LayerStyle) keys that the consume pass will read back.
+  BackgroundSnapshotMap* snapshotMap() const {
+    return snapshots;
+  }
+
  private:
   bool isForcedCapture() const {
     return _forcedCaptureDepth > 0;
@@ -178,8 +199,9 @@ class BackgroundConsumer : public BackgroundHandler {
   // context). In that case the consumer synthesizes backdrops on the fly via
   // Layer::synthesizeBackgroundImage. When snapshots is non-null (surface path) the map is
   // authoritative — a miss there indicates a capture-side coverage bug, so we silently skip
-  // rather than masking it with synthesis.
-  explicit BackgroundConsumer(const BackgroundSnapshotMap* snapshots) : snapshots(snapshots) {
+  // rather than masking it with synthesis. The pointer is non-const because each successful
+  // lookup advances an internal read cursor (see BackgroundSnapshotList).
+  explicit BackgroundConsumer(BackgroundSnapshotMap* snapshots) : snapshots(snapshots) {
   }
 
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
@@ -188,7 +210,42 @@ class BackgroundConsumer : public BackgroundHandler {
   const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
 
  private:
-  const BackgroundSnapshotMap* snapshots = nullptr;
+  BackgroundSnapshotMap* snapshots = nullptr;
+};
+
+/**
+ * Capture-pass handler installed on every leaf raster inside a 3D subtree's finishAndDrawTo. It
+ * captures BackgroundBlur dispatches by sampling two GPU surfaces on the spot:
+ *  - The 3D compositor's render target (already primed with the outer canvas's pre-3D contents
+ *    and accumulating BSP fragments in back-to-front order).
+ *  - The active leaf raster surface (whatever the layer's parent has already drawn into the leaf
+ *    before this dispatch fires — content-below, layer styles, prior siblings).
+ * The two are projected back into the dispatching layer's local space and SrcOver-composed in
+ * that order, then written into the shared BackgroundSnapshotMap under (Layer, LayerStyle). The
+ * consume pass walks the same BSP and reads entries back via BackgroundConsumer's normal path.
+ */
+class Compositor3DCapturer : public BackgroundHandler {
+ public:
+  Compositor3DCapturer(BackgroundSnapshotMap* snapshots, Context3DCompositor* compositor,
+                       const Rect& renderRect, float contentScale,
+                       std::shared_ptr<ColorSpace> colorSpace)
+      : snapshots(snapshots), compositor(compositor), renderRect(renderRect),
+        contentScale(contentScale), colorSpace(std::move(colorSpace)) {
+  }
+
+  void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
+                           LayerStyle* style, const LayerStyleSource* source) override;
+
+  bool isCapturer() const override {
+    return true;
+  }
+
+ private:
+  BackgroundSnapshotMap* snapshots = nullptr;
+  Context3DCompositor* compositor = nullptr;
+  Rect renderRect = {};
+  float contentScale = 1.0f;
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 };
 
 }  // namespace tgfx

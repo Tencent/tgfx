@@ -79,6 +79,24 @@ class Context3DCompositor {
   void drawPolygon(const DrawPolygon3D* polygon, const std::shared_ptr<Image>& image);
 
   /**
+   * Returns an immutable snapshot of the compositor's render target with all currently queued
+   * draw ops applied. Used by 3D-subtree BackgroundBlur to feed the in-progress BSP-accumulated
+   * pixels as part of the per-fragment backdrop. The returned Image is independent of subsequent
+   * draws (a copy task is enqueued).
+   */
+  std::shared_ptr<Image> snapshotTarget();
+
+  /**
+   * Lays down a target-sized image as the very first draw on the compositor target so that
+   * subsequent BSP fragments composite on top of it. Used by Render3DContext to inject the
+   * outer-canvas snapshot before BSP raster, giving in-subtree BackgroundBlur dispatches a
+   * backdrop that includes "behind 3D subtree" content.
+   *
+   * @param image A target-sized image in compositor pixel space.
+   */
+  void primeWithImage(const std::shared_ptr<Image>& image);
+
+  /**
    * Flushes accumulated draw ops to the offscreen target and returns the composited image.
    */
   std::shared_ptr<Image> flushToImage();
@@ -95,6 +113,9 @@ class Context3DCompositor {
   std::vector<DrawPolygon3D*> _orderedFragments = {};
   std::vector<PlacementPtr<DrawOp>> _drawOps = {};
   std::unordered_map<int, int> _depthSequenceCounters = {};
+  // Tracks whether at least one OpsRenderTask has been submitted to _targetColorProxy. The first
+  // submission must clear the target; subsequent submissions append on top.
+  bool _targetCleared = false;
 };
 
 }  // namespace tgfx

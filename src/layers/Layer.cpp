@@ -921,12 +921,15 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   BackgroundSnapshotMap* snapshotsPtr = nullptr;
   bool needBackground = canInvert && !canPreserve3D() && hasBackgroundStyle();
   if (needBackground && context != nullptr) {
-    // Use the canvas matrix as the viewMatrix (world → surface pixel mapping), consistent with
-    // how DisplayList::captureBackgrounds passes getViewMatrix() to createBackgroundSource.
-    auto canvasMatrix = canvas->getMatrix();
     auto rectForDraw = maxBackgroundOutset > 0.0f ? clippedBounds : bounds;
-    auto drawRect = canvasMatrix.mapRect(rectForDraw);
-    auto backgroundMatrix = canvasMatrix;
+    Matrix backgroundMatrix = canvas->getMatrix();
+    Rect drawRect = backgroundMatrix.mapRect(rectForDraw);
+    if (_root != nullptr) {
+      // Capture replays from _root and accumulates ancestors. viewMatrix = invert(globalMatrix)
+      // folds them into self.local, so bgSurface only needs to cover self.bounds + outset.
+      backgroundMatrix = globalToLocalMatrix.asMatrix();
+      drawRect = rectForDraw;
+    }
     if (auto bgSource = createBackgroundSource(context, drawRect, backgroundMatrix,
                                                rectForDraw == bounds, args.dstColorSpace)) {
       // Replay from _root so ancestor matrices apply; orphan layers replay from themselves.

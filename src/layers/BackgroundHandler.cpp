@@ -23,6 +23,7 @@
 #include "layers/BackgroundSource.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
+#include "layers/compositing3d/Context3DCompositor.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
@@ -232,8 +233,8 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (image == nullptr) {
     return;
   }
-  snapshots->emplace(BackgroundSnapshotKey{layer, style},
-                     BackgroundSnapshotEntry{std::move(image), offset});
+  snapshots->snapshots[BackgroundSnapshotKey{layer, style}].entries.push_back(
+      BackgroundSnapshotEntry{std::move(image), offset});
 }
 
 const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* layer) const {
@@ -304,14 +305,15 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   std::shared_ptr<Image> bgImage = nullptr;
   Point bgOffset = {};
   if (snapshots != nullptr) {
-    auto it = snapshots->find(BackgroundSnapshotKey{layer, style});
-    if (it == snapshots->end()) {
+    auto it = snapshots->snapshots.find(BackgroundSnapshotKey{layer, style});
+    if (it == snapshots->snapshots.end() || it->second.readCursor >= it->second.entries.size()) {
       // Surface path: the map is authoritative, so a miss is a capture-side coverage bug.
       // Silently skip rather than masking the bug with on-the-fly synthesis.
       return;
     }
-    bgImage = it->second.image;
-    bgOffset = it->second.offset;
+    auto& entry = it->second.entries[it->second.readCursor++];
+    bgImage = entry.image;
+    bgOffset = entry.offset;
   } else {
     // Picture-canvas path: capture was skipped because there is no GPU context. Synthesize the
     // backdrop on the fly by walking ancestors and prior siblings via PictureRecorder.
@@ -327,6 +329,85 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   auto backgroundOffset = bgOffset - contentEntry.offset;
   style->drawWithExtraSource(canvas, contentEntry.image, source->contentScale, std::move(bgImage),
                              backgroundOffset, alpha);
+}
+
+void Compositor3DCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
+                                               float /*alpha*/, LayerStyle* style,
+                                               const LayerStyleSource* source) {
+  if (snapshots == nullptr || compositor == nullptr || layer == nullptr || style == nullptr ||
+      canvas == nullptr || source == nullptr) {
+    return;
+  }
+  auto compositorSnapshot = compositor->snapshotTarget();
+  if (compositorSnapshot == nullptr) {
+    return;
+  }
+  auto contentScaleOut = source->contentScale;
+  if (FloatNearlyZero(contentScaleOut)) {
+    return;
+  }
+  auto layerBounds = layer->getBounds();
+  if (layerBounds.isEmpty()) {
+    return;
+  }
+  // layer-local → world (== outer canvas-local) via the cached global matrix; flatten to 2D
+  // since Canvas::concat does not accept Matrix3D and we'd lose perspective on the descendant
+  // matrix anyway. The resulting backdrop is going to be blurred, so the affine approximation is
+  // visually indistinguishable from a perspective-correct sample.
+  auto localToWorld = layer->getGlobalMatrix().asMatrix();
+  Matrix worldToLocal = Matrix::I();
+  if (!localToWorld.invert(&worldToLocal)) {
+    return;
+  }
+
+  PictureRecorder recorder = {};
+  auto* recording = recorder.beginRecording();
+  recording->scale(contentScaleOut, contentScaleOut);
+  recording->clipRect(layerBounds);
+
+  // Layer 1: 3D compositor target snapshot (outer prime + BSP fragments accumulated so far).
+  // compositor pixel space → world: cancel the contentScale baked into the target and shift
+  // back from the renderRect-anchored origin to outer canvas pixels.
+  {
+    AutoCanvasRestore restore(recording);
+    recording->concat(worldToLocal);
+    auto compositorToWorld = Matrix::MakeScale(1.0f / contentScale, 1.0f / contentScale);
+    compositorToWorld.preTranslate(renderRect.left, renderRect.top);
+    recording->concat(compositorToWorld);
+    recording->drawImage(compositorSnapshot);
+  }
+
+  // Layer 2: leaf surface's accumulated state, if any. Without this overlay a BackgroundBlur on a
+  // descendant inside a non-preserve3D leaf's subtree would miss the parent layer's content that
+  // was already drawn before the dispatch (drawLayerStyles below + content-default + earlier
+  // siblings). canvas->getMatrix() maps layer-local to leaf-surface pixel.
+  if (auto* leafSurface = canvas->getSurface()) {
+    auto leafSnapshot = leafSurface->makeImageSnapshot();
+    if (leafSnapshot != nullptr) {
+      auto canvasMatrix = canvas->getMatrix();
+      Matrix leafToLocal = Matrix::I();
+      if (canvasMatrix.invert(&leafToLocal)) {
+        AutoCanvasRestore restore(recording);
+        recording->concat(leafToLocal);
+        recording->drawImage(leafSnapshot);
+      }
+    }
+  }
+
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return;
+  }
+  auto bounds = layerBounds;
+  bounds.scale(contentScaleOut, contentScaleOut);
+  bounds.roundOut();
+  Point offset = {};
+  auto image = ToImageWithOffset(std::move(picture), &offset, &bounds, args.dstColorSpace);
+  if (image == nullptr) {
+    return;
+  }
+  snapshots->snapshots[BackgroundSnapshotKey{layer, style}].entries.push_back(
+      BackgroundSnapshotEntry{std::move(image), offset});
 }
 
 void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,

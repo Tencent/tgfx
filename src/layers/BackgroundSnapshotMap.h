@@ -53,6 +53,19 @@ struct BackgroundSnapshotKey {
   }
 };
 
+/**
+ * Snapshot entries for one (Layer, LayerStyle) pair. The list grows once per dispatch during the
+ * capture pass and is consumed in the same order during the consume pass, with `readCursor`
+ * advancing on every successful lookup. Normal 2D paths only ever push and read a single entry,
+ * which is equivalent to the previous single-value behaviour. Paths that rasterize the same
+ * (layer, style) multiple times — e.g. a BackgroundBlur layer split into multiple fragments by a
+ * 3D subtree's BSP — push and consume one entry per dispatch in BSP order.
+ */
+struct BackgroundSnapshotList {
+  std::vector<BackgroundSnapshotEntry> entries = {};
+  std::size_t readCursor = 0;
+};
+
 struct BackgroundSnapshotKeyHash {
   std::size_t operator()(const BackgroundSnapshotKey& key) const noexcept {
     auto h1 = std::hash<const void*>{}(key.layer);
@@ -68,18 +81,21 @@ struct BackgroundSnapshotKeyHash {
 };
 
 /**
- * Concrete map type used to carry background snapshots from the capture pass to the consume
- * pass. Declared as a named struct (instead of a using-alias over std::unordered_map) so that
- * callers which only need a pointer or reference can forward-declare the type in public headers
- * without pulling in this internal header.
+ * Carries background snapshots from the capture pass to the consume pass. Each (Layer, LayerStyle)
+ * key maps to a list (not a single entry), since the same pair can be dispatched more than once
+ * within one render — e.g. a BackgroundBlur layer that gets split into multiple fragments by a
+ * 3D subtree's BSP. Capture pushes entries in dispatch order; consume reads them in the same
+ * order through an internal cursor. The interface is unchanged from the caller's perspective.
  *
  * Also caches LayerStyleSource per layer: capture and consume passes walk the same tree, so
  * each layer's content/contour images are identical between passes. Building the source once in
- * capture and reusing it in consume avoids redundant intermediate renders.
+ * capture and reusing it in consume avoids redundant intermediate renders. LayerStyleSource is
+ * not list-ised because, even when a layer is split into multiple fragments, the source is
+ * built at most once and read N times — list semantics would offer no value here.
  */
-struct BackgroundSnapshotMap
-    : public std::unordered_map<BackgroundSnapshotKey, BackgroundSnapshotEntry,
-                                BackgroundSnapshotKeyHash> {
+struct BackgroundSnapshotMap {
+  std::unordered_map<BackgroundSnapshotKey, BackgroundSnapshotList, BackgroundSnapshotKeyHash>
+      snapshots = {};
   std::unordered_map<Layer*, std::unique_ptr<LayerStyleSource>> layerStyleSources = {};
 };
 
