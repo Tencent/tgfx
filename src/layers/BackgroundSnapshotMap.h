@@ -55,15 +55,17 @@ struct BackgroundSnapshotKey {
 
 /**
  * Snapshot entries for one (Layer, LayerStyle) pair. The list grows once per dispatch during the
- * capture pass and is consumed in the same order during the consume pass, with `readCursor`
- * advancing on every successful lookup. Normal 2D paths only ever push and read a single entry,
- * which is equivalent to the previous single-value behaviour. Paths that rasterize the same
- * (layer, style) multiple times — e.g. a BackgroundBlur layer split into multiple fragments by a
- * 3D subtree's BSP — push and consume one entry per dispatch in BSP order.
+ * capture pass and is consumed in the same order during the consume pass. Normal 2D paths only
+ * ever push and read a single entry, which is equivalent to the previous single-value behaviour.
+ * Paths that rasterize the same (layer, style) multiple times — e.g. a BackgroundBlur layer split
+ * into multiple fragments by a 3D subtree's BSP — push one entry per dispatch in BSP order.
+ *
+ * Read cursors live on BackgroundConsumer (per-consumer state), not on this list, so that the
+ * same shared snapshot map can be consumed multiple times — once per tile in tiled rendering, or
+ * twice when partial-cache and on-screen passes share a cache.
  */
 struct BackgroundSnapshotList {
   std::vector<BackgroundSnapshotEntry> entries = {};
-  std::size_t readCursor = 0;
 };
 
 struct BackgroundSnapshotKeyHash {

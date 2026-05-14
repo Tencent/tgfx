@@ -305,13 +305,18 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   std::shared_ptr<Image> bgImage = nullptr;
   Point bgOffset = {};
   if (snapshots != nullptr) {
-    auto it = snapshots->snapshots.find(BackgroundSnapshotKey{layer, style});
-    if (it == snapshots->snapshots.end() || it->second.readCursor >= it->second.entries.size()) {
+    BackgroundSnapshotKey key{layer, style};
+    auto it = snapshots->snapshots.find(key);
+    if (it == snapshots->snapshots.end()) {
       // Surface path: the map is authoritative, so a miss is a capture-side coverage bug.
       // Silently skip rather than masking the bug with on-the-fly synthesis.
       return;
     }
-    auto& entry = it->second.entries[it->second.readCursor++];
+    auto& cursor = readCursors[key];
+    if (cursor >= it->second.entries.size()) {
+      return;
+    }
+    auto& entry = it->second.entries[cursor++];
     bgImage = entry.image;
     bgOffset = entry.offset;
   } else {

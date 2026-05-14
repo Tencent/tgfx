@@ -925,10 +925,12 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     Matrix backgroundMatrix = canvas->getMatrix();
     Rect drawRect = backgroundMatrix.mapRect(rectForDraw);
     if (_root != nullptr) {
-      // Capture replays from _root and accumulates ancestors. viewMatrix = invert(globalMatrix)
-      // folds them into self.local, so bgSurface only needs to cover self.bounds + outset.
-      backgroundMatrix = globalToLocalMatrix.asMatrix();
-      drawRect = rectForDraw;
+      // Capture replays from _root, accumulating ancestor matrices on bgCanvas. To keep bgSurface
+      // sized just for self.bounds + outset, prefix the canvas matrix with invert(globalMatrix)
+      // so the ancestor chain folds into self.local while still respecting any zoom/translate
+      // already on the outer canvas (otherwise blur radius would lose the outer scale).
+      backgroundMatrix.preConcat(globalToLocalMatrix.asMatrix());
+      drawRect = backgroundMatrix.mapRect(rectForDraw);
     }
     if (auto bgSource = createBackgroundSource(context, drawRect, backgroundMatrix,
                                                rectForDraw == bounds, args.dstColorSpace)) {

@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 #include "layers/BackgroundSnapshotMap.h"
 #include "tgfx/core/Matrix.h"
@@ -198,8 +199,7 @@ class BackgroundConsumer : public BackgroundHandler {
   // context). In that case the consumer synthesizes backdrops on the fly via
   // Layer::synthesizeBackgroundImage. When snapshots is non-null (surface path) the map is
   // authoritative — a miss there indicates a capture-side coverage bug, so we silently skip
-  // rather than masking it with synthesis. The pointer is non-const because each successful
-  // lookup advances an internal read cursor (see BackgroundSnapshotList).
+  // rather than masking it with synthesis.
   explicit BackgroundConsumer(BackgroundSnapshotMap* snapshots) : snapshots(snapshots) {
   }
 
@@ -210,6 +210,10 @@ class BackgroundConsumer : public BackgroundHandler {
 
  private:
   BackgroundSnapshotMap* snapshots = nullptr;
+  // Per-consumer read cursors: each (Layer, LayerStyle) entry list is consumed in dispatch order
+  // through this map, so a shared snapshot map can be consumed by multiple consumers (e.g. one
+  // per tile in tiled rendering) without cursors interfering.
+  std::unordered_map<BackgroundSnapshotKey, std::size_t, BackgroundSnapshotKeyHash> readCursors;
 };
 
 }  // namespace tgfx
