@@ -104,13 +104,14 @@ if (TGFX_USE_FREETYPE)
 endif ()
 
 if (TGFX_USE_VULKAN)
-    if (NOT WIN32)
-        message(FATAL_ERROR "TGFX_USE_VULKAN is currently only supported on Windows.")
+    if (NOT WIN32 AND NOT APPLE AND NOT UNIX)
+        message(FATAL_ERROR "TGFX_USE_VULKAN is not supported on this platform.")
     endif ()
     set(TGFX_USE_OPENGL OFF)
     set(TGFX_USE_METAL OFF)
     set(TGFX_USE_QT OFF)
-    set(TGFX_USE_SWIFTSHADER OFF)
+    # Keep TGFX_USE_SWIFTSHADER — in Vulkan mode it only controls ICD file copy,
+    # not EGL/GLES library linking.
     set(TGFX_USE_ANGLE OFF)
 elseif (TGFX_USE_METAL)
     if (NOT APPLE)
@@ -437,15 +438,27 @@ if (TGFX_USE_QT)
         list(APPEND TGFX_SHARED_LIBS ${OpenGL_LIBS})
     endif ()
 elseif (TGFX_USE_SWIFTSHADER)
-    list(APPEND TGFX_INCLUDES vendor/swiftshader/include)
-    # SwiftShader ships prebuilt binaries without a debug variant, so always use the release path.
-    if (WIN32)
-        file(GLOB SWIFTSHADER_LIBS vendor/swiftshader/${PLATFORM}/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})
+    if (TGFX_USE_VULKAN)
+        # Vulkan + SwiftShader: copy Vulkan ICD files to build directory for runtime discovery.
+        # No EGL/GLES libraries are needed — Vulkan uses ICD mechanism via VK_ICD_FILENAMES.
+        file(GLOB VK_SWIFTSHADER_ICD_FILES
+                vendor/swiftshader/${PLATFORM}/${ARCH}/vk_swiftshader*
+                vendor/swiftshader/${PLATFORM}/${ARCH}/libvk_swiftshader*)
+        if (VK_SWIFTSHADER_ICD_FILES)
+            file(COPY ${VK_SWIFTSHADER_ICD_FILES} DESTINATION ${CMAKE_BINARY_DIR})
+        endif ()
     else ()
-        file(GLOB SWIFTSHADER_LIBS vendor/swiftshader/${PLATFORM}/${ARCH}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
+        # OpenGL + SwiftShader: link EGL/GLES libraries as before.
+        list(APPEND TGFX_INCLUDES vendor/swiftshader/include)
+        # SwiftShader ships prebuilt binaries without a debug variant, so always use the release path.
+        if (WIN32)
+            file(GLOB SWIFTSHADER_LIBS vendor/swiftshader/${PLATFORM}/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})
+        else ()
+            file(GLOB SWIFTSHADER_LIBS vendor/swiftshader/${PLATFORM}/${ARCH}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
+        endif ()
+        list(APPEND TGFX_SHARED_LIBS ${SWIFTSHADER_LIBS})
+        list(APPEND TGFX_FILES ${EGL_PLATFORM_FILES})
     endif ()
-    list(APPEND TGFX_SHARED_LIBS ${SWIFTSHADER_LIBS})
-    list(APPEND TGFX_FILES ${EGL_PLATFORM_FILES})
 elseif (TGFX_USE_ANGLE)
     file(GLOB ANGLE_LIBS vendor/angle/${PLATFORM}/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})
     list(APPEND TGFX_STATIC_LIBS ${ANGLE_LIBS})

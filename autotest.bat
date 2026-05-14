@@ -49,6 +49,7 @@ cd build
 :: Configure CMake with Ninja
 set "USE_SWIFTSHADER_FLAG="
 if "%1"=="USE_SWIFTSHADER" set "USE_SWIFTSHADER_FLAG=-DTGFX_USE_SWIFTSHADER=ON"
+if "%1"=="USE_VULKAN_SWIFTSHADER" set "USE_SWIFTSHADER_FLAG=-DTGFX_USE_VULKAN=ON -DTGFX_USE_SWIFTSHADER=ON"
 cmake -G Ninja %USE_SWIFTSHADER_FLAG% -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release ..
 if %errorlevel% equ 0 (
     echo ~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~
@@ -69,6 +70,11 @@ if %errorlevel% equ 0 (
 :: Copy SwiftShader DLLs to build directory if needed
 if "%1"=="USE_SWIFTSHADER" (
     copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\*.dll" "%WORKSPACE%\build\" >nul 2>&1
+)
+if "%1"=="USE_VULKAN_SWIFTSHADER" (
+    copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\vk_swiftshader*" "%WORKSPACE%\build\" >nul 2>&1
+    set "VK_ICD_FILENAMES=%WORKSPACE%\vendor\swiftshader\win\x64\vk_swiftshader_icd.json"
+    set "VK_DRIVER_FILES=%VK_ICD_FILENAMES%"
 )
 
 :: Run tests
