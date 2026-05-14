@@ -39,6 +39,16 @@
 
 namespace tgfx {
 
+static bool HasInstanceExtension(const std::vector<VkExtensionProperties>& available,
+                                 const char* name) {
+  for (auto& ext : available) {
+    if (strcmp(ext.extensionName, name) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 #ifdef DEBUG
 // Validation layer callback that routes Vulkan errors and warnings to the tgfx logging system.
 // Registered only in Debug builds when VK_LAYER_KHRONOS_validation is available.
@@ -171,15 +181,30 @@ bool VulkanGPU::createInstance() {
   appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
   appInfo.apiVersion = VK_API_VERSION_1_0;
 
+  // Always required.
   std::vector<const char*> instanceExtensions = {
-      VK_KHR_SURFACE_EXTENSION_NAME,
-#ifdef _WIN32
-      VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-#elif defined(__ANDROID__)
-      VK_KHR_ANDROID_SURFACE_EXTENSION_NAME,
-#endif
       VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
   };
+
+  // Surface extensions are optional — headless environments (e.g. SwiftShader CI)
+  // may not provide them. Enumerate available extensions first, then enable if present.
+  uint32_t availExtCount = 0;
+  vkEnumerateInstanceExtensionProperties(nullptr, &availExtCount, nullptr);
+  std::vector<VkExtensionProperties> availableExts(availExtCount);
+  vkEnumerateInstanceExtensionProperties(nullptr, &availExtCount, availableExts.data());
+
+  if (HasInstanceExtension(availableExts, VK_KHR_SURFACE_EXTENSION_NAME)) {
+    instanceExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+#ifdef _WIN32
+    if (HasInstanceExtension(availableExts, VK_KHR_WIN32_SURFACE_EXTENSION_NAME)) {
+      instanceExtensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+    }
+#elif defined(__ANDROID__)
+    if (HasInstanceExtension(availableExts, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME)) {
+      instanceExtensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
+    }
+#endif
+  }
 
   // In Debug builds, enable VK_LAYER_KHRONOS_validation and VK_EXT_debug_utils if available.
   // This catches spec violations (e.g. missing barriers, layout mismatches) during development.
@@ -197,16 +222,9 @@ bool VulkanGPU::createInstance() {
     }
   }
 
-  uint32_t extCount = 0;
-  vkEnumerateInstanceExtensionProperties(nullptr, &extCount, nullptr);
-  std::vector<VkExtensionProperties> availableExts(extCount);
-  vkEnumerateInstanceExtensionProperties(nullptr, &extCount, availableExts.data());
-  for (auto& ext : availableExts) {
-    if (strcmp(ext.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0) {
-      instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-      debugUtilsEnabled = true;
-      break;
-    }
+  if (HasInstanceExtension(availableExts, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
+    instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    debugUtilsEnabled = true;
   }
 #endif
 
