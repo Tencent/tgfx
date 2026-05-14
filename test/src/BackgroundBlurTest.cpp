@@ -1031,6 +1031,73 @@ TGFX_TEST(BackgroundBlurTest, BackgroundBlur3DLayer) {
   surface->getCanvas()->clear();
   layerC->draw(surface->getCanvas());
   EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/BackgroundBlur3DLayer_DirectDraw"));
+
+  // Case 5: layerC carries a BlurFilter (forces drawOffscreen) on top of its BackgroundBlur
+  // style, so the BackgroundBlur dispatches happen inside a nested offscreen sub-canvas. With
+  // fragment-as-offscreen plumbing (Compositor3DBackgroundSource as parent + sub source on the
+  // leaf surface), nested offscreens take the standard BackgroundCapturer::createSubHandler
+  // path and resolve their backdrops through it, with no 3D-specific code.
+  layerD->setAlpha(0.6f);
+  layerB1->setLayerStyles({});
+  layerB1->setPreserve3D(true);
+  layerC->setFilters({BlurFilter::Make(2, 2)});
+  displayList->render(surface.get());
+  EXPECT_TRUE(
+      Baseline::Compare(surface, "BackgroundBlurTest/BackgroundBlur3DLayer_NestedOffscreen"));
+
+  // Case 6: nested 3D rendering context inside a non-preserve3D leaf. layerC is a leaf in the
+  // outer 3D context (BackgroundBlur style breaks canPreserve3D). When layerC rasterizes, its
+  // child layerE has preserve3D=true and starts a fresh inner 3D context whose own leaf layerF
+  // dispatches another BackgroundBlur. Verifies that fragment-as-offscreen plumbing nests
+  // recursively (each layer of 3D installs its own Compositor3DBackgroundSource).
+  // Note: when BSP splits a BackgroundBlur layer's polygon into multiple fragments, each
+  // fragment captures its own backdrop entry within its sub-rect, so adjacent fragments may
+  // show a faint seam along the split line. This is an inherent BSP-vs-blur trade-off.
+  layerC->setFilters({});
+  layerC->removeChildren();
+
+  auto layerE = Layer::Make();
+  layerE->setName("layerE");
+  layerE->setPreserve3D(true);
+  {
+    auto size = Size::Make(80, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, 20);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(40, 40, 0);
+    layerE->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  layerC->addChild(layerE);
+
+  auto layerF = SolidLayer::Make();
+  layerF->setName("layerF");
+  layerF->setColor(Color::Blue());
+  layerF->setAlpha(0.6f);
+  layerF->setWidth(60);
+  layerF->setHeight(60);
+  {
+    auto size = Size::Make(60, 60);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({1, 0, 0}, 15);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(10, 10, 0);
+    layerF->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  layerF->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
+  layerE->addChild(layerF);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/BackgroundBlur3DLayer_Nested3D"));
 }
 
 }  // namespace tgfx

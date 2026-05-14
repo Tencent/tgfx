@@ -21,6 +21,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/BackgroundHandler.h"
+#include "layers/BackgroundSource.h"
 #include "layers/DrawArgs.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
@@ -30,6 +31,35 @@
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
+
+namespace {
+
+// BackgroundSource implementation that delegates onGetOwnContents to a Context3DCompositor's
+// current target snapshot. Used as the parent source for every fragment's leaf bgSource so
+// in-fragment BackgroundBlur dispatches see the BSP-accumulated compositor state plus the
+// outer-canvas content that was primed at the start of finishAndDrawTo.
+class Compositor3DBackgroundSource : public BackgroundSource {
+ public:
+  Compositor3DBackgroundSource(Context3DCompositor* compositor, const Matrix& imageMatrix,
+                               const Rect& backgroundRect, std::shared_ptr<ColorSpace> colorSpace)
+      : BackgroundSource(imageMatrix, backgroundRect, /*surfaceScale=*/1.0f, std::move(colorSpace)),
+        _compositor(compositor) {
+  }
+
+  Canvas* getCanvas() override {
+    return nullptr;
+  }
+
+ protected:
+  std::shared_ptr<Image> onGetOwnContents() override {
+    return _compositor != nullptr ? _compositor->snapshotTarget() : nullptr;
+  }
+
+ private:
+  Context3DCompositor* _compositor = nullptr;
+};
+
+}  // namespace
 
 Render3DContext::Render3DContext(std::shared_ptr<Context3DCompositor> compositor,
                                  const Rect& renderRect, float contentScale,
@@ -101,29 +131,45 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
   const auto& fragments = _compositor->prepareTraversal();
 
   // BackgroundBlur dispatches inside the subtree see two layers of backdrop: outer-canvas content
-  // (primed once before the BSP loop) and intra-subtree fragments accumulated as the loop runs.
+  // (primed once before the BSP loop into the compositor target) and intra-subtree fragments
+  // accumulated as the loop runs. Both contribute via the parent-source path below.
   if (_subtreeNeedsBackdrop) {
     primeCompositorFromOuterCanvas(canvas);
   }
 
-  // Capture-pass: install a Compositor3DCapturer so each in-subtree dispatch writes one entry
-  // into the shared snapshot list. Consume-pass keeps the outer consumer; both walk the list in
-  // dispatch order via a cursor, so capture and consume stay in lock-step.
-  std::unique_ptr<Compositor3DCapturer> compositorCapturer;
+  // Each fragment raster is conceptually a sub-offscreen of an outer Background-aware draw, so we
+  // hand its dispatches the same machinery 2D offscreens use: a borrowed sub BackgroundSource
+  // backed by the leaf surface, parented to a source that returns the live compositor target
+  // snapshot (== outer prime + earlier BSP fragments). dispatch then runs through the standard
+  // BackgroundCapturer code path; nested offscreens nested further down derive sub-sub sources
+  // through BackgroundCapturer::createSubHandler with no 3D-specific code at all.
+  std::shared_ptr<BackgroundSource> compositorSource;
+  BackgroundSnapshotMap* outerSnapshots = nullptr;
   bool capturePass = args.backgroundHandler != nullptr && args.backgroundHandler->isCapturer();
   if (_subtreeNeedsBackdrop && capturePass) {
     auto* outerCapturer = static_cast<BackgroundCapturer*>(args.backgroundHandler);
-    compositorCapturer = std::make_unique<Compositor3DCapturer>(
-        outerCapturer->snapshotMap(), _compositor.get(), _renderRect, _contentScale, _colorSpace);
+    outerSnapshots = outerCapturer->snapshotMap();
+    Matrix compositorImageMatrix = Matrix::MakeScale(1.0f / _contentScale, 1.0f / _contentScale);
+    compositorImageMatrix.preTranslate(_renderRect.left, _renderRect.top);
+    Rect compositorRect =
+        compositorImageMatrix.mapRect(Rect::MakeWH(_renderRect.width(), _renderRect.height()));
+    compositorSource = std::make_shared<Compositor3DBackgroundSource>(
+        _compositor.get(), compositorImageMatrix, compositorRect, _colorSpace);
   }
 
   std::unordered_map<Layer*, std::shared_ptr<Image>> layerImages;
   layerImages.reserve(_pendingNodes.size());
+  // Pre-compute each pending layer's local→world matrix in this context's world space (== outer
+  // canvas-local for the top 3D context; == enclosing leaf's local for a nested 3D context).
+  // This is exactly node.transform (collected during addLayer/collectNodes); the polygon's matrix
+  // has been remapped into compositor pixel space and is the wrong basis for the bgSource.
+  std::unordered_map<Layer*, Matrix> layerLocalToWorld;
+  layerLocalToWorld.reserve(_pendingNodes.size());
+  for (const auto& node : _pendingNodes) {
+    layerLocalToWorld.emplace(node.layer, node.transform.asMatrix());
+  }
   DrawArgs leafArgs = args;
   leafArgs.opaqueContext = nullptr;
-  if (compositorCapturer) {
-    leafArgs.backgroundHandler = compositorCapturer.get();
-  }
 
   for (auto* fragment : fragments) {
     auto* layer = fragment->layer();
@@ -132,13 +178,17 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
     // pass expects. Plain layers keep the shared cache for cheap re-use across split fragments.
     bool perFragmentRaster = layer->hasBackgroundStyle();
     float rasterAlpha = fragment->rasterAlpha();
+    auto worldIt = layerLocalToWorld.find(layer);
+    Matrix localToWorld = worldIt != layerLocalToWorld.end() ? worldIt->second : Matrix::I();
     std::shared_ptr<Image> image;
     if (perFragmentRaster) {
-      image = rasterLayer(layer, fragment->localBounds(), rasterAlpha, leafArgs);
+      image = rasterLayer(layer, fragment->localBounds(), rasterAlpha, leafArgs, compositorSource,
+                          outerSnapshots, localToWorld);
     } else {
       auto cacheIt = layerImages.find(layer);
       if (cacheIt == layerImages.end()) {
-        image = rasterLayer(layer, fragment->localBounds(), rasterAlpha, leafArgs);
+        image = rasterLayer(layer, fragment->localBounds(), rasterAlpha, leafArgs, compositorSource,
+                            outerSnapshots, localToWorld);
         layerImages.emplace(layer, image);
       } else {
         image = cacheIt->second;
@@ -162,8 +212,10 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
   canvas->drawImage(contextImage);
 }
 
-std::shared_ptr<Image> Render3DContext::rasterLayer(Layer* layer, const Rect& localBounds,
-                                                    float alpha, DrawArgs& leafArgs) {
+std::shared_ptr<Image> Render3DContext::rasterLayer(
+    Layer* layer, const Rect& localBounds, float alpha, DrawArgs& leafArgs,
+    const std::shared_ptr<BackgroundSource>& compositorSource, BackgroundSnapshotMap* snapshots,
+    const Matrix& localToWorld) {
   auto scaledBounds = localBounds;
   scaledBounds.scale(_contentScale, _contentScale);
   scaledBounds.roundOut();
@@ -180,6 +232,22 @@ std::shared_ptr<Image> Render3DContext::rasterLayer(Layer* layer, const Rect& lo
   auto density = Matrix::MakeScale(_contentScale, _contentScale);
   density.postTranslate(-localBounds.left * _contentScale, -localBounds.top * _contentScale);
   leafCanvas->setMatrix(density);
+
+  // Bind a fresh BackgroundCapturer to a leaf-backed sub source for this fragment when the
+  // outer pass is capturing. The sub source treats the leaf as own contents and the compositor
+  // target snapshot as its parent — dispatch & nested offscreen handlers then run the standard
+  // BackgroundCapturer pipeline with no 3D-specific code paths.
+  std::unique_ptr<BackgroundCapturer> leafCapturer;
+  std::shared_ptr<BackgroundSource> leafSource;
+  if (compositorSource != nullptr && snapshots != nullptr) {
+    auto worldBounds = localToWorld.mapRect(localBounds);
+    leafSource =
+        compositorSource->createFromSurface(surface.get(), worldBounds, localToWorld, density);
+    if (leafSource != nullptr) {
+      leafCapturer = std::make_unique<BackgroundCapturer>(snapshots, leafSource);
+      leafArgs.backgroundHandler = leafCapturer.get();
+    }
+  }
 
   // render3DContext signals Layer::drawChildren that we're rasterizing inside a 3D context, so
   // preserve3D middle nodes are not recursed into (they're already registered as polygons).

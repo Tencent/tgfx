@@ -28,7 +28,6 @@ namespace tgfx {
 
 class BackgroundSource;
 class Canvas;
-class Context3DCompositor;
 class DrawArgs;
 class Layer;
 class LayerStyle;
@@ -211,41 +210,6 @@ class BackgroundConsumer : public BackgroundHandler {
 
  private:
   BackgroundSnapshotMap* snapshots = nullptr;
-};
-
-/**
- * Capture-pass handler installed on every leaf raster inside a 3D subtree's finishAndDrawTo. It
- * captures BackgroundBlur dispatches by sampling two GPU surfaces on the spot:
- *  - The 3D compositor's render target (already primed with the outer canvas's pre-3D contents
- *    and accumulating BSP fragments in back-to-front order).
- *  - The active leaf raster surface (whatever the layer's parent has already drawn into the leaf
- *    before this dispatch fires — content-below, layer styles, prior siblings).
- * The two are projected back into the dispatching layer's local space and SrcOver-composed in
- * that order, then written into the shared BackgroundSnapshotMap under (Layer, LayerStyle). The
- * consume pass walks the same BSP and reads entries back via BackgroundConsumer's normal path.
- */
-class Compositor3DCapturer : public BackgroundHandler {
- public:
-  Compositor3DCapturer(BackgroundSnapshotMap* snapshots, Context3DCompositor* compositor,
-                       const Rect& renderRect, float contentScale,
-                       std::shared_ptr<ColorSpace> colorSpace)
-      : snapshots(snapshots), compositor(compositor), renderRect(renderRect),
-        contentScale(contentScale), colorSpace(std::move(colorSpace)) {
-  }
-
-  void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
-                           LayerStyle* style, const LayerStyleSource* source) override;
-
-  bool isCapturer() const override {
-    return true;
-  }
-
- private:
-  BackgroundSnapshotMap* snapshots = nullptr;
-  Context3DCompositor* compositor = nullptr;
-  Rect renderRect = {};
-  float contentScale = 1.0f;
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 };
 
 }  // namespace tgfx

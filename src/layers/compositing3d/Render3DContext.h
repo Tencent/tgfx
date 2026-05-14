@@ -26,6 +26,8 @@
 
 namespace tgfx {
 
+struct BackgroundSnapshotMap;
+class BackgroundSource;
 class Context3DCompositor;
 class DrawArgs;
 
@@ -58,8 +60,16 @@ class Render3DContext : public Layer3DContext {
   };
 
   void collectNodes(Layer* layer, const Matrix3D& transform, float alpha, int depth);
+  // Rasters the layer onto a fresh leaf surface and returns the snapshot. When `compositorSource`
+  // is non-null, builds a sub BackgroundSource on the leaf surface (parented to compositorSource)
+  // and installs a fresh BackgroundCapturer on `leafArgs.backgroundHandler` so in-fragment
+  // dispatches and any nested offscreen handlers walk the standard BackgroundCapturer pipeline.
+  // `localToWorld` is the layer's matrix in this context's world space (== outer canvas-local at
+  // the top level; == enclosing leaf's local for nested 3D contexts).
   std::shared_ptr<Image> rasterLayer(Layer* layer, const Rect& localBounds, float alpha,
-                                     DrawArgs& leafArgs);
+                                     DrawArgs& leafArgs,
+                                     const std::shared_ptr<BackgroundSource>& compositorSource,
+                                     BackgroundSnapshotMap* snapshots, const Matrix& localToWorld);
   // Snapshot the outer canvas and prime the compositor target with it so in-subtree
   // BackgroundBlur dispatches can sample "outside the 3D subtree" content as part of their
   // backdrop. Silently no-ops when the outer canvas has no surface or the snapshot can't be
