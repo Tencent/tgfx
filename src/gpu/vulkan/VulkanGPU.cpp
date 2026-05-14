@@ -188,9 +188,20 @@ bool VulkanGPU::createInstance() {
   // VK_KHR_get_physical_device_properties2 is core in Vulkan 1.1+, so 1.1 ICDs may not list it
   // as an extension; request it only when advertised.
   uint32_t availExtCount = 0;
-  vkEnumerateInstanceExtensionProperties(nullptr, &availExtCount, nullptr);
+  auto enumResult = vkEnumerateInstanceExtensionProperties(nullptr, &availExtCount, nullptr);
+  if (enumResult != VK_SUCCESS && enumResult != VK_INCOMPLETE) {
+    LOGE("VulkanGPU::createInstance() vkEnumerateInstanceExtensionProperties failed: %s",
+         VkResultToString(enumResult));
+    return false;
+  }
   std::vector<VkExtensionProperties> availableExts(availExtCount);
-  vkEnumerateInstanceExtensionProperties(nullptr, &availExtCount, availableExts.data());
+  enumResult =
+      vkEnumerateInstanceExtensionProperties(nullptr, &availExtCount, availableExts.data());
+  if (enumResult != VK_SUCCESS && enumResult != VK_INCOMPLETE) {
+    LOGE("VulkanGPU::createInstance() vkEnumerateInstanceExtensionProperties failed: %s",
+         VkResultToString(enumResult));
+    return false;
+  }
 
   if (HasInstanceExtension(availableExts, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)) {
     instanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);

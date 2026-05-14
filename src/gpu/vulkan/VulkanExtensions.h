@@ -61,15 +61,12 @@ struct VulkanExtensions {
     for (const auto& ext : available) {
       if (strcmp(ext.extensionName, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
         hasTimeline = true;
-      }
-      if (strcmp(ext.extensionName, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) == 0) {
+      } else if (strcmp(ext.extensionName, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) == 0) {
         hasDynState = true;
-      }
-      if (strcmp(ext.extensionName, "VK_EXT_rasterization_order_attachment_access") == 0 ||
-          strcmp(ext.extensionName, "VK_ARM_rasterization_order_attachment_access") == 0) {
+      } else if (strcmp(ext.extensionName, "VK_EXT_rasterization_order_attachment_access") == 0 ||
+                 strcmp(ext.extensionName, "VK_ARM_rasterization_order_attachment_access") == 0) {
         hasROAA = true;
-      }
-      if (strcmp(ext.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
+      } else if (strcmp(ext.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
         hasSwapchain = true;
       }
     }

@@ -188,14 +188,9 @@ jobs:
             test/baseline/.cache
           key: third-party-autotest-win-vk-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 
-      - name: Job Failed
-        if: ${{ failure() }}
+      - name: Upload Result
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
-        with:
-          name: win_vulkan_result
-          path: result
-
-      - uses: actions/upload-artifact@v4
         with:
           name: win_vulkan_result
           path: result
