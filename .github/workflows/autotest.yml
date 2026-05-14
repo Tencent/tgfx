@@ -176,6 +176,14 @@ jobs:
       - name: Install Vulkan SDK
         uses: NcStudios/VulkanCI@v1.2
 
+      - name: Verify Vulkan Setup
+        shell: bash
+        run: |
+          echo "VULKAN_SDK=$VULKAN_SDK"
+          find "$VULKAN_SDK" -name "vulkan-1.dll" 2>/dev/null || echo "vulkan-1.dll not found in SDK"
+          echo "VK_ICD_FILENAMES=$VK_ICD_FILENAMES"
+          ls -la vendor/swiftshader/win/x64/ || true
+
       - name: Run Autotest
         run: autotest.bat USE_VULKAN_SWIFTSHADER
         shell: cmd
