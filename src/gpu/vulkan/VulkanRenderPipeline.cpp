@@ -159,7 +159,11 @@ VulkanRenderPipeline::VulkanRenderPipeline(VulkanGPU* gpu,
   // draw calls requesting strip topology can bind the correct pipeline instead of falling back
   // to an incorrect TriangleList interpretation.
   if (!gpu->extensions().extendedDynamicState) {
-    createPipeline(gpu, descriptor, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, &stripPipeline);
+    if (!createPipeline(gpu, descriptor, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, &stripPipeline)) {
+      vkDestroyPipeline(gpu->device(), pipeline, nullptr);
+      pipeline = VK_NULL_HANDLE;
+      return;
+    }
   }
 
   unsigned textureUnit = 0;
