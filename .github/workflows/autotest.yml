@@ -178,6 +178,8 @@ jobs:
         shell: cmd
         env:
           TRACY_NO_INVARIANT_CHECK: 1
+          VK_ICD_FILENAMES: ${{ github.workspace }}\vendor\swiftshader\win\x64\vk_swiftshader_icd.json
+          VK_DRIVER_FILES: ${{ github.workspace }}\vendor\swiftshader\win\x64\vk_swiftshader_icd.json
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
