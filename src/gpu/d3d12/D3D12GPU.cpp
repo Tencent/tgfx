@@ -25,6 +25,7 @@
 #include "D3D12Resource.h"
 #include "D3D12Sampler.h"
 #include "D3D12Semaphore.h"
+#include "D3D12ShaderModule.h"
 #include "D3D12Texture.h"
 #include "core/utils/Log.h"
 
@@ -208,9 +209,9 @@ uint32_t D3D12GPU::MakeSamplerKey(const SamplerDescriptor& descriptor) {
   return key;
 }
 
-std::shared_ptr<ShaderModule> D3D12GPU::createShaderModule(const ShaderModuleDescriptor&) {
-  // Will be implemented in sub-task 4 (D3D12ShaderModule).
-  return nullptr;
+std::shared_ptr<ShaderModule> D3D12GPU::createShaderModule(
+    const ShaderModuleDescriptor& descriptor) {
+  return D3D12ShaderModule::Make(this, descriptor);
 }
 
 std::shared_ptr<RenderPipeline> D3D12GPU::createRenderPipeline(const RenderPipelineDescriptor&) {
