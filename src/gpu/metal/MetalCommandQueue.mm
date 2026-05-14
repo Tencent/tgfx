@@ -31,6 +31,9 @@ MetalCommandQueue::MetalCommandQueue(MetalGPU* metalGPU) : gpu(metalGPU) {
 }
 
 MetalCommandQueue::~MetalCommandQueue() {
+  // Wait for the last submitted command buffer to complete before releasing, ensuring all
+  // async completion handlers (which capture `this`) have fired before the object is destroyed.
+  [lastSubmittedCommandBuffer waitUntilCompleted];
   [lastSubmittedCommandBuffer release];
   [commandQueue release];
 }
@@ -50,6 +53,17 @@ void MetalCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
                         value:value];
         pendingSignalSemaphore = nullptr;
       }
+
+      // Present all pending drawables after the command buffer's GPU work completes.
+      for (auto& drawable : pendingDrawables) {
+        [metalCommandBuffer->metalCommandBuffer() presentDrawable:drawable];
+      }
+      pendingDrawables.clear();
+
+      auto frameTicks = _frameTime.time_since_epoch().count();
+      [metalCommandBuffer->metalCommandBuffer() addCompletedHandler:^(id<MTLCommandBuffer>) {
+        _completedFrameTime.store(frameTicks, std::memory_order_release);
+      }];
 
       [metalCommandBuffer->metalCommandBuffer() commit];
 
@@ -177,6 +191,10 @@ void MetalCommandQueue::encodePendingWait(id<MTLCommandBuffer> commandBuffer) {
   [commandBuffer encodeWaitForEvent:pendingWaitSemaphore->metalEvent()
                               value:pendingWaitSemaphore->signalValue()];
   pendingWaitSemaphore = nullptr;
+}
+
+void MetalCommandQueue::schedulePresent(id<CAMetalDrawable> drawable) {
+  pendingDrawables.push_back(drawable);
 }
 
 void MetalCommandQueue::waitUntilCompleted() {

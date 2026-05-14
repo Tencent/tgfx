@@ -448,7 +448,7 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
   CHECK_PIXELS(RGB565Info, pixels, "JpegCodec_Encode_RGB565");
 }
 
-TGFX_TEST(ReadPixelsTest, NativeCodec) {
+TGFX_TEST_PRIVATE(ReadPixelsTest, NativeCodec){TGFX_PRIVATE_ACCESS({
   auto rgbaCodec = MakeNativeCodec("resources/apitest/imageReplacement.png");
   auto colorSpace = rgbaCodec->colorSpace();
   ASSERT_TRUE(rgbaCodec != nullptr);
@@ -483,7 +483,7 @@ TGFX_TEST(ReadPixelsTest, NativeCodec) {
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "NativeCodec_Encode_Alpha8");
-}
+})}
 
 TGFX_TEST(ReadPixelsTest, ReadScaleCodec) {
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");

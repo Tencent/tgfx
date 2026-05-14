@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <array>
 #include <list>
 #include <optional>
 #include <unordered_map>
@@ -122,6 +121,7 @@ class GlobalCache {
     std::vector<std::shared_ptr<GPUBuffer>> gpuBuffers = {};
     size_t bufferIndex = 0;
     size_t cursor = 0;
+    std::chrono::steady_clock::time_point frameTime = {};
   };
 
   std::shared_ptr<GPUBufferProxy> getMiterStrokeIndexBuffer(bool antialias);
@@ -148,11 +148,9 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> hairlineQuadIndexBuffer = nullptr;
 
   ResourceKeyMap<std::shared_ptr<Resource>> staticResources = {};
-  // Triple buffering for uniform buffer management
-  static constexpr uint32_t UNIFORM_BUFFER_COUNT = 3;
-  std::array<UniformBufferPacket, UNIFORM_BUFFER_COUNT> tripleUniformBuffer = {};
-  uint32_t tripleUniformBufferIndex = 0;
-  uint64_t counter = 0;
+  static constexpr size_t INITIAL_UNIFORM_PACKET_COUNT = 1;
+  std::vector<UniformBufferPacket> uniformBufferPool = {};
+  UniformBufferPacket* activePacket = nullptr;
   SlidingWindowTracker maxUniformBufferTracker = {10};
 };
 }  // namespace tgfx

@@ -101,9 +101,15 @@ class ResourceCache {
   bool purgeUntilMemoryTo(size_t bytesLimit);
 
   /**
-   * Advances the frame counter and purges resources that have expired or exceed the cache limit.
+   * Synchronizes the cache's current frame time with the command queue's frame time.
+   * Must be called after CommandQueue::advanceFrameTime() and before encode().
    */
-  void advanceFrameAndPurge();
+  void syncFrameTime();
+
+  /**
+   * Records the current frame and purges resources that have expired or exceed the cache limit.
+   */
+  void recordFrameAndPurge();
 
   /**
    * Returns a scratch resource in the cache by the specified ScratchKey.

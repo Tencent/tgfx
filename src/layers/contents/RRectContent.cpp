@@ -31,7 +31,7 @@ Rect RRectContent::getTightBounds(const Matrix& matrix) const {
     strokedPath.transform(matrix);
     return strokedPath.getBounds();
   }
-  return matrix.mapRect(rRect.rect);
+  return matrix.mapRect(rRect.rect());
 }
 
 bool RRectContent::hitTestPoint(float localX, float localY) const {
@@ -42,7 +42,7 @@ bool RRectContent::hitTestPoint(float localX, float localY) const {
 }
 
 Rect RRectContent::onGetBounds() const {
-  return rRect.rect;
+  return rRect.rect();
 }
 
 void RRectContent::onDraw(Canvas* canvas, const Paint& paint) const {
@@ -51,7 +51,7 @@ void RRectContent::onDraw(Canvas* canvas, const Paint& paint) const {
 
 bool RRectContent::onHasSameGeometry(const GeometryContent* other) const {
   auto otherRRect = static_cast<const RRectContent*>(other)->rRect;
-  return rRect.rect == otherRRect.rect && rRect.radii == otherRRect.radii;
+  return rRect.rect() == otherRRect.rect() && rRect.radii() == otherRRect.radii();
 }
 
 Path RRectContent::getFilledPath() const {

@@ -43,51 +43,43 @@ class FillPainter : public Painter {
     return std::make_unique<FillPainter>(*this);
   }
 
-  void draw(LayerRecorder* recorder) override {
-    for (auto* geometry : geometries) {
-      if (geometry->hasText()) {
-        for (const auto& run : geometry->getGlyphRuns()) {
-          auto runMatrix = run.matrix;
-          runMatrix.postConcat(geometry->matrix);
-          drawGlyphRun(recorder, runMatrix, run);
-        }
-        continue;
-      }
-
-      auto shape = geometry->getShape();
-      if (shape == nullptr) {
-        continue;
-      }
-      if (shape->fillType() == PathFillType::Winding) {
-        shape = Shape::ApplyFillType(shape, fillRule);
-      }
-      shape = Shape::ApplyMatrix(shape, geometry->matrix);
-      LayerPaint paint(shader, alpha, blendMode);
-      paint.placement = placement;
-      recorder->addShape(std::move(shape), paint);
+ protected:
+  std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t /*index*/,
+                                      LayerPaint* paint) override {
+    if (innerShape->fillType() == PathFillType::Winding) {
+      innerShape = Shape::ApplyFillType(innerShape, fillRule);
     }
+    // Use the resolved path bounds so the fit region matches the actual fill footprint rather than the conservative cover.
+    paint->shader = wrapShaderWithFit(innerShape->getPath().getBounds());
+    return innerShape;
   }
 
- private:
-  void drawGlyphRun(LayerRecorder* recorder, const Matrix& geometryMatrix,
-                    const StyledGlyphRun& run) {
-    float blendFactor = run.style.fillColor.alpha;
-    recorder->setMatrix(geometryMatrix);
-    if (blendFactor < 1.0f) {
-      LayerPaint paint(shader, alpha * run.style.alpha, blendMode);
-      paint.placement = placement;
-      recorder->addTextBlob(run.textBlob, paint);
+  GlyphRunEmit prepareGlyphRun(const StyledGlyphRun& run, size_t /*index*/) override {
+    GlyphRunEmit emit = {};
+    if (run.textBlob == nullptr) {
+      return emit;
     }
-
+    emit.textBlob = run.textBlob;
+    // Tight bounds keep the fit region in step with the visible glyph extents instead of the conservative blob cover.
+    auto baseShader = wrapShaderWithFit(run.textBlob->getTightBounds());
+    float blendFactor = run.style.fillColor.alpha;
+    float runAlpha = alpha * run.style.alpha;
+    if (blendFactor < 1.0f) {
+      auto paint = makeBasePaint();
+      paint.color.alpha = runAlpha;
+      paint.shader = baseShader;
+      emit.paints.push_back(std::move(paint));
+    }
     if (blendFactor > 0.0f) {
       const auto& fillColor = run.style.fillColor;
       auto overlayColor = Color{fillColor.red, fillColor.green, fillColor.blue, blendFactor};
-      auto colorShader = Shader::MakeColorShader(overlayColor);
-      LayerPaint paint(colorShader, alpha * run.style.alpha, BlendMode::SrcOver);
-      paint.placement = placement;
-      recorder->addTextBlob(run.textBlob, paint);
+      auto paint = makeBasePaint();
+      paint.blendMode = BlendMode::SrcOver;
+      paint.shader = Shader::MakeColorShader(overlayColor);
+      paint.color.alpha = runAlpha;
+      emit.paints.push_back(std::move(paint));
     }
-    recorder->resetMatrix();
+    return emit;
   }
 };
 
@@ -156,14 +148,12 @@ void FillStyle::apply(VectorContext* context) {
 
   auto painter = std::make_unique<FillPainter>();
   painter->shader = std::move(shader);
+  painter->colorSource = _colorSource;
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
-  painter->fillRule = ToPathFillType(_fillRule);
   painter->placement = _placement;
-  painter->geometries.reserve(context->geometries.size());
-  for (auto& geometry : context->geometries) {
-    painter->geometries.push_back(geometry.get());
-  }
+  painter->fillRule = ToPathFillType(_fillRule);
+  painter->captureGeometries(context);
   context->painters.push_back(std::move(painter));
 }
 

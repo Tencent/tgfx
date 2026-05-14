@@ -2,14 +2,17 @@
 process.chdir(__dirname);
 
 const childProcess = require("child_process");
-childProcess.execSync("depsync");
+childProcess.execSync("depsync", {stdio: "inherit"});
 
-process.argv.push("../");
-process.argv.push("-w");
-process.argv.push("-DTGFX_BUILD_HELLO2D=ON")
-let args = process.argv.slice(2);
-if (args.indexOf("-p") === -1 && args.indexOf("--platform") === -1) {
-    process.argv.push("-p");
-    process.argv.push("mac");
-}
-require("../third_party/vendor_tools/xcode-gen");
+const xcodeGen = require("path").resolve(__dirname, "../third_party/vendor_tools/xcode-gen");
+const extraArgs = process.argv.slice(2).join(" ");
+
+childProcess.execSync(
+    `node "${xcodeGen}" ../ -w -DTGFX_BUILD_HELLO2D=ON -DTGFX_USE_METAL=ON -p mac -o metal ${extraArgs}`,
+    {stdio: "inherit"}
+);
+
+childProcess.execSync(
+    `node "${xcodeGen}" ../ -w -DTGFX_BUILD_HELLO2D=ON -p mac -o opengl ${extraArgs}`,
+    {stdio: "inherit"}
+);

@@ -42,12 +42,14 @@ Scope → Review → Filter → Fix/Validate → Confirm → Report
 Determine the diff to review based on `$ARGUMENTS`:
 
 - **Empty arguments**: find the base branch by checking common base branches
-  in order: `main`, `master`. Use the first one that exists. Fetch the branch
-  diff:
+  in order: `main`, `master`. Use the first one that exists. Fetch the full diff
+  from merge-base to the working tree (committed + uncommitted changes):
   ```
   git merge-base origin/{base_branch} HEAD
   git diff <merge-base-sha>
   ```
+  Also check for untracked files with `git status --porcelain` (`??` lines)
+  and read their contents for review.
 - **Commit hash** (e.g., `abc123`): validate with `git rev-parse --verify`,
   then `git show`.
 - **Commit range** (e.g., `abc123..def456` or `abc123...def456`): validate both
@@ -175,6 +177,11 @@ For each issue you receive:
    context that makes this a non-issue (e.g., invariants guaranteed by callers, platform
    constraints, intentional design)? Does the code actually behave as the reviewer
    claims? Look for the strongest counter-argument you can find.
+   - For cross-module "inconsistency" claims: read the type definitions at both
+     locations — different libraries may use different conventions (coordinate systems,
+     sign conventions) that make surface-level differences correct. REJECT if the
+     reviewer's evidence is limited to "these two snippets look different" without
+     confirming both operate under the same conventions.
 3. Output for each issue:
    - Verdict: REJECT or CONFIRM
    - Reasoning: for REJECT, state the concrete counter-argument. For CONFIRM, briefly

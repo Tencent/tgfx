@@ -94,6 +94,21 @@
         "url": "https://github.com/KhronosGroup/SPIRV-Cross.git",
         "commit": "ebe2aa0cd80f5eb5cd8a605da604cacf72205f3b",
         "dir": "third_party/SPIRV-Cross"
+      },
+      {
+        "url": "https://github.com/KhronosGroup/Vulkan-Headers.git",
+        "commit": "b5c8f996196ba4aa6d8f97e52b5d3b6e70f7e4e2",
+        "dir": "third_party/Vulkan-Headers"
+      },
+      {
+        "url": "https://github.com/zeux/volk.git",
+        "commit": "0b17a763ba5643e32da1b2152f8140461b3b7345",
+        "dir": "third_party/volk"
+      },
+      {
+        "url": "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git",
+        "commit": "1d8f600fd424278486eade7ed3e877c99f0846b1",
+        "dir": "third_party/VulkanMemoryAllocator"
       }
     ]
   },

@@ -18,18 +18,26 @@
 
 #pragma once
 
-#include "core/MCState.h"
+#include "core/ClipStack.h"
+#include "tgfx/core/Brush.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
+class DrawContext;
 
 class PlaybackContext {
  public:
   PlaybackContext() = default;
 
-  explicit PlaybackContext(MCState state);
+  PlaybackContext(const Matrix& matrix, const ClipStack& clip);
 
-  const MCState& state() const {
-    return _state;
+  const Matrix& matrix() const {
+    return _matrix;
+  }
+
+  const ClipStack& clip() const {
+    return _clip;
   }
 
   const Brush& brush() const {
@@ -42,7 +50,7 @@ class PlaybackContext {
 
   void setMatrix(const Matrix& matrix);
 
-  void setClip(const Path& clip);
+  void setClip(const ClipStack& clip);
 
   void setColor(const Color& color);
 
@@ -57,10 +65,12 @@ class PlaybackContext {
   void drawFill(DrawContext* context);
 
  private:
-  MCState initState = {};
+  Matrix initMatrix = {};
+  ClipStack initClip = {};
   bool hasInitMatrix = false;
   bool hasInitClip = false;
-  MCState _state = {};
+  Matrix _matrix = {};
+  ClipStack _clip = {};
   Brush _brush = {};
   Stroke _stroke = {};
   bool hasStroke = false;

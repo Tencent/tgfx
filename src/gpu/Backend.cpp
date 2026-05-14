@@ -20,6 +20,7 @@
 #include "d3d12/D3D12Defines.h"
 #include "metal/MetalDefines.h"
 #include "opengl/GLDefines.h"
+#include "vulkan/VulkanDefines.h"
 
 namespace tgfx {
 
@@ -60,6 +61,9 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
     case Backend::Metal:
       metalInfo = that.metalInfo;
       break;
+    case Backend::Vulkan:
+      vulkanInfo = that.vulkanInfo;
+      break;
     case Backend::D3D12:
       d3d12Info = that.d3d12Info;
       break;
@@ -78,6 +82,8 @@ PixelFormat BackendTexture::format() const {
       return GLSizeFormatToPixelFormat(glInfo.format);
     case Backend::Metal:
       return MetalPixelFormatToPixelFormat(metalInfo.format);
+    case Backend::Vulkan:
+      return VulkanFormatToPixelFormat(vulkanInfo.format);
     case Backend::D3D12:
       return DXGIFormatToPixelFormat(d3d12Info.format);
     default:
@@ -99,6 +105,14 @@ bool BackendTexture::getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) con
     return false;
   }
   *metalTextureInfo = metalInfo;
+  return true;
+}
+
+bool BackendTexture::getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) const {
+  if (!isValid() || _backend != Backend::Vulkan) {
+    return false;
+  }
+  *vulkanImageInfo = vulkanInfo;
   return true;
 }
 
@@ -125,6 +139,9 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
     case Backend::Metal:
       metalInfo = that.metalInfo;
       break;
+    case Backend::Vulkan:
+      vulkanInfo = that.vulkanInfo;
+      break;
     case Backend::D3D12:
       d3d12Info = that.d3d12Info;
       break;
@@ -143,6 +160,8 @@ PixelFormat BackendRenderTarget::format() const {
       return GLSizeFormatToPixelFormat(glInfo.format);
     case Backend::Metal:
       return MetalPixelFormatToPixelFormat(metalInfo.format);
+    case Backend::Vulkan:
+      return VulkanFormatToPixelFormat(vulkanInfo.format);
     case Backend::D3D12:
       return DXGIFormatToPixelFormat(d3d12Info.format);
     default:
@@ -167,6 +186,14 @@ bool BackendRenderTarget::getMetalTextureInfo(MetalTextureInfo* metalTextureInfo
   return true;
 }
 
+bool BackendRenderTarget::getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) const {
+  if (!isValid() || _backend != Backend::Vulkan) {
+    return false;
+  }
+  *vulkanImageInfo = vulkanInfo;
+  return true;
+}
+
 bool BackendRenderTarget::getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const {
   if (!isValid() || _backend != Backend::D3D12) {
     return false;
@@ -184,6 +211,9 @@ BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
     case Backend::Metal:
       metalSyncInfo = that.metalSyncInfo;
       break;
+    case Backend::Vulkan:
+      vulkanSyncInfo = that.vulkanSyncInfo;
+      break;
     case Backend::D3D12:
       d3d12SyncInfo = that.d3d12SyncInfo;
       break;
@@ -199,6 +229,8 @@ bool BackendSemaphore::isInitialized() const {
       return glSyncInfo.sync != nullptr;
     case Backend::Metal:
       return metalSyncInfo.event != nullptr;
+    case Backend::Vulkan:
+      return vulkanSyncInfo.semaphore != 0;
     case Backend::D3D12:
       return d3d12SyncInfo.fence != nullptr;
     default:
@@ -220,6 +252,14 @@ bool BackendSemaphore::getMetalSync(MetalSyncInfo* metalInfo) const {
     return false;
   }
   *metalInfo = metalSyncInfo;
+  return true;
+}
+
+bool BackendSemaphore::getVulkanSync(VulkanSyncInfo* vulkanSyncInfo) const {
+  if (_backend != Backend::Vulkan || this->vulkanSyncInfo.semaphore == 0) {
+    return false;
+  }
+  *vulkanSyncInfo = this->vulkanSyncInfo;
   return true;
 }
 

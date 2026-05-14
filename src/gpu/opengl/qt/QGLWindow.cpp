@@ -148,7 +148,37 @@ void QGLWindow::moveToThread(QThread* thread) {
   }
 }
 
-QSGTexture* QGLWindow::getQSGTexture() const {
+QSGTexture* QGLWindow::getQSGTexture() {
+  std::shared_ptr<RenderTargetProxy> localProxy = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    localProxy = std::move(pendingProxy);
+  }
+  if (localProxy != nullptr) {
+    auto textureView = localProxy->getTextureView();
+    GLTextureInfo info = {};
+    if (textureView != nullptr && textureView->getBackendTexture().getGLTextureInfo(&info)) {
+      auto nativeWindow = quickItem->window();
+      if (nativeWindow != nullptr) {
+        delete presentedQSGTexture;
+        presentedQSGTexture = nullptr;
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+        presentedQSGTexture = QNativeInterface::QSGOpenGLTexture::fromNative(
+            info.id, nativeWindow, QSize(localProxy->width(), localProxy->height()),
+            QQuickWindow::TextureHasAlphaChannel);
+#elif (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
+        presentedQSGTexture = nativeWindow->createTextureFromNativeObject(
+            QQuickWindow::NativeObjectTexture, &info.id, 0,
+            QSize(localProxy->width(), localProxy->height()), QQuickWindow::TextureHasAlphaChannel);
+#else
+        presentedQSGTexture = nativeWindow->createTextureFromId(
+            info.id, QSize(localProxy->width(), localProxy->height()),
+            QQuickWindow::TextureHasAlphaChannel);
+#endif
+      }
+    }
+    reuseTexture(localProxy);
+  }
   return presentedQSGTexture;
 }
 
@@ -175,58 +205,51 @@ void QGLWindow::onPresent(Context*) {
   }
   auto proxy = std::static_pointer_cast<QGLDrawableProxy>(presentingProxy);
   presentingProxy = nullptr;
-  auto textureView = proxy->getTextureView();
-  if (textureView == nullptr) {
+  if (proxy->getTextureView() == nullptr) {
     proxy->releaseTexture();
     return;
   }
-  GLTextureInfo info = {};
-  if (!textureView->getBackendTexture().getGLTextureInfo(&info)) {
-    proxy->releaseTexture();
-    return;
+  std::shared_ptr<RenderTargetProxy> oldProxy = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    oldProxy = std::move(pendingProxy);
+    pendingProxy = proxy->getTextureTargetProxy();
+    proxy->textureRTProxy = nullptr;
   }
-  auto nativeWindow = quickItem->window();
-  if (nativeWindow == nullptr) {
-    proxy->releaseTexture();
-    return;
+  // Release the proxy from the previous pending frame if it was not consumed.
+  if (oldProxy != nullptr) {
+    reuseTexture(oldProxy);
   }
-  auto textureWidth = proxy->width();
-  auto textureHeight = proxy->height();
-  delete presentedQSGTexture;
-  presentedQSGTexture = nullptr;
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-  presentedQSGTexture = QNativeInterface::QSGOpenGLTexture::fromNative(
-      info.id, nativeWindow, QSize(textureWidth, textureHeight),
-      QQuickWindow::TextureHasAlphaChannel);
-#elif (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
-  presentedQSGTexture = nativeWindow->createTextureFromNativeObject(
-      QQuickWindow::NativeObjectTexture, &info.id, 0, QSize(textureWidth, textureHeight),
-      QQuickWindow::TextureHasAlphaChannel);
-#else
-  presentedQSGTexture = nativeWindow->createTextureFromId(
-      info.id, QSize(textureWidth, textureHeight), QQuickWindow::TextureHasAlphaChannel);
-#endif
-  proxy->releaseTexture();
   QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
 }
 
 std::shared_ptr<RenderTargetProxy> QGLWindow::acquireTexture(Context* context, int width,
                                                              int height) {
   std::lock_guard<std::mutex> autoLock(locker);
-  for (auto& slot : textureSlots) {
-    if (slot.available && slot.proxy->width() == width && slot.proxy->height() == height) {
-      slot.available = false;
-      return slot.proxy;
+  // In single buffer mode, reclaim the pending frame if it hasn't been consumed yet.
+  // This handles the case where draw() is called before getQSGTexture() in singleBufferMode.
+  // In dual buffer mode, we have 2 slots available, so no need to reclaim the pending proxy.
+  if (maxTextureCount == 1 && pendingProxy != nullptr) {
+    for (auto& slot : textureSlots) {
+      if (slot.proxy == pendingProxy) {
+        slot.available = true;
+        break;
+      }
     }
+    pendingProxy = nullptr;
   }
-  // Remove stale available slots whose size no longer matches.
+  // Find an available slot with matching size, and remove stale slots with mismatched size.
   auto it = textureSlots.begin();
   while (it != textureSlots.end()) {
-    if (it->available && (it->proxy->width() != width || it->proxy->height() != height)) {
-      it = textureSlots.erase(it);
-    } else {
+    if (!it->available) {
       ++it;
+      continue;
     }
+    if (it->proxy->width() == width && it->proxy->height() == height) {
+      it->available = false;
+      return it->proxy;
+    }
+    it = textureSlots.erase(it);
   }
   if (static_cast<int>(textureSlots.size()) >= maxTextureCount) {
     LOGE("QGLWindow::acquireTexture() All textures are in use. No available texture in the pool.");

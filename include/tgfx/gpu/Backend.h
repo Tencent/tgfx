@@ -22,6 +22,7 @@
 #include "tgfx/gpu/d3d12/D3D12Types.h"
 #include "tgfx/gpu/metal/MetalTypes.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
+#include "tgfx/gpu/vulkan/VulkanTypes.h"
 
 namespace tgfx {
 /**
@@ -43,15 +44,22 @@ class BackendTexture {
   /**
    * Creates an OpenGL backend texture.
    */
-  BackendTexture(const GLTextureInfo& glInfo, int width, int height)
+  explicit BackendTexture(const GLTextureInfo& glInfo, int width, int height)
       : _backend(Backend::OpenGL), _width(width), _height(height), glInfo(glInfo) {
   }
 
   /**
    * Creates a Metal backend texture.
    */
-  BackendTexture(const MetalTextureInfo& metalInfo, int width, int height)
+  explicit BackendTexture(const MetalTextureInfo& metalInfo, int width, int height)
       : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
+  }
+
+  /**
+   * Creates a Vulkan backend texture.
+   */
+  explicit BackendTexture(const VulkanImageInfo& vulkanInfo, int width, int height)
+      : _backend(Backend::Vulkan), _width(width), _height(height), vulkanInfo(vulkanInfo) {
   }
 
   /**
@@ -113,6 +121,12 @@ class BackendTexture {
   bool getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const;
 
   /**
+   * If the backend API is Vulkan, copies a snapshot of the VulkanImageInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
+   */
+  bool getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) const;
+
+  /**
    * If the backend API is D3D12, copies a snapshot of the D3D12TextureInfo struct into the passed
    * in pointer and returns true. Otherwise, returns false if the backend API is not D3D12.
    */
@@ -126,6 +140,7 @@ class BackendTexture {
   union {
     GLTextureInfo glInfo;
     MetalTextureInfo metalInfo;
+    VulkanImageInfo vulkanInfo;
     D3D12TextureInfo d3d12Info;
   };
 };
@@ -144,15 +159,22 @@ class BackendRenderTarget {
   /**
    * Creates an OpenGL backend render target.
    */
-  BackendRenderTarget(const GLFrameBufferInfo& glInfo, int width, int height)
+  explicit BackendRenderTarget(const GLFrameBufferInfo& glInfo, int width, int height)
       : _backend(Backend::OpenGL), _width(width), _height(height), glInfo(glInfo) {
   }
 
   /**
    * Creates a Metal backend render target.
    */
-  BackendRenderTarget(const MetalTextureInfo& metalInfo, int width, int height)
+  explicit BackendRenderTarget(const MetalTextureInfo& metalInfo, int width, int height)
       : _backend(Backend::Metal), _width(width), _height(height), metalInfo(metalInfo) {
+  }
+
+  /**
+   * Creates a Vulkan backend render target.
+   */
+  explicit BackendRenderTarget(const VulkanImageInfo& vulkanInfo, int width, int height)
+      : _backend(Backend::Vulkan), _width(width), _height(height), vulkanInfo(vulkanInfo) {
   }
 
   /**
@@ -214,6 +236,12 @@ class BackendRenderTarget {
   bool getMetalTextureInfo(MetalTextureInfo* metalTextureInfo) const;
 
   /**
+   * If the backend API is Vulkan, copies a snapshot of the VulkanImageInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
+   */
+  bool getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) const;
+
+  /**
    * If the backend API is D3D12, copies a snapshot of the D3D12TextureInfo struct into the passed
    * in pointer and returns true. Otherwise, returns false if the backend API is not D3D12.
    */
@@ -226,6 +254,7 @@ class BackendRenderTarget {
   union {
     GLFrameBufferInfo glInfo;
     MetalTextureInfo metalInfo;
+    VulkanImageInfo vulkanInfo;
     D3D12TextureInfo d3d12Info;
   };
 };
@@ -238,20 +267,28 @@ class BackendSemaphore {
   /**
    * Creates an uninitialized backend semaphore.
    */
-  BackendSemaphore() : _backend(Backend::Unknown) {
+  BackendSemaphore() : _backend(Backend::Unknown), glSyncInfo{} {
   }
 
   /**
    * Creates an OpenGL backend semaphore.
    */
-  BackendSemaphore(const GLSyncInfo& syncInfo) : _backend(Backend::OpenGL), glSyncInfo(syncInfo) {
+  explicit BackendSemaphore(const GLSyncInfo& syncInfo)
+      : _backend(Backend::OpenGL), glSyncInfo(syncInfo) {
   }
 
   /**
    * Creates a Metal backend semaphore.
    */
-  BackendSemaphore(const MetalSyncInfo& metalInfo)
+  explicit BackendSemaphore(const MetalSyncInfo& metalInfo)
       : _backend(Backend::Metal), metalSyncInfo(metalInfo) {
+  }
+
+  /**
+   * Creates a Vulkan backend semaphore.
+   */
+  explicit BackendSemaphore(const VulkanSyncInfo& vulkanInfo)
+      : _backend(Backend::Vulkan), vulkanSyncInfo(vulkanInfo) {
   }
 
   /**
@@ -292,6 +329,12 @@ class BackendSemaphore {
   bool getMetalSync(MetalSyncInfo* metalInfo) const;
 
   /**
+   * If the backend API is Vulkan, copies a snapshot of the VulkanSyncInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
+   */
+  bool getVulkanSync(VulkanSyncInfo* vulkanSyncInfo) const;
+
+  /**
    * If the backend API is D3D12, copies a snapshot of the D3D12SyncInfo struct into the passed in
    * pointer and returns true. Otherwise, returns false if the backend API is not D3D12.
    */
@@ -302,6 +345,7 @@ class BackendSemaphore {
   union {
     GLSyncInfo glSyncInfo;
     MetalSyncInfo metalSyncInfo;
+    VulkanSyncInfo vulkanSyncInfo;
     D3D12SyncInfo d3d12SyncInfo;
   };
 };

@@ -38,33 +38,36 @@ class RenderContext : public DrawContext {
 
   void drawFill(const Brush& brush) override;
 
-  void drawRect(const Rect& rect, const MCState& state, const Brush& brush,
+  void drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip, const Brush& brush,
                 const Stroke* stroke) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
-                 const Stroke* stroke) override;
+  void drawRRect(const RRect& rRect, const Matrix& matrix, const ClipStack& clip,
+                 const Brush& brush, const Stroke* stroke) override;
 
-  void drawPath(const Path& path, const MCState& state, const Brush& brush) override;
+  void drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
+                const Brush& brush) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush,
-                 const Stroke* stroke) override;
+  void drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix, const ClipStack& clip,
+                 const Brush& brush, const Stroke* stroke) override;
 
-  void drawMesh(std::shared_ptr<Mesh> mesh, const MCState& state, const Brush& brush) override;
+  void drawMesh(std::shared_ptr<Mesh> mesh, const Matrix& matrix, const ClipStack& clip,
+                const Brush& brush) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const Brush& brush) override;
+                 const Matrix& matrix, const ClipStack& clip, const Brush& brush) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling, const MCState& state, const Brush& brush,
-                     SrcRectConstraint constraint) override;
+                     const SamplingOptions& sampling, const Matrix& matrix, const ClipStack& clip,
+                     const Brush& brush, SrcRectConstraint constraint) override;
 
-  void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state, const Brush& brush,
-                    const Stroke* stroke) override;
+  void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix, const ClipStack& clip,
+                    const Brush& brush, const Stroke* stroke) override;
 
-  void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
+  void drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,
+                   const ClipStack& clip) override;
 
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                 const MCState& state, const Brush& brush) override;
+                 const Matrix& matrix, const ClipStack& clip, const Brush& brush) override;
 
   /**
    * Flushes the render context, submitting all pending operations to the drawing manager. Returns
@@ -81,17 +84,17 @@ class RenderContext : public DrawContext {
    * Draws glyphs using direct mask rendering. Glyphs that fail to render (too large for atlas,
    * etc.) are recorded in rejectedIndices if provided.
    */
-  void drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
-                              const Brush& brush, const Stroke* stroke, const Rect& localClipBounds,
-                              std::vector<size_t>* rejectedIndices);
+  void drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const Matrix& matrix,
+                              const ClipStack& clip, const Brush& brush, const Stroke* stroke,
+                              const Rect& localClipBounds, std::vector<size_t>* rejectedIndices);
 
   void drawGlyphAsPath(const Font& font, GlyphID glyphID, const Matrix& glyphMatrix,
-                       const MCState& state, const Brush& brush, const Stroke* stroke,
-                       Rect& localClipBounds);
+                       const Matrix& matrix, const ClipStack& clip, const Brush& brush,
+                       const Stroke* stroke, Rect& localClipBounds);
 
   void drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
-                                   const std::vector<size_t>& glyphIndices, const MCState& state,
-                                   const Brush& brush, const Stroke* stroke);
+                                   const std::vector<size_t>& glyphIndices, const Matrix& matrix,
+                                   const ClipStack& clip, const Brush& brush, const Stroke* stroke);
 
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
   uint32_t renderFlags = 0;
@@ -99,7 +102,7 @@ class RenderContext : public DrawContext {
   std::shared_ptr<OpsCompositor> opsCompositor = nullptr;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
-  Rect getClipBounds(const Path& clip);
+  Rect getClipBounds(const ClipStack& clip);
   OpsCompositor* getOpsCompositor(bool discardContent = false);
   void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTarget,
                            std::shared_ptr<Image> oldContent);

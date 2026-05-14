@@ -17,9 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFBitmap.h"
-#include "core/codecs/jpeg/JpegCodec.h"
-#include "core/images/CodecImage.h"
-#include "core/utils/Types.h"
 #include "pdf/DeflateStream.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
@@ -30,7 +27,6 @@
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/WriteStream.h"
-#include "tgfx/core/YUVColorSpace.h"
 
 namespace tgfx {
 
@@ -291,7 +287,8 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
 
 void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodingQuality*/,
                                PDFDocumentImpl* doc, PDFIndirectReference ref) {
-  //TODO (YGaurora): is image opaque,encode as jpeg
+  // TODO (YGaurora): Re-enable JPEG direct embedding once Image provides a unified encoded data
+  // access interface, so we don't need to reach into internal Image subclass hierarchy.
   auto image2bitmap = [doc](Context* context, const std::shared_ptr<Image>& image) {
     auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
                                  doc->dstColorSpace());

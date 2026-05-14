@@ -40,7 +40,7 @@ enum class FillRule {
 };
 
 /**
- * FillStyle applies a fill to shapes in the same group using a ColorSource.
+ * FillStyle applies a fill to geometries in the same group using a ColorSource.
  */
 class FillStyle : public VectorElement {
  public:

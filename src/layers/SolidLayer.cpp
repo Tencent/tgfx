@@ -73,8 +73,7 @@ void SolidLayer::onUpdateContent(LayerRecorder* recorder) {
   if (_width == 0 || _height == 0) {
     return;
   }
-  RRect rRect = {};
-  rRect.setRectXY(Rect::MakeLTRB(0, 0, _width, _height), _radiusX, _radiusY);
+  auto rRect = RRect::MakeRectXY(Rect::MakeLTRB(0, 0, _width, _height), _radiusX, _radiusY);
   recorder->addRRect(rRect, LayerPaint(_color));
 }
 

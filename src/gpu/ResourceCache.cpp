@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include "core/utils/Log.h"
 #include "gpu/resources/Resource.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 static constexpr size_t MAX_EXPIRATION_FRAMES = 1000000;  // About 4.5 hours at 60 FPS
@@ -70,8 +71,11 @@ bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit) {
   return totalBytes <= bytesLimit;
 }
 
-void ResourceCache::advanceFrameAndPurge() {
-  currentFrameTime = std::chrono::steady_clock::now();
+void ResourceCache::syncFrameTime() {
+  currentFrameTime = context->gpu()->queue()->frameTime();
+}
+
+void ResourceCache::recordFrameAndPurge() {
   frameTimes.push_back(currentFrameTime);
   if (frameTimes.size() > _expirationFrames + 1) {
     frameTimes.pop_front();
@@ -160,11 +164,13 @@ std::shared_ptr<Resource> ResourceCache::findScratchResource(const ScratchKey& s
   if (result == scratchKeyMap.end()) {
     return nullptr;
   }
+  auto completed = context->gpu()->queue()->completedFrameTime();
   auto& list = result->second;
   size_t index = 0;
   bool found = false;
   for (auto& resource : list) {
-    if (resource->isPurgeable() && !resource->hasExternalReferences()) {
+    if (resource->isPurgeable() && !resource->hasExternalReferences() &&
+        resource->lastUsedTime <= completed) {
       found = true;
       break;
     }

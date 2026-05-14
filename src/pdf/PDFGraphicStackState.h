@@ -21,7 +21,7 @@
 #include <limits>
 #include <memory>
 #include <utility>
-#include "core/MCState.h"
+#include "core/ClipStack.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/WriteStream.h"
@@ -30,8 +30,9 @@ namespace tgfx {
 struct PDFIndirectReference;
 struct PDFGraphicStackState {
   struct Entry {
+    Matrix entryMatrix = Matrix::I();
     Matrix matrix = Matrix::I();
-    MCState state;
+    ClipStack clip;
     Color color = {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN(),
                    std::numeric_limits<float>::quiet_NaN(),
                    std::numeric_limits<float>::quiet_NaN()};
@@ -50,8 +51,8 @@ struct PDFGraphicStackState {
       : contentStream(std::move(stream)) {
   }
 
-  void updateClip(const MCState& state);
-  void updateMatrix(const Matrix& matrix);
+  void updateMatrixClip(const Matrix& matrix, const ClipStack& clip);
+  void updateEntryMatrix(const Matrix& matrix);
   void updateDrawingState(const Entry& state, const PDFIndirectReference& ref);
   void push();
   void pop();

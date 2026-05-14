@@ -124,22 +124,39 @@ static void SerializeRectsContent(flexbuffers::Builder& fbb, const RectsContent*
   SerializeUtils::SetFlexBufferMap(fbb, "rectsCount", static_cast<int>(content->rects.size()));
 }
 
+static void SerializeRRectFields(flexbuffers::Builder& fbb, const RRect& rRect) {
+  SerializeRect(fbb, "rect", rRect.rect());
+  SerializeUtils::SetFlexBufferMap(fbb, "type", static_cast<int>(rRect.type()));
+  fbb.Key("radii");
+  auto radiiStart = fbb.StartVector();
+  for (const auto& radius : rRect.radii()) {
+    auto cornerStart = fbb.StartMap();
+    SerializeUtils::SetFlexBufferMap(fbb, "x", radius.x);
+    SerializeUtils::SetFlexBufferMap(fbb, "y", radius.y);
+    fbb.EndMap(cornerStart);
+  }
+  fbb.EndVector(radiiStart, false, false);
+}
+
 static void SerializeRRectContent(flexbuffers::Builder& fbb, const RRectContent* content) {
   SerializeDrawContent(fbb, content);
   fbb.Key("rRect");
   auto rRectStart = fbb.StartMap();
-  SerializeRect(fbb, "rect", content->rRect.rect);
-  fbb.Key("radii");
-  auto radiiStart = fbb.StartMap();
-  SerializeUtils::SetFlexBufferMap(fbb, "x", content->rRect.radii.x);
-  SerializeUtils::SetFlexBufferMap(fbb, "y", content->rRect.radii.y);
-  fbb.EndMap(radiiStart);
+  SerializeRRectFields(fbb, content->rRect);
   fbb.EndMap(rRectStart);
 }
 
 static void SerializeRRectsContent(flexbuffers::Builder& fbb, const RRectsContent* content) {
   SerializeDrawContent(fbb, content);
   SerializeUtils::SetFlexBufferMap(fbb, "rRectsCount", static_cast<int>(content->rRects.size()));
+  fbb.Key("rRects");
+  auto rRectsStart = fbb.StartVector();
+  for (const auto& rRect : content->rRects) {
+    auto rRectStart = fbb.StartMap();
+    SerializeRRectFields(fbb, rRect);
+    fbb.EndMap(rRectStart);
+  }
+  fbb.EndVector(rRectsStart, false, false);
 }
 
 static void SerializePathContent(flexbuffers::Builder& fbb, const PathContent* content) {

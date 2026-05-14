@@ -51,6 +51,8 @@ class CodecImage : public GeneratorImage {
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;
 
+  std::shared_ptr<Image> onMakeMipmapped(bool mipmapped) const override;
+
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
  private:

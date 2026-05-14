@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <array>
 #include <memory>
 #include <vector>
 #include "CornerPinEffect.h"
@@ -406,7 +407,7 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
 
   {
     auto imageFilter = ImageFilter::Blur(20, 30);
-    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Blur);
+    TGFX_PRIVATE_ACCESS(EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Blur));
     Size blurSize = imageFilter->filterBounds({}).size();
     EXPECT_EQ(blurSize.width, 80.f);
     EXPECT_EQ(blurSize.height, 120.f);
@@ -414,66 +415,59 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
 
   {
     auto imageFilter = ImageFilter::DropShadow(15.f, 15.f, 20.f, 30.f, Color::White());
-    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::DropShadow);
-    auto dropShadowFilter = std::static_pointer_cast<const DropShadowImageFilter>(imageFilter);
-    Size blurSize = dropShadowFilter->blurFilter->filterBounds({}).size();
-    EXPECT_EQ(blurSize.width, 80.f);
-    EXPECT_EQ(blurSize.height, 120.f);
-    EXPECT_EQ(dropShadowFilter->dx, 15.f);
-    EXPECT_EQ(dropShadowFilter->dy, 15.f);
-    EXPECT_EQ(dropShadowFilter->color, Color::White());
-    EXPECT_EQ(dropShadowFilter->shadowOnly, false);
+    TGFX_PRIVATE_ACCESS(
+        EXPECT_EQ(imageFilter->type(), ImageFilter::Type::DropShadow);
+        auto dropShadowFilter = std::static_pointer_cast<const DropShadowImageFilter>(imageFilter);
+        Size blurSize = dropShadowFilter->blurFilter->filterBounds({}).size();
+        EXPECT_EQ(blurSize.width, 80.f); EXPECT_EQ(blurSize.height, 120.f);
+        EXPECT_EQ(dropShadowFilter->dx, 15.f); EXPECT_EQ(dropShadowFilter->dy, 15.f);
+        EXPECT_EQ(dropShadowFilter->color, Color::White());
+        EXPECT_EQ(dropShadowFilter->shadowOnly, false));
   }
 
   {
     auto imageFilter = ImageFilter::DropShadowOnly(15.f, 15.f, 20.f, 30.f, Color::White());
-    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::DropShadow);
-    auto dropShadowFilter = std::static_pointer_cast<const DropShadowImageFilter>(imageFilter);
-    Size blurSize = dropShadowFilter->blurFilter->filterBounds({}).size();
-    EXPECT_EQ(blurSize.width, 80.f);
-    EXPECT_EQ(blurSize.height, 120.f);
-    EXPECT_EQ(dropShadowFilter->dx, 15.f);
-    EXPECT_EQ(dropShadowFilter->dy, 15.f);
-    EXPECT_EQ(dropShadowFilter->color, Color::White());
-    EXPECT_EQ(dropShadowFilter->shadowOnly, true);
+    TGFX_PRIVATE_ACCESS(
+        EXPECT_EQ(imageFilter->type(), ImageFilter::Type::DropShadow);
+        auto dropShadowFilter = std::static_pointer_cast<const DropShadowImageFilter>(imageFilter);
+        Size blurSize = dropShadowFilter->blurFilter->filterBounds({}).size();
+        EXPECT_EQ(blurSize.width, 80.f); EXPECT_EQ(blurSize.height, 120.f);
+        EXPECT_EQ(dropShadowFilter->dx, 15.f); EXPECT_EQ(dropShadowFilter->dy, 15.f);
+        EXPECT_EQ(dropShadowFilter->color, Color::White());
+        EXPECT_EQ(dropShadowFilter->shadowOnly, true));
   }
 
   {
     auto imageFilter = ImageFilter::InnerShadow(15.f, 15.f, 20.f, 30.f, Color::White());
-    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::InnerShadow);
-    auto innerShadowFilter = std::static_pointer_cast<InnerShadowImageFilter>(imageFilter);
-    Size blurSize = innerShadowFilter->blurFilter->filterBounds({}).size();
-    EXPECT_EQ(blurSize.width, 80.f);
-    EXPECT_EQ(blurSize.height, 120.f);
-    EXPECT_EQ(innerShadowFilter->dx, 15.f);
-    EXPECT_EQ(innerShadowFilter->dy, 15.f);
-    EXPECT_EQ(innerShadowFilter->color, Color::White());
-    EXPECT_EQ(innerShadowFilter->shadowOnly, false);
+    TGFX_PRIVATE_ACCESS(
+        EXPECT_EQ(imageFilter->type(), ImageFilter::Type::InnerShadow);
+        auto innerShadowFilter = std::static_pointer_cast<InnerShadowImageFilter>(imageFilter);
+        Size blurSize = innerShadowFilter->blurFilter->filterBounds({}).size();
+        EXPECT_EQ(blurSize.width, 80.f); EXPECT_EQ(blurSize.height, 120.f);
+        EXPECT_EQ(innerShadowFilter->dx, 15.f); EXPECT_EQ(innerShadowFilter->dy, 15.f);
+        EXPECT_EQ(innerShadowFilter->color, Color::White());
+        EXPECT_EQ(innerShadowFilter->shadowOnly, false));
   }
 
   {
     auto imageFilter = ImageFilter::InnerShadowOnly(15.f, 15.f, 20.f, 30.f, Color::White());
-    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::InnerShadow);
-    auto innerShadowFilter = std::static_pointer_cast<InnerShadowImageFilter>(imageFilter);
-    Size blurSize = innerShadowFilter->blurFilter->filterBounds({}).size();
-    EXPECT_EQ(blurSize.width, 80.f);
-    EXPECT_EQ(blurSize.height, 120.f);
-    EXPECT_EQ(innerShadowFilter->dx, 15.f);
-    EXPECT_EQ(innerShadowFilter->dy, 15.f);
-    EXPECT_EQ(innerShadowFilter->color, Color::White());
-    EXPECT_EQ(innerShadowFilter->shadowOnly, true);
+    TGFX_PRIVATE_ACCESS(
+        EXPECT_EQ(imageFilter->type(), ImageFilter::Type::InnerShadow);
+        auto innerShadowFilter = std::static_pointer_cast<InnerShadowImageFilter>(imageFilter);
+        Size blurSize = innerShadowFilter->blurFilter->filterBounds({}).size();
+        EXPECT_EQ(blurSize.width, 80.f); EXPECT_EQ(blurSize.height, 120.f);
+        EXPECT_EQ(innerShadowFilter->dx, 15.f); EXPECT_EQ(innerShadowFilter->dy, 15.f);
+        EXPECT_EQ(innerShadowFilter->color, Color::White());
+        EXPECT_EQ(innerShadowFilter->shadowOnly, true));
   }
 
   {
     auto imageFilter = ImageFilter::ColorFilter(modeColorFilter);
-    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Color);
-    auto colorFilter = std::static_pointer_cast<ColorImageFilter>(imageFilter);
-    Color color;
-    BlendMode mode;
-    bool ret = colorFilter->filter->asColorMode(&color, &mode);
-    EXPECT_TRUE(ret);
-    EXPECT_EQ(color, Color::Red());
-    EXPECT_EQ(mode, BlendMode::Multiply);
+    TGFX_PRIVATE_ACCESS(
+        EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Color);
+        auto colorFilter = std::static_pointer_cast<ColorImageFilter>(imageFilter); Color color;
+        BlendMode mode; bool ret = colorFilter->filter->asColorMode(&color, &mode);
+        EXPECT_TRUE(ret); EXPECT_EQ(color, Color::Red()); EXPECT_EQ(mode, BlendMode::Multiply));
   }
 
   {
@@ -481,14 +475,14 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     auto greenFilter = ImageFilter::DropShadow(-100, -100, 0, 0, Color::Green());
     auto blackFilter = ImageFilter::DropShadow(0, 0, 300, 300, Color::Black());
     auto imageFilter = ImageFilter::Compose({blueFilter, greenFilter, blackFilter});
-    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Compose);
+    TGFX_PRIVATE_ACCESS(EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Compose));
   }
 
   {
     EffectCache effectCache = {};
     auto effect = CornerPinEffect::Make(&effectCache, {484, 54}, {764, 80}, {764, 504}, {482, 512});
     auto imageFilter = ImageFilter::Runtime(std::move(effect));
-    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Runtime);
+    TGFX_PRIVATE_ACCESS(EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Runtime));
   }
 }
 
@@ -497,7 +491,7 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
   {
     auto colorShader = Shader::MakeColorShader(Color::Red());
     ASSERT_TRUE(colorShader != nullptr);
-    EXPECT_EQ(colorShader->type(), Shader::Type::Color);
+    TGFX_PRIVATE_ACCESS(EXPECT_EQ(colorShader->type(), Shader::Type::Color));
 
     Color color = {};
     bool ret = colorShader->asColor(&color);
@@ -511,12 +505,11 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
     auto shader = Shader::MakeImageShader(inputImage, TileMode::Mirror, TileMode::Repeat);
     ASSERT_TRUE(shader != nullptr);
 
-    EXPECT_EQ(shader->type(), Shader::Type::Image);
-
-    auto imageShader = std::static_pointer_cast<ImageShader>(shader);
-    EXPECT_TRUE(imageShader != nullptr);
-    EXPECT_EQ(imageShader->tileModeX, TileMode::Mirror);
-    EXPECT_EQ(imageShader->tileModeY, TileMode::Repeat);
+    TGFX_PRIVATE_ACCESS(EXPECT_EQ(shader->type(), Shader::Type::Image);
+                        auto imageShader = std::static_pointer_cast<ImageShader>(shader);
+                        EXPECT_TRUE(imageShader != nullptr);
+                        EXPECT_EQ(imageShader->tileModeX, TileMode::Mirror);
+                        EXPECT_EQ(imageShader->tileModeY, TileMode::Repeat));
   }
 
   {
@@ -524,7 +517,7 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
     auto greenShader = Shader::MakeColorShader(Color::Green());
     auto blendShader = Shader::MakeBlend(BlendMode::SrcOut, redShader, greenShader);
     ASSERT_TRUE(blendShader != nullptr);
-    EXPECT_EQ(blendShader->type(), Shader::Type::Blend);
+    TGFX_PRIVATE_ACCESS(EXPECT_EQ(blendShader->type(), Shader::Type::Blend));
   }
 
   std::vector<Color> colors = {Color::Red(), Color::Green(), Color::Blue()};
@@ -534,7 +527,7 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
   {
     auto shader = Shader::MakeLinearGradient(startPoint, endPoint, colors, positions);
     ASSERT_TRUE(shader != nullptr);
-    EXPECT_EQ(shader->type(), Shader::Type::Gradient);
+    TGFX_PRIVATE_ACCESS(EXPECT_EQ(shader->type(), Shader::Type::Gradient));
 
     auto gradientShader = std::static_pointer_cast<LinearGradientShader>(shader);
 
@@ -552,7 +545,7 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
   {
     auto shader = Shader::MakeRadialGradient(center, radius, colors, positions);
     ASSERT_TRUE(shader != nullptr);
-    EXPECT_EQ(shader->type(), Shader::Type::Gradient);
+    TGFX_PRIVATE_ACCESS(EXPECT_EQ(shader->type(), Shader::Type::Gradient));
 
     auto gradientShader = std::static_pointer_cast<LinearGradientShader>(shader);
 
@@ -570,7 +563,7 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
     float endAngle = 360.f;
     auto shader = Shader::MakeConicGradient(center, startAngle, endAngle, colors, positions);
     ASSERT_TRUE(shader != nullptr);
-    EXPECT_EQ(shader->type(), Shader::Type::Gradient);
+    TGFX_PRIVATE_ACCESS(EXPECT_EQ(shader->type(), Shader::Type::Gradient));
 
     auto gradientShader = std::static_pointer_cast<LinearGradientShader>(shader);
 
@@ -589,7 +582,7 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
   {
     auto shader = Shader::MakeDiamondGradient(center, diamondRadius, colors, positions);
     ASSERT_TRUE(shader != nullptr);
-    EXPECT_EQ(shader->type(), Shader::Type::Gradient);
+    TGFX_PRIVATE_ACCESS(EXPECT_EQ(shader->type(), Shader::Type::Gradient));
 
     auto gradientShader = std::static_pointer_cast<DiamondGradientShader>(shader);
 
@@ -944,61 +937,72 @@ TGFX_TEST(FilterTest, ReverseFilterBounds) {
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ReverseFilterBounds_dropShadow"));
 }
 
-TGFX_TEST(FilterTest, AffectsTransparentBlack) {
+TGFX_TEST_PRIVATE(FilterTest, AffectsTransparentBlack) {
   // ModeColorFilter: modes that do NOT affect transparent black
-  EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::SrcIn)->affectsTransparentBlack());
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::SrcIn)->affectsTransparentBlack()));
   // Blend(Red, DstIn) returns nullptr because alpha=1 DstIn is a no-op (result = dst * 1 = dst).
   EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::DstIn) == nullptr);
-  EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::DstOut)->affectsTransparentBlack());
-  EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::SrcATop)->affectsTransparentBlack());
-  EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::Modulate)->affectsTransparentBlack());
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::DstOut)->affectsTransparentBlack());
+      EXPECT_FALSE(ColorFilter::Blend(Color::Red(), BlendMode::SrcATop)->affectsTransparentBlack());
+      EXPECT_FALSE(
+          ColorFilter::Blend(Color::Red(), BlendMode::Modulate)->affectsTransparentBlack()));
 
   // ModeColorFilter: modes that DO affect transparent black
-  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Src)->affectsTransparentBlack());
-  EXPECT_TRUE(ColorFilter::Blend(Color::White(), BlendMode::SrcOver)->affectsTransparentBlack());
-  EXPECT_TRUE(ColorFilter::Blend(Color::White(), BlendMode::Screen)->affectsTransparentBlack());
-  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::DstOver)->affectsTransparentBlack());
-  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::SrcOut)->affectsTransparentBlack());
-  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::DstATop)->affectsTransparentBlack());
-  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Xor)->affectsTransparentBlack());
-  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::PlusLighter)->affectsTransparentBlack());
-  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Overlay)->affectsTransparentBlack());
-  EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Multiply)->affectsTransparentBlack());
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Src)->affectsTransparentBlack());
+      EXPECT_TRUE(
+          ColorFilter::Blend(Color::White(), BlendMode::SrcOver)->affectsTransparentBlack());
+      EXPECT_TRUE(ColorFilter::Blend(Color::White(), BlendMode::Screen)->affectsTransparentBlack());
+      EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::DstOver)->affectsTransparentBlack());
+      EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::SrcOut)->affectsTransparentBlack());
+      EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::DstATop)->affectsTransparentBlack());
+      EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Xor)->affectsTransparentBlack());
+      EXPECT_TRUE(
+          ColorFilter::Blend(Color::Red(), BlendMode::PlusLighter)->affectsTransparentBlack());
+      EXPECT_TRUE(ColorFilter::Blend(Color::Red(), BlendMode::Overlay)->affectsTransparentBlack());
+      EXPECT_TRUE(
+          ColorFilter::Blend(Color::Red(), BlendMode::Multiply)->affectsTransparentBlack()));
 
   // ModeColorFilter: transparent color never affects transparent black
   auto transparentFilter = ColorFilter::Blend(Color::Transparent(), BlendMode::Screen);
   // Blend() with alpha=0 and SrcOver converts to Dst, which is a no-op and returns nullptr.
   // Screen with transparent color: src=(0,0,0,0), dst=(0,0,0,0) → 0, not affected.
-  EXPECT_TRUE(transparentFilter == nullptr || !transparentFilter->affectsTransparentBlack());
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_TRUE(transparentFilter == nullptr || !transparentFilter->affectsTransparentBlack()));
 
   // MatrixColorFilter: no alpha offset → false
   std::array<float, 20> identityMatrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
                                           0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
-  EXPECT_FALSE(ColorFilter::Matrix(identityMatrix)->affectsTransparentBlack());
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(ColorFilter::Matrix(identityMatrix)->affectsTransparentBlack()));
 
   // MatrixColorFilter: positive alpha offset → true
   std::array<float, 20> alphaOffsetMatrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
                                              0, 0, 1, 0, 0, 0, 0, 0, 1, 0.5f};
-  EXPECT_TRUE(ColorFilter::Matrix(alphaOffsetMatrix)->affectsTransparentBlack());
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_TRUE(ColorFilter::Matrix(alphaOffsetMatrix)->affectsTransparentBlack()));
 
   // MatrixColorFilter: RGB offset only (no alpha offset) → false (premultiply makes rgb 0)
   std::array<float, 20> rgbOffsetMatrix = {1, 0, 0, 0, 0.5f, 0, 1, 0, 0, 0,
                                            0, 0, 1, 0, 0,    0, 0, 0, 1, 0};
-  EXPECT_FALSE(ColorFilter::Matrix(rgbOffsetMatrix)->affectsTransparentBlack());
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_FALSE(ColorFilter::Matrix(rgbOffsetMatrix)->affectsTransparentBlack()));
 
   // AlphaThresholdColorFilter
-  EXPECT_TRUE(ColorFilter::AlphaThreshold(0.0f)->affectsTransparentBlack());
-  EXPECT_FALSE(ColorFilter::AlphaThreshold(0.5f)->affectsTransparentBlack());
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(ColorFilter::AlphaThreshold(0.0f)->affectsTransparentBlack());
+                      EXPECT_FALSE(ColorFilter::AlphaThreshold(0.5f)->affectsTransparentBlack()));
 
   // LumaColorFilter
-  EXPECT_FALSE(ColorFilter::Luma()->affectsTransparentBlack());
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(ColorFilter::Luma()->affectsTransparentBlack()));
 
   // ComposeColorFilter
   auto innerSafe = ColorFilter::Blend(Color::Red(), BlendMode::SrcIn);
   auto outerUnsafe = ColorFilter::Blend(Color::White(), BlendMode::Screen);
-  EXPECT_TRUE(ColorFilter::Compose(innerSafe, outerUnsafe)->affectsTransparentBlack());
-  EXPECT_TRUE(ColorFilter::Compose(outerUnsafe, innerSafe)->affectsTransparentBlack());
-  EXPECT_FALSE(ColorFilter::Compose(innerSafe, innerSafe)->affectsTransparentBlack());
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_TRUE(ColorFilter::Compose(innerSafe, outerUnsafe)->affectsTransparentBlack());
+      EXPECT_TRUE(ColorFilter::Compose(outerUnsafe, innerSafe)->affectsTransparentBlack());
+      EXPECT_FALSE(ColorFilter::Compose(innerSafe, innerSafe)->affectsTransparentBlack()));
 }
 
 TGFX_TEST(FilterTest, ColorImageFilterTransparent) {
@@ -1095,6 +1099,139 @@ TGFX_TEST(FilterTest, AlphaThresholdZero) {
   paint.setColorFilter(ColorFilter::AlphaThreshold(0.0f));
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/AlphaThresholdZero"));
+}
+
+TGFX_TEST(FilterTest, BlendImageFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+  auto padding = 30.f;
+  auto surfaceWidth = static_cast<int>(imageWidth * 2.f + padding * 3.f);
+  auto surfaceHeight = static_cast<int>(imageHeight * 2.f + padding * 3.f);
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(217, 217, 217));
+
+  // Top-left: SrcOver blend with a color shader.
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(padding, padding));
+  auto colorShader = Shader::MakeColorShader(Color{1.0f, 0.0f, 0.0f, 0.5f});
+  auto filter = ImageFilter::Blend(BlendMode::SrcOver, colorShader);
+  Paint paint = {};
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  // Top-right: SrcOver blend with a noise shader.
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(imageWidth + padding * 2.f, padding));
+  auto noiseShader = Shader::MakeFractalNoise(0.05f, 0.05f, 3, 42);
+  filter = ImageFilter::Blend(BlendMode::SrcOver, noiseShader);
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  // Bottom-left: SrcIn blend with a gradient shader (clips to source alpha).
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(padding, imageHeight + padding * 2.f));
+  auto gradientShader = Shader::MakeLinearGradient(
+      Point::Make(0, 0), Point::Make(imageWidth, imageHeight),
+      {Color{0.0f, 0.0f, 1.0f, 1.0f}, Color{0.0f, 1.0f, 0.0f, 1.0f}}, {});
+  filter = ImageFilter::Blend(BlendMode::SrcIn, gradientShader);
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  // Bottom-right: Multiply blend with a color shader.
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(imageWidth + padding * 2.f, imageHeight + padding * 2.f));
+  auto whiteShader = Shader::MakeColorShader(Color{1.0f, 1.0f, 0.0f, 0.8f});
+  filter = ImageFilter::Blend(BlendMode::Multiply, whiteShader);
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/BlendImageFilter"));
+}
+
+TGFX_TEST(FilterTest, BlendImageFilterClipToSource) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+  auto padding = 30.f;
+  auto surfaceWidth = static_cast<int>(imageWidth * 2.f + padding * 3.f);
+  auto surfaceHeight = static_cast<int>(imageHeight + padding * 2.f);
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(217, 217, 217));
+
+  // Binarized noise: luminanceToAlpha -> AlphaThreshold(0.5) -> fill with semi-transparent black
+  // (0.25 alpha). Reproduces the SVG filter: feTurbulence -> luminanceToAlpha -> discrete threshold
+  // -> feComposite(in, shape) -> feFlood(rgba(0,0,0,0.25)) -> feComposite(in) -> feMerge(shape).
+  // ColorFilter::Matrix correctly handles the premultiplied noise output, producing a clean
+  // luminance value in alpha.
+  constexpr std::array<float, 20> luminanceToAlpha = {
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.0f,    0.0f,    0.0f,    0.0f, 0.0f,  //
+      0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+  };
+  auto binarize = ColorFilter::Compose(ColorFilter::Matrix(luminanceToAlpha),
+                                       ColorFilter::AlphaThreshold(0.5f));
+  binarize = ColorFilter::Compose(
+      binarize, ColorFilter::Blend(Color{0.0f, 0.0f, 0.0f, 0.25f}, BlendMode::SrcIn));
+  auto noiseShader =
+      Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903)->makeWithColorFilter(std::move(binarize));
+
+  // Left: plain Blend with binarized noise, shader extends beyond source bounds.
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(padding, padding));
+  auto filter = ImageFilter::Blend(BlendMode::SrcOver, noiseShader);
+  Paint paint = {};
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  // Right: simulate clipToSource by composing Blend(noise) with Blend(DstIn, imageShader),
+  // clipping the result to the source content area.
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(imageWidth + padding * 2.f, padding));
+  auto blendFilter = ImageFilter::Blend(BlendMode::SrcOver, noiseShader);
+  auto imageShader = Shader::MakeImageShader(image);
+  auto clipFilter = ImageFilter::Blend(BlendMode::DstIn, imageShader);
+  filter = ImageFilter::Compose(blendFilter, clipFilter);
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/BlendImageFilterClipToSource"));
+}
+
+TGFX_TEST(FilterTest, BlendImageFilterNullShader) {
+  auto filter = ImageFilter::Blend(BlendMode::SrcOver, nullptr);
+  EXPECT_EQ(filter, nullptr);
+}
+
+TGFX_TEST(FilterTest, BlendImageFilterVariousModes) {
+  // Valid shader but caller passes a range of blend modes. All combinations must produce a
+  // non-null filter; the DstIsRequired short-circuit only takes effect at FP generation time when
+  // the source image is absent, which the rendering tests above already exercise.
+  auto shader = Shader::MakeColorShader(Color{0.0f, 0.0f, 0.0f, 0.5f});
+  ASSERT_TRUE(shader != nullptr);
+  const BlendMode modes[] = {BlendMode::Src,     BlendMode::SrcOver, BlendMode::SrcOut,
+                             BlendMode::DstIn,   BlendMode::DstOut,  BlendMode::Modulate,
+                             BlendMode::Multiply};
+  for (auto mode : modes) {
+    EXPECT_NE(ImageFilter::Blend(mode, shader), nullptr);
+  }
 }
 
 }  // namespace tgfx

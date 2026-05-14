@@ -20,6 +20,7 @@
 #include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
 #include "gpu/proxies/GPUBufferProxy.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 SurfaceReadback::~SurfaceReadback() {
@@ -52,13 +53,30 @@ const void* SurfaceReadback::lockPixels(Context* context, bool flipY) {
   }
   auto readbackBuffer = proxy->getBuffer();
   if (readbackBuffer == nullptr) {
-    // The readback buffer is not created yet, we need to flush the context to create it.
-    context->flushAndSubmit();
+    // The readback buffer has not been created yet because the transfer task has not been flushed.
+    // Flush all pending drawing and transfer commands, then wait for GPU completion. We must pass
+    // syncCpu=true because the GPU copy-to-buffer command needs to finish before we can map the
+    // buffer and read valid pixel data on the CPU side.
+    //
+    // Why this is necessary across all backends:
+    //   - Vulkan: submit() is async (fence-based), GPU may still be executing the transfer.
+    //   - Metal:  [cmd commit] is async, GPU blit may not have finished yet.
+    //   - OpenGL: glReadPixels is internally synchronous so this is redundant but harmless.
+    //   - DX12:   ExecuteCommandLists is async, same as Vulkan — must fence before Map().
+    context->flushAndSubmit(true);
     readbackBuffer = proxy->getBuffer();
     if (readbackBuffer == nullptr) {
       LOGE("SurfaceReadback::lockPixels() Failed to get readback buffer!");
       return nullptr;
     }
+  } else {
+    // The buffer already exists (transfer task was flushed in a previous submit), but under
+    // asynchronous submission models the GPU transfer command may still be in-flight. We must
+    // wait for all previously submitted GPU work to complete before mapping the buffer.
+    //
+    // Without this wait, map() would return a pointer to memory that the GPU has not yet written
+    // to, resulting in stale or garbage pixel data (observed as test failures on Vulkan).
+    context->gpu()->queue()->waitUntilCompleted();
   }
   auto pixels = readbackBuffer->gpuBuffer()->map();
   if (flipY) {

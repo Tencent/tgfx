@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include "tgfx/core/Rect.h"
 #include "tgfx/gpu/CommandBuffer.h"
@@ -46,11 +47,12 @@ class CommandQueue {
                            size_t size) = 0;
 
   /**
-   * Writes pixel data to the texture within the specified rectangle. The pixel data must match
-   * the texture's pixel format, and the rectangle must be fully contained within the texture's
-   * dimensions. If the texture has mipmaps, you should call CommandEncoder's
-   * generateMipmapsForTexture() method after writing the pixels, as mipmaps will not be generated
-   * automatically.
+   * Writes pixel data to the texture within the specified rectangle. The pixel data is copied
+   * before this call returns — the caller does not need to keep the pixels pointer valid
+   * afterwards. The pixel data must match the texture's pixel format, and the rectangle must be
+   * fully contained within the texture's dimensions. If the texture has mipmaps, you should call
+   * CommandEncoder's generateMipmapsForTexture() method after writing the pixels, as mipmaps will
+   * not be generated automatically.
    */
   virtual void writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, const void* pixels,
                             size_t rowBytes) = 0;
@@ -78,5 +80,26 @@ class CommandQueue {
    * execution on the GPU.
    */
   virtual void waitUntilCompleted() = 0;
+
+ protected:
+  std::chrono::steady_clock::time_point frameTime() const {
+    return _frameTime;
+  }
+
+  virtual std::chrono::steady_clock::time_point completedFrameTime() const {
+    return _frameTime;
+  }
+
+  void advanceFrameTime() {
+    _frameTime = std::chrono::steady_clock::now();
+  }
+
+  std::chrono::steady_clock::time_point _frameTime = {};
+
+ private:
+  friend class Context;
+  friend class GlobalCache;
+  friend class GPU;
+  friend class ResourceCache;
 };
 }  // namespace tgfx

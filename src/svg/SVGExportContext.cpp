@@ -84,27 +84,24 @@ SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
 }
 
 void SVGExportContext::drawFill(const Brush& brush) {
-  drawRect(viewBox, {}, brush, nullptr);
+  drawRect(viewBox, {}, ClipStack(), brush, nullptr);
 }
 
-void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Brush& brush,
-                                const Stroke*) {
-
+void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
+                                const Brush& brush, const Stroke*) {
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(brush)) {
     svg =
         std::make_unique<ElementWriter>("svg", context, this, xmlWriter.get(), resourceBucket.get(),
-                                        exportFlags & SVGExportFlags::DisableWarnings, state, brush,
-                                        nullptr, _targetColorSpace, _assignColorSpace);
+                                        exportFlags & SVGExportFlags::DisableWarnings, matrix,
+                                        brush, nullptr, _targetColorSpace, _assignColorSpace);
     svg->addRectAttributes(rect);
   }
 
-  if (!state.clip.contains(rect)) {
-    applyClipPath(state.clip);
-  }
+  applyClip(clip, matrix.mapRect(rect));
 
   ElementWriter rectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, state, brush, nullptr,
+                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, nullptr,
                             _targetColorSpace, _assignColorSpace);
 
   if (svg) {
@@ -117,38 +114,40 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Br
   }
 }
 
-void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, const Brush& brush,
-                                 const Stroke*) {
-  if (!state.clip.contains(roundRect.rect)) {
-    applyClipPath(state.clip);
-  }
+void SVGExportContext::drawRRect(const RRect& roundRect, const Matrix& matrix,
+                                 const ClipStack& clip, const Brush& brush, const Stroke*) {
+  applyClip(clip, matrix.mapRect(roundRect.rect()));
   if (roundRect.isOval()) {
-    if (roundRect.rect.width() == roundRect.rect.height()) {
+    if (roundRect.rect().width() == roundRect.rect().height()) {
       ElementWriter circleElement("circle", context, this, xmlWriter.get(), resourceBucket.get(),
-                                  exportFlags & SVGExportFlags::DisableWarnings, state, brush,
+                                  exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
                                   nullptr, _targetColorSpace, _assignColorSpace);
-      circleElement.addCircleAttributes(roundRect.rect);
+      circleElement.addCircleAttributes(roundRect.rect());
       return;
     } else {
       ElementWriter ovalElement("ellipse", context, this, xmlWriter.get(), resourceBucket.get(),
-                                exportFlags & SVGExportFlags::DisableWarnings, state, brush,
+                                exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
                                 nullptr, _targetColorSpace, _assignColorSpace);
-      ovalElement.addEllipseAttributes(roundRect.rect);
+      ovalElement.addEllipseAttributes(roundRect.rect());
     }
+  } else if (roundRect.isComplex()) {
+    // SVG <rect> only supports uniform rx/ry. Complex RRects must be exported as <path>.
+    Path path = {};
+    path.addRRect(roundRect);
+    drawPath(path, matrix, clip, brush);
   } else {
     ElementWriter rrectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
-                               exportFlags & SVGExportFlags::DisableWarnings, state, brush, nullptr,
-                               _targetColorSpace, _assignColorSpace);
+                               exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
+                               nullptr, _targetColorSpace, _assignColorSpace);
     rrectElement.addRoundRectAttributes(roundRect);
   }
 }
 
-void SVGExportContext::drawPath(const Path& path, const MCState& state, const Brush& brush) {
-  if (!state.clip.contains(path.getBounds())) {
-    applyClipPath(state.clip);
-  }
+void SVGExportContext::drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
+                                const Brush& brush) {
+  applyClip(clip, matrix.mapRect(path.getBounds()));
   ElementWriter pathElement("path", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, state, brush, nullptr,
+                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, nullptr,
                             _targetColorSpace, _assignColorSpace);
   pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
   if (path.getFillType() == PathFillType::EvenOdd) {
@@ -156,25 +155,69 @@ void SVGExportContext::drawPath(const Path& path, const MCState& state, const Br
   }
 }
 
-void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const Brush& brush, const Stroke* stroke) {
+void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix,
+                                 const ClipStack& clip, const Brush& brush, const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   shape = Shape::ApplyStroke(shape, stroke);
-  auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix.getMaxScale());
-  drawPath(path, state, brush);
+  auto path = ShapeUtils::GetShapeRenderingPath(shape, matrix.getMaxScale());
+  drawPath(path, matrix, clip, brush);
 }
 
 void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                 const MCState& state, const Brush& brush) {
+                                 const Matrix& matrix, const ClipStack& clip, const Brush& brush) {
   DEBUG_ASSERT(image != nullptr);
   auto type = Types::Get(image.get());
   if (type == Types::ImageType::Picture) {
-    const auto pictureImage = static_cast<const PictureImage*>(image.get());
-    auto newState = state;
-    if (pictureImage->matrix) {
-      newState.matrix.preConcat(*pictureImage->matrix);
+    if (brush.nothingToDraw()) {
+      return;
     }
-    drawPicture(pictureImage->picture, newState);
+    // Keep PictureImage vectorized when the brush only carries effects SVG <g> can express:
+    // alpha as opacity, Blend/Matrix colorFilter as a <filter> resource, and a separable blend
+    // mode as mix-blend-mode. Anything else (shader, maskFilter, Porter-Duff blend without an
+    // SVG mapping, or unsupported colorFilter subtype) rasterizes.
+    bool canVectorize = brush.shader == nullptr && brush.maskFilter == nullptr;
+    std::string blendModeStyle;
+    if (canVectorize && brush.blendMode != BlendMode::SrcOver) {
+      auto svgBlendMode = ToSVGBlendMode(brush.blendMode);
+      if (svgBlendMode.empty() || svgBlendMode == "normal") {
+        canVectorize = false;
+      } else {
+        blendModeStyle = "mix-blend-mode: " + svgBlendMode;
+      }
+    }
+    std::shared_ptr<ColorFilter> vectorColorFilter;
+    if (canVectorize && brush.colorFilter) {
+      auto colorFilterType = Types::Get(brush.colorFilter.get());
+      // Decide expressibility WITHOUT writing <defs> yet; the actual <defs>/<filter> emission is
+      // deferred to exportPictureImageAsVector so it lands AFTER the outer clip wrapper has been
+      // closed and at the same XML level as the brush <g> that consumes it.
+      bool expressible =
+          colorFilterType == Types::ColorFilterType::Matrix ||
+          (colorFilterType == Types::ColorFilterType::Blend &&
+           !ToSVGBlendMode(static_cast<const ModeColorFilter*>(brush.colorFilter.get())->mode)
+                .empty());
+      if (!expressible) {
+        canVectorize = false;
+      } else {
+        vectorColorFilter = brush.colorFilter;
+      }
+    }
+    if (canVectorize) {
+      const auto pictureImage = static_cast<const PictureImage*>(image.get());
+      auto newMatrix = matrix;
+      if (pictureImage->matrix) {
+        newMatrix.preConcat(*pictureImage->matrix);
+      }
+      exportPictureImageAsVector(pictureImage, newMatrix, clip, vectorColorFilter, blendModeStyle,
+                                 brush.color.alpha);
+      return;
+    }
+    auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
+    Bitmap bitmap = ImageExportToBitmap(context, modifyImage);
+    if (!bitmap.isEmpty()) {
+      applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
+      exportPixmap(Pixmap(bitmap), matrix, brush);
+    }
   } else if (type == Types::ImageType::Filter) {
     const auto filterImage = static_cast<const FilterImage*>(image.get());
     auto filter = filterImage->filter;
@@ -184,7 +227,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
                              (filtBound.height() - bound.height()) / 2);
     auto offset =
         Point::Make((filtBound.centerX() - bound.centerX()), filtBound.centerY() - bound.centerY());
-    bound = state.matrix.mapRect(bound);
+    bound = matrix.mapRect(bound);
 
     Resources resources;
     if (filter) {
@@ -192,7 +235,24 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
                          _assignColorSpace);
       resources = defs.addImageFilterResource(filter, bound, customWriter);
     }
+    auto clipPath = clip.getClipPath();
+    bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+    std::string clipID;
+    if (needsClip) {
+      clipID = defineClipPath(clipPath);
+    }
     {
+      // Close any active clip group from prior draws so the local clip/transform/filter
+      // groups below sit at the correct parent level. On exit, leave both members cleared
+      // so the next applyClipPath rebuilds the clip group instead of short-circuiting on
+      // a matching currentClipPath.
+      clipGroupElement = nullptr;
+      currentClipPath = {};
+      std::unique_ptr<ElementWriter> clipElement;
+      if (needsClip) {
+        clipElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+        clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
+      }
       auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
       if (!outer.isZero()) {
         groupElement->addAttribute(
@@ -201,7 +261,9 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       if (filter) {
         groupElement->addAttribute("filter", resources.filter);
       }
-      drawImage(filterImage->source, sampling, state, brush);
+      drawImage(filterImage->source, sampling, matrix, needsClip ? ClipStack{} : clip, brush);
+      clipGroupElement = nullptr;
+      currentClipPath = {};
     }
   } else if (type == Types::ImageType::Subset) {
     const auto subsetImage = static_cast<const SubsetImage*>(image.get());
@@ -216,19 +278,20 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       groupElement->addAttribute("transform",
                                  ToSVGTransform(Matrix::MakeTrans(offset.x, offset.y)));
     }
-    drawImage(subsetImage->source, sampling, state, brush);
+    drawImage(subsetImage->source, sampling, matrix, clip, brush);
   } else {
     auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
     Bitmap bitmap = ImageExportToBitmap(context, modifyImage);
     if (!bitmap.isEmpty()) {
-      exportPixmap(Pixmap(bitmap), state, brush);
+      exportPixmap(Pixmap(bitmap), matrix, brush);
     }
   }
 }
 
 void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                      const Rect& dstRect, const SamplingOptions&,
-                                     const MCState& state, const Brush& brush, SrcRectConstraint) {
+                                     const Matrix& matrix, const ClipStack& clip,
+                                     const Brush& brush, SrcRectConstraint) {
   DEBUG_ASSERT(image != nullptr);
   auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
   auto subsetImage = modifyImage->makeSubset(srcRect);
@@ -237,21 +300,22 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
   }
   Bitmap bitmap = ImageExportToBitmap(context, subsetImage);
   if (!bitmap.isEmpty()) {
+    applyClip(clip, matrix.mapRect(dstRect));
+
     auto viewMatrix =
         MakeRectToRectMatrix(Rect::MakeWH(srcRect.width(), srcRect.height()), dstRect);
 
-    MCState newState;
-    newState.matrix = state.matrix;
-    newState.matrix.preConcat(viewMatrix);
+    auto newMatrix = matrix;
+    newMatrix.preConcat(viewMatrix);
 
     auto fillMatrix = Matrix::I();
     viewMatrix.invert(&fillMatrix);
 
-    exportPixmap(Pixmap(bitmap), newState, brush.makeWithMatrix(fillMatrix));
+    exportPixmap(Pixmap(bitmap), newMatrix, brush.makeWithMatrix(fillMatrix));
   }
 }
 
-void SVGExportContext::exportPixmap(const Pixmap& pixmap, const MCState& state,
+void SVGExportContext::exportPixmap(const Pixmap& pixmap, const Matrix& matrix,
                                     const Brush& brush) {
   auto dataUri = AsDataUri(pixmap);
   if (!dataUri) {
@@ -271,19 +335,18 @@ void SVGExportContext::exportPixmap(const Pixmap& pixmap, const MCState& state,
   }
   {
     ElementWriter imageUse("use", context, this, xmlWriter.get(), resourceBucket.get(),
-                           exportFlags & SVGExportFlags::DisableWarnings, state, brush, nullptr,
+                           exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, nullptr,
                            _targetColorSpace, _assignColorSpace);
     imageUse.addAttribute("xlink:href", "#" + imageID);
   }
 }
 
-void SVGExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
-                                    const Brush& brush, const Stroke* stroke) {
+void SVGExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
+                                    const ClipStack& clip, const Brush& brush,
+                                    const Stroke* stroke) {
   DEBUG_ASSERT(textBlob != nullptr);
-  auto deviceBounds = state.matrix.mapRect(textBlob->getBounds());
-  if (!state.clip.contains(deviceBounds)) {
-    applyClipPath(state.clip);
-  }
+  auto deviceBounds = matrix.mapRect(textBlob->getBounds());
+  applyClip(clip, deviceBounds);
   for (auto glyphRun : *textBlob) {
     auto typeface = glyphRun.font.getTypeface();
     if (typeface == nullptr) {
@@ -295,21 +358,21 @@ void SVGExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MC
       if (HasComplexTransform(glyphRun) ||
           (glyphRun.font.hasOutlines() && !glyphRun.font.hasColor() &&
            exportFlags & SVGExportFlags::ConvertTextToPaths)) {
-        exportGlyphRunAsPath(glyphRun, state, brush, stroke);
+        exportGlyphRunAsPath(glyphRun, matrix, brush, stroke);
       } else {
-        exportGlyphRunAsText(glyphRun, state, brush, stroke);
+        exportGlyphRunAsText(glyphRun, matrix, brush, stroke);
       }
     } else {
       if (glyphRun.font.hasColor()) {
-        exportGlyphRunAsImage(glyphRun, state, brush);
+        exportGlyphRunAsImage(glyphRun, matrix, clip, brush);
       } else {
-        exportGlyphRunAsPath(glyphRun, state, brush, stroke);
+        exportGlyphRunAsPath(glyphRun, matrix, brush, stroke);
       }
     }
   }
 }
 
-void SVGExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCState& state,
+void SVGExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matrix& matrix,
                                             const Brush& brush, const Stroke* stroke) {
   Path path = {};
   auto& font = glyphRun.font;
@@ -327,7 +390,7 @@ void SVGExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCSt
     return;
   }
   ElementWriter pathElement("path", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, state, brush, stroke,
+                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, stroke,
                             _targetColorSpace, _assignColorSpace);
   pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
   if (path.getFillType() == PathFillType::EvenOdd) {
@@ -335,10 +398,10 @@ void SVGExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCSt
   }
 }
 
-void SVGExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCState& state,
+void SVGExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matrix& matrix,
                                             const Brush& brush, const Stroke* stroke) {
   ElementWriter textElement("text", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, state, brush, stroke,
+                            exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, stroke,
                             _targetColorSpace, _assignColorSpace);
 
   textElement.addFontAttributes(glyphRun.font);
@@ -349,9 +412,9 @@ void SVGExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
   textElement.addText(unicharInfo.text);
 }
 
-void SVGExportContext::exportGlyphRunAsImage(const GlyphRun& glyphRun, const MCState& state,
-                                             const Brush& brush) {
-  auto scale = state.matrix.getMaxScale();
+void SVGExportContext::exportGlyphRunAsImage(const GlyphRun& glyphRun, const Matrix& matrix,
+                                             const ClipStack& clip, const Brush& brush) {
+  auto scale = matrix.getMaxScale();
   if (FloatNearlyZero(scale)) {
     return;
   }
@@ -359,47 +422,114 @@ void SVGExportContext::exportGlyphRunAsImage(const GlyphRun& glyphRun, const MCS
   size_t glyphCount = glyphRun.glyphCount;
   for (size_t i = 0; i < glyphCount; ++i) {
     auto glyphID = glyphRun.glyphs[i];
-    auto glyphMatrix = GetGlyphMatrix(glyphRun, i);
-    auto glyphState = state;
-    auto glyphCodec = font.getImage(glyphID, nullptr, &glyphState.matrix);
+    auto glyphRunMatrix = GetGlyphMatrix(glyphRun, i);
+    auto glyphMatrix = matrix;
+    auto glyphCodec = font.getImage(glyphID, nullptr, &glyphMatrix);
     auto glyphImage = Image::MakeFrom(glyphCodec);
     if (glyphImage == nullptr) {
       continue;
     }
-    glyphState.matrix.postScale(1.0f / scale, 1.0f / scale);
-    glyphState.matrix.postConcat(glyphMatrix);
-    glyphState.matrix.postConcat(state.matrix);
+    glyphMatrix.postScale(1.0f / scale, 1.0f / scale);
+    glyphMatrix.postConcat(glyphRunMatrix);
+    glyphMatrix.postConcat(matrix);
     auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-    drawImageRect(std::move(glyphImage), rect, rect, {}, glyphState, brush,
+    drawImageRect(std::move(glyphImage), rect, rect, {}, glyphMatrix, clip, brush,
                   SrcRectConstraint::Fast);
   }
 }
 
-void SVGExportContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
+void SVGExportContext::drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,
+                                   const ClipStack& clip) {
   DEBUG_ASSERT(picture != nullptr);
-  picture->playback(this, state);
+  picture->playback(this, matrix, clip);
+}
+
+void SVGExportContext::exportPictureImageAsVector(const PictureImage* pictureImage,
+                                                  const Matrix& matrix, const ClipStack& clip,
+                                                  const std::shared_ptr<ColorFilter>& colorFilter,
+                                                  const std::string& blendModeStyle, float alpha) {
+  // Skip the wrapper when there is nothing to attach to it.
+  if (!colorFilter && blendModeStyle.empty() && alpha == 1.0f) {
+    drawPicture(pictureImage->picture, matrix, clip);
+    return;
+  }
+  // Lift the outer clip to a single <g clip-path> wrapping the brush group so nested playback
+  // ops do not redefine identical clipPath resources. See drawLayer for the same pattern.
+  // Use the PictureImage's logical output rect (not the raw picture bounds) so the contains()
+  // check matches what is actually painted into the SVG.
+  auto clipPath = clip.getClipPath();
+  auto bound = matrix.mapRect(Rect::MakeWH(static_cast<float>(pictureImage->width()),
+                                           static_cast<float>(pictureImage->height())));
+  bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+  {
+    // Close any clip wrapper opened by previous draws BEFORE emitting our <clipPath>, <defs>
+    // and brush <g>. Otherwise these resources would be nested inside a stale <g clip-path>
+    // that does not belong to this draw, leaving them at the wrong XML depth.
+    clipGroupElement = nullptr;
+    currentClipPath = {};
+    std::string clipID;
+    if (needsClip) {
+      clipID = defineClipPath(clipPath);
+    }
+    std::string filterUrl;
+    if (colorFilter) {
+      ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
+                         _assignColorSpace);
+      filterUrl = defs.addColorFilterResource(colorFilter).filter;
+    }
+    std::unique_ptr<ElementWriter> clipElement;
+    if (needsClip) {
+      clipElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+      clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
+    }
+    ElementWriter brushGroup("g", xmlWriter, resourceBucket.get());
+    if (!filterUrl.empty()) {
+      brushGroup.addAttribute("filter", filterUrl);
+    }
+    if (!blendModeStyle.empty()) {
+      brushGroup.addAttribute("style", blendModeStyle);
+    }
+    if (alpha != 1.0f) {
+      brushGroup.addAttribute("opacity", alpha);
+    }
+    drawPicture(pictureImage->picture, matrix, needsClip ? ClipStack{} : clip);
+    clipGroupElement = nullptr;
+    currentClipPath = {};
+  }
 }
 
 void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
-                                 std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
-                                 const Brush&) {
+                                 std::shared_ptr<ImageFilter> imageFilter, const Matrix& matrix,
+                                 const ClipStack& clip, const Brush&) {
   DEBUG_ASSERT(picture != nullptr);
   Resources resources;
+  auto bound = matrix.mapRect(picture->getBounds());
   if (imageFilter) {
     ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                        _assignColorSpace);
-    auto bound = picture->getBounds();
-    resources = defs.addImageFilterResource(imageFilter, bound, customWriter);
+    resources = defs.addImageFilterResource(imageFilter, picture->getBounds(), customWriter);
+  }
+  auto clipPath = clip.getClipPath();
+  bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+  std::string clipID;
+  if (needsClip) {
+    clipID = defineClipPath(clipPath);
   }
   {
-    if (!state.clip.contains(picture->getBounds())) {
-      applyClipPath(state.clip);
-    }
+    // See drawImage FilterImage branch for why the active clip state is cleared here and
+    // left cleared on exit instead of being saved and restored.
+    clipGroupElement = nullptr;
+    currentClipPath = {};
     auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
+    if (needsClip) {
+      groupElement->addAttribute("clip-path", "url(#" + clipID + ")");
+    }
     if (imageFilter) {
       groupElement->addAttribute("filter", resources.filter);
     }
-    picture->playback(this, state);
+    picture->playback(this, matrix, needsClip ? ClipStack{} : clip);
+    clipGroupElement = nullptr;
+    currentClipPath = {};
   }
 }
 
@@ -421,41 +551,58 @@ SVGPathParser::PathEncoding SVGExportContext::PathEncodingType() {
   return SVGPathParser::PathEncoding::Absolute;
 }
 
-void SVGExportContext::applyClipPath(const Path& clipPath) {
-  auto defineClip = [this](const Path& clipPath) -> std::string {
-    std::string clipID = resourceBucket->addClip();
-    ElementWriter clipPathElement("clipPath", xmlWriter);
-    clipPathElement.addAttribute("id", clipID);
-    {
-      std::unique_ptr<ElementWriter> element;
-      Rect rect;
-      RRect rrect;
-      Rect ovalBound;
-      if (clipPath.isRect(&rect)) {
-        element = std::make_unique<ElementWriter>("rect", xmlWriter);
-        element->addRectAttributes(rect);
-      } else if (clipPath.isRRect(&rrect)) {
-        element = std::make_unique<ElementWriter>("rect", xmlWriter);
-        element->addRoundRectAttributes(rrect);
-      } else if (clipPath.isOval(&ovalBound)) {
-        if (FloatNearlyEqual(ovalBound.width(), ovalBound.height())) {
-          element = std::make_unique<ElementWriter>("circle", xmlWriter);
-          element->addCircleAttributes(ovalBound);
-        } else {
-          element = std::make_unique<ElementWriter>("ellipse", xmlWriter);
-          element->addEllipseAttributes(ovalBound);
-        }
+void SVGExportContext::applyClip(const ClipStack& clip, const Rect& contentBound) {
+  // SVG export merges all clip elements into a single path to reduce file complexity.
+  // Per-element anti-alias info is lost; the merged path's AA is left to the SVG renderer.
+  auto clipPath = clip.getClipPath();
+  if (clipPath.contains(contentBound)) {
+    // No clip needed for this draw, but a previous draw may have left a <g clip-path>
+    // wrapper open. Only close it when the active wrapper's clip differs from ours;
+    // matching wrappers are kept so consecutive same-clip draws keep sharing one group.
+    if (clipPath != currentClipPath) {
+      clipGroupElement = nullptr;
+      currentClipPath = {};
+    }
+    return;
+  }
+  applyClipPath(clipPath);
+}
+
+std::string SVGExportContext::defineClipPath(const Path& clipPath) {
+  std::string clipID = resourceBucket->addClip();
+  ElementWriter clipPathElement("clipPath", xmlWriter);
+  clipPathElement.addAttribute("id", clipID);
+  {
+    std::unique_ptr<ElementWriter> element;
+    Rect rect;
+    RRect rrect;
+    Rect ovalBound;
+    if (clipPath.isRect(&rect)) {
+      element = std::make_unique<ElementWriter>("rect", xmlWriter);
+      element->addRectAttributes(rect);
+    } else if (clipPath.isRRect(&rrect) && !rrect.isComplex()) {
+      element = std::make_unique<ElementWriter>("rect", xmlWriter);
+      element->addRoundRectAttributes(rrect);
+    } else if (clipPath.isOval(&ovalBound)) {
+      if (FloatNearlyEqual(ovalBound.width(), ovalBound.height())) {
+        element = std::make_unique<ElementWriter>("circle", xmlWriter);
+        element->addCircleAttributes(ovalBound);
       } else {
-        element = std::make_unique<ElementWriter>("path", xmlWriter);
-        element->addPathAttributes(clipPath, tgfx::SVGExportContext::PathEncodingType());
-        if (clipPath.getFillType() == PathFillType::EvenOdd) {
-          element->addAttribute("clip-rule", "evenodd");
-        }
+        element = std::make_unique<ElementWriter>("ellipse", xmlWriter);
+        element->addEllipseAttributes(ovalBound);
+      }
+    } else {
+      element = std::make_unique<ElementWriter>("path", xmlWriter);
+      element->addPathAttributes(clipPath, tgfx::SVGExportContext::PathEncodingType());
+      if (clipPath.getFillType() == PathFillType::EvenOdd) {
+        element->addAttribute("clip-rule", "evenodd");
       }
     }
-    return clipID;
-  };
+  }
+  return clipID;
+}
 
+void SVGExportContext::applyClipPath(const Path& clipPath) {
   if (clipPath == currentClipPath) {
     return;
   }
@@ -464,7 +611,7 @@ void SVGExportContext::applyClipPath(const Path& clipPath) {
     return;
   }
   currentClipPath = clipPath;
-  auto clipID = defineClip(currentClipPath);
+  auto clipID = defineClipPath(currentClipPath);
   clipGroupElement = std::make_unique<ElementWriter>("g", xmlWriter);
   clipGroupElement->addAttribute("clip-path", "url(#" + clipID + ")");
 }

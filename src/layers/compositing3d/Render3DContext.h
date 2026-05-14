@@ -24,7 +24,6 @@
 
 namespace tgfx {
 
-class BackgroundContext;
 class Context3DCompositor;
 
 /**
@@ -34,8 +33,7 @@ class Context3DCompositor;
 class Render3DContext : public Layer3DContext {
  public:
   Render3DContext(std::shared_ptr<Context3DCompositor> compositor, const Rect& renderRect,
-                  float contentScale, std::shared_ptr<ColorSpace> colorSpace,
-                  std::shared_ptr<BackgroundContext> backgroundContext);
+                  float contentScale, std::shared_ptr<ColorSpace> colorSpace);
 
   void finishAndDrawTo(Canvas* canvas, bool antialiasing) override;
 
@@ -47,7 +45,6 @@ class Render3DContext : public Layer3DContext {
 
  private:
   std::shared_ptr<Context3DCompositor> _compositor = nullptr;
-  std::shared_ptr<BackgroundContext> _backgroundContext = nullptr;
   std::stack<PictureRecorder> _recorderStack = {};
 };
 

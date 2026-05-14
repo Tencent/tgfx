@@ -37,6 +37,8 @@ namespace tgfx {
 
 class ResourceStore;
 class ElementWriter;
+class PictureImage;
+class ColorFilter;
 
 class SVGExportContext : public DrawContext {
  public:
@@ -52,35 +54,37 @@ class SVGExportContext : public DrawContext {
 
   void drawFill(const Brush& brush) override;
 
-  void drawRect(const Rect& rect, const MCState& state, const Brush& brush,
+  void drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip, const Brush& brush,
                 const Stroke* stroke) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
-                 const Stroke* stroke) override;
+  void drawRRect(const RRect& rRect, const Matrix& matrix, const ClipStack& clip,
+                 const Brush& brush, const Stroke* stroke) override;
 
-  void drawPath(const Path& path, const MCState& state, const Brush& brush) override;
+  void drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
+                const Brush& brush) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush,
-                 const Stroke* stroke) override;
+  void drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix, const ClipStack& clip,
+                 const Brush& brush, const Stroke* stroke) override;
 
-  void drawMesh(std::shared_ptr<Mesh>, const MCState&, const Brush&) override {
+  void drawMesh(std::shared_ptr<Mesh>, const Matrix&, const ClipStack&, const Brush&) override {
     // SVG does not support mesh rendering.
   }
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const Brush& brush) override;
+                 const Matrix& matrix, const ClipStack& clip, const Brush& brush) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling, const MCState& state, const Brush& brush,
-                     SrcRectConstraint constraint) override;
+                     const SamplingOptions& sampling, const Matrix& matrix, const ClipStack& clip,
+                     const Brush& brush, SrcRectConstraint constraint) override;
 
-  void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state, const Brush& brush,
-                    const Stroke* stroke) override;
+  void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix, const ClipStack& clip,
+                    const Brush& brush, const Stroke* stroke) override;
 
-  void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
+  void drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,
+                   const ClipStack& clip) override;
 
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                 const MCState& state, const Brush& brush) override;
+                 const Matrix& matrix, const ClipStack& clip, const Brush& brush) override;
 
   XMLWriter* getWriter() const {
     return xmlWriter.get();
@@ -103,17 +107,36 @@ class SVGExportContext : public DrawContext {
    */
   static bool RequiresViewportReset(const Brush& brush);
 
-  void exportPixmap(const Pixmap& pixmap, const MCState& state, const Brush& brush);
+  void exportPixmap(const Pixmap& pixmap, const Matrix& matrix, const Brush& brush);
 
-  void exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCState& state, const Brush& brush,
+  /**
+   * Replays a PictureImage as SVG vector elements, wrapped in a single <g> carrying any
+   * colorFilter as a <filter> resource, any non-empty blendModeStyle (as a CSS mix-blend-mode),
+   * and any alpha < 1. All three empty/identity skip the corresponding attributes; the wrapper
+   * is elided when none apply. The colorFilter must be one of the SVG-expressible types (Matrix
+   * or Blend with a mappable BlendMode); the caller is responsible for filtering out the rest.
+   * The associated <defs>/<filter> is emitted from inside this function, AFTER the active clip
+   * group is closed, so it is placed at the same level as the brush <g> that consumes it.
+   */
+  void exportPictureImageAsVector(const PictureImage* pictureImage, const Matrix& matrix,
+                                  const ClipStack& clip,
+                                  const std::shared_ptr<ColorFilter>& colorFilter,
+                                  const std::string& blendModeStyle, float alpha);
+
+  void exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matrix& matrix, const Brush& brush,
                             const Stroke* stroke);
 
-  void exportGlyphRunAsText(const GlyphRun& glyphRun, const MCState& state, const Brush& brush,
+  void exportGlyphRunAsText(const GlyphRun& glyphRun, const Matrix& matrix, const Brush& brush,
                             const Stroke* stroke);
 
-  void exportGlyphRunAsImage(const GlyphRun& glyphRun, const MCState& state, const Brush& brush);
+  void exportGlyphRunAsImage(const GlyphRun& glyphRun, const Matrix& matrix, const ClipStack& clip,
+                             const Brush& brush);
+
+  void applyClip(const ClipStack& clip, const Rect& contentBound);
 
   void applyClipPath(const Path& clipPath);
+
+  std::string defineClipPath(const Path& clipPath);
 
   static SVGPathParser::PathEncoding PathEncodingType();
 

@@ -19,7 +19,8 @@
 #include "tgfx/gpu/opengl/egl/EGLGlobals.h"
 #include <EGL/eglext.h>
 #include <atomic>
-#if defined(_WIN32)
+#include <cstring>
+#if defined(TGFX_USE_ANGLE)
 #include "EGLDisplayWrapper.h"
 #endif
 
@@ -28,7 +29,7 @@ EGLGlobals InitializeEGL() {
   EGLGlobals globals = {};
   EGLint majorVersion;
   EGLint minorVersion;
-#if defined(_WIN32)
+#if defined(TGFX_USE_ANGLE)
   do {
     globals.display = EGLDisplayWrapper::EGLGetPlatformDisplay();
   } while (eglInitialize(globals.display, &majorVersion, &minorVersion) == EGL_FALSE &&
@@ -41,6 +42,10 @@ EGLGlobals InitializeEGL() {
   globals.pbufferSurfaceAttributes = {EGL_WIDTH,           1,        EGL_HEIGHT, 1,
                                       EGL_LARGEST_PBUFFER, EGL_TRUE, EGL_NONE};
   eglBindAPI(EGL_OPENGL_ES_API);
+  auto extensions = eglQueryString(globals.display, EGL_EXTENSIONS);
+  if (extensions && strstr(extensions, "EGL_EXT_create_context_robustness")) {
+    globals.contextRobustnessSupported = true;
+  }
   EGLint numConfigs = 0;
   const EGLint configAttribs[] = {EGL_SURFACE_TYPE,
                                   EGL_WINDOW_BIT,

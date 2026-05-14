@@ -210,7 +210,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   textLayer->setFont(font);
   parentLayer->addChild(textLayer);
   auto textLayerBounds = textLayer->getBounds(nullptr, true);
-  textLayerBounds = textLayer->getGlobalMatrix().mapRect(textLayerBounds);
+  TGFX_PRIVATE_ACCESS(textLayerBounds = textLayer->getGlobalMatrix().mapRect(textLayerBounds));
 
   auto textLayer2 = TextLayer::Make();
   textLayer2->setMatrix(Matrix::MakeTrans(50.0f, 100.0f));
@@ -224,7 +224,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   textLayer2->setFont(font);
   parentLayer->addChild(textLayer2);
   auto textLayer2Bounds = textLayer2->getBounds(nullptr, true);
-  textLayer2Bounds = textLayer2->getGlobalMatrix().mapRect(textLayer2Bounds);
+  TGFX_PRIVATE_ACCESS(textLayer2Bounds = textLayer2->getGlobalMatrix().mapRect(textLayer2Bounds));
 
   auto textLayer3 = TextLayer::Make();
   textLayer3->setMatrix(Matrix::MakeTrans(50.0f, 200.0f));
@@ -238,7 +238,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   textLayer3->setFont(font);
   parentLayer->addChild(textLayer3);
   auto textLayer3Bounds = textLayer3->getBounds(nullptr, true);
-  textLayer3Bounds = textLayer3->getGlobalMatrix().mapRect(textLayer3Bounds);
+  TGFX_PRIVATE_ACCESS(textLayer3Bounds = textLayer3->getGlobalMatrix().mapRect(textLayer3Bounds));
 
   auto textLayer4 = TextLayer::Make();
   textLayer4->setMatrix(Matrix::MakeTrans(50.0f, 300.0f));
@@ -252,7 +252,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   textLayer4->setFont(font);
   parentLayer->addChild(textLayer4);
   auto textLayer4Bounds = textLayer4->getBounds(nullptr, true);
-  textLayer4Bounds = textLayer4->getGlobalMatrix().mapRect(textLayer4Bounds);
+  TGFX_PRIVATE_ACCESS(textLayer4Bounds = textLayer4->getGlobalMatrix().mapRect(textLayer4Bounds));
 
   auto textLayer5 = TextLayer::Make();
   textLayer5->setMatrix(Matrix::MakeTrans(50.0f, 400.0f));
@@ -266,7 +266,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   textLayer5->setFont(font);
   parentLayer->addChild(textLayer5);
   auto textLayer5Bounds = textLayer5->getBounds(nullptr, true);
-  textLayer5Bounds = textLayer5->getGlobalMatrix().mapRect(textLayer5Bounds);
+  TGFX_PRIVATE_ACCESS(textLayer5Bounds = textLayer5->getGlobalMatrix().mapRect(textLayer5Bounds));
 
   displayList->root()->addChild(rootLayer);
   displayList->render(surface.get());
@@ -314,7 +314,7 @@ TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
   textLayer->setFont(font);
   parentLayer->addChild(textLayer);
   auto textLayerBounds = textLayer->getBounds(nullptr, true);
-  textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
+  TGFX_PRIVATE_ACCESS(textLayer->getGlobalMatrix().mapRect(&textLayerBounds));
 
   auto textLayer2 = TextLayer::Make();
   textLayer2->setMatrix(Matrix::MakeTrans(100.0f, 0.0f));
@@ -328,7 +328,7 @@ TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
   textLayer2->setFont(font);
   parentLayer->addChild(textLayer2);
   auto textLayer2Bounds = textLayer2->getBounds(nullptr, true);
-  textLayer2->getGlobalMatrix().mapRect(&textLayer2Bounds);
+  TGFX_PRIVATE_ACCESS(textLayer2->getGlobalMatrix().mapRect(&textLayer2Bounds));
 
   auto textLayer3 = TextLayer::Make();
   textLayer3->setMatrix(Matrix::MakeTrans(200.0f, 0.0f));
@@ -342,7 +342,7 @@ TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
   textLayer3->setFont(font);
   parentLayer->addChild(textLayer3);
   auto textLayer3Bounds = textLayer3->getBounds(nullptr, true);
-  textLayer3->getGlobalMatrix().mapRect(&textLayer3Bounds);
+  TGFX_PRIVATE_ACCESS(textLayer3->getGlobalMatrix().mapRect(&textLayer3Bounds));
 
   auto textLayer4 = TextLayer::Make();
   textLayer4->setMatrix(Matrix::MakeTrans(300.0f, 0.0f));
@@ -356,7 +356,7 @@ TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
   textLayer4->setFont(font);
   parentLayer->addChild(textLayer4);
   auto textLayer4Bounds = textLayer4->getBounds(nullptr, true);
-  textLayer4->getGlobalMatrix().mapRect(&textLayer4Bounds);
+  TGFX_PRIVATE_ACCESS(textLayer4->getGlobalMatrix().mapRect(&textLayer4Bounds));
 
   auto textLayer5 = TextLayer::Make();
   textLayer5->setMatrix(Matrix::MakeTrans(0.0f, 300.0f));
@@ -370,7 +370,7 @@ TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
   textLayer5->setFont(font);
   parentLayer->addChild(textLayer5);
   auto textLayer5Bounds = textLayer5->getBounds(nullptr, true);
-  textLayer5->getGlobalMatrix().mapRect(&textLayer5Bounds);
+  TGFX_PRIVATE_ACCESS(textLayer5->getGlobalMatrix().mapRect(&textLayer5Bounds));
 
   auto textLayer6 = TextLayer::Make();
   textLayer6->setMatrix(Matrix::MakeTrans(100.0f, 300.0f));
@@ -384,7 +384,7 @@ TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
   textLayer6->setFont(font);
   parentLayer->addChild(textLayer6);
   auto textLayer6Bounds = textLayer6->getBounds(nullptr, true);
-  textLayer6->getGlobalMatrix().mapRect(&textLayer6Bounds);
+  TGFX_PRIVATE_ACCESS(textLayer6->getGlobalMatrix().mapRect(&textLayer6Bounds));
 
   auto textLayer7 = TextLayer::Make();
   textLayer7->setMatrix(Matrix::MakeTrans(200.0f, 300.0f));
@@ -398,7 +398,7 @@ TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
   textLayer7->setFont(font);
   parentLayer->addChild(textLayer7);
   auto textLayer7Bounds = textLayer7->getBounds(nullptr, true);
-  textLayer7->getGlobalMatrix().mapRect(&textLayer7Bounds);
+  TGFX_PRIVATE_ACCESS(textLayer7->getGlobalMatrix().mapRect(&textLayer7Bounds));
 
   auto textLayer8 = TextLayer::Make();
   textLayer8->setMatrix(Matrix::MakeTrans(300.0f, 300.0f));
@@ -412,7 +412,7 @@ TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
   textLayer8->setFont(font);
   parentLayer->addChild(textLayer8);
   auto textLayer8Bounds = textLayer8->getBounds(nullptr, true);
-  textLayer8->getGlobalMatrix().mapRect(&textLayer8Bounds);
+  TGFX_PRIVATE_ACCESS(textLayer8->getGlobalMatrix().mapRect(&textLayer8Bounds));
 
   displayList->root()->addChild(rootLayer);
   displayList->render(surface.get());
@@ -462,7 +462,7 @@ TGFX_TEST(TextAlignTest, SingleLineTextAlign) {
   textLayer->setFont(font);
   parentLayer->addChild(textLayer);
   auto textLayerBounds = textLayer->getBounds(nullptr, true);
-  textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
+  TGFX_PRIVATE_ACCESS(textLayer->getGlobalMatrix().mapRect(&textLayerBounds));
 
   auto textLayer2 = TextLayer::Make();
   textLayer2->setMatrix(Matrix::MakeTrans(0.0f, 50.0f));
@@ -476,7 +476,7 @@ TGFX_TEST(TextAlignTest, SingleLineTextAlign) {
   textLayer2->setFont(font);
   parentLayer->addChild(textLayer2);
   auto textLayer2Bounds = textLayer2->getBounds(nullptr, true);
-  textLayer2->getGlobalMatrix().mapRect(&textLayer2Bounds);
+  TGFX_PRIVATE_ACCESS(textLayer2->getGlobalMatrix().mapRect(&textLayer2Bounds));
 
   auto textLayer3 = TextLayer::Make();
   textLayer3->setMatrix(Matrix::MakeTrans(0.0f, 100.0f));
@@ -490,7 +490,7 @@ TGFX_TEST(TextAlignTest, SingleLineTextAlign) {
   textLayer3->setFont(font);
   parentLayer->addChild(textLayer3);
   auto textLayer3Bounds = textLayer3->getBounds(nullptr, true);
-  textLayer3->getGlobalMatrix().mapRect(&textLayer3Bounds);
+  TGFX_PRIVATE_ACCESS(textLayer3->getGlobalMatrix().mapRect(&textLayer3Bounds));
 
   auto textLayer4 = TextLayer::Make();
   textLayer4->setMatrix(Matrix::MakeTrans(0.0f, 150.0f));
@@ -504,7 +504,7 @@ TGFX_TEST(TextAlignTest, SingleLineTextAlign) {
   textLayer4->setFont(font);
   parentLayer->addChild(textLayer4);
   auto textLayer4Bounds = textLayer4->getBounds(nullptr, true);
-  textLayer4->getGlobalMatrix().mapRect(&textLayer4Bounds);
+  TGFX_PRIVATE_ACCESS(textLayer4->getGlobalMatrix().mapRect(&textLayer4Bounds));
 
   displayList->root()->addChild(rootLayer);
   displayList->render(surface.get());
@@ -626,7 +626,7 @@ TGFX_TEST(TextAlignTest, FontFallbackTest) {
   textLayer->setFont(font);
   parentLayer->addChild(textLayer);
   auto textLayerBounds = textLayer->getBounds(nullptr, true);
-  textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
+  TGFX_PRIVATE_ACCESS(textLayer->getGlobalMatrix().mapRect(&textLayerBounds));
 
   auto textLayer2 = TextLayer::Make();
   textLayer2->setMatrix(Matrix::MakeTrans(0.0f, 100.0f));
@@ -640,7 +640,7 @@ TGFX_TEST(TextAlignTest, FontFallbackTest) {
   textLayer2->setFont(font);
   parentLayer->addChild(textLayer2);
   auto textLayerBounds2 = textLayer2->getBounds(nullptr, true);
-  textLayer2->getGlobalMatrix().mapRect(&textLayerBounds2);
+  TGFX_PRIVATE_ACCESS(textLayer2->getGlobalMatrix().mapRect(&textLayerBounds2));
 
   auto textLayer3 = TextLayer::Make();
   textLayer3->setMatrix(Matrix::MakeTrans(150.0f, 100.0f));
@@ -654,7 +654,7 @@ TGFX_TEST(TextAlignTest, FontFallbackTest) {
   textLayer3->setFont(font);
   parentLayer->addChild(textLayer3);
   auto textLayerBounds3 = textLayer3->getBounds(nullptr, true);
-  textLayer3->getGlobalMatrix().mapRect(&textLayerBounds3);
+  TGFX_PRIVATE_ACCESS(textLayer3->getGlobalMatrix().mapRect(&textLayerBounds3));
 
   auto textLayer4 = TextLayer::Make();
   textLayer4->setMatrix(Matrix::MakeTrans(300.0f, 100.0f));
@@ -668,7 +668,7 @@ TGFX_TEST(TextAlignTest, FontFallbackTest) {
   textLayer4->setFont(font);
   parentLayer->addChild(textLayer4);
   auto textLayerBounds4 = textLayer4->getBounds(nullptr, true);
-  textLayer4->getGlobalMatrix().mapRect(&textLayerBounds4);
+  TGFX_PRIVATE_ACCESS(textLayer4->getGlobalMatrix().mapRect(&textLayerBounds4));
 
   auto textLayer5 = TextLayer::Make();
   textLayer5->setMatrix(Matrix::MakeTrans(450.0f, 100.0f));
@@ -682,7 +682,7 @@ TGFX_TEST(TextAlignTest, FontFallbackTest) {
   textLayer5->setFont(font);
   parentLayer->addChild(textLayer5);
   auto textLayerBounds5 = textLayer5->getBounds(nullptr, true);
-  textLayer5->getGlobalMatrix().mapRect(&textLayerBounds5);
+  TGFX_PRIVATE_ACCESS(textLayer5->getGlobalMatrix().mapRect(&textLayerBounds5));
 
   displayList->root()->addChild(rootLayer);
   displayList->render(surface.get());
@@ -732,7 +732,7 @@ TGFX_TEST(TextAlignTest, TextAlignBlankLineTest) {
   textLayer->setFont(font);
   parentLayer->addChild(textLayer);
   auto textLayerBounds = textLayer->getBounds(nullptr, true);
-  textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
+  TGFX_PRIVATE_ACCESS(textLayer->getGlobalMatrix().mapRect(&textLayerBounds));
 
   auto textLayer2 = TextLayer::Make();
   textLayer2->setMatrix(Matrix::MakeTrans(150.0f, 0.0f));
@@ -760,11 +760,13 @@ TGFX_TEST(TextAlignTest, TextAlignBlankLineTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TextAlignBlankLineTest"));
 }
 
-TGFX_TEST(TextAlignTest, TextAlignPrint) {
+TGFX_TEST_PRIVATE(TextAlignTest, TextAlignPrint) {
   std::string text = "ab\rcd\nef\r\ngh\n\rij\tk\r\r\rp";
   auto textLayer = TextLayer::Make();
   textLayer->setText(text);
-  text = TextLayer::PreprocessNewLines(text);
-  EXPECT_EQ(text, "ab\ncd\nef\ngh\n\nij\tk\n\n\np");
+  TGFX_PRIVATE_ACCESS({
+    text = TextLayer::PreprocessNewLines(text);
+    EXPECT_EQ(text, "ab\ncd\nef\ngh\n\nij\tk\n\n\np");
+  })
 }
 }  // namespace tgfx

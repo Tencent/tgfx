@@ -21,6 +21,7 @@
 #include <functional>
 #include <string>
 #include <thread>
+#include "HmacAuth.h"
 #include "ProcessUtils.h"
 #include "Protocol.h"
 #include "concurrentqueue.h"
@@ -275,6 +276,12 @@ void LayerTree::SocketAgent::sendWork() {
       }
       socket = listenSocket->acceptSock();
       if (socket) {
+        if (!authenticateClient(socket.get())) {
+          auto status = HandshakeStatus::HandshakeAuthenticationFailed;
+          socket->sendData(&status, sizeof(status));
+          socket.reset();
+          continue;
+        }
         break;
       }
     }
@@ -302,14 +309,19 @@ void LayerTree::SocketAgent::recvWork() {
   while (!stopFlag.load(std::memory_order_acquire)) {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     if (socket && socket->hasData()) {
-      int size;
+      int size = 0;
       int flag = socket->readUpTo(&size, sizeof(int));
-      std::vector<uint8_t> data(static_cast<size_t>(size));
-      int flag1 = socket->readUpTo(data.data(), (size_t)size);
-      messages.push(std::move(data));
-      if (!flag || !flag1) {
+      if (flag != sizeof(int) || size <= 0 || size > MaxLayerTreeMessageSize) {
         socket.reset();
+        continue;
       }
+      std::vector<uint8_t> data(static_cast<size_t>(size));
+      int flag1 = socket->readUpTo(data.data(), static_cast<size_t>(size));
+      if (flag1 != size) {
+        socket.reset();
+        continue;
+      }
+      messages.push(std::move(data));
     }
     if (!messages.empty()) {
       if (callback) {

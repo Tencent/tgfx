@@ -43,8 +43,9 @@ std::shared_ptr<MetalSampler> MetalSampler::Make(MetalGPU* gpu,
   // Set border color (if supported)
   if (descriptor.addressModeX == AddressMode::ClampToBorder ||
       descriptor.addressModeY == AddressMode::ClampToBorder) {
-    // Metal supports transparent black and opaque black/white border colors
-    metalDescriptor.borderColor = MTLSamplerBorderColorTransparentBlack;
+    if (@available(iOS 14.0, macOS 10.12, *)) {
+      metalDescriptor.borderColor = MTLSamplerBorderColorTransparentBlack;
+    }
   }
 
   // Create Metal sampler state

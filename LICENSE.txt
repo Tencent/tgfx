@@ -692,6 +692,14 @@ Open Source Software Licensed under the MIT License:
 Copyright (c) 1998-2000 Thai Open Source Software Center Ltd and Clark Cooper
 Copyright (c) 2001-2022 Expat maintainers
 
+2. volk
+Copyright (c) 2018-2024 Arseny Kapoulkine
+Source code: https://github.com/zeux/volk
+
+3. Vulkan Memory Allocator (VMA)
+Copyright (c) 2017-2024 Advanced Micro Devices, Inc.
+Source code: https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+
 
 Terms of the MIT License:
 --------------------------------------------------------------------
@@ -707,6 +715,18 @@ Open Source Software Licensed under the Apache License Version 2.0 and Other Lic
 1. swiftshader
 Copyright (c) swiftshader original author and authors
 Source code of this software can be obtained from: https://swiftshader.googlesource.com/SwiftShader
+
+2. Vulkan-Headers
+Copyright (c) 2015-2024 The Khronos Group Inc.
+Source code: https://github.com/KhronosGroup/Vulkan-Headers
+
+3. shaderc
+Copyright (c) 2015-2024 Google LLC
+Source code: https://github.com/google/shaderc
+
+4. SPIRV-Cross
+Copyright (c) 2015-2024 The Khronos Group Inc.
+Source code: https://github.com/KhronosGroup/SPIRV-Cross
 
 
 Terms of the Apache 2.0:
