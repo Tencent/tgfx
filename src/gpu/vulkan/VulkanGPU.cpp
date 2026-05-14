@@ -179,14 +179,17 @@ bool VulkanGPU::createInstance() {
   appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
   appInfo.pEngineName = "TGFX";
   appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+  // Vulkan 1.1 is required because the engine calls 1.1 core entry points
+  // (e.g. vkGetPhysicalDeviceFeatures2). With a 1.0 instance these symbols are
+  // not loaded by volk and would crash on first use.
   appInfo.apiVersion = VK_API_VERSION_1_1;
 
   std::vector<const char*> instanceExtensions;
 
   // Surface and utility extensions are optional — headless environments (e.g. SwiftShader CI)
   // may not provide them. Enumerate available extensions first, then enable if present.
-  // VK_KHR_get_physical_device_properties2 is core in Vulkan 1.1+, so 1.1 ICDs may not list it
-  // as an extension; request it only when advertised.
+  // VK_KHR_get_physical_device_properties2 is core in 1.1, so 1.1 ICDs may not advertise it
+  // as an extension; request it only when listed.
   uint32_t availExtCount = 0;
   auto enumResult = vkEnumerateInstanceExtensionProperties(nullptr, &availExtCount, nullptr);
   if (enumResult != VK_SUCCESS && enumResult != VK_INCOMPLETE) {

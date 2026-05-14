@@ -329,9 +329,15 @@ void VulkanRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
     return;
   }
   encoder->retainResource(std::static_pointer_cast<VulkanResource>(lastBound.pipeline));
-  auto vkPipeline = lastBound.pipeline->vulkanPipeline();
-  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
-  lastBound.boundVkPipeline = vkPipeline;
+  if (vulkanGPU->extensions().extendedDynamicState) {
+    auto vkPipeline = lastBound.pipeline->vulkanPipeline();
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
+    lastBound.boundVkPipeline = vkPipeline;
+  } else {
+    // Defer bind to draw()/drawIndexed(), which know the requested topology and will
+    // select the correct pipeline variant (list or strip).
+    lastBound.boundVkPipeline = VK_NULL_HANDLE;
+  }
   lastBound.descriptorDirty = true;
 }
 
