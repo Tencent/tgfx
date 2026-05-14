@@ -179,19 +179,22 @@ bool VulkanGPU::createInstance() {
   appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
   appInfo.pEngineName = "TGFX";
   appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-  appInfo.apiVersion = VK_API_VERSION_1_0;
+  appInfo.apiVersion = VK_API_VERSION_1_1;
 
-  // Always required.
-  std::vector<const char*> instanceExtensions = {
-      VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-  };
+  std::vector<const char*> instanceExtensions;
 
-  // Surface extensions are optional — headless environments (e.g. SwiftShader CI)
+  // Surface and utility extensions are optional — headless environments (e.g. SwiftShader CI)
   // may not provide them. Enumerate available extensions first, then enable if present.
+  // VK_KHR_get_physical_device_properties2 is core in Vulkan 1.1+, so 1.1 ICDs may not list it
+  // as an extension; request it only when advertised.
   uint32_t availExtCount = 0;
   vkEnumerateInstanceExtensionProperties(nullptr, &availExtCount, nullptr);
   std::vector<VkExtensionProperties> availableExts(availExtCount);
   vkEnumerateInstanceExtensionProperties(nullptr, &availExtCount, availableExts.data());
+
+  if (HasInstanceExtension(availableExts, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)) {
+    instanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+  }
 
   if (HasInstanceExtension(availableExts, VK_KHR_SURFACE_EXTENSION_NAME)) {
     instanceExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
