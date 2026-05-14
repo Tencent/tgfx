@@ -173,6 +173,9 @@ jobs:
         with:
           arch: amd64
 
+      - name: Install Vulkan SDK
+        uses: NcStudios/VulkanCI@v1.2
+
       - name: Run Autotest
         run: autotest.bat USE_VULKAN_SWIFTSHADER
         shell: cmd
