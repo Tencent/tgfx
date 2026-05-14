@@ -71,12 +71,12 @@ if %errorlevel% equ 0 (
 if "%1"=="USE_SWIFTSHADER" (
     copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\*.dll" "%WORKSPACE%\build\" >nul 2>&1
 )
-if "%1"=="USE_VULKAN_SWIFTSHADER" copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\vk_swiftshader*" "%WORKSPACE%\build\" >nul 2>&1
-if "%1"=="USE_VULKAN_SWIFTSHADER" set "VK_ICD_FILENAMES=%WORKSPACE%\vendor\swiftshader\win\x64\vk_swiftshader_icd.json"
-if "%1"=="USE_VULKAN_SWIFTSHADER" set "VK_DRIVER_FILES=%WORKSPACE%\vendor\swiftshader\win\x64\vk_swiftshader_icd.json"
+:: SwiftShader exports vkGetInstanceProcAddr, so it can serve as a drop-in replacement for the
+:: Vulkan Loader (vulkan-1.dll). Renaming it avoids the need for a real Vulkan SDK installation
+:: or VK_ICD_FILENAMES — volk's LoadLibraryA("vulkan-1.dll") picks it up from the exe directory.
+if "%1"=="USE_VULKAN_SWIFTSHADER" copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\vk_swiftshader.dll" "%WORKSPACE%\build\vulkan-1.dll" >nul 2>&1
 
 :: Run tests
-echo VK_ICD_FILENAMES=!VK_ICD_FILENAMES!
 TGFXFullTest.exe --gtest_output=json:TGFXFullTest.json
 if %errorlevel% equ 0 (
     echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest successed~~~~~~~~~~~~~~~~~~
