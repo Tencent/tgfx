@@ -18,7 +18,6 @@
 
 #include "D3D12RenderPipeline.h"
 #include <d3dcompiler.h>
-#include <array>
 #include <vector>
 #include "D3D12GPU.h"
 #include "D3D12ShaderModule.h"
@@ -100,6 +99,11 @@ uint32_t D3D12RenderPipeline::getTextureRootParameterIndex(unsigned binding) con
   return it != textureRootParameterIndex.end() ? it->second : UINT32_MAX;
 }
 
+uint32_t D3D12RenderPipeline::getSamplerRootParameterIndex(unsigned binding) const {
+  auto it = samplerRootParameterIndex.find(binding);
+  return it != samplerRootParameterIndex.end() ? it->second : UINT32_MAX;
+}
+
 unsigned D3D12RenderPipeline::getTextureIndex(unsigned binding) const {
   auto it = textureUnits.find(binding);
   return it != textureUnits.end() ? it->second : binding;
@@ -113,11 +117,15 @@ uint32_t D3D12RenderPipeline::getUniformBlockVisibility(unsigned binding) const 
 bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
                                               const RenderPipelineDescriptor& descriptor) {
   std::vector<D3D12_ROOT_PARAMETER> rootParameters;
-  // Each texture binding contributes one descriptor table containing two ranges (SRV + Sampler).
-  // The ranges array is referenced by pointer inside D3D12_ROOT_PARAMETER, so it must outlive
-  // the serialization call. We reserve up-front to keep pointers stable across emplace_back().
-  std::vector<std::array<D3D12_DESCRIPTOR_RANGE, 2>> textureRanges;
-  textureRanges.reserve(descriptor.layout.textureSamplers.size());
+  // Each texture binding contributes two descriptor tables (SRV + Sampler) that live in different
+  // descriptor heap types. They cannot share one D3D12_ROOT_PARAMETER because each table can only
+  // reference a single heap. We therefore store each range in its own array entry; the
+  // D3D12_ROOT_PARAMETER references the array by pointer, so the storage must outlive the
+  // SerializeRootSignature call. reserve() keeps pointers stable across emplace_back().
+  std::vector<D3D12_DESCRIPTOR_RANGE> srvRanges;
+  std::vector<D3D12_DESCRIPTOR_RANGE> samplerRanges;
+  srvRanges.reserve(descriptor.layout.textureSamplers.size());
+  samplerRanges.reserve(descriptor.layout.textureSamplers.size());
 
   for (const auto& entry : descriptor.layout.uniformBlocks) {
     uint32_t paramIndex = static_cast<uint32_t>(rootParameters.size());
@@ -137,30 +145,40 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
 
   unsigned textureUnit = 0;
   for (const auto& entry : descriptor.layout.textureSamplers) {
-    auto& ranges = textureRanges.emplace_back();
-    ranges[0] = {};
-    ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    ranges[0].NumDescriptors = 1;
-    ranges[0].BaseShaderRegister = textureUnit;
-    ranges[0].RegisterSpace = 0;
-    ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+    auto& srvRange = srvRanges.emplace_back();
+    srvRange = {};
+    srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    srvRange.NumDescriptors = 1;
+    srvRange.BaseShaderRegister = textureUnit;
+    srvRange.RegisterSpace = 0;
+    srvRange.OffsetInDescriptorsFromTableStart = 0;
 
-    ranges[1] = {};
-    ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-    ranges[1].NumDescriptors = 1;
-    ranges[1].BaseShaderRegister = textureUnit;
-    ranges[1].RegisterSpace = 0;
-    ranges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+    uint32_t srvParamIndex = static_cast<uint32_t>(rootParameters.size());
+    D3D12_ROOT_PARAMETER srvParam = {};
+    srvParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    srvParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    srvParam.DescriptorTable.NumDescriptorRanges = 1;
+    srvParam.DescriptorTable.pDescriptorRanges = &srvRange;
+    rootParameters.push_back(srvParam);
 
-    uint32_t paramIndex = static_cast<uint32_t>(rootParameters.size());
-    D3D12_ROOT_PARAMETER param = {};
-    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    param.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(ranges.size());
-    param.DescriptorTable.pDescriptorRanges = ranges.data();
-    rootParameters.push_back(param);
+    auto& samplerRange = samplerRanges.emplace_back();
+    samplerRange = {};
+    samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+    samplerRange.NumDescriptors = 1;
+    samplerRange.BaseShaderRegister = textureUnit;
+    samplerRange.RegisterSpace = 0;
+    samplerRange.OffsetInDescriptorsFromTableStart = 0;
 
-    textureRootParameterIndex[entry.binding] = paramIndex;
+    uint32_t samplerParamIndex = static_cast<uint32_t>(rootParameters.size());
+    D3D12_ROOT_PARAMETER samplerParam = {};
+    samplerParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    samplerParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplerParam.DescriptorTable.NumDescriptorRanges = 1;
+    samplerParam.DescriptorTable.pDescriptorRanges = &samplerRange;
+    rootParameters.push_back(samplerParam);
+
+    textureRootParameterIndex[entry.binding] = srvParamIndex;
+    samplerRootParameterIndex[entry.binding] = samplerParamIndex;
     textureUnits[entry.binding] = textureUnit++;
     textureBindingSet.insert(entry.binding);
   }
@@ -217,6 +235,7 @@ bool D3D12RenderPipeline::createPipelineState(D3D12GPU* gpu,
   // where N is the SPIR-V input location assigned by ShaderCompiler::PreprocessGLSL().
   std::vector<D3D12_INPUT_ELEMENT_DESC> inputElements;
   uint32_t globalLocation = 0;
+  vertexStrides.assign(descriptor.vertex.bufferLayouts.size(), 0);
   for (uint32_t i = 0; i < static_cast<uint32_t>(descriptor.vertex.bufferLayouts.size()); i++) {
     const auto& layout = descriptor.vertex.bufferLayouts[i];
     uint32_t offset = 0;
@@ -234,6 +253,9 @@ bool D3D12RenderPipeline::createPipelineState(D3D12GPU* gpu,
       inputElements.push_back(element);
       offset += static_cast<uint32_t>(attr.size());
     }
+    // Fall back to the computed attribute total when the descriptor leaves stride at zero, which
+    // is the same convention the Vulkan/Metal backends use.
+    vertexStrides[i] = static_cast<uint32_t>(layout.stride > 0 ? layout.stride : offset);
   }
 
   D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
@@ -256,8 +278,8 @@ bool D3D12RenderPipeline::createPipelineState(D3D12GPU* gpu,
     rt.SrcBlend = ToD3D12BlendFactor(ca.srcColorBlendFactor);
     rt.DestBlend = ToD3D12BlendFactor(ca.dstColorBlendFactor);
     rt.BlendOp = ToD3D12BlendOperation(ca.colorBlendOp);
-    rt.SrcBlendAlpha = ToD3D12BlendFactor(ca.srcAlphaBlendFactor);
-    rt.DestBlendAlpha = ToD3D12BlendFactor(ca.dstAlphaBlendFactor);
+    rt.SrcBlendAlpha = ToD3D12BlendFactorAlpha(ca.srcAlphaBlendFactor);
+    rt.DestBlendAlpha = ToD3D12BlendFactorAlpha(ca.dstAlphaBlendFactor);
     rt.BlendOpAlpha = ToD3D12BlendOperation(ca.alphaBlendOp);
     rt.LogicOp = D3D12_LOGIC_OP_NOOP;
     rt.RenderTargetWriteMask = ToD3D12RenderTargetWriteMask(ca.colorWriteMask);
@@ -335,6 +357,25 @@ bool D3D12RenderPipeline::createPipelineState(D3D12GPU* gpu,
   if (FAILED(hr)) {
     LOGE("D3D12RenderPipeline: CreateGraphicsPipelineState failed (HRESULT=0x%08X).",
          static_cast<unsigned>(hr));
+#ifdef TGFX_D3D12_DEBUG_LAYER
+    // Surface debug-layer messages so the underlying validation issue is visible. These are
+    // queued by the runtime when EnableDebugLayer was called before device creation.
+    ComPtr<ID3D12InfoQueue> infoQueue = nullptr;
+    if (SUCCEEDED(gpu->device()->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
+      auto count = infoQueue->GetNumStoredMessages();
+      for (UINT64 i = 0; i < count; i++) {
+        SIZE_T msgLen = 0;
+        infoQueue->GetMessage(i, nullptr, &msgLen);
+        std::vector<char> buf(msgLen);
+        auto* msg = reinterpret_cast<D3D12_MESSAGE*>(buf.data());
+        if (SUCCEEDED(infoQueue->GetMessage(i, msg, &msgLen))) {
+          LOGE("  D3D12 message: %.*s", static_cast<int>(msg->DescriptionByteLength),
+               msg->pDescription);
+        }
+      }
+      infoQueue->ClearStoredMessages();
+    }
+#endif
     pipelineState = nullptr;
     return false;
   }

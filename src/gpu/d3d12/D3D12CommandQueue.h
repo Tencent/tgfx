@@ -18,6 +18,9 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+#include "D3D12GPU.h"
 #include "D3D12Util.h"
 #include "tgfx/gpu/CommandQueue.h"
 
@@ -27,7 +30,13 @@ class D3D12GPU;
 class D3D12Semaphore;
 
 /**
- * D3D12 command queue implementation.
+ * Thin coordination layer satisfying the public CommandQueue interface. Mirrors VulkanCommandQueue:
+ * holds only the data accumulated between two consecutive submit() calls and delegates submission
+ * timing / inflight tracking to D3D12GPU::executeSubmission().
+ *
+ * Pending state held here:
+ *   - pendingUploads: staging UPLOAD buffers from writeTexture(), consumed by submit().
+ *   - pendingSignal/WaitSemaphore: from insertSemaphore()/waitSemaphore(), consumed by submit().
  */
 class D3D12CommandQueue : public CommandQueue {
  public:
@@ -53,15 +62,29 @@ class D3D12CommandQueue : public CommandQueue {
   void waitUntilCompleted() override;
 
  private:
-  void waitForFence(uint64_t fenceValue);
+  void flushUploads(ID3D12GraphicsCommandList* commandList);
 
   D3D12GPU* gpu = nullptr;
   ComPtr<ID3D12CommandQueue> commandQueue = nullptr;
-  ComPtr<ID3D12Fence> fence = nullptr;
-  uint64_t fenceValue = 0;
-  HANDLE fenceEvent = nullptr;
-  std::shared_ptr<D3D12Semaphore> pendingSignalSemaphore = nullptr;
-  std::shared_ptr<D3D12Semaphore> pendingWaitSemaphore = nullptr;
+
+  // Produced by writeTexture(), consumed by the next submit() (or waitUntilCompleted()) which
+  // records CopyTextureRegion commands and then moves the staging buffers into the inflight
+  // submission so they can be safely released after the GPU fence signals.
+  std::vector<D3D12GPU::PendingUpload> pendingUploads;
+
+  // Per-upload metadata kept alongside pendingUploads so flushUploads can record the GPU copy
+  // without re-deriving the row pitch / pixel dimensions.
+  struct UploadFootprint {
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint = {};
+    UINT dstX = 0;
+    UINT dstY = 0;
+    UINT srcWidth = 0;
+    UINT srcHeight = 0;
+  };
+  std::vector<UploadFootprint> pendingFootprints;
+
+  std::shared_ptr<D3D12Semaphore> pendingSignalSemaphore;
+  std::shared_ptr<D3D12Semaphore> pendingWaitSemaphore;
 };
 
 }  // namespace tgfx

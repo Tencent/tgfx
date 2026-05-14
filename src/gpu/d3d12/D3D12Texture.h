@@ -37,8 +37,7 @@ class D3D12Texture : public Texture, public D3D12Resource {
    * Creates a D3D12Texture wrapper from an external D3D12 resource.
    */
   static std::shared_ptr<D3D12Texture> MakeFrom(D3D12GPU* gpu, ComPtr<ID3D12Resource> resource,
-                                                 unsigned dxgiFormat, uint32_t usage,
-                                                 bool adopted);
+                                                unsigned dxgiFormat, uint32_t usage, bool adopted);
 
   /**
    * Returns the underlying D3D12 resource.
@@ -52,6 +51,24 @@ class D3D12Texture : public Texture, public D3D12Resource {
    */
   unsigned dxgiFormat() const {
     return _dxgiFormat;
+  }
+
+  /**
+   * Returns the resource state currently tracked on the CPU. D3D12, unlike Vulkan, requires the
+   * application to issue explicit ResourceBarrier calls to transition between read and write
+   * states. We track the most recently announced state per texture so that subsequent bindings
+   * can construct the correct transition barrier.
+   *
+   * Note: on textures imported from external D3D12 resources we initialise the state to COMMON
+   * (the value the application is required to leave the resource in when handing it off — see
+   * D3D12 SDK common-state promotion rules). This is conservative but correct.
+   */
+  D3D12_RESOURCE_STATES currentState() const {
+    return _currentState;
+  }
+
+  void setCurrentState(D3D12_RESOURCE_STATES state) {
+    _currentState = state;
   }
 
   BackendTexture getBackendTexture() const override;
@@ -68,6 +85,7 @@ class D3D12Texture : public Texture, public D3D12Resource {
 
   ComPtr<ID3D12Resource> resource = nullptr;
   unsigned _dxgiFormat = 0;
+  D3D12_RESOURCE_STATES _currentState = D3D12_RESOURCE_STATE_COMMON;
 
   friend class D3D12GPU;
 };

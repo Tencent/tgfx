@@ -24,6 +24,17 @@
 namespace tgfx {
 
 std::shared_ptr<D3D12Device> D3D12Device::Make() {
+#if !defined(NDEBUG) || defined(TGFX_D3D12_DEBUG_LAYER)
+  // Enable the D3D12 debug layer when explicitly requested. Must be called before
+  // D3D12CreateDevice. Validation messages surface as readable text instead of
+  // generic E_INVALIDARG return codes.
+  {
+    ComPtr<ID3D12Debug> debugController = nullptr;
+    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
+      debugController->EnableDebugLayer();
+    }
+  }
+#endif
   ComPtr<IDXGIFactory4> factory = nullptr;
   if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
     LOGE("D3D12Device::Make() Failed to create DXGI factory.");

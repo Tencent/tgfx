@@ -20,6 +20,7 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 #include "D3D12Resource.h"
 #include "D3D12Util.h"
 #include "tgfx/gpu/RenderPipeline.h"
@@ -72,10 +73,18 @@ class D3D12RenderPipeline : public RenderPipeline, public D3D12Resource {
   uint32_t getUniformRootParameterIndex(unsigned binding) const;
 
   /**
-   * Returns the root-parameter index of the descriptor table that holds the SRV+Sampler pair
-   * for the given texture-sampler binding, or UINT32_MAX if the binding is not present.
+   * Returns the root-parameter index of the descriptor table holding the SRV for the given
+   * texture-sampler binding, or UINT32_MAX if the binding is not present. The Sampler descriptor
+   * table for the same binding is stored at the next consecutive root parameter and can be
+   * obtained with getSamplerRootParameterIndex().
    */
   uint32_t getTextureRootParameterIndex(unsigned binding) const;
+
+  /**
+   * Returns the root-parameter index of the descriptor table holding the Sampler for the given
+   * texture-sampler binding, or UINT32_MAX if the binding is not present.
+   */
+  uint32_t getSamplerRootParameterIndex(unsigned binding) const;
 
   /**
    * Returns the dense 0-based texture unit index for a texture-sampler binding. Mirrors the
@@ -88,6 +97,14 @@ class D3D12RenderPipeline : public RenderPipeline, public D3D12Resource {
    * binding, or ShaderVisibility::VertexFragment if unspecified.
    */
   uint32_t getUniformBlockVisibility(unsigned binding) const;
+
+  /**
+   * Returns the byte stride for the vertex buffer slot at the given index, as declared by the
+   * pipeline's VertexBufferLayout. Returns 0 for slots that the pipeline does not consume.
+   */
+  uint32_t getVertexStride(unsigned slot) const {
+    return slot < vertexStrides.size() ? vertexStrides[slot] : 0;
+  }
 
   bool hasUniformBinding(unsigned binding) const {
     return uniformBindingSet.count(binding) > 0;
@@ -116,10 +133,12 @@ class D3D12RenderPipeline : public RenderPipeline, public D3D12Resource {
 
   std::unordered_map<unsigned, uint32_t> uniformRootParameterIndex = {};
   std::unordered_map<unsigned, uint32_t> textureRootParameterIndex = {};
+  std::unordered_map<unsigned, uint32_t> samplerRootParameterIndex = {};
   std::unordered_map<unsigned, unsigned> textureUnits = {};
   std::unordered_map<unsigned, uint32_t> uniformBlockVisibility = {};
   std::unordered_set<unsigned> uniformBindingSet = {};
   std::unordered_set<unsigned> textureBindingSet = {};
+  std::vector<uint32_t> vertexStrides = {};
 
   friend class D3D12GPU;
 };

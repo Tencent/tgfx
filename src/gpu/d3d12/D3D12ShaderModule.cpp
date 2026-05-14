@@ -60,7 +60,10 @@ static std::string convertSPIRVToHLSL(const std::vector<uint32_t>& spirvBinary, 
 
   auto resources = hlslCompiler.get_shader_resources();
 
-  // Map UBOs: SPIR-V binding K -> CBV register bK on this stage.
+  // Map UBOs: every UBO maps to CBV register b0 in its stage. HLSL's b/t/s register namespaces
+  // are per shader stage, so the vertex stage's b0 and the pixel stage's b0 do not collide. This
+  // matches the root signature created by D3D12RenderPipeline, which assigns one root CBV
+  // (ShaderRegister=0) per uniform block.
   for (auto& ubo : resources.uniform_buffers) {
     uint32_t spvBinding = hlslCompiler.get_decoration(ubo.id, spv::DecorationBinding);
     uint32_t spvDescSet = hlslCompiler.get_decoration(ubo.id, spv::DecorationDescriptorSet);
@@ -68,7 +71,7 @@ static std::string convertSPIRVToHLSL(const std::vector<uint32_t>& spirvBinary, 
     resourceBinding.stage = executionModel;
     resourceBinding.desc_set = spvDescSet;
     resourceBinding.binding = spvBinding;
-    resourceBinding.cbv.register_binding = spvBinding;
+    resourceBinding.cbv.register_binding = 0;
     resourceBinding.cbv.register_space = 0;
     hlslCompiler.add_hlsl_resource_binding(resourceBinding);
   }

@@ -48,6 +48,14 @@ D3D12_STENCIL_OP ToD3D12StencilOperation(StencilOperation stencilOp);
 
 D3D12_BLEND ToD3D12BlendFactor(BlendFactor blendFactor);
 
+/**
+ * Like ToD3D12BlendFactor() but rewrites the four COLOR-only D3D12 blend factors (SRC_COLOR,
+ * INV_SRC_COLOR, DEST_COLOR, INV_DEST_COLOR, plus their dual-source variants) into their ALPHA
+ * counterparts. CreateBlendState validation rejects color factors when applied to the alpha
+ * channel, so this helper must be used for {Src,Dest}BlendAlpha.
+ */
+D3D12_BLEND ToD3D12BlendFactorAlpha(BlendFactor blendFactor);
+
 D3D12_BLEND_OP ToD3D12BlendOperation(BlendOperation blendOp);
 
 D3D12_TEXTURE_ADDRESS_MODE ToD3D12AddressMode(AddressMode addressMode);
@@ -59,5 +67,14 @@ D3D12_CULL_MODE ToD3D12CullMode(CullMode cullMode);
 bool ToD3D12FrontCounterClockwise(FrontFace frontFace);
 
 D3D12_INDEX_BUFFER_STRIP_CUT_VALUE ToD3D12StripCutValue(IndexFormat indexFormat);
+
+/**
+ * Records a single ID3D12Resource::ResourceBarrier(TRANSITION) on the given command list. No-op
+ * when oldState == newState. Used by every code path that needs to flip an ID3D12Resource between
+ * read- and write-only states (RTV/DSV setup, copy commands, shader sampling, etc.).
+ */
+void TransitionResourceState(ID3D12GraphicsCommandList* commandList, ID3D12Resource* resource,
+                             D3D12_RESOURCE_STATES oldState, D3D12_RESOURCE_STATES newState,
+                             UINT subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 
 }  // namespace tgfx

@@ -165,6 +165,28 @@ D3D12_BLEND ToD3D12BlendFactor(BlendFactor blendFactor) {
   }
 }
 
+D3D12_BLEND ToD3D12BlendFactorAlpha(BlendFactor blendFactor) {
+  // Alpha blend factors must use the *_ALPHA variants. D3D11/12 validation rejects color factors
+  // (SRC_COLOR / INV_SRC_COLOR / DEST_COLOR / INV_DEST_COLOR / SRC1_COLOR / INV_SRC1_COLOR) when
+  // they appear in SrcBlendAlpha or DestBlendAlpha — color and alpha are independent channels.
+  switch (blendFactor) {
+    case BlendFactor::Src:
+      return D3D12_BLEND_SRC_ALPHA;
+    case BlendFactor::OneMinusSrc:
+      return D3D12_BLEND_INV_SRC_ALPHA;
+    case BlendFactor::Dst:
+      return D3D12_BLEND_DEST_ALPHA;
+    case BlendFactor::OneMinusDst:
+      return D3D12_BLEND_INV_DEST_ALPHA;
+    case BlendFactor::Src1:
+      return D3D12_BLEND_SRC1_ALPHA;
+    case BlendFactor::OneMinusSrc1:
+      return D3D12_BLEND_INV_SRC1_ALPHA;
+    default:
+      return ToD3D12BlendFactor(blendFactor);
+  }
+}
+
 D3D12_BLEND_OP ToD3D12BlendOperation(BlendOperation blendOp) {
   switch (blendOp) {
     case BlendOperation::Add:
@@ -270,6 +292,22 @@ D3D12_INDEX_BUFFER_STRIP_CUT_VALUE ToD3D12StripCutValue(IndexFormat indexFormat)
       return D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_0xFFFFFFFF;
   }
   return D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
+}
+
+void TransitionResourceState(ID3D12GraphicsCommandList* commandList, ID3D12Resource* resource,
+                             D3D12_RESOURCE_STATES oldState, D3D12_RESOURCE_STATES newState,
+                             UINT subresource) {
+  if (commandList == nullptr || resource == nullptr || oldState == newState) {
+    return;
+  }
+  D3D12_RESOURCE_BARRIER barrier = {};
+  barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+  barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+  barrier.Transition.pResource = resource;
+  barrier.Transition.StateBefore = oldState;
+  barrier.Transition.StateAfter = newState;
+  barrier.Transition.Subresource = subresource;
+  commandList->ResourceBarrier(1, &barrier);
 }
 
 }  // namespace tgfx

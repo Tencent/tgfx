@@ -21,6 +21,7 @@
 #include <shaderc/shaderc.hpp>
 #include <string>
 #include "D3D12Buffer.h"
+#include "D3D12CommandEncoder.h"
 #include "D3D12CommandQueue.h"
 #include "D3D12RenderPipeline.h"
 #include "D3D12Resource.h"
@@ -60,7 +61,8 @@ std::unique_ptr<D3D12GPU> D3D12GPU::Make(ComPtr<ID3D12Device> device) {
   }
   auto adapter = FindAdapter(device.Get());
   auto gpu = std::unique_ptr<D3D12GPU>(new D3D12GPU(std::move(device), std::move(adapter)));
-  if (gpu->commandQueue == nullptr) {
+  if (gpu->commandQueue == nullptr || gpu->_frameFence == nullptr ||
+      gpu->_frameFenceEvent == nullptr) {
     return nullptr;
   }
   return gpu;
@@ -71,6 +73,18 @@ D3D12GPU::D3D12GPU(ComPtr<ID3D12Device> device, ComPtr<IDXGIAdapter1> adapter)
   initInfo();
   initFeatures();
   initLimits();
+  // Create the per-frame fence and its waitable event before the command queue, since the queue
+  // uses these handles when scheduling Signal/Wait operations.
+  if (FAILED(d3d12Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_frameFence)))) {
+    LOGE("D3D12GPU: failed to create frame fence.");
+    return;
+  }
+  _frameFenceEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+  if (_frameFenceEvent == nullptr) {
+    LOGE("D3D12GPU: failed to create frame fence event.");
+    _frameFence = nullptr;
+    return;
+  }
   commandQueue = std::make_unique<D3D12CommandQueue>(this);
   compiler = std::make_unique<shaderc::Compiler>();
 }
@@ -78,6 +92,10 @@ D3D12GPU::D3D12GPU(ComPtr<ID3D12Device> device, ComPtr<IDXGIAdapter1> adapter)
 D3D12GPU::~D3D12GPU() {
   DEBUG_ASSERT(returnQueue == nullptr);
   DEBUG_ASSERT(resources.empty());
+  if (_frameFenceEvent != nullptr) {
+    CloseHandle(_frameFenceEvent);
+    _frameFenceEvent = nullptr;
+  }
 }
 
 void D3D12GPU::initInfo() {
@@ -222,8 +240,7 @@ std::shared_ptr<RenderPipeline> D3D12GPU::createRenderPipeline(
 
 std::shared_ptr<CommandEncoder> D3D12GPU::createCommandEncoder() {
   processUnreferencedResources();
-  // Will be implemented in sub-task 6 (D3D12CommandEncoder).
-  return nullptr;
+  return D3D12CommandEncoder::Make(this);
 }
 
 int D3D12GPU::getSampleCount(int requestedCount, PixelFormat pixelFormat) const {
@@ -338,6 +355,15 @@ void D3D12GPU::processUnreferencedResources() {
 }
 
 void D3D12GPU::releaseAll(bool releaseGPU) {
+  // Shutdown ordering must wait for all GPU work to complete before destroying anything that the
+  // GPU may still be reading. The Vulkan backend does the same via waitAllInflightSubmissions().
+  if (releaseGPU) {
+    waitAllInflightSubmissions();
+  } else {
+    // Even when releaseGPU is false (test teardown), inflight sessions must drop their references
+    // so we don't leak the underlying D3D12 resources captured by retainedResources.
+    inflightSubmissions.clear();
+  }
   samplerCache.clear();
   if (releaseGPU) {
     for (auto& resource : resources) {
@@ -350,11 +376,129 @@ void D3D12GPU::releaseAll(bool releaseGPU) {
 
 void D3D12GPU::reclaimAbandonedSession(D3D12FrameSession session) {
   // Letting the local go out of scope releases the command list and allocator via ComPtr, and
-  // drops every shared_ptr in retainedResources. Resources whose refcount reaches zero enter the
-  // ReturnQueue and will be destroyed by the next processUnreferencedResources() call.
-  // Once InflightSubmission is introduced (later step), this method will be reused for the
-  // post-fence reclaim path.
+  // drops every shared_ptr in retainedResources/retainedDescriptorHeaps/retainedRTVDSVHeaps.
+  // Resources whose refcount reaches zero enter the ReturnQueue and will be destroyed by the
+  // next processUnreferencedResources() call.
   (void)session;
+}
+
+void D3D12GPU::executeSubmission(SubmitRequest request) {
+  // Step 1: Non-blocking reclaim of any submissions whose fence values have already signalled.
+  pollCompletedSubmissions();
+
+  // Step 2: Backpressure — block until the oldest inflight submission completes if we have
+  // already filled the in-flight pipeline.
+  if (inflightSubmissions.size() >= MAX_FRAMES_IN_FLIGHT) {
+    auto& oldest = inflightSubmissions.front();
+    if (_frameFence->GetCompletedValue() < oldest.fenceValue) {
+      _frameFence->SetEventOnCompletion(oldest.fenceValue, _frameFenceEvent);
+      WaitForSingleObject(_frameFenceEvent, INFINITE);
+    }
+    pollCompletedSubmissions();
+  }
+
+  auto cmdQueue = commandQueue->d3d12CommandQueue();
+  if (cmdQueue == nullptr) {
+    LOGE("D3D12GPU::executeSubmission: command queue is null, abandoning session.");
+    reclaimAbandonedSession(std::move(request.session));
+    return;
+  }
+
+  // Step 3: Optional cross-queue wait. D3D12Semaphore stores its target value as a host-readable
+  // member; the GPU side simply re-uses ID3D12CommandQueue::Wait().
+  if (request.waitSemaphore != nullptr) {
+    auto fence = request.waitSemaphore->d3d12Fence();
+    if (fence != nullptr) {
+      cmdQueue->Wait(fence, request.waitSemaphore->signalValue());
+    }
+  }
+
+  // Step 4: Execute auxiliary command lists (e.g. texture upload lists recorded by the queue
+  // outside the main render command list) followed by the main render command list. Order
+  // matters: uploads must complete before the render list can sample the destination textures.
+  std::vector<ID3D12CommandList*> lists;
+  lists.reserve(request.session.auxCommandLists.size() + 1);
+  for (auto& aux : request.session.auxCommandLists) {
+    if (aux != nullptr) {
+      lists.push_back(aux.Get());
+    }
+  }
+  if (request.session.commandList != nullptr) {
+    lists.push_back(request.session.commandList.Get());
+  }
+  if (!lists.empty()) {
+    cmdQueue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
+  }
+
+  // Step 5: Optional signal of an external semaphore. The semaphore exposes a fixed fence value
+  // assigned at creation time — we just signal that value on this queue. After signalling, bump
+  // the semaphore's internal value so a subsequent insertSemaphore() call would see a fresh
+  // generation if the same fence object is re-used.
+  if (request.signalSemaphore != nullptr) {
+    auto fence = request.signalSemaphore->d3d12Fence();
+    if (fence != nullptr) {
+      auto target = request.signalSemaphore->nextSignalValue();
+      cmdQueue->Signal(fence, target);
+      request.signalSemaphore->commitSignalValue();
+    }
+    // Keep the semaphore alive until the GPU has consumed the Signal command. Without this
+    // retention the application could drop its last reference and the underlying ID3D12Fence
+    // would be released before the GPU is done with it.
+    request.session.retainedResources.push_back(std::move(request.signalSemaphore));
+  }
+  if (request.waitSemaphore != nullptr) {
+    request.session.retainedResources.push_back(std::move(request.waitSemaphore));
+  }
+
+  // Step 6: Signal the GPU's internal frame fence so we can later detect completion of this
+  // submission and reclaim its session.
+  ++_lastSignalledFenceValue;
+  cmdQueue->Signal(_frameFence.Get(), _lastSignalledFenceValue);
+
+  InflightSubmission inflight = {};
+  inflight.fenceValue = _lastSignalledFenceValue;
+  inflight.session = std::move(request.session);
+  inflight.uploads = std::move(request.uploads);
+  inflightSubmissions.push_back(std::move(inflight));
+}
+
+void D3D12GPU::waitAllInflightSubmissions() {
+  if (_frameFence == nullptr) {
+    return;
+  }
+  if (!inflightSubmissions.empty()) {
+    auto& last = inflightSubmissions.back();
+    if (_frameFence->GetCompletedValue() < last.fenceValue) {
+      _frameFence->SetEventOnCompletion(last.fenceValue, _frameFenceEvent);
+      WaitForSingleObject(_frameFenceEvent, INFINITE);
+    }
+  }
+  pollCompletedSubmissions();
+}
+
+uint64_t D3D12GPU::completedFenceValue() const {
+  return _frameFence != nullptr ? _frameFence->GetCompletedValue() : 0;
+}
+
+void D3D12GPU::pollCompletedSubmissions() {
+  if (_frameFence == nullptr) {
+    return;
+  }
+  auto completed = _frameFence->GetCompletedValue();
+  while (!inflightSubmissions.empty() && inflightSubmissions.front().fenceValue <= completed) {
+    reclaimSubmission(inflightSubmissions.front());
+    inflightSubmissions.pop_front();
+  }
+  // Releasing retained shared_ptrs may have moved D3D12Resource instances into the return queue;
+  // free them now so the caller sees up-to-date memory accounting.
+  processUnreferencedResources();
+}
+
+void D3D12GPU::reclaimSubmission(InflightSubmission& submission) {
+  // ComPtr / shared_ptr destructors handle command list, allocator, descriptor heaps, retained
+  // resources, and staging UPLOAD buffers. Nothing else is needed.
+  submission.session = D3D12FrameSession{};
+  submission.uploads.clear();
 }
 
 }  // namespace tgfx
