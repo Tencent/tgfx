@@ -60,13 +60,19 @@ class Render3DContext : public Layer3DContext {
   void collectNodes(Layer* layer, const Matrix3D& transform, float alpha, int depth);
   std::shared_ptr<Image> rasterLayer(Layer* layer, const Rect& localBounds, float alpha,
                                      DrawArgs& leafArgs);
-  // Whether `layer` itself or any descendant carries a Background-sourced layer style. Reads the
-  // cached presence flag (maxBackgroundOutset > 0) directly via friend access from Layer.
-  static bool SubtreeHasBackgroundStyle(Layer* layer);
+  // Snapshot the outer canvas and prime the compositor target with it so in-subtree
+  // BackgroundBlur dispatches can sample "outside the 3D subtree" content as part of their
+  // backdrop. Silently no-ops when the outer canvas has no surface or the snapshot can't be
+  // remapped into compositor pixel space.
+  void primeCompositorFromOuterCanvas(Canvas* outerCanvas);
 
   std::shared_ptr<Context3DCompositor> _compositor = nullptr;
   std::vector<PendingNode> _pendingNodes = {};
   LayerDrawFunc _drawFunc = nullptr;
+  // OR of hasBackgroundStyle() across every node collected into _pendingNodes. Set during
+  // collectNodes so finishAndDrawTo can skip outer-canvas priming and capturer setup when no
+  // descendant will dispatch a Background-sourced style.
+  bool _subtreeNeedsBackdrop = false;
 };
 
 }  // namespace tgfx

@@ -177,14 +177,10 @@ void Context3DCompositor::drawQuads(const DrawPolygon3D* polygon,
   Rect originalRect = localBounds;
 
   auto allocator = context->drawingAllocator();
-  // Decide whether the polygon's alpha is applied here (group opacity) or has already been baked
-  // into `image` by Layer::drawLayer's recursive raster pass:
-  //   - allowsGroupOpacity=true  -> raster uses alpha=1, multiply by polygon.alpha here.
-  //   - allowsGroupOpacity=false -> raster bakes polygon.alpha into `image`, leave vertex at 1.
-  auto* polygonLayer = polygon->layer();
-  float vertexAlpha =
-      (polygonLayer != nullptr && polygonLayer->allowsGroupOpacity()) ? polygon->alpha() : 1.0f;
-  Color vertexColor(1, 1, 1, vertexAlpha);
+  // Polygon decides whether the per-layer alpha was already baked into `image` (group opacity
+  // off) or still needs to be multiplied here as vertex color (group opacity on). Either way,
+  // just consume compositeAlpha() — no need to peek at the layer.
+  Color vertexColor(1, 1, 1, polygon->compositeAlpha());
   auto matrix = polygon->matrix().asMatrix();
   std::vector<PlacementPtr<QuadRecord>> quadRecords;
   if (subQuads.empty()) {

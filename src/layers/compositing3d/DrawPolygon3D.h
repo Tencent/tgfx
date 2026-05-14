@@ -44,6 +44,7 @@ class DrawPolygon3D {
    * @param matrix The 3D transformation applied to the local-space corners.
    * @param depth The depth level in the layer tree (used for sorting coplanar polygons).
    * @param sequenceIndex The sequence index within the same depth level.
+   * @param alpha Accumulated alpha through the layer's parent chain.
    */
   DrawPolygon3D(Layer* layer, const Rect& localBounds, const Matrix3D& matrix, int depth,
                 int sequenceIndex, float alpha, bool antiAlias);
@@ -73,9 +74,18 @@ class DrawPolygon3D {
     return _isSplit;
   }
 
-  float alpha() const {
-    return _alpha;
-  }
+  /**
+   * Alpha applied while rasterizing the layer to its image. Equals the polygon's accumulated
+   * alpha when the layer doesn't opt into group opacity (alpha must be baked into pixels), or
+   * 1.0 when it does (pixels stay opaque so the compositor can multiply by the group alpha).
+   */
+  float rasterAlpha() const;
+
+  /**
+   * Alpha applied as vertex color during compositing. Mirror of rasterAlpha(): 1.0 for
+   * non-group layers, accumulated alpha for group-opacity layers.
+   */
+  float compositeAlpha() const;
 
   Layer* layer() const {
     return _layer;

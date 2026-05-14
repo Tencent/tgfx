@@ -21,6 +21,7 @@
 #include <cmath>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "tgfx/layers/Layer.h"
 
 namespace tgfx {
 
@@ -255,6 +256,14 @@ std::vector<Quad> DrawPolygon3D::toQuads() const {
                                      localPoints[n - 1]));
   }
   return quads;
+}
+
+float DrawPolygon3D::rasterAlpha() const {
+  return (_layer != nullptr && _layer->allowsGroupOpacity()) ? 1.0f : _alpha;
+}
+
+float DrawPolygon3D::compositeAlpha() const {
+  return (_layer != nullptr && _layer->allowsGroupOpacity()) ? _alpha : 1.0f;
 }
 
 }  // namespace tgfx

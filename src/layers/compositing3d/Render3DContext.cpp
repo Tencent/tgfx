@@ -67,6 +67,7 @@ void Render3DContext::collectNodes(Layer* layer, const Matrix3D& transform, floa
     node.alpha = alpha;
     node.antialiasing = layer->allowsEdgeAntialiasing();
     _pendingNodes.push_back(node);
+    _subtreeNeedsBackdrop = _subtreeNeedsBackdrop || layer->hasBackgroundStyle();
   }
   if (!layer->canPreserve3D()) {
     return;
@@ -81,22 +82,14 @@ void Render3DContext::collectNodes(Layer* layer, const Matrix3D& transform, floa
   }
 }
 
-bool Render3DContext::SubtreeHasBackgroundStyle(Layer* layer) {
-  // The cached presence flag is set whenever a Background-sourced style exists in this layer or
-  // any of its descendants, so we can skip the recursion. Friend access reads it directly.
-  return layer != nullptr && layer->maxBackgroundOutset > 0;
-}
-
 void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
   DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
   if (_pendingNodes.empty() || args.context == nullptr) {
     return;
   }
 
-  // Register every node as a polygon (geometry only). The compositor's BSP tree may split
-  // polygons; each fragment retains a Layer* (for raster lookup) and node.alpha. node.alpha is
-  // carried as the polygon's nominal alpha but applied differently in the raster vs compositor
-  // passes depending on the layer's group-opacity setting (decided per-stage below).
+  // Register every collected node as a polygon. The compositor's BSP tree may split polygons
+  // further; each fragment carries the layer pointer and node alpha for the raster pass below.
   for (const auto& node : _pendingNodes) {
     Matrix3D finalTransform = node.transform;
     finalTransform.postScale(_contentScale, _contentScale, 1.0f);
@@ -107,62 +100,18 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
 
   const auto& fragments = _compositor->prepareTraversal();
 
-  // Detect whether the subtree contains any Background-sourced layer style. The Compositor3DCapturer
-  // only needs to be installed when there's something inside the subtree that will dispatch.
-  bool subtreeNeedsBackdrop = false;
-  for (const auto& node : _pendingNodes) {
-    if (SubtreeHasBackgroundStyle(node.layer)) {
-      subtreeNeedsBackdrop = true;
-      break;
-    }
+  // BackgroundBlur dispatches inside the subtree see two layers of backdrop: outer-canvas content
+  // (primed once before the BSP loop) and intra-subtree fragments accumulated as the loop runs.
+  if (_subtreeNeedsBackdrop) {
+    primeCompositorFromOuterCanvas(canvas);
   }
 
-  // Prime the compositor target with the outer canvas snapshot so any in-subtree BackgroundBlur
-  // dispatch sees "outside the 3D subtree" content as part of its backdrop. We project the outer
-  // snapshot into compositor pixel space via PictureRecorder, then ask the compositor to lay it
-  // down as the very first quad — subsequent BSP fragments composite on top via SrcOver.
-  if (subtreeNeedsBackdrop) {
-    if (auto* outerSurface = canvas->getSurface()) {
-      auto outerSnapshot = outerSurface->makeImageSnapshot();
-      if (outerSnapshot != nullptr) {
-        auto targetWidth = static_cast<int>(_renderRect.width());
-        auto targetHeight = static_cast<int>(_renderRect.height());
-        if (targetWidth > 0 && targetHeight > 0) {
-          // Compose: device pixel → compositor pixel.
-          //   compositor pixel → outer canvas-local: Scale(1/contentScale).preTranslate(rr.tl)
-          //   outer canvas-local → device pixel: outerCanvasMatrix
-          // Combined the other direction (outer device → compositor pixel) by inverting both.
-          Matrix compositorToOuterDevice = canvas->getMatrix();
-          compositorToOuterDevice.preScale(1.0f / _contentScale, 1.0f / _contentScale);
-          compositorToOuterDevice.preTranslate(_renderRect.left, _renderRect.top);
-          Matrix outerDeviceToCompositor = Matrix::I();
-          if (compositorToOuterDevice.invert(&outerDeviceToCompositor)) {
-            PictureRecorder primeRecorder = {};
-            auto* primeRec = primeRecorder.beginRecording();
-            primeRec->concat(outerDeviceToCompositor);
-            primeRec->drawImage(outerSnapshot);
-            auto picture = primeRecorder.finishRecordingAsPicture();
-            if (picture != nullptr) {
-              Matrix imageMatrix = Matrix::I();
-              auto primeImage = Image::MakeFrom(std::move(picture), targetWidth, targetHeight,
-                                                &imageMatrix, _colorSpace);
-              if (primeImage != nullptr) {
-                _compositor->primeWithImage(primeImage);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  // Build a single shared sub-handler for the whole BSP traversal. dispatch fires per-layer per-
-  // fragment; the handler reads the compositor target on demand inside drawBackgroundStyle so
-  // each dispatch sees the up-to-date BSP accumulation. Capture writes one entry per dispatch
-  // into the shared snapshot list; consume reads them back in the same dispatch order, so the
-  // list cursor stays in lock-step.
+  // Capture-pass: install a Compositor3DCapturer so each in-subtree dispatch writes one entry
+  // into the shared snapshot list. Consume-pass keeps the outer consumer; both walk the list in
+  // dispatch order via a cursor, so capture and consume stay in lock-step.
   std::unique_ptr<Compositor3DCapturer> compositorCapturer;
   bool capturePass = args.backgroundHandler != nullptr && args.backgroundHandler->isCapturer();
-  if (subtreeNeedsBackdrop && capturePass) {
+  if (_subtreeNeedsBackdrop && capturePass) {
     auto* outerCapturer = static_cast<BackgroundCapturer*>(args.backgroundHandler);
     compositorCapturer = std::make_unique<Compositor3DCapturer>(
         outerCapturer->snapshotMap(), _compositor.get(), _renderRect, _contentScale, _colorSpace);
@@ -172,26 +121,17 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
   layerImages.reserve(_pendingNodes.size());
   DrawArgs leafArgs = args;
   leafArgs.opaqueContext = nullptr;
-  // Replace the outer handler with the compositor-aware one during raster. Capture: write entries
-  // into the snapshot list. Consume: keep the outer consumer (it reads the same list under the
-  // same key, advancing its own cursor). NoOp paths fall through to the parent NoOp.
   if (compositorCapturer) {
     leafArgs.backgroundHandler = compositorCapturer.get();
   }
 
   for (auto* fragment : fragments) {
     auto* layer = fragment->layer();
-    // Per-fragment raster (no caching) is required whenever the subtree carries BackgroundBlur:
-    // each BSP slice's raster sees a different mid-traversal compositor state, so cached images
-    // would drift from the snapshot the consume pass expects. Plain layers without backdrop
-    // dependency keep the shared cache for cheap re-use across split fragments.
-    bool perFragmentRaster = SubtreeHasBackgroundStyle(layer);
-
-    // Raster alpha mirrors the compositor's vertex-color logic: when the layer opts into group
-    // opacity, raster the subtree opaque (alpha=1) and let the compositor multiply by node.alpha
-    // at composite time; otherwise bake node.alpha into the raster image so the compositor stays
-    // at alpha=1.
-    float rasterAlpha = layer->allowsGroupOpacity() ? 1.0f : fragment->alpha();
+    // Layers carrying BackgroundBlur must raster per-fragment because each BSP slice samples a
+    // different mid-traversal compositor state; cached images would drift from what the consume
+    // pass expects. Plain layers keep the shared cache for cheap re-use across split fragments.
+    bool perFragmentRaster = layer->hasBackgroundStyle();
+    float rasterAlpha = fragment->rasterAlpha();
     std::shared_ptr<Image> image;
     if (perFragmentRaster) {
       image = rasterLayer(layer, fragment->localBounds(), rasterAlpha, leafArgs);
@@ -241,14 +181,51 @@ std::shared_ptr<Image> Render3DContext::rasterLayer(Layer* layer, const Rect& lo
   density.postTranslate(-localBounds.left * _contentScale, -localBounds.top * _contentScale);
   leafCanvas->setMatrix(density);
 
-  // Set render3DContext so that Layer::drawChildren detects "I am a preserve3D middle node being
-  // rasterized inside a 3D context" and stops descending. Non-preserve3D leaves still draw their
-  // children normally because the guard checks canPreserve3D() too.
+  // render3DContext signals Layer::drawChildren that we're rasterizing inside a 3D context, so
+  // preserve3D middle nodes are not recursed into (they're already registered as polygons).
+  // Non-preserve3D leaves still draw their own children normally.
   leafArgs.render3DContext = shared_from_this();
   auto blendMode = static_cast<BlendMode>(layer->bitFields.blendMode);
   (layer->*_drawFunc)(leafArgs, leafCanvas, alpha, blendMode);
   leafArgs.render3DContext = nullptr;
   return surface->makeImageSnapshot();
+}
+
+void Render3DContext::primeCompositorFromOuterCanvas(Canvas* outerCanvas) {
+  auto* outerSurface = outerCanvas->getSurface();
+  if (outerSurface == nullptr) {
+    return;
+  }
+  auto outerSnapshot = outerSurface->makeImageSnapshot();
+  if (outerSnapshot == nullptr) {
+    return;
+  }
+  auto targetWidth = static_cast<int>(_renderRect.width());
+  auto targetHeight = static_cast<int>(_renderRect.height());
+  if (targetWidth <= 0 || targetHeight <= 0) {
+    return;
+  }
+  // Map outer-device pixels into compositor pixel space:
+  //   compositor pixel → outer canvas-local: Scale(1/contentScale).preTranslate(rr.tl)
+  //   outer canvas-local → outer device:   outerCanvas->getMatrix()
+  Matrix compositorToOuterDevice = outerCanvas->getMatrix();
+  compositorToOuterDevice.preScale(1.0f / _contentScale, 1.0f / _contentScale);
+  compositorToOuterDevice.preTranslate(_renderRect.left, _renderRect.top);
+  Matrix outerDeviceToCompositor = Matrix::I();
+  if (!compositorToOuterDevice.invert(&outerDeviceToCompositor)) {
+    return;
+  }
+  PictureRecorder recorder = {};
+  recorder.beginRecording()->drawImage(std::move(outerSnapshot));
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return;
+  }
+  auto primeImage = Image::MakeFrom(std::move(picture), targetWidth, targetHeight,
+                                    &outerDeviceToCompositor, _colorSpace);
+  if (primeImage != nullptr) {
+    _compositor->primeWithImage(primeImage);
+  }
 }
 
 }  // namespace tgfx
