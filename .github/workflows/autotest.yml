@@ -7,7 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  mac:
+  mac-opengl:
+    name: mac (opengl)
     # the macos-latest may randomly give us macos-12.6.9 or macos-12.7.0 which may break the autotest.
     runs-on: macos-14
     steps:
@@ -80,6 +81,59 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: result
+          path: result
+
+  mac-vulkan:
+    name: mac (vulkan)
+    runs-on: macos-14
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+            test/baseline/.cache
+          key: third-party-autotest-mac-vk-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: third-party-autotest-mac-vk-
+
+      - uses: tecolicom/actions-use-homebrew-tools@v1
+        with:
+          tools: ninja yasm
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Run Autotest
+        run: |
+          chmod +x autotest.sh
+          ./autotest.sh USE_VULKAN_SWIFTSHADER
+        env:
+          TRACY_NO_INVARIANT_CHECK: 1
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+            test/baseline/.cache
+          key: third-party-autotest-mac-vk-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+
+      - name: Upload Result
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac_vulkan_result
           path: result
 
   win-opengl:

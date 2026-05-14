@@ -31,6 +31,8 @@
 
   if [[ "$1" == "USE_SWIFTSHADER" ]]; then
     cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_USE_SWIFTSHADER=ON -DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ../
+  elif [[ "$1" == "USE_VULKAN_SWIFTSHADER" ]]; then
+    cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_USE_VULKAN=ON -DTGFX_USE_SWIFTSHADER=ON -DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ../
   elif [[ "$1" == "USE_METAL" ]]; then
     cmake -DTGFX_USE_METAL=ON -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ../
   else
@@ -38,6 +40,15 @@
   fi
 
   cmake --build . --target UpdateBaseline -- -j 12
+  if [[ "$1" == "USE_VULKAN_SWIFTSHADER" ]]; then
+    # macOS: see autotest.sh for the rationale of this rename + DYLD_LIBRARY_PATH dance.
+    HOST_ARCH=$(uname -m)
+    if [[ "$HOST_ARCH" == "x86_64" ]]; then
+      HOST_ARCH=x64
+    fi
+    cp ../vendor/swiftshader/mac/$HOST_ARCH/libvk_swiftshader.dylib ./libvulkan.dylib
+    export DYLD_LIBRARY_PATH=$(pwd):${DYLD_LIBRARY_PATH:-}
+  fi
   ./UpdateBaseline
 
   if test $? -eq 0; then
