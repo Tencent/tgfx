@@ -102,6 +102,9 @@ class VulkanRenderPass : public RenderPass {
     int scissorWidth = -1;
     int scissorHeight = -1;
     bool descriptorDirty = false;
+    // The actual VkPipeline handle currently bound to the command buffer. Used when
+    // extendedDynamicState is unavailable to detect whether a topology-variant rebind is needed.
+    VkPipeline boundVkPipeline = VK_NULL_HANDLE;
   };
 
   BoundState lastBound;

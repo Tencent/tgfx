@@ -22,6 +22,7 @@
 #include <unordered_set>
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanResource.h"
+#include "tgfx/gpu/RenderPass.h"
 #include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
@@ -37,6 +38,15 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
                                                     const RenderPipelineDescriptor& descriptor);
 
   VkPipeline vulkanPipeline() const {
+    return pipeline;
+  }
+
+  /// Returns the VkPipeline matching the given primitive type. When extendedDynamicState is
+  /// unavailable, a separate TriangleStrip pipeline variant is created at construction time.
+  VkPipeline vulkanPipeline(PrimitiveType type) const {
+    if (type == PrimitiveType::TriangleStrip && stripPipeline != VK_NULL_HANDLE) {
+      return stripPipeline;
+    }
     return pipeline;
   }
 
@@ -75,9 +85,11 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
 
   bool createDescriptorSetLayout(VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor);
   bool createPipelineLayout(VulkanGPU* gpu);
-  bool createPipeline(VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor);
+  bool createPipeline(VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor,
+                      VkPrimitiveTopology topology, VkPipeline* outPipeline);
 
   VkPipeline pipeline = VK_NULL_HANDLE;
+  VkPipeline stripPipeline = VK_NULL_HANDLE;
   VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
   VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
