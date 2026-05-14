@@ -22,6 +22,7 @@
 #include <memory>
 #include <unordered_map>
 #include "D3D12Defines.h"
+#include "D3D12FrameSession.h"
 #include "D3D12Util.h"
 #include "core/utils/ReturnQueue.h"
 #include "tgfx/gpu/GPU.h"
@@ -113,6 +114,13 @@ class D3D12GPU : public GPU {
   void processUnreferencedResources();
 
   void releaseAll(bool releaseGPU);
+
+  /**
+   * Reclaims resources from a D3D12FrameSession that was created but never submitted (abandon
+   * path). Invoked by D3D12CommandBuffer's destructor and by D3D12CommandEncoder::onRelease(). This
+   * is the same unified cleanup path used after the GPU fence signals successful completion.
+   */
+  void reclaimAbandonedSession(D3D12FrameSession session);
 
  private:
   explicit D3D12GPU(ComPtr<ID3D12Device> device, ComPtr<IDXGIAdapter1> adapter);

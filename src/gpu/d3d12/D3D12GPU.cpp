@@ -86,8 +86,8 @@ void D3D12GPU::initInfo() {
     dxgiAdapter->GetDesc1(&desc);
     std::wstring wRenderer(desc.Description);
     int sizeNeeded =
-        WideCharToMultiByte(CP_UTF8, 0, wRenderer.data(),
-                            static_cast<int>(wRenderer.size()), nullptr, 0, nullptr, nullptr);
+        WideCharToMultiByte(CP_UTF8, 0, wRenderer.data(), static_cast<int>(wRenderer.size()),
+                            nullptr, 0, nullptr, nullptr);
     _info.renderer.resize(static_cast<size_t>(sizeNeeded));
     WideCharToMultiByte(CP_UTF8, 0, wRenderer.data(), static_cast<int>(wRenderer.size()),
                         _info.renderer.data(), sizeNeeded, nullptr, nullptr);
@@ -117,7 +117,7 @@ void D3D12GPU::initFeatures() {
 void D3D12GPU::initLimits() {
   D3D12_FEATURE_DATA_D3D12_OPTIONS options = {};
   if (SUCCEEDED(d3d12Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options,
-                                                  sizeof(options)))) {
+                                                 sizeof(options)))) {
     // D3D12 resource binding tier determines sampler limits.
     switch (options.ResourceBindingTier) {
       case D3D12_RESOURCE_BINDING_TIER_1:
@@ -153,7 +153,7 @@ bool D3D12GPU::isFormatRenderable(PixelFormat format) const {
   D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport = {};
   formatSupport.Format = static_cast<DXGI_FORMAT>(dxgiFormat);
   if (FAILED(d3d12Device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &formatSupport,
-                                               sizeof(formatSupport)))) {
+                                              sizeof(formatSupport)))) {
     return false;
   }
   return (formatSupport.Support1 & D3D12_FORMAT_SUPPORT1_RENDER_TARGET) != 0;
@@ -238,7 +238,7 @@ int D3D12GPU::getSampleCount(int requestedCount, PixelFormat pixelFormat) const 
     qualityLevels.Format = static_cast<DXGI_FORMAT>(dxgiFormat);
     qualityLevels.SampleCount = static_cast<UINT>(sampleCount);
     if (SUCCEEDED(d3d12Device->CheckFeatureSupport(D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
-                                                    &qualityLevels, sizeof(qualityLevels))) &&
+                                                   &qualityLevels, sizeof(qualityLevels))) &&
         qualityLevels.NumQualityLevels > 0) {
       return sampleCount;
     }
@@ -261,7 +261,8 @@ std::shared_ptr<Texture> D3D12GPU::importBackendTexture(const BackendTexture& ba
   if (!backendTexture.getD3D12TextureInfo(&d3d12Info) || d3d12Info.resource == nullptr) {
     return nullptr;
   }
-  auto d3d12Resource = const_cast<ID3D12Resource*>(static_cast<const ID3D12Resource*>(d3d12Info.resource));
+  auto d3d12Resource =
+      const_cast<ID3D12Resource*>(static_cast<const ID3D12Resource*>(d3d12Info.resource));
   ComPtr<ID3D12Resource> resource = nullptr;
   d3d12Resource->QueryInterface(IID_PPV_ARGS(&resource));
   if (resource == nullptr) {
@@ -283,7 +284,8 @@ std::shared_ptr<Texture> D3D12GPU::importBackendRenderTarget(
   if (!isFormatRenderable(format)) {
     return nullptr;
   }
-  auto d3d12Resource = const_cast<ID3D12Resource*>(static_cast<const ID3D12Resource*>(d3d12Info.resource));
+  auto d3d12Resource =
+      const_cast<ID3D12Resource*>(static_cast<const ID3D12Resource*>(d3d12Info.resource));
   ComPtr<ID3D12Resource> resource = nullptr;
   d3d12Resource->QueryInterface(IID_PPV_ARGS(&resource));
   if (resource == nullptr) {
@@ -342,6 +344,15 @@ void D3D12GPU::releaseAll(bool releaseGPU) {
   }
   resources.clear();
   returnQueue = nullptr;
+}
+
+void D3D12GPU::reclaimAbandonedSession(D3D12FrameSession session) {
+  // Letting the local go out of scope releases the command list and allocator via ComPtr, and
+  // drops every shared_ptr in retainedResources. Resources whose refcount reaches zero enter the
+  // ReturnQueue and will be destroyed by the next processUnreferencedResources() call.
+  // Once InflightSubmission is introduced (later step), this method will be reused for the
+  // post-fence reclaim path.
+  (void)session;
 }
 
 }  // namespace tgfx
