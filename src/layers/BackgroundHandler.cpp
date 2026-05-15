@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BackgroundHandler.h"
-#include <cstdio>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/BackgroundSnapshotMap.h"
@@ -233,7 +232,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (image == nullptr) {
     return;
   }
-  snapshots->snapshots[BackgroundSnapshotKey{layer, style}].entries.push_back(
+  snapshots->snapshots[BackgroundSnapshotKey{layer, style}].push_back(
       BackgroundSnapshotEntry{std::move(image), offset});
 }
 
@@ -313,10 +312,10 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       return;
     }
     auto& cursor = readCursors[key];
-    if (cursor >= it->second.entries.size()) {
+    if (cursor >= it->second.size()) {
       return;
     }
-    auto& entry = it->second.entries[cursor++];
+    auto& entry = it->second[cursor++];
     bgImage = entry.image;
     bgOffset = entry.offset;
   } else {

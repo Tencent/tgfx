@@ -33,7 +33,6 @@ class DrawArgs;
 class Layer;
 class LayerStyle;
 class Surface;
-struct BackgroundSnapshotMap;
 struct LayerStyleSource;
 
 /**

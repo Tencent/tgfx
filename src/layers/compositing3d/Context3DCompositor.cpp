@@ -259,10 +259,8 @@ void Context3DCompositor::primeWithImage(const std::shared_ptr<Image>& image) {
     return;
   }
   // Construct a full-target polygon with identity transform so the image lands one-to-one in
-  // compositor pixel space. Layer pointer is unused here (drawQuads only reads localBounds /
-  // matrix / alpha / antiAlias), but DrawPolygon3D's constructor asserts on null — pass the
-  // raw image as a placeholder image, since drawQuads ignores polygon->image() in favour of
-  // the explicit `image` parameter.
+  // compositor pixel space. Passing layer=nullptr is safe: DrawPolygon3D's alpha helpers
+  // null-check _layer and fall back to _alpha, and drawQuads ignores the layer pointer.
   auto fullRect = Rect::MakeWH(width, height);
   auto identity3D = Matrix3D::I();
   auto polygon = std::make_unique<DrawPolygon3D>(/*layer=*/nullptr, fullRect, identity3D,

@@ -53,21 +53,6 @@ struct BackgroundSnapshotKey {
   }
 };
 
-/**
- * Snapshot entries for one (Layer, LayerStyle) pair. The list grows once per dispatch during the
- * capture pass and is consumed in the same order during the consume pass. Normal 2D paths only
- * ever push and read a single entry, which is equivalent to the previous single-value behaviour.
- * Paths that rasterize the same (layer, style) multiple times — e.g. a BackgroundBlur layer split
- * into multiple fragments by a 3D subtree's BSP — push one entry per dispatch in BSP order.
- *
- * Read cursors live on BackgroundConsumer (per-consumer state), not on this list, so that the
- * same shared snapshot map can be consumed multiple times — once per tile in tiled rendering, or
- * twice when partial-cache and on-screen passes share a cache.
- */
-struct BackgroundSnapshotList {
-  std::vector<BackgroundSnapshotEntry> entries = {};
-};
-
 struct BackgroundSnapshotKeyHash {
   std::size_t operator()(const BackgroundSnapshotKey& key) const noexcept {
     auto h1 = std::hash<const void*>{}(key.layer);
@@ -84,10 +69,13 @@ struct BackgroundSnapshotKeyHash {
 
 /**
  * Carries background snapshots from the capture pass to the consume pass. Each (Layer, LayerStyle)
- * key maps to a list (not a single entry), since the same pair can be dispatched more than once
+ * key maps to a vector (not a single entry), since the same pair can be dispatched more than once
  * within one render — e.g. a BackgroundBlur layer that gets split into multiple fragments by a
  * 3D subtree's BSP. Capture pushes entries in dispatch order; consume reads them in the same
- * order through an internal cursor. The interface is unchanged from the caller's perspective.
+ * order through a cursor that lives on BackgroundConsumer (per-consumer state), so that the same
+ * shared snapshot map can be consumed multiple times — once per tile in tiled rendering, or twice
+ * when partial-cache and on-screen passes share a cache. Normal 2D paths only ever push and read a
+ * single entry, which is equivalent to the previous single-value behaviour.
  *
  * Also caches LayerStyleSource per layer: capture and consume passes walk the same tree, so
  * each layer's content/contour images are identical between passes. Building the source once in
@@ -96,7 +84,8 @@ struct BackgroundSnapshotKeyHash {
  * built at most once and read N times — list semantics would offer no value here.
  */
 struct BackgroundSnapshotMap {
-  std::unordered_map<BackgroundSnapshotKey, BackgroundSnapshotList, BackgroundSnapshotKeyHash>
+  std::unordered_map<BackgroundSnapshotKey, std::vector<BackgroundSnapshotEntry>,
+                     BackgroundSnapshotKeyHash>
       snapshots = {};
   std::unordered_map<Layer*, std::unique_ptr<LayerStyleSource>> layerStyleSources = {};
 };
