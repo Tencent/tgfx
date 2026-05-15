@@ -252,9 +252,9 @@ class VulkanGPU : public GPU {
   bool adopted = false;
 
   // Subsystems
-  std::unique_ptr<VulkanCaps> caps = nullptr;
-  std::unique_ptr<VulkanCommandQueue> commandQueue = nullptr;
-  std::unique_ptr<shaderc::Compiler> compiler = nullptr;
+  std::unique_ptr<VulkanCaps> caps;
+  std::unique_ptr<VulkanCommandQueue> commandQueue;
+  std::unique_ptr<shaderc::Compiler> compiler;
 
   // Resource tracking (resources list + ReturnQueue for deferred destruction)
   std::shared_ptr<VulkanResource> addResource(VulkanResource* resource);
