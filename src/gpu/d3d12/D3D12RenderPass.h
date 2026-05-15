@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 #include "D3D12Util.h"
 #include "tgfx/gpu/RenderPass.h"
@@ -104,6 +105,29 @@ class D3D12RenderPass : public RenderPass {
   uint32_t srvHeapCapacity = 0;
   uint32_t samplerHeapCapacity = 0;
   bool descriptorHeapsBoundToCmdList = false;
+
+  // Per-render-pass dedup caches. Repeated setTexture() calls with the same texture+format or
+  // sampler reuse the previously-allocated heap slot, so the heaps see one descriptor per unique
+  // resource instead of one per draw call. This is critical for the Sampler heap because D3D12
+  // caps the total live sampler descriptors per shader-visible heap at 2048.
+  struct SrvCacheKey {
+    ID3D12Resource* resource = nullptr;
+    DXGI_FORMAT format = static_cast<DXGI_FORMAT>(0);  // DXGI_FORMAT_UNKNOWN
+    UINT mipLevels = 0;
+    bool operator==(const SrvCacheKey& other) const {
+      return resource == other.resource && format == other.format && mipLevels == other.mipLevels;
+    }
+  };
+  struct SrvCacheKeyHash {
+    size_t operator()(const SrvCacheKey& k) const noexcept {
+      auto h1 = std::hash<void*>{}(static_cast<void*>(k.resource));
+      auto h2 = std::hash<UINT>{}(static_cast<UINT>(k.format));
+      auto h3 = std::hash<UINT>{}(k.mipLevels);
+      return h1 ^ (h2 * 0x9E3779B97F4A7C15ull) ^ (h3 * 0xBF58476D1CE4E5B9ull);
+    }
+  };
+  std::unordered_map<SrvCacheKey, D3D12_GPU_DESCRIPTOR_HANDLE, SrvCacheKeyHash> srvSlotCache;
+  std::unordered_map<const void*, D3D12_GPU_DESCRIPTOR_HANDLE> samplerSlotCache;
 
   // Per-binding deferred state. setUniformBuffer / setTexture record the argument; the actual
   // RootCBV / RootDescriptorTable bind happens at flushBindingsIfNeeded() (just before draw).

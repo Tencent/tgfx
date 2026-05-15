@@ -69,6 +69,21 @@ std::shared_ptr<D3D12Device> D3D12Device::MakeFrom(void* device) {
   if (devicePtr == nullptr) {
     return nullptr;
   }
+#if !defined(NDEBUG) || defined(TGFX_D3D12_DEBUG_LAYER)
+  // Configure the debug-layer info queue so subsequent CreateDescriptorHeap / ResourceBarrier /
+  // DrawX failures get logged with the underlying validation message instead of just an opaque
+  // HRESULT. Messages are drained per-submission by D3D12GPU::executeSubmission().
+  ComPtr<ID3D12InfoQueue> infoQueue = nullptr;
+  if (SUCCEEDED(devicePtr->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
+    infoQueue->SetMuteDebugOutput(FALSE);
+    // Default storage limit is 1024; expand it so we don't lose messages between drains.
+    infoQueue->SetMessageCountLimit(8192);
+    // Break into the debugger on the most useful severities. When no debugger is attached the
+    // breaks are no-ops, but the messages still queue up for DrainDebugMessages() to log.
+    infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+    infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, FALSE);
+  }
+#endif
   auto gpu = D3D12GPU::Make(std::move(devicePtr));
   if (gpu == nullptr) {
     return nullptr;

@@ -27,12 +27,20 @@
 
 namespace tgfx {
 
-// Capacity of the per-render-pass shader-visible descriptor heaps. Each setTexture() call inside
-// a render pass consumes one SRV slot and one Sampler slot. 1024 is large enough for typical
-// TGFX render passes (several hundred draws with a handful of texture binds each) and stays well
-// below the 1,000,000 hardware maximum.
+// Capacity of the per-render-pass shader-visible descriptor heaps.
+//
+// CBV/SRV/UAV heap: setTexture() allocates one SRV slot per unique (resource, format, mipLevels)
+// triple so its capacity bounds the number of *distinct* textures sampled in this pass, not the
+// total number of setTexture() calls.
+//
+// Sampler heap: D3D12 caps a single shader-visible sampler heap at 2048 descriptors. Because
+// every typical TGFX render pass binds far fewer than that — sampler descriptors are heavily
+// reused across draws — a small cap of 256 unique samplers is plenty and keeps the per-pass
+// memory footprint low. setTexture() also dedups by D3D12Sampler pointer (samplers are cached
+// at the GPU level by SamplerDescriptor), so repeated bindings of the same sampler don't
+// consume new slots.
 static constexpr uint32_t kRenderPassSrvHeapSize = 1024;
-static constexpr uint32_t kRenderPassSamplerHeapSize = 1024;
+static constexpr uint32_t kRenderPassSamplerHeapSize = 256;
 
 static D3D12_PRIMITIVE_TOPOLOGY ToD3D12Topology(PrimitiveType type) {
   return type == PrimitiveType::TriangleStrip ? D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP
@@ -333,11 +341,6 @@ void D3D12RenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> text
   if (!texture || !sampler || !currentPipeline || binding >= MaxTextureBindings) {
     return;
   }
-  if (srvHeapHead >= srvHeapCapacity || samplerHeapHead >= samplerHeapCapacity) {
-    LOGE("D3D12RenderPass::setTexture: descriptor heap exhausted (capacity %u/%u).",
-         srvHeapCapacity, samplerHeapCapacity);
-    return;
-  }
   auto d3d12Tex = std::static_pointer_cast<D3D12Texture>(texture);
   auto d3d12Samp = std::static_pointer_cast<D3D12Sampler>(sampler);
   encoder->retainResource(d3d12Tex);
@@ -355,34 +358,64 @@ void D3D12RenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> text
 
   auto device = d3d12GPU->device();
 
-  // Allocate one SRV slot for this texture.
-  D3D12_CPU_DESCRIPTOR_HANDLE srvCpu = srvHeap->GetCPUDescriptorHandleForHeapStart();
-  srvCpu.ptr += static_cast<SIZE_T>(srvHeapHead) * srvDescriptorSize;
-  D3D12_GPU_DESCRIPTOR_HANDLE srvGpu = srvHeap->GetGPUDescriptorHandleForHeapStart();
-  srvGpu.ptr += static_cast<UINT64>(srvHeapHead) * srvDescriptorSize;
+  // SRV slot: dedup by (resource, format, mipLevels). Repeated bindings of the same texture
+  // within one render pass share a single descriptor.
+  SrvCacheKey srvKey = {};
+  srvKey.resource = d3d12Tex->d3d12Resource();
+  srvKey.format = static_cast<DXGI_FORMAT>(d3d12Tex->dxgiFormat());
+  srvKey.mipLevels = static_cast<UINT>(d3d12Tex->mipLevelCount());
+  D3D12_GPU_DESCRIPTOR_HANDLE srvGpu = {};
+  auto srvIt = srvSlotCache.find(srvKey);
+  if (srvIt != srvSlotCache.end()) {
+    srvGpu = srvIt->second;
+  } else {
+    if (srvHeapHead >= srvHeapCapacity) {
+      LOGE("D3D12RenderPass::setTexture: SRV heap exhausted (capacity=%u).", srvHeapCapacity);
+      return;
+    }
+    D3D12_CPU_DESCRIPTOR_HANDLE srvCpu = srvHeap->GetCPUDescriptorHandleForHeapStart();
+    srvCpu.ptr += static_cast<SIZE_T>(srvHeapHead) * srvDescriptorSize;
+    srvGpu = srvHeap->GetGPUDescriptorHandleForHeapStart();
+    srvGpu.ptr += static_cast<UINT64>(srvHeapHead) * srvDescriptorSize;
 
-  D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-  srvDesc.Format = static_cast<DXGI_FORMAT>(d3d12Tex->dxgiFormat());
-  srvDesc.ViewDimension = (d3d12Tex->sampleCount() > 1) ? D3D12_SRV_DIMENSION_TEXTURE2DMS
-                                                        : D3D12_SRV_DIMENSION_TEXTURE2D;
-  srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-  if (srvDesc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2D) {
-    srvDesc.Texture2D.MostDetailedMip = 0;
-    srvDesc.Texture2D.MipLevels = static_cast<UINT>(d3d12Tex->mipLevelCount());
-    srvDesc.Texture2D.PlaneSlice = 0;
-    srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = srvKey.format;
+    srvDesc.ViewDimension = (d3d12Tex->sampleCount() > 1) ? D3D12_SRV_DIMENSION_TEXTURE2DMS
+                                                          : D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    if (srvDesc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2D) {
+      srvDesc.Texture2D.MostDetailedMip = 0;
+      srvDesc.Texture2D.MipLevels = srvKey.mipLevels;
+      srvDesc.Texture2D.PlaneSlice = 0;
+      srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+    }
+    device->CreateShaderResourceView(d3d12Tex->d3d12Resource(), &srvDesc, srvCpu);
+    srvHeapHead++;
+    srvSlotCache.emplace(srvKey, srvGpu);
   }
-  device->CreateShaderResourceView(d3d12Tex->d3d12Resource(), &srvDesc, srvCpu);
-  srvHeapHead++;
 
-  // Allocate one Sampler slot in the parallel sampler heap.
-  D3D12_CPU_DESCRIPTOR_HANDLE sampCpu = samplerHeap->GetCPUDescriptorHandleForHeapStart();
-  sampCpu.ptr += static_cast<SIZE_T>(samplerHeapHead) * samplerDescriptorSize;
-  D3D12_GPU_DESCRIPTOR_HANDLE sampGpu = samplerHeap->GetGPUDescriptorHandleForHeapStart();
-  sampGpu.ptr += static_cast<UINT64>(samplerHeapHead) * samplerDescriptorSize;
-  auto samplerDesc = d3d12Samp->samplerDesc();
-  device->CreateSampler(&samplerDesc, sampCpu);
-  samplerHeapHead++;
+  // Sampler slot: dedup by D3D12Sampler pointer. The GPU-level sampler cache (D3D12GPU::
+  // samplerCache) already collapses identical SamplerDescriptors to a single shared D3D12Sampler
+  // instance, so pointer identity is a sufficient key.
+  D3D12_GPU_DESCRIPTOR_HANDLE sampGpu = {};
+  auto sampIt = samplerSlotCache.find(d3d12Samp.get());
+  if (sampIt != samplerSlotCache.end()) {
+    sampGpu = sampIt->second;
+  } else {
+    if (samplerHeapHead >= samplerHeapCapacity) {
+      LOGE("D3D12RenderPass::setTexture: Sampler heap exhausted (capacity=%u).",
+           samplerHeapCapacity);
+      return;
+    }
+    D3D12_CPU_DESCRIPTOR_HANDLE sampCpu = samplerHeap->GetCPUDescriptorHandleForHeapStart();
+    sampCpu.ptr += static_cast<SIZE_T>(samplerHeapHead) * samplerDescriptorSize;
+    sampGpu = samplerHeap->GetGPUDescriptorHandleForHeapStart();
+    sampGpu.ptr += static_cast<UINT64>(samplerHeapHead) * samplerDescriptorSize;
+    auto samplerDesc = d3d12Samp->samplerDesc();
+    device->CreateSampler(&samplerDesc, sampCpu);
+    samplerHeapHead++;
+    samplerSlotCache.emplace(d3d12Samp.get(), sampGpu);
+  }
 
   auto& tb = textureBindings[binding];
   tb.srvTableStart = srvGpu;

@@ -71,6 +71,9 @@ struct D3D12FrameSession {
   // main command list. Captured here so they outlive GPU execution; freed after the fence signals.
   std::vector<ComPtr<ID3D12CommandAllocator>> auxAllocators;
   std::vector<ComPtr<ID3D12GraphicsCommandList>> auxCommandLists;
+  // Auxiliary ID3D12Resource buffers (e.g. transient staging buffers used by
+  // copyTextureToBuffer for row-pitch alignment) that must live until the fence signals.
+  std::vector<ComPtr<ID3D12Resource>> auxBuffers;
 
   D3D12FrameSession() = default;
 

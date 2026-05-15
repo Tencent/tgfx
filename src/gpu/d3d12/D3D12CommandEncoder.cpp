@@ -169,32 +169,70 @@ void D3D12CommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextur
 
   auto cmd = session.commandList.Get();
   auto bytesPerPixel = static_cast<uint32_t>(DXGIFormatBytesPerPixel(d3d12Src->dxgiFormat()));
-  uint32_t rowBytes = dstRowBytes > 0 ? static_cast<uint32_t>(dstRowBytes) : copyWidth * bytesPerPixel;
+  uint32_t tightRowBytes =
+      dstRowBytes > 0 ? static_cast<uint32_t>(dstRowBytes) : copyWidth * bytesPerPixel;
 
-  // D3D12 requires the destination row pitch to be a multiple of
-  // D3D12_TEXTURE_DATA_PITCH_ALIGNMENT (256). The caller is expected to honour this; we only
-  // assert and log so that mis-sized destinations surface as a recognisable error rather than
-  // silent corruption.
-  if (rowBytes % D3D12_TEXTURE_DATA_PITCH_ALIGNMENT != 0) {
-    LOGE(
-        "D3D12CommandEncoder::copyTextureToBuffer: row pitch %u is not a multiple of %u; "
-        "results will be undefined.",
-        static_cast<unsigned>(rowBytes), static_cast<unsigned>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT));
-  }
+  // D3D12 requires CopyTextureRegion's destination buffer footprint to use a row pitch that is a
+  // multiple of D3D12_TEXTURE_DATA_PITCH_ALIGNMENT (256). The caller's buffer is laid out tightly
+  // (one row immediately follows the previous), so when tightRowBytes happens to be unaligned we
+  // route the copy through a transient default-heap staging buffer with an aligned row pitch and
+  // then issue per-row CopyBufferRegion calls to repack the rows into the caller's buffer.
+  uint32_t alignedRowPitch = (tightRowBytes + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1) &
+                             ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
+  bool needsRepack = (alignedRowPitch != tightRowBytes);
 
   TransitionResourceState(cmd, d3d12Src->d3d12Resource(), d3d12Src->currentState(),
                           D3D12_RESOURCE_STATE_COPY_SOURCE);
 
+  ComPtr<ID3D12Resource> stagingBuffer = nullptr;
+  ID3D12Resource* footprintTarget = d3d12Dst->d3d12Resource();
+  UINT64 footprintOffset = static_cast<UINT64>(dstOffset);
+
+  if (needsRepack) {
+    // Allocate a transient default-heap buffer big enough to hold the aligned-row-pitch image.
+    // The buffer is created in COPY_DEST state so CopyTextureRegion can write to it directly,
+    // then transitioned to COPY_SOURCE so we can read it back row-by-row into the caller's
+    // buffer. The session retains the staging buffer until the fence signals.
+    auto device = _gpu->device();
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12_RESOURCE_DESC bufferDesc = {};
+    bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    bufferDesc.Width = static_cast<UINT64>(alignedRowPitch) * copyHeight;
+    bufferDesc.Height = 1;
+    bufferDesc.DepthOrArraySize = 1;
+    bufferDesc.MipLevels = 1;
+    bufferDesc.Format = static_cast<DXGI_FORMAT>(0);  // DXGI_FORMAT_UNKNOWN
+    bufferDesc.SampleDesc.Count = 1;
+    bufferDesc.SampleDesc.Quality = 0;
+    bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    bufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    auto hr = device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc,
+                                              D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+                                              IID_PPV_ARGS(&stagingBuffer));
+    if (FAILED(hr)) {
+      LOGE("D3D12CommandEncoder::copyTextureToBuffer: staging buffer creation failed, "
+           "HRESULT=0x%08X",
+           static_cast<unsigned>(hr));
+      // Fall back to direct copy with potentially wrong stride; better than dropping silently.
+      stagingBuffer = nullptr;
+      needsRepack = false;
+    } else {
+      footprintTarget = stagingBuffer.Get();
+      footprintOffset = 0;
+    }
+  }
+
   D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint = {};
-  footprint.Offset = static_cast<UINT64>(dstOffset);
+  footprint.Offset = footprintOffset;
   footprint.Footprint.Format = static_cast<DXGI_FORMAT>(d3d12Src->dxgiFormat());
   footprint.Footprint.Width = copyWidth;
   footprint.Footprint.Height = copyHeight;
   footprint.Footprint.Depth = 1;
-  footprint.Footprint.RowPitch = rowBytes;
+  footprint.Footprint.RowPitch = needsRepack ? alignedRowPitch : tightRowBytes;
 
   D3D12_TEXTURE_COPY_LOCATION dstLoc = {};
-  dstLoc.pResource = d3d12Dst->d3d12Resource();
+  dstLoc.pResource = footprintTarget;
   dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
   dstLoc.PlacedFootprint = footprint;
 
@@ -212,6 +250,18 @@ void D3D12CommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextur
   srcBox.back = 1;
 
   cmd->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, &srcBox);
+
+  if (needsRepack) {
+    // Transition the staging buffer to COPY_SOURCE and repack each row into the caller's buffer.
+    TransitionResourceState(cmd, stagingBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
+                            D3D12_RESOURCE_STATE_COPY_SOURCE);
+    for (uint32_t row = 0; row < copyHeight; row++) {
+      cmd->CopyBufferRegion(d3d12Dst->d3d12Resource(),
+                            static_cast<UINT64>(dstOffset) + row * tightRowBytes,
+                            stagingBuffer.Get(), row * alignedRowPitch, tightRowBytes);
+    }
+    session.auxBuffers.push_back(std::move(stagingBuffer));
+  }
 
   TransitionResourceState(cmd, d3d12Src->d3d12Resource(), D3D12_RESOURCE_STATE_COPY_SOURCE,
                           D3D12_RESOURCE_STATE_COMMON);

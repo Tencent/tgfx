@@ -20,6 +20,7 @@
 #include <dxgi1_4.h>
 #include <shaderc/shaderc.hpp>
 #include <string>
+#include <vector>
 #include "D3D12Buffer.h"
 #include "D3D12CommandEncoder.h"
 #include "D3D12CommandQueue.h"
@@ -36,6 +37,34 @@ namespace tgfx {
 bool HardwareBufferAvailable() {
   return false;
 }
+
+#ifdef TGFX_D3D12_DEBUG_LAYER
+// Drain the D3D12 InfoQueue and forward any debug-layer messages to LOGE so they show up next
+// to the C++ failure they correlate with. Cheap when the queue is empty.
+static void DrainDebugMessages(ID3D12Device* device, const char* tag) {
+  if (device == nullptr) {
+    return;
+  }
+  ComPtr<ID3D12InfoQueue> infoQueue = nullptr;
+  if (FAILED(device->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
+    return;
+  }
+  auto count = infoQueue->GetNumStoredMessages();
+  for (UINT64 i = 0; i < count; i++) {
+    SIZE_T msgLen = 0;
+    infoQueue->GetMessage(i, nullptr, &msgLen);
+    std::vector<char> buf(msgLen);
+    auto* msg = reinterpret_cast<D3D12_MESSAGE*>(buf.data());
+    if (SUCCEEDED(infoQueue->GetMessage(i, msg, &msgLen))) {
+      LOGE("[D3D12 debug @ %s] %.*s", tag, static_cast<int>(msg->DescriptionByteLength),
+           msg->pDescription);
+    }
+  }
+  if (count > 0) {
+    infoQueue->ClearStoredMessages();
+  }
+}
+#endif
 
 static ComPtr<IDXGIAdapter1> FindAdapter(ID3D12Device* device) {
   ComPtr<IDXGIFactory4> factory = nullptr;
@@ -466,6 +495,9 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
   if (!lists.empty()) {
     cmdQueue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
   }
+#ifdef TGFX_D3D12_DEBUG_LAYER
+  DrainDebugMessages(d3d12Device.Get(), "executeSubmission");
+#endif
 
   // Step 5: Optional signal of an external semaphore. The semaphore exposes a fixed fence value
   // assigned at creation time — we just signal that value on this queue. After signalling, bump
