@@ -367,8 +367,8 @@ if (TGFX_USE_VULKAN)
     file(GLOB VOLK_FILES third_party/volk/volk.c)
     list(APPEND TGFX_FILES ${VOLK_FILES})
 
-    # VMA (header-only, same pattern as json/concurrentqueue)
-    list(APPEND TGFX_INCLUDES third_party/VulkanMemoryAllocator/include)
+    # VMA (header-only). Added as SYSTEM include later to suppress
+    # nullability-extension warnings from vk_mem_alloc.h on Apple Clang.
 
     # shaderc + SPIRV-Cross (shared with Metal backend)
     list(APPEND TGFX_STATIC_VENDORS shaderc SPIRV-Cross)
@@ -691,6 +691,9 @@ target_compile_definitions(tgfx PRIVATE ${TGFX_DEFINES})
 target_compile_options(tgfx PRIVATE ${TGFX_COMPILE_OPTIONS})
 target_include_directories(tgfx PUBLIC include PRIVATE src)
 target_include_directories(tgfx PRIVATE ${TGFX_INCLUDES})
+if (TGFX_USE_VULKAN)
+    target_include_directories(tgfx SYSTEM PRIVATE third_party/VulkanMemoryAllocator/include)
+endif ()
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS})
 target_link_libraries(tgfx ${TGFX_SHARED_LIBS})
 set_target_properties(tgfx PROPERTIES PREFIX "")

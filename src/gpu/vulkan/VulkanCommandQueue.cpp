@@ -61,7 +61,7 @@ void VulkanCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Re
 
   auto width = static_cast<uint32_t>(rect.width());
   auto height = static_cast<uint32_t>(rect.height());
-  auto bytesPerPixel = VkFormatBytesPerPixel(vulkanTexture->vulkanFormat());
+  auto bytesPerPixel = static_cast<uint32_t>(VkFormatBytesPerPixel(vulkanTexture->vulkanFormat()));
   size_t tightRowBytes = width * bytesPerPixel;
   size_t stagingSize = tightRowBytes * height;
 

@@ -241,10 +241,10 @@ bool VulkanRenderPipeline::createDescriptorSetLayout(VulkanGPU* gpu,
     bindings.push_back(binding);
   }
 
-  unsigned texUnit = 0;
-  for (auto& entry : descriptor.layout.textureSamplers) {
+  auto samplerCount = descriptor.layout.textureSamplers.size();
+  for (size_t i = 0; i < samplerCount; ++i) {
     VkDescriptorSetLayoutBinding binding = {};
-    binding.binding = static_cast<unsigned>(TEXTURE_BINDING_POINT_START) + texUnit++;
+    binding.binding = static_cast<unsigned>(TEXTURE_BINDING_POINT_START) + static_cast<unsigned>(i);
     binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     binding.descriptorCount = 1;
     binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;

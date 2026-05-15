@@ -146,17 +146,17 @@ void VulkanCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcText
   }
 
   // Clamp copy region to source image bounds.
-  auto srcX = static_cast<int32_t>(srcRect.x());
-  auto srcY = static_cast<int32_t>(srcRect.y());
+  auto srcX = srcRect.x() < 0 ? 0u : static_cast<uint32_t>(srcRect.x());
+  auto srcY = srcRect.y() < 0 ? 0u : static_cast<uint32_t>(srcRect.y());
   auto copyWidth = static_cast<uint32_t>(srcRect.width());
   auto copyHeight = static_cast<uint32_t>(srcRect.height());
   auto srcW = static_cast<uint32_t>(srcTexture->width());
   auto srcH = static_cast<uint32_t>(srcTexture->height());
   if (srcX + copyWidth > srcW) {
-    copyWidth = srcW > static_cast<uint32_t>(srcX) ? srcW - static_cast<uint32_t>(srcX) : 0;
+    copyWidth = srcW > srcX ? srcW - srcX : 0;
   }
   if (srcY + copyHeight > srcH) {
-    copyHeight = srcH > static_cast<uint32_t>(srcY) ? srcH - static_cast<uint32_t>(srcY) : 0;
+    copyHeight = srcH > srcY ? srcH - srcY : 0;
   }
   if (copyWidth == 0 || copyHeight == 0) {
     // Even if nothing is copied, ensure dst layout is valid for subsequent use.
@@ -186,7 +186,7 @@ void VulkanCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcText
 
   VkImageCopy region = {};
   region.srcSubresource = {srcAspect, 0, 0, 1};
-  region.srcOffset = {srcX, srcY, 0};
+  region.srcOffset = {static_cast<int32_t>(srcX), static_cast<int32_t>(srcY), 0};
   region.dstSubresource = {dstAspect, 0, 0, 1};
   region.dstOffset = {static_cast<int32_t>(dstOffset.x), static_cast<int32_t>(dstOffset.y), 0};
   region.extent = {copyWidth, copyHeight, 1};
@@ -212,17 +212,17 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   }
 
   // Clamp copy region to source image bounds.
-  auto srcX = static_cast<int32_t>(srcRect.x());
-  auto srcY = static_cast<int32_t>(srcRect.y());
+  auto srcX = srcRect.x() < 0 ? 0u : static_cast<uint32_t>(srcRect.x());
+  auto srcY = srcRect.y() < 0 ? 0u : static_cast<uint32_t>(srcRect.y());
   auto copyWidth = static_cast<uint32_t>(srcRect.width());
   auto copyHeight = static_cast<uint32_t>(srcRect.height());
   auto srcW = static_cast<uint32_t>(srcTexture->width());
   auto srcH = static_cast<uint32_t>(srcTexture->height());
   if (srcX + copyWidth > srcW) {
-    copyWidth = srcW > static_cast<uint32_t>(srcX) ? srcW - static_cast<uint32_t>(srcX) : 0;
+    copyWidth = srcW > srcX ? srcW - srcX : 0;
   }
   if (srcY + copyHeight > srcH) {
-    copyHeight = srcH > static_cast<uint32_t>(srcY) ? srcH - static_cast<uint32_t>(srcY) : 0;
+    copyHeight = srcH > srcY ? srcH - srcY : 0;
   }
   if (copyWidth == 0 || copyHeight == 0) {
     return;
@@ -239,7 +239,7 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   TransitionImageLayout(commandBuffer, vulkanSrc->vulkanImage(), vulkanSrc->currentLayout(),
                         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, aspectMask);
 
-  auto bytesPerPixel = VkFormatBytesPerPixel(vulkanSrc->vulkanFormat());
+  auto bytesPerPixel = static_cast<uint32_t>(VkFormatBytesPerPixel(vulkanSrc->vulkanFormat()));
   DEBUG_ASSERT(dstRowBytes == 0 || dstRowBytes % bytesPerPixel == 0);
   uint32_t rowBytes =
       dstRowBytes > 0 ? static_cast<uint32_t>(dstRowBytes) : copyWidth * bytesPerPixel;
@@ -249,7 +249,7 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   region.bufferRowLength = rowBytes / bytesPerPixel;
   region.bufferImageHeight = copyHeight;
   region.imageSubresource = {aspectMask, 0, 0, 1};
-  region.imageOffset = {srcX, srcY, 0};
+  region.imageOffset = {static_cast<int32_t>(srcX), static_cast<int32_t>(srcY), 0};
   region.imageExtent = {copyWidth, copyHeight, 1};
 
   vkCmdCopyImageToBuffer(commandBuffer, vulkanSrc->vulkanImage(),
