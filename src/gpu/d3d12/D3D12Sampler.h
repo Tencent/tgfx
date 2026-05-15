@@ -28,6 +28,11 @@ class D3D12GPU;
 
 /**
  * D3D12 sampler implementation.
+ *
+ * The sampler descriptor is written into the GPU's process-wide shader-visible Sampler heap at
+ * construction time and the resulting GPU descriptor handle is cached on the instance. That
+ * handle is what render passes bind via SetGraphicsRootDescriptorTable: there is no per-pass
+ * Sampler heap allocation or per-binding CreateSampler call.
  */
 class D3D12Sampler : public Sampler, public D3D12Resource {
  public:
@@ -40,14 +45,23 @@ class D3D12Sampler : public Sampler, public D3D12Resource {
     return _samplerDesc;
   }
 
+  /**
+   * GPU descriptor handle pointing at this sampler's slot in the process-wide shader-visible
+   * Sampler heap. Stable for the lifetime of the GPU instance.
+   */
+  D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptorHandle() const {
+    return _gpuHandle;
+  }
+
  protected:
   void onRelease(D3D12GPU* gpu) override;
 
  private:
-  explicit D3D12Sampler(const D3D12_SAMPLER_DESC& samplerDesc);
+  D3D12Sampler(const D3D12_SAMPLER_DESC& samplerDesc, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle);
   ~D3D12Sampler() override = default;
 
   D3D12_SAMPLER_DESC _samplerDesc = {};
+  D3D12_GPU_DESCRIPTOR_HANDLE _gpuHandle = {};
 
   friend class D3D12GPU;
 };

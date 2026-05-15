@@ -52,6 +52,13 @@ std::shared_ptr<D3D12CommandEncoder> D3D12CommandEncoder::Make(D3D12GPU* gpu) {
   }
   // The command list returned by CreateCommandList is already in the recording state, matching
   // VulkanCommandEncoder's vkBeginCommandBuffer.
+  //
+  // Bind the process-wide shader-visible CBV/SRV/UAV ring and Sampler heap once for the entire
+  // life of this command list. D3D12 documents repeated SetDescriptorHeaps as a potential stall
+  // on some drivers, and our render passes always sub-allocate descriptors into these two heaps,
+  // so a single bind is both correct and optimal.
+  ID3D12DescriptorHeap* heaps[] = {gpu->srvRing().heap(), gpu->samplerHeap()};
+  commandList->SetDescriptorHeaps(2, heaps);
 
   return gpu->makeResource<D3D12CommandEncoder>(gpu, std::move(allocator), std::move(commandList));
 }
@@ -297,27 +304,20 @@ void D3D12CommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> tex
 
   retainResource(d3d12Tex);
 
-  // Allocate a single shader-visible CBV/SRV/UAV heap for the whole chain. We need (mipCount-1)
-  // SRV slots and (mipCount-1) UAV slots arranged as alternating pairs so each level can bind a
-  // descriptor table containing one descriptor.
+  // Sub-allocate a contiguous (mipCount-1)*2-slot range out of the GPU's process-wide
+  // CBV/SRV/UAV ring. Each mip level pair occupies two consecutive slots (SRV at 2i, UAV at
+  // 2i+1) so the compute shader's two single-descriptor tables can be bound by GPU handle. The
+  // ring is already bound to this command list; no SetDescriptorHeaps needed.
   uint32_t descriptorsPerLevel = 2;
   uint32_t totalDescriptors = (mipCount - 1) * descriptorsPerLevel;
-  D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
-  heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-  heapDesc.NumDescriptors = totalDescriptors;
-  heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-  ComPtr<ID3D12DescriptorHeap> mipHeap = nullptr;
-  if (FAILED(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&mipHeap)))) {
-    LOGE("D3D12CommandEncoder::generateMipmapsForTexture: failed to create descriptor heap.");
+  auto range = _gpu->srvRing().allocate(totalDescriptors);
+  if (!range.valid()) {
+    LOGE("D3D12CommandEncoder::generateMipmapsForTexture: SRV ring allocation failed (count=%u).",
+         totalDescriptors);
     return;
   }
-  auto descSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+  auto descSize = _gpu->srvRing().descriptorSize();
 
-  // Save the previous descriptor-heap binding so the surrounding render pass (if any) doesn't
-  // observe our mipmap heap. The compute root signature is independent of the graphics root
-  // signature, but SetDescriptorHeaps changes runtime state for both.
-  ID3D12DescriptorHeap* heaps[] = {mipHeap.Get()};
-  cmd->SetDescriptorHeaps(1, heaps);
   cmd->SetComputeRootSignature(generator->rootSignature());
   cmd->SetPipelineState(generator->pipelineState());
 
@@ -348,16 +348,15 @@ void D3D12CommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> tex
     barrier.Transition.Subresource = i + 1;
     cmd->ResourceBarrier(1, &barrier);
 
-    // Write the SRV for mip[i] and the UAV for mip[i+1] into the descriptor heap. Each level
-    // occupies two consecutive slots so the table base for the SRV is at index 2i and for the
-    // UAV at 2i+1.
-    D3D12_CPU_DESCRIPTOR_HANDLE srvCpu = mipHeap->GetCPUDescriptorHandleForHeapStart();
+    // Compute the descriptor handles for this iteration's SRV (slot 2i within range) and UAV
+    // (slot 2i+1).
+    D3D12_CPU_DESCRIPTOR_HANDLE srvCpu = range.cpuStart;
     srvCpu.ptr += static_cast<SIZE_T>(2 * i) * descSize;
-    D3D12_CPU_DESCRIPTOR_HANDLE uavCpu = mipHeap->GetCPUDescriptorHandleForHeapStart();
+    D3D12_CPU_DESCRIPTOR_HANDLE uavCpu = range.cpuStart;
     uavCpu.ptr += static_cast<SIZE_T>(2 * i + 1) * descSize;
-    D3D12_GPU_DESCRIPTOR_HANDLE srvGpu = mipHeap->GetGPUDescriptorHandleForHeapStart();
+    D3D12_GPU_DESCRIPTOR_HANDLE srvGpu = range.gpuStart;
     srvGpu.ptr += static_cast<UINT64>(2 * i) * descSize;
-    D3D12_GPU_DESCRIPTOR_HANDLE uavGpu = mipHeap->GetGPUDescriptorHandleForHeapStart();
+    D3D12_GPU_DESCRIPTOR_HANDLE uavGpu = range.gpuStart;
     uavGpu.ptr += static_cast<UINT64>(2 * i + 1) * descSize;
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -411,10 +410,6 @@ void D3D12CommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> tex
   TransitionResourceState(cmd, resource, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
                           D3D12_RESOURCE_STATE_COMMON);
   d3d12Tex->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
-
-  // Keep the mipmap-generator descriptor heap alive until the GPU is done; it lives in the
-  // generic descriptor-heap retention list along with the per-render-pass heaps.
-  session.retainedDescriptorHeaps.push_back(std::move(mipHeap));
 }
 
 std::shared_ptr<CommandBuffer> D3D12CommandEncoder::onFinish() {

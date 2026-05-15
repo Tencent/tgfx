@@ -34,9 +34,11 @@ class D3D12GPU;
  *
  * Lifecycle mirrors VulkanCommandEncoder:
  *   - Make() allocates an ID3D12CommandAllocator + ID3D12GraphicsCommandList (already in
- *     recording state per the D3D12 API).
- *   - Resource binding (RenderPass) and copy commands populate retainedResources /
- *     retainedDescriptorHeaps so that the GPU keeps live references until the fence signals.
+ *     recording state per the D3D12 API) and binds the GPU's process-wide shader-visible
+ *     CBV/SRV/UAV ring and Sampler heap to the list.
+ *   - Resource binding (RenderPass) and copy commands populate retainedResources so the GPU
+ *     keeps live references until the fence signals. Descriptor slots used during the session
+ *     are sub-allocated from the GPU's descriptor ring and reclaimed by fence directly.
  *   - onFinish() Closes the command list and moves the entire session to D3D12CommandBuffer.
  *   - onRelease() (abandon path) reclaims the session via D3D12GPU::reclaimAbandonedSession().
  */

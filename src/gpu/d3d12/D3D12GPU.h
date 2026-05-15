@@ -24,6 +24,7 @@
 #include <unordered_map>
 #include <vector>
 #include "D3D12Defines.h"
+#include "D3D12DescriptorRing.h"
 #include "D3D12FrameSession.h"
 #include "D3D12Util.h"
 #include "core/utils/ReturnQueue.h"
@@ -209,6 +210,33 @@ class D3D12GPU : public GPU {
    */
   D3D12MipmapGenerator* mipmapGenerator();
 
+  /**
+   * Process-wide shader-visible CBV/SRV/UAV ring backing every D3D12RenderPass binding. One large
+   * heap is created once at GPU construction; render passes sub-allocate slots out of it and the
+   * descriptors are reclaimed as soon as the owning fence signals. Avoids the per-pass
+   * CreateDescriptorHeap call and the associated GPU-VA churn.
+   */
+  D3D12DescriptorRing& srvRing() {
+    return _srvRing;
+  }
+
+  /**
+   * Allocates a GPU descriptor handle in the process-wide shader-visible Sampler heap and writes
+   * `desc` into it. The slot is never freed; the sampler heap is bounded by D3D12's hard 2048
+   * limit and every distinct SamplerDescriptor is created at most once via D3D12GPU's sampler
+   * cache, so the heap effectively acts as an append-only descriptor table. Returns an
+   * uninitialised handle (.ptr == 0) if the heap is exhausted.
+   */
+  D3D12_GPU_DESCRIPTOR_HANDLE allocatePermanentSamplerSlot(const D3D12_SAMPLER_DESC& desc);
+
+  /**
+   * Returns the underlying shader-visible Sampler heap. Used by D3D12CommandEncoder when binding
+   * heaps onto a fresh command list (D3D12 requires SetDescriptorHeaps once per list).
+   */
+  ID3D12DescriptorHeap* samplerHeap() const {
+    return _samplerHeap.Get();
+  }
+
  private:
   /// Single entry point for marking the context lost. Sets the flag, dumps DRED diagnostics on
   /// the first transition (subsequent calls are silent), and short-circuits all wait paths.
@@ -236,6 +264,18 @@ class D3D12GPU : public GPU {
   // Lazily-initialised compute pipeline used by D3D12CommandEncoder::generateMipmapsForTexture.
   // Built on first use so backends that never request mipmaps don't pay the shader-compile cost.
   std::unique_ptr<D3D12MipmapGenerator> _mipmapGenerator = nullptr;
+
+  // Process-wide shader-visible descriptor heaps used by render passes. The CBV/SRV/UAV ring is
+  // sized for thousands of unique bindings per frame and is recycled per-fence. The Sampler heap
+  // is append-only (capped at D3D12's 2048 limit; one entry per unique SamplerDescriptor for the
+  // life of the GPU instance) and therefore does not need a ring tail pointer.
+  static constexpr uint32_t SRV_RING_CAPACITY = 64 * 1024;
+  static constexpr uint32_t SAMPLER_HEAP_CAPACITY = 2048;
+  D3D12DescriptorRing _srvRing;
+  ComPtr<ID3D12DescriptorHeap> _samplerHeap = nullptr;
+  uint32_t _samplerHeapSize = 0;
+  uint32_t _samplerHeapCapacity = 0;
+  uint32_t _samplerDescriptorIncrement = 0;
 
   // Submission state. Following the Vulkan model, the GPU owns the frame fence and the inflight
   // queue; D3D12CommandQueue is a thin coordination layer that builds a SubmitRequest and hands

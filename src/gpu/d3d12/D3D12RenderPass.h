@@ -37,14 +37,20 @@ class D3D12Texture;
  * On construction:
  *   - Allocates per-pass non-shader-visible RTV/DSV heaps and creates one descriptor per
  *     attachment. Issues ResourceBarrier transitions and OMSetRenderTargets.
- *   - Allocates a pair of shader-visible heaps (CBV_SRV_UAV + SAMPLER) used by every draw inside
- *     this render pass. SetGraphicsRootDescriptorTable writes during draw point into these heaps.
  *   - Performs ClearRenderTargetView / ClearDepthStencilView for any attachment with
  *     LoadAction::Clear.
  *
+ * Texture/sampler bindings:
+ *   - Sub-allocates SRV slots out of the GPU's process-wide D3D12DescriptorRing (committed and
+ *     fence-retired around each submission). No CreateDescriptorHeap call per render pass.
+ *   - Reuses each D3D12Sampler's stable GPU descriptor handle from the GPU's append-only
+ *     shader-visible Sampler heap; no per-binding CreateSampler is issued either.
+ *   - SetDescriptorHeaps was already issued once on the encoder's command list, so render passes
+ *     never need to call it.
+ *
  * On end:
  *   - Transitions color attachments back to COMMON so they can be sampled later. RTV/DSV heaps
- *     and shader-visible heaps remain alive in the FrameSession until the fence signals.
+ *     remain alive in the FrameSession until the fence signals.
  */
 class D3D12RenderPass : public RenderPass {
  public:
@@ -80,7 +86,6 @@ class D3D12RenderPass : public RenderPass {
                   const RenderPassDescriptor& descriptor);
 
   bool initialise(const RenderPassDescriptor& descriptor);
-  bool allocateShaderVisibleHeaps();
 
   // Lazily writes any pending texture/uniform bindings to the shader-visible descriptor heaps and
   // calls SetGraphicsRootConstantBufferView / SetGraphicsRootDescriptorTable as appropriate.
@@ -91,25 +96,10 @@ class D3D12RenderPass : public RenderPass {
   D3D12GPU* d3d12GPU = nullptr;
   ID3D12GraphicsCommandList* commandList = nullptr;
 
-  // Shader-visible descriptor heaps used to back SetGraphicsRootDescriptorTable. One CBV/SRV/UAV
-  // heap and one Sampler heap, sized by NumTextureSlots * MaxTextureSlots; the encoder retains
-  // them so they outlive GPU execution.
-  ComPtr<ID3D12DescriptorHeap> srvHeap = nullptr;
-  ComPtr<ID3D12DescriptorHeap> samplerHeap = nullptr;
-  UINT srvDescriptorSize = 0;
-  UINT samplerDescriptorSize = 0;
-  // Linearly growing tail indices into the heaps. setTexture() advances them by one each.
-  uint32_t srvHeapHead = 0;
-  uint32_t samplerHeapHead = 0;
-  // Total descriptor slots reserved at allocation time. Bindings beyond this fail with an error.
-  uint32_t srvHeapCapacity = 0;
-  uint32_t samplerHeapCapacity = 0;
-  bool descriptorHeapsBoundToCmdList = false;
-
-  // Per-render-pass dedup caches. Repeated setTexture() calls with the same texture+format or
-  // sampler reuse the previously-allocated heap slot, so the heaps see one descriptor per unique
-  // resource instead of one per draw call. This is critical for the Sampler heap because D3D12
-  // caps the total live sampler descriptors per shader-visible heap at 2048.
+  // Per-render-pass dedup cache for SRV slots in the GPU's shader-visible CBV/SRV/UAV ring.
+  // Repeated bindings of the same (resource, format, mipLevels) within a single pass share one
+  // sub-allocated descriptor; the cache is cleared at the next pass start because ring slots may
+  // have been retired by then.
   struct SrvCacheKey {
     ID3D12Resource* resource = nullptr;
     DXGI_FORMAT format = static_cast<DXGI_FORMAT>(0);  // DXGI_FORMAT_UNKNOWN
@@ -127,7 +117,6 @@ class D3D12RenderPass : public RenderPass {
     }
   };
   std::unordered_map<SrvCacheKey, D3D12_GPU_DESCRIPTOR_HANDLE, SrvCacheKeyHash> srvSlotCache;
-  std::unordered_map<const void*, D3D12_GPU_DESCRIPTOR_HANDLE> samplerSlotCache;
 
   // Per-binding deferred state. setUniformBuffer / setTexture record the argument; the actual
   // RootCBV / RootDescriptorTable bind happens at flushBindingsIfNeeded() (just before draw).
