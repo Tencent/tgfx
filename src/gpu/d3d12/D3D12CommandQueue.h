@@ -75,6 +75,10 @@ class D3D12CommandQueue : public CommandQueue {
   // Per-upload metadata kept alongside pendingUploads so flushUploads can record the GPU copy
   // without re-deriving the row pitch / pixel dimensions.
   struct UploadFootprint {
+    // Source ID3D12Resource for CopyTextureRegion. Lifetime is owned either by D3D12GPU's
+    // UPLOAD ring (fast path, no extra retention required) or by the matching PendingUpload's
+    // stagingBuffer ComPtr (slow / fallback path).
+    ID3D12Resource* stagingResource = nullptr;
     D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint = {};
     UINT dstX = 0;
     UINT dstY = 0;

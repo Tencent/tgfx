@@ -27,6 +27,7 @@
 #include "D3D12Defines.h"
 #include "D3D12DescriptorRing.h"
 #include "D3D12FrameSession.h"
+#include "D3D12UploadHeap.h"
 #include "D3D12Util.h"
 #include "core/utils/ReturnQueue.h"
 #include "tgfx/gpu/GPU.h"
@@ -247,6 +248,16 @@ class D3D12GPU : public GPU {
     return _commandListPool;
   }
 
+  /**
+   * Process-wide UPLOAD-heap ring used to stage texture pixel uploads (and other CPU-to-GPU
+   * data). Sub-allocations live until the owning fence signals; callers fall back to a one-off
+   * CreateCommittedResource only if a single allocation exceeds the ring's capacity or the
+   * ring is fully in flight.
+   */
+  D3D12UploadHeap& uploadHeap() {
+    return _uploadHeap;
+  }
+
  private:
   /// Single entry point for marking the context lost. Sets the flag, dumps DRED diagnostics on
   /// the first transition (subsequent calls are silent), and short-circuits all wait paths.
@@ -291,6 +302,13 @@ class D3D12GPU : public GPU {
   // reclaimSubmission once a submission's fence signals; consumed by D3D12CommandEncoder::Make
   // and the transient upload-list paths inside D3D12CommandQueue.
   D3D12CommandListPool _commandListPool;
+
+  // Process-wide UPLOAD ring used by D3D12CommandQueue::writeTexture / writeBuffer. Initial
+  // capacity is sized for typical glyph atlas / blur seed traffic; oversize allocations or a
+  // saturated ring fall back to per-call CreateCommittedResource so behaviour stays correct
+  // even when the steady-state fast path can't satisfy the request.
+  static constexpr size_t UPLOAD_HEAP_CAPACITY = 64 * 1024 * 1024;
+  D3D12UploadHeap _uploadHeap;
 
   // Submission state. Following the Vulkan model, the GPU owns the frame fence and the inflight
   // queue; D3D12CommandQueue is a thin coordination layer that builds a SubmitRequest and hands

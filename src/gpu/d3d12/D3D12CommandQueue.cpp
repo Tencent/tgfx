@@ -81,54 +81,80 @@ void D3D12CommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
       width * bytesPerPixel, static_cast<uint32_t>(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT));
   uint64_t stagingSize = static_cast<uint64_t>(alignedRowPitch) * height;
 
-  D3D12_HEAP_PROPERTIES heapProps = {};
-  heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-  D3D12_RESOURCE_DESC bufferDesc = {};
-  bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-  bufferDesc.Width = stagingSize;
-  bufferDesc.Height = 1;
-  bufferDesc.DepthOrArraySize = 1;
-  bufferDesc.MipLevels = 1;
-  bufferDesc.Format = static_cast<DXGI_FORMAT>(DXGI_FORMAT_UNKNOWN);
-  bufferDesc.SampleDesc.Count = 1;
-  bufferDesc.SampleDesc.Quality = 0;
-  bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-  bufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-  ComPtr<ID3D12Resource> staging = nullptr;
-  auto hr = gpu->device()->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc,
-                                                   D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-                                                   IID_PPV_ARGS(&staging));
-  if (FAILED(hr)) {
-    LOGE("D3D12CommandQueue::writeTexture: failed to create staging buffer, HRESULT=0x%08X",
-         static_cast<unsigned>(hr));
-    return;
-  }
-
-  void* mapped = nullptr;
-  D3D12_RANGE readRange = {0, 0};
-  hr = staging->Map(0, &readRange, &mapped);
-  if (FAILED(hr) || mapped == nullptr) {
-    LOGE("D3D12CommandQueue::writeTexture: failed to map staging buffer, HRESULT=0x%08X",
-         static_cast<unsigned>(hr));
-    return;
+  // Fast path: sub-allocate from the GPU's process-wide UPLOAD ring. The ring resource is kept
+  // alive by D3D12GPU and the bytes are reclaimed automatically once the owning fence signals,
+  // so we do not need to add anything to PendingUpload to keep the resource live.
+  ID3D12Resource* stagingResource = nullptr;
+  uint64_t stagingOffset = 0;
+  uint8_t* stagingCpu = nullptr;
+  ComPtr<ID3D12Resource> fallbackResource = nullptr;
+  auto allocation = gpu->uploadHeap().allocate(
+      static_cast<size_t>(stagingSize),
+      static_cast<size_t>(D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT));
+  if (allocation.valid()) {
+    stagingResource = allocation.resource;
+    stagingOffset = allocation.offsetInResource;
+    stagingCpu = static_cast<uint8_t*>(allocation.cpu);
+  } else {
+    // Slow path (oversize allocation or saturated ring): create a one-off UPLOAD buffer. Its
+    // ComPtr is parked in PendingUpload so the resource outlives GPU execution.
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+    D3D12_RESOURCE_DESC bufferDesc = {};
+    bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    bufferDesc.Width = stagingSize;
+    bufferDesc.Height = 1;
+    bufferDesc.DepthOrArraySize = 1;
+    bufferDesc.MipLevels = 1;
+    bufferDesc.Format = static_cast<DXGI_FORMAT>(DXGI_FORMAT_UNKNOWN);
+    bufferDesc.SampleDesc.Count = 1;
+    bufferDesc.SampleDesc.Quality = 0;
+    bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    bufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    auto hr = gpu->device()->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc,
+                                                     D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+                                                     IID_PPV_ARGS(&fallbackResource));
+    if (FAILED(hr)) {
+      LOGE("D3D12CommandQueue::writeTexture: fallback CreateCommittedResource failed, "
+           "HRESULT=0x%08X",
+           static_cast<unsigned>(hr));
+      return;
+    }
+    void* mapped = nullptr;
+    D3D12_RANGE readRange = {0, 0};
+    hr = fallbackResource->Map(0, &readRange, &mapped);
+    if (FAILED(hr) || mapped == nullptr) {
+      LOGE("D3D12CommandQueue::writeTexture: fallback Map failed, HRESULT=0x%08X",
+           static_cast<unsigned>(hr));
+      return;
+    }
+    stagingResource = fallbackResource.Get();
+    stagingOffset = 0;
+    stagingCpu = static_cast<uint8_t*>(mapped);
   }
 
   auto src = static_cast<const uint8_t*>(pixels);
-  auto dst = static_cast<uint8_t*>(mapped);
   uint32_t tightRowBytes = width * bytesPerPixel;
   for (uint32_t row = 0; row < height; row++) {
-    memcpy(dst + row * alignedRowPitch, src + row * srcRowBytes, tightRowBytes);
+    memcpy(stagingCpu + row * alignedRowPitch, src + row * srcRowBytes, tightRowBytes);
   }
-  staging->Unmap(0, nullptr);
+  if (fallbackResource != nullptr) {
+    // Mapping a one-off UPLOAD buffer for the duration of GPU execution is allowed but we Unmap
+    // here for symmetry with the previous (pre-ring) implementation; this also lets the runtime
+    // page out the buffer if memory pressure allows.
+    fallbackResource->Unmap(0, nullptr);
+  }
 
   D3D12GPU::PendingUpload upload = {};
-  upload.stagingBuffer = staging;
+  // Only the slow path needs to retain the staging buffer: the ring resource lives on the GPU
+  // instance and is reclaimed by fence directly.
+  upload.stagingBuffer = std::move(fallbackResource);
   upload.texture = d3d12Tex;
   pendingUploads.push_back(std::move(upload));
 
   UploadFootprint fp = {};
-  fp.footprint.Offset = 0;
+  fp.stagingResource = stagingResource;
+  fp.footprint.Offset = stagingOffset;
   fp.footprint.Footprint.Format = static_cast<DXGI_FORMAT>(d3d12Tex->dxgiFormat());
   fp.footprint.Footprint.Width = width;
   fp.footprint.Footprint.Height = height;
@@ -162,7 +188,11 @@ void D3D12CommandQueue::flushUploads(ID3D12GraphicsCommandList* commandList) {
     dstLoc.SubresourceIndex = 0;
 
     D3D12_TEXTURE_COPY_LOCATION srcLoc = {};
-    srcLoc.pResource = up.stagingBuffer.Get();
+    // The staging source is either a slot inside the GPU's UPLOAD ring (kept alive by the GPU
+    // instance, with offsetInResource embedded in fp.footprint.Offset) or a one-off staging
+    // buffer parked in PendingUpload::stagingBuffer. Either way fp.stagingResource is the raw
+    // pointer to use at copy time.
+    srcLoc.pResource = fp.stagingResource;
     srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     srcLoc.PlacedFootprint = fp.footprint;
 

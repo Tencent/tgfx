@@ -95,7 +95,7 @@ std::unique_ptr<D3D12GPU> D3D12GPU::Make(ComPtr<ID3D12Device> device) {
   auto gpu = std::unique_ptr<D3D12GPU>(new D3D12GPU(std::move(device), std::move(adapter)));
   if (gpu->commandQueue == nullptr || gpu->_frameFence == nullptr ||
       gpu->_frameFenceEvent == nullptr || gpu->_srvRing.heap() == nullptr ||
-      gpu->_samplerHeap == nullptr) {
+      gpu->_samplerHeap == nullptr || gpu->_uploadHeap.capacity() == 0) {
     return nullptr;
   }
   return gpu;
@@ -140,6 +140,13 @@ D3D12GPU::D3D12GPU(ComPtr<ID3D12Device> device, ComPtr<IDXGIAdapter1> adapter)
   _samplerHeapCapacity = SAMPLER_HEAP_CAPACITY;
   _samplerDescriptorIncrement =
       d3d12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+  // Allocate the process-wide UPLOAD ring used to stage CPU-to-GPU pixel/buffer data. Failure
+  // is surfaced through the capacity-zero check in Make() so the GPU does not come up with a
+  // partially-functional upload path.
+  if (!_uploadHeap.init(d3d12Device.Get(), UPLOAD_HEAP_CAPACITY)) {
+    LOGE("D3D12GPU: failed to initialise UPLOAD heap.");
+    return;
+  }
   commandQueue = std::make_unique<D3D12CommandQueue>(this);
   compiler = std::make_unique<shaderc::Compiler>();
 }
@@ -582,6 +589,10 @@ void D3D12GPU::releaseAll(bool releaseGPU) {
   // them; doing it before would still be safe (ComPtrs hold the only references) but ordering
   // matches the rest of the shutdown path.
   _commandListPool.clear();
+  // Drop the UPLOAD ring's underlying resource similarly. Inflight allocations have either been
+  // drained by the wait above or are tracked against fences that will never advance, in which
+  // case dropping the resource is the only safe action.
+  _uploadHeap.clear();
   // Drop the cached mipmap generator's root signature + PSO before tearing the device down.
   // Resources retained by inflight submissions have already been released above.
   _mipmapGenerator = nullptr;
@@ -719,8 +730,11 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
   // Tag every CBV/SRV/UAV descriptor-ring slot allocated during this submission with the
   // about-to-be-signalled fence value. Once that fence value completes, the slots become
   // reclaimable in retire(); see pollCompletedSubmissions(). The Sampler heap is append-only
-  // (slots persist for the GPU's lifetime) and does not need fence tracking.
+  // (slots persist for the GPU's lifetime) and does not need fence tracking. The upload ring's
+  // sub-allocations are tracked the same way so the staging bytes outlive their CopyTextureRegion
+  // commands.
   _srvRing.commit(_lastSignalledFenceValue);
+  _uploadHeap.commit(_lastSignalledFenceValue);
   auto signalHr = cmdQueue->Signal(_frameFence.Get(), _lastSignalledFenceValue);
   if (FAILED(signalHr) || FAILED(d3d12Device->GetDeviceRemovedReason())) {
     LOGE("D3D12GPU::executeSubmission: Signal failed (HRESULT=0x%08X) or device removed; "
@@ -797,8 +811,10 @@ void D3D12GPU::pollCompletedSubmissions() {
     inflightSubmissions.pop_front();
   }
   // Free shader-visible CBV/SRV/UAV descriptor slots whose owning submissions have signalled.
-  // Sampler slots persist for the GPU's lifetime so they need no per-fence retirement.
+  // Sampler slots persist for the GPU's lifetime so they need no per-fence retirement. The
+  // upload ring sheds reclaimable byte ranges on the same schedule.
   _srvRing.retire(completed);
+  _uploadHeap.retire(completed);
   // Releasing retained shared_ptrs may have moved D3D12Resource instances into the return queue;
   // free them now so the caller sees up-to-date memory accounting.
   processUnreferencedResources();
