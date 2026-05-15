@@ -68,48 +68,18 @@ Render3DContext::Render3DContext(std::shared_ptr<Context3DCompositor> compositor
       _compositor(std::move(compositor)) {
 }
 
-void Render3DContext::addLayer(Layer* layer, const Matrix3D& transform, float alpha,
-                               LayerDrawFunc drawFunc) {
-  _drawFunc = drawFunc;
-  collectNodes(layer, transform, alpha, /*depth=*/0);
-}
-
-void Render3DContext::collectNodes(Layer* layer, const Matrix3D& transform, float alpha,
-                                   int depth) {
-  if (layer == nullptr) {
-    return;
-  }
-  Rect bounds = {};
-  if (layer->canPreserve3D()) {
-    auto contentBounds = layer->computeContentBounds({}, false);
-    if (contentBounds.has_value()) {
-      bounds = *contentBounds;
-    }
-  } else {
-    bounds = layer->getBounds();
-  }
-  if (!bounds.isEmpty()) {
-    PendingNode node;
-    node.layer = layer;
-    node.transform = transform;
-    node.localBounds = bounds;
-    node.depth = depth;
-    node.alpha = alpha;
-    node.antialiasing = layer->allowsEdgeAntialiasing();
-    _pendingNodes.push_back(node);
-    _subtreeNeedsBackdrop = _subtreeNeedsBackdrop || layer->hasBackgroundStyle();
-  }
-  if (!layer->canPreserve3D()) {
-    return;
-  }
-  for (auto& child : layer->_children) {
-    if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
-      continue;
-    }
-    auto childTransform = child->getMatrixWithScrollRect();
-    childTransform.postConcat(transform);
-    collectNodes(child.get(), childTransform, alpha * child->_alpha, depth + 1);
-  }
+void Render3DContext::emitNode(Layer* layer, const Rect& localBounds, const Matrix3D& transform,
+                               float alpha, int depth, bool hasBackgroundStyle) {
+  PendingNode node;
+  node.layer = layer;
+  node.transform = transform;
+  node.localBounds = localBounds;
+  node.depth = depth;
+  node.alpha = alpha;
+  node.antialiasing = layer->allowsEdgeAntialiasing();
+  node.hasBackgroundStyle = hasBackgroundStyle;
+  _pendingNodes.push_back(node);
+  _subtreeNeedsBackdrop = _subtreeNeedsBackdrop || hasBackgroundStyle;
 }
 
 void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
@@ -161,12 +131,15 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
   layerImages.reserve(_pendingNodes.size());
   // Pre-compute each pending layer's local→world matrix in this context's world space (== outer
   // canvas-local for the top 3D context; == enclosing leaf's local for a nested 3D context).
-  // This is exactly node.transform (collected during addLayer/collectNodes); the polygon's matrix
-  // has been remapped into compositor pixel space and is the wrong basis for the bgSource.
+  // This is exactly node.transform; the polygon's matrix has been remapped into compositor pixel
+  // space and is the wrong basis for the bgSource.
   std::unordered_map<Layer*, Matrix> layerLocalToWorld;
+  std::unordered_map<Layer*, bool> layerHasBackgroundStyle;
   layerLocalToWorld.reserve(_pendingNodes.size());
+  layerHasBackgroundStyle.reserve(_pendingNodes.size());
   for (const auto& node : _pendingNodes) {
     layerLocalToWorld.emplace(node.layer, node.transform.asMatrix());
+    layerHasBackgroundStyle.emplace(node.layer, node.hasBackgroundStyle);
   }
   DrawArgs leafArgs = args;
   leafArgs.opaqueContext = nullptr;
@@ -176,19 +149,21 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
     // Layers carrying BackgroundBlur must raster per-fragment because each BSP slice samples a
     // different mid-traversal compositor state; cached images would drift from what the consume
     // pass expects. Plain layers keep the shared cache for cheap re-use across split fragments.
-    bool perFragmentRaster = layer->hasBackgroundStyle();
+    auto bgIt = layerHasBackgroundStyle.find(layer);
+    bool perFragmentRaster = bgIt != layerHasBackgroundStyle.end() && bgIt->second;
     float rasterAlpha = fragment->rasterAlpha();
     auto worldIt = layerLocalToWorld.find(layer);
     Matrix localToWorld = worldIt != layerLocalToWorld.end() ? worldIt->second : Matrix::I();
+    auto blendMode = layer->blendMode();
     std::shared_ptr<Image> image;
     if (perFragmentRaster) {
-      image = rasterLayer(layer, fragment->localBounds(), rasterAlpha, leafArgs, compositorSource,
-                          outerSnapshots, localToWorld);
+      image = rasterLayer(layer, fragment->localBounds(), rasterAlpha, blendMode, leafArgs,
+                          compositorSource, outerSnapshots, localToWorld);
     } else {
       auto cacheIt = layerImages.find(layer);
       if (cacheIt == layerImages.end()) {
-        image = rasterLayer(layer, fragment->localBounds(), rasterAlpha, leafArgs, compositorSource,
-                            outerSnapshots, localToWorld);
+        image = rasterLayer(layer, fragment->localBounds(), rasterAlpha, blendMode, leafArgs,
+                            compositorSource, outerSnapshots, localToWorld);
         layerImages.emplace(layer, image);
       } else {
         image = cacheIt->second;
@@ -213,7 +188,7 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
 }
 
 std::shared_ptr<Image> Render3DContext::rasterLayer(
-    Layer* layer, const Rect& localBounds, float alpha, DrawArgs& leafArgs,
+    Layer* layer, const Rect& localBounds, float alpha, BlendMode blendMode, DrawArgs& leafArgs,
     const std::shared_ptr<BackgroundSource>& compositorSource, BackgroundSnapshotMap* snapshots,
     const Matrix& localToWorld) {
   auto scaledBounds = localBounds;
@@ -240,6 +215,9 @@ std::shared_ptr<Image> Render3DContext::rasterLayer(
   std::unique_ptr<BackgroundCapturer> leafCapturer;
   std::shared_ptr<BackgroundSource> leafSource;
   if (compositorSource != nullptr && snapshots != nullptr) {
+    // leafArgs is reused across fragments; reset to NoOp so a failed createFromSurface call
+    // doesn't leave a dangling pointer to the previous iteration's stack-local capturer.
+    leafArgs.backgroundHandler = BackgroundHandler::NoOp();
     auto worldBounds = localToWorld.mapRect(localBounds);
     leafSource =
         compositorSource->createFromSurface(surface.get(), worldBounds, localToWorld, density);
@@ -253,8 +231,7 @@ std::shared_ptr<Image> Render3DContext::rasterLayer(
   // preserve3D middle nodes are not recursed into (they're already registered as polygons).
   // Non-preserve3D leaves still draw their own children normally.
   leafArgs.render3DContext = shared_from_this();
-  auto blendMode = static_cast<BlendMode>(layer->bitFields.blendMode);
-  (layer->*_drawFunc)(leafArgs, leafCanvas, alpha, blendMode);
+  drawWithFunc(layer, leafArgs, leafCanvas, alpha, blendMode);
   leafArgs.render3DContext = nullptr;
   return surface->makeImageSnapshot();
 }

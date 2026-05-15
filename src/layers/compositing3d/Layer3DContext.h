@@ -67,10 +67,10 @@ class Layer3DContext : public std::enable_shared_from_this<Layer3DContext> {
   using LayerDrawFunc = bool (Layer::*)(const DrawArgs&, Canvas*, float, BlendMode);
 
   /**
-   * Build phase: registers the root of a 3D subtree. The context internally walks the subtree
-   * (recursing through preserve3D descendants and stopping at non-preserve3D leaves) and records
-   * a node descriptor for each layer that should participate in 3D compositing. No raster work
-   * happens here.
+   * Build phase: registers the root of a 3D subtree. The context recursively walks the
+   * preserve3D descendants (stopping at non-preserve3D leaves) and records a node descriptor for
+   * each layer that should participate in 3D compositing through the protected emitNode() hook.
+   * No raster work happens here.
    * @param layer The 3D subtree root.
    * @param transform Accumulated 3D transform from outside the subtree down to this layer.
    * @param alpha Accumulated alpha along the path from outside the subtree.
@@ -78,8 +78,7 @@ class Layer3DContext : public std::enable_shared_from_this<Layer3DContext> {
    * &Layer::drawLayer for normal compositing or &Layer::drawContour when the 3D subtree is being
    * recorded as a contour source.
    */
-  virtual void addLayer(Layer* layer, const Matrix3D& transform, float alpha,
-                        LayerDrawFunc drawFunc) = 0;
+  void addLayer(Layer* layer, const Matrix3D& transform, float alpha, LayerDrawFunc drawFunc);
 
   /**
    * Composite phase: rasterizes registered nodes and draws the composited result onto canvas.
@@ -90,9 +89,22 @@ class Layer3DContext : public std::enable_shared_from_this<Layer3DContext> {
   virtual void finishAndDrawTo(const DrawArgs& args, Canvas* canvas) = 0;
 
  protected:
+  // Emits one descriptor per layer that should participate in 3D compositing. Subclasses push
+  // it onto their own _pendingNodes container.
+  virtual void emitNode(Layer* layer, const Rect& localBounds, const Matrix3D& transform,
+                        float alpha, int depth, bool hasBackgroundStyle) = 0;
+
+  // Invokes the LayerDrawFunc registered by addLayer.
+  bool drawWithFunc(Layer* layer, const DrawArgs& args, Canvas* canvas, float alpha,
+                    BlendMode blendMode);
+
   Rect _renderRect = {};
   float _contentScale = 1.0f;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
+  LayerDrawFunc _drawFunc = nullptr;
+
+ private:
+  void collectNodes(Layer* layer, const Matrix3D& transform, float alpha, int depth);
 };
 
 }  // namespace tgfx

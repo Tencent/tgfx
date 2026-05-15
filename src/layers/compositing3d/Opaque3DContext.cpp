@@ -35,44 +35,14 @@ Opaque3DContext::Opaque3DContext(const Rect& renderRect, float contentScale,
     : Layer3DContext(renderRect, contentScale, std::move(colorSpace)) {
 }
 
-void Opaque3DContext::addLayer(Layer* layer, const Matrix3D& transform, float alpha,
-                               LayerDrawFunc drawFunc) {
-  _drawFunc = drawFunc;
-  collectNodes(layer, transform, alpha);
-}
-
-void Opaque3DContext::collectNodes(Layer* layer, const Matrix3D& transform, float alpha) {
-  if (layer == nullptr) {
-    return;
-  }
-  Rect bounds = {};
-  if (layer->canPreserve3D()) {
-    auto contentBounds = layer->computeContentBounds({}, false);
-    if (contentBounds.has_value()) {
-      bounds = *contentBounds;
-    }
-  } else {
-    bounds = layer->getBounds();
-  }
-  if (!bounds.isEmpty()) {
-    PendingNode node;
-    node.layer = layer;
-    node.transform = transform;
-    node.localBounds = bounds;
-    node.alpha = alpha;
-    _pendingNodes.push_back(node);
-  }
-  if (!layer->canPreserve3D()) {
-    return;
-  }
-  for (auto& child : layer->_children) {
-    if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
-      continue;
-    }
-    auto childTransform = child->getMatrixWithScrollRect();
-    childTransform.postConcat(transform);
-    collectNodes(child.get(), childTransform, alpha * child->_alpha);
-  }
+void Opaque3DContext::emitNode(Layer* layer, const Rect& localBounds, const Matrix3D& transform,
+                               float alpha, int /*depth*/, bool /*hasBackgroundStyle*/) {
+  PendingNode node;
+  node.layer = layer;
+  node.transform = transform;
+  node.localBounds = localBounds;
+  node.alpha = alpha;
+  _pendingNodes.push_back(node);
 }
 
 void Opaque3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
@@ -103,7 +73,7 @@ void Opaque3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
     DrawArgs nodeArgs = leafArgs;
     nodeArgs.opaqueContext = &opaqueContext;
     nodeArgs.render3DContext = shared_from_this();
-    (node.layer->*_drawFunc)(nodeArgs, leafCanvas, node.alpha, BlendMode::SrcOver);
+    drawWithFunc(node.layer, nodeArgs, leafCanvas, node.alpha, BlendMode::SrcOver);
     auto picture = opaqueContext.finishRecordingAsPicture();
     if (picture == nullptr) {
       continue;

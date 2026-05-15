@@ -44,9 +44,6 @@ class Render3DContext : public Layer3DContext {
   Render3DContext(std::shared_ptr<Context3DCompositor> compositor, const Rect& renderRect,
                   float contentScale, std::shared_ptr<ColorSpace> colorSpace);
 
-  void addLayer(Layer* layer, const Matrix3D& transform, float alpha,
-                LayerDrawFunc drawFunc) override;
-
   void finishAndDrawTo(const DrawArgs& args, Canvas* canvas) override;
 
  private:
@@ -57,9 +54,11 @@ class Render3DContext : public Layer3DContext {
     int depth = 0;
     float alpha = 1.0f;
     bool antialiasing = true;
+    bool hasBackgroundStyle = false;
   };
 
-  void collectNodes(Layer* layer, const Matrix3D& transform, float alpha, int depth);
+  void emitNode(Layer* layer, const Rect& localBounds, const Matrix3D& transform, float alpha,
+                int depth, bool hasBackgroundStyle) override;
   // Rasters the layer onto a fresh leaf surface and returns the snapshot. When `compositorSource`
   // is non-null, builds a sub BackgroundSource on the leaf surface (parented to compositorSource)
   // and installs a fresh BackgroundCapturer on `leafArgs.backgroundHandler` so in-fragment
@@ -67,7 +66,7 @@ class Render3DContext : public Layer3DContext {
   // `localToWorld` is the layer's matrix in this context's world space (== outer canvas-local at
   // the top level; == enclosing leaf's local for nested 3D contexts).
   std::shared_ptr<Image> rasterLayer(Layer* layer, const Rect& localBounds, float alpha,
-                                     DrawArgs& leafArgs,
+                                     BlendMode blendMode, DrawArgs& leafArgs,
                                      const std::shared_ptr<BackgroundSource>& compositorSource,
                                      BackgroundSnapshotMap* snapshots, const Matrix& localToWorld);
   // Snapshot the outer canvas and prime the compositor target with it so in-subtree
@@ -78,10 +77,8 @@ class Render3DContext : public Layer3DContext {
 
   std::shared_ptr<Context3DCompositor> _compositor = nullptr;
   std::vector<PendingNode> _pendingNodes = {};
-  LayerDrawFunc _drawFunc = nullptr;
-  // OR of hasBackgroundStyle() across every node collected into _pendingNodes. Set during
-  // collectNodes so finishAndDrawTo can skip outer-canvas priming and capturer setup when no
-  // descendant will dispatch a Background-sourced style.
+  // OR of hasBackgroundStyle across every collected node; gates outer-canvas priming and
+  // capturer setup in finishAndDrawTo.
   bool _subtreeNeedsBackdrop = false;
 };
 

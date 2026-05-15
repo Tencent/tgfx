@@ -36,9 +36,6 @@ class Opaque3DContext : public Layer3DContext {
   Opaque3DContext(const Rect& renderRect, float contentScale,
                   std::shared_ptr<ColorSpace> colorSpace);
 
-  void addLayer(Layer* layer, const Matrix3D& transform, float alpha,
-                LayerDrawFunc drawFunc) override;
-
   void finishAndDrawTo(const DrawArgs& args, Canvas* canvas) override;
 
  private:
@@ -49,10 +46,10 @@ class Opaque3DContext : public Layer3DContext {
     float alpha = 1.0f;
   };
 
-  void collectNodes(Layer* layer, const Matrix3D& transform, float alpha);
+  void emitNode(Layer* layer, const Rect& localBounds, const Matrix3D& transform, float alpha,
+                int depth, bool hasBackgroundStyle) override;
 
   std::vector<PendingNode> _pendingNodes = {};
-  LayerDrawFunc _drawFunc = nullptr;
 };
 
 }  // namespace tgfx
