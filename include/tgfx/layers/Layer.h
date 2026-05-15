@@ -621,9 +621,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   LayerContent* getContent();
 
-  std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
+  std::shared_ptr<ImageFilter> getImageFilter(float contentScale, float width = 0.f,
+                                               float height = 0.f,
+                                               const Point& originOffset = {});
 
   std::shared_ptr<Image> applyFilters(std::shared_ptr<Image> image, float contentScale,
+                                      float width, float height, const Point& originOffset,
                                       Point* offset);
 
   virtual bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);

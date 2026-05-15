@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/OffscreenRenderer.h"
+#include "core/utils/Log.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/PictureRecorder.h"
@@ -75,10 +76,20 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
     return {};
   }
 
+  // Compute the offset between the clipped input bounds and the full content bounds, so filters
+  // that anchor to content coordinates (e.g. NoiseFilter) can compensate for surface clipping.
+  auto contentBounds = layer->getBounds();
+  contentBounds.roundOut();
+  Point originOffset = Point::Make(inputBounds->left - contentBounds.left,
+                                    inputBounds->top - contentBounds.top);
+
+  auto imageFilter = args.excludeEffects
+                         ? nullptr
+                         : layer->getImageFilter(contentMatrix.getMaxScale(), contentBounds.width(),
+                                                 contentBounds.height(), originOffset);
+
   // With an image filter, force an isotropic scale so blur / drop-shadow operate in pixel space;
   // without a filter keep the full contentMatrix to preserve rotation/skew fidelity.
-  auto imageFilter =
-      args.excludeEffects ? nullptr : layer->getImageFilter(contentMatrix.getMaxScale());
   Matrix density = imageFilter
                        ? Matrix::MakeScale(contentMatrix.getMaxScale(), contentMatrix.getMaxScale())
                        : contentMatrix;

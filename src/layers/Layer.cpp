@@ -1082,14 +1082,15 @@ LayerContent* Layer::getContent() {
   return layerContent.get();
 }
 
-std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
+std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale, float width, float height,
+                                                   const Point& originOffset) {
   if (_filters.empty()) {
     return nullptr;
   }
   std::vector<std::shared_ptr<ImageFilter>> filters;
   for (const auto& layerFilter : _filters) {
     DEBUG_ASSERT(layerFilter != nullptr);
-    if (auto filter = layerFilter->getImageFilter(contentScale)) {
+    if (auto filter = layerFilter->getComposeFilter(contentScale, width, height, originOffset)) {
       filters.push_back(filter);
     }
   }
@@ -1097,6 +1098,7 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
 }
 
 std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float contentScale,
+                                           float width, float height, const Point& originOffset,
                                            Point* offset) {
   if (!image || _filters.empty()) {
     return image;
@@ -1104,7 +1106,8 @@ std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float c
   for (const auto& layerFilter : _filters) {
     DEBUG_ASSERT(layerFilter != nullptr);
     Point filterOffset = {};
-    image = layerFilter->filterImage(std::move(image), contentScale, &filterOffset);
+    image = layerFilter->filterImage(std::move(image), contentScale, width, height, originOffset,
+                                     &filterOffset);
     if (!image) {
       return nullptr;
     }
@@ -1329,13 +1332,9 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode) const {
 }
 
 bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
-  // If the layer can start or extend a 3D rendering context, child layers need to maintain
-  // independent 3D states, so subtree caching is not supported.
   if (canPreserve3D()) {
     return false;
   }
-  // The cache stores Normal mode content. Since layers with BackgroundStyle are excluded from
-  // caching, the cached content can also be used for Background mode drawing.
   if (args.excludeEffects) {
     return false;
   }
@@ -1343,7 +1342,6 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
     return false;
   }
   if (subtreeCache) {
-    // Recreate if maxSize has changed
     if (subtreeCache->maxSize() != args.subtreeCacheMaxSize) {
       subtreeCache = std::make_unique<SubtreeCache>(args.subtreeCacheMaxSize);
     }
@@ -1353,8 +1351,6 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
     return false;
   }
   if (!bitFields.staticSubtree) {
-    // Skip caching on the first render to avoid caching content that is only displayed once.
-    // The cache is created on the second render when the layer is confirmed to be reused.
     return false;
   }
   // Skip caching for leaf nodes with basic shapes (Rect, RRect) that have no filters or layer
@@ -1414,7 +1410,11 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 
   if (!_filters.empty()) {
     Point filterOffset = {};
-    image = applyFilters(std::move(image), contentScale, &filterOffset);
+    auto bounds = getBounds();
+    Point originOffset = {pictureBounds.left / contentScale - bounds.left,
+                          pictureBounds.top / contentScale - bounds.top};
+    image = applyFilters(std::move(image), contentScale, bounds.width(), bounds.height(),
+                         originOffset, &filterOffset);
     offset += filterOffset;
   }
 

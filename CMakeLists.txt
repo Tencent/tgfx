@@ -739,6 +739,11 @@ if (TGFX_BUILD_TESTS)
     target_link_options(UpdateBaseline PRIVATE ${TGFX_TEST_LINK_OPTIONS})
     target_link_libraries(UpdateBaseline ${TGFX_TEST_LIBS})
 
+    if (TGFX_USE_METAL)
+        set_source_files_properties(test/src/metal/MetalRenderPassTest.mm PROPERTIES
+            COMPILE_OPTIONS "-Wno-error")
+    endif ()
+
     add_executable(TGFXFullTest ${TGFX_TEST_FILES})
     add_dependencies(TGFXFullTest test-vendor)
     target_compile_definitions(TGFXFullTest PRIVATE ${TGFX_TEST_DEFINES})
