@@ -383,6 +383,132 @@ void D3D12GPU::processUnreferencedResources() {
   }
 }
 
+// Map a D3D12_AUTO_BREADCRUMB_OP enum value to a short readable string. Not exhaustive — only the
+// ops the TGFX backend actually emits are listed; everything else falls through to "<other>".
+static const char* AutoBreadcrumbOpName(D3D12_AUTO_BREADCRUMB_OP op) {
+  switch (op) {
+    case D3D12_AUTO_BREADCRUMB_OP_SETMARKER:
+      return "SetMarker";
+    case D3D12_AUTO_BREADCRUMB_OP_BEGINEVENT:
+      return "BeginEvent";
+    case D3D12_AUTO_BREADCRUMB_OP_ENDEVENT:
+      return "EndEvent";
+    case D3D12_AUTO_BREADCRUMB_OP_DRAWINSTANCED:
+      return "DrawInstanced";
+    case D3D12_AUTO_BREADCRUMB_OP_DRAWINDEXEDINSTANCED:
+      return "DrawIndexedInstanced";
+    case D3D12_AUTO_BREADCRUMB_OP_EXECUTEINDIRECT:
+      return "ExecuteIndirect";
+    case D3D12_AUTO_BREADCRUMB_OP_DISPATCH:
+      return "Dispatch";
+    case D3D12_AUTO_BREADCRUMB_OP_COPYBUFFERREGION:
+      return "CopyBufferRegion";
+    case D3D12_AUTO_BREADCRUMB_OP_COPYTEXTUREREGION:
+      return "CopyTextureRegion";
+    case D3D12_AUTO_BREADCRUMB_OP_COPYRESOURCE:
+      return "CopyResource";
+    case D3D12_AUTO_BREADCRUMB_OP_RESOLVESUBRESOURCE:
+      return "ResolveSubresource";
+    case D3D12_AUTO_BREADCRUMB_OP_CLEARRENDERTARGETVIEW:
+      return "ClearRenderTargetView";
+    case D3D12_AUTO_BREADCRUMB_OP_CLEARDEPTHSTENCILVIEW:
+      return "ClearDepthStencilView";
+    case D3D12_AUTO_BREADCRUMB_OP_CLEARUNORDEREDACCESSVIEW:
+      return "ClearUAV";
+    case D3D12_AUTO_BREADCRUMB_OP_RESOURCEBARRIER:
+      return "ResourceBarrier";
+    case D3D12_AUTO_BREADCRUMB_OP_PRESENT:
+      return "Present";
+    default:
+      return "<other>";
+  }
+}
+
+void D3D12GPU::markContextLost(const char* tag) {
+  if (contextLost) {
+    return;
+  }
+  contextLost = true;
+  dumpDeviceRemovedExtendedData(tag);
+}
+
+void D3D12GPU::dumpDeviceRemovedExtendedData(const char* tag) {
+  if (d3d12Device == nullptr) {
+    return;
+  }
+  auto reason = d3d12Device->GetDeviceRemovedReason();
+  if (SUCCEEDED(reason)) {
+    return;
+  }
+  // Some drivers populate DRED breadcrumb buffers asynchronously after the device transitions to
+  // a removed state. Sleep briefly so the breadcrumb / page-fault output is fully formed before
+  // we query it. Diagnostic-only path; cost is bounded to a couple of milliseconds at fault time.
+  Sleep(50);
+  LOGE("[DRED %s] device removed, reason=0x%08X", tag, static_cast<unsigned>(reason));
+
+  ComPtr<ID3D12DeviceRemovedExtendedData> dred = nullptr;
+  if (FAILED(d3d12Device.As(&dred))) {
+    LOGE("[DRED %s] DRED interface unavailable on this device.", tag);
+    return;
+  }
+
+  D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT breadcrumbsOutput = {};
+  if (SUCCEEDED(dred->GetAutoBreadcrumbsOutput(&breadcrumbsOutput))) {
+    auto* node = breadcrumbsOutput.pHeadAutoBreadcrumbNode;
+    if (node == nullptr) {
+      LOGE("[DRED %s] auto-breadcrumb list is empty — either no command list executed before "
+           "the fault, or the driver did not record breadcrumbs (verify "
+           "SetAutoBreadcrumbsEnablement(FORCED_ON) was called before D3D12CreateDevice).",
+           tag);
+    }
+    int nodeIndex = 0;
+    while (node != nullptr) {
+      const char* listName =
+          node->pCommandListDebugNameA ? node->pCommandListDebugNameA : "<unnamed>";
+      const char* queueName =
+          node->pCommandQueueDebugNameA ? node->pCommandQueueDebugNameA : "<unnamed>";
+      auto last = node->pLastBreadcrumbValue ? *node->pLastBreadcrumbValue : 0u;
+      auto count = node->BreadcrumbCount;
+      LOGE("[DRED %s] node %d: list='%s' queue='%s' completed=%u/%u", tag, nodeIndex, listName,
+           queueName, last, count);
+      // Print a small window around the last completed op so we can see the failing call.
+      uint32_t windowStart = last >= 4 ? last - 4 : 0;
+      uint32_t windowEnd = (last + 8 < count) ? (last + 8) : count;
+      for (uint32_t i = windowStart; i < windowEnd; i++) {
+        const char* marker = (i == last) ? "  >>>" : "     ";
+        LOGE("[DRED %s] %s op[%u] = %s", tag, marker, i,
+             AutoBreadcrumbOpName(node->pCommandHistory[i]));
+      }
+      node = node->pNext;
+      nodeIndex++;
+    }
+  } else {
+    LOGE("[DRED %s] GetAutoBreadcrumbsOutput failed.", tag);
+  }
+
+  D3D12_DRED_PAGE_FAULT_OUTPUT pageFaultOutput = {};
+  if (SUCCEEDED(dred->GetPageFaultAllocationOutput(&pageFaultOutput))) {
+    if (pageFaultOutput.PageFaultVA != 0) {
+      LOGE("[DRED %s] page fault VA = 0x%llx", tag,
+           static_cast<unsigned long long>(pageFaultOutput.PageFaultVA));
+      auto* existing = pageFaultOutput.pHeadExistingAllocationNode;
+      while (existing != nullptr) {
+        LOGE("[DRED %s] existing alloc near fault: '%s' type=%d", tag,
+             existing->ObjectNameA ? existing->ObjectNameA : "<unnamed>",
+             static_cast<int>(existing->AllocationType));
+        existing = existing->pNext;
+      }
+      auto* recent = pageFaultOutput.pHeadRecentFreedAllocationNode;
+      while (recent != nullptr) {
+        LOGE("[DRED %s] recently freed: '%s' type=%d", tag,
+             recent->ObjectNameA ? recent->ObjectNameA : "<unnamed>",
+             static_cast<int>(recent->AllocationType));
+        recent = recent->pNext;
+      }
+    }
+  }
+}
+
 void D3D12GPU::releaseAll(bool releaseGPU) {
   // Shutdown ordering must wait for all GPU work to complete before destroying anything that the
   // GPU may still be reading. The Vulkan backend does the same via waitAllInflightSubmissions().
@@ -436,7 +562,7 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
         LOGE("D3D12GPU::executeSubmission: backpressure wait timed out (target=%llu), "
              "marking context lost.",
              static_cast<unsigned long long>(oldest.fenceValue));
-        contextLost = true;
+        markContextLost("executeSubmission backpressure timeout");
         reclaimAbandonedSession(std::move(request.session));
         request.uploads.clear();
         while (!inflightSubmissions.empty()) {
@@ -451,7 +577,7 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
     // event would have been signalled but no work has actually completed. Detect this and exit
     // the inflight queue cleanup path immediately.
     if (FAILED(d3d12Device->GetDeviceRemovedReason())) {
-      contextLost = true;
+      markContextLost("executeSubmission backpressure post-check");
       reclaimAbandonedSession(std::move(request.session));
       request.uploads.clear();
       // Drop every still-tracked submission since the GPU will never signal again.
@@ -530,7 +656,7 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
     LOGE("D3D12GPU::executeSubmission: Signal failed (HRESULT=0x%08X) or device removed; "
          "marking context lost.",
          static_cast<unsigned>(signalHr));
-    contextLost = true;
+    markContextLost("executeSubmission Signal");
     reclaimAbandonedSession(std::move(request.session));
     request.uploads.clear();
     while (!inflightSubmissions.empty()) {
@@ -553,7 +679,7 @@ void D3D12GPU::waitAllInflightSubmissions() {
   }
   if (contextLost || FAILED(d3d12Device->GetDeviceRemovedReason())) {
     // Device is gone — fence will never advance again. Drop everything synchronously.
-    contextLost = true;
+    markContextLost("waitAllInflightSubmissions entry");
     while (!inflightSubmissions.empty()) {
       reclaimSubmission(inflightSubmissions.front());
       inflightSubmissions.pop_front();
@@ -574,7 +700,7 @@ void D3D12GPU::waitAllInflightSubmissions() {
         LOGE("D3D12GPU::waitAllInflightSubmissions: fence wait timed out (target=%llu), "
              "marking context lost.",
              static_cast<unsigned long long>(last.fenceValue));
-        contextLost = true;
+        markContextLost("waitAllInflightSubmissions timeout");
         while (!inflightSubmissions.empty()) {
           reclaimSubmission(inflightSubmissions.front());
           inflightSubmissions.pop_front();

@@ -181,7 +181,20 @@ class D3D12GPU : public GPU {
     return contextLost;
   }
 
+  /**
+   * If the device has been removed and DRED was enabled at device creation, queries
+   * ID3D12DeviceRemovedExtendedData and logs the auto-breadcrumb history (the command list
+   * operations the GPU had completed and was about to execute when it died) plus any page-fault
+   * information. Each (HRESULT-failing) call site that detects context loss should invoke this
+   * helper exactly once so the diagnostic appears next to the failure that triggered it. No-op on
+   * builds without DRED enabled or when GetDeviceRemovedReason() reports success.
+   */
+  void dumpDeviceRemovedExtendedData(const char* tag);
+
  private:
+  /// Single entry point for marking the context lost. Sets the flag, dumps DRED diagnostics on
+  /// the first transition (subsequent calls are silent), and short-circuits all wait paths.
+  void markContextLost(const char* tag);
   explicit D3D12GPU(ComPtr<ID3D12Device> device, ComPtr<IDXGIAdapter1> adapter);
 
   std::shared_ptr<D3D12Resource> addResource(D3D12Resource* resource);

@@ -35,6 +35,25 @@ std::shared_ptr<D3D12Device> D3D12Device::Make() {
     }
   }
 #endif
+#if !defined(NDEBUG) || defined(TGFX_D3D12_DEBUG_LAYER) || defined(TGFX_D3D12_DRED)
+  // Enable Device Removed Extended Data so that, on a TDR/hang, we can ask the driver which
+  // command was the last one the GPU started and which one it was about to execute next. This
+  // is the cheapest way to localise a hang without attaching PIX. Must be requested before
+  // D3D12CreateDevice; queried later via D3D12GPU when GetDeviceRemovedReason() reports a fault.
+  {
+    ComPtr<ID3D12DeviceRemovedExtendedDataSettings> dredSettings = nullptr;
+    auto dredHr = D3D12GetDebugInterface(IID_PPV_ARGS(&dredSettings));
+    if (SUCCEEDED(dredHr)) {
+      dredSettings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+      dredSettings->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+      LOGE("[DRED setup] Auto-breadcrumbs and page-fault tracking enabled.");
+    } else {
+      LOGE("[DRED setup] D3D12GetDebugInterface(ID3D12DeviceRemovedExtendedDataSettings) "
+           "returned HRESULT=0x%08X; DRED unavailable.",
+           static_cast<unsigned>(dredHr));
+    }
+  }
+#endif
   ComPtr<IDXGIFactory4> factory = nullptr;
   if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
     LOGE("D3D12Device::Make() Failed to create DXGI factory.");
