@@ -50,11 +50,25 @@ std::shared_ptr<D3D12Texture> D3D12Texture::Make(D3D12GPU* gpu,
   if (isDepthStencil) {
     resourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
     resourceFlags &= ~D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-  } else if (descriptor.mipLevelCount > 1) {
-    // Mipmapped textures need to be writable from a compute shader so that
-    // generateMipmapsForTexture() can downsample mip[i] -> mip[i+1] via UAV writes. The flag is a
-    // no-op for the basic sampling path and only adds a small driver-internal alignment overhead.
-    resourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+  } else {
+    // D3D12 requires ALLOW_RENDER_TARGET to be set at resource creation time before any
+    // CreateRenderTargetView call against the resource is legal. Other backends (Vulkan/Metal)
+    // can derive render-target capability lazily, so callers across the codebase commonly
+    // create textures with the default usage (TEXTURE_BINDING) and later wrap them via
+    // Surface::MakeFrom(context, backendTexture, ...). To keep that path working on D3D12 we
+    // unconditionally enable the flag for any non-depth, renderable colour format. The cost is
+    // marginal (some drivers skip a sampling-only compression path) and it avoids hard
+    // device-removal when a sampled texture is later asked to act as a render target.
+    if (gpu->isFormatRenderable(descriptor.format)) {
+      resourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+    }
+    if (descriptor.mipLevelCount > 1) {
+      // Mipmapped textures need to be writable from a compute shader so that
+      // generateMipmapsForTexture() can downsample mip[i] -> mip[i+1] via UAV writes. The flag is
+      // a no-op for the basic sampling path and only adds a small driver-internal alignment
+      // overhead.
+      resourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+    }
   }
 
   D3D12_HEAP_PROPERTIES heapProperties = {};

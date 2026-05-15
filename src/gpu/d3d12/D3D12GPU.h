@@ -193,6 +193,15 @@ class D3D12GPU : public GPU {
   void dumpDeviceRemovedExtendedData(const char* tag);
 
   /**
+   * Drains the D3D12 debug-layer ID3D12InfoQueue and forwards every queued message to LOGE
+   * tagged with `tag`. Call sites should invoke this whenever a D3D12 API returns a failure
+   * (especially DEVICE_REMOVED) so the underlying validation error appears next to the failing
+   * call instead of being lost inside the runtime queue. No-op on builds without
+   * TGFX_D3D12_DEBUG_LAYER (and outside Debug builds), where the InfoQueue is not populated.
+   */
+  void drainDebugMessages(const char* tag);
+
+  /**
    * Returns the singleton compute-shader mipmap generator, creating it on first use. The
    * generator is owned by the GPU because its root signature and pipeline state can be reused
    * across every D3D12CommandEncoder that asks to generate mipmaps. Returns nullptr if compute

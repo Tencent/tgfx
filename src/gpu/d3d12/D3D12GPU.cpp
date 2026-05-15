@@ -40,14 +40,12 @@ bool HardwareBufferAvailable() {
 }
 
 #ifdef TGFX_D3D12_DEBUG_LAYER
-// Drain the D3D12 InfoQueue and forward any debug-layer messages to LOGE so they show up next
-// to the C++ failure they correlate with. Cheap when the queue is empty.
-static void DrainDebugMessages(ID3D12Device* device, const char* tag) {
-  if (device == nullptr) {
+void D3D12GPU::drainDebugMessages(const char* tag) {
+  if (d3d12Device == nullptr) {
     return;
   }
   ComPtr<ID3D12InfoQueue> infoQueue = nullptr;
-  if (FAILED(device->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
+  if (FAILED(d3d12Device->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
     return;
   }
   auto count = infoQueue->GetNumStoredMessages();
@@ -64,6 +62,9 @@ static void DrainDebugMessages(ID3D12Device* device, const char* tag) {
   if (count > 0) {
     infoQueue->ClearStoredMessages();
   }
+}
+#else
+void D3D12GPU::drainDebugMessages(const char*) {
 }
 #endif
 
@@ -636,7 +637,7 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
     cmdQueue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
   }
 #ifdef TGFX_D3D12_DEBUG_LAYER
-  DrainDebugMessages(d3d12Device.Get(), "executeSubmission");
+  drainDebugMessages("executeSubmission");
 #endif
 
   // Step 5: Optional signal of an external semaphore. The semaphore exposes a fixed fence value

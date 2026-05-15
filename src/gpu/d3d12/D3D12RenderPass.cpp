@@ -239,6 +239,7 @@ bool D3D12RenderPass::allocateShaderVisibleHeaps() {
   srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
   if (FAILED(device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&srvHeap)))) {
     LOGE("D3D12RenderPass: failed to create shader-visible CBV/SRV/UAV heap.");
+    d3d12GPU->drainDebugMessages("D3D12RenderPass::allocateShaderVisibleHeaps");
     return false;
   }
 
