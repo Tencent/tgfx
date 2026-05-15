@@ -23,9 +23,6 @@
 #include "gpu/ProgramBuilder.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/glsl/GLSLFragmentShaderBuilder.h"
-#ifdef TGFX_USE_INSPECTOR
-#include "inspect/FrameCapture.h"
-#endif
 
 namespace tgfx {
 class GLSLProgramBuilder : public ProgramBuilder {
@@ -69,8 +66,5 @@ class GLSLProgramBuilder : public ProgramBuilder {
   size_t vertexStride = 0;
 
   friend class ProgramBuilder;
-#ifdef TGFX_USE_INSPECTOR
-  friend class inspect::FrameCapture;
-#endif
 };
 }  // namespace tgfx

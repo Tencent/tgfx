@@ -24,7 +24,6 @@
 #include "gpu/tasks/GenerateMipmapsTask.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
-#include "inspect/InspectorMark.h"
 #include "tasks/TransferPixelsTask.h"
 
 namespace tgfx {

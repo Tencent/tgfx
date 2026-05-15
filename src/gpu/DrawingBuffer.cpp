@@ -19,7 +19,6 @@
 #include "DrawingBuffer.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/GlobalCache.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Window.h"
 
@@ -35,9 +34,7 @@ DrawingBuffer::DrawingBuffer(Context* context)
 
 std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   DEBUG_ASSERT(!empty());
-  TASK_MARK(tgfx::inspect::OpTaskType::Flush);
   {
-    TASK_MARK(tgfx::inspect::OpTaskType::ResourceTask);
     for (auto& task : resourceTasks) {
       task->execute(context);
       task = nullptr;
@@ -49,7 +46,6 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   }
   auto commandEncoder = context->gpu()->createCommandEncoder();
   {
-    TASK_MARK(tgfx::inspect::OpTaskType::RenderTask);
     for (auto& task : renderTasks) {
       task->execute(commandEncoder.get());
       task = nullptr;
@@ -64,15 +60,10 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
 }
 
 void DrawingBuffer::presentWindows(Context* context) {
-  bool presented = false;
   for (auto& pendingWindow : windows) {
     if (auto window = pendingWindow.lock()) {
       window->onPresent(context);
-      presented = true;
     }
-  }
-  if (presented) {
-    FRAME_MARK;
   }
 }
 
