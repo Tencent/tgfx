@@ -772,15 +772,6 @@ For the license of other third party components, please refer to the following U
 https://swiftshader.googlesource.com/SwiftShader/+/refs/heads/master/LICENSE.txt
 
 
-Open Source Software Licensed under the Apache License Version 2.0 License:
---------------------------------------------------------------------
-1. flatbuffers
-Copyright (c) flatbuffers original author and authors
-
-A copy of the Apache License Version 2.0 License is included in this file.
-
-
-
 Open Source Software Licensed under the BSD 3-Clause License and Other Licenses of the Third-Party Components therein:
 --------------------------------------------------------------------
 1. angle
@@ -812,16 +803,3 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 For the license of other third party components, please refer to the following URL:
 https://github.com/cameron314/concurrentqueue/tree/master/benchmarks
-
-
-
-Open Source Software Licensed under the BSD 2-Clause License and Other Licenses of the Third-Party Components therein:
---------------------------------------------------------------------
-1. lz4
-Copyright (c) 2011-2020, Yann Collet
-All rights reserved.
-
-A copy of the BSD 2-Clause License is included in this file.
-
-For the license of other third party components, please refer to the following URL:
-https://github.com/lz4/lz4/tree/dev/lib
