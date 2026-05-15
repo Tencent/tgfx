@@ -151,6 +151,11 @@ class D3D12RenderPass : public RenderPass {
 
   // Color attachments retained for state-restore at onEnd() time.
   std::vector<std::shared_ptr<D3D12Texture>> colorAttachments;
+  // Per-color-attachment MSAA resolve target. Index N corresponds to colorAttachments[N]; an
+  // entry is nullptr when the matching color attachment has no resolve texture (i.e. sampleCount
+  // == 1). At onEnd() time we issue ResolveSubresource(colorAttachments[N], resolveTextures[N])
+  // for every non-null pair, mirroring Vulkan's pResolveAttachments behaviour.
+  std::vector<std::shared_ptr<D3D12Texture>> resolveTextures;
   std::shared_ptr<D3D12Texture> depthStencilAttachment;
   // Textures that were transitioned to PIXEL_SHADER_RESOURCE inside this pass via setTexture().
   // We keep them tracked so that onEnd() can transition them back to COMMON, avoiding mismatches

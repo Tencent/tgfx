@@ -150,11 +150,14 @@ bool D3D12RenderPass::initialise(const RenderPassDescriptor& passDescriptor) {
     fbWidth = static_cast<uint32_t>(d3d12Tex->width());
     fbHeight = static_cast<uint32_t>(d3d12Tex->height());
 
-    // Resolve textures are unsupported for now in the D3D12 path. ResolveSubresource at end of
-    // pass will be added together with full MSAA support; the SVG/layer tests we currently target
-    // only exercise non-MSAA passes.
+    // Capture the optional resolve target for this attachment. A null entry keeps the parallel
+    // vector aligned with colorAttachments so the onEnd() loop can match them by index.
     if (ca.resolveTexture != nullptr) {
-      LOGE("D3D12RenderPass: resolveTexture is not yet implemented.");
+      auto resolveTex = std::static_pointer_cast<D3D12Texture>(ca.resolveTexture);
+      encoder->retainResource(resolveTex);
+      resolveTextures.push_back(std::move(resolveTex));
+    } else {
+      resolveTextures.push_back(nullptr);
     }
   }
 
@@ -536,9 +539,48 @@ void D3D12RenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCou
 }
 
 void D3D12RenderPass::onEnd() {
-  // Transition every color attachment back to COMMON. The next consumer (sample, copy, present)
-  // will issue its own transition from COMMON to whatever state it needs.
+  // Step 1: Resolve every multi-sampled colour attachment that has a resolveTexture into its
+  // single-sample destination, mirroring Vulkan's pResolveAttachments. Driver state requirements
+  // are RESOLVE_SOURCE for the multi-sample source and RESOLVE_DEST for the single-sample
+  // destination; both are restored to COMMON afterwards in step 2.
+  for (size_t i = 0; i < colorAttachments.size(); i++) {
+    if (i >= resolveTextures.size() || resolveTextures[i] == nullptr) {
+      continue;
+    }
+    auto& src = colorAttachments[i];
+    auto& resolveDst = resolveTextures[i];
+    if (src == nullptr) {
+      continue;
+    }
+
+    auto srcState = src->currentState();
+    if (srcState != D3D12_RESOURCE_STATE_RESOLVE_SOURCE) {
+      TransitionResourceState(commandList, src->d3d12Resource(), srcState,
+                              D3D12_RESOURCE_STATE_RESOLVE_SOURCE);
+      src->setCurrentState(D3D12_RESOURCE_STATE_RESOLVE_SOURCE);
+    }
+    auto dstState = resolveDst->currentState();
+    if (dstState != D3D12_RESOURCE_STATE_RESOLVE_DEST) {
+      TransitionResourceState(commandList, resolveDst->d3d12Resource(), dstState,
+                              D3D12_RESOURCE_STATE_RESOLVE_DEST);
+      resolveDst->setCurrentState(D3D12_RESOURCE_STATE_RESOLVE_DEST);
+    }
+    commandList->ResolveSubresource(resolveDst->d3d12Resource(), 0, src->d3d12Resource(), 0,
+                                    static_cast<DXGI_FORMAT>(src->dxgiFormat()));
+  }
+
+  // Step 2: Transition every color attachment back to COMMON. The next consumer (sample, copy,
+  // present) will issue its own transition from COMMON to whatever state it needs.
   for (auto& tex : colorAttachments) {
+    if (tex == nullptr) continue;
+    auto current = tex->currentState();
+    if (current != D3D12_RESOURCE_STATE_COMMON) {
+      TransitionResourceState(commandList, tex->d3d12Resource(), current,
+                              D3D12_RESOURCE_STATE_COMMON);
+      tex->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
+    }
+  }
+  for (auto& tex : resolveTextures) {
     if (tex == nullptr) continue;
     auto current = tex->currentState();
     if (current != D3D12_RESOURCE_STATE_COMMON) {
