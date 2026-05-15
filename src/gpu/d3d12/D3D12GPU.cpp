@@ -19,6 +19,7 @@
 #include "D3D12GPU.h"
 #include <dxgi1_4.h>
 #include <shaderc/shaderc.hpp>
+#include <algorithm>
 #include <string>
 #include <vector>
 #include "D3D12Buffer.h"
@@ -577,6 +578,10 @@ void D3D12GPU::releaseAll(bool releaseGPU) {
     inflightSubmissions.clear();
   }
   samplerCache.clear();
+  // Drop pooled command allocator/list pairs. Done after wait so the GPU is no longer using
+  // them; doing it before would still be safe (ComPtrs hold the only references) but ordering
+  // matches the rest of the shutdown path.
+  _commandListPool.clear();
   // Drop the cached mipmap generator's root signature + PSO before tearing the device down.
   // Resources retained by inflight submissions have already been released above.
   _mipmapGenerator = nullptr;
@@ -800,8 +805,32 @@ void D3D12GPU::pollCompletedSubmissions() {
 }
 
 void D3D12GPU::reclaimSubmission(InflightSubmission& submission) {
-  // ComPtr / shared_ptr destructors handle command list, allocator, descriptor heaps, retained
-  // resources, and staging UPLOAD buffers. Nothing else is needed.
+  // The GPU has signalled the fence value associated with this submission, so every command
+  // allocator/list pair it referenced is safe to reuse. Return them to the pool before tearing
+  // down the rest of the session — once the FrameSession destructor runs, the ComPtrs are gone.
+  if (submission.session.commandAllocator != nullptr &&
+      submission.session.commandList != nullptr) {
+    D3D12CommandListPool::Entry entry = {};
+    entry.allocator = std::move(submission.session.commandAllocator);
+    entry.commandList = std::move(submission.session.commandList);
+    _commandListPool.release(std::move(entry));
+  }
+  // Auxiliary command lists (e.g. transient upload lists recorded by D3D12CommandQueue::submit)
+  // are paired one-to-one with their auxAllocators by index; recycle them together so the pool
+  // sees consistent (allocator, list) pairs.
+  size_t auxCount = std::min(submission.session.auxAllocators.size(),
+                             submission.session.auxCommandLists.size());
+  for (size_t i = 0; i < auxCount; i++) {
+    if (submission.session.auxAllocators[i] != nullptr &&
+        submission.session.auxCommandLists[i] != nullptr) {
+      D3D12CommandListPool::Entry entry = {};
+      entry.allocator = std::move(submission.session.auxAllocators[i]);
+      entry.commandList = std::move(submission.session.auxCommandLists[i]);
+      _commandListPool.release(std::move(entry));
+    }
+  }
+  // The remaining ComPtr / shared_ptr destructors in FrameSession handle descriptor heaps,
+  // retained resources, and staging UPLOAD buffers.
   submission.session = D3D12FrameSession{};
   submission.uploads.clear();
 }

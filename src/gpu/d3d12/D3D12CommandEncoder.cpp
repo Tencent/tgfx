@@ -32,35 +32,25 @@ std::shared_ptr<D3D12CommandEncoder> D3D12CommandEncoder::Make(D3D12GPU* gpu) {
   if (gpu == nullptr) {
     return nullptr;
   }
-  auto device = gpu->device();
-  ComPtr<ID3D12CommandAllocator> allocator = nullptr;
-  auto hr =
-      device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator));
-  if (FAILED(hr)) {
-    LOGE("D3D12CommandEncoder: CreateCommandAllocator failed, HRESULT=0x%08X",
-         static_cast<unsigned>(hr));
+  // Pull a recording-state allocator/list pair from the pool. On a hit, it has just been Reset();
+  // on a miss, the pool creates a fresh pair internally. Either way, the list arrives in the
+  // same recording state CreateCommandList would have produced.
+  auto entry = gpu->commandListPool().acquire(gpu->device());
+  if (!entry.valid()) {
+    LOGE("D3D12CommandEncoder: command-list pool acquire failed.");
     return nullptr;
   }
 
-  ComPtr<ID3D12GraphicsCommandList> commandList = nullptr;
-  hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.Get(), nullptr,
-                                 IID_PPV_ARGS(&commandList));
-  if (FAILED(hr)) {
-    LOGE("D3D12CommandEncoder: CreateCommandList failed, HRESULT=0x%08X",
-         static_cast<unsigned>(hr));
-    return nullptr;
-  }
-  // The command list returned by CreateCommandList is already in the recording state, matching
-  // VulkanCommandEncoder's vkBeginCommandBuffer.
-  //
   // Bind the process-wide shader-visible CBV/SRV/UAV ring and Sampler heap once for the entire
-  // life of this command list. D3D12 documents repeated SetDescriptorHeaps as a potential stall
-  // on some drivers, and our render passes always sub-allocate descriptors into these two heaps,
-  // so a single bind is both correct and optimal.
+  // life of this command list. Reset() clears any previous SetDescriptorHeaps state, so the
+  // bind has to happen on every reuse, not just on first creation. D3D12 documents repeated
+  // SetDescriptorHeaps as a potential stall on some drivers, and our render passes always
+  // sub-allocate descriptors into these two heaps, so a single bind is both correct and optimal.
   ID3D12DescriptorHeap* heaps[] = {gpu->srvRing().heap(), gpu->samplerHeap()};
-  commandList->SetDescriptorHeaps(2, heaps);
+  entry.commandList->SetDescriptorHeaps(2, heaps);
 
-  return gpu->makeResource<D3D12CommandEncoder>(gpu, std::move(allocator), std::move(commandList));
+  return gpu->makeResource<D3D12CommandEncoder>(gpu, std::move(entry.allocator),
+                                                std::move(entry.commandList));
 }
 
 D3D12CommandEncoder::D3D12CommandEncoder(D3D12GPU* gpu, ComPtr<ID3D12CommandAllocator> allocator,

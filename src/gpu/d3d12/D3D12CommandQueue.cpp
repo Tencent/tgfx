@@ -199,21 +199,17 @@ void D3D12CommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   // submission as an auxiliary upload command list. The GPU executes auxCommandLists before the
   // session.commandList, ensuring textures are populated before the render list samples them.
   if (!pendingUploads.empty()) {
-    auto device = gpu->device();
-    ComPtr<ID3D12CommandAllocator> uploadAllocator = nullptr;
-    ComPtr<ID3D12GraphicsCommandList> uploadList = nullptr;
-    if (FAILED(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                              IID_PPV_ARGS(&uploadAllocator))) ||
-        FAILED(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, uploadAllocator.Get(),
-                                         nullptr, IID_PPV_ARGS(&uploadList)))) {
-      LOGE("D3D12CommandQueue::submit: failed to create transient upload list, dropping uploads.");
+    auto entry = gpu->commandListPool().acquire(gpu->device());
+    if (!entry.valid()) {
+      LOGE("D3D12CommandQueue::submit: failed to acquire transient upload list, dropping "
+           "uploads.");
       pendingUploads.clear();
       pendingFootprints.clear();
     } else {
-      flushUploads(uploadList.Get());
-      uploadList->Close();
-      session.auxAllocators.push_back(std::move(uploadAllocator));
-      session.auxCommandLists.push_back(std::move(uploadList));
+      flushUploads(entry.commandList.Get());
+      entry.commandList->Close();
+      session.auxAllocators.push_back(std::move(entry.allocator));
+      session.auxCommandLists.push_back(std::move(entry.commandList));
     }
   }
 
@@ -250,25 +246,21 @@ void D3D12CommandQueue::waitUntilCompleted() {
   // Flush any pending uploads even if the application did not submit a command buffer between
   // writeTexture() and waitUntilCompleted().
   if (!pendingUploads.empty()) {
-    auto device = gpu->device();
-    ComPtr<ID3D12CommandAllocator> allocator = nullptr;
-    ComPtr<ID3D12GraphicsCommandList> list = nullptr;
-    if (SUCCEEDED(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                                 IID_PPV_ARGS(&allocator))) &&
-        SUCCEEDED(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.Get(),
-                                            nullptr, IID_PPV_ARGS(&list)))) {
-      flushUploads(list.Get());
-      list->Close();
+    auto entry = gpu->commandListPool().acquire(gpu->device());
+    if (entry.valid()) {
+      flushUploads(entry.commandList.Get());
+      entry.commandList->Close();
 
       D3D12GPU::SubmitRequest request = {};
-      request.session.auxAllocators.push_back(std::move(allocator));
-      request.session.auxCommandLists.push_back(std::move(list));
+      request.session.auxAllocators.push_back(std::move(entry.allocator));
+      request.session.auxCommandLists.push_back(std::move(entry.commandList));
       request.uploads = std::move(pendingUploads);
       pendingUploads.clear();
       pendingFootprints.clear();
       gpu->executeSubmission(std::move(request));
     } else {
-      LOGE("D3D12CommandQueue::waitUntilCompleted: failed to flush uploads, dropping.");
+      LOGE("D3D12CommandQueue::waitUntilCompleted: failed to acquire upload list, dropping "
+           "uploads.");
       pendingUploads.clear();
       pendingFootprints.clear();
     }

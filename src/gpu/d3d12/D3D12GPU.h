@@ -23,6 +23,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include "D3D12CommandListPool.h"
 #include "D3D12Defines.h"
 #include "D3D12DescriptorRing.h"
 #include "D3D12FrameSession.h"
@@ -237,6 +238,15 @@ class D3D12GPU : public GPU {
     return _samplerHeap.Get();
   }
 
+  /**
+   * Pool of (ID3D12CommandAllocator, ID3D12GraphicsCommandList) pairs reused across
+   * encoders/queue uploads. Avoids the per-submission CreateCommandAllocator/CreateCommandList
+   * overhead. Pairs are returned to the pool by reclaimSubmission once their fence signals.
+   */
+  D3D12CommandListPool& commandListPool() {
+    return _commandListPool;
+  }
+
  private:
   /// Single entry point for marking the context lost. Sets the flag, dumps DRED diagnostics on
   /// the first transition (subsequent calls are silent), and short-circuits all wait paths.
@@ -276,6 +286,11 @@ class D3D12GPU : public GPU {
   uint32_t _samplerHeapSize = 0;
   uint32_t _samplerHeapCapacity = 0;
   uint32_t _samplerDescriptorIncrement = 0;
+
+  // Pool of recycled command allocator + graphics command list pairs. Populated by
+  // reclaimSubmission once a submission's fence signals; consumed by D3D12CommandEncoder::Make
+  // and the transient upload-list paths inside D3D12CommandQueue.
+  D3D12CommandListPool _commandListPool;
 
   // Submission state. Following the Vulkan model, the GPU owns the frame fence and the inflight
   // queue; D3D12CommandQueue is a thin coordination layer that builds a SubmitRequest and hands
