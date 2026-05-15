@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VaryingHandler.h"
+#include <string>
 #include "ProgramBuilder.h"
 
 namespace tgfx {
@@ -61,7 +62,21 @@ void VaryingHandler::finalize() {
 
 void VaryingHandler::appendDecls(const std::vector<ShaderVar>& vars, std::string* out,
                                  ShaderStage stage) const {
+  // Track the next interpolant location to assign so vertex outputs and fragment inputs end up
+  // at exactly matching slots. Without this, ShaderCompiler::PreprocessGLSL would later number
+  // the two stages independently, and any unused fragment input would shift the location of all
+  // subsequent inputs — producing a valid GLSL program (Vulkan/GL link by location) but failing
+  // D3D12's strict signature check ("PS input register is not a subset of VS output").
+  uint32_t location = 0;
   for (const auto& var : vars) {
+    bool isVarying = var.modifier() == ShaderVar::TypeModifier::Varying ||
+                     var.modifier() == ShaderVar::TypeModifier::FlatVarying;
+    if (isVarying) {
+      out->append("layout(location=");
+      out->append(std::to_string(location));
+      out->append(") ");
+      ++location;
+    }
     out->append(programBuilder->getShaderVarDeclarations(var, stage));
     out->append(";\n");
   }

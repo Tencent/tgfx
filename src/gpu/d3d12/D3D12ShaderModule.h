@@ -19,6 +19,7 @@
 #pragma once
 
 #include <d3dcompiler.h>
+#include <string>
 #include "D3D12Resource.h"
 #include "D3D12Util.h"
 #include "tgfx/gpu/ShaderModule.h"
@@ -71,6 +72,15 @@ class D3D12ShaderModule : public ShaderModule, public D3D12Resource {
     return _stage;
   }
 
+#ifdef TGFX_D3D12_DEBUG_LAYER
+  /// Returns the cross-compiled HLSL source captured during construction. Diagnostic-only:
+  /// available only when TGFX_D3D12_DEBUG_LAYER is defined so production builds don't pay the
+  /// memory cost of holding HLSL strings.
+  const std::string& hlslSource() const {
+    return _hlslSource;
+  }
+#endif
+
  protected:
   void onRelease(D3D12GPU* gpu) override;
 
@@ -80,6 +90,9 @@ class D3D12ShaderModule : public ShaderModule, public D3D12Resource {
 
   ShaderStage _stage = ShaderStage::Vertex;
   ComPtr<ID3DBlob> bytecode = nullptr;
+#ifdef TGFX_D3D12_DEBUG_LAYER
+  std::string _hlslSource;
+#endif
 
   friend class D3D12GPU;
 };

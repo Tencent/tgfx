@@ -144,7 +144,13 @@ std::vector<uint32_t> CompileGLSLToSPIRV(const shaderc::Compiler* compiler,
     return {};
   }
   shaderc::CompileOptions options;
-  options.SetOptimizationLevel(shaderc_optimization_level_performance);
+  // Optimisation level zero preserves all declared interface variables (vertex outputs / fragment
+  // inputs). The performance optimiser would otherwise dead-strip fragment inputs that the body
+  // doesn't use, leaving gaps in the location numbering. Vulkan and Metal accept those gaps
+  // because their binders are name/location-based, but D3D12 hardware register packing fails the
+  // PSO's "PS input register is a subset of VS output" check whenever the gaps shift the
+  // remaining locations onto a different slot than the one the vertex shader writes to.
+  options.SetOptimizationLevel(shaderc_optimization_level_zero);
   options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_0);
 
   shaderc_shader_kind shaderKind =

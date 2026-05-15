@@ -155,6 +155,9 @@ D3D12ShaderModule::D3D12ShaderModule(D3D12GPU* gpu, const ShaderModuleDescriptor
     return;
   }
   bytecode = compileHLSLToDXBC(hlsl, descriptor.stage);
+#ifdef TGFX_D3D12_DEBUG_LAYER
+  _hlslSource = std::move(hlsl);
+#endif
 }
 
 void D3D12ShaderModule::onRelease(D3D12GPU*) {
