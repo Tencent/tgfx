@@ -152,6 +152,10 @@ class D3D12RenderPass : public RenderPass {
   // Color attachments retained for state-restore at onEnd() time.
   std::vector<std::shared_ptr<D3D12Texture>> colorAttachments;
   std::shared_ptr<D3D12Texture> depthStencilAttachment;
+  // Textures that were transitioned to PIXEL_SHADER_RESOURCE inside this pass via setTexture().
+  // We keep them tracked so that onEnd() can transition them back to COMMON, avoiding mismatches
+  // with D3D12's automatic state-decay rules between ExecuteCommandLists calls.
+  std::vector<std::shared_ptr<D3D12Texture>> shaderResourceTextures;
 };
 
 }  // namespace tgfx

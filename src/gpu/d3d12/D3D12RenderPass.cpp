@@ -354,6 +354,11 @@ void D3D12RenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> text
     TransitionResourceState(commandList, d3d12Tex->d3d12Resource(), current,
                             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     d3d12Tex->setCurrentState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    // Track this texture so onEnd() can transition it back to COMMON. Without that step, D3D12
+    // automatic state decay after ExecuteCommandLists drops the resource to COMMON, but our CPU
+    // tracker still believes it is in PIXEL_SHADER_RESOURCE — every subsequent transition then
+    // fails "Before state mismatch" validation and (on some drivers) destabilises the device.
+    shaderResourceTextures.push_back(d3d12Tex);
   }
 
   auto device = d3d12GPU->device();
@@ -548,6 +553,19 @@ void D3D12RenderPass::onEnd() {
       TransitionResourceState(commandList, depthStencilAttachment->d3d12Resource(), current,
                               D3D12_RESOURCE_STATE_COMMON);
       depthStencilAttachment->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
+    }
+  }
+  // Transition every texture that was sampled (PIXEL_SHADER_RESOURCE) inside this pass back to
+  // COMMON. D3D12 implicitly decays buffers and simultaneous-access textures to COMMON after the
+  // command list executes; explicitly issuing the matching CPU-side transition keeps our tracker
+  // aligned with the runtime so subsequent passes don't trip "Before state mismatch" barriers.
+  for (auto& tex : shaderResourceTextures) {
+    if (tex == nullptr) continue;
+    auto current = tex->currentState();
+    if (current != D3D12_RESOURCE_STATE_COMMON) {
+      TransitionResourceState(commandList, tex->d3d12Resource(), current,
+                              D3D12_RESOURCE_STATE_COMMON);
+      tex->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
     }
   }
 }
