@@ -24,8 +24,12 @@ using namespace pk;
 
 namespace tgfx {
 
-#define ADAPTIVE_DASH_SEGMENT_EPSILON 120000
-#define ADAPTIVE_DASH_MIN_DASHABLE_LENGTH 0.1f
+static constexpr int ADAPTIVE_DASH_SEGMENT_EPSILON = 120000;
+// Aligns with SkPathStroker's teenyLine threshold (PK_ScalarNearlyZero = 1/4096 ≈ 2.44e-4).
+// Segments shorter than this would be dropped by the stroker anyway, so the dash effect skips
+// splitting them. Using a value much larger risks merging dash splits across short edges and
+// turning what should be Cap endpoints into LineJoin geometry.
+static constexpr float ADAPTIVE_DASH_MIN_DASHABLE_LENGTH = 1.0f / (1 << 12);
 
 inline bool IsEven(int x) {
   return !(x & 1);

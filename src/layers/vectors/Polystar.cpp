@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/vectors/Polystar.h"
+#include <algorithm>
 #include <cmath>
 #include "VectorContext.h"
 #include "core/utils/Log.h"
@@ -263,9 +264,23 @@ void Polystar::setReversed(bool value) {
 void Polystar::apply(VectorContext* context) {
   DEBUG_ASSERT(context != nullptr);
   if (_cachedShape == nullptr) {
+    constexpr float MinExtent = 5e-3f;
+    // Classic 5-pointed star uses r/R = (3 - sqrt(5)) / 2, the only ratio that yields horizontal
+    // edges between adjacent inner and outer vertices. When both radii degenerate to zero we
+    // fall back to a path that preserves this ratio: clamp the inner radius to MinExtent and
+    // derive the outer radius from it.
+    constexpr float StarRatio = 0.381966011f;
+    auto outerRadius = _outerRadius;
+    auto innerRadius = _innerRadius;
+    if (_polystarType == PolystarType::Star && _outerRadius == 0.0f && _innerRadius == 0.0f) {
+      innerRadius = MinExtent;
+      outerRadius = innerRadius / StarRatio;
+    } else {
+      outerRadius = std::max(outerRadius, MinExtent);
+    }
     auto pathProvider = std::make_shared<PolystarPathProvider>(
-        _position, _polystarType, _pointCount, _rotation, _outerRadius, _outerRoundness,
-        _innerRadius, _innerRoundness, _reversed);
+        _position, _polystarType, _pointCount, _rotation, outerRadius, _outerRoundness, innerRadius,
+        _innerRoundness, _reversed);
     _cachedShape = Shape::MakeFrom(std::move(pathProvider));
   }
   if (_cachedShape) {

@@ -68,13 +68,14 @@ void Rectangle::apply(VectorContext* context) {
   DEBUG_ASSERT(context != nullptr);
   if (_cachedShape == nullptr) {
     // Replace zero-extent axes with a sub-pixel epsilon so a Rectangle with one or both
-    // sides collapsed to zero stays a closed area shape. The value sits just above the
-    // engine-wide FLOAT_NEARLY_ZERO (1/4096 ~ 2.44e-4) so stroker and path utility code
-    // keep treating the axis as non-zero, yet remains far below any sampling grid (GPUs
-    // sample at 1/16 px or coarser), so the geometry still reads as a line or point
-    // visually while the stroker can expand symmetrically on both sides and trim, dash,
-    // and inside/outside align all keep their well-defined area semantics.
-    constexpr float MinExtent = 5e-4f;
+    // sides collapsed to zero stays a closed area shape. The value is chosen so the resulting
+    // path edges are well above the stroker's teenyLine threshold (PK_ScalarNearlyZero ~ 2.44e-4)
+    // even after dash splitting halves the edge length, so SkPathStroker generates correct
+    // LineJoin geometry at corners. It still sits far below any sampling grid (GPUs sample at
+    // 1/16 px or coarser), so the geometry reads as a line or point visually while the stroker
+    // can expand symmetrically on both sides and trim, dash, and inside/outside align all keep
+    // their well-defined area semantics.
+    constexpr float MinExtent = 5e-3f;
     auto width = std::max(_size.width, MinExtent);
     auto height = std::max(_size.height, MinExtent);
     auto halfWidth = width * 0.5f;

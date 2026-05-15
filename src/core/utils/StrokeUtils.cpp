@@ -30,9 +30,13 @@ void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, const Matrix& matri
     return;
   }
   auto width = TreatStrokeAsHairline(stroke, matrix) ? 1.0f : stroke.width;
-  auto expand = width * 0.5f;
+  auto halfWidth = width * 0.5f;
+  auto expand = halfWidth;
   if (applyMiterLimit && stroke.join == LineJoin::Miter) {
-    expand *= stroke.miterLimit;
+    expand = std::max(expand, halfWidth * stroke.miterLimit);
+  }
+  if (stroke.cap == LineCap::Square) {
+    expand = std::max(expand, halfWidth * FLOAT_SQRT2);
   }
   expand = ceilf(expand);
   bounds->outset(expand, expand);

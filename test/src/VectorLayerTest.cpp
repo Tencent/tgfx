@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "tgfx/core/Paint.h"
+#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathMeasure.h"
 #include "tgfx/core/RSXform.h"
 #include "tgfx/core/TextBlobBuilder.h"
@@ -5107,6 +5109,324 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/FillInTransformedGroup"));
+}
+
+/**
+ * Replicates the Figma reference (FigmaRefer.png) for degenerate-geometry strokes.
+ * 4 rows (Rectangle / Triangle / Star / Ellipse) x 10 columns of stroke configurations.
+ * Used as a visual baseline against Figma while implementing degenerate-geometry rendering.
+ */
+TGFX_TEST(VectorLayerTest, DegenerateStroke_FigmaRefer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr float CellSize = 190.0f;
+  constexpr float ExtraColShift = 40.0f;
+  constexpr int ColCount = 10;
+  constexpr int RowCount = 4;
+  constexpr float NonDegenerateSize = 100.0f;
+  constexpr float StarInnerRatio = 0.381966011f;  // (3 - sqrt(5)) / 2, gives horizontal upper edges
+  constexpr float StarOuterRadius = 50.0f;
+  constexpr float StarInnerRadius = StarOuterRadius * StarInnerRatio;
+  const Color FillColor = Color::FromRGBA(9, 0, 246, 255);
+  const Color StrokeColor = Color::White();
+
+  enum class SizeMode {
+    NonDegenerate,    // 100x100
+    FullyDegenerate,  // 0x0
+    EdgeDegenerate,   // 0x60 (only meaningful for Rectangle / Ellipse)
+  };
+
+  struct ColumnConfig {
+    SizeMode size;
+    LineCap cap;
+    LineJoin join;
+    float strokeWidth;
+    bool dashed;
+    float dashLength;
+    float dashGap;
+  };
+
+  const ColumnConfig columns[ColCount] = {
+      // Col 1: Cap None, Join Bevel, Size 100x100, StrokeWidth 20, solid
+      {SizeMode::NonDegenerate, LineCap::Butt, LineJoin::Bevel, 20.0f, false, 0, 0},
+      // Col 2: Cap Round, Join Miter, Size 100x100, StrokeWidth 20, dashed 10/40
+      {SizeMode::NonDegenerate, LineCap::Round, LineJoin::Miter, 20.0f, true, 10.0f, 40.0f},
+      // Col 3: Cap None, Join Miter, Size 0x0, StrokeWidth 40, solid
+      {SizeMode::FullyDegenerate, LineCap::Butt, LineJoin::Miter, 40.0f, false, 0, 0},
+      // Col 4: Cap None, Join Bevel, Size 0x0, StrokeWidth 50, solid
+      {SizeMode::FullyDegenerate, LineCap::Butt, LineJoin::Bevel, 50.0f, false, 0, 0},
+      // Col 5: Cap None, Join Round, Size 0x0, StrokeWidth 50, solid
+      {SizeMode::FullyDegenerate, LineCap::Butt, LineJoin::Round, 50.0f, false, 0, 0},
+      // Col 6: Cap Square, Join Miter, Size 0x0, StrokeWidth 40, dashed 10/80
+      {SizeMode::FullyDegenerate, LineCap::Square, LineJoin::Miter, 40.0f, true, 10.0f, 80.0f},
+      // Col 7: Cap Square, Join Bevel, Size 0x0, StrokeWidth 50, dashed 10/100
+      {SizeMode::FullyDegenerate, LineCap::Square, LineJoin::Bevel, 50.0f, true, 10.0f, 100.0f},
+      // Col 8: Cap Round, Join Bevel, Size 0x0, StrokeWidth 50, dashed 10/100
+      {SizeMode::FullyDegenerate, LineCap::Round, LineJoin::Bevel, 50.0f, true, 10.0f, 100.0f},
+      // Col 9: Cap Square, Join Bevel, Size 0x60, StrokeWidth 20, dashed 10/100
+      {SizeMode::EdgeDegenerate, LineCap::Square, LineJoin::Bevel, 20.0f, true, 10.0f, 100.0f},
+      // Col 10: Cap None, Join Bevel, Size 0x0, StrokeWidth 50, dashed 10/100
+      {SizeMode::FullyDegenerate, LineCap::Butt, LineJoin::Bevel, 50.0f, true, 10.0f, 100.0f},
+  };
+
+  auto makeShape = [&](int row, SizeMode mode) -> std::shared_ptr<VectorElement> {
+    switch (row) {
+      case 0: {
+        auto rect = Rectangle::Make();
+        Size size = {NonDegenerateSize, NonDegenerateSize};
+        if (mode == SizeMode::FullyDegenerate) {
+          size = Size{0.0f, 0.0f};
+        } else if (mode == SizeMode::EdgeDegenerate) {
+          size = Size{0.0f, 60.0f};
+        }
+        rect->setSize(size);
+        return rect;
+      }
+      case 1: {
+        auto triangle = Polystar::Make();
+        triangle->setPolystarType(PolystarType::Polygon);
+        triangle->setPointCount(3);
+        if (mode == SizeMode::EdgeDegenerate) {
+          // Polystar has no width/height. Figma's reference uses outerRadius = nominalSize / 2,
+          // so for nominal 0x60 we set R = 30, then squash x to ~5e-3 via an inner VectorGroup
+          // scale. The inner scale only transforms the polygon geometry; the outer group's
+          // stroke sees the squashed path but its width is not affected by the inner scale.
+          constexpr float OuterRadius = 30.0f;
+          constexpr float TargetXExtent = 5e-3f;
+          auto triangleWidth = OuterRadius * 2.0f * 0.866025404f;  // cos(30 deg)
+          auto xScale = TargetXExtent / triangleWidth;
+          triangle->setOuterRadius(OuterRadius);
+          auto innerGroup = VectorGroup::Make();
+          innerGroup->setElements({triangle});
+          innerGroup->setScale({xScale, 1.0f});
+          return innerGroup;
+        }
+        triangle->setOuterRadius(mode == SizeMode::FullyDegenerate ? 0.0f
+                                                                   : NonDegenerateSize * 0.5f);
+        return triangle;
+      }
+      case 2: {
+        auto star = Polystar::Make();
+        star->setPolystarType(PolystarType::Star);
+        star->setPointCount(5);
+        if (mode == SizeMode::EdgeDegenerate) {
+          // Mirror row 2: R = 30 (nominalSize / 2), use the row's StarInnerRatio.
+          constexpr float OuterRadius = 30.0f;
+          constexpr float InnerRadius = OuterRadius * StarInnerRatio;
+          constexpr float TargetXExtent = 5e-3f;
+          auto starWidth = OuterRadius * 2.0f * 0.951056516f;  // cos(18 deg)
+          auto xScale = TargetXExtent / starWidth;
+          star->setOuterRadius(OuterRadius);
+          star->setInnerRadius(InnerRadius);
+          auto innerGroup = VectorGroup::Make();
+          innerGroup->setElements({star});
+          innerGroup->setScale({xScale, 1.0f});
+          return innerGroup;
+        }
+        star->setOuterRadius(mode == SizeMode::FullyDegenerate ? 0.0f : StarOuterRadius);
+        star->setInnerRadius(mode == SizeMode::FullyDegenerate ? 0.0f : StarInnerRadius);
+        return star;
+      }
+      case 3: {
+        auto ellipse = Ellipse::Make();
+        Size size = {NonDegenerateSize, NonDegenerateSize};
+        if (mode == SizeMode::FullyDegenerate) {
+          size = Size{0.0f, 0.0f};
+        } else if (mode == SizeMode::EdgeDegenerate) {
+          size = Size{0.0f, 60.0f};
+        }
+        ellipse->setSize(size);
+        return ellipse;
+      }
+      default:
+        return nullptr;
+    }
+  };
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+  std::vector<std::shared_ptr<VectorElement>> contents = {};
+
+  for (int row = 0; row < RowCount; ++row) {
+    for (int col = 0; col < ColCount; ++col) {
+      const auto& config = columns[col];
+      auto shape = makeShape(row, config.size);
+      if (shape == nullptr) {
+        continue;
+      }
+      auto fill = MakeFillStyle(FillColor);
+      auto stroke = StrokeStyle::Make(SolidColor::Make(StrokeColor));
+      stroke->setStrokeWidth(config.strokeWidth);
+      stroke->setLineJoin(config.join);
+      stroke->setLineCap(config.cap);
+      stroke->setStrokeAlign(StrokeAlign::Outside);
+      if (config.dashed) {
+        stroke->setDashes({config.dashLength, config.dashGap});
+        stroke->setDashOffset(config.dashLength * 0.5f);
+        stroke->setDashAdaptive(true);
+      }
+      auto group = VectorGroup::Make();
+      // Shift columns starting from the 3rd one rightward so the wide outside-stroke geometry
+      // of column 2 (and the dense row-3 stars in subsequent cols) stays inside its own cell
+      // band. Without this gap, large square-cap strokes from adjacent cells overlap visibly.
+      auto extraShift = col >= 2 ? ExtraColShift : 0.0f;
+      group->setPosition(
+          {col * CellSize + CellSize * 0.5f + extraShift, row * CellSize + CellSize * 0.5f});
+      group->setElements({shape, fill, stroke});
+      contents.push_back(group);
+    }
+  }
+
+  vectorLayer->setContents(contents);
+
+  constexpr int Padding = 20;
+  auto width = static_cast<int>(std::ceil(CellSize * ColCount + ExtraColShift + Padding * 2));
+  auto height = static_cast<int>(std::ceil(CellSize * RowCount + Padding * 2));
+  vectorLayer->setMatrix(Matrix::MakeTrans(Padding, Padding));
+
+  auto background = SolidLayer::Make();
+  background->setColor(Color::FromRGBA(46, 46, 46, 255));
+  background->setWidth(static_cast<float>(width));
+  background->setHeight(static_cast<float>(height));
+  displayList->root()->addChild(background);
+  displayList->root()->addChild(vectorLayer);
+
+  auto surface = Surface::Make(context, width, height);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/DegenerateStroke_FigmaRefer"));
+}
+
+// Temporary probe: isolated render of DegenerateStroke_FigmaRefer r3c3 (Polystar Star n=5,
+// FullyDegenerate R=r=0, Butt cap, Miter join, SW=40, solid) at 600x600 so we can inspect
+// whether the upper-pair edges are exactly horizontal.
+TGFX_TEST(VectorLayerTest, DegenerateStroke_R3C3_Probe) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr int Size = 600;
+  auto surface = Surface::Make(context, Size, Size);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto background = SolidLayer::Make();
+  background->setColor(Color::FromRGBA(46, 46, 46, 255));
+  background->setWidth(static_cast<float>(Size));
+  background->setHeight(static_cast<float>(Size));
+  displayList->root()->addChild(background);
+
+  auto vectorLayer = VectorLayer::Make();
+  auto star = Polystar::Make();
+  star->setPolystarType(PolystarType::Star);
+  star->setPointCount(5);
+  star->setOuterRadius(0.0f);
+  star->setInnerRadius(0.0f);
+  auto fill = MakeFillStyle(Color::FromRGBA(9, 0, 246, 255));
+  auto stroke = StrokeStyle::Make(SolidColor::Make(Color::White()));
+  stroke->setStrokeWidth(40.0f);
+  stroke->setLineCap(LineCap::Butt);
+  stroke->setLineJoin(LineJoin::Miter);
+  stroke->setStrokeAlign(StrokeAlign::Outside);
+
+  auto group = VectorGroup::Make();
+  group->setPosition({Size * 0.5f, Size * 0.5f});
+  group->setElements({star, fill, stroke});
+  vectorLayer->setContents({group});
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/DegenerateStroke_R3C3_Probe"));
+}
+
+// Temporary probe: render Polystar Star with pointCount = 5, 6, 7, 8, 9 all with FullyDegenerate
+// R=r=0, Butt cap, Miter join, SW=40, solid, so we can inspect how the Polystar fallback
+// behaves across point counts.
+TGFX_TEST(VectorLayerTest, DegenerateStroke_HighPointCount_Probe) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr int CellSize = 400;
+  constexpr int Counts[] = {5, 6, 7, 8, 9};
+  constexpr int CountsSize = sizeof(Counts) / sizeof(Counts[0]);
+  const int width = CellSize * CountsSize;
+  const int height = CellSize;
+  auto surface = Surface::Make(context, width, height);
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto background = SolidLayer::Make();
+  background->setColor(Color::FromRGBA(46, 46, 46, 255));
+  background->setWidth(static_cast<float>(width));
+  background->setHeight(static_cast<float>(height));
+  displayList->root()->addChild(background);
+
+  auto vectorLayer = VectorLayer::Make();
+  std::vector<std::shared_ptr<VectorElement>> contents;
+  for (int i = 0; i < CountsSize; ++i) {
+    auto star = Polystar::Make();
+    star->setPolystarType(PolystarType::Star);
+    star->setPointCount(static_cast<float>(Counts[i]));
+    star->setOuterRadius(0.0f);
+    star->setInnerRadius(0.0f);
+    auto fill = MakeFillStyle(Color::FromRGBA(9, 0, 246, 255));
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::White()));
+    stroke->setStrokeWidth(40.0f);
+    stroke->setLineCap(LineCap::Butt);
+    stroke->setLineJoin(LineJoin::Miter);
+    stroke->setStrokeAlign(StrokeAlign::Outside);
+    auto group = VectorGroup::Make();
+    group->setPosition({i * CellSize + CellSize * 0.5f, CellSize * 0.5f});
+    group->setElements({star, fill, stroke});
+    contents.push_back(group);
+  }
+  vectorLayer->setContents(contents);
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/DegenerateStroke_HighPointCount_Probe"));
+}
+
+// Temporary probe: isolated render of DegenerateStroke_FigmaRefer r4c9 (Ellipse EdgeDegenerate
+// 0x200, Square cap, Bevel join, SW=80, dashed 10/100, dashOffset=5). Larger size and stroke
+// make it easy to see whether the "round" top is coming from the path or from the cap geometry.
+TGFX_TEST(VectorLayerTest, DegenerateStroke_R4C9_Probe) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr int Size = 600;
+  auto surface = Surface::Make(context, Size, Size);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto background = SolidLayer::Make();
+  background->setColor(Color::FromRGBA(46, 46, 46, 255));
+  background->setWidth(static_cast<float>(Size));
+  background->setHeight(static_cast<float>(Size));
+  displayList->root()->addChild(background);
+
+  auto vectorLayer = VectorLayer::Make();
+  auto ellipse = Ellipse::Make();
+  ellipse->setSize({0.0f, 200.0f});
+  auto fill = MakeFillStyle(Color::FromRGBA(9, 0, 246, 255));
+  auto stroke = StrokeStyle::Make(SolidColor::Make(Color::White()));
+  stroke->setStrokeWidth(80.0f);
+  stroke->setLineCap(LineCap::Square);
+  stroke->setLineJoin(LineJoin::Bevel);
+  stroke->setStrokeAlign(StrokeAlign::Outside);
+  stroke->setDashes({10.0f, 100.0f});
+  stroke->setDashOffset(5.0f);
+  stroke->setDashAdaptive(true);
+
+  auto group = VectorGroup::Make();
+  group->setPosition({Size * 0.5f, Size * 0.5f});
+  group->setElements({ellipse, fill, stroke});
+  vectorLayer->setContents({group});
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/DegenerateStroke_R4C9_Probe"));
 }
 
 }  // namespace tgfx

@@ -25,6 +25,13 @@
 
 namespace tgfx {
 
+// Skip the boolean op for outside-align stroke when the original shape's bounds are sub-pixel
+// thin (a degenerate-fallback rectangle/ellipse can have one axis at 5e-3). Skia PathOps is
+// numerically unstable on such input and may emit spurious diagonals visualized as spikes.
+// At sub-pixel scale the original shape is invisible anyway, so omitting the Difference is
+// visually harmless.
+static constexpr float MinBoundExtentForBooleanOp = 0.5f;
+
 static float BlendStrokeWidth(float base, const GlyphStyle& style) {
   if (style.strokeWidthFactor <= 0.0f) {
     return base;
@@ -156,6 +163,13 @@ class StrokePainter : public Painter {
       return nullptr;
     }
     auto op = strokeAlign == StrokeAlign::Inside ? PathOp::Intersect : PathOp::Difference;
+    if (op == PathOp::Difference && originalShape != nullptr) {
+      auto bounds = originalShape->getBounds();
+      if (bounds.width() < MinBoundExtentForBooleanOp ||
+          bounds.height() < MinBoundExtentForBooleanOp) {
+        return shape;
+      }
+    }
     return Shape::Merge(std::move(shape), std::move(originalShape), op);
   }
 };
