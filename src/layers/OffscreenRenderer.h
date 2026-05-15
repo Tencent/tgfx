@@ -26,7 +26,6 @@ namespace tgfx {
 
 class Canvas;
 class Image;
-class ImageFilter;
 class Layer;
 class Surface;
 
@@ -54,14 +53,13 @@ class OffscreenRenderer {
   //     subtree. Requires a GPU context.
   //   - Picture: default / fallback. Cheaper; backdrop styles are dropped on this path because
   //     no surface is available for sub bg sources to sample.
-  static OffscreenResult RenderContentOnSurface(
-      Layer* layer, const DrawArgs& args, std::shared_ptr<Surface> surface, const Matrix& density,
-      const Rect& imageClip, const std::shared_ptr<ImageFilter>& imageFilter,
-      const std::optional<Rect>& clipBounds, const Rect& inputBounds, const Matrix& contentMatrix);
-  static OffscreenResult RenderContentOnPicture(Layer* layer, const DrawArgs& args,
+  static OffscreenResult RenderContentOnSurface(Layer* layer, const DrawArgs& args,
+                                                std::shared_ptr<Surface> surface,
                                                 const Matrix& density, const Rect& imageClip,
-                                                const std::shared_ptr<ImageFilter>& imageFilter,
-                                                const std::optional<Rect>& clipBounds);
+                                                const Rect& inputBounds,
+                                                const Matrix& contentMatrix);
+  static OffscreenResult RenderContentOnPicture(Layer* layer, const DrawArgs& args,
+                                                const Matrix& density, const Rect& imageClip);
 
   // Two backing variants for renderPassThrough. Same split rationale as renderContent; both
   // seed the parent backdrop first so the pass-through subtree composes on top.
