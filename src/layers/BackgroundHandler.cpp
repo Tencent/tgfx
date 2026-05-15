@@ -312,6 +312,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       return;
     }
     auto& cursor = readCursors[key];
+    DEBUG_ASSERT(cursor < it->second.size() && "capture/consume push-pop count mismatch");
     if (cursor >= it->second.size()) {
       return;
     }

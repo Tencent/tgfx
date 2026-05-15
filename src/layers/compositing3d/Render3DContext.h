@@ -71,9 +71,11 @@ class Render3DContext : public Layer3DContext {
                                      BackgroundSnapshotMap* snapshots, const Matrix& localToWorld);
   // Snapshot the outer canvas and prime the compositor target with it so in-subtree
   // BackgroundBlur dispatches can sample "outside the 3D subtree" content as part of their
-  // backdrop. Silently no-ops when the outer canvas has no surface or the snapshot can't be
-  // remapped into compositor pixel space.
-  void primeCompositorFromOuterCanvas(Canvas* outerCanvas);
+  // backdrop. Returns true on success; returns false (with a LOGW for the no-surface case)
+  // when the outer canvas has no surface or the snapshot can't be remapped into compositor
+  // pixel space — the caller must skip compositorSource construction so blur falls back
+  // cleanly rather than consuming an un-primed compositor.
+  bool primeCompositorFromOuterCanvas(Canvas* outerCanvas);
 
   std::shared_ptr<Context3DCompositor> _compositor = nullptr;
   std::vector<PendingNode> _pendingNodes = {};

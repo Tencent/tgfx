@@ -103,8 +103,9 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
   // BackgroundBlur dispatches inside the subtree see two layers of backdrop: outer-canvas content
   // (primed once before the BSP loop into the compositor target) and intra-subtree fragments
   // accumulated as the loop runs. Both contribute via the parent-source path below.
+  bool primedFromOuterCanvas = false;
   if (_subtreeNeedsBackdrop) {
-    primeCompositorFromOuterCanvas(canvas);
+    primedFromOuterCanvas = primeCompositorFromOuterCanvas(canvas);
   }
 
   // Each fragment raster is conceptually a sub-offscreen of an outer Background-aware draw, so we
@@ -115,9 +116,8 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
   // through BackgroundCapturer::createSubHandler with no 3D-specific code at all.
   std::shared_ptr<BackgroundSource> compositorSource;
   BackgroundSnapshotMap* outerSnapshots = nullptr;
-  bool capturePass = args.backgroundHandler != nullptr && args.backgroundHandler->isCapturer();
-  if (_subtreeNeedsBackdrop && capturePass) {
-    auto* outerCapturer = static_cast<BackgroundCapturer*>(args.backgroundHandler);
+  auto* outerCapturer = args.backgroundHandler ? args.backgroundHandler->asCapturer() : nullptr;
+  if (_subtreeNeedsBackdrop && primedFromOuterCanvas && outerCapturer != nullptr) {
     outerSnapshots = outerCapturer->snapshotMap();
     Matrix compositorImageMatrix = Matrix::MakeScale(1.0f / _contentScale, 1.0f / _contentScale);
     compositorImageMatrix.preTranslate(_renderRect.left, _renderRect.top);
@@ -142,7 +142,6 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
     layerHasBackgroundStyle.emplace(node.layer, node.hasBackgroundStyle);
   }
   DrawArgs leafArgs = args;
-  leafArgs.opaqueContext = nullptr;
 
   for (auto* fragment : fragments) {
     auto* layer = fragment->layer();
@@ -236,19 +235,20 @@ std::shared_ptr<Image> Render3DContext::rasterLayer(
   return surface->makeImageSnapshot();
 }
 
-void Render3DContext::primeCompositorFromOuterCanvas(Canvas* outerCanvas) {
+bool Render3DContext::primeCompositorFromOuterCanvas(Canvas* outerCanvas) {
   auto* outerSurface = outerCanvas->getSurface();
   if (outerSurface == nullptr) {
-    return;
+    LOGE("primeCompositorFromOuterCanvas: outer canvas has no surface, 3D backdrop is unavailable");
+    return false;
   }
   auto outerSnapshot = outerSurface->makeImageSnapshot();
   if (outerSnapshot == nullptr) {
-    return;
+    return false;
   }
   auto targetWidth = static_cast<int>(_renderRect.width());
   auto targetHeight = static_cast<int>(_renderRect.height());
   if (targetWidth <= 0 || targetHeight <= 0) {
-    return;
+    return false;
   }
   // Map outer-device pixels into compositor pixel space:
   //   compositor pixel → outer canvas-local: Scale(1/contentScale).preTranslate(rr.tl)
@@ -258,19 +258,20 @@ void Render3DContext::primeCompositorFromOuterCanvas(Canvas* outerCanvas) {
   compositorToOuterDevice.preTranslate(_renderRect.left, _renderRect.top);
   Matrix outerDeviceToCompositor = Matrix::I();
   if (!compositorToOuterDevice.invert(&outerDeviceToCompositor)) {
-    return;
+    return false;
   }
   PictureRecorder recorder = {};
   recorder.beginRecording()->drawImage(std::move(outerSnapshot));
   auto picture = recorder.finishRecordingAsPicture();
   if (picture == nullptr) {
-    return;
+    return false;
   }
   auto primeImage = Image::MakeFrom(std::move(picture), targetWidth, targetHeight,
                                     &outerDeviceToCompositor, _colorSpace);
   if (primeImage != nullptr) {
     _compositor->primeWithImage(primeImage);
   }
+  return true;
 }
 
 }  // namespace tgfx

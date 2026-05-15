@@ -43,6 +43,7 @@ Layer3DContext::Layer3DContext(const Rect& renderRect, float contentScale,
 
 void Layer3DContext::addLayer(Layer* layer, const Matrix3D& transform, float alpha,
                               LayerDrawFunc drawFunc) {
+  DEBUG_ASSERT(_drawFunc == nullptr || _drawFunc == drawFunc);
   _drawFunc = drawFunc;
   collectNodes(layer, transform, alpha, /*depth=*/0);
 }

@@ -63,7 +63,6 @@ void Opaque3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
   opaqueImages.reserve(_pendingNodes.size());
 
   DrawArgs leafArgs = args;
-  leafArgs.opaqueContext = nullptr;
   leafArgs.backgroundHandler = BackgroundHandler::NoOp();
 
   for (const auto& node : _pendingNodes) {

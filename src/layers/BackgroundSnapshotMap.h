@@ -82,6 +82,15 @@ struct BackgroundSnapshotKeyHash {
  * capture and reusing it in consume avoids redundant intermediate renders. LayerStyleSource is
  * not list-ised because, even when a layer is split into multiple fragments, the source is
  * built at most once and read N times — list semantics would offer no value here.
+ *
+ * Consumers (BackgroundConsumer) read the snapshots vector through their own readCursors state
+ * (per-consumer, stored on the consumer itself), not through the map. This is why callers that
+ * only need to hand a snapshot map to a consumer can pass a const pointer to the map while the
+ * consumer still advances its non-const cursor — the cursor is not on the map. It also explains
+ * why some call sites (e.g. DisplayList::drawTileTask) pass BackgroundSnapshotMap* as non-const
+ * despite not writing snapshots: the consumer's cursor state is co-located with the consumer,
+ * not the map, but the consumer is constructed with a mutable pointer so it can read the vector
+ * contents through a non-const path.
  */
 struct BackgroundSnapshotMap {
   std::unordered_map<BackgroundSnapshotKey, std::vector<BackgroundSnapshotEntry>,

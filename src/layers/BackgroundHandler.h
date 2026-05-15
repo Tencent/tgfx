@@ -27,6 +27,7 @@
 
 namespace tgfx {
 
+class BackgroundCapturer;
 class BackgroundSource;
 class Canvas;
 class DrawArgs;
@@ -55,12 +56,10 @@ class BackgroundHandler {
   virtual void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                                    LayerStyle* style, const LayerStyleSource* source) = 0;
 
-  // Returns true when this handler participates in the capture pass (i.e. writes snapshots into
-  // the BackgroundSnapshotMap). 3D subtrees consult this to decide whether their per-fragment
-  // raster should bind a sub-handler that writes the composed backdrop into the same snapshot
-  // map. Default false; BackgroundCapturer (and its derivatives) override to true.
-  virtual bool isCapturer() const {
-    return false;
+  // Returns this handler as a BackgroundCapturer pointer, or nullptr if it is not one.
+  // Replaces isCapturer() + static_cast with a single type-safe query that the compiler enforces.
+  virtual BackgroundCapturer* asCapturer() {
+    return nullptr;
   }
 
   // Returns true when descendants of `layer` should render onto a real Surface so a sub
@@ -133,8 +132,8 @@ class BackgroundCapturer : public BackgroundHandler {
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                            LayerStyle* style, const LayerStyleSource* source) override;
 
-  bool isCapturer() const override {
-    return true;
+  BackgroundCapturer* asCapturer() override {
+    return this;
   }
 
   bool needsSurface(Layer* layer) const override;
