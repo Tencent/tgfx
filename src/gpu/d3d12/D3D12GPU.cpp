@@ -207,7 +207,12 @@ bool D3D12GPU::isFormatRenderable(PixelFormat format) const {
                                               sizeof(formatSupport)))) {
     return false;
   }
-  return (formatSupport.Support1 & D3D12_FORMAT_SUPPORT1_RENDER_TARGET) != 0;
+  // Vulkan/Metal back-ends report any colour or depth-stencil attachment format as renderable.
+  // Match that language so callers using a backend-agnostic gate (e.g. createTexture's
+  // RENDER_ATTACHMENT pre-check) work uniformly when the format happens to be depth-stencil.
+  constexpr UINT attachmentMask =
+      D3D12_FORMAT_SUPPORT1_RENDER_TARGET | D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL;
+  return (formatSupport.Support1 & attachmentMask) != 0;
 }
 
 std::shared_ptr<GPUBuffer> D3D12GPU::createBuffer(size_t size, uint32_t usage) {
