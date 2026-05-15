@@ -11,6 +11,8 @@
 #include "gtest/gtest.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/CustomTypeface.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -29,6 +31,8 @@
 #include "tgfx/layers/vectors/ShapePath.h"
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/StrokeStyle.h"
+#include "tgfx/layers/vectors/Text.h"
+#include "tgfx/layers/vectors/VectorGroup.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "utils/TestUtils.h"
 
@@ -1381,6 +1385,116 @@ TGFX_TEST(StrokeTest, DashConsistencyBetweenVectorAndShapeLayer) {
   displayList.render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/DashConsistencyBetweenVectorAndShapeLayer"));
+}
+
+// Wraps an SVG path as a glyph of a custom PathUserTypeface, then strokes it through the text
+// rendering pipeline (TextBlob -> drawTextBlob) under different zoom scales and stroke widths.
+// Guards against a regression where the stroke width was effectively scaled twice when the canvas
+// had a non-identity zoom: ApplyStroke ran on the design-space path before the scaler's internal
+// Matrix::MakeScale(textScale) transform, while the caller had already multiplied the stroke
+// width by maxScale. The double scaling produced over-thick strokes that swallowed thin glyph
+// details (or vanishingly thin strokes) and varied with the canvas scale.
+TGFX_TEST(StrokeTest, StrokePathTypeface) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto path = SVGPathParser::FromSVGString(
+      "M4.128 -9.636L6.156 -9.636L6.264 -9.66L6.804 -9.384Q6.624 -8.628 6.384 -7.728Q6.156 -6.84 "
+      "5.904 -5.916Q6.396 -5.076 6.624 -4.44Q6.864 -3.804 6.864 -3.24Q6.864 -2.76 6.756 -2.34Q6.66 "
+      "-1.932 6.432 -1.74Q6.228 -1.56 5.916 -1.536Q5.784 -1.512 5.604 -1.5Q5.436 -1.5 5.268 "
+      "-1.512Q5.256 -1.668 5.208 -1.872Q5.16 -2.088 5.064 -2.244Q5.232 -2.232 5.376 -2.22Q5.52 "
+      "-2.22 5.616 -2.22Q5.796 -2.22 5.916 -2.316Q6.036 -2.412 6.084 -2.688Q6.132 -2.964 6.132 "
+      "-3.264Q6.132 -3.792 5.916 -4.38Q5.7 -4.98 5.208 -5.832Q5.412 -6.648 5.58 -7.416Q5.76 -8.184 "
+      "5.892 -8.844L4.86 -8.844L4.86 0.948L4.128 0.948L4.128 -9.636ZM0.888 -9.132L3.42 -9.132L3.42 "
+      "-2.244L1.608 -2.244L1.608 -1.068L0.888 -1.068L0.888 -9.132ZM1.608 -8.256L1.608 -3.108L2.7 "
+      "-3.108L2.7 -8.256L1.608 -8.256ZM7.008 -9.516L11.52 -9.516L11.52 -8.664L10.932 -8.664L10.932 "
+      "-0.228Q10.932 0.144 10.836 0.36Q10.752 0.588 10.5 0.696Q10.248 0.804 9.828 0.828Q9.408 "
+      "0.864 "
+      "8.784 0.864Q8.772 0.684 8.676 0.42Q8.592 0.168 8.496 -0.012Q9 0.012 9.396 0.012Q9.804 0.012 "
+      "9.948 0Q10.188 0 10.188 -0.24L10.188 -8.664L7.008 -8.664L7.008 -9.516ZM7.836 -3.06L8.796 "
+      "-3.06L8.796 -6.48L7.836 -6.48L7.836 -3.06ZM7.212 -7.296L9.444 -7.296L9.444 -2.244L7.836 "
+      "-2.244L7.836 -1.416L7.212 -1.416L7.212 -7.296Z");
+  ASSERT_TRUE(path != nullptr);
+
+  // Use unitsPerEm == FontSize so the glyph is rendered 1:1 in glyph design space, matching the
+  // raw path coordinates. Visual scaling is driven by per-cell layer matrices.
+  constexpr int UnitsPerEm = 12;
+  constexpr float FontSize = 12.0f;
+
+  PathTypefaceBuilder builder(UnitsPerEm);
+  auto glyphID = builder.addGlyph(*path, static_cast<float>(UnitsPerEm));
+  ASSERT_TRUE(glyphID > 0);
+  auto typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+
+  Font font(typeface, FontSize);
+  GlyphID glyphs[] = {glyphID};
+  Point positions[] = {{0.0f, 0.0f}};
+  auto textBlob = TextBlob::MakeFrom(glyphs, positions, 1, font);
+  ASSERT_TRUE(textBlob != nullptr);
+  auto glyphBounds = textBlob->getBounds();
+
+  // Test matrix: rows are zoom scales, columns are stroke widths (in surface pixels).
+  const std::vector<float> scales = {0.5f, 1.0f, 2.0f, 4.0f};
+  const std::vector<float> strokeWidths = {0.5f, 1.0f, 2.0f, 4.0f};
+
+  // Each cell is sized to fit the largest scale, leaving room around the glyph for thick strokes.
+  constexpr float CellPadding = 12.0f;
+  const float maxScale = scales.back();
+  const float cellWidth = glyphBounds.width() * maxScale + CellPadding * 2.0f;
+  const float cellHeight = glyphBounds.height() * maxScale + CellPadding * 2.0f;
+
+  const auto columnCount = static_cast<int>(strokeWidths.size());
+  const auto rowCount = static_cast<int>(scales.size());
+  const auto surfaceWidth = static_cast<int>(cellWidth * static_cast<float>(columnCount) + 0.5f);
+  const auto surfaceHeight = static_cast<int>(cellHeight * static_cast<float>(rowCount) + 0.5f);
+
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear(Color::White());
+
+  DisplayList displayList;
+  for (int row = 0; row < rowCount; ++row) {
+    const float scale = scales[static_cast<size_t>(row)];
+    for (int col = 0; col < columnCount; ++col) {
+      const float strokeWidth = strokeWidths[static_cast<size_t>(col)];
+
+      auto text = Text::Make(textBlob);
+      ASSERT_TRUE(text != nullptr);
+
+      auto strokeStyle = StrokeStyle::Make(SolidColor::Make(Color::Red()));
+      ASSERT_TRUE(strokeStyle != nullptr);
+      strokeStyle->setStrokeWidth(strokeWidth);
+      strokeStyle->setStrokeAlign(StrokeAlign::Center);
+
+      auto group = VectorGroup::Make();
+      group->setElements({text, strokeStyle});
+
+      auto layer = VectorLayer::Make();
+      layer->setContents({group});
+
+      // Center the scaled glyph inside its cell. The layer matrix scales the glyph and translates
+      // so the top-left of the scaled glyph bounds aligns to the cell's top-left + padding.
+      const float scaledWidth = glyphBounds.width() * scale;
+      const float scaledHeight = glyphBounds.height() * scale;
+      const float cellOriginX = static_cast<float>(col) * cellWidth;
+      const float cellOriginY = static_cast<float>(row) * cellHeight;
+      const float offsetX =
+          cellOriginX + (cellWidth - scaledWidth) * 0.5f - glyphBounds.left * scale;
+      const float offsetY =
+          cellOriginY + (cellHeight - scaledHeight) * 0.5f - glyphBounds.top * scale;
+
+      auto matrix = Matrix::MakeScale(scale, scale);
+      matrix.postTranslate(offsetX, offsetY);
+      layer->setMatrix(matrix);
+
+      displayList.root()->addChild(layer);
+    }
+  }
+  displayList.render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/StrokePathTypeface"));
 }
 
 }  // namespace tgfx

@@ -20,6 +20,7 @@
 #include "UserScalerContext.h"
 #include "core/PathRasterizer.h"
 #include "core/utils/FauxBoldScale.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Shape.h"
 
@@ -125,7 +126,22 @@ class PathUserScalerContext final : public UserScalerContext {
       shape = Shape::ApplyStroke(shape, boldStroke.get());
       shape = Shape::Merge(Shape::MakeFrom(pathProvider), std::move(shape));
     }
-    shape = Shape::ApplyStroke(std::move(shape), stroke);
+    // The stroke parameter is already scaled by matrix.maxScale in the caller (GetScaledStroke).
+    // Since ApplyStroke runs before the upcoming Matrix::MakeScale(textScale) transform, we must
+    // pre-shrink the stroke width so the downstream matrix re-applies the correct visual width.
+    //
+    // NOTE: dividing by textScale is exact only when textScale equals the caller's maxScale, which
+    // holds when unitsPerEm == originalFontSize. Custom typefaces created with unitsPerEm !=
+    // originalFontSize (e.g. unitsPerEm=1024 with fontSize=16) will have textScale != maxScale and
+    // this compensation will be off; revisit if such usage is added.
+    std::unique_ptr<Stroke> adjustedStroke;
+    const Stroke* strokeToApply = stroke;
+    if (stroke != nullptr && !FloatNearlyEqual(textScale, 1.0f)) {
+      adjustedStroke = std::make_unique<Stroke>(*stroke);
+      adjustedStroke->width /= textScale;
+      strokeToApply = adjustedStroke.get();
+    }
+    shape = Shape::ApplyStroke(std::move(shape), strokeToApply);
     shape = Shape::ApplyMatrix(std::move(shape), matrix);
     auto rasterizer = PathRasterizer::MakeFrom(width, height, std::move(shape), true,
 #ifdef TGFX_USE_TEXT_GAMMA_CORRECTION
