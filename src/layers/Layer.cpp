@@ -925,12 +925,14 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     Matrix backgroundMatrix = canvas->getMatrix();
     Rect drawRect = backgroundMatrix.mapRect(rectForDraw);
     if (_root != nullptr) {
-      // Capture replays from _root, accumulating ancestor matrices on bgCanvas. To keep bgSurface
-      // sized just for self.bounds + outset, prefix the canvas matrix with invert(globalMatrix)
-      // so the ancestor chain folds into self.local while still respecting any zoom/translate
-      // already on the outer canvas (otherwise blur radius would lose the outer scale).
+      // Capture replays from _root, so bgCanvas accumulates globalMatrix when reaching this
+      // layer. But Layer::draw() itself paints via drawLayer without concatenating globalMatrix,
+      // so the device position is just outerCanvas * self-local. Compose the viewMatrix as
+      // outerCanvas * invert(globalMatrix) so that surfaceMatrix * globalMatrix collapses back
+      // to outerCanvas, aligning capture and consume in the same device-pixel space.
+      // drawRect stays at outerCanvas.mapRect(rectForDraw) (the device-pixel layer rect)
+      // computed above, since BackgroundSource uses it to size the surface.
       backgroundMatrix.preConcat(globalToLocalMatrix.asMatrix());
-      drawRect = backgroundMatrix.mapRect(rectForDraw);
     }
     if (auto bgSource = createBackgroundSource(context, drawRect, backgroundMatrix,
                                                rectForDraw == bounds, args.dstColorSpace)) {
