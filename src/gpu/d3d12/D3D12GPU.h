@@ -36,6 +36,7 @@ class Compiler;
 namespace tgfx {
 
 class D3D12CommandQueue;
+class D3D12MipmapGenerator;
 class D3D12Resource;
 class D3D12Semaphore;
 class D3D12Texture;
@@ -191,6 +192,14 @@ class D3D12GPU : public GPU {
    */
   void dumpDeviceRemovedExtendedData(const char* tag);
 
+  /**
+   * Returns the singleton compute-shader mipmap generator, creating it on first use. The
+   * generator is owned by the GPU because its root signature and pipeline state can be reused
+   * across every D3D12CommandEncoder that asks to generate mipmaps. Returns nullptr if compute
+   * shader compilation or pipeline creation failed.
+   */
+  D3D12MipmapGenerator* mipmapGenerator();
+
  private:
   /// Single entry point for marking the context lost. Sets the flag, dumps DRED diagnostics on
   /// the first transition (subsequent calls are silent), and short-circuits all wait paths.
@@ -215,6 +224,9 @@ class D3D12GPU : public GPU {
   std::list<D3D12Resource*> resources = {};
   std::shared_ptr<ReturnQueue> returnQueue = ReturnQueue::Make();
   std::unordered_map<uint32_t, std::shared_ptr<Sampler>> samplerCache = {};
+  // Lazily-initialised compute pipeline used by D3D12CommandEncoder::generateMipmapsForTexture.
+  // Built on first use so backends that never request mipmaps don't pay the shader-compile cost.
+  std::unique_ptr<D3D12MipmapGenerator> _mipmapGenerator = nullptr;
 
   // Submission state. Following the Vulkan model, the GPU owns the frame fence and the inflight
   // queue; D3D12CommandQueue is a thin coordination layer that builds a SubmitRequest and hands

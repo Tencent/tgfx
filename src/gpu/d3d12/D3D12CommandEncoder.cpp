@@ -21,6 +21,7 @@
 #include "D3D12CommandBuffer.h"
 #include "D3D12Defines.h"
 #include "D3D12GPU.h"
+#include "D3D12MipmapGenerator.h"
 #include "D3D12RenderPass.h"
 #include "D3D12Texture.h"
 #include "core/utils/Log.h"
@@ -272,15 +273,148 @@ void D3D12CommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> tex
   if (!texture) {
     return;
   }
-  // D3D12 has no built-in equivalent to vkCmdBlitImage. A correct implementation requires either
-  // a compute shader doing per-level downsampling or a small graphics pipeline. We log a warning
-  // here so the omission is visible; the few rendering paths that depend on mip generation will
-  // need follow-up work.
-  if (texture->mipLevelCount() > 1) {
-    LOGE(
-        "D3D12CommandEncoder::generateMipmapsForTexture: mipmap generation is not yet "
-        "implemented for the D3D12 backend.");
+  auto d3d12Tex = std::static_pointer_cast<D3D12Texture>(texture);
+  auto mipCount = static_cast<uint32_t>(d3d12Tex->mipLevelCount());
+  if (mipCount <= 1) {
+    return;
   }
+
+  auto* generator = _gpu->mipmapGenerator();
+  if (generator == nullptr || !generator->isReady()) {
+    static bool warned = false;
+    if (!warned) {
+      LOGE("D3D12CommandEncoder::generateMipmapsForTexture: mipmap generator unavailable, "
+           "skipping (subsequent calls silently no-op).");
+      warned = true;
+    }
+    return;
+  }
+
+  auto device = _gpu->device();
+  auto cmd = session.commandList.Get();
+  auto resource = d3d12Tex->d3d12Resource();
+  auto dxgiFormat = static_cast<DXGI_FORMAT>(d3d12Tex->dxgiFormat());
+
+  retainResource(d3d12Tex);
+
+  // Allocate a single shader-visible CBV/SRV/UAV heap for the whole chain. We need (mipCount-1)
+  // SRV slots and (mipCount-1) UAV slots arranged as alternating pairs so each level can bind a
+  // descriptor table containing one descriptor.
+  uint32_t descriptorsPerLevel = 2;
+  uint32_t totalDescriptors = (mipCount - 1) * descriptorsPerLevel;
+  D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+  heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+  heapDesc.NumDescriptors = totalDescriptors;
+  heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+  ComPtr<ID3D12DescriptorHeap> mipHeap = nullptr;
+  if (FAILED(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&mipHeap)))) {
+    LOGE("D3D12CommandEncoder::generateMipmapsForTexture: failed to create descriptor heap.");
+    return;
+  }
+  auto descSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+  // Save the previous descriptor-heap binding so the surrounding render pass (if any) doesn't
+  // observe our mipmap heap. The compute root signature is independent of the graphics root
+  // signature, but SetDescriptorHeaps changes runtime state for both.
+  ID3D12DescriptorHeap* heaps[] = {mipHeap.Get()};
+  cmd->SetDescriptorHeaps(1, heaps);
+  cmd->SetComputeRootSignature(generator->rootSignature());
+  cmd->SetPipelineState(generator->pipelineState());
+
+  // Move every subresource into NON_PIXEL_SHADER_RESOURCE so the SRV reads in the first iteration
+  // are valid. The current() state is the per-resource state set by previous code (typically
+  // COMMON after a writeTexture / RenderPass end).
+  auto previousState = d3d12Tex->currentState();
+  if (previousState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
+    TransitionResourceState(cmd, resource, previousState,
+                            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+  }
+
+  uint32_t mipWidth = static_cast<uint32_t>(d3d12Tex->width());
+  uint32_t mipHeight = static_cast<uint32_t>(d3d12Tex->height());
+  for (uint32_t i = 0; i < mipCount - 1; i++) {
+    uint32_t outWidth = (mipWidth > 1) ? mipWidth / 2 : 1;
+    uint32_t outHeight = (mipHeight > 1) ? mipHeight / 2 : 1;
+
+    // Transition the destination subresource (mip[i+1]) from NON_PIXEL_SHADER_RESOURCE to
+    // UNORDERED_ACCESS so the compute shader can write to it. Source mip[i] stays in
+    // NON_PIXEL_SHADER_RESOURCE.
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.pResource = resource;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    barrier.Transition.Subresource = i + 1;
+    cmd->ResourceBarrier(1, &barrier);
+
+    // Write the SRV for mip[i] and the UAV for mip[i+1] into the descriptor heap. Each level
+    // occupies two consecutive slots so the table base for the SRV is at index 2i and for the
+    // UAV at 2i+1.
+    D3D12_CPU_DESCRIPTOR_HANDLE srvCpu = mipHeap->GetCPUDescriptorHandleForHeapStart();
+    srvCpu.ptr += static_cast<SIZE_T>(2 * i) * descSize;
+    D3D12_CPU_DESCRIPTOR_HANDLE uavCpu = mipHeap->GetCPUDescriptorHandleForHeapStart();
+    uavCpu.ptr += static_cast<SIZE_T>(2 * i + 1) * descSize;
+    D3D12_GPU_DESCRIPTOR_HANDLE srvGpu = mipHeap->GetGPUDescriptorHandleForHeapStart();
+    srvGpu.ptr += static_cast<UINT64>(2 * i) * descSize;
+    D3D12_GPU_DESCRIPTOR_HANDLE uavGpu = mipHeap->GetGPUDescriptorHandleForHeapStart();
+    uavGpu.ptr += static_cast<UINT64>(2 * i + 1) * descSize;
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = dxgiFormat;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture2D.MostDetailedMip = i;
+    srvDesc.Texture2D.MipLevels = 1;
+    srvDesc.Texture2D.PlaneSlice = 0;
+    srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+    device->CreateShaderResourceView(resource, &srvDesc, srvCpu);
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+    uavDesc.Format = dxgiFormat;
+    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+    uavDesc.Texture2D.MipSlice = i + 1;
+    uavDesc.Texture2D.PlaneSlice = 0;
+    device->CreateUnorderedAccessView(resource, nullptr, &uavDesc, uavCpu);
+
+    // Bind 4 root constants (output mip width, height, 1/width, 1/height) plus the SRV and UAV
+    // tables, then dispatch enough thread groups to cover the destination mip.
+    UINT mipConstants[4];
+    mipConstants[0] = outWidth;
+    mipConstants[1] = outHeight;
+    *reinterpret_cast<float*>(&mipConstants[2]) = 1.0f / static_cast<float>(outWidth);
+    *reinterpret_cast<float*>(&mipConstants[3]) = 1.0f / static_cast<float>(outHeight);
+    cmd->SetComputeRoot32BitConstants(0, 4, mipConstants, 0);
+    cmd->SetComputeRootDescriptorTable(1, srvGpu);
+    cmd->SetComputeRootDescriptorTable(2, uavGpu);
+
+    UINT groupsX =
+        (outWidth + D3D12_MIPMAP_THREAD_GROUP_SIZE - 1) / D3D12_MIPMAP_THREAD_GROUP_SIZE;
+    UINT groupsY =
+        (outHeight + D3D12_MIPMAP_THREAD_GROUP_SIZE - 1) / D3D12_MIPMAP_THREAD_GROUP_SIZE;
+    cmd->Dispatch(groupsX, groupsY, 1);
+
+    // Transition mip[i+1] from UNORDERED_ACCESS back to NON_PIXEL_SHADER_RESOURCE so the next
+    // iteration can use it as the SRV source.
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.Subresource = i + 1;
+    cmd->ResourceBarrier(1, &barrier);
+
+    mipWidth = outWidth;
+    mipHeight = outHeight;
+  }
+
+  // Final transition: every subresource is currently NON_PIXEL_SHADER_RESOURCE. Move the whole
+  // resource back to COMMON so subsequent samplers / RTVs can pick a fresh state on demand,
+  // matching the convention every other code path uses.
+  TransitionResourceState(cmd, resource, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+                          D3D12_RESOURCE_STATE_COMMON);
+  d3d12Tex->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
+
+  // Keep the mipmap-generator descriptor heap alive until the GPU is done; it lives in the
+  // generic descriptor-heap retention list along with the per-render-pass heaps.
+  session.retainedDescriptorHeaps.push_back(std::move(mipHeap));
 }
 
 std::shared_ptr<CommandBuffer> D3D12CommandEncoder::onFinish() {

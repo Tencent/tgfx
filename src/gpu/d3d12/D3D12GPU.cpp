@@ -24,6 +24,7 @@
 #include "D3D12Buffer.h"
 #include "D3D12CommandEncoder.h"
 #include "D3D12CommandQueue.h"
+#include "D3D12MipmapGenerator.h"
 #include "D3D12RenderPipeline.h"
 #include "D3D12Resource.h"
 #include "D3D12Sampler.h"
@@ -270,6 +271,16 @@ std::shared_ptr<RenderPipeline> D3D12GPU::createRenderPipeline(
 std::shared_ptr<CommandEncoder> D3D12GPU::createCommandEncoder() {
   processUnreferencedResources();
   return D3D12CommandEncoder::Make(this);
+}
+
+D3D12MipmapGenerator* D3D12GPU::mipmapGenerator() {
+  if (_mipmapGenerator == nullptr) {
+    _mipmapGenerator = std::unique_ptr<D3D12MipmapGenerator>(new D3D12MipmapGenerator(this));
+    if (!_mipmapGenerator->isReady()) {
+      _mipmapGenerator = nullptr;
+    }
+  }
+  return _mipmapGenerator.get();
 }
 
 int D3D12GPU::getSampleCount(int requestedCount, PixelFormat pixelFormat) const {
@@ -520,6 +531,9 @@ void D3D12GPU::releaseAll(bool releaseGPU) {
     inflightSubmissions.clear();
   }
   samplerCache.clear();
+  // Drop the cached mipmap generator's root signature + PSO before tearing the device down.
+  // Resources retained by inflight submissions have already been released above.
+  _mipmapGenerator = nullptr;
   if (releaseGPU) {
     for (auto& resource : resources) {
       resource->onRelease(this);

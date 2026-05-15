@@ -50,6 +50,11 @@ std::shared_ptr<D3D12Texture> D3D12Texture::Make(D3D12GPU* gpu,
   if (isDepthStencil) {
     resourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
     resourceFlags &= ~D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+  } else if (descriptor.mipLevelCount > 1) {
+    // Mipmapped textures need to be writable from a compute shader so that
+    // generateMipmapsForTexture() can downsample mip[i] -> mip[i+1] via UAV writes. The flag is a
+    // no-op for the basic sampling path and only adds a small driver-internal alignment overhead.
+    resourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
   }
 
   D3D12_HEAP_PROPERTIES heapProperties = {};
