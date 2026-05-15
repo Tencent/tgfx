@@ -82,7 +82,7 @@ static EGLContext CreateContext(EGLContext sharedContext, EGLDisplay eglDisplay,
   return eglContext;
 }
 
-#if defined(_WIN32)
+#if defined(TGFX_USE_ANGLE)
 // Create a fixed-size window surface for ANGLE, as ANGLE can only detect resizes during a swap.
 // https://groups.google.com/g/angleproject/c/j3SF7nVIpD8
 static EGLSurface CreateFixedSizeSurfaceForAngle(EGLNativeWindowType nativeWindow,
@@ -151,7 +151,7 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
                                                EGLContext sharedContext,
                                                std::shared_ptr<ColorSpace> colorSpace) {
   auto eglGlobals = EGLGlobals::Get();
-#if defined(_WIN32)
+#if defined(TGFX_USE_ANGLE)
   auto eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, eglGlobals);
   if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
     LOGE(
@@ -333,17 +333,26 @@ bool EGLDevice::checkGraphicsResetStatus() {
     return false;
   }
   auto status = getGraphicsResetStatus();
-  if (status != GL_NO_ERROR) {
-    graphicsResetStatus = status;
-    LOGE("EGLDevice::checkGraphicsResetStatus() GPU reset detected: status=0x%x", status);
-    handleContextLost();
-    return true;
+  if (status == GL_NO_ERROR) {
+    return false;
   }
-  return false;
+  // The GL_KHR_robustness/GL_EXT_robustness spec restricts the return value to one of the four
+  // constants below. Some drivers (notably Android emulator GPU stubs) return out-of-spec values
+  // such as uninitialized memory, which would otherwise trigger a false context-lost. Treat any
+  // non-spec value as no reset to avoid taking down all contexts on broken drivers.
+  if (status != GL_GUILTY_CONTEXT_RESET && status != GL_INNOCENT_CONTEXT_RESET &&
+      status != GL_UNKNOWN_CONTEXT_RESET) {
+    LOGE("EGLDevice::checkGraphicsResetStatus() ignored out-of-spec status=0x%x", status);
+    return false;
+  }
+  graphicsResetStatus = status;
+  LOGE("EGLDevice::checkGraphicsResetStatus() GPU reset detected: status=0x%x", status);
+  handleContextLost();
+  return true;
 }
 
 bool EGLDevice::recreateSurfaceIfNeeded(EGLNativeWindowType nativeWindow) {
-#if defined(_WIN32)
+#if defined(TGFX_USE_ANGLE)
   if (nativeWindow == nullptr) {
     return true;
   }

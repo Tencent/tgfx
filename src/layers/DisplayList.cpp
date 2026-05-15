@@ -21,6 +21,9 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
+#include "layers/BackgroundHandler.h"
+#include "layers/BackgroundSnapshotMap.h"
+#include "layers/BackgroundSource.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
@@ -346,7 +349,11 @@ void DisplayList::render(Surface* surface, bool autoClear) {
 
 std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) const {
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
-  drawRootLayer(surface, surfaceRect, getViewMatrix(), autoClear);
+  std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
+  if (_root->hasBackgroundStyle()) {
+    snapshotMap = captureBackgrounds(surface, {surfaceRect});
+  }
+  drawRootLayer(surface, surfaceRect, getViewMatrix(), autoClear, snapshotMap.get());
   return {Rect::MakeEmpty()};
 }
 
@@ -393,17 +400,23 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   }
   auto viewMatrix = getViewMatrix();
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
-  std::vector<Rect> drawRects = {};
+  std::vector<Rect> renderRects = {};
   if (cacheChanged || lastZoomScaleInt != _zoomScaleInt || lastContentOffset != _contentOffset) {
-    drawRects = {surfaceRect};
+    renderRects = {surfaceRect};
     lastZoomScaleInt = _zoomScaleInt;
     lastContentOffset = _contentOffset;
   } else {
-    drawRects = MapDirtyRegions(dirtyRegions, viewMatrix, true, &surfaceRect);
+    renderRects = MapDirtyRegions(dirtyRegions, viewMatrix, true, &surfaceRect);
+  }
+  // Pass the full rect list so each replay is scoped to a single rect; otherwise Layers in the
+  // gaps between scattered dirty regions get skipped.
+  std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
+  if (_root->hasBackgroundStyle()) {
+    snapshotMap = captureBackgrounds(surface, renderRects);
   }
   auto canvas = surface->getCanvas();
-  for (auto& drawRect : drawRects) {
-    drawRootLayer(partialCache.get(), drawRect, viewMatrix, true);
+  for (auto& drawRect : renderRects) {
+    drawRootLayer(partialCache.get(), drawRect, viewMatrix, true, snapshotMap.get());
   }
   AutoCanvasRestore restore(canvas);
   canvas->resetMatrix();
@@ -414,7 +427,7 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   }
   static SamplingOptions sampling(FilterMode::Nearest);
   canvas->drawImage(partialCache->makeImageSnapshot(), sampling, &paint);
-  return drawRects;
+  return renderRects;
 }
 
 std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
@@ -431,10 +444,22 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
   }
+  // tileRect is in zoom space; offset by contentOffset to line it up with surface pixel coords.
+  std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
+  if (_root->hasBackgroundStyle()) {
+    std::vector<Rect> captureRects = {};
+    captureRects.reserve(tileTasks.size());
+    for (auto& task : tileTasks) {
+      auto captureRect = task.tileRect();
+      captureRect.offset(_contentOffset.x, _contentOffset.y);
+      captureRects.push_back(captureRect);
+    }
+    snapshotMap = captureBackgrounds(surface, captureRects);
+  }
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   for (auto& task : tileTasks) {
-    drawTileTask(task);
+    drawTileTask(task, snapshotMap.get());
     auto dirtyRect = task.tileRect();
     dirtyRect.offset(_contentOffset.x, _contentOffset.y);
     if (dirtyRect.intersect(surfaceRect)) {
@@ -908,7 +933,7 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
-void DisplayList::drawTileTask(const DrawTask& task) const {
+void DisplayList::drawTileTask(const DrawTask& task, const BackgroundSnapshotMap* snapshots) const {
   auto surface = surfaceCaches[task.sourceIndex()].get();
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
@@ -923,7 +948,7 @@ void DisplayList::drawTileTask(const DrawTask& task) const {
   viewMatrix.postTranslate(offsetX, offsetY);
   auto clipRect = tileRect;
   clipRect.offset(offsetX, offsetY);
-  drawRootLayer(surface, clipRect, viewMatrix, true);
+  drawRootLayer(surface, clipRect, viewMatrix, true, snapshots);
 }
 
 void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface,
@@ -1010,7 +1035,7 @@ void DisplayList::resetCaches() {
 }
 
 void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                                bool autoClear) const {
+                                bool autoClear, const BackgroundSnapshotMap* snapshots) const {
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   auto context = surface->getContext();
@@ -1030,12 +1055,69 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   viewMatrix.invert(&inverse);
   auto renderRect = inverse.mapRect(drawRect);
   renderRect.roundOut();
-  args.renderRect = &renderRect;
-  args.blurBackground =
-      _root->createBackgroundContext(context, drawRect, viewMatrix, false, args.dstColorSpace);
+  std::vector<Rect> renderRectsVec = {renderRect};
+  args.renderRects = &renderRectsVec;
   args.dstColorSpace = surface->colorSpace();
   args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
-  _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
+  // Consume pass: replay snapshots produced by the capture pass. When the tree has no
+  // background-sourced styles, snapshots is null and we fall back to NoOp, which makes
+  // background-sourced styles (if any show up unexpectedly) silently no-op — matching the
+  // contour / 3D subtree semantics.
+  BackgroundConsumer consumer(snapshots);
+  args.backgroundHandler = snapshots ? &consumer : BackgroundHandler::NoOp();
+  _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
+}
+
+std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
+    Surface* surface, const std::vector<Rect>& renderRects) const {
+  DEBUG_ASSERT(surface != nullptr);
+  if (!_root->hasBackgroundStyle()) {
+    return nullptr;
+  }
+  if (renderRects.empty()) {
+    return nullptr;
+  }
+  auto context = surface->getContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto viewMatrix = getViewMatrix();
+  DEBUG_ASSERT(viewMatrix.invertible());
+  // createBackgroundSource takes a surface-pixel-space rect for sizing; BackgroundCapturer::Run
+  // takes world-space renderRects (pre-outset by blur sampling range) for per-rect culling.
+  Matrix inverse = Matrix::I();
+  viewMatrix.invert(&inverse);
+  Rect surfaceUnion = Rect::MakeEmpty();
+  std::vector<Rect> worldRects = {};
+  worldRects.reserve(renderRects.size());
+  for (const auto& drawRect : renderRects) {
+    if (drawRect.isEmpty()) {
+      continue;
+    }
+    surfaceUnion.join(drawRect);
+    auto worldRect = inverse.mapRect(drawRect);
+    worldRect.roundOut();
+    worldRects.push_back(worldRect);
+  }
+  if (worldRects.empty()) {
+    return nullptr;
+  }
+  // Expand by the max blur outset so layers whose bounds sit just outside the dirty rects but
+  // still contribute pixels to the blur sampling region are not culled by the capture pass.
+  for (auto& rect : worldRects) {
+    rect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
+  }
+  DrawArgs args(context);
+  args.dstColorSpace = surface->colorSpace();
+  args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
+  auto bgSource =
+      _root->createBackgroundSource(context, surfaceUnion, viewMatrix, false, args.dstColorSpace);
+  if (bgSource == nullptr) {
+    return nullptr;
+  }
+  auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
+  BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get(), worldRects);
+  return snapshotMap;
 }
 
 void DisplayList::updateMousePosition() {

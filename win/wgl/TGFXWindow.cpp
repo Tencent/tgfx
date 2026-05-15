@@ -1,4 +1,3 @@
-// win/src/TGFXWindow.cpp
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
@@ -361,6 +360,9 @@ void TGFXWindow::draw() {
     return;
   }
   if (surface == nullptr) {
+    if (lastRecording) {
+      context->submit(std::move(lastRecording));
+    }
     surface = tgfx::Surface::MakeFrom(context, tgfxWindow);
   }
   if (surface == nullptr) {

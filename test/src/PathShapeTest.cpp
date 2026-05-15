@@ -25,6 +25,7 @@
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Shape.h"
@@ -195,7 +196,8 @@ TGFX_TEST(PathShapeTest, simpleShape) {
   EXPECT_TRUE(Baseline::Compare(surface, "PathShapeTest/shape"));
 }
 
-static std::vector<Resource*> FindResourceByDomainID(Context* context, uint32_t domainID) {
+TGFX_PRIVATE_ACCESS(static std::vector<Resource*> FindResourceByDomainID(Context* context,
+                                                                         uint32_t domainID) {
   std::vector<Resource*> resources = {};
   auto resourceCache = context->resourceCache();
   for (auto& item : resourceCache->uniqueKeyMap) {
@@ -205,7 +207,7 @@ static std::vector<Resource*> FindResourceByDomainID(Context* context, uint32_t 
     }
   }
   return resources;
-}
+})
 
 TGFX_TEST(PathShapeTest, inversePath) {
   ContextScope scope;
@@ -252,9 +254,9 @@ TGFX_TEST(PathShapeTest, inversePath) {
   canvas->drawPath(path, paint);
   canvas->restore();
   EXPECT_TRUE(Baseline::Compare(surface, "PathShapeTest/inversePath_rect"));
-  auto uniqueKey = PathRef::GetUniqueKey(path);
-  auto cachesBefore = FindResourceByDomainID(context, uniqueKey.domainID());
-  EXPECT_EQ(cachesBefore.size(), 1u);
+  TGFX_PRIVATE_ACCESS(auto uniqueKey = PathRef::GetUniqueKey(path);
+                      auto cachesBefore = FindResourceByDomainID(context, uniqueKey.domainID());
+                      EXPECT_EQ(cachesBefore.size(), 1u));
   canvas->clear();
   canvas->clipPath(clipPath);
   auto shape = Shape::MakeFrom(path);
@@ -262,12 +264,12 @@ TGFX_TEST(PathShapeTest, inversePath) {
   canvas->translate(-50, -50);
   canvas->drawShape(shape, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "PathShapeTest/inversePath_rect"));
-  auto cachesAfter = FindResourceByDomainID(context, uniqueKey.domainID());
-  EXPECT_EQ(cachesAfter.size(), 1u);
-  EXPECT_TRUE(cachesBefore.front() == cachesAfter.front());
+  TGFX_PRIVATE_ACCESS(auto cachesAfter = FindResourceByDomainID(context, uniqueKey.domainID());
+                      EXPECT_EQ(cachesAfter.size(), 1u);
+                      EXPECT_TRUE(cachesBefore.front() == cachesAfter.front()));
 }
 
-TGFX_TEST(PathShapeTest, drawShape) {
+TGFX_TEST_PRIVATE(PathShapeTest, drawShape) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -288,9 +290,11 @@ TGFX_TEST(PathShapeTest, drawShape) {
   EXPECT_FALSE(mergedShape->isSimplePath());
   auto transShape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(10, 10));
   mergedShape = Shape::Merge({transShape, shape, shape2});
-  EXPECT_EQ(mergedShape->type(), Shape::Type::Append);
-  auto appendShape = std::static_pointer_cast<AppendShape>(mergedShape);
-  EXPECT_EQ(appendShape->shapes.size(), 3u);
+  TGFX_PRIVATE_ACCESS({
+    EXPECT_EQ(mergedShape->type(), Shape::Type::Append);
+    auto appendShape = std::static_pointer_cast<AppendShape>(mergedShape);
+    EXPECT_EQ(appendShape->shapes.size(), 3u);
+  })
 
   Paint paint;
   paint.setStyle(PaintStyle::Stroke);
@@ -390,7 +394,7 @@ TGFX_TEST(PathShapeTest, inverseFillType) {
   EXPECT_TRUE(shape->isInverseFillType());
 }
 
-TGFX_TEST(PathShapeTest, MergeShapeFillType) {
+TGFX_TEST_PRIVATE(PathShapeTest, MergeShapeFillType) {
   // MergeShape always produces EvenOdd fill type regardless of input fill types.
   Path rectPath;
   rectPath.addRect(Rect::MakeXYWH(0, 0, 100, 100));
@@ -465,12 +469,12 @@ TGFX_TEST(PathShapeTest, MergeShapeFillType) {
   auto matrixShape = Shape::ApplyMatrix(shape1, matrix);
   auto fillTypeMatrixShape = Shape::ApplyFillType(matrixShape, PathFillType::EvenOdd);
   ASSERT_TRUE(fillTypeMatrixShape != nullptr);
-  EXPECT_EQ(fillTypeMatrixShape->type(), Shape::Type::Matrix);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(fillTypeMatrixShape->type(), Shape::Type::Matrix);)
   EXPECT_EQ(fillTypeMatrixShape->fillType(), PathFillType::EvenOdd);
   EXPECT_EQ(fillTypeMatrixShape->getBounds(), matrixShape->getBounds());
 }
 
-TGFX_TEST(PathShapeTest, ReverseShape) {
+TGFX_TEST_PRIVATE(PathShapeTest, ReverseShape) {
   Path path;
   path.moveTo(0, 0);
   path.lineTo(100, 0);
@@ -506,7 +510,7 @@ TGFX_TEST(PathShapeTest, ReverseShape) {
   auto matrixShape = Shape::ApplyMatrix(shape, matrix);
   auto reversedMatrixShape = Shape::ApplyReverse(matrixShape);
   ASSERT_TRUE(reversedMatrixShape != nullptr);
-  EXPECT_EQ(reversedMatrixShape->type(), Shape::Type::Matrix);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(reversedMatrixShape->type(), Shape::Type::Matrix);)
   EXPECT_EQ(reversedMatrixShape->getBounds(), matrixShape->getBounds());
 }
 
@@ -737,9 +741,7 @@ TGFX_TEST(PathShapeTest, AdaptiveDashEffect) {
 
   // Test large path dash effect - should apply dash correctly, not draw as continuous line
   Path largePath = {};
-  RRect rRect;
-  rRect.rect = Rect::MakeXYWH(10, 10, 432, 400);
-  rRect.radii = Point(6, 6);
+  auto rRect = RRect::MakeRectXY(Rect::MakeXYWH(10, 10, 432, 400), 6, 6);
   largePath.addRRect(rRect);
   float largeDashList[] = {2.f, 2.f};
   auto largeEffect = PathEffect::MakeDash(largeDashList, 2, 0.0f, true);
@@ -1154,6 +1156,41 @@ TGFX_TEST(PathShapeTest, RoundRectRadii) {
   canvas->clear();
   canvas->drawPath(path2, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "PathShapeTest/roundRectRadiiStroke"));
+}
+
+/**
+ * Verifies that addRRect() -> isRRect() round-trip preserves per-corner radii.
+ */
+TGFX_TEST(PathShapeTest, RRectPathRoundTrip) {
+  auto rect = Rect::MakeWH(200, 120);
+  // Simple RRect round-trip.
+  auto simpleIn = RRect::MakeRectXY(rect, 15, 15);
+  Path simplePath = {};
+  simplePath.addRRect(simpleIn);
+  RRect simpleOut = {};
+  EXPECT_TRUE(simplePath.isRRect(&simpleOut));
+  EXPECT_EQ(simpleOut.type(), RRect::Type::Simple);
+  EXPECT_EQ(simpleOut.radii()[0], simpleIn.radii()[0]);
+
+  // Complex RRect round-trip.
+  auto complexIn = RRect::MakeRectRadii(rect, {{{30, 30}, {10, 10}, {20, 20}, {5, 5}}});
+  Path complexPath = {};
+  complexPath.addRRect(complexIn);
+  RRect complexOut = {};
+  EXPECT_TRUE(complexPath.isRRect(&complexOut));
+  EXPECT_EQ(complexOut.type(), RRect::Type::Complex);
+  for (size_t i = 0; i < 4; ++i) {
+    EXPECT_NEAR(complexOut.radii()[i].x, complexIn.radii()[i].x, 0.01f);
+    EXPECT_NEAR(complexOut.radii()[i].y, complexIn.radii()[i].y, 0.01f);
+  }
+
+  // Oval RRects added via addRRect are classified as ovals in the underlying path, so
+  // isRRect() returns false while isOval() returns true. This is expected behavior.
+  auto ovalIn = RRect::MakeOval(rect);
+  Path ovalPath = {};
+  ovalPath.addRRect(ovalIn);
+  EXPECT_FALSE(ovalPath.isRRect(nullptr));
+  EXPECT_TRUE(ovalPath.isOval(nullptr));
 }
 
 }  // namespace tgfx

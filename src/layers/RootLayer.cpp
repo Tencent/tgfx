@@ -81,15 +81,14 @@ bool RootLayer::mergeDirtyList(bool forceMerge) {
 }
 
 bool RootLayer::invalidateBackground(const Rect& drawRect, LayerStyle* layerStyle,
-                                     float contentScale) {
-  if (dirtyRects.empty()) {
+                                     float contentScale, const std::vector<Rect>& sourceRects) {
+  if (sourceRects.empty()) {
     return false;
   }
-  auto dirtySize = dirtyRects.size();
   std::vector<Rect> dirtyBackgrounds = {};
-  dirtyBackgrounds.reserve(dirtySize);
-  for (size_t i = 0; i < dirtySize; i++) {
-    auto background = dirtyRects[i];
+  dirtyBackgrounds.reserve(sourceRects.size());
+  for (const auto& sourceRect : sourceRects) {
+    auto background = sourceRect;
     if (background.intersect(drawRect)) {
       if (layerStyle == nullptr) {
         return true;
@@ -119,9 +118,6 @@ bool RootLayer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   auto color = _backgroundColor;
   color.alpha = color.alpha * alpha;
   canvas->drawColor(color, blendMode);
-  if (args.blurBackground) {
-    args.blurBackground->getCanvas()->drawColor(color, blendMode);
-  }
   return Layer::drawLayer(args, canvas, alpha, blendMode);
 }
 

@@ -53,6 +53,7 @@ std::shared_ptr<RenderTargetProxy> WebGLWindow::onCreateRenderTarget(Context* co
   GLFrameBufferInfo glInfo = {};
   glInfo.id = 0;
   glInfo.format = GL_RGBA8;
-  return RenderTargetProxy::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft);
+  return RenderTargetProxy::MakeFrom(context, BackendRenderTarget(glInfo, width, height),
+                                     ImageOrigin::BottomLeft);
 }
 }  // namespace tgfx

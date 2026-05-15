@@ -34,6 +34,7 @@
 #include "tgfx/core/GradientType.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
@@ -252,12 +253,14 @@ void ElementWriter::addRectAttributes(const Rect& rect) {
 }
 
 void ElementWriter::addRoundRectAttributes(const RRect& roundRect) {
-  addRectAttributes(roundRect.rect);
-  if (FloatNearlyZero(roundRect.radii.x) && FloatNearlyZero(roundRect.radii.y)) {
+  // SVG <rect> only supports uniform rx/ry; complex RRects must be emitted as <path>.
+  DEBUG_ASSERT(!roundRect.isComplex());
+  addRectAttributes(roundRect.rect());
+  if (FloatNearlyZero(roundRect.radii()[0].x) && FloatNearlyZero(roundRect.radii()[0].y)) {
     return;
   }
-  addAttribute("rx", roundRect.radii.x);
-  addAttribute("ry", roundRect.radii.y);
+  addAttribute("rx", roundRect.radii()[0].x);
+  addAttribute("ry", roundRect.radii()[0].y);
 }
 
 void ElementWriter::addCircleAttributes(const Rect& bound) {
@@ -283,6 +286,26 @@ Resources ElementWriter::addImageFilterResource(
   auto filterID = addImageFilter(imageFilter, bound, std::move(exportWriter));
   Resources resources;
   resources.filter = "url(#" + filterID + ")";
+  return resources;
+}
+
+Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilter>& colorFilter) {
+  Resources resources;
+  if (!colorFilter) {
+    return resources;
+  }
+  switch (Types::Get(colorFilter.get())) {
+    case Types::ColorFilterType::Blend:
+      addBlendColorFilterResources(static_cast<const ModeColorFilter*>(colorFilter.get()),
+                                   &resources);
+      break;
+    case Types::ColorFilterType::Matrix:
+      addMatrixColorFilterResources(static_cast<const MatrixColorFilter*>(colorFilter.get()),
+                                    &resources);
+      break;
+    default:
+      break;
+  }
   return resources;
 }
 
@@ -524,21 +547,12 @@ Resources ElementWriter::addResources(const Brush& brush, Context* context,
     addShaderResources(shader, context, &resources);
   }
 
-  if (auto colorFilter = brush.colorFilter) {
-    auto type = Types::Get(colorFilter.get());
-    switch (type) {
-      case Types::ColorFilterType::Blend:
-        addBlendColorFilterResources(static_cast<const ModeColorFilter*>(colorFilter.get()),
-                                     &resources);
-        break;
-      case Types::ColorFilterType::Matrix: {
-        addMatrixColorFilterResources(static_cast<const MatrixColorFilter*>(colorFilter.get()),
-                                      &resources);
-        break;
-      }
-      default:
-        reportUnsupportedElement("Unsupported color filter");
+  if (brush.colorFilter) {
+    auto filterResources = addColorFilterResource(brush.colorFilter);
+    if (filterResources.filter.empty()) {
+      reportUnsupportedElement("Unsupported color filter");
     }
+    resources.filter = filterResources.filter;
   }
 
   if (auto maskFilter = brush.maskFilter) {

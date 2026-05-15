@@ -59,7 +59,7 @@ std::shared_ptr<RenderTargetProxy> WGLWindow::onCreateRenderTarget(Context* cont
   }
 
   GLFrameBufferInfo frameBuffer = {0, GL_RGBA8};
-  BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
+  BackendRenderTarget renderTarget(frameBuffer, size.width, size.height);
   return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 

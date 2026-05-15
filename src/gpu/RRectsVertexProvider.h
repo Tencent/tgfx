@@ -76,21 +76,22 @@ class RRectsVertexProvider : public VertexProvider {
   }
 
   /**
+   * Returns true if the provider holds complex RRects with per-corner radii.
+   */
+  virtual bool isComplex() const = 0;
+
+  /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
   const Color& firstColor() const {
     return rects.front()->color;
   }
 
-  size_t vertexCount() const override;
-
-  void getVertices(float* vertices) const override;
-
   const std::shared_ptr<ColorSpace>& dstColorSpace() const {
     return _dstColorSpace;
   }
 
- private:
+ protected:
   PlacementArray<RRectRecord> rects = {};
   PlacementArray<Stroke> strokes = {};
   std::shared_ptr<ColorSpace> _dstColorSpace = nullptr;
@@ -103,11 +104,5 @@ class RRectsVertexProvider : public VertexProvider {
   RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
                        PlacementArray<Stroke>&& strokes, std::shared_ptr<BlockAllocator> reference,
                        std::shared_ptr<ColorSpace> colorSpace = nullptr);
-
-  void getAAVertices(float* vertices) const;
-
-  void getNonAAVertices(float* vertices) const;
-
-  friend class BlockAllocator;
 };
 }  // namespace tgfx
