@@ -79,6 +79,13 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd,
   }
 
   auto vulkanGPU = static_cast<VulkanGPU*>(device->lockContext()->gpu());
+
+  if (!vulkanGPU->extensions().swapchain) {
+    LOGE("VulkanWindow: swapchain extension not available; cannot create window surface.");
+    device->unlock();
+    return nullptr;
+  }
+
   auto vkInstance = vulkanGPU->instance();
   auto vkDevice = vulkanGPU->device();
   auto physicalDevice = vulkanGPU->physicalDevice();

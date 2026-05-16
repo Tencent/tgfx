@@ -39,6 +39,16 @@
 
 namespace tgfx {
 
+static bool HasInstanceExtension(const std::vector<VkExtensionProperties>& available,
+                                 const char* name) {
+  for (auto& ext : available) {
+    if (strcmp(ext.extensionName, name) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 #ifdef DEBUG
 // Validation layer callback that routes Vulkan errors and warnings to the tgfx logging system.
 // Registered only in Debug builds when VK_LAYER_KHRONOS_validation is available.
@@ -169,17 +179,49 @@ bool VulkanGPU::createInstance() {
   appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
   appInfo.pEngineName = "TGFX";
   appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-  appInfo.apiVersion = VK_API_VERSION_1_0;
+  // Vulkan 1.1 is required because the engine calls 1.1 core entry points
+  // (e.g. vkGetPhysicalDeviceFeatures2). With a 1.0 instance these symbols are
+  // not loaded by volk and would crash on first use.
+  appInfo.apiVersion = VK_API_VERSION_1_1;
 
-  std::vector<const char*> instanceExtensions = {
-      VK_KHR_SURFACE_EXTENSION_NAME,
+  std::vector<const char*> instanceExtensions;
+
+  // Surface and utility extensions are optional — headless environments (e.g. SwiftShader CI)
+  // may not provide them. Enumerate available extensions first, then enable if present.
+  // VK_KHR_get_physical_device_properties2 is core in 1.1, so 1.1 ICDs may not advertise it
+  // as an extension; request it only when listed.
+  uint32_t availExtCount = 0;
+  auto enumResult = vkEnumerateInstanceExtensionProperties(nullptr, &availExtCount, nullptr);
+  if (enumResult != VK_SUCCESS && enumResult != VK_INCOMPLETE) {
+    LOGE("VulkanGPU::createInstance() vkEnumerateInstanceExtensionProperties failed: %s",
+         VkResultToString(enumResult));
+    return false;
+  }
+  std::vector<VkExtensionProperties> availableExts(availExtCount);
+  enumResult =
+      vkEnumerateInstanceExtensionProperties(nullptr, &availExtCount, availableExts.data());
+  if (enumResult != VK_SUCCESS && enumResult != VK_INCOMPLETE) {
+    LOGE("VulkanGPU::createInstance() vkEnumerateInstanceExtensionProperties failed: %s",
+         VkResultToString(enumResult));
+    return false;
+  }
+
+  if (HasInstanceExtension(availableExts, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)) {
+    instanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+  }
+
+  if (HasInstanceExtension(availableExts, VK_KHR_SURFACE_EXTENSION_NAME)) {
+    instanceExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
 #ifdef _WIN32
-      VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+    if (HasInstanceExtension(availableExts, VK_KHR_WIN32_SURFACE_EXTENSION_NAME)) {
+      instanceExtensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+    }
 #elif defined(__ANDROID__)
-      VK_KHR_ANDROID_SURFACE_EXTENSION_NAME,
+    if (HasInstanceExtension(availableExts, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME)) {
+      instanceExtensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
+    }
 #endif
-      VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-  };
+  }
 
   // In Debug builds, enable VK_LAYER_KHRONOS_validation and VK_EXT_debug_utils if available.
   // This catches spec violations (e.g. missing barriers, layout mismatches) during development.
@@ -197,16 +239,9 @@ bool VulkanGPU::createInstance() {
     }
   }
 
-  uint32_t extCount = 0;
-  vkEnumerateInstanceExtensionProperties(nullptr, &extCount, nullptr);
-  std::vector<VkExtensionProperties> availableExts(extCount);
-  vkEnumerateInstanceExtensionProperties(nullptr, &extCount, availableExts.data());
-  for (auto& ext : availableExts) {
-    if (strcmp(ext.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0) {
-      instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-      debugUtilsEnabled = true;
-      break;
-    }
+  if (HasInstanceExtension(availableExts, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
+    instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    debugUtilsEnabled = true;
   }
 #endif
 

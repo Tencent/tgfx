@@ -329,8 +329,15 @@ void VulkanRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
     return;
   }
   encoder->retainResource(std::static_pointer_cast<VulkanResource>(lastBound.pipeline));
-  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    lastBound.pipeline->vulkanPipeline());
+  if (vulkanGPU->extensions().extendedDynamicState) {
+    auto vkPipeline = lastBound.pipeline->vulkanPipeline();
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
+    lastBound.boundVkPipeline = vkPipeline;
+  } else {
+    // Defer bind to draw()/drawIndexed(), which know the requested topology and will
+    // select the correct pipeline variant (list or strip).
+    lastBound.boundVkPipeline = VK_NULL_HANDLE;
+  }
   lastBound.descriptorDirty = true;
 }
 
@@ -493,10 +500,14 @@ void VulkanRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
                           ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
                           : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     vkCmdSetPrimitiveTopologyEXT(commandBuffer, vkTopology);
-  } else if (primitiveType == PrimitiveType::TriangleStrip) {
-    LOGE(
-        "VulkanRenderPass::draw: TriangleStrip requested but extendedDynamicState is unavailable. "
-        "Falling back to TriangleList (incorrect rendering).");
+  } else {
+    // Bind the pipeline variant matching the requested topology. The VulkanRenderPipeline holds
+    // both a TriangleList and a TriangleStrip VkPipeline when extendedDynamicState is unavailable.
+    auto targetPipeline = lastBound.pipeline->vulkanPipeline(primitiveType);
+    if (targetPipeline != lastBound.boundVkPipeline) {
+      vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, targetPipeline);
+      lastBound.boundVkPipeline = targetPipeline;
+    }
   }
   vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 }
@@ -513,10 +524,12 @@ void VulkanRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCo
                           ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
                           : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     vkCmdSetPrimitiveTopologyEXT(commandBuffer, vkTopology);
-  } else if (primitiveType == PrimitiveType::TriangleStrip) {
-    LOGE(
-        "VulkanRenderPass::drawIndexed: TriangleStrip requested but extendedDynamicState is "
-        "unavailable. Falling back to TriangleList (incorrect rendering).");
+  } else {
+    auto targetPipeline = lastBound.pipeline->vulkanPipeline(primitiveType);
+    if (targetPipeline != lastBound.boundVkPipeline) {
+      vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, targetPipeline);
+      lastBound.boundVkPipeline = targetPipeline;
+    }
   }
   vkCmdDrawIndexed(commandBuffer, indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
 }
