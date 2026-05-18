@@ -21,7 +21,6 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -68,9 +67,6 @@ Quads3DDrawOp::Quads3DDrawOp(BlockAllocator* allocator, QuadsVertexProvider* pro
 }
 
 PlacementPtr<GeometryProcessor> Quads3DDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
-  ATTRIBUTE_NAME("quadCount", static_cast<int>(quadCount));
-  ATTRIBUTE_NAME("commonColor", commonColor);
-  ATTRIBUTE_NAME("uvMatrix", uvMatrix);
   return QuadPerEdgeAAGeometryProcessor::Make(allocator, renderTarget->width(),
                                               renderTarget->height(), aaType, commonColor, uvMatrix,
                                               false);

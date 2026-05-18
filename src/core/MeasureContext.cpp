@@ -39,7 +39,7 @@ void MeasureContext::drawRect(const Rect& rect, const Matrix& matrix, const Clip
 
 void MeasureContext::drawRRect(const RRect& rRect, const Matrix& matrix, const ClipStack& clip,
                                const Brush&, const Stroke* stroke) {
-  auto rect = rRect.rect;
+  auto rect = rRect.rect();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &rect, matrix);
   }

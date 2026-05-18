@@ -23,6 +23,7 @@
 #include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -764,9 +765,7 @@ TGFX_TEST(SVGExportTest, DstColorSpace) {
   Paint paint;
   paint.setColor(Color::Green());
   canvas->drawRect(Rect::MakeXYWH(20, 20, 100, 100), paint);
-  RRect rrect;
-  rrect.setOval(Rect::MakeXYWH(140, 20, 100, 100));
-  canvas->drawRRect(rrect, paint);
+  canvas->drawRRect(RRect::MakeOval(Rect::MakeXYWH(140, 20, 100, 100)), paint);
   canvas->drawImageRect(image, Rect::MakeXYWH(260, 20, 100, 100), {}, &paint);
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
@@ -802,9 +801,7 @@ TGFX_TEST(SVGExportTest, AssignColorSpace) {
   Paint paint;
   paint.setColor(Color::Green());
   canvas->drawRect(Rect::MakeXYWH(20, 20, 100, 100), paint);
-  RRect rrect;
-  rrect.setOval(Rect::MakeXYWH(140, 20, 100, 100));
-  canvas->drawRRect(rrect, paint);
+  canvas->drawRRect(RRect::MakeOval(Rect::MakeXYWH(140, 20, 100, 100)), paint);
   canvas->drawImageRect(image, Rect::MakeXYWH(260, 20, 100, 100), {}, &paint);
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
@@ -840,9 +837,7 @@ TGFX_TEST(SVGExportTest, DstAssignColorSpace) {
   Paint paint;
   paint.setColor(Color::Green());
   canvas->drawRect(Rect::MakeXYWH(20, 20, 100, 100), paint);
-  RRect rrect;
-  rrect.setOval(Rect::MakeXYWH(140, 20, 100, 100));
-  canvas->drawRRect(rrect, paint);
+  canvas->drawRRect(RRect::MakeOval(Rect::MakeXYWH(140, 20, 100, 100)), paint);
   canvas->drawImageRect(image, Rect::MakeXYWH(260, 20, 100, 100), {}, &paint);
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
@@ -980,5 +975,259 @@ TGFX_TEST(SVGExportTest, ClipWithMatrixTransform) {
   exporter->close();
 
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ClipWithMatrixTransform"));
+}
+
+TGFX_TEST(SVGExportTest, PictureImageWithAlpha) {
+  // Covers the alpha-only branch of SVGExportContext::drawImage for PictureImage: when a
+  // PictureImage is drawn with paint.alpha < 1 and no shader/mask/color filter, the exporter
+  // should wrap the playback in a <g opacity="..."> while preserving vector output inside.
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  PictureRecorder recorder;
+  auto pictureCanvas = recorder.beginRecording();
+  {
+    Paint redPaint;
+    redPaint.setColor(Color::Red());
+    pictureCanvas->drawRect(Rect::MakeWH(100, 100), redPaint);
+
+    Paint bluePaint;
+    bluePaint.setColor(Color::Blue());
+    pictureCanvas->drawCircle(65, 65, 35, bluePaint);
+  }
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+  auto image = Image::MakeFrom(picture, 100, 100);
+  ASSERT_TRUE(image != nullptr);
+
+  Paint paint;
+  paint.setAlpha(0.5f);
+  canvas->drawImage(image, 50, 50, &paint);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PictureImageWithAlpha"));
+}
+
+TGFX_TEST(SVGExportTest, PictureImageWithColorFilter) {
+  // Covers the colorFilter-only branch of SVGExportContext::drawImage for PictureImage:
+  // when the brush carries a Blend or Matrix ColorFilter, the exporter should emit a
+  // <g filter="url(...)"> wrapping a vector replay of the picture, not a rasterized image.
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  PictureRecorder recorder;
+  auto pictureCanvas = recorder.beginRecording();
+  {
+    Paint redPaint;
+    redPaint.setColor(Color::Red());
+    pictureCanvas->drawRect(Rect::MakeWH(100, 100), redPaint);
+
+    Paint bluePaint;
+    bluePaint.setColor(Color::Blue());
+    pictureCanvas->drawCircle(65, 65, 35, bluePaint);
+  }
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+  auto image = Image::MakeFrom(picture, 100, 100);
+  ASSERT_TRUE(image != nullptr);
+
+  Paint paint;
+  paint.setColorFilter(ColorFilter::Blend(Color::White(), BlendMode::Difference));
+  canvas->drawImage(image, 50, 50, &paint);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PictureImageWithColorFilter"));
+}
+
+TGFX_TEST(SVGExportTest, PictureImageWithBlendMode) {
+  // Covers the blend-mode branch of SVGExportContext::drawImage for PictureImage: when the
+  // brush carries a separable blend mode (Multiply here), the exporter should wrap the
+  // vector replay in a <g style="mix-blend-mode: ..."> rather than rasterizing.
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  Paint backgroundPaint;
+  backgroundPaint.setColor(Color::FromRGBA(255, 200, 0));
+  canvas->drawRect(Rect::MakeWH(200, 200), backgroundPaint);
+
+  PictureRecorder recorder;
+  auto pictureCanvas = recorder.beginRecording();
+  {
+    Paint redPaint;
+    redPaint.setColor(Color::Red());
+    pictureCanvas->drawRect(Rect::MakeWH(100, 100), redPaint);
+
+    Paint bluePaint;
+    bluePaint.setColor(Color::Blue());
+    pictureCanvas->drawCircle(65, 65, 35, bluePaint);
+  }
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+  auto image = Image::MakeFrom(picture, 100, 100);
+  ASSERT_TRUE(image != nullptr);
+
+  Paint paint;
+  paint.setBlendMode(BlendMode::Multiply);
+  canvas->drawImage(image, 50, 50, &paint);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PictureImageWithBlendMode"));
+}
+
+TGFX_TEST(SVGExportTest, PictureImageWithAlphaAndClip) {
+  // Covers the alpha-only branch of SVGExportContext::drawImage for PictureImage under an
+  // active outer clip. The exporter must close the outer clip group before opening the
+  // <g opacity="..."> wrapper and let nested playback ops rebuild their own clip groups
+  // inside it, instead of short-circuiting on a stale currentClipPath that no longer
+  // corresponds to the current parent element.
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200));
+  auto canvas = exporter->getCanvas();
+
+  Paint backgroundPaint;
+  backgroundPaint.setColor(Color::White());
+  canvas->drawRect(Rect::MakeWH(200, 200), backgroundPaint);
+
+  PictureRecorder recorder;
+  auto pictureCanvas = recorder.beginRecording();
+  {
+    Paint redPaint;
+    redPaint.setColor(Color::Red());
+    pictureCanvas->drawRect(Rect::MakeWH(100, 100), redPaint);
+
+    Paint bluePaint;
+    bluePaint.setColor(Color::Blue());
+    pictureCanvas->drawCircle(65, 65, 35, bluePaint);
+  }
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+  auto image = Image::MakeFrom(picture, 100, 100);
+  ASSERT_TRUE(image != nullptr);
+
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(70, 70, 100, 100));
+
+  Paint paint;
+  paint.setAlpha(0.5f);
+  canvas->drawImage(image, 50, 50, &paint);
+  canvas->restore();
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/PictureImageWithAlphaAndClip"));
+}
+
+/**
+ * Complex RRect (per-corner different radii) cannot be represented by SVG <rect> because
+ * <rect> only supports uniform rx/ry. Verify the exporter falls back to <path>.
+ */
+TGFX_TEST(SVGExportTest, ComplexRRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  tgfx::Paint paint;
+  paint.setColor(Color::Blue());
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+                                    SVGExportFlags::DisablePrettyXML);
+  auto canvas = exporter->getCanvas();
+
+  auto complexRRect = RRect::MakeRectRadii(Rect::MakeXYWH(20, 20, 160, 160),
+                                           {{{30, 30}, {10, 10}, {20, 20}, {5, 5}}});
+  ASSERT_EQ(complexRRect.type(), RRect::Type::Complex);
+  canvas->drawRRect(complexRRect, paint);
+
+  exporter->close();
+  auto SVGString = SVGStream->readString();
+  // Complex RRect must be exported as <path>, not <rect>.
+  ASSERT_NE(SVGString.find("<path"), std::string::npos);
+  ASSERT_EQ(SVGString.find("<rect"), std::string::npos);
+}
+
+/**
+ * Reproduces a bug where a draw whose bounds lie fully inside an outer clip
+ * gets short-circuited (no clip emitted), but is then incorrectly written into
+ * a stale <g clip-path> wrapper opened by a previous draw with a different,
+ * smaller clip. Sequence:
+ *   1. Outer clipRect(0,0,300,300)  - must stay a convex rect so that
+ *                                     conservativelyContainsRect returns true
+ *                                     for steps 3/4 and triggers the
+ *                                     short-circuit.
+ *   2. Inner clipRect(0,0,100,100)  - small clip
+ *      drawRect(0,0,200,200)         -> escapes the small clip, opens
+ *                                       <g clip-path="url(#clip_0)">
+ *      restore()                      -> pops the inner clip
+ *   3. drawRect(150,150,100,100)     -> bounds fully inside the outer clip,
+ *                                       so applyClip short-circuits and the
+ *                                       rect must not stay inside the still-
+ *                                       open <g clip-path="url(#clip_0)">.
+ *   4. drawPath bounds (180,180,100,100) covers the real-world failure shape:
+ *      a <path> draw must escape the stale group on the same code path.
+ */
+TGFX_TEST(SVGExportTest, ClipShortCircuitWithStaleGroup) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
+  auto canvas = exporter->getCanvas();
+
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 300, 300));
+
+  // First draw escapes the small clip and opens a <g clip-path> wrapper.
+  Paint redPaint;
+  redPaint.setColor(Color::Red());
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 100, 100));
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 200, 200), redPaint);
+  canvas->restore();
+
+  // Second draw (rect) is fully inside the outer clip - short-circuits and must
+  // NOT inherit the small clip group.
+  Paint bluePaint;
+  bluePaint.setColor(Color::Blue());
+  canvas->drawRect(Rect::MakeXYWH(150, 150, 100, 100), bluePaint);
+
+  // Third draw (path) reproduces the real-world failure shape: a path whose
+  // bounds lie fully inside the outer clip must also escape the stale group.
+  // Use a triangle so Canvas cannot forward to drawRect/drawRRect; this
+  // exercises SVGExportContext::drawPath directly and emits a <path>.
+  Paint greenPaint;
+  greenPaint.setColor(Color::Green());
+  Path path;
+  path.moveTo(180, 280);
+  path.lineTo(230, 180);
+  path.lineTo(280, 280);
+  path.close();
+  canvas->drawPath(path, greenPaint);
+
+  canvas->restore();
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ClipShortCircuitWithStaleGroup"));
 }
 }  // namespace tgfx

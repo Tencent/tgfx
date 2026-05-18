@@ -65,6 +65,11 @@ class ElementWriter {
   void addText(const std::string& text);
   void addFontAttributes(const Font& font);
   void addRectAttributes(const Rect& rect);
+  /**
+   * Writes rx/ry attributes for a <rect> element. The caller must ensure the RRect is not
+   * Complex, since SVG <rect> only supports uniform corner radii; complex RRects should be
+   * emitted as <path> instead.
+   */
   void addRoundRectAttributes(const RRect& roundRect);
   void addCircleAttributes(const Rect& bound);
   void addEllipseAttributes(const Rect& bound);
@@ -72,6 +77,14 @@ class ElementWriter {
 
   Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
                                    const std::shared_ptr<SVGCustomWriter>& exportWriter);
+
+  /**
+   * Emits an SVG <filter> resource that reproduces the given color filter and returns its
+   * Resources::filter url. Returns empty Resources::filter when the color filter type cannot be
+   * expressed as a vector SVG filter, in which case the caller must rasterize. Must be called
+   * within a parent <defs> element.
+   */
+  Resources addColorFilterResource(const std::shared_ptr<ColorFilter>& colorFilter);
 
  private:
   Resources addResources(const Brush& brush, Context* context, SVGExportContext* svgContext);

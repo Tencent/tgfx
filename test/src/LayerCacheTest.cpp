@@ -423,7 +423,10 @@ TGFX_TEST_PRIVATE(LayerCacheTest, SimpleShapeSkipsCache) {
   // Test 3: ShapeLayer with Path (not Rect/RRect) - SHOULD create subtree cache
   auto pathLayer = ShapeLayer::Make();
   Path path = {};
-  path.addOval(Rect::MakeWH(50, 50));
+  path.moveTo(0, 0);
+  path.lineTo(50, 0);
+  path.lineTo(25, 50);
+  path.close();
   pathLayer->setPath(path);
   pathLayer->setFillStyle(ShapeStyle::Make(Color::Green()));
   pathLayer->setMatrix(Matrix::MakeTrans(130, 10));

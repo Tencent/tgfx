@@ -56,7 +56,7 @@ BackendTexture GLTexture::getBackendTexture() const {
   textureInfo.id = _textureID;
   textureInfo.target = _target;
   textureInfo.format = PixelFormatToGLSizeFormat(format());
-  return {textureInfo, width(), height()};
+  return BackendTexture(textureInfo, width(), height());
 }
 
 BackendRenderTarget GLTexture::getBackendRenderTarget() const {
@@ -66,7 +66,7 @@ BackendRenderTarget GLTexture::getBackendRenderTarget() const {
   GLFrameBufferInfo glInfo = {};
   glInfo.id = frameBufferID();
   glInfo.format = PixelFormatToGLSizeFormat(format());
-  return {glInfo, width(), height()};
+  return BackendRenderTarget(glInfo, width(), height());
 }
 
 void GLTexture::onRelease(GLGPU* gpu) {

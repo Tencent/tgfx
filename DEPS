@@ -66,11 +66,6 @@
         "dir": "third_party/expat"
       },
       {
-        "url": "https://github.com/google/flatbuffers.git",
-        "commit": "1c514626e83c20fffa8557e75641848e1e15cd5e",
-        "dir": "third_party/flatbuffers"
-      },
-      {
          "url": "https://github.com/cameron314/concurrentqueue.git",
          "commit": "6dd38b8a1dbaa7863aa907045f32308a56a6ff5d",
          "dir": "third_party/concurrentqueue"
@@ -81,11 +76,6 @@
         "dir": "third_party/highway"
       },
       {
-        "url": "https://github.com/lz4/lz4.git",
-        "commit": "cacca37747572717ceb1f156eb9840644205ca4f",
-        "dir": "third_party/lz4"
-      },
-      {
         "url": "https://github.com/google/shaderc.git",
         "commit": "3362e24c42ab5bf7ad32c0fec64b0a0ddeb2fda1",
         "dir": "third_party/shaderc"
@@ -94,6 +84,21 @@
         "url": "https://github.com/KhronosGroup/SPIRV-Cross.git",
         "commit": "ebe2aa0cd80f5eb5cd8a605da604cacf72205f3b",
         "dir": "third_party/SPIRV-Cross"
+      },
+      {
+        "url": "https://github.com/KhronosGroup/Vulkan-Headers.git",
+        "commit": "b5c8f996196ba4aa6d8f97e52b5d3b6e70f7e4e2",
+        "dir": "third_party/Vulkan-Headers"
+      },
+      {
+        "url": "https://github.com/zeux/volk.git",
+        "commit": "0b17a763ba5643e32da1b2152f8140461b3b7345",
+        "dir": "third_party/volk"
+      },
+      {
+        "url": "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git",
+        "commit": "1d8f600fd424278486eade7ed3e877c99f0846b1",
+        "dir": "third_party/VulkanMemoryAllocator"
       }
     ]
   },
