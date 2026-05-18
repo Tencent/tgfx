@@ -644,11 +644,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   using LayerDrawFunc = bool (Layer::*)(const DrawArgs&, Canvas*, float, BlendMode);
 
   void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const Matrix3D& matrix3D,
-                               LayerDrawFunc drawFunc, float alpha, BlendMode blendMode);
-
-  std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child);
-
-  bool drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, float alpha,
+                               LayerDrawFunc drawFunc, float alpha);
+  bool drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float alpha,
                  LayerDrawFunc drawFunc);
 
   std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
@@ -771,5 +768,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   friend class BackgroundConsumer;
   friend class LayerProperty;
   friend class OffscreenRenderer;
+  friend class Layer3DContext;
 };
 }  // namespace tgfx
