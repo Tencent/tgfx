@@ -108,7 +108,7 @@ class InnerShadowStyle : public LayerStyle {
                    const Color& color);
 
   void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha,
-              BlendMode blendMode) override;
+              BlendMode blendMode, const Point& contentOffset) override;
 
   std::shared_ptr<ImageFilter> getShadowFilter(float scale);
 

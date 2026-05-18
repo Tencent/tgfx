@@ -116,37 +116,12 @@ class NoiseStyle : public LayerStyle {
 
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
-  /**
-   * Applies the noise style with an explicit sampling origin in the content image's local
-   * coordinate space. The sampling origin is computed by the caller from the layer's global
-   * position, so the noise pattern stays anchored to a stable surface-space point and does not
-   * drift when the layer moves across tiles or repaints with different dirty regions.
-   * @param canvas The canvas to draw the noise style on.
-   * @param content The opaque layer content image used as alpha mask.
-   * @param contentScale The scale factor of the layer content relative to its original size.
-   * @param alpha The alpha transparency value used for drawing the noise.
-   * @param noiseSamplingOrigin The noise pattern origin in the content image's local coordinate
-   * space. Callers should derive this from the layer's surface-space origin minus the content
-   * image offset, so the value stays invariant when the layer position is unchanged.
-   */
-  void drawWithGlobalOrigin(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                            float alpha, const Point& noiseSamplingOrigin);
-
  protected:
   NoiseStyle(float size, float density, float seed);
 
   void invalidateNoise();
 
   std::shared_ptr<Shader> getNoiseShader(float contentScale) const;
-
-  /**
-   * Subclasses override this to draw the noise with the supplied sampling origin. The default
-   * onDraw path forwards here with a zero origin to preserve the original behavior when the
-   * sampling origin is not explicitly provided.
-   */
-  virtual void onDrawWithGlobalOrigin(Canvas* canvas, std::shared_ptr<Image> content,
-                                      float contentScale, float alpha, BlendMode blendMode,
-                                      const Point& noiseSamplingOrigin) = 0;
 
   float _size = 4.0f;
   float _density = 0.5f;
@@ -172,11 +147,7 @@ class MonoNoiseStyle : public NoiseStyle {
 
  protected:
   void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha,
-              BlendMode blendMode) override;
-
-  void onDrawWithGlobalOrigin(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                              float alpha, BlendMode blendMode,
-                              const Point& noiseSamplingOrigin) override;
+              BlendMode blendMode, const Point& contentOffset) override;
 
  private:
   MonoNoiseStyle(float size, float density, const Color& color, float seed);
@@ -218,11 +189,7 @@ class DuoNoiseStyle : public NoiseStyle {
 
  protected:
   void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha,
-              BlendMode blendMode) override;
-
-  void onDrawWithGlobalOrigin(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                              float alpha, BlendMode blendMode,
-                              const Point& noiseSamplingOrigin) override;
+              BlendMode blendMode, const Point& contentOffset) override;
 
  private:
   DuoNoiseStyle(float size, float density, const Color& firstColor, const Color& secondColor,
@@ -254,11 +221,7 @@ class MultiNoiseStyle : public NoiseStyle {
 
  protected:
   void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha,
-              BlendMode blendMode) override;
-
-  void onDrawWithGlobalOrigin(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                              float alpha, BlendMode blendMode,
-                              const Point& noiseSamplingOrigin) override;
+              BlendMode blendMode, const Point& contentOffset) override;
 
  private:
   MultiNoiseStyle(float size, float density, float opacity, float seed);

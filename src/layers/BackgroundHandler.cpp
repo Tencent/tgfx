@@ -326,7 +326,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   canvas->concat(matrix);
   auto backgroundOffset = bgOffset - contentEntry.offset;
   style->drawWithExtraSource(canvas, contentEntry.image, source->contentScale, std::move(bgImage),
-                             backgroundOffset, alpha);
+                             backgroundOffset, alpha, contentEntry.offset);
 }
 
 void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,

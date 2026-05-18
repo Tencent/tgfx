@@ -46,7 +46,6 @@
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
-#include "tgfx/layers/layerstyles/NoiseStyle.h"
 
 namespace tgfx {
 
@@ -1952,14 +1951,8 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   canvas->concat(matrix);
   switch (layerStyle->extraSourceType()) {
     case LayerStyleExtraSourceType::None:
-      if (layerStyle->Type() == LayerStyleType::Noise) {
-        auto noiseSamplingOrigin = contentEntry.offset;
-        auto* noiseStyle = static_cast<NoiseStyle*>(layerStyle);
-        noiseStyle->drawWithGlobalOrigin(canvas, contentEntry.image, source->contentScale, alpha,
-                                         noiseSamplingOrigin);
-      } else {
-        layerStyle->draw(canvas, contentEntry.image, source->contentScale, alpha);
-      }
+      layerStyle->draw(canvas, contentEntry.image, source->contentScale, alpha,
+                       contentEntry.offset);
       break;
     case LayerStyleExtraSourceType::Background:
       // Unreachable: Background-sourced styles are routed through BackgroundHandler.
@@ -1969,7 +1962,8 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
       if (group->contour.has_value()) {
         auto contourOffset = group->contour->offset - contentEntry.offset;
         layerStyle->drawWithExtraSource(canvas, contentEntry.image, source->contentScale,
-                                        group->contour->image, contourOffset, alpha);
+                                        group->contour->image, contourOffset, alpha,
+                                        contentEntry.offset);
       }
       break;
   }
