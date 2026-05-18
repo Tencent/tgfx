@@ -71,7 +71,7 @@ class Context3DCompositor {
    * Each fragment carries a Layer* identifying which layer's raster image should be sampled when
    * passed back via drawPolygon.
    */
-  const std::vector<DrawPolygon3D*>& prepareTraversal();
+  const std::vector<const DrawPolygon3D*>& prepareTraversal();
 
   /**
    * Draws a single fragment (returned by prepareTraversal) with its supplied raster image.
@@ -110,7 +110,7 @@ class Context3DCompositor {
   std::shared_ptr<RenderTargetProxy> _targetColorProxy = nullptr;
   std::deque<std::unique_ptr<DrawPolygon3D>> _polygons = {};
   std::unique_ptr<BspTree> _bspTree = nullptr;
-  std::vector<DrawPolygon3D*> _orderedFragments = {};
+  std::vector<const DrawPolygon3D*> _orderedFragments = {};
   std::vector<PlacementPtr<DrawOp>> _drawOps = {};
   std::unordered_map<int, int> _depthSequenceCounters = {};
   // Tracks whether at least one OpsRenderTask has been submitted to _targetColorProxy. The first

@@ -143,7 +143,7 @@ void Render3DContext::finishAndDrawTo(const DrawArgs& args, Canvas* canvas) {
   }
   DrawArgs leafArgs = args;
 
-  for (auto* fragment : fragments) {
+  for (const auto* fragment : fragments) {
     auto* layer = fragment->layer();
     // Layers carrying BackgroundBlur must raster per-fragment because each BSP slice samples a
     // different mid-traversal compositor state; cached images would drift from what the consume

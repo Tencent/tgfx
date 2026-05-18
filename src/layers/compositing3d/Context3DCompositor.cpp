@@ -158,10 +158,10 @@ namespace {
 // Functor adapter so BspTree::traverseBackToFront — which expects a callable taking
 // const DrawPolygon3D* — can collect fragments into a vector without a lambda.
 struct CollectFragmentsAction {
-  std::vector<DrawPolygon3D*>* output = nullptr;
+  std::vector<const DrawPolygon3D*>* output = nullptr;
 
   void operator()(const DrawPolygon3D* polygon) const {
-    output->push_back(const_cast<DrawPolygon3D*>(polygon));
+    output->push_back(polygon);
   }
 };
 }  // namespace
@@ -216,7 +216,7 @@ void Context3DCompositor::drawQuads(const DrawPolygon3D* polygon,
   _drawOps.emplace_back(std::move(drawOp));
 }
 
-const std::vector<DrawPolygon3D*>& Context3DCompositor::prepareTraversal() {
+const std::vector<const DrawPolygon3D*>& Context3DCompositor::prepareTraversal() {
   _orderedFragments.clear();
   if (_polygons.empty()) {
     return _orderedFragments;
