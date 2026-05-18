@@ -330,7 +330,21 @@ uint32_t D3D12GPU::MakeSamplerKey(const SamplerDescriptor& descriptor) {
 
 std::shared_ptr<ShaderModule> D3D12GPU::createShaderModule(
     const ShaderModuleDescriptor& descriptor) {
-  return D3D12ShaderModule::Make(this, descriptor);
+  // Cache compiled DXBC blobs by (stage, hash(GLSL source)). The upper layer's program cache
+  // works at the (vertex+fragment) tuple level, so two distinct programs sharing one of the two
+  // sources still hit our backend twice. Caching here lets the second hit skip the full
+  // GLSL -> SPIR-V -> HLSL -> DXBC chain.
+  ShaderCacheKey key = {};
+  key.stage = static_cast<uint32_t>(descriptor.stage);
+  key.sourceHash = std::hash<std::string>{}(descriptor.code);
+  if (auto it = shaderModuleCache.find(key); it != shaderModuleCache.end()) {
+    return it->second;
+  }
+  auto module = D3D12ShaderModule::Make(this, descriptor);
+  if (module != nullptr) {
+    shaderModuleCache.emplace(key, module);
+  }
+  return module;
 }
 
 std::shared_ptr<RenderPipeline> D3D12GPU::createRenderPipeline(
@@ -601,6 +615,10 @@ void D3D12GPU::releaseAll(bool releaseGPU) {
     inflightSubmissions.clear();
   }
   samplerCache.clear();
+  // Drop cached shader-module shared_ptrs so D3D12Resource cleanup can run. Without this the
+  // shaderModuleCache would hold strong refs through the resources-list walk below and prevent
+  // the modules from ever being released.
+  shaderModuleCache.clear();
   rootSignatureCache.clear();
   // Drop pooled command allocator/list pairs. Done after wait so the GPU is no longer using
   // them; doing it before would still be safe (ComPtrs hold the only references) but ordering
