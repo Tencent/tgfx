@@ -18,12 +18,10 @@
 
 #include "OpsRenderTask.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
 void OpsRenderTask::execute(CommandEncoder* encoder) {
-  TASK_MARK(tgfx::inspect::OpTaskType::OpsRenderTask);
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("OpsRenderTask::execute() Render target is null!");

@@ -249,18 +249,6 @@
       }
     },
     {
-      "name": "flatbuffers",
-      "cmake": {
-        "targets": [
-          "flatbuffers"
-        ],
-        "arguments": [
-          "-DFLATBUFFERS_BUILD_FLATLIB=ON",
-          "-DFLATBUFFERS_BUILD_CPP17=ON"
-        ]
-      }
-    },
-    {
       "name": "highway",
       "cmake": {
         "targets": [

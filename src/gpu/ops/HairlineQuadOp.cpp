@@ -19,7 +19,6 @@
 #include "HairlineQuadOp.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/processors/HairlineQuadGeometryProcessor.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -50,8 +49,6 @@ HairlineQuadOp::HairlineQuadOp(BlockAllocator* allocator,
 
 PlacementPtr<GeometryProcessor> HairlineQuadOp::onMakeGeometryProcessor(
     RenderTarget* /*renderTarget*/) {
-  ATTRIBUTE_NAME("color", color);
-  ATTRIBUTE_NAME("coverage", coverage);
   auto viewMatrix = hairlineProxy->getDrawingMatrix();
   auto realUVMatrix = uvMatrix;
   realUVMatrix.preConcat(viewMatrix);

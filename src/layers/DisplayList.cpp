@@ -21,7 +21,6 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
-#include "inspect/InspectorMark.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
@@ -179,7 +178,6 @@ static std::vector<std::pair<int, int>> GetSortedTiles(int startX, int endX, int
 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
-  SET_DISPLAY_LIST(this);
 }
 
 DisplayList::~DisplayList() {
@@ -323,7 +321,6 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   if (!surface) {
     return;
   }
-  RENDER_VISABLE_OBJECT(surface->getContext());
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {

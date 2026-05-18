@@ -26,7 +26,6 @@
 #include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 #include "tgfx/gpu/RenderPass.h"
 
@@ -54,7 +53,6 @@ RuntimeDrawTask::RuntimeDrawTask(BlockAllocator* allocator,
 }
 
 void RuntimeDrawTask::execute(CommandEncoder* encoder) {
-  TASK_MARK(tgfx::inspect::OpTaskType::RuntimeDrawTask);
   std::vector<std::shared_ptr<TextureView>> flatTextures = {};
   flatTextures.reserve(inputTextures.size());
   for (size_t i = 0; i < inputTextures.size(); i++) {

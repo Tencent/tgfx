@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderTargetCopyTask.h"
-#include "inspect/InspectorMark.h"
 
 namespace tgfx {
 RenderTargetCopyTask::RenderTargetCopyTask(BlockAllocator* allocator,
@@ -28,7 +27,6 @@ RenderTargetCopyTask::RenderTargetCopyTask(BlockAllocator* allocator,
 }
 
 void RenderTargetCopyTask::execute(CommandEncoder* encoder) {
-  TASK_MARK(tgfx::inspect::OpTaskType::RenderTargetCopyTask);
   auto renderTarget = source->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("RenderTargetCopyTask::execute() Failed to get the source render target!");
