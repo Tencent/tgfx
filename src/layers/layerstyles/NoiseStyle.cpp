@@ -85,6 +85,13 @@ Rect NoiseStyle::filterBounds(const Rect& srcRect, float) {
   return srcRect;
 }
 
+void NoiseStyle::drawWithGlobalOrigin(Canvas* canvas, std::shared_ptr<Image> content,
+                                      float contentScale, float alpha,
+                                      const Point& noiseSamplingOrigin) {
+  onDrawWithGlobalOrigin(canvas, std::move(content), contentScale, alpha, blendMode(),
+                         noiseSamplingOrigin);
+}
+
 void NoiseStyle::invalidateNoise() {
   invalidateContent();
 }
@@ -148,20 +155,26 @@ static std::shared_ptr<Image> RasterizeNoiseShader(std::shared_ptr<Shader> shade
 }
 
 // Draws a noise layer clipped to content alpha. The shader must already have color, density, and
-// alpha fully baked in. The shader is shifted so that its sampling origin aligns with the content
-// image center, then rasterized into a fixed image so that noise coordinates stay local regardless
-// of the canvas matrix during picture playback.
+// alpha fully baked in. The shader sampling origin is anchored to noiseSamplingOrigin (expressed
+// in the content image's local coordinate space). Callers derive this origin from the layer's
+// surface-space position, so the noise pattern stays stable as tiles, dirty regions, or content
+// image sizes change. A half-image offset is added to preserve the original "centered" feel of
+// the noise relative to the content.
 static void DrawNoiseLayer(Canvas* canvas, std::shared_ptr<Image> content,
-                           std::shared_ptr<Shader> coloredShader, BlendMode blendMode) {
+                           std::shared_ptr<Shader> coloredShader, BlendMode blendMode,
+                           const Point& noiseSamplingOrigin) {
   if (coloredShader == nullptr || content == nullptr) {
     return;
   }
   auto width = content->width();
   auto height = content->height();
-  // Shift the sampling origin from the image top-left to the image center, so the noise pattern is
-  // anchored to the layer content center and stays stable as the layer bounds grow or shrink.
-  auto centeredShader = coloredShader->makeWithMatrix(
-      Matrix::MakeTrans(static_cast<float>(width) * 0.5f, static_cast<float>(height) * 0.5f));
+  // Shift the procedural noise so that sample (0,0) lands at noiseSamplingOrigin inside the
+  // content image. A half-image offset is then added so that the original "centered" appearance
+  // is preserved when noiseSamplingOrigin is zero.
+  auto samplingMatrix =
+      Matrix::MakeTrans(-1.f * noiseSamplingOrigin.x + static_cast<float>(width) * 0.5f,
+                        -1.f * noiseSamplingOrigin.y + static_cast<float>(height) * 0.5f);
+  auto centeredShader = coloredShader->makeWithMatrix(samplingMatrix);
   auto noiseImage = RasterizeNoiseShader(std::move(centeredShader), width, height);
   if (noiseImage == nullptr) {
     return;
@@ -189,6 +202,12 @@ void MonoNoiseStyle::setColor(const Color& color) {
 
 void MonoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                             float alpha, BlendMode blendMode) {
+  onDrawWithGlobalOrigin(canvas, std::move(content), contentScale, alpha, blendMode, Point::Zero());
+}
+
+void MonoNoiseStyle::onDrawWithGlobalOrigin(Canvas* canvas, std::shared_ptr<Image> content,
+                                            float contentScale, float alpha, BlendMode blendMode,
+                                            const Point& noiseSamplingOrigin) {
   auto noiseShader = getNoiseShader(contentScale);
   if (noiseShader == nullptr) {
     return;
@@ -207,7 +226,8 @@ void MonoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, floa
   };
   // clang-format on
   auto coloredShader = alphaShader->makeWithColorFilter(ColorFilter::Matrix(colorMatrix));
-  DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode);
+  DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode,
+                 noiseSamplingOrigin);
 }
 
 // --- DuoNoiseStyle ---
@@ -235,6 +255,12 @@ void DuoNoiseStyle::setSecondColor(const Color& color) {
 
 void DuoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                            float alpha, BlendMode blendMode) {
+  onDrawWithGlobalOrigin(canvas, std::move(content), contentScale, alpha, blendMode, Point::Zero());
+}
+
+void DuoNoiseStyle::onDrawWithGlobalOrigin(Canvas* canvas, std::shared_ptr<Image> content,
+                                           float contentScale, float alpha, BlendMode blendMode,
+                                           const Point& noiseSamplingOrigin) {
   auto noiseShader = getNoiseShader(contentScale);
   if (noiseShader == nullptr) {
     return;
@@ -252,7 +278,7 @@ void DuoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float
     };
     // clang-format on
     auto coloredShader = alphaShader->makeWithColorFilter(ColorFilter::Matrix(colorMatrix));
-    DrawNoiseLayer(canvas, content, std::move(coloredShader), blendMode);
+    DrawNoiseLayer(canvas, content, std::move(coloredShader), blendMode, noiseSamplingOrigin);
   }
   {
     auto densityFilter = MakeBrightDensityFilter(_density);
@@ -267,7 +293,7 @@ void DuoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float
     };
     // clang-format on
     auto coloredShader = alphaShader->makeWithColorFilter(ColorFilter::Matrix(colorMatrix));
-    DrawNoiseLayer(canvas, content, std::move(coloredShader), blendMode);
+    DrawNoiseLayer(canvas, content, std::move(coloredShader), blendMode, noiseSamplingOrigin);
   }
 }
 
@@ -288,6 +314,12 @@ void MultiNoiseStyle::setOpacity(float opacity) {
 
 void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                              float alpha, BlendMode blendMode) {
+  onDrawWithGlobalOrigin(canvas, std::move(content), contentScale, alpha, blendMode, Point::Zero());
+}
+
+void MultiNoiseStyle::onDrawWithGlobalOrigin(Canvas* canvas, std::shared_ptr<Image> content,
+                                             float contentScale, float alpha, BlendMode blendMode,
+                                             const Point& noiseSamplingOrigin) {
   auto noiseShader = getNoiseShader(contentScale);
   if (noiseShader == nullptr) {
     return;
@@ -317,7 +349,8 @@ void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
   auto composedFilter = ColorFilter::Compose(contrastLumaFilter, thresholdFilter);
   composedFilter = ColorFilter::Compose(composedFilter, alphaScaleFilter);
   auto coloredShader = noiseShader->makeWithColorFilter(std::move(composedFilter));
-  DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode);
+  DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode,
+                 noiseSamplingOrigin);
 }
 
 }  // namespace tgfx

@@ -46,6 +46,7 @@
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/layerstyles/NoiseStyle.h"
 
 namespace tgfx {
 
@@ -731,8 +732,9 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     bool behindCamera =
         !isAffine && Matrix3DUtils::IsRectBehindCamera(contentBounds, coordinateMatrix);
     if (!behindCamera) {
-      bounds.join(ComputeContentBounds(*content, contentBounds, coordinateMatrix, applyMatrixAtEnd,
-                                       computeTightBounds));
+      auto computedBounds = ComputeContentBounds(*content, contentBounds, coordinateMatrix,
+                                                  applyMatrixAtEnd, computeTightBounds);
+      bounds.join(computedBounds);
     }
   }
 
@@ -1950,7 +1952,14 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   canvas->concat(matrix);
   switch (layerStyle->extraSourceType()) {
     case LayerStyleExtraSourceType::None:
-      layerStyle->draw(canvas, contentEntry.image, source->contentScale, alpha);
+      if (layerStyle->Type() == LayerStyleType::Noise) {
+        auto noiseSamplingOrigin = contentEntry.offset;
+        auto* noiseStyle = static_cast<NoiseStyle*>(layerStyle);
+        noiseStyle->drawWithGlobalOrigin(canvas, contentEntry.image, source->contentScale, alpha,
+                                         noiseSamplingOrigin);
+      } else {
+        layerStyle->draw(canvas, contentEntry.image, source->contentScale, alpha);
+      }
       break;
     case LayerStyleExtraSourceType::Background:
       // Unreachable: Background-sourced styles are routed through BackgroundHandler.

@@ -442,7 +442,6 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   }
   checkTileCount(surface);
   auto tileTasks = invalidateTileCaches(dirtyRegions);
-  LOGI("renderTiled: tileTasks count = %zu", tileTasks.size());
   auto screenTasks = collectScreenTasks(surface, &tileTasks);
   if (screenTasks.empty()) {
     recycleCurrentTileTasks(tileTasks);
