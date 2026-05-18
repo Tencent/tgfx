@@ -97,6 +97,10 @@ bool D3D12RenderPass::initialise(const RenderPassDescriptor& passDescriptor) {
   uint32_t fbWidth = 0;
   uint32_t fbHeight = 0;
 
+  // First pass over color attachments: create RTV descriptors and accumulate transitions.
+  // We deliberately separate this from the Clear* calls below so we can issue a single
+  // ResourceBarrier for every attachment (color + depth) instead of N+1 individual calls.
+  D3D12BarrierBatch entryBatch;
   for (auto& ca : passDescriptor.colorAttachments) {
     if (ca.texture == nullptr) {
       continue;
@@ -105,11 +109,11 @@ bool D3D12RenderPass::initialise(const RenderPassDescriptor& passDescriptor) {
     encoder->retainResource(d3d12Tex);
     colorAttachments.push_back(d3d12Tex);
 
-    // Transition to RENDER_TARGET state before clearing or rendering. The "current" state is
-    // either COMMON (newly created or coming back from sampling) or COLOR_ATTACHMENT from a
-    // preceding render pass that already left it there. Both transitions are valid.
-    TransitionResourceState(commandList, d3d12Tex->d3d12Resource(), d3d12Tex->currentState(),
-                            D3D12_RESOURCE_STATE_RENDER_TARGET);
+    // Queue the transition to RENDER_TARGET. The "current" state is either COMMON (newly
+    // created or coming back from sampling) or RENDER_TARGET from a preceding render pass that
+    // already left it there; addTransition() collapses the latter into a no-op.
+    entryBatch.addTransition(d3d12Tex->d3d12Resource(), d3d12Tex->currentState(),
+                             D3D12_RESOURCE_STATE_RENDER_TARGET);
     d3d12Tex->setCurrentState(D3D12_RESOURCE_STATE_RENDER_TARGET);
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
@@ -125,12 +129,6 @@ bool D3D12RenderPass::initialise(const RenderPassDescriptor& passDescriptor) {
     }
     device->CreateRenderTargetView(d3d12Tex->d3d12Resource(), &rtvDesc, rtvHandle);
     rtvHandles.push_back(rtvHandle);
-
-    if (ca.loadAction == LoadAction::Clear) {
-      const float clear[4] = {ca.clearValue.red, ca.clearValue.green, ca.clearValue.blue,
-                              ca.clearValue.alpha};
-      commandList->ClearRenderTargetView(rtvHandle, clear, 0, nullptr);
-    }
 
     fbWidth = static_cast<uint32_t>(d3d12Tex->width());
     fbHeight = static_cast<uint32_t>(d3d12Tex->height());
@@ -153,8 +151,8 @@ bool D3D12RenderPass::initialise(const RenderPassDescriptor& passDescriptor) {
     encoder->retainResource(d3d12Tex);
     depthStencilAttachment = d3d12Tex;
 
-    TransitionResourceState(commandList, d3d12Tex->d3d12Resource(), d3d12Tex->currentState(),
-                            D3D12_RESOURCE_STATE_DEPTH_WRITE);
+    entryBatch.addTransition(d3d12Tex->d3d12Resource(), d3d12Tex->currentState(),
+                             D3D12_RESOURCE_STATE_DEPTH_WRITE);
     d3d12Tex->setCurrentState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
     dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
@@ -167,17 +165,38 @@ bool D3D12RenderPass::initialise(const RenderPassDescriptor& passDescriptor) {
     }
     device->CreateDepthStencilView(d3d12Tex->d3d12Resource(), &dsvDesc, dsvHandle);
 
-    if (passDescriptor.depthStencilAttachment.loadAction == LoadAction::Clear) {
-      D3D12_CLEAR_FLAGS clearFlags = D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL;
-      commandList->ClearDepthStencilView(
-          dsvHandle, clearFlags, passDescriptor.depthStencilAttachment.depthClearValue,
-          static_cast<UINT8>(passDescriptor.depthStencilAttachment.stencilClearValue), 0, nullptr);
-    }
-
     if (fbWidth == 0) {
       fbWidth = static_cast<uint32_t>(d3d12Tex->width());
       fbHeight = static_cast<uint32_t>(d3d12Tex->height());
     }
+  }
+
+  // Flush every pre-pass transition in one ResourceBarrier(N, ...) call. After this point all
+  // attachments are in their target state and clears are safe to issue.
+  entryBatch.flush(commandList);
+
+  // Second pass: ClearRenderTargetView / ClearDepthStencilView for any attachment with
+  // LoadAction::Clear. These run after the barrier flush so the resource state is correct.
+  // rtvHandles[] was populated in the order non-null colorAttachments are visited above, so we
+  // walk passDescriptor.colorAttachments again with a parallel running counter — keeping this
+  // O(N) instead of paying an inner search per attachment.
+  size_t rtvIndex = 0;
+  for (const auto& ca : passDescriptor.colorAttachments) {
+    if (ca.texture == nullptr) {
+      continue;
+    }
+    if (ca.loadAction == LoadAction::Clear) {
+      const float clear[4] = {ca.clearValue.red, ca.clearValue.green, ca.clearValue.blue,
+                              ca.clearValue.alpha};
+      commandList->ClearRenderTargetView(rtvHandles[rtvIndex], clear, 0, nullptr);
+    }
+    rtvIndex++;
+  }
+  if (hasDepth && passDescriptor.depthStencilAttachment.loadAction == LoadAction::Clear) {
+    D3D12_CLEAR_FLAGS clearFlags = D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL;
+    commandList->ClearDepthStencilView(
+        dsvHandle, clearFlags, passDescriptor.depthStencilAttachment.depthClearValue,
+        static_cast<UINT8>(passDescriptor.depthStencilAttachment.stencilClearValue), 0, nullptr);
   }
 
   // Step 2: Bind render targets.
@@ -294,12 +313,16 @@ void D3D12RenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> text
   encoder->retainResource(d3d12Samp);
 
   // Color render targets and write-back textures may currently be in RENDER_TARGET / COPY_DEST.
-  // Transition to PIXEL_SHADER_RESOURCE so the SRV is valid. The Vulkan backend keeps everything
-  // in GENERAL layout; D3D12 has no equivalent and must transition explicitly.
+  // Queue a transition to PIXEL_SHADER_RESOURCE so the SRV will be valid by the time the next
+  // draw fires. The barrier is not issued immediately; pendingBarriers accumulates every state
+  // change recorded by setTexture() in this pass and flushBindingsIfNeeded() emits them all in
+  // a single ResourceBarrier(N, ...) call right before the draw. The CPU-side _currentState is
+  // updated immediately so a second setTexture() with the same texture sees the correct state
+  // and does not enqueue a redundant barrier.
   auto current = d3d12Tex->currentState();
   if (current != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
-    TransitionResourceState(commandList, d3d12Tex->d3d12Resource(), current,
-                            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    pendingBarriers.addTransition(d3d12Tex->d3d12Resource(), current,
+                                  D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     d3d12Tex->setCurrentState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     // Track this texture so onEnd() can transition it back to COMMON. Without that step, D3D12
     // automatic state decay after ExecuteCommandLists drops the resource to COMMON, but our CPU
@@ -357,6 +380,12 @@ void D3D12RenderPass::flushBindingsIfNeeded() {
   if (!currentPipeline) {
     return;
   }
+  // Issue every queued state transition in a single ResourceBarrier(N, ...) call right before
+  // the draw. setTexture() may have added several transitions (one per unique sampled texture
+  // entering this pass); flushing them together lets the driver collapse redundant cache
+  // operations and avoids per-barrier API overhead.
+  pendingBarriers.flush(commandList);
+
   // Apply uniform CBVs — one root constant buffer view per dirty uniform binding.
   for (unsigned i = 0; i < MaxUniformBindings; i++) {
     auto& ub = uniformBindings[i];
@@ -461,10 +490,16 @@ void D3D12RenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCou
 }
 
 void D3D12RenderPass::onEnd() {
-  // Step 1: Resolve every multi-sampled colour attachment that has a resolveTexture into its
-  // single-sample destination, mirroring Vulkan's pResolveAttachments. Driver state requirements
-  // are RESOLVE_SOURCE for the multi-sample source and RESOLVE_DEST for the single-sample
-  // destination; both are restored to COMMON afterwards in step 2.
+  // Should not happen in normal flow (every draw flushes pendingBarriers), but guard against
+  // a render pass that ends without any draws ever recorded.
+  pendingBarriers.flush(commandList);
+
+  // Step 1: collect the pre-resolve transitions for every MSAA color attachment that has a
+  // resolveTexture, then issue them in a single ResourceBarrier(N, ...) before the actual
+  // ResolveSubresource calls. Driver state requirements are RESOLVE_SOURCE for the multi-sample
+  // source and RESOLVE_DEST for the single-sample destination; both are restored to COMMON
+  // afterwards in step 3, mirroring Vulkan's pResolveAttachments behaviour.
+  D3D12BarrierBatch resolveBatch;
   for (size_t i = 0; i < colorAttachments.size(); i++) {
     if (i >= resolveTextures.size() || resolveTextures[i] == nullptr) {
       continue;
@@ -474,31 +509,48 @@ void D3D12RenderPass::onEnd() {
     if (src == nullptr) {
       continue;
     }
-
     auto srcState = src->currentState();
     if (srcState != D3D12_RESOURCE_STATE_RESOLVE_SOURCE) {
-      TransitionResourceState(commandList, src->d3d12Resource(), srcState,
-                              D3D12_RESOURCE_STATE_RESOLVE_SOURCE);
+      resolveBatch.addTransition(src->d3d12Resource(), srcState,
+                                 D3D12_RESOURCE_STATE_RESOLVE_SOURCE);
       src->setCurrentState(D3D12_RESOURCE_STATE_RESOLVE_SOURCE);
     }
     auto dstState = resolveDst->currentState();
     if (dstState != D3D12_RESOURCE_STATE_RESOLVE_DEST) {
-      TransitionResourceState(commandList, resolveDst->d3d12Resource(), dstState,
-                              D3D12_RESOURCE_STATE_RESOLVE_DEST);
+      resolveBatch.addTransition(resolveDst->d3d12Resource(), dstState,
+                                 D3D12_RESOURCE_STATE_RESOLVE_DEST);
       resolveDst->setCurrentState(D3D12_RESOURCE_STATE_RESOLVE_DEST);
+    }
+  }
+  resolveBatch.flush(commandList);
+
+  // Step 2: do the actual MSAA resolves now that every source/destination is in the right state.
+  for (size_t i = 0; i < colorAttachments.size(); i++) {
+    if (i >= resolveTextures.size() || resolveTextures[i] == nullptr) {
+      continue;
+    }
+    auto& src = colorAttachments[i];
+    auto& resolveDst = resolveTextures[i];
+    if (src == nullptr) {
+      continue;
     }
     commandList->ResolveSubresource(resolveDst->d3d12Resource(), 0, src->d3d12Resource(), 0,
                                     static_cast<DXGI_FORMAT>(src->dxgiFormat()));
   }
 
-  // Step 2: Transition every color attachment back to COMMON. The next consumer (sample, copy,
-  // present) will issue its own transition from COMMON to whatever state it needs.
+  // Step 3: collapse every "back to COMMON" transition (color attachments, resolve targets,
+  // depth stencil, sampled textures) into a single ResourceBarrier. The next consumer
+  // (sample, copy, present) will issue its own transition from COMMON to whatever state it
+  // needs. D3D12 implicitly decays buffers and simultaneous-access textures to COMMON after
+  // the command list executes; explicitly issuing the matching CPU-side transition keeps our
+  // tracker aligned with the runtime so subsequent passes don't trip "Before state mismatch"
+  // barriers.
+  D3D12BarrierBatch finalBatch;
   for (auto& tex : colorAttachments) {
     if (tex == nullptr) continue;
     auto current = tex->currentState();
     if (current != D3D12_RESOURCE_STATE_COMMON) {
-      TransitionResourceState(commandList, tex->d3d12Resource(), current,
-                              D3D12_RESOURCE_STATE_COMMON);
+      finalBatch.addTransition(tex->d3d12Resource(), current, D3D12_RESOURCE_STATE_COMMON);
       tex->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
     }
   }
@@ -506,32 +558,27 @@ void D3D12RenderPass::onEnd() {
     if (tex == nullptr) continue;
     auto current = tex->currentState();
     if (current != D3D12_RESOURCE_STATE_COMMON) {
-      TransitionResourceState(commandList, tex->d3d12Resource(), current,
-                              D3D12_RESOURCE_STATE_COMMON);
+      finalBatch.addTransition(tex->d3d12Resource(), current, D3D12_RESOURCE_STATE_COMMON);
       tex->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
     }
   }
   if (depthStencilAttachment != nullptr) {
     auto current = depthStencilAttachment->currentState();
     if (current != D3D12_RESOURCE_STATE_COMMON) {
-      TransitionResourceState(commandList, depthStencilAttachment->d3d12Resource(), current,
-                              D3D12_RESOURCE_STATE_COMMON);
+      finalBatch.addTransition(depthStencilAttachment->d3d12Resource(), current,
+                               D3D12_RESOURCE_STATE_COMMON);
       depthStencilAttachment->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
     }
   }
-  // Transition every texture that was sampled (PIXEL_SHADER_RESOURCE) inside this pass back to
-  // COMMON. D3D12 implicitly decays buffers and simultaneous-access textures to COMMON after the
-  // command list executes; explicitly issuing the matching CPU-side transition keeps our tracker
-  // aligned with the runtime so subsequent passes don't trip "Before state mismatch" barriers.
   for (auto& tex : shaderResourceTextures) {
     if (tex == nullptr) continue;
     auto current = tex->currentState();
     if (current != D3D12_RESOURCE_STATE_COMMON) {
-      TransitionResourceState(commandList, tex->d3d12Resource(), current,
-                              D3D12_RESOURCE_STATE_COMMON);
+      finalBatch.addTransition(tex->d3d12Resource(), current, D3D12_RESOURCE_STATE_COMMON);
       tex->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
     }
   }
+  finalBatch.flush(commandList);
 }
 
 }  // namespace tgfx

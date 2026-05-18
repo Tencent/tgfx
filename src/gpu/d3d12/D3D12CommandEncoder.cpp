@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "D3D12CommandEncoder.h"
+#include "D3D12BarrierBatch.h"
 #include "D3D12Buffer.h"
 #include "D3D12CommandBuffer.h"
 #include "D3D12Defines.h"
@@ -100,10 +101,15 @@ void D3D12CommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTextu
     return;
   }
 
-  TransitionResourceState(cmd, d3d12Src->d3d12Resource(), d3d12Src->currentState(),
-                          D3D12_RESOURCE_STATE_COPY_SOURCE);
-  TransitionResourceState(cmd, d3d12Dst->d3d12Resource(), d3d12Dst->currentState(),
-                          D3D12_RESOURCE_STATE_COPY_DEST);
+  // Combine the two pre-copy transitions (src -> COPY_SOURCE, dst -> COPY_DEST) into a single
+  // ResourceBarrier(2, ...) call. addTransition() collapses no-op transitions, so callers that
+  // are already in the requested state simply skip ahead.
+  D3D12BarrierBatch enterBatch;
+  enterBatch.addTransition(d3d12Src->d3d12Resource(), d3d12Src->currentState(),
+                           D3D12_RESOURCE_STATE_COPY_SOURCE);
+  enterBatch.addTransition(d3d12Dst->d3d12Resource(), d3d12Dst->currentState(),
+                           D3D12_RESOURCE_STATE_COPY_DEST);
+  enterBatch.flush(cmd);
 
   D3D12_TEXTURE_COPY_LOCATION dst = {};
   dst.pResource = d3d12Dst->d3d12Resource();
@@ -126,13 +132,15 @@ void D3D12CommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTextu
   cmd->CopyTextureRegion(&dst, static_cast<UINT>(dstOffset.x), static_cast<UINT>(dstOffset.y), 0,
                          &src, &srcBox);
 
-  // Transition back to a generic shader-readable state. We use COMMON, which D3D12 will promote
-  // implicitly to PIXEL_SHADER_RESOURCE the next time the texture is sampled — matching the
-  // "promote on demand" behaviour the rest of the backend assumes.
-  TransitionResourceState(cmd, d3d12Src->d3d12Resource(), D3D12_RESOURCE_STATE_COPY_SOURCE,
+  // Transition both resources back to COMMON in a single barrier call. D3D12 will then promote
+  // them implicitly to PIXEL_SHADER_RESOURCE on the next sample — matching the "promote on
+  // demand" behaviour the rest of the backend assumes.
+  D3D12BarrierBatch exitBatch;
+  exitBatch.addTransition(d3d12Src->d3d12Resource(), D3D12_RESOURCE_STATE_COPY_SOURCE,
                           D3D12_RESOURCE_STATE_COMMON);
-  TransitionResourceState(cmd, d3d12Dst->d3d12Resource(), D3D12_RESOURCE_STATE_COPY_DEST,
+  exitBatch.addTransition(d3d12Dst->d3d12Resource(), D3D12_RESOURCE_STATE_COPY_DEST,
                           D3D12_RESOURCE_STATE_COMMON);
+  exitBatch.flush(cmd);
   d3d12Src->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
   d3d12Dst->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
 }

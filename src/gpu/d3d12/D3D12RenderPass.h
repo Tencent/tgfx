@@ -21,6 +21,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include "D3D12BarrierBatch.h"
 #include "D3D12Util.h"
 #include "tgfx/gpu/RenderPass.h"
 
@@ -95,6 +96,11 @@ class D3D12RenderPass : public RenderPass {
   D3D12CommandEncoder* encoder = nullptr;
   D3D12GPU* d3d12GPU = nullptr;
   ID3D12GraphicsCommandList* commandList = nullptr;
+
+  // Accumulator for resource state transitions queued by setTexture(). Flushed in
+  // flushBindingsIfNeeded() just before the actual draw, so a draw that touches N sampled
+  // textures issues a single ResourceBarrier(N, ...) call instead of N single-barrier calls.
+  D3D12BarrierBatch pendingBarriers;
 
   // Per-render-pass dedup cache for SRV slots in the GPU's shader-visible CBV/SRV/UAV ring.
   // Repeated bindings of the same (resource, format, mipLevels) within a single pass share one
