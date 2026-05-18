@@ -302,6 +302,22 @@ std::shared_ptr<Sampler> D3D12GPU::createSampler(const SamplerDescriptor& descri
   return sampler;
 }
 
+ComPtr<ID3D12RootSignature> D3D12GPU::findRootSignature(const std::vector<uint8_t>& shapeKey) {
+  auto iter = rootSignatureCache.find(shapeKey);
+  if (iter == rootSignatureCache.end()) {
+    return nullptr;
+  }
+  return iter->second;
+}
+
+void D3D12GPU::cacheRootSignature(std::vector<uint8_t> shapeKey,
+                                   ComPtr<ID3D12RootSignature> rootSignature) {
+  if (rootSignature == nullptr) {
+    return;
+  }
+  rootSignatureCache.emplace(std::move(shapeKey), std::move(rootSignature));
+}
+
 uint32_t D3D12GPU::MakeSamplerKey(const SamplerDescriptor& descriptor) {
   uint32_t key = 0;
   key |= static_cast<uint32_t>(descriptor.addressModeX);
@@ -585,6 +601,7 @@ void D3D12GPU::releaseAll(bool releaseGPU) {
     inflightSubmissions.clear();
   }
   samplerCache.clear();
+  rootSignatureCache.clear();
   // Drop pooled command allocator/list pairs. Done after wait so the GPU is no longer using
   // them; doing it before would still be safe (ComPtrs hold the only references) but ordering
   // matches the rest of the shutdown path.

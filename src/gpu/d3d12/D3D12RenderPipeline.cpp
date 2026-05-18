@@ -116,6 +116,46 @@ uint32_t D3D12RenderPipeline::getUniformBlockVisibility(unsigned binding) const 
 
 bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
                                               const RenderPipelineDescriptor& descriptor) {
+  // First, populate the per-binding index maps — those are needed for every pipeline regardless
+  // of whether the underlying ID3D12RootSignature is cached. Walk uniform blocks first, then
+  // texture samplers, so the parameter indices line up with the order used when serialising.
+  std::vector<uint8_t> shapeKey;
+  // Reserve roughly: 1 byte UBO count + 2 bytes per UBO (visibility) + 1 byte sampler count.
+  shapeKey.reserve(2 + descriptor.layout.uniformBlocks.size() * 2);
+
+  uint32_t paramCursor = 0;
+  shapeKey.push_back(static_cast<uint8_t>(descriptor.layout.uniformBlocks.size()));
+  for (const auto& entry : descriptor.layout.uniformBlocks) {
+    uniformRootParameterIndex[entry.binding] = paramCursor++;
+    uniformBlockVisibility[entry.binding] = entry.visibility;
+    uniformBindingSet.insert(entry.binding);
+    // Visibility is the only knob that varies between UBO entries (ShaderRegister is always 0).
+    // Encode it in the shape key so two pipelines with different vertex/fragment splits get
+    // different cache entries.
+    shapeKey.push_back(static_cast<uint8_t>(entry.visibility & 0xFF));
+    shapeKey.push_back(static_cast<uint8_t>((entry.visibility >> 8) & 0xFF));
+  }
+
+  shapeKey.push_back(static_cast<uint8_t>(descriptor.layout.textureSamplers.size()));
+  unsigned textureUnit = 0;
+  for (const auto& entry : descriptor.layout.textureSamplers) {
+    uint32_t srvParamIndex = paramCursor++;
+    uint32_t samplerParamIndex = paramCursor++;
+    textureRootParameterIndex[entry.binding] = srvParamIndex;
+    samplerRootParameterIndex[entry.binding] = samplerParamIndex;
+    textureUnits[entry.binding] = textureUnit++;
+    textureBindingSet.insert(entry.binding);
+  }
+
+  // Cache hit: reuse the existing D3D12 root signature object. Different pipelines sharing the
+  // same binding shape (e.g. all single-texture fragment-only shaders) end up referencing one
+  // ID3D12RootSignature, saving SerializeRootSignature + CreateRootSignature on every PSO.
+  if (auto cached = gpu->findRootSignature(shapeKey); cached != nullptr) {
+    rootSignature = std::move(cached);
+    return true;
+  }
+
+  // Cache miss: build the root signature description from scratch and serialise it.
   std::vector<D3D12_ROOT_PARAMETER> rootParameters;
   // Each texture binding contributes two descriptor tables (SRV + Sampler) that live in different
   // descriptor heap types. They cannot share one D3D12_ROOT_PARAMETER because each table can only
@@ -128,7 +168,6 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   samplerRanges.reserve(descriptor.layout.textureSamplers.size());
 
   for (const auto& entry : descriptor.layout.uniformBlocks) {
-    uint32_t paramIndex = static_cast<uint32_t>(rootParameters.size());
     D3D12_ROOT_PARAMETER param = {};
     param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     param.ShaderVisibility = ToD3D12ShaderVisibility(entry.visibility);
@@ -137,23 +176,18 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
     param.Descriptor.ShaderRegister = 0;
     param.Descriptor.RegisterSpace = 0;
     rootParameters.push_back(param);
-
-    uniformRootParameterIndex[entry.binding] = paramIndex;
-    uniformBlockVisibility[entry.binding] = entry.visibility;
-    uniformBindingSet.insert(entry.binding);
   }
 
-  unsigned textureUnit = 0;
-  for (const auto& entry : descriptor.layout.textureSamplers) {
+  unsigned rangeRegister = 0;
+  for (size_t i = 0; i < descriptor.layout.textureSamplers.size(); i++) {
     auto& srvRange = srvRanges.emplace_back();
     srvRange = {};
     srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     srvRange.NumDescriptors = 1;
-    srvRange.BaseShaderRegister = textureUnit;
+    srvRange.BaseShaderRegister = rangeRegister;
     srvRange.RegisterSpace = 0;
     srvRange.OffsetInDescriptorsFromTableStart = 0;
 
-    uint32_t srvParamIndex = static_cast<uint32_t>(rootParameters.size());
     D3D12_ROOT_PARAMETER srvParam = {};
     srvParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     srvParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
@@ -165,11 +199,10 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
     samplerRange = {};
     samplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
     samplerRange.NumDescriptors = 1;
-    samplerRange.BaseShaderRegister = textureUnit;
+    samplerRange.BaseShaderRegister = rangeRegister;
     samplerRange.RegisterSpace = 0;
     samplerRange.OffsetInDescriptorsFromTableStart = 0;
 
-    uint32_t samplerParamIndex = static_cast<uint32_t>(rootParameters.size());
     D3D12_ROOT_PARAMETER samplerParam = {};
     samplerParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     samplerParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
@@ -177,10 +210,7 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
     samplerParam.DescriptorTable.pDescriptorRanges = &samplerRange;
     rootParameters.push_back(samplerParam);
 
-    textureRootParameterIndex[entry.binding] = srvParamIndex;
-    samplerRootParameterIndex[entry.binding] = samplerParamIndex;
-    textureUnits[entry.binding] = textureUnit++;
-    textureBindingSet.insert(entry.binding);
+    rangeRegister++;
   }
 
   D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
@@ -213,6 +243,11 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
     rootSignature = nullptr;
     return false;
   }
+  // Publish the freshly-built root signature so subsequent pipelines with the same shape hit
+  // the cache. The map keeps an additional ComPtr reference; the pipeline retains its own
+  // reference via the rootSignature member, so the object outlives whichever owner is dropped
+  // first.
+  gpu->cacheRootSignature(std::move(shapeKey), rootSignature);
   return true;
 }
 
