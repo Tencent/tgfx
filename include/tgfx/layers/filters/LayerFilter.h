@@ -41,6 +41,8 @@ class LayerFilter : public LayerProperty {
   /**
    * Applies this filter to the given input image at the specified scale factor. The offset stores
    * the translation of the filtered image relative to the input image origin.
+   * the translation of the filtered image relative to the input image origin. Subclasses that need
+   * custom rendering should override onFilterImage().
    * @param input The source image to filter.
    * @param scale The scale factor to apply to scale-dependent filter parameters.
    * @param offset If non-null, receives the (x, y) translation of the filtered image.
@@ -128,6 +130,12 @@ class LayerFilter : public LayerProperty {
   virtual std::shared_ptr<ImageFilter> getComposeFilter(float scale, float width = 0.f,
                                                          float height = 0.f,
                                                          const Point& originOffset = {});
+
+  /**
+   * Returns the cached ImageFilter for the given scale, creating it via onCreateImageFilter() if
+   * needed. Available for subclasses that override onFilterImage() and need the internal ImageFilter.
+   */
+  std::shared_ptr<ImageFilter> getImageFilter(float scale);
 
  private:
   std::unique_ptr<Rect> _clipBounds = nullptr;
