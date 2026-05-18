@@ -398,6 +398,10 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
       LOGE("DisplayList::renderPartial: Failed to create partial cache surface.");
       return renderDirect(surface, autoClear);
     }
+    // Explicitly clear the freshly created partial cache surface. Some legacy GL drivers
+    // (notably Intel macOS GL) do not zero-fill new render targets, which causes garbage
+    // pixels to appear in regions that have not yet been overdrawn by drawRootLayer below.
+    partialCache->getCanvas()->clear();
     surfaceCaches.push_back(partialCache);
     cacheChanged = true;
   }
@@ -864,6 +868,13 @@ std::vector<std::shared_ptr<Tile>> DisplayList::createContinuousTiles(const Surf
   if (surface == nullptr) {
     return {};
   }
+  // Explicitly clear the freshly created tile atlas. Some legacy GL drivers
+  // (notably Intel macOS GL) do not zero-fill new render targets. Without this,
+  // tiles that are referenced by drawTasks but not fully overdrawn (e.g. when using
+  // fallback caches across zoom levels, or when refine budget is exhausted) sample
+  // uninitialized memory and produce regular white/grey/black blocks aligned to the
+  // tile grid during zoom interactions.
+  surface->getCanvas()->clear();
   surfaceCaches.push_back(std::move(surface));
   auto surfaceIndex = surfaceCaches.size() - 1;
   auto emptyCount = countX * countY - requestCount;
@@ -901,6 +912,9 @@ bool DisplayList::createEmptyTiles(const Surface* renderSurface) {
   if (surface == nullptr) {
     return false;
   }
+  // See comment in createContinuousTiles: explicit clear avoids garbage pixels on
+  // drivers that do not zero-fill freshly allocated render targets.
+  surface->getCanvas()->clear();
   surfaceCaches.push_back(std::move(surface));
   auto surfaceIndex = surfaceCaches.size() - 1;
   emptyTiles.reserve(emptyTiles.size() + static_cast<size_t>(countX * countY));
