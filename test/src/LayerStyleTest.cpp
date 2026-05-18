@@ -36,7 +36,7 @@ TGFX_TEST(LayerStyleTest, NoiseStyleMovingRect) {
   auto parent = ShapeLayer::Make();
   parent->setFillStyle(ShapeStyle::Make(Color::White()));
   Path parentPath;
-  parentPath.addRect(Rect::MakeXYWH(50, 50, 300, 300));
+  parentPath.addRect(Rect::MakeXYWH(50.f, 50.f, 300.f, 300.f));
   parent->setPath(parentPath);
   displayList.root()->addChild(parent);
 
@@ -47,6 +47,9 @@ TGFX_TEST(LayerStyleTest, NoiseStyleMovingRect) {
   parent->addChild(child);
 
   for (int i = 0; i < 8; i++) {
+    auto parentOffsetX = static_cast<float>(i) * 10.f;
+    parent->setMatrix(Matrix::MakeTrans(parentOffsetX, 0.f));
+
     Path path;
     auto offsetX = 50.f + static_cast<float>(i) * 20.f;
     path.addRect(Rect::MakeXYWH(offsetX, 100.f, 100.f, 100.f));
