@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include "tgfx/gpu/PixelFormat.h"
 
 namespace tgfx {

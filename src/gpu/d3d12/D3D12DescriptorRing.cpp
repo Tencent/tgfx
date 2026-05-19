@@ -67,9 +67,10 @@ D3D12DescriptorRing::Range D3D12DescriptorRing::allocate(uint32_t count) {
   if (head + count > _capacity) {
     uint32_t skipped = _capacity - head;
     if (skipped > free - count) {
-      LOGE("D3D12DescriptorRing::allocate() wrap skip exceeds free space (count=%u free=%u "
-           "skipped=%u).",
-           count, free, skipped);
+      LOGE(
+          "D3D12DescriptorRing::allocate() wrap skip exceeds free space (count=%u free=%u "
+          "skipped=%u).",
+          count, free, skipped);
       return {};
     }
     startSlot = 0;

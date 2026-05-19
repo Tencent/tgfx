@@ -124,9 +124,8 @@ void D3D12UploadHeap::commit(uint64_t fenceValue) {
   }
   // Pair the about-to-be-signalled fence with the bytes consumed since the last commit so
   // retire() can give those bytes back when the GPU finishes with them.
-  size_t bytesSinceCommit = (head >= committedHead)
-                                ? (head - committedHead)
-                                : (_capacity - (committedHead - head));
+  size_t bytesSinceCommit =
+      (head >= committedHead) ? (head - committedHead) : (_capacity - (committedHead - head));
   InflightRange entry = {};
   entry.fenceValue = fenceValue;
   entry.newHead = head;

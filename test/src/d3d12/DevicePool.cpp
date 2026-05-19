@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/d3d12/D3D12Device.h"
 #include "utils/DevicePool.h"
+#include "tgfx/gpu/d3d12/D3D12Device.h"
 
 namespace tgfx {
 thread_local std::shared_ptr<Device> cachedDevice = nullptr;

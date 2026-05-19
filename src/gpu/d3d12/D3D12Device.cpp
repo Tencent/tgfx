@@ -48,9 +48,10 @@ std::shared_ptr<D3D12Device> D3D12Device::Make() {
       dredSettings->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
       LOGE("[DRED setup] Auto-breadcrumbs and page-fault tracking enabled.");
     } else {
-      LOGE("[DRED setup] D3D12GetDebugInterface(ID3D12DeviceRemovedExtendedDataSettings) "
-           "returned HRESULT=0x%08X; DRED unavailable.",
-           static_cast<unsigned>(dredHr));
+      LOGE(
+          "[DRED setup] D3D12GetDebugInterface(ID3D12DeviceRemovedExtendedDataSettings) "
+          "returned HRESULT=0x%08X; DRED unavailable.",
+          static_cast<unsigned>(dredHr));
     }
   }
 #endif

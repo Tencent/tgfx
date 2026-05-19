@@ -52,9 +52,9 @@ std::shared_ptr<D3D12Buffer> D3D12Buffer::Make(D3D12GPU* gpu, size_t size, uint3
   }
 
   ComPtr<ID3D12Resource> d3d12Resource = nullptr;
-  auto hr = gpu->device()->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE,
-                                                   &resourceDesc, initialState, nullptr,
-                                                   IID_PPV_ARGS(&d3d12Resource));
+  auto hr =
+      gpu->device()->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc,
+                                             initialState, nullptr, IID_PPV_ARGS(&d3d12Resource));
   if (FAILED(hr)) {
     LOGE("D3D12Buffer::Make() CreateCommittedResource failed, HRESULT=0x%08X",
          static_cast<unsigned>(hr));

@@ -79,9 +79,9 @@ bool D3D12Window::PlatformState::rebuild(int newWidth, int newHeight) {
   // returns DXGI_ERROR_INVALID_CALL because the swapchain still owns outstanding references.
   backBuffers.clear();
   currentProxy = nullptr;
-  auto hr = swapChain->ResizeBuffers(BACKBUFFER_COUNT, static_cast<UINT>(newWidth),
-                                     static_cast<UINT>(newHeight),
-                                     static_cast<DXGI_FORMAT>(format), 0);
+  auto hr =
+      swapChain->ResizeBuffers(BACKBUFFER_COUNT, static_cast<UINT>(newWidth),
+                               static_cast<UINT>(newHeight), static_cast<DXGI_FORMAT>(format), 0);
   if (FAILED(hr)) {
     LOGE("D3D12Window: ResizeBuffers failed, HRESULT=0x%08X", static_cast<unsigned>(hr));
     return false;
@@ -196,8 +196,7 @@ std::shared_ptr<D3D12Window> D3D12Window::MakeFrom(HWND hwnd, std::shared_ptr<D3
     return nullptr;
   }
   auto* gpu = static_cast<D3D12GPU*>(context->gpu());
-  auto* d3d12CommandQueue =
-      static_cast<D3D12CommandQueue*>(gpu->queue())->d3d12CommandQueue();
+  auto* d3d12CommandQueue = static_cast<D3D12CommandQueue*>(gpu->queue())->d3d12CommandQueue();
 
   RECT clientRect = {};
   GetClientRect(hwnd, &clientRect);
@@ -293,8 +292,7 @@ D3D12Window::~D3D12Window() {
   auto context = device->lockContext();
   if (context != nullptr) {
     auto* d3d12GPU = static_cast<D3D12GPU*>(context->gpu());
-    auto* d3d12CmdQueue =
-        static_cast<D3D12CommandQueue*>(d3d12GPU->queue())->d3d12CommandQueue();
+    auto* d3d12CmdQueue = static_cast<D3D12CommandQueue*>(d3d12GPU->queue())->d3d12CommandQueue();
 
     // 1. Wait for all tgfx-managed submissions to complete.
     d3d12GPU->queue()->waitUntilCompleted();
@@ -303,8 +301,8 @@ D3D12Window::~D3D12Window() {
     //    swap-chain release path below trips OBJECT_DELETED_WHILE_STILL_IN_USE because DXGI's
     //    internal flip operation is still in flight on the queue.
     ComPtr<ID3D12Fence> drainFence;
-    if (SUCCEEDED(d3d12GPU->device()->CreateFence(0, D3D12_FENCE_FLAG_NONE,
-                                                  IID_PPV_ARGS(&drainFence)))) {
+    if (SUCCEEDED(
+            d3d12GPU->device()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&drainFence)))) {
       const UINT64 targetValue = 1;
       if (SUCCEEDED(d3d12CmdQueue->Signal(drainFence.Get(), targetValue))) {
         if (drainFence->GetCompletedValue() < targetValue) {

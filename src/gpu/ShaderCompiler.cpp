@@ -148,9 +148,8 @@ std::vector<uint32_t> CompileGLSLToSPIRV(const shaderc::Compiler* compiler,
   // See header doc on `preserveInterfaceVariables` for the rationale; D3D12 requires zero so the
   // optimiser cannot dead-strip fragment inputs that have no body uses, while Vulkan/Metal stay
   // on the performance preset for tighter SPIR-V.
-  options.SetOptimizationLevel(preserveInterfaceVariables
-                                   ? shaderc_optimization_level_zero
-                                   : shaderc_optimization_level_performance);
+  options.SetOptimizationLevel(preserveInterfaceVariables ? shaderc_optimization_level_zero
+                                                          : shaderc_optimization_level_performance);
   options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_0);
 
   shaderc_shader_kind shaderKind =

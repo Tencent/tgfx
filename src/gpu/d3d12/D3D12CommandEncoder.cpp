@@ -217,9 +217,10 @@ void D3D12CommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextur
                                               D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
                                               IID_PPV_ARGS(&stagingBuffer));
     if (FAILED(hr)) {
-      LOGE("D3D12CommandEncoder::copyTextureToBuffer: staging buffer creation failed, "
-           "HRESULT=0x%08X",
-           static_cast<unsigned>(hr));
+      LOGE(
+          "D3D12CommandEncoder::copyTextureToBuffer: staging buffer creation failed, "
+          "HRESULT=0x%08X",
+          static_cast<unsigned>(hr));
       // Fall back to direct copy with potentially wrong stride; better than dropping silently.
       stagingBuffer = nullptr;
       needsRepack = false;
@@ -288,8 +289,9 @@ void D3D12CommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> tex
   if (generator == nullptr || !generator->isReady()) {
     static bool warned = false;
     if (!warned) {
-      LOGE("D3D12CommandEncoder::generateMipmapsForTexture: mipmap generator unavailable, "
-           "skipping (subsequent calls silently no-op).");
+      LOGE(
+          "D3D12CommandEncoder::generateMipmapsForTexture: mipmap generator unavailable, "
+          "skipping (subsequent calls silently no-op).");
       warned = true;
     }
     return;
@@ -385,8 +387,7 @@ void D3D12CommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> tex
     cmd->SetComputeRootDescriptorTable(1, srvGpu);
     cmd->SetComputeRootDescriptorTable(2, uavGpu);
 
-    UINT groupsX =
-        (outWidth + D3D12_MIPMAP_THREAD_GROUP_SIZE - 1) / D3D12_MIPMAP_THREAD_GROUP_SIZE;
+    UINT groupsX = (outWidth + D3D12_MIPMAP_THREAD_GROUP_SIZE - 1) / D3D12_MIPMAP_THREAD_GROUP_SIZE;
     UINT groupsY =
         (outHeight + D3D12_MIPMAP_THREAD_GROUP_SIZE - 1) / D3D12_MIPMAP_THREAD_GROUP_SIZE;
     cmd->Dispatch(groupsX, groupsY, 1);

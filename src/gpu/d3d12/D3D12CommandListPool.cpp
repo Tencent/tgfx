@@ -43,17 +43,18 @@ D3D12CommandListPool::Entry D3D12CommandListPool::acquire(ID3D12Device* device) 
     }
     hr = entry.commandList->Reset(entry.allocator.Get(), nullptr);
     if (FAILED(hr)) {
-      LOGE("D3D12CommandListPool::acquire: command-list Reset failed (HRESULT=0x%08X), "
-           "discarding.",
-           static_cast<unsigned>(hr));
+      LOGE(
+          "D3D12CommandListPool::acquire: command-list Reset failed (HRESULT=0x%08X), "
+          "discarding.",
+          static_cast<unsigned>(hr));
       continue;
     }
     return entry;
   }
   // Cold path: nothing pooled (or every pooled entry failed to Reset). Build a fresh pair.
   ComPtr<ID3D12CommandAllocator> allocator = nullptr;
-  auto hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                           IID_PPV_ARGS(&allocator));
+  auto hr =
+      device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator));
   if (FAILED(hr)) {
     LOGE("D3D12CommandListPool::acquire: CreateCommandAllocator failed (HRESULT=0x%08X).",
          static_cast<unsigned>(hr));

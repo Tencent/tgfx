@@ -47,8 +47,7 @@ std::shared_ptr<D3D12Sampler> D3D12Sampler::Make(D3D12GPU* gpu,
   // used between mips, not whether mip selection happens). Mirror VulkanSampler's maxLod clamp
   // so a SamplerDescriptor with mipmapMode=None produces the same result that
   // RenderContext::drawImageRect (and other Strict-constraint paths) intend.
-  samplerDesc.MaxLOD =
-      (descriptor.mipmapMode == MipmapMode::None) ? 0.0f : D3D12_FLOAT32_MAX;
+  samplerDesc.MaxLOD = (descriptor.mipmapMode == MipmapMode::None) ? 0.0f : D3D12_FLOAT32_MAX;
 
   // Permanently reserve a slot in the process-wide shader-visible Sampler heap and write the
   // descriptor there. The slot lives for the rest of the GPU's lifetime, mirroring the cache

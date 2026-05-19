@@ -36,7 +36,7 @@ std::shared_ptr<D3D12Semaphore> D3D12Semaphore::Make(D3D12GPU* gpu) {
 }
 
 std::shared_ptr<D3D12Semaphore> D3D12Semaphore::MakeFrom(D3D12GPU* gpu, ComPtr<ID3D12Fence> fence,
-                                                        uint64_t value) {
+                                                         uint64_t value) {
   if (gpu == nullptr || fence == nullptr) {
     return nullptr;
   }
