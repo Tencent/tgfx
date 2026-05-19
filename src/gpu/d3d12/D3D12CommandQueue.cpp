@@ -48,6 +48,10 @@ D3D12CommandQueue::~D3D12CommandQueue() {
   // application must call waitUntilCompleted() before destruction if it cares about durability.
 }
 
+std::chrono::steady_clock::time_point D3D12CommandQueue::completedFrameTime() const {
+  return gpu->lastFenceSignalTime();
+}
+
 void D3D12CommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset,
                                     const void* data, size_t dataSize) {
   if (!buffer || !data || dataSize == 0) {
@@ -88,9 +92,9 @@ void D3D12CommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
   uint64_t stagingOffset = 0;
   uint8_t* stagingCpu = nullptr;
   ComPtr<ID3D12Resource> fallbackResource = nullptr;
-  auto allocation = gpu->uploadHeap().allocate(
-      static_cast<size_t>(stagingSize),
-      static_cast<size_t>(D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT));
+  auto allocation =
+      gpu->uploadHeap().allocate(static_cast<size_t>(stagingSize),
+                                 static_cast<size_t>(D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT));
   if (allocation.valid()) {
     stagingResource = allocation.resource;
     stagingOffset = allocation.offsetInResource;
@@ -115,9 +119,10 @@ void D3D12CommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
                                                      D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
                                                      IID_PPV_ARGS(&fallbackResource));
     if (FAILED(hr)) {
-      LOGE("D3D12CommandQueue::writeTexture: fallback CreateCommittedResource failed, "
-           "HRESULT=0x%08X",
-           static_cast<unsigned>(hr));
+      LOGE(
+          "D3D12CommandQueue::writeTexture: fallback CreateCommittedResource failed, "
+          "HRESULT=0x%08X",
+          static_cast<unsigned>(hr));
       return;
     }
     void* mapped = nullptr;
@@ -231,8 +236,9 @@ void D3D12CommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   if (!pendingUploads.empty()) {
     auto entry = gpu->commandListPool().acquire(gpu->device());
     if (!entry.valid()) {
-      LOGE("D3D12CommandQueue::submit: failed to acquire transient upload list, dropping "
-           "uploads.");
+      LOGE(
+          "D3D12CommandQueue::submit: failed to acquire transient upload list, dropping "
+          "uploads.");
       pendingUploads.clear();
       pendingFootprints.clear();
     } else {
@@ -248,6 +254,10 @@ void D3D12CommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   request.uploads = std::move(pendingUploads);
   request.signalSemaphore = std::move(pendingSignalSemaphore);
   request.waitSemaphore = std::move(pendingWaitSemaphore);
+  // Capture _frameTime here (CommandQueue base class member). The GPU stamps the inflight
+  // submission with this value and later publishes it as _lastFenceSignalTime so the resource
+  // cache can decide which scratch resources the GPU is done reading.
+  request.frameTime = _frameTime;
   pendingUploads.clear();
   pendingFootprints.clear();
   pendingSignalSemaphore = nullptr;
@@ -285,12 +295,14 @@ void D3D12CommandQueue::waitUntilCompleted() {
       request.session.auxAllocators.push_back(std::move(entry.allocator));
       request.session.auxCommandLists.push_back(std::move(entry.commandList));
       request.uploads = std::move(pendingUploads);
+      request.frameTime = _frameTime;
       pendingUploads.clear();
       pendingFootprints.clear();
       gpu->executeSubmission(std::move(request));
     } else {
-      LOGE("D3D12CommandQueue::waitUntilCompleted: failed to acquire upload list, dropping "
-           "uploads.");
+      LOGE(
+          "D3D12CommandQueue::waitUntilCompleted: failed to acquire upload list, dropping "
+          "uploads.");
       pendingUploads.clear();
       pendingFootprints.clear();
     }

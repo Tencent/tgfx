@@ -61,6 +61,14 @@ class D3D12CommandQueue : public CommandQueue {
 
   void waitUntilCompleted() override;
 
+ protected:
+  // Report the steady-clock timestamp of the most recently completed inflight submission so
+  // ResourceCache::findScratchResource can correctly skip scratch buffers/textures that the GPU
+  // is still reading. The base class default returns the *current* frame time, which lets a
+  // second flush() reuse a vertex buffer the first flush()'s GPU work is still reading
+  // (see RecordingTest.MultipleRecordingsInOrder).
+  std::chrono::steady_clock::time_point completedFrameTime() const override;
+
  private:
   void flushUploads(ID3D12GraphicsCommandList* commandList);
 

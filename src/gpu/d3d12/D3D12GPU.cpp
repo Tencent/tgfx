@@ -18,8 +18,8 @@
 
 #include "D3D12GPU.h"
 #include <dxgi1_4.h>
-#include <shaderc/shaderc.hpp>
 #include <algorithm>
+#include <shaderc/shaderc.hpp>
 #include <string>
 #include <vector>
 #include "D3D12Buffer.h"
@@ -151,8 +151,7 @@ D3D12GPU::D3D12GPU(ComPtr<ID3D12Device> device, ComPtr<IDXGIAdapter1> adapter)
   compiler = std::make_unique<shaderc::Compiler>();
 }
 
-D3D12_GPU_DESCRIPTOR_HANDLE D3D12GPU::allocatePermanentSamplerSlot(
-    const D3D12_SAMPLER_DESC& desc) {
+D3D12_GPU_DESCRIPTOR_HANDLE D3D12GPU::allocatePermanentSamplerSlot(const D3D12_SAMPLER_DESC& desc) {
   D3D12_GPU_DESCRIPTOR_HANDLE invalid = {};
   if (_samplerHeap == nullptr || _samplerHeapSize >= _samplerHeapCapacity) {
     LOGE("D3D12GPU::allocatePermanentSamplerSlot: sampler heap exhausted (%u/%u).",
@@ -311,7 +310,7 @@ ComPtr<ID3D12RootSignature> D3D12GPU::findRootSignature(const std::vector<uint8_
 }
 
 void D3D12GPU::cacheRootSignature(std::vector<uint8_t> shapeKey,
-                                   ComPtr<ID3D12RootSignature> rootSignature) {
+                                  ComPtr<ID3D12RootSignature> rootSignature) {
   if (rootSignature == nullptr) {
     return;
   }
@@ -551,10 +550,11 @@ void D3D12GPU::dumpDeviceRemovedExtendedData(const char* tag) {
   if (SUCCEEDED(dred->GetAutoBreadcrumbsOutput(&breadcrumbsOutput))) {
     auto* node = breadcrumbsOutput.pHeadAutoBreadcrumbNode;
     if (node == nullptr) {
-      LOGE("[DRED %s] auto-breadcrumb list is empty — either no command list executed before "
-           "the fault, or the driver did not record breadcrumbs (verify "
-           "SetAutoBreadcrumbsEnablement(FORCED_ON) was called before D3D12CreateDevice).",
-           tag);
+      LOGE(
+          "[DRED %s] auto-breadcrumb list is empty — either no command list executed before "
+          "the fault, or the driver did not record breadcrumbs (verify "
+          "SetAutoBreadcrumbsEnablement(FORCED_ON) was called before D3D12CreateDevice).",
+          tag);
     }
     int nodeIndex = 0;
     while (node != nullptr) {
@@ -670,9 +670,10 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
       _frameFence->SetEventOnCompletion(oldest.fenceValue, _frameFenceEvent);
       auto waitResult = WaitForSingleObject(_frameFenceEvent, 5000);
       if (waitResult != WAIT_OBJECT_0) {
-        LOGE("D3D12GPU::executeSubmission: backpressure wait timed out (target=%llu), "
-             "marking context lost.",
-             static_cast<unsigned long long>(oldest.fenceValue));
+        LOGE(
+            "D3D12GPU::executeSubmission: backpressure wait timed out (target=%llu), "
+            "marking context lost.",
+            static_cast<unsigned long long>(oldest.fenceValue));
         markContextLost("executeSubmission backpressure timeout");
         reclaimAbandonedSession(std::move(request.session));
         request.uploads.clear();
@@ -772,9 +773,10 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
   _uploadHeap.commit(_lastSignalledFenceValue);
   auto signalHr = cmdQueue->Signal(_frameFence.Get(), _lastSignalledFenceValue);
   if (FAILED(signalHr) || FAILED(d3d12Device->GetDeviceRemovedReason())) {
-    LOGE("D3D12GPU::executeSubmission: Signal failed (HRESULT=0x%08X) or device removed; "
-         "marking context lost.",
-         static_cast<unsigned>(signalHr));
+    LOGE(
+        "D3D12GPU::executeSubmission: Signal failed (HRESULT=0x%08X) or device removed; "
+        "marking context lost.",
+        static_cast<unsigned>(signalHr));
     markContextLost("executeSubmission Signal");
     reclaimAbandonedSession(std::move(request.session));
     request.uploads.clear();
@@ -787,6 +789,9 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
 
   InflightSubmission inflight = {};
   inflight.fenceValue = _lastSignalledFenceValue;
+  // Capture the submission timestamp so pollCompletedSubmissions() can later publish it as the
+  // "GPU completed up to this point" marker that ResourceCache uses to gate scratch reuse.
+  inflight.frameTime = request.frameTime;
   inflight.session = std::move(request.session);
   inflight.uploads = std::move(request.uploads);
   inflightSubmissions.push_back(std::move(inflight));
@@ -816,9 +821,10 @@ void D3D12GPU::waitAllInflightSubmissions() {
       _frameFence->SetEventOnCompletion(last.fenceValue, _frameFenceEvent);
       auto waitResult = WaitForSingleObject(_frameFenceEvent, 5000);
       if (waitResult != WAIT_OBJECT_0) {
-        LOGE("D3D12GPU::waitAllInflightSubmissions: fence wait timed out (target=%llu), "
-             "marking context lost.",
-             static_cast<unsigned long long>(last.fenceValue));
+        LOGE(
+            "D3D12GPU::waitAllInflightSubmissions: fence wait timed out (target=%llu), "
+            "marking context lost.",
+            static_cast<unsigned long long>(last.fenceValue));
         markContextLost("waitAllInflightSubmissions timeout");
         while (!inflightSubmissions.empty()) {
           reclaimSubmission(inflightSubmissions.front());
@@ -842,7 +848,15 @@ void D3D12GPU::pollCompletedSubmissions() {
   }
   auto completed = _frameFence->GetCompletedValue();
   while (!inflightSubmissions.empty() && inflightSubmissions.front().fenceValue <= completed) {
-    reclaimSubmission(inflightSubmissions.front());
+    auto& front = inflightSubmissions.front();
+    // Publish the just-completed submission's submit-time stamp so ResourceCache can decide
+    // which scratch resources the GPU has finished reading. Without this update, the default
+    // CommandQueue::completedFrameTime() returns the *current* frame time, telling the cache
+    // every resource is reusable immediately — that lets a second flush() steal a vertex
+    // buffer the first flush()'s GPU work is still reading (see RecordingTest race).
+    auto ticks = front.frameTime.time_since_epoch().count();
+    _lastFenceSignalTime.store(ticks, std::memory_order_release);
+    reclaimSubmission(front);
     inflightSubmissions.pop_front();
   }
   // Free shader-visible CBV/SRV/UAV descriptor slots whose owning submissions have signalled.
@@ -855,12 +869,16 @@ void D3D12GPU::pollCompletedSubmissions() {
   processUnreferencedResources();
 }
 
+std::chrono::steady_clock::time_point D3D12GPU::lastFenceSignalTime() const {
+  auto ticks = _lastFenceSignalTime.load(std::memory_order_acquire);
+  return std::chrono::steady_clock::time_point(std::chrono::steady_clock::duration(ticks));
+}
+
 void D3D12GPU::reclaimSubmission(InflightSubmission& submission) {
   // The GPU has signalled the fence value associated with this submission, so every command
   // allocator/list pair it referenced is safe to reuse. Return them to the pool before tearing
   // down the rest of the session — once the FrameSession destructor runs, the ComPtrs are gone.
-  if (submission.session.commandAllocator != nullptr &&
-      submission.session.commandList != nullptr) {
+  if (submission.session.commandAllocator != nullptr && submission.session.commandList != nullptr) {
     D3D12CommandListPool::Entry entry = {};
     entry.allocator = std::move(submission.session.commandAllocator);
     entry.commandList = std::move(submission.session.commandList);
@@ -869,8 +887,8 @@ void D3D12GPU::reclaimSubmission(InflightSubmission& submission) {
   // Auxiliary command lists (e.g. transient upload lists recorded by D3D12CommandQueue::submit)
   // are paired one-to-one with their auxAllocators by index; recycle them together so the pool
   // sees consistent (allocator, list) pairs.
-  size_t auxCount = std::min(submission.session.auxAllocators.size(),
-                             submission.session.auxCommandLists.size());
+  size_t auxCount =
+      std::min(submission.session.auxAllocators.size(), submission.session.auxCommandLists.size());
   for (size_t i = 0; i < auxCount; i++) {
     if (submission.session.auxAllocators[i] != nullptr &&
         submission.session.auxCommandLists[i] != nullptr) {
