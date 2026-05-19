@@ -274,34 +274,59 @@ D3D12Window::D3D12Window(std::shared_ptr<Device> device, std::unique_ptr<Platfor
 }
 
 D3D12Window::~D3D12Window() {
-  // The shutdown ordering here is load-bearing. Naively releasing the swap chain first leaves
-  // the cached D3D12ExternalTexture (which wraps each backbuffer) alive inside D3D12GPU's
-  // resources list. When ~Window later triggers D3D12GPU::releaseAll, it walks that list and
-  // calls onReleaseTexture, which releases the ComPtr on a backbuffer whose swap chain is
-  // already gone — that crashes inside d3d12.dll on shutdown.
+  // Tear-down ordering is delicate. After the last frame, swap-chain Present() schedules its
+  // own GPU work on our command queue (the GPU-side flip), but that work is *not* tracked by
+  // any tgfx fence — D3D12CommandQueue::waitUntilCompleted() only waits on submissions we
+  // submitted via executeSubmission. If we release the swap chain (or its backbuffers) while
+  // that Present work is still pending, the runtime fires
+  // OBJECT_DELETED_WHILE_STILL_IN_USE (#921) and the debug layer asserts.
   //
-  // There is also a second, less obvious owner of backbuffer references: the recycled command
-  // lists sitting in D3D12CommandListPool. Each list still holds the ID3D12Resource references
-  // it was last recorded with (RTV, ResourceBarrier transitions on the backbuffer), and those
-  // references are not released until the next acquire()'s Reset() call. We must therefore
-  // drop the pooled lists too before destroying the swap chain.
+  // To make sure the queue really is idle, we Signal a fresh fence on the queue and wait for
+  // it: that flushes everything previously enqueued, Present included.
   //
-  // Drain order:
-  //   1) drop currentProxy           -> ExternalRenderTarget enters ResourceCache::returnQueue
-  //   2) purge the resource cache    -> deletes ExternalRenderTarget, enqueues
-  //                                      D3D12ExternalTexture into D3D12GPU::returnQueue
-  //   3) process the GPU's queue     -> calls onReleaseTexture(), dropping ComPtr<backbuffer>
-  //   4) clear the command list pool -> drops the freeList's command lists, releasing whatever
-  //                                      backbuffer references those lists recorded earlier
-  //   5) clear backBuffers + swap chain (now safe; no outstanding refs from inside tgfx)
+  // Then we still have to release the in-tgfx owners of each backbuffer before destroying
+  // the swap chain itself:
+  //   - the cached ExternalRenderTarget / ExternalTexture pair (drained via ResourceCache and
+  //     D3D12GPU return queues)
+  //   - recycled command lists in D3D12CommandListPool (each list still pins the resources it
+  //     was last recorded against until its next Reset())
   auto context = device->lockContext();
   if (context != nullptr) {
-    context->gpu()->queue()->waitUntilCompleted();
+    auto* d3d12GPU = static_cast<D3D12GPU*>(context->gpu());
+    auto* d3d12CmdQueue =
+        static_cast<D3D12CommandQueue*>(d3d12GPU->queue())->d3d12CommandQueue();
+
+    // 1. Wait for all tgfx-managed submissions to complete.
+    d3d12GPU->queue()->waitUntilCompleted();
+
+    // 2. Wait for any Present-driven work the queue still has queued up. Without this the
+    //    swap-chain release path below trips OBJECT_DELETED_WHILE_STILL_IN_USE because DXGI's
+    //    internal flip operation is still in flight on the queue.
+    ComPtr<ID3D12Fence> drainFence;
+    if (SUCCEEDED(d3d12GPU->device()->CreateFence(0, D3D12_FENCE_FLAG_NONE,
+                                                  IID_PPV_ARGS(&drainFence)))) {
+      const UINT64 targetValue = 1;
+      if (SUCCEEDED(d3d12CmdQueue->Signal(drainFence.Get(), targetValue))) {
+        if (drainFence->GetCompletedValue() < targetValue) {
+          HANDLE evt = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+          if (evt != nullptr) {
+            if (SUCCEEDED(drainFence->SetEventOnCompletion(targetValue, evt))) {
+              WaitForSingleObject(evt, 5000);
+            }
+            CloseHandle(evt);
+          }
+        }
+      }
+    }
+
+    // 3. Drop tgfx-side owners of the backbuffers.
     _platformState->currentProxy = nullptr;
     context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
-    auto* d3d12GPU = static_cast<D3D12GPU*>(context->gpu());
     d3d12GPU->processUnreferencedResources();
     d3d12GPU->commandListPool().clear();
+
+    // 4. Release the swap chain and our own backbuffer ComPtrs. The order between these two
+    //    is not important once the queue is idle and no tgfx object pins the backbuffers.
     _platformState->backBuffers.clear();
     _platformState->swapChain = nullptr;
     device->unlock();
