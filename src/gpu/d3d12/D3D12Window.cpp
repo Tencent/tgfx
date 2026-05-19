@@ -280,21 +280,28 @@ D3D12Window::~D3D12Window() {
   // calls onReleaseTexture, which releases the ComPtr on a backbuffer whose swap chain is
   // already gone — that crashes inside d3d12.dll on shutdown.
   //
-  // The fix is to drain both reclaim queues *before* destroying the swap chain so the
-  // ExternalTexture's ComPtr releases its backbuffer reference while the swap chain is still
-  // alive and well:
+  // There is also a second, less obvious owner of backbuffer references: the recycled command
+  // lists sitting in D3D12CommandListPool. Each list still holds the ID3D12Resource references
+  // it was last recorded with (RTV, ResourceBarrier transitions on the backbuffer), and those
+  // references are not released until the next acquire()'s Reset() call. We must therefore
+  // drop the pooled lists too before destroying the swap chain.
+  //
+  // Drain order:
   //   1) drop currentProxy           -> ExternalRenderTarget enters ResourceCache::returnQueue
-  //   2) purge the resource cache    -> deletes ExternalRenderTarget, which drops its
-  //                                      shared_ptr<Texture>, enqueuing the D3D12ExternalTexture
-  //                                      into D3D12GPU::returnQueue
-  //   3) process the GPU's queue     -> calls onReleaseTexture(), releasing the backbuffer ComPtr
-  //   4) clear backBuffers + swap chain (now safe; no outstanding refs from inside tgfx)
+  //   2) purge the resource cache    -> deletes ExternalRenderTarget, enqueues
+  //                                      D3D12ExternalTexture into D3D12GPU::returnQueue
+  //   3) process the GPU's queue     -> calls onReleaseTexture(), dropping ComPtr<backbuffer>
+  //   4) clear the command list pool -> drops the freeList's command lists, releasing whatever
+  //                                      backbuffer references those lists recorded earlier
+  //   5) clear backBuffers + swap chain (now safe; no outstanding refs from inside tgfx)
   auto context = device->lockContext();
   if (context != nullptr) {
     context->gpu()->queue()->waitUntilCompleted();
     _platformState->currentProxy = nullptr;
     context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
-    static_cast<D3D12GPU*>(context->gpu())->processUnreferencedResources();
+    auto* d3d12GPU = static_cast<D3D12GPU*>(context->gpu());
+    d3d12GPU->processUnreferencedResources();
+    d3d12GPU->commandListPool().clear();
     _platformState->backBuffers.clear();
     _platformState->swapChain = nullptr;
     device->unlock();
