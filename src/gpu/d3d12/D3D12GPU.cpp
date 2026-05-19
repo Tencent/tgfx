@@ -209,7 +209,12 @@ void D3D12GPU::initInfo() {
 void D3D12GPU::initFeatures() {
   _features.semaphore = true;
   _features.clampToBorder = true;
-  _features.textureBarrier = true;
+  // D3D12 has no glTextureBarrier() equivalent: a resource cannot be in RENDER_TARGET and
+  // PIXEL_SHADER_RESOURCE state simultaneously, so the renderer cannot bind the current RTV
+  // as an SRV inside the same render pass. Mirror VulkanCaps and disable this feature so
+  // OpsCompositor::makeDstTextureInfo falls back to the copy-to-temp-texture path whenever an
+  // advanced blend mode (Lighten / Darken / etc.) needs to read the destination.
+  _features.textureBarrier = false;
 }
 
 void D3D12GPU::initLimits() {
