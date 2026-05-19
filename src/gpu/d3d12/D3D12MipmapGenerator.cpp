@@ -34,6 +34,12 @@ namespace tgfx {
 //   register(t0) — input mip (mip[i])
 //   register(s0) — point sampler with clamp address mode
 //   register(u0) — output mip (mip[i+1])
+// Hardware linear sampling at the destination texel center performs a 2x2 weighted average of
+// the source texels with the same weights MTLBlitCommandEncoder generateMipmapsForTexture and
+// vkCmdBlitImage(VK_FILTER_LINEAR) use, so a single SampleLevel matches the Metal/Vulkan output
+// bit-for-bit on even-divided mip levels and follows GPU-driver edge handling on odd ones. The
+// older quincunx (four 0.25-texel offsets) effectively did a 16-tap blur and produced softer
+// mips than the other backends.
 static constexpr const char* kHLSLSource = R"(
 cbuffer MipmapCB : register(b0)
 {
@@ -43,9 +49,9 @@ cbuffer MipmapCB : register(b0)
     float InvOutMipHeight;
 };
 
-Texture2D<float4>   InputMip  : register(t0);
-SamplerState        PointClamp : register(s0);
-RWTexture2D<float4> OutputMip : register(u0);
+Texture2D<float4>   InputMip   : register(t0);
+SamplerState        LinearClamp : register(s0);
+RWTexture2D<float4> OutputMip  : register(u0);
 
 [numthreads(8, 8, 1)]
 void main(uint3 dtID : SV_DispatchThreadID)
@@ -53,13 +59,8 @@ void main(uint3 dtID : SV_DispatchThreadID)
     if (dtID.x >= OutMipWidth || dtID.y >= OutMipHeight) {
         return;
     }
-    // Sample at the four sub-pixel corners of the destination texel.
     float2 uv = (float2(dtID.xy) + 0.5f) * float2(InvOutMipWidth, InvOutMipHeight);
-    float4 c0 = InputMip.SampleLevel(PointClamp, uv + float2(-0.25f * InvOutMipWidth, -0.25f * InvOutMipHeight), 0);
-    float4 c1 = InputMip.SampleLevel(PointClamp, uv + float2( 0.25f * InvOutMipWidth, -0.25f * InvOutMipHeight), 0);
-    float4 c2 = InputMip.SampleLevel(PointClamp, uv + float2(-0.25f * InvOutMipWidth,  0.25f * InvOutMipHeight), 0);
-    float4 c3 = InputMip.SampleLevel(PointClamp, uv + float2( 0.25f * InvOutMipWidth,  0.25f * InvOutMipHeight), 0);
-    OutputMip[dtID.xy] = 0.25f * (c0 + c1 + c2 + c3);
+    OutputMip[dtID.xy] = InputMip.SampleLevel(LinearClamp, uv, 0);
 }
 )";
 
@@ -163,8 +164,7 @@ bool D3D12MipmapGenerator::createPipelineState(D3D12GPU* gpu) {
   auto hr = D3DCompile(kHLSLSource, strlen(kHLSLSource), nullptr, nullptr, nullptr, "main",
                        "cs_5_0", compileFlags, 0, &csBlob, &errorBlob);
   if (FAILED(hr)) {
-    LOGE("D3D12MipmapGenerator: D3DCompile failed (HRESULT=0x%08X): %s",
-         static_cast<unsigned>(hr),
+    LOGE("D3D12MipmapGenerator: D3DCompile failed (HRESULT=0x%08X): %s", static_cast<unsigned>(hr),
          errorBlob ? static_cast<const char*>(errorBlob->GetBufferPointer()) : "<no message>");
     return false;
   }
