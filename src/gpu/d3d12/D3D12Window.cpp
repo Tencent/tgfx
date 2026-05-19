@@ -91,15 +91,21 @@ bool D3D12Window::PlatformState::rebuild(int newWidth, int newHeight) {
 
 namespace {
 
-// Private RenderTargetProxy that wraps the current swap-chain backbuffer as an external D3D12
-// render target. Lives only for one frame; D3D12Window resets it on onPresent so the next frame
-// re-queries the swap chain index.
+// Private RenderTargetProxy that exposes the swap chain's current backbuffer as an external
+// D3D12 render target. The proxy is created once when the application calls Surface::MakeFrom()
+// and is then reused for every subsequent frame: Surface caches it for its entire lifetime
+// rather than re-acquiring on each render. To keep that pattern working with FLIP_DISCARD —
+// which rotates between BACKBUFFER_COUNT distinct ID3D12Resources — getRenderTarget() must
+// re-query GetCurrentBackBufferIndex every call and invalidate the cached RenderTarget when
+// the index changes. Otherwise every frame would be drawn into the same backbuffer slot and
+// the other slot would never get updated, manifesting as "no visible change" on user input.
 class D3D12SwapchainProxy : public RenderTargetProxy {
  public:
-  D3D12SwapchainProxy(Context* context, ID3D12Resource* backBuffer, unsigned format, int width,
-                      int height)
-      : _context(context), _backBuffer(backBuffer), _format(format), _width(width),
-        _height(height) {
+  D3D12SwapchainProxy(Context* context, IDXGISwapChain3* swapChain,
+                      const std::vector<ComPtr<ID3D12Resource>>* backBuffers, unsigned format,
+                      int width, int height)
+      : _context(context), _swapChain(swapChain), _backBuffers(backBuffers), _format(format),
+        _width(width), _height(height) {
   }
 
   Context* getContext() const override {
@@ -128,23 +134,44 @@ class D3D12SwapchainProxy : public RenderTargetProxy {
   }
 
   std::shared_ptr<RenderTarget> getRenderTarget() const override {
-    if (_renderTarget == nullptr) {
-      D3D12TextureInfo info = {};
-      info.resource = _backBuffer;
-      info.format = _format;
-      BackendRenderTarget backendRT(info, _width, _height);
-      _renderTarget = RenderTarget::MakeFrom(_context, backendRT, ImageOrigin::TopLeft);
+    if (_swapChain == nullptr || _backBuffers == nullptr || _backBuffers->empty()) {
+      return nullptr;
     }
+    UINT index = _swapChain->GetCurrentBackBufferIndex();
+    if (index >= _backBuffers->size()) {
+      return nullptr;
+    }
+    auto* currentBuffer = (*_backBuffers)[index].Get();
+    if (_renderTarget != nullptr && currentBuffer == _cachedBackBuffer) {
+      return _renderTarget;
+    }
+    D3D12TextureInfo info = {};
+    info.resource = currentBuffer;
+    info.format = _format;
+    BackendRenderTarget backendRT(info, _width, _height);
+    _renderTarget = RenderTarget::MakeFrom(_context, backendRT, ImageOrigin::TopLeft);
+    _cachedBackBuffer = currentBuffer;
     return _renderTarget;
+  }
+
+  /// Drops the cached RenderTarget so the next getRenderTarget() call goes through MakeFrom
+  /// again. Invoked by D3D12Window::onPresent — after Present() the swap chain promotes a new
+  /// backbuffer to "current", so the next acquisition must wrap that buffer instead of the one
+  /// the GPU just submitted to.
+  void releaseFrame() {
+    _renderTarget = nullptr;
+    _cachedBackBuffer = nullptr;
   }
 
  private:
   Context* _context = nullptr;
-  ID3D12Resource* _backBuffer = nullptr;
+  IDXGISwapChain3* _swapChain = nullptr;
+  const std::vector<ComPtr<ID3D12Resource>>* _backBuffers = nullptr;
   unsigned _format = DXGI_FORMAT_R8G8B8A8_UNORM;
   int _width = 0;
   int _height = 0;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
+  mutable ID3D12Resource* _cachedBackBuffer = nullptr;
 };
 
 }  // namespace
@@ -280,13 +307,13 @@ std::shared_ptr<RenderTargetProxy> D3D12Window::onCreateRenderTarget(Context* co
     }
   }
 
-  UINT index = _platformState->swapChain->GetCurrentBackBufferIndex();
-  if (index >= _platformState->backBuffers.size()) {
-    return nullptr;
-  }
+  // Build one proxy per Surface and let it pull the current backbuffer index out of the swap
+  // chain on every getRenderTarget() call. Surface caches the proxy for its whole lifetime, so
+  // a per-frame allocation here would leak the freshly-created proxy and never reach the
+  // backbuffer-rotation code path.
   _platformState->currentProxy = std::make_shared<D3D12SwapchainProxy>(
-      context, _platformState->backBuffers[index].Get(), _platformState->format,
-      _platformState->width, _platformState->height);
+      context, _platformState->swapChain.Get(), &_platformState->backBuffers,
+      _platformState->format, _platformState->width, _platformState->height);
   return _platformState->currentProxy;
 }
 
@@ -300,8 +327,12 @@ void D3D12Window::onPresent(Context* /*context*/) {
   if (FAILED(hr)) {
     LOGE("D3D12Window: Present failed, HRESULT=0x%08X", static_cast<unsigned>(hr));
   }
-  // Release the cached proxy so the next onCreateRenderTarget() acquires the post-flip backbuffer.
-  _platformState->currentProxy = nullptr;
+  // Tell the proxy to drop its cached RenderTarget so the next getRenderTarget() picks up the
+  // backbuffer the swap chain just rotated in. Without this Surface keeps drawing into the
+  // same slot forever and the user sees a frozen frame regardless of input.
+  if (auto* proxy = static_cast<D3D12SwapchainProxy*>(_platformState->currentProxy.get())) {
+    proxy->releaseFrame();
+  }
 }
 
 }  // namespace tgfx
