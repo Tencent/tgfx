@@ -22,14 +22,14 @@
 namespace tgfx {
 
 std::shared_ptr<D3D12Sampler> D3D12Sampler::Make(D3D12GPU* gpu,
-                                                  const SamplerDescriptor& descriptor) {
+                                                 const SamplerDescriptor& descriptor) {
   if (gpu == nullptr) {
     return nullptr;
   }
 
   D3D12_SAMPLER_DESC samplerDesc = {};
-  samplerDesc.Filter = ToD3D12Filter(descriptor.minFilter, descriptor.magFilter,
-                                     descriptor.mipmapMode);
+  samplerDesc.Filter =
+      ToD3D12Filter(descriptor.minFilter, descriptor.magFilter, descriptor.mipmapMode);
   samplerDesc.AddressU = ToD3D12AddressMode(descriptor.addressModeX);
   samplerDesc.AddressV = ToD3D12AddressMode(descriptor.addressModeY);
   samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
@@ -41,7 +41,14 @@ std::shared_ptr<D3D12Sampler> D3D12Sampler::Make(D3D12GPU* gpu,
   samplerDesc.BorderColor[2] = 0.0f;
   samplerDesc.BorderColor[3] = 0.0f;
   samplerDesc.MinLOD = 0.0f;
-  samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+  // When mipmap is disabled, clamp MaxLOD to 0 so the hardware always samples mip 0. Picking a
+  // D3D12_FILTER_*_MIP_POINT alone is not enough: the driver still walks the mip chain and may
+  // pick a smaller level (the "mipmap-disabled" filters in D3D12 only describe the filter shape
+  // used between mips, not whether mip selection happens). Mirror VulkanSampler's maxLod clamp
+  // so a SamplerDescriptor with mipmapMode=None produces the same result that
+  // RenderContext::drawImageRect (and other Strict-constraint paths) intend.
+  samplerDesc.MaxLOD =
+      (descriptor.mipmapMode == MipmapMode::None) ? 0.0f : D3D12_FLOAT32_MAX;
 
   // Permanently reserve a slot in the process-wide shader-visible Sampler heap and write the
   // descriptor there. The slot lives for the rest of the GPU's lifetime, mirroring the cache
