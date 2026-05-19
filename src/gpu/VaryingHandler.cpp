@@ -62,21 +62,15 @@ void VaryingHandler::finalize() {
 
 void VaryingHandler::appendDecls(const std::vector<ShaderVar>& vars, std::string* out,
                                  ShaderStage stage) const {
-  // Track the next interpolant location to assign so vertex outputs and fragment inputs end up
-  // at exactly matching slots. Without this, ShaderCompiler::PreprocessGLSL would later number
-  // the two stages independently, and any unused fragment input would shift the location of all
-  // subsequent inputs — producing a valid GLSL program (Vulkan/GL link by location) but failing
-  // D3D12's strict signature check ("PS input register is not a subset of VS output").
-  uint32_t location = 0;
+  // Do not emit explicit "layout(location=N)" qualifiers for varyings here. Desktop OpenGL
+  // sticks to "#version 150" which rejects layout(location) on varyings without the
+  // GL_ARB_separate_shader_objects extension, so emitting them breaks shader compilation on
+  // that backend. The SPIR-V cross-compiled backends (D3D12 / Vulkan / Metal) reassign
+  // locations later in ShaderCompiler::PreprocessGLSL via the in/out regex passes, which walk
+  // the GLSL source in textual order. Vertex outputs and fragment inputs come from the same
+  // VaryingHandler::varyings sequence, so the per-stage numbering they end up with already
+  // matches across the boundary.
   for (const auto& var : vars) {
-    bool isVarying = var.modifier() == ShaderVar::TypeModifier::Varying ||
-                     var.modifier() == ShaderVar::TypeModifier::FlatVarying;
-    if (isVarying) {
-      out->append("layout(location=");
-      out->append(std::to_string(location));
-      out->append(") ");
-      ++location;
-    }
     out->append(programBuilder->getShaderVarDeclarations(var, stage));
     out->append(";\n");
   }
