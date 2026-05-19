@@ -31,8 +31,8 @@ class Image;
  *
  * Subclasses fall into two broad categories:
  *   - Effects expressible as a single ImageFilter (blur, drop shadow, inner shadow, color matrix,
- *     blend) should derive from LayerImageFilter, which provides ImageFilter caching and the
- *     compose hook used by Layer::getImageFilter().
+ *     blend) should derive from LayerImageFilter, which provides ImageFilter caching and overrides
+ *     getImageFilter() used by Layer::getImageFilter() for bounds reverse-mapping.
  *   - Effects that need access to the input image (such as procedural overlays anchored to image
  *     dimensions) should derive directly from LayerFilter and override onFilterImage().
  */
@@ -97,12 +97,14 @@ class LayerFilter : public LayerProperty {
   }
 
   /**
-   * Applies this filter to the given input image. Subclasses must implement this method to perform
-   * the actual filtering. The default LayerFilter base class does not provide a default
-   * implementation because it has no notion of how the effect is produced.
+   * Applies this filter to the given input image. The default implementation returns the input
+   * unchanged. Subclasses whose effect depends only on the input image (not on the layer content
+   * bounds) should override this method; the default LayerFilter::onFilterImage(5-arg) overload
+   * forwards to this method when subclasses do not override the 5-arg version.
    */
-  virtual std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                               Point* offset) = 0;
+  virtual std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float, Point*) {
+    return input;
+  }
 
   /**
    * Applies this filter to the given input image with knowledge of the layer content bounds. The
@@ -121,15 +123,13 @@ class LayerFilter : public LayerProperty {
   virtual void invalidateFilter();
 
   /**
-   * Returns an ImageFilter that fully expresses this filter's effect at the given scale, for
-   * inclusion in Layer::getImageFilter() composition. Subclasses that cannot be expressed as a
-   * single ImageFilter (or whose effect depends on the input image geometry not yet available at
-   * composition time) should return nullptr or a degraded equivalent. The default implementation
-   * returns nullptr.
+   * Returns an ImageFilter that approximates this filter's effect at the given scale, used by
+   * Layer::getImageFilter() for bounds reverse-mapping. Subclasses that cannot be expressed as a
+   * single ImageFilter (or whose effect depends on input image geometry not yet known) may return
+   * a degraded equivalent sufficient for bounds calculation, or nullptr if the filter does not
+   * grow or shrink the visible region. The default implementation returns nullptr.
    */
-  virtual std::shared_ptr<ImageFilter> getComposeFilter(float scale, float width = 0.f,
-                                                         float height = 0.f,
-                                                         const Point& originOffset = {});
+  virtual std::shared_ptr<ImageFilter> getImageFilter(float scale);
 
   /**
    * Returns the cached ImageFilter for the given scale, creating it via onCreateImageFilter() if

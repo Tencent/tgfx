@@ -1083,15 +1083,14 @@ LayerContent* Layer::getContent() {
   return layerContent.get();
 }
 
-std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale, float width, float height,
-                                                   const Point& originOffset) {
+std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
   if (_filters.empty()) {
     return nullptr;
   }
   std::vector<std::shared_ptr<ImageFilter>> filters;
   for (const auto& layerFilter : _filters) {
     DEBUG_ASSERT(layerFilter != nullptr);
-    if (auto filter = layerFilter->getComposeFilter(contentScale, width, height, originOffset)) {
+    if (auto filter = layerFilter->getImageFilter(contentScale)) {
       filters.push_back(filter);
     }
   }

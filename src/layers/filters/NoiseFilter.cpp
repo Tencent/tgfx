@@ -158,34 +158,14 @@ void NoiseFilter::setBlendMode(BlendMode blendMode) {
 }
 
 std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
-                                                  Point* offset) {
-  if (input == nullptr) {
-    return nullptr;
-  }
-  Point shift = {static_cast<float>(input->width()) * 0.5f,
-                 static_cast<float>(input->height()) * 0.5f};
-  auto blendFilter = onBuildNoiseImageFilter(scale, shift);
-  if (blendFilter == nullptr) {
-    return input;
-  }
-  auto imageShader = Shader::MakeImageShader(input);
-  if (imageShader == nullptr) {
-    return input;
-  }
-  auto clipFilter = ImageFilter::Blend(BlendMode::DstIn, std::move(imageShader));
-  auto composedFilter = ImageFilter::Compose(std::move(blendFilter), std::move(clipFilter));
-  return FilterImage::MakeFrom(std::move(input), std::move(composedFilter), offset);
-}
-
-std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
                                                   float width, float height,
                                                   const Point& originOffset, Point* offset) {
   if (input == nullptr) {
     return nullptr;
   }
   // Anchor the noise pattern to the content bounds center, expressed in input image pixel space.
-  // This matches the shift formula used by getComposeFilter() so the noise stays stable regardless
-  // of how the input image is clipped relative to the content bounds.
+  // The shift compensates for the offset of the input image origin relative to the full content
+  // bounds, so the noise pattern stays stable regardless of how the input image is clipped.
   Point shift = {(width * 0.5f - originOffset.x) * scale, (height * 0.5f - originOffset.y) * scale};
   auto blendFilter = onBuildNoiseImageFilter(scale, shift);
   if (blendFilter == nullptr) {
@@ -200,38 +180,19 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, 
   return FilterImage::MakeFrom(std::move(input), std::move(composedFilter), offset);
 }
 
-std::shared_ptr<ImageFilter> NoiseFilter::getComposeFilter(float scale, float width, float height,
-                                                           const Point& originOffset) {
-  bool useDefault =
-      width == 0.f && height == 0.f && originOffset.x == 0.f && originOffset.y == 0.f;
-  if (!useDefault) {
-    Point shift = {(width * 0.5f - originOffset.x) * scale,
-                   (height * 0.5f - originOffset.y) * scale};
-    return onBuildNoiseImageFilter(scale, shift);
-  }
-  if (composedDirty || composedScale != scale) {
-    composedFilter = onBuildNoiseImageFilter(scale, {});
-    composedScale = scale;
-    composedDirty = false;
-  }
-  return composedFilter;
+std::shared_ptr<ImageFilter> NoiseFilter::getImageFilter(float scale) {
+  // Used by Layer::getImageFilter() for bounds reverse-mapping only. The shift is irrelevant for
+  // bounds because the underlying ImageFilter::Blend does not grow the visible region; we pass a
+  // zero shift to keep the construction self-contained.
+  return onBuildNoiseImageFilter(scale, {});
 }
 
 Rect NoiseFilter::filterBounds(const Rect& srcRect, float contentScale) {
-  // Match the historical behavior: when the noise filter participates in
-  // Layer::getImageFilter() composition, its bounds are computed from the same ImageFilter that
-  // the composition would use (built with zero-sized dimensions).
-  auto filter = getComposeFilter(contentScale);
+  auto filter = onBuildNoiseImageFilter(contentScale, {});
   if (!filter) {
     return srcRect;
   }
   return filter->filterBounds(srcRect);
-}
-
-void NoiseFilter::invalidateFilter() {
-  composedFilter = nullptr;
-  composedDirty = true;
-  LayerFilter::invalidateFilter();
 }
 
 // --- MonoNoiseFilter ---

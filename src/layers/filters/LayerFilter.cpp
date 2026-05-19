@@ -51,7 +51,7 @@ void LayerFilter::invalidateFilter() {
   invalidateTransform();
 }
 
-std::shared_ptr<ImageFilter> LayerFilter::getComposeFilter(float, float, float, const Point&) {
+std::shared_ptr<ImageFilter> LayerFilter::getImageFilter(float) {
   return nullptr;
 }
 

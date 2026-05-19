@@ -43,29 +43,6 @@ void SeedBackdrop(Canvas* canvas, const std::shared_ptr<Image>& backdrop, const 
   canvas->restore();
 }
 
-std::shared_ptr<Image> ApplyImageFilterIfNeeded(std::shared_ptr<Image> image,
-                                                const std::shared_ptr<ImageFilter>& imageFilter,
-                                                const std::optional<Rect>& clipBounds,
-                                                Matrix* imageMatrix) {
-  if (image == nullptr || imageFilter == nullptr) {
-    return image;
-  }
-  std::optional<Rect> filterClipBounds = std::nullopt;
-  if (clipBounds.has_value()) {
-    Matrix invertMatrix = Matrix::I();
-    if (!imageMatrix->invert(&invertMatrix)) {
-      return nullptr;
-    }
-    filterClipBounds = invertMatrix.mapRect(*clipBounds);
-    filterClipBounds->roundOut();
-  }
-  Point filterOffset = {};
-  image = image->makeWithFilter(imageFilter, &filterOffset,
-                                filterClipBounds.has_value() ? &*filterClipBounds : nullptr);
-  imageMatrix->preTranslate(filterOffset.x, filterOffset.y);
-  return image;
-}
-
 }  // namespace
 
 OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& args,
@@ -83,19 +60,17 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
   Point originOffset = Point::Make(inputBounds->left - contentBounds.left,
                                     inputBounds->top - contentBounds.top);
 
-  auto imageFilter = args.excludeEffects
-                         ? nullptr
-                         : layer->getImageFilter(contentMatrix.getMaxScale(), contentBounds.width(),
-                                                 contentBounds.height(), originOffset);
+  bool hasFilter = !args.excludeEffects && !layer->filters().empty();
 
-  // With an image filter, force an isotropic scale so blur / drop-shadow operate in pixel space;
-  // without a filter keep the full contentMatrix to preserve rotation/skew fidelity.
-  Matrix density = imageFilter
+  // With filters active, force an isotropic scale so blur / drop-shadow operate in pixel space;
+  // otherwise keep the full contentMatrix to preserve rotation/skew fidelity.
+  Matrix density = hasFilter
                        ? Matrix::MakeScale(contentMatrix.getMaxScale(), contentMatrix.getMaxScale())
                        : contentMatrix;
   auto imageClip = density.mapRect(*inputBounds);
   imageClip.roundOut();
 
+  OffscreenResult result;
   // Need a Surface backing only when a descendant Background-sourced style will read back
   // through this subtree; otherwise a PictureRecorder is cheaper.
   if (args.backgroundHandler != nullptr && args.backgroundHandler->needsSurface(layer) &&
@@ -104,11 +79,27 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
         Surface::Make(args.context, static_cast<int>(imageClip.width()),
                       static_cast<int>(imageClip.height()), false, 1, false, 0, args.dstColorSpace);
     if (surface != nullptr) {
-      return RenderContentOnSurface(layer, args, std::move(surface), density, imageClip,
-                                    imageFilter, clipBounds, *inputBounds, contentMatrix);
+      result = RenderContentOnSurface(layer, args, std::move(surface), density, imageClip,
+                                      *inputBounds, contentMatrix);
+    } else {
+      result = RenderContentOnPicture(layer, args, density, imageClip);
     }
+  } else {
+    result = RenderContentOnPicture(layer, args, density, imageClip);
   }
-  return RenderContentOnPicture(layer, args, density, imageClip, imageFilter, clipBounds);
+
+  if (result.image == nullptr || !hasFilter) {
+    return result;
+  }
+  Point filterOffset = {};
+  result.image = layer->applyFilters(std::move(result.image), density.getMaxScale(),
+                                     contentBounds.width(), contentBounds.height(), originOffset,
+                                     &filterOffset);
+  if (result.image == nullptr) {
+    return {};
+  }
+  result.imageMatrix.preTranslate(filterOffset.x, filterOffset.y);
+  return result;
 }
 
 OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArgs& args,
@@ -142,10 +133,12 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
   return RenderPassThroughOnPicture(layer, args, backdrop, parentMatrix, surfaceRect);
 }
 
-OffscreenResult OffscreenRenderer::RenderContentOnSurface(
-    Layer* layer, const DrawArgs& args, std::shared_ptr<Surface> surface, const Matrix& density,
-    const Rect& imageClip, const std::shared_ptr<ImageFilter>& imageFilter,
-    const std::optional<Rect>& clipBounds, const Rect& inputBounds, const Matrix& contentMatrix) {
+OffscreenResult OffscreenRenderer::RenderContentOnSurface(Layer* layer, const DrawArgs& args,
+                                                          std::shared_ptr<Surface> surface,
+                                                          const Matrix& density,
+                                                          const Rect& imageClip,
+                                                          const Rect& inputBounds,
+                                                          const Matrix& contentMatrix) {
   // Translate the basis so (0,0) maps to imageClip.topLeft, giving the allocated pixel grid a
   // canonical origin.
   auto localToSurface = density;
@@ -178,14 +171,12 @@ OffscreenResult OffscreenRenderer::RenderContentOnSurface(
   if (!localToSurface.invert(&result.imageMatrix)) {
     return {};
   }
-  result.image =
-      ApplyImageFilterIfNeeded(result.image, imageFilter, clipBounds, &result.imageMatrix);
   return result;
 }
 
-OffscreenResult OffscreenRenderer::RenderContentOnPicture(
-    Layer* layer, const DrawArgs& args, const Matrix& density, const Rect& imageClip,
-    const std::shared_ptr<ImageFilter>& imageFilter, const std::optional<Rect>& clipBounds) {
+OffscreenResult OffscreenRenderer::RenderContentOnPicture(Layer* layer, const DrawArgs& args,
+                                                          const Matrix& density,
+                                                          const Rect& imageClip) {
   PictureRecorder recorder;
   auto* canvas = recorder.beginRecording();
   if (!imageClip.isEmpty()) {
@@ -207,8 +198,6 @@ OffscreenResult OffscreenRenderer::RenderContentOnPicture(
     return {};
   }
   result.imageMatrix.preTranslate(offset.x, offset.y);
-  result.image =
-      ApplyImageFilterIfNeeded(result.image, imageFilter, clipBounds, &result.imageMatrix);
   return result;
 }
 

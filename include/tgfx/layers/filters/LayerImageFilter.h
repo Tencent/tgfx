@@ -28,9 +28,8 @@ namespace tgfx {
  * onCreateImageFilter() extension point. Subclasses include BlurFilter, DropShadowFilter,
  * InnerShadowFilter, ColorMatrixFilter, and BlendFilter.
  *
- * LayerImageFilter participates in Layer::getImageFilter() composition: when a Layer composes its
- * LayerFilter chain into a single ImageFilter for downstream rendering, only LayerImageFilter
- * subclasses contribute to the composed ImageFilter.
+ * LayerImageFilter participates in Layer::getImageFilter() by overriding getImageFilter(scale) to
+ * return its cached ImageFilter, which Layer composes for bounds reverse-mapping.
  */
 class LayerImageFilter : public LayerFilter {
  public:
@@ -60,18 +59,11 @@ class LayerImageFilter : public LayerFilter {
   void invalidateFilter() override;
 
   /**
-   * Returns the cached ImageFilter at the given scale, suitable for inclusion in
-   * Layer::getImageFilter() composition.
-   */
-  std::shared_ptr<ImageFilter> getComposeFilter(float scale, float width = 0.f,
-                                                 float height = 0.f,
-                                                 const Point& originOffset = {}) override;
-
-  /**
    * Returns the cached ImageFilter for the given scale, building it via onCreateImageFilter() on
-   * cache miss.
+   * cache miss. Overrides LayerFilter::getImageFilter() so that Layer::getImageFilter() can pick
+   * up this filter's contribution to the composed bounds-reverse-mapping ImageFilter.
    */
-  std::shared_ptr<ImageFilter> getImageFilter(float scale);
+  std::shared_ptr<ImageFilter> getImageFilter(float scale) override;
 
  private:
   bool dirty = true;

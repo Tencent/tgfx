@@ -134,20 +134,13 @@ class NoiseFilter : public LayerFilter {
     return Type::NoiseFilter;
   }
 
-  std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                       Point* offset) override;
-
   std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale, float width,
                                        float height, const Point& originOffset,
                                        Point* offset) override;
 
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
-  void invalidateFilter() override;
-
-  std::shared_ptr<ImageFilter> getComposeFilter(float scale, float width = 0.f,
-                                                 float height = 0.f,
-                                                 const Point& originOffset = {}) override;
+  std::shared_ptr<ImageFilter> getImageFilter(float scale) override;
 
   /**
    * Builds the noise overlay ImageFilter with the noise shader sampling origin shifted by the
@@ -163,13 +156,6 @@ class NoiseFilter : public LayerFilter {
   BlendMode _blendMode = BlendMode::SrcOver;
 
  private:
-  // Cache of the compose-mode ImageFilter, built with zero-sized input dimensions. This degrades
-  // the center-anchored sampling to top-left-anchored sampling, matching the behavior of every
-  // other LayerFilter that participates in Layer::getImageFilter() composition.
-  bool composedDirty = true;
-  float composedScale = 1.0f;
-  std::shared_ptr<ImageFilter> composedFilter;
-
   friend class Layer;
 };
 

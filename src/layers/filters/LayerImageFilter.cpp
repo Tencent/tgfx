@@ -53,9 +53,4 @@ void LayerImageFilter::invalidateFilter() {
   LayerFilter::invalidateFilter();
 }
 
-std::shared_ptr<ImageFilter> LayerImageFilter::getComposeFilter(float scale, float, float,
-                                                                const Point&) {
-  return getImageFilter(scale);
-}
-
 }  // namespace tgfx
