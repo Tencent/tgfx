@@ -899,4 +899,205 @@ TGFX_TEST(BackgroundBlurTest, GroupOpacityNestedBackgroundBlurPicturePath) {
   Layer::SetDefaultAllowsGroupOpacity(oldGroupOpacity);
 }
 
+/**
+ * Background blur inside a 3D rendering context. Builds a layer tree where preserve3D parents,
+ * 3D-transformed leaves, and BackgroundBlur layerStyles interact in three configurations:
+ *   - Preserve3D: parent has preserve3D=true and no styles, so canPreserve3D()=true and the
+ *     subtree truly enters the 3D context. BackgroundBlur on descendants is composed via the
+ *     compositor's per-fragment backdrop.
+ *   - Flat: same tree but parent.preserve3D=false, falling back to the standard 2D path.
+ *   - Preserve3DFallback: parent.preserve3D=true but parent itself has a BackgroundBlur style,
+ *     so canPreserve3D()=false and the subtree degrades to flat.
+ */
+TGFX_TEST(BackgroundBlurTest, BackgroundBlur3DLayer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 250, 250);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto backImage = MakeImage("resources/assets/HappyNewYear.png");
+  auto layerA = ImageLayer::Make();
+  layerA->setName("layerA");
+  layerA->setImage(backImage);
+  layerA->setMatrix(Matrix::MakeScale(250.f / 1024.f));
+  displayList->root()->addChild(layerA);
+
+  auto layerB1Image = MakeImage("resources/assets/glyph3.png")->makeSubset(Rect::MakeWH(150, 150));
+  auto layerB1 = ImageLayer::Make();
+  layerB1->setName("layerB1");
+  layerB1->setImage(layerB1Image);
+  layerB1->setAlpha(0.8f);
+  {
+    auto size = Size::Make(150, 150);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, 25);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(50, 50, 0);
+    layerB1->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  displayList->root()->addChild(layerB1);
+
+  auto layerB2 = SolidLayer::Make();
+  layerB2->setName("layerB2");
+  layerB2->setColor(Color::Green());
+  layerB2->setAlpha(0.3f);
+  layerB2->setWidth(60);
+  layerB2->setHeight(80);
+  {
+    auto size = Size::Make(60, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({1, 0, 0}, 20);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(80, 150, 0);
+    layerB2->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  layerB2->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
+  displayList->root()->addChild(layerB2);
+
+  auto layerCImage = MakeImage("resources/assets/glyph2.png")->makeSubset(Rect::MakeWH(80, 80));
+  auto layerC = ImageLayer::Make();
+  layerC->setName("layerC");
+  layerC->setImage(layerCImage);
+  layerC->setAlpha(0.6f);
+  {
+    auto size = Size::Make(80, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({1, 0, 0}, 20);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(35, 35, 0);
+    layerC->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  layerC->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
+  layerB1->addChild(layerC);
+
+  auto layerD = SolidLayer::Make();
+  layerD->setName("layerD");
+  layerD->setColor(Color::Red());
+  layerD->setAlpha(0.6f);
+  layerD->setWidth(80);
+  layerD->setHeight(80);
+  {
+    auto size = Size::Make(80, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({1, 0, 0}, 20);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(40, 40, 0);
+    layerD->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  layerD->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
+  layerC->addChild(layerD);
+
+  // Case 1: B1.preserve3D=true with no styles, B1 enters 3D context.
+  layerB1->setPreserve3D(true);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/BackgroundBlur3DLayer_Preserve3D"));
+
+  // Case 2: B1.preserve3D=false. Standard 2D path.
+  layerB1->setPreserve3D(false);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/BackgroundBlur3DLayer_Flat"));
+
+  // Case 3: B1.preserve3D=true but B1 has a BackgroundBlur style, so canPreserve3D()=false and
+  // preserve3D falls back to flat.
+  layerB1->setPreserve3D(true);
+  layerB1->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
+  displayList->render(surface.get());
+  EXPECT_TRUE(
+      Baseline::Compare(surface, "BackgroundBlurTest/BackgroundBlur3DLayer_Preserve3DFallback"));
+
+  // Case 4: Direct Layer::draw() entry on a perspective-transformed inner subtree.
+  layerD->setAlpha(0.2f);
+  surface->getCanvas()->clear();
+  layerC->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/BackgroundBlur3DLayer_DirectDraw"));
+
+  // Case 5: layerC carries a BlurFilter (forces drawOffscreen) on top of its BackgroundBlur
+  // style, so the BackgroundBlur dispatches happen inside a nested offscreen sub-canvas. With
+  // fragment-as-offscreen plumbing (Compositor3DBackgroundSource as parent + sub source on the
+  // leaf surface), nested offscreens take the standard BackgroundCapturer::createSubHandler
+  // path and resolve their backdrops through it, with no 3D-specific code.
+  layerD->setAlpha(0.6f);
+  layerB1->setLayerStyles({});
+  layerB1->setPreserve3D(true);
+  layerC->setFilters({BlurFilter::Make(2, 2)});
+  displayList->render(surface.get());
+  EXPECT_TRUE(
+      Baseline::Compare(surface, "BackgroundBlurTest/BackgroundBlur3DLayer_NestedOffscreen"));
+
+  // Case 6: nested 3D rendering context inside a non-preserve3D leaf. layerC is a leaf in the
+  // outer 3D context (BackgroundBlur style breaks canPreserve3D). When layerC rasterizes, its
+  // child layerE has preserve3D=true and starts a fresh inner 3D context whose own leaf layerF
+  // dispatches another BackgroundBlur. Verifies that fragment-as-offscreen plumbing nests
+  // recursively (each layer of 3D installs its own Compositor3DBackgroundSource).
+  // Note: when BSP splits a BackgroundBlur layer's polygon into multiple fragments, each
+  // fragment captures its own backdrop entry within its sub-rect, so adjacent fragments may
+  // show a faint seam along the split line. This is an inherent BSP-vs-blur trade-off.
+  layerC->setFilters({});
+  layerC->removeChildren();
+
+  auto layerE = Layer::Make();
+  layerE->setName("layerE");
+  layerE->setPreserve3D(true);
+  {
+    auto size = Size::Make(80, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, 20);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(40, 40, 0);
+    layerE->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  layerC->addChild(layerE);
+
+  auto layerF = SolidLayer::Make();
+  layerF->setName("layerF");
+  layerF->setColor(Color::Blue());
+  layerF->setAlpha(0.6f);
+  layerF->setWidth(60);
+  layerF->setHeight(60);
+  {
+    auto size = Size::Make(60, 60);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({1, 0, 0}, 15);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(10, 10, 0);
+    layerF->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+  layerF->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
+  layerE->addChild(layerF);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/BackgroundBlur3DLayer_Nested3D"));
+}
+
 }  // namespace tgfx
