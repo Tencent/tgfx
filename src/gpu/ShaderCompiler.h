@@ -36,7 +36,17 @@ std::string PreprocessGLSL(const std::string& glslCode);
 
 /// Compiles preprocessed GLSL 450 source to SPIR-V binary using shaderc. Returns an empty vector
 /// on failure.
+///
+/// `preserveInterfaceVariables` controls the optimisation level:
+///   - false (default): runs `shaderc_optimization_level_performance`, which is what Vulkan and
+///     Metal want — both bind interface variables by name/location, so dead-stripping unused
+///     fragment inputs is harmless and yields better generated code.
+///   - true: runs `shaderc_optimization_level_zero` so every declared vertex output / fragment
+///     input survives. D3D12 needs this because the SPIR-V → HLSL pass turns SPIR-V locations
+///     into TEXCOORDn semantics; if the optimiser drops a fragment input, the resulting HLSL
+///     mismatches the vertex shader's output signature and PSO creation fails.
 std::vector<uint32_t> CompileGLSLToSPIRV(const shaderc::Compiler* compiler,
-                                         const std::string& vulkanGLSL, ShaderStage stage);
+                                         const std::string& vulkanGLSL, ShaderStage stage,
+                                         bool preserveInterfaceVariables = false);
 
 }  // namespace tgfx

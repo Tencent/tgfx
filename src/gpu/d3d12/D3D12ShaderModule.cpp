@@ -145,7 +145,9 @@ std::shared_ptr<D3D12ShaderModule> D3D12ShaderModule::Make(
 D3D12ShaderModule::D3D12ShaderModule(D3D12GPU* gpu, const ShaderModuleDescriptor& descriptor)
     : _stage(descriptor.stage) {
   std::string vulkanGLSL = PreprocessGLSL(descriptor.code);
-  auto spirvBinary = CompileGLSLToSPIRV(gpu->shaderCompiler(), vulkanGLSL, descriptor.stage);
+  // D3D12 needs every declared interface variable to survive — see ShaderCompiler.h.
+  auto spirvBinary =
+      CompileGLSLToSPIRV(gpu->shaderCompiler(), vulkanGLSL, descriptor.stage, true);
   if (spirvBinary.empty()) {
     LOGE("D3D12ShaderModule: GLSL to SPIR-V compilation failed.");
     return;
