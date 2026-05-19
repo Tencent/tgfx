@@ -19,6 +19,7 @@
 #include "tgfx/gpu/d3d12/D3D12Window.h"
 #include <windows.h>
 #include <algorithm>
+#include <chrono>
 #include <vector>
 #include "D3D12CommandQueue.h"
 #include "D3D12Defines.h"
@@ -27,6 +28,7 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
+#include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/d3d12/D3D12Types.h"
 
 namespace tgfx {
@@ -272,16 +274,35 @@ D3D12Window::D3D12Window(std::shared_ptr<Device> device, std::unique_ptr<Platfor
 }
 
 D3D12Window::~D3D12Window() {
-  // Drain GPU work that still references the backbuffers before the swap chain releases them.
-  // Without this the runtime warns "ID3D12Resource referenced by the GPU was released" on exit.
+  // The shutdown ordering here is load-bearing. Naively releasing the swap chain first leaves
+  // the cached D3D12ExternalTexture (which wraps each backbuffer) alive inside D3D12GPU's
+  // resources list. When ~Window later triggers D3D12GPU::releaseAll, it walks that list and
+  // calls onReleaseTexture, which releases the ComPtr on a backbuffer whose swap chain is
+  // already gone — that crashes inside d3d12.dll on shutdown.
+  //
+  // The fix is to drain both reclaim queues *before* destroying the swap chain so the
+  // ExternalTexture's ComPtr releases its backbuffer reference while the swap chain is still
+  // alive and well:
+  //   1) drop currentProxy           -> ExternalRenderTarget enters ResourceCache::returnQueue
+  //   2) purge the resource cache    -> deletes ExternalRenderTarget, which drops its
+  //                                      shared_ptr<Texture>, enqueuing the D3D12ExternalTexture
+  //                                      into D3D12GPU::returnQueue
+  //   3) process the GPU's queue     -> calls onReleaseTexture(), releasing the backbuffer ComPtr
+  //   4) clear backBuffers + swap chain (now safe; no outstanding refs from inside tgfx)
   auto context = device->lockContext();
   if (context != nullptr) {
     context->gpu()->queue()->waitUntilCompleted();
+    _platformState->currentProxy = nullptr;
+    context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
+    static_cast<D3D12GPU*>(context->gpu())->processUnreferencedResources();
+    _platformState->backBuffers.clear();
+    _platformState->swapChain = nullptr;
     device->unlock();
+  } else {
+    _platformState->currentProxy = nullptr;
+    _platformState->backBuffers.clear();
+    _platformState->swapChain = nullptr;
   }
-  _platformState->currentProxy = nullptr;
-  _platformState->backBuffers.clear();
-  _platformState->swapChain = nullptr;
 }
 
 std::shared_ptr<RenderTargetProxy> D3D12Window::onCreateRenderTarget(Context* context) {
