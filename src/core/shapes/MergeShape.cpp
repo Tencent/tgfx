@@ -18,6 +18,7 @@
 
 #include "MergeShape.h"
 #include "core/shapes/AppendShape.h"
+#include "core/utils/AtomicCache.h"
 
 namespace tgfx {
 std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_ptr<Shape> second,
@@ -80,11 +81,23 @@ Rect MergeShape::onGetBounds() const {
   }
 }
 
-Path MergeShape::onGetPath(float resolutionScale) const {
-  auto path = first->onGetPath(resolutionScale);
-  auto secondPath = second->onGetPath(resolutionScale);
+Path MergeShape::onGetPath(float /*resolutionScale*/) const {
+  if (auto cached = AtomicCacheGet(bakedPath)) {
+    return *cached;
+  }
+  // Hardcoded high-precision scale to bake the boolean result once and reuse across all zoom
+  // levels. This is a debug-only experiment to verify whether eliminating repeated boolean ops
+  // improves zoom interaction smoothness. Visual fidelity holds for zoom <= ~1000%.
+  constexpr float BakedResolutionScale = 10.0f;
+  auto path = first->onGetPath(BakedResolutionScale);
+  auto secondPath = second->onGetPath(BakedResolutionScale);
   path.addPath(secondPath, pathOp);
+  AtomicCacheSet(bakedPath, &path);
   return path;
+}
+
+MergeShape::~MergeShape() {
+  AtomicCacheReset(bakedPath);
 }
 
 }  // namespace tgfx

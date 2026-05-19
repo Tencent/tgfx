@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "core/shapes/UniqueKeyShape.h"
 #include "tgfx/core/Matrix.h"
 
@@ -30,6 +31,8 @@ class MergeShape : public UniqueKeyShape {
   MergeShape(std::shared_ptr<Shape> first, std::shared_ptr<Shape> second, PathOp pathOp)
       : first(std::move(first)), second(std::move(second)), pathOp(pathOp) {
   }
+
+  ~MergeShape() override;
 
   PathFillType fillType() const override;
 
@@ -45,5 +48,8 @@ class MergeShape : public UniqueKeyShape {
   }
 
   Path onGetPath(float resolutionScale) const override;
+
+ private:
+  mutable std::atomic<Path*> bakedPath = {nullptr};
 };
 }  // namespace tgfx
