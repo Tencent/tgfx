@@ -112,10 +112,17 @@ class D3D12UploadHeap {
   size_t head = 0;
   size_t tail = 0;
   size_t committedHead = 0;
+  // Bytes currently held by either a still-uncommitted allocation or an inflight commit waiting
+  // for its fence to signal. Tracked explicitly so allocate() can disambiguate "ring empty"
+  // from "ring full" — the (head, tail) pair alone collapses both cases to head == tail.
+  size_t outstandingBytes = 0;
 
   struct InflightRange {
     uint64_t fenceValue = 0;
     size_t newHead = 0;
+    // Bytes consumed between the previous commit() and this one; returned to outstandingBytes
+    // when retire() reaches this entry.
+    size_t bytes = 0;
   };
   std::deque<InflightRange> inflight;
 };

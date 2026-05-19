@@ -80,30 +80,27 @@ D3D12UploadHeap::Allocation D3D12UploadHeap::allocate(size_t size, size_t alignm
     return {};
   }
   size_t alignedHead = AlignUpSize(head, alignment);
-  // Available room without crossing tail; tail == head means the ring is empty.
-  size_t used = (head >= tail) ? (head - tail) : (_capacity - (tail - head));
-  size_t free = _capacity - used;
-  // Skip over the wrap boundary if a contiguous range cannot be carved out at the tail end of
-  // the buffer. Splitting the range across the boundary would force callers to issue two
-  // CopyTextureRegion calls per upload, which D3D12 does not naturally support for a single
-  // PLACED_SUBRESOURCE_FOOTPRINT.
+  // Track how much of the ring is currently occupied by outstanding allocations. The classic
+  // (head, tail) bookkeeping cannot disambiguate "ring empty" from "ring full" because both
+  // produce head == tail; we add an explicit byte counter that is incremented on every
+  // allocate() and decremented on retire(). This is what stops a wrap from silently overwriting
+  // staging bytes that were allocated but not yet committed (see RecordingTest race details
+  // captured in commit notes).
+  size_t free = _capacity - outstandingBytes;
+  size_t needed = size;
   size_t startOffset = alignedHead;
+  size_t skipped = 0;
   if (alignedHead + size > _capacity) {
-    size_t skipped = _capacity - head;
-    if (size + skipped > free) {
-      return {};
-    }
+    // Splitting the range across the wrap boundary is not supported (CopyTextureRegion needs a
+    // single contiguous PLACED_SUBRESOURCE_FOOTPRINT), so jump back to offset 0 and pay for the
+    // discarded tail bytes out of the same free pool.
+    skipped = _capacity - head;
+    needed = size + skipped;
     startOffset = 0;
-    used += skipped;
-    free -= skipped;
-  } else if (alignedHead - head > free - size) {
-    // Aligning consumes some bytes that fall after head; ensure they fit before allocating.
-    return {};
   } else {
-    used += alignedHead - head;
-    free -= alignedHead - head;
+    needed = size + (alignedHead - head);
   }
-  if (size > free) {
+  if (needed > free) {
     return {};
   }
 
@@ -117,6 +114,7 @@ D3D12UploadHeap::Allocation D3D12UploadHeap::allocate(size_t size, size_t alignm
   if (head == _capacity) {
     head = 0;
   }
+  outstandingBytes += needed;
   return result;
 }
 
@@ -124,9 +122,15 @@ void D3D12UploadHeap::commit(uint64_t fenceValue) {
   if (head == committedHead) {
     return;
   }
+  // Pair the about-to-be-signalled fence with the bytes consumed since the last commit so
+  // retire() can give those bytes back when the GPU finishes with them.
+  size_t bytesSinceCommit = (head >= committedHead)
+                                ? (head - committedHead)
+                                : (_capacity - (committedHead - head));
   InflightRange entry = {};
   entry.fenceValue = fenceValue;
   entry.newHead = head;
+  entry.bytes = bytesSinceCommit;
   inflight.push_back(entry);
   committedHead = head;
 }
@@ -134,6 +138,13 @@ void D3D12UploadHeap::commit(uint64_t fenceValue) {
 void D3D12UploadHeap::retire(uint64_t completedFenceValue) {
   while (!inflight.empty() && inflight.front().fenceValue <= completedFenceValue) {
     tail = inflight.front().newHead;
+    if (outstandingBytes >= inflight.front().bytes) {
+      outstandingBytes -= inflight.front().bytes;
+    } else {
+      // Defensive: bookkeeping should never drop below zero, but if it does we reset rather
+      // than wrap to ~0 and stop accepting allocations forever.
+      outstandingBytes = 0;
+    }
     inflight.pop_front();
   }
 }
@@ -149,6 +160,7 @@ void D3D12UploadHeap::clear() {
   head = 0;
   tail = 0;
   committedHead = 0;
+  outstandingBytes = 0;
   inflight.clear();
 }
 
