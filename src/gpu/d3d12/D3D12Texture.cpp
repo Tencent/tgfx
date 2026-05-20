@@ -18,7 +18,6 @@
 
 #include "D3D12Texture.h"
 #include "D3D12Defines.h"
-#include "D3D12ExternalTexture.h"
 #include "D3D12GPU.h"
 #include "core/utils/Log.h"
 
@@ -120,7 +119,7 @@ std::shared_ptr<D3D12Texture> D3D12Texture::Make(D3D12GPU* gpu,
 
 std::shared_ptr<D3D12Texture> D3D12Texture::MakeFrom(D3D12GPU* gpu, ComPtr<ID3D12Resource> resource,
                                                      unsigned dxgiFormat, uint32_t usage,
-                                                     bool adopted) {
+                                                     bool /*adopted*/) {
   if (gpu == nullptr || resource == nullptr) {
     return nullptr;
   }
@@ -133,11 +132,16 @@ std::shared_ptr<D3D12Texture> D3D12Texture::MakeFrom(D3D12GPU* gpu, ComPtr<ID3D1
   descriptor.mipLevelCount = static_cast<int>(desc.MipLevels);
   descriptor.sampleCount = static_cast<int>(desc.SampleDesc.Count);
   descriptor.usage = usage;
-
-  if (adopted) {
-    return gpu->makeResource<D3D12Texture>(descriptor, std::move(resource), dxgiFormat);
-  }
-  return gpu->makeResource<D3D12ExternalTexture>(descriptor, std::move(resource), dxgiFormat);
+  // The `adopted` flag is intentionally ignored on D3D12: COM reference counting makes the
+  // distinction Vulkan/Metal draw — "tgfx must explicitly destroy" vs "caller keeps owning it" —
+  // meaningless here. ComPtr<ID3D12Resource> always carries its own AddRef/Release pair, so:
+  //   * adopted == true  : caller hands its reference to us; on D3D12Texture destruction the
+  //     ComPtr Release brings the refcount to zero and the runtime destroys the resource.
+  //   * adopted == false : caller keeps its reference; we hold an additional one. The resource
+  //     stays alive at least until both refs are released, satisfying the GPU::importBackendTexture
+  //     contract that the backend texture remain valid for the wrapped Texture's lifetime.
+  // Either way the cleanup logic is identical, so a single code path is enough.
+  return gpu->makeResource<D3D12Texture>(descriptor, std::move(resource), dxgiFormat);
 }
 
 D3D12Texture::D3D12Texture(const TextureDescriptor& descriptor,
