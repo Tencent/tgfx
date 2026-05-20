@@ -97,19 +97,29 @@ class D3D12DescriptorRing {
   }
 
  private:
-  // Head/tail are slot indices modulo capacity. The ring is "empty" when head == tail and there
-  // are no inflight ranges; "full" when an allocation would advance head into tail.
+  // Head/tail are slot indices modulo capacity. The (head, tail) pair alone cannot disambiguate
+  // "ring empty" from "ring full" — both produce head == tail — so we maintain an explicit
+  // outstandingSlots counter that allocate() bumps and retire() drains. Without this an
+  // allocation that spans the entire capacity (or a sequence whose head wraps right onto tail)
+  // would convince the next allocate() that the ring is empty and hand back slots the GPU is
+  // still reading.
   uint32_t head = 0;
   uint32_t tail = 0;
   // Snapshot of head at the last commit() call. Slots in [committedHead, head) are part of the
   // current pending submission; slots before that have already been associated with a fence.
   uint32_t committedHead = 0;
+  // Slots currently held by either an as-yet-uncommitted allocation or an inflight commit
+  // waiting on its fence. allocate() rejects the request when needed > capacity - outstanding.
+  uint32_t outstandingSlots = 0;
 
   struct InflightRange {
     uint64_t fenceValue = 0;
     // Snapshot of head taken at commit() time. When fenceValue completes, tail can advance up
     // to this point.
     uint32_t newHead = 0;
+    // Slots consumed between the previous commit() and this one (including any wrap-around
+    // skip), returned to outstandingSlots when retire() reaches this entry.
+    uint32_t slots = 0;
   };
   std::deque<InflightRange> inflight;
 

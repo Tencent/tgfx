@@ -119,13 +119,22 @@ D3D12UploadHeap::Allocation D3D12UploadHeap::allocate(size_t size, size_t alignm
 }
 
 void D3D12UploadHeap::commit(uint64_t fenceValue) {
-  if (head == committedHead) {
-    return;
-  }
   // Pair the about-to-be-signalled fence with the bytes consumed since the last commit so
-  // retire() can give those bytes back when the GPU finishes with them.
+  // retire() can give those bytes back when the GPU finishes with them. Compute the byte total
+  // first because the fast `head == committedHead` check is ambiguous: it triggers both when
+  // truly nothing was allocated and when a single allocation spanned the entire capacity and
+  // wrapped head right back to committedHead.
   size_t bytesSinceCommit =
       (head >= committedHead) ? (head - committedHead) : (_capacity - (committedHead - head));
+  if (bytesSinceCommit == 0) {
+    if (outstandingBytes == 0) {
+      return;
+    }
+    // Whole-capacity allocation case — bill the full ring to this fence so the retire() path
+    // eventually drains outstandingBytes. Without this branch the bytes would leak and stop
+    // the ring from accepting any further allocations once outstandingBytes saturates.
+    bytesSinceCommit = _capacity;
+  }
   InflightRange entry = {};
   entry.fenceValue = fenceValue;
   entry.newHead = head;
