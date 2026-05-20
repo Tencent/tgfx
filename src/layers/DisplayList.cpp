@@ -199,9 +199,6 @@ void DisplayList::setZoomScale(float zoomScale) {
     return;
   }
   _hasContentChanged = true;
-  // Only track direction when throttling can actually fire; otherwise the work and the
-  // accumulated state would be wasted, and would also stay stale across a later
-  // setAllowZoomBlur(true) toggle.
   if (_zoomOutTileThrottlePerFrame > 0 && _allowZoomBlur) {
     _accumulatedZoomDeltaInt += (zoomScaleInt - _zoomScaleInt);
     int64_t deadband = std::max<int64_t>(_zoomScalePrecision / 100, 1);
