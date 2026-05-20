@@ -31,6 +31,12 @@ std::shared_ptr<D3D12Buffer> D3D12Buffer::Make(D3D12GPU* gpu, size_t size, uint3
   if (usage & GPUBufferUsage::READBACK) {
     heapProperties.Type = D3D12_HEAP_TYPE_READBACK;
   } else {
+    // TODO: Place static (write-once) vertex/index buffers in D3D12_HEAP_TYPE_DEFAULT and stage
+    // their initial contents through an UPLOAD heap copy, leaving only streamed (per-frame)
+    // buffers in D3D12_HEAP_TYPE_UPLOAD. The Vulkan and Metal backends share the same shortcut
+    // today (every non-readback buffer is host-visible) so any improvement here should be paired
+    // with the matching VMA/MTLResourceStorageModePrivate work and a STATIC/STREAM hint on
+    // GPUBufferUsage. Until then keep UPLOAD so vertex/index/uniform buffers remain mappable.
     heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
   }
 
