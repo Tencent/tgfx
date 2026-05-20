@@ -3392,6 +3392,7 @@ TGFX_TEST(LayerTest, ZoomOutThrottle_SetterPreservesValue) {
 
 TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_InitialStateAfterEnable) {
   auto displayList = std::make_unique<DisplayList>();
+  displayList->setAllowZoomBlur(true);
   displayList->setZoomOutTileThrottlePerFrame(3);
 
   // Enabling the feature must not pre-set any direction; the next setZoomScale call decides.
@@ -3401,6 +3402,7 @@ TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_InitialStateAfterEnable) {
 
 TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_ConfirmedZoomIn) {
   auto displayList = std::make_unique<DisplayList>();
+  displayList->setAllowZoomBlur(true);
   displayList->setZoomOutTileThrottlePerFrame(3);
 
   // Default precision is 1000, so deadband = max(1000/100, 1) = 10 (= 0.01 in scale units).
@@ -3421,6 +3423,7 @@ TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_ConfirmedZoomIn) {
 
 TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_ConfirmedZoomOut) {
   auto displayList = std::make_unique<DisplayList>();
+  displayList->setAllowZoomBlur(true);
   displayList->setZoomOutTileThrottlePerFrame(3);
 
   // Jump to scale 2.0 first; this single large positive delta confirms zoom-in and resets
@@ -3442,6 +3445,7 @@ TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_ConfirmedZoomOut) {
 
 TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_JitterIgnored) {
   auto displayList = std::make_unique<DisplayList>();
+  displayList->setAllowZoomBlur(true);
   displayList->setZoomOutTileThrottlePerFrame(3);
 
   // Tiny back-and-forth deltas whose running sum never exceeds the deadband must not flip
@@ -3457,6 +3461,7 @@ TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_JitterIgnored) {
 
 TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_FlipResetAccumulator) {
   auto displayList = std::make_unique<DisplayList>();
+  displayList->setAllowZoomBlur(true);
   displayList->setZoomOutTileThrottlePerFrame(3);
 
   // Confirm zoom-in first.
@@ -3479,6 +3484,7 @@ TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_FlipResetAccumulator) {
 
 TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_PrecisionChange) {
   auto displayList = std::make_unique<DisplayList>();
+  displayList->setAllowZoomBlur(true);
   displayList->setZoomOutTileThrottlePerFrame(3);
 
   // Build up some accumulator at the default precision (1000).
@@ -3502,6 +3508,7 @@ TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_PrecisionChange) {
 
 TGFX_TEST_PRIVATE(LayerTest, ZoomOutThrottle_DisableAfterEnable) {
   auto displayList = std::make_unique<DisplayList>();
+  displayList->setAllowZoomBlur(true);
   displayList->setZoomOutTileThrottlePerFrame(3);
   // Confirm zoom-in.
   displayList->setZoomScale(1.005f);

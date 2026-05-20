@@ -199,7 +199,10 @@ void DisplayList::setZoomScale(float zoomScale) {
     return;
   }
   _hasContentChanged = true;
-  if (_zoomOutTileThrottlePerFrame > 0) {
+  // Only track direction when throttling can actually fire; otherwise the work and the
+  // accumulated state would be wasted, and would also stay stale across a later
+  // setAllowZoomBlur(true) toggle.
+  if (_zoomOutTileThrottlePerFrame > 0 && _allowZoomBlur) {
     _accumulatedZoomDeltaInt += (zoomScaleInt - _zoomScaleInt);
     int64_t deadband = std::max<int64_t>(_zoomScalePrecision / 100, 1);
     if (std::abs(_accumulatedZoomDeltaInt) > deadband) {
@@ -222,7 +225,7 @@ void DisplayList::setZoomScalePrecision(int precision) {
   _zoomScalePrecision = precision;
   _zoomScaleInt = ChangeZoomScalePrecision(_zoomScaleInt, oldPrecision, precision);
   lastZoomScaleInt = ChangeZoomScalePrecision(lastZoomScaleInt, oldPrecision, precision);
-  if (_zoomOutTileThrottlePerFrame > 0) {
+  if (_zoomOutTileThrottlePerFrame > 0 && _allowZoomBlur) {
     _accumulatedZoomDeltaInt =
         ChangeZoomScalePrecision(_accumulatedZoomDeltaInt, oldPrecision, precision);
   }
@@ -684,9 +687,9 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
         // Throttled: try a relaxed fallback that accepts partial coverage across scales to
         // avoid leaving the tile blank.
         auto throttleFallback = getThrottleFallbackTasks(tileX, tileY, fallbackTileCaches);
-        hasZoomBlurTiles = true;
         if (!throttleFallback.empty()) {
           screenTasks.insert(screenTasks.end(), throttleFallback.begin(), throttleFallback.end());
+          hasZoomBlurTiles = true;
         } else {
           auto skippedRect =
               Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
