@@ -554,6 +554,10 @@ void D3D12RenderPass::onEnd() {
     }
     commandList->ResolveSubresource(resolveDst->d3d12Resource(), 0, src->d3d12Resource(), 0,
                                     static_cast<DXGI_FORMAT>(src->dxgiFormat()));
+    // The two zeros above are dst / src subresource indices. tgfx render targets are flat 2D
+    // textures (no array, MSAA targets are mip-locked to 1), so subresource 0 is the only valid
+    // index. Vulkan's pResolveAttachments and Metal's resolve attachments make the same
+    // assumption.
   }
 
   // Step 3: collapse every "back to COMMON" transition (color attachments, resolve targets,

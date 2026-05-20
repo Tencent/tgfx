@@ -119,6 +119,10 @@ void D3D12CommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTextu
   D3D12_TEXTURE_COPY_LOCATION src = {};
   src.pResource = d3d12Src->d3d12Resource();
   src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+  // Both SubresourceIndex 0 values intentionally target (mip 0, array slice 0, plane 0). The
+  // CommandEncoder::copyTextureToTexture contract does not expose mip / slice arguments and the
+  // Vulkan/Metal backends do exactly the same thing. A per-mip copy would require an API
+  // extension across every backend, not just D3D12.
   src.SubresourceIndex = 0;
 
   D3D12_BOX srcBox = {};

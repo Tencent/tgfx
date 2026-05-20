@@ -190,6 +190,13 @@ void D3D12CommandQueue::flushUploads(ID3D12GraphicsCommandList* commandList) {
     D3D12_TEXTURE_COPY_LOCATION dstLoc = {};
     dstLoc.pResource = up.texture->d3d12Resource();
     dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    // SubresourceIndex 0 = (mip level 0, array slice 0, plane 0). This matches the public
+    // writeTexture contract in CommandQueue.h: "If the texture has mipmaps, you should call
+    // CommandEncoder's generateMipmapsForTexture() method after writing the pixels, as mipmaps
+    // will not be generated automatically." VulkanCommandQueue / MetalCommandQueue make the
+    // same assumption (Vulkan even DEBUG_ASSERTs imageSubresource.mipLevel == 0 in its upload
+    // batcher). If tgfx ever adds array textures or a per-mip writeTexture overload, every
+    // backend must extend together — this is not a D3D12-only TODO.
     dstLoc.SubresourceIndex = 0;
 
     D3D12_TEXTURE_COPY_LOCATION srcLoc = {};
