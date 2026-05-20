@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <type_traits>
 
 namespace tgfx {
 /**
@@ -50,4 +51,10 @@ struct D3D12SyncInfo {
    */
   uint64_t value = 0;
 };
+
+static_assert(std::is_trivially_copyable_v<D3D12TextureInfo>);
+static_assert(std::is_trivially_copyable_v<D3D12SyncInfo>);
+static_assert(std::is_standard_layout_v<D3D12TextureInfo>);
+static_assert(std::is_standard_layout_v<D3D12SyncInfo>);
+
 }  // namespace tgfx
