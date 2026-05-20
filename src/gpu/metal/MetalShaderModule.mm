@@ -24,6 +24,7 @@
 #include "MetalGPU.h"
 #include "core/utils/Log.h"
 #include "gpu/ShaderCompiler.h"
+#include "gpu/UniformData.h"
 // Suppress warnings from SPIRV-Cross headers
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
@@ -78,6 +79,16 @@ static std::string injectSampleMask(const std::string& glslCode, uint32_t consta
   return result;
 }
 
+// Map SPIR-V texture/sampler bindings to Metal texture indices (0, 1, 2, ...).
+// Vulkan-style bindings reserve 0/1 for UBOs (TEXTURE_BINDING_POINT_START = 2); Metal texture
+// slots are independent of buffer slots and are remapped at runtime by MetalRenderPipeline.
+static uint32_t toMslTextureSamplerIndex(uint32_t spvBinding) {
+  if (spvBinding >= static_cast<uint32_t>(TEXTURE_BINDING_POINT_START)) {
+    return spvBinding - static_cast<uint32_t>(TEXTURE_BINDING_POINT_START);
+  }
+  return spvBinding;
+}
+
 // Convert a SPIR-V binary to MSL source code.
 static std::string convertSPIRVToMSL(const std::vector<uint32_t>& spirvBinary, ShaderStage stage) {
   spirv_cross::Parser spvParser(spirvBinary.data(), spirvBinary.size());
@@ -119,8 +130,9 @@ static std::string convertSPIRVToMSL(const std::vector<uint32_t>& spirvBinary, S
     uint32_t spvBinding = mslCompiler.get_decoration(image.id, spv::DecorationBinding);
     uint32_t spvDescSet = mslCompiler.get_decoration(image.id, spv::DecorationDescriptorSet);
     auto key = std::make_pair(spvDescSet, spvBinding);
-    bindingMap[key].mslTexture = spvBinding;
-    bindingMap[key].mslSampler = spvBinding;
+    uint32_t mslIndex = toMslTextureSamplerIndex(spvBinding);
+    bindingMap[key].mslTexture = mslIndex;
+    bindingMap[key].mslSampler = mslIndex;
   }
 
   for (auto& [key, info] : bindingMap) {
