@@ -419,6 +419,18 @@ bool D3D12RenderPipeline::createPipelineState(D3D12GPU* gpu,
 
   psoDesc.InputLayout.pInputElementDescs = inputElements.empty() ? nullptr : inputElements.data();
   psoDesc.InputLayout.NumElements = static_cast<UINT>(inputElements.size());
+  // Strip cut and topology type live on the PSO in D3D12, but tgfx exposes IndexFormat and
+  // PrimitiveType as per-draw-call state (RenderPass::setIndexBuffer / RenderPass::draw)
+  // rather than fields on RenderPipelineDescriptor. The two values below therefore must be
+  // chosen at PSO creation time without knowing what the eventual draws look like, so we hard
+  // code them to the only combination tgfx ever uses:
+  //   * IBStripCutValue=DISABLED — matches Vulkan, which sets primitiveRestartEnable=false on
+  //     its PSOs. No tgfx draw op relies on 0xFFFF/0xFFFFFFFF restarting a strip.
+  //   * PrimitiveTopologyType=TRIANGLE — tgfx's PrimitiveType only carries Triangles and
+  //     TriangleStrip today and ToD3D12PrimitiveTopologyType already collapses both onto
+  //     TRIANGLE. Once tgfx adds LINE/POINT (or moves these fields onto PrimitiveDescriptor)
+  //     this branch must be revisited together with the matching IASetPrimitiveTopology call
+  //     in D3D12RenderPass; until then a single PSO topology type covers every draw call.
   psoDesc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
   psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
   psoDesc.NumRenderTargets = static_cast<UINT>(descriptor.fragment.colorAttachments.size());
