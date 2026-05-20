@@ -34,10 +34,12 @@ namespace tgfx {
 // Convert a SPIR-V binary to HLSL source code suitable for D3DCompile with profile vs_5_0/ps_5_0.
 //
 // Binding strategy:
-//   - UBOs at SPIR-V bindings 0 and 1 (VertexUniformBlock, FragmentUniformBlock) are mapped to
-//     CBV register b0 of the corresponding stage. HLSL register namespaces are per-stage, so
-//     vertex b0 and pixel b0 do not collide and the root signature simply assigns each its own
-//     visibility-restricted descriptor range.
+//   - UBOs are walked in the order SPIRV-Cross returns them — which is GLSL declaration order,
+//     and therefore matches the BindingLayout::uniformBlocks order seen by the pipeline side —
+//     and assigned consecutive CBV registers b0, b1, ... within this single stage. HLSL register
+//     namespaces are per-stage so the vertex stage and the pixel stage have independent b0
+//     packings; D3D12RenderPipeline's root signature mirrors this by giving each entry a
+//     stage-local register index.
 //   - Sampled images at SPIR-V bindings 2..N are mapped to (t{N-2}, s{N-2}). Shifting by
 //     TEXTURE_BINDING_POINT_START keeps the t/s register space dense starting at zero, which
 //     simplifies root-signature construction.
@@ -60,10 +62,13 @@ static std::string convertSPIRVToHLSL(const std::vector<uint32_t>& spirvBinary, 
 
   auto resources = hlslCompiler.get_shader_resources();
 
-  // Map UBOs: every UBO maps to CBV register b0 in its stage. HLSL's b/t/s register namespaces
-  // are per shader stage, so the vertex stage's b0 and the pixel stage's b0 do not collide. This
-  // matches the root signature created by D3D12RenderPipeline, which assigns one root CBV
-  // (ShaderRegister=0) per uniform block.
+  // Map UBOs: for the current stage, walk the SPIR-V uniform buffers in the order produced by
+  // SPIRV-Cross (which matches GLSL declaration order, identical to BindingLayout's
+  // uniformBlocks order on the pipeline side) and assign them HLSL CBV registers b0, b1, ...
+  // sequentially. HLSL register namespaces are per-stage, so this gives each stage a dense
+  // packing that matches D3D12RenderPipeline::createRootSignature, which assigns the same
+  // stage-local index to each entry's CBV root parameter.
+  uint32_t cbvRegister = 0;
   for (auto& ubo : resources.uniform_buffers) {
     uint32_t spvBinding = hlslCompiler.get_decoration(ubo.id, spv::DecorationBinding);
     uint32_t spvDescSet = hlslCompiler.get_decoration(ubo.id, spv::DecorationDescriptorSet);
@@ -71,7 +76,7 @@ static std::string convertSPIRVToHLSL(const std::vector<uint32_t>& spirvBinary, 
     resourceBinding.stage = executionModel;
     resourceBinding.desc_set = spvDescSet;
     resourceBinding.binding = spvBinding;
-    resourceBinding.cbv.register_binding = 0;
+    resourceBinding.cbv.register_binding = cbvRegister++;
     resourceBinding.cbv.register_space = 0;
     hlslCompiler.add_hlsl_resource_binding(resourceBinding);
   }

@@ -120,22 +120,46 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   // of whether the underlying ID3D12RootSignature is cached. Walk uniform blocks first, then
   // texture samplers, so the parameter indices line up with the order used when serialising.
   std::vector<uint8_t> shapeKey;
-  // Reserve roughly: 1 byte UBO count + 2 bytes per UBO (visibility) + 1 byte sampler count +
-  // 2 bytes per sampler (visibility).
-  shapeKey.reserve(2 + descriptor.layout.uniformBlocks.size() * 2 +
+  // Reserve roughly: 1 byte UBO count + 4 bytes per UBO (2 visibility + 1 vertex register +
+  // 1 fragment register) + 1 byte sampler count + 2 bytes per sampler (visibility).
+  shapeKey.reserve(2 + descriptor.layout.uniformBlocks.size() * 4 +
                    descriptor.layout.textureSamplers.size() * 2);
+
+  // Pre-scan uniform blocks to compute, for every entry, its 0-based register index inside the
+  // vertex and fragment stages. SPIR-V binding K is mapped to HLSL register b{idx} where idx is
+  // the entry's position among same-stage entries in BindingLayout.uniformBlocks. Two entries
+  // visible to the same stage must therefore yield different register indices, and the indices
+  // must agree with what D3D12ShaderModule produces when it walks the SPIR-V resources of that
+  // stage in declaration order.
+  std::vector<uint8_t> ubVertexRegister(descriptor.layout.uniformBlocks.size(), 0xFF);
+  std::vector<uint8_t> ubFragmentRegister(descriptor.layout.uniformBlocks.size(), 0xFF);
+  uint32_t nextVertexRegister = 0;
+  uint32_t nextFragmentRegister = 0;
+  for (size_t i = 0; i < descriptor.layout.uniformBlocks.size(); i++) {
+    const auto& entry = descriptor.layout.uniformBlocks[i];
+    if (entry.visibility & ShaderVisibility::Vertex) {
+      ubVertexRegister[i] = static_cast<uint8_t>(nextVertexRegister++);
+    }
+    if (entry.visibility & ShaderVisibility::Fragment) {
+      ubFragmentRegister[i] = static_cast<uint8_t>(nextFragmentRegister++);
+    }
+  }
 
   uint32_t paramCursor = 0;
   shapeKey.push_back(static_cast<uint8_t>(descriptor.layout.uniformBlocks.size()));
-  for (const auto& entry : descriptor.layout.uniformBlocks) {
+  for (size_t i = 0; i < descriptor.layout.uniformBlocks.size(); i++) {
+    const auto& entry = descriptor.layout.uniformBlocks[i];
     uniformRootParameterIndex[entry.binding] = paramCursor++;
     uniformBlockVisibility[entry.binding] = entry.visibility;
     uniformBindingSet.insert(entry.binding);
-    // Visibility is the only knob that varies between UBO entries (ShaderRegister is always 0).
-    // Encode it in the shape key so two pipelines with different vertex/fragment splits get
-    // different cache entries.
+    // Encode visibility plus per-stage register indices in the shape key. Different stage-local
+    // register layouts must hit different cached root signatures; otherwise a pipeline whose
+    // fragment UBO ends up at b1 (because it has a sibling at b0) would reuse another
+    // pipeline's root signature that still places it at b0.
     shapeKey.push_back(static_cast<uint8_t>(entry.visibility & 0xFF));
     shapeKey.push_back(static_cast<uint8_t>((entry.visibility >> 8) & 0xFF));
+    shapeKey.push_back(ubVertexRegister[i]);
+    shapeKey.push_back(ubFragmentRegister[i]);
   }
 
   shapeKey.push_back(static_cast<uint8_t>(descriptor.layout.textureSamplers.size()));
@@ -174,13 +198,27 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   srvRanges.reserve(descriptor.layout.textureSamplers.size());
   samplerRanges.reserve(descriptor.layout.textureSamplers.size());
 
-  for (const auto& entry : descriptor.layout.uniformBlocks) {
+  for (size_t i = 0; i < descriptor.layout.uniformBlocks.size(); i++) {
+    const auto& entry = descriptor.layout.uniformBlocks[i];
     D3D12_ROOT_PARAMETER param = {};
     param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     param.ShaderVisibility = ToD3D12ShaderVisibility(entry.visibility);
-    // SPIR-V binding K (0 for vertex UBO, 1 for fragment UBO) is mapped to HLSL register b0 in the
-    // matching shader stage by D3D12ShaderModule, so use ShaderRegister=0 here irrespective of K.
-    param.Descriptor.ShaderRegister = 0;
+    // ShaderRegister is per-stage in HLSL. Pick the register index from whichever stage the
+    // entry is visible to; for VertexFragment-visible UBOs the two stage-local indices must
+    // match, otherwise the single CBV root parameter cannot satisfy both stages with one
+    // register number. Such a configuration is rejected here so the mismatch surfaces early
+    // instead of producing silently broken bindings.
+    uint8_t vsReg = ubVertexRegister[i];
+    uint8_t fsReg = ubFragmentRegister[i];
+    if (vsReg != 0xFF && fsReg != 0xFF && vsReg != fsReg) {
+      LOGE(
+          "D3D12RenderPipeline: VertexFragment-visible UBO binding %u maps to mismatched "
+          "stage-local registers (vs=b%u, ps=b%u). Reorder uniformBlocks so shared UBOs share "
+          "their stage-local index in both stages.",
+          entry.binding, static_cast<unsigned>(vsReg), static_cast<unsigned>(fsReg));
+      return false;
+    }
+    param.Descriptor.ShaderRegister = (vsReg != 0xFF) ? vsReg : fsReg;
     param.Descriptor.RegisterSpace = 0;
     rootParameters.push_back(param);
   }
