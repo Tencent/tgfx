@@ -120,8 +120,10 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   // of whether the underlying ID3D12RootSignature is cached. Walk uniform blocks first, then
   // texture samplers, so the parameter indices line up with the order used when serialising.
   std::vector<uint8_t> shapeKey;
-  // Reserve roughly: 1 byte UBO count + 2 bytes per UBO (visibility) + 1 byte sampler count.
-  shapeKey.reserve(2 + descriptor.layout.uniformBlocks.size() * 2);
+  // Reserve roughly: 1 byte UBO count + 2 bytes per UBO (visibility) + 1 byte sampler count +
+  // 2 bytes per sampler (visibility).
+  shapeKey.reserve(2 + descriptor.layout.uniformBlocks.size() * 2 +
+                   descriptor.layout.textureSamplers.size() * 2);
 
   uint32_t paramCursor = 0;
   shapeKey.push_back(static_cast<uint8_t>(descriptor.layout.uniformBlocks.size()));
@@ -145,6 +147,11 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
     samplerRootParameterIndex[entry.binding] = samplerParamIndex;
     textureUnits[entry.binding] = textureUnit++;
     textureBindingSet.insert(entry.binding);
+    // Encode each sampler binding's visibility into the shape key. Without this two pipelines
+    // that differ only in vertex/fragment-only sampler visibility would collide on the cached
+    // root signature once the SRV/Sampler root parameters below honour entry.visibility.
+    shapeKey.push_back(static_cast<uint8_t>(entry.visibility & 0xFF));
+    shapeKey.push_back(static_cast<uint8_t>((entry.visibility >> 8) & 0xFF));
   }
 
   // Cache hit: reuse the existing D3D12 root signature object. Different pipelines sharing the
@@ -179,7 +186,7 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   }
 
   unsigned rangeRegister = 0;
-  for (size_t i = 0; i < descriptor.layout.textureSamplers.size(); i++) {
+  for (const auto& entry : descriptor.layout.textureSamplers) {
     auto& srvRange = srvRanges.emplace_back();
     srvRange = {};
     srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -190,7 +197,11 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
 
     D3D12_ROOT_PARAMETER srvParam = {};
     srvParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    srvParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    // Honour the caller-declared visibility instead of forcing pixel-only. Vertex texture
+    // sampling (noise / displacement / geometry LOD lookups) needs SRVs visible to the vertex
+    // stage; the per-entry shapeKey above already partitions the cache so different visibility
+    // shapes do not collide.
+    srvParam.ShaderVisibility = ToD3D12ShaderVisibility(entry.visibility);
     srvParam.DescriptorTable.NumDescriptorRanges = 1;
     srvParam.DescriptorTable.pDescriptorRanges = &srvRange;
     rootParameters.push_back(srvParam);
@@ -205,7 +216,7 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
 
     D3D12_ROOT_PARAMETER samplerParam = {};
     samplerParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    samplerParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplerParam.ShaderVisibility = ToD3D12ShaderVisibility(entry.visibility);
     samplerParam.DescriptorTable.NumDescriptorRanges = 1;
     samplerParam.DescriptorTable.pDescriptorRanges = &samplerRange;
     rootParameters.push_back(samplerParam);
