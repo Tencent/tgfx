@@ -37,6 +37,19 @@ std::shared_ptr<D3D12Texture> D3D12Texture::Make(D3D12GPU* gpu,
     return nullptr;
   }
 
+  // D3D12 disallows D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS on MSAA resources, and we need
+  // UAV access on every mipmapped texture so the compute mipmap generator can write each
+  // downsampled level. Rather than create the resource and let CreateCommittedResource fail
+  // with a runtime debug-layer error, reject the combination up front. The GL backend already
+  // enforces the same contract in GLMultisampleTexture::MakeFrom; Metal's MTLTextureType2D-
+  // Multisample type cannot carry mip levels at all and so doesn't need an explicit check.
+  if (descriptor.mipLevelCount > 1 && descriptor.sampleCount > 1) {
+    LOGE("D3D12Texture::Make() multisample textures cannot have mip levels (mipLevelCount=%d, "
+         "sampleCount=%d).",
+         descriptor.mipLevelCount, descriptor.sampleCount);
+    return nullptr;
+  }
+
   auto dxgiFormat = static_cast<DXGI_FORMAT>(gpu->getDXGIFormat(descriptor.format));
   if (dxgiFormat == static_cast<DXGI_FORMAT>(DXGI_FORMAT_UNKNOWN)) {
     LOGE("D3D12Texture::Make() unsupported pixel format: %d", static_cast<int>(descriptor.format));
