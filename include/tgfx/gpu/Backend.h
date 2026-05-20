@@ -65,7 +65,7 @@ class BackendTexture {
   /**
    * Creates a D3D12 backend texture.
    */
-  BackendTexture(const D3D12TextureInfo& d3d12Info, int width, int height)
+  explicit BackendTexture(const D3D12TextureInfo& d3d12Info, int width, int height)
       : _backend(Backend::D3D12), _width(width), _height(height), d3d12Info(d3d12Info) {
   }
 
@@ -180,7 +180,7 @@ class BackendRenderTarget {
   /**
    * Creates a D3D12 backend render target.
    */
-  BackendRenderTarget(const D3D12TextureInfo& d3d12Info, int width, int height)
+  explicit BackendRenderTarget(const D3D12TextureInfo& d3d12Info, int width, int height)
       : _backend(Backend::D3D12), _width(width), _height(height), d3d12Info(d3d12Info) {
   }
 
@@ -294,7 +294,7 @@ class BackendSemaphore {
   /**
    * Creates a D3D12 backend semaphore.
    */
-  BackendSemaphore(const D3D12SyncInfo& d3d12Info)
+  explicit BackendSemaphore(const D3D12SyncInfo& d3d12Info)
       : _backend(Backend::D3D12), d3d12SyncInfo(d3d12Info) {
   }
 
