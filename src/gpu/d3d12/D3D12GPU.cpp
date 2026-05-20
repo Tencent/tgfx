@@ -300,9 +300,12 @@ std::shared_ptr<Sampler> D3D12GPU::createSampler(const SamplerDescriptor& descri
     return iter->second;
   }
   auto sampler = D3D12Sampler::Make(this, descriptor);
-  if (sampler != nullptr) {
-    samplerCache[key] = sampler;
-  }
+  // Cache the result even when Make returned nullptr. The total number of distinct
+  // SamplerDescriptor values is bounded by the AddressMode/FilterMode/MipmapMode enums
+  // (currently 4 x 4 x 2 x 2 x 3 = 192), so the sampler heap (2048 slots) should never run
+  // out, but memoising the failure protects the hot path: a repeated failing key would
+  // otherwise retry CreateSampler + log the error on every draw call that needs a sampler.
+  samplerCache[key] = sampler;
   return sampler;
 }
 
