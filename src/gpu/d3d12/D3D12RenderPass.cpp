@@ -427,11 +427,21 @@ void D3D12RenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> 
     return;
   }
   auto d3d12Buffer = std::static_pointer_cast<D3D12Buffer>(buffer);
+  // Guard against the size_t subtraction below underflowing. Unlike Vulkan/Metal where the
+  // backing API consumes (buffer, offset) directly, D3D12 expects us to compute SizeInBytes
+  // ourselves; an offset at or past the buffer end would wrap to ~0 and the UINT cast would
+  // then publish a 4 GB range to the GPU.
+  auto bufferSize = d3d12Buffer->size();
+  if (offset >= bufferSize) {
+    LOGE("D3D12RenderPass::setVertexBuffer: offset %zu is out of range (buffer size=%zu).", offset,
+         bufferSize);
+    return;
+  }
   encoder->retainResource(d3d12Buffer);
 
   D3D12_VERTEX_BUFFER_VIEW view = {};
   view.BufferLocation = d3d12Buffer->d3d12Resource()->GetGPUVirtualAddress() + offset;
-  view.SizeInBytes = static_cast<UINT>(d3d12Buffer->size() - offset);
+  view.SizeInBytes = static_cast<UINT>(bufferSize - offset);
   // D3D12 requires the per-vertex stride at draw time. We sourced it from the bound pipeline's
   // VertexBufferLayout when the pipeline was built. The Vulkan backend keeps stride implicit in
   // the VkPipeline's vertex input description; for D3D12 we must echo it back here.
@@ -444,11 +454,19 @@ void D3D12RenderPass::setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFor
     return;
   }
   auto d3d12Buffer = std::static_pointer_cast<D3D12Buffer>(buffer);
+  // Reject empty buffers up front: passing SizeInBytes=0 to IASetIndexBuffer leaves the index
+  // buffer effectively unset and later draws would silently produce no primitives. Mirrors the
+  // defensive offset check in setVertexBuffer.
+  auto bufferSize = d3d12Buffer->size();
+  if (bufferSize == 0) {
+    LOGE("D3D12RenderPass::setIndexBuffer: buffer has zero size.");
+    return;
+  }
   encoder->retainResource(d3d12Buffer);
 
   D3D12_INDEX_BUFFER_VIEW view = {};
   view.BufferLocation = d3d12Buffer->d3d12Resource()->GetGPUVirtualAddress();
-  view.SizeInBytes = static_cast<UINT>(d3d12Buffer->size());
+  view.SizeInBytes = static_cast<UINT>(bufferSize);
   view.Format = (format == IndexFormat::UInt32) ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT;
   commandList->IASetIndexBuffer(&view);
 }
