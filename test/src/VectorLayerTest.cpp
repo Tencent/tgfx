@@ -16,6 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "core/PathRef.h"
+#include "tgfx/core/Paint.h"
+#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathMeasure.h"
 #include "tgfx/core/RSXform.h"
 #include "tgfx/core/TextBlobBuilder.h"
@@ -4627,11 +4630,7 @@ TGFX_TEST(VectorLayerTest, StrokeDashAdaptive) {
 }
 
 /**
- * Test Rectangle collapsing to a line segment when one side is zero: horizontal stroke,
- * trimmed (forward and reversed) segments, along-axis fit gradients that prove the stroke
- * fit bounds expand only perpendicular to the segment (not along it), and a double-zero
- * Rectangle that must keep its area-shape semantics (round-cap stroked dot with a
- * symmetric two-axis fit gradient).
+ * Test Rectangle collapsing to a sub-pixel band when one side is zero.
  */
 TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   ContextScope scope;
@@ -4644,7 +4643,6 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto displayList = std::make_unique<DisplayList>();
   auto vectorLayer = VectorLayer::Make();
 
-  // Row 1: Horizontal degenerate Rectangle with solid red stroke.
   auto rect1 = Rectangle::Make();
   rect1->setPosition({300, 54});
   rect1->setSize({500, 0});
@@ -4652,35 +4650,17 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto group1 = VectorGroup::Make();
   group1->setElements({rect1, stroke1});
 
-  // Row 2: Horizontal degenerate Rectangle trimmed to the first half, stroked green.
   auto rect2 = Rectangle::Make();
-  rect2->setPosition({175, 150});
-  rect2->setSize({250, 0});
+  rect2->setPosition({300, 150});
+  rect2->setSize({500, 0});
   auto trim2 = TrimPath::Make();
   trim2->setStart(0.0f);
   trim2->setEnd(0.5f);
   auto stroke2 = MakeStrokeStyle(Color::Green(), 8.0f);
+  stroke2->setDashes({20.0f, 20.0f});
   auto group2 = VectorGroup::Make();
   group2->setElements({rect2, trim2, stroke2});
 
-  // Row 3: Reversed horizontal degenerate Rectangle with the same trim; the opposite half
-  // should be drawn.
-  auto rect3 = Rectangle::Make();
-  rect3->setPosition({425, 150});
-  rect3->setSize({250, 0});
-  rect3->setReversed(true);
-  auto trim3 = TrimPath::Make();
-  trim3->setStart(0.0f);
-  trim3->setEnd(0.5f);
-  auto stroke3 = MakeStrokeStyle(Color::FromRGBA(255, 128, 0, 255), 8.0f);
-  auto group3 = VectorGroup::Make();
-  group3->setElements({rect3, trim3, stroke3});
-
-  // Row 4: Center-aligned stroke with an along-segment fit gradient. The fit bounds come from
-  // the path geometry (a horizontal zero-height segment) so the gradient runs from red (left)
-  // to blue (right) across the full stroked length and the perpendicular axis falls into the
-  // epsilon fallback. A regression that padded the fit bounds by stroke width would inset both
-  // ends in fit space, washing the endpoints toward purple.
   auto rect4 = Rectangle::Make();
   rect4->setPosition({300, 258});
   rect4->setSize({500, 0});
@@ -4691,13 +4671,9 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto group4 = VectorGroup::Make();
   group4->setElements({rect4, stroke4});
 
-  // Row 5: Outside-aligned stroke with a perpendicular fit gradient. The fit bounds collapse
-  // along y so the epsilon fallback turns the perpendicular axis into a sharp red/blue split:
-  // the upper half of the Outside band is pure red and the lower half is pure blue, with no
-  // horizontal padding from the fit.
   auto rect5 = Rectangle::Make();
   rect5->setPosition({300, 354});
-  rect5->setSize({500, 0});
+  rect5->setSize({476, 0});
   auto gradient5 = Gradient::MakeLinear({0.5f, 0.0f}, {0.5f, 1.0f}, {Color::Red(), Color::Blue()});
   auto stroke5 = StrokeStyle::Make(gradient5);
   stroke5->setStrokeWidth(24.0f);
@@ -4705,25 +4681,18 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
   auto group5 = VectorGroup::Make();
   group5->setElements({rect5, stroke5});
 
-  // Row 6: Four Center-aligned 72px stroke samples sharing a fit linear gradient. Round and
-  // Square sit on a double-zero Rectangle (collapses to a moveTo+lineTo with overlapping
-  // endpoints) and rely on the epsilon fit-axis fallback: Round splits diagonally red/blue,
-  // Square splits horizontally red/blue. The third sample is a 50x0 Rectangle stroked with a
-  // Butt cap, so the band only extends vertically along the stroke width while the vertical
-  // gradient runs through it. The fourth sample uses a real 50x10 Rectangle so the vertical
-  // gradient fills the stroked band continuously inside the geometry's height and clamps to
-  // the end colors above and below.
   struct DotConfig {
     float cx;
     LineCap cap;
     Size size;
     Point gradEnd;
+    StrokeAlign align;
   };
   const std::array<DotConfig, 4> dotConfigs = {{
-      {86.0f, LineCap::Round, {0.0f, 0.0f}, {1.0f, 1.0f}},
-      {219.0f, LineCap::Square, {0.0f, 0.0f}, {0.0f, 1.0f}},
-      {341.0f, LineCap::Butt, {50.0f, 0.0f}, {0.0f, 1.0f}},
-      {489.0f, LineCap::Butt, {50.0f, 10.0f}, {0.0f, 1.0f}},
+      {76.0f, LineCap::Round, {0.0f, 0.0f}, {1.0f, 1.0f}, StrokeAlign::Center},
+      {224.0f, LineCap::Square, {0.0f, 0.0f}, {0.0f, 1.0f}, StrokeAlign::Outside},
+      {373.0f, LineCap::Butt, {50.0f, 0.0f}, {0.0f, 1.0f}, StrokeAlign::Center},
+      {523.0f, LineCap::Butt, {50.0f, 10.0f}, {0.0f, 1.0f}, StrokeAlign::Center},
   }};
   std::vector<std::shared_ptr<VectorGroup>> dotGroups;
   dotGroups.reserve(dotConfigs.size());
@@ -4734,16 +4703,16 @@ TGFX_TEST(VectorLayerTest, RectangleAsLine) {
     auto dotGradient =
         Gradient::MakeLinear({0.0f, 0.0f}, config.gradEnd, {Color::Red(), Color::Blue()});
     auto dotStroke = StrokeStyle::Make(dotGradient);
-    dotStroke->setStrokeWidth(72.0f);
+    dotStroke->setStrokeWidth(48.0f);
     dotStroke->setLineCap(config.cap);
-    dotStroke->setStrokeAlign(StrokeAlign::Center);
+    dotStroke->setStrokeAlign(config.align);
     auto dotGroup = VectorGroup::Make();
     dotGroup->setElements({dotRect, dotStroke});
     dotGroups.push_back(dotGroup);
   }
 
-  vectorLayer->setContents({group1, group2, group3, group4, group5, dotGroups[0], dotGroups[1],
-                            dotGroups[2], dotGroups[3]});
+  vectorLayer->setContents(
+      {group1, group2, group4, group5, dotGroups[0], dotGroups[1], dotGroups[2], dotGroups[3]});
 
   displayList->root()->addChild(vectorLayer);
   displayList->render(surface.get());
@@ -5141,6 +5110,222 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/FillInTransformedGroup"));
+}
+
+/**
+ * Tests stroke rendering on degenerate geometry (point or line) for built-in vector
+ * shapes in VectorLayer.
+ */
+TGFX_TEST(VectorLayerTest, DegenerateStroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr float CellSize = 190.0f;
+  constexpr float ExtraColShift = 40.0f;
+  constexpr int ColCount = 10;
+  constexpr int RowCount = 5;
+  constexpr float NonDegenerateSize = 100.0f;
+  constexpr float MinExtent = 5e-3f;
+  const Color FillColor = Color::FromRGBA(9, 0, 246, 255);
+  const Color StrokeColor = Color::White();
+
+  enum class SizeMode {
+    Normal,
+    DegeneratePoint,
+    DegenerateLine,
+  };
+
+  struct ColumnConfig {
+    SizeMode size;
+    LineCap cap;
+    LineJoin join;
+    float strokeWidth;
+    bool dashed;
+    float dashLength;
+    float dashGap;
+  };
+
+  const ColumnConfig columns[ColCount] = {
+      {SizeMode::Normal, LineCap::Butt, LineJoin::Bevel, 20.0f, false, 0, 0},
+      {SizeMode::Normal, LineCap::Round, LineJoin::Miter, 20.0f, true, 10.0f, 40.0f},
+      {SizeMode::DegeneratePoint, LineCap::Butt, LineJoin::Miter, 40.0f, false, 0, 0},
+      {SizeMode::DegeneratePoint, LineCap::Butt, LineJoin::Bevel, 50.0f, false, 0, 0},
+      {SizeMode::DegeneratePoint, LineCap::Butt, LineJoin::Round, 50.0f, false, 0, 0},
+      {SizeMode::DegeneratePoint, LineCap::Square, LineJoin::Miter, 40.0f, true, 10.0f, 80.0f},
+      {SizeMode::DegeneratePoint, LineCap::Square, LineJoin::Bevel, 50.0f, true, 10.0f, 100.0f},
+      {SizeMode::DegeneratePoint, LineCap::Round, LineJoin::Bevel, 50.0f, true, 10.0f, 100.0f},
+      {SizeMode::DegenerateLine, LineCap::Square, LineJoin::Bevel, 20.0f, true, 10.0f, 100.0f},
+      {SizeMode::DegeneratePoint, LineCap::Butt, LineJoin::Bevel, 50.0f, true, 10.0f, 100.0f},
+  };
+
+  auto makeShape = [&](int row, SizeMode mode) -> std::shared_ptr<VectorElement> {
+    // row 0: Rectangle
+    if (row == 0) {
+      auto rect = Rectangle::Make();
+      Size size = {NonDegenerateSize, NonDegenerateSize};
+      if (mode == SizeMode::DegeneratePoint) {
+        size = Size{0.0f, 0.0f};
+      } else if (mode == SizeMode::DegenerateLine) {
+        size = Size{0.0f, 60.0f};
+      }
+      rect->setSize(size);
+      return rect;
+    }
+    // row 1: Triangle (Polystar with 3 points)
+    if (row == 1) {
+      auto triangle = Polystar::Make();
+      triangle->setPolystarType(PolystarType::Polygon);
+      triangle->setPointCount(3);
+      if (mode == SizeMode::DegenerateLine) {
+        constexpr float OuterRadius = 30.0f;
+        constexpr float TargetXExtent = 5e-3f;
+        // cos(30 deg) = 0.866025404f
+        auto triangleWidth = OuterRadius * 2.0f * 0.866025404f;
+        auto xScale = TargetXExtent / triangleWidth;
+        triangle->setOuterRadius(OuterRadius);
+        auto innerGroup = VectorGroup::Make();
+        innerGroup->setElements({triangle});
+        // Polystar has no width/height, so x-axis degeneracy is simulated by squashing the
+        // fully-sized polygon via an inner VectorGroup scale.
+        innerGroup->setScale({xScale, 1.0f});
+        return innerGroup;
+      }
+      triangle->setOuterRadius(mode == SizeMode::DegeneratePoint ? 0.0f : NonDegenerateSize * 0.5f);
+      return triangle;
+    }
+
+    // row 2: Star with default r/R = 0.5
+    if (row == 2) {
+      constexpr float StarAOuterRadius = 50.0f;
+      constexpr float StarAInnerRadius = 25.0f;
+
+      auto star = Polystar::Make();
+      star->setPolystarType(PolystarType::Star);
+      star->setPointCount(5);
+      if (mode == SizeMode::DegenerateLine) {
+        // Mirror row 2: R = 30 (nominalSize / 2), default r/R = 0.5.
+        constexpr float OuterRadius = 30.0f;
+        constexpr float InnerRadius = OuterRadius * 0.5f;
+        constexpr float TargetXExtent = 5e-3f;
+        // cos(18 deg) = 0.951056516f
+        auto starWidth = OuterRadius * 2.0f * 0.951056516f;
+        auto xScale = TargetXExtent / starWidth;
+        star->setOuterRadius(OuterRadius);
+        star->setInnerRadius(InnerRadius);
+        auto innerGroup = VectorGroup::Make();
+        innerGroup->setElements({star});
+        // Polystar has no width/height, so x-axis degeneracy is simulated by squashing the
+        // fully-sized polygon via an inner VectorGroup scale.
+        innerGroup->setScale({xScale, 1.0f});
+        return innerGroup;
+      }
+      star->setOuterRadius(mode == SizeMode::DegeneratePoint ? 0.0f : StarAOuterRadius);
+      star->setInnerRadius(mode == SizeMode::DegeneratePoint ? 0.0f : StarAInnerRadius);
+      return star;
+    }
+
+    // row 3: Star with r/R = (3 - sqrt(5)) / 2 (horizontal upper edge)
+    if (row == 3) {
+      constexpr float StarBRatio = 0.381966011f;
+      constexpr float StarBOuterRadius = 50.0f;
+      constexpr float StarBInnerRadius = StarBOuterRadius * StarBRatio;
+      constexpr float StarBFallbackInnerRadius = MinExtent;
+      constexpr float StarBFallbackOuterRadius = MinExtent / StarBRatio;
+
+      auto star = Polystar::Make();
+      star->setPolystarType(PolystarType::Star);
+      star->setPointCount(5);
+      if (mode == SizeMode::DegenerateLine) {
+        constexpr float OuterRadius = 30.0f;
+        constexpr float InnerRadius = OuterRadius * StarBRatio;
+        constexpr float TargetXExtent = 5e-3f;
+        // cos(18 deg) = 0.951056516f
+        auto starWidth = OuterRadius * 2.0f * 0.951056516f;
+        auto xScale = TargetXExtent / starWidth;
+        star->setOuterRadius(OuterRadius);
+        star->setInnerRadius(InnerRadius);
+        auto innerGroup = VectorGroup::Make();
+        innerGroup->setElements({star});
+        // Polystar has no width/height, so x-axis degeneracy is simulated by squashing the
+        // fully-sized polygon via an inner VectorGroup scale.
+        innerGroup->setScale({xScale, 1.0f});
+        return innerGroup;
+      }
+      star->setOuterRadius(mode == SizeMode::DegeneratePoint ? StarBFallbackOuterRadius
+                                                             : StarBOuterRadius);
+      star->setInnerRadius(mode == SizeMode::DegeneratePoint ? StarBFallbackInnerRadius
+                                                             : StarBInnerRadius);
+      return star;
+    }
+
+    // row 4: Ellipse
+    if (row == 4) {
+      auto ellipse = Ellipse::Make();
+      Size size = {NonDegenerateSize, NonDegenerateSize};
+      if (mode == SizeMode::DegeneratePoint) {
+        size = Size{0.0f, 0.0f};
+      } else if (mode == SizeMode::DegenerateLine) {
+        size = Size{0.0f, 60.0f};
+      }
+      ellipse->setSize(size);
+      return ellipse;
+    }
+    return nullptr;
+  };
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+  std::vector<std::shared_ptr<VectorElement>> contents = {};
+
+  for (int row = 0; row < RowCount; ++row) {
+    for (int col = 0; col < ColCount; ++col) {
+      const auto& config = columns[col];
+      auto shape = makeShape(row, config.size);
+      if (shape == nullptr) {
+        continue;
+      }
+      auto fill = MakeFillStyle(FillColor);
+      auto stroke = StrokeStyle::Make(SolidColor::Make(StrokeColor));
+      stroke->setStrokeWidth(config.strokeWidth);
+      stroke->setLineJoin(config.join);
+      stroke->setLineCap(config.cap);
+      stroke->setStrokeAlign(StrokeAlign::Outside);
+      if (config.dashed) {
+        stroke->setDashes({config.dashLength, config.dashGap});
+        stroke->setDashOffset(config.dashLength * 0.5f);
+        stroke->setDashAdaptive(true);
+      }
+      auto group = VectorGroup::Make();
+      // Shift columns starting from the 3rd one rightward so the wide outside-stroke geometry
+      // of column 2 (and the dense row-3 stars in subsequent cols) stays inside its own cell
+      // band. Without this gap, large square-cap strokes from adjacent cells overlap visibly.
+      auto extraShift = col >= 2 ? ExtraColShift : 0.0f;
+      group->setPosition(
+          {col * CellSize + CellSize * 0.5f + extraShift, row * CellSize + CellSize * 0.5f});
+      group->setElements({shape, fill, stroke});
+      contents.push_back(group);
+    }
+  }
+
+  vectorLayer->setContents(contents);
+
+  constexpr int Padding = 20;
+  auto width = static_cast<int>(std::ceil(CellSize * ColCount + ExtraColShift + Padding * 2));
+  auto height = static_cast<int>(std::ceil(CellSize * RowCount + Padding * 2));
+  vectorLayer->setMatrix(Matrix::MakeTrans(Padding, Padding));
+
+  auto background = SolidLayer::Make();
+  background->setColor(Color::FromRGBA(46, 46, 46, 255));
+  background->setWidth(static_cast<float>(width));
+  background->setHeight(static_cast<float>(height));
+  displayList->root()->addChild(background);
+  displayList->root()->addChild(vectorLayer);
+
+  auto surface = Surface::Make(context, width, height);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/DegenerateStroke"));
 }
 
 }  // namespace tgfx

@@ -24,6 +24,8 @@
 
 namespace tgfx {
 
+static constexpr float RECTANGLE_MIN_EXTENT = 5e-3f;
+
 std::shared_ptr<Rectangle> Rectangle::Make() {
   return std::shared_ptr<Rectangle>(new Rectangle());
 }
@@ -67,32 +69,19 @@ void Rectangle::setReversed(bool value) {
 void Rectangle::apply(VectorContext* context) {
   DEBUG_ASSERT(context != nullptr);
   if (_cachedShape == nullptr) {
-    auto halfWidth = _size.width * 0.5f;
-    auto halfHeight = _size.height * 0.5f;
+    // Clamp to a non-zero extent so the generated rectangle remains a well-defined path with
+    // valid tangents and length for downstream stroke/dash/measure operations. The value sits
+    // above the stroker's internal precision threshold so each edge is not treated as a tiny
+    // segment, yet far below any sampling grid so the shape stays visually invisible.
+    const auto width = std::max(_size.width, RECTANGLE_MIN_EXTENT);
+    const auto height = std::max(_size.height, RECTANGLE_MIN_EXTENT);
+    const auto halfWidth = width * 0.5f;
+    const auto halfHeight = height * 0.5f;
+    const auto radius = std::min({_roundness, halfWidth, halfHeight});
+    const auto rect =
+        Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, width, height);
     Path path;
-    // A degenerate rectangle is treated as an open line segment (or a single point when both
-    // sides are zero).
-    bool degenerate = _size.width == 0.0f || _size.height == 0.0f;
-    if (degenerate) {
-      Point p0 = {_position.x - halfWidth, _position.y - halfHeight};
-      Point p1 = {_position.x + halfWidth, _position.y + halfHeight};
-      if (_reversed) {
-        std::swap(p0, p1);
-      }
-      path.moveTo(p0);
-      path.lineTo(p1);
-    } else {
-      auto radius = _roundness;
-      if (radius > halfWidth) {
-        radius = halfWidth;
-      }
-      if (radius > halfHeight) {
-        radius = halfHeight;
-      }
-      auto rect = Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, _size.width,
-                                 _size.height);
-      path.addRoundRect(rect, radius, radius, _reversed, 2);
-    }
+    path.addRoundRect(rect, radius, radius, _reversed, 2);
     _cachedShape = Shape::MakeFrom(path);
   }
   if (_cachedShape) {

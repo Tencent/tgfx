@@ -24,8 +24,8 @@ using namespace pk;
 
 namespace tgfx {
 
-#define ADAPTIVE_DASH_SEGMENT_EPSILON 120000
-#define ADAPTIVE_DASH_MIN_DASHABLE_LENGTH 0.1f
+static constexpr int ADAPTIVE_DASH_SEGMENT_EPSILON = 120000;
+static constexpr float ADAPTIVE_DASH_MIN_DASHABLE_LENGTH = 1.0f / (1 << 12);
 
 inline bool IsEven(int x) {
   return !(x & 1);
@@ -179,6 +179,11 @@ bool AdaptiveDashEffect::filterPath(Path* path) const {
 
     for (const auto& segment : contour.segments) {
       const float segmentLength = segment->getLength();
+      // The threshold sits at the stroker's internal precision threshold for short-edge
+      // detection, so any segment long enough to be visible to the stroker also enters the
+      // dash split path and contributes dash endpoints for downstream stroke/cap rendering.
+      // Setting it higher would let small but still-visible segments skip the dash split
+      // and lose their endpoints.
       bool isTinySegment = segmentLength < ADAPTIVE_DASH_MIN_DASHABLE_LENGTH;
       bool isNearlyFullContour = FloatNearlyZero(segmentLength) ||
                                  AreWithinUlps(contour.length - segmentLength, contour.length,
