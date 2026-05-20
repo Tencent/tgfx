@@ -361,9 +361,6 @@ class DisplayList {
   std::vector<DrawTask> getThrottleFallbackTasks(
       int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const;
 
-  // Recycles tiles from non-current-scale caches to use as blank canvases for dirty tiles.
-  // Tiles are harvested farthest-scale-first, then farthest-from-viewport-center within each
-  // scale, so the most stale tiles are reused first.
   std::vector<std::shared_ptr<Tile>> getFreeTiles(
       const Surface* renderSurface, size_t tileCount,
       const std::vector<std::pair<float, TileCache*>>& sortedCaches);

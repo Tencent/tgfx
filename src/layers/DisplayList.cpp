@@ -701,6 +701,9 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   }
   std::vector<std::shared_ptr<Tile>> freeTiles = {};
   bool continuous = false;
+  // Take the continuous-fill fast path only when this frame is allowed to rasterize every tile
+  // (throttle disabled). Throttled frames intentionally leave some tiles for later, so the
+  // "single big rect" assumption would not hold.
   if (screenTasks.empty() && maxDirtyCount == 0) {
     freeTiles = createContinuousTiles(surface, endX - startX, endY - startY);
     continuous = !freeTiles.empty();
