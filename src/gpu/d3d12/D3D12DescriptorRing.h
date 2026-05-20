@@ -87,6 +87,17 @@ class D3D12DescriptorRing {
    */
   void retire(uint64_t completedFenceValue);
 
+  /**
+   * Drops every inflight range and resets the ring head/tail/outstanding bookkeeping while
+   * keeping the underlying ID3D12DescriptorHeap allocated. Intended for the context-lost
+   * recovery path: once D3D12GPU has decided the device is gone, the fences associated with
+   * those inflight ranges will never advance, so retire() would never reclaim them. Without
+   * this reset their slots stay billed against outstandingSlots and the ring would refuse
+   * every subsequent allocation forever, even if the application keeps the GPU instance
+   * around for diagnostics.
+   */
+  void resetForContextLost();
+
   ID3D12DescriptorHeap* heap() const {
     return _heap.Get();
   }

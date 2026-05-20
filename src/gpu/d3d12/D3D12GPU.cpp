@@ -546,6 +546,16 @@ void D3D12GPU::markContextLost(const char* tag) {
     return;
   }
   contextLost = true;
+  // Once the GPU is gone every fence value associated with previously-committed inflight ring
+  // ranges will stay unsignalled forever, so retire() can never reclaim them and the per-ring
+  // outstandingSlots / outstandingBytes counters would saturate. Reset the bookkeeping in
+  // place — the underlying ID3D12DescriptorHeap / UPLOAD ID3D12Resource stay allocated so any
+  // diagnostics path that keeps the GPU instance around (DRED dump etc.) can still query the
+  // device — just stop the rings from rejecting future allocations forever.
+  _srvRing.resetForContextLost();
+  _rtvRing.resetForContextLost();
+  _dsvRing.resetForContextLost();
+  _uploadHeap.resetForContextLost();
   dumpDeviceRemovedExtendedData(tag);
 }
 

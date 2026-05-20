@@ -172,4 +172,14 @@ void D3D12UploadHeap::clear() {
   inflight.clear();
 }
 
+void D3D12UploadHeap::resetForContextLost() {
+  // Keep _resource / mappedCpu / gpuVA / _capacity intact; the ring stays usable. Just drop
+  // every accounting entry that is waiting on a fence that is never going to advance.
+  head = 0;
+  tail = 0;
+  committedHead = 0;
+  outstandingBytes = 0;
+  inflight.clear();
+}
+
 }  // namespace tgfx

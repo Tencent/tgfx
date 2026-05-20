@@ -130,4 +130,12 @@ void D3D12DescriptorRing::retire(uint64_t completedFenceValue) {
   }
 }
 
+void D3D12DescriptorRing::resetForContextLost() {
+  inflight.clear();
+  head = 0;
+  tail = 0;
+  committedHead = 0;
+  outstandingSlots = 0;
+}
+
 }  // namespace tgfx

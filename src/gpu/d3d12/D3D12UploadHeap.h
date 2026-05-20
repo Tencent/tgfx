@@ -100,6 +100,15 @@ class D3D12UploadHeap {
    */
   void clear();
 
+  /**
+   * Drops every inflight byte range and zeroes the head/tail/outstanding bookkeeping while
+   * keeping the mapped UPLOAD ID3D12Resource alive. Used by the context-lost recovery path so
+   * the ring stops accumulating inflight bytes whose fences will never advance, which would
+   * otherwise saturate outstandingBytes and reject every future allocation even though the
+   * GPU is no longer touching anything.
+   */
+  void resetForContextLost();
+
   size_t capacity() const {
     return _capacity;
   }
