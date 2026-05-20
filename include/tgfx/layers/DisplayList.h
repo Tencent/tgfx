@@ -374,7 +374,7 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  void drawTileTask(const DrawTask& task, const BackgroundSnapshotMap* snapshots) const;
+  void drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots) const;
 
   void drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
                        Surface* surface, bool autoClear) const;
@@ -386,7 +386,7 @@ class DisplayList {
   void resetCaches();
 
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                     bool autoClear, const BackgroundSnapshotMap* snapshots) const;
+                     bool autoClear, BackgroundSnapshotMap* snapshots) const;
 
   std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(
       Surface* surface, const std::vector<Rect>& renderRects) const;
