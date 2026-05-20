@@ -88,10 +88,6 @@ class D3D12CommandEncoder : public CommandEncoder, public D3D12Resource {
     session.retainedDescriptorHeaps.push_back(std::move(heap));
   }
 
-  void retainRTVDSVHeap(ComPtr<ID3D12DescriptorHeap> heap) {
-    session.retainedRTVDSVHeaps.push_back(std::move(heap));
-  }
-
   friend class D3D12GPU;
   friend class D3D12RenderPass;
 };

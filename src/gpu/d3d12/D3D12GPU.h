@@ -241,6 +241,22 @@ class D3D12GPU : public GPU {
   }
 
   /**
+   * Non-shader-visible RTV ring used by D3D12RenderPass to publish OMSetRenderTargets handles
+   * without paying for a CreateDescriptorHeap on every pass. Slots are reclaimed once the
+   * fence value committed at submit() signals.
+   */
+  D3D12DescriptorRing& rtvRing() {
+    return _rtvRing;
+  }
+
+  /**
+   * Non-shader-visible DSV ring counterpart of rtvRing(), shared across all render passes.
+   */
+  D3D12DescriptorRing& dsvRing() {
+    return _dsvRing;
+  }
+
+  /**
    * Allocates a GPU descriptor handle in the process-wide shader-visible Sampler heap and writes
    * `desc` into it. The slot is never freed; the sampler heap is bounded by D3D12's hard 2048
    * limit and every distinct SamplerDescriptor is created at most once via D3D12GPU's sampler
@@ -366,7 +382,14 @@ class D3D12GPU : public GPU {
   // life of the GPU instance) and therefore does not need a ring tail pointer.
   static constexpr uint32_t SRV_RING_CAPACITY = 64 * 1024;
   static constexpr uint32_t SAMPLER_HEAP_CAPACITY = 2048;
+  // RTV / DSV rings replace the per-render-pass CreateDescriptorHeap calls. Sized to handle a
+  // few dozen passes per frame with MAX_FRAMES_IN_FLIGHT outstanding; well under D3D12's hard
+  // 1024-RTV / 1024-DSV per-heap caps.
+  static constexpr uint32_t RTV_RING_CAPACITY = 512;
+  static constexpr uint32_t DSV_RING_CAPACITY = 64;
   D3D12DescriptorRing _srvRing;
+  D3D12DescriptorRing _rtvRing;
+  D3D12DescriptorRing _dsvRing;
   ComPtr<ID3D12DescriptorHeap> _samplerHeap = nullptr;
   uint32_t _samplerHeapSize = 0;
   uint32_t _samplerHeapCapacity = 0;

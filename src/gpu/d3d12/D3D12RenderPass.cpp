@@ -57,7 +57,12 @@ bool D3D12RenderPass::initialise(const RenderPassDescriptor& passDescriptor) {
   }
   auto device = d3d12GPU->device();
 
-  // Step 1: Allocate and populate the per-pass RTV heap.
+  // Step 1: Allocate RTV / DSV descriptor slots from the GPU-wide non-shader-visible rings.
+  // Each render pass used to call CreateDescriptorHeap for these every time it was begun; we
+  // now sub-allocate from a shared ring that is reclaimed by fence value, removing a kernel
+  // round-trip per pass on the hot path. Ring slots stay valid until the next pollCompleted-
+  // Submissions() retires them, so OMSetRenderTargets does not need the heap pinned in
+  // FrameSession::retainedRTVDSVHeaps any more.
   uint32_t numColorAttachments = 0;
   for (auto& ca : passDescriptor.colorAttachments) {
     if (ca.texture != nullptr) {
@@ -66,31 +71,25 @@ bool D3D12RenderPass::initialise(const RenderPassDescriptor& passDescriptor) {
   }
   bool hasDepth = (passDescriptor.depthStencilAttachment.texture != nullptr);
 
-  ComPtr<ID3D12DescriptorHeap> rtvHeap = nullptr;
+  D3D12DescriptorRing::Range rtvRange = {};
   if (numColorAttachments > 0) {
-    D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-    rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvHeapDesc.NumDescriptors = numColorAttachments;
-    rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-    if (FAILED(device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvHeap)))) {
-      LOGE("D3D12RenderPass: failed to create RTV heap.");
+    rtvRange = d3d12GPU->rtvRing().allocate(numColorAttachments);
+    if (!rtvRange.valid()) {
+      LOGE("D3D12RenderPass: RTV ring exhausted (requested %u slots).", numColorAttachments);
       return false;
     }
   }
 
-  ComPtr<ID3D12DescriptorHeap> dsvHeap = nullptr;
+  D3D12DescriptorRing::Range dsvRange = {};
   if (hasDepth) {
-    D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-    dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-    dsvHeapDesc.NumDescriptors = 1;
-    dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-    if (FAILED(device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsvHeap)))) {
-      LOGE("D3D12RenderPass: failed to create DSV heap.");
+    dsvRange = d3d12GPU->dsvRing().allocate(1);
+    if (!dsvRange.valid()) {
+      LOGE("D3D12RenderPass: DSV ring exhausted.");
       return false;
     }
   }
 
-  auto rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+  auto rtvDescriptorSize = d3d12GPU->rtvRing().descriptorSize();
 
   std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvHandles;
   rtvHandles.reserve(numColorAttachments);
@@ -116,7 +115,7 @@ bool D3D12RenderPass::initialise(const RenderPassDescriptor& passDescriptor) {
                              D3D12_RESOURCE_STATE_RENDER_TARGET);
     d3d12Tex->setCurrentState(D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvRange.cpuStart;
     rtvHandle.ptr += static_cast<SIZE_T>(rtvHandles.size()) * rtvDescriptorSize;
 
     D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
@@ -155,7 +154,7 @@ bool D3D12RenderPass::initialise(const RenderPassDescriptor& passDescriptor) {
                              D3D12_RESOURCE_STATE_DEPTH_WRITE);
     d3d12Tex->setCurrentState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
-    dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+    dsvHandle = dsvRange.cpuStart;
     D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
     dsvDesc.Format = static_cast<DXGI_FORMAT>(d3d12Tex->dxgiFormat());
     dsvDesc.ViewDimension = (d3d12Tex->sampleCount() > 1) ? D3D12_DSV_DIMENSION_TEXTURE2DMS
@@ -221,15 +220,10 @@ bool D3D12RenderPass::initialise(const RenderPassDescriptor& passDescriptor) {
   scissor.bottom = static_cast<LONG>(fbHeight);
   commandList->RSSetScissorRects(1, &scissor);
 
-  // Shader-visible descriptor heaps live on the GPU instance and were already bound to this
-  // command list in D3D12CommandEncoder::Make(). Render passes only retain RTV/DSV heaps, which
-  // are non-shader-visible and cheap.
-  if (rtvHeap != nullptr) {
-    encoder->retainRTVDSVHeap(std::move(rtvHeap));
-  }
-  if (dsvHeap != nullptr) {
-    encoder->retainRTVDSVHeap(std::move(dsvHeap));
-  }
+  // No per-pass descriptor heaps to retain any more: the RTV / DSV slots we allocated above
+  // live in D3D12GPU::_rtvRing / _dsvRing, whose underlying ID3D12DescriptorHeap is owned by
+  // the GPU instance and reclaimed by fence value (see pollCompletedSubmissions). Shader-
+  // visible heaps were already bound to this command list in D3D12CommandEncoder::Make().
   return true;
 }
 

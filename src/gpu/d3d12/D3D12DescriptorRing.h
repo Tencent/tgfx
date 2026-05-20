@@ -61,10 +61,13 @@ class D3D12DescriptorRing {
   D3D12DescriptorRing() = default;
 
   /**
-   * Creates the underlying shader-visible heap. Pass D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV or
-   * D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER. Returns false if the device call fails.
+   * Creates the underlying descriptor heap. Pass D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV /
+   * SAMPLER for shader-visible rings (the default), or RTV / DSV with shaderVisible=false for
+   * the non-shader-visible variants used by render targets. D3D12 rejects SHADER_VISIBLE on
+   * RTV/DSV heaps, so the flag must follow the heap type.
    */
-  bool init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t capacity);
+  bool init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t capacity,
+            bool shaderVisible = true);
 
   /**
    * Sub-allocates `count` consecutive slots. Returns an invalid Range if the ring cannot satisfy

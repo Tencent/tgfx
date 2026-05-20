@@ -147,6 +147,21 @@ D3D12GPU::D3D12GPU(ComPtr<ID3D12Device> device, ComPtr<IDXGIAdapter1> adapter)
     LOGE("D3D12GPU: failed to initialise UPLOAD heap.");
     return;
   }
+  // Non-shader-visible RTV / DSV rings replace the per-render-pass CreateDescriptorHeap calls
+  // that the old D3D12RenderPass::initialise made. The OMSetRenderTargets command consumes
+  // CPU descriptor handles only, so a single shared heap is enough; we ring-buffer the slots
+  // by fence value just like the SRV/Sampler ring so descriptors stay valid until the GPU
+  // command list referencing them has retired.
+  if (!_rtvRing.init(d3d12Device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RTV_RING_CAPACITY,
+                     false)) {
+    LOGE("D3D12GPU: failed to initialise RTV descriptor ring.");
+    return;
+  }
+  if (!_dsvRing.init(d3d12Device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, DSV_RING_CAPACITY,
+                     false)) {
+    LOGE("D3D12GPU: failed to initialise DSV descriptor ring.");
+    return;
+  }
   commandQueue = std::make_unique<D3D12CommandQueue>(this);
   compiler = std::make_unique<shaderc::Compiler>();
 }
@@ -649,7 +664,9 @@ void D3D12GPU::releaseAll(bool releaseGPU) {
 
 void D3D12GPU::reclaimAbandonedSession(D3D12FrameSession session) {
   // Letting the local go out of scope releases the command list and allocator via ComPtr, and
-  // drops every shared_ptr in retainedResources/retainedDescriptorHeaps/retainedRTVDSVHeaps.
+  // drops every shared_ptr in retainedResources / retainedDescriptorHeaps. RTV / DSV descriptor
+  // slots used by this session live in D3D12GPU::_rtvRing / _dsvRing and will be reclaimed by
+  // their fence-based retire path; nothing is held here for them.
   // Resources whose refcount reaches zero enter the ReturnQueue and will be destroyed by the
   // next processUnreferencedResources() call.
   (void)session;
@@ -777,6 +794,8 @@ void D3D12GPU::executeSubmission(SubmitRequest request) {
   // sub-allocations are tracked the same way so the staging bytes outlive their CopyTextureRegion
   // commands.
   _srvRing.commit(_lastSignalledFenceValue);
+  _rtvRing.commit(_lastSignalledFenceValue);
+  _dsvRing.commit(_lastSignalledFenceValue);
   _uploadHeap.commit(_lastSignalledFenceValue);
   auto signalHr = cmdQueue->Signal(_frameFence.Get(), _lastSignalledFenceValue);
   if (FAILED(signalHr) || FAILED(d3d12Device->GetDeviceRemovedReason())) {
@@ -870,6 +889,8 @@ void D3D12GPU::pollCompletedSubmissions() {
   // Sampler slots persist for the GPU's lifetime so they need no per-fence retirement. The
   // upload ring sheds reclaimable byte ranges on the same schedule.
   _srvRing.retire(completed);
+  _rtvRing.retire(completed);
+  _dsvRing.retire(completed);
   _uploadHeap.retire(completed);
   // Releasing retained shared_ptrs may have moved D3D12Resource instances into the return queue;
   // free them now so the caller sees up-to-date memory accounting.
