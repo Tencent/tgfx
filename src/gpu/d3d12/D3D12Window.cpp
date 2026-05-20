@@ -39,60 +39,6 @@ namespace tgfx {
 // windows. The presentation engine still queues a small number of frames internally.
 static constexpr UINT BACKBUFFER_COUNT = 2;
 
-// Hidden state shared between D3D12Window and its private RenderTargetProxy. Stored as PImpl so
-// the public header doesn't need <dxgi.h> / <d3d12.h>. The DXGI format is kept as `unsigned` to
-// match the rest of the D3D12 backend (D3D12Defines.h shadows the SDK enum with constexpr
-// integers so an unqualified DXGI_FORMAT_R8G8B8A8_UNORM here is `unsigned`, not the enum type).
-struct D3D12Window::PlatformState {
-  ComPtr<IDXGISwapChain3> swapChain;
-  std::vector<ComPtr<ID3D12Resource>> backBuffers;
-  unsigned format = DXGI_FORMAT_R8G8B8A8_UNORM;
-  HWND hwnd = nullptr;
-  int width = 0;
-  int height = 0;
-
-  // Cached proxy for the currently-acquired backbuffer. Reset by onPresent() so the next
-  // onCreateRenderTarget() picks up the new frame's index. Held as a shared_ptr because tgfx's
-  // surface code may keep a strong reference for a single frame.
-  std::shared_ptr<RenderTargetProxy> currentProxy;
-
-  bool buildBackBuffers();
-  bool rebuild(int newWidth, int newHeight);
-};
-
-bool D3D12Window::PlatformState::buildBackBuffers() {
-  backBuffers.clear();
-  backBuffers.resize(BACKBUFFER_COUNT);
-  for (UINT i = 0; i < BACKBUFFER_COUNT; i++) {
-    auto hr = swapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffers[i]));
-    if (FAILED(hr)) {
-      LOGE("D3D12Window: GetBuffer(%u) failed, HRESULT=0x%08X", i, static_cast<unsigned>(hr));
-      backBuffers.clear();
-      return false;
-    }
-  }
-  return true;
-}
-
-bool D3D12Window::PlatformState::rebuild(int newWidth, int newHeight) {
-  // Releasing every backbuffer reference is mandatory before ResizeBuffers; otherwise the call
-  // returns DXGI_ERROR_INVALID_CALL because the swapchain still owns outstanding references.
-  backBuffers.clear();
-  currentProxy = nullptr;
-  auto hr =
-      swapChain->ResizeBuffers(BACKBUFFER_COUNT, static_cast<UINT>(newWidth),
-                               static_cast<UINT>(newHeight), static_cast<DXGI_FORMAT>(format), 0);
-  if (FAILED(hr)) {
-    LOGE("D3D12Window: ResizeBuffers failed, HRESULT=0x%08X", static_cast<unsigned>(hr));
-    return false;
-  }
-  width = newWidth;
-  height = newHeight;
-  return buildBackBuffers();
-}
-
-namespace {
-
 // Private RenderTargetProxy that exposes the swap chain's current backbuffer as an external
 // D3D12 render target. The proxy is created once when the application calls Surface::MakeFrom()
 // and is then reused for every subsequent frame: Surface caches it for its entire lifetime
@@ -101,6 +47,10 @@ namespace {
 // re-query GetCurrentBackBufferIndex every call and invalidate the cached RenderTarget when
 // the index changes. Otherwise every frame would be drawn into the same backbuffer slot and
 // the other slot would never get updated, manifesting as "no visible change" on user input.
+//
+// Defined at file scope (not in an anonymous namespace) so D3D12Window::PlatformState can store
+// a typed raw pointer to it; the .h does not expose this class, so it remains private to this
+// translation unit even without anonymous-namespace internal linkage.
 class D3D12SwapchainProxy : public RenderTargetProxy {
  public:
   D3D12SwapchainProxy(Context* context, IDXGISwapChain3* swapChain,
@@ -176,7 +126,62 @@ class D3D12SwapchainProxy : public RenderTargetProxy {
   mutable ID3D12Resource* _cachedBackBuffer = nullptr;
 };
 
-}  // namespace
+// Hidden state shared between D3D12Window and its private RenderTargetProxy. Stored as PImpl so
+// the public header doesn't need <dxgi.h> / <d3d12.h>. The DXGI format is kept as `unsigned` to
+// match the rest of the D3D12 backend (D3D12Defines.h shadows the SDK enum with constexpr
+// integers so an unqualified DXGI_FORMAT_R8G8B8A8_UNORM here is `unsigned`, not the enum type).
+struct D3D12Window::PlatformState {
+  ComPtr<IDXGISwapChain3> swapChain;
+  std::vector<ComPtr<ID3D12Resource>> backBuffers;
+  unsigned format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  HWND hwnd = nullptr;
+  int width = 0;
+  int height = 0;
+
+  // Cached proxy for the currently-acquired backbuffer. Reset by onPresent() so the next
+  // onCreateRenderTarget() picks up the new frame's index. Held as a shared_ptr because tgfx's
+  // surface code may keep a strong reference for a single frame; currentProxyRaw mirrors the
+  // underlying D3D12SwapchainProxy* so onPresent() can call releaseFrame() without a static_cast
+  // from the base RenderTargetProxy*. The two pointers are written and cleared together so the
+  // raw view never outlives the shared owner.
+  std::shared_ptr<RenderTargetProxy> currentProxy;
+  D3D12SwapchainProxy* currentProxyRaw = nullptr;
+
+  bool buildBackBuffers();
+  bool rebuild(int newWidth, int newHeight);
+};
+
+bool D3D12Window::PlatformState::buildBackBuffers() {
+  backBuffers.clear();
+  backBuffers.resize(BACKBUFFER_COUNT);
+  for (UINT i = 0; i < BACKBUFFER_COUNT; i++) {
+    auto hr = swapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffers[i]));
+    if (FAILED(hr)) {
+      LOGE("D3D12Window: GetBuffer(%u) failed, HRESULT=0x%08X", i, static_cast<unsigned>(hr));
+      backBuffers.clear();
+      return false;
+    }
+  }
+  return true;
+}
+
+bool D3D12Window::PlatformState::rebuild(int newWidth, int newHeight) {
+  // Releasing every backbuffer reference is mandatory before ResizeBuffers; otherwise the call
+  // returns DXGI_ERROR_INVALID_CALL because the swapchain still owns outstanding references.
+  backBuffers.clear();
+  currentProxy = nullptr;
+  currentProxyRaw = nullptr;
+  auto hr =
+      swapChain->ResizeBuffers(BACKBUFFER_COUNT, static_cast<UINT>(newWidth),
+                               static_cast<UINT>(newHeight), static_cast<DXGI_FORMAT>(format), 0);
+  if (FAILED(hr)) {
+    LOGE("D3D12Window: ResizeBuffers failed, HRESULT=0x%08X", static_cast<unsigned>(hr));
+    return false;
+  }
+  width = newWidth;
+  height = newHeight;
+  return buildBackBuffers();
+}
 
 #ifdef _WIN32
 
@@ -319,6 +324,7 @@ D3D12Window::~D3D12Window() {
 
     // 3. Drop tgfx-side owners of the backbuffers.
     _platformState->currentProxy = nullptr;
+    _platformState->currentProxyRaw = nullptr;
     context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
     d3d12GPU->processUnreferencedResources();
     d3d12GPU->commandListPool().clear();
@@ -330,6 +336,7 @@ D3D12Window::~D3D12Window() {
     device->unlock();
   } else {
     _platformState->currentProxy = nullptr;
+    _platformState->currentProxyRaw = nullptr;
     _platformState->backBuffers.clear();
     _platformState->swapChain = nullptr;
   }
@@ -362,9 +369,11 @@ std::shared_ptr<RenderTargetProxy> D3D12Window::onCreateRenderTarget(Context* co
   // chain on every getRenderTarget() call. Surface caches the proxy for its whole lifetime, so
   // a per-frame allocation here would leak the freshly-created proxy and never reach the
   // backbuffer-rotation code path.
-  _platformState->currentProxy = std::make_shared<D3D12SwapchainProxy>(
+  auto proxy = std::make_shared<D3D12SwapchainProxy>(
       context, _platformState->swapChain.Get(), &_platformState->backBuffers,
       _platformState->format, _platformState->width, _platformState->height);
+  _platformState->currentProxyRaw = proxy.get();
+  _platformState->currentProxy = std::move(proxy);
   return _platformState->currentProxy;
 }
 
@@ -381,8 +390,8 @@ void D3D12Window::onPresent(Context* /*context*/) {
   // Tell the proxy to drop its cached RenderTarget so the next getRenderTarget() picks up the
   // backbuffer the swap chain just rotated in. Without this Surface keeps drawing into the
   // same slot forever and the user sees a frozen frame regardless of input.
-  if (auto* proxy = static_cast<D3D12SwapchainProxy*>(_platformState->currentProxy.get())) {
-    proxy->releaseFrame();
+  if (_platformState->currentProxyRaw != nullptr) {
+    _platformState->currentProxyRaw->releaseFrame();
   }
 }
 
