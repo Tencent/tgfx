@@ -103,12 +103,16 @@ void D3D12CommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTextu
 
   // Combine the two pre-copy transitions (src -> COPY_SOURCE, dst -> COPY_DEST) into a single
   // ResourceBarrier(2, ...) call. addTransition() collapses no-op transitions, so callers that
-  // are already in the requested state simply skip ahead.
+  // are already in the requested state simply skip ahead. recordTextureStateChange snapshots
+  // the original state into session.initialTextureStates on first touch so the abandoned-
+  // session path can roll _currentState back if this copy never reaches the GPU.
   D3D12BarrierBatch enterBatch;
   enterBatch.addTransition(d3d12Src->d3d12Resource(), d3d12Src->currentState(),
                            D3D12_RESOURCE_STATE_COPY_SOURCE);
+  recordTextureStateChange(d3d12Src.get(), D3D12_RESOURCE_STATE_COPY_SOURCE);
   enterBatch.addTransition(d3d12Dst->d3d12Resource(), d3d12Dst->currentState(),
                            D3D12_RESOURCE_STATE_COPY_DEST);
+  recordTextureStateChange(d3d12Dst.get(), D3D12_RESOURCE_STATE_COPY_DEST);
   enterBatch.flush(cmd);
 
   D3D12_TEXTURE_COPY_LOCATION dst = {};
@@ -145,8 +149,8 @@ void D3D12CommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTextu
   exitBatch.addTransition(d3d12Dst->d3d12Resource(), D3D12_RESOURCE_STATE_COPY_DEST,
                           D3D12_RESOURCE_STATE_COMMON);
   exitBatch.flush(cmd);
-  d3d12Src->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
-  d3d12Dst->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
+  recordTextureStateChange(d3d12Src.get(), D3D12_RESOURCE_STATE_COMMON);
+  recordTextureStateChange(d3d12Dst.get(), D3D12_RESOURCE_STATE_COMMON);
 }
 
 void D3D12CommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTexture,
@@ -193,6 +197,7 @@ void D3D12CommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextur
 
   TransitionResourceState(cmd, d3d12Src->d3d12Resource(), d3d12Src->currentState(),
                           D3D12_RESOURCE_STATE_COPY_SOURCE);
+  recordTextureStateChange(d3d12Src.get(), D3D12_RESOURCE_STATE_COPY_SOURCE);
 
   ComPtr<ID3D12Resource> stagingBuffer = nullptr;
   ID3D12Resource* footprintTarget = d3d12Dst->d3d12Resource();
@@ -276,7 +281,7 @@ void D3D12CommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextur
 
   TransitionResourceState(cmd, d3d12Src->d3d12Resource(), D3D12_RESOURCE_STATE_COPY_SOURCE,
                           D3D12_RESOURCE_STATE_COMMON);
-  d3d12Src->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
+  recordTextureStateChange(d3d12Src.get(), D3D12_RESOURCE_STATE_COMMON);
 }
 
 void D3D12CommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> texture) {
@@ -332,6 +337,7 @@ void D3D12CommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> tex
   if (previousState != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) {
     TransitionResourceState(cmd, resource, previousState,
                             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    recordTextureStateChange(d3d12Tex.get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
   }
 
   uint32_t mipWidth = static_cast<uint32_t>(d3d12Tex->width());
@@ -412,7 +418,7 @@ void D3D12CommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> tex
   // matching the convention every other code path uses.
   TransitionResourceState(cmd, resource, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
                           D3D12_RESOURCE_STATE_COMMON);
-  d3d12Tex->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
+  recordTextureStateChange(d3d12Tex.get(), D3D12_RESOURCE_STATE_COMMON);
 }
 
 std::shared_ptr<CommandBuffer> D3D12CommandEncoder::onFinish() {
@@ -424,6 +430,18 @@ std::shared_ptr<CommandBuffer> D3D12CommandEncoder::onFinish() {
     return nullptr;
   }
   return std::make_shared<D3D12CommandBuffer>(_gpu, std::move(session));
+}
+
+void D3D12CommandEncoder::recordTextureStateChange(D3D12Texture* texture,
+                                                   D3D12_RESOURCE_STATES newState) {
+  if (texture == nullptr) {
+    return;
+  }
+  // Snapshot the original state on the first call for this texture inside the current session.
+  // unordered_map::emplace inserts only when the key is not present, leaving subsequent calls
+  // for the same texture as cheap O(1) lookups that do not overwrite the saved value.
+  session.initialTextureStates.emplace(texture, texture->currentState());
+  texture->setCurrentState(newState);
 }
 
 void D3D12CommandEncoder::onRelease(D3D12GPU* gpu) {

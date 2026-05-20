@@ -113,7 +113,7 @@ bool D3D12RenderPass::initialise(const RenderPassDescriptor& passDescriptor) {
     // already left it there; addTransition() collapses the latter into a no-op.
     entryBatch.addTransition(d3d12Tex->d3d12Resource(), d3d12Tex->currentState(),
                              D3D12_RESOURCE_STATE_RENDER_TARGET);
-    d3d12Tex->setCurrentState(D3D12_RESOURCE_STATE_RENDER_TARGET);
+    encoder->recordTextureStateChange(d3d12Tex.get(), D3D12_RESOURCE_STATE_RENDER_TARGET);
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvRange.cpuStart;
     rtvHandle.ptr += static_cast<SIZE_T>(rtvHandles.size()) * rtvDescriptorSize;
@@ -152,7 +152,7 @@ bool D3D12RenderPass::initialise(const RenderPassDescriptor& passDescriptor) {
 
     entryBatch.addTransition(d3d12Tex->d3d12Resource(), d3d12Tex->currentState(),
                              D3D12_RESOURCE_STATE_DEPTH_WRITE);
-    d3d12Tex->setCurrentState(D3D12_RESOURCE_STATE_DEPTH_WRITE);
+    encoder->recordTextureStateChange(d3d12Tex.get(), D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
     dsvHandle = dsvRange.cpuStart;
     D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
@@ -317,7 +317,8 @@ void D3D12RenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> text
   if (current != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
     pendingBarriers.addTransition(d3d12Tex->d3d12Resource(), current,
                                   D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    d3d12Tex->setCurrentState(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    encoder->recordTextureStateChange(d3d12Tex.get(),
+                                      D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     // Track this texture so onEnd() can transition it back to COMMON. Without that step, D3D12
     // automatic state decay after ExecuteCommandLists drops the resource to COMMON, but our CPU
     // tracker still believes it is in PIXEL_SHADER_RESOURCE — every subsequent transition then
@@ -525,13 +526,13 @@ void D3D12RenderPass::onEnd() {
     if (srcState != D3D12_RESOURCE_STATE_RESOLVE_SOURCE) {
       resolveBatch.addTransition(src->d3d12Resource(), srcState,
                                  D3D12_RESOURCE_STATE_RESOLVE_SOURCE);
-      src->setCurrentState(D3D12_RESOURCE_STATE_RESOLVE_SOURCE);
+      encoder->recordTextureStateChange(src.get(), D3D12_RESOURCE_STATE_RESOLVE_SOURCE);
     }
     auto dstState = resolveDst->currentState();
     if (dstState != D3D12_RESOURCE_STATE_RESOLVE_DEST) {
       resolveBatch.addTransition(resolveDst->d3d12Resource(), dstState,
                                  D3D12_RESOURCE_STATE_RESOLVE_DEST);
-      resolveDst->setCurrentState(D3D12_RESOURCE_STATE_RESOLVE_DEST);
+      encoder->recordTextureStateChange(resolveDst.get(), D3D12_RESOURCE_STATE_RESOLVE_DEST);
     }
   }
   resolveBatch.flush(commandList);
@@ -567,7 +568,7 @@ void D3D12RenderPass::onEnd() {
     auto current = tex->currentState();
     if (current != D3D12_RESOURCE_STATE_COMMON) {
       finalBatch.addTransition(tex->d3d12Resource(), current, D3D12_RESOURCE_STATE_COMMON);
-      tex->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
+      encoder->recordTextureStateChange(tex.get(), D3D12_RESOURCE_STATE_COMMON);
     }
   }
   for (auto& tex : resolveTextures) {
@@ -575,7 +576,7 @@ void D3D12RenderPass::onEnd() {
     auto current = tex->currentState();
     if (current != D3D12_RESOURCE_STATE_COMMON) {
       finalBatch.addTransition(tex->d3d12Resource(), current, D3D12_RESOURCE_STATE_COMMON);
-      tex->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
+      encoder->recordTextureStateChange(tex.get(), D3D12_RESOURCE_STATE_COMMON);
     }
   }
   if (depthStencilAttachment != nullptr) {
@@ -583,7 +584,8 @@ void D3D12RenderPass::onEnd() {
     if (current != D3D12_RESOURCE_STATE_COMMON) {
       finalBatch.addTransition(depthStencilAttachment->d3d12Resource(), current,
                                D3D12_RESOURCE_STATE_COMMON);
-      depthStencilAttachment->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
+      encoder->recordTextureStateChange(depthStencilAttachment.get(),
+                                        D3D12_RESOURCE_STATE_COMMON);
     }
   }
   for (auto& tex : shaderResourceTextures) {
@@ -591,7 +593,7 @@ void D3D12RenderPass::onEnd() {
     auto current = tex->currentState();
     if (current != D3D12_RESOURCE_STATE_COMMON) {
       finalBatch.addTransition(tex->d3d12Resource(), current, D3D12_RESOURCE_STATE_COMMON);
-      tex->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
+      encoder->recordTextureStateChange(tex.get(), D3D12_RESOURCE_STATE_COMMON);
     }
   }
   finalBatch.flush(commandList);

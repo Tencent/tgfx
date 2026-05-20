@@ -172,7 +172,8 @@ void D3D12CommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
   pendingFootprints.push_back(fp);
 }
 
-void D3D12CommandQueue::flushUploads(ID3D12GraphicsCommandList* commandList) {
+void D3D12CommandQueue::flushUploads(ID3D12GraphicsCommandList* commandList,
+                                     D3D12FrameSession& session) {
   if (pendingUploads.empty() || commandList == nullptr) {
     return;
   }
@@ -184,6 +185,11 @@ void D3D12CommandQueue::flushUploads(ID3D12GraphicsCommandList* commandList) {
     if (current != D3D12_RESOURCE_STATE_COPY_DEST) {
       TransitionResourceState(commandList, up.texture->d3d12Resource(), current,
                               D3D12_RESOURCE_STATE_COPY_DEST);
+      // Snapshot the original CPU-tracked state on the first touch of this texture during the
+      // session so reclaimAbandonedSession() can roll _currentState back if the upload is
+      // never executed by the GPU. emplace() preserves the earliest snapshot on subsequent
+      // updates, exactly like D3D12CommandEncoder::recordTextureStateChange().
+      session.initialTextureStates.emplace(up.texture.get(), current);
       up.texture->setCurrentState(D3D12_RESOURCE_STATE_COPY_DEST);
     }
 
@@ -220,6 +226,9 @@ void D3D12CommandQueue::flushUploads(ID3D12GraphicsCommandList* commandList) {
 
     TransitionResourceState(commandList, up.texture->d3d12Resource(),
                             D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
+    // Already snapshotted at the COPY_DEST entry above; the second emplace is a no-op when the
+    // texture appears for the first time in this branch and a no-op-on-collision otherwise.
+    session.initialTextureStates.emplace(up.texture.get(), up.texture->currentState());
     up.texture->setCurrentState(D3D12_RESOURCE_STATE_COMMON);
   }
   pendingFootprints.clear();
@@ -249,7 +258,7 @@ void D3D12CommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
       pendingUploads.clear();
       pendingFootprints.clear();
     } else {
-      flushUploads(entry.commandList.Get());
+      flushUploads(entry.commandList.Get(), session);
       entry.commandList->Close();
       session.auxAllocators.push_back(std::move(entry.allocator));
       session.auxCommandLists.push_back(std::move(entry.commandList));
@@ -295,10 +304,10 @@ void D3D12CommandQueue::waitUntilCompleted() {
   if (!pendingUploads.empty()) {
     auto entry = gpu->commandListPool().acquire(gpu->device());
     if (entry.valid()) {
-      flushUploads(entry.commandList.Get());
+      D3D12GPU::SubmitRequest request = {};
+      flushUploads(entry.commandList.Get(), request.session);
       entry.commandList->Close();
 
-      D3D12GPU::SubmitRequest request = {};
       request.session.auxAllocators.push_back(std::move(entry.allocator));
       request.session.auxCommandLists.push_back(std::move(entry.commandList));
       request.uploads = std::move(pendingUploads);

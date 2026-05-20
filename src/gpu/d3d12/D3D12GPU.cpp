@@ -669,6 +669,19 @@ void D3D12GPU::reclaimAbandonedSession(D3D12FrameSession session) {
   // their fence-based retire path; nothing is held here for them.
   // Resources whose refcount reaches zero enter the ReturnQueue and will be destroyed by the
   // next processUnreferencedResources() call.
+  //
+  // The work that *does* need active rollback here is CPU-side D3D12 resource state tracking.
+  // Render-pass / copy / generate-mipmaps codepaths bumped D3D12Texture::_currentState while
+  // recording transition commands. If those commands never make it to the GPU (this abandon
+  // path), the GPU is still in the original state. Walking session.initialTextureStates and
+  // restoring the snapshotted state keeps CPU and GPU views aligned so the next encoder does
+  // not emit a barrier whose StateBefore disagrees with reality (which the D3D12 debug layer
+  // flags as "Before state mismatch").
+  for (auto& [texture, originalState] : session.initialTextureStates) {
+    if (texture != nullptr) {
+      texture->setCurrentState(originalState);
+    }
+  }
   (void)session;
 }
 

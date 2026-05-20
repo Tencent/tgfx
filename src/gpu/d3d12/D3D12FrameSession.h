@@ -19,11 +19,14 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 #include "gpu/d3d12/D3D12Resource.h"
 #include "gpu/d3d12/D3D12Util.h"
 
 namespace tgfx {
+
+class D3D12Texture;
 
 /**
  * Value-type aggregate of all per-frame GPU resources produced during one encoding session.
@@ -70,6 +73,16 @@ struct D3D12FrameSession {
   // Auxiliary ID3D12Resource buffers (e.g. transient staging buffers used by
   // copyTextureToBuffer for row-pitch alignment) that must live until the fence signals.
   std::vector<ComPtr<ID3D12Resource>> auxBuffers;
+
+  // Original D3D12_RESOURCE_STATES of every texture this session has been about to mutate, keyed
+  // by raw D3D12Texture* (raw is fine because the matching shared_ptr is held in
+  // retainedResources for the session's lifetime). Populated by the helper recordTextureState-
+  // Change(): the first call for a given texture saves its current state, subsequent calls do
+  // nothing. If the session is abandoned (~D3D12CommandBuffer or ~D3D12CommandEncoder before
+  // submit), reclaimAbandonedSession walks this map to roll D3D12Texture::_currentState back
+  // to what the GPU still sees, preventing the next render pass from emitting transitions
+  // whose StateBefore disagrees with reality.
+  std::unordered_map<D3D12Texture*, D3D12_RESOURCE_STATES> initialTextureStates;
 
   D3D12FrameSession() = default;
 

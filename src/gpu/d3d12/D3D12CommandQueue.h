@@ -70,7 +70,10 @@ class D3D12CommandQueue : public CommandQueue {
   std::chrono::steady_clock::time_point completedFrameTime() const override;
 
  private:
-  void flushUploads(ID3D12GraphicsCommandList* commandList);
+  // Records the upload command list, retaining the staging buffer references inside `session` so
+  // it can carry them through to the inflight submission and so an abandoned submit can roll
+  // back any texture state changes the upload introduced.
+  void flushUploads(ID3D12GraphicsCommandList* commandList, D3D12FrameSession& session);
 
   D3D12GPU* gpu = nullptr;
   ComPtr<ID3D12CommandQueue> commandQueue = nullptr;

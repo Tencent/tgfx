@@ -27,6 +27,7 @@
 namespace tgfx {
 
 class D3D12GPU;
+class D3D12Texture;
 
 /**
  * Records GPU commands into an ID3D12GraphicsCommandList and collects resource references into a
@@ -87,6 +88,16 @@ class D3D12CommandEncoder : public CommandEncoder, public D3D12Resource {
   void retainDescriptorHeap(ComPtr<ID3D12DescriptorHeap> heap) {
     session.retainedDescriptorHeaps.push_back(std::move(heap));
   }
+
+  /**
+   * Updates a D3D12Texture's CPU-tracked _currentState and, on the first call for this texture
+   * within the current session, snapshots the original state into session.initialTextureStates
+   * so reclaimAbandonedSession() can roll it back if the encoder is destroyed before submit.
+   * Every D3D12 backend call site that previously did `tex->setCurrentState(newState)` must go
+   * through this helper instead, otherwise an aborted encoder would leave _currentState ahead
+   * of the GPU's real state and the next pass would emit a "Before state mismatch" barrier.
+   */
+  void recordTextureStateChange(D3D12Texture* texture, D3D12_RESOURCE_STATES newState);
 
   friend class D3D12GPU;
   friend class D3D12RenderPass;
