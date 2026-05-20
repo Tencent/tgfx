@@ -610,15 +610,14 @@ void D3D12GPU::dumpDeviceRemovedExtendedData(const char* tag) {
 }
 
 void D3D12GPU::releaseAll(bool releaseGPU) {
-  // Shutdown ordering must wait for all GPU work to complete before destroying anything that the
-  // GPU may still be reading. The Vulkan backend does the same via waitAllInflightSubmissions().
-  if (releaseGPU) {
-    waitAllInflightSubmissions();
-  } else {
-    // Even when releaseGPU is false (test teardown), inflight sessions must drop their references
-    // so we don't leak the underlying D3D12 resources captured by retainedResources.
-    inflightSubmissions.clear();
-  }
+  // Shutdown ordering must wait for all GPU work to complete before destroying anything that
+  // the GPU may still be reading. waitAllInflightSubmissions() also handles the device-removed
+  // case internally (it short-circuits to a synchronous reclaim instead of waiting on a fence
+  // that will never advance), so it is safe to call regardless of the releaseGPU flag and
+  // mirrors what VulkanGPU::releaseAll does. The earlier "releaseGPU == false skips the wait"
+  // path could leave inflight FrameSessions holding command lists / allocators the GPU was
+  // still reading, tripping OBJECT_DELETED_WHILE_STILL_IN_USE.
+  waitAllInflightSubmissions();
   samplerCache.clear();
   // Drop cached shader-module shared_ptrs so D3D12Resource cleanup can run. Without this the
   // shaderModuleCache would hold strong refs through the resources-list walk below and prevent
