@@ -27,6 +27,9 @@
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
+// === [DIAG-INTEL] 诊断日志 sink，复现完后整段删除 ===
+#include "layers/DiagIntelLog.h"
+// === [DIAG-INTEL END] ===
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -622,11 +625,18 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   auto sortedCaches = getSortedTileCaches();
   auto fallbackTileCaches = getFallbackTileCaches(sortedCaches);
   auto sortedTiles = GetSortedTiles(startX, endX, startY, endY, _tileSize, mousePosition);
+  // === [DIAG-INTEL] 计数 ===
+  int diag_hit_count = 0;
+  int diag_fallback_used = 0;
+  int diag_fallback_miss = 0;
+  int diag_dirty_count = 0;
+  // === [DIAG-INTEL END] ===
   for (const auto& [tileX, tileY] : sortedTiles) {
     auto tile = currentTileCache->getTile(tileX, tileY);
     if (tile != nullptr) {
       auto tileRect = tile->getTileRect(_tileSize, &renderRect);
       screenTasks.emplace_back(tile, _tileSize, tileRect);
+      diag_hit_count++;
     } else {
       if (_allowZoomBlur) {
         auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
@@ -634,12 +644,16 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
           if (maxRefinedCount <= 0) {
             screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
             hasZoomBlurTiles = true;
+            diag_fallback_used++;
             continue;
           }
           maxRefinedCount--;
+        } else {
+          diag_fallback_miss++;
         }
       }
       dirtyGrids.emplace_back(tileX, tileY);
+      diag_dirty_count++;
     }
   }
   std::vector<std::shared_ptr<Tile>> freeTiles = {};
@@ -652,11 +666,15 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   if (freeTiles.empty()) {
     freeTiles = getFreeTiles(surface, dirtyGrids.size(), sortedCaches);
   }
+  // === [DIAG-INTEL] 关键失败路径：dirty tile 申请不够 ===
   if (dirtyGrids.size() != freeTiles.size()) {
+    DIAG_LOG("!!! NOT-ENOUGH-FREE-TILES dirty=%zu free=%zu zoomInt=%lld",
+             dirtyGrids.size(), freeTiles.size(), static_cast<long long>(_zoomScaleInt));
     DEBUG_ASSERT(freeTiles.size() < dirtyGrids.size());
     LOGE("DisplayList::collectRenderTiles() Not enough free tiles available.");
     return {};
   }
+  // === [DIAG-INTEL END] ===
   size_t tileIndex = 0;
   std::vector<std::shared_ptr<Tile>> taskTiles = {};
   for (auto& grid : dirtyGrids) {
@@ -678,6 +696,18 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       tileTasks->emplace_back(tile, _tileSize);
     }
   }
+  // === [DIAG-INTEL] 每 30 帧打一行摘要 ===
+  static int diag_frame_id = 0;
+  diag_frame_id++;
+  if ((diag_frame_id % 30) == 1 || diag_fallback_used > 0) {
+    DIAG_LOG("collectScreenTasks#%d zoomInt=%lld buckets=%zu hit=%d fbUsed=%d fbMiss=%d dirty=%d "
+             "tiles=%dx%d=%zu maxRefined=%d/%d allowZoomBlur=%d hasZoomBlurTiles=%d",
+             diag_frame_id, static_cast<long long>(_zoomScaleInt), tileCaches.size(),
+             diag_hit_count, diag_fallback_used, diag_fallback_miss, diag_dirty_count,
+             endX - startX, endY - startY, tileCount, maxRefinedCount, _maxTilesRefinedPerFrame,
+             _allowZoomBlur ? 1 : 0, hasZoomBlurTiles ? 1 : 0);
+  }
+  // === [DIAG-INTEL END] ===
   return screenTasks;
 }
 
@@ -979,6 +1009,26 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
 
   auto screenRect = Rect::MakeWH(surface->width(), surface->height());
   screenRect.offset(-_contentOffset.x, -_contentOffset.y);
+  // === [DIAG-INTEL] 关键路径：tileRect.contains(screenRect) 提前 return ===
+  // 怀疑：散布的 task 让 tileRect.join 出来的外接矩形覆盖整屏，
+  //       中间没有 task 的位置因此跳过底色绘制，残留 surface 旧像素。
+  static int diag_screen_call = 0;
+  diag_screen_call++;
+  bool diag_will_skip_bg = tileRect.contains(screenRect);
+  Color diag_bg = _root->backgroundColor();
+  if ((diag_screen_call % 30) == 1 || diag_will_skip_bg) {
+    DIAG_LOG("drawScreenTasks#%d tasks=%zu tileRect=(%.0f,%.0f,%.0f,%.0f) "
+             "screenRect=(%.0f,%.0f,%.0f,%.0f) skipBg=%d bg=(%.2f,%.2f,%.2f,%.2f) autoClear=%d "
+             "surface=%dx%d",
+             diag_screen_call, screenTasks.size(),
+             tileRect.left, tileRect.top, tileRect.right, tileRect.bottom,
+             screenRect.left, screenRect.top, screenRect.right, screenRect.bottom,
+             diag_will_skip_bg ? 1 : 0,
+             diag_bg.red, diag_bg.green, diag_bg.blue, diag_bg.alpha,
+             autoClear ? 1 : 0,
+             surface->width(), surface->height());
+  }
+  // === [DIAG-INTEL END] ===
   if (tileRect.contains(screenRect)) {
     return;
   }
