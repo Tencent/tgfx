@@ -110,11 +110,11 @@ void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint, const Mat
 }
 
 void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint, const Matrix& matrix) {
-  if (rRect.rect.isEmpty()) {
+  if (rRect.rect().isEmpty()) {
     return;
   }
   if (rRect.isRect()) {
-    addRect(rRect.rect, paint, matrix);
+    addRect(rRect.rect(), paint, matrix);
     return;
   }
   if (!canAppend(PendingType::RRect, paint, matrix)) {

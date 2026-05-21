@@ -26,7 +26,6 @@
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
 #include "layers/TileCache.h"
-#include "layers/compositing3d/Layer3DContext.h"
 #include "layers/contents/ComposeContent.h"
 #include "layers/contents/MatrixContent.h"
 #include "layers/contents/RRectsContent.h"
@@ -1196,8 +1195,7 @@ TGFX_TEST(LayerTest, HitTestPointWithStroke) {
   // Test stroke hit test for ShapeLayer with RRect
   auto rRectLayer = ShapeLayer::Make();
   Path rRectPath = {};
-  RRect rRect = {};
-  rRect.setRectXY(Rect::MakeXYWH(50, 200, 100, 100), 20.0f, 20.0f);
+  auto rRect = RRect::MakeRectXY(Rect::MakeXYWH(50, 200, 100, 100), 20.0f, 20.0f);
   rRectPath.addRRect(rRect);
   rRectLayer->setPath(rRectPath);
   rRectLayer->setStrokeStyle(ShapeStyle::Make(Color::Blue()));
@@ -1315,8 +1313,7 @@ TGFX_TEST(LayerTest, drawRRect) {
   fillPaint.setStyle(PaintStyle::Fill);
   fillPaint.setColor(Color::Red());
   Rect rect = Rect::MakeXYWH(50, 50, 200, 160);
-  RRect rRect = {};
-  rRect.setRectXY(rect, 10.0f, 10.0f);
+  auto rRect = RRect::MakeRectXY(rect, 10.0f, 10.0f);
   canvas->drawRRect(rRect, fillPaint);
 
   auto strokePaint = Paint();
@@ -1325,23 +1322,19 @@ TGFX_TEST(LayerTest, drawRRect) {
   strokePaint.setColor(Color::Red());
 
   Rect rect1 = Rect::MakeXYWH(300, 50, 200, 160);
-  RRect rRect1 = {};
-  rRect1.setRectXY(rect1, 10.0f, 10.0f);
+  auto rRect1 = RRect::MakeRectXY(rect1, 10.0f, 10.0f);
   canvas->drawRRect(rRect1, strokePaint);
 
   Rect rect2 = Rect::MakeXYWH(600, 50, 200, 160);
-  RRect rRect2 = {};
-  rRect2.setRectXY(rect2, 15.0f, 10.0f);
+  auto rRect2 = RRect::MakeRectXY(rect2, 15.0f, 10.0f);
   canvas->drawRRect(rRect2, strokePaint);
 
   Rect rect3 = Rect::MakeXYWH(50, 300, 200, 160);
-  RRect rRect3 = {};
-  rRect3.setRectXY(rect3, 100.0f, 150.0f);
+  auto rRect3 = RRect::MakeRectXY(rect3, 100.0f, 150.0f);
   canvas->drawRRect(rRect3, strokePaint);
 
   Rect rect4 = Rect::MakeXYWH(300, 300, 200, 160);
-  RRect rRect4 = {};
-  rRect4.setRectXY(rect4, 50.0f, 10.0f);
+  auto rRect4 = RRect::MakeRectXY(rect4, 50.0f, 10.0f);
   canvas->drawRRect(rRect4, strokePaint);
 
   auto strokePaint2 = Paint();
@@ -1350,8 +1343,7 @@ TGFX_TEST(LayerTest, drawRRect) {
   strokePaint2.setColor(Color::Red());
 
   Rect rect5 = Rect::MakeXYWH(600, 300, 200, 160);
-  RRect rRect5 = {};
-  rRect5.setRectXY(rect5, 20.f, 10.f);
+  auto rRect5 = RRect::MakeRectXY(rect5, 20.f, 10.f);
   canvas->drawRRect(rRect5, strokePaint2);
 
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Layer_drawRRect"));
@@ -1785,7 +1777,7 @@ TGFX_TEST_PRIVATE(LayerTest, ContourTest) {
   twoGroupsLayer->addFillStyle(imageStyle2);
   auto childLayer = ShapeLayer::Make();
   path.reset();
-  path.addRRect(RRect{Rect::MakeXYWH(120, 120, 60, 60), Point::Make(10, 10)});
+  path.addRRect(RRect::MakeRectXY(Rect::MakeXYWH(120, 120, 60, 60), 10, 10));
   childLayer->setPath(path);
   childLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
   childLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
@@ -2094,7 +2086,8 @@ TGFX_TEST(LayerTest, TemporaryOffscreenImage) {
 
   auto glassLayer = ShapeLayer::Make();
   Path glassPath;
-  glassPath.addRRect(RRect{Rect::MakeXYWH(10, 10, 80, 80), Point::Make(40, 40)});
+  auto glassRRect = RRect::MakeRectXY(Rect::MakeXYWH(10, 10, 80, 80), 40, 40);
+  glassPath.addRRect(glassRRect);
   glassLayer->setPath(glassPath);
   glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 50)));
   glassLayer->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
@@ -2496,14 +2489,10 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
   {
     auto surface = Surface::Make(context, 200, 150);
     LayerRecorder recorder = {};
-    RRect rRect1 = {};
-    rRect1.setRectXY(Rect::MakeXYWH(10, 10, 50, 50), 10, 10);
-    RRect rRect2 = {};
-    rRect2.setRectXY(Rect::MakeXYWH(70, 10, 50, 50), 10, 10);
-    RRect rRect3 = {};
-    rRect3.setRectXY(Rect::MakeXYWH(130, 10, 50, 50), 10, 10);
-    RRect rRect4 = {};
-    rRect4.setRectXY(Rect::MakeXYWH(10, 70, 50, 50), 10, 10);
+    auto rRect1 = RRect::MakeRectXY(Rect::MakeXYWH(10, 10, 50, 50), 10, 10);
+    auto rRect2 = RRect::MakeRectXY(Rect::MakeXYWH(70, 10, 50, 50), 10, 10);
+    auto rRect3 = RRect::MakeRectXY(Rect::MakeXYWH(130, 10, 50, 50), 10, 10);
+    auto rRect4 = RRect::MakeRectXY(Rect::MakeXYWH(10, 70, 50, 50), 10, 10);
     recorder.addRRect(rRect1, redPaint);
     recorder.addRRect(rRect2, redPaint);
     recorder.addRRect(rRect3, redPaint);
@@ -2556,8 +2545,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
     auto surface = Surface::Make(context, 200, 100);
     LayerRecorder recorder = {};
     recorder.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint);
-    RRect rRect = {};
-    rRect.setRectXY(Rect::MakeXYWH(70, 10, 50, 50), 10, 10);
+    auto rRect = RRect::MakeRectXY(Rect::MakeXYWH(70, 10, 50, 50), 10, 10);
     recorder.addRRect(rRect, redPaint);
     Path path = {};
     path.addOval(Rect::MakeXYWH(130, 10, 50, 50));
@@ -2634,8 +2622,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
   // Test 9: Single rrect should be RRectContent, not RRectsContent
   {
     LayerRecorder recorder = {};
-    RRect rRect = {};
-    rRect.setRectXY(Rect::MakeXYWH(10, 10, 50, 50), 10, 10);
+    auto rRect = RRect::MakeRectXY(Rect::MakeXYWH(10, 10, 50, 50), 10, 10);
     recorder.addRRect(rRect, redPaint);
     TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
                         EXPECT_EQ(content->type(), LayerContent::Type::RRect));
@@ -2644,8 +2631,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
   // Test 10: RRect with zero radius should be converted to Rect
   {
     LayerRecorder recorder = {};
-    RRect rRect = {};
-    rRect.setRectXY(Rect::MakeXYWH(10, 10, 50, 50), 0, 0);
+    auto rRect = RRect::MakeRectXY(Rect::MakeXYWH(10, 10, 50, 50), 0, 0);
     recorder.addRRect(rRect, redPaint);
     TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
                         EXPECT_EQ(content->type(), LayerContent::Type::Rect));
@@ -3112,66 +3098,6 @@ TGFX_TEST_PRIVATE(LayerTest, SetChildrenLISValidation) {
   TGFX_PRIVATE_ACCESS(EXPECT_FALSE(singleLayer->bitFields.dirtyTransform));
 }
 
-TGFX_TEST(LayerTest, Layer3DContextAPI) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto renderRect = Rect::MakeWH(200, 200);
-  float contentScale = 1.0f;
-  auto colorSpace = ColorSpace::SRGB();
-
-  // Test Render3DContext creation (opaqueMode = false)
-  auto render3DContext =
-      Layer3DContext::Make(false, context, renderRect, contentScale, colorSpace, nullptr);
-  ASSERT_TRUE(render3DContext != nullptr);
-  EXPECT_TRUE(render3DContext->isFinished());
-
-  // Test beginRecording/endRecording cycle
-  auto rotateMatrix = Matrix3D::MakeRotate({0, 1, 0}, 30);
-  auto recordCanvas = render3DContext->beginRecording(rotateMatrix, true);
-  ASSERT_TRUE(recordCanvas != nullptr);
-  EXPECT_FALSE(render3DContext->isFinished());
-
-  // Draw something
-  Paint paint = {};
-  paint.setColor(Color::Red());
-  recordCanvas->drawRect(Rect::MakeXYWH(20, 20, 60, 60), paint);
-
-  render3DContext->endRecording();
-  EXPECT_TRUE(render3DContext->isFinished());
-
-  // Test Opaque3DContext creation (opaqueMode = true)
-  auto opaque3DContext =
-      Layer3DContext::Make(true, context, renderRect, contentScale, colorSpace, nullptr);
-  ASSERT_TRUE(opaque3DContext != nullptr);
-  EXPECT_TRUE(opaque3DContext->isFinished());
-
-  // Test nested recording (simulates nested preserve3D layers)
-  auto transform1 = Matrix3D::MakeRotate({0, 1, 0}, 20);
-  auto canvas1 = opaque3DContext->beginRecording(transform1, true);
-  EXPECT_FALSE(opaque3DContext->isFinished());
-  paint.setColor(Color::Blue());
-  canvas1->drawRect(Rect::MakeXYWH(10, 10, 80, 80), paint);
-
-  // Nested recording - tests recorder stack isolation
-  auto transform2 = Matrix3D::MakeRotate({1, 0, 0}, 30);
-  auto canvas2 = opaque3DContext->beginRecording(transform2, true);
-  ASSERT_TRUE(canvas2 != nullptr);
-  EXPECT_NE(canvas1, canvas2);
-  EXPECT_FALSE(opaque3DContext->isFinished());
-  paint.setColor(Color::Green());
-  canvas2->drawRect(Rect::MakeXYWH(30, 30, 40, 40), paint);
-
-  // End inner recording first
-  opaque3DContext->endRecording();
-  EXPECT_FALSE(opaque3DContext->isFinished());
-
-  // End outer recording
-  opaque3DContext->endRecording();
-  EXPECT_TRUE(opaque3DContext->isFinished());
-}
-
 TGFX_TEST(LayerTest, Preserve3DNestedLayers) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -3327,7 +3253,7 @@ TGFX_TEST(LayerTest, RootLayerBackgroundColorWithBlurBackground) {
       ShapeStyle::Make(Color::FromRGBA(0, 0, 255, 255)));  // Blue background content
   displayList->root()->addChild(bottomLayer);
 
-  // Add a shape layer with background blur to trigger the blurBackground code path
+  // Add a shape layer with background blur to exercise the BackgroundCapturer / BackgroundConsumer pipeline.
   // Position it so part covers bottomLayer and part covers pure background
   auto shapeLayer = ShapeLayer::Make();
   Path path = {};
@@ -3342,8 +3268,8 @@ TGFX_TEST(LayerTest, RootLayerBackgroundColorWithBlurBackground) {
 
   displayList->root()->addChild(shapeLayer);
 
-  // Render the display list - this will internally create BackgroundContext and call
-  // RootLayer::drawLayer with args.blurBackground set, testing our new code path
+  // Render the display list. RootLayer::drawLayer feeds the background-blur capture pass via
+  // DisplayList::captureBackgrounds, which internally creates a BackgroundSource.
   displayList->render(surface.get());
 
   // Compare with baseline to verify the background color is correctly drawn

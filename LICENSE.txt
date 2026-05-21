@@ -692,6 +692,14 @@ Open Source Software Licensed under the MIT License:
 Copyright (c) 1998-2000 Thai Open Source Software Center Ltd and Clark Cooper
 Copyright (c) 2001-2022 Expat maintainers
 
+2. volk
+Copyright (c) 2018-2024 Arseny Kapoulkine
+Source code: https://github.com/zeux/volk
+
+3. Vulkan Memory Allocator (VMA)
+Copyright (c) 2017-2024 Advanced Micro Devices, Inc.
+Source code: https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+
 
 Terms of the MIT License:
 --------------------------------------------------------------------
@@ -707,6 +715,18 @@ Open Source Software Licensed under the Apache License Version 2.0 and Other Lic
 1. swiftshader
 Copyright (c) swiftshader original author and authors
 Source code of this software can be obtained from: https://swiftshader.googlesource.com/SwiftShader
+
+2. Vulkan-Headers
+Copyright (c) 2015-2024 The Khronos Group Inc.
+Source code: https://github.com/KhronosGroup/Vulkan-Headers
+
+3. shaderc
+Copyright (c) 2015-2024 Google LLC
+Source code: https://github.com/google/shaderc
+
+4. SPIRV-Cross
+Copyright (c) 2015-2024 The Khronos Group Inc.
+Source code: https://github.com/KhronosGroup/SPIRV-Cross
 
 
 Terms of the Apache 2.0:
@@ -772,15 +792,6 @@ For the license of other third party components, please refer to the following U
 https://swiftshader.googlesource.com/SwiftShader/+/refs/heads/master/LICENSE.txt
 
 
-Open Source Software Licensed under the Apache License Version 2.0 License:
---------------------------------------------------------------------
-1. flatbuffers
-Copyright (c) flatbuffers original author and authors
-
-A copy of the Apache License Version 2.0 License is included in this file.
-
-
-
 Open Source Software Licensed under the BSD 3-Clause License and Other Licenses of the Third-Party Components therein:
 --------------------------------------------------------------------
 1. angle
@@ -812,16 +823,3 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 For the license of other third party components, please refer to the following URL:
 https://github.com/cameron314/concurrentqueue/tree/master/benchmarks
-
-
-
-Open Source Software Licensed under the BSD 2-Clause License and Other Licenses of the Third-Party Components therein:
---------------------------------------------------------------------
-1. lz4
-Copyright (c) 2011-2020, Yann Collet
-All rights reserved.
-
-A copy of the BSD 2-Clause License is included in this file.
-
-For the license of other third party components, please refer to the following URL:
-https://github.com/lz4/lz4/tree/dev/lib

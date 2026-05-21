@@ -22,7 +22,6 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/resources/RenderTarget.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -132,7 +131,6 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   // Note: if mask or alphaToCoverage from MultisampleDescriptor are used in the pipeline
   // creation, they must also be encoded here.
   programKey.write(static_cast<uint32_t>(renderTarget->sampleCount()));
-  CAPUTRE_PROGRAM_INFO(programKey, context, this);
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
     program = ProgramBuilder::CreateProgram(context, this);
