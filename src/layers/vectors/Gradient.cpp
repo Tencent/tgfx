@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/vectors/Gradient.h"
+#include <algorithm>
+#include "core/utils/Log.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
@@ -72,12 +74,35 @@ void Gradient::setMatrix(const Matrix& matrix) {
   invalidateContent();
 }
 
+void Gradient::setFitsToGeometry(bool value) {
+  if (_fitsToGeometry == value) {
+    return;
+  }
+  _fitsToGeometry = value;
+  invalidateContent();
+}
+
 std::shared_ptr<Shader> Gradient::getShader() const {
   auto shader = onCreateShader();
   if (shader == nullptr || _matrix.isIdentity()) {
     return shader;
   }
   return shader->makeWithMatrix(_matrix);
+}
+
+Matrix Gradient::getFitMatrix(const Rect& bounds) const {
+  DEBUG_ASSERT(_fitsToGeometry);
+  // Clamp zero or sub-pixel bounds axes to the 1/16 px GPU sub-pixel grid. Below this
+  // floor, 1/sx blows up shader-space coordinates and (tu + tv) suffers catastrophic
+  // cancellation, producing stair-step artifacts along the split. 1/16 px is still
+  // narrow enough to read as a hard Clamp split between the first and last colors on a
+  // collapsed axis.
+  constexpr float MinFitScale = 1.0f / 16.0f;
+  float sx = std::max(bounds.width(), MinFitScale);
+  float sy = std::max(bounds.height(), MinFitScale);
+  auto matrix = Matrix::MakeScale(sx, sy);
+  matrix.postTranslate(bounds.left, bounds.top);
+  return matrix;
 }
 
 void LinearGradient::setEndPoint(const Point& endPoint) {

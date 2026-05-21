@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TestUtils.h"
-#include <dirent.h>
+#include <filesystem>
 #include <fstream>
 #include "ProjectPath.h"
 #include "core/utils/Log.h"
@@ -36,9 +36,9 @@ std::shared_ptr<ImageCodec> MakeImageCodec(const std::string& path) {
   return ImageCodec::MakeFrom(ProjectPath::Absolute(path));
 }
 
-std::shared_ptr<ImageCodec> MakeNativeCodec(const std::string& path) {
+TGFX_PRIVATE_ACCESS(std::shared_ptr<ImageCodec> MakeNativeCodec(const std::string& path) {
   return ImageCodec::MakeNativeCodec(ProjectPath::Absolute(path));
-}
+})
 
 std::shared_ptr<Image> MakeImage(const std::string& path) {
   return Image::MakeFromFile(ProjectPath::Absolute(path));
@@ -61,7 +61,9 @@ std::shared_ptr<Data> ReadFile(const std::string& path) {
 void SaveFile(std::shared_ptr<Data> data, const std::string& key) {
   std::filesystem::path path = OUT_ROOT + "/" + key;
   std::filesystem::create_directories(path.parent_path());
-  std::ofstream out(path);
+  // Open in binary mode; otherwise on Windows '\n' (0x0A) bytes inside the binary payload would
+  // be expanded to "\r\n" (0x0D 0x0A), corrupting encoded image data such as WebP.
+  std::ofstream out(path, std::ios::binary | std::ios::trunc);
   out.write(reinterpret_cast<const char*>(data->data()),
             static_cast<std::streamsize>(data->size()));
   out.close();

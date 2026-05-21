@@ -54,7 +54,7 @@ static std::string GetFinalShaderCode(const char* codeSnippet, bool isDesktop) {
 
 std::shared_ptr<MultisampleTestEffect> MultisampleTestEffect::Make(
     const MultisampleConfig& config) {
-  return std::make_shared<MultisampleTestEffect>(config);
+  return std::shared_ptr<MultisampleTestEffect>(new MultisampleTestEffect(config));
 }
 
 MultisampleTestEffect::MultisampleTestEffect(const MultisampleConfig& config) : config(config) {

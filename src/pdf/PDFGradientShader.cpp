@@ -622,7 +622,15 @@ PDFIndirectReference MakePSFunction(std::unique_ptr<Stream> psCode,
 // Conic Gradient Triangle Mesh (ShadingType 4) Implementation
 ///////////////////////////////////////////////////////////////////////////
 
-constexpr int ConicSegmentCount = 64;
+// Lower bound on the number of angular segments. 65 is chosen so that a full 360° sweep keeps
+// each segment around 5.54 degrees. More segments improve arc accuracy but increase file size.
+// Sweeps larger than 2π will use more segments according to the π/32 threshold at the call site.
+constexpr int ConicSegmentCount = 65;
+// Number of radial steps per segment for the rectangle strip. Fine subdivision is intentional:
+// fewer steps leave large triangles whose shared edges can produce sub-pixel white-line artifacts
+// in Chrome's Gouraud renderer.
+// The trade-off is file size: 65 segments × 500 steps × 2 vertices ≈ 65K vertices per gradient.
+constexpr int ConicRadialStepsPerSegment = 500;
 
 Color InterpolateColorAtT(float t, const std::vector<Color>& colors,
                           const std::vector<float>& positions) {
@@ -677,14 +685,46 @@ void WriteTriangleMeshVertex(MemoryWriteStream* stream, uint8_t flag, float x, f
   stream->write(&b, 1);
 }
 
-void WriteConicMeshSegment(MemoryWriteStream* stream, Point center, float radius, float fromAngle,
-                           float toAngle, const Color& fromColor, const Color& toColor, float minX,
-                           float maxX, float minY, float maxY) {
-  Point p1 = {center.x + radius * std::cos(fromAngle), center.y + radius * std::sin(fromAngle)};
-  Point p2 = {center.x + radius * std::cos(toAngle), center.y + radius * std::sin(toAngle)};
+// Writes one wedge-shaped segment as a radial rectangle strip. Instead of a fan triangle
+// (center + two rim points), each segment expands from the center outward using
+// ConicRadialStepsPerSegment flag=1 vertex pairs. This eliminates seam artifacts because all
+// inter-segment boundaries are shared radial edges, not arc edges.
+//
+// Vertex layout per segment:
+//   3 degenerate flag=0 triangles (center, center, center) to reset the color anchor, then
+//   ConicRadialStepsPerSegment+1 pairs of (leftEdge, rightEdge) points along the two radial
+//   boundaries, stepping from radius=0 to radius=maxRadius.
+void WriteConicRectStripSegment(MemoryWriteStream* stream, Point center, float maxRadius,
+                                float fromAngle, float toAngle, const Color& fromColor,
+                                const Color& toColor, float minX, float maxX, float minY,
+                                float maxY) {
+  Color blendColor = {
+      (fromColor.red + toColor.red) * 0.5f, (fromColor.green + toColor.green) * 0.5f,
+      (fromColor.blue + toColor.blue) * 0.5f, (fromColor.alpha + toColor.alpha) * 0.5f};
+
+  // 3 degenerate triangles at center to establish color anchors (flag=0 each, area=0).
+  WriteTriangleMeshVertex(stream, 0, center.x, center.y, minX, maxX, minY, maxY, blendColor);
   WriteTriangleMeshVertex(stream, 0, center.x, center.y, minX, maxX, minY, maxY, fromColor);
-  WriteTriangleMeshVertex(stream, 1, p1.x, p1.y, minX, maxX, minY, maxY, fromColor);
-  WriteTriangleMeshVertex(stream, 1, p2.x, p2.y, minX, maxX, minY, maxY, toColor);
+  WriteTriangleMeshVertex(stream, 0, center.x, center.y, minX, maxX, minY, maxY, toColor);
+
+  // Radial rectangle strip: ConicRadialStepsPerSegment+1 pairs of points, each pair is the
+  // left boundary (fromAngle direction) and right boundary (toAngle direction) at the same radius.
+  // flag=1 extends the previous triangle by adding one new vertex: v0=prev[1], v1=prev[2], v2=new.
+  // Alternating left/right produces a strip of quads (2 triangles per step).
+  float cosFrom = std::cos(fromAngle);
+  float sinFrom = std::sin(fromAngle);
+  float cosTo = std::cos(toAngle);
+  float sinTo = std::sin(toAngle);
+  int steps = ConicRadialStepsPerSegment;
+  for (int i = 0; i <= steps; ++i) {
+    float r = maxRadius * static_cast<float>(i) / static_cast<float>(steps);
+    float leftX = center.x + r * cosFrom;
+    float leftY = center.y + r * sinFrom;
+    float rightX = center.x + r * cosTo;
+    float rightY = center.y + r * sinTo;
+    WriteTriangleMeshVertex(stream, 1, leftX, leftY, minX, maxX, minY, maxY, fromColor);
+    WriteTriangleMeshVertex(stream, 1, rightX, rightY, minX, maxX, minY, maxY, toColor);
+  }
 }
 
 // Conic uses ShadingType 4 (Free-Form Gouraud-Shaded Triangle Mesh).
@@ -741,8 +781,8 @@ PDFIndirectReference MakeConicTriangleMeshShader(PDFDocumentImpl* doc,
       for (int i = 0; i < segments; ++i) {
         float a1 = lastColorStart + static_cast<float>(i) * step;
         float a2 = lastColorStart + static_cast<float>(i + 1) * step;
-        WriteConicMeshSegment(meshStream.get(), center, maxRadius, a1, a2, lastColor, lastColor,
-                              minX, maxX, minY, maxY);
+        WriteConicRectStripSegment(meshStream.get(), center, maxRadius, a1, a2, lastColor,
+                                   lastColor, minX, maxX, minY, maxY);
       }
     }
     if (std::abs(firstColorEnd - firstColorStart) > absSegAngle * 0.5f) {
@@ -752,8 +792,8 @@ PDFIndirectReference MakeConicTriangleMeshShader(PDFDocumentImpl* doc,
       for (int i = 0; i < segments; ++i) {
         float a1 = firstColorStart + static_cast<float>(i) * step;
         float a2 = firstColorStart + static_cast<float>(i + 1) * step;
-        WriteConicMeshSegment(meshStream.get(), center, maxRadius, a1, a2, firstColor, firstColor,
-                              minX, maxX, minY, maxY);
+        WriteConicRectStripSegment(meshStream.get(), center, maxRadius, a1, a2, firstColor,
+                                   firstColor, minX, maxX, minY, maxY);
       }
     }
   }
@@ -766,8 +806,8 @@ PDFIndirectReference MakeConicTriangleMeshShader(PDFDocumentImpl* doc,
 
     Color color1 = InterpolateColorAtT(t1, info.colors, info.positions);
     Color color2 = InterpolateColorAtT(t2, info.colors, info.positions);
-    WriteConicMeshSegment(meshStream.get(), center, maxRadius, angle1, angle2, color1, color2, minX,
-                          maxX, minY, maxY);
+    WriteConicRectStripSegment(meshStream.get(), center, maxRadius, angle1, angle2, color1, color2,
+                               minX, maxX, minY, maxY);
   }
 
   auto pdfShader = PDFDictionary::Make();

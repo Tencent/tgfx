@@ -21,9 +21,10 @@
 #include "core/utils/ColorHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/processors/ComplexEllipseGeometryProcessor.h"
+#include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -35,7 +36,6 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
   }
   auto allocator = context->drawingAllocator();
   auto drawOp = allocator->make<RRectDrawOp>(allocator, provider.get());
-  CAPUTRE_RRECT_MESH(drawOp.get(), provider.get());
   drawOp->indexBufferProxy =
       context->globalCache()->getRRectIndexBuffer(provider->hasStroke(), provider->aaType());
   if (provider->rectCount() <= 1) {
@@ -53,6 +53,10 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
     commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
   hasStroke = provider->hasStroke();
+  isComplex = provider->isComplex();
+  // MSAA shares the AA-coverage vertex layout: the quad covers more than the rounded shape,
+  // so the arc boundary is evaluated inside the shader and hardware MSAA cannot provide
+  // edge coverage on its own.
   if (aaType == AAType::None) {
     indicesPerRRect = IndicesPerNonAARRect;
   } else {
@@ -61,12 +65,17 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
 }
 
 PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
-  ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
-  ATTRIBUTE_NAME("hasStroke", hasStroke);
-  ATTRIBUTE_NAME("commonColor", commonColor);
   if (aaType == AAType::None) {
+    if (isComplex) {
+      return ComplexNonAARRectGeometryProcessor::Make(
+          allocator, renderTarget->width(), renderTarget->height(), hasStroke, commonColor);
+    }
     return NonAARRectGeometryProcessor::Make(allocator, renderTarget->width(),
                                              renderTarget->height(), hasStroke, commonColor);
+  }
+  if (isComplex) {
+    return ComplexEllipseGeometryProcessor::Make(allocator, renderTarget->width(),
+                                                 renderTarget->height(), hasStroke, commonColor);
   }
   return EllipseGeometryProcessor::Make(allocator, renderTarget->width(), renderTarget->height(),
                                         hasStroke, commonColor);

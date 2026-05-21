@@ -110,11 +110,11 @@ void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint, const Mat
 }
 
 void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint, const Matrix& matrix) {
-  if (rRect.rect.isEmpty()) {
+  if (rRect.rect().isEmpty()) {
     return;
   }
   if (rRect.isRect()) {
-    addRect(rRect.rect, paint, matrix);
+    addRect(rRect.rect(), paint, matrix);
     return;
   }
   if (!canAppend(PendingType::RRect, paint, matrix)) {
@@ -156,24 +156,32 @@ bool LayerRecorder::tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& sh
   if (matrixShape == nullptr || !matrixShape->shape->isSimplePath()) {
     return false;
   }
-  auto combinedMatrix = matrixShape->matrix;
-  combinedMatrix.postConcat(matrix);
-  if (paint.style == PaintStyle::Stroke) {
+  // Pulling matrixShape->matrix out of the shape and folding it into the combined CTM affects how
+  // the paint is sampled. The shader is supplied in the original shape's local space, so apply the
+  // inverse to keep its appearance unchanged. The stroke is also specified in that local space,
+  // and uniform scales need to be canceled out so the visual stroke width stays as the caller
+  // intended; non-uniform scales would distort the stroke and are not safe to fold into the CTM.
+  Matrix inverseInner = {};
+  if (!matrixShape->matrix.invert(&inverseInner)) {
+    return false;
+  }
+  LayerPaint adjustedPaint = paint;
+  if (adjustedPaint.shader != nullptr) {
+    adjustedPaint.shader = adjustedPaint.shader->makeWithMatrix(inverseInner);
+  }
+  if (adjustedPaint.style == PaintStyle::Stroke) {
     auto scales = matrixShape->matrix.getAxisScales();
-    // Skip tryAddSimplifiedPath for stroke with non-uniform scale in shape's matrix, as this
-    // optimization would cause the stroke to be scaled non-uniformly.
     if (!FloatNearlyEqual(scales.x, scales.y)) {
       return false;
     }
-    // Compensate stroke width for uniform scale to keep stroke width constant.
     if (!FloatNearlyEqual(scales.x, 1.0f)) {
       DEBUG_ASSERT(scales.x != 0);
-      auto compensatedPaint = paint;
-      compensatedPaint.stroke.width = paint.stroke.width / scales.x;
-      return tryAddSimplifiedPath(matrixShape->shape->getPath(), compensatedPaint, combinedMatrix);
+      adjustedPaint.stroke.width = paint.stroke.width / scales.x;
     }
   }
-  return tryAddSimplifiedPath(matrixShape->shape->getPath(), paint, combinedMatrix);
+  auto combinedMatrix = matrixShape->matrix;
+  combinedMatrix.postConcat(matrix);
+  return tryAddSimplifiedPath(matrixShape->shape->getPath(), adjustedPaint, combinedMatrix);
 }
 
 bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& paint,
@@ -197,12 +205,25 @@ bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& pai
       addRRect(rRect, fillPaint, matrix);
       return true;
     }
+    return false;
   }
-  if (Rect rect = {}; path.isRect(&rect)) {
+  Rect rect = {};
+  bool closed = false;
+  // isRect can match an open 4-segment polyline whose stroke (open contour with caps) differs
+  // from a closed rectangle stroke, so only forward when the path is closed or there is no
+  // stroke (closedness does not affect fill).
+  if (path.isRect(&rect, &closed) && (paint.style != PaintStyle::Stroke || closed)) {
     addRect(rect, paint, matrix);
     return true;
   }
-  if (RRect rRect = {}; path.isRRect(&rRect)) {
+  RRect rRect = {};
+  // isRRect returns false for oval/circle paths, so check isOval explicitly.
+  if (path.isOval(&rect)) {
+    rRect.setOval(rect);
+    addRRect(rRect, paint, matrix);
+    return true;
+  }
+  if (path.isRRect(&rRect)) {
     addRRect(rRect, paint, matrix);
     return true;
   }

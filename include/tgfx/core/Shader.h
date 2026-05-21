@@ -123,6 +123,40 @@ class Shader {
   static std::shared_ptr<Shader> MakeDiamondGradient(const Point& center, float radius,
                                                      const std::vector<Color>& colors,
                                                      const std::vector<float>& positions = {});
+
+  /**
+   * Creates a shader that generates fractal noise using the Perlin noise algorithm. The noise is
+   * generated in all four RGBA channels independently, but the alpha channel is always set to 1.0
+   * (fully opaque) to avoid premultiplied-alpha artifacts. The output values are in the [0, 1]
+   * range. Returns nullptr if any argument is not finite, if either base frequency is not strictly
+   * positive, or if numOctaves is less than 1.
+   * @param baseFrequencyX  The noise frequency in the X direction, must be finite and positive.
+   * @param baseFrequencyY  The noise frequency in the Y direction, must be finite and positive.
+   * @param numOctaves      The number of octaves, clamped to [1, 255].
+   * @param seed            The random seed for generating the noise pattern, must be finite.
+   * @param tileSize        If non-null and non-empty, the noise will tile seamlessly with the given
+   *                        size.
+   */
+  static std::shared_ptr<Shader> MakeFractalNoise(float baseFrequencyX, float baseFrequencyY,
+                                                  int numOctaves, float seed,
+                                                  const ISize* tileSize = nullptr);
+
+  /**
+   * Creates a shader that generates turbulence using the Perlin noise algorithm. Turbulence is
+   * similar to fractal noise but takes the absolute value of each octave, producing sharper
+   * patterns. The alpha channel is always set to 1.0 (fully opaque). Returns nullptr under the same
+   * conditions as MakeFractalNoise.
+   * @param baseFrequencyX  The noise frequency in the X direction, must be finite and positive.
+   * @param baseFrequencyY  The noise frequency in the Y direction, must be finite and positive.
+   * @param numOctaves      The number of octaves, clamped to [1, 255].
+   * @param seed            The random seed for generating the noise pattern, must be finite.
+   * @param tileSize        If non-null and non-empty, the noise will tile seamlessly with the given
+   *                        size.
+   */
+  static std::shared_ptr<Shader> MakeTurbulence(float baseFrequencyX, float baseFrequencyY,
+                                                int numOctaves, float seed,
+                                                const ISize* tileSize = nullptr);
+
   virtual ~Shader() = default;
 
   /**
@@ -162,7 +196,7 @@ class Shader {
   std::shared_ptr<Shader> makeWithColorFilter(std::shared_ptr<ColorFilter> colorFilter) const;
 
  protected:
-  enum class Type { Color, ColorFilter, Image, Blend, Matrix, Gradient };
+  enum class Type { Color, ColorFilter, Image, Blend, Matrix, Gradient, PerlinNoise };
 
   /**
    * Returns the type of this shader.

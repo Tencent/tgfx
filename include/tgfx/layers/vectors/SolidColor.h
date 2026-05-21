@@ -24,7 +24,7 @@
 
 namespace tgfx {
 /**
- * SolidColor represents a solid color that can be drawn on a shape layer.
+ * SolidColor represents a solid color that can be drawn on a vector layer.
  */
 class SolidColor : public ColorSource {
  public:
@@ -46,6 +46,14 @@ class SolidColor : public ColorSource {
   void setColor(const Color& color);
 
   std::shared_ptr<Shader> getShader() const override;
+
+  bool fitsToGeometry() const override {
+    return false;
+  }
+
+  Matrix getFitMatrix(const Rect&) const override {
+    return Matrix::I();
+  }
 
  protected:
   Type getType() const override {

@@ -95,9 +95,6 @@
     "freetype": {
       "description": "Enable Freetype as the vector backend"
     },
-    "inspector": {
-      "description": "Enable profiling support for the TGFX Inspector tool"
-    },
     "png-decode": {
       "description": "Enable embedded PNG decoding support"
     },

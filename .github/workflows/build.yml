@@ -80,7 +80,8 @@ jobs:
           npm install depsync -g
           depsync
 
-      - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
 
       - uses: actions/setup-java@v4
         with:
@@ -242,7 +243,8 @@ jobs:
           key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-linux-
 
-      - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
 
       - name: Run depsync
         run: |
@@ -289,7 +291,8 @@ jobs:
           key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-qt-
 
-      - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
 
       - name: Run depsync
         run: |

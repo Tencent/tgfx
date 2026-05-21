@@ -172,14 +172,20 @@ bool Path::isOval(Rect* bounds) const {
 
 bool Path::isRRect(RRect* rRect) const {
   SkRRect skRRect = {};
-  if (!pathRef->path.isRRect(&skRRect) || !skRRect.isSimple()) {
+  if (!pathRef->path.isRRect(&skRRect) || skRRect.isEmpty() || skRRect.isRect() ||
+      skRRect.isOval()) {
     return false;
   }
   if (rRect) {
-    const auto& rect = skRRect.rect();
-    rRect->rect.setLTRB(rect.fLeft, rect.fTop, rect.fRight, rect.fBottom);
-    auto radii = skRRect.getSimpleRadii();
-    rRect->radii.set(radii.fX, radii.fY);
+    const auto& skRect = skRRect.rect();
+    const auto rect = Rect::MakeLTRB(skRect.fLeft, skRect.fTop, skRect.fRight, skRect.fBottom);
+    std::array<Point, 4> cornerRadii = {};
+    for (size_t i = 0; i < 4; ++i) {
+      const auto r = skRRect.radii(static_cast<SkRRect::Corner>(i));
+      cornerRadii[i] = {r.fX, r.fY};
+    }
+    // Re-normalize to stay within RRect's invariants.
+    rRect->setRectRadii(rect, cornerRadii);
   }
   return true;
 }
@@ -475,7 +481,13 @@ void Path::addArc(const Rect& oval, float startAngle, float sweepAngle) {
   auto path = &(writableRef()->path);
   path->moveTo(iter.current());
   for (int i = 0; i < numBeziers; i++) {
-    path->cubicTo(iter.next(), iter.next(), iter.next());
+    // Bind each iter.next() to a local first; argument evaluation order is unspecified, and MSVC
+    // evaluates right-to-left while Clang/GCC go left-to-right, which would otherwise reverse the
+    // (c1, c2, end) order on Windows and produce a corrupted path.
+    auto c1 = iter.next();
+    auto c2 = iter.next();
+    auto end = iter.next();
+    path->cubicTo(c1, c2, end);
   }
 }
 
@@ -493,7 +505,9 @@ void Path::addRoundRect(const Rect& rect, const std::array<Point, 4>& radii, boo
 }
 
 void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) {
-  auto skRRect = SkRRect::MakeRectXY(ToSkRect(rRect.rect), rRect.radii.x, rRect.radii.y);
+  SkRRect skRRect;
+  skRRect.setRectRadii(ToSkRect(rRect.rect()),
+                       reinterpret_cast<const SkPoint*>(rRect.radii().data()));
   writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);
 }
 

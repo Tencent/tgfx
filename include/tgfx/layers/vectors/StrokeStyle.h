@@ -30,7 +30,7 @@
 namespace tgfx {
 
 /**
- * StrokeStyle applies a stroke to shapes in the same group using a ColorSource.
+ * StrokeStyle applies a stroke to geometries in the same group using a ColorSource.
  */
 class StrokeStyle : public VectorElement {
  public:
@@ -159,7 +159,7 @@ class StrokeStyle : public VectorElement {
   void setDashAdaptive(bool value);
 
   /**
-   * Returns the stroke alignment relative to the shape boundary. The default value is
+   * Returns the stroke alignment relative to the geometry boundary. The default value is
    * StrokeAlign::Center.
    */
   StrokeAlign strokeAlign() const {
@@ -167,7 +167,7 @@ class StrokeStyle : public VectorElement {
   }
 
   /**
-   * Sets the stroke alignment relative to the shape boundary.
+   * Sets the stroke alignment relative to the geometry boundary.
    */
   void setStrokeAlign(StrokeAlign value);
 

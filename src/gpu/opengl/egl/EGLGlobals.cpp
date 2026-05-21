@@ -20,7 +20,7 @@
 #include <EGL/eglext.h>
 #include <atomic>
 #include <cstring>
-#if defined(_WIN32)
+#if defined(TGFX_USE_ANGLE)
 #include "EGLDisplayWrapper.h"
 #endif
 
@@ -29,7 +29,7 @@ EGLGlobals InitializeEGL() {
   EGLGlobals globals = {};
   EGLint majorVersion;
   EGLint minorVersion;
-#if defined(_WIN32)
+#if defined(TGFX_USE_ANGLE)
   do {
     globals.display = EGLDisplayWrapper::EGLGetPlatformDisplay();
   } while (eglInitialize(globals.display, &majorVersion, &minorVersion) == EGL_FALSE &&
