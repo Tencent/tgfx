@@ -21,6 +21,7 @@
 #include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/TextLayer.h"
+#include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/layers/vectors/ImagePattern.h"
 #include "tgfx/core/Image.h"
@@ -47,7 +48,7 @@ TGFX_TEST(NoiseStyleTest, NoiseShiftText) {
   auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
   ASSERT_TRUE(typeface != nullptr);
 
-  auto noise = NoiseStyle::MakeMono(6.0f, 0.5f, Color::FromRGBA(0, 0, 0, 128), 42.0f);
+  auto noise = NoiseStyle::MakeMono(10.0f, 0.5f, Color::FromRGBA(0, 0, 0, 128), 42.0f);
 
   auto textLayer = TextLayer::Make();
   textLayer->setText("style");
@@ -101,7 +102,7 @@ TGFX_TEST(NoiseStyleTest, NoiseShapeText) {
   auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
   ASSERT_TRUE(typeface != nullptr);
 
-  auto noise = NoiseStyle::MakeMono(6.0f, 0.5f, Color::FromRGBA(0, 0, 0, 128), 42.0f);
+  auto noise = NoiseStyle::MakeMono(10.0f, 0.5f, Color::FromRGBA(0, 0, 0, 128), 42.0f);
 
   auto shapeLayer = ShapeLayer::Make();
   Path path = {};
@@ -167,7 +168,7 @@ TGFX_TEST(NoiseStyleTest, NoiseMovingRect) {
 
   auto child = ShapeLayer::Make();
   child->setFillStyle(ShapeStyle::Make(Color::White()));
-  auto noise = NoiseStyle::MakeMono(3.0f, 0.505f, Color::FromRGBA(0, 0, 0, 128), 42.0f);
+  auto noise = NoiseStyle::MakeMono(10.0f, 0.505f, Color::FromRGBA(0, 0, 0, 128), 42.0f);
   child->setLayerStyles({noise});
   parent->addChild(child);
 
@@ -209,7 +210,7 @@ TGFX_TEST(NoiseStyleTest, NoiseMovingRectTiled) {
 
   auto child = ShapeLayer::Make();
   child->setFillStyle(ShapeStyle::Make(Color::White()));
-  auto noise = NoiseStyle::MakeMono(3.0f, 0.505f, Color::FromRGBA(0, 0, 0, 128), 42.0f);
+  auto noise = NoiseStyle::MakeMono(10.0f, 0.505f, Color::FromRGBA(0, 0, 0, 128), 42.0f);
   child->setLayerStyles({noise});
   parent->addChild(child);
 
@@ -268,6 +269,48 @@ TGFX_TEST(NoiseStyleTest, NoiseTileMode) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "NoiseStyleTest/NoiseTileMode"));
+}
+
+TGFX_TEST(NoiseStyleTest, NoiseMovingRectWithDropShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1000, 1000);
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto back = SolidLayer::Make();
+  back->setColor(Color::White());
+  back->setWidth(1000);
+  back->setHeight(1000);
+
+  auto parent = ShapeLayer::Make();
+  parent->setFillStyle(ShapeStyle::Make(Color::White()));
+  Path parentPath;
+  parentPath.addRect(Rect::MakeXYWH(50.f, 50.f, 900.f, 900.f));
+  parent->setPath(parentPath);
+
+  auto child = ShapeLayer::Make();
+  child->setFillStyle(ShapeStyle::Make(Color::White()));
+  auto noise = NoiseStyle::MakeMono(10.0f, 0.505f, Color::FromRGBA(0, 0, 0, 128), 42.0f);
+  auto shadow = DropShadowStyle::Make(10.f, 10.f, 5.f, 5.f, Color::FromRGBA(0, 0, 0, 128), false);
+  child->setLayerStyles({noise, shadow});
+  parent->addChild(child);
+
+  back->addChild(parent);
+  displayList->root()->addChild(back);
+
+  for (int i = 0; i < 16; i++) {
+    surface->getCanvas()->clear();
+    Path childPath;
+    auto offsetX = -150.f + static_cast<float>(i) * 20.f;
+    childPath.addRect(Rect::MakeXYWH(offsetX, 50.f, 200.f, 200.f));
+    child->setPath(childPath);
+    displayList->render(surface.get());
+    EXPECT_TRUE(Baseline::Compare(surface,
+                                  "NoiseStyleTest/NoiseMovingRectWithDropShadow_frame" +
+                                      std::to_string(i)));
+  }
 }
 
 }  // namespace tgfx

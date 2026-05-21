@@ -36,6 +36,7 @@
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
 #include "layers/MaskContext.h"
+#include "tgfx/layers/filters/LayerImageFilter.h"
 #include "layers/OffscreenRenderer.h"
 #include "layers/OpaqueContext.h"
 #include "layers/RegionTransformer.h"
@@ -1090,24 +1091,25 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
   std::vector<std::shared_ptr<ImageFilter>> filters;
   for (const auto& layerFilter : _filters) {
     DEBUG_ASSERT(layerFilter != nullptr);
-    if (auto filter = layerFilter->getImageFilter(contentScale)) {
-      filters.push_back(filter);
+    if (layerFilter->isImageFilter()) {
+      auto* imageFilter = static_cast<LayerImageFilter*>(layerFilter.get());
+      if (auto filter = imageFilter->getImageFilter(contentScale)) {
+        filters.push_back(filter);
+      }
     }
   }
   return ImageFilter::Compose(filters);
 }
 
 std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float contentScale,
-                                           float width, float height, const Point& originOffset,
-                                           Point* offset) {
+                                           const Rect& contentBounds, Point* offset) {
   if (!image || _filters.empty()) {
     return image;
   }
   for (const auto& layerFilter : _filters) {
     DEBUG_ASSERT(layerFilter != nullptr);
     Point filterOffset = {};
-    image = layerFilter->filterImage(std::move(image), contentScale, width, height, originOffset,
-                                     &filterOffset);
+    image = layerFilter->filterImage(std::move(image), contentScale, contentBounds, &filterOffset);
     if (!image) {
       return nullptr;
     }
@@ -1411,10 +1413,11 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
   if (!_filters.empty()) {
     Point filterOffset = {};
     auto bounds = getBounds();
-    Point originOffset = {pictureBounds.left / contentScale - bounds.left,
-                          pictureBounds.top / contentScale - bounds.top};
-    image = applyFilters(std::move(image), contentScale, bounds.width(), bounds.height(),
-                         originOffset, &filterOffset);
+    Rect contentBounds = Rect::MakeXYWH(
+        bounds.left * contentScale - pictureBounds.left,
+        bounds.top * contentScale - pictureBounds.top,
+        bounds.width() * contentScale, bounds.height() * contentScale);
+    image = applyFilters(std::move(image), contentScale, contentBounds, &filterOffset);
     offset += filterOffset;
   }
 
@@ -1526,6 +1529,7 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
+  printf("Layer::drawDirectly, layer=%s\n", name().c_str());
   // Capture and consume passes share the same per-layer LayerStyleSource via the active handler,
   // so the content/contour intermediate renders happen once per frame instead of twice.
   const LayerStyleSource* sourcePtr = nullptr;

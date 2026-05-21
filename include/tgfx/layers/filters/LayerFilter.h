@@ -23,57 +23,32 @@
 
 namespace tgfx {
 class Image;
+class LayerImageFilter;
 
 /**
- * LayerFilter is the abstract base class for filters that apply effects to a layer, such as blurs,
- * shadows, color adjustments, or procedural overlays. A LayerFilter consumes the rendered layer
- * image and produces a new image. LayerFilters are mutable and can be changed at any time.
- *
- * Subclasses fall into two broad categories:
- *   - Effects expressible as a single ImageFilter (blur, drop shadow, inner shadow, color matrix,
- *     blend) should derive from LayerImageFilter, which provides ImageFilter caching and overrides
- *     getImageFilter() used by Layer::getImageFilter() for bounds reverse-mapping.
- *   - Effects that need access to the input image (such as procedural overlays anchored to image
- *     dimensions) should derive directly from LayerFilter and override onFilterImage().
+ * LayerFilter is the abstract base class for filters applied to a layer's rendered image, such as
+ * blurs, shadows, color adjustments, or procedural overlays. A LayerFilter consumes the rendered
+ * layer image and produces a new image. LayerFilters are mutable and can be changed at any time.
  */
 class LayerFilter : public LayerProperty {
  public:
   /**
-   * Applies this filter to the given input image at the specified scale factor. The offset stores
-   * the translation of the filtered image relative to the input image origin.
-   * the translation of the filtered image relative to the input image origin. Subclasses that need
-   * custom rendering should override onFilterImage().
+   * Applies this filter to the given input image at the specified scale factor.
    * @param input The source image to filter.
    * @param scale The scale factor to apply to scale-dependent filter parameters.
-   * @param offset If non-null, receives the (x, y) translation of the filtered image.
+   * @param contentBounds The layer content bounds, expressed in the input image coordinate space
+   * (the input image origin is the coordinate origin). Filters whose effect is anchored to the
+   * layer geometry use this rectangle to recover the anchor regardless of how the input image is
+   * clipped relative to the content bounds.
+   * @param offset If non-null, receives the (x, y) translation of the filtered image relative to
+   * the input image origin.
    * @return The filtered image, or nullptr on failure.
    */
   std::shared_ptr<Image> filterImage(std::shared_ptr<Image> input, float scale,
-                                     Point* offset = nullptr);
+                                     const Rect& contentBounds, Point* offset = nullptr);
 
   /**
-   * Applies this filter to the given input image, providing the geometry of the layer content
-   * bounds the input image was rendered from. Filters whose effect depends on the layer geometry
-   * (such as procedural overlays anchored to content bounds center) use this overload to recover
-   * the anchor regardless of how the input image is clipped relative to the content bounds. The
-   * default implementation ignores the geometry and forwards to the basic filterImage().
-   * @param input The source image to filter.
-   * @param scale The scale factor to apply to scale-dependent filter parameters.
-   * @param width The width of the layer content bounds in layer-local units.
-   * @param height The height of the layer content bounds in layer-local units.
-   * @param originOffset The (x, y) offset of the input image origin relative to the content bounds
-   *                     origin, in layer-local units.
-   * @param offset If non-null, receives the (x, y) translation of the filtered image.
-   * @return The filtered image, or nullptr on failure.
-   */
-  std::shared_ptr<Image> filterImage(std::shared_ptr<Image> input, float scale, float width,
-                                     float height, const Point& originOffset,
-                                     Point* offset = nullptr);
-
-  /**
-   * Returns the bounds of the layer filter after applying it to the scaled layer bounds. The
-   * default implementation returns srcRect unchanged. Subclasses whose effect grows or shrinks
-   * the visible region must override this method.
+   * Returns the bounds of the layer filter after applying it to the scaled layer bounds.
    * @param srcRect The scaled bounds of the layer content.
    * @param contentScale The scale factor of the layer bounds relative to its original size. Some
    * layer filters have size-related parameters that must be adjusted with this scale factor.
@@ -97,47 +72,28 @@ class LayerFilter : public LayerProperty {
   }
 
   /**
-   * Applies this filter to the given input image. The default implementation returns the input
-   * unchanged. Subclasses whose effect depends only on the input image (not on the layer content
-   * bounds) should override this method; the default LayerFilter::onFilterImage(5-arg) overload
-   * forwards to this method when subclasses do not override the 5-arg version.
-   */
-  virtual std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float, Point*) {
-    return input;
-  }
-
-  /**
-   * Applies this filter to the given input image with knowledge of the layer content bounds. The
-   * default implementation ignores the geometry parameters and forwards to onFilterImage().
-   * Subclasses whose effect is anchored to the content bounds (rather than the input image)
-   * should override this method.
+   * Subclasses must override this method to produce the filtered image. See filterImage() for
+   * parameter semantics.
    */
   virtual std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                               float width, float height,
-                                               const Point& originOffset, Point* offset);
+                                               const Rect& contentBounds, Point* offset) = 0;
 
   /**
-   * Marks this filter as dirty. Subclasses that maintain cached state derived from the filter's
-   * properties should override this method to drop their caches, then call the base implementation.
+   * Marks this filter as dirty. Subclasses that maintain cached state should override this method
+   * to drop their caches, then call the base implementation.
    */
   virtual void invalidateFilter();
 
-  /**
-   * Returns an ImageFilter that approximates this filter's effect at the given scale, used by
-   * Layer::getImageFilter() for bounds reverse-mapping. Subclasses that cannot be expressed as a
-   * single ImageFilter (or whose effect depends on input image geometry not yet known) may return
-   * a degraded equivalent sufficient for bounds calculation, or nullptr if the filter does not
-   * grow or shrink the visible region. The default implementation returns nullptr.
-   */
-  virtual std::shared_ptr<ImageFilter> getImageFilter(float scale);
-
-  /**
-   * Returns the cached ImageFilter for the given scale, creating it via onCreateImageFilter() if
-   * needed. Available for subclasses that override onFilterImage() and need the internal ImageFilter.
-   */
-  std::shared_ptr<ImageFilter> getImageFilter(float scale);
-
  private:
+  /**
+   * Returns true if this filter is a LayerImageFilter. Used by Layer to safely access the cached
+   * ImageFilter without dynamic_cast. The default implementation returns false; LayerImageFilter
+   * overrides it to return true.
+   */
+  virtual bool isImageFilter() const {
+    return false;
+  }
+
   std::unique_ptr<Rect> _clipBounds = nullptr;
 
   friend class Layer;

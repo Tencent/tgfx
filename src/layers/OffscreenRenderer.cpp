@@ -53,12 +53,15 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
     return {};
   }
 
-  // Compute the offset between the clipped input bounds and the full content bounds, so filters
-  // that anchor to content coordinates (e.g. NoiseFilter) can compensate for surface clipping.
+  // Compute the layer content bounds in the input image coordinate space, so filters that anchor
+  // to content coordinates (e.g. NoiseFilter) can compensate for surface clipping. The input
+  // image origin sits at inputBounds.topLeft, so contentBounds.topLeft becomes
+  // contentBounds.topLeft - inputBounds.topLeft.
   auto contentBounds = layer->getBounds();
   contentBounds.roundOut();
-  Point originOffset = Point::Make(inputBounds->left - contentBounds.left,
-                                    inputBounds->top - contentBounds.top);
+  auto inputContentBounds =
+      Rect::MakeXYWH(contentBounds.left - inputBounds->left, contentBounds.top - inputBounds->top,
+                     contentBounds.width(), contentBounds.height());
 
   bool hasFilter = !args.excludeEffects && !layer->filters().empty();
 
@@ -93,8 +96,7 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
   }
   Point filterOffset = {};
   result.image = layer->applyFilters(std::move(result.image), density.getMaxScale(),
-                                     contentBounds.width(), contentBounds.height(), originOffset,
-                                     &filterOffset);
+                                     inputContentBounds, &filterOffset);
   if (result.image == nullptr) {
     return {};
   }

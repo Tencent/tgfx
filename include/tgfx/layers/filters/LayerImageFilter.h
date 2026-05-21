@@ -24,12 +24,8 @@ namespace tgfx {
 
 /**
  * LayerImageFilter is the base class for LayerFilters whose effect can be expressed as a single
- * ImageFilter that depends only on the scale factor. It owns the ImageFilter cache and exposes the
- * onCreateImageFilter() extension point. Subclasses include BlurFilter, DropShadowFilter,
- * InnerShadowFilter, ColorMatrixFilter, and BlendFilter.
- *
- * LayerImageFilter participates in Layer::getImageFilter() by overriding getImageFilter(scale) to
- * return its cached ImageFilter, which Layer composes for bounds reverse-mapping.
+ * ImageFilter that depends only on the scale factor. Subclasses include BlurFilter,
+ * DropShadowFilter, InnerShadowFilter, ColorMatrixFilter, and BlendFilter.
  */
 class LayerImageFilter : public LayerFilter {
  public:
@@ -46,26 +42,22 @@ class LayerImageFilter : public LayerFilter {
    */
   virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) = 0;
 
-  /**
-   * Applies the cached ImageFilter to the input image via FilterImage::MakeFrom. Subclasses
-   * generally do not need to override this method.
-   */
   std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                       Point* offset) override;
+                                       const Rect& contentBounds, Point* offset) override;
 
-  /**
-   * Drops the cached ImageFilter and chains to LayerFilter::invalidateFilter().
-   */
   void invalidateFilter() override;
 
   /**
    * Returns the cached ImageFilter for the given scale, building it via onCreateImageFilter() on
-   * cache miss. Overrides LayerFilter::getImageFilter() so that Layer::getImageFilter() can pick
-   * up this filter's contribution to the composed bounds-reverse-mapping ImageFilter.
+   * cache miss.
    */
-  std::shared_ptr<ImageFilter> getImageFilter(float scale) override;
+  std::shared_ptr<ImageFilter> getImageFilter(float scale);
 
  private:
+  bool isImageFilter() const override {
+    return true;
+  }
+
   bool dirty = true;
   float lastScale = 1.0f;
   std::shared_ptr<ImageFilter> lastFilter;
