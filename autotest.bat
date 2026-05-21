@@ -44,7 +44,7 @@ echo shell log - BACKEND_ARG: [%BACKEND_ARG%]
 
 :: Determine cmake args and target suffix based on BACKEND_ARG
 set "CMAKE_BACKEND_ARGS="
-set "TARGET_SUFFIX=OpenGL"
+set "TARGET_SUFFIX="
 
 if /I "%BACKEND_ARG%"=="USE_OPENGL_SWIFTSHADER" (
     set "CMAKE_BACKEND_ARGS=-DTGFX_USE_SWIFTSHADER=ON"
@@ -61,6 +61,11 @@ if /I "%BACKEND_ARG%"=="USE_VULKAN" (
 if /I "%BACKEND_ARG%"=="USE_OPENGL" (
     set "CMAKE_BACKEND_ARGS="
     set "TARGET_SUFFIX=OpenGL"
+)
+if "%TARGET_SUFFIX%"=="" (
+    echo ERROR: Unsupported backend argument: %BACKEND_ARG%
+    echo Supported: USE_OPENGL, USE_OPENGL_SWIFTSHADER, USE_VULKAN, USE_VULKAN_SWIFTSHADER
+    exit /b 1
 )
 
 echo shell log - CMAKE_BACKEND_ARGS: [%CMAKE_BACKEND_ARGS%]
