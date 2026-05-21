@@ -72,15 +72,21 @@ if %errorlevel% neq 0 (
     goto :restore
 )
 
-cmake --build . --target UpdateBaseline_%TARGET_SUFFIX%
+:: TODO: Remove fallback after this branch is merged into main.
+:: Main branch still uses the old target name "UpdateBaseline". Once merged, only the new name
+:: "UpdateBaseline_{Backend}" will exist and the else branch can be deleted.
+cmake --build . --target UpdateBaseline_%TARGET_SUFFIX% 2>nul
 if %errorlevel% neq 0 (
-    echo Build failed
-    cd ..
-    goto :restore
+    cmake --build . --target UpdateBaseline
+    if %errorlevel% neq 0 (
+        echo Build failed
+        cd ..
+        goto :restore
+    )
+    UpdateBaseline.exe
+) else (
+    UpdateBaseline_%TARGET_SUFFIX%.exe
 )
-
-:: Run UpdateBaseline
-UpdateBaseline_%TARGET_SUFFIX%.exe
 if %errorlevel% equ 0 (
     echo ~~~~~~~~~~~~~~~~~~~Update Baseline (%BACKEND_NAME%) Success~~~~~~~~~~~~~~~~~~~~~
 ) else (

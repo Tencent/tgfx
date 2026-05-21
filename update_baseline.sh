@@ -75,8 +75,15 @@
         -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON \
         -DCMAKE_BUILD_TYPE=Debug ../
 
-  cmake --build . --target UpdateBaseline_${TARGET_SUFFIX} -- -j 12
-  ./UpdateBaseline_${TARGET_SUFFIX}
+  # TODO: Remove fallback after this branch is merged into main.
+  # Main branch still uses the old target name "UpdateBaseline". Once merged, only the new name
+  # "UpdateBaseline_{Backend}" will exist and the else branch can be deleted.
+  if cmake --build . --target UpdateBaseline_${TARGET_SUFFIX} -- -j 12 2>/dev/null; then
+    ./UpdateBaseline_${TARGET_SUFFIX}
+  else
+    cmake --build . --target UpdateBaseline -- -j 12
+    ./UpdateBaseline
+  fi
 
   if test $? -eq 0; then
      echo "~~~~~~~~~~~~~~~~~~~Update Baseline ($BACKEND_NAME) Success~~~~~~~~~~~~~~~~~~~~~"
