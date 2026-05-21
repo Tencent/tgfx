@@ -5239,8 +5239,8 @@ TGFX_TEST(VectorLayerTest, DegenerateStroke) {
       constexpr float StarBRatio = 0.381966011f;
       constexpr float StarBOuterRadius = 50.0f;
       constexpr float StarBInnerRadius = StarBOuterRadius * StarBRatio;
-      constexpr float StarBFallbackInnerRadius = MinExtent;
-      constexpr float StarBFallbackOuterRadius = MinExtent / StarBRatio;
+      const float StarBFallbackInnerRadius = MinExtent;
+      const float StarBFallbackOuterRadius = MinExtent / StarBRatio;
 
       auto star = Polystar::Make();
       star->setPolystarType(PolystarType::Star);
