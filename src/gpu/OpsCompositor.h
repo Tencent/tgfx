@@ -183,6 +183,9 @@ class OpsCompositor {
   void flushPendingOps(PendingOpType currentType = PendingOpType::Unknown,
                        ClipStack currentClip = {}, Brush currentBrush = {});
   void flushPendingShapeOps();
+  bool shouldUseBezierRasterize(const Brush& brush) const;
+  void drawShapeBezierRasterize(std::shared_ptr<Shape> shape, const Matrix& matrix,
+                                const ClipStack& clip, const Brush& brush);
   void resetPendingOps(PendingOpType currentType = PendingOpType::Unknown,
                        ClipStack currentClip = {}, Brush currentBrush = {});
   AAType getAAType(const Brush& brush) const;

@@ -19,6 +19,7 @@
 #include "ProxyProvider.h"
 #include "core/HairlineTriangulator.h"
 #include "core/MeshBase.h"
+#include "core/ShapeBezierRasterizer.h"
 #include "core/ShapeMesh.h"
 #include "core/ShapeRasterizer.h"
 #include "core/ShapeVertexSource.h"
@@ -30,11 +31,13 @@
 #include "gpu/proxies/DefaultTextureProxy.h"
 #include "gpu/proxies/ExternalTextureRenderTargetProxy.h"
 #include "gpu/proxies/HardwareRenderTargetProxy.h"
+#include "gpu/proxies/ShapeBezierRasterizeGeometryProxy.h"
 #include "gpu/proxies/TextureRenderTargetProxy.h"
 #include "gpu/tasks/GPUBufferUploadTask.h"
 #include "gpu/tasks/HairlineBufferUploadTask.h"
 #include "gpu/tasks/MeshBufferUploadTask.h"
 #include "gpu/tasks/ReadbackBufferCreateTask.h"
+#include "gpu/tasks/ShapeBezierRasterizeUploadTask.h"
 #include "gpu/tasks/ShapeBufferUploadTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
 #include "proxies/HardwareTextureProxy.h"
@@ -272,6 +275,42 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
   }
   context->drawingManager()->addResourceTask(std::move(task));
   return std::make_shared<GPUShapeProxy>(drawingMatrix, triangleProxy, textureProxy);
+}
+
+std::shared_ptr<ShapeBezierRasterizeGeometryProxy>
+ProxyProvider::createShapeBezierRasterizeGeometryProxy(std::shared_ptr<Shape> shape,
+                                                       uint32_t renderFlags) {
+  if (shape == nullptr) {
+    return nullptr;
+  }
+  // Bezier rasterization geometry is independent of the render target size, transform and color,
+  // so the cache key only mixes the shape's geometry with a dedicated marker. This is what allows
+  // future instanced batching to share a single GPU buffer across draws of the same shape.
+  static const auto ShapeBezierRasterizeGeometryType = UniqueID::Next();
+  auto vertexKey = UniqueKey::Append(shape->getUniqueKey(), &ShapeBezierRasterizeGeometryType, 1);
+  if (auto cached = findOrWrapGPUBufferProxy(vertexKey)) {
+    return std::make_shared<ShapeBezierRasterizeGeometryProxy>(std::move(cached));
+  }
+  auto rasterizer = std::make_unique<ShapeBezierRasterizer>(std::move(shape));
+  std::unique_ptr<DataSource<ShapeBezierBuffer>> dataSource = nullptr;
+#ifdef TGFX_USE_THREADS
+  if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
+    dataSource = DataSource<ShapeBezierBuffer>::Async(std::move(rasterizer));
+  } else {
+    dataSource = std::move(rasterizer);
+  }
+#else
+  dataSource = std::move(rasterizer);
+#endif
+  auto vertexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+  addResourceProxy(vertexProxy, vertexKey);
+  if (!(renderFlags & RenderFlags::DisableCache)) {
+    vertexProxy->uniqueKey = vertexKey;
+  }
+  auto task = context->drawingAllocator()->make<ShapeBezierRasterizeUploadTask>(
+      vertexProxy, std::move(dataSource));
+  context->drawingManager()->addResourceTask(std::move(task));
+  return std::make_shared<ShapeBezierRasterizeGeometryProxy>(std::move(vertexProxy));
 }
 
 std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(

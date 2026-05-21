@@ -32,6 +32,7 @@
 #include "gpu/ops/HairlineLineOp.h"
 #include "gpu/ops/HairlineQuadOp.h"
 #include "gpu/ops/MeshDrawOp.h"
+#include "gpu/ops/ShapeBezierRasterizeDrawOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/ops/ShapeInstancedDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
@@ -40,6 +41,7 @@
 #include "processors/ColorSpaceXFormEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
 #include "processors/XfermodeFragmentProcessor.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 
@@ -174,6 +176,14 @@ static bool MatrixOnlyDiffersInTranslation(const Matrix& a, const Matrix& b) {
 void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix,
                               const ClipStack& clip, const Brush& brush) {
   DEBUG_ASSERT(shape != nullptr);
+  if (shouldUseBezierRasterize(brush)) {
+    // Bezier rasterization is the first stencil-based render path in tgfx and is not part of
+    // the legacy ShapeDrawOp batching pipeline. Flush any pending ops first so the new op is
+    // emitted in order, then dispatch directly without joining the pendingShape queue.
+    flushPendingOps();
+    drawShapeBezierRasterize(std::move(shape), matrix, clip, brush);
+    return;
+  }
   if (canAppend(PendingOpType::Shape, clip, brush) && pendingShape &&
       pendingShape->getUniqueKey() == shape->getUniqueKey() &&
       MatrixOnlyDiffersInTranslation(pendingShapeMatrix, matrix)) {
@@ -202,6 +212,76 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix
   pendingShapeMatrix = matrix;
   pendingShapeOffsets.emplace_back(0.0f, 0.0f);
   pendingShapeColors.emplace_back(brush.color);
+}
+
+bool OpsCompositor::shouldUseBezierRasterize(const Brush& brush) const {
+  // Antialiased draws keep using the existing triangulation path so the visual contract for
+  // AA shapes stays untouched. MSAA and Coverage produce smoother edges than the bezier
+  // implicit-curve test would here, and avoiding the new path on those configurations also
+  // sidesteps the stencil setup cost.
+  if (brush.antiAlias) {
+    return false;
+  }
+  if (renderTarget->sampleCount() > 1) {
+    return false;
+  }
+  // The capability is the gating switch — false during stage 2 (skeleton not yet electrified)
+  // and flipped on per backend after stage 3 lands the algorithm and shaders.
+  return context->gpu()->features()->bezierRasterizeSupported;
+}
+
+void OpsCompositor::drawShapeBezierRasterize(std::shared_ptr<Shape> shape, const Matrix& matrix,
+                                             const ClipStack& clip, const Brush& brush) {
+  auto geometryProxy = proxyProvider()->createShapeBezierRasterizeGeometryProxy(shape, renderFlags);
+  if (geometryProxy == nullptr) {
+    return;
+  }
+
+  std::optional<Rect> localBounds = std::nullopt;
+  std::optional<Rect> deviceBounds = std::nullopt;
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, /*hasCoverage=*/true);
+  auto clipBounds = getClipBounds(clip);
+
+  float drawScale = 1.0f;
+  auto shapeBounds = shape->getBounds();
+  if (needLocalBounds) {
+    if (shape->isInverseFillType()) {
+      localBounds = ToLocalBounds(clipBounds, matrix);
+    } else {
+      localBounds = ClipLocalBounds(shapeBounds, matrix, clipBounds);
+      if (localBounds->isEmpty()) {
+        return;
+      }
+    }
+    drawScale = std::min(matrix.getMaxScale(), 1.0f);
+  }
+
+  Rect coverBounds = shape->isInverseFillType() ? clipBounds : matrix.mapRect(shapeBounds);
+  if (needDeviceBounds) {
+    deviceBounds = coverBounds;
+    if (!shape->isInverseFillType() && !deviceBounds->intersect(clipBounds)) {
+      deviceBounds->setEmpty();
+    }
+  }
+
+  Matrix uvMatrix = {};
+  if (!matrix.invert(&uvMatrix)) {
+    return;
+  }
+
+  // The cover-pass quad is supplied in local space because the cover GP applies the view
+  // matrix (same as the stencil pass). For inverse fills the visible region is the device-space
+  // clip, so map it back through uvMatrix to keep the quad in local space.
+  Rect coverLocalBounds = shape->isInverseFillType() ? uvMatrix.mapRect(clipBounds) : shapeBounds;
+
+  auto dstColor = ToPMColor(brush.color, dstColorSpace);
+  auto fillType = shape->getPath().getFillType();
+  auto drawOp = ShapeBezierRasterizeDrawOp::Make(std::move(geometryProxy), dstColor, matrix,
+                                                 uvMatrix, coverLocalBounds, fillType);
+  if (drawOp == nullptr) {
+    return;
+  }
+  addDrawOp(std::move(drawOp), clip, brush, localBounds, deviceBounds, drawScale);
 }
 
 void OpsCompositor::drawMesh(std::shared_ptr<Mesh> mesh, const Matrix& matrix,

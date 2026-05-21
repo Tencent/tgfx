@@ -291,9 +291,10 @@ class PathDecomposer {
   void processCubic(const Point points[4]) {
     Point devPts[4];
     matrix_.mapPoints(devPts, points, 4);
-    auto quadPoints = PathUtils::ConvertCubicToQuads(devPts, 1.f);
-    for (size_t i = 0; i < quadPoints.size(); i += 3) {
-      addChoppedQuad(&quadPoints[i], verbsInContour_ == 0 && i == 0);
+    cubicQuads_.clear();
+    PathUtils::ConvertCubicToQuads(devPts, 1.f, &cubicQuads_);
+    for (size_t i = 0; i < cubicQuads_.size(); i += 3) {
+      addChoppedQuad(&cubicQuads_[i], verbsInContour_ == 0 && i == 0);
     }
     verbsInContour_++;
   }
@@ -320,6 +321,9 @@ class PathDecomposer {
   std::vector<Point> lines_;
   std::vector<Point> quads_;
   std::vector<int> quadSubdivCounts_;
+
+  // Scratch buffer reused across processCubic calls to avoid repeated heap allocations.
+  std::vector<Point> cubicQuads_;
 
   // Decomposition state
   uint32_t totalQuadCount_ = 0;

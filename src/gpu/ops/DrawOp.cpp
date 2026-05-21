@@ -43,6 +43,7 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   ProgramInfo programInfo(renderTarget, geometryProcessor.get(), std::move(fragmentProcessors),
                           colors.size(), xferProcessor.get(), blendMode);
   programInfo.setCullMode(cullMode);
+  onConfigureProgramInfo(programInfo);
   auto program = programInfo.getProgram();
   if (program == nullptr) {
     LOGE("DrawOp::execute() Failed to get the program!");
@@ -59,7 +60,18 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
                                static_cast<int>(scissorRect.width()),
                                static_cast<int>(scissorRect.height()));
   }
+  // Expose the render target to onDraw() for the duration of this call. Most ops ignore it
+  // and just operate on the render pass; ops that need to materialise their own ProgramInfo
+  // mid-draw (currently only ShapeBezierRasterizeDrawOp) read it through this->currentRenderTarget.
+  // Same lifetime applies to currentProgram / currentProgramInfo, which let multi-pass ops
+  // re-bind the standard pipeline without rebuilding it.
+  currentRenderTarget = renderTarget;
+  currentProgram = program.get();
+  currentProgramInfo = &programInfo;
   onDraw(renderPass);
+  currentProgramInfo = nullptr;
+  currentProgram = nullptr;
+  currentRenderTarget = nullptr;
   CAPUTRE_FRARGMENT_PROCESSORS(renderTarget->getContext(), colors, coverages);
   CAPUTRE_RENDER_TARGET(renderTarget);
 }

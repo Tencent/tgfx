@@ -68,6 +68,7 @@ int ProgramInfo::getSampleCount() const {
 PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
   PipelineColorAttachment colorAttachment = {};
   colorAttachment.format = renderTarget->format();
+  colorAttachment.colorWriteMask = colorWriteMask;
   if (xferProcessor != nullptr || blendMode == BlendMode::Src) {
     return colorAttachment;
   }
@@ -82,7 +83,6 @@ PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
   colorAttachment.srcAlphaBlendFactor = blendFormula.srcFactor();
   colorAttachment.dstAlphaBlendFactor = blendFormula.dstFactor();
   colorAttachment.alphaBlendOp = blendFormula.operation();
-  colorAttachment.colorWriteMask = ColorWriteMask::All;
   return colorAttachment;
 }
 
@@ -132,6 +132,24 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   // Note: if mask or alphaToCoverage from MultisampleDescriptor are used in the pipeline
   // creation, they must also be encoded here.
   programKey.write(static_cast<uint32_t>(renderTarget->sampleCount()));
+  // Pipelines that share shaders but differ in colour write mask or stencil configuration must
+  // resolve to distinct cache entries — otherwise the bezier rasterization stencil/cover passes
+  // would silently collapse onto a single program. Keep this section in sync with the fields that
+  // are actually written into RenderPipelineDescriptor.
+  programKey.write(colorWriteMask);
+  programKey.write(static_cast<uint32_t>(depthStencil.format));
+  programKey.write(static_cast<uint32_t>(depthStencil.depthCompare));
+  programKey.write(static_cast<uint32_t>(depthStencil.depthWriteEnabled ? 1 : 0));
+  programKey.write(depthStencil.stencilReadMask);
+  programKey.write(depthStencil.stencilWriteMask);
+  auto encodeStencilFace = [&](const StencilDescriptor& s) {
+    programKey.write(static_cast<uint32_t>(s.compare));
+    programKey.write(static_cast<uint32_t>(s.failOp));
+    programKey.write(static_cast<uint32_t>(s.depthFailOp));
+    programKey.write(static_cast<uint32_t>(s.passOp));
+  };
+  encodeStencilFace(depthStencil.stencilFront);
+  encodeStencilFace(depthStencil.stencilBack);
   CAPUTRE_PROGRAM_INFO(programKey, context, this);
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
