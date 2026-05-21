@@ -50,7 +50,10 @@ echo ~~~~~~~~~~~~~~~~~~~Update Baseline (%BACKEND_NAME%) Start~~~~~~~~~~~~~~~~~~
 :: Save current state
 for /f "delims=" %%i in ('git rev-parse --abbrev-ref HEAD') do set "CURRENT_BRANCH=%%i"
 for /f "delims=" %%i in ('git rev-parse HEAD') do set "CURRENT_COMMIT=%%i"
+for /f "delims=" %%i in ('git stash list') do set "STASH_BEFORE=%%i"
 git stash push --include-untracked --quiet
+set "STASH_AFTER="
+for /f "delims=" %%i in ('git stash list') do set "STASH_AFTER=%%i"
 
 :: Switch to main
 git switch main --quiet
@@ -103,7 +106,9 @@ if "%CURRENT_BRANCH%"=="HEAD" (
 ) else (
     git switch %CURRENT_BRANCH% --quiet
 )
-git stash pop --index --quiet 2>nul
+if not "!STASH_BEFORE!"=="!STASH_AFTER!" (
+    git stash pop --index --quiet 2>nul
+)
 
 call depsync
 
