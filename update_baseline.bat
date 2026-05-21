@@ -56,6 +56,7 @@ git stash push --include-untracked --quiet
 git switch main --quiet
 
 :: Install dependencies
+for /f "delims=" %%i in ('npm prefix -g') do set "PATH=%%i;!PATH!"
 call npm install depsync -g >nul 2>&1
 call depsync
 
