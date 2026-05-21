@@ -32,8 +32,8 @@ bool D3D12DescriptorRing::init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE 
   // SHADER_VISIBLE is illegal on RTV/DSV heaps; callers that build those rings pass
   // shaderVisible=false and skip the gpuBase initialisation below so the ring still works for
   // CPU-side allocation but never hands out a GPU handle.
-  desc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE
-                             : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+  desc.Flags =
+      shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
   if (FAILED(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&_heap)))) {
     LOGE("D3D12DescriptorRing::init() CreateDescriptorHeap failed (type=%d capacity=%u).",
          static_cast<int>(type), capacity);
@@ -42,8 +42,8 @@ bool D3D12DescriptorRing::init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE 
   _capacity = capacity;
   _descriptorSize = device->GetDescriptorHandleIncrementSize(type);
   cpuBase = _heap->GetCPUDescriptorHandleForHeapStart();
-  gpuBase = shaderVisible ? _heap->GetGPUDescriptorHandleForHeapStart()
-                          : D3D12_GPU_DESCRIPTOR_HANDLE{};
+  gpuBase =
+      shaderVisible ? _heap->GetGPUDescriptorHandleForHeapStart() : D3D12_GPU_DESCRIPTOR_HANDLE{};
   head = 0;
   tail = 0;
   committedHead = 0;

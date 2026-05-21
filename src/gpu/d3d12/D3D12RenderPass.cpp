@@ -317,8 +317,7 @@ void D3D12RenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> text
   if (current != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
     pendingBarriers.addTransition(d3d12Tex->d3d12Resource(), current,
                                   D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    encoder->recordTextureStateChange(d3d12Tex.get(),
-                                      D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    encoder->recordTextureStateChange(d3d12Tex.get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     // Track this texture so onEnd() can transition it back to COMMON. Without that step, D3D12
     // automatic state decay after ExecuteCommandLists drops the resource to COMMON, but our CPU
     // tracker still believes it is in PIXEL_SHADER_RESOURCE — every subsequent transition then
@@ -584,8 +583,7 @@ void D3D12RenderPass::onEnd() {
     if (current != D3D12_RESOURCE_STATE_COMMON) {
       finalBatch.addTransition(depthStencilAttachment->d3d12Resource(), current,
                                D3D12_RESOURCE_STATE_COMMON);
-      encoder->recordTextureStateChange(depthStencilAttachment.get(),
-                                        D3D12_RESOURCE_STATE_COMMON);
+      encoder->recordTextureStateChange(depthStencilAttachment.get(), D3D12_RESOURCE_STATE_COMMON);
     }
   }
   for (auto& tex : shaderResourceTextures) {

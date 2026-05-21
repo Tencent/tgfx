@@ -44,9 +44,10 @@ std::shared_ptr<D3D12Texture> D3D12Texture::Make(D3D12GPU* gpu,
   // enforces the same contract in GLMultisampleTexture::MakeFrom; Metal's MTLTextureType2D-
   // Multisample type cannot carry mip levels at all and so doesn't need an explicit check.
   if (descriptor.mipLevelCount > 1 && descriptor.sampleCount > 1) {
-    LOGE("D3D12Texture::Make() multisample textures cannot have mip levels (mipLevelCount=%d, "
-         "sampleCount=%d).",
-         descriptor.mipLevelCount, descriptor.sampleCount);
+    LOGE(
+        "D3D12Texture::Make() multisample textures cannot have mip levels (mipLevelCount=%d, "
+        "sampleCount=%d).",
+        descriptor.mipLevelCount, descriptor.sampleCount);
     return nullptr;
   }
 

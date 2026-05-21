@@ -152,13 +152,11 @@ D3D12GPU::D3D12GPU(ComPtr<ID3D12Device> device, ComPtr<IDXGIAdapter1> adapter)
   // CPU descriptor handles only, so a single shared heap is enough; we ring-buffer the slots
   // by fence value just like the SRV/Sampler ring so descriptors stay valid until the GPU
   // command list referencing them has retired.
-  if (!_rtvRing.init(d3d12Device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RTV_RING_CAPACITY,
-                     false)) {
+  if (!_rtvRing.init(d3d12Device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RTV_RING_CAPACITY, false)) {
     LOGE("D3D12GPU: failed to initialise RTV descriptor ring.");
     return;
   }
-  if (!_dsvRing.init(d3d12Device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, DSV_RING_CAPACITY,
-                     false)) {
+  if (!_dsvRing.init(d3d12Device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, DSV_RING_CAPACITY, false)) {
     LOGE("D3D12GPU: failed to initialise DSV descriptor ring.");
     return;
   }
