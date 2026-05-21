@@ -100,6 +100,8 @@ if %errorlevel% equ 0 (
 if /I "%BACKEND_ARG%"=="USE_OPENGL_SWIFTSHADER" (
     copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\*.dll" "%WORKSPACE%\build\" >nul 2>&1
 )
+:: Rename SwiftShader to vulkan-1.dll so volk loads it directly (volk uses
+:: LoadLibrary("vulkan-1.dll") on Windows, dlopen("libvulkan.dylib") on macOS).
 if /I "%BACKEND_ARG%"=="USE_VULKAN_SWIFTSHADER" copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\vk_swiftshader.dll" "%WORKSPACE%\build\vulkan-1.dll" >nul 2>&1
 
 :: Run tests
