@@ -8,22 +8,22 @@ set "CMAKE_BACKEND_ARGS="
 set "BACKEND_NAME=opengl"
 set "TARGET_SUFFIX=OpenGL"
 
-if "%1"=="USE_OPENGL_SWIFTSHADER" (
+if /I "%~1"=="USE_OPENGL_SWIFTSHADER" (
     set "CMAKE_BACKEND_ARGS=-DTGFX_USE_SWIFTSHADER=ON"
     set "BACKEND_NAME=opengl-swiftshader"
     set "TARGET_SUFFIX=OpenGL"
 )
-if "%1"=="USE_VULKAN_SWIFTSHADER" (
+if /I "%~1"=="USE_VULKAN_SWIFTSHADER" (
     set "CMAKE_BACKEND_ARGS=-DTGFX_USE_VULKAN=ON -DTGFX_USE_SWIFTSHADER=ON"
     set "BACKEND_NAME=vulkan-swiftshader"
     set "TARGET_SUFFIX=Vulkan"
 )
-if "%1"=="USE_VULKAN" (
+if /I "%~1"=="USE_VULKAN" (
     set "CMAKE_BACKEND_ARGS=-DTGFX_USE_VULKAN=ON"
     set "BACKEND_NAME=vulkan"
     set "TARGET_SUFFIX=Vulkan"
 )
-if "%1"=="USE_OPENGL" (
+if /I "%~1"=="USE_OPENGL" (
     set "CMAKE_BACKEND_ARGS="
     set "BACKEND_NAME=opengl"
     set "TARGET_SUFFIX=OpenGL"

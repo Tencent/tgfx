@@ -57,22 +57,27 @@ cd build
 set "CMAKE_BACKEND_ARGS="
 set "TARGET_SUFFIX=OpenGL"
 
-if "%1"=="USE_OPENGL_SWIFTSHADER" (
+echo shell log - backend arg: [%1]
+
+if /I "%~1"=="USE_OPENGL_SWIFTSHADER" (
     set "CMAKE_BACKEND_ARGS=-DTGFX_USE_SWIFTSHADER=ON"
     set "TARGET_SUFFIX=OpenGL"
 )
-if "%1"=="USE_VULKAN_SWIFTSHADER" (
+if /I "%~1"=="USE_VULKAN_SWIFTSHADER" (
     set "CMAKE_BACKEND_ARGS=-DTGFX_USE_VULKAN=ON -DTGFX_USE_SWIFTSHADER=ON"
     set "TARGET_SUFFIX=Vulkan"
 )
-if "%1"=="USE_VULKAN" (
+if /I "%~1"=="USE_VULKAN" (
     set "CMAKE_BACKEND_ARGS=-DTGFX_USE_VULKAN=ON"
     set "TARGET_SUFFIX=Vulkan"
 )
-if "%1"=="USE_OPENGL" (
+if /I "%~1"=="USE_OPENGL" (
     set "CMAKE_BACKEND_ARGS="
     set "TARGET_SUFFIX=OpenGL"
 )
+
+echo shell log - CMAKE_BACKEND_ARGS: [%CMAKE_BACKEND_ARGS%]
+echo shell log - TARGET_SUFFIX: [%TARGET_SUFFIX%]
 
 :: Configure CMake with Ninja
 cmake -G Ninja %CMAKE_BACKEND_ARGS% -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release ..
