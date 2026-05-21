@@ -25,7 +25,7 @@
 
 namespace tgfx {
 
-static constexpr float MinBoundExtentForBooleanOp = 0.5f;
+static constexpr float MIN_BOUND_EXTENT_FOR_BOOLEAN_OP = 0.5f;
 
 static float BlendStrokeWidth(float base, const GlyphStyle& style) {
   if (style.strokeWidthFactor <= 0.0f) {
@@ -163,8 +163,8 @@ class StrokePainter : public Painter {
       // subtraction is numerically unstable on such input and can produce spurious geometry.
       // At sub-pixel scale the original shape is invisible anyway, so omitting it is harmless.
       const auto bounds = originalShape->getBounds();
-      if (bounds.width() < MinBoundExtentForBooleanOp ||
-          bounds.height() < MinBoundExtentForBooleanOp) {
+      if (bounds.width() < MIN_BOUND_EXTENT_FOR_BOOLEAN_OP ||
+          bounds.height() < MIN_BOUND_EXTENT_FOR_BOOLEAN_OP) {
         return shape;
       }
     }

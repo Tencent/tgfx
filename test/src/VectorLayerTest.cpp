@@ -16,9 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/PathRef.h"
 #include "tgfx/core/Paint.h"
-#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathMeasure.h"
 #include "tgfx/core/RSXform.h"
 #include "tgfx/core/TextBlobBuilder.h"

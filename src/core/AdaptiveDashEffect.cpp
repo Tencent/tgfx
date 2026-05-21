@@ -25,7 +25,6 @@ using namespace pk;
 namespace tgfx {
 
 static constexpr int ADAPTIVE_DASH_SEGMENT_EPSILON = 120000;
-static constexpr float ADAPTIVE_DASH_MIN_DASHABLE_LENGTH = 1.0f / (1 << 12);
 
 inline bool IsEven(int x) {
   return !(x & 1);
@@ -184,7 +183,7 @@ bool AdaptiveDashEffect::filterPath(Path* path) const {
       // dash split path and contributes dash endpoints for downstream stroke/cap rendering.
       // Setting it higher would let small but still-visible segments skip the dash split
       // and lose their endpoints.
-      bool isTinySegment = segmentLength < ADAPTIVE_DASH_MIN_DASHABLE_LENGTH;
+      bool isTinySegment = segmentLength < FLOAT_NEARLY_ZERO;
       bool isNearlyFullContour = FloatNearlyZero(segmentLength) ||
                                  AreWithinUlps(contour.length - segmentLength, contour.length,
                                                ADAPTIVE_DASH_SEGMENT_EPSILON);
