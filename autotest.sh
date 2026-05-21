@@ -25,15 +25,27 @@ make_dir result
 make_dir build
 cd build
 
-if [[ "$1" == "USE_SWIFTSHADER" ]]; then
+# Determine cmake args and target suffix
+if [[ "$1" == "USE_OPENGL_SWIFTSHADER" ]]; then
   cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_USE_SWIFTSHADER=ON -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
+  TARGET_SUFFIX="OpenGL"
 elif [[ "$1" == "USE_VULKAN_SWIFTSHADER" ]]; then
   cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_USE_VULKAN=ON -DTGFX_USE_SWIFTSHADER=ON -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
+  TARGET_SUFFIX="Vulkan"
 elif [[ "$1" == "USE_METAL" ]]; then
   cmake -DTGFX_USE_METAL=ON -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
+  TARGET_SUFFIX="Metal"
+elif [[ "$1" == "USE_VULKAN" ]]; then
+  cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_USE_VULKAN=ON -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
+  TARGET_SUFFIX="Vulkan"
+elif [[ "$1" == "USE_OPENGL" ]]; then
+  cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
+  TARGET_SUFFIX="OpenGL"
 else
   cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
+  TARGET_SUFFIX="OpenGL"
 fi
+
 if test $? -eq 0; then
   echo "~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~"
 else
@@ -41,17 +53,15 @@ else
   exit
 fi
 
-cmake --build . --target TGFXFullTest -- -j 12
+cmake --build . --target TGFXFullTest_${TARGET_SUFFIX} -- -j 12
 if test $? -eq 0; then
-  echo "~~~~~~~~~~~~~~~~~~~TGFXFullTest make successed~~~~~~~~~~~~~~~~~~"
+  echo "~~~~~~~~~~~~~~~~~~~TGFXFullTest_${TARGET_SUFFIX} make successed~~~~~~~~~~~~~~~~~~"
 else
-  echo "~~~~~~~~~~~~~~~~~~~TGFXFullTest make error~~~~~~~~~~~~~~~~~~"
+  echo "~~~~~~~~~~~~~~~~~~~TGFXFullTest_${TARGET_SUFFIX} make error~~~~~~~~~~~~~~~~~~"
   exit 1
 fi
 
 if [[ "$1" == "USE_VULKAN_SWIFTSHADER" ]]; then
-  # macOS: SwiftShader ships libvk_swiftshader.dylib, but the Vulkan loader looks for libvulkan.dylib.
-  # Copy and rename it next to the test binary, then point DYLD_LIBRARY_PATH there for this process only.
   HOST_ARCH=$(uname -m)
   if [[ "$HOST_ARCH" == "x86_64" ]]; then
     HOST_ARCH=x64
@@ -60,12 +70,12 @@ if [[ "$1" == "USE_VULKAN_SWIFTSHADER" ]]; then
   export DYLD_LIBRARY_PATH=$WORKSPACE/build:${DYLD_LIBRARY_PATH:-}
 fi
 
-./TGFXFullTest --gtest_output=json:TGFXFullTest.json
+./TGFXFullTest_${TARGET_SUFFIX} --gtest_output=json:TGFXFullTest.json
 
 if test $? -eq 0; then
-  echo "~~~~~~~~~~~~~~~~~~~TGFXFullTest successed~~~~~~~~~~~~~~~~~~"
+  echo "~~~~~~~~~~~~~~~~~~~TGFXFullTest_${TARGET_SUFFIX} successed~~~~~~~~~~~~~~~~~~"
 else
-  echo "~~~~~~~~~~~~~~~~~~~TGFXFullTest Failed~~~~~~~~~~~~~~~~~~"
+  echo "~~~~~~~~~~~~~~~~~~~TGFXFullTest_${TARGET_SUFFIX} Failed~~~~~~~~~~~~~~~~~~"
   COMPLIE_RESULT=false
 fi
 

@@ -8,8 +8,7 @@ on:
 
 jobs:
   mac-opengl:
-    name: mac (opengl)
-    # the macos-latest may randomly give us macos-12.6.9 or macos-12.7.0 which may break the autotest.
+    name: mac (opengl-swiftshader)
     runs-on: macos-14
     steps:
       - name: Check Out Repo
@@ -24,9 +23,9 @@ jobs:
         with:
           path: |
             third_party
-            test/baseline/.cache
-          key: third-party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
-          restore-keys: third-party-autotest-
+            test/baseline/.cache/opengl-swiftshader
+          key: autotest-mac-opengl-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: autotest-mac-opengl-
 
       - uses: tecolicom/actions-use-homebrew-tools@v1
         with:
@@ -47,7 +46,7 @@ jobs:
       - name: Run Autotest
         run: |
           chmod +x autotest.sh
-          ./autotest.sh USE_SWIFTSHADER
+          ./autotest.sh USE_OPENGL_SWIFTSHADER
         env:
           TRACY_NO_INVARIANT_CHECK: 1
 
@@ -68,23 +67,18 @@ jobs:
         with:
           path: |
             third_party
-            test/baseline/.cache
-          key: third-party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+            test/baseline/.cache/opengl-swiftshader
+          key: autotest-mac-opengl-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 
-      - name: Job Failed
-        if: ${{ failure() }}
+      - name: Upload Result
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: result
+          name: mac_opengl_result
           path: result
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: result
-          path: result
-
-  mac-vulkan:
-    name: mac (vulkan)
+  mac-metal:
+    name: mac (metal)
     runs-on: macos-14
     steps:
       - name: Check Out Repo
@@ -99,9 +93,9 @@ jobs:
         with:
           path: |
             third_party
-            test/baseline/.cache
-          key: third-party-autotest-mac-vk-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
-          restore-keys: third-party-autotest-mac-vk-
+            test/baseline/.cache/metal
+          key: autotest-mac-metal-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: autotest-mac-metal-
 
       - uses: tecolicom/actions-use-homebrew-tools@v1
         with:
@@ -116,7 +110,7 @@ jobs:
       - name: Run Autotest
         run: |
           chmod +x autotest.sh
-          ./autotest.sh USE_VULKAN_SWIFTSHADER
+          ./autotest.sh USE_METAL
         env:
           TRACY_NO_INVARIANT_CHECK: 1
 
@@ -126,84 +120,24 @@ jobs:
         with:
           path: |
             third_party
-            test/baseline/.cache
-          key: third-party-autotest-mac-vk-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+            test/baseline/.cache/metal
+          key: autotest-mac-metal-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 
       - name: Upload Result
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: mac_vulkan_result
-          path: result
-
-  win-opengl:
-    name: win (opengl)
-    runs-on: windows-latest
-    steps:
-      - name: Check Out Repo
-        uses: actions/checkout@v4
-        with:
-          lfs: true
-
-      - name: Get Third-Party Cache
-        id: third-party-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            third_party
-            test/baseline/.cache
-          key: third-party-autotest-win-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
-          restore-keys: third-party-autotest-win-
-
-      - name: Run depsync
-        run: |
-          npm install depsync -g
-          depsync
-        shell: bash
-
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: amd64
-
-      - name: Check Code Format
-        run: codeformat.bat
-        shell: cmd
-
-      - name: Run Autotest
-        run: autotest.bat USE_SWIFTSHADER
-        shell: cmd
-        env:
-          TRACY_NO_INVARIANT_CHECK: 1
-
-      - name: Save Third-Party Cache
-        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            third_party
-            test/baseline/.cache
-          key: third-party-autotest-win-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
-
-      - name: Job Failed
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: win_opengl_result
-          path: result
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: win_opengl_result
+          name: mac_metal_result
           path: result
 
   win-vulkan:
-    name: win (vulkan)
+    name: win (vulkan-swiftshader)
     runs-on: windows-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           lfs: true
 
       - name: Get Third-Party Cache
@@ -212,9 +146,9 @@ jobs:
         with:
           path: |
             third_party
-            test/baseline/.cache
-          key: third-party-autotest-win-vk-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
-          restore-keys: third-party-autotest-win-vk-
+            test/baseline/.cache/vulkan-swiftshader
+          key: autotest-win-vulkan-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: autotest-win-vulkan-
 
       - name: Run depsync
         run: |
@@ -239,8 +173,8 @@ jobs:
         with:
           path: |
             third_party
-            test/baseline/.cache
-          key: third-party-autotest-win-vk-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+            test/baseline/.cache/vulkan-swiftshader
+          key: autotest-win-vulkan-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 
       - name: Upload Result
         if: ${{ always() }}

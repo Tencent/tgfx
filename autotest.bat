@@ -39,6 +39,13 @@ if %errorlevel% neq 0 (
 set COMPLIE_RESULT=true
 set WORKSPACE=%cd%
 
+:: Update baseline cache (same as autotest.sh)
+call update_baseline.bat %1
+if %errorlevel% neq 0 (
+    echo update_baseline failed
+    exit /b 1
+)
+
 :: Clean and create directories
 if exist result rd /s /q result
 mkdir result
@@ -46,11 +53,29 @@ if exist build rd /s /q build
 mkdir build
 cd build
 
+:: Determine cmake args and target suffix
+set "CMAKE_BACKEND_ARGS="
+set "TARGET_SUFFIX=OpenGL"
+
+if "%1"=="USE_OPENGL_SWIFTSHADER" (
+    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_SWIFTSHADER=ON"
+    set "TARGET_SUFFIX=OpenGL"
+)
+if "%1"=="USE_VULKAN_SWIFTSHADER" (
+    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_VULKAN=ON -DTGFX_USE_SWIFTSHADER=ON"
+    set "TARGET_SUFFIX=Vulkan"
+)
+if "%1"=="USE_VULKAN" (
+    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_VULKAN=ON"
+    set "TARGET_SUFFIX=Vulkan"
+)
+if "%1"=="USE_OPENGL" (
+    set "CMAKE_BACKEND_ARGS="
+    set "TARGET_SUFFIX=OpenGL"
+)
+
 :: Configure CMake with Ninja
-set "USE_SWIFTSHADER_FLAG="
-if "%1"=="USE_SWIFTSHADER" set "USE_SWIFTSHADER_FLAG=-DTGFX_USE_SWIFTSHADER=ON"
-if "%1"=="USE_VULKAN_SWIFTSHADER" set "USE_SWIFTSHADER_FLAG=-DTGFX_USE_VULKAN=ON -DTGFX_USE_SWIFTSHADER=ON"
-cmake -G Ninja %USE_SWIFTSHADER_FLAG% -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release ..
+cmake -G Ninja %CMAKE_BACKEND_ARGS% -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release ..
 if %errorlevel% equ 0 (
     echo ~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~
 ) else (
@@ -58,33 +83,27 @@ if %errorlevel% equ 0 (
     exit /b 1
 )
 
-:: Build TGFXFullTest
-cmake --build . --target TGFXFullTest
+:: Build
+cmake --build . --target TGFXFullTest_%TARGET_SUFFIX%
 if %errorlevel% equ 0 (
-    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest make successed~~~~~~~~~~~~~~~~~~
+    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest_%TARGET_SUFFIX% make successed~~~~~~~~~~~~~~~~~~
 ) else (
-    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest make error~~~~~~~~~~~~~~~~~~
+    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest_%TARGET_SUFFIX% make error~~~~~~~~~~~~~~~~~~
     exit /b 1
 )
 
 :: Copy SwiftShader DLLs to build directory if needed
-if "%1"=="USE_SWIFTSHADER" (
+if "%1"=="USE_OPENGL_SWIFTSHADER" (
     copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\*.dll" "%WORKSPACE%\build\" >nul 2>&1
 )
-:: SwiftShader exports vkGetInstanceProcAddr, so it can serve as a drop-in replacement for the
-:: Vulkan Loader (vulkan-1.dll). Renaming it avoids the need for a real Vulkan SDK installation
-:: or VK_ICD_FILENAMES — volk's LoadLibraryA("vulkan-1.dll") picks it up from the exe directory.
-:: NOTE: This bypasses the real Vulkan Loader, so layer support (e.g.
-:: VK_LAYER_KHRONOS_validation) is unavailable. Developers needing validation should install
-:: the Vulkan SDK locally and use the loader + ICD path instead.
 if "%1"=="USE_VULKAN_SWIFTSHADER" copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\vk_swiftshader.dll" "%WORKSPACE%\build\vulkan-1.dll" >nul 2>&1
 
 :: Run tests
-TGFXFullTest.exe --gtest_output=json:TGFXFullTest.json
+TGFXFullTest_%TARGET_SUFFIX%.exe --gtest_output=json:TGFXFullTest.json
 if %errorlevel% equ 0 (
-    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest successed~~~~~~~~~~~~~~~~~~
+    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest_%TARGET_SUFFIX% successed~~~~~~~~~~~~~~~~~~
 ) else (
-    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest Failed~~~~~~~~~~~~~~~~~~
+    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest_%TARGET_SUFFIX% Failed~~~~~~~~~~~~~~~~~~
     set COMPLIE_RESULT=false
 )
 

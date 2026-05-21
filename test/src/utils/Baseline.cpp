@@ -36,17 +36,21 @@
 #include "utils/TestUtils.h"
 
 namespace tgfx {
+
+#ifndef TGFX_BACKEND_NAME
+#define TGFX_BACKEND_NAME "opengl"
+#endif
+
 static const std::string BASELINE_ROOT = ProjectPath::Absolute("test/baseline/");
 static const std::string BASELINE_VERSION_PATH = BASELINE_ROOT + "/version.json";
 #ifdef __EMSCRIPTEN__
-static const std::string CACHE_MD5_PATH = BASELINE_ROOT + "/.cache-web/md5.json";
-static const std::string CACHE_VERSION_PATH = BASELINE_ROOT + "/.cache-web/version.json";
-static const std::string GIT_HEAD_PATH = BASELINE_ROOT + "/.cache-web/HEAD";
+static const std::string CACHE_DIR = BASELINE_ROOT + "/.cache-web/";
 #else
-static const std::string CACHE_MD5_PATH = BASELINE_ROOT + "/.cache/md5.json";
-static const std::string CACHE_VERSION_PATH = BASELINE_ROOT + "/.cache/version.json";
-static const std::string GIT_HEAD_PATH = BASELINE_ROOT + "/.cache/HEAD";
+static const std::string CACHE_DIR = BASELINE_ROOT + "/.cache/" + TGFX_BACKEND_NAME + "/";
 #endif
+static const std::string CACHE_MD5_PATH = CACHE_DIR + "md5.json";
+static const std::string CACHE_VERSION_PATH = CACHE_DIR + "version.json";
+static const std::string GIT_HEAD_PATH = CACHE_DIR + "HEAD";
 static const std::string EXISTING_OUT_ROOT = ProjectPath::Absolute("test/out/");
 #ifdef GENERATE_BASELINE_IMAGES
 static const std::string OUT_ROOT = ProjectPath::Absolute("test/baseline-out/");
