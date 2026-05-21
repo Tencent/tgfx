@@ -38,9 +38,36 @@ if %errorlevel% neq 0 (
 
 set COMPLIE_RESULT=true
 set WORKSPACE=%cd%
+set "BACKEND_ARG=%~1"
+
+echo shell log - BACKEND_ARG: [%BACKEND_ARG%]
+
+:: Determine cmake args and target suffix based on BACKEND_ARG
+set "CMAKE_BACKEND_ARGS="
+set "TARGET_SUFFIX=OpenGL"
+
+if /I "%BACKEND_ARG%"=="USE_OPENGL_SWIFTSHADER" (
+    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_SWIFTSHADER=ON"
+    set "TARGET_SUFFIX=OpenGL"
+)
+if /I "%BACKEND_ARG%"=="USE_VULKAN_SWIFTSHADER" (
+    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_VULKAN=ON -DTGFX_USE_SWIFTSHADER=ON"
+    set "TARGET_SUFFIX=Vulkan"
+)
+if /I "%BACKEND_ARG%"=="USE_VULKAN" (
+    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_VULKAN=ON"
+    set "TARGET_SUFFIX=Vulkan"
+)
+if /I "%BACKEND_ARG%"=="USE_OPENGL" (
+    set "CMAKE_BACKEND_ARGS="
+    set "TARGET_SUFFIX=OpenGL"
+)
+
+echo shell log - CMAKE_BACKEND_ARGS: [%CMAKE_BACKEND_ARGS%]
+echo shell log - TARGET_SUFFIX: [%TARGET_SUFFIX%]
 
 :: Update baseline cache (same as autotest.sh)
-call update_baseline.bat %1
+call update_baseline.bat %BACKEND_ARG%
 if %errorlevel% neq 0 (
     echo update_baseline failed
     exit /b 1
@@ -52,32 +79,6 @@ mkdir result
 if exist build rd /s /q build
 mkdir build
 cd build
-
-:: Determine cmake args and target suffix
-set "CMAKE_BACKEND_ARGS="
-set "TARGET_SUFFIX=OpenGL"
-
-echo shell log - backend arg: [%1]
-
-if /I "%~1"=="USE_OPENGL_SWIFTSHADER" (
-    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_SWIFTSHADER=ON"
-    set "TARGET_SUFFIX=OpenGL"
-)
-if /I "%~1"=="USE_VULKAN_SWIFTSHADER" (
-    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_VULKAN=ON -DTGFX_USE_SWIFTSHADER=ON"
-    set "TARGET_SUFFIX=Vulkan"
-)
-if /I "%~1"=="USE_VULKAN" (
-    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_VULKAN=ON"
-    set "TARGET_SUFFIX=Vulkan"
-)
-if /I "%~1"=="USE_OPENGL" (
-    set "CMAKE_BACKEND_ARGS="
-    set "TARGET_SUFFIX=OpenGL"
-)
-
-echo shell log - CMAKE_BACKEND_ARGS: [%CMAKE_BACKEND_ARGS%]
-echo shell log - TARGET_SUFFIX: [%TARGET_SUFFIX%]
 
 :: Configure CMake with Ninja
 cmake -G Ninja %CMAKE_BACKEND_ARGS% -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release ..
@@ -98,10 +99,10 @@ if %errorlevel% equ 0 (
 )
 
 :: Copy SwiftShader DLLs to build directory if needed
-if "%1"=="USE_OPENGL_SWIFTSHADER" (
+if /I "%BACKEND_ARG%"=="USE_OPENGL_SWIFTSHADER" (
     copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\*.dll" "%WORKSPACE%\build\" >nul 2>&1
 )
-if "%1"=="USE_VULKAN_SWIFTSHADER" copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\vk_swiftshader.dll" "%WORKSPACE%\build\vulkan-1.dll" >nul 2>&1
+if /I "%BACKEND_ARG%"=="USE_VULKAN_SWIFTSHADER" copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\vk_swiftshader.dll" "%WORKSPACE%\build\vulkan-1.dll" >nul 2>&1
 
 :: Run tests
 TGFXFullTest_%TARGET_SUFFIX%.exe --gtest_output=json:TGFXFullTest.json
