@@ -416,8 +416,10 @@ if (TGFX_USE_QT)
     endif ()
 elseif (TGFX_USE_SWIFTSHADER)
     if (TGFX_USE_VULKAN)
-        # Vulkan + SwiftShader: copy Vulkan ICD files to build directory for runtime discovery.
-        # No EGL/GLES libraries are needed — Vulkan uses ICD mechanism via VK_ICD_FILENAMES.
+        # Vulkan + SwiftShader: copy SwiftShader files to build directory. At runtime, the
+        # autotest script renames vk_swiftshader to the platform Vulkan loader name (vulkan-1.dll
+        # on Windows, libvulkan.dylib on macOS) so that volk loads it directly without requiring
+        # a Vulkan SDK or ICD environment variables.
         file(GLOB VK_SWIFTSHADER_ICD_FILES
                 vendor/swiftshader/${PLATFORM}/${ARCH}/vk_swiftshader*
                 vendor/swiftshader/${PLATFORM}/${ARCH}/libvk_swiftshader*)
