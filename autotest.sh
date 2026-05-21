@@ -19,7 +19,6 @@ cd $WORKSPACE
 if test $? -ne 0; then
    exit 1
 fi
-cp -r $WORKSPACE/test/baseline $WORKSPACE/result
 
 make_dir result
 make_dir build
