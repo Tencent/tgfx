@@ -156,6 +156,10 @@ jobs:
         with:
           arch: amd64
 
+      - name: Update Baseline Cache
+        run: update_baseline.bat USE_VULKAN_SWIFTSHADER
+        shell: cmd
+
       - name: Run Autotest
         run: autotest.bat USE_VULKAN_SWIFTSHADER
         shell: cmd

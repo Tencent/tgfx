@@ -66,12 +66,10 @@ if /I "%BACKEND_ARG%"=="USE_OPENGL" (
 echo shell log - CMAKE_BACKEND_ARGS: [%CMAKE_BACKEND_ARGS%]
 echo shell log - TARGET_SUFFIX: [%TARGET_SUFFIX%]
 
-:: Update baseline cache (same as autotest.sh)
-call update_baseline.bat %BACKEND_ARG%
-if %errorlevel% neq 0 (
-    echo update_baseline failed
-    exit /b 1
-)
+:: NOTE: Do NOT call update_baseline.bat here. It uses git switch which changes files on disk,
+:: and cmd.exe reads bat files line-by-line from disk, causing offset corruption after switch.
+:: Run update_baseline.bat as a separate step (CI) or a separate cmd invocation (local) before
+:: running this script.
 
 :: Clean and create directories
 if exist result rd /s /q result
