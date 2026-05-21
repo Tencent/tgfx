@@ -158,15 +158,15 @@ void NoiseFilter::setBlendMode(BlendMode blendMode) {
 }
 
 std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
-                                                  float width, float height,
-                                                  const Point& originOffset, Point* offset) {
+                                                  const Rect& contentBounds, Point* offset) {
   if (input == nullptr) {
     return nullptr;
   }
   // Anchor the noise pattern to the content bounds center, expressed in input image pixel space.
-  // The shift compensates for the offset of the input image origin relative to the full content
-  // bounds, so the noise pattern stays stable regardless of how the input image is clipped.
-  Point shift = {(width * 0.5f - originOffset.x) * scale, (height * 0.5f - originOffset.y) * scale};
+  // The contentBounds rect is given in the input image coordinate space, so its center is the
+  // anchor position regardless of how the input image is clipped relative to the full content
+  // bounds.
+  Point shift = {contentBounds.centerX() * scale, contentBounds.centerY() * scale};
   auto blendFilter = onBuildNoiseImageFilter(scale, shift);
   if (blendFilter == nullptr) {
     return input;
@@ -178,13 +178,6 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, 
   auto clipFilter = ImageFilter::Blend(BlendMode::DstIn, std::move(imageShader));
   auto composedFilter = ImageFilter::Compose(std::move(blendFilter), std::move(clipFilter));
   return FilterImage::MakeFrom(std::move(input), std::move(composedFilter), offset);
-}
-
-std::shared_ptr<ImageFilter> NoiseFilter::getImageFilter(float scale) {
-  // Used by Layer::getImageFilter() for bounds reverse-mapping only. The shift is irrelevant for
-  // bounds because the underlying ImageFilter::Blend does not grow the visible region; we pass a
-  // zero shift to keep the construction self-contained.
-  return onBuildNoiseImageFilter(scale, {});
 }
 
 Rect NoiseFilter::filterBounds(const Rect& srcRect, float contentScale) {
@@ -210,7 +203,8 @@ void MonoNoiseFilter::setColor(const Color& color) {
   invalidateFilter();
 }
 
-std::shared_ptr<ImageFilter> MonoNoiseFilter::onBuildNoiseImageFilter(float scale, Point shift) {
+std::shared_ptr<ImageFilter> MonoNoiseFilter::onBuildNoiseImageFilter(float scale,
+                                                                      const Point& shift) {
   auto noiseShader = MakeNoiseShader(_size, scale, _seed);
   if (noiseShader == nullptr) {
     return nullptr;
@@ -247,7 +241,8 @@ void DuoNoiseFilter::setSecondColor(const Color& color) {
   invalidateFilter();
 }
 
-std::shared_ptr<ImageFilter> DuoNoiseFilter::onBuildNoiseImageFilter(float scale, Point shift) {
+std::shared_ptr<ImageFilter> DuoNoiseFilter::onBuildNoiseImageFilter(float scale,
+                                                                     const Point& shift) {
   auto noiseShader = MakeNoiseShader(_size, scale, _seed);
   if (noiseShader == nullptr) {
     return nullptr;
@@ -289,7 +284,8 @@ void MultiNoiseFilter::setOpacity(float opacity) {
   invalidateFilter();
 }
 
-std::shared_ptr<ImageFilter> MultiNoiseFilter::onBuildNoiseImageFilter(float scale, Point shift) {
+std::shared_ptr<ImageFilter> MultiNoiseFilter::onBuildNoiseImageFilter(float scale,
+                                                                       const Point& shift) {
   auto noiseShader = MakeNoiseShader(_size, scale, _seed);
   if (noiseShader == nullptr) {
     return nullptr;
