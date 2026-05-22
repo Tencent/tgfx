@@ -66,7 +66,5 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   currentProgramInfo = nullptr;
   currentProgram = nullptr;
   currentRenderTarget = nullptr;
-  CAPUTRE_FRARGMENT_PROCESSORS(renderTarget->getContext(), colors, coverages);
-  CAPUTRE_RENDER_TARGET(renderTarget);
 }
 }  // namespace tgfx

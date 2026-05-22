@@ -22,7 +22,6 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/resources/RenderTarget.h"
-#include "inspect/InspectorMark.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -150,7 +149,6 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   };
   encodeStencilFace(depthStencil.stencilFront);
   encodeStencilFace(depthStencil.stencilBack);
-  CAPUTRE_PROGRAM_INFO(programKey, context, this);
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
     program = ProgramBuilder::CreateProgram(context, this);
