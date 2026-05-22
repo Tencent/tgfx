@@ -67,8 +67,8 @@ if [[ "$1" == "USE_VULKAN_SWIFTSHADER" ]]; then
   fi
   # Rename SwiftShader to libvulkan.dylib so volk loads it directly (volk uses
   # dlopen("libvulkan.dylib") on macOS, LoadLibrary("vulkan-1.dll") on Windows).
-  cp $WORKSPACE/vendor/swiftshader/mac/$HOST_ARCH/libvk_swiftshader.dylib $WORKSPACE/build/libvulkan.dylib
-  export DYLD_LIBRARY_PATH=$WORKSPACE/build:${DYLD_LIBRARY_PATH:-}
+  cp "$WORKSPACE/vendor/swiftshader/mac/$HOST_ARCH/libvk_swiftshader.dylib" "$WORKSPACE/build/libvulkan.dylib"
+  export DYLD_LIBRARY_PATH="$WORKSPACE/build:${DYLD_LIBRARY_PATH:-}"
 fi
 
 ./TGFXFullTest_${TARGET_SUFFIX} --gtest_output=json:TGFXFullTest.json
