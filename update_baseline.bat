@@ -117,6 +117,7 @@ call depsync
 
 :: Cleanup
 if exist %BUILD_DIR% rd /s /q %BUILD_DIR%
+del "%TEMP%\tgfx_main_version.json" >nul 2>&1
 
 if "!BASELINE_FAILED!"=="true" (
     if not exist result mkdir result
