@@ -26,21 +26,31 @@ std::shared_ptr<tgfx::Layer> ConicGradient::onBuildLayerTree(const AppHost*) {
   auto root = tgfx::Layer::Make();
   auto shapeLayer = tgfx::ShapeLayer::Make();
 
-  // Fixed size: 720x720 with 50px padding, content area: 620x620
-  constexpr auto size = 620;
-
-  tgfx::Color cyan = {0.0f, 1.0f, 1.0f, 1.0f};
-  tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
-  tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
-
-  auto conicShader = tgfx::Shader::MakeConicGradient(tgfx::Point::Make(size / 2, size / 2), 0, 360,
-                                                     {cyan, magenta, yellow, cyan}, {});
-  auto rect = tgfx::Rect::MakeXYWH(0, 0, size, size);
+  // Build a closed shape with a flat bottom: the upper outline (right -> top -> left) is formed
+  // by two cubic (3rd-order) Bezier segments, while the lower outline (left -> bottom-left ->
+  // bottom-right -> right) is composed of straight line segments. The shape is positioned so
+  // that its bounding box starts at the origin, allowing the framework to center it correctly.
+  constexpr float Radius = 250;
+  constexpr float Bulge = 100;
+  constexpr float CenterX = Radius;
+  constexpr float CenterY = Radius;
 
   tgfx::Path path = {};
-  path.addRoundRect(rect, 20, 20);
+  path.moveTo(CenterX + Radius, CenterY);
+  // Right -> Top
+  path.cubicTo(CenterX + Radius, CenterY - Bulge, CenterX + Bulge, CenterY - Radius, CenterX,
+               CenterY - Radius);
+  // Top -> Left
+  path.cubicTo(CenterX - Bulge, CenterY - Radius, CenterX - Radius, CenterY - Bulge,
+               CenterX - Radius, CenterY);
+  // Left -> bottom-left -> bottom-right -> Right (straight segments).
+  path.lineTo(CenterX - Radius, CenterY + Radius);
+  path.lineTo(CenterX + Radius, CenterY + Radius);
+  path.lineTo(CenterX + Radius, CenterY);
+  path.close();
+
   shapeLayer->setPath(path);
-  shapeLayer->setFillStyle(tgfx::ShapeStyle::Make(conicShader));
+  shapeLayer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color{1.0f, 0.0f, 0.0f, 1.0f}));
 
   root->addChild(shapeLayer);
   return root;

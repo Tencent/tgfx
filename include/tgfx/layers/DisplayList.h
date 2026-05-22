@@ -345,7 +345,8 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  void drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots, const Surface* renderSurface);
+  void drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots,
+                    const Surface* renderSurface);
 
   Surface* getOrCreateSSAATileSurface(const Surface* renderSurface, int requiredWidth,
                                       int requiredHeight);

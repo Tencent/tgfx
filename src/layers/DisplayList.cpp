@@ -21,6 +21,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
+#include "gpu/OpsCompositor.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
@@ -28,7 +29,6 @@
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
 #include "tgfx/gpu/GPU.h"
-#include "gpu/OpsCompositor.h"
 
 namespace tgfx {
 static constexpr size_t MAX_DIRTY_REGION_FRAMES = 5;
@@ -934,8 +934,8 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
-void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots,const Surface* renderSurface)
-{
+void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots,
+                               const Surface* renderSurface) {
   auto atlasSurface = surfaceCaches[task.sourceIndex()].get();
   DEBUG_ASSERT(atlasSurface != nullptr);
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
@@ -960,7 +960,7 @@ void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
     // Force all draws to use NoAA; the flag must remain true through makeImageSnapshot(), which
     // internally triggers renderContext->flush() where getAAType() is evaluated.
     OpsCompositorForceNoAA = true;
-    drawRootLayer(tileSurface, tileClipRect, viewMatrix, true,snapshots);
+    drawRootLayer(tileSurface, tileClipRect, viewMatrix, true, snapshots);
     auto image = tileSurface->makeImageSnapshot();
     OpsCompositorForceNoAA = false;
 
