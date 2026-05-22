@@ -80,9 +80,9 @@ if %errorlevel% neq 0 (
 :: Main branch still uses the old target name "UpdateBaseline". Once merged, only the new name
 :: "UpdateBaseline_{Backend}" will exist and the else branch can be deleted.
 cmake --build . --target UpdateBaseline_%TARGET_SUFFIX% 2>nul
-if %errorlevel% neq 0 (
+if !errorlevel! neq 0 (
     cmake --build . --target UpdateBaseline
-    if %errorlevel% neq 0 (
+    if !errorlevel! neq 0 (
         echo Build failed
         cd ..
         goto :restore
@@ -91,7 +91,7 @@ if %errorlevel% neq 0 (
 ) else (
     UpdateBaseline_%TARGET_SUFFIX%.exe
 )
-if %errorlevel% equ 0 (
+if !errorlevel! equ 0 (
     echo ~~~~~~~~~~~~~~~~~~~Update Baseline (%BACKEND_NAME%) Success~~~~~~~~~~~~~~~~~~~~~
 ) else (
     echo ~~~~~~~~~~~~~~~~~~~Update Baseline (%BACKEND_NAME%) Failed~~~~~~~~~~~~~~~~~~
