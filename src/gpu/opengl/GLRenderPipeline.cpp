@@ -220,8 +220,17 @@ static GLStencil MakeGLStencil(const StencilDescriptor& descriptor) {
 static std::unique_ptr<GLStencilState> MakeStencilState(const DepthStencilDescriptor& descriptor) {
   auto& stencilFront = descriptor.stencilFront;
   auto& stencilBack = descriptor.stencilBack;
-  if (stencilFront.compare == CompareFunction::Always &&
-      stencilBack.compare == CompareFunction::Always) {
+  // The pipeline configures no real stencil work only when both faces would leave the buffer
+  // unchanged on every code path — i.e. failOp / passOp / depthFailOp are all Keep. The compare
+  // function is irrelevant in that case (Always + Keep is a no-op, but Always + Invert is a
+  // legitimate write). Returning nullptr when compare==Always silently broke any pipeline that
+  // wanted to use Always as a write trigger, which is exactly what the bezier rasterization
+  // stencil pass needs.
+  auto isStencilNoOp = [](const StencilDescriptor& s) {
+    return s.failOp == StencilOperation::Keep && s.passOp == StencilOperation::Keep &&
+           s.depthFailOp == StencilOperation::Keep;
+  };
+  if (isStencilNoOp(stencilFront) && isStencilNoOp(stencilBack)) {
     return nullptr;
   }
   auto stencilState = std::make_unique<GLStencilState>();

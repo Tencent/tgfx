@@ -146,6 +146,11 @@ GLCaps::GLCaps(const GLInfo& info) {
       break;
   }
   _features.semaphore = true;
+  // Bezier rasterization needs stencil and DEPTH24_STENCIL8 support — both guaranteed by tgfx's
+  // minimum required GL versions (desktop GL >= 3.2, GLES >= 3.0). WebGL is intentionally
+  // left disabled until the path is independently validated there.
+  _features.bezierRasterizeSupported =
+      (standard == GLStandard::GL) || (standard == GLStandard::GLES);
   info.getIntegerv(GL_MAX_TEXTURE_SIZE, &_limits.maxTextureDimension2D);
   info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &_limits.maxSamplersPerShaderStage);
   info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_limits.maxUniformBufferBindingSize);
