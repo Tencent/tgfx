@@ -38,14 +38,14 @@ case "$1" in
     TARGET_SUFFIX="OpenGL" ;;
 esac
 
-echo "Step 1: Accepting version.json..."
-cp test/out/version.json test/baseline/version.json
-
-echo "Step 2: Building and running UpdateBaseline_${TARGET_SUFFIX} to refresh .cache..."
+echo "Step 1: Building and running UpdateBaseline_${TARGET_SUFFIX} to refresh .cache..."
 cmake -G Ninja $CMAKE_ARGS -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON \
       -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
 cmake --build cmake-build-debug --target UpdateBaseline_${TARGET_SUFFIX}
 ./cmake-build-debug/UpdateBaseline_${TARGET_SUFFIX}
+
+echo "Step 2: Accepting version.json..."
+cp test/out/version.json test/baseline/version.json
 
 echo "Baseline accepted. Commit:"
 echo "  git add test/baseline/version.json && git commit -m 'Update baseline.'"
