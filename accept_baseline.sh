@@ -33,9 +33,12 @@ case "$1" in
   USE_METAL)
     CMAKE_ARGS="-DTGFX_USE_METAL=ON"
     TARGET_SUFFIX="Metal" ;;
+  USE_OPENGL)
+    CMAKE_ARGS=""
+    TARGET_SUFFIX="OpenGL" ;;
   *)
     echo "Error: Unsupported backend argument: $1"
-    echo "Supported: USE_OPENGL_SWIFTSHADER, USE_VULKAN_SWIFTSHADER, USE_VULKAN, USE_METAL"
+    echo "Supported: USE_OPENGL_SWIFTSHADER, USE_OPENGL, USE_VULKAN_SWIFTSHADER, USE_VULKAN, USE_METAL"
     exit 1 ;;
 esac
 
