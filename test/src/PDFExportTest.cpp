@@ -631,6 +631,31 @@ TGFX_TEST(PDFExportTest, LayerLinearGradient) {
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/LayerLinearGradient"));
 }
 
+TGFX_TEST(PDFExportTest, LinearGradientWhiteAlpha) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::Black());
+
+  auto shader = Shader::MakeLinearGradient(
+      Point{0.f, 0.f}, Point{256.f, 0.f},
+      {Color::FromRGBA(255, 255, 255, 128), Color::FromRGBA(255, 255, 255, 26)}, {});
+
+  Paint paint;
+  paint.setShader(shader);
+  canvas->drawRect(Rect::MakeWH(256.f, 256.f), paint);
+
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/LinearGradientWhiteAlpha"));
+}
+
 TGFX_TEST(PDFExportTest, LayerRadialGradient) {
   ContextScope scope;
   auto context = scope.getContext();

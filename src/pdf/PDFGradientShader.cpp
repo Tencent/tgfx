@@ -476,7 +476,12 @@ std::shared_ptr<MemoryWriteStream> CreatePatternFillContent(int gsIndex, int pat
 PDFIndirectReference CreateSmaskGraphicState(PDFDocumentImpl* doc,
                                              const PDFGradientShader::Key& state) {
   PDFGradientShader::Key luminosityState = CloneKey(state);
+  // Encode each stop's alpha as a gray RGB triplet so the Luminosity SMask reproduces the
+  // gradient's transparency. Without this, the SMask renders pure white and the alpha is lost.
   for (auto& color : luminosityState.info.colors) {
+    color.red = color.alpha;
+    color.green = color.alpha;
+    color.blue = color.alpha;
     color.alpha = 1.0f;
   }
   luminosityState.hash = Hash(luminosityState);
