@@ -779,10 +779,6 @@ std::shared_ptr<Data> PDFExportContext::getContent() {
   if (content->bytesWritten() == 0) {
     return Data::MakeEmpty();
   }
-  // Drain any pending graphic-state pushes left by the last draw. updateMatrixClip pushes a `q`
-  // whenever the incoming ClipStack changes, but no caller pops the final push, so without this
-  // drain the page content stream ends with an unmatched `q`.
-  // activeStackState.drainStack();
   auto buffer = MemoryWriteStream::Make();
   if (!_initialTransform.isIdentity()) {
     PDFUtils::AppendTransform(_initialTransform, buffer);
