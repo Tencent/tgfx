@@ -119,6 +119,8 @@ call depsync
 if exist %BUILD_DIR% rd /s /q %BUILD_DIR%
 
 if "!BASELINE_FAILED!"=="true" (
+    if not exist result mkdir result
+    xcopy /s /e /i /q test\out result\out >nul 2>&1
     exit /b 1
 )
 exit /b 0
