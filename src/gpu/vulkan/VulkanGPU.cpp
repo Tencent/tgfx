@@ -361,7 +361,7 @@ bool VulkanGPU::createAllocator() {
   allocatorInfo.device = vulkanDevice;
   allocatorInfo.instance = vulkanInstance;
   allocatorInfo.pVulkanFunctions = &vulkanFunctions;
-  allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_0;
+  allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_1;
 
   auto result = vmaCreateAllocator(&allocatorInfo, &vmaAllocator);
   if (result != VK_SUCCESS) {
