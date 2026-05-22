@@ -47,6 +47,8 @@
   echo "~~~~~~~~~~~~~~~~~~~Update Baseline ($BACKEND_NAME) Start~~~~~~~~~~~~~~~~~~~~~"
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
   CURRENT_COMMIT=$(git rev-parse HEAD)
+  # Remove build artifacts before stash to avoid "already exists" conflicts on pop.
+  rm -rf build-update-baseline
   STASH_LIST_BEFORE=$(git stash list)
   git stash push --include-untracked --quiet
   STASH_LIST_AFTER=$(git stash list)
@@ -107,7 +109,11 @@
 
   if [ "$COMPLIE_RESULT" == false ]; then
     mkdir -p result
-    cp -r test/out result
+    # Copy test output for CI diagnostic upload (if it exists).
+    # UpdateBaseline may not produce test/out/ — it writes to .cache/ instead.
+    if [ -d test/out ]; then
+      cp -r test/out result
+    fi
     exit 1
   fi
   rm -rf ${BUILD_DIR}
