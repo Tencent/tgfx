@@ -726,7 +726,7 @@ if (TGFX_BUILD_TESTS)
 
     set(CACHE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test/baseline/.cache/${TGFX_BACKEND_NAME})
     file(MAKE_DIRECTORY ${CACHE_DIR})
-    execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE HEAD_COMMIT)
+    execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE HEAD_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
     file(WRITE ${CACHE_DIR}/HEAD "${HEAD_COMMIT}")
     if (NOT TGFX_SKIP_BASELINE_CHECK)
         set(CacheVersionFile ${CACHE_DIR}/version.json)
