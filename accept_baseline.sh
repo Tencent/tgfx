@@ -34,8 +34,9 @@ case "$1" in
     CMAKE_ARGS="-DTGFX_USE_METAL=ON"
     TARGET_SUFFIX="Metal" ;;
   *)
-    CMAKE_ARGS=""
-    TARGET_SUFFIX="OpenGL" ;;
+    echo "Error: Unsupported backend argument: $1"
+    echo "Supported: USE_OPENGL_SWIFTSHADER, USE_VULKAN_SWIFTSHADER, USE_VULKAN, USE_METAL"
+    exit 1 ;;
 esac
 
 echo "Step 1: Building and running UpdateBaseline_${TARGET_SUFFIX} to refresh .cache..."
