@@ -110,7 +110,7 @@ if "%CURRENT_BRANCH%"=="HEAD" (
     git switch %CURRENT_BRANCH% --quiet
 )
 if not "!STASH_BEFORE!"=="!STASH_AFTER!" (
-    git stash pop --index --quiet 2>nul
+    git stash pop --index --quiet
 )
 
 call depsync
