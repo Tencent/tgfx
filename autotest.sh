@@ -41,8 +41,9 @@ elif [[ "$1" == "USE_OPENGL" ]]; then
   TARGET_SUFFIX="OpenGL"
   cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
 else
-  TARGET_SUFFIX="OpenGL"
-  cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
+  echo "ERROR: Unsupported backend argument: $1"
+  echo "Supported: USE_OPENGL, USE_OPENGL_SWIFTSHADER, USE_VULKAN, USE_VULKAN_SWIFTSHADER, USE_METAL"
+  exit 1
 fi
 
 if test $? -eq 0; then

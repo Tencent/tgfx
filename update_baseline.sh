@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 # Update local baseline cache from remote changes.
 # Run this after pulling main branch that contains baseline changes from others.
