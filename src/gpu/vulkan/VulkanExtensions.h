@@ -46,6 +46,12 @@ struct VulkanExtensions {
   /// Whether VK_KHR_swapchain is available. Headless drivers (e.g. SwiftShader) do not expose it.
   bool swapchain = false;
 
+ private:
+  // Stores the actual ROAA extension name detected (EXT or ARM variant) for use in
+  // getEnabledNames(). Null when ROAA is unavailable.
+  const char* _roaaExtensionName = nullptr;
+
+ public:
   /// Queries extension availability and feature support from a physical device. Used when tgfx
   /// creates its own VkDevice.
   void query(VkPhysicalDevice physicalDevice) {
@@ -56,16 +62,19 @@ struct VulkanExtensions {
 
     bool hasTimeline = false;
     bool hasDynState = false;
-    bool hasROAA = false;
+    const char* roaaExtName = nullptr;
     bool hasSwapchain = false;
     for (const auto& ext : available) {
       if (strcmp(ext.extensionName, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
         hasTimeline = true;
       } else if (strcmp(ext.extensionName, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) == 0) {
         hasDynState = true;
-      } else if (strcmp(ext.extensionName, "VK_EXT_rasterization_order_attachment_access") == 0 ||
-                 strcmp(ext.extensionName, "VK_ARM_rasterization_order_attachment_access") == 0) {
-        hasROAA = true;
+      } else if (strcmp(ext.extensionName, "VK_EXT_rasterization_order_attachment_access") == 0) {
+        roaaExtName = "VK_EXT_rasterization_order_attachment_access";
+      } else if (strcmp(ext.extensionName, "VK_ARM_rasterization_order_attachment_access") == 0) {
+        if (!roaaExtName) {
+          roaaExtName = "VK_ARM_rasterization_order_attachment_access";
+        }
       } else if (strcmp(ext.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
         hasSwapchain = true;
       }
@@ -90,7 +99,8 @@ struct VulkanExtensions {
 
     timelineSemaphore = hasTimeline && timelineFeature.timelineSemaphore;
     extendedDynamicState = hasDynState && dynStateFeature.extendedDynamicState;
-    rasterizationOrderAttachmentAccess = hasROAA;
+    rasterizationOrderAttachmentAccess = (roaaExtName != nullptr);
+    _roaaExtensionName = roaaExtName;
     swapchain = hasSwapchain;
   }
 
@@ -118,7 +128,7 @@ struct VulkanExtensions {
       names.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
     }
     if (rasterizationOrderAttachmentAccess) {
-      names.push_back("VK_EXT_rasterization_order_attachment_access");
+      names.push_back(_roaaExtensionName);
     }
     return names;
   }
