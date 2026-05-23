@@ -87,19 +87,34 @@ struct VulkanExtensions {
     VkPhysicalDeviceExtendedDynamicStateFeaturesEXT dynStateFeature = {};
     dynStateFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
 
+    VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT roaaFeature = {};
+    roaaFeature.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_FEATURES_EXT;
+
+    // Build pNext chain: timeline → dynState → roaa (only include structs for detected extensions)
+    void* pNextChain = nullptr;
+    if (roaaExtName) {
+      roaaFeature.pNext = pNextChain;
+      pNextChain = &roaaFeature;
+    }
+    if (hasDynState) {
+      dynStateFeature.pNext = pNextChain;
+      pNextChain = &dynStateFeature;
+    }
+    if (hasTimeline) {
+      timelineFeature.pNext = pNextChain;
+      pNextChain = &timelineFeature;
+    }
+
     VkPhysicalDeviceFeatures2 features2 = {};
     features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    if (hasTimeline) {
-      timelineFeature.pNext = hasDynState ? &dynStateFeature : nullptr;
-      features2.pNext = &timelineFeature;
-    } else if (hasDynState) {
-      features2.pNext = &dynStateFeature;
-    }
+    features2.pNext = pNextChain;
     vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
 
     timelineSemaphore = hasTimeline && timelineFeature.timelineSemaphore;
     extendedDynamicState = hasDynState && dynStateFeature.extendedDynamicState;
-    rasterizationOrderAttachmentAccess = (roaaExtName != nullptr);
+    rasterizationOrderAttachmentAccess =
+        (roaaExtName != nullptr) && roaaFeature.rasterizationOrderColorAttachmentAccess;
     _roaaExtensionName = roaaExtName;
     swapchain = hasSwapchain;
   }
