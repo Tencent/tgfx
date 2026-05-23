@@ -235,7 +235,7 @@ class VulkanGPU : public GPU {
   void installDebugMessenger();
   bool pickPhysicalDevice();
   bool createDevice();
-  bool createAllocator();
+  bool createAllocator(uint32_t apiVersion);
   bool createPresentationSlots();
 
   // Device handles (immutable after init; when adopted==true, caller owns device and instance)

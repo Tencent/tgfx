@@ -21,6 +21,7 @@
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 
 #include "VulkanGPU.h"
+#include <algorithm>
 #include <cstring>
 #include <shaderc/shaderc.hpp>
 #include <vector>
@@ -100,7 +101,14 @@ std::unique_ptr<VulkanGPU> VulkanGPU::MakeFrom(VkInstance instance, VkPhysicalDe
   gpu->debugUtilsEnabled = (vkCreateDebugUtilsMessengerEXT != nullptr);
   gpu->installDebugMessenger();
   gpu->_extensions.detectFromDevice();
-  if (!gpu->createAllocator()) {
+  // Query the actual Vulkan API version supported by the host instance. VMA requires this to match
+  // the instance version — using a higher version causes NULL dereferences on 1.0 entry points.
+  uint32_t instanceVersion = VK_API_VERSION_1_0;
+  if (vkEnumerateInstanceVersion != nullptr) {
+    vkEnumerateInstanceVersion(&instanceVersion);
+  }
+  auto allocatorApiVersion = std::min(instanceVersion, static_cast<uint32_t>(VK_API_VERSION_1_1));
+  if (!gpu->createAllocator(allocatorApiVersion)) {
     return nullptr;
   }
   VkPipelineCacheCreateInfo cacheInfo = {};
@@ -140,7 +148,7 @@ bool VulkanGPU::initVulkan() {
     return false;
   }
   volkLoadDevice(vulkanDevice);
-  if (!createAllocator()) {
+  if (!createAllocator(VK_API_VERSION_1_1)) {
     return false;
   }
   VkPipelineCacheCreateInfo cacheInfo = {};
@@ -351,7 +359,7 @@ bool VulkanGPU::createDevice() {
   return true;
 }
 
-bool VulkanGPU::createAllocator() {
+bool VulkanGPU::createAllocator(uint32_t apiVersion) {
   VmaVulkanFunctions vulkanFunctions = {};
   vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
   vulkanFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
@@ -361,7 +369,7 @@ bool VulkanGPU::createAllocator() {
   allocatorInfo.device = vulkanDevice;
   allocatorInfo.instance = vulkanInstance;
   allocatorInfo.pVulkanFunctions = &vulkanFunctions;
-  allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_1;
+  allocatorInfo.vulkanApiVersion = apiVersion;
 
   auto result = vmaCreateAllocator(&allocatorInfo, &vmaAllocator);
   if (result != VK_SUCCESS) {
