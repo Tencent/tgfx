@@ -19,6 +19,7 @@
 #include "ShaderCompiler.h"
 #include <regex>
 #include <shaderc/shaderc.hpp>
+#include "UniformData.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -57,16 +58,20 @@ static std::string upgradeGLSLVersion(const std::string& source) {
 static std::string assignInternalUBOBindings(const std::string& source) {
   static std::regex vertexUboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+VertexUniformBlock)");
   auto result = std::regex_replace(source, vertexUboRegex,
-                                   "layout(std140, set=0, binding=0) uniform VertexUniformBlock");
+                                   "layout(std140, set=" + std::to_string(UBO_DESCRIPTOR_SET) +
+                                       ", binding=" + std::to_string(VERTEX_UBO_BINDING_POINT) +
+                                       ") uniform VertexUniformBlock");
   static std::regex fragmentUboRegex(
       R"(layout\s*\(\s*std140\s*\)\s*uniform\s+FragmentUniformBlock)");
   return std::regex_replace(result, fragmentUboRegex,
-                            "layout(std140, set=0, binding=1) uniform FragmentUniformBlock");
+                            "layout(std140, set=" + std::to_string(UBO_DESCRIPTOR_SET) +
+                                ", binding=" + std::to_string(FRAGMENT_UBO_BINDING_POINT) +
+                                ") uniform FragmentUniformBlock");
 }
 
 static std::string replaceCustomUBO(const std::smatch& match, int& counter) {
-  return "layout(std140, set=0, binding=" + std::to_string(counter++) + ") uniform " +
-         match[1].str();
+  return "layout(std140, set=" + std::to_string(UBO_DESCRIPTOR_SET) +
+         ", binding=" + std::to_string(counter++) + ") uniform " + match[1].str();
 }
 
 // Add binding to any remaining uniform blocks (custom shaders) sequentially from 0 in set 0.
@@ -77,8 +82,9 @@ static std::string assignCustomUBOBindings(const std::string& source) {
 }
 
 static std::string replaceSamplerBinding(const std::smatch& match, int& counter) {
-  return "layout(set=1, binding=" + std::to_string(counter++) + ") uniform " + match[1].str() +
-         " " + match[2].str() + ";";
+  return "layout(set=" + std::to_string(TEXTURE_DESCRIPTOR_SET) +
+         ", binding=" + std::to_string(counter++) + ") uniform " + match[1].str() + " " +
+         match[2].str() + ";";
 }
 
 // Add binding to sampler uniforms sequentially from 0 in descriptor set 1.

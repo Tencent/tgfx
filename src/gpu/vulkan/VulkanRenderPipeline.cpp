@@ -229,12 +229,13 @@ bool VulkanRenderPipeline::createDescriptorSetLayouts(VulkanGPU* gpu,
   }
 
   // Set 1: Combined image sampler bindings, starting from binding 0.
+  // Currently all texture sampling occurs in fragment shaders. If vertex texture sampling is
+  // needed in the future (e.g. displacement mapping), stageFlags should be extended accordingly.
   std::vector<VkDescriptorSetLayoutBinding> texBindings;
-  unsigned texUnit = 0;
-  for (auto& entry : descriptor.layout.textureSamplers) {
-    (void)entry;
+  auto samplerCount = descriptor.layout.textureSamplers.size();
+  for (size_t i = 0; i < samplerCount; i++) {
     VkDescriptorSetLayoutBinding binding = {};
-    binding.binding = texUnit++;
+    binding.binding = static_cast<unsigned>(i);
     binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     binding.descriptorCount = 1;
     binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
