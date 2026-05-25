@@ -70,7 +70,6 @@ bool D3D12UploadHeap::init(ID3D12Device* device, size_t capacity) {
   gpuVA = _resource->GetGPUVirtualAddress();
   _capacity = capacity;
   head = 0;
-  tail = 0;
   committedHead = 0;
   return true;
 }
@@ -80,9 +79,9 @@ D3D12UploadHeap::Allocation D3D12UploadHeap::allocate(size_t size, size_t alignm
     return {};
   }
   size_t alignedHead = AlignUpSize(head, alignment);
-  // Track how much of the ring is currently occupied by outstanding allocations. The classic
-  // (head, tail) bookkeeping cannot disambiguate "ring empty" from "ring full" because both
-  // produce head == tail; we add an explicit byte counter that is incremented on every
+  // Track how much of the ring is currently occupied by outstanding allocations. head alone
+  // cannot disambiguate "ring empty" from "ring full" because both produce the same value once
+  // an allocation wraps it; we add an explicit byte counter that is incremented on every
   // allocate() and decremented on retire(). This is what stops a wrap from silently overwriting
   // staging bytes that were allocated but not yet committed (see RecordingTest race details
   // captured in commit notes).
@@ -93,7 +92,7 @@ D3D12UploadHeap::Allocation D3D12UploadHeap::allocate(size_t size, size_t alignm
   if (alignedHead + size > _capacity) {
     // Splitting the range across the wrap boundary is not supported (CopyTextureRegion needs a
     // single contiguous PLACED_SUBRESOURCE_FOOTPRINT), so jump back to offset 0 and pay for the
-    // discarded tail bytes out of the same free pool.
+    // discarded bytes between head and the end of the ring out of the same free pool.
     skipped = _capacity - head;
     needed = size + skipped;
     startOffset = 0;
@@ -137,7 +136,6 @@ void D3D12UploadHeap::commit(uint64_t fenceValue) {
   }
   InflightRange entry = {};
   entry.fenceValue = fenceValue;
-  entry.newHead = head;
   entry.bytes = bytesSinceCommit;
   inflight.push_back(entry);
   committedHead = head;
@@ -145,7 +143,6 @@ void D3D12UploadHeap::commit(uint64_t fenceValue) {
 
 void D3D12UploadHeap::retire(uint64_t completedFenceValue) {
   while (!inflight.empty() && inflight.front().fenceValue <= completedFenceValue) {
-    tail = inflight.front().newHead;
     if (outstandingBytes >= inflight.front().bytes) {
       outstandingBytes -= inflight.front().bytes;
     } else {
@@ -166,7 +163,6 @@ void D3D12UploadHeap::clear() {
   gpuVA = 0;
   _capacity = 0;
   head = 0;
-  tail = 0;
   committedHead = 0;
   outstandingBytes = 0;
   inflight.clear();
@@ -176,7 +172,6 @@ void D3D12UploadHeap::resetForContextLost() {
   // Keep _resource / mappedCpu / gpuVA / _capacity intact; the ring stays usable. Just drop
   // every accounting entry that is waiting on a fence that is never going to advance.
   head = 0;
-  tail = 0;
   committedHead = 0;
   outstandingBytes = 0;
   inflight.clear();

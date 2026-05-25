@@ -101,7 +101,7 @@ class D3D12UploadHeap {
   void clear();
 
   /**
-   * Drops every inflight byte range and zeroes the head/tail/outstanding bookkeeping while
+   * Drops every inflight byte range and zeroes the head / outstanding bookkeeping while
    * keeping the mapped UPLOAD ID3D12Resource alive. Used by the context-lost recovery path so
    * the ring stops accumulating inflight bytes whose fences will never advance, which would
    * otherwise saturate outstandingBytes and reject every future allocation even though the
@@ -119,16 +119,15 @@ class D3D12UploadHeap {
   uint64_t gpuVA = 0;
   size_t _capacity = 0;
   size_t head = 0;
-  size_t tail = 0;
   size_t committedHead = 0;
   // Bytes currently held by either a still-uncommitted allocation or an inflight commit waiting
-  // for its fence to signal. Tracked explicitly so allocate() can disambiguate "ring empty"
-  // from "ring full" — the (head, tail) pair alone collapses both cases to head == tail.
+  // for its fence to signal. Tracked explicitly so allocate() can know how many bytes are still
+  // in use — head alone cannot distinguish "ring empty" from "ring full" when an allocation
+  // wraps head right back to where it started.
   size_t outstandingBytes = 0;
 
   struct InflightRange {
     uint64_t fenceValue = 0;
-    size_t newHead = 0;
     // Bytes consumed between the previous commit() and this one; returned to outstandingBytes
     // when retire() reaches this entry.
     size_t bytes = 0;

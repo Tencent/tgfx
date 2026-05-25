@@ -45,7 +45,6 @@ bool D3D12DescriptorRing::init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE 
   gpuBase =
       shaderVisible ? _heap->GetGPUDescriptorHandleForHeapStart() : D3D12_GPU_DESCRIPTOR_HANDLE{};
   head = 0;
-  tail = 0;
   committedHead = 0;
   outstandingSlots = 0;
   return true;
@@ -55,9 +54,9 @@ D3D12DescriptorRing::Range D3D12DescriptorRing::allocate(uint32_t count) {
   if (_heap == nullptr || count == 0 || count > _capacity) {
     return {};
   }
-  // Use the explicit outstandingSlots counter rather than head/tail arithmetic. Plain
-  // (head, tail) bookkeeping cannot tell "empty" from "full" once an allocation pushes head
-  // back onto tail — see the rationale on outstandingSlots in the header.
+  // Use the explicit outstandingSlots counter to know how many slots are still in use.
+  // (head, tail) arithmetic cannot disambiguate "empty" from "full" once an allocation pushes
+  // head back onto where tail used to be — see the rationale on outstandingSlots in the header.
   uint32_t free = _capacity - outstandingSlots;
   uint32_t needed = count;
   uint32_t startSlot = head;
@@ -65,8 +64,8 @@ D3D12DescriptorRing::Range D3D12DescriptorRing::allocate(uint32_t count) {
   if (head + count > _capacity) {
     // Avoid splitting an allocation across the wrap-around boundary so callers can pass a
     // single contiguous CPU/GPU descriptor range to D3D12 APIs (CreateShaderResourceView,
-    // SetGraphicsRootDescriptorTable, etc.). The discarded tail slots are billed against the
-    // same free pool so the ring stays accounting-consistent.
+    // SetGraphicsRootDescriptorTable, etc.). The discarded slots between head and the end of
+    // the ring are billed against the same free pool so the ring stays accounting-consistent.
     skipped = _capacity - head;
     needed = count + skipped;
     startSlot = 0;
@@ -110,7 +109,6 @@ void D3D12DescriptorRing::commit(uint64_t fenceValue) {
   }
   InflightRange entry = {};
   entry.fenceValue = fenceValue;
-  entry.newHead = head;
   entry.slots = bytesSinceCommit;
   inflight.push_back(entry);
   committedHead = head;
@@ -118,7 +116,6 @@ void D3D12DescriptorRing::commit(uint64_t fenceValue) {
 
 void D3D12DescriptorRing::retire(uint64_t completedFenceValue) {
   while (!inflight.empty() && inflight.front().fenceValue <= completedFenceValue) {
-    tail = inflight.front().newHead;
     if (outstandingSlots >= inflight.front().slots) {
       outstandingSlots -= inflight.front().slots;
     } else {
@@ -133,7 +130,6 @@ void D3D12DescriptorRing::retire(uint64_t completedFenceValue) {
 void D3D12DescriptorRing::resetForContextLost() {
   inflight.clear();
   head = 0;
-  tail = 0;
   committedHead = 0;
   outstandingSlots = 0;
 }
