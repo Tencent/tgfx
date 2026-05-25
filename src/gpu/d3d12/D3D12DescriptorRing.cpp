@@ -47,6 +47,11 @@ bool D3D12DescriptorRing::init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE 
   head = 0;
   committedHead = 0;
   outstandingSlots = 0;
+  // Drop any inflight entries left over from a previous init() so the post-init state really is
+  // "fresh", matching the resetForContextLost() invariant. There is no current re-init path,
+  // but if one is added later (device-lost recovery, test teardown) those inflight entries
+  // would otherwise reference the previous, just-released heap.
+  inflight.clear();
   return true;
 }
 

@@ -71,6 +71,12 @@ bool D3D12UploadHeap::init(ID3D12Device* device, size_t capacity) {
   _capacity = capacity;
   head = 0;
   committedHead = 0;
+  outstandingBytes = 0;
+  // Drop any inflight entries left over from a previous init() so the post-init state really is
+  // "fresh", matching the resetForContextLost() invariant. There is no current re-init path,
+  // but if one is added later (device-lost recovery, test teardown) those inflight entries
+  // would otherwise reference the previous, just-released resource.
+  inflight.clear();
   return true;
 }
 
