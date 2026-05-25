@@ -212,9 +212,10 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
     uint8_t fsReg = ubFragmentRegister[i];
     if (vsReg != 0xFF && fsReg != 0xFF && vsReg != fsReg) {
       LOGE(
-          "D3D12RenderPipeline: VertexFragment-visible UBO binding %u maps to mismatched "
-          "stage-local registers (vs=b%u, ps=b%u). Reorder uniformBlocks so shared UBOs share "
-          "their stage-local index in both stages.",
+          "D3D12RenderPipeline: VertexFragment-visible UBO binding %u cannot share a single CBV "
+          "root parameter when its vertex-stage register (b%u) and fragment-stage register (b%u) "
+          "differ. Either split it into vertex-only and fragment-only entries, or extend the "
+          "root signature to emit two CBV root parameters for this binding.",
           entry.binding, static_cast<unsigned>(vsReg), static_cast<unsigned>(fsReg));
       return false;
     }
