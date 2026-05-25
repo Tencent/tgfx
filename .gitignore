@@ -54,6 +54,8 @@ local.properties
 /vendor_tools
 /out
 cmake-build-*
+/build-*
+/web/test/build-*
 node_modules
 Build/
 test/out/
