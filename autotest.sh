@@ -35,8 +35,8 @@ elif [[ "$1" == "USE_METAL" ]]; then
   TARGET_SUFFIX="Metal"
   cmake -DTGFX_USE_METAL=ON -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
 elif [[ "$1" == "USE_VULKAN" ]]; then
-  TARGET_SUFFIX="Vulkan"
-  cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_USE_VULKAN=ON -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
+  echo "ERROR: USE_VULKAN (native GPU) is not supported on macOS. Use USE_VULKAN_SWIFTSHADER instead."
+  exit 1
 elif [[ "$1" == "USE_OPENGL" ]]; then
   TARGET_SUFFIX="OpenGL"
   cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
