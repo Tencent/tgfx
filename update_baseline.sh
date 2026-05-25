@@ -77,15 +77,19 @@
         -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON \
         -DCMAKE_BUILD_TYPE=Debug ../
 
-  # TODO: Remove fallback after this branch is merged into main.
-  # Main branch still uses the old target name "UpdateBaseline". Once merged, only the new name
-  # "UpdateBaseline_{Backend}" will exist and the else branch can be deleted.
-  if cmake --build . --target UpdateBaseline_${TARGET_SUFFIX} -- -j 12 2>/dev/null; then
-    ./UpdateBaseline_${TARGET_SUFFIX}
-  else
-    cmake --build . --target UpdateBaseline -- -j 12
-    ./UpdateBaseline
+  cmake --build . --target UpdateBaseline_${TARGET_SUFFIX} -- -j 12
+
+  # Set up SwiftShader Vulkan library so volk can load it at runtime.
+  if [[ "$1" == "USE_VULKAN_SWIFTSHADER" ]]; then
+    HOST_ARCH=$(uname -m)
+    if [[ "$HOST_ARCH" == "x86_64" ]]; then
+      HOST_ARCH=x64
+    fi
+    cp "../vendor/swiftshader/mac/$HOST_ARCH/libvk_swiftshader.dylib" "$(pwd)/libvulkan.dylib"
+    export DYLD_LIBRARY_PATH="$(pwd):${DYLD_LIBRARY_PATH:-}"
   fi
+
+  ./UpdateBaseline_${TARGET_SUFFIX}
 
   if test $? -eq 0; then
      echo "~~~~~~~~~~~~~~~~~~~Update Baseline ($BACKEND_NAME) Success~~~~~~~~~~~~~~~~~~~~~"
