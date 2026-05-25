@@ -23,6 +23,7 @@
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorType.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
@@ -59,9 +60,6 @@ void EmitImageStream(PDFDocumentImpl* doc, PDFIndirectReference ref, T writeStre
       break;
   }
 
-  if (format == PDFStreamFormat::DCT) {
-    pdfDict->insertInt("ColorTransform", 0);
-  }
   pdfDict->insertInt("Length", length);
   doc->emitStream(*pdfDict, std::move(writeStream), ref);
 }
@@ -283,12 +281,38 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
   }
 }
 
+void DoDCTImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpaque, int encodingQuality,
+                PDFIndirectReference ref) {
+  auto jpegData = ImageCodec::Encode(pixmap, EncodedFormat::JPEG, encodingQuality);
+  if (jpegData == nullptr) {
+    DoDeflatedImage(pixmap, document, isOpaque, ref);
+    return;
+  }
+
+  PDFIndirectReference sMask;
+  if (!isOpaque) {
+    sMask = document->reserveRef();
+  }
+
+  auto length = static_cast<int>(jpegData->size());
+  auto imageSize = ISize::Make(pixmap.width(), pixmap.height());
+  auto colorSpaceRef = document->colorSpaceRef();
+  auto colorSpace = colorSpaceRef ? PDFUnion::Ref(colorSpaceRef) : PDFUnion::Name("DeviceRGB");
+  auto streamWriter = [&jpegData](const std::shared_ptr<WriteStream>& stream) {
+    stream->write(jpegData->data(), jpegData->size());
+  };
+  EmitImageStream(document, ref, streamWriter, imageSize, std::move(colorSpace), sMask, length,
+                  PDFStreamFormat::DCT);
+
+  if (!isOpaque) {
+    DoDeflatedAlpha(pixmap, document, sMask);
+  }
+}
+
 }  // namespace
 
-void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodingQuality*/,
+void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int encodingQuality,
                                PDFDocumentImpl* doc, PDFIndirectReference ref) {
-  // TODO (YGaurora): Re-enable JPEG direct embedding once Image provides a unified encoded data
-  // access interface, so we don't need to reach into internal Image subclass hierarchy.
   auto image2bitmap = [doc](Context* context, const std::shared_ptr<Image>& image) {
     auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
                                  doc->dstColorSpace());
@@ -302,7 +326,6 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
                                    AlphaType::Unpremultiplied, 0, surface->colorSpace());
     Bitmap bitmap(surface->width(), surface->height(), false, false, surface->colorSpace());
     auto pixels = bitmap.lockPixels();
-    //bitmap in pdf must be unpremultiplied
     if (surface->readPixels(dstInfo, pixels)) {
       bitmap.unlockPixels();
       return bitmap;
@@ -315,6 +338,12 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
     return;
   }
   auto pixmap = Pixmap(bitmap);
+
+  if (encodingQuality <= 100) {
+    DoDCTImage(pixmap, doc, bitmap.isOpaque(), encodingQuality, ref);
+    return;
+  }
+
   DoDeflatedImage(pixmap, doc, bitmap.isOpaque(), ref);
 }
 
@@ -322,8 +351,13 @@ PDFIndirectReference PDFBitmap::Serialize(const std::shared_ptr<Image>& image,
                                           PDFDocumentImpl* document, int encodingQuality) {
   DEBUG_ASSERT(image);
   DEBUG_ASSERT(document);
+  auto it = document->imageRefCache.find(image);
+  if (it != document->imageRefCache.end()) {
+    return it->second;
+  }
   auto ref = document->reserveRef();
   SerializeImage(image, encodingQuality, document, ref);
+  document->imageRefCache[image] = ref;
   return ref;
 }
 }  // namespace tgfx
