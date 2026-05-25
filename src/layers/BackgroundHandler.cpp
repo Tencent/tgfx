@@ -348,8 +348,8 @@ void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
   }
 
   auto* bgCanvas = bgSource->getCanvas();
-  AutoCanvasRestore autoRestore(bgCanvas);
   BackgroundCapturer capturer(snapshots, std::move(bgSource));
+  AutoCanvasRestore autoRestore(bgCanvas);
   DrawArgs captureArgs = baseArgs;
   captureArgs.backgroundHandler = &capturer;
   captureArgs.renderRects = &renderRects;
