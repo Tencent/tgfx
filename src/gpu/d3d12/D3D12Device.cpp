@@ -23,7 +23,10 @@
 
 namespace tgfx {
 
-std::shared_ptr<D3D12Device> D3D12Device::Make() {
+// Initialise the optional D3D12 debug layer and DRED settings shared by both Make() and
+// MakeWarp(). Idempotent — calling EnableDebugLayer / DRED setup twice is a no-op past the
+// first invocation, so the duplication does not cost anything in practice.
+static void EnableD3D12DebugFeatures() {
 #if !defined(NDEBUG) || defined(TGFX_D3D12_DEBUG_LAYER)
   // Enable the D3D12 debug layer when explicitly requested. Must be called before
   // D3D12CreateDevice. Validation messages surface as readable text instead of
@@ -55,6 +58,10 @@ std::shared_ptr<D3D12Device> D3D12Device::Make() {
     }
   }
 #endif
+}
+
+std::shared_ptr<D3D12Device> D3D12Device::Make() {
+  EnableD3D12DebugFeatures();
   ComPtr<IDXGIFactory4> factory = nullptr;
   if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
     LOGE("D3D12Device::Make() Failed to create DXGI factory.");
@@ -77,6 +84,32 @@ std::shared_ptr<D3D12Device> D3D12Device::Make() {
   }
   LOGE("D3D12Device::Make() No suitable D3D12 hardware adapter found.");
   return nullptr;
+}
+
+std::shared_ptr<D3D12Device> D3D12Device::MakeWarp() {
+  // WARP is the Windows Advanced Rasterization Platform — Microsoft's CPU-based reference
+  // implementation of D3D12 that ships with every modern Windows install. It is feature
+  // complete (FL12_1) but very slow; the only sensible callers are CI runners and offline
+  // tools that do not have a usable hardware adapter. CreateDXGIFactory1 +
+  // EnumWarpAdapter is the documented entry point.
+  EnableD3D12DebugFeatures();
+  ComPtr<IDXGIFactory4> factory = nullptr;
+  if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
+    LOGE("D3D12Device::MakeWarp() Failed to create DXGI factory.");
+    return nullptr;
+  }
+  ComPtr<IDXGIAdapter1> warpAdapter = nullptr;
+  if (FAILED(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)))) {
+    LOGE("D3D12Device::MakeWarp() EnumWarpAdapter failed; WARP unavailable on this system.");
+    return nullptr;
+  }
+  ComPtr<ID3D12Device> d3d12Device = nullptr;
+  if (FAILED(D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0,
+                               IID_PPV_ARGS(&d3d12Device)))) {
+    LOGE("D3D12Device::MakeWarp() D3D12CreateDevice on WARP adapter failed.");
+    return nullptr;
+  }
+  return MakeFrom(d3d12Device.Get());
 }
 
 std::shared_ptr<D3D12Device> D3D12Device::MakeFrom(void* device) {

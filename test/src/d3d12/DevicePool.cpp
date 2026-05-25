@@ -24,7 +24,14 @@ thread_local std::shared_ptr<Device> cachedDevice = nullptr;
 
 std::shared_ptr<Device> DevicePool::Make() {
   if (cachedDevice == nullptr) {
+#ifdef TGFX_D3D12_USE_WARP
+    // CI opt-in (-DTGFX_D3D12_USE_WARP=ON): force the test suite onto WARP so headless runners
+    // without a hardware adapter can still exercise the D3D12 backend. WARP is functionally
+    // complete but very slow — never enable this for performance baselines.
+    cachedDevice = D3D12Device::MakeWarp();
+#else
     cachedDevice = D3D12Device::Make();
+#endif
   }
   return cachedDevice;
 }
