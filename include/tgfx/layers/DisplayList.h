@@ -206,14 +206,12 @@ class DisplayList {
   }
 
   /**
-   * Returns the maximum number of tiles processed per frame in tiled rendering mode. This setting
-   * is ignored in other render modes or if allowZoomBlur is false. A "processed" tile is either
-   * rasterized at the current zoom scale or refined from a fallback cache. Tiles invalidated by
-   * content changes are exempt from this limit and always rasterized to keep the frame consistent.
-   * Once the limit is reached, remaining tiles fall back to cached content from other zoom scales,
-   * or are filled with the background color when no fallback is available.
-   * Higher values fill the screen faster during zoom and pan at the cost of per-frame GPU load;
-   * lower values prioritize stable frame rate.
+   * Returns the maximum number of tiles rasterized per frame in tiled rendering mode. This
+   * setting is ignored in other render modes or if allowZoomBlur is false. Once the limit is
+   * reached, remaining tiles fall back to cached content from other zoom scales, or are filled
+   * with the background color when no fallback is available. Higher values fill the screen
+   * faster during zoom and pan at the cost of per-frame GPU load; lower values prioritize
+   * stable frame rate.
    */
   int maxTilesRefinedPerFrame() const {
     return _maxTilesRefinedPerFrame;
@@ -321,7 +319,6 @@ class DisplayList {
   void recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks);
 
   std::vector<DrawTask> collectScreenTasks(const Surface* surface,
-                                           const std::vector<Rect>& dirtyRegions,
                                            std::vector<DrawTask>* tileTasks,
                                            std::vector<Rect>* skippedRects);
 

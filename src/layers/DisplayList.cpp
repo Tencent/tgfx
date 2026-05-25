@@ -441,7 +441,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   checkTileCount(surface);
   auto tileTasks = invalidateTileCaches(dirtyRegions);
   std::vector<Rect> skippedRects = {};
-  auto screenTasks = collectScreenTasks(surface, dirtyRegions, &tileTasks, &skippedRects);
+  auto screenTasks = collectScreenTasks(surface, &tileTasks, &skippedRects);
   if (screenTasks.empty()) {
     recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
@@ -577,20 +577,14 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
 }
 
 std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
-                                                      const std::vector<Rect>& dirtyRegions,
                                                       std::vector<DrawTask>* tileTasks,
                                                       std::vector<Rect>* skippedRects) {
-  auto budgetEnabled = _allowZoomBlur;
   auto maxBudget = _maxTilesRefinedPerFrame;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
     updateMousePosition();
     lastContentOffset = _contentOffset;
     lastZoomScaleInt = _zoomScaleInt;
-    // Skip rasterization during ongoing offset/zoom changes so user gestures stay responsive;
-    // tiles without an exact-scale match fall back to cached content from other zoom scales.
-    if (_allowZoomBlur) {
-      maxBudget = 0;
-    }
+    maxBudget = 0;
   }
   hasZoomBlurTiles = false;
   TileCache* currentTileCache = nullptr;
@@ -629,16 +623,6 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   auto sortedCaches = getSortedTileCaches();
   auto fallbackTileCaches = getFallbackTileCaches(sortedCaches);
   auto sortedTiles = GetSortedTiles(startX, endX, startY, endY, _tileSize, mousePosition);
-  // Map dirtyRegions to current-scale pixel coordinates. Tiles intersecting these rects lost
-  // their fallback sources at other scales (cleared by invalidateTileCaches), so they bypass
-  // the per-frame budget and must be rasterized to avoid blank holes on content changes.
-  std::vector<Rect> dirtyRectsAtCurrentScale = {};
-  if (!dirtyRegions.empty()) {
-    auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-    dirtyRectsAtCurrentScale.reserve(dirtyRegions.size());
-    auto zoomMatrix = Matrix::MakeScale(currentZoomScale);
-    dirtyRectsAtCurrentScale = MapDirtyRegions(dirtyRegions, zoomMatrix, true);
-  }
   for (const auto& [tileX, tileY] : sortedTiles) {
     auto tile = currentTileCache->getTile(tileX, tileY);
     if (tile != nullptr) {
@@ -646,64 +630,37 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       screenTasks.emplace_back(tile, _tileSize, tileRect);
       continue;
     }
-    // Tiles invalidated by content changes must be rasterized this frame to keep the frame
-    // consistent. They bypass the per-frame budget below.
-    if (!dirtyRectsAtCurrentScale.empty()) {
-      auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
-      bool mustRefine = std::any_of(
-          dirtyRectsAtCurrentScale.begin(), dirtyRectsAtCurrentScale.end(),
-          [&tileRect](const Rect& dirtyRect) { return Rect::Intersects(tileRect, dirtyRect); });
-      if (mustRefine) {
-        dirtyGrids.emplace_back(tileX, tileY);
-        continue;
+    if (!_allowZoomBlur || maxBudget > 0) {
+      // Either zoom-blur is disabled (no throttling) or the budget still allows rasterizing
+      // this tile. Either way, schedule it for refinement.
+      if (_allowZoomBlur) {
+        maxBudget--;
       }
-    }
-    std::vector<DrawTask> fallbackTasks = {};
-    if (_allowZoomBlur) {
-      fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
-    }
-    if (!fallbackTasks.empty()) {
-      // Tile has a same-resolution fallback: refine it only when the per-frame budget allows;
-      // otherwise stick with the fallback to keep the screen filled at minimal cost.
-      if (budgetEnabled && maxBudget <= 0) {
+      dirtyGrids.emplace_back(tileX, tileY);
+    } else {
+      auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
+      if (!fallbackTasks.empty()) {
         screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
         hasZoomBlurTiles = true;
         continue;
       }
-      if (budgetEnabled) {
-        maxBudget--;
-      }
-      dirtyGrids.emplace_back(tileX, tileY);
-      continue;
-    }
-    // No fallback at the same resolution. Rasterize when allowed by the budget; otherwise try a
-    // partial-coverage fallback or leave the tile blank to defer work to a later frame.
-    if (!budgetEnabled || maxBudget > 0) {
-      if (budgetEnabled) {
-        maxBudget--;
-      }
-      dirtyGrids.emplace_back(tileX, tileY);
-      continue;
-    }
-    if (_allowZoomBlur) {
       auto throttleFallback = getThrottleFallbackTasks(tileX, tileY, fallbackTileCaches);
       if (!throttleFallback.empty()) {
         screenTasks.insert(screenTasks.end(), throttleFallback.begin(), throttleFallback.end());
         hasZoomBlurTiles = true;
         continue;
       }
-    }
-    auto skippedRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
-    if (skippedRect.intersect(renderRect)) {
-      skippedRects->push_back(skippedRect);
+      auto skippedRect =
+          Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
+      if (skippedRect.intersect(renderRect)) {
+        skippedRects->push_back(skippedRect);
+      }
     }
   }
   std::vector<std::shared_ptr<Tile>> freeTiles = {};
   bool continuous = false;
-  // Take the continuous-fill fast path only when this frame is allowed to rasterize every tile
-  // in the visible region (no tile was skipped by the per-frame budget). Throttled frames
-  // intentionally leave some tiles for later, so the "single big rect" assumption would not
-  // hold.
+  // The continuous-fill fast path requires every visible tile to be rasterized; skip it when
+  // any tile was deferred to fallback or throttle.
   if (screenTasks.empty() && skippedRects->empty()) {
     freeTiles = createContinuousTiles(surface, endX - startX, endY - startY);
     continuous = !freeTiles.empty();
