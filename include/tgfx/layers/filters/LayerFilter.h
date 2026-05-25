@@ -94,8 +94,6 @@ class LayerFilter : public LayerProperty {
     return false;
   }
 
-  std::unique_ptr<Rect> _clipBounds = nullptr;
-
   friend class Layer;
   friend class Types;
 };
