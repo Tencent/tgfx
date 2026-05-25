@@ -330,11 +330,6 @@ class DisplayList {
   std::vector<DrawTask> getFallbackDrawTasks(
       int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const;
 
-  // Tile-level fallback used only by the throttling branch in collectScreenTasks. Unlike
-  // getFallbackDrawTasks (which requires every 64x64 sub-grid of the tile to be fully covered
-  // by a single cache), this one treats the whole tile as one unit, accepts partial coverage,
-  // and stacks contributions across scales. It is intentionally more permissive so that a
-  // throttled tile stays visually covered instead of showing the clear background.
   std::vector<DrawTask> getThrottleFallbackTasks(
       int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const;
 
