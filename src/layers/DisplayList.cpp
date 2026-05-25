@@ -199,15 +199,6 @@ void DisplayList::setZoomScale(float zoomScale) {
     return;
   }
   _hasContentChanged = true;
-  if (_zoomOutTileThrottlePerFrame > 0 && _allowZoomBlur) {
-    _accumulatedZoomDeltaInt += (zoomScaleInt - _zoomScaleInt);
-    int64_t deadband = std::max<int64_t>(_zoomScalePrecision / 100, 1);
-    if (std::abs(_accumulatedZoomDeltaInt) > deadband) {
-      _isZoomingIn = _accumulatedZoomDeltaInt > 0;
-      // Reset on every confirmed flip so the accumulator never grows unbounded.
-      _accumulatedZoomDeltaInt = 0;
-    }
-  }
   _zoomScaleInt = zoomScaleInt;
 }
 
@@ -222,10 +213,6 @@ void DisplayList::setZoomScalePrecision(int precision) {
   _zoomScalePrecision = precision;
   _zoomScaleInt = ChangeZoomScalePrecision(_zoomScaleInt, oldPrecision, precision);
   lastZoomScaleInt = ChangeZoomScalePrecision(lastZoomScaleInt, oldPrecision, precision);
-  if (_zoomOutTileThrottlePerFrame > 0 && _allowZoomBlur) {
-    _accumulatedZoomDeltaInt =
-        ChangeZoomScalePrecision(_accumulatedZoomDeltaInt, oldPrecision, precision);
-  }
   if (!tileCaches.empty()) {
     std::unordered_map<int64_t, TileCache*> newCaches = {};
     for (auto& item : tileCaches) {
@@ -593,20 +580,21 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       const std::vector<Rect>& dirtyRegions,
                                                       std::vector<DrawTask>* tileTasks,
                                                       std::vector<Rect>* skippedRects) {
-  auto maxRefinedCount = _maxTilesRefinedPerFrame;
+  // The per-frame tile budget is only enforced when zoom-blur is enabled, otherwise every
+  // visible tile is rasterized this frame so behavior matches non-tiled rendering.
+  bool budgetEnabled = _allowZoomBlur;
+  int maxBudget = _maxTilesRefinedPerFrame;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
     updateMousePosition();
     lastContentOffset = _contentOffset;
     lastZoomScaleInt = _zoomScaleInt;
-    // To ensure smooth user interactions, we skip refinement when the offset or zoom scale is
-    // changing.
-    maxRefinedCount = 0;
+    // Skip rasterization during ongoing offset/zoom changes so user gestures stay responsive;
+    // tiles without an exact-scale match fall back to cached content from other zoom scales.
+    if (_allowZoomBlur) {
+      maxBudget = 0;
+    }
   }
   hasZoomBlurTiles = false;
-  int maxDirtyCount = 0;
-  if (_zoomOutTileThrottlePerFrame > 0 && _allowZoomBlur && !_isZoomingIn && !tileCaches.empty()) {
-    maxDirtyCount = _zoomOutTileThrottlePerFrame;
-  }
   TileCache* currentTileCache = nullptr;
   auto result = tileCaches.find(_zoomScaleInt);
   if (result != tileCaches.end()) {
@@ -644,10 +632,10 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   auto fallbackTileCaches = getFallbackTileCaches(sortedCaches);
   auto sortedTiles = GetSortedTiles(startX, endX, startY, endY, _tileSize, mousePosition);
   // Map dirtyRegions to current-scale pixel coordinates. Tiles intersecting these rects lost
-  // their fallback sources at other scales (cleared by invalidateTileCaches), so they must
-  // bypass maxDirtyCount throttling to avoid blank holes on content changes.
+  // their fallback sources at other scales (cleared by invalidateTileCaches), so they bypass
+  // the per-frame budget and must be rasterized to avoid blank holes on content changes.
   std::vector<Rect> dirtyRectsAtCurrentScale = {};
-  if (maxDirtyCount > 0 && !dirtyRegions.empty()) {
+  if (!dirtyRegions.empty()) {
     auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
     dirtyRectsAtCurrentScale.reserve(dirtyRegions.size());
     auto zoomMatrix = Matrix::MakeScale(currentZoomScale);
@@ -658,53 +646,68 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     if (tile != nullptr) {
       auto tileRect = tile->getTileRect(_tileSize, &renderRect);
       screenTasks.emplace_back(tile, _tileSize, tileRect);
-    } else {
-      if (_allowZoomBlur) {
-        auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
-        if (!fallbackTasks.empty()) {
-          if (maxRefinedCount <= 0) {
-            screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
-            hasZoomBlurTiles = true;
-            continue;
-          }
-          maxRefinedCount--;
-        }
-      }
-      // Tiles invalidated by invalidateTileCaches must be rasterized this frame, exempt from
-      // the maxDirtyCount cap.
-      bool mustRefine = false;
-      if (!dirtyRectsAtCurrentScale.empty()) {
-        auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
-        mustRefine = std::any_of(
-            dirtyRectsAtCurrentScale.begin(), dirtyRectsAtCurrentScale.end(),
-            [&tileRect](const Rect& dirtyRect) { return Rect::Intersects(tileRect, dirtyRect); });
-      }
-      if (maxDirtyCount > 0 && !mustRefine &&
-          static_cast<int>(dirtyGrids.size()) >= maxDirtyCount) {
-        // Throttled: try a relaxed fallback that accepts partial coverage across scales to
-        // avoid leaving the tile blank.
-        auto throttleFallback = getThrottleFallbackTasks(tileX, tileY, fallbackTileCaches);
-        if (!throttleFallback.empty()) {
-          screenTasks.insert(screenTasks.end(), throttleFallback.begin(), throttleFallback.end());
-          hasZoomBlurTiles = true;
-        } else {
-          auto skippedRect =
-              Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
-          if (skippedRect.intersect(renderRect)) {
-            skippedRects->push_back(skippedRect);
-          }
-        }
+      continue;
+    }
+    // Tiles invalidated by content changes must be rasterized this frame to keep the frame
+    // consistent. They bypass the per-frame budget below.
+    bool mustRefine = false;
+    if (!dirtyRectsAtCurrentScale.empty()) {
+      auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
+      mustRefine = std::any_of(
+          dirtyRectsAtCurrentScale.begin(), dirtyRectsAtCurrentScale.end(),
+          [&tileRect](const Rect& dirtyRect) { return Rect::Intersects(tileRect, dirtyRect); });
+    }
+    std::vector<DrawTask> fallbackTasks = {};
+    if (_allowZoomBlur) {
+      fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
+    }
+    if (mustRefine) {
+      dirtyGrids.emplace_back(tileX, tileY);
+      continue;
+    }
+    if (!fallbackTasks.empty()) {
+      // Tile has a same-resolution fallback: refine it only when the per-frame budget allows;
+      // otherwise stick with the fallback to keep the screen filled at minimal cost.
+      if (budgetEnabled && maxBudget <= 0) {
+        screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
+        hasZoomBlurTiles = true;
         continue;
       }
+      if (budgetEnabled) {
+        maxBudget--;
+      }
       dirtyGrids.emplace_back(tileX, tileY);
+      continue;
+    }
+    // No fallback at the same resolution. Rasterize when allowed by the budget; otherwise try a
+    // partial-coverage fallback or leave the tile blank to defer work to a later frame.
+    if (!budgetEnabled || maxBudget > 0) {
+      if (budgetEnabled) {
+        maxBudget--;
+      }
+      dirtyGrids.emplace_back(tileX, tileY);
+      continue;
+    }
+    if (_allowZoomBlur) {
+      auto throttleFallback = getThrottleFallbackTasks(tileX, tileY, fallbackTileCaches);
+      if (!throttleFallback.empty()) {
+        screenTasks.insert(screenTasks.end(), throttleFallback.begin(), throttleFallback.end());
+        hasZoomBlurTiles = true;
+        continue;
+      }
+    }
+    auto skippedRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
+    if (skippedRect.intersect(renderRect)) {
+      skippedRects->push_back(skippedRect);
     }
   }
   std::vector<std::shared_ptr<Tile>> freeTiles = {};
   bool continuous = false;
   // Take the continuous-fill fast path only when this frame is allowed to rasterize every tile
-  // (throttle disabled). Throttled frames intentionally leave some tiles for later, so the
-  // "single big rect" assumption would not hold.
-  if (screenTasks.empty() && maxDirtyCount == 0) {
+  // in the visible region (no tile was skipped by the per-frame budget). Throttled frames
+  // intentionally leave some tiles for later, so the "single big rect" assumption would not
+  // hold.
+  if (screenTasks.empty() && skippedRects->empty()) {
     freeTiles = createContinuousTiles(surface, endX - startX, endY - startY);
     continuous = !freeTiles.empty();
     dirtyGrids = GenerateGridTiles(startX, endX, startY, endY);

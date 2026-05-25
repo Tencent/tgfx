@@ -206,41 +206,25 @@ class DisplayList {
   }
 
   /**
-   * Returns the maximum number of tiles that can be refined (updated to the current zoom scale) per
-   * frame in tiled rendering mode. This setting is ignored in other render modes or if
-   * allowZoomBlur is false. When zooming, cached images from other zoom levels may be used
-   * temporarily, resulting in brief blur artifacts. Increasing this value refines more tiles per
-   * frame, reducing blur more quickly but potentially impacting performance. The default is 5.
+   * Returns the maximum number of tiles processed per frame in tiled rendering mode. This setting
+   * is ignored in other render modes or if allowZoomBlur is false. A "processed" tile is either
+   * rasterized at the current zoom scale or refined from a fallback cache. Tiles invalidated by
+   * content changes are exempt from this cap and always rasterized to keep the frame consistent.
+   * Once the cap is reached, remaining tiles fall back to cached content from other zoom scales,
+   * or leave a transparent hole filled with the background color when no fallback is available.
+   * Higher values fill the screen faster during zoom and pan at the cost of per-frame GPU load;
+   * lower values prioritize stable frame rate. The default is 5; tune according to the target
+   * platform's GPU capability.
    */
   int maxTilesRefinedPerFrame() const {
     return _maxTilesRefinedPerFrame;
   }
 
   /**
-   * Sets the maximum number of tiles that can be refined (updated to the current zoom scale) per
-   * frame in tiled rendering mode.
+   * Sets the maximum number of tiles processed per frame in tiled rendering mode.
    */
   void setMaxTilesRefinedPerFrame(int count) {
     _maxTilesRefinedPerFrame = count;
-  }
-
-  /**
-   * Returns the per-frame tile rasterization throttle that applies during zoom-out and idle
-   * frames in tiled rendering mode. This setting is ignored in other render modes. When set to
-   * a positive value, that many dirty tiles are rasterized per frame; remaining tiles use
-   * fallback content from other zoom scales (requires setAllowZoomBlur(true)). The default is
-   * 0 (disabled).
-   */
-  int zoomOutTileThrottlePerFrame() const {
-    return _zoomOutTileThrottlePerFrame;
-  }
-
-  /**
-   * Sets the per-frame tile rasterization throttle for zoom-out frames. See
-   * zoomOutTileThrottlePerFrame() for the full contract.
-   */
-  void setZoomOutTileThrottlePerFrame(int count) {
-    _zoomOutTileThrottlePerFrame = count;
   }
 
   /**
@@ -307,13 +291,10 @@ class DisplayList {
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
   int _maxTilesRefinedPerFrame = 5;
-  int _zoomOutTileThrottlePerFrame = 0;
   int _subtreeCacheMaxSize = 0;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;
-  bool _isZoomingIn = false;
-  int64_t _accumulatedZoomDeltaInt = 0;
   int64_t lastZoomScaleInt = 1000;
   Point lastContentOffset = {};
   Point mousePosition = {};
