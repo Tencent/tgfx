@@ -622,8 +622,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   LayerContent* getContent();
 
-  std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
-
   Rect getInputContentBounds(float scale, const Rect& imageBounds);
 
   Rect accumulateFilterBoundsReverse(const Rect& srcRect, float contentScale);

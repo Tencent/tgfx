@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/filters/BlurFilter.h"
+#include "core/images/FilterImage.h"
 
 namespace tgfx {
 
@@ -49,8 +50,41 @@ void BlurFilter::setTileMode(TileMode tileMode) {
   invalidateFilter();
 }
 
+std::shared_ptr<Image> BlurFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
+                                                 const Rect&, Point* offset,
+                                                 const Rect* clipBounds) {
+  auto filter = getImageFilter(scale);
+  if (!filter) {
+    return input;
+  }
+  return FilterImage::MakeFrom(std::move(input), std::move(filter), offset, clipBounds);
+}
+
+Rect BlurFilter::filterBounds(const Rect& srcRect, float contentScale, MapDirection direction) {
+  auto filter = getImageFilter(contentScale);
+  if (!filter) {
+    return srcRect;
+  }
+  return filter->filterBounds(srcRect, direction);
+}
+
+void BlurFilter::invalidateFilter() {
+  lastFilter = nullptr;
+  dirty = true;
+  LayerFilter::invalidateFilter();
+}
+
 BlurFilter::BlurFilter(float blurrinessX, float blurrinessY, TileMode tileMode)
     : _blurrinessX(blurrinessX), _blurrinessY(blurrinessY), _tileMode(tileMode) {
+}
+
+std::shared_ptr<ImageFilter> BlurFilter::getImageFilter(float scale) {
+  if (lastScale != scale || dirty) {
+    lastFilter = onCreateImageFilter(scale);
+    lastScale = scale;
+    dirty = false;
+  }
+  return lastFilter;
 }
 
 std::shared_ptr<ImageFilter> BlurFilter::onCreateImageFilter(float scale) {

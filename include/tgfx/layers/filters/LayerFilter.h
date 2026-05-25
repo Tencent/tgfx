@@ -24,7 +24,6 @@
 
 namespace tgfx {
 class Image;
-class LayerImageFilter;
 
 /**
  * LayerFilter is the abstract base class for filters applied to a layer's rendered image, such as
@@ -95,16 +94,6 @@ class LayerFilter : public LayerProperty {
   virtual void invalidateFilter();
 
  private:
-  /**
-   * Returns true if this filter is a LayerImageFilter. Used by Layer to safely access the cached
-   * ImageFilter without dynamic_cast. The default implementation returns false; LayerImageFilter
-   * overrides it to return true.
-   */
-  virtual bool isImageFilter() const {
-    return false;
-  }
-
-  friend class Layer;
   friend class Types;
 };
 }  // namespace tgfx

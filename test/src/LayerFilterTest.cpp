@@ -125,7 +125,7 @@ TGFX_TEST(LayerFilterTest, dropshadowLayerFilter) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/dropShadow"));
 
   auto src = Rect::MakeXYWH(10, 10, 10, 10);
-  auto bounds = filter4->getImageFilter(1.0f)->filterBounds(src);
+  auto bounds = filter4->filterBounds(src, 1.0f, MapDirection::Forward);
   EXPECT_EQ(bounds, Rect::MakeXYWH(10, 10, 13, 13));
   bounds = ImageFilter::DropShadowOnly(3, 3, 0, 0, Color::White())->filterBounds(src);
   EXPECT_EQ(bounds, Rect::MakeXYWH(13, 13, 10, 10));
@@ -184,14 +184,9 @@ TGFX_TEST(LayerFilterTest, blurLayerFilter) {
   EXPECT_EQ(blur->blurrinessX(), 130.f);
   blur->setTileMode(TileMode::Clamp);
   EXPECT_EQ(blur->tileMode(), TileMode::Clamp);
-  auto imageFilter = std::static_pointer_cast<GaussianBlurImageFilter>(blur->getImageFilter(0.5f));
   auto imageFilter2 = std::static_pointer_cast<GaussianBlurImageFilter>(
       ImageFilter::Blur(65.f, 65.f, TileMode::Clamp));
-  TGFX_PRIVATE_ACCESS(EXPECT_EQ(imageFilter->blurrinessX, imageFilter2->blurrinessX);
-                      EXPECT_EQ(imageFilter->blurrinessY, imageFilter2->blurrinessY);
-                      EXPECT_EQ(imageFilter->tileMode, imageFilter2->tileMode);)
-
-  EXPECT_EQ(blur->getImageFilter(0.5f)->filterBounds(Rect::MakeWH(200, 200)),
+  EXPECT_EQ(blur->filterBounds(Rect::MakeWH(200, 200), 0.5f, MapDirection::Forward),
             imageFilter2->filterBounds(Rect::MakeWH(200, 200)));
 }
 

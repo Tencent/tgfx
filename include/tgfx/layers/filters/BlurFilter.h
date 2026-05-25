@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "tgfx/layers/filters/LayerImageFilter.h"
+#include "tgfx/layers/filters/LayerFilter.h"
 
 namespace tgfx {
 
 /**
  * A filter that blurs its input by the separate X and Y blurriness.
  */
-class BlurFilter : public LayerImageFilter {
+class BlurFilter : public LayerFilter {
  public:
   /**
    * Create a filter that blurs its input by the separate X and Y blurriness. The provided tile mode
@@ -72,18 +72,33 @@ class BlurFilter : public LayerImageFilter {
    */
   void setTileMode(TileMode tileMode);
 
+  Rect filterBounds(const Rect& srcRect, float contentScale,
+                    MapDirection direction = MapDirection::Forward) override;
+
  protected:
   Type type() const override {
     return Type::BlurFilter;
   }
 
-  std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
+  std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
+                                       const Rect& contentBounds, Point* offset,
+                                       const Rect* clipBounds) override;
+
+  void invalidateFilter() override;
 
  private:
   BlurFilter(float blurrinessX, float blurrinessY, TileMode tileMode);
+
+  std::shared_ptr<ImageFilter> getImageFilter(float scale);
+  std::shared_ptr<ImageFilter> onCreateImageFilter(float scale);
+
   float _blurrinessX = 0.0f;
   float _blurrinessY = 0.0f;
   TileMode _tileMode = TileMode::Decal;
+
+  bool dirty = true;
+  float lastScale = 1.0f;
+  std::shared_ptr<ImageFilter> lastFilter;
 };
 
 }  // namespace tgfx

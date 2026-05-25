@@ -46,7 +46,6 @@
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
-#include "tgfx/layers/filters/LayerImageFilter.h"
 
 namespace tgfx {
 
@@ -1085,23 +1084,6 @@ LayerContent* Layer::getContent() {
     bitFields.dirtyContent = false;
   }
   return layerContent.get();
-}
-
-std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
-  if (_filters.empty()) {
-    return nullptr;
-  }
-  std::vector<std::shared_ptr<ImageFilter>> filters;
-  for (const auto& layerFilter : _filters) {
-    DEBUG_ASSERT(layerFilter != nullptr);
-    if (layerFilter->isImageFilter()) {
-      auto* imageFilter = static_cast<LayerImageFilter*>(layerFilter.get());
-      if (auto filter = imageFilter->getImageFilter(contentScale)) {
-        filters.push_back(filter);
-      }
-    }
-  }
-  return ImageFilter::Compose(filters);
 }
 
 std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float contentScale,

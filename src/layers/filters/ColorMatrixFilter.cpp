@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/filters/ColorMatrixFilter.h"
+#include "core/images/FilterImage.h"
 
 namespace tgfx {
 
@@ -32,12 +33,46 @@ void ColorMatrixFilter::setMatrix(const std::array<float, 20>& matrix) {
   invalidateFilter();
 }
 
-std::shared_ptr<ImageFilter> ColorMatrixFilter::onCreateImageFilter(float) {
-  return ImageFilter::ColorFilter(ColorFilter::Matrix(_matrix));
+std::shared_ptr<Image> ColorMatrixFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
+                                                        const Rect&, Point* offset,
+                                                        const Rect* clipBounds) {
+  auto filter = getImageFilter(scale);
+  if (!filter) {
+    return input;
+  }
+  return FilterImage::MakeFrom(std::move(input), std::move(filter), offset, clipBounds);
+}
+
+Rect ColorMatrixFilter::filterBounds(const Rect& srcRect, float contentScale,
+                                     MapDirection direction) {
+  auto filter = getImageFilter(contentScale);
+  if (!filter) {
+    return srcRect;
+  }
+  return filter->filterBounds(srcRect, direction);
+}
+
+void ColorMatrixFilter::invalidateFilter() {
+  lastFilter = nullptr;
+  dirty = true;
+  LayerFilter::invalidateFilter();
 }
 
 ColorMatrixFilter::ColorMatrixFilter(const std::array<float, 20>& matrix)
     : _matrix(std::move(matrix)) {
+}
+
+std::shared_ptr<ImageFilter> ColorMatrixFilter::getImageFilter(float scale) {
+  if (lastScale != scale || dirty) {
+    lastFilter = onCreateImageFilter(scale);
+    lastScale = scale;
+    dirty = false;
+  }
+  return lastFilter;
+}
+
+std::shared_ptr<ImageFilter> ColorMatrixFilter::onCreateImageFilter(float) {
+  return ImageFilter::ColorFilter(ColorFilter::Matrix(_matrix));
 }
 
 }  // namespace tgfx
