@@ -213,8 +213,7 @@ class DisplayList {
    * Once the limit is reached, remaining tiles fall back to cached content from other zoom scales,
    * or are filled with the background color when no fallback is available.
    * Higher values fill the screen faster during zoom and pan at the cost of per-frame GPU load;
-   * lower values prioritize stable frame rate. Tune according to the target platform's GPU
-   * capability.
+   * lower values prioritize stable frame rate.
    */
   int maxTilesRefinedPerFrame() const {
     return _maxTilesRefinedPerFrame;
