@@ -135,17 +135,29 @@ class NoiseFilter : public LayerFilter {
   }
 
   std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                       const Rect& contentBounds, Point* offset) override;
+                                       const Rect& contentBounds, Point* offset,
+                                       const Rect* clipBounds) override;
 
-  Rect filterBounds(const Rect& srcRect, float contentScale) override;
+  void invalidateFilter() override;
 
   /**
-   * Builds the noise overlay ImageFilter with the noise shader sampling origin shifted by the
-   * given amount (in input image pixel units). The shift is the position of the desired noise
-   * anchor (e.g. content bounds center) within the input image coordinate space. Subclasses
-   * construct the colored noise shader, apply the shift, and wrap it in an ImageFilter::Blend.
+   * Builds the base noise shader for the given scale, without any shift applied. The returned
+   * shader contains the colored noise sampling pipeline (fractal noise + density threshold +
+   * color matrix) but is anchored to the shader-local origin. Subclasses with a single shader
+   * (Mono, Multi) implement this; subclasses that manage multiple base shaders themselves (Duo)
+   * override buildAtShift directly and may return nullptr here.
    */
-  virtual std::shared_ptr<ImageFilter> onBuildNoiseImageFilter(float scale, const Point& shift) = 0;
+  virtual std::shared_ptr<Shader> onBuildBaseShader(float scale) = 0;
+
+  /**
+   * Builds the noise overlay ImageFilter shifted to the given anchor in input image pixel space.
+   * The default implementation caches the base shader returned by onBuildBaseShader, applies a
+   * translation matrix per call, and wraps the result in ImageFilter::Blend(blendMode). The base
+   * shader is rebuilt only when the scale changes or the filter is invalidated; geometry-only
+   * changes (anchor shift) reuse the cached base shader. Subclasses with multiple shaders
+   * (e.g. Duo) override this method to manage their own caches.
+   */
+  virtual std::shared_ptr<ImageFilter> buildAtShift(float scale, const Point& shift);
 
   float _size = 4.0f;
   float _density = 0.5f;
@@ -153,6 +165,10 @@ class NoiseFilter : public LayerFilter {
   BlendMode _blendMode = BlendMode::SrcOver;
 
  private:
+  std::shared_ptr<Shader> cachedBaseShader = nullptr;
+  float cachedScale = -1.0f;
+  bool baseDirty = true;
+
   friend class Layer;
 };
 
@@ -174,7 +190,7 @@ class MonoNoiseFilter : public NoiseFilter {
   void setColor(const Color& color);
 
  protected:
-  std::shared_ptr<ImageFilter> onBuildNoiseImageFilter(float scale, const Point& shift) override;
+  std::shared_ptr<Shader> onBuildBaseShader(float scale) override;
 
  private:
   MonoNoiseFilter(float size, float density, const Color& color, float seed, BlendMode blendMode);
@@ -215,7 +231,11 @@ class DuoNoiseFilter : public NoiseFilter {
   void setSecondColor(const Color& color);
 
  protected:
-  std::shared_ptr<ImageFilter> onBuildNoiseImageFilter(float scale, const Point& shift) override;
+  std::shared_ptr<Shader> onBuildBaseShader(float scale) override;
+
+  std::shared_ptr<ImageFilter> buildAtShift(float scale, const Point& shift) override;
+
+  void invalidateFilter() override;
 
  private:
   DuoNoiseFilter(float size, float density, const Color& firstColor, const Color& secondColor,
@@ -223,6 +243,11 @@ class DuoNoiseFilter : public NoiseFilter {
 
   Color _firstColor = Color::Black();
   Color _secondColor = Color::White();
+
+  std::shared_ptr<Shader> cachedDarkBase = nullptr;
+  std::shared_ptr<Shader> cachedBrightBase = nullptr;
+  float cachedDuoScale = -1.0f;
+  bool duoDirty = true;
 
   friend class NoiseFilter;
 };
@@ -246,7 +271,7 @@ class MultiNoiseFilter : public NoiseFilter {
   void setOpacity(float opacity);
 
  protected:
-  std::shared_ptr<ImageFilter> onBuildNoiseImageFilter(float scale, const Point& shift) override;
+  std::shared_ptr<Shader> onBuildBaseShader(float scale) override;
 
  private:
   MultiNoiseFilter(float size, float density, float opacity, float seed, BlendMode blendMode);

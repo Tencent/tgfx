@@ -53,16 +53,6 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
     return {};
   }
 
-  // Compute the layer content bounds in the input image coordinate space, so filters that anchor
-  // to content coordinates (e.g. NoiseFilter) can compensate for surface clipping. The input
-  // image origin sits at inputBounds.topLeft, so contentBounds.topLeft becomes
-  // contentBounds.topLeft - inputBounds.topLeft.
-  auto contentBounds = layer->getBounds();
-  contentBounds.roundOut();
-  auto inputContentBounds =
-      Rect::MakeXYWH(contentBounds.left - inputBounds->left, contentBounds.top - inputBounds->top,
-                     contentBounds.width(), contentBounds.height());
-
   bool hasFilter = !args.excludeEffects && !layer->filters().empty();
 
   // With filters active, force an isotropic scale so blur / drop-shadow operate in pixel space;
@@ -72,6 +62,11 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
                        : contentMatrix;
   auto imageClip = density.mapRect(*inputBounds);
   imageClip.roundOut();
+
+  // Compute the layer content bounds in the input image coordinate space (excluding filter
+  // extensions) so geometry-anchored filters such as NoiseFilter recover the layer-local anchor
+  // regardless of how the input image is clipped relative to the full content bounds.
+  auto inputContentBounds = layer->getInputContentBounds(density.getMaxScale(), imageClip);
 
   OffscreenResult result;
   // Need a Surface backing only when a descendant Background-sourced style will read back
@@ -95,8 +90,11 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
     return result;
   }
   Point filterOffset = {};
+  // Restrict the filter output to the pixels visible in the resulting image so large-radius
+  // filters can skip off-screen processing.
+  Rect imageClipBounds = Rect::MakeWH(result.image->width(), result.image->height());
   result.image = layer->applyFilters(std::move(result.image), density.getMaxScale(),
-                                     inputContentBounds, &filterOffset);
+                                     inputContentBounds, &filterOffset, &imageClipBounds);
   if (result.image == nullptr) {
     return {};
   }
@@ -135,12 +133,9 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
   return RenderPassThroughOnPicture(layer, args, backdrop, parentMatrix, surfaceRect);
 }
 
-OffscreenResult OffscreenRenderer::RenderContentOnSurface(Layer* layer, const DrawArgs& args,
-                                                          std::shared_ptr<Surface> surface,
-                                                          const Matrix& density,
-                                                          const Rect& imageClip,
-                                                          const Rect& inputBounds,
-                                                          const Matrix& contentMatrix) {
+OffscreenResult OffscreenRenderer::RenderContentOnSurface(
+    Layer* layer, const DrawArgs& args, std::shared_ptr<Surface> surface, const Matrix& density,
+    const Rect& imageClip, const Rect& inputBounds, const Matrix& contentMatrix) {
   // Translate the basis so (0,0) maps to imageClip.topLeft, giving the allocated pixel grid a
   // canonical origin.
   auto localToSurface = density;

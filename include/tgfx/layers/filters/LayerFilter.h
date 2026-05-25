@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/MapDirection.h"
 #include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
@@ -42,19 +43,26 @@ class LayerFilter : public LayerProperty {
    * clipped relative to the content bounds.
    * @param offset If non-null, receives the (x, y) translation of the filtered image relative to
    * the input image origin.
+   * @param clipBounds Optional clip rectangle in the input image coordinate space. When provided,
+   * the filter output is restricted to the pixels visible inside this rectangle, enabling backends
+   * to skip processing for off-screen regions (e.g. large-radius blurs).
    * @return The filtered image, or nullptr on failure.
    */
   std::shared_ptr<Image> filterImage(std::shared_ptr<Image> input, float scale,
-                                     const Rect& contentBounds, Point* offset = nullptr);
+                                     const Rect& contentBounds, Point* offset = nullptr,
+                                     const Rect* clipBounds = nullptr);
 
   /**
    * Returns the bounds of the layer filter after applying it to the scaled layer bounds.
    * @param srcRect The scaled bounds of the layer content.
    * @param contentScale The scale factor of the layer bounds relative to its original size. Some
    * layer filters have size-related parameters that must be adjusted with this scale factor.
+   * @param direction Forward computes the destination bounds produced by filtering a source rect.
+   * Reverse computes the source rect needed to fill a destination rect (typically a clip rect).
    * @return The bounds of the layer filter.
    */
-  virtual Rect filterBounds(const Rect& srcRect, float contentScale);
+  virtual Rect filterBounds(const Rect& srcRect, float contentScale,
+                            MapDirection direction = MapDirection::Forward);
 
  protected:
   enum class Type {
@@ -73,10 +81,12 @@ class LayerFilter : public LayerProperty {
 
   /**
    * Subclasses must override this method to produce the filtered image. See filterImage() for
-   * parameter semantics.
+   * parameter semantics, including the optional clipBounds rectangle in the input image
+   * coordinate space.
    */
   virtual std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                               const Rect& contentBounds, Point* offset) = 0;
+                                               const Rect& contentBounds, Point* offset,
+                                               const Rect* clipBounds) = 0;
 
   /**
    * Marks this filter as dirty. Subclasses that maintain cached state should override this method

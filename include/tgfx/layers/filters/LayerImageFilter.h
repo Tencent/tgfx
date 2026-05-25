@@ -31,9 +31,11 @@ class LayerImageFilter : public LayerFilter {
  public:
   /**
    * Returns the bounds of the filter after applying it to the scaled source bounds, using the
-   * underlying ImageFilter's bounds calculation.
+   * underlying ImageFilter's bounds calculation. Supports both forward (output bounds for a
+   * source rect) and reverse (source bounds required for an output rect) mappings.
    */
-  Rect filterBounds(const Rect& srcRect, float contentScale) override;
+  Rect filterBounds(const Rect& srcRect, float contentScale,
+                    MapDirection direction = MapDirection::Forward) override;
 
  protected:
   /**
@@ -43,7 +45,8 @@ class LayerImageFilter : public LayerFilter {
   virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) = 0;
 
   std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                       const Rect& contentBounds, Point* offset) override;
+                                       const Rect& contentBounds, Point* offset,
+                                       const Rect* clipBounds) override;
 
   void invalidateFilter() override;
 

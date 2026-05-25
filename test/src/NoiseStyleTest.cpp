@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "tgfx/core/Image.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
@@ -24,8 +26,6 @@
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/layers/vectors/ImagePattern.h"
-#include "tgfx/core/Image.h"
-#include "tgfx/core/PictureRecorder.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -75,8 +75,8 @@ TGFX_TEST(NoiseStyleTest, NoiseShiftText) {
   for (int i = 0; i < 5; i++) {
     surface->getCanvas()->clear();
     float angle = static_cast<float>(i + 1) * 20.f;
-    auto matrix = Matrix::MakeTrans(lastX + centerX, lastY + centerY) *
-                  Matrix::MakeRotate(angle) * Matrix::MakeTrans(-centerX, -centerY);
+    auto matrix = Matrix::MakeTrans(lastX + centerX, lastY + centerY) * Matrix::MakeRotate(angle) *
+                  Matrix::MakeTrans(-centerX, -centerY);
     textLayer->setMatrix(matrix);
     displayList->render(surface.get());
     EXPECT_TRUE(
@@ -307,9 +307,8 @@ TGFX_TEST(NoiseStyleTest, NoiseMovingRectWithDropShadow) {
     childPath.addRect(Rect::MakeXYWH(offsetX, 50.f, 200.f, 200.f));
     child->setPath(childPath);
     displayList->render(surface.get());
-    EXPECT_TRUE(Baseline::Compare(surface,
-                                  "NoiseStyleTest/NoiseMovingRectWithDropShadow_frame" +
-                                      std::to_string(i)));
+    EXPECT_TRUE(Baseline::Compare(
+        surface, "NoiseStyleTest/NoiseMovingRectWithDropShadow_frame" + std::to_string(i)));
   }
 }
 

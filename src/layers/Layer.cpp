@@ -36,7 +36,6 @@
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
 #include "layers/MaskContext.h"
-#include "tgfx/layers/filters/LayerImageFilter.h"
 #include "layers/OffscreenRenderer.h"
 #include "layers/OpaqueContext.h"
 #include "layers/RegionTransformer.h"
@@ -47,6 +46,7 @@
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/filters/LayerImageFilter.h"
 
 namespace tgfx {
 
@@ -718,9 +718,10 @@ static Rect ComputeContentBounds(const LayerContent& content, const Rect& conten
   return contentMatrix.mapRect(bounds);
 }
 
-Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
+Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds,
+                          bool excludeFilters) {
   auto canPreserve3D = this->canPreserve3D();
-  bool hasEffects = !_layerStyles.empty() || !_filters.empty();
+  bool hasEffects = !_layerStyles.empty() || (!excludeFilters && !_filters.empty());
   // When preserving 3D, the matrix must be passed down to preserve 3D state.
   // Otherwise, when has effects, compute in local coordinates first, then apply matrix at end.
   bool isAffine = Matrix3DUtils::IsMatrix3DAffine(coordinateMatrix);
@@ -733,7 +734,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
         !isAffine && Matrix3DUtils::IsRectBehindCamera(contentBounds, coordinateMatrix);
     if (!behindCamera) {
       auto computedBounds = ComputeContentBounds(*content, contentBounds, coordinateMatrix,
-                                                  applyMatrixAtEnd, computeTightBounds);
+                                                 applyMatrixAtEnd, computeTightBounds);
       bounds.join(computedBounds);
     }
   }
@@ -775,9 +776,11 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
       auto styleBounds = layerStyle->filterBounds(layerBounds, 1.0f);
       bounds.join(styleBounds);
     }
-    for (auto& filter : _filters) {
-      DEBUG_ASSERT(filter != nullptr);
-      bounds = filter->filterBounds(bounds, 1.0f);
+    if (!excludeFilters) {
+      for (auto& filter : _filters) {
+        DEBUG_ASSERT(filter != nullptr);
+        bounds = filter->filterBounds(bounds, 1.0f);
+      }
     }
   }
 
@@ -1102,14 +1105,16 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
 }
 
 std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float contentScale,
-                                           const Rect& contentBounds, Point* offset) {
+                                           const Rect& contentBounds, Point* offset,
+                                           const Rect* clipBounds) {
   if (!image || _filters.empty()) {
     return image;
   }
   for (const auto& layerFilter : _filters) {
     DEBUG_ASSERT(layerFilter != nullptr);
     Point filterOffset = {};
-    image = layerFilter->filterImage(std::move(image), contentScale, contentBounds, &filterOffset);
+    image = layerFilter->filterImage(std::move(image), contentScale, contentBounds, &filterOffset,
+                                     clipBounds);
     if (!image) {
       return nullptr;
     }
@@ -1118,6 +1123,22 @@ std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float c
     }
   }
   return image;
+}
+
+Rect Layer::getInputContentBounds(float scale, const Rect& imageBounds) {
+  auto layerBounds = computeBounds(Matrix3D::I(), false, /*excludeFilters=*/true);
+  return Rect::MakeXYWH(layerBounds.left * scale - imageBounds.left,
+                        layerBounds.top * scale - imageBounds.top, layerBounds.width() * scale,
+                        layerBounds.height() * scale);
+}
+
+Rect Layer::accumulateFilterBoundsReverse(const Rect& srcRect, float contentScale) {
+  auto bounds = srcRect;
+  for (auto it = _filters.rbegin(); it != _filters.rend(); ++it) {
+    DEBUG_ASSERT(*it != nullptr);
+    bounds = (*it)->filterBounds(bounds, contentScale, MapDirection::Reverse);
+  }
+  return bounds;
 }
 
 bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
@@ -1389,9 +1410,9 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 
   auto pictureBounds = layerBounds;
   pictureBounds.scale(contentScale, contentScale);
-  auto filter = getImageFilter(contentScale);
-  if (filter) {
-    auto reverseBounds = filter->filterBounds(pictureBounds, MapDirection::Reverse);
+  auto filterClipBounds = pictureBounds;
+  if (!_filters.empty()) {
+    auto reverseBounds = accumulateFilterBoundsReverse(pictureBounds, contentScale);
     pictureBounds.intersect(reverseBounds);
   }
   PictureRecorder recorder = {};
@@ -1412,12 +1433,10 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 
   if (!_filters.empty()) {
     Point filterOffset = {};
-    auto bounds = getBounds();
-    Rect contentBounds = Rect::MakeXYWH(
-        bounds.left * contentScale - pictureBounds.left,
-        bounds.top * contentScale - pictureBounds.top,
-        bounds.width() * contentScale, bounds.height() * contentScale);
-    image = applyFilters(std::move(image), contentScale, contentBounds, &filterOffset);
+    auto contentBounds = getInputContentBounds(contentScale, pictureBounds);
+    filterClipBounds.offset(-offset.x, -offset.y);
+    image = applyFilters(std::move(image), contentScale, contentBounds, &filterOffset,
+                         &filterClipBounds);
     offset += filterOffset;
   }
 
@@ -1514,11 +1533,8 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
   auto inputBounds = getBounds();
   if (clipBounds.has_value()) {
     auto mappedClipBounds = *clipBounds;
-    if (!excludeEffects) {
-      auto filter = getImageFilter(1.0f);
-      if (filter) {
-        mappedClipBounds = filter->filterBounds(mappedClipBounds, MapDirection::Reverse);
-      }
+    if (!excludeEffects && !_filters.empty()) {
+      mappedClipBounds = accumulateFilterBoundsReverse(mappedClipBounds, 1.0f);
     }
     if (!inputBounds.intersect(mappedClipBounds)) {
       return std::nullopt;
@@ -2139,14 +2155,11 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     // beyond the background content area. Expand the background outset to include the filter's
     // sampling range. Use Reverse direction to calculate required input bounds.
     if (backOutset > 0 && !_filters.empty()) {
-      auto imageFilter = getImageFilter(contentScale);
-      if (imageFilter) {
-        auto baseBounds = imageFilter->filterBounds(Rect::MakeEmpty(), MapDirection::Reverse);
-        if (!baseBounds.isEmpty()) {
-          auto maxOutset =
-              std::max({-baseBounds.left, -baseBounds.top, baseBounds.right, baseBounds.bottom});
-          backOutset += maxOutset;
-        }
+      auto baseBounds = accumulateFilterBoundsReverse(Rect::MakeEmpty(), contentScale);
+      if (!baseBounds.isEmpty()) {
+        auto maxOutset =
+            std::max({-baseBounds.left, -baseBounds.top, baseBounds.right, baseBounds.bottom});
+        backOutset += maxOutset;
       }
     }
   }

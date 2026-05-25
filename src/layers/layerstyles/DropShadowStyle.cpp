@@ -120,7 +120,8 @@ void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Imag
 
 void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                              float alpha, BlendMode blendMode, const Point& contentOffset) {
-  onDrawWithExtraSource(canvas, content, contentScale, nullptr, {}, alpha, blendMode, contentOffset);
+  onDrawWithExtraSource(canvas, content, contentScale, nullptr, {}, alpha, blendMode,
+                        contentOffset);
 }
 
 std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {
