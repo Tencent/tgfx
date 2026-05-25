@@ -211,7 +211,7 @@ class DisplayList {
    * rasterized at the current zoom scale or refined from a fallback cache. Tiles invalidated by
    * content changes are exempt from this cap and always rasterized to keep the frame consistent.
    * Once the cap is reached, remaining tiles fall back to cached content from other zoom scales,
-   * or leave a transparent hole filled with the background color when no fallback is available.
+   * or are filled with the background color when no fallback is available.
    * Higher values fill the screen faster during zoom and pan at the cost of per-frame GPU load;
    * lower values prioritize stable frame rate. The default is 5; tune according to the target
    * platform's GPU capability.
