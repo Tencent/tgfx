@@ -580,10 +580,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       const std::vector<Rect>& dirtyRegions,
                                                       std::vector<DrawTask>* tileTasks,
                                                       std::vector<Rect>* skippedRects) {
-  // The per-frame tile budget is only enforced when zoom-blur is enabled, otherwise every
-  // visible tile is rasterized this frame so behavior matches non-tiled rendering.
-  bool budgetEnabled = _allowZoomBlur;
-  int maxBudget = _maxTilesRefinedPerFrame;
+  auto budgetEnabled = _allowZoomBlur;
+  auto maxBudget = _maxTilesRefinedPerFrame;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
     updateMousePosition();
     lastContentOffset = _contentOffset;
@@ -650,20 +648,19 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     }
     // Tiles invalidated by content changes must be rasterized this frame to keep the frame
     // consistent. They bypass the per-frame budget below.
-    bool mustRefine = false;
     if (!dirtyRectsAtCurrentScale.empty()) {
       auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
-      mustRefine = std::any_of(
+      bool mustRefine = std::any_of(
           dirtyRectsAtCurrentScale.begin(), dirtyRectsAtCurrentScale.end(),
           [&tileRect](const Rect& dirtyRect) { return Rect::Intersects(tileRect, dirtyRect); });
+      if (mustRefine) {
+        dirtyGrids.emplace_back(tileX, tileY);
+        continue;
+      }
     }
     std::vector<DrawTask> fallbackTasks = {};
     if (_allowZoomBlur) {
       fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
-    }
-    if (mustRefine) {
-      dirtyGrids.emplace_back(tileX, tileY);
-      continue;
     }
     if (!fallbackTasks.empty()) {
       // Tile has a same-resolution fallback: refine it only when the per-frame budget allows;
