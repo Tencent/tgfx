@@ -24,6 +24,40 @@
 
 namespace tgfx {
 
+// Density filter for dark pixels: luminance RGB -> inverted alpha -> threshold.
+// Keeps pixels where luminance < density (dark noise), discards bright ones. Uses a single
+// ColorFilter::Matrix to compute the inverted luminance directly into alpha, avoiding the
+// premultiplied handling difference of ColorFilter::Luma().
+static std::shared_ptr<ColorFilter> MakeDarkDensityFilter(float density) {
+  // clang-format off
+  std::array<float, 20> invertLumaMatrix = {
+    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
+    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
+    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
+    -0.2126f, -0.7152f, -0.0722f, 0.0f, 1.0f,
+  };
+  // clang-format on
+  auto invertFilter = ColorFilter::Matrix(invertLumaMatrix);
+  auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - density);
+  return ColorFilter::Compose(invertFilter, thresholdFilter);
+}
+
+// Complementary density filter for bright pixels: luminance RGB -> alpha -> threshold at density.
+// Keeps pixels where luminance >= density (bright noise), discards dark ones.
+static std::shared_ptr<ColorFilter> MakeBrightDensityFilter(float density) {
+  // clang-format off
+  std::array<float, 20> lumaMatrix = {
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+  };
+  // clang-format on
+  auto lumaFilter = ColorFilter::Matrix(lumaMatrix);
+  auto thresholdFilter = ColorFilter::AlphaThreshold(density);
+  return ColorFilter::Compose(lumaFilter, thresholdFilter);
+}
+
 // --- NoiseStyle base ---
 
 NoiseStyle::NoiseStyle(float size, float density, float seed)
@@ -92,40 +126,6 @@ void NoiseStyle::invalidateNoise() {
 std::shared_ptr<Shader> NoiseStyle::getNoiseShader(float contentScale) const {
   auto freq = 1.0f / (_size * contentScale);
   return Shader::MakeFractalNoise(freq, freq, 3, _seed);
-}
-
-// Density filter for dark pixels: luminance RGB -> inverted alpha -> threshold.
-// Keeps pixels where luminance < density (dark noise), discards bright ones. Uses a single
-// ColorFilter::Matrix to compute the inverted luminance directly into alpha, avoiding the
-// premultiplied handling difference of ColorFilter::Luma().
-static std::shared_ptr<ColorFilter> MakeDarkDensityFilter(float density) {
-  // clang-format off
-  std::array<float, 20> invertLumaMatrix = {
-    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
-    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
-    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
-    -0.2126f, -0.7152f, -0.0722f, 0.0f, 1.0f,
-  };
-  // clang-format on
-  auto invertFilter = ColorFilter::Matrix(invertLumaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - density);
-  return ColorFilter::Compose(invertFilter, thresholdFilter);
-}
-
-// Complementary density filter for bright pixels: luminance RGB -> alpha -> threshold at density.
-// Keeps pixels where luminance >= density (bright noise), discards dark ones.
-static std::shared_ptr<ColorFilter> MakeBrightDensityFilter(float density) {
-  // clang-format off
-  std::array<float, 20> lumaMatrix = {
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
-  };
-  // clang-format on
-  auto lumaFilter = ColorFilter::Matrix(lumaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(density);
-  return ColorFilter::Compose(lumaFilter, thresholdFilter);
 }
 
 // Rasterizes a procedural noise shader into a fixed image at local coordinates (0,0).
@@ -298,17 +298,6 @@ void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
   if (noiseShader == nullptr) {
     return;
   }
-  // Contrast enhance RGB and compute inverted luminance to alpha for density thresholding.
-  // clang-format off
-  std::array<float, 20> contrastLumaMatrix = {
-     2.0f,     0.0f,     0.0f,     0.0f, -0.5f,
-     0.0f,     2.0f,     0.0f,     0.0f, -0.5f,
-     0.0f,     0.0f,     2.0f,     0.0f, -0.5f,
-    -0.2126f, -0.7152f, -0.0722f,  0.0f,  1.0f,
-  };
-  // clang-format on
-  auto contrastLumaFilter = ColorFilter::Matrix(contrastLumaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - _density);
   // Scale alpha by opacity (encode into matrix to avoid paint.setAlpha issues).
   float finalAlpha = _opacity * alpha;
   // clang-format off
@@ -320,8 +309,8 @@ void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
   };
   // clang-format on
   auto alphaScaleFilter = ColorFilter::Matrix(alphaScaleMatrix);
-  auto composedFilter = ColorFilter::Compose(contrastLumaFilter, thresholdFilter);
-  composedFilter = ColorFilter::Compose(composedFilter, alphaScaleFilter);
+  auto contrastDensityFilter = MakeDarkDensityFilter(_density);
+  auto composedFilter = ColorFilter::Compose(contrastDensityFilter, alphaScaleFilter);
   auto coloredShader = noiseShader->makeWithColorFilter(std::move(composedFilter));
   DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode, contentOffset);
 }

@@ -37,10 +37,10 @@ class NoiseStyle : public LayerStyle {
   /**
    * Creates a single-color noise style. Noise pixels are filled with the specified color, and the
    * color's alpha serves as the noise opacity.
-   * @param size     The noise grain size. Larger values produce coarser grains. Must be positive.
-   * @param density  The noise density in [0, 1]. Controls the proportion of visible noise pixels.
-   * @param color    The noise color. The alpha component controls the noise opacity.
-   * @param seed     The random seed for the noise pattern.
+   * @param size    The noise grain size. Larger values produce coarser grains. Must be positive.
+   * @param density The noise density in [0, 1]. Controls the proportion of visible noise pixels.
+   * @param color   The noise color. The alpha component controls the noise opacity.
+   * @param seed    The random seed for the noise pattern.
    */
   static std::shared_ptr<MonoNoiseStyle> MakeMono(float size, float density, const Color& color,
                                                   float seed);
@@ -48,24 +48,23 @@ class NoiseStyle : public LayerStyle {
   /**
    * Creates a dual-color noise style. The noise source is split into two complementary regions,
    * each filled with a different color.
-   * @param size         The noise grain size. Larger values produce coarser grains. Must be
-   *                     positive.
-   * @param density      The noise density in [0, 1]. Controls the proportion of visible noise
-   *                     pixels.
-   * @param firstColor   The first noise color. The alpha component controls its opacity.
-   * @param secondColor  The second noise color. The alpha component controls its opacity.
-   * @param seed         The random seed for the noise pattern.
+   * @param size        The noise grain size. Larger values produce coarser grains. Must be
+   *                    positive.
+   * @param density     The noise density in [0, 1]. Controls the proportion of visible noise
+   *                    pixels.
+   * @param firstColor  The first noise color. The alpha component controls its opacity.
+   * @param secondColor The second noise color. The alpha component controls its opacity.
+   * @param seed        The random seed for the noise pattern.
    */
   static std::shared_ptr<DuoNoiseStyle> MakeDuo(float size, float density, const Color& firstColor,
                                                 const Color& secondColor, float seed);
 
   /**
-   * Creates a multi-color noise style that preserves the original Perlin noise RGB values with
-   * enhanced contrast.
-   * @param size     The noise grain size. Larger values produce coarser grains. Must be positive.
-   * @param density  The noise density in [0, 1]. Controls the proportion of visible noise pixels.
-   * @param opacity  The overall noise opacity in [0, 1].
-   * @param seed     The random seed for the noise pattern.
+   * Creates a multi-color noise style that preserves the original Perlin noise RGB values.
+   * @param size    The noise grain size. Larger values produce coarser grains. Must be positive.
+   * @param density The noise density in [0, 1]. Controls the proportion of visible noise pixels.
+   * @param opacity The overall noise opacity in [0, 1].
+   * @param seed    The random seed for the noise pattern.
    */
   static std::shared_ptr<MultiNoiseStyle> MakeMulti(float size, float density, float opacity,
                                                     float seed);
@@ -203,7 +202,7 @@ class DuoNoiseStyle : public NoiseStyle {
 
 /**
  * MultiNoiseStyle adds a multi-color noise overlay above the layer content. The original Perlin
- * noise RGB values are preserved with enhanced contrast.
+ * noise RGB values are preserved.
  */
 class MultiNoiseStyle : public NoiseStyle {
  public:
