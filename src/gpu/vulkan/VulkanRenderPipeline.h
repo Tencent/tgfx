@@ -62,10 +62,6 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
     return uniformBindingSet.count(binding) > 0;
   }
 
-  bool hasTextureBinding(unsigned binding) const {
-    return textureBindingSet.count(binding) > 0;
-  }
-
   const std::unordered_set<unsigned>& getTextureBindings() const {
     return textureBindingSet;
   }
