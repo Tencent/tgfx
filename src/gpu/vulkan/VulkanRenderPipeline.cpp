@@ -152,7 +152,19 @@ VulkanRenderPipeline::VulkanRenderPipeline(VulkanGPU* gpu,
   if (!createPipelineLayout(gpu)) {
     return;
   }
-  createPipeline(gpu, descriptor);
+  if (!createPipeline(gpu, descriptor, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, &pipeline)) {
+    return;
+  }
+  // When extendedDynamicState is unavailable, create a TriangleStrip pipeline variant so that
+  // draw calls requesting strip topology can bind the correct pipeline instead of falling back
+  // to an incorrect TriangleList interpretation.
+  if (!gpu->extensions().extendedDynamicState) {
+    if (!createPipeline(gpu, descriptor, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, &stripPipeline)) {
+      vkDestroyPipeline(gpu->device(), pipeline, nullptr);
+      pipeline = VK_NULL_HANDLE;
+      return;
+    }
+  }
 
   // Build texture binding mapping: user-facing binding -> sequential texture unit index.
   // With multi descriptor set layout, texture bindings start from 0 in both SPIR-V (set 1)
@@ -173,6 +185,10 @@ void VulkanRenderPipeline::onRelease(VulkanGPU* gpu) {
   if (pipeline != VK_NULL_HANDLE) {
     vkDestroyPipeline(device, pipeline, nullptr);
     pipeline = VK_NULL_HANDLE;
+  }
+  if (stripPipeline != VK_NULL_HANDLE) {
+    vkDestroyPipeline(device, stripPipeline, nullptr);
+    stripPipeline = VK_NULL_HANDLE;
   }
   if (pipelineLayout != VK_NULL_HANDLE) {
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
@@ -270,7 +286,8 @@ bool VulkanRenderPipeline::createPipelineLayout(VulkanGPU* gpu) {
 }
 
 bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
-                                          const RenderPipelineDescriptor& descriptor) {
+                                          const RenderPipelineDescriptor& descriptor,
+                                          VkPrimitiveTopology topology, VkPipeline* outPipeline) {
   // Shader stages
   std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
 
@@ -338,7 +355,7 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
 
   VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
   inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-  inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  inputAssembly.topology = topology;
   inputAssembly.primitiveRestartEnable = VK_FALSE;
 
   // Dynamic viewport and scissor
@@ -563,7 +580,7 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
   pipelineInfo.subpass = 0;
 
   result = vkCreateGraphicsPipelines(gpu->device(), gpu->pipelineCache(), 1, &pipelineInfo, nullptr,
-                                     &pipeline);
+                                     outPipeline);
 
   // The render pass object used for pipeline creation can be destroyed immediately since Vulkan
   // only requires render pass compatibility (not identity) at draw time.
