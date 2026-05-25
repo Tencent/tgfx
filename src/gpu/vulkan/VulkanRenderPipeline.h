@@ -44,13 +44,17 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
     return pipelineLayout;
   }
 
-  VkDescriptorSetLayout vulkanDescriptorSetLayout() const {
-    return descriptorSetLayout;
+  /// Returns the descriptor set layout for UBO bindings (set 0).
+  VkDescriptorSetLayout vulkanUboSetLayout() const {
+    return uboSetLayout;
+  }
+
+  /// Returns the descriptor set layout for texture/sampler bindings (set 1).
+  VkDescriptorSetLayout vulkanTextureSetLayout() const {
+    return textureSetLayout;
   }
 
   unsigned getTextureIndex(unsigned binding) const;
-
-  unsigned getDescriptorBinding(unsigned binding) const;
 
   uint32_t getUniformBlockVisibility(unsigned binding) const;
 
@@ -73,15 +77,17 @@ class VulkanRenderPipeline : public RenderPipeline, public VulkanResource {
   VulkanRenderPipeline(VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor);
   ~VulkanRenderPipeline() override = default;
 
-  bool createDescriptorSetLayout(VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor);
+  bool createDescriptorSetLayouts(VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor);
   bool createPipelineLayout(VulkanGPU* gpu);
   bool createPipeline(VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor);
 
   VkPipeline pipeline = VK_NULL_HANDLE;
   VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-  VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+  // Descriptor set 0: UBO bindings (vertex UBO at binding 0, fragment UBO at binding 1).
+  VkDescriptorSetLayout uboSetLayout = VK_NULL_HANDLE;
+  // Descriptor set 1: texture/sampler bindings (binding 0, 1, 2, ...).
+  VkDescriptorSetLayout textureSetLayout = VK_NULL_HANDLE;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
-  std::unordered_map<unsigned, unsigned> textureDescriptorBindings = {};
   std::unordered_map<unsigned, uint32_t> uniformBlockVisibility = {};
   std::unordered_set<unsigned> uniformBindingSet = {};
   std::unordered_set<unsigned> textureBindingSet = {};

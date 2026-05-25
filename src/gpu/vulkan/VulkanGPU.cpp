@@ -480,9 +480,9 @@ void VulkanGPU::processUnreferencedResources() {
 
 // Per-pool capacity for descriptor set allocation. Pools are chained on demand when exhausted
 // (see VulkanCommandEncoder::allocateDescriptorSet), so this value controls granularity rather
-// than a hard per-frame limit. 1024 covers most 2D frames in a single pool; complex scenes
-// transparently chain additional pools as needed.
-static constexpr uint32_t POOL_MAX_DESCRIPTOR_SETS = 1024;
+// than a hard per-frame limit. Each draw allocates 2 sets (UBO + texture), so 2048 covers
+// ~1024 draws per pool before chaining.
+static constexpr uint32_t POOL_MAX_DESCRIPTOR_SETS = 2048;
 static constexpr uint32_t POOL_MAX_UNIFORM_BUFFERS = 2048;
 static constexpr uint32_t POOL_MAX_COMBINED_SAMPLERS = 1024;
 

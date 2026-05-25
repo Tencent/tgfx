@@ -146,7 +146,7 @@ std::shared_ptr<VulkanRenderPipeline> VulkanRenderPipeline::Make(
 
 VulkanRenderPipeline::VulkanRenderPipeline(VulkanGPU* gpu,
                                            const RenderPipelineDescriptor& descriptor) {
-  if (!createDescriptorSetLayout(gpu, descriptor)) {
+  if (!createDescriptorSetLayouts(gpu, descriptor)) {
     return;
   }
   if (!createPipelineLayout(gpu)) {
@@ -154,21 +154,17 @@ VulkanRenderPipeline::VulkanRenderPipeline(VulkanGPU* gpu,
   }
   createPipeline(gpu, descriptor);
 
+  // Build texture binding mapping: user-facing binding -> sequential texture unit index.
+  // With multi descriptor set layout, texture bindings start from 0 in both SPIR-V (set 1)
+  // and the runtime API, so this map is effectively an identity mapping.
   unsigned textureUnit = 0;
   for (auto& entry : descriptor.layout.textureSamplers) {
-    auto spirvBinding = static_cast<unsigned>(TEXTURE_BINDING_POINT_START) + textureUnit;
     textureUnits[entry.binding] = textureUnit++;
-    textureDescriptorBindings[entry.binding] = spirvBinding;
     textureBindingSet.insert(entry.binding);
   }
   for (auto& entry : descriptor.layout.uniformBlocks) {
     uniformBlockVisibility[entry.binding] = entry.visibility;
     uniformBindingSet.insert(entry.binding);
-  }
-
-  // Verify uniform and texture descriptor bindings do not overlap in the same descriptor set.
-  for (auto& [userBinding, descriptorBinding] : textureDescriptorBindings) {
-    DEBUG_ASSERT(uniformBindingSet.count(descriptorBinding) == 0);
   }
 }
 
@@ -182,23 +178,19 @@ void VulkanRenderPipeline::onRelease(VulkanGPU* gpu) {
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     pipelineLayout = VK_NULL_HANDLE;
   }
-  if (descriptorSetLayout != VK_NULL_HANDLE) {
-    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-    descriptorSetLayout = VK_NULL_HANDLE;
+  if (uboSetLayout != VK_NULL_HANDLE) {
+    vkDestroyDescriptorSetLayout(device, uboSetLayout, nullptr);
+    uboSetLayout = VK_NULL_HANDLE;
+  }
+  if (textureSetLayout != VK_NULL_HANDLE) {
+    vkDestroyDescriptorSetLayout(device, textureSetLayout, nullptr);
+    textureSetLayout = VK_NULL_HANDLE;
   }
 }
 
 unsigned VulkanRenderPipeline::getTextureIndex(unsigned binding) const {
   auto result = textureUnits.find(binding);
   if (result != textureUnits.end()) {
-    return result->second;
-  }
-  return binding;
-}
-
-unsigned VulkanRenderPipeline::getDescriptorBinding(unsigned binding) const {
-  auto result = textureDescriptorBindings.find(binding);
-  if (result != textureDescriptorBindings.end()) {
     return result->second;
   }
   return binding;
@@ -212,48 +204,61 @@ uint32_t VulkanRenderPipeline::getUniformBlockVisibility(unsigned binding) const
   return ShaderVisibility::VertexFragment;
 }
 
-bool VulkanRenderPipeline::createDescriptorSetLayout(VulkanGPU* gpu,
-                                                     const RenderPipelineDescriptor& descriptor) {
-  std::vector<VkDescriptorSetLayoutBinding> bindings;
+bool VulkanRenderPipeline::createDescriptorSetLayouts(VulkanGPU* gpu,
+                                                      const RenderPipelineDescriptor& descriptor) {
+  auto device = gpu->device();
 
+  // Set 0: Uniform buffer bindings only.
+  std::vector<VkDescriptorSetLayoutBinding> uboBindings;
   for (auto& entry : descriptor.layout.uniformBlocks) {
     VkDescriptorSetLayoutBinding binding = {};
     binding.binding = entry.binding;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     binding.descriptorCount = 1;
     binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    bindings.push_back(binding);
+    uboBindings.push_back(binding);
+  }
+  VkDescriptorSetLayoutCreateInfo uboLayoutInfo = {};
+  uboLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  uboLayoutInfo.bindingCount = static_cast<uint32_t>(uboBindings.size());
+  uboLayoutInfo.pBindings = uboBindings.data();
+  auto result = vkCreateDescriptorSetLayout(device, &uboLayoutInfo, nullptr, &uboSetLayout);
+  if (result != VK_SUCCESS) {
+    LOGE("VulkanRenderPipeline: vkCreateDescriptorSetLayout (UBO set) failed.");
+    return false;
   }
 
+  // Set 1: Combined image sampler bindings, starting from binding 0.
+  std::vector<VkDescriptorSetLayoutBinding> texBindings;
   unsigned texUnit = 0;
   for (auto& entry : descriptor.layout.textureSamplers) {
+    (void)entry;
     VkDescriptorSetLayoutBinding binding = {};
-    binding.binding = static_cast<unsigned>(TEXTURE_BINDING_POINT_START) + texUnit++;
+    binding.binding = texUnit++;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     binding.descriptorCount = 1;
     binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    bindings.push_back(binding);
+    texBindings.push_back(binding);
   }
-
-  VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-  layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-  layoutInfo.pBindings = bindings.data();
-
-  auto result =
-      vkCreateDescriptorSetLayout(gpu->device(), &layoutInfo, nullptr, &descriptorSetLayout);
+  VkDescriptorSetLayoutCreateInfo texLayoutInfo = {};
+  texLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  texLayoutInfo.bindingCount = static_cast<uint32_t>(texBindings.size());
+  texLayoutInfo.pBindings = texBindings.data();
+  result = vkCreateDescriptorSetLayout(device, &texLayoutInfo, nullptr, &textureSetLayout);
   if (result != VK_SUCCESS) {
-    LOGE("VulkanRenderPipeline: vkCreateDescriptorSetLayout failed.");
+    LOGE("VulkanRenderPipeline: vkCreateDescriptorSetLayout (texture set) failed.");
     return false;
   }
+
   return true;
 }
 
 bool VulkanRenderPipeline::createPipelineLayout(VulkanGPU* gpu) {
+  VkDescriptorSetLayout setLayouts[] = {uboSetLayout, textureSetLayout};
   VkPipelineLayoutCreateInfo layoutInfo = {};
   layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  layoutInfo.setLayoutCount = 1;
-  layoutInfo.pSetLayouts = &descriptorSetLayout;
+  layoutInfo.setLayoutCount = 2;
+  layoutInfo.pSetLayouts = setLayouts;
 
   auto result = vkCreatePipelineLayout(gpu->device(), &layoutInfo, nullptr, &pipelineLayout);
   if (result != VK_SUCCESS) {
