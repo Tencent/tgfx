@@ -297,9 +297,12 @@ std::shared_ptr<ImageFilter> DuoNoiseFilter::buildAtShift(float scale, const Poi
   if (shiftedDark == nullptr || shiftedBright == nullptr) {
     return nullptr;
   }
-  auto firstFilter = ImageFilter::Blend(_blendMode, std::move(shiftedDark));
-  auto secondFilter = ImageFilter::Blend(_blendMode, std::move(shiftedBright));
-  return ImageFilter::Compose(std::move(firstFilter), std::move(secondFilter));
+  auto duoShader =
+      Shader::MakeBlend(BlendMode::SrcOver, std::move(shiftedDark), std::move(shiftedBright));
+  if (duoShader == nullptr) {
+    return nullptr;
+  }
+  return ImageFilter::Blend(_blendMode, std::move(duoShader));
 }
 
 // --- MultiNoiseFilter ---
