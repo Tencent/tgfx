@@ -77,22 +77,18 @@ if %errorlevel% neq 0 (
     goto :restore
 )
 
-:: TODO: Remove fallback after this branch is merged into main.
-:: Main branch still uses the old target name "UpdateBaseline". Once merged, only the new name
-:: "UpdateBaseline_{Backend}" will exist and the else branch can be deleted.
-cmake --build . --target UpdateBaseline_%TARGET_SUFFIX% 2>nul
+cmake --build . --target UpdateBaseline_%TARGET_SUFFIX%
 if !errorlevel! neq 0 (
-    cmake --build . --target UpdateBaseline
-    if !errorlevel! neq 0 (
-        echo Build failed
-        set "BASELINE_FAILED=true"
-        cd ..
-        goto :restore
-    )
-    UpdateBaseline.exe
-) else (
-    UpdateBaseline_%TARGET_SUFFIX%.exe
+    echo Build failed
+    set "BASELINE_FAILED=true"
+    cd ..
+    goto :restore
 )
+
+:: Set up SwiftShader Vulkan library so volk can load it at runtime.
+if /I "%~1"=="USE_VULKAN_SWIFTSHADER" copy /y "%~dp0vendor\swiftshader\win\x64\vk_swiftshader.dll" "%CD%\vulkan-1.dll" >nul 2>&1
+
+UpdateBaseline_%TARGET_SUFFIX%.exe
 if !errorlevel! equ 0 (
     echo ~~~~~~~~~~~~~~~~~~~Update Baseline (%BACKEND_NAME%) Success~~~~~~~~~~~~~~~~~~~~~
 ) else (
