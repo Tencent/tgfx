@@ -57,7 +57,7 @@ Rect BackgroundBlurStyle::filterBackground(const Rect& srcRect, float contentSca
 }
 
 void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
-                                                float contentScale,
+                                                float contentScale, const Point& /*contentOffset*/,
                                                 std::shared_ptr<Image> extraSource,
                                                 const Point& extraSourceOffset, float, BlendMode) {
   if (_blurrinessX <= 0 && _blurrinessY <= 0) {

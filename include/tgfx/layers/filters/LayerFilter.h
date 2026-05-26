@@ -19,38 +19,49 @@
 #pragma once
 
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/MapDirection.h"
 #include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
 class Image;
 
 /**
- * LayerFilter represents a filter that applies effects to a layer, such as blurs, shadows, or color
- * adjustments. It creates a new offscreen image that replaces the original layer content.
- * LayerFilters are mutable and can be changed at any time.
+ * LayerFilter is the abstract base class for filters applied to a layer's rendered image, such as
+ * blurs, shadows, color adjustments, or procedural overlays. A LayerFilter consumes the rendered
+ * layer image and produces a new image. LayerFilters are mutable and can be changed at any time.
  */
 class LayerFilter : public LayerProperty {
  public:
   /**
-   * Applies this filter to the given input image at the specified scale factor. The offset stores
-   * the translation of the filtered image relative to the input image origin. Subclasses that need
-   * custom rendering should override onFilterImage().
+   * Applies this filter to the given input image at the specified scale factor.
    * @param input The source image to filter.
    * @param scale The scale factor to apply to scale-dependent filter parameters.
-   * @param offset If non-null, receives the (x, y) translation of the filtered image.
+   * @param contentBounds The layer content bounds, expressed in the input image coordinate space
+   * (the input image origin is the coordinate origin). Filters whose effect is anchored to the
+   * layer geometry use this rectangle to recover the anchor regardless of how the input image is
+   * clipped relative to the content bounds.
+   * @param clipBounds Optional clip rectangle in the input image coordinate space. When provided,
+   * the filter output is restricted to the pixels visible inside this rectangle, enabling backends
+   * to skip processing for off-screen regions (e.g. large-radius blurs).
+   * @param offset If non-null, receives the (x, y) translation of the filtered image relative to
+   * the input image origin.
    * @return The filtered image, or nullptr on failure.
    */
   std::shared_ptr<Image> filterImage(std::shared_ptr<Image> input, float scale,
+                                     const Rect& contentBounds, const Rect* clipBounds = nullptr,
                                      Point* offset = nullptr);
 
   /**
    * Returns the bounds of the layer filter after applying it to the scaled layer bounds.
    * @param srcRect The scaled bounds of the layer content.
-   * @param contentScale The scale factor of the layer bounds relative to its original size.
-   * Some layer filters have size-related parameters that must be adjusted with this scale factor.
+   * @param contentScale The scale factor of the layer bounds relative to its original size. Some
+   * layer filters have size-related parameters that must be adjusted with this scale factor.
+   * @param direction Forward computes the destination bounds produced by filtering a source rect.
+   * Reverse computes the source rect needed to fill a destination rect (typically a clip rect).
    * @return The bounds of the layer filter.
    */
-  Rect filterBounds(const Rect& srcRect, float contentScale);
+  virtual Rect filterBounds(const Rect& srcRect, float contentScale,
+                            MapDirection direction = MapDirection::Forward);
 
  protected:
   enum class Type {
@@ -68,37 +79,20 @@ class LayerFilter : public LayerProperty {
   }
 
   /**
-   * Creates a new image filter for the given scale factor. Subclasses that can express their effect
-   * as a single ImageFilter should override this method. The default implementation returns nullptr.
-   */
-  virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale);
-
-  /**
-   * Applies this filter to the given input image. Subclasses that need custom rendering beyond
-   * what a single ImageFilter can express should override this method. The default implementation
-   * applies the ImageFilter from onCreateImageFilter() to the input image via FilterImage::MakeFrom.
+   * Subclasses must override this method to produce the filtered image. See filterImage() for
+   * parameter semantics, including the optional clipBounds rectangle in the input image
+   * coordinate space.
    */
   virtual std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                               Point* offset);
+                                               const Rect& contentBounds, const Rect* clipBounds,
+                                               Point* offset) = 0;
 
   /**
-   * Marks the filter as dirty and invalidates the cached filter.
+   * Marks this filter as dirty. Subclasses that maintain cached state should override this method
+   * to drop their caches, then call the base implementation.
    */
-  void invalidateFilter();
+  virtual void invalidateFilter();
 
-  /**
-   * Returns the cached ImageFilter for the given scale, creating it via onCreateImageFilter() if
-   * needed. Available for subclasses that override onFilterImage() and need the internal ImageFilter.
-   */
-  std::shared_ptr<ImageFilter> getImageFilter(float scale);
-
- private:
-  bool dirty = true;
-  float lastScale = 1.0f;
-  std::unique_ptr<Rect> _clipBounds = nullptr;
-  std::shared_ptr<ImageFilter> lastFilter;
-
-  friend class Layer;
   friend class Types;
 };
 }  // namespace tgfx

@@ -21,6 +21,7 @@
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidLayer.h"
+#include "tgfx/layers/TextLayer.h"
 #include "tgfx/layers/filters/BlendFilter.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/ColorMatrixFilter.h"
@@ -125,7 +126,7 @@ TGFX_TEST(LayerFilterTest, dropshadowLayerFilter) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/dropShadow"));
 
   auto src = Rect::MakeXYWH(10, 10, 10, 10);
-  auto bounds = filter4->getImageFilter(1.0f)->filterBounds(src);
+  auto bounds = filter4->filterBounds(src, 1.0f, MapDirection::Forward);
   EXPECT_EQ(bounds, Rect::MakeXYWH(10, 10, 13, 13));
   bounds = ImageFilter::DropShadowOnly(3, 3, 0, 0, Color::White())->filterBounds(src);
   EXPECT_EQ(bounds, Rect::MakeXYWH(13, 13, 10, 10));
@@ -664,6 +665,43 @@ TGFX_TEST(LayerFilterTest, NoiseStyleBlendMode) {
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseStyleBlendMode"));
+}
+
+// NoiseFilterMovingText test migrated from NoiseFilterTest.cpp
+TGFX_TEST(LayerFilterTest, NoiseFilterMovingText) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 500);
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto back = SolidLayer::Make();
+  back->setColor(Color::White());
+  back->setWidth(500);
+  back->setHeight(500);
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+
+  auto noise =
+      NoiseFilter::MakeMono(10.0f, 0.5f, Color::FromRGBA(0, 0, 0, 128), 42.0f, BlendMode::SrcOver);
+
+  auto textLayer = TextLayer::Make();
+  textLayer->setText("filter");
+  textLayer->setFont(Font(typeface, 70.f));
+  textLayer->setTextColor(Color::FromRGBA(192, 192, 192, 255));
+  textLayer->setFilters({noise});
+  back->addChild(textLayer);
+  displayList->root()->addChild(back);
+
+  for (int i = 0; i < 8; i++) {
+    surface->getCanvas()->clear();
+    textLayer->setMatrix(Matrix::MakeTrans(50.f + static_cast<float>(i) * 20.f, 50.f));
+    displayList->render(surface.get());
+    EXPECT_TRUE(Baseline::Compare(
+        surface, "LayerFilterTest/NoiseFilterMovingText_frame" + std::to_string(i)));
+  }
 }
 
 }  // namespace tgfx
