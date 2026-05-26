@@ -322,6 +322,10 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(OHNativeWindow* nativeWindo
   std::vector<VkSurfaceFormatKHR> formats(formatCount);
   vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, formats.data());
 
+  // TODO: The colorSpace parameter is currently unused. Swapchain format is hardcoded to
+  // B8G8R8A8_UNORM + SRGB_NONLINEAR, consistent with Metal and OpenGL backends which also default
+  // to sRGB. HDR / Display-P3 support would require a ColorSpace → VkColorSpaceKHR mapping here.
+  // Spec allows a single {VK_FORMAT_UNDEFINED, SRGB_NONLINEAR} entry meaning "any format".
   VkSurfaceFormatKHR chosenFormat = formats[0];
   if (formats.size() == 1 && formats[0].format == VK_FORMAT_UNDEFINED) {
     chosenFormat = {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
@@ -370,7 +374,13 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(OHNativeWindow* nativeWindo
   swapchainInfo.imageUsage = imageUsage;
   swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   swapchainInfo.preTransform = capabilities.currentTransform;
-  swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+  // Prefer INHERIT so the OHOS compositor controls alpha blending (e.g. system navigation bar
+  // transparency). Fall back to OPAQUE if the device does not advertise INHERIT support.
+  VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+  if (!(capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR)) {
+    compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  }
+  swapchainInfo.compositeAlpha = compositeAlpha;
   swapchainInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
   swapchainInfo.clipped = VK_TRUE;
 
