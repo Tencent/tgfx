@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/filters/NoiseFilter.h"
+#include <utility>
 #include "core/images/FilterImage.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/ColorFilter.h"
@@ -26,27 +27,34 @@
 
 namespace tgfx {
 
-// Density filter for dark pixels: luminance RGB -> inverted alpha -> threshold.
-// Keeps pixels where luminance < density (dark noise), discards bright ones. Uses a single
-// ColorFilter::Matrix to compute the inverted luminance directly into alpha, avoiding the
-// premultiplied handling difference of ColorFilter::Luma().
-static std::shared_ptr<ColorFilter> MakeDarkDensityFilter(float density) {
-  // clang-format off
-  std::array<float, 20> invertLumaMatrix = {
-    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
-    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
-    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
-    -0.2126f, -0.7152f, -0.0722f, 0.0f, 1.0f,
-  };
-  // clang-format on
-  auto invertFilter = ColorFilter::Matrix(invertLumaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - density);
-  return ColorFilter::Compose(invertFilter, thresholdFilter);
+static int ComputeLinearBucket(float density, float slope, float intercept) {
+  density = std::max(0.0f, std::min(1.0f, density));
+  auto value = slope * density + intercept;
+  auto bucket = static_cast<int>(value + 0.5f);
+  return std::max(0, std::min(99, bucket));
 }
 
-// Complementary density filter for bright pixels: luminance RGB -> alpha -> threshold at density.
-// Keeps pixels where luminance >= density (bright noise), discards dark ones.
-static std::shared_ptr<ColorFilter> MakeBrightDensityFilter(float density) {
+// Slopes/intercepts are chosen so that at density=0 each band collapses to a single bucket
+// (dark=25, bright=74) and at density=1 the bands fully expand without overlap:
+//   dark  -> [0, 49], bright -> [50, 99].
+// This keeps the transition strictly monotonic across the full 0..1 range, avoiding the
+// plateau that occurs when bucket values are clamped at the 0 / 99 boundaries.
+static std::pair<int, int> ComputeDarkBandBuckets(float density) {
+  auto lower = ComputeLinearBucket(density, -25.0f, 25.0f);
+  auto upper = ComputeLinearBucket(density, 24.0f, 25.0f);
+  return {lower, upper};
+}
+
+static std::pair<int, int> ComputeBrightBandBuckets(float density) {
+  auto lower = ComputeLinearBucket(density, -24.0f, 74.0f);
+  auto upper = ComputeLinearBucket(density, 25.0f, 74.0f);
+  return {lower, upper};
+}
+
+static std::shared_ptr<ColorFilter> MakeLumaAlphaThresholdFilter(float threshold) {
+  if (threshold <= 0.0f) {
+    return nullptr;
+  }
   // clang-format off
   std::array<float, 20> lumaMatrix = {
     0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
@@ -56,8 +64,38 @@ static std::shared_ptr<ColorFilter> MakeBrightDensityFilter(float density) {
   };
   // clang-format on
   auto lumaFilter = ColorFilter::Matrix(lumaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(density);
+  auto thresholdFilter = ColorFilter::AlphaThreshold(threshold);
   return ColorFilter::Compose(lumaFilter, thresholdFilter);
+}
+
+static std::shared_ptr<Shader> MakeDensityBandShader(std::shared_ptr<Shader> noiseShader,
+                                                     int lowerBucket, int upperBucket) {
+  if (noiseShader == nullptr || lowerBucket < 0 || upperBucket < lowerBucket) {
+    return nullptr;
+  }
+  auto lowerThreshold = static_cast<float>(std::max(0, std::min(99, lowerBucket))) / 100.0f;
+  auto upperThreshold = static_cast<float>(std::max(0, std::min(100, upperBucket + 1))) / 100.0f;
+  auto lowerMaskFilter = MakeLumaAlphaThresholdFilter(lowerThreshold);
+  auto upperMaskFilter = MakeLumaAlphaThresholdFilter(upperThreshold);
+  auto upperMask = noiseShader->makeWithColorFilter(std::move(upperMaskFilter));
+  if (lowerMaskFilter == nullptr) {
+    return Shader::MakeBlend(BlendMode::DstOut, Shader::MakeColorShader(Color::Black()),
+                             std::move(upperMask));
+  }
+  auto lowerMask = noiseShader->makeWithColorFilter(std::move(lowerMaskFilter));
+  return Shader::MakeBlend(BlendMode::DstOut, std::move(lowerMask), std::move(upperMask));
+}
+
+static std::shared_ptr<Shader> MakeBrightDensityFilter(std::shared_ptr<Shader> noiseShader,
+                                                       float density) {
+  auto buckets = ComputeBrightBandBuckets(density);
+  return MakeDensityBandShader(std::move(noiseShader), buckets.first, buckets.second);
+}
+
+static std::shared_ptr<Shader> MakeDarkDensityFilter(std::shared_ptr<Shader> noiseShader,
+                                                     float density) {
+  auto buckets = ComputeDarkBandBuckets(density);
+  return MakeDensityBandShader(std::move(noiseShader), buckets.first, buckets.second);
 }
 
 static std::shared_ptr<Shader> MakeNoiseShader(float size, float scale, float seed) {
@@ -65,16 +103,9 @@ static std::shared_ptr<Shader> MakeNoiseShader(float size, float scale, float se
   return Shader::MakeFractalNoise(freq, freq, 3, seed);
 }
 
-static std::shared_ptr<ColorFilter> MakeColorMatrix(const Color& color, float alpha) {
-  // clang-format off
-  std::array<float, 20> colorMatrix = {
-    0.0f, 0.0f, 0.0f, 0.0f, color.red,
-    0.0f, 0.0f, 0.0f, 0.0f, color.green,
-    0.0f, 0.0f, 0.0f, 0.0f, color.blue,
-    0.0f, 0.0f, 0.0f, alpha, 0.0f,
-  };
-  // clang-format on
-  return ColorFilter::Matrix(colorMatrix);
+static std::shared_ptr<ColorFilter> MakeColorFillFilter(const Color& color, float alpha) {
+  Color fillColor = {color.red, color.green, color.blue, alpha};
+  return ColorFilter::Blend(fillColor, BlendMode::SrcIn);
 }
 
 // Shifts the sampling origin of the shader by (shiftX, shiftY) pixels. When the input image is
@@ -194,12 +225,12 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, 
   if (imageShader == nullptr) {
     return input;
   }
-  auto clippedNoiseShader =
-      Shader::MakeBlend(BlendMode::DstIn, std::move(noiseShader), std::move(imageShader));
-  if (clippedNoiseShader == nullptr) {
-    return input;
-  }
-  auto blendFilter = ImageFilter::Blend(_blendMode, std::move(clippedNoiseShader));
+  // auto clippedNoiseShader =
+  //     Shader::MakeBlend(BlendMode::SrcIn, std::move(imageShader), std::move(noiseShader));
+  // if (clippedNoiseShader == nullptr) {
+  //   return input;
+  // }
+  auto blendFilter = ImageFilter::Blend(BlendMode::SrcIn, std::move(noiseShader));
   if (blendFilter == nullptr) {
     return input;
   }
@@ -226,10 +257,12 @@ std::shared_ptr<Shader> MonoNoiseFilter::onBuildBaseShader(float scale) {
   if (noiseShader == nullptr) {
     return nullptr;
   }
-  auto densityFilter = MakeDarkDensityFilter(_density);
-  auto colorFilter = MakeColorMatrix(_color, _color.alpha);
-  auto composedFilter = ColorFilter::Compose(densityFilter, colorFilter);
-  return noiseShader->makeWithColorFilter(std::move(composedFilter));
+  auto darkMask = MakeDarkDensityFilter(noiseShader, _density);
+  if (darkMask == nullptr) {
+    return nullptr;
+  }
+  auto colorFilter = MakeColorFillFilter(_color, _color.alpha);
+  return darkMask->makeWithColorFilter(std::move(colorFilter));
 }
 
 // --- DuoNoiseFilter ---
@@ -277,17 +310,24 @@ std::shared_ptr<Shader> DuoNoiseFilter::buildAtShift(float scale, const Point& s
       cachedDarkBase = nullptr;
       cachedBrightBase = nullptr;
     } else {
-      // Dark noise layer: keeps pixels where luminance < density, filled with firstColor.
-      auto darkDensity = MakeDarkDensityFilter(_density);
-      auto firstColorFilter = MakeColorMatrix(_firstColor, _firstColor.alpha);
-      auto darkComposed = ColorFilter::Compose(darkDensity, firstColorFilter);
-      cachedDarkBase = noiseShader->makeWithColorFilter(std::move(darkComposed));
+      // Dark noise layer: use low/high limits to form a discrete band, then fill with firstColor.
+      auto darkMask = MakeDarkDensityFilter(noiseShader, _density);
+      if (darkMask == nullptr) {
+        cachedDarkBase = nullptr;
+      } else {
+        auto firstColorFilter = MakeColorFillFilter(_firstColor, _firstColor.alpha);
+        cachedDarkBase = darkMask->makeWithColorFilter(std::move(firstColorFilter));
+      }
 
-      // Bright noise layer: keeps pixels where luminance >= density, filled with secondColor.
-      auto brightDensity = MakeBrightDensityFilter(_density);
-      auto secondColorFilter = MakeColorMatrix(_secondColor, _secondColor.alpha);
-      auto brightComposed = ColorFilter::Compose(brightDensity, secondColorFilter);
-      cachedBrightBase = noiseShader->makeWithColorFilter(std::move(brightComposed));
+      // Bright noise layer: use low/high limits to form a discrete band, then fill with
+      // secondColor.
+      auto brightMask = MakeBrightDensityFilter(noiseShader, _density);
+      if (brightMask == nullptr) {
+        cachedBrightBase = nullptr;
+      } else {
+        auto secondColorFilter = MakeColorFillFilter(_secondColor, _secondColor.alpha);
+        cachedBrightBase = brightMask->makeWithColorFilter(std::move(secondColorFilter));
+      }
     }
     cachedDuoScale = scale;
     duoDirty = false;
