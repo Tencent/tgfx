@@ -223,7 +223,7 @@ if (TGFX_BUILD_PDF)
 endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    list(APPEND TGFX_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-unused-command-line-argument -Wno-invalid-utf8 -Wno-enum-enum-conversion -Wno-variadic-macro-arguments-omitted -Wno-unguarded-availability-new -Wno-zero-length-array -Wno-missing-method-return-type -Wno-deprecated-declarations -Wno-variadic-macros)
+    list(APPEND TGFX_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-unused-command-line-argument)
 endif ()
 
 if (WIN32)
@@ -738,11 +738,6 @@ if (TGFX_BUILD_TESTS)
     target_compile_options(UpdateBaseline PRIVATE ${TGFX_TEST_COMPILE_OPTIONS})
     target_link_options(UpdateBaseline PRIVATE ${TGFX_TEST_LINK_OPTIONS})
     target_link_libraries(UpdateBaseline ${TGFX_TEST_LIBS})
-
-    if (TGFX_USE_METAL)
-        set_source_files_properties(test/src/metal/MetalRenderPassTest.mm PROPERTIES
-            COMPILE_OPTIONS "-Wno-error")
-    endif ()
 
     add_executable(TGFXFullTest ${TGFX_TEST_FILES})
     add_dependencies(TGFXFullTest test-vendor)

@@ -93,7 +93,6 @@ class LayerFilter : public LayerProperty {
    */
   virtual void invalidateFilter();
 
- private:
   friend class Types;
 };
 }  // namespace tgfx

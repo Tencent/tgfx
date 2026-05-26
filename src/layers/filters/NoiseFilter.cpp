@@ -187,7 +187,7 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, 
     return nullptr;
   }
   // Anchor the noise pattern to the content bounds center, expressed in input image pixel space.
-  // contentBounds is already in the input image coordinate space (see Layer::getInputContentBounds),
+  // contentBounds is already in the input image coordinate space (see Layer::mapContentBoundsToImage),
   // so its center is the anchor position directly without an extra scale multiplication.
   Point shift = {contentBounds.centerX(), contentBounds.centerY()};
   auto blendFilter = buildAtShift(scale, shift);
