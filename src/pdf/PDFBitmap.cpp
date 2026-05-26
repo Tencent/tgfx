@@ -112,38 +112,6 @@ uint32_t GetNeighborAvgColor(const Pixmap& pixmap, int xOrig, int yOrig) {
   return 0x00000000;
 }
 
-// Build a tightly-packed RGBA copy of the source pixmap where any pixel with alpha==0 has its RGB
-// channels replaced by the average color of its non-transparent 3x3 neighborhood. The alpha byte
-// is preserved but unused — the JPEG encoder reads only RGB.
-//
-// Used by the DCT (JPEG) path because libjpeg consumes a Pixmap, not a stream, so the cleaned
-// pixels must be staged into a buffer first. The Flate path inlines the same cleanup directly in
-// its streaming write loop and does not need this helper.
-std::vector<uint8_t> BuildCleanRGBA(const Pixmap& pixmap) {
-  auto width = pixmap.width();
-  auto height = pixmap.height();
-  std::vector<uint8_t> dst(static_cast<size_t>(width) * static_cast<size_t>(height) * 4);
-  const auto srcBytes = reinterpret_cast<const uint8_t*>(pixmap.pixels());
-  auto srcRowBytes = pixmap.rowBytes();
-  uint8_t* dstPointer = dst.data();
-  for (int y = 0; y < height; ++y) {
-    auto scanline =
-        reinterpret_cast<const uint32_t*>(srcBytes + (static_cast<size_t>(y) * srcRowBytes));
-    for (int x = 0; x < width; ++x) {
-      uint32_t color = scanline[x];
-      uint8_t alpha = static_cast<uint8_t>((color >> 24) & 0xFF);
-      if (alpha == 0x00) {
-        color = GetNeighborAvgColor(pixmap, x, y);
-      }
-      *dstPointer++ = static_cast<uint8_t>((color >> 0) & 0xFF);
-      *dstPointer++ = static_cast<uint8_t>((color >> 8) & 0xFF);
-      *dstPointer++ = static_cast<uint8_t>((color >> 16) & 0xFF);
-      *dstPointer++ = alpha;
-    }
-  }
-  return dst;
-}
-
 void DoDeflatedAlpha(const Pixmap& pixmap, PDFDocumentImpl* document, PDFIndirectReference ref) {
   PDFMetadata::CompressionLevel compressionLevel = document->metadata().compressionLevel;
   PDFStreamFormat format = compressionLevel == PDFMetadata::CompressionLevel::None
@@ -316,6 +284,39 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
   }
 }
 
+#ifdef TGFX_USE_JPEG_ENCODE
+// Build a tightly-packed RGBA copy of the source pixmap where any pixel with alpha==0 has its RGB
+// channels replaced by the average color of its non-transparent 3x3 neighborhood. The alpha byte
+// is preserved but unused — the JPEG encoder reads only RGB.
+//
+// Used by the DCT (JPEG) path because libjpeg consumes a Pixmap, not a stream, so the cleaned
+// pixels must be staged into a buffer first. The Flate path inlines the same cleanup directly in
+// its streaming write loop and does not need this helper.
+std::vector<uint8_t> BuildCleanRGBA(const Pixmap& pixmap) {
+  auto width = pixmap.width();
+  auto height = pixmap.height();
+  std::vector<uint8_t> dst(static_cast<size_t>(width) * static_cast<size_t>(height) * 4);
+  const auto srcBytes = reinterpret_cast<const uint8_t*>(pixmap.pixels());
+  auto srcRowBytes = pixmap.rowBytes();
+  uint8_t* dstPointer = dst.data();
+  for (int y = 0; y < height; ++y) {
+    auto scanline =
+        reinterpret_cast<const uint32_t*>(srcBytes + (static_cast<size_t>(y) * srcRowBytes));
+    for (int x = 0; x < width; ++x) {
+      uint32_t color = scanline[x];
+      uint8_t alpha = static_cast<uint8_t>((color >> 24) & 0xFF);
+      if (alpha == 0x00) {
+        color = GetNeighborAvgColor(pixmap, x, y);
+      }
+      *dstPointer++ = static_cast<uint8_t>((color >> 0) & 0xFF);
+      *dstPointer++ = static_cast<uint8_t>((color >> 8) & 0xFF);
+      *dstPointer++ = static_cast<uint8_t>((color >> 16) & 0xFF);
+      *dstPointer++ = alpha;
+    }
+  }
+  return dst;
+}
+
 void DoDCTImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpaque, int encodingQuality,
                 PDFIndirectReference ref) {
   // For non-opaque images, replace the RGB of fully-transparent pixels with the neighborhood
@@ -352,6 +353,7 @@ void DoDCTImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpaque, 
     DoDeflatedAlpha(pixmap, document, sMask);
   }
 }
+#endif  // TGFX_USE_JPEG_ENCODE
 
 }  // namespace
 
@@ -388,6 +390,8 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int encoding
     DoDCTImage(pixmap, doc, bitmap.isOpaque(), encodingQuality, ref);
     return;
   }
+#else
+  (void)encodingQuality;
 #endif
 
   DoDeflatedImage(pixmap, doc, bitmap.isOpaque(), ref);
