@@ -86,7 +86,7 @@ if !errorlevel! neq 0 (
 )
 
 :: Set up SwiftShader Vulkan library so volk can load it at runtime.
-if /I "%BACKEND_ARG%"=="USE_VULKAN_SWIFTSHADER" copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\vk_swiftshader.dll" "%CD%\vulkan-1.dll" >nul 2>&1
+if /I "%~1"=="USE_VULKAN_SWIFTSHADER" copy /y "%~dp0vendor\swiftshader\win\x64\vk_swiftshader.dll" "%CD%\vulkan-1.dll" >nul 2>&1
 
 UpdateBaseline_%TARGET_SUFFIX%.exe
 if !errorlevel! equ 0 (
