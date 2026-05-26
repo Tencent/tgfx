@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "tgfx/core/Paint.h"
 #include "tgfx/core/PathMeasure.h"
 #include "tgfx/core/RSXform.h"
 #include "tgfx/core/TextBlobBuilder.h"
@@ -5118,6 +5119,222 @@ TGFX_TEST(VectorLayerTest, FillInTransformedGroup) {
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/FillInTransformedGroup"));
+}
+
+/**
+ * Tests stroke rendering on degenerate geometry (point or line) for built-in vector
+ * shapes in VectorLayer.
+ */
+TGFX_TEST(VectorLayerTest, DegenerateStroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr float CellSize = 190.0f;
+  constexpr float ExtraColShift = 40.0f;
+  constexpr int ColCount = 10;
+  constexpr int RowCount = 5;
+  constexpr float NonDegenerateSize = 100.0f;
+  constexpr float MinExtent = 5e-3f;
+  const Color FillColor = Color::FromRGBA(9, 0, 246, 255);
+  const Color StrokeColor = Color::White();
+
+  enum class SizeMode {
+    Normal,
+    DegeneratePoint,
+    DegenerateLine,
+  };
+
+  struct ColumnConfig {
+    SizeMode size;
+    LineCap cap;
+    LineJoin join;
+    float strokeWidth;
+    bool dashed;
+    float dashLength;
+    float dashGap;
+  };
+
+  const ColumnConfig columns[ColCount] = {
+      {SizeMode::Normal, LineCap::Butt, LineJoin::Bevel, 20.0f, false, 0, 0},
+      {SizeMode::Normal, LineCap::Round, LineJoin::Miter, 20.0f, true, 10.0f, 40.0f},
+      {SizeMode::DegeneratePoint, LineCap::Butt, LineJoin::Miter, 40.0f, false, 0, 0},
+      {SizeMode::DegeneratePoint, LineCap::Butt, LineJoin::Bevel, 50.0f, false, 0, 0},
+      {SizeMode::DegeneratePoint, LineCap::Butt, LineJoin::Round, 50.0f, false, 0, 0},
+      {SizeMode::DegeneratePoint, LineCap::Square, LineJoin::Miter, 40.0f, true, 10.0f, 80.0f},
+      {SizeMode::DegeneratePoint, LineCap::Square, LineJoin::Bevel, 50.0f, true, 10.0f, 100.0f},
+      {SizeMode::DegeneratePoint, LineCap::Round, LineJoin::Bevel, 50.0f, true, 10.0f, 100.0f},
+      {SizeMode::DegenerateLine, LineCap::Square, LineJoin::Bevel, 20.0f, true, 10.0f, 100.0f},
+      {SizeMode::DegeneratePoint, LineCap::Butt, LineJoin::Bevel, 50.0f, true, 10.0f, 100.0f},
+  };
+
+  auto makeShape = [&](int row, SizeMode mode) -> std::shared_ptr<VectorElement> {
+    // row 0: Rectangle
+    if (row == 0) {
+      auto rect = Rectangle::Make();
+      Size size = {NonDegenerateSize, NonDegenerateSize};
+      if (mode == SizeMode::DegeneratePoint) {
+        size = Size{0.0f, 0.0f};
+      } else if (mode == SizeMode::DegenerateLine) {
+        size = Size{0.0f, 60.0f};
+      }
+      rect->setSize(size);
+      return rect;
+    }
+    // row 1: Triangle (Polystar with 3 points)
+    if (row == 1) {
+      auto triangle = Polystar::Make();
+      triangle->setPolystarType(PolystarType::Polygon);
+      triangle->setPointCount(3);
+      if (mode == SizeMode::DegenerateLine) {
+        constexpr float OuterRadius = 30.0f;
+        constexpr float TargetXExtent = 5e-3f;
+        // cos(30 deg) = 0.866025404f
+        auto triangleWidth = OuterRadius * 2.0f * 0.866025404f;
+        auto xScale = TargetXExtent / triangleWidth;
+        triangle->setOuterRadius(OuterRadius);
+        auto innerGroup = VectorGroup::Make();
+        innerGroup->setElements({triangle});
+        // Polystar has no width/height, so x-axis degeneracy is simulated by squashing the
+        // fully-sized polygon via an inner VectorGroup scale.
+        innerGroup->setScale({xScale, 1.0f});
+        return innerGroup;
+      }
+      triangle->setOuterRadius(mode == SizeMode::DegeneratePoint ? 0.0f : NonDegenerateSize * 0.5f);
+      return triangle;
+    }
+
+    // row 2: Star with default r/R = 0.5
+    if (row == 2) {
+      constexpr float StarAOuterRadius = 50.0f;
+      constexpr float StarAInnerRadius = 25.0f;
+
+      auto star = Polystar::Make();
+      star->setPolystarType(PolystarType::Star);
+      star->setPointCount(5);
+      if (mode == SizeMode::DegenerateLine) {
+        // Mirror row 2: R = 30 (nominalSize / 2), default r/R = 0.5.
+        constexpr float OuterRadius = 30.0f;
+        constexpr float InnerRadius = OuterRadius * 0.5f;
+        constexpr float TargetXExtent = 5e-3f;
+        // cos(18 deg) = 0.951056516f
+        auto starWidth = OuterRadius * 2.0f * 0.951056516f;
+        auto xScale = TargetXExtent / starWidth;
+        star->setOuterRadius(OuterRadius);
+        star->setInnerRadius(InnerRadius);
+        auto innerGroup = VectorGroup::Make();
+        innerGroup->setElements({star});
+        // Polystar has no width/height, so x-axis degeneracy is simulated by squashing the
+        // fully-sized polygon via an inner VectorGroup scale.
+        innerGroup->setScale({xScale, 1.0f});
+        return innerGroup;
+      }
+      star->setOuterRadius(mode == SizeMode::DegeneratePoint ? 0.0f : StarAOuterRadius);
+      star->setInnerRadius(mode == SizeMode::DegeneratePoint ? 0.0f : StarAInnerRadius);
+      return star;
+    }
+
+    // row 3: Star with r/R = (3 - sqrt(5)) / 2 (horizontal upper edge)
+    if (row == 3) {
+      constexpr float StarBRatio = 0.381966011f;
+      constexpr float StarBOuterRadius = 50.0f;
+      constexpr float StarBInnerRadius = StarBOuterRadius * StarBRatio;
+      const float StarBFallbackInnerRadius = MinExtent;
+      const float StarBFallbackOuterRadius = MinExtent / StarBRatio;
+
+      auto star = Polystar::Make();
+      star->setPolystarType(PolystarType::Star);
+      star->setPointCount(5);
+      if (mode == SizeMode::DegenerateLine) {
+        constexpr float OuterRadius = 30.0f;
+        constexpr float InnerRadius = OuterRadius * StarBRatio;
+        constexpr float TargetXExtent = 5e-3f;
+        // cos(18 deg) = 0.951056516f
+        auto starWidth = OuterRadius * 2.0f * 0.951056516f;
+        auto xScale = TargetXExtent / starWidth;
+        star->setOuterRadius(OuterRadius);
+        star->setInnerRadius(InnerRadius);
+        auto innerGroup = VectorGroup::Make();
+        innerGroup->setElements({star});
+        // Polystar has no width/height, so x-axis degeneracy is simulated by squashing the
+        // fully-sized polygon via an inner VectorGroup scale.
+        innerGroup->setScale({xScale, 1.0f});
+        return innerGroup;
+      }
+      star->setOuterRadius(mode == SizeMode::DegeneratePoint ? StarBFallbackOuterRadius
+                                                             : StarBOuterRadius);
+      star->setInnerRadius(mode == SizeMode::DegeneratePoint ? StarBFallbackInnerRadius
+                                                             : StarBInnerRadius);
+      return star;
+    }
+
+    // row 4: Ellipse
+    if (row == 4) {
+      auto ellipse = Ellipse::Make();
+      Size size = {NonDegenerateSize, NonDegenerateSize};
+      if (mode == SizeMode::DegeneratePoint) {
+        size = Size{0.0f, 0.0f};
+      } else if (mode == SizeMode::DegenerateLine) {
+        size = Size{0.0f, 60.0f};
+      }
+      ellipse->setSize(size);
+      return ellipse;
+    }
+    return nullptr;
+  };
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+  std::vector<std::shared_ptr<VectorElement>> contents = {};
+
+  for (int row = 0; row < RowCount; ++row) {
+    for (int col = 0; col < ColCount; ++col) {
+      const auto& config = columns[col];
+      auto shape = makeShape(row, config.size);
+      if (shape == nullptr) {
+        continue;
+      }
+      auto fill = MakeFillStyle(FillColor);
+      auto stroke = StrokeStyle::Make(SolidColor::Make(StrokeColor));
+      stroke->setStrokeWidth(config.strokeWidth);
+      stroke->setLineJoin(config.join);
+      stroke->setLineCap(config.cap);
+      stroke->setStrokeAlign(StrokeAlign::Outside);
+      if (config.dashed) {
+        stroke->setDashes({config.dashLength, config.dashGap});
+        stroke->setDashOffset(config.dashLength * 0.5f);
+        stroke->setDashAdaptive(true);
+      }
+      auto group = VectorGroup::Make();
+      // Shift columns starting from the 3rd one rightward so the wide outside-stroke geometry
+      // of column 2 (and the dense row-3 stars in subsequent cols) stays inside its own cell
+      // band. Without this gap, large square-cap strokes from adjacent cells overlap visibly.
+      auto extraShift = col >= 2 ? ExtraColShift : 0.0f;
+      group->setPosition(
+          {col * CellSize + CellSize * 0.5f + extraShift, row * CellSize + CellSize * 0.5f});
+      group->setElements({shape, fill, stroke});
+      contents.push_back(group);
+    }
+  }
+
+  vectorLayer->setContents(contents);
+
+  constexpr int Padding = 20;
+  auto width = static_cast<int>(std::ceil(CellSize * ColCount + ExtraColShift + Padding * 2));
+  auto height = static_cast<int>(std::ceil(CellSize * RowCount + Padding * 2));
+  vectorLayer->setMatrix(Matrix::MakeTrans(Padding, Padding));
+
+  auto background = SolidLayer::Make();
+  background->setColor(Color::FromRGBA(46, 46, 46, 255));
+  background->setWidth(static_cast<float>(width));
+  background->setHeight(static_cast<float>(height));
+  displayList->root()->addChild(background);
+  displayList->root()->addChild(vectorLayer);
+
+  auto surface = Surface::Make(context, width, height);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/DegenerateStroke"));
 }
 
 }  // namespace tgfx

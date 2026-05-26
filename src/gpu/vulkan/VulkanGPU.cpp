@@ -21,6 +21,7 @@
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 
 #include "VulkanGPU.h"
+#include <algorithm>
 #include <cstring>
 #include <shaderc/shaderc.hpp>
 #include <vector>
@@ -38,6 +39,16 @@
 #include "vk_mem_alloc.h"
 
 namespace tgfx {
+
+static bool HasInstanceExtension(const std::vector<VkExtensionProperties>& available,
+                                 const char* name) {
+  for (auto& ext : available) {
+    if (strcmp(ext.extensionName, name) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
 
 #ifdef DEBUG
 // Validation layer callback that routes Vulkan errors and warnings to the tgfx logging system.
@@ -90,7 +101,14 @@ std::unique_ptr<VulkanGPU> VulkanGPU::MakeFrom(VkInstance instance, VkPhysicalDe
   gpu->debugUtilsEnabled = (vkCreateDebugUtilsMessengerEXT != nullptr);
   gpu->installDebugMessenger();
   gpu->_extensions.detectFromDevice();
-  if (!gpu->createAllocator()) {
+  // Query the actual Vulkan API version supported by the host instance. VMA requires this to match
+  // the instance version — using a higher version causes NULL dereferences on 1.0 entry points.
+  uint32_t instanceVersion = VK_API_VERSION_1_0;
+  if (vkEnumerateInstanceVersion != nullptr) {
+    vkEnumerateInstanceVersion(&instanceVersion);
+  }
+  auto allocatorApiVersion = std::min(instanceVersion, static_cast<uint32_t>(VK_API_VERSION_1_1));
+  if (!gpu->createAllocator(allocatorApiVersion)) {
     return nullptr;
   }
   VkPipelineCacheCreateInfo cacheInfo = {};
@@ -130,7 +148,7 @@ bool VulkanGPU::initVulkan() {
     return false;
   }
   volkLoadDevice(vulkanDevice);
-  if (!createAllocator()) {
+  if (!createAllocator(VK_API_VERSION_1_1)) {
     return false;
   }
   VkPipelineCacheCreateInfo cacheInfo = {};
@@ -169,17 +187,49 @@ bool VulkanGPU::createInstance() {
   appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
   appInfo.pEngineName = "TGFX";
   appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-  appInfo.apiVersion = VK_API_VERSION_1_0;
+  // Vulkan 1.1 is required because the engine calls 1.1 core entry points
+  // (e.g. vkGetPhysicalDeviceFeatures2). With a 1.0 instance these symbols are
+  // not loaded by volk and would crash on first use.
+  appInfo.apiVersion = VK_API_VERSION_1_1;
 
-  std::vector<const char*> instanceExtensions = {
-      VK_KHR_SURFACE_EXTENSION_NAME,
+  std::vector<const char*> instanceExtensions;
+
+  // Surface and utility extensions are optional — headless environments (e.g. SwiftShader CI)
+  // may not provide them. Enumerate available extensions first, then enable if present.
+  // VK_KHR_get_physical_device_properties2 is core in 1.1, so 1.1 ICDs may not advertise it
+  // as an extension; request it only when listed.
+  uint32_t availExtCount = 0;
+  auto enumResult = vkEnumerateInstanceExtensionProperties(nullptr, &availExtCount, nullptr);
+  if (enumResult != VK_SUCCESS && enumResult != VK_INCOMPLETE) {
+    LOGE("VulkanGPU::createInstance() vkEnumerateInstanceExtensionProperties failed: %s",
+         VkResultToString(enumResult));
+    return false;
+  }
+  std::vector<VkExtensionProperties> availableExts(availExtCount);
+  enumResult =
+      vkEnumerateInstanceExtensionProperties(nullptr, &availExtCount, availableExts.data());
+  if (enumResult != VK_SUCCESS && enumResult != VK_INCOMPLETE) {
+    LOGE("VulkanGPU::createInstance() vkEnumerateInstanceExtensionProperties failed: %s",
+         VkResultToString(enumResult));
+    return false;
+  }
+
+  if (HasInstanceExtension(availableExts, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)) {
+    instanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+  }
+
+  if (HasInstanceExtension(availableExts, VK_KHR_SURFACE_EXTENSION_NAME)) {
+    instanceExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
 #ifdef _WIN32
-      VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+    if (HasInstanceExtension(availableExts, VK_KHR_WIN32_SURFACE_EXTENSION_NAME)) {
+      instanceExtensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+    }
 #elif defined(__ANDROID__)
-      VK_KHR_ANDROID_SURFACE_EXTENSION_NAME,
+    if (HasInstanceExtension(availableExts, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME)) {
+      instanceExtensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
+    }
 #endif
-      VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-  };
+  }
 
   // In Debug builds, enable VK_LAYER_KHRONOS_validation and VK_EXT_debug_utils if available.
   // This catches spec violations (e.g. missing barriers, layout mismatches) during development.
@@ -197,16 +247,9 @@ bool VulkanGPU::createInstance() {
     }
   }
 
-  uint32_t extCount = 0;
-  vkEnumerateInstanceExtensionProperties(nullptr, &extCount, nullptr);
-  std::vector<VkExtensionProperties> availableExts(extCount);
-  vkEnumerateInstanceExtensionProperties(nullptr, &extCount, availableExts.data());
-  for (auto& ext : availableExts) {
-    if (strcmp(ext.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0) {
-      instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-      debugUtilsEnabled = true;
-      break;
-    }
+  if (HasInstanceExtension(availableExts, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
+    instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    debugUtilsEnabled = true;
   }
 #endif
 
@@ -316,7 +359,7 @@ bool VulkanGPU::createDevice() {
   return true;
 }
 
-bool VulkanGPU::createAllocator() {
+bool VulkanGPU::createAllocator(uint32_t apiVersion) {
   VmaVulkanFunctions vulkanFunctions = {};
   vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
   vulkanFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
@@ -326,7 +369,7 @@ bool VulkanGPU::createAllocator() {
   allocatorInfo.device = vulkanDevice;
   allocatorInfo.instance = vulkanInstance;
   allocatorInfo.pVulkanFunctions = &vulkanFunctions;
-  allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_0;
+  allocatorInfo.vulkanApiVersion = apiVersion;
 
   auto result = vmaCreateAllocator(&allocatorInfo, &vmaAllocator);
   if (result != VK_SUCCESS) {
@@ -480,9 +523,9 @@ void VulkanGPU::processUnreferencedResources() {
 
 // Per-pool capacity for descriptor set allocation. Pools are chained on demand when exhausted
 // (see VulkanCommandEncoder::allocateDescriptorSet), so this value controls granularity rather
-// than a hard per-frame limit. 1024 covers most 2D frames in a single pool; complex scenes
-// transparently chain additional pools as needed.
-static constexpr uint32_t POOL_MAX_DESCRIPTOR_SETS = 1024;
+// than a hard per-frame limit. Each draw allocates 2 sets (UBO + texture), so 2048 covers
+// ~1024 draws per pool before chaining.
+static constexpr uint32_t POOL_MAX_DESCRIPTOR_SETS = 2048;
 static constexpr uint32_t POOL_MAX_UNIFORM_BUFFERS = 2048;
 static constexpr uint32_t POOL_MAX_COMBINED_SAMPLERS = 1024;
 
