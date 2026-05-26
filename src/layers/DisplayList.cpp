@@ -660,9 +660,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   }
   std::vector<std::shared_ptr<Tile>> freeTiles = {};
   bool continuous = false;
-  // The continuous-fill fast path requires every visible tile to be rasterized; skip it when
-  // any tile was deferred to fallback or throttle.
-  if (screenTasks.empty() && skippedRects->empty()) {
+  if (screenTasks.empty()) {
     freeTiles = createContinuousTiles(surface, endX - startX, endY - startY);
     continuous = !freeTiles.empty();
     dirtyGrids = GenerateGridTiles(startX, endX, startY, endY);
