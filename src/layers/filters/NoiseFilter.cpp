@@ -164,7 +164,7 @@ void NoiseFilter::invalidateFilter() {
   LayerFilter::invalidateFilter();
 }
 
-std::shared_ptr<ImageFilter> NoiseFilter::buildAtShift(float scale, const Point& shift) {
+std::shared_ptr<Shader> NoiseFilter::buildAtShift(float scale, const Point& shift) {
   if (baseDirty || cachedScale != scale) {
     cachedBaseShader = onBuildBaseShader(scale);
     cachedScale = scale;
@@ -173,11 +173,7 @@ std::shared_ptr<ImageFilter> NoiseFilter::buildAtShift(float scale, const Point&
   if (cachedBaseShader == nullptr) {
     return nullptr;
   }
-  auto shifted = ShiftShader(cachedBaseShader, shift.x, shift.y);
-  if (shifted == nullptr) {
-    return nullptr;
-  }
-  return ImageFilter::Blend(_blendMode, std::move(shifted));
+  return ShiftShader(cachedBaseShader, shift.x, shift.y);
 }
 
 std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
@@ -190,17 +186,24 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, 
   // contentBounds is already in the input image coordinate space (see Layer::mapContentBoundsToImage),
   // so its center is the anchor position directly without an extra scale multiplication.
   Point shift = {contentBounds.centerX(), contentBounds.centerY()};
-  auto blendFilter = buildAtShift(scale, shift);
-  if (blendFilter == nullptr) {
+  auto noiseShader = buildAtShift(scale, shift);
+  if (noiseShader == nullptr) {
     return input;
   }
   auto imageShader = Shader::MakeImageShader(input);
   if (imageShader == nullptr) {
     return input;
   }
-  auto clipFilter = ImageFilter::Blend(BlendMode::DstIn, std::move(imageShader));
-  auto composedFilter = ImageFilter::Compose(std::move(blendFilter), std::move(clipFilter));
-  return FilterImage::MakeFrom(std::move(input), std::move(composedFilter), offset, clipBounds);
+  auto clippedNoiseShader =
+      Shader::MakeBlend(BlendMode::DstIn, std::move(noiseShader), std::move(imageShader));
+  if (clippedNoiseShader == nullptr) {
+    return input;
+  }
+  auto blendFilter = ImageFilter::Blend(_blendMode, std::move(clippedNoiseShader));
+  if (blendFilter == nullptr) {
+    return input;
+  }
+  return FilterImage::MakeFrom(std::move(input), std::move(blendFilter), offset, clipBounds);
 }
 
 // --- MonoNoiseFilter ---
@@ -267,7 +270,7 @@ std::shared_ptr<Shader> DuoNoiseFilter::onBuildBaseShader(float /*scale*/) {
   return nullptr;
 }
 
-std::shared_ptr<ImageFilter> DuoNoiseFilter::buildAtShift(float scale, const Point& shift) {
+std::shared_ptr<Shader> DuoNoiseFilter::buildAtShift(float scale, const Point& shift) {
   if (duoDirty || cachedDuoScale != scale) {
     auto noiseShader = MakeNoiseShader(_size, scale, _seed);
     if (noiseShader == nullptr) {
@@ -297,12 +300,7 @@ std::shared_ptr<ImageFilter> DuoNoiseFilter::buildAtShift(float scale, const Poi
   if (shiftedDark == nullptr || shiftedBright == nullptr) {
     return nullptr;
   }
-  auto duoShader =
-      Shader::MakeBlend(BlendMode::SrcOver, std::move(shiftedDark), std::move(shiftedBright));
-  if (duoShader == nullptr) {
-    return nullptr;
-  }
-  return ImageFilter::Blend(_blendMode, std::move(duoShader));
+  return Shader::MakeBlend(BlendMode::SrcOver, std::move(shiftedDark), std::move(shiftedBright));
 }
 
 // --- MultiNoiseFilter ---
