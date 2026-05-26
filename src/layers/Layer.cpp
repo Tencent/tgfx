@@ -717,9 +717,10 @@ static Rect ComputeContentBounds(const LayerContent& content, const Rect& conten
   return contentMatrix.mapRect(bounds);
 }
 
-Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
+Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds,
+                          bool excludeEffects) {
   auto canPreserve3D = this->canPreserve3D();
-  bool hasEffects = !_layerStyles.empty() || !_filters.empty();
+  bool hasEffects = !excludeEffects && (!_layerStyles.empty() || !_filters.empty());
   // When preserving 3D, the matrix must be passed down to preserve 3D state.
   // Otherwise, when has effects, compute in local coordinates first, then apply matrix at end.
   bool isAffine = Matrix3DUtils::IsMatrix3DAffine(coordinateMatrix);
@@ -731,8 +732,9 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     bool behindCamera =
         !isAffine && Matrix3DUtils::IsRectBehindCamera(contentBounds, coordinateMatrix);
     if (!behindCamera) {
-      bounds.join(ComputeContentBounds(*content, contentBounds, coordinateMatrix, applyMatrixAtEnd,
-                                       computeTightBounds));
+      auto computedBounds = ComputeContentBounds(*content, contentBounds, coordinateMatrix,
+                                                 applyMatrixAtEnd, computeTightBounds);
+      bounds.join(computedBounds);
     }
   }
 
@@ -1088,37 +1090,53 @@ LayerContent* Layer::getContent() {
   return layerContent.get();
 }
 
-std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
-  if (_filters.empty()) {
-    return nullptr;
-  }
-  std::vector<std::shared_ptr<ImageFilter>> filters;
-  for (const auto& layerFilter : _filters) {
-    DEBUG_ASSERT(layerFilter != nullptr);
-    if (auto filter = layerFilter->getImageFilter(contentScale)) {
-      filters.push_back(filter);
-    }
-  }
-  return ImageFilter::Compose(filters);
-}
-
 std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float contentScale,
-                                           Point* offset) {
+                                           const Rect& contentBounds, Point* offset,
+                                           const Rect* clipBounds) {
   if (!image || _filters.empty()) {
     return image;
   }
+  // Each filter may shift the output image origin by filterOffset. Subsequent filters receive an
+  // image in the shifted coordinate system, so the contentBounds and clipBounds rects (originally
+  // expressed in the input image coordinate space) must be translated by -filterOffset before
+  // being passed to the next filter, otherwise geometry-anchored filters would sample or clip in
+  // a stale coordinate system.
+  Rect currentContentBounds = contentBounds;
+  Rect currentClipBounds = clipBounds ? *clipBounds : Rect::MakeEmpty();
+  const Rect* clipBoundsPtr = clipBounds ? &currentClipBounds : nullptr;
   for (const auto& layerFilter : _filters) {
     DEBUG_ASSERT(layerFilter != nullptr);
     Point filterOffset = {};
-    image = layerFilter->filterImage(std::move(image), contentScale, &filterOffset);
+    image = layerFilter->filterImage(std::move(image), contentScale, currentContentBounds,
+                                     clipBoundsPtr, &filterOffset);
     if (!image) {
       return nullptr;
     }
     if (offset) {
       offset->offset(filterOffset.x, filterOffset.y);
     }
+    currentContentBounds.offset(-filterOffset.x, -filterOffset.y);
+    if (clipBoundsPtr) {
+      currentClipBounds.offset(-filterOffset.x, -filterOffset.y);
+    }
   }
   return image;
+}
+
+Rect Layer::mapContentBoundsToImage(float scale, const Rect& imageBounds) {
+  auto layerBounds = computeBounds(Matrix3D::I(), false, /*excludeEffects=*/true);
+  return Rect::MakeXYWH(layerBounds.left * scale - imageBounds.left,
+                        layerBounds.top * scale - imageBounds.top, layerBounds.width() * scale,
+                        layerBounds.height() * scale);
+}
+
+Rect Layer::mapOutputBoundsToInput(const Rect& srcRect, float contentScale) {
+  auto bounds = srcRect;
+  for (auto it = _filters.rbegin(); it != _filters.rend(); ++it) {
+    DEBUG_ASSERT(*it != nullptr);
+    bounds = (*it)->filterBounds(bounds, contentScale, MapDirection::Reverse);
+  }
+  return bounds;
 }
 
 bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
@@ -1340,13 +1358,9 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode) const {
 }
 
 bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
-  // If the layer can start or extend a 3D rendering context, child layers need to maintain
-  // independent 3D states, so subtree caching is not supported.
   if (canPreserve3D()) {
     return false;
   }
-  // The cache stores Normal mode content. Since layers with BackgroundStyle are excluded from
-  // caching, the cached content can also be used for Background mode drawing.
   if (args.excludeEffects) {
     return false;
   }
@@ -1354,7 +1368,6 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
     return false;
   }
   if (subtreeCache) {
-    // Recreate if maxSize has changed
     if (subtreeCache->maxSize() != args.subtreeCacheMaxSize) {
       subtreeCache = std::make_unique<SubtreeCache>(args.subtreeCacheMaxSize);
     }
@@ -1364,8 +1377,6 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
     return false;
   }
   if (!bitFields.staticSubtree) {
-    // Skip caching on the first render to avoid caching content that is only displayed once.
-    // The cache is created on the second render when the layer is confirmed to be reused.
     return false;
   }
   // Skip caching for leaf nodes with basic shapes (Rect, RRect) that have no filters or layer
@@ -1402,9 +1413,9 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 
   auto pictureBounds = layerBounds;
   pictureBounds.scale(contentScale, contentScale);
-  auto filter = getImageFilter(contentScale);
-  if (filter) {
-    auto reverseBounds = filter->filterBounds(pictureBounds, MapDirection::Reverse);
+  auto filterClipBounds = pictureBounds;
+  if (!_filters.empty()) {
+    auto reverseBounds = mapOutputBoundsToInput(pictureBounds, contentScale);
     pictureBounds.intersect(reverseBounds);
   }
   PictureRecorder recorder = {};
@@ -1425,7 +1436,10 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 
   if (!_filters.empty()) {
     Point filterOffset = {};
-    image = applyFilters(std::move(image), contentScale, &filterOffset);
+    auto contentBounds = mapContentBoundsToImage(contentScale, pictureBounds);
+    filterClipBounds.offset(-offset.x, -offset.y);
+    image = applyFilters(std::move(image), contentScale, contentBounds, &filterOffset,
+                         &filterClipBounds);
     offset += filterOffset;
   }
 
@@ -1524,11 +1538,8 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
   auto inputBounds = getBounds();
   if (clipBounds.has_value()) {
     auto mappedClipBounds = *clipBounds;
-    if (!excludeEffects) {
-      auto filter = getImageFilter(1.0f);
-      if (filter) {
-        mappedClipBounds = filter->filterBounds(mappedClipBounds, MapDirection::Reverse);
-      }
+    if (!excludeEffects && !_filters.empty()) {
+      mappedClipBounds = mapOutputBoundsToInput(mappedClipBounds, 1.0f);
     }
     if (!inputBounds.intersect(mappedClipBounds)) {
       return std::nullopt;
@@ -1910,7 +1921,8 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   canvas->concat(matrix);
   switch (layerStyle->extraSourceType()) {
     case LayerStyleExtraSourceType::None:
-      layerStyle->draw(canvas, contentEntry.image, source->contentScale, alpha);
+      layerStyle->draw(canvas, contentEntry.image, source->contentScale, contentEntry.offset,
+                       alpha);
       break;
     case LayerStyleExtraSourceType::Background:
       // Unreachable: Background-sourced styles are routed through BackgroundHandler.
@@ -1920,7 +1932,8 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
       if (group->contour.has_value()) {
         auto contourOffset = group->contour->offset - contentEntry.offset;
         layerStyle->drawWithExtraSource(canvas, contentEntry.image, source->contentScale,
-                                        group->contour->image, contourOffset, alpha);
+                                        contentEntry.offset, group->contour->image, contourOffset,
+                                        alpha);
       }
       break;
   }
@@ -2094,14 +2107,11 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     // beyond the background content area. Expand the background outset to include the filter's
     // sampling range. Use Reverse direction to calculate required input bounds.
     if (backOutset > 0 && !_filters.empty()) {
-      auto imageFilter = getImageFilter(contentScale);
-      if (imageFilter) {
-        auto baseBounds = imageFilter->filterBounds(Rect::MakeEmpty(), MapDirection::Reverse);
-        if (!baseBounds.isEmpty()) {
-          auto maxOutset =
-              std::max({-baseBounds.left, -baseBounds.top, baseBounds.right, baseBounds.bottom});
-          backOutset += maxOutset;
-        }
+      auto baseBounds = mapOutputBoundsToInput(Rect::MakeEmpty(), contentScale);
+      if (!baseBounds.isEmpty()) {
+        auto maxOutset =
+            std::max({-baseBounds.left, -baseBounds.top, baseBounds.right, baseBounds.bottom});
+        backOutset += maxOutset;
       }
     }
   }

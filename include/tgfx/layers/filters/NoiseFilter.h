@@ -28,12 +28,12 @@ class DuoNoiseFilter;
 class MultiNoiseFilter;
 
 /**
- * NoiseFilter overlays procedural noise on its input image using the specified blend mode. The noise
- * is generated using the Perlin fractal noise algorithm. The noise pattern is anchored to the input
- * image center so that it remains stable as the layer bounds grow or shrink. Only pixels with
- * non-zero alpha in the source image are affected. Three noise modes are available: Mono (single
- * color), Duo (two complementary colors), and Multi (preserving original noise RGB with enhanced
- * contrast).
+ * NoiseFilter overlays procedural noise on its input image using the specified blend mode. The
+ * noise is generated using the Perlin fractal noise algorithm. The noise pattern is anchored to
+ * the layer content bounds center so that it remains stable as the input image is clipped or the
+ * layer is rendered into different surfaces. Only pixels with non-zero alpha in the source image
+ * are affected. Three noise modes are available: Mono (single color), Duo (two complementary
+ * colors), and Multi (preserving original noise RGB with enhanced contrast).
  */
 class NoiseFilter : public LayerFilter {
  public:
@@ -135,21 +135,41 @@ class NoiseFilter : public LayerFilter {
   }
 
   std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
+                                       const Rect& contentBounds, const Rect* clipBounds,
                                        Point* offset) override;
 
+  void invalidateFilter() override;
+
   /**
-   * Builds the noise overlay ImageFilter for an input image of the given dimensions. Subclasses
-   * construct the colored noise shader, shift its sampling origin to the image center, and wrap it
-   * in an ImageFilter::Blend with the configured blend mode. Implementations may compose multiple
-   * layers (e.g. DuoNoiseFilter's two complementary passes).
+   * Builds the base noise shader for the given scale, without any shift applied. The returned
+   * shader contains the colored noise sampling pipeline (fractal noise + density threshold +
+   * color matrix) but is anchored to the shader-local origin. Subclasses with a single shader
+   * (Mono, Multi) implement this; subclasses that manage multiple base shaders themselves (Duo)
+   * override buildAtShift directly and may return nullptr here.
    */
-  virtual std::shared_ptr<ImageFilter> onBuildNoiseImageFilter(float scale, int width,
-                                                               int height) = 0;
+  virtual std::shared_ptr<Shader> onBuildBaseShader(float scale) = 0;
+
+  /**
+   * Builds the noise overlay ImageFilter shifted to the given anchor in input image pixel space.
+   * The default implementation caches the base shader returned by onBuildBaseShader, applies a
+   * translation matrix per call, and wraps the result in ImageFilter::Blend(blendMode). The base
+   * shader is rebuilt only when the scale changes or the filter is invalidated; geometry-only
+   * changes (anchor shift) reuse the cached base shader. Subclasses with multiple shaders
+   * (e.g. Duo) override this method to manage their own caches.
+   */
+  virtual std::shared_ptr<ImageFilter> buildAtShift(float scale, const Point& shift);
 
   float _size = 4.0f;
   float _density = 0.5f;
   float _seed = 0.0f;
   BlendMode _blendMode = BlendMode::SrcOver;
+
+ private:
+  std::shared_ptr<Shader> cachedBaseShader = nullptr;
+  float cachedScale = -1.0f;
+  bool baseDirty = true;
+
+  friend class Layer;
 };
 
 /**
@@ -170,7 +190,7 @@ class MonoNoiseFilter : public NoiseFilter {
   void setColor(const Color& color);
 
  protected:
-  std::shared_ptr<ImageFilter> onBuildNoiseImageFilter(float scale, int width, int height) override;
+  std::shared_ptr<Shader> onBuildBaseShader(float scale) override;
 
  private:
   MonoNoiseFilter(float size, float density, const Color& color, float seed, BlendMode blendMode);
@@ -211,7 +231,11 @@ class DuoNoiseFilter : public NoiseFilter {
   void setSecondColor(const Color& color);
 
  protected:
-  std::shared_ptr<ImageFilter> onBuildNoiseImageFilter(float scale, int width, int height) override;
+  std::shared_ptr<Shader> onBuildBaseShader(float scale) override;
+
+  std::shared_ptr<ImageFilter> buildAtShift(float scale, const Point& shift) override;
+
+  void invalidateFilter() override;
 
  private:
   DuoNoiseFilter(float size, float density, const Color& firstColor, const Color& secondColor,
@@ -219,6 +243,11 @@ class DuoNoiseFilter : public NoiseFilter {
 
   Color _firstColor = Color::Black();
   Color _secondColor = Color::White();
+
+  std::shared_ptr<Shader> cachedDarkBase = nullptr;
+  std::shared_ptr<Shader> cachedBrightBase = nullptr;
+  float cachedDuoScale = -1.0f;
+  bool duoDirty = true;
 
   friend class NoiseFilter;
 };
@@ -242,7 +271,7 @@ class MultiNoiseFilter : public NoiseFilter {
   void setOpacity(float opacity);
 
  protected:
-  std::shared_ptr<ImageFilter> onBuildNoiseImageFilter(float scale, int width, int height) override;
+  std::shared_ptr<Shader> onBuildBaseShader(float scale) override;
 
  private:
   MultiNoiseFilter(float size, float density, float opacity, float seed, BlendMode blendMode);

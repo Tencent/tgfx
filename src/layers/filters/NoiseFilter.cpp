@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/filters/NoiseFilter.h"
 #include "core/images/FilterImage.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
@@ -76,14 +77,15 @@ static std::shared_ptr<ColorFilter> MakeColorMatrix(const Color& color, float al
   return ColorFilter::Matrix(colorMatrix);
 }
 
-// Shifts the sampling origin of the shader from the image top-left to the image center, so the
-// noise pattern is anchored at the input image center and stays stable as the layer bounds change.
-static std::shared_ptr<Shader> CenterShader(std::shared_ptr<Shader> shader, int width, int height) {
+// Shifts the sampling origin of the shader by (shiftX, shiftY) pixels. When the input image is
+// clipped, the shift compensates for the offset so the noise pattern remains anchored relative to
+// the full content bounds rather than the clipped input image origin.
+static std::shared_ptr<Shader> ShiftShader(std::shared_ptr<Shader> shader, float shiftX,
+                                           float shiftY) {
   if (shader == nullptr) {
     return nullptr;
   }
-  return shader->makeWithMatrix(
-      Matrix::MakeTrans(static_cast<float>(width) * 0.5f, static_cast<float>(height) * 0.5f));
+  return shader->makeWithMatrix(Matrix::MakeTrans(shiftX, shiftY));
 }
 
 // --- NoiseFilter base ---
@@ -156,12 +158,39 @@ void NoiseFilter::setBlendMode(BlendMode blendMode) {
   invalidateFilter();
 }
 
+void NoiseFilter::invalidateFilter() {
+  baseDirty = true;
+  cachedBaseShader = nullptr;
+  LayerFilter::invalidateFilter();
+}
+
+std::shared_ptr<ImageFilter> NoiseFilter::buildAtShift(float scale, const Point& shift) {
+  if (baseDirty || cachedScale != scale) {
+    cachedBaseShader = onBuildBaseShader(scale);
+    cachedScale = scale;
+    baseDirty = false;
+  }
+  if (cachedBaseShader == nullptr) {
+    return nullptr;
+  }
+  auto shifted = ShiftShader(cachedBaseShader, shift.x, shift.y);
+  if (shifted == nullptr) {
+    return nullptr;
+  }
+  return ImageFilter::Blend(_blendMode, std::move(shifted));
+}
+
 std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
+                                                  const Rect& contentBounds, const Rect* clipBounds,
                                                   Point* offset) {
   if (input == nullptr) {
     return nullptr;
   }
-  auto blendFilter = onBuildNoiseImageFilter(scale, input->width(), input->height());
+  // Anchor the noise pattern to the content bounds center, expressed in input image pixel space.
+  // contentBounds is already in the input image coordinate space (see Layer::mapContentBoundsToImage),
+  // so its center is the anchor position directly without an extra scale multiplication.
+  Point shift = {contentBounds.centerX(), contentBounds.centerY()};
+  auto blendFilter = buildAtShift(scale, shift);
   if (blendFilter == nullptr) {
     return input;
   }
@@ -171,7 +200,7 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, 
   }
   auto clipFilter = ImageFilter::Blend(BlendMode::DstIn, std::move(imageShader));
   auto composedFilter = ImageFilter::Compose(std::move(blendFilter), std::move(clipFilter));
-  return FilterImage::MakeFrom(std::move(input), std::move(composedFilter), offset);
+  return FilterImage::MakeFrom(std::move(input), std::move(composedFilter), offset, clipBounds);
 }
 
 // --- MonoNoiseFilter ---
@@ -189,8 +218,7 @@ void MonoNoiseFilter::setColor(const Color& color) {
   invalidateFilter();
 }
 
-std::shared_ptr<ImageFilter> MonoNoiseFilter::onBuildNoiseImageFilter(float scale, int width,
-                                                                      int height) {
+std::shared_ptr<Shader> MonoNoiseFilter::onBuildBaseShader(float scale) {
   auto noiseShader = MakeNoiseShader(_size, scale, _seed);
   if (noiseShader == nullptr) {
     return nullptr;
@@ -198,9 +226,7 @@ std::shared_ptr<ImageFilter> MonoNoiseFilter::onBuildNoiseImageFilter(float scal
   auto densityFilter = MakeDarkDensityFilter(_density);
   auto colorFilter = MakeColorMatrix(_color, _color.alpha);
   auto composedFilter = ColorFilter::Compose(densityFilter, colorFilter);
-  auto coloredShader = noiseShader->makeWithColorFilter(std::move(composedFilter));
-  auto centeredShader = CenterShader(std::move(coloredShader), width, height);
-  return ImageFilter::Blend(_blendMode, std::move(centeredShader));
+  return noiseShader->makeWithColorFilter(std::move(composedFilter));
 }
 
 // --- DuoNoiseFilter ---
@@ -227,29 +253,52 @@ void DuoNoiseFilter::setSecondColor(const Color& color) {
   invalidateFilter();
 }
 
-std::shared_ptr<ImageFilter> DuoNoiseFilter::onBuildNoiseImageFilter(float scale, int width,
-                                                                     int height) {
-  auto noiseShader = MakeNoiseShader(_size, scale, _seed);
-  if (noiseShader == nullptr) {
+void DuoNoiseFilter::invalidateFilter() {
+  duoDirty = true;
+  cachedDarkBase = nullptr;
+  cachedBrightBase = nullptr;
+  NoiseFilter::invalidateFilter();
+}
+
+std::shared_ptr<Shader> DuoNoiseFilter::onBuildBaseShader(float /*scale*/) {
+  // Duo manages its own dual-shader cache in buildAtShift; the base-class single-shader path is
+  // unused for Duo.
+  DEBUG_ASSERT(false);
+  return nullptr;
+}
+
+std::shared_ptr<ImageFilter> DuoNoiseFilter::buildAtShift(float scale, const Point& shift) {
+  if (duoDirty || cachedDuoScale != scale) {
+    auto noiseShader = MakeNoiseShader(_size, scale, _seed);
+    if (noiseShader == nullptr) {
+      cachedDarkBase = nullptr;
+      cachedBrightBase = nullptr;
+    } else {
+      // Dark noise layer: keeps pixels where luminance < density, filled with firstColor.
+      auto darkDensity = MakeDarkDensityFilter(_density);
+      auto firstColorFilter = MakeColorMatrix(_firstColor, _firstColor.alpha);
+      auto darkComposed = ColorFilter::Compose(darkDensity, firstColorFilter);
+      cachedDarkBase = noiseShader->makeWithColorFilter(std::move(darkComposed));
+
+      // Bright noise layer: keeps pixels where luminance >= density, filled with secondColor.
+      auto brightDensity = MakeBrightDensityFilter(_density);
+      auto secondColorFilter = MakeColorMatrix(_secondColor, _secondColor.alpha);
+      auto brightComposed = ColorFilter::Compose(brightDensity, secondColorFilter);
+      cachedBrightBase = noiseShader->makeWithColorFilter(std::move(brightComposed));
+    }
+    cachedDuoScale = scale;
+    duoDirty = false;
+  }
+  if (cachedDarkBase == nullptr || cachedBrightBase == nullptr) {
     return nullptr;
   }
-
-  // Dark noise layer: keeps pixels where luminance < density, filled with firstColor.
-  auto darkDensity = MakeDarkDensityFilter(_density);
-  auto firstColorFilter = MakeColorMatrix(_firstColor, _firstColor.alpha);
-  auto darkComposed = ColorFilter::Compose(darkDensity, firstColorFilter);
-  auto darkShader = noiseShader->makeWithColorFilter(std::move(darkComposed));
-  auto centeredDark = CenterShader(std::move(darkShader), width, height);
-  auto firstFilter = ImageFilter::Blend(_blendMode, std::move(centeredDark));
-
-  // Bright noise layer: keeps pixels where luminance >= density, filled with secondColor.
-  auto brightDensity = MakeBrightDensityFilter(_density);
-  auto secondColorFilter = MakeColorMatrix(_secondColor, _secondColor.alpha);
-  auto brightComposed = ColorFilter::Compose(brightDensity, secondColorFilter);
-  auto brightShader = noiseShader->makeWithColorFilter(std::move(brightComposed));
-  auto centeredBright = CenterShader(std::move(brightShader), width, height);
-  auto secondFilter = ImageFilter::Blend(_blendMode, std::move(centeredBright));
-
+  auto shiftedDark = ShiftShader(cachedDarkBase, shift.x, shift.y);
+  auto shiftedBright = ShiftShader(cachedBrightBase, shift.x, shift.y);
+  if (shiftedDark == nullptr || shiftedBright == nullptr) {
+    return nullptr;
+  }
+  auto firstFilter = ImageFilter::Blend(_blendMode, std::move(shiftedDark));
+  auto secondFilter = ImageFilter::Blend(_blendMode, std::move(shiftedBright));
   return ImageFilter::Compose(std::move(firstFilter), std::move(secondFilter));
 }
 
@@ -270,8 +319,7 @@ void MultiNoiseFilter::setOpacity(float opacity) {
   invalidateFilter();
 }
 
-std::shared_ptr<ImageFilter> MultiNoiseFilter::onBuildNoiseImageFilter(float scale, int width,
-                                                                       int height) {
+std::shared_ptr<Shader> MultiNoiseFilter::onBuildBaseShader(float scale) {
   auto noiseShader = MakeNoiseShader(_size, scale, _seed);
   if (noiseShader == nullptr) {
     return nullptr;
@@ -301,10 +349,7 @@ std::shared_ptr<ImageFilter> MultiNoiseFilter::onBuildNoiseImageFilter(float sca
   auto alphaScaleFilter = ColorFilter::Matrix(alphaScaleMatrix);
   auto composedFilter = ColorFilter::Compose(contrastLumaFilter, thresholdFilter);
   composedFilter = ColorFilter::Compose(composedFilter, alphaScaleFilter);
-  auto coloredShader = noiseShader->makeWithColorFilter(std::move(composedFilter));
-  auto centeredShader = CenterShader(std::move(coloredShader), width, height);
-
-  return ImageFilter::Blend(_blendMode, std::move(centeredShader));
+  return noiseShader->makeWithColorFilter(std::move(composedFilter));
 }
 
 }  // namespace tgfx

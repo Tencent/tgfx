@@ -605,7 +605,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   Rect getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds);
 
-  Rect computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds);
+  Rect computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds,
+                     bool excludeEffects = false);
 
   void onAttachToRoot(RootLayer* rootLayer);
 
@@ -621,10 +622,13 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   LayerContent* getContent();
 
-  std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
+  Rect mapContentBoundsToImage(float scale, const Rect& imageBounds);
+
+  Rect mapOutputBoundsToInput(const Rect& srcRect, float contentScale);
 
   std::shared_ptr<Image> applyFilters(std::shared_ptr<Image> image, float contentScale,
-                                      Point* offset);
+                                      const Rect& contentBounds, Point* offset,
+                                      const Rect* clipBounds = nullptr);
 
   virtual bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 

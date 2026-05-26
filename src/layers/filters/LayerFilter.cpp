@@ -17,51 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/filters/LayerFilter.h"
-#include "core/images/FilterImage.h"
 
 namespace tgfx {
 
-std::shared_ptr<ImageFilter> LayerFilter::onCreateImageFilter(float) {
-  return nullptr;
-}
-
-std::shared_ptr<Image> LayerFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
-                                                  Point* offset) {
-  auto filter = getImageFilter(scale);
-  if (!filter) {
-    return input;
-  }
-  return FilterImage::MakeFrom(std::move(input), std::move(filter), offset);
-}
-
 std::shared_ptr<Image> LayerFilter::filterImage(std::shared_ptr<Image> input, float scale,
+                                                const Rect& contentBounds, const Rect* clipBounds,
                                                 Point* offset) {
   if (!input) {
     return nullptr;
   }
-  return onFilterImage(std::move(input), scale, offset);
+  return onFilterImage(std::move(input), scale, contentBounds, clipBounds, offset);
 }
 
-std::shared_ptr<ImageFilter> LayerFilter::getImageFilter(float scale) {
-  if (lastScale != scale || dirty) {
-    lastFilter = onCreateImageFilter(scale);
-    lastScale = scale;
-    dirty = false;
-  }
-  return lastFilter;
-}
-
-Rect LayerFilter::filterBounds(const Rect& srcRect, float contentScale) {
-  auto filter = getImageFilter(contentScale);
-  if (!filter) {
-    return srcRect;
-  }
-  return filter->filterBounds(srcRect);
+Rect LayerFilter::filterBounds(const Rect& srcRect, float, MapDirection) {
+  return srcRect;
 }
 
 void LayerFilter::invalidateFilter() {
-  lastFilter = nullptr;
-  dirty = true;
   invalidateTransform();
 }
 

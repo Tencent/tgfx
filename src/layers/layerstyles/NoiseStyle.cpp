@@ -24,6 +24,40 @@
 
 namespace tgfx {
 
+// Density filter for dark pixels: luminance RGB -> inverted alpha -> threshold.
+// Keeps pixels where luminance < density (dark noise), discards bright ones. Uses a single
+// ColorFilter::Matrix to compute the inverted luminance directly into alpha, avoiding the
+// premultiplied handling difference of ColorFilter::Luma().
+static std::shared_ptr<ColorFilter> MakeDarkDensityFilter(float density) {
+  // clang-format off
+  std::array<float, 20> invertLumaMatrix = {
+    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
+    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
+    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
+    -0.2126f, -0.7152f, -0.0722f, 0.0f, 1.0f,
+  };
+  // clang-format on
+  auto invertFilter = ColorFilter::Matrix(invertLumaMatrix);
+  auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - density);
+  return ColorFilter::Compose(invertFilter, thresholdFilter);
+}
+
+// Complementary density filter for bright pixels: luminance RGB -> alpha -> threshold at density.
+// Keeps pixels where luminance >= density (bright noise), discards dark ones.
+static std::shared_ptr<ColorFilter> MakeBrightDensityFilter(float density) {
+  // clang-format off
+  std::array<float, 20> lumaMatrix = {
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
+    0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
+  };
+  // clang-format on
+  auto lumaFilter = ColorFilter::Matrix(lumaMatrix);
+  auto thresholdFilter = ColorFilter::AlphaThreshold(density);
+  return ColorFilter::Compose(lumaFilter, thresholdFilter);
+}
+
 // --- NoiseStyle base ---
 
 NoiseStyle::NoiseStyle(float size, float density, float seed)
@@ -94,40 +128,6 @@ std::shared_ptr<Shader> NoiseStyle::getNoiseShader(float contentScale) const {
   return Shader::MakeFractalNoise(freq, freq, 3, _seed);
 }
 
-// Density filter for dark pixels: luminance RGB -> inverted alpha -> threshold.
-// Keeps pixels where luminance < density (dark noise), discards bright ones. Uses a single
-// ColorFilter::Matrix to compute the inverted luminance directly into alpha, avoiding the
-// premultiplied handling difference of ColorFilter::Luma().
-static std::shared_ptr<ColorFilter> MakeDarkDensityFilter(float density) {
-  // clang-format off
-  std::array<float, 20> invertLumaMatrix = {
-    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
-    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
-    0.0f,     0.0f,     0.0f,     0.0f, 0.0f,
-    -0.2126f, -0.7152f, -0.0722f, 0.0f, 1.0f,
-  };
-  // clang-format on
-  auto invertFilter = ColorFilter::Matrix(invertLumaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - density);
-  return ColorFilter::Compose(invertFilter, thresholdFilter);
-}
-
-// Complementary density filter for bright pixels: luminance RGB -> alpha -> threshold at density.
-// Keeps pixels where luminance >= density (bright noise), discards dark ones.
-static std::shared_ptr<ColorFilter> MakeBrightDensityFilter(float density) {
-  // clang-format off
-  std::array<float, 20> lumaMatrix = {
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
-  };
-  // clang-format on
-  auto lumaFilter = ColorFilter::Matrix(lumaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(density);
-  return ColorFilter::Compose(lumaFilter, thresholdFilter);
-}
-
 // Rasterizes a procedural noise shader into a fixed image at local coordinates (0,0).
 // This is needed because drawLayerStyles may use canvas->drawPicture() to replay the
 // recording, which would transform shader coordinates by the canvas matrix, causing the
@@ -148,20 +148,26 @@ static std::shared_ptr<Image> RasterizeNoiseShader(std::shared_ptr<Shader> shade
 }
 
 // Draws a noise layer clipped to content alpha. The shader must already have color, density, and
-// alpha fully baked in. The shader is shifted so that its sampling origin aligns with the content
-// image center, then rasterized into a fixed image so that noise coordinates stay local regardless
-// of the canvas matrix during picture playback.
+// alpha fully baked in. The shader sampling origin is anchored to contentOffset (expressed in the
+// content image's local coordinate space). Callers derive this origin from the layer's surface-space
+// position, so the noise pattern stays stable as tiles, dirty regions, or content image sizes
+// change. A half-image offset is added to preserve the original "centered" feel of the noise
+// relative to the content.
 static void DrawNoiseLayer(Canvas* canvas, std::shared_ptr<Image> content,
-                           std::shared_ptr<Shader> coloredShader, BlendMode blendMode) {
+                           std::shared_ptr<Shader> coloredShader, BlendMode blendMode,
+                           const Point& contentOffset) {
   if (coloredShader == nullptr || content == nullptr) {
     return;
   }
   auto width = content->width();
   auto height = content->height();
-  // Shift the sampling origin from the image top-left to the image center, so the noise pattern is
-  // anchored to the layer content center and stays stable as the layer bounds grow or shrink.
-  auto centeredShader = coloredShader->makeWithMatrix(
-      Matrix::MakeTrans(static_cast<float>(width) * 0.5f, static_cast<float>(height) * 0.5f));
+  // Shift the procedural noise so that sample (0,0) lands at contentOffset inside the content
+  // image. A half-image offset is then added so that the original "centered" appearance is
+  // preserved when contentOffset is zero.
+  auto samplingMatrix =
+      Matrix::MakeTrans(-1.f * contentOffset.x + static_cast<float>(width) * 0.5f,
+                        -1.f * contentOffset.y + static_cast<float>(height) * 0.5f);
+  auto centeredShader = coloredShader->makeWithMatrix(samplingMatrix);
   auto noiseImage = RasterizeNoiseShader(std::move(centeredShader), width, height);
   if (noiseImage == nullptr) {
     return;
@@ -188,7 +194,7 @@ void MonoNoiseStyle::setColor(const Color& color) {
 }
 
 void MonoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                            float alpha, BlendMode blendMode) {
+                            const Point& contentOffset, float alpha, BlendMode blendMode) {
   auto noiseShader = getNoiseShader(contentScale);
   if (noiseShader == nullptr) {
     return;
@@ -207,7 +213,7 @@ void MonoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, floa
   };
   // clang-format on
   auto coloredShader = alphaShader->makeWithColorFilter(ColorFilter::Matrix(colorMatrix));
-  DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode);
+  DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode, contentOffset);
 }
 
 // --- DuoNoiseStyle ---
@@ -234,7 +240,7 @@ void DuoNoiseStyle::setSecondColor(const Color& color) {
 }
 
 void DuoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                           float alpha, BlendMode blendMode) {
+                           const Point& contentOffset, float alpha, BlendMode blendMode) {
   auto noiseShader = getNoiseShader(contentScale);
   if (noiseShader == nullptr) {
     return;
@@ -252,7 +258,7 @@ void DuoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float
     };
     // clang-format on
     auto coloredShader = alphaShader->makeWithColorFilter(ColorFilter::Matrix(colorMatrix));
-    DrawNoiseLayer(canvas, content, std::move(coloredShader), blendMode);
+    DrawNoiseLayer(canvas, content, std::move(coloredShader), blendMode, contentOffset);
   }
   {
     auto densityFilter = MakeBrightDensityFilter(_density);
@@ -267,7 +273,7 @@ void DuoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float
     };
     // clang-format on
     auto coloredShader = alphaShader->makeWithColorFilter(ColorFilter::Matrix(colorMatrix));
-    DrawNoiseLayer(canvas, content, std::move(coloredShader), blendMode);
+    DrawNoiseLayer(canvas, content, std::move(coloredShader), blendMode, contentOffset);
   }
 }
 
@@ -287,22 +293,11 @@ void MultiNoiseStyle::setOpacity(float opacity) {
 }
 
 void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                             float alpha, BlendMode blendMode) {
+                             const Point& contentOffset, float alpha, BlendMode blendMode) {
   auto noiseShader = getNoiseShader(contentScale);
   if (noiseShader == nullptr) {
     return;
   }
-  // Contrast enhance RGB and compute inverted luminance to alpha for density thresholding.
-  // clang-format off
-  std::array<float, 20> contrastLumaMatrix = {
-     2.0f,     0.0f,     0.0f,     0.0f, -0.5f,
-     0.0f,     2.0f,     0.0f,     0.0f, -0.5f,
-     0.0f,     0.0f,     2.0f,     0.0f, -0.5f,
-    -0.2126f, -0.7152f, -0.0722f,  0.0f,  1.0f,
-  };
-  // clang-format on
-  auto contrastLumaFilter = ColorFilter::Matrix(contrastLumaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - _density);
   // Scale alpha by opacity (encode into matrix to avoid paint.setAlpha issues).
   float finalAlpha = _opacity * alpha;
   // clang-format off
@@ -314,10 +309,10 @@ void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
   };
   // clang-format on
   auto alphaScaleFilter = ColorFilter::Matrix(alphaScaleMatrix);
-  auto composedFilter = ColorFilter::Compose(contrastLumaFilter, thresholdFilter);
-  composedFilter = ColorFilter::Compose(composedFilter, alphaScaleFilter);
+  auto contrastDensityFilter = MakeDarkDensityFilter(_density);
+  auto composedFilter = ColorFilter::Compose(contrastDensityFilter, alphaScaleFilter);
   auto coloredShader = noiseShader->makeWithColorFilter(std::move(composedFilter));
-  DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode);
+  DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode, contentOffset);
 }
 
 }  // namespace tgfx
