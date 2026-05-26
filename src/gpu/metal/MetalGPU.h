@@ -144,12 +144,12 @@ class MetalGPU : public GPU {
   static uint32_t MakeSamplerKey(const SamplerDescriptor& descriptor);
 
   id<MTLDevice> metalDevice = nil;
-  std::unique_ptr<MetalCaps> caps = nullptr;
-  std::unique_ptr<MetalCommandQueue> commandQueue = nullptr;
+  std::unique_ptr<MetalCaps> caps;
+  std::unique_ptr<MetalCommandQueue> commandQueue;
   // Keep one shader compiler per MetalGPU so glslang stays initialized across shader
   // compilations. The win is not the Compiler object itself, which is lightweight, but avoiding
   // repeated rebuilds of glslang's global built-in symbol tables after init/finalize churn.
-  std::unique_ptr<shaderc::Compiler> compiler = nullptr;
+  std::unique_ptr<shaderc::Compiler> compiler;
   std::list<MetalResource*> resources = {};
   std::shared_ptr<ReturnQueue> returnQueue = ReturnQueue::Make();
   CVMetalTextureCacheRef textureCache = nil;
