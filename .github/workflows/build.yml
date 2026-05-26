@@ -484,13 +484,10 @@ jobs:
       - name: Install CLI Tools
         if: steps.cli-tools-cache.outputs.cache-hit != 'true'
         run: |
-          CLI_DIR=/opt/ohos-cmd-tools
-          mkdir -p $CLI_DIR
-          CLI_ARCHIVE=commandline-tools-linux-x64-6.0.0.868.zip
-          curl -fsSL -o "$CLI_ARCHIVE" "https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/b1/v3/uJyuq_v-TbGSJxGMcQFSgg/$CLI_ARCHIVE?HW-CC-KV=V1&HW-CC-Date=20250408T084712Z&HW-CC-Expire=315360000&HW-CC-Sign=04FFD26C96B03C80E1E82AC0E62B1C19FB2CF5EC4DD3B4E3E5C38E2F06D73B6C"
-          unzip -qo "$CLI_ARCHIVE" -d $CLI_DIR
-          rm -f "$CLI_ARCHIVE"
-          yes | $CLI_DIR/bin/sdkmgr install ets:6.0.0.0 js:6.0.0.0 native:6.0.0.0 previewer:6.0.0.0 toolchains:6.0.0.0 --sdk-directory=$CLI_DIR/sdk --accept_license
+          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/6.0.0.868/commandline-tools-linux-x64-6.0.0.868.zip"
+          curl -L -o /tmp/cmdtools.zip "$TOOLS_URL"
+          unzip -q /tmp/cmdtools.zip -d /tmp
+          sudo mv /tmp/command-line-tools /opt/ohos-cmd-tools
 
       - name: Save CLI Tools Cache
         if: ${{ (github.event_name == 'push') && (steps.cli-tools-cache.outputs.cache-hit != 'true') }}
