@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/filters/InnerShadowFilter.h"
-#include "core/images/FilterImage.h"
 
 namespace tgfx {
 std::shared_ptr<InnerShadowFilter> InnerShadowFilter::Make(float offsetX, float offsetY,
@@ -76,44 +75,10 @@ void InnerShadowFilter::setInnerShadowOnly(bool value) {
   invalidateFilter();
 }
 
-std::shared_ptr<Image> InnerShadowFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
-                                                        const Rect&, const Rect* clipBounds,
-                                                        Point* offset) {
-  auto filter = getImageFilter(scale);
-  if (!filter) {
-    return input;
-  }
-  return FilterImage::MakeFrom(std::move(input), std::move(filter), offset, clipBounds);
-}
-
-Rect InnerShadowFilter::filterBounds(const Rect& srcRect, float contentScale,
-                                     MapDirection direction) {
-  auto filter = getImageFilter(contentScale);
-  if (!filter) {
-    return srcRect;
-  }
-  return filter->filterBounds(srcRect, direction);
-}
-
-void InnerShadowFilter::invalidateFilter() {
-  lastFilter = nullptr;
-  dirty = true;
-  LayerFilter::invalidateFilter();
-}
-
 InnerShadowFilter::InnerShadowFilter(float offsetX, float offsetY, float blurrinessX,
                                      float blurrinessY, const Color& color, bool innerShadowOnly)
     : _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX), _blurrinessY(blurrinessY),
       _color(color), _innerShadowOnly(innerShadowOnly) {
-}
-
-std::shared_ptr<ImageFilter> InnerShadowFilter::getImageFilter(float scale) {
-  if (lastScale != scale || dirty) {
-    lastFilter = onCreateImageFilter(scale);
-    lastScale = scale;
-    dirty = false;
-  }
-  return lastFilter;
 }
 
 std::shared_ptr<ImageFilter> InnerShadowFilter::onCreateImageFilter(float scale) {

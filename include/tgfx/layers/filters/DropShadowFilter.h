@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/LayerImageFilter.h"
 
 namespace tgfx {
 /**
  * A filter draws a drop shadow under the input content.
  */
-class DropShadowFilter : public LayerFilter {
+class DropShadowFilter : public LayerImageFilter {
  public:
   /**
    * Create a filter that draws a drop shadow under the input content.
@@ -110,26 +110,16 @@ class DropShadowFilter : public LayerFilter {
    */
   void setDropsShadowOnly(bool value);
 
-  Rect filterBounds(const Rect& srcRect, float contentScale,
-                    MapDirection direction = MapDirection::Forward) override;
-
  protected:
   Type type() const override {
     return Type::DropShadowFilter;
   }
 
-  std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                       const Rect& contentBounds, const Rect* clipBounds,
-                                       Point* offset) override;
-
-  void invalidateFilter() override;
+  std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:
   DropShadowFilter(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
                    const Color& color, bool dropsShadowOnly);
-
-  std::shared_ptr<ImageFilter> getImageFilter(float scale);
-  std::shared_ptr<ImageFilter> onCreateImageFilter(float scale);
 
   float _offsetX = 0.0f;
   float _offsetY = 0.0f;
@@ -137,10 +127,6 @@ class DropShadowFilter : public LayerFilter {
   float _blurrinessY = 0.0f;
   Color _color = Color::Black();
   bool _dropsShadowOnly = false;
-
-  bool dirty = true;
-  float lastScale = 1.0f;
-  std::shared_ptr<ImageFilter> lastFilter;
 };
 
 }  // namespace tgfx

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/filters/DropShadowFilter.h"
-#include "core/images/FilterImage.h"
 
 namespace tgfx {
 std::shared_ptr<DropShadowFilter> DropShadowFilter::Make(float offsetX, float offsetY,
@@ -75,44 +74,10 @@ void DropShadowFilter::setDropsShadowOnly(bool value) {
   invalidateFilter();
 }
 
-std::shared_ptr<Image> DropShadowFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
-                                                       const Rect&, const Rect* clipBounds,
-                                                       Point* offset) {
-  auto filter = getImageFilter(scale);
-  if (!filter) {
-    return input;
-  }
-  return FilterImage::MakeFrom(std::move(input), std::move(filter), offset, clipBounds);
-}
-
-Rect DropShadowFilter::filterBounds(const Rect& srcRect, float contentScale,
-                                    MapDirection direction) {
-  auto filter = getImageFilter(contentScale);
-  if (!filter) {
-    return srcRect;
-  }
-  return filter->filterBounds(srcRect, direction);
-}
-
-void DropShadowFilter::invalidateFilter() {
-  lastFilter = nullptr;
-  dirty = true;
-  LayerFilter::invalidateFilter();
-}
-
 DropShadowFilter::DropShadowFilter(float offsetX, float offsetY, float blurrinessX,
                                    float blurrinessY, const Color& color, bool dropsShadowOnly)
     : _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX), _blurrinessY(blurrinessY),
       _color(std::move(color)), _dropsShadowOnly(dropsShadowOnly) {
-}
-
-std::shared_ptr<ImageFilter> DropShadowFilter::getImageFilter(float scale) {
-  if (lastScale != scale || dirty) {
-    lastFilter = onCreateImageFilter(scale);
-    lastScale = scale;
-    dirty = false;
-  }
-  return lastFilter;
 }
 
 std::shared_ptr<ImageFilter> DropShadowFilter::onCreateImageFilter(float scale) {

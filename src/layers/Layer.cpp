@@ -1092,16 +1092,28 @@ std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float c
   if (!image || _filters.empty()) {
     return image;
   }
+  // Each filter may shift the output image origin by filterOffset. Subsequent filters receive an
+  // image in the shifted coordinate system, so the contentBounds and clipBounds rects (originally
+  // expressed in the input image coordinate space) must be translated by -filterOffset before
+  // being passed to the next filter, otherwise geometry-anchored filters would sample or clip in
+  // a stale coordinate system.
+  Rect currentContentBounds = contentBounds;
+  Rect currentClipBounds = clipBounds ? *clipBounds : Rect::MakeEmpty();
+  const Rect* clipBoundsPtr = clipBounds ? &currentClipBounds : nullptr;
   for (const auto& layerFilter : _filters) {
     DEBUG_ASSERT(layerFilter != nullptr);
     Point filterOffset = {};
-    image = layerFilter->filterImage(std::move(image), contentScale, contentBounds, clipBounds,
-                                     &filterOffset);
+    image = layerFilter->filterImage(std::move(image), contentScale, currentContentBounds,
+                                     clipBoundsPtr, &filterOffset);
     if (!image) {
       return nullptr;
     }
     if (offset) {
       offset->offset(filterOffset.x, filterOffset.y);
+    }
+    currentContentBounds.offset(-filterOffset.x, -filterOffset.y);
+    if (clipBoundsPtr) {
+      currentClipBounds.offset(-filterOffset.x, -filterOffset.y);
     }
   }
   return image;

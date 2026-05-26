@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/LayerImageFilter.h"
 
 namespace tgfx {
 
 /**
  * A filter that transforms the color using the given 4x5 matrix.
  */
-class ColorMatrixFilter : public LayerFilter {
+class ColorMatrixFilter : public LayerImageFilter {
  public:
   /**
    * Creates a new ColorMatrixFilter that transforms the color using the given 4x5 matrix. The matrix can
@@ -64,30 +64,16 @@ class ColorMatrixFilter : public LayerFilter {
    */
   void setMatrix(const std::array<float, 20>& matrix);
 
-  Rect filterBounds(const Rect& srcRect, float contentScale,
-                    MapDirection direction = MapDirection::Forward) override;
-
  protected:
   Type type() const override {
     return Type::ColorMatrixFilter;
   }
 
-  std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                       const Rect& contentBounds, const Rect* clipBounds,
-                                       Point* offset) override;
-
-  void invalidateFilter() override;
+  std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:
   ColorMatrixFilter(const std::array<float, 20>& matrix);
 
-  std::shared_ptr<ImageFilter> getImageFilter(float scale);
-  std::shared_ptr<ImageFilter> onCreateImageFilter(float scale);
-
   std::array<float, 20> _matrix;
-
-  bool dirty = true;
-  float lastScale = 1.0f;
-  std::shared_ptr<ImageFilter> lastFilter;
 };
 }  // namespace tgfx

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/LayerImageFilter.h"
 
 namespace tgfx {
 
@@ -26,7 +26,7 @@ namespace tgfx {
  * A filter that applies blends between the constant color (src) and input color (dst) based on the
  * BlendMode.
  */
-class BlendFilter : public LayerFilter {
+class BlendFilter : public LayerImageFilter {
  public:
   /**
    * Creates a new ColorFilter that applies blends between the constant color (src) and input color
@@ -60,31 +60,17 @@ class BlendFilter : public LayerFilter {
    */
   void setBlendMode(BlendMode mode);
 
-  Rect filterBounds(const Rect& srcRect, float contentScale,
-                    MapDirection direction = MapDirection::Forward) override;
-
  protected:
   Type type() const override {
     return Type::BlendFilter;
   }
 
-  std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                       const Rect& contentBounds, const Rect* clipBounds,
-                                       Point* offset) override;
-
-  void invalidateFilter() override;
+  std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:
   BlendFilter(const Color& color, BlendMode blendMode);
 
-  std::shared_ptr<ImageFilter> getImageFilter(float scale);
-  std::shared_ptr<ImageFilter> onCreateImageFilter(float scale);
-
   Color _color = Color::Transparent();
   BlendMode _blendMode = BlendMode::SrcOver;
-
-  bool dirty = true;
-  float lastScale = 1.0f;
-  std::shared_ptr<ImageFilter> lastFilter;
 };
 }  // namespace tgfx
