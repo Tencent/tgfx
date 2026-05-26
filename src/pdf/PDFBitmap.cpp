@@ -18,6 +18,7 @@
 
 #include "PDFBitmap.h"
 #include <vector>
+#include "core/utils/USE.h"
 #include "pdf/DeflateStream.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
@@ -391,7 +392,7 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int encoding
     return;
   }
 #else
-  (void)encodingQuality;
+  USE(encodingQuality);
 #endif
 
   DoDeflatedImage(pixmap, doc, bitmap.isOpaque(), ref);
