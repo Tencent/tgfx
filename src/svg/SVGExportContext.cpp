@@ -556,8 +556,6 @@ void SVGExportContext::applyClip(const ClipStack& clip, const Rect& contentBound
   // Per-element anti-alias info is lost; the merged path's AA is left to the SVG renderer.
   auto clipPath = clip.getClipPath();
   if (clipPath.contains(contentBound)) {
-    clipGroupElement = nullptr;
-    currentClipPath = {};
     return;
   }
   applyClipPath(clipPath);
