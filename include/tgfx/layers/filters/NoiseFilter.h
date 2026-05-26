@@ -150,14 +150,13 @@ class NoiseFilter : public LayerFilter {
   virtual std::shared_ptr<Shader> onBuildBaseShader(float scale) = 0;
 
   /**
-   * Builds the noise overlay ImageFilter shifted to the given anchor in input image pixel space.
-   * The default implementation caches the base shader returned by onBuildBaseShader, applies a
-   * translation matrix per call, and wraps the result in ImageFilter::Blend(blendMode). The base
-   * shader is rebuilt only when the scale changes or the filter is invalidated; geometry-only
-   * changes (anchor shift) reuse the cached base shader. Subclasses with multiple shaders
-   * (e.g. Duo) override this method to manage their own caches.
+   * Builds the shifted noise shader at the given anchor in input image pixel space.
+   * The default implementation caches the base shader returned by onBuildBaseShader and applies a
+   * translation matrix per call. The base shader is rebuilt only when the scale changes or the
+   * filter is invalidated; geometry-only changes (anchor shift) reuse the cached base shader.
+   * Subclasses with multiple shaders (e.g. Duo) override this method to manage their own caches.
    */
-  virtual std::shared_ptr<ImageFilter> buildAtShift(float scale, const Point& shift);
+  virtual std::shared_ptr<Shader> buildAtShift(float scale, const Point& shift);
 
   float _size = 4.0f;
   float _density = 0.5f;
@@ -233,7 +232,7 @@ class DuoNoiseFilter : public NoiseFilter {
  protected:
   std::shared_ptr<Shader> onBuildBaseShader(float scale) override;
 
-  std::shared_ptr<ImageFilter> buildAtShift(float scale, const Point& shift) override;
+  std::shared_ptr<Shader> buildAtShift(float scale, const Point& shift) override;
 
   void invalidateFilter() override;
 
