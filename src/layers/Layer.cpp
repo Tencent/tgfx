@@ -718,9 +718,9 @@ static Rect ComputeContentBounds(const LayerContent& content, const Rect& conten
 }
 
 Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds,
-                          bool excludeFilters) {
+                          bool excludeEffects) {
   auto canPreserve3D = this->canPreserve3D();
-  bool hasEffects = !_layerStyles.empty() || (!excludeFilters && !_filters.empty());
+  bool hasEffects = !excludeEffects && (!_layerStyles.empty() || !_filters.empty());
   // When preserving 3D, the matrix must be passed down to preserve 3D state.
   // Otherwise, when has effects, compute in local coordinates first, then apply matrix at end.
   bool isAffine = Matrix3DUtils::IsMatrix3DAffine(coordinateMatrix);
@@ -1118,7 +1118,7 @@ std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float c
 }
 
 Rect Layer::mapContentBoundsToImage(float scale, const Rect& imageBounds) {
-  auto layerBounds = computeBounds(Matrix3D::I(), false, /*excludeFilters=*/true);
+  auto layerBounds = computeBounds(Matrix3D::I(), false, /*excludeEffects=*/true);
   return Rect::MakeXYWH(layerBounds.left * scale - imageBounds.left,
                         layerBounds.top * scale - imageBounds.top, layerBounds.width() * scale,
                         layerBounds.height() * scale);
