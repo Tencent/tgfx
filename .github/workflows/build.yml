@@ -434,11 +434,22 @@ jobs:
           restore-keys: |
             ccache-ohos-${{ runner.os }}-
 
-      - name: Build Harmony
+      - name: Build Harmony (OpenGL)
         run: |
           cd ohos
           sed -i '/"abiFilters"/,/\]/{ /"x86_64"/d }' hello2d/build-profile.json5
           sed -i 's/"arguments": "\(.*\)"/"arguments": "\1 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"/' hello2d/build-profile.json5
+          hvigorw assembleHap \
+            -Dohos.sdk.root=$DEVECO_SDK_HOME \
+            -p buildMode=release \
+            --parallel \
+            --no-daemon
+
+      - name: Build Harmony (Vulkan)
+        run: |
+          cd ohos
+          rm -rf hello2d/build
+          sed -i 's/"arguments": "\(.*\)"/"arguments": "\1 -DTGFX_USE_VULKAN=ON"/' hello2d/build-profile.json5
           hvigorw assembleHap \
             -Dohos.sdk.root=$DEVECO_SDK_HOME \
             -p buildMode=release \
