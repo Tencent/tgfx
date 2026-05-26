@@ -664,6 +664,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     freeTiles = createContinuousTiles(surface, endX - startX, endY - startY);
     continuous = !freeTiles.empty();
     dirtyGrids = GenerateGridTiles(startX, endX, startY, endY);
+    skippedRects->clear();
+    hasZoomBlurTiles = false;
   }
   if (freeTiles.empty()) {
     freeTiles = getFreeTiles(surface, dirtyGrids.size(), sortedCaches);
