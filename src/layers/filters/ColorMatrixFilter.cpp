@@ -34,8 +34,8 @@ void ColorMatrixFilter::setMatrix(const std::array<float, 20>& matrix) {
 }
 
 std::shared_ptr<Image> ColorMatrixFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
-                                                        const Rect&, Point* offset,
-                                                        const Rect* clipBounds) {
+                                                        const Rect&, const Rect* clipBounds,
+                                                        Point* offset) {
   auto filter = getImageFilter(scale);
   if (!filter) {
     return input;

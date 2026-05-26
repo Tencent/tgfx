@@ -42,8 +42,8 @@ void BlendFilter::setColor(const Color& color) {
 }
 
 std::shared_ptr<Image> BlendFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
-                                                  const Rect&, Point* offset,
-                                                  const Rect* clipBounds) {
+                                                  const Rect&, const Rect* clipBounds,
+                                                  Point* offset) {
   auto filter = getImageFilter(scale);
   if (!filter) {
     return input;

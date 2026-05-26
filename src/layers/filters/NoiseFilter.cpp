@@ -181,8 +181,8 @@ std::shared_ptr<ImageFilter> NoiseFilter::buildAtShift(float scale, const Point&
 }
 
 std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
-                                                  const Rect& contentBounds, Point* offset,
-                                                  const Rect* clipBounds) {
+                                                  const Rect& contentBounds, const Rect* clipBounds,
+                                                  Point* offset) {
   if (input == nullptr) {
     return nullptr;
   }

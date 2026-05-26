@@ -1095,8 +1095,8 @@ std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float c
   for (const auto& layerFilter : _filters) {
     DEBUG_ASSERT(layerFilter != nullptr);
     Point filterOffset = {};
-    image = layerFilter->filterImage(std::move(image), contentScale, contentBounds, &filterOffset,
-                                     clipBounds);
+    image = layerFilter->filterImage(std::move(image), contentScale, contentBounds, clipBounds,
+                                     &filterOffset);
     if (!image) {
       return nullptr;
     }

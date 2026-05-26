@@ -40,16 +40,16 @@ class LayerFilter : public LayerProperty {
    * (the input image origin is the coordinate origin). Filters whose effect is anchored to the
    * layer geometry use this rectangle to recover the anchor regardless of how the input image is
    * clipped relative to the content bounds.
-   * @param offset If non-null, receives the (x, y) translation of the filtered image relative to
-   * the input image origin.
    * @param clipBounds Optional clip rectangle in the input image coordinate space. When provided,
    * the filter output is restricted to the pixels visible inside this rectangle, enabling backends
    * to skip processing for off-screen regions (e.g. large-radius blurs).
+   * @param offset If non-null, receives the (x, y) translation of the filtered image relative to
+   * the input image origin.
    * @return The filtered image, or nullptr on failure.
    */
   std::shared_ptr<Image> filterImage(std::shared_ptr<Image> input, float scale,
-                                     const Rect& contentBounds, Point* offset = nullptr,
-                                     const Rect* clipBounds = nullptr);
+                                     const Rect& contentBounds, const Rect* clipBounds = nullptr,
+                                     Point* offset = nullptr);
 
   /**
    * Returns the bounds of the layer filter after applying it to the scaled layer bounds.
@@ -84,8 +84,8 @@ class LayerFilter : public LayerProperty {
    * coordinate space.
    */
   virtual std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                               const Rect& contentBounds, Point* offset,
-                                               const Rect* clipBounds) = 0;
+                                               const Rect& contentBounds, const Rect* clipBounds,
+                                               Point* offset) = 0;
 
   /**
    * Marks this filter as dirty. Subclasses that maintain cached state should override this method

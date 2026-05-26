@@ -77,8 +77,8 @@ void InnerShadowFilter::setInnerShadowOnly(bool value) {
 }
 
 std::shared_ptr<Image> InnerShadowFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
-                                                        const Rect&, Point* offset,
-                                                        const Rect* clipBounds) {
+                                                        const Rect&, const Rect* clipBounds,
+                                                        Point* offset) {
   auto filter = getImageFilter(scale);
   if (!filter) {
     return input;

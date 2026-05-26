@@ -51,8 +51,8 @@ void BlurFilter::setTileMode(TileMode tileMode) {
 }
 
 std::shared_ptr<Image> BlurFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
-                                                 const Rect&, Point* offset,
-                                                 const Rect* clipBounds) {
+                                                 const Rect&, const Rect* clipBounds,
+                                                 Point* offset) {
   auto filter = getImageFilter(scale);
   if (!filter) {
     return input;

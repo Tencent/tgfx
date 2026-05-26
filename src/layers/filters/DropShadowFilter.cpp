@@ -76,8 +76,8 @@ void DropShadowFilter::setDropsShadowOnly(bool value) {
 }
 
 std::shared_ptr<Image> DropShadowFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
-                                                       const Rect&, Point* offset,
-                                                       const Rect* clipBounds) {
+                                                       const Rect&, const Rect* clipBounds,
+                                                       Point* offset) {
   auto filter = getImageFilter(scale);
   if (!filter) {
     return input;

@@ -73,8 +73,8 @@ class ColorMatrixFilter : public LayerFilter {
   }
 
   std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                       const Rect& contentBounds, Point* offset,
-                                       const Rect* clipBounds) override;
+                                       const Rect& contentBounds, const Rect* clipBounds,
+                                       Point* offset) override;
 
   void invalidateFilter() override;
 
