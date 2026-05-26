@@ -91,9 +91,10 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
 }
 
 void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
-                                            float contentScale, std::shared_ptr<Image> extraSource,
+                                            float contentScale, const Point& /*contentOffset*/,
+                                            std::shared_ptr<Image> extraSource,
                                             const Point& extraSourceOffset, float alpha,
-                                            BlendMode blendMode, const Point& /*contentOffset*/) {
+                                            BlendMode blendMode) {
   Point offset = {};
   auto filter = getShadowFilter(contentScale);
   if (!filter) {
@@ -119,9 +120,9 @@ void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Imag
 }
 
 void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                             float alpha, BlendMode blendMode, const Point& contentOffset) {
-  onDrawWithExtraSource(canvas, content, contentScale, nullptr, {}, alpha, blendMode,
-                        contentOffset);
+                             const Point& contentOffset, float alpha, BlendMode blendMode) {
+  onDrawWithExtraSource(canvas, content, contentScale, contentOffset, nullptr, {}, alpha,
+                        blendMode);
 }
 
 std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {

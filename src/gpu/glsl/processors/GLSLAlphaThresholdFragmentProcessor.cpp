@@ -36,6 +36,8 @@ void GLSLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
                            args.inputColor.c_str(), args.inputColor.c_str());
   fragBuilder->codeAppendf("  %s.a = step(%s, %s.a);", args.outputColor.c_str(),
                            thresholdUniformName.c_str(), args.inputColor.c_str());
+  fragBuilder->codeAppendf("  %s = clamp(%s, 0.0, 1.0);", args.outputColor.c_str(),
+                           args.outputColor.c_str());
   fragBuilder->codeAppend("}");
 }
 

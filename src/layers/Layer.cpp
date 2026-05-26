@@ -1951,8 +1951,8 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   canvas->concat(matrix);
   switch (layerStyle->extraSourceType()) {
     case LayerStyleExtraSourceType::None:
-      layerStyle->draw(canvas, contentEntry.image, source->contentScale, alpha,
-                       contentEntry.offset);
+      layerStyle->draw(canvas, contentEntry.image, source->contentScale, contentEntry.offset,
+                       alpha);
       break;
     case LayerStyleExtraSourceType::Background:
       // Unreachable: Background-sourced styles are routed through BackgroundHandler.
@@ -1962,8 +1962,8 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
       if (group->contour.has_value()) {
         auto contourOffset = group->contour->offset - contentEntry.offset;
         layerStyle->drawWithExtraSource(canvas, contentEntry.image, source->contentScale,
-                                        group->contour->image, contourOffset, alpha,
-                                        contentEntry.offset);
+                                        contentEntry.offset, group->contour->image, contourOffset,
+                                        alpha);
       }
       break;
   }

@@ -194,7 +194,7 @@ void MonoNoiseStyle::setColor(const Color& color) {
 }
 
 void MonoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                            float alpha, BlendMode blendMode, const Point& contentOffset) {
+                            const Point& contentOffset, float alpha, BlendMode blendMode) {
   auto noiseShader = getNoiseShader(contentScale);
   if (noiseShader == nullptr) {
     return;
@@ -240,7 +240,7 @@ void DuoNoiseStyle::setSecondColor(const Color& color) {
 }
 
 void DuoNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                           float alpha, BlendMode blendMode, const Point& contentOffset) {
+                           const Point& contentOffset, float alpha, BlendMode blendMode) {
   auto noiseShader = getNoiseShader(contentScale);
   if (noiseShader == nullptr) {
     return;
@@ -293,7 +293,7 @@ void MultiNoiseStyle::setOpacity(float opacity) {
 }
 
 void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                             float alpha, BlendMode blendMode, const Point& contentOffset) {
+                             const Point& contentOffset, float alpha, BlendMode blendMode) {
   auto noiseShader = getNoiseShader(contentScale);
   if (noiseShader == nullptr) {
     return;

@@ -421,18 +421,25 @@ void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& c
   }
   Rect rect = {};
   bool closed = false;
+  // isRect can match an open 4-segment polyline whose stroke (open contour with caps) differs
+  // from a closed rectangle stroke, so only forward when the path is closed or there is no
+  // stroke (closedness does not affect fill).
   if (path.isRect(&rect, &closed) && !rect.isEmpty() && (stroke == nullptr || closed)) {
     drawContext->drawRect(rect, matrix, clip, brush, stroke);
     return;
   }
   RRect rRect = {};
   bool hasRRect = false;
+  // Path::isOval can return true with empty bounds because addOval does not filter them, so
+  // guard against an empty oval reaching the backend (which asserts on empty rrects).
   if (path.isOval(&rect) && !rect.isEmpty()) {
     rRect.setOval(rect);
     hasRRect = true;
   } else if (path.isRRect(&rRect) && !rRect.rect().isEmpty()) {
     hasRRect = true;
   }
+  // UseDrawPath forces complex stroke/radius combinations through the generic stroker, matching
+  // the drawRRect entry point.
   if (hasRRect && !UseDrawPath(stroke, rRect, HasSharpCorner(rRect), matrix)) {
     drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
     return;
