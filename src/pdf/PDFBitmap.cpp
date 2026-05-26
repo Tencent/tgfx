@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFBitmap.h"
+#include <vector>
 #include "pdf/DeflateStream.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
@@ -109,6 +110,38 @@ uint32_t GetNeighborAvgColor(const Pixmap& pixmap, int xOrig, int yOrig) {
             (static_cast<uint32_t>(avgB) << 16));
   }
   return 0x00000000;
+}
+
+// Build a tightly-packed RGBA copy of the source pixmap where any pixel with alpha==0 has its RGB
+// channels replaced by the average color of its non-transparent 3x3 neighborhood. The alpha byte
+// is preserved (Flate path consumes it via the SMask, JPEG path ignores it).
+//
+// This avoids the "undefined" RGB of fully-transparent pixels (often pure black for premultiplied
+// sources) leaking into nearby semi-transparent pixels: in the Flate path, color sampling at SMask
+// edges; in the JPEG path, the 8x8 DCT block average mixes the leaked color into visible edges.
+std::vector<uint8_t> BuildCleanRGBA(const Pixmap& pixmap) {
+  auto width = pixmap.width();
+  auto height = pixmap.height();
+  std::vector<uint8_t> dst(static_cast<size_t>(width) * static_cast<size_t>(height) * 4);
+  const auto srcBytes = reinterpret_cast<const uint8_t*>(pixmap.pixels());
+  auto srcRowBytes = pixmap.rowBytes();
+  uint8_t* dstPointer = dst.data();
+  for (int y = 0; y < height; ++y) {
+    auto scanline =
+        reinterpret_cast<const uint32_t*>(srcBytes + (static_cast<size_t>(y) * srcRowBytes));
+    for (int x = 0; x < width; ++x) {
+      uint32_t color = scanline[x];
+      uint8_t alpha = static_cast<uint8_t>((color >> 24) & 0xFF);
+      if (alpha == 0x00) {
+        color = GetNeighborAvgColor(pixmap, x, y);
+      }
+      *dstPointer++ = static_cast<uint8_t>((color >> 0) & 0xFF);
+      *dstPointer++ = static_cast<uint8_t>((color >> 8) & 0xFF);
+      *dstPointer++ = static_cast<uint8_t>((color >> 16) & 0xFF);
+      *dstPointer++ = alpha;
+    }
+  }
+  return dst;
 }
 
 void DoDeflatedAlpha(const Pixmap& pixmap, PDFDocumentImpl* document, PDFIndirectReference ref) {
@@ -236,28 +269,23 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
       } else {
         colorSpace = PDFUnion::Name("DeviceRGB");
       }
-      const auto pixelPointer = reinterpret_cast<const uint8_t*>(pixmap.pixels());
-      auto rowBytes = pixmap.rowBytes();
+      auto cleanRGBA = BuildCleanRGBA(pixmap);
+      const uint8_t* srcPointer = cleanRGBA.data();
+      size_t pixelCount =
+          static_cast<size_t>(pixmap.width()) * static_cast<size_t>(pixmap.height());
 
       uint8_t byteBuffer[3072];
       static_assert(std::size(byteBuffer) % 3 == 0);
       uint8_t* bufferStop = byteBuffer + std::size(byteBuffer);
       uint8_t* bufferPointer = byteBuffer;
-      for (int y = 0; y < pixmap.height(); ++y) {
-        auto scanline =
-            reinterpret_cast<const uint32_t*>(pixelPointer + (static_cast<size_t>(y) * rowBytes));
-        for (int x = 0; x < pixmap.width(); ++x) {
-          uint32_t color = *scanline++;
-          if ((((color) >> 24) & 0xFF) == 0x00) {
-            color = GetNeighborAvgColor(pixmap, x, y);
-          }
-          *bufferPointer++ = (((color) >> 0) & 0xFF);
-          *bufferPointer++ = (((color) >> 8) & 0xFF);
-          *bufferPointer++ = (((color) >> 16) & 0xFF);
-          if (bufferPointer == bufferStop) {
-            stream->write(byteBuffer, sizeof(byteBuffer));
-            bufferPointer = byteBuffer;
-          }
+      for (size_t i = 0; i < pixelCount; ++i) {
+        *bufferPointer++ = srcPointer[0];
+        *bufferPointer++ = srcPointer[1];
+        *bufferPointer++ = srcPointer[2];
+        srcPointer += 4;
+        if (bufferPointer == bufferStop) {
+          stream->write(byteBuffer, sizeof(byteBuffer));
+          bufferPointer = byteBuffer;
         }
       }
       stream->write(byteBuffer, static_cast<size_t>(bufferPointer - byteBuffer));
@@ -283,7 +311,19 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
 
 void DoDCTImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpaque, int encodingQuality,
                 PDFIndirectReference ref) {
-  auto jpegData = ImageCodec::Encode(pixmap, EncodedFormat::JPEG, encodingQuality);
+  // For non-opaque images, replace the RGB of fully-transparent pixels with the neighborhood
+  // average so JPEG's 8x8 DCT blocks do not bleed undefined colors into nearby semi-transparent
+  // pixels at the SMask edge.
+  std::shared_ptr<Data> jpegData;
+  if (isOpaque) {
+    jpegData = ImageCodec::Encode(pixmap, EncodedFormat::JPEG, encodingQuality);
+  } else {
+    auto cleanRGBA = BuildCleanRGBA(pixmap);
+    auto cleanInfo = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888,
+                                     AlphaType::Unpremultiplied, 0, pixmap.colorSpace());
+    Pixmap cleanPixmap(cleanInfo, cleanRGBA.data());
+    jpegData = ImageCodec::Encode(cleanPixmap, EncodedFormat::JPEG, encodingQuality);
+  }
   if (jpegData == nullptr) {
     DoDeflatedImage(pixmap, document, isOpaque, ref);
     return;
