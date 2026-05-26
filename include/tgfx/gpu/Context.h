@@ -167,6 +167,19 @@ class Context {
   void submit(std::unique_ptr<Recording> recording, bool syncCpu = false);
 
   /**
+   * Returns the wall-clock time, in microseconds, spent inside Window::onPresent() during the most
+   * recent Context::submit() call. The value covers every window presented by that submit (when a
+   * submit drives multiple windows the per-window times are summed) and is reset to zero at the
+   * start of each submit, so a submit that presents no windows always reads back as zero. This is
+   * a CPU-side measurement that includes any blocking the underlying swap chain performs while
+   * waiting for the next vblank, which makes it the right value to subtract when reporting
+   * draw-only frame times under vsync.
+   */
+  int64_t lastPresentTime() const {
+    return _lastPresentTime;
+  }
+
+  /**
    * Call to ensure all drawing to the context has been flushed and submitted to the underlying 3D
    * API. This is equivalent to calling Context::flush() followed by Context::submit().
    * Returns false if there are no pending drawing operations and nothing was flushed to the GPU.
@@ -212,6 +225,7 @@ class Context {
   AtlasManager* _atlasManager = nullptr;
   AtlasStrikeCache* _atlasStrikeCache = nullptr;
   std::deque<std::shared_ptr<DrawingBuffer>> pendingDrawingBuffers = {};
+  int64_t _lastPresentTime = 0;
 
 #if DEBUG
   std::unique_ptr<SingleOwner> singleOwner;

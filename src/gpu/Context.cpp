@@ -119,6 +119,7 @@ std::shared_ptr<DrawingBuffer> Context::getDrawingBuffer(const Recording* record
 
 void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
   ASSERT_OWNER_THREAD;
+  _lastPresentTime = 0;
   _resourceCache->processUnreferencedResources();
   auto queue = gpu()->queue();
   auto targetBuffer = getDrawingBuffer(recording.get());
@@ -140,7 +141,14 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
         }
       }
       queue->submit(std::move(commandBuffer));
+      // Record CPU wall-clock spent inside Window::onPresent for this submit. The clock reads
+      // are cheap (~30ns each via QueryPerformanceCounter on Windows) and the value is exposed
+      // via lastPresentTime() so callers can isolate vsync-blocking time from per-frame draw
+      // time. Per-drawingBuffer durations are summed because one submit may flush several
+      // RenderTargets, each with its own windows to present.
+      auto presentStart = Clock::Now();
       drawingBuffer->presentWindows(this);
+      _lastPresentTime += Clock::Now() - presentStart;
       pendingDrawingBuffers.pop_front();
       if (isLast) {
         break;
