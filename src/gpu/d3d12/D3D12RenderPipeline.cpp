@@ -25,6 +25,9 @@
 #include "gpu/UniformData.h"
 #include "tgfx/gpu/ColorWriteMask.h"
 #include "tgfx/gpu/ShaderVisibility.h"
+#ifdef TGFX_D3D12_PERF_TRACE
+#include "tgfx/core/Clock.h"
+#endif
 
 namespace tgfx {
 
@@ -183,8 +186,14 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   // ID3D12RootSignature, saving SerializeRootSignature + CreateRootSignature on every PSO.
   if (auto cached = gpu->findRootSignature(shapeKey); cached != nullptr) {
     rootSignature = std::move(cached);
+#ifdef TGFX_D3D12_PERF_TRACE
+    LOGI("[D3D12-Perf] RootSignature   HIT  (shape=%zuB)", shapeKey.size());
+#endif
     return true;
   }
+#ifdef TGFX_D3D12_PERF_TRACE
+  auto rsT0 = Clock::Now();
+#endif
 
   // Cache miss: build the root signature description from scratch and serialise it.
   std::vector<D3D12_ROOT_PARAMETER> rootParameters;
@@ -298,6 +307,10 @@ bool D3D12RenderPipeline::createRootSignature(D3D12GPU* gpu,
   // reference via the rootSignature member, so the object outlives whichever owner is dropped
   // first.
   gpu->cacheRootSignature(std::move(shapeKey), rootSignature);
+#ifdef TGFX_D3D12_PERF_TRACE
+  LOGI("[D3D12-Perf] RootSignature   MISS build=%lluus",
+       static_cast<unsigned long long>(Clock::Now() - rsT0));
+#endif
   return true;
 }
 
@@ -450,7 +463,15 @@ bool D3D12RenderPipeline::createPipelineState(D3D12GPU* gpu,
   psoDesc.NodeMask = 0;
   psoDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 
+#ifdef TGFX_D3D12_PERF_TRACE
+  auto psoT0 = Clock::Now();
+#endif
   auto hr = gpu->device()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState));
+#ifdef TGFX_D3D12_PERF_TRACE
+  LOGI("[D3D12-Perf] CreateGraphicsPipelineState=%lluus rt=%u msaa=%u",
+       static_cast<unsigned long long>(Clock::Now() - psoT0), psoDesc.NumRenderTargets,
+       psoDesc.SampleDesc.Count);
+#endif
   if (FAILED(hr)) {
     LOGE("D3D12RenderPipeline: CreateGraphicsPipelineState failed (HRESULT=0x%08X).",
          static_cast<unsigned>(hr));

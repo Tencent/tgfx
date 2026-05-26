@@ -33,6 +33,9 @@
 #include "D3D12ShaderModule.h"
 #include "D3D12Texture.h"
 #include "core/utils/Log.h"
+#ifdef TGFX_D3D12_PERF_TRACE
+#include "tgfx/core/Clock.h"
+#endif
 
 namespace tgfx {
 
@@ -358,8 +361,18 @@ std::shared_ptr<ShaderModule> D3D12GPU::createShaderModule(
   key.stage = static_cast<uint32_t>(descriptor.stage);
   key.sourceHash = std::hash<std::string>{}(descriptor.code);
   if (auto it = shaderModuleCache.find(key); it != shaderModuleCache.end()) {
+#ifdef TGFX_D3D12_PERF_TRACE
+    const auto* stageName = (descriptor.stage == ShaderStage::Vertex) ? "VS" : "FS";
+    LOGI("[D3D12-Perf] ShaderModuleCache HIT  (%s, sourceHash=0x%016llX)", stageName,
+         static_cast<unsigned long long>(key.sourceHash));
+#endif
     return it->second;
   }
+#ifdef TGFX_D3D12_PERF_TRACE
+  const auto* stageName = (descriptor.stage == ShaderStage::Vertex) ? "VS" : "FS";
+  LOGI("[D3D12-Perf] ShaderModuleCache MISS (%s, sourceHash=0x%016llX) — compiling...", stageName,
+       static_cast<unsigned long long>(key.sourceHash));
+#endif
   auto module = D3D12ShaderModule::Make(this, descriptor);
   if (module != nullptr) {
     shaderModuleCache.emplace(key, module);
@@ -369,7 +382,16 @@ std::shared_ptr<ShaderModule> D3D12GPU::createShaderModule(
 
 std::shared_ptr<RenderPipeline> D3D12GPU::createRenderPipeline(
     const RenderPipelineDescriptor& descriptor) {
+#ifdef TGFX_D3D12_PERF_TRACE
+  auto t0 = Clock::Now();
+  auto pipeline = D3D12RenderPipeline::Make(this, descriptor);
+  auto t1 = Clock::Now();
+  LOGI("[D3D12-Perf] createRenderPipeline total=%lluus (%s)",
+       static_cast<unsigned long long>(t1 - t0), pipeline != nullptr ? "ok" : "FAILED");
+  return pipeline;
+#else
   return D3D12RenderPipeline::Make(this, descriptor);
+#endif
 }
 
 std::shared_ptr<CommandEncoder> D3D12GPU::createCommandEncoder() {

@@ -24,6 +24,7 @@ option(TGFX_USE_OPENGL "Use OpenGL as the GPU backend" ON)
 option(TGFX_USE_METAL "Use Metal as the GPU backend on Apple platforms" OFF)
 option(TGFX_USE_D3D12 "Use D3D12 as the GPU backend on Windows" OFF)
 option(TGFX_D3D12_USE_WARP "Force the D3D12 backend onto the WARP software rasterizer (CI only)" OFF)
+option(TGFX_D3D12_PERF_TRACE "Emit per-stage timing logs from the D3D12 backend (shader compile, PSO creation, etc.) for first-frame spike analysis. Off by default; enable only when profiling." OFF)
 option(TGFX_USE_QT "Enable building with the Qt framework." OFF)
 option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
@@ -149,6 +150,7 @@ message("TGFX_USE_METAL: ${TGFX_USE_METAL}")
 message("TGFX_USE_VULKAN: ${TGFX_USE_VULKAN}")
 message("TGFX_USE_D3D12: ${TGFX_USE_D3D12}")
 message("TGFX_D3D12_USE_WARP: ${TGFX_D3D12_USE_WARP}")
+message("TGFX_D3D12_PERF_TRACE: ${TGFX_D3D12_PERF_TRACE}")
 message("TGFX_USE_QT: ${TGFX_USE_QT}")
 message("TGFX_USE_SWIFTSHADER: ${TGFX_USE_SWIFTSHADER}")
 message("TGFX_USE_ANGLE: ${TGFX_USE_ANGLE}")
@@ -393,6 +395,13 @@ if (TGFX_USE_D3D12)
         # CI / headless opt-in: route DevicePool::Make() onto D3D12Device::MakeWarp() so the
         # tests run on the WARP software rasterizer instead of expecting a hardware GPU.
         list(APPEND TGFX_DEFINES TGFX_D3D12_USE_WARP)
+    endif ()
+    if (TGFX_D3D12_PERF_TRACE)
+        # Profiling opt-in: emits LOGI lines from D3D12ShaderModule, D3D12RenderPipeline, and
+        # D3D12GPU breaking down first-frame compile / link costs. Adds a few cheap timer reads
+        # per pipeline build but no instrumentation in steady-state command recording, so the
+        # impact on per-draw throughput numbers is negligible.
+        list(APPEND TGFX_DEFINES TGFX_D3D12_PERF_TRACE)
     endif ()
     # Add shaderc and SPIRV-Cross for GLSL to HLSL conversion
     list(APPEND TGFX_STATIC_VENDORS shaderc SPIRV-Cross)

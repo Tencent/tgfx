@@ -22,6 +22,9 @@
 #include "core/utils/Log.h"
 #include "gpu/ShaderCompiler.h"
 #include "gpu/UniformData.h"
+#ifdef TGFX_D3D12_PERF_TRACE
+#include "tgfx/core/Clock.h"
+#endif
 // Suppress warnings from SPIRV-Cross headers
 #pragma warning(push)
 #pragma warning(disable : 4100 4458 4245 4127 4244)
@@ -149,6 +152,9 @@ std::shared_ptr<D3D12ShaderModule> D3D12ShaderModule::Make(
 
 D3D12ShaderModule::D3D12ShaderModule(D3D12GPU* gpu, const ShaderModuleDescriptor& descriptor)
     : _stage(descriptor.stage) {
+#ifdef TGFX_D3D12_PERF_TRACE
+  auto t0 = Clock::Now();
+#endif
   std::string vulkanGLSL = PreprocessGLSL(descriptor.code);
   // D3D12 needs every declared interface variable to survive — see ShaderCompiler.h.
   auto spirvBinary = CompileGLSLToSPIRV(gpu->shaderCompiler(), vulkanGLSL, descriptor.stage, true);
@@ -156,11 +162,29 @@ D3D12ShaderModule::D3D12ShaderModule(D3D12GPU* gpu, const ShaderModuleDescriptor
     LOGE("D3D12ShaderModule: GLSL to SPIR-V compilation failed.");
     return;
   }
+#ifdef TGFX_D3D12_PERF_TRACE
+  auto t1 = Clock::Now();
+#endif
   std::string hlsl = convertSPIRVToHLSL(spirvBinary, descriptor.stage);
   if (hlsl.empty()) {
     return;
   }
+#ifdef TGFX_D3D12_PERF_TRACE
+  auto t2 = Clock::Now();
+#endif
   bytecode = compileHLSLToDXBC(hlsl, descriptor.stage);
+#ifdef TGFX_D3D12_PERF_TRACE
+  auto t3 = Clock::Now();
+  const auto* stageName = (descriptor.stage == ShaderStage::Vertex) ? "VS" : "FS";
+  LOGI(
+      "[D3D12-Perf] ShaderModule(%s) glsl=%lluus spv2hlsl=%lluus hlsl2dxbc=%lluus total=%lluus "
+      "src=%zuB dxbc=%zuB",
+      stageName, static_cast<unsigned long long>(t1 - t0), static_cast<unsigned long long>(t2 - t1),
+      static_cast<unsigned long long>(t3 - t2), static_cast<unsigned long long>(t3 - t0),
+      descriptor.code.size(),
+      bytecode != nullptr ? static_cast<size_t>(bytecode->GetBufferSize())
+                          : static_cast<size_t>(0));
+#endif
 #ifdef TGFX_D3D12_DEBUG_LAYER
   _hlslSource = std::move(hlsl);
 #endif
