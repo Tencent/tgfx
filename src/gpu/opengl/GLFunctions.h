@@ -167,6 +167,8 @@ using GLUseProgram = void GL_FUNCTION_TYPE(unsigned program);
 using GLVertexAttribPointer = void GL_FUNCTION_TYPE(unsigned indx, int size, unsigned type,
                                                     unsigned char normalized, int stride,
                                                     const void* ptr);
+using GLVertexAttribIPointer = void GL_FUNCTION_TYPE(unsigned indx, int size, unsigned type,
+                                                     int stride, const void* ptr);
 using GLVertexAttribDivisor = void GL_FUNCTION_TYPE(unsigned index, int divisor);
 using GLViewport = void GL_FUNCTION_TYPE(int x, int y, int width, int height);
 
@@ -281,6 +283,7 @@ class GLFunctions {
   GLUniform1i* uniform1i = nullptr;
   GLUseProgram* useProgram = nullptr;
   GLVertexAttribPointer* vertexAttribPointer = nullptr;
+  GLVertexAttribIPointer* vertexAttribIPointer = nullptr;
   GLVertexAttribDivisor* vertexAttribDivisor = nullptr;
   GLViewport* viewport = nullptr;
   GLClientWaitSync* clientWaitSync = nullptr;
