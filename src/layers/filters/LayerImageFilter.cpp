@@ -22,13 +22,12 @@
 namespace tgfx {
 
 std::shared_ptr<Image> LayerImageFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
-                                                       const Rect&, const Rect* clipBounds,
-                                                       Point* offset) {
+                                                       const Rect&, Point* offset) {
   auto filter = getImageFilter(scale);
   if (!filter) {
     return input;
   }
-  return FilterImage::MakeFrom(std::move(input), std::move(filter), offset, clipBounds);
+  return FilterImage::MakeFrom(std::move(input), std::move(filter), offset, nullptr);
 }
 
 Rect LayerImageFilter::filterBounds(const Rect& srcRect, float contentScale,

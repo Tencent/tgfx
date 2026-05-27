@@ -40,8 +40,7 @@ class LayerImageFilter : public LayerFilter {
   virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) = 0;
 
   std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                       const Rect& contentBounds, const Rect* clipBounds,
-                                       Point* offset) override;
+                                       const Rect& contentBounds, Point* offset) override;
 
   void onInvalidateFilter() override;
 

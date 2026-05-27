@@ -89,11 +89,8 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
     return result;
   }
   Point filterOffset = {};
-  // Restrict the filter output to the pixels visible in the resulting image so large-radius
-  // filters can skip off-screen processing.
-  Rect imageClipBounds = Rect::MakeWH(result.image->width(), result.image->height());
   result.image = layer->applyFilters(std::move(result.image), density.getMaxScale(),
-                                     inputContentBounds, &filterOffset, &imageClipBounds);
+                                     inputContentBounds, &filterOffset);
   if (result.image == nullptr) {
     return {};
   }

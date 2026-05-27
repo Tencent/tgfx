@@ -20,83 +20,13 @@
 #include <utility>
 #include "core/images/FilterImage.h"
 #include "core/utils/Log.h"
+#include "layers/NoiseDensityUtils.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shader.h"
 
 namespace tgfx {
-
-static int ComputeLinearBucket(float density, float slope, float intercept) {
-  density = std::max(0.0f, std::min(1.0f, density));
-  auto value = slope * density + intercept;
-  auto bucket = static_cast<int>(value + 0.5f);
-  return std::max(0, std::min(99, bucket));
-}
-
-// Slopes/intercepts are chosen so that at density=0 each band collapses to a single bucket
-// (dark=25, bright=74) and at density=1 the bands fully expand without overlap:
-//   dark  -> [0, 49], bright -> [50, 99].
-// This keeps the transition strictly monotonic across the full 0..1 range, avoiding the
-// plateau that occurs when bucket values are clamped at the 0 / 99 boundaries.
-static std::pair<int, int> ComputeDarkBandBuckets(float density) {
-  auto lower = ComputeLinearBucket(density, -25.0f, 25.0f);
-  auto upper = ComputeLinearBucket(density, 24.0f, 25.0f);
-  return {lower, upper};
-}
-
-static std::pair<int, int> ComputeBrightBandBuckets(float density) {
-  auto lower = ComputeLinearBucket(density, -24.0f, 74.0f);
-  auto upper = ComputeLinearBucket(density, 25.0f, 74.0f);
-  return {lower, upper};
-}
-
-static std::shared_ptr<ColorFilter> MakeLumaAlphaThresholdFilter(float threshold) {
-  if (threshold <= 0.0f) {
-    return nullptr;
-  }
-  // clang-format off
-  std::array<float, 20> lumaMatrix = {
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
-    0.2126f, 0.7152f, 0.0722f, 0.0f, 0.0f,
-  };
-  // clang-format on
-  auto lumaFilter = ColorFilter::Matrix(lumaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(threshold);
-  return ColorFilter::Compose(lumaFilter, thresholdFilter);
-}
-
-static std::shared_ptr<Shader> MakeDensityBandShader(std::shared_ptr<Shader> noiseShader,
-                                                     int lowerBucket, int upperBucket) {
-  if (noiseShader == nullptr || lowerBucket < 0 || upperBucket < lowerBucket) {
-    return nullptr;
-  }
-  auto lowerThreshold = static_cast<float>(std::max(0, std::min(99, lowerBucket))) / 100.0f;
-  auto upperThreshold = static_cast<float>(std::max(0, std::min(100, upperBucket + 1))) / 100.0f;
-  auto lowerMaskFilter = MakeLumaAlphaThresholdFilter(lowerThreshold);
-  auto upperMaskFilter = MakeLumaAlphaThresholdFilter(upperThreshold);
-  auto upperMask = noiseShader->makeWithColorFilter(std::move(upperMaskFilter));
-  if (lowerMaskFilter == nullptr) {
-    return Shader::MakeBlend(BlendMode::DstOut, Shader::MakeColorShader(Color::Black()),
-                             std::move(upperMask));
-  }
-  auto lowerMask = noiseShader->makeWithColorFilter(std::move(lowerMaskFilter));
-  return Shader::MakeBlend(BlendMode::DstOut, std::move(lowerMask), std::move(upperMask));
-}
-
-static std::shared_ptr<Shader> MakeBrightDensityFilter(std::shared_ptr<Shader> noiseShader,
-                                                       float density) {
-  auto buckets = ComputeBrightBandBuckets(density);
-  return MakeDensityBandShader(std::move(noiseShader), buckets.first, buckets.second);
-}
-
-static std::shared_ptr<Shader> MakeDarkDensityFilter(std::shared_ptr<Shader> noiseShader,
-                                                     float density) {
-  auto buckets = ComputeDarkBandBuckets(density);
-  return MakeDensityBandShader(std::move(noiseShader), buckets.first, buckets.second);
-}
 
 static std::shared_ptr<Shader> MakeNoiseShader(float size, float scale, float seed) {
   auto freq = 1.0f / (size * scale);
@@ -207,8 +137,7 @@ std::shared_ptr<Shader> NoiseFilter::buildAtShift(float scale, const Point& shif
 }
 
 std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
-                                                  const Rect& contentBounds, const Rect* clipBounds,
-                                                  Point* offset) {
+                                                  const Rect& contentBounds, Point* offset) {
   if (input == nullptr) {
     return nullptr;
   }
@@ -244,7 +173,7 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, 
   if (compositeFilter == nullptr) {
     return input;
   }
-  return FilterImage::MakeFrom(std::move(input), std::move(compositeFilter), offset, clipBounds);
+  return FilterImage::MakeFrom(std::move(input), std::move(compositeFilter), offset, nullptr);
 }
 
 // --- MonoNoiseFilter ---
