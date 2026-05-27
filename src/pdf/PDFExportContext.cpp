@@ -991,13 +991,25 @@ std::vector<PDFIndirectReference> Sort(const std::unordered_set<PDFIndirectRefer
 }  // namespace
 
 std::unique_ptr<PDFDictionary> PDFExportContext::makeResourceDict() {
-  return MakePDFResourceDictionary(Sort(graphicStateResources), Sort(shaderResources),
-                                   Sort(xObjectResources), Sort(fontResources));
+  auto resourceDict = MakePDFResourceDictionary(Sort(graphicStateResources), Sort(shaderResources),
+                                                Sort(xObjectResources), Sort(fontResources));
+  // Inject the document-wide /CS color space into the Resources/ColorSpace dictionary whenever a
+  // target color space has been set. Form XObjects and Tiling Patterns own independent Resources
+  // dictionaries (ISO 32000-1 §8.10.1, §8.7.3.3) and cannot inherit ColorSpace from the page, so
+  // their content streams that emit "/CS CS" or "/CS cs" would fail in strict PDF readers (Adobe
+  // Acrobat, qpdf) when /CS is not declared locally.
+  if (auto ref = document->colorSpaceRef()) {
+    auto colorSpaceDic = PDFDictionary::Make();
+    colorSpaceDic->insertRef("CS", ref);
+    resourceDict->insertObject("ColorSpace", std::move(colorSpaceDic));
+  }
+  return resourceDict;
 }
 
+// TODO(pdf): makeResourceDictionary and makeResourceDict are duplicates kept for historical
+// reasons; consolidate them into a single function in a follow-up cleanup.
 std::unique_ptr<PDFDictionary> PDFExportContext::makeResourceDictionary() {
-  return MakePDFResourceDictionary(Sort(graphicStateResources), Sort(shaderResources),
-                                   Sort(xObjectResources), Sort(fontResources));
+  return makeResourceDict();
 }
 
 bool PDFExportContext::isContentEmpty() {
