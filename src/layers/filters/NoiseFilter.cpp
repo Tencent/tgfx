@@ -366,19 +366,34 @@ std::shared_ptr<Shader> MultiNoiseFilter::onBuildBaseShader(float scale) {
     return nullptr;
   }
 
-  // Contrast enhance RGB and compute inverted luminance to alpha for density thresholding.
+  // Use dark band bucket for density thresholding (same as MonoNoiseFilter)
+  auto darkMask = MakeDarkDensityFilter(noiseShader, _density);
+  if (darkMask == nullptr) {
+    return nullptr;
+  }
+
+  // Contrast enhance the original noise RGB, keep alpha unchanged
   // clang-format off
-  std::array<float, 20> contrastLumaMatrix = {
+  std::array<float, 20> contrastMatrix = {
      2.0f,     0.0f,     0.0f,     0.0f, -0.5f,
      0.0f,     2.0f,     0.0f,     0.0f, -0.5f,
      0.0f,     0.0f,     2.0f,     0.0f, -0.5f,
-    -0.2126f, -0.7152f, -0.0722f,  0.0f,  1.0f,
+     0.0f,     0.0f,     0.0f,     1.0f,  0.0f,
   };
   // clang-format on
-  auto contrastLumaFilter = ColorFilter::Matrix(contrastLumaMatrix);
-  auto thresholdFilter = ColorFilter::AlphaThreshold(1.0f - _density);
+  auto contrastFilter = ColorFilter::Matrix(contrastMatrix);
+  auto contrastNoise = noiseShader->makeWithColorFilter(std::move(contrastFilter));
+  if (contrastNoise == nullptr) {
+    return nullptr;
+  }
 
-  // Scale alpha by opacity.
+  // Apply the band mask alpha to the contrast-enhanced noise
+  auto masked = Shader::MakeBlend(BlendMode::DstIn, std::move(contrastNoise), std::move(darkMask));
+  if (masked == nullptr) {
+    return nullptr;
+  }
+
+  // Scale alpha by opacity
   // clang-format off
   std::array<float, 20> alphaScaleMatrix = {
     1.0f, 0.0f, 0.0f, 0.0f,     0.0f,
@@ -388,9 +403,7 @@ std::shared_ptr<Shader> MultiNoiseFilter::onBuildBaseShader(float scale) {
   };
   // clang-format on
   auto alphaScaleFilter = ColorFilter::Matrix(alphaScaleMatrix);
-  auto composedFilter = ColorFilter::Compose(contrastLumaFilter, thresholdFilter);
-  composedFilter = ColorFilter::Compose(composedFilter, alphaScaleFilter);
-  return noiseShader->makeWithColorFilter(std::move(composedFilter));
+  return masked->makeWithColorFilter(std::move(alphaScaleFilter));
 }
 
 }  // namespace tgfx
