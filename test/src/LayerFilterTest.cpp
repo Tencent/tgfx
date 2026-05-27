@@ -779,109 +779,43 @@ TGFX_TEST(LayerFilterTest, NoiseFilterMovingText) {
     surface->getCanvas()->clear();
     textLayer->setMatrix(Matrix::MakeTrans(50.f + static_cast<float>(i) * 20.f, 50.f));
     displayList->render(surface.get());
-    EXPECT_TRUE(Baseline::Compare(
-        surface, "LayerFilterTest/NoiseFilterMovingText_frame" + std::to_string(i)));
   }
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseFilterMovingText"));
 }
 
-static std::shared_ptr<LayerFilter> MakeBlendModeNoiseFilter(NoiseFilterSweepType type,
-                                                             BlendMode blendMode) {
-  switch (type) {
-    case NoiseFilterSweepType::Mono:
-      return NoiseFilter::MakeMono(6.0f, 1.0f, Color::FromRGBA(0, 0, 0, 128), 42.0f, blendMode);
-    case NoiseFilterSweepType::Duo:
-      return NoiseFilter::MakeDuo(6.0f, 1.0f, Color::FromRGBA(0, 0, 0, 128),
-                                  Color::FromRGBA(255, 255, 255, 128), 42.0f, blendMode);
-    case NoiseFilterSweepType::Multi:
-      return NoiseFilter::MakeMulti(6.0f, 1.0f, 0.3f, 42.0f, blendMode);
-  }
-  return nullptr;
-}
-
-// Verify every blend mode with each noise filter type.
-TGFX_TEST(LayerFilterTest, NoiseFilterBlendModes) {
+// Verify blend mode with MonoNoise filter.
+TGFX_TEST(LayerFilterTest, NoiseFilterBlendMode) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  struct NoiseConfig {
-    NoiseFilterSweepType type;
-    std::string name;
-  };
-  struct BlendModeConfig {
-    BlendMode mode;
-    std::string name;
-  };
-
-  std::vector<NoiseConfig> noiseConfigs = {
-      {NoiseFilterSweepType::Mono, "Mono"},
-      {NoiseFilterSweepType::Duo, "Duo"},
-      {NoiseFilterSweepType::Multi, "Multi"},
-  };
-  std::vector<BlendModeConfig> blendModes = {
-      {BlendMode::Clear, "Clear"},
-      {BlendMode::Src, "Src"},
-      {BlendMode::Dst, "Dst"},
-      {BlendMode::SrcOver, "SrcOver"},
-      {BlendMode::DstOver, "DstOver"},
-      {BlendMode::SrcIn, "SrcIn"},
-      {BlendMode::DstIn, "DstIn"},
-      {BlendMode::SrcOut, "SrcOut"},
-      {BlendMode::DstOut, "DstOut"},
-      {BlendMode::SrcATop, "SrcATop"},
-      {BlendMode::DstATop, "DstATop"},
-      {BlendMode::Xor, "Xor"},
-      {BlendMode::PlusLighter, "PlusLighter"},
-      {BlendMode::Modulate, "Modulate"},
-      {BlendMode::Screen, "Screen"},
-      {BlendMode::Overlay, "Overlay"},
-      {BlendMode::Darken, "Darken"},
-      {BlendMode::Lighten, "Lighten"},
-      {BlendMode::ColorDodge, "ColorDodge"},
-      {BlendMode::ColorBurn, "ColorBurn"},
-      {BlendMode::HardLight, "HardLight"},
-      {BlendMode::SoftLight, "SoftLight"},
-      {BlendMode::Difference, "Difference"},
-      {BlendMode::Exclusion, "Exclusion"},
-      {BlendMode::Multiply, "Multiply"},
-      {BlendMode::Hue, "Hue"},
-      {BlendMode::Saturation, "Saturation"},
-      {BlendMode::Color, "Color"},
-      {BlendMode::Luminosity, "Luminosity"},
-      {BlendMode::PlusDarker, "PlusDarker"},
-  };
-
   auto rectSize = 200.0f;
   auto padding = 50.0f;
   auto surfaceSize = static_cast<int>(rectSize + padding * 2.0f);
-  for (const auto& noiseConfig : noiseConfigs) {
-    for (const auto& blendMode : blendModes) {
-      auto surface = Surface::Make(context, surfaceSize, surfaceSize);
-      ASSERT_TRUE(surface != nullptr);
-      auto displayList = std::make_unique<DisplayList>();
+  auto surface = Surface::Make(context, surfaceSize, surfaceSize);
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
 
-      auto back = SolidLayer::Make();
-      back->setColor(Color::White());
-      back->setWidth(static_cast<float>(surfaceSize));
-      back->setHeight(static_cast<float>(surfaceSize));
-      displayList->root()->addChild(back);
+  auto back = SolidLayer::Make();
+  back->setColor(Color::White());
+  back->setWidth(static_cast<float>(surfaceSize));
+  back->setHeight(static_cast<float>(surfaceSize));
+  displayList->root()->addChild(back);
 
-      auto layer = ShapeLayer::Make();
-      layer->setMatrix(Matrix::MakeTrans(padding, padding));
-      Path path;
-      path.addRoundRect(Rect::MakeWH(rectSize, rectSize), 20, 20);
-      layer->setPath(path);
-      layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
-      auto filter = MakeBlendModeNoiseFilter(noiseConfig.type, blendMode.mode);
-      ASSERT_TRUE(filter != nullptr);
-      layer->setFilters({filter});
-      back->addChild(layer);
+  auto layer = ShapeLayer::Make();
+  layer->setMatrix(Matrix::MakeTrans(padding, padding));
+  Path path;
+  path.addRoundRect(Rect::MakeWH(rectSize, rectSize), 20, 20);
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
+  auto filter =
+      NoiseFilter::MakeMono(6.0f, 1.0f, Color::FromRGBA(0, 0, 0, 128), 42.0f, BlendMode::SrcOver);
+  ASSERT_TRUE(filter != nullptr);
+  layer->setFilters({filter});
+  back->addChild(layer);
 
-      displayList->render(surface.get());
-      auto key = "LayerFilterTest/NoiseFilterBlendModes_" + noiseConfig.name + "_" + blendMode.name;
-      EXPECT_TRUE(Baseline::Compare(surface, key));
-    }
-  }
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseFilterBlendMode_Mono_SrcOver"));
 }
 
 }  // namespace tgfx

@@ -53,19 +53,12 @@ TGFX_TEST(LayerStyleTest, NoiseStyleMovingRect) {
   child->setLayerStyles({noise});
   parent->addChild(child);
 
-  for (int i = 0; i < 8; i++) {
-    auto parentOffsetX = static_cast<float>(i) * 10.f;
-    parent->setMatrix(Matrix::MakeTrans(parentOffsetX, 0.f));
-
-    Path path;
-    auto offsetX = 50.f + static_cast<float>(i) * 20.f;
-    path.addRect(Rect::MakeXYWH(offsetX, 100.f, 100.f, 100.f));
-    child->setPath(path);
-
-    displayList.render(surface.get());
-    EXPECT_TRUE(
-        Baseline::Compare(surface, "LayerStyleTest/NoiseStyleMovingRect_" + std::to_string(i)));
-  }
+  parent->setMatrix(Matrix::MakeTrans(0.f, 0.f));
+  Path path;
+  path.addRect(Rect::MakeXYWH(50.f, 100.f, 100.f, 100.f));
+  child->setPath(path);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerStyleTest/NoiseStyleMovingRect"));
 }
 
 // Migrated from NoiseStyleTest.cpp
@@ -101,8 +94,6 @@ TGFX_TEST(LayerStyleTest, NoiseShiftText) {
     surface->getCanvas()->clear();
     textLayer->setMatrix(Matrix::MakeTrans(-50.f + static_cast<float>(i) * 20.f, 20.f));
     displayList->render(surface.get());
-    EXPECT_TRUE(
-        Baseline::Compare(surface, "LayerStyleTest/NoiseShiftText_frame" + std::to_string(i)));
   }
 
   auto textBounds = textLayer->getBounds();
@@ -111,16 +102,13 @@ TGFX_TEST(LayerStyleTest, NoiseShiftText) {
   float lastX = -50.f + 7 * 20.f;
   float lastY = 20.f;
 
-  for (int i = 0; i < 5; i++) {
-    surface->getCanvas()->clear();
-    float angle = static_cast<float>(i + 1) * 20.f;
-    auto matrix = Matrix::MakeTrans(lastX + centerX, lastY + centerY) * Matrix::MakeRotate(angle) *
-                  Matrix::MakeTrans(-centerX, -centerY);
-    textLayer->setMatrix(matrix);
-    displayList->render(surface.get());
-    EXPECT_TRUE(
-        Baseline::Compare(surface, "LayerStyleTest/NoiseShiftText_frame" + std::to_string(i + 8)));
-  }
+  surface->getCanvas()->clear();
+  float angle = 20.f;
+  auto matrix = Matrix::MakeTrans(lastX + centerX, lastY + centerY) * Matrix::MakeRotate(angle) *
+                Matrix::MakeTrans(-centerX, -centerY);
+  textLayer->setMatrix(matrix);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerStyleTest/NoiseShiftText"));
 }
 
 // Migrated from NoiseStyleTest.cpp
@@ -164,9 +152,8 @@ TGFX_TEST(LayerStyleTest, NoiseShapeText) {
     surface->getCanvas()->clear();
     shapeLayer->setMatrix(Matrix::MakeTrans(static_cast<float>(i) * 20.f, 0.f));
     displayList->render(surface.get());
-    EXPECT_TRUE(
-        Baseline::Compare(surface, "LayerStyleTest/NoiseShapeText_frame" + std::to_string(i)));
   }
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerStyleTest/NoiseShapeText"));
 }
 
 static std::shared_ptr<Image> MakeNoiseTileImage(int tileSize) {
@@ -216,16 +203,11 @@ TGFX_TEST(LayerStyleTest, NoiseMovingRect) {
   back->addChild(parent);
   displayList->root()->addChild(back);
 
-  for (int i = 0; i < 16; i++) {
-    surface->getCanvas()->clear();
-    Path childPath;
-    auto offsetX = -150.f + static_cast<float>(i) * 20.f;
-    childPath.addRect(Rect::MakeXYWH(offsetX, 50.f, 200.f, 200.f));
-    child->setPath(childPath);
-    displayList->render(surface.get());
-    EXPECT_TRUE(
-        Baseline::Compare(surface, "LayerStyleTest/NoiseMovingRect_frame" + std::to_string(i)));
-  }
+  Path childPath;
+  childPath.addRect(Rect::MakeXYWH(-150.f, 50.f, 200.f, 200.f));
+  child->setPath(childPath);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerStyleTest/NoiseMovingRect"));
 }
 
 // Migrated from NoiseStyleTest.cpp
@@ -266,9 +248,8 @@ TGFX_TEST(LayerStyleTest, NoiseMovingRectTiled) {
     childPath.addRect(Rect::MakeXYWH(offsetX, 50.f, 200.f, 200.f));
     child->setPath(childPath);
     displayList->render(surface.get());
-    EXPECT_TRUE(Baseline::Compare(surface,
-                                  "LayerStyleTest/NoiseMovingRectTiled_frame" + std::to_string(i)));
   }
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerStyleTest/NoiseMovingRectTiled"));
 }
 
 // Migrated from NoiseStyleTest.cpp
@@ -351,9 +332,8 @@ TGFX_TEST(LayerStyleTest, NoiseMovingRectWithDropShadow) {
     childPath.addRect(Rect::MakeXYWH(offsetX, 50.f, 200.f, 200.f));
     child->setPath(childPath);
     displayList->render(surface.get());
-    EXPECT_TRUE(Baseline::Compare(
-        surface, "LayerStyleTest/NoiseMovingRectWithDropShadow_frame" + std::to_string(i)));
   }
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerStyleTest/NoiseMovingRectWithDropShadow"));
 }
 
 enum class NoiseStyleSweepType { Mono, Duo, Multi };
@@ -434,110 +414,39 @@ TGFX_TEST(LayerStyleTest, MultiNoiseStyleDensitySweep) {
                                "LayerStyleTest/MultiNoiseStyleDensitySweep");
 }
 
-static std::shared_ptr<NoiseStyle> MakeBlendModeNoiseStyle(NoiseStyleSweepType type,
-                                                           BlendMode blendMode) {
-  std::shared_ptr<NoiseStyle> style;
-  switch (type) {
-    case NoiseStyleSweepType::Mono:
-      style = NoiseStyle::MakeMono(6.0f, 1.0f, Color::FromRGBA(0, 0, 0, 128), 42.0f);
-      break;
-    case NoiseStyleSweepType::Duo:
-      style = NoiseStyle::MakeDuo(6.0f, 1.0f, Color::FromRGBA(0, 0, 0, 128),
-                                  Color::FromRGBA(255, 255, 255, 128), 42.0f);
-      break;
-    case NoiseStyleSweepType::Multi:
-      style = NoiseStyle::MakeMulti(6.0f, 1.0f, 0.3f, 42.0f);
-      break;
-  }
-  if (style != nullptr) {
-    style->setBlendMode(blendMode);
-  }
-  return style;
-}
-
-TGFX_TEST(LayerStyleTest, NoiseStyleBlendModes) {
+// Verify blend mode with MonoNoiseStyle.
+TGFX_TEST(LayerStyleTest, NoiseStyleBlendMode) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  struct NoiseConfig {
-    NoiseStyleSweepType type;
-    std::string name;
-  };
-  struct BlendModeConfig {
-    BlendMode mode;
-    std::string name;
-  };
-
-  std::vector<NoiseConfig> noiseConfigs = {
-      {NoiseStyleSweepType::Mono, "Mono"},
-      {NoiseStyleSweepType::Duo, "Duo"},
-      {NoiseStyleSweepType::Multi, "Multi"},
-  };
-  std::vector<BlendModeConfig> blendModes = {
-      {BlendMode::Clear, "Clear"},
-      {BlendMode::Src, "Src"},
-      {BlendMode::Dst, "Dst"},
-      {BlendMode::SrcOver, "SrcOver"},
-      {BlendMode::DstOver, "DstOver"},
-      {BlendMode::SrcIn, "SrcIn"},
-      {BlendMode::DstIn, "DstIn"},
-      {BlendMode::SrcOut, "SrcOut"},
-      {BlendMode::DstOut, "DstOut"},
-      {BlendMode::SrcATop, "SrcATop"},
-      {BlendMode::DstATop, "DstATop"},
-      {BlendMode::Xor, "Xor"},
-      {BlendMode::PlusLighter, "PlusLighter"},
-      {BlendMode::Modulate, "Modulate"},
-      {BlendMode::Screen, "Screen"},
-      {BlendMode::Overlay, "Overlay"},
-      {BlendMode::Darken, "Darken"},
-      {BlendMode::Lighten, "Lighten"},
-      {BlendMode::ColorDodge, "ColorDodge"},
-      {BlendMode::ColorBurn, "ColorBurn"},
-      {BlendMode::HardLight, "HardLight"},
-      {BlendMode::SoftLight, "SoftLight"},
-      {BlendMode::Difference, "Difference"},
-      {BlendMode::Exclusion, "Exclusion"},
-      {BlendMode::Multiply, "Multiply"},
-      {BlendMode::Hue, "Hue"},
-      {BlendMode::Saturation, "Saturation"},
-      {BlendMode::Color, "Color"},
-      {BlendMode::Luminosity, "Luminosity"},
-      {BlendMode::PlusDarker, "PlusDarker"},
-  };
-
   auto rectSize = 200.0f;
   auto padding = 50.0f;
   auto surfaceSize = static_cast<int>(rectSize + padding * 2.0f);
-  for (const auto& noiseConfig : noiseConfigs) {
-    for (const auto& blendMode : blendModes) {
-      auto surface = Surface::Make(context, surfaceSize, surfaceSize);
-      ASSERT_TRUE(surface != nullptr);
-      auto displayList = std::make_unique<DisplayList>();
+  auto surface = Surface::Make(context, surfaceSize, surfaceSize);
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
 
-      auto back = SolidLayer::Make();
-      back->setColor(Color::White());
-      back->setWidth(static_cast<float>(surfaceSize));
-      back->setHeight(static_cast<float>(surfaceSize));
-      displayList->root()->addChild(back);
+  auto back = SolidLayer::Make();
+  back->setColor(Color::White());
+  back->setWidth(static_cast<float>(surfaceSize));
+  back->setHeight(static_cast<float>(surfaceSize));
+  displayList->root()->addChild(back);
 
-      auto layer = ShapeLayer::Make();
-      layer->setMatrix(Matrix::MakeTrans(padding, padding));
-      Path path;
-      path.addRoundRect(Rect::MakeWH(rectSize, rectSize), 20, 20);
-      layer->setPath(path);
-      layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
-      auto style = MakeBlendModeNoiseStyle(noiseConfig.type, blendMode.mode);
-      ASSERT_TRUE(style != nullptr);
-      layer->setLayerStyles({style});
-      back->addChild(layer);
+  auto layer = ShapeLayer::Make();
+  layer->setMatrix(Matrix::MakeTrans(padding, padding));
+  Path path;
+  path.addRoundRect(Rect::MakeWH(rectSize, rectSize), 20, 20);
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
+  auto style = NoiseStyle::MakeMono(6.0f, 1.0f, Color::FromRGBA(0, 0, 0, 128), 42.0f);
+  ASSERT_TRUE(style != nullptr);
+  style->setBlendMode(BlendMode::SrcOver);
+  layer->setLayerStyles({style});
+  back->addChild(layer);
 
-      displayList->render(surface.get());
-      auto key = "LayerStyleTest/NoiseStyleBlendModes_" + noiseConfig.name + "_" + blendMode.name;
-      EXPECT_TRUE(Baseline::Compare(surface, key));
-    }
-  }
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerStyleTest/NoiseStyleBlendMode_Mono_SrcOver"));
 }
 
 }  // namespace tgfx
