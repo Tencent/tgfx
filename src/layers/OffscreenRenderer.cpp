@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/OffscreenRenderer.h"
-#include "core/utils/Log.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/PictureRecorder.h"

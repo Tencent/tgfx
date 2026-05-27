@@ -212,6 +212,9 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, 
   if (input == nullptr) {
     return nullptr;
   }
+  if (_density == 0.0f) {
+    return input;
+  }
   // Anchor the noise pattern to the content bounds center, expressed in input image pixel space.
   // contentBounds is already in the input image coordinate space (see Layer::mapContentBoundsToImage),
   // so its center is the anchor position directly without an extra scale multiplication.
@@ -220,15 +223,6 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, 
   if (noiseShader == nullptr) {
     return input;
   }
-  auto imageShader = Shader::MakeImageShader(input);
-  if (imageShader == nullptr) {
-    return input;
-  }
-  // auto clippedNoiseShader =
-  //     Shader::MakeBlend(BlendMode::SrcIn, std::move(imageShader), std::move(noiseShader));
-  // if (clippedNoiseShader == nullptr) {
-  //   return input;
-  // }
   auto blendFilter = ImageFilter::Blend(BlendMode::SrcIn, std::move(noiseShader));
   if (blendFilter == nullptr) {
     return input;
