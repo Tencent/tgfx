@@ -172,7 +172,6 @@
     },
     "ImageRenderTest": {
         "RotateImageRect": "bf48e614",
-        "TileModeFallback": "bf48e614",
         "YUVImage": "bf48e614",
         "YUVImage_RGBAA": "bf48e614",
         "atlas": "bf48e614",
@@ -184,7 +183,6 @@
         "drawScaleSubImage": "bf48e614",
         "filter_mode_linear": "bf48e614",
         "filter_mode_nearest": "bf48e614",
-        "hardware_render_target_blend": "bf48e614",
         "mipmap_linear": "bf48e614",
         "mipmap_linear_hardware": "bf48e614",
         "mipmap_linear_texture_effect": "bf48e614",
@@ -257,7 +255,7 @@
         "innerShadow": "bf48e614"
     },
     "LayerMaskTest": {
-        "ChildMask": "3247ebaa",
+        "ChildMask": "9c9b0f77",
         "HighZoomWithMask_Tiled": "bf48e614",
         "InvalidMask": "bf48e614",
         "MaskAlpha": "bf48e614",
@@ -326,7 +324,7 @@
         "Matrix_3D": "439ca4178",
         "Matrix_3D_2D": "3d686214e",
         "Matrix_3D_2D_3D": "3d686214e",
-        "Matrix_3D_2D_3D_Preserve3D": "e581709f9",
+        "Matrix_3D_2D_3D_Preserve3D": "9c9b0f77",
         "Matrix_3D_Offscreen_Blend": "7ce872bef",
         "Matrix_Behind_Viewer": "3d686214e",
         "MeshLayer": "c3630d40",
