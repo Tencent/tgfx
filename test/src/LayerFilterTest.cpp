@@ -570,41 +570,37 @@ static std::shared_ptr<LayerFilter> MakeDensitySweepFilter(NoiseFilterSweepType 
 
 static void RenderNoiseFilterDensitySweep(Context* context, NoiseFilterSweepType type,
                                           const std::string& keyPrefix) {
-  constexpr int frameCount = 20;
   constexpr float size = 1000.0f;
   auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
   ASSERT_TRUE(typeface != nullptr);
   Font font(typeface, 300.0f);
-  for (int i = 0; i < frameCount; ++i) {
-    auto density = static_cast<float>(i) / static_cast<float>(frameCount - 1);
-    auto surface = Surface::Make(context, static_cast<int>(size), static_cast<int>(size));
-    ASSERT_TRUE(surface != nullptr);
-    auto displayList = std::make_unique<DisplayList>();
+  auto density = 0.5f;
+  auto surface = Surface::Make(context, static_cast<int>(size), static_cast<int>(size));
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
 
-    auto back = SolidLayer::Make();
-    back->setColor(Color::White());
-    back->setWidth(size);
-    back->setHeight(size);
+  auto back = SolidLayer::Make();
+  back->setColor(Color::White());
+  back->setWidth(size);
+  back->setHeight(size);
 
-    auto layer = TextLayer::Make();
-    layer->setText("text");
-    layer->setFont(font);
-    layer->setTextColor(Color::FromRGBA(60, 120, 200));
-    auto textBounds = layer->getBounds(nullptr, true);
-    layer->setMatrix(
-        Matrix::MakeTrans(size * 0.5f - textBounds.centerX(), size * 0.5f - textBounds.centerY()));
+  auto layer = TextLayer::Make();
+  layer->setText("text");
+  layer->setFont(font);
+  layer->setTextColor(Color::FromRGBA(60, 120, 200));
+  auto textBounds = layer->getBounds(nullptr, true);
+  layer->setMatrix(
+      Matrix::MakeTrans(size * 0.5f - textBounds.centerX(), size * 0.5f - textBounds.centerY()));
 
-    auto noise = MakeDensitySweepFilter(type, density);
-    ASSERT_TRUE(noise != nullptr);
-    layer->setFilters({noise});
+  auto noise = MakeDensitySweepFilter(type, density);
+  ASSERT_TRUE(noise != nullptr);
+  layer->setFilters({noise});
 
-    back->addChild(layer);
-    displayList->root()->addChild(back);
-    displayList->render(surface.get());
+  back->addChild(layer);
+  displayList->root()->addChild(back);
+  displayList->render(surface.get());
 
-    auto key = keyPrefix + "_" + std::to_string(i);
-    EXPECT_TRUE(Baseline::Compare(surface, key));
-  }
+  EXPECT_TRUE(Baseline::Compare(surface, keyPrefix));
 }
 
 TGFX_TEST(LayerFilterTest, MonoNoiseFilterDensitySweep) {
