@@ -46,12 +46,6 @@ InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrin
       shadowOnly(shadowOnly) {
 }
 
-Rect InnerShadowImageFilter::onFilterBounds(const Rect& rect, MapDirection /*mapDirection*/) const {
-  // InnerShadow never expands bounds in either direction: the shadow is clipped to the source
-  // shape, so the output region is always contained within the input region.
-  return rect;
-}
-
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
