@@ -228,6 +228,10 @@ bool VulkanGPU::createInstance() {
     if (HasInstanceExtension(availableExts, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME)) {
       instanceExtensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
     }
+#elif defined(__OHOS__)
+    if (HasInstanceExtension(availableExts, VK_OHOS_SURFACE_EXTENSION_NAME)) {
+      instanceExtensions.push_back(VK_OHOS_SURFACE_EXTENSION_NAME);
+    }
 #endif
   }
 
