@@ -34,7 +34,11 @@ Rect LayerFilter::filterBounds(const Rect& srcRect, float, MapDirection) {
 }
 
 void LayerFilter::invalidateFilter() {
+  onInvalidateFilter();
   invalidateTransform();
+}
+
+void LayerFilter::onInvalidateFilter() {
 }
 
 }  // namespace tgfx

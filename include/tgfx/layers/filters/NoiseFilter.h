@@ -138,7 +138,7 @@ class NoiseFilter : public LayerFilter {
                                        const Rect& contentBounds, const Rect* clipBounds,
                                        Point* offset) override;
 
-  void invalidateFilter() override;
+  void onInvalidateFilter() override;
 
   /**
    * Builds the base noise shader for the given scale, without any shift applied. The returned
@@ -234,7 +234,7 @@ class DuoNoiseFilter : public NoiseFilter {
 
   std::shared_ptr<Shader> buildAtShift(float scale, const Point& shift) override;
 
-  void invalidateFilter() override;
+  void onInvalidateFilter() override;
 
  private:
   DuoNoiseFilter(float size, float density, const Color& firstColor, const Color& secondColor,

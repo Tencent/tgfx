@@ -44,7 +44,7 @@ class LayerImageFilter : public LayerFilter {
                                        const Rect& contentBounds, const Rect* clipBounds,
                                        Point* offset) override;
 
-  void invalidateFilter() override;
+  void onInvalidateFilter() override;
 
  private:
   std::shared_ptr<ImageFilter> getImageFilter(float scale);

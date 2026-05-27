@@ -189,10 +189,9 @@ void NoiseFilter::setBlendMode(BlendMode blendMode) {
   invalidateFilter();
 }
 
-void NoiseFilter::invalidateFilter() {
+void NoiseFilter::onInvalidateFilter() {
   baseDirty = true;
   cachedBaseShader = nullptr;
-  LayerFilter::invalidateFilter();
 }
 
 std::shared_ptr<Shader> NoiseFilter::buildAtShift(float scale, const Point& shift) {
@@ -289,11 +288,10 @@ void DuoNoiseFilter::setSecondColor(const Color& color) {
   invalidateFilter();
 }
 
-void DuoNoiseFilter::invalidateFilter() {
+void DuoNoiseFilter::onInvalidateFilter() {
   duoDirty = true;
   cachedDarkBase = nullptr;
   cachedBrightBase = nullptr;
-  NoiseFilter::invalidateFilter();
 }
 
 std::shared_ptr<Shader> DuoNoiseFilter::onBuildBaseShader(float /*scale*/) {

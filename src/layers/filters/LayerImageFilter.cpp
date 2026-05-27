@@ -40,10 +40,9 @@ Rect LayerImageFilter::filterBounds(const Rect& srcRect, float contentScale,
   return filter->filterBounds(srcRect, direction);
 }
 
-void LayerImageFilter::invalidateFilter() {
+void LayerImageFilter::onInvalidateFilter() {
   lastFilter = nullptr;
   dirty = true;
-  LayerFilter::invalidateFilter();
 }
 
 std::shared_ptr<ImageFilter> LayerImageFilter::getImageFilter(float scale) {

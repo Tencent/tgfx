@@ -88,10 +88,14 @@ class LayerFilter : public LayerProperty {
                                                Point* offset) = 0;
 
   /**
-   * Marks this filter as dirty. Subclasses that maintain cached state should override this method
-   * to drop their caches, then call the base implementation.
+   * Marks this filter as dirty and drops any cached state.
    */
-  virtual void invalidateFilter();
+  void invalidateFilter();
+
+  /**
+   * Called by invalidateFilter() to allow subclasses to drop their cached state.
+   */
+  virtual void onInvalidateFilter();
 
   friend class Types;
 };
