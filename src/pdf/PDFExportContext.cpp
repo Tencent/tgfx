@@ -1370,7 +1370,14 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
   // Inverted masks have no vector Picture representation — always rasterize as bitmap.
   bool useBitmapMask = !picture || shaderMaskFilter->isInverted();
 
+  // TEMP(pdf-bg-blur): The SMask must follow the same CTM as the masked path. Previously the
+  // mask was drawn in path-local coordinates while the path itself was placed by `matrix`, so the
+  // SMask and the path drifted apart whenever `matrix` was not identity (common for any layer
+  // with a transform). Apply `matrix` on the mask canvas and use the matrix-mapped bounds for the
+  // Form XObject BBox so the SMask aligns with the drawn path. Revert if this regresses.
   auto maskContext = makeCongruentDevice();
+  auto mappedMaskBound = matrix.mapRect(maskBound);
+  mappedMaskBound.roundOut();
   if (useBitmapMask) {
     auto surface = Surface::Make(document->context(), static_cast<int>(maskBound.width()),
                                  static_cast<int>(maskBound.height()), false, 1, false, 0,
@@ -1422,10 +1429,14 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
     // Must mask with a Form XObject.
     {
       Canvas canvas(maskContext.get());
+      // TEMP(pdf-bg-blur): align mask to the same CTM as the masked path.
+      canvas.concat(matrix);
       canvas.drawImage(maskImage, maskBound.x(), maskBound.y());
     }
   } else {
     Canvas canvas(maskContext.get());
+    // TEMP(pdf-bg-blur): align mask to the same CTM as the masked path.
+    canvas.concat(matrix);
     canvas.concat(pictureMatrix);
     canvas.drawPicture(picture);
   }
@@ -1439,7 +1450,9 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
   }
 
   setGraphicState(PDFGraphicState::GetSMaskGraphicState(
-                      maskContext->makeFormXObjectFromDevice(maskBound, true), false,
+                      // TEMP(pdf-bg-blur): use the matrix-mapped bounds as the Form XObject BBox
+                      // so the SMask covers the same device region the path will fill.
+                      maskContext->makeFormXObjectFromDevice(mappedMaskBound, true), false,
                       useBitmapMask ? PDFGraphicState::SMaskMode::Luminosity
                                     : PDFGraphicState::SMaskMode::Alpha,
                       document),
