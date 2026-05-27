@@ -779,11 +779,6 @@ std::shared_ptr<Data> PDFExportContext::getContent() {
   if (content->bytesWritten() == 0) {
     return Data::MakeEmpty();
   }
-  // Emit any pending "Q" operators so the graphics state stack is balanced before the content
-  // stream is handed to the caller (page Contents, Form XObject, or tiling pattern). PDF spec
-  // ISO 32000-1 §8.4.2 requires the stack depth at the end of these streams to match the depth
-  // at the beginning, otherwise strict viewers reject the stream as malformed.
-  activeStackState.drainStack();
   auto buffer = MemoryWriteStream::Make();
   if (!_initialTransform.isIdentity()) {
     PDFUtils::AppendTransform(_initialTransform, buffer);

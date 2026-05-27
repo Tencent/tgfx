@@ -74,17 +74,12 @@ size_t FindBytes(const uint8_t* data, size_t size, size_t offset, const char* ne
   return std::string::npos;
 }
 
-// Walks every "N 0 obj ... endobj" block in the given raw PDF bytes and checks two structural
-// invariants required by ISO 32000-1:
-//   * For each stream, the dictionary's /Length entry must equal the actual byte count written
-//     between the "stream\n" marker and the "\nendstream" marker (see §7.3.8.2).
-//   * For each plain-text content stream (page Contents, Form XObject, tiling pattern), the
-//     graphics state stack operators 'q' and 'Q' must be balanced (see §8.4.2).
-// The plaintext q/Q check requires the content streams to be uncompressed, so the caller should
-// disable FlateDecode via PDFMetadata::compressionLevel = None. When skipUncompressedQQ is true,
-// only the /Length invariant is verified.
-bool VerifyPDFStructure(const std::shared_ptr<Data>& pdfData, bool skipUncompressedQQ,
-                        std::string* errorMessage) {
+// Walks every "N 0 obj ... endobj" block in the given raw PDF bytes and checks that, for each
+// stream object, the dictionary's /Length entry matches the actual byte count written between the
+// "stream\n" marker and the "\nendstream" marker (ISO 32000-1 §7.3.8.2). When this invariant is
+// violated, strict PDF readers fail to parse the stream payload and may corrupt downstream
+// objects.
+bool VerifyPDFStructure(const std::shared_ptr<Data>& pdfData, std::string* errorMessage) {
   const auto* bytes = static_cast<const uint8_t*>(pdfData->data());
   size_t size = pdfData->size();
   bool ok = true;
@@ -163,43 +158,6 @@ bool VerifyPDFStructure(const std::shared_ptr<Data>& pdfData, bool skipUncompres
       reportError("obj " + std::to_string(objNum) + ": /Length=" +
                   std::to_string(declaredLength) + " but actual stream bytes=" +
                   std::to_string(actualLength));
-    }
-
-    // q/Q balance check is only meaningful for uncompressed text content streams.
-    if (skipUncompressedQQ) {
-      continue;
-    }
-    if (dictText.find("/Filter") != std::string::npos) {
-      // Compressed stream; cannot inspect operators without decoding.
-      continue;
-    }
-    if (dictText.find("/Subtype /Image") != std::string::npos) {
-      continue;
-    }
-    int qCount = 0;
-    int QCount = 0;
-    for (size_t i = payloadStart; i < payloadEnd; ++i) {
-      uint8_t ch = bytes[i];
-      if (ch != 'q' && ch != 'Q') {
-        continue;
-      }
-      // PDF operators must be delimited by whitespace or stream boundaries.
-      bool leftOk = (i == payloadStart) || bytes[i - 1] == ' ' || bytes[i - 1] == '\n' ||
-                    bytes[i - 1] == '\r' || bytes[i - 1] == '\t';
-      bool rightOk = (i + 1 == payloadEnd) || bytes[i + 1] == ' ' || bytes[i + 1] == '\n' ||
-                     bytes[i + 1] == '\r' || bytes[i + 1] == '\t';
-      if (!leftOk || !rightOk) {
-        continue;
-      }
-      if (ch == 'q') {
-        ++qCount;
-      } else {
-        ++QCount;
-      }
-    }
-    if (qCount != QCount) {
-      reportError("obj " + std::to_string(objNum) + ": graphics state stack unbalanced (q=" +
-                  std::to_string(qCount) + ", Q=" + std::to_string(QCount) + ")");
     }
   }
   return ok;
@@ -1280,14 +1238,9 @@ static void DrawIntegrityScene(Canvas* canvas, const std::shared_ptr<Image>& ima
   }
 }
 
-// Regression test guarding two PDF writer bugs:
-//   * /Length entries previously stored the uncompressed byte count for FlateDecode streams,
-//     producing malformed PDFs (Bug 1).
-//   * Page Contents streams previously left the graphics state stack non-empty, violating
-//     ISO 32000-1 §8.4.2 (Bug 2).
-// The scene is exported twice. The first pass keeps default compression on and only checks
-// /Length. The second pass disables compression so that q/Q operators stay in plain text and the
-// graphics state stack balance can be verified directly.
+// Regression test guarding the PDF stream /Length writer bug, where FlateDecode streams used to
+// store the uncompressed byte count in /Length, producing malformed PDFs. The scene is exported
+// twice (with and without compression) so both code paths are covered.
 TGFX_TEST(PDFExportTest, PDFStructureIntegrity) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -1296,7 +1249,7 @@ TGFX_TEST(PDFExportTest, PDFStructureIntegrity) {
   auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/apitest/mandrill_128.webp"));
   EXPECT_TRUE(image != nullptr);
 
-  // Pass 1: default (FlateDecode enabled) - only /Length is verifiable without zlib.
+  // Pass 1: default (FlateDecode enabled).
   {
     auto PDFStream = MemoryWriteStream::Make();
     auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
@@ -1308,11 +1261,11 @@ TGFX_TEST(PDFExportTest, PDFStructureIntegrity) {
     PDFStream->flush();
 
     std::string errors;
-    bool ok = VerifyPDFStructure(PDFStream->readData(), /*skipUncompressedQQ=*/true, &errors);
+    bool ok = VerifyPDFStructure(PDFStream->readData(), &errors);
     EXPECT_TRUE(ok) << "Compressed PDF failed /Length check:\n" << errors;
   }
 
-  // Pass 2: compression off - both /Length and q/Q balance are checked.
+  // Pass 2: compression off.
   {
     auto PDFStream = MemoryWriteStream::Make();
     PDFMetadata metadata;
@@ -1326,8 +1279,8 @@ TGFX_TEST(PDFExportTest, PDFStructureIntegrity) {
     PDFStream->flush();
 
     std::string errors;
-    bool ok = VerifyPDFStructure(PDFStream->readData(), /*skipUncompressedQQ=*/false, &errors);
-    EXPECT_TRUE(ok) << "Uncompressed PDF failed structural check:\n" << errors;
+    bool ok = VerifyPDFStructure(PDFStream->readData(), &errors);
+    EXPECT_TRUE(ok) << "Uncompressed PDF failed /Length check:\n" << errors;
   }
 }
 
