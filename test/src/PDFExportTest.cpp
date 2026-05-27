@@ -58,6 +58,152 @@ bool ComparePDF(const std::shared_ptr<MemoryWriteStream>& stream, const std::str
   }
   return result;
 }
+
+// Searches forward from "offset" for the byte sequence "needle" and returns its start position, or
+// std::string::npos when not found.
+size_t FindBytes(const uint8_t* data, size_t size, size_t offset, const char* needle,
+                 size_t needleSize) {
+  if (needleSize == 0 || offset + needleSize > size) {
+    return std::string::npos;
+  }
+  for (size_t i = offset; i + needleSize <= size; ++i) {
+    if (memcmp(data + i, needle, needleSize) == 0) {
+      return i;
+    }
+  }
+  return std::string::npos;
+}
+
+// Walks every "N 0 obj ... endobj" block in the given raw PDF bytes and checks two structural
+// invariants required by ISO 32000-1:
+//   * For each stream, the dictionary's /Length entry must equal the actual byte count written
+//     between the "stream\n" marker and the "\nendstream" marker (see §7.3.8.2).
+//   * For each plain-text content stream (page Contents, Form XObject, tiling pattern), the
+//     graphics state stack operators 'q' and 'Q' must be balanced (see §8.4.2).
+// The plaintext q/Q check requires the content streams to be uncompressed, so the caller should
+// disable FlateDecode via PDFMetadata::compressionLevel = None. When skipUncompressedQQ is true,
+// only the /Length invariant is verified.
+bool VerifyPDFStructure(const std::shared_ptr<Data>& pdfData, bool skipUncompressedQQ,
+                        std::string* errorMessage) {
+  const auto* bytes = static_cast<const uint8_t*>(pdfData->data());
+  size_t size = pdfData->size();
+  bool ok = true;
+  auto reportError = [&](const std::string& msg) {
+    ok = false;
+    if (errorMessage) {
+      if (!errorMessage->empty()) {
+        errorMessage->append("\n");
+      }
+      errorMessage->append(msg);
+    }
+  };
+
+  size_t cursor = 0;
+  while (cursor < size) {
+    size_t objPos = FindBytes(bytes, size, cursor, " 0 obj", 6);
+    if (objPos == std::string::npos) {
+      break;
+    }
+    // Walk back to capture the object number.
+    size_t numStart = objPos;
+    while (numStart > 0 && bytes[numStart - 1] >= '0' && bytes[numStart - 1] <= '9') {
+      --numStart;
+    }
+    if (numStart == objPos) {
+      cursor = objPos + 6;
+      continue;
+    }
+    int objNum = std::stoi(std::string(reinterpret_cast<const char*>(bytes + numStart),
+                                       objPos - numStart));
+    size_t endobjPos = FindBytes(bytes, size, objPos, "endobj", 6);
+    if (endobjPos == std::string::npos) {
+      reportError("obj " + std::to_string(objNum) + ": missing 'endobj'");
+      break;
+    }
+    size_t bodyEnd = endobjPos;
+    cursor = endobjPos + 6;
+
+    size_t streamPos = FindBytes(bytes, size, objPos, "stream\n", 7);
+    if (streamPos == std::string::npos || streamPos >= bodyEnd) {
+      continue;
+    }
+    size_t endstreamPos = FindBytes(bytes, size, streamPos, "\nendstream", 10);
+    if (endstreamPos == std::string::npos || endstreamPos >= bodyEnd) {
+      reportError("obj " + std::to_string(objNum) + ": missing 'endstream'");
+      continue;
+    }
+    size_t payloadStart = streamPos + 7;
+    size_t payloadEnd = endstreamPos;
+    size_t actualLength = payloadEnd - payloadStart;
+
+    // Parse "/Length <N>" inside the dictionary preceding the stream marker.
+    std::string dictText(reinterpret_cast<const char*>(bytes + objPos),
+                         streamPos - objPos);
+    auto lengthKey = dictText.find("/Length");
+    if (lengthKey == std::string::npos) {
+      reportError("obj " + std::to_string(objNum) + ": stream without /Length entry");
+      continue;
+    }
+    size_t numCursor = lengthKey + 7;
+    while (numCursor < dictText.size() &&
+           (dictText[numCursor] == ' ' || dictText[numCursor] == '\t')) {
+      ++numCursor;
+    }
+    size_t numEnd = numCursor;
+    while (numEnd < dictText.size() && dictText[numEnd] >= '0' && dictText[numEnd] <= '9') {
+      ++numEnd;
+    }
+    if (numEnd == numCursor) {
+      // /Length is an indirect reference (e.g. "/Length 5 0 R"). Skip the numeric check for it.
+      continue;
+    }
+    size_t declaredLength =
+        static_cast<size_t>(std::stoul(dictText.substr(numCursor, numEnd - numCursor)));
+    if (declaredLength != actualLength) {
+      reportError("obj " + std::to_string(objNum) + ": /Length=" +
+                  std::to_string(declaredLength) + " but actual stream bytes=" +
+                  std::to_string(actualLength));
+    }
+
+    // q/Q balance check is only meaningful for uncompressed text content streams.
+    if (skipUncompressedQQ) {
+      continue;
+    }
+    if (dictText.find("/Filter") != std::string::npos) {
+      // Compressed stream; cannot inspect operators without decoding.
+      continue;
+    }
+    if (dictText.find("/Subtype /Image") != std::string::npos) {
+      continue;
+    }
+    int qCount = 0;
+    int QCount = 0;
+    for (size_t i = payloadStart; i < payloadEnd; ++i) {
+      uint8_t ch = bytes[i];
+      if (ch != 'q' && ch != 'Q') {
+        continue;
+      }
+      // PDF operators must be delimited by whitespace or stream boundaries.
+      bool leftOk = (i == payloadStart) || bytes[i - 1] == ' ' || bytes[i - 1] == '\n' ||
+                    bytes[i - 1] == '\r' || bytes[i - 1] == '\t';
+      bool rightOk = (i + 1 == payloadEnd) || bytes[i + 1] == ' ' || bytes[i + 1] == '\n' ||
+                     bytes[i + 1] == '\r' || bytes[i + 1] == '\t';
+      if (!leftOk || !rightOk) {
+        continue;
+      }
+      if (ch == 'q') {
+        ++qCount;
+      } else {
+        ++QCount;
+      }
+    }
+    if (qCount != QCount) {
+      reportError("obj " + std::to_string(objNum) + ": graphics state stack unbalanced (q=" +
+                  std::to_string(qCount) + ", Q=" + std::to_string(QCount) + ")");
+    }
+  }
+  return ok;
+}
 }  // namespace
 
 TGFX_TEST(PDFExportTest, Empty) {
@@ -1102,6 +1248,87 @@ TGFX_TEST(PDFExportTest, ImageDeduplicationCrossPage) {
   PDFStream->flush();
 
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ImageDeduplicationCrossPage"));
+}
+
+// Helper for PDFStructureIntegrity: draws a scene that exercises nested save/restore, multiple
+// paint types, clipping and image XObjects, so the resulting page Contents stream contains a
+// non-trivial sequence of graphics state operators.
+static void DrawIntegrityScene(Canvas* canvas, const std::shared_ptr<Image>& image) {
+  Paint background;
+  background.setColor(Color{0.94f, 0.94f, 0.98f, 1.f});
+  canvas->drawRect(Rect::MakeWH(256.f, 256.f), background);
+
+  canvas->save();
+  canvas->translate(40.f, 40.f);
+  Paint red;
+  red.setColor(Color{0.85f, 0.2f, 0.2f, 1.f});
+  canvas->drawRect(Rect::MakeWH(60.f, 60.f), red);
+
+  canvas->save();
+  canvas->clipRect(Rect::MakeXYWH(10.f, 10.f, 40.f, 40.f));
+  Paint translucent;
+  translucent.setColor(Color{0.1f, 0.4f, 0.9f, 0.5f});
+  canvas->drawRect(Rect::MakeWH(60.f, 60.f), translucent);
+  canvas->restore();
+  canvas->restore();
+
+  if (image != nullptr) {
+    canvas->save();
+    canvas->translate(120.f, 40.f);
+    canvas->drawImage(image, 0.f, 0.f);
+    canvas->restore();
+  }
+}
+
+// Regression test guarding two PDF writer bugs:
+//   * /Length entries previously stored the uncompressed byte count for FlateDecode streams,
+//     producing malformed PDFs (Bug 1).
+//   * Page Contents streams previously left the graphics state stack non-empty, violating
+//     ISO 32000-1 §8.4.2 (Bug 2).
+// The scene is exported twice. The first pass keeps default compression on and only checks
+// /Length. The second pass disables compression so that q/Q operators stay in plain text and the
+// graphics state stack balance can be verified directly.
+TGFX_TEST(PDFExportTest, PDFStructureIntegrity) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/apitest/mandrill_128.webp"));
+  EXPECT_TRUE(image != nullptr);
+
+  // Pass 1: default (FlateDecode enabled) - only /Length is verifiable without zlib.
+  {
+    auto PDFStream = MemoryWriteStream::Make();
+    auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+    DrawIntegrityScene(document->beginPage(256.f, 256.f), image);
+    document->endPage();
+    DrawIntegrityScene(document->beginPage(256.f, 256.f), image);
+    document->endPage();
+    document->close();
+    PDFStream->flush();
+
+    std::string errors;
+    bool ok = VerifyPDFStructure(PDFStream->readData(), /*skipUncompressedQQ=*/true, &errors);
+    EXPECT_TRUE(ok) << "Compressed PDF failed /Length check:\n" << errors;
+  }
+
+  // Pass 2: compression off - both /Length and q/Q balance are checked.
+  {
+    auto PDFStream = MemoryWriteStream::Make();
+    PDFMetadata metadata;
+    metadata.compressionLevel = PDFMetadata::CompressionLevel::None;
+    auto document = PDFDocument::Make(PDFStream, context, metadata);
+    DrawIntegrityScene(document->beginPage(256.f, 256.f), image);
+    document->endPage();
+    DrawIntegrityScene(document->beginPage(256.f, 256.f), image);
+    document->endPage();
+    document->close();
+    PDFStream->flush();
+
+    std::string errors;
+    bool ok = VerifyPDFStructure(PDFStream->readData(), /*skipUncompressedQQ=*/false, &errors);
+    EXPECT_TRUE(ok) << "Uncompressed PDF failed structural check:\n" << errors;
+  }
 }
 
 }  // namespace tgfx
