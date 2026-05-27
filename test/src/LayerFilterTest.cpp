@@ -551,6 +551,86 @@ TGFX_TEST(LayerFilterTest, DuoNoiseFilter) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/DuoNoiseFilter"));
 }
 
+enum class NoiseFilterSweepType { Mono, Duo, Multi };
+
+static std::shared_ptr<LayerFilter> MakeDensitySweepFilter(NoiseFilterSweepType type,
+                                                           float density) {
+  switch (type) {
+    case NoiseFilterSweepType::Mono:
+      return NoiseFilter::MakeMono(25.0f, density, Color::FromRGBA(255, 0, 0, 128), 42.0f,
+                                   BlendMode::SrcOver);
+    case NoiseFilterSweepType::Duo:
+      return NoiseFilter::MakeDuo(25.0f, density, Color::FromRGBA(255, 0, 0, 128),
+                                  Color::FromRGBA(0, 0, 255, 128), 42.0f, BlendMode::SrcOver);
+    case NoiseFilterSweepType::Multi:
+      return NoiseFilter::MakeMulti(25.0f, density, 1.0f, 42.0f, BlendMode::SrcOver);
+  }
+  return nullptr;
+}
+
+static void RenderNoiseFilterDensitySweep(Context* context, NoiseFilterSweepType type,
+                                          const std::string& keyPrefix) {
+  constexpr int frameCount = 20;
+  constexpr float size = 1000.0f;
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 300.0f);
+  for (int i = 0; i < frameCount; ++i) {
+    auto density = static_cast<float>(i) / static_cast<float>(frameCount - 1);
+    auto surface = Surface::Make(context, static_cast<int>(size), static_cast<int>(size));
+    ASSERT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+
+    auto back = SolidLayer::Make();
+    back->setColor(Color::White());
+    back->setWidth(size);
+    back->setHeight(size);
+
+    auto layer = TextLayer::Make();
+    layer->setText("text");
+    layer->setFont(font);
+    layer->setTextColor(Color::FromRGBA(60, 120, 200));
+    auto textBounds = layer->getBounds(nullptr, true);
+    layer->setMatrix(
+        Matrix::MakeTrans(size * 0.5f - textBounds.centerX(), size * 0.5f - textBounds.centerY()));
+
+    auto noise = MakeDensitySweepFilter(type, density);
+    ASSERT_TRUE(noise != nullptr);
+    layer->setFilters({noise});
+
+    back->addChild(layer);
+    displayList->root()->addChild(back);
+    displayList->render(surface.get());
+
+    auto key = keyPrefix + "_" + std::to_string(i);
+    EXPECT_TRUE(Baseline::Compare(surface, key));
+  }
+}
+
+TGFX_TEST(LayerFilterTest, MonoNoiseFilterDensitySweep) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  RenderNoiseFilterDensitySweep(context, NoiseFilterSweepType::Mono,
+                                "LayerFilterTest/MonoNoiseFilterDensitySweep");
+}
+
+TGFX_TEST(LayerFilterTest, DuoNoiseFilterDensitySweep) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  RenderNoiseFilterDensitySweep(context, NoiseFilterSweepType::Duo,
+                                "LayerFilterTest/DuoNoiseFilterDensitySweep");
+}
+
+TGFX_TEST(LayerFilterTest, MultiNoiseFilterDensitySweep) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  RenderNoiseFilterDensitySweep(context, NoiseFilterSweepType::Multi,
+                                "LayerFilterTest/MultiNoiseFilterDensitySweep");
+}
+
 // Verify MultiNoiseFilter preserves original Perlin noise RGB with enhanced contrast.
 TGFX_TEST(LayerFilterTest, MultiNoiseFilter) {
   ContextScope scope;

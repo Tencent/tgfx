@@ -50,6 +50,9 @@ static std::pair<int, int> ComputeBrightBandBuckets(float density) {
 }
 
 static std::shared_ptr<ColorFilter> MakeLumaAlphaThresholdFilter(float threshold) {
+  if (threshold <= 0.0f) {
+    return nullptr;
+  }
   // clang-format off
   std::array<float, 20> lumaMatrix = {
     0.0f,    0.0f,    0.0f,    0.0f, 0.0f,
@@ -72,11 +75,12 @@ static std::shared_ptr<Shader> MakeDensityBandShader(std::shared_ptr<Shader> noi
   auto upperThreshold = static_cast<float>(std::max(0, std::min(100, upperBucket + 1))) / 100.0f;
   auto lowerMaskFilter = MakeLumaAlphaThresholdFilter(lowerThreshold);
   auto upperMaskFilter = MakeLumaAlphaThresholdFilter(upperThreshold);
-  auto lowerMask = noiseShader->makeWithColorFilter(std::move(lowerMaskFilter));
   auto upperMask = noiseShader->makeWithColorFilter(std::move(upperMaskFilter));
-  if (lowerMask == nullptr || upperMask == nullptr) {
-    return nullptr;
+  if (lowerMaskFilter == nullptr) {
+    return Shader::MakeBlend(BlendMode::DstOut, Shader::MakeColorShader(Color::Black()),
+                             std::move(upperMask));
   }
+  auto lowerMask = noiseShader->makeWithColorFilter(std::move(lowerMaskFilter));
   return Shader::MakeBlend(BlendMode::DstOut, std::move(lowerMask), std::move(upperMask));
 }
 
@@ -316,22 +320,41 @@ void MultiNoiseStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
   if (noiseShader == nullptr) {
     return;
   }
-  // Scale alpha by opacity (encode into matrix to avoid paint.setAlpha issues).
-  float finalAlpha = _opacity * alpha;
-  // clang-format off
-  std::array<float, 20> alphaScaleMatrix = {
-    1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, finalAlpha, 0.0f,
-  };
-  // clang-format on
   auto densityShader = MakeDarkDensityFilter(noiseShader, _density);
   if (densityShader == nullptr) {
     return;
   }
+
+  // clang-format off
+  std::array<float, 20> contrastMatrix = {
+     2.0f, 0.0f, 0.0f, 0.0f, -0.5f,
+     0.0f, 2.0f, 0.0f, 0.0f, -0.5f,
+     0.0f, 0.0f, 2.0f, 0.0f, -0.5f,
+     0.0f, 0.0f, 0.0f, 1.0f,  0.0f,
+  };
+  // clang-format on
+  auto contrastFilter = ColorFilter::Matrix(contrastMatrix);
+  auto contrastNoise = noiseShader->makeWithColorFilter(std::move(contrastFilter));
+  if (contrastNoise == nullptr) {
+    return;
+  }
+  auto maskedShader =
+      Shader::MakeBlend(BlendMode::DstIn, std::move(contrastNoise), std::move(densityShader));
+  if (maskedShader == nullptr) {
+    return;
+  }
+
+  float finalAlpha = _opacity * alpha;
+  // clang-format off
+  std::array<float, 20> alphaScaleMatrix = {
+    1.0f, 0.0f, 0.0f, 0.0f,       0.0f,
+    0.0f, 1.0f, 0.0f, 0.0f,       0.0f,
+    0.0f, 0.0f, 1.0f, 0.0f,       0.0f,
+    0.0f, 0.0f, 0.0f, finalAlpha, 0.0f,
+  };
+  // clang-format on
   auto alphaScaleFilter = ColorFilter::Matrix(alphaScaleMatrix);
-  auto coloredShader = densityShader->makeWithColorFilter(std::move(alphaScaleFilter));
+  auto coloredShader = maskedShader->makeWithColorFilter(std::move(alphaScaleFilter));
   DrawNoiseLayer(canvas, std::move(content), std::move(coloredShader), blendMode, contentOffset);
 }
 
