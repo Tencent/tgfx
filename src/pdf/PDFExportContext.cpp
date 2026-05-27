@@ -931,9 +931,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     return;
   }
   if (modifiedBrush.maskFilter) {
-    if (drawImageWithMask(image, rect, sampling, matrix, clip, modifiedBrush)) {
-      return;
-    }
+    return;
     auto imageShader =
         Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, SamplingOptions());
     imageShader = imageShader->makeWithMatrix(transform);
@@ -1354,64 +1352,6 @@ std::tuple<std::shared_ptr<Picture>, Matrix> MaskFilterToPicture(
 };
 
 }  // namespace
-
-bool PDFExportContext::drawImageWithMask(std::shared_ptr<Image> image, const Rect& rect,
-                                         const SamplingOptions& sampling, const Matrix& matrix,
-                                         const ClipStack& clip, const Brush& brush) {
-  if (Types::Get(brush.maskFilter.get()) != Types::MaskFilterType::Shader) {
-    return false;
-  }
-  const auto shaderMaskFilter = static_cast<const ShaderMaskFilter*>(brush.maskFilter.get());
-  if (shaderMaskFilter->isInverted()) {
-    return false;
-  }
-  auto [picture, pictureMatrix] = MaskFilterToPicture(shaderMaskFilter);
-  if (!picture) {
-    return false;
-  }
-
-  auto sourceContext = makeCongruentDevice();
-  auto sourceBrush = brush;
-  sourceBrush.maskFilter = nullptr;
-  sourceBrush.shader = nullptr;
-  sourceBrush.blendMode = BlendMode::SrcOver;
-  sourceBrush.color.alpha = 1.0f;
-  sourceContext->onDrawImageRect(std::move(image), rect, sampling, Matrix::I(), ClipStack(),
-                                 sourceBrush);
-  auto sourceBounds = rect.makeSorted();
-  sourceBounds.roundOut();
-  auto sourceForm = sourceContext->makeFormXObjectFromDevice(sourceBounds, false);
-
-  auto maskContext = makeCongruentDevice();
-  {
-    Canvas canvas(maskContext.get());
-    canvas.concat(pictureMatrix);
-    canvas.drawPicture(picture);
-  }
-  auto maskBounds = picture->getBounds();
-  pictureMatrix.mapRect(&maskBounds);
-  maskBounds.roundOut();
-  if (maskBounds.isEmpty()) {
-    return true;
-  }
-  auto maskForm = maskContext->makeFormXObjectFromDevice(maskBounds, true);
-
-  auto contentBrush = brush;
-  contentBrush.maskFilter = nullptr;
-  contentBrush.shader = nullptr;
-  contentBrush.colorFilter = nullptr;
-  ScopedContentEntry content(this, matrix, clip, Matrix::I(), contentBrush);
-  if (!content) {
-    return true;
-  }
-  setGraphicState(
-      PDFGraphicState::GetSMaskGraphicState(maskForm, false, PDFGraphicState::SMaskMode::Alpha,
-                                            document),
-      content.stream());
-  drawFormXObject(sourceForm, content.stream(), nullptr);
-  clearMaskOnGraphicState(content.stream());
-  return true;
-}
 
 void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack& clip,
                                           const Path& originPath, const Matrix& pathExtraMatrix,
