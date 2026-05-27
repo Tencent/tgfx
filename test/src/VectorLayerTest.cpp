@@ -5311,7 +5311,8 @@ TGFX_TEST(VectorLayerTest, DegenerateStroke) {
       // band. Without this gap, large square-cap strokes from adjacent cells overlap visibly.
       auto extraShift = col >= 2 ? ExtraColShift : 0.0f;
       group->setPosition(
-          {col * CellSize + CellSize * 0.5f + extraShift, row * CellSize + CellSize * 0.5f});
+          {static_cast<float>(col) * CellSize + CellSize * 0.5f + extraShift,
+           static_cast<float>(row) * CellSize + CellSize * 0.5f});
       group->setElements({shape, fill, stroke});
       contents.push_back(group);
     }
