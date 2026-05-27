@@ -21,7 +21,6 @@
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/MaskFilter.h"
-#include "tgfx/core/PictureRecorder.h"
 
 namespace tgfx {
 
@@ -166,25 +165,6 @@ std::shared_ptr<Shader> NoiseStyle::getNoiseShader(float contentScale) const {
   return Shader::MakeFractalNoise(freq, freq, 3, _seed);
 }
 
-// Rasterizes a procedural noise shader into a fixed image at local coordinates (0,0).
-// This is needed because drawLayerStyles may use canvas->drawPicture() to replay the
-// recording, which would transform shader coordinates by the canvas matrix, causing the
-// noise pattern to shift with the layer position.
-static std::shared_ptr<Image> RasterizeNoiseShader(std::shared_ptr<Shader> shader, int width,
-                                                   int height) {
-  PictureRecorder recorder = {};
-  auto recordCanvas = recorder.beginRecording();
-  Paint paint = {};
-  paint.setShader(std::move(shader));
-  recordCanvas->drawRect(Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)),
-                         paint);
-  auto picture = recorder.finishRecordingAsPicture();
-  if (picture == nullptr) {
-    return nullptr;
-  }
-  return Image::MakeFrom(std::move(picture), width, height);
-}
-
 // Draws a noise layer clipped to content alpha. The shader must already have color, density, and
 // alpha fully baked in. The shader sampling origin is anchored to contentOffset (expressed in the
 // content image's local coordinate space). Callers derive this origin from the layer's surface-space
@@ -197,24 +177,20 @@ static void DrawNoiseLayer(Canvas* canvas, std::shared_ptr<Image> content,
   if (coloredShader == nullptr || content == nullptr) {
     return;
   }
-  auto width = content->width();
-  auto height = content->height();
+  auto width = static_cast<float>(content->width());
+  auto height = static_cast<float>(content->height());
   // Shift the procedural noise so that sample (0,0) lands at contentOffset inside the content
   // image. A half-image offset is then added so that the original "centered" appearance is
   // preserved when contentOffset is zero.
-  auto samplingMatrix =
-      Matrix::MakeTrans(-1.f * contentOffset.x + static_cast<float>(width) * 0.5f,
-                        -1.f * contentOffset.y + static_cast<float>(height) * 0.5f);
+  auto samplingMatrix = Matrix::MakeTrans(-1.f * contentOffset.x + width * 0.5f,
+                                          -1.f * contentOffset.y + height * 0.5f);
   auto centeredShader = coloredShader->makeWithMatrix(samplingMatrix);
-  auto noiseImage = RasterizeNoiseShader(std::move(centeredShader), width, height);
-  if (noiseImage == nullptr) {
-    return;
-  }
   Paint paint = {};
+  paint.setShader(std::move(centeredShader));
   paint.setMaskFilter(
       MaskFilter::MakeShader(Shader::MakeImageShader(content, TileMode::Decal, TileMode::Decal)));
   paint.setBlendMode(blendMode);
-  canvas->drawImage(std::move(noiseImage), 0, 0, {}, &paint);
+  canvas->drawRect(Rect::MakeWH(width, height), paint);
 }
 
 // --- MonoNoiseStyle ---
