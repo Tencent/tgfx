@@ -295,6 +295,60 @@ int add_resource(std::unordered_set<PDFIndirectReference>& resources, PDFIndirec
   resources.insert(ref);
   return ref.value;
 }
+
+// TEMP(pdf-form-resources): Scan a Form XObject's content stream and return only the resource
+// references that are actually referenced by name. The page-level PDFExportContext accumulates
+// every resource it has ever produced into a single set, and `makeFormXObjectFromDevice` was
+// dumping that whole set into every Form XObject's /Resources dictionary -- even though each
+// Form XObject's stream only references a tiny subset. For Source blend-mode emulation we
+// build O(page-blur-count) Form XObjects, each carrying the page's full resource manifest,
+// which dominates the file size on busy pages. Revert if this regresses any reader.
+//
+// Resource names in the stream are emitted as "/<prefix><value>" (see PDFWriteResourceName):
+//   /G<id> = ExtGState, /P<id> = Pattern (shader),
+//   /X<id> = XObject,   /F<id> = Font.
+// The value is the PDF object number. We match a leading '/', a single prefix char from the
+// set above, then one or more decimal digits, and require the next byte to not be a digit so
+// "/X12" is not confused with "/X123". This is purely textual; the underlying stream is the
+// uncompressed PDF content text.
+std::unordered_set<PDFIndirectReference> FilterReferencedResources(
+    const std::shared_ptr<Data>& streamData,
+    const std::unordered_set<PDFIndirectReference>& source, char prefix) {
+  std::unordered_set<PDFIndirectReference> result;
+  if (source.empty() || streamData == nullptr || streamData->size() == 0) {
+    return result;
+  }
+  std::unordered_set<int> seenValues;
+  const auto* bytes = static_cast<const uint8_t*>(streamData->data());
+  size_t size = streamData->size();
+  for (size_t i = 0; i + 1 < size; ++i) {
+    if (bytes[i] != '/' || bytes[i + 1] != static_cast<uint8_t>(prefix)) {
+      continue;
+    }
+    size_t j = i + 2;
+    int value = 0;
+    bool hasDigit = false;
+    while (j < size && bytes[j] >= '0' && bytes[j] <= '9') {
+      value = value * 10 + (bytes[j] - '0');
+      hasDigit = true;
+      ++j;
+    }
+    if (!hasDigit) {
+      continue;
+    }
+    if (j < size && bytes[j] >= '0' && bytes[j] <= '9') {
+      continue;  // Should not happen but be defensive.
+    }
+    seenValues.insert(value);
+    i = j - 1;
+  }
+  for (auto ref : source) {
+    if (seenValues.count(ref.value) > 0) {
+      result.insert(ref);
+    }
+  }
+  return result;
+}
 }  // namespace
 
 namespace {
@@ -1029,9 +1083,25 @@ PDFIndirectReference PDFExportContext::makeFormXObjectFromDevice(Rect bounds, bo
 
   auto mediaBox = MakePDFArray(static_cast<int>(bounds.left), static_cast<int>(bounds.top),
                                static_cast<int>(bounds.right), static_cast<int>(bounds.bottom));
-  PDFIndirectReference xObject =
-      MakePDFFormXObject(document, getContent(), std::move(mediaBox), makeResourceDictionary(),
-                         inverseTransform, colorSpace);
+  // TEMP(pdf-form-resources): Only inherit the resources this Form XObject's stream actually
+  // references. See FilterReferencedResources for rationale.
+  auto contentData = getContent();
+  auto referencedGraphicStates =
+      FilterReferencedResources(contentData, graphicStateResources, 'G');
+  auto referencedShaders = FilterReferencedResources(contentData, shaderResources, 'P');
+  auto referencedXObjects = FilterReferencedResources(contentData, xObjectResources, 'X');
+  auto referencedFonts = FilterReferencedResources(contentData, fontResources, 'F');
+  auto resourceDict =
+      MakePDFResourceDictionary(Sort(referencedGraphicStates), Sort(referencedShaders),
+                                Sort(referencedXObjects), Sort(referencedFonts));
+  if (auto ref = document->colorSpaceRef()) {
+    auto colorSpaceDic = PDFDictionary::Make();
+    colorSpaceDic->insertRef("CS", ref);
+    resourceDict->insertObject("ColorSpace", std::move(colorSpaceDic));
+  }
+  PDFIndirectReference xObject = MakePDFFormXObject(document, std::move(contentData),
+                                                    std::move(mediaBox), std::move(resourceDict),
+                                                    inverseTransform, colorSpace);
 
   reset();
   return xObject;
@@ -1370,14 +1440,7 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
   // Inverted masks have no vector Picture representation — always rasterize as bitmap.
   bool useBitmapMask = !picture || shaderMaskFilter->isInverted();
 
-  // TEMP(pdf-bg-blur): The SMask must follow the same CTM as the masked path. Previously the
-  // mask was drawn in path-local coordinates while the path itself was placed by `matrix`, so the
-  // SMask and the path drifted apart whenever `matrix` was not identity (common for any layer
-  // with a transform). Apply `matrix` on the mask canvas and use the matrix-mapped bounds for the
-  // Form XObject BBox so the SMask aligns with the drawn path. Revert if this regresses.
   auto maskContext = makeCongruentDevice();
-  auto mappedMaskBound = matrix.mapRect(maskBound);
-  mappedMaskBound.roundOut();
   if (useBitmapMask) {
     auto surface = Surface::Make(document->context(), static_cast<int>(maskBound.width()),
                                  static_cast<int>(maskBound.height()), false, 1, false, 0,
@@ -1429,14 +1492,10 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
     // Must mask with a Form XObject.
     {
       Canvas canvas(maskContext.get());
-      // TEMP(pdf-bg-blur): align mask to the same CTM as the masked path.
-      canvas.concat(matrix);
       canvas.drawImage(maskImage, maskBound.x(), maskBound.y());
     }
   } else {
     Canvas canvas(maskContext.get());
-    // TEMP(pdf-bg-blur): align mask to the same CTM as the masked path.
-    canvas.concat(matrix);
     canvas.concat(pictureMatrix);
     canvas.drawPicture(picture);
   }
@@ -1450,9 +1509,7 @@ void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack&
   }
 
   setGraphicState(PDFGraphicState::GetSMaskGraphicState(
-                      // TEMP(pdf-bg-blur): use the matrix-mapped bounds as the Form XObject BBox
-                      // so the SMask covers the same device region the path will fill.
-                      maskContext->makeFormXObjectFromDevice(mappedMaskBound, true), false,
+                      maskContext->makeFormXObjectFromDevice(maskBound, true), false,
                       useBitmapMask ? PDFGraphicState::SMaskMode::Luminosity
                                     : PDFGraphicState::SMaskMode::Alpha,
                       document),
