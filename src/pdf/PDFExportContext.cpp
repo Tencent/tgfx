@@ -710,7 +710,6 @@ void PDFExportContext::drawBlurLayer(const std::shared_ptr<Picture>& picture,
                                      const std::shared_ptr<ImageFilter>& imageFilter,
                                      const Matrix& matrix, const ClipStack& clip,
                                      const Brush& brush) {
-  return;
   auto pictureBounds = picture->getBounds();
   auto blurBounds = imageFilter->filterBounds(pictureBounds);
   blurBounds = blurBounds.makeOutset(100, 100);
@@ -932,6 +931,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     return;
   }
   if (modifiedBrush.maskFilter) {
+    return;
     auto imageShader =
         Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, SamplingOptions());
     imageShader = imageShader->makeWithMatrix(transform);
