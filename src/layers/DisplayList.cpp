@@ -650,8 +650,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
         hasZoomBlurTiles = true;
         continue;
       }
-      auto skippedRect =
-          Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
+      auto skippedRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
       if (skippedRect.intersect(renderRect)) {
         skippedRects->push_back(skippedRect);
         hasZoomBlurTiles = true;
