@@ -631,6 +631,31 @@ TGFX_TEST(PDFExportTest, LayerLinearGradient) {
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/LayerLinearGradient"));
 }
 
+TGFX_TEST(PDFExportTest, LinearGradientWhiteAlpha) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::Black());
+
+  auto shader = Shader::MakeLinearGradient(
+      Point{0.f, 0.f}, Point{256.f, 0.f},
+      {Color::FromRGBA(255, 255, 255, 128), Color::FromRGBA(255, 255, 255, 26)}, {});
+
+  Paint paint;
+  paint.setShader(shader);
+  canvas->drawRect(Rect::MakeWH(256.f, 256.f), paint);
+
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/LinearGradientWhiteAlpha"));
+}
+
 TGFX_TEST(PDFExportTest, LayerRadialGradient) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -960,6 +985,123 @@ TGFX_TEST(PDFExportTest, SrcBlendOverlap) {
   document->close();
   PDFStream->flush();
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/SrcBlendOverlap"));
+}
+
+// Verifies that setting encodingQuality <= 100 enables JPEG (DCT) compression for the RGB data of
+// images in the exported PDF. The alpha channel should still use FlateDecode.
+TGFX_TEST(PDFExportTest, ImageDCTEncode) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/apitest/mandrill_128.webp"));
+  EXPECT_TRUE(image != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  PDFMetadata metadata;
+  metadata.encodingQuality = 85;
+  auto document = PDFDocument::Make(PDFStream, context, metadata);
+  auto canvas = document->beginPage(228.f, 228.f);
+  ASSERT_TRUE(canvas != nullptr);
+
+  canvas->drawImage(image, 50.f, 50.f);
+
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ImageDCTEncode"));
+}
+
+// Verifies that drawing the same image multiple times reuses a single Image XObject in the PDF
+// rather than embedding duplicate copies of the image data.
+TGFX_TEST(PDFExportTest, ImageDeduplication) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/apitest/mandrill_128.webp"));
+  EXPECT_TRUE(image != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(500.f, 250.f);
+  ASSERT_TRUE(canvas != nullptr);
+
+  canvas->drawImage(image, 50.f, 50.f);
+
+  canvas->save();
+  canvas->translate(200.f, 0.f);
+  canvas->scale(0.5f, 0.5f);
+  canvas->drawImage(image, 0.f, 0.f);
+  canvas->restore();
+
+  canvas->save();
+  canvas->translate(350.f, 50.f);
+  canvas->scale(0.25f, 0.25f);
+  canvas->drawImage(image, 0.f, 0.f);
+  canvas->restore();
+
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ImageDeduplication"));
+}
+
+// Verifies that JPEG encoding works correctly for images with alpha channel: RGB data should use
+// DCTDecode while the alpha (SMask) should use FlateDecode.
+TGFX_TEST(PDFExportTest, ImageDCTEncodeWithAlpha) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/apitest/imageReplacement.png"));
+  EXPECT_TRUE(image != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  PDFMetadata metadata;
+  metadata.encodingQuality = 80;
+  auto document = PDFDocument::Make(PDFStream, context, metadata);
+  auto canvas = document->beginPage(300.f, 300.f);
+  ASSERT_TRUE(canvas != nullptr);
+
+  canvas->drawImage(image, 50.f, 50.f);
+
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ImageDCTEncodeWithAlpha"));
+}
+
+// Verifies that drawing the same image across multiple pages reuses a single Image XObject
+// reference instead of embedding duplicate copies.
+TGFX_TEST(PDFExportTest, ImageDeduplicationCrossPage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/apitest/mandrill_128.webp"));
+  EXPECT_TRUE(image != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+
+  auto canvas = document->beginPage(228.f, 228.f);
+  ASSERT_TRUE(canvas != nullptr);
+  canvas->drawImage(image, 50.f, 50.f);
+  document->endPage();
+
+  canvas = document->beginPage(228.f, 228.f);
+  ASSERT_TRUE(canvas != nullptr);
+  canvas->drawImage(image, 50.f, 50.f);
+  document->endPage();
+
+  document->close();
+  PDFStream->flush();
+
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ImageDeduplicationCrossPage"));
 }
 
 }  // namespace tgfx

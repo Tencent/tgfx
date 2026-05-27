@@ -28,6 +28,11 @@ struct HWND__;
 typedef HWND__* HWND;
 #endif
 
+#ifdef __OHOS__
+struct NativeWindow;
+typedef struct NativeWindow OHNativeWindow;
+#endif
+
 namespace tgfx {
 
 /**
@@ -44,6 +49,16 @@ class VulkanWindow : public Window {
    * HDR / Display-P3 support will be added in a follow-up.
    */
   static std::shared_ptr<VulkanWindow> MakeFrom(HWND hwnd, std::shared_ptr<VulkanDevice> device,
+                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
+#endif
+
+#ifdef __OHOS__
+  /**
+   * Creates a VulkanWindow from an OHOS NativeWindow. Returns nullptr if the Vulkan surface or
+   * swapchain cannot be created. Note: only sRGB output is currently supported.
+   */
+  static std::shared_ptr<VulkanWindow> MakeFrom(OHNativeWindow* nativeWindow,
+                                                std::shared_ptr<VulkanDevice> device,
                                                 std::shared_ptr<ColorSpace> colorSpace = nullptr);
 #endif
 

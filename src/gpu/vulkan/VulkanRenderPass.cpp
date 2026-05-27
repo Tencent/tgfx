@@ -329,8 +329,15 @@ void VulkanRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
     return;
   }
   encoder->retainResource(std::static_pointer_cast<VulkanResource>(lastBound.pipeline));
-  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    lastBound.pipeline->vulkanPipeline());
+  if (vulkanGPU->extensions().extendedDynamicState) {
+    auto vkPipeline = lastBound.pipeline->vulkanPipeline();
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
+    lastBound.boundVkPipeline = vkPipeline;
+  } else {
+    // Defer bind to draw()/drawIndexed(), which know the requested topology and will
+    // select the correct pipeline variant (list or strip).
+    lastBound.boundVkPipeline = VK_NULL_HANDLE;
+  }
   lastBound.descriptorDirty = true;
 }
 
@@ -380,13 +387,16 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
   lastBound.descriptorDirty = false;
 
   auto device = vulkanGPU->device();
-  auto setLayout = lastBound.pipeline->vulkanDescriptorSetLayout();
-  if (setLayout == VK_NULL_HANDLE) {
+  auto uboLayout = lastBound.pipeline->vulkanUboSetLayout();
+  auto texLayout = lastBound.pipeline->vulkanTextureSetLayout();
+  if (uboLayout == VK_NULL_HANDLE || texLayout == VK_NULL_HANDLE) {
     return;
   }
 
-  auto descriptorSet = encoder->allocateDescriptorSet(setLayout);
-  if (descriptorSet == VK_NULL_HANDLE) {
+  // Allocate two descriptor sets: set 0 for UBOs, set 1 for textures.
+  auto uboSet = encoder->allocateDescriptorSet(uboLayout);
+  auto texSet = encoder->allocateDescriptorSet(texLayout);
+  if (uboSet == VK_NULL_HANDLE || texSet == VK_NULL_HANDLE) {
     LOGE("VulkanRenderPass: descriptor set allocation failed, draw will be dropped.");
     return;
   }
@@ -397,6 +407,7 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
   bufferInfos.reserve(lastBound.uniformBindings.size());
   imageInfos.reserve(lastBound.textureBindings.size());
 
+  // Write UBO descriptors into set 0.
   for (unsigned i = 0; i < static_cast<unsigned>(lastBound.uniformBindings.size()); i++) {
     auto& ub = lastBound.uniformBindings[i];
     if (ub.buffer == VK_NULL_HANDLE || !lastBound.pipeline->hasUniformBinding(i)) {
@@ -405,7 +416,7 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
     bufferInfos.push_back({ub.buffer, ub.offset, ub.size});
     VkWriteDescriptorSet write = {};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write.dstSet = descriptorSet;
+    write.dstSet = uboSet;
     write.dstBinding = i;
     write.descriptorCount = 1;
     write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -413,6 +424,8 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
     writes.push_back(write);
   }
 
+  // Write texture/sampler descriptors into set 1. Binding index equals the texture unit index
+  // (both start from 0), so no offset translation is needed.
   for (auto userBinding : lastBound.pipeline->getTextureBindings()) {
     auto unitIndex = lastBound.pipeline->getTextureIndex(userBinding);
     if (unitIndex >= lastBound.textureBindings.size()) {
@@ -426,8 +439,8 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
     imageInfos.push_back({tb.sampler, tb.imageView, VK_IMAGE_LAYOUT_GENERAL});
     VkWriteDescriptorSet write = {};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write.dstSet = descriptorSet;
-    write.dstBinding = lastBound.pipeline->getDescriptorBinding(userBinding);
+    write.dstSet = texSet;
+    write.dstBinding = unitIndex;
     write.descriptorCount = 1;
     write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     write.pImageInfo = &imageInfos.back();
@@ -438,9 +451,10 @@ void VulkanRenderPass::bindDescriptorSetIfDirty() {
     vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
   }
 
+  // Bind both descriptor sets in a single call.
+  VkDescriptorSet sets[] = {uboSet, texSet};
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          lastBound.pipeline->vulkanPipelineLayout(), 0, 1, &descriptorSet, 0,
-                          nullptr);
+                          lastBound.pipeline->vulkanPipelineLayout(), 0, 2, sets, 0, nullptr);
 }
 
 void VulkanRenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer,
@@ -493,10 +507,14 @@ void VulkanRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
                           ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
                           : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     vkCmdSetPrimitiveTopologyEXT(commandBuffer, vkTopology);
-  } else if (primitiveType == PrimitiveType::TriangleStrip) {
-    LOGE(
-        "VulkanRenderPass::draw: TriangleStrip requested but extendedDynamicState is unavailable. "
-        "Falling back to TriangleList (incorrect rendering).");
+  } else {
+    // Bind the pipeline variant matching the requested topology. The VulkanRenderPipeline holds
+    // both a TriangleList and a TriangleStrip VkPipeline when extendedDynamicState is unavailable.
+    auto targetPipeline = lastBound.pipeline->vulkanPipeline(primitiveType);
+    if (targetPipeline != lastBound.boundVkPipeline) {
+      vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, targetPipeline);
+      lastBound.boundVkPipeline = targetPipeline;
+    }
   }
   vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 }
@@ -513,10 +531,12 @@ void VulkanRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCo
                           ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
                           : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     vkCmdSetPrimitiveTopologyEXT(commandBuffer, vkTopology);
-  } else if (primitiveType == PrimitiveType::TriangleStrip) {
-    LOGE(
-        "VulkanRenderPass::drawIndexed: TriangleStrip requested but extendedDynamicState is "
-        "unavailable. Falling back to TriangleList (incorrect rendering).");
+  } else {
+    auto targetPipeline = lastBound.pipeline->vulkanPipeline(primitiveType);
+    if (targetPipeline != lastBound.boundVkPipeline) {
+      vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, targetPipeline);
+      lastBound.boundVkPipeline = targetPipeline;
+    }
   }
   vkCmdDrawIndexed(commandBuffer, indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
 }

@@ -266,7 +266,7 @@
           "-DSHADERC_SKIP_TESTS=ON",
           "-DSHADERC_SKIP_EXAMPLES=ON",
           "-DSHADERC_SKIP_INSTALL=ON",
-          "-DCMAKE_CXX_FLAGS=\"-w -D_LIBCPP_DISABLE_AVAILABILITY\""
+          "-DCMAKE_CXX_FLAGS=\"-w\""
         ],
         "platforms": [
           "mac"
@@ -283,7 +283,7 @@
           "-DSHADERC_SKIP_TESTS=ON",
           "-DSHADERC_SKIP_EXAMPLES=ON",
           "-DSHADERC_SKIP_INSTALL=ON",
-          "-DCMAKE_CXX_FLAGS=\"-w -D_LIBCPP_DISABLE_AVAILABILITY\"",
+          "-DCMAKE_CXX_FLAGS=\"-w\"",
           "-DDEPLOYMENT_TARGET=13.0"
         ],
         "platforms": [
@@ -323,6 +323,39 @@
         ],
         "platforms": [
           "ios"
+        ]
+      }
+    },
+    {
+      "name": "shaderc",
+      "cmake": {
+        "targets": [
+          "shaderc_combined"
+        ],
+        "arguments": [
+          "-DSHADERC_SKIP_TESTS=ON",
+          "-DSHADERC_SKIP_EXAMPLES=ON",
+          "-DSHADERC_SKIP_INSTALL=ON",
+          "-DCMAKE_CXX_FLAGS=\"-w\""
+        ],
+        "platforms": [
+          "ohos"
+        ]
+      }
+    },
+    {
+      "name": "SPIRV-Cross",
+      "cmake": {
+        "targets": [
+          "spirv-cross-core",
+          "spirv-cross-glsl"
+        ],
+        "arguments": [
+          "-DSPIRV_CROSS_ENABLE_TESTS=OFF",
+          "-DCMAKE_CXX_FLAGS=\"-w\""
+        ],
+        "platforms": [
+          "ohos"
         ]
       }
     },

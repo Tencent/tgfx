@@ -53,23 +53,28 @@ static std::string upgradeGLSLVersion(const std::string& source) {
 }
 
 // Assign fixed binding points for internal UBOs to match CPU-side constants:
-// VertexUniformBlock -> binding 0 (VERTEX_UBO_BINDING_POINT)
-// FragmentUniformBlock -> binding 1 (FRAGMENT_UBO_BINDING_POINT)
+// VertexUniformBlock -> set 0, binding 0 (VERTEX_UBO_BINDING_POINT)
+// FragmentUniformBlock -> set 0, binding 1 (FRAGMENT_UBO_BINDING_POINT)
 static std::string assignInternalUBOBindings(const std::string& source) {
   static std::regex vertexUboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+VertexUniformBlock)");
   auto result = std::regex_replace(source, vertexUboRegex,
-                                   "layout(std140, binding=0) uniform VertexUniformBlock");
+                                   "layout(std140, set=" + std::to_string(UBO_DESCRIPTOR_SET) +
+                                       ", binding=" + std::to_string(VERTEX_UBO_BINDING_POINT) +
+                                       ") uniform VertexUniformBlock");
   static std::regex fragmentUboRegex(
       R"(layout\s*\(\s*std140\s*\)\s*uniform\s+FragmentUniformBlock)");
   return std::regex_replace(result, fragmentUboRegex,
-                            "layout(std140, binding=1) uniform FragmentUniformBlock");
+                            "layout(std140, set=" + std::to_string(UBO_DESCRIPTOR_SET) +
+                                ", binding=" + std::to_string(FRAGMENT_UBO_BINDING_POINT) +
+                                ") uniform FragmentUniformBlock");
 }
 
 static std::string replaceCustomUBO(const std::smatch& match, int& counter) {
-  return "layout(std140, binding=" + std::to_string(counter++) + ") uniform " + match[1].str();
+  return "layout(std140, set=" + std::to_string(UBO_DESCRIPTOR_SET) +
+         ", binding=" + std::to_string(counter++) + ") uniform " + match[1].str();
 }
 
-// Add binding to any remaining uniform blocks (custom shaders) sequentially from 0.
+// Add binding to any remaining uniform blocks (custom shaders) sequentially from 0 in set 0.
 static std::string assignCustomUBOBindings(const std::string& source) {
   static std::regex uboRegex(R"(layout\s*\(\s*std140\s*\)\s*uniform\s+(\w+))");
   int binding = 0;
@@ -77,15 +82,16 @@ static std::string assignCustomUBOBindings(const std::string& source) {
 }
 
 static std::string replaceSamplerBinding(const std::smatch& match, int& counter) {
-  return "layout(binding=" + std::to_string(counter++) + ") uniform " + match[1].str() + " " +
+  return "layout(set=" + std::to_string(TEXTURE_DESCRIPTOR_SET) +
+         ", binding=" + std::to_string(counter++) + ") uniform " + match[1].str() + " " +
          match[2].str() + ";";
 }
 
-// Add binding to sampler uniforms sequentially from TEXTURE_BINDING_POINT_START.
-// This aligns with the descriptor set layout where bindings 0 and 1 are reserved for UBOs.
+// Add binding to sampler uniforms sequentially from 0 in descriptor set 1.
+// UBOs reside in set 0, so texture bindings start fresh from 0 without collision.
 static std::string assignSamplerBindings(const std::string& source) {
   static std::regex samplerRegex(R"(uniform\s+(sampler\w+)\s+(\w+);)");
-  int binding = TEXTURE_BINDING_POINT_START;
+  int binding = 0;
   return replaceAllMatches(source, samplerRegex, replaceSamplerBinding, binding);
 }
 

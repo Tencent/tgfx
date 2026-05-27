@@ -38,6 +38,43 @@ if %errorlevel% neq 0 (
 
 set COMPLIE_RESULT=true
 set WORKSPACE=%cd%
+set "BACKEND_ARG=%~1"
+
+echo shell log - BACKEND_ARG: [%BACKEND_ARG%]
+
+:: Determine cmake args and target suffix based on BACKEND_ARG
+set "CMAKE_BACKEND_ARGS="
+set "TARGET_SUFFIX="
+
+if /I "%BACKEND_ARG%"=="USE_OPENGL_SWIFTSHADER" (
+    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_SWIFTSHADER=ON"
+    set "TARGET_SUFFIX=OpenGL"
+)
+if /I "%BACKEND_ARG%"=="USE_VULKAN_SWIFTSHADER" (
+    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_VULKAN=ON -DTGFX_USE_SWIFTSHADER=ON"
+    set "TARGET_SUFFIX=Vulkan"
+)
+if /I "%BACKEND_ARG%"=="USE_VULKAN" (
+    set "CMAKE_BACKEND_ARGS=-DTGFX_USE_VULKAN=ON"
+    set "TARGET_SUFFIX=Vulkan"
+)
+if /I "%BACKEND_ARG%"=="USE_OPENGL" (
+    set "CMAKE_BACKEND_ARGS="
+    set "TARGET_SUFFIX=OpenGL"
+)
+if "%TARGET_SUFFIX%"=="" (
+    echo ERROR: Unsupported backend argument: %BACKEND_ARG%
+    echo Supported: USE_OPENGL, USE_OPENGL_SWIFTSHADER, USE_VULKAN, USE_VULKAN_SWIFTSHADER
+    exit /b 1
+)
+
+echo shell log - CMAKE_BACKEND_ARGS: [%CMAKE_BACKEND_ARGS%]
+echo shell log - TARGET_SUFFIX: [%TARGET_SUFFIX%]
+
+:: NOTE: Do NOT call update_baseline.bat here. It uses git switch which changes files on disk,
+:: and cmd.exe reads bat files line-by-line from disk, causing offset corruption after switch.
+:: Run update_baseline.bat as a separate step (CI) or a separate cmd invocation (local) before
+:: running this script.
 
 :: Clean and create directories
 if exist result rd /s /q result
@@ -47,9 +84,7 @@ mkdir build
 cd build
 
 :: Configure CMake with Ninja
-set "USE_SWIFTSHADER_FLAG="
-if "%1"=="USE_SWIFTSHADER" set "USE_SWIFTSHADER_FLAG=-DTGFX_USE_SWIFTSHADER=ON"
-cmake -G Ninja %USE_SWIFTSHADER_FLAG% -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release ..
+cmake -G Ninja %CMAKE_BACKEND_ARGS% -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release ..
 if %errorlevel% equ 0 (
     echo ~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~
 ) else (
@@ -57,26 +92,29 @@ if %errorlevel% equ 0 (
     exit /b 1
 )
 
-:: Build TGFXFullTest
-cmake --build . --target TGFXFullTest
+:: Build
+cmake --build . --target TGFXFullTest_%TARGET_SUFFIX%
 if %errorlevel% equ 0 (
-    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest make successed~~~~~~~~~~~~~~~~~~
+    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest_%TARGET_SUFFIX% make successed~~~~~~~~~~~~~~~~~~
 ) else (
-    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest make error~~~~~~~~~~~~~~~~~~
+    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest_%TARGET_SUFFIX% make error~~~~~~~~~~~~~~~~~~
     exit /b 1
 )
 
 :: Copy SwiftShader DLLs to build directory if needed
-if "%1"=="USE_SWIFTSHADER" (
+if /I "%BACKEND_ARG%"=="USE_OPENGL_SWIFTSHADER" (
     copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\*.dll" "%WORKSPACE%\build\" >nul 2>&1
 )
+:: Rename SwiftShader to vulkan-1.dll so volk loads it directly (volk uses
+:: LoadLibrary("vulkan-1.dll") on Windows, dlopen("libvulkan.dylib") on macOS).
+if /I "%BACKEND_ARG%"=="USE_VULKAN_SWIFTSHADER" copy /y "%WORKSPACE%\vendor\swiftshader\win\x64\vk_swiftshader.dll" "%WORKSPACE%\build\vulkan-1.dll" >nul 2>&1
 
 :: Run tests
-TGFXFullTest.exe --gtest_output=json:TGFXFullTest.json
+TGFXFullTest_%TARGET_SUFFIX%.exe --gtest_output=json:TGFXFullTest.json
 if %errorlevel% equ 0 (
-    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest successed~~~~~~~~~~~~~~~~~~
+    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest_%TARGET_SUFFIX% successed~~~~~~~~~~~~~~~~~~
 ) else (
-    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest Failed~~~~~~~~~~~~~~~~~~
+    echo ~~~~~~~~~~~~~~~~~~~TGFXFullTest_%TARGET_SUFFIX% Failed~~~~~~~~~~~~~~~~~~
     set COMPLIE_RESULT=false
 )
 

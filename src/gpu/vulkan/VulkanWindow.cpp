@@ -20,6 +20,9 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
+#ifdef __OHOS__
+#include <native_window/external_window.h>
+#endif
 #include <vector>
 #include "core/utils/Log.h"
 #include "gpu/vulkan/VulkanAPI.h"
@@ -79,6 +82,13 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd,
   }
 
   auto vulkanGPU = static_cast<VulkanGPU*>(device->lockContext()->gpu());
+
+  if (!vulkanGPU->extensions().swapchain) {
+    LOGE("VulkanWindow: swapchain extension not available; cannot create window surface.");
+    device->unlock();
+    return nullptr;
+  }
+
   auto vkInstance = vulkanGPU->instance();
   auto vkDevice = vulkanGPU->device();
   auto physicalDevice = vulkanGPU->physicalDevice();
@@ -181,6 +191,196 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd,
   swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   swapchainInfo.preTransform = capabilities.currentTransform;
   swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  swapchainInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  swapchainInfo.clipped = VK_TRUE;
+
+  VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+  result = vkCreateSwapchainKHR(vkDevice, &swapchainInfo, nullptr, &swapchain);
+  if (result != VK_SUCCESS) {
+    LOGE("VulkanWindow: vkCreateSwapchainKHR failed: %s", VkResultToString(result));
+    vkDestroySurfaceKHR(vkInstance, surface, nullptr);
+    device->unlock();
+    return nullptr;
+  }
+
+  uint32_t swapImageCount = 0;
+  vkGetSwapchainImagesKHR(vkDevice, swapchain, &swapImageCount, nullptr);
+  std::vector<VkImage> images(swapImageCount);
+  vkGetSwapchainImagesKHR(vkDevice, swapchain, &swapImageCount, images.data());
+
+  std::vector<VkImageView> imageViews(swapImageCount);
+  for (uint32_t i = 0; i < swapImageCount; i++) {
+    VkImageViewCreateInfo viewInfo = {};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = images[i];
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = chosenFormat.format;
+    viewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    auto viewResult = vkCreateImageView(vkDevice, &viewInfo, nullptr, &imageViews[i]);
+    if (viewResult != VK_SUCCESS) {
+      LOGE("VulkanWindow: vkCreateImageView failed for image %u: %s", i,
+           VkResultToString(viewResult));
+      DestroySwapchainResources(vkDevice, vkInstance, surface, swapchain, imageViews);
+      device->unlock();
+      return nullptr;
+    }
+  }
+
+  device->unlock();
+
+  auto state = std::make_unique<PlatformState>();
+  state->cachedDevice = vkDevice;
+  state->cachedInstance = vkInstance;
+  state->surface = surface;
+  state->swapchain = swapchain;
+  state->images = std::move(images);
+  state->imageViews = std::move(imageViews);
+  state->format = chosenFormat.format;
+  state->width = static_cast<int>(extent.width);
+  state->height = static_cast<int>(extent.height);
+
+  return std::shared_ptr<VulkanWindow>(new VulkanWindow(device, std::move(state), colorSpace));
+}
+
+#endif
+
+#ifdef __OHOS__
+
+std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(OHNativeWindow* nativeWindow,
+                                                     std::shared_ptr<VulkanDevice> device,
+                                                     std::shared_ptr<ColorSpace> colorSpace) {
+  if (nativeWindow == nullptr || device == nullptr) {
+    return nullptr;
+  }
+
+  if (colorSpace && !colorSpace->isSRGB()) {
+    LOGI(
+        "VulkanWindow::MakeFrom(): non-sRGB colorSpace is not yet supported and will be ignored. "
+        "Only sRGB output is currently available.");
+  }
+
+  auto vulkanGPU = static_cast<VulkanGPU*>(device->lockContext()->gpu());
+
+  if (!vulkanGPU->extensions().swapchain) {
+    LOGE("VulkanWindow: swapchain extension not available; cannot create window surface.");
+    device->unlock();
+    return nullptr;
+  }
+
+  auto vkInstance = vulkanGPU->instance();
+  auto vkDevice = vulkanGPU->device();
+  auto physicalDevice = vulkanGPU->physicalDevice();
+
+  VkSurfaceCreateInfoOHOS surfaceInfo = {};
+  surfaceInfo.sType = VK_STRUCTURE_TYPE_SURFACE_CREATE_INFO_OHOS;
+  surfaceInfo.window = nativeWindow;
+
+  VkSurfaceKHR surface = VK_NULL_HANDLE;
+  // volk does not include OHOS surface support, so we load vkCreateSurfaceOHOS manually.
+  auto createSurfaceOHOS = reinterpret_cast<PFN_vkCreateSurfaceOHOS>(
+      vkGetInstanceProcAddr(vkInstance, "vkCreateSurfaceOHOS"));
+  if (!createSurfaceOHOS) {
+    LOGE("VulkanWindow: vkCreateSurfaceOHOS not available.");
+    device->unlock();
+    return nullptr;
+  }
+  auto result = createSurfaceOHOS(vkInstance, &surfaceInfo, nullptr, &surface);
+  if (result != VK_SUCCESS) {
+    LOGE("VulkanWindow: vkCreateSurfaceOHOS failed: %s", VkResultToString(result));
+    device->unlock();
+    return nullptr;
+  }
+
+  VkBool32 presentSupport = VK_FALSE;
+  vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, vulkanGPU->graphicsQueueIndex(), surface,
+                                       &presentSupport);
+  if (!presentSupport) {
+    LOGE("VulkanWindow: graphics queue does not support presentation.");
+    vkDestroySurfaceKHR(vkInstance, surface, nullptr);
+    device->unlock();
+    return nullptr;
+  }
+
+  VkSurfaceCapabilitiesKHR capabilities = {};
+  result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities);
+  if (result != VK_SUCCESS) {
+    LOGE("VulkanWindow: vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed: %s",
+         VkResultToString(result));
+    vkDestroySurfaceKHR(vkInstance, surface, nullptr);
+    device->unlock();
+    return nullptr;
+  }
+
+  uint32_t formatCount = 0;
+  vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
+  if (formatCount == 0) {
+    LOGE("VulkanWindow: no surface formats available.");
+    vkDestroySurfaceKHR(vkInstance, surface, nullptr);
+    device->unlock();
+    return nullptr;
+  }
+  std::vector<VkSurfaceFormatKHR> formats(formatCount);
+  vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, formats.data());
+
+  // TODO: The colorSpace parameter is currently unused. Swapchain format is hardcoded to
+  // B8G8R8A8_UNORM + SRGB_NONLINEAR, consistent with Metal and OpenGL backends which also default
+  // to sRGB. HDR / Display-P3 support would require a ColorSpace → VkColorSpaceKHR mapping here.
+  // Spec allows a single {VK_FORMAT_UNDEFINED, SRGB_NONLINEAR} entry meaning "any format".
+  VkSurfaceFormatKHR chosenFormat = formats[0];
+  if (formats.size() == 1 && formats[0].format == VK_FORMAT_UNDEFINED) {
+    chosenFormat = {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+  } else {
+    for (auto& f : formats) {
+      if (f.format == VK_FORMAT_B8G8R8A8_UNORM &&
+          f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+        chosenFormat = f;
+        break;
+      }
+    }
+  }
+
+  VkExtent2D extent = capabilities.currentExtent;
+  if (extent.width == 0xFFFFFFFF) {
+    int32_t width = 0;
+    int32_t height = 0;
+    OH_NativeWindow_NativeWindowHandleOpt(nativeWindow, GET_BUFFER_GEOMETRY, &height, &width);
+    extent.width = static_cast<uint32_t>(width);
+    extent.height = static_cast<uint32_t>(height);
+  }
+
+  uint32_t imageCount = capabilities.minImageCount + 1;
+  if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount) {
+    imageCount = capabilities.maxImageCount;
+  }
+
+  VkImageUsageFlags desiredUsage =
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  VkImageUsageFlags imageUsage = desiredUsage & capabilities.supportedUsageFlags;
+  if (!(imageUsage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) {
+    LOGE("VulkanWindow: surface does not support COLOR_ATTACHMENT usage.");
+    vkDestroySurfaceKHR(vkInstance, surface, nullptr);
+    device->unlock();
+    return nullptr;
+  }
+
+  VkSwapchainCreateInfoKHR swapchainInfo = {};
+  swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+  swapchainInfo.surface = surface;
+  swapchainInfo.minImageCount = imageCount;
+  swapchainInfo.imageFormat = chosenFormat.format;
+  swapchainInfo.imageColorSpace = chosenFormat.colorSpace;
+  swapchainInfo.imageExtent = extent;
+  swapchainInfo.imageArrayLayers = 1;
+  swapchainInfo.imageUsage = imageUsage;
+  swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  swapchainInfo.preTransform = capabilities.currentTransform;
+  // Prefer INHERIT so the OHOS compositor controls alpha blending (e.g. system navigation bar
+  // transparency). Fall back to OPAQUE if the device does not advertise INHERIT support.
+  VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+  if (!(capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR)) {
+    compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  }
+  swapchainInfo.compositeAlpha = compositeAlpha;
   swapchainInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
   swapchainInfo.clipped = VK_TRUE;
 
