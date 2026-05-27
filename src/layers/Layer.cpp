@@ -919,7 +919,11 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   // the consumer falls back to on-the-fly synthesis (signalled by passing a null snapshot map).
   BackgroundSnapshotMap snapshotMap = {};
   BackgroundSnapshotMap* snapshotsPtr = nullptr;
-  bool needBackground = canInvert && !canPreserve3D() && hasBackgroundStyle();
+  // TEMP: disable background-sourced styles (e.g. BackgroundBlurStyle) entirely to isolate
+  // whether the PDF export corruption is caused by the background blur path. Revert before
+  // landing.
+  bool needBackground = false;
+  (void)canInvert;
   if (needBackground && context != nullptr) {
     auto rectForDraw = maxBackgroundOutset > 0.0f ? clippedBounds : bounds;
     Matrix backgroundMatrix = canvas->getMatrix();
