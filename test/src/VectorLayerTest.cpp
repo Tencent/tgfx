@@ -5133,7 +5133,7 @@ TGFX_TEST(VectorLayerTest, DegenerateStroke) {
   constexpr float CellSize = 190.0f;
   constexpr float ExtraColShift = 40.0f;
   constexpr int ColCount = 10;
-  constexpr int RowCount = 5;
+  constexpr int RowCount = 6;
   constexpr float NonDegenerateSize = 100.0f;
   constexpr float MinExtent = 5e-3f;
   const Color FillColor = Color::FromRGBA(9, 0, 246, 255);
@@ -5181,8 +5181,21 @@ TGFX_TEST(VectorLayerTest, DegenerateStroke) {
       rect->setSize(size);
       return rect;
     }
-    // row 1: Triangle (Polystar with 3 points)
+    // row 1: Rounded Rectangle (roundness = 10)
     if (row == 1) {
+      auto rect = Rectangle::Make();
+      Size size = {NonDegenerateSize, NonDegenerateSize};
+      if (mode == SizeMode::DegeneratePoint) {
+        size = Size{0.0f, 0.0f};
+      } else if (mode == SizeMode::DegenerateLine) {
+        size = Size{0.0f, 60.0f};
+      }
+      rect->setSize(size);
+      rect->setRoundness(10.0f);
+      return rect;
+    }
+    // row 2: Triangle (Polystar with 3 points)
+    if (row == 2) {
       auto triangle = Polystar::Make();
       triangle->setPolystarType(PolystarType::Polygon);
       triangle->setPointCount(3);
@@ -5204,8 +5217,8 @@ TGFX_TEST(VectorLayerTest, DegenerateStroke) {
       return triangle;
     }
 
-    // row 2: Star with default r/R = 0.5
-    if (row == 2) {
+    // row 3: Star with default r/R = 0.5
+    if (row == 3) {
       constexpr float StarAOuterRadius = 50.0f;
       constexpr float StarAInnerRadius = 25.0f;
 
@@ -5213,7 +5226,7 @@ TGFX_TEST(VectorLayerTest, DegenerateStroke) {
       star->setPolystarType(PolystarType::Star);
       star->setPointCount(5);
       if (mode == SizeMode::DegenerateLine) {
-        // Mirror row 2: R = 30 (nominalSize / 2), default r/R = 0.5.
+        // Mirror row 3: R = 30 (nominalSize / 2), default r/R = 0.5.
         constexpr float OuterRadius = 30.0f;
         constexpr float InnerRadius = OuterRadius * 0.5f;
         constexpr float TargetXExtent = 5e-3f;
@@ -5234,8 +5247,8 @@ TGFX_TEST(VectorLayerTest, DegenerateStroke) {
       return star;
     }
 
-    // row 3: Star with r/R = (3 - sqrt(5)) / 2 (horizontal upper edge)
-    if (row == 3) {
+    // row 4: Star with r/R = (3 - sqrt(5)) / 2 (horizontal upper edge)
+    if (row == 4) {
       constexpr float StarBRatio = 0.381966011f;
       constexpr float StarBOuterRadius = 50.0f;
       constexpr float StarBInnerRadius = StarBOuterRadius * StarBRatio;
@@ -5268,8 +5281,8 @@ TGFX_TEST(VectorLayerTest, DegenerateStroke) {
       return star;
     }
 
-    // row 4: Ellipse
-    if (row == 4) {
+    // row 5: Ellipse
+    if (row == 5) {
       auto ellipse = Ellipse::Make();
       Size size = {NonDegenerateSize, NonDegenerateSize};
       if (mode == SizeMode::DegeneratePoint) {
