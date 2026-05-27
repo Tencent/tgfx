@@ -214,38 +214,298 @@ B = \sum_{i \in S} b_i + \epsilon
 
 ### 5.3 第三阶段：上移异步边界
 
-若希望系统性降低 `ASYNCIFY_STACK_SIZE`，应将异步等待从 `WebGPUBuffer::requestMapAsync()` 深层调用移动到更浅层。
+若希望系统性降低 `ASYNCIFY_STACK_SIZE`，应将异步等待从 `WebGPUBuffer::requestMapAsync()` 深层调用移动到更浅层。这里需要特别区分两类改造：
 
-建议目标模型：
+1. **仅把 `RunAllTests()` 包装成 JavaScript async 函数是不充分的。** 如果 `Surface::readPixels()` 内部仍然执行 `await buffer.mapAsync()`，Asyncify 仍然必须保存 `RUN_ALL_TESTS()` 到 `WebGPUBuffer::requestMapAsync()` 的完整调用栈。
+2. **真正有效的改造是让深层 C++ API 不再等待 Promise。** 深层 API 只提交 readback 请求并返回一个可轮询对象，等待动作由更浅层的 WebGPU 调度器或测试调度器统一执行。
 
-```text
-RunAllTestsAsync()
-  -> execute one test case
-  -> collect pending WebGPU async readbacks
-  -> await all pending GPU operations
-  -> resume verification
+#### 5.3.1 当前同步实现的关键问题
+
+当前 `SurfaceReadback::lockPixels()` 在深层同步等待 readback 完成：
+
+```cpp
+const void* SurfaceReadback::lockPixels(Context* context, bool flipY) {
+  auto readbackBuffer = proxy->getBuffer();
+  if (readbackBuffer == nullptr) {
+    context->flushAndSubmit(true);
+    readbackBuffer = proxy->getBuffer();
+  } else {
+    context->gpu()->queue()->waitUntilCompleted();
+  }
+
+  auto gpuBuffer = readbackBuffer->gpuBuffer();
+  if (!gpuBuffer->isReady()) {
+    gpuBuffer->requestMapAsync();
+    if (!gpuBuffer->isReady()) {
+      return nullptr;
+    }
+  }
+  return gpuBuffer->map();
+}
 ```
 
-或者在 readback API 层显式建模：
+在 WebGPU 后端中，`gpuBuffer->requestMapAsync()` 最终进入：
+
+```cpp
+EM_ASYNC_JS(int, webgpu_buffer_map_sync, (WGPUBuffer buffer, size_t size), {
+  var bufferWrapper = WebGPU.mgrBuffer.objects[buffer];
+  if (!bufferWrapper) {
+    return 1;
+  }
+  await bufferWrapper.object.mapAsync(1, 0, size);
+  bufferWrapper.onUnmap = bufferWrapper.onUnmap || [];
+  return 0;
+});
+```
+
+因此，真正的挂起点位于 `Surface::readPixels()` 的深层实现中。只要这个结构不变，Asyncify 保存的就是完整深栈。
+
+#### 5.3.2 目标一：将 readback 拆成 request / poll / lock 三段
+
+第一步是在 `SurfaceReadback` 层引入显式异步生命周期。新的 API 不改变 GPU 后端抽象，只把“启动异步 map”和“读取已经 map 完成的数据”拆开。
+
+建议接口形态如下：
+
+```cpp
+class SurfaceReadback {
+ public:
+  bool requestMapAsync(Context* context);
+
+  bool isReady(Context* context) const;
+
+  const void* lockMappedPixels(Context* context, bool flipY = false);
+
+  void unlockPixels(Context* context);
+};
+```
+
+对应实现可以写成：
+
+```cpp
+bool SurfaceReadback::requestMapAsync(Context* context) {
+  if (context != proxy->getContext()) {
+    return false;
+  }
+
+  auto readbackBuffer = proxy->getBuffer();
+  if (readbackBuffer == nullptr) {
+    context->flushAndSubmit(false);
+    readbackBuffer = proxy->getBuffer();
+    if (readbackBuffer == nullptr) {
+      return false;
+    }
+  }
+
+  auto gpuBuffer = readbackBuffer->gpuBuffer();
+  if (!gpuBuffer->isReady()) {
+    gpuBuffer->requestMapAsync();
+  }
+  return true;
+}
+
+const void* SurfaceReadback::lockMappedPixels(Context* context, bool flipY) {
+  if (!isReady(context)) {
+    return nullptr;
+  }
+
+  auto readbackBuffer = proxy->getBuffer();
+  auto pixels = readbackBuffer->gpuBuffer()->map();
+  if (pixels == nullptr) {
+    return nullptr;
+  }
+
+  if (flipY) {
+    flipYPixels = malloc(_info.byteSize());
+    if (flipYPixels == nullptr) {
+      readbackBuffer->gpuBuffer()->unmap();
+      return nullptr;
+    }
+    CopyPixels(_info, pixels, _info, flipYPixels, true);
+    pixels = flipYPixels;
+  }
+
+  locked = true;
+  return pixels;
+}
+```
+
+此时深层 C++ 代码不再执行 `await`，而是只做三件事：提交 GPU copy、启动 `mapAsync()`、返回控制权。`mapAsync()` 的完成由事件循环推进，调用方通过 `isReady()` 判断结果是否可读。
+
+#### 5.3.3 目标二：增加浅层 WebGPU readback 调度器
+
+为了避免每个测试或业务调用方自行管理 readback，可以建立一个 WebGPU 专用调度器。调度器持有 pending readback 列表，并在浅层统一等待。
+
+建议抽象如下：
+
+```cpp
+class AsyncReadbackTask {
+ public:
+  virtual ~AsyncReadbackTask() = default;
+
+  virtual bool begin(Context* context) = 0;
+
+  virtual bool isReady(Context* context) const = 0;
+
+  virtual bool finish(Context* context) = 0;
+};
+
+class WebGPUReadbackScheduler {
+ public:
+  static WebGPUReadbackScheduler* Get();
+
+  void add(std::unique_ptr<AsyncReadbackTask> task);
+
+  bool beginAll(Context* context);
+
+  bool isAllReady(Context* context) const;
+
+  bool finishAll(Context* context);
+
+ private:
+  std::vector<std::unique_ptr<AsyncReadbackTask>> tasks = {};
+};
+```
+
+一个 surface readback task 可以实现为：
+
+```cpp
+class SurfaceReadbackTask : public AsyncReadbackTask {
+ public:
+  SurfaceReadbackTask(std::shared_ptr<SurfaceReadback> readback, Pixmap dst)
+      : readback(std::move(readback)), dst(dst) {
+  }
+
+  bool begin(Context* context) override {
+    return readback != nullptr && readback->requestMapAsync(context);
+  }
+
+  bool isReady(Context* context) const override {
+    return readback != nullptr && readback->isReady(context);
+  }
+
+  bool finish(Context* context) override {
+    auto pixels = readback->lockMappedPixels(context);
+    if (pixels == nullptr) {
+      return false;
+    }
+    CopyPixels(readback->info(), pixels, dst.info(), dst.writablePixels());
+    readback->unlockPixels(context);
+    return true;
+  }
+
+ private:
+  std::shared_ptr<SurfaceReadback> readback = nullptr;
+  Pixmap dst = {};
+};
+```
+
+该结构的关键点是：`begin()` 会触发 `mapAsync()`，但不会同步等待；`finish()` 只在 `isReady()` 已经为 true 后执行，因此也不会触发 Asyncify 挂起。
+
+#### 5.3.4 目标三：在测试入口上移等待点
+
+Web 端测试入口目前是同步导出函数：
+
+```cpp
+extern "C" {
+
+EMSCRIPTEN_KEEPALIVE
+int RunAllTests() {
+  initTests();
+  return RUN_ALL_TESTS();
+}
+
+}
+```
+
+为了让浏览器事件循环有机会推进 pending Promise，需要增加浅层异步入口。该入口不应再让 `RUN_ALL_TESTS()` 内部执行深层 `await`，而应执行“启动测试逻辑、收集 readback、等待 ready、完成验证”的分段流程。
+
+需要注意：Google Test 本身不是异步测试框架，不能在一个普通 `TEST()` 函数中返回到 JavaScript 后再自动恢复原测试函数。因此下列代码是测试入口分段模型，实际落地时需要配合 WebGPU 专用测试 helper：测试体只注册 pending readback 和验证任务，不在 `TEST()` 内立即读取像素并断言。
+
+概念代码如下：
+
+```cpp
+extern "C" {
+
+EMSCRIPTEN_KEEPALIVE
+int RunAllTestsBegin() {
+  initTests();
+  return RUN_ALL_TESTS();
+}
+
+EMSCRIPTEN_KEEPALIVE
+int RunPendingReadbacksBegin(Context* context) {
+  return WebGPUReadbackScheduler::Get()->beginAll(context) ? 0 : 1;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int RunPendingReadbacksReady(Context* context) {
+  return WebGPUReadbackScheduler::Get()->isAllReady(context) ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int RunPendingReadbacksFinish(Context* context) {
+  return WebGPUReadbackScheduler::Get()->finishAll(context) ? 0 : 1;
+}
+
+}
+```
+
+JavaScript 侧浅层调度可以写成：
+
+```javascript
+async function runWebGPUTests(module, contextHandle) {
+  const testResult = module._RunAllTestsBegin();
+  if (testResult !== 0) {
+    return testResult;
+  }
+
+  const beginResult = module._RunPendingReadbacksBegin(contextHandle);
+  if (beginResult !== 0) {
+    return beginResult;
+  }
+
+  while (module._RunPendingReadbacksReady(contextHandle) === 0) {
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  }
+
+  return module._RunPendingReadbacksFinish(contextHandle);
+}
+```
+
+这里的 `await` 位于 JavaScript 浅层调度器中，而不是 `SurfaceReadback::lockPixels()` 内部。WebAssembly 栈在 `await` 之前已经返回到 JavaScript，因此无需保存 Google Test 到 readback 的深层调用栈。
+
+#### 5.3.5 对现有同步 API 的兼容策略
+
+`Surface::readPixels()` 可以保留为同步兼容层，但 WebGPU 测试和新代码应优先使用显式异步 readback。同步兼容层仍可继续依赖 Asyncify，因此它的目标是兼容旧调用，而不是降低 `ASYNCIFY_STACK_SIZE`。
+
+建议分层如下：
 
 ```text
+Legacy synchronous path:
+Surface::readPixels()
+  -> SurfaceReadback::lockPixels()
+  -> may use Asyncify internally
+
+WebGPU optimized path:
 Surface::asyncReadPixels()
-  -> returns SurfaceReadback
-SurfaceReadback::requestMapAsync()
-  -> no deep synchronous wait
-outer scheduler
-  -> await map completion
-SurfaceReadback::lockPixels()
-  -> no await, only map already-ready buffer
+  -> SurfaceReadback::requestMapAsync()
+  -> outer scheduler awaits readiness
+  -> SurfaceReadback::lockMappedPixels()
 ```
 
-该阶段可以将挂起点从深层 readPixels 调用链上移到测试调度器或 WebGPU 任务调度器，从而显著降低活跃帧数量。
+这种分层可以保证迁移过程可控：未迁移代码继续工作；迁移后的 WebGPU readback 路径不再依赖深层 Asyncify 挂起。
+
+#### 5.3.6 预期收益与验收标准
+
+上移异步边界后，Asyncify 不再需要在 `Surface::readPixels()` 深层保存完整调用栈。若所有 WebGPU readback 测试均迁移到显式异步路径，则 `ASYNCIFY_STACK_SIZE` 可重新下调并验证，例如从 256KB 逐步回退到 128KB、64KB。
 
 验收标准：
 
-1. `ASYNCIFY_STACK_SIZE` 可降回 64KB 或更低，并通过全量测试。
-2. 同步 API 兼容层明确隔离，不污染非 WebGPU 后端。
-3. 异步 readback 的生命周期和资源释放语义清晰可验证。
+1. `SurfaceReadback::requestMapAsync()` 在 WebGPU 后端不执行同步等待。
+2. `SurfaceReadback::lockMappedPixels()` 只允许读取已经 ready 的 buffer，不触发 Promise 等待。
+3. WebGPU 测试入口能够在 JavaScript 浅层调度器中等待 pending readback。
+4. 迁移后的 readback 测试在 64KB `ASYNCIFY_STACK_SIZE` 下通过。
+5. 未迁移的同步 `Surface::readPixels()` 路径保持可用，并明确标记为兼容路径。
 
 ### 5.4 第四阶段：评估 JSPI
 
