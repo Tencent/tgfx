@@ -296,34 +296,6 @@ int add_resource(std::unordered_set<PDFIndirectReference>& resources, PDFIndirec
   return ref.value;
 }
 
-bool GetFiniteMaskBounds(const std::shared_ptr<MaskFilter>& maskFilter, Rect* bounds) {
-  if (Types::Get(maskFilter.get()) != Types::MaskFilterType::Shader) {
-    return false;
-  }
-  const auto shaderMaskFilter = static_cast<const ShaderMaskFilter*>(maskFilter.get());
-  if (shaderMaskFilter->isInverted()) {
-    return false;
-  }
-  auto matrix = Matrix::I();
-  auto shader = shaderMaskFilter->getShader();
-  while (Types::Get(shader.get()) == Types::ShaderType::Matrix) {
-    const auto matrixShader = static_cast<const MatrixShader*>(shader.get());
-    matrix.postConcat(matrixShader->matrix);
-    shader = matrixShader->source;
-  }
-  if (Types::Get(shader.get()) != Types::ShaderType::Image) {
-    return false;
-  }
-  const auto imageShader = static_cast<const ImageShader*>(shader.get());
-  if (!imageShader->image || imageShader->tileModeX != TileMode::Decal ||
-      imageShader->tileModeY != TileMode::Decal) {
-    return false;
-  }
-  *bounds = Rect::MakeWH(imageShader->image->width(), imageShader->image->height());
-  matrix.mapRect(bounds);
-  return !bounds->isEmpty();
-}
-
 }  // namespace
 
 namespace {
@@ -959,43 +931,17 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     return;
   }
   if (modifiedBrush.maskFilter) {
-    Rect maskBounds = {};
-    if (!GetFiniteMaskBounds(modifiedBrush.maskFilter, &maskBounds)) {
+    if (drawImageWithMask(image, rect, sampling, matrix, clip, modifiedBrush)) {
       return;
     }
-    if (!maskBounds.intersect(rect)) {
-      return;
-    }
-    maskBounds.roundOut();
-    auto width = static_cast<int>(maskBounds.width());
-    auto height = static_cast<int>(maskBounds.height());
-    if (width <= 0 || height <= 0) {
-      return;
-    }
+    auto imageShader =
+        Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, SamplingOptions());
+    imageShader = imageShader->makeWithMatrix(transform);
+    modifiedBrush.shader = imageShader;
 
-    auto surface = Surface::Make(document->context(), width, height, false, 1, false, 0,
-                                 document->dstColorSpace());
-    if (!surface) {
-      return;
-    }
-    auto canvas = surface->getCanvas();
-    canvas->clear(Color::Transparent());
-
-    auto localRect = rect;
-    localRect.offset(-maskBounds.x(), -maskBounds.y());
-    Paint maskPaint;
-    // TODO(pdf-temp): Apply image masks into a mask-sized bitmap to avoid large PDF SMask objects.
-    auto maskMatrix = Matrix::MakeTrans(-maskBounds.x(), -maskBounds.y());
-    maskPaint.setMaskFilter(modifiedBrush.maskFilter->makeWithMatrix(maskMatrix));
-    canvas->drawImageRect(image, localRect, sampling, &maskPaint);
-
-    auto maskedImage = surface->makeImageSnapshot();
-    if (!maskedImage) {
-      return;
-    }
-    auto imageBrush = modifiedBrush;
-    imageBrush.maskFilter = nullptr;
-    onDrawImageRect(std::move(maskedImage), maskBounds, SamplingOptions(), matrix, clip, imageBrush);
+    Path path;
+    path.addRect(rect);
+    this->onDrawPath(matrix, clip, path, modifiedBrush);
     return;
   }
 
@@ -1408,6 +1354,64 @@ std::tuple<std::shared_ptr<Picture>, Matrix> MaskFilterToPicture(
 };
 
 }  // namespace
+
+bool PDFExportContext::drawImageWithMask(std::shared_ptr<Image> image, const Rect& rect,
+                                         const SamplingOptions& sampling, const Matrix& matrix,
+                                         const ClipStack& clip, const Brush& brush) {
+  if (Types::Get(brush.maskFilter.get()) != Types::MaskFilterType::Shader) {
+    return false;
+  }
+  const auto shaderMaskFilter = static_cast<const ShaderMaskFilter*>(brush.maskFilter.get());
+  if (shaderMaskFilter->isInverted()) {
+    return false;
+  }
+  auto [picture, pictureMatrix] = MaskFilterToPicture(shaderMaskFilter);
+  if (!picture) {
+    return false;
+  }
+
+  auto sourceContext = makeCongruentDevice();
+  auto sourceBrush = brush;
+  sourceBrush.maskFilter = nullptr;
+  sourceBrush.shader = nullptr;
+  sourceBrush.blendMode = BlendMode::SrcOver;
+  sourceBrush.color.alpha = 1.0f;
+  sourceContext->onDrawImageRect(std::move(image), rect, sampling, Matrix::I(), ClipStack(),
+                                 sourceBrush);
+  auto sourceBounds = rect.makeSorted();
+  sourceBounds.roundOut();
+  auto sourceForm = sourceContext->makeFormXObjectFromDevice(sourceBounds, false);
+
+  auto maskContext = makeCongruentDevice();
+  {
+    Canvas canvas(maskContext.get());
+    canvas.concat(pictureMatrix);
+    canvas.drawPicture(picture);
+  }
+  auto maskBounds = picture->getBounds();
+  pictureMatrix.mapRect(&maskBounds);
+  maskBounds.roundOut();
+  if (maskBounds.isEmpty()) {
+    return true;
+  }
+  auto maskForm = maskContext->makeFormXObjectFromDevice(maskBounds, true);
+
+  auto contentBrush = brush;
+  contentBrush.maskFilter = nullptr;
+  contentBrush.shader = nullptr;
+  contentBrush.colorFilter = nullptr;
+  ScopedContentEntry content(this, matrix, clip, Matrix::I(), contentBrush);
+  if (!content) {
+    return true;
+  }
+  setGraphicState(
+      PDFGraphicState::GetSMaskGraphicState(maskForm, false, PDFGraphicState::SMaskMode::Alpha,
+                                            document),
+      content.stream());
+  drawFormXObject(sourceForm, content.stream(), nullptr);
+  clearMaskOnGraphicState(content.stream());
+  return true;
+}
 
 void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack& clip,
                                           const Path& originPath, const Matrix& pathExtraMatrix,

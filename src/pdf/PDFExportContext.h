@@ -103,6 +103,10 @@ class PDFExportContext : public DrawContext {
                        const SamplingOptions& sampling, const Matrix& matrix, const ClipStack& clip,
                        const Brush& brush);
 
+  bool drawImageWithMask(std::shared_ptr<Image> image, const Rect& rect,
+                         const SamplingOptions& sampling, const Matrix& matrix,
+                         const ClipStack& clip, const Brush& brush);
+
   void onDrawGlyphRun(const GlyphRun& glyphRun, const Matrix& matrix, const ClipStack& clip,
                       const Brush& brush, const Stroke* stroke);
 
