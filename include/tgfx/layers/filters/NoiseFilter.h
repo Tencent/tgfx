@@ -141,20 +141,15 @@ class NoiseFilter : public LayerFilter {
   void onInvalidateFilter() override;
 
   /**
-   * Builds the base noise shader for the given scale, without any shift applied. The returned
-   * shader contains the colored noise sampling pipeline (fractal noise + density threshold +
-   * color matrix) but is anchored to the shader-local origin. Subclasses with a single shader
-   * (Mono, Multi) implement this; subclasses that manage multiple base shaders themselves (Duo)
-   * override buildAtShift directly and may return nullptr here.
+   * Subclasses override this method to construct the per-scale noise shader anchored to the
+   * shader-local origin. The returned shader is cached and reused across geometry-only changes.
    */
   virtual std::shared_ptr<Shader> onBuildBaseShader(float scale) = 0;
 
   /**
-   * Builds the shifted noise shader at the given anchor in input image pixel space.
-   * The default implementation caches the base shader returned by onBuildBaseShader and applies a
-   * translation matrix per call. The base shader is rebuilt only when the scale changes or the
-   * filter is invalidated; geometry-only changes (anchor shift) reuse the cached base shader.
-   * Subclasses with multiple shaders (e.g. Duo) override this method to manage their own caches.
+   * Returns the noise shader anchored at the given shift in input image pixel space. The default
+   * implementation translates the cached base shader; subclasses with more complex caching may
+   * override this.
    */
   virtual std::shared_ptr<Shader> buildAtShift(float scale, const Point& shift);
 

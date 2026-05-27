@@ -20,7 +20,7 @@
 #include <utility>
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Image.h"
-#include "tgfx/core/MaskFilter.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
 
@@ -179,18 +179,20 @@ static void DrawNoiseLayer(Canvas* canvas, std::shared_ptr<Image> content,
   }
   auto width = static_cast<float>(content->width());
   auto height = static_cast<float>(content->height());
-  // Shift the procedural noise so that sample (0,0) lands at contentOffset inside the content
-  // image. A half-image offset is then added so that the original "centered" appearance is
-  // preserved when contentOffset is zero.
   auto samplingMatrix = Matrix::MakeTrans(-1.f * contentOffset.x + width * 0.5f,
                                           -1.f * contentOffset.y + height * 0.5f);
   auto centeredShader = coloredShader->makeWithMatrix(samplingMatrix);
+  auto blendFilter = ImageFilter::Blend(BlendMode::SrcIn, std::move(centeredShader));
+  if (blendFilter == nullptr) {
+    return;
+  }
+  auto noiseImage = content->makeWithFilter(std::move(blendFilter));
+  if (noiseImage == nullptr) {
+    return;
+  }
   Paint paint = {};
-  paint.setShader(std::move(centeredShader));
-  paint.setMaskFilter(
-      MaskFilter::MakeShader(Shader::MakeImageShader(content, TileMode::Decal, TileMode::Decal)));
   paint.setBlendMode(blendMode);
-  canvas->drawRect(Rect::MakeWH(width, height), paint);
+  canvas->drawImage(std::move(noiseImage), &paint);
 }
 
 // --- MonoNoiseStyle ---

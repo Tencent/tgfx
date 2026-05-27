@@ -23,10 +23,9 @@
 namespace tgfx {
 
 /**
- * LayerImageFilter is the abstract base class for layer filters that produce their effect by
- * wrapping an ImageFilter. It owns the cached ImageFilter and implements the standard
- * filterImage / filterBounds plumbing, so subclasses only need to construct the ImageFilter for
- * a given content scale via onCreateImageFilter().
+ * LayerImageFilter is the base class for layer filters whose effect is expressed as an
+ * ImageFilter. Subclasses override onCreateImageFilter() to return the ImageFilter for a given
+ * content scale.
  */
 class LayerImageFilter : public LayerFilter {
  public:

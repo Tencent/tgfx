@@ -223,11 +223,28 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, 
   if (noiseShader == nullptr) {
     return input;
   }
-  auto blendFilter = ImageFilter::Blend(BlendMode::SrcIn, std::move(noiseShader));
-  if (blendFilter == nullptr) {
+  // Step 1: Clip the noise to the content alpha region using SrcIn, producing a noise-only image
+  // shaped by the content.
+  auto clipFilter = ImageFilter::Blend(BlendMode::SrcIn, std::move(noiseShader));
+  if (clipFilter == nullptr) {
     return input;
   }
-  return FilterImage::MakeFrom(std::move(input), std::move(blendFilter), offset, clipBounds);
+  auto clippedNoise = FilterImage::MakeFrom(input, std::move(clipFilter));
+  if (clippedNoise == nullptr) {
+    return input;
+  }
+  // Step 2: Composite the clipped noise with the original content using the user-specified blend
+  // mode. This two-step approach ensures the noise is always constrained to the content alpha
+  // while the blend mode controls how the noise interacts with the content color.
+  auto noiseImageShader = Shader::MakeImageShader(std::move(clippedNoise));
+  if (noiseImageShader == nullptr) {
+    return input;
+  }
+  auto compositeFilter = ImageFilter::Blend(_blendMode, std::move(noiseImageShader));
+  if (compositeFilter == nullptr) {
+    return input;
+  }
+  return FilterImage::MakeFrom(std::move(input), std::move(compositeFilter), offset, clipBounds);
 }
 
 // --- MonoNoiseFilter ---

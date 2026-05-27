@@ -41,8 +41,7 @@ class LayerFilter : public LayerProperty {
    * layer geometry use this rectangle to recover the anchor regardless of how the input image is
    * clipped relative to the content bounds.
    * @param clipBounds Optional clip rectangle in the input image coordinate space. When provided,
-   * the filter output is restricted to the pixels visible inside this rectangle, enabling backends
-   * to skip processing for off-screen regions (e.g. large-radius blurs).
+   * the filter output is restricted to the pixels visible inside this rectangle.
    * @param offset If non-null, receives the (x, y) translation of the filtered image relative to
    * the input image origin.
    * @return The filtered image, or nullptr on failure.
