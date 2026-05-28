@@ -74,20 +74,19 @@ void DropShadowFilter::setDropsShadowOnly(bool value) {
   invalidateFilter();
 }
 
-std::shared_ptr<ImageFilter> DropShadowFilter::onCreateImageFilter(float scale) {
-  if (_dropsShadowOnly) {
-    return ImageFilter::DropShadowOnly(_offsetX * scale, _offsetY * scale, _blurrinessX * scale,
-                                       _blurrinessY * scale, _color);
-  } else {
-    return ImageFilter::DropShadow(_offsetX * scale, _offsetY * scale, _blurrinessX * scale,
-                                   _blurrinessY * scale, _color);
-  }
-}
-
 DropShadowFilter::DropShadowFilter(float offsetX, float offsetY, float blurrinessX,
                                    float blurrinessY, const Color& color, bool dropsShadowOnly)
     : _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX), _blurrinessY(blurrinessY),
       _color(std::move(color)), _dropsShadowOnly(dropsShadowOnly) {
+}
+
+std::shared_ptr<ImageFilter> DropShadowFilter::onCreateImageFilter(float scale) {
+  if (_dropsShadowOnly) {
+    return ImageFilter::DropShadowOnly(_offsetX * scale, _offsetY * scale, _blurrinessX * scale,
+                                       _blurrinessY * scale, _color);
+  }
+  return ImageFilter::DropShadow(_offsetX * scale, _offsetY * scale, _blurrinessX * scale,
+                                 _blurrinessY * scale, _color);
 }
 
 }  // namespace tgfx

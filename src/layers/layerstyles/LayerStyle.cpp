@@ -41,9 +41,10 @@ void LayerStyle::setExcludeChildEffects(bool value) {
 }
 
 void LayerStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
-                                       float contentScale, std::shared_ptr<Image>, const Point&,
-                                       float alpha, BlendMode blendMode) {
-  onDraw(canvas, std::move(content), contentScale, alpha, blendMode);
+                                       float contentScale, const Point& contentOffset,
+                                       std::shared_ptr<Image>, const Point&, float alpha,
+                                       BlendMode blendMode) {
+  onDraw(canvas, std::move(content), contentScale, contentOffset, alpha, blendMode);
 }
 
 }  // namespace tgfx

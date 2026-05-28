@@ -75,6 +75,12 @@ void InnerShadowFilter::setInnerShadowOnly(bool value) {
   invalidateFilter();
 }
 
+InnerShadowFilter::InnerShadowFilter(float offsetX, float offsetY, float blurrinessX,
+                                     float blurrinessY, const Color& color, bool innerShadowOnly)
+    : _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX), _blurrinessY(blurrinessY),
+      _color(color), _innerShadowOnly(innerShadowOnly) {
+}
+
 std::shared_ptr<ImageFilter> InnerShadowFilter::onCreateImageFilter(float scale) {
   if (_innerShadowOnly) {
     return ImageFilter::InnerShadowOnly(_offsetX * scale, _offsetY * scale, _blurrinessX * scale,
@@ -82,12 +88,6 @@ std::shared_ptr<ImageFilter> InnerShadowFilter::onCreateImageFilter(float scale)
   }
   return ImageFilter::InnerShadow(_offsetX * scale, _offsetY * scale, _blurrinessX * scale,
                                   _blurrinessY * scale, _color);
-}
-
-InnerShadowFilter::InnerShadowFilter(float offsetX, float offsetY, float blurrinessX,
-                                     float blurrinessY, const Color& color, bool innerShadowOnly)
-    : _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX), _blurrinessY(blurrinessY),
-      _color(color), _innerShadowOnly(innerShadowOnly) {
 }
 
 }  // namespace tgfx

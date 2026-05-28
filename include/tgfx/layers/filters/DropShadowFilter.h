@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/LayerImageFilter.h"
 
 namespace tgfx {
 /**
  * A filter draws a drop shadow under the input content.
  */
-class DropShadowFilter : public LayerFilter {
+class DropShadowFilter : public LayerImageFilter {
  public:
   /**
    * Create a filter that draws a drop shadow under the input content.
@@ -120,6 +120,7 @@ class DropShadowFilter : public LayerFilter {
  private:
   DropShadowFilter(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
                    const Color& color, bool dropsShadowOnly);
+
   float _offsetX = 0.0f;
   float _offsetY = 0.0f;
   float _blurrinessX = 0.0f;

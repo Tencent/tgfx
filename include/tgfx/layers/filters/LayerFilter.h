@@ -19,32 +19,45 @@
 #pragma once
 
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/MapDirection.h"
 #include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
+class Image;
+
 /**
- * LayerFilter represents a filter that applies effects to a layer, such as blurs, shadows, or color
- * adjustments. It creates a new offscreen image that replaces the original layer content.
- * LayerFilters are mutable and can be changed at any time.
+ * LayerFilter is the abstract base class for filters applied to a layer's rendered image, such as
+ * blurs, shadows, color adjustments, or procedural overlays. A LayerFilter consumes the rendered
+ * layer image and produces a new image. LayerFilters are mutable and can be changed at any time.
  */
 class LayerFilter : public LayerProperty {
  public:
   /**
-   * Returns the current image filter for the given scale factor. If the filter has not been
-   * created yet, it will be created and cached.
-   * @param scale The scale factor to apply to the filter.
-   * @return The current image filter.
+   * Applies this filter to the given input image at the specified scale factor.
+   * @param input The source image to filter.
+   * @param scale The scale factor to apply to scale-dependent filter parameters.
+   * @param contentBounds The layer content bounds, expressed in the input image coordinate space
+   * (the input image origin is the coordinate origin). Filters whose effect is anchored to the
+   * layer geometry use this rectangle to recover the anchor regardless of how the input image is
+   * clipped relative to the content bounds.
+   * @param offset If non-null, receives the (x, y) translation of the filtered image relative to
+   * the input image origin.
+   * @return The filtered image, or nullptr on failure.
    */
-  std::shared_ptr<ImageFilter> getImageFilter(float scale);
+  std::shared_ptr<Image> filterImage(std::shared_ptr<Image> input, float scale,
+                                     const Rect& contentBounds, Point* offset = nullptr);
 
   /**
    * Returns the bounds of the layer filter after applying it to the scaled layer bounds.
    * @param srcRect The scaled bounds of the layer content.
-   * @param contentScale The scale factor of the layer bounds relative to its original size.
-   * Some layer filters have size-related parameters that must be adjusted with this scale factor.
+   * @param contentScale The scale factor of the layer bounds relative to its original size. Some
+   * layer filters have size-related parameters that must be adjusted with this scale factor.
+   * @param direction Forward computes the destination bounds produced by filtering a source rect.
+   * Reverse computes the source rect needed to fill a destination rect (typically a clip rect).
    * @return The bounds of the layer filter.
    */
-  Rect filterBounds(const Rect& srcRect, float contentScale);
+  virtual Rect filterBounds(const Rect& srcRect, float contentScale,
+                            MapDirection direction = MapDirection::Forward);
 
  protected:
   enum class Type {
@@ -53,30 +66,32 @@ class LayerFilter : public LayerProperty {
     BlurFilter,
     ColorMatrixFilter,
     DropShadowFilter,
-    InnerShadowFilter
+    InnerShadowFilter,
+    MonoNoiseFilter,
+    DuoNoiseFilter,
+    MultiNoiseFilter
   };
 
   virtual Type type() const {
     return Type::LayerFilter;
   }
-  /**
-   * Creates a new image filter for the given scale factor. When it is necessary to recreate the
-   * ImageFilter, the onCreateImageFilter method will be called.
-   * @param scale The scale factor to apply to the filter.
-   * @return A new image filter.
-   */
-  virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) = 0;
 
   /**
-   * Marks the filter as dirty and invalidates the cached filter.
+   * Subclasses must override this method to produce the filtered image. See filterImage() for
+   * parameter semantics.
+   */
+  virtual std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
+                                               const Rect& contentBounds, Point* offset) = 0;
+
+  /**
+   * Marks this filter as dirty and drops any cached state.
    */
   void invalidateFilter();
 
- private:
-  bool dirty = true;
-  float lastScale = 1.0f;
-  std::unique_ptr<Rect> _clipBounds = nullptr;
-  std::shared_ptr<ImageFilter> lastFilter;
+  /**
+   * Called by invalidateFilter() to allow subclasses to drop their cached state.
+   */
+  virtual void onInvalidateFilter();
 
   friend class Types;
 };

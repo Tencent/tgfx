@@ -40,12 +40,12 @@ void BlendFilter::setColor(const Color& color) {
   invalidateFilter();
 }
 
-std::shared_ptr<ImageFilter> BlendFilter::onCreateImageFilter(float) {
-  return ImageFilter::ColorFilter(ColorFilter::Blend(_color, _blendMode));
-}
-
 BlendFilter::BlendFilter(const Color& color, BlendMode blendMode)
     : _color(std::move(color)), _blendMode(blendMode) {
+}
+
+std::shared_ptr<ImageFilter> BlendFilter::onCreateImageFilter(float) {
+  return ImageFilter::ColorFilter(ColorFilter::Blend(_color, _blendMode));
 }
 
 }  // namespace tgfx

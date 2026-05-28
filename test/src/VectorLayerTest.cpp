@@ -5323,8 +5323,8 @@ TGFX_TEST(VectorLayerTest, DegenerateStroke) {
       // of column 2 (and the dense row-3 stars in subsequent cols) stays inside its own cell
       // band. Without this gap, large square-cap strokes from adjacent cells overlap visibly.
       auto extraShift = col >= 2 ? ExtraColShift : 0.0f;
-      group->setPosition(
-          {col * CellSize + CellSize * 0.5f + extraShift, row * CellSize + CellSize * 0.5f});
+      group->setPosition({static_cast<float>(col) * CellSize + CellSize * 0.5f + extraShift,
+                          static_cast<float>(row) * CellSize + CellSize * 0.5f});
       group->setElements({shape, fill, stroke});
       contents.push_back(group);
     }
