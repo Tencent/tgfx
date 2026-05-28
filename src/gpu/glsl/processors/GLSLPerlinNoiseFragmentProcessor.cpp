@@ -85,14 +85,13 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
   auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
 
   // tgfx feeds the fragment shader transformedCoords sitting on the pixel centre (X+0.5, Y+0.5).
-  // The classic SVG / Skia formula `(coord + 0.5) * baseFrequency` assumes coord is the integer
-  // pixel corner, so reusing it here would shift every pixel onto a noise lattice point: with an
-  // integer baseFrequency every fragment ends up with fract(noiseVec) = 0, all four corner
-  // gradient dot products vanish, and the output collapses to a flat 0.5 grey (visible bug at
-  // baseFrequency=1, which the SVG feTurbulence reference uses). To keep the lattice offset that
-  // SVG/Skia rely on without re-aligning to lattice points, we drop the `+0.5` and add a tiny
-  // sub-lattice bias (1/128) instead. 1/128 is exactly representable in float and stays well
-  // below half a lattice cell at typical baseFrequencies, so it is invisible in output.
+  // Multiplying by baseFrequency directly would shift every pixel onto a noise lattice point
+  // whenever baseFrequency is an integer: every fragment ends up with fract(noiseVec) = 0, all
+  // four corner gradient dot products vanish, and the output collapses to a flat 0.5 grey
+  // (visible bug at baseFrequency=1, which the SVG feTurbulence reference uses). To prevent
+  // this we add a tiny sub-lattice bias so fract(noiseVec) stays bounded away from 0. 1/128 is
+  // exactly representable in float and stays well below half a lattice cell at typical
+  // baseFrequencies, so it is invisible in output.
   //
   // Octave doubling: every iteration multiplies noiseVec by 2.0, so the bias becomes 2^k/128.
   // For k <= 6 the bias contribution to fract is non-zero, keeping each octave non-degenerate;
