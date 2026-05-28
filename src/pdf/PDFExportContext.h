@@ -83,9 +83,11 @@ class PDFExportContext : public DrawContext {
 
   /**
    * Finalizes the content stream and returns its bytes. Drains any open graphic-state frames
-   * (balancing residual q's with Q's) and resets the active stack state. After calling this, the
-   * context must not receive further draw calls — submitting more draws would re-emit a fresh
-   * q/Q wrapper and produce inconsistent state.
+   * (balancing residual q's with Q's) and resets the active stack state so the returned stream is
+   * self-balanced. The context itself remains usable: callers that intend to keep drawing after
+   * this (e.g. makeFormXObjectFromDevice followed by additional draws on the same context) must
+   * first call reset() to clear the content buffer; the next setUpContentEntry will then rebuild
+   * the graphic-state stack from scratch.
    */
   std::shared_ptr<Data> getContent();
 

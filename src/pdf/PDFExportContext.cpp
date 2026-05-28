@@ -297,9 +297,12 @@ int add_resource(std::unordered_set<PDFIndirectReference>& resources, PDFIndirec
   return ref.value;
 }
 
-// Recognizes the lowered representation of BackgroundBlurStyle: a blur-filtered FilterImage drawn
-// with BlendMode::Src and an active maskFilter. The PDF backend cannot currently express this
-// pattern correctly, so the caller skips the draw entirely (see TODO at the call site).
+// Detects the (BlendMode::Src + FilterImage<Blur> + maskFilter) draw pattern. Today this shape is
+// only produced by BackgroundBlurStyle's lower path, but the check intentionally matches on the
+// pattern itself rather than the originating layer style: any caller that ends up in this exact
+// combination is known to render incorrectly through the current PDF maskFilter path, so the
+// caller treats a positive result as a "PDF cannot express this" guard and skips the draw (see
+// TODO at the call site).
 bool IsBackgroundBlurStylePattern(const Brush& brush, const Image* image) {
   if (brush.blendMode != BlendMode::Src) {
     return false;
