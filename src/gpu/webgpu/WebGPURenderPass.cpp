@@ -105,10 +105,9 @@ std::shared_ptr<WebGPURenderPass> WebGPURenderPass::Make(WebGPUGPU* gpu, WGPUCom
   if (!colorAttachments.empty()) {
     auto& firstAttach = descriptor.colorAttachments[0];
     if (firstAttach.texture != nullptr) {
-      wgpuRenderPassEncoderSetViewport(passEncoder, 0.0f, 0.0f,
-                                       static_cast<float>(firstAttach.texture->width()),
-                                       static_cast<float>(firstAttach.texture->height()), 0.0f,
-                                       1.0f);
+      wgpuRenderPassEncoderSetViewport(
+          passEncoder, 0.0f, 0.0f, static_cast<float>(firstAttach.texture->width()),
+          static_cast<float>(firstAttach.texture->height()), 0.0f, 1.0f);
     }
   }
 

@@ -92,7 +92,7 @@ Then, run `depsync` in the project's root directory.
 depsync
 ```
 
-You might need to enter your Git account and password during synchronization. Make sure you’ve 
+You might need to enter your Git account and password during synchronization. Make sure you've 
 enabled the `git-credential-store` so that `CMakeLists.txt` can automatically trigger synchronization 
 next time.
 
@@ -200,13 +200,18 @@ Finally, open Xcode and launch the `mac/Hello2D.xcworkspace`. You are all set!
 
 ### Web
 
-To run the web demo, you need the **Emscripten SDK**. You can download and install it from the 
-[official website](https://emscripten.org/). We recommend using the latest version. If you’re on 
-macOS, you can also install it using the following script:
+To run the web demo, you need the **Emscripten SDK (emsdk)**. Install and activate a specific version
+to ensure consistent builds across all backends (including WebGPU):
 
 ```
-brew install emscripten
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk && ./emsdk install 4.0.15 && ./emsdk activate 4.0.15
+source ./emsdk_env.sh
 ```
+
+> **Note:** `brew install emscripten` installs version 5.x which removed `-sUSE_WEBGPU` support.
+> Always use emsdk with the version above for WebGPU builds. Remember to run
+> `source <path-to-emsdk>/emsdk_env.sh` in each new terminal session.
 
 To get started, go to the `web/` directory and run the following command to install the necessary
 node modules:
@@ -228,8 +233,22 @@ Next, you can start an HTTP server by running the following command:
 npm run server
 ```
 
-This will open [http://localhost:8081/web/demo/index.html](http://localhost:8081/web/demo/index.html) 
+This will open [http://localhost:8081/index.html](http://localhost:8081/index.html) 
 in your default browser. You can also open it manually to view the demo.
+
+To build and run the **WebGPU** version:
+
+```
+npm run build:webgpu
+npm run server:webgpu
+```
+
+To build a single-threaded WebGL version:
+
+```
+npm run build:st
+npm run server:st
+```
 
 To debug the C++ code, install the browser plugin:
 [**C/C++ DevTools Support (DWARF)**](https://chromewebstore.google.com/detail/cc++-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb).
@@ -269,14 +288,6 @@ After modification:
      name: "em-pthread"
     });
 ```
-
-To build a single-threaded version, just add the suffix ":st" to each command. For example:
-
-```
-npm run build:st
-npm run build:st:debug
-npm run server:st
-``` 
 
 To build the demo project in CLion, open the `Settings` panel and go to `Build, Execution, Deployment` > `CMake`.
 Create a new build target and set the `CMake options` to:
@@ -335,7 +346,7 @@ a project for the `x86` architecture with the `Release` configuration, open the
 cmake -G "Visual Studio 16 2019" -A Win32 -DCMAKE_CONFIGURATION_TYPES="Release" -B ./Release-x86
 ```
 
-Finally, open the `Hello2D.sln` file in the `Debug-x64/` or `Release-x86/` directory, and you’re all
+Finally, open the `Hello2D.sln` file in the `Debug-x64/` or `Release-x86/` directory, and you're all
 set!
 
 ### QT

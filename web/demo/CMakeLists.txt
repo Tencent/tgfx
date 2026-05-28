@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.13)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 project(Hello2D)
+
+if (DEFINED EMSCRIPTEN AND TGFX_USE_WEBGPU)
+    if (EMSCRIPTEN_VERSION VERSION_GREATER_EQUAL "5.0.0")
+        message(FATAL_ERROR "WebGPU backend requires emsdk <= 4.x (found ${EMSCRIPTEN_VERSION}). "
+            "Homebrew emscripten 5.x removed -sUSE_WEBGPU support. "
+            "Please run: source <path-to-emsdk>/emsdk_env.sh")
+    endif ()
+endif ()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../hello2d/include)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -19,8 +27,13 @@ file(GLOB_RECURSE HELLO_2D_FILES src/*.cpp)
 if (DEFINED EMSCRIPTEN)
     add_executable(hello2d ${HELLO_2D_FILES})
     list(APPEND H2D_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
+    if (TGFX_USE_WEBGPU)
+        set(H2D_GRAPHICS_OPTIONS -sUSE_WEBGPU=1)
+    else ()
+        set(H2D_GRAPHICS_OPTIONS -sMAX_WEBGL_VERSION=2)
+    endif ()
     list(APPEND H2D_LINK_OPTIONS --no-entry -lembind -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0 -sEXPORT_NAME='Hello2D' -sWASM=1
-            -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'] -sMODULARIZE=1
+            ${H2D_GRAPHICS_OPTIONS} -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'] -sMODULARIZE=1
             -sENVIRONMENT=web,worker -sEXPORT_ES6=1)
     set(unsupported_emsdk_versions "4.0.11")
     foreach (unsupported_version IN LISTS unsupported_emsdk_versions)
@@ -34,7 +47,7 @@ if (DEFINED EMSCRIPTEN)
                 -sEXIT_RUNTIME=0 -sINVOKE_RUN=0 -sMALLOC=dlmalloc)
         list(APPEND H2D_COMPILE_OPTIONS -fPIC -pthread)
     else ()
-        list(APPEND H2D_LINK_OPTIONS -sALLOW_MEMORY_GROWTH=1)
+        list(APPEND H2D_LINK_OPTIONS -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=1MB)
     endif ()
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         list(APPEND H2D_COMPILE_OPTIONS -O0 -g3)
@@ -49,4 +62,7 @@ endif ()
 
 target_compile_options(hello2d PUBLIC ${H2D_COMPILE_OPTIONS})
 target_link_options(hello2d PUBLIC ${H2D_LINK_OPTIONS})
+if (TGFX_USE_WEBGPU)
+    target_compile_definitions(hello2d PRIVATE TGFX_USE_WEBGPU ${TGFX_DEFINES})
+endif ()
 target_link_libraries(hello2d tgfx-hello2d tgfx ${HELLO_2D_SHARED_LIBS})
