@@ -31,6 +31,7 @@
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/images/PictureImage.h"
+#include "core/images/FilterImage.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/ImageShader.h"
 #include "core/shaders/MatrixShader.h"
@@ -937,7 +938,28 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     return;
   }
   if (modifiedBrush.maskFilter) {
-    drawImageRectWithMaskFilter(image, rect, matrix, clip, modifiedBrush, transform);
+    // A blur-filtered image is rasterized into a bitmap; combined with BlendMode::Src this is
+    // the signature of BackgroundBlurStyle. PDF currently can't represent it correctly — the
+    // mask machinery produces visibly wrong output. Skip it for now as a temporary workaround.
+    if (modifiedBrush.blendMode == BlendMode::Src &&
+        Types::Get(image.get()) == Types::ImageType::Filter) {
+      const auto* filterImage = static_cast<const FilterImage*>(image.get());
+      if (filterImage->filter &&
+          Types::Get(filterImage->filter.get()) == Types::ImageFilterType::Blur) {
+        return;
+      }
+    }
+    // Convert the image into an image shader and route through onDrawPath, which emits the
+    // bitmap as a tiling pattern combined with the existing maskFilter machinery. This is the
+    // historical PDF path that supports DropShadowStyle's mask-filter case.
+    auto imageShader =
+        Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, SamplingOptions());
+    imageShader = imageShader->makeWithMatrix(transform);
+    modifiedBrush.shader = imageShader;
+
+    Path path;
+    path.addRect(rect);
+    this->onDrawPath(matrix, clip, path, modifiedBrush);
     return;
   }
 
@@ -1350,140 +1372,6 @@ std::tuple<std::shared_ptr<Picture>, Matrix> MaskFilterToPicture(
 };
 
 }  // namespace
-
-void PDFExportContext::drawImageRectWithMaskFilter(const std::shared_ptr<Image>& image,
-                                                   const Rect& rect, const Matrix& matrix,
-                                                   const ClipStack& clip, const Brush& brush,
-                                                   const Matrix& transform) {
-  DEBUG_ASSERT(image);
-  DEBUG_ASSERT(brush.maskFilter);
-
-  // Plan X: instead of routing this through PDFShader's tiling-pattern path (which has a
-  // long-standing pattern-matrix vs. set-time-CTM composition bug for spec-compliant viewers
-  // such as Chrome / Adobe Acrobat / macOS Quartz), emit the bitmap as an ordinary Image XObject
-  // and let an SMask form clip it to the layer's content shape — this matches the shape that
-  // mainstream PDF producers (e.g. Figma) use for background-blur effects.
-
-  // Step 1: build a soft-mask form XObject from the mask filter's shader. If unsupported, fall
-  // back to drawing the image without the mask rather than producing a wrong PDF.
-  auto maskFormRef = MakeMaskFormXObjectForRect(brush.maskFilter, rect, transform);
-
-  // Step 2: detach the mask filter from the brush; the SMask is applied via graphic state
-  // below instead of the maskFilter machinery.
-  Brush imageBrush = brush;
-  imageBrush.maskFilter = nullptr;
-
-  // Step 3: prepare the image draw matrix and shape (mirrors the regular image path below).
-  Matrix scaled;
-  scaled.setScale(1.f, -1.f);
-  scaled.postTranslate(0, 1.f);
-  auto subset = Rect::MakeWH(image->width(), image->height());
-  scaled.postScale(subset.width(), subset.height());
-  scaled.postConcat(transform);
-
-  ScopedContentEntry content(this, matrix, clip, scaled, imageBrush);
-  if (!content) {
-    return;
-  }
-  Path shape;
-  shape.addRect(subset);
-  shape.transform(transform);
-  if (content.needShape()) {
-    content.setShape(shape);
-  }
-  if (!content.needSource()) {
-    return;
-  }
-
-  // Step 4: install the SMask graphic state on the current content stream (if available), so
-  // the subsequent image draw is masked. Then emit the image XObject and clear the mask state.
-  if (maskFormRef) {
-    auto smaskState = PDFGraphicState::GetSMaskGraphicState(
-        maskFormRef, false, PDFGraphicState::SMaskMode::Luminosity, document);
-    this->setGraphicState(smaskState, content.stream());
-  }
-  PDFIndirectReference pdfImage =
-      PDFBitmap::Serialize(image, document, document->metadata().encodingQuality);
-  this->drawFormXObject(pdfImage, content.stream(), &shape);
-  if (maskFormRef) {
-    this->clearMaskOnGraphicState(content.stream());
-  }
-}
-
-PDFIndirectReference PDFExportContext::MakeMaskFormXObjectForRect(
-    const std::shared_ptr<MaskFilter>& maskFilter, const Rect& rect, const Matrix& transform) {
-  if (!maskFilter || Types::Get(maskFilter.get()) != Types::MaskFilterType::Shader) {
-    return PDFIndirectReference();
-  }
-  const auto* shaderMaskFilter = static_cast<const ShaderMaskFilter*>(maskFilter.get());
-
-  // The mask must cover the rectangle that will be drawn (in path-local coordinates) once
-  // `transform` is applied. We resolve everything in the path-local space first.
-  Rect maskBound = rect;
-  transform.mapRect(&maskBound);
-  if (maskBound.isEmpty()) {
-    return PDFIndirectReference();
-  }
-  int maskWidth = static_cast<int>(std::ceil(maskBound.width()));
-  int maskHeight = static_cast<int>(std::ceil(maskBound.height()));
-  if (maskWidth <= 0 || maskHeight <= 0) {
-    return PDFIndirectReference();
-  }
-
-  // Render the mask shader into a CPU surface sized to the mask bound. The shader's coordinate
-  // system is the path's coordinate space (which starts at maskBound.x/y); we shift it back so
-  // the surface starts at (0, 0).
-  auto surface = Surface::Make(document->context(), maskWidth, maskHeight, false, 1, false, 0,
-                               document->dstColorSpace());
-  if (!surface) {
-    return PDFIndirectReference();
-  }
-  Canvas* maskCanvas = surface->getCanvas();
-  Paint maskPaint;
-  auto shader = shaderMaskFilter->getShader();
-  if (maskBound.x() != 0 || maskBound.y() != 0) {
-    shader = shader->makeWithMatrix(Matrix::MakeTrans(-maskBound.x(), -maskBound.y()));
-  }
-  maskPaint.setShader(shader);
-  maskCanvas->drawPaint(maskPaint);
-
-  // Read pixels as ALPHA_8, then convert to RGBA luminosity mask.
-  auto grayscaleInfo = ImageInfo::Make(maskWidth, maskHeight, ColorType::ALPHA_8);
-  std::vector<uint8_t> alphaPixels(grayscaleInfo.byteSize(), 0);
-  if (!surface->readPixels(grayscaleInfo, alphaPixels.data())) {
-    return PDFIndirectReference();
-  }
-  auto rgbaInfo =
-      ImageInfo::Make(maskWidth, maskHeight, ColorType::RGBA_8888, AlphaType::Unpremultiplied);
-  auto rgbaSize = rgbaInfo.byteSize();
-  auto* rgbaPixels = static_cast<uint8_t*>(malloc(rgbaSize));
-  size_t pixelCount = static_cast<size_t>(maskWidth) * static_cast<size_t>(maskHeight);
-  for (size_t i = 0; i < pixelCount; ++i) {
-    uint8_t a = shaderMaskFilter->isInverted() ? static_cast<uint8_t>(255 - alphaPixels[i])
-                                               : alphaPixels[i];
-    rgbaPixels[i * 4 + 0] = a;
-    rgbaPixels[i * 4 + 1] = a;
-    rgbaPixels[i * 4 + 2] = a;
-    rgbaPixels[i * 4 + 3] = 255;
-  }
-  auto rgbaData = Data::MakeAdopted(rgbaPixels, rgbaSize, Data::FreeProc);
-  auto maskImage = Image::MakeFrom(rgbaInfo, rgbaData);
-  if (!maskImage) {
-    return PDFIndirectReference();
-  }
-
-  // Build a form XObject hosting the rasterized mask. We size the form to the same page
-  // dimensions and initial transform as the parent context, so the mask content drawn at
-  // path-local position (maskBound.x/y) aligns automatically with the SMask consumer's
-  // set-time CTM. The BBox is the full page rect to ensure the entire content (including any
-  // y-flipped y coordinates) lives inside the form's clipping rectangle.
-  auto maskContext = std::make_shared<PDFExportContext>(_pageSize, document, _initialTransform);
-  {
-    Canvas canvas(maskContext.get());
-    canvas.drawImage(maskImage, maskBound.x(), maskBound.y());
-  }
-  return maskContext->makeFormXObjectFromDevice(true);
-}
 
 void PDFExportContext::drawPathWithFilter(const Matrix& matrix, const ClipStack& clip,
                                           const Path& originPath, const Matrix& pathExtraMatrix,
