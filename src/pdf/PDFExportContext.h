@@ -160,6 +160,23 @@ class PDFExportContext : public DrawContext {
   void drawPathWithFilter(const Matrix& matrix, const ClipStack& clip, const Path& originPath,
                           const Matrix& pathExtraMatrix, const Brush& originPaint);
 
+  // Plan X: emit a bitmap-with-mask as an ordinary Image XObject + SMask form (instead of
+  // routing through PDFShader's tiling-pattern path). `image`, `rect`, `matrix`, `clip` and
+  // `brush` carry the same semantics as in onDrawImageRect; `transform` is the image-pixel ->
+  // path-local mapping computed by the caller. The brush's maskFilter must be non-null on
+  // entry; this function consumes it (the caller should not also draw the image again).
+  void drawImageRectWithMaskFilter(const std::shared_ptr<Image>& image, const Rect& rect,
+                                   const Matrix& matrix, const ClipStack& clip, const Brush& brush,
+                                   const Matrix& transform);
+
+  // Build an SMask form XObject from `maskFilter` for the rectangle `rect` (in path-local
+  // space), assuming the rectangle is later drawn under `transform` (image-pixel -> path-local).
+  // Returns an empty reference if the mask filter cannot be represented as an SMask form.
+  // The produced form lives in this context's set-time user space, so it can be installed via
+  // setGraphicState() and aligns with subsequent draws on the same content stream.
+  PDFIndirectReference MakeMaskFormXObjectForRect(const std::shared_ptr<MaskFilter>& maskFilter,
+                                                  const Rect& rect, const Matrix& transform);
+
   ISize _pageSize = {};
   PDFDocumentImpl* document = nullptr;
   Matrix _initialTransform = {};
