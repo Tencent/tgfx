@@ -19,6 +19,7 @@
 #include "WebGPUShaderModule.h"
 #include <regex>
 #include <shaderc/shaderc.hpp>
+#include "WebGPUDefines.h"
 #include "WebGPUGPU.h"
 #include "core/utils/Log.h"
 #include "gpu/UniformData.h"

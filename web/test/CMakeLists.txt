@@ -31,11 +31,15 @@ file(GLOB_RECURSE TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/*.*)
 # Exclude platform-specific directories
 file(GLOB_RECURSE TEST_METAL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/metal/*.*)
 file(GLOB_RECURSE TEST_OPENGL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/opengl/*.*)
+file(GLOB_RECURSE TEST_VULKAN_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/vulkan/*.*)
 if (TEST_METAL_FILES)
     list(REMOVE_ITEM TEST_SOURCES ${TEST_METAL_FILES})
 endif ()
 if (TEST_OPENGL_FILES)
     list(REMOVE_ITEM TEST_SOURCES ${TEST_OPENGL_FILES})
+endif ()
+if (TEST_VULKAN_FILES)
+    list(REMOVE_ITEM TEST_SOURCES ${TEST_VULKAN_FILES})
 endif ()
 
 # Include backend-specific test sources
@@ -135,7 +139,7 @@ if (TGFX_USE_ASYNCIFY)
     # operations. Without this exclusion, Asyncify corrupts their execution state.
     set(ASYNCIFY_LINK_OPTIONS
         -sASYNCIFY=1
-        -sASYNCIFY_STACK_SIZE=65536
+        -sASYNCIFY_STACK_SIZE=262144
         "-sASYNCIFY_REMOVE=['shaderc*','glslang*','spv::*','spvtools*','tint::*','Glslang*','TShader*','Compile*ToSpv*','SpvCompilat*']"
     )
     set(ASYNCIFY_COMPILE_DEFS TGFX_USE_ASYNCIFY)

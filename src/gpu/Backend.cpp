@@ -63,6 +63,7 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
       break;
     case Backend::Vulkan:
       vulkanInfo = that.vulkanInfo;
+      break;
     case Backend::WebGPU:
       webgpuInfo = that.webgpuInfo;
       break;
@@ -112,6 +113,9 @@ bool BackendTexture::getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) const 
     return false;
   }
   *vulkanImageInfo = vulkanInfo;
+  return true;
+}
+
 bool BackendTexture::getWebGPUTextureInfo(WebGPUTextureInfo* webgpuTextureInfo) const {
   if (!isValid() || _backend != Backend::WebGPU) {
     return false;
@@ -137,6 +141,7 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
       break;
     case Backend::Vulkan:
       vulkanInfo = that.vulkanInfo;
+      break;
     case Backend::WebGPU:
       webgpuInfo = that.webgpuInfo;
       break;
@@ -186,6 +191,9 @@ bool BackendRenderTarget::getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) c
     return false;
   }
   *vulkanImageInfo = vulkanInfo;
+  return true;
+}
+
 bool BackendRenderTarget::getWebGPUTextureInfo(WebGPUTextureInfo* webgpuTextureInfo) const {
   if (!isValid() || _backend != Backend::WebGPU) {
     return false;
@@ -205,6 +213,7 @@ BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
       break;
     case Backend::Vulkan:
       vulkanSyncInfo = that.vulkanSyncInfo;
+      break;
     case Backend::WebGPU:
       webgpuSyncInfo = that.webgpuSyncInfo;
       break;
@@ -251,6 +260,9 @@ bool BackendSemaphore::getVulkanSync(VulkanSyncInfo* vulkanSyncInfo) const {
     return false;
   }
   *vulkanSyncInfo = this->vulkanSyncInfo;
+  return true;
+}
+
 bool BackendSemaphore::getWebGPUSync(WebGPUSyncInfo* webgpuInfo) const {
   if (_backend != Backend::WebGPU) {
     return false;

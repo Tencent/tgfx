@@ -60,6 +60,9 @@ class BackendTexture {
    */
   explicit BackendTexture(const VulkanImageInfo& vulkanInfo, int width, int height)
       : _backend(Backend::Vulkan), _width(width), _height(height), vulkanInfo(vulkanInfo) {
+  }
+
+  /**
    * Creates a WebGPU backend texture.
    */
   BackendTexture(const WebGPUTextureInfo& webgpuInfo, int width, int height)
@@ -122,6 +125,8 @@ class BackendTexture {
    * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
    */
   bool getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) const;
+
+  /**
    * If the backend API is WebGPU, copies a snapshot of the WebGPUTextureInfo struct into the passed
    * in pointer and returns true. Otherwise, returns false if the backend API is not WebGPU.
    */
@@ -170,6 +175,9 @@ class BackendRenderTarget {
    */
   explicit BackendRenderTarget(const VulkanImageInfo& vulkanInfo, int width, int height)
       : _backend(Backend::Vulkan), _width(width), _height(height), vulkanInfo(vulkanInfo) {
+  }
+
+  /**
    * Creates a WebGPU backend render target.
    */
   BackendRenderTarget(const WebGPUTextureInfo& webgpuInfo, int width, int height)
@@ -232,6 +240,8 @@ class BackendRenderTarget {
    * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
    */
   bool getVulkanImageInfo(VulkanImageInfo* vulkanImageInfo) const;
+
+  /**
    * If the backend API is WebGPU, copies a snapshot of the WebGPUTextureInfo struct into the passed
    * in pointer and returns true. Otherwise, returns false if the backend API is not WebGPU.
    */
@@ -279,6 +289,9 @@ class BackendSemaphore {
    */
   explicit BackendSemaphore(const VulkanSyncInfo& vulkanInfo)
       : _backend(Backend::Vulkan), vulkanSyncInfo(vulkanInfo) {
+  }
+
+  /**
    * Creates a WebGPU backend semaphore.
    */
   BackendSemaphore(const WebGPUSyncInfo& webgpuInfo)
@@ -320,6 +333,8 @@ class BackendSemaphore {
    * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
    */
   bool getVulkanSync(VulkanSyncInfo* vulkanSyncInfo) const;
+
+  /**
    * If the backend API is WebGPU, copies a snapshot of the WebGPUSyncInfo struct into the passed in
    * pointer and returns true. Otherwise, returns false if the backend API is not WebGPU.
    */

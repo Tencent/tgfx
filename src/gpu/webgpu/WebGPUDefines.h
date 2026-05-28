@@ -22,6 +22,8 @@
 
 namespace tgfx {
 
+static constexpr int TEXTURE_BINDING_POINT_START = 2;
+
 // WGPUTextureFormat values (from webgpu.h)
 #define WGPU_TEXTURE_FORMAT_R8Unorm 0x01
 #define WGPU_TEXTURE_FORMAT_RG8Unorm 0x04

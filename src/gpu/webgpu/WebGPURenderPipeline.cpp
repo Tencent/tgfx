@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebGPURenderPipeline.h"
+#include "WebGPUDefines.h"
 #include "WebGPUGPU.h"
 #include "WebGPUShaderModule.h"
 #include "WebGPUUtil.h"
