@@ -84,12 +84,22 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
 
   auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
 
-  // texCoord is at the pixel center (X.5, Y.5) per fragment-shader convention. A small
-  // sub-lattice offset prevents fract(noiseVec) from collapsing to 0 when baseFrequency lands
-  // such that (texCoord * baseFrequency) hits integer lattice points (e.g. baseFrequency=1
-  // would yield fract()=0 at every pixel and produce a flat 0.5 grey output). 1/128 is small
-  // enough not to be visible at typical frequencies and is not a rational multiple of common
-  // baseFrequencies, so it keeps fract() bounded away from 0 across the supported range.
+  // tgfx feeds the fragment shader transformedCoords sitting on the pixel centre (X+0.5, Y+0.5).
+  // The classic SVG / Skia formula `(coord + 0.5) * baseFrequency` assumes coord is the integer
+  // pixel corner, so reusing it here would shift every pixel onto a noise lattice point: with an
+  // integer baseFrequency every fragment ends up with fract(noiseVec) = 0, all four corner
+  // gradient dot products vanish, and the output collapses to a flat 0.5 grey (visible bug at
+  // baseFrequency=1, which the SVG feTurbulence reference uses). To keep the lattice offset that
+  // SVG/Skia rely on without re-aligning to lattice points, we drop the `+0.5` and add a tiny
+  // sub-lattice bias (1/128) instead. 1/128 is exactly representable in float and stays well
+  // below half a lattice cell at typical baseFrequencies, so it is invisible in output.
+  //
+  // Octave doubling: every iteration multiplies noiseVec by 2.0, so the bias becomes 2^k/128.
+  // For k <= 6 the bias contribution to fract is non-zero, keeping each octave non-degenerate;
+  // for k >= 7 the bias lands back on an integer and that octave can degenerate, but its
+  // weight in the final accumulation is ratio = 2^-k <= 1/128, contributing < 1% of the total
+  // amplitude. With the supported numOctaves <= 8 this is invisible. The exact bias value is
+  // not load-bearing — any small non-zero constant breaks the integer-baseFrequency case.
   fragBuilder->codeAppendf("vec2 noiseVec = %s * %s + vec2(0.0078125);", texCoordName.c_str(),
                            baseFreqName.c_str());
 
