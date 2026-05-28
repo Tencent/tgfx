@@ -3127,6 +3127,29 @@ TGFX_TEST(CanvasTest, NoiseShaderParameterValidation) {
   EXPECT_EQ(noiseShader->numOctaves, PerlinNoiseShader::MAX_OCTAVES);
 }
 
+// Renders FractalNoise at the high-frequency boundary baseFrequency=1 (one full noise period
+// per pixel) with a 100x100 stitch tile to match the SVG feTurbulence reference at
+// baseFrequency="1 1" stitchTiles="stitch". The 100x100 noise patch is centred in a 200x200
+// surface with the standard 50px padding.
+TGFX_TEST(CanvasTest, FractalNoiseFreqOne) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  ISize tileSize = {100, 100};
+  auto noise = Shader::MakeFractalNoise(1.0f, 1.0f, 3, 1379, &tileSize);
+  ASSERT_TRUE(noise != nullptr);
+  Paint paint;
+  paint.setShader(std::move(noise));
+  canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/FractalNoiseFreqOne"));
+}
+
 TGFX_TEST_PRIVATE(CanvasTest, NoiseShaderIsEqual) {
   auto a = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
   auto b = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
