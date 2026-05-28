@@ -45,6 +45,8 @@ class WebGPUWindow : public Window {
   void* _surface = nullptr;
   int _width = 0;
   int _height = 0;
+  int _configuredWidth = 0;
+  int _configuredHeight = 0;
   std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
 };
 

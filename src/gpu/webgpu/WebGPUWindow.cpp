@@ -114,20 +114,25 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
     return nullptr;
   }
 
-  // Reconfigure the surface with the updated dimensions.
-  auto wgpuDevice =
-      static_cast<WGPUDevice>(static_cast<WebGPUDevice*>(getDevice().get())->webgpuDevice());
-  auto wgpuSurface = static_cast<WGPUSurface>(_surface);
-  WGPUSurfaceConfiguration config = {};
-  config.device = wgpuDevice;
-  config.format = WGPUTextureFormat_BGRA8Unorm;
-  config.usage = WGPUTextureUsage_RenderAttachment;
-  config.width = static_cast<uint32_t>(_width);
-  config.height = static_cast<uint32_t>(_height);
-  config.presentMode = WGPUPresentMode_Fifo;
-  config.alphaMode = WGPUCompositeAlphaMode_Premultiplied;
-  wgpuSurfaceConfigure(wgpuSurface, &config);
+  // Only reconfigure the surface when dimensions actually change.
+  if (_width != _configuredWidth || _height != _configuredHeight) {
+    auto wgpuDevice =
+        static_cast<WGPUDevice>(static_cast<WebGPUDevice*>(getDevice().get())->webgpuDevice());
+    auto wgpuSurface = static_cast<WGPUSurface>(_surface);
+    WGPUSurfaceConfiguration config = {};
+    config.device = wgpuDevice;
+    config.format = WGPUTextureFormat_BGRA8Unorm;
+    config.usage = WGPUTextureUsage_RenderAttachment;
+    config.width = static_cast<uint32_t>(_width);
+    config.height = static_cast<uint32_t>(_height);
+    config.presentMode = WGPUPresentMode_Fifo;
+    config.alphaMode = WGPUCompositeAlphaMode_Premultiplied;
+    wgpuSurfaceConfigure(wgpuSurface, &config);
+    _configuredWidth = _width;
+    _configuredHeight = _height;
+  }
 
+  auto wgpuSurface = static_cast<WGPUSurface>(_surface);
   drawableProxy = std::make_shared<WebGPUDrawableProxy>(
       context, _width, _height, wgpuSurface, WGPUTextureFormat_BGRA8Unorm, PixelFormat::BGRA_8888);
   return drawableProxy;
