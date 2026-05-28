@@ -931,6 +931,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     return;
   }
   if (modifiedBrush.maskFilter) {
+    return;
     drawImageRectWithMaskFilter(image, rect, matrix, clip, modifiedBrush, transform);
     return;
   }
@@ -1349,6 +1350,7 @@ void PDFExportContext::drawImageRectWithMaskFilter(const std::shared_ptr<Image>&
                                                    const Rect& rect, const Matrix& matrix,
                                                    const ClipStack& clip, const Brush& brush,
                                                    const Matrix& transform) {
+  return;
   DEBUG_ASSERT(image);
   DEBUG_ASSERT(brush.maskFilter);
 
