@@ -20,6 +20,7 @@
 #include "gpu/resources/TextureView.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/CommandQueue.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -29,9 +30,8 @@ namespace tgfx {
 
 static std::shared_ptr<Data> CopyPixelsFromNativeImage(const val& nativeImage, int width,
                                                        int height) {
-  auto data = val::module_property("tgfx").call<val>("readImagePixels",
-                                                     val::module_property("module"), nativeImage,
-                                                     width, height);
+  auto data = val::module_property("tgfx").call<val>(
+      "readImagePixels", val::module_property("module"), nativeImage, width, height);
   if (!data.as<bool>()) {
     return nullptr;
   }
@@ -99,35 +99,57 @@ bool WebImageBuffer::uploadToTexture(std::shared_ptr<Texture> texture, CommandQu
   if (pixelData == nullptr) {
     return false;
   }
-  auto rect = Rect::MakeXYWH(offsetX, offsetY, _width, _height);
+  // Canvas 2D getImageData returns unpremultiplied RGBA. Convert to the format expected by the
+  // texture (premultiplied, matching the native AtlasUploadTask behavior).
+  auto srcInfo = ImageInfo::Make(_width, _height, ColorType::RGBA_8888, AlphaType::Unpremultiplied,
+                                 static_cast<size_t>(_width) * 4);
   if (_alphaOnly) {
-    // Canvas 2D always returns RGBA data. Extract the alpha channel for R8 texture upload.
-    auto pixelCount = static_cast<size_t>(_width) * static_cast<size_t>(_height);
-    Buffer alphaBuffer(pixelCount);
-    auto src = static_cast<const uint8_t*>(pixelData->data());
-    auto dst = static_cast<uint8_t*>(alphaBuffer.data());
-    for (size_t i = 0; i < pixelCount; i++) {
-      dst[i] = src[i * 4 + 3];
-    }
-    auto rowBytes = static_cast<size_t>(_width);
-    queue->writeTexture(texture, rect, alphaBuffer.data(), rowBytes);
+    // Target is R8 (alpha-only): convert RGBA unpremul to ALPHA_8.
+    auto dstInfo = ImageInfo::Make(_width, _height, ColorType::ALPHA_8, AlphaType::Premultiplied,
+                                   static_cast<size_t>(_width));
+    Buffer dstBuffer(dstInfo.byteSize());
+    Pixmap srcPixmap(srcInfo, pixelData->data());
+    srcPixmap.readPixels(dstInfo, dstBuffer.data());
+    auto rect = Rect::MakeXYWH(offsetX, offsetY, _width, _height);
+    queue->writeTexture(texture, rect, dstBuffer.data(), static_cast<size_t>(_width));
   } else {
-    auto rowBytes = static_cast<size_t>(_width) * 4;
-    queue->writeTexture(texture, rect, pixelData->data(), rowBytes);
+    // Target is RGBA8: convert unpremultiplied to premultiplied.
+    auto dstInfo = ImageInfo::Make(_width, _height, ColorType::RGBA_8888, AlphaType::Premultiplied,
+                                   static_cast<size_t>(_width) * 4);
+    Buffer dstBuffer(dstInfo.byteSize());
+    Pixmap srcPixmap(srcInfo, pixelData->data());
+    srcPixmap.readPixels(dstInfo, dstBuffer.data());
+    auto rect = Rect::MakeXYWH(offsetX, offsetY, _width, _height);
+    queue->writeTexture(texture, rect, dstBuffer.data(), static_cast<size_t>(_width) * 4);
   }
   return true;
 }
 
-std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, bool) const {
+std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, bool mipmapped) const {
   auto pixelData = CopyPixelsFromNativeImage(getImage(), _width, _height);
   if (pixelData == nullptr) {
     return nullptr;
   }
-  auto rowBytes = static_cast<size_t>(_width) * 4;
+  // Canvas 2D getImageData returns unpremultiplied RGBA. Convert to premultiplied before uploading
+  // to match the native ImageCodec behavior (all GPU texture data must be premultiplied).
+  auto srcInfo = ImageInfo::Make(_width, _height, ColorType::RGBA_8888, AlphaType::Unpremultiplied,
+                                 static_cast<size_t>(_width) * 4);
   if (_alphaOnly) {
-    return TextureView::MakeAlpha(context, _width, _height, pixelData->data(), rowBytes);
+    auto dstInfo = ImageInfo::Make(_width, _height, ColorType::ALPHA_8, AlphaType::Premultiplied,
+                                   static_cast<size_t>(_width));
+    Buffer dstBuffer(dstInfo.byteSize());
+    Pixmap srcPixmap(srcInfo, pixelData->data());
+    srcPixmap.readPixels(dstInfo, dstBuffer.data());
+    return TextureView::MakeAlpha(context, _width, _height, dstBuffer.data(),
+                                  static_cast<size_t>(_width), mipmapped);
   }
-  return TextureView::MakeRGBA(context, _width, _height, pixelData->data(), rowBytes);
+  auto dstInfo = ImageInfo::Make(_width, _height, ColorType::RGBA_8888, AlphaType::Premultiplied,
+                                 static_cast<size_t>(_width) * 4);
+  Buffer dstBuffer(dstInfo.byteSize());
+  Pixmap srcPixmap(srcInfo, pixelData->data());
+  srcPixmap.readPixels(dstInfo, dstBuffer.data());
+  return TextureView::MakeRGBA(context, _width, _height, dstBuffer.data(),
+                               static_cast<size_t>(_width) * 4, mipmapped);
 }
 
 emscripten::val WebImageBuffer::getImage() const {

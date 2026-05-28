@@ -54,7 +54,12 @@ export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: n
     if (!ctx) {
         return null;
     }
+    // Use "copy" composite operation to avoid source-over blending artifacts from canvas reuse.
+    // This ensures the image pixels are written directly without compositing with any residual
+    // background, which can cause white fringe on semi-transparent edges.
+    ctx.globalCompositeOperation = 'copy';
     ctx.drawImage(image, 0, 0, width, height);
+    ctx.globalCompositeOperation = 'source-over';
     const {data} = ctx.getImageData(0, 0, width, height);
     releaseCanvas2D(canvas);
     if (data.length === 0) {
