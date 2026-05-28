@@ -937,7 +937,6 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     return;
   }
   if (modifiedBrush.maskFilter) {
-    modifiedBrush.maskFilter = nullptr;
     drawImageRectWithMaskFilter(image, rect, matrix, clip, modifiedBrush, transform);
     return;
   }
@@ -1357,7 +1356,7 @@ void PDFExportContext::drawImageRectWithMaskFilter(const std::shared_ptr<Image>&
                                                    const ClipStack& clip, const Brush& brush,
                                                    const Matrix& transform) {
   DEBUG_ASSERT(image);
-  // DEBUG_ASSERT(brush.maskFilter);
+  DEBUG_ASSERT(brush.maskFilter);
 
   // Plan X: instead of routing this through PDFShader's tiling-pattern path (which has a
   // long-standing pattern-matrix vs. set-time-CTM composition bug for spec-compliant viewers
@@ -1413,8 +1412,7 @@ void PDFExportContext::drawImageRectWithMaskFilter(const std::shared_ptr<Image>&
 
 PDFIndirectReference PDFExportContext::MakeMaskFormXObjectForRect(
     const std::shared_ptr<MaskFilter>& maskFilter, const Rect& rect, const Matrix& transform) {
-  if (!maskFilter ||
-      Types::Get(maskFilter.get()) != Types::MaskFilterType::Shader) {
+  if (!maskFilter || Types::Get(maskFilter.get()) != Types::MaskFilterType::Shader) {
     return PDFIndirectReference();
   }
   const auto* shaderMaskFilter = static_cast<const ShaderMaskFilter*>(maskFilter.get());
