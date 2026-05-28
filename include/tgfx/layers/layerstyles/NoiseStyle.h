@@ -69,10 +69,6 @@ class NoiseStyle : public LayerStyle {
   static std::shared_ptr<MultiNoiseStyle> MakeMulti(float size, float density, float opacity,
                                                     float seed);
 
-  LayerStyleType Type() const override {
-    return LayerStyleType::Noise;
-  }
-
   /**
    * The noise grain size. Larger values produce coarser grains.
    */
@@ -145,6 +141,10 @@ class MonoNoiseStyle : public NoiseStyle {
   void setColor(const Color& color);
 
  protected:
+  LayerStyleType Type() const override {
+    return LayerStyleType::MonoNoise;
+  }
+
   void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
               const Point& contentOffset, float alpha, BlendMode blendMode) override;
 
@@ -187,6 +187,10 @@ class DuoNoiseStyle : public NoiseStyle {
   void setSecondColor(const Color& color);
 
  protected:
+  LayerStyleType Type() const override {
+    return LayerStyleType::DuoNoise;
+  }
+
   void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
               const Point& contentOffset, float alpha, BlendMode blendMode) override;
 
@@ -219,6 +223,10 @@ class MultiNoiseStyle : public NoiseStyle {
   void setOpacity(float opacity);
 
  protected:
+  LayerStyleType Type() const override {
+    return LayerStyleType::MultiNoise;
+  }
+
   void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
               const Point& contentOffset, float alpha, BlendMode blendMode) override;
 

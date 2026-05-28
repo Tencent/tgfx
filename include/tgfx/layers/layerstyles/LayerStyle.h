@@ -52,7 +52,15 @@ enum class LayerStyleExtraSourceType {
   Background
 };
 
-enum class LayerStyleType { LayerStyle, BackgroundBlur, DropShadow, InnerShadow, Noise };
+enum class LayerStyleType {
+  LayerStyle,
+  BackgroundBlur,
+  DropShadow,
+  InnerShadow,
+  MonoNoise,
+  DuoNoise,
+  MultiNoise
+};
 
 /**
  * LayerStyle is used to change the appearance of a layer. Unlike LayerFilter, it does not create a

@@ -130,10 +130,6 @@ class NoiseFilter : public LayerFilter {
  protected:
   NoiseFilter(float size, float density, float seed, BlendMode blendMode);
 
-  Type type() const override {
-    return Type::NoiseFilter;
-  }
-
   std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
                                        const Rect& contentBounds, Point* offset) override;
 
@@ -183,6 +179,10 @@ class MonoNoiseFilter : public NoiseFilter {
   void setColor(const Color& color);
 
  protected:
+  Type type() const override {
+    return Type::MonoNoiseFilter;
+  }
+
   std::shared_ptr<Shader> onBuildBaseShader(float scale) override;
 
  private:
@@ -224,6 +224,10 @@ class DuoNoiseFilter : public NoiseFilter {
   void setSecondColor(const Color& color);
 
  protected:
+  Type type() const override {
+    return Type::DuoNoiseFilter;
+  }
+
   std::shared_ptr<Shader> onBuildBaseShader(float scale) override;
 
   std::shared_ptr<Shader> buildAtShift(float scale, const Point& shift) override;
@@ -264,6 +268,10 @@ class MultiNoiseFilter : public NoiseFilter {
   void setOpacity(float opacity);
 
  protected:
+  Type type() const override {
+    return Type::MultiNoiseFilter;
+  }
+
   std::shared_ptr<Shader> onBuildBaseShader(float scale) override;
 
  private:
