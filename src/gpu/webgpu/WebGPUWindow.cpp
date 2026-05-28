@@ -85,25 +85,49 @@ std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(const std::string& canvasSe
   wgpuSurfaceConfigure(surface, &config);
 
   return std::shared_ptr<WebGPUWindow>(
-      new WebGPUWindow(std::move(device), surface, canvasWidth, canvasHeight));
+      new WebGPUWindow(std::move(device), surface, canvasWidth, canvasHeight, canvasSelector));
 }
 
-WebGPUWindow::WebGPUWindow(std::shared_ptr<Device> device, void* surface, int width, int height)
-    : Window(std::move(device)), _surface(surface), _width(width), _height(height) {
+WebGPUWindow::WebGPUWindow(std::shared_ptr<Device> device, void* surface, int width, int height,
+                           const std::string& canvasSelector)
+    : Window(std::move(device)), _canvasSelector(canvasSelector), _surface(surface), _width(width),
+      _height(height) {
 }
 
 std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* context) {
-  if (_surface == nullptr || _width <= 0 || _height <= 0) {
+  if (_surface == nullptr) {
     return nullptr;
   }
 
-  // Re-query canvas size in case it changed.
+  // Re-query canvas size in case it changed (e.g., after updateSize sets canvas.width/height).
 #ifdef __EMSCRIPTEN__
-  // For Emscripten, we could re-query the canvas size here if needed.
-  // For now, use the stored dimensions.
+  int canvasWidth = 0;
+  int canvasHeight = 0;
+  emscripten_get_canvas_element_size(_canvasSelector.c_str(), &canvasWidth, &canvasHeight);
+  if (canvasWidth > 0 && canvasHeight > 0) {
+    _width = canvasWidth;
+    _height = canvasHeight;
+  }
 #endif
 
+  if (_width <= 0 || _height <= 0) {
+    return nullptr;
+  }
+
+  // Reconfigure the surface with the updated dimensions.
+  auto wgpuDevice =
+      static_cast<WGPUDevice>(static_cast<WebGPUDevice*>(getDevice().get())->webgpuDevice());
   auto wgpuSurface = static_cast<WGPUSurface>(_surface);
+  WGPUSurfaceConfiguration config = {};
+  config.device = wgpuDevice;
+  config.format = WGPUTextureFormat_BGRA8Unorm;
+  config.usage = WGPUTextureUsage_RenderAttachment;
+  config.width = static_cast<uint32_t>(_width);
+  config.height = static_cast<uint32_t>(_height);
+  config.presentMode = WGPUPresentMode_Fifo;
+  config.alphaMode = WGPUCompositeAlphaMode_Premultiplied;
+  wgpuSurfaceConfigure(wgpuSurface, &config);
+
   drawableProxy = std::make_shared<WebGPUDrawableProxy>(
       context, _width, _height, wgpuSurface, WGPUTextureFormat_BGRA8Unorm, PixelFormat::BGRA_8888);
   return drawableProxy;

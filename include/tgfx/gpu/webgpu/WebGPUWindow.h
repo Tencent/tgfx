@@ -38,8 +38,10 @@ class WebGPUWindow : public Window {
   void onPresent(Context* context) override;
 
  private:
-  WebGPUWindow(std::shared_ptr<Device> device, void* surface, int width, int height);
+  WebGPUWindow(std::shared_ptr<Device> device, void* surface, int width, int height,
+               const std::string& canvasSelector);
 
+  std::string _canvasSelector;
   void* _surface = nullptr;
   int _width = 0;
   int _height = 0;
