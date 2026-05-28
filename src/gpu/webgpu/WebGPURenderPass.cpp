@@ -49,9 +49,11 @@ std::shared_ptr<WebGPURenderPass> WebGPURenderPass::Make(WebGPUGPU* gpu, WGPUCom
     colorAttach.clearValue = {attachment.clearValue.red, attachment.clearValue.green,
                               attachment.clearValue.blue, attachment.clearValue.alpha};
     colorAttach.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
-    emscripten_console_logf("[WebGPU RenderPass] Color[%zu]: view=%p loadOp=%d storeOp=%d",
-                            colorAttachments.size(), static_cast<void*>(colorAttach.view),
-                            colorAttach.loadOp, colorAttach.storeOp);
+    emscripten_console_logf(
+        "[WebGPU RenderPass] Color[%zu]: view=%p loadOp=%d storeOp=%d clear=(%.2f,%.2f,%.2f,%.2f)",
+        colorAttachments.size(), static_cast<void*>(colorAttach.view), colorAttach.loadOp,
+        colorAttach.storeOp, colorAttach.clearValue.r, colorAttach.clearValue.g,
+        colorAttach.clearValue.b, colorAttach.clearValue.a);
     if (attachment.resolveTexture != nullptr) {
       auto resolveTexture = std::static_pointer_cast<WebGPUTexture>(attachment.resolveTexture);
       colorAttach.resolveTarget = resolveTexture->webgpuRenderView();
@@ -99,6 +101,17 @@ std::shared_ptr<WebGPURenderPass> WebGPURenderPass::Make(WebGPUGPU* gpu, WGPUCom
     return nullptr;
   }
 
+  // Set default viewport to match the color attachment size (matching GL behavior).
+  if (!colorAttachments.empty()) {
+    auto& firstAttach = descriptor.colorAttachments[0];
+    if (firstAttach.texture != nullptr) {
+      wgpuRenderPassEncoderSetViewport(passEncoder, 0.0f, 0.0f,
+                                       static_cast<float>(firstAttach.texture->width()),
+                                       static_cast<float>(firstAttach.texture->height()), 0.0f,
+                                       1.0f);
+    }
+  }
+
   return std::shared_ptr<WebGPURenderPass>(new WebGPURenderPass(gpu, passEncoder, descriptor));
 }
 
@@ -144,10 +157,15 @@ void WebGPURenderPass::setScissorRect(int x, int y, int width, int height) {
 
 void WebGPURenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   if (passEncoder == nullptr || pipeline == nullptr) {
+    emscripten_console_errorf("[WebGPU RenderPass] setPipeline FAILED: encoder=%p pipeline=%p",
+                              static_cast<void*>(passEncoder), static_cast<void*>(pipeline.get()));
     return;
   }
   currentPipeline = std::static_pointer_cast<WebGPURenderPipeline>(pipeline);
   if (currentPipeline->webgpuRenderPipeline() == nullptr) {
+    emscripten_console_errorf(
+        "[WebGPU RenderPass] setPipeline FAILED: webgpuRenderPipeline is null (shader compile "
+        "failed)");
     currentPipeline = nullptr;
     return;
   }
@@ -263,6 +281,9 @@ void WebGPURenderPass::updateBindGroup() {
 void WebGPURenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
                             uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
   if (passEncoder == nullptr || currentPipeline == nullptr) {
+    emscripten_console_errorf("[WebGPU Draw] SKIPPED: encoder=%p pipeline=%p",
+                              static_cast<void*>(passEncoder),
+                              static_cast<void*>(currentPipeline.get()));
     return;
   }
   // WebGPU requires topology at pipeline creation time. Select the correct pipeline variant.
