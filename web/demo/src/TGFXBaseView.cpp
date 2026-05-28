@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXBaseView.h"
+#include <emscripten/html5.h>
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
@@ -34,7 +35,11 @@ TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
 
 void TGFXBaseView::updateSize() {
   if (window == nullptr) {
+#ifdef TGFX_USE_WEBGPU
+    window = tgfx::WebGPUWindow::MakeFrom(canvasID);
+#else
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
+#endif
   }
   if (window == nullptr) {
     return;
@@ -96,7 +101,11 @@ void TGFXBaseView::updateLayerTree(int drawIndex) {
 
 void TGFXBaseView::draw() {
   if (window == nullptr) {
+#ifdef TGFX_USE_WEBGPU
+    window = tgfx::WebGPUWindow::MakeFrom(canvasID);
+#else
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
+#endif
   }
   if (window == nullptr) {
     return;
@@ -135,6 +144,11 @@ void TGFXBaseView::draw() {
 
   auto recording = context->flush();
 
+#ifdef TGFX_USE_WEBGPU
+  if (recording) {
+    context->submit(std::move(recording));
+  }
+#else
   if (presentImmediately) {
     presentImmediately = false;
     if (recording) {
@@ -147,6 +161,7 @@ void TGFXBaseView::draw() {
       context->submit(std::move(recording));
     }
   }
+#endif
 
   device->unlock();
 }
