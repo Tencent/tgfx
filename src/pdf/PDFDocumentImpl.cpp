@@ -382,7 +382,7 @@ void PDFDocumentImpl::onEndPage() {
                   static_cast<float>(drawContext->pageSize().height) * inverseRasterScale);
   auto pageContent = drawContext->getContent();
 
-  auto resourceDict = drawContext->makeResourceDict();
+  auto resourceDict = drawContext->makeResourceDictionary();
   DEBUG_ASSERT(!pageRefs.empty());
 
   page->insertObject("Resources", std::move(resourceDict));

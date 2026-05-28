@@ -30,8 +30,8 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
-#include "core/images/PictureImage.h"
 #include "core/images/FilterImage.h"
+#include "core/images/PictureImage.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/ImageShader.h"
 #include "core/shaders/MatrixShader.h"
@@ -297,6 +297,20 @@ int add_resource(std::unordered_set<PDFIndirectReference>& resources, PDFIndirec
   return ref.value;
 }
 
+// Recognizes the lowered representation of BackgroundBlurStyle: a blur-filtered FilterImage drawn
+// with BlendMode::Src and an active maskFilter. The PDF backend cannot currently express this
+// pattern correctly, so the caller skips the draw entirely (see TODO at the call site).
+bool IsBackgroundBlurStylePattern(const Brush& brush, const Image* image) {
+  if (brush.blendMode != BlendMode::Src) {
+    return false;
+  }
+  if (Types::Get(image) != Types::ImageType::Filter) {
+    return false;
+  }
+  const auto* filterImage = static_cast<const FilterImage*>(image);
+  return filterImage->filter &&
+         Types::Get(filterImage->filter.get()) == Types::ImageFilterType::Blur;
+}
 }  // namespace
 
 namespace {
@@ -938,16 +952,12 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     return;
   }
   if (modifiedBrush.maskFilter) {
-    // A blur-filtered image is rasterized into a bitmap; combined with BlendMode::Src this is
-    // the signature of BackgroundBlurStyle. PDF currently can't represent it correctly — the
-    // mask machinery produces visibly wrong output. Skip it for now as a temporary workaround.
-    if (modifiedBrush.blendMode == BlendMode::Src &&
-        Types::Get(image.get()) == Types::ImageType::Filter) {
-      const auto* filterImage = static_cast<const FilterImage*>(image.get());
-      if (filterImage->filter &&
-          Types::Get(filterImage->filter.get()) == Types::ImageFilterType::Blur) {
-        return;
-      }
+    // TODO(pdf): BackgroundBlurStyle currently lowers to (BlendMode::Src + FilterImage<Blur> +
+    // maskFilter). The PDF maskFilter path cannot express this combination correctly — running
+    // it produces visibly wrong output. Skip the draw as a temporary workaround until the PDF
+    // backend gains a proper backdrop-blur path. Add a regression test once the real path lands.
+    if (IsBackgroundBlurStylePattern(modifiedBrush, image.get())) {
+      return;
     }
     // Convert the image into an image shader and route through onDrawPath, which emits the
     // bitmap as a tiling pattern combined with the existing maskFilter machinery. This is the
@@ -1012,7 +1022,7 @@ std::vector<PDFIndirectReference> Sort(const std::unordered_set<PDFIndirectRefer
 }
 }  // namespace
 
-std::unique_ptr<PDFDictionary> PDFExportContext::makeResourceDict() {
+std::unique_ptr<PDFDictionary> PDFExportContext::makeResourceDictionary() {
   auto resourceDict = MakePDFResourceDictionary(Sort(graphicStateResources), Sort(shaderResources),
                                                 Sort(xObjectResources), Sort(fontResources));
   // Inject the document-wide /CS color space into the Resources/ColorSpace dictionary whenever a
@@ -1026,12 +1036,6 @@ std::unique_ptr<PDFDictionary> PDFExportContext::makeResourceDict() {
     resourceDict->insertObject("ColorSpace", std::move(colorSpaceDic));
   }
   return resourceDict;
-}
-
-// TODO(pdf): makeResourceDictionary and makeResourceDict are duplicates kept for historical
-// reasons; consolidate them into a single function in a follow-up cleanup.
-std::unique_ptr<PDFDictionary> PDFExportContext::makeResourceDictionary() {
-  return makeResourceDict();
 }
 
 bool PDFExportContext::isContentEmpty() {

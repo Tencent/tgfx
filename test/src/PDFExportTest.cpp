@@ -18,8 +18,11 @@
 
 #include <hb-subset.h>
 #include <hb.h>
+#include <cstring>
 #include "base/TGFXTest.h"
 #include "core/utils/MD5.h"
+#include "pdf/PDFDocumentImpl.h"
+#include "pdf/PDFTypes.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
@@ -57,110 +60,6 @@ bool ComparePDF(const std::shared_ptr<MemoryWriteStream>& stream, const std::str
     SaveFile(data, key + ".pdf");
   }
   return result;
-}
-
-// Searches forward from "offset" for the byte sequence "needle" and returns its start position, or
-// std::string::npos when not found.
-size_t FindBytes(const uint8_t* data, size_t size, size_t offset, const char* needle,
-                 size_t needleSize) {
-  if (needleSize == 0 || offset + needleSize > size) {
-    return std::string::npos;
-  }
-  for (size_t i = offset; i + needleSize <= size; ++i) {
-    if (memcmp(data + i, needle, needleSize) == 0) {
-      return i;
-    }
-  }
-  return std::string::npos;
-}
-
-// Walks every "N 0 obj ... endobj" block in the given raw PDF bytes and checks that, for each
-// stream object, the dictionary's /Length entry matches the actual byte count written between the
-// "stream\n" marker and the "\nendstream" marker (ISO 32000-1 §7.3.8.2). When this invariant is
-// violated, strict PDF readers fail to parse the stream payload and may corrupt downstream
-// objects.
-bool VerifyPDFStructure(const std::shared_ptr<Data>& pdfData, std::string* errorMessage) {
-  const auto* bytes = static_cast<const uint8_t*>(pdfData->data());
-  size_t size = pdfData->size();
-  bool ok = true;
-  auto reportError = [&](const std::string& msg) {
-    ok = false;
-    if (errorMessage) {
-      if (!errorMessage->empty()) {
-        errorMessage->append("\n");
-      }
-      errorMessage->append(msg);
-    }
-  };
-
-  size_t cursor = 0;
-  while (cursor < size) {
-    size_t objPos = FindBytes(bytes, size, cursor, " 0 obj", 6);
-    if (objPos == std::string::npos) {
-      break;
-    }
-    // Walk back to capture the object number.
-    size_t numStart = objPos;
-    while (numStart > 0 && bytes[numStart - 1] >= '0' && bytes[numStart - 1] <= '9') {
-      --numStart;
-    }
-    if (numStart == objPos) {
-      cursor = objPos + 6;
-      continue;
-    }
-    int objNum = std::stoi(std::string(reinterpret_cast<const char*>(bytes + numStart),
-                                       objPos - numStart));
-    size_t endobjPos = FindBytes(bytes, size, objPos, "endobj", 6);
-    if (endobjPos == std::string::npos) {
-      reportError("obj " + std::to_string(objNum) + ": missing 'endobj'");
-      break;
-    }
-    size_t bodyEnd = endobjPos;
-    cursor = endobjPos + 6;
-
-    size_t streamPos = FindBytes(bytes, size, objPos, "stream\n", 7);
-    if (streamPos == std::string::npos || streamPos >= bodyEnd) {
-      continue;
-    }
-    size_t endstreamPos = FindBytes(bytes, size, streamPos, "\nendstream", 10);
-    if (endstreamPos == std::string::npos || endstreamPos >= bodyEnd) {
-      reportError("obj " + std::to_string(objNum) + ": missing 'endstream'");
-      continue;
-    }
-    size_t payloadStart = streamPos + 7;
-    size_t payloadEnd = endstreamPos;
-    size_t actualLength = payloadEnd - payloadStart;
-
-    // Parse "/Length <N>" inside the dictionary preceding the stream marker.
-    std::string dictText(reinterpret_cast<const char*>(bytes + objPos),
-                         streamPos - objPos);
-    auto lengthKey = dictText.find("/Length");
-    if (lengthKey == std::string::npos) {
-      reportError("obj " + std::to_string(objNum) + ": stream without /Length entry");
-      continue;
-    }
-    size_t numCursor = lengthKey + 7;
-    while (numCursor < dictText.size() &&
-           (dictText[numCursor] == ' ' || dictText[numCursor] == '\t')) {
-      ++numCursor;
-    }
-    size_t numEnd = numCursor;
-    while (numEnd < dictText.size() && dictText[numEnd] >= '0' && dictText[numEnd] <= '9') {
-      ++numEnd;
-    }
-    if (numEnd == numCursor) {
-      // /Length is an indirect reference (e.g. "/Length 5 0 R"). Skip the numeric check for it.
-      continue;
-    }
-    size_t declaredLength =
-        static_cast<size_t>(std::stoul(dictText.substr(numCursor, numEnd - numCursor)));
-    if (declaredLength != actualLength) {
-      reportError("obj " + std::to_string(objNum) + ": /Length=" +
-                  std::to_string(declaredLength) + " but actual stream bytes=" +
-                  std::to_string(actualLength));
-    }
-  }
-  return ok;
 }
 }  // namespace
 
@@ -1208,80 +1107,168 @@ TGFX_TEST(PDFExportTest, ImageDeduplicationCrossPage) {
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ImageDeduplicationCrossPage"));
 }
 
-// Helper for PDFStructureIntegrity: draws a scene that exercises nested save/restore, multiple
-// paint types, clipping and image XObjects, so the resulting page Contents stream contains a
-// non-trivial sequence of graphics state operators.
-static void DrawIntegrityScene(Canvas* canvas, const std::shared_ptr<Image>& image) {
-  Paint background;
-  background.setColor(Color{0.94f, 0.94f, 0.98f, 1.f});
-  canvas->drawRect(Rect::MakeWH(256.f, 256.f), background);
+// Direct unit-test fixture for PDFStreamOut. Builds a minimal PDFDocumentImpl whose underlying
+// WriteStream is a MemoryWriteStream we own, runs PDFStreamOut on the supplied input, and returns
+// the raw bytes that were emitted for the single stream object. The fixture does not call
+// beginPage / endPage, so the document remains in BetweenPages state and ~PDFDocumentImpl exits
+// cleanly via the empty-pages branch in onClose.
+namespace {
+struct EmittedStream {
+  std::shared_ptr<Data> bytes;
+  PDFIndirectReference ref;
+};
 
-  canvas->save();
-  canvas->translate(40.f, 40.f);
-  Paint red;
-  red.setColor(Color{0.85f, 0.2f, 0.2f, 1.f});
-  canvas->drawRect(Rect::MakeWH(60.f, 60.f), red);
+EmittedStream RunPDFStreamOut(const std::string& input,
+                              PDFMetadata::CompressionLevel compressionLevel,
+                              PDFSteamCompressionEnabled compressFlag) {
+  auto sink = MemoryWriteStream::Make();
+  PDFMetadata metadata;
+  metadata.compressionLevel = compressionLevel;
+  PDFDocumentImpl doc(sink, /*context=*/nullptr, metadata);
+  // PDFStreamOut routes through emitStream, which records object offsets via offsetMap. The full
+  // PDFDocument pipeline initializes baseOffset inside SerializeHeader during the first
+  // onBeginPage call; this fixture skips beginPage entirely, so initialize the offset map here so
+  // the DEBUG_ASSERT inside Difference does not fire.
+  doc.offsetMap.markStartOfDocument(sink);
 
-  canvas->save();
-  canvas->clipRect(Rect::MakeXYWH(10.f, 10.f, 40.f, 40.f));
-  Paint translucent;
-  translucent.setColor(Color{0.1f, 0.4f, 0.9f, 0.5f});
-  canvas->drawRect(Rect::MakeWH(60.f, 60.f), translucent);
-  canvas->restore();
-  canvas->restore();
+  auto inputData = Data::MakeWithCopy(input.data(), input.size());
+  auto inputStream = Stream::MakeFromData(inputData);
 
-  if (image != nullptr) {
-    canvas->save();
-    canvas->translate(120.f, 40.f);
-    canvas->drawImage(image, 0.f, 0.f);
-    canvas->restore();
-  }
+  auto dict = PDFDictionary::Make();
+  PDFIndirectReference ref =
+      PDFStreamOut(std::move(dict), std::move(inputStream), &doc, compressFlag);
+  return EmittedStream{sink->readData(), ref};
 }
 
-// Regression test guarding the PDF stream /Length writer bug, where FlateDecode streams used to
-// store the uncompressed byte count in /Length, producing malformed PDFs. The scene is exported
-// twice (with and without compression) so both code paths are covered.
-TGFX_TEST(PDFExportTest, PDFStructureIntegrity) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-
-  auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/apitest/mandrill_128.webp"));
-  EXPECT_TRUE(image != nullptr);
-
-  // Pass 1: default (FlateDecode enabled).
-  {
-    auto PDFStream = MemoryWriteStream::Make();
-    auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-    DrawIntegrityScene(document->beginPage(256.f, 256.f), image);
-    document->endPage();
-    DrawIntegrityScene(document->beginPage(256.f, 256.f), image);
-    document->endPage();
-    document->close();
-    PDFStream->flush();
-
-    std::string errors;
-    bool ok = VerifyPDFStructure(PDFStream->readData(), &errors);
-    EXPECT_TRUE(ok) << "Compressed PDF failed /Length check:\n" << errors;
+// Searches `bytes` for the byte sequence `needle` and returns its start offset, or
+// std::string::npos if not found.
+size_t IndexOf(const std::shared_ptr<Data>& bytes, const char* needle) {
+  size_t needleSize = std::strlen(needle);
+  if (bytes == nullptr || needleSize == 0 || bytes->size() < needleSize) {
+    return std::string::npos;
   }
-
-  // Pass 2: compression off.
-  {
-    auto PDFStream = MemoryWriteStream::Make();
-    PDFMetadata metadata;
-    metadata.compressionLevel = PDFMetadata::CompressionLevel::None;
-    auto document = PDFDocument::Make(PDFStream, context, metadata);
-    DrawIntegrityScene(document->beginPage(256.f, 256.f), image);
-    document->endPage();
-    DrawIntegrityScene(document->beginPage(256.f, 256.f), image);
-    document->endPage();
-    document->close();
-    PDFStream->flush();
-
-    std::string errors;
-    bool ok = VerifyPDFStructure(PDFStream->readData(), &errors);
-    EXPECT_TRUE(ok) << "Uncompressed PDF failed /Length check:\n" << errors;
+  const auto* base = static_cast<const uint8_t*>(bytes->data());
+  size_t size = bytes->size();
+  for (size_t i = 0; i + needleSize <= size; ++i) {
+    if (memcmp(base + i, needle, needleSize) == 0) {
+      return i;
+    }
   }
+  return std::string::npos;
+}
+
+// Parses an unsigned decimal integer starting at `offset` in `bytes`, stopping at the first
+// non-digit. Returns the parsed value; sets *consumed to the number of bytes consumed (0 if no
+// digit was found).
+size_t ParseUnsigned(const std::shared_ptr<Data>& bytes, size_t offset, size_t* consumed) {
+  const auto* base = static_cast<const uint8_t*>(bytes->data());
+  size_t size = bytes->size();
+  size_t value = 0;
+  size_t i = offset;
+  while (i < size && base[i] >= '0' && base[i] <= '9') {
+    value = value * 10 + static_cast<size_t>(base[i] - '0');
+    ++i;
+  }
+  *consumed = i - offset;
+  return value;
+}
+
+// Reads "/Length <N>" from the emitted bytes and returns N. Fails the current test if the entry
+// is missing or malformed.
+size_t ReadDeclaredLength(const std::shared_ptr<Data>& bytes) {
+  size_t at = IndexOf(bytes, "/Length ");
+  if (at == std::string::npos) {
+    ADD_FAILURE() << "Emitted stream does not contain a '/Length ' entry.";
+    return 0;
+  }
+  size_t consumed = 0;
+  size_t value = ParseUnsigned(bytes, at + std::strlen("/Length "), &consumed);
+  if (consumed == 0) {
+    ADD_FAILURE() << "Emitted stream's /Length entry is not followed by a decimal integer.";
+    return 0;
+  }
+  return value;
+}
+
+// Returns the byte count between the "stream\n" marker and the "\nendstream" marker — i.e. the
+// number of bytes that PDFDocumentImpl::emitStream actually wrote between the keywords. /Length
+// must equal this value (ISO 32000-1 §7.3.8.2).
+size_t MeasureActualPayload(const std::shared_ptr<Data>& bytes) {
+  size_t streamAt = IndexOf(bytes, "stream\n");
+  size_t endstreamAt = IndexOf(bytes, "\nendstream");
+  if (streamAt == std::string::npos || endstreamAt == std::string::npos ||
+      endstreamAt <= streamAt) {
+    ADD_FAILURE() << "Emitted bytes do not contain a complete stream/endstream pair.";
+    return 0;
+  }
+  size_t payloadStart = streamAt + std::strlen("stream\n");
+  return endstreamAt - payloadStart;
+}
+}  // namespace
+
+// Bug 1 unit test, compressed branch. Drives PDFStreamOut with input large enough that
+// FlateDecode actually saves bytes; expects /Length to equal the compressed payload size, not the
+// original input size. This is the case the PR fix targets directly.
+TGFX_TEST(PDFExportTest, PDFStreamOutWritesCompressedLength) {
+  // Highly redundant input compresses well; the 4096-byte block reliably exceeds MinimumSavings.
+  std::string input(4096, 'A');
+  auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default,
+                                 PDFSteamCompressionEnabled::Yes);
+
+  EXPECT_NE(IndexOf(emitted.bytes, "/Filter /FlateDecode"), std::string::npos)
+      << "Compressed branch should emit /Filter /FlateDecode.";
+
+  size_t declared = ReadDeclaredLength(emitted.bytes);
+  size_t actual = MeasureActualPayload(emitted.bytes);
+
+  EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes (ISO 32000-1 "
+                                 "§7.3.8.2). declared="
+                              << declared << " actual=" << actual;
+  EXPECT_LT(declared, input.size())
+      << "Compressed payload should be smaller than the uncompressed input; otherwise the test "
+         "input is not exercising the compression path.";
+}
+
+// Bug 1 unit test, uncompressed branch (compression disabled by metadata). /Length must equal the
+// input size and no /Filter entry should be emitted.
+TGFX_TEST(PDFExportTest, PDFStreamOutWritesUncompressedLength) {
+  std::string input = "Hello, PDF stream length test.";
+  auto emitted =
+      RunPDFStreamOut(input, PDFMetadata::CompressionLevel::None, PDFSteamCompressionEnabled::Yes);
+
+  EXPECT_EQ(IndexOf(emitted.bytes, "/Filter"), std::string::npos)
+      << "Uncompressed branch must not emit a /Filter entry.";
+
+  size_t declared = ReadDeclaredLength(emitted.bytes);
+  size_t actual = MeasureActualPayload(emitted.bytes);
+
+  EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes. declared="
+                              << declared << " actual=" << actual;
+  EXPECT_EQ(declared, input.size());
+}
+
+// Bug 1 unit test, "compression refused" branch: input is too short or too random for FlateDecode
+// to save MinimumSavings bytes, so SerializeStream falls back to writing the raw bytes. The
+// pre-fix code wrote the original input size into /Length unconditionally, so the bug surfaces in
+// this branch as well — making sure /Length still matches the actually-emitted payload (== input
+// size, since no Filter is written).
+TGFX_TEST(PDFExportTest, PDFStreamOutFallsBackWhenCompressionDoesNotSave) {
+  // 8 bytes is well under MinimumSavings (= strlen("/Filter_/FlateDecode_") = 21), so
+  // SerializeStream skips the deflate path entirely.
+  std::string input = "abcdefgh";
+  auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default,
+                                 PDFSteamCompressionEnabled::Yes);
+
+  EXPECT_EQ(IndexOf(emitted.bytes, "/Filter"), std::string::npos)
+      << "Short input below MinimumSavings should bypass FlateDecode.";
+
+  size_t declared = ReadDeclaredLength(emitted.bytes);
+  size_t actual = MeasureActualPayload(emitted.bytes);
+
+  EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes even when the "
+                                 "compression path is skipped. declared="
+                              << declared << " actual=" << actual;
+  EXPECT_EQ(declared, input.size());
 }
 
 }  // namespace tgfx

@@ -81,6 +81,12 @@ class PDFExportContext : public DrawContext {
 
   std::unique_ptr<PDFDictionary> makeResourceDictionary();
 
+  /**
+   * Finalizes the content stream and returns its bytes. Drains any open graphic-state frames
+   * (balancing residual q's with Q's) and resets the active stack state. After calling this, the
+   * context must not receive further draw calls — submitting more draws would re-emit a fresh
+   * q/Q wrapper and produce inconsistent state.
+   */
   std::shared_ptr<Data> getContent();
 
   ISize pageSize() const {
@@ -90,8 +96,6 @@ class PDFExportContext : public DrawContext {
   const Matrix& initialTransform() {
     return _initialTransform;
   }
-
-  std::unique_ptr<PDFDictionary> makeResourceDict();
 
  private:
   void reset();
