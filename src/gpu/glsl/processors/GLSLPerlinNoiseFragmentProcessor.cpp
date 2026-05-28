@@ -84,12 +84,14 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
 
   auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
 
-  // texCoord is already at the pixel center (X.5, Y.5) per fragment-shader convention, which
-  // matches the SVG spec's "noise sampled at (kx+0.5, ky+0.5)" rule. Multiply by baseFrequency
-  // directly; adding another 0.5 here would shift integer pixel centers onto lattice points and
-  // collapse the noise into a constant whenever baseFrequency is an integer (e.g. baseFrequency=1
-  // produced fract()=0 for every pixel and yielded a flat 0.5 grey output).
-  fragBuilder->codeAppendf("vec2 noiseVec = %s * %s;", texCoordName.c_str(), baseFreqName.c_str());
+  // texCoord is at the pixel center (X.5, Y.5) per fragment-shader convention. A small
+  // sub-lattice offset prevents fract(noiseVec) from collapsing to 0 when baseFrequency lands
+  // such that (texCoord * baseFrequency) hits integer lattice points (e.g. baseFrequency=1
+  // would yield fract()=0 at every pixel and produce a flat 0.5 grey output). 1/128 is small
+  // enough not to be visible at typical frequencies and is not a rational multiple of common
+  // baseFrequencies, so it keeps fract() bounded away from 0 across the supported range.
+  fragBuilder->codeAppendf("vec2 noiseVec = %s * %s + vec2(0.0078125);", texCoordName.c_str(),
+                           baseFreqName.c_str());
 
   fragBuilder->codeAppend("vec4 color = vec4(0.0);");
 
