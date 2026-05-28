@@ -25,9 +25,6 @@
 #include "WebGPUTexture.h"
 #include "WebGPUUtil.h"
 #include "core/utils/Log.h"
-#ifdef __EMSCRIPTEN__
-#include <emscripten/console.h>
-#endif
 
 // WGSL shader for mipmap generation via fullscreen triangle + bilinear sampling.
 static const char* MipmapWGSL = R"(
@@ -84,9 +81,6 @@ GPU* WebGPUCommandEncoder::gpu() const {
 
 std::shared_ptr<RenderPass> WebGPUCommandEncoder::onBeginRenderPass(
     const RenderPassDescriptor& descriptor) {
-  emscripten_console_logf("[WebGPU CmdEncoder] beginRenderPass: colorAttachments=%zu hasDS=%d",
-                          descriptor.colorAttachments.size(),
-                          descriptor.depthStencilAttachment.texture != nullptr);
   return WebGPURenderPass::Make(_gpu, commandEncoder, descriptor);
 }
 

@@ -249,14 +249,8 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
   pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Uint16;
   pipelineStrip = wgpuDeviceCreateRenderPipeline(gpu->device(), &pipelineDesc);
   if (pipeline == nullptr) {
-    emscripten_console_logf("[WebGPU Pipeline] FAILED (entries=%zu vbufs=%zu ctargets=%zu ds=%d)",
-                            layoutEntries.size(), vertexBuffers.size(), colorTargets.size(),
-                            hasDepthStencil);
     return false;
   }
-  emscripten_console_logf("[WebGPU Pipeline] Created OK: %p (bindings=%zu)",
-                          static_cast<void*>(pipeline), layoutEntries.size());
-
   return true;
 }
 

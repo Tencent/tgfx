@@ -67,17 +67,13 @@ std::shared_ptr<RenderTarget> WebGPUDrawableProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
     WGPUSurfaceTexture surfaceTexture = {};
     wgpuSurfaceGetCurrentTexture(_surface, &surfaceTexture);
-    printf("[WebGPU Drawable] getSurfaceTexture: status=%d texture=%p\n",
-           static_cast<int>(surfaceTexture.status), static_cast<void*>(surfaceTexture.texture));
     if (surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_Success ||
         surfaceTexture.texture == nullptr) {
-      printf("[WebGPU Drawable] FAILED to get surface texture!\n");
       return nullptr;
     }
     _surfaceTexture = surfaceTexture.texture;
     _surfaceTextureView = wgpuTextureCreateView(_surfaceTexture, nullptr);
     if (_surfaceTextureView == nullptr) {
-      printf("[WebGPU Drawable] FAILED to create texture view!\n");
       return nullptr;
     }
     WebGPUTextureInfo textureInfo = {};
@@ -88,8 +84,6 @@ std::shared_ptr<RenderTarget> WebGPUDrawableProxy::getRenderTarget() const {
     auto textureHeight = static_cast<int>(wgpuTextureGetHeight(_surfaceTexture));
     BackendRenderTarget backendRT(textureInfo, textureWidth, textureHeight);
     _renderTarget = RenderTarget::MakeFrom(_context, backendRT, ImageOrigin::TopLeft);
-    printf("[WebGPU Drawable] RenderTarget created: %p (%dx%d)\n",
-           static_cast<void*>(_renderTarget.get()), textureWidth, textureHeight);
   }
   return _renderTarget;
 }
@@ -103,9 +97,6 @@ void WebGPUDrawableProxy::present() {
 }
 
 void WebGPUDrawableProxy::releaseDrawable() {
-  printf("[WebGPU Drawable] releaseDrawable: view=%p texture=%p rt=%p\n",
-         static_cast<void*>(_surfaceTextureView), static_cast<void*>(_surfaceTexture),
-         static_cast<void*>(_renderTarget.get()));
   if (_surfaceTextureView != nullptr) {
     wgpuTextureViewRelease(_surfaceTextureView);
     _surfaceTextureView = nullptr;

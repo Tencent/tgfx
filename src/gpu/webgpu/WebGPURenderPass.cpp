@@ -49,11 +49,6 @@ std::shared_ptr<WebGPURenderPass> WebGPURenderPass::Make(WebGPUGPU* gpu, WGPUCom
     colorAttach.clearValue = {attachment.clearValue.red, attachment.clearValue.green,
                               attachment.clearValue.blue, attachment.clearValue.alpha};
     colorAttach.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
-    emscripten_console_logf(
-        "[WebGPU RenderPass] Color[%zu]: view=%p loadOp=%d storeOp=%d clear=(%.2f,%.2f,%.2f,%.2f)",
-        colorAttachments.size(), static_cast<void*>(colorAttach.view), colorAttach.loadOp,
-        colorAttach.storeOp, colorAttach.clearValue.r, colorAttach.clearValue.g,
-        colorAttach.clearValue.b, colorAttach.clearValue.a);
     if (attachment.resolveTexture != nullptr) {
       auto resolveTexture = std::static_pointer_cast<WebGPUTexture>(attachment.resolveTexture);
       colorAttach.resolveTarget = resolveTexture->webgpuRenderView();
@@ -76,27 +71,13 @@ std::shared_ptr<WebGPURenderPass> WebGPURenderPass::Make(WebGPUGPU* gpu, WGPUCom
         ToWGPUStoreOp(descriptor.depthStencilAttachment.storeAction);
     depthStencilAttach.stencilClearValue = descriptor.depthStencilAttachment.stencilClearValue;
     depthStencilAttach.stencilReadOnly = descriptor.depthStencilAttachment.stencilReadOnly;
-    emscripten_console_logf(
-        "[WebGPU RenderPass] DS: view=%p depthLoad=%d depthStore=%d stencilLoad=%d stencilStore=%d "
-        "depthRO=%d stencilRO=%d",
-        static_cast<void*>(depthStencilAttach.view), depthStencilAttach.depthLoadOp,
-        depthStencilAttach.depthStoreOp, depthStencilAttach.stencilLoadOp,
-        depthStencilAttach.stencilStoreOp, depthStencilAttach.depthReadOnly,
-        depthStencilAttach.stencilReadOnly);
   }
 
   WGPURenderPassDescriptor passDesc = {};
   passDesc.colorAttachmentCount = colorAttachments.size();
   passDesc.colorAttachments = colorAttachments.data();
   passDesc.depthStencilAttachment = hasDepthStencil ? &depthStencilAttach : nullptr;
-
-  emscripten_console_logf(
-      "[WebGPU RenderPass] Calling wgpuCommandEncoderBeginRenderPass colorCount=%zu hasDS=%d",
-      colorAttachments.size(), hasDepthStencil);
   auto passEncoder = wgpuCommandEncoderBeginRenderPass(encoder, &passDesc);
-  emscripten_console_logf("[WebGPU RenderPass] beginRenderPass: colorCount=%zu hasDS=%d => %p",
-                          colorAttachments.size(), hasDepthStencil,
-                          static_cast<void*>(passEncoder));
   if (passEncoder == nullptr) {
     return nullptr;
   }
@@ -135,9 +116,7 @@ void WebGPURenderPass::setViewport(int x, int y, int width, int height) {
 void WebGPURenderPass::setScissorRect(int x, int y, int width, int height) {
   if (passEncoder == nullptr) {
     return;
-  }
-  emscripten_console_logf("[WebGPU] setScissorRect: x=%d y=%d w=%d h=%d", x, y, width, height);
-  // Clamp negative origins and adjust dimensions accordingly. WebGPU requires unsigned values.
+  }  // Clamp negative origins and adjust dimensions accordingly. WebGPU requires unsigned values.
   if (x < 0) {
     width += x;
     x = 0;
@@ -193,9 +172,6 @@ void WebGPURenderPass::setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer>
   }
   auto webgpuBuffer = std::static_pointer_cast<WebGPUBuffer>(buffer);
   auto bufferSize = webgpuBuffer->size();
-  emscripten_console_logf("[WebGPU] setVertexBuffer: slot=%u buffer=%p offset=%zu bufferSize=%zu",
-                          slot, static_cast<void*>(webgpuBuffer->webgpuBuffer()), offset,
-                          bufferSize);
   wgpuRenderPassEncoderSetVertexBuffer(passEncoder, slot, webgpuBuffer->webgpuBuffer(), offset,
                                        bufferSize - offset);
 }
@@ -260,17 +236,9 @@ void WebGPURenderPass::updateBindGroup() {
   bindGroupDesc.layout = currentPipeline->bindGroupLayout();
   bindGroupDesc.entryCount = entries.size();
   bindGroupDesc.entries = entries.data();
-  emscripten_console_logf("[WebGPU BindGroup] Creating with %zu entries, layout=%p", entries.size(),
-                          static_cast<void*>(bindGroupDesc.layout));
   for (size_t i = 0; i < entries.size(); i++) {
-    emscripten_console_logf(
-        "[WebGPU BindGroup] Entry[%zu]: binding=%u buf=%p tv=%p samp=%p off=%zu sz=%zu", i,
-        entries[i].binding, static_cast<void*>(entries[i].buffer),
-        static_cast<void*>(entries[i].textureView), static_cast<void*>(entries[i].sampler),
-        static_cast<size_t>(entries[i].offset), static_cast<size_t>(entries[i].size));
   }
   auto bindGroup = wgpuDeviceCreateBindGroup(_gpu->device(), &bindGroupDesc);
-  emscripten_console_logf("[WebGPU BindGroup] Result: %p", static_cast<void*>(bindGroup));
   if (bindGroup != nullptr) {
     wgpuRenderPassEncoderSetBindGroup(passEncoder, 0, bindGroup, 0, nullptr);
     wgpuBindGroupRelease(bindGroup);
@@ -289,28 +257,19 @@ void WebGPURenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
   auto topology = ToWGPUPrimitiveTopology(primitiveType);
   auto wgpuPipeline = currentPipeline->webgpuRenderPipeline(topology);
   wgpuRenderPassEncoderSetPipeline(passEncoder, wgpuPipeline);
-  emscripten_console_logf("[WebGPU Draw] vertexCount=%u instanceCount=%u topology=%d", vertexCount,
-                          instanceCount, static_cast<int>(topology));
   updateBindGroup();
   wgpuRenderPassEncoderDraw(passEncoder, vertexCount, instanceCount, firstVertex, firstInstance);
-  emscripten_console_logf("[WebGPU Draw] Done");
 }
 
 void WebGPURenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCount,
                                    uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
                                    uint32_t firstInstance) {
   if (passEncoder == nullptr || currentPipeline == nullptr) {
-    emscripten_console_logf(
-        "[WebGPU DrawIndexed] SKIPPED: encoder=%p pipeline=%p", static_cast<void*>(passEncoder),
-        currentPipeline ? static_cast<void*>(currentPipeline->webgpuRenderPipeline()) : nullptr);
     return;
   }
   auto topology = ToWGPUPrimitiveTopology(primitiveType);
   auto wgpuPipeline = currentPipeline->webgpuRenderPipeline(topology);
   wgpuRenderPassEncoderSetPipeline(passEncoder, wgpuPipeline);
-  emscripten_console_logf(
-      "[WebGPU DrawIndexed] indexCount=%u instanceCount=%u baseVertex=%d topology=%d", indexCount,
-      instanceCount, baseVertex, static_cast<int>(topology));
   updateBindGroup();
   wgpuRenderPassEncoderDrawIndexed(passEncoder, indexCount, instanceCount, firstIndex, baseVertex,
                                    firstInstance);

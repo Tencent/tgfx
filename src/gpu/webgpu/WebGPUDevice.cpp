@@ -23,13 +23,8 @@
 
 namespace tgfx {
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdollar-in-identifier-extension"
-
 std::shared_ptr<WebGPUDevice> WebGPUDevice::Make() {
-  EM_ASM({ console.log("[WebGPU] WebGPUDevice::Make() called"); }, 0);
   auto wgpuDevice = emscripten_webgpu_get_device();
-  EM_ASM({ console.log("[WebGPU] emscripten_webgpu_get_device() returned:", $0); }, wgpuDevice);
   if (wgpuDevice == nullptr) {
     return nullptr;
   }
@@ -37,13 +32,10 @@ std::shared_ptr<WebGPUDevice> WebGPUDevice::Make() {
   if (gpu == nullptr) {
     return nullptr;
   }
-  EM_ASM({ console.log("[WebGPU] WebGPUDevice created successfully"); }, 0);
   auto device = std::shared_ptr<WebGPUDevice>(new WebGPUDevice(std::move(gpu)));
   device->weakThis = device;
   return device;
 }
-
-#pragma clang diagnostic pop
 
 std::shared_ptr<WebGPUDevice> WebGPUDevice::MakeFrom(void* device) {
   if (device == nullptr) {
