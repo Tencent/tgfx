@@ -17,9 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/filters/GaussianBlurImageFilter.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/Paint.h"
+#include "tgfx/core/PictureRecorder.h"
+#include "tgfx/core/Shader.h"
+#include "tgfx/core/TileMode.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/TextLayer.h"
 #include "tgfx/layers/filters/BlendFilter.h"
@@ -31,6 +37,7 @@
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/layers/layerstyles/NoiseStyle.h"
+#include "tgfx/layers/vectors/ImagePattern.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -470,348 +477,294 @@ TGFX_TEST(LayerFilterTest, ScaledRectWithInnerShadow) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/ScaledRectWithInnerShadow"));
 }
 
-// Verify MonoNoiseFilter + BlurFilter combination: blur first, then noise overlay.
-// Also verify that DropShadowStyle is not affected by the filters.
-TGFX_TEST(LayerFilterTest, MonoNoiseFilterWithBlur) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 300, 300);
-  auto displayList = std::make_unique<DisplayList>();
+enum class NoiseMode { Mono, Duo, Multi };
 
-  // White background.
-  auto back = SolidLayer::Make();
-  back->setColor(Color::White());
-  back->setWidth(300);
-  back->setHeight(300);
-
-  // Shape layer with a colored rect.
-  auto layer = ShapeLayer::Make();
-  layer->setMatrix(Matrix::MakeTrans(50, 50));
-  Path path;
-  path.addRoundRect(Rect::MakeWH(200, 200), 20, 20);
-  layer->setPath(path);
-  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
-
-  // DropShadow style (Below) — should NOT be affected by filters.
-  auto shadow = DropShadowStyle::Make(8, 8, 5, 5, Color::Black());
-  layer->setLayerStyles({shadow});
-
-  // Blur + Noise filters. Noise executes after blur in the compose chain.
-  auto blur = BlurFilter::Make(3, 3);
-  auto noise =
-      NoiseFilter::MakeMono(6.0f, 0.5f, Color::FromRGBA(0, 0, 0, 128), 42.0f, BlendMode::Multiply);
-  layer->setFilters({blur, noise});
-
-  back->addChild(layer);
-  displayList->root()->addChild(back);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseFilterWithBlur"));
-
-  // Change noise blend mode to Screen.
-  noise->setBlendMode(BlendMode::Screen);
-  noise->setColor(Color::FromRGBA(200, 200, 200, 180));
-  noise->setDensity(0.7f);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseFilterWithBlur_Screen"));
-
-  // Noise only, no blur.
-  layer->setFilters({noise});
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseFilterOnly"));
-}
-
-// Verify DuoNoiseFilter overlays two complementary noise layers on the input image.
-TGFX_TEST(LayerFilterTest, DuoNoiseFilter) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 300, 300);
-  auto displayList = std::make_unique<DisplayList>();
-
-  auto back = SolidLayer::Make();
-  back->setColor(Color::White());
-  back->setWidth(300);
-  back->setHeight(300);
-
-  auto layer = ShapeLayer::Make();
-  layer->setMatrix(Matrix::MakeTrans(50, 50));
-  Path path;
-  path.addRoundRect(Rect::MakeWH(200, 200), 20, 20);
-  layer->setPath(path);
-  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
-
-  auto noise = NoiseFilter::MakeDuo(6.0f, 0.5f, Color::FromRGBA(0, 0, 0, 128),
-                                    Color::FromRGBA(255, 255, 255, 128), 42.0f, BlendMode::SrcOver);
-  layer->setFilters({noise});
-
-  back->addChild(layer);
-  displayList->root()->addChild(back);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/DuoNoiseFilter"));
-}
-
-enum class NoiseFilterSweepType { Mono, Duo, Multi };
-
-static std::shared_ptr<LayerFilter> MakeDensitySweepFilter(NoiseFilterSweepType type,
-                                                           float density) {
-  switch (type) {
-    case NoiseFilterSweepType::Mono:
-      return NoiseFilter::MakeMono(25.0f, density, Color::FromRGBA(255, 0, 0, 128), 42.0f,
-                                   BlendMode::SrcOver);
-    case NoiseFilterSweepType::Duo:
-      return NoiseFilter::MakeDuo(25.0f, density, Color::FromRGBA(255, 0, 0, 128),
-                                  Color::FromRGBA(0, 0, 255, 128), 42.0f, BlendMode::SrcOver);
-    case NoiseFilterSweepType::Multi:
-      return NoiseFilter::MakeMulti(25.0f, density, 1.0f, 42.0f, BlendMode::SrcOver);
+// Builds a NoiseFilter with the given mode using a fixed cosmetic palette so the
+// Filter and Style baselines can be visually compared.
+static std::shared_ptr<LayerFilter> MakeNoiseFilter(NoiseMode mode, float size, float density,
+                                                    BlendMode blendMode = BlendMode::SrcOver) {
+  switch (mode) {
+    case NoiseMode::Mono:
+      return NoiseFilter::MakeMono(size, density, Color::FromRGBA(255, 0, 0, 128), 42.0f,
+                                   blendMode);
+    case NoiseMode::Duo:
+      return NoiseFilter::MakeDuo(size, density, Color::FromRGBA(255, 0, 0, 128),
+                                  Color::FromRGBA(0, 0, 255, 128), 42.0f, blendMode);
+    case NoiseMode::Multi:
+      return NoiseFilter::MakeMulti(size, density, 1.0f, 42.0f, blendMode);
   }
   return nullptr;
 }
 
-static void RenderNoiseFilterDensitySweep(Context* context, NoiseFilterSweepType type,
-                                          const std::string& keyPrefix) {
-  constexpr float size = 1000.0f;
-  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
-  ASSERT_TRUE(typeface != nullptr);
-  Font font(typeface, 300.0f);
-  auto density = 0.5f;
-  auto surface = Surface::Make(context, static_cast<int>(size), static_cast<int>(size));
-  ASSERT_TRUE(surface != nullptr);
-  auto displayList = std::make_unique<DisplayList>();
-
-  auto back = SolidLayer::Make();
-  back->setColor(Color::White());
-  back->setWidth(size);
-  back->setHeight(size);
-
-  auto layer = TextLayer::Make();
-  layer->setText("text");
-  layer->setFont(font);
-  layer->setTextColor(Color::FromRGBA(60, 120, 200));
-  auto textBounds = layer->getBounds(nullptr, true);
-  layer->setMatrix(
-      Matrix::MakeTrans(size * 0.5f - textBounds.centerX(), size * 0.5f - textBounds.centerY()));
-
-  auto noise = MakeDensitySweepFilter(type, density);
-  ASSERT_TRUE(noise != nullptr);
-  layer->setFilters({noise});
-
-  back->addChild(layer);
-  displayList->root()->addChild(back);
-  displayList->render(surface.get());
-
-  EXPECT_TRUE(Baseline::Compare(surface, keyPrefix));
-}
-
-TGFX_TEST(LayerFilterTest, MonoNoiseFilterDensitySweep) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  RenderNoiseFilterDensitySweep(context, NoiseFilterSweepType::Mono,
-                                "LayerFilterTest/MonoNoiseFilterDensitySweep");
-}
-
-TGFX_TEST(LayerFilterTest, DuoNoiseFilterDensitySweep) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  RenderNoiseFilterDensitySweep(context, NoiseFilterSweepType::Duo,
-                                "LayerFilterTest/DuoNoiseFilterDensitySweep");
-}
-
-TGFX_TEST(LayerFilterTest, MultiNoiseFilterDensitySweep) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  RenderNoiseFilterDensitySweep(context, NoiseFilterSweepType::Multi,
-                                "LayerFilterTest/MultiNoiseFilterDensitySweep");
-}
-
-// Verify MultiNoiseFilter preserves original Perlin noise RGB with enhanced contrast.
-TGFX_TEST(LayerFilterTest, MultiNoiseFilter) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 300, 300);
-  auto displayList = std::make_unique<DisplayList>();
-
-  auto back = SolidLayer::Make();
-  back->setColor(Color::White());
-  back->setWidth(300);
-  back->setHeight(300);
-
-  auto layer = ShapeLayer::Make();
-  layer->setMatrix(Matrix::MakeTrans(50, 50));
-  Path path;
-  path.addRoundRect(Rect::MakeWH(200, 200), 20, 20);
-  layer->setPath(path);
-  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
-
-  auto noise = NoiseFilter::MakeMulti(6.0f, 0.5f, 0.3f, 42.0f, BlendMode::SrcOver);
-  layer->setFilters({noise});
-
-  back->addChild(layer);
-  displayList->root()->addChild(back);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/MultiNoiseFilter"));
-}
-
-TGFX_TEST(LayerFilterTest, MonoNoiseStyle) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 345, 304);
-  auto displayList = std::make_unique<DisplayList>();
-
-  auto layer = ShapeLayer::Make();
-  Path path;
-  path.addRect(Rect::MakeWH(345, 304));
-  layer->setPath(path);
-  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(217, 217, 217)));
-
-  auto noise = NoiseStyle::MakeMono(4, 0.51f, Color{0.0f, 0.0f, 0.0f, 0.25f}, 6903);
-  layer->setLayerStyles({noise});
-
-  displayList->root()->addChild(layer);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/MonoNoiseStyle"));
-}
-
-TGFX_TEST(LayerFilterTest, DuoNoiseStyle) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 345, 304);
-  auto displayList = std::make_unique<DisplayList>();
-
-  auto layer = ShapeLayer::Make();
-  Path path;
-  path.addRect(Rect::MakeWH(345, 304));
-  layer->setPath(path);
-  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(217, 217, 217)));
-
-  auto noise = NoiseStyle::MakeDuo(4, 0.51f, Color{0.0f, 0.0f, 0.0f, 0.25f},
-                                   Color{1.0f, 1.0f, 1.0f, 0.25f}, 6903);
-  layer->setLayerStyles({noise});
-
-  displayList->root()->addChild(layer);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/DuoNoiseStyle"));
-}
-
-TGFX_TEST(LayerFilterTest, MultiNoiseStyle) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 345, 304);
-  auto displayList = std::make_unique<DisplayList>();
-
-  auto layer = ShapeLayer::Make();
-  Path path;
-  path.addRect(Rect::MakeWH(345, 304));
-  layer->setPath(path);
-  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(217, 217, 217)));
-
-  auto noise = NoiseStyle::MakeMulti(4, 0.51f, 0.15f, 6903);
-  layer->setLayerStyles({noise});
-
-  displayList->root()->addChild(layer);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/MultiNoiseStyle"));
-}
-
-TGFX_TEST(LayerFilterTest, NoiseStyleBlendMode) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 300, 300);
-  auto displayList = std::make_unique<DisplayList>();
-
-  auto layer = ShapeLayer::Make();
-  layer->setMatrix(Matrix::MakeTrans(50, 50));
-  Path path;
-  path.addRoundRect(Rect::MakeWH(200, 200), 20, 20);
-  layer->setPath(path);
-  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(100, 150, 200)));
-
-  auto noise = NoiseStyle::MakeMono(4, 0.5f, Color{0.0f, 0.0f, 0.0f, 0.5f}, 6903);
-  noise->setBlendMode(BlendMode::Overlay);
-  layer->setLayerStyles({noise});
-
-  displayList->root()->addChild(layer);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseStyleBlendMode"));
-}
-
-// NoiseFilterMovingText test migrated from NoiseFilterTest.cpp
-TGFX_TEST(LayerFilterTest, NoiseFilterMovingText) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 500, 500);
-  ASSERT_TRUE(surface != nullptr);
-  auto displayList = std::make_unique<DisplayList>();
-
-  auto back = SolidLayer::Make();
-  back->setColor(Color::White());
-  back->setWidth(500);
-  back->setHeight(500);
-
-  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
-  ASSERT_TRUE(typeface != nullptr);
-
-  auto noise =
-      NoiseFilter::MakeMono(10.0f, 0.5f, Color::FromRGBA(0, 0, 0, 128), 42.0f, BlendMode::SrcOver);
-
-  auto textLayer = TextLayer::Make();
-  textLayer->setText("filter");
-  textLayer->setFont(Font(typeface, 70.f));
-  textLayer->setTextColor(Color::FromRGBA(192, 192, 192, 255));
-  textLayer->setFilters({noise});
-  back->addChild(textLayer);
-  displayList->root()->addChild(back);
-
-  for (int i = 0; i < 8; i++) {
-    surface->getCanvas()->clear();
-    textLayer->setMatrix(Matrix::MakeTrans(50.f + static_cast<float>(i) * 20.f, 50.f));
-    displayList->render(surface.get());
+static std::shared_ptr<NoiseStyle> MakeNoiseStyle(NoiseMode mode, float size, float density) {
+  switch (mode) {
+    case NoiseMode::Mono:
+      return NoiseStyle::MakeMono(size, density, Color::FromRGBA(255, 0, 0, 128), 42.0f);
+    case NoiseMode::Duo:
+      return NoiseStyle::MakeDuo(size, density, Color::FromRGBA(255, 0, 0, 128),
+                                 Color::FromRGBA(0, 0, 255, 128), 42.0f);
+    case NoiseMode::Multi:
+      return NoiseStyle::MakeMulti(size, density, 1.0f, 42.0f);
   }
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseFilterMovingText"));
+  return nullptr;
 }
 
-// Verify blend mode with MonoNoise filter.
-TGFX_TEST(LayerFilterTest, NoiseFilterBlendMode) {
+static std::shared_ptr<ShapeLayer> MakeFilledRect(const Rect& rect, const Color& color) {
+  auto layer = ShapeLayer::Make();
+  Path path;
+  path.addRect(rect);
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(color));
+  return layer;
+}
+
+// 3 (Mono/Duo/Multi) x 2 (Filter/Style) grid. Each cell renders a colored rect with the
+// corresponding noise applied. Covers the basic pixel output of all six combinations in one
+// baseline.
+TGFX_TEST(LayerFilterTest, BasicMonoDuoMulti) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto rectSize = 200.0f;
-  auto padding = 50.0f;
-  auto surfaceSize = static_cast<int>(rectSize + padding * 2.0f);
-  auto surface = Surface::Make(context, surfaceSize, surfaceSize);
+  constexpr float CellW = 200.0f;
+  constexpr float CellH = 200.0f;
+  constexpr float Padding = 20.0f;
+  constexpr int Cols = 3;
+  constexpr int Rows = 2;
+  auto width = static_cast<int>(Padding * (Cols + 1) + CellW * Cols);
+  auto height = static_cast<int>(Padding * (Rows + 1) + CellH * Rows);
+  auto surface = Surface::Make(context, width, height);
   ASSERT_TRUE(surface != nullptr);
   auto displayList = std::make_unique<DisplayList>();
 
   auto back = SolidLayer::Make();
   back->setColor(Color::White());
-  back->setWidth(static_cast<float>(surfaceSize));
-  back->setHeight(static_cast<float>(surfaceSize));
+  back->setWidth(static_cast<float>(width));
+  back->setHeight(static_cast<float>(height));
   displayList->root()->addChild(back);
 
-  auto layer = ShapeLayer::Make();
-  layer->setMatrix(Matrix::MakeTrans(padding, padding));
-  Path path;
-  path.addRoundRect(Rect::MakeWH(rectSize, rectSize), 20, 20);
-  layer->setPath(path);
-  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
-  auto filter =
-      NoiseFilter::MakeMono(6.0f, 1.0f, Color::FromRGBA(0, 0, 0, 128), 42.0f, BlendMode::SrcOver);
-  ASSERT_TRUE(filter != nullptr);
-  layer->setFilters({filter});
-  back->addChild(layer);
+  NoiseMode modes[Cols] = {NoiseMode::Mono, NoiseMode::Duo, NoiseMode::Multi};
+  auto fill = Color::FromRGBA(60, 120, 200);
+  for (int row = 0; row < Rows; ++row) {
+    bool useFilter = (row == 0);
+    for (int col = 0; col < Cols; ++col) {
+      auto cell = MakeFilledRect(Rect::MakeWH(CellW, CellH), fill);
+      cell->setMatrix(Matrix::MakeTrans(Padding + static_cast<float>(col) * (CellW + Padding),
+                                        Padding + static_cast<float>(row) * (CellH + Padding)));
+      if (useFilter) {
+        cell->setFilters({MakeNoiseFilter(modes[col], 6.0f, 0.5f)});
+      } else {
+        cell->setLayerStyles({MakeNoiseStyle(modes[col], 6.0f, 0.5f)});
+      }
+      back->addChild(cell);
+    }
+  }
 
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/NoiseFilterBlendMode_Mono_SrcOver"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/BasicMonoDuoMulti"));
+}
+
+// 6 rows (Mono/Duo/Multi x Filter/Style) x N density columns. Verifies the density transition
+// is monotonic and produces a stable visual sweep for all modes / both consumers.
+TGFX_TEST(LayerFilterTest, DensitySweep) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr float CellW = 160.0f;
+  constexpr float CellH = 160.0f;
+  constexpr float Padding = 20.0f;
+  constexpr int Cols = 5;  // density values
+  constexpr int Rows = 6;  // 3 modes x 2 (filter, style)
+  const float densities[Cols] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
+  auto width = static_cast<int>(Padding * (Cols + 1) + CellW * Cols);
+  auto height = static_cast<int>(Padding * (Rows + 1) + CellH * Rows);
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto back = SolidLayer::Make();
+  back->setColor(Color::White());
+  back->setWidth(static_cast<float>(width));
+  back->setHeight(static_cast<float>(height));
+  displayList->root()->addChild(back);
+
+  NoiseMode modes[3] = {NoiseMode::Mono, NoiseMode::Duo, NoiseMode::Multi};
+  auto fill = Color::FromRGBA(60, 120, 200);
+  for (int row = 0; row < Rows; ++row) {
+    int modeIndex = row / 2;
+    bool useFilter = (row % 2) == 0;
+    for (int col = 0; col < Cols; ++col) {
+      auto cell = MakeFilledRect(Rect::MakeWH(CellW, CellH), fill);
+      cell->setMatrix(Matrix::MakeTrans(Padding + static_cast<float>(col) * (CellW + Padding),
+                                        Padding + static_cast<float>(row) * (CellH + Padding)));
+      if (useFilter) {
+        cell->setFilters({MakeNoiseFilter(modes[modeIndex], 12.0f, densities[col])});
+      } else {
+        cell->setLayerStyles({MakeNoiseStyle(modes[modeIndex], 12.0f, densities[col])});
+      }
+      back->addChild(cell);
+    }
+  }
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/DensitySweep"));
+}
+
+// Covers blend mode parity between NoiseFilter and NoiseStyle. Two rows: top = Filter,
+// bottom = Style; columns iterate through SrcOver / Multiply / Screen / Overlay.
+TGFX_TEST(LayerFilterTest, BlendMode) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr float CellW = 180.0f;
+  constexpr float CellH = 180.0f;
+  constexpr float Padding = 20.0f;
+  constexpr int Cols = 4;
+  constexpr int Rows = 2;
+  const BlendMode modes[Cols] = {BlendMode::SrcOver, BlendMode::Multiply, BlendMode::Screen,
+                                 BlendMode::Overlay};
+  auto width = static_cast<int>(Padding * (Cols + 1) + CellW * Cols);
+  auto height = static_cast<int>(Padding * (Rows + 1) + CellH * Rows);
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto back = SolidLayer::Make();
+  back->setColor(Color::White());
+  back->setWidth(static_cast<float>(width));
+  back->setHeight(static_cast<float>(height));
+  displayList->root()->addChild(back);
+
+  auto fill = Color::FromRGBA(100, 150, 200);
+  for (int col = 0; col < Cols; ++col) {
+    {
+      auto cell = MakeFilledRect(Rect::MakeWH(CellW, CellH), fill);
+      cell->setMatrix(
+          Matrix::MakeTrans(Padding + static_cast<float>(col) * (CellW + Padding), Padding));
+      cell->setFilters({MakeNoiseFilter(NoiseMode::Mono, 6.0f, 1.0f, modes[col])});
+      back->addChild(cell);
+    }
+    {
+      auto cell = MakeFilledRect(Rect::MakeWH(CellW, CellH), fill);
+      cell->setMatrix(Matrix::MakeTrans(Padding + static_cast<float>(col) * (CellW + Padding),
+                                        Padding * 2.0f + CellH));
+      auto style = MakeNoiseStyle(NoiseMode::Mono, 6.0f, 1.0f);
+      style->setBlendMode(modes[col]);
+      cell->setLayerStyles({style});
+      back->addChild(cell);
+    }
+  }
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/BlendMode"));
+}
+
+// Renders the layer at two positions back-to-back under tiled rendering. The first frame
+// populates the tile cache; the second frame exercises tile reuse with shifted geometry. If the
+// noise pattern were anchored to the input image origin (or to a stale tile-cache origin) rather
+// than to the layer geometry, the second frame would show seams or drift in the cached tiles.
+// The baseline captures the second frame only.
+TGFX_TEST(LayerFilterTest, AnchorStability) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr int Width = 600;
+  constexpr int Height = 300;
+  auto surface = Surface::Make(context, Width, Height);
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileSize(64);
+
+  auto back = Layer::Make();
+  displayList->root()->addChild(back);
+
+  // Top half: layer with NoiseFilter.
+  auto filterLayer = MakeFilledRect(Rect::MakeWH(150.0f, 100.0f), Color::FromRGBA(60, 120, 200));
+  filterLayer->setFilters({MakeNoiseFilter(NoiseMode::Mono, 8.0f, 0.5f)});
+  back->addChild(filterLayer);
+
+  // Bottom half: layer with NoiseStyle.
+  auto styleLayer = MakeFilledRect(Rect::MakeWH(150.0f, 100.0f), Color::FromRGBA(60, 120, 200));
+  styleLayer->setLayerStyles({MakeNoiseStyle(NoiseMode::Mono, 8.0f, 0.5f)});
+  back->addChild(styleLayer);
+
+  filterLayer->setMatrix(Matrix::MakeTrans(0, 30.0f));
+  styleLayer->setMatrix(Matrix::MakeTrans(0, 170.0f));
+  const float positions[2] = {30.0f, 230.0f};
+  for (auto offsetX : positions) {
+    filterLayer->setMatrix(Matrix::MakeTrans(offsetX, 30.0f));
+    styleLayer->setMatrix(Matrix::MakeTrans(offsetX, 170.0f));
+    displayList->render(surface.get(), false);
+    context->flush();
+  }
+
+  // diff anchor
+  auto path = filterLayer->path();
+  path.transform(Matrix::MakeTrans(200.f, 0));
+  filterLayer->setPath(path);
+
+  path = styleLayer->path();
+  path.transform(Matrix::MakeTrans(200.f, 0));
+  styleLayer->setPath(path);
+
+  displayList->render(surface.get(), false);
+  context->flush();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/AnchorStability"));
+}
+
+// Verifies noise correctly composes with a preceding BlurFilter and a sibling DropShadowStyle.
+// Top row: NoiseFilter chained after Blur, with a DropShadowStyle. Bottom row: NoiseStyle
+// composed on top of the same DropShadowStyle. Confirms the filter chain order and layer style
+// stacking remain visually correct after the noise feature lands.
+TGFX_TEST(LayerFilterTest, WithBlurAndShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr int Width = 600;
+  constexpr int Height = 300;
+  auto surface = Surface::Make(context, Width, Height);
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto back = SolidLayer::Make();
+  back->setColor(Color::White());
+  back->setWidth(static_cast<float>(Width));
+  back->setHeight(static_cast<float>(Height));
+  displayList->root()->addChild(back);
+
+  auto fill = Color::FromRGBA(60, 120, 200);
+
+  // Filter side: Blur -> NoiseFilter chain, with DropShadow style.
+  {
+    auto layer = MakeFilledRect(Rect::MakeWH(180.0f, 180.0f), fill);
+    layer->setMatrix(Matrix::MakeTrans(60.0f, 60.0f));
+    auto blur = BlurFilter::Make(3.0f, 3.0f);
+    auto noise = NoiseFilter::MakeMono(6.0f, 0.5f, Color::FromRGBA(0, 0, 0, 128), 42.0f,
+                                       BlendMode::Multiply);
+    layer->setFilters({blur, noise});
+    auto shadow = DropShadowStyle::Make(8.0f, 8.0f, 5.0f, 5.0f, Color::Black());
+    layer->setLayerStyles({shadow});
+    back->addChild(layer);
+  }
+
+  // Style side: NoiseStyle stacked with DropShadow style.
+  {
+    auto layer = MakeFilledRect(Rect::MakeWH(180.0f, 180.0f), fill);
+    layer->setMatrix(Matrix::MakeTrans(360.0f, 60.0f));
+    auto noise = NoiseStyle::MakeMono(6.0f, 0.5f, Color::FromRGBA(0, 0, 0, 128), 42.0f);
+    auto shadow = DropShadowStyle::Make(8.0f, 8.0f, 5.0f, 5.0f, Color::Black());
+    layer->setLayerStyles({noise, shadow});
+    back->addChild(layer);
+  }
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/WithBlurAndShadow"));
 }
 
 }  // namespace tgfx
