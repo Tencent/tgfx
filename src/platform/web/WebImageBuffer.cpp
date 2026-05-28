@@ -17,13 +17,39 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebImageBuffer.h"
-#include "gpu/opengl/GLTexture.h"
 #include "gpu/resources/TextureView.h"
+#include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/gpu/CommandQueue.h"
+#include "tgfx/gpu/GPU.h"
 
 using namespace emscripten;
 
 namespace tgfx {
+
+static std::shared_ptr<Data> CopyPixelsFromNativeImage(const val& nativeImage, int width,
+                                                       int height) {
+  auto data = val::module_property("tgfx").call<val>("readImagePixels",
+                                                     val::module_property("module"), nativeImage,
+                                                     width, height);
+  if (!data.as<bool>()) {
+    return nullptr;
+  }
+  auto length = data["length"].as<size_t>();
+  if (length == 0) {
+    return nullptr;
+  }
+  Buffer buffer(length);
+  if (buffer.isEmpty()) {
+    return nullptr;
+  }
+  auto memory = val::module_property("HEAPU8")["buffer"];
+  auto memoryView =
+      val::global("Uint8Array").new_(memory, reinterpret_cast<uintptr_t>(buffer.data()), length);
+  memoryView.call<void>("set", data);
+  return buffer.release();
+}
+
 std::shared_ptr<WebImageBuffer> WebImageBuffer::MakeFrom(emscripten::val nativeImage) {
   if (!nativeImage.as<bool>()) {
     return nullptr;
@@ -64,32 +90,44 @@ WebImageBuffer::~WebImageBuffer() {
   }
 }
 
-bool WebImageBuffer::uploadToTexture(std::shared_ptr<Texture> texture, int offsetX,
-                                     int offsetY) const {
-  if (texture == nullptr || !nativeImage.as<bool>()) {
+bool WebImageBuffer::uploadToTexture(std::shared_ptr<Texture> texture, CommandQueue* queue,
+                                     int offsetX, int offsetY) const {
+  if (texture == nullptr || queue == nullptr || !nativeImage.as<bool>()) {
     return false;
   }
-  auto glTexture = std::static_pointer_cast<GLTexture>(texture);
-  val::module_property("tgfx").call<void>("uploadToTexture", val::module_property("GL"),
-                                          nativeImage, glTexture->textureID(), offsetX, offsetY,
-                                          _alphaOnly);
+  auto pixelData = CopyPixelsFromNativeImage(getImage(), _width, _height);
+  if (pixelData == nullptr) {
+    return false;
+  }
+  auto rect = Rect::MakeXYWH(offsetX, offsetY, _width, _height);
+  if (_alphaOnly) {
+    // Canvas 2D always returns RGBA data. Extract the alpha channel for R8 texture upload.
+    auto pixelCount = static_cast<size_t>(_width) * static_cast<size_t>(_height);
+    Buffer alphaBuffer(pixelCount);
+    auto src = static_cast<const uint8_t*>(pixelData->data());
+    auto dst = static_cast<uint8_t*>(alphaBuffer.data());
+    for (size_t i = 0; i < pixelCount; i++) {
+      dst[i] = src[i * 4 + 3];
+    }
+    auto rowBytes = static_cast<size_t>(_width);
+    queue->writeTexture(texture, rect, alphaBuffer.data(), rowBytes);
+  } else {
+    auto rowBytes = static_cast<size_t>(_width) * 4;
+    queue->writeTexture(texture, rect, pixelData->data(), rowBytes);
+  }
   return true;
 }
 
 std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, bool) const {
-  std::shared_ptr<TextureView> textureView = nullptr;
-  if (_alphaOnly) {
-    textureView = TextureView::MakeAlpha(context, width(), height(), nullptr, 0);
-  } else {
-    textureView = TextureView::MakeRGBA(context, width(), height(), nullptr, 0);
-  }
-  if (textureView == nullptr) {
+  auto pixelData = CopyPixelsFromNativeImage(getImage(), _width, _height);
+  if (pixelData == nullptr) {
     return nullptr;
   }
-  auto glTexture = std::static_pointer_cast<GLTexture>(textureView->getTexture());
-  val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          getImage(), glTexture->textureID(), 0, 0, _alphaOnly);
-  return textureView;
+  auto rowBytes = static_cast<size_t>(_width) * 4;
+  if (_alphaOnly) {
+    return TextureView::MakeAlpha(context, _width, _height, pixelData->data(), rowBytes);
+  }
+  return TextureView::MakeRGBA(context, _width, _height, pixelData->data(), rowBytes);
 }
 
 emscripten::val WebImageBuffer::getImage() const {
