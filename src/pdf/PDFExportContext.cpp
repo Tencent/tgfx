@@ -777,6 +777,12 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
 }
 
 std::shared_ptr<Data> PDFExportContext::getContent() {
+  // Close any graphic-state stack frames that ScopedContentEntry left open. finishContentEntry()
+  // intentionally skips drainStack() for regular blend modes so that consecutive draws can reuse
+  // the same activeStackState (and avoid re-emitting clip / cm sequences). The residual q's must
+  // still be balanced before the stream is sealed into a Form XObject or page content stream.
+  activeStackState.drainStack();
+  activeStackState = PDFGraphicStackState();
   if (content->bytesWritten() == 0) {
     return Data::MakeEmpty();
   }
