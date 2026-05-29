@@ -18,8 +18,11 @@
 
 #include <hb-subset.h>
 #include <hb.h>
+#include <cstring>
 #include "base/TGFXTest.h"
 #include "core/utils/MD5.h"
+#include "pdf/PDFDocumentImpl.h"
+#include "pdf/PDFTypes.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
@@ -1102,6 +1105,170 @@ TGFX_TEST(PDFExportTest, ImageDeduplicationCrossPage) {
   PDFStream->flush();
 
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ImageDeduplicationCrossPage"));
+}
+
+// Direct unit-test fixture for PDFStreamOut. Builds a minimal PDFDocumentImpl whose underlying
+// WriteStream is a MemoryWriteStream we own, runs PDFStreamOut on the supplied input, and returns
+// the raw bytes that were emitted for the single stream object. The fixture does not call
+// beginPage / endPage, so the document remains in BetweenPages state and ~PDFDocumentImpl exits
+// cleanly via the empty-pages branch in onClose.
+namespace {
+struct EmittedStream {
+  std::shared_ptr<Data> bytes;
+  PDFIndirectReference ref;
+};
+
+EmittedStream RunPDFStreamOut(const std::string& input,
+                              PDFMetadata::CompressionLevel compressionLevel,
+                              PDFSteamCompressionEnabled compressFlag) {
+  auto sink = MemoryWriteStream::Make();
+  PDFMetadata metadata;
+  metadata.compressionLevel = compressionLevel;
+  PDFDocumentImpl doc(sink, /*context=*/nullptr, metadata);
+  // PDFStreamOut routes through emitStream, which records object offsets via offsetMap. The full
+  // PDFDocument pipeline initializes baseOffset inside SerializeHeader during the first
+  // onBeginPage call; this fixture skips beginPage entirely, so initialize the offset map here so
+  // the DEBUG_ASSERT inside Difference does not fire.
+  doc.offsetMap.markStartOfDocument(sink);
+
+  auto inputData = Data::MakeWithCopy(input.data(), input.size());
+  auto inputStream = Stream::MakeFromData(inputData);
+
+  auto dict = PDFDictionary::Make();
+  PDFIndirectReference ref =
+      PDFStreamOut(std::move(dict), std::move(inputStream), &doc, compressFlag);
+  return EmittedStream{sink->readData(), ref};
+}
+
+// Searches `bytes` for the byte sequence `needle` and returns its start offset, or
+// std::string::npos if not found.
+size_t IndexOf(const std::shared_ptr<Data>& bytes, const char* needle) {
+  size_t needleSize = std::strlen(needle);
+  if (bytes == nullptr || needleSize == 0 || bytes->size() < needleSize) {
+    return std::string::npos;
+  }
+  const auto* base = static_cast<const uint8_t*>(bytes->data());
+  size_t size = bytes->size();
+  for (size_t i = 0; i + needleSize <= size; ++i) {
+    if (memcmp(base + i, needle, needleSize) == 0) {
+      return i;
+    }
+  }
+  return std::string::npos;
+}
+
+// Parses an unsigned decimal integer starting at `offset` in `bytes`, stopping at the first
+// non-digit. Returns the parsed value; sets *consumed to the number of bytes consumed (0 if no
+// digit was found).
+size_t ParseUnsigned(const std::shared_ptr<Data>& bytes, size_t offset, size_t* consumed) {
+  const auto* base = static_cast<const uint8_t*>(bytes->data());
+  size_t size = bytes->size();
+  size_t value = 0;
+  size_t i = offset;
+  while (i < size && base[i] >= '0' && base[i] <= '9') {
+    value = value * 10 + static_cast<size_t>(base[i] - '0');
+    ++i;
+  }
+  *consumed = i - offset;
+  return value;
+}
+
+// Reads "/Length <N>" from the emitted bytes and returns N. Fails the current test if the entry
+// is missing or malformed.
+size_t ReadDeclaredLength(const std::shared_ptr<Data>& bytes) {
+  size_t at = IndexOf(bytes, "/Length ");
+  if (at == std::string::npos) {
+    ADD_FAILURE() << "Emitted stream does not contain a '/Length ' entry.";
+    return 0;
+  }
+  size_t consumed = 0;
+  size_t value = ParseUnsigned(bytes, at + std::strlen("/Length "), &consumed);
+  if (consumed == 0) {
+    ADD_FAILURE() << "Emitted stream's /Length entry is not followed by a decimal integer.";
+    return 0;
+  }
+  return value;
+}
+
+// Returns the byte count between the "stream\n" marker and the "\nendstream" marker — i.e. the
+// number of bytes that PDFDocumentImpl::emitStream actually wrote between the keywords. /Length
+// must equal this value (ISO 32000-1 §7.3.8.2).
+size_t MeasureActualPayload(const std::shared_ptr<Data>& bytes) {
+  size_t streamAt = IndexOf(bytes, "stream\n");
+  size_t endstreamAt = IndexOf(bytes, "\nendstream");
+  if (streamAt == std::string::npos || endstreamAt == std::string::npos ||
+      endstreamAt <= streamAt) {
+    ADD_FAILURE() << "Emitted bytes do not contain a complete stream/endstream pair.";
+    return 0;
+  }
+  size_t payloadStart = streamAt + std::strlen("stream\n");
+  return endstreamAt - payloadStart;
+}
+}  // namespace
+
+// Bug 1 unit test, compressed branch. Drives PDFStreamOut with input large enough that
+// FlateDecode actually saves bytes; expects /Length to equal the compressed payload size, not the
+// original input size. This is the case the PR fix targets directly.
+TGFX_TEST(PDFExportTest, PDFStreamOutWritesCompressedLength) {
+  // Highly redundant input compresses well; the 4096-byte block reliably exceeds MinimumSavings.
+  std::string input(4096, 'A');
+  auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default,
+                                 PDFSteamCompressionEnabled::Yes);
+
+  EXPECT_NE(IndexOf(emitted.bytes, "/Filter /FlateDecode"), std::string::npos)
+      << "Compressed branch should emit /Filter /FlateDecode.";
+
+  size_t declared = ReadDeclaredLength(emitted.bytes);
+  size_t actual = MeasureActualPayload(emitted.bytes);
+
+  EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes (ISO 32000-1 "
+                                 "§7.3.8.2). declared="
+                              << declared << " actual=" << actual;
+  EXPECT_LT(declared, input.size())
+      << "Compressed payload should be smaller than the uncompressed input; otherwise the test "
+         "input is not exercising the compression path.";
+}
+
+// Bug 1 unit test, uncompressed branch (compression disabled by metadata). /Length must equal the
+// input size and no /Filter entry should be emitted.
+TGFX_TEST(PDFExportTest, PDFStreamOutWritesUncompressedLength) {
+  std::string input = "Hello, PDF stream length test.";
+  auto emitted =
+      RunPDFStreamOut(input, PDFMetadata::CompressionLevel::None, PDFSteamCompressionEnabled::Yes);
+
+  EXPECT_EQ(IndexOf(emitted.bytes, "/Filter"), std::string::npos)
+      << "Uncompressed branch must not emit a /Filter entry.";
+
+  size_t declared = ReadDeclaredLength(emitted.bytes);
+  size_t actual = MeasureActualPayload(emitted.bytes);
+
+  EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes. declared="
+                              << declared << " actual=" << actual;
+  EXPECT_EQ(declared, input.size());
+}
+
+// Bug 1 unit test, "compression refused" branch: input is too short or too random for FlateDecode
+// to save MinimumSavings bytes, so SerializeStream falls back to writing the raw bytes. The
+// pre-fix code wrote the original input size into /Length unconditionally, so the bug surfaces in
+// this branch as well — making sure /Length still matches the actually-emitted payload (== input
+// size, since no Filter is written).
+TGFX_TEST(PDFExportTest, PDFStreamOutFallsBackWhenCompressionDoesNotSave) {
+  // 8 bytes is well under MinimumSavings (= strlen("/Filter_/FlateDecode_") = 21), so
+  // SerializeStream skips the deflate path entirely.
+  std::string input = "abcdefgh";
+  auto emitted = RunPDFStreamOut(input, PDFMetadata::CompressionLevel::Default,
+                                 PDFSteamCompressionEnabled::Yes);
+
+  EXPECT_EQ(IndexOf(emitted.bytes, "/Filter"), std::string::npos)
+      << "Short input below MinimumSavings should bypass FlateDecode.";
+
+  size_t declared = ReadDeclaredLength(emitted.bytes);
+  size_t actual = MeasureActualPayload(emitted.bytes);
+
+  EXPECT_EQ(declared, actual) << "/Length must match the actual payload bytes even when the "
+                                 "compression path is skipped. declared="
+                              << declared << " actual=" << actual;
+  EXPECT_EQ(declared, input.size());
 }
 
 }  // namespace tgfx
