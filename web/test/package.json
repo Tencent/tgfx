@@ -3,13 +3,19 @@
   "version": "1.0.0",
   "description": "TGFX Web Test Runner",
   "scripts": {
-    "build": "emcmake cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -- -j 8 && npm run copy",
-    "build:debug": "emcmake cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build -- -j 8 && npm run copy",
-    "copy": "cp build/tgfx-test.js build/tgfx-test.wasm build/tgfx-test.data . 2>/dev/null || true; cp ../lib/tgfx.esm.js . 2>/dev/null || true",
+    "build": "npm run build:webgl",
+    "build:webgl": "bash ../setup_emsdk.sh emcmake cmake -B build-webgl -DCMAKE_BUILD_TYPE=Release && cmake --build build-webgl -- -j 8 && npm run copy:webgl",
+    "build:webgpu": "bash ../setup_emsdk.sh emcmake cmake -B build-webgpu -DCMAKE_BUILD_TYPE=Release -DTGFX_USE_WEBGPU=ON && cmake --build build-webgpu -- -j 8 && npm run copy:webgpu",
+    "build:debug": "bash ../setup_emsdk.sh emcmake cmake -B build-webgl -DCMAKE_BUILD_TYPE=Debug && cmake --build build-webgl -- -j 8 && npm run copy:webgl",
+    "build:webgpu:debug": "bash ../setup_emsdk.sh emcmake cmake -B build-webgpu -DCMAKE_BUILD_TYPE=Debug -DTGFX_USE_WEBGPU=ON && cmake --build build-webgpu -- -j 8 && npm run copy:webgpu",
+    "copy:webgl": "cp build-webgl/tgfx-test.js build-webgl/tgfx-test.wasm build-webgl/tgfx-test.data . 2>/dev/null || true; cp ../lib/tgfx.esm.js . 2>/dev/null || true",
+    "copy:webgpu": "cp build-webgpu/tgfx-test.js build-webgpu/tgfx-test.wasm build-webgpu/tgfx-test.data . 2>/dev/null || true; cp ../lib/tgfx.esm.js . 2>/dev/null || true",
     "serve": "npx http-server -p 8082 -c-1",
-    "test": "npm run build && npm run serve",
+    "test": "npm run test:webgl",
+    "test:webgl": "npm run build:webgl && node run_test.js",
+    "test:webgpu": "npm run build:webgpu && node run_test.js",
     "autotest": "node run_test.js",
-    "clean": "rm -rf build tgfx-test.js tgfx-test.wasm tgfx-test.data"
+    "clean": "rm -rf build-webgl build-webgpu tgfx-test.js tgfx-test.wasm tgfx-test.data"
   },
   "devDependencies": {
     "adm-zip": "^0.5.16",

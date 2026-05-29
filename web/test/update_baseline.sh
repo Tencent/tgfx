@@ -14,9 +14,14 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Auto-detect emsdk if not already active
+if [ -z "$EMSDK" ]; then
+    source "$SCRIPT_DIR/../setup_emsdk.sh"
+fi
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WEB_TEST_DIR="$SCRIPT_DIR"
-BUILD_DIR="$WEB_TEST_DIR/build"
+BUILD_DIR="$WEB_TEST_DIR/build-webgl"
 
 cd "$PROJECT_ROOT"
 
@@ -48,9 +53,9 @@ echo ""
 echo "Building web tests on main (UPDATE_BASELINE mode)..."
 cd "$WEB_TEST_DIR"
 rm -rf "$BUILD_DIR"
-emcmake cmake -B build -DCMAKE_BUILD_TYPE=Release -DTGFX_UPDATE_BASELINE=ON
-cmake --build build -- -j 8
-npm run copy
+emcmake cmake -B build-webgl -DCMAKE_BUILD_TYPE=Release -DTGFX_UPDATE_BASELINE=ON
+cmake --build build-webgl -- -j 8
+npm run copy:webgl
 
 echo ""
 echo "Running web tests on main..."

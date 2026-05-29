@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 project(TGFXWebTest)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/check_emscripten.cmake)
+
 set(CMAKE_CXX_STANDARD 17)
 
 if (NOT CMAKE_BUILD_TYPE)
@@ -128,11 +130,9 @@ endif ()
 # Asyncify enables synchronous C++ code to await JS Promises.
 # Required for WebGPU buffer.mapAsync() which is fully async. Without Asyncify, readPixels() will
 # timeout because the WASM busy-wait blocks the JS event loop preventing callbacks from firing.
-# Asyncify automatically instruments all code to allow suspend/resume at await points,
-# making it compatible with Google Test's virtual function dispatch (unlike JSPI which requires
-# explicit export declarations and fails with indirect calls).
-option(TGFX_USE_ASYNCIFY "Enable Asyncify for WebGPU async buffer mapping" ON)
-if (TGFX_USE_ASYNCIFY)
+# Only enabled for WebGPU builds. WebGL readPixels is synchronous and does not need Asyncify.
+# Enabling Asyncify on WebGL causes function signature mismatch crashes in indirect calls.
+if (TGFX_USE_WEBGPU)
     # Asyncify is needed to synchronously wait for WebGPU async buffer mapping.
     # ASYNCIFY_REMOVE excludes shader compilation libraries (shaderc, glslang, tint, spvtools)
     # from instrumentation. These are pure CPU computation and never participate in async

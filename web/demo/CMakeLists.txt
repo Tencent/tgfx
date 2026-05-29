@@ -2,13 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 project(Hello2D)
 
-if (DEFINED EMSCRIPTEN AND TGFX_USE_WEBGPU)
-    if (EMSCRIPTEN_VERSION VERSION_GREATER_EQUAL "5.0.0")
-        message(FATAL_ERROR "WebGPU backend requires emsdk <= 4.x (found ${EMSCRIPTEN_VERSION}). "
-            "Homebrew emscripten 5.x removed -sUSE_WEBGPU support. "
-            "Please run: source <path-to-emsdk>/emsdk_env.sh")
-    endif ()
-endif ()
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/check_emscripten.cmake)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../hello2d/include)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -35,12 +29,6 @@ if (DEFINED EMSCRIPTEN)
     list(APPEND H2D_LINK_OPTIONS --no-entry -lembind -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0 -sEXPORT_NAME='Hello2D' -sWASM=1
             ${H2D_GRAPHICS_OPTIONS} -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'] -sMODULARIZE=1
             -sENVIRONMENT=web,worker -sEXPORT_ES6=1)
-    set(unsupported_emsdk_versions "4.0.11")
-    foreach (unsupported_version IN LISTS unsupported_emsdk_versions)
-        if (${EMSCRIPTEN_VERSION} VERSION_EQUAL ${unsupported_version})
-            message(FATAL_ERROR "Emscripten version ${EMSCRIPTEN_VERSION} is not supported.")
-        endif ()
-    endforeach ()
     if (EMSCRIPTEN_PTHREADS)
         list(APPEND H2D_LINK_OPTIONS -sUSE_PTHREADS=1 -sINITIAL_MEMORY=32MB -sALLOW_MEMORY_GROWTH=1
                 -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency -sPROXY_TO_PTHREAD=1
