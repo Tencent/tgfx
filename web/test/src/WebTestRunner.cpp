@@ -23,7 +23,13 @@
 
 static bool initialized = false;
 
-static const char* excludeFilter = "-BackgroundBlurTest.BackgroundBlur";
+// Asyncify (WebGPU only) causes function signature mismatch in BackgroundBlurTest due to
+// instrumentation of deep virtual call chains. Exclude the entire suite for WebGPU builds.
+#ifdef TGFX_USE_ASYNCIFY
+static const char* excludeFilter = "-BackgroundBlurTest.*:CanvasTest.FlushSemaphore";
+#else
+static const char* excludeFilter = "";
+#endif
 
 static void initTests() {
   if (initialized) {
@@ -34,8 +40,9 @@ static void initTests() {
   const char* argv[] = {"tgfx-test"};
   testing::AddGlobalTestEnvironment(new tgfx::TestEnvironment());
   testing::InitGoogleTest(&argc, const_cast<char**>(argv));
-  // Exclude tests that depend on platform-specific native image codecs unavailable in Emscripten.
-  testing::GTEST_FLAG(filter) = excludeFilter;
+  if (excludeFilter[0] != '\0') {
+    testing::GTEST_FLAG(filter) = excludeFilter;
+  }
 }
 
 extern "C" {
@@ -50,8 +57,12 @@ EMSCRIPTEN_KEEPALIVE
 int RunTest(const char* filter) {
   initTests();
   if (filter != nullptr && filter[0] != '\0') {
-    testing::GTEST_FLAG(filter) = std::string(filter) + ":" + excludeFilter;
-  } else {
+    if (excludeFilter[0] != '\0') {
+      testing::GTEST_FLAG(filter) = std::string(filter) + ":" + excludeFilter;
+    } else {
+      testing::GTEST_FLAG(filter) = filter;
+    }
+  } else if (excludeFilter[0] != '\0') {
     testing::GTEST_FLAG(filter) = excludeFilter;
   }
   return RUN_ALL_TESTS();

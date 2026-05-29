@@ -72,8 +72,8 @@ bool VideoElement::onUpdateTexture(std::shared_ptr<TextureView> textureView) {
   auto wgpuTexture = webgpuTexture->webgpuTexture();
   auto w = webgpuTexture->width();
   auto h = webgpuTexture->height();
-  val::module_property("tgfx").call<void>("uploadVideoToWebGPUTexture", source, val(wgpuTexture), w,
-                                          h);
+  val::module_property("tgfx").call<void>("uploadVideoToWebGPUTexture", source,
+                                          reinterpret_cast<uintptr_t>(wgpuTexture), w, h);
 #else
   auto glTexture = std::static_pointer_cast<GLTexture>(textureView->getTexture());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
