@@ -178,8 +178,8 @@ EAGLDevice::~EAGLDevice() {
   // following [_eaglContext release] could crash inside _gleTerminateContext when GLEngine cleans
   // up its internal program/shader hash tables on a stale sharegroup.
   EAGLContext* previousContext = [[EAGLContext currentContext] retain];
-  bool madeCurrent = previousContext == _eaglContext ||
-                     [EAGLContext setCurrentContext:_eaglContext];
+  bool madeCurrent =
+      previousContext == _eaglContext || [EAGLContext setCurrentContext:_eaglContext];
   releaseAll();
   if (madeCurrent) {
     // Flush any pending GL deletions issued by releaseAll() so that the EAGLContext can be
