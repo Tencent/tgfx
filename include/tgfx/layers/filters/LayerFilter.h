@@ -36,10 +36,9 @@ class LayerFilter : public LayerProperty {
    * Applies this filter to the given input image at the specified scale factor.
    * @param input The source image to filter.
    * @param scale The scale factor to apply to scale-dependent filter parameters.
-   * @param contentBounds The layer content bounds, expressed in the input image coordinate space
-   * (the input image origin is the coordinate origin). Filters whose effect is anchored to the
-   * layer geometry use this rectangle to recover the anchor regardless of how the input image is
-   * clipped relative to the content bounds.
+   * @param contentBounds The layer content bounds adjusted into the current input image coordinate
+   * space. Filters whose effect is anchored to the layer geometry use this rectangle to recover the
+   * anchor regardless of how the input image is clipped relative to the content bounds.
    * @param offset If non-null, receives the (x, y) translation of the filtered image relative to
    * the input image origin.
    * @return The filtered image, or nullptr on failure.

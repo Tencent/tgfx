@@ -17,17 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
+#include "gpu/resources/TextureView.h"
 
 namespace tgfx {
 
 PerlinNoiseFragmentProcessor::PerlinNoiseFragmentProcessor(
     PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
     std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
-    std::shared_ptr<Texture> permutationsTexture, std::shared_ptr<Texture> noiseTexture,
+    std::shared_ptr<TextureView> permutationsView, std::shared_ptr<TextureView> noiseView,
     const Matrix* uvMatrix)
     : FragmentProcessor(ClassID()), noiseType(noiseType), numOctaves(numOctaves),
       stitchTiles(stitchTiles), paintingData(std::move(paintingData)),
-      permutationsTexture(std::move(permutationsTexture)), noiseTexture(std::move(noiseTexture)) {
+      permutationsView(std::move(permutationsView)), noiseView(std::move(noiseView)) {
   if (uvMatrix) {
     coordTransform = CoordTransform(*uvMatrix);
   }
@@ -50,9 +51,9 @@ void PerlinNoiseFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) con
 
 std::shared_ptr<Texture> PerlinNoiseFragmentProcessor::onTextureAt(size_t index) const {
   if (index == 0) {
-    return permutationsTexture;
+    return permutationsView->getTexture();
   }
-  return noiseTexture;
+  return noiseView->getTexture();
 }
 
 SamplerState PerlinNoiseFragmentProcessor::onSamplerStateAt(size_t) const {
