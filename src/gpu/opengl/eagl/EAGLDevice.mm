@@ -35,9 +35,20 @@ static DeviceRegistry& GetRegistry() {
   return *registry;
 }
 
-void ApplicationWillResignActive() {
-  // Set applicationInBackground to true first to ensure that no new GL operation is generated
-  // during the callback process.
+void ApplicationDidEnterBackground() {
+  // The application has actually transitioned to the background. Per Apple's documentation,
+  // executing OpenGL ES commands from this point on will cause iOS to terminate the process,
+  // so:
+  //   1) Close the gate first to make sure no new GL commands can be produced from this point on.
+  //   2) Then call glFinish() on every active device to flush any commands that were already in
+  //      flight when the gate was closed, so that they complete on the GPU before the app is
+  //      actually suspended.
+  //
+  // These two steps must happen together at exactly the same lifecycle event. If the gate were
+  // closed earlier (e.g. on applicationWillResignActive:) but glFinish() were performed there as
+  // well, new GL commands generated between the flush and the actual transition into background
+  // (e.g. by CADisplayLink callbacks during the inactive period) could still slip through and be
+  // executed by the GPU after the app is suspended, which would terminate the process.
   appInBackground = true;
   std::vector<std::shared_ptr<EAGLDevice>> devices = {};
   {
@@ -56,7 +67,19 @@ void ApplicationWillResignActive() {
   }
 }
 
+void ApplicationWillEnterForeground() {
+  // The application is leaving the background. OpenGL ES calls become legal again, so reopen
+  // the gate immediately.
+  appInBackground = false;
+}
+
 void ApplicationDidBecomeActive() {
+  // Also reopen the gate here for safety: the cold-launch path posts only didBecomeActive
+  // (without willEnterForeground), so this is the canonical place to ensure the gate is open
+  // while the application is active. Then defer the deletion of EAGLDevices that became
+  // unreferenced while the app was backgrounded until the application is fully active again.
+  // Doing it here (rather than in applicationWillEnterForeground:) avoids issuing GL deletions
+  // while UIKit is still mid-way through restoring the scene.
   appInBackground = false;
   std::vector<EAGLDevice*> delayList = {};
   auto& registry = GetRegistry();
@@ -240,8 +263,12 @@ void EAGLDevice::finish() {
 @end
 
 @implementation TGFXAppMonitor
-+ (void)applicationWillResignActive:(NSNotification*)notification {
-  tgfx::ApplicationWillResignActive();
++ (void)applicationDidEnterBackground:(NSNotification*)notification {
+  tgfx::ApplicationDidEnterBackground();
+}
+
++ (void)applicationWillEnterForeground:(NSNotification*)notification {
+  tgfx::ApplicationWillEnterForeground();
 }
 
 + (void)applicationDidBecomeActive:(NSNotification*)notification {
@@ -251,8 +278,12 @@ void EAGLDevice::finish() {
 
 static bool RegisterNotifications() {
   [[NSNotificationCenter defaultCenter] addObserver:[TGFXAppMonitor class]
-                                           selector:@selector(applicationWillResignActive:)
-                                               name:UIApplicationWillResignActiveNotification
+                                           selector:@selector(applicationDidEnterBackground:)
+                                               name:UIApplicationDidEnterBackgroundNotification
+                                             object:nil];
+  [[NSNotificationCenter defaultCenter] addObserver:[TGFXAppMonitor class]
+                                           selector:@selector(applicationWillEnterForeground:)
+                                               name:UIApplicationWillEnterForegroundNotification
                                              object:nil];
   [[NSNotificationCenter defaultCenter] addObserver:[TGFXAppMonitor class]
                                            selector:@selector(applicationDidBecomeActive:)
