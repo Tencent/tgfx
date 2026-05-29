@@ -95,18 +95,25 @@ execute_process(COMMAND git rev-parse --short HEAD
     OUTPUT_VARIABLE HEAD_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/HEAD "${HEAD_COMMIT}")
 
-# Preload web-specific baseline cache if it exists locally (from a previous test run download).
-set(CACHE_WEB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../test/baseline/.cache-web)
-set(PRELOAD_CACHE_WEB "")
-if (EXISTS ${CACHE_WEB_DIR}/md5.json AND EXISTS ${CACHE_WEB_DIR}/version.json)
-    set(PRELOAD_CACHE_WEB
-        "SHELL:--preload-file ${CACHE_WEB_DIR}/md5.json@/test/baseline/.cache-web/md5.json"
-        "SHELL:--preload-file ${CACHE_WEB_DIR}/version.json@/test/baseline/.cache-web/version.json"
+# Determine backend name for baseline cache directory.
+if (TGFX_USE_WEBGPU)
+    set(TGFX_BACKEND_NAME "webgpu")
+else ()
+    set(TGFX_BACKEND_NAME "webgl")
+endif ()
+
+# Preload backend-specific baseline cache if it exists locally (from a previous test run download).
+set(CACHE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../test/baseline/.cache/${TGFX_BACKEND_NAME})
+set(PRELOAD_CACHE "")
+if (EXISTS ${CACHE_DIR}/md5.json AND EXISTS ${CACHE_DIR}/version.json)
+    set(PRELOAD_CACHE
+        "SHELL:--preload-file ${CACHE_DIR}/md5.json@/test/baseline/.cache/${TGFX_BACKEND_NAME}/md5.json"
+        "SHELL:--preload-file ${CACHE_DIR}/version.json@/test/baseline/.cache/${TGFX_BACKEND_NAME}/version.json"
     )
 else ()
-    message(WARNING "Baseline cache not found at ${CACHE_WEB_DIR}/. "
+    message(WARNING "Baseline cache not found at ${CACHE_DIR}/. "
         "Screenshot tests will pass without actual comparison. "
-        "Run 'bash update_baseline.sh' first to generate the baseline cache from main branch.")
+        "Run './update_baseline.sh USE_WEBGL' (or USE_WEBGPU) from project root first.")
 endif ()
 
 target_compile_options(tgfx-test PRIVATE
@@ -118,6 +125,7 @@ target_compile_options(tgfx-test PRIVATE
 
 target_compile_definitions(tgfx-test PRIVATE
     GENERATE_BASELINE_IMAGES
+    TGFX_BACKEND_NAME="${TGFX_BACKEND_NAME}"
     $<$<BOOL:${TGFX_UPDATE_BASELINE}>:UPDATE_BASELINE>
     ${ASYNCIFY_COMPILE_DEFS}
 )
@@ -169,8 +177,8 @@ target_link_options(tgfx-test PRIVATE
     -sENVIRONMENT=web,worker
     "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/../../resources@/resources"
     "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/../../test/baseline/version.json@/test/baseline/version.json"
-    "SHELL:--preload-file ${CMAKE_CURRENT_BINARY_DIR}/HEAD@/test/baseline/.cache-web/HEAD"
-    ${PRELOAD_CACHE_WEB}
+    "SHELL:--preload-file ${CMAKE_CURRENT_BINARY_DIR}/HEAD@/test/baseline/.cache/${TGFX_BACKEND_NAME}/HEAD"
+    ${PRELOAD_CACHE}
 )
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")

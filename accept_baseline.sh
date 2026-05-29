@@ -58,5 +58,15 @@ for entry in "${BACKENDS[@]}"; do
 done
 
 echo ""
+echo "Step 3: Syncing version.json to web baseline caches (if they exist)..."
+for WEB_BACKEND in webgl webgpu; do
+  WEB_CACHE="test/baseline/.cache/${WEB_BACKEND}"
+  if [ -d "$WEB_CACHE" ]; then
+    cp test/baseline/version.json "$WEB_CACHE/version.json"
+    echo "  Updated $WEB_CACHE/version.json"
+  fi
+done
+
+echo ""
 echo "Baseline accepted for all local backends. Commit:"
 echo "  git add test/baseline/version.json && git commit -m 'Update baseline.'"

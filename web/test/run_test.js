@@ -11,11 +11,15 @@ const PORT = 8082;
 const TEST_URL = `http://127.0.0.1:${PORT}/index.html`;
 const TIMEOUT_MS = 10 * 60 * 1000;
 
+// Determine backend from --backend argument (default: webgl).
+const backendArg = process.argv.find(a => a.startsWith('--backend'));
+const BACKEND = backendArg ? (backendArg.includes('=') ? backendArg.split('=')[1] : process.argv[process.argv.indexOf(backendArg) + 1]) : 'webgl';
+
 // Map downloaded zip files to their extraction destinations.
 const ZIP_DESTINATIONS = {
   'baseline-out.zip': path.join(PROJECT_ROOT, 'test/baseline-out'),
   'test-out.zip': path.join(PROJECT_ROOT, 'test/out'),
-  'cache-web.zip': path.join(PROJECT_ROOT, 'test/baseline/.cache-web'),
+  'cache-web.zip': path.join(PROJECT_ROOT, `test/baseline/.cache/${BACKEND}`),
 };
 
 function startHttpServer() {
@@ -174,12 +178,12 @@ async function run() {
   }
 
   // Extract downloaded zip files to their destinations.
-  // Preserve the Metal baseline version.json so that subsequent runs still compare against Metal
+  // Preserve the existing baseline version.json so that subsequent runs still compare against
   // baselines. Merge new md5.json entries into the existing cache so that tests passing on the
   // current build are recognized as passing on the next rebuild + run cycle.
-  const cacheWebDir = path.join(PROJECT_ROOT, 'test/baseline/.cache-web');
-  const md5Path = path.join(cacheWebDir, 'md5.json');
-  const versionPath = path.join(cacheWebDir, 'version.json');
+  const cacheDir = path.join(PROJECT_ROOT, `test/baseline/.cache/${BACKEND}`);
+  const md5Path = path.join(cacheDir, 'md5.json');
+  const versionPath = path.join(cacheDir, 'version.json');
   const versionBackupPath = versionPath + '.bak';
   let existingMd5 = {};
   if (fs.existsSync(md5Path)) {
@@ -202,7 +206,7 @@ async function run() {
     }
   }
 
-  // Restore the Metal baseline version.json after cache-web.zip extraction overwrites it.
+  // Restore the baseline version.json after cache-web.zip extraction overwrites it.
   if (fs.existsSync(versionBackupPath)) {
     fs.copyFileSync(versionBackupPath, versionPath);
     fs.unlinkSync(versionBackupPath);
@@ -223,7 +227,7 @@ async function run() {
         }
       }
       fs.writeFileSync(md5Path, JSON.stringify(existingMd5, null, 4) + '\n');
-      console.log('  Merged new MD5 values into .cache-web/md5.json');
+      console.log(`  Merged new MD5 values into .cache/${BACKEND}/md5.json`);
     } catch (e) {
       console.warn('  Failed to merge MD5 values:', e.message);
     }

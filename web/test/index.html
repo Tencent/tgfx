@@ -94,7 +94,7 @@
         await downloadOutputDir(module.FS, '/test/baseline-out', 'baseline-out.zip');
         await downloadOutputDir(module.FS, '/test/out', 'test-out.zip');
         // Pack md5.json and version.json from baseline-out as cache-web.zip for reuse.
-        // Extract this zip into test/baseline/.cache-web/ to enable baseline comparison.
+        // Extract this zip into test/baseline/.cache/{backend}/ to enable baseline comparison.
         try {
             const cacheZip = new JSZip();
             const baselineOut = '/test/baseline-out';

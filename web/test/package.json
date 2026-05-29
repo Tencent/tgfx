@@ -12,9 +12,11 @@
     "copy:webgpu": "cp build-webgpu/tgfx-test.js build-webgpu/tgfx-test.wasm build-webgpu/tgfx-test.data . 2>/dev/null || true; cp ../lib/tgfx.esm.js . 2>/dev/null || true",
     "serve": "npx http-server -p 8082 -c-1",
     "test": "npm run test:webgl",
-    "test:webgl": "npm run build:webgl && node run_test.js",
-    "test:webgpu": "npm run build:webgpu && node run_test.js",
-    "autotest": "node run_test.js",
+    "test:webgl": "npm run build:webgl && node run_test.js --backend=webgl",
+    "test:webgpu": "npm run build:webgpu && node run_test.js --backend=webgpu",
+    "autotest": "npm run autotest:webgl",
+    "autotest:webgl": "node run_test.js --backend=webgl",
+    "autotest:webgpu": "node run_test.js --backend=webgpu",
     "clean": "rm -rf build-webgl build-webgpu tgfx-test.js tgfx-test.wasm tgfx-test.data"
   },
   "devDependencies": {
