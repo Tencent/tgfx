@@ -172,7 +172,28 @@ EAGLDevice::~EAGLDevice() {
     tail->cacheArrayIndex = index;
     deviceList.pop_back();
   }
+  // Force the EAGLContext to be current before releaseAll() so that any cached GPU resources
+  // (programs/shaders/textures/...) can be released via glDelete* even when the app has been
+  // reported as backgrounded. Without this, releaseAll() would skip all glDelete* calls and the
+  // following [_eaglContext release] could crash inside _gleTerminateContext when GLEngine cleans
+  // up its internal program/shader hash tables on a stale sharegroup.
+  EAGLContext* previousContext = [[EAGLContext currentContext] retain];
+  bool madeCurrent = previousContext == _eaglContext ||
+                     [EAGLContext setCurrentContext:_eaglContext];
   releaseAll();
+  if (madeCurrent) {
+    // Flush any pending GL deletions issued by releaseAll() so that the EAGLContext can be
+    // safely deallocated below.
+    glFinish();
+  }
+  // Restore the previous current context. The EAGLContext being destroyed must not remain the
+  // current context when [_eaglContext release] triggers its dealloc.
+  if (previousContext != _eaglContext) {
+    [EAGLContext setCurrentContext:previousContext];
+  } else {
+    [EAGLContext setCurrentContext:nil];
+  }
+  [previousContext release];
   [_eaglContext release];
 }
 
@@ -197,12 +218,18 @@ void EAGLDevice::onUnlockContext() {
 }
 
 bool EAGLDevice::makeCurrent(bool force) {
-  if (!force && appInBackground) {
-    return false;
-  }
   oldContext = [[EAGLContext currentContext] retain];
+  // Fast path: the EAGLContext is already current on this thread. This must be checked before
+  // the appInBackground gate so that nested locks (e.g. GLDevice::releaseAll() called from
+  // ~EAGLDevice() after the destructor has forced setCurrentContext) can still succeed even
+  // when the app has been reported as backgrounded.
   if (oldContext == _eaglContext) {
     return true;
+  }
+  if (!force && appInBackground) {
+    [oldContext release];
+    oldContext = nil;
+    return false;
   }
   if (![EAGLContext setCurrentContext:_eaglContext]) {
     [oldContext release];
