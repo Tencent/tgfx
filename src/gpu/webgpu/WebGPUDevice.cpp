@@ -19,15 +19,39 @@
 #include "tgfx/gpu/webgpu/WebGPUDevice.h"
 #include <emscripten/emscripten.h>
 #include <emscripten/html5_webgpu.h>
+#include <webgpu/webgpu.h>
 #include "WebGPUGPU.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
+
+static void OnUncapturedError(WGPUErrorType type, const char* message, void*) {
+  const char* typeStr = "Unknown";
+  switch (type) {
+    case WGPUErrorType_Validation:
+      typeStr = "Validation";
+      break;
+    case WGPUErrorType_OutOfMemory:
+      typeStr = "OutOfMemory";
+      break;
+    case WGPUErrorType_Internal:
+      typeStr = "Internal";
+      break;
+    case WGPUErrorType_DeviceLost:
+      typeStr = "DeviceLost";
+      break;
+    default:
+      break;
+  }
+  LOGE("[WebGPU] Uncaptured %s error: %s", typeStr, message ? message : "(no message)");
+}
 
 std::shared_ptr<WebGPUDevice> WebGPUDevice::Make() {
   auto wgpuDevice = emscripten_webgpu_get_device();
   if (wgpuDevice == nullptr) {
     return nullptr;
   }
+  wgpuDeviceSetUncapturedErrorCallback(wgpuDevice, OnUncapturedError, nullptr);
   auto gpu = WebGPUGPU::Make(wgpuDevice);
   if (gpu == nullptr) {
     return nullptr;
@@ -42,6 +66,7 @@ std::shared_ptr<WebGPUDevice> WebGPUDevice::MakeFrom(void* device) {
     return nullptr;
   }
   auto wgpuDevice = static_cast<WGPUDevice>(device);
+  wgpuDeviceSetUncapturedErrorCallback(wgpuDevice, OnUncapturedError, nullptr);
   auto gpu = WebGPUGPU::Make(wgpuDevice);
   if (gpu == nullptr) {
     return nullptr;
