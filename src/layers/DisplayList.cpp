@@ -441,7 +441,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   checkTileCount(surface);
   auto tileTasks = invalidateTileCaches(dirtyRegions);
   std::vector<Rect> skippedRects = {};
-  auto screenTasks = collectScreenTasks(surface, &tileTasks, &skippedRects);
+  std::vector<DrawTask> throttleScreenTasks = {};
+  auto screenTasks = collectScreenTasks(surface, &tileTasks, &skippedRects, &throttleScreenTasks);
   if (screenTasks.empty()) {
     recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
@@ -468,7 +469,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       dirtyRects.emplace_back(dirtyRect);
     }
   }
-  drawScreenTasks(std::move(screenTasks), std::move(skippedRects), surface, autoClear);
+  drawScreenTasks(std::move(screenTasks), surface, autoClear);
+  drawThrottleScreenTasks(std::move(throttleScreenTasks), std::move(skippedRects), surface);
   return dirtyRects;
 }
 
@@ -578,7 +580,8 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
 
 std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks,
-                                                      std::vector<Rect>* skippedRects) {
+                                                      std::vector<Rect>* skippedRects,
+                                                      std::vector<DrawTask>* throttleScreenTasks) {
   auto maxBudget = _maxTilesRefinedPerFrame;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
     updateMousePosition();
@@ -638,28 +641,24 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       }
       dirtyGrids.emplace_back(tileX, tileY);
     } else {
+      hasZoomBlurTiles = true;
       auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
       if (!fallbackTasks.empty()) {
         screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
-        hasZoomBlurTiles = true;
-        continue;
-      }
-      auto throttleFallback = getThrottleFallbackTasks(tileX, tileY, fallbackTileCaches);
-      if (!throttleFallback.empty()) {
-        screenTasks.insert(screenTasks.end(), throttleFallback.begin(), throttleFallback.end());
-        hasZoomBlurTiles = true;
         continue;
       }
       auto skippedRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
-      if (skippedRect.intersect(renderRect)) {
-        skippedRects->push_back(skippedRect);
-        hasZoomBlurTiles = true;
+      skippedRects->push_back(skippedRect);
+      auto throttleFallback = getThrottleFallbackTasks(tileX, tileY, fallbackTileCaches);
+      if (!throttleFallback.empty()) {
+        throttleScreenTasks->insert(throttleScreenTasks->end(), throttleFallback.begin(),
+                                    throttleFallback.end());
       }
     }
   }
   std::vector<std::shared_ptr<Tile>> freeTiles = {};
   bool continuous = false;
-  if (screenTasks.empty()) {
+  if (screenTasks.empty() && throttleScreenTasks->empty()) {
     freeTiles = createContinuousTiles(surface, endX - startX, endY - startY);
     continuous = !freeTiles.empty();
     dirtyGrids = GenerateGridTiles(startX, endX, startY, endY);
@@ -685,7 +684,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     screenTasks.emplace_back(tile, _tileSize, tileRect);
     currentTileCache->addTile(tile);
   }
-  if (continuous && !hasZoomBlurTiles) {
+  if (continuous) {
     // If we have continuous tiles, we can draw a single rectangle for the entire area.
     auto drawRect = Rect::MakeXYWH(startX * _tileSize, startY * _tileSize,
                                    (endX - startX) * _tileSize, (endY - startY) * _tileSize);
@@ -806,13 +805,20 @@ std::vector<DrawTask> DisplayList::getThrottleFallbackTasks(
   if (!tileRect.intersect(renderBounds)) {
     return {};
   }
-  // Sort fallback caches strictly by distance from currentZoomScale using ScaleRatio, so the
-  // "nearest-first + break on full coverage" logic picks the visually closest scale first.
+  // Sort fallback caches farthest-first so that nearer (higher-quality) tiles are drawn on top
+  // of farther (lower-quality) ones during rendering. When two caches have the same ScaleRatio
+  // (e.g. 0.5x and 2.0x relative to 1.0x), the upsample cache is placed before the downsample
+  // cache so the downsample output (sharper) overlays the upsample output (blurrier).
   auto orderedCaches = fallbackCaches;
   std::sort(orderedCaches.begin(), orderedCaches.end(),
             [currentZoomScale](const std::pair<float, TileCache*>& a,
                                const std::pair<float, TileCache*>& b) {
-              return ScaleRatio(a.first, currentZoomScale) < ScaleRatio(b.first, currentZoomScale);
+              auto ratioA = ScaleRatio(a.first, currentZoomScale);
+              auto ratioB = ScaleRatio(b.first, currentZoomScale);
+              if (ratioA != ratioB) {
+                return ratioA > ratioB;
+              }
+              return a.first < b.first;
             });
   std::vector<DrawTask> tasks = {};
   for (auto& [scale, tileCache] : orderedCaches) {
@@ -823,11 +829,7 @@ std::vector<DrawTask> DisplayList::getThrottleFallbackTasks(
     DEBUG_ASSERT(scaleRatio != 0.0f);
     auto zoomedRect = tileRect;
     zoomedRect.scale(scaleRatio, scaleRatio);
-    auto covering = tileCache->getTilesUnderRect(zoomedRect, true);
-    bool fullyCovered = !covering.empty();
-    if (!fullyCovered) {
-      covering = tileCache->getTilesUnderRect(zoomedRect, false);
-    }
+    auto covering = tileCache->getTilesUnderRect(zoomedRect, false);
     if (covering.empty()) {
       continue;
     }
@@ -836,9 +838,6 @@ std::vector<DrawTask> DisplayList::getThrottleFallbackTasks(
       if (drawRect.intersect(zoomedRect)) {
         tasks.emplace_back(t, _tileSize, drawRect, 1.0f / scaleRatio);
       }
-    }
-    if (fullyCovered) {
-      break;
     }
   }
   return tasks;
@@ -1017,8 +1016,8 @@ void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
   drawRootLayer(surface, clipRect, viewMatrix, true, snapshots);
 }
 
-void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
-                                  Surface* surface, bool autoClear) const {
+void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface,
+                                  bool autoClear) const {
   // Sort tasks by surface index to ensure they are drawn in batches.
   std::sort(screenTasks.begin(), screenTasks.end(),
             [](const DrawTask& a, const DrawTask& b) { return a.sourceIndex() < b.sourceIndex(); });
@@ -1043,17 +1042,6 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector
     tileRect.join(task.tileRect());
   }
 
-  // Fill skipped-tile regions with background color using the same Src-mode approach as the
-  // outer-border fill below. Must happen before the `contains` short-circuit since the
-  // bounding-box `tileRect` may "contain" screenRect while still having holes in the middle
-  // from skipped tiles.
-  if (!skippedRects.empty()) {
-    paint.setColor(_root->backgroundColor());
-    for (auto& rect : skippedRects) {
-      canvas->drawRect(rect, paint);
-    }
-  }
-
   auto screenRect = Rect::MakeWH(surface->width(), surface->height());
   screenRect.offset(-_contentOffset.x, -_contentOffset.y);
   if (tileRect.contains(screenRect)) {
@@ -1071,6 +1059,37 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector
   auto backgroundRect = GetNonIntersectingRects(screenRect, tileRect);
   for (auto& rect : backgroundRect) {
     canvas->drawRect(rect, paint);
+  }
+}
+
+void DisplayList::drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTasks,
+                                          std::vector<Rect> skippedRects, Surface* surface) const {
+  if (throttleScreenTasks.empty() && skippedRects.empty()) {
+    return;
+  }
+  auto canvas = surface->getCanvas();
+  AutoCanvasRestore autoRestore(canvas);
+  canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
+  Paint paint = {};
+  paint.setAntiAlias(false);
+  paint.setBlendMode(BlendMode::Src);
+  if (!skippedRects.empty()) {
+    paint.setColor(_root->backgroundColor());
+    for (auto& rect : skippedRects) {
+      canvas->drawRect(rect, paint);
+    }
+  }
+  if (throttleScreenTasks.empty()) {
+    return;
+  }
+  paint.setColor(Color::White());
+  static SamplingOptions linearSampling(FilterMode::Linear, MipmapMode::None);
+  for (auto& task : throttleScreenTasks) {
+    auto surfaceCache = surfaceCaches[task.sourceIndex()];
+    DEBUG_ASSERT(surfaceCache != nullptr);
+    auto image = surfaceCache->makeImageSnapshot();
+    canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), linearSampling, &paint,
+                          SrcRectConstraint::Strict);
   }
 }
 

@@ -319,7 +319,8 @@ class DisplayList {
   void recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks);
 
   std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
-                                           std::vector<Rect>* skippedRects);
+                                           std::vector<Rect>* skippedRects,
+                                           std::vector<DrawTask>* throttleScreenTasks);
 
   std::vector<std::pair<float, TileCache*>> getSortedTileCaches() const;
 
@@ -347,8 +348,10 @@ class DisplayList {
 
   void drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots) const;
 
-  void drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
-                       Surface* surface, bool autoClear) const;
+  void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear) const;
+
+  void drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTasks,
+                               std::vector<Rect> skippedRects, Surface* surface) const;
 
   void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
 
