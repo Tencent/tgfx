@@ -22,6 +22,9 @@
 #include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Surface.h"
+#ifdef TGFX_USE_WEBGPU
+#include "gpu/webgpu/WebGPUBuffer.h"
+#endif
 
 using namespace emscripten;
 namespace hello2d {
@@ -197,13 +200,20 @@ emscripten::val TGFXBaseView::startReadback(int srcX, int srcY, int width, int h
   // flush. For WebGPU, we need to expose buffer info through a different path.
   // For now, use a simpler approach: call readPixels synchronously on WebGL, async on WebGPU.
 #ifdef TGFX_USE_WEBGPU
-  // Access internal buffer via the readback's proxy (requires friend or public accessor)
-  // Since we can't easily access the private proxy, we'll use a workaround:
-  // Store the readback and let finishReadback do the actual map+copy after JS awaits.
+  auto gpuBuffer = pendingReadback->getGPUBuffer(context);
+  if (gpuBuffer == nullptr) {
+    pendingReadback = nullptr;
+    device->unlock();
+    return emscripten::val::null();
+  }
   auto result = emscripten::val::object();
   result.set("width", info.width());
   result.set("height", info.height());
   result.set("rowBytes", static_cast<int>(info.rowBytes()));
+  result.set(
+      "bufferHandle",
+      reinterpret_cast<int>(static_cast<tgfx::WebGPUBuffer*>(gpuBuffer.get())->webgpuBuffer()));
+  result.set("bufferSize", static_cast<int>(gpuBuffer->size()));
   result.set("ready", false);
   device->unlock();
   return result;
@@ -246,7 +256,12 @@ emscripten::val TGFXBaseView::finishReadback() {
   }
 
 #ifdef TGFX_USE_WEBGPU
-  // JS already called mapAsync and it resolved. Now lock the mapped data.
+  // JS already called mapAsync and it resolved. Mark buffer as ready so lockPixels skips
+  // requestMapAsync (which would trigger Asyncify).
+  auto gpuBuffer = pendingReadback->getGPUBuffer(context);
+  if (gpuBuffer != nullptr) {
+    static_cast<tgfx::WebGPUBuffer*>(gpuBuffer.get())->setMapReady(true);
+  }
   auto info = pendingReadback->info();
   auto pixels =
       pendingReadback->lockPixels(context, surface->origin() == tgfx::ImageOrigin::BottomLeft);

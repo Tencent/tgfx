@@ -18,6 +18,8 @@
 
 import * as types from '../types/types';
 
+declare const Module: any;
+
 export const MIN_ZOOM = 0.001;
 export const MAX_ZOOM = 1000.0;
 
@@ -26,6 +28,8 @@ export class TGFXBaseView {
     public updateLayerTree: (drawIndex: number) => void;
     public updateZoomScaleAndOffset: (zoom: number, offsetX: number, offsetY: number) => void;
     public draw: () => void;
+    public startReadback: (x: number, y: number, w: number, h: number) => any;
+    public finishReadback: () => Uint8Array | null;
 }
 
 export class ShareData {
@@ -335,9 +339,19 @@ export async function readPixelsAsync(view: TGFXBaseView, x: number, y: number,
         // WebGL path: pixels already available
         return result.pixels;
     }
-    // WebGPU path: need to await buffer mapping in JS
-    // TODO: Expose buffer handle from C++ to enable JS-side mapAsync
-    // For now, fall back to synchronous readback via finishReadback
+    // WebGPU path: await buffer mapping in JS (no C++ stack alive)
+    const bufferHandle = result.bufferHandle;
+    const bufferSize = result.bufferSize;
+    if (bufferHandle && bufferSize > 0) {
+        const WebGPU = (Module as any).WebGPU;
+        if (WebGPU) {
+            const gpuBuffer = WebGPU.mgrBuffer.get(bufferHandle);
+            if (gpuBuffer) {
+                await gpuBuffer.mapAsync(1 /* GPUMapMode.READ */, 0, bufferSize);
+            }
+        }
+    }
+    // Phase C: copy mapped data to Uint8Array
     const pixels = view.finishReadback();
     return pixels;
 }

@@ -46,6 +46,14 @@ class WebGPUBuffer : public GPUBuffer, public WebGPUResource {
    */
   void requestMapAsync() override;
 
+  /**
+   * Marks the buffer as mapped (ready for map() call). Used by external async mapping paths
+   * (e.g., JS-side mapAsync) to notify C++ that the buffer is now accessible.
+   */
+  void setMapReady(bool ready) {
+    mapReady = ready;
+  }
+
   void onRelease(WebGPUGPU* gpu) override;
 
  private:

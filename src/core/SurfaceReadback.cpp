@@ -21,6 +21,7 @@
 #include "core/utils/Log.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/GPUBuffer.h"
 
 namespace tgfx {
 SurfaceReadback::~SurfaceReadback() {
@@ -122,5 +123,21 @@ void SurfaceReadback::unlockPixels(Context* context) {
   auto readbackBuffer = proxy->getBuffer();
   DEBUG_ASSERT(readbackBuffer != nullptr);
   readbackBuffer->gpuBuffer()->unmap();
+}
+
+std::shared_ptr<GPUBuffer> SurfaceReadback::getGPUBuffer(Context* context) const {
+  if (context != proxy->getContext()) {
+    LOGE("SurfaceReadback::getGPUBuffer() Context mismatch!");
+    return nullptr;
+  }
+  auto readbackBuffer = proxy->getBuffer();
+  if (readbackBuffer == nullptr) {
+    context->flushAndSubmit(false);
+    readbackBuffer = proxy->getBuffer();
+    if (readbackBuffer == nullptr) {
+      return nullptr;
+    }
+  }
+  return readbackBuffer->gpuBuffer();
 }
 }  // namespace tgfx

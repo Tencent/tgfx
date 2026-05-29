@@ -22,6 +22,7 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+class GPUBuffer;
 class GPUBufferProxy;
 
 /**
@@ -67,6 +68,13 @@ class SurfaceReadback {
    * pointer returned by lockPixels() is no longer valid.
    */
   void unlockPixels(Context* context);
+
+  /**
+   * Returns the underlying GPU buffer used for readback. This is useful for platforms that need
+   * to perform async buffer mapping externally (e.g., WebGPU's mapAsync via JavaScript Promise).
+   * May trigger a flush if the buffer has not been created yet. Returns nullptr on failure.
+   */
+  std::shared_ptr<GPUBuffer> getGPUBuffer(Context* context) const;
 
  private:
   ImageInfo _info = {};
