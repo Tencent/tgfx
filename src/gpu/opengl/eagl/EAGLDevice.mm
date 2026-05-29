@@ -68,27 +68,40 @@ void ApplicationDidEnterBackground() {
 }
 
 void ApplicationWillEnterForeground() {
-  // The application is leaving the background. OpenGL ES calls become legal again, so reopen
-  // the gate immediately.
+  // The application is about to return to the foreground. OpenGL ES calls are legal again from
+  // this point on, so:
+  //   1) Drain delayPurgeList first, while the gate is still closed. EAGLDevice instances whose
+  //      reference count reached zero during the background period were parked on this list
+  //      because deleting them would have issued GL commands (e.g. glDeleteTextures from
+  //      releaseAll()) at a moment when GL was forbidden. Now is the right time to actually
+  //      delete them.
+  //   2) Open the gate only after the purge has completed.
+  //
+  // The ordering matters: if the gate were opened first, render threads could observe
+  // appInBackground == false, acquire an EAGLDevice via GLDevice::Current()/Make(), and start
+  // issuing GL commands on this thread's context while we are concurrently destroying other
+  // EAGLDevices on the same sharegroup (each ~EAGLDevice() switches the current context to run
+  // releaseAll()). Draining first guarantees that no GL deletion races with any new rendering
+  // work scheduled after the gate opens.
+  std::vector<EAGLDevice*> delayList = {};
+  {
+    auto& registry = GetRegistry();
+    std::lock_guard<std::mutex> autoLock(registry.deviceLocker);
+    std::swap(delayList, registry.delayPurgeList);
+  }
+  for (auto& device : delayList) {
+    delete device;
+  }
   appInBackground = false;
 }
 
 void ApplicationDidBecomeActive() {
-  // Also reopen the gate here for safety: the cold-launch path posts only didBecomeActive
-  // (without willEnterForeground), so this is the canonical place to ensure the gate is open
-  // while the application is active. Then defer the deletion of EAGLDevices that became
-  // unreferenced while the app was backgrounded until the application is fully active again.
-  // Doing it here (rather than in applicationWillEnterForeground:) avoids issuing GL deletions
-  // while UIKit is still mid-way through restoring the scene.
+  // Cold-launch is the only lifecycle path where applicationWillEnterForeground: is not
+  // delivered (the system posts didBecomeActive: directly), so this is the canonical fallback
+  // for opening the gate. delayPurgeList is necessarily empty on the cold-launch path because
+  // no EAGLDevice could have been registered, then released, before the process had even
+  // started, so no purge step is needed here.
   appInBackground = false;
-  std::vector<EAGLDevice*> delayList = {};
-  auto& registry = GetRegistry();
-  registry.deviceLocker.lock();
-  std::swap(delayList, registry.delayPurgeList);
-  registry.deviceLocker.unlock();
-  for (auto& device : delayList) {
-    delete device;
-  }
 }
 
 void* GLDevice::CurrentNativeHandle() {
