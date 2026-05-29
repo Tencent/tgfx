@@ -108,12 +108,7 @@ void ResourceCache::purgeResourcesByLRU(bool scratchResourceOnly,
     if (satisfied(resource)) {
       break;
     }
-    // A resource still tracked by a UniqueKey is a named cache entry callers expect to look up by
-    // key, not an anonymous scratch buffer. Skip it during the scratch-expiration sweep so a brief
-    // drop in external references does not silently invalidate it; the byte-capacity sweep below
-    // still reclaims it via downgrade or deletion when memory pressure demands it.
-    if (scratchResourceOnly &&
-        (resource->hasExternalReferences() || !resource->uniqueKey.empty())) {
+    if (scratchResourceOnly && resource->hasExternalReferences()) {
       item++;
       continue;
     }
