@@ -24,6 +24,7 @@ import {EmscriptenGL, TGFX, WindowColorSpace} from './types';
 import type {wx} from './wechat/interfaces';
 
 declare const wx: wx;
+declare const Module: any;
 
 export const createImage = (source: string) => {
     return new Promise<HTMLImageElement | null>((resolve) => {
@@ -178,6 +179,32 @@ export const releaseNativeImage = (source: TexImageSource | OffscreenCanvas) => 
 export const getBytesFromPath = async (module: TGFX, path: string) => {
     const buffer = await fetch(path).then((res) => res.arrayBuffer());
     return new Uint8Array(buffer);
+};
+
+export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr: number,
+                                           width: number, height: number) => {
+    if (!source || !texturePtr) {
+        return;
+    }
+    syncVideoFrame(source);
+    // Emscripten maps WGPUTexture C pointers to JS GPUTexture objects via WebGPU.mgrTexture.
+    const WebGPU = (Module as any).WebGPU;
+    if (!WebGPU) {
+        return;
+    }
+    const gpuTexture = WebGPU.mgrTexture.get(texturePtr);
+    if (!gpuTexture) {
+        return;
+    }
+    const device = (Module as any).preinitializedWebGPUDevice as GPUDevice;
+    if (!device || !device.queue) {
+        return;
+    }
+    device.queue.copyExternalImageToTexture(
+        {source: source},
+        {texture: gpuTexture, premultipliedAlpha: true},
+        [width, height]
+    );
 };
 
 export {getCanvas2D as createCanvas2D};
