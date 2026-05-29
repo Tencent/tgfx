@@ -209,10 +209,11 @@ cd emsdk && ./emsdk install 4.0.15 && ./emsdk activate 4.0.15
 source ./emsdk_env.sh
 ```
 
-> **Note:** `brew install emscripten` installs version 5.x which removed `-sUSE_WEBGPU` support.
-> Always use emsdk with the version above. The build scripts (`web/setup_emsdk.sh`) will
-> auto-detect emsdk at `~/emsdk`, `/opt/emsdk`, or `~/.emsdk`. If your emsdk is elsewhere,
-> either run `source <path-to-emsdk>/emsdk_env.sh` manually or set the `EMSDK` environment variable.
+> **Note:** Emscripten >= 4.0.18 removed `-sUSE_WEBGPU` in favor of `--use-port=emdawnwebgpu`.
+> Always use emsdk 4.0.15 (the last version with working `-sUSE_WEBGPU`) until the project
+> migrates to emdawnwebgpu. The build scripts (`web/setup_emsdk.sh`) will auto-detect emsdk
+> at `~/emsdk`, `/opt/emsdk`, or `~/.emsdk`. If your emsdk is elsewhere, either run
+> `source <path-to-emsdk>/emsdk_env.sh` manually or set the `EMSDK` environment variable.
 
 To get started, go to the `web/` directory and run the following command to install the necessary
 node modules:

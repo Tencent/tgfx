@@ -4,7 +4,7 @@
 
 ## 前置要求
 
-- [emsdk](https://github.com/emscripten-core/emsdk) 4.0.15（安装后无需每次手动 source，构建脚本会自动检测 `~/emsdk`、`/opt/emsdk`、`~/.emsdk`）
+- [emsdk](https://github.com/emscripten-core/emsdk) 4.0.15（`-sUSE_WEBGPU` 在 4.0.18 中被移除，4.0.15 是最后一个兼容版本。安装后无需每次手动 source，构建脚本会自动检测 `~/emsdk`、`/opt/emsdk`、`~/.emsdk`）
 - Node.js >= 18
 - Chrome（autotest 模式需要，Puppeteer 会自动下载）
 

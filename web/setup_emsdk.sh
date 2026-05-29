@@ -4,6 +4,9 @@
 #
 # When sourced: sets up emsdk environment variables in the current shell.
 # When executed with arguments: activates emsdk and runs the given command.
+#
+# Version constraint: -sUSE_WEBGPU was removed in 4.0.18 in favor of --use-port=emdawnwebgpu.
+# Use emsdk 4.0.15 (the last version with working -sUSE_WEBGPU) until the project migrates.
 
 EMSDK_REQUIRED_VERSION="4.0.15"
 
@@ -28,8 +31,7 @@ fi
 # Check active Emscripten version and auto-switch if incompatible
 if command -v emcc >/dev/null 2>&1; then
     EMCC_VERSION=$(emcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-    EMCC_MAJOR=$(echo "$EMCC_VERSION" | cut -d. -f1)
-    if [ "$EMCC_MAJOR" -ge 5 ] 2>/dev/null; then
+    if [ "$EMCC_VERSION" != "$EMSDK_REQUIRED_VERSION" ]; then
         echo "Active Emscripten is ${EMCC_VERSION}, switching to ${EMSDK_REQUIRED_VERSION}..."
         (
             cd "$EMSDK"
