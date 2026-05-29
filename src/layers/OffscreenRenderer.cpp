@@ -66,6 +66,8 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
   // extensions) so geometry-anchored filters such as NoiseFilter recover the layer-local anchor
   // regardless of how the input image is clipped relative to the full content bounds.
   auto inputContentBounds = layer->mapContentBoundsToImage(density.getMaxScale(), imageClip);
+  inputContentBounds.offset(-(inputContentBounds.left + imageClip.left),
+                            -(inputContentBounds.top + imageClip.top));
 
   OffscreenResult result;
   // Need a Surface backing only when a descendant Background-sourced style will read back
