@@ -1096,9 +1096,9 @@ std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float c
     return image;
   }
   // Each filter may shift the output image origin by filterOffset. Subsequent filters receive an
-  // image in the shifted coordinate system, so the contentBounds rect (originally expressed in the
-  // input image coordinate space) must be translated by -filterOffset before being passed to the
-  // next filter, otherwise geometry-anchored filters would sample in a stale coordinate system.
+  // image in the shifted coordinate system, so contentBounds must be translated by -filterOffset
+  // before being passed to the next filter, otherwise geometry-anchored filters would sample in a
+  // stale coordinate system.
   Rect currentContentBounds = contentBounds;
   for (const auto& layerFilter : _filters) {
     DEBUG_ASSERT(layerFilter != nullptr);
@@ -1429,6 +1429,8 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
   if (!_filters.empty()) {
     Point filterOffset = {};
     auto contentBounds = mapContentBoundsToImage(contentScale, pictureBounds);
+    contentBounds.offset(-(contentBounds.left + pictureBounds.left),
+                         -(contentBounds.top + pictureBounds.top));
     image = applyFilters(std::move(image), contentScale, contentBounds, &filterOffset);
     offset += filterOffset;
   }

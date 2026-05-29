@@ -144,9 +144,8 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, 
   if (_density == 0.0f) {
     return input;
   }
-  // Anchor the noise pattern to the content bounds center, expressed in input image pixel space.
-  // contentBounds is already in the input image coordinate space (see Layer::mapContentBoundsToImage),
-  // so its center is the anchor position directly without an extra scale multiplication.
+  // contentBounds has already folded in the layer-local content offset, so its center directly
+  // matches the anchor used by NoiseStyle.
   Point shift = {contentBounds.centerX(), contentBounds.centerY()};
   auto noiseShader = buildAtShift(scale, shift);
   if (noiseShader == nullptr) {
