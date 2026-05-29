@@ -31,6 +31,8 @@ class WebGLBuffer : public GLBuffer {
 
   ~WebGLBuffer() override;
 
+  bool isReady() const override;
+
   void* map(size_t offset, size_t size) override;
 
   void unmap() override;
