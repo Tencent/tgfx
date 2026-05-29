@@ -20,6 +20,7 @@ set(TGFX_BUILD_HELLO2D ON)
 set(TGFX_USE_FREETYPE ON)
 # Web platform only enables WEBP decode by default. Enable encode for baseline image generation.
 set(TGFX_USE_WEBP_ENCODE ON)
+set(TGFX_USE_JPEG_ENCODE ON)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 # Include vendor.cmake before add_subdirectory so that vendor variables (VENDOR_TOOLS_DIR,
 # PLATFORM, ARCH, etc.) are set in this scope. The include_guard(GLOBAL) in vendor.cmake
