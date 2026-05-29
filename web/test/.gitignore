@@ -1,5 +1,6 @@
 # Build artifacts
-build/
+build-webgl/
+build-webgpu/
 node_modules/
 *.log
 
