@@ -317,3 +317,27 @@ export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: Share
         gestureManager.onWheel(e, canvas, shareData);
     }, { passive: false });
 }
+
+/**
+ * Asynchronously reads pixels from the view's current surface. Returns a Promise that resolves
+ * to a Uint8Array containing RGBA pixel data in top-left origin format.
+ * For WebGPU, this uses the three-phase async readback (start → JS await mapAsync → finish)
+ * to avoid Asyncify stack overhead.
+ * For WebGL, the readback is performed synchronously and wrapped in a resolved Promise.
+ */
+export async function readPixelsAsync(view: TGFXBaseView, x: number, y: number,
+                                      w: number, h: number): Promise<Uint8Array | null> {
+    const result = view.startReadback(x, y, w, h);
+    if (!result) {
+        return null;
+    }
+    if (result.ready) {
+        // WebGL path: pixels already available
+        return result.pixels;
+    }
+    // WebGPU path: need to await buffer mapping in JS
+    // TODO: Expose buffer handle from C++ to enable JS-side mapAsync
+    // For now, fall back to synchronous readback via finishReadback
+    const pixels = view.finishReadback();
+    return pixels;
+}

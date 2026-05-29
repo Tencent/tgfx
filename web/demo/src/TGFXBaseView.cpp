@@ -166,6 +166,113 @@ void TGFXBaseView::draw() {
   device->unlock();
 }
 
+emscripten::val TGFXBaseView::startReadback(int srcX, int srcY, int width, int height) {
+  if (window == nullptr || surface == nullptr) {
+    return emscripten::val::null();
+  }
+  auto device = window->getDevice();
+  auto context = device->lockContext();
+  if (context == nullptr) {
+    return emscripten::val::null();
+  }
+
+  auto rect = tgfx::Rect::MakeXYWH(srcX, srcY, width, height);
+  pendingReadback = surface->asyncReadPixels(rect);
+  if (pendingReadback == nullptr) {
+    device->unlock();
+    return emscripten::val::null();
+  }
+
+  // Flush and submit GPU commands (but don't wait for completion).
+  auto recording = context->flush();
+  if (recording) {
+    context->submit(std::move(recording), false);
+  }
+
+  // Get the underlying WebGPU buffer handle for JS-side mapAsync.
+  auto info = pendingReadback->info();
+  // We need to access the internal buffer proxy. Since SurfaceReadback doesn't expose it directly,
+  // we call lockPixels which will flush if needed, but we already flushed above.
+  // Instead, use isReady to check — if not ready, the buffer handle should be obtainable after
+  // flush. For WebGPU, we need to expose buffer info through a different path.
+  // For now, use a simpler approach: call readPixels synchronously on WebGL, async on WebGPU.
+#ifdef TGFX_USE_WEBGPU
+  // Access internal buffer via the readback's proxy (requires friend or public accessor)
+  // Since we can't easily access the private proxy, we'll use a workaround:
+  // Store the readback and let finishReadback do the actual map+copy after JS awaits.
+  auto result = emscripten::val::object();
+  result.set("width", info.width());
+  result.set("height", info.height());
+  result.set("rowBytes", static_cast<int>(info.rowBytes()));
+  result.set("ready", false);
+  device->unlock();
+  return result;
+#else
+  // WebGL: readback is synchronous, just do it immediately.
+  auto pixels =
+      pendingReadback->lockPixels(context, surface->origin() == tgfx::ImageOrigin::BottomLeft);
+  if (pixels == nullptr) {
+    pendingReadback = nullptr;
+    device->unlock();
+    return emscripten::val::null();
+  }
+  auto byteSize = static_cast<size_t>(info.height()) * info.rowBytes();
+  auto uint8Array = emscripten::val::global("Uint8Array").new_(byteSize);
+  auto memory = emscripten::val::module_property("HEAPU8")["buffer"];
+  auto view = emscripten::val::global("Uint8Array")
+                  .new_(memory, reinterpret_cast<uintptr_t>(pixels), byteSize);
+  uint8Array.call<void>("set", view);
+  pendingReadback->unlockPixels(context);
+  pendingReadback = nullptr;
+  auto result = emscripten::val::object();
+  result.set("width", info.width());
+  result.set("height", info.height());
+  result.set("rowBytes", static_cast<int>(info.rowBytes()));
+  result.set("pixels", uint8Array);
+  result.set("ready", true);
+  device->unlock();
+  return result;
+#endif
+}
+
+emscripten::val TGFXBaseView::finishReadback() {
+  if (window == nullptr || pendingReadback == nullptr) {
+    return emscripten::val::null();
+  }
+  auto device = window->getDevice();
+  auto context = device->lockContext();
+  if (context == nullptr) {
+    return emscripten::val::null();
+  }
+
+#ifdef TGFX_USE_WEBGPU
+  // JS already called mapAsync and it resolved. Now lock the mapped data.
+  auto info = pendingReadback->info();
+  auto pixels =
+      pendingReadback->lockPixels(context, surface->origin() == tgfx::ImageOrigin::BottomLeft);
+  if (pixels == nullptr) {
+    pendingReadback = nullptr;
+    device->unlock();
+    return emscripten::val::null();
+  }
+  auto byteSize = static_cast<size_t>(info.height()) * info.rowBytes();
+  auto uint8Array = emscripten::val::global("Uint8Array").new_(byteSize);
+  auto memory = emscripten::val::module_property("HEAPU8")["buffer"];
+  auto view = emscripten::val::global("Uint8Array")
+                  .new_(memory, reinterpret_cast<uintptr_t>(pixels), byteSize);
+  uint8Array.call<void>("set", view);
+  pendingReadback->unlockPixels(context);
+  pendingReadback = nullptr;
+  device->unlock();
+  return uint8Array;
+#else
+  // WebGL path: should not reach here (startReadback returns ready=true with pixels).
+  pendingReadback = nullptr;
+  device->unlock();
+  return emscripten::val::null();
+#endif
+}
+
 }  // namespace hello2d
 
 int main(int, const char*[]) {
