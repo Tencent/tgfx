@@ -4,9 +4,11 @@
 
 ## 前置要求
 
-- [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html)（确保 `emcmake` 可用）
+- [emsdk](https://github.com/emscripten-core/emsdk) 4.0.15（安装后无需每次手动 source，构建脚本会自动检测 `~/emsdk`、`/opt/emsdk`、`~/.emsdk`）
 - Node.js >= 18
 - Chrome（autotest 模式需要，Puppeteer 会自动下载）
+
+> 如果 emsdk 不在上述默认路径，可设置环境变量 `EMSDK` 指向安装目录，或手动 `source <path>/emsdk_env.sh`。
 
 ## 快速开始
 

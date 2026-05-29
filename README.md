@@ -48,7 +48,7 @@ TGFX uses **C++17** features. Here are the minimum tools needed to build TGFX on
 - CMake 3.13.0+
 - QT 6.2.0+
 - NDK 20+ (**20.1.5948944 recommended**)
-- Emscripten 3.1.58+ 
+- Emscripten 4.0.15 (via [emsdk](https://github.com/emscripten-core/emsdk))
 
 
 Please note the following additional notices:
@@ -210,8 +210,9 @@ source ./emsdk_env.sh
 ```
 
 > **Note:** `brew install emscripten` installs version 5.x which removed `-sUSE_WEBGPU` support.
-> Always use emsdk with the version above for WebGPU builds. Remember to run
-> `source <path-to-emsdk>/emsdk_env.sh` in each new terminal session.
+> Always use emsdk with the version above. The build scripts (`web/setup_emsdk.sh`) will
+> auto-detect emsdk at `~/emsdk`, `/opt/emsdk`, or `~/.emsdk`. If your emsdk is elsewhere,
+> either run `source <path-to-emsdk>/emsdk_env.sh` manually or set the `EMSDK` environment variable.
 
 To get started, go to the `web/` directory and run the following command to install the necessary
 node modules:
