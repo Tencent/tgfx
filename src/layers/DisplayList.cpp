@@ -94,19 +94,11 @@ class DrawTask {
     }));
     auto& tile = tiles.front();
     _tileRect = drawRect.isEmpty() ? tile->getTileRect(tileSize) : drawRect;
-    // For fallback rendering, round to integers to ensure precise pixel mapping with sourceRect.
-    if (!_identityScale) {
-      _tileRect.roundOut();
-    }
     _sourceRect = _tileRect;
     auto offsetX = (tile->sourceX - tile->tileX) * tileSize;
     auto offsetY = (tile->sourceY - tile->tileY) * tileSize;
     _sourceRect.offset(static_cast<float>(offsetX), static_cast<float>(offsetY));
     _tileRect.scale(scale, scale);
-    // Round to pixel boundaries for 1:1 mapping; fallback uses linear sampling with float coords.
-    if (_identityScale) {
-      _tileRect.round();
-    }
   }
 };
 
