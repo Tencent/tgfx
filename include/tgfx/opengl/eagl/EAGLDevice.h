@@ -60,7 +60,8 @@ class EAGLDevice : public GLDevice {
   friend class GLDevice;
   friend class EAGLWindow;
 
-  friend void ApplicationWillResignActive();
+  friend void ApplicationDidEnterBackground();
+  friend void ApplicationWillEnterForeground();
   friend void ApplicationDidBecomeActive();
 };
 }  // namespace tgfx

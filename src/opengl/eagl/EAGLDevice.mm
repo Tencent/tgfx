@@ -35,9 +35,20 @@ static DeviceRegistry& GetRegistry() {
   return *registry;
 }
 
-void ApplicationWillResignActive() {
-  // Set applicationInBackground to true first to ensure that no new GL operation is generated
-  // during the callback process.
+void ApplicationDidEnterBackground() {
+  // The application has actually transitioned to the background. Per Apple's documentation,
+  // executing OpenGL ES commands from this point on will cause iOS to terminate the process,
+  // so:
+  //   1) Close the gate first to make sure no new GL commands can be produced from this point on.
+  //   2) Then call glFinish() on every active device to flush any commands that were already in
+  //      flight when the gate was closed, so that they complete on the GPU before the app is
+  //      actually suspended.
+  //
+  // These two steps must happen together at exactly the same lifecycle event. If the gate were
+  // closed earlier (e.g. on applicationWillResignActive:) but glFinish() were performed there as
+  // well, new GL commands generated between the flush and the actual transition into background
+  // (e.g. by CADisplayLink callbacks during the inactive period) could still slip through and be
+  // executed by the GPU after the app is suspended, which would terminate the process.
   appInBackground = true;
   std::vector<std::shared_ptr<EAGLDevice>> devices = {};
   {
@@ -56,16 +67,41 @@ void ApplicationWillResignActive() {
   }
 }
 
-void ApplicationDidBecomeActive() {
-  appInBackground = false;
+void ApplicationWillEnterForeground() {
+  // The application is about to return to the foreground. OpenGL ES calls are legal again from
+  // this point on, so:
+  //   1) Drain delayPurgeList first, while the gate is still closed. EAGLDevice instances whose
+  //      reference count reached zero during the background period were parked on this list
+  //      because deleting them would have issued GL commands (e.g. glDeleteTextures from
+  //      releaseAll()) at a moment when GL was forbidden. Now is the right time to actually
+  //      delete them.
+  //   2) Open the gate only after the purge has completed.
+  //
+  // The ordering matters: if the gate were opened first, render threads could observe
+  // appInBackground == false, acquire an EAGLDevice via GLDevice::Current()/Make(), and start
+  // issuing GL commands on this thread's context while we are concurrently destroying other
+  // EAGLDevices on the same sharegroup (each ~EAGLDevice() switches the current context to run
+  // releaseAll()). Draining first guarantees that no GL deletion races with any new rendering
+  // work scheduled after the gate opens.
   std::vector<EAGLDevice*> delayList = {};
-  auto& registry = GetRegistry();
-  registry.deviceLocker.lock();
-  std::swap(delayList, registry.delayPurgeList);
-  registry.deviceLocker.unlock();
+  {
+    auto& registry = GetRegistry();
+    std::lock_guard<std::mutex> autoLock(registry.deviceLocker);
+    std::swap(delayList, registry.delayPurgeList);
+  }
   for (auto& device : delayList) {
     delete device;
   }
+  appInBackground = false;
+}
+
+void ApplicationDidBecomeActive() {
+  // Cold-launch is the only lifecycle path where applicationWillEnterForeground: is not
+  // delivered (the system posts didBecomeActive: directly), so this is the canonical fallback
+  // for opening the gate. delayPurgeList is necessarily empty on the cold-launch path because
+  // no EAGLDevice could have been registered, then released, before the process had even
+  // started, so no purge step is needed here.
+  appInBackground = false;
 }
 
 void* GLDevice::CurrentNativeHandle() {
@@ -259,8 +295,12 @@ void EAGLDevice::finish() {
 @end
 
 @implementation TGFXAppMonitor
-+ (void)applicationWillResignActive:(NSNotification*)notification {
-  tgfx::ApplicationWillResignActive();
++ (void)applicationDidEnterBackground:(NSNotification*)notification {
+  tgfx::ApplicationDidEnterBackground();
+}
+
++ (void)applicationWillEnterForeground:(NSNotification*)notification {
+  tgfx::ApplicationWillEnterForeground();
 }
 
 + (void)applicationDidBecomeActive:(NSNotification*)notification {
@@ -270,8 +310,12 @@ void EAGLDevice::finish() {
 
 static bool RegisterNotifications() {
   [[NSNotificationCenter defaultCenter] addObserver:[TGFXAppMonitor class]
-                                           selector:@selector(applicationWillResignActive:)
-                                               name:UIApplicationWillResignActiveNotification
+                                           selector:@selector(applicationDidEnterBackground:)
+                                               name:UIApplicationDidEnterBackgroundNotification
+                                             object:nil];
+  [[NSNotificationCenter defaultCenter] addObserver:[TGFXAppMonitor class]
+                                           selector:@selector(applicationWillEnterForeground:)
+                                               name:UIApplicationWillEnterForegroundNotification
                                              object:nil];
   [[NSNotificationCenter defaultCenter] addObserver:[TGFXAppMonitor class]
                                            selector:@selector(applicationDidBecomeActive:)
