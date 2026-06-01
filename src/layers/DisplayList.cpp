@@ -442,7 +442,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   auto tileTasks = invalidateTileCaches(dirtyRegions);
   std::vector<Rect> skippedRects = {};
   std::vector<DrawTask> throttleScreenTasks = {};
-  auto screenTasks = collectScreenTasks(surface, &tileTasks, &skippedRects, &throttleScreenTasks);
+  auto screenTasks =
+      collectScreenTasks(surface, &tileTasks, &skippedRects, &throttleScreenTasks, autoClear);
   if (screenTasks.empty()) {
     recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
@@ -581,7 +582,8 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
 std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks,
                                                       std::vector<Rect>* skippedRects,
-                                                      std::vector<DrawTask>* throttleScreenTasks) {
+                                                      std::vector<DrawTask>* throttleScreenTasks,
+                                                      bool autoClear) {
   auto maxBudget = _maxTilesRefinedPerFrame;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
     updateMousePosition();
@@ -645,6 +647,12 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
       if (!fallbackTasks.empty()) {
         screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
+        continue;
+      }
+      // Skip throttle fallback under autoClear=false: filling skippedRects with the background
+      // color or overlaying lower-quality tiles would destroy the caller's existing canvas
+      // pixels, breaking the additive rendering contract of autoClear=false.
+      if (!autoClear) {
         continue;
       }
       skippedRects->emplace_back(

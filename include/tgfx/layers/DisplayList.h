@@ -320,7 +320,8 @@ class DisplayList {
 
   std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
                                            std::vector<Rect>* skippedRects,
-                                           std::vector<DrawTask>* throttleScreenTasks);
+                                           std::vector<DrawTask>* throttleScreenTasks,
+                                           bool autoClear);
 
   std::vector<std::pair<float, TileCache*>> getSortedTileCaches() const;
 
