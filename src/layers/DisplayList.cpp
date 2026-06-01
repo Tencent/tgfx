@@ -1083,7 +1083,11 @@ void DisplayList::drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTa
       canvas->drawRect(rect, paint);
     }
   }
-  if (throttleScreenTasks.empty()) {
+  // Skip throttle fallback tiles under autoClear=false: SrcOver blending of overlapping
+  // cross-scale tiles would let farther tiles bleed through nearer tiles wherever the nearer
+  // atlas edges have alpha < 1, producing cross-scale artifacts. The Src path is only safe
+  // under autoClear=true.
+  if (!autoClear || throttleScreenTasks.empty()) {
     return;
   }
   paint.setColor(Color::White());
