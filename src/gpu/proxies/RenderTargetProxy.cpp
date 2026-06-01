@@ -68,4 +68,11 @@ Matrix RenderTargetProxy::getOriginTransform() const {
   return result;
 }
 
+std::shared_ptr<StencilTextureResource> RenderTargetProxy::getStencil() {
+  if (stencilResource == nullptr) {
+    stencilResource = StencilTextureResource::FindOrCreate(getContext(), width(), height());
+  }
+  return stencilResource;
+}
+
 }  // namespace tgfx

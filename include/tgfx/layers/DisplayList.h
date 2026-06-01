@@ -206,19 +206,19 @@ class DisplayList {
   }
 
   /**
-   * Returns the maximum number of tiles that can be refined (updated to the current zoom scale) per
-   * frame in tiled rendering mode. This setting is ignored in other render modes or if
-   * allowZoomBlur is false. When zooming, cached images from other zoom levels may be used
-   * temporarily, resulting in brief blur artifacts. Increasing this value refines more tiles per
-   * frame, reducing blur more quickly but potentially impacting performance. The default is 5.
+   * Returns the maximum number of tiles rasterized per frame in tiled rendering mode. This
+   * setting is ignored in other render modes or if allowZoomBlur is false. Once the limit is
+   * reached, remaining tiles fall back to cached content from other zoom scales, or are filled
+   * with the background color when no fallback is available. Higher values fill the screen
+   * faster during zoom and pan at the cost of per-frame GPU load; lower values prioritize
+   * stable frame rate.
    */
   int maxTilesRefinedPerFrame() const {
     return _maxTilesRefinedPerFrame;
   }
 
   /**
-   * Sets the maximum number of tiles that can be refined (updated to the current zoom scale) per
-   * frame in tiled rendering mode.
+   * Sets the maximum number of tiles processed per frame in tiled rendering mode.
    */
   void setMaxTilesRefinedPerFrame(int count) {
     _maxTilesRefinedPerFrame = count;
@@ -321,8 +321,9 @@ class DisplayList {
 
   void recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks);
 
-  std::vector<DrawTask> collectScreenTasks(const Surface* surface,
-                                           std::vector<DrawTask>* tileTasks);
+  std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
+                                           std::vector<Rect>* skippedRects,
+                                           std::vector<DrawTask>* throttleScreenTasks);
 
   std::vector<std::pair<float, TileCache*>> getSortedTileCaches() const;
 
@@ -330,6 +331,9 @@ class DisplayList {
       const std::vector<std::pair<float, TileCache*>>& sortedCaches) const;
 
   std::vector<DrawTask> getFallbackDrawTasks(
+      int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const;
+
+  std::vector<DrawTask> getThrottleFallbackTasks(
       int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const;
 
   std::vector<std::shared_ptr<Tile>> getFreeTiles(
@@ -352,6 +356,9 @@ class DisplayList {
                                       int requiredHeight);
 
   void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear) const;
+
+  void drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTasks,
+                               std::vector<Rect> skippedRects, Surface* surface) const;
 
   void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
 

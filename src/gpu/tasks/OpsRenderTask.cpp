@@ -18,7 +18,6 @@
 
 #include "OpsRenderTask.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "gpu/resources/StencilTextureResource.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
@@ -33,14 +32,13 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
       renderTarget->sampleCount() > 1 ? renderTarget->getSampleTexture() : nullptr;
   RenderPassDescriptor descriptor(renderTarget->getRenderTexture(), loadOp, StoreAction::Store,
                                   clearColor.value_or(PMColor::Transparent()), resolveTexture);
-  // Attach a depth/stencil texture only when at least one op opts in. The texture is reused
-  // through StencilTextureResource's scratch cache; we keep the strong reference alive for the
-  // duration of the render pass so the cache cannot recycle it mid-execution.
-  std::shared_ptr<StencilTextureResource> stencilResource = nullptr;
+  // Attach a depth/stencil renderbuffer only when at least one op opts in. The renderbuffer is
+  // owned by the RenderTargetProxy itself, so successive render passes targeting the same RT
+  // share the same stencil without going through the scratch cache and without paying the cost
+  // of allocating a new renderbuffer per pass.
   for (auto& op : drawOps) {
     if (op != nullptr && op->needsStencil()) {
-      stencilResource = StencilTextureResource::FindOrCreate(
-          renderTarget->getContext(), renderTarget->width(), renderTarget->height());
+      auto stencilResource = renderTargetProxy->getStencil();
       if (stencilResource != nullptr) {
         descriptor.depthStencilAttachment.texture = stencilResource->getTexture();
         descriptor.depthStencilAttachment.loadAction = LoadAction::Clear;

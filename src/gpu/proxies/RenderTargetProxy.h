@@ -21,6 +21,7 @@
 #include "TextureProxy.h"
 #include "gpu/BackingFit.h"
 #include "gpu/resources/RenderTarget.h"
+#include "gpu/resources/StencilTextureResource.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
@@ -145,5 +146,18 @@ class RenderTargetProxy {
    * Y-axis for ImageOrigin::BottomLeft.
    */
   Matrix getOriginTransform() const;
+
+  /**
+   * Returns a depth/stencil renderbuffer matching this proxy's dimensions, lazily creating one on
+   * first access. The renderbuffer follows this proxy's lifetime, so successive render passes
+   * targeting the same RT reuse the same renderbuffer instead of going through the scratch cache.
+   * Returns nullptr if creation fails.
+   */
+  std::shared_ptr<StencilTextureResource> getStencil();
+
+ protected:
+  // Lazily populated by getStencil() and kept alive for this proxy's lifetime so that all render
+  // passes targeting this RT share the same stencil renderbuffer.
+  std::shared_ptr<StencilTextureResource> stencilResource = nullptr;
 };
 }  // namespace tgfx
