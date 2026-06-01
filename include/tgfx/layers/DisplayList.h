@@ -320,8 +320,7 @@ class DisplayList {
 
   std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
                                            std::vector<Rect>* skippedRects,
-                                           std::vector<DrawTask>* throttleScreenTasks,
-                                           bool autoClear);
+                                           std::vector<DrawTask>* throttleScreenTasks);
 
   std::vector<std::pair<float, TileCache*>> getSortedTileCaches() const;
 
@@ -352,7 +351,8 @@ class DisplayList {
   void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear) const;
 
   void drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTasks,
-                               std::vector<Rect> skippedRects, Surface* surface) const;
+                               std::vector<Rect> skippedRects, Surface* surface,
+                               bool autoClear) const;
 
   void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
 

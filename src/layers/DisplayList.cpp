@@ -442,8 +442,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   auto tileTasks = invalidateTileCaches(dirtyRegions);
   std::vector<Rect> skippedRects = {};
   std::vector<DrawTask> throttleScreenTasks = {};
-  auto screenTasks =
-      collectScreenTasks(surface, &tileTasks, &skippedRects, &throttleScreenTasks, autoClear);
+  auto screenTasks = collectScreenTasks(surface, &tileTasks, &skippedRects, &throttleScreenTasks);
   if (screenTasks.empty()) {
     recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
@@ -471,7 +470,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     }
   }
   drawScreenTasks(std::move(screenTasks), surface, autoClear);
-  drawThrottleScreenTasks(std::move(throttleScreenTasks), std::move(skippedRects), surface);
+  drawThrottleScreenTasks(std::move(throttleScreenTasks), std::move(skippedRects), surface,
+                          autoClear);
   return dirtyRects;
 }
 
@@ -582,8 +582,7 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
 std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks,
                                                       std::vector<Rect>* skippedRects,
-                                                      std::vector<DrawTask>* throttleScreenTasks,
-                                                      bool autoClear) {
+                                                      std::vector<DrawTask>* throttleScreenTasks) {
   auto maxBudget = _maxTilesRefinedPerFrame;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
     updateMousePosition();
@@ -647,12 +646,6 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
       if (!fallbackTasks.empty()) {
         screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
-        continue;
-      }
-      // Skip throttle fallback under autoClear=false: filling skippedRects with the background
-      // color or overlaying lower-quality tiles would destroy the caller's existing canvas
-      // pixels, breaking the additive rendering contract of autoClear=false.
-      if (!autoClear) {
         continue;
       }
       skippedRects->emplace_back(
@@ -1071,7 +1064,8 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
 }
 
 void DisplayList::drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTasks,
-                                          std::vector<Rect> skippedRects, Surface* surface) const {
+                                          std::vector<Rect> skippedRects, Surface* surface,
+                                          bool autoClear) const {
   if (throttleScreenTasks.empty() && skippedRects.empty()) {
     return;
   }
@@ -1080,10 +1074,9 @@ void DisplayList::drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTa
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
   Paint paint = {};
   paint.setAntiAlias(false);
-  // Force Src: nearer throttle tiles must fully overwrite farther ones in overlap regions to
-  // avoid cross-scale bleed-through, and the background fill must replace any stale pixels
-  // underneath so partially covered throttle tiles do not pick them up.
-  paint.setBlendMode(BlendMode::Src);
+  if (autoClear) {
+    paint.setBlendMode(BlendMode::Src);
+  }
   if (!skippedRects.empty()) {
     paint.setColor(_root->backgroundColor());
     for (auto& rect : skippedRects) {
