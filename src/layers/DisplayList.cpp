@@ -442,7 +442,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   auto tileTasks = invalidateTileCaches(dirtyRegions);
   std::vector<Rect> skippedRects = {};
   std::vector<DrawTask> throttleScreenTasks = {};
-  auto screenTasks = collectScreenTasks(surface, &tileTasks, &skippedRects, &throttleScreenTasks);
+  auto screenTasks =
+      collectScreenTasks(surface, &tileTasks, &skippedRects, &throttleScreenTasks, autoClear);
   if (screenTasks.empty()) {
     recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
@@ -582,7 +583,8 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
 std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks,
                                                       std::vector<Rect>* skippedRects,
-                                                      std::vector<DrawTask>* throttleScreenTasks) {
+                                                      std::vector<DrawTask>* throttleScreenTasks,
+                                                      bool autoClear) {
   auto maxBudget = _maxTilesRefinedPerFrame;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
     updateMousePosition();
@@ -650,6 +652,12 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       }
       skippedRects->emplace_back(
           Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize));
+      if (!autoClear) {
+        // Under autoClear=false, throttle fallback tiles are not drawn because SrcOver blending
+        // would let farther tiles bleed through near-tile alpha edges, producing cross-scale
+        // artifacts. Skip collection entirely to avoid wasted work.
+        continue;
+      }
       auto throttleFallback = getThrottleFallbackTasks(tileX, tileY, fallbackTileCaches);
       if (!throttleFallback.empty()) {
         throttleScreenTasks->insert(throttleScreenTasks->end(), throttleFallback.begin(),
@@ -1083,11 +1091,7 @@ void DisplayList::drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTa
       canvas->drawRect(rect, paint);
     }
   }
-  // Skip throttle fallback tiles under autoClear=false: SrcOver blending of overlapping
-  // cross-scale tiles would let farther tiles bleed through nearer tiles wherever the nearer
-  // atlas edges have alpha < 1, producing cross-scale artifacts. The Src path is only safe
-  // under autoClear=true.
-  if (!autoClear || throttleScreenTasks.empty()) {
+  if (throttleScreenTasks.empty()) {
     return;
   }
   paint.setColor(Color::White());
