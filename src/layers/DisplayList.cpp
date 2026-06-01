@@ -1080,9 +1080,9 @@ void DisplayList::drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTa
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
   Paint paint = {};
   paint.setAntiAlias(false);
-  // Force Src regardless of autoClear: nearer throttle tiles must fully overwrite farther ones in
-  // overlap regions to avoid cross-scale bleed-through, and the background fill must replace any
-  // stale pixels underneath so partially covered throttle tiles do not pick them up.
+  // Force Src: nearer throttle tiles must fully overwrite farther ones in overlap regions to
+  // avoid cross-scale bleed-through, and the background fill must replace any stale pixels
+  // underneath so partially covered throttle tiles do not pick them up.
   paint.setBlendMode(BlendMode::Src);
   if (!skippedRects.empty()) {
     paint.setColor(_root->backgroundColor());
