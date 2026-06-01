@@ -647,8 +647,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
         screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
         continue;
       }
-      auto skippedRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
-      skippedRects->push_back(skippedRect);
+      skippedRects->emplace_back(
+          Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize));
       auto throttleFallback = getThrottleFallbackTasks(tileX, tileY, fallbackTileCaches);
       if (!throttleFallback.empty()) {
         throttleScreenTasks->insert(throttleScreenTasks->end(), throttleFallback.begin(),
