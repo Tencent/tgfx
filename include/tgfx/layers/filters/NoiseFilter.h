@@ -130,7 +130,7 @@ class NoiseFilter : public LayerFilter {
  protected:
   NoiseFilter(float size, float density, float seed, BlendMode blendMode);
 
-  std::shared_ptr<Image> onFilterImage(Context* context, std::shared_ptr<Image> input, float scale,
+  std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
                                        const Rect& contentBounds, Point* offset) override;
 
   void onInvalidateFilter() override;

@@ -1090,9 +1090,8 @@ LayerContent* Layer::getContent() {
   return layerContent.get();
 }
 
-std::shared_ptr<Image> Layer::applyFilters(Context* context, std::shared_ptr<Image> image,
-                                           float contentScale, const Rect& contentBounds,
-                                           Point* offset) {
+std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float contentScale,
+                                           const Rect& contentBounds, Point* offset) {
   if (!image || _filters.empty()) {
     return image;
   }
@@ -1104,7 +1103,7 @@ std::shared_ptr<Image> Layer::applyFilters(Context* context, std::shared_ptr<Ima
   for (const auto& layerFilter : _filters) {
     DEBUG_ASSERT(layerFilter != nullptr);
     Point filterOffset = {};
-    image = layerFilter->filterImage(context, std::move(image), contentScale, currentContentBounds,
+    image = layerFilter->filterImage(std::move(image), contentScale, currentContentBounds,
                                      &filterOffset);
     if (!image) {
       return nullptr;
@@ -1432,8 +1431,7 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
     auto contentBounds = mapContentBoundsToImage(contentScale, pictureBounds);
     contentBounds.offset(-(contentBounds.left + pictureBounds.left),
                          -(contentBounds.top + pictureBounds.top));
-    image =
-        applyFilters(args.context, std::move(image), contentScale, contentBounds, &filterOffset);
+    image = applyFilters(std::move(image), contentScale, contentBounds, &filterOffset);
     offset += filterOffset;
   }
 

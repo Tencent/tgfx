@@ -25,7 +25,6 @@
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shader.h"
-#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 
@@ -137,9 +136,8 @@ std::shared_ptr<Shader> NoiseFilter::buildAtShift(float scale, const Point& shif
   return ShiftShader(cachedBaseShader, shift.x, shift.y);
 }
 
-std::shared_ptr<Image> NoiseFilter::onFilterImage(Context* context, std::shared_ptr<Image> input,
-                                                  float scale, const Rect& contentBounds,
-                                                  Point* offset) {
+std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
+                                                  const Rect& contentBounds, Point* offset) {
   if (input == nullptr) {
     return nullptr;
   }
@@ -176,12 +174,12 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(Context* context, std::shared_
   }
   auto result =
       FilterImage::MakeFrom(std::move(input), std::move(compositeFilter), offset, nullptr);
-  // Rasterize the filter result to a texture immediately so that chained noise filters do not
-  // accumulate deeply nested fragment processor trees that exceed GPU sampler limits.
-  if (context != nullptr && result != nullptr) {
-    auto textureImage = result->makeTextureImage(context);
-    if (textureImage != nullptr) {
-      return textureImage;
+  // Rasterize the filter result so that chained noise filters do not accumulate deeply nested
+  // fragment processor trees that exceed GPU sampler limits.
+  if (result != nullptr) {
+    auto rasterized = result->makeRasterized();
+    if (rasterized != nullptr) {
+      return rasterized;
     }
   }
   return result;

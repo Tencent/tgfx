@@ -91,7 +91,7 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
     return result;
   }
   Point filterOffset = {};
-  result.image = layer->applyFilters(args.context, std::move(result.image), density.getMaxScale(),
+  result.image = layer->applyFilters(std::move(result.image), density.getMaxScale(),
                                      inputContentBounds, &filterOffset);
   if (result.image == nullptr) {
     return {};

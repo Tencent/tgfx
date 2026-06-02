@@ -20,13 +20,12 @@
 
 namespace tgfx {
 
-std::shared_ptr<Image> LayerFilter::filterImage(Context* context, std::shared_ptr<Image> input,
-                                                float scale, const Rect& contentBounds,
-                                                Point* offset) {
+std::shared_ptr<Image> LayerFilter::filterImage(std::shared_ptr<Image> input, float scale,
+                                                const Rect& contentBounds, Point* offset) {
   if (!input) {
     return nullptr;
   }
-  return onFilterImage(context, std::move(input), scale, contentBounds, offset);
+  return onFilterImage(std::move(input), scale, contentBounds, offset);
 }
 
 Rect LayerFilter::filterBounds(const Rect& srcRect, float, MapDirection) {
