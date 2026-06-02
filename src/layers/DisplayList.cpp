@@ -444,7 +444,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   std::vector<DrawTask> throttleScreenTasks = {};
   auto screenTasks =
       collectScreenTasks(surface, &tileTasks, &skippedRects, &throttleScreenTasks, autoClear);
-  if (screenTasks.empty()) {
+  // Throttle tasks and skipped rects must keep the tiled path; only fall back when all are empty.
+  if (screenTasks.empty() && throttleScreenTasks.empty() && skippedRects.empty()) {
     recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
   }
@@ -470,9 +471,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       dirtyRects.emplace_back(dirtyRect);
     }
   }
-  drawScreenTasks(std::move(screenTasks), skippedRects, surface, autoClear);
-  drawThrottleScreenTasks(std::move(throttleScreenTasks), std::move(skippedRects), surface,
-                          autoClear);
+  drawScreenTasks(std::move(screenTasks), std::move(skippedRects), surface, autoClear);
+  drawThrottleScreenTasks(std::move(throttleScreenTasks), surface, autoClear);
   return dirtyRects;
 }
 
@@ -1025,9 +1025,8 @@ void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
   drawRootLayer(surface, clipRect, viewMatrix, true, snapshots);
 }
 
-void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks,
-                                  const std::vector<Rect>& skippedRects, Surface* surface,
-                                  bool autoClear) const {
+void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
+                                  Surface* surface, bool autoClear) const {
   // Sort tasks by surface index to ensure they are drawn in batches.
   std::sort(screenTasks.begin(), screenTasks.end(),
             [](const DrawTask& a, const DrawTask& b) { return a.sourceIndex() < b.sourceIndex(); });
@@ -1051,15 +1050,16 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks,
                           SrcRectConstraint::Strict);
     tileRect.join(task.tileRect());
   }
-  // skippedRects belong to the same tile grid as screenTasks and are filled with the background
-  // color by drawThrottleScreenTasks. Include them here so the screen-edge fallback below does
-  // not paint them twice.
-  for (auto& rect : skippedRects) {
-    tileRect.join(rect);
-  }
 
   auto screenRect = Rect::MakeWH(surface->width(), surface->height());
   screenRect.offset(-_contentOffset.x, -_contentOffset.y);
+
+  paint.setColor(_root->backgroundColor());
+  for (auto& rect : skippedRects) {
+    canvas->drawRect(rect, paint);
+    tileRect.join(rect);
+  }
+
   if (tileRect.contains(screenRect)) {
     return;
   }
@@ -1071,7 +1071,6 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks,
   // Clip to render bounds because fallback tiles may extend beyond content due to roundOut.
   tileRect.intersect(renderBounds);
 
-  paint.setColor(_root->backgroundColor());
   auto backgroundRect = GetNonIntersectingRects(screenRect, tileRect);
   for (auto& rect : backgroundRect) {
     canvas->drawRect(rect, paint);
@@ -1079,9 +1078,8 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks,
 }
 
 void DisplayList::drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTasks,
-                                          std::vector<Rect> skippedRects, Surface* surface,
-                                          bool autoClear) const {
-  if (throttleScreenTasks.empty() && skippedRects.empty()) {
+                                          Surface* surface, bool autoClear) const {
+  if (throttleScreenTasks.empty()) {
     return;
   }
   auto canvas = surface->getCanvas();
@@ -1089,21 +1087,7 @@ void DisplayList::drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTa
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
   Paint paint = {};
   paint.setAntiAlias(false);
-  if (!skippedRects.empty()) {
-    // skippedRects represent areas intentionally left blank due to throttling. They must
-    // overwrite stale pixels from the previous frame regardless of autoClear, otherwise
-    // residual content would remain visible when the background color is transparent.
-    paint.setBlendMode(BlendMode::Src);
-    paint.setColor(_root->backgroundColor());
-    for (auto& rect : skippedRects) {
-      canvas->drawRect(rect, paint);
-    }
-  }
-  if (throttleScreenTasks.empty()) {
-    return;
-  }
   paint.setBlendMode(autoClear ? BlendMode::Src : BlendMode::SrcOver);
-  paint.setColor(Color::White());
   static SamplingOptions linearSampling(FilterMode::Linear, MipmapMode::None);
   for (auto& task : throttleScreenTasks) {
     auto surfaceCache = surfaceCaches[task.sourceIndex()];

@@ -349,11 +349,10 @@ class DisplayList {
 
   void drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots) const;
 
-  void drawScreenTasks(std::vector<DrawTask> screenTasks, const std::vector<Rect>& skippedRects,
+  void drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
                        Surface* surface, bool autoClear) const;
 
-  void drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTasks,
-                               std::vector<Rect> skippedRects, Surface* surface,
+  void drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTasks, Surface* surface,
                                bool autoClear) const;
 
   void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
