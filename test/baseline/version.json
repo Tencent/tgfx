@@ -28,6 +28,7 @@
     },
     "CanvasTest": {
         "AARRectOp": "f377f9d5d",
+        "AARRectOpZeroInnerRadius": "7ad889d5",
         "BlendFormula": "543054b5",
         "CMYKWithoutICCProfile": "29dde9e0",
         "ClipAntiAlias": "c37a86c8",
