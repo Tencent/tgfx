@@ -767,4 +767,38 @@ TGFX_TEST(LayerFilterTest, WithBlurAndShadow) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/WithBlurAndShadow"));
 }
 
+TGFX_TEST(LayerFilterTest, ChainedMonoNoise) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto rectWidth = 150.0f;
+  auto rectHeight = 100.0f;
+  auto padding = 50.0f;
+  auto surfaceWidth = static_cast<int>(rectWidth + padding * 2);
+  auto surfaceHeight = static_cast<int>(rectHeight + padding * 2);
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(rectWidth, rectHeight));
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::White()));
+  layer->setMatrix(Matrix::MakeTrans(padding, padding));
+
+  std::vector<std::shared_ptr<LayerFilter>> filters;
+  for (int i = 0; i < 10; ++i) {
+    float density = 0.1f + static_cast<float>(i) * 0.09f;
+    filters.push_back(NoiseFilter::MakeMono(5.0f, density, Color::FromRGBA(128, 64, 32, 100),
+                                            static_cast<float>(i * 7), BlendMode::SrcOver));
+  }
+  layer->setFilters(filters);
+
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerFilterTest/ChainedMonoNoise"));
+}
+
 }  // namespace tgfx

@@ -172,7 +172,17 @@ std::shared_ptr<Image> NoiseFilter::onFilterImage(std::shared_ptr<Image> input, 
   if (compositeFilter == nullptr) {
     return input;
   }
-  return FilterImage::MakeFrom(std::move(input), std::move(compositeFilter), offset, nullptr);
+  auto result =
+      FilterImage::MakeFrom(std::move(input), std::move(compositeFilter), offset, nullptr);
+  // Rasterize the filter result so that chained noise filters do not accumulate deeply nested
+  // fragment processor trees that exceed GPU sampler limits.
+  if (result != nullptr) {
+    auto rasterized = result->makeRasterized();
+    if (rasterized != nullptr) {
+      return rasterized;
+    }
+  }
+  return result;
 }
 
 // --- MonoNoiseFilter ---
