@@ -21,8 +21,8 @@
 
 namespace tgfx {
 
-std::shared_ptr<Image> LayerImageFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
-                                                       const Rect&, Point* offset) {
+std::shared_ptr<Image> LayerImageFilter::onFilterImage(Context*, std::shared_ptr<Image> input,
+                                                       float scale, const Rect&, Point* offset) {
   auto filter = getImageFilter(scale);
   if (!filter) {
     return input;

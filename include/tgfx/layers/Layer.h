@@ -626,8 +626,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   Rect mapOutputBoundsToInput(const Rect& srcRect, float contentScale);
 
-  std::shared_ptr<Image> applyFilters(std::shared_ptr<Image> image, float contentScale,
-                                      const Rect& contentBounds, Point* offset);
+  std::shared_ptr<Image> applyFilters(Context* context, std::shared_ptr<Image> image,
+                                      float contentScale, const Rect& contentBounds, Point* offset);
 
   virtual bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 

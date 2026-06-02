@@ -23,6 +23,7 @@
 #include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
+class Context;
 class Image;
 
 /**
@@ -47,7 +48,7 @@ class LayerFilter : public LayerProperty {
    * the input image origin.
    * @return The filtered image, or nullptr on failure.
    */
-  std::shared_ptr<Image> filterImage(std::shared_ptr<Image> input, float scale,
+  std::shared_ptr<Image> filterImage(Context* context, std::shared_ptr<Image> input, float scale,
                                      const Rect& contentBounds, Point* offset = nullptr);
 
   /**
@@ -83,8 +84,9 @@ class LayerFilter : public LayerProperty {
    * Subclasses must override this method to produce the filtered image. See filterImage() for
    * parameter semantics.
    */
-  virtual std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
-                                               const Rect& contentBounds, Point* offset) = 0;
+  virtual std::shared_ptr<Image> onFilterImage(Context* context, std::shared_ptr<Image> input,
+                                               float scale, const Rect& contentBounds,
+                                               Point* offset) = 0;
 
   /**
    * Marks this filter as dirty and drops any cached state.
