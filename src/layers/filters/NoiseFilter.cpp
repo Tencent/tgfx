@@ -22,10 +22,10 @@
 #include "core/utils/Log.h"
 #include "layers/NoiseDensityUtils.h"
 #include "tgfx/core/ColorFilter.h"
-#include "tgfx/gpu/Context.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 
