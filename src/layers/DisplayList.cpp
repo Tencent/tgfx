@@ -470,7 +470,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       dirtyRects.emplace_back(dirtyRect);
     }
   }
-  drawScreenTasks(std::move(screenTasks), surface, autoClear);
+  drawScreenTasks(std::move(screenTasks), skippedRects, surface, autoClear);
   drawThrottleScreenTasks(std::move(throttleScreenTasks), std::move(skippedRects), surface,
                           autoClear);
   return dirtyRects;
@@ -1025,7 +1025,8 @@ void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
   drawRootLayer(surface, clipRect, viewMatrix, true, snapshots);
 }
 
-void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface,
+void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks,
+                                  const std::vector<Rect>& skippedRects, Surface* surface,
                                   bool autoClear) const {
   // Sort tasks by surface index to ensure they are drawn in batches.
   std::sort(screenTasks.begin(), screenTasks.end(),
@@ -1049,6 +1050,12 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
     canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
                           SrcRectConstraint::Strict);
     tileRect.join(task.tileRect());
+  }
+  // skippedRects belong to the same tile grid as screenTasks and are filled with the background
+  // color by drawThrottleScreenTasks. Include them here so the screen-edge fallback below does
+  // not paint them twice.
+  for (auto& rect : skippedRects) {
+    tileRect.join(rect);
   }
 
   auto screenRect = Rect::MakeWH(surface->width(), surface->height());
@@ -1082,10 +1089,11 @@ void DisplayList::drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTa
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
   Paint paint = {};
   paint.setAntiAlias(false);
-  if (autoClear) {
-    paint.setBlendMode(BlendMode::Src);
-  }
   if (!skippedRects.empty()) {
+    // skippedRects represent areas intentionally left blank due to throttling. They must
+    // overwrite stale pixels from the previous frame regardless of autoClear, otherwise
+    // residual content would remain visible when the background color is transparent.
+    paint.setBlendMode(BlendMode::Src);
     paint.setColor(_root->backgroundColor());
     for (auto& rect : skippedRects) {
       canvas->drawRect(rect, paint);
@@ -1094,6 +1102,7 @@ void DisplayList::drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTa
   if (throttleScreenTasks.empty()) {
     return;
   }
+  paint.setBlendMode(autoClear ? BlendMode::Src : BlendMode::SrcOver);
   paint.setColor(Color::White());
   static SamplingOptions linearSampling(FilterMode::Linear, MipmapMode::None);
   for (auto& task : throttleScreenTasks) {
