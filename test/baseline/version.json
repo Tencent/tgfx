@@ -553,6 +553,7 @@
         "ZoomUpTinyStrokeShape": "cd6a8dff"
     },
     "SurfaceRenderTest": {
+        "ClipPathOrigin": "fdf3a44b",
         "EmptyLocalBounds": "bf48e614",
         "ImageSnapshot1": "bf48e614",
         "ImageSnapshot2": "bf48e614",
