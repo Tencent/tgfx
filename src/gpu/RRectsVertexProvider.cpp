@@ -248,7 +248,7 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
       if (stroke) {
         innerXRadius = xRadius - strokeParams.halfStrokeX;
         innerYRadius = yRadius - strokeParams.halfStrokeY;
-        stroked = innerXRadius > 0.0f && innerYRadius > 0.0f;
+        stroked = innerXRadius >= 0.0f && innerYRadius >= 0.0f;
         xRadius += strokeParams.halfStrokeX;
         yRadius += strokeParams.halfStrokeY;
         rectBounds.outset(strokeParams.halfStrokeX, strokeParams.halfStrokeY);
