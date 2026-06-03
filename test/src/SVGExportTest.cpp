@@ -1297,7 +1297,7 @@ TGFX_TEST(SVGExportTest, MonoNoiseFilterExport) {
   rect.addRect(Rect::MakeXYWH(50, 50, 100, 100));
   layer->setPath(rect);
   layer->setFillStyle(ShapeStyle::Make(Color::Red()));
-  auto noiseFilter = NoiseFilter::MakeMono(50.f, 0.5f, Color::Black(), 42.f, BlendMode::SrcOver);
+  auto noiseFilter = NoiseFilter::MakeMono(10.f, 0.5f, Color::Black(), 42.f, BlendMode::SrcOver);
   layer->setFilters({noiseFilter});
   displayList->root()->addChild(layer);
   displayList->root()->draw(canvas);
