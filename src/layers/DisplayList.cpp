@@ -1220,6 +1220,11 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     return nullptr;
   }
   auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
+  // Draw backgroundColor before the layer tree so that the capture pass includes it as part of
+  // the background for blur/backdrop effects.
+  if (_backgroundColor != Color::Transparent()) {
+    bgSource->getCanvas()->drawColor(_backgroundColor, BlendMode::SrcOver);
+  }
   BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get(), worldRects);
   return snapshotMap;
 }
