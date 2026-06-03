@@ -32,6 +32,7 @@
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/TextContent.h"
 #include "tgfx/core/Mesh.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/layers/DisplayList.h"
@@ -3363,6 +3364,63 @@ TGFX_TEST(LayerTest, BackgroundBlurWithFilter) {
   displayList.setRenderMode(RenderMode::Partial);
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurWithFilter_Partial"));
+}
+
+TGFX_TEST(LayerTest, BackgroundColor) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto bgColor = Color::FromRGBA(200, 50, 50);
+  const int surfaceWidth = 100;
+  const int surfaceHeight = 80;
+
+  // Test 1: DisplayList::render() should paint backgroundColor
+  {
+    auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+    ASSERT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setBackgroundColor(bgColor);
+    displayList->render(surface.get());
+    context->flushAndSubmit();
+
+    Bitmap bitmap(surfaceWidth, surfaceHeight);
+    Pixmap pixmap(bitmap);
+    auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
+    EXPECT_TRUE(result);
+    auto pixels = static_cast<const uint8_t*>(pixmap.pixels());
+    // Center pixel should have the background color (R=200, G=50, B=50)
+    // Note: macOS uses BGRA byte order in pixel buffers
+    auto centerPixel = (surfaceHeight / 2) * surfaceWidth + (surfaceWidth / 2);
+    EXPECT_NEAR(pixels[centerPixel * 4 + 2], 200, 2);   // R (BGRA layout)
+    EXPECT_NEAR(pixels[centerPixel * 4 + 1], 50, 2);     // G
+    EXPECT_NEAR(pixels[centerPixel * 4], 50, 2);         // B
+    EXPECT_GT(pixels[centerPixel * 4 + 3], 0);           // A > 0
+  }
+
+  // Test 2: Layer::draw() on root layer should NOT paint backgroundColor
+  {
+    auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+    ASSERT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setBackgroundColor(bgColor);
+    // Draw via Layer::draw() directly on root layer — backgroundColor must not appear
+    displayList->root()->draw(surface->getCanvas());
+    context->flushAndSubmit();
+
+    Bitmap bitmap(surfaceWidth, surfaceHeight);
+    Pixmap pixmap(bitmap);
+    auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
+    EXPECT_TRUE(result);
+    auto pixels = static_cast<const uint8_t*>(pixmap.pixels());
+    // Center pixel must NOT be the background color — it should be transparent/zero since
+    // there are no child layers and RootLayer no longer draws backgroundColor.
+    auto centerPixel = (surfaceHeight / 2) * surfaceWidth + (surfaceWidth / 2);
+    EXPECT_EQ(pixels[centerPixel * 4], 0);      // R = 0 (transparent)
+    EXPECT_EQ(pixels[centerPixel * 4 + 1], 0);  // G = 0
+    EXPECT_EQ(pixels[centerPixel * 4 + 2], 0);  // B = 0
+    EXPECT_EQ(pixels[centerPixel * 4 + 3], 0);  // A = 0
+  }
 }
 
 }  // namespace tgfx
