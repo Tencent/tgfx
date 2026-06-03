@@ -489,8 +489,10 @@
     },
     "SVGExportTest": {
         "AssignColorSpace": "0d4409dd",
+        "BlendFilterExport": "4c9e2d74",
         "ClipShortCircuitWithStaleGroup": "28f84e48",
         "ClipWithMatrixTransform": "082ec7b6b",
+        "ColorMatrixFilterExport": "4c9e2d74",
         "DrawImageRect": "f8344be7",
         "DstAssignColorSpace": "0d4409dd",
         "DstColorSpace": "0d4409dd",
@@ -498,6 +500,7 @@
         "InvertPictureImageMask": "9a80633b",
         "LayerDropShadow": "743efde6",
         "LayerMaskBlur": "9a253385",
+        "MonoNoiseFilterExport": "4c9e2d74",
         "PictureImageMask": "9a80633b",
         "PictureImageWithAlpha": "743efde6",
         "PictureImageWithAlphaAndClip": "a7a1cbb4",
