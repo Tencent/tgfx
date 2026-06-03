@@ -149,4 +149,56 @@ TGFX_TEST(SurfaceRenderTest, OutOfRenderTarget) {
   EXPECT_TRUE(Baseline::Compare(surface, "SurfaceRenderTest/OutOfRenderTarget"));
 }
 
+TGFX_TEST(SurfaceRenderTest, ClipPathOrigin) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto width = 200;
+  auto height = 300;
+
+  Path trianglePath;
+  trianglePath.moveTo(100, 50);
+  trianglePath.lineTo(150, 120);
+  trianglePath.lineTo(50, 120);
+  trianglePath.close();
+
+  Paint paint;
+  paint.setColor(Color::Red());
+
+  auto topLeftSurface = Surface::Make(context, width, height);
+  ASSERT_TRUE(topLeftSurface != nullptr);
+  auto canvas = topLeftSurface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->save();
+  canvas->clipPath(trianglePath);
+  canvas->drawRect(Rect::MakeWH(width, height), paint);
+  canvas->restore();
+  EXPECT_TRUE(Baseline::Compare(topLeftSurface, "SurfaceRenderTest/ClipPath_TopLeft"));
+
+  auto texture = context->gpu()->createTexture({width, height, PixelFormat::RGBA_8888});
+  ASSERT_TRUE(texture != nullptr);
+  auto bottomLeftSurface =
+      Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
+  ASSERT_TRUE(bottomLeftSurface != nullptr);
+  canvas = bottomLeftSurface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->save();
+  canvas->clipPath(trianglePath);
+  canvas->drawRect(Rect::MakeWH(width, height), paint);
+  canvas->restore();
+  EXPECT_TRUE(Baseline::Compare(bottomLeftSurface, "SurfaceRenderTest/ClipPath_BottomLeft"));
+
+  auto colorSpace = topLeftSurface->colorSpace();
+  auto info =
+      ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied, 0, colorSpace);
+  Buffer topLeftBuffer(info.byteSize());
+  Buffer bottomLeftBuffer(info.byteSize());
+  ASSERT_TRUE(topLeftSurface->readPixels(info, topLeftBuffer.data()));
+  ASSERT_TRUE(bottomLeftSurface->readPixels(info, bottomLeftBuffer.data()));
+  bool pixelsMatch = memcmp(topLeftBuffer.data(), bottomLeftBuffer.data(), info.byteSize()) == 0;
+  EXPECT_TRUE(pixelsMatch)
+      << "ClipPath rendering differs between TopLeft and BottomLeft origin surfaces. "
+         "The clip mask may be vertically flipped on BottomLeft surfaces.";
+}
+
 }  // namespace tgfx
