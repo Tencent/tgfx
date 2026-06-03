@@ -173,7 +173,7 @@ TGFX_TEST(SurfaceRenderTest, ClipPathOrigin) {
   canvas->clipPath(trianglePath);
   canvas->drawRect(Rect::MakeWH(width, height), paint);
   canvas->restore();
-  EXPECT_TRUE(Baseline::Compare(topLeftSurface, "SurfaceRenderTest/ClipPath_TopLeft"));
+  EXPECT_TRUE(Baseline::Compare(topLeftSurface, "SurfaceRenderTest/ClipPathOrigin"));
 
   auto texture = context->gpu()->createTexture({width, height, PixelFormat::RGBA_8888});
   ASSERT_TRUE(texture != nullptr);
@@ -186,19 +186,7 @@ TGFX_TEST(SurfaceRenderTest, ClipPathOrigin) {
   canvas->clipPath(trianglePath);
   canvas->drawRect(Rect::MakeWH(width, height), paint);
   canvas->restore();
-  EXPECT_TRUE(Baseline::Compare(bottomLeftSurface, "SurfaceRenderTest/ClipPath_BottomLeft"));
-
-  auto colorSpace = topLeftSurface->colorSpace();
-  auto info =
-      ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied, 0, colorSpace);
-  Buffer topLeftBuffer(info.byteSize());
-  Buffer bottomLeftBuffer(info.byteSize());
-  ASSERT_TRUE(topLeftSurface->readPixels(info, topLeftBuffer.data()));
-  ASSERT_TRUE(bottomLeftSurface->readPixels(info, bottomLeftBuffer.data()));
-  bool pixelsMatch = memcmp(topLeftBuffer.data(), bottomLeftBuffer.data(), info.byteSize()) == 0;
-  EXPECT_TRUE(pixelsMatch)
-      << "ClipPath rendering differs between TopLeft and BottomLeft origin surfaces. "
-         "The clip mask may be vertically flipped on BottomLeft surfaces.";
+  EXPECT_TRUE(Baseline::Compare(bottomLeftSurface, "SurfaceRenderTest/ClipPathOrigin"));
 }
 
 }  // namespace tgfx
