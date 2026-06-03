@@ -42,6 +42,12 @@ class EGLHardwareTexture : public GLTexture {
  private:
   HardwareBufferRef hardwareBuffer = nullptr;
   EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
+#if defined(__OHOS__)
+  // OH_NativeWindow_CreateNativeWindowBufferFromNativeBuffer allocates a wrapper that must be
+  // paired with OH_NativeWindow_DestroyNativeWindowBuffer; otherwise the underlying
+  // OH_NativeBuffer reference is leaked. Stored as void* to avoid pulling OHOS headers here.
+  void* nativeWindowBuffer = nullptr;
+#endif
 
   EGLHardwareTexture(const TextureDescriptor& descriptor, HardwareBufferRef hardwareBuffer,
                      EGLImageKHR eglImage, unsigned target, unsigned textureID);

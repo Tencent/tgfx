@@ -101,6 +101,9 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
   EGLImageKHR eglImage = eglext::eglCreateImageKHR(
       display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_TARGET, clientBuffer, attributes);
   if (eglImage == EGL_NO_IMAGE_KHR) {
+#if defined(__OHOS__)
+    OH_NativeWindow_DestroyNativeWindowBuffer(static_cast<OHNativeWindowBuffer*>(clientBuffer));
+#endif
     return nullptr;
   }
 
@@ -108,11 +111,19 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
   glGenTextures(1, &textureID);
   if (textureID == 0) {
     eglext::eglDestroyImageKHR(display, eglImage);
+#if defined(__OHOS__)
+    OH_NativeWindow_DestroyNativeWindowBuffer(static_cast<OHNativeWindowBuffer*>(clientBuffer));
+#endif
     return nullptr;
   }
   TextureDescriptor descriptor = {info.width, info.height, format, false, 1, usage};
   auto texture = gpu->makeResource<EGLHardwareTexture>(descriptor, hardwareBuffer, eglImage, target,
                                                        textureID);
+#if defined(__OHOS__)
+  // Hand wrapper ownership to the texture; it will be destroyed in onReleaseTexture together with
+  // the EGLImage, ensuring the underlying OH_NativeBuffer reference is released.
+  texture->nativeWindowBuffer = clientBuffer;
+#endif
   auto state = gpu->state();
   state->bindTexture(texture.get());
   eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
@@ -137,6 +148,13 @@ void EGLHardwareTexture::onReleaseTexture(GLGPU* gpu) {
   GLTexture::onReleaseTexture(gpu);
   auto display = static_cast<EGLGPU*>(gpu)->getDisplay();
   eglext::eglDestroyImageKHR(display, eglImage);
+#if defined(__OHOS__)
+  if (nativeWindowBuffer != nullptr) {
+    OH_NativeWindow_DestroyNativeWindowBuffer(
+        static_cast<OHNativeWindowBuffer*>(nativeWindowBuffer));
+    nativeWindowBuffer = nullptr;
+  }
+#endif
 }
 }  // namespace tgfx
 
