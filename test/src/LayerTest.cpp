@@ -3389,14 +3389,11 @@ TGFX_TEST(LayerTest, BackgroundColor) {
     Pixmap pixmap(bitmap);
     auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
     EXPECT_TRUE(result);
-    auto pixels = static_cast<const uint8_t*>(pixmap.pixels());
-    // Center pixel should have the background color (R=200, G=50, B=50)
-    // Note: macOS uses BGRA byte order in pixel buffers
-    auto centerPixel = (surfaceHeight / 2) * surfaceWidth + (surfaceWidth / 2);
-    EXPECT_NEAR(pixels[centerPixel * 4 + 2], 200, 2);  // R (BGRA layout)
-    EXPECT_NEAR(pixels[centerPixel * 4 + 1], 50, 2);   // G
-    EXPECT_NEAR(pixels[centerPixel * 4], 50, 2);       // B
-    EXPECT_GT(pixels[centerPixel * 4 + 3], 0);         // A > 0
+    auto color = pixmap.getColor(surfaceWidth / 2, surfaceHeight / 2);
+    EXPECT_NEAR(color.red * 255, 200, 2);
+    EXPECT_NEAR(color.green * 255, 50, 2);
+    EXPECT_NEAR(color.blue * 255, 50, 2);
+    EXPECT_GT(color.alpha, 0);
   }
 
   // Test 2: Layer::draw() on root layer should NOT paint backgroundColor
@@ -3414,14 +3411,11 @@ TGFX_TEST(LayerTest, BackgroundColor) {
     Pixmap pixmap(bitmap);
     auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
     EXPECT_TRUE(result);
-    auto pixels = static_cast<const uint8_t*>(pixmap.pixels());
-    // Center pixel must NOT be the background color — it should be transparent/zero since
-    // there are no child layers and RootLayer no longer draws backgroundColor.
-    auto centerPixel = (surfaceHeight / 2) * surfaceWidth + (surfaceWidth / 2);
-    EXPECT_EQ(pixels[centerPixel * 4], 0);      // R = 0 (transparent)
-    EXPECT_EQ(pixels[centerPixel * 4 + 1], 0);  // G = 0
-    EXPECT_EQ(pixels[centerPixel * 4 + 2], 0);  // B = 0
-    EXPECT_EQ(pixels[centerPixel * 4 + 3], 0);  // A = 0
+    auto color = pixmap.getColor(surfaceWidth / 2, surfaceHeight / 2);
+    EXPECT_EQ(color.red, 0);
+    EXPECT_EQ(color.green, 0);
+    EXPECT_EQ(color.blue, 0);
+    EXPECT_EQ(color.alpha, 0);
   }
 }
 
