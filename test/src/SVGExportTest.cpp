@@ -1254,11 +1254,7 @@ TGFX_TEST(SVGExportTest, BlendFilterExport) {
   displayList->root()->draw(canvas);
 
   exporter->close();
-  auto data = SVGStream->readData();
-  std::string svgContent(static_cast<const char*>(data->data()), data->size());
-  EXPECT_TRUE(svgContent.find("feFlood") != std::string::npos);
-  EXPECT_TRUE(svgContent.find("feBlend") != std::string::npos);
-  EXPECT_TRUE(svgContent.find("feComposite") != std::string::npos);
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BlendFilterExport"));
 }
 
 TGFX_TEST(SVGExportTest, ColorMatrixFilterExport) {
@@ -1283,10 +1279,7 @@ TGFX_TEST(SVGExportTest, ColorMatrixFilterExport) {
   displayList->root()->draw(canvas);
 
   exporter->close();
-  auto data = SVGStream->readData();
-  std::string svgContent(static_cast<const char*>(data->data()), data->size());
-  EXPECT_TRUE(svgContent.find("feColorMatrix") != std::string::npos);
-  EXPECT_TRUE(svgContent.find("type=\"matrix\"") != std::string::npos);
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/ColorMatrixFilterExport"));
 }
 
 TGFX_TEST(SVGExportTest, MonoNoiseFilterExport) {
@@ -1310,11 +1303,7 @@ TGFX_TEST(SVGExportTest, MonoNoiseFilterExport) {
   displayList->root()->draw(canvas);
 
   exporter->close();
-  auto data = SVGStream->readData();
-  std::string svgContent(static_cast<const char*>(data->data()), data->size());
-  EXPECT_TRUE(svgContent.find("feTurbulence") != std::string::npos);
-  EXPECT_TRUE(svgContent.find("feComponentTransfer") != std::string::npos);
-  EXPECT_TRUE(svgContent.find("feComposite") != std::string::npos);
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/MonoNoiseFilterExport"));
 }
 
 }  // namespace tgfx

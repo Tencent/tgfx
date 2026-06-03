@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <tuple>
 #include "ResourceStore.h"
 #include "core/filters/BlendImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
@@ -155,6 +156,10 @@ class ElementWriter {
                                    std::string* retString);
 
   void generateWriteColorSpaceString();
+
+  static std::tuple<std::string, std::string, std::string> toSVGCompositeOp(BlendMode mode,
+                                                                            const std::string& src,
+                                                                            const std::string& dst);
 
   XMLWriter* writer = nullptr;
   ResourceStore* resourceStore = nullptr;

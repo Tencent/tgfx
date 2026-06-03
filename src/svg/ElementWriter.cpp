@@ -845,6 +845,34 @@ std::string ElementWriter::nextResultName() {
   return "r" + std::to_string(resultCounter++);
 }
 
+std::tuple<std::string, std::string, std::string> ElementWriter::toSVGCompositeOp(
+    BlendMode mode, const std::string& src, const std::string& dst) {
+  // Maps Porter-Duff blend modes to SVG feComposite operators.
+  // Returns {in, in2, operator}. Empty operator means unsupported.
+  switch (mode) {
+    case BlendMode::SrcOver:
+      return {src, dst, "over"};
+    case BlendMode::SrcIn:
+      return {src, dst, "in"};
+    case BlendMode::SrcOut:
+      return {src, dst, "out"};
+    case BlendMode::DstOver:
+      return {dst, src, "over"};
+    case BlendMode::DstIn:
+      return {dst, src, "in"};
+    case BlendMode::DstOut:
+      return {dst, src, "out"};
+    case BlendMode::SrcATop:
+      return {src, dst, "atop"};
+    case BlendMode::DstATop:
+      return {dst, src, "atop"};
+    case BlendMode::Xor:
+      return {src, dst, "xor"};
+    default:
+      return {"", "", ""};
+  }
+}
+
 std::string ElementWriter::addColorFilterAsPrimitive(const ColorFilter* colorFilter,
                                                      const std::string& inputRef) {
   auto cfType = Types::Get(colorFilter);
@@ -970,10 +998,16 @@ std::string ElementWriter::addShaderAsFilterPrimitives(const Shader* shader) {
         blendElement.addAttribute("mode", svgBlend);
         blendElement.addAttribute("result", resultName);
       } else {
+        auto [compositeIn, compositeIn2, compositeOp] =
+            toSVGCompositeOp(blendShader->mode, srcResult, dstResult);
+        if (compositeOp.empty()) {
+          reportUnsupportedElement("Unsupported blend mode in shader serialization");
+          return dstResult;
+        }
         ElementWriter compositeElement("feComposite", writer);
-        compositeElement.addAttribute("in", srcResult);
-        compositeElement.addAttribute("in2", dstResult);
-        compositeElement.addAttribute("operator", "over");
+        compositeElement.addAttribute("in", compositeIn);
+        compositeElement.addAttribute("in2", compositeIn2);
+        compositeElement.addAttribute("operator", compositeOp);
         compositeElement.addAttribute("result", resultName);
       }
       return resultName;
@@ -1025,10 +1059,16 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter) {
     blendElement.addAttribute("in2", "SourceGraphic");
     blendElement.addAttribute("mode", svgBlend);
   } else {
+    auto [compositeIn, compositeIn2, compositeOp] =
+        toSVGCompositeOp(filter->blendMode, shaderResult, "SourceGraphic");
+    if (compositeOp.empty()) {
+      reportUnsupportedElement("Unsupported blend mode in BlendImageFilter");
+      return;
+    }
     ElementWriter compositeElement("feComposite", writer);
-    compositeElement.addAttribute("in", shaderResult);
-    compositeElement.addAttribute("in2", "SourceGraphic");
-    compositeElement.addAttribute("operator", "in");
+    compositeElement.addAttribute("in", compositeIn);
+    compositeElement.addAttribute("in2", compositeIn2);
+    compositeElement.addAttribute("operator", compositeOp);
   }
 }
 
